@@ -126,6 +126,7 @@ assert.match(databaseRunner, /SUPABASE_TEST_BRANCH_NAME[\s\S]+SUPABASE_TEST_PARE
 assert.match(databaseRunner, /new Client\([\s\S]+connectionString: databaseUrl[\s\S]+options: `-c vaeroex\.test_database_url_b64=/, "the hosted runner must pass the credential through an ephemeral database session setting");
 assert.match(databaseRunner, /Array\.isArray\(queryResult\)[\s\S]+assertionCount/, "the direct runner must verify every pgTAP result rather than trusting query completion alone");
 assert.match(databaseRunner, /isLocalDatabase[\s\S]+localDblinkConnection\(testUrl\)[\s\S]+: databaseUrl/, "the database runner must use an internal socket connection locally and the remote connection for a hosted branch");
+assert.match(databaseRunner, /host='127\.0\.0\.1'[\s\S]+port='5432'[\s\S]+sslmode='disable'/, "local dblink sessions must use password-authenticated container loopback rather than the host-facing Supabase port or a trusted socket");
 assert.match(databaseRunner, /decodeURIComponent\(url\.password\)/, "the local dblink connection must derive its credential from the ephemeral Supabase URL");
 assert.match(databaseRunner, /Buffer\.from\(dblinkConnection, "utf8"\)\.toString\("base64"\)/, "the database runner must pass the appropriate dblink connection without embedding it in test SQL");
 assert.doesNotMatch(databaseRunner, /postgres:\s*postgres|password\s*[:=]\s*["']postgres/i, "the database runner must not hardcode local database credentials");

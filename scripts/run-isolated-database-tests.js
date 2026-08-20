@@ -99,6 +99,9 @@ function localDblinkConnection(url) {
   const password = decodeURIComponent(url.password);
 
   return [
+    "host='127.0.0.1'",
+    "port='5432'",
+    "sslmode='disable'",
     `dbname=${quoteConnectionValue(database)}`,
     `user=${quoteConnectionValue(user)}`,
     `password=${quoteConnectionValue(password)}`
