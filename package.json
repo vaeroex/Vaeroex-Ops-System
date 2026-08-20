@@ -10,6 +10,8 @@
     "start": "next start",
     "lint": "eslint . --max-warnings=59",
     "typecheck": "tsc --noEmit",
+    "test:external-integrations-contracts": "node scripts/external-integrations-contract-regression-tests.js",
+    "test:external-integrations-architecture": "node scripts/external-integrations-architecture-regression-tests.js",
     "security:check": "node scripts/security-check.ts && node scripts/adversarial-regression-tests.js && node scripts/security-high-remediation-regression-tests.js && node scripts/security-medium-hardening-regression-tests.js && node scripts/auth-captcha-regression-tests.js && node scripts/customer-1-billing-remediation-regression-tests.js && node scripts/platform-failure-evidence-regression-tests.js && node scripts/demo-retirement-regression-tests.js && node scripts/search-ask-generation-regression-tests.js && node scripts/persistent-ask-regression-tests.js && node scripts/ask-vaeroex-retirement-regression-tests.js",
     "test:adversarial": "node scripts/adversarial-regression-tests.js",
     "test:security-high-remediation": "node scripts/security-high-remediation-regression-tests.js",
