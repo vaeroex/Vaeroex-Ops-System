@@ -1,5 +1,6 @@
 const { spawnSync } = require("node:child_process");
 const fs = require("node:fs");
+const path = require("node:path");
 
 const cli = process.env.SUPABASE_CLI_PATH || "supabase";
 const testFiles = process.argv.slice(2);
@@ -145,6 +146,26 @@ const dblinkConnection = isLocalDatabase
   : databaseUrl;
 const connectionSetting = Buffer.from(dblinkConnection, "utf8").toString("base64");
 
+const billingDatabaseTest = "customer_1_billing_entitlement.test.sql";
+const localBillingServiceRolePrivileges = [
+  ["profiles", "SELECT"],
+  ["profiles", "UPDATE"],
+  ["subscription_plans", "SELECT"],
+  ["stripe_checkout_intents", "SELECT"],
+  ["stripe_checkout_intents", "INSERT"],
+  ["stripe_checkout_intents", "UPDATE"],
+  ["customer_subscriptions", "SELECT"],
+  ["customer_subscriptions", "INSERT"],
+  ["customer_subscriptions", "UPDATE"],
+  ["workspaces", "SELECT"],
+  ["workspaces", "INSERT"],
+  ["workspaces", "UPDATE"],
+  ["workspace_members", "SELECT"],
+  ["workspace_members", "INSERT"],
+  ["audit_logs", "INSERT"],
+  ["security_audit_events", "INSERT"]
+];
+
 function redactDatabaseDiagnostic(value) {
   let diagnostic = String(value || "unknown database error");
   const credentialFragments = [
@@ -172,6 +193,55 @@ function clearCredentialEnvironment() {
   delete process.env.SUPABASE_TEST_PARENT_PROJECT_REF;
 }
 
+async function installLocalBillingServiceRoleAdapter(Client) {
+  if (
+    !isLocalDatabase ||
+    !testFiles.some((testFile) => path.basename(testFile) === billingDatabaseTest)
+  ) {
+    return async () => undefined;
+  }
+
+  const client = new Client({ connectionString: databaseUrl });
+  const addedPrivileges = [];
+  await client.connect();
+
+  try {
+    for (const [table, privilege] of localBillingServiceRolePrivileges) {
+      const existing = await client.query(
+        "select has_table_privilege('service_role', $1, $2) as allowed",
+        [`public.${table}`, privilege]
+      );
+
+      if (!existing.rows[0]?.allowed) {
+        await client.query(
+          `grant ${privilege} on table public.${table} to service_role`
+        );
+        addedPrivileges.push([table, privilege]);
+      }
+    }
+  } catch (error) {
+    for (const [table, privilege] of addedPrivileges.reverse()) {
+      await client
+        .query(`revoke ${privilege} on table public.${table} from service_role`)
+        .catch(() => undefined);
+    }
+    await client.end().catch(() => undefined);
+    throw error;
+  }
+
+  return async () => {
+    try {
+      for (const [table, privilege] of addedPrivileges.reverse()) {
+        await client.query(
+          `revoke ${privilege} on table public.${table} from service_role`
+        );
+      }
+    } finally {
+      await client.end().catch(() => undefined);
+    }
+  };
+}
+
 async function runWithPostgresClient() {
   let Client;
   try {
@@ -180,48 +250,55 @@ async function runWithPostgresClient() {
     throw new Error("The pinned PostgreSQL test client is unavailable.");
   }
 
-  for (const testFile of testFiles) {
-    const client = new Client({
-      connectionString: databaseUrl,
-      options: `-c vaeroex.test_database_url_b64=${connectionSetting}`
-    });
+  const restoreLocalBillingServiceRole =
+    await installLocalBillingServiceRoleAdapter(Client);
 
-    let assertionCount = 0;
-    let failed = false;
+  try {
+    for (const testFile of testFiles) {
+      const client = new Client({
+        connectionString: databaseUrl,
+        options: `-c vaeroex.test_database_url_b64=${connectionSetting}`
+      });
 
-    try {
-      await client.connect();
-      const queryResult = await client.query(fs.readFileSync(testFile, "utf8"));
-      const results = Array.isArray(queryResult) ? queryResult : [queryResult];
+      let assertionCount = 0;
+      let failed = false;
 
-      for (const result of results) {
-        for (const row of result.rows || []) {
-          for (const value of Object.values(row)) {
-            if (typeof value !== "string") continue;
-            if (/^(?:not )?ok\s+\d+\b/.test(value)) {
-              assertionCount += 1;
-              failed ||= value.startsWith("not ok");
-              if (value.startsWith("not ok")) process.stderr.write(`${value}\n`);
+      try {
+        await client.connect();
+        const queryResult = await client.query(fs.readFileSync(testFile, "utf8"));
+        const results = Array.isArray(queryResult) ? queryResult : [queryResult];
+
+        for (const result of results) {
+          for (const row of result.rows || []) {
+            for (const value of Object.values(row)) {
+              if (typeof value !== "string") continue;
+              if (/^(?:not )?ok\s+\d+\b/.test(value)) {
+                assertionCount += 1;
+                failed ||= value.startsWith("not ok");
+                if (value.startsWith("not ok")) process.stderr.write(`${value}\n`);
+              }
             }
           }
         }
+      } catch (error) {
+        const code = error && typeof error === "object" && "code" in error ? error.code : "unknown";
+        const message = redactDatabaseDiagnostic(
+          error instanceof Error ? error.message : "unknown database error"
+        );
+        process.stderr.write(`${testFile}: database test failed (${code}): ${message}\n`);
+        failed = true;
+      } finally {
+        await client.end().catch(() => undefined);
       }
-    } catch (error) {
-      const code = error && typeof error === "object" && "code" in error ? error.code : "unknown";
-      const message = redactDatabaseDiagnostic(
-        error instanceof Error ? error.message : "unknown database error"
-      );
-      process.stderr.write(`${testFile}: database test failed (${code}): ${message}\n`);
-      failed = true;
-    } finally {
-      await client.end().catch(() => undefined);
-    }
 
-    if (failed || assertionCount === 0) {
-      throw new Error("An isolated database test did not complete successfully.");
-    }
+      if (failed || assertionCount === 0) {
+        throw new Error("An isolated database test did not complete successfully.");
+      }
 
-    process.stdout.write(`${testFile}: ${assertionCount} assertions passed.\n`);
+      process.stdout.write(`${testFile}: ${assertionCount} assertions passed.\n`);
+    }
+  } finally {
+    await restoreLocalBillingServiceRole();
   }
 }
 

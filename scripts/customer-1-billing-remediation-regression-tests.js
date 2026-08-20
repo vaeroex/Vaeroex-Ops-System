@@ -126,6 +126,10 @@ assert.match(databaseRunner, /SUPABASE_TEST_DATABASE_URL/, "the database runner 
 assert.match(databaseRunner, /POSTGRES_URL_NON_POOLING/, "the database runner must retrieve the disposable branch's non-pooling connection in memory");
 assert.match(databaseRunner, /SUPABASE_TEST_BRANCH_NAME[\s\S]+SUPABASE_TEST_PARENT_PROJECT_REF/, "hosted verification must bind the exact branch to its parent project");
 assert.match(databaseRunner, /new Client\([\s\S]+connectionString: databaseUrl[\s\S]+options: `-c vaeroex\.test_database_url_b64=/, "the hosted runner must pass the credential through an ephemeral database session setting");
+assert.match(databaseRunner, /isLocalDatabase[\s\S]+installLocalBillingServiceRoleAdapter/, "only the disposable local database may receive the service-role ACL adapter");
+assert.match(databaseRunner, /has_table_privilege\('service_role', \$1, \$2\)/, "the local ACL adapter must snapshot each effective privilege before adding it");
+assert.match(databaseRunner, /addedPrivileges\.reverse\(\)[\s\S]+revoke \$\{privilege\} on table public\.\$\{table\} from service_role/, "the local ACL adapter must restore every privilege that it added");
+assert.doesNotMatch(databaseRunner, /grant (?:all|delete|truncate|references|trigger) on table/i, "the local ACL adapter must not grant authority beyond the exact trusted-server operations under test");
 assert.match(databaseRunner, /Array\.isArray\(queryResult\)[\s\S]+assertionCount/, "the direct runner must verify every pgTAP result rather than trusting query completion alone");
 assert.match(databaseRunner, /isLocalDatabase[\s\S]+localDblinkConnection\(testUrl, localDatabaseContainerHost\(\)\)[\s\S]+: databaseUrl/, "the database runner must use the isolated container network locally and the remote connection for a hosted branch");
 assert.match(databaseRunner, /docker[\s\S]+name=supabase_db_[\s\S]+docker[\s\S]+inspect[\s\S]+NetworkSettings\.Networks/, "local verification must discover the one isolated database container without assuming a machine-specific host address");
