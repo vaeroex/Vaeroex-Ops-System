@@ -5,6 +5,38 @@ export type WorkspaceRole = "owner" | "admin" | "manager" | "staff" | "viewer";
 export type Database = {
   public: {
     Functions: {
+      commit_contribution_family_version_v1: {
+        Args: {
+          p_actor_id: string;
+          p_family: Json;
+          p_request_id: string;
+        };
+        Returns: Json;
+      };
+      commit_fact_contribution_batch_v1: {
+        Args: {
+          p_actor_id: string;
+          p_batch: Json;
+          p_request_id: string;
+        };
+        Returns: Json;
+      };
+      commit_reconciliation_case_v1: {
+        Args: {
+          p_actor_id: string;
+          p_case: Json;
+          p_request_id: string;
+        };
+        Returns: Json;
+      };
+      commit_source_authority_policy_version_v1: {
+        Args: {
+          p_actor_id: string;
+          p_policy: Json;
+          p_request_id: string;
+        };
+        Returns: Json;
+      };
       commit_canonical_business_fact_version_v2: {
         Args: {
           p_actor_id: string;
@@ -20,6 +52,14 @@ export type Database = {
           p_request_id: string;
           p_source_identity_fingerprint: string;
           p_version: Json;
+        };
+        Returns: Json;
+      };
+      read_fact_contribution_aggregate_v1: {
+        Args: {
+          p_business_entity_id: string;
+          p_contribution_family_version_id: string;
+          p_workspace_id: string;
         };
         Returns: Json;
       };

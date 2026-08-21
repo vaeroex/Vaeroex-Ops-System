@@ -7,6 +7,7 @@ import {
   BoundedIdentifierSchema,
   BoundedLabelSchema,
   CurrencyCodeSchema,
+  PersistedFactDecimalSchema,
   TimeZoneSchema,
   UuidSchema
 } from "@/lib/integrations/contracts/primitives";
@@ -14,6 +15,12 @@ import {
   prepareCanonicalFactVersionCommit,
   prepareExternalSourceVersionCommit
 } from "@/lib/integrations/persistence/serializers";
+import {
+  ContributionFamilyCommitSchema,
+  FactContributionBatchCommitSchema,
+  ReconciliationCaseCommitSchema,
+  SourceAuthorityPolicyCommitSchema
+} from "@/lib/integrations/persistence/reconciliation-commands";
 
 type RpcResult = Readonly<{
   data: unknown;
@@ -161,4 +168,120 @@ export async function commitCanonicalBusinessFactVersion(
     factFingerprint: z.literal(prepared.factFingerprint),
     sourceCount: z.number().int().positive()
   }).parse(data);
+}
+
+export async function commitSourceAuthorityPolicyVersion(
+  input: unknown,
+  requestId: string,
+  actorId: string,
+  client: ExternalIntegrationsRpcClient
+) {
+  const policy = SourceAuthorityPolicyCommitSchema.parse(input);
+  const data = await rpc("commit_source_authority_policy_version_v1", {
+    p_policy: policy,
+    p_request_id: BoundedIdentifierSchema.parse(requestId),
+    p_actor_id: BoundedIdentifierSchema.parse(actorId)
+  }, client);
+  return z.object({
+    policyVersionId: z.literal(policy.id),
+    immutableVersion: z.literal(policy.immutableVersion),
+    policyFingerprint: z.literal(policy.policyFingerprint),
+    ruleCount: z.number().int().positive(),
+    idempotent: z.boolean()
+  }).parse(data);
+}
+
+export async function commitContributionFamilyVersion(
+  input: unknown,
+  requestId: string,
+  actorId: string,
+  client: ExternalIntegrationsRpcClient
+) {
+  const family = ContributionFamilyCommitSchema.parse(input);
+  const data = await rpc("commit_contribution_family_version_v1", {
+    p_family: family,
+    p_request_id: BoundedIdentifierSchema.parse(requestId),
+    p_actor_id: BoundedIdentifierSchema.parse(actorId)
+  }, client);
+  return z.object({
+    familyVersionId: z.literal(family.id),
+    immutableVersion: z.literal(family.immutableVersion),
+    familyFingerprint: z.literal(family.familyFingerprint),
+    idempotent: z.boolean()
+  }).parse(data);
+}
+
+export async function commitReconciliationCase(
+  input: unknown,
+  requestId: string,
+  actorId: string,
+  client: ExternalIntegrationsRpcClient
+) {
+  const reconciliationCase = ReconciliationCaseCommitSchema.parse(input);
+  const data = await rpc("commit_reconciliation_case_v1", {
+    p_case: reconciliationCase,
+    p_request_id: BoundedIdentifierSchema.parse(requestId),
+    p_actor_id: BoundedIdentifierSchema.parse(actorId)
+  }, client);
+  return z.object({
+    reconciliationCaseId: z.literal(reconciliationCase.id),
+    classification: z.literal(reconciliationCase.classification),
+    caseState: z.literal(reconciliationCase.caseState),
+    memberCount: z.number().int().min(2).max(100),
+    caseFingerprint: z.literal(reconciliationCase.caseFingerprint),
+    idempotent: z.boolean()
+  }).parse(data);
+}
+
+export async function commitFactContributionBatch(
+  input: unknown,
+  requestId: string,
+  actorId: string,
+  client: ExternalIntegrationsRpcClient
+) {
+  const batch = FactContributionBatchCommitSchema.parse(input);
+  const data = await rpc("commit_fact_contribution_batch_v1", {
+    p_batch: batch,
+    p_request_id: BoundedIdentifierSchema.parse(requestId),
+    p_actor_id: BoundedIdentifierSchema.parse(actorId)
+  }, client);
+  return z.object({
+    contributionBatchId: z.literal(batch.id),
+    eventCount: z.number().int().min(0).max(100),
+    insertedEventCount: z.number().int().min(0).max(100).optional(),
+    batchFingerprint: z.literal(batch.batchFingerprint),
+    idempotent: z.boolean()
+  }).parse(data);
+}
+
+export async function readFactContributionAggregate(
+  workspaceId: string,
+  businessEntityId: string,
+  contributionFamilyVersionId: string,
+  client: ExternalIntegrationsRpcClient
+) {
+  const scope = {
+    workspaceId: UuidSchema.parse(workspaceId),
+    businessEntityId: UuidSchema.parse(businessEntityId),
+    contributionFamilyVersionId: UuidSchema.parse(contributionFamilyVersionId)
+  };
+  const data = await rpc("read_fact_contribution_aggregate_v1", {
+    p_workspace_id: scope.workspaceId,
+    p_business_entity_id: scope.businessEntityId,
+    p_contribution_family_version_id: scope.contributionFamilyVersionId
+  }, client);
+  return z.object({
+    workspaceId: z.literal(scope.workspaceId),
+    businessEntityId: z.literal(scope.businessEntityId),
+    contributionFamilyVersionId: z.literal(scope.contributionFamilyVersionId),
+    familyKey: BoundedIdentifierSchema,
+    measureKey: BoundedIdentifierSchema,
+    aggregateKey: BoundedIdentifierSchema,
+    contributionMode: z.enum(["additive_transaction", "non_additive_control"]),
+    registryVersion: BoundedIdentifierSchema,
+    currentTotal: PersistedFactDecimalSchema,
+    establishedCount: z.number().int().nonnegative(),
+    retractedCount: z.number().int().nonnegative(),
+    controlObservationCount: z.number().int().nonnegative()
+  }).strict().parse(data);
 }

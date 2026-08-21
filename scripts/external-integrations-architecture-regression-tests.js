@@ -126,6 +126,11 @@ equal(
   "node scripts/external-integrations-architecture-regression-tests.js",
   "architecture test script must be registered"
 );
+equal(
+  packageJson.scripts["test:external-integrations-phase-2"],
+  "node scripts/external-integrations-phase-2-reconciliation-regression-tests.js",
+  "Phase 2 reconciliation regression script must be registered"
+);
 
 const protectedDiff = childProcess.execFileSync(
   "git",
@@ -135,7 +140,9 @@ const protectedDiff = childProcess.execFileSync(
 const phase1ProtectedPaths = new Set([
   "lib/supabase/types.ts",
   "supabase/migrations/20260820233007_external_integrations_phase_1_canonical_foundation.sql",
-  "supabase/tests/external_integrations_phase_1_canonical_foundation.test.sql"
+  "supabase/tests/external_integrations_phase_1_canonical_foundation.test.sql",
+  "supabase/migrations/20260821064333_external_integrations_phase_2_reconciliation.sql",
+  "supabase/tests/external_integrations_phase_2_reconciliation.test.sql"
 ]);
 const unexpectedProtectedDiff = protectedDiff
   .split("\n")
@@ -145,7 +152,7 @@ const unexpectedProtectedDiff = protectedDiff
 equal(
   unexpectedProtectedDiff,
   "",
-  "Phase 0 and Phase 1 must not change routes, UI, provider infrastructure, or deployment files"
+  "Phase 0 through Phase 2 must not change routes, UI, provider infrastructure, or deployment files"
 );
 
 const untrackedMigrations = childProcess.execFileSync(
@@ -161,7 +168,7 @@ const unexpectedUntrackedMigrations = untrackedMigrations
 equal(
   unexpectedUntrackedMigrations,
   "",
-  "only the approved Phase 1 foundation migration may extend the Phase 0 baseline"
+  "only the approved Phase 1 and Phase 2 migrations may extend the Phase 0 baseline"
 );
 
 console.log(`External integration Phase 0 architecture regressions: ${assertionCount} assertions passed.`);
