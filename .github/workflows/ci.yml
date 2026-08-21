@@ -41,6 +41,9 @@ jobs:
       - name: External integrations Phase 2 reconciliation regressions
         run: pnpm test:external-integrations-phase-2
 
+      - name: External integrations Phase 3 deterministic dependency regressions
+        run: pnpm test:external-integrations-phase-3
+
       - name: TypeScript check
         run: pnpm typecheck
 
@@ -91,7 +94,8 @@ jobs:
             supabase/tests/security_high_findings_remediation.test.sql \
             supabase/tests/customer_1_billing_entitlement.test.sql \
             supabase/tests/external_integrations_phase_1_canonical_foundation.test.sql \
-            supabase/tests/external_integrations_phase_2_reconciliation.test.sql
+            supabase/tests/external_integrations_phase_2_reconciliation.test.sql \
+            supabase/tests/external_integrations_phase_3_deterministic_dependencies.test.sql
 
       - name: Remove isolated database state
         if: always()
