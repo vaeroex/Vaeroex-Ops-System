@@ -137,22 +137,24 @@ const protectedDiff = childProcess.execFileSync(
   ["diff", "--name-only", "origin/main", "--", "app", "components", "supabase", "lib/supabase", "services", "vercel.json"],
   { cwd: root, encoding: "utf8" }
 ).trim();
-const phase1ProtectedPaths = new Set([
+const approvedProtectedPaths = new Set([
   "lib/supabase/types.ts",
   "supabase/migrations/20260820233007_external_integrations_phase_1_canonical_foundation.sql",
   "supabase/tests/external_integrations_phase_1_canonical_foundation.test.sql",
   "supabase/migrations/20260821064333_external_integrations_phase_2_reconciliation.sql",
-  "supabase/tests/external_integrations_phase_2_reconciliation.test.sql"
+  "supabase/tests/external_integrations_phase_2_reconciliation.test.sql",
+  "supabase/migrations/20260821172015_external_integrations_phase_3_deterministic_dependencies.sql",
+  "supabase/tests/external_integrations_phase_3_deterministic_dependencies.test.sql"
 ]);
 const unexpectedProtectedDiff = protectedDiff
   .split("\n")
   .filter(Boolean)
-  .filter((file) => !phase1ProtectedPaths.has(file))
+  .filter((file) => !approvedProtectedPaths.has(file))
   .join("\n");
 equal(
   unexpectedProtectedDiff,
   "",
-  "Phase 0 through Phase 2 must not change routes, UI, provider infrastructure, or deployment files"
+  "Phase 0 through Phase 3 must not change routes, UI, provider infrastructure, or deployment files"
 );
 
 const untrackedMigrations = childProcess.execFileSync(
@@ -163,12 +165,12 @@ const untrackedMigrations = childProcess.execFileSync(
 const unexpectedUntrackedMigrations = untrackedMigrations
   .split("\n")
   .filter(Boolean)
-  .filter((file) => !phase1ProtectedPaths.has(file))
+  .filter((file) => !approvedProtectedPaths.has(file))
   .join("\n");
 equal(
   unexpectedUntrackedMigrations,
   "",
-  "only the approved Phase 1 and Phase 2 migrations may extend the Phase 0 baseline"
+  "only the approved Phase 1, Phase 2, and Phase 3 migrations may extend the Phase 0 baseline"
 );
 
 console.log(`External integration Phase 0 architecture regressions: ${assertionCount} assertions passed.`);
