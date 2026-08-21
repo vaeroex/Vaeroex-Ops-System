@@ -1,3 +1,5 @@
+export * from "@/lib/integrations/persistence/control-plane-commands";
+export * from "@/lib/integrations/persistence/control-plane-repository";
 export * from "@/lib/integrations/persistence/deterministic-commands";
 export * from "@/lib/integrations/persistence/deterministic-repository";
 export * from "@/lib/integrations/persistence/identity";
