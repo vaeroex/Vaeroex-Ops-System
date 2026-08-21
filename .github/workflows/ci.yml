@@ -35,6 +35,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: External integrations Phase 1 regressions
+        run: pnpm test:external-integrations-phase-1
+
       - name: TypeScript check
         run: pnpm typecheck
 
@@ -83,7 +86,8 @@ jobs:
         run: |
           node scripts/run-isolated-database-tests.js \
             supabase/tests/security_high_findings_remediation.test.sql \
-            supabase/tests/customer_1_billing_entitlement.test.sql
+            supabase/tests/customer_1_billing_entitlement.test.sql \
+            supabase/tests/external_integrations_phase_1_canonical_foundation.test.sql
 
       - name: Remove isolated database state
         if: always()

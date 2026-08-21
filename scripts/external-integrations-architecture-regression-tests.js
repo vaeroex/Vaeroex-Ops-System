@@ -132,13 +132,36 @@ const protectedDiff = childProcess.execFileSync(
   ["diff", "--name-only", "origin/main", "--", "app", "components", "supabase", "lib/supabase", "services", "vercel.json"],
   { cwd: root, encoding: "utf8" }
 ).trim();
-equal(protectedDiff, "", "Phase 0 must not change routes, UI, database, infrastructure, or deployment files");
+const phase1ProtectedPaths = new Set([
+  "lib/supabase/types.ts",
+  "supabase/migrations/20260820233007_external_integrations_phase_1_canonical_foundation.sql",
+  "supabase/tests/external_integrations_phase_1_canonical_foundation.test.sql"
+]);
+const unexpectedProtectedDiff = protectedDiff
+  .split("\n")
+  .filter(Boolean)
+  .filter((file) => !phase1ProtectedPaths.has(file))
+  .join("\n");
+equal(
+  unexpectedProtectedDiff,
+  "",
+  "Phase 0 and Phase 1 must not change routes, UI, provider infrastructure, or deployment files"
+);
 
 const untrackedMigrations = childProcess.execFileSync(
   "git",
   ["ls-files", "--others", "--exclude-standard", "supabase/migrations"],
   { cwd: root, encoding: "utf8" }
 ).trim();
-equal(untrackedMigrations, "", "Phase 0 must not add an untracked migration");
+const unexpectedUntrackedMigrations = untrackedMigrations
+  .split("\n")
+  .filter(Boolean)
+  .filter((file) => !phase1ProtectedPaths.has(file))
+  .join("\n");
+equal(
+  unexpectedUntrackedMigrations,
+  "",
+  "only the approved Phase 1 foundation migration may extend the Phase 0 baseline"
+);
 
 console.log(`External integration Phase 0 architecture regressions: ${assertionCount} assertions passed.`);

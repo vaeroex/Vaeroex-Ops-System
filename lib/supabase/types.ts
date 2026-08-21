@@ -5,6 +5,48 @@ export type WorkspaceRole = "owner" | "admin" | "manager" | "staff" | "viewer";
 export type Database = {
   public: {
     Functions: {
+      commit_canonical_business_fact_version_v2: {
+        Args: {
+          p_actor_id: string;
+          p_identity_fingerprint: string;
+          p_request_id: string;
+          p_version: Json;
+        };
+        Returns: Json;
+      };
+      commit_external_source_record_version_v1: {
+        Args: {
+          p_actor_id: string;
+          p_request_id: string;
+          p_source_identity_fingerprint: string;
+          p_version: Json;
+        };
+        Returns: Json;
+      };
+      create_business_entity_v1: {
+        Args: {
+          p_base_currency: string;
+          p_consolidation_policy_version: string | null;
+          p_display_name: string;
+          p_entity_key: string;
+          p_entity_type: string;
+          p_fiscal_year_start_month: number;
+          p_legal_name: string | null;
+          p_parent_business_entity_id: string | null;
+          p_reporting_currency: string | null;
+          p_time_zone: string;
+          p_workspace_id: string;
+        };
+        Returns: Json;
+      };
+      update_business_entity_v1: {
+        Args: {
+          p_entity_id: string;
+          p_expected_row_version: number;
+          p_patch: Json;
+        };
+        Returns: Json;
+      };
       accept_workspace_invites_for_current_user: {
         Args: Record<string, never>;
         Returns: void;
@@ -804,6 +846,101 @@ export type Database = {
       };
     };
     Tables: {
+      business_entities: {
+        Row: {
+          base_currency: string;
+          consolidation_policy_version: string | null;
+          contract_version: "business_entity_v1";
+          created_at: string;
+          created_by: string;
+          display_name: string;
+          entity_key: string;
+          entity_type: "operating_company" | "holding_company" | "division" | "consolidated_group";
+          fiscal_year_start_month: number;
+          id: string;
+          legal_name: string | null;
+          parent_business_entity_id: string | null;
+          reporting_currency: string | null;
+          row_version: number;
+          status: "active" | "inactive" | "archived";
+          timezone: string;
+          updated_at: string;
+          updated_by: string;
+          workspace_id: string;
+        };
+        Insert: {
+          base_currency: string;
+          consolidation_policy_version?: string | null;
+          contract_version?: "business_entity_v1";
+          created_at?: string;
+          created_by: string;
+          display_name: string;
+          entity_key: string;
+          entity_type?: "operating_company" | "holding_company" | "division" | "consolidated_group";
+          fiscal_year_start_month?: number;
+          id?: string;
+          legal_name?: string | null;
+          parent_business_entity_id?: string | null;
+          reporting_currency?: string | null;
+          row_version?: number;
+          status?: "active" | "inactive" | "archived";
+          timezone: string;
+          updated_at?: string;
+          updated_by: string;
+          workspace_id: string;
+        };
+        Update: {
+          base_currency?: string;
+          consolidation_policy_version?: string | null;
+          contract_version?: "business_entity_v1";
+          created_at?: string;
+          created_by?: string;
+          display_name?: string;
+          entity_key?: string;
+          entity_type?: "operating_company" | "holding_company" | "division" | "consolidated_group";
+          fiscal_year_start_month?: number;
+          id?: string;
+          legal_name?: string | null;
+          parent_business_entity_id?: string | null;
+          reporting_currency?: string | null;
+          row_version?: number;
+          status?: "active" | "inactive" | "archived";
+          timezone?: string;
+          updated_at?: string;
+          updated_by?: string;
+          workspace_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "business_entities_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "business_entities_parent_fkey";
+            columns: ["workspace_id", "parent_business_entity_id"];
+            isOneToOne: false;
+            referencedRelation: "business_entities";
+            referencedColumns: ["workspace_id", "id"];
+          },
+          {
+            foreignKeyName: "business_entities_updated_by_fkey";
+            columns: ["updated_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "business_entities_workspace_id_fkey";
+            columns: ["workspace_id"];
+            isOneToOne: false;
+            referencedRelation: "workspaces";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
       document_extraction_circuit_events: {
         Row: {
           actor_id: string | null
