@@ -55,6 +55,9 @@ jobs:
       - name: External integrations Phase 4 control-plane regressions
         run: pnpm test:external-integrations-phase-4
 
+      - name: External integrations Phase 5 credential-security regressions
+        run: pnpm test:external-integrations-phase-5
+
       - name: TypeScript check
         run: pnpm typecheck
 
@@ -110,7 +113,8 @@ jobs:
             supabase/tests/external_integrations_phase_1_canonical_foundation.test.sql \
             supabase/tests/external_integrations_phase_2_reconciliation.test.sql \
             supabase/tests/external_integrations_phase_3_deterministic_dependencies.test.sql \
-            supabase/tests/external_integrations_phase_4_control_plane.test.sql
+            supabase/tests/external_integrations_phase_4_control_plane.test.sql \
+            supabase/tests/external_integrations_phase_5_credential_security.test.sql
 
       - name: Remove isolated database state
         if: always()

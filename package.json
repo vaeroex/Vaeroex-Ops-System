@@ -16,6 +16,7 @@
     "test:external-integrations-phase-2": "node scripts/external-integrations-phase-2-reconciliation-regression-tests.js",
     "test:external-integrations-phase-3": "node scripts/external-integrations-phase-3-deterministic-dependency-regression-tests.js",
     "test:external-integrations-phase-4": "node scripts/external-integrations-phase-4-control-plane-regression-tests.js",
+    "test:external-integrations-phase-5": "node scripts/external-integrations-phase-5-credential-security-regression-tests.js",
     "security:check": "node scripts/security-check.ts && node scripts/adversarial-regression-tests.js && node scripts/security-high-remediation-regression-tests.js && node scripts/security-medium-hardening-regression-tests.js && node scripts/auth-captcha-regression-tests.js && node scripts/customer-1-billing-remediation-regression-tests.js && node scripts/platform-failure-evidence-regression-tests.js && node scripts/demo-retirement-regression-tests.js && node scripts/search-ask-generation-regression-tests.js && node scripts/persistent-ask-regression-tests.js && node scripts/ask-vaeroex-retirement-regression-tests.js",
     "test:adversarial": "node scripts/adversarial-regression-tests.js",
     "test:security-high-remediation": "node scripts/security-high-remediation-regression-tests.js",

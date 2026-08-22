@@ -136,6 +136,11 @@ equal(
   "node scripts/external-integrations-phase-4-control-plane-regression-tests.js",
   "Phase 4 control-plane regression script must be registered"
 );
+equal(
+  packageJson.scripts["test:external-integrations-phase-5"],
+  "node scripts/external-integrations-phase-5-credential-security-regression-tests.js",
+  "Phase 5 credential-security regression script must be registered"
+);
 
 const protectedDiff = childProcess.execFileSync(
   "git",
@@ -151,7 +156,9 @@ const approvedProtectedPaths = new Set([
   "supabase/migrations/20260821172015_external_integrations_phase_3_deterministic_dependencies.sql",
   "supabase/tests/external_integrations_phase_3_deterministic_dependencies.test.sql",
   "supabase/migrations/20260821201220_external_integrations_phase_4_control_plane.sql",
-  "supabase/tests/external_integrations_phase_4_control_plane.test.sql"
+  "supabase/tests/external_integrations_phase_4_control_plane.test.sql",
+  "supabase/migrations/20260821220853_external_integrations_phase_5_credential_security.sql",
+  "supabase/tests/external_integrations_phase_5_credential_security.test.sql"
 ]);
 const unexpectedProtectedDiff = protectedDiff
   .split("\n")
@@ -161,7 +168,7 @@ const unexpectedProtectedDiff = protectedDiff
 equal(
   unexpectedProtectedDiff,
   "",
-  "Phase 0 through Phase 4 must not change routes, UI, provider infrastructure, or deployment files"
+  "Phase 0 through Phase 5 must not change routes, UI, provider infrastructure, or deployment files"
 );
 
 const untrackedMigrations = childProcess.execFileSync(
@@ -177,7 +184,7 @@ const unexpectedUntrackedMigrations = untrackedMigrations
 equal(
   unexpectedUntrackedMigrations,
   "",
-  "only the approved Phase 1 through Phase 4 migrations may extend the Phase 0 baseline"
+  "only the approved Phase 1 through Phase 5 migrations may extend the Phase 0 baseline"
 );
 
 console.log(`External integration Phase 0 architecture regressions: ${assertionCount} assertions passed.`);

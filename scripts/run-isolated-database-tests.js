@@ -147,6 +147,13 @@ const dblinkConnection = isLocalDatabase
 const connectionSetting = Buffer.from(dblinkConnection, "utf8").toString("base64");
 
 const billingDatabaseTest = "customer_1_billing_entitlement.test.sql";
+const phase5DatabaseTest = "external_integrations_phase_5_credential_security.test.sql";
+const phase5TestRoles = [
+  "integration_oauth_ingress_authority",
+  "integration_credential_broker_authority",
+  "integration_control_plane_authority"
+];
+const phase5TestBridgeRole = "phase5_database_test_authority";
 const localBillingServiceRolePrivileges = [
   ["profiles", "SELECT"],
   ["profiles", "UPDATE"],
@@ -242,6 +249,52 @@ async function installLocalBillingServiceRoleAdapter(Client) {
   };
 }
 
+async function installPhase5RoleAdapter(Client) {
+  if (!testFiles.some((testFile) => path.basename(testFile) === phase5DatabaseTest)) {
+    return async () => undefined;
+  }
+
+  const client = new Client({ connectionString: databaseUrl });
+  let bridgeCreated = false;
+  await client.connect();
+
+  try {
+    await client.query(`drop role if exists ${phase5TestBridgeRole}`);
+    await client.query(
+      `create role ${phase5TestBridgeRole} nologin noinherit`
+    );
+    bridgeCreated = true;
+    await client.query(
+      `do $grant$ begin execute format(
+        'grant ${phase5TestBridgeRole} to %I with inherit false, set true',
+        session_user
+      ); end $grant$;`
+    );
+    for (const role of phase5TestRoles) {
+      await client.query(
+        `grant ${role} to ${phase5TestBridgeRole}
+          with admin false, inherit false, set true`
+      );
+    }
+  } catch (error) {
+    if (bridgeCreated) {
+      await client
+        .query(`drop role if exists ${phase5TestBridgeRole}`)
+        .catch(() => undefined);
+    }
+    await client.end().catch(() => undefined);
+    throw error;
+  }
+
+  return async () => {
+    try {
+      await client.query(`drop role if exists ${phase5TestBridgeRole}`);
+    } finally {
+      await client.end().catch(() => undefined);
+    }
+  };
+}
+
 async function runWithPostgresClient() {
   let Client;
   try {
@@ -252,8 +305,10 @@ async function runWithPostgresClient() {
 
   const restoreLocalBillingServiceRole =
     await installLocalBillingServiceRoleAdapter(Client);
+  let restorePhase5Roles = async () => undefined;
 
   try {
+    restorePhase5Roles = await installPhase5RoleAdapter(Client);
     for (const testFile of testFiles) {
       const client = new Client({
         connectionString: databaseUrl,
@@ -285,7 +340,17 @@ async function runWithPostgresClient() {
         const message = redactDatabaseDiagnostic(
           error instanceof Error ? error.message : "unknown database error"
         );
-        process.stderr.write(`${testFile}: database test failed (${code}): ${message}\n`);
+        const context =
+          error && typeof error === "object" && "where" in error && error.where
+            ? ` Context: ${redactDatabaseDiagnostic(error.where)}`
+            : "";
+        const position =
+          error && typeof error === "object" && "position" in error && error.position
+            ? ` Position: ${error.position}`
+            : "";
+        process.stderr.write(
+          `${testFile}: database test failed (${code}): ${message}${position}${context}\n`
+        );
         failed = true;
       } finally {
         await client.end().catch(() => undefined);
@@ -298,6 +363,7 @@ async function runWithPostgresClient() {
       process.stdout.write(`${testFile}: ${assertionCount} assertions passed.\n`);
     }
   } finally {
+    await restorePhase5Roles();
     await restoreLocalBillingServiceRole();
   }
 }
@@ -310,7 +376,14 @@ async function main() {
   }
 }
 
-main().catch(() => {
-  process.stderr.write("The isolated database test coordinator failed.\n");
+main().catch((error) => {
+  const code =
+    error && typeof error === "object" && "code" in error ? error.code : "unknown";
+  const message = redactDatabaseDiagnostic(
+    error instanceof Error ? error.message : "unknown database error"
+  );
+  process.stderr.write(
+    `The isolated database test coordinator failed (${code}): ${message}\n`
+  );
   process.exit(1);
 });
