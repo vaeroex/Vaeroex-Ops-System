@@ -2244,7 +2244,7 @@ select is(
         'disconnected',
         pg_temp.fingerprint('tenant-a-reauthorized'),
         jsonb_build_array('read_synthetic_business_data'),
-        '2026-08-21T23:01:00.000Z'
+        (transaction_timestamp() + interval '1 minute')::text
       ),
       'connection_a_disconnected',
       'phase4_test_service'
