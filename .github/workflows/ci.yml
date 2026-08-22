@@ -58,6 +58,9 @@ jobs:
       - name: External integrations Phase 5 credential-security regressions
         run: pnpm test:external-integrations-phase-5
 
+      - name: External integrations Phase 7 QBO provider regressions
+        run: pnpm test:external-integrations-phase-7
+
       - name: TypeScript check
         run: pnpm typecheck
 
