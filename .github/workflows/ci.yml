@@ -58,6 +58,9 @@ jobs:
       - name: External integrations Phase 5 credential-security regressions
         run: pnpm test:external-integrations-phase-5
 
+      - name: External integrations Phase 6 durable-runtime regressions
+        run: pnpm test:external-integrations-phase-6
+
       - name: External integrations Phase 7 QBO provider regressions
         run: pnpm test:external-integrations-phase-7
 
@@ -117,7 +120,8 @@ jobs:
             supabase/tests/external_integrations_phase_2_reconciliation.test.sql \
             supabase/tests/external_integrations_phase_3_deterministic_dependencies.test.sql \
             supabase/tests/external_integrations_phase_4_control_plane.test.sql \
-            supabase/tests/external_integrations_phase_5_credential_security.test.sql
+            supabase/tests/external_integrations_phase_5_credential_security.test.sql \
+            supabase/tests/external_integrations_phase_6_durable_runtime.test.sql
 
       - name: Remove isolated database state
         if: always()

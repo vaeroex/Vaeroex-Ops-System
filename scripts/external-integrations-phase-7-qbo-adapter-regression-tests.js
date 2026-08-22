@@ -469,20 +469,21 @@ const qboSource = qboSourceFiles.map((file) => read(file)).join("\n");
 doesNotMatch(qboSource, /\bfetch\s*\(|axios|node:https|node:http|@supabase|supabase-js|openai|chat\.completions|responses\.create/i, "QBO Phase 7 package has no network, Supabase, or AI runtime dependency");
 doesNotMatch(qboSource, /process\.env|client_secret|clientSecret|access_token|refresh_token|authorization_code|@google-cloud\/kms|@google-cloud\/tasks|SecretManagerServiceClient|CloudTasksClient/i, "QBO Phase 7 package has no credential, KMS, or queue dependency");
 doesNotMatch(qboSource, /createInvoice|updateInvoice|deleteInvoice|createPayment|updatePayment|deletePayment|AddEntity|service\.Add|service\.Update|service\.Delete|method:\s*["']POST["']|method:\s*["']DELETE["']/i, "QBO adapter source contains no accounting write operation implementation");
-
-const protectedDiff = childProcess.execFileSync(
-  "git",
-  ["diff", "--name-only", "origin/main", "--", "app", "components", "services", "vercel.json", "supabase", "lib/supabase"],
-  { cwd: root, encoding: "utf8" }
-).trim();
-equal(protectedDiff, "", "Phase 7 changes no UI, route, service, deployment, Supabase migration, or generated Supabase client surface");
-
-const migrationDiff = childProcess.execFileSync(
-  "git",
-  ["diff", "--name-only", "origin/main", "--", "supabase/migrations", "supabase/tests"],
-  { cwd: root, encoding: "utf8" }
-).trim();
-equal(migrationDiff, "", "Phase 7 adds no database migration or database test fixture");
+doesNotMatch(
+  qboSource,
+  /@\/lib\/integrations\/(?:persistence|credentials|runtime)|(?:\.\.\/)+(?:persistence|credentials|runtime)(?:\/|["'])/i,
+  "pure QBO package imports no persistence, credential authority, or Phase 6 runtime module"
+);
+doesNotMatch(
+  qboSource,
+  /@\/(?:app|components|services)(?:\/|["'])|(?:\.\.\/)+(?:app|components|services)(?:\/|["'])/i,
+  "pure QBO package imports no customer UI, route, or service module"
+);
+doesNotMatch(
+  qboSource,
+  /promotionAuthorized\s*[:=]\s*true/i,
+  "pure QBO package cannot authorize direct KPI promotion"
+);
 
 const packageJson = JSON.parse(read("package.json"));
 equal(
