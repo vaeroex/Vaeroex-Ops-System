@@ -67,6 +67,9 @@ jobs:
       - name: External integrations Phase 8A.0 contract-convergence regressions
         run: pnpm test:external-integrations-phase-8a0
 
+      - name: External integrations Phase 8A live-GCP readiness regressions
+        run: pnpm test:external-integrations-phase-8a-live
+
       - name: TypeScript check
         run: pnpm typecheck
 

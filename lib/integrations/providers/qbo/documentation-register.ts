@@ -5,10 +5,11 @@ import {
   QBO_PROVIDER_ADAPTER_VERSION,
   QBO_REPORT_CONTRACT_VERSION,
   QBO_SOURCE_RECORD_CONTRACT_VERSION,
-  QBO_WEBHOOK_CONTRACT_VERSION
+  QBO_WEBHOOK_CONTRACT_VERSION,
+  QBO_WEBHOOK_SIGNATURE_CONTRACT_VERSION
 } from "@/lib/integrations/providers/qbo/contracts";
 
-export const QBO_DOCUMENTATION_CHECKED_DATE = "2026-08-21" as const;
+export const QBO_DOCUMENTATION_CHECKED_DATE = "2026-08-22" as const;
 
 export type QboDocumentationStatus =
   | "confirmed_provider_behavior"
@@ -35,6 +36,14 @@ export const QBO_OFFICIAL_DOCUMENTATION_LINKS = [
   "https://developer.intuit.com/app/developer/qbo/docs/develop/troubleshooting",
   "https://developer.intuit.com/app/developer/qbpayments/docs/learn/scopes",
   "https://blogs.a.intuit.com/2018/09/10/quickbooks-online-api-best-practices/"
+] as const;
+
+// Kept outside the descriptor-fingerprinted V1 list so the reviewed provider
+// descriptor bytes remain unchanged while security evidence can advance.
+export const QBO_PHASE_8A_WEBHOOK_DOCUMENTATION_LINKS = [
+  "https://developer.intuit.com/app/developer/qbo/docs/develop/webhooks/configure-webhooks",
+  "https://developer.intuit.com/app/developer/qbo/docs/develop/webhooks/best-practices",
+  "https://blogs.intuit.com/2025/11/12/upcoming-change-to-webhooks-payload-structure/"
 ] as const;
 
 export const QBO_DOCUMENTATION_REGISTER: readonly QboDocumentationRegisterEntry[] = [
@@ -79,10 +88,18 @@ export const QBO_DOCUMENTATION_REGISTER: readonly QboDocumentationRegisterEntry[
     relevantContractVersion: QBO_WEBHOOK_CONTRACT_VERSION
   },
   {
-    claimKey: "qbo_webhook_signature_later_authority",
-    status: "deferred_runtime_authority",
-    claim: "Webhook signature cryptography requires verifier secret authority and remains deferred to runtime/broker integration.",
-    sourceUrl: "https://github.com/IntuitDeveloper/SampleApp-Webhooks-Java-Cloudevents",
+    claimKey: "qbo_webhook_signature_hmac_sha256",
+    status: "confirmed_provider_behavior",
+    claim: "QBO webhook authenticity uses the Intuit-Signature header containing a Base64 HMAC-SHA256 of the exact notification payload keyed by the environment-specific verifier token; Vaeroex keeps that verifier separate from OAuth client credentials and verifies exact raw bytes with constant-time comparison before JSON parsing or durable ingress.",
+    sourceUrl: "https://developer.intuit.com/app/developer/qbo/docs/develop/webhooks/configure-webhooks",
+    checkedDate: QBO_DOCUMENTATION_CHECKED_DATE,
+    relevantContractVersion: QBO_WEBHOOK_SIGNATURE_CONTRACT_VERSION
+  },
+  {
+    claimKey: "qbo_webhook_acknowledgement_and_replay",
+    status: "confirmed_provider_behavior",
+    claim: "QBO expects a successful acknowledgement within three seconds and may retry delivery; signature verification establishes authenticity, while the Phase 6 webhook-event ledger remains the authoritative replay and duplicate-delivery boundary.",
+    sourceUrl: "https://developer.intuit.com/app/developer/qbo/docs/develop/webhooks/best-practices",
     checkedDate: QBO_DOCUMENTATION_CHECKED_DATE,
     relevantContractVersion: QBO_WEBHOOK_CONTRACT_VERSION
   },

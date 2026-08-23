@@ -113,9 +113,9 @@ notEqual(
   "QBO descriptor fingerprint is distinct from synthetic"
 );
 
-equal(qbo.QBO_DOCUMENTATION_CHECKED_DATE, "2026-08-21", "documentation register records the checked date");
+equal(qbo.QBO_DOCUMENTATION_CHECKED_DATE, "2026-08-22", "documentation register records the checked date");
 for (const entry of qbo.QBO_DOCUMENTATION_REGISTER) {
-  equal(entry.checkedDate, "2026-08-21", `documentation claim ${entry.claimKey} has checked date`);
+  equal(entry.checkedDate, "2026-08-22", `documentation claim ${entry.claimKey} has checked date`);
   ok(entry.sourceUrl.startsWith("https://"), `documentation claim ${entry.claimKey} uses HTTPS source`);
   ok(entry.relevantContractVersion.endsWith("_v1"), `documentation claim ${entry.claimKey} is version-bound`);
 }
