@@ -144,7 +144,7 @@ export const IntegrationConnectionControlSchema = z
       context.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["authorizedAt"],
-        message: "Authorized connections require synthetic authorization evidence"
+        message: "Authorized connections require provider authorization evidence"
       });
     }
     if (
@@ -208,7 +208,7 @@ export const ProviderEntityMappingSchema = z
     mappingSeriesId: UuidSchema,
     mappingRole: z.enum(["primary", "subsidiary", "location", "operating_unit"]),
     status: ProviderEntityMappingStatusSchema,
-    verificationMode: z.literal("synthetic_phase_4"),
+    verificationMode: z.enum(["synthetic_phase_4", "qbo_realm_mapping_v1"]),
     verificationFingerprint: Sha256FingerprintSchema.nullable(),
     verifiedAt: IsoTimestampSchema.nullable(),
     mappedBy: UuidSchema.nullable(),
@@ -225,7 +225,7 @@ export const ProviderEntityMappingSchema = z
       context.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["verificationFingerprint"],
-        message: "Active mappings require synthetic verification evidence"
+        message: "Active mappings require provider verification evidence"
       });
     }
     if (mapping.mappingVersion === 1 && mapping.replacesMappingId !== null) {
@@ -292,7 +292,12 @@ export const IntegrationSyncRunSchema = z
     connectionId: UuidSchema,
     mappingId: UuidSchema.nullable(),
     connectionGeneration: z.number().int().positive().safe(),
-    trigger: z.enum(["synthetic_verification", "manual", "recovery"]),
+    trigger: z.enum([
+      "synthetic_verification",
+      "provider_initialization",
+      "manual",
+      "recovery"
+    ]),
     mode: z.enum(["initialization", "incremental", "backfill", "verification"]),
     state: IntegrationSyncRunStateSchema,
     idempotencyFingerprint: Sha256FingerprintSchema,

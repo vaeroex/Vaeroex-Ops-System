@@ -6,6 +6,7 @@ import {
   BoundedTextSchema,
   IsoTimestampSchema,
   ProviderKeySchema,
+  ProviderEnvironmentKeySchema,
   Sha256FingerprintSchema,
   UuidSchema,
   uniqueStringArray
@@ -103,7 +104,7 @@ export const ProviderAdapterContextSchema = z
     businessEntityId: UuidSchema,
     connectionId: UuidSchema,
     providerKey: ProviderKeySchema,
-    providerEnvironment: BoundedIdentifierSchema,
+    providerEnvironment: ProviderEnvironmentKeySchema,
     providerTenantReferenceFingerprint: Sha256FingerprintSchema,
     connectionConfigurationVersion: z.number().int().positive().safe(),
     mappingVersion: z.number().int().nonnegative().safe()

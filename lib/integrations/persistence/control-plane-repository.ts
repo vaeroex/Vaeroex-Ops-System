@@ -15,10 +15,10 @@ import {
   ProviderEntityMappingStatusSchema
 } from "@/lib/integrations/control-plane/contracts";
 import {
-  PHASE_4_PROVIDER_REGISTRY,
   providerDescriptor,
   safeCapabilitySnapshot
 } from "@/lib/integrations/control-plane/provider-registry";
+import { REGISTERED_PROVIDER_REGISTRY } from "@/lib/integrations/control-plane/registered-provider-registry";
 import {
   CreateIntegrationConnectionIntentSchema,
   CreateIntegrationSyncRunSchema,
@@ -67,7 +67,11 @@ export async function createIntegrationConnectionIntent(
   },
   client: ExternalIntegrationsRpcClient
 ) {
-  const entry = providerDescriptor(input.providerKey, input.providerEnvironment);
+  const entry = providerDescriptor(
+    input.providerKey,
+    input.providerEnvironment,
+    REGISTERED_PROVIDER_REGISTRY
+  );
   const requestedScopes = uniqueStringArray(BoundedIdentifierSchema, 64).parse([
     ...input.requestedScopes
   ]);
@@ -90,9 +94,9 @@ export async function createIntegrationConnectionIntent(
     providerEnvironment: input.providerEnvironment,
     safeDisplayName: input.safeDisplayName,
     requestedScopes,
-    providerDescriptorRegistryVersion: PHASE_4_PROVIDER_REGISTRY.registryVersion,
+    providerDescriptorRegistryVersion: REGISTERED_PROVIDER_REGISTRY.registryVersion,
     providerDescriptorRegistryFingerprint:
-      PHASE_4_PROVIDER_REGISTRY.registryFingerprint,
+      REGISTERED_PROVIDER_REGISTRY.registryFingerprint,
     providerDescriptorFingerprint: entry.descriptorFingerprint,
     adapterVersion: entry.descriptor.adapterVersion,
     capabilitySnapshot: safeCapabilitySnapshot(entry.descriptor),

@@ -146,6 +146,11 @@ equal(
   "node scripts/external-integrations-phase-6-durable-runtime-regression-tests.js",
   "Phase 6 durable-runtime regression script must be registered"
 );
+equal(
+  packageJson.scripts["test:external-integrations-phase-8a0"],
+  "node scripts/external-integrations-phase-8a0-contract-convergence-regression-tests.js",
+  "Phase 8A.0 contract-convergence regression script must be registered"
+);
 
 const protectedDiff = childProcess.execFileSync(
   "git",
@@ -165,7 +170,9 @@ const approvedProtectedPaths = new Set([
   "supabase/migrations/20260821220853_external_integrations_phase_5_credential_security.sql",
   "supabase/tests/external_integrations_phase_5_credential_security.test.sql",
   "supabase/migrations/20260822012253_external_integrations_phase_6_durable_runtime.sql",
-  "supabase/tests/external_integrations_phase_6_durable_runtime.test.sql"
+  "supabase/tests/external_integrations_phase_6_durable_runtime.test.sql",
+  "supabase/migrations/20260822035335_external_integrations_phase_8a0_provider_contract_convergence.sql",
+  "supabase/tests/external_integrations_phase_8a0_contract_convergence.test.sql"
 ]);
 const unexpectedProtectedDiff = protectedDiff
   .split("\n")
@@ -191,7 +198,7 @@ const unexpectedUntrackedMigrations = untrackedMigrations
 equal(
   unexpectedUntrackedMigrations,
   "",
-  "only the approved Phase 1 through Phase 6 migrations may extend the Phase 0 baseline"
+  "only the approved Phase 1 through Phase 6 and Phase 8A.0 migrations may extend the Phase 0 baseline"
 );
 
 console.log(`External integration Phase 0 architecture regressions: ${assertionCount} assertions passed.`);

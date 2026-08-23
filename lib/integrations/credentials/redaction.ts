@@ -42,6 +42,7 @@ export function safeCredentialBrokerError(reasonCode: string) {
     "refresh_not_acquired",
     "refresh_failed",
     "reauthorization_required",
+    "credential_read_failed",
     "disconnect_completed"
   ]);
   return allowed.has(reasonCode)

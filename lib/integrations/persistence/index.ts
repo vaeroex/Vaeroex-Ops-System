@@ -4,6 +4,7 @@ export * from "@/lib/integrations/persistence/credential-repository";
 export * from "@/lib/integrations/persistence/deterministic-commands";
 export * from "@/lib/integrations/persistence/deterministic-repository";
 export * from "@/lib/integrations/persistence/identity";
+export * from "@/lib/integrations/persistence/provider-source-repository";
 export * from "@/lib/integrations/persistence/reconciliation-commands";
 export * from "@/lib/integrations/persistence/serializers";
 export * from "@/lib/integrations/persistence/repository";

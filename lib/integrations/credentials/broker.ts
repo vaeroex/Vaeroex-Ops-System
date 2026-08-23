@@ -14,6 +14,8 @@ import {
   DestroyCredentialCommandSchema,
   OAuthStateConsumeResultSchema,
   PHASE_5_REFRESH_LEASE_SECONDS,
+  ProviderCredentialReadResultSchema,
+  ReadProviderCredentialCommandSchema,
   RefreshLeaseResultSchema,
   RevokeCredentialCommandSchema,
   RotateCredentialCommandSchema,
@@ -24,6 +26,7 @@ import {
   type CompleteRefreshFailureCommand,
   type CreateOAuthStateCommand,
   type DestroyCredentialCommand,
+  type ReadProviderCredentialCommand,
   type RevokeCredentialCommand,
   type RotateCredentialCommand,
   type StoreCredentialCommand
@@ -46,6 +49,10 @@ export type CredentialBrokerStore = Readonly<{
   createOAuthState(command: CreateOAuthStateCommand, requestId: string): PromiseLike<unknown>;
   consumeOAuthState(command: unknown, requestId: string): PromiseLike<unknown>;
   storeCredential(command: StoreCredentialCommand, requestId: string): PromiseLike<unknown>;
+  readProviderCredential(
+    command: ReadProviderCredentialCommand,
+    requestId: string
+  ): PromiseLike<unknown>;
   acquireRefreshLease(command: AcquireRefreshLeaseCommand, requestId: string): PromiseLike<unknown>;
   rotateCredential(command: RotateCredentialCommand, requestId: string): PromiseLike<unknown>;
   completeRefreshFailure(
@@ -60,6 +67,57 @@ export type CredentialBrokerStore = Readonly<{
   destroyCredential(command: DestroyCredentialCommand, requestId: string): PromiseLike<unknown>;
   recordAuthorizationEvent(event: AuthorizationAuditEvent, requestId: string): PromiseLike<unknown>;
 }>;
+
+export class ProviderAccessCredential {
+  readonly providerKey: string;
+  readonly providerEnvironment: string;
+  readonly accessExpiresAt: string;
+  readonly grantedScopes: readonly string[];
+  #accessToken: Buffer | null;
+
+  constructor(input: {
+    providerKey: string;
+    providerEnvironment: string;
+    accessExpiresAt: string;
+    grantedScopes: readonly string[];
+    accessToken: string;
+  }) {
+    this.providerKey = input.providerKey;
+    this.providerEnvironment = input.providerEnvironment;
+    this.accessExpiresAt = input.accessExpiresAt;
+    this.grantedScopes = Object.freeze([...input.grantedScopes]);
+    this.#accessToken = Buffer.from(input.accessToken, "utf8");
+  }
+
+  async use<T>(
+    callback: (value: Readonly<{ accessToken: string }>) => T | PromiseLike<T>
+  ): Promise<T> {
+    if (this.#accessToken === null) {
+      throw new Error("provider_access_credential_already_consumed");
+    }
+    const token = this.#accessToken;
+    try {
+      return await callback({ accessToken: token.toString("utf8") });
+    } finally {
+      token.fill(0);
+      this.#accessToken = null;
+    }
+  }
+
+  toJSON() {
+    return {
+      providerKey: this.providerKey,
+      providerEnvironment: this.providerEnvironment,
+      accessExpiresAt: this.accessExpiresAt,
+      grantedScopes: this.grantedScopes,
+      accessToken: "[redacted]"
+    };
+  }
+
+  toString() {
+    return "[ProviderAccessCredential redacted]";
+  }
+}
 
 export type ProviderSecretStore = Readonly<{
   access(providerKey: string, environment: string): PromiseLike<ProviderApplicationSecret>;
@@ -445,6 +503,84 @@ export class IntegrationCredentialBroker {
     } finally {
       plaintext?.fill(0);
       nextPlaintext?.fill(0);
+    }
+  }
+
+  async readProviderAccessCredential(input: {
+    taskId: string;
+    leaseId: string;
+    leaseOwnerFingerprint: string;
+    expectedCredentialVersion: number;
+    requiredScopes: readonly string[];
+    minimumValiditySeconds: number;
+    requestId: string;
+  }) {
+    const now = this.#clock();
+    const result = ProviderCredentialReadResultSchema.parse(
+      await this.#store.readProviderCredential(
+        ReadProviderCredentialCommandSchema.parse({
+          contractVersion: CREDENTIAL_SECURITY_CONTRACT_VERSIONS.providerRead,
+          taskId: input.taskId,
+          leaseId: input.leaseId,
+          leaseOwnerFingerprint: input.leaseOwnerFingerprint,
+          expectedCredentialVersion: input.expectedCredentialVersion,
+          requiredScopes: sortedCredentialScopes(input.requiredScopes),
+          minimumValiditySeconds: input.minimumValiditySeconds,
+          requestedAt: now.toISOString()
+        }),
+        input.requestId
+      )
+    );
+    if (result.state !== "available") return result;
+
+    let plaintext: Buffer | null = null;
+    try {
+      if (
+        result.providerKey !== this.#provider.providerKey ||
+        result.providerEnvironment !== this.#provider.environment ||
+        result.providerKey !== result.aadContext.providerKey ||
+        result.providerEnvironment !== result.aadContext.environment ||
+        credentialAadDigest(result.aadContext) !== result.aadDigest
+      ) {
+        throw new Error("provider_credential_read_aad_binding_invalid");
+      }
+      plaintext = Buffer.from(
+        await this.#kms.decrypt({
+          keyResource: result.kmsKeyResource,
+          ciphertext: Buffer.from(result.ciphertextBase64, "base64"),
+          additionalAuthenticatedData: credentialAad(result.aadContext)
+        })
+      );
+      const envelope = CredentialEnvelopeSchema.parse(
+        JSON.parse(plaintext.toString("utf8"))
+      );
+      if (
+        envelope.providerKey !== result.providerKey ||
+        envelope.environment !== result.providerEnvironment ||
+        envelope.accessExpiresAt !== result.accessExpiresAt ||
+        result.grantedScopes.some((scope) => !envelope.grantedScopes.includes(scope)) ||
+        input.requiredScopes.some((scope) => !envelope.grantedScopes.includes(scope)) ||
+        Date.parse(envelope.accessExpiresAt) <=
+          now.getTime() + input.minimumValiditySeconds * 1_000
+      ) {
+        throw new Error("provider_credential_read_envelope_binding_invalid");
+      }
+      return {
+        state: "available" as const,
+        credentialId: result.credentialId,
+        credentialVersion: result.credentialVersion,
+        credential: new ProviderAccessCredential({
+          providerKey: envelope.providerKey,
+          providerEnvironment: envelope.environment,
+          accessExpiresAt: envelope.accessExpiresAt,
+          grantedScopes: envelope.grantedScopes,
+          accessToken: envelope.accessToken
+        })
+      };
+    } catch {
+      throw new Error(safeCredentialBrokerError("credential_read_failed"));
+    } finally {
+      plaintext?.fill(0);
     }
   }
 

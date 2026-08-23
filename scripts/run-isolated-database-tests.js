@@ -163,6 +163,17 @@ const phase6TestRoles = [
   "integration_credential_broker_authority"
 ];
 const phase6TestBridgeRole = "phase6_database_test_authority";
+const phase8a0DatabaseTest =
+  "external_integrations_phase_8a0_contract_convergence.test.sql";
+const phase8a0TestRoles = [
+  "integration_control_plane_authority",
+  "integration_oauth_ingress_authority",
+  "integration_credential_broker_authority",
+  "integration_task_dispatch_authority",
+  "integration_provider_runtime_authority",
+  "integration_provider_source_authority"
+];
+const phase8a0TestBridgeRole = "phase8a0_database_test_authority";
 const localBillingServiceRolePrivileges = [
   ["profiles", "SELECT"],
   ["profiles", "UPDATE"],
@@ -348,6 +359,56 @@ async function installPhase6RoleAdapter(Client) {
   };
 }
 
+async function installPhase8a0RoleAdapter(Client) {
+  if (
+    !testFiles.some(
+      (testFile) => path.basename(testFile) === phase8a0DatabaseTest
+    )
+  ) {
+    return async () => undefined;
+  }
+
+  const client = new Client({ connectionString: databaseUrl });
+  let bridgeCreated = false;
+  await client.connect();
+
+  try {
+    await client.query(`drop role if exists ${phase8a0TestBridgeRole}`);
+    await client.query(
+      `create role ${phase8a0TestBridgeRole} nologin noinherit`
+    );
+    bridgeCreated = true;
+    await client.query(
+      `do $grant$ begin execute format(
+        'grant ${phase8a0TestBridgeRole} to %I with inherit false, set true',
+        session_user
+      ); end $grant$;`
+    );
+    for (const role of phase8a0TestRoles) {
+      await client.query(
+        `grant ${role} to ${phase8a0TestBridgeRole}
+          with admin false, inherit false, set true`
+      );
+    }
+  } catch (error) {
+    if (bridgeCreated) {
+      await client
+        .query(`drop role if exists ${phase8a0TestBridgeRole}`)
+        .catch(() => undefined);
+    }
+    await client.end().catch(() => undefined);
+    throw error;
+  }
+
+  return async () => {
+    try {
+      await client.query(`drop role if exists ${phase8a0TestBridgeRole}`);
+    } finally {
+      await client.end().catch(() => undefined);
+    }
+  };
+}
+
 async function runWithPostgresClient() {
   let Client;
   try {
@@ -360,10 +421,12 @@ async function runWithPostgresClient() {
     await installLocalBillingServiceRoleAdapter(Client);
   let restorePhase5Roles = async () => undefined;
   let restorePhase6Roles = async () => undefined;
+  let restorePhase8a0Roles = async () => undefined;
 
   try {
     restorePhase5Roles = await installPhase5RoleAdapter(Client);
     restorePhase6Roles = await installPhase6RoleAdapter(Client);
+    restorePhase8a0Roles = await installPhase8a0RoleAdapter(Client);
     for (const testFile of testFiles) {
       const client = new Client({
         connectionString: databaseUrl,
@@ -418,6 +481,7 @@ async function runWithPostgresClient() {
       process.stdout.write(`${testFile}: ${assertionCount} assertions passed.\n`);
     }
   } finally {
+    await restorePhase8a0Roles();
     await restorePhase6Roles();
     await restorePhase5Roles();
     await restoreLocalBillingServiceRole();
