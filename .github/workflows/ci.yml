@@ -64,6 +64,9 @@ jobs:
       - name: External integrations Phase 7 QBO provider regressions
         run: pnpm test:external-integrations-phase-7
 
+      - name: External integrations Phase 8A.0 contract-convergence regressions
+        run: pnpm test:external-integrations-phase-8a0
+
       - name: TypeScript check
         run: pnpm typecheck
 
@@ -121,7 +124,8 @@ jobs:
             supabase/tests/external_integrations_phase_3_deterministic_dependencies.test.sql \
             supabase/tests/external_integrations_phase_4_control_plane.test.sql \
             supabase/tests/external_integrations_phase_5_credential_security.test.sql \
-            supabase/tests/external_integrations_phase_6_durable_runtime.test.sql
+            supabase/tests/external_integrations_phase_6_durable_runtime.test.sql \
+            supabase/tests/external_integrations_phase_8a0_contract_convergence.test.sql
 
       - name: Remove isolated database state
         if: always()

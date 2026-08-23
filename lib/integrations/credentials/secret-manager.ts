@@ -1,16 +1,18 @@
 import { z } from "zod";
 
 import {
-  CredentialEnvironmentSchema,
   SecretManagerVersionResourceSchema
 } from "@/lib/integrations/credentials/contracts";
-import { ProviderKeySchema } from "@/lib/integrations/contracts/primitives";
+import {
+  ProviderEnvironmentKeySchema,
+  ProviderKeySchema
+} from "@/lib/integrations/contracts/primitives";
 
 const ProviderApplicationSecretPayloadSchema = z
   .object({
     schemaVersion: z.literal("provider_application_secret_v1"),
     providerKey: ProviderKeySchema,
-    environment: CredentialEnvironmentSchema,
+    environment: ProviderEnvironmentKeySchema,
     clientId: z.string().min(8).max(512),
     clientSecret: z.string().min(16).max(16_384)
   })
@@ -72,7 +74,7 @@ export class GoogleSecretManagerProviderSecrets {
 
   async access(providerKey: string, environment: string) {
     const checkedProvider = ProviderKeySchema.parse(providerKey);
-    const checkedEnvironment = CredentialEnvironmentSchema.parse(environment);
+    const checkedEnvironment = ProviderEnvironmentKeySchema.parse(environment);
     const resource = this.#resources.get(
       `${checkedProvider}:${checkedEnvironment}`
     );

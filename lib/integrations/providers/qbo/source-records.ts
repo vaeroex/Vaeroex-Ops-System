@@ -35,6 +35,12 @@ export function qboMinimizedRecordToExternalSourceVersion(input: {
   if (input.record.provider.providerKey !== QBO_PROVIDER_KEY) {
     throw new Error("qbo_record_provider_mismatch");
   }
+  if (
+    input.record.provider.sourceEnvironment === "unknown" ||
+    input.record.provider.sourceEnvironment !== input.context.providerEnvironment
+  ) {
+    throw new Error("qbo_source_environment_mismatch");
+  }
   const changeKind = classifyQboSourceChange({
     previous: input.previousRecord,
     current: input.record

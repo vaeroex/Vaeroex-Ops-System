@@ -16,6 +16,7 @@ export const BoundedIdentifierSchema = z
   .min(1)
   .max(EXTERNAL_INTEGRATION_LIMITS.boundedIdentifier)
   .regex(/^[A-Za-z0-9][A-Za-z0-9._:/-]*$/);
+export const ProviderEnvironmentKeySchema = BoundedIdentifierSchema;
 export const BoundedLabelSchema = z.string().trim().min(1).max(EXTERNAL_INTEGRATION_LIMITS.boundedLabel);
 export const BoundedTextSchema = z.string().max(EXTERNAL_INTEGRATION_LIMITS.boundedText);
 export const ProviderKeySchema = z.string().min(1).max(64).regex(/^[a-z][a-z0-9_-]*$/);

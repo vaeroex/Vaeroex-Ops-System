@@ -109,7 +109,12 @@ export const CreateIntegrationSyncRunSchema = z
     businessEntityId: UuidSchema,
     connectionId: UuidSchema,
     mappingId: UuidSchema.nullable(),
-    trigger: z.enum(["synthetic_verification", "manual", "recovery"]),
+    trigger: z.enum([
+      "synthetic_verification",
+      "provider_initialization",
+      "manual",
+      "recovery"
+    ]),
     mode: z.enum(["initialization", "incremental", "backfill", "verification"]),
     idempotencyFingerprint: Sha256FingerprintSchema,
     windowStartAt: IsoTimestampSchema.nullable(),

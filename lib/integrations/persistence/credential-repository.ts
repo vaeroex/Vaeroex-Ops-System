@@ -12,6 +12,8 @@ import {
   CredentialMutationResultSchema,
   DestroyCredentialCommandSchema,
   OAuthStateConsumeResultSchema,
+  ProviderCredentialReadResultSchema,
+  ReadProviderCredentialCommandSchema,
   RefreshLeaseResultSchema,
   RevokeCredentialCommandSchema,
   RotateCredentialCommandSchema,
@@ -93,6 +95,23 @@ export async function acquireIntegrationCredentialRefreshLease(
     await credentialRpc(
       "acquire_integration_credential_refresh_lease_v1",
       { p_command: AcquireRefreshLeaseCommandSchema.parse(input), p_request_id: requestId(id) },
+      client
+    )
+  );
+}
+
+export async function readIntegrationProviderCredential(
+  input: unknown,
+  id: string,
+  client: ExternalIntegrationsRpcClient
+) {
+  return ProviderCredentialReadResultSchema.parse(
+    await credentialRpc(
+      "read_integration_provider_credential_v1",
+      {
+        p_command: ReadProviderCredentialCommandSchema.parse(input),
+        p_request_id: requestId(id)
+      },
       client
     )
   );

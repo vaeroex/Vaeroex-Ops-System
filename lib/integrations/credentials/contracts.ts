@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   BoundedIdentifierSchema,
   IsoTimestampSchema,
+  ProviderEnvironmentKeySchema,
   ProviderKeySchema,
   Sha256FingerprintSchema,
   UuidSchema
@@ -13,7 +14,8 @@ export const CREDENTIAL_SECURITY_CONTRACT_VERSIONS = {
   credentialAuthority: "integration_credential_authority_v1",
   credentialEnvelope: "oauth_credential_envelope_v1",
   credentialAad: "oauth_credential_aad_v1",
-  brokerAudit: "integration_authorization_audit_v1"
+  brokerAudit: "integration_authorization_audit_v1",
+  providerRead: "integration_provider_credential_read_v1"
 } as const;
 
 export const PHASE_5_MODEL_CALL_COUNT = 0 as const;
@@ -43,13 +45,6 @@ const SortedScopeSetSchema = z
     }
   });
 
-export const CredentialEnvironmentSchema = z.enum([
-  "development",
-  "test",
-  "preview",
-  "production"
-]);
-
 export const OAuthReturnIntentSchema = z
   .string()
   .min(1)
@@ -67,7 +62,7 @@ export const CreateOAuthStateCommandSchema = z
     connectionId: UuidSchema,
     connectionGeneration: z.number().int().positive().safe(),
     providerKey: ProviderKeySchema,
-    providerEnvironment: CredentialEnvironmentSchema,
+    providerEnvironment: ProviderEnvironmentKeySchema,
     initiatedBy: UuidSchema,
     requestedScopes: SortedScopeSetSchema,
     returnIntent: OAuthReturnIntentSchema,
@@ -103,7 +98,7 @@ export const OAuthStateConsumeResultSchema = z
         connectionId: UuidSchema,
         connectionGeneration: z.number().int().positive().safe(),
         providerKey: ProviderKeySchema,
-        providerEnvironment: CredentialEnvironmentSchema,
+        providerEnvironment: ProviderEnvironmentKeySchema,
         requestedScopes: SortedScopeSetSchema,
         returnIntent: OAuthReturnIntentSchema
       })
@@ -125,7 +120,8 @@ export const CredentialEnvelopeSchema = z
   .object({
     schemaVersion: z.literal(CREDENTIAL_SECURITY_CONTRACT_VERSIONS.credentialEnvelope),
     providerKey: ProviderKeySchema,
-    environment: CredentialEnvironmentSchema,
+    // This legacy field name means the provider descriptor environment key.
+    environment: ProviderEnvironmentKeySchema,
     externalAuthorizedEntityReference: z.string().min(1).max(512).nullable(),
     accessToken: z.string().min(16).max(16_384),
     accessExpiresAt: IsoTimestampSchema,
@@ -172,7 +168,8 @@ export const CredentialAadContextSchema = z
   .object({
     schemaVersion: z.literal(CREDENTIAL_SECURITY_CONTRACT_VERSIONS.credentialAad),
     purpose: z.literal("provider_oauth_credential"),
-    environment: CredentialEnvironmentSchema,
+    // The V1 AAD bytes already bind the provider environment under this name.
+    environment: ProviderEnvironmentKeySchema,
     workspaceId: UuidSchema,
     connectionId: UuidSchema,
     connectionGeneration: z.number().int().positive().safe(),
@@ -207,7 +204,7 @@ export const StoreCredentialCommandSchema = z
     connectionId: UuidSchema,
     connectionGeneration: z.number().int().positive().safe(),
     providerKey: ProviderKeySchema,
-    providerEnvironment: CredentialEnvironmentSchema,
+    providerEnvironment: ProviderEnvironmentKeySchema,
     initiatedBy: UuidSchema,
     expectedConnectionRowVersion: z.number().int().positive().safe(),
     credentialVersion: z.literal(1),
@@ -260,13 +257,53 @@ export const RefreshLeaseResultSchema = z.discriminatedUnion("acquired", [
       aadDigest: Sha256FingerprintSchema,
       kmsKeyResource: KmsCryptoKeyResourceSchema,
       aadContext: CredentialAadContextSchema,
-      providerEnvironment: CredentialEnvironmentSchema,
+      providerEnvironment: ProviderEnvironmentKeySchema,
       grantedScopes: SortedScopeSetSchema,
       leaseId: UuidSchema,
       leaseOwnerFingerprint: Sha256FingerprintSchema,
       leaseExpiresAt: IsoTimestampSchema
     })
     .strict()
+  ]);
+
+export const ReadProviderCredentialCommandSchema = z
+  .object({
+    contractVersion: z.literal(CREDENTIAL_SECURITY_CONTRACT_VERSIONS.providerRead),
+    taskId: UuidSchema,
+    leaseId: UuidSchema,
+    leaseOwnerFingerprint: Sha256FingerprintSchema,
+    expectedCredentialVersion: z.number().int().positive().safe(),
+    requiredScopes: SortedScopeSetSchema,
+    minimumValiditySeconds: z.number().int().min(30).max(900).safe(),
+    requestedAt: IsoTimestampSchema
+  })
+  .strict();
+
+const ProviderCredentialReadIdentitySchema = z
+  .object({
+    credentialId: UuidSchema,
+    credentialVersion: z.number().int().positive().safe(),
+    providerKey: ProviderKeySchema,
+    providerEnvironment: ProviderEnvironmentKeySchema,
+    accessExpiresAt: IsoTimestampSchema
+  })
+  .strict();
+
+export const ProviderCredentialReadResultSchema = z.discriminatedUnion("state", [
+  ProviderCredentialReadIdentitySchema.extend({
+    state: z.literal("available"),
+    ciphertextBase64: CiphertextBase64Schema,
+    aadDigest: Sha256FingerprintSchema,
+    kmsKeyResource: KmsCryptoKeyResourceSchema,
+    aadContext: CredentialAadContextSchema,
+    grantedScopes: SortedScopeSetSchema
+  }).strict(),
+  ProviderCredentialReadIdentitySchema.extend({
+    state: z.literal("refresh_required")
+  }).strict(),
+  ProviderCredentialReadIdentitySchema.extend({
+    state: z.literal("credential_version_stale")
+  }).strict()
 ]);
 
 export const RotateCredentialCommandSchema = z
@@ -442,6 +479,9 @@ export type CreateOAuthStateCommand = Readonly<z.infer<typeof CreateOAuthStateCo
 export type ConsumeOAuthStateCommand = Readonly<z.infer<typeof ConsumeOAuthStateCommandSchema>>;
 export type StoreCredentialCommand = Readonly<z.infer<typeof StoreCredentialCommandSchema>>;
 export type AcquireRefreshLeaseCommand = Readonly<z.infer<typeof AcquireRefreshLeaseCommandSchema>>;
+export type ReadProviderCredentialCommand = Readonly<
+  z.infer<typeof ReadProviderCredentialCommandSchema>
+>;
 export type RotateCredentialCommand = Readonly<z.infer<typeof RotateCredentialCommandSchema>>;
 export type CompleteRefreshFailureCommand = Readonly<z.infer<typeof CompleteRefreshFailureCommandSchema>>;
 export type RevokeCredentialCommand = Readonly<z.infer<typeof RevokeCredentialCommandSchema>>;
