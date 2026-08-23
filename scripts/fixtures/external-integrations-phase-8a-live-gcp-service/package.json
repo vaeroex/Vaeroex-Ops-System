@@ -1,0 +1,11 @@
+{
+  "name": "vaeroex-external-integrations-phase-8a-live-gcp-service",
+  "version": "0.0.0",
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node server.js"
+  }
+}

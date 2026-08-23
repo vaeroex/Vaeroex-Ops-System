@@ -14,6 +14,7 @@ export const QBO_PAGINATION_POLICY_VERSION = "qbo_query_pagination_policy_v1" as
 export const QBO_CDC_POLICY_VERSION = "qbo_cdc_planning_policy_v1" as const;
 export const QBO_HISTORICAL_SYNC_POLICY_VERSION = "qbo_historical_sync_policy_v1" as const;
 export const QBO_WEBHOOK_CONTRACT_VERSION = "qbo_cloudevents_change_hint_v1" as const;
+export const QBO_WEBHOOK_SIGNATURE_CONTRACT_VERSION = "qbo_webhook_signature_v1" as const;
 export const QBO_ERROR_POLICY_VERSION = "qbo_error_rate_limit_policy_v1" as const;
 export const QBO_MODEL_CALL_COUNT = 0 as const;
 

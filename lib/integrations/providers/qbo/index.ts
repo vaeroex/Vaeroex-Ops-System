@@ -7,4 +7,5 @@ export * from "@/lib/integrations/providers/qbo/planning";
 export * from "@/lib/integrations/providers/qbo/read-only";
 export * from "@/lib/integrations/providers/qbo/reports";
 export * from "@/lib/integrations/providers/qbo/source-records";
+export * from "@/lib/integrations/providers/qbo/webhook-signature";
 export * from "@/lib/integrations/providers/qbo/webhooks";

@@ -20,6 +20,7 @@
     "test:external-integrations-phase-6": "node scripts/external-integrations-phase-6-durable-runtime-regression-tests.js",
     "test:external-integrations-phase-7": "node scripts/external-integrations-phase-7-qbo-adapter-regression-tests.js",
     "test:external-integrations-phase-8a0": "node scripts/external-integrations-phase-8a0-contract-convergence-regression-tests.js",
+    "test:external-integrations-phase-8a-live": "node scripts/external-integrations-phase-8a-live-gcp-regression-tests.js",
     "security:check": "node scripts/security-check.ts && node scripts/adversarial-regression-tests.js && node scripts/security-high-remediation-regression-tests.js && node scripts/security-medium-hardening-regression-tests.js && node scripts/auth-captcha-regression-tests.js && node scripts/customer-1-billing-remediation-regression-tests.js && node scripts/platform-failure-evidence-regression-tests.js && node scripts/demo-retirement-regression-tests.js && node scripts/search-ask-generation-regression-tests.js && node scripts/persistent-ask-regression-tests.js && node scripts/ask-vaeroex-retirement-regression-tests.js",
     "test:adversarial": "node scripts/adversarial-regression-tests.js",
     "test:security-high-remediation": "node scripts/security-high-remediation-regression-tests.js",
