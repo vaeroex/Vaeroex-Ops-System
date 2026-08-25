@@ -6,7 +6,8 @@ select no_plan();
 
 grant usage on schema extensions to
   integration_oauth_ingress_authority,
-  integration_credential_broker_authority;
+  integration_credential_broker_authority,
+  integration_control_plane_authority;
 
 create or replace function pg_temp.raises_sqlstate(p_sql text, p_expected text)
 returns boolean
