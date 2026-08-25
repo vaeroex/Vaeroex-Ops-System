@@ -976,10 +976,51 @@ select is(
     select pg_catalog.count(*)::integer
     from phase6_concurrent_lease_results
     where not (result ->> 'acquired')::boolean
-      and result ->> 'reasonCode' = 'lease_held'
   ),
   1,
-  'concurrent loser receives a bounded lease-held result'
+  'exactly one concurrent worker receives no execution authority'
+);
+
+select is(
+  (
+    select pg_catalog.count(*)::integer
+    from phase6_concurrent_lease_results
+    where (result ->> 'acquired')::boolean
+      and not (result ->> 'idempotent')::boolean
+      and not (result ->> 'terminalReplay')::boolean
+      and result ->> 'reasonCode' = 'leased'
+      and result ->> 'state' = 'leased'
+      and (result ->> 'attemptCount')::integer = 1
+  ),
+  1,
+  'concurrent winner returns the bounded leased-owner result'
+);
+
+select is(
+  (
+    select pg_catalog.count(*)::integer
+    from phase6_concurrent_lease_results
+    where not (result ->> 'acquired')::boolean
+      and (result ->> 'idempotent')::boolean
+      and not (result ->> 'terminalReplay')::boolean
+      and result ->> 'reasonCode' = 'delivery_replayed'
+      and result ->> 'state' = 'leased'
+      and (result ->> 'attemptCount')::integer = 1
+  ),
+  1,
+  'same-tuple concurrent loser returns the bounded delivery-replayed result'
+);
+
+select ok(
+  (
+    select task.state = 'leased'
+      and task.attempt_count = 1
+      and task.lease_id is not null
+      and task.durable_effect_fingerprint is null
+    from private.integration_sync_tasks as task
+    where task.id = '16c00000-0000-4000-8000-000000000001'
+  ),
+  'the concurrent race creates one lease and no provider effect'
 );
 
 select is(
@@ -1001,6 +1042,46 @@ select is(
   0,
   'concurrent first delivery persists the required execution count zero'
 );
+
+set local role integration_provider_runtime_authority;
+select ok(
+  (
+    select not (contention.result ->> 'acquired')::boolean
+      and not (contention.result ->> 'idempotent')::boolean
+      and not (contention.result ->> 'terminalReplay')::boolean
+      and contention.result ->> 'reasonCode' = 'lease_held'
+      and contention.result ->> 'state' = 'leased'
+      and (contention.result ->> 'attemptCount')::integer = 1
+    from (
+      select public.lease_integration_sync_task_v1(
+        jsonb_build_object(
+          'workspaceId', 'b6c00000-0000-4000-8000-000000000001',
+          'businessEntityId', 'c6c00000-0000-4000-8000-000000000001',
+          'connectionId', 'd6c00000-0000-4000-8000-000000000001',
+          'connectionGeneration', 1,
+          'taskId', '16c00000-0000-4000-8000-000000000001',
+          'expectedRowVersion', 3,
+          'workerKind', 'provider_runtime',
+          'leaseId', '66c00000-0000-4000-8000-000000000005',
+          'leaseOwnerFingerprint',
+            'sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',
+          'leaseSeconds', 120,
+          'dispatcherTaskName',
+            'projects/phase6-test/locations/us-central1/queues/provider-interactive/tasks/eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
+          'deliveryDispatchGeneration', 1,
+          'deliveryRetryCount', 1,
+          'deliveryExecutionCount', 0,
+          'deliveryAttemptFingerprint',
+            'sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd'
+        ),
+        'phase6-active-lease-contention',
+        'phase6-provider-worker-3'
+      ) as result
+    ) as contention
+  ),
+  'a genuinely later tuple remains bounded by distinguishable active-lease contention'
+);
+reset role;
 
 -- Close the first synthetic proof lease before the independent zero/zero race
 -- so admission control cannot become the result under test.
@@ -1125,9 +1206,11 @@ select is(
     from phase6_concurrent_zero_results
     where not (result ->> 'acquired')::boolean
       and (result ->> 'idempotent')::boolean
+      and not (result ->> 'terminalReplay')::boolean
+      and result ->> 'reasonCode' = 'delivery_replayed'
   ),
   1,
-  'the identical execution-count-zero loser converges as an idempotent replay'
+  'the identical execution-count-zero loser converges as a bounded idempotent replay'
 );
 
 select ok(
@@ -1138,6 +1221,8 @@ select ok(
       and task.last_delivery_dispatch_generation = task.dispatch_generation
       and task.last_delivery_retry_count = 0
       and task.last_delivery_execution_count = 0
+      and task.lease_id is not null
+      and task.durable_effect_fingerprint is null
     from private.integration_sync_tasks as task
     where task.id = '16c00000-0000-4000-8000-000000000002'
   ),
