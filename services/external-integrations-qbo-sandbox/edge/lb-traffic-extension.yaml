@@ -1,0 +1,19 @@
+name: p8b-oauth-callback-edge
+forwardingRules:
+  - https://www.googleapis.com/compute/v1/projects/vaeroex-p8b-20260823-84b2f0/global/forwardingRules/p8b-oauth-edge-forwarding-rule
+loadBalancingScheme: EXTERNAL_MANAGED
+extensionChains:
+  - name: callback-only
+    matchCondition:
+      celExpression: 'request.path.startsWith("/")'
+    extensions:
+      - name: strip-sensitive-query
+        service: projects/vaeroex-p8b-20260823-84b2f0/locations/global/wasmPlugins/p8b-oauth-callback-edge
+        failOpen: false
+        supportedEvents:
+          - REQUEST_HEADERS
+        forwardAttributes:
+          - request.host
+          - request.method
+          - request.path
+          - request.query

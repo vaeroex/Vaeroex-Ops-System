@@ -37,13 +37,13 @@ export const QBO_SYNTHETIC_MASTER_FIXTURES: Record<string, unknown> = {
     UnsupportedCustomField: "ignore-me"
   },
   Account: {
-    Id: "41",
+    Id: "401",
     SyncToken: "2",
     MetaData: metadata,
-    Name: "Operating Checking",
-    AccountType: "Bank",
-    AccountSubType: "Checking",
-    Classification: "Asset",
+    Name: "Services Revenue",
+    AccountType: "Income",
+    AccountSubType: "ServiceFeeIncome",
+    Classification: "Revenue",
     Active: true,
     CurrencyRef: { value: "USD", name: "United States Dollar" },
     AcctNum: "123456789",

@@ -16,6 +16,7 @@ import type {
   CredentialKmsEncryptRequest
 } from "@/lib/integrations/credentials/kms";
 import { PHASE_5_LEAKAGE_CANARIES } from "@/lib/integrations/credentials/redaction";
+import { ProviderCredentialRefreshFailure } from "@/lib/integrations/credentials/provider-failure";
 import type { ProviderApplicationSecret } from "@/lib/integrations/credentials/secret-manager";
 
 export type SyntheticProviderFailureCode =
@@ -24,12 +25,10 @@ export type SyntheticProviderFailureCode =
   | "provider_transient"
   | "scope_loss";
 
-export class SyntheticProviderFailure extends Error {
-  readonly code: SyntheticProviderFailureCode;
-
+export class SyntheticProviderFailure extends ProviderCredentialRefreshFailure {
   constructor(code: SyntheticProviderFailureCode) {
-    super("synthetic_provider_authorization_failed");
-    this.code = code;
+    super(code);
+    this.name = "SyntheticProviderFailure";
   }
 }
 
@@ -91,6 +90,8 @@ export class SyntheticCredentialKms implements CredentialKms {
 export class SyntheticOAuthProvider {
   readonly providerKey = "synthetic" as const;
   readonly environment = "test" as const;
+  readonly refreshTokenRotationPolicy = "must_rotate" as const;
+  readonly tokenType = "bearer" as const;
   readonly #activeRefreshTokens = new Set<string>();
   readonly #revokedRefreshTokens = new Set<string>();
   #sequence = 0;

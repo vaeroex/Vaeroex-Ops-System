@@ -152,7 +152,15 @@ export const CloudTaskDeliveryMetadataSchema = z
     retryCount: z.number().int().nonnegative().max(100),
     executionCount: z.number().int().nonnegative().max(100)
   })
-  .strict();
+  .strict()
+  .superRefine((value, context) => {
+    if (value.executionCount > value.retryCount) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Cloud Tasks execution count cannot exceed retry count"
+      });
+    }
+  });
 
 export const VerifiedGoogleOidcClaimsSchema = z
   .object({

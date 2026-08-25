@@ -119,6 +119,7 @@ class InMemoryCredentialStore {
       this.connectionStatus !== "pending_authorization";
     if (mismatch) return { accepted: false, reasonCode: "state_invalid" };
     state.status = "consumed";
+    state.consumedAt = new Date(Date.parse(command.consumedAt) + 1).toISOString();
     const result = {
       accepted: true,
       stateId: state.id,
@@ -129,7 +130,8 @@ class InMemoryCredentialStore {
       providerKey: state.providerKey,
       providerEnvironment: state.providerEnvironment,
       requestedScopes: state.requestedScopes,
-      returnIntent: state.returnIntent
+      returnIntent: state.returnIntent,
+      consumedAt: state.consumedAt
     };
     this.clientOutputs.push(result);
     return result;
@@ -138,6 +140,9 @@ class InMemoryCredentialStore {
   async storeCredential(command) {
     const state = [...this.states.values()].find((candidate) => candidate.id === command.oauthStateId);
     if (!state || state.status !== "consumed") throw new Error("state_not_consumed");
+    if (Date.parse(command.authorizedAt) < Date.parse(state.consumedAt)) {
+      throw new Error("authorized_before_state_consumption");
+    }
     this.connectionStatus = "authorized_unmapped";
     const value = {
       ...command,

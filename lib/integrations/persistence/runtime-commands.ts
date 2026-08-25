@@ -38,9 +38,20 @@ export const LeaseRuntimeTaskCommandSchema = TaskScopeSchema.extend({
   leaseOwnerFingerprint: Sha256FingerprintSchema,
   leaseSeconds: z.number().int().min(30).max(900),
   dispatcherTaskName: z.string().min(1).max(1_024),
+  deliveryDispatchGeneration: z.number().int().positive().safe(),
+  deliveryRetryCount: z.number().int().nonnegative().max(100),
   deliveryExecutionCount: z.number().int().nonnegative().max(100),
   deliveryAttemptFingerprint: Sha256FingerprintSchema
-}).strict();
+})
+  .strict()
+  .superRefine((value, context) => {
+    if (value.deliveryExecutionCount > value.deliveryRetryCount) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Cloud Tasks execution count cannot exceed retry count"
+      });
+    }
+  });
 
 export const HeartbeatRuntimeTaskCommandSchema = TaskScopeSchema.extend({
   leaseId: UuidSchema,

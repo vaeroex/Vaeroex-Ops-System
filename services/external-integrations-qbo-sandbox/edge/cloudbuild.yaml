@@ -1,0 +1,32 @@
+steps:
+  - name: mirror.gcr.io/library/golang@sha256:b970e6d47c09fdd34179acef5c4fecaf6410f0b597a759733b3cbea04b4e604a
+    id: test
+    entrypoint: /bin/bash
+    args:
+      - -ceu
+      - |-
+        test -z "$(gofmt -l .)"
+        go test -count=1 .
+  - name: mirror.gcr.io/library/golang@sha256:b970e6d47c09fdd34179acef5c4fecaf6410f0b597a759733b3cbea04b4e604a
+    id: compile
+    entrypoint: /bin/bash
+    args:
+      - -ceu
+      - >-
+        GOOS=wasip1 GOARCH=wasm
+        go build -buildvcs=false -buildmode=c-shared -trimpath
+        -o package/plugin.wasm ./plugin
+  - name: gcr.io/cloud-builders/docker@sha256:2e8d40d8e48dc14fab4213d5e532d74f63fd403d9e8d7f6463096a75820286c3
+    id: package
+    args:
+      - build
+      - --no-cache
+      - --platform
+      - wasm
+      - --tag
+      - ${_PLUGIN_IMAGE}
+      - package
+images:
+  - ${_PLUGIN_IMAGE}
+options:
+  logging: CLOUD_LOGGING_ONLY

@@ -34,6 +34,12 @@ jobs:
           node-version: 24
           cache: pnpm
 
+      - name: Set up Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version: 1.24.0
+          cache-dependency-path: services/external-integrations-qbo-sandbox/edge/go.sum
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
@@ -69,6 +75,19 @@ jobs:
 
       - name: External integrations Phase 8A live-GCP readiness regressions
         run: pnpm test:external-integrations-phase-8a-live
+
+      - name: External integrations Phase 8B QBO sandbox regressions
+        run: pnpm test:external-integrations-phase-8b
+
+      - name: External integrations Phase 8B OAuth callback edge tests
+        working-directory: services/external-integrations-qbo-sandbox/edge
+        run: |
+          test -z "$(gofmt -l .)"
+          go test -count=1 .
+          GOOS=wasip1 GOARCH=wasm go build -buildvcs=false -buildmode=c-shared -trimpath -o /tmp/p8b-oauth-callback-edge.wasm ./plugin
+
+      - name: Build external integrations QBO sandbox runtime
+        run: pnpm build:external-integrations-qbo-sandbox
 
       - name: TypeScript check
         run: pnpm typecheck
@@ -128,7 +147,15 @@ jobs:
             supabase/tests/external_integrations_phase_4_control_plane.test.sql \
             supabase/tests/external_integrations_phase_5_credential_security.test.sql \
             supabase/tests/external_integrations_phase_6_durable_runtime.test.sql \
-            supabase/tests/external_integrations_phase_8a0_contract_convergence.test.sql
+            supabase/tests/external_integrations_phase_8a0_contract_convergence.test.sql \
+            supabase/tests/external_integrations_phase_8b_qbo_sandbox_validation.test.sql \
+            supabase/tests/external_integrations_phase_8b_credential_refresh_recovery.test.sql \
+            supabase/tests/external_integrations_phase_8b_same_generation_reauthorization.test.sql \
+            supabase/tests/external_integrations_phase_8b_expired_refresh_lease_reclamation.test.sql \
+            supabase/tests/external_integrations_phase_8b_zero_based_delivery_clean.test.sql
+
+      - name: Verify fixture-rich zero-based delivery migration
+        run: node scripts/run-phase8b-zero-based-delivery-migration-tests.js
 
       - name: Remove isolated database state
         if: always()

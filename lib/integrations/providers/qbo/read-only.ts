@@ -6,6 +6,7 @@ export type QboHttpOperation = Readonly<{
 
 const allowedReadPaths = [
   /^\/v3\/company\/[A-Za-z0-9._:-]+\/query$/,
+  /^\/v3\/company\/[A-Za-z0-9._:-]+\/companyinfo\/[A-Za-z0-9._:-]+$/,
   /^\/v3\/company\/[A-Za-z0-9._:-]+\/reports\/[A-Za-z0-9]+$/,
   /^\/v3\/company\/[A-Za-z0-9._:-]+\/cdc$/
 ];

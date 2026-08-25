@@ -1,4 +1,8 @@
-import { externalSourceFingerprint } from "@/lib/integrations/contracts/canonical";
+import {
+  canonicalContractJson,
+  externalSourceFingerprint
+} from "@/lib/integrations/contracts/canonical";
+import { ContractJsonObjectSchema } from "@/lib/integrations/contracts/primitives";
 import {
   ExternalSourceRecordVersionSchema,
   type ExternalSourceRecordVersion
@@ -6,7 +10,8 @@ import {
 import { EXTERNAL_INTEGRATION_CONTRACT_VERSIONS } from "@/lib/integrations/contracts/versions";
 import {
   QBO_PROVIDER_KEY,
-  type QboMinimizedSourceRecord
+  type QboMinimizedSourceRecord,
+  type QboReportControlObservation
 } from "@/lib/integrations/providers/qbo/contracts";
 import { classifyQboSourceChange } from "@/lib/integrations/providers/qbo/minimizers";
 import type { ProviderAdapterContext } from "@/lib/integrations/contracts/provider-adapter";
@@ -88,6 +93,95 @@ export function qboMinimizedRecordToExternalSourceVersion(input: {
     validation: {
       state: "pending",
       validatorVersion: "qbo_phase_7_contract_validator_v1",
+      issues: []
+    },
+    receivedAt: input.receivedAt
+  };
+  const parsed = ExternalSourceRecordVersionSchema.parse(draft);
+  return ExternalSourceRecordVersionSchema.parse({
+    ...parsed,
+    sourceFingerprint: externalSourceFingerprint(parsed)
+  });
+}
+
+export function qboReportToExternalSourceVersion(input: {
+  context: ProviderAdapterContext;
+  report: QboReportControlObservation;
+  id: string;
+  immutableVersion: number;
+  priorVersionId: string | null;
+  previousReport?: QboReportControlObservation | null;
+  observedAt: string;
+  synchronizedAt: string;
+  ingestedAt: string;
+  receivedAt: string;
+}) {
+  if (
+    input.context.providerKey !== QBO_PROVIDER_KEY ||
+    input.report.provider.providerKey !== QBO_PROVIDER_KEY
+  ) {
+    throw new Error("qbo_report_context_provider_mismatch");
+  }
+  if (
+    input.report.provider.sourceEnvironment === "unknown" ||
+    input.report.provider.sourceEnvironment !== input.context.providerEnvironment
+  ) {
+    throw new Error("qbo_report_source_environment_mismatch");
+  }
+  const providerRecordId = [
+    input.report.reportType,
+    input.report.reportBasis,
+    input.report.periodStart ?? "open",
+    input.report.periodEnd ?? "open",
+    input.report.sourceCurrency
+  ].join(":");
+  const draft: ExternalSourceRecordVersion = {
+    contractVersion: EXTERNAL_INTEGRATION_CONTRACT_VERSIONS.sourceRecord,
+    id: input.id,
+    workspaceId: input.context.workspaceId,
+    businessEntityId: input.context.businessEntityId,
+    connectionId: input.context.connectionId,
+    immutableVersion: input.immutableVersion,
+    priorVersionId: input.priorVersionId,
+    recordKind: `qbo_report_${input.report.reportType.toLowerCase()}`,
+    source: {
+      kind: "provider",
+      providerKey: QBO_PROVIDER_KEY,
+      providerRecordType: input.report.reportType,
+      providerRecordId,
+      providerVersionReference: input.observedAt
+    },
+    temporal: {
+      basis: "period",
+      providerCreatedAt: null,
+      providerUpdatedAt: null,
+      observedAt: input.observedAt,
+      synchronizedAt: input.synchronizedAt,
+      ingestedAt: input.ingestedAt,
+      effectiveAt: null,
+      postingDate: null,
+      periodStart: input.report.periodStart,
+      periodEnd: input.report.periodEnd,
+      sourceTimeZone: null
+    },
+    accounting: {
+      basis: input.report.reportBasis,
+      currency: input.report.sourceCurrency
+    },
+    normalizedSchemaVersion: input.report.parserVersion,
+    changeKind:
+      input.priorVersionId === null
+        ? "created"
+        : input.previousReport &&
+            canonicalContractJson(input.previousReport) ===
+              canonicalContractJson(input.report)
+          ? "unchanged"
+          : "updated",
+    normalizedProjection: ContractJsonObjectSchema.parse(input.report),
+    trust: "untrusted_external_input",
+    validation: {
+      state: "pending",
+      validatorVersion: "qbo_phase_8b_deterministic_validator_v1",
       issues: []
     },
     receivedAt: input.receivedAt

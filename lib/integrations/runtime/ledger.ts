@@ -33,7 +33,10 @@ export type RuntimeTaskRecord = CreateRuntimeTaskCommand & {
   leaseOwnerFingerprint: string | null;
   leaseExpiresAt: string | null;
   heartbeatAt: string | null;
-  lastDeliveryExecutionCount: number;
+  deliveryAttributionState: RuntimeDeliveryAttributionState;
+  lastDeliveryDispatchGeneration: number | null;
+  lastDeliveryRetryCount: number | null;
+  lastDeliveryExecutionCount: number | null;
   lastDeliveryAttemptFingerprint: string | null;
   failureCategory: string | null;
   failureCode: string | null;
@@ -43,6 +46,19 @@ export type RuntimeTaskRecord = CreateRuntimeTaskCommand & {
   rowVersion: number;
   updatedAt: string;
 };
+
+export type RuntimeDeliveryAttributionState =
+  | "none"
+  | "attributed"
+  | "legacy_unattributed";
+
+export function assertRuntimeDeliveryAttributionLeaseable(
+  state: RuntimeDeliveryAttributionState
+) {
+  if (state === "legacy_unattributed") {
+    throw new Error("integration_sync_task_delivery_attribution_unresolved");
+  }
+}
 
 export type RuntimeCheckpointRecord = RuntimeCheckpointCommit & {
   workspaceId: string;
@@ -206,7 +222,10 @@ export class SyntheticDurableRuntimeLedger {
       leaseOwnerFingerprint: null,
       leaseExpiresAt: null,
       heartbeatAt: null,
-      lastDeliveryExecutionCount: -1,
+      deliveryAttributionState: "none",
+      lastDeliveryDispatchGeneration: null,
+      lastDeliveryRetryCount: null,
+      lastDeliveryExecutionCount: null,
       lastDeliveryAttemptFingerprint: null,
       failureCategory: null,
       failureCode: null,
@@ -229,6 +248,7 @@ export class SyntheticDurableRuntimeLedger {
       if (
         task.queueClass !== queueClass ||
         task.state !== "pending" ||
+        task.deliveryAttributionState === "legacy_unattributed" ||
         Date.parse(task.availableAt) > now.getTime()
       ) continue;
       const values = byWorkspace.get(task.workspaceId) ?? [];
@@ -268,6 +288,7 @@ export class SyntheticDurableRuntimeLedger {
 
   markDispatched(taskId: string, dispatcherTaskName: string, now: Date) {
     const task = this.#requiredTask(taskId);
+    assertRuntimeDeliveryAttributionLeaseable(task.deliveryAttributionState);
     if (task.state === "dispatched" && task.dispatcherTaskName === dispatcherTaskName) {
       return { task: copyTask(task), idempotent: true } as const;
     }
@@ -286,6 +307,8 @@ export class SyntheticDurableRuntimeLedger {
     ownerFingerprint: string;
     leaseSeconds: number;
     expectedConnectionGeneration: number;
+    deliveryDispatchGeneration: number;
+    deliveryRetryCount: number;
     deliveryExecutionCount: number;
     deliveryAttemptFingerprint: string;
     now: Date;
@@ -296,9 +319,13 @@ export class SyntheticDurableRuntimeLedger {
     if (!this.#workerMayLease(workerKind, task.queueClass)) {
       throw new Error("integration_sync_task_worker_authority_denied");
     }
+    assertRuntimeDeliveryAttributionLeaseable(task.deliveryAttributionState);
     if (
       task.state === "succeeded" ||
       (task.state === "leased" &&
+        task.deliveryAttributionState === "attributed" &&
+        task.lastDeliveryDispatchGeneration === task.dispatchGeneration &&
+        input.deliveryRetryCount === task.lastDeliveryRetryCount &&
         input.deliveryExecutionCount === task.lastDeliveryExecutionCount &&
         input.deliveryAttemptFingerprint === task.lastDeliveryAttemptFingerprint)
     ) {
@@ -317,8 +344,26 @@ export class SyntheticDurableRuntimeLedger {
     }
     if (
       !Number.isInteger(input.deliveryExecutionCount) ||
-      input.deliveryExecutionCount <= task.lastDeliveryExecutionCount ||
-      input.deliveryAttemptFingerprint === task.lastDeliveryAttemptFingerprint
+      input.deliveryExecutionCount < 0 ||
+      input.deliveryExecutionCount > 100 ||
+      !Number.isInteger(input.deliveryRetryCount) ||
+      input.deliveryRetryCount < 0 ||
+      input.deliveryRetryCount > 100 ||
+      input.deliveryExecutionCount > input.deliveryRetryCount ||
+      input.deliveryDispatchGeneration !== task.dispatchGeneration ||
+      ((task.deliveryAttributionState === "none" ||
+        task.lastDeliveryDispatchGeneration !== task.dispatchGeneration) &&
+        (input.deliveryRetryCount !== 0 || input.deliveryExecutionCount !== 0)) ||
+      (task.deliveryAttributionState === "attributed" &&
+        task.lastDeliveryDispatchGeneration === task.dispatchGeneration &&
+        task.lastDeliveryRetryCount === null) ||
+      (task.deliveryAttributionState === "attributed" &&
+        task.lastDeliveryDispatchGeneration === task.dispatchGeneration &&
+        task.lastDeliveryRetryCount !== null &&
+        task.lastDeliveryExecutionCount !== null &&
+        (input.deliveryRetryCount <= task.lastDeliveryRetryCount ||
+          input.deliveryExecutionCount < task.lastDeliveryExecutionCount ||
+          input.deliveryAttemptFingerprint === task.lastDeliveryAttemptFingerprint))
     ) {
       this.#metrics.duplicateDeliveries += 1;
       return { acquired: false, reasonCode: "delivery_replayed", task: copyTask(task) } as const;
@@ -335,6 +380,9 @@ export class SyntheticDurableRuntimeLedger {
     task.leaseOwnerFingerprint = input.ownerFingerprint;
     task.leaseExpiresAt = new Date(input.now.getTime() + input.leaseSeconds * 1_000).toISOString();
     task.heartbeatAt = input.now.toISOString();
+    task.deliveryAttributionState = "attributed";
+    task.lastDeliveryDispatchGeneration = task.dispatchGeneration;
+    task.lastDeliveryRetryCount = input.deliveryRetryCount;
     task.lastDeliveryExecutionCount = input.deliveryExecutionCount;
     task.lastDeliveryAttemptFingerprint = input.deliveryAttemptFingerprint;
     this.#bump(task, input.now);
@@ -482,6 +530,7 @@ export class SyntheticDurableRuntimeLedger {
   sweep(now: Date, input: { dispatchStaleAfterMs: number }) {
     const recovered: RuntimeTaskRecord[] = [];
     for (const task of this.#tasks.values()) {
+      if (task.deliveryAttributionState === "legacy_unattributed") continue;
       let changed = false;
       if (
         task.state === "leased" &&
@@ -691,7 +740,11 @@ export class SyntheticDurableRuntimeLedger {
   }
 
   #withinConcurrency(task: RuntimeTaskRecord) {
-    const leased = [...this.#tasks.values()].filter((candidate) => candidate.state === "leased");
+    const leased = [...this.#tasks.values()].filter(
+      (candidate) =>
+        candidate.state === "leased" &&
+        candidate.deliveryAttributionState === "attributed"
+    );
     return (
       leased.filter((candidate) => candidate.workspaceId === task.workspaceId).length < this.#limits.workspace &&
       leased.filter((candidate) => candidate.connectionId === task.connectionId).length < this.#limits.connection &&

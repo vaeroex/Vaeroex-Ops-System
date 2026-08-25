@@ -158,6 +158,7 @@ const phase6DatabaseTest = "external_integrations_phase_6_durable_runtime.test.s
 const phase6TestRoles = [
   "integration_webhook_ingress_authority",
   "integration_task_dispatch_authority",
+  "integration_task_scheduler_authority",
   "integration_provider_runtime_authority",
   "integration_deterministic_runtime_authority",
   "integration_credential_broker_authority"
@@ -174,6 +175,25 @@ const phase8a0TestRoles = [
   "integration_provider_source_authority"
 ];
 const phase8a0TestBridgeRole = "phase8a0_database_test_authority";
+const phase8bDatabaseTests = new Set([
+  "external_integrations_phase_8b_qbo_sandbox_validation.test.sql",
+  "external_integrations_phase_8b_credential_refresh_recovery.test.sql",
+  "external_integrations_phase_8b_same_generation_reauthorization.test.sql",
+  "external_integrations_phase_8b_expired_refresh_lease_reclamation.test.sql",
+  "external_integrations_phase_8b_zero_based_delivery_clean.test.sql",
+  "external_integrations_phase_8b_zero_based_delivery_upgrade.test.sql"
+]);
+const phase8bTestRoles = [
+  "integration_control_plane_authority",
+  "integration_oauth_ingress_authority",
+  "integration_credential_broker_authority",
+  "integration_task_dispatch_authority",
+  "integration_task_scheduler_authority",
+  "integration_provider_runtime_authority",
+  "integration_provider_source_authority",
+  "integration_provider_validation_authority"
+];
+const phase8bTestBridgeRole = "phase8b_database_test_authority";
 const localBillingServiceRolePrivileges = [
   ["profiles", "SELECT"],
   ["profiles", "UPDATE"],
@@ -409,6 +429,56 @@ async function installPhase8a0RoleAdapter(Client) {
   };
 }
 
+async function installPhase8bRoleAdapter(Client) {
+  if (
+    !testFiles.some(
+      (testFile) => phase8bDatabaseTests.has(path.basename(testFile))
+    )
+  ) {
+    return async () => undefined;
+  }
+
+  const client = new Client({ connectionString: databaseUrl });
+  let bridgeCreated = false;
+  await client.connect();
+
+  try {
+    await client.query(`drop role if exists ${phase8bTestBridgeRole}`);
+    await client.query(
+      `create role ${phase8bTestBridgeRole} nologin noinherit`
+    );
+    bridgeCreated = true;
+    await client.query(
+      `do $grant$ begin execute format(
+        'grant ${phase8bTestBridgeRole} to %I with inherit false, set true',
+        session_user
+      ); end $grant$;`
+    );
+    for (const role of phase8bTestRoles) {
+      await client.query(
+        `grant ${role} to ${phase8bTestBridgeRole}
+          with admin false, inherit false, set true`
+      );
+    }
+  } catch (error) {
+    if (bridgeCreated) {
+      await client
+        .query(`drop role if exists ${phase8bTestBridgeRole}`)
+        .catch(() => undefined);
+    }
+    await client.end().catch(() => undefined);
+    throw error;
+  }
+
+  return async () => {
+    try {
+      await client.query(`drop role if exists ${phase8bTestBridgeRole}`);
+    } finally {
+      await client.end().catch(() => undefined);
+    }
+  };
+}
+
 async function runWithPostgresClient() {
   let Client;
   try {
@@ -422,11 +492,13 @@ async function runWithPostgresClient() {
   let restorePhase5Roles = async () => undefined;
   let restorePhase6Roles = async () => undefined;
   let restorePhase8a0Roles = async () => undefined;
+  let restorePhase8bRoles = async () => undefined;
 
   try {
     restorePhase5Roles = await installPhase5RoleAdapter(Client);
     restorePhase6Roles = await installPhase6RoleAdapter(Client);
     restorePhase8a0Roles = await installPhase8a0RoleAdapter(Client);
+    restorePhase8bRoles = await installPhase8bRoleAdapter(Client);
     for (const testFile of testFiles) {
       const client = new Client({
         connectionString: databaseUrl,
@@ -481,6 +553,7 @@ async function runWithPostgresClient() {
       process.stdout.write(`${testFile}: ${assertionCount} assertions passed.\n`);
     }
   } finally {
+    await restorePhase8bRoles();
     await restorePhase8a0Roles();
     await restorePhase6Roles();
     await restorePhase5Roles();
