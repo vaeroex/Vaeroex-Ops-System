@@ -6,7 +6,8 @@ const root = path.resolve(__dirname, "..");
 const cli = process.env.SUPABASE_CLI_PATH || "supabase";
 const fixtureBaseVersion = "20260824083917";
 const zeroBasedVersion = "20260824193332";
-const targetVersion = "20260824233000";
+const retryExecutionVersion = "20260824233000";
+const targetVersion = "20260825180000";
 const fixturePath = path.join(
   root,
   "supabase/tests/fixtures/external_integrations_phase_8b_zero_based_legacy.sql"
@@ -74,8 +75,21 @@ function assertTargetIsSinglePendingMigration() {
       `Migration ${zeroBasedVersion} no longer immediately follows ${fixtureBaseVersion}.`
     );
   }
-  if (migrations[targetIndex - 1]?.slice(0, 14) !== zeroBasedVersion) {
-    fail(`Migration ${targetVersion} no longer immediately follows ${zeroBasedVersion}.`);
+  const retryExecutionIndex = migrations.findIndex((name) =>
+    name.startsWith(`${retryExecutionVersion}_`)
+  );
+  if (retryExecutionIndex < 0) {
+    fail(`Retry/execution migration ${retryExecutionVersion} is missing.`);
+  }
+  if (migrations[retryExecutionIndex - 1]?.slice(0, 14) !== zeroBasedVersion) {
+    fail(
+      `Migration ${retryExecutionVersion} no longer immediately follows ${zeroBasedVersion}.`
+    );
+  }
+  if (migrations[targetIndex - 1]?.slice(0, 14) !== retryExecutionVersion) {
+    fail(
+      `Migration ${targetVersion} no longer immediately follows ${retryExecutionVersion}.`
+    );
   }
   if (targetIndex !== migrations.length - 1) {
     fail(

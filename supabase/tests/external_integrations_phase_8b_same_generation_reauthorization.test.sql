@@ -1465,5 +1465,742 @@ select ok(
   'reauthorization audit metadata retains no credential or OAuth leakage canary'
 );
 
+-- Recovery reauthorization is a distinct path from the original initializing
+-- flow. Build a separate, already-authorized connection so the original 40
+-- assertions and their immutable history remain independent.
+insert into private.integration_connections (
+  id, contract_version, control_contract_version, workspace_id,
+  business_entity_id, connection_series_id, connection_generation,
+  provider_key, provider_environment, provider_tenant_reference_fingerprint,
+  status, state_reason_code, requested_scopes, granted_scopes,
+  safe_display_name, provider_descriptor_registry_version,
+  provider_descriptor_registry_fingerprint, provider_descriptor_fingerprint,
+  adapter_version, capability_snapshot, configuration_version, authorized_at,
+  status_changed_at, disconnected_at, deleted_at,
+  last_transition_request_id, last_transition_request_fingerprint,
+  row_version, created_by, created_at, updated_at
+)
+select
+  'e8f00000-0000-4000-8000-000000000002',
+  connection.contract_version,
+  connection.control_contract_version,
+  connection.workspace_id,
+  connection.business_entity_id,
+  'e8f00000-0000-4000-8000-000000000002',
+  1,
+  connection.provider_key,
+  connection.provider_environment,
+  private.qbo_phase_8b_realm_fingerprint_v1(
+    'phase8b-recovery-reauthorization-realm'
+  ),
+  'reauthorization_required',
+  'authorization_required',
+  connection.requested_scopes,
+  connection.granted_scopes,
+  'Phase 8B Recovery Reauthorization Sandbox',
+  connection.provider_descriptor_registry_version,
+  connection.provider_descriptor_registry_fingerprint,
+  connection.provider_descriptor_fingerprint,
+  connection.adapter_version,
+  connection.capability_snapshot,
+  connection.configuration_version,
+  connection.authorized_at,
+  pg_catalog.transaction_timestamp() - interval '2 minutes',
+  null,
+  null,
+  'phase8b_recovery_reauthorization_required',
+  extensions.digest(
+    pg_catalog.convert_to(
+      'phase8b-recovery-reauthorization-required',
+      'UTF8'
+    ),
+    'sha256'
+  ),
+  7,
+  connection.created_by,
+  connection.created_at,
+  pg_catalog.transaction_timestamp() - interval '2 minutes'
+from private.integration_connections as connection
+where connection.id = 'e8f00000-0000-4000-8000-000000000001';
+
+insert into private.provider_entity_mappings (
+  id, contract_version, workspace_id, business_entity_id, connection_id,
+  mapping_series_id, mapping_version, provider_key, provider_environment,
+  provider_entity_type, provider_entity_reference_fingerprint,
+  safe_display_name, mapping_role, status, verification_mode,
+  verification_fingerprint, verified_at, mapped_by, mapped_at, row_version,
+  created_at, updated_at
+)
+select
+  'f8f00000-0000-4000-8000-000000000002',
+  mapping.contract_version,
+  mapping.workspace_id,
+  mapping.business_entity_id,
+  'e8f00000-0000-4000-8000-000000000002',
+  'f8f00000-0000-4000-8000-000000000002',
+  1,
+  mapping.provider_key,
+  mapping.provider_environment,
+  mapping.provider_entity_type,
+  private.qbo_phase_8b_realm_fingerprint_v1(
+    'phase8b-recovery-reauthorization-realm'
+  ),
+  'Phase 8B Recovery Reauthorization Sandbox',
+  mapping.mapping_role,
+  mapping.status,
+  mapping.verification_mode,
+  mapping.verification_fingerprint,
+  mapping.verified_at,
+  mapping.mapped_by,
+  mapping.mapped_at,
+  2,
+  mapping.created_at,
+  mapping.updated_at
+from private.provider_entity_mappings as mapping
+where mapping.id = 'f8f00000-0000-4000-8000-000000000001';
+
+insert into private.integration_oauth_states (
+  id, contract_version, workspace_id, business_entity_id, connection_id,
+  connection_generation, provider_key, provider_environment, initiated_by,
+  requested_scopes, return_intent, state_hash, status,
+  creation_request_id, creation_request_fingerprint, consume_request_id,
+  consume_request_fingerprint, created_at, expires_at, consumed_at, row_version
+) values (
+  '18f00000-0000-4000-8000-000000000002',
+  'integration_oauth_state_v1',
+  'b8f00000-0000-4000-8000-000000000001',
+  'd8f00000-0000-4000-8000-000000000001',
+  'e8f00000-0000-4000-8000-000000000002',
+  1,
+  'quickbooks_online',
+  'sandbox',
+  'a8f00000-0000-4000-8000-000000000001',
+  array['com.intuit.quickbooks.accounting']::text[],
+  '/phase8b/sandbox/authorized',
+  extensions.digest(
+    pg_catalog.convert_to('phase8b-recovery-initial-state', 'UTF8'),
+    'sha256'
+  ),
+  'consumed',
+  'phase8b_recovery_initial_create',
+  extensions.digest(
+    pg_catalog.convert_to('phase8b-recovery-initial-create', 'UTF8'),
+    'sha256'
+  ),
+  'phase8b_recovery_initial_consume',
+  extensions.digest(
+    pg_catalog.convert_to('phase8b-recovery-initial-consume', 'UTF8'),
+    'sha256'
+  ),
+  pg_catalog.transaction_timestamp() - interval '3 hours',
+  pg_catalog.transaction_timestamp() - interval '170 minutes',
+  pg_catalog.transaction_timestamp() - interval '175 minutes',
+  2
+);
+
+insert into private.integration_credentials (
+  id, contract_version, oauth_state_id, workspace_id, business_entity_id,
+  connection_id, connection_generation, provider_key, provider_environment,
+  initiated_by, credential_version, envelope_schema_version,
+  aad_schema_version, aad_digest, kms_key_resource, credential_ciphertext,
+  access_expires_at, refresh_expires_at, granted_scopes,
+  external_entity_reference_fingerprint, status, last_request_id,
+  last_request_fingerprint, row_version, created_at, updated_at
+) values (
+  '78f00000-0000-4000-8000-000000000002',
+  'integration_credential_authority_v1',
+  '18f00000-0000-4000-8000-000000000002',
+  'b8f00000-0000-4000-8000-000000000001',
+  'd8f00000-0000-4000-8000-000000000001',
+  'e8f00000-0000-4000-8000-000000000002',
+  1,
+  'quickbooks_online',
+  'sandbox',
+  'a8f00000-0000-4000-8000-000000000001',
+  1,
+  'oauth_credential_envelope_v1',
+  'oauth_credential_aad_v1',
+  private.phase_5_credential_aad_digest_v1(
+    'sandbox',
+    'b8f00000-0000-4000-8000-000000000001',
+    'e8f00000-0000-4000-8000-000000000002',
+    1,
+    'quickbooks_online',
+    '78f00000-0000-4000-8000-000000000002'
+  ),
+  'projects/vaeroex-intg-dev-9999/locations/us-west1/keyRings/phase8b/cryptoKeys/qbo-sandbox-oauth',
+  pg_catalog.convert_to(pg_catalog.repeat('r', 256), 'UTF8'),
+  pg_catalog.transaction_timestamp() - interval '1 minute',
+  pg_catalog.transaction_timestamp() + interval '30 days',
+  array['com.intuit.quickbooks.accounting']::text[],
+  private.qbo_phase_8b_realm_fingerprint_v1(
+    'phase8b-recovery-reauthorization-realm'
+  ),
+  'reauthorization_required',
+  'phase8b_recovery_credential_required',
+  extensions.digest(
+    pg_catalog.convert_to('phase8b-recovery-credential-required', 'UTF8'),
+    'sha256'
+  ),
+  4,
+  pg_catalog.transaction_timestamp() - interval '2 hours',
+  pg_catalog.transaction_timestamp() - interval '2 minutes'
+);
+
+select private.phase_5_insert_audit_v1(
+  'b8f00000-0000-4000-8000-000000000001',
+  'd8f00000-0000-4000-8000-000000000001',
+  'e8f00000-0000-4000-8000-000000000002',
+  'service',
+  'integration_credential_broker',
+  'reauthorization_required',
+  'failed',
+  'integration_credential',
+  '78f00000-0000-4000-8000-000000000002',
+  'phase8b_recovery_credential_expired',
+  'credential_expired',
+  pg_catalog.jsonb_build_object(
+    'connection_generation', 1,
+    'connection_status', 'reauthorization_required',
+    'credential_status', 'reauthorization_required',
+    'credential_version', 1,
+    'lease_state', 'released'
+  ),
+  pg_catalog.transaction_timestamp() - interval '1 minute'
+);
+
+create or replace function pg_temp.recovery_reauthorization_create_command(
+  p_id uuid,
+  p_state text,
+  p_connection_id uuid default
+    'e8f00000-0000-4000-8000-000000000002',
+  p_mapping_id uuid default
+    'f8f00000-0000-4000-8000-000000000002'
+)
+returns jsonb
+language sql
+stable
+as $function$
+  select pg_catalog.jsonb_build_object(
+    'contractVersion', 'integration_reauthorization_state_v1',
+    'id', p_id,
+    'workspaceId', 'b8f00000-0000-4000-8000-000000000001',
+    'businessEntityId', 'd8f00000-0000-4000-8000-000000000001',
+    'connectionId', p_connection_id,
+    'connectionGeneration', 1,
+    'mappingId', p_mapping_id,
+    'providerKey', 'quickbooks_online',
+    'providerEnvironment', 'sandbox',
+    'initiatedBy', 'a8f00000-0000-4000-8000-000000000001',
+    'requestedScopes', pg_catalog.jsonb_build_array(
+      'com.intuit.quickbooks.accounting'
+    ),
+    'redirectUri',
+      'https://p8b-oauth-34-120-247-116.sslip.io/oauth/callback',
+    'returnIntent', '/phase8b/sandbox/reauthorized',
+    'authorizationPurpose', 'reauthorization',
+    'reasonCode', 'expired_credential_recovery',
+    'stateHash', pg_temp.fingerprint(p_state),
+    'createdAt', pg_temp.timestamp_text(pg_catalog.transaction_timestamp()),
+    'expiresAt', pg_temp.timestamp_text(
+      pg_catalog.transaction_timestamp() + interval '10 minutes'
+    )
+  );
+$function$;
+
+create or replace function pg_temp.recovery_reauthorization_consume_command(
+  p_state text
+)
+returns jsonb
+language sql
+stable
+as $function$
+  select pg_catalog.jsonb_build_object(
+    'workspaceId', 'b8f00000-0000-4000-8000-000000000001',
+    'businessEntityId', 'd8f00000-0000-4000-8000-000000000001',
+    'connectionId', 'e8f00000-0000-4000-8000-000000000002',
+    'connectionGeneration', 1,
+    'mappingId', 'f8f00000-0000-4000-8000-000000000002',
+    'providerKey', 'quickbooks_online',
+    'providerEnvironment', 'sandbox',
+    'initiatedBy', 'a8f00000-0000-4000-8000-000000000001',
+    'requestedScopes', pg_catalog.jsonb_build_array(
+      'com.intuit.quickbooks.accounting'
+    ),
+    'redirectUri',
+      'https://p8b-oauth-34-120-247-116.sslip.io/oauth/callback',
+    'returnIntent', '/phase8b/sandbox/reauthorized',
+    'authorizationPurpose', 'reauthorization',
+    'reasonCode', 'expired_credential_recovery',
+    'stateHash', pg_temp.fingerprint(p_state),
+    'providerEntityReferenceFingerprint',
+      'sha256:2ba60dfb538944945786919e3a1156aaf9420bf75c07f57120d933d19d8fd94d',
+    'consumedAt', pg_temp.timestamp_text(pg_catalog.transaction_timestamp())
+  );
+$function$;
+
+create or replace function pg_temp.recovery_reauthorization_store_command(
+  p_state_id uuid,
+  p_credential_id uuid,
+  p_reauthorized_at text
+)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $function$
+  select pg_catalog.jsonb_build_object(
+    'contractVersion', 'integration_credential_reauthorization_v1',
+    'id', p_credential_id,
+    'reauthorizationStateId', p_state_id,
+    'workspaceId', 'b8f00000-0000-4000-8000-000000000001',
+    'businessEntityId', 'd8f00000-0000-4000-8000-000000000001',
+    'connectionId', 'e8f00000-0000-4000-8000-000000000002',
+    'connectionGeneration', 1,
+    'mappingId', 'f8f00000-0000-4000-8000-000000000002',
+    'providerKey', 'quickbooks_online',
+    'providerEnvironment', 'sandbox',
+    'initiatedBy', 'a8f00000-0000-4000-8000-000000000001',
+    'envelopeSchemaVersion', 'oauth_credential_envelope_v1',
+    'aadSchemaVersion', 'oauth_credential_aad_v1',
+    'aadDigest', private.phase_5_fingerprint_text_v1(
+      private.phase_5_credential_aad_digest_v1(
+        'sandbox',
+        'b8f00000-0000-4000-8000-000000000001',
+        'e8f00000-0000-4000-8000-000000000002',
+        1,
+        'quickbooks_online',
+        p_credential_id
+      )
+    ),
+    'kmsKeyResource',
+      'projects/vaeroex-intg-dev-9999/locations/us-west1/keyRings/phase8b/cryptoKeys/qbo-sandbox-oauth',
+    'ciphertextBase64', pg_catalog.translate(
+      pg_catalog.encode(
+        pg_catalog.convert_to(pg_catalog.repeat('s', 256), 'UTF8'),
+        'base64'
+      ),
+      E'\n\r',
+      ''
+    ),
+    'accessExpiresAt', pg_temp.timestamp_text(
+      p_reauthorized_at::timestamptz + interval '1 hour'
+    ),
+    'refreshExpiresAt', pg_temp.timestamp_text(
+      p_reauthorized_at::timestamptz + interval '30 days'
+    ),
+    'grantedScopes', pg_catalog.jsonb_build_array(
+      'com.intuit.quickbooks.accounting'
+    ),
+    'externalEntityReferenceFingerprint',
+      'sha256:2ba60dfb538944945786919e3a1156aaf9420bf75c07f57120d933d19d8fd94d',
+    'mappingRevalidationFingerprint',
+      pg_temp.fingerprint('phase8b-recovery-reauthorization-company-v2'),
+    'reauthorizedAt', p_reauthorized_at
+  );
+$function$;
+
+create or replace function pg_temp.recovery_reauthorization_revoked_denied(
+  p_reason text
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $function$
+begin
+  begin
+    perform private.phase_5_insert_audit_v1(
+      'b8f00000-0000-4000-8000-000000000001',
+      'd8f00000-0000-4000-8000-000000000001',
+      'e8f00000-0000-4000-8000-000000000002',
+      'service',
+      'integration_credential_broker',
+      'credential_refresh_boundary',
+      'failed',
+      'integration_credential',
+      '78f00000-0000-4000-8000-000000000002',
+      'phase8b_recovery_' || p_reason,
+      p_reason,
+      pg_catalog.jsonb_build_object(
+        'connection_generation', 1,
+        'credential_version', 1,
+        'refresh_boundary_stage', 'provider_response_parse',
+        'refresh_operation_fingerprint',
+          private.phase_5_fingerprint_text_v1(
+            extensions.digest(
+              pg_catalog.convert_to(
+                'phase8b-recovery-' || p_reason,
+                'UTF8'
+              ),
+              'sha256'
+            )
+          ),
+        'refresh_diagnostics', null
+      ),
+      pg_catalog.clock_timestamp()
+    );
+    perform public.create_integration_reauthorization_state_v1(
+      pg_temp.recovery_reauthorization_create_command(
+        case p_reason
+          when 'invalid_grant' then
+            '58f00000-0000-4000-8000-000000000061'::uuid
+          else '58f00000-0000-4000-8000-000000000062'::uuid
+        end,
+        'r1_phase8b-recovery-' || p_reason
+      ),
+      'phase8b_recovery_' || p_reason || '_create'
+    );
+    return false;
+  exception when sqlstate '42501' then
+    return true;
+  end;
+end;
+$function$;
+
+create or replace function pg_temp.recovery_reauthorization_stale_denied()
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $function$
+declare
+  v_result jsonb;
+begin
+  begin
+    perform public.create_integration_reauthorization_state_v1(
+      pg_temp.recovery_reauthorization_create_command(
+        '58f00000-0000-4000-8000-000000000063',
+        'r1_phase8b-recovery-stale'
+      ),
+      'phase8b_recovery_stale_create'
+    );
+    update private.integration_credentials
+    set last_request_id = 'phase8b_recovery_stale_mutation',
+        last_request_fingerprint = extensions.digest(
+          pg_catalog.convert_to('phase8b-recovery-stale-mutation', 'UTF8'),
+          'sha256'
+        ),
+        row_version = row_version + 1,
+        updated_at = pg_catalog.clock_timestamp()
+    where id = '78f00000-0000-4000-8000-000000000002';
+    v_result := public.consume_integration_reauthorization_state_v1(
+      pg_temp.recovery_reauthorization_consume_command(
+        'r1_phase8b-recovery-stale'
+      ),
+      'phase8b_recovery_stale_consume'
+    );
+    if v_result ->> 'reasonCode' = 'authority_stale' then
+      raise exception using errcode = 'P8B01', message = 'expected';
+    end if;
+    return false;
+  exception when sqlstate 'P8B01' then
+    return true;
+  end;
+end;
+$function$;
+
+select ok(
+  (
+    select reauthorization_path = 'initializing_same_generation'
+    from private.integration_reauthorization_states
+    where id = '58f00000-0000-4000-8000-000000000050'
+  ),
+  'existing same-generation evidence is explicitly preserved as the initializing path'
+);
+select ok(
+  pg_temp.recovery_reauthorization_revoked_denied('invalid_grant')
+  and pg_temp.recovery_reauthorization_revoked_denied('provider_revoked'),
+  'canonical invalid_grant and provider_revoked evidence deny recovery reauthorization'
+);
+select ok(
+  pg_temp.recovery_reauthorization_stale_denied(),
+  'credential CAS drift makes recovery reauthorization authority stale'
+);
+
+insert into private.integration_connections (
+  id, contract_version, control_contract_version, workspace_id,
+  business_entity_id, connection_series_id, connection_generation,
+  provider_key, provider_environment, provider_tenant_reference_fingerprint,
+  status, state_reason_code, requested_scopes, granted_scopes,
+  safe_display_name, provider_descriptor_registry_version,
+  provider_descriptor_registry_fingerprint, provider_descriptor_fingerprint,
+  adapter_version, capability_snapshot, configuration_version, authorized_at,
+  status_changed_at, disconnected_at, deleted_at, row_version, created_by,
+  created_at, updated_at
+)
+select
+  terminal.id,
+  connection.contract_version,
+  connection.control_contract_version,
+  connection.workspace_id,
+  connection.business_entity_id,
+  terminal.id,
+  1,
+  connection.provider_key,
+  connection.provider_environment,
+  connection.provider_tenant_reference_fingerprint,
+  terminal.status,
+  terminal.reason_code,
+  connection.requested_scopes,
+  connection.granted_scopes,
+  'Phase 8B terminal recovery denial',
+  connection.provider_descriptor_registry_version,
+  connection.provider_descriptor_registry_fingerprint,
+  connection.provider_descriptor_fingerprint,
+  connection.adapter_version,
+  connection.capability_snapshot,
+  connection.configuration_version,
+  connection.authorized_at,
+  pg_catalog.transaction_timestamp(),
+  case when terminal.status = 'disconnected'
+    then pg_catalog.transaction_timestamp()
+    else null
+  end,
+  case when terminal.status = 'deleted'
+    then pg_catalog.transaction_timestamp()
+    else null
+  end,
+  1,
+  connection.created_by,
+  connection.created_at,
+  pg_catalog.transaction_timestamp()
+from private.integration_connections as connection
+cross join (
+  values
+    (
+      'e8f00000-0000-4000-8000-000000000003'::uuid,
+      'disconnected'::text,
+      'disconnected'::text
+    ),
+    (
+      'e8f00000-0000-4000-8000-000000000004'::uuid,
+      'deleted'::text,
+      'deleted'::text
+    )
+) as terminal(id, status, reason_code)
+where connection.id = 'e8f00000-0000-4000-8000-000000000002';
+
+set local role integration_oauth_ingress_authority;
+select ok(
+  pg_temp.raises_sqlstate(
+    $$select public.create_integration_reauthorization_state_v1(
+      pg_temp.recovery_reauthorization_create_command(
+        '58f00000-0000-4000-8000-000000000064',
+        'r1_phase8b-recovery-disconnected',
+        'e8f00000-0000-4000-8000-000000000003'
+      ),
+      'phase8b_recovery_disconnected_create'
+    )$$,
+    '42501'
+  )
+  and pg_temp.raises_sqlstate(
+    $$select public.create_integration_reauthorization_state_v1(
+      pg_temp.recovery_reauthorization_create_command(
+        '58f00000-0000-4000-8000-000000000065',
+        'r1_phase8b-recovery-deleted',
+        'e8f00000-0000-4000-8000-000000000004'
+      ),
+      'phase8b_recovery_deleted_create'
+    )$$,
+    '42501'
+  ),
+  'disconnected and deleted connections cannot begin recovery reauthorization'
+);
+reset role;
+
+set local role integration_control_plane_authority;
+select ok(
+  pg_temp.raises_sqlstate(
+    $$select public.transition_integration_connection_v1(
+      pg_catalog.jsonb_build_object(
+        'workspaceId', 'b8f00000-0000-4000-8000-000000000001',
+        'businessEntityId', 'd8f00000-0000-4000-8000-000000000001',
+        'connectionId', 'e8f00000-0000-4000-8000-000000000002',
+        'expectedRowVersion', 7,
+        'expectedGeneration', 1,
+        'targetStatus', 'initializing',
+        'stateReasonCode', 'initial_sync_pending',
+        'providerTenantReferenceFingerprint',
+          'sha256:2ba60dfb538944945786919e3a1156aaf9420bf75c07f57120d933d19d8fd94d',
+        'grantedScopes', pg_catalog.jsonb_build_array(
+          'com.intuit.quickbooks.accounting'
+        ),
+        'transitionedAt',
+          pg_temp.timestamp_text(pg_catalog.transaction_timestamp())
+      ),
+      'phase8b_recovery_generic_transition_denied',
+      'phase8b_control_plane'
+    )$$,
+    '55000'
+  ),
+  'generic control-plane authority cannot bypass completed reauthorization evidence'
+);
+reset role;
+
+set local role integration_oauth_ingress_authority;
+create temporary table phase8b_recovery_reauthorization_state on commit drop as
+select public.create_integration_reauthorization_state_v1(
+  pg_temp.recovery_reauthorization_create_command(
+    '58f00000-0000-4000-8000-000000000060',
+    'r1_phase8b-recovery-success'
+  ),
+  'phase8b_recovery_success_create'
+) as result;
+select ok(
+  (
+    select reauthorization_path = 'authorization_required_recovery'
+      and expected_connection_row_version = 7
+      and expected_credential_row_version = 4
+      and recovery_evidence_count = 1
+    from private.integration_reauthorization_states
+    where id = '58f00000-0000-4000-8000-000000000060'
+  ),
+  'recovery state captures the distinct lifecycle and database-derived CAS evidence'
+);
+create temporary table phase8b_recovery_reauthorization_consume on commit drop as
+select public.consume_integration_reauthorization_state_v1(
+  pg_temp.recovery_reauthorization_consume_command(
+    'r1_phase8b-recovery-success'
+  ),
+  'phase8b_recovery_success_consume'
+) as result;
+select is(
+  (
+    select result ->> 'accepted'
+    from phase8b_recovery_reauthorization_consume
+  ),
+  'true',
+  'recovery reauthorization consumes once against unchanged connection, credential and mapping authority'
+);
+reset role;
+
+set local role integration_credential_broker_authority;
+create temporary table phase8b_recovery_reauthorization_store on commit drop as
+select public.store_reauthorized_integration_credential_v1(
+  pg_temp.recovery_reauthorization_store_command(
+    '58f00000-0000-4000-8000-000000000060',
+    '68f00000-0000-4000-8000-000000000060',
+    (
+      select result ->> 'consumedAt'
+      from phase8b_recovery_reauthorization_consume
+    )
+  ),
+  'phase8b_recovery_success_store'
+) as result;
+select ok(
+  (
+    select result ->> 'credentialVersion' = '2'
+      and result ->> 'credentialStatus' = 'active'
+      and result ->> 'connectionStatus' = 'initializing'
+      and result ->> 'connectionRowVersion' = '8'
+      and result ->> 'mappingStatus' = 'active'
+    from phase8b_recovery_reauthorization_store
+  ),
+  'replacement completion atomically returns only the recovery connection to initializing'
+);
+select is(
+  public.store_reauthorized_integration_credential_v1(
+    pg_temp.recovery_reauthorization_store_command(
+      '58f00000-0000-4000-8000-000000000060',
+      '68f00000-0000-4000-8000-000000000060',
+      (
+        select result ->> 'consumedAt'
+        from phase8b_recovery_reauthorization_consume
+      )
+    ),
+    'phase8b_recovery_success_store'
+  ) ->> 'idempotent',
+  'true',
+  'recovery completion retry is idempotent'
+);
+reset role;
+
+select ok(
+  (
+    select status = 'initializing'
+      and state_reason_code = 'initial_sync_pending'
+      and connection_generation = 1
+      and row_version = 8
+      and requested_scopes = array['com.intuit.quickbooks.accounting']::text[]
+      and granted_scopes = array['com.intuit.quickbooks.accounting']::text[]
+      and provider_tenant_reference_fingerprint =
+        private.qbo_phase_8b_realm_fingerprint_v1(
+          'phase8b-recovery-reauthorization-realm'
+        )
+    from private.integration_connections
+    where id = 'e8f00000-0000-4000-8000-000000000002'
+  )
+  and (
+    select status = 'superseded'
+      and credential_version = 1
+      and credential_ciphertext is not null
+    from private.integration_credentials
+    where id = '78f00000-0000-4000-8000-000000000002'
+  )
+  and (
+    select status = 'active'
+      and credential_version = 2
+      and supersedes_credential_id =
+        '78f00000-0000-4000-8000-000000000002'
+      and granted_scopes = array['com.intuit.quickbooks.accounting']::text[]
+    from private.integration_credentials
+    where id = '68f00000-0000-4000-8000-000000000060'
+  ),
+  'connection identity, generation, realm, scope and immutable credential lineage survive recovery'
+);
+select ok(
+  (
+    select status = 'completed'
+      and reauthorization_path = 'authorization_required_recovery'
+      and replacement_credential_id =
+        '68f00000-0000-4000-8000-000000000060'
+    from private.integration_reauthorization_states
+    where id = '58f00000-0000-4000-8000-000000000060'
+  )
+  and pg_temp.raises_sqlstate(
+    $$update private.integration_reauthorization_states
+      set reauthorization_path = 'initializing_same_generation',
+          row_version = row_version + 1
+      where id = '58f00000-0000-4000-8000-000000000060'$$,
+    '55000'
+  ),
+  'the recovery path remains immutable completion evidence'
+);
+select ok(
+  (
+    select status = 'active'
+      and row_version = 2
+      and provider_entity_reference_fingerprint =
+        private.qbo_phase_8b_realm_fingerprint_v1(
+          'phase8b-recovery-reauthorization-realm'
+        )
+    from private.provider_entity_mappings
+    where id = 'f8f00000-0000-4000-8000-000000000002'
+  )
+  and not exists (
+    select 1
+    from private.integration_sync_tasks
+    where connection_id = 'e8f00000-0000-4000-8000-000000000002'
+  )
+  and not exists (
+    select 1
+    from private.external_source_record_versions
+    where connection_id = 'e8f00000-0000-4000-8000-000000000002'
+  ),
+  'recovery preserves the verified mapping and creates no task or provider-data effect'
+);
+select ok(
+  not exists (
+    select 1
+    from private.integration_audit_events
+    where connection_id = 'e8f00000-0000-4000-8000-000000000002'
+      and metadata::text ~*
+        '(access.?token|refresh.?token|client.?secret|authorization.?code|ciphertext|state.?hash|realm.?id)'
+  ),
+  'recovery authorization audit metadata retains no credential or OAuth leakage canary'
+);
+
 select * from finish();
 rollback;

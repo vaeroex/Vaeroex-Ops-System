@@ -1742,6 +1742,9 @@ function testMigrationBoundary() {
   const retryExecutionMigration = read(
     "supabase/migrations/20260824233000_qbo_retry_execution_and_reauthorization_recovery.sql"
   );
+  const recoveryReauthorizationMigration = read(
+    "supabase/migrations/20260825180000_qbo_reauthorization_required_lifecycle.sql"
+  );
   const service = read("services/external-integrations-qbo-sandbox/src/server.ts");
   const deliveryParser = read(
     "services/external-integrations-qbo-sandbox/src/cloud-task-delivery.ts"
@@ -1852,6 +1855,17 @@ function testMigrationBoundary() {
   ok(/grant execute on function public\.create_integration_reauthorization_state_v1[\s\S]+to integration_oauth_ingress_authority/.test(reauthorizationMigration), "only OAuth ingress receives reauthorization state creation");
   ok(/grant execute on function public\.store_reauthorized_integration_credential_v1[\s\S]+to integration_credential_broker_authority/.test(reauthorizationMigration), "only credential broker receives replacement authority");
   ok(!/grant (?:execute|integration_credential_broker_authority)[\s\S]{0,100}to service_role/i.test(reauthorizationMigration), "service_role receives no reauthorization shortcut");
+  ok(/add column reauthorization_path text not null/.test(recoveryReauthorizationMigration), "recovery reauthorization persists a distinct immutable lifecycle path");
+  ok(/'initializing_same_generation'[\s\S]+?'authorization_required_recovery'/.test(recoveryReauthorizationMigration), "initializing and authorization-required recovery paths remain explicit and separate");
+  ok(/is_qbo_sandbox_recovery_reauthorization_eligible_v1[\s\S]+action = 'reauthorization_required'[\s\S]+reason_code in \([\s\S]+?'credential_expired'[\s\S]+?'scope_loss'[\s\S]+?'kms_failure'[\s\S]+?'integrity_failure'/.test(recoveryReauthorizationMigration), "recovery begin requires canonical recoverable credential-failure evidence");
+  ok(/reason_code in \('invalid_grant', 'provider_revoked'\)/.test(recoveryReauthorizationMigration), "revoked provider authorization remains an explicit recovery fence");
+  ok(/connection\.status = 'reauthorization_required'[\s\S]+connection\.state_reason_code = 'authorization_required'/.test(recoveryReauthorizationMigration), "recovery state creation admits only the exact authorization-required connection lifecycle");
+  ok(/credential\.status = case v_reauthorization_path[\s\S]+?'initializing_same_generation' then 'active'[\s\S]+?else 'reauthorization_required'/.test(recoveryReauthorizationMigration), "credential authority is path-specific and database-derived");
+  ok(/v_state\.reauthorization_path = 'authorization_required_recovery'[\s\S]+is_qbo_sandbox_recovery_reauthorization_eligible_v1/.test(recoveryReauthorizationMigration), "consume and completion recheck recovery authority after state creation");
+  ok(/set status = 'superseded'[\s\S]+insert into private\.integration_credentials[\s\S]+set status = 'completed'[\s\S]+set status = 'initializing'/.test(recoveryReauthorizationMigration), "credential replacement, state completion, and lifecycle restoration are atomic and ordered");
+  ok(/state\.status = 'completed'[\s\S]+state\.expected_connection_row_version = old\.row_version[\s\S]+replacement\.status = 'active'/.test(recoveryReauthorizationMigration), "the exceptional connection transition requires one-shot completed replacement evidence");
+  ok(!/create or replace function private\.is_integration_connection_transition_v1/.test(recoveryReauthorizationMigration), "the generic connection lifecycle graph is not broadened");
+  ok(/revoke all on function[\s\S]+is_qbo_sandbox_recovery_reauthorization_eligible_v1[\s\S]+from public, anon, authenticated, service_role/.test(recoveryReauthorizationMigration), "recovery evidence inspection exposes no client or service-role shortcut");
   ok(/integration_expired_refresh_lease_reclamation_v1/.test(leaseReclamationMigration), "expired lease reclamation is a distinct versioned authority action");
   ok(/select credential\.\*[\s\S]+for update/.test(leaseReclamationMigration), "reclamation locks the credential before its CAS decision");
   ok(/p_command is null[\s\S]+is not true[\s\S]+is distinct from/.test(leaseReclamationMigration), "reclamation rejects JSON null and three-valued validation bypasses");
