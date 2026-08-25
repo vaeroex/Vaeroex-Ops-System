@@ -2049,6 +2049,16 @@ select public.create_integration_reauthorization_state_v1(
   'phase8b_recovery_success_create'
 ) as result;
 select ok(
+  pg_temp.raises_sqlstate(
+    $$select 1
+      from private.integration_reauthorization_states
+      where id = '58f00000-0000-4000-8000-000000000060'$$,
+    '42501'
+  ),
+  'oauth ingress authority cannot directly inspect private reauthorization state'
+);
+reset role;
+select ok(
   (
     select reauthorization_path = 'authorization_required_recovery'
       and expected_connection_row_version = 7
@@ -2059,6 +2069,7 @@ select ok(
   ),
   'recovery state captures the distinct lifecycle and database-derived CAS evidence'
 );
+set local role integration_oauth_ingress_authority;
 create temporary table phase8b_recovery_reauthorization_consume on commit drop as
 select public.consume_integration_reauthorization_state_v1(
   pg_temp.recovery_reauthorization_consume_command(
