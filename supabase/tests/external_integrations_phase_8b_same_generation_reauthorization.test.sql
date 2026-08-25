@@ -1734,7 +1734,7 @@ as $function$
     'reasonCode', 'expired_credential_recovery',
     'stateHash', pg_temp.fingerprint(p_state),
     'providerEntityReferenceFingerprint',
-      'sha256:2ba60dfb538944945786919e3a1156aaf9420bf75c07f57120d933d19d8fd94d',
+      'sha256:16de2d0734aa05677cb6ceb26deb64014602427ff94ccf7c0f55c5f41f0f0fe3',
     'consumedAt', pg_temp.timestamp_text(pg_catalog.transaction_timestamp())
   );
 $function$;
@@ -1794,7 +1794,7 @@ as $function$
       'com.intuit.quickbooks.accounting'
     ),
     'externalEntityReferenceFingerprint',
-      'sha256:2ba60dfb538944945786919e3a1156aaf9420bf75c07f57120d933d19d8fd94d',
+      'sha256:16de2d0734aa05677cb6ceb26deb64014602427ff94ccf7c0f55c5f41f0f0fe3',
     'mappingRevalidationFingerprint',
       pg_temp.fingerprint('phase8b-recovery-reauthorization-company-v2'),
     'reauthorizedAt', p_reauthorized_at
@@ -2023,7 +2023,7 @@ select ok(
         'targetStatus', 'initializing',
         'stateReasonCode', 'initial_sync_pending',
         'providerTenantReferenceFingerprint',
-          'sha256:2ba60dfb538944945786919e3a1156aaf9420bf75c07f57120d933d19d8fd94d',
+          'sha256:16de2d0734aa05677cb6ceb26deb64014602427ff94ccf7c0f55c5f41f0f0fe3',
         'grantedScopes', pg_catalog.jsonb_build_array(
           'com.intuit.quickbooks.accounting'
         ),
@@ -2077,13 +2077,13 @@ select public.consume_integration_reauthorization_state_v1(
   ),
   'phase8b_recovery_success_consume'
 ) as result;
-select is(
+select ok(
   (
-    select result ->> 'accepted'
+    select result ->> 'accepted' = 'true'
+      and result ? 'consumedAt'
     from phase8b_recovery_reauthorization_consume
   ),
-  'true',
-  'recovery reauthorization consumes once against unchanged connection, credential and mapping authority'
+  'recovery reauthorization returns canonical consumed evidence against unchanged connection, credential and mapping authority'
 );
 reset role;
 
@@ -2127,8 +2127,9 @@ select is(
       '58f00000-0000-4000-8000-000000000060',
       '68f00000-0000-4000-8000-000000000060',
       (
-        select result ->> 'consumedAt'
-        from phase8b_recovery_reauthorization_consume
+        select pg_catalog.current_setting(
+          'vaeroex.test_recovery_reauthorization_consumed_at'
+        )
       )
     ),
     'phase8b_recovery_success_store'
