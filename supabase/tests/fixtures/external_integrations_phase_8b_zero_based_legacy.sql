@@ -613,6 +613,8 @@ begin
         'projects/fixture/locations/test/queues/p8b/tasks/' ||
           pg_catalog.replace(v_task.id::text, '-', '')
       ),
+      'deliveryDispatchGeneration', v_task.dispatch_generation,
+      'deliveryRetryCount', 1,
       'deliveryExecutionCount', 1,
       'deliveryAttemptFingerprint',
         'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
