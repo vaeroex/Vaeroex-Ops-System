@@ -2087,6 +2087,15 @@ select is(
 );
 reset role;
 
+select pg_catalog.set_config(
+  'vaeroex.test_recovery_reauthorization_consumed_at',
+  (
+    select result ->> 'consumedAt'
+    from phase8b_recovery_reauthorization_consume
+  ),
+  true
+);
+
 set local role integration_credential_broker_authority;
 create temporary table phase8b_recovery_reauthorization_store on commit drop as
 select public.store_reauthorized_integration_credential_v1(
@@ -2094,8 +2103,9 @@ select public.store_reauthorized_integration_credential_v1(
     '58f00000-0000-4000-8000-000000000060',
     '68f00000-0000-4000-8000-000000000060',
     (
-      select result ->> 'consumedAt'
-      from phase8b_recovery_reauthorization_consume
+      select pg_catalog.current_setting(
+        'vaeroex.test_recovery_reauthorization_consumed_at'
+      )
     )
   ),
   'phase8b_recovery_success_store'
