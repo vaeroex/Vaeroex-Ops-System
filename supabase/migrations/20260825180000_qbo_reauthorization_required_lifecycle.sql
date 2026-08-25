@@ -1107,14 +1107,14 @@ begin
     and connection.provider_environment = v_state.provider_environment
   for update;
   if not found
-    or v_connection.status <> case v_state.reauthorization_path
+    or v_connection.status <> (case v_state.reauthorization_path
       when 'initializing_same_generation' then 'initializing'
       else 'reauthorization_required'
-    end
-    or v_connection.state_reason_code <> case v_state.reauthorization_path
+    end)
+    or v_connection.state_reason_code <> (case v_state.reauthorization_path
       when 'initializing_same_generation' then 'initial_sync_pending'
       else 'authorization_required'
-    end
+    end)
     or v_connection.row_version <> v_state.expected_connection_row_version
     or v_connection.provider_tenant_reference_fingerprint <>
       v_state.provider_entity_reference_fingerprint
@@ -1137,10 +1137,10 @@ begin
     and credential.provider_environment = v_state.provider_environment
   for update;
   if not found
-    or v_old_credential.status <> case v_state.reauthorization_path
+    or v_old_credential.status <> (case v_state.reauthorization_path
       when 'initializing_same_generation' then 'active'
       else 'reauthorization_required'
-    end
+    end)
     or v_old_credential.credential_version <>
       v_state.superseded_credential_version
     or v_old_credential.row_version <> v_state.expected_credential_row_version
