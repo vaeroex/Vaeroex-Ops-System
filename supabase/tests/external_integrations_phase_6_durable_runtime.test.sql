@@ -1043,46 +1043,6 @@ select is(
   'concurrent first delivery persists the required execution count zero'
 );
 
-set local role integration_provider_runtime_authority;
-select ok(
-  (
-    select not (contention.result ->> 'acquired')::boolean
-      and not (contention.result ->> 'idempotent')::boolean
-      and not (contention.result ->> 'terminalReplay')::boolean
-      and contention.result ->> 'reasonCode' = 'lease_held'
-      and contention.result ->> 'state' = 'leased'
-      and (contention.result ->> 'attemptCount')::integer = 1
-    from (
-      select public.lease_integration_sync_task_v1(
-        jsonb_build_object(
-          'workspaceId', 'b6c00000-0000-4000-8000-000000000001',
-          'businessEntityId', 'c6c00000-0000-4000-8000-000000000001',
-          'connectionId', 'd6c00000-0000-4000-8000-000000000001',
-          'connectionGeneration', 1,
-          'taskId', '16c00000-0000-4000-8000-000000000001',
-          'expectedRowVersion', 3,
-          'workerKind', 'provider_runtime',
-          'leaseId', '66c00000-0000-4000-8000-000000000005',
-          'leaseOwnerFingerprint',
-            'sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',
-          'leaseSeconds', 120,
-          'dispatcherTaskName',
-            'projects/phase6-test/locations/us-central1/queues/provider-interactive/tasks/eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
-          'deliveryDispatchGeneration', 1,
-          'deliveryRetryCount', 1,
-          'deliveryExecutionCount', 0,
-          'deliveryAttemptFingerprint',
-            'sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd'
-        ),
-        'phase6-active-lease-contention',
-        'phase6-provider-worker-3'
-      ) as result
-    ) as contention
-  ),
-  'a genuinely later tuple remains bounded by distinguishable active-lease contention'
-);
-reset role;
-
 -- Close the first synthetic proof lease before the independent zero/zero race
 -- so admission control cannot become the result under test.
 select extensions.dblink_exec(
@@ -2096,6 +2056,33 @@ select is(
   ) ->> 'acquired',
   'false',
   'duplicate Cloud Task delivery cannot acquire a second lease'
+);
+
+select ok(
+  (
+    select not (contention.result ->> 'acquired')::boolean
+      and not (contention.result ->> 'idempotent')::boolean
+      and not (contention.result ->> 'terminalReplay')::boolean
+      and contention.result ->> 'reasonCode' = 'lease_held'
+      and contention.result ->> 'state' = 'leased'
+      and (contention.result ->> 'attemptCount')::integer = 1
+    from (
+      select public.lease_integration_sync_task_v1(
+        pg_temp.lease_command(
+          'b6000000-0000-4000-8000-000000000001',
+          'c6000000-0000-4000-8000-000000000001',
+          'd6000000-0000-4000-8000-000000000001',
+          '16000000-0000-4000-8000-000000000001', 3,
+          'projects/phase6-test/locations/us-central1/queues/provider-interactive/tasks/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+          '66000000-0000-4000-8000-000000000098',
+          'later-delivery-worker', 0, 'provider_runtime', 1, 1
+        ),
+        'phase6-task-1-active-lease-contention',
+        'phase6-provider-worker'
+      ) as result
+    ) as contention
+  ),
+  'a genuinely later tuple remains bounded by distinguishable active-lease contention'
 );
 
 select ok(
