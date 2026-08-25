@@ -1823,8 +1823,8 @@ where id in (
   '38e00000-0000-4000-8000-000000000013'
 );
 
--- A dispatched reconstruction fixture isolates ordering after count one. It
--- has no lease/effect and is used only to prove the comparator boundary.
+-- Dispatched reconstruction fixtures isolate retry and execution ordering.
+-- They have no lease/effect and differ only where each comparator requires it.
 insert into private.integration_sync_tasks (
   id, contract_version, workspace_id, business_entity_id, connection_id,
   connection_generation, sync_run_id, provider_key, provider_environment,
@@ -1838,7 +1838,7 @@ insert into private.integration_sync_tasks (
   last_request_fingerprint, row_version, created_at, updated_at,
   retention_expires_at
 ) select
-  '38e00000-0000-4000-8000-000000000301',
+  fixture.id,
   task.contract_version,
   task.workspace_id,
   task.business_entity_id,
@@ -1853,25 +1853,59 @@ insert into private.integration_sync_tasks (
   'dispatched',
   task.priority,
   task.control_metadata,
-  extensions.digest(pg_catalog.convert_to('phase8b-zero-ordering', 'UTF8'), 'sha256'),
-  extensions.digest(pg_catalog.convert_to('phase8b-zero-ordering-coalesce', 'UTF8'), 'sha256'),
-  pg_catalog.repeat('a', 64),
+  extensions.digest(
+    pg_catalog.convert_to(fixture.identity_seed, 'UTF8'),
+    'sha256'
+  ),
+  extensions.digest(
+    pg_catalog.convert_to(fixture.identity_seed || '-coalesce', 'UTF8'),
+    'sha256'
+  ),
+  pg_catalog.repeat(fixture.dispatcher_character, 64),
   2,
   'attributed',
   2,
   1,
-  1,
-  extensions.digest(pg_catalog.convert_to('phase8b-zero-count-one', 'UTF8'), 'sha256'),
+  fixture.execution_count,
+  extensions.digest(
+    pg_catalog.convert_to(
+      fixture.identity_seed || '-count-' || fixture.execution_count::text,
+      'UTF8'
+    ),
+    'sha256'
+  ),
   1,
   3,
   pg_catalog.transaction_timestamp(),
-  'phase8b_zero_ordering_fixture',
-  extensions.digest(pg_catalog.convert_to('phase8b-zero-ordering-request', 'UTF8'), 'sha256'),
+  fixture.request_id,
+  extensions.digest(
+    pg_catalog.convert_to(fixture.request_id, 'UTF8'),
+    'sha256'
+  ),
   8,
   task.created_at,
   pg_catalog.transaction_timestamp(),
   task.retention_expires_at
 from private.integration_sync_tasks as task
+cross join (
+  values
+    (
+      '38e00000-0000-4000-8000-000000000301'::uuid,
+      'phase8b-zero-retry-ordering'::text,
+      'a'::text,
+      0::integer,
+      'phase8b_zero_retry_ordering_fixture'::text
+    ),
+    (
+      '38e00000-0000-4000-8000-000000000302'::uuid,
+      'phase8b-zero-execution-ordering'::text,
+      'b'::text,
+      1::integer,
+      'phase8b_zero_execution_ordering_fixture'::text
+    )
+) as fixture(
+  id, identity_seed, dispatcher_character, execution_count, request_id
+)
 where task.id = '38e00000-0000-4000-8000-000000000024';
 
 set local role integration_provider_runtime_authority;
@@ -1880,7 +1914,7 @@ select ok(
     $$select public.lease_integration_sync_task_v1(
       pg_catalog.jsonb_set(
         pg_temp.zero_delivery_lease_command(
-          1, 0, 1, 8,
+          1, 0, 0, 8,
           '48e00000-0000-4000-8000-000000000301',
           'phase8b-zero-ordering-owner',
           'phase8b-zero-ordering-zero'
@@ -1903,14 +1937,14 @@ select ok(
       pg_catalog.jsonb_set(
         pg_temp.zero_delivery_lease_command(
           1, 2, 0, 8,
-          '48e00000-0000-4000-8000-000000000301',
-          'phase8b-zero-ordering-owner',
-          'phase8b-zero-ordering-one'
+          '48e00000-0000-4000-8000-000000000302',
+          'phase8b-zero-execution-ordering-owner',
+          'phase8b-zero-execution-ordering-one'
         ),
         '{taskId}',
-        '"38e00000-0000-4000-8000-000000000301"'::jsonb
+        '"38e00000-0000-4000-8000-000000000302"'::jsonb
       ) || pg_catalog.jsonb_build_object(
-        'dispatcherTaskName', pg_catalog.repeat('a', 64)
+        'dispatcherTaskName', pg_catalog.repeat('b', 64)
       ),
       'phase8b_zero_ordering_one',
       'phase8b_provider_runtime'
