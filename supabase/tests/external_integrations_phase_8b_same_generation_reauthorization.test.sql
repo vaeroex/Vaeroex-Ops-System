@@ -4,6 +4,10 @@ create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 select no_plan();
 
+grant usage on schema extensions to
+  integration_oauth_ingress_authority,
+  integration_credential_broker_authority;
+
 create or replace function pg_temp.raises_sqlstate(p_sql text, p_expected text)
 returns boolean
 language plpgsql
