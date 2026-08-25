@@ -1371,11 +1371,13 @@ select private.phase_5_insert_audit_v1(
   'invalid_grant',
   pg_catalog.jsonb_build_object(
     'connection_generation', 1,
-    'credential_status', 'active',
     'credential_version', 2,
-    'idempotent', false
+    'refresh_boundary_stage', 'provider_response_parse',
+    'refresh_operation_fingerprint',
+      pg_temp.fingerprint('phase8b-replacement-invalid-grant-refresh'),
+    'refresh_diagnostics', null
   ),
-  pg_catalog.transaction_timestamp()
+  pg_catalog.clock_timestamp()
 );
 set local role integration_credential_broker_authority;
 select ok(
