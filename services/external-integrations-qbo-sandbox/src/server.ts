@@ -60,6 +60,7 @@ import {
   completeQboSandboxRuntimeTask,
   QboSandboxCloudTaskNameSchema,
   QBO_SANDBOX_AUTHORIZATION_RECOVERY_CONTRACT_VERSION,
+  QBO_SANDBOX_DUE_RETRY_PROMOTION_CONTRACT_VERSION,
   QBO_SANDBOX_EXPIRED_CREDENTIAL_RECOVERY_CONTRACT_VERSION,
   QBO_SANDBOX_REAUTHORIZED_PURCHASE_RECOVERY_CONTRACT_VERSION,
   QBO_SANDBOX_SCOPED_DISPATCH_DISCOVERY_CONTRACT_VERSION,
@@ -68,6 +69,7 @@ import {
   readQboSandboxAuthorizationRecovery,
   readQboSandboxScopedDispatchCandidates,
   readQboSandboxRuntimeTaskDelivery,
+  promoteQboSandboxDueRetryTasks,
   recoverQboSandboxExpiredCredentialTasks,
   recoverQboSandboxReauthorizedPurchaseTask,
   QboSandboxRuntimeLeaseResultSchema,
@@ -1370,9 +1372,22 @@ async function handleTaskDispatcher(
         businessEntityId: scope.businessEntityId,
         connectionId: scope.connectionId,
         connectionGeneration: config.connectionGeneration,
-        maximumTasks: Math.max(body.maximumTasks, 25)
+        maximumTasks: body.maximumTasks
       },
       `phase8b_sweep_${randomUUID()}`,
+      "phase8b_qbo_task_dispatcher",
+      dispatcherClient
+    );
+    await promoteQboSandboxDueRetryTasks(
+      {
+        contractVersion: QBO_SANDBOX_DUE_RETRY_PROMOTION_CONTRACT_VERSION,
+        workspaceId: scope.workspaceId,
+        businessEntityId: scope.businessEntityId,
+        connectionId: scope.connectionId,
+        connectionGeneration: config.connectionGeneration,
+        maximumTasks: body.maximumTasks
+      },
+      `phase8b_retry_ready_${randomUUID()}`,
       "phase8b_qbo_task_dispatcher",
       dispatcherClient
     );

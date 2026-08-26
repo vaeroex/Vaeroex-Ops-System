@@ -1745,6 +1745,9 @@ function testMigrationBoundary() {
   const recoveryReauthorizationMigration = read(
     "supabase/migrations/20260825180000_qbo_reauthorization_required_lifecycle.sql"
   );
+  const dispatchRetryLifecycleMigration = read(
+    "supabase/migrations/20260825190000_qbo_scoped_dispatch_retry_lifecycle.sql"
+  );
   const service = read("services/external-integrations-qbo-sandbox/src/server.ts");
   const deliveryParser = read(
     "services/external-integrations-qbo-sandbox/src/cloud-task-delivery.ts"
@@ -1825,6 +1828,67 @@ function testMigrationBoundary() {
         scopedRunLockMigration
       ),
     "run-lock correction preserves dispatcher-only RPC execution"
+  );
+  const globalSweepCorrection = dispatchRetryLifecycleMigration.slice(
+    dispatchRetryLifecycleMigration.indexOf(
+      "create or replace function public.sweep_integration_sync_tasks_v1"
+    ),
+    dispatchRetryLifecycleMigration.indexOf(
+      "create or replace function public.sweep_qbo_sandbox_scoped_dispatch_tasks_v1"
+    )
+  );
+  const scopedSweepCorrection = dispatchRetryLifecycleMigration.slice(
+    dispatchRetryLifecycleMigration.indexOf(
+      "create or replace function public.sweep_qbo_sandbox_scoped_dispatch_tasks_v1"
+    ),
+    dispatchRetryLifecycleMigration.indexOf(
+      "create or replace function public.promote_qbo_sandbox_due_retry_tasks_v1"
+    )
+  );
+  ok(
+    !/15 minutes|task\.state = 'dispatched'[\s\S]+task\.updated_at/.test(
+      globalSweepCorrection
+    ) &&
+      !/15 minutes|task\.state = 'dispatched'[\s\S]+task\.updated_at/.test(
+        scopedSweepCorrection
+      ),
+    "global and scoped sweeps eliminate age-only dispatched recovery"
+  );
+  ok(
+    /task\.state = 'retry_wait'[\s\S]+task\.available_at <= v_now/.test(
+      globalSweepCorrection
+    ) &&
+      !/task\.state = 'retry_wait'[\s\S]+task\.available_at <= v_now/.test(
+        scopedSweepCorrection
+      ),
+    "generic scheduling remains compatible while scoped retry promotion is separated"
+  );
+  ok(
+    /create or replace function public\.promote_qbo_sandbox_due_retry_tasks_v1[\s\S]+qbo_sandbox_due_retry_promotion_v1/.test(
+      dispatchRetryLifecycleMigration
+    ),
+    "forward migration adds a distinct scoped due-retry scheduling contract"
+  );
+  ok(
+    /select connection\.\* into v_connection[\s\S]+for share[\s\S]+perform run\.id[\s\S]+for share[\s\S]+for update of task skip locked/.test(
+      dispatchRetryLifecycleMigration
+    ),
+    "due-retry promotion locks connection, live runs, and tasks in canonical order"
+  );
+  ok(
+    /task\.state = 'retry_wait'[\s\S]+task\.available_at <= v_now[\s\S]+set[\s\S]+state = 'pending'/.test(
+      dispatchRetryLifecycleMigration
+    ),
+    "only due retry_wait work is promoted through the existing state graph"
+  );
+  ok(
+    /grant execute on function public\.promote_qbo_sandbox_due_retry_tasks_v1[\s\S]+to integration_task_dispatch_authority/.test(
+      dispatchRetryLifecycleMigration
+    ) &&
+      !/grant integration_task_dispatch_authority\s+to service_role/i.test(
+        dispatchRetryLifecycleMigration
+      ),
+    "retry promotion remains dispatcher-only with no service_role shortcut"
   );
   ok(/qbo_phase_8b_realm_fingerprint_v1/.test(migration) && /qbo_provider_source_realm_binding_denied/.test(migration), "provider source persistence is bound to the trusted mapping realm fingerprint");
   ok(/p_dispatcher_task_name !~ '\^\[a-f0-9\]\{64\}\$'/.test(migration), "runtime delivery accepts only the Cloud Tasks short task identifier");
@@ -1988,8 +2052,16 @@ function testMigrationBoundary() {
     "even terminal idempotent replays validate both Cloud Tasks counters first"
   );
   ok(/readQboSandboxScopedDispatchCandidates\([\s\S]+workspaceId: scope\.workspaceId[\s\S]+businessEntityId: scope\.businessEntityId[\s\S]+connectionId: scope\.connectionId[\s\S]+connectionGeneration: config\.connectionGeneration/.test(service), "dispatcher builds discovery scope from trusted service configuration");
-  ok(/sweepQboSandboxScopedDispatchTasks\([\s\S]+workspaceId: scope\.workspaceId[\s\S]+businessEntityId: scope\.businessEntityId[\s\S]+connectionId: scope\.connectionId[\s\S]+connectionGeneration: config\.connectionGeneration/.test(service), "dispatcher builds retry-recovery scope from trusted service configuration");
+  ok(/sweepQboSandboxScopedDispatchTasks\([\s\S]+workspaceId: scope\.workspaceId[\s\S]+businessEntityId: scope\.businessEntityId[\s\S]+connectionId: scope\.connectionId[\s\S]+connectionGeneration: config\.connectionGeneration/.test(service), "dispatcher builds lifecycle-sweep scope from trusted service configuration");
+  ok(/promoteQboSandboxDueRetryTasks\([\s\S]+workspaceId: scope\.workspaceId[\s\S]+businessEntityId: scope\.businessEntityId[\s\S]+connectionId: scope\.connectionId[\s\S]+connectionGeneration: config\.connectionGeneration/.test(service), "dispatcher builds due-retry scope from trusted service configuration");
   ok(!/sweepRuntimeTasks/.test(service), "connection-scoped dispatcher cannot invoke global task recovery");
+  const retryPromotionIndex = service.indexOf("await promoteQboSandboxDueRetryTasks(");
+  const discoveryIndex = service.indexOf("await readQboSandboxScopedDispatchCandidates(");
+  ok(
+    retryPromotionIndex >= 0 && discoveryIndex > retryPromotionIndex,
+    "due retries enter pending state before scoped candidate discovery"
+  );
+  ok(!/Math\.max\(body\.maximumTasks, 25\)/.test(service), "dispatcher lifecycle work is bounded by the requested batch size");
   const reservationIndex = service.indexOf("await reserveQboSandboxScopedDispatchTask(");
   const enqueueIndex = service.indexOf("const cloudTask = await googleCreateCloudTask(");
   ok(reservationIndex >= 0 && enqueueIndex > reservationIndex, "database scope reservation completes before external Cloud Task enqueue");
@@ -2113,6 +2185,29 @@ function testMigrationBoundary() {
       maximumTasks: 25
     },
     "scoped recovery command carries only the reviewed trusted boundary"
+  );
+  deepEqual(
+    qboRuntimeRepository.PromoteQboSandboxDueRetryTasksCommandSchema.parse({
+      contractVersion: "qbo_sandbox_due_retry_promotion_v1",
+      ...trustedScope,
+      maximumTasks: 25
+    }),
+    {
+      contractVersion: "qbo_sandbox_due_retry_promotion_v1",
+      ...trustedScope,
+      maximumTasks: 25
+    },
+    "due-retry promotion carries only the reviewed trusted boundary"
+  );
+  throws(
+    () => qboRuntimeRepository.PromoteQboSandboxDueRetryTasksCommandSchema.parse({
+      contractVersion: "qbo_sandbox_due_retry_promotion_v1",
+      ...trustedScope,
+      maximumTasks: 25,
+      cloudTaskMissing: true
+    }),
+    /unrecognized|Unrecognized|invalid/i,
+    "caller-claimed missing Cloud Task evidence cannot widen retry promotion"
   );
   throws(
     () => qboRuntimeRepository.SweepQboSandboxScopedDispatchTasksCommandSchema.parse({

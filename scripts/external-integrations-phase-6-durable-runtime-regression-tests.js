@@ -920,9 +920,14 @@ async function main() {
   }
   const recoveryStarted = performance.now();
   const recoveredBacklog = backlogLedger.sweep(BASE_TIME, { dispatchStaleAfterMs: 15 * 60_000 });
-  benchmark.recover_100_stale_dispatches_ms = Number((performance.now() - recoveryStarted).toFixed(3));
-  equal(recoveredBacklog.length, 100, "sweeper recovers a disappeared Cloud Tasks backlog");
-  ok(recoveredBacklog.every((task) => task.state === "pending"), "recovered dispatches are eligible for idempotent redispatch");
+  benchmark.preserve_100_old_dispatches_ms = Number((performance.now() - recoveryStarted).toFixed(3));
+  equal(recoveredBacklog.length, 0, "sweeper does not infer missing Cloud Tasks from dispatch age");
+  ok(
+    backlogLedger.allTasks().every(
+      (task) => task.state === "dispatched" && task.dispatchGeneration === 1
+    ),
+    "old live dispatches preserve their envelope identity and generation"
+  );
 
   benchmark.single_task_latency_ms = Number(singleTaskLatencyMs.toFixed(3));
   benchmark.duplicate_delivery_rate = `${normalLedger.metrics().duplicateDeliveries}/1 replayed delivery`;

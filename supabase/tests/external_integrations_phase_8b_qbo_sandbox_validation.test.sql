@@ -543,6 +543,7 @@ select ok(
   and not has_function_privilege('service_role', 'public.complete_qbo_sandbox_runtime_task_v1(jsonb,text,text)', 'EXECUTE')
   and has_function_privilege('integration_task_dispatch_authority', 'public.read_qbo_sandbox_scoped_dispatch_candidates_v1(jsonb)', 'EXECUTE')
   and has_function_privilege('integration_task_dispatch_authority', 'public.sweep_qbo_sandbox_scoped_dispatch_tasks_v1(jsonb,text,text)', 'EXECUTE')
+  and has_function_privilege('integration_task_dispatch_authority', 'public.promote_qbo_sandbox_due_retry_tasks_v1(jsonb,text,text)', 'EXECUTE')
   and has_function_privilege('integration_task_dispatch_authority', 'public.reserve_qbo_sandbox_scoped_dispatch_task_v1(jsonb,text,text)', 'EXECUTE')
   and not has_function_privilege('integration_task_dispatch_authority', 'public.read_qbo_sandbox_dispatch_candidates_v1(integer)', 'EXECUTE')
   and not has_function_privilege('integration_task_dispatch_authority', 'public.discover_integration_sync_dispatch_v1(text,integer)', 'EXECUTE')
@@ -550,6 +551,7 @@ select ok(
   and not has_function_privilege('integration_task_dispatch_authority', 'public.sweep_integration_sync_tasks_v1(integer,text,text)', 'EXECUTE')
   and not has_function_privilege('service_role', 'public.read_qbo_sandbox_scoped_dispatch_candidates_v1(jsonb)', 'EXECUTE')
   and not has_function_privilege('service_role', 'public.sweep_qbo_sandbox_scoped_dispatch_tasks_v1(jsonb,text,text)', 'EXECUTE')
+  and not has_function_privilege('service_role', 'public.promote_qbo_sandbox_due_retry_tasks_v1(jsonb,text,text)', 'EXECUTE')
   and not has_function_privilege('service_role', 'public.reserve_qbo_sandbox_scoped_dispatch_task_v1(jsonb,text,text)', 'EXECUTE')
   and not has_function_privilege('service_role', 'public.read_qbo_sandbox_dispatch_candidates_v1(integer)', 'EXECUTE')
   and not has_function_privilege('service_role', 'public.read_qbo_sandbox_runtime_task_delivery_v1(uuid,text)', 'EXECUTE')
@@ -1205,8 +1207,8 @@ select is(
 );
 reset role;
 
--- Add twenty-three more valid tasks for the configured connection. Together
--- with the derived continuation above, the trusted scope contains exactly 24.
+-- Add twenty-four more scoped tasks. One is a non-due retry, so the trusted
+-- scope still contains exactly 24 dispatchable tasks with the continuation.
 insert into private.integration_sync_tasks (
   id, contract_version, workspace_id, business_entity_id, connection_id,
   connection_generation, sync_run_id, provider_key, provider_environment,
@@ -1225,7 +1227,7 @@ select
   '28000000-0000-4000-8000-000000008b01',
   'quickbooks_online', 'sandbox', 'provider_bulk', 'initial_historical',
   'qbo_invoice',
-  case when series.value = 2 then 'retry_wait' else 'pending' end,
+  case when series.value in (2, 25) then 'retry_wait' else 'pending' end,
   40,
   pg_catalog.jsonb_build_object(
     'checkpointId', null,
@@ -1247,8 +1249,11 @@ select
     pg_catalog.convert_to('phase8b-scoped-coalescing-' || series.value::text, 'UTF8'),
     'sha256'
   ),
-  0, null, 0, 3,
-  pg_catalog.transaction_timestamp(),
+  case when series.value = 2 then 2 else 0 end, null, 0, 3,
+  case when series.value = 25
+    then pg_catalog.transaction_timestamp() + interval '1 hour'
+    else pg_catalog.transaction_timestamp()
+  end,
   'phase8b_scoped_task_' || series.value::text,
   extensions.digest(
     pg_catalog.convert_to('phase8b-scoped-request-' || series.value::text, 'UTF8'),
@@ -1258,7 +1263,90 @@ select
   pg_catalog.transaction_timestamp(),
   pg_catalog.transaction_timestamp(),
   pg_catalog.transaction_timestamp() + interval '7 days'
-from pg_catalog.generate_series(2, 24) as series(value);
+from pg_catalog.generate_series(2, 25) as series(value);
+
+-- These rows model the 23 still-live generation-2 Cloud Task envelopes in the
+-- preserved Phase 8B queue. Their old database timestamps are not recovery
+-- evidence and must never make them ordinary dispatcher candidates.
+insert into private.integration_sync_tasks (
+  id, contract_version, workspace_id, business_entity_id, connection_id,
+  connection_generation, sync_run_id, provider_key, provider_environment,
+  queue_class, task_kind, stream_key, state, priority, control_metadata,
+  idempotency_fingerprint, coalescing_fingerprint, dispatcher_task_name,
+  dispatch_generation, last_delivery_execution_count, attempt_count,
+  maximum_attempts, available_at, last_request_id, last_request_fingerprint,
+  row_version, created_at, updated_at, retention_expires_at
+)
+select
+  ('a8e00000-0000-4000-8000-' ||
+    pg_catalog.lpad(series.value::text, 12, '0'))::uuid,
+  'integration_sync_task_v1',
+  'b8b00000-0000-4000-8000-000000000001',
+  'd8b00000-0000-4000-8000-000000000001',
+  'e8b00000-0000-4000-8000-000000000001', 1,
+  '28000000-0000-4000-8000-000000008b01',
+  'quickbooks_online', 'sandbox', 'provider_bulk', 'initial_historical',
+  'qbo_invoice', 'dispatched', 30,
+  pg_catalog.jsonb_build_object(
+    'checkpointId', null,
+    'mappingId', 'f8b00000-0000-4000-8000-000000000001',
+    'eventId', null,
+    'pageOrdinal', 0,
+    'cursorVersion', 0,
+    'windowStartAt', '2026-01-01T00:00:00.000Z',
+    'windowEndAt', '2026-01-31T23:59:59.999Z',
+    'reasonCode', 'phase8b_preserved_staged_delivery',
+    'recordHintCount', 0,
+    'coalescedEventCount', 1
+  ),
+  extensions.digest(
+    pg_catalog.convert_to(
+      'phase8b-preserved-dispatch-' || series.value::text,
+      'UTF8'
+    ),
+    'sha256'
+  ),
+  extensions.digest(
+    pg_catalog.convert_to(
+      'phase8b-preserved-dispatch-coalesce-' || series.value::text,
+      'UTF8'
+    ),
+    'sha256'
+  ),
+  pg_catalog.encode(
+    extensions.digest(
+      pg_catalog.convert_to(
+        'phase8b-preserved-cloud-task-' || series.value::text,
+        'UTF8'
+      ),
+      'sha256'
+    ),
+    'hex'
+  ),
+  2, null, 0, 3,
+  pg_catalog.transaction_timestamp() - interval '30 minutes',
+  'phase8b_preserved_dispatch_' || series.value::text,
+  extensions.digest(
+    pg_catalog.convert_to(
+      'phase8b-preserved-dispatch-request-' || series.value::text,
+      'UTF8'
+    ),
+    'sha256'
+  ),
+  3,
+  pg_catalog.transaction_timestamp() - interval '1 day',
+  pg_catalog.transaction_timestamp() - interval '30 minutes',
+  pg_catalog.transaction_timestamp() + interval '7 days'
+from pg_catalog.generate_series(1, 23) as series(value);
+
+create temporary table phase8b_preserved_dispatch_snapshot
+on commit drop
+as
+select task.id, pg_catalog.to_jsonb(task) as value
+from private.integration_sync_tasks as task
+where task.id between
+  'a8e00000-0000-4000-8000-000000000001'::uuid and
+  'a8e00000-0000-4000-8000-000000000023'::uuid;
 
 insert into public.workspaces (id, name, created_by) values (
   'b8c00000-0000-4000-8000-000000000001',
@@ -1433,8 +1521,71 @@ select is(
     'phase8b_scoped_recovery',
     'phase8b_qbo_dispatcher'
   ) ->> 'recoveredTaskCount',
+  '0',
+  'ordinary scoped sweep does not recover due retries or old dispatched rows'
+);
+select is(
+  (
+    select pg_catalog.count(*)::text
+    from private.integration_sync_tasks as task
+    inner join phase8b_preserved_dispatch_snapshot as snapshot
+      on snapshot.id = task.id
+    where pg_catalog.to_jsonb(task) = snapshot.value
+  ),
+  '23',
+  'queue pause age leaves all 23 staged dispatch rows value-equivalent'
+);
+select is(
+  public.promote_qbo_sandbox_due_retry_tasks_v1(
+    pg_catalog.jsonb_build_object(
+      'contractVersion', 'qbo_sandbox_due_retry_promotion_v1',
+      'workspaceId', 'b8b00000-0000-4000-8000-000000000001',
+      'businessEntityId', 'd8b00000-0000-4000-8000-000000000001',
+      'connectionId', 'e8b00000-0000-4000-8000-000000000001',
+      'connectionGeneration', 1,
+      'maximumTasks', 100
+    ),
+    'phase8b_due_retry_promotion',
+    'phase8b_qbo_dispatcher'
+  ) ->> 'promotedTaskCount',
   '1',
-  'scoped recovery returns only configured retry work to pending'
+  'narrow retry scheduling promotes exactly the one due retry'
+);
+select is(
+  public.promote_qbo_sandbox_due_retry_tasks_v1(
+    pg_catalog.jsonb_build_object(
+      'contractVersion', 'qbo_sandbox_due_retry_promotion_v1',
+      'workspaceId', 'b8b00000-0000-4000-8000-000000000001',
+      'businessEntityId', 'd8b00000-0000-4000-8000-000000000001',
+      'connectionId', 'e8b00000-0000-4000-8000-000000000001',
+      'connectionGeneration', 1,
+      'maximumTasks', 100
+    ),
+    'phase8b_due_retry_promotion_replay',
+    'phase8b_qbo_dispatcher'
+  ) ->> 'promotedTaskCount',
+  '0',
+  'repeated due-retry promotion is idempotent'
+);
+select is(
+  (
+    select pg_catalog.concat_ws(
+      ':', state, dispatch_generation::text, row_version::text
+    )
+    from private.integration_sync_tasks
+    where id = 'a8c00000-0000-4000-8000-000000000002'
+  ),
+  'pending:2:2',
+  'promotion preserves dispatch generation while advancing retry state once'
+);
+select is(
+  (
+    select pg_catalog.concat_ws(':', state, row_version::text)
+    from private.integration_sync_tasks
+    where id = 'a8c00000-0000-4000-8000-000000000025'
+  ),
+  'retry_wait:1',
+  'non-due retry remains ineligible and unchanged'
 );
 select is(
   pg_catalog.jsonb_array_length(
@@ -1450,7 +1601,7 @@ select is(
     )
   )::text,
   '24',
-  'configured connection discovers exactly its 24 valid pending tasks'
+  'configured connection discovers exactly its 24 due pending tasks'
 );
 select is(
   (
@@ -1477,6 +1628,30 @@ select is(
   ),
   '24',
   'every discovered candidate equals the complete trusted scope'
+);
+select is(
+  (
+    select pg_catalog.count(*)::text
+    from pg_catalog.jsonb_array_elements(
+      public.read_qbo_sandbox_scoped_dispatch_candidates_v1(
+        pg_catalog.jsonb_build_object(
+          'contractVersion', 'qbo_sandbox_scoped_dispatch_discovery_v1',
+          'workspaceId', 'b8b00000-0000-4000-8000-000000000001',
+          'businessEntityId', 'd8b00000-0000-4000-8000-000000000001',
+          'connectionId', 'e8b00000-0000-4000-8000-000000000001',
+          'connectionGeneration', 1,
+          'maximumTasks', 100
+        )
+      )
+    ) as candidate(value)
+    where candidate.value ->> 'taskId' =
+        'a8c00000-0000-4000-8000-000000000025'
+      or (candidate.value ->> 'taskId')::uuid between
+        'a8e00000-0000-4000-8000-000000000001'::uuid and
+        'a8e00000-0000-4000-8000-000000000023'::uuid
+  ),
+  '0',
+  'non-due retry and all 23 existing dispatch envelopes stay undiscoverable'
 );
 select is(
   pg_catalog.jsonb_array_length(
@@ -1549,6 +1724,40 @@ select is(
 );
 select ok(
   pg_temp.raises_sqlstate(
+    $$select public.promote_qbo_sandbox_due_retry_tasks_v1(
+      pg_catalog.jsonb_build_object(
+        'contractVersion', 'qbo_sandbox_due_retry_promotion_v1',
+        'workspaceId', 'b8c00000-0000-4000-8000-000000000001',
+        'businessEntityId', 'd8b00000-0000-4000-8000-000000000001',
+        'connectionId', 'e8b00000-0000-4000-8000-000000000001',
+        'connectionGeneration', 1,
+        'maximumTasks', 100
+      ),
+      'phase8b_forged_retry_promotion',
+      'phase8b_qbo_dispatcher'
+    )$$,
+    '42501'
+  )
+    and pg_temp.raises_sqlstate(
+      $$select public.promote_qbo_sandbox_due_retry_tasks_v1(
+        pg_catalog.jsonb_build_object(
+          'contractVersion', 'qbo_sandbox_due_retry_promotion_v1',
+          'workspaceId', 'b8b00000-0000-4000-8000-000000000001',
+          'businessEntityId', 'd8b00000-0000-4000-8000-000000000001',
+          'connectionId', 'e8b00000-0000-4000-8000-000000000001',
+          'connectionGeneration', 1,
+          'maximumTasks', 100,
+          'cloudTaskMissing', true
+        ),
+        'phase8b_untrusted_missing_envelope',
+        'phase8b_qbo_dispatcher'
+      )$$,
+      '22023'
+    ),
+  'copied scope and caller-claimed missing delivery evidence fail closed'
+);
+select ok(
+  pg_temp.raises_sqlstate(
     $$select public.read_qbo_sandbox_dispatch_candidates_v1(100)$$,
     '42501'
   ),
@@ -1608,6 +1817,28 @@ select is(
   ) ->> 'idempotent',
   'true',
   'reservation replay preserves idempotency and the exact short task identity'
+);
+select is(
+  (
+    select pg_catalog.concat_ws(
+      ':', state, dispatch_generation::text, row_version::text
+    )
+    from private.integration_sync_tasks
+    where id = 'a8c00000-0000-4000-8000-000000000002'
+  ),
+  'dispatched:3:3',
+  'due retry receives exactly one new dispatch generation after reservation'
+);
+select is(
+  (
+    select pg_catalog.count(*)::text
+    from private.integration_sync_tasks as task
+    inner join phase8b_preserved_dispatch_snapshot as snapshot
+      on snapshot.id = task.id
+    where pg_catalog.to_jsonb(task) = snapshot.value
+  ),
+  '23',
+  'retry scheduling and reservation never rewrite existing staged deliveries'
 );
 select ok(
   pg_temp.raises_sqlstate(
@@ -2046,6 +2277,290 @@ select extensions.dblink_disconnect(connection_name)
 from (values
   ('phase8b_dispatch_terminalizer'),
   ('phase8b_dispatch_reservation')
+) as connections(connection_name);
+
+-- Two ordinary dispatcher runs may discover the same promoted retry before
+-- either reserves it. The checked reservation must advance authority once.
+select extensions.dblink_connect(
+  connection_name,
+  pg_catalog.convert_from(
+    pg_catalog.decode(
+      pg_catalog.current_setting('vaeroex.test_database_url_b64'),
+      'base64'
+    ),
+    'UTF8'
+  )
+)
+from (values
+  ('phase8b_retry_reservation_1'),
+  ('phase8b_retry_reservation_2')
+) as connections(connection_name);
+
+select extensions.dblink_exec(
+  'phase8b_retry_reservation_1',
+  $setup$
+    insert into private.integration_sync_runs (
+      id, contract_version, workspace_id, business_entity_id, connection_id,
+      mapping_id, connection_generation, trigger_kind, mode, state,
+      idempotency_fingerprint, provider_contract_version, adapter_version,
+      policy_version, records_observed, records_accepted, records_rejected,
+      facts_accepted, contributions_changed, created_at, started_at,
+      row_version, updated_at
+    ) values (
+      '28d00000-0000-4000-8000-000000000002',
+      'integration_sync_run_v1',
+      'b8d00000-0000-4000-8000-000000000001',
+      'd8d00000-0000-4000-8000-000000000001',
+      'e8d00000-0000-4000-8000-000000000001', null, 1,
+      'recovery', 'incremental', 'running',
+      extensions.digest(
+        pg_catalog.convert_to('phase8b-due-retry-concurrency-run', 'UTF8'),
+        'sha256'
+      ),
+      'provider_adapter_v1', 'qbo_provider_adapter_v1',
+      'qbo_historical_sync_policy_v1', 0, 0, 0, 0, 0,
+      pg_catalog.transaction_timestamp(), pg_catalog.transaction_timestamp(),
+      2, pg_catalog.transaction_timestamp()
+    );
+    insert into private.integration_sync_tasks (
+      id, contract_version, workspace_id, business_entity_id, connection_id,
+      connection_generation, sync_run_id, provider_key,
+      provider_environment, queue_class, task_kind, stream_key, state,
+      priority, control_metadata, idempotency_fingerprint,
+      coalescing_fingerprint, dispatch_generation,
+      last_delivery_execution_count, attempt_count, maximum_attempts,
+      available_at, failure_category, failure_code, last_request_id,
+      last_request_fingerprint, row_version, created_at, updated_at,
+      retention_expires_at
+    ) values (
+      '38d00000-0000-4000-8000-000000000002',
+      'integration_sync_task_v1',
+      'b8d00000-0000-4000-8000-000000000001',
+      'd8d00000-0000-4000-8000-000000000001',
+      'e8d00000-0000-4000-8000-000000000001', 1,
+      '28d00000-0000-4000-8000-000000000002',
+      'quickbooks_online', 'sandbox', 'provider_interactive',
+      'incremental', 'qbo_purchase', 'retry_wait', 100,
+      pg_catalog.jsonb_build_object(
+        'checkpointId', null,
+        'mappingId', null,
+        'eventId', null,
+        'pageOrdinal', 0,
+        'cursorVersion', 0,
+        'windowStartAt', null,
+        'windowEndAt', null,
+        'reasonCode', 'phase8b_due_retry_concurrency',
+        'recordHintCount', 0,
+        'coalescedEventCount', 1
+      ),
+      extensions.digest(
+        pg_catalog.convert_to('phase8b-due-retry-concurrency-task', 'UTF8'),
+        'sha256'
+      ),
+      extensions.digest(
+        pg_catalog.convert_to(
+          'phase8b-due-retry-concurrency-coalescing',
+          'UTF8'
+        ),
+        'sha256'
+      ),
+      2, null, 1, 3,
+      pg_catalog.transaction_timestamp() - interval '1 minute',
+      'availability', 'phase8b_retryable_failure',
+      'phase8b_due_retry_concurrency_fixture',
+      extensions.digest(
+        pg_catalog.convert_to(
+          'phase8b-due-retry-concurrency-fixture',
+          'UTF8'
+        ),
+        'sha256'
+      ),
+      1,
+      pg_catalog.transaction_timestamp() - interval '1 hour',
+      pg_catalog.transaction_timestamp() - interval '1 minute',
+      pg_catalog.transaction_timestamp() + interval '7 days'
+    );
+    set role integration_task_dispatch_authority;
+    do $promote$
+    begin
+      perform public.promote_qbo_sandbox_due_retry_tasks_v1(
+        pg_catalog.jsonb_build_object(
+          'contractVersion', 'qbo_sandbox_due_retry_promotion_v1',
+          'workspaceId', 'b8d00000-0000-4000-8000-000000000001',
+          'businessEntityId', 'd8d00000-0000-4000-8000-000000000001',
+          'connectionId', 'e8d00000-0000-4000-8000-000000000001',
+          'connectionGeneration', 1,
+          'maximumTasks', 100
+        ),
+        'phase8b_due_retry_concurrency_promote',
+        'phase8b_qbo_dispatcher'
+      );
+    end;
+    $promote$;
+    reset role
+  $setup$
+);
+
+select extensions.dblink_exec(
+  connection_name,
+  'set role integration_task_dispatch_authority'
+)
+from (values
+  ('phase8b_retry_reservation_1'),
+  ('phase8b_retry_reservation_2')
+) as connections(connection_name);
+
+create temporary table phase8b_retry_dispatch_backend_ids (
+  connection_name text primary key,
+  backend_pid integer not null
+) on commit drop;
+
+insert into phase8b_retry_dispatch_backend_ids(connection_name, backend_pid)
+select connection_name, backend_pid
+from (values
+  ('phase8b_retry_reservation_1'),
+  ('phase8b_retry_reservation_2')
+) as connections(connection_name)
+cross join lateral extensions.dblink(
+  connections.connection_name,
+  'select pg_catalog.pg_backend_pid()'
+) as backend(backend_pid integer);
+
+select pg_catalog.pg_advisory_lock(816000000000000002);
+select extensions.dblink_send_query(
+  'phase8b_retry_reservation_1',
+  $reserve$
+    with reserved as materialized (
+      select public.reserve_qbo_sandbox_scoped_dispatch_task_v1(
+        pg_catalog.jsonb_build_object(
+          'contractVersion', 'qbo_sandbox_scoped_dispatch_reservation_v1',
+          'workspaceId', 'b8d00000-0000-4000-8000-000000000001',
+          'businessEntityId', 'd8d00000-0000-4000-8000-000000000001',
+          'connectionId', 'e8d00000-0000-4000-8000-000000000001',
+          'connectionGeneration', 1,
+          'taskId', '38d00000-0000-4000-8000-000000000002',
+          'expectedRowVersion', 2,
+          'dispatcherTaskName', pg_catalog.repeat('f', 64)
+        ),
+        'phase8b_reserve_' || pg_catalog.repeat('f', 64),
+        'phase8b_qbo_dispatcher'
+      ) as result
+    )
+    select reserved.result ->> 'idempotent' as idempotent
+    from reserved
+    cross join lateral (
+      select pg_catalog.pg_advisory_xact_lock(
+        816000000000000002 +
+        pg_catalog.char_length(reserved.result::text)::bigint * 0
+      )
+    ) as barrier
+  $reserve$
+);
+
+select ok(
+  pg_temp.wait_for_phase8b_ungranted_lock(
+    (
+      select backend_pid
+      from phase8b_retry_dispatch_backend_ids
+      where connection_name = 'phase8b_retry_reservation_1'
+    ),
+    'advisory'
+  ),
+  'first retry dispatcher holds the authoritative reservation before commit'
+);
+
+select extensions.dblink_send_query(
+  'phase8b_retry_reservation_2',
+  $reserve$
+    select public.reserve_qbo_sandbox_scoped_dispatch_task_v1(
+      pg_catalog.jsonb_build_object(
+        'contractVersion', 'qbo_sandbox_scoped_dispatch_reservation_v1',
+        'workspaceId', 'b8d00000-0000-4000-8000-000000000001',
+        'businessEntityId', 'd8d00000-0000-4000-8000-000000000001',
+        'connectionId', 'e8d00000-0000-4000-8000-000000000001',
+        'connectionGeneration', 1,
+        'taskId', '38d00000-0000-4000-8000-000000000002',
+        'expectedRowVersion', 2,
+        'dispatcherTaskName', pg_catalog.repeat('f', 64)
+      ),
+      'phase8b_reserve_' || pg_catalog.repeat('f', 64),
+      'phase8b_qbo_dispatcher'
+    ) ->> 'idempotent'
+  $reserve$
+);
+
+select ok(
+  pg_temp.wait_for_phase8b_ungranted_lock(
+    (
+      select backend_pid
+      from phase8b_retry_dispatch_backend_ids
+      where connection_name = 'phase8b_retry_reservation_2'
+    )
+  ),
+  'second retry dispatcher waits on the first task reservation'
+);
+
+select pg_catalog.pg_advisory_unlock(816000000000000002);
+
+create temporary table phase8b_retry_reservation_results (
+  connection_name text primary key,
+  idempotent boolean not null
+) on commit drop;
+
+insert into phase8b_retry_reservation_results(connection_name, idempotent)
+select 'phase8b_retry_reservation_1', idempotent::boolean
+from extensions.dblink_get_result('phase8b_retry_reservation_1')
+  as response(idempotent text);
+insert into phase8b_retry_reservation_results(connection_name, idempotent)
+select 'phase8b_retry_reservation_2', idempotent::boolean
+from extensions.dblink_get_result('phase8b_retry_reservation_2')
+  as response(idempotent text);
+
+select is(
+  (
+    select pg_catalog.count(*)::text
+    from phase8b_retry_reservation_results
+    where not idempotent
+  ),
+  '1',
+  'concurrent dispatchers produce exactly one authoritative retry reservation'
+);
+select is(
+  (
+    select pg_catalog.count(*)::text
+    from phase8b_retry_reservation_results
+    where idempotent
+  ),
+  '1',
+  'the concurrent duplicate converges as one idempotent reservation replay'
+);
+select is(
+  (
+    select pg_catalog.concat_ws(
+      ':', state, dispatch_generation::text, row_version::text
+    )
+    from private.integration_sync_tasks
+    where id = '38d00000-0000-4000-8000-000000000002'
+  ),
+  'dispatched:3:3',
+  'concurrent reservation advances dispatch generation and row version once'
+);
+
+select extensions.dblink_exec(
+  'phase8b_retry_reservation_1',
+  $cleanup$
+    reset role;
+    delete from private.integration_sync_tasks
+    where id = '38d00000-0000-4000-8000-000000000002';
+    delete from private.integration_sync_runs
+    where id = '28d00000-0000-4000-8000-000000000002'
+  $cleanup$
+);
+
+select extensions.dblink_disconnect(connection_name)
+from (values
+  ('phase8b_retry_reservation_1'),
+  ('phase8b_retry_reservation_2')
 ) as connections(connection_name);
 
 select is(

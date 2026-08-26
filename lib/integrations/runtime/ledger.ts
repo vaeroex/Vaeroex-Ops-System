@@ -528,6 +528,9 @@ export class SyntheticDurableRuntimeLedger {
   }
 
   sweep(now: Date, input: { dispatchStaleAfterMs: number }) {
+    if (!Number.isSafeInteger(input.dispatchStaleAfterMs) || input.dispatchStaleAfterMs <= 0) {
+      throw new Error("integration_runtime_sweep_configuration_invalid");
+    }
     const recovered: RuntimeTaskRecord[] = [];
     for (const task of this.#tasks.values()) {
       if (task.deliveryAttributionState === "legacy_unattributed") continue;
@@ -556,15 +559,6 @@ export class SyntheticDurableRuntimeLedger {
         task.state = "pending";
         task.failureCategory = null;
         task.failureCode = null;
-        changed = true;
-      } else if (
-        task.state === "dispatched" &&
-        now.getTime() - Date.parse(task.updatedAt) >= input.dispatchStaleAfterMs
-      ) {
-        task.state = "pending";
-        task.dispatcherTaskName = null;
-        task.failureCategory = "availability";
-        task.failureCode = "dispatch_reference_stale";
         changed = true;
       }
       if (changed) {

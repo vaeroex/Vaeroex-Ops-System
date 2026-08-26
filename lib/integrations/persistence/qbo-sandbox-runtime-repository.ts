@@ -24,6 +24,8 @@ export const QBO_SANDBOX_SCOPED_DISPATCH_DISCOVERY_CONTRACT_VERSION =
   "qbo_sandbox_scoped_dispatch_discovery_v1" as const;
 export const QBO_SANDBOX_SCOPED_DISPATCH_RECOVERY_CONTRACT_VERSION =
   "qbo_sandbox_scoped_dispatch_recovery_v1" as const;
+export const QBO_SANDBOX_DUE_RETRY_PROMOTION_CONTRACT_VERSION =
+  "qbo_sandbox_due_retry_promotion_v1" as const;
 export const QBO_SANDBOX_SCOPED_DISPATCH_RESERVATION_CONTRACT_VERSION =
   "qbo_sandbox_scoped_dispatch_reservation_v1" as const;
 export const QBO_SANDBOX_EXPIRED_CREDENTIAL_RECOVERY_CONTRACT_VERSION =
@@ -111,6 +113,19 @@ export const SweepQboSandboxScopedDispatchTasksCommandSchema = z
   .object({
     contractVersion: z.literal(
       QBO_SANDBOX_SCOPED_DISPATCH_RECOVERY_CONTRACT_VERSION
+    ),
+    workspaceId: UuidSchema,
+    businessEntityId: UuidSchema,
+    connectionId: UuidSchema,
+    connectionGeneration: z.number().int().positive().safe(),
+    maximumTasks: z.number().int().min(1).max(100)
+  })
+  .strict();
+
+export const PromoteQboSandboxDueRetryTasksCommandSchema = z
+  .object({
+    contractVersion: z.literal(
+      QBO_SANDBOX_DUE_RETRY_PROMOTION_CONTRACT_VERSION
     ),
     workspaceId: UuidSchema,
     businessEntityId: UuidSchema,
@@ -322,6 +337,13 @@ const QboSandboxScopedDispatchRecoveryResultSchema = z
   })
   .strict();
 
+const QboSandboxDueRetryPromotionResultSchema = z
+  .object({
+    promotedTaskCount: z.number().int().nonnegative().safe(),
+    promotedAt: IsoTimestampSchema
+  })
+  .strict();
+
 const QboSandboxScopedDispatchReservationResultSchema = z
   .object({
     taskId: UuidSchema,
@@ -457,6 +479,24 @@ export async function sweepQboSandboxScopedDispatchTasks(
     client
   );
   return QboSandboxScopedDispatchRecoveryResultSchema.parse(data);
+}
+
+export async function promoteQboSandboxDueRetryTasks(
+  input: unknown,
+  requestId: string,
+  actorId: string,
+  client: ExternalIntegrationsRpcClient
+) {
+  const data = await checkedRpc(
+    "promote_qbo_sandbox_due_retry_tasks_v1",
+    {
+      p_command: PromoteQboSandboxDueRetryTasksCommandSchema.parse(input),
+      p_request_id: BoundedIdentifierSchema.parse(requestId),
+      p_actor_id: BoundedIdentifierSchema.parse(actorId)
+    },
+    client
+  );
+  return QboSandboxDueRetryPromotionResultSchema.parse(data);
 }
 
 export async function reserveQboSandboxScopedDispatchTask(
