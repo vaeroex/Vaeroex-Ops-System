@@ -2558,17 +2558,6 @@ select is(
   'concurrent reservation advances dispatch generation and row version once'
 );
 
-select extensions.dblink_exec(
-  'phase8b_retry_reservation_1',
-  $cleanup$
-    reset role;
-    delete from private.integration_sync_tasks
-    where id = '38d00000-0000-4000-8000-000000000002';
-    delete from private.integration_sync_runs
-    where id = '28d00000-0000-4000-8000-000000000002'
-  $cleanup$
-);
-
 select extensions.dblink_disconnect(connection_name)
 from (values
   ('phase8b_retry_reservation_1'),
