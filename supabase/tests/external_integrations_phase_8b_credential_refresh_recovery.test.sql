@@ -622,9 +622,13 @@ select is(
         select result ->> 'kmsKeyResource'
         from phase8b_recovery_provider_read
       ),
-      'ciphertextBase64', pg_catalog.encode(
-        pg_catalog.decode(pg_catalog.repeat('ef', 256), 'hex'),
-        'base64'
+      'ciphertextBase64', pg_catalog.translate(
+        pg_catalog.encode(
+          pg_catalog.decode(pg_catalog.repeat('ef', 256), 'hex'),
+          'base64'
+        ),
+        E'\n\r',
+        ''
       ),
       'accessExpiresAt', pg_catalog.clock_timestamp() + interval '1 hour',
       'refreshExpiresAt', pg_catalog.clock_timestamp() + interval '30 days',
