@@ -2044,7 +2044,9 @@ select fixture.task_id, public.read_integration_provider_credential_v5(
     'contractVersion', 'integration_provider_credential_read_v1',
     'taskId', fixture.task_id,
     'leaseId', fixture.lease_id,
-    'leaseOwnerFingerprint', pg_temp.fingerprint(fixture.owner_seed),
+    'leaseOwnerFingerprint', 'sha256:'
+      || pg_catalog.md5(fixture.owner_seed)
+      || pg_catalog.md5(fixture.owner_seed),
     'expectedCredentialVersion', 1,
     'requiredScopes', pg_catalog.jsonb_build_array(
       'com.intuit.quickbooks.accounting'
