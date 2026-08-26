@@ -668,18 +668,24 @@ select public.read_integration_provider_credential_v5(
   'phase8b_validation_credential_read'
 ) as result;
 reset role;
-grant select on phase8b_validation_credential_read
-  to integration_provider_runtime_authority;
+create or replace function pg_temp.validation_credential_read_evidence_id()
+returns uuid
+language sql
+stable
+security definer
+set search_path = ''
+as $function$
+  select (result ->> 'credentialReadEvidenceId')::uuid
+  from pg_temp.phase8b_validation_credential_read;
+$function$;
 
 set local role integration_provider_runtime_authority;
 create temporary table phase8b_validation_provider_result on commit drop as
 select public.record_qbo_sandbox_provider_result_v1(
   pg_catalog.jsonb_build_object(
     'contractVersion', 'qbo_sandbox_provider_result_evidence_v1',
-    'credentialReadEvidenceId', (
-      select result ->> 'credentialReadEvidenceId'
-      from phase8b_validation_credential_read
-    ),
+    'credentialReadEvidenceId',
+      pg_temp.validation_credential_read_evidence_id(),
     'requestOrdinal', 1,
     'endpointDomain', 'entity_query',
     'endpointClass', 'qbo_entity_query',
