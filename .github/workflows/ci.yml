@@ -154,7 +154,8 @@ jobs:
             supabase/tests/external_integrations_phase_8b_expired_refresh_lease_reclamation.test.sql \
             supabase/tests/external_integrations_phase_8b_zero_based_delivery_clean.test.sql \
             supabase/tests/external_integrations_phase_8b_credential_binding_canary.test.sql \
-            supabase/tests/external_integrations_phase_8b_credential_lineage_recovery.test.sql
+            supabase/tests/external_integrations_phase_8b_credential_lineage_recovery.test.sql \
+            supabase/tests/external_integrations_phase_8b_precontract_retirement.test.sql
 
       - name: Verify fixture-rich zero-based delivery migration
         run: node scripts/run-phase8b-zero-based-delivery-migration-tests.js

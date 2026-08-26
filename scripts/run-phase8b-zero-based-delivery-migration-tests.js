@@ -11,7 +11,8 @@ const recoveryLifecycleVersion = "20260825180000";
 const scopedRetryLifecycleVersion = "20260825190000";
 const credentialBindingVersion = "20260826043610";
 const credentialBindingCanaryVersion = "20260826090000";
-const targetVersion = "20260826120000";
+const credentialLineageVersion = "20260826120000";
+const targetVersion = "20260826190801";
 const fixturePath = path.join(
   root,
   "supabase/tests/fixtures/external_integrations_phase_8b_zero_based_legacy.sql"
@@ -22,7 +23,8 @@ const testPaths = [
   "supabase/tests/external_integrations_phase_8b_credential_refresh_recovery.test.sql",
   "supabase/tests/external_integrations_phase_8b_same_generation_reauthorization.test.sql",
   "supabase/tests/external_integrations_phase_8b_credential_binding_canary.test.sql",
-  "supabase/tests/external_integrations_phase_8b_credential_lineage_recovery.test.sql"
+  "supabase/tests/external_integrations_phase_8b_credential_lineage_recovery.test.sql",
+  "supabase/tests/external_integrations_phase_8b_precontract_retirement.test.sql"
 ];
 
 function fail(message, status = 1) {
@@ -153,11 +155,28 @@ function assertTargetIsSinglePendingMigration() {
     );
   }
   if (
-    migrations[targetIndex - 1]?.slice(0, 14) !==
+    migrations.findIndex((name) =>
+      name.startsWith(`${credentialLineageVersion}_`)
+    ) < 0
+  ) {
+    fail(`Credential-lineage migration ${credentialLineageVersion} is missing.`);
+  }
+  const credentialLineageIndex = migrations.findIndex((name) =>
+    name.startsWith(`${credentialLineageVersion}_`)
+  );
+  if (
+    migrations[credentialLineageIndex - 1]?.slice(0, 14) !==
       credentialBindingCanaryVersion
   ) {
     fail(
-      `Migration ${targetVersion} no longer immediately follows ${credentialBindingCanaryVersion}.`
+      `Migration ${credentialLineageVersion} no longer immediately follows ${credentialBindingCanaryVersion}.`
+    );
+  }
+  if (
+    migrations[targetIndex - 1]?.slice(0, 14) !== credentialLineageVersion
+  ) {
+    fail(
+      `Migration ${targetVersion} no longer immediately follows ${credentialLineageVersion}.`
     );
   }
   if (targetIndex !== migrations.length - 1) {

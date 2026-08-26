@@ -181,6 +181,11 @@ matches(
 );
 matches(
   ciWorkflow,
+  /external_integrations_phase_8b_precontract_retirement\.test\.sql/,
+  "CI must exercise exact pre-contract task retirement and replacement planning"
+);
+matches(
+  ciWorkflow,
   /node scripts\/run-phase8b-zero-based-delivery-migration-tests\.js/,
   "CI must exercise the fixture-rich zero-based upgrade path"
 );
@@ -191,7 +196,7 @@ matches(
 );
 matches(
   zeroBasedUpgradeRunner,
-  /const fixtureBaseVersion = "20260824083917";[\s\S]*const zeroBasedVersion = "20260824193332";[\s\S]*const retryExecutionVersion = "20260824233000";[\s\S]*const recoveryLifecycleVersion = "20260825180000";[\s\S]*const scopedRetryLifecycleVersion = "20260825190000";[\s\S]*const credentialBindingVersion = "20260826043610";[\s\S]*const credentialBindingCanaryVersion = "20260826090000";[\s\S]*const targetVersion = "20260826120000";[\s\S]*"db",[\s\S]*"reset",[\s\S]*"--version",[\s\S]*fixtureBaseVersion/,
+  /const fixtureBaseVersion = "20260824083917";[\s\S]*const zeroBasedVersion = "20260824193332";[\s\S]*const retryExecutionVersion = "20260824233000";[\s\S]*const recoveryLifecycleVersion = "20260825180000";[\s\S]*const scopedRetryLifecycleVersion = "20260825190000";[\s\S]*const credentialBindingVersion = "20260826043610";[\s\S]*const credentialBindingCanaryVersion = "20260826090000";[\s\S]*const credentialLineageVersion = "20260826120000";[\s\S]*const targetVersion = "20260826190801";[\s\S]*"db",[\s\S]*"reset",[\s\S]*"--version",[\s\S]*fixtureBaseVersion/,
   "the fixture-rich runner must reset to the exact pre-migration boundary"
 );
 matches(
@@ -201,7 +206,7 @@ matches(
 );
 matches(
   zeroBasedUpgradeRunner,
-  /external_integrations_phase_6_durable_runtime\.test\.sql[\s\S]*external_integrations_phase_8b_credential_refresh_recovery\.test\.sql[\s\S]*external_integrations_phase_8b_same_generation_reauthorization\.test\.sql[\s\S]*external_integrations_phase_8b_credential_binding_canary\.test\.sql[\s\S]*external_integrations_phase_8b_credential_lineage_recovery\.test\.sql/,
+  /external_integrations_phase_6_durable_runtime\.test\.sql[\s\S]*external_integrations_phase_8b_credential_refresh_recovery\.test\.sql[\s\S]*external_integrations_phase_8b_same_generation_reauthorization\.test\.sql[\s\S]*external_integrations_phase_8b_credential_binding_canary\.test\.sql[\s\S]*external_integrations_phase_8b_credential_lineage_recovery\.test\.sql[\s\S]*external_integrations_phase_8b_precontract_retirement\.test\.sql/,
   "the fixture-rich runner must prove Phase 6 concurrency, retry compatibility, purchase recovery, and canary isolation together"
 );
 matches(
@@ -251,6 +256,7 @@ const approvedProtectedPaths = new Set([
   "supabase/migrations/20260826043610_qbo_credential_envelope_binding_convergence.sql",
   "supabase/migrations/20260826090000_qbo_credential_envelope_binding_incident_canary.sql",
   "supabase/migrations/20260826120000_qbo_credential_lineage_incident_recovery.sql",
+  "supabase/migrations/20260826190801_qbo_precontract_initialization_retirement.sql",
   "supabase/tests/external_integrations_phase_8b_qbo_sandbox_validation.test.sql",
   "supabase/tests/external_integrations_phase_8b_credential_refresh_recovery.test.sql",
   "supabase/tests/external_integrations_phase_8b_same_generation_reauthorization.test.sql",
@@ -259,6 +265,8 @@ const approvedProtectedPaths = new Set([
   "supabase/tests/external_integrations_phase_8b_zero_based_delivery_upgrade.test.sql",
   "supabase/tests/external_integrations_phase_8b_credential_binding_canary.test.sql",
   "supabase/tests/external_integrations_phase_8b_credential_lineage_recovery.test.sql",
+  "supabase/tests/external_integrations_phase_8b_precontract_retirement.test.sql",
+  "lib/integrations/control-plane/qbo-precontract-retirement.ts",
   "supabase/tests/fixtures/external_integrations_phase_8b_zero_based_legacy.sql",
   "services/external-integrations-qbo-sandbox/Dockerfile",
   "services/external-integrations-qbo-sandbox/package.json",

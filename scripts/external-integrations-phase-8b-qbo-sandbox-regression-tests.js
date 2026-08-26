@@ -57,6 +57,9 @@ const cloudTaskDelivery = require(
   "../services/external-integrations-qbo-sandbox/src/cloud-task-delivery.ts"
 );
 const controlledRun = require("../lib/integrations/runtime/controlled-run-observer.ts");
+const precontractRetirement = require(
+  "../lib/integrations/control-plane/qbo-precontract-retirement.ts"
+);
 const runtimeContracts = require("../lib/integrations/runtime/contracts.ts");
 const { ProviderCredentialRefreshFailure } = require("../lib/integrations/credentials/provider-failure.ts");
 
@@ -99,6 +102,114 @@ function hash(value) {
 
 function fingerprint(value) {
   return `sha256:${hash(value)}`;
+}
+
+async function testPrecontractEnvelopeRetirementCoordinator() {
+  const taskId = id(8991);
+  const retirementEventId = id(8992);
+  const reconciliationId = id(8993);
+  const dispatcherTaskName = "a".repeat(64);
+  const events = [];
+  const retirement = {
+    retirementEventId,
+    taskId,
+    state: "cancelled",
+    priorRowVersion: 7,
+    rowVersion: 8,
+    dispatchGeneration: 2,
+    dispatcherTaskName,
+    queueState: "PAUSED",
+    externalDeletionAuthorized: true,
+    idempotent: false
+  };
+
+  const result = await precontractRetirement.retireQboPrecontractEnvelope({
+    taskId,
+    expectedDispatcherTaskName: dispatcherTaskName,
+    expectedDispatchGeneration: 2,
+    async retireInDatabase() {
+      events.push("database_retired");
+      return retirement;
+    },
+    async deleteExactCloudTask(input) {
+      events.push("external_deleted");
+      deepEqual(input, {
+        queueResource: precontractRetirement.QBO_PRECONTRACT_QUEUE_RESOURCE,
+        dispatcherTaskName
+      }, "external deletion receives only the exact reviewed queue and task identity");
+      return "deleted";
+    },
+    async reconcileDeletion(input) {
+      events.push("deletion_reconciled");
+      deepEqual(input, {
+        retirementEventId,
+        taskId,
+        queueResource: precontractRetirement.QBO_PRECONTRACT_QUEUE_RESOURCE,
+        dispatcherTaskName,
+        deletionOutcome: "deleted"
+      }, "deletion reconciliation remains bound to the exact retirement event");
+      return {
+        reconciliationId,
+        taskId,
+        deletionOutcome: "deleted",
+        idempotent: false
+      };
+    }
+  });
+  deepEqual(events, [
+    "database_retired",
+    "external_deleted",
+    "deletion_reconciled"
+  ], "database retirement is authoritative before exact envelope deletion");
+  equal(result.deletionOutcome, "deleted", "a deleted envelope is reconciled");
+
+  let deletionCalled = false;
+  await rejects(
+    () => precontractRetirement.retireQboPrecontractEnvelope({
+      taskId,
+      expectedDispatcherTaskName: dispatcherTaskName,
+      expectedDispatchGeneration: 2,
+      async retireInDatabase() {
+        return { ...retirement, dispatchGeneration: 3 };
+      },
+      async deleteExactCloudTask() {
+        deletionCalled = true;
+        return "deleted";
+      },
+      async reconcileDeletion() {
+        throw new Error("unreachable");
+      }
+    }),
+    /qbo_precontract_retirement_snapshot_mismatch/,
+    "a mismatched database snapshot fails before external deletion"
+  );
+  equal(deletionCalled, false, "snapshot denial performs no Cloud Tasks mutation");
+
+  const replay = await precontractRetirement.retireQboPrecontractEnvelope({
+    taskId,
+    expectedDispatcherTaskName: dispatcherTaskName,
+    expectedDispatchGeneration: 2,
+    async retireInDatabase() {
+      return { ...retirement, idempotent: true };
+    },
+    async deleteExactCloudTask() {
+      return "already_absent";
+    },
+    async reconcileDeletion() {
+      return {
+        reconciliationId,
+        taskId,
+        deletionOutcome: "already_absent",
+        idempotent: true
+      };
+    }
+  });
+  equal(
+    replay.deletionOutcome,
+    "already_absent",
+    "an already-absent envelope converges through explicit reconciliation"
+  );
+  equal(replay.reconciliation.idempotent, true, "deletion replay is idempotent");
 }
 
 const ids = {
@@ -2237,11 +2348,20 @@ function testMigrationBoundary() {
   const credentialLineageRecoveryMigration = read(
     "supabase/migrations/20260826120000_qbo_credential_lineage_incident_recovery.sql"
   );
+  const precontractRetirementMigration = read(
+    "supabase/migrations/20260826190801_qbo_precontract_initialization_retirement.sql"
+  );
   const credentialBindingCanaryTest = read(
     "supabase/tests/external_integrations_phase_8b_credential_binding_canary.test.sql"
   );
   const credentialLineageRecoveryTest = read(
     "supabase/tests/external_integrations_phase_8b_credential_lineage_recovery.test.sql"
+  );
+  const precontractRetirementTest = read(
+    "supabase/tests/external_integrations_phase_8b_precontract_retirement.test.sql"
+  );
+  const precontractRetirementCoordinator = read(
+    "lib/integrations/control-plane/qbo-precontract-retirement.ts"
   );
   const canaryProvisioning = read(
     "services/external-integrations-qbo-sandbox/ops/provision-qbo-canary.sh"
@@ -2500,6 +2620,37 @@ function testMigrationBoundary() {
   ok(/valid reauthorization successor cannot substitute/.test(credentialLineageRecoveryTest), "database coverage rejects reauthorization-row substitution");
   ok(/provider completion evidence still blocks lineage recovery/.test(credentialLineageRecoveryTest), "database coverage rejects effect-bearing recovery");
   ok(/dblink_send_query[\s\S]+concurrent lineage recovery permits exactly one authoritative mutation/.test(credentialLineageRecoveryTest), "hosted concurrency proves one V2 mutation and idempotent convergence");
+  equal(
+    (precontractRetirementMigration.match(/when '[0-9a-f-]{36}'::uuid then/g) || []).length,
+    3,
+    "pre-contract retirement has exactly three immutable task targets"
+  );
+  ok(/bc6c3cb1-7a9f-4d1b-98b6-fa82fb348bea[\s\S]+49dd3c22-a3d4-4f85-83c0-ed91fdb16131[\s\S]+872142c0-ddae-41eb-9e60-1babc6629d68/.test(precontractRetirementMigration), "only the three reviewed pre-contract tasks are allowlisted");
+  ok(/integration_sync_task_precontract_retirement_events[\s\S]+enable row level security[\s\S]+force row level security/.test(precontractRetirementMigration), "retirement evidence is private and forced-RLS protected");
+  ok(/integration_sync_task_envelope_retirement_reconciliations[\s\S]+enable row level security[\s\S]+force row level security/.test(precontractRetirementMigration), "external deletion reconciliation is immutable private evidence");
+  ok(/task\.state = 'dispatched'[\s\S]+task\.row_version =[\s\S]+task\.dispatch_generation =[\s\S]+task\.dispatcher_task_name =/.test(precontractRetirementMigration), "retirement requires exact state, CAS, dispatch generation, and envelope identity");
+  ok([
+    /v_task\.lease_id is not null/,
+    /v_task\.durable_effect_fingerprint is not null/,
+    /integration_sync_task\.complete/,
+    /private\.integration_sync_checkpoints/,
+    /private\.integration_provider_credential_task_read_evidence/
+  ].every((pattern) => pattern.test(precontractRetirementMigration)), "lease, effect, completed request, checkpoint, and V5 read evidence independently deny retirement");
+  ok(/insert into private\.integration_sync_task_precontract_retirement_events[\s\S]+update private\.integration_sync_tasks/.test(precontractRetirementMigration), "immutable retirement evidence is appended before task cancellation");
+  ok(/state = 'cancelled'[\s\S]+dispatcher_task_name = null[\s\S]+row_version = task\.row_version \+ 1/.test(precontractRetirementMigration), "retirement makes the task terminal without rewriting delivery identity");
+  ok(/queue_state = 'PAUSED'[\s\S]+observed_envelope_count = 3[\s\S]+expires_at > v_now/.test(precontractRetirementMigration), "retirement requires fresh exact paused-queue evidence");
+  ok(/failed_task_count[\s\S]+20[\s\S]+cancelled_task_count[\s\S]+3[\s\S]+succeeded_task_count[\s\S]+1/.test(precontractRetirementMigration), "old-run finalization fixes the canonical 20 failed, 3 cancelled, 1 succeeded outcome");
+  ok(/set[\s\S]+state = 'failed'[\s\S]+error_code = 'pre_v5_task_bound_evidence_incomplete'/.test(precontractRetirementMigration), "the incomplete old run can never be mislabeled successful");
+  ok(/qbo_company_info_carry_forward_evidence_v1[\s\S]+untrusted_external_input[\s\S]+pending[\s\S]+downstream_fact_source_count = 0[\s\S]+downstream_reconciliation_member_count = 0/.test(precontractRetirementMigration), "CompanyInfo carry-forward preserves pending untrusted source authority without downstream duplication");
+  ok(/jsonb_array_length\(p_manifest\) = 23[\s\S]+taskId[\s\S]+checkpointId[\s\S]+qbo_vendorcredit[\s\S]+vendors_minimized/.test(precontractRetirementMigration), "replacement planning requires 23 fresh non-CompanyInfo tasks and checkpoints");
+  ok(/integration_qbo_clean_replacement_wave_plans[\s\S]+enable row level security[\s\S]+force row level security/.test(precontractRetirementMigration), "replacement-wave design is immutable plan evidence and does not create work");
+  ok(/revoke all on function[\s\S]+retire_qbo_sandbox_precontract_dispatched_task_v1[\s\S]+grant execute on function[\s\S]+retire_qbo_sandbox_precontract_dispatched_task_v1[\s\S]+to integration_qbo_precontract_retirement_authority/.test(precontractRetirementMigration), "only the narrow retirement authority can execute the checked action");
+  ok(!/grant integration_qbo_precontract_retirement_authority\s+to service_role/i.test(precontractRetirementMigration), "service_role has no retirement shortcut");
+  ok(/retireInDatabase\(\)[\s\S]+deleteExactCloudTask[\s\S]+reconcileDeletion/.test(precontractRetirementCoordinator), "the coordinator orders database retirement before exact deletion and reconciliation");
+  ok(/already_absent/.test(precontractRetirementCoordinator), "already-absent Cloud Tasks converge explicitly without recreation");
+  ok(/dblink_send_query[\s\S]+concurrent retirement permits one mutation and one idempotent replay/.test(precontractRetirementTest), "hosted concurrency proves one retirement mutation with idempotent convergence");
+  ok(/cancelled tasks remain undiscoverable, unpromotable, and unreservable/.test(precontractRetirementTest), "database tests prove retired tasks cannot return to scheduling authority");
+  ok(/replacement plan creates no run, task, source, fact, reconciliation, or KPI mutation/.test(precontractRetirementTest), "database tests prove replacement-wave design is plan-only and non-duplicating");
 
   const validIncidentRecovery = {
     contractVersion:
@@ -3295,6 +3446,7 @@ function testOAuthCallbackEdgeSource() {
 
 async function main() {
   await testControlledRunObserver();
+  await testPrecontractEnvelopeRetirementCoordinator();
   await testOAuth();
   testCloudTaskDeliveryIdentity();
   await testSameGenerationReauthorizationBroker();
