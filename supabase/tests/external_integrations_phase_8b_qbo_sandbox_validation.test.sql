@@ -2521,6 +2521,12 @@ insert into phase8b_retry_reservation_results(connection_name, idempotent)
 select 'phase8b_retry_reservation_2', idempotent::boolean
 from extensions.dblink_get_result('phase8b_retry_reservation_2')
   as response(idempotent text);
+select pg_catalog.count(*)
+from extensions.dblink_get_result('phase8b_retry_reservation_1')
+  as response(idempotent text);
+select pg_catalog.count(*)
+from extensions.dblink_get_result('phase8b_retry_reservation_2')
+  as response(idempotent text);
 
 select is(
   (
