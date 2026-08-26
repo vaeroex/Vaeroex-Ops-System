@@ -699,6 +699,33 @@ rollback to savepoint phase8b_v4_post_rotation_read;
 release savepoint phase8b_v4_post_rotation_read;
 reset role;
 
+create or replace function pg_temp.recovery_read_evidence_id()
+returns uuid
+language sql
+stable
+security definer
+set search_path = ''
+as $function$
+  select (result ->> 'credentialReadEvidenceId')::uuid
+  from pg_temp.phase8b_recovery_provider_read;
+$function$;
+
+set local role integration_provider_runtime_authority;
+select public.record_qbo_sandbox_provider_result_v1(
+  pg_catalog.jsonb_build_object(
+    'contractVersion', 'qbo_sandbox_provider_result_evidence_v1',
+    'credentialReadEvidenceId', pg_temp.recovery_read_evidence_id(),
+    'requestOrdinal', 1,
+    'endpointDomain', 'entity_query',
+    'endpointClass', 'qbo_entity_query',
+    'providerRequestFingerprint',
+      'sha256:' || pg_catalog.repeat('a', 64),
+    'providerOutcome', 'provider_success'
+  ),
+  'phase8b_recovery_provider_result'
+);
+reset role;
+
 update private.integration_sync_tasks
 set state = 'succeeded',
     lease_id = null,
@@ -2002,6 +2029,93 @@ select ok(
   ),
   'execution count cannot bypass task row-version CAS'
 );
+reset role;
+
+update private.integration_credentials
+set access_expires_at = pg_catalog.transaction_timestamp() + interval '1 hour',
+    row_version = row_version + 1,
+    updated_at = pg_catalog.transaction_timestamp()
+where id = '78e00000-0000-4000-8000-000000000001';
+
+set local role integration_credential_broker_authority;
+create temporary table phase8b_zero_provider_reads on commit drop as
+select fixture.task_id, public.read_integration_provider_credential_v5(
+  pg_catalog.jsonb_build_object(
+    'contractVersion', 'integration_provider_credential_read_v1',
+    'taskId', fixture.task_id,
+    'leaseId', fixture.lease_id,
+    'leaseOwnerFingerprint', pg_temp.fingerprint(fixture.owner_seed),
+    'expectedCredentialVersion', 1,
+    'requiredScopes', pg_catalog.jsonb_build_array(
+      'com.intuit.quickbooks.accounting'
+    ),
+    'minimumValiditySeconds', 300,
+    'requestedAt', pg_catalog.to_char(
+      pg_catalog.transaction_timestamp() at time zone 'UTC',
+      'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'
+    )
+  ),
+  fixture.request_id
+) as result
+from (
+  values
+    (
+      '38e00000-0000-4000-8000-000000000001'::uuid,
+      '48e00000-0000-4000-8000-000000000202'::uuid,
+      'phase8b-zero-owner-2'::text,
+      'phase8b_zero_provider_read_1'::text
+    ),
+    (
+      '38e00000-0000-4000-8000-000000000013'::uuid,
+      '48e00000-0000-4000-8000-000000000213'::uuid,
+      'phase8b-zero-owner-13'::text,
+      'phase8b_zero_provider_read_13'::text
+    )
+) as fixture(task_id, lease_id, owner_seed, request_id);
+reset role;
+
+create or replace function pg_temp.zero_provider_read_evidence_id(
+  p_task_id uuid
+)
+returns uuid
+language sql
+stable
+security definer
+set search_path = ''
+as $function$
+  select (provider_read.result ->> 'credentialReadEvidenceId')::uuid
+  from pg_temp.phase8b_zero_provider_reads as provider_read
+  where provider_read.task_id = p_task_id;
+$function$;
+
+set local role integration_provider_runtime_authority;
+select public.record_qbo_sandbox_provider_result_v1(
+  pg_catalog.jsonb_build_object(
+    'contractVersion', 'qbo_sandbox_provider_result_evidence_v1',
+    'credentialReadEvidenceId', pg_temp.zero_provider_read_evidence_id(
+      fixture.task_id
+    ),
+    'requestOrdinal', 1,
+    'endpointDomain', 'entity_query',
+    'endpointClass', 'qbo_entity_query',
+    'providerRequestFingerprint', fixture.request_fingerprint,
+    'providerOutcome', 'provider_success'
+  ),
+  fixture.request_id
+)
+from (
+  values
+    (
+      '38e00000-0000-4000-8000-000000000001'::uuid,
+      'sha256:' || pg_catalog.repeat('b', 64),
+      'phase8b_zero_provider_result_1'::text
+    ),
+    (
+      '38e00000-0000-4000-8000-000000000013'::uuid,
+      'sha256:' || pg_catalog.repeat('c', 64),
+      'phase8b_zero_provider_result_13'::text
+    )
+) as fixture(task_id, request_fingerprint, request_id);
 reset role;
 
 update private.integration_sync_tasks
