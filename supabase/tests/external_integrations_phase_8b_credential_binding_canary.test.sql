@@ -1329,6 +1329,7 @@ from (values
 ) as connections(connection_name);
 
 select pg_catalog.pg_sleep(1.1);
+commit;
 begin;
 set local search_path = public, extensions;
 
