@@ -526,6 +526,7 @@ select public.read_integration_provider_credential_v4(
   ),
   'phase8b_recovery_provider_read_v4'
 ) as result;
+reset role;
 select ok(
   (select result ->> 'state' from phase8b_recovery_provider_read) = 'available'
   and pg_catalog.length(
@@ -580,6 +581,7 @@ select is(
   'provider read V4 deterministically returns the sole authoritative active credential'
 );
 
+set local role integration_credential_broker_authority;
 savepoint phase8b_v4_post_rotation_read;
 select ok(
   (
@@ -659,6 +661,7 @@ select public.read_integration_provider_credential_v4(
   ),
   'phase8b_recovery_provider_read_v4_rotated'
 ) as result;
+reset role;
 select ok(
   (
     select result ->> 'state' = 'available'
