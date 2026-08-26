@@ -17,6 +17,7 @@ const CredentialIdentitySchema = z
 export const ProviderCredentialBrokerReadSchema = z.discriminatedUnion("state", [
   CredentialIdentitySchema.extend({
     state: z.literal("available"),
+    credentialReadEvidenceId: UuidSchema,
     accessToken: z.string().min(16).max(16_384)
   }).strict(),
   CredentialIdentitySchema.extend({ state: z.literal("refresh_required") }).strict(),
@@ -29,6 +30,7 @@ export const ProviderCredentialResolutionSchema = z.discriminatedUnion("state", 
       state: z.literal("available"),
       credentialId: UuidSchema,
       credentialVersion: z.number().int().positive().safe(),
+      credentialReadEvidenceId: UuidSchema,
       accessExpiresAt: IsoTimestampSchema,
       accessToken: z.string().min(16).max(16_384)
     })

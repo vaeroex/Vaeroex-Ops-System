@@ -61,6 +61,7 @@ import {
   assertQboSandboxRuntimeTaskDeliveryScope,
   completeQboSandboxRuntimeTask,
   QboSandboxCloudTaskNameSchema,
+  QBO_SANDBOX_AR_AGING_IDENTIFIER_RECOVERY_CONTRACT_VERSION,
   QBO_SANDBOX_AUTHORIZATION_RECOVERY_CONTRACT_VERSION,
   QBO_SANDBOX_CANARY_DISPATCH_DISCOVERY_CONTRACT_VERSION,
   QBO_SANDBOX_CANARY_DISPATCH_RESERVATION_CONTRACT_VERSION,
@@ -68,17 +69,22 @@ import {
   QBO_SANDBOX_CREDENTIAL_BINDING_INCIDENT_RECOVERY_CONTRACT_VERSION,
   QBO_SANDBOX_DUE_RETRY_PROMOTION_CONTRACT_VERSION,
   QBO_SANDBOX_EXPIRED_CREDENTIAL_RECOVERY_CONTRACT_VERSION,
+  QBO_SANDBOX_PROVIDER_RESULT_EVIDENCE_CONTRACT_VERSION,
   QBO_SANDBOX_REAUTHORIZED_PURCHASE_RECOVERY_CONTRACT_VERSION,
+  QBO_SANDBOX_REPORT_PARSER_RESULT_EVIDENCE_CONTRACT_VERSION,
   QBO_SANDBOX_SCOPED_DISPATCH_DISCOVERY_CONTRACT_VERSION,
   QBO_SANDBOX_SCOPED_DISPATCH_RECOVERY_CONTRACT_VERSION,
   QBO_SANDBOX_SCOPED_DISPATCH_RESERVATION_CONTRACT_VERSION,
   readQboSandboxAuthorizationRecovery,
   readQboSandboxScopedDispatchCandidates,
   readQboSandboxRuntimeTaskDelivery,
+  recordQboSandboxProviderResult,
+  recordQboSandboxReportParserResult,
   promoteQboSandboxDueRetryTasks,
   promoteQboSandboxCanaryTask,
   readQboSandboxCanaryDispatchCandidate,
   recoverQboSandboxCredentialBindingIncidentTask,
+  recoverQboSandboxArAgingIdentifierFailure,
   recoverQboSandboxExpiredCredentialTasks,
   recoverQboSandboxReauthorizedPurchaseTask,
   QboSandboxRuntimeLeaseResultSchema,
@@ -114,6 +120,7 @@ import {
   QBO_TRANSACTION_RECORD_TYPES,
   QboMinimizedSourceRecordSchema,
   QboReportControlObservationSchema,
+  QboReportParserOutcomeSchema,
   type QboReportType,
   type QboSupportedObjectType
 } from "@/lib/integrations/providers/qbo/contracts";
@@ -912,6 +919,7 @@ async function handleBroker(request: IncomingMessage, response: ServerResponse, 
           state: "available",
           credentialId: result.credentialId,
           credentialVersion: result.credentialVersion,
+          credentialReadEvidenceId: result.credentialReadEvidenceId,
           accessExpiresAt: result.credential.accessExpiresAt,
           accessToken
         })
@@ -1112,6 +1120,65 @@ async function handleBroker(request: IncomingMessage, response: ServerResponse, 
         db.role("integration_credential_broker_authority")
       );
       safeEvent("credential_binding_incident_task_recovered", {
+        taskId: result.taskId,
+        state: result.state,
+        idempotent: result.idempotent
+      });
+      return json(response, 200, result);
+    }
+    if (url.pathname === "/tasks/recover-ar-aging-identifier") {
+      if (!cleanupCapabilityAuthorized(request)) {
+        return json(response, 403, { error: "recovery_capability_denied" });
+      }
+      const body = z
+        .object({
+          recoveryRequestId: BoundedIdentifierSchema,
+          syncRunId: UuidSchema,
+          mappingId: UuidSchema,
+          expectedMappingRowVersion: z.number().int().positive().safe(),
+          historicalCredentialId: UuidSchema,
+          expectedHistoricalCredentialVersion: z.number().int().positive().safe(),
+          currentCredentialId: UuidSchema,
+          expectedCurrentCredentialVersion: z.number().int().positive().safe(),
+          expectedCurrentCredentialRowVersion: z.number().int().positive().safe(),
+          taskId: z.literal("1eb257e9-5275-51a7-992c-d08186c58c98"),
+          expectedTaskRowVersion: z.number().int().positive().safe(),
+          expectedDispatchGeneration: z.number().int().positive().safe(),
+          failureAuditEventId: UuidSchema,
+          credentialReadEvidenceId: UuidSchema,
+          retryAfterSeconds: z.number().int().min(1).max(3_600)
+        })
+        .strict()
+        .parse(await readBody(request));
+      const result = await recoverQboSandboxArAgingIdentifierFailure(
+        {
+          contractVersion: QBO_SANDBOX_AR_AGING_IDENTIFIER_RECOVERY_CONTRACT_VERSION,
+          workspaceId: scope.workspaceId,
+          businessEntityId: scope.businessEntityId,
+          connectionId: scope.connectionId,
+          connectionGeneration: config.connectionGeneration,
+          syncRunId: body.syncRunId,
+          mappingId: body.mappingId,
+          expectedMappingRowVersion: body.expectedMappingRowVersion,
+          historicalCredentialId: body.historicalCredentialId,
+          expectedHistoricalCredentialVersion:
+            body.expectedHistoricalCredentialVersion,
+          currentCredentialId: body.currentCredentialId,
+          expectedCurrentCredentialVersion: body.expectedCurrentCredentialVersion,
+          expectedCurrentCredentialRowVersion:
+            body.expectedCurrentCredentialRowVersion,
+          taskId: body.taskId,
+          expectedTaskRowVersion: body.expectedTaskRowVersion,
+          expectedDispatchGeneration: body.expectedDispatchGeneration,
+          failureAuditEventId: body.failureAuditEventId,
+          credentialReadEvidenceId: body.credentialReadEvidenceId,
+          retryAfterSeconds: body.retryAfterSeconds
+        },
+        body.recoveryRequestId,
+        "phase8b_ar_aging_identifier_recovery",
+        db.role("integration_credential_broker_authority")
+      );
+      safeEvent("ar_aging_identifier_task_recovered", {
         taskId: result.taskId,
         state: result.state,
         idempotent: result.idempotent
@@ -1322,17 +1389,38 @@ async function commitReport(input: {
   reportType: QboReportType;
   realmId: string;
   sourceClient: ReturnType<Phase8bDatabase["role"]>;
+  runtimeClient: ReturnType<Phase8bDatabase["role"]>;
+  providerResultEvidenceId: string;
   now: string;
 }) {
-  const report = parseQboReport({
-    reportType: input.reportType,
-    raw: input.raw,
-    provider: {
-      providerKey: "quickbooks_online",
-      realmId: input.realmId,
-      sourceEnvironment: "sandbox"
+  const recordParserResult = (parserOutcome: unknown) =>
+    recordQboSandboxReportParserResult(
+      {
+        contractVersion:
+          QBO_SANDBOX_REPORT_PARSER_RESULT_EVIDENCE_CONTRACT_VERSION,
+        providerResultEvidenceId: input.providerResultEvidenceId,
+        parserOutcome: QboReportParserOutcomeSchema.parse(parserOutcome)
+      },
+      `phase8b_report_parser_${randomUUID()}`,
+      input.runtimeClient
+    );
+  let report: ReturnType<typeof parseQboReport>;
+  try {
+    report = parseQboReport({
+      reportType: input.reportType,
+      raw: input.raw,
+      provider: {
+        providerKey: "quickbooks_online",
+        realmId: input.realmId,
+        sourceEnvironment: "sandbox"
+      }
+    });
+  } catch (error) {
+    if (error instanceof QboReportContractError) {
+      await recordParserResult(error.diagnosticClass);
     }
-  });
+    throw error;
+  }
   const recordId = qboReportProviderRecordId(report);
   const state = await readProviderExternalSourceRecordState(
     sourceStateCommand(input.task, input.leaseId, input.owner, report.reportType, recordId),
@@ -1342,27 +1430,34 @@ async function commitReport(input: {
     state.state === "available" && state.normalizedProjection
       ? QboReportControlObservationSchema.parse(state.normalizedProjection)
       : null;
-  const version = qboReportToExternalSourceVersion({
-    context: {
-      workspaceId: input.task.workspaceId,
-      businessEntityId: input.task.businessEntityId,
-      connectionId: input.task.connectionId,
-      providerKey: "quickbooks_online",
-      providerEnvironment: "sandbox",
-      providerTenantReferenceFingerprint: contractSha256({ realmId: input.realmId }),
-      connectionConfigurationVersion: 1,
-      mappingVersion: 1
-    },
-    report,
-    previousReport: previous,
-    id: randomUUID(),
-    immutableVersion: state.state === "available" ? state.immutableVersion + 1 : 1,
-    priorVersionId: state.state === "available" ? state.currentVersionId : null,
-    observedAt: input.now,
-    synchronizedAt: input.now,
-    ingestedAt: input.now,
-    receivedAt: input.now
-  });
+  let version: ReturnType<typeof qboReportToExternalSourceVersion>;
+  try {
+    version = qboReportToExternalSourceVersion({
+      context: {
+        workspaceId: input.task.workspaceId,
+        businessEntityId: input.task.businessEntityId,
+        connectionId: input.task.connectionId,
+        providerKey: "quickbooks_online",
+        providerEnvironment: "sandbox",
+        providerTenantReferenceFingerprint: contractSha256({ realmId: input.realmId }),
+        connectionConfigurationVersion: 1,
+        mappingVersion: 1
+      },
+      report,
+      previousReport: previous,
+      id: randomUUID(),
+      immutableVersion: state.state === "available" ? state.immutableVersion + 1 : 1,
+      priorVersionId: state.state === "available" ? state.currentVersionId : null,
+      observedAt: input.now,
+      synchronizedAt: input.now,
+      ingestedAt: input.now,
+      receivedAt: input.now
+    });
+  } catch (error) {
+    await recordParserResult("minimization_failure");
+    throw error;
+  }
+  await recordParserResult("parser_success");
   if (version.changeKind === "unchanged") return null;
   return commitProviderExternalSourceRecordVersion(
     {
@@ -1806,9 +1901,31 @@ async function executeProviderTask(request: IncomingMessage, response: ServerRes
       });
     }
     const realmId = env("PHASE8B_SANDBOX_REALM_ID");
+    let providerRequestOrdinal = 0;
+    let latestReportProviderResultEvidenceId: string | null = null;
     const client = new QboSandboxReadOnlyClient({
       realmId,
-      transport: new FetchQboRuntimeTransport()
+      transport: new FetchQboRuntimeTransport(),
+      providerResultObserver: async (observation) => {
+        providerRequestOrdinal += 1;
+        const evidence = await recordQboSandboxProviderResult(
+          {
+            contractVersion: QBO_SANDBOX_PROVIDER_RESULT_EVIDENCE_CONTRACT_VERSION,
+            credentialReadEvidenceId: credential.credentialReadEvidenceId,
+            requestOrdinal: providerRequestOrdinal,
+            ...observation
+          },
+          `phase8b_provider_result_${randomUUID()}`,
+          runtimeClient
+        );
+        if (
+          observation.endpointDomain === "report" &&
+          observation.providerOutcome === "provider_success"
+        ) {
+          latestReportProviderResultEvidenceId =
+            evidence.providerResultEvidenceId;
+        }
+      }
     });
     const now = new Date().toISOString();
     const committed: Array<{
@@ -1893,6 +2010,7 @@ async function executeProviderTask(request: IncomingMessage, response: ServerRes
         if (!leased.controlMetadata.windowStartAt || !leased.controlMetadata.windowEndAt) {
           throw new Error("phase8b_report_window_missing");
         }
+        latestReportProviderResultEvidenceId = null;
         const raw = await client.fetchReport({
           reportType,
           startDate: leased.controlMetadata.windowStartAt.slice(0, 10),
@@ -1909,6 +2027,12 @@ async function executeProviderTask(request: IncomingMessage, response: ServerRes
           reportType,
           realmId,
           sourceClient,
+          runtimeClient,
+          providerResultEvidenceId:
+            latestReportProviderResultEvidenceId ??
+            (() => {
+              throw new Error("phase8b_report_provider_result_evidence_missing");
+            })(),
           now
         });
         if (result) committed.push(result);

@@ -1660,8 +1660,12 @@ async function testReadOnlyClient() {
   equal(companyCalls[0].url.includes(accessCanary), false, "company identity URL excludes access credentials");
 
   const reportCalls = [];
+  const reportObservations = [];
   const reportClient = new phase8b.QboSandboxReadOnlyClient({
     realmId: provider.realmId,
+    providerResultObserver: async (observation) => {
+      reportObservations.push(observation);
+    },
     transport: {
       async request(input) {
         reportCalls.push(input);
@@ -1733,6 +1737,25 @@ async function testReadOnlyClient() {
     reportCalls.every((call) => !call.url.includes(accessCanary)),
     true,
     "report URLs exclude access credentials"
+  );
+  equal(
+    reportObservations.length,
+    reportCalls.length,
+    "each completed report request produces exactly one bounded provider observation"
+  );
+  ok(
+    reportObservations.every(
+      (observation) =>
+        observation.endpointDomain === "report" &&
+        observation.providerOutcome === "provider_success" &&
+        /^sha256:[0-9a-f]{64}$/.test(observation.providerRequestFingerprint)
+    ),
+    "provider observations retain only canonical endpoint classes, outcomes, and opaque request fingerprints"
+  );
+  deepEqual(
+    reportObservations.slice(-2).map((observation) => observation.endpointClass),
+    ["qbo_report_aged_receivables", "qbo_report_aged_payables"],
+    "A/R and A/P provider evidence records the exact mapped report endpoint classes"
   );
   const reportCallCount = reportCalls.length;
   await rejects(
@@ -2451,6 +2474,9 @@ function testMigrationBoundary() {
   const precontractRetirementMigration = read(
     "supabase/migrations/20260826190801_qbo_precontract_initialization_retirement.sql"
   );
+  const providerResultEvidenceMigration = read(
+    "supabase/migrations/20260826222000_qbo_provider_result_evidence_and_ar_aging_recovery.sql"
+  );
   const credentialBindingCanaryTest = read(
     "supabase/tests/external_integrations_phase_8b_credential_binding_canary.test.sql"
   );
@@ -2459,6 +2485,9 @@ function testMigrationBoundary() {
   );
   const precontractRetirementTest = read(
     "supabase/tests/external_integrations_phase_8b_precontract_retirement.test.sql"
+  );
+  const providerResultEvidenceTest = read(
+    "supabase/tests/external_integrations_phase_8b_provider_result_evidence.test.sql"
   );
   const precontractRetirementCoordinator = read(
     "lib/integrations/control-plane/qbo-precontract-retirement.ts"
@@ -2751,6 +2780,26 @@ function testMigrationBoundary() {
   ok(/dblink_send_query[\s\S]+concurrent retirement permits one mutation and one idempotent replay/.test(precontractRetirementTest), "hosted concurrency proves one retirement mutation with idempotent convergence");
   ok(/cancelled tasks remain undiscoverable, unpromotable, and unreservable/.test(precontractRetirementTest), "database tests prove retired tasks cannot return to scheduling authority");
   ok(/replacement plan creates no run, task, source, fact, reconciliation, or KPI mutation/.test(precontractRetirementTest), "database tests prove replacement-wave design is plan-only and non-duplicating");
+  ok(/create table private\.integration_qbo_provider_task_result_evidence[\s\S]+credential_read_evidence_id[\s\S]+delivery_attempt_fingerprint[\s\S]+provider_request_fingerprint[\s\S]+provider_outcome/.test(providerResultEvidenceMigration), "provider outcomes are immutable evidence bound to the exact task read, delivery, and request");
+  ok(/create table private\.integration_qbo_report_parser_result_evidence[\s\S]+provider_result_evidence_id uuid not null unique[\s\S]+parser_outcome/.test(providerResultEvidenceMigration), "parser outcomes bind one-to-one to exact provider-result evidence");
+  ok(/enable row level security[\s\S]+force row level security[\s\S]+reject_integration_qbo_provider_result_mutation_v1[\s\S]+reject_integration_qbo_report_parser_result_mutation_v1/.test(providerResultEvidenceMigration), "provider and parser evidence is forced-RLS and update/delete immutable");
+  ok(!/(response_payload|access_token|refresh_token|authorization_header|realm_id|business_data)/i.test(providerResultEvidenceMigration.split("create or replace function private.qbo_provider_endpoint_binding_v1")[0]), "provider and parser evidence schemas retain no payload, token, authorization, realm, or business-data columns");
+  ok(/record_qbo_sandbox_provider_result_v1[\s\S]+v_task\.state <> 'leased'[\s\S]+v_task\.lease_id <> v_read\.lease_id[\s\S]+qbo_provider_endpoint_binding_v1/.test(providerResultEvidenceMigration), "provider-result insertion derives live lease identity and exact endpoint authority from task-bound read evidence");
+  ok(/new\.state = 'succeeded'[\s\S]+qbo_task_provider_result_evidence_required[\s\S]+qbo_task_report_parser_evidence_required/.test(providerResultEvidenceMigration), "QBO task success is impossible without successful provider evidence and report parser evidence");
+  ok(/'provider_success', 'provider_fault', 'provider_transport_failure',[\s\S]*'provider_schema_failure'/.test(providerResultEvidenceMigration), "provider outcomes use only the bounded reviewed classification set");
+  ok(/'parser_success', 'report_header_shape', 'report_columns_shape',[\s\S]*'report_rows_shape',[\s\S]*'report_cell_shape',[\s\S]*'report_summary_shape',[\s\S]*'report_metadata_shape', 'minimization_failure'/.test(providerResultEvidenceMigration), "parser and minimizer outcomes use only bounded structural diagnostics");
+  ok(/task_id = '1eb257e9-5275-51a7-992c-d08186c58c98'::uuid[\s\S]+prior_failure_code text not null check \(prior_failure_code = '5020'\)/.test(providerResultEvidenceMigration), "historical recovery authority is allowlisted to the exact A/R 5020 task");
+  ok(!providerResultEvidenceMigration.includes("99ae1ff1-2049-59a4-9c4b-a26e7adecba8"), "the nonrecoverable historical A/P task is absent from recovery authority");
+  ok(/evidence\.task_row_version = v_task\.row_version - 1[\s\S]+evidence\.credential_id = v_current_credential\.id[\s\S]+expectedHistoricalCredentialVersion/.test(providerResultEvidenceMigration), "A/R recovery requires the exact preceding task read on the current same-row credential lineage");
+  ok(/durable_effect_fingerprint is not null[\s\S]+integration_sync_task\.complete[\s\S]+external_source_records[\s\S]+external_source_record_versions[\s\S]+checkpoint\.last_task_id = v_task\.id/.test(providerResultEvidenceMigration), "effect, source, version, completion, or actual checkpoint advancement independently denies A/R recovery");
+  ok(/insert into private\.integration_sync_task_ar_aging_recovery_events[\s\S]+update private\.integration_sync_tasks[\s\S]+state = 'retry_wait'/.test(providerResultEvidenceMigration), "A/R recovery appends immutable evidence before the sole failed-to-retry-wait transition");
+  ok(/grant execute on function[\s\S]+record_qbo_sandbox_provider_result_v1[\s\S]+to integration_provider_runtime_authority[\s\S]+grant execute on function[\s\S]+recover_qbo_sandbox_ar_aging_identifier_failure_v1[\s\S]+to integration_credential_broker_authority/.test(providerResultEvidenceMigration), "only provider runtime and credential broker receive their narrow checked RPCs");
+  ok(!/grant integration_(?:provider_runtime|credential_broker)_authority\s+to service_role/i.test(providerResultEvidenceMigration), "service_role receives no provider-evidence or A/R-recovery shortcut");
+  ok(/concurrent A\/R recovery produces one authoritative mutation[\s\S]+concurrent A\/R recovery loser converges idempotently/.test(providerResultEvidenceTest), "hosted dblink coverage proves one A/R recovery mutation and idempotent convergence");
+  ok(/providerResultObserver:[\s\S]+recordQboSandboxProviderResult[\s\S]+credentialReadEvidenceId: credential\.credentialReadEvidenceId/.test(service), "runtime provider observations are bound to the broker-issued task read evidence ID");
+  ok(/recordQboSandboxReportParserResult[\s\S]+providerResultEvidenceId: input\.providerResultEvidenceId[\s\S]+QboReportParserOutcomeSchema/.test(service), "runtime parser evidence can name only the exact provider result and bounded diagnostic class");
+  ok(/credentialReadEvidenceId: result\.credentialReadEvidenceId/.test(credentialBrokerSource), "the broker propagates the database-created read evidence ID without caller substitution");
+  ok(!/safeEvent\([^\n]+(?:accessToken|refreshToken|providerRequestFingerprint|providerResultEvidenceId)/.test(service), "provider evidence adds no secret or linkable evidence identifiers to retained runtime logs");
 
   const validIncidentRecovery = {
     contractVersion:
@@ -3280,6 +3329,7 @@ async function testCredentialRefreshFanoutAndCallbackSafety() {
       state: "available",
       credentialId,
       credentialVersion,
+      credentialReadEvidenceId: id(9190 + credentialVersion),
       accessExpiresAt,
       accessToken: accessTokenCanary
     };

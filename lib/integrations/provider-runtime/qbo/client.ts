@@ -3,6 +3,7 @@ import "server-only";
 import { parse as parseLosslessJson } from "lossless-json";
 import { z } from "zod";
 
+import { contractSha256 } from "@/lib/integrations/contracts/canonical";
 import {
   QBO_CDC_RESPONSE_OBJECT_CAP,
   QBO_MAX_QUERY_PAGE_SIZE,
@@ -14,8 +15,14 @@ import {
   QBO_PROVIDER_KEY,
   QBO_REPORT_TYPES,
   QBO_TRANSACTION_RECORD_TYPES,
+  QboProviderEndpointClassSchema,
+  QboProviderEndpointDomainSchema,
+  QboProviderOutcomeSchema,
   QboReportTypeSchema,
   QboSupportedObjectTypeSchema,
+  type QboProviderEndpointClass,
+  type QboProviderEndpointDomain,
+  type QboProviderOutcome,
   type QboReportType,
   type QboSupportedObjectType
 } from "@/lib/integrations/providers/qbo/contracts";
@@ -62,6 +69,26 @@ const permittedQueryParameters: Readonly<Record<string, ReadonlySet<string>>> = 
 };
 
 type JsonRecord = Record<string, unknown>;
+
+export type QboProviderResultObservation = Readonly<{
+  endpointDomain: QboProviderEndpointDomain;
+  endpointClass: QboProviderEndpointClass;
+  providerRequestFingerprint: string;
+  providerOutcome: QboProviderOutcome;
+}>;
+
+export type QboProviderResultObserver = (
+  observation: QboProviderResultObservation
+) => PromiseLike<void>;
+
+const REPORT_ENDPOINT_CLASS_BY_TYPE = {
+  APAgingSummary: "qbo_report_aged_payables",
+  ARAgingSummary: "qbo_report_aged_receivables",
+  BalanceSheet: "qbo_report_balance_sheet",
+  CashFlow: "qbo_report_cash_flow",
+  ProfitAndLoss: "qbo_report_profit_and_loss",
+  TrialBalance: "qbo_report_trial_balance"
+} as const satisfies Record<QboReportType, QboProviderEndpointClass>;
 
 function object(value: unknown, code: string): JsonRecord {
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
@@ -185,7 +212,16 @@ function parseJsonResponse(response: QboRuntimeHttpResponse) {
       })
     );
   }
-  return object(parsed, "qbo_runtime_response_invalid");
+  try {
+    return object(parsed, "qbo_runtime_response_invalid");
+  } catch {
+    throw new QboRuntimeProviderError({
+      ...classifyQboProviderError({ httpStatus: response.status }),
+      kind: "malformed_response",
+      safeCode: "malformed_response",
+      retryDisposition: "do_not_retry"
+    });
+  }
 }
 
 function queryRecords(root: JsonRecord, recordType: QboSupportedObjectType) {
@@ -227,17 +263,46 @@ function queryText(input: {
 export class QboSandboxReadOnlyClient {
   readonly #realmId: string;
   readonly #transport: QboRuntimeHttpTransport;
+  readonly #providerResultObserver: QboProviderResultObserver | null;
 
-  constructor(input: { realmId: string; transport: QboRuntimeHttpTransport }) {
+  constructor(input: {
+    realmId: string;
+    transport: QboRuntimeHttpTransport;
+    providerResultObserver?: QboProviderResultObserver;
+  }) {
     this.#realmId = RealmIdSchema.parse(input.realmId);
     this.#transport = input.transport;
+    this.#providerResultObserver = input.providerResultObserver ?? null;
   }
 
   get realmId() {
     return this.#realmId;
   }
 
-  async #get(input: { path: string; parameters: URLSearchParams; accessToken: string; queryText?: string }) {
+  async #observeProviderResult(input: {
+    endpointDomain: QboProviderEndpointDomain;
+    endpointClass: QboProviderEndpointClass;
+    providerRequestFingerprint: string;
+    providerOutcome: QboProviderOutcome;
+  }) {
+    if (!this.#providerResultObserver) return;
+    await this.#providerResultObserver({
+      endpointDomain: QboProviderEndpointDomainSchema.parse(input.endpointDomain),
+      endpointClass: QboProviderEndpointClassSchema.parse(input.endpointClass),
+      providerRequestFingerprint: input.providerRequestFingerprint,
+      providerOutcome: QboProviderOutcomeSchema.parse(input.providerOutcome)
+    });
+  }
+
+  async #get(input: {
+    path: string;
+    parameters: URLSearchParams;
+    accessToken: string;
+    queryText?: string;
+    endpointDomain: QboProviderEndpointDomain;
+    endpointClass: QboProviderEndpointClass;
+    requestFingerprintInput: Readonly<Record<string, unknown>>;
+  }) {
     const url = new URL(input.path, QBO_SANDBOX_API_ORIGIN);
     url.search = input.parameters.toString();
     assertQboSandboxRuntimeEgress({
@@ -246,21 +311,66 @@ export class QboSandboxReadOnlyClient {
       realmId: this.#realmId,
       queryText: input.queryText
     });
+    const providerRequestFingerprint = contractSha256({
+      fingerprintPurpose: "qbo_task_bound_provider_request",
+      fingerprintVersion: "qbo_task_bound_provider_request_v1",
+      endpointDomain: input.endpointDomain,
+      endpointClass: input.endpointClass,
+      request: input.requestFingerprintInput
+    });
+    let response: QboRuntimeHttpResponse;
     try {
-      const response = await this.#transport.request({
+      response = await this.#transport.request({
         method: "GET",
         url: url.toString(),
         accessToken: AccessTokenSchema.parse(input.accessToken),
         timeoutMs: QBO_RUNTIME_TIMEOUT_MS,
         maximumResponseBytes: QBO_RUNTIME_MAX_RESPONSE_BYTES
       });
-      return parseJsonResponse(response);
     } catch (error) {
-      if (error instanceof QboRuntimeProviderError) throw error;
-      throw new QboRuntimeProviderError(
+      const providerError = error instanceof QboRuntimeProviderError
+        ? error
+        : new QboRuntimeProviderError(
         classifyQboProviderError({ httpStatus: null, transportFailure: true })
       );
+      await this.#observeProviderResult({
+        endpointDomain: input.endpointDomain,
+        endpointClass: input.endpointClass,
+        providerRequestFingerprint,
+        providerOutcome: "provider_transport_failure"
+      });
+      throw providerError;
     }
+    let parsed: JsonRecord;
+    try {
+      parsed = parseJsonResponse(response);
+    } catch (error) {
+      const providerError = error instanceof QboRuntimeProviderError
+        ? error
+        : new QboRuntimeProviderError({
+            ...classifyQboProviderError({ httpStatus: response.status }),
+            kind: "malformed_response",
+            safeCode: "malformed_response",
+            retryDisposition: "do_not_retry"
+          });
+      await this.#observeProviderResult({
+        endpointDomain: input.endpointDomain,
+        endpointClass: input.endpointClass,
+        providerRequestFingerprint,
+        providerOutcome:
+          providerError.classification.kind === "malformed_response"
+            ? "provider_schema_failure"
+            : "provider_fault"
+      });
+      throw providerError;
+    }
+    await this.#observeProviderResult({
+      endpointDomain: input.endpointDomain,
+      endpointClass: input.endpointClass,
+      providerRequestFingerprint,
+      providerOutcome: "provider_success"
+    });
+    return parsed;
   }
 
   async fetchEntityPage(input: {
@@ -281,7 +391,17 @@ export class QboSandboxReadOnlyClient {
       path: `/v3/company/${this.#realmId}/query`,
       parameters: new URLSearchParams({ query: statement }),
       queryText: statement,
-      accessToken: input.accessToken
+      accessToken: input.accessToken,
+      endpointDomain: "entity_query",
+      endpointClass: "qbo_entity_query",
+      requestFingerprintInput: {
+        recordType,
+        startPosition: input.startPosition ?? 1,
+        maximumResults: normalizeQboQueryPageSize(
+          input.maximumResults ?? QBO_MAX_QUERY_PAGE_SIZE
+        ),
+        postingWindow: input.postingWindow ?? null
+      }
     });
     const records = queryRecords(root, recordType);
     const startPosition = input.startPosition ?? 1;
@@ -302,7 +422,10 @@ export class QboSandboxReadOnlyClient {
     const root = await this.#get({
       path: `/v3/company/${this.#realmId}/companyinfo/${this.#realmId}`,
       parameters: new URLSearchParams(),
-      accessToken: input.accessToken
+      accessToken: input.accessToken,
+      endpointDomain: "company_info",
+      endpointClass: "qbo_company_info",
+      requestFingerprintInput: { operation: "company_info" }
     });
     return object(root.CompanyInfo, "qbo_company_info_response_invalid");
   }
@@ -332,7 +455,16 @@ export class QboSandboxReadOnlyClient {
     return this.#get({
       path: `/v3/company/${this.#realmId}/reports/${providerReportIdentifier}`,
       parameters,
-      accessToken: input.accessToken
+      accessToken: input.accessToken,
+      endpointDomain: "report",
+      endpointClass: REPORT_ENDPOINT_CLASS_BY_TYPE[reportType],
+      requestFingerprintInput: {
+        reportType,
+        providerReportIdentifier,
+        startDate: window.startDate,
+        endDate: window.endDate,
+        accountingMethod: input.accountingMethod
+      }
     });
   }
 
@@ -354,7 +486,10 @@ export class QboSandboxReadOnlyClient {
         entities: recordTypes.join(","),
         changedSince
       }),
-      accessToken: input.accessToken
+      accessToken: input.accessToken,
+      endpointDomain: "cdc",
+      endpointClass: "qbo_cdc",
+      requestFingerprintInput: { recordTypes, changedSince }
     });
     const responses = root.CDCResponse;
     if (!Array.isArray(responses)) throw new Error("qbo_cdc_response_invalid");

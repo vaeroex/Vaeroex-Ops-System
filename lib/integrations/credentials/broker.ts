@@ -1216,6 +1216,7 @@ export class IntegrationCredentialBroker {
         state: "available" as const,
         credentialId: result.credentialId,
         credentialVersion: result.credentialVersion,
+        credentialReadEvidenceId: result.credentialReadEvidenceId,
         credential: new ProviderAccessCredential({
           providerKey: envelope.providerKey,
           providerEnvironment: envelope.environment,

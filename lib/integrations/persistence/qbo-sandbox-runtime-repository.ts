@@ -13,6 +13,12 @@ import {
   CredentialAadContextSchema,
   KmsCryptoKeyResourceSchema
 } from "@/lib/integrations/credentials/contracts";
+import {
+  QboProviderEndpointClassSchema,
+  QboProviderEndpointDomainSchema,
+  QboProviderOutcomeSchema,
+  QboReportParserOutcomeSchema
+} from "@/lib/integrations/providers/qbo/contracts";
 import { CompleteRuntimeTaskCommandSchema } from "@/lib/integrations/persistence/runtime-commands";
 import type { ExternalIntegrationsRpcClient } from "@/lib/integrations/persistence/repository";
 import { RuntimeQueueClassSchema, RuntimeTaskStateSchema } from "@/lib/integrations/runtime/contracts";
@@ -38,6 +44,12 @@ export const QBO_SANDBOX_REAUTHORIZED_PURCHASE_RECOVERY_CONTRACT_VERSION =
   "qbo_sandbox_reauthorized_purchase_recovery_v1" as const;
 export const QBO_SANDBOX_CREDENTIAL_BINDING_INCIDENT_RECOVERY_CONTRACT_VERSION =
   "qbo_sandbox_credential_envelope_binding_incident_recovery_v2" as const;
+export const QBO_SANDBOX_PROVIDER_RESULT_EVIDENCE_CONTRACT_VERSION =
+  "qbo_sandbox_provider_result_evidence_v1" as const;
+export const QBO_SANDBOX_REPORT_PARSER_RESULT_EVIDENCE_CONTRACT_VERSION =
+  "qbo_sandbox_report_parser_result_evidence_v1" as const;
+export const QBO_SANDBOX_AR_AGING_IDENTIFIER_RECOVERY_CONTRACT_VERSION =
+  "qbo_sandbox_ar_aging_identifier_recovery_v1" as const;
 export const QBO_SANDBOX_CANARY_DUE_RETRY_PROMOTION_CONTRACT_VERSION =
   "qbo_sandbox_canary_due_retry_promotion_v1" as const;
 export const QBO_SANDBOX_CANARY_DISPATCH_DISCOVERY_CONTRACT_VERSION =
@@ -320,6 +332,91 @@ export const RecoverQboSandboxCredentialBindingIncidentTaskCommandSchema = z
     credentialReadFailureEvidenceId: UuidSchema,
     diagnosticClass: z.literal("expires_at_binding"),
     retryAfterSeconds: z.number().int().min(1).max(3_600)
+  })
+  .strict();
+
+export const RecordQboSandboxProviderResultCommandSchema = z
+  .object({
+    contractVersion: z.literal(
+      QBO_SANDBOX_PROVIDER_RESULT_EVIDENCE_CONTRACT_VERSION
+    ),
+    credentialReadEvidenceId: UuidSchema,
+    requestOrdinal: z.number().int().min(1).max(128),
+    endpointDomain: QboProviderEndpointDomainSchema,
+    endpointClass: QboProviderEndpointClassSchema,
+    providerRequestFingerprint: Sha256FingerprintSchema,
+    providerOutcome: QboProviderOutcomeSchema
+  })
+  .strict();
+
+const QboSandboxProviderResultEvidenceResultSchema = z
+  .object({
+    providerResultEvidenceId: UuidSchema,
+    credentialReadEvidenceId: UuidSchema,
+    requestOrdinal: z.number().int().min(1).max(128),
+    endpointDomain: QboProviderEndpointDomainSchema,
+    endpointClass: QboProviderEndpointClassSchema,
+    providerOutcome: QboProviderOutcomeSchema,
+    observedAt: IsoTimestampSchema,
+    idempotent: z.boolean()
+  })
+  .strict();
+
+export const RecordQboSandboxReportParserResultCommandSchema = z
+  .object({
+    contractVersion: z.literal(
+      QBO_SANDBOX_REPORT_PARSER_RESULT_EVIDENCE_CONTRACT_VERSION
+    ),
+    providerResultEvidenceId: UuidSchema,
+    parserOutcome: QboReportParserOutcomeSchema
+  })
+  .strict();
+
+const QboSandboxReportParserResultEvidenceResultSchema = z
+  .object({
+    parserResultEvidenceId: UuidSchema,
+    providerResultEvidenceId: UuidSchema,
+    parserOutcome: QboReportParserOutcomeSchema,
+    observedAt: IsoTimestampSchema,
+    idempotent: z.boolean()
+  })
+  .strict();
+
+export const RecoverQboSandboxArAgingIdentifierFailureCommandSchema = z
+  .object({
+    contractVersion: z.literal(
+      QBO_SANDBOX_AR_AGING_IDENTIFIER_RECOVERY_CONTRACT_VERSION
+    ),
+    workspaceId: UuidSchema,
+    businessEntityId: UuidSchema,
+    connectionId: UuidSchema,
+    connectionGeneration: z.number().int().positive().safe(),
+    syncRunId: UuidSchema,
+    mappingId: UuidSchema,
+    expectedMappingRowVersion: z.number().int().positive().safe(),
+    historicalCredentialId: UuidSchema,
+    expectedHistoricalCredentialVersion: z.number().int().positive().safe(),
+    currentCredentialId: UuidSchema,
+    expectedCurrentCredentialVersion: z.number().int().positive().safe(),
+    expectedCurrentCredentialRowVersion: z.number().int().positive().safe(),
+    taskId: z.literal("1eb257e9-5275-51a7-992c-d08186c58c98"),
+    expectedTaskRowVersion: z.number().int().positive().safe(),
+    expectedDispatchGeneration: z.number().int().positive().safe(),
+    failureAuditEventId: UuidSchema,
+    credentialReadEvidenceId: UuidSchema,
+    retryAfterSeconds: z.number().int().min(1).max(3_600)
+  })
+  .strict();
+
+const RecoverQboSandboxArAgingIdentifierFailureResultSchema = z
+  .object({
+    recoveryEventId: UuidSchema,
+    taskId: UuidSchema,
+    recoveredAt: IsoTimestampSchema,
+    state: z.literal("retry_wait"),
+    rowVersion: z.number().int().positive().safe(),
+    dispatchGeneration: z.number().int().positive().safe(),
+    idempotent: z.boolean()
   })
   .strict();
 
@@ -647,6 +744,56 @@ export async function completeQboSandboxRuntimeTask(
     client
   );
   return QboSandboxRuntimeCompletionResultSchema.parse(data);
+}
+
+export async function recordQboSandboxProviderResult(
+  input: unknown,
+  requestId: string,
+  client: ExternalIntegrationsRpcClient
+) {
+  const data = await checkedRpc(
+    "record_qbo_sandbox_provider_result_v1",
+    {
+      p_command: RecordQboSandboxProviderResultCommandSchema.parse(input),
+      p_request_id: BoundedIdentifierSchema.parse(requestId)
+    },
+    client
+  );
+  return QboSandboxProviderResultEvidenceResultSchema.parse(data);
+}
+
+export async function recordQboSandboxReportParserResult(
+  input: unknown,
+  requestId: string,
+  client: ExternalIntegrationsRpcClient
+) {
+  const data = await checkedRpc(
+    "record_qbo_sandbox_report_parser_result_v1",
+    {
+      p_command: RecordQboSandboxReportParserResultCommandSchema.parse(input),
+      p_request_id: BoundedIdentifierSchema.parse(requestId)
+    },
+    client
+  );
+  return QboSandboxReportParserResultEvidenceResultSchema.parse(data);
+}
+
+export async function recoverQboSandboxArAgingIdentifierFailure(
+  input: unknown,
+  requestId: string,
+  actorId: string,
+  client: ExternalIntegrationsRpcClient
+) {
+  const data = await checkedRpc(
+    "recover_qbo_sandbox_ar_aging_identifier_failure_v1",
+    {
+      p_command: RecoverQboSandboxArAgingIdentifierFailureCommandSchema.parse(input),
+      p_request_id: BoundedIdentifierSchema.parse(requestId),
+      p_actor_id: BoundedIdentifierSchema.parse(actorId)
+    },
+    client
+  );
+  return RecoverQboSandboxArAgingIdentifierFailureResultSchema.parse(data);
 }
 
 export async function recoverQboSandboxExpiredCredentialTasks(

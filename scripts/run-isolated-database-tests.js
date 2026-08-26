@@ -184,7 +184,8 @@ const phase8bDatabaseTests = new Set([
   "external_integrations_phase_8b_zero_based_delivery_upgrade.test.sql",
   "external_integrations_phase_8b_credential_binding_canary.test.sql",
   "external_integrations_phase_8b_credential_lineage_recovery.test.sql",
-  "external_integrations_phase_8b_precontract_retirement.test.sql"
+  "external_integrations_phase_8b_precontract_retirement.test.sql",
+  "external_integrations_phase_8b_provider_result_evidence.test.sql"
 ]);
 const phase8bTestRoles = [
   "integration_control_plane_authority",

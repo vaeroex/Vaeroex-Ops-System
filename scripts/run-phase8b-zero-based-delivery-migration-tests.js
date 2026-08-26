@@ -12,7 +12,8 @@ const scopedRetryLifecycleVersion = "20260825190000";
 const credentialBindingVersion = "20260826043610";
 const credentialBindingCanaryVersion = "20260826090000";
 const credentialLineageVersion = "20260826120000";
-const targetVersion = "20260826190801";
+const precontractRetirementVersion = "20260826190801";
+const targetVersion = "20260826222000";
 const fixturePath = path.join(
   root,
   "supabase/tests/fixtures/external_integrations_phase_8b_zero_based_legacy.sql"
@@ -24,7 +25,8 @@ const testPaths = [
   "supabase/tests/external_integrations_phase_8b_same_generation_reauthorization.test.sql",
   "supabase/tests/external_integrations_phase_8b_credential_binding_canary.test.sql",
   "supabase/tests/external_integrations_phase_8b_credential_lineage_recovery.test.sql",
-  "supabase/tests/external_integrations_phase_8b_precontract_retirement.test.sql"
+  "supabase/tests/external_integrations_phase_8b_precontract_retirement.test.sql",
+  "supabase/tests/external_integrations_phase_8b_provider_result_evidence.test.sql"
 ];
 
 function fail(message, status = 1) {
@@ -172,11 +174,27 @@ function assertTargetIsSinglePendingMigration() {
       `Migration ${credentialLineageVersion} no longer immediately follows ${credentialBindingCanaryVersion}.`
     );
   }
+  const precontractRetirementIndex = migrations.findIndex((name) =>
+    name.startsWith(`${precontractRetirementVersion}_`)
+  );
+  if (precontractRetirementIndex < 0) {
+    fail(
+      `Pre-contract retirement migration ${precontractRetirementVersion} is missing.`
+    );
+  }
   if (
-    migrations[targetIndex - 1]?.slice(0, 14) !== credentialLineageVersion
+    migrations[precontractRetirementIndex - 1]?.slice(0, 14) !==
+      credentialLineageVersion
   ) {
     fail(
-      `Migration ${targetVersion} no longer immediately follows ${credentialLineageVersion}.`
+      `Migration ${precontractRetirementVersion} no longer immediately follows ${credentialLineageVersion}.`
+    );
+  }
+  if (
+    migrations[targetIndex - 1]?.slice(0, 14) !== precontractRetirementVersion
+  ) {
+    fail(
+      `Migration ${targetVersion} no longer immediately follows ${precontractRetirementVersion}.`
     );
   }
   if (targetIndex !== migrations.length - 1) {
