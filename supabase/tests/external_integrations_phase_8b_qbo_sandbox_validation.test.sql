@@ -462,6 +462,7 @@ insert into private.integration_sync_tasks (
   idempotency_fingerprint, coalescing_fingerprint, dispatcher_task_name,
   dispatch_generation, delivery_attribution_state,
   last_delivery_dispatch_generation,
+  last_delivery_retry_count,
   last_delivery_execution_count,
   last_delivery_attempt_fingerprint, attempt_count, maximum_attempts,
   last_request_id, last_request_fingerprint, available_at,
@@ -489,7 +490,7 @@ insert into private.integration_sync_tasks (
   ),
   extensions.digest(pg_catalog.convert_to('phase8b-task', 'UTF8'), 'sha256'),
   extensions.digest(pg_catalog.convert_to('phase8b-task-coalesce', 'UTF8'), 'sha256'),
-  pg_catalog.repeat('a', 64), 1, 'attributed', 1, 0,
+  pg_catalog.repeat('a', 64), 1, 'attributed', 1, 0, 0,
   extensions.digest(pg_catalog.convert_to('phase8b-delivery', 'UTF8'), 'sha256'),
   1, 3, 'phase8b_task_fixture',
   extensions.digest(pg_catalog.convert_to('phase8b-task-fixture', 'UTF8'), 'sha256'),
@@ -646,7 +647,47 @@ select ok(
 );
 reset role;
 
+set local role integration_credential_broker_authority;
+create temporary table phase8b_validation_credential_read on commit drop as
+select public.read_integration_provider_credential_v5(
+  pg_catalog.jsonb_build_object(
+    'contractVersion', 'integration_provider_credential_read_v1',
+    'taskId', '38000000-0000-4000-8000-000000008b01',
+    'leaseId', '48000000-0000-4000-8000-000000008b01',
+    'leaseOwnerFingerprint', pg_temp.fingerprint('phase8b-runtime-owner'),
+    'expectedCredentialVersion', 1,
+    'requiredScopes', pg_catalog.jsonb_build_array(
+      'com.intuit.quickbooks.accounting'
+    ),
+    'minimumValiditySeconds', 300,
+    'requestedAt', pg_catalog.to_char(
+      pg_catalog.transaction_timestamp() at time zone 'UTC',
+      'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'
+    )
+  ),
+  'phase8b_validation_credential_read'
+) as result;
+reset role;
+
 set local role integration_provider_runtime_authority;
+create temporary table phase8b_validation_provider_result on commit drop as
+select public.record_qbo_sandbox_provider_result_v1(
+  pg_catalog.jsonb_build_object(
+    'contractVersion', 'qbo_sandbox_provider_result_evidence_v1',
+    'credentialReadEvidenceId', (
+      select result ->> 'credentialReadEvidenceId'
+      from phase8b_validation_credential_read
+    ),
+    'requestOrdinal', 1,
+    'endpointDomain', 'entity_query',
+    'endpointClass', 'qbo_entity_query',
+    'providerRequestFingerprint', pg_temp.fingerprint(
+      'phase8b-validation-invoice-query'
+    ),
+    'providerOutcome', 'provider_success'
+  ),
+  'phase8b_validation_provider_result'
+) as result;
 select is(
   public.read_qbo_sandbox_runtime_task_delivery_v1(
     '38000000-0000-4000-8000-000000008b01',
