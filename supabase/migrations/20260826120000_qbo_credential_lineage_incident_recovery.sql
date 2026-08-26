@@ -931,6 +931,301 @@ on private.integration_sync_task_credential_lineage_recovery_events
 for each row execute function
   private.reject_external_integration_immutable_mutation_v1();
 
+create or replace function private.validate_integration_sync_task_mutation_v1()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $function$
+begin
+  if (
+    new.id, new.contract_version, new.workspace_id, new.business_entity_id,
+    new.connection_id, new.connection_generation, new.sync_run_id,
+    new.parent_task_id, new.provider_key, new.provider_environment,
+    new.queue_class, new.task_kind, new.stream_key, new.priority,
+    new.control_metadata, new.idempotency_fingerprint,
+    new.coalescing_fingerprint, new.maximum_attempts, new.created_at,
+    new.retention_expires_at
+  ) is distinct from (
+    old.id, old.contract_version, old.workspace_id, old.business_entity_id,
+    old.connection_id, old.connection_generation, old.sync_run_id,
+    old.parent_task_id, old.provider_key, old.provider_environment,
+    old.queue_class, old.task_kind, old.stream_key, old.priority,
+    old.control_metadata, old.idempotency_fingerprint,
+    old.coalescing_fingerprint, old.maximum_attempts, old.created_at,
+    old.retention_expires_at
+  ) then
+    raise exception using
+      errcode = '55000',
+      message = 'integration_sync_task_identity_immutable';
+  end if;
+
+  if old.delivery_attribution_state = 'legacy_unattributed' then
+    raise exception using
+      errcode = '55000',
+      message = 'integration_sync_task_delivery_attribution_unresolved';
+  end if;
+
+  if old.state in ('succeeded', 'failed', 'dead_letter', 'cancelled') then
+    if old.state = 'failed'
+      and old.durable_effect_fingerprint is null
+      and new.state = 'retry_wait'
+      and new.failure_category is null
+      and new.failure_code is null
+      and new.completed_at is null
+      and new.row_version = old.row_version + 1
+      and new.updated_at >= old.updated_at
+      and new.available_at >= new.updated_at
+      and (
+        new.dispatcher_task_name,
+        new.dispatch_generation,
+        new.delivery_attribution_state,
+        new.last_delivery_dispatch_generation,
+        new.last_delivery_retry_count,
+        new.last_delivery_execution_count,
+        new.last_delivery_attempt_fingerprint,
+        new.attempt_count,
+        new.lease_id,
+        new.lease_owner_fingerprint,
+        new.lease_expires_at,
+        new.heartbeat_at,
+        new.cancel_requested_at,
+        new.durable_effect_fingerprint
+      ) is not distinct from (
+        old.dispatcher_task_name,
+        old.dispatch_generation,
+        old.delivery_attribution_state,
+        old.last_delivery_dispatch_generation,
+        old.last_delivery_retry_count,
+        old.last_delivery_execution_count,
+        old.last_delivery_attempt_fingerprint,
+        old.attempt_count,
+        old.lease_id,
+        old.lease_owner_fingerprint,
+        old.lease_expires_at,
+        old.heartbeat_at,
+        old.cancel_requested_at,
+        old.durable_effect_fingerprint
+      )
+      and (
+        (
+          old.failure_category = 'contract'
+          and old.failure_code = 'phase8b_provider_task_failed'
+          and exists (
+            select 1
+            from private.integration_sync_task_recovery_events as recovery
+            where recovery.workspace_id = old.workspace_id
+              and recovery.business_entity_id = old.business_entity_id
+              and recovery.connection_id = old.connection_id
+              and recovery.connection_generation = old.connection_generation
+              and recovery.task_id = old.id
+              and recovery.prior_state = old.state
+              and recovery.prior_failure_category = old.failure_category
+              and recovery.prior_failure_code = old.failure_code
+              and recovery.prior_row_version = old.row_version
+              and recovery.prior_completed_at = old.completed_at
+              and recovery.request_id = new.last_request_id
+              and recovery.request_fingerprint = new.last_request_fingerprint
+              and recovery.recovered_at = new.updated_at
+              and recovery.recovered_at + pg_catalog.make_interval(
+                secs => recovery.retry_after_seconds
+              ) = new.available_at
+          )
+        )
+        or (
+          old.failure_category = 'authorization'
+          and old.failure_code = 'credential_reauthorization_required'
+          and old.stream_key = 'qbo_purchase'
+          and exists (
+            select 1
+            from private.integration_sync_task_reauthorization_recovery_events
+              as recovery
+            where recovery.workspace_id = old.workspace_id
+              and recovery.business_entity_id = old.business_entity_id
+              and recovery.connection_id = old.connection_id
+              and recovery.connection_generation = old.connection_generation
+              and recovery.task_id = old.id
+              and recovery.prior_state = old.state
+              and recovery.prior_failure_category = old.failure_category
+              and recovery.prior_failure_code = old.failure_code
+              and recovery.prior_row_version = old.row_version
+              and recovery.prior_completed_at = old.completed_at
+              and recovery.request_id = new.last_request_id
+              and recovery.request_fingerprint = new.last_request_fingerprint
+              and recovery.recovered_at = new.updated_at
+              and recovery.recovered_at + pg_catalog.make_interval(
+                secs => recovery.retry_after_seconds
+              ) = new.available_at
+          )
+        )
+        or (
+          old.failure_category = 'contract'
+          and old.failure_code = 'phase8b_provider_task_failed'
+          and exists (
+            select 1
+            from
+              private.integration_sync_task_credential_binding_recovery_events
+                as recovery
+            where recovery.workspace_id = old.workspace_id
+              and recovery.business_entity_id = old.business_entity_id
+              and recovery.connection_id = old.connection_id
+              and recovery.connection_generation = old.connection_generation
+              and recovery.task_id = old.id
+              and recovery.prior_state = old.state
+              and recovery.prior_failure_category = old.failure_category
+              and recovery.prior_failure_code = old.failure_code
+              and recovery.prior_row_version = old.row_version
+              and recovery.prior_completed_at = old.completed_at
+              and recovery.prior_dispatch_generation =
+                old.dispatch_generation
+              and recovery.request_id = new.last_request_id
+              and recovery.request_fingerprint = new.last_request_fingerprint
+              and recovery.recovered_at = new.updated_at
+              and recovery.recovered_at + pg_catalog.make_interval(
+                secs => recovery.retry_after_seconds
+              ) = new.available_at
+          )
+        )
+        or (
+          old.failure_category = 'contract'
+          and old.failure_code = 'phase8b_provider_task_failed'
+          and exists (
+            select 1
+            from
+              private.integration_sync_task_credential_lineage_recovery_events
+                as recovery
+            where recovery.workspace_id = old.workspace_id
+              and recovery.business_entity_id = old.business_entity_id
+              and recovery.connection_id = old.connection_id
+              and recovery.connection_generation = old.connection_generation
+              and recovery.task_id = old.id
+              and recovery.prior_state = old.state
+              and recovery.prior_failure_category = old.failure_category
+              and recovery.prior_failure_code = old.failure_code
+              and recovery.prior_row_version = old.row_version
+              and recovery.prior_completed_at = old.completed_at
+              and recovery.prior_dispatch_generation =
+                old.dispatch_generation
+              and recovery.request_id = new.last_request_id
+              and recovery.request_fingerprint = new.last_request_fingerprint
+              and recovery.recovered_at = new.updated_at
+              and recovery.recovered_at + pg_catalog.make_interval(
+                secs => recovery.retry_after_seconds
+              ) = new.available_at
+          )
+        )
+      ) then
+      return new;
+    end if;
+    raise exception using
+      errcode = '55000',
+      message = 'integration_sync_task_terminal_immutable';
+  end if;
+
+  if not private.is_phase_6_task_transition_v1(old.state, new.state)
+    or new.row_version <> old.row_version + 1
+    or new.attempt_count < old.attempt_count
+    or new.dispatch_generation < old.dispatch_generation
+    or new.updated_at < old.updated_at then
+    raise exception using
+      errcode = '55000',
+      message = 'integration_sync_task_mutation_invalid';
+  end if;
+
+  if (
+    new.delivery_attribution_state,
+    new.last_delivery_dispatch_generation,
+    new.last_delivery_retry_count,
+    new.last_delivery_execution_count,
+    new.last_delivery_attempt_fingerprint
+  ) is distinct from (
+    old.delivery_attribution_state,
+    old.last_delivery_dispatch_generation,
+    old.last_delivery_retry_count,
+    old.last_delivery_execution_count,
+    old.last_delivery_attempt_fingerprint
+  ) and (
+    new.delivery_attribution_state <> 'attributed'
+    or new.last_delivery_dispatch_generation is null
+    or new.last_delivery_dispatch_generation <> new.dispatch_generation
+    or new.last_delivery_retry_count is null
+    or new.last_delivery_execution_count is null
+    or new.last_delivery_execution_count > new.last_delivery_retry_count
+    or new.last_delivery_attempt_fingerprint is null
+    or (
+      old.delivery_attribution_state = 'attributed'
+      and old.last_delivery_dispatch_generation =
+        new.last_delivery_dispatch_generation
+      and (
+        new.last_delivery_attempt_fingerprint =
+          old.last_delivery_attempt_fingerprint
+        or (
+          old.last_delivery_retry_count is not null
+          and (
+            new.last_delivery_retry_count <= old.last_delivery_retry_count
+            or new.last_delivery_execution_count <
+              old.last_delivery_execution_count
+          )
+        )
+        or (
+          old.last_delivery_retry_count is null
+          and not exists (
+            select 1
+            from
+              private.integration_sync_task_delivery_retry_compatibility_events
+                as compatibility
+            where compatibility.workspace_id = old.workspace_id
+              and compatibility.business_entity_id = old.business_entity_id
+              and compatibility.connection_id = old.connection_id
+              and compatibility.connection_generation = old.connection_generation
+              and compatibility.task_id = old.id
+              and compatibility.dispatch_generation =
+                new.last_delivery_dispatch_generation
+              and compatibility.observed_delivery_retry_count <
+                new.last_delivery_retry_count
+              and compatibility.observed_delivery_execution_count <=
+                new.last_delivery_execution_count
+          )
+        )
+      )
+    )
+    or (
+      (
+        old.delivery_attribution_state = 'none'
+        or old.last_delivery_dispatch_generation <
+          new.last_delivery_dispatch_generation
+      )
+      and (
+        new.last_delivery_retry_count <> 0
+        or new.last_delivery_execution_count <> 0
+      )
+      and not exists (
+        select 1
+        from
+          private.integration_sync_task_delivery_retry_compatibility_events
+            as compatibility
+        where compatibility.workspace_id = old.workspace_id
+          and compatibility.business_entity_id = old.business_entity_id
+          and compatibility.connection_id = old.connection_id
+          and compatibility.connection_generation = old.connection_generation
+          and compatibility.task_id = old.id
+          and compatibility.dispatch_generation =
+            new.last_delivery_dispatch_generation
+          and compatibility.observed_delivery_retry_count <
+            new.last_delivery_retry_count
+          and compatibility.observed_delivery_execution_count <=
+            new.last_delivery_execution_count
+      )
+    )
+  ) then
+    raise exception using
+      errcode = '55000',
+      message = 'integration_sync_task_delivery_evidence_invalid';
+  end if;
+  return new;
+end;
+$function$;
+
 create or replace function
   public.recover_qbo_sandbox_credential_binding_incident_task_v2(
     p_command jsonb,

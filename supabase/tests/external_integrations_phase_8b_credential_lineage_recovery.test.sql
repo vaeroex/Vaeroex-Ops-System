@@ -1053,6 +1053,15 @@ select ok(
   ),
   'lineage recovery evidence remains private with forced RLS'
 );
+select ok(
+  position(
+    'integration_sync_task_credential_lineage_recovery_events'
+    in pg_catalog.pg_get_functiondef(
+      'private.validate_integration_sync_task_mutation_v1()'::regprocedure
+    )
+  ) > 0,
+  'terminal task recovery requires exact immutable lineage recovery evidence'
+);
 
 set local role service_role;
 select ok(
