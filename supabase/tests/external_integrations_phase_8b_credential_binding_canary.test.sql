@@ -1329,7 +1329,6 @@ from (values
 ) as connections(connection_name);
 
 select pg_catalog.pg_sleep(1.1);
-commit;
 begin;
 set local search_path = public, extensions;
 
@@ -1351,55 +1350,90 @@ select ok(
   ),
   'JSON null cannot bypass canary discovery contract selection'
 );
+reset role;
+
+select extensions.dblink_connect(
+  'phase8b_canary_dispatch',
+  pg_catalog.convert_from(
+    pg_catalog.decode(current_setting('vaeroex.test_database_url_b64'), 'base64'),
+    'UTF8'
+  )
+);
+select extensions.dblink_exec(
+  'phase8b_canary_dispatch',
+  'set role integration_qbo_canary_dispatch_authority'
+);
+
 create temporary table phase8b_canary_promotion_result as
-select public.promote_qbo_sandbox_canary_task_v1(
-  pg_catalog.jsonb_build_object(
-    'contractVersion', 'qbo_sandbox_canary_due_retry_promotion_v1',
-    'workspaceId', 'b8c00000-0000-4000-8000-000000000001',
-    'businessEntityId', 'd8c00000-0000-4000-8000-000000000001',
-    'connectionId', 'e8c00000-0000-4000-8000-000000000001',
-    'connectionGeneration', 1,
-    'taskId', '38c00000-0000-4000-8000-000000000001',
-    'maximumTasks', 1
-  ),
-  'phase8b_canary_retry_ready_38c00000',
-  'phase8b_qbo_canary_dispatcher'
-) as result;
+select response.result
+from extensions.dblink(
+  'phase8b_canary_dispatch',
+  $query$
+    select public.promote_qbo_sandbox_canary_task_v1(
+      pg_catalog.jsonb_build_object(
+        'contractVersion', 'qbo_sandbox_canary_due_retry_promotion_v1',
+        'workspaceId', 'b8c00000-0000-4000-8000-000000000001',
+        'businessEntityId', 'd8c00000-0000-4000-8000-000000000001',
+        'connectionId', 'e8c00000-0000-4000-8000-000000000001',
+        'connectionGeneration', 1,
+        'taskId', '38c00000-0000-4000-8000-000000000001',
+        'maximumTasks', 1
+      ),
+      'phase8b_canary_retry_ready_38c00000',
+      'phase8b_qbo_canary_dispatcher'
+    )
+  $query$
+) as response(result jsonb);
 select is(
   (select result ->> 'promotedTaskCount' from phase8b_canary_promotion_result),
   '1',
   'exact canary due retry is promoted once'
 );
+create temporary table phase8b_canary_promotion_replay_result as
+select response.result
+from extensions.dblink(
+  'phase8b_canary_dispatch',
+  $query$
+    select public.promote_qbo_sandbox_canary_task_v1(
+      pg_catalog.jsonb_build_object(
+        'contractVersion', 'qbo_sandbox_canary_due_retry_promotion_v1',
+        'workspaceId', 'b8c00000-0000-4000-8000-000000000001',
+        'businessEntityId', 'd8c00000-0000-4000-8000-000000000001',
+        'connectionId', 'e8c00000-0000-4000-8000-000000000001',
+        'connectionGeneration', 1,
+        'taskId', '38c00000-0000-4000-8000-000000000001',
+        'maximumTasks', 1
+      ),
+      'phase8b_canary_retry_ready_38c00000',
+      'phase8b_qbo_canary_dispatcher'
+    )
+  $query$
+) as response(result jsonb);
 select is(
-  public.promote_qbo_sandbox_canary_task_v1(
-    pg_catalog.jsonb_build_object(
-      'contractVersion', 'qbo_sandbox_canary_due_retry_promotion_v1',
-      'workspaceId', 'b8c00000-0000-4000-8000-000000000001',
-      'businessEntityId', 'd8c00000-0000-4000-8000-000000000001',
-      'connectionId', 'e8c00000-0000-4000-8000-000000000001',
-      'connectionGeneration', 1,
-      'taskId', '38c00000-0000-4000-8000-000000000001',
-      'maximumTasks', 1
-    ),
-    'phase8b_canary_retry_ready_38c00000',
-    'phase8b_qbo_canary_dispatcher'
-  ) ->> 'idempotent',
+  (select result ->> 'idempotent'
+   from phase8b_canary_promotion_replay_result),
   'true',
   'canary due-retry promotion is idempotent'
 );
 
 create temporary table phase8b_canary_discovery_result as
-select public.read_qbo_sandbox_canary_dispatch_candidate_v1(
-  pg_catalog.jsonb_build_object(
-    'contractVersion', 'qbo_sandbox_canary_dispatch_discovery_v1',
-    'workspaceId', 'b8c00000-0000-4000-8000-000000000001',
-    'businessEntityId', 'd8c00000-0000-4000-8000-000000000001',
-    'connectionId', 'e8c00000-0000-4000-8000-000000000001',
-    'connectionGeneration', 1,
-    'taskId', '38c00000-0000-4000-8000-000000000001',
-    'maximumTasks', 1
-  )
-) as result;
+select response.result
+from extensions.dblink(
+  'phase8b_canary_dispatch',
+  $query$
+    select public.read_qbo_sandbox_canary_dispatch_candidate_v1(
+      pg_catalog.jsonb_build_object(
+        'contractVersion', 'qbo_sandbox_canary_dispatch_discovery_v1',
+        'workspaceId', 'b8c00000-0000-4000-8000-000000000001',
+        'businessEntityId', 'd8c00000-0000-4000-8000-000000000001',
+        'connectionId', 'e8c00000-0000-4000-8000-000000000001',
+        'connectionGeneration', 1,
+        'taskId', '38c00000-0000-4000-8000-000000000001',
+        'maximumTasks', 1
+      )
+    )
+  $query$
+) as response(result jsonb);
 select is(
   (select pg_catalog.jsonb_array_length(result)
    from phase8b_canary_discovery_result),
@@ -1411,9 +1445,12 @@ select is(
   '38c00000-0000-4000-8000-000000000001',
   'canary discovery returns only the configured company_info identity'
 );
-select is(
-  pg_catalog.jsonb_array_length(
-    public.read_qbo_sandbox_canary_dispatch_candidate_v1(
+create temporary table phase8b_canary_wrong_discovery_result as
+select response.result
+from extensions.dblink(
+  'phase8b_canary_dispatch',
+  $query$
+    select public.read_qbo_sandbox_canary_dispatch_candidate_v1(
       pg_catalog.jsonb_build_object(
         'contractVersion', 'qbo_sandbox_canary_dispatch_discovery_v1',
         'workspaceId', 'b8c00000-0000-4000-8000-000000000001',
@@ -1424,27 +1461,37 @@ select is(
         'maximumTasks', 1
       )
     )
-  ),
+  $query$
+) as response(result jsonb);
+select is(
+  (select pg_catalog.jsonb_array_length(result)
+   from phase8b_canary_wrong_discovery_result),
   0,
   'wrong failed task identity cannot widen canary discovery'
 );
 
 create temporary table phase8b_canary_reservation_result as
-select public.reserve_qbo_sandbox_canary_dispatch_task_v1(
-  pg_catalog.jsonb_build_object(
-    'contractVersion', 'qbo_sandbox_canary_dispatch_reservation_v1',
-    'workspaceId', 'b8c00000-0000-4000-8000-000000000001',
-    'businessEntityId', 'd8c00000-0000-4000-8000-000000000001',
-    'connectionId', 'e8c00000-0000-4000-8000-000000000001',
-    'connectionGeneration', 1,
-    'taskId', '38c00000-0000-4000-8000-000000000001',
-    'expectedRowVersion', 11,
-    'dispatcherTaskName',
-      '24eb1112219d59b7c6cbf162e8d3ef39d48b712dc1529dd1db58545613cd7b82'
-  ),
-  'phase8b_canary_reserve_24eb1112219d59b7c6cbf162e8d3ef39d48b712dc1529dd1db58545613cd7b82',
-  'phase8b_qbo_canary_dispatcher'
-) as result;
+select response.result
+from extensions.dblink(
+  'phase8b_canary_dispatch',
+  $query$
+    select public.reserve_qbo_sandbox_canary_dispatch_task_v1(
+      pg_catalog.jsonb_build_object(
+        'contractVersion', 'qbo_sandbox_canary_dispatch_reservation_v1',
+        'workspaceId', 'b8c00000-0000-4000-8000-000000000001',
+        'businessEntityId', 'd8c00000-0000-4000-8000-000000000001',
+        'connectionId', 'e8c00000-0000-4000-8000-000000000001',
+        'connectionGeneration', 1,
+        'taskId', '38c00000-0000-4000-8000-000000000001',
+        'expectedRowVersion', 11,
+        'dispatcherTaskName',
+          '24eb1112219d59b7c6cbf162e8d3ef39d48b712dc1529dd1db58545613cd7b82'
+      ),
+      'phase8b_canary_reserve_24eb1112219d59b7c6cbf162e8d3ef39d48b712dc1529dd1db58545613cd7b82',
+      'phase8b_qbo_canary_dispatcher'
+    )
+  $query$
+) as response(result jsonb);
 select is(
   (select result ->> 'state' from phase8b_canary_reservation_result),
   'dispatched',
@@ -1457,17 +1504,23 @@ select is(
   'only canary dispatch generation advances'
 );
 create temporary table phase8b_canary_reserved_reconciliation_result as
-select public.read_qbo_sandbox_canary_dispatch_candidate_v1(
-  pg_catalog.jsonb_build_object(
-    'contractVersion', 'qbo_sandbox_canary_dispatch_discovery_v1',
-    'workspaceId', 'b8c00000-0000-4000-8000-000000000001',
-    'businessEntityId', 'd8c00000-0000-4000-8000-000000000001',
-    'connectionId', 'e8c00000-0000-4000-8000-000000000001',
-    'connectionGeneration', 1,
-    'taskId', '38c00000-0000-4000-8000-000000000001',
-    'maximumTasks', 1
-  )
-) as result;
+select response.result
+from extensions.dblink(
+  'phase8b_canary_dispatch',
+  $query$
+    select public.read_qbo_sandbox_canary_dispatch_candidate_v1(
+      pg_catalog.jsonb_build_object(
+        'contractVersion', 'qbo_sandbox_canary_dispatch_discovery_v1',
+        'workspaceId', 'b8c00000-0000-4000-8000-000000000001',
+        'businessEntityId', 'd8c00000-0000-4000-8000-000000000001',
+        'connectionId', 'e8c00000-0000-4000-8000-000000000001',
+        'connectionGeneration', 1,
+        'taskId', '38c00000-0000-4000-8000-000000000001',
+        'maximumTasks', 1
+      )
+    )
+  $query$
+) as response(result jsonb);
 select ok(
   (
     select pg_catalog.jsonb_array_length(result) = 1
@@ -1477,26 +1530,35 @@ select ok(
   ),
   'reserved canary reconciliation returns the same virtual pre-reservation identity'
 );
+create temporary table phase8b_canary_reservation_replay_result as
+select response.result
+from extensions.dblink(
+  'phase8b_canary_dispatch',
+  $query$
+    select public.reserve_qbo_sandbox_canary_dispatch_task_v1(
+      pg_catalog.jsonb_build_object(
+        'contractVersion', 'qbo_sandbox_canary_dispatch_reservation_v1',
+        'workspaceId', 'b8c00000-0000-4000-8000-000000000001',
+        'businessEntityId', 'd8c00000-0000-4000-8000-000000000001',
+        'connectionId', 'e8c00000-0000-4000-8000-000000000001',
+        'connectionGeneration', 1,
+        'taskId', '38c00000-0000-4000-8000-000000000001',
+        'expectedRowVersion', 11,
+        'dispatcherTaskName',
+          '24eb1112219d59b7c6cbf162e8d3ef39d48b712dc1529dd1db58545613cd7b82'
+      ),
+      'phase8b_canary_reserve_24eb1112219d59b7c6cbf162e8d3ef39d48b712dc1529dd1db58545613cd7b82',
+      'phase8b_qbo_canary_dispatcher'
+    )
+  $query$
+) as response(result jsonb);
 select is(
-  public.reserve_qbo_sandbox_canary_dispatch_task_v1(
-    pg_catalog.jsonb_build_object(
-      'contractVersion', 'qbo_sandbox_canary_dispatch_reservation_v1',
-      'workspaceId', 'b8c00000-0000-4000-8000-000000000001',
-      'businessEntityId', 'd8c00000-0000-4000-8000-000000000001',
-      'connectionId', 'e8c00000-0000-4000-8000-000000000001',
-      'connectionGeneration', 1,
-      'taskId', '38c00000-0000-4000-8000-000000000001',
-      'expectedRowVersion', 11,
-      'dispatcherTaskName',
-        '24eb1112219d59b7c6cbf162e8d3ef39d48b712dc1529dd1db58545613cd7b82'
-    ),
-    'phase8b_canary_reserve_24eb1112219d59b7c6cbf162e8d3ef39d48b712dc1529dd1db58545613cd7b82',
-    'phase8b_qbo_canary_dispatcher'
-  ) ->> 'idempotent',
+  (select result ->> 'idempotent'
+   from phase8b_canary_reservation_replay_result),
   'true',
   'deterministic canary reservation replay cannot create another dispatch'
 );
-reset role;
+select extensions.dblink_disconnect('phase8b_canary_dispatch');
 
 select ok(
   (
