@@ -1474,6 +1474,21 @@ select is(
   'successful recoveries append exactly one immutable event per task'
 );
 select ok(
+  not exists (
+    select 1
+    from private.integration_audit_events as audit
+    where audit.action =
+        'integration_sync_task.credential_binding_lineage_recover'
+      and audit.metadata ?| array[
+        'credential_lineage_id',
+        'historical_credential_version',
+        'current_credential_version',
+        'refresh_advancement_count'
+      ]
+  ),
+  'generic recovery audits remain minimized while lineage stays private'
+);
+select ok(
   pg_temp.raises_sqlstate(
     $$update private.integration_sync_task_credential_lineage_recovery_events
       set actor_id = 'forged_actor'
