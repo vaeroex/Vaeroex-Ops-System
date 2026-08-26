@@ -465,7 +465,8 @@ export function mapValidatedQboProfitAndLossControl(input: {
     value === null ||
     report.reportBasis !== "accrual" ||
     report.periodStart === null ||
-    report.periodEnd === null
+    report.periodEnd === null ||
+    report.sourceCurrency === null
   ) {
     return {
       disposition: "quarantined" as const,

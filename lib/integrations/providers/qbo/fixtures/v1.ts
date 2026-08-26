@@ -1,7 +1,8 @@
-import type {
-  QboProviderMetadata,
-  QboReportType,
-  QboSupportedObjectType
+import {
+  QBO_PROVIDER_REPORT_IDENTIFIER_BY_TYPE,
+  type QboProviderMetadata,
+  type QboReportType,
+  type QboSupportedObjectType
 } from "@/lib/integrations/providers/qbo/contracts";
 
 export const QBO_SYNTHETIC_PROVIDER: QboProviderMetadata = {
@@ -221,7 +222,7 @@ export const QBO_SYNTHETIC_TRANSACTION_FIXTURES: Record<QboNonReportObjectType, 
 function report(name: QboReportType) {
   return {
     Header: {
-      ReportName: name,
+      ReportName: QBO_PROVIDER_REPORT_IDENTIFIER_BY_TYPE[name],
       ReportBasis: name === "CashFlow" ? "Cash" : "Accrual",
       StartPeriod: "2026-06-01",
       EndPeriod: "2026-06-30",
@@ -270,6 +271,107 @@ export const QBO_SYNTHETIC_REPORT_FIXTURES: Record<QboReportType, unknown> = {
   ARAgingSummary: report("ARAgingSummary"),
   APAgingSummary: report("APAgingSummary"),
   TrialBalance: report("TrialBalance")
+};
+
+const agingColumns = (entityType: "Vendor" | "Customer") => ({
+  Column: [
+    { ColTitle: "", ColType: entityType },
+    { ColTitle: "Current", ColType: "Money", MetaData: [{ Name: "ColKey", Value: "current" }] },
+    { ColTitle: "1 - 30", ColType: "Money", MetaData: [{ Name: "ColKey", Value: "0" }] },
+    { ColTitle: "31 - 60", ColType: "Money", MetaData: [{ Name: "ColKey", Value: "1" }] },
+    { ColTitle: "61 - 90", ColType: "Money", MetaData: [{ Name: "ColKey", Value: "2" }] },
+    { ColTitle: "91 and over", ColType: "Money", MetaData: [{ Name: "ColKey", Value: "3" }] },
+    { ColTitle: "Total", ColType: "Money", MetaData: [{ Name: "ColKey", Value: "total" }] }
+  ]
+});
+
+const emptyAgingValues = [
+  { value: "0.00" },
+  { value: "" },
+  { value: "" },
+  { value: "" },
+  { value: "" },
+  { value: "" }
+];
+
+export const QBO_SANITIZED_AGING_REPORT_FIXTURES: Record<
+  "APAgingSummary" | "ARAgingSummary",
+  unknown
+> = {
+  APAgingSummary: {
+    Header: {
+      ReportName: "AgedPayables",
+      StartPeriod: "2026-08-01",
+      EndPeriod: "2026-08-26",
+      Option: [{ Name: "NoReportData", Value: "false" }],
+      IgnoredProviderMetadata: "not-retained"
+    },
+    Columns: agingColumns("Vendor"),
+    Rows: {
+      Row: [
+        {
+          ColData: [
+            { value: "Entity A", id: "synthetic-vendor-1", href: "not-retained" },
+            ...emptyAgingValues
+          ]
+        },
+        {
+          type: "Section",
+          group: "GrandTotal",
+          Summary: {
+            ColData: [
+              { value: "TOTAL" },
+              ...emptyAgingValues
+            ]
+          }
+        }
+      ]
+    },
+    IgnoredProviderEnvelope: { value: "not-retained" }
+  },
+  ARAgingSummary: {
+    Header: {
+      ReportName: "AgedReceivables",
+      ReportBasis: "Accrual",
+      StartPeriod: "2026-08-01",
+      EndPeriod: "2026-08-26",
+      Currency: "USD",
+      Option: [{ Name: "NoReportData", Value: "false" }]
+    },
+    Columns: agingColumns("Customer"),
+    Rows: {
+      Row: [
+        {
+          type: "Section",
+          group: "Receivables",
+          Header: { ColData: [{ value: "Receivables" }] },
+          Rows: {
+            Row: [
+              {
+                type: "Data",
+                ColData: [
+                  { value: "Entity B", id: "synthetic-customer-1" },
+                  ...emptyAgingValues
+                ]
+              },
+              {
+                type: "Section",
+                group: "DocumentedEmptySection",
+                Header: { ColData: [{ value: "Empty section" }] },
+                Rows: { Row: [] }
+              }
+            ]
+          },
+          Summary: {
+            ColData: [
+              { value: "TOTAL" },
+              ...emptyAgingValues
+            ]
+          }
+        }
+      ]
+    }
+  }
 };
 
 export const QBO_SYNTHETIC_CLOUDEVENTS_FIXTURE = [

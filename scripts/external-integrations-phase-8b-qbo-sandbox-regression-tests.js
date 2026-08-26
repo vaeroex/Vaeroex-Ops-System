@@ -2220,6 +2220,51 @@ function testReportControl() {
   equal(mapped.disposition, "mapped", "compatible P&L control maps deterministically");
   equal(mapped.candidate.representation.economicIdentity.contributionFamilyKind, "non_additive_control", "report control family is non-additive");
   equal(mapped.candidate.fact.sources[0].sourceRole, "control_observation", "report provenance is marked control-only");
+
+  const aging = qbo.parseQboReport({
+    reportType: "APAgingSummary",
+    raw: fixtures.QBO_SANITIZED_AGING_REPORT_FIXTURES.APAgingSummary,
+    provider
+  });
+  equal(aging.sourceCurrency, null, "Phase 8B accepts documented optional aging currency without inventing authority");
+  const agingPending = qbo.qboReportToExternalSourceVersion({
+    context: sourceContext(),
+    report: aging,
+    id: id(8302),
+    immutableVersion: 1,
+    priorVersionId: null,
+    observedAt: at,
+    synchronizedAt: at,
+    ingestedAt: at,
+    receivedAt: at
+  });
+  equal(agingPending.accounting.currency, null, "missing aging currency remains null in pending source authority");
+  ok(
+    agingPending.source.providerRecordId.endsWith(":currency_unspecified"),
+    "missing optional aging currency uses a stable non-financial provider identity marker"
+  );
+  deepEqual(
+    qbo.QBO_REPORT_DIAGNOSTIC_CLASSES,
+    [
+      "report_header_shape",
+      "report_columns_shape",
+      "report_rows_shape",
+      "report_cell_shape",
+      "report_summary_shape",
+      "report_metadata_shape"
+    ],
+    "report diagnostics are an explicit bounded non-payload allowlist"
+  );
+  const serviceSource = read("services/external-integrations-qbo-sandbox/src/server.ts");
+  ok(
+    /reportDiagnosticClass:\s*reportFailure\?\.diagnosticClass\s*\?\?\s*"not_applicable"/.test(serviceSource),
+    "runtime failure telemetry records only the bounded report diagnostic class"
+  );
+  equal(
+    /reportFailure\?\.(?:message|field|expectedType|actualType)/.test(serviceSource),
+    false,
+    "runtime telemetry does not retain report values or detailed provider paths"
+  );
   return mapped.candidate;
 }
 

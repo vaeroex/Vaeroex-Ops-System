@@ -224,7 +224,7 @@ export const QboReportControlObservationSchema = z
     provider: QboProviderMetadataSchema,
     reportType: QboReportTypeSchema,
     reportBasis: QboAccountingBasisSchema,
-    sourceCurrency: CurrencyCodeSchema,
+    sourceCurrency: CurrencyCodeSchema.nullable(),
     periodStart: IsoDateSchema.nullable(),
     periodEnd: IsoDateSchema.nullable(),
     columns: z.array(

@@ -287,6 +287,117 @@ throws(
   "missing required report hierarchy fails closed"
 );
 
+const apAging = qbo.parseQboReport({
+  reportType: "APAgingSummary",
+  raw: fixtures.QBO_SANITIZED_AGING_REPORT_FIXTURES.APAgingSummary,
+  provider
+});
+equal(apAging.sourceCurrency, null, "documented optional A/P currency metadata is not fabricated");
+equal(apAging.reportBasis, "unknown", "documented optional A/P report basis remains explicitly unknown");
+equal(apAging.rows.length, 2, "A/P data and grand-total section hierarchy are preserved");
+equal(new Set(apAging.columns.map((column) => column.columnKey)).size, 7, "repeated provider Money column types receive unique minimized identities");
+doesNotMatch(
+  JSON.stringify(apAging),
+  /Option|MetaData|IgnoredProvider|href|not-retained/,
+  "A/P minimization drops provider options, column metadata, links, and unknown envelope fields"
+);
+equal(
+  qbo.qboReportProviderRecordId(apAging),
+  "APAgingSummary:unknown:2026-08-01:2026-08-26:currency_unspecified",
+  "missing optional currency has one explicit non-financial source identity marker"
+);
+
+const emptyApAgingFixture = clone(fixtures.QBO_SANITIZED_AGING_REPORT_FIXTURES.APAgingSummary);
+emptyApAgingFixture.Header.Option = [{ Name: "NoReportData", Value: "true" }];
+emptyApAgingFixture.Rows.Row = [];
+const emptyApAging = qbo.parseQboReport({
+  reportType: "APAgingSummary",
+  raw: emptyApAgingFixture,
+  provider
+});
+equal(emptyApAging.rows.length, 0, "documented no-report-data aging envelopes retain an empty hierarchy");
+
+const arAging = qbo.parseQboReport({
+  reportType: "ARAgingSummary",
+  raw: fixtures.QBO_SANITIZED_AGING_REPORT_FIXTURES.ARAgingSummary,
+  provider
+});
+equal(arAging.sourceCurrency, "USD", "A/R preserves present valid currency metadata");
+equal(arAging.reportBasis, "accrual", "A/R preserves present valid report basis metadata");
+ok(
+  qbo.flattenQboReportRows(arAging).some((row) => row.group === "DocumentedEmptySection" && row.rowType === "section"),
+  "A/R preserves documented empty nested sections without inventing data rows"
+);
+ok(
+  qbo.flattenQboReportRows(arAging).some((row) => row.rowType === "summary"),
+  "A/R preserves nested summary rows as non-additive control hierarchy"
+);
+
+const malformedAgingMetadata = clone(fixtures.QBO_SANITIZED_AGING_REPORT_FIXTURES.APAgingSummary);
+malformedAgingMetadata.Header.Currency = 7;
+throws(
+  () => qbo.parseQboReport({ reportType: "APAgingSummary", raw: malformedAgingMetadata, provider }),
+  (error) => error instanceof qbo.QboReportContractError &&
+    error.diagnosticClass === "report_metadata_shape" &&
+    error.field === "Header.Currency" &&
+    error.actualType === "number",
+  "malformed aging metadata fails with bounded non-payload classification"
+);
+
+const malformedAgingColumns = clone(fixtures.QBO_SANITIZED_AGING_REPORT_FIXTURES.APAgingSummary);
+malformedAgingColumns.Columns.Column = {};
+throws(
+  () => qbo.parseQboReport({ reportType: "APAgingSummary", raw: malformedAgingColumns, provider }),
+  (error) => error instanceof qbo.QboReportContractError && error.diagnosticClass === "report_columns_shape",
+  "malformed aging columns fail closed"
+);
+
+const malformedAgingRows = clone(fixtures.QBO_SANITIZED_AGING_REPORT_FIXTURES.APAgingSummary);
+malformedAgingRows.Rows.Row = {};
+throws(
+  () => qbo.parseQboReport({ reportType: "APAgingSummary", raw: malformedAgingRows, provider }),
+  (error) => error instanceof qbo.QboReportContractError && error.diagnosticClass === "report_rows_shape",
+  "malformed aging row containers fail closed"
+);
+
+const malformedAgingCell = clone(fixtures.QBO_SANITIZED_AGING_REPORT_FIXTURES.APAgingSummary);
+malformedAgingCell.Rows.Row[0].ColData[1].value = { unsafe: true };
+throws(
+  () => qbo.parseQboReport({ reportType: "APAgingSummary", raw: malformedAgingCell, provider }),
+  (error) => error instanceof qbo.QboReportContractError &&
+    error.diagnosticClass === "report_cell_shape" &&
+    error.actualType === "object",
+  "malformed aging cells fail without retaining their value"
+);
+
+const malformedAgingSummary = clone(fixtures.QBO_SANITIZED_AGING_REPORT_FIXTURES.APAgingSummary);
+malformedAgingSummary.Rows.Row[1].Summary.ColData = {};
+throws(
+  () => qbo.parseQboReport({ reportType: "APAgingSummary", raw: malformedAgingSummary, provider }),
+  (error) => error instanceof qbo.QboReportContractError && error.diagnosticClass === "report_summary_shape",
+  "malformed aging summaries fail closed"
+);
+
+const unknownAgingRow = clone(fixtures.QBO_SANITIZED_AGING_REPORT_FIXTURES.ARAgingSummary);
+unknownAgingRow.Rows.Row[0].Rows.Row[0].type = "CallerControlled";
+throws(
+  () => qbo.parseQboReport({ reportType: "ARAgingSummary", raw: unknownAgingRow, provider }),
+  (error) => error instanceof qbo.QboReportContractError &&
+    error.diagnosticClass === "report_rows_shape" &&
+    error.expectedType === "data_or_section",
+  "unknown provider row branches fail closed"
+);
+
+const mixedAgingRow = clone(fixtures.QBO_SANITIZED_AGING_REPORT_FIXTURES.APAgingSummary);
+mixedAgingRow.Rows.Row[0].Summary = { ColData: [{ value: "unexpected" }] };
+throws(
+  () => qbo.parseQboReport({ reportType: "APAgingSummary", raw: mixedAgingRow, provider }),
+  (error) => error instanceof qbo.QboReportContractError &&
+    error.diagnosticClass === "report_rows_shape" &&
+    error.expectedType === "section_without_direct_coldata",
+  "ambiguous mixed data-and-summary rows fail closed"
+);
+
 deepEqual(qbo.planQboQueryPages({ recordType: "Invoice", totalCount: 0 }), [], "0 records creates no pages");
 equal(qbo.planQboQueryPages({ recordType: "Invoice", totalCount: 1 }).length, 1, "1 record creates one page");
 equal(qbo.planQboQueryPages({ recordType: "Invoice", totalCount: 500 }).length, 1, "page-size boundary creates one page");

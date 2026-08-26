@@ -128,9 +128,13 @@ import {
   verifyAndParseQboCloudEventsWebhook
 } from "@/lib/integrations/providers/qbo/webhook-signature";
 import { minimizeQboSourceRecord } from "@/lib/integrations/providers/qbo/minimizers";
-import { parseQboReport } from "@/lib/integrations/providers/qbo/reports";
+import {
+  QboReportContractError,
+  parseQboReport
+} from "@/lib/integrations/providers/qbo/reports";
 import {
   qboMinimizedRecordToExternalSourceVersion,
+  qboReportProviderRecordId,
   qboReportToExternalSourceVersion
 } from "@/lib/integrations/providers/qbo/source-records";
 import {
@@ -1329,13 +1333,7 @@ async function commitReport(input: {
       sourceEnvironment: "sandbox"
     }
   });
-  const recordId = [
-    report.reportType,
-    report.reportBasis,
-    report.periodStart ?? "open",
-    report.periodEnd ?? "open",
-    report.sourceCurrency
-  ].join(":");
+  const recordId = qboReportProviderRecordId(report);
   const state = await readProviderExternalSourceRecordState(
     sourceStateCommand(input.task, input.leaseId, input.owner, report.reportType, recordId),
     input.sourceClient
@@ -2009,6 +2007,8 @@ async function executeProviderTask(request: IncomingMessage, response: ServerRes
         : null;
     const credentialFailure =
       error instanceof CredentialResolutionFailure ? error : null;
+    const reportFailure =
+      error instanceof QboReportContractError ? error : null;
     if (leased === null) throw error;
     const failed = await failRuntimeTask(
       {
@@ -2056,7 +2056,9 @@ async function executeProviderTask(request: IncomingMessage, response: ServerRes
       .parse(failed);
     safeEvent("provider_task_failure_recorded", {
       retryable: failedState.state === "retry_wait",
-      state: failedState.state
+      state: failedState.state,
+      reportDiagnosticClass:
+        reportFailure?.diagnosticClass ?? "not_applicable"
     });
     return json(response, 200, {
       state: failedState.state,

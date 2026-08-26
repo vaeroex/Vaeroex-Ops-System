@@ -128,13 +128,7 @@ export function qboReportToExternalSourceVersion(input: {
   ) {
     throw new Error("qbo_report_source_environment_mismatch");
   }
-  const providerRecordId = [
-    input.report.reportType,
-    input.report.reportBasis,
-    input.report.periodStart ?? "open",
-    input.report.periodEnd ?? "open",
-    input.report.sourceCurrency
-  ].join(":");
+  const providerRecordId = qboReportProviderRecordId(input.report);
   const draft: ExternalSourceRecordVersion = {
     contractVersion: EXTERNAL_INTEGRATION_CONTRACT_VERSIONS.sourceRecord,
     id: input.id,
@@ -191,4 +185,14 @@ export function qboReportToExternalSourceVersion(input: {
     ...parsed,
     sourceFingerprint: externalSourceFingerprint(parsed)
   });
+}
+
+export function qboReportProviderRecordId(report: QboReportControlObservation) {
+  return [
+    report.reportType,
+    report.reportBasis,
+    report.periodStart ?? "open",
+    report.periodEnd ?? "open",
+    report.sourceCurrency ?? "currency_unspecified"
+  ].join(":");
 }
