@@ -2200,8 +2200,14 @@ function testMigrationBoundary() {
   const credentialBindingCanaryMigration = read(
     "supabase/migrations/20260826090000_qbo_credential_envelope_binding_incident_canary.sql"
   );
+  const credentialLineageRecoveryMigration = read(
+    "supabase/migrations/20260826120000_qbo_credential_lineage_incident_recovery.sql"
+  );
   const credentialBindingCanaryTest = read(
     "supabase/tests/external_integrations_phase_8b_credential_binding_canary.test.sql"
+  );
+  const credentialLineageRecoveryTest = read(
+    "supabase/tests/external_integrations_phase_8b_credential_lineage_recovery.test.sql"
   );
   const canaryProvisioning = read(
     "services/external-integrations-qbo-sandbox/ops/provision-qbo-canary.sh"
@@ -2435,6 +2441,24 @@ function testMigrationBoundary() {
   ok(/extensions\.dblink_send_query[\s\S]+extensions\.dblink_get_result/.test(credentialBindingCanaryTest), "database tests include hosted concurrent incident recovery");
   ok(/legacy_unattributed[\s\S]+remains quarantined and unchanged/.test(credentialBindingCanaryTest), "database tests preserve legacy-unattributed quarantine");
   ok(/reserved canary reconciliation returns the same virtual pre-reservation identity/.test(credentialBindingCanaryTest), "database tests prove deterministic reservation-to-enqueue reconciliation");
+  ok(/integration_sync_task_credential_lineage_recovery_events[\s\S]+enable row level security[\s\S]+force row level security/.test(credentialLineageRecoveryMigration), "lineage recovery evidence is private with forced RLS");
+  ok(/credential_lineage_id = historical_credential_id[\s\S]+credential_lineage_id = current_credential_id/.test(credentialLineageRecoveryMigration), "credential row ID is the immutable refresh-lineage anchor");
+  ok(/historicalCredentialId[\s\S]+expectedHistoricalCredentialVersion[\s\S]+currentCredentialId[\s\S]+expectedCurrentCredentialVersion[\s\S]+expectedCurrentCredentialRowVersion/.test(credentialLineageRecoveryMigration), "lineage recovery separates historical incident evidence from current credential CAS authority");
+  ok(/generate_series[\s\S]+credential_rotated[\s\S]+refresh_succeeded[\s\S]+credential_version/.test(credentialLineageRecoveryMigration), "every credential-version advance requires one immutable canonical refresh event");
+  ok(/supersedes_credential_id is null[\s\S]+oauth_state_id is null[\s\S]+integration_reauthorization_states[\s\S]+replacement_credential_id = v_current_credential\.id/.test(credentialLineageRecoveryMigration), "the current credential row must itself have canonical creation authority");
+  ok(/historicalCredentialId'\)::uuid <>[\s\S]+v_current_credential\.id[\s\S]+incident_recovery_lineage_denied/.test(credentialLineageRecoveryMigration), "reauthorization row substitution cannot cross the refresh-lineage anchor");
+  ok(/credential_provider_read[\s\S]+audit\.metadata \? 'task_id'[\s\S]+audit\.metadata ->> 'task_id' = v_task\.id::text/.test(credentialLineageRecoveryMigration), "task-bound read metadata cannot be substituted across tasks");
+  ok(/integration_sync_task\.lease[\s\S]+audit\.target_id = v_task\.id::text[\s\S]+audit\.occurred_at <= v_credential_read_audit\.occurred_at/.test(credentialLineageRecoveryMigration), "historical read evidence remains bounded to the exact task lease window");
+  ok(/v_historical_persisted_at[\s\S]+credential_version'\)::bigint >[\s\S]+v_historical_credential_version[\s\S]+audit\.occurred_at <= v_credential_read_audit\.occurred_at/.test(credentialLineageRecoveryMigration), "credential versions newer than the incident must postdate the historical read");
+  ok(/reason_code in \('invalid_grant', 'provider_revoked'\)[\s\S]+lineage_recovery_revoked/.test(credentialLineageRecoveryMigration), "invalid-grant and provider-revoked evidence still blocks lineage recovery");
+  ok(/integration_sync_task\.complete[\s\S]+external_source_record_versions[\s\S]+lineage_recovery_effect_denied/.test(credentialLineageRecoveryMigration), "provider completion or source effects still block lineage recovery");
+  ok(/grant execute on function[\s\S]+recover_qbo_sandbox_credential_binding_incident_task_v2[\s\S]+to integration_credential_broker_authority/.test(credentialLineageRecoveryMigration), "only credential-broker authority receives V2 lineage recovery execution");
+  ok(!/grant (?:execute|integration_credential_broker_authority)[\s\S]{0,100}to service_role/i.test(credentialLineageRecoveryMigration), "service_role receives no V2 lineage recovery shortcut");
+  ok(/historical V5 incident plus current V6[\s\S]+exact same refresh-lineage version remains recoverable/.test(credentialLineageRecoveryTest), "database coverage proves both advanced and unchanged refresh-lineage recovery");
+  ok(/credential-read evidence explicitly bound to another task is denied/.test(credentialLineageRecoveryTest), "database coverage rejects a read audit bound to another task");
+  ok(/valid reauthorization successor cannot substitute/.test(credentialLineageRecoveryTest), "database coverage rejects reauthorization-row substitution");
+  ok(/provider completion evidence still blocks lineage recovery/.test(credentialLineageRecoveryTest), "database coverage rejects effect-bearing recovery");
+  ok(/dblink_send_query[\s\S]+concurrent lineage recovery permits exactly one authoritative mutation/.test(credentialLineageRecoveryTest), "hosted concurrency proves one V2 mutation and idempotent convergence");
 
   const validIncidentRecovery = {
     contractVersion:
@@ -2445,9 +2469,11 @@ function testMigrationBoundary() {
     connectionGeneration: 1,
     mappingId: id(8904),
     expectedMappingRowVersion: 1,
-    credentialId: id(8905),
-    expectedCredentialVersion: 5,
-    expectedCredentialRowVersion: 3,
+    historicalCredentialId: id(8905),
+    expectedHistoricalCredentialVersion: 5,
+    currentCredentialId: id(8905),
+    expectedCurrentCredentialVersion: 6,
+    expectedCurrentCredentialRowVersion: 4,
     taskId: id(8906),
     expectedTaskRowVersion: 9,
     expectedDispatchGeneration: 2,

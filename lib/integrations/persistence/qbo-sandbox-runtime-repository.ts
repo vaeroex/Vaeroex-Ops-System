@@ -37,7 +37,7 @@ export const QBO_SANDBOX_DELIVERY_RETRY_COMPATIBILITY_CONTRACT_VERSION =
 export const QBO_SANDBOX_REAUTHORIZED_PURCHASE_RECOVERY_CONTRACT_VERSION =
   "qbo_sandbox_reauthorized_purchase_recovery_v1" as const;
 export const QBO_SANDBOX_CREDENTIAL_BINDING_INCIDENT_RECOVERY_CONTRACT_VERSION =
-  "qbo_sandbox_credential_envelope_binding_incident_recovery_v1" as const;
+  "qbo_sandbox_credential_envelope_binding_incident_recovery_v2" as const;
 export const QBO_SANDBOX_CANARY_DUE_RETRY_PROMOTION_CONTRACT_VERSION =
   "qbo_sandbox_canary_due_retry_promotion_v1" as const;
 export const QBO_SANDBOX_CANARY_DISPATCH_DISCOVERY_CONTRACT_VERSION =
@@ -307,9 +307,11 @@ export const RecoverQboSandboxCredentialBindingIncidentTaskCommandSchema = z
     connectionGeneration: z.number().int().positive().safe(),
     mappingId: UuidSchema,
     expectedMappingRowVersion: z.number().int().positive().safe(),
-    credentialId: UuidSchema,
-    expectedCredentialVersion: z.number().int().positive().safe(),
-    expectedCredentialRowVersion: z.number().int().positive().safe(),
+    historicalCredentialId: UuidSchema,
+    expectedHistoricalCredentialVersion: z.number().int().positive().safe(),
+    currentCredentialId: UuidSchema,
+    expectedCurrentCredentialVersion: z.number().int().positive().safe(),
+    expectedCurrentCredentialRowVersion: z.number().int().positive().safe(),
     taskId: UuidSchema,
     expectedTaskRowVersion: z.number().int().positive().safe(),
     expectedDispatchGeneration: z.number().int().positive().safe(),
@@ -461,6 +463,8 @@ const QboSandboxCredentialBindingIncidentRecoveryResultSchema = z
     recoveredAt: IsoTimestampSchema,
     state: z.literal("retry_wait"),
     rowVersion: z.number().int().positive().safe(),
+    historicalCredentialVersion: z.number().int().positive().safe(),
+    currentCredentialVersion: z.number().int().positive().safe(),
     idempotent: z.boolean()
   })
   .strict();
@@ -724,7 +728,7 @@ export async function recoverQboSandboxCredentialBindingIncidentTask(
   client: ExternalIntegrationsRpcClient
 ) {
   const data = await checkedRpc(
-    "recover_qbo_sandbox_credential_binding_incident_task_v1",
+    "recover_qbo_sandbox_credential_binding_incident_task_v2",
     {
       p_command:
         RecoverQboSandboxCredentialBindingIncidentTaskCommandSchema.parse(input),

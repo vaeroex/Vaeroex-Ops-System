@@ -10,7 +10,8 @@ const retryExecutionVersion = "20260824233000";
 const recoveryLifecycleVersion = "20260825180000";
 const scopedRetryLifecycleVersion = "20260825190000";
 const credentialBindingVersion = "20260826043610";
-const targetVersion = "20260826090000";
+const credentialBindingCanaryVersion = "20260826090000";
+const targetVersion = "20260826120000";
 const fixturePath = path.join(
   root,
   "supabase/tests/fixtures/external_integrations_phase_8b_zero_based_legacy.sql"
@@ -20,7 +21,8 @@ const testPaths = [
   "supabase/tests/external_integrations_phase_6_durable_runtime.test.sql",
   "supabase/tests/external_integrations_phase_8b_credential_refresh_recovery.test.sql",
   "supabase/tests/external_integrations_phase_8b_same_generation_reauthorization.test.sql",
-  "supabase/tests/external_integrations_phase_8b_credential_binding_canary.test.sql"
+  "supabase/tests/external_integrations_phase_8b_credential_binding_canary.test.sql",
+  "supabase/tests/external_integrations_phase_8b_credential_lineage_recovery.test.sql"
 ];
 
 function fail(message, status = 1) {
@@ -134,9 +136,28 @@ function assertTargetIsSinglePendingMigration() {
       `Migration ${credentialBindingVersion} no longer immediately follows ${scopedRetryLifecycleVersion}.`
     );
   }
-  if (migrations[targetIndex - 1]?.slice(0, 14) !== credentialBindingVersion) {
+  const credentialBindingCanaryIndex = migrations.findIndex((name) =>
+    name.startsWith(`${credentialBindingCanaryVersion}_`)
+  );
+  if (credentialBindingCanaryIndex < 0) {
     fail(
-      `Migration ${targetVersion} no longer immediately follows ${credentialBindingVersion}.`
+      `Credential-binding canary migration ${credentialBindingCanaryVersion} is missing.`
+    );
+  }
+  if (
+    migrations[credentialBindingCanaryIndex - 1]?.slice(0, 14) !==
+      credentialBindingVersion
+  ) {
+    fail(
+      `Migration ${credentialBindingCanaryVersion} no longer immediately follows ${credentialBindingVersion}.`
+    );
+  }
+  if (
+    migrations[targetIndex - 1]?.slice(0, 14) !==
+      credentialBindingCanaryVersion
+  ) {
+    fail(
+      `Migration ${targetVersion} no longer immediately follows ${credentialBindingCanaryVersion}.`
     );
   }
   if (targetIndex !== migrations.length - 1) {
