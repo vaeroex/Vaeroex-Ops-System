@@ -1498,8 +1498,9 @@ select is(
   'canary reservation follows the normal durable dispatched lifecycle'
 );
 select is(
-  (select result ->> 'dispatchGeneration'
-   from phase8b_canary_reservation_result),
+  (select dispatch_generation::text
+   from private.integration_sync_tasks
+   where id = '38c00000-0000-4000-8000-000000000001'),
   '3',
   'only canary dispatch generation advances'
 );
