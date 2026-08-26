@@ -1524,6 +1524,7 @@ select is(
   '0',
   'ordinary scoped sweep does not recover due retries or old dispatched rows'
 );
+reset role;
 select is(
   (
     select pg_catalog.count(*)::text
@@ -1535,6 +1536,7 @@ select is(
   '23',
   'queue pause age leaves all 23 staged dispatch rows value-equivalent'
 );
+set local role integration_task_dispatch_authority;
 select is(
   public.promote_qbo_sandbox_due_retry_tasks_v1(
     pg_catalog.jsonb_build_object(
@@ -1567,6 +1569,7 @@ select is(
   '0',
   'repeated due-retry promotion is idempotent'
 );
+reset role;
 select is(
   (
     select pg_catalog.concat_ws(
@@ -1587,6 +1590,7 @@ select is(
   'retry_wait:1',
   'non-due retry remains ineligible and unchanged'
 );
+set local role integration_task_dispatch_authority;
 select is(
   pg_catalog.jsonb_array_length(
     public.read_qbo_sandbox_scoped_dispatch_candidates_v1(
@@ -1818,6 +1822,7 @@ select is(
   'true',
   'reservation replay preserves idempotency and the exact short task identity'
 );
+reset role;
 select is(
   (
     select pg_catalog.concat_ws(
@@ -1840,6 +1845,7 @@ select is(
   '23',
   'retry scheduling and reservation never rewrite existing staged deliveries'
 );
+set local role integration_task_dispatch_authority;
 select ok(
   pg_temp.raises_sqlstate(
     $$select public.reserve_qbo_sandbox_scoped_dispatch_task_v1(
