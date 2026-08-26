@@ -581,7 +581,7 @@ begin
     'b9d00000-0000-4000-8000-000000000001',
     'd9d00000-0000-4000-8000-000000000001',
     p_connection_id, 1, 3, p_sync_run_id, p_mapping_id, 1,
-    pg_catalog.coalesce(p_read_task_id, p_task_id), 8, 2,
+    coalesce(p_read_task_id, p_task_id), 8, 2,
     p_seed || '_dispatcher', 'attributed', 2, 0, 0,
     extensions.digest(
       pg_catalog.convert_to(p_seed || '-delivery', 'UTF8'),
@@ -638,7 +638,7 @@ begin
       p_read_audit_event_id,
       'b9d00000-0000-4000-8000-000000000001',
       'd9d00000-0000-4000-8000-000000000001',
-      p_connection_id, 1, pg_catalog.coalesce(p_read_task_id, p_task_id),
+      p_connection_id, 1, coalesce(p_read_task_id, p_task_id),
       2, 2, 0, 0,
       extensions.digest(
         pg_catalog.convert_to(p_seed || '-delivery', 'UTF8'),
