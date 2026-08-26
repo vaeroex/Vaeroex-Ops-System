@@ -668,6 +668,8 @@ select public.read_integration_provider_credential_v5(
   'phase8b_validation_credential_read'
 ) as result;
 reset role;
+grant select on phase8b_validation_credential_read
+  to integration_provider_runtime_authority;
 
 set local role integration_provider_runtime_authority;
 create temporary table phase8b_validation_provider_result on commit drop as
