@@ -10,6 +10,7 @@ import {
 } from "@/lib/integrations/providers/qbo/planning";
 import {
   QBO_MASTER_RECORD_TYPES,
+  QBO_PROVIDER_REPORT_IDENTIFIER_BY_TYPE,
   QBO_PROVIDER_KEY,
   QBO_REPORT_TYPES,
   QBO_TRANSACTION_RECORD_TYPES,
@@ -49,6 +50,9 @@ const queryableTypes = new Set<string>([
   ...QBO_MASTER_RECORD_TYPES,
   ...QBO_TRANSACTION_RECORD_TYPES
 ]);
+const permittedReportIdentifiers = new Set<string>(
+  Object.values(QBO_PROVIDER_REPORT_IDENTIFIER_BY_TYPE)
+);
 
 const permittedQueryParameters: Readonly<Record<string, ReadonlySet<string>>> = {
   company_info: new Set(),
@@ -101,7 +105,13 @@ function routeKind(pathname: string, realmId: string) {
   }
   if (pathname === `/v3/company/${realmId}/query`) return "query" as const;
   if (pathname === `/v3/company/${realmId}/cdc`) return "cdc" as const;
-  if (pathname.startsWith(`/v3/company/${realmId}/reports/`)) return "report" as const;
+  const reportPrefix = `/v3/company/${realmId}/reports/`;
+  if (
+    pathname.startsWith(reportPrefix) &&
+    permittedReportIdentifiers.has(pathname.slice(reportPrefix.length))
+  ) {
+    return "report" as const;
+  }
   throw new Error("qbo_runtime_egress_path_denied");
 }
 
@@ -305,6 +315,8 @@ export class QboSandboxReadOnlyClient {
     accessToken: string;
   }) {
     const reportType = QboReportTypeSchema.parse(input.reportType);
+    const providerReportIdentifier =
+      QBO_PROVIDER_REPORT_IDENTIFIER_BY_TYPE[reportType];
     const window = PostingWindowSchema.parse({
       startDate: input.startDate,
       endDate: input.endDate
@@ -318,7 +330,7 @@ export class QboSandboxReadOnlyClient {
             accounting_method: input.accountingMethod
           });
     return this.#get({
-      path: `/v3/company/${this.#realmId}/reports/${reportType}`,
+      path: `/v3/company/${this.#realmId}/reports/${providerReportIdentifier}`,
       parameters,
       accessToken: input.accessToken
     });

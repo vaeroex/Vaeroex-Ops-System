@@ -80,6 +80,18 @@ export type QboTransactionRecordType = (typeof QBO_TRANSACTION_RECORD_TYPES)[num
 export type QboReportType = (typeof QBO_REPORT_TYPES)[number];
 export type QboSupportedObjectType = (typeof QBO_V1_SUPPORTED_OBJECTS)[number];
 
+export const QBO_PROVIDER_REPORT_IDENTIFIER_BY_TYPE = {
+  ProfitAndLoss: "ProfitAndLoss",
+  BalanceSheet: "BalanceSheet",
+  CashFlow: "CashFlow",
+  ARAgingSummary: "AgedReceivables",
+  APAgingSummary: "AgedPayables",
+  TrialBalance: "TrialBalance"
+} as const satisfies Readonly<Record<QboReportType, string>>;
+
+export type QboProviderReportIdentifier =
+  (typeof QBO_PROVIDER_REPORT_IDENTIFIER_BY_TYPE)[QboReportType];
+
 export const QboSupportedObjectTypeSchema = z.enum(QBO_V1_SUPPORTED_OBJECTS);
 export const QboReportTypeSchema = z.enum(QBO_REPORT_TYPES);
 

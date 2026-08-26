@@ -1673,6 +1673,19 @@ async function testReadOnlyClient() {
       }
     }
   });
+  const expectedReportIdentifiers = {
+    ProfitAndLoss: "ProfitAndLoss",
+    BalanceSheet: "BalanceSheet",
+    CashFlow: "CashFlow",
+    ARAgingSummary: "AgedReceivables",
+    APAgingSummary: "AgedPayables",
+    TrialBalance: "TrialBalance"
+  };
+  deepEqual(
+    qbo.QBO_PROVIDER_REPORT_IDENTIFIER_BY_TYPE,
+    expectedReportIdentifiers,
+    "internal report types map exhaustively to documented Intuit report identifiers"
+  );
   for (const reportType of ["ProfitAndLoss", "BalanceSheet", "CashFlow", "TrialBalance"]) {
     await reportClient.fetchReport({
       reportType,
@@ -1682,6 +1695,11 @@ async function testReadOnlyClient() {
       accessToken: accessCanary
     });
     const url = new URL(reportCalls.at(-1).url);
+    equal(
+      url.pathname,
+      `/v3/company/${provider.realmId}/reports/${expectedReportIdentifiers[reportType]}`,
+      `${reportType} uses its documented Intuit report identifier`
+    );
     deepEqual(
       [...url.searchParams.keys()].sort(),
       ["accounting_method", "end_date", "start_date"],
@@ -1699,6 +1717,11 @@ async function testReadOnlyClient() {
       accessToken: accessCanary
     });
     const url = new URL(reportCalls.at(-1).url);
+    equal(
+      url.pathname,
+      `/v3/company/${provider.realmId}/reports/${expectedReportIdentifiers[reportType]}`,
+      `${reportType} remains an internal type and maps to its documented Intuit report identifier`
+    );
     deepEqual(
       [...url.searchParams.keys()],
       ["report_date"],
@@ -1710,6 +1733,38 @@ async function testReadOnlyClient() {
     reportCalls.every((call) => !call.url.includes(accessCanary)),
     true,
     "report URLs exclude access credentials"
+  );
+  const reportCallCount = reportCalls.length;
+  await rejects(
+    () => reportClient.fetchReport({
+      reportType: "../query",
+      startDate: "2026-01-01",
+      endDate: "2026-08-22",
+      accountingMethod: "Accrual",
+      accessToken: accessCanary
+    }),
+    /Invalid enum|invalid/i,
+    "unsupported caller-controlled report types fail before provider transport"
+  );
+  equal(
+    reportCalls.length,
+    reportCallCount,
+    "an unsupported report type cannot create an arbitrary provider request"
+  );
+  throws(
+    () => phase8b.assertQboSandboxRuntimeEgress({
+      method: "GET",
+      url: `${phase8b.QBO_SANDBOX_API_ORIGIN}/v3/company/${provider.realmId}/reports/CallerControlled`,
+      realmId: provider.realmId
+    }),
+    /qbo_runtime_egress_path_denied/,
+    "runtime egress independently rejects noncanonical report paths"
+  );
+  const serviceSource = read("services/external-integrations-qbo-sandbox/src/server.ts");
+  ok(
+    /qbo_apagingsummary:\s*"APAgingSummary"/.test(serviceSource) &&
+      /qbo_aragingsummary:\s*"ARAgingSummary"/.test(serviceSource),
+    "Vaeroex A/P and A/R stream identifiers remain unchanged"
   );
 
   const evidence = await new phase8b.QboSandboxCompanyVerifier({
