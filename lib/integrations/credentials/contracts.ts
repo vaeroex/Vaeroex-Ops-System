@@ -20,7 +20,9 @@ export const CREDENTIAL_SECURITY_CONTRACT_VERSIONS = {
   refreshBoundaryAudit: "integration_credential_refresh_boundary_v2",
   expiredRefreshLeaseReclamation:
     "integration_expired_refresh_lease_reclamation_v1",
-  providerRead: "integration_provider_credential_read_v1"
+  providerRead: "integration_provider_credential_read_v1",
+  providerReadFailure:
+    "integration_provider_credential_task_read_failure_evidence_v1"
 } as const;
 
 export const PHASE_5_MODEL_CALL_COUNT = 0 as const;
@@ -489,6 +491,7 @@ const ProviderCredentialReadIdentitySchema = z
 export const ProviderCredentialReadResultSchema = z.discriminatedUnion("state", [
   ProviderCredentialReadIdentitySchema.extend({
     state: z.literal("available"),
+    credentialReadEvidenceId: UuidSchema,
     ciphertextBase64: CiphertextBase64Schema,
     ciphertextPersistedAt: IsoTimestampSchema,
     aadDigest: Sha256FingerprintSchema,
@@ -522,6 +525,26 @@ export const ProviderCredentialReadDiagnosticClassSchema = z.enum([
   "unknown_missing_field_contract",
   "credential_expired"
 ]);
+
+export const RecordProviderCredentialReadFailureCommandSchema = z
+  .object({
+    contractVersion: z.literal(
+      CREDENTIAL_SECURITY_CONTRACT_VERSIONS.providerReadFailure
+    ),
+    credentialReadEvidenceId: UuidSchema,
+    diagnosticClass: ProviderCredentialReadDiagnosticClassSchema
+  })
+  .strict();
+
+export const ProviderCredentialReadFailureEvidenceResultSchema = z
+  .object({
+    credentialReadFailureEvidenceId: UuidSchema,
+    credentialReadEvidenceId: UuidSchema,
+    diagnosticClass: ProviderCredentialReadDiagnosticClassSchema,
+    failedAt: IsoTimestampSchema,
+    idempotent: z.boolean()
+  })
+  .strict();
 
 export type ProviderCredentialReadDiagnosticClass = z.infer<
   typeof ProviderCredentialReadDiagnosticClassSchema
@@ -825,6 +848,9 @@ export type ReclaimExpiredRefreshLeaseCommand = Readonly<
 >;
 export type ReadProviderCredentialCommand = Readonly<
   z.infer<typeof ReadProviderCredentialCommandSchema>
+>;
+export type RecordProviderCredentialReadFailureCommand = Readonly<
+  z.infer<typeof RecordProviderCredentialReadFailureCommandSchema>
 >;
 export type RotateCredentialCommand = Readonly<z.infer<typeof RotateCredentialCommandSchema>>;
 export type CompleteRefreshFailureCommand = Readonly<z.infer<typeof CompleteRefreshFailureCommandSchema>>;

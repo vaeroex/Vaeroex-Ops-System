@@ -39,6 +39,7 @@ import {
   reclaimIntegrationExpiredRefreshLease,
   recordIntegrationAuthorizationEvent,
   recordIntegrationCredentialRefreshBoundary,
+  recordIntegrationProviderCredentialReadFailure,
   revokeIntegrationCredential,
   rotateIntegrationCredential,
   storeReauthorizedIntegrationCredential,
@@ -435,6 +436,8 @@ function credentialStore(db: Phase8bDatabase): CredentialBrokerStore {
     storeReauthorizedCredential: (command, requestId) =>
       storeReauthorizedIntegrationCredential(command, requestId, broker),
     readProviderCredential: (command, requestId) => readIntegrationProviderCredential(command, requestId, broker),
+    recordProviderCredentialReadFailure: (command, requestId) =>
+      recordIntegrationProviderCredentialReadFailure(command, requestId, broker),
     acquireRefreshLease: (command, requestId) => acquireIntegrationCredentialRefreshLease(command, requestId, broker),
     reclaimExpiredRefreshLease: (command, requestId) =>
       reclaimIntegrationExpiredRefreshLease(command, requestId, broker),
@@ -1066,9 +1069,9 @@ async function handleBroker(request: IncomingMessage, response: ServerResponse, 
           expectedTaskRowVersion: z.number().int().positive().safe(),
           expectedDispatchGeneration: z.number().int().positive().safe(),
           failureAuditEventId: UuidSchema,
-          credentialReadAuditEventId: UuidSchema,
+          credentialReadEvidenceId: UuidSchema,
+          credentialReadFailureEvidenceId: UuidSchema,
           diagnosticClass: z.literal("expires_at_binding"),
-          externalEvidenceFingerprint: z.string().regex(/^sha256:[a-f0-9]{64}$/),
           retryAfterSeconds: z.number().int().min(1).max(3_600)
         })
         .strict()
@@ -1094,9 +1097,10 @@ async function handleBroker(request: IncomingMessage, response: ServerResponse, 
           expectedTaskRowVersion: body.expectedTaskRowVersion,
           expectedDispatchGeneration: body.expectedDispatchGeneration,
           failureAuditEventId: body.failureAuditEventId,
-          credentialReadAuditEventId: body.credentialReadAuditEventId,
+          credentialReadEvidenceId: body.credentialReadEvidenceId,
+          credentialReadFailureEvidenceId:
+            body.credentialReadFailureEvidenceId,
           diagnosticClass: body.diagnosticClass,
-          externalEvidenceFingerprint: body.externalEvidenceFingerprint,
           retryAfterSeconds: body.retryAfterSeconds
         },
         body.recoveryRequestId,

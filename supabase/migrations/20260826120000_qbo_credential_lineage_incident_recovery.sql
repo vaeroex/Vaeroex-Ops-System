@@ -1,12 +1,777 @@
--- Phase 8B credential-envelope incident recovery lineage convergence.
+-- Phase 8B task-bound credential-read evidence and incident recovery lineage.
 --
 -- Refreshes advance credential_version on one immutable credential row. A
 -- reauthorization creates a different row linked through supersedes_credential_id.
 -- This recovery contract therefore uses integration_credentials.id as its
 -- refresh-lineage anchor and proves every version advance with immutable refresh
 -- audit evidence. It does not authorize recovery across reauthorization rows.
+-- Provider credential authority is returned only after an exact task/lease/read
+-- evidence row is durably appended in the same database transaction.
 
 begin;
+
+create table private.integration_provider_credential_task_read_evidence (
+  id uuid primary key default gen_random_uuid(),
+  contract_version text not null check (
+    contract_version = 'integration_provider_credential_task_read_evidence_v1'
+  ),
+  workspace_id uuid not null,
+  business_entity_id uuid not null,
+  connection_id uuid not null,
+  connection_generation bigint not null check (connection_generation > 0),
+  connection_row_version bigint not null check (connection_row_version > 0),
+  sync_run_id uuid not null,
+  mapping_id uuid not null,
+  mapping_row_version bigint not null check (mapping_row_version > 0),
+  task_id uuid not null,
+  task_row_version bigint not null check (task_row_version > 0),
+  task_dispatch_generation bigint not null check (task_dispatch_generation > 0),
+  dispatcher_task_name text not null check (
+    pg_catalog.octet_length(dispatcher_task_name) between 1 and 1024
+  ),
+  delivery_attribution_state text not null check (
+    delivery_attribution_state = 'attributed'
+  ),
+  delivery_dispatch_generation bigint not null check (
+    delivery_dispatch_generation > 0
+      and delivery_dispatch_generation = task_dispatch_generation
+  ),
+  delivery_retry_count integer not null check (
+    delivery_retry_count between 0 and 100
+  ),
+  delivery_execution_count integer not null check (
+    delivery_execution_count between 0 and delivery_retry_count
+  ),
+  delivery_attempt_fingerprint bytea not null check (
+    pg_catalog.octet_length(delivery_attempt_fingerprint) = 32
+  ),
+  lease_id uuid not null,
+  lease_owner_fingerprint bytea not null check (
+    pg_catalog.octet_length(lease_owner_fingerprint) = 32
+  ),
+  lease_expires_at timestamptz not null,
+  credential_id uuid not null references
+    private.integration_credentials(id) on delete restrict,
+  credential_version bigint not null check (credential_version > 0),
+  credential_row_version bigint not null check (credential_row_version > 0),
+  provider_key text not null check (
+    provider_key ~ '^[a-z][a-z0-9_-]{0,63}$'
+  ),
+  provider_environment text not null check (
+    private.is_bounded_identifier_v1(provider_environment)
+  ),
+  granted_scopes text[] not null check (
+    private.is_phase_5_scope_set_v1(granted_scopes)
+  ),
+  granted_scope_fingerprint bytea not null check (
+    pg_catalog.octet_length(granted_scope_fingerprint) = 32
+  ),
+  credential_read_audit_event_id uuid not null unique references
+    private.integration_audit_events(id) on delete restrict,
+  request_id text not null unique check (
+    private.is_bounded_identifier_v1(request_id)
+  ),
+  request_fingerprint bytea not null check (
+    pg_catalog.octet_length(request_fingerprint) = 32
+  ),
+  evidence_fingerprint bytea not null unique check (
+    pg_catalog.octet_length(evidence_fingerprint) = 32
+  ),
+  authority_role text not null check (
+    authority_role = 'integration_credential_broker_authority'
+  ),
+  authorized_at timestamptz not null,
+  created_at timestamptz not null,
+  constraint integration_provider_credential_task_read_task_fkey
+    foreign key (workspace_id, business_entity_id, connection_id, task_id)
+    references private.integration_sync_tasks(
+      workspace_id, business_entity_id, connection_id, id
+    ) on delete restrict,
+  constraint integration_provider_credential_task_read_run_fkey
+    foreign key (workspace_id, business_entity_id, connection_id, sync_run_id)
+    references private.integration_sync_runs(
+      workspace_id, business_entity_id, connection_id, id
+    ) on delete restrict,
+  constraint integration_provider_credential_task_read_mapping_fkey
+    foreign key (workspace_id, business_entity_id, connection_id, mapping_id)
+    references private.provider_entity_mappings(
+      workspace_id, business_entity_id, connection_id, id
+    ) on delete restrict,
+  constraint integration_provider_credential_task_read_time_check
+    check (created_at = authorized_at and authorized_at < lease_expires_at)
+);
+
+create index integration_provider_credential_task_read_scope_idx
+  on private.integration_provider_credential_task_read_evidence(
+    workspace_id, business_entity_id, connection_id,
+    connection_generation, task_id, authorized_at
+  );
+create index integration_provider_credential_task_read_credential_idx
+  on private.integration_provider_credential_task_read_evidence(
+    credential_id, credential_version, authorized_at
+  );
+
+alter table private.integration_provider_credential_task_read_evidence
+  enable row level security;
+alter table private.integration_provider_credential_task_read_evidence
+  force row level security;
+
+revoke all on table
+  private.integration_provider_credential_task_read_evidence
+  from public, anon, authenticated, service_role,
+    external_integrations_authority, deterministic_calculation_authority,
+    integration_control_plane_authority,
+    integration_oauth_ingress_authority,
+    integration_credential_broker_authority,
+    integration_webhook_ingress_authority,
+    integration_task_dispatch_authority,
+    integration_task_scheduler_authority,
+    integration_qbo_canary_dispatch_authority,
+    integration_provider_runtime_authority,
+    integration_deterministic_runtime_authority,
+    integration_provider_source_authority,
+    integration_provider_validation_authority;
+
+create trigger reject_integration_provider_credential_task_read_mutation_v1
+before update or delete
+on private.integration_provider_credential_task_read_evidence
+for each row execute function
+  private.reject_external_integration_immutable_mutation_v1();
+
+create or replace function public.read_integration_provider_credential_v5(
+  p_command jsonb,
+  p_request_id text
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $function$
+declare
+  v_now timestamptz := pg_catalog.transaction_timestamp();
+  v_result jsonb;
+  v_task private.integration_sync_tasks;
+  v_connection private.integration_connections;
+  v_mapping private.provider_entity_mappings;
+  v_credential private.integration_credentials;
+  v_read_audit private.integration_audit_events;
+  v_read_audit_count bigint;
+  v_lease_owner_fingerprint bytea;
+  v_granted_scopes text[];
+  v_granted_scope_fingerprint bytea;
+  v_request_fingerprint bytea;
+  v_evidence_fingerprint bytea;
+  v_read_evidence_id uuid;
+begin
+  perform private.assert_integration_credential_broker_authority_v1();
+
+  v_result := public.read_integration_provider_credential_v4(
+    p_command,
+    p_request_id
+  );
+  if v_result ->> 'state' <> 'available' then
+    return v_result;
+  end if;
+
+  v_lease_owner_fingerprint := private.sha256_fingerprint_bytes_v1(
+    p_command ->> 'leaseOwnerFingerprint'
+  );
+  v_granted_scopes := private.phase_5_text_array_v1(
+    v_result -> 'grantedScopes'
+  );
+  v_request_fingerprint := private.phase_6_request_fingerprint_v1(
+    p_request_id,
+    p_command
+  );
+
+  select task.* into v_task
+  from private.integration_sync_tasks as task
+  where task.id = (p_command ->> 'taskId')::uuid
+  for share;
+  if not found
+    or v_task.state <> 'leased'
+    or v_task.queue_class not in ('provider_interactive', 'provider_bulk')
+    or v_task.lease_id <> (p_command ->> 'leaseId')::uuid
+    or v_task.lease_owner_fingerprint <> v_lease_owner_fingerprint
+    or v_task.lease_expires_at <= v_now
+    or v_task.dispatcher_task_name is null
+    or v_task.delivery_attribution_state <> 'attributed'
+    or v_task.last_delivery_dispatch_generation is null
+    or v_task.last_delivery_dispatch_generation <> v_task.dispatch_generation
+    or v_task.last_delivery_retry_count is null
+    or v_task.last_delivery_execution_count is null
+    or v_task.last_delivery_execution_count > v_task.last_delivery_retry_count
+    or v_task.last_delivery_attempt_fingerprint is null
+    or v_task.control_metadata -> 'mappingId' = 'null'::jsonb then
+    raise exception using
+      errcode = '42501',
+      message = 'integration_provider_credential_task_read_evidence_denied';
+  end if;
+
+  select connection.* into v_connection
+  from private.integration_connections as connection
+  where connection.workspace_id = v_task.workspace_id
+    and connection.business_entity_id = v_task.business_entity_id
+    and connection.id = v_task.connection_id
+    and connection.connection_generation = v_task.connection_generation
+    and connection.provider_key = v_task.provider_key
+    and connection.provider_environment = v_task.provider_environment
+    and connection.status in ('initializing', 'active', 'degraded')
+    and connection.disconnected_at is null
+    and connection.deleted_at is null
+  for share;
+  if not found then
+    raise exception using
+      errcode = '42501',
+      message = 'integration_provider_credential_task_read_evidence_denied';
+  end if;
+
+  select mapping.* into v_mapping
+  from private.provider_entity_mappings as mapping
+  where mapping.workspace_id = v_task.workspace_id
+    and mapping.business_entity_id = v_task.business_entity_id
+    and mapping.connection_id = v_task.connection_id
+    and mapping.id = (v_task.control_metadata ->> 'mappingId')::uuid
+    and mapping.provider_key = v_task.provider_key
+    and mapping.provider_environment = v_task.provider_environment
+    and mapping.status = 'active'
+  for share;
+  if not found then
+    raise exception using
+      errcode = '42501',
+      message = 'integration_provider_credential_task_read_evidence_denied';
+  end if;
+
+  select credential.* into v_credential
+  from private.integration_credentials as credential
+  where credential.id = (v_result ->> 'credentialId')::uuid
+    and credential.workspace_id = v_task.workspace_id
+    and credential.business_entity_id = v_task.business_entity_id
+    and credential.connection_id = v_task.connection_id
+    and credential.connection_generation = v_task.connection_generation
+    and credential.provider_key = v_task.provider_key
+    and credential.provider_environment = v_task.provider_environment
+    and credential.credential_version =
+      (v_result ->> 'credentialVersion')::bigint
+    and credential.status = 'active'
+    and credential.credential_ciphertext is not null
+  for share;
+  if not found
+    or v_credential.granted_scopes <> v_granted_scopes
+    or (
+      select pg_catalog.count(*)
+      from private.integration_credentials as active
+      where active.workspace_id = v_task.workspace_id
+        and active.business_entity_id = v_task.business_entity_id
+        and active.connection_id = v_task.connection_id
+        and active.connection_generation = v_task.connection_generation
+        and active.provider_key = v_task.provider_key
+        and active.provider_environment = v_task.provider_environment
+        and active.status = 'active'
+    ) <> 1 then
+    raise exception using
+      errcode = '42501',
+      message = 'integration_provider_credential_task_read_evidence_denied';
+  end if;
+
+  select audit.* into v_read_audit
+  from private.integration_audit_events as audit
+  where audit.workspace_id = v_task.workspace_id
+    and audit.business_entity_id = v_task.business_entity_id
+    and audit.connection_id = v_task.connection_id
+    and audit.action = 'credential_provider_read'
+    and audit.outcome = 'allowed'
+    and audit.target_type = 'integration_credential'
+    and audit.target_id = v_credential.id::text
+    and audit.request_id = p_request_id
+    and audit.reason_code = 'authorized'
+    and audit.metadata ->> 'connection_generation' =
+      v_task.connection_generation::text
+    and audit.metadata ->> 'credential_status' = 'active'
+    and audit.metadata ->> 'credential_version' =
+      v_credential.credential_version::text
+    and audit.metadata ->> 'task_state' = 'leased'
+    and audit.occurred_at = v_now
+  order by audit.id
+  limit 1;
+  if not found then
+    raise exception using
+      errcode = '42501',
+      message = 'integration_provider_credential_task_read_audit_denied';
+  end if;
+  select pg_catalog.count(*) into v_read_audit_count
+  from private.integration_audit_events as audit
+  where audit.workspace_id = v_task.workspace_id
+    and audit.business_entity_id = v_task.business_entity_id
+    and audit.connection_id = v_task.connection_id
+    and audit.action = 'credential_provider_read'
+    and audit.outcome = 'allowed'
+    and audit.target_type = 'integration_credential'
+    and audit.target_id = v_credential.id::text
+    and audit.request_id = p_request_id
+    and audit.reason_code = 'authorized'
+    and audit.metadata ->> 'connection_generation' =
+      v_task.connection_generation::text
+    and audit.metadata ->> 'credential_status' = 'active'
+    and audit.metadata ->> 'credential_version' =
+      v_credential.credential_version::text
+    and audit.metadata ->> 'task_state' = 'leased'
+    and audit.occurred_at = v_now;
+  if v_read_audit_count <> 1 then
+    raise exception using
+      errcode = '42501',
+      message = 'integration_provider_credential_task_read_audit_denied';
+  end if;
+
+  v_granted_scope_fingerprint := private.phase_3_contract_fingerprint_v1(
+    pg_catalog.jsonb_build_object(
+      'contractVersion', 'integration_provider_credential_scope_binding_v1',
+      'providerKey', v_credential.provider_key,
+      'providerEnvironment', v_credential.provider_environment,
+      'grantedScopes', pg_catalog.to_jsonb(v_credential.granted_scopes)
+    )
+  );
+  v_evidence_fingerprint := private.phase_3_contract_fingerprint_v1(
+    pg_catalog.jsonb_build_object(
+      'contractVersion', 'integration_provider_credential_task_read_evidence_v1',
+      'workspaceId', v_task.workspace_id,
+      'businessEntityId', v_task.business_entity_id,
+      'connectionId', v_task.connection_id,
+      'connectionGeneration', v_task.connection_generation,
+      'mappingId', v_mapping.id,
+      'taskId', v_task.id,
+      'taskDispatchGeneration', v_task.dispatch_generation,
+      'dispatcherTaskName', v_task.dispatcher_task_name,
+      'deliveryAttributionState', v_task.delivery_attribution_state,
+      'deliveryDispatchGeneration', v_task.last_delivery_dispatch_generation,
+      'deliveryRetryCount', v_task.last_delivery_retry_count,
+      'deliveryExecutionCount', v_task.last_delivery_execution_count,
+      'deliveryAttemptFingerprint', private.phase_5_fingerprint_text_v1(
+        v_task.last_delivery_attempt_fingerprint
+      ),
+      'leaseId', v_task.lease_id,
+      'leaseOwnerFingerprint', private.phase_5_fingerprint_text_v1(
+        v_task.lease_owner_fingerprint
+      ),
+      'credentialId', v_credential.id,
+      'credentialVersion', v_credential.credential_version,
+      'providerKey', v_credential.provider_key,
+      'providerEnvironment', v_credential.provider_environment,
+      'grantedScopeFingerprint', private.phase_5_fingerprint_text_v1(
+        v_granted_scope_fingerprint
+      ),
+      'credentialReadAuditEventId', v_read_audit.id,
+      'requestId', p_request_id,
+      'authorizedAt', v_now
+    )
+  );
+
+  insert into private.integration_provider_credential_task_read_evidence (
+    contract_version, workspace_id, business_entity_id, connection_id,
+    connection_generation, connection_row_version, sync_run_id,
+    mapping_id, mapping_row_version, task_id, task_row_version,
+    task_dispatch_generation, dispatcher_task_name,
+    delivery_attribution_state, delivery_dispatch_generation,
+    delivery_retry_count, delivery_execution_count,
+    delivery_attempt_fingerprint, lease_id, lease_owner_fingerprint,
+    lease_expires_at, credential_id, credential_version,
+    credential_row_version, provider_key, provider_environment,
+    granted_scopes, granted_scope_fingerprint,
+    credential_read_audit_event_id, request_id, request_fingerprint,
+    evidence_fingerprint, authority_role, authorized_at, created_at
+  ) values (
+    'integration_provider_credential_task_read_evidence_v1',
+    v_task.workspace_id, v_task.business_entity_id, v_task.connection_id,
+    v_task.connection_generation, v_connection.row_version,
+    v_task.sync_run_id, v_mapping.id, v_mapping.row_version,
+    v_task.id, v_task.row_version, v_task.dispatch_generation,
+    v_task.dispatcher_task_name, v_task.delivery_attribution_state,
+    v_task.last_delivery_dispatch_generation,
+    v_task.last_delivery_retry_count, v_task.last_delivery_execution_count,
+    v_task.last_delivery_attempt_fingerprint, v_task.lease_id,
+    v_task.lease_owner_fingerprint, v_task.lease_expires_at,
+    v_credential.id, v_credential.credential_version,
+    v_credential.row_version, v_credential.provider_key,
+    v_credential.provider_environment, v_credential.granted_scopes,
+    v_granted_scope_fingerprint, v_read_audit.id, p_request_id,
+    v_request_fingerprint, v_evidence_fingerprint,
+    'integration_credential_broker_authority', v_now, v_now
+  ) returning id into v_read_evidence_id;
+
+  return v_result || pg_catalog.jsonb_build_object(
+    'credentialReadEvidenceId', v_read_evidence_id
+  );
+exception
+  when invalid_text_representation or invalid_datetime_format
+    or datetime_field_overflow or numeric_value_out_of_range then
+    raise exception using
+      errcode = '22023',
+      message = 'integration_provider_credential_read_payload_invalid';
+end;
+$function$;
+
+revoke all on function public.read_integration_provider_credential_v5(jsonb, text)
+  from public, anon, authenticated, service_role,
+    external_integrations_authority, deterministic_calculation_authority,
+    integration_control_plane_authority,
+    integration_oauth_ingress_authority,
+    integration_credential_broker_authority,
+    integration_webhook_ingress_authority,
+    integration_task_dispatch_authority,
+    integration_task_scheduler_authority,
+    integration_qbo_canary_dispatch_authority,
+    integration_provider_runtime_authority,
+    integration_deterministic_runtime_authority,
+    integration_provider_source_authority,
+    integration_provider_validation_authority;
+
+revoke execute on function public.read_integration_provider_credential_v1(jsonb, text)
+  from integration_credential_broker_authority;
+revoke execute on function public.read_integration_provider_credential_v2(jsonb, text)
+  from integration_credential_broker_authority;
+revoke execute on function public.read_integration_provider_credential_v3(jsonb, text)
+  from integration_credential_broker_authority;
+revoke execute on function public.read_integration_provider_credential_v4(jsonb, text)
+  from integration_credential_broker_authority;
+
+grant execute on function public.read_integration_provider_credential_v5(jsonb, text)
+  to integration_credential_broker_authority;
+
+create table private.integration_provider_credential_task_read_failure_evidence (
+  id uuid primary key default gen_random_uuid(),
+  contract_version text not null check (
+    contract_version =
+      'integration_provider_credential_task_read_failure_evidence_v1'
+  ),
+  credential_read_evidence_id uuid not null unique references
+    private.integration_provider_credential_task_read_evidence(id)
+    on delete restrict,
+  workspace_id uuid not null,
+  business_entity_id uuid not null,
+  connection_id uuid not null,
+  connection_generation bigint not null check (connection_generation > 0),
+  task_id uuid not null,
+  task_dispatch_generation bigint not null check (task_dispatch_generation > 0),
+  delivery_dispatch_generation bigint not null check (
+    delivery_dispatch_generation = task_dispatch_generation
+  ),
+  delivery_retry_count integer not null check (
+    delivery_retry_count between 0 and 100
+  ),
+  delivery_execution_count integer not null check (
+    delivery_execution_count between 0 and delivery_retry_count
+  ),
+  delivery_attempt_fingerprint bytea not null check (
+    pg_catalog.octet_length(delivery_attempt_fingerprint) = 32
+  ),
+  lease_id uuid not null,
+  lease_owner_fingerprint bytea not null check (
+    pg_catalog.octet_length(lease_owner_fingerprint) = 32
+  ),
+  credential_id uuid not null references
+    private.integration_credentials(id) on delete restrict,
+  credential_version bigint not null check (credential_version > 0),
+  provider_key text not null check (
+    provider_key ~ '^[a-z][a-z0-9_-]{0,63}$'
+  ),
+  provider_environment text not null check (
+    private.is_bounded_identifier_v1(provider_environment)
+  ),
+  diagnostic_class text not null check (
+    diagnostic_class = any (array[
+      'reader_contract',
+      'aad_binding',
+      'kms_failure',
+      'envelope_version',
+      'provider_key',
+      'provider_environment',
+      'scope_shape',
+      'token_shape',
+      'refresh_token_presence',
+      'expires_at_shape',
+      'expires_at_binding',
+      'credential_binding',
+      'unknown_missing_field_contract',
+      'credential_expired'
+    ]::text[])
+  ),
+  request_id text not null unique check (
+    private.is_bounded_identifier_v1(request_id)
+  ),
+  request_fingerprint bytea not null check (
+    pg_catalog.octet_length(request_fingerprint) = 32
+  ),
+  evidence_fingerprint bytea not null unique check (
+    pg_catalog.octet_length(evidence_fingerprint) = 32
+  ),
+  authority_role text not null check (
+    authority_role = 'integration_credential_broker_authority'
+  ),
+  failed_at timestamptz not null,
+  created_at timestamptz not null,
+  constraint integration_provider_credential_task_read_failure_task_fkey
+    foreign key (workspace_id, business_entity_id, connection_id, task_id)
+    references private.integration_sync_tasks(
+      workspace_id, business_entity_id, connection_id, id
+    ) on delete restrict,
+  constraint integration_provider_credential_task_read_failure_time_check
+    check (created_at = failed_at)
+);
+
+create index integration_provider_credential_task_read_failure_scope_idx
+  on private.integration_provider_credential_task_read_failure_evidence(
+    workspace_id, business_entity_id, connection_id,
+    connection_generation, task_id, failed_at
+  );
+
+alter table private.integration_provider_credential_task_read_failure_evidence
+  enable row level security;
+alter table private.integration_provider_credential_task_read_failure_evidence
+  force row level security;
+
+revoke all on table
+  private.integration_provider_credential_task_read_failure_evidence
+  from public, anon, authenticated, service_role,
+    external_integrations_authority, deterministic_calculation_authority,
+    integration_control_plane_authority,
+    integration_oauth_ingress_authority,
+    integration_credential_broker_authority,
+    integration_webhook_ingress_authority,
+    integration_task_dispatch_authority,
+    integration_task_scheduler_authority,
+    integration_qbo_canary_dispatch_authority,
+    integration_provider_runtime_authority,
+    integration_deterministic_runtime_authority,
+    integration_provider_source_authority,
+    integration_provider_validation_authority;
+
+create trigger reject_integration_provider_credential_task_read_failure_mutation_v1
+before update or delete
+on private.integration_provider_credential_task_read_failure_evidence
+for each row execute function
+  private.reject_external_integration_immutable_mutation_v1();
+
+create or replace function
+  public.record_integration_provider_credential_task_read_failure_v1(
+    p_command jsonb,
+    p_request_id text
+  )
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $function$
+declare
+  v_now timestamptz := pg_catalog.transaction_timestamp();
+  v_read private.integration_provider_credential_task_read_evidence;
+  v_task private.integration_sync_tasks;
+  v_existing
+    private.integration_provider_credential_task_read_failure_evidence;
+  v_request_fingerprint bytea;
+  v_evidence_fingerprint bytea;
+  v_failure_evidence_id uuid;
+begin
+  perform private.assert_integration_credential_broker_authority_v1();
+  if not private.is_bounded_identifier_v1(p_request_id)
+    or not private.jsonb_has_exact_keys_v1(
+      p_command,
+      array['contractVersion', 'credentialReadEvidenceId', 'diagnosticClass']
+    )
+    or p_command ->> 'contractVersion' <>
+      'integration_provider_credential_task_read_failure_evidence_v1'
+    or p_command ->> 'diagnosticClass' is null
+    or p_command ->> 'diagnosticClass' <> all (array[
+      'reader_contract',
+      'aad_binding',
+      'kms_failure',
+      'envelope_version',
+      'provider_key',
+      'provider_environment',
+      'scope_shape',
+      'token_shape',
+      'refresh_token_presence',
+      'expires_at_shape',
+      'expires_at_binding',
+      'credential_binding',
+      'unknown_missing_field_contract',
+      'credential_expired'
+    ]::text[]) then
+    raise exception using
+      errcode = '22023',
+      message = 'integration_provider_credential_task_read_failure_invalid';
+  end if;
+  perform (p_command ->> 'credentialReadEvidenceId')::uuid;
+  v_request_fingerprint := private.phase_6_request_fingerprint_v1(
+    p_request_id,
+    p_command
+  );
+
+  perform pg_catalog.pg_advisory_xact_lock(
+    pg_catalog.hashtextextended(
+      'integration_provider_credential_task_read_failure:'
+        || (p_command ->> 'credentialReadEvidenceId'),
+      0
+    )
+  );
+
+  select failure.* into v_existing
+  from private.integration_provider_credential_task_read_failure_evidence
+    as failure
+  where failure.credential_read_evidence_id =
+      (p_command ->> 'credentialReadEvidenceId')::uuid
+    or failure.request_id = p_request_id
+  order by failure.credential_read_evidence_id
+  limit 1;
+  if found then
+    if v_existing.credential_read_evidence_id =
+        (p_command ->> 'credentialReadEvidenceId')::uuid
+      and v_existing.diagnostic_class = p_command ->> 'diagnosticClass'
+      and v_existing.request_id = p_request_id
+      and v_existing.request_fingerprint = v_request_fingerprint then
+      return pg_catalog.jsonb_build_object(
+        'credentialReadFailureEvidenceId', v_existing.id,
+        'credentialReadEvidenceId', v_existing.credential_read_evidence_id,
+        'diagnosticClass', v_existing.diagnostic_class,
+        'failedAt', pg_catalog.to_char(
+          v_existing.failed_at at time zone 'UTC',
+          'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'
+        ),
+        'idempotent', true
+      );
+    end if;
+    raise exception using
+      errcode = '23505',
+      message = 'integration_provider_credential_task_read_failure_conflict';
+  end if;
+
+  select evidence.* into v_read
+  from private.integration_provider_credential_task_read_evidence as evidence
+  where evidence.id = (p_command ->> 'credentialReadEvidenceId')::uuid
+    and evidence.authority_role = 'integration_credential_broker_authority'
+  for share;
+  if not found
+    or p_request_id <> v_read.request_id
+    or v_now < v_read.authorized_at
+    or v_now >= v_read.lease_expires_at then
+    raise exception using
+      errcode = '42501',
+      message = 'integration_provider_credential_task_read_failure_denied';
+  end if;
+
+  select task.* into v_task
+  from private.integration_sync_tasks as task
+  where task.workspace_id = v_read.workspace_id
+    and task.business_entity_id = v_read.business_entity_id
+    and task.connection_id = v_read.connection_id
+    and task.connection_generation = v_read.connection_generation
+    and task.id = v_read.task_id
+    and task.row_version = v_read.task_row_version
+    and task.state = 'leased'
+    and task.dispatch_generation = v_read.task_dispatch_generation
+    and task.delivery_attribution_state = v_read.delivery_attribution_state
+    and task.last_delivery_dispatch_generation =
+      v_read.delivery_dispatch_generation
+    and task.last_delivery_retry_count = v_read.delivery_retry_count
+    and task.last_delivery_execution_count = v_read.delivery_execution_count
+    and task.last_delivery_attempt_fingerprint =
+      v_read.delivery_attempt_fingerprint
+    and task.lease_id = v_read.lease_id
+    and task.lease_owner_fingerprint = v_read.lease_owner_fingerprint
+    and task.lease_expires_at = v_read.lease_expires_at
+    and task.lease_expires_at > v_now
+  for share;
+  if not found then
+    raise exception using
+      errcode = '42501',
+      message = 'integration_provider_credential_task_read_failure_denied';
+  end if;
+
+  v_evidence_fingerprint := private.phase_3_contract_fingerprint_v1(
+    pg_catalog.jsonb_build_object(
+      'contractVersion',
+        'integration_provider_credential_task_read_failure_evidence_v1',
+      'credentialReadEvidenceId', v_read.id,
+      'taskId', v_read.task_id,
+      'taskDispatchGeneration', v_read.task_dispatch_generation,
+      'deliveryDispatchGeneration', v_read.delivery_dispatch_generation,
+      'deliveryRetryCount', v_read.delivery_retry_count,
+      'deliveryExecutionCount', v_read.delivery_execution_count,
+      'deliveryAttemptFingerprint', private.phase_5_fingerprint_text_v1(
+        v_read.delivery_attempt_fingerprint
+      ),
+      'leaseId', v_read.lease_id,
+      'leaseOwnerFingerprint', private.phase_5_fingerprint_text_v1(
+        v_read.lease_owner_fingerprint
+      ),
+      'credentialId', v_read.credential_id,
+      'credentialVersion', v_read.credential_version,
+      'diagnosticClass', p_command ->> 'diagnosticClass',
+      'requestId', p_request_id,
+      'failedAt', v_now
+    )
+  );
+
+  insert into
+    private.integration_provider_credential_task_read_failure_evidence (
+      contract_version, credential_read_evidence_id, workspace_id,
+      business_entity_id, connection_id, connection_generation, task_id,
+      task_dispatch_generation, delivery_dispatch_generation,
+      delivery_retry_count, delivery_execution_count,
+      delivery_attempt_fingerprint, lease_id, lease_owner_fingerprint,
+      credential_id, credential_version, provider_key, provider_environment,
+      diagnostic_class, request_id, request_fingerprint,
+      evidence_fingerprint, authority_role, failed_at, created_at
+    ) values (
+      'integration_provider_credential_task_read_failure_evidence_v1',
+      v_read.id, v_read.workspace_id, v_read.business_entity_id,
+      v_read.connection_id, v_read.connection_generation, v_read.task_id,
+      v_read.task_dispatch_generation, v_read.delivery_dispatch_generation,
+      v_read.delivery_retry_count, v_read.delivery_execution_count,
+      v_read.delivery_attempt_fingerprint, v_read.lease_id,
+      v_read.lease_owner_fingerprint, v_read.credential_id,
+      v_read.credential_version, v_read.provider_key,
+      v_read.provider_environment, p_command ->> 'diagnosticClass',
+      p_request_id, v_request_fingerprint, v_evidence_fingerprint,
+      'integration_credential_broker_authority', v_now, v_now
+    ) returning id into v_failure_evidence_id;
+
+  return pg_catalog.jsonb_build_object(
+    'credentialReadFailureEvidenceId', v_failure_evidence_id,
+    'credentialReadEvidenceId', v_read.id,
+    'diagnosticClass', p_command ->> 'diagnosticClass',
+    'failedAt', pg_catalog.to_char(
+      v_now at time zone 'UTC',
+      'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'
+    ),
+    'idempotent', false
+  );
+exception
+  when invalid_text_representation or invalid_datetime_format
+    or datetime_field_overflow or numeric_value_out_of_range then
+    raise exception using
+      errcode = '22023',
+      message = 'integration_provider_credential_task_read_failure_invalid';
+end;
+$function$;
+
+revoke all on function
+  public.record_integration_provider_credential_task_read_failure_v1(jsonb, text)
+  from public, anon, authenticated, service_role,
+    external_integrations_authority, deterministic_calculation_authority,
+    integration_control_plane_authority,
+    integration_oauth_ingress_authority,
+    integration_credential_broker_authority,
+    integration_webhook_ingress_authority,
+    integration_task_dispatch_authority,
+    integration_task_scheduler_authority,
+    integration_qbo_canary_dispatch_authority,
+    integration_provider_runtime_authority,
+    integration_deterministic_runtime_authority,
+    integration_provider_source_authority,
+    integration_provider_validation_authority;
+grant execute on function
+  public.record_integration_provider_credential_task_read_failure_v1(jsonb, text)
+  to integration_credential_broker_authority;
 
 create table private.integration_sync_task_credential_lineage_recovery_events (
   id uuid primary key default gen_random_uuid(),
@@ -53,12 +818,15 @@ create table private.integration_sync_task_credential_lineage_recovery_events (
     private.integration_audit_events(id) on delete restrict,
   credential_read_audit_event_id uuid not null references
     private.integration_audit_events(id) on delete restrict,
+  credential_read_evidence_id uuid not null unique references
+    private.integration_provider_credential_task_read_evidence(id)
+    on delete restrict,
   diagnostic_class text not null check (
     diagnostic_class = 'expires_at_binding'
   ),
-  external_evidence_fingerprint bytea not null check (
-    pg_catalog.octet_length(external_evidence_fingerprint) = 32
-  ),
+  credential_read_failure_evidence_id uuid not null unique references
+    private.integration_provider_credential_task_read_failure_evidence(id)
+    on delete restrict,
   prior_state text not null check (prior_state = 'failed'),
   prior_failure_category text not null check (
     prior_failure_category = 'contract'
@@ -187,10 +955,13 @@ declare
   v_task_lease_audit private.integration_audit_events;
   v_failure_audit private.integration_audit_events;
   v_credential_read_audit private.integration_audit_events;
+  v_credential_read_evidence
+    private.integration_provider_credential_task_read_evidence;
+  v_credential_read_failure_evidence
+    private.integration_provider_credential_task_read_failure_evidence;
   v_existing
     private.integration_sync_task_credential_lineage_recovery_events;
   v_request_fingerprint bytea;
-  v_external_evidence_fingerprint bytea;
   v_historical_credential_version bigint;
   v_historical_persisted_at timestamptz;
   v_created_credential_version bigint;
@@ -209,8 +980,8 @@ begin
         'expectedCurrentCredentialVersion',
         'expectedCurrentCredentialRowVersion', 'taskId',
         'expectedTaskRowVersion', 'expectedDispatchGeneration',
-        'failureAuditEventId', 'credentialReadAuditEventId',
-        'diagnosticClass', 'externalEvidenceFingerprint',
+        'failureAuditEventId', 'credentialReadEvidenceId',
+        'credentialReadFailureEvidenceId', 'diagnosticClass',
         'retryAfterSeconds'
       ]
     )
@@ -255,9 +1026,7 @@ begin
     or (p_command ->> 'expectedDispatchGeneration') !~ '^[1-9][0-9]*$'
     or (p_command ->> 'retryAfterSeconds') !~ '^[1-9][0-9]*$'
     or (p_command ->> 'retryAfterSeconds')::integer not between 1 and 3600
-    or p_command ->> 'externalEvidenceFingerprint' is null
-    or p_command ->> 'externalEvidenceFingerprint'
-      !~ '^sha256:[a-f0-9]{64}$' then
+    then
     raise exception using
       errcode = '22023',
       message =
@@ -272,7 +1041,8 @@ begin
   perform (p_command ->> 'currentCredentialId')::uuid;
   perform (p_command ->> 'taskId')::uuid;
   perform (p_command ->> 'failureAuditEventId')::uuid;
-  perform (p_command ->> 'credentialReadAuditEventId')::uuid;
+  perform (p_command ->> 'credentialReadEvidenceId')::uuid;
+  perform (p_command ->> 'credentialReadFailureEvidenceId')::uuid;
 
   v_historical_credential_version :=
     (p_command ->> 'expectedHistoricalCredentialVersion')::bigint;
@@ -280,11 +1050,6 @@ begin
     p_request_id,
     p_command
   );
-  v_external_evidence_fingerprint :=
-    private.sha256_fingerprint_bytes_v1(
-      p_command ->> 'externalEvidenceFingerprint'
-    );
-
   perform pg_catalog.pg_advisory_xact_lock(
     pg_catalog.hashtextextended(
       'qbo_sandbox_credential_binding_incident_lineage_recovery:'
@@ -325,11 +1090,11 @@ begin
         (p_command ->> 'expectedDispatchGeneration')::bigint
       and v_existing.failure_audit_event_id =
         (p_command ->> 'failureAuditEventId')::uuid
-      and v_existing.credential_read_audit_event_id =
-        (p_command ->> 'credentialReadAuditEventId')::uuid
+      and v_existing.credential_read_evidence_id =
+        (p_command ->> 'credentialReadEvidenceId')::uuid
+      and v_existing.credential_read_failure_evidence_id =
+        (p_command ->> 'credentialReadFailureEvidenceId')::uuid
       and v_existing.diagnostic_class = p_command ->> 'diagnosticClass'
-      and v_existing.external_evidence_fingerprint =
-        v_external_evidence_fingerprint
       and v_existing.retry_after_seconds =
         (p_command ->> 'retryAfterSeconds')::integer
       and v_existing.request_id = p_request_id
@@ -668,7 +1433,103 @@ begin
     and audit.outcome = 'failed'
     and audit.target_type = 'integration_sync_task'
     and audit.target_id = v_task.id::text
+    and audit.metadata ->> 'task_state' = 'failed'
+    and audit.metadata ->> 'dispatch_generation' =
+      v_task.dispatch_generation::text
+    and audit.metadata ->> 'attempt_count' = v_task.attempt_count::text
+    and audit.metadata ->> 'row_version' = v_task.row_version::text
     and audit.occurred_at = v_task.completed_at;
+  if not found then
+    raise exception using
+      errcode = '42501',
+      message =
+        'qbo_sandbox_credential_binding_incident_lineage_recovery_failure_denied';
+  end if;
+
+  select evidence.* into v_credential_read_evidence
+  from private.integration_provider_credential_task_read_evidence as evidence
+  where evidence.id = (p_command ->> 'credentialReadEvidenceId')::uuid
+    and evidence.workspace_id = v_task.workspace_id
+    and evidence.business_entity_id = v_task.business_entity_id
+    and evidence.connection_id = v_task.connection_id
+    and evidence.connection_generation = v_task.connection_generation
+    and evidence.sync_run_id = v_task.sync_run_id
+    and evidence.mapping_id = v_mapping.id
+    and evidence.mapping_row_version = v_mapping.row_version
+    and evidence.task_id = v_task.id
+    and evidence.task_dispatch_generation = v_task.dispatch_generation
+    and evidence.delivery_attribution_state =
+      v_task.delivery_attribution_state
+    and evidence.delivery_dispatch_generation =
+      v_task.last_delivery_dispatch_generation
+    and evidence.delivery_retry_count = v_task.last_delivery_retry_count
+    and evidence.delivery_execution_count = v_task.last_delivery_execution_count
+    and evidence.delivery_attempt_fingerprint =
+      v_task.last_delivery_attempt_fingerprint
+    and evidence.credential_id =
+      (p_command ->> 'historicalCredentialId')::uuid
+    and evidence.credential_version = v_historical_credential_version
+    and evidence.provider_key = v_task.provider_key
+    and evidence.provider_environment = v_task.provider_environment
+    and evidence.granted_scopes =
+      array['com.intuit.quickbooks.accounting']::text[]
+    and evidence.granted_scope_fingerprint =
+      private.phase_3_contract_fingerprint_v1(
+        pg_catalog.jsonb_build_object(
+          'contractVersion',
+            'integration_provider_credential_scope_binding_v1',
+          'providerKey', v_current_credential.provider_key,
+          'providerEnvironment', v_current_credential.provider_environment,
+          'grantedScopes',
+            pg_catalog.to_jsonb(v_current_credential.granted_scopes)
+        )
+      )
+    and evidence.authority_role = 'integration_credential_broker_authority'
+    and evidence.authorized_at >= v_previous_recovery.recovered_at
+    and evidence.authorized_at <= v_task.completed_at;
+  if not found then
+    raise exception using
+      errcode = '42501',
+      message =
+        'qbo_sandbox_credential_binding_incident_lineage_recovery_read_denied';
+  end if;
+
+  select failure.* into v_credential_read_failure_evidence
+  from private.integration_provider_credential_task_read_failure_evidence
+    as failure
+  where failure.id =
+      (p_command ->> 'credentialReadFailureEvidenceId')::uuid
+    and failure.credential_read_evidence_id = v_credential_read_evidence.id
+    and failure.workspace_id = v_credential_read_evidence.workspace_id
+    and failure.business_entity_id =
+      v_credential_read_evidence.business_entity_id
+    and failure.connection_id = v_credential_read_evidence.connection_id
+    and failure.connection_generation =
+      v_credential_read_evidence.connection_generation
+    and failure.task_id = v_credential_read_evidence.task_id
+    and failure.task_dispatch_generation =
+      v_credential_read_evidence.task_dispatch_generation
+    and failure.delivery_dispatch_generation =
+      v_credential_read_evidence.delivery_dispatch_generation
+    and failure.delivery_retry_count =
+      v_credential_read_evidence.delivery_retry_count
+    and failure.delivery_execution_count =
+      v_credential_read_evidence.delivery_execution_count
+    and failure.delivery_attempt_fingerprint =
+      v_credential_read_evidence.delivery_attempt_fingerprint
+    and failure.lease_id = v_credential_read_evidence.lease_id
+    and failure.lease_owner_fingerprint =
+      v_credential_read_evidence.lease_owner_fingerprint
+    and failure.credential_id = v_credential_read_evidence.credential_id
+    and failure.credential_version =
+      v_credential_read_evidence.credential_version
+    and failure.provider_key = v_credential_read_evidence.provider_key
+    and failure.provider_environment =
+      v_credential_read_evidence.provider_environment
+    and failure.request_id = v_credential_read_evidence.request_id
+    and failure.diagnostic_class = 'expires_at_binding'
+    and failure.failed_at >= v_credential_read_evidence.authorized_at
+    and failure.failed_at <= v_task.completed_at;
   if not found then
     raise exception using
       errcode = '42501',
@@ -678,27 +1539,24 @@ begin
 
   select audit.* into v_credential_read_audit
   from private.integration_audit_events as audit
-  where audit.id = (p_command ->> 'credentialReadAuditEventId')::uuid
-    and audit.workspace_id = v_task.workspace_id
-    and audit.business_entity_id = v_task.business_entity_id
-    and audit.connection_id = v_task.connection_id
+  where audit.id = v_credential_read_evidence.credential_read_audit_event_id
+    and audit.workspace_id = v_credential_read_evidence.workspace_id
+    and audit.business_entity_id =
+      v_credential_read_evidence.business_entity_id
+    and audit.connection_id = v_credential_read_evidence.connection_id
     and audit.action = 'credential_provider_read'
     and audit.outcome = 'allowed'
     and audit.target_type = 'integration_credential'
-    and audit.target_id = (p_command ->> 'historicalCredentialId')
+    and audit.target_id = v_credential_read_evidence.credential_id::text
+    and audit.request_id = v_credential_read_evidence.request_id
     and audit.reason_code = 'authorized'
     and audit.metadata ->> 'connection_generation' =
-      v_task.connection_generation::text
+      v_credential_read_evidence.connection_generation::text
     and audit.metadata ->> 'credential_status' = 'active'
     and audit.metadata ->> 'credential_version' =
-      v_historical_credential_version::text
+      v_credential_read_evidence.credential_version::text
     and audit.metadata ->> 'task_state' = 'leased'
-    and (
-      not (audit.metadata ? 'task_id')
-      or audit.metadata ->> 'task_id' = v_task.id::text
-    )
-    and audit.occurred_at >= v_previous_recovery.recovered_at
-    and audit.occurred_at <= v_task.completed_at;
+    and audit.occurred_at = v_credential_read_evidence.authorized_at;
   if not found then
     raise exception using
       errcode = '42501',
@@ -726,7 +1584,7 @@ begin
         v_historical_credential_version::text;
   end if;
   if v_historical_persisted_at is null
-    or v_historical_persisted_at > v_credential_read_audit.occurred_at
+    or v_historical_persisted_at > v_credential_read_evidence.authorized_at
     or exists (
       select 1
       from private.integration_audit_events as audit
@@ -743,7 +1601,7 @@ begin
         and audit.metadata ->> 'credential_status' = 'active'
         and (audit.metadata ->> 'credential_version')::bigint >
           v_historical_credential_version
-        and audit.occurred_at <= v_credential_read_audit.occurred_at
+        and audit.occurred_at <= v_credential_read_evidence.authorized_at
     ) then
     raise exception using
       errcode = '42501',
@@ -764,8 +1622,10 @@ begin
     and audit.metadata ->> 'dispatch_generation' =
       v_task.dispatch_generation::text
     and audit.metadata ->> 'attempt_count' = v_task.attempt_count::text
+    and audit.metadata ->> 'row_version' =
+      v_credential_read_evidence.task_row_version::text
     and audit.occurred_at >= v_previous_recovery.recovered_at
-    and audit.occurred_at <= v_credential_read_audit.occurred_at
+    and audit.occurred_at <= v_credential_read_evidence.authorized_at
   order by audit.occurred_at desc
   limit 1;
   if not found then
@@ -812,7 +1672,8 @@ begin
       credential_created_version, refresh_advancement_count,
       prior_expired_recovery_event_id, task_lease_audit_event_id,
       failure_audit_event_id, credential_read_audit_event_id,
-      diagnostic_class, external_evidence_fingerprint,
+      credential_read_evidence_id, credential_read_failure_evidence_id,
+      diagnostic_class,
       prior_state, prior_failure_category, prior_failure_code,
       prior_row_version, prior_completed_at, prior_dispatch_generation,
       prior_delivery_attribution_state,
@@ -842,8 +1703,9 @@ begin
     v_task_lease_audit.id,
     v_failure_audit.id,
     v_credential_read_audit.id,
+    v_credential_read_evidence.id,
+    v_credential_read_failure_evidence.id,
     'expires_at_binding',
-    v_external_evidence_fingerprint,
     v_task.state,
     v_task.failure_category,
     v_task.failure_code,
@@ -951,6 +1813,17 @@ revoke all on function
     integration_deterministic_runtime_authority,
     integration_provider_source_authority,
     integration_provider_validation_authority;
+
+-- The V1 incident RPC accepted a generic credential-read audit plus an
+-- operator-supplied external fingerprint. Preserve the historical definition,
+-- but remove it from runtime authority now that V2 requires the immutable
+-- task-bound read and failure evidence rows above.
+revoke execute on function
+  public.recover_qbo_sandbox_credential_binding_incident_task_v1(
+    jsonb, text, text
+  )
+  from integration_credential_broker_authority;
+
 grant execute on function
   public.recover_qbo_sandbox_credential_binding_incident_task_v2(
     jsonb, text, text

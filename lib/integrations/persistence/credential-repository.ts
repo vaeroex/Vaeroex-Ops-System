@@ -18,7 +18,9 @@ import {
   ExpiredRefreshLeaseReclamationResultSchema,
   OAuthStateConsumeResultSchema,
   ProviderCredentialReadResultSchema,
+  ProviderCredentialReadFailureEvidenceResultSchema,
   ReadProviderCredentialCommandSchema,
+  RecordProviderCredentialReadFailureCommandSchema,
   ReclaimExpiredRefreshLeaseCommandSchema,
   RefreshLeaseResultSchema,
   ReauthorizationStateConsumeResultSchema,
@@ -197,9 +199,26 @@ export async function readIntegrationProviderCredential(
 ) {
   return ProviderCredentialReadResultSchema.parse(
     await credentialRpc(
-      "read_integration_provider_credential_v4",
+      "read_integration_provider_credential_v5",
       {
         p_command: ReadProviderCredentialCommandSchema.parse(input),
+        p_request_id: requestId(id)
+      },
+      client
+    )
+  );
+}
+
+export async function recordIntegrationProviderCredentialReadFailure(
+  input: unknown,
+  id: string,
+  client: ExternalIntegrationsRpcClient
+) {
+  return ProviderCredentialReadFailureEvidenceResultSchema.parse(
+    await credentialRpc(
+      "record_integration_provider_credential_task_read_failure_v1",
+      {
+        p_command: RecordProviderCredentialReadFailureCommandSchema.parse(input),
         p_request_id: requestId(id)
       },
       client

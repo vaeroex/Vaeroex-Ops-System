@@ -581,6 +581,11 @@ select ok(
   )
   and has_function_privilege(
     'integration_credential_broker_authority',
+    'public.read_integration_provider_credential_v5(jsonb,text)',
+    'EXECUTE'
+  )
+  and not has_function_privilege(
+    'integration_credential_broker_authority',
     'public.read_integration_provider_credential_v3(jsonb,text)',
     'EXECUTE'
   ),

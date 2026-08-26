@@ -59,10 +59,9 @@ as $function$
     'expectedTaskRowVersion', p_task_row_version,
     'expectedDispatchGeneration', 2,
     'failureAuditEventId', p_failure_audit_id,
-    'credentialReadAuditEventId', p_credential_read_audit_id,
+    'credentialReadEvidenceId', p_credential_read_audit_id,
+    'credentialReadFailureEvidenceId', p_credential_read_audit_id,
     'diagnosticClass', 'expires_at_binding',
-    'externalEvidenceFingerprint',
-      'sha256:abababababababababababababababababababababababababababababababab',
     'retryAfterSeconds', 1
   );
 $function$;
@@ -554,16 +553,117 @@ begin
     p_credential_id::text,
     p_seed || '_credential_read',
     'authorized',
-    pg_catalog.jsonb_strip_nulls(pg_catalog.jsonb_build_object(
+    pg_catalog.jsonb_build_object(
       'connection_generation', 1,
       'credential_status', 'active',
       'credential_version', p_historical_credential_version,
-      'task_state', 'leased',
-      'task_id', p_read_task_id
-    )),
+      'task_state', 'leased'
+    ),
     v_completed_at - interval '1 second',
     'security'
   );
+
+  insert into private.integration_provider_credential_task_read_evidence (
+    id, contract_version, workspace_id, business_entity_id, connection_id,
+    connection_generation, connection_row_version, sync_run_id, mapping_id,
+    mapping_row_version, task_id, task_row_version, task_dispatch_generation,
+    dispatcher_task_name, delivery_attribution_state,
+    delivery_dispatch_generation, delivery_retry_count,
+    delivery_execution_count, delivery_attempt_fingerprint, lease_id,
+    lease_owner_fingerprint, lease_expires_at, credential_id,
+    credential_version, credential_row_version, provider_key,
+    provider_environment, granted_scopes, granted_scope_fingerprint,
+    credential_read_audit_event_id, request_id, request_fingerprint,
+    evidence_fingerprint, authority_role, authorized_at, created_at
+  ) values (
+    p_read_audit_event_id,
+    'integration_provider_credential_task_read_evidence_v1',
+    'b9d00000-0000-4000-8000-000000000001',
+    'd9d00000-0000-4000-8000-000000000001',
+    p_connection_id, 1, 3, p_sync_run_id, p_mapping_id, 1,
+    pg_catalog.coalesce(p_read_task_id, p_task_id), 8, 2,
+    p_seed || '_dispatcher', 'attributed', 2, 0, 0,
+    extensions.digest(
+      pg_catalog.convert_to(p_seed || '-delivery', 'UTF8'),
+      'sha256'
+    ),
+    p_lease_audit_event_id,
+    extensions.digest(
+      pg_catalog.convert_to(p_seed || '-lease-owner', 'UTF8'),
+      'sha256'
+    ),
+    v_completed_at + interval '5 minutes',
+    p_credential_id, p_historical_credential_version,
+    p_historical_credential_version + 1,
+    'quickbooks_online', 'sandbox',
+    array['com.intuit.quickbooks.accounting']::text[],
+    private.phase_3_contract_fingerprint_v1(
+      pg_catalog.jsonb_build_object(
+        'contractVersion', 'integration_provider_credential_scope_binding_v1',
+        'providerKey', 'quickbooks_online',
+        'providerEnvironment', 'sandbox',
+        'grantedScopes', pg_catalog.jsonb_build_array(
+          'com.intuit.quickbooks.accounting'
+        )
+      )
+    ),
+    p_read_audit_event_id,
+    p_seed || '_credential_read',
+    extensions.digest(
+      pg_catalog.convert_to(p_seed || '-credential-read-request', 'UTF8'),
+      'sha256'
+    ),
+    extensions.digest(
+      pg_catalog.convert_to(p_seed || '-credential-read-evidence', 'UTF8'),
+      'sha256'
+    ),
+    'integration_credential_broker_authority',
+    v_completed_at - interval '1 second',
+    v_completed_at - interval '1 second'
+  );
+
+  insert into
+    private.integration_provider_credential_task_read_failure_evidence (
+      id, contract_version, credential_read_evidence_id, workspace_id,
+      business_entity_id, connection_id, connection_generation, task_id,
+      task_dispatch_generation, delivery_dispatch_generation,
+      delivery_retry_count, delivery_execution_count,
+      delivery_attempt_fingerprint, lease_id, lease_owner_fingerprint,
+      credential_id, credential_version, provider_key, provider_environment,
+      diagnostic_class, request_id, request_fingerprint,
+      evidence_fingerprint, authority_role, failed_at, created_at
+    ) values (
+      p_read_audit_event_id,
+      'integration_provider_credential_task_read_failure_evidence_v1',
+      p_read_audit_event_id,
+      'b9d00000-0000-4000-8000-000000000001',
+      'd9d00000-0000-4000-8000-000000000001',
+      p_connection_id, 1, pg_catalog.coalesce(p_read_task_id, p_task_id),
+      2, 2, 0, 0,
+      extensions.digest(
+        pg_catalog.convert_to(p_seed || '-delivery', 'UTF8'),
+        'sha256'
+      ),
+      p_lease_audit_event_id,
+      extensions.digest(
+        pg_catalog.convert_to(p_seed || '-lease-owner', 'UTF8'),
+        'sha256'
+      ),
+      p_credential_id, p_historical_credential_version,
+      'quickbooks_online', 'sandbox', 'expires_at_binding',
+      p_seed || '_credential_read',
+      extensions.digest(
+        pg_catalog.convert_to(p_seed || '-credential-read-failure-request', 'UTF8'),
+        'sha256'
+      ),
+      extensions.digest(
+        pg_catalog.convert_to(p_seed || '-credential-read-failure-evidence', 'UTF8'),
+        'sha256'
+      ),
+      'integration_credential_broker_authority',
+      v_completed_at - interval '500 milliseconds',
+      v_completed_at - interval '500 milliseconds'
+    );
 end;
 $function$;
 
@@ -1424,10 +1524,10 @@ select extensions.dblink_send_query(
         'expectedTaskRowVersion', 9,
         'expectedDispatchGeneration', 2,
         'failureAuditEventId', '69d00000-0000-4000-8000-000000000006',
-        'credentialReadAuditEventId', '79e00000-0000-4000-8000-000000000006',
+        'credentialReadEvidenceId', '79e00000-0000-4000-8000-000000000006',
+        'credentialReadFailureEvidenceId',
+          '79e00000-0000-4000-8000-000000000006',
         'diagnosticClass', 'expires_at_binding',
-        'externalEvidenceFingerprint',
-          'sha256:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd',
         'retryAfterSeconds', 1
       ),
       'phase8b_lineage_concurrent_recovery',

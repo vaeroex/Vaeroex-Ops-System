@@ -749,7 +749,7 @@ where task.connection_id = 'e8c00000-0000-4000-8000-000000000001'
   and task.id <> '38c00000-0000-4000-8000-000000000001';
 
 select ok(
-  has_function_privilege(
+  not has_function_privilege(
     'integration_credential_broker_authority',
     'public.recover_qbo_sandbox_credential_binding_incident_task_v1(jsonb,text,text)',
     'EXECUTE'
@@ -769,7 +769,7 @@ select ok(
     'private.integration_sync_task_credential_binding_recovery_events',
     'SELECT,INSERT,UPDATE,DELETE'
   ),
-  'credential-binding incident recovery is broker-RPC-only with no service or table shortcut'
+  'historical generic-audit incident recovery has no runtime or table authority'
 );
 select ok(
   has_function_privilege(
@@ -837,7 +837,8 @@ select ok(
 );
 reset role;
 
-set local role integration_credential_broker_authority;
+-- V1 remains owner-callable only so its historical semantics stay regression
+-- covered after runtime authority moves exclusively to evidence-bound V2.
 select ok(
   pg_temp.raises_sqlstate(
     $$select public.recover_qbo_sandbox_credential_binding_incident_task_v1(
@@ -1006,7 +1007,6 @@ select ok(
   ),
   'stale connection generation recovery fails closed'
 );
-reset role;
 
 savepoint phase8b_canary_invalid_grant;
 insert into private.integration_audit_events (
@@ -1032,7 +1032,6 @@ insert into private.integration_audit_events (
   pg_catalog.transaction_timestamp() - interval '5 minutes',
   'security'
 );
-set local role integration_credential_broker_authority;
 select ok(
   pg_temp.raises_sqlstate(
     $$select public.recover_qbo_sandbox_credential_binding_incident_task_v1(
@@ -1048,7 +1047,6 @@ select ok(
   ),
   'applicable invalid_grant evidence blocks recovery'
 );
-reset role;
 rollback to savepoint phase8b_canary_invalid_grant;
 release savepoint phase8b_canary_invalid_grant;
 
@@ -1076,7 +1074,6 @@ insert into private.integration_audit_events (
   pg_catalog.transaction_timestamp() - interval '5 minutes',
   'security'
 );
-set local role integration_credential_broker_authority;
 select ok(
   pg_temp.raises_sqlstate(
     $$select public.recover_qbo_sandbox_credential_binding_incident_task_v1(
@@ -1092,11 +1089,9 @@ select ok(
   ),
   'applicable provider_revoked evidence blocks recovery'
 );
-reset role;
 rollback to savepoint phase8b_canary_provider_revoked;
 release savepoint phase8b_canary_provider_revoked;
 
-set local role integration_credential_broker_authority;
 create temporary table phase8b_canary_recovery_result as
 select public.recover_qbo_sandbox_credential_binding_incident_task_v1(
   pg_temp.canary_recovery_command(
@@ -1130,7 +1125,6 @@ select is(
   'true',
   'identical recovery replay creates no second mutation'
 );
-reset role;
 
 select is(
   (
@@ -1181,15 +1175,6 @@ select extensions.dblink_connect(
     pg_catalog.decode(current_setting('vaeroex.test_database_url_b64'), 'base64'),
     'UTF8'
   )
-)
-from (values
-  ('phase8b_canary_recovery_race_1'),
-  ('phase8b_canary_recovery_race_2')
-) as connections(connection_name);
-
-select extensions.dblink_exec(
-  connection_name,
-  'set role integration_credential_broker_authority'
 )
 from (values
   ('phase8b_canary_recovery_race_1'),

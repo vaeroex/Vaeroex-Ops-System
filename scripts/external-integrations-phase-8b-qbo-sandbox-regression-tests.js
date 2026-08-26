@@ -677,6 +677,7 @@ async function testSameGenerationReauthorizationBroker() {
       };
     },
     async readProviderCredential() {},
+    async recordProviderCredentialReadFailure() {},
     async acquireRefreshLease() {},
     async reclaimExpiredRefreshLease() {},
     async rotateCredential() {},
@@ -820,6 +821,7 @@ async function testSameGenerationReauthorizationBroker() {
           state: "available",
           credentialId: completed.credentialId,
           credentialVersion: completed.credentialVersion,
+          credentialReadEvidenceId: id(8813),
           providerKey: "quickbooks_online",
           providerEnvironment: "sandbox",
           accessExpiresAt: rebaseExpiry(callbackEnvelope.accessExpiresAt),
@@ -1227,6 +1229,7 @@ async function testQboRefreshRotationPolicy() {
             state: "available",
             credentialId: tested.scope.credentialId,
             credentialVersion: tested.result.credentialVersion,
+            credentialReadEvidenceId: id(mode === "same" ? 8965 : 8966),
             providerKey: "quickbooks_online",
             providerEnvironment: "sandbox",
             accessExpiresAt: rebaseExpiry(persisted.accessExpiresAt),
@@ -1240,6 +1243,9 @@ async function testQboRefreshRotationPolicy() {
             aadContext: tested.aadContext,
             grantedScopes: persisted.grantedScopes
           };
+        },
+        async recordProviderCredentialReadFailure() {
+          throw new Error("unexpected_read_failure");
         }
       },
       kms: {
@@ -1329,6 +1335,7 @@ async function testCredentialReadDiagnostics() {
     state: "available",
     credentialId: aadContext.credentialId,
     credentialVersion: 5,
+    credentialReadEvidenceId: id(8976),
     providerKey: "quickbooks_online",
     providerEnvironment: "sandbox",
     accessExpiresAt: "2026-08-24T13:00:01.000Z",
@@ -1346,6 +1353,7 @@ async function testCredentialReadDiagnostics() {
     aadContext,
     grantedScopes: [phase8b.QBO_ACCOUNTING_SCOPE]
   };
+  const recordedFailures = [];
   const input = {
     taskId: id(8974),
     leaseId: id(8975),
@@ -1361,6 +1369,16 @@ async function testCredentialReadDiagnostics() {
       store: {
         async readProviderCredential() {
           return { ...baseResult, ...options.result };
+        },
+        async recordProviderCredentialReadFailure(command) {
+          recordedFailures.push(command);
+          return {
+            credentialReadFailureEvidenceId: id(8977),
+            credentialReadEvidenceId: command.credentialReadEvidenceId,
+            diagnosticClass: command.diagnosticClass,
+            failedAt: now.toISOString(),
+            idempotent: false
+          };
         }
       },
       kms: {
@@ -1427,6 +1445,22 @@ async function testCredentialReadDiagnostics() {
       `${diagnosticClass} diagnostics contain no credential, realm, or authorization material`
     );
   }
+  deepEqual(
+    recordedFailures.map((failure) => failure.diagnosticClass),
+    cases
+      .map(([diagnosticClass]) => diagnosticClass)
+      .filter((diagnosticClass) => diagnosticClass !== "reader_contract"),
+    "all parsed post-decrypt failures append one bounded task-read evidence classification"
+  );
+  ok(
+    recordedFailures.every(
+      (failure) =>
+        failure.credentialReadEvidenceId === baseResult.credentialReadEvidenceId
+        && Object.keys(failure).sort().join(",") ===
+          "contractVersion,credentialReadEvidenceId,diagnosticClass"
+    ),
+    "failure evidence carries no caller-supplied task, lease, credential, or secret identity"
+  );
 }
 
 async function testReadOnlyClient() {
@@ -2392,7 +2426,7 @@ function testMigrationBoundary() {
   ok(/grant execute on function public\.read_integration_provider_credential_v4\(jsonb, text\)[\s\S]+to integration_credential_broker_authority/.test(credentialBindingMigration), "only credential-broker authority receives the converged read RPC");
   ok(!/grant (?:execute|integration_credential_broker_authority)[\s\S]{0,100}to service_role/i.test(credentialBindingMigration), "service_role receives no converged credential-read shortcut");
   ok(!/(?:create or replace|drop) function public\.read_integration_provider_credential_v[123]/.test(credentialBindingMigration), "forward convergence leaves all historical credential-read definitions unchanged");
-  ok(/read_integration_provider_credential_v4/.test(credentialRepositorySource) && !/read_integration_provider_credential_v[123]/.test(credentialRepositorySource), "runtime persistence uses only the converged V4 credential read");
+  ok(/read_integration_provider_credential_v5/.test(credentialRepositorySource) && !/read_integration_provider_credential_v[1-4]/.test(credentialRepositorySource), "runtime persistence uses only the task-bound V5 credential read");
   ok(/databaseAccessLifetime !== envelopeAccessLifetime[\s\S]+databaseRefreshLifetime !== envelopeRefreshLifetime/.test(credentialBrokerSource), "broker validates exact access and refresh lifetimes across trusted-clock rebasing");
   ok(/externalEntityReferenceFingerprint[\s\S]+credential_binding/.test(credentialBrokerSource), "broker binds the decrypted realm reference to its persisted fingerprint");
   ok(/ProviderCredentialReadFailure[\s\S]+diagnosticClass/.test(credentialBrokerSource) && /safeEvent\("credential_read_failed"[\s\S]+diagnosticClass/.test(service), "credential read failures retain only a bounded non-secret diagnostic class");
@@ -2442,17 +2476,24 @@ function testMigrationBoundary() {
   ok(/legacy_unattributed[\s\S]+remains quarantined and unchanged/.test(credentialBindingCanaryTest), "database tests preserve legacy-unattributed quarantine");
   ok(/reserved canary reconciliation returns the same virtual pre-reservation identity/.test(credentialBindingCanaryTest), "database tests prove deterministic reservation-to-enqueue reconciliation");
   ok(/integration_sync_task_credential_lineage_recovery_events[\s\S]+enable row level security[\s\S]+force row level security/.test(credentialLineageRecoveryMigration), "lineage recovery evidence is private with forced RLS");
+  ok(/integration_provider_credential_task_read_evidence[\s\S]+enable row level security[\s\S]+force row level security/.test(credentialLineageRecoveryMigration), "task-bound credential-read evidence is private with forced RLS");
+  ok(/integration_provider_credential_task_read_failure_evidence[\s\S]+enable row level security[\s\S]+force row level security/.test(credentialLineageRecoveryMigration), "post-decrypt failure evidence is private with forced RLS");
+  ok(/read_integration_provider_credential_v5[\s\S]+read_integration_provider_credential_v4[\s\S]+insert into private\.integration_provider_credential_task_read_evidence[\s\S]+return v_result \|\|/.test(credentialLineageRecoveryMigration), "V5 appends task-bound evidence before returning credential authority in one transaction");
+  ok(/revoke execute on function public\.read_integration_provider_credential_v1[\s\S]+revoke execute on function public\.read_integration_provider_credential_v4[\s\S]+grant execute on function public\.read_integration_provider_credential_v5/.test(credentialLineageRecoveryMigration), "broker cannot bypass task-bound evidence through an older read RPC");
+  ok(/record_integration_provider_credential_task_read_failure_v1[\s\S]+jsonb_has_exact_keys_v1[\s\S]+credentialReadEvidenceId[\s\S]+diagnosticClass[\s\S]+p_request_id <> v_read\.request_id[\s\S]+task\.lease_id = v_read\.lease_id/.test(credentialLineageRecoveryMigration), "post-decrypt failures derive identity from the same request and still-current immutable task lease evidence");
   ok(/credential_lineage_id = historical_credential_id[\s\S]+credential_lineage_id = current_credential_id/.test(credentialLineageRecoveryMigration), "credential row ID is the immutable refresh-lineage anchor");
   ok(/historicalCredentialId[\s\S]+expectedHistoricalCredentialVersion[\s\S]+currentCredentialId[\s\S]+expectedCurrentCredentialVersion[\s\S]+expectedCurrentCredentialRowVersion/.test(credentialLineageRecoveryMigration), "lineage recovery separates historical incident evidence from current credential CAS authority");
   ok(/generate_series[\s\S]+credential_rotated[\s\S]+refresh_succeeded[\s\S]+credential_version/.test(credentialLineageRecoveryMigration), "every credential-version advance requires one immutable canonical refresh event");
   ok(/supersedes_credential_id is null[\s\S]+oauth_state_id is null[\s\S]+integration_reauthorization_states[\s\S]+replacement_credential_id = v_current_credential\.id/.test(credentialLineageRecoveryMigration), "the current credential row must itself have canonical creation authority");
   ok(/historicalCredentialId'\)::uuid <>[\s\S]+v_current_credential\.id[\s\S]+incident_recovery_lineage_denied/.test(credentialLineageRecoveryMigration), "reauthorization row substitution cannot cross the refresh-lineage anchor");
-  ok(/credential_provider_read[\s\S]+audit\.metadata \? 'task_id'[\s\S]+audit\.metadata ->> 'task_id' = v_task\.id::text/.test(credentialLineageRecoveryMigration), "task-bound read metadata cannot be substituted across tasks");
-  ok(/integration_sync_task\.lease[\s\S]+audit\.target_id = v_task\.id::text[\s\S]+audit\.occurred_at <= v_credential_read_audit\.occurred_at/.test(credentialLineageRecoveryMigration), "historical read evidence remains bounded to the exact task lease window");
-  ok(/v_historical_persisted_at[\s\S]+credential_version'\)::bigint >[\s\S]+v_historical_credential_version[\s\S]+audit\.occurred_at <= v_credential_read_audit\.occurred_at/.test(credentialLineageRecoveryMigration), "credential versions newer than the incident must postdate the historical read");
+  ok(/credentialReadEvidenceId[\s\S]+evidence\.task_id = v_task\.id[\s\S]+evidence\.delivery_attempt_fingerprint =[\s\S]+v_task\.last_delivery_attempt_fingerprint[\s\S]+evidence\.credential_version = v_historical_credential_version/.test(credentialLineageRecoveryMigration), "future recovery requires exact task, delivery, and historical credential read evidence");
+  ok(/credentialReadFailureEvidenceId[\s\S]+failure\.credential_read_evidence_id = v_credential_read_evidence\.id[\s\S]+failure\.diagnostic_class = 'expires_at_binding'/.test(credentialLineageRecoveryMigration), "future recovery requires the exact task-bound post-decrypt incident evidence");
+  ok(/integration_sync_task\.lease[\s\S]+audit\.target_id = v_task\.id::text[\s\S]+audit\.occurred_at <= v_credential_read_evidence\.authorized_at/.test(credentialLineageRecoveryMigration), "historical read evidence remains bounded to the exact task lease window");
+  ok(/v_historical_persisted_at[\s\S]+credential_version'\)::bigint >[\s\S]+v_historical_credential_version[\s\S]+audit\.occurred_at <= v_credential_read_evidence\.authorized_at/.test(credentialLineageRecoveryMigration), "credential versions newer than the incident must postdate the historical read");
   ok(/reason_code in \('invalid_grant', 'provider_revoked'\)[\s\S]+lineage_recovery_revoked/.test(credentialLineageRecoveryMigration), "invalid-grant and provider-revoked evidence still blocks lineage recovery");
   ok(/integration_sync_task\.complete[\s\S]+external_source_record_versions[\s\S]+lineage_recovery_effect_denied/.test(credentialLineageRecoveryMigration), "provider completion or source effects still block lineage recovery");
   ok(/grant execute on function[\s\S]+recover_qbo_sandbox_credential_binding_incident_task_v2[\s\S]+to integration_credential_broker_authority/.test(credentialLineageRecoveryMigration), "only credential-broker authority receives V2 lineage recovery execution");
+  ok(/revoke execute on function[\s\S]+recover_qbo_sandbox_credential_binding_incident_task_v1[\s\S]+from integration_credential_broker_authority/.test(credentialLineageRecoveryMigration), "generic-audit V1 incident recovery is unavailable to runtime authority");
   ok(!/grant (?:execute|integration_credential_broker_authority)[\s\S]{0,100}to service_role/i.test(credentialLineageRecoveryMigration), "service_role receives no V2 lineage recovery shortcut");
   ok(/historical V5 incident plus current V6[\s\S]+exact same refresh-lineage version remains recoverable/.test(credentialLineageRecoveryTest), "database coverage proves both advanced and unchanged refresh-lineage recovery");
   ok(/credential-read evidence explicitly bound to another task is denied/.test(credentialLineageRecoveryTest), "database coverage rejects a read audit bound to another task");
@@ -2478,9 +2519,9 @@ function testMigrationBoundary() {
     expectedTaskRowVersion: 9,
     expectedDispatchGeneration: 2,
     failureAuditEventId: id(8907),
-    credentialReadAuditEventId: id(8908),
+    credentialReadEvidenceId: id(8908),
+    credentialReadFailureEvidenceId: id(8909),
     diagnosticClass: "expires_at_binding",
-    externalEvidenceFingerprint: fingerprint("phase8b-binding-incident"),
     retryAfterSeconds: 1
   };
   equal(

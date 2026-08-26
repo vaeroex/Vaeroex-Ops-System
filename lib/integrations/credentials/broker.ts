@@ -28,6 +28,7 @@ import {
   ProviderCredentialReadDiagnosticClassSchema,
   ProviderCredentialReadResultSchema,
   ReadProviderCredentialCommandSchema,
+  RecordProviderCredentialReadFailureCommandSchema,
   ReclaimExpiredRefreshLeaseCommandSchema,
   RefreshLeaseResultSchema,
   ReauthorizationStateConsumeResultSchema,
@@ -46,6 +47,7 @@ import {
   type DestroyCredentialCommand,
   type ProviderCredentialReadDiagnosticClass,
   type ReadProviderCredentialCommand,
+  type RecordProviderCredentialReadFailureCommand,
   type ReclaimExpiredRefreshLeaseCommand,
   type RevokeCredentialCommand,
   type RotateCredentialCommand,
@@ -92,6 +94,10 @@ export type CredentialBrokerStore = Readonly<{
   ): PromiseLike<unknown>;
   readProviderCredential(
     command: ReadProviderCredentialCommand,
+    requestId: string
+  ): PromiseLike<unknown>;
+  recordProviderCredentialReadFailure(
+    command: RecordProviderCredentialReadFailureCommand,
     requestId: string
   ): PromiseLike<unknown>;
   acquireRefreshLease(command: AcquireRefreshLeaseCommand, requestId: string): PromiseLike<unknown>;
@@ -1219,11 +1225,25 @@ export class IntegrationCredentialBroker {
         })
       };
     } catch (error) {
-      throw error instanceof ProviderCredentialReadFailure
+      const failure = error instanceof ProviderCredentialReadFailure
         ? error
         : new ProviderCredentialReadFailure(
             "unknown_missing_field_contract"
           );
+      try {
+        await this.#store.recordProviderCredentialReadFailure(
+          RecordProviderCredentialReadFailureCommandSchema.parse({
+            contractVersion:
+              CREDENTIAL_SECURITY_CONTRACT_VERSIONS.providerReadFailure,
+            credentialReadEvidenceId: result.credentialReadEvidenceId,
+            diagnosticClass: failure.diagnosticClass
+          }),
+          input.requestId
+        );
+      } catch {
+        throw new ProviderCredentialReadFailure("reader_contract");
+      }
+      throw failure;
     } finally {
       plaintext?.fill(0);
     }

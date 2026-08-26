@@ -397,10 +397,12 @@ async function main() {
     additionalAuthenticatedData: credentialKms.credentialAad(aadContext)
   });
   let readCount = 0;
+  const readFailures = [];
   const readResult = {
     state: "available",
     credentialId: id(12),
     credentialVersion: 1,
+    credentialReadEvidenceId: id(15),
     providerKey: "quickbooks_online",
     providerEnvironment: "sandbox",
     accessExpiresAt: "2026-08-22T02:00:00.000Z",
@@ -427,6 +429,16 @@ async function main() {
     async readProviderCredential() {
       readCount += 1;
       return readResult;
+    },
+    async recordProviderCredentialReadFailure(command) {
+      readFailures.push(command);
+      return {
+        credentialReadFailureEvidenceId: id(16 + readFailures.length),
+        credentialReadEvidenceId: command.credentialReadEvidenceId,
+        diagnosticClass: command.diagnosticClass,
+        failedAt: now.toISOString(),
+        idempotent: false
+      };
     },
     acquireRefreshLease: unavailable,
     rotateCredential: unavailable,
@@ -533,6 +545,11 @@ async function main() {
     expiryBindingFailure.diagnosticClass,
     "expires_at_binding",
     "credential reads diagnose lifetime-binding mismatch without secret material"
+  );
+  deepEqual(
+    readFailures.map((failure) => failure.diagnosticClass),
+    ["aad_binding", "expires_at_binding"],
+    "post-decrypt failures append only bounded evidence classifications"
   );
   doesNotMatch(
     JSON.stringify(expiryBindingFailure),

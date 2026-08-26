@@ -316,9 +316,9 @@ export const RecoverQboSandboxCredentialBindingIncidentTaskCommandSchema = z
     expectedTaskRowVersion: z.number().int().positive().safe(),
     expectedDispatchGeneration: z.number().int().positive().safe(),
     failureAuditEventId: UuidSchema,
-    credentialReadAuditEventId: UuidSchema,
+    credentialReadEvidenceId: UuidSchema,
+    credentialReadFailureEvidenceId: UuidSchema,
     diagnosticClass: z.literal("expires_at_binding"),
-    externalEvidenceFingerprint: Sha256FingerprintSchema,
     retryAfterSeconds: z.number().int().min(1).max(3_600)
   })
   .strict();

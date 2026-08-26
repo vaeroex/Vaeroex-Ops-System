@@ -330,7 +330,7 @@ insert into private.integration_sync_tasks (
   queue_class, task_kind, stream_key, state, priority, control_metadata,
   idempotency_fingerprint, coalescing_fingerprint, dispatcher_task_name,
   dispatch_generation, delivery_attribution_state,
-  last_delivery_dispatch_generation,
+  last_delivery_dispatch_generation, last_delivery_retry_count,
   last_delivery_execution_count,
   last_delivery_attempt_fingerprint, attempt_count, maximum_attempts,
   available_at, lease_id, lease_owner_fingerprint, lease_expires_at,
@@ -376,6 +376,7 @@ insert into private.integration_sync_tasks (
   'attributed',
   1,
   0,
+  0,
   extensions.digest(
     pg_catalog.convert_to('phase8b-recovery-read-delivery', 'UTF8'),
     'sha256'
@@ -407,14 +408,24 @@ select ok(
     'public.acquire_integration_credential_refresh_lease_v2(jsonb,text)',
     'EXECUTE'
   )
-  and has_function_privilege(
+  and not has_function_privilege(
     'integration_credential_broker_authority',
     'public.read_integration_provider_credential_v2(jsonb,text)',
     'EXECUTE'
   )
-  and has_function_privilege(
+  and not has_function_privilege(
     'integration_credential_broker_authority',
     'public.read_integration_provider_credential_v4(jsonb,text)',
+    'EXECUTE'
+  )
+  and has_function_privilege(
+    'integration_credential_broker_authority',
+    'public.read_integration_provider_credential_v5(jsonb,text)',
+    'EXECUTE'
+  )
+  and has_function_privilege(
+    'integration_credential_broker_authority',
+    'public.record_integration_provider_credential_task_read_failure_v1(jsonb,text)',
     'EXECUTE'
   )
   and has_function_privilege(
@@ -457,12 +468,12 @@ select ok(
   )
   and not has_function_privilege(
     'service_role',
-    'public.read_integration_provider_credential_v4(jsonb,text)',
+    'public.read_integration_provider_credential_v5(jsonb,text)',
     'EXECUTE'
   )
   and not has_function_privilege(
     'integration_provider_runtime_authority',
-    'public.read_integration_provider_credential_v4(jsonb,text)',
+    'public.read_integration_provider_credential_v5(jsonb,text)',
     'EXECUTE'
   )
   and not has_table_privilege(
@@ -474,8 +485,8 @@ select ok(
 );
 
 set local role integration_credential_broker_authority;
-create temporary table phase8b_recovery_provider_read_v2 on commit drop as
-select public.read_integration_provider_credential_v2(
+create temporary table phase8b_recovery_provider_read_v5_first on commit drop as
+select public.read_integration_provider_credential_v5(
   pg_catalog.jsonb_build_object(
     'contractVersion', 'integration_provider_credential_read_v1',
     'taskId', '38e00000-0000-4000-8000-000000000100',
@@ -491,24 +502,24 @@ select public.read_integration_provider_credential_v2(
       'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'
     )
   ),
-  'phase8b_recovery_provider_read_v2'
+  'phase8b_recovery_provider_read_v5_first'
 ) as result;
 select is(
   pg_catalog.octet_length(
     pg_catalog.decode(
       (
         select result ->> 'ciphertextBase64'
-        from phase8b_recovery_provider_read_v2
+        from phase8b_recovery_provider_read_v5_first
       ),
       'base64'
     )
   ),
   256,
-  'historical provider read V2 retains canonical unbroken base64 behavior'
+  'task-bound provider read V5 retains canonical unbroken base64 behavior'
 );
 
 create temporary table phase8b_recovery_provider_read on commit drop as
-select public.read_integration_provider_credential_v4(
+select public.read_integration_provider_credential_v5(
   pg_catalog.jsonb_build_object(
     'contractVersion', 'integration_provider_credential_read_v1',
     'taskId', '38e00000-0000-4000-8000-000000000100',
@@ -524,7 +535,7 @@ select public.read_integration_provider_credential_v4(
       'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'
     )
   ),
-  'phase8b_recovery_provider_read_v4'
+  'phase8b_recovery_provider_read_v5'
 ) as result;
 reset role;
 select ok(
@@ -570,7 +581,7 @@ select ok(
   ) = private.phase_5_fingerprint_text_v1(
     private.qbo_phase_8b_realm_fingerprint_v1('phase8b-recovery-realm')
   ),
-  'provider read V4 returns canonical ciphertext and exact trusted binding metadata'
+  'provider read V5 returns canonical ciphertext and exact trusted binding metadata'
 );
 select is(
   (
@@ -578,7 +589,7 @@ select is(
     from phase8b_recovery_provider_read
   ),
   '78e00000-0000-4000-8000-000000000001',
-  'provider read V4 deterministically returns the sole authoritative active credential'
+  'provider read V5 deterministically returns the sole authoritative active credential'
 );
 
 set local role integration_credential_broker_authority;
@@ -644,10 +655,10 @@ select is(
     'phase8b_v4_rotation_store'
   ) ->> 'credentialVersion',
   '2',
-  'post-rotation V4 fixture persists a new authoritative ciphertext version'
+  'post-rotation V5 fixture persists a new authoritative ciphertext version'
 );
 create temporary table phase8b_recovery_provider_read_rotated on commit drop as
-select public.read_integration_provider_credential_v4(
+select public.read_integration_provider_credential_v5(
   pg_catalog.jsonb_build_object(
     'contractVersion', 'integration_provider_credential_read_v1',
     'taskId', '38e00000-0000-4000-8000-000000000100',
@@ -663,7 +674,7 @@ select public.read_integration_provider_credential_v4(
       'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'
     )
   ),
-  'phase8b_recovery_provider_read_v4_rotated'
+  'phase8b_recovery_provider_read_v5_rotated'
 ) as result;
 reset role;
 select ok(
@@ -682,7 +693,7 @@ select ok(
       )
     from phase8b_recovery_provider_read_rotated
   ),
-  'provider read V4 binds refreshed ciphertext to its one immutable rotation event'
+  'provider read V5 binds refreshed ciphertext to its one immutable rotation event'
 );
 rollback to savepoint phase8b_v4_post_rotation_read;
 release savepoint phase8b_v4_post_rotation_read;

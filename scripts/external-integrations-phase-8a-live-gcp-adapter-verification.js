@@ -309,6 +309,7 @@ async function main() {
     state: "available",
     credentialId: aadContext.credentialId,
     credentialVersion: 1,
+    credentialReadEvidenceId: "00000000-0000-4000-8000-000000000004",
     providerKey: "synthetic",
     providerEnvironment: "test",
     accessExpiresAt: envelope.accessExpiresAt,
@@ -333,6 +334,7 @@ async function main() {
       providerReadCount += 1;
       return readResult;
     },
+    recordProviderCredentialReadFailure: unavailable,
     acquireRefreshLease: unavailable,
     rotateCredential: unavailable,
     completeRefreshFailure: unavailable,

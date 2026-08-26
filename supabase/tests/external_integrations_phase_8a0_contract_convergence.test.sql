@@ -26,6 +26,20 @@ exception when others then
 end;
 $function$;
 
+create or replace function pg_temp.provider_read_evidence_id(
+  p_request_id text
+)
+returns uuid
+language sql
+stable
+security definer
+set search_path = ''
+as $function$
+  select evidence.id
+  from private.integration_provider_credential_task_read_evidence as evidence
+  where evidence.request_id = p_request_id;
+$function$;
+
 create or replace function pg_temp.fingerprint(p_value text)
 returns text
 language sql
@@ -407,30 +421,80 @@ select ok(
 select ok(
   has_function_privilege(
     'integration_credential_broker_authority',
+    'public.read_integration_provider_credential_v5(jsonb,text)',
+    'EXECUTE'
+  )
+  and has_function_privilege(
+    'integration_credential_broker_authority',
+    'public.record_integration_provider_credential_task_read_failure_v1(jsonb,text)',
+    'EXECUTE'
+  )
+  and not has_function_privilege(
+    'integration_credential_broker_authority',
     'public.read_integration_provider_credential_v1(jsonb,text)',
+    'EXECUTE'
+  )
+  and not has_function_privilege(
+    'integration_credential_broker_authority',
+    'public.read_integration_provider_credential_v4(jsonb,text)',
     'EXECUTE'
   )
   and not has_function_privilege(
     'service_role',
-    'public.read_integration_provider_credential_v1(jsonb,text)',
+    'public.read_integration_provider_credential_v5(jsonb,text)',
+    'EXECUTE'
+  )
+  and not has_function_privilege(
+    'service_role',
+    'public.record_integration_provider_credential_task_read_failure_v1(jsonb,text)',
     'EXECUTE'
   )
   and not has_function_privilege(
     'authenticated',
-    'public.read_integration_provider_credential_v1(jsonb,text)',
+    'public.read_integration_provider_credential_v5(jsonb,text)',
     'EXECUTE'
   )
   and not has_function_privilege(
     'deterministic_calculation_authority',
-    'public.read_integration_provider_credential_v1(jsonb,text)',
+    'public.read_integration_provider_credential_v5(jsonb,text)',
     'EXECUTE'
   )
   and not has_function_privilege(
     'integration_deterministic_runtime_authority',
-    'public.read_integration_provider_credential_v1(jsonb,text)',
+    'public.read_integration_provider_credential_v5(jsonb,text)',
     'EXECUTE'
   ),
-  'provider credential read execution belongs only to the broker'
+  'task-bound provider credential read execution belongs only to the broker'
+);
+select ok(
+  (
+    select relation.relrowsecurity and relation.relforcerowsecurity
+    from pg_catalog.pg_class as relation
+    where relation.oid =
+      'private.integration_provider_credential_task_read_evidence'::regclass
+  )
+  and (
+    select relation.relrowsecurity and relation.relforcerowsecurity
+    from pg_catalog.pg_class as relation
+    where relation.oid =
+      'private.integration_provider_credential_task_read_failure_evidence'::regclass
+  )
+  and not has_table_privilege(
+    'integration_credential_broker_authority',
+    'private.integration_provider_credential_task_read_evidence',
+    'SELECT,INSERT,UPDATE,DELETE'
+  )
+  and not has_table_privilege(
+    'integration_credential_broker_authority',
+    'private.integration_provider_credential_task_read_failure_evidence',
+    'SELECT,INSERT,UPDATE,DELETE'
+  )
+  and not has_table_privilege(
+    'service_role',
+    'private.integration_provider_credential_task_read_evidence',
+    'SELECT,INSERT,UPDATE,DELETE'
+  ),
+  'task-bound read evidence is private, forced-RLS, and RPC-only'
 );
 
 select ok(
@@ -949,8 +1013,9 @@ insert into private.integration_sync_tasks (
   provider_environment, queue_class, task_kind, stream_key, state, priority,
   control_metadata, idempotency_fingerprint, coalescing_fingerprint,
   dispatcher_task_name, dispatch_generation, delivery_attribution_state,
-  last_delivery_dispatch_generation, last_delivery_execution_count,
-  last_delivery_attempt_fingerprint, attempt_count, maximum_attempts,
+  last_delivery_dispatch_generation, last_delivery_retry_count,
+  last_delivery_execution_count, last_delivery_attempt_fingerprint,
+  attempt_count, maximum_attempts,
   available_at, lease_id, lease_owner_fingerprint, lease_expires_at,
   heartbeat_at, last_request_id, last_request_fingerprint, row_version,
   created_at, updated_at, retention_expires_at
@@ -977,7 +1042,7 @@ insert into private.integration_sync_tasks (
     ),
     extensions.digest(convert_to('phase8a0-task-a', 'UTF8'), 'sha256'),
     extensions.digest(convert_to('phase8a0-task-a-coalesce', 'UTF8'), 'sha256'),
-    'projects/phase8a0/locations/us/tasks/runtime-a', 1, 'attributed', 1, 0,
+    'projects/phase8a0/locations/us/tasks/runtime-a', 1, 'attributed', 1, 0, 0,
     extensions.digest(convert_to('phase8a0-delivery-a', 'UTF8'), 'sha256'),
     1, 3,
     transaction_timestamp(),
@@ -1011,7 +1076,7 @@ insert into private.integration_sync_tasks (
     ),
     extensions.digest(convert_to('phase8a0-task-b', 'UTF8'), 'sha256'),
     extensions.digest(convert_to('phase8a0-task-b-coalesce', 'UTF8'), 'sha256'),
-    'projects/phase8a0/locations/us/tasks/runtime-b', 1, 'attributed', 1, 0,
+    'projects/phase8a0/locations/us/tasks/runtime-b', 1, 'attributed', 1, 0, 0,
     extensions.digest(convert_to('phase8a0-delivery-b', 'UTF8'), 'sha256'),
     1, 3,
     transaction_timestamp(),
@@ -1020,6 +1085,74 @@ insert into private.integration_sync_tasks (
     transaction_timestamp() + interval '10 minutes', transaction_timestamp(),
     'phase8a0-task-b',
     extensions.digest(convert_to('phase8a0-task-b-request', 'UTF8'), 'sha256'),
+    3, transaction_timestamp(), transaction_timestamp(),
+    transaction_timestamp() + interval '7 days'
+  ),
+  (
+    '38000000-0000-4000-8000-000000000103', 'integration_sync_task_v1',
+    'b8000000-0000-4000-8000-000000000001',
+    'd8000000-0000-4000-8000-000000000001',
+    'e8000000-0000-4000-8000-000000000101', 1,
+    '28000000-0000-4000-8000-000000000101', null,
+    'quickbooks_online', 'sandbox', 'provider_interactive', 'incremental',
+    'qbo_bill', 'leased', 50,
+    jsonb_build_object(
+      'checkpointId', null,
+      'mappingId', 'f8000000-0000-4000-8000-000000000101',
+      'eventId', null,
+      'pageOrdinal', 0,
+      'cursorVersion', 0,
+      'windowStartAt', null,
+      'windowEndAt', null,
+      'reasonCode', 'phase8a0_provider_read_concurrent',
+      'recordHintCount', 1,
+      'coalescedEventCount', 1
+    ),
+    extensions.digest(convert_to('phase8a0-task-c', 'UTF8'), 'sha256'),
+    extensions.digest(convert_to('phase8a0-task-c-coalesce', 'UTF8'), 'sha256'),
+    'projects/phase8a0/locations/us/tasks/runtime-c', 1, 'attributed', 1, 0, 0,
+    extensions.digest(convert_to('phase8a0-delivery-c', 'UTF8'), 'sha256'),
+    1, 3,
+    transaction_timestamp(),
+    '48000000-0000-4000-8000-000000000103',
+    extensions.digest(convert_to('phase8a0-owner-c', 'UTF8'), 'sha256'),
+    transaction_timestamp() + interval '10 minutes', transaction_timestamp(),
+    'phase8a0-task-c',
+    extensions.digest(convert_to('phase8a0-task-c-request', 'UTF8'), 'sha256'),
+    3, transaction_timestamp(), transaction_timestamp(),
+    transaction_timestamp() + interval '7 days'
+  ),
+  (
+    '38000000-0000-4000-8000-000000000104', 'integration_sync_task_v1',
+    'b8000000-0000-4000-8000-000000000001',
+    'd8000000-0000-4000-8000-000000000001',
+    'e8000000-0000-4000-8000-000000000101', 1,
+    '28000000-0000-4000-8000-000000000101', null,
+    'quickbooks_online', 'sandbox', 'provider_interactive', 'incremental',
+    'qbo_payment', 'leased', 50,
+    jsonb_build_object(
+      'checkpointId', null,
+      'mappingId', 'f8000000-0000-4000-8000-000000000101',
+      'eventId', null,
+      'pageOrdinal', 0,
+      'cursorVersion', 0,
+      'windowStartAt', null,
+      'windowEndAt', null,
+      'reasonCode', 'phase8a0_stale_delivery_generation',
+      'recordHintCount', 1,
+      'coalescedEventCount', 1
+    ),
+    extensions.digest(convert_to('phase8a0-task-d', 'UTF8'), 'sha256'),
+    extensions.digest(convert_to('phase8a0-task-d-coalesce', 'UTF8'), 'sha256'),
+    'projects/phase8a0/locations/us/tasks/runtime-d', 2, 'attributed', 1, 0, 0,
+    extensions.digest(convert_to('phase8a0-delivery-d', 'UTF8'), 'sha256'),
+    1, 3,
+    transaction_timestamp(),
+    '48000000-0000-4000-8000-000000000104',
+    extensions.digest(convert_to('phase8a0-owner-d', 'UTF8'), 'sha256'),
+    transaction_timestamp() + interval '10 minutes', transaction_timestamp(),
+    'phase8a0-task-d',
+    extensions.digest(convert_to('phase8a0-task-d-request', 'UTF8'), 'sha256'),
     3, transaction_timestamp(), transaction_timestamp(),
     transaction_timestamp() + interval '7 days'
   );
@@ -1161,21 +1294,157 @@ select ok(
   'QBO sandbox and production credentials persist only against matching trusted connections'
 );
 
+-- Seed a test-only request-key collision so V5's evidence append fails after
+-- its internal V4 authority selection. The caught statement is a subtransaction:
+-- no ciphertext result or generic read audit can survive that failed append.
+insert into private.integration_audit_events (
+  id, workspace_id, business_entity_id, connection_id, actor_type, actor_id,
+  action, outcome, target_type, target_id, request_id, reason_code, metadata,
+  occurred_at, retention_class
+) values (
+  '88000000-0000-4000-8000-000000000101',
+  'b8000000-0000-4000-8000-000000000001',
+  'd8000000-0000-4000-8000-000000000001',
+  'e8000000-0000-4000-8000-000000000101',
+  'service', 'integration_credential_broker',
+  'credential_provider_read', 'allowed', 'integration_credential',
+  '68000000-0000-4000-8000-000000000101',
+  'phase8a0-provider-read-evidence-collision-seed', 'authorized',
+  pg_catalog.jsonb_build_object(
+    'connection_generation', 1,
+    'credential_status', 'active',
+    'credential_version', 1,
+    'task_state', 'leased'
+  ),
+  pg_catalog.transaction_timestamp(),
+  'security'
+);
+insert into private.integration_provider_credential_task_read_evidence (
+  id, contract_version, workspace_id, business_entity_id, connection_id,
+  connection_generation, connection_row_version, sync_run_id, mapping_id,
+  mapping_row_version, task_id, task_row_version, task_dispatch_generation,
+  dispatcher_task_name, delivery_attribution_state,
+  delivery_dispatch_generation, delivery_retry_count,
+  delivery_execution_count, delivery_attempt_fingerprint, lease_id,
+  lease_owner_fingerprint, lease_expires_at, credential_id,
+  credential_version, credential_row_version, provider_key,
+  provider_environment, granted_scopes, granted_scope_fingerprint,
+  credential_read_audit_event_id, request_id, request_fingerprint,
+  evidence_fingerprint, authority_role, authorized_at, created_at
+) values (
+  '89000000-0000-4000-8000-000000000101',
+  'integration_provider_credential_task_read_evidence_v1',
+  'b8000000-0000-4000-8000-000000000001',
+  'd8000000-0000-4000-8000-000000000001',
+  'e8000000-0000-4000-8000-000000000101', 1, 1,
+  '28000000-0000-4000-8000-000000000101',
+  'f8000000-0000-4000-8000-000000000101', 1,
+  '38000000-0000-4000-8000-000000000101', 3, 1,
+  'projects/phase8a0/locations/us/tasks/runtime-a', 'attributed',
+  1, 0, 0,
+  extensions.digest(convert_to('phase8a0-delivery-a', 'UTF8'), 'sha256'),
+  '48000000-0000-4000-8000-000000000101',
+  extensions.digest(convert_to('phase8a0-owner-a', 'UTF8'), 'sha256'),
+  pg_catalog.transaction_timestamp() + interval '10 minutes',
+  '68000000-0000-4000-8000-000000000101', 1, 1,
+  'quickbooks_online', 'sandbox',
+  array['com.intuit.quickbooks.accounting']::text[],
+  private.phase_3_contract_fingerprint_v1(
+    pg_catalog.jsonb_build_object(
+      'contractVersion', 'integration_provider_credential_scope_binding_v1',
+      'providerKey', 'quickbooks_online',
+      'providerEnvironment', 'sandbox',
+      'grantedScopes', pg_catalog.jsonb_build_array(
+        'com.intuit.quickbooks.accounting'
+      )
+    )
+  ),
+  '88000000-0000-4000-8000-000000000101',
+  'phase8a0-provider-read-evidence-collision',
+  extensions.digest(
+    convert_to('phase8a0-provider-read-evidence-collision-request', 'UTF8'),
+    'sha256'
+  ),
+  extensions.digest(
+    convert_to('phase8a0-provider-read-evidence-collision-row', 'UTF8'),
+    'sha256'
+  ),
+  'integration_credential_broker_authority',
+  pg_catalog.transaction_timestamp(),
+  pg_catalog.transaction_timestamp()
+);
+
 set local role integration_credential_broker_authority;
-select is(
-  public.read_integration_provider_credential_v4(
+create temporary table phase8a0_provider_read_result as
+select public.read_integration_provider_credential_v5(
     pg_temp.provider_read_command(
       '38000000-0000-4000-8000-000000000101',
       '48000000-0000-4000-8000-000000000101',
       'phase8a0-owner-a'
     ),
     'phase8a0-provider-read-valid'
-  ) ->> 'state',
+  ) as result;
+select is(
+  (select result ->> 'state' from phase8a0_provider_read_result),
   'available',
   'valid current QBO credential is available to the broker'
 );
+select ok(
+  (
+    select result ? 'credentialReadEvidenceId'
+      and (result ->> 'credentialReadEvidenceId')::uuid =
+        pg_temp.provider_read_evidence_id('phase8a0-provider-read-valid')
+    from phase8a0_provider_read_result
+  ),
+  'credential authority is returned only with its exact immutable evidence ID'
+);
 select is(
-  public.read_integration_provider_credential_v4(
+  public.record_integration_provider_credential_task_read_failure_v1(
+    pg_catalog.jsonb_build_object(
+      'contractVersion',
+        'integration_provider_credential_task_read_failure_evidence_v1',
+      'credentialReadEvidenceId',
+        pg_temp.provider_read_evidence_id('phase8a0-provider-read-valid'),
+      'diagnosticClass', 'expires_at_binding'
+    ),
+    'phase8a0-provider-read-valid'
+  ) ->> 'diagnosticClass',
+  'expires_at_binding',
+  'post-decrypt failure evidence derives identity only from the read evidence'
+);
+select is(
+  public.record_integration_provider_credential_task_read_failure_v1(
+    pg_catalog.jsonb_build_object(
+      'contractVersion',
+        'integration_provider_credential_task_read_failure_evidence_v1',
+      'credentialReadEvidenceId',
+        pg_temp.provider_read_evidence_id('phase8a0-provider-read-valid'),
+      'diagnosticClass', 'expires_at_binding'
+    ),
+    'phase8a0-provider-read-valid'
+  ) ->> 'idempotent',
+  'true',
+  'identical post-decrypt failure evidence replay is idempotent'
+);
+select ok(
+  pg_temp.raises_sqlstate(
+    $$select public.record_integration_provider_credential_task_read_failure_v1(
+      pg_catalog.jsonb_build_object(
+        'contractVersion',
+          'integration_provider_credential_task_read_failure_evidence_v1',
+        'credentialReadEvidenceId',
+          pg_temp.provider_read_evidence_id('phase8a0-provider-read-valid'),
+        'diagnosticClass', 'expires_at_binding',
+        'taskId', '38000000-0000-4000-8000-000000000102'
+      ),
+      'phase8a0-provider-read-forged-failure'
+    )$$,
+    '22023'
+  ),
+  'caller-forged task identity is not accepted by failure evidence'
+);
+select is(
+  public.read_integration_provider_credential_v5(
     pg_temp.provider_read_command(
       '38000000-0000-4000-8000-000000000101',
       '48000000-0000-4000-8000-000000000101',
@@ -1189,7 +1458,7 @@ select is(
 );
 select ok(
   pg_temp.raises_sqlstate(
-    $$select public.read_integration_provider_credential_v4(
+    $$select public.read_integration_provider_credential_v5(
       pg_temp.provider_read_command(
         '38000000-0000-4000-8000-000000000102',
         '48000000-0000-4000-8000-000000000102',
@@ -1203,7 +1472,7 @@ select ok(
 );
 select ok(
   pg_temp.raises_sqlstate(
-    $$select public.read_integration_provider_credential_v4(
+    $$select public.read_integration_provider_credential_v5(
       pg_temp.provider_read_command(
         '38000000-0000-4000-8000-000000000101',
         '48000000-0000-4000-8000-000000000101',
@@ -1217,7 +1486,66 @@ select ok(
 );
 select ok(
   pg_temp.raises_sqlstate(
-    $$select public.read_integration_provider_credential_v4(
+    $$select public.read_integration_provider_credential_v5(
+      pg_temp.provider_read_command(
+        '38000000-0000-4000-8000-000000000101',
+        '48000000-0000-4000-8000-000000000199',
+        'phase8a0-owner-a'
+      ),
+      'phase8a0-provider-read-lease-mismatch'
+    )$$,
+    '42501'
+  ),
+  'wrong task lease ID cannot read credentials'
+);
+select ok(
+  pg_temp.raises_sqlstate(
+    $$select public.read_integration_provider_credential_v5(
+      pg_temp.provider_read_command(
+        '38000000-0000-4000-8000-000000000104',
+        '48000000-0000-4000-8000-000000000104',
+        'phase8a0-owner-d'
+      ),
+      'phase8a0-provider-read-stale-delivery-generation'
+    )$$,
+    '42501'
+  ),
+  'stale delivery dispatch generation cannot receive credential authority'
+);
+select ok(
+  pg_temp.raises_sqlstate(
+    $$select public.read_integration_provider_credential_v5(
+      pg_temp.provider_read_command(
+        '38000000-0000-4000-8000-000000000101',
+        '48000000-0000-4000-8000-000000000101',
+        'phase8a0-owner-a'
+      ) || pg_catalog.jsonb_build_object(
+        'taskDispatchGeneration', 99,
+        'deliveryRetryCount', 99
+      ),
+      'phase8a0-provider-read-forged-delivery'
+    )$$,
+    '22023'
+  ),
+  'caller-forged task and delivery identity is rejected as malformed input'
+);
+select ok(
+  pg_temp.raises_sqlstate(
+    $$select public.read_integration_provider_credential_v5(
+      pg_temp.provider_read_command(
+        '38000000-0000-4000-8000-000000000101',
+        '48000000-0000-4000-8000-000000000101',
+        'phase8a0-owner-a'
+      ),
+      'phase8a0-provider-read-evidence-collision'
+    )$$,
+    '23505'
+  ),
+  'credential authority fails closed when its atomic evidence append cannot commit'
+);
+select ok(
+  pg_temp.raises_sqlstate(
+    $$select public.read_integration_provider_credential_v5(
       pg_temp.provider_read_command(
         '38000000-0000-4000-8000-000000000101',
         '48000000-0000-4000-8000-000000000102',
@@ -1230,6 +1558,123 @@ select ok(
   'copied cross-tenant lease and owner identifiers cannot widen credential discovery'
 );
 reset role;
+
+select ok(
+  (
+    select evidence.workspace_id =
+        'b8000000-0000-4000-8000-000000000001'
+      and evidence.business_entity_id =
+        'd8000000-0000-4000-8000-000000000001'
+      and evidence.connection_id =
+        'e8000000-0000-4000-8000-000000000101'
+      and evidence.connection_generation = 1
+      and evidence.mapping_id =
+        'f8000000-0000-4000-8000-000000000101'
+      and evidence.task_id =
+        '38000000-0000-4000-8000-000000000101'
+      and evidence.task_dispatch_generation = 1
+      and evidence.delivery_dispatch_generation = 1
+      and evidence.delivery_retry_count = 0
+      and evidence.delivery_execution_count = 0
+      and evidence.lease_id =
+        '48000000-0000-4000-8000-000000000101'
+      and evidence.lease_owner_fingerprint = extensions.digest(
+        pg_catalog.convert_to('phase8a0-owner-a', 'UTF8'),
+        'sha256'
+      )
+      and evidence.credential_id =
+        '68000000-0000-4000-8000-000000000101'
+      and evidence.credential_version = 1
+      and evidence.provider_key = 'quickbooks_online'
+      and evidence.provider_environment = 'sandbox'
+      and evidence.granted_scopes =
+        array['com.intuit.quickbooks.accounting']::text[]
+      and evidence.credential_read_audit_event_id = audit.id
+      and evidence.authorized_at = audit.occurred_at
+      and evidence.created_at = evidence.authorized_at
+    from private.integration_provider_credential_task_read_evidence as evidence
+    inner join private.integration_audit_events as audit
+      on audit.id = evidence.credential_read_audit_event_id
+    where evidence.request_id = 'phase8a0-provider-read-valid'
+  ),
+  'successful read evidence binds exact tenant, task, delivery, lease, credential, scope, and audit authority'
+);
+select is(
+  (
+    select pg_catalog.count(*)::integer
+    from private.integration_provider_credential_task_read_evidence
+    where request_id = 'phase8a0-provider-read-valid'
+  ),
+  1,
+  'one successful credential read creates exactly one evidence row'
+);
+select is(
+  (
+    select pg_catalog.count(*)::integer
+    from private.integration_provider_credential_task_read_evidence
+    where request_id in (
+      'phase8a0-provider-read-stale',
+      'phase8a0-provider-read-disconnected',
+      'phase8a0-provider-read-owner-mismatch',
+      'phase8a0-provider-read-lease-mismatch',
+      'phase8a0-provider-read-stale-delivery-generation',
+      'phase8a0-provider-read-forged-delivery',
+      'phase8a0-provider-read-cross-tenant-forgery'
+    )
+  ),
+  0,
+  'denied, malformed, and stale reads create no task-bound authority evidence'
+);
+select ok(
+  (
+    select pg_catalog.count(*) = 1
+    from private.integration_provider_credential_task_read_evidence
+    where request_id = 'phase8a0-provider-read-evidence-collision'
+  )
+  and not exists (
+    select 1
+    from private.integration_audit_events
+    where request_id = 'phase8a0-provider-read-evidence-collision'
+  ),
+  'failed evidence append rolls back its internal read audit and returns no new authority'
+);
+select ok(
+  (
+    select failure.task_id = read.task_id
+      and failure.task_dispatch_generation = read.task_dispatch_generation
+      and failure.delivery_dispatch_generation =
+        read.delivery_dispatch_generation
+      and failure.delivery_retry_count = read.delivery_retry_count
+      and failure.delivery_execution_count = read.delivery_execution_count
+      and failure.delivery_attempt_fingerprint =
+        read.delivery_attempt_fingerprint
+      and failure.lease_id = read.lease_id
+      and failure.lease_owner_fingerprint = read.lease_owner_fingerprint
+      and failure.credential_id = read.credential_id
+      and failure.credential_version = read.credential_version
+      and failure.diagnostic_class = 'expires_at_binding'
+    from private.integration_provider_credential_task_read_failure_evidence
+      as failure
+    inner join private.integration_provider_credential_task_read_evidence
+      as read on read.id = failure.credential_read_evidence_id
+    where failure.request_id = 'phase8a0-provider-read-valid'
+  ),
+  'failure evidence copies exact immutable read authority without caller task identity'
+);
+select ok(
+  pg_temp.raises_sqlstate(
+    $$update private.integration_provider_credential_task_read_evidence
+      set task_id = '38000000-0000-4000-8000-000000000102'
+      where request_id = 'phase8a0-provider-read-valid'$$,
+    '55000'
+  )
+  and pg_temp.raises_sqlstate(
+    $$delete from private.integration_provider_credential_task_read_failure_evidence
+      where request_id = 'phase8a0-provider-read-valid'$$,
+    '55000'
+  ),
+  'task-bound read and failure evidence are update/delete immutable'
+);
 
 select is(
   (
@@ -1266,7 +1711,7 @@ select ok(
 
 set local role integration_credential_broker_authority;
 select is(
-  public.read_integration_provider_credential_v4(
+  public.read_integration_provider_credential_v5(
     pg_temp.provider_read_command(
       '38000000-0000-4000-8000-000000000101',
       '48000000-0000-4000-8000-000000000101',
@@ -1560,7 +2005,7 @@ select is(
 from extensions.dblink(
   'phase8a0_read_concurrency_1',
   $read_one$
-    select public.read_integration_provider_credential_v4(
+    select public.read_integration_provider_credential_v5(
         jsonb_build_object(
           'contractVersion', 'integration_provider_credential_read_v1',
           'taskId', '38000000-0000-4000-8000-000000000101',
@@ -1593,14 +2038,14 @@ select is(
 from extensions.dblink(
   'phase8a0_read_concurrency_2',
   $read_two$
-    select public.read_integration_provider_credential_v4(
+    select public.read_integration_provider_credential_v5(
       jsonb_build_object(
         'contractVersion', 'integration_provider_credential_read_v1',
-        'taskId', '38000000-0000-4000-8000-000000000101',
-        'leaseId', '48000000-0000-4000-8000-000000000101',
+        'taskId', '38000000-0000-4000-8000-000000000103',
+        'leaseId', '48000000-0000-4000-8000-000000000103',
         'leaseOwnerFingerprint',
           'sha256:' || encode(
-            extensions.digest(convert_to('phase8a0-owner-a', 'UTF8'), 'sha256'),
+            extensions.digest(convert_to('phase8a0-owner-c', 'UTF8'), 'sha256'),
             'hex'
           ),
         'expectedCredentialVersion', 1,
@@ -1620,6 +2065,22 @@ from extensions.dblink(
 
 select extensions.dblink_exec('phase8a0_read_concurrency_1', 'commit');
 
+select ok(
+  (
+    select pg_catalog.count(*) = 2
+      and pg_catalog.count(distinct task_id) = 2
+      and pg_catalog.count(distinct lease_id) = 2
+      and pg_catalog.count(distinct evidence_fingerprint) = 2
+      and pg_catalog.count(distinct credential_id) = 1
+    from private.integration_provider_credential_task_read_evidence
+    where request_id in (
+      'phase8a0-concurrent-read-one',
+      'phase8a0-concurrent-read-two'
+    )
+  ),
+  'concurrent tasks sharing one credential create distinct non-cross-bound evidence'
+);
+
 select extensions.dblink_exec('phase8a0_read_concurrency_1', 'begin');
 select is(
   result.state,
@@ -1629,7 +2090,7 @@ select is(
 from extensions.dblink(
   'phase8a0_read_concurrency_1',
   $read_during_refresh$
-    select public.read_integration_provider_credential_v4(
+    select public.read_integration_provider_credential_v5(
         jsonb_build_object(
           'contractVersion', 'integration_provider_credential_read_v1',
           'taskId', '38000000-0000-4000-8000-000000000101',
