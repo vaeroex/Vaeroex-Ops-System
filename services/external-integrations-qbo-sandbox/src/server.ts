@@ -61,6 +61,10 @@ import {
   completeQboSandboxRuntimeTask,
   QboSandboxCloudTaskNameSchema,
   QBO_SANDBOX_AUTHORIZATION_RECOVERY_CONTRACT_VERSION,
+  QBO_SANDBOX_CANARY_DISPATCH_DISCOVERY_CONTRACT_VERSION,
+  QBO_SANDBOX_CANARY_DISPATCH_RESERVATION_CONTRACT_VERSION,
+  QBO_SANDBOX_CANARY_DUE_RETRY_PROMOTION_CONTRACT_VERSION,
+  QBO_SANDBOX_CREDENTIAL_BINDING_INCIDENT_RECOVERY_CONTRACT_VERSION,
   QBO_SANDBOX_DUE_RETRY_PROMOTION_CONTRACT_VERSION,
   QBO_SANDBOX_EXPIRED_CREDENTIAL_RECOVERY_CONTRACT_VERSION,
   QBO_SANDBOX_REAUTHORIZED_PURCHASE_RECOVERY_CONTRACT_VERSION,
@@ -71,10 +75,14 @@ import {
   readQboSandboxScopedDispatchCandidates,
   readQboSandboxRuntimeTaskDelivery,
   promoteQboSandboxDueRetryTasks,
+  promoteQboSandboxCanaryTask,
+  readQboSandboxCanaryDispatchCandidate,
+  recoverQboSandboxCredentialBindingIncidentTask,
   recoverQboSandboxExpiredCredentialTasks,
   recoverQboSandboxReauthorizedPurchaseTask,
   QboSandboxRuntimeLeaseResultSchema,
   reserveQboSandboxScopedDispatchTask,
+  reserveQboSandboxCanaryDispatchTask,
   sweepQboSandboxScopedDispatchTasks
 } from "@/lib/integrations/persistence/qbo-sandbox-runtime-repository";
 import {
@@ -140,6 +148,7 @@ import {
 
 const MAX_BODY_BYTES = 32 * 1024;
 const QBO_ACCOUNTING_METHOD = "Accrual" as const;
+const QBO_CANARY_QUEUE_NAME = "p8b-qbo-canary" as const;
 
 class CredentialResolutionFailure extends Error {
   readonly retryable: boolean;
@@ -163,6 +172,7 @@ const ServiceModeSchema = z.enum([
   "oauth_ingress",
   "credential_broker",
   "task_dispatcher",
+  "task_canary_dispatcher",
   "provider_runtime"
 ]);
 type ServiceMode = z.infer<typeof ServiceModeSchema>;
@@ -175,6 +185,7 @@ const databaseRolesByMode: Readonly<Record<ServiceMode, readonly string[]>> = {
     "integration_control_plane_authority"
   ],
   task_dispatcher: ["integration_task_dispatch_authority"],
+  task_canary_dispatcher: ["integration_qbo_canary_dispatch_authority"],
   provider_runtime: [
     "integration_provider_runtime_authority",
     "integration_provider_source_authority"
@@ -235,7 +246,8 @@ const config = {
   queueResource: process.env.PHASE8B_QUEUE_RESOURCE ?? null,
   providerRuntimeUrl: process.env.PHASE8B_PROVIDER_RUNTIME_URL ?? null,
   runtimeInvokerServiceAccount:
-    process.env.PHASE8B_RUNTIME_INVOKER_SERVICE_ACCOUNT ?? null
+    process.env.PHASE8B_RUNTIME_INVOKER_SERVICE_ACCOUNT ?? null,
+  canaryTaskId: process.env.PHASE8B_CANARY_TASK_ID ?? null
 };
 
 function requireCommonScope() {
@@ -1036,6 +1048,62 @@ async function handleBroker(request: IncomingMessage, response: ServerResponse, 
       });
       return json(response, 200, result);
     }
+    if (url.pathname === "/tasks/recover-credential-binding-incident") {
+      if (!cleanupCapabilityAuthorized(request)) {
+        return json(response, 403, { error: "recovery_capability_denied" });
+      }
+      const body = z
+        .object({
+          recoveryRequestId: BoundedIdentifierSchema,
+          mappingId: UuidSchema,
+          expectedMappingRowVersion: z.number().int().positive().safe(),
+          credentialId: UuidSchema,
+          expectedCredentialVersion: z.number().int().positive().safe(),
+          expectedCredentialRowVersion: z.number().int().positive().safe(),
+          taskId: UuidSchema,
+          expectedTaskRowVersion: z.number().int().positive().safe(),
+          expectedDispatchGeneration: z.number().int().positive().safe(),
+          failureAuditEventId: UuidSchema,
+          credentialReadAuditEventId: UuidSchema,
+          diagnosticClass: z.literal("expires_at_binding"),
+          externalEvidenceFingerprint: z.string().regex(/^sha256:[a-f0-9]{64}$/),
+          retryAfterSeconds: z.number().int().min(1).max(3_600)
+        })
+        .strict()
+        .parse(await readBody(request));
+      const result = await recoverQboSandboxCredentialBindingIncidentTask(
+        {
+          contractVersion:
+            QBO_SANDBOX_CREDENTIAL_BINDING_INCIDENT_RECOVERY_CONTRACT_VERSION,
+          workspaceId: scope.workspaceId,
+          businessEntityId: scope.businessEntityId,
+          connectionId: scope.connectionId,
+          connectionGeneration: config.connectionGeneration,
+          mappingId: body.mappingId,
+          expectedMappingRowVersion: body.expectedMappingRowVersion,
+          credentialId: body.credentialId,
+          expectedCredentialVersion: body.expectedCredentialVersion,
+          expectedCredentialRowVersion: body.expectedCredentialRowVersion,
+          taskId: body.taskId,
+          expectedTaskRowVersion: body.expectedTaskRowVersion,
+          expectedDispatchGeneration: body.expectedDispatchGeneration,
+          failureAuditEventId: body.failureAuditEventId,
+          credentialReadAuditEventId: body.credentialReadAuditEventId,
+          diagnosticClass: body.diagnosticClass,
+          externalEvidenceFingerprint: body.externalEvidenceFingerprint,
+          retryAfterSeconds: body.retryAfterSeconds
+        },
+        body.recoveryRequestId,
+        "phase8b_credential_binding_incident_recovery",
+        db.role("integration_credential_broker_authority")
+      );
+      safeEvent("credential_binding_incident_task_recovered", {
+        taskId: result.taskId,
+        state: result.state,
+        idempotent: result.idempotent
+      });
+      return json(response, 200, result);
+    }
     if (url.pathname === "/credentials/disconnect") {
       if (!cleanupCapabilityAuthorized(request)) {
         return json(response, 403, { error: "cleanup_capability_denied" });
@@ -1464,6 +1532,131 @@ async function handleTaskDispatcher(
       candidateCount: candidates.length,
       created,
       reused,
+      promotionAuthorized: false,
+      modelCallCount: 0
+    });
+  } finally {
+    await db.close();
+  }
+}
+
+async function handleCanaryTaskDispatcher(
+  request: IncomingMessage,
+  response: ServerResponse,
+  url: URL
+) {
+  if (request.method !== "POST" || url.pathname !== "/tasks/dispatch-canary") {
+    return json(response, 404, { error: "not_found" });
+  }
+  const body = z
+    .object({ maximumTasks: z.literal(1) })
+    .strict()
+    .parse(await readBody(request));
+  const queueResource = env("PHASE8B_QUEUE_RESOURCE");
+  const queueName = env("PHASE8B_QUEUE_NAME");
+  if (
+    queueName !== QBO_CANARY_QUEUE_NAME ||
+    !queueResource.endsWith(`/queues/${QBO_CANARY_QUEUE_NAME}`)
+  ) {
+    throw new Error("phase8b_canary_queue_configuration_mismatch");
+  }
+  const runtimeOrigin = new URL(env("PHASE8B_PROVIDER_RUNTIME_URL"));
+  if (
+    runtimeOrigin.protocol !== "https:" ||
+    runtimeOrigin.pathname !== "/" ||
+    runtimeOrigin.search ||
+    runtimeOrigin.hash
+  ) {
+    throw new Error("phase8b_canary_provider_runtime_url_invalid");
+  }
+  const targetUrl = new URL("/tasks/execute", runtimeOrigin).toString();
+  const canaryTaskId = UuidSchema.parse(config.canaryTaskId);
+  const db = database();
+  const dispatcherClient = db.role("integration_qbo_canary_dispatch_authority");
+  try {
+    const scope = requireCommonScope();
+    await promoteQboSandboxCanaryTask(
+      {
+        contractVersion: QBO_SANDBOX_CANARY_DUE_RETRY_PROMOTION_CONTRACT_VERSION,
+        workspaceId: scope.workspaceId,
+        businessEntityId: scope.businessEntityId,
+        connectionId: scope.connectionId,
+        connectionGeneration: config.connectionGeneration,
+        taskId: canaryTaskId,
+        maximumTasks: body.maximumTasks
+      },
+      `phase8b_canary_retry_ready_${canaryTaskId}`,
+      "phase8b_qbo_canary_dispatcher",
+      dispatcherClient
+    );
+    const candidates = await readQboSandboxCanaryDispatchCandidate(
+      {
+        contractVersion: QBO_SANDBOX_CANARY_DISPATCH_DISCOVERY_CONTRACT_VERSION,
+        workspaceId: scope.workspaceId,
+        businessEntityId: scope.businessEntityId,
+        connectionId: scope.connectionId,
+        connectionGeneration: config.connectionGeneration,
+        taskId: canaryTaskId,
+        maximumTasks: body.maximumTasks
+      },
+      dispatcherClient
+    );
+    let created = 0;
+    let reused = 0;
+    for (const candidate of candidates) {
+      if (candidate.taskId !== canaryTaskId || candidate.streamKey !== "company_info") {
+        throw new Error("phase8b_canary_candidate_scope_mismatch");
+      }
+      const cloudTaskId = createHash("sha256")
+        .update(
+          [
+            "phase8b_qbo_canary_cloud_task_v1",
+            candidate.taskId,
+            candidate.rowVersion,
+            candidate.dispatchGeneration + 1
+          ].join(":"),
+          "utf8"
+        )
+        .digest("hex");
+      await reserveQboSandboxCanaryDispatchTask(
+        {
+          contractVersion: QBO_SANDBOX_CANARY_DISPATCH_RESERVATION_CONTRACT_VERSION,
+          workspaceId: candidate.workspaceId,
+          businessEntityId: candidate.businessEntityId,
+          connectionId: candidate.connectionId,
+          connectionGeneration: candidate.connectionGeneration,
+          taskId: candidate.taskId,
+          expectedRowVersion: candidate.rowVersion,
+          dispatcherTaskName: cloudTaskId
+        },
+        `phase8b_canary_reserve_${cloudTaskId}`,
+        "phase8b_qbo_canary_dispatcher",
+        dispatcherClient
+      );
+      const cloudTask = await googleCreateCloudTask({
+        queueResource,
+        taskId: cloudTaskId,
+        targetUrl,
+        oidcServiceAccountEmail: env("PHASE8B_RUNTIME_INVOKER_SERVICE_ACCOUNT"),
+        oidcAudience: runtimeOrigin.origin,
+        payload: {
+          protocolVersion: RUNTIME_CONTRACT_VERSIONS.cloudTaskProtocol,
+          taskId: candidate.taskId
+        }
+      });
+      if (cloudTask.created) created += 1;
+      else reused += 1;
+    }
+    safeEvent("canary_provider_task_dispatched", {
+      candidateCount: candidates.length,
+      created,
+      reused
+    });
+    return json(response, 200, {
+      candidateCount: candidates.length,
+      created,
+      reused,
+      maximumTasks: 1,
       promotionAuthorized: false,
       modelCallCount: 0
     });
@@ -1989,6 +2182,9 @@ async function route(request: IncomingMessage, response: ServerResponse) {
   if (config.mode === "credential_broker") return handleBroker(request, response, url);
   if (config.mode === "task_dispatcher") {
     return handleTaskDispatcher(request, response, url);
+  }
+  if (config.mode === "task_canary_dispatcher") {
+    return handleCanaryTaskDispatcher(request, response, url);
   }
   if (request.method === "POST" && url.pathname === "/tasks/execute") {
     return executeProviderTask(request, response);

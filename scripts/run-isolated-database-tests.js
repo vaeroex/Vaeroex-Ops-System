@@ -181,7 +181,8 @@ const phase8bDatabaseTests = new Set([
   "external_integrations_phase_8b_same_generation_reauthorization.test.sql",
   "external_integrations_phase_8b_expired_refresh_lease_reclamation.test.sql",
   "external_integrations_phase_8b_zero_based_delivery_clean.test.sql",
-  "external_integrations_phase_8b_zero_based_delivery_upgrade.test.sql"
+  "external_integrations_phase_8b_zero_based_delivery_upgrade.test.sql",
+  "external_integrations_phase_8b_credential_binding_canary.test.sql"
 ]);
 const phase8bTestRoles = [
   "integration_control_plane_authority",
@@ -189,6 +190,7 @@ const phase8bTestRoles = [
   "integration_credential_broker_authority",
   "integration_task_dispatch_authority",
   "integration_task_scheduler_authority",
+  "integration_qbo_canary_dispatch_authority",
   "integration_provider_runtime_authority",
   "integration_provider_source_authority",
   "integration_provider_validation_authority"

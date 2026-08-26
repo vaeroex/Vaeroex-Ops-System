@@ -24,6 +24,7 @@ const allowedRoles = new Set([
   "integration_control_plane_authority",
   "integration_webhook_ingress_authority",
   "integration_task_dispatch_authority",
+  "integration_qbo_canary_dispatch_authority",
   "integration_provider_runtime_authority",
   "integration_provider_source_authority",
   "integration_provider_validation_authority"

@@ -9,7 +9,8 @@ const zeroBasedVersion = "20260824193332";
 const retryExecutionVersion = "20260824233000";
 const recoveryLifecycleVersion = "20260825180000";
 const scopedRetryLifecycleVersion = "20260825190000";
-const targetVersion = "20260826043610";
+const credentialBindingVersion = "20260826043610";
+const targetVersion = "20260826090000";
 const fixturePath = path.join(
   root,
   "supabase/tests/fixtures/external_integrations_phase_8b_zero_based_legacy.sql"
@@ -18,7 +19,8 @@ const testPaths = [
   "supabase/tests/external_integrations_phase_8b_zero_based_delivery_upgrade.test.sql",
   "supabase/tests/external_integrations_phase_6_durable_runtime.test.sql",
   "supabase/tests/external_integrations_phase_8b_credential_refresh_recovery.test.sql",
-  "supabase/tests/external_integrations_phase_8b_same_generation_reauthorization.test.sql"
+  "supabase/tests/external_integrations_phase_8b_same_generation_reauthorization.test.sql",
+  "supabase/tests/external_integrations_phase_8b_credential_binding_canary.test.sql"
 ];
 
 function fail(message, status = 1) {
@@ -118,12 +120,23 @@ function assertTargetIsSinglePendingMigration() {
       `Migration ${scopedRetryLifecycleVersion} no longer immediately follows ${recoveryLifecycleVersion}.`
     );
   }
+  const credentialBindingIndex = migrations.findIndex((name) =>
+    name.startsWith(`${credentialBindingVersion}_`)
+  );
+  if (credentialBindingIndex < 0) {
+    fail(`Credential-binding migration ${credentialBindingVersion} is missing.`);
+  }
   if (
-    migrations[targetIndex - 1]?.slice(0, 14) !==
+    migrations[credentialBindingIndex - 1]?.slice(0, 14) !==
       scopedRetryLifecycleVersion
   ) {
     fail(
-      `Migration ${targetVersion} no longer immediately follows ${scopedRetryLifecycleVersion}.`
+      `Migration ${credentialBindingVersion} no longer immediately follows ${scopedRetryLifecycleVersion}.`
+    );
+  }
+  if (migrations[targetIndex - 1]?.slice(0, 14) !== credentialBindingVersion) {
+    fail(
+      `Migration ${targetVersion} no longer immediately follows ${credentialBindingVersion}.`
     );
   }
   if (targetIndex !== migrations.length - 1) {

@@ -304,6 +304,32 @@ function testCloudTaskDeliveryIdentity() {
   equal(first.retryCount, 0, "first Cloud Tasks delivery retains retry count zero");
   equal(first.executionCount, 0, "first Cloud Tasks delivery retains execution count zero");
   equal(first.dispatchGeneration, 2, "delivery identity uses the trusted dispatch generation");
+  throws(
+    () => cloudTaskDelivery.parseQboCloudTaskDelivery({
+      ...base,
+      queueName: "p8b-qbo-canary"
+    }),
+    /queue mismatch|invalid/i,
+    "the main runtime cannot execute a canary-queue envelope"
+  );
+  const canaryDelivery = cloudTaskDelivery.parseQboCloudTaskDelivery({
+    ...base,
+    expectedQueueName: "p8b-qbo-canary",
+    queueName: "p8b-qbo-canary"
+  });
+  equal(
+    canaryDelivery.queueName,
+    "p8b-qbo-canary",
+    "the canary runtime accepts only its exact queue identity"
+  );
+  throws(
+    () => cloudTaskDelivery.parseQboCloudTaskDelivery({
+      ...base,
+      expectedQueueName: "p8b-qbo-canary"
+    }),
+    /queue mismatch|invalid/i,
+    "the canary runtime cannot execute a main-queue envelope"
+  );
 
   const retryWithoutExecutionAdvance = cloudTaskDelivery.parseQboCloudTaskDelivery({
     ...base,
@@ -2023,6 +2049,15 @@ function testMigrationBoundary() {
   const credentialBindingMigration = read(
     "supabase/migrations/20260826043610_qbo_credential_envelope_binding_convergence.sql"
   );
+  const credentialBindingCanaryMigration = read(
+    "supabase/migrations/20260826090000_qbo_credential_envelope_binding_incident_canary.sql"
+  );
+  const credentialBindingCanaryTest = read(
+    "supabase/tests/external_integrations_phase_8b_credential_binding_canary.test.sql"
+  );
+  const canaryProvisioning = read(
+    "services/external-integrations-qbo-sandbox/ops/provision-qbo-canary.sh"
+  );
   const service = read("services/external-integrations-qbo-sandbox/src/server.ts");
   const credentialBrokerSource = read("lib/integrations/credentials/broker.ts");
   const credentialRepositorySource = read(
@@ -2207,6 +2242,113 @@ function testMigrationBoundary() {
   ok(/databaseAccessLifetime !== envelopeAccessLifetime[\s\S]+databaseRefreshLifetime !== envelopeRefreshLifetime/.test(credentialBrokerSource), "broker validates exact access and refresh lifetimes across trusted-clock rebasing");
   ok(/externalEntityReferenceFingerprint[\s\S]+credential_binding/.test(credentialBrokerSource), "broker binds the decrypted realm reference to its persisted fingerprint");
   ok(/ProviderCredentialReadFailure[\s\S]+diagnosticClass/.test(credentialBrokerSource) && /safeEvent\("credential_read_failed"[\s\S]+diagnosticClass/.test(service), "credential read failures retain only a bounded non-secret diagnostic class");
+  ok(/create role integration_qbo_canary_dispatch_authority nologin noinherit/.test(credentialBindingCanaryMigration), "canary dispatch authority is NOLOGIN/NOINHERIT");
+  ok(/integration_sync_task_credential_binding_recovery_events[\s\S]+enable row level security[\s\S]+force row level security/.test(credentialBindingCanaryMigration), "incident recovery evidence is private with forced RLS");
+  ok(/qbo_sandbox_credential_envelope_binding_incident_recovery_v1/.test(credentialBindingCanaryMigration), "credential-envelope-binding recovery has a distinct incident contract");
+  ok(!/integration_sync_task_credential_binding_recovery_scope_key/.test(credentialBindingCanaryMigration), "incident recovery remains one-time per task without stranding other incident tasks in the same scope");
+  ok(/qbo_sandbox_expired_credential_recovery_v1[\s\S]+recovered_at < v_task\.completed_at/.test(credentialBindingCanaryMigration), "incident recovery requires preserved earlier expired-credential recovery lineage");
+  ok(/failureAuditEventId[\s\S]+integration_sync_task\.fail[\s\S]+audit\.occurred_at = v_task\.completed_at/.test(credentialBindingCanaryMigration), "incident recovery binds the exact latest terminal failure audit");
+  ok(/credentialReadAuditEventId[\s\S]+credential_provider_read[\s\S]+audit\.outcome = 'allowed'[\s\S]+audit\.metadata ->> 'task_state' = 'leased'/.test(credentialBindingCanaryMigration), "incident recovery requires the exact leased credential-read boundary");
+  ok(/diagnosticClass'[\s\S]+expires_at_binding[\s\S]+externalEvidenceFingerprint/.test(credentialBindingCanaryMigration), "incident recovery accepts only redacted expires-at-binding evidence");
+  ok(/integration_sync_task\.complete[\s\S]+external_source_record_versions[\s\S]+qbo_sandbox_credential_binding_incident_recovery_effect_denied/.test(credentialBindingCanaryMigration), "completed provider effects or source versions deny recovery");
+  ok(/reason_code in \('invalid_grant', 'provider_revoked'\)[\s\S]+qbo_sandbox_credential_binding_incident_recovery_revoked/.test(credentialBindingCanaryMigration), "invalid-grant and provider-revoked evidence deny incident recovery");
+  ok(/v_task\.state <> 'failed'[\s\S]+v_task\.row_version <>[\s\S]+v_task\.dispatch_generation <>/.test(credentialBindingCanaryMigration), "incident recovery requires exact failed task CAS and dispatch generation");
+  ok(/v_credential\.status <> 'active'[\s\S]+array\['com\.intuit\.quickbooks\.accounting'\][\s\S]+v_credential\.refresh_lease_id is not null/.test(credentialBindingCanaryMigration), "incident recovery requires exact lease-free active QBO accounting credential authority");
+  ok(/pg_advisory_xact_lock[\s\S]+integration_sync_task_credential_binding_recovery_events[\s\S]+'idempotent', true/.test(credentialBindingCanaryMigration), "incident recovery serializes before immutable idempotency evidence");
+  ok(/state = 'retry_wait'[\s\S]+failure_category = null[\s\S]+completed_at = null[\s\S]+row_version = task\.row_version \+ 1/.test(credentialBindingCanaryMigration), "incident recovery uses only the checked failed-to-retry_wait transition");
+  ok(/grant execute on function[\s\S]+recover_qbo_sandbox_credential_binding_incident_task_v1[\s\S]+to integration_credential_broker_authority/.test(credentialBindingCanaryMigration), "only credential-broker authority receives incident recovery execution");
+  ok(!/grant integration_(?:credential_broker|qbo_canary_dispatch)_authority\s+to service_role/i.test(credentialBindingCanaryMigration), "service_role receives no incident recovery or canary shortcut");
+  equal((credentialBindingCanaryMigration.match(/p_command ->> 'maximumTasks' <> '1'/g) || []).length, 2, "canary promotion and discovery both require maximumTasks exactly one");
+  equal((credentialBindingCanaryMigration.match(/task\.stream_key = 'company_info'/g) || []).length >= 3, true, "promotion, discovery, and reservation remain company_info-only");
+  ok(/read_qbo_sandbox_canary_dispatch_candidate_v1[\s\S]+task\.id = \(p_command ->> 'taskId'\)::uuid[\s\S]+integration_sync_task_credential_binding_recovery_events/.test(credentialBindingCanaryMigration), "canary discovery requires both exact task identity and immutable incident recovery evidence");
+  ok(/task\.state = 'dispatched'[\s\S]+phase8b_qbo_canary_cloud_task_v1:[\s\S]+candidate_row_version[\s\S]+candidate_dispatch_generation/.test(credentialBindingCanaryMigration), "reserved canary discovery reconstructs only the same deterministic pre-enqueue identity");
+  ok(/grant execute on function public\.read_qbo_sandbox_canary_dispatch_candidate_v1[\s\S]+to integration_qbo_canary_dispatch_authority/.test(credentialBindingCanaryMigration), "only canary authority receives exact discovery execution");
+  ok(/revoke execute on function public\.read_qbo_sandbox_scoped_dispatch_candidates_v1[\s\S]+revoke execute on function public\.sweep_integration_sync_tasks_v1/.test(credentialBindingCanaryMigration), "canary authority has no global or ordinary scoped discovery and recovery surface");
+  ok(/url\.pathname === "\/tasks\/recover-credential-binding-incident"[\s\S]+scope\.workspaceId[\s\S]+scope\.businessEntityId[\s\S]+scope\.connectionId/.test(service), "incident recovery derives tenant scope from trusted broker configuration");
+  ok(/task_canary_dispatcher[\s\S]+integration_qbo_canary_dispatch_authority/.test(service), "canary service mode has only the narrow database authority");
+  ok(/QBO_CANARY_QUEUE_NAME = "p8b-qbo-canary"[\s\S]+queueName !== QBO_CANARY_QUEUE_NAME/.test(service), "canary dispatcher is bound to the exact canary queue");
+  ok(/PHASE8B_CANARY_TASK_ID[\s\S]+UuidSchema\.parse\(config\.canaryTaskId\)/.test(service), "canary task identity comes only from trusted service configuration");
+  const canaryHandler = service.slice(
+    service.indexOf("async function handleCanaryTaskDispatcher"),
+    service.indexOf("async function executeProviderTask")
+  );
+  ok(!/readQboSandboxScopedDispatchCandidates|sweepQboSandboxScopedDispatchTasks|promoteQboSandboxDueRetryTasks/.test(canaryHandler), "canary dispatcher cannot fall back to ordinary scope-wide discovery or recovery");
+  ok(/candidate\.taskId !== canaryTaskId \|\| candidate\.streamKey !== "company_info"/.test(canaryHandler), "canary dispatcher rejects any candidate other than the configured company_info task");
+  ok(canaryHandler.indexOf("reserveQboSandboxCanaryDispatchTask(") < canaryHandler.indexOf("googleCreateCloudTask({"), "canary reservation is durable before external enqueue");
+  ok(/maximumTasks: z\.literal\(1\)/.test(service), "canary dispatcher accepts no batch size other than one");
+  ok(/modelCallCount: 0[\s\S]+promotionAuthorized: false|promotionAuthorized: false[\s\S]+modelCallCount: 0/.test(canaryHandler), "canary dispatch preserves zero model calls and no promotion authority");
+  ok(/PROJECT_ID="vaeroex-p8b-20260823-84b2f0"/.test(canaryProvisioning), "canary provisioning is pinned to the disposable Phase 8B project");
+  ok(/CANARY_TASK_ID="edb562b4-11fa-4bc4-93ea-2bb50e4d7f15"/.test(canaryProvisioning), "canary provisioning pins the reviewed company_info task");
+  ok(/MAIN_QUEUE_STATE[\s\S]+PAUSED[\s\S]+tasks queues create "\$CANARY_QUEUE"[\s\S]+max-concurrent-dispatches 1[\s\S]+tasks queues pause "\$CANARY_QUEUE"/.test(canaryProvisioning), "provisioning refuses an active main queue and leaves the canary paused at concurrency one");
+  ok(/--image "\$IMAGE"[\s\S]+PHASE8B_SERVICE_MODE=provider_runtime[\s\S]+--image "\$IMAGE"[\s\S]+PHASE8B_SERVICE_MODE=task_canary_dispatcher/.test(canaryProvisioning), "canary runtime and dispatcher use the same immutable reviewed image");
+  ok(/--no-allow-unauthenticated[\s\S]+roles\/run\.invoker[\s\S]+PHASE8B_RUNTIME_INVOKER_SERVICE_ACCOUNT/.test(canaryProvisioning), "canary services preserve private OIDC invocation");
+  ok(!/quickbooks\.api\.intuit\.com|PHASE8B_QUEUE_NAME=\$MAIN_QUEUE/.test(canaryProvisioning), "canary provisioning has no Production provider endpoint or main-queue fallback");
+  ok(/raises_sqlstate[\s\S]+service_role[\s\S]+42501/.test(credentialBindingCanaryTest), "database tests prove service_role has no recovery shortcut");
+  ok(/extensions\.dblink_send_query[\s\S]+extensions\.dblink_get_result/.test(credentialBindingCanaryTest), "database tests include hosted concurrent incident recovery");
+  ok(/legacy_unattributed[\s\S]+remains quarantined and unchanged/.test(credentialBindingCanaryTest), "database tests preserve legacy-unattributed quarantine");
+  ok(/reserved canary reconciliation returns the same virtual pre-reservation identity/.test(credentialBindingCanaryTest), "database tests prove deterministic reservation-to-enqueue reconciliation");
+
+  const validIncidentRecovery = {
+    contractVersion:
+      qboRuntimeRepository.QBO_SANDBOX_CREDENTIAL_BINDING_INCIDENT_RECOVERY_CONTRACT_VERSION,
+    workspaceId: id(8901),
+    businessEntityId: id(8902),
+    connectionId: id(8903),
+    connectionGeneration: 1,
+    mappingId: id(8904),
+    expectedMappingRowVersion: 1,
+    credentialId: id(8905),
+    expectedCredentialVersion: 5,
+    expectedCredentialRowVersion: 3,
+    taskId: id(8906),
+    expectedTaskRowVersion: 9,
+    expectedDispatchGeneration: 2,
+    failureAuditEventId: id(8907),
+    credentialReadAuditEventId: id(8908),
+    diagnosticClass: "expires_at_binding",
+    externalEvidenceFingerprint: fingerprint("phase8b-binding-incident"),
+    retryAfterSeconds: 1
+  };
+  equal(
+    qboRuntimeRepository.RecoverQboSandboxCredentialBindingIncidentTaskCommandSchema.parse(
+      validIncidentRecovery
+    ).diagnosticClass,
+    "expires_at_binding",
+    "repository accepts only the canonical redacted incident classification"
+  );
+  throws(
+    () => qboRuntimeRepository.RecoverQboSandboxCredentialBindingIncidentTaskCommandSchema.parse({
+      ...validIncidentRecovery,
+      diagnosticClass: "credential_expired"
+    }),
+    /invalid|literal/i,
+    "non-binding credential failures cannot use incident recovery"
+  );
+  const validCanaryTarget = {
+    contractVersion:
+      qboRuntimeRepository.QBO_SANDBOX_CANARY_DISPATCH_DISCOVERY_CONTRACT_VERSION,
+    workspaceId: id(8901),
+    businessEntityId: id(8902),
+    connectionId: id(8903),
+    connectionGeneration: 1,
+    taskId: id(8906),
+    maximumTasks: 1
+  };
+  equal(
+    qboRuntimeRepository.ReadQboSandboxCanaryDispatchCandidateCommandSchema.parse(
+      validCanaryTarget
+    ).maximumTasks,
+    1,
+    "repository accepts exactly one canary target"
+  );
+  throws(
+    () => qboRuntimeRepository.ReadQboSandboxCanaryDispatchCandidateCommandSchema.parse({
+      ...validCanaryTarget,
+      maximumTasks: 2
+    }),
+    /invalid|literal/i,
+    "repository rejects any widened canary batch"
+  );
   ok(/grant execute on function public\.create_integration_reauthorization_state_v1[\s\S]+to integration_oauth_ingress_authority/.test(reauthorizationMigration), "only OAuth ingress receives reauthorization state creation");
   ok(/grant execute on function public\.store_reauthorized_integration_credential_v1[\s\S]+to integration_credential_broker_authority/.test(reauthorizationMigration), "only credential broker receives replacement authority");
   ok(!/grant (?:execute|integration_credential_broker_authority)[\s\S]{0,100}to service_role/i.test(reauthorizationMigration), "service_role receives no reauthorization shortcut");
