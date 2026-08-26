@@ -480,7 +480,7 @@ select public.read_integration_provider_credential_v2(
     'contractVersion', 'integration_provider_credential_read_v1',
     'taskId', '38e00000-0000-4000-8000-000000000100',
     'leaseId', '48e00000-0000-4000-8000-000000000100',
-    'leaseOwnerFingerprint', pg_temp.fingerprint('phase8b-recovery-owner'),
+    'leaseOwnerFingerprint', pg_temp.fingerprint('phase8b-recovery-read-owner'),
     'expectedCredentialVersion', 1,
     'requiredScopes', pg_catalog.jsonb_build_array(
       'com.intuit.quickbooks.accounting'
@@ -646,7 +646,7 @@ select public.read_integration_provider_credential_v4(
     'contractVersion', 'integration_provider_credential_read_v1',
     'taskId', '38e00000-0000-4000-8000-000000000100',
     'leaseId', '48e00000-0000-4000-8000-000000000100',
-    'leaseOwnerFingerprint', pg_temp.fingerprint('phase8b-recovery-owner'),
+    'leaseOwnerFingerprint', pg_temp.fingerprint('phase8b-recovery-read-owner'),
     'expectedCredentialVersion', 2,
     'requiredScopes', pg_catalog.jsonb_build_array(
       'com.intuit.quickbooks.accounting'
