@@ -56,6 +56,8 @@ const canonical = require("../lib/integrations/contracts/canonical.ts");
 const cloudTaskDelivery = require(
   "../services/external-integrations-qbo-sandbox/src/cloud-task-delivery.ts"
 );
+const controlledRun = require("../lib/integrations/runtime/controlled-run-observer.ts");
+const runtimeContracts = require("../lib/integrations/runtime/contracts.ts");
 const { ProviderCredentialRefreshFailure } = require("../lib/integrations/credentials/provider-failure.ts");
 
 let assertionCount = 0;
@@ -116,6 +118,152 @@ const ids = {
 };
 const at = "2026-08-22T12:00:00.000Z";
 const provider = fixtures.QBO_SYNTHETIC_PROVIDER;
+
+async function testControlledRunObserver() {
+  const taskId = id(8999);
+  const queueName = "p8b-qbo-canary";
+  const snapshot = (state, queueState = "RUNNING") => ({
+    queueName,
+    queueState,
+    tasks: [{ taskId, state }]
+  });
+
+  deepEqual(
+    runtimeContracts.RUNTIME_TERMINAL_TASK_STATES,
+    ["succeeded", "failed", "dead_letter", "cancelled"],
+    "the runtime contract owns the complete terminal task-state set"
+  );
+  deepEqual(
+    runtimeContracts.RUNTIME_NON_TERMINAL_TASK_STATES,
+    ["pending", "dispatched", "leased", "retry_wait"],
+    "the runtime contract distinguishes every nonterminal task state"
+  );
+
+  for (const terminalState of runtimeContracts.RUNTIME_TERMINAL_TASK_STATES) {
+    let pauses = 0;
+    const observer = new controlledRun.ControlledRunObserver({
+      queueName,
+      expectedTaskIds: [taskId],
+      pauseQueue: async () => {
+        pauses += 1;
+      }
+    });
+    const result = await observer.observe(snapshot(terminalState));
+    equal(result.status, "finalized", `${terminalState} terminates controlled observation`);
+    equal(pauses, 1, `${terminalState} triggers exactly one queue finalization`);
+  }
+
+  let nonTerminalPauses = 0;
+  const nonTerminalObserver = new controlledRun.ControlledRunObserver({
+    queueName,
+    expectedTaskIds: [taskId],
+    pauseQueue: async () => {
+      nonTerminalPauses += 1;
+    }
+  });
+  for (const nonTerminalState of runtimeContracts.RUNTIME_NON_TERMINAL_TASK_STATES) {
+    const result = await nonTerminalObserver.observe(snapshot(nonTerminalState));
+    equal(result.status, "observing", `${nonTerminalState} remains nonterminal`);
+  }
+  equal(nonTerminalPauses, 0, "nonterminal states never request queue finalization");
+
+  let streamedSnapshots = 0;
+  let canaryPauses = 0;
+  async function* canarySnapshots() {
+    streamedSnapshots += 1;
+    yield snapshot("leased");
+    streamedSnapshots += 1;
+    yield snapshot("succeeded");
+    streamedSnapshots += 1;
+    yield snapshot("failed");
+  }
+  const canaryObserver = new controlledRun.ControlledRunObserver({
+    queueName,
+    expectedTaskIds: [taskId],
+    pauseQueue: async () => {
+      canaryPauses += 1;
+    }
+  });
+  const canaryResult = await controlledRun.observeControlledRunSnapshots(
+    canaryObserver,
+    canarySnapshots()
+  );
+  equal(canaryResult.status, "finalized", "the one-task canary finalizes on success");
+  equal(streamedSnapshots, 2, "observation stops without reading a post-terminal snapshot");
+  equal(canaryPauses, 1, "one-task completion performs exactly one pause action");
+
+  const replay = await canaryObserver.observe(snapshot("succeeded"));
+  equal(replay.idempotent, true, "terminal observation replay is idempotent");
+  equal(canaryPauses, 1, "terminal replay cannot perform a second pause action");
+
+  let alreadyPausedCalls = 0;
+  const alreadyPausedObserver = new controlledRun.ControlledRunObserver({
+    queueName,
+    expectedTaskIds: [taskId],
+    pauseQueue: async () => {
+      alreadyPausedCalls += 1;
+    }
+  });
+  const alreadyPaused = await alreadyPausedObserver.observe(snapshot("succeeded", "PAUSED"));
+  equal(alreadyPaused.idempotent, true, "an already-paused settled run finalizes idempotently");
+  equal(alreadyPausedCalls, 0, "an already-paused queue does not receive another pause request");
+
+  let releasePause;
+  const pauseGate = new Promise((resolve) => {
+    releasePause = resolve;
+  });
+  let concurrentPauses = 0;
+  const concurrentObserver = new controlledRun.ControlledRunObserver({
+    queueName,
+    expectedTaskIds: [taskId],
+    pauseQueue: async () => {
+      concurrentPauses += 1;
+      await pauseGate;
+    }
+  });
+  const firstFinalization = concurrentObserver.observe(snapshot("succeeded"));
+  const secondFinalization = concurrentObserver.observe(snapshot("succeeded"));
+  await Promise.resolve();
+  equal(concurrentPauses, 1, "concurrent terminal observations share one pause action");
+  releasePause();
+  const concurrentResults = await Promise.all([firstFinalization, secondFinalization]);
+  equal(
+    concurrentResults.filter((result) => result.pauseRequested).length,
+    1,
+    "exactly one concurrent observer owns finalization"
+  );
+  equal(
+    concurrentResults.filter((result) => result.idempotent).length,
+    1,
+    "the concurrent finalization follower is idempotent"
+  );
+
+  await rejects(
+    () => canaryObserver.observe({ ...snapshot("succeeded"), tasks: [] }),
+    /controlled_run_task_scope_mismatch|too_small/,
+    "an incomplete controlled batch fails closed"
+  );
+  await rejects(
+    () => canaryObserver.observe({
+      ...snapshot("succeeded"),
+      tasks: [snapshot("succeeded").tasks[0], snapshot("succeeded").tasks[0]]
+    }),
+    /controlled_run_task_scope_mismatch/,
+    "duplicate task observations cannot widen or settle the batch"
+  );
+
+  const observerSource = read("lib/integrations/runtime/controlled-run-observer.ts");
+  equal(
+    /resumeQueue|dispatchTask|createCloudTask|googleCreateCloudTask/.test(observerSource),
+    false,
+    "the observer has no queue-resume or delivery-creation capability"
+  );
+  equal(
+    /setInterval|setTimeout/.test(observerSource),
+    false,
+    "the observer does not use a polling timer as its execution safety boundary"
+  );
+}
 
 async function testOAuth() {
   equal(
@@ -3079,6 +3227,7 @@ function testOAuthCallbackEdgeSource() {
 }
 
 async function main() {
+  await testControlledRunObserver();
   await testOAuth();
   testCloudTaskDeliveryIdentity();
   await testSameGenerationReauthorizationBroker();
