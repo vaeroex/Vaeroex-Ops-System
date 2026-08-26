@@ -1121,20 +1121,20 @@ where id in (
 
 set local role integration_task_dispatch_authority;
 select is(
-  public.sweep_qbo_sandbox_scoped_dispatch_tasks_v1(
+  public.promote_qbo_sandbox_due_retry_tasks_v1(
     pg_catalog.jsonb_build_object(
-      'contractVersion', 'qbo_sandbox_scoped_dispatch_recovery_v1',
+      'contractVersion', 'qbo_sandbox_due_retry_promotion_v1',
       'workspaceId', 'b8e00000-0000-4000-8000-000000000001',
       'businessEntityId', 'd8e00000-0000-4000-8000-000000000001',
       'connectionId', 'e8e00000-0000-4000-8000-000000000001',
       'connectionGeneration', 1,
       'maximumTasks', 24
     ),
-    'phase8b_zero_sweep',
+    'phase8b_zero_retry_promotion',
     'phase8b_dispatcher'
-  ) ->> 'recoveredTaskCount',
+  ) ->> 'promotedTaskCount',
   '24',
-  'the scoped sweeper returns exactly the 24 recovered tasks to pending'
+  'scoped retry scheduling returns exactly 24 due tasks to pending'
 );
 
 do $reserve_incident$
