@@ -17,6 +17,7 @@ const DatabaseRpcSchema = z.enum([
   "consume_integration_oauth_state_v1",
   "store_integration_credential_v1",
   "read_integration_provider_credential_v1",
+  "read_integration_provider_credential_v4",
   "acquire_integration_credential_refresh_lease_v1",
   "rotate_integration_credential_v1",
   "complete_integration_credential_refresh_failure_v1",
@@ -78,6 +79,7 @@ export function createPhase5CredentialIamBoundary(input: {
       databaseRpcs: [
         "store_integration_credential_v1",
         "read_integration_provider_credential_v1",
+        "read_integration_provider_credential_v4",
         "acquire_integration_credential_refresh_lease_v1",
         "rotate_integration_credential_v1",
         "complete_integration_credential_refresh_failure_v1",

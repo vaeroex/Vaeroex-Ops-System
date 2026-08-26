@@ -50,6 +50,7 @@ const credentialResolution = require("../lib/integrations/provider-runtime/crede
 const credentialContracts = require("../lib/integrations/credentials/contracts.ts");
 const credentialBroker = require("../lib/integrations/credentials/broker.ts");
 const credentialKms = require("../lib/integrations/credentials/kms.ts");
+const credentialRedaction = require("../lib/integrations/credentials/redaction.ts");
 const oauthState = require("../lib/integrations/credentials/oauth-state.ts");
 const canonical = require("../lib/integrations/contracts/canonical.ts");
 const cloudTaskDelivery = require(
@@ -435,7 +436,8 @@ async function testSameGenerationReauthorizationBroker() {
     consumed: [],
     stored: [],
     exchanged: 0,
-    verified: 0
+    verified: 0,
+    encryptedPlaintext: null
   };
   const store = {
     async createOAuthState() {},
@@ -521,7 +523,8 @@ async function testSameGenerationReauthorizationBroker() {
   const broker = new credentialBroker.IntegrationCredentialBroker({
     store,
     kms: {
-      async encrypt() {
+      async encrypt(input) {
+        calls.encryptedPlaintext = Buffer.from(input.plaintext);
         return Buffer.from("phase8b-reauthorized-ciphertext-v2", "utf8");
       },
       async decrypt() {
@@ -625,6 +628,82 @@ async function testSameGenerationReauthorizationBroker() {
   equal(calls.stored[0].externalEntityReferenceFingerprint, realmFingerprint, "replacement storage preserves existing realm identity");
   equal("expectedConnectionRowVersion" in calls.stored[0], false, "completion storage derives CAS versions from persisted state");
   equal("credentialVersion" in calls.stored[0], false, "completion storage cannot choose its successor version");
+
+  const callbackEnvelope = credentialContracts.CredentialEnvelopeSchema.parse(
+    JSON.parse(calls.encryptedPlaintext.toString("utf8"))
+  );
+  const callbackPersistedAt = new Date(now.getTime() + 1_000);
+  const rebaseExpiry = (expiresAt) => new Date(
+    callbackPersistedAt.getTime() +
+      Date.parse(expiresAt) -
+      Date.parse(callbackEnvelope.updatedAt)
+  ).toISOString();
+  const callbackReadBroker = new credentialBroker.IntegrationCredentialBroker({
+    store: {
+      ...store,
+      async readProviderCredential() {
+        return {
+          state: "available",
+          credentialId: completed.credentialId,
+          credentialVersion: completed.credentialVersion,
+          providerKey: "quickbooks_online",
+          providerEnvironment: "sandbox",
+          accessExpiresAt: rebaseExpiry(callbackEnvelope.accessExpiresAt),
+          ciphertextPersistedAt: callbackPersistedAt.toISOString(),
+          refreshExpiresAt: rebaseExpiry(callbackEnvelope.refreshExpiresAt),
+          externalEntityReferenceFingerprint: realmFingerprint,
+          ciphertextBase64: Buffer.from(
+            "phase8b-reauthorized-ciphertext-v2",
+            "utf8"
+          ).toString("base64"),
+          aadDigest: calls.stored[0].aadDigest,
+          kmsKeyResource,
+          aadContext: {
+            schemaVersion: "oauth_credential_aad_v1",
+            purpose: "provider_oauth_credential",
+            environment: "sandbox",
+            workspaceId,
+            connectionId,
+            connectionGeneration: 1,
+            providerKey: "quickbooks_online",
+            credentialId: completed.credentialId
+          },
+          grantedScopes: [phase8b.QBO_ACCOUNTING_SCOPE]
+        };
+      }
+    },
+    kms: {
+      async encrypt() {
+        throw new Error("unexpected_encrypt");
+      },
+      async decrypt() {
+        return Buffer.from(calls.encryptedPlaintext);
+      }
+    },
+    kmsKeyResource,
+    secrets: { async access() { throw new Error("unexpected_secret"); } },
+    provider: {
+      providerKey: "quickbooks_online",
+      environment: "sandbox",
+      async exchangeAuthorizationCode() { throw new Error("unexpected_exchange"); },
+      async refreshCredential() { throw new Error("unexpected_refresh"); },
+      async revokeCredential() { throw new Error("unexpected_revoke"); }
+    },
+    clock: () => now
+  });
+  equal(
+    (await callbackReadBroker.readProviderAccessCredential({
+      taskId: id(8811),
+      leaseId: id(8812),
+      leaseOwnerFingerprint: fingerprint("phase8b-callback-read-owner"),
+      expectedCredentialVersion: completed.credentialVersion,
+      requiredScopes: [phase8b.QBO_ACCOUNTING_SCOPE],
+      minimumValiditySeconds: 300,
+      requestId: "phase8b_callback_credential_read"
+    })).state,
+    "available",
+    "callback-created credential remains readable after trusted-clock expiry rebasing"
+  );
 
   const providerCallsBeforeMismatch = calls.exchanged;
   await rejects(
@@ -914,7 +993,10 @@ async function runRefreshRotationCase(mode) {
     result,
     calls,
     priorRefreshToken,
-    rotatedRefreshToken
+    rotatedRefreshToken,
+    scope,
+    aadContext,
+    now
   };
 }
 
@@ -955,6 +1037,66 @@ async function testQboRefreshRotationPolicy() {
     const auditText = JSON.stringify(tested.calls.boundaries);
     equal(auditText.includes(tested.priorRefreshToken), false, "refresh audit never retains prior token bytes");
     equal(auditText.includes(tested.rotatedRefreshToken), false, "refresh audit never retains returned token bytes");
+
+    const persistedAt = new Date(tested.now.getTime() + 500);
+    const rebaseExpiry = (expiresAt) => expiresAt === null
+      ? null
+      : new Date(
+          persistedAt.getTime() +
+            Date.parse(expiresAt) -
+            Date.parse(persisted.updatedAt)
+        ).toISOString();
+    const readBroker = new credentialBroker.IntegrationCredentialBroker({
+      store: {
+        async readProviderCredential() {
+          return {
+            state: "available",
+            credentialId: tested.scope.credentialId,
+            credentialVersion: tested.result.credentialVersion,
+            providerKey: "quickbooks_online",
+            providerEnvironment: "sandbox",
+            accessExpiresAt: rebaseExpiry(persisted.accessExpiresAt),
+            ciphertextPersistedAt: persistedAt.toISOString(),
+            refreshExpiresAt: rebaseExpiry(persisted.refreshExpiresAt),
+            externalEntityReferenceFingerprint:
+              tested.calls.rotate[0].externalEntityReferenceFingerprint,
+            ciphertextBase64: tested.calls.rotate[0].ciphertextBase64,
+            aadDigest: tested.calls.rotate[0].aadDigest,
+            kmsKeyResource: tested.calls.rotate[0].kmsKeyResource,
+            aadContext: tested.aadContext,
+            grantedScopes: persisted.grantedScopes
+          };
+        }
+      },
+      kms: {
+        async decrypt() {
+          return Buffer.from(tested.calls.encryptedPlaintext);
+        }
+      },
+      kmsKeyResource: tested.calls.rotate[0].kmsKeyResource,
+      secrets: { async access() { throw new Error("unexpected_secret"); } },
+      provider: {
+        providerKey: "quickbooks_online",
+        environment: "sandbox",
+        async exchangeAuthorizationCode() { throw new Error("unexpected_exchange"); },
+        async refreshCredential() { throw new Error("unexpected_refresh"); },
+        async revokeCredential() { throw new Error("unexpected_revoke"); }
+      },
+      clock: () => tested.now
+    });
+    equal(
+      (await readBroker.readProviderAccessCredential({
+        taskId: id(mode === "same" ? 8961 : 8962),
+        leaseId: id(mode === "same" ? 8963 : 8964),
+        leaseOwnerFingerprint: fingerprint(`phase8b-${mode}-refresh-read`),
+        expectedCredentialVersion: tested.result.credentialVersion,
+        requiredScopes: [phase8b.QBO_ACCOUNTING_SCOPE],
+        minimumValiditySeconds: 300,
+        requestId: `phase8b_${mode}_refresh_read`
+      })).state,
+      "available",
+      `${mode} returned-token refresh remains readable after trusted-clock rebasing`
+    );
   }
 
   const missing = await runRefreshRotationCase("missing");
@@ -981,6 +1123,136 @@ async function testQboRefreshRotationPolicy() {
     /credential_refresh_failure_stale/,
     "stale credential CAS and stale failure ownership both fail closed"
   );
+}
+
+async function testCredentialReadDiagnostics() {
+  const now = new Date("2026-08-24T12:00:00.000Z");
+  const realmId = "phase8b-read-diagnostic-realm";
+  const aadContext = {
+    schemaVersion: "oauth_credential_aad_v1",
+    purpose: "provider_oauth_credential",
+    environment: "sandbox",
+    workspaceId: id(8971),
+    connectionId: id(8972),
+    connectionGeneration: 1,
+    providerKey: "quickbooks_online",
+    credentialId: id(8973)
+  };
+  const envelope = {
+    schemaVersion: "oauth_credential_envelope_v1",
+    providerKey: "quickbooks_online",
+    environment: "sandbox",
+    externalAuthorizedEntityReference: realmId,
+    accessToken: credentialRedaction.PHASE_5_LEAKAGE_CANARIES.accessToken,
+    accessExpiresAt: "2026-08-24T13:00:00.000Z",
+    refreshToken: credentialRedaction.PHASE_5_LEAKAGE_CANARIES.refreshToken,
+    refreshExpiresAt: "2026-11-22T12:00:00.000Z",
+    grantedScopes: [phase8b.QBO_ACCOUNTING_SCOPE],
+    issuedAt: now.toISOString(),
+    updatedAt: now.toISOString()
+  };
+  const baseResult = {
+    state: "available",
+    credentialId: aadContext.credentialId,
+    credentialVersion: 5,
+    providerKey: "quickbooks_online",
+    providerEnvironment: "sandbox",
+    accessExpiresAt: "2026-08-24T13:00:01.000Z",
+    ciphertextPersistedAt: "2026-08-24T12:00:01.000Z",
+    refreshExpiresAt: "2026-11-22T12:00:01.000Z",
+    externalEntityReferenceFingerprint: canonical.contractSha256({
+      fingerprintPurpose: "provider_authorized_entity_reference",
+      fingerprintVersion: "provider_authorized_entity_reference_fingerprint_v1",
+      value: realmId
+    }),
+    ciphertextBase64: Buffer.from("phase8b-read-ciphertext", "utf8").toString("base64"),
+    aadDigest: credentialKms.credentialAadDigest(aadContext),
+    kmsKeyResource:
+      "projects/vaeroex-intg-dev-9999/locations/us-west1/keyRings/phase8b/cryptoKeys/qbo-sandbox-oauth",
+    aadContext,
+    grantedScopes: [phase8b.QBO_ACCOUNTING_SCOPE]
+  };
+  const input = {
+    taskId: id(8974),
+    leaseId: id(8975),
+    leaseOwnerFingerprint: fingerprint("phase8b-read-diagnostic-owner"),
+    expectedCredentialVersion: 5,
+    requiredScopes: [phase8b.QBO_ACCOUNTING_SCOPE],
+    minimumValiditySeconds: 300,
+    requestId: "phase8b_read_diagnostic"
+  };
+
+  async function readWith(options = {}) {
+    const broker = new credentialBroker.IntegrationCredentialBroker({
+      store: {
+        async readProviderCredential() {
+          return { ...baseResult, ...options.result };
+        }
+      },
+      kms: {
+        async decrypt() {
+          if (options.kmsFailure) throw new Error("kms_decrypt_failed");
+          return Buffer.from(
+            JSON.stringify(options.envelope ?? envelope),
+            "utf8"
+          );
+        }
+      },
+      kmsKeyResource: baseResult.kmsKeyResource,
+      secrets: { async access() { throw new Error("unexpected_secret"); } },
+      provider: {
+        providerKey: "quickbooks_online",
+        environment: "sandbox",
+        async exchangeAuthorizationCode() { throw new Error("unexpected_exchange"); },
+        async refreshCredential() { throw new Error("unexpected_refresh"); },
+        async revokeCredential() { throw new Error("unexpected_revoke"); }
+      },
+      clock: () => now
+    });
+    return broker.readProviderAccessCredential(input);
+  }
+
+  equal((await readWith()).state, "available", "canonical V5 envelope is readable after exact clock rebasing");
+  const missingRefresh = { ...envelope };
+  delete missingRefresh.refreshToken;
+  const cases = [
+    ["refresh_token_presence", { envelope: missingRefresh }],
+    ["provider_key", { envelope: { ...envelope, providerKey: "synthetic" } }],
+    ["provider_environment", { envelope: { ...envelope, environment: "test" } }],
+    ["scope_shape", { envelope: { ...envelope, grantedScopes: ["openid"] } }],
+    ["credential_binding", {
+      result: { externalEntityReferenceFingerprint: fingerprint("wrong-realm") }
+    }],
+    ["expires_at_binding", {
+      result: { accessExpiresAt: "2026-08-24T13:00:02.000Z" }
+    }],
+    ["kms_failure", { kmsFailure: true }],
+    ["aad_binding", {
+      result: { aadDigest: fingerprint("wrong-aad") }
+    }],
+    ["reader_contract", {
+      result: { ciphertextPersistedAt: undefined }
+    }]
+  ];
+  for (const [diagnosticClass, options] of cases) {
+    const error = await readWith(options).catch((failure) => failure);
+    equal(
+      error.diagnosticClass,
+      diagnosticClass,
+      `${diagnosticClass} fails closed with only its bounded diagnostic class`
+    );
+    const diagnostic = JSON.stringify(error);
+    equal(
+      [
+        ...Object.values(credentialRedaction.PHASE_5_LEAKAGE_CANARIES),
+        realmId,
+        "Authorization",
+        "Bearer"
+      ].some((secret) => diagnostic.includes(secret)),
+      false,
+      `${diagnosticClass} diagnostics contain no credential, realm, or authorization material`
+    );
+  }
 }
 
 async function testReadOnlyClient() {
@@ -1748,7 +2020,14 @@ function testMigrationBoundary() {
   const dispatchRetryLifecycleMigration = read(
     "supabase/migrations/20260825190000_qbo_scoped_dispatch_retry_lifecycle.sql"
   );
+  const credentialBindingMigration = read(
+    "supabase/migrations/20260826043610_qbo_credential_envelope_binding_convergence.sql"
+  );
   const service = read("services/external-integrations-qbo-sandbox/src/server.ts");
+  const credentialBrokerSource = read("lib/integrations/credentials/broker.ts");
+  const credentialRepositorySource = read(
+    "lib/integrations/persistence/credential-repository.ts"
+  );
   const deliveryParser = read(
     "services/external-integrations-qbo-sandbox/src/cloud-task-delivery.ts"
   );
@@ -1916,6 +2195,18 @@ function testMigrationBoundary() {
   ok(/integration_credentials_current_scope_key[\s\S]+where status in \('active', 'reauthorization_required'\)/.test(reauthorizationMigration), "database enforces one authoritative credential per connection generation");
   ok(/v_mapping\.provider_entity_reference_fingerprint <>[\s\S]+v_state\.provider_entity_reference_fingerprint/.test(reauthorizationMigration), "completion fails closed on any realm mapping mismatch");
   ok(/read_integration_provider_credential_v3[\s\S]+credential\.status = 'active'/.test(reauthorizationMigration), "provider reads select only the authoritative active credential");
+  ok(/integration_credentials_current_scope_key[\s\S]+where status in \('active', 'reauthorization_required'\)/.test(reauthorizationMigration), "one partial unique index makes current credential authority deterministic per tenant scope");
+  ok(/read_integration_provider_credential_v4[\s\S]+read_integration_provider_credential_v3/.test(credentialBindingMigration), "credential read V4 inherits the complete task, tenant, lease, and active-row authority check");
+  ok(/credential\.status = 'active'[\s\S]+credential\.credential_ciphertext is not null[\s\S]+for share/.test(credentialBindingMigration), "credential read V4 rechecks the exact returned active version under a shared lock");
+  ok(/v_created_credential_version[\s\S]+v_rotation_evidence_count <> 0[\s\S]+v_rotation_evidence_count <> 1/.test(credentialBindingMigration), "credential read V4 uses creation time only for an unrotated row and requires exactly one immutable event for the current refreshed version");
+  ok(/ciphertextPersistedAt[\s\S]+refreshExpiresAt[\s\S]+externalEntityReferenceFingerprint/.test(credentialBindingMigration), "credential read V4 returns only the trusted non-secret binding metadata needed for exact validation");
+  ok(/grant execute on function public\.read_integration_provider_credential_v4\(jsonb, text\)[\s\S]+to integration_credential_broker_authority/.test(credentialBindingMigration), "only credential-broker authority receives the converged read RPC");
+  ok(!/grant (?:execute|integration_credential_broker_authority)[\s\S]{0,100}to service_role/i.test(credentialBindingMigration), "service_role receives no converged credential-read shortcut");
+  ok(!/(?:create or replace|drop) function public\.read_integration_provider_credential_v[123]/.test(credentialBindingMigration), "forward convergence leaves all historical credential-read definitions unchanged");
+  ok(/read_integration_provider_credential_v4/.test(credentialRepositorySource) && !/read_integration_provider_credential_v[123]/.test(credentialRepositorySource), "runtime persistence uses only the converged V4 credential read");
+  ok(/databaseAccessLifetime !== envelopeAccessLifetime[\s\S]+databaseRefreshLifetime !== envelopeRefreshLifetime/.test(credentialBrokerSource), "broker validates exact access and refresh lifetimes across trusted-clock rebasing");
+  ok(/externalEntityReferenceFingerprint[\s\S]+credential_binding/.test(credentialBrokerSource), "broker binds the decrypted realm reference to its persisted fingerprint");
+  ok(/ProviderCredentialReadFailure[\s\S]+diagnosticClass/.test(credentialBrokerSource) && /safeEvent\("credential_read_failed"[\s\S]+diagnosticClass/.test(service), "credential read failures retain only a bounded non-secret diagnostic class");
   ok(/grant execute on function public\.create_integration_reauthorization_state_v1[\s\S]+to integration_oauth_ingress_authority/.test(reauthorizationMigration), "only OAuth ingress receives reauthorization state creation");
   ok(/grant execute on function public\.store_reauthorized_integration_credential_v1[\s\S]+to integration_credential_broker_authority/.test(reauthorizationMigration), "only credential broker receives replacement authority");
   ok(!/grant (?:execute|integration_credential_broker_authority)[\s\S]{0,100}to service_role/i.test(reauthorizationMigration), "service_role receives no reauthorization shortcut");
@@ -2651,6 +2942,7 @@ async function main() {
   await testSameGenerationReauthorizationBroker();
   await testExpiredRefreshLeaseReclamationBroker();
   await testQboRefreshRotationPolicy();
+  await testCredentialReadDiagnostics();
   await testReadOnlyClient();
   const source = testSourceValidationAndMapping();
   const report = testReportControl();

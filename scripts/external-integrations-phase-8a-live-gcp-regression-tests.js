@@ -242,8 +242,8 @@ const iamBoundary = require("../lib/integrations/credentials/iam.ts")
   });
 const brokerIam = iamBoundary.find((identity) => identity.identity === "connector_broker");
 ok(
-  brokerIam.databaseRpcs.includes("read_integration_provider_credential_v1"),
-  "credential IAM architecture includes the merged provider-read RPC"
+  brokerIam.databaseRpcs.includes("read_integration_provider_credential_v4"),
+  "credential IAM architecture includes the converged provider-read RPC"
 );
 
 equal(credentials.PHASE_5_MODEL_CALL_COUNT, 0, "credential model-call count remains zero");

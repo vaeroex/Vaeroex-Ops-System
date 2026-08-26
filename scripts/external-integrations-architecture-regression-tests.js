@@ -181,7 +181,7 @@ matches(
 );
 matches(
   zeroBasedUpgradeRunner,
-  /const fixtureBaseVersion = "20260824083917";[\s\S]*const zeroBasedVersion = "20260824193332";[\s\S]*const retryExecutionVersion = "20260824233000";[\s\S]*const recoveryLifecycleVersion = "20260825180000";[\s\S]*const targetVersion = "20260825190000";[\s\S]*"db",[\s\S]*"reset",[\s\S]*"--version",[\s\S]*fixtureBaseVersion/,
+  /const fixtureBaseVersion = "20260824083917";[\s\S]*const zeroBasedVersion = "20260824193332";[\s\S]*const retryExecutionVersion = "20260824233000";[\s\S]*const recoveryLifecycleVersion = "20260825180000";[\s\S]*const scopedRetryLifecycleVersion = "20260825190000";[\s\S]*const targetVersion = "20260826043610";[\s\S]*"db",[\s\S]*"reset",[\s\S]*"--version",[\s\S]*fixtureBaseVersion/,
   "the fixture-rich runner must reset to the exact pre-migration boundary"
 );
 matches(
@@ -238,6 +238,7 @@ const approvedProtectedPaths = new Set([
   "supabase/migrations/20260824233000_qbo_retry_execution_and_reauthorization_recovery.sql",
   "supabase/migrations/20260825180000_qbo_reauthorization_required_lifecycle.sql",
   "supabase/migrations/20260825190000_qbo_scoped_dispatch_retry_lifecycle.sql",
+  "supabase/migrations/20260826043610_qbo_credential_envelope_binding_convergence.sql",
   "supabase/tests/external_integrations_phase_8b_qbo_sandbox_validation.test.sql",
   "supabase/tests/external_integrations_phase_8b_credential_refresh_recovery.test.sql",
   "supabase/tests/external_integrations_phase_8b_same_generation_reauthorization.test.sql",

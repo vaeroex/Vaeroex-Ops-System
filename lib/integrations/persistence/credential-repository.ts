@@ -197,7 +197,7 @@ export async function readIntegrationProviderCredential(
 ) {
   return ProviderCredentialReadResultSchema.parse(
     await credentialRpc(
-      "read_integration_provider_credential_v3",
+      "read_integration_provider_credential_v4",
       {
         p_command: ReadProviderCredentialCommandSchema.parse(input),
         p_request_id: requestId(id)

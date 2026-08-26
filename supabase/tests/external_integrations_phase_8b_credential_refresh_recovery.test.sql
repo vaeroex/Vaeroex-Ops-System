@@ -414,6 +414,11 @@ select ok(
   )
   and has_function_privilege(
     'integration_credential_broker_authority',
+    'public.read_integration_provider_credential_v4(jsonb,text)',
+    'EXECUTE'
+  )
+  and has_function_privilege(
+    'integration_credential_broker_authority',
     'public.record_integration_credential_refresh_boundary_v1(jsonb,text)',
     'EXECUTE'
   )
@@ -427,7 +432,7 @@ select ok(
     'public.recover_qbo_sandbox_expired_credential_tasks_v1(jsonb,text,text)',
     'EXECUTE'
   ),
-  'credential broker receives only the checked V2 and recovery RPCs'
+  'credential broker receives the checked refresh, converged read, and recovery RPCs'
 );
 select ok(
   not has_function_privilege(
@@ -450,6 +455,16 @@ select ok(
     'public.recover_qbo_sandbox_expired_credential_tasks_v1(jsonb,text,text)',
     'EXECUTE'
   )
+  and not has_function_privilege(
+    'service_role',
+    'public.read_integration_provider_credential_v4(jsonb,text)',
+    'EXECUTE'
+  )
+  and not has_function_privilege(
+    'integration_provider_runtime_authority',
+    'public.read_integration_provider_credential_v4(jsonb,text)',
+    'EXECUTE'
+  )
   and not has_table_privilege(
     'integration_credential_broker_authority',
     'private.integration_sync_task_recovery_events',
@@ -459,8 +474,41 @@ select ok(
 );
 
 set local role integration_credential_broker_authority;
-create temporary table phase8b_recovery_provider_read on commit drop as
+create temporary table phase8b_recovery_provider_read_v2 on commit drop as
 select public.read_integration_provider_credential_v2(
+  pg_catalog.jsonb_build_object(
+    'contractVersion', 'integration_provider_credential_read_v1',
+    'taskId', '38e00000-0000-4000-8000-000000000100',
+    'leaseId', '48e00000-0000-4000-8000-000000000100',
+    'leaseOwnerFingerprint', pg_temp.fingerprint('phase8b-recovery-owner'),
+    'expectedCredentialVersion', 1,
+    'requiredScopes', pg_catalog.jsonb_build_array(
+      'com.intuit.quickbooks.accounting'
+    ),
+    'minimumValiditySeconds', 300,
+    'requestedAt', pg_catalog.to_char(
+      pg_catalog.transaction_timestamp(),
+      'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'
+    )
+  ),
+  'phase8b_recovery_provider_read_v2'
+) as result;
+select is(
+  pg_catalog.octet_length(
+    pg_catalog.decode(
+      (
+        select result ->> 'ciphertextBase64'
+        from phase8b_recovery_provider_read_v2
+      ),
+      'base64'
+    )
+  ),
+  256,
+  'historical provider read V2 retains canonical unbroken base64 behavior'
+);
+
+create temporary table phase8b_recovery_provider_read on commit drop as
+select public.read_integration_provider_credential_v4(
   pg_catalog.jsonb_build_object(
     'contractVersion', 'integration_provider_credential_read_v1',
     'taskId', '38e00000-0000-4000-8000-000000000100',
@@ -476,7 +524,7 @@ select public.read_integration_provider_credential_v2(
       'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'
     )
   ),
-  'phase8b_recovery_provider_read_v2'
+  'phase8b_recovery_provider_read_v4'
 ) as result;
 select ok(
   (select result ->> 'state' from phase8b_recovery_provider_read) = 'available'
@@ -492,9 +540,145 @@ select ok(
       (select result ->> 'ciphertextBase64' from phase8b_recovery_provider_read),
       'base64'
     )
-  ) = 256,
-  'provider read V2 returns canonical unbroken base64 without changing bytes'
+  ) = 256
+  and (
+    select result ->> 'ciphertextPersistedAt'
+    from phase8b_recovery_provider_read
+  ) = (
+    select pg_catalog.to_char(
+      credential.created_at at time zone 'UTC',
+      'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'
+    )
+    from private.integration_credentials as credential
+    where credential.id = '78e00000-0000-4000-8000-000000000001'
+  )
+  and (
+    select result ->> 'refreshExpiresAt'
+    from phase8b_recovery_provider_read
+  ) = (
+    select pg_catalog.to_char(
+      credential.refresh_expires_at at time zone 'UTC',
+      'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'
+    )
+    from private.integration_credentials as credential
+    where credential.id = '78e00000-0000-4000-8000-000000000001'
+  )
+  and (
+    select result ->> 'externalEntityReferenceFingerprint'
+    from phase8b_recovery_provider_read
+  ) = private.phase_5_fingerprint_text_v1(
+    private.qbo_phase_8b_realm_fingerprint_v1('phase8b-recovery-realm')
+  ),
+  'provider read V4 returns canonical ciphertext and exact trusted binding metadata'
 );
+select is(
+  (
+    select result ->> 'credentialId'
+    from phase8b_recovery_provider_read
+  ),
+  '78e00000-0000-4000-8000-000000000001',
+  'provider read V4 deterministically returns the sole authoritative active credential'
+);
+
+savepoint phase8b_v4_post_rotation_read;
+select ok(
+  (
+    public.acquire_integration_credential_refresh_lease_v1(
+      pg_catalog.jsonb_build_object(
+        'workspaceId', 'b8e00000-0000-4000-8000-000000000001',
+        'businessEntityId', 'd8e00000-0000-4000-8000-000000000001',
+        'connectionId', 'e8e00000-0000-4000-8000-000000000001',
+        'connectionGeneration', 1,
+        'credentialId', '78e00000-0000-4000-8000-000000000001',
+        'expectedCredentialVersion', 1,
+        'leaseId', '98e00000-0000-4000-8000-000000000099',
+        'leaseOwnerFingerprint', pg_temp.fingerprint('phase8b-v4-rotation-owner'),
+        'acquiredAt', pg_catalog.clock_timestamp(),
+        'leaseExpiresAt', pg_catalog.clock_timestamp() + interval '2 minutes'
+      ),
+      'phase8b_v4_rotation_lease'
+    ) ->> 'acquired'
+  )::boolean,
+  'post-rotation V4 fixture acquires the checked refresh lease'
+);
+select is(
+  public.rotate_integration_credential_v1(
+    pg_catalog.jsonb_build_object(
+      'workspaceId', 'b8e00000-0000-4000-8000-000000000001',
+      'businessEntityId', 'd8e00000-0000-4000-8000-000000000001',
+      'connectionId', 'e8e00000-0000-4000-8000-000000000001',
+      'connectionGeneration', 1,
+      'credentialId', '78e00000-0000-4000-8000-000000000001',
+      'expectedCredentialVersion', 1,
+      'leaseId', '98e00000-0000-4000-8000-000000000099',
+      'leaseOwnerFingerprint', pg_temp.fingerprint('phase8b-v4-rotation-owner'),
+      'aadDigest', (
+        select result ->> 'aadDigest'
+        from phase8b_recovery_provider_read
+      ),
+      'kmsKeyResource', (
+        select result ->> 'kmsKeyResource'
+        from phase8b_recovery_provider_read
+      ),
+      'ciphertextBase64', pg_catalog.encode(
+        pg_catalog.decode(pg_catalog.repeat('ef', 256), 'hex'),
+        'base64'
+      ),
+      'accessExpiresAt', pg_catalog.clock_timestamp() + interval '1 hour',
+      'refreshExpiresAt', pg_catalog.clock_timestamp() + interval '30 days',
+      'grantedScopes', pg_catalog.jsonb_build_array(
+        'com.intuit.quickbooks.accounting'
+      ),
+      'externalEntityReferenceFingerprint', (
+        select result ->> 'externalEntityReferenceFingerprint'
+        from phase8b_recovery_provider_read
+      ),
+      'rotatedAt', pg_catalog.clock_timestamp()
+    ),
+    'phase8b_v4_rotation_store'
+  ) ->> 'credentialVersion',
+  '2',
+  'post-rotation V4 fixture persists a new authoritative ciphertext version'
+);
+create temporary table phase8b_recovery_provider_read_rotated on commit drop as
+select public.read_integration_provider_credential_v4(
+  pg_catalog.jsonb_build_object(
+    'contractVersion', 'integration_provider_credential_read_v1',
+    'taskId', '38e00000-0000-4000-8000-000000000100',
+    'leaseId', '48e00000-0000-4000-8000-000000000100',
+    'leaseOwnerFingerprint', pg_temp.fingerprint('phase8b-recovery-owner'),
+    'expectedCredentialVersion', 2,
+    'requiredScopes', pg_catalog.jsonb_build_array(
+      'com.intuit.quickbooks.accounting'
+    ),
+    'minimumValiditySeconds', 300,
+    'requestedAt', pg_catalog.to_char(
+      pg_catalog.transaction_timestamp(),
+      'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'
+    )
+  ),
+  'phase8b_recovery_provider_read_v4_rotated'
+) as result;
+select ok(
+  (
+    select result ->> 'state' = 'available'
+      and result ->> 'credentialVersion' = '2'
+      and result ->> 'ciphertextPersistedAt' = (
+        select pg_catalog.to_char(
+          audit.occurred_at at time zone 'UTC',
+          'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'
+        )
+        from private.integration_audit_events as audit
+        where audit.request_id = 'phase8b_v4_rotation_store'
+          and audit.action = 'credential_rotated'
+          and audit.outcome = 'succeeded'
+      )
+    from phase8b_recovery_provider_read_rotated
+  ),
+  'provider read V4 binds refreshed ciphertext to its one immutable rotation event'
+);
+rollback to savepoint phase8b_v4_post_rotation_read;
+release savepoint phase8b_v4_post_rotation_read;
 reset role;
 
 update private.integration_sync_tasks

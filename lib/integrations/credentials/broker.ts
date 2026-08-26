@@ -25,6 +25,7 @@ import {
   PHASE_5_REFRESH_LEASE_SECONDS,
   PHASE_8B_REAUTHORIZATION_REDIRECT_URI,
   PHASE_8B_REAUTHORIZATION_RETURN_INTENT,
+  ProviderCredentialReadDiagnosticClassSchema,
   ProviderCredentialReadResultSchema,
   ReadProviderCredentialCommandSchema,
   ReclaimExpiredRefreshLeaseCommandSchema,
@@ -43,6 +44,7 @@ import {
   type CredentialRefreshBoundaryEvent,
   type CredentialRefreshBoundaryReporter,
   type DestroyCredentialCommand,
+  type ProviderCredentialReadDiagnosticClass,
   type ReadProviderCredentialCommand,
   type ReclaimExpiredRefreshLeaseCommand,
   type RevokeCredentialCommand,
@@ -69,6 +71,9 @@ import { SyntheticProviderFailure } from "@/lib/integrations/credentials/synthet
 import {
   BoundedIdentifierSchema,
   BoundedLabelSchema,
+  IsoTimestampSchema,
+  ProviderEnvironmentKeySchema,
+  ProviderKeySchema,
   Sha256FingerprintSchema
 } from "@/lib/integrations/contracts/primitives";
 
@@ -163,6 +168,18 @@ export class ProviderAccessCredential {
   }
 }
 
+export class ProviderCredentialReadFailure extends Error {
+  readonly diagnosticClass: ProviderCredentialReadDiagnosticClass;
+
+  constructor(diagnosticClass: ProviderCredentialReadDiagnosticClass) {
+    super(safeCredentialBrokerError("credential_read_failed"));
+    this.name = "ProviderCredentialReadFailure";
+    this.diagnosticClass = ProviderCredentialReadDiagnosticClassSchema.parse(
+      diagnosticClass
+    );
+  }
+}
+
 export type ProviderSecretStore = Readonly<{
   access(providerKey: string, environment: string): PromiseLike<ProviderApplicationSecret>;
 }>;
@@ -215,6 +232,114 @@ function externalEntityReferenceFingerprint(value: string | null) {
         fingerprintVersion: "provider_authorized_entity_reference_fingerprint_v1",
         value
       });
+}
+
+const credentialEnvelopeKeys = [
+  "schemaVersion",
+  "providerKey",
+  "environment",
+  "externalAuthorizedEntityReference",
+  "accessToken",
+  "accessExpiresAt",
+  "refreshToken",
+  "refreshExpiresAt",
+  "grantedScopes",
+  "issuedAt",
+  "updatedAt"
+] as const;
+
+function credentialEnvelopeDiagnosticClass(
+  value: unknown
+): ProviderCredentialReadDiagnosticClass {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    return "unknown_missing_field_contract";
+  }
+  const record = value as Record<string, unknown>;
+  if (!("refreshToken" in record)) return "refresh_token_presence";
+  const keys = Object.keys(record).sort();
+  if (
+    keys.length !== credentialEnvelopeKeys.length ||
+    credentialEnvelopeKeys.some((key) => !keys.includes(key))
+  ) {
+    return "unknown_missing_field_contract";
+  }
+  if (
+    record.schemaVersion !==
+    CREDENTIAL_SECURITY_CONTRACT_VERSIONS.credentialEnvelope
+  ) {
+    return "envelope_version";
+  }
+  if (!ProviderKeySchema.safeParse(record.providerKey).success) {
+    return "provider_key";
+  }
+  if (!ProviderEnvironmentKeySchema.safeParse(record.environment).success) {
+    return "provider_environment";
+  }
+  const grantedScopes = record.grantedScopes;
+  if (
+    !Array.isArray(grantedScopes) ||
+    grantedScopes.some((scope) => typeof scope !== "string") ||
+    grantedScopes.length === 0 ||
+    new Set(grantedScopes).size !== grantedScopes.length ||
+    [...grantedScopes]
+      .sort()
+      .some((scope, index) => scope !== grantedScopes[index])
+  ) {
+    return "scope_shape";
+  }
+  if (
+    typeof record.accessToken !== "string" ||
+    record.accessToken.length < 16 ||
+    record.accessToken.length > 16_384
+  ) {
+    return "token_shape";
+  }
+  if (
+    typeof record.refreshToken !== "string" ||
+    record.refreshToken.length < 16 ||
+    record.refreshToken.length > 16_384
+  ) {
+    return "refresh_token_presence";
+  }
+  if (
+    !IsoTimestampSchema.safeParse(record.accessExpiresAt).success ||
+    (record.refreshExpiresAt !== null &&
+      !IsoTimestampSchema.safeParse(record.refreshExpiresAt).success) ||
+    !IsoTimestampSchema.safeParse(record.issuedAt).success ||
+    !IsoTimestampSchema.safeParse(record.updatedAt).success
+  ) {
+    return "expires_at_shape";
+  }
+  return "unknown_missing_field_contract";
+}
+
+function parseCredentialEnvelopeForRead(plaintext: Buffer) {
+  let value: unknown;
+  try {
+    value = JSON.parse(plaintext.toString("utf8"));
+  } catch {
+    throw new ProviderCredentialReadFailure(
+      "unknown_missing_field_contract"
+    );
+  }
+  const parsed = CredentialEnvelopeSchema.safeParse(value);
+  if (!parsed.success) {
+    throw new ProviderCredentialReadFailure(
+      credentialEnvelopeDiagnosticClass(value)
+    );
+  }
+  return parsed.data;
+}
+
+function credentialLifetimeMilliseconds(expiresAt: string, updatedAt: string) {
+  return Date.parse(expiresAt) - Date.parse(updatedAt);
+}
+
+function exactScopeSet(left: readonly string[], right: readonly string[]) {
+  return (
+    left.length === right.length &&
+    left.every((scope, index) => scope === right[index])
+  );
 }
 
 function credentialFailureReason(error: unknown) {
@@ -970,21 +1095,26 @@ export class IntegrationCredentialBroker {
     requestId: string;
   }) {
     const now = this.#clock();
-    const result = ProviderCredentialReadResultSchema.parse(
-      await this.#store.readProviderCredential(
-        ReadProviderCredentialCommandSchema.parse({
-          contractVersion: CREDENTIAL_SECURITY_CONTRACT_VERSIONS.providerRead,
-          taskId: input.taskId,
-          leaseId: input.leaseId,
-          leaseOwnerFingerprint: input.leaseOwnerFingerprint,
-          expectedCredentialVersion: input.expectedCredentialVersion,
-          requiredScopes: sortedCredentialScopes(input.requiredScopes),
-          minimumValiditySeconds: input.minimumValiditySeconds,
-          requestedAt: now.toISOString()
-        }),
-        input.requestId
-      )
-    );
+    let result: ReturnType<typeof ProviderCredentialReadResultSchema.parse>;
+    try {
+      result = ProviderCredentialReadResultSchema.parse(
+        await this.#store.readProviderCredential(
+          ReadProviderCredentialCommandSchema.parse({
+            contractVersion: CREDENTIAL_SECURITY_CONTRACT_VERSIONS.providerRead,
+            taskId: input.taskId,
+            leaseId: input.leaseId,
+            leaseOwnerFingerprint: input.leaseOwnerFingerprint,
+            expectedCredentialVersion: input.expectedCredentialVersion,
+            requiredScopes: sortedCredentialScopes(input.requiredScopes),
+            minimumValiditySeconds: input.minimumValiditySeconds,
+            requestedAt: now.toISOString()
+          }),
+          input.requestId
+        )
+      );
+    } catch {
+      throw new ProviderCredentialReadFailure("reader_contract");
+    }
     if (result.state !== "available") return result;
 
     let plaintext: Buffer | null = null;
@@ -996,28 +1126,85 @@ export class IntegrationCredentialBroker {
         result.providerEnvironment !== result.aadContext.environment ||
         credentialAadDigest(result.aadContext) !== result.aadDigest
       ) {
-        throw new Error("provider_credential_read_aad_binding_invalid");
+        throw new ProviderCredentialReadFailure("aad_binding");
       }
-      plaintext = Buffer.from(
-        await this.#kms.decrypt({
-          keyResource: result.kmsKeyResource,
-          ciphertext: Buffer.from(result.ciphertextBase64, "base64"),
-          additionalAuthenticatedData: credentialAad(result.aadContext)
-        })
-      );
-      const envelope = CredentialEnvelopeSchema.parse(
-        JSON.parse(plaintext.toString("utf8"))
-      );
+      try {
+        plaintext = Buffer.from(
+          await this.#kms.decrypt({
+            keyResource: result.kmsKeyResource,
+            ciphertext: Buffer.from(result.ciphertextBase64, "base64"),
+            additionalAuthenticatedData: credentialAad(result.aadContext)
+          })
+        );
+      } catch {
+        throw new ProviderCredentialReadFailure("kms_failure");
+      }
+      const envelope = parseCredentialEnvelopeForRead(plaintext);
+      if (envelope.providerKey !== result.providerKey) {
+        throw new ProviderCredentialReadFailure("provider_key");
+      }
+      if (envelope.environment !== result.providerEnvironment) {
+        throw new ProviderCredentialReadFailure("provider_environment");
+      }
       if (
-        envelope.providerKey !== result.providerKey ||
-        envelope.environment !== result.providerEnvironment ||
-        envelope.accessExpiresAt !== result.accessExpiresAt ||
-        result.grantedScopes.some((scope) => !envelope.grantedScopes.includes(scope)) ||
-        input.requiredScopes.some((scope) => !envelope.grantedScopes.includes(scope)) ||
-        Date.parse(envelope.accessExpiresAt) <=
-          now.getTime() + input.minimumValiditySeconds * 1_000
+        !exactScopeSet(envelope.grantedScopes, result.grantedScopes) ||
+        input.requiredScopes.some(
+          (scope) => !envelope.grantedScopes.includes(scope)
+        )
       ) {
-        throw new Error("provider_credential_read_envelope_binding_invalid");
+        throw new ProviderCredentialReadFailure("scope_shape");
+      }
+      if (
+        externalEntityReferenceFingerprint(
+          envelope.externalAuthorizedEntityReference
+        ) !== result.externalEntityReferenceFingerprint
+      ) {
+        throw new ProviderCredentialReadFailure("credential_binding");
+      }
+
+      const databaseAccessLifetime = credentialLifetimeMilliseconds(
+        result.accessExpiresAt,
+        result.ciphertextPersistedAt
+      );
+      const envelopeAccessLifetime = credentialLifetimeMilliseconds(
+        envelope.accessExpiresAt,
+        envelope.updatedAt
+      );
+      const refreshExpiryShapeMatches =
+        (result.refreshExpiresAt === null) ===
+        (envelope.refreshExpiresAt === null);
+      const databaseRefreshLifetime = result.refreshExpiresAt === null
+        ? null
+        : credentialLifetimeMilliseconds(
+            result.refreshExpiresAt,
+            result.ciphertextPersistedAt
+          );
+      const envelopeRefreshLifetime = envelope.refreshExpiresAt === null
+        ? null
+        : credentialLifetimeMilliseconds(
+            envelope.refreshExpiresAt,
+            envelope.updatedAt
+          );
+      if (
+        databaseAccessLifetime <= 0 ||
+        envelopeAccessLifetime <= 0 ||
+        !refreshExpiryShapeMatches ||
+        (databaseRefreshLifetime !== null && databaseRefreshLifetime <= 0) ||
+        (envelopeRefreshLifetime !== null && envelopeRefreshLifetime <= 0)
+      ) {
+        throw new ProviderCredentialReadFailure("expires_at_shape");
+      }
+      if (
+        databaseAccessLifetime !== envelopeAccessLifetime ||
+        databaseRefreshLifetime !== envelopeRefreshLifetime
+      ) {
+        throw new ProviderCredentialReadFailure("expires_at_binding");
+      }
+      if (
+        Date.parse(envelope.accessExpiresAt) <=
+        now.getTime() + input.minimumValiditySeconds * 1_000
+      ) {
+        throw new ProviderCredentialReadFailure("credential_expired");
       }
       return {
         state: "available" as const,
@@ -1031,8 +1218,12 @@ export class IntegrationCredentialBroker {
           accessToken: envelope.accessToken
         })
       };
-    } catch {
-      throw new Error(safeCredentialBrokerError("credential_read_failed"));
+    } catch (error) {
+      throw error instanceof ProviderCredentialReadFailure
+        ? error
+        : new ProviderCredentialReadFailure(
+            "unknown_missing_field_contract"
+          );
     } finally {
       plaintext?.fill(0);
     }

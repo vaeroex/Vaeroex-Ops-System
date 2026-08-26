@@ -11,6 +11,7 @@ import {
   AuthorizedProviderEntityEvidenceSchema,
   IntegrationCredentialBroker,
   ProviderAccessCredential,
+  ProviderCredentialReadFailure,
   type CredentialBrokerStore
 } from "@/lib/integrations/credentials/broker";
 import {
@@ -864,12 +865,21 @@ async function handleBroker(request: IncomingMessage, response: ServerResponse, 
         })
         .strict()
         .parse(await readBody(request));
-      const result = await dependencies.broker.readProviderAccessCredential({
-        ...body,
-        requiredScopes: [QBO_ACCOUNTING_SCOPE],
-        minimumValiditySeconds: 300,
-        requestId: `phase8b_provider_read_${randomUUID()}`
-      });
+      const result = await dependencies.broker
+        .readProviderAccessCredential({
+          ...body,
+          requiredScopes: [QBO_ACCOUNTING_SCOPE],
+          minimumValiditySeconds: 300,
+          requestId: `phase8b_provider_read_${randomUUID()}`
+        })
+        .catch((error: unknown) => {
+          if (error instanceof ProviderCredentialReadFailure) {
+            safeEvent("credential_read_failed", {
+              diagnosticClass: error.diagnosticClass
+            });
+          }
+          throw error;
+        });
       if (result.state !== "available") {
         return json(response, 409, {
           state: result.state,

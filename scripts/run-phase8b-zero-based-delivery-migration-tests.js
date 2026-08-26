@@ -8,7 +8,8 @@ const fixtureBaseVersion = "20260824083917";
 const zeroBasedVersion = "20260824193332";
 const retryExecutionVersion = "20260824233000";
 const recoveryLifecycleVersion = "20260825180000";
-const targetVersion = "20260825190000";
+const scopedRetryLifecycleVersion = "20260825190000";
+const targetVersion = "20260826043610";
 const fixturePath = path.join(
   root,
   "supabase/tests/fixtures/external_integrations_phase_8b_zero_based_legacy.sql"
@@ -101,11 +102,28 @@ function assertTargetIsSinglePendingMigration() {
       `Migration ${recoveryLifecycleVersion} no longer immediately follows ${retryExecutionVersion}.`
     );
   }
+  const scopedRetryLifecycleIndex = migrations.findIndex((name) =>
+    name.startsWith(`${scopedRetryLifecycleVersion}_`)
+  );
+  if (scopedRetryLifecycleIndex < 0) {
+    fail(
+      `Scoped retry lifecycle migration ${scopedRetryLifecycleVersion} is missing.`
+    );
+  }
   if (
-    migrations[targetIndex - 1]?.slice(0, 14) !== recoveryLifecycleVersion
+    migrations[scopedRetryLifecycleIndex - 1]?.slice(0, 14) !==
+      recoveryLifecycleVersion
   ) {
     fail(
-      `Migration ${targetVersion} no longer immediately follows ${recoveryLifecycleVersion}.`
+      `Migration ${scopedRetryLifecycleVersion} no longer immediately follows ${recoveryLifecycleVersion}.`
+    );
+  }
+  if (
+    migrations[targetIndex - 1]?.slice(0, 14) !==
+      scopedRetryLifecycleVersion
+  ) {
+    fail(
+      `Migration ${targetVersion} no longer immediately follows ${scopedRetryLifecycleVersion}.`
     );
   }
   if (targetIndex !== migrations.length - 1) {

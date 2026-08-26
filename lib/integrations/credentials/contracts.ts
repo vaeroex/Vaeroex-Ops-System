@@ -490,10 +490,13 @@ export const ProviderCredentialReadResultSchema = z.discriminatedUnion("state", 
   ProviderCredentialReadIdentitySchema.extend({
     state: z.literal("available"),
     ciphertextBase64: CiphertextBase64Schema,
+    ciphertextPersistedAt: IsoTimestampSchema,
     aadDigest: Sha256FingerprintSchema,
     kmsKeyResource: KmsCryptoKeyResourceSchema,
     aadContext: CredentialAadContextSchema,
-    grantedScopes: SortedScopeSetSchema
+    grantedScopes: SortedScopeSetSchema,
+    refreshExpiresAt: IsoTimestampSchema.nullable(),
+    externalEntityReferenceFingerprint: Sha256FingerprintSchema.nullable()
   }).strict(),
   ProviderCredentialReadIdentitySchema.extend({
     state: z.literal("refresh_required")
@@ -502,6 +505,27 @@ export const ProviderCredentialReadResultSchema = z.discriminatedUnion("state", 
     state: z.literal("credential_version_stale")
   }).strict()
 ]);
+
+export const ProviderCredentialReadDiagnosticClassSchema = z.enum([
+  "reader_contract",
+  "aad_binding",
+  "kms_failure",
+  "envelope_version",
+  "provider_key",
+  "provider_environment",
+  "scope_shape",
+  "token_shape",
+  "refresh_token_presence",
+  "expires_at_shape",
+  "expires_at_binding",
+  "credential_binding",
+  "unknown_missing_field_contract",
+  "credential_expired"
+]);
+
+export type ProviderCredentialReadDiagnosticClass = z.infer<
+  typeof ProviderCredentialReadDiagnosticClassSchema
+>;
 
 export const RotateCredentialCommandSchema = z
   .object({

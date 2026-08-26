@@ -312,6 +312,13 @@ async function main() {
     providerKey: "synthetic",
     providerEnvironment: "test",
     accessExpiresAt: envelope.accessExpiresAt,
+    ciphertextPersistedAt: envelope.updatedAt,
+    refreshExpiresAt: envelope.refreshExpiresAt,
+    externalEntityReferenceFingerprint: canonical.contractSha256({
+      fingerprintPurpose: "provider_authorized_entity_reference",
+      fingerprintVersion: "provider_authorized_entity_reference_fingerprint_v1",
+      value: envelope.externalAuthorizedEntityReference
+    }),
     ciphertextBase64: Buffer.from(ciphertext).toString("base64"),
     aadDigest: credentialKms.credentialAadDigest(aadContext),
     kmsKeyResource,

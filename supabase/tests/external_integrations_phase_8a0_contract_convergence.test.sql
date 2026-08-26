@@ -1163,7 +1163,7 @@ select ok(
 
 set local role integration_credential_broker_authority;
 select is(
-  public.read_integration_provider_credential_v1(
+  public.read_integration_provider_credential_v4(
     pg_temp.provider_read_command(
       '38000000-0000-4000-8000-000000000101',
       '48000000-0000-4000-8000-000000000101',
@@ -1175,7 +1175,7 @@ select is(
   'valid current QBO credential is available to the broker'
 );
 select is(
-  public.read_integration_provider_credential_v1(
+  public.read_integration_provider_credential_v4(
     pg_temp.provider_read_command(
       '38000000-0000-4000-8000-000000000101',
       '48000000-0000-4000-8000-000000000101',
@@ -1189,7 +1189,7 @@ select is(
 );
 select ok(
   pg_temp.raises_sqlstate(
-    $$select public.read_integration_provider_credential_v1(
+    $$select public.read_integration_provider_credential_v4(
       pg_temp.provider_read_command(
         '38000000-0000-4000-8000-000000000102',
         '48000000-0000-4000-8000-000000000102',
@@ -1203,7 +1203,7 @@ select ok(
 );
 select ok(
   pg_temp.raises_sqlstate(
-    $$select public.read_integration_provider_credential_v1(
+    $$select public.read_integration_provider_credential_v4(
       pg_temp.provider_read_command(
         '38000000-0000-4000-8000-000000000101',
         '48000000-0000-4000-8000-000000000101',
@@ -1214,6 +1214,20 @@ select ok(
     '42501'
   ),
   'wrong task lease owner cannot read credentials'
+);
+select ok(
+  pg_temp.raises_sqlstate(
+    $$select public.read_integration_provider_credential_v4(
+      pg_temp.provider_read_command(
+        '38000000-0000-4000-8000-000000000101',
+        '48000000-0000-4000-8000-000000000102',
+        'phase8a0-owner-b'
+      ),
+      'phase8a0-provider-read-cross-tenant-forgery'
+    )$$,
+    '42501'
+  ),
+  'copied cross-tenant lease and owner identifiers cannot widen credential discovery'
 );
 reset role;
 
@@ -1252,7 +1266,7 @@ select ok(
 
 set local role integration_credential_broker_authority;
 select is(
-  public.read_integration_provider_credential_v1(
+  public.read_integration_provider_credential_v4(
     pg_temp.provider_read_command(
       '38000000-0000-4000-8000-000000000101',
       '48000000-0000-4000-8000-000000000101',
@@ -1546,7 +1560,7 @@ select is(
 from extensions.dblink(
   'phase8a0_read_concurrency_1',
   $read_one$
-    select public.read_integration_provider_credential_v1(
+    select public.read_integration_provider_credential_v4(
         jsonb_build_object(
           'contractVersion', 'integration_provider_credential_read_v1',
           'taskId', '38000000-0000-4000-8000-000000000101',
@@ -1579,7 +1593,7 @@ select is(
 from extensions.dblink(
   'phase8a0_read_concurrency_2',
   $read_two$
-    select public.read_integration_provider_credential_v1(
+    select public.read_integration_provider_credential_v4(
       jsonb_build_object(
         'contractVersion', 'integration_provider_credential_read_v1',
         'taskId', '38000000-0000-4000-8000-000000000101',
@@ -1615,7 +1629,7 @@ select is(
 from extensions.dblink(
   'phase8a0_read_concurrency_1',
   $read_during_refresh$
-    select public.read_integration_provider_credential_v1(
+    select public.read_integration_provider_credential_v4(
         jsonb_build_object(
           'contractVersion', 'integration_provider_credential_read_v1',
           'taskId', '38000000-0000-4000-8000-000000000101',
