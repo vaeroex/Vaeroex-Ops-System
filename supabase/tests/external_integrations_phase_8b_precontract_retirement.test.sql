@@ -746,11 +746,8 @@ select
       target.row_version,
       target.dispatch_generation,
       target.task_name,
-      (
-        select id
-        from private.integration_qbo_precontract_queue_pause_evidence
-        where request_id = 'precontract_pause_attestation'
-      )
+      (select (result ->> 'pauseEvidenceId')::uuid
+        from phase8b_precontract_pause)
     ),
     target.request_id,
     'phase8b_precontract_operator'
@@ -774,6 +771,15 @@ from (values
   task_id, row_version, dispatch_generation, task_name, request_id
 );
 reset role;
+
+create temporary table phase8b_precontract_retirement_events_observed as
+select
+  id,
+  task_id,
+  prior_dispatcher_task_name
+from private.integration_sync_task_precontract_retirement_events;
+grant select on phase8b_precontract_retirement_events_observed to
+  integration_qbo_precontract_retirement_authority;
 
 select is(
   (
@@ -817,7 +823,8 @@ select
     'precontract_reconcile_' || pg_catalog.replace(event.task_id::text, '-', ''),
     'phase8b_precontract_operator'
   ) as result
-from private.integration_sync_task_precontract_retirement_events as event;
+from phase8b_precontract_retirement_events_observed as event;
+reset role;
 
 select is(
   (
@@ -827,6 +834,8 @@ select is(
   '3',
   'all exact external deletion outcomes are reconciled once'
 );
+
+set local role integration_qbo_precontract_retirement_authority;
 select is(
   public.reconcile_qbo_sandbox_precontract_envelope_retirement_v1(
     pg_temp.reconciliation_command(
@@ -841,7 +850,7 @@ select is(
   'true',
   'already-absent deletion reconciliation is idempotent'
 )
-from private.integration_sync_task_precontract_retirement_events as event
+from phase8b_precontract_retirement_events_observed as event
 where event.task_id = '872142c0-ddae-41eb-9e60-1babc6629d68';
 reset role;
 
@@ -949,6 +958,13 @@ select
   (select pg_catalog.count(*) from private.reconciliation_case_members)
     as reconciliation_count;
 
+create temporary table phase8b_precontract_carry_forward_observed as
+select id
+from private.integration_sync_run_company_info_carry_forward_evidence
+where old_sync_run_id = 'a291839a-99c7-495e-8a53-57aa8aa6c99e';
+grant select on phase8b_precontract_carry_forward_observed to
+  integration_qbo_precontract_retirement_authority;
+
 set local role integration_qbo_precontract_retirement_authority;
 create temporary table phase8b_precontract_plan_result as
 select public.plan_qbo_sandbox_clean_replacement_initialization_v1(
@@ -963,8 +979,7 @@ select public.plan_qbo_sandbox_clean_replacement_initialization_v1(
     'replacementSyncRunId', '99000000-0000-4000-8009-000000000001',
     'companyInfoCarryForwardEvidenceId', (
       select id
-      from private.integration_sync_run_company_info_carry_forward_evidence
-      where old_sync_run_id = 'a291839a-99c7-495e-8a53-57aa8aa6c99e'
+      from phase8b_precontract_carry_forward_observed
     ),
     'tasks', pg_temp.replacement_manifest()
   ),
