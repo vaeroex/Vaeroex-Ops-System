@@ -1331,18 +1331,18 @@ select ok(
 );
 select ok(
   (
-    select pg_catalog.pronargs = 2
-    from pg_catalog.pg_proc
-    where oid =
+    select procedure.pronargs = 2
+    from pg_catalog.pg_proc as procedure
+    where procedure.oid =
       'public.discover_qbo_runtime_dispatch_v2(text,integer)'::regprocedure
   ),
   'dispatcher accepts only queue class and bound, never caller tenant IDs'
 );
 select ok(
   (
-    select pg_catalog.pronargs = 3
-    from pg_catalog.pg_proc
-    where oid =
+    select procedure.pronargs = 3
+    from pg_catalog.pg_proc as procedure
+    where procedure.oid =
       'public.read_qbo_runtime_task_delivery_v2(uuid,text,text)'::regprocedure
   ),
   'runtime delivery accepts only task and Cloud Tasks identity inputs'
