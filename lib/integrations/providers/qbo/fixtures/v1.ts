@@ -374,6 +374,36 @@ export const QBO_SANITIZED_AGING_REPORT_FIXTURES: Record<
   }
 };
 
+function withoutAgingPeriodBounds(
+  raw: unknown,
+  omitted: readonly ("StartPeriod" | "EndPeriod")[]
+) {
+  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
+    throw new Error("qbo_sanitized_aging_fixture_shape_invalid");
+  }
+  const report = raw as Record<string, unknown>;
+  if (report.Header === null || typeof report.Header !== "object" || Array.isArray(report.Header)) {
+    throw new Error("qbo_sanitized_aging_header_fixture_shape_invalid");
+  }
+  const header = { ...(report.Header as Record<string, unknown>) };
+  for (const field of omitted) delete header[field];
+  return { ...report, Header: header };
+}
+
+export const QBO_SANITIZED_OPTIONAL_PERIOD_AGING_REPORT_FIXTURES: Record<
+  "APAgingSummary" | "ARAgingSummary",
+  unknown
+> = {
+  APAgingSummary: withoutAgingPeriodBounds(
+    QBO_SANITIZED_AGING_REPORT_FIXTURES.APAgingSummary,
+    ["StartPeriod"]
+  ),
+  ARAgingSummary: withoutAgingPeriodBounds(
+    QBO_SANITIZED_AGING_REPORT_FIXTURES.ARAgingSummary,
+    ["StartPeriod", "EndPeriod"]
+  )
+};
+
 export const QBO_SYNTHETIC_CLOUDEVENTS_FIXTURE = [
   {
     specversion: "1.0",

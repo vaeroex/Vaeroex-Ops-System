@@ -2262,10 +2262,39 @@ function testReportControl() {
     receivedAt: at
   });
   equal(agingPending.accounting.currency, null, "missing aging currency remains null in pending source authority");
+  equal(agingPending.temporal.basis, "period", "fully bounded aging reports retain period semantics");
   ok(
     agingPending.source.providerRecordId.endsWith(":currency_unspecified"),
     "missing optional aging currency uses a stable non-financial provider identity marker"
   );
+  for (const [index, reportType] of ["ARAgingSummary", "APAgingSummary"].entries()) {
+    const optionalPeriodAging = qbo.parseQboReport({
+      reportType,
+      raw: fixtures.QBO_SANITIZED_OPTIONAL_PERIOD_AGING_REPORT_FIXTURES[reportType],
+      provider
+    });
+    const optionalPeriodPending = qbo.qboReportToExternalSourceVersion({
+      context: sourceContext(),
+      report: optionalPeriodAging,
+      id: id(8303 + index),
+      immutableVersion: 1,
+      priorVersionId: null,
+      observedAt: at,
+      synchronizedAt: at,
+      ingestedAt: at,
+      receivedAt: at
+    });
+    equal(
+      optionalPeriodPending.temporal.basis,
+      "point_in_time",
+      `${reportType} accepts documented optional period bounds without fabricating a period`
+    );
+    equal(
+      optionalPeriodPending.validation.state,
+      "pending",
+      `${reportType} remains untrusted pending source authority after minimization`
+    );
+  }
   deepEqual(
     qbo.QBO_REPORT_DIAGNOSTIC_CLASSES,
     [

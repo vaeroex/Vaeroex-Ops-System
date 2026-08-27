@@ -22,6 +22,36 @@ function recordKind(recordType: string) {
     .toLowerCase()}`;
 }
 
+const QBO_POINT_IN_TIME_AGING_REPORT_TYPES = new Set<
+  QboReportControlObservation["reportType"]
+>(["ARAgingSummary", "APAgingSummary"]);
+
+function qboReportTemporalProjection(report: QboReportControlObservation) {
+  if (report.periodStart !== null && report.periodEnd !== null) {
+    return {
+      basis: "period" as const,
+      effectiveAt: null,
+      periodStart: report.periodStart,
+      periodEnd: report.periodEnd
+    };
+  }
+  if (QBO_POINT_IN_TIME_AGING_REPORT_TYPES.has(report.reportType)) {
+    const effectiveDate = report.periodEnd ?? report.periodStart;
+    return {
+      basis: "point_in_time" as const,
+      effectiveAt: effectiveDate === null ? null : `${effectiveDate}T00:00:00.000Z`,
+      periodStart: null,
+      periodEnd: null
+    };
+  }
+  return {
+    basis: "period" as const,
+    effectiveAt: null,
+    periodStart: report.periodStart,
+    periodEnd: report.periodEnd
+  };
+}
+
 export function qboMinimizedRecordToExternalSourceVersion(input: {
   context: ProviderAdapterContext;
   record: QboMinimizedSourceRecord;
@@ -129,6 +159,7 @@ export function qboReportToExternalSourceVersion(input: {
     throw new Error("qbo_report_source_environment_mismatch");
   }
   const providerRecordId = qboReportProviderRecordId(input.report);
+  const reportTemporal = qboReportTemporalProjection(input.report);
   const draft: ExternalSourceRecordVersion = {
     contractVersion: EXTERNAL_INTEGRATION_CONTRACT_VERSIONS.sourceRecord,
     id: input.id,
@@ -146,16 +177,16 @@ export function qboReportToExternalSourceVersion(input: {
       providerVersionReference: input.observedAt
     },
     temporal: {
-      basis: "period",
+      basis: reportTemporal.basis,
       providerCreatedAt: null,
       providerUpdatedAt: null,
       observedAt: input.observedAt,
       synchronizedAt: input.synchronizedAt,
       ingestedAt: input.ingestedAt,
-      effectiveAt: null,
+      effectiveAt: reportTemporal.effectiveAt,
       postingDate: null,
-      periodStart: input.report.periodStart,
-      periodEnd: input.report.periodEnd,
+      periodStart: reportTemporal.periodStart,
+      periodEnd: reportTemporal.periodEnd,
       sourceTimeZone: null
     },
     accounting: {
