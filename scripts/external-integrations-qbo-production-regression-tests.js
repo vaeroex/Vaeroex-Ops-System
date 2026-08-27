@@ -206,6 +206,7 @@ matches(descriptor, /accounting_writes/, "Production continues to prohibit accou
 matches(descriptor, /requiredForActivation: true/, "activation streams remain explicit descriptor data");
 matches(migration, /integration_stream_freshness_domain_v1/, "activation uses an explicit stream-to-domain mapping");
 matches(migration, /integration_connection_activation_gate_unsatisfied/, "missing or stale required streams block activation");
+matches(migration, /v_connection\.provider_key <> 'quickbooks_online'[\s\S]*freshness\.scope_key = required\.stream_key/, "QBO activation requires exact stream freshness without changing legacy provider scope semantics");
 matches(status, /lastSuccessfulSyncAt/, "customer status reports last successful sync");
 matches(status, /freshness/, "customer status reports freshness");
 excludes(status, /credential|lease|ciphertext|kms/i, "customer status hides internal security implementation");

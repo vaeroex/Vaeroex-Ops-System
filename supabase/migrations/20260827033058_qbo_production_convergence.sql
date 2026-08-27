@@ -3412,7 +3412,10 @@ begin
                 v_connection.provider_key,
                 required.stream_key
               )
-              and freshness.scope_key = required.stream_key
+              and (
+                v_connection.provider_key <> 'quickbooks_online'
+                or freshness.scope_key = required.stream_key
+              )
               and freshness.status in ('current', 'aging')
               and freshness.blocking_level in ('none', 'warning')
               and mapping.status = 'active'
