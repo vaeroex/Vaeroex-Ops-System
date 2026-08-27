@@ -409,6 +409,7 @@ select pg_temp.raises_sqlstate(
     '23505'
   ) as denied;
 reset role;
+set local search_path = public, extensions;
 
 select is(
   (select result ->> 'idempotent'
@@ -457,6 +458,7 @@ select is(
   'Workspace A creates server-bound OAuth state for its own connection'
 );
 reset role;
+set local search_path = public, extensions;
 
 select set_config(
   'request.jwt.claims',
@@ -511,6 +513,7 @@ select is(
   'Workspace B cannot read Workspace A connection summary'
 );
 reset role;
+set local search_path = public, extensions;
 
 set local role integration_oauth_ingress_authority;
 select is(
@@ -547,6 +550,7 @@ select ok(
   'OAuth ingress cannot directly inspect another connection private state'
 );
 reset role;
+set local search_path = public, extensions;
 select is(
   (
     select status
@@ -936,6 +940,7 @@ select ok(
   'Workspace B cannot begin reauthorization for Workspace A connection'
 );
 reset role;
+set local search_path = public, extensions;
 
 select set_config(
   'request.jwt.claims',
@@ -958,6 +963,7 @@ select is(
   'Workspace A begins reauthorization only for its exact connection snapshot'
 );
 reset role;
+set local search_path = public, extensions;
 
 set local role integration_oauth_ingress_authority;
 select ok(
@@ -1009,6 +1015,7 @@ select is(
   'reauthorization state remains single-use'
 );
 reset role;
+set local search_path = public, extensions;
 
 set local role integration_task_scheduler_authority;
 create temporary table qbo_production_schedule_result on commit drop as
@@ -1017,6 +1024,7 @@ select public.schedule_qbo_initialization_v2(
     'qbo_prod_schedule_two_connections'
   ) as result;
 reset role;
+set local search_path = public, extensions;
 select is(
   (select result ->> 'scheduledConnectionCount'
    from qbo_production_schedule_result),
@@ -1145,6 +1153,7 @@ select public.confirm_qbo_runtime_cloud_task_staged_v2(
   ) as result
 from qbo_production_staging_confirmation;
 reset role;
+set local search_path = public, extensions;
 
 select is(
   (
@@ -1276,6 +1285,7 @@ select
     '42501'
   ) as wrong_queue_denied;
 reset role;
+set local search_path = public, extensions;
 
 select is(
   (select result ->> 'credentialId'
