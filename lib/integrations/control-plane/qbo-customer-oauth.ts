@@ -13,7 +13,14 @@ const ReauthorizationRequestSchema = z
   .object({ connectionId: z.string().uuid() })
   .strict();
 
-function applicationOrigin() {
+const DisconnectRequestSchema = z
+  .object({
+    connectionId: z.string().uuid(),
+    confirmation: z.literal("disconnect")
+  })
+  .strict();
+
+export function qboCustomerApplicationOrigin() {
   const value = new URL(process.env.QBO_APPLICATION_ORIGIN ?? "");
   if (
     value.protocol !== "https:" ||
@@ -31,7 +38,7 @@ function applicationOrigin() {
 
 export function assertQboCustomerRequestOrigin(request: Request) {
   const origin = request.headers.get("origin");
-  if (!origin || new URL(origin).origin !== applicationOrigin()) {
+  if (!origin || new URL(origin).origin !== qboCustomerApplicationOrigin()) {
     throw new Error("qbo_customer_request_origin_denied");
   }
 }
@@ -58,6 +65,12 @@ export async function readQboConnectRequest(request: Request) {
 
 export async function readQboReauthorizationRequest(request: Request) {
   return ReauthorizationRequestSchema.parse(
+    await boundedRequestRecord(request, 1_024)
+  );
+}
+
+export async function readQboDisconnectRequest(request: Request) {
+  return DisconnectRequestSchema.parse(
     await boundedRequestRecord(request, 1_024)
   );
 }

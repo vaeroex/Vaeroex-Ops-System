@@ -233,7 +233,9 @@ const protectedDiff = childProcess.execFileSync(
 const approvedProtectedPaths = new Set([
   "app/app/settings/page.tsx",
   "app/api/integrations/qbo/connect/route.ts",
+  "app/api/integrations/qbo/disconnect/route.ts",
   "app/api/integrations/qbo/reauthorize/route.ts",
+  "app/app/settings/integrations/quickbooks/disconnect/page.tsx",
   "components/integrations/ConnectionStatusPanel.tsx",
   "components/operations/StatusBadge.tsx",
   "lib/supabase/types.ts",

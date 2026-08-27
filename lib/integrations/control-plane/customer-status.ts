@@ -20,6 +20,8 @@ export type CustomerConnectionStatus =
   | "Current"
   | "Delayed"
   | "Failed"
+  | "Disconnecting"
+  | "Disconnected"
   | "Reauthorization required";
 
 function latestTimestamp(values: readonly (string | null)[]) {
@@ -33,7 +35,11 @@ export function customerConnectionStatus(
   freshness: readonly IntegrationFreshnessSummaryRow[]
 ) {
   let status: CustomerConnectionStatus;
-  if (connection.status === "reauthorization_required") {
+  if (connection.status === "disconnecting") {
+    status = "Disconnecting";
+  } else if (connection.status === "disconnected") {
+    status = "Disconnected";
+  } else if (connection.status === "reauthorization_required") {
     status = "Reauthorization required";
   } else if (connection.status === "error" || freshness.some((row) => row.status === "sync_error")) {
     status = "Failed";

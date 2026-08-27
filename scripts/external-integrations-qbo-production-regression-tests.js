@@ -20,8 +20,14 @@ const excludes = (value, pattern, message) => {
 
 const migration = read("supabase/migrations/20260827033058_qbo_production_convergence.sql");
 const connect = read("app/api/integrations/qbo/connect/route.ts");
+const disconnect = read("app/api/integrations/qbo/disconnect/route.ts");
+const disconnectPage = read("app/app/settings/integrations/quickbooks/disconnect/page.tsx");
 const reauthorize = read("app/api/integrations/qbo/reauthorize/route.ts");
 const oauth = read("lib/integrations/control-plane/qbo-customer-oauth.ts");
+const customerRoutes = read("lib/integrations/control-plane/qbo-customer-routes.ts");
+const customerStatus = read("lib/integrations/control-plane/customer-status.ts");
+const connectionPanel = read("components/integrations/ConnectionStatusPanel.tsx");
+const controlPlaneRepository = read("lib/integrations/persistence/control-plane-repository.ts");
 const repository = read("lib/integrations/persistence/qbo-production-repository.ts");
 const database = read("services/external-integrations-qbo/src/database.ts");
 const server = read("services/external-integrations-qbo/src/server.ts");
@@ -75,9 +81,31 @@ excludes(reauthorize, /input\.workspaceId/, "reauthorization cannot substitute c
 excludes(reauthorize, /input\.mappingId/, "reauthorization cannot substitute a caller mapping");
 excludes(reauthorize, /input\.credentialId/, "reauthorization cannot substitute a caller credential");
 
+matches(disconnect, /requireWorkspaceAccess\(\)/, "disconnect derives workspace authority from the server session");
+matches(disconnect, /\["owner", "admin", "manager"\]/, "disconnect requires a management role");
+matches(disconnect, /assertQboCustomerRequestOrigin\(request\)/, "disconnect enforces same-origin request provenance");
+matches(disconnect, /\.eq\("workspace_id", access\.workspaceId\)/, "disconnect scopes the connection to the authenticated workspace");
+matches(disconnect, /\.eq\("provider_key", "quickbooks_online"\)/, "disconnect is QBO-only");
+matches(disconnect, /\.eq\("provider_environment", "production"\)/, "disconnect cannot target a non-Production provider connection");
+matches(disconnect, /expectedRowVersion: connection\.row_version/, "disconnect derives its CAS snapshot from the authorized database row");
+matches(disconnect, /requestIntegrationDisconnect/, "disconnect invokes the reviewed customer disconnect contract");
+matches(disconnect, /randomUUID\(\)/, "disconnect request identity is server-generated");
+matches(disconnect, /result\.connection\.status !== "disconnecting"/, "disconnect verifies the canonical backend result");
+excludes(disconnect, /input\.(?:workspaceId|businessEntityId|expectedRowVersion|credentialId)/, "disconnect accepts no caller tenant, CAS, or credential authority");
+excludes(disconnect, /\.delete\(|accessToken|refreshToken|clientSecret/, "disconnect cannot delete history or expose credential material");
+matches(oauth, /DisconnectRequestSchema[\s\S]*confirmation: z\.literal\("disconnect"\)[\s\S]*\.strict\(\)/, "disconnect input requires an exact customer confirmation");
+matches(disconnectPage, /requireWorkspacePage\(\)/, "disconnect URL is an authenticated workspace surface");
+matches(disconnectPage, /\.eq\("workspace_id", workspaceId\)/, "disconnect page lists only the active workspace's connections");
+matches(disconnectPage, /action="\/api\/integrations\/qbo\/disconnect"/, "disconnect confirmation posts only to the checked route");
+matches(disconnectPage, /Historical Vaeroex records and audit evidence remain unchanged/, "disconnect truthfully preserves historical evidence");
+matches(customerRoutes, /QBO_CUSTOMER_DISCONNECT_PATH\s*=\s*[\s\S]*"\/app\/settings\/integrations\/quickbooks\/disconnect"/, "disconnect has one stable customer-facing route");
+matches(connectionPanel, /QBO_CUSTOMER_DISCONNECT_PATH/, "settings exposes the customer disconnect surface");
+matches(customerStatus, /connection\.status === "disconnecting"[\s\S]*status = "Disconnecting"/, "customer status reports a pending disconnect truthfully");
+matches(controlPlaneRepository, /request_integration_disconnect_v1/, "the customer route delegates to the audited database disconnect RPC");
+
 matches(oauth, /request\.arrayBuffer\(\)/, "customer OAuth request limits are enforced on actual bytes");
 matches(oauth, /bytes\.byteLength > maximumBytes/, "oversized customer requests fail closed");
-matches(oauth, /new URL\(origin\)\.origin !== applicationOrigin\(\)/, "customer OAuth requires the exact configured origin");
+matches(oauth, /new URL\(origin\)\.origin !== qboCustomerApplicationOrigin\(\)/, "customer OAuth requires the exact configured origin");
 matches(oauth, /QBO_PRODUCTION_CLIENT_ID/, "Production client ID is environment-driven");
 matches(oauth, /QBO_PRODUCTION_CALLBACK_URI/, "Production callback is environment-driven");
 matches(oauth, /QBO_PRODUCTION_RETURN_INTENT/, "Production return intent is environment-driven");

@@ -1,10 +1,13 @@
 import { StatusBadge } from "@/components/operations/StatusBadge";
-import { Link2, RefreshCw } from "lucide-react";
+import Link from "next/link";
+import type { Route } from "next";
+import { Link2, RefreshCw, Unplug } from "lucide-react";
 import {
   customerConnectionStatus,
   type IntegrationConnectionSummaryRow,
   type IntegrationFreshnessSummaryRow
 } from "@/lib/integrations/control-plane/customer-status";
+import { QBO_CUSTOMER_DISCONNECT_PATH } from "@/lib/integrations/control-plane/qbo-customer-routes";
 
 function timestamp(value: string | null) {
   if (!value) return "Not yet available";
@@ -70,6 +73,16 @@ export function ConnectionStatusPanel({
                         <RefreshCw aria-hidden="true" className="h-4 w-4" />
                       </button>
                     </form>
+                  ) : null}
+                  {canManage ? (
+                    <Link
+                      href={QBO_CUSTOMER_DISCONNECT_PATH as Route}
+                      title="Manage or disconnect QuickBooks"
+                      aria-label="Manage or disconnect QuickBooks"
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-line text-ink hover:bg-slate-50"
+                    >
+                      <Unplug aria-hidden="true" className="h-4 w-4" />
+                    </Link>
                   ) : null}
                 </div>
               </div>
