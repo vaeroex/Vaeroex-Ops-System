@@ -908,7 +908,9 @@ insert into private.integration_credentials (
       convert_to('credential-reauthorization-a-seed', 'UTF8'),
       'sha256'
     ),
-    1, transaction_timestamp(), transaction_timestamp()
+    1,
+    transaction_timestamp() - interval '2 hours',
+    transaction_timestamp() - interval '1 minute'
   );
 
 select set_config(
