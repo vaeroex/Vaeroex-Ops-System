@@ -515,12 +515,18 @@ select is(
 reset role;
 set local search_path = public, extensions;
 
+create temporary table qbo_production_oauth_consume_input on commit drop as
+select pg_temp.fingerprint('production-customer-state-a') as state_hash;
+grant select on qbo_production_oauth_consume_input
+to integration_oauth_ingress_authority;
+
 set local role integration_oauth_ingress_authority;
 create temporary table qbo_production_oauth_consume_result on commit drop as
 select public.consume_qbo_customer_oauth_state_v2(
     pg_catalog.jsonb_build_object(
       'contractVersion', 'qbo_customer_oauth_state_consume_v2',
-      'stateHash', pg_temp.fingerprint('production-customer-state-a'),
+      'stateHash',
+        (select state_hash from qbo_production_oauth_consume_input),
       'redirectUri', 'https://integrations.vaeroex.com/oauth/callback'
     ),
     'qbo_customer_oauth_consume_a'
@@ -529,7 +535,8 @@ create temporary table qbo_production_oauth_replay_result on commit drop as
 select public.consume_qbo_customer_oauth_state_v2(
     pg_catalog.jsonb_build_object(
       'contractVersion', 'qbo_customer_oauth_state_consume_v2',
-      'stateHash', pg_temp.fingerprint('production-customer-state-a'),
+      'stateHash',
+        (select state_hash from qbo_production_oauth_consume_input),
       'redirectUri', 'https://integrations.vaeroex.com/oauth/callback'
     ),
     'qbo_customer_oauth_replay_a'
@@ -974,6 +981,17 @@ select is(
 reset role;
 set local search_path = public, extensions;
 
+create temporary table qbo_production_reauthorization_consume_input
+on commit drop as
+select
+  pg_temp.fingerprint('production-reauthorization-state-a') as state_hash,
+  pg_temp.fingerprint('production-reauthorization-realm-a')
+    as provider_entity_reference_fingerprint,
+  pg_temp.fingerprint('wrong-production-realm')
+    as wrong_provider_entity_reference_fingerprint;
+grant select on qbo_production_reauthorization_consume_input
+to integration_oauth_ingress_authority;
+
 set local role integration_oauth_ingress_authority;
 create temporary table qbo_production_reauthorization_realm_denial
 on commit drop as
@@ -983,10 +1001,12 @@ select pg_temp.raises_sqlstate(
         'contractVersion',
           'qbo_customer_reauthorization_state_consume_v2',
         'stateHash',
-          pg_temp.fingerprint('production-reauthorization-state-a'),
+          (select state_hash
+           from pg_temp.qbo_production_reauthorization_consume_input),
         'redirectUri', 'https://integrations.vaeroex.com/oauth/callback',
         'providerEntityReferenceFingerprint',
-          pg_temp.fingerprint('wrong-production-realm')
+          (select wrong_provider_entity_reference_fingerprint
+           from pg_temp.qbo_production_reauthorization_consume_input)
       ),
       'qbo_customer_reauthorization_wrong_realm'
     )$$,
@@ -998,10 +1018,12 @@ select public.consume_qbo_customer_reauthorization_state_v2(
     pg_catalog.jsonb_build_object(
       'contractVersion', 'qbo_customer_reauthorization_state_consume_v2',
       'stateHash',
-        pg_temp.fingerprint('production-reauthorization-state-a'),
+        (select state_hash
+         from qbo_production_reauthorization_consume_input),
       'redirectUri', 'https://integrations.vaeroex.com/oauth/callback',
       'providerEntityReferenceFingerprint',
-        pg_temp.fingerprint('production-reauthorization-realm-a')
+        (select provider_entity_reference_fingerprint
+         from qbo_production_reauthorization_consume_input)
     ),
     'qbo_customer_reauthorization_consume_a'
   ) as result;
@@ -1011,10 +1033,12 @@ select public.consume_qbo_customer_reauthorization_state_v2(
     pg_catalog.jsonb_build_object(
       'contractVersion', 'qbo_customer_reauthorization_state_consume_v2',
       'stateHash',
-        pg_temp.fingerprint('production-reauthorization-state-a'),
+        (select state_hash
+         from qbo_production_reauthorization_consume_input),
       'redirectUri', 'https://integrations.vaeroex.com/oauth/callback',
       'providerEntityReferenceFingerprint',
-        pg_temp.fingerprint('production-reauthorization-realm-a')
+        (select provider_entity_reference_fingerprint
+         from qbo_production_reauthorization_consume_input)
     ),
     'qbo_customer_reauthorization_replay_a'
   ) as result;
