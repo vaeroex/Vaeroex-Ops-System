@@ -25,6 +25,19 @@ locals {
     dispatch_scheduler       = "qbo-dispatch-scheduler"
     initialization_scheduler = "qbo-initialization-scheduler"
   }
+  provider_egress_modes = toset([
+    "credential_broker",
+    "provider_runtime",
+  ])
+  provider_egress_network = {
+    network_name = "qbo-production-egress"
+    subnet_name  = "qbo-production-egress-us-central1"
+    subnet_cidr  = "10.70.0.0/24"
+    address_name = "qbo-production-egress-ip"
+    router_name  = "qbo-production-egress-router"
+    nat_name     = "qbo-production-egress-nat"
+    network_tag  = "qbo-production-provider-egress"
+  }
   queue_resource        = "projects/${var.project_id}/locations/${var.region}/queues/${var.queue_name}"
   callback_edge_version = "v${substr(var.source_commit, 0, 12)}"
 }
@@ -34,6 +47,76 @@ resource "google_service_account" "service" {
 
   account_id   = each.value
   display_name = "Vaeroex QBO ${replace(each.key, "_", " ")}"
+}
+
+resource "google_compute_network" "provider_egress" {
+  name                    = local.provider_egress_network.network_name
+  auto_create_subnetworks = false
+  routing_mode            = "REGIONAL"
+  mtu                     = 1460
+
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
+resource "google_compute_subnetwork" "provider_egress" {
+  name                     = local.provider_egress_network.subnet_name
+  ip_cidr_range            = local.provider_egress_network.subnet_cidr
+  region                   = var.region
+  network                  = google_compute_network.provider_egress.id
+  private_ip_google_access = true
+
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
+resource "google_compute_address" "provider_egress" {
+  name         = local.provider_egress_network.address_name
+  region       = var.region
+  address_type = "EXTERNAL"
+  network_tier = "PREMIUM"
+
+  lifecycle {
+    create_before_destroy = true
+    prevent_destroy       = true
+  }
+}
+
+resource "google_compute_router" "provider_egress" {
+  name    = local.provider_egress_network.router_name
+  region  = var.region
+  network = google_compute_network.provider_egress.id
+
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
+resource "google_compute_router_nat" "provider_egress" {
+  name                               = local.provider_egress_network.nat_name
+  router                             = google_compute_router.provider_egress.name
+  region                             = google_compute_router.provider_egress.region
+  nat_ip_allocate_option             = "MANUAL_ONLY"
+  nat_ips                            = [google_compute_address.provider_egress.self_link]
+  source_subnetwork_ip_ranges_to_nat = "LIST_OF_SUBNETWORKS"
+  endpoint_types                     = ["ENDPOINT_TYPE_VM"]
+  min_ports_per_vm                   = 128
+
+  subnetwork {
+    name                    = google_compute_subnetwork.provider_egress.id
+    source_ip_ranges_to_nat = ["ALL_IP_RANGES"]
+  }
+
+  log_config {
+    enable = true
+    filter = "ERRORS_ONLY"
+  }
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "google_cloud_tasks_queue" "main" {
@@ -70,6 +153,20 @@ resource "google_cloud_run_v2_service" "service" {
     scaling {
       min_instance_count = 0
       max_instance_count = each.key == "provider_runtime" ? 20 : 5
+    }
+
+    dynamic "vpc_access" {
+      for_each = contains(local.provider_egress_modes, each.key) ? [each.key] : []
+
+      content {
+        egress = "ALL_TRAFFIC"
+
+        network_interfaces {
+          network    = google_compute_network.provider_egress.id
+          subnetwork = google_compute_subnetwork.provider_egress.id
+          tags       = [local.provider_egress_network.network_tag]
+        }
+      }
     }
 
     containers {

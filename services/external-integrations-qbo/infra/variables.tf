@@ -4,6 +4,10 @@ variable "project_id" {
 
 variable "region" {
   type = string
+  validation {
+    condition     = var.region == "us-central1"
+    error_message = "The Production QBO runtime must remain in us-central1."
+  }
 }
 
 variable "image_digest" {

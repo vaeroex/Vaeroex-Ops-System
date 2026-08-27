@@ -35,6 +35,7 @@ const edgePlugin = read("services/external-integrations-qbo/edge/plugin/main.go"
 const edgeTests = read("services/external-integrations-qbo/edge/callback_test.go");
 const terraform = read("services/external-integrations-qbo/infra/main.tf");
 const variables = read("services/external-integrations-qbo/infra/variables.tf");
+const terraformOutputs = read("services/external-integrations-qbo/infra/outputs.tf");
 const terraformVersions = read("services/external-integrations-qbo/infra/versions.tf");
 const terraformLock = read("services/external-integrations-qbo/infra/.terraform.lock.hcl");
 const dockerfile = read("services/external-integrations-qbo/Dockerfile");
@@ -46,6 +47,9 @@ const schedulerRepositoryCall = repository.match(
 const publicCallbackGrant = terraform.match(
   /resource "google_cloud_run_v2_service_iam_member" "public_callback" \{([\s\S]*?)\n\}/
 )?.[1] ?? "";
+const providerEgressModes = terraform.match(
+  /provider_egress_modes = toset\(\[([\s\S]*?)\]\)/
+)?.[0] ?? "";
 
 matches(connect, /requireWorkspaceAccess\(\)/, "connect derives workspace authority from the server session");
 matches(connect, /\.eq\("workspace_id", access\.workspaceId\)/, "connect binds the entity to the authorized workspace");
@@ -184,6 +188,19 @@ matches(terraform, /provider_secret_version/, "provider secret access is version
 matches(terraform, /webhook_secret_version/, "webhook verification secret access is version pinned");
 matches(terraform, /google_secret_manager_secret_iam_member" "webhook"[\s\S]*credential_broker/, "only the broker can read the webhook verifier secret");
 matches(terraform, /task_invoker/, "Cloud Tasks uses a dedicated runtime invoker");
+matches(variables, /var\.region == "us-central1"/, "Production QBO networking is pinned to the reviewed region");
+matches(terraform, /google_compute_network" "provider_egress"[\s\S]*auto_create_subnetworks = false[\s\S]*routing_mode\s+= "REGIONAL"/, "provider egress uses a dedicated custom-mode regional VPC");
+matches(terraform, /subnet_cidr\s+= "10\.70\.0\.0\/24"/, "provider egress reserves the reviewed bounded Production subnet range");
+matches(terraform, /google_compute_subnetwork" "provider_egress"[\s\S]*ip_cidr_range\s+= local\.provider_egress_network\.subnet_cidr[\s\S]*private_ip_google_access = true/, "provider egress consumes the bounded range with private Google API access");
+matches(terraform, /google_compute_address" "provider_egress"[\s\S]*region\s+= var\.region[\s\S]*address_type = "EXTERNAL"[\s\S]*network_tier = "PREMIUM"/, "provider egress reserves one regional Premium public address");
+matches(terraform, /google_compute_router" "provider_egress"[\s\S]*network = google_compute_network\.provider_egress\.id/, "provider egress uses the dedicated VPC router");
+matches(terraform, /google_compute_router_nat" "provider_egress"[\s\S]*nat_ip_allocate_option\s+= "MANUAL_ONLY"[\s\S]*nat_ips\s+= \[google_compute_address\.provider_egress\.self_link\]/, "Cloud NAT uses exactly the reserved provider address");
+matches(terraform, /google_compute_router_nat" "provider_egress"[\s\S]*source_subnetwork_ip_ranges_to_nat = "LIST_OF_SUBNETWORKS"[\s\S]*endpoint_types\s+= \["ENDPOINT_TYPE_VM"\][\s\S]*min_ports_per_vm\s+= 128/, "Cloud NAT is scoped to Direct VPC egress with bounded port capacity");
+matches(providerEgressModes, /provider_egress_modes = toset\(\[\s*"credential_broker",\s*"provider_runtime",\s*\]\)/, "only Intuit-facing service modes are eligible for static egress");
+matches(terraform, /dynamic "vpc_access"[\s\S]*contains\(local\.provider_egress_modes, each\.key\)[\s\S]*egress = "ALL_TRAFFIC"[\s\S]*google_compute_subnetwork\.provider_egress\.id/, "eligible Cloud Run revisions route all traffic through Direct VPC egress");
+excludes(providerEgressModes, /oauth_ingress|task_scheduler|task_dispatcher/, "ingress and control-plane services cannot acquire provider static egress");
+matches(terraformOutputs, /output "provider_egress_ip"[\s\S]*google_compute_address\.provider_egress\.address/, "Terraform exposes only the reserved public provider egress IP");
+excludes(terraform, /nat_ips\s+= \[google_compute_global_address\.callback/, "callback ingress can never become provider egress authority");
 matches(terraform, /oauth_ingress" \? "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER"/, "direct callback service ingress is closed outside the load balancer");
 matches(terraform, /google_network_services_wasm_plugin" "callback"/, "Production callback uses a managed immutable edge plugin");
 matches(terraform, /google_network_services_lb_edge_extension" "callback"[\s\S]*fail_open\s+= false/, "callback edge extension fails closed");

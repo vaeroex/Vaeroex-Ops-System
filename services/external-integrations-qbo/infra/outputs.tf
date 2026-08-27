@@ -10,6 +10,11 @@ output "queue_resource" {
   value = local.queue_resource
 }
 
+output "provider_egress_ip" {
+  description = "Static public IP used only by Intuit-facing broker and provider-runtime egress."
+  value       = google_compute_address.provider_egress.address
+}
+
 output "public_ingress" {
   value = {
     address          = google_compute_global_address.callback.address
