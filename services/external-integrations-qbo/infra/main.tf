@@ -38,6 +38,10 @@ locals {
     nat_name     = "qbo-production-egress-nat"
     network_tag  = "qbo-production-provider-egress"
   }
+  service_origins = {
+    for mode, name in var.service_names :
+    mode => "https://${name}-${data.google_project.current.number}.${var.region}.run.app"
+  }
   queue_resource        = "projects/${var.project_id}/locations/${var.region}/queues/${var.queue_name}"
   callback_edge_version = "v${substr(var.source_commit, 0, 12)}"
 }
@@ -190,11 +194,11 @@ resource "google_cloud_run_v2_service" "service" {
       }
       env {
         name  = "QBO_BROKER_URL"
-        value = var.service_origins.credential_broker
+        value = local.service_origins.credential_broker
       }
       env {
         name  = "QBO_PROVIDER_RUNTIME_URL"
-        value = var.service_origins.provider_runtime
+        value = local.service_origins.provider_runtime
       }
       env {
         name  = "QBO_QUEUE_NAME"
@@ -461,7 +465,7 @@ resource "google_cloud_scheduler_job" "dispatcher" {
   }
 
   http_target {
-    uri         = "${var.service_origins.task_dispatcher}/tasks/dispatch"
+    uri         = "${local.service_origins.task_dispatcher}/tasks/dispatch"
     http_method = "POST"
     body = base64encode(jsonencode({
       maximumTasks = var.maximum_dispatch_tasks
@@ -471,7 +475,7 @@ resource "google_cloud_scheduler_job" "dispatcher" {
 
     oidc_token {
       service_account_email = google_service_account.service["dispatch_scheduler"].email
-      audience              = var.service_origins.task_dispatcher
+      audience              = local.service_origins.task_dispatcher
     }
   }
 }
@@ -490,7 +494,7 @@ resource "google_cloud_scheduler_job" "initializer" {
   }
 
   http_target {
-    uri         = "${var.service_origins.task_scheduler}/tasks/schedule"
+    uri         = "${local.service_origins.task_scheduler}/tasks/schedule"
     http_method = "POST"
     body = base64encode(jsonencode({
       maximumConnections = var.maximum_initialization_connections
@@ -499,7 +503,7 @@ resource "google_cloud_scheduler_job" "initializer" {
 
     oidc_token {
       service_account_email = google_service_account.service["initialization_scheduler"].email
-      audience              = var.service_origins.task_scheduler
+      audience              = local.service_origins.task_scheduler
     }
   }
 }

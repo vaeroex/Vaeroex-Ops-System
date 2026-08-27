@@ -6,6 +6,8 @@ steps:
       - services/external-integrations-qbo/Dockerfile
       - --tag
       - ${_IMAGE}
+      - --build-arg
+      - QBO_SOURCE_COMMIT=${_SOURCE_COMMIT}
       - .
 images:
   - ${_IMAGE}

@@ -44,23 +44,6 @@ variable "service_names" {
   }
 }
 
-variable "service_origins" {
-  type = object({
-    credential_broker = string
-    provider_runtime  = string
-    task_scheduler    = string
-    task_dispatcher   = string
-  })
-  validation {
-    condition = alltrue([
-      for origin in values(var.service_origins) :
-      can(regex("^https://[A-Za-z0-9.-]+$", origin)) &&
-      length(regexall("(?i)(phase8b|p8b|canary|sandbox|sslip\\.io)", origin)) == 0
-    ])
-    error_message = "Service origins must be exact Production HTTPS origins."
-  }
-}
-
 variable "application_origin" {
   type = string
   validation {

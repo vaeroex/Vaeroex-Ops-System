@@ -9,7 +9,7 @@ steps:
     args: ["-ceu", "GOOS=wasip1 GOARCH=wasm go build -buildvcs=false -buildmode=c-shared -trimpath -o package/plugin.wasm ./plugin"]
   - name: gcr.io/cloud-builders/docker@sha256:2e8d40d8e48dc14fab4213d5e532d74f63fd403d9e8d7f6463096a75820286c3
     id: package
-    args: ["build", "--no-cache", "--platform", "wasm", "--tag", "${_PLUGIN_IMAGE}", "package"]
+    args: ["build", "--no-cache", "--platform", "wasm", "--build-arg", "QBO_SOURCE_COMMIT=${_SOURCE_COMMIT}", "--tag", "${_PLUGIN_IMAGE}", "package"]
 images: ["${_PLUGIN_IMAGE}"]
 options:
   logging: CLOUD_LOGGING_ONLY

@@ -39,6 +39,9 @@ const terraformOutputs = read("services/external-integrations-qbo/infra/outputs.
 const terraformVersions = read("services/external-integrations-qbo/infra/versions.tf");
 const terraformLock = read("services/external-integrations-qbo/infra/.terraform.lock.hcl");
 const dockerfile = read("services/external-integrations-qbo/Dockerfile");
+const cloudbuild = read("services/external-integrations-qbo/cloudbuild.yaml");
+const edgeDockerfile = read("services/external-integrations-qbo/edge/package/Dockerfile");
+const edgeCloudbuild = read("services/external-integrations-qbo/edge/cloudbuild.yaml");
 const descriptor = read("lib/integrations/providers/qbo/descriptor.ts");
 const status = read("lib/integrations/control-plane/customer-status.ts");
 const schedulerRepositoryCall = repository.match(
@@ -143,6 +146,7 @@ matches(server, /if \(!decision\.acquired\)[\s\S]*leaseAcquired: false/, "non-ow
 excludes(server, /PHASE8B_|P8B_/, "Production runtime has no qualification process constants");
 excludes(database, /service_role/, "Production database roles do not include service_role");
 matches(database, /set local role/, "every Production RPC transaction assumes one explicit narrow role");
+matches(database, /integration_webhook_ingress_authority/, "OAuth ingress can assume its narrow webhook evidence authority");
 
 matches(callbackHandoff, /x-vaeroex-oauth-handoff-version/, "callback handoff uses reserved internal headers");
 excludes(server, /url\.searchParams/, "Cloud Run never parses sensitive OAuth callback query parameters");
@@ -188,6 +192,9 @@ matches(terraform, /provider_secret_version/, "provider secret access is version
 matches(terraform, /webhook_secret_version/, "webhook verification secret access is version pinned");
 matches(terraform, /google_secret_manager_secret_iam_member" "webhook"[\s\S]*credential_broker/, "only the broker can read the webhook verifier secret");
 matches(terraform, /task_invoker/, "Cloud Tasks uses a dedicated runtime invoker");
+matches(terraform, /service_origins = \{[\s\S]*https:\/\/\$\{name\}-\$\{data\.google_project\.current\.number\}\.\$\{var\.region\}\.run\.app/, "managed service names derive deterministic Cloud Run origins");
+excludes(variables, /variable "service_origins"/, "callers cannot inject fabricated or pre-existing service origins");
+excludes(terraform, /var\.service_origins/, "runtime URLs and OIDC audiences use only managed service origins");
 matches(variables, /var\.region == "us-central1"/, "Production QBO networking is pinned to the reviewed region");
 matches(terraform, /google_compute_network" "provider_egress"[\s\S]*auto_create_subnetworks = false[\s\S]*routing_mode\s+= "REGIONAL"/, "provider egress uses a dedicated custom-mode regional VPC");
 matches(terraform, /subnet_cidr\s+= "10\.70\.0\.0\/24"/, "provider egress reserves the reviewed bounded Production subnet range");
@@ -217,6 +224,10 @@ matches(variables, /source_commit must be a full Git commit SHA/, "IaC records t
 excludes(terraform, /p8b-qbo|canary|sslip\.io|sandbox-quickbooks|intuit.*development/i, "deployable IaC contains no qualification resource binding");
 matches(dockerfile, /FROM node:22\.23\.1-bookworm-slim@sha256:/, "build image is digest pinned");
 matches(dockerfile, /FROM gcr\.io\/distroless\/nodejs22-debian12@sha256:/, "runtime image is digest pinned");
+matches(dockerfile, /LABEL org\.opencontainers\.image\.revision=\$QBO_SOURCE_COMMIT/, "runtime image records its exact source revision");
+matches(cloudbuild, /QBO_SOURCE_COMMIT=\$\{_SOURCE_COMMIT\}/, "runtime publication supplies the reviewed source revision");
+matches(edgeDockerfile, /LABEL org\.opencontainers\.image\.revision=\$QBO_SOURCE_COMMIT/, "callback edge image records its exact source revision");
+matches(edgeCloudbuild, /QBO_SOURCE_COMMIT=\$\{_SOURCE_COMMIT\}/, "callback edge publication supplies the reviewed source revision");
 
 matches(descriptor, /qbo_production_read_only_v1/, "descriptor uses the Production read-only gate");
 matches(descriptor, /accounting_writes/, "Production continues to prohibit accounting writes");

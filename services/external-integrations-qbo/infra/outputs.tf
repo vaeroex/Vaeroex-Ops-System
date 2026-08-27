@@ -34,6 +34,6 @@ output "runtime_configuration_registration" {
     authorizationReturnIntent = "/app/settings"
     providerApiOrigin         = "https://quickbooks.api.intuit.com"
     queueName                 = var.queue_name
-    queueAudience             = var.service_origins.provider_runtime
+    queueAudience             = local.service_origins.provider_runtime
   }
 }

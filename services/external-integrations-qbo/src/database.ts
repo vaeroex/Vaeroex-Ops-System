@@ -18,6 +18,7 @@ const productionRoles = new Set([
   "integration_oauth_ingress_authority",
   "integration_credential_broker_authority",
   "integration_control_plane_authority",
+  "integration_webhook_ingress_authority",
   "integration_task_scheduler_authority",
   "integration_task_dispatch_authority",
   "integration_provider_runtime_authority",
