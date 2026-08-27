@@ -1217,6 +1217,8 @@ export class IntegrationCredentialBroker {
         credentialId: result.credentialId,
         credentialVersion: result.credentialVersion,
         credentialReadEvidenceId: result.credentialReadEvidenceId,
+        externalAuthorizedEntityReference:
+          envelope.externalAuthorizedEntityReference,
         credential: new ProviderAccessCredential({
           providerKey: envelope.providerKey,
           providerEnvironment: envelope.environment,

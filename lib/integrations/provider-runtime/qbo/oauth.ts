@@ -11,6 +11,10 @@ import {
 } from "@/lib/integrations/credentials/contracts";
 import { ProviderCredentialRefreshFailure } from "@/lib/integrations/credentials/provider-failure";
 import type { ProviderApplicationSecret } from "@/lib/integrations/credentials/secret-manager";
+import {
+  QboProviderEnvironmentSchema,
+  type QboProviderEnvironment
+} from "@/lib/integrations/provider-runtime/qbo/client";
 import { QBO_PROVIDER_KEY } from "@/lib/integrations/providers/qbo/contracts";
 
 export const QBO_ACCOUNTING_SCOPE = "com.intuit.quickbooks.accounting" as const;
@@ -167,6 +171,7 @@ async function parseTokenResponse(
 function credentialEnvelope(input: {
   response: z.infer<typeof QboOAuthTokenResponseSchema>;
   realmId: string;
+  providerEnvironment: QboProviderEnvironment;
   now: Date;
   grantedScopes: readonly string[];
 }): CredentialEnvelope {
@@ -182,7 +187,7 @@ function credentialEnvelope(input: {
   return CredentialEnvelopeSchema.parse({
     schemaVersion: CREDENTIAL_SECURITY_CONTRACT_VERSIONS.credentialEnvelope,
     providerKey: QBO_PROVIDER_KEY,
-    environment: "sandbox",
+    environment: QboProviderEnvironmentSchema.parse(input.providerEnvironment),
     externalAuthorizedEntityReference: QboRealmIdSchema.parse(input.realmId),
     accessToken: input.response.access_token,
     accessExpiresAt: timestampAfter(input.now, input.response.expires_in),
@@ -197,7 +202,7 @@ function credentialEnvelope(input: {
   });
 }
 
-export function createQboSandboxAuthorizationUrl(input: {
+export function createQboAuthorizationUrl(input: {
   clientId: string;
   redirectUri: string;
   state: string;
@@ -214,18 +219,22 @@ export function createQboSandboxAuthorizationUrl(input: {
   return url.toString();
 }
 
-export class QboSandboxOAuthCredentialProvider {
+export const createQboSandboxAuthorizationUrl = createQboAuthorizationUrl;
+
+export class QboOAuthCredentialProvider {
   readonly providerKey = QBO_PROVIDER_KEY;
-  readonly environment = "sandbox" as const;
+  readonly environment: QboProviderEnvironment;
   readonly refreshTokenRotationPolicy = "returned_token_authoritative" as const;
   readonly tokenType = "bearer" as const;
   readonly #redirectUri: string;
   readonly #transport: QboOAuthHttpTransport;
 
   constructor(input: {
+    environment: QboProviderEnvironment;
     redirectUri: string;
     transport: QboOAuthHttpTransport;
   }) {
+    this.environment = QboProviderEnvironmentSchema.parse(input.environment);
     this.#redirectUri = z.string().url().max(2_048).parse(input.redirectUri);
     this.#transport = input.transport;
   }
@@ -258,6 +267,7 @@ export class QboSandboxOAuthCredentialProvider {
       return credentialEnvelope({
         response: await parseTokenResponse(response),
         realmId,
+        providerEnvironment: this.environment,
         now: input.now,
         grantedScopes: requestedScopes
       });
@@ -273,7 +283,7 @@ export class QboSandboxOAuthCredentialProvider {
     const current = CredentialEnvelopeSchema.parse(input.credential);
     if (
       current.providerKey !== QBO_PROVIDER_KEY ||
-      current.environment !== "sandbox" ||
+      current.environment !== this.environment ||
       current.externalAuthorizedEntityReference === null
     ) {
       throw new Error("qbo_oauth_credential_binding_invalid");
@@ -316,6 +326,7 @@ export class QboSandboxOAuthCredentialProvider {
       return credentialEnvelope({
         response: await parseTokenResponse(response, input.reportBoundary),
         realmId,
+        providerEnvironment: this.environment,
         now: input.now,
         grantedScopes: current.grantedScopes
       });
@@ -340,5 +351,13 @@ export class QboSandboxOAuthCredentialProvider {
         throw new Error("qbo_oauth_revocation_failed");
       }
     });
+  }
+}
+
+export class QboSandboxOAuthCredentialProvider extends QboOAuthCredentialProvider {
+  constructor(
+    input: Omit<ConstructorParameters<typeof QboOAuthCredentialProvider>[0], "environment">
+  ) {
+    super({ ...input, environment: "sandbox" });
   }
 }

@@ -98,8 +98,18 @@ ok(qbo.QBO_PROVIDER_DESCRIPTOR.minimumScopes.includes("com.intuit.quickbooks.acc
 ok(qbo.QBO_PROVIDER_DESCRIPTOR.hostnameAllowlist.includes("quickbooks.api.intuit.com"), "production API hostname is declared");
 ok(qbo.QBO_PROVIDER_DESCRIPTOR.hostnameAllowlist.includes("sandbox-quickbooks.api.intuit.com"), "sandbox API hostname is declared");
 ok(qbo.QBO_PROVIDER_DESCRIPTOR.unsupportedCapabilities.includes("accounting_writes"), "accounting writes are explicitly unsupported");
-ok(qbo.QBO_PROVIDER_DESCRIPTOR.unsupportedCapabilities.includes("credential_storage"), "credential storage is explicitly unsupported");
 ok(qbo.QBO_PROVIDER_DESCRIPTOR.unsupportedCapabilities.includes("kpi_promotion"), "KPI promotion is explicitly unsupported");
+equal(qbo.QBO_PROVIDER_DESCRIPTOR.legalCommercialGateVersion, "qbo_production_read_only_v1", "QBO uses the Production read-only commercial gate");
+for (const implemented of [
+  "credential_storage",
+  "kms_encryption",
+  "cloud_tasks",
+  "sync_worker",
+  "webhook_route",
+  "customer_ui"
+]) {
+  ok(!qbo.QBO_PROVIDER_DESCRIPTOR.unsupportedCapabilities.includes(implemented), `${implemented} is implemented by the Production boundary`);
+}
 
 const phase7Registry = registry.assertProviderDescriptorRegistry(qbo.QBO_PHASE_7_PROVIDER_REGISTRY);
 equal(phase7Registry.registryVersion, "vaeroex_provider_descriptors_v1", "Phase 7 preserves registry version");

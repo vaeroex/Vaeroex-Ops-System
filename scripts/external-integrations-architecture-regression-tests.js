@@ -231,6 +231,11 @@ const protectedDiff = childProcess.execFileSync(
   { cwd: root, encoding: "utf8" }
 ).trim();
 const approvedProtectedPaths = new Set([
+  "app/app/settings/page.tsx",
+  "app/api/integrations/qbo/connect/route.ts",
+  "app/api/integrations/qbo/reauthorize/route.ts",
+  "components/integrations/ConnectionStatusPanel.tsx",
+  "components/operations/StatusBadge.tsx",
   "lib/supabase/types.ts",
   "supabase/migrations/20260820233007_external_integrations_phase_1_canonical_foundation.sql",
   "supabase/tests/external_integrations_phase_1_canonical_foundation.test.sql",
@@ -263,6 +268,7 @@ const approvedProtectedPaths = new Set([
   "supabase/migrations/20260826120000_qbo_credential_lineage_incident_recovery.sql",
   "supabase/migrations/20260826190801_qbo_precontract_initialization_retirement.sql",
   "supabase/migrations/20260826222000_qbo_provider_result_evidence_and_ar_aging_recovery.sql",
+  "supabase/migrations/20260827033058_qbo_production_convergence.sql",
   "supabase/tests/external_integrations_phase_8b_qbo_sandbox_validation.test.sql",
   "supabase/tests/external_integrations_phase_8b_credential_refresh_recovery.test.sql",
   "supabase/tests/external_integrations_phase_8b_same_generation_reauthorization.test.sql",
@@ -273,6 +279,7 @@ const approvedProtectedPaths = new Set([
   "supabase/tests/external_integrations_phase_8b_credential_lineage_recovery.test.sql",
   "supabase/tests/external_integrations_phase_8b_precontract_retirement.test.sql",
   "supabase/tests/external_integrations_phase_8b_provider_result_evidence.test.sql",
+  "supabase/tests/external_integrations_qbo_production_convergence.test.sql",
   "lib/integrations/control-plane/qbo-precontract-retirement.ts",
   "supabase/tests/fixtures/external_integrations_phase_8b_zero_based_legacy.sql",
   "services/external-integrations-qbo-sandbox/Dockerfile",
@@ -293,7 +300,28 @@ const approvedProtectedPaths = new Set([
   "services/external-integrations-qbo-sandbox/src/cloud-task-delivery.ts",
   "services/external-integrations-qbo-sandbox/src/database.ts",
   "services/external-integrations-qbo-sandbox/src/google.ts",
-  "services/external-integrations-qbo-sandbox/src/server.ts"
+  "services/external-integrations-qbo-sandbox/src/server.ts",
+  "services/external-integrations-qbo/Dockerfile",
+  "services/external-integrations-qbo/cloudbuild.yaml",
+  "services/external-integrations-qbo/edge/callback.go",
+  "services/external-integrations-qbo/edge/callback_test.go",
+  "services/external-integrations-qbo/edge/cloudbuild.yaml",
+  "services/external-integrations-qbo/edge/go.mod",
+  "services/external-integrations-qbo/edge/go.sum",
+  "services/external-integrations-qbo/edge/package/Dockerfile",
+  "services/external-integrations-qbo/edge/plugin/main.go",
+  "services/external-integrations-qbo/infra/.terraform.lock.hcl",
+  "services/external-integrations-qbo/infra/README.md",
+  "services/external-integrations-qbo/infra/main.tf",
+  "services/external-integrations-qbo/infra/outputs.tf",
+  "services/external-integrations-qbo/infra/variables.tf",
+  "services/external-integrations-qbo/infra/versions.tf",
+  "services/external-integrations-qbo/package.json",
+  "services/external-integrations-qbo/src/cloud-task-delivery.ts",
+  "services/external-integrations-qbo/src/database.ts",
+  "services/external-integrations-qbo/src/executor.ts",
+  "services/external-integrations-qbo/src/google.ts",
+  "services/external-integrations-qbo/src/server.ts"
 ]);
 const unexpectedProtectedDiff = protectedDiff
   .split("\n")
@@ -303,7 +331,7 @@ const unexpectedProtectedDiff = protectedDiff
 equal(
   unexpectedProtectedDiff,
   "",
-  "Phase 0 through Phase 8B may change only registered migrations, tests, and the isolated QBO sandbox service"
+  "external-integration phases may change only registered migrations, tests, UI surfaces, and reviewed runtime services"
 );
 
 const untrackedMigrations = childProcess.execFileSync(
@@ -319,7 +347,7 @@ const unexpectedUntrackedMigrations = untrackedMigrations
 equal(
   unexpectedUntrackedMigrations,
   "",
-  "only the approved Phase 1 through Phase 8B migrations may extend the Phase 0 baseline"
+  "only approved external-integration migrations may extend the Phase 0 baseline"
 );
 
 console.log(`External integration Phase 0 architecture regressions: ${assertionCount} assertions passed.`);

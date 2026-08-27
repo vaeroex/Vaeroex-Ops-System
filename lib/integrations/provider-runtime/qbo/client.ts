@@ -34,6 +34,14 @@ import { assertQboReadOnlyOperation } from "@/lib/integrations/providers/qbo/rea
 
 export const QBO_SANDBOX_API_ORIGIN =
   "https://sandbox-quickbooks.api.intuit.com" as const;
+export const QBO_PRODUCTION_API_ORIGIN =
+  "https://quickbooks.api.intuit.com" as const;
+export const QboProviderEnvironmentSchema = z.enum(["sandbox", "production"]);
+export type QboProviderEnvironment = z.infer<typeof QboProviderEnvironmentSchema>;
+export const QBO_API_ORIGIN_BY_ENVIRONMENT = {
+  sandbox: QBO_SANDBOX_API_ORIGIN,
+  production: QBO_PRODUCTION_API_ORIGIN
+} as const satisfies Record<QboProviderEnvironment, string>;
 export const QBO_RUNTIME_EGRESS_POLICY_VERSION =
   "qbo_runtime_egress_policy_v1" as const;
 export const QBO_RUNTIME_MAX_RESPONSE_BYTES = 8 * 1024 * 1024;
@@ -142,18 +150,22 @@ function routeKind(pathname: string, realmId: string) {
   throw new Error("qbo_runtime_egress_path_denied");
 }
 
-export function assertQboSandboxRuntimeEgress(input: {
+export function assertQboRuntimeEgress(input: {
   method: string;
   url: string;
   realmId: string;
+  providerEnvironment: QboProviderEnvironment;
   queryText?: string | null;
 }) {
   const realmId = RealmIdSchema.parse(input.realmId);
+  const providerEnvironment = QboProviderEnvironmentSchema.parse(
+    input.providerEnvironment
+  );
   const url = new URL(input.url);
   if (
     input.method !== "GET" ||
     url.protocol !== "https:" ||
-    url.origin !== QBO_SANDBOX_API_ORIGIN ||
+    url.origin !== QBO_API_ORIGIN_BY_ENVIRONMENT[providerEnvironment] ||
     url.username !== "" ||
     url.password !== "" ||
     url.hash !== ""
@@ -175,10 +187,16 @@ export function assertQboSandboxRuntimeEgress(input: {
   return {
     policyVersion: QBO_RUNTIME_EGRESS_POLICY_VERSION,
     providerKey: QBO_PROVIDER_KEY,
-    providerEnvironment: "sandbox" as const,
+    providerEnvironment,
     routeKind: kind,
     readOnly: true as const
   };
+}
+
+export function assertQboSandboxRuntimeEgress(
+  input: Omit<Parameters<typeof assertQboRuntimeEgress>[0], "providerEnvironment">
+) {
+  return assertQboRuntimeEgress({ ...input, providerEnvironment: "sandbox" });
 }
 
 function parseJsonResponse(response: QboRuntimeHttpResponse) {
@@ -260,23 +278,32 @@ function queryText(input: {
   return `SELECT * FROM ${input.recordType}${where} STARTPOSITION ${input.startPosition} MAXRESULTS ${maximumResults}`;
 }
 
-export class QboSandboxReadOnlyClient {
+export class QboReadOnlyClient {
   readonly #realmId: string;
+  readonly #providerEnvironment: QboProviderEnvironment;
   readonly #transport: QboRuntimeHttpTransport;
   readonly #providerResultObserver: QboProviderResultObserver | null;
 
   constructor(input: {
     realmId: string;
+    providerEnvironment: QboProviderEnvironment;
     transport: QboRuntimeHttpTransport;
     providerResultObserver?: QboProviderResultObserver;
   }) {
     this.#realmId = RealmIdSchema.parse(input.realmId);
+    this.#providerEnvironment = QboProviderEnvironmentSchema.parse(
+      input.providerEnvironment
+    );
     this.#transport = input.transport;
     this.#providerResultObserver = input.providerResultObserver ?? null;
   }
 
   get realmId() {
     return this.#realmId;
+  }
+
+  get providerEnvironment() {
+    return this.#providerEnvironment;
   }
 
   async #observeProviderResult(input: {
@@ -303,12 +330,16 @@ export class QboSandboxReadOnlyClient {
     endpointClass: QboProviderEndpointClass;
     requestFingerprintInput: Readonly<Record<string, unknown>>;
   }) {
-    const url = new URL(input.path, QBO_SANDBOX_API_ORIGIN);
+    const url = new URL(
+      input.path,
+      QBO_API_ORIGIN_BY_ENVIRONMENT[this.#providerEnvironment]
+    );
     url.search = input.parameters.toString();
-    assertQboSandboxRuntimeEgress({
+    assertQboRuntimeEgress({
       method: "GET",
       url: url.toString(),
       realmId: this.#realmId,
+      providerEnvironment: this.#providerEnvironment,
       queryText: input.queryText
     });
     const providerRequestFingerprint = contractSha256({
@@ -510,5 +541,13 @@ export class QboSandboxReadOnlyClient {
       throw new Error("qbo_cdc_response_cap_exceeded");
     }
     return { records, observedObjectCount: records.length } as const;
+  }
+}
+
+export class QboSandboxReadOnlyClient extends QboReadOnlyClient {
+  constructor(
+    input: Omit<ConstructorParameters<typeof QboReadOnlyClient>[0], "providerEnvironment">
+  ) {
+    super({ ...input, providerEnvironment: "sandbox" });
   }
 }

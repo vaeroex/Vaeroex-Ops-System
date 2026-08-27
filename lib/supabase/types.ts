@@ -884,6 +884,54 @@ export type Database = {
         };
         Relationships: [];
       };
+      integration_connection_summaries: {
+        Row: {
+          id: string;
+          contract_version: string;
+          workspace_id: string;
+          business_entity_id: string;
+          provider_key: string;
+          provider_environment: string;
+          safe_display_name: string;
+          status: string;
+          state_reason_code: string;
+          requested_scopes: string[];
+          granted_scopes: string[];
+          capability_snapshot: Json;
+          adapter_version: string;
+          configuration_version: number;
+          connection_generation: number;
+          status_changed_at: string;
+          disconnected_at: string | null;
+          row_version: number;
+          updated_at: string;
+        };
+        Relationships: [];
+      };
+      integration_freshness_summaries: {
+        Row: {
+          id: string;
+          contract_version: string;
+          workspace_id: string;
+          business_entity_id: string;
+          connection_id: string;
+          provider_key: string;
+          domain: string;
+          scope_key: string;
+          last_attempt_at: string | null;
+          last_successful_sync_at: string | null;
+          last_reconciled_at: string | null;
+          observed_lag_seconds: number | null;
+          status: string;
+          blocking_level: string;
+          reason_code: string | null;
+          policy_version: string;
+          calculated_at: string;
+          row_version: number;
+          updated_at: string;
+        };
+        Relationships: [];
+      };
     };
     Tables: {
       business_entities: {

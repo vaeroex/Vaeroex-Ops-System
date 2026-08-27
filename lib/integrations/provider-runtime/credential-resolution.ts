@@ -4,7 +4,11 @@ import {
   CredentialRefreshResultSchema,
   type CredentialRefreshResult
 } from "@/lib/integrations/credentials/contracts";
-import { IsoTimestampSchema, UuidSchema } from "@/lib/integrations/contracts/primitives";
+import {
+  BoundedIdentifierSchema,
+  IsoTimestampSchema,
+  UuidSchema
+} from "@/lib/integrations/contracts/primitives";
 
 const CredentialIdentitySchema = z
   .object({
@@ -18,6 +22,7 @@ export const ProviderCredentialBrokerReadSchema = z.discriminatedUnion("state", 
   CredentialIdentitySchema.extend({
     state: z.literal("available"),
     credentialReadEvidenceId: UuidSchema,
+    externalAuthorizedEntityReference: BoundedIdentifierSchema.optional(),
     accessToken: z.string().min(16).max(16_384)
   }).strict(),
   CredentialIdentitySchema.extend({ state: z.literal("refresh_required") }).strict(),
@@ -31,6 +36,7 @@ export const ProviderCredentialResolutionSchema = z.discriminatedUnion("state", 
       credentialId: UuidSchema,
       credentialVersion: z.number().int().positive().safe(),
       credentialReadEvidenceId: UuidSchema,
+      externalAuthorizedEntityReference: BoundedIdentifierSchema.optional(),
       accessExpiresAt: IsoTimestampSchema,
       accessToken: z.string().min(16).max(16_384)
     })

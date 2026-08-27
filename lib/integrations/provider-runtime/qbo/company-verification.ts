@@ -7,19 +7,31 @@ import {
 } from "@/lib/integrations/contracts/primitives";
 import type { AuthorizedProviderEntityVerifier } from "@/lib/integrations/credentials/broker";
 import { minimizeQboSourceRecord } from "@/lib/integrations/providers/qbo/minimizers";
-import type { QboSandboxReadOnlyClient } from "@/lib/integrations/provider-runtime/qbo/client";
+import {
+  QboProviderEnvironmentSchema,
+  type QboProviderEnvironment,
+  type QboReadOnlyClient,
+  type QboSandboxReadOnlyClient
+} from "@/lib/integrations/provider-runtime/qbo/client";
 
 export const QBO_COMPANY_VERIFICATION_VERSION =
   "qbo_sandbox_company_verification_v1" as const;
+export const QBO_PRODUCTION_COMPANY_VERIFICATION_VERSION =
+  "qbo_production_company_verification_v1" as const;
 
-export class QboSandboxCompanyVerifier
+export class QboCompanyVerifier
   implements AuthorizedProviderEntityVerifier
 {
-  readonly #clientForRealm: (realmId: string) => QboSandboxReadOnlyClient;
+  readonly #providerEnvironment: QboProviderEnvironment;
+  readonly #clientForRealm: (realmId: string) => QboReadOnlyClient;
 
   constructor(input: {
-    clientForRealm: (realmId: string) => QboSandboxReadOnlyClient;
+    providerEnvironment: QboProviderEnvironment;
+    clientForRealm: (realmId: string) => QboReadOnlyClient;
   }) {
+    this.#providerEnvironment = QboProviderEnvironmentSchema.parse(
+      input.providerEnvironment
+    );
     this.#clientForRealm = input.clientForRealm;
   }
 
@@ -32,6 +44,9 @@ export class QboSandboxCompanyVerifier
       if (client.realmId !== realmId) {
         throw new Error("qbo_company_verification_realm_substitution");
       }
+      if (client.providerEnvironment !== this.#providerEnvironment) {
+        throw new Error("qbo_company_verification_environment_substitution");
+      }
       const raw = await client.fetchCompanyInfo({ accessToken });
       return minimizeQboSourceRecord({
         recordType: "CompanyInfo",
@@ -39,22 +54,31 @@ export class QboSandboxCompanyVerifier
         provider: {
           providerKey: "quickbooks_online",
           realmId,
-          sourceEnvironment: "sandbox"
+          sourceEnvironment: this.#providerEnvironment
         }
       });
     });
     const safeDisplayName = BoundedLabelSchema.parse(
-      company.displayName ?? "QuickBooks Online Sandbox Company"
+      company.displayName ?? "QuickBooks Online Company"
     );
+    const verificationContract = this.#providerEnvironment === "sandbox"
+      ? {
+          purpose: "qbo_sandbox_company_verification",
+          version: QBO_COMPANY_VERIFICATION_VERSION
+        }
+      : {
+          purpose: "qbo_production_company_verification",
+          version: QBO_PRODUCTION_COMPANY_VERIFICATION_VERSION
+        };
     return {
       externalAuthorizedEntityReference: realmId,
       providerEntityType: "company",
       safeDisplayName,
       verificationFingerprint: contractSha256({
-        fingerprintPurpose: "qbo_sandbox_company_verification",
-        fingerprintVersion: QBO_COMPANY_VERIFICATION_VERSION,
+        fingerprintPurpose: verificationContract.purpose,
+        fingerprintVersion: verificationContract.version,
         providerKey: "quickbooks_online",
-        providerEnvironment: "sandbox",
+        providerEnvironment: this.#providerEnvironment,
         realmId,
         companyId: company.id,
         providerUpdatedAt: company.metadata.providerUpdatedAt,
@@ -62,5 +86,13 @@ export class QboSandboxCompanyVerifier
         safeDisplayName
       })
     } as const;
+  }
+}
+
+export class QboSandboxCompanyVerifier extends QboCompanyVerifier {
+  constructor(input: {
+    clientForRealm: (realmId: string) => QboSandboxReadOnlyClient;
+  }) {
+    super({ providerEnvironment: "sandbox", clientForRealm: input.clientForRealm });
   }
 }

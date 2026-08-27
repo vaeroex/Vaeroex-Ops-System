@@ -27,6 +27,10 @@ import {
   ReconciliationRepresentationSchema,
   type ReconciliationRepresentation
 } from "@/lib/integrations/reconciliation/contracts";
+import {
+  QboProviderEnvironmentSchema,
+  type QboProviderEnvironment
+} from "@/lib/integrations/provider-runtime/qbo/client";
 import { z } from "zod";
 
 export const QBO_CANONICAL_MAPPING_VERSION =
@@ -42,7 +46,7 @@ const QboRevenueMappingAuthoritySchema = z
   .object({
     contractVersion: z.literal(QBO_REVENUE_MAPPING_AUTHORITY_VERSION),
     providerKey: z.literal(QBO_PROVIDER_KEY),
-    providerEnvironment: z.literal("sandbox"),
+    providerEnvironment: QboProviderEnvironmentSchema,
     realmId: z.string().min(1).max(64).regex(/^[A-Za-z0-9._:-]+$/),
     incomeAccountRefs: z.array(z.string().min(1).max(128)).max(10_000),
     revenueItemRefs: z.array(z.string().min(1).max(128)).max(100_000),
@@ -94,7 +98,11 @@ function authorityFingerprintInput(
 export function deriveQboRevenueMappingAuthority(input: {
   sourceVersions: readonly unknown[];
   expectedRealmId: string;
+  providerEnvironment?: QboProviderEnvironment;
 }) {
+  const providerEnvironment = QboProviderEnvironmentSchema.parse(
+    input.providerEnvironment ?? "sandbox"
+  );
   const records = input.sourceVersions.flatMap((value) => {
     const source = ExternalSourceRecordVersionSchema.parse(value);
     const projection = sourceProjection(source);
@@ -102,7 +110,7 @@ export function deriveQboRevenueMappingAuthority(input: {
     const record = QboMinimizedSourceRecordSchema.parse(projection);
     if (
       record.provider.realmId !== input.expectedRealmId ||
-      record.provider.sourceEnvironment !== "sandbox"
+      record.provider.sourceEnvironment !== providerEnvironment
     ) {
       throw new Error("qbo_revenue_authority_provider_binding_denied");
     }
@@ -134,7 +142,7 @@ export function deriveQboRevenueMappingAuthority(input: {
   const draft = {
     contractVersion: QBO_REVENUE_MAPPING_AUTHORITY_VERSION,
     providerKey: QBO_PROVIDER_KEY,
-    providerEnvironment: "sandbox" as const,
+    providerEnvironment,
     realmId: input.expectedRealmId,
     incomeAccountRefs,
     revenueItemRefs,
@@ -146,11 +154,16 @@ export function deriveQboRevenueMappingAuthority(input: {
   });
 }
 
-function checkedRevenueAuthority(input: unknown, realmId: string) {
+function checkedRevenueAuthority(
+  input: unknown,
+  realmId: string,
+  providerEnvironment: QboProviderEnvironment
+) {
   const authority = QboRevenueMappingAuthoritySchema.parse(input);
   const { authorityFingerprint, ...draft } = authority;
   if (
     authority.realmId !== realmId ||
+    authority.providerEnvironment !== providerEnvironment ||
     authorityFingerprint !== contractSha256(authorityFingerprintInput(draft))
   ) {
     throw new Error("qbo_revenue_mapping_authority_denied");
@@ -298,7 +311,14 @@ export function mapValidatedQboRevenueSource(input: {
   ) {
     return { disposition: "quarantined" as const, candidates: [] as Candidate[], reasonCodes: ["qbo_revenue_accounting_context_unsupported"] };
   }
-  const authority = checkedRevenueAuthority(input.revenueAuthority, record.provider.realmId);
+  const providerEnvironment = QboProviderEnvironmentSchema.parse(
+    record.provider.sourceEnvironment
+  );
+  const authority = checkedRevenueAuthority(
+    input.revenueAuthority,
+    record.provider.realmId,
+    providerEnvironment
+  );
   const postingDate = record.temporal.postingDate;
   const sourceCurrency = record.accounting.sourceCurrency;
   const incomeAccountRefs = new Set(authority.incomeAccountRefs);

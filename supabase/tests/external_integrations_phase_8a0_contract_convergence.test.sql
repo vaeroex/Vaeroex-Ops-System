@@ -2164,4 +2164,340 @@ select extensions.dblink_disconnect('phase8a0_read_concurrency_1');
 select extensions.dblink_disconnect('phase8a0_read_concurrency_2');
 select extensions.dblink_disconnect('phase8a0_refresh_concurrency');
 
+select is(
+  private.integration_stream_freshness_domain_v1(
+    'quickbooks_online',
+    'company_info'
+  ),
+  'company_configuration',
+  'QBO company streams map to the canonical company-configuration domain'
+);
+select is(
+  private.integration_stream_freshness_domain_v1(
+    'quickbooks_online',
+    'accounts'
+  ),
+  'master_records',
+  'QBO master-record streams map to the canonical master-records domain'
+);
+select is(
+  private.integration_stream_freshness_domain_v1(
+    'quickbooks_online',
+    'qbo_invoice'
+  ),
+  'financial_transactions',
+  'QBO transaction streams map to the canonical financial-transactions domain'
+);
+select is(
+  private.integration_stream_freshness_domain_v1(
+    'quickbooks_online',
+    'qbo_balancesheet'
+  ),
+  'report_control_observations',
+  'QBO report streams map to the canonical report-control domain'
+);
+select is(
+  private.integration_stream_freshness_domain_v1(
+    'quickbooks_online',
+    'caller_controlled_stream'
+  ),
+  null,
+  'unknown QBO streams fail closed without a freshness-domain mapping'
+);
+
+insert into private.integration_connections (
+  id, contract_version, control_contract_version, workspace_id,
+  business_entity_id, connection_series_id, connection_generation,
+  replaces_connection_id, provider_key, provider_environment,
+  provider_tenant_reference_fingerprint, status, state_reason_code,
+  requested_scopes, granted_scopes, safe_display_name,
+  provider_descriptor_registry_version,
+  provider_descriptor_registry_fingerprint,
+  provider_descriptor_fingerprint, adapter_version, capability_snapshot,
+  configuration_version, authorized_at, status_changed_at,
+  disconnected_at, deleted_at, last_transition_request_id,
+  last_transition_request_fingerprint, row_version, created_by,
+  created_at, updated_at
+) values (
+  'e8000000-0000-4000-8000-000000000201',
+  'integration_connection_v1', 'integration_connection_control_v1',
+  'b8000000-0000-4000-8000-000000000001',
+  'd8000000-0000-4000-8000-000000000001',
+  'e8000000-0000-4000-8000-000000000201', 1, null,
+  'quickbooks_online', 'production',
+  extensions.digest(
+    convert_to('synthetic-qbo-activation-realm', 'UTF8'),
+    'sha256'
+  ),
+  'initializing', 'initial_sync_pending',
+  array['com.intuit.quickbooks.accounting']::text[],
+  array['com.intuit.quickbooks.accounting']::text[],
+  'Synthetic QBO Activation', 'vaeroex_provider_descriptors_v1',
+  decode(
+    '6981f2593ee13a1476be9940d752bbccffaa07f6ff45d153e8cacbd5837ce758',
+    'hex'
+  ),
+  decode(
+    'e4c07ee40eacda38342037219c473159aab5109c3d94c5e22d306364523d74ac',
+    'hex'
+  ),
+  'qbo_provider_adapter_v1', pg_temp.qbo_capability(), 1,
+  transaction_timestamp(), transaction_timestamp(), null, null,
+  null, null, 1, 'a8000000-0000-4000-8000-000000000001',
+  transaction_timestamp(), transaction_timestamp()
+);
+
+insert into private.provider_entity_mappings (
+  id, contract_version, workspace_id, business_entity_id, connection_id,
+  mapping_series_id, mapping_version, replaces_mapping_id, provider_key,
+  provider_environment, provider_entity_type,
+  provider_entity_reference_fingerprint, safe_display_name, mapping_role,
+  status, verification_mode, verification_fingerprint, verified_at, mapped_by,
+  mapped_at, last_transition_request_id, last_transition_request_fingerprint,
+  row_version, created_at, updated_at
+) values (
+  'f8000000-0000-4000-8000-000000000201', 'provider_entity_mapping_v1',
+  'b8000000-0000-4000-8000-000000000001',
+  'd8000000-0000-4000-8000-000000000001',
+  'e8000000-0000-4000-8000-000000000201',
+  'f8000000-0000-4000-8000-000000000201', 1, null,
+  'quickbooks_online', 'production', 'company',
+  extensions.digest(convert_to('synthetic-qbo-activation-entity', 'UTF8'), 'sha256'),
+  'Synthetic QBO Activation Entity', 'primary', 'active',
+  'qbo_realm_mapping_v1',
+  extensions.digest(convert_to('synthetic-qbo-activation-verified', 'UTF8'), 'sha256'),
+  transaction_timestamp(), 'a8000000-0000-4000-8000-000000000001',
+  transaction_timestamp(), null, null, 1,
+  transaction_timestamp(), transaction_timestamp()
+);
+
+insert into private.integration_sync_runs (
+  id, contract_version, workspace_id, business_entity_id, connection_id,
+  mapping_id, connection_generation, trigger_kind, mode, state,
+  idempotency_fingerprint, window_start_at, window_end_at,
+  provider_contract_version, adapter_version, policy_version,
+  records_observed, records_accepted, records_rejected, facts_accepted,
+  contributions_changed, error_category, error_code,
+  last_transition_request_id, last_transition_request_fingerprint,
+  created_at, started_at, finished_at, row_version, updated_at
+) values (
+  '28000000-0000-4000-8000-000000000201', 'integration_sync_run_v1',
+  'b8000000-0000-4000-8000-000000000001',
+  'd8000000-0000-4000-8000-000000000001',
+  'e8000000-0000-4000-8000-000000000201',
+  'f8000000-0000-4000-8000-000000000201', 1,
+  'provider_initialization', 'initialization', 'succeeded',
+  extensions.digest(convert_to('phase8a0-activation-run', 'UTF8'), 'sha256'),
+  null, null, 'provider_adapter_v1', 'qbo_provider_adapter_v1',
+  'qbo_historical_sync_policy_v1', 21, 21, 0, 0, 0, null, null,
+  'phase8a0-activation-run',
+  extensions.digest(convert_to('phase8a0-activation-run-request', 'UTF8'), 'sha256'),
+  transaction_timestamp(), transaction_timestamp(), transaction_timestamp(), 3,
+  transaction_timestamp()
+);
+
+with required_streams as (
+  select required.stream_key, required.ordinality
+  from pg_catalog.jsonb_array_elements_text(
+    pg_temp.qbo_capability() -> 'requiredStreamKeys'
+  ) with ordinality as required(stream_key, ordinality)
+  where required.stream_key <> 'qbo_vendorcredit'
+)
+insert into private.integration_freshness_states (
+  id, contract_version, workspace_id, business_entity_id, connection_id,
+  mapping_id, provider_key, domain, scope_key, provider_watermark_at,
+  last_attempt_at, last_successful_sync_at, last_reconciled_at,
+  observed_lag_seconds, status, blocking_level, reason_code, policy_version,
+  current_max_age_seconds, stale_after_seconds, age_seconds, calculated_at,
+  state_fingerprint, last_request_id, last_request_fingerprint, row_version,
+  created_at, updated_at
+)
+select
+  (
+    '98000000-0000-4000-8000-'
+    || pg_catalog.lpad(required.ordinality::text, 12, '0')
+  )::uuid,
+  'integration_freshness_v1',
+  'b8000000-0000-4000-8000-000000000001'::uuid,
+  'd8000000-0000-4000-8000-000000000001'::uuid,
+  'e8000000-0000-4000-8000-000000000201'::uuid,
+  'f8000000-0000-4000-8000-000000000201'::uuid,
+  'quickbooks_online',
+  private.integration_stream_freshness_domain_v1(
+    'quickbooks_online',
+    required.stream_key
+  ),
+  required.stream_key,
+  transaction_timestamp(), transaction_timestamp(), transaction_timestamp(),
+  transaction_timestamp(), 0, 'current', 'none', 'within_current_threshold',
+  'qbo_control_plane_freshness_policy_v1', 3600, 7200, 0,
+  transaction_timestamp(),
+  extensions.digest(
+    convert_to('phase8a0-activation-' || required.stream_key, 'UTF8'),
+    'sha256'
+  ),
+  'phase8a0-activation-' || required.stream_key,
+  extensions.digest(
+    convert_to('phase8a0-activation-request-' || required.stream_key, 'UTF8'),
+    'sha256'
+  ),
+  1, transaction_timestamp(), transaction_timestamp()
+from required_streams as required;
+
+create or replace function pg_temp.qbo_activation_command()
+returns jsonb
+language sql
+stable
+as $function$
+  select pg_catalog.jsonb_build_object(
+    'workspaceId', 'b8000000-0000-4000-8000-000000000001',
+    'businessEntityId', 'd8000000-0000-4000-8000-000000000001',
+    'connectionId', 'e8000000-0000-4000-8000-000000000201',
+    'expectedRowVersion', 1,
+    'expectedGeneration', 1,
+    'targetStatus', 'active',
+    'stateReasonCode', 'healthy',
+    'providerTenantReferenceFingerprint', 'synthetic-qbo-activation-realm',
+    'grantedScopes', pg_catalog.jsonb_build_array(
+      'com.intuit.quickbooks.accounting'
+    ),
+    'transitionedAt', transaction_timestamp()
+  );
+$function$;
+
+set local role integration_control_plane_authority;
+select ok(
+  pg_temp.raises_sqlstate(
+    $$select public.transition_integration_connection_v1(
+      pg_temp.qbo_activation_command(),
+      'phase8a0-activation-missing',
+      'phase8a0-test'
+    )$$,
+    '55000'
+  ),
+  'a missing required QBO stream keeps activation fail closed'
+);
+reset role;
+
+insert into private.integration_freshness_states (
+  id, contract_version, workspace_id, business_entity_id, connection_id,
+  mapping_id, provider_key, domain, scope_key, provider_watermark_at,
+  last_attempt_at, last_successful_sync_at, last_reconciled_at,
+  observed_lag_seconds, status, blocking_level, reason_code, policy_version,
+  current_max_age_seconds, stale_after_seconds, age_seconds, calculated_at,
+  state_fingerprint, last_request_id, last_request_fingerprint, row_version,
+  created_at, updated_at
+) values (
+  '98000000-0000-4000-8000-000000000021',
+  'integration_freshness_v1',
+  'b8000000-0000-4000-8000-000000000001',
+  'd8000000-0000-4000-8000-000000000001',
+  'e8000000-0000-4000-8000-000000000201',
+  'f8000000-0000-4000-8000-000000000201',
+  'quickbooks_online', 'financial_transactions', 'qbo_vendorcredit',
+  transaction_timestamp(), transaction_timestamp(), transaction_timestamp(),
+  null, 0, 'sync_error', 'current_intelligence', 'latest_sync_failed',
+  'qbo_control_plane_freshness_policy_v1', 3600, 7200, 0,
+  transaction_timestamp(),
+  extensions.digest(convert_to('phase8a0-activation-failed', 'UTF8'), 'sha256'),
+  'phase8a0-activation-failed',
+  extensions.digest(
+    convert_to('phase8a0-activation-failed-request', 'UTF8'),
+    'sha256'
+  ),
+  1, transaction_timestamp(), transaction_timestamp()
+);
+
+set local role integration_control_plane_authority;
+select ok(
+  pg_temp.raises_sqlstate(
+    $$select public.transition_integration_connection_v1(
+      pg_temp.qbo_activation_command(),
+      'phase8a0-activation-failed',
+      'phase8a0-test'
+    )$$,
+    '55000'
+  ),
+  'a failed required QBO stream keeps activation fail closed'
+);
+reset role;
+
+update private.integration_freshness_states
+set status = 'unknown',
+  blocking_level = 'all_derived',
+  reason_code = 'source_quarantined',
+  row_version = row_version + 1,
+  updated_at = transaction_timestamp()
+where id = '98000000-0000-4000-8000-000000000021';
+
+set local role integration_control_plane_authority;
+select ok(
+  pg_temp.raises_sqlstate(
+    $$select public.transition_integration_connection_v1(
+      pg_temp.qbo_activation_command(),
+      'phase8a0-activation-quarantined',
+      'phase8a0-test'
+    )$$,
+    '55000'
+  ),
+  'a quarantined required QBO stream keeps activation fail closed'
+);
+reset role;
+
+update private.integration_freshness_states
+set status = 'stale',
+  blocking_level = 'all_derived',
+  reason_code = 'exceeds_stale_threshold',
+  last_successful_sync_at = transaction_timestamp() - interval '3 hours',
+  age_seconds = 10800,
+  row_version = row_version + 1,
+  updated_at = transaction_timestamp()
+where id = '98000000-0000-4000-8000-000000000021';
+
+set local role integration_control_plane_authority;
+select ok(
+  pg_temp.raises_sqlstate(
+    $$select public.transition_integration_connection_v1(
+      pg_temp.qbo_activation_command(),
+      'phase8a0-activation-stale',
+      'phase8a0-test'
+    )$$,
+    '55000'
+  ),
+  'a stale required QBO stream keeps activation fail closed'
+);
+reset role;
+
+update private.integration_freshness_states
+set status = 'current',
+  blocking_level = 'none',
+  reason_code = 'within_current_threshold',
+  last_successful_sync_at = transaction_timestamp(),
+  age_seconds = 0,
+  row_version = row_version + 1,
+  updated_at = transaction_timestamp()
+where id = '98000000-0000-4000-8000-000000000021';
+
+set local role integration_control_plane_authority;
+select is(
+  public.transition_integration_connection_v1(
+    pg_temp.qbo_activation_command(),
+    'phase8a0-activation-complete',
+    'phase8a0-test'
+  ) #>> '{connection,status}',
+  'active',
+  'a completed QBO initial synchronization can transition to active'
+);
+reset role;
+
+select is(
+  (
+    select connection.status
+    from private.integration_connections as connection
+    where connection.id = 'e8000000-0000-4000-8000-000000000201'
+  ),
+  'active',
+  'the positive activation transition is durably recorded'
+);
+
 select * from finish();

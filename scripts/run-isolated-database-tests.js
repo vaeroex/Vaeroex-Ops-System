@@ -185,10 +185,12 @@ const phase8bDatabaseTests = new Set([
   "external_integrations_phase_8b_credential_binding_canary.test.sql",
   "external_integrations_phase_8b_credential_lineage_recovery.test.sql",
   "external_integrations_phase_8b_precontract_retirement.test.sql",
-  "external_integrations_phase_8b_provider_result_evidence.test.sql"
+  "external_integrations_phase_8b_provider_result_evidence.test.sql",
+  "external_integrations_qbo_production_convergence.test.sql"
 ]);
 const phase8bTestRoles = [
   "integration_control_plane_authority",
+  "integration_qbo_configuration_authority",
   "integration_oauth_ingress_authority",
   "integration_credential_broker_authority",
   "integration_task_dispatch_authority",

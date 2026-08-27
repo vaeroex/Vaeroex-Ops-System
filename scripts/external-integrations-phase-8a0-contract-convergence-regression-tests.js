@@ -229,7 +229,7 @@ async function main() {
   const registry = registered.REGISTERED_PROVIDER_REGISTRY;
   equal(
     registry.registryFingerprint,
-    "sha256:6981f2593ee13a1476be9940d752bbccffaa07f6ff45d153e8cacbd5837ce758",
+    "sha256:2099f06e90a53e632acbe55ee4d95cfd2f7fac7c2c994bb733ec332f7d09dfad",
     "new persistence uses the canonical QBO-inclusive registry fingerprint"
   );
   const qboEntry = controlPlane.providerDescriptor(
@@ -239,7 +239,7 @@ async function main() {
   );
   equal(
     qboEntry.descriptorFingerprint,
-    "sha256:e4c07ee40eacda38342037219c473159aab5109c3d94c5e22d306364523d74ac",
+    "sha256:1812bfa5fb9903583a672028aeefb40855211b19f2ce423f608c49f86db77b7f",
     "QBO persistence uses the reviewed descriptor fingerprint"
   );
   equal(

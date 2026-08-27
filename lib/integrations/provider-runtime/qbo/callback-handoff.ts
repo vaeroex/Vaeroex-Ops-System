@@ -31,7 +31,7 @@ export function parseQboOAuthCallbackHandoff(input: {
   requestUrl: string;
   headers: Readonly<Record<string, string | readonly string[] | undefined>>;
 }) {
-  const url = new URL(input.requestUrl, "https://phase8b-callback.invalid");
+  const url = new URL(input.requestUrl, "https://qbo-callback.invalid");
   if (
     input.method !== "GET" ||
     url.pathname !== "/oauth/callback" ||
