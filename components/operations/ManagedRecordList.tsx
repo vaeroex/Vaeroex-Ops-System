@@ -15,19 +15,9 @@ import { EmptyState } from "@/components/operations/EmptyState";
 import { PendingSubmitButton } from "@/components/operations/PendingSubmitButton";
 import { RecordDetailDrawer } from "@/components/operations/RecordDetailDrawer";
 import { StatusBadge } from "@/components/operations/StatusBadge";
+import type { ManagedRecordCollection } from "@/lib/records/management";
 
-export type ManagedRecordCollection =
-  | "sops"
-  | "issues"
-  | "kpis"
-  | "forms"
-  | "form_submissions"
-  | "assets"
-  | "asset_checks"
-  | "crm_leads"
-  | "files"
-  | "people"
-  | "support_requests";
+export type { ManagedRecordCollection } from "@/lib/records/management";
 
 export type ManagedRecordFolder = {
   id: string;

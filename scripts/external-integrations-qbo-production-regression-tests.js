@@ -42,6 +42,7 @@ const dockerfile = read("services/external-integrations-qbo/Dockerfile");
 const cloudbuild = read("services/external-integrations-qbo/cloudbuild.yaml");
 const edgeDockerfile = read("services/external-integrations-qbo/edge/package/Dockerfile");
 const edgeCloudbuild = read("services/external-integrations-qbo/edge/cloudbuild.yaml");
+const recordManagement = read("lib/records/management.ts");
 const descriptor = read("lib/integrations/providers/qbo/descriptor.ts");
 const status = read("lib/integrations/control-plane/customer-status.ts");
 const schedulerRepositoryCall = repository.match(
@@ -228,6 +229,8 @@ matches(dockerfile, /LABEL org\.opencontainers\.image\.revision=\$QBO_SOURCE_COM
 matches(cloudbuild, /QBO_SOURCE_COMMIT=\$\{_SOURCE_COMMIT\}/, "runtime publication supplies the reviewed source revision");
 matches(edgeDockerfile, /LABEL org\.opencontainers\.image\.revision=\$QBO_SOURCE_COMMIT/, "callback edge image records its exact source revision");
 matches(edgeCloudbuild, /QBO_SOURCE_COMMIT=\$\{_SOURCE_COMMIT\}/, "callback edge publication supplies the reviewed source revision");
+matches(recordManagement, /export type ManagedRecordCollection =/, "shared record types remain available to reduced runtime builds");
+excludes(recordManagement, /@\/components\//, "shared runtime libraries do not type-depend on React components");
 
 matches(descriptor, /qbo_production_read_only_v1/, "descriptor uses the Production read-only gate");
 matches(descriptor, /accounting_writes/, "Production continues to prohibit accounting writes");
