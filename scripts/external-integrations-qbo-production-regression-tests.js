@@ -227,8 +227,8 @@ matches(dockerfile, /FROM node:22\.23\.1-bookworm-slim@sha256:/, "build image is
 matches(dockerfile, /FROM gcr\.io\/distroless\/nodejs22-debian12@sha256:/, "runtime image is digest pinned");
 matches(dockerfile, /LABEL org\.opencontainers\.image\.revision=\$QBO_SOURCE_COMMIT/, "runtime image records its exact source revision");
 matches(cloudbuild, /QBO_SOURCE_COMMIT=\$\{_SOURCE_COMMIT\}/, "runtime publication supplies the reviewed source revision");
-matches(edgeDockerfile, /LABEL org\.opencontainers\.image\.revision=\$QBO_SOURCE_COMMIT/, "callback edge image records its exact source revision");
-matches(edgeCloudbuild, /QBO_SOURCE_COMMIT=\$\{_SOURCE_COMMIT\}/, "callback edge publication supplies the reviewed source revision");
+matches(edgeCloudbuild, /_SOURCE_COMMIT[\s\S]*\^\[a-f0-9\]\{40\}\$/, "callback edge publication validates and records the reviewed source revision");
+excludes(edgeDockerfile, /\b(?:ARG|LABEL)\b/, "Wasm callback packaging remains a canonical config-free scratch image");
 matches(recordManagement, /export type ManagedRecordCollection =/, "shared record types remain available to reduced runtime builds");
 excludes(recordManagement, /@\/components\//, "shared runtime libraries do not type-depend on React components");
 
