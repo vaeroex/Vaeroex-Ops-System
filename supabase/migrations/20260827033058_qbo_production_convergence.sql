@@ -1525,7 +1525,7 @@ end;
 $function$;
 
 alter table private.integration_qbo_provider_task_result_evidence
-  drop constraint integration_qbo_provider_task_result_evidence_contract_version_;
+  drop constraint integration_qbo_provider_task_result_evi_contract_version_check;
 alter table private.integration_qbo_provider_task_result_evidence
   add constraint integration_qbo_provider_result_contract_check
   check (contract_version in (
@@ -1533,13 +1533,13 @@ alter table private.integration_qbo_provider_task_result_evidence
     'qbo_provider_result_evidence_v2'
   ));
 alter table private.integration_qbo_provider_task_result_evidence
-  drop constraint integration_qbo_provider_task_result_evidence_provider_environm;
+  drop constraint integration_qbo_provider_task_result_provider_environment_check;
 alter table private.integration_qbo_provider_task_result_evidence
   add constraint integration_qbo_provider_result_environment_check
   check (provider_environment in ('sandbox', 'production'));
 
 alter table private.integration_qbo_report_parser_result_evidence
-  drop constraint integration_qbo_report_parser_result_evidence_contract_version_;
+  drop constraint integration_qbo_report_parser_result_evi_contract_version_check;
 alter table private.integration_qbo_report_parser_result_evidence
   add constraint integration_qbo_parser_result_contract_check
   check (contract_version in (
@@ -1547,7 +1547,7 @@ alter table private.integration_qbo_report_parser_result_evidence
     'qbo_report_parser_result_evidence_v2'
   ));
 alter table private.integration_qbo_report_parser_result_evidence
-  drop constraint integration_qbo_report_parser_result_evidence_provider_environm;
+  drop constraint integration_qbo_report_parser_result_provider_environment_check;
 alter table private.integration_qbo_report_parser_result_evidence
   add constraint integration_qbo_parser_result_environment_check
   check (provider_environment in ('sandbox', 'production'));
