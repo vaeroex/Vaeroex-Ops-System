@@ -1525,31 +1525,31 @@ end;
 $function$;
 
 alter table private.integration_qbo_provider_task_result_evidence
-  drop constraint integration_qbo_provider_task_result_evidence_contract_version_check;
+  drop constraint integration_qbo_provider_task_result_evidence_contract_version_;
 alter table private.integration_qbo_provider_task_result_evidence
-  add constraint integration_qbo_provider_task_result_evidence_contract_version_check
+  add constraint integration_qbo_provider_result_contract_check
   check (contract_version in (
     'qbo_sandbox_provider_result_evidence_v1',
     'qbo_provider_result_evidence_v2'
   ));
 alter table private.integration_qbo_provider_task_result_evidence
-  drop constraint integration_qbo_provider_task_result_evidence_provider_environment_check;
+  drop constraint integration_qbo_provider_task_result_evidence_provider_environm;
 alter table private.integration_qbo_provider_task_result_evidence
-  add constraint integration_qbo_provider_task_result_evidence_provider_environment_check
+  add constraint integration_qbo_provider_result_environment_check
   check (provider_environment in ('sandbox', 'production'));
 
 alter table private.integration_qbo_report_parser_result_evidence
-  drop constraint integration_qbo_report_parser_result_evidence_contract_version_check;
+  drop constraint integration_qbo_report_parser_result_evidence_contract_version_;
 alter table private.integration_qbo_report_parser_result_evidence
-  add constraint integration_qbo_report_parser_result_evidence_contract_version_check
+  add constraint integration_qbo_parser_result_contract_check
   check (contract_version in (
     'qbo_sandbox_report_parser_result_evidence_v1',
     'qbo_report_parser_result_evidence_v2'
   ));
 alter table private.integration_qbo_report_parser_result_evidence
-  drop constraint integration_qbo_report_parser_result_evidence_provider_environment_check;
+  drop constraint integration_qbo_report_parser_result_evidence_provider_environm;
 alter table private.integration_qbo_report_parser_result_evidence
-  add constraint integration_qbo_report_parser_result_evidence_provider_environment_check
+  add constraint integration_qbo_parser_result_environment_check
   check (provider_environment in ('sandbox', 'production'));
 
 create or replace function public.read_qbo_runtime_configuration_v2(
