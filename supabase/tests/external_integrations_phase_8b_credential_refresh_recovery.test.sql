@@ -606,8 +606,9 @@ select ok(
         'expectedCredentialVersion', 1,
         'leaseId', '98e00000-0000-4000-8000-000000000099',
         'leaseOwnerFingerprint', pg_temp.fingerprint('phase8b-v4-rotation-owner'),
-        'acquiredAt', pg_catalog.clock_timestamp(),
-        'leaseExpiresAt', pg_catalog.clock_timestamp() + interval '2 minutes'
+        'acquiredAt', pg_catalog.transaction_timestamp(),
+        'leaseExpiresAt',
+          pg_catalog.transaction_timestamp() + interval '2 minutes'
       ),
       'phase8b_v4_rotation_lease'
     ) ->> 'acquired'
