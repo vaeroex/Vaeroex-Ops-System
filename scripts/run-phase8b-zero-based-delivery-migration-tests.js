@@ -13,7 +13,8 @@ const credentialBindingVersion = "20260826043610";
 const credentialBindingCanaryVersion = "20260826090000";
 const credentialLineageVersion = "20260826120000";
 const precontractRetirementVersion = "20260826190801";
-const targetVersion = "20260826222000";
+const providerResultEvidenceVersion = "20260826222000";
+const targetVersion = "20260827033058";
 const fixturePath = path.join(
   root,
   "supabase/tests/fixtures/external_integrations_phase_8b_zero_based_legacy.sql"
@@ -26,7 +27,8 @@ const testPaths = [
   "supabase/tests/external_integrations_phase_8b_credential_binding_canary.test.sql",
   "supabase/tests/external_integrations_phase_8b_credential_lineage_recovery.test.sql",
   "supabase/tests/external_integrations_phase_8b_precontract_retirement.test.sql",
-  "supabase/tests/external_integrations_phase_8b_provider_result_evidence.test.sql"
+  "supabase/tests/external_integrations_phase_8b_provider_result_evidence.test.sql",
+  "supabase/tests/external_integrations_qbo_production_convergence.test.sql"
 ];
 
 function fail(message, status = 1) {
@@ -190,11 +192,28 @@ function assertTargetIsSinglePendingMigration() {
       `Migration ${precontractRetirementVersion} no longer immediately follows ${credentialLineageVersion}.`
     );
   }
+  const providerResultEvidenceIndex = migrations.findIndex((name) =>
+    name.startsWith(`${providerResultEvidenceVersion}_`)
+  );
+  if (providerResultEvidenceIndex < 0) {
+    fail(
+      `Provider-result evidence migration ${providerResultEvidenceVersion} is missing.`
+    );
+  }
   if (
-    migrations[targetIndex - 1]?.slice(0, 14) !== precontractRetirementVersion
+    migrations[providerResultEvidenceIndex - 1]?.slice(0, 14) !==
+      precontractRetirementVersion
   ) {
     fail(
-      `Migration ${targetVersion} no longer immediately follows ${precontractRetirementVersion}.`
+      `Migration ${providerResultEvidenceVersion} no longer immediately follows ${precontractRetirementVersion}.`
+    );
+  }
+  if (
+    migrations[targetIndex - 1]?.slice(0, 14) !==
+      providerResultEvidenceVersion
+  ) {
+    fail(
+      `Migration ${targetVersion} no longer immediately follows ${providerResultEvidenceVersion}.`
     );
   }
   if (targetIndex !== migrations.length - 1) {

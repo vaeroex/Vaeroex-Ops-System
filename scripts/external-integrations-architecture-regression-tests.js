@@ -201,7 +201,7 @@ matches(
 );
 matches(
   zeroBasedUpgradeRunner,
-  /const fixtureBaseVersion = "20260824083917";[\s\S]*const zeroBasedVersion = "20260824193332";[\s\S]*const retryExecutionVersion = "20260824233000";[\s\S]*const recoveryLifecycleVersion = "20260825180000";[\s\S]*const scopedRetryLifecycleVersion = "20260825190000";[\s\S]*const credentialBindingVersion = "20260826043610";[\s\S]*const credentialBindingCanaryVersion = "20260826090000";[\s\S]*const credentialLineageVersion = "20260826120000";[\s\S]*const precontractRetirementVersion = "20260826190801";[\s\S]*const targetVersion = "20260826222000";[\s\S]*"db",[\s\S]*"reset",[\s\S]*"--version",[\s\S]*fixtureBaseVersion/,
+  /const fixtureBaseVersion = "20260824083917";[\s\S]*const zeroBasedVersion = "20260824193332";[\s\S]*const retryExecutionVersion = "20260824233000";[\s\S]*const recoveryLifecycleVersion = "20260825180000";[\s\S]*const scopedRetryLifecycleVersion = "20260825190000";[\s\S]*const credentialBindingVersion = "20260826043610";[\s\S]*const credentialBindingCanaryVersion = "20260826090000";[\s\S]*const credentialLineageVersion = "20260826120000";[\s\S]*const precontractRetirementVersion = "20260826190801";[\s\S]*const providerResultEvidenceVersion = "20260826222000";[\s\S]*const targetVersion = "20260827033058";[\s\S]*"db",[\s\S]*"reset",[\s\S]*"--version",[\s\S]*fixtureBaseVersion/,
   "the fixture-rich runner must reset to the exact pre-migration boundary"
 );
 matches(
@@ -211,7 +211,7 @@ matches(
 );
 matches(
   zeroBasedUpgradeRunner,
-  /external_integrations_phase_6_durable_runtime\.test\.sql[\s\S]*external_integrations_phase_8b_credential_refresh_recovery\.test\.sql[\s\S]*external_integrations_phase_8b_same_generation_reauthorization\.test\.sql[\s\S]*external_integrations_phase_8b_credential_binding_canary\.test\.sql[\s\S]*external_integrations_phase_8b_credential_lineage_recovery\.test\.sql[\s\S]*external_integrations_phase_8b_precontract_retirement\.test\.sql[\s\S]*external_integrations_phase_8b_provider_result_evidence\.test\.sql/,
+  /external_integrations_phase_6_durable_runtime\.test\.sql[\s\S]*external_integrations_phase_8b_credential_refresh_recovery\.test\.sql[\s\S]*external_integrations_phase_8b_same_generation_reauthorization\.test\.sql[\s\S]*external_integrations_phase_8b_credential_binding_canary\.test\.sql[\s\S]*external_integrations_phase_8b_credential_lineage_recovery\.test\.sql[\s\S]*external_integrations_phase_8b_precontract_retirement\.test\.sql[\s\S]*external_integrations_phase_8b_provider_result_evidence\.test\.sql[\s\S]*external_integrations_qbo_production_convergence\.test\.sql/,
   "the fixture-rich runner must prove Phase 6 concurrency, retry compatibility, purchase recovery, and canary isolation together"
 );
 matches(
