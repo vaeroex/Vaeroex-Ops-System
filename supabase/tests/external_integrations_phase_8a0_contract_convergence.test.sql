@@ -2357,7 +2357,8 @@ as $function$
     'expectedGeneration', 1,
     'targetStatus', 'active',
     'stateReasonCode', 'healthy',
-    'providerTenantReferenceFingerprint', 'synthetic-qbo-activation-realm',
+    'providerTenantReferenceFingerprint',
+      pg_temp.fingerprint('synthetic-qbo-activation-realm'),
     'grantedScopes', pg_catalog.jsonb_build_array(
       'com.intuit.quickbooks.accounting'
     ),
