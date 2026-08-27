@@ -516,41 +516,50 @@ reset role;
 set local search_path = public, extensions;
 
 set local role integration_oauth_ingress_authority;
-select is(
-  public.consume_qbo_customer_oauth_state_v2(
+create temporary table qbo_production_oauth_consume_result on commit drop as
+select public.consume_qbo_customer_oauth_state_v2(
     pg_catalog.jsonb_build_object(
       'contractVersion', 'qbo_customer_oauth_state_consume_v2',
       'stateHash', pg_temp.fingerprint('production-customer-state-a'),
       'redirectUri', 'https://integrations.vaeroex.com/oauth/callback'
     ),
     'qbo_customer_oauth_consume_a'
-  ) ->> 'connectionId',
-  'e9f00000-0000-4000-8000-000000000001',
-  'callback state resolves only its exact tenant and connection binding'
-);
-select is(
-  public.consume_qbo_customer_oauth_state_v2(
+  ) as result;
+create temporary table qbo_production_oauth_replay_result on commit drop as
+select public.consume_qbo_customer_oauth_state_v2(
     pg_catalog.jsonb_build_object(
       'contractVersion', 'qbo_customer_oauth_state_consume_v2',
       'stateHash', pg_temp.fingerprint('production-customer-state-a'),
       'redirectUri', 'https://integrations.vaeroex.com/oauth/callback'
     ),
     'qbo_customer_oauth_replay_a'
-  ) ->> 'reasonCode',
-  'state_replayed',
-  'customer OAuth state replay fails closed'
-);
-select ok(
-  pg_temp.raises_sqlstate(
+  ) as result;
+create temporary table qbo_production_oauth_private_denial on commit drop as
+select pg_temp.raises_sqlstate(
     $$select status
       from private.integration_oauth_states
       where id = '09f00000-0000-4000-8000-000000000002'$$,
     '42501'
-  ),
-  'OAuth ingress cannot directly inspect another connection private state'
-);
+  ) as denied;
 reset role;
 set local search_path = public, extensions;
+
+select is(
+  (select result ->> 'connectionId'
+   from qbo_production_oauth_consume_result),
+  'e9f00000-0000-4000-8000-000000000001',
+  'callback state resolves only its exact tenant and connection binding'
+);
+select is(
+  (select result ->> 'reasonCode'
+   from qbo_production_oauth_replay_result),
+  'state_replayed',
+  'customer OAuth state replay fails closed'
+);
+select ok(
+  (select denied from qbo_production_oauth_private_denial),
+  'OAuth ingress cannot directly inspect another connection private state'
+);
 select is(
   (
     select status
@@ -966,8 +975,9 @@ reset role;
 set local search_path = public, extensions;
 
 set local role integration_oauth_ingress_authority;
-select ok(
-  pg_temp.raises_sqlstate(
+create temporary table qbo_production_reauthorization_realm_denial
+on commit drop as
+select pg_temp.raises_sqlstate(
     $$select public.consume_qbo_customer_reauthorization_state_v2(
       jsonb_build_object(
         'contractVersion',
@@ -981,11 +991,10 @@ select ok(
       'qbo_customer_reauthorization_wrong_realm'
     )$$,
     '42501'
-  ),
-  'reauthorization callback cannot substitute the mapped provider realm'
-);
-select is(
-  public.consume_qbo_customer_reauthorization_state_v2(
+  ) as denied;
+create temporary table qbo_production_reauthorization_consume_result
+on commit drop as
+select public.consume_qbo_customer_reauthorization_state_v2(
     pg_catalog.jsonb_build_object(
       'contractVersion', 'qbo_customer_reauthorization_state_consume_v2',
       'stateHash',
@@ -995,12 +1004,10 @@ select is(
         pg_temp.fingerprint('production-reauthorization-realm-a')
     ),
     'qbo_customer_reauthorization_consume_a'
-  ) ->> 'accepted',
-  'true',
-  'reauthorization callback requires exact tenant, generation, mapping, and realm'
-);
-select is(
-  public.consume_qbo_customer_reauthorization_state_v2(
+  ) as result;
+create temporary table qbo_production_reauthorization_replay_result
+on commit drop as
+select public.consume_qbo_customer_reauthorization_state_v2(
     pg_catalog.jsonb_build_object(
       'contractVersion', 'qbo_customer_reauthorization_state_consume_v2',
       'stateHash',
@@ -1010,12 +1017,26 @@ select is(
         pg_temp.fingerprint('production-reauthorization-realm-a')
     ),
     'qbo_customer_reauthorization_replay_a'
-  ) ->> 'reasonCode',
+  ) as result;
+reset role;
+set local search_path = public, extensions;
+
+select ok(
+  (select denied from qbo_production_reauthorization_realm_denial),
+  'reauthorization callback cannot substitute the mapped provider realm'
+);
+select is(
+  (select result ->> 'accepted'
+   from qbo_production_reauthorization_consume_result),
+  'true',
+  'reauthorization callback requires exact tenant, generation, mapping, and realm'
+);
+select is(
+  (select result ->> 'reasonCode'
+   from qbo_production_reauthorization_replay_result),
   'state_replayed',
   'reauthorization state remains single-use'
 );
-reset role;
-set local search_path = public, extensions;
 
 set local role integration_task_scheduler_authority;
 create temporary table qbo_production_schedule_result on commit drop as
