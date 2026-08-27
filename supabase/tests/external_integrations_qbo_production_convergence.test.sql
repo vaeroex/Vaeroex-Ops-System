@@ -166,26 +166,26 @@ $function$;
 
 insert into public.profiles (id, email, full_name) values
   (
-    'a9000000-0000-4000-8000-000000000001',
+    'a9f00000-0000-4000-8000-000000000001',
     'qbo-production-owner-a@example.test',
     'QBO Production Owner A'
   ),
   (
-    'a9000000-0000-4000-8000-000000000002',
+    'a9f00000-0000-4000-8000-000000000002',
     'qbo-production-owner-b@example.test',
     'QBO Production Owner B'
   );
 
 insert into public.workspaces (id, name, created_by) values
   (
-    'b9000000-0000-4000-8000-000000000001',
+    'b9f00000-0000-4000-8000-000000000001',
     'QBO Production Workspace A',
-    'a9000000-0000-4000-8000-000000000001'
+    'a9f00000-0000-4000-8000-000000000001'
   ),
   (
-    'b9000000-0000-4000-8000-000000000002',
+    'b9f00000-0000-4000-8000-000000000002',
     'QBO Production Workspace B',
-    'a9000000-0000-4000-8000-000000000002'
+    'a9f00000-0000-4000-8000-000000000002'
   );
 
 insert into public.workspace_members (
@@ -196,16 +196,16 @@ insert into public.workspace_members (
   status
 ) values
   (
-    'c9000000-0000-4000-8000-000000000001',
-    'b9000000-0000-4000-8000-000000000001',
-    'a9000000-0000-4000-8000-000000000001',
+    'c9f00000-0000-4000-8000-000000000001',
+    'b9f00000-0000-4000-8000-000000000001',
+    'a9f00000-0000-4000-8000-000000000001',
     'owner',
     'active'
   ),
   (
-    'c9000000-0000-4000-8000-000000000002',
-    'b9000000-0000-4000-8000-000000000002',
-    'a9000000-0000-4000-8000-000000000002',
+    'c9f00000-0000-4000-8000-000000000002',
+    'b9f00000-0000-4000-8000-000000000002',
+    'a9f00000-0000-4000-8000-000000000002',
     'owner',
     'active'
   );
@@ -227,8 +227,8 @@ insert into public.business_entities (
   updated_at
 ) values
   (
-    'd9000000-0000-4000-8000-000000000001',
-    'b9000000-0000-4000-8000-000000000001',
+    'd9f00000-0000-4000-8000-000000000001',
+    'b9f00000-0000-4000-8000-000000000001',
     'business_entity_v1',
     'qbo_production_company_a',
     'operating_company',
@@ -237,14 +237,14 @@ insert into public.business_entities (
     'UTC',
     1,
     'active',
-    'a9000000-0000-4000-8000-000000000001',
-    'a9000000-0000-4000-8000-000000000001',
+    'a9f00000-0000-4000-8000-000000000001',
+    'a9f00000-0000-4000-8000-000000000001',
     pg_catalog.transaction_timestamp(),
     pg_catalog.transaction_timestamp()
   ),
   (
-    'd9000000-0000-4000-8000-000000000002',
-    'b9000000-0000-4000-8000-000000000002',
+    'd9f00000-0000-4000-8000-000000000002',
+    'b9f00000-0000-4000-8000-000000000002',
     'business_entity_v1',
     'qbo_production_company_b',
     'operating_company',
@@ -253,8 +253,8 @@ insert into public.business_entities (
     'UTC',
     1,
     'active',
-    'a9000000-0000-4000-8000-000000000002',
-    'a9000000-0000-4000-8000-000000000002',
+    'a9f00000-0000-4000-8000-000000000002',
+    'a9f00000-0000-4000-8000-000000000002',
     pg_catalog.transaction_timestamp(),
     pg_catalog.transaction_timestamp()
   );
@@ -420,70 +420,70 @@ reset role;
 
 select set_config(
   'request.jwt.claims',
-  '{"role":"authenticated","sub":"a9000000-0000-4000-8000-000000000001"}',
+  '{"role":"authenticated","sub":"a9f00000-0000-4000-8000-000000000001"}',
   true
 );
 set local role authenticated;
 select is(
   public.create_integration_connection_intent_v1(
     pg_temp.qbo_connection_intent(
-      'e9000000-0000-4000-8000-000000000001',
-      'b9000000-0000-4000-8000-000000000001',
-      'd9000000-0000-4000-8000-000000000001'
+      'e9f00000-0000-4000-8000-000000000001',
+      'b9f00000-0000-4000-8000-000000000001',
+      'd9f00000-0000-4000-8000-000000000001'
     )
   ) -> 'connection' ->> 'workspaceId',
-  'b9000000-0000-4000-8000-000000000001',
+  'b9f00000-0000-4000-8000-000000000001',
   'Workspace A creates a connection only inside its authenticated workspace'
 );
 select is(
   public.create_qbo_customer_oauth_state_v2(
     pg_temp.customer_oauth_state_command(
-      '09000000-0000-4000-8000-000000000001',
-      'e9000000-0000-4000-8000-000000000001',
+      '09f00000-0000-4000-8000-000000000001',
+      'e9f00000-0000-4000-8000-000000000001',
       'production-customer-state-a'
     ),
     'qbo_customer_oauth_a'
   ) ->> 'connectionId',
-  'e9000000-0000-4000-8000-000000000001',
+  'e9f00000-0000-4000-8000-000000000001',
   'Workspace A creates server-bound OAuth state for its own connection'
 );
 reset role;
 
 select set_config(
   'request.jwt.claims',
-  '{"role":"authenticated","sub":"a9000000-0000-4000-8000-000000000002"}',
+  '{"role":"authenticated","sub":"a9f00000-0000-4000-8000-000000000002"}',
   true
 );
 set local role authenticated;
 select is(
   public.create_integration_connection_intent_v1(
     pg_temp.qbo_connection_intent(
-      'e9000000-0000-4000-8000-000000000002',
-      'b9000000-0000-4000-8000-000000000002',
-      'd9000000-0000-4000-8000-000000000002'
+      'e9f00000-0000-4000-8000-000000000002',
+      'b9f00000-0000-4000-8000-000000000002',
+      'd9f00000-0000-4000-8000-000000000002'
     )
   ) -> 'connection' ->> 'workspaceId',
-  'b9000000-0000-4000-8000-000000000002',
+  'b9f00000-0000-4000-8000-000000000002',
   'Workspace B creates a separate authenticated connection'
 );
 select is(
   public.create_qbo_customer_oauth_state_v2(
     pg_temp.customer_oauth_state_command(
-      '09000000-0000-4000-8000-000000000002',
-      'e9000000-0000-4000-8000-000000000002',
+      '09f00000-0000-4000-8000-000000000002',
+      'e9f00000-0000-4000-8000-000000000002',
       'production-customer-state-b'
     ),
     'qbo_customer_oauth_b'
   ) ->> 'connectionId',
-  'e9000000-0000-4000-8000-000000000002',
+  'e9f00000-0000-4000-8000-000000000002',
   'Workspace B receives a distinct OAuth state binding'
 );
 select ok(
   pg_temp.raises_sqlstate(
     $$select public.create_qbo_customer_oauth_state_v2(
       pg_temp.customer_oauth_state_command(
-        '09000000-0000-4000-8000-000000000003',
-        'e9000000-0000-4000-8000-000000000001',
+        '09f00000-0000-4000-8000-000000000003',
+        'e9f00000-0000-4000-8000-000000000001',
         'cross-tenant-oauth-state'
       ),
       'qbo_customer_oauth_cross_tenant'
@@ -496,7 +496,7 @@ select is(
   (
     select pg_catalog.count(*)::text
     from public.integration_connection_summaries as summary
-    where summary.id = 'e9000000-0000-4000-8000-000000000001'
+    where summary.id = 'e9f00000-0000-4000-8000-000000000001'
   ),
   '0',
   'Workspace B cannot read Workspace A connection summary'
@@ -513,7 +513,7 @@ select is(
     ),
     'qbo_customer_oauth_consume_a'
   ) ->> 'connectionId',
-  'e9000000-0000-4000-8000-000000000001',
+  'e9f00000-0000-4000-8000-000000000001',
   'callback state resolves only its exact tenant and connection binding'
 );
 select is(
@@ -532,7 +532,7 @@ select is(
   (
     select status
     from private.integration_oauth_states
-    where id = '09000000-0000-4000-8000-000000000002'
+    where id = '09f00000-0000-4000-8000-000000000002'
   ),
   'pending',
   'consuming Workspace A state does not mutate Workspace B state'
@@ -554,11 +554,11 @@ insert into private.integration_connections (
   created_at, updated_at
 ) values
   (
-    'e9000000-0000-4000-8000-000000000101',
+    'e9f00000-0000-4000-8000-000000000101',
     'integration_connection_v1', 'integration_connection_control_v1',
-    'b9000000-0000-4000-8000-000000000001',
-    'd9000000-0000-4000-8000-000000000001',
-    'e9000000-0000-4000-8000-000000000101', 1, null,
+    'b9f00000-0000-4000-8000-000000000001',
+    'd9f00000-0000-4000-8000-000000000001',
+    'e9f00000-0000-4000-8000-000000000101', 1, null,
     'quickbooks_online', 'production',
     extensions.digest(convert_to('production-realm-a', 'UTF8'), 'sha256'),
     'initializing', 'initial_sync_pending',
@@ -569,15 +569,15 @@ insert into private.integration_connections (
     decode('1812bfa5fb9903583a672028aeefb40855211b19f2ce423f608c49f86db77b7f', 'hex'),
     'qbo_provider_adapter_v1', pg_temp.qbo_capability(), 1,
     transaction_timestamp(), transaction_timestamp(), null, null,
-    null, null, 1, 'a9000000-0000-4000-8000-000000000001',
+    null, null, 1, 'a9f00000-0000-4000-8000-000000000001',
     transaction_timestamp(), transaction_timestamp()
   ),
   (
-    'e9000000-0000-4000-8000-000000000102',
+    'e9f00000-0000-4000-8000-000000000102',
     'integration_connection_v1', 'integration_connection_control_v1',
-    'b9000000-0000-4000-8000-000000000002',
-    'd9000000-0000-4000-8000-000000000002',
-    'e9000000-0000-4000-8000-000000000102', 1, null,
+    'b9f00000-0000-4000-8000-000000000002',
+    'd9f00000-0000-4000-8000-000000000002',
+    'e9f00000-0000-4000-8000-000000000102', 1, null,
     'quickbooks_online', 'production',
     extensions.digest(convert_to('production-realm-b', 'UTF8'), 'sha256'),
     'disconnected', 'disconnected',
@@ -590,16 +590,16 @@ insert into private.integration_connections (
     'qbo_provider_adapter_v1', pg_temp.qbo_capability(), 1,
     transaction_timestamp(), transaction_timestamp(),
     transaction_timestamp(), null, null, null, 1,
-    'a9000000-0000-4000-8000-000000000002',
+    'a9f00000-0000-4000-8000-000000000002',
     transaction_timestamp(), transaction_timestamp()
   ),
   (
-    'e9000000-0000-4000-8000-000000000103',
+    'e9f00000-0000-4000-8000-000000000103',
     'integration_connection_v1', 'integration_connection_control_v1',
-    'b9000000-0000-4000-8000-000000000002',
-    'd9000000-0000-4000-8000-000000000002',
-    'e9000000-0000-4000-8000-000000000102', 2,
-    'e9000000-0000-4000-8000-000000000102',
+    'b9f00000-0000-4000-8000-000000000002',
+    'd9f00000-0000-4000-8000-000000000002',
+    'e9f00000-0000-4000-8000-000000000102', 2,
+    'e9f00000-0000-4000-8000-000000000102',
     'quickbooks_online', 'production',
     extensions.digest(convert_to('production-realm-b', 'UTF8'), 'sha256'),
     'initializing', 'initial_sync_pending',
@@ -611,15 +611,15 @@ insert into private.integration_connections (
     decode('1812bfa5fb9903583a672028aeefb40855211b19f2ce423f608c49f86db77b7f', 'hex'),
     'qbo_provider_adapter_v1', pg_temp.qbo_capability(), 1,
     transaction_timestamp(), transaction_timestamp(), null, null,
-    null, null, 1, 'a9000000-0000-4000-8000-000000000002',
+    null, null, 1, 'a9f00000-0000-4000-8000-000000000002',
     transaction_timestamp(), transaction_timestamp()
   ),
   (
-    'e9000000-0000-4000-8000-000000000201',
+    'e9f00000-0000-4000-8000-000000000201',
     'integration_connection_v1', 'integration_connection_control_v1',
-    'b9000000-0000-4000-8000-000000000001',
-    'd9000000-0000-4000-8000-000000000001',
-    'e9000000-0000-4000-8000-000000000201', 1, null,
+    'b9f00000-0000-4000-8000-000000000001',
+    'd9f00000-0000-4000-8000-000000000001',
+    'e9f00000-0000-4000-8000-000000000201', 1, null,
     'quickbooks_online', 'production',
     extensions.digest(
       convert_to('production-reauthorization-realm-a', 'UTF8'),
@@ -634,7 +634,7 @@ insert into private.integration_connections (
     decode('1812bfa5fb9903583a672028aeefb40855211b19f2ce423f608c49f86db77b7f', 'hex'),
     'qbo_provider_adapter_v1', pg_temp.qbo_capability(), 1,
     transaction_timestamp(), transaction_timestamp(), null, null,
-    null, null, 1, 'a9000000-0000-4000-8000-000000000001',
+    null, null, 1, 'a9f00000-0000-4000-8000-000000000001',
     transaction_timestamp(), transaction_timestamp()
   );
 
@@ -648,42 +648,42 @@ insert into private.provider_entity_mappings (
   last_transition_request_fingerprint, row_version, created_at, updated_at
 ) values
   (
-    'f9000000-0000-4000-8000-000000000101',
+    'f9f00000-0000-4000-8000-000000000101',
     'provider_entity_mapping_v1',
-    'b9000000-0000-4000-8000-000000000001',
-    'd9000000-0000-4000-8000-000000000001',
-    'e9000000-0000-4000-8000-000000000101',
-    'f9000000-0000-4000-8000-000000000101', 1, null,
+    'b9f00000-0000-4000-8000-000000000001',
+    'd9f00000-0000-4000-8000-000000000001',
+    'e9f00000-0000-4000-8000-000000000101',
+    'f9f00000-0000-4000-8000-000000000101', 1, null,
     'quickbooks_online', 'production', 'company',
     extensions.digest(convert_to('production-realm-a', 'UTF8'), 'sha256'),
     'Production Company A', 'primary', 'active', 'qbo_realm_mapping_v1',
     extensions.digest(convert_to('verified-a', 'UTF8'), 'sha256'),
-    transaction_timestamp(), 'a9000000-0000-4000-8000-000000000001',
+    transaction_timestamp(), 'a9f00000-0000-4000-8000-000000000001',
     transaction_timestamp(), null, null, 1,
     transaction_timestamp(), transaction_timestamp()
   ),
   (
-    'f9000000-0000-4000-8000-000000000103',
+    'f9f00000-0000-4000-8000-000000000103',
     'provider_entity_mapping_v1',
-    'b9000000-0000-4000-8000-000000000002',
-    'd9000000-0000-4000-8000-000000000002',
-    'e9000000-0000-4000-8000-000000000103',
-    'f9000000-0000-4000-8000-000000000103', 1, null,
+    'b9f00000-0000-4000-8000-000000000002',
+    'd9f00000-0000-4000-8000-000000000002',
+    'e9f00000-0000-4000-8000-000000000103',
+    'f9f00000-0000-4000-8000-000000000103', 1, null,
     'quickbooks_online', 'production', 'company',
     extensions.digest(convert_to('production-realm-b', 'UTF8'), 'sha256'),
     'Production Company B', 'primary', 'active', 'qbo_realm_mapping_v1',
     extensions.digest(convert_to('verified-b', 'UTF8'), 'sha256'),
-    transaction_timestamp(), 'a9000000-0000-4000-8000-000000000002',
+    transaction_timestamp(), 'a9f00000-0000-4000-8000-000000000002',
     transaction_timestamp(), null, null, 1,
     transaction_timestamp(), transaction_timestamp()
   ),
   (
-    'f9000000-0000-4000-8000-000000000201',
+    'f9f00000-0000-4000-8000-000000000201',
     'provider_entity_mapping_v1',
-    'b9000000-0000-4000-8000-000000000001',
-    'd9000000-0000-4000-8000-000000000001',
-    'e9000000-0000-4000-8000-000000000201',
-    'f9000000-0000-4000-8000-000000000201', 1, null,
+    'b9f00000-0000-4000-8000-000000000001',
+    'd9f00000-0000-4000-8000-000000000001',
+    'e9f00000-0000-4000-8000-000000000201',
+    'f9f00000-0000-4000-8000-000000000201', 1, null,
     'quickbooks_online', 'production', 'company',
     extensions.digest(
       convert_to('production-reauthorization-realm-a', 'UTF8'),
@@ -692,7 +692,7 @@ insert into private.provider_entity_mappings (
     'Production Reauthorization Company A', 'primary', 'active',
     'qbo_realm_mapping_v1',
     extensions.digest(convert_to('verified-reauthorization-a', 'UTF8'), 'sha256'),
-    transaction_timestamp(), 'a9000000-0000-4000-8000-000000000001',
+    transaction_timestamp(), 'a9f00000-0000-4000-8000-000000000001',
     transaction_timestamp(), null, null, 1,
     transaction_timestamp(), transaction_timestamp()
   );
@@ -704,9 +704,9 @@ insert into private.integration_workspace_policies (
   last_request_id, last_request_fingerprint, created_at, updated_at
 ) values
   (
-    '19000000-0000-4000-8000-000000000101',
+    '19f00000-0000-4000-8000-000000000101',
     'integration_workspace_policy_v1',
-    'b9000000-0000-4000-8000-000000000001',
+    'b9f00000-0000-4000-8000-000000000001',
     'quickbooks_online', 'production', 'enabled', true, 365, 2,
     'qbo_control_plane_freshness_policy_v1',
     'qbo_metadata_retention_v1', 1, 'qbo-prod-policy-a',
@@ -714,9 +714,9 @@ insert into private.integration_workspace_policies (
     transaction_timestamp(), transaction_timestamp()
   ),
   (
-    '19000000-0000-4000-8000-000000000103',
+    '19f00000-0000-4000-8000-000000000103',
     'integration_workspace_policy_v1',
-    'b9000000-0000-4000-8000-000000000002',
+    'b9f00000-0000-4000-8000-000000000002',
     'quickbooks_online', 'production', 'enabled', true, 365, 2,
     'qbo_control_plane_freshness_policy_v1',
     'qbo_metadata_retention_v1', 1, 'qbo-prod-policy-b',
@@ -733,13 +733,13 @@ insert into private.integration_oauth_states (
   row_version
 ) values
   (
-    '59000000-0000-4000-8000-000000000101',
+    '59f00000-0000-4000-8000-000000000101',
     'integration_oauth_state_v1',
-    'b9000000-0000-4000-8000-000000000001',
-    'd9000000-0000-4000-8000-000000000001',
-    'e9000000-0000-4000-8000-000000000101', 1,
+    'b9f00000-0000-4000-8000-000000000001',
+    'd9f00000-0000-4000-8000-000000000001',
+    'e9f00000-0000-4000-8000-000000000101', 1,
     'quickbooks_online', 'production',
-    'a9000000-0000-4000-8000-000000000001',
+    'a9f00000-0000-4000-8000-000000000001',
     array['com.intuit.quickbooks.accounting']::text[], '/app/settings',
     extensions.digest(convert_to('runtime-state-a', 'UTF8'), 'sha256'),
     'consumed', 'runtime-state-a-create',
@@ -751,13 +751,13 @@ insert into private.integration_oauth_states (
     transaction_timestamp(), 2
   ),
   (
-    '59000000-0000-4000-8000-000000000103',
+    '59f00000-0000-4000-8000-000000000103',
     'integration_oauth_state_v1',
-    'b9000000-0000-4000-8000-000000000002',
-    'd9000000-0000-4000-8000-000000000002',
-    'e9000000-0000-4000-8000-000000000103', 2,
+    'b9f00000-0000-4000-8000-000000000002',
+    'd9f00000-0000-4000-8000-000000000002',
+    'e9f00000-0000-4000-8000-000000000103', 2,
     'quickbooks_online', 'production',
-    'a9000000-0000-4000-8000-000000000002',
+    'a9f00000-0000-4000-8000-000000000002',
     array['com.intuit.quickbooks.accounting']::text[], '/app/settings',
     extensions.digest(convert_to('runtime-state-b', 'UTF8'), 'sha256'),
     'consumed', 'runtime-state-b-create',
@@ -769,13 +769,13 @@ insert into private.integration_oauth_states (
     transaction_timestamp(), 2
   ),
   (
-    '59000000-0000-4000-8000-000000000201',
+    '59f00000-0000-4000-8000-000000000201',
     'integration_oauth_state_v1',
-    'b9000000-0000-4000-8000-000000000001',
-    'd9000000-0000-4000-8000-000000000001',
-    'e9000000-0000-4000-8000-000000000201', 1,
+    'b9f00000-0000-4000-8000-000000000001',
+    'd9f00000-0000-4000-8000-000000000001',
+    'e9f00000-0000-4000-8000-000000000201', 1,
     'quickbooks_online', 'production',
-    'a9000000-0000-4000-8000-000000000001',
+    'a9f00000-0000-4000-8000-000000000001',
     array['com.intuit.quickbooks.accounting']::text[], '/app/settings',
     extensions.digest(convert_to('reauthorization-state-a', 'UTF8'), 'sha256'),
     'consumed', 'reauthorization-state-a-create',
@@ -803,22 +803,22 @@ insert into private.integration_credentials (
   last_request_fingerprint, row_version, created_at, updated_at
 ) values
   (
-    '69000000-0000-4000-8000-000000000101',
+    '69f00000-0000-4000-8000-000000000101',
     'integration_credential_authority_v1',
-    '59000000-0000-4000-8000-000000000101',
-    'b9000000-0000-4000-8000-000000000001',
-    'd9000000-0000-4000-8000-000000000001',
-    'e9000000-0000-4000-8000-000000000101', 1,
+    '59f00000-0000-4000-8000-000000000101',
+    'b9f00000-0000-4000-8000-000000000001',
+    'd9f00000-0000-4000-8000-000000000001',
+    'e9f00000-0000-4000-8000-000000000101', 1,
     'quickbooks_online', 'production',
-    'a9000000-0000-4000-8000-000000000001', 3,
+    'a9f00000-0000-4000-8000-000000000001', 3,
     'oauth_credential_envelope_v1', 'oauth_credential_aad_v1',
     private.phase_5_credential_aad_digest_v1(
       'production',
-      'b9000000-0000-4000-8000-000000000001',
-      'e9000000-0000-4000-8000-000000000101',
+      'b9f00000-0000-4000-8000-000000000001',
+      'e9f00000-0000-4000-8000-000000000101',
       1,
       'quickbooks_online',
-      '69000000-0000-4000-8000-000000000101'
+      '69f00000-0000-4000-8000-000000000101'
     ),
     'projects/vaeroex-prod/locations/us-central1/keyRings/qbo/cryptoKeys/oauth',
     decode(repeat('ab', 32), 'hex'),
@@ -831,22 +831,22 @@ insert into private.integration_credentials (
     1, transaction_timestamp(), transaction_timestamp()
   ),
   (
-    '69000000-0000-4000-8000-000000000103',
+    '69f00000-0000-4000-8000-000000000103',
     'integration_credential_authority_v1',
-    '59000000-0000-4000-8000-000000000103',
-    'b9000000-0000-4000-8000-000000000002',
-    'd9000000-0000-4000-8000-000000000002',
-    'e9000000-0000-4000-8000-000000000103', 2,
+    '59f00000-0000-4000-8000-000000000103',
+    'b9f00000-0000-4000-8000-000000000002',
+    'd9f00000-0000-4000-8000-000000000002',
+    'e9f00000-0000-4000-8000-000000000103', 2,
     'quickbooks_online', 'production',
-    'a9000000-0000-4000-8000-000000000002', 7,
+    'a9f00000-0000-4000-8000-000000000002', 7,
     'oauth_credential_envelope_v1', 'oauth_credential_aad_v1',
     private.phase_5_credential_aad_digest_v1(
       'production',
-      'b9000000-0000-4000-8000-000000000002',
-      'e9000000-0000-4000-8000-000000000103',
+      'b9f00000-0000-4000-8000-000000000002',
+      'e9f00000-0000-4000-8000-000000000103',
       2,
       'quickbooks_online',
-      '69000000-0000-4000-8000-000000000103'
+      '69f00000-0000-4000-8000-000000000103'
     ),
     'projects/vaeroex-prod/locations/us-central1/keyRings/qbo/cryptoKeys/oauth',
     decode(repeat('cd', 32), 'hex'),
@@ -859,22 +859,22 @@ insert into private.integration_credentials (
     1, transaction_timestamp(), transaction_timestamp()
   ),
   (
-    '69000000-0000-4000-8000-000000000201',
+    '69f00000-0000-4000-8000-000000000201',
     'integration_credential_authority_v1',
-    '59000000-0000-4000-8000-000000000201',
-    'b9000000-0000-4000-8000-000000000001',
-    'd9000000-0000-4000-8000-000000000001',
-    'e9000000-0000-4000-8000-000000000201', 1,
+    '59f00000-0000-4000-8000-000000000201',
+    'b9f00000-0000-4000-8000-000000000001',
+    'd9f00000-0000-4000-8000-000000000001',
+    'e9f00000-0000-4000-8000-000000000201', 1,
     'quickbooks_online', 'production',
-    'a9000000-0000-4000-8000-000000000001', 5,
+    'a9f00000-0000-4000-8000-000000000001', 5,
     'oauth_credential_envelope_v1', 'oauth_credential_aad_v1',
     private.phase_5_credential_aad_digest_v1(
       'production',
-      'b9000000-0000-4000-8000-000000000001',
-      'e9000000-0000-4000-8000-000000000201',
+      'b9f00000-0000-4000-8000-000000000001',
+      'e9f00000-0000-4000-8000-000000000201',
       1,
       'quickbooks_online',
-      '69000000-0000-4000-8000-000000000201'
+      '69f00000-0000-4000-8000-000000000201'
     ),
     'projects/vaeroex-prod/locations/us-central1/keyRings/qbo/cryptoKeys/oauth',
     decode(repeat('ef', 32), 'hex'),
@@ -895,7 +895,7 @@ insert into private.integration_credentials (
 
 select set_config(
   'request.jwt.claims',
-  '{"role":"authenticated","sub":"a9000000-0000-4000-8000-000000000002"}',
+  '{"role":"authenticated","sub":"a9f00000-0000-4000-8000-000000000002"}',
   true
 );
 set local role authenticated;
@@ -903,8 +903,8 @@ select ok(
   pg_temp.raises_sqlstate(
     $$select public.create_qbo_customer_reauthorization_state_v2(
       pg_temp.customer_reauthorization_command(
-        '09000000-0000-4000-8000-000000000201',
-        'e9000000-0000-4000-8000-000000000201',
+        '09f00000-0000-4000-8000-000000000201',
+        'e9f00000-0000-4000-8000-000000000201',
         'production-reauthorization-state-a',
         1,
         1
@@ -919,22 +919,22 @@ reset role;
 
 select set_config(
   'request.jwt.claims',
-  '{"role":"authenticated","sub":"a9000000-0000-4000-8000-000000000001"}',
+  '{"role":"authenticated","sub":"a9f00000-0000-4000-8000-000000000001"}',
   true
 );
 set local role authenticated;
 select is(
   public.create_qbo_customer_reauthorization_state_v2(
     pg_temp.customer_reauthorization_command(
-      '09000000-0000-4000-8000-000000000201',
-      'e9000000-0000-4000-8000-000000000201',
+      '09f00000-0000-4000-8000-000000000201',
+      'e9f00000-0000-4000-8000-000000000201',
       'production-reauthorization-state-a',
       1,
       1
     ),
     'qbo_customer_reauthorization_a'
   ) ->> 'connectionId',
-  'e9000000-0000-4000-8000-000000000201',
+  'e9f00000-0000-4000-8000-000000000201',
   'Workspace A begins reauthorization only for its exact connection snapshot'
 );
 reset role;
@@ -1004,8 +1004,8 @@ select is(
     select pg_catalog.count(*)::text
     from private.integration_sync_tasks as task
     where task.connection_id in (
-      'e9000000-0000-4000-8000-000000000101',
-      'e9000000-0000-4000-8000-000000000103'
+      'e9f00000-0000-4000-8000-000000000101',
+      'e9f00000-0000-4000-8000-000000000103'
     )
   ),
   '48',
@@ -1015,7 +1015,7 @@ select is(
   (
     select pg_catalog.count(*)::text
     from private.integration_sync_tasks as task
-    where task.connection_id = 'e9000000-0000-4000-8000-000000000103'
+    where task.connection_id = 'e9f00000-0000-4000-8000-000000000103'
       and task.connection_generation = 2
   ),
   '24',
@@ -1066,7 +1066,7 @@ select ok(
 with selected as (
   select task.*
   from private.integration_sync_tasks as task
-  where task.connection_id = 'e9000000-0000-4000-8000-000000000101'
+  where task.connection_id = 'e9f00000-0000-4000-8000-000000000101'
     and task.stream_key = 'accounts'
 )
 select public.mark_integration_sync_task_dispatched_v1(
@@ -1089,7 +1089,7 @@ from selected;
 with selected as (
   select task.*
   from private.integration_sync_tasks as task
-  where task.connection_id = 'e9000000-0000-4000-8000-000000000103'
+  where task.connection_id = 'e9f00000-0000-4000-8000-000000000103'
     and task.stream_key = 'accounts'
 )
 select public.mark_integration_sync_task_dispatched_v1(
@@ -1129,7 +1129,7 @@ select ok(
 with selected as (
   select task.*
   from private.integration_sync_tasks as task
-  where task.connection_id = 'e9000000-0000-4000-8000-000000000101'
+  where task.connection_id = 'e9f00000-0000-4000-8000-000000000101'
     and task.stream_key = 'accounts'
 )
 select ok(
@@ -1165,7 +1165,7 @@ select is(
 with selected as (
   select task.*
   from private.integration_sync_tasks as task
-  where task.connection_id = 'e9000000-0000-4000-8000-000000000101'
+  where task.connection_id = 'e9f00000-0000-4000-8000-000000000101'
     and task.stream_key = 'accounts'
 )
 select ok(
@@ -1196,10 +1196,10 @@ select is(
       'qbo-production'
     ) ->> 'credentialId'
     from private.integration_sync_tasks as task
-    where task.connection_id = 'e9000000-0000-4000-8000-000000000101'
+    where task.connection_id = 'e9f00000-0000-4000-8000-000000000101'
       and task.stream_key = 'accounts'
   ),
-  '69000000-0000-4000-8000-000000000101',
+  '69f00000-0000-4000-8000-000000000101',
   'tenant A delivery resolves only tenant A active credential'
 );
 select is(
@@ -1210,7 +1210,7 @@ select is(
       'qbo-production'
     ) ->> 'connectionGeneration'
     from private.integration_sync_tasks as task
-    where task.connection_id = 'e9000000-0000-4000-8000-000000000103'
+    where task.connection_id = 'e9f00000-0000-4000-8000-000000000103'
       and task.stream_key = 'accounts'
   ),
   '2',
@@ -1225,7 +1225,7 @@ select ok(
       'qbo-production'
     )
     from private.integration_sync_tasks as task
-    where task.connection_id = 'e9000000-0000-4000-8000-000000000101'
+    where task.connection_id = 'e9f00000-0000-4000-8000-000000000101'
       and task.stream_key = 'accounts'$$,
     '42501'
   ),
@@ -1239,7 +1239,7 @@ select ok(
       'qbo-production-other'
     )
     from private.integration_sync_tasks as task
-    where task.connection_id = 'e9000000-0000-4000-8000-000000000101'
+    where task.connection_id = 'e9f00000-0000-4000-8000-000000000101'
       and task.stream_key = 'accounts'$$,
     '42501'
   ),
@@ -1267,8 +1267,8 @@ select ok(
       from private.integration_sync_tasks as task
       where task.stream_key = 'accounts'
         and task.connection_id in (
-          'e9000000-0000-4000-8000-000000000101',
-          'e9000000-0000-4000-8000-000000000103'
+          'e9f00000-0000-4000-8000-000000000101',
+          'e9f00000-0000-4000-8000-000000000103'
         )
     ) as binding
   ),
