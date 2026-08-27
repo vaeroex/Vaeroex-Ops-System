@@ -73,6 +73,39 @@ const aliasesReverted = [
   "20260801221439", "20260801221447", "20260809025117", "20260809025123", "20260809025128", "20260809025137",
   "20260809025142", "20260809025150", "20260809025154", "20260809025158", "20260809025203", "20260809025207"
 ];
+const verifiedCanonicalApplied = [
+  "202607110001_business_memory_evidence_eligibility.sql",
+  "20260731071855_business_health_generation_claim.sql",
+  "20260811233219_restore_manual_activation_review_rpc.sql",
+  "20260817185529_intelligence_briefing_storage_contract.sql"
+];
+const expectedQboPending = [
+  "20260820233007_external_integrations_phase_1_canonical_foundation.sql",
+  "20260821064333_external_integrations_phase_2_reconciliation.sql",
+  "20260821172015_external_integrations_phase_3_deterministic_dependencies.sql",
+  "20260821201220_external_integrations_phase_4_control_plane.sql",
+  "20260821220853_external_integrations_phase_5_credential_security.sql",
+  "20260822012253_external_integrations_phase_6_durable_runtime.sql",
+  "20260822035335_external_integrations_phase_8a0_provider_contract_convergence.sql",
+  "20260823042718_external_integrations_phase_8b_qbo_sandbox_validation.sql",
+  "20260823111004_scope_qbo_sandbox_dispatch_candidates.sql",
+  "20260823113832_qbo_sandbox_scoped_dispatch_recovery.sql",
+  "20260823115807_reserve_qbo_sandbox_scoped_dispatch.sql",
+  "20260823121454_qbo_sandbox_dispatch_run_lock.sql",
+  "20260823205806_qbo_sandbox_credential_refresh_recovery.sql",
+  "20260824071101_qbo_sandbox_same_generation_reauthorization.sql",
+  "20260824083917_qbo_sandbox_expired_refresh_lease_reclamation.sql",
+  "20260824193332_qbo_cloud_tasks_zero_based_delivery.sql",
+  "20260824233000_qbo_retry_execution_and_reauthorization_recovery.sql",
+  "20260825180000_qbo_reauthorization_required_lifecycle.sql",
+  "20260825190000_qbo_scoped_dispatch_retry_lifecycle.sql",
+  "20260826043610_qbo_credential_envelope_binding_convergence.sql",
+  "20260826090000_qbo_credential_envelope_binding_incident_canary.sql",
+  "20260826120000_qbo_credential_lineage_incident_recovery.sql",
+  "20260826190801_qbo_precontract_initialization_retirement.sql",
+  "20260826222000_qbo_provider_result_evidence_and_ar_aging_recovery.sql",
+  "20260827033058_qbo_production_convergence.sql"
+];
 
 assert.equal(canonicalApplied.length, 60, "the proposed plan must retain exactly 60 canonical/history-only apply commands");
 assert.equal(new Set(canonicalApplied).size, 60, "canonical/history-only apply versions must be unique");
@@ -89,6 +122,28 @@ for (const name of expected.keys()) {
 
 for (const version of [...canonicalApplied, ...aliasesReverted]) {
   assert.match(reconciliation, new RegExp(`\\b${version}\\b`), `${version} must remain in the checkpointed reconciliation note`);
+}
+
+assert.doesNotMatch(reconciliation, /## Qualified pending migrations/, "the stale four-migration pending claim must not return");
+assert.match(reconciliation, /75 unique rows/, "the verified current Production ledger size must be documented");
+assert.match(
+  reconciliation,
+  /ef87be4520d35e5ab7a443c5fe2c359f3aaa3be1910de89610d2a7de24bcc08a/,
+  "the verified current Production ledger fingerprint must be documented"
+);
+
+for (const name of verifiedCanonicalApplied) {
+  const version = name.split("_")[0];
+  assert.match(reconciliation, new RegExp(`\\b${name.replaceAll(".", "\\.")}\\b`), `${name} must be documented as canonical applied`);
+  assert.equal(canonicalApplied.includes(version), false, `${version} must not enter the history repair apply set`);
+  assert.equal(aliasesReverted.includes(version), false, `${version} must not enter the alias revert set`);
+}
+
+assert.equal(expectedQboPending.length, 25, "the expected Production pending set must contain exactly 25 QBO migrations");
+assert.equal(new Set(expectedQboPending).size, 25, "the expected Production pending QBO migrations must be unique");
+for (const name of expectedQboPending) {
+  assert.equal(migrationNames.includes(name), true, `${name} must exist in the canonical migration directory`);
+  assert.match(reconciliation, new RegExp(`\\b${name.replaceAll(".", "\\.")}\\b`), `${name} must remain in the expected dry run`);
 }
 
 console.log("Production migration history regressions passed.");
