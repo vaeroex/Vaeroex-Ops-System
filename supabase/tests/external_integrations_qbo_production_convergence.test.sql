@@ -1161,7 +1161,7 @@ select is(
 select ok(
   (
     select pg_catalog.count(*) = 4
-      and pg_catalog.count(distinct candidate ->> 'connectionId') = 2
+      and pg_catalog.count(distinct connection_id) = 2
       and pg_catalog.min(per_connection) = 2
       and pg_catalog.max(per_connection) = 2
     from (
