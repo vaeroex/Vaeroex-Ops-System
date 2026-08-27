@@ -357,8 +357,8 @@ select ok(
 );
 
 set local role integration_qbo_configuration_authority;
-select is(
-  public.register_qbo_runtime_configuration_v2(
+create temporary table qbo_production_configuration_create_result on commit drop as
+select public.register_qbo_runtime_configuration_v2(
     pg_catalog.jsonb_build_object(
       'contractVersion', 'qbo_runtime_configuration_v2',
       'providerEnvironment', 'production',
@@ -372,12 +372,9 @@ select is(
       'queueAudience', 'https://qbo-runtime.vaeroex.com'
     ),
     'qbo_prod_config_create'
-  ) ->> 'idempotent',
-  'false',
-  'Production runtime configuration is registered once'
-);
-select is(
-  public.register_qbo_runtime_configuration_v2(
+  ) as result;
+create temporary table qbo_production_configuration_replay_result on commit drop as
+select public.register_qbo_runtime_configuration_v2(
     pg_catalog.jsonb_build_object(
       'contractVersion', 'qbo_runtime_configuration_v2',
       'providerEnvironment', 'production',
@@ -391,12 +388,9 @@ select is(
       'queueAudience', 'https://qbo-runtime.vaeroex.com'
     ),
     'qbo_prod_config_replay'
-  ) ->> 'idempotent',
-  'true',
-  'identical Production runtime configuration replay is idempotent'
-);
-select ok(
-  pg_temp.raises_sqlstate(
+  ) as result;
+create temporary table qbo_production_configuration_invalid_result on commit drop as
+select pg_temp.raises_sqlstate(
     $$select public.register_qbo_runtime_configuration_v2(
       jsonb_build_object(
         'contractVersion', 'qbo_runtime_configuration_v2',
@@ -413,10 +407,25 @@ select ok(
       'qbo_prod_config_invalid'
     )$$,
     '23505'
-  ),
+  ) as denied;
+reset role;
+
+select is(
+  (select result ->> 'idempotent'
+   from qbo_production_configuration_create_result),
+  'false',
+  'Production runtime configuration is registered once'
+);
+select is(
+  (select result ->> 'idempotent'
+   from qbo_production_configuration_replay_result),
+  'true',
+  'identical Production runtime configuration replay is idempotent'
+);
+select ok(
+  (select denied from qbo_production_configuration_invalid_result),
   'Production configuration cannot be replaced by a Phase 8B binding'
 );
-reset role;
 
 select set_config(
   'request.jwt.claims',
