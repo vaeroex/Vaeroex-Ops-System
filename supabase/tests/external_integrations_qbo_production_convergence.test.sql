@@ -1011,11 +1011,15 @@ select is(
 reset role;
 
 set local role integration_task_scheduler_authority;
-select is(
-  public.schedule_qbo_initialization_v2(
+create temporary table qbo_production_schedule_result on commit drop as
+select public.schedule_qbo_initialization_v2(
     2,
     'qbo_prod_schedule_two_connections'
-  ) ->> 'scheduledConnectionCount',
+  ) as result;
+reset role;
+select is(
+  (select result ->> 'scheduledConnectionCount'
+   from qbo_production_schedule_result),
   '2',
   'scheduler discovers two eligible Production connections from the database'
 );
@@ -1041,15 +1045,115 @@ select is(
   '24',
   'Production scheduling supports a legitimate generation-2 connection'
 );
-reset role;
 
 set local role integration_task_dispatch_authority;
+create temporary table qbo_production_dispatch_discovery_results (
+  observation text primary key,
+  result jsonb not null
+) on commit drop;
+insert into qbo_production_dispatch_discovery_results (observation, result)
+values
+  ('two', public.discover_qbo_runtime_dispatch_v2('provider_bulk', 2)),
+  ('four', public.discover_qbo_runtime_dispatch_v2('provider_bulk', 4)),
+  ('all', public.discover_qbo_runtime_dispatch_v2('provider_bulk', 100));
+
+create temporary table qbo_production_dispatch_mark_results on commit drop as
+with candidates as (
+  select candidate
+  from qbo_production_dispatch_discovery_results as discovery
+  cross join lateral pg_catalog.jsonb_array_elements(
+    discovery.result
+  ) as item(candidate)
+  where discovery.observation = 'all'
+    and candidate ->> 'streamKey' = 'accounts'
+    and candidate ->> 'connectionId' in (
+      'e9f00000-0000-4000-8000-000000000101',
+      'e9f00000-0000-4000-8000-000000000103'
+    )
+)
+select
+  candidate ->> 'connectionId' as connection_id,
+  public.mark_integration_sync_task_dispatched_v1(
+    pg_catalog.jsonb_build_object(
+      'workspaceId', candidate ->> 'workspaceId',
+      'businessEntityId', candidate ->> 'businessEntityId',
+      'connectionId', candidate ->> 'connectionId',
+      'connectionGeneration', candidate ->> 'connectionGeneration',
+      'taskId', candidate ->> 'taskId',
+      'expectedRowVersion', candidate ->> 'rowVersion',
+      'dispatcherTaskName',
+        'projects/vaeroex-prod/locations/us-central1/queues/' ||
+          'qbo-production/tasks/' || case
+            when candidate ->> 'connectionId' =
+              'e9f00000-0000-4000-8000-000000000101'
+              then pg_catalog.repeat('a', 64)
+            else pg_catalog.repeat('b', 64)
+          end
+    ),
+    case
+      when candidate ->> 'connectionId' =
+        'e9f00000-0000-4000-8000-000000000101'
+        then 'qbo_prod_dispatch_a'
+      else 'qbo_prod_dispatch_b'
+    end,
+    'qbo_production_dispatcher'
+  ) as result
+from candidates;
+
+create temporary table qbo_production_reconciliation_before on commit drop as
+select public.discover_qbo_runtime_dispatch_reconciliation_v2(
+    'provider_bulk',
+    2
+  ) as result;
+
+create temporary table qbo_production_staging_confirmation on commit drop as
+select public.confirm_qbo_runtime_cloud_task_staged_v2(
+    pg_catalog.jsonb_build_object(
+      'contractVersion', 'qbo_runtime_cloud_task_staging_v2',
+      'taskId', reservation ->> 'taskId',
+      'expectedRowVersion', reservation ->> 'rowVersion',
+      'dispatcherTaskName', reservation ->> 'dispatcherTaskName',
+      'dispatchGeneration', reservation ->> 'dispatchGeneration',
+      'stagingOutcome', 'created'
+    ),
+    'qbo_prod_stage_confirm_a'
+  ) as result
+from qbo_production_reconciliation_before as reconciliation
+cross join lateral pg_catalog.jsonb_array_elements(
+  reconciliation.result
+) as item(reservation)
+where reservation ->> 'connectionId' =
+  'e9f00000-0000-4000-8000-000000000101';
+
+create temporary table qbo_production_reconciliation_after on commit drop as
+select public.discover_qbo_runtime_dispatch_reconciliation_v2(
+    'provider_bulk',
+    2
+  ) as result;
+
+create temporary table qbo_production_staging_replay on commit drop as
+select public.confirm_qbo_runtime_cloud_task_staged_v2(
+    pg_catalog.jsonb_build_object(
+      'contractVersion', 'qbo_runtime_cloud_task_staging_v2',
+      'taskId', result ->> 'taskId',
+      'expectedRowVersion', (result ->> 'rowVersion')::bigint - 1,
+      'dispatcherTaskName', result ->> 'dispatcherTaskName',
+      'dispatchGeneration', result ->> 'dispatchGeneration',
+      'stagingOutcome', 'already_existing'
+    ),
+    'qbo_prod_stage_confirm_a_replay'
+  ) as result
+from qbo_production_staging_confirmation;
+reset role;
+
 select is(
   (
     select pg_catalog.count(distinct candidate ->> 'connectionId')::text
-    from pg_catalog.jsonb_array_elements(
-      public.discover_qbo_runtime_dispatch_v2('provider_bulk', 2)
+    from qbo_production_dispatch_discovery_results as discovery
+    cross join lateral pg_catalog.jsonb_array_elements(
+      discovery.result
     ) as item(candidate)
+    where discovery.observation = 'two'
   ),
   '2',
   'bounded dispatcher gives the first two slots to distinct connections'
@@ -1065,9 +1169,11 @@ select ok(
         pg_catalog.count(*) over (
           partition by candidate ->> 'connectionId'
         ) as per_connection
-      from pg_catalog.jsonb_array_elements(
-        public.discover_qbo_runtime_dispatch_v2('provider_bulk', 4)
+      from qbo_production_dispatch_discovery_results as discovery
+      cross join lateral pg_catalog.jsonb_array_elements(
+        discovery.result
       ) as item(candidate)
+      where discovery.observation = 'four'
     ) as discovered
   ),
   'fair dispatcher returns two tasks per connection for a four-task bound'
@@ -1075,59 +1181,15 @@ select ok(
 select ok(
   not exists (
     select 1
-    from pg_catalog.jsonb_array_elements(
-      public.discover_qbo_runtime_dispatch_v2('provider_bulk', 100)
+    from qbo_production_dispatch_discovery_results as discovery
+    cross join lateral pg_catalog.jsonb_array_elements(
+      discovery.result
     ) as item(candidate)
-    where candidate ->> 'providerEnvironment' <> 'production'
+    where discovery.observation = 'all'
+      and candidate ->> 'providerEnvironment' <> 'production'
   ),
   'Production dispatcher cannot cross into another provider environment'
 );
-
-with selected as (
-  select task.*
-  from private.integration_sync_tasks as task
-  where task.connection_id = 'e9f00000-0000-4000-8000-000000000101'
-    and task.stream_key = 'accounts'
-)
-select public.mark_integration_sync_task_dispatched_v1(
-  pg_catalog.jsonb_build_object(
-    'workspaceId', selected.workspace_id,
-    'businessEntityId', selected.business_entity_id,
-    'connectionId', selected.connection_id,
-    'connectionGeneration', selected.connection_generation,
-    'taskId', selected.id,
-    'expectedRowVersion', selected.row_version,
-    'dispatcherTaskName',
-      'projects/vaeroex-prod/locations/us-central1/queues/qbo-production/tasks/' ||
-        repeat('a', 64)
-  ),
-  'qbo_prod_dispatch_a',
-  'qbo_production_dispatcher'
-)
-from selected;
-
-with selected as (
-  select task.*
-  from private.integration_sync_tasks as task
-  where task.connection_id = 'e9f00000-0000-4000-8000-000000000103'
-    and task.stream_key = 'accounts'
-)
-select public.mark_integration_sync_task_dispatched_v1(
-  pg_catalog.jsonb_build_object(
-    'workspaceId', selected.workspace_id,
-    'businessEntityId', selected.business_entity_id,
-    'connectionId', selected.connection_id,
-    'connectionGeneration', selected.connection_generation,
-    'taskId', selected.id,
-    'expectedRowVersion', selected.row_version,
-    'dispatcherTaskName',
-      'projects/vaeroex-prod/locations/us-central1/queues/qbo-production/tasks/' ||
-        repeat('b', 64)
-  ),
-  'qbo_prod_dispatch_b',
-  'qbo_production_dispatcher'
-)
-from selected;
 
 select ok(
   (
@@ -1137,135 +1199,108 @@ select ok(
       and pg_catalog.bool_and(
         reservation ->> 'queueName' = 'qbo-production'
       )
-    from pg_catalog.jsonb_array_elements(
-      public.discover_qbo_runtime_dispatch_reconciliation_v2(
-        'provider_bulk',
-        2
-      )
+    from qbo_production_reconciliation_before as reconciliation
+    cross join lateral pg_catalog.jsonb_array_elements(
+      reconciliation.result
     ) as item(reservation)
   ),
   'never-delivered reservations are fairly and exactly rediscovered for idempotent envelope reconciliation'
 );
-with selected as (
-  select task.*
-  from private.integration_sync_tasks as task
-  where task.connection_id = 'e9f00000-0000-4000-8000-000000000101'
-    and task.stream_key = 'accounts'
-)
 select ok(
-  not (
-    public.confirm_qbo_runtime_cloud_task_staged_v2(
-      pg_catalog.jsonb_build_object(
-        'contractVersion', 'qbo_runtime_cloud_task_staging_v2',
-        'taskId', selected.id,
-        'expectedRowVersion', selected.row_version,
-        'dispatcherTaskName', selected.dispatcher_task_name,
-        'dispatchGeneration', selected.dispatch_generation,
-        'stagingOutcome', 'created'
-      ),
-      'qbo_prod_stage_confirm_a'
-    ) ->> 'idempotent'
-  )::boolean,
+  not (select (result ->> 'idempotent')::boolean
+       from qbo_production_staging_confirmation),
   'dispatcher atomically confirms one current-generation Cloud Task envelope'
-)
-from selected;
+);
 select is(
   (
     select pg_catalog.count(*)::text
-    from pg_catalog.jsonb_array_elements(
-      public.discover_qbo_runtime_dispatch_reconciliation_v2(
-        'provider_bulk',
-        2
-      )
+    from qbo_production_reconciliation_after as reconciliation
+    cross join lateral pg_catalog.jsonb_array_elements(
+      reconciliation.result
     ) as item(reservation)
   ),
   '1',
   'confirmed envelope is no longer rediscovered while the unconfirmed reservation remains eligible'
 );
-with selected as (
-  select task.*
-  from private.integration_sync_tasks as task
-  where task.connection_id = 'e9f00000-0000-4000-8000-000000000101'
-    and task.stream_key = 'accounts'
-)
 select ok(
-  (
-    public.confirm_qbo_runtime_cloud_task_staged_v2(
-      pg_catalog.jsonb_build_object(
-        'contractVersion', 'qbo_runtime_cloud_task_staging_v2',
-        'taskId', selected.id,
-        'expectedRowVersion', selected.row_version - 1,
-        'dispatcherTaskName', selected.dispatcher_task_name,
-        'dispatchGeneration', selected.dispatch_generation,
-        'stagingOutcome', 'already_existing'
-      ),
-      'qbo_prod_stage_confirm_a_replay'
-    ) ->> 'idempotent'
-  )::boolean,
+  (select (result ->> 'idempotent')::boolean
+   from qbo_production_staging_replay),
   'staging confirmation replay is idempotent without changing authoritative outcome'
-)
-from selected;
-reset role;
+);
+
+create temporary table qbo_production_runtime_delivery_inputs on commit drop as
+select task.id as task_id, task.connection_id, task.dispatcher_task_name
+from private.integration_sync_tasks as task
+where task.connection_id in (
+    'e9f00000-0000-4000-8000-000000000101',
+    'e9f00000-0000-4000-8000-000000000103'
+  )
+  and task.stream_key = 'accounts';
+grant select on qbo_production_runtime_delivery_inputs
+to integration_provider_runtime_authority;
 
 set local role integration_provider_runtime_authority;
-select is(
-  (
-    select public.read_qbo_runtime_task_delivery_v2(
-      task.id,
-      task.dispatcher_task_name,
+create temporary table qbo_production_runtime_delivery_results on commit drop as
+select input.connection_id,
+  public.read_qbo_runtime_task_delivery_v2(
+    input.task_id,
+    input.dispatcher_task_name,
+    'qbo-production'
+  ) as result
+from qbo_production_runtime_delivery_inputs as input;
+create temporary table qbo_production_runtime_delivery_denials on commit drop as
+select
+  pg_temp.raises_sqlstate(
+    $$select public.read_qbo_runtime_task_delivery_v2(
+      input.task_id,
+      substituted.dispatcher_task_name,
       'qbo-production'
-    ) ->> 'credentialId'
-    from private.integration_sync_tasks as task
-    where task.connection_id = 'e9f00000-0000-4000-8000-000000000101'
-      and task.stream_key = 'accounts'
-  ),
+    )
+    from pg_temp.qbo_production_runtime_delivery_inputs as input
+    cross join pg_temp.qbo_production_runtime_delivery_inputs as substituted
+    where input.connection_id =
+        'e9f00000-0000-4000-8000-000000000101'
+      and substituted.connection_id =
+        'e9f00000-0000-4000-8000-000000000103'$$,
+    '42501'
+  ) as cross_tenant_task_denied,
+  pg_temp.raises_sqlstate(
+    $$select public.read_qbo_runtime_task_delivery_v2(
+      input.task_id,
+      input.dispatcher_task_name,
+      'qbo-production-other'
+    )
+    from pg_temp.qbo_production_runtime_delivery_inputs as input
+    where input.connection_id =
+      'e9f00000-0000-4000-8000-000000000101'$$,
+    '42501'
+  ) as wrong_queue_denied;
+reset role;
+
+select is(
+  (select result ->> 'credentialId'
+   from qbo_production_runtime_delivery_results
+   where connection_id = 'e9f00000-0000-4000-8000-000000000101'),
   '69f00000-0000-4000-8000-000000000101',
   'tenant A delivery resolves only tenant A active credential'
 );
 select is(
-  (
-    select public.read_qbo_runtime_task_delivery_v2(
-      task.id,
-      task.dispatcher_task_name,
-      'qbo-production'
-    ) ->> 'connectionGeneration'
-    from private.integration_sync_tasks as task
-    where task.connection_id = 'e9f00000-0000-4000-8000-000000000103'
-      and task.stream_key = 'accounts'
-  ),
+  (select result ->> 'connectionGeneration'
+   from qbo_production_runtime_delivery_results
+   where connection_id = 'e9f00000-0000-4000-8000-000000000103'),
   '2',
   'generation-2 delivery derives generation authority from the task'
 );
 select ok(
-  pg_temp.raises_sqlstate(
-    $$select public.read_qbo_runtime_task_delivery_v2(
-      task.id,
-      'projects/vaeroex-prod/locations/us-central1/queues/qbo-production/tasks/' ||
-        repeat('b', 64),
-      'qbo-production'
-    )
-    from private.integration_sync_tasks as task
-    where task.connection_id = 'e9f00000-0000-4000-8000-000000000101'
-      and task.stream_key = 'accounts'$$,
-    '42501'
-  ),
+  (select cross_tenant_task_denied
+   from qbo_production_runtime_delivery_denials),
   'tenant B Cloud Task identity cannot be substituted onto tenant A task'
 );
 select ok(
-  pg_temp.raises_sqlstate(
-    $$select public.read_qbo_runtime_task_delivery_v2(
-      task.id,
-      task.dispatcher_task_name,
-      'qbo-production-other'
-    )
-    from private.integration_sync_tasks as task
-    where task.connection_id = 'e9f00000-0000-4000-8000-000000000101'
-      and task.stream_key = 'accounts'$$,
-    '42501'
-  ),
+  (select wrong_queue_denied
+   from qbo_production_runtime_delivery_denials),
   'queue delivery cannot substitute the configured queue name'
 );
-reset role;
 
 select ok(
   (
