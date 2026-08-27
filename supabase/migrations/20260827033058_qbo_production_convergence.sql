@@ -2040,7 +2040,7 @@ begin
       eligible.id
     limit p_limit
   )
-  select pg_catalog.coalesce(
+  select coalesce(
     pg_catalog.jsonb_agg(
       pg_catalog.jsonb_build_object(
         'taskId', fair.id,
@@ -2155,7 +2155,7 @@ begin
       eligible.id
     limit p_limit
   )
-  select pg_catalog.coalesce(
+  select coalesce(
     pg_catalog.jsonb_agg(
       pg_catalog.jsonb_build_object(
         'taskId', fair.id,
@@ -3064,7 +3064,7 @@ begin
     'pending', v_parent.priority, v_child_control, v_child_idempotency,
     v_child_coalescing, v_parent.maximum_attempts, v_now, p_request_id,
     v_child_request_fingerprint, v_now, v_now,
-    pg_catalog.greatest(
+    greatest(
       v_parent.retention_expires_at,
       v_now + interval '1 day'
     )
