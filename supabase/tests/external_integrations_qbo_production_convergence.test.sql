@@ -537,6 +537,16 @@ select is(
   'state_replayed',
   'customer OAuth state replay fails closed'
 );
+select ok(
+  pg_temp.raises_sqlstate(
+    $$select status
+      from private.integration_oauth_states
+      where id = '09f00000-0000-4000-8000-000000000002'$$,
+    '42501'
+  ),
+  'OAuth ingress cannot directly inspect another connection private state'
+);
+reset role;
 select is(
   (
     select status
@@ -546,7 +556,6 @@ select is(
   'pending',
   'consuming Workspace A state does not mutate Workspace B state'
 );
-reset role;
 
 insert into private.integration_connections (
   id, contract_version, control_contract_version, workspace_id,
