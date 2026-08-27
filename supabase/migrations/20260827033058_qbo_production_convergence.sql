@@ -2327,7 +2327,6 @@ begin
     p_request_id,
     pg_catalog.jsonb_build_object(
       'dispatch_generation', v_task.dispatch_generation,
-      'staging_outcome', v_task.qbo_cloud_task_staging_outcome,
       'row_version', v_task.row_version,
       'idempotent', false
     )
