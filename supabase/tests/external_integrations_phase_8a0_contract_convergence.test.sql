@@ -707,17 +707,28 @@ select is(
   'sandbox',
   'QBO sandbox connection intent persists through the checked control plane'
 );
+select ok(
+  pg_temp.raises_sqlstate(
+    $$select public.create_integration_connection_intent_v1(
+      pg_temp.qbo_connection_intent(
+        'e8000000-0000-4000-8000-000000000002',
+        'b8000000-0000-4000-8000-000000000001',
+        'd8000000-0000-4000-8000-000000000001',
+        'production'
+      )
+    )$$,
+    '42501'
+  ),
+  'QBO production connection intent is denied without runtime configuration'
+);
 select is(
-  public.create_integration_connection_intent_v1(
-    pg_temp.qbo_connection_intent(
-      'e8000000-0000-4000-8000-000000000002',
-      'b8000000-0000-4000-8000-000000000001',
-      'd8000000-0000-4000-8000-000000000001',
-      'production'
-    )
-  ) -> 'connection' ->> 'providerEnvironment',
-  'production',
-  'QBO production connection intent persists separately'
+  (
+    select pg_catalog.count(*)::text
+    from private.integration_connections
+    where id = 'e8000000-0000-4000-8000-000000000002'
+  ),
+  '0',
+  'denied QBO production intent creates no connection mutation'
 );
 select ok(
   pg_temp.raises_sqlstate(
