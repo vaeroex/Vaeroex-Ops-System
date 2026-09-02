@@ -1,7 +1,19 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { ManagedRecordCollection } from "@/components/operations/ManagedRecordList";
 import type { Json } from "@/lib/supabase/types";
 import type { Database } from "@/lib/supabase/types";
+
+export type ManagedRecordCollection =
+  | "sops"
+  | "issues"
+  | "kpis"
+  | "forms"
+  | "form_submissions"
+  | "assets"
+  | "asset_checks"
+  | "crm_leads"
+  | "files"
+  | "people"
+  | "support_requests";
 
 type ManagedValues = {
   folderId: string | null;

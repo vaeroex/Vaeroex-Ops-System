@@ -238,6 +238,32 @@ export function bisectQboCdcWindowIfDense(input: {
   ];
 }
 
+export function bisectQboCdcEntityTypesIfDense(input: {
+  recordTypes: readonly QboSupportedObjectType[];
+  observedObjectCount: number;
+}) {
+  if (!Number.isSafeInteger(input.observedObjectCount) || input.observedObjectCount < 0) {
+    throw new Error("qbo_cdc_observed_count_invalid");
+  }
+  const recordTypes = input.recordTypes.map((value) =>
+    QboSupportedObjectTypeSchema.parse(value)
+  );
+  if (
+    recordTypes.length === 0 ||
+    new Set(recordTypes).size !== recordTypes.length
+  ) {
+    throw new Error("qbo_cdc_record_types_invalid");
+  }
+  if (input.observedObjectCount < QBO_CDC_RESPONSE_OBJECT_CAP) {
+    return [recordTypes] as QboSupportedObjectType[][];
+  }
+  if (recordTypes.length === 1) {
+    throw new Error("qbo_cdc_single_entity_cap_requires_full_reconciliation");
+  }
+  const midpoint = Math.ceil(recordTypes.length / 2);
+  return [recordTypes.slice(0, midpoint), recordTypes.slice(midpoint)];
+}
+
 export function resumeQboCdcCursor(input: {
   lastCompletedUntil: string;
   restartUntil: string;

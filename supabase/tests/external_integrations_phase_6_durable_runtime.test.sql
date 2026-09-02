@@ -5,6 +5,7 @@ begin;
 grant usage on schema extensions
   to integration_webhook_ingress_authority,
     integration_task_dispatch_authority,
+    integration_task_scheduler_authority,
     integration_provider_runtime_authority,
     integration_deterministic_runtime_authority;
 
@@ -133,7 +134,9 @@ create or replace function pg_temp.lease_command(
   p_lease_id uuid,
   p_owner text,
   p_execution_count integer,
-  p_worker_kind text default 'provider_runtime'
+  p_worker_kind text default 'provider_runtime',
+  p_retry_count integer default null,
+  p_dispatch_generation bigint default 1
 )
 returns jsonb
 language sql
@@ -150,9 +153,16 @@ as $function$
     'leaseOwnerFingerprint', pg_temp.fingerprint(p_owner),
     'leaseSeconds', 120,
     'dispatcherTaskName', p_task_name,
+    'deliveryDispatchGeneration', p_dispatch_generation,
+    'deliveryRetryCount', coalesce(p_retry_count, p_execution_count),
     'deliveryExecutionCount', p_execution_count,
     'deliveryAttemptFingerprint',
-      pg_temp.fingerprint(p_task_id::text || ':' || p_execution_count::text)
+      pg_temp.fingerprint(
+        p_task_id::text || ':' || p_task_name || ':' ||
+        p_dispatch_generation::text || ':' ||
+        coalesce(p_retry_count, p_execution_count)::text || ':' ||
+        p_execution_count::text
+      )
   );
 $function$;
 
@@ -468,14 +478,49 @@ select is(
     where rolname in (
       'integration_webhook_ingress_authority',
       'integration_task_dispatch_authority',
+      'integration_task_scheduler_authority',
       'integration_provider_runtime_authority',
       'integration_deterministic_runtime_authority'
     )
       and not rolcanlogin
       and not rolinherit
   ),
-  4,
-  'all four Phase 6 authority roles are NOLOGIN and NOINHERIT'
+  5,
+  'all five Phase 6 authority roles are NOLOGIN and NOINHERIT'
+);
+
+select ok(
+  has_function_privilege(
+    'integration_task_scheduler_authority',
+    'public.discover_integration_sync_dispatch_v1(text,integer)',
+    'EXECUTE'
+  )
+    and has_function_privilege(
+      'integration_task_scheduler_authority',
+      'public.discover_integration_sync_due_work_v1(timestamptz,integer)',
+      'EXECUTE'
+    )
+    and has_function_privilege(
+      'integration_task_scheduler_authority',
+      'public.sweep_integration_sync_tasks_v1(integer,text,text)',
+      'EXECUTE'
+    )
+    and not has_function_privilege(
+      'integration_task_dispatch_authority',
+      'public.discover_integration_sync_dispatch_v1(text,integer)',
+      'EXECUTE'
+    )
+    and not has_function_privilege(
+      'integration_task_dispatch_authority',
+      'public.discover_integration_sync_due_work_v1(timestamptz,integer)',
+      'EXECUTE'
+    )
+    and not has_function_privilege(
+      'integration_task_dispatch_authority',
+      'public.sweep_integration_sync_tasks_v1(integer,text,text)',
+      'EXECUTE'
+    ),
+  'global scheduling is separated from connection-scoped dispatch authority'
 );
 
 select is(
@@ -763,6 +808,60 @@ select extensions.dblink_exec(
         'phase6-concurrency-dispatch',
         'phase6-concurrency-dispatcher'
       );
+      perform public.create_integration_sync_task_v1(
+        jsonb_build_object(
+          'contractVersion', 'integration_sync_task_v1',
+          'id', '16c00000-0000-4000-8000-000000000002',
+          'workspaceId', 'b6c00000-0000-4000-8000-000000000001',
+          'businessEntityId', 'c6c00000-0000-4000-8000-000000000001',
+          'connectionId', 'd6c00000-0000-4000-8000-000000000001',
+          'connectionGeneration', 1,
+          'syncRunId', 'f6c00000-0000-4000-8000-000000000001',
+          'parentTaskId', null,
+          'providerKey', 'synthetic',
+          'providerEnvironment', 'test',
+          'queueClass', 'provider_interactive',
+          'taskKind', 'incremental',
+          'streamKey', 'general_ledger',
+          'priority', 50,
+          'controlMetadata', jsonb_build_object(
+            'checkpointId', null,
+            'mappingId', null,
+            'eventId', null,
+            'pageOrdinal', 0,
+            'cursorVersion', 0,
+            'windowStartAt', null,
+            'windowEndAt', null,
+            'reasonCode', 'phase6_zero_concurrency',
+            'recordHintCount', 1,
+            'coalescedEventCount', 1
+          ),
+          'idempotencyFingerprint',
+            'sha256:7777777777777777777777777777777777777777777777777777777777777777',
+          'coalescingFingerprint',
+            'sha256:8888888888888888888888888888888888888888888888888888888888888888',
+          'maximumAttempts', 2,
+          'availableAt', transaction_timestamp(),
+          'retentionExpiresAt', transaction_timestamp() + interval '7 days',
+          'createdAt', transaction_timestamp()
+        ),
+        'phase6-zero-concurrency-create',
+        'phase6-concurrency-dispatcher'
+      );
+      perform public.mark_integration_sync_task_dispatched_v1(
+        jsonb_build_object(
+          'workspaceId', 'b6c00000-0000-4000-8000-000000000001',
+          'businessEntityId', 'c6c00000-0000-4000-8000-000000000001',
+          'connectionId', 'd6c00000-0000-4000-8000-000000000001',
+          'connectionGeneration', 1,
+          'taskId', '16c00000-0000-4000-8000-000000000002',
+          'expectedRowVersion', 1,
+          'dispatcherTaskName',
+            'projects/phase6-test/locations/us-central1/queues/provider-interactive/tasks/ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff'
+        ),
+        'phase6-zero-concurrency-dispatch',
+        'phase6-concurrency-dispatcher'
+      );
     end;
     $create_task$;
     reset role
@@ -794,6 +893,8 @@ select extensions.dblink_send_query(
         'leaseSeconds', 120,
         'dispatcherTaskName',
           'projects/phase6-test/locations/us-central1/queues/provider-interactive/tasks/eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
+        'deliveryDispatchGeneration', 1,
+        'deliveryRetryCount', 0,
         'deliveryExecutionCount', 0,
         'deliveryAttemptFingerprint',
           'sha256:4444444444444444444444444444444444444444444444444444444444444444'
@@ -822,7 +923,9 @@ select extensions.dblink_send_query(
         'leaseSeconds', 120,
         'dispatcherTaskName',
           'projects/phase6-test/locations/us-central1/queues/provider-interactive/tasks/eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
-        'deliveryExecutionCount', 1,
+        'deliveryDispatchGeneration', 1,
+        'deliveryRetryCount', 0,
+        'deliveryExecutionCount', 0,
         'deliveryAttemptFingerprint',
           'sha256:6666666666666666666666666666666666666666666666666666666666666666'
       ),
@@ -833,15 +936,22 @@ select extensions.dblink_send_query(
 );
 
 create temporary table phase6_concurrent_lease_results (
-  result jsonb not null
+  result jsonb not null,
+  execution_count integer not null
 ) on commit drop;
 
-insert into phase6_concurrent_lease_results(result)
-select result
+insert into phase6_concurrent_lease_results(result, execution_count)
+select result, 0
 from extensions.dblink_get_result('phase6_lease_concurrency_1')
   as response(result jsonb);
-insert into phase6_concurrent_lease_results(result)
-select result
+insert into phase6_concurrent_lease_results(result, execution_count)
+select result, 0
+from extensions.dblink_get_result('phase6_lease_concurrency_2')
+  as response(result jsonb);
+select pg_catalog.count(*)
+from extensions.dblink_get_result('phase6_lease_concurrency_1')
+  as response(result jsonb);
+select pg_catalog.count(*)
 from extensions.dblink_get_result('phase6_lease_concurrency_2')
   as response(result jsonb);
 
@@ -866,10 +976,217 @@ select is(
     select pg_catalog.count(*)::integer
     from phase6_concurrent_lease_results
     where not (result ->> 'acquired')::boolean
-      and result ->> 'reasonCode' = 'lease_held'
   ),
   1,
-  'concurrent loser receives a bounded lease-held result'
+  'exactly one concurrent worker receives no execution authority'
+);
+
+select is(
+  (
+    select pg_catalog.count(*)::integer
+    from phase6_concurrent_lease_results
+    where (result ->> 'acquired')::boolean
+      and not (result ->> 'idempotent')::boolean
+      and not (result ->> 'terminalReplay')::boolean
+      and result ->> 'reasonCode' = 'leased'
+      and result ->> 'state' = 'leased'
+      and (result ->> 'attemptCount')::integer = 1
+  ),
+  1,
+  'concurrent winner returns the bounded leased-owner result'
+);
+
+select is(
+  (
+    select pg_catalog.count(*)::integer
+    from phase6_concurrent_lease_results
+    where not (result ->> 'acquired')::boolean
+      and (result ->> 'idempotent')::boolean
+      and not (result ->> 'terminalReplay')::boolean
+      and result ->> 'reasonCode' = 'delivery_replayed'
+      and result ->> 'state' = 'leased'
+      and (result ->> 'attemptCount')::integer = 1
+  ),
+  1,
+  'same-tuple concurrent loser returns the bounded delivery-replayed result'
+);
+
+select ok(
+  (
+    select task.state = 'leased'
+      and task.attempt_count = 1
+      and task.lease_id is not null
+      and task.durable_effect_fingerprint is null
+    from private.integration_sync_tasks as task
+    where task.id = '16c00000-0000-4000-8000-000000000001'
+  ),
+  'the concurrent race creates one lease and no provider effect'
+);
+
+select is(
+  (
+    select task.last_delivery_retry_count
+    from private.integration_sync_tasks as task
+    where task.id = '16c00000-0000-4000-8000-000000000001'
+  ),
+  0,
+  'concurrent first delivery persists the required retry count zero'
+);
+
+select is(
+  (
+    select task.last_delivery_execution_count
+    from private.integration_sync_tasks as task
+    where task.id = '16c00000-0000-4000-8000-000000000001'
+  ),
+  0,
+  'concurrent first delivery persists the required execution count zero'
+);
+
+-- Close the first synthetic proof lease before the independent zero/zero race
+-- so admission control cannot become the result under test.
+select extensions.dblink_exec(
+  'phase6_lease_concurrency_1',
+  'reset role'
+);
+select extensions.dblink_exec(
+  'phase6_lease_concurrency_1',
+  $complete_first_race$
+    update private.integration_sync_tasks
+    set state = 'succeeded',
+        lease_id = null,
+        lease_owner_fingerprint = null,
+        lease_expires_at = null,
+        heartbeat_at = null,
+        durable_effect_fingerprint =
+          decode(repeat('c', 64), 'hex'),
+        completed_at = transaction_timestamp(),
+        row_version = row_version + 1,
+        updated_at = transaction_timestamp()
+    where id = '16c00000-0000-4000-8000-000000000001'
+  $complete_first_race$
+);
+select extensions.dblink_exec(
+  'phase6_lease_concurrency_1',
+  'set role integration_provider_runtime_authority'
+);
+
+select extensions.dblink_send_query(
+  'phase6_lease_concurrency_1',
+  $query$
+    select public.lease_integration_sync_task_v1(
+      jsonb_build_object(
+        'workspaceId', 'b6c00000-0000-4000-8000-000000000001',
+        'businessEntityId', 'c6c00000-0000-4000-8000-000000000001',
+        'connectionId', 'd6c00000-0000-4000-8000-000000000001',
+        'connectionGeneration', 1,
+        'taskId', '16c00000-0000-4000-8000-000000000002',
+        'expectedRowVersion', 2,
+        'workerKind', 'provider_runtime',
+        'leaseId', '66c00000-0000-4000-8000-000000000003',
+        'leaseOwnerFingerprint',
+          'sha256:9999999999999999999999999999999999999999999999999999999999999999',
+        'leaseSeconds', 120,
+        'dispatcherTaskName',
+          'projects/phase6-test/locations/us-central1/queues/provider-interactive/tasks/ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff',
+        'deliveryDispatchGeneration', 1,
+        'deliveryRetryCount', 0,
+        'deliveryExecutionCount', 0,
+        'deliveryAttemptFingerprint',
+          'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+      ),
+      'phase6-zero-concurrency-lease-1',
+      'phase6-provider-worker-1'
+    )
+  $query$
+);
+
+select extensions.dblink_send_query(
+  'phase6_lease_concurrency_2',
+  $query$
+    select public.lease_integration_sync_task_v1(
+      jsonb_build_object(
+        'workspaceId', 'b6c00000-0000-4000-8000-000000000001',
+        'businessEntityId', 'c6c00000-0000-4000-8000-000000000001',
+        'connectionId', 'd6c00000-0000-4000-8000-000000000001',
+        'connectionGeneration', 1,
+        'taskId', '16c00000-0000-4000-8000-000000000002',
+        'expectedRowVersion', 2,
+        'workerKind', 'provider_runtime',
+        'leaseId', '66c00000-0000-4000-8000-000000000004',
+        'leaseOwnerFingerprint',
+          'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+        'leaseSeconds', 120,
+        'dispatcherTaskName',
+          'projects/phase6-test/locations/us-central1/queues/provider-interactive/tasks/ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff',
+        'deliveryDispatchGeneration', 1,
+        'deliveryRetryCount', 0,
+        'deliveryExecutionCount', 0,
+        'deliveryAttemptFingerprint',
+          'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+      ),
+      'phase6-zero-concurrency-lease-2',
+      'phase6-provider-worker-2'
+    )
+  $query$
+);
+
+create temporary table phase6_concurrent_zero_results (
+  result jsonb not null
+) on commit drop;
+
+insert into phase6_concurrent_zero_results(result)
+select result
+from extensions.dblink_get_result('phase6_lease_concurrency_1')
+  as response(result jsonb);
+insert into phase6_concurrent_zero_results(result)
+select result
+from extensions.dblink_get_result('phase6_lease_concurrency_2')
+  as response(result jsonb);
+select pg_catalog.count(*)
+from extensions.dblink_get_result('phase6_lease_concurrency_1')
+  as response(result jsonb);
+select pg_catalog.count(*)
+from extensions.dblink_get_result('phase6_lease_concurrency_2')
+  as response(result jsonb);
+
+select is(
+  (
+    select pg_catalog.count(*)::integer
+    from phase6_concurrent_zero_results
+    where (result ->> 'acquired')::boolean
+  ),
+  1,
+  'exactly one concurrent execution-count-zero delivery acquires the lease'
+);
+
+select is(
+  (
+    select pg_catalog.count(*)::integer
+    from phase6_concurrent_zero_results
+    where not (result ->> 'acquired')::boolean
+      and (result ->> 'idempotent')::boolean
+      and not (result ->> 'terminalReplay')::boolean
+      and result ->> 'reasonCode' = 'delivery_replayed'
+  ),
+  1,
+  'the identical execution-count-zero loser converges as a bounded idempotent replay'
+);
+
+select ok(
+  (
+    select task.state = 'leased'
+      and task.attempt_count = 1
+      and task.delivery_attribution_state = 'attributed'
+      and task.last_delivery_dispatch_generation = task.dispatch_generation
+      and task.last_delivery_retry_count = 0
+      and task.last_delivery_execution_count = 0
+      and task.lease_id is not null
+      and task.durable_effect_fingerprint is null
+    from private.integration_sync_tasks as task
+    where task.id = '16c00000-0000-4000-8000-000000000002'
+  ),
+  'concurrent first delivery creates one lease and one zero-based evidence tuple'
 );
 
 select extensions.dblink_disconnect(connection_name)
@@ -1742,6 +2059,33 @@ select is(
 );
 
 select ok(
+  (
+    select not (contention.result ->> 'acquired')::boolean
+      and not (contention.result ->> 'idempotent')::boolean
+      and not (contention.result ->> 'terminalReplay')::boolean
+      and contention.result ->> 'reasonCode' = 'lease_held'
+      and contention.result ->> 'state' = 'leased'
+      and (contention.result ->> 'attemptCount')::integer = 1
+    from (
+      select public.lease_integration_sync_task_v1(
+        pg_temp.lease_command(
+          'b6000000-0000-4000-8000-000000000001',
+          'c6000000-0000-4000-8000-000000000001',
+          'd6000000-0000-4000-8000-000000000001',
+          '16000000-0000-4000-8000-000000000001', 3,
+          'projects/phase6-test/locations/us-central1/queues/provider-interactive/tasks/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+          '66000000-0000-4000-8000-000000000098',
+          'later-delivery-worker', 0, 'provider_runtime', 1, 1
+        ),
+        'phase6-task-1-active-lease-contention',
+        'phase6-provider-worker'
+      ) as result
+    ) as contention
+  ),
+  'a genuinely later tuple remains bounded by distinguishable active-lease contention'
+);
+
+select ok(
   pg_temp.raises_sqlstate(
     $$select public.heartbeat_integration_sync_task_v1(
       jsonb_build_object(
@@ -1978,7 +2322,7 @@ set
   updated_at = pg_catalog.transaction_timestamp()
 where id = '16000000-0000-4000-8000-000000000002';
 
-set local role integration_task_dispatch_authority;
+set local role integration_task_scheduler_authority;
 select is(
   public.sweep_integration_sync_tasks_v1(
     100,
@@ -2028,7 +2372,8 @@ select is(
       'd6000000-0000-4000-8000-000000000001',
       '16000000-0000-4000-8000-000000000002', 7,
       'projects/phase6-test/locations/us-central1/queues/provider-interactive/tasks/cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',
-      '66000000-0000-4000-8000-000000000003', 'retry-worker-2', 1
+      '66000000-0000-4000-8000-000000000003', 'retry-worker-2', 0,
+      'provider_runtime', 0, 2
     ),
     'phase6-retry-lease-2',
     'phase6-provider-worker'
@@ -2261,7 +2606,7 @@ select is(
 
 reset role;
 
-set local role integration_task_dispatch_authority;
+set local role integration_task_scheduler_authority;
 select ok(
   pg_catalog.jsonb_array_length(
     public.discover_integration_sync_due_work_v1(

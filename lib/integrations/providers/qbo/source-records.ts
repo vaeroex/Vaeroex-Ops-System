@@ -1,4 +1,8 @@
-import { externalSourceFingerprint } from "@/lib/integrations/contracts/canonical";
+import {
+  canonicalContractJson,
+  externalSourceFingerprint
+} from "@/lib/integrations/contracts/canonical";
+import { ContractJsonObjectSchema } from "@/lib/integrations/contracts/primitives";
 import {
   ExternalSourceRecordVersionSchema,
   type ExternalSourceRecordVersion
@@ -6,7 +10,8 @@ import {
 import { EXTERNAL_INTEGRATION_CONTRACT_VERSIONS } from "@/lib/integrations/contracts/versions";
 import {
   QBO_PROVIDER_KEY,
-  type QboMinimizedSourceRecord
+  type QboMinimizedSourceRecord,
+  type QboReportControlObservation
 } from "@/lib/integrations/providers/qbo/contracts";
 import { classifyQboSourceChange } from "@/lib/integrations/providers/qbo/minimizers";
 import type { ProviderAdapterContext } from "@/lib/integrations/contracts/provider-adapter";
@@ -15,6 +20,36 @@ function recordKind(recordType: string) {
   return `qbo_${recordType
     .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
     .toLowerCase()}`;
+}
+
+const QBO_POINT_IN_TIME_AGING_REPORT_TYPES = new Set<
+  QboReportControlObservation["reportType"]
+>(["ARAgingSummary", "APAgingSummary"]);
+
+function qboReportTemporalProjection(report: QboReportControlObservation) {
+  if (report.periodStart !== null && report.periodEnd !== null) {
+    return {
+      basis: "period" as const,
+      effectiveAt: null,
+      periodStart: report.periodStart,
+      periodEnd: report.periodEnd
+    };
+  }
+  if (QBO_POINT_IN_TIME_AGING_REPORT_TYPES.has(report.reportType)) {
+    const effectiveDate = report.periodEnd ?? report.periodStart;
+    return {
+      basis: "point_in_time" as const,
+      effectiveAt: effectiveDate === null ? null : `${effectiveDate}T00:00:00.000Z`,
+      periodStart: null,
+      periodEnd: null
+    };
+  }
+  return {
+    basis: "period" as const,
+    effectiveAt: null,
+    periodStart: report.periodStart,
+    periodEnd: report.periodEnd
+  };
 }
 
 export function qboMinimizedRecordToExternalSourceVersion(input: {
@@ -97,4 +132,98 @@ export function qboMinimizedRecordToExternalSourceVersion(input: {
     ...parsed,
     sourceFingerprint: externalSourceFingerprint(parsed)
   });
+}
+
+export function qboReportToExternalSourceVersion(input: {
+  context: ProviderAdapterContext;
+  report: QboReportControlObservation;
+  id: string;
+  immutableVersion: number;
+  priorVersionId: string | null;
+  previousReport?: QboReportControlObservation | null;
+  observedAt: string;
+  synchronizedAt: string;
+  ingestedAt: string;
+  receivedAt: string;
+}) {
+  if (
+    input.context.providerKey !== QBO_PROVIDER_KEY ||
+    input.report.provider.providerKey !== QBO_PROVIDER_KEY
+  ) {
+    throw new Error("qbo_report_context_provider_mismatch");
+  }
+  if (
+    input.report.provider.sourceEnvironment === "unknown" ||
+    input.report.provider.sourceEnvironment !== input.context.providerEnvironment
+  ) {
+    throw new Error("qbo_report_source_environment_mismatch");
+  }
+  const providerRecordId = qboReportProviderRecordId(input.report);
+  const reportTemporal = qboReportTemporalProjection(input.report);
+  const draft: ExternalSourceRecordVersion = {
+    contractVersion: EXTERNAL_INTEGRATION_CONTRACT_VERSIONS.sourceRecord,
+    id: input.id,
+    workspaceId: input.context.workspaceId,
+    businessEntityId: input.context.businessEntityId,
+    connectionId: input.context.connectionId,
+    immutableVersion: input.immutableVersion,
+    priorVersionId: input.priorVersionId,
+    recordKind: `qbo_report_${input.report.reportType.toLowerCase()}`,
+    source: {
+      kind: "provider",
+      providerKey: QBO_PROVIDER_KEY,
+      providerRecordType: input.report.reportType,
+      providerRecordId,
+      providerVersionReference: input.observedAt
+    },
+    temporal: {
+      basis: reportTemporal.basis,
+      providerCreatedAt: null,
+      providerUpdatedAt: null,
+      observedAt: input.observedAt,
+      synchronizedAt: input.synchronizedAt,
+      ingestedAt: input.ingestedAt,
+      effectiveAt: reportTemporal.effectiveAt,
+      postingDate: null,
+      periodStart: reportTemporal.periodStart,
+      periodEnd: reportTemporal.periodEnd,
+      sourceTimeZone: null
+    },
+    accounting: {
+      basis: input.report.reportBasis,
+      currency: input.report.sourceCurrency
+    },
+    normalizedSchemaVersion: input.report.parserVersion,
+    changeKind:
+      input.priorVersionId === null
+        ? "created"
+        : input.previousReport &&
+            canonicalContractJson(input.previousReport) ===
+              canonicalContractJson(input.report)
+          ? "unchanged"
+          : "updated",
+    normalizedProjection: ContractJsonObjectSchema.parse(input.report),
+    trust: "untrusted_external_input",
+    validation: {
+      state: "pending",
+      validatorVersion: "qbo_phase_8b_deterministic_validator_v1",
+      issues: []
+    },
+    receivedAt: input.receivedAt
+  };
+  const parsed = ExternalSourceRecordVersionSchema.parse(draft);
+  return ExternalSourceRecordVersionSchema.parse({
+    ...parsed,
+    sourceFingerprint: externalSourceFingerprint(parsed)
+  });
+}
+
+export function qboReportProviderRecordId(report: QboReportControlObservation) {
+  return [
+    report.reportType,
+    report.reportBasis,
+    report.periodStart ?? "open",
+    report.periodEnd ?? "open",
+    report.sourceCurrency ?? "currency_unspecified"
+  ].join(":");
 }

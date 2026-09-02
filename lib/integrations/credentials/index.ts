@@ -3,6 +3,7 @@ export * from "@/lib/integrations/credentials/contracts";
 export * from "@/lib/integrations/credentials/iam";
 export * from "@/lib/integrations/credentials/kms";
 export * from "@/lib/integrations/credentials/oauth-state";
+export * from "@/lib/integrations/credentials/provider-failure";
 export * from "@/lib/integrations/credentials/redaction";
 export * from "@/lib/integrations/credentials/secret-manager";
 export * from "@/lib/integrations/credentials/synthetic-provider";

@@ -34,6 +34,20 @@ jobs:
           node-version: 24
           cache: pnpm
 
+      - name: Set up Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version: 1.24.0
+          cache-dependency-path: |
+            services/external-integrations-qbo-sandbox/edge/go.sum
+            services/external-integrations-qbo/edge/go.sum
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: 1.13.5
+          terraform_wrapper: false
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
@@ -69,6 +83,39 @@ jobs:
 
       - name: External integrations Phase 8A live-GCP readiness regressions
         run: pnpm test:external-integrations-phase-8a-live
+
+      - name: External integrations Phase 8B QBO sandbox regressions
+        run: pnpm test:external-integrations-phase-8b
+
+      - name: External integrations QBO Production multi-tenant regressions
+        run: pnpm test:external-integrations-qbo-production
+
+      - name: External integrations Phase 8B OAuth callback edge tests
+        working-directory: services/external-integrations-qbo-sandbox/edge
+        run: |
+          test -z "$(gofmt -l .)"
+          go test -count=1 .
+          GOOS=wasip1 GOARCH=wasm go build -buildvcs=false -buildmode=c-shared -trimpath -o /tmp/p8b-oauth-callback-edge.wasm ./plugin
+
+      - name: External integrations QBO Production callback edge tests
+        working-directory: services/external-integrations-qbo/edge
+        run: |
+          test -z "$(gofmt -l .)"
+          go test -count=1 .
+          GOOS=wasip1 GOARCH=wasm go build -buildvcs=false -buildmode=c-shared -trimpath -o /tmp/qbo-production-callback-edge.wasm ./plugin
+
+      - name: Validate external integrations QBO Production infrastructure
+        working-directory: services/external-integrations-qbo/infra
+        run: |
+          terraform fmt -check -recursive
+          terraform init -backend=false -input=false
+          terraform validate
+
+      - name: Build external integrations QBO sandbox runtime
+        run: pnpm build:external-integrations-qbo-sandbox
+
+      - name: Build external integrations QBO Production runtime
+        run: pnpm build:external-integrations-qbo
 
       - name: TypeScript check
         run: pnpm typecheck
@@ -128,7 +175,20 @@ jobs:
             supabase/tests/external_integrations_phase_4_control_plane.test.sql \
             supabase/tests/external_integrations_phase_5_credential_security.test.sql \
             supabase/tests/external_integrations_phase_6_durable_runtime.test.sql \
-            supabase/tests/external_integrations_phase_8a0_contract_convergence.test.sql
+            supabase/tests/external_integrations_phase_8a0_contract_convergence.test.sql \
+            supabase/tests/external_integrations_phase_8b_qbo_sandbox_validation.test.sql \
+            supabase/tests/external_integrations_phase_8b_credential_refresh_recovery.test.sql \
+            supabase/tests/external_integrations_phase_8b_same_generation_reauthorization.test.sql \
+            supabase/tests/external_integrations_phase_8b_expired_refresh_lease_reclamation.test.sql \
+            supabase/tests/external_integrations_phase_8b_zero_based_delivery_clean.test.sql \
+            supabase/tests/external_integrations_phase_8b_credential_binding_canary.test.sql \
+            supabase/tests/external_integrations_phase_8b_credential_lineage_recovery.test.sql \
+            supabase/tests/external_integrations_phase_8b_precontract_retirement.test.sql \
+            supabase/tests/external_integrations_phase_8b_provider_result_evidence.test.sql \
+            supabase/tests/external_integrations_qbo_production_convergence.test.sql
+
+      - name: Verify fixture-rich zero-based delivery migration
+        run: node scripts/run-phase8b-zero-based-delivery-migration-tests.js
 
       - name: Remove isolated database state
         if: always()

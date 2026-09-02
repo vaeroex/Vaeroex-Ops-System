@@ -62,12 +62,15 @@ export class DurableSynchronizationWorker {
     checkpointId: string;
     checkpointVersion: number;
     cursorVersion: number;
-    deliveryExecutionCount?: number;
+    deliveryRetryCount: number;
+    deliveryExecutionCount: number;
     deliveryAttemptFingerprint?: string;
     childTaskFactory?: (parent: RuntimeTaskRecord, now: Date) => CreateRuntimeTaskCommand;
   }) {
     const now = this.#clock();
     const leaseId = randomUUID();
+    const deliveryDispatchGeneration =
+      this.#ledger.task(input.taskId)?.dispatchGeneration ?? 0;
     const leased = this.#ledger.leaseTask({
       taskId: input.taskId,
       workerKind: input.workerKind,
@@ -75,11 +78,18 @@ export class DurableSynchronizationWorker {
       ownerFingerprint: input.ownerFingerprint,
       leaseSeconds: 120,
       expectedConnectionGeneration: input.expectedConnectionGeneration,
-      deliveryExecutionCount: input.deliveryExecutionCount ?? 0,
+      deliveryDispatchGeneration,
+      deliveryRetryCount: input.deliveryRetryCount,
+      deliveryExecutionCount: input.deliveryExecutionCount,
       deliveryAttemptFingerprint: input.deliveryAttemptFingerprint ?? contractSha256({
         fingerprintPurpose: "synthetic_runtime_delivery_attempt",
         fingerprintVersion: "synthetic_runtime_delivery_attempt_fingerprint_v1",
-        payload: { taskId: input.taskId, executionCount: input.deliveryExecutionCount ?? 0 }
+        payload: {
+          taskId: input.taskId,
+          dispatchGeneration: deliveryDispatchGeneration,
+          retryCount: input.deliveryRetryCount,
+          executionCount: input.deliveryExecutionCount
+        }
       }),
       now
     });

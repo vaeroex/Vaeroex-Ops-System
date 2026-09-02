@@ -157,16 +157,30 @@ function dispatch(ledger, task, now = new Date(task.createdAt)) {
   return ledger.markDispatched(created.task.id, name, now).task;
 }
 
-function lease(ledger, taskId, now, executionCount = 0, workerKind = "provider_runtime") {
+function lease(
+  ledger,
+  taskId,
+  now,
+  retryCount = 0,
+  executionCount = retryCount,
+  workerKind = "provider_runtime"
+) {
+  const dispatchGeneration = ledger.task(taskId)?.dispatchGeneration ?? 0;
   return ledger.leaseTask({
     taskId,
     workerKind,
-    leaseId: id(900_000 + executionCount + taskSequence),
-    ownerFingerprint: hash(`owner:${taskId}:${executionCount}`),
+    leaseId: id(
+      900_000 + retryCount + executionCount + taskSequence + dispatchGeneration * 100
+    ),
+    ownerFingerprint: hash(`owner:${taskId}:${retryCount}:${executionCount}`),
     leaseSeconds: 120,
     expectedConnectionGeneration: 1,
+    deliveryDispatchGeneration: dispatchGeneration,
+    deliveryRetryCount: retryCount,
     deliveryExecutionCount: executionCount,
-    deliveryAttemptFingerprint: hash(`delivery:${taskId}:${executionCount}`),
+    deliveryAttemptFingerprint: hash(
+      `delivery:${taskId}:${dispatchGeneration}:${retryCount}:${executionCount}`
+    ),
     now
   });
 }
@@ -190,6 +204,11 @@ function webhookEvent(sequence, overrides = {}) {
 async function main() {
   equal(runtime.PHASE_6_MODEL_CALL_COUNT, 0, "Phase 6 makes zero model calls");
   equal(runtime.PHASE_6_PROMOTION_AUTHORIZED, false, "Phase 6 does not authorize KPI promotion");
+  throws(
+    () => runtime.assertRuntimeDeliveryAttributionLeaseable("legacy_unattributed"),
+    /delivery_attribution_unresolved/,
+    "ambiguous legacy delivery evidence is never leaseable"
+  );
   deepEqual(
     Object.values(runtime.RUNTIME_CONTRACT_VERSIONS),
     [
@@ -358,6 +377,7 @@ async function main() {
     checkpointId: normalTask.controlMetadata.checkpointId,
     checkpointVersion: 0,
     cursorVersion: 1,
+    deliveryRetryCount: 0,
     deliveryExecutionCount: 0,
     deliveryAttemptFingerprint: authorized.deliveryAttemptFingerprint
   });
@@ -377,6 +397,7 @@ async function main() {
     checkpointId: normalTask.controlMetadata.checkpointId,
     checkpointVersion: 1,
     cursorVersion: 2,
+    deliveryRetryCount: 1,
     deliveryExecutionCount: 1
   });
   equal(completedReplay.acquired, false, "delivery after durable completion is ignored");
@@ -384,9 +405,17 @@ async function main() {
 
   const replayLedger = ledgerWith(scopeA);
   const replayTask = taskCommand(scopeA);
-  dispatch(replayLedger, replayTask);
+  const firstDispatch = dispatch(replayLedger, replayTask);
+  equal(firstDispatch.deliveryAttributionState, "none", "a new task has explicit no-delivery attribution");
+  equal(firstDispatch.lastDeliveryDispatchGeneration, null, "new dispatch has no accepted delivery generation");
+  equal(firstDispatch.lastDeliveryRetryCount, null, "new dispatch has no accepted retry count");
+  equal(firstDispatch.lastDeliveryExecutionCount, null, "new dispatch has no accepted execution count");
   const firstLease = lease(replayLedger, replayTask.id, new Date(replayTask.createdAt), 0);
   equal(firstLease.acquired, true, "first delivery leases the task");
+  equal(firstLease.task.deliveryAttributionState, "attributed", "an accepted lease establishes explicit attribution");
+  equal(firstLease.task.lastDeliveryDispatchGeneration, 1, "accepted delivery binds evidence to dispatch generation one");
+  equal(firstLease.task.lastDeliveryRetryCount, 0, "Cloud Tasks retry count zero is persisted as real evidence");
+  equal(firstLease.task.lastDeliveryExecutionCount, 0, "Cloud Tasks execution count zero is persisted as real evidence");
   const copiedDelivery = replayLedger.leaseTask({
     taskId: replayTask.id,
     workerKind: "provider_runtime",
@@ -394,11 +423,42 @@ async function main() {
     ownerFingerprint: hash("copied-delivery"),
     leaseSeconds: 120,
     expectedConnectionGeneration: 1,
+    deliveryDispatchGeneration: firstLease.task.dispatchGeneration,
+    deliveryRetryCount: 0,
     deliveryExecutionCount: 0,
     deliveryAttemptFingerprint: firstLease.task.lastDeliveryAttemptFingerprint,
     now: new Date(replayTask.createdAt)
   });
   equal(copiedDelivery.reasonCode, "delivery_replayed", "replayed Cloud Task delivery is rejected by durable state");
+  let deniedProviderCalls = 0;
+  const deniedSink = new runtime.IdempotentSyntheticPageSink();
+  const deniedWorker = new runtime.DurableSynchronizationWorker({
+    ledger: replayLedger,
+    provider: {
+      async fetchPage() {
+        deniedProviderCalls += 1;
+        throw new Error("non_owner_provider_execution");
+      }
+    },
+    sink: deniedSink,
+    clock: () => new Date(replayTask.createdAt)
+  });
+  const deniedReplay = await deniedWorker.execute({
+    taskId: replayTask.id,
+    workerKind: "provider_runtime",
+    expectedConnectionGeneration: 1,
+    ownerFingerprint: hash("denied-replay-owner"),
+    scenario: "successful_page",
+    checkpointId: replayTask.controlMetadata.checkpointId,
+    checkpointVersion: 0,
+    cursorVersion: 1,
+    deliveryRetryCount: 0,
+    deliveryExecutionCount: 0,
+    deliveryAttemptFingerprint: firstLease.task.lastDeliveryAttemptFingerprint
+  });
+  equal(deniedReplay.acquired, false, "acquired false is authoritative for a competing duplicate delivery");
+  equal(deniedProviderCalls, 0, "a non-owner never reaches provider execution");
+  equal(deniedSink.calls, 0, "a non-owner never reaches durable source persistence");
   throws(
     () => replayLedger.heartbeat({
       taskId: replayTask.id,
@@ -420,6 +480,58 @@ async function main() {
     }).state,
     "leased",
     "the current worker may heartbeat its lease"
+  );
+
+  const generationLedger = ledgerWith(scopeA);
+  const generationTask = taskCommand(scopeA, { maximumAttempts: 3 });
+  dispatch(generationLedger, generationTask);
+  const generationZero = lease(
+    generationLedger,
+    generationTask.id,
+    new Date(generationTask.createdAt),
+    0
+  );
+  const generationFailure = generationLedger.fail({
+    taskId: generationTask.id,
+    leaseId: generationZero.task.leaseId,
+    ownerFingerprint: generationZero.task.leaseOwnerFingerprint,
+    category: "rate_limit",
+    safeCode: "synthetic_retry",
+    retryable: true,
+    retryAfterMs: 1_000,
+    now: new Date(generationTask.createdAt)
+  });
+  const generationRetryAt = new Date(Date.parse(generationFailure.availableAt));
+  generationLedger.sweep(generationRetryAt, { dispatchStaleAfterMs: 900_000 });
+  const secondDispatch = dispatchExisting(
+    generationLedger,
+    generationTask.id,
+    generationRetryAt
+  );
+  equal(secondDispatch.dispatchGeneration, 2, "retry reservation advances the Cloud Task generation");
+  equal(secondDispatch.lastDeliveryDispatchGeneration, 1, "retry preserves prior delivery evidence without assigning it to the new task");
+  equal(
+    lease(generationLedger, generationTask.id, generationRetryAt, 0).acquired,
+    true,
+    "a newly created Cloud Task may start at execution count zero again"
+  );
+
+  const invalidCountLedger = ledgerWith(scopeA);
+  const invalidCountTask = taskCommand(scopeA);
+  dispatch(invalidCountLedger, invalidCountTask);
+  equal(
+    lease(invalidCountLedger, invalidCountTask.id, new Date(invalidCountTask.createdAt), -1).acquired,
+    false,
+    "negative Cloud Tasks execution counts fail closed"
+  );
+
+  const skippedZeroLedger = ledgerWith(scopeA);
+  const skippedZeroTask = taskCommand(scopeA);
+  dispatch(skippedZeroLedger, skippedZeroTask);
+  equal(
+    lease(skippedZeroLedger, skippedZeroTask.id, new Date(skippedZeroTask.createdAt), 1).acquired,
+    false,
+    "a new dispatch generation cannot skip execution count zero"
   );
 
   const boundaryResults = {};
@@ -446,7 +558,9 @@ async function main() {
         crashAt,
         checkpointId: command.controlMetadata.checkpointId,
         checkpointVersion: 0,
-        cursorVersion: 1
+        cursorVersion: 1,
+        deliveryRetryCount: 0,
+        deliveryExecutionCount: 0
       }),
       /synthetic_crash/,
       `${crashAt} is observable and recoverable`
@@ -465,7 +579,8 @@ async function main() {
         checkpointId: command.controlMetadata.checkpointId,
         checkpointVersion: 0,
         cursorVersion: 1,
-        deliveryExecutionCount: 1
+        deliveryRetryCount: 0,
+        deliveryExecutionCount: 0
       });
       equal(recovered.completed.task.state, "succeeded", `${crashAt} recovers to durable success`);
     } else {
@@ -494,6 +609,8 @@ async function main() {
     checkpointId: parent.controlMetadata.checkpointId,
     checkpointVersion: 0,
     cursorVersion: 1,
+    deliveryRetryCount: 0,
+    deliveryExecutionCount: 0,
     childTaskFactory: (parentTask, now) => taskCommand(scopeA, {
       parentTaskId: parentTask.id,
       syncRunId: parentTask.syncRunId,
@@ -530,7 +647,7 @@ async function main() {
   dispatch(retryLedger, retryTask);
   let retryNow = new Date(retryTask.createdAt);
   for (let attempt = 0; attempt < 2; attempt += 1) {
-    const currentLease = lease(retryLedger, retryTask.id, retryNow, attempt);
+    const currentLease = lease(retryLedger, retryTask.id, retryNow, 0);
     equal(currentLease.acquired, true, `retry attempt ${attempt + 1} leases once`);
     const failed = retryLedger.fail({
       taskId: retryTask.id,
@@ -579,7 +696,9 @@ async function main() {
       scenario,
       checkpointId: command.controlMetadata.checkpointId,
       checkpointVersion: 0,
-      cursorVersion: 1
+      cursorVersion: 1,
+      deliveryRetryCount: 0,
+      deliveryExecutionCount: 0
     });
     equal(result.failed.state, expectedState, `${scenario} has deterministic retry disposition`);
   }
@@ -801,9 +920,14 @@ async function main() {
   }
   const recoveryStarted = performance.now();
   const recoveredBacklog = backlogLedger.sweep(BASE_TIME, { dispatchStaleAfterMs: 15 * 60_000 });
-  benchmark.recover_100_stale_dispatches_ms = Number((performance.now() - recoveryStarted).toFixed(3));
-  equal(recoveredBacklog.length, 100, "sweeper recovers a disappeared Cloud Tasks backlog");
-  ok(recoveredBacklog.every((task) => task.state === "pending"), "recovered dispatches are eligible for idempotent redispatch");
+  benchmark.preserve_100_old_dispatches_ms = Number((performance.now() - recoveryStarted).toFixed(3));
+  equal(recoveredBacklog.length, 0, "sweeper does not infer missing Cloud Tasks from dispatch age");
+  ok(
+    backlogLedger.allTasks().every(
+      (task) => task.state === "dispatched" && task.dispatchGeneration === 1
+    ),
+    "old live dispatches preserve their envelope identity and generation"
+  );
 
   benchmark.single_task_latency_ms = Number(singleTaskLatencyMs.toFixed(3));
   benchmark.duplicate_delivery_rate = `${normalLedger.metrics().duplicateDeliveries}/1 replayed delivery`;

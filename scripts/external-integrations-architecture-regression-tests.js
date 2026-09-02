@@ -14,6 +14,14 @@ const sourceFactContracts = read("lib/integrations/contracts/source-facts.ts");
 const intelligenceContracts = read("lib/integrations/contracts/intelligence.ts");
 const versionContracts = read("lib/integrations/contracts/versions.ts");
 const packageJson = JSON.parse(read("package.json"));
+const ciWorkflow = read(".github/workflows/ci.yml");
+const databaseTestRunner = read("scripts/run-isolated-database-tests.js");
+const zeroBasedUpgradeRunner = read(
+  "scripts/run-phase8b-zero-based-delivery-migration-tests.js"
+);
+const zeroBasedFixture = read(
+  "supabase/tests/fixtures/external_integrations_phase_8b_zero_based_legacy.sql"
+);
 
 let assertionCount = 0;
 function ok(value, message) {
@@ -151,6 +159,71 @@ equal(
   "node scripts/external-integrations-phase-8a0-contract-convergence-regression-tests.js",
   "Phase 8A.0 contract-convergence regression script must be registered"
 );
+equal(
+  packageJson.scripts["test:external-integrations-phase-8b"],
+  "node scripts/external-integrations-phase-8b-qbo-sandbox-regression-tests.js",
+  "Phase 8B QBO sandbox regression script must be registered"
+);
+matches(
+  ciWorkflow,
+  /external_integrations_phase_8b_zero_based_delivery_clean\.test\.sql/,
+  "CI must exercise the clean zero-based migration path"
+);
+matches(
+  ciWorkflow,
+  /external_integrations_phase_8b_credential_binding_canary\.test\.sql/,
+  "CI must exercise the credential-binding incident recovery and exact canary path"
+);
+matches(
+  ciWorkflow,
+  /external_integrations_phase_8b_credential_lineage_recovery\.test\.sql/,
+  "CI must exercise historical/current credential-lineage recovery fencing"
+);
+matches(
+  ciWorkflow,
+  /external_integrations_phase_8b_precontract_retirement\.test\.sql/,
+  "CI must exercise exact pre-contract task retirement and replacement planning"
+);
+matches(
+  ciWorkflow,
+  /external_integrations_phase_8b_provider_result_evidence\.test\.sql/,
+  "CI must exercise task-bound provider and parser evidence with exact A/R recovery"
+);
+matches(
+  ciWorkflow,
+  /node scripts\/run-phase8b-zero-based-delivery-migration-tests\.js/,
+  "CI must exercise the fixture-rich zero-based upgrade path"
+);
+matches(
+  databaseTestRunner,
+  /external_integrations_phase_8b_zero_based_delivery_upgrade\.test\.sql/,
+  "the fixture-rich suite must retain the hosted/local database role adapter"
+);
+matches(
+  zeroBasedUpgradeRunner,
+  /const fixtureBaseVersion = "20260824083917";[\s\S]*const zeroBasedVersion = "20260824193332";[\s\S]*const retryExecutionVersion = "20260824233000";[\s\S]*const recoveryLifecycleVersion = "20260825180000";[\s\S]*const scopedRetryLifecycleVersion = "20260825190000";[\s\S]*const credentialBindingVersion = "20260826043610";[\s\S]*const credentialBindingCanaryVersion = "20260826090000";[\s\S]*const credentialLineageVersion = "20260826120000";[\s\S]*const precontractRetirementVersion = "20260826190801";[\s\S]*const providerResultEvidenceVersion = "20260826222000";[\s\S]*const productionConvergenceVersion = "20260827033058";[\s\S]*const targetVersion = "20260902191322";[\s\S]*"db",[\s\S]*"reset",[\s\S]*"--version",[\s\S]*fixtureBaseVersion/,
+  "the fixture-rich runner must reset to the exact pre-migration boundary"
+);
+matches(
+  zeroBasedUpgradeRunner,
+  /run\(cli, \["migration", "up", "--local"\]\)/,
+  "the fixture-rich runner must apply the ordered zero-based and retry-identity migrations"
+);
+matches(
+  zeroBasedUpgradeRunner,
+  /external_integrations_phase_6_durable_runtime\.test\.sql[\s\S]*external_integrations_phase_8b_credential_refresh_recovery\.test\.sql[\s\S]*external_integrations_phase_8b_same_generation_reauthorization\.test\.sql[\s\S]*external_integrations_phase_8b_credential_binding_canary\.test\.sql[\s\S]*external_integrations_phase_8b_credential_lineage_recovery\.test\.sql[\s\S]*external_integrations_phase_8b_precontract_retirement\.test\.sql[\s\S]*external_integrations_phase_8b_provider_result_evidence\.test\.sql[\s\S]*external_integrations_qbo_production_convergence\.test\.sql/,
+  "the fixture-rich runner must prove Phase 6 concurrency, retry compatibility, purchase recovery, and canary isolation together"
+);
+matches(
+  zeroBasedFixture,
+  /'sandbox', 'leased', 1[\s\S]*'sandbox', 'leased', 2[\s\S]*'sandbox', 'pending', 3/,
+  "the fixture must preserve the exact sandbox 2-leased/1-pending shape"
+);
+matches(
+  zeroBasedFixture,
+  /'production', 'leased', 4[\s\S]*'production', 'leased', 5[\s\S]*'production', 'pending', 6/,
+  "the fixture must preserve the exact production-labelled 2-leased/1-pending shape"
+);
 
 const protectedDiff = childProcess.execFileSync(
   "git",
@@ -158,6 +231,13 @@ const protectedDiff = childProcess.execFileSync(
   { cwd: root, encoding: "utf8" }
 ).trim();
 const approvedProtectedPaths = new Set([
+  "app/app/settings/page.tsx",
+  "app/api/integrations/qbo/connect/route.ts",
+  "app/api/integrations/qbo/disconnect/route.ts",
+  "app/api/integrations/qbo/reauthorize/route.ts",
+  "app/app/settings/integrations/quickbooks/disconnect/page.tsx",
+  "components/integrations/ConnectionStatusPanel.tsx",
+  "components/operations/StatusBadge.tsx",
   "lib/supabase/types.ts",
   "supabase/migrations/20260820233007_external_integrations_phase_1_canonical_foundation.sql",
   "supabase/tests/external_integrations_phase_1_canonical_foundation.test.sql",
@@ -172,7 +252,79 @@ const approvedProtectedPaths = new Set([
   "supabase/migrations/20260822012253_external_integrations_phase_6_durable_runtime.sql",
   "supabase/tests/external_integrations_phase_6_durable_runtime.test.sql",
   "supabase/migrations/20260822035335_external_integrations_phase_8a0_provider_contract_convergence.sql",
-  "supabase/tests/external_integrations_phase_8a0_contract_convergence.test.sql"
+  "supabase/tests/external_integrations_phase_8a0_contract_convergence.test.sql",
+  "supabase/migrations/20260823042718_external_integrations_phase_8b_qbo_sandbox_validation.sql",
+  "supabase/migrations/20260823111004_scope_qbo_sandbox_dispatch_candidates.sql",
+  "supabase/migrations/20260823113832_qbo_sandbox_scoped_dispatch_recovery.sql",
+  "supabase/migrations/20260823115807_reserve_qbo_sandbox_scoped_dispatch.sql",
+  "supabase/migrations/20260823121454_qbo_sandbox_dispatch_run_lock.sql",
+  "supabase/migrations/20260823205806_qbo_sandbox_credential_refresh_recovery.sql",
+  "supabase/migrations/20260824071101_qbo_sandbox_same_generation_reauthorization.sql",
+  "supabase/migrations/20260824083917_qbo_sandbox_expired_refresh_lease_reclamation.sql",
+  "supabase/migrations/20260824193332_qbo_cloud_tasks_zero_based_delivery.sql",
+  "supabase/migrations/20260824233000_qbo_retry_execution_and_reauthorization_recovery.sql",
+  "supabase/migrations/20260825180000_qbo_reauthorization_required_lifecycle.sql",
+  "supabase/migrations/20260825190000_qbo_scoped_dispatch_retry_lifecycle.sql",
+  "supabase/migrations/20260826043610_qbo_credential_envelope_binding_convergence.sql",
+  "supabase/migrations/20260826090000_qbo_credential_envelope_binding_incident_canary.sql",
+  "supabase/migrations/20260826120000_qbo_credential_lineage_incident_recovery.sql",
+  "supabase/migrations/20260826190801_qbo_precontract_initialization_retirement.sql",
+  "supabase/migrations/20260826222000_qbo_provider_result_evidence_and_ar_aging_recovery.sql",
+  "supabase/migrations/20260827033058_qbo_production_convergence.sql",
+  "supabase/migrations/20260902191322_qbo_production_dormant_connection_gate.sql",
+  "supabase/tests/external_integrations_phase_8b_qbo_sandbox_validation.test.sql",
+  "supabase/tests/external_integrations_phase_8b_credential_refresh_recovery.test.sql",
+  "supabase/tests/external_integrations_phase_8b_same_generation_reauthorization.test.sql",
+  "supabase/tests/external_integrations_phase_8b_expired_refresh_lease_reclamation.test.sql",
+  "supabase/tests/external_integrations_phase_8b_zero_based_delivery_clean.test.sql",
+  "supabase/tests/external_integrations_phase_8b_zero_based_delivery_upgrade.test.sql",
+  "supabase/tests/external_integrations_phase_8b_credential_binding_canary.test.sql",
+  "supabase/tests/external_integrations_phase_8b_credential_lineage_recovery.test.sql",
+  "supabase/tests/external_integrations_phase_8b_precontract_retirement.test.sql",
+  "supabase/tests/external_integrations_phase_8b_provider_result_evidence.test.sql",
+  "supabase/tests/external_integrations_qbo_production_convergence.test.sql",
+  "lib/integrations/control-plane/qbo-precontract-retirement.ts",
+  "supabase/tests/fixtures/external_integrations_phase_8b_zero_based_legacy.sql",
+  "services/external-integrations-qbo-sandbox/Dockerfile",
+  "services/external-integrations-qbo-sandbox/package.json",
+  "services/external-integrations-qbo-sandbox/edge/callback.go",
+  "services/external-integrations-qbo-sandbox/edge/callback_test.go",
+  "services/external-integrations-qbo-sandbox/edge/cloudbuild.yaml",
+  "services/external-integrations-qbo-sandbox/edge/go.mod",
+  "services/external-integrations-qbo-sandbox/edge/go.sum",
+  "services/external-integrations-qbo-sandbox/edge/lb-traffic-extension.yaml",
+  "services/external-integrations-qbo-sandbox/edge/package/Dockerfile",
+  "services/external-integrations-qbo-sandbox/edge/plugin/main.go",
+  "services/external-integrations-qbo-sandbox/ops/build-oauth-callback-edge.sh",
+  "services/external-integrations-qbo-sandbox/ops/cleanup-oauth-callback-edge.sh",
+  "services/external-integrations-qbo-sandbox/ops/provision-oauth-callback-edge.sh",
+  "services/external-integrations-qbo-sandbox/ops/provision-qbo-canary.sh",
+  "services/external-integrations-qbo-sandbox/ops/verify-oauth-callback-edge.sh",
+  "services/external-integrations-qbo-sandbox/src/cloud-task-delivery.ts",
+  "services/external-integrations-qbo-sandbox/src/database.ts",
+  "services/external-integrations-qbo-sandbox/src/google.ts",
+  "services/external-integrations-qbo-sandbox/src/server.ts",
+  "services/external-integrations-qbo/Dockerfile",
+  "services/external-integrations-qbo/cloudbuild.yaml",
+  "services/external-integrations-qbo/edge/callback.go",
+  "services/external-integrations-qbo/edge/callback_test.go",
+  "services/external-integrations-qbo/edge/cloudbuild.yaml",
+  "services/external-integrations-qbo/edge/go.mod",
+  "services/external-integrations-qbo/edge/go.sum",
+  "services/external-integrations-qbo/edge/package/Dockerfile",
+  "services/external-integrations-qbo/edge/plugin/main.go",
+  "services/external-integrations-qbo/infra/.terraform.lock.hcl",
+  "services/external-integrations-qbo/infra/README.md",
+  "services/external-integrations-qbo/infra/main.tf",
+  "services/external-integrations-qbo/infra/outputs.tf",
+  "services/external-integrations-qbo/infra/variables.tf",
+  "services/external-integrations-qbo/infra/versions.tf",
+  "services/external-integrations-qbo/package.json",
+  "services/external-integrations-qbo/src/cloud-task-delivery.ts",
+  "services/external-integrations-qbo/src/database.ts",
+  "services/external-integrations-qbo/src/executor.ts",
+  "services/external-integrations-qbo/src/google.ts",
+  "services/external-integrations-qbo/src/server.ts"
 ]);
 const unexpectedProtectedDiff = protectedDiff
   .split("\n")
@@ -182,7 +334,7 @@ const unexpectedProtectedDiff = protectedDiff
 equal(
   unexpectedProtectedDiff,
   "",
-  "Phase 0 through Phase 6 must not change routes, UI, provider infrastructure, or deployment files"
+  "external-integration phases may change only registered migrations, tests, UI surfaces, and reviewed runtime services"
 );
 
 const untrackedMigrations = childProcess.execFileSync(
@@ -198,7 +350,7 @@ const unexpectedUntrackedMigrations = untrackedMigrations
 equal(
   unexpectedUntrackedMigrations,
   "",
-  "only the approved Phase 1 through Phase 6 and Phase 8A.0 migrations may extend the Phase 0 baseline"
+  "only approved external-integration migrations may extend the Phase 0 baseline"
 );
 
 console.log(`External integration Phase 0 architecture regressions: ${assertionCount} assertions passed.`);

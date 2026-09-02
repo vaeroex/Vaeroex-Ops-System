@@ -10,6 +10,10 @@ import {
   type QboProviderMetadata,
   type QboSupportedObjectType
 } from "@/lib/integrations/providers/qbo/contracts";
+import {
+  PersistedExchangeRateSchema,
+  PersistedFactDecimalSchema
+} from "@/lib/integrations/contracts/primitives";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -68,30 +72,48 @@ function optionalDate(record: JsonRecord, key: string) {
   return value;
 }
 
-function normalizeDecimalText(value: string, field: string, allowNegative: boolean) {
+function normalizeDecimalText(
+  value: string,
+  field: string,
+  allowNegative: boolean,
+  kind: "fact" | "exchange_rate" = "fact"
+) {
   const trimmed = value.trim();
   if (!/^-?(?:0|[1-9]\d*)(?:\.\d+)?$/.test(trimmed)) fail(field);
   if (!allowNegative && trimmed.startsWith("-")) fail(field);
   const negative = trimmed.startsWith("-");
   const unsigned = negative ? trimmed.slice(1) : trimmed;
   const [integerPart, fractionPart = ""] = unsigned.split(".");
-  const normalizedInteger = String(Number.parseInt(integerPart, 10));
+  const normalizedInteger = integerPart;
   const normalizedFraction = fractionPart.replace(/0+$/, "");
   const normalized = normalizedFraction === "" ? normalizedInteger : `${normalizedInteger}.${normalizedFraction}`;
-  return normalized === "0" ? "0" : `${negative ? "-" : ""}${normalized}`;
+  const canonical = normalized === "0" ? "0" : `${negative ? "-" : ""}${normalized}`;
+  try {
+    return kind === "exchange_rate"
+      ? PersistedExchangeRateSchema.parse(canonical)
+      : PersistedFactDecimalSchema.parse(canonical);
+  } catch {
+    fail(field);
+  }
 }
 
-function optionalDecimal(record: JsonRecord, key: string, options: { allowNegative: boolean }) {
+function optionalDecimal(
+  record: JsonRecord,
+  key: string,
+  options: { allowNegative: boolean; kind?: "fact" | "exchange_rate" }
+) {
   const value = record[key];
   if (value === undefined || value === null || value === "") return null;
   if (typeof value === "number") {
-    if (!Number.isFinite(value) || Object.is(value, -0)) fail(key);
+    if (!Number.isSafeInteger(value) || Object.is(value, -0)) {
+      fail(key);
+    }
     const text = String(value);
     if (text.includes("e") || text.includes("E")) fail(key);
-    return normalizeDecimalText(text, key, options.allowNegative);
+    return normalizeDecimalText(text, key, options.allowNegative, options.kind);
   }
   if (typeof value !== "string") fail(key);
-  return normalizeDecimalText(value, key, options.allowNegative);
+  return normalizeDecimalText(value, key, options.allowNegative, options.kind);
 }
 
 function requiredCurrency(record: JsonRecord, key: string) {
@@ -239,7 +261,10 @@ function transactionAccounting(raw: JsonRecord) {
     basis: "unknown" as const,
     sourceCurrency: currency,
     homeCurrency: optionalCurrency(raw, "HomeCurrencyRef"),
-    exchangeRate: optionalDecimal(raw, "ExchangeRate", { allowNegative: false })
+    exchangeRate: optionalDecimal(raw, "ExchangeRate", {
+      allowNegative: false,
+      kind: "exchange_rate"
+    })
   };
 }
 
@@ -277,6 +302,12 @@ function buildProjection(
     "ExpenseAccountRef",
     "AssetAccountRef"
   ]);
+  if (recordType === "Account") {
+    const accountType = optionalString(raw, "AccountType");
+    if (accountType !== null) {
+      commonRelationships.AccountType = { value: accountType, name: null };
+    }
+  }
 
   const minimized = {
     contractVersion: QBO_SOURCE_RECORD_CONTRACT_VERSION,

@@ -1,4 +1,6 @@
-import { randomUUID } from "node:crypto";
+import { randomUUID, timingSafeEqual } from "node:crypto";
+
+import { z } from "zod";
 
 import { canonicalContractJson, contractSha256 } from "@/lib/integrations/contracts/canonical";
 import {
@@ -7,29 +9,50 @@ import {
   CREDENTIAL_SECURITY_CONTRACT_VERSIONS,
   CompleteCredentialRevocationCommandSchema,
   CompleteRefreshFailureCommandSchema,
+  ConsumeReauthorizationStateCommandSchema,
   ConsumeOAuthStateCommandSchema,
   CredentialAadContextSchema,
   CredentialEnvelopeSchema,
   CredentialMutationResultSchema,
+  CredentialRefreshDiagnosticsSchema,
+  ExpiredRefreshLeaseReclamationResultSchema,
+  CredentialRefreshBoundaryEventSchema,
+  CredentialRefreshResultSchema,
+  CredentialReauthorizationResultSchema,
   DestroyCredentialCommandSchema,
   OAuthStateConsumeResultSchema,
+  PHASE_5_DIRECT_KMS_MAX_PLAINTEXT_BYTES,
   PHASE_5_REFRESH_LEASE_SECONDS,
+  PHASE_8B_REAUTHORIZATION_REDIRECT_URI,
+  PHASE_8B_REAUTHORIZATION_RETURN_INTENT,
+  ProviderCredentialReadDiagnosticClassSchema,
   ProviderCredentialReadResultSchema,
   ReadProviderCredentialCommandSchema,
+  RecordProviderCredentialReadFailureCommandSchema,
+  ReclaimExpiredRefreshLeaseCommandSchema,
   RefreshLeaseResultSchema,
+  ReauthorizationStateConsumeResultSchema,
   RevokeCredentialCommandSchema,
   RotateCredentialCommandSchema,
   StoreCredentialCommandSchema,
+  StoreReauthorizedCredentialCommandSchema,
   type AcquireRefreshLeaseCommand,
   type AuthorizationAuditEvent,
   type CompleteCredentialRevocationCommand,
-  type CompleteRefreshFailureCommand,
   type CreateOAuthStateCommand,
+  type CreateReauthorizationStateCommand,
+  type CompleteRefreshFailureCommand,
+  type CredentialRefreshBoundaryEvent,
+  type CredentialRefreshBoundaryReporter,
   type DestroyCredentialCommand,
+  type ProviderCredentialReadDiagnosticClass,
   type ReadProviderCredentialCommand,
+  type RecordProviderCredentialReadFailureCommand,
+  type ReclaimExpiredRefreshLeaseCommand,
   type RevokeCredentialCommand,
   type RotateCredentialCommand,
-  type StoreCredentialCommand
+  type StoreCredentialCommand,
+  type StoreReauthorizedCredentialCommand
 } from "@/lib/integrations/credentials/contracts";
 import {
   credentialAad,
@@ -38,22 +61,50 @@ import {
 } from "@/lib/integrations/credentials/kms";
 import {
   createOAuthStateIntent,
+  createReauthorizationStateIntent,
   oauthStateHash,
+  reauthorizationStateHash,
   sortedCredentialScopes
 } from "@/lib/integrations/credentials/oauth-state";
+import { ProviderCredentialRefreshFailure } from "@/lib/integrations/credentials/provider-failure";
 import { safeCredentialBrokerError } from "@/lib/integrations/credentials/redaction";
 import type { ProviderApplicationSecret } from "@/lib/integrations/credentials/secret-manager";
 import { SyntheticProviderFailure } from "@/lib/integrations/credentials/synthetic-provider";
+import {
+  BoundedIdentifierSchema,
+  BoundedLabelSchema,
+  IsoTimestampSchema,
+  ProviderEnvironmentKeySchema,
+  ProviderKeySchema,
+  Sha256FingerprintSchema
+} from "@/lib/integrations/contracts/primitives";
 
 export type CredentialBrokerStore = Readonly<{
   createOAuthState(command: CreateOAuthStateCommand, requestId: string): PromiseLike<unknown>;
   consumeOAuthState(command: unknown, requestId: string): PromiseLike<unknown>;
   storeCredential(command: StoreCredentialCommand, requestId: string): PromiseLike<unknown>;
+  createReauthorizationState(
+    command: CreateReauthorizationStateCommand,
+    requestId: string
+  ): PromiseLike<unknown>;
+  consumeReauthorizationState(command: unknown, requestId: string): PromiseLike<unknown>;
+  storeReauthorizedCredential(
+    command: StoreReauthorizedCredentialCommand,
+    requestId: string
+  ): PromiseLike<unknown>;
   readProviderCredential(
     command: ReadProviderCredentialCommand,
     requestId: string
   ): PromiseLike<unknown>;
+  recordProviderCredentialReadFailure(
+    command: RecordProviderCredentialReadFailureCommand,
+    requestId: string
+  ): PromiseLike<unknown>;
   acquireRefreshLease(command: AcquireRefreshLeaseCommand, requestId: string): PromiseLike<unknown>;
+  reclaimExpiredRefreshLease(
+    command: ReclaimExpiredRefreshLeaseCommand,
+    requestId: string
+  ): PromiseLike<unknown>;
   rotateCredential(command: RotateCredentialCommand, requestId: string): PromiseLike<unknown>;
   completeRefreshFailure(
     command: CompleteRefreshFailureCommand,
@@ -66,6 +117,10 @@ export type CredentialBrokerStore = Readonly<{
   ): PromiseLike<unknown>;
   destroyCredential(command: DestroyCredentialCommand, requestId: string): PromiseLike<unknown>;
   recordAuthorizationEvent(event: AuthorizationAuditEvent, requestId: string): PromiseLike<unknown>;
+  recordRefreshBoundaryEvent(
+    event: CredentialRefreshBoundaryEvent,
+    requestId: string
+  ): PromiseLike<unknown>;
 }>;
 
 export class ProviderAccessCredential {
@@ -119,6 +174,18 @@ export class ProviderAccessCredential {
   }
 }
 
+export class ProviderCredentialReadFailure extends Error {
+  readonly diagnosticClass: ProviderCredentialReadDiagnosticClass;
+
+  constructor(diagnosticClass: ProviderCredentialReadDiagnosticClass) {
+    super(safeCredentialBrokerError("credential_read_failed"));
+    this.name = "ProviderCredentialReadFailure";
+    this.diagnosticClass = ProviderCredentialReadDiagnosticClassSchema.parse(
+      diagnosticClass
+    );
+  }
+}
+
 export type ProviderSecretStore = Readonly<{
   access(providerKey: string, environment: string): PromiseLike<ProviderApplicationSecret>;
 }>;
@@ -126,8 +193,11 @@ export type ProviderSecretStore = Readonly<{
 export type OAuthCredentialProvider = Readonly<{
   providerKey: string;
   environment: string;
+  refreshTokenRotationPolicy: "must_rotate" | "returned_token_authoritative";
+  tokenType: "bearer";
   exchangeAuthorizationCode(input: {
     authorizationCode: string;
+    externalAuthorizedEntityReference?: string | null;
     applicationSecret: ProviderApplicationSecret;
     requestedScopes: readonly string[];
     now: Date;
@@ -136,11 +206,28 @@ export type OAuthCredentialProvider = Readonly<{
     credential: ReturnType<typeof CredentialEnvelopeSchema.parse>;
     applicationSecret: ProviderApplicationSecret;
     now: Date;
+    reportBoundary?: CredentialRefreshBoundaryReporter;
   }): PromiseLike<unknown>;
   revokeCredential(input: {
     credential: ReturnType<typeof CredentialEnvelopeSchema.parse>;
     applicationSecret: ProviderApplicationSecret;
   }): PromiseLike<unknown>;
+}>;
+
+export const AuthorizedProviderEntityEvidenceSchema = z
+  .object({
+    externalAuthorizedEntityReference: BoundedIdentifierSchema,
+    providerEntityType: BoundedIdentifierSchema,
+    safeDisplayName: BoundedLabelSchema,
+    verificationFingerprint: Sha256FingerprintSchema
+  })
+  .strict();
+
+export type AuthorizedProviderEntityVerifier = Readonly<{
+  verify(input: Readonly<{
+    externalAuthorizedEntityReference: string;
+    credential: ProviderAccessCredential;
+  }>): PromiseLike<unknown>;
 }>;
 
 function externalEntityReferenceFingerprint(value: string | null) {
@@ -153,10 +240,130 @@ function externalEntityReferenceFingerprint(value: string | null) {
       });
 }
 
+const credentialEnvelopeKeys = [
+  "schemaVersion",
+  "providerKey",
+  "environment",
+  "externalAuthorizedEntityReference",
+  "accessToken",
+  "accessExpiresAt",
+  "refreshToken",
+  "refreshExpiresAt",
+  "grantedScopes",
+  "issuedAt",
+  "updatedAt"
+] as const;
+
+function credentialEnvelopeDiagnosticClass(
+  value: unknown
+): ProviderCredentialReadDiagnosticClass {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    return "unknown_missing_field_contract";
+  }
+  const record = value as Record<string, unknown>;
+  if (!("refreshToken" in record)) return "refresh_token_presence";
+  const keys = Object.keys(record).sort();
+  if (
+    keys.length !== credentialEnvelopeKeys.length ||
+    credentialEnvelopeKeys.some((key) => !keys.includes(key))
+  ) {
+    return "unknown_missing_field_contract";
+  }
+  if (
+    record.schemaVersion !==
+    CREDENTIAL_SECURITY_CONTRACT_VERSIONS.credentialEnvelope
+  ) {
+    return "envelope_version";
+  }
+  if (!ProviderKeySchema.safeParse(record.providerKey).success) {
+    return "provider_key";
+  }
+  if (!ProviderEnvironmentKeySchema.safeParse(record.environment).success) {
+    return "provider_environment";
+  }
+  const grantedScopes = record.grantedScopes;
+  if (
+    !Array.isArray(grantedScopes) ||
+    grantedScopes.some((scope) => typeof scope !== "string") ||
+    grantedScopes.length === 0 ||
+    new Set(grantedScopes).size !== grantedScopes.length ||
+    [...grantedScopes]
+      .sort()
+      .some((scope, index) => scope !== grantedScopes[index])
+  ) {
+    return "scope_shape";
+  }
+  if (
+    typeof record.accessToken !== "string" ||
+    record.accessToken.length < 16 ||
+    record.accessToken.length > 16_384
+  ) {
+    return "token_shape";
+  }
+  if (
+    typeof record.refreshToken !== "string" ||
+    record.refreshToken.length < 16 ||
+    record.refreshToken.length > 16_384
+  ) {
+    return "refresh_token_presence";
+  }
+  if (
+    !IsoTimestampSchema.safeParse(record.accessExpiresAt).success ||
+    (record.refreshExpiresAt !== null &&
+      !IsoTimestampSchema.safeParse(record.refreshExpiresAt).success) ||
+    !IsoTimestampSchema.safeParse(record.issuedAt).success ||
+    !IsoTimestampSchema.safeParse(record.updatedAt).success
+  ) {
+    return "expires_at_shape";
+  }
+  return "unknown_missing_field_contract";
+}
+
+function parseCredentialEnvelopeForRead(plaintext: Buffer) {
+  let value: unknown;
+  try {
+    value = JSON.parse(plaintext.toString("utf8"));
+  } catch {
+    throw new ProviderCredentialReadFailure(
+      "unknown_missing_field_contract"
+    );
+  }
+  const parsed = CredentialEnvelopeSchema.safeParse(value);
+  if (!parsed.success) {
+    throw new ProviderCredentialReadFailure(
+      credentialEnvelopeDiagnosticClass(value)
+    );
+  }
+  return parsed.data;
+}
+
+function credentialLifetimeMilliseconds(expiresAt: string, updatedAt: string) {
+  return Date.parse(expiresAt) - Date.parse(updatedAt);
+}
+
+function exactScopeSet(left: readonly string[], right: readonly string[]) {
+  return (
+    left.length === right.length &&
+    left.every((scope, index) => scope === right[index])
+  );
+}
+
 function credentialFailureReason(error: unknown) {
+  if (error instanceof ProviderCredentialRefreshFailure) return error.code;
   if (error instanceof SyntheticProviderFailure) return error.code;
   if (error instanceof Error && error.message.includes("kms")) return "kms_failure";
   return "integrity_failure";
+}
+
+function credentialSecretEqual(left: string, right: string) {
+  const leftBytes = Buffer.from(left, "utf8");
+  const rightBytes = Buffer.from(right, "utf8");
+  try {
+    return leftBytes.byteLength === rightBytes.byteLength && timingSafeEqual(leftBytes, rightBytes);
+  } finally {
+    leftBytes.fill(0);
+    rightBytes.fill(0);
+  }
 }
 
 export class IntegrationCredentialBroker {
@@ -165,6 +372,7 @@ export class IntegrationCredentialBroker {
   readonly #kmsKeyResource: string;
   readonly #secrets: ProviderSecretStore;
   readonly #provider: OAuthCredentialProvider;
+  readonly #authorizedEntityVerifier: AuthorizedProviderEntityVerifier | null;
   readonly #clock: () => Date;
 
   constructor(input: {
@@ -173,6 +381,7 @@ export class IntegrationCredentialBroker {
     kmsKeyResource: string;
     secrets: ProviderSecretStore;
     provider: OAuthCredentialProvider;
+    authorizedEntityVerifier?: AuthorizedProviderEntityVerifier;
     clock?: () => Date;
   }) {
     this.#store = input.store;
@@ -180,6 +389,7 @@ export class IntegrationCredentialBroker {
     this.#kmsKeyResource = input.kmsKeyResource;
     this.#secrets = input.secrets;
     this.#provider = input.provider;
+    this.#authorizedEntityVerifier = input.authorizedEntityVerifier ?? null;
     this.#clock = input.clock ?? (() => new Date());
   }
 
@@ -202,9 +412,41 @@ export class IntegrationCredentialBroker {
     } as const;
   }
 
+  async beginReauthorization(
+    input: Omit<
+      CreateReauthorizationStateCommand,
+      | "contractVersion"
+      | "id"
+      | "stateHash"
+      | "createdAt"
+      | "expiresAt"
+      | "requestedScopes"
+      | "redirectUri"
+      | "returnIntent"
+      | "authorizationPurpose"
+      | "reasonCode"
+    > & {
+      requestedScopes: readonly string[];
+      requestId: string;
+    }
+  ) {
+    const { requestId, ...intent } = input;
+    const created = createReauthorizationStateIntent(intent, this.#clock());
+    const persisted = await this.#store.createReauthorizationState(
+      created.command,
+      requestId
+    );
+    return {
+      state: created.state,
+      expiresAt: created.command.expiresAt,
+      authority: persisted
+    } as const;
+  }
+
   async completeAuthorization(input: {
     state: string;
     authorizationCode: string;
+    externalAuthorizedEntityReference?: string | null;
     workspaceId: string;
     businessEntityId: string;
     connectionId: string;
@@ -240,6 +482,7 @@ export class IntegrationCredentialBroker {
     if (!consumed.accepted) {
       throw new Error(safeCredentialBrokerError("oauth_state_rejected"));
     }
+    const authorizationTime = new Date(consumed.consumedAt);
     let plaintext: Buffer | null = null;
     try {
       if (
@@ -255,9 +498,11 @@ export class IntegrationCredentialBroker {
       const envelope = CredentialEnvelopeSchema.parse(
         await this.#provider.exchangeAuthorizationCode({
           authorizationCode: input.authorizationCode,
+          externalAuthorizedEntityReference:
+            input.externalAuthorizedEntityReference ?? null,
           applicationSecret,
           requestedScopes: consumed.requestedScopes,
-          now
+          now: authorizationTime
         })
       );
       if (
@@ -269,6 +514,10 @@ export class IntegrationCredentialBroker {
       ) {
         throw new Error("authorization_envelope_binding_invalid");
       }
+
+      const authorizedEntity = this.#authorizedEntityVerifier
+        ? await this.#verifyAuthorizedEntity(envelope)
+        : null;
 
       const credentialId = randomUUID();
       const aadContext = CredentialAadContextSchema.parse({
@@ -311,7 +560,7 @@ export class IntegrationCredentialBroker {
         externalEntityReferenceFingerprint: externalEntityReferenceFingerprint(
           envelope.externalAuthorizedEntityReference
         ),
-        authorizedAt: now.toISOString()
+        authorizedAt: consumed.consumedAt
       });
       const result = CredentialMutationResultSchema.parse(
         await this.#store.storeCredential(command, input.storeRequestId)
@@ -320,7 +569,8 @@ export class IntegrationCredentialBroker {
         credentialId: result.credentialId,
         credentialVersion: result.credentialVersion,
         connectionStatus: result.connectionStatus,
-        returnIntent: consumed.returnIntent
+        returnIntent: consumed.returnIntent,
+        authorizedEntity
       } as const;
     } catch (error) {
       await this.#auditAuthorizationFailure(
@@ -332,6 +582,195 @@ export class IntegrationCredentialBroker {
     } finally {
       plaintext?.fill(0);
     }
+  }
+
+  async completeReauthorization(input: {
+    state: string;
+    authorizationCode: string;
+    externalAuthorizedEntityReference: string;
+    workspaceId: string;
+    businessEntityId: string;
+    connectionId: string;
+    connectionGeneration: number;
+    mappingId: string;
+    providerKey: string;
+    providerEnvironment: string;
+    initiatedBy: string;
+    requestedScopes: readonly string[];
+    consumeRequestId: string;
+    storeRequestId: string;
+  }) {
+    const now = this.#clock();
+    const realmFingerprint = externalEntityReferenceFingerprint(
+      input.externalAuthorizedEntityReference
+    );
+    if (realmFingerprint === null) {
+      throw new Error(safeCredentialBrokerError("authorization_failed"));
+    }
+    const consumed = ReauthorizationStateConsumeResultSchema.parse(
+      await this.#store.consumeReauthorizationState(
+        ConsumeReauthorizationStateCommandSchema.parse({
+          workspaceId: input.workspaceId,
+          businessEntityId: input.businessEntityId,
+          connectionId: input.connectionId,
+          connectionGeneration: input.connectionGeneration,
+          mappingId: input.mappingId,
+          providerKey: input.providerKey,
+          providerEnvironment: input.providerEnvironment,
+          initiatedBy: input.initiatedBy,
+          requestedScopes: sortedCredentialScopes(input.requestedScopes),
+          redirectUri: PHASE_8B_REAUTHORIZATION_REDIRECT_URI,
+          returnIntent: PHASE_8B_REAUTHORIZATION_RETURN_INTENT,
+          authorizationPurpose: "reauthorization",
+          reasonCode: "expired_credential_recovery",
+          stateHash: reauthorizationStateHash(input.state),
+          providerEntityReferenceFingerprint: realmFingerprint,
+          consumedAt: now.toISOString()
+        }),
+        input.consumeRequestId
+      )
+    );
+    if (!consumed.accepted) {
+      throw new Error(safeCredentialBrokerError("oauth_state_rejected"));
+    }
+    if (realmFingerprint !== consumed.providerEntityReferenceFingerprint) {
+      throw new Error(safeCredentialBrokerError("authorization_failed"));
+    }
+
+    const authorizationTime = new Date(consumed.consumedAt);
+    let plaintext: Buffer | null = null;
+    try {
+      if (
+        this.#provider.providerKey !== consumed.providerKey ||
+        this.#provider.environment !== consumed.providerEnvironment
+      ) {
+        throw new Error("reauthorization_provider_binding_invalid");
+      }
+      const applicationSecret = await this.#secrets.access(
+        consumed.providerKey,
+        consumed.providerEnvironment
+      );
+      const envelope = CredentialEnvelopeSchema.parse(
+        await this.#provider.exchangeAuthorizationCode({
+          authorizationCode: input.authorizationCode,
+          externalAuthorizedEntityReference:
+            input.externalAuthorizedEntityReference,
+          applicationSecret,
+          requestedScopes: consumed.requestedScopes,
+          now: authorizationTime
+        })
+      );
+      if (
+        envelope.providerKey !== consumed.providerKey ||
+        envelope.environment !== consumed.providerEnvironment ||
+        envelope.externalAuthorizedEntityReference !==
+          input.externalAuthorizedEntityReference ||
+        consumed.requestedScopes.some(
+          (scope) => !envelope.grantedScopes.includes(scope)
+        )
+      ) {
+        throw new Error("reauthorization_envelope_binding_invalid");
+      }
+
+      const authorizedEntity = await this.#verifyAuthorizedEntity(envelope);
+      if (
+        authorizedEntity.providerEntityType !== "company" ||
+        authorizedEntity.externalAuthorizedEntityReference !==
+          input.externalAuthorizedEntityReference
+      ) {
+        throw new Error("reauthorization_mapping_evidence_invalid");
+      }
+
+      const credentialId = randomUUID();
+      const aadContext = CredentialAadContextSchema.parse({
+        schemaVersion: CREDENTIAL_SECURITY_CONTRACT_VERSIONS.credentialAad,
+        purpose: "provider_oauth_credential",
+        environment: consumed.providerEnvironment,
+        workspaceId: consumed.workspaceId,
+        connectionId: consumed.connectionId,
+        connectionGeneration: consumed.connectionGeneration,
+        providerKey: consumed.providerKey,
+        credentialId
+      });
+      plaintext = Buffer.from(canonicalContractJson(envelope), "utf8");
+      const ciphertext = await this.#kms.encrypt({
+        keyResource: this.#kmsKeyResource,
+        plaintext,
+        additionalAuthenticatedData: credentialAad(aadContext)
+      });
+      const command = StoreReauthorizedCredentialCommandSchema.parse({
+        contractVersion:
+          CREDENTIAL_SECURITY_CONTRACT_VERSIONS.credentialReauthorization,
+        id: credentialId,
+        reauthorizationStateId: consumed.stateId,
+        workspaceId: consumed.workspaceId,
+        businessEntityId: consumed.businessEntityId,
+        connectionId: consumed.connectionId,
+        connectionGeneration: consumed.connectionGeneration,
+        mappingId: consumed.mappingId,
+        providerKey: consumed.providerKey,
+        providerEnvironment: consumed.providerEnvironment,
+        initiatedBy: input.initiatedBy,
+        envelopeSchemaVersion:
+          CREDENTIAL_SECURITY_CONTRACT_VERSIONS.credentialEnvelope,
+        aadSchemaVersion: CREDENTIAL_SECURITY_CONTRACT_VERSIONS.credentialAad,
+        aadDigest: credentialAadDigest(aadContext),
+        kmsKeyResource: this.#kmsKeyResource,
+        ciphertextBase64: Buffer.from(ciphertext).toString("base64"),
+        accessExpiresAt: envelope.accessExpiresAt,
+        refreshExpiresAt: envelope.refreshExpiresAt,
+        grantedScopes: envelope.grantedScopes,
+        externalEntityReferenceFingerprint: realmFingerprint,
+        mappingRevalidationFingerprint:
+          authorizedEntity.verificationFingerprint,
+        reauthorizedAt: consumed.consumedAt
+      });
+      const result = CredentialReauthorizationResultSchema.parse(
+        await this.#store.storeReauthorizedCredential(
+          command,
+          input.storeRequestId
+        )
+      );
+      return {
+        ...result,
+        returnIntent: consumed.returnIntent,
+        authorizedEntity
+      } as const;
+    } catch (error) {
+      await this.#auditAuthorizationFailure(
+        input,
+        credentialFailureReason(error),
+        now.toISOString()
+      );
+      throw new Error(safeCredentialBrokerError("authorization_failed"));
+    } finally {
+      plaintext?.fill(0);
+    }
+  }
+
+  async #verifyAuthorizedEntity(
+    envelope: ReturnType<typeof CredentialEnvelopeSchema.parse>
+  ) {
+    const externalReference = envelope.externalAuthorizedEntityReference;
+    if (externalReference === null || this.#authorizedEntityVerifier === null) {
+      throw new Error("authorization_entity_reference_missing");
+    }
+    const evidence = AuthorizedProviderEntityEvidenceSchema.parse(
+      await this.#authorizedEntityVerifier.verify({
+        externalAuthorizedEntityReference: externalReference,
+        credential: new ProviderAccessCredential({
+          providerKey: envelope.providerKey,
+          providerEnvironment: envelope.environment,
+          accessExpiresAt: envelope.accessExpiresAt,
+          grantedScopes: envelope.grantedScopes,
+          accessToken: envelope.accessToken
+        })
+      })
+    );
+    if (evidence.externalAuthorizedEntityReference !== externalReference) {
+      throw new Error("authorization_entity_reference_mismatch");
+    }
+    return evidence;
   }
 
   async refreshCredential(input: {
@@ -374,16 +813,48 @@ export class IntegrationCredentialBroker {
       )
     );
     if (!acquired.acquired) {
-      return {
+      if (acquired.reasonCode === "refresh_lease_held") {
+        return CredentialRefreshResultSchema.parse({
+          state: "refresh_in_progress",
+          refreshed: false,
+          reasonCode: safeCredentialBrokerError("refresh_not_acquired"),
+          retryAfterSeconds: 5
+        });
+      }
+      if (acquired.reasonCode === "credential_version_stale") {
+        return CredentialRefreshResultSchema.parse({
+          state: "credential_version_superseded",
+          refreshed: false,
+          reasonCode: "credential_version_stale"
+        });
+      }
+      return CredentialRefreshResultSchema.parse({
+        state: "credential_unavailable",
         refreshed: false,
         reasonCode: safeCredentialBrokerError("refresh_not_acquired")
-      } as const;
+      });
     }
 
     let plaintext: Buffer | null = null;
     let nextPlaintext: Buffer | null = null;
+    let refreshDiagnostics: ReturnType<typeof CredentialRefreshDiagnosticsSchema.parse> | null = null;
     let decryptSucceeded = false;
+    let activeStage: CredentialRefreshBoundaryEvent["stage"] = "broker_decrypt";
+    const reportBoundary: CredentialRefreshBoundaryReporter = (event) => {
+      activeStage = event.stage;
+      return this.#recordRefreshBoundary(
+        input,
+        acquired.credentialVersion,
+        leaseId,
+        event
+      );
+    };
     try {
+      await reportBoundary({
+        stage: "broker_decrypt",
+        outcome: "started",
+        reasonCode: "started"
+      });
       if (credentialAadDigest(acquired.aadContext) !== acquired.aadDigest) {
         throw new Error("credential_aad_digest_mismatch");
       }
@@ -395,12 +866,21 @@ export class IntegrationCredentialBroker {
         })
       );
       decryptSucceeded = true;
-      await this.#audit(input, acquired.credentialVersion, {
-        action: "credential_decrypt_attempt",
+      await reportBoundary({
+        stage: "broker_decrypt",
         outcome: "succeeded",
-        reasonCode: "decrypt_succeeded",
-        occurredAt: now.toISOString()
+        reasonCode: "succeeded"
       });
+      try {
+        await this.#audit(input, acquired.credentialVersion, {
+          action: "credential_decrypt_attempt",
+          outcome: "succeeded",
+          reasonCode: "decrypt_succeeded",
+          occurredAt: now.toISOString()
+        });
+      } catch {
+        // Boundary telemetry is independent of the credential lease/CAS transition.
+      }
       const envelope = CredentialEnvelopeSchema.parse(
         JSON.parse(plaintext.toString("utf8"))
       );
@@ -410,18 +890,42 @@ export class IntegrationCredentialBroker {
       ) {
         throw new Error("credential_envelope_binding_invalid");
       }
+      activeStage = "secret_manager_access";
+      await reportBoundary({
+        stage: activeStage,
+        outcome: "started",
+        reasonCode: "started"
+      });
       const secret = await this.#secrets.access(
         envelope.providerKey,
         envelope.environment
       );
+      await reportBoundary({
+        stage: activeStage,
+        outcome: "succeeded",
+        reasonCode: "succeeded"
+      });
       const next = CredentialEnvelopeSchema.parse(
         await this.#provider.refreshCredential({
           credential: envelope,
           applicationSecret: secret,
-          now
+          now,
+          reportBoundary
         })
       );
-      if (next.refreshToken === envelope.refreshToken) {
+      activeStage = "credential_cas";
+      const refreshTokenEqualToPrior = credentialSecretEqual(
+        next.refreshToken,
+        envelope.refreshToken
+      );
+      const accessTokenEqualToPrior = credentialSecretEqual(next.accessToken, envelope.accessToken);
+      const scopeEquivalent =
+        JSON.stringify(sortedCredentialScopes(next.grantedScopes)) ===
+        JSON.stringify(sortedCredentialScopes(envelope.grantedScopes));
+      if (
+        this.#provider.refreshTokenRotationPolicy === "must_rotate" &&
+        refreshTokenEqualToPrior
+      ) {
         throw new Error("credential_refresh_token_not_rotated");
       }
       if (
@@ -432,6 +936,33 @@ export class IntegrationCredentialBroker {
         throw new SyntheticProviderFailure("scope_loss");
       }
       nextPlaintext = Buffer.from(canonicalContractJson(next), "utf8");
+      refreshDiagnostics = CredentialRefreshDiagnosticsSchema.parse({
+        returnedRefreshTokenPresent: next.refreshToken.length > 0,
+        refreshTokenEqualToPrior,
+        accessTokenEqualToPrior,
+        envelopeByteLength: nextPlaintext.byteLength,
+        tokenType: this.#provider.tokenType,
+        scopeEquivalent,
+        accessExpiresInSeconds: Math.max(
+          1,
+          Math.ceil((Date.parse(next.accessExpiresAt) - now.getTime()) / 1_000)
+        ),
+        refreshExpiresInSeconds: next.refreshExpiresAt === null
+          ? null
+          : Math.max(
+              1,
+              Math.ceil((Date.parse(next.refreshExpiresAt) - now.getTime()) / 1_000)
+            )
+      });
+      await reportBoundary({
+        stage: activeStage,
+        outcome: "started",
+        reasonCode: "started",
+        diagnostics: refreshDiagnostics
+      });
+      if (nextPlaintext.byteLength > PHASE_5_DIRECT_KMS_MAX_PLAINTEXT_BYTES) {
+        throw new Error("credential_envelope_plaintext_too_large");
+      }
       const ciphertext = await this.#kms.encrypt({
         keyResource: acquired.kmsKeyResource,
         plaintext: nextPlaintext,
@@ -460,12 +991,28 @@ export class IntegrationCredentialBroker {
       const result = CredentialMutationResultSchema.parse(
         await this.#store.rotateCredential(command, input.rotateRequestId)
       );
-      return {
+      await reportBoundary({
+        stage: activeStage,
+        outcome: "succeeded",
+        reasonCode: "succeeded",
+        diagnostics: refreshDiagnostics
+      });
+      return CredentialRefreshResultSchema.parse({
+        state: "refreshed",
         refreshed: true,
         credentialVersion: result.credentialVersion
-      } as const;
+      });
     } catch (error) {
       const reasonCode = credentialFailureReason(error);
+      await reportBoundary({
+        stage: activeStage,
+        outcome: "failed",
+        reasonCode:
+          activeStage === "broker_decrypt" && reasonCode !== "kms_failure"
+            ? "integrity_failure"
+            : reasonCode,
+        diagnostics: refreshDiagnostics
+      });
       if (!decryptSucceeded) {
         try {
           await this.#audit(input, acquired.credentialVersion, {
@@ -493,17 +1040,55 @@ export class IntegrationCredentialBroker {
       const result = CredentialMutationResultSchema.parse(
         await this.#store.completeRefreshFailure(failure, input.failureRequestId)
       );
-      return {
-        refreshed: false,
-        reasonCode:
-          result.credentialStatus === "reauthorization_required"
-            ? safeCredentialBrokerError("reauthorization_required")
-            : safeCredentialBrokerError("refresh_failed")
-      } as const;
+      return result.credentialStatus === "reauthorization_required"
+        ? CredentialRefreshResultSchema.parse({
+            state: "reauthorization_required",
+            refreshed: false,
+            reasonCode: safeCredentialBrokerError("reauthorization_required")
+          })
+        : CredentialRefreshResultSchema.parse({
+            state: "retry_required",
+            refreshed: false,
+            reasonCode: safeCredentialBrokerError("refresh_failed"),
+            retryAfterSeconds: 15
+          });
     } finally {
       plaintext?.fill(0);
       nextPlaintext?.fill(0);
     }
+  }
+
+  async reclaimExpiredRefreshLease(
+    input: Readonly<{
+      workspaceId: string;
+      businessEntityId: string;
+      connectionId: string;
+      connectionGeneration: number;
+      credentialId: string;
+      expectedCredentialVersion: number;
+      expectedCredentialRowVersion: number;
+      providerKey: string;
+      providerEnvironment: string;
+      requestId: string;
+    }>
+  ) {
+    const command = ReclaimExpiredRefreshLeaseCommandSchema.parse({
+      contractVersion:
+        CREDENTIAL_SECURITY_CONTRACT_VERSIONS.expiredRefreshLeaseReclamation,
+      workspaceId: input.workspaceId,
+      businessEntityId: input.businessEntityId,
+      connectionId: input.connectionId,
+      connectionGeneration: input.connectionGeneration,
+      credentialId: input.credentialId,
+      expectedCredentialVersion: input.expectedCredentialVersion,
+      expectedCredentialRowVersion: input.expectedCredentialRowVersion,
+      providerKey: input.providerKey,
+      providerEnvironment: input.providerEnvironment,
+      reasonCode: "refresh_lease_expired_reclaimed"
+    });
+    return ExpiredRefreshLeaseReclamationResultSchema.parse(
+      await this.#store.reclaimExpiredRefreshLease(command, input.requestId)
+    );
   }
 
   async readProviderAccessCredential(input: {
@@ -516,21 +1101,26 @@ export class IntegrationCredentialBroker {
     requestId: string;
   }) {
     const now = this.#clock();
-    const result = ProviderCredentialReadResultSchema.parse(
-      await this.#store.readProviderCredential(
-        ReadProviderCredentialCommandSchema.parse({
-          contractVersion: CREDENTIAL_SECURITY_CONTRACT_VERSIONS.providerRead,
-          taskId: input.taskId,
-          leaseId: input.leaseId,
-          leaseOwnerFingerprint: input.leaseOwnerFingerprint,
-          expectedCredentialVersion: input.expectedCredentialVersion,
-          requiredScopes: sortedCredentialScopes(input.requiredScopes),
-          minimumValiditySeconds: input.minimumValiditySeconds,
-          requestedAt: now.toISOString()
-        }),
-        input.requestId
-      )
-    );
+    let result: ReturnType<typeof ProviderCredentialReadResultSchema.parse>;
+    try {
+      result = ProviderCredentialReadResultSchema.parse(
+        await this.#store.readProviderCredential(
+          ReadProviderCredentialCommandSchema.parse({
+            contractVersion: CREDENTIAL_SECURITY_CONTRACT_VERSIONS.providerRead,
+            taskId: input.taskId,
+            leaseId: input.leaseId,
+            leaseOwnerFingerprint: input.leaseOwnerFingerprint,
+            expectedCredentialVersion: input.expectedCredentialVersion,
+            requiredScopes: sortedCredentialScopes(input.requiredScopes),
+            minimumValiditySeconds: input.minimumValiditySeconds,
+            requestedAt: now.toISOString()
+          }),
+          input.requestId
+        )
+      );
+    } catch {
+      throw new ProviderCredentialReadFailure("reader_contract");
+    }
     if (result.state !== "available") return result;
 
     let plaintext: Buffer | null = null;
@@ -542,33 +1132,93 @@ export class IntegrationCredentialBroker {
         result.providerEnvironment !== result.aadContext.environment ||
         credentialAadDigest(result.aadContext) !== result.aadDigest
       ) {
-        throw new Error("provider_credential_read_aad_binding_invalid");
+        throw new ProviderCredentialReadFailure("aad_binding");
       }
-      plaintext = Buffer.from(
-        await this.#kms.decrypt({
-          keyResource: result.kmsKeyResource,
-          ciphertext: Buffer.from(result.ciphertextBase64, "base64"),
-          additionalAuthenticatedData: credentialAad(result.aadContext)
-        })
-      );
-      const envelope = CredentialEnvelopeSchema.parse(
-        JSON.parse(plaintext.toString("utf8"))
-      );
+      try {
+        plaintext = Buffer.from(
+          await this.#kms.decrypt({
+            keyResource: result.kmsKeyResource,
+            ciphertext: Buffer.from(result.ciphertextBase64, "base64"),
+            additionalAuthenticatedData: credentialAad(result.aadContext)
+          })
+        );
+      } catch {
+        throw new ProviderCredentialReadFailure("kms_failure");
+      }
+      const envelope = parseCredentialEnvelopeForRead(plaintext);
+      if (envelope.providerKey !== result.providerKey) {
+        throw new ProviderCredentialReadFailure("provider_key");
+      }
+      if (envelope.environment !== result.providerEnvironment) {
+        throw new ProviderCredentialReadFailure("provider_environment");
+      }
       if (
-        envelope.providerKey !== result.providerKey ||
-        envelope.environment !== result.providerEnvironment ||
-        envelope.accessExpiresAt !== result.accessExpiresAt ||
-        result.grantedScopes.some((scope) => !envelope.grantedScopes.includes(scope)) ||
-        input.requiredScopes.some((scope) => !envelope.grantedScopes.includes(scope)) ||
-        Date.parse(envelope.accessExpiresAt) <=
-          now.getTime() + input.minimumValiditySeconds * 1_000
+        !exactScopeSet(envelope.grantedScopes, result.grantedScopes) ||
+        input.requiredScopes.some(
+          (scope) => !envelope.grantedScopes.includes(scope)
+        )
       ) {
-        throw new Error("provider_credential_read_envelope_binding_invalid");
+        throw new ProviderCredentialReadFailure("scope_shape");
+      }
+      if (
+        externalEntityReferenceFingerprint(
+          envelope.externalAuthorizedEntityReference
+        ) !== result.externalEntityReferenceFingerprint
+      ) {
+        throw new ProviderCredentialReadFailure("credential_binding");
+      }
+
+      const databaseAccessLifetime = credentialLifetimeMilliseconds(
+        result.accessExpiresAt,
+        result.ciphertextPersistedAt
+      );
+      const envelopeAccessLifetime = credentialLifetimeMilliseconds(
+        envelope.accessExpiresAt,
+        envelope.updatedAt
+      );
+      const refreshExpiryShapeMatches =
+        (result.refreshExpiresAt === null) ===
+        (envelope.refreshExpiresAt === null);
+      const databaseRefreshLifetime = result.refreshExpiresAt === null
+        ? null
+        : credentialLifetimeMilliseconds(
+            result.refreshExpiresAt,
+            result.ciphertextPersistedAt
+          );
+      const envelopeRefreshLifetime = envelope.refreshExpiresAt === null
+        ? null
+        : credentialLifetimeMilliseconds(
+            envelope.refreshExpiresAt,
+            envelope.updatedAt
+          );
+      if (
+        databaseAccessLifetime <= 0 ||
+        envelopeAccessLifetime <= 0 ||
+        !refreshExpiryShapeMatches ||
+        (databaseRefreshLifetime !== null && databaseRefreshLifetime <= 0) ||
+        (envelopeRefreshLifetime !== null && envelopeRefreshLifetime <= 0)
+      ) {
+        throw new ProviderCredentialReadFailure("expires_at_shape");
+      }
+      if (
+        databaseAccessLifetime !== envelopeAccessLifetime ||
+        databaseRefreshLifetime !== envelopeRefreshLifetime
+      ) {
+        throw new ProviderCredentialReadFailure("expires_at_binding");
+      }
+      if (
+        Date.parse(envelope.accessExpiresAt) <=
+        now.getTime() + input.minimumValiditySeconds * 1_000
+      ) {
+        throw new ProviderCredentialReadFailure("credential_expired");
       }
       return {
         state: "available" as const,
         credentialId: result.credentialId,
         credentialVersion: result.credentialVersion,
+        credentialReadEvidenceId: result.credentialReadEvidenceId,
+        externalAuthorizedEntityReference:
+          envelope.externalAuthorizedEntityReference,
         credential: new ProviderAccessCredential({
           providerKey: envelope.providerKey,
           providerEnvironment: envelope.environment,
@@ -577,8 +1227,26 @@ export class IntegrationCredentialBroker {
           accessToken: envelope.accessToken
         })
       };
-    } catch {
-      throw new Error(safeCredentialBrokerError("credential_read_failed"));
+    } catch (error) {
+      const failure = error instanceof ProviderCredentialReadFailure
+        ? error
+        : new ProviderCredentialReadFailure(
+            "unknown_missing_field_contract"
+          );
+      try {
+        await this.#store.recordProviderCredentialReadFailure(
+          RecordProviderCredentialReadFailureCommandSchema.parse({
+            contractVersion:
+              CREDENTIAL_SECURITY_CONTRACT_VERSIONS.providerReadFailure,
+            credentialReadEvidenceId: result.credentialReadEvidenceId,
+            diagnosticClass: failure.diagnosticClass
+          }),
+          input.requestId
+        );
+      } catch {
+        throw new ProviderCredentialReadFailure("reader_contract");
+      }
+      throw failure;
     } finally {
       plaintext?.fill(0);
     }
@@ -783,5 +1451,50 @@ export class IntegrationCredentialBroker {
       }),
       input.failureRequestId
     );
+  }
+
+  async #recordRefreshBoundary(
+    input: {
+      workspaceId: string;
+      businessEntityId: string;
+      connectionId: string;
+      connectionGeneration: number;
+      credentialId: string;
+      workerId: string;
+    },
+    credentialVersion: number,
+    refreshOperationId: string,
+    event: Parameters<CredentialRefreshBoundaryReporter>[0]
+  ) {
+    const requestFingerprint = contractSha256({
+      fingerprintPurpose: "credential_refresh_boundary_request",
+      fingerprintVersion: "credential_refresh_boundary_request_v1",
+      credentialId: input.credentialId,
+      credentialVersion,
+      refreshOperationId,
+      stage: event.stage,
+      outcome: event.outcome
+    }).slice("sha256:".length);
+    try {
+      await this.#store.recordRefreshBoundaryEvent(
+        CredentialRefreshBoundaryEventSchema.parse({
+          contractVersion: CREDENTIAL_SECURITY_CONTRACT_VERSIONS.refreshBoundaryAudit,
+          workspaceId: input.workspaceId,
+          businessEntityId: input.businessEntityId,
+          connectionId: input.connectionId,
+          connectionGeneration: input.connectionGeneration,
+          credentialId: input.credentialId,
+          credentialVersion,
+          refreshOperationId,
+          actorId: input.workerId,
+          ...event,
+          diagnostics: event.diagnostics ?? null,
+          occurredAt: this.#clock().toISOString()
+        }),
+        `credential_refresh_boundary_${requestFingerprint}`
+      );
+    } catch {
+      // The boundary result remains redacted and the lease/CAS path stays authoritative.
+    }
   }
 }

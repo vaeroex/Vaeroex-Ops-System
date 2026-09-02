@@ -7,17 +7,27 @@ import {
   AuthorizationAuditEventSchema,
   CompleteCredentialRevocationCommandSchema,
   CompleteRefreshFailureCommandSchema,
+  ConsumeReauthorizationStateCommandSchema,
   ConsumeOAuthStateCommandSchema,
+  CreateReauthorizationStateCommandSchema,
   CreateOAuthStateCommandSchema,
+  CredentialReauthorizationResultSchema,
+  CredentialRefreshBoundaryEventSchema,
   CredentialMutationResultSchema,
   DestroyCredentialCommandSchema,
+  ExpiredRefreshLeaseReclamationResultSchema,
   OAuthStateConsumeResultSchema,
   ProviderCredentialReadResultSchema,
+  ProviderCredentialReadFailureEvidenceResultSchema,
   ReadProviderCredentialCommandSchema,
+  RecordProviderCredentialReadFailureCommandSchema,
+  ReclaimExpiredRefreshLeaseCommandSchema,
   RefreshLeaseResultSchema,
+  ReauthorizationStateConsumeResultSchema,
   RevokeCredentialCommandSchema,
   RotateCredentialCommandSchema,
-  StoreCredentialCommandSchema
+  StoreCredentialCommandSchema,
+  StoreReauthorizedCredentialCommandSchema
 } from "@/lib/integrations/credentials/contracts";
 import { BoundedIdentifierSchema, UuidSchema } from "@/lib/integrations/contracts/primitives";
 import type { ExternalIntegrationsRpcClient } from "@/lib/integrations/persistence/repository";
@@ -38,6 +48,20 @@ async function credentialRpc(
 
 const OAuthStateCreateResultSchema = z
   .object({ stateId: UuidSchema, idempotent: z.boolean() })
+  .strict();
+
+const ReauthorizationStateCreateResultSchema = z
+  .object({
+    stateId: UuidSchema,
+    connectionRowVersion: z.number().int().positive().safe(),
+    credentialId: UuidSchema,
+    credentialVersion: z.number().int().positive().safe(),
+    credentialRowVersion: z.number().int().positive().safe(),
+    mappingId: UuidSchema,
+    mappingRowVersion: z.number().int().positive().safe(),
+    recoveryEvidenceCount: z.number().int().positive().safe(),
+    idempotent: z.boolean()
+  })
   .strict();
 
 function requestId(value: string) {
@@ -65,8 +89,42 @@ export async function consumeIntegrationOAuthState(
 ) {
   return OAuthStateConsumeResultSchema.parse(
     await credentialRpc(
-      "consume_integration_oauth_state_v1",
+      "consume_integration_oauth_state_v2",
       { p_command: ConsumeOAuthStateCommandSchema.parse(input), p_request_id: requestId(id) },
+      client
+    )
+  );
+}
+
+export async function createIntegrationReauthorizationState(
+  input: unknown,
+  id: string,
+  client: ExternalIntegrationsRpcClient
+) {
+  return ReauthorizationStateCreateResultSchema.parse(
+    await credentialRpc(
+      "create_integration_reauthorization_state_v1",
+      {
+        p_command: CreateReauthorizationStateCommandSchema.parse(input),
+        p_request_id: requestId(id)
+      },
+      client
+    )
+  );
+}
+
+export async function consumeIntegrationReauthorizationState(
+  input: unknown,
+  id: string,
+  client: ExternalIntegrationsRpcClient
+) {
+  return ReauthorizationStateConsumeResultSchema.parse(
+    await credentialRpc(
+      "consume_integration_reauthorization_state_v1",
+      {
+        p_command: ConsumeReauthorizationStateCommandSchema.parse(input),
+        p_request_id: requestId(id)
+      },
       client
     )
   );
@@ -86,6 +144,23 @@ export async function storeIntegrationCredential(
   );
 }
 
+export async function storeReauthorizedIntegrationCredential(
+  input: unknown,
+  id: string,
+  client: ExternalIntegrationsRpcClient
+) {
+  return CredentialReauthorizationResultSchema.parse(
+    await credentialRpc(
+      "store_reauthorized_integration_credential_v1",
+      {
+        p_command: StoreReauthorizedCredentialCommandSchema.parse(input),
+        p_request_id: requestId(id)
+      },
+      client
+    )
+  );
+}
+
 export async function acquireIntegrationCredentialRefreshLease(
   input: unknown,
   id: string,
@@ -93,8 +168,25 @@ export async function acquireIntegrationCredentialRefreshLease(
 ) {
   return RefreshLeaseResultSchema.parse(
     await credentialRpc(
-      "acquire_integration_credential_refresh_lease_v1",
+      "acquire_integration_credential_refresh_lease_v2",
       { p_command: AcquireRefreshLeaseCommandSchema.parse(input), p_request_id: requestId(id) },
+      client
+    )
+  );
+}
+
+export async function reclaimIntegrationExpiredRefreshLease(
+  input: unknown,
+  id: string,
+  client: ExternalIntegrationsRpcClient
+) {
+  return ExpiredRefreshLeaseReclamationResultSchema.parse(
+    await credentialRpc(
+      "reclaim_integration_expired_refresh_lease_v1",
+      {
+        p_command: ReclaimExpiredRefreshLeaseCommandSchema.parse(input),
+        p_request_id: requestId(id)
+      },
       client
     )
   );
@@ -107,9 +199,26 @@ export async function readIntegrationProviderCredential(
 ) {
   return ProviderCredentialReadResultSchema.parse(
     await credentialRpc(
-      "read_integration_provider_credential_v1",
+      "read_integration_provider_credential_v5",
       {
         p_command: ReadProviderCredentialCommandSchema.parse(input),
+        p_request_id: requestId(id)
+      },
+      client
+    )
+  );
+}
+
+export async function recordIntegrationProviderCredentialReadFailure(
+  input: unknown,
+  id: string,
+  client: ExternalIntegrationsRpcClient
+) {
+  return ProviderCredentialReadFailureEvidenceResultSchema.parse(
+    await credentialRpc(
+      "record_integration_provider_credential_task_read_failure_v1",
+      {
+        p_command: RecordProviderCredentialReadFailureCommandSchema.parse(input),
         p_request_id: requestId(id)
       },
       client
@@ -205,6 +314,26 @@ export async function recordIntegrationAuthorizationEvent(
       await credentialRpc(
         "record_integration_authorization_event_v1",
         { p_event: AuthorizationAuditEventSchema.parse(input), p_request_id: requestId(id) },
+        client
+      )
+    );
+}
+
+export async function recordIntegrationCredentialRefreshBoundary(
+  input: unknown,
+  id: string,
+  client: ExternalIntegrationsRpcClient
+) {
+  return z
+    .object({ eventId: UuidSchema, idempotent: z.boolean() })
+    .strict()
+    .parse(
+      await credentialRpc(
+        "record_integration_credential_refresh_boundary_v2",
+        {
+          p_event: CredentialRefreshBoundaryEventSchema.parse(input),
+          p_request_id: requestId(id)
+        },
         client
       )
     );

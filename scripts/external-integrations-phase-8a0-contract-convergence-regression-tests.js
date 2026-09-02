@@ -229,7 +229,7 @@ async function main() {
   const registry = registered.REGISTERED_PROVIDER_REGISTRY;
   equal(
     registry.registryFingerprint,
-    "sha256:6981f2593ee13a1476be9940d752bbccffaa07f6ff45d153e8cacbd5837ce758",
+    "sha256:2099f06e90a53e632acbe55ee4d95cfd2f7fac7c2c994bb733ec332f7d09dfad",
     "new persistence uses the canonical QBO-inclusive registry fingerprint"
   );
   const qboEntry = controlPlane.providerDescriptor(
@@ -239,7 +239,7 @@ async function main() {
   );
   equal(
     qboEntry.descriptorFingerprint,
-    "sha256:e4c07ee40eacda38342037219c473159aab5109c3d94c5e22d306364523d74ac",
+    "sha256:1812bfa5fb9903583a672028aeefb40855211b19f2ce423f608c49f86db77b7f",
     "QBO persistence uses the reviewed descriptor fingerprint"
   );
   equal(
@@ -397,13 +397,22 @@ async function main() {
     additionalAuthenticatedData: credentialKms.credentialAad(aadContext)
   });
   let readCount = 0;
+  const readFailures = [];
   const readResult = {
     state: "available",
     credentialId: id(12),
     credentialVersion: 1,
+    credentialReadEvidenceId: id(15),
     providerKey: "quickbooks_online",
     providerEnvironment: "sandbox",
-    accessExpiresAt: envelope.accessExpiresAt,
+    accessExpiresAt: "2026-08-22T02:00:00.000Z",
+    ciphertextPersistedAt: "2026-08-22T00:00:00.000Z",
+    refreshExpiresAt: "2026-09-22T01:00:00.000Z",
+    externalEntityReferenceFingerprint: canonical.contractSha256({
+      fingerprintPurpose: "provider_authorized_entity_reference",
+      fingerprintVersion: "provider_authorized_entity_reference_fingerprint_v1",
+      value: envelope.externalAuthorizedEntityReference
+    }),
     ciphertextBase64: Buffer.from(ciphertext).toString("base64"),
     aadDigest: credentialKms.credentialAadDigest(aadContext),
     kmsKeyResource: keyResource,
@@ -420,6 +429,16 @@ async function main() {
     async readProviderCredential() {
       readCount += 1;
       return readResult;
+    },
+    async recordProviderCredentialReadFailure(command) {
+      readFailures.push(command);
+      return {
+        credentialReadFailureEvidenceId: id(16 + readFailures.length),
+        credentialReadEvidenceId: command.credentialReadEvidenceId,
+        diagnosticClass: command.diagnosticClass,
+        failedAt: now.toISOString(),
+        idempotent: false
+      };
     },
     acquireRefreshLease: unavailable,
     rotateCredential: unavailable,
@@ -459,6 +478,11 @@ async function main() {
   equal(readCount, 2, "ordinary provider reads are concurrent and independently checked");
   equal(readA.state, "available", "valid credential read is available");
   equal(readB.state, "available", "second concurrent credential read is available");
+  equal(
+    readA.credential.accessExpiresAt,
+    envelope.accessExpiresAt,
+    "provider reads accept exact lifetime-preserving database clock rebasing"
+  );
   const mismatchedAadContext = {
     ...aadContext,
     environment: "production"
@@ -491,6 +515,48 @@ async function main() {
     () => mismatchedBroker.readProviderAccessCredential(readInput),
     /credential_read_failed/,
     "broker rejects a cross-environment credential result before decryption"
+  );
+  const expiryBindingBroker = new brokerModule.IntegrationCredentialBroker({
+    store: {
+      ...store,
+      async readProviderCredential() {
+        return {
+          ...readResult,
+          accessExpiresAt: "2026-08-22T02:00:01.000Z"
+        };
+      }
+    },
+    kms,
+    kmsKeyResource: keyResource,
+    secrets: { access: unavailable },
+    provider: {
+      providerKey: "quickbooks_online",
+      environment: "sandbox",
+      exchangeAuthorizationCode: unavailable,
+      refreshCredential: unavailable,
+      revokeCredential: unavailable
+    },
+    clock: () => now
+  });
+  const expiryBindingFailure = await expiryBindingBroker
+    .readProviderAccessCredential(readInput)
+    .catch((error) => error);
+  equal(
+    expiryBindingFailure.diagnosticClass,
+    "expires_at_binding",
+    "credential reads diagnose lifetime-binding mismatch without secret material"
+  );
+  deepEqual(
+    readFailures.map((failure) => failure.diagnosticClass),
+    ["aad_binding", "expires_at_binding"],
+    "post-decrypt failures append only bounded evidence classifications"
+  );
+  doesNotMatch(
+    JSON.stringify(expiryBindingFailure),
+    new RegExp(
+      Object.values(redaction.PHASE_5_LEAKAGE_CANARIES).join("|")
+    ),
+    "credential-read diagnostics contain no access, refresh, code, or client-secret canary"
   );
   const exposedKeys = [];
   const token = await readA.credential.use((value) => {

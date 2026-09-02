@@ -98,8 +98,18 @@ ok(qbo.QBO_PROVIDER_DESCRIPTOR.minimumScopes.includes("com.intuit.quickbooks.acc
 ok(qbo.QBO_PROVIDER_DESCRIPTOR.hostnameAllowlist.includes("quickbooks.api.intuit.com"), "production API hostname is declared");
 ok(qbo.QBO_PROVIDER_DESCRIPTOR.hostnameAllowlist.includes("sandbox-quickbooks.api.intuit.com"), "sandbox API hostname is declared");
 ok(qbo.QBO_PROVIDER_DESCRIPTOR.unsupportedCapabilities.includes("accounting_writes"), "accounting writes are explicitly unsupported");
-ok(qbo.QBO_PROVIDER_DESCRIPTOR.unsupportedCapabilities.includes("credential_storage"), "credential storage is explicitly unsupported");
 ok(qbo.QBO_PROVIDER_DESCRIPTOR.unsupportedCapabilities.includes("kpi_promotion"), "KPI promotion is explicitly unsupported");
+equal(qbo.QBO_PROVIDER_DESCRIPTOR.legalCommercialGateVersion, "qbo_production_read_only_v1", "QBO uses the Production read-only commercial gate");
+for (const implemented of [
+  "credential_storage",
+  "kms_encryption",
+  "cloud_tasks",
+  "sync_worker",
+  "webhook_route",
+  "customer_ui"
+]) {
+  ok(!qbo.QBO_PROVIDER_DESCRIPTOR.unsupportedCapabilities.includes(implemented), `${implemented} is implemented by the Production boundary`);
+}
 
 const phase7Registry = registry.assertProviderDescriptorRegistry(qbo.QBO_PHASE_7_PROVIDER_REGISTRY);
 equal(phase7Registry.registryVersion, "vaeroex_provider_descriptors_v1", "Phase 7 preserves registry version");
@@ -287,6 +297,152 @@ throws(
   "missing required report hierarchy fails closed"
 );
 
+const apAging = qbo.parseQboReport({
+  reportType: "APAgingSummary",
+  raw: fixtures.QBO_SANITIZED_AGING_REPORT_FIXTURES.APAgingSummary,
+  provider
+});
+equal(apAging.sourceCurrency, null, "documented optional A/P currency metadata is not fabricated");
+equal(apAging.reportBasis, "unknown", "documented optional A/P report basis remains explicitly unknown");
+equal(apAging.rows.length, 2, "A/P data and grand-total section hierarchy are preserved");
+equal(new Set(apAging.columns.map((column) => column.columnKey)).size, 7, "repeated provider Money column types receive unique minimized identities");
+doesNotMatch(
+  JSON.stringify(apAging),
+  /Option|MetaData|IgnoredProvider|href|not-retained/,
+  "A/P minimization drops provider options, column metadata, links, and unknown envelope fields"
+);
+equal(
+  qbo.qboReportProviderRecordId(apAging),
+  "APAgingSummary:unknown:2026-08-01:2026-08-26:currency_unspecified",
+  "missing optional currency has one explicit non-financial source identity marker"
+);
+
+const emptyApAgingFixture = clone(
+  fixtures.QBO_SANITIZED_OPTIONAL_PERIOD_AGING_REPORT_FIXTURES.APAgingSummary
+);
+emptyApAgingFixture.Header.Option = [{ Name: "NoReportData", Value: "true" }];
+emptyApAgingFixture.Rows.Row = [];
+const emptyApAging = qbo.parseQboReport({
+  reportType: "APAgingSummary",
+  raw: emptyApAgingFixture,
+  provider
+});
+equal(emptyApAging.rows.length, 0, "documented no-report-data aging envelopes retain an empty hierarchy");
+
+const arAging = qbo.parseQboReport({
+  reportType: "ARAgingSummary",
+  raw: fixtures.QBO_SANITIZED_AGING_REPORT_FIXTURES.ARAgingSummary,
+  provider
+});
+equal(arAging.sourceCurrency, "USD", "A/R preserves present valid currency metadata");
+equal(arAging.reportBasis, "accrual", "A/R preserves present valid report basis metadata");
+ok(
+  qbo.flattenQboReportRows(arAging).some((row) => row.group === "DocumentedEmptySection" && row.rowType === "section"),
+  "A/R preserves documented empty nested sections without inventing data rows"
+);
+ok(
+  qbo.flattenQboReportRows(arAging).some((row) => row.rowType === "summary"),
+  "A/R preserves nested summary rows as non-additive control hierarchy"
+);
+
+const pointInTimeApAging = qbo.parseQboReport({
+  reportType: "APAgingSummary",
+  raw: fixtures.QBO_SANITIZED_OPTIONAL_PERIOD_AGING_REPORT_FIXTURES.APAgingSummary,
+  provider
+});
+equal(pointInTimeApAging.periodStart, null, "A/P accepts a documented omitted start period");
+equal(pointInTimeApAging.periodEnd, "2026-08-26", "A/P preserves a present as-of end period");
+
+const pointInTimeArAging = qbo.parseQboReport({
+  reportType: "ARAgingSummary",
+  raw: fixtures.QBO_SANITIZED_OPTIONAL_PERIOD_AGING_REPORT_FIXTURES.ARAgingSummary,
+  provider
+});
+equal(pointInTimeArAging.periodStart, null, "A/R accepts a documented omitted start period");
+equal(pointInTimeArAging.periodEnd, null, "A/R accepts a documented omitted end period");
+ok(
+  qbo.flattenQboReportRows(pointInTimeArAging).some((row) => row.group === "DocumentedEmptySection"),
+  "optional-period A/R preserves nested and empty report sections"
+);
+
+const malformedOptionalPeriodAging = clone(
+  fixtures.QBO_SANITIZED_OPTIONAL_PERIOD_AGING_REPORT_FIXTURES.APAgingSummary
+);
+malformedOptionalPeriodAging.Header.EndPeriod = { unsafe: true };
+throws(
+  () => qbo.parseQboReport({ reportType: "APAgingSummary", raw: malformedOptionalPeriodAging, provider }),
+  (error) => error instanceof qbo.QboReportContractError &&
+    error.diagnosticClass === "report_metadata_shape" &&
+    error.field === "Header.EndPeriod" &&
+    error.actualType === "object",
+  "malformed optional aging period metadata still fails closed"
+);
+
+const malformedAgingMetadata = clone(fixtures.QBO_SANITIZED_AGING_REPORT_FIXTURES.APAgingSummary);
+malformedAgingMetadata.Header.Currency = 7;
+throws(
+  () => qbo.parseQboReport({ reportType: "APAgingSummary", raw: malformedAgingMetadata, provider }),
+  (error) => error instanceof qbo.QboReportContractError &&
+    error.diagnosticClass === "report_metadata_shape" &&
+    error.field === "Header.Currency" &&
+    error.actualType === "number",
+  "malformed aging metadata fails with bounded non-payload classification"
+);
+
+const malformedAgingColumns = clone(fixtures.QBO_SANITIZED_AGING_REPORT_FIXTURES.APAgingSummary);
+malformedAgingColumns.Columns.Column = {};
+throws(
+  () => qbo.parseQboReport({ reportType: "APAgingSummary", raw: malformedAgingColumns, provider }),
+  (error) => error instanceof qbo.QboReportContractError && error.diagnosticClass === "report_columns_shape",
+  "malformed aging columns fail closed"
+);
+
+const malformedAgingRows = clone(fixtures.QBO_SANITIZED_AGING_REPORT_FIXTURES.APAgingSummary);
+malformedAgingRows.Rows.Row = {};
+throws(
+  () => qbo.parseQboReport({ reportType: "APAgingSummary", raw: malformedAgingRows, provider }),
+  (error) => error instanceof qbo.QboReportContractError && error.diagnosticClass === "report_rows_shape",
+  "malformed aging row containers fail closed"
+);
+
+const malformedAgingCell = clone(fixtures.QBO_SANITIZED_AGING_REPORT_FIXTURES.APAgingSummary);
+malformedAgingCell.Rows.Row[0].ColData[1].value = { unsafe: true };
+throws(
+  () => qbo.parseQboReport({ reportType: "APAgingSummary", raw: malformedAgingCell, provider }),
+  (error) => error instanceof qbo.QboReportContractError &&
+    error.diagnosticClass === "report_cell_shape" &&
+    error.actualType === "object",
+  "malformed aging cells fail without retaining their value"
+);
+
+const malformedAgingSummary = clone(fixtures.QBO_SANITIZED_AGING_REPORT_FIXTURES.APAgingSummary);
+malformedAgingSummary.Rows.Row[1].Summary.ColData = {};
+throws(
+  () => qbo.parseQboReport({ reportType: "APAgingSummary", raw: malformedAgingSummary, provider }),
+  (error) => error instanceof qbo.QboReportContractError && error.diagnosticClass === "report_summary_shape",
+  "malformed aging summaries fail closed"
+);
+
+const unknownAgingRow = clone(fixtures.QBO_SANITIZED_AGING_REPORT_FIXTURES.ARAgingSummary);
+unknownAgingRow.Rows.Row[0].Rows.Row[0].type = "CallerControlled";
+throws(
+  () => qbo.parseQboReport({ reportType: "ARAgingSummary", raw: unknownAgingRow, provider }),
+  (error) => error instanceof qbo.QboReportContractError &&
+    error.diagnosticClass === "report_rows_shape" &&
+    error.expectedType === "data_or_section",
+  "unknown provider row branches fail closed"
+);
+
+const mixedAgingRow = clone(fixtures.QBO_SANITIZED_AGING_REPORT_FIXTURES.APAgingSummary);
+mixedAgingRow.Rows.Row[0].Summary = { ColData: [{ value: "unexpected" }] };
+throws(
+  () => qbo.parseQboReport({ reportType: "APAgingSummary", raw: mixedAgingRow, provider }),
+  (error) => error instanceof qbo.QboReportContractError &&
+    error.diagnosticClass === "report_rows_shape" &&
+    error.expectedType === "section_without_direct_coldata",
+  "ambiguous mixed data-and-summary rows fail closed"
+);
+
 deepEqual(qbo.planQboQueryPages({ recordType: "Invoice", totalCount: 0 }), [], "0 records creates no pages");
 equal(qbo.planQboQueryPages({ recordType: "Invoice", totalCount: 1 }).length, 1, "1 record creates one page");
 equal(qbo.planQboQueryPages({ recordType: "Invoice", totalCount: 500 }).length, 1, "page-size boundary creates one page");
@@ -443,6 +599,59 @@ equal(sourceVersion.trust, "untrusted_external_input", "source envelope remains 
 equal(sourceVersion.validation.state, "pending", "QBO parsing does not validate canonical truth");
 equal(sourceVersion.normalizedProjection.provider.realmId, provider.realmId, "realm identity is retained as provider metadata");
 notEqual(sourceVersion.workspaceId, sourceVersion.normalizedProjection.provider.realmId, "realm ID cannot overwrite tenant authority");
+
+const pointInTimeArSource = qbo.qboReportToExternalSourceVersion({
+  context,
+  report: pointInTimeArAging,
+  id: id(6),
+  immutableVersion: 1,
+  priorVersionId: null,
+  observedAt: "2026-06-20T12:00:00.000Z",
+  synchronizedAt: "2026-06-20T12:00:01.000Z",
+  ingestedAt: "2026-06-20T12:00:02.000Z",
+  receivedAt: "2026-06-20T12:00:03.000Z"
+});
+equal(pointInTimeArSource.temporal.basis, "point_in_time", "open A/R aging minimizes as a point-in-time source");
+equal(pointInTimeArSource.temporal.effectiveAt, null, "open A/R aging does not fabricate an as-of date");
+equal(pointInTimeArSource.temporal.periodStart, null, "point-in-time A/R has no fabricated period start");
+equal(pointInTimeArSource.temporal.periodEnd, null, "point-in-time A/R has no fabricated period end");
+equal(pointInTimeArSource.validation.state, "pending", "point-in-time A/R remains untrusted pending input");
+doesNotMatch(
+  JSON.stringify(pointInTimeArSource.normalizedProjection),
+  /Option|MetaData|IgnoredProvider|href|not-retained/,
+  "point-in-time A/R source minimization excludes unnecessary provider fields"
+);
+
+const pointInTimeApSource = qbo.qboReportToExternalSourceVersion({
+  context,
+  report: pointInTimeApAging,
+  id: id(7),
+  immutableVersion: 1,
+  priorVersionId: null,
+  observedAt: "2026-06-20T12:00:00.000Z",
+  synchronizedAt: "2026-06-20T12:00:01.000Z",
+  ingestedAt: "2026-06-20T12:00:02.000Z",
+  receivedAt: "2026-06-20T12:00:03.000Z"
+});
+equal(pointInTimeApSource.temporal.basis, "point_in_time", "end-only A/P aging minimizes as a point-in-time source");
+equal(
+  pointInTimeApSource.temporal.effectiveAt,
+  "2026-08-26T00:00:00.000Z",
+  "A/P aging binds a present as-of date without inventing a period"
+);
+equal(pointInTimeApSource.temporal.periodStart, null, "point-in-time A/P has no period start");
+equal(pointInTimeApSource.temporal.periodEnd, null, "point-in-time A/P has no period end");
+equal(
+  qbo.qboReportProviderRecordId(pointInTimeApAging),
+  qbo.qboReportProviderRecordId(
+    qbo.parseQboReport({
+      reportType: "APAgingSummary",
+      raw: clone(fixtures.QBO_SANITIZED_OPTIONAL_PERIOD_AGING_REPORT_FIXTURES.APAgingSummary),
+      provider
+    })
+  ),
+  "optional-period aging source identity is deterministic"
+);
 throws(
   () => qbo.qboMinimizedRecordToExternalSourceVersion({ ...{
     context: { ...context, providerKey: "synthetic" },

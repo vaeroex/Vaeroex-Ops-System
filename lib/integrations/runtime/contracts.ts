@@ -41,15 +41,31 @@ export const RuntimeTaskKindSchema = z.enum([
   "deterministic_shadow"
 ]);
 
-export const RuntimeTaskStateSchema = z.enum([
+export const RUNTIME_NON_TERMINAL_TASK_STATES = [
   "pending",
   "dispatched",
   "leased",
-  "retry_wait",
+  "retry_wait"
+] as const;
+
+export const RUNTIME_TERMINAL_TASK_STATES = [
   "succeeded",
   "failed",
   "dead_letter",
   "cancelled"
+] as const;
+
+export const RuntimeNonTerminalTaskStateSchema = z.enum(
+  RUNTIME_NON_TERMINAL_TASK_STATES
+);
+
+export const RuntimeTerminalTaskStateSchema = z.enum(
+  RUNTIME_TERMINAL_TASK_STATES
+);
+
+export const RuntimeTaskStateSchema = z.enum([
+  ...RUNTIME_NON_TERMINAL_TASK_STATES,
+  ...RUNTIME_TERMINAL_TASK_STATES
 ]);
 
 export const RuntimeWorkerKindSchema = z.enum([
@@ -152,7 +168,15 @@ export const CloudTaskDeliveryMetadataSchema = z
     retryCount: z.number().int().nonnegative().max(100),
     executionCount: z.number().int().nonnegative().max(100)
   })
-  .strict();
+  .strict()
+  .superRefine((value, context) => {
+    if (value.executionCount > value.retryCount) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Cloud Tasks execution count cannot exceed retry count"
+      });
+    }
+  });
 
 export const VerifiedGoogleOidcClaimsSchema = z
   .object({
@@ -272,6 +296,12 @@ export const DurablePageCommitResultSchema = z
 export type RuntimeQueueClass = z.infer<typeof RuntimeQueueClassSchema>;
 export type RuntimeTaskKind = z.infer<typeof RuntimeTaskKindSchema>;
 export type RuntimeTaskState = z.infer<typeof RuntimeTaskStateSchema>;
+export type RuntimeNonTerminalTaskState = z.infer<
+  typeof RuntimeNonTerminalTaskStateSchema
+>;
+export type RuntimeTerminalTaskState = z.infer<
+  typeof RuntimeTerminalTaskStateSchema
+>;
 export type RuntimeWorkerKind = z.infer<typeof RuntimeWorkerKindSchema>;
 export type RuntimeControlMetadata = z.infer<typeof RuntimeControlMetadataSchema>;
 export type CreateRuntimeTaskCommand = z.infer<typeof CreateRuntimeTaskCommandSchema>;

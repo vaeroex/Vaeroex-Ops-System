@@ -6,9 +6,9 @@ export function StatusBadge({ value }: StatusBadgeProps) {
   const label = value || "Unassigned";
   const tone = label.toLowerCase();
   const className =
-    tone.includes("urgent") || tone.includes("high") || tone.includes("broken") || tone.includes("overdue")
+    tone.includes("urgent") || tone.includes("high") || tone.includes("broken") || tone.includes("overdue") || tone.includes("failed") || tone.includes("reauthorization")
       ? "border-red-200 bg-red-50 text-red-700"
-      : tone.includes("medium") || tone.includes("needs") || tone.includes("waiting")
+      : tone.includes("medium") || tone.includes("needs") || tone.includes("waiting") || tone.includes("delayed") || tone.includes("syncing")
         ? "border-amber-200 bg-amber-50 text-amber-800"
         : tone.includes("done") || tone.includes("ready") || tone.includes("complete") || tone.includes("active")
           ? "border-emerald-200 bg-emerald-50 text-emerald-700"

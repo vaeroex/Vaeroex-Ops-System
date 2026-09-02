@@ -77,7 +77,7 @@ export const QBO_PROVIDER_DESCRIPTOR: ProviderDescriptor = ProviderDescriptorSch
     defaultMinimumDelayMs: 250
   },
   officialDocumentationLinks: [...QBO_OFFICIAL_DOCUMENTATION_LINKS],
-  legalCommercialGateVersion: "qbo_phase_7_metadata_only_v1",
+  legalCommercialGateVersion: "qbo_production_read_only_v1",
   unsupportedCapabilities: [
     "accounting_writes",
     "batch_writes",
@@ -87,14 +87,6 @@ export const QBO_PROVIDER_DESCRIPTOR: ProviderDescriptor = ProviderDescriptorSch
     "payroll",
     "bank_feeds",
     "attachments",
-    "live_provider_access",
-    "oauth_exchange",
-    "credential_storage",
-    "kms",
-    "cloud_tasks",
-    "sync_worker",
-    "webhook_route",
-    "customer_ui",
     "ai_mapping",
     "kpi_promotion",
     ...QBO_V1_UNSUPPORTED_OR_DEFERRED_OBJECTS.map((value) => `deferred_${value.toLowerCase()}`)

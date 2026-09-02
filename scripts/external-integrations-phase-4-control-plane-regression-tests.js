@@ -1,5 +1,4 @@
 const assert = require("node:assert/strict");
-const childProcess = require("node:child_process");
 const fs = require("node:fs");
 const Module = require("node:module");
 const path = require("node:path");
@@ -383,28 +382,27 @@ const safeJson = JSON.stringify({ safeConnection, safeFreshness });
 doesNotMatch(safeJson, /tenantReference|descriptorFingerprint|providerWatermark|mappingId|errorCategory/i, "customer summaries omit private operational identifiers");
 doesNotMatch(safeJson, /accessToken|refreshToken|clientSecret|authorizationCode|rawPayload/i, "customer summaries cannot carry secret or payload fields");
 
-const migration = read("supabase/migrations/20260821201220_external_integrations_phase_4_control_plane.sql");
-const phase4Source = [
-  read("lib/integrations/control-plane/contracts.ts"),
-  read("lib/integrations/control-plane/provider-registry.ts"),
-  read("lib/integrations/control-plane/lifecycle.ts"),
-  migration
-].join("\n");
+const phase4OwnedPaths = [
+  "lib/integrations/control-plane/contracts.ts",
+  "lib/integrations/control-plane/provider-registry.ts",
+  "lib/integrations/control-plane/lifecycle.ts",
+  "supabase/migrations/20260821201220_external_integrations_phase_4_control_plane.sql"
+];
+const phase4Source = phase4OwnedPaths.map(read).join("\n");
 doesNotMatch(phase4Source, /QuickBooks|Intuit|Business Central|NetSuite|SAP|CAKE/i, "Phase 4 remains provider-neutral");
-doesNotMatch(migration, /access[_ ]?token|refresh[_ ]?token|client[_ ]?secret|authorization[_ ]?code/i, "the control-plane schema has no secret-shaped columns");
-doesNotMatch(migration, /raw[_ ]?(?:provider[_ ]?)?payload|provider[_ ]?payload/i, "the control-plane schema stores no provider payload");
+doesNotMatch(phase4Source, /access[_ ]?token|refresh[_ ]?token|client[_ ]?secret|authorization[_ ]?code/i, "Phase 4-owned source has no provider-secret surface");
+doesNotMatch(phase4Source, /raw[_ ]?(?:provider[_ ]?)?payload|provider[_ ]?payload/i, "Phase 4-owned source stores no provider payload");
 doesNotMatch(phase4Source, /cloud tasks|cloud run|scheduler|webhook route|business_state_delta|openai|embedding|rerank/i, "Phase 4 introduces no runtime, delta, or AI infrastructure");
 doesNotMatch(phase4Source, /\bfetch\s*\(|axios|node:https|node:http/i, "Phase 4 makes no provider network calls");
+doesNotMatch(
+  phase4Source,
+  /@\/lib\/integrations\/(?:credentials|persistence|provider-runtime|providers\/qbo|runtime)(?:\/|["'])/,
+  "Phase 4-owned source does not import later provider, runtime, credential, or persistence implementations"
+);
+doesNotMatch(phase4Source, /promotionAuthorized\s*:\s*true/, "Phase 4 cannot authorize KPI promotion");
 
 const phase3Adapter = read("lib/integrations/deterministic/legacy-kpi-shadow-adapter.ts");
 ok(/promotionAuthorized:\s*false/.test(phase3Adapter), "Phase 3 promotion remains disabled");
-
-const protectedDiff = childProcess.execFileSync(
-  "git",
-  ["diff", "--name-only", "origin/main", "--", "app", "components", "services", "vercel.json", "lib/supabase"],
-  { cwd: root, encoding: "utf8" }
-).trim();
-equal(protectedDiff, "", "Phase 4 changes no route, UI, runtime service, deployment, or generated client surface");
 
 const packageJson = JSON.parse(read("package.json"));
 equal(

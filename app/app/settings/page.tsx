@@ -1,8 +1,10 @@
 import { AuthMessage } from "@/components/auth/AuthMessage";
 import { ThemeControls } from "@/components/app/ThemeControls";
+import { ConnectionStatusPanel } from "@/components/integrations/ConnectionStatusPanel";
 import { PageHeader } from "@/components/operations/PageHeader";
 import { SectionCard } from "@/components/operations/SectionCard";
 import { changePasswordAction } from "@/lib/auth/actions";
+import { qboProductionCustomerConnectionsEnabled } from "@/lib/integrations/control-plane/qbo-customer-availability";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
 
 type SettingsPageProps = {
@@ -14,7 +16,36 @@ type SettingsPageProps = {
 
 export default async function SettingsPage({ searchParams }: SettingsPageProps) {
   const params = await searchParams;
-  const { context } = await requireWorkspacePage();
+  const { context, supabase, workspaceId } = await requireWorkspacePage();
+  const qboConnectionsEnabled = qboProductionCustomerConnectionsEnabled();
+  const { data: connections } = qboConnectionsEnabled
+    ? await supabase
+        .from("integration_connection_summaries")
+        .select("id, provider_key, safe_display_name, status, status_changed_at")
+        .eq("workspace_id", workspaceId)
+        .eq("provider_key", "quickbooks_online")
+        .not("status", "in", '("deleted","disconnected")')
+        .order("status_changed_at", { ascending: false })
+    : { data: [] };
+  const canManage = ["owner", "admin", "manager"].includes(
+    context.membership?.role ?? ""
+  );
+  const { data: businessEntities } = qboConnectionsEnabled && canManage
+    ? await supabase
+        .from("business_entities")
+        .select("id, display_name")
+        .eq("workspace_id", workspaceId)
+        .eq("status", "active")
+        .order("display_name", { ascending: true })
+    : { data: [] };
+  const connectionIds = (connections ?? []).map((connection) => connection.id);
+  const { data: freshness } = connectionIds.length
+    ? await supabase
+        .from("integration_freshness_summaries")
+        .select("connection_id, scope_key, status, last_successful_sync_at, calculated_at")
+        .eq("workspace_id", workspaceId)
+        .in("connection_id", connectionIds)
+    : { data: [] };
 
   return (
     <div className="space-y-6">
@@ -25,6 +56,20 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
       />
 
       <ThemeControls />
+
+      {qboConnectionsEnabled ? (
+        <SectionCard
+          title="Accounting connection"
+          description="Connection health and data freshness for this workspace."
+        >
+          <ConnectionStatusPanel
+            connections={connections ?? []}
+            freshness={freshness ?? []}
+            businessEntities={businessEntities ?? []}
+            canManage={canManage}
+          />
+        </SectionCard>
+      ) : null}
 
       <SectionCard
         title="Account Security"
