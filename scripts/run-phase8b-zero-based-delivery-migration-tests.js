@@ -14,7 +14,8 @@ const credentialBindingCanaryVersion = "20260826090000";
 const credentialLineageVersion = "20260826120000";
 const precontractRetirementVersion = "20260826190801";
 const providerResultEvidenceVersion = "20260826222000";
-const targetVersion = "20260827033058";
+const productionConvergenceVersion = "20260827033058";
+const targetVersion = "20260902191322";
 const fixturePath = path.join(
   root,
   "supabase/tests/fixtures/external_integrations_phase_8b_zero_based_legacy.sql"
@@ -208,12 +209,28 @@ function assertTargetIsSinglePendingMigration() {
       `Migration ${providerResultEvidenceVersion} no longer immediately follows ${precontractRetirementVersion}.`
     );
   }
+  const productionConvergenceIndex = migrations.findIndex((name) =>
+    name.startsWith(`${productionConvergenceVersion}_`)
+  );
+  if (productionConvergenceIndex < 0) {
+    fail(
+      `Production convergence migration ${productionConvergenceVersion} is missing.`
+    );
+  }
   if (
-    migrations[targetIndex - 1]?.slice(0, 14) !==
+    migrations[productionConvergenceIndex - 1]?.slice(0, 14) !==
       providerResultEvidenceVersion
   ) {
     fail(
-      `Migration ${targetVersion} no longer immediately follows ${providerResultEvidenceVersion}.`
+      `Migration ${productionConvergenceVersion} no longer immediately follows ${providerResultEvidenceVersion}.`
+    );
+  }
+  if (
+    migrations[targetIndex - 1]?.slice(0, 14) !==
+      productionConvergenceVersion
+  ) {
+    fail(
+      `Migration ${targetVersion} no longer immediately follows ${productionConvergenceVersion}.`
     );
   }
   if (targetIndex !== migrations.length - 1) {
