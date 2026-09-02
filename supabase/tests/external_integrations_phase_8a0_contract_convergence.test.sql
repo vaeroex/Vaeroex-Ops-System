@@ -724,7 +724,7 @@ select ok(
 select is(
   (
     select pg_catalog.count(*)::text
-    from private.integration_connections
+    from public.integration_connection_summaries
     where id = 'e8000000-0000-4000-8000-000000000002'
   ),
   '0',
