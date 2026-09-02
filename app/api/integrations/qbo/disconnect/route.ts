@@ -6,6 +6,10 @@ import {
   qboCustomerApplicationOrigin,
   readQboDisconnectRequest
 } from "@/lib/integrations/control-plane/qbo-customer-oauth";
+import {
+  qboCustomerConnectionsUnavailableResponse,
+  qboProductionCustomerConnectionsEnabled
+} from "@/lib/integrations/control-plane/qbo-customer-availability";
 import { QBO_CUSTOMER_DISCONNECT_PATH } from "@/lib/integrations/control-plane/qbo-customer-routes";
 import { requestIntegrationDisconnect } from "@/lib/integrations/persistence/control-plane-repository";
 import type { ExternalIntegrationsRpcClient } from "@/lib/integrations/persistence/repository";
@@ -32,6 +36,10 @@ function disconnectRedirect(kind: "result" | "error", code: string) {
 }
 
 export async function POST(request: Request) {
+  if (!qboProductionCustomerConnectionsEnabled()) {
+    return qboCustomerConnectionsUnavailableResponse();
+  }
+
   const access = await requireWorkspaceAccess();
 
   try {

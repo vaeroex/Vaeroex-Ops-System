@@ -6,6 +6,10 @@ import {
   qboProductionOAuthConfiguration,
   readQboConnectRequest
 } from "@/lib/integrations/control-plane/qbo-customer-oauth";
+import {
+  qboCustomerConnectionsUnavailableResponse,
+  qboProductionCustomerConnectionsEnabled
+} from "@/lib/integrations/control-plane/qbo-customer-availability";
 import { createIntegrationConnectionIntent } from "@/lib/integrations/persistence/control-plane-repository";
 import {
   createQboCustomerOAuthState,
@@ -19,7 +23,12 @@ import {
 import { requireWorkspaceAccess } from "@/lib/security/require-workspace-access";
 
 export async function POST(request: Request) {
+  if (!qboProductionCustomerConnectionsEnabled()) {
+    return qboCustomerConnectionsUnavailableResponse();
+  }
+
   try {
+    const configuration = qboProductionOAuthConfiguration();
     assertQboCustomerRequestOrigin(request);
     const input = await readQboConnectRequest(request);
     const access = await requireWorkspaceAccess();
@@ -53,7 +62,6 @@ export async function POST(request: Request) {
       },
       rpcClient
     );
-    const configuration = qboProductionOAuthConfiguration();
     const state = `i1_${randomBytes(32).toString("base64url")}`;
     const stateHash = `sha256:${createHash("sha256").update(state, "utf8").digest("hex")}`;
     const stateId = randomUUID();

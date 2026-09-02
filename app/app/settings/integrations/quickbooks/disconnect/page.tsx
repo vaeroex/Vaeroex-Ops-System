@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { ArrowLeft, Unplug } from "lucide-react";
+import { notFound } from "next/navigation";
 
 import { AuthMessage } from "@/components/auth/AuthMessage";
 import { StatusBadge } from "@/components/operations/StatusBadge";
 import { PageHeader } from "@/components/operations/PageHeader";
 import { SectionCard } from "@/components/operations/SectionCard";
 import { QBO_CUSTOMER_SETTINGS_PATH } from "@/lib/integrations/control-plane/qbo-customer-routes";
+import { qboProductionCustomerConnectionsEnabled } from "@/lib/integrations/control-plane/qbo-customer-availability";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
 
 type DisconnectPageProps = {
@@ -46,6 +48,8 @@ function statusLabel(status: string) {
 export default async function QuickBooksDisconnectPage({
   searchParams
 }: DisconnectPageProps) {
+  if (!qboProductionCustomerConnectionsEnabled()) notFound();
+
   const params = await searchParams;
   const { context, supabase, workspaceId } = await requireWorkspacePage();
   const canManage = ["owner", "admin", "manager"].includes(

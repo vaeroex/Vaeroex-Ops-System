@@ -7,6 +7,10 @@ import {
   readQboReauthorizationRequest
 } from "@/lib/integrations/control-plane/qbo-customer-oauth";
 import {
+  qboCustomerConnectionsUnavailableResponse,
+  qboProductionCustomerConnectionsEnabled
+} from "@/lib/integrations/control-plane/qbo-customer-availability";
+import {
   createQboCustomerReauthorizationState,
   QBO_CUSTOMER_REAUTHORIZATION_STATE_CONTRACT_VERSION
 } from "@/lib/integrations/persistence/qbo-production-repository";
@@ -18,7 +22,12 @@ import {
 import { requireWorkspaceAccess } from "@/lib/security/require-workspace-access";
 
 export async function POST(request: Request) {
+  if (!qboProductionCustomerConnectionsEnabled()) {
+    return qboCustomerConnectionsUnavailableResponse();
+  }
+
   try {
+    const configuration = qboProductionOAuthConfiguration();
     assertQboCustomerRequestOrigin(request);
     const input = await readQboReauthorizationRequest(request);
     const access = await requireWorkspaceAccess();
@@ -39,7 +48,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, error: "Connection is unavailable." }, { status: 403 });
     }
 
-    const configuration = qboProductionOAuthConfiguration();
     const now = new Date();
     const state = `r1_${randomBytes(32).toString("base64url")}`;
     const stateId = randomUUID();

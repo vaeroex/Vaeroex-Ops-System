@@ -356,6 +356,77 @@ select ok(
   'task delivery authority is isolated from dispatcher authority'
 );
 
+select ok(
+  exists (
+    select 1
+    from pg_catalog.pg_trigger
+    where tgrelid = 'private.integration_connections'::regclass
+      and tgname = 'guard_qbo_production_connection_intent_v1'
+      and not tgisinternal
+  ),
+  'Production QBO connection intents have a database dormant-mode guard'
+);
+select ok(
+  exists (
+    select 1
+    from pg_catalog.pg_proc
+    where oid =
+      'private.guard_qbo_production_connection_intent_v1()'::regprocedure
+      and prosecdef
+      and pg_catalog.array_length(proconfig, 1) = 1
+      and pg_catalog.replace(
+        pg_catalog.split_part(proconfig[1], '=', 2),
+        '"',
+        ''
+      ) = ''
+  ),
+  'the dormant-mode trigger guard is security definer with an empty search path'
+);
+select ok(
+  not pg_catalog.has_function_privilege(
+    'authenticated',
+    'private.guard_qbo_production_connection_intent_v1()',
+    'EXECUTE'
+  )
+  and not pg_catalog.has_function_privilege(
+    'service_role',
+    'private.guard_qbo_production_connection_intent_v1()',
+    'EXECUTE'
+  ),
+  'customer and service roles cannot execute the dormant-mode guard directly'
+);
+
+select set_config(
+  'request.jwt.claims',
+  '{"role":"authenticated","sub":"a9f00000-0000-4000-8000-000000000001"}',
+  true
+);
+set local role authenticated;
+select ok(
+  pg_temp.raises_sqlstate(
+    $$select public.create_integration_connection_intent_v1(
+      pg_temp.qbo_connection_intent(
+        'e9f00000-0000-4000-8000-000000000099',
+        'b9f00000-0000-4000-8000-000000000001',
+        'd9f00000-0000-4000-8000-000000000001'
+      )
+    )$$,
+    '42501'
+  ),
+  'authenticated QBO Production intent creation is denied while configuration is absent'
+);
+reset role;
+set local search_path = public, extensions;
+select is(
+  (
+    select pg_catalog.count(*)::text
+    from private.integration_connections
+    where id = 'e9f00000-0000-4000-8000-000000000099'
+  ),
+  '0',
+  'disabled direct-RPC access creates no connection mutation'
+);
+
 set local role integration_qbo_configuration_authority;
 create temporary table qbo_production_configuration_create_result on commit drop as
 select public.register_qbo_runtime_configuration_v2(

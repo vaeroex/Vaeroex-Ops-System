@@ -271,6 +271,7 @@ const approvedProtectedPaths = new Set([
   "supabase/migrations/20260826190801_qbo_precontract_initialization_retirement.sql",
   "supabase/migrations/20260826222000_qbo_provider_result_evidence_and_ar_aging_recovery.sql",
   "supabase/migrations/20260827033058_qbo_production_convergence.sql",
+  "supabase/migrations/20260902191322_qbo_production_dormant_connection_gate.sql",
   "supabase/tests/external_integrations_phase_8b_qbo_sandbox_validation.test.sql",
   "supabase/tests/external_integrations_phase_8b_credential_refresh_recovery.test.sql",
   "supabase/tests/external_integrations_phase_8b_same_generation_reauthorization.test.sql",

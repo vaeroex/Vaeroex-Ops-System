@@ -17,12 +17,24 @@ const excludes = (value, pattern, message) => {
   assertionCount += 1;
   assert.doesNotMatch(value, pattern, message);
 };
+const precedes = (value, earlier, later, message) => {
+  assertionCount += 1;
+  const earlierIndex = value.indexOf(earlier);
+  const laterIndex = value.indexOf(later);
+  assert.ok(
+    earlierIndex >= 0 && laterIndex >= 0 && earlierIndex < laterIndex,
+    message
+  );
+};
 
 const migration = read("supabase/migrations/20260827033058_qbo_production_convergence.sql");
+const dormantMigration = read("supabase/migrations/20260902191322_qbo_production_dormant_connection_gate.sql");
 const connect = read("app/api/integrations/qbo/connect/route.ts");
 const disconnect = read("app/api/integrations/qbo/disconnect/route.ts");
 const disconnectPage = read("app/app/settings/integrations/quickbooks/disconnect/page.tsx");
 const reauthorize = read("app/api/integrations/qbo/reauthorize/route.ts");
+const settings = read("app/app/settings/page.tsx");
+const customerAvailability = read("lib/integrations/control-plane/qbo-customer-availability.ts");
 const oauth = read("lib/integrations/control-plane/qbo-customer-oauth.ts");
 const customerRoutes = read("lib/integrations/control-plane/qbo-customer-routes.ts");
 const customerStatus = read("lib/integrations/control-plane/customer-status.ts");
@@ -60,6 +72,29 @@ const publicCallbackGrant = terraform.match(
 const providerEgressModes = terraform.match(
   /provider_egress_modes = toset\(\[([\s\S]*?)\]\)/
 )?.[0] ?? "";
+
+matches(customerAvailability, /import "server-only"/, "customer connection availability is server-only");
+matches(customerAvailability, /QBO_PRODUCTION_CUSTOMER_CONNECTIONS_ENABLED/, "customer connection availability uses the explicit Production gate");
+matches(customerAvailability, /process\.env\[QBO_CUSTOMER_CONNECTIONS_ENABLED_ENV\] === "true"/, "customer connection availability is absent-by-default and requires exact opt-in");
+excludes(customerAvailability, /NEXT_PUBLIC_/, "customer connection availability is never exposed to the browser environment");
+matches(customerAvailability, /status: 404/, "disabled customer connection routes return the established not-found response");
+matches(customerAvailability, /"cache-control": "no-store"/, "disabled customer connection responses are not cached");
+matches(settings, /const qboConnectionsEnabled = qboProductionCustomerConnectionsEnabled\(\)/, "settings derives QBO visibility from the server-only gate");
+matches(settings, /const \{ data: connections \} = qboConnectionsEnabled\s*\? await supabase[\s\S]*\.from\("integration_connection_summaries"\)[\s\S]*: \{ data: \[\] \}/, "disabled settings skip the connection-summary query");
+matches(settings, /\{qboConnectionsEnabled \? \([\s\S]*<ConnectionStatusPanel/, "disabled settings do not render the QuickBooks connection panel");
+precedes(connect, "if (!qboProductionCustomerConnectionsEnabled())", "assertQboCustomerRequestOrigin(request)", "connect denies disabled access before request processing");
+precedes(connect, "if (!qboProductionCustomerConnectionsEnabled())", "requireWorkspaceAccess()", "connect denies disabled access before authentication and database access");
+precedes(connect, "const configuration = qboProductionOAuthConfiguration()", "createIntegrationConnectionIntent(", "connect validates OAuth configuration before creating a pending intent");
+precedes(reauthorize, "if (!qboProductionCustomerConnectionsEnabled())", "requireWorkspaceAccess()", "reauthorization denies disabled access before authentication and database access");
+precedes(disconnect, "if (!qboProductionCustomerConnectionsEnabled())", "requireWorkspaceAccess()", "disconnect denies disabled access before authentication and database access");
+precedes(disconnectPage, "if (!qboProductionCustomerConnectionsEnabled()) notFound()", "requireWorkspacePage()", "the disabled disconnect page stops before authentication and integration queries");
+matches(dormantMigration, /before insert on private\.integration_connections/, "the dormant database guard runs before any connection mutation");
+matches(dormantMigration, /new\.provider_key = 'quickbooks_online'[\s\S]*new\.provider_environment = 'production'/, "the dormant database guard is QBO Production-specific");
+matches(dormantMigration, /configuration\.configuration_version = new\.configuration_version[\s\S]*configuration\.enabled/, "the dormant database guard requires the exact enabled runtime configuration");
+matches(dormantMigration, /message = 'qbo_production_customer_connections_disabled'/, "disabled direct RPC access fails closed with a stable diagnostic");
+matches(dormantMigration, /security definer[\s\S]*set search_path = ''/, "the dormant database guard fixes an empty search path");
+matches(dormantMigration, /revoke all on function[\s\S]*from public, anon, authenticated, service_role/, "no caller receives direct execution authority over the trigger guard");
+excludes(terraform, /QBO_PRODUCTION_CUSTOMER_CONNECTIONS_ENABLED/, "Production runtime IaC cannot implicitly enable the customer connection surface");
 
 matches(connect, /requireWorkspaceAccess\(\)/, "connect derives workspace authority from the server session");
 matches(connect, /\.eq\("workspace_id", access\.workspaceId\)/, "connect binds the entity to the authorized workspace");
