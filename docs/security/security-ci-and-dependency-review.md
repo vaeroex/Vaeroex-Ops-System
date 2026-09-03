@@ -23,7 +23,7 @@ Run `pnpm audit --prod` on every dependency update. The accepted Sharp advisory 
 
 ## Three.js clock deprecation
 
-Vaeroex application components consume React Three Fiber's frame-state `clock`; they do not instantiate `THREE.Clock`. The warning is emitted by `@react-three/fiber` 9.6.1, which creates the clock internally, against Three.js 0.185.1. React Three Fiber's maintainers have identified the `THREE.Timer` move as a next-major concern because the current stable package supports Three versions older than `Timer`.
+Vaeroex application components consume React Three Fiber's frame-state `clock`; they do not instantiate `THREE.Clock`. The warning is emitted by `@react-three/fiber` 9.7.0, which creates the clock internally, against Three.js 0.185.1. React Three Fiber's maintainers have identified the `THREE.Timer` move as a next-major concern because the current stable package supports Three versions older than `Timer`.
 
 Do not hide the warning, patch `node_modules`, downgrade Three, or adopt a pre-release renderer solely to remove it. Upgrade when a stable React Three Fiber release owns the Timer transition, then rerun desktop, mobile, reduced-motion, and non-WebGL visual checks.
 
