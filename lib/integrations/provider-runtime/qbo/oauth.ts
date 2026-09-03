@@ -11,20 +11,29 @@ import {
 } from "@/lib/integrations/credentials/contracts";
 import { ProviderCredentialRefreshFailure } from "@/lib/integrations/credentials/provider-failure";
 import type { ProviderApplicationSecret } from "@/lib/integrations/credentials/secret-manager";
+import { validateProviderOAuthCallbackUri } from "@/lib/integrations/credentials/oauth-policy";
 import {
   QboProviderEnvironmentSchema,
   type QboProviderEnvironment
 } from "@/lib/integrations/provider-runtime/qbo/client";
+import {
+  QBO_ACCOUNTING_SCOPE,
+  QBO_AUTHORIZATION_ENDPOINT,
+  QBO_REVOCATION_ENDPOINT,
+  QBO_TOKEN_ENDPOINT,
+  qboProviderOAuthPolicy
+} from "@/lib/integrations/provider-runtime/qbo/oauth-policy";
 import { QBO_PROVIDER_KEY } from "@/lib/integrations/providers/qbo/contracts";
 
-export const QBO_ACCOUNTING_SCOPE = "com.intuit.quickbooks.accounting" as const;
-export const QBO_AUTHORIZATION_ENDPOINT =
-  "https://appcenter.intuit.com/connect/oauth2" as const;
-export const QBO_TOKEN_ENDPOINT =
-  "https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer" as const;
-export const QBO_REVOCATION_ENDPOINT =
-  "https://developer.api.intuit.com/v2/oauth2/tokens/revoke" as const;
-export const QBO_OAUTH_POLICY_VERSION = "qbo_oauth_runtime_policy_v1" as const;
+export {
+  QBO_ACCOUNTING_SCOPE,
+  QBO_AUTHORIZATION_ENDPOINT,
+  QBO_OAUTH_POLICY_VERSION,
+  QBO_PROVIDER_OAUTH_POLICY_REGISTRY,
+  QBO_REVOCATION_ENDPOINT,
+  QBO_TOKEN_ENDPOINT
+} from "@/lib/integrations/provider-runtime/qbo/oauth-policy";
+
 export const QBO_OAUTH_MAX_RESPONSE_BYTES = 64 * 1024;
 
 const QboRealmIdSchema = z
@@ -206,9 +215,16 @@ export function createQboAuthorizationUrl(input: {
   clientId: string;
   redirectUri: string;
   state: string;
+  providerEnvironment?: QboProviderEnvironment;
 }) {
   const clientId = z.string().min(8).max(512).parse(input.clientId);
-  const redirectUri = z.string().url().max(2_048).parse(input.redirectUri);
+  const providerEnvironment = QboProviderEnvironmentSchema.parse(
+    input.providerEnvironment ?? "production"
+  );
+  const redirectUri = validateProviderOAuthCallbackUri(
+    qboProviderOAuthPolicy(providerEnvironment),
+    input.redirectUri
+  );
   const state = z.string().min(43).max(256).regex(/^[A-Za-z0-9_-]+$/).parse(input.state);
   const url = new URL(QBO_AUTHORIZATION_ENDPOINT);
   url.searchParams.set("client_id", clientId);
@@ -219,7 +235,11 @@ export function createQboAuthorizationUrl(input: {
   return url.toString();
 }
 
-export const createQboSandboxAuthorizationUrl = createQboAuthorizationUrl;
+export function createQboSandboxAuthorizationUrl(
+  input: Omit<Parameters<typeof createQboAuthorizationUrl>[0], "providerEnvironment">
+) {
+  return createQboAuthorizationUrl({ ...input, providerEnvironment: "sandbox" });
+}
 
 export class QboOAuthCredentialProvider {
   readonly providerKey = QBO_PROVIDER_KEY;
@@ -235,7 +255,10 @@ export class QboOAuthCredentialProvider {
     transport: QboOAuthHttpTransport;
   }) {
     this.environment = QboProviderEnvironmentSchema.parse(input.environment);
-    this.#redirectUri = z.string().url().max(2_048).parse(input.redirectUri);
+    this.#redirectUri = validateProviderOAuthCallbackUri(
+      qboProviderOAuthPolicy(this.environment),
+      input.redirectUri
+    );
     this.#transport = input.transport;
   }
 

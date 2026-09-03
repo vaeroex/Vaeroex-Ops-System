@@ -7,11 +7,14 @@ import {
   OAuthReturnIntentSchema,
   PHASE_5_OAUTH_STATE_BYTES,
   PHASE_5_OAUTH_STATE_TTL_SECONDS,
-  PHASE_8B_REAUTHORIZATION_REDIRECT_URI,
-  PHASE_8B_REAUTHORIZATION_RETURN_INTENT,
   type CreateOAuthStateCommand,
   type CreateReauthorizationStateCommand
 } from "@/lib/integrations/credentials/contracts";
+import {
+  assertProviderOAuthPolicyBinding,
+  normalizeProviderOAuthReturnPath,
+  type ProviderOAuthPolicy
+} from "@/lib/integrations/credentials/oauth-policy";
 
 export function oauthStateHash(state: string) {
   if (!/^[A-Za-z0-9_-]{43}$/.test(state)) {
@@ -47,8 +50,10 @@ export function createOAuthStateIntent(
     requestedScopes: readonly string[];
     returnIntent: string;
   },
+  policy: ProviderOAuthPolicy,
   now = new Date()
 ) {
+  const checkedPolicy = assertProviderOAuthPolicyBinding(policy, input);
   const state = randomBytes(PHASE_5_OAUTH_STATE_BYTES).toString("base64url");
   const createdAt = now.toISOString();
   const expiresAt = new Date(
@@ -59,7 +64,10 @@ export function createOAuthStateIntent(
     contractVersion: CREDENTIAL_SECURITY_CONTRACT_VERSIONS.oauthState,
     id: randomUUID(),
     requestedScopes: sortedCredentialScopes(input.requestedScopes),
-    returnIntent: normalizeOAuthReturnIntent(input.returnIntent),
+    returnIntent: normalizeProviderOAuthReturnPath(
+      checkedPolicy,
+      input.returnIntent
+    ),
     stateHash: oauthStateHash(state),
     createdAt,
     expiresAt
@@ -87,8 +95,10 @@ export function createReauthorizationStateIntent(
   > & {
     requestedScopes: readonly string[];
   },
+  policy: ProviderOAuthPolicy,
   now = new Date()
 ) {
+  const checkedPolicy = assertProviderOAuthPolicyBinding(policy, input);
   const state = `r1_${randomBytes(PHASE_5_OAUTH_STATE_BYTES).toString("base64url")}`;
   const createdAt = now.toISOString();
   const expiresAt = new Date(
@@ -99,8 +109,8 @@ export function createReauthorizationStateIntent(
     contractVersion: CREDENTIAL_SECURITY_CONTRACT_VERSIONS.reauthorizationState,
     id: randomUUID(),
     requestedScopes: sortedCredentialScopes(input.requestedScopes),
-    redirectUri: PHASE_8B_REAUTHORIZATION_REDIRECT_URI,
-    returnIntent: PHASE_8B_REAUTHORIZATION_RETURN_INTENT,
+    redirectUri: checkedPolicy.callbackUri,
+    returnIntent: checkedPolicy.defaultReauthorizationReturnPath,
     authorizationPurpose: "reauthorization",
     reasonCode: "expired_credential_recovery",
     stateHash: reauthorizationStateHash(state),

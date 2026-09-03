@@ -2,6 +2,12 @@ import "server-only";
 
 import { z } from "zod";
 
+import {
+  normalizeProviderOAuthReturnPath,
+  validateProviderOAuthCallbackUri
+} from "@/lib/integrations/credentials/oauth-policy";
+import { QBO_PRODUCTION_OAUTH_POLICY } from "@/lib/integrations/provider-runtime/qbo/oauth-policy";
+
 const ConnectRequestSchema = z
   .object({
     businessEntityId: z.string().uuid(),
@@ -82,7 +88,13 @@ export function qboProductionOAuthConfiguration() {
   if (!clientId || !redirectUri || !returnIntent) {
     throw new Error("qbo_production_oauth_configuration_missing");
   }
-  const callback = new URL(redirectUri);
+  const callback = new URL(
+    validateProviderOAuthCallbackUri(QBO_PRODUCTION_OAUTH_POLICY, redirectUri)
+  );
+  const normalizedReturnIntent = normalizeProviderOAuthReturnPath(
+    QBO_PRODUCTION_OAUTH_POLICY,
+    returnIntent
+  );
   const callbackOrigin = callback.origin;
   if (
     callback.protocol !== "https:" ||
@@ -92,11 +104,13 @@ export function qboProductionOAuthConfiguration() {
     callback.hash ||
     /(?:sandbox|phase8b|p8b|sslip\.io)/i.test(callback.toString()) ||
     callbackOrigin === "https://appcenter.intuit.com" ||
-    !returnIntent.startsWith("/") ||
-    returnIntent.startsWith("//") ||
-    /(?:sandbox|phase8b|p8b)/i.test(returnIntent)
+    /(?:sandbox|phase8b|p8b)/i.test(normalizedReturnIntent)
   ) {
     throw new Error("qbo_production_oauth_configuration_invalid");
   }
-  return { clientId, redirectUri: callback.toString(), returnIntent } as const;
+  return {
+    clientId,
+    redirectUri: callback.toString(),
+    returnIntent: normalizedReturnIntent
+  } as const;
 }

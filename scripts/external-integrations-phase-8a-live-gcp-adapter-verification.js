@@ -41,6 +41,7 @@ const canonical = require("../lib/integrations/contracts/canonical.ts");
 const credentialContracts = require("../lib/integrations/credentials/contracts.ts");
 const credentialKms = require("../lib/integrations/credentials/kms.ts");
 const credentialBroker = require("../lib/integrations/credentials/broker.ts");
+const syntheticProvider = require("../lib/integrations/credentials/synthetic-provider.ts");
 const secretManager = require("../lib/integrations/credentials/secret-manager.ts");
 
 const CONFIRMATION = "vaeroex-phase8a-disposable-nonproduction-only";
@@ -355,6 +356,7 @@ async function main() {
       refreshCredential: unavailable,
       revokeCredential: unavailable
     },
+    providerOAuthPolicy: syntheticProvider.SYNTHETIC_OAUTH_POLICY,
     clock: () => new Date("2026-08-22T12:00:00.000Z")
   });
   const readCommand = {

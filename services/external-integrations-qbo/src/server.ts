@@ -8,7 +8,6 @@ import { z } from "zod";
 import { canonicalContractJson, contractSha256 } from "@/lib/integrations/contracts/canonical";
 import { BoundedIdentifierSchema, UuidSchema } from "@/lib/integrations/contracts/primitives";
 import {
-  AuthorizedProviderEntityEvidenceSchema,
   IntegrationCredentialBroker,
   ProviderAccessCredential,
   ProviderCredentialReadFailure,
@@ -67,6 +66,13 @@ import {
 } from "@/lib/integrations/persistence/runtime-repository";
 import { resolveProviderAccessCredential } from "@/lib/integrations/provider-runtime/credential-resolution";
 import {
+  assertAuthorizedProviderEntityEvidence,
+  assertCredentialEnvelopeMatchesProviderOAuthPolicy,
+  normalizeProviderOAuthReturnPath,
+  validateProviderOAuthCallbackUri,
+  type ProviderOAuthPolicy
+} from "@/lib/integrations/credentials/oauth-policy";
+import {
   parseQboOAuthCallbackHandoff,
   sanitizedQboOAuthConfirmationUrl
 } from "@/lib/integrations/provider-runtime/qbo/callback-handoff";
@@ -77,6 +83,7 @@ import {
   QBO_ACCOUNTING_SCOPE,
   QboOAuthCredentialProvider
 } from "@/lib/integrations/provider-runtime/qbo/oauth";
+import { QBO_PRODUCTION_OAUTH_POLICY } from "@/lib/integrations/provider-runtime/qbo/oauth-policy";
 import {
   QBO_WEBHOOK_MAX_RAW_BODY_BYTES,
   QBO_WEBHOOK_SIGNATURE_HEADER,
@@ -243,11 +250,10 @@ async function readRawBody(request: IncomingMessage, maximumBytes: number) {
 }
 
 function callbackUrl() {
-  const value = new URL(config.callbackUrl ?? "");
-  if (value.protocol !== "https:" || value.username || value.password || value.search || value.hash) {
-    throw new Error("qbo_production_callback_invalid");
-  }
-  return value.toString();
+  return validateProviderOAuthCallbackUri(
+    QBO_PRODUCTION_OAUTH_POLICY,
+    config.callbackUrl ?? ""
+  );
 }
 
 function queueConfiguration() {
@@ -322,6 +328,7 @@ function brokerDependencies(db: QboProductionDatabase) {
     kmsKeyResource,
     secrets,
     provider,
+    providerOAuthPolicy: QBO_PRODUCTION_OAUTH_POLICY,
     authorizedEntityVerifier: verifier
   });
   return { broker, kms, kmsKeyResource, provider, secrets, verifier } as const;
@@ -340,26 +347,35 @@ async function exchangeAndVerify(
     requestedScopes: readonly string[];
     consumedAt: string;
   },
-  dependencies: ReturnType<typeof brokerDependencies>
+  dependencies: ReturnType<typeof brokerDependencies>,
+  policy: ProviderOAuthPolicy,
+  purpose: "authorization" | "reauthorization"
 ) {
   const secret = await dependencies.secrets.access("quickbooks_online", "production");
-  const envelope = CredentialEnvelopeSchema.parse(await dependencies.provider.exchangeAuthorizationCode({
-    authorizationCode: callback.code,
-    externalAuthorizedEntityReference: callback.realmId,
-    applicationSecret: secret,
-    requestedScopes: consumed.requestedScopes,
-    now: new Date(consumed.consumedAt)
-  }));
-  const evidence = AuthorizedProviderEntityEvidenceSchema.parse(await dependencies.verifier.verify({
-    externalAuthorizedEntityReference: callback.realmId,
-    credential: new ProviderAccessCredential({
-      providerKey: envelope.providerKey,
-      providerEnvironment: envelope.environment,
-      accessExpiresAt: envelope.accessExpiresAt,
-      grantedScopes: envelope.grantedScopes,
-      accessToken: envelope.accessToken
+  const envelope = assertCredentialEnvelopeMatchesProviderOAuthPolicy(
+    policy,
+    await dependencies.provider.exchangeAuthorizationCode({
+      authorizationCode: callback.code,
+      externalAuthorizedEntityReference: callback.realmId,
+      applicationSecret: secret,
+      requestedScopes: consumed.requestedScopes,
+      now: new Date(consumed.consumedAt)
     })
-  }));
+  );
+  const evidence = assertAuthorizedProviderEntityEvidence(
+    policy,
+    await dependencies.verifier.verify({
+      externalAuthorizedEntityReference: callback.realmId,
+      credential: new ProviderAccessCredential({
+        providerKey: envelope.providerKey,
+        providerEnvironment: envelope.environment,
+        accessExpiresAt: envelope.accessExpiresAt,
+        grantedScopes: envelope.grantedScopes,
+        accessToken: envelope.accessToken
+      })
+    }),
+    { externalAuthorizedEntityReference: callback.realmId, purpose }
+  );
   if (evidence.externalAuthorizedEntityReference !== callback.realmId) {
     throw new Error("qbo_production_authorized_entity_mismatch");
   }
@@ -416,7 +432,13 @@ async function completeInitialAuthorization(
     db.role("integration_oauth_ingress_authority")
   );
   if (!consumed.accepted) throw new Error("qbo_production_oauth_state_rejected");
-  const { envelope, evidence } = await exchangeAndVerify(callback, consumed, dependencies);
+  const { envelope, evidence } = await exchangeAndVerify(
+    callback,
+    consumed,
+    dependencies,
+    QBO_PRODUCTION_OAUTH_POLICY,
+    "authorization"
+  );
   const credentialId = randomUUID();
   const encrypted = await encryptedCredential({
     envelope,
@@ -536,7 +558,13 @@ async function completeReauthorization(
   if (!consumed.accepted || consumed.providerEntityReferenceFingerprint !== realmFingerprint) {
     throw new Error("qbo_production_reauthorization_state_rejected");
   }
-  const { envelope, evidence } = await exchangeAndVerify(callback, consumed, dependencies);
+  const { envelope, evidence } = await exchangeAndVerify(
+    callback,
+    consumed,
+    dependencies,
+    QBO_PRODUCTION_OAUTH_POLICY,
+    "reauthorization"
+  );
   const credentialId = randomUUID();
   const encrypted = await encryptedCredential({
     envelope,
@@ -1187,7 +1215,10 @@ async function handleIngress(request: IncomingMessage, response: ServerResponse,
   }));
   safeEvent("oauth_callback_handoff_accepted");
   const result = await callBroker("/oauth/complete", callback);
-  const returnIntent = z.string().startsWith("/").max(512).parse(result.returnIntent);
+  const returnIntent = normalizeProviderOAuthReturnPath(
+    QBO_PRODUCTION_OAUTH_POLICY,
+    z.string().startsWith("/").max(512).parse(result.returnIntent)
+  );
   const appOrigin = new URL(env("QBO_APPLICATION_ORIGIN"));
   const target = new URL(returnIntent, appOrigin);
   if (target.origin !== appOrigin.origin) throw new Error("qbo_production_return_intent_invalid");

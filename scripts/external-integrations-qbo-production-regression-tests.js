@@ -37,6 +37,7 @@ const settings = read("app/app/settings/page.tsx");
 const customerAvailability = read("lib/integrations/control-plane/qbo-customer-availability.ts");
 const oauth = read("lib/integrations/control-plane/qbo-customer-oauth.ts");
 const customerRoutes = read("lib/integrations/control-plane/qbo-customer-routes.ts");
+const qboOAuthPolicy = read("lib/integrations/provider-runtime/qbo/oauth-policy.ts");
 const customerStatus = read("lib/integrations/control-plane/customer-status.ts");
 const connectionPanel = read("components/integrations/ConnectionStatusPanel.tsx");
 const controlPlaneRepository = read("lib/integrations/persistence/control-plane-repository.ts");
@@ -133,7 +134,8 @@ matches(disconnectPage, /requireWorkspacePage\(\)/, "disconnect URL is an authen
 matches(disconnectPage, /\.eq\("workspace_id", workspaceId\)/, "disconnect page lists only the active workspace's connections");
 matches(disconnectPage, /action="\/api\/integrations\/qbo\/disconnect"/, "disconnect confirmation posts only to the checked route");
 matches(disconnectPage, /Historical Vaeroex records and audit evidence remain unchanged/, "disconnect truthfully preserves historical evidence");
-matches(customerRoutes, /QBO_CUSTOMER_DISCONNECT_PATH\s*=\s*[\s\S]*"\/app\/settings\/integrations\/quickbooks\/disconnect"/, "disconnect has one stable customer-facing route");
+matches(customerRoutes, /QBO_CUSTOMER_DISCONNECT_PATH[\s\S]*oauth-policy/, "disconnect route constant is QBO policy-owned");
+matches(qboOAuthPolicy, /QBO_CUSTOMER_DISCONNECT_PATH\s*=[\s\S]*"\/app\/settings\/integrations\/quickbooks\/disconnect"/, "disconnect has one stable customer-facing route");
 matches(connectionPanel, /QBO_CUSTOMER_DISCONNECT_PATH/, "settings exposes the customer disconnect surface");
 matches(customerStatus, /connection\.status === "disconnecting"[\s\S]*status = "Disconnecting"/, "customer status reports a pending disconnect truthfully");
 matches(controlPlaneRepository, /request_integration_disconnect_v1/, "the customer route delegates to the audited database disconnect RPC");
