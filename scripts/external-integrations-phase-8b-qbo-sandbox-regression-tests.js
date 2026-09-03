@@ -52,6 +52,7 @@ const credentialBroker = require("../lib/integrations/credentials/broker.ts");
 const credentialKms = require("../lib/integrations/credentials/kms.ts");
 const credentialRedaction = require("../lib/integrations/credentials/redaction.ts");
 const oauthState = require("../lib/integrations/credentials/oauth-state.ts");
+const qboOAuthPolicy = require("../lib/integrations/provider-runtime/qbo/oauth-policy.ts");
 const canonical = require("../lib/integrations/contracts/canonical.ts");
 const cloudTaskDelivery = require(
   "../services/external-integrations-qbo-sandbox/src/cloud-task-delivery.ts"
@@ -397,7 +398,7 @@ async function testOAuth() {
   const authorizationUrl = new URL(
     phase8b.createQboSandboxAuthorizationUrl({
       clientId: "phase8b-development-client",
-      redirectUri: "https://phase8b.example.test/oauth/callback",
+      redirectUri: qboOAuthPolicy.QBO_PHASE_8B_CALLBACK_URI,
       state: "a".repeat(43)
     })
   );
@@ -408,7 +409,7 @@ async function testOAuth() {
     "authorization URL contains only the five reviewed OAuth parameters"
   );
   equal(authorizationUrl.searchParams.get("client_id"), "phase8b-development-client", "client ID is exact");
-  equal(authorizationUrl.searchParams.get("redirect_uri"), "https://phase8b.example.test/oauth/callback", "redirect URI is exact");
+  equal(authorizationUrl.searchParams.get("redirect_uri"), qboOAuthPolicy.QBO_PHASE_8B_CALLBACK_URI, "redirect URI is exact");
   equal(authorizationUrl.searchParams.get("response_type"), "code", "authorization-code flow is exact");
   equal(authorizationUrl.searchParams.get("scope"), phase8b.QBO_ACCOUNTING_SCOPE, "scope is exact");
   equal(authorizationUrl.searchParams.getAll("scope").length, 1, "scope is not duplicated");
@@ -416,6 +417,15 @@ async function testOAuth() {
   equal(authorizationUrl.searchParams.has("prompt"), false, "Vaeroex cannot request a silent authorization path");
   equal(authorizationUrl.searchParams.has("realmId"), false, "authorization URL cannot choose realm authority");
   equal(authorizationUrl.toString().includes("quickbooks.payment"), false, "payments scope is absent");
+  throws(
+    () => phase8b.createQboSandboxAuthorizationUrl({
+      clientId: "phase8b-development-client",
+      redirectUri: "https://phase8b.example.test/oauth/callback",
+      state: "a".repeat(43)
+    }),
+    /callback_uri_denied/,
+    "sandbox authorization URL rejects caller-selected callback routes"
+  );
 
   const callbackBoundary = read(
     "docs/architecture/external-integrations-phase-8b-oauth-callback-log-boundary.md"
@@ -463,7 +473,7 @@ async function testOAuth() {
     clientSecret: "phase8b-client-secret-canary-0001"
   });
   const oauth = new phase8b.QboSandboxOAuthCredentialProvider({
-    redirectUri: "https://phase8b.example.test/oauth/callback",
+    redirectUri: qboOAuthPolicy.QBO_PHASE_8B_CALLBACK_URI,
     transport
   });
   const envelope = await oauth.exchangeAuthorizationCode({
@@ -505,7 +515,7 @@ async function testOAuth() {
     "arbitrary or payment scopes fail closed"
   );
   const mismatchedScopeOauth = new phase8b.QboSandboxOAuthCredentialProvider({
-    redirectUri: "https://phase8b.example.test/oauth/callback",
+    redirectUri: qboOAuthPolicy.QBO_PHASE_8B_CALLBACK_URI,
     transport: {
       async postForm() {
         return {
@@ -674,7 +684,7 @@ function testCloudTaskDeliveryIdentity() {
 }
 
 async function testSameGenerationReauthorizationBroker() {
-  const callback = credentialContracts.PHASE_8B_REAUTHORIZATION_REDIRECT_URI;
+  const callback = qboOAuthPolicy.QBO_PHASE_8B_CALLBACK_URI;
   equal(
     callback,
     "https://p8b-oauth-34-120-247-116.sslip.io/oauth/callback",
@@ -850,6 +860,7 @@ async function testSameGenerationReauthorizationBroker() {
         throw new Error("unexpected_revoke");
       }
     },
+    providerOAuthPolicy: qboOAuthPolicy.QBO_PHASE_8B_OAUTH_POLICY,
     authorizedEntityVerifier: {
       async verify(input) {
         calls.verified += 1;
@@ -861,6 +872,8 @@ async function testSameGenerationReauthorizationBroker() {
           );
         });
         return {
+          providerKey: "quickbooks_online",
+          providerEnvironment: "sandbox",
           externalAuthorizedEntityReference: realmId,
           providerEntityType: "company",
           safeDisplayName: "Phase 8B Sandbox Company",
@@ -976,6 +989,7 @@ async function testSameGenerationReauthorizationBroker() {
       async refreshCredential() { throw new Error("unexpected_refresh"); },
       async revokeCredential() { throw new Error("unexpected_revoke"); }
     },
+    providerOAuthPolicy: qboOAuthPolicy.QBO_PHASE_8B_OAUTH_POLICY,
     clock: () => now
   });
   equal(
@@ -1080,7 +1094,8 @@ async function testExpiredRefreshLeaseReclamationBroker() {
         sensitiveBoundaryCalls += 1;
         throw new Error("unexpected_revoke");
       }
-    }
+    },
+    providerOAuthPolicy: qboOAuthPolicy.QBO_PHASE_8B_OAUTH_POLICY
   });
 
   const result = await broker.reclaimExpiredRefreshLease({
@@ -1265,6 +1280,7 @@ async function runRefreshRotationCase(mode) {
         throw new Error("unexpected_revoke");
       }
     },
+    providerOAuthPolicy: qboOAuthPolicy.QBO_PHASE_8B_OAUTH_POLICY,
     clock: () => now
   });
   const result = await broker.refreshCredential({
@@ -1290,7 +1306,7 @@ async function runRefreshRotationCase(mode) {
 async function testQboRefreshRotationPolicy() {
   equal(
     new phase8b.QboSandboxOAuthCredentialProvider({
-      redirectUri: "https://phase8b.example.test/oauth/callback",
+      redirectUri: qboOAuthPolicy.QBO_PHASE_8B_CALLBACK_URI,
       transport: { async postForm() { throw new Error("unused"); } }
     }).refreshTokenRotationPolicy,
     "returned_token_authoritative",
@@ -1373,6 +1389,7 @@ async function testQboRefreshRotationPolicy() {
         async refreshCredential() { throw new Error("unexpected_refresh"); },
         async revokeCredential() { throw new Error("unexpected_revoke"); }
       },
+      providerOAuthPolicy: qboOAuthPolicy.QBO_PHASE_8B_OAUTH_POLICY,
       clock: () => tested.now
     });
     equal(
@@ -1510,6 +1527,7 @@ async function testCredentialReadDiagnostics() {
         async refreshCredential() { throw new Error("unexpected_refresh"); },
         async revokeCredential() { throw new Error("unexpected_revoke"); }
       },
+      providerOAuthPolicy: qboOAuthPolicy.QBO_PHASE_8B_OAUTH_POLICY,
       clock: () => now
     });
     return broker.readProviderAccessCredential(input);
@@ -3006,7 +3024,7 @@ function testMigrationBoundary() {
   ok(/isReauthorizationOAuthState\(callback\.state\)/.test(service), "callback routing distinguishes reauthorization state before completion");
   ok(/if \(isReauthorizationOAuthState\(callback\.state\)\)[\s\S]+throw new Error\("phase8b_reauthorization_completion_failed"\)/.test(service), "reauthorization cannot fall back into initial mapping finalization");
   equal(service.includes('integerEnv("PHASE8B_CONNECTION_ROW_VERSION", 1)'), false, "broker no longer hard-codes connection row version one");
-  ok(/callbackUrl !== PHASE_8B_REAUTHORIZATION_REDIRECT_URI/.test(service), "runtime fails closed unless callback configuration equals the approved edge");
+  ok(/validateProviderOAuthCallbackUri\(QBO_PHASE_8B_OAUTH_POLICY, callbackUrl\)/.test(service), "runtime fails closed unless callback configuration equals the approved edge policy");
   ok(/credentialAadDigest\(credential\.aadContext\)/.test(service) && /companyVerifier\.verify/.test(service), "recovery revalidates canonical AAD and current sandbox company evidence");
   ok(/cleanupCapabilityAuthorized\(request\)/.test(service), "disconnect requires an application-level cleanup capability");
   ok(/url\.pathname === "\/webhooks\/verify"/.test(service), "private broker owns raw webhook verification");
@@ -3543,7 +3561,7 @@ async function testCredentialRefreshFanoutAndCallbackSafety() {
   ]) {
     const boundaries = [];
     const oauth = new phase8b.QboSandboxOAuthCredentialProvider({
-      redirectUri: "https://phase8b.example.test/oauth/callback",
+      redirectUri: qboOAuthPolicy.QBO_PHASE_8B_CALLBACK_URI,
       transport: {
         async postForm() {
           return {

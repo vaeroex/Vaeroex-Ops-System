@@ -32,10 +32,6 @@ export const PHASE_5_OAUTH_STATE_TTL_SECONDS = 600 as const;
 export const PHASE_5_REFRESH_LEASE_SECONDS = 120 as const;
 export const PHASE_5_DIRECT_KMS_MAX_PLAINTEXT_BYTES = 32 * 1024;
 export const PHASE_5_MAX_AAD_BYTES = 4 * 1024;
-export const PHASE_8B_REAUTHORIZATION_REDIRECT_URI =
-  "https://p8b-oauth-34-120-247-116.sslip.io/oauth/callback" as const;
-export const PHASE_8B_REAUTHORIZATION_RETURN_INTENT =
-  "/phase8b/sandbox/reauthorized" as const;
 
 const SortedScopeSetSchema = z
   .array(BoundedIdentifierSchema)
@@ -60,7 +56,80 @@ export const OAuthReturnIntentSchema = z
   .string()
   .min(1)
   .max(256)
-  .regex(/^\/(?!\/)[A-Za-z0-9/_-]*$/);
+  .superRefine((value, context) => {
+    if (
+      !value.startsWith("/") ||
+      value.startsWith("//") ||
+      value.includes("\\") ||
+      value.includes("%") ||
+      value.includes("?") ||
+      value.includes("#") ||
+      value.includes("@") ||
+      value.includes(":") ||
+      value.includes("//") ||
+      /[\u0000-\u001f\u007f\s]/.test(value) ||
+      !/^\/[A-Za-z0-9/_-]*$/.test(value) ||
+      value.split("/").some(
+        (segment) =>
+          segment === "." || segment === ".." || segment.endsWith(".")
+      )
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "OAuth return intent must be a normalized local path"
+      });
+    }
+  });
+
+export const OAuthRedirectUriSchema = z
+  .string()
+  .url()
+  .max(2_048)
+  .startsWith("https://")
+  .superRefine((value, context) => {
+    if (
+      /[\u0000-\u001f\u007f\s]/.test(value) ||
+      value.includes("\\") ||
+      value.includes("%") ||
+      value.includes("@")
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "OAuth redirect URI contains unsafe characters"
+      });
+      return;
+    }
+    let parsed: URL;
+    try {
+      parsed = new URL(value);
+    } catch {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "OAuth redirect URI is malformed"
+      });
+      return;
+    }
+    if (
+      parsed.protocol !== "https:" ||
+      parsed.username !== "" ||
+      parsed.password !== "" ||
+      parsed.port !== "" ||
+      parsed.search !== "" ||
+      parsed.hash !== "" ||
+      parsed.hostname.endsWith(".") ||
+      parsed.pathname.includes("//") ||
+      parsed.pathname.split("/").some(
+        (segment) =>
+          segment === "." || segment === ".." || segment.endsWith(".")
+      ) ||
+      parsed.toString() !== value
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "OAuth redirect URI must be exact and normalized"
+      });
+    }
+  });
 
 export const OAuthStateHashSchema = Sha256FingerprintSchema;
 
@@ -132,12 +201,8 @@ export const ReauthorizationPurposeSchema = z.literal("reauthorization");
 export const ReauthorizationReasonSchema = z.literal(
   "expired_credential_recovery"
 );
-export const ReauthorizationRedirectUriSchema = z.literal(
-  PHASE_8B_REAUTHORIZATION_REDIRECT_URI
-);
-export const ReauthorizationReturnIntentSchema = z.literal(
-  PHASE_8B_REAUTHORIZATION_RETURN_INTENT
-);
+export const ReauthorizationRedirectUriSchema = OAuthRedirectUriSchema;
+export const ReauthorizationReturnIntentSchema = OAuthReturnIntentSchema;
 
 export const CreateReauthorizationStateCommandSchema = z
   .object({

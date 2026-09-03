@@ -352,6 +352,7 @@ async function bootstrap(seed) {
     kmsKeyResource,
     secrets: createSecretStore(),
     provider,
+    providerOAuthPolicy: credentials.SYNTHETIC_OAUTH_POLICY,
     clock
   });
   const authorization = await broker.beginAuthorization({
@@ -385,12 +386,12 @@ async function main() {
   equal(credentials.PHASE_5_OAUTH_STATE_BYTES, 32, "OAuth state uses 256 bits of entropy");
   throws(
     () => credentials.normalizeOAuthReturnIntent("https://attacker.example/callback"),
-    /Invalid/,
+    /OAuth return|Invalid/,
     "external return intents fail closed"
   );
   throws(
     () => credentials.normalizeOAuthReturnIntent("//attacker.example"),
-    /Invalid/,
+    /OAuth return|Invalid/,
     "scheme-relative return intents fail closed"
   );
   throws(
@@ -412,17 +413,21 @@ async function main() {
     "credential envelopes reject customer and display data"
   );
 
-  const stateFixture = credentials.createOAuthStateIntent({
-    workspaceId: id(1),
-    businessEntityId: id(2),
-    connectionId: id(3),
-    connectionGeneration: 1,
-    providerKey: "synthetic",
-    providerEnvironment: "test",
-    initiatedBy: id(4),
-    requestedScopes: [scope],
-    returnIntent: "/app/integrations"
-  }, new Date("2026-08-21T22:00:00.000Z"));
+  const stateFixture = credentials.createOAuthStateIntent(
+    {
+      workspaceId: id(1),
+      businessEntityId: id(2),
+      connectionId: id(3),
+      connectionGeneration: 1,
+      providerKey: "synthetic",
+      providerEnvironment: "test",
+      initiatedBy: id(4),
+      requestedScopes: [scope],
+      returnIntent: "/app/integrations"
+    },
+    credentials.SYNTHETIC_OAUTH_POLICY,
+    new Date("2026-08-21T22:00:00.000Z")
+  );
   equal(stateFixture.state.length, 43, "the browser receives a fixed-length base64url state");
   doesNotMatch(JSON.stringify(stateFixture.command), new RegExp(stateFixture.state), "persistence receives only the state hash");
   equal(
@@ -470,17 +475,21 @@ async function main() {
     stateHash: credentials.oauthStateHash("A".repeat(43))
   });
   equal(missing.reasonCode, "state_missing", "an unknown state hash fails closed");
-  const expiredFixture = credentials.createOAuthStateIntent({
-    workspaceId: id(11),
-    businessEntityId: id(12),
-    connectionId: id(13),
-    connectionGeneration: 1,
-    providerKey: "synthetic",
-    providerEnvironment: "test",
-    initiatedBy: id(14),
-    requestedScopes: [scope],
-    returnIntent: "/app/integrations"
-  }, new Date("2026-08-21T20:00:00.000Z"));
+  const expiredFixture = credentials.createOAuthStateIntent(
+    {
+      workspaceId: id(11),
+      businessEntityId: id(12),
+      connectionId: id(13),
+      connectionGeneration: 1,
+      providerKey: "synthetic",
+      providerEnvironment: "test",
+      initiatedBy: id(14),
+      requestedScopes: [scope],
+      returnIntent: "/app/integrations"
+    },
+    credentials.SYNTHETIC_OAUTH_POLICY,
+    new Date("2026-08-21T20:00:00.000Z")
+  );
   const expiredStore = new InMemoryCredentialStore();
   await expiredStore.createOAuthState(expiredFixture.command);
   const expired = await expiredStore.consumeOAuthState({
@@ -603,6 +612,7 @@ async function main() {
     kmsKeyResource,
     secrets: createSecretStore(),
     provider: new credentials.SyntheticOAuthProvider(),
+    providerOAuthPolicy: credentials.SYNTHETIC_OAUTH_POLICY,
     clock: () => new Date("2026-08-21T22:30:00.000Z")
   });
   const authorizationFailureState = await authorizationFailureBroker.beginAuthorization({

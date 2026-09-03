@@ -1,7 +1,5 @@
 import { randomUUID, timingSafeEqual } from "node:crypto";
 
-import { z } from "zod";
-
 import { canonicalContractJson, contractSha256 } from "@/lib/integrations/contracts/canonical";
 import {
   AcquireRefreshLeaseCommandSchema,
@@ -23,8 +21,6 @@ import {
   OAuthStateConsumeResultSchema,
   PHASE_5_DIRECT_KMS_MAX_PLAINTEXT_BYTES,
   PHASE_5_REFRESH_LEASE_SECONDS,
-  PHASE_8B_REAUTHORIZATION_REDIRECT_URI,
-  PHASE_8B_REAUTHORIZATION_RETURN_INTENT,
   ProviderCredentialReadDiagnosticClassSchema,
   ProviderCredentialReadResultSchema,
   ReadProviderCredentialCommandSchema,
@@ -66,17 +62,22 @@ import {
   reauthorizationStateHash,
   sortedCredentialScopes
 } from "@/lib/integrations/credentials/oauth-state";
+import {
+  assertAuthorizedProviderEntityEvidence,
+  assertCredentialEnvelopeMatchesProviderOAuthPolicy,
+  assertProviderOAuthPolicyBinding,
+  normalizeProviderOAuthRequestedScopes,
+  normalizeProviderOAuthReturnPath,
+  type ProviderOAuthPolicy
+} from "@/lib/integrations/credentials/oauth-policy";
 import { ProviderCredentialRefreshFailure } from "@/lib/integrations/credentials/provider-failure";
 import { safeCredentialBrokerError } from "@/lib/integrations/credentials/redaction";
 import type { ProviderApplicationSecret } from "@/lib/integrations/credentials/secret-manager";
 import { SyntheticProviderFailure } from "@/lib/integrations/credentials/synthetic-provider";
 import {
-  BoundedIdentifierSchema,
-  BoundedLabelSchema,
   IsoTimestampSchema,
   ProviderEnvironmentKeySchema,
-  ProviderKeySchema,
-  Sha256FingerprintSchema
+  ProviderKeySchema
 } from "@/lib/integrations/contracts/primitives";
 
 export type CredentialBrokerStore = Readonly<{
@@ -214,14 +215,8 @@ export type OAuthCredentialProvider = Readonly<{
   }): PromiseLike<unknown>;
 }>;
 
-export const AuthorizedProviderEntityEvidenceSchema = z
-  .object({
-    externalAuthorizedEntityReference: BoundedIdentifierSchema,
-    providerEntityType: BoundedIdentifierSchema,
-    safeDisplayName: BoundedLabelSchema,
-    verificationFingerprint: Sha256FingerprintSchema
-  })
-  .strict();
+export { AuthorizedProviderEntityEvidenceSchema } from "@/lib/integrations/credentials/oauth-policy";
+export type { AuthorizedProviderEntityEvidence } from "@/lib/integrations/credentials/oauth-policy";
 
 export type AuthorizedProviderEntityVerifier = Readonly<{
   verify(input: Readonly<{
@@ -372,6 +367,7 @@ export class IntegrationCredentialBroker {
   readonly #kmsKeyResource: string;
   readonly #secrets: ProviderSecretStore;
   readonly #provider: OAuthCredentialProvider;
+  readonly #providerOAuthPolicy: ProviderOAuthPolicy;
   readonly #authorizedEntityVerifier: AuthorizedProviderEntityVerifier | null;
   readonly #clock: () => Date;
 
@@ -381,6 +377,7 @@ export class IntegrationCredentialBroker {
     kmsKeyResource: string;
     secrets: ProviderSecretStore;
     provider: OAuthCredentialProvider;
+    providerOAuthPolicy: ProviderOAuthPolicy;
     authorizedEntityVerifier?: AuthorizedProviderEntityVerifier;
     clock?: () => Date;
   }) {
@@ -389,6 +386,13 @@ export class IntegrationCredentialBroker {
     this.#kmsKeyResource = input.kmsKeyResource;
     this.#secrets = input.secrets;
     this.#provider = input.provider;
+    this.#providerOAuthPolicy = assertProviderOAuthPolicyBinding(
+      input.providerOAuthPolicy,
+      {
+        providerKey: input.provider.providerKey,
+        providerEnvironment: input.provider.environment
+      }
+    );
     this.#authorizedEntityVerifier = input.authorizedEntityVerifier ?? null;
     this.#clock = input.clock ?? (() => new Date());
   }
@@ -404,7 +408,23 @@ export class IntegrationCredentialBroker {
     }
   ) {
     const { requestId, ...intent } = input;
-    const created = createOAuthStateIntent(intent, this.#clock());
+    assertProviderOAuthPolicyBinding(this.#providerOAuthPolicy, intent);
+    const requestedScopes = normalizeProviderOAuthRequestedScopes(
+      this.#providerOAuthPolicy,
+      intent.requestedScopes
+    );
+    const created = createOAuthStateIntent(
+      {
+        ...intent,
+        requestedScopes,
+        returnIntent: normalizeProviderOAuthReturnPath(
+          this.#providerOAuthPolicy,
+          intent.returnIntent
+        )
+      },
+      this.#providerOAuthPolicy,
+      this.#clock()
+    );
     await this.#store.createOAuthState(created.command, requestId);
     return {
       state: created.state,
@@ -431,7 +451,16 @@ export class IntegrationCredentialBroker {
     }
   ) {
     const { requestId, ...intent } = input;
-    const created = createReauthorizationStateIntent(intent, this.#clock());
+    assertProviderOAuthPolicyBinding(this.#providerOAuthPolicy, intent);
+    const requestedScopes = normalizeProviderOAuthRequestedScopes(
+      this.#providerOAuthPolicy,
+      intent.requestedScopes
+    );
+    const created = createReauthorizationStateIntent(
+      { ...intent, requestedScopes },
+      this.#providerOAuthPolicy,
+      this.#clock()
+    );
     const persisted = await this.#store.createReauthorizationState(
       created.command,
       requestId
@@ -461,6 +490,22 @@ export class IntegrationCredentialBroker {
     storeRequestId: string;
   }) {
     const now = this.#clock();
+    assertProviderOAuthPolicyBinding(this.#providerOAuthPolicy, input);
+    const requestedScopes = normalizeProviderOAuthRequestedScopes(
+      this.#providerOAuthPolicy,
+      input.requestedScopes
+    );
+    const requestedReturnIntent = normalizeProviderOAuthReturnPath(
+      this.#providerOAuthPolicy,
+      input.returnIntent
+    );
+    if (
+      this.#providerOAuthPolicy.externalEntityAuthority
+        .requiredForAuthorization &&
+      this.#authorizedEntityVerifier === null
+    ) {
+      throw new Error(safeCredentialBrokerError("authorization_failed"));
+    }
     const consumed = OAuthStateConsumeResultSchema.parse(
       await this.#store.consumeOAuthState(
         ConsumeOAuthStateCommandSchema.parse({
@@ -471,8 +516,8 @@ export class IntegrationCredentialBroker {
           providerKey: input.providerKey,
           providerEnvironment: input.providerEnvironment,
           initiatedBy: input.initiatedBy,
-          requestedScopes: sortedCredentialScopes(input.requestedScopes),
-          returnIntent: input.returnIntent,
+          requestedScopes,
+          returnIntent: requestedReturnIntent,
           stateHash: oauthStateHash(input.state),
           consumedAt: now.toISOString()
         }),
@@ -481,6 +526,22 @@ export class IntegrationCredentialBroker {
     );
     if (!consumed.accepted) {
       throw new Error(safeCredentialBrokerError("oauth_state_rejected"));
+    }
+    const consumedReturnIntent = normalizeProviderOAuthReturnPath(
+      this.#providerOAuthPolicy,
+      consumed.returnIntent
+    );
+    if (
+      consumed.workspaceId !== input.workspaceId ||
+      consumed.businessEntityId !== input.businessEntityId ||
+      consumed.connectionId !== input.connectionId ||
+      consumed.connectionGeneration !== input.connectionGeneration ||
+      consumed.providerKey !== input.providerKey ||
+      consumed.providerEnvironment !== input.providerEnvironment ||
+      !exactScopeSet(consumed.requestedScopes, requestedScopes) ||
+      consumedReturnIntent !== requestedReturnIntent
+    ) {
+      throw new Error(safeCredentialBrokerError("authorization_failed"));
     }
     const authorizationTime = new Date(consumed.consumedAt);
     let plaintext: Buffer | null = null;
@@ -495,7 +556,8 @@ export class IntegrationCredentialBroker {
         consumed.providerKey,
         consumed.providerEnvironment
       );
-      const envelope = CredentialEnvelopeSchema.parse(
+      const envelope = assertCredentialEnvelopeMatchesProviderOAuthPolicy(
+        this.#providerOAuthPolicy,
         await this.#provider.exchangeAuthorizationCode({
           authorizationCode: input.authorizationCode,
           externalAuthorizedEntityReference:
@@ -516,7 +578,7 @@ export class IntegrationCredentialBroker {
       }
 
       const authorizedEntity = this.#authorizedEntityVerifier
-        ? await this.#verifyAuthorizedEntity(envelope)
+        ? await this.#verifyAuthorizedEntity(envelope, "authorization")
         : null;
 
       const credentialId = randomUUID();
@@ -569,7 +631,7 @@ export class IntegrationCredentialBroker {
         credentialId: result.credentialId,
         credentialVersion: result.credentialVersion,
         connectionStatus: result.connectionStatus,
-        returnIntent: consumed.returnIntent,
+        returnIntent: consumedReturnIntent,
         authorizedEntity
       } as const;
     } catch (error) {
@@ -601,6 +663,14 @@ export class IntegrationCredentialBroker {
     storeRequestId: string;
   }) {
     const now = this.#clock();
+    assertProviderOAuthPolicyBinding(this.#providerOAuthPolicy, input);
+    const requestedScopes = normalizeProviderOAuthRequestedScopes(
+      this.#providerOAuthPolicy,
+      input.requestedScopes
+    );
+    if (this.#authorizedEntityVerifier === null) {
+      throw new Error(safeCredentialBrokerError("authorization_failed"));
+    }
     const realmFingerprint = externalEntityReferenceFingerprint(
       input.externalAuthorizedEntityReference
     );
@@ -618,9 +688,10 @@ export class IntegrationCredentialBroker {
           providerKey: input.providerKey,
           providerEnvironment: input.providerEnvironment,
           initiatedBy: input.initiatedBy,
-          requestedScopes: sortedCredentialScopes(input.requestedScopes),
-          redirectUri: PHASE_8B_REAUTHORIZATION_REDIRECT_URI,
-          returnIntent: PHASE_8B_REAUTHORIZATION_RETURN_INTENT,
+          requestedScopes,
+          redirectUri: this.#providerOAuthPolicy.callbackUri,
+          returnIntent:
+            this.#providerOAuthPolicy.defaultReauthorizationReturnPath,
           authorizationPurpose: "reauthorization",
           reasonCode: "expired_credential_recovery",
           stateHash: reauthorizationStateHash(input.state),
@@ -633,7 +704,28 @@ export class IntegrationCredentialBroker {
     if (!consumed.accepted) {
       throw new Error(safeCredentialBrokerError("oauth_state_rejected"));
     }
+    const consumedReturnIntent = normalizeProviderOAuthReturnPath(
+      this.#providerOAuthPolicy,
+      consumed.returnIntent
+    );
     if (realmFingerprint !== consumed.providerEntityReferenceFingerprint) {
+      throw new Error(safeCredentialBrokerError("authorization_failed"));
+    }
+    if (
+      consumed.workspaceId !== input.workspaceId ||
+      consumed.businessEntityId !== input.businessEntityId ||
+      consumed.connectionId !== input.connectionId ||
+      consumed.connectionGeneration !== input.connectionGeneration ||
+      consumed.mappingId !== input.mappingId ||
+      consumed.providerKey !== input.providerKey ||
+      consumed.providerEnvironment !== input.providerEnvironment ||
+      consumed.redirectUri !== this.#providerOAuthPolicy.callbackUri ||
+      consumedReturnIntent !==
+        this.#providerOAuthPolicy.defaultReauthorizationReturnPath ||
+      consumed.authorizationPurpose !== "reauthorization" ||
+      consumed.reasonCode !== "expired_credential_recovery" ||
+      !exactScopeSet(consumed.requestedScopes, requestedScopes)
+    ) {
       throw new Error(safeCredentialBrokerError("authorization_failed"));
     }
 
@@ -650,7 +742,8 @@ export class IntegrationCredentialBroker {
         consumed.providerKey,
         consumed.providerEnvironment
       );
-      const envelope = CredentialEnvelopeSchema.parse(
+      const envelope = assertCredentialEnvelopeMatchesProviderOAuthPolicy(
+        this.#providerOAuthPolicy,
         await this.#provider.exchangeAuthorizationCode({
           authorizationCode: input.authorizationCode,
           externalAuthorizedEntityReference:
@@ -672,9 +765,11 @@ export class IntegrationCredentialBroker {
         throw new Error("reauthorization_envelope_binding_invalid");
       }
 
-      const authorizedEntity = await this.#verifyAuthorizedEntity(envelope);
+      const authorizedEntity = await this.#verifyAuthorizedEntity(
+        envelope,
+        "reauthorization"
+      );
       if (
-        authorizedEntity.providerEntityType !== "company" ||
         authorizedEntity.externalAuthorizedEntityReference !==
           input.externalAuthorizedEntityReference
       ) {
@@ -733,7 +828,7 @@ export class IntegrationCredentialBroker {
       );
       return {
         ...result,
-        returnIntent: consumed.returnIntent,
+        returnIntent: consumedReturnIntent,
         authorizedEntity
       } as const;
     } catch (error) {
@@ -749,13 +844,15 @@ export class IntegrationCredentialBroker {
   }
 
   async #verifyAuthorizedEntity(
-    envelope: ReturnType<typeof CredentialEnvelopeSchema.parse>
+    envelope: ReturnType<typeof CredentialEnvelopeSchema.parse>,
+    purpose: "authorization" | "reauthorization"
   ) {
     const externalReference = envelope.externalAuthorizedEntityReference;
     if (externalReference === null || this.#authorizedEntityVerifier === null) {
       throw new Error("authorization_entity_reference_missing");
     }
-    const evidence = AuthorizedProviderEntityEvidenceSchema.parse(
+    const evidence = assertAuthorizedProviderEntityEvidence(
+      this.#providerOAuthPolicy,
       await this.#authorizedEntityVerifier.verify({
         externalAuthorizedEntityReference: externalReference,
         credential: new ProviderAccessCredential({
@@ -765,7 +862,8 @@ export class IntegrationCredentialBroker {
           grantedScopes: envelope.grantedScopes,
           accessToken: envelope.accessToken
         })
-      })
+      }),
+      { externalAuthorizedEntityReference: externalReference, purpose }
     );
     if (evidence.externalAuthorizedEntityReference !== externalReference) {
       throw new Error("authorization_entity_reference_mismatch");
@@ -881,7 +979,8 @@ export class IntegrationCredentialBroker {
       } catch {
         // Boundary telemetry is independent of the credential lease/CAS transition.
       }
-      const envelope = CredentialEnvelopeSchema.parse(
+      const envelope = assertCredentialEnvelopeMatchesProviderOAuthPolicy(
+        this.#providerOAuthPolicy,
         JSON.parse(plaintext.toString("utf8"))
       );
       if (
@@ -905,7 +1004,8 @@ export class IntegrationCredentialBroker {
         outcome: "succeeded",
         reasonCode: "succeeded"
       });
-      const next = CredentialEnvelopeSchema.parse(
+      const next = assertCredentialEnvelopeMatchesProviderOAuthPolicy(
+        this.#providerOAuthPolicy,
         await this.#provider.refreshCredential({
           credential: envelope,
           applicationSecret: secret,
@@ -1206,6 +1306,14 @@ export class IntegrationCredentialBroker {
       ) {
         throw new ProviderCredentialReadFailure("expires_at_binding");
       }
+      try {
+        assertCredentialEnvelopeMatchesProviderOAuthPolicy(
+          this.#providerOAuthPolicy,
+          envelope
+        );
+      } catch {
+        throw new ProviderCredentialReadFailure("expires_at_shape");
+      }
       if (
         Date.parse(envelope.accessExpiresAt) <=
         now.getTime() + input.minimumValiditySeconds * 1_000
@@ -1308,7 +1416,8 @@ export class IntegrationCredentialBroker {
               additionalAuthenticatedData: credentialAad(acquired.aadContext)
             })
           );
-          envelope = CredentialEnvelopeSchema.parse(
+          envelope = assertCredentialEnvelopeMatchesProviderOAuthPolicy(
+            this.#providerOAuthPolicy,
             JSON.parse(plaintext.toString("utf8"))
           );
           applicationSecret = await this.#secrets.access(
