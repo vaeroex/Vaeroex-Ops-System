@@ -254,6 +254,21 @@ function testPolicyRegistry() {
     /binding_invalid/,
     "environment mismatch cannot reuse another environment OAuth policy"
   );
+  deepEqual(
+    credentials.normalizeProviderOAuthRequestedScopes(retailPolicy, [
+      "read_retail_orders"
+    ]),
+    ["read_retail_orders"],
+    "requested scopes are accepted only when they match static provider policy"
+  );
+  throws(
+    () => credentials.normalizeProviderOAuthRequestedScopes(retailPolicy, [
+      "read_retail_orders",
+      "write_retail_orders"
+    ]),
+    /requested_scopes_denied/,
+    "caller-requested scopes cannot widen static provider policy"
+  );
   throws(
     () => new credentials.IntegrationCredentialBroker({
       ...minimalBrokerInput(),
@@ -270,6 +285,102 @@ function testPolicyRegistry() {
     /binding_invalid/,
     "broker construction fails closed when provider and policy disagree"
   );
+}
+
+async function testBrokerStoreResultSubstitution() {
+  const now = "2026-09-03T12:00:00.000Z";
+  const brokerInput = minimalBrokerInput({
+    store: {
+      ...minimalBrokerInput().store,
+      async consumeOAuthState() {
+        return {
+          accepted: true,
+          stateId: "00000000-0000-4000-8000-000000000101",
+          workspaceId: "00000000-0000-4000-8000-000000000201",
+          businessEntityId: "00000000-0000-4000-8000-000000000202",
+          connectionId: "00000000-0000-4000-8000-000000000203",
+          connectionGeneration: 1,
+          providerKey: "synthetic_retail",
+          providerEnvironment: "sandbox",
+          requestedScopes: ["read_retail_orders"],
+          returnIntent: "/app/attacker",
+          consumedAt: now
+        };
+      },
+      async recordAuthorizationEvent() {
+        return { eventId: "00000000-0000-4000-8000-000000000301" };
+      }
+    }
+  });
+  const broker = new credentials.IntegrationCredentialBroker(brokerInput);
+  await assert.rejects(
+    () => broker.completeAuthorization({
+      state: "A".repeat(43),
+      authorizationCode: "phase1b-authorization-code-canary",
+      workspaceId: "00000000-0000-4000-8000-000000000201",
+      businessEntityId: "00000000-0000-4000-8000-000000000202",
+      connectionId: "00000000-0000-4000-8000-000000000203",
+      connectionGeneration: 1,
+      expectedConnectionRowVersion: 1,
+      providerKey: "synthetic_retail",
+      providerEnvironment: "sandbox",
+      initiatedBy: "00000000-0000-4000-8000-000000000204",
+      requestedScopes: ["read_retail_orders"],
+      returnIntent: "/app/integrations",
+      consumeRequestId: "phase1b_consume_spoofed_return",
+      storeRequestId: "phase1b_store_spoofed_return"
+    }),
+    /authorization_failed/,
+    "database-returned return paths cannot override static provider policy"
+  );
+  assertionCount += 1;
+
+  const scopeBroker = new credentials.IntegrationCredentialBroker(
+    minimalBrokerInput({
+      store: {
+        ...minimalBrokerInput().store,
+        async consumeOAuthState() {
+          return {
+            accepted: true,
+            stateId: "00000000-0000-4000-8000-000000000102",
+            workspaceId: "00000000-0000-4000-8000-000000000201",
+            businessEntityId: "00000000-0000-4000-8000-000000000202",
+            connectionId: "00000000-0000-4000-8000-000000000203",
+            connectionGeneration: 1,
+            providerKey: "synthetic_retail",
+            providerEnvironment: "sandbox",
+            requestedScopes: ["read_retail_orders", "write_retail_orders"],
+            returnIntent: "/app/integrations",
+            consumedAt: now
+          };
+        },
+        async recordAuthorizationEvent() {
+          return { eventId: "00000000-0000-4000-8000-000000000302" };
+        }
+      }
+    })
+  );
+  await assert.rejects(
+    () => scopeBroker.completeAuthorization({
+      state: "B".repeat(43),
+      authorizationCode: "phase1b-authorization-code-canary",
+      workspaceId: "00000000-0000-4000-8000-000000000201",
+      businessEntityId: "00000000-0000-4000-8000-000000000202",
+      connectionId: "00000000-0000-4000-8000-000000000203",
+      connectionGeneration: 1,
+      expectedConnectionRowVersion: 1,
+      providerKey: "synthetic_retail",
+      providerEnvironment: "sandbox",
+      initiatedBy: "00000000-0000-4000-8000-000000000204",
+      requestedScopes: ["read_retail_orders"],
+      returnIntent: "/app/integrations",
+      consumeRequestId: "phase1b_consume_spoofed_scope",
+      storeRequestId: "phase1b_store_spoofed_scope"
+    }),
+    /authorization_failed/,
+    "database-returned scopes cannot override static provider policy"
+  );
+  assertionCount += 1;
 }
 
 function testQboPolicyParity() {
@@ -626,14 +737,22 @@ function testStaticArchitectureBoundaries() {
   );
 }
 
-testPolicyRegistry();
-testQboPolicyParity();
-testTokenLifetimePolicy();
-testEntityAuthority();
-testReturnPathAndCallbackSafety();
-testDeterministicAndRedactedDiagnostics();
-testStaticArchitectureBoundaries();
+async function main() {
+  testPolicyRegistry();
+  await testBrokerStoreResultSubstitution();
+  testQboPolicyParity();
+  testTokenLifetimePolicy();
+  testEntityAuthority();
+  testReturnPathAndCallbackSafety();
+  testDeterministicAndRedactedDiagnostics();
+  testStaticArchitectureBoundaries();
 
-console.log(
-  `External integration Phase 1B OAuth authority regressions: ${assertionCount} assertions passed.`
-);
+  console.log(
+    `External integration Phase 1B OAuth authority regressions: ${assertionCount} assertions passed.`
+  );
+}
+
+main().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});

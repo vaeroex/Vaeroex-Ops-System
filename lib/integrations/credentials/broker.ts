@@ -66,6 +66,7 @@ import {
   assertAuthorizedProviderEntityEvidence,
   assertCredentialEnvelopeMatchesProviderOAuthPolicy,
   assertProviderOAuthPolicyBinding,
+  normalizeProviderOAuthRequestedScopes,
   normalizeProviderOAuthReturnPath,
   type ProviderOAuthPolicy
 } from "@/lib/integrations/credentials/oauth-policy";
@@ -408,9 +409,14 @@ export class IntegrationCredentialBroker {
   ) {
     const { requestId, ...intent } = input;
     assertProviderOAuthPolicyBinding(this.#providerOAuthPolicy, intent);
+    const requestedScopes = normalizeProviderOAuthRequestedScopes(
+      this.#providerOAuthPolicy,
+      intent.requestedScopes
+    );
     const created = createOAuthStateIntent(
       {
         ...intent,
+        requestedScopes,
         returnIntent: normalizeProviderOAuthReturnPath(
           this.#providerOAuthPolicy,
           intent.returnIntent
@@ -446,8 +452,12 @@ export class IntegrationCredentialBroker {
   ) {
     const { requestId, ...intent } = input;
     assertProviderOAuthPolicyBinding(this.#providerOAuthPolicy, intent);
+    const requestedScopes = normalizeProviderOAuthRequestedScopes(
+      this.#providerOAuthPolicy,
+      intent.requestedScopes
+    );
     const created = createReauthorizationStateIntent(
-      intent,
+      { ...intent, requestedScopes },
       this.#providerOAuthPolicy,
       this.#clock()
     );
@@ -481,6 +491,14 @@ export class IntegrationCredentialBroker {
   }) {
     const now = this.#clock();
     assertProviderOAuthPolicyBinding(this.#providerOAuthPolicy, input);
+    const requestedScopes = normalizeProviderOAuthRequestedScopes(
+      this.#providerOAuthPolicy,
+      input.requestedScopes
+    );
+    const requestedReturnIntent = normalizeProviderOAuthReturnPath(
+      this.#providerOAuthPolicy,
+      input.returnIntent
+    );
     if (
       this.#providerOAuthPolicy.externalEntityAuthority
         .requiredForAuthorization &&
@@ -498,11 +516,8 @@ export class IntegrationCredentialBroker {
           providerKey: input.providerKey,
           providerEnvironment: input.providerEnvironment,
           initiatedBy: input.initiatedBy,
-          requestedScopes: sortedCredentialScopes(input.requestedScopes),
-          returnIntent: normalizeProviderOAuthReturnPath(
-            this.#providerOAuthPolicy,
-            input.returnIntent
-          ),
+          requestedScopes,
+          returnIntent: requestedReturnIntent,
           stateHash: oauthStateHash(input.state),
           consumedAt: now.toISOString()
         }),
@@ -511,6 +526,22 @@ export class IntegrationCredentialBroker {
     );
     if (!consumed.accepted) {
       throw new Error(safeCredentialBrokerError("oauth_state_rejected"));
+    }
+    const consumedReturnIntent = normalizeProviderOAuthReturnPath(
+      this.#providerOAuthPolicy,
+      consumed.returnIntent
+    );
+    if (
+      consumed.workspaceId !== input.workspaceId ||
+      consumed.businessEntityId !== input.businessEntityId ||
+      consumed.connectionId !== input.connectionId ||
+      consumed.connectionGeneration !== input.connectionGeneration ||
+      consumed.providerKey !== input.providerKey ||
+      consumed.providerEnvironment !== input.providerEnvironment ||
+      !exactScopeSet(consumed.requestedScopes, requestedScopes) ||
+      consumedReturnIntent !== requestedReturnIntent
+    ) {
+      throw new Error(safeCredentialBrokerError("authorization_failed"));
     }
     const authorizationTime = new Date(consumed.consumedAt);
     let plaintext: Buffer | null = null;
@@ -600,7 +631,7 @@ export class IntegrationCredentialBroker {
         credentialId: result.credentialId,
         credentialVersion: result.credentialVersion,
         connectionStatus: result.connectionStatus,
-        returnIntent: consumed.returnIntent,
+        returnIntent: consumedReturnIntent,
         authorizedEntity
       } as const;
     } catch (error) {
@@ -633,6 +664,10 @@ export class IntegrationCredentialBroker {
   }) {
     const now = this.#clock();
     assertProviderOAuthPolicyBinding(this.#providerOAuthPolicy, input);
+    const requestedScopes = normalizeProviderOAuthRequestedScopes(
+      this.#providerOAuthPolicy,
+      input.requestedScopes
+    );
     if (this.#authorizedEntityVerifier === null) {
       throw new Error(safeCredentialBrokerError("authorization_failed"));
     }
@@ -653,7 +688,7 @@ export class IntegrationCredentialBroker {
           providerKey: input.providerKey,
           providerEnvironment: input.providerEnvironment,
           initiatedBy: input.initiatedBy,
-          requestedScopes: sortedCredentialScopes(input.requestedScopes),
+          requestedScopes,
           redirectUri: this.#providerOAuthPolicy.callbackUri,
           returnIntent:
             this.#providerOAuthPolicy.defaultReauthorizationReturnPath,
@@ -669,7 +704,28 @@ export class IntegrationCredentialBroker {
     if (!consumed.accepted) {
       throw new Error(safeCredentialBrokerError("oauth_state_rejected"));
     }
+    const consumedReturnIntent = normalizeProviderOAuthReturnPath(
+      this.#providerOAuthPolicy,
+      consumed.returnIntent
+    );
     if (realmFingerprint !== consumed.providerEntityReferenceFingerprint) {
+      throw new Error(safeCredentialBrokerError("authorization_failed"));
+    }
+    if (
+      consumed.workspaceId !== input.workspaceId ||
+      consumed.businessEntityId !== input.businessEntityId ||
+      consumed.connectionId !== input.connectionId ||
+      consumed.connectionGeneration !== input.connectionGeneration ||
+      consumed.mappingId !== input.mappingId ||
+      consumed.providerKey !== input.providerKey ||
+      consumed.providerEnvironment !== input.providerEnvironment ||
+      consumed.redirectUri !== this.#providerOAuthPolicy.callbackUri ||
+      consumedReturnIntent !==
+        this.#providerOAuthPolicy.defaultReauthorizationReturnPath ||
+      consumed.authorizationPurpose !== "reauthorization" ||
+      consumed.reasonCode !== "expired_credential_recovery" ||
+      !exactScopeSet(consumed.requestedScopes, requestedScopes)
+    ) {
       throw new Error(safeCredentialBrokerError("authorization_failed"));
     }
 
@@ -772,7 +828,7 @@ export class IntegrationCredentialBroker {
       );
       return {
         ...result,
-        returnIntent: consumed.returnIntent,
+        returnIntent: consumedReturnIntent,
         authorizedEntity
       } as const;
     } catch (error) {

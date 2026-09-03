@@ -12,6 +12,7 @@ import {
 } from "@/lib/integrations/credentials/contracts";
 import {
   assertProviderOAuthPolicyBinding,
+  normalizeProviderOAuthRequestedScopes,
   normalizeProviderOAuthReturnPath,
   type ProviderOAuthPolicy
 } from "@/lib/integrations/credentials/oauth-policy";
@@ -63,7 +64,10 @@ export function createOAuthStateIntent(
     ...input,
     contractVersion: CREDENTIAL_SECURITY_CONTRACT_VERSIONS.oauthState,
     id: randomUUID(),
-    requestedScopes: sortedCredentialScopes(input.requestedScopes),
+    requestedScopes: normalizeProviderOAuthRequestedScopes(
+      checkedPolicy,
+      input.requestedScopes
+    ),
     returnIntent: normalizeProviderOAuthReturnPath(
       checkedPolicy,
       input.returnIntent
@@ -108,7 +112,10 @@ export function createReauthorizationStateIntent(
     ...input,
     contractVersion: CREDENTIAL_SECURITY_CONTRACT_VERSIONS.reauthorizationState,
     id: randomUUID(),
-    requestedScopes: sortedCredentialScopes(input.requestedScopes),
+    requestedScopes: normalizeProviderOAuthRequestedScopes(
+      checkedPolicy,
+      input.requestedScopes
+    ),
     redirectUri: checkedPolicy.callbackUri,
     returnIntent: checkedPolicy.defaultReauthorizationReturnPath,
     authorizationPurpose: "reauthorization",

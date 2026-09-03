@@ -351,6 +351,23 @@ export function normalizeProviderOAuthReturnPath(
   return normalized;
 }
 
+export function normalizeProviderOAuthRequestedScopes(
+  policy: ProviderOAuthPolicy,
+  values: readonly string[]
+) {
+  const checked = ProviderOAuthPolicySchema.parse(policy);
+  const normalized = sortedUniqueIdentifierSetSchema.parse(
+    [...new Set(values)].sort((left, right) => left.localeCompare(right))
+  );
+  if (
+    normalized.length !== checked.requestedScopes.length ||
+    normalized.some((scope, index) => scope !== checked.requestedScopes[index])
+  ) {
+    throw new Error("provider_oauth_requested_scopes_denied");
+  }
+  return normalized;
+}
+
 export function validateProviderOAuthCallbackUri(
   policy: ProviderOAuthPolicy,
   value: string
