@@ -54,6 +54,9 @@ jobs:
       - name: External integrations contract regressions
         run: pnpm test:external-integrations-contracts
 
+      - name: External integrations Phase 1A operation-policy regressions
+        run: pnpm test:external-integrations-phase-1a
+
       - name: External integrations architecture regressions
         run: pnpm test:external-integrations-architecture
 
