@@ -94,7 +94,7 @@ assert.doesNotMatch(kpiPage, /KpiVisualizationSwitcher|KpiSpatialCanvas|spatial-
 
 assert.equal(packageJson.dependencies.three, "0.185.1", "Three.js must remain available to the public cinematic website");
 assert.equal(packageJson.dependencies["@react-three/fiber"], "9.7.0", "R3F must remain available to the public cinematic website");
-assert.equal(packageJson.dependencies["@react-three/drei"], "10.7.7", "Drei must remain available to the public cinematic website");
+assert.equal(packageJson.dependencies["@react-three/drei"], "10.7.8", "Drei must remain available to the public cinematic website");
 assert.match(publicSpatialSource, /@react-three\/fiber/, "public marketing experiences must retain R3F rendering");
 assert.match(publicSpatialSource, /<Canvas\b/, "public marketing experiences must retain their WebGL canvases");
 assert.match(publicSpatialSource, /useSpatialCapability/, "public marketing experiences must retain capability-tier fallbacks");
