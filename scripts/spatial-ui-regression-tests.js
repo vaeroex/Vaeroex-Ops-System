@@ -93,7 +93,7 @@ assert.match(kpiPage, /const chartColor = kpiColor\(metricName, settings\)/, "pe
 assert.doesNotMatch(kpiPage, /KpiVisualizationSwitcher|KpiSpatialCanvas|spatial-kpi|2D\s*\/\s*3D/, "KPI Performance must not regain a 3D mode");
 
 assert.equal(packageJson.dependencies.three, "0.185.1", "Three.js must remain available to the public cinematic website");
-assert.equal(packageJson.dependencies["@react-three/fiber"], "9.6.1", "R3F must remain available to the public cinematic website");
+assert.equal(packageJson.dependencies["@react-three/fiber"], "9.7.0", "R3F must remain available to the public cinematic website");
 assert.equal(packageJson.dependencies["@react-three/drei"], "10.7.7", "Drei must remain available to the public cinematic website");
 assert.match(publicSpatialSource, /@react-three\/fiber/, "public marketing experiences must retain R3F rendering");
 assert.match(publicSpatialSource, /<Canvas\b/, "public marketing experiences must retain their WebGL canvases");
