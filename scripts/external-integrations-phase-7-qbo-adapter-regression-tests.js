@@ -93,6 +93,10 @@ equal(qbo.QBO_MODEL_CALL_COUNT, 0, "Phase 7 QBO adapter makes zero model calls")
 equal(qbo.QBO_PROVIDER_DESCRIPTOR.providerKey, "quickbooks_online", "QBO descriptor uses the approved provider key");
 equal(qbo.QBO_PROVIDER_DESCRIPTOR.accessMode, "read_only", "QBO descriptor is read-only");
 deepEqual(qbo.QBO_PROVIDER_DESCRIPTOR.readMethodAllowlist, ["GET"], "only GET is allowed by descriptor");
+ok(
+  !Object.prototype.hasOwnProperty.call(qbo.QBO_PROVIDER_DESCRIPTOR, "readOnlyPostOperations"),
+  "QBO descriptor does not opt in to provider-neutral read-only POST operations"
+);
 equal(qbo.QBO_PROVIDER_DESCRIPTOR.authorizationMode, "oauth2_confidential", "OAuth mode is metadata only");
 ok(qbo.QBO_PROVIDER_DESCRIPTOR.minimumScopes.includes("com.intuit.quickbooks.accounting"), "accounting scope metadata is present");
 ok(qbo.QBO_PROVIDER_DESCRIPTOR.hostnameAllowlist.includes("quickbooks.api.intuit.com"), "production API hostname is declared");
@@ -117,6 +121,16 @@ equal(phase7Registry.descriptors.length, 2, "Phase 7 registry composes synthetic
 const qboDescriptorEntry = phase7Registry.descriptors.find((entry) => entry.descriptor.providerKey === "quickbooks_online");
 ok(qboDescriptorEntry, "QBO descriptor is registry-addressable");
 ok(qboDescriptorEntry.descriptorFingerprint.startsWith("sha256:"), "QBO descriptor has canonical fingerprint");
+equal(
+  qboDescriptorEntry.descriptorFingerprint,
+  "sha256:1812bfa5fb9903583a672028aeefb40855211b19f2ce423f608c49f86db77b7f",
+  "QBO descriptor fingerprint remains unchanged"
+);
+equal(
+  phase7Registry.registryFingerprint,
+  "sha256:2099f06e90a53e632acbe55ee4d95cfd2f7fac7c2c994bb733ec332f7d09dfad",
+  "QBO-inclusive registry fingerprint remains unchanged"
+);
 notEqual(
   qboDescriptorEntry.descriptorFingerprint,
   phase7Registry.descriptors.find((entry) => entry.descriptor.providerKey === "synthetic").descriptorFingerprint,

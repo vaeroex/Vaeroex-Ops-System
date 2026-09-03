@@ -557,11 +557,121 @@ for (const [providerKey, displayName] of [
     `${providerKey} must fit the provider-neutral contract`
   );
 }
+
+const parsedProviderDescriptor = contract.ProviderDescriptorSchema.parse(providerDescriptor);
+ok(
+  !Object.prototype.hasOwnProperty.call(parsedProviderDescriptor, "readOnlyPostOperations"),
+  "GET-only descriptors do not acquire implicit read-only POST operations"
+);
+const readOnlyPostOperation = {
+  operationKey: "ledger_search",
+  providerKey: "ledger_demo",
+  providerEnvironment: "sandbox",
+  hostname: "api.ledger.example",
+  path: "/v1/records/search",
+  method: "POST",
+  contentType: "application/json",
+  maximumRequestBodyBytes: 4096,
+  requestValidatorKey: "ledger_search_request_v1",
+  maximumResponseBytes: 1048576,
+  timeoutMs: 30000,
+  retryClassification: "idempotent_read_with_backoff"
+};
+doesNotThrow(
+  () =>
+    contract.ProviderDescriptorSchema.parse({
+      ...providerDescriptor,
+      readOnlyPostOperations: [readOnlyPostOperation]
+    }),
+  "provider descriptors can declare exact semantically read-only POST operations"
+);
 throws(
   () => contract.ProviderDescriptorSchema.parse({ ...providerDescriptor, readMethodAllowlist: ["POST"] }),
   undefined,
   "provider data methods must remain read-only"
 );
+throws(
+  () =>
+    contract.ProviderDescriptorSchema.parse({
+      ...providerDescriptor,
+      readOnlyPostOperations: [{ ...readOnlyPostOperation, providerKey: "archive_demo" }]
+    }),
+  /must match the descriptor provider/,
+  "read-only POST operations must be bound to the descriptor provider"
+);
+throws(
+  () =>
+    contract.ProviderDescriptorSchema.parse({
+      ...providerDescriptor,
+      readOnlyPostOperations: [{ ...readOnlyPostOperation, providerEnvironment: "production" }]
+    }),
+  /declared environment/,
+  "read-only POST operations must be bound to a declared provider environment"
+);
+throws(
+  () =>
+    contract.ProviderDescriptorSchema.parse({
+      ...providerDescriptor,
+      readOnlyPostOperations: [{ ...readOnlyPostOperation, hostname: "write.ledger.example" }]
+    }),
+  /declared hostname/,
+  "read-only POST operations must be bound to a declared hostname"
+);
+throws(
+  () =>
+    contract.ProviderDescriptorSchema.parse({
+      ...providerDescriptor,
+      readOnlyPostOperations: [
+        readOnlyPostOperation,
+        { ...readOnlyPostOperation, operationKey: "ledger_search_duplicate" }
+      ]
+    }),
+  /destinations must be unique/,
+  "duplicate read-only POST destinations are ambiguous and fail closed"
+);
+throws(
+  () =>
+    contract.ProviderDescriptorSchema.parse({
+      ...providerDescriptor,
+      readOnlyPostOperations: [{ ...readOnlyPostOperation, method: "GET" }]
+    }),
+  undefined,
+  "read-only POST operation declarations cannot authorize another method"
+);
+throws(
+  () =>
+    contract.ProviderDescriptorSchema.parse({
+      ...providerDescriptor,
+      readOnlyPostOperations: [{ ...readOnlyPostOperation, contentType: "application/x-www-form-urlencoded" }]
+    }),
+  undefined,
+  "read-only POST operations must declare JSON request validation"
+);
+throws(
+  () =>
+    contract.ProviderDescriptorSchema.parse({
+      ...providerDescriptor,
+      readOnlyPostOperations: [{ ...readOnlyPostOperation, maximumRequestBodyBytes: 0 }]
+    }),
+  undefined,
+  "read-only POST operations must declare a positive request-body ceiling"
+);
+for (const malformedPath of [
+  "/v1//records/search",
+  "/v1/records/%73earch",
+  "/v1/records/../search",
+  "v1/records/search"
+]) {
+  throws(
+    () =>
+      contract.ProviderDescriptorSchema.parse({
+        ...providerDescriptor,
+        readOnlyPostOperations: [{ ...readOnlyPostOperation, path: malformedPath }]
+      }),
+    /operation paths/,
+    `malformed read-only POST path ${malformedPath} fails descriptor validation`
+  );
+}
 throws(
   () => contract.ProviderDescriptorSchema.parse({ ...providerDescriptor, optionalScopes: ["accounting.read"] }),
   /must not overlap/,
