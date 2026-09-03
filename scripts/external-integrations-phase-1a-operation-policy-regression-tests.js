@@ -239,6 +239,7 @@ doesNotMatch(
 denied({ url: "https://api.synthetic.example/v1/source-records/create?page=next" }, "undeclared POST endpoint fails closed");
 denied({ url: "https://api.synthetic.example/v1/source-records/delete?page=next" }, "write-like POST endpoint fails closed");
 denied({ method: "GET" }, "declared POST permission does not authorize other methods");
+denied({ method: "post" }, "declared POST permission requires an exact method match");
 denied({ body: "{\"filter\":" }, "malformed JSON body fails closed");
 denied({ body: JSON.stringify([{ filter: { status: "active" }, limit: 25 }]) }, "non-object JSON body fails closed");
 denied(

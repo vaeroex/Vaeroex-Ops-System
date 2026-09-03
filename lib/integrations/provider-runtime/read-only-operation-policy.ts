@@ -244,7 +244,7 @@ export function assertDeclaredReadOnlyPostOperation(
   const providerEnvironment = parseProviderEnvironment(input.providerEnvironment);
   if (
     providerKey !== descriptor.providerKey ||
-    input.method.toUpperCase() !== "POST"
+    input.method !== "POST"
   ) {
     deny();
   }
