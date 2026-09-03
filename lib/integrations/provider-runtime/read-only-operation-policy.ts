@@ -51,6 +51,7 @@ export type ProviderReadOnlyPostOperationDecision = Readonly<{
   maximumResponseBytes: number;
   timeoutMs: number;
   retryClassification: ProviderReadOnlyPostOperation["retryClassification"];
+  redirectPolicy: "manual";
   requestValidatorKey: string;
   requestFingerprint: string;
 }>;
@@ -72,6 +73,30 @@ export type AssertDeclaredReadOnlyPostOperationInput = Readonly<{
 
 function deny(): never {
   throw new Error("provider_read_only_post_operation_denied");
+}
+
+function parseDescriptor(input: ProviderDescriptor) {
+  try {
+    return ProviderDescriptorSchema.parse(input);
+  } catch {
+    deny();
+  }
+}
+
+function parseProviderKey(input: string) {
+  try {
+    return ProviderKeySchema.parse(input);
+  } catch {
+    deny();
+  }
+}
+
+function parseProviderEnvironment(input: string) {
+  try {
+    return ProviderEnvironmentKeySchema.parse(input);
+  } catch {
+    deny();
+  }
 }
 
 export function providerReadOnlyPostValidatorRegistryKey(
@@ -214,11 +239,9 @@ function matchingReadOnlyPostOperation(input: {
 export function assertDeclaredReadOnlyPostOperation(
   input: AssertDeclaredReadOnlyPostOperationInput
 ): ProviderReadOnlyPostOperationDecision {
-  const descriptor = ProviderDescriptorSchema.parse(input.descriptor);
-  const providerKey = ProviderKeySchema.parse(input.providerKey);
-  const providerEnvironment = ProviderEnvironmentKeySchema.parse(
-    input.providerEnvironment
-  );
+  const descriptor = parseDescriptor(input.descriptor);
+  const providerKey = parseProviderKey(input.providerKey);
+  const providerEnvironment = parseProviderEnvironment(input.providerEnvironment);
   if (
     providerKey !== descriptor.providerKey ||
     input.method.toUpperCase() !== "POST"
@@ -276,6 +299,7 @@ export function assertDeclaredReadOnlyPostOperation(
     maximumResponseBytes: operation.maximumResponseBytes,
     timeoutMs: operation.timeoutMs,
     retryClassification: operation.retryClassification,
+    redirectPolicy: "manual",
     requestValidatorKey: operation.requestValidatorKey,
     requestFingerprint: contractSha256({
       fingerprintPurpose: "provider_read_only_post_request",

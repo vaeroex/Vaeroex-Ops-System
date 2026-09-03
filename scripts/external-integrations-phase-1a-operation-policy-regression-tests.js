@@ -228,7 +228,13 @@ equal(decision.method, "POST", "decision is exact-method-bound");
 equal(decision.maximumResponseBytes, 4096, "decision carries the declared response ceiling");
 equal(decision.timeoutMs, 30000, "decision carries the declared timeout");
 equal(decision.retryClassification, "idempotent_read_with_backoff", "decision carries the declared retry class");
+equal(decision.redirectPolicy, "manual", "decision requires manual redirect handling");
 matches(decision.requestFingerprint, /^sha256:[a-f0-9]{64}$/, "authorized request receives only a fingerprint");
+doesNotMatch(
+  JSON.stringify(decision),
+  /cursor_01|active|page":"next|sk_test_phase1a_secret/i,
+  "operation decisions do not expose raw body, query, or credential values"
+);
 
 denied({ url: "https://api.synthetic.example/v1/source-records/create?page=next" }, "undeclared POST endpoint fails closed");
 denied({ url: "https://api.synthetic.example/v1/source-records/delete?page=next" }, "write-like POST endpoint fails closed");
@@ -244,6 +250,14 @@ denied(
   "forbidden write-like body fields fail closed through provider validation"
 );
 denied(
+  { body: JSON.stringify({ filter: { status: "active" }, limit: 25, hostname: "evil.synthetic.example" }) },
+  "body fields cannot override the approved host"
+);
+denied(
+  { body: JSON.stringify({ filter: { status: "active" }, limit: 25, providerEnvironment: "sandbox" }) },
+  "body fields cannot override the approved provider environment"
+);
+denied(
   { body: JSON.stringify({ filter: { status: "active" }, limit: 25, padding: "x".repeat(260) }) },
   "oversized request body fails closed before validation"
 );
@@ -252,8 +266,12 @@ denied({ contentType: "application/json; boundary=forbidden" }, "malformed JSON 
 denied({ contentType: "application/json;" }, "empty JSON content type parameters fail closed");
 denied({ contentType: "application/json; charset=\"utf-8" }, "unbalanced JSON content type parameters fail closed");
 denied({ url: "https://evil.synthetic.example/v1/source-records/search?page=next" }, "wrong host fails closed");
+denied({ url: "https://api.synthetic.example./v1/source-records/search?page=next" }, "trailing-dot host normalization fails closed");
+denied({ url: "https://api%2Esynthetic.example/v1/source-records/search?page=next" }, "encoded host normalization fails closed");
 denied({ providerEnvironment: "sandbox" }, "wrong provider environment fails closed");
 denied({ providerKey: "synthetic" }, "wrong provider fails closed");
+denied({ providerEnvironment: "sk_test_phase1a_secret" }, "malformed provider environment fails closed with a safe error");
+denied({ providerKey: "sk_test_phase1a_secret" }, "malformed provider key fails closed with a safe error");
 denied({ url: "http://api.synthetic.example/v1/source-records/search?page=next" }, "non-HTTPS URL fails closed");
 denied({ url: "https://api.synthetic.example:443/v1/source-records/search?page=next" }, "explicit port path confusion fails closed");
 denied({ url: "https://user:pass@api.synthetic.example/v1/source-records/search?page=next" }, "URL credentials fail closed");
@@ -289,6 +307,7 @@ denied(
 const deniedMessages = [];
 for (const badInput of [
   { body: JSON.stringify({ filter: { status: "active" }, limit: 25, access_token: "sk_test_phase1a_secret" }) },
+  { descriptor: { ...syntheticPostDescriptor, client_secret: "sk_test_phase1a_secret" } },
   { url: "https://api.synthetic.example/v1/source-records/search?client_secret=sk_test_phase1a_secret" },
   { url: "https://Bearer:sk_test_phase1a_secret@api.synthetic.example/v1/source-records/search?page=next" }
 ]) {
