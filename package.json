@@ -13,6 +13,7 @@
     "test:external-integrations-contracts": "node scripts/external-integrations-contract-regression-tests.js",
     "test:external-integrations-phase-1a": "node scripts/external-integrations-phase-1a-operation-policy-regression-tests.js",
     "test:external-integrations-phase-1b": "node scripts/external-integrations-phase-1b-oauth-authority-regression-tests.js",
+    "test:external-integrations-square-phase-2a": "node scripts/external-integrations-square-phase-2a-regression-tests.js",
     "test:external-integrations-architecture": "node scripts/external-integrations-architecture-regression-tests.js",
     "test:external-integrations-phase-1": "node scripts/external-integrations-phase-1-foundation-regression-tests.js",
     "test:external-integrations-phase-2": "node scripts/external-integrations-phase-2-reconciliation-regression-tests.js",

@@ -135,6 +135,11 @@ equal(
   "Phase 1A operation-policy regression script must be registered"
 );
 equal(
+  packageJson.scripts["test:external-integrations-square-phase-2a"],
+  "node scripts/external-integrations-square-phase-2a-regression-tests.js",
+  "Square Phase 2A dormant contract regression script must be registered"
+);
+equal(
   packageJson.scripts["test:external-integrations-architecture"],
   "node scripts/external-integrations-architecture-regression-tests.js",
   "architecture test script must be registered"
@@ -173,6 +178,11 @@ matches(
   ciWorkflow,
   /pnpm test:external-integrations-phase-1a/,
   "CI must exercise the Phase 1A operation-policy regression suite"
+);
+matches(
+  ciWorkflow,
+  /pnpm test:external-integrations-square-phase-2a/,
+  "CI must exercise the Square Phase 2A dormant contract regression suite"
 );
 matches(
   ciWorkflow,

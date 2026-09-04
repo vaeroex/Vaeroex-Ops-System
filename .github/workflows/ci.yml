@@ -60,6 +60,9 @@ jobs:
       - name: External integrations Phase 1B OAuth authority regressions
         run: pnpm test:external-integrations-phase-1b
 
+      - name: External integrations Square Phase 2A dormant contract regressions
+        run: pnpm test:external-integrations-square-phase-2a
+
       - name: External integrations architecture regressions
         run: pnpm test:external-integrations-architecture
 
