@@ -4,6 +4,7 @@ import { IsoTimestampSchema } from "@/lib/integrations/contracts/primitives";
 import {
   SQUARE_ALLOWED_LOCATION_STATUSES,
   SQUARE_ALLOWED_LOCATION_TYPES,
+  SQUARE_MERCHANT_LOCATION_ENTITY_VERSION,
   SQUARE_LOCATION_RESPONSE_CONTRACT_VERSION,
   SQUARE_MERCHANT_LOCATION_MINIMIZATION_VERSION,
   SQUARE_PROVIDER_KEY
@@ -20,15 +21,15 @@ import {
   type SquareResponseParserResult,
   type SquareResponseProvenance,
   squareAcceptedResult,
-  squareEntityVersion,
   squareFailureResult,
   squareMinimizedProjectionFingerprint,
-  squareOptionalCursorState,
   squareOptionalNullableDisplayText,
   squareOptionalNullableIdentifier,
   squareOptionalNullableTimeZone,
   squareOptionalNullableTimestamp,
   squareOptionalNullableEnum,
+  squareProviderErrorState,
+  squareRejectResponse,
   squareRequiredCountryCode,
   squareRequiredCurrencyCode,
   squareRequiredEnum,
@@ -49,13 +50,6 @@ const SquareLocationAuthoritySchema = z
   })
   .strict();
 
-const SquareResponseCursorStateSchema = z
-  .object({
-    present: z.literal(true),
-    cursorFingerprint: z.string().regex(/^sha256:[a-f0-9]{64}$/)
-  })
-  .strict();
-
 export const SquareMinimizedLocationSchema = z
   .object({
     contractVersion: z.literal(SQUARE_LOCATION_RESPONSE_CONTRACT_VERSION),
@@ -72,8 +66,7 @@ export const SquareMinimizedLocationSchema = z
     currency: SquareCurrencyCodeSchema,
     country: SquareCountryCodeSchema,
     locationType: z.enum(SQUARE_ALLOWED_LOCATION_TYPES).nullable(),
-    createdAt: IsoTimestampSchema.nullable(),
-    updatedAt: IsoTimestampSchema.nullable()
+    createdAt: IsoTimestampSchema.nullable()
   })
   .strict();
 
@@ -84,7 +77,6 @@ export const SquareLocationResponseSchema = z
     entityType: z.literal("location"),
     provider: SquareResponseProvenanceSchema,
     items: z.array(SquareMinimizedLocationSchema).max(500),
-    cursor: SquareResponseCursorStateSchema.nullable(),
     itemCount: z.number().int().nonnegative().max(500).safe()
   })
   .strict();
@@ -107,11 +99,7 @@ export function parseSquareLocationResponse(
     const provenance = squareResponseProvenance(parserInput);
     const response = squareSafeJsonObject(parserInput.response);
 
-    if (
-      Object.prototype.hasOwnProperty.call(response, "errors") &&
-      !Object.prototype.hasOwnProperty.call(response, "locations") &&
-      !Object.prototype.hasOwnProperty.call(response, "location")
-    ) {
+    if (squareProviderErrorState(response) === "present") {
       return squareUnsupportedResult(
         "square_location_provider_errors_present",
         "$response.errors"
@@ -133,11 +121,7 @@ export function parseSquareLocationResponse(
     const items = rawItems.map((item) =>
       minimizeSquareLocation(item, provenance)
     );
-    const cursor = squareOptionalCursorState(
-      response,
-      "cursor",
-      "$response.cursor"
-    );
+    assertUniqueLocationAuthorities(items);
     return squareAcceptedResult(
       SquareLocationResponseSchema.parse({
         contractVersion: SQUARE_LOCATION_RESPONSE_CONTRACT_VERSION,
@@ -145,7 +129,6 @@ export function parseSquareLocationResponse(
         entityType: "location",
         provider: provenance,
         items,
-        cursor,
         itemCount: items.length
       })
     );
@@ -171,11 +154,7 @@ export function minimizeSquareLocation(
     contractVersion: SQUARE_LOCATION_RESPONSE_CONTRACT_VERSION,
     minimizationVersion: SQUARE_MERCHANT_LOCATION_MINIMIZATION_VERSION,
     entityType: "location",
-    entityVersion: squareEntityVersion(
-      location,
-      "version",
-      "$response.locations[].version"
-    ),
+    entityVersion: SQUARE_MERCHANT_LOCATION_ENTITY_VERSION,
     authority: {
       providerKey: SQUARE_PROVIDER_KEY,
       providerEnvironment,
@@ -227,11 +206,6 @@ export function minimizeSquareLocation(
       location,
       "created_at",
       "$response.locations[].created_at"
-    ),
-    updatedAt: squareOptionalNullableTimestamp(
-      location,
-      "updated_at",
-      "$response.locations[].updated_at"
     )
   });
 }
@@ -258,4 +232,20 @@ function locationResponseItems(
     return [squareSafeJsonObject(response.location, "$response.location")];
   }
   throw new Error("square_location_response_missing");
+}
+
+function assertUniqueLocationAuthorities(
+  items: readonly SquareMinimizedLocation[]
+) {
+  const seen = new Set<string>();
+  for (const item of items) {
+    const identity = `${item.authority.providerEnvironment}:${item.authority.entityType}:${item.authority.providerId}`;
+    if (seen.has(identity)) {
+      squareRejectResponse(
+        "square_duplicate_authority_identity",
+        "$response.locations[].id"
+      );
+    }
+    seen.add(identity);
+  }
 }

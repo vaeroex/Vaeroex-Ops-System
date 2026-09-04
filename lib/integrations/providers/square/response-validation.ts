@@ -88,7 +88,6 @@ const DEFAULT_SAFE_JSON_LIMITS = {
 } as const satisfies SafeJsonLimits;
 
 const SQUARE_ID_PATTERN = /^[A-Za-z0-9._:-]+$/;
-const SQUARE_CURSOR_PATTERN = /^[A-Za-z0-9._~:+/-]+={0,2}$/;
 const BCP_47_SHORT_PATTERN = /^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8}){0,2}$/;
 const SQUARE_API_VERSION_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const CONTROL_CHARACTER_PATTERN = /[\u0000-\u001F\u007F-\u009F]/u;
@@ -365,11 +364,6 @@ export const SquareIdentifierSchema = z
   .min(1)
   .max(191)
   .regex(SQUARE_ID_PATTERN);
-export const SquarePaginationCursorSchema = z
-  .string()
-  .min(1)
-  .max(4_096)
-  .regex(SQUARE_CURSOR_PATTERN);
 export const SquareCurrencyCodeSchema = CurrencyCodeSchema.refine(
   isSquareCurrencyCode,
   "Currency must be a supported ISO 4217 code"
@@ -417,7 +411,11 @@ export const SquareResponseProvenanceSchema = z
 export function squareAcceptedResult<T>(
   value: T
 ): SquareResponseAcceptedResult<T> {
-  return { outcome: "accepted", value, diagnostics: [] };
+  return squareDeepFreeze({
+    outcome: "accepted",
+    value: squareDeepFreeze(value),
+    diagnostics: [] as const
+  });
 }
 
 export function squareUnsupportedResult(
@@ -466,12 +464,12 @@ export function squareResponseParserInput(
   input: unknown
 ): SquareResponseParserInput {
   const record = squareParserInputRecord(input);
-  const providerKey = optionalDataProperty(record, "providerKey") ?? SQUARE_PROVIDER_KEY;
+  const providerKey = requiredDataProperty(record, "providerKey");
   const providerEnvironment = requiredDataProperty(record, "providerEnvironment");
   const apiVersion = requiredDataProperty(record, "apiVersion");
   const response = requiredDataProperty(record, "response");
 
-  if (providerKey !== SQUARE_PROVIDER_KEY) {
+  if (typeof providerKey !== "string" || providerKey !== SQUARE_PROVIDER_KEY) {
     throw new SquareResponseValidationFailure(
       "square_provider_key_invalid",
       "$input.providerKey"
@@ -505,6 +503,35 @@ export function squareResponseParserInput(
     apiVersion,
     response
   };
+}
+
+export function squareProviderErrorState(
+  record: SquareSafeJsonObject,
+  field = "$response.errors"
+): "absent" | "empty" | "present" {
+  if (!Object.prototype.hasOwnProperty.call(record, "errors")) {
+    return "absent";
+  }
+  const errors = record.errors;
+  if (!Array.isArray(errors)) {
+    throw new SquareResponseValidationFailure(
+      "square_provider_errors_invalid",
+      field
+    );
+  }
+  for (const error of errors) {
+    if (!isSquareSafeJsonObject(error)) {
+      throw new SquareResponseValidationFailure(
+        "square_provider_errors_invalid",
+        `${field}[]`
+      );
+    }
+  }
+  return errors.length === 0 ? "empty" : "present";
+}
+
+export function squareRejectResponse(code: string, field: string): never {
+  throw new SquareResponseValidationFailure(code, field);
 }
 
 export function squareSafeJsonObject(
@@ -789,65 +816,6 @@ export function squareOptionalNullableTimeZone(
   );
 }
 
-export function squareEntityVersion(
-  record: SquareSafeJsonObject,
-  key: string,
-  field: string
-): number {
-  return squareOptionalNullableField(record, key, field, (value) =>
-    squareIntegerVersion(value, field)
-  ) ?? 1;
-}
-
-export function squareIntegerVersion(value: SquareSafeJsonValue, field: string) {
-  if (
-    typeof value !== "number" ||
-    !Number.isSafeInteger(value) ||
-    value < 1 ||
-    Object.is(value, -0)
-  ) {
-    throw new SquareResponseValidationFailure(
-      "square_integer_version_invalid",
-      field
-    );
-  }
-  return value;
-}
-
-export function squarePaginationCursorFingerprint(
-  value: SquareSafeJsonValue,
-  field: string
-) {
-  const cursor = squareBoundedString(value, field, {
-    minimumLength: 1,
-    maximumLength: 4_096
-  });
-  if (!SQUARE_CURSOR_PATTERN.test(cursor)) {
-    throw new SquareResponseValidationFailure(
-      "square_pagination_cursor_invalid",
-      field
-    );
-  }
-  return Sha256FingerprintSchema.parse(
-    contractSha256({
-      fingerprintPurpose: "square_response_cursor",
-      fingerprintVersion: "square_response_cursor_fingerprint_v1",
-      value: cursor
-    })
-  );
-}
-
-export function squareOptionalCursorState(
-  record: SquareSafeJsonObject,
-  key: string,
-  field: string
-): { present: true; cursorFingerprint: string } | null {
-  return squareOptionalNullableField(record, key, field, (value) => ({
-    present: true,
-    cursorFingerprint: squarePaginationCursorFingerprint(value, field)
-  }));
-}
-
 export function squareMinimizedProjectionFingerprint(input: unknown) {
   return Sha256FingerprintSchema.parse(contractSha256(input));
 }
@@ -875,10 +843,7 @@ function squareSafeJsonValue(
   }
   if (input === null || typeof input === "boolean") return input;
   if (typeof input === "string") {
-    if (
-      input.length > limits.maximumStringLength ||
-      hasUnsafeTrustedText(input)
-    ) {
+    if (input.length > limits.maximumStringLength) {
       throw new SquareResponseValidationFailure(
         "square_response_string_invalid",
         field
@@ -1095,19 +1060,21 @@ function requiredDataProperty(
   return descriptor.value;
 }
 
-function optionalDataProperty(
-  record: Readonly<Record<string, unknown>>,
-  key: string
-) {
-  const descriptor = Object.getOwnPropertyDescriptor(record, key);
-  if (!descriptor) return undefined;
-  if (!descriptor.enumerable || !("value" in descriptor)) {
-    throw new SquareResponseValidationFailure(
-      "square_parser_input_invalid",
-      `$input.${key}`
-    );
+function squareDeepFreeze<T>(input: T, seen = new WeakSet<object>()): T {
+  if (input === null || (typeof input !== "object" && typeof input !== "function")) {
+    return input;
   }
-  return descriptor.value;
+  const object = input as object;
+  if (seen.has(object)) return input;
+  seen.add(object);
+  for (const key of Reflect.ownKeys(object)) {
+    const descriptor = Object.getOwnPropertyDescriptor(object, key);
+    if (descriptor && "value" in descriptor) {
+      squareDeepFreeze(descriptor.value, seen);
+    }
+  }
+  Object.freeze(object);
+  return input;
 }
 
 function squareRequiredField(

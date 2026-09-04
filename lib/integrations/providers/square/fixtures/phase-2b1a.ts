@@ -12,9 +12,13 @@ export const SQUARE_PHASE_2B1A_SYNTHETIC_CANARIES = {
   merchantContactPhone: "+15550101010",
   merchantStreetAddress: "1 Synthetic Merchant Way",
   merchantCustomerNote: "sq2b1a-customer-note-canary",
+  merchantDescription: "sq2b1a-merchant-description-canary",
+  merchantWebsiteUrl: "https://example.test/sq2b1a-merchant-url",
   locationBusinessEmail: "sq2b1a-location@example.test",
   locationPhone: "+15550202020",
   locationStreetAddress: "2 Synthetic Location Ave",
+  locationDescription: "sq2b1a-location-description-canary",
+  locationWebsiteUrl: "https://example.test/sq2b1a-location-url",
   locationCoordinates: "sq2b1a-location-coordinate-canary",
   locationSocial: "sq2b1a-social-canary"
 } as const;
@@ -29,10 +33,28 @@ export function squarePhase2B1AParserInput(
   response: unknown,
   overrides: SquarePhase2B1AInputOverrides = {}
 ) {
+  const hasProviderKeyOverride = Object.prototype.hasOwnProperty.call(
+    overrides,
+    "providerKey"
+  );
+  const hasProviderEnvironmentOverride = Object.prototype.hasOwnProperty.call(
+    overrides,
+    "providerEnvironment"
+  );
+  const hasApiVersionOverride = Object.prototype.hasOwnProperty.call(
+    overrides,
+    "apiVersion"
+  );
   return {
-    providerKey: overrides.providerKey ?? SQUARE_PROVIDER_KEY,
-    providerEnvironment: overrides.providerEnvironment ?? "sandbox",
-    apiVersion: overrides.apiVersion ?? SQUARE_API_VERSION,
+    providerKey: hasProviderKeyOverride
+      ? overrides.providerKey
+      : SQUARE_PROVIDER_KEY,
+    providerEnvironment: hasProviderEnvironmentOverride
+      ? overrides.providerEnvironment
+      : "sandbox",
+    apiVersion: hasApiVersionOverride
+      ? overrides.apiVersion
+      : SQUARE_API_VERSION,
     response
   };
 }
@@ -49,7 +71,6 @@ export function squarePhase2B1AMerchant(
     status: "ACTIVE",
     main_location_id: "SQ2B1ALOCATION001",
     created_at: "2026-08-19T12:00:00.000Z",
-    version: 1,
     ...overrides
   };
 }
@@ -67,8 +88,6 @@ export function squarePhase2B1ALocation(
     currency: "USD",
     type: "PHYSICAL",
     created_at: "2026-08-19T12:30:00.000Z",
-    updated_at: "2026-08-19T13:30:00.000Z",
-    version: 1,
     ...overrides
   };
 }
@@ -112,8 +131,7 @@ export const SQUARE_PHASE_2B1A_MERCHANT_FIXTURES = {
     currency: "CAD",
     status: "INACTIVE",
     main_location_id: "SQ2B1ALOCATION002",
-    created_at: "2026-08-18T10:00:00.000Z",
-    version: 2
+    created_at: "2026-08-18T10:00:00.000Z"
   }),
   multiple: {
     merchant: [
@@ -126,13 +144,12 @@ export const SQUARE_PHASE_2B1A_MERCHANT_FIXTURES = {
         currency: "JPY",
         status: "ACTIVE",
         main_location_id: "SQ2B1ALOCATION003",
-        created_at: "2026-08-17T08:00:00.000Z",
-        version: 3
+        created_at: "2026-08-17T08:00:00.000Z"
       })
     ]
   },
   empty: { merchant: [] },
-  paginated: {
+  extraCursor: {
     merchant: [],
     cursor: SQUARE_PHASE_2B1A_SYNTHETIC_CURSOR
   },
@@ -144,12 +161,13 @@ export const SQUARE_PHASE_2B1A_MERCHANT_FIXTURES = {
     currency: null,
     status: "ACTIVE",
     main_location_id: null,
-    created_at: null,
-    version: 4
+    created_at: null
   }),
   contactAndOwnerCanaries: squarePhase2B1AMerchantEnvelope({
     owner_email: SQUARE_PHASE_2B1A_SYNTHETIC_CANARIES.merchantOwnerEmail,
     phone_number: SQUARE_PHASE_2B1A_SYNTHETIC_CANARIES.merchantContactPhone,
+    website_url: SQUARE_PHASE_2B1A_SYNTHETIC_CANARIES.merchantWebsiteUrl,
+    description: SQUARE_PHASE_2B1A_SYNTHETIC_CANARIES.merchantDescription,
     address: {
       address_line_1:
         SQUARE_PHASE_2B1A_SYNTHETIC_CANARIES.merchantStreetAddress,
@@ -168,6 +186,19 @@ export const SQUARE_PHASE_2B1A_MERCHANT_FIXTURES = {
       }
     }
   }),
+  excludedHostileFields: squarePhase2B1AMerchantEnvelope({
+    description: "<script>alert('discarded')</script>\nordinary note",
+    website_url: "javascript:alert('discarded')",
+    support_url: "https://example.test/path?next=<b>discarded</b>"
+  }),
+  duplicateAuthorities: {
+    merchant: [
+      squarePhase2B1AMerchant(),
+      squarePhase2B1AMerchant({
+        business_name: "Duplicate Merchant Authority"
+      })
+    ]
+  },
   missingRequired: {
     merchant: [withoutKeys(squarePhase2B1AMerchant(), ["id"])]
   },
@@ -176,10 +207,8 @@ export const SQUARE_PHASE_2B1A_MERCHANT_FIXTURES = {
     created_at: "2026-99-99T99:99:99Z"
   }),
   malformedCurrency: squarePhase2B1AMerchantEnvelope({ currency: "US" }),
-  fractionalVersion: squarePhase2B1AMerchantEnvelope({ version: 1.5 }),
-  unsafeVersion: squarePhase2B1AMerchantEnvelope({
-    version: Number.MAX_SAFE_INTEGER + 1
-  }),
+  extraVersion: squarePhase2B1AMerchantEnvelope({ version: 9 }),
+  extraFractionalVersion: squarePhase2B1AMerchantEnvelope({ version: 1.5 }),
   oversizedDisplayName: squarePhase2B1AMerchantEnvelope({
     business_name: "A".repeat(256)
   }),
@@ -208,9 +237,7 @@ export const SQUARE_PHASE_2B1A_LOCATION_FIXTURES = {
     country: "CA",
     currency: "CAD",
     type: "PHYSICAL",
-    created_at: "2026-08-18T10:30:00.000Z",
-    updated_at: null,
-    version: 2
+    created_at: "2026-08-18T10:30:00.000Z"
   }),
   multiple: {
     locations: [
@@ -225,8 +252,7 @@ export const SQUARE_PHASE_2B1A_LOCATION_FIXTURES = {
         currency: "JPY",
         type: "MOBILE",
         created_at: "2026-08-17T09:00:00.000Z",
-        updated_at: "2026-08-17T09:30:00.000Z",
-        version: 3
+        description: "Tokyo mobile counter"
       }),
       squarePhase2B1ALocation({
         id: "SQ2B1ALOCATION004",
@@ -237,14 +263,12 @@ export const SQUARE_PHASE_2B1A_LOCATION_FIXTURES = {
         country: "GB",
         currency: "GBP",
         type: "PHYSICAL",
-        created_at: "2026-08-16T09:00:00.000Z",
-        updated_at: "2026-08-16T09:30:00.000Z",
-        version: 4
+        created_at: "2026-08-16T09:00:00.000Z"
       })
     ]
   },
   empty: { locations: [] },
-  paginated: {
+  extraCursor: {
     locations: [],
     cursor: SQUARE_PHASE_2B1A_SYNTHETIC_CURSOR
   },
@@ -257,13 +281,13 @@ export const SQUARE_PHASE_2B1A_LOCATION_FIXTURES = {
     country: "GB",
     currency: "GBP",
     type: null,
-    created_at: null,
-    updated_at: null,
-    version: 5
+    created_at: null
   }),
   contactAddressAndSocialCanaries: squarePhase2B1ALocationEnvelope({
     phone_number: SQUARE_PHASE_2B1A_SYNTHETIC_CANARIES.locationPhone,
     business_email: SQUARE_PHASE_2B1A_SYNTHETIC_CANARIES.locationBusinessEmail,
+    description: SQUARE_PHASE_2B1A_SYNTHETIC_CANARIES.locationDescription,
+    website_url: SQUARE_PHASE_2B1A_SYNTHETIC_CANARIES.locationWebsiteUrl,
     address: {
       address_line_1:
         SQUARE_PHASE_2B1A_SYNTHETIC_CANARIES.locationStreetAddress,
@@ -285,7 +309,8 @@ export const SQUARE_PHASE_2B1A_LOCATION_FIXTURES = {
       ]
     },
     twitter_username: SQUARE_PHASE_2B1A_SYNTHETIC_CANARIES.locationSocial,
-    instagram_username: "sq2b1a_social"
+    instagram_username: "sq2b1a_social",
+    facebook_url: "https://facebook.com/sq2b1a"
   }),
   unexpectedNestedFields: squarePhase2B1ALocationEnvelope({
     nested_extra: {
@@ -294,6 +319,20 @@ export const SQUARE_PHASE_2B1A_LOCATION_FIXTURES = {
       }
     }
   }),
+  excludedHostileFields: squarePhase2B1ALocationEnvelope({
+    description: "<img src=x onerror=alert('discarded')>\nordinary note",
+    website_url: "javascript:alert('discarded')",
+    custom_receipt_text: "Line 1\nLine 2",
+    return_policy: "No receipt? Still discarded."
+  }),
+  duplicateAuthorities: {
+    locations: [
+      squarePhase2B1ALocation(),
+      squarePhase2B1ALocation({
+        name: "Duplicate Location Authority"
+      })
+    ]
+  },
   missingTimezone: {
     locations: [withoutKeys(squarePhase2B1ALocation(), ["timezone"])]
   },
@@ -310,10 +349,11 @@ export const SQUARE_PHASE_2B1A_LOCATION_FIXTURES = {
     created_at: "2026-99-99T99:99:99Z"
   }),
   malformedCurrency: squarePhase2B1ALocationEnvelope({ currency: "US" }),
-  fractionalVersion: squarePhase2B1ALocationEnvelope({ version: 1.5 }),
-  unsafeVersion: squarePhase2B1ALocationEnvelope({
-    version: Number.MAX_SAFE_INTEGER + 1
+  extraUpdatedAt: squarePhase2B1ALocationEnvelope({
+    updated_at: "2026-08-19T13:30:00.000Z"
   }),
+  extraVersion: squarePhase2B1ALocationEnvelope({ version: 9 }),
+  extraFractionalVersion: squarePhase2B1ALocationEnvelope({ version: 1.5 }),
   oversizedDisplayName: squarePhase2B1ALocationEnvelope({
     name: "L".repeat(256)
   }),

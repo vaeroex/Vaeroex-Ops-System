@@ -3,6 +3,7 @@ import { z } from "zod";
 import { IsoTimestampSchema } from "@/lib/integrations/contracts/primitives";
 import {
   SQUARE_ALLOWED_MERCHANT_STATUSES,
+  SQUARE_MERCHANT_LOCATION_ENTITY_VERSION,
   SQUARE_MERCHANT_LOCATION_MINIMIZATION_VERSION,
   SQUARE_MERCHANT_RESPONSE_CONTRACT_VERSION,
   SQUARE_PROVIDER_KEY
@@ -19,15 +20,15 @@ import {
   type SquareResponseParserResult,
   type SquareResponseProvenance,
   squareAcceptedResult,
-  squareEntityVersion,
   squareFailureResult,
   squareMinimizedProjectionFingerprint,
-  squareOptionalCursorState,
   squareOptionalNullableCurrencyCode,
   squareOptionalNullableDisplayText,
   squareOptionalNullableIdentifier,
   squareOptionalNullableLanguageCode,
   squareOptionalNullableTimestamp,
+  squareProviderErrorState,
+  squareRejectResponse,
   squareRequiredCountryCode,
   squareRequiredEnum,
   squareRequiredIdentifier,
@@ -44,13 +45,6 @@ const SquareMerchantAuthoritySchema = z
     providerEnvironment: SquareProviderEnvironmentSchema,
     entityType: z.literal("merchant"),
     providerId: SquareIdentifierSchema
-  })
-  .strict();
-
-const SquareResponseCursorStateSchema = z
-  .object({
-    present: z.literal(true),
-    cursorFingerprint: z.string().regex(/^sha256:[a-f0-9]{64}$/)
   })
   .strict();
 
@@ -80,7 +74,6 @@ export const SquareMerchantResponseSchema = z
     entityType: z.literal("merchant"),
     provider: SquareResponseProvenanceSchema,
     items: z.array(SquareMinimizedMerchantSchema).max(250),
-    cursor: SquareResponseCursorStateSchema.nullable(),
     itemCount: z.number().int().nonnegative().max(250).safe()
   })
   .strict();
@@ -102,10 +95,7 @@ export function parseSquareMerchantResponse(
     const provenance = squareResponseProvenance(parserInput);
     const response = squareSafeJsonObject(parserInput.response);
 
-    if (
-      Object.prototype.hasOwnProperty.call(response, "errors") &&
-      !Object.prototype.hasOwnProperty.call(response, "merchant")
-    ) {
+    if (squareProviderErrorState(response) === "present") {
       return squareUnsupportedResult(
         "square_merchant_provider_errors_present",
         "$response.errors"
@@ -116,11 +106,7 @@ export function parseSquareMerchantResponse(
     const items = rawItems.map((item) =>
       minimizeSquareMerchant(item, provenance)
     );
-    const cursor = squareOptionalCursorState(
-      response,
-      "cursor",
-      "$response.cursor"
-    );
+    assertUniqueMerchantAuthorities(items);
     return squareAcceptedResult(
       SquareMerchantResponseSchema.parse({
         contractVersion: SQUARE_MERCHANT_RESPONSE_CONTRACT_VERSION,
@@ -128,7 +114,6 @@ export function parseSquareMerchantResponse(
         entityType: "merchant",
         provider: provenance,
         items,
-        cursor,
         itemCount: items.length
       })
     );
@@ -149,11 +134,7 @@ export function minimizeSquareMerchant(
     contractVersion: SQUARE_MERCHANT_RESPONSE_CONTRACT_VERSION,
     minimizationVersion: SQUARE_MERCHANT_LOCATION_MINIMIZATION_VERSION,
     entityType: "merchant",
-    entityVersion: squareEntityVersion(
-      merchant,
-      "version",
-      "$response.merchant[].version"
-    ),
+    entityVersion: SQUARE_MERCHANT_LOCATION_ENTITY_VERSION,
     authority: {
       providerKey: SQUARE_PROVIDER_KEY,
       providerEnvironment,
@@ -225,4 +206,20 @@ function merchantResponseItems(
     );
   }
   return [squareSafeJsonObject(raw, "$response.merchant")];
+}
+
+function assertUniqueMerchantAuthorities(
+  items: readonly SquareMinimizedMerchant[]
+) {
+  const seen = new Set<string>();
+  for (const item of items) {
+    const identity = `${item.authority.providerEnvironment}:${item.authority.entityType}:${item.authority.providerId}`;
+    if (seen.has(identity)) {
+      squareRejectResponse(
+        "square_duplicate_authority_identity",
+        "$response.merchant[].id"
+      );
+    }
+    seen.add(identity);
+  }
 }

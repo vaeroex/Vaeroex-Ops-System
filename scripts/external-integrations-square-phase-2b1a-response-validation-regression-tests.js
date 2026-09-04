@@ -114,9 +114,19 @@ function parseMerchant(response, overrides = {}) {
   return square.parseSquareMerchantResponse(parserInput(response, overrides));
 }
 
+function parseMerchantRawInput(input) {
+  fixtureScenarioCount += 1;
+  return square.parseSquareMerchantResponse(input);
+}
+
 function parseLocation(response, overrides = {}) {
   fixtureScenarioCount += 1;
   return square.parseSquareLocationResponse(parserInput(response, overrides));
+}
+
+function parseLocationRawInput(input) {
+  fixtureScenarioCount += 1;
+  return square.parseSquareLocationResponse(input);
 }
 
 function assertSafeDiagnostics(result, message) {
@@ -157,7 +167,7 @@ function assertProjectionClean(value, message) {
   doesNotMatch(serialized, piiCanaryPattern, `${message}: PII canaries do not survive`);
   doesNotMatch(
     serialized,
-    /owner_email|phone_number|business_email|address_line_1|postal_code|coordinates|business_hours|twitter_username|instagram_username|facebook_url|customer|account/i,
+    /owner_email|phone_number|business_email|address_line_1|postal_code|coordinates|business_hours|twitter_username|instagram_username|facebook_url|website_url|support_url|description|custom_receipt_text|return_policy|customer|account/i,
     `${message}: excluded fields do not survive`
   );
 }
@@ -194,7 +204,8 @@ function testMerchantAcceptedProjection() {
   equal(active.items[0].currency, "USD", "merchant currency is retained");
   equal(active.items[0].mainLocationId, "SQ2B1ALOCATION001", "merchant main location ID is retained");
   equal(active.items[0].createdAt, "2026-08-19T12:00:00.000Z", "merchant creation timestamp is retained");
-  equal(active.items[0].entityVersion, 1, "merchant version is an integer");
+  equal(active.items[0].entityVersion, 1, "merchant entity version is contract-owned");
+  equal(Object.prototype.hasOwnProperty.call(active.items[0], "version"), false, "merchant provider version is not trusted output");
   doesNotMatch(JSON.stringify(active.items[0].authority), /displayName|business_name|Café/, "display name is not merchant authority");
 
   const inactive = accepted(parseMerchant(merchantFixtures.inactive), "inactive merchant accepted");
@@ -202,6 +213,7 @@ function testMerchantAcceptedProjection() {
   equal(inactive.items[0].currency, "CAD", "second merchant currency is retained");
   equal(inactive.items[0].country, "CA", "second merchant country is retained");
   equal(inactive.items[0].languageCode, "fr-CA", "second merchant language is retained");
+  equal(inactive.items[0].entityVersion, 1, "second merchant version remains contract-owned");
 
   const multiple = accepted(parseMerchant(merchantFixtures.multiple), "multiple merchants accepted");
   equal(multiple.itemCount, 2, "multiple merchant envelope retains both records");
@@ -218,12 +230,10 @@ function testMerchantAcceptedProjection() {
 
   const empty = accepted(parseMerchant(merchantFixtures.empty), "empty merchant envelope accepted");
   equal(empty.itemCount, 0, "empty merchant envelope has zero items");
-  equal(empty.cursor, null, "empty merchant envelope has no cursor");
+  equal(Object.prototype.hasOwnProperty.call(empty, "cursor"), false, "empty merchant envelope has no trusted cursor state");
 
-  const paginated = accepted(parseMerchant(merchantFixtures.paginated), "paginated merchant envelope accepted");
-  equal(paginated.itemCount, 0, "paginated empty merchant envelope has zero items");
-  ok(paginated.cursor?.present, "paginated merchant envelope records cursor presence");
-  assertFingerprintShape(paginated.cursor.cursorFingerprint, "merchant cursor");
+  const extraCursor = accepted(parseMerchant(merchantFixtures.extraCursor), "merchant envelope with extra cursor accepted");
+  deepEqual(extraCursor, empty, "merchant cursor is discarded from trusted output");
 
   const optionalNulls = accepted(parseMerchant(merchantFixtures.optionalNulls), "merchant optional null fields accepted");
   equal(optionalNulls.items[0].displayName, null, "merchant nullable display name is explicit");
@@ -250,8 +260,9 @@ function testLocationAcceptedProjection() {
   equal(active.items[0].country, "US", "location country is retained");
   equal(active.items[0].locationType, "PHYSICAL", "location type is retained");
   equal(active.items[0].createdAt, "2026-08-19T12:30:00.000Z", "location creation timestamp is retained");
-  equal(active.items[0].updatedAt, "2026-08-19T13:30:00.000Z", "location update timestamp is retained when present");
-  equal(active.items[0].entityVersion, 1, "location version is an integer");
+  equal(Object.prototype.hasOwnProperty.call(active.items[0], "updatedAt"), false, "location updated_at is not trusted output");
+  equal(Object.prototype.hasOwnProperty.call(active.items[0], "version"), false, "location provider version is not trusted output");
+  equal(active.items[0].entityVersion, 1, "location entity version is contract-owned");
   doesNotMatch(JSON.stringify(active.items[0].authority), /displayName|Grant|Park|name/, "display name is not location authority");
 
   const inactive = accepted(parseLocation(locationFixtures.inactive), "inactive location accepted");
@@ -281,18 +292,17 @@ function testLocationAcceptedProjection() {
 
   const empty = accepted(parseLocation(locationFixtures.empty), "empty location envelope accepted");
   equal(empty.itemCount, 0, "empty location envelope has zero items");
-  equal(empty.cursor, null, "empty location envelope has no cursor");
+  equal(Object.prototype.hasOwnProperty.call(empty, "cursor"), false, "empty location envelope has no trusted cursor state");
 
-  const paginated = accepted(parseLocation(locationFixtures.paginated), "paginated location envelope accepted");
-  ok(paginated.cursor?.present, "paginated location envelope records cursor presence");
-  assertFingerprintShape(paginated.cursor.cursorFingerprint, "location cursor");
+  const extraCursor = accepted(parseLocation(locationFixtures.extraCursor), "location envelope with extra cursor accepted");
+  deepEqual(extraCursor, empty, "location cursor is discarded from trusted output");
 
   const optionalNulls = accepted(parseLocation(locationFixtures.optionalNulls), "location optional null fields accepted");
   equal(optionalNulls.items[0].merchantId, null, "location nullable merchant relationship is explicit");
   equal(optionalNulls.items[0].displayName, null, "location nullable display name is explicit");
   equal(optionalNulls.items[0].locationType, null, "location nullable type is explicit");
   equal(optionalNulls.items[0].createdAt, null, "location nullable creation timestamp is explicit");
-  equal(optionalNulls.items[0].updatedAt, null, "location nullable update timestamp is explicit");
+  equal(Object.prototype.hasOwnProperty.call(optionalNulls.items[0], "updatedAt"), false, "location updated_at remains absent when input is null");
 }
 
 function testRejectedAndUnsupportedPayloads() {
@@ -301,13 +311,12 @@ function testRejectedAndUnsupportedPayloads() {
     ["unknown merchant status", merchantFixtures.unknownStatus],
     ["malformed merchant timestamp", merchantFixtures.malformedTimestamp],
     ["malformed merchant currency", merchantFixtures.malformedCurrency],
-    ["fractional merchant version", merchantFixtures.fractionalVersion],
-    ["unsafe merchant version", merchantFixtures.unsafeVersion],
     ["oversized merchant display name", merchantFixtures.oversizedDisplayName],
     ["merchant HTML display name", merchantFixtures.htmlDisplayName],
     ["merchant bidirectional display name", merchantFixtures.bidirectionalDisplayName],
     ["merchant control display name", merchantFixtures.controlDisplayName],
     ["merchant prototype pollution", merchantFixtures.prototypePollution],
+    ["duplicate merchant authorities", merchantFixtures.duplicateAuthorities],
     ["oversized merchant array", square.squarePhase2B1AOversizedMerchantArray()],
     ["oversized merchant cursor", square.squarePhase2B1AOversizedCursorEnvelope("merchant")],
     ["oversized merchant object", square.squarePhase2B1AOversizedObjectEnvelope("merchant")]
@@ -326,6 +335,40 @@ function testRejectedAndUnsupportedPayloads() {
     }),
     "merchant provider error envelope is unsupported without leaking details"
   );
+  unsupported(
+    parseMerchant({
+      errors: [
+        {
+          category: "AUTHENTICATION_ERROR",
+          detail: "SQ2B1AMERCHANT001 synthetic detail"
+        }
+      ],
+      merchant: [square.squarePhase2B1AMerchant()]
+    }),
+    "merchant provider errors are not ignored when data is present"
+  );
+  rejected(
+    parseMerchant({
+      errors: {},
+      merchant: [square.squarePhase2B1AMerchant()]
+    }),
+    "merchant malformed provider errors are rejected"
+  );
+  rejected(
+    parseMerchant({
+      errors: [null],
+      merchant: [square.squarePhase2B1AMerchant()]
+    }),
+    "merchant malformed provider error entries are rejected"
+  );
+  const emptyMerchantErrors = accepted(
+    parseMerchant({
+      errors: [],
+      merchant: [square.squarePhase2B1AMerchant()]
+    }),
+    "merchant explicitly empty provider errors are accepted"
+  );
+  deepEqual(emptyMerchantErrors, accepted(parseMerchant(merchantFixtures.active), "merchant without errors accepted"), "empty merchant errors do not enter trusted output");
 
   for (const [name, fixture] of [
     ["invalid location timezone", locationFixtures.invalidTimezone],
@@ -335,13 +378,12 @@ function testRejectedAndUnsupportedPayloads() {
     ["unknown location type", locationFixtures.unknownType],
     ["malformed location timestamp", locationFixtures.malformedTimestamp],
     ["malformed location currency", locationFixtures.malformedCurrency],
-    ["fractional location version", locationFixtures.fractionalVersion],
-    ["unsafe location version", locationFixtures.unsafeVersion],
     ["oversized location display name", locationFixtures.oversizedDisplayName],
     ["location HTML display name", locationFixtures.htmlDisplayName],
     ["location bidirectional display name", locationFixtures.bidirectionalDisplayName],
     ["location control display name", locationFixtures.controlDisplayName],
     ["location prototype pollution", locationFixtures.prototypePollution],
+    ["duplicate location authorities", locationFixtures.duplicateAuthorities],
     ["oversized location array", square.squarePhase2B1AOversizedLocationArray()],
     ["oversized location cursor", square.squarePhase2B1AOversizedCursorEnvelope("location")],
     ["oversized location object", square.squarePhase2B1AOversizedObjectEnvelope("location")]
@@ -361,6 +403,52 @@ function testRejectedAndUnsupportedPayloads() {
     }),
     "location provider error envelope is unsupported without leaking details"
   );
+  unsupported(
+    parseLocation({
+      errors: [
+        {
+          category: "AUTHENTICATION_ERROR",
+          detail: "SQ2B1ALOCATION001 synthetic detail"
+        }
+      ],
+      location: square.squarePhase2B1ALocation()
+    }),
+    "location provider errors are not ignored when location data is present"
+  );
+  unsupported(
+    parseLocation({
+      errors: [
+        {
+          category: "AUTHENTICATION_ERROR",
+          detail: "SQ2B1ALOCATION001 synthetic detail"
+        }
+      ],
+      locations: [square.squarePhase2B1ALocation()]
+    }),
+    "location provider errors are not ignored when locations data is present"
+  );
+  rejected(
+    parseLocation({
+      errors: {},
+      locations: [square.squarePhase2B1ALocation()]
+    }),
+    "location malformed provider errors are rejected"
+  );
+  rejected(
+    parseLocation({
+      errors: [null],
+      locations: [square.squarePhase2B1ALocation()]
+    }),
+    "location malformed provider error entries are rejected"
+  );
+  const emptyLocationErrors = accepted(
+    parseLocation({
+      errors: [],
+      locations: [square.squarePhase2B1ALocation()]
+    }),
+    "location explicitly empty provider errors are accepted"
+  );
+  deepEqual(emptyLocationErrors, accepted(parseLocation(locationFixtures.active), "location without errors accepted"), "empty location errors do not enter trusted output");
 }
 
 function testUntrustedJsonBoundaries() {
@@ -373,12 +461,20 @@ function testUntrustedJsonBoundaries() {
     "symbol values are rejected"
   );
   rejected(
-    parseMerchant(square.squarePhase2B1AMerchantEnvelope({ version: Number.NaN })),
+    parseMerchant(square.squarePhase2B1AMerchantEnvelope({ nested_number: Number.NaN })),
     "NaN is rejected"
   );
   rejected(
-    parseMerchant(square.squarePhase2B1AMerchantEnvelope({ version: Number.POSITIVE_INFINITY })),
+    parseMerchant(square.squarePhase2B1AMerchantEnvelope({ nested_number: Number.POSITIVE_INFINITY })),
     "Infinity is rejected"
+  );
+  rejected(
+    parseMerchant(square.squarePhase2B1AMerchantEnvelope({ description: "D".repeat(4_097) })),
+    "oversized excluded merchant strings are rejected structurally"
+  );
+  rejected(
+    parseLocation(square.squarePhase2B1ALocationEnvelope({ description: "L".repeat(4_097) })),
+    "oversized excluded location strings are rejected structurally"
   );
 
   const accessorEnvelope = {};
@@ -441,8 +537,60 @@ function testMinimizationAndFingerprints() {
     parseMerchant(merchantFixtures.unexpectedNestedFields),
     "merchant with unexpected extras accepted"
   );
+  const merchantWithHostileExcludedFields = accepted(
+    parseMerchant(merchantFixtures.excludedHostileFields),
+    "merchant with hostile excluded fields accepted"
+  );
+  const merchantWithExtraCursor = accepted(
+    parseMerchant(
+      square.squarePhase2B1AMerchantEnvelope(
+        {},
+        { cursor: square.SQUARE_PHASE_2B1A_SYNTHETIC_CURSOR }
+      )
+    ),
+    "merchant with extra cursor accepted"
+  );
+  const merchantWithExtraVersion = accepted(
+    parseMerchant(merchantFixtures.extraVersion),
+    "merchant with undocumented extra version accepted"
+  );
+  const merchantWithFractionalExtraVersion = accepted(
+    parseMerchant(merchantFixtures.extraFractionalVersion),
+    "merchant with fractional undocumented extra version accepted"
+  );
   assertProjectionClean(merchantWithSensitiveExtras, "merchant projection");
   assertProjectionClean(merchantWithUnexpectedExtras, "merchant unexpected projection");
+  assertProjectionClean(merchantWithHostileExcludedFields, "merchant hostile excluded projection");
+  deepEqual(
+    merchantWithSensitiveExtras,
+    baseMerchant,
+    "merchant contact extras do not change projection"
+  );
+  deepEqual(
+    merchantWithUnexpectedExtras,
+    baseMerchant,
+    "merchant unexpected extras do not change projection"
+  );
+  deepEqual(
+    merchantWithHostileExcludedFields,
+    baseMerchant,
+    "merchant hostile excluded fields do not change projection"
+  );
+  deepEqual(
+    merchantWithExtraCursor,
+    baseMerchant,
+    "merchant extra cursor does not change projection"
+  );
+  deepEqual(
+    merchantWithExtraVersion,
+    baseMerchant,
+    "merchant undocumented version does not change projection"
+  );
+  deepEqual(
+    merchantWithFractionalExtraVersion,
+    baseMerchant,
+    "merchant fractional undocumented version does not change projection"
+  );
 
   const baseMerchantFingerprint = square.squareMerchantFingerprint(baseMerchant.items[0]);
   const sensitiveMerchantFingerprint = square.squareMerchantFingerprint(
@@ -450,6 +598,9 @@ function testMinimizationAndFingerprints() {
   );
   const unexpectedMerchantFingerprint = square.squareMerchantFingerprint(
     merchantWithUnexpectedExtras.items[0]
+  );
+  const hostileExcludedMerchantFingerprint = square.squareMerchantFingerprint(
+    merchantWithHostileExcludedFields.items[0]
   );
   assertFingerprintShape(baseMerchantFingerprint, "merchant");
   equal(
@@ -461,6 +612,26 @@ function testMinimizationAndFingerprints() {
     unexpectedMerchantFingerprint,
     baseMerchantFingerprint,
     "merchant unexpected extras do not affect fingerprints"
+  );
+  equal(
+    hostileExcludedMerchantFingerprint,
+    baseMerchantFingerprint,
+    "merchant hostile excluded fields do not affect fingerprints"
+  );
+  equal(
+    square.squareMerchantFingerprint(merchantWithExtraCursor.items[0]),
+    baseMerchantFingerprint,
+    "merchant extra cursor does not affect fingerprints"
+  );
+  equal(
+    square.squareMerchantFingerprint(merchantWithExtraVersion.items[0]),
+    baseMerchantFingerprint,
+    "merchant undocumented version does not affect fingerprints"
+  );
+  equal(
+    square.squareMerchantFingerprint(merchantWithFractionalExtraVersion.items[0]),
+    baseMerchantFingerprint,
+    "merchant fractional undocumented version does not affect fingerprints"
   );
 
   const repeatedMerchant = accepted(parseMerchant(merchantFixtures.active), "repeated merchant parse accepted");
@@ -487,10 +658,10 @@ function testMinimizationAndFingerprints() {
     baseMerchantFingerprint,
     "merchant fingerprint binds provider identity"
   );
-  notEqual(
-    firstMerchantFingerprint(square.squarePhase2B1AMerchantEnvelope({ version: 9 })),
+  equal(
+    firstMerchantFingerprint(square.squarePhase2B1AMerchantEnvelope({ version: 99 })),
     baseMerchantFingerprint,
-    "merchant fingerprint binds integer version"
+    "merchant extra provider version remains excluded from fingerprints"
   );
 
   const baseLocation = accepted(parseLocation(locationFixtures.active), "base location accepted");
@@ -502,8 +673,69 @@ function testMinimizationAndFingerprints() {
     parseLocation(locationFixtures.unexpectedNestedFields),
     "location with unexpected extras accepted"
   );
+  const locationWithHostileExcludedFields = accepted(
+    parseLocation(locationFixtures.excludedHostileFields),
+    "location with hostile excluded fields accepted"
+  );
+  const locationWithExtraCursor = accepted(
+    parseLocation(
+      square.squarePhase2B1ALocationEnvelope(
+        {},
+        { cursor: square.SQUARE_PHASE_2B1A_SYNTHETIC_CURSOR }
+      )
+    ),
+    "location with extra cursor accepted"
+  );
+  const locationWithExtraUpdatedAt = accepted(
+    parseLocation(locationFixtures.extraUpdatedAt),
+    "location with undocumented extra updated_at accepted"
+  );
+  const locationWithExtraVersion = accepted(
+    parseLocation(locationFixtures.extraVersion),
+    "location with undocumented extra version accepted"
+  );
+  const locationWithFractionalExtraVersion = accepted(
+    parseLocation(locationFixtures.extraFractionalVersion),
+    "location with fractional undocumented extra version accepted"
+  );
   assertProjectionClean(locationWithSensitiveExtras, "location projection");
   assertProjectionClean(locationWithUnexpectedExtras, "location unexpected projection");
+  assertProjectionClean(locationWithHostileExcludedFields, "location hostile excluded projection");
+  deepEqual(
+    locationWithSensitiveExtras,
+    baseLocation,
+    "location contact extras do not change projection"
+  );
+  deepEqual(
+    locationWithUnexpectedExtras,
+    baseLocation,
+    "location unexpected extras do not change projection"
+  );
+  deepEqual(
+    locationWithHostileExcludedFields,
+    baseLocation,
+    "location hostile excluded fields do not change projection"
+  );
+  deepEqual(
+    locationWithExtraCursor,
+    baseLocation,
+    "location extra cursor does not change projection"
+  );
+  deepEqual(
+    locationWithExtraUpdatedAt,
+    baseLocation,
+    "location undocumented updated_at does not change projection"
+  );
+  deepEqual(
+    locationWithExtraVersion,
+    baseLocation,
+    "location undocumented version does not change projection"
+  );
+  deepEqual(
+    locationWithFractionalExtraVersion,
+    baseLocation,
+    "location fractional undocumented version does not change projection"
+  );
 
   const baseLocationFingerprint = square.squareLocationFingerprint(baseLocation.items[0]);
   const sensitiveLocationFingerprint = square.squareLocationFingerprint(
@@ -511,6 +743,9 @@ function testMinimizationAndFingerprints() {
   );
   const unexpectedLocationFingerprint = square.squareLocationFingerprint(
     locationWithUnexpectedExtras.items[0]
+  );
+  const hostileExcludedLocationFingerprint = square.squareLocationFingerprint(
+    locationWithHostileExcludedFields.items[0]
   );
   assertFingerprintShape(baseLocationFingerprint, "location");
   equal(
@@ -522,6 +757,31 @@ function testMinimizationAndFingerprints() {
     unexpectedLocationFingerprint,
     baseLocationFingerprint,
     "location unexpected extras do not affect fingerprints"
+  );
+  equal(
+    hostileExcludedLocationFingerprint,
+    baseLocationFingerprint,
+    "location hostile excluded fields do not affect fingerprints"
+  );
+  equal(
+    square.squareLocationFingerprint(locationWithExtraCursor.items[0]),
+    baseLocationFingerprint,
+    "location extra cursor does not affect fingerprints"
+  );
+  equal(
+    square.squareLocationFingerprint(locationWithExtraUpdatedAt.items[0]),
+    baseLocationFingerprint,
+    "location undocumented updated_at does not affect fingerprints"
+  );
+  equal(
+    square.squareLocationFingerprint(locationWithExtraVersion.items[0]),
+    baseLocationFingerprint,
+    "location undocumented version does not affect fingerprints"
+  );
+  equal(
+    square.squareLocationFingerprint(locationWithFractionalExtraVersion.items[0]),
+    baseLocationFingerprint,
+    "location fractional undocumented version does not affect fingerprints"
   );
 
   const repeatedLocation = accepted(parseLocation(locationFixtures.active), "repeated location parse accepted");
@@ -548,10 +808,15 @@ function testMinimizationAndFingerprints() {
     baseLocationFingerprint,
     "location fingerprint binds provider identity"
   );
-  notEqual(
-    firstLocationFingerprint(square.squarePhase2B1ALocationEnvelope({ version: 9 })),
+  equal(
+    firstLocationFingerprint(square.squarePhase2B1ALocationEnvelope({ updated_at: "2026-08-19T15:30:00.000Z" })),
     baseLocationFingerprint,
-    "location fingerprint binds integer version"
+    "location extra updated_at remains excluded from fingerprints"
+  );
+  equal(
+    firstLocationFingerprint(square.squarePhase2B1ALocationEnvelope({ version: 99 })),
+    baseLocationFingerprint,
+    "location extra provider version remains excluded from fingerprints"
   );
   notEqual(
     square.squareMerchantFingerprint(
@@ -574,12 +839,100 @@ function testVersionAndProvenanceOutcomes() {
     "location parser rejects malformed Square API version as incompatible"
   );
   rejected(
+    parseMerchantRawInput({
+      providerEnvironment: "sandbox",
+      apiVersion: "2026-08-19",
+      response: merchantFixtures.active
+    }),
+    "merchant parser rejects missing provider key"
+  );
+  rejected(
+    parseMerchant(merchantFixtures.active, { providerKey: null }),
+    "merchant parser rejects null provider key"
+  );
+  rejected(
+    parseMerchant(merchantFixtures.active, { providerKey: undefined }),
+    "merchant parser rejects undefined provider key"
+  );
+  rejected(
+    parseMerchant(merchantFixtures.active, { providerKey: "" }),
+    "merchant parser rejects empty provider key"
+  );
+  rejected(
     parseMerchant(merchantFixtures.active, { providerKey: "not_square" }),
-    "merchant parser rejects the wrong provider key"
+    "merchant parser rejects another provider key"
+  );
+  rejected(
+    parseLocationRawInput({
+      providerEnvironment: "sandbox",
+      apiVersion: "2026-08-19",
+      response: locationFixtures.active
+    }),
+    "location parser rejects missing provider key"
+  );
+  rejected(
+    parseLocation(locationFixtures.active, { providerKey: null }),
+    "location parser rejects null provider key"
+  );
+  rejected(
+    parseLocation(locationFixtures.active, { providerKey: undefined }),
+    "location parser rejects undefined provider key"
+  );
+  rejected(
+    parseLocation(locationFixtures.active, { providerKey: "" }),
+    "location parser rejects empty provider key"
+  );
+  rejected(
+    parseLocation(locationFixtures.active, { providerKey: "quickbooks_online" }),
+    "location parser rejects another provider key"
   );
   rejected(
     parseLocation(locationFixtures.active, { providerEnvironment: "staging" }),
     "location parser rejects unknown provider environment"
+  );
+}
+
+function testAcceptedResultImmutability() {
+  const merchantResult = parseMerchant(merchantFixtures.active);
+  equal(merchantResult.outcome, "accepted", "merchant result is accepted for immutability checks");
+  const merchantValue = merchantResult.value;
+  ok(Object.isFrozen(merchantResult), "merchant accepted result is frozen");
+  ok(Object.isFrozen(merchantResult.diagnostics), "merchant accepted diagnostics are frozen");
+  ok(Object.isFrozen(merchantValue), "merchant response projection is frozen");
+  ok(Object.isFrozen(merchantValue.provider), "merchant response provider provenance is frozen");
+  ok(Object.isFrozen(merchantValue.items), "merchant response item array is frozen");
+  ok(Object.isFrozen(merchantValue.items[0]), "merchant trusted item is frozen");
+  ok(Object.isFrozen(merchantValue.items[0].authority), "merchant authority is frozen");
+  const merchantSnapshot = JSON.stringify(merchantValue);
+  try {
+    merchantValue.items[0].displayName = "Mutated Merchant";
+  } catch {}
+  equal(JSON.stringify(merchantValue), merchantSnapshot, "merchant trusted projection cannot be mutated");
+  throws(
+    () => merchantValue.items.push(merchantValue.items[0]),
+    /Cannot|read only|extensible|frozen/i,
+    "merchant trusted item array cannot be extended"
+  );
+
+  const locationResult = parseLocation(locationFixtures.active);
+  equal(locationResult.outcome, "accepted", "location result is accepted for immutability checks");
+  const locationValue = locationResult.value;
+  ok(Object.isFrozen(locationResult), "location accepted result is frozen");
+  ok(Object.isFrozen(locationResult.diagnostics), "location accepted diagnostics are frozen");
+  ok(Object.isFrozen(locationValue), "location response projection is frozen");
+  ok(Object.isFrozen(locationValue.provider), "location response provider provenance is frozen");
+  ok(Object.isFrozen(locationValue.items), "location response item array is frozen");
+  ok(Object.isFrozen(locationValue.items[0]), "location trusted item is frozen");
+  ok(Object.isFrozen(locationValue.items[0].authority), "location authority is frozen");
+  const locationSnapshot = JSON.stringify(locationValue);
+  try {
+    locationValue.items[0].displayName = "Mutated Location";
+  } catch {}
+  equal(JSON.stringify(locationValue), locationSnapshot, "location trusted projection cannot be mutated");
+  throws(
+    () => locationValue.items.push(locationValue.items[0]),
+    /Cannot|read only|extensible|frozen/i,
+    "location trusted item array cannot be extended"
   );
 }
 
@@ -711,6 +1064,7 @@ testRejectedAndUnsupportedPayloads();
 testUntrustedJsonBoundaries();
 testMinimizationAndFingerprints();
 testVersionAndProvenanceOutcomes();
+testAcceptedResultImmutability();
 testDormancyAndRegistration();
 
 const fixtureInventory =
