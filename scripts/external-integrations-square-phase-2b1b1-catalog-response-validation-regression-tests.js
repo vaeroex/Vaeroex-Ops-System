@@ -1032,13 +1032,23 @@ function testCatalogRelationshipIdentityOccurrences() {
 }
 
 function testRejectedAndUnsupportedCatalogPayloads() {
+  const unsupportedImageObject = {
+    type: "IMAGE",
+    id: "SQ2B1B1IMAGE001",
+    updated_at: "2026-08-19T15:11:00.000Z",
+    version: 1_787_142_660_001,
+    is_deleted: false,
+    image_data: {
+      name: "Deferred image"
+    }
+  };
   for (const [fixture, message] of [
-    [catalogFixtures.unsupportedModifierList, "deferred MODIFIER_LIST payload is unsupported"],
+    [{ objects: [unsupportedImageObject] }, "deferred IMAGE payload is unsupported"],
     [
       {
         objects: [
           square.squarePhase2B1B1Category(),
-          catalogFixtures.unsupportedModifierList.objects[0]
+          unsupportedImageObject
         ]
       },
       "mixed supported and deferred payload is unsupported"
@@ -2009,11 +2019,6 @@ function testDormancyAndRegistration() {
     squarePhase2B1B1Sources,
     /\bfetch\s*\(|axios|node:https|node:http|@supabase|supabase-js|process\.env|openai|generateText|streamText/i,
     "Square Phase 2B.1B-1 source has no network, database, environment, or model call path"
-  );
-  doesNotMatch(
-    squarePhase2B1B1Sources,
-    /parseSquare(?:Modifier|Discount|Tax)|minimizeSquare(?:Modifier|Discount|Tax)|CatalogModifier|CatalogDiscount|CatalogTax/i,
-    "Square Phase 2B.1B-2 object minimizers are not started"
   );
 
   const packageJson = JSON.parse(read("package.json"));
