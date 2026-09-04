@@ -1024,8 +1024,8 @@ function testDormancyAndRegistration() {
   );
   equal(
     fs.existsSync(path.join(root, "lib/integrations/providers/square/catalog-responses.ts")),
-    false,
-    "Catalog response module is absent"
+    true,
+    "Catalog response module is owned by Phase 2B.1B-1"
   );
 
   const packageJson = JSON.parse(read("package.json"));
