@@ -286,8 +286,8 @@ function testAcceptedCatalogObjectFamilies() {
   );
   deepEqual(
     modifier.availability,
-    modifierList.availability,
-    "nested modifier availability follows parent list inheritance"
+    { mode: "inherited_from_modifier_list" },
+    "nested modifier availability records parent-list inheritance"
   );
 
   const discount = findObject(list, "DISCOUNT");
@@ -313,6 +313,11 @@ function testAcceptedCatalogObjectFamilies() {
   equal(search.itemCount, 5, "SearchCatalogObjects primary count is retained");
   equal(search.relatedItemCount, 1, "SearchCatalogObjects related count is retained");
   equal(search.includedItemCount, 1, "SearchCatalogObjects included count is retained");
+  equal(
+    search.includedItems[0].catalogObjectType,
+    "MODIFIER_LIST",
+    "SearchCatalogObjects retains only an official nested modifier list resource"
+  );
   equal(search.latestTime, "2026-08-19T17:30:00.000Z", "Search latest_time is retained");
   equal(
     findObject(search, "MODIFIER_LIST").selectionType,
@@ -447,11 +452,116 @@ function testProviderErrors() {
         errors: [{ category: "AUTHENTICATION_ERROR", detail: "SQ2B1B2MOD001" }],
         objects: [square.squarePhase2B1B2ModifierList()],
         related_objects: [square.squarePhase2B1B2Tax()],
-        included_resources: { objects: [square.squarePhase2B1B2FixedAmountDiscount()] }
+        included_resources: {
+          nested_modifiers: [square.squarePhase2B1B2ModifierList()]
+        }
       },
       "catalog_search"
     ),
     "provider errors fail closed with primary, related, and included data"
+  );
+}
+
+function testIncludedResourceContract() {
+  const official = accepted(
+    parseCatalog(
+      {
+        objects: [],
+        included_resources: {
+          nested_modifiers: [square.squarePhase2B1B2ModifierList()],
+          ancestor_modifiers: [square.squarePhase2B1B2DeletedModifierList()]
+        }
+      },
+      "catalog_search"
+    ),
+    "official nested and ancestor modifier resources are accepted"
+  );
+  equal(
+    official.includedItemCount,
+    2,
+    "both official included-resource arrays are retained"
+  );
+  ok(
+    official.includedItems.every(
+      (item) => item.catalogObjectType === "MODIFIER_LIST"
+    ),
+    "official included resources contain only modifier-list projections"
+  );
+
+  rejected(
+    parseCatalog(
+      {
+        objects: [],
+        included_resources: {
+          nested_modifiers: [square.squarePhase2B1B2Tax()]
+        }
+      },
+      "catalog_search"
+    ),
+    "included resource with a non-modifier-list discriminator is rejected"
+  );
+  rejected(
+    parseCatalog(
+      {
+        objects: [],
+        included_resources: { nested_modifiers: {} }
+      },
+      "catalog_search"
+    ),
+    "malformed official included-resource collection is rejected"
+  );
+  rejected(
+    parseCatalog(
+      {
+        objects: [],
+        included_resources: {
+          nested_modifiers: [
+            square.squarePhase2B1B2ModifierList(),
+            square.squarePhase2B1B2ModifierList()
+          ]
+        }
+      },
+      "catalog_search"
+    ),
+    "duplicate modifier-list authority in an official included bucket is rejected"
+  );
+
+  const emptyIncluded = accepted(
+    parseCatalog(
+      { objects: [square.squarePhase2B1B2Tax()], included_resources: {} },
+      "catalog_search"
+    ),
+    "empty official included_resources object is accepted"
+  );
+  const undocumentedObjects = accepted(
+    parseCatalog(
+      {
+        objects: [square.squarePhase2B1B2Tax()],
+        included_resources: {
+          objects: [
+            square.squarePhase2B1B2FixedAmountDiscount(
+              {},
+              {
+                description: "<script>discarded included-resource canary</script>",
+                ecom_uri: "https://discarded.example.test/catalog"
+              }
+            )
+          ]
+        }
+      },
+      "catalog_search"
+    ),
+    "undocumented included_resources.objects content is structurally bounded then discarded"
+  );
+  deepEqual(
+    undocumentedObjects,
+    emptyIncluded,
+    "undocumented included_resources.objects cannot change the trusted projection"
+  );
+  equal(
+    square.squareCatalogResponseFingerprint(undocumentedObjects),
+    square.squareCatalogResponseFingerprint(emptyIncluded),
+    "undocumented included_resources.objects cannot change the response fingerprint"
   );
 }
 
@@ -688,8 +798,99 @@ function testModifierListAndModifierSemantics() {
   ).items[0];
   deepEqual(
     inherited.modifiers[0].availability,
-    inherited.availability,
-    "modifier child inherits parent availability"
+    { mode: "inherited_from_modifier_list" },
+    "modifier child records parent-list availability inheritance"
+  );
+
+  const baseModifierList = accepted(
+    parseCatalog({ objects: [square.squarePhase2B1B2ModifierList()] }),
+    "base modifier-list location inheritance is accepted"
+  ).items[0];
+  const providerScopedModifiers = accepted(
+    parseCatalog({
+      objects: [
+        square.squarePhase2B1B2ModifierList(
+          {},
+          {
+            modifiers: [
+              square.squarePhase2B1B2SecondModifier({
+                present_at_all_locations: true,
+                present_at_location_ids: ["SQ2B1B2IGNOREDLOC001"],
+                absent_at_location_ids: ["SQ2B1B2IGNOREDLOC002"]
+              }),
+              square.squarePhase2B1B2Modifier({
+                present_at_all_locations: false,
+                present_at_location_ids: ["SQ2B1B2IGNOREDLOC003"],
+                absent_at_location_ids: ["SQ2B1B2IGNOREDLOC004"]
+              })
+            ]
+          }
+        )
+      ]
+    }),
+    "nested modifier provider location fields are discarded in favor of parent scope"
+  ).items[0];
+  deepEqual(
+    providerScopedModifiers,
+    baseModifierList,
+    "nested modifier provider location fields cannot change the trusted projection"
+  );
+  equal(
+    square.squareCatalogObjectFingerprint(providerScopedModifiers),
+    square.squareCatalogObjectFingerprint(baseModifierList),
+    "nested modifier provider location fields cannot change the object fingerprint"
+  );
+  for (const modifier of providerScopedModifiers.modifiers) {
+    deepEqual(
+      modifier.availability,
+      { mode: "inherited_from_modifier_list" },
+      "every nested modifier records modifier-list availability inheritance"
+    );
+  }
+
+  const standaloneModifier = accepted(
+    parseCatalog({ objects: [square.squarePhase2B1B2Modifier()] }),
+    "standalone modifier is accepted with explicit inherited availability"
+  ).items[0];
+  deepEqual(
+    standaloneModifier.availability,
+    { mode: "inherited_from_modifier_list" },
+    "standalone modifier does not trust provider-controlled location scope"
+  );
+  const standaloneModifierWithScope = accepted(
+    parseCatalog({
+      objects: [
+        square.squarePhase2B1B2Modifier({
+          present_at_all_locations: true,
+          present_at_location_ids: ["SQ2B1B2IGNOREDLOC005"],
+          absent_at_location_ids: ["SQ2B1B2IGNOREDLOC006"]
+        })
+      ]
+    }),
+    "standalone modifier provider location fields are discarded"
+  ).items[0];
+  deepEqual(
+    standaloneModifierWithScope,
+    standaloneModifier,
+    "standalone modifier provider location fields cannot change the trusted projection"
+  );
+  equal(
+    square.squareCatalogObjectFingerprint(standaloneModifierWithScope),
+    square.squareCatalogObjectFingerprint(standaloneModifier),
+    "standalone modifier provider location fields cannot change the object fingerprint"
+  );
+  rejected(
+    parseCatalog({
+      objects: [
+        square.squarePhase2B1B2Modifier({
+          present_at_location_ids: Array.from(
+            { length: 1_001 },
+            (_, index) => `SQ2B1B2STRUCTURAL${index}`
+          )
+        })
+      ]
+    }),
+    "oversized discarded modifier location collection is structurally rejected"
   );
 
   const repeated = accepted(
@@ -705,6 +906,21 @@ function testModifierListAndModifierSemantics() {
   assertFingerprintShape(
     square.squareCatalogResponseFingerprint(repeated),
     "repeated modifier-list response fingerprint"
+  );
+
+  const repeatedModifier = accepted(
+    parseCatalog(
+      {
+        objects: [square.squarePhase2B1B2Modifier()],
+        related_objects: [square.squarePhase2B1B2ModifierList()]
+      },
+      "catalog_search"
+    ),
+    "identical modifier authority can repeat standalone and within its parent list"
+  );
+  assertFingerprintShape(
+    square.squareCatalogResponseFingerprint(repeatedModifier),
+    "cross-context repeated modifier response fingerprint"
   );
 
   for (const [fixture, message] of [
@@ -728,24 +944,6 @@ function testModifierListAndModifierSemantics() {
         ]
       },
       "nested modifier parent-list mismatch is rejected"
-    ],
-    [
-      {
-        objects: [
-          square.squarePhase2B1B2ModifierList(
-            {},
-            {
-              modifiers: [
-                square.squarePhase2B1B2Modifier({
-                  present_at_all_locations: true,
-                  absent_at_location_ids: ["SQ2B1B2LOC999"]
-                })
-              ]
-            }
-          )
-        ]
-      },
-      "nested modifier conflicting location scope is rejected"
     ],
     [
       {
@@ -1066,10 +1264,8 @@ function testDiscountSemantics() {
     " 7.5",
     "7.5 ",
     "-1",
-    "100.000001",
-    "100.1",
-    "101",
-    "7.1234567"
+    "01",
+    "1".repeat(129)
   ]) {
     rejected(
       parseCatalog({
@@ -1085,6 +1281,25 @@ function testDiscountSemantics() {
       `invalid discount percentage ${String(badPercentage)} is rejected`
     );
   }
+
+  const exactUnboundedDiscount = accepted(
+    parseCatalog({
+      objects: [
+        square.squarePhase2B1B2FixedPercentageDiscount(
+          {},
+          {
+            percentage: "125.1234567890123456789"
+          }
+        )
+      ]
+    }),
+    "Catalog discount percentage does not invent an undocumented numeric range or precision"
+  ).items[0];
+  equal(
+    exactUnboundedDiscount.percentage,
+    "125.1234567890123456789",
+    "Catalog discount percentage retains the exact bounded decimal string"
+  );
 }
 
 function testTaxSemantics() {
@@ -1131,34 +1346,6 @@ function testTaxSemantics() {
       },
       "rejected",
       "unsupported tax inclusion type is rejected"
-    ],
-    [
-      {
-        objects: [
-          square.squarePhase2B1B2Tax(
-            {},
-            {
-              percentage: "8.2500001"
-            }
-          )
-        ]
-      },
-      "rejected",
-      "tax percentage over precision is rejected"
-    ],
-    [
-      {
-        objects: [
-          square.squarePhase2B1B2Tax(
-            {},
-            {
-              percentage: "101"
-            }
-          )
-        ]
-      },
-      "rejected",
-      "tax percentage over range is rejected"
     ],
     [
       {
@@ -1216,6 +1403,25 @@ function testTaxSemantics() {
       rejected(parseCatalog(fixture), message);
     }
   }
+
+  const exactUnboundedTax = accepted(
+    parseCatalog({
+      objects: [
+        square.squarePhase2B1B2Tax(
+          {},
+          {
+            percentage: "250.0000001000000000001"
+          }
+        )
+      ]
+    }),
+    "Catalog tax percentage does not invent an undocumented numeric range or precision"
+  ).items[0];
+  equal(
+    exactUnboundedTax.percentage,
+    "250.0000001000000000001",
+    "Catalog tax percentage retains the exact bounded decimal string"
+  );
 }
 
 function testDiscriminatorTombstonesAndDuplicates() {
@@ -1482,12 +1688,19 @@ function testAcceptedResultImmutability() {
   const modifierList = findObject(value, "MODIFIER_LIST");
   const discount = findObject(value, "DISCOUNT");
   const tax = findObject(value, "TAX");
+  const includedValue = accepted(
+    parseCatalog(catalogFixtures.searchCatalog, "catalog_search"),
+    "included-resource immutability fixture accepted"
+  );
+  const includedModifierList = includedValue.includedItems[0];
 
   for (const [item, label] of [
     [value, "Catalog response"],
     [value.provider, "Catalog response provider provenance"],
     [value.pagination, "Catalog pagination state"],
     [value.items, "Catalog primary object array"],
+    [value.relatedItems, "Catalog related object array"],
+    [value.includedItems, "Catalog included object array"],
     [modifierList, "Catalog modifier-list projection"],
     [modifierList.authority, "Catalog modifier-list authority"],
     [modifierList.provider, "Catalog modifier-list provenance"],
@@ -1507,7 +1720,11 @@ function testAcceptedResultImmutability() {
     [discount.maximumAmount, "Catalog discount maximum amount"],
     [tax, "Catalog tax projection"],
     [tax.authority, "Catalog tax authority"],
-    [tax.provider, "Catalog tax provenance"]
+    [tax.provider, "Catalog tax provenance"],
+    [includedValue.includedItems, "populated Catalog included object array"],
+    [includedModifierList, "included modifier-list projection"],
+    [includedModifierList.modifiers, "included modifier-list child array"],
+    [includedModifierList.modifiers[0], "included modifier projection"]
   ]) {
     expectFrozen(item, label);
   }
@@ -1528,7 +1745,16 @@ function testAcceptedResultImmutability() {
   try {
     tax.provider.apiVersion = "2026-08-20";
   } catch {}
+  const includedSnapshot = JSON.stringify(includedValue);
+  try {
+    includedModifierList.modifiers[0].displayName = "Changed included modifier";
+  } catch {}
   equal(JSON.stringify(value), snapshot, "accepted Catalog result cannot be mutated");
+  equal(
+    JSON.stringify(includedValue),
+    includedSnapshot,
+    "accepted included-resource projections cannot be mutated"
+  );
   throws(
     () => value.items.push(discount),
     /Cannot|read only|extensible|frozen/i,
@@ -1650,6 +1876,7 @@ function testSchemaExportsAndDocs() {
 testAcceptedCatalogObjectFamilies();
 testProviderAndVersionBoundaries();
 testProviderErrors();
+testIncludedResourceContract();
 testMinimizationAndFingerprints();
 testModifierListAndModifierSemantics();
 testDiscountSemantics();

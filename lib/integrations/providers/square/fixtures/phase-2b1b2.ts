@@ -389,16 +389,7 @@ export function squarePhase2B1B2SearchEnvelope(
     ],
     related_objects: [squarePhase2B1B1Category()],
     included_resources: {
-      objects: [
-        squarePhase2B1B2FixedPercentageDiscount({
-          id: "SQ2B1B2DISCINC001",
-          discount_data: {
-            name: "Included discount",
-            discount_type: "FIXED_PERCENTAGE",
-            percentage: "2.25"
-          }
-        })
-      ]
+      nested_modifiers: [squarePhase2B1B2ModifierList()]
     },
     cursor: SQUARE_PHASE_2B1B2_SYNTHETIC_CURSOR,
     latest_time: "2026-08-19T17:30:00.000Z",
@@ -438,7 +429,8 @@ export function squarePhase2B1B2BatchEnvelope(
     ],
     related_objects: [],
     included_resources: {
-      objects: []
+      nested_modifiers: [],
+      ancestor_modifiers: []
     },
     ...envelopeOverrides
   };

@@ -379,7 +379,11 @@ function testAcceptedEnvelopes() {
   equal(search.operation, "catalog_search", "Search operation is retained");
   equal(search.itemCount, 1, "Search primary object count is retained");
   equal(search.relatedItemCount, 1, "Search related object count is retained");
-  equal(search.includedItemCount, 1, "Search included resource count is retained");
+  equal(
+    search.includedItemCount,
+    0,
+    "Search ignores undocumented included_resources.objects"
+  );
   equal(search.latestTime, "2026-08-19T15:10:00.000Z", "Search latest_time is retained");
   equal(search.pagination.cursorPresent, true, "Search cursor presence is retained");
   assertFingerprintShape(search.pagination.cursorFingerprint, "Search cursor");
@@ -407,7 +411,11 @@ function testAcceptedEnvelopes() {
   equal(batch.operation, "catalog_batch_retrieve", "Batch retrieve operation is retained");
   equal(batch.itemCount, 2, "Batch retrieve retains deleted primary objects");
   equal(batch.relatedItemCount, 1, "Batch retrieve retains deleted related objects");
-  equal(batch.includedItemCount, 1, "Batch retrieve retains included resources");
+  equal(
+    batch.includedItemCount,
+    0,
+    "Batch retrieve ignores undocumented included_resources.objects"
+  );
   equal(batch.items[0].isDeleted, true, "Deleted category tombstone is retained");
   equal(batch.items[0].displayName, null, "Deleted category tombstone omits data fields");
   equal(batch.items[1].isDeleted, true, "Deleted item tombstone is retained");
@@ -455,7 +463,7 @@ function testAcceptedEnvelopes() {
             category_data: { name: "Related Empty Search", is_top_level: true }
           })
         ],
-        included_resources: { objects: [] },
+        included_resources: { nested_modifiers: [] },
         cursor: square.SQUARE_PHASE_2B1B1_SYNTHETIC_CURSOR,
         latest_time: "2026-08-19T15:10:00.000Z"
       },
@@ -489,7 +497,7 @@ function testAcceptedEnvelopes() {
     parseCatalog(
       {
         related_objects: [square.squarePhase2B1B1DeletedVariation()],
-        included_resources: { objects: [] }
+        included_resources: { ancestor_modifiers: [] }
       },
       "catalog_batch_retrieve"
     ),
@@ -604,7 +612,9 @@ function testProviderErrors() {
         ],
         objects: [square.squarePhase2B1B1Item()],
         related_objects: [square.squarePhase2B1B1Category()],
-        included_resources: { objects: [square.squarePhase2B1B1Category()] }
+        included_resources: {
+          nested_modifiers: [square.squarePhase2B1B2ModifierList()]
+        }
       },
       "catalog_search"
     ),
@@ -998,9 +1008,9 @@ function testCatalogRelationshipIdentityOccurrences() {
       {
         objects: [],
         included_resources: {
-          objects: [
-            square.squarePhase2B1B1Category(),
-            square.squarePhase2B1B1Category()
+          nested_modifiers: [
+            square.squarePhase2B1B2ModifierList(),
+            square.squarePhase2B1B2ModifierList()
           ]
         }
       },
@@ -1378,7 +1388,7 @@ function testRejectedAndUnsupportedCatalogPayloads() {
     rejected(parseCatalog(fixture), message);
   }
 
-  rejected(
+  const emptyIncludedResources = accepted(
     parseCatalog(
       {
         objects: [square.squarePhase2B1B1Category()],
@@ -1386,7 +1396,12 @@ function testRejectedAndUnsupportedCatalogPayloads() {
       },
       "catalog_search"
     ),
-    "present included_resources without objects is rejected"
+    "empty official included_resources object is accepted"
+  );
+  equal(
+    emptyIncludedResources.includedItemCount,
+    0,
+    "empty official included_resources object has no trusted items"
   );
 
   rejected(

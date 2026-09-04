@@ -50,6 +50,8 @@ import {
   squareUnsupportedResult
 } from "@/lib/integrations/providers/square/response-validation";
 
+const SQUARE_CATALOG_PERCENTAGE_MAX_TEXT_LENGTH = 128;
+
 const SquareCatalogEntityTypeSchema = z.enum([
   "catalog_category",
   "catalog_item",
@@ -119,6 +121,12 @@ const SquareCatalogScopedAvailabilitySchema = z.discriminatedUnion("mode", [
   SquareCatalogSpecificLocationsAvailabilitySchema
 ]);
 
+const SquareCatalogInheritedModifierAvailabilitySchema = z
+  .object({
+    mode: z.literal("inherited_from_modifier_list")
+  })
+  .strict();
+
 const SquareCatalogCategoryReferenceSchema = z
   .object({
     id: SquareIdentifierSchema,
@@ -135,17 +143,8 @@ const SquareCatalogPriceSchema = z
 
 const SquareCatalogPercentageStringSchema = z
   .string()
-  .regex(/^(?:0|[1-9][0-9]?|100)(?:\.[0-9]*[1-9])?$/)
-  .refine(
-    (value) => {
-      const [whole, fractional = ""] = value.split(".");
-      return (
-        fractional.length <= 6 &&
-        (whole !== "100" || fractional === "")
-      );
-    },
-    "Percentage must be a canonical decimal string"
-  );
+  .max(SQUARE_CATALOG_PERCENTAGE_MAX_TEXT_LENGTH)
+  .regex(/^(?:0|[1-9][0-9]*)(?:\.[0-9]*[1-9])?$/);
 
 const SquareCatalogBaseObjectSchema = z
   .object({
@@ -199,7 +198,7 @@ export const SquareMinimizedCatalogModifierSchema =
   SquareCatalogBaseObjectSchema.extend({
     entityType: z.literal("catalog_modifier"),
     catalogObjectType: z.literal("MODIFIER"),
-    availability: SquareCatalogScopedAvailabilitySchema,
+    availability: SquareCatalogInheritedModifierAvailabilitySchema,
     parentModifierListAuthority:
       SquareCatalogModifierListAuthoritySchema.nullable(),
     displayName: SquareCatalogTrustedTextSchema.nullable(),
@@ -340,7 +339,12 @@ type SquareCatalogResponseParserInput = SquareResponseParserInput &
 type CatalogObjectBucket = Readonly<{
   items: readonly SquareSafeJsonObject[];
   relatedItems: readonly SquareSafeJsonObject[];
-  includedItems: readonly SquareSafeJsonObject[];
+  includedItems: readonly CatalogIncludedObject[];
+}>;
+
+type CatalogIncludedObject = Readonly<{
+  object: SquareSafeJsonObject;
+  field: string;
 }>;
 
 type CatalogRelationshipBucket = "primary" | "related" | "included";
@@ -411,14 +415,19 @@ export function parseSquareCatalogResponse(
       )
     );
     const includedItems = sortCatalogObjects(
-      rawObjects.includedItems.map((item) =>
-        minimizeSquareCatalogObject(
-          item,
-          provenance,
-          "$response.included_resources.objects[]",
-          { state: minimizationState, context: { bucket: "included" } }
-        )
-      )
+      rawObjects.includedItems.map(({ object, field }) => {
+        const item = minimizeSquareCatalogObject(object, provenance, field, {
+          state: minimizationState,
+          context: { bucket: "included" }
+        });
+        if (item.catalogObjectType !== "MODIFIER_LIST") {
+          squareRejectResponse(
+            "square_catalog_included_resource_type_invalid",
+            `${field}.type`
+          );
+        }
+        return item;
+      })
     );
 
     return squareAcceptedResult(
@@ -458,9 +467,6 @@ export function minimizeSquareCatalogObject(
     state?: SquareCatalogMinimizationState;
     parentItemId?: string | null;
     parentModifierListId?: string | null;
-    inheritedAvailability?: z.infer<
-      typeof SquareCatalogScopedAvailabilitySchema
-    > | null;
     context?: CatalogRelationshipContext;
   }> = {}
 ): SquareMinimizedCatalogObject {
@@ -789,7 +795,6 @@ function minimizeSquareCatalogModifierList(
           field,
           options.state,
           base.id,
-          availability,
           modifierType,
           options.context
         );
@@ -832,9 +837,6 @@ function minimizeSquareCatalogModifier(
   options: Readonly<{
     state?: SquareCatalogMinimizationState;
     parentModifierListId?: string | null;
-    inheritedAvailability?: z.infer<
-      typeof SquareCatalogScopedAvailabilitySchema
-    > | null;
     context?: CatalogRelationshipContext;
   }>
 ): SquareMinimizedCatalogModifier {
@@ -844,11 +846,7 @@ function minimizeSquareCatalogModifier(
     field,
     "catalog_modifier"
   );
-  const availability = modifierAvailability(
-    object,
-    field,
-    options.inheritedAvailability
-  );
+  const availability = modifierAvailability();
   const modifierData = base.isDeleted
     ? null
     : squareRequiredObject(object, "modifier_data", `${field}.modifier_data`);
@@ -1277,38 +1275,12 @@ function itemAvailability(
   });
 }
 
-function modifierAvailability(
-  object: SquareSafeJsonObject,
-  field: string,
-  inheritedAvailability:
-    | z.infer<typeof SquareCatalogScopedAvailabilitySchema>
-    | null
-    | undefined
-): z.infer<typeof SquareCatalogScopedAvailabilitySchema> {
-  if (!inheritedAvailability) {
-    return itemAvailability(object, field);
-  }
-  if (!catalogObjectHasLocationScope(object)) {
-    return inheritedAvailability;
-  }
-  const explicitAvailability = itemAvailability(object, field);
-  if (
-    JSON.stringify(explicitAvailability) !== JSON.stringify(inheritedAvailability)
-  ) {
-    squareRejectResponse(
-      "square_catalog_modifier_location_scope_invalid",
-      `${field}.present_at_all_locations`
-    );
-  }
-  return inheritedAvailability;
-}
-
-function catalogObjectHasLocationScope(object: SquareSafeJsonObject) {
-  return (
-    hasOwn(object, "present_at_all_locations") ||
-    hasOwn(object, "present_at_location_ids") ||
-    hasOwn(object, "absent_at_location_ids")
-  );
+function modifierAvailability(): z.infer<
+  typeof SquareCatalogInheritedModifierAvailabilitySchema
+> {
+  return SquareCatalogInheritedModifierAvailabilitySchema.parse({
+    mode: "inherited_from_modifier_list"
+  });
 }
 
 function catalogItemVariationChildren(
@@ -1355,7 +1327,6 @@ function catalogModifierListChildren(
   field: string,
   state: SquareCatalogMinimizationState | undefined,
   parentModifierListId: string,
-  inheritedAvailability: z.infer<typeof SquareCatalogScopedAvailabilitySchema>,
   modifierType: "LIST" | "TEXT" | null,
   parentContext: CatalogRelationshipContext | undefined
 ) {
@@ -1390,7 +1361,6 @@ function catalogModifierListChildren(
         {
           state,
           parentModifierListId,
-          inheritedAvailability,
           context: {
             bucket: "nested_modifier",
             parentBucket: parentContext?.bucket ?? "primary",
@@ -1662,16 +1632,13 @@ function catalogPercentageString(value: SquareSafeJsonValue, field: string) {
   if (typeof value !== "string") {
     squareRejectResponse("square_catalog_percentage_invalid", field);
   }
-  if (!/^(?:0|[1-9][0-9]{0,2})(?:\.[0-9]{1,6})?$/.test(value)) {
-    squareRejectResponse("square_catalog_percentage_invalid", field);
-  }
-  const [whole, fractional = ""] = value.split(".");
   if (
-    Number(whole) > 100 ||
-    (whole === "100" && /[1-9]/.test(fractional))
+    value.length > SQUARE_CATALOG_PERCENTAGE_MAX_TEXT_LENGTH ||
+    !/^(?:0|[1-9][0-9]*)(?:\.[0-9]+)?$/.test(value)
   ) {
     squareRejectResponse("square_catalog_percentage_invalid", field);
   }
+  const [whole, fractional = ""] = value.split(".");
   const canonicalFractional = fractional.replace(/0+$/u, "");
   const canonical =
     canonicalFractional.length > 0 ? `${whole}.${canonicalFractional}` : whole;
@@ -1781,23 +1748,32 @@ function optionalIncludedResources(response: SquareSafeJsonObject) {
     response.included_resources,
     "$response.included_resources"
   );
-  return requiredCatalogObjectArray(
+  const nestedModifiers = optionalCatalogObjectArray(
     includedResources,
-    "objects",
-    "$response.included_resources.objects",
+    "nested_modifiers",
+    "$response.included_resources.nested_modifiers",
     1_000
-  );
-}
-
-function requiredCatalogObjectArray(
-  record: SquareSafeJsonObject,
-  key: string,
-  field: string,
-  maximumLength: number
-) {
-  return requiredArray(record, key, field, maximumLength).map((item) =>
-    squareSafeJsonObject(item, `${field}[]`)
-  );
+  ).map((object) => ({
+    object,
+    field: "$response.included_resources.nested_modifiers[]"
+  }));
+  const ancestorModifiers = optionalCatalogObjectArray(
+    includedResources,
+    "ancestor_modifiers",
+    "$response.included_resources.ancestor_modifiers",
+    1_000
+  ).map((object) => ({
+    object,
+    field: "$response.included_resources.ancestor_modifiers[]"
+  }));
+  const includedObjects = [...nestedModifiers, ...ancestorModifiers];
+  if (includedObjects.length > 1_000) {
+    squareRejectResponse(
+      "square_response_array_invalid",
+      "$response.included_resources"
+    );
+  }
+  return includedObjects;
 }
 
 function optionalCatalogObjectArray(
