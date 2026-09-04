@@ -1263,7 +1263,8 @@ function testDiscountSemantics() {
     "7.5%",
     " 7.5",
     "7.5 ",
-    "-1",
+    "-0",
+    "-0.0",
     "01",
     "1".repeat(129)
   ]) {
@@ -1299,6 +1300,25 @@ function testDiscountSemantics() {
     exactUnboundedDiscount.percentage,
     "125.1234567890123456789",
     "Catalog discount percentage retains the exact bounded decimal string"
+  );
+
+  const exactSignedDiscount = accepted(
+    parseCatalog({
+      objects: [
+        square.squarePhase2B1B2FixedPercentageDiscount(
+          {},
+          {
+            percentage: "-125.123456789012345678900"
+          }
+        )
+      ]
+    }),
+    "Catalog discount percentage does not invent an undocumented lower bound"
+  ).items[0];
+  equal(
+    exactSignedDiscount.percentage,
+    "-125.1234567890123456789",
+    "Catalog discount percentage canonicalizes a signed decimal without numeric conversion"
   );
 }
 
@@ -1421,6 +1441,25 @@ function testTaxSemantics() {
     exactUnboundedTax.percentage,
     "250.0000001000000000001",
     "Catalog tax percentage retains the exact bounded decimal string"
+  );
+
+  const exactSignedTax = accepted(
+    parseCatalog({
+      objects: [
+        square.squarePhase2B1B2Tax(
+          {},
+          {
+            percentage: "-250.000000100000000000100"
+          }
+        )
+      ]
+    }),
+    "Catalog tax percentage does not invent an undocumented lower bound"
+  ).items[0];
+  equal(
+    exactSignedTax.percentage,
+    "-250.0000001000000000001",
+    "Catalog tax percentage canonicalizes a signed decimal without numeric conversion"
   );
 }
 

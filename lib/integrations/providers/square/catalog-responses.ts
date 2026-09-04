@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import {
+  CanonicalDecimalSchema,
   IsoTimestampSchema,
   Sha256FingerprintSchema
 } from "@/lib/integrations/contracts/primitives";
@@ -141,10 +142,10 @@ const SquareCatalogPriceSchema = z
   })
   .strict();
 
-const SquareCatalogPercentageStringSchema = z
-  .string()
-  .max(SQUARE_CATALOG_PERCENTAGE_MAX_TEXT_LENGTH)
-  .regex(/^(?:0|[1-9][0-9]*)(?:\.[0-9]*[1-9])?$/);
+const SquareCatalogPercentageStringSchema = CanonicalDecimalSchema.refine(
+  (value) => value.length <= SQUARE_CATALOG_PERCENTAGE_MAX_TEXT_LENGTH,
+  "Percentage must fit the structural text bound"
+);
 
 const SquareCatalogBaseObjectSchema = z
   .object({
@@ -1634,7 +1635,7 @@ function catalogPercentageString(value: SquareSafeJsonValue, field: string) {
   }
   if (
     value.length > SQUARE_CATALOG_PERCENTAGE_MAX_TEXT_LENGTH ||
-    !/^(?:0|[1-9][0-9]*)(?:\.[0-9]+)?$/.test(value)
+    !/^-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?$/.test(value)
   ) {
     squareRejectResponse("square_catalog_percentage_invalid", field);
   }
