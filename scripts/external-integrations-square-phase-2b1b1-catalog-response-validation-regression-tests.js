@@ -1412,10 +1412,102 @@ function testRejectedAndUnsupportedCatalogPayloads() {
 }
 
 function testCatalogObjectDiscriminatorExclusivity() {
+  ok(
+    Object.isFrozen(square.SQUARE_CATALOG_OBJECT_TYPE_DATA_KEY_BY_TYPE),
+    "Catalog discriminator type-data map is frozen"
+  );
+  ok(
+    Object.isFrozen(square.SQUARE_CATALOG_OBJECT_TYPE_DATA_KEYS),
+    "Catalog discriminator type-data key array is frozen"
+  );
   deepEqual(
     [...square.SQUARE_CATALOG_OBJECT_TYPE_DATA_KEYS],
     EXPECTED_CATALOG_OBJECT_TYPE_DATA_KEYS,
     "Catalog discriminator guard covers pinned type-specific data keys"
+  );
+
+  const dataKeyByTypeSnapshot = JSON.stringify(
+    square.SQUARE_CATALOG_OBJECT_TYPE_DATA_KEY_BY_TYPE
+  );
+  const dataKeysSnapshot = JSON.stringify(
+    square.SQUARE_CATALOG_OBJECT_TYPE_DATA_KEYS
+  );
+  for (const [mutate, message] of [
+    [
+      () => {
+        square.SQUARE_CATALOG_OBJECT_TYPE_DATA_KEY_BY_TYPE.ITEM =
+          "category_data";
+      },
+      "Catalog discriminator map rejects property replacement"
+    ],
+    [
+      () => {
+        square.SQUARE_CATALOG_OBJECT_TYPE_DATA_KEY_BY_TYPE.FUTURE_OBJECT =
+          "future_data";
+      },
+      "Catalog discriminator map rejects property addition"
+    ],
+    [
+      () => {
+        delete square.SQUARE_CATALOG_OBJECT_TYPE_DATA_KEY_BY_TYPE.CATEGORY;
+      },
+      "Catalog discriminator map rejects property deletion"
+    ],
+    [
+      () => {
+        square.SQUARE_CATALOG_OBJECT_TYPE_DATA_KEYS.push("future_data");
+      },
+      "Catalog discriminator key array rejects push"
+    ],
+    [
+      () => {
+        square.SQUARE_CATALOG_OBJECT_TYPE_DATA_KEYS.pop();
+      },
+      "Catalog discriminator key array rejects pop"
+    ],
+    [
+      () => {
+        square.SQUARE_CATALOG_OBJECT_TYPE_DATA_KEYS.splice(0, 1);
+      },
+      "Catalog discriminator key array rejects splice"
+    ],
+    [
+      () => {
+        square.SQUARE_CATALOG_OBJECT_TYPE_DATA_KEYS[0] = "category_data";
+      },
+      "Catalog discriminator key array rejects index assignment"
+    ],
+    [
+      () => {
+        square.SQUARE_CATALOG_OBJECT_TYPE_DATA_KEYS.length = 1;
+      },
+      "Catalog discriminator key array rejects length replacement"
+    ]
+  ]) {
+    try {
+      mutate();
+    } catch {}
+    equal(
+      JSON.stringify(square.SQUARE_CATALOG_OBJECT_TYPE_DATA_KEY_BY_TYPE),
+      dataKeyByTypeSnapshot,
+      `${message}: type-data map is unchanged`
+    );
+    equal(
+      JSON.stringify(square.SQUARE_CATALOG_OBJECT_TYPE_DATA_KEYS),
+      dataKeysSnapshot,
+      `${message}: type-data key array is unchanged`
+    );
+  }
+
+  rejected(
+    parseCatalog({
+      objects: [
+        square.squarePhase2B1B1Category({
+          item_data: catalogItemData()
+        })
+      ]
+    }),
+    "discriminator rejection still works after policy mutation attempts"
   );
 
   for (const [fixture, message] of [
