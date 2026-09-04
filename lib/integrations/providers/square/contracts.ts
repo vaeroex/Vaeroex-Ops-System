@@ -8,6 +8,14 @@ export const SQUARE_PROVIDER_DISPLAY_NAME = "Square" as const;
 export const SQUARE_PROVIDER_ADAPTER_VERSION =
   "square_phase_2a_dormant_provider_contract_v1" as const;
 export const SQUARE_API_VERSION = "2026-08-19" as const;
+export const SQUARE_RESPONSE_VALIDATION_VERSION =
+  "square_phase_2b1a_response_validation_v1" as const;
+export const SQUARE_MERCHANT_RESPONSE_CONTRACT_VERSION =
+  "square_merchant_response_minimized_v1" as const;
+export const SQUARE_LOCATION_RESPONSE_CONTRACT_VERSION =
+  "square_location_response_minimized_v1" as const;
+export const SQUARE_MERCHANT_LOCATION_MINIMIZATION_VERSION =
+  "square_merchant_location_minimizer_v1" as const;
 export const SQUARE_DORMANT_GATE_VERSION =
   "square_phase_2a_dormant_descriptor_only_v1" as const;
 export const SQUARE_MODEL_CALL_COUNT = 0 as const;
@@ -38,6 +46,21 @@ export const SQUARE_MINIMUM_READ_SCOPES = [
 export const SQUARE_OPTIONAL_READ_SCOPES = [] as const;
 
 export type SquareMinimumReadScope = (typeof SQUARE_MINIMUM_READ_SCOPES)[number];
+
+export const SQUARE_ALLOWED_MERCHANT_STATUSES = [
+  "ACTIVE",
+  "INACTIVE"
+] as const;
+
+export const SQUARE_ALLOWED_LOCATION_STATUSES = [
+  "ACTIVE",
+  "INACTIVE"
+] as const;
+
+export const SQUARE_ALLOWED_LOCATION_TYPES = [
+  "PHYSICAL",
+  "MOBILE"
+] as const;
 
 export const SQUARE_WRITE_OR_DEFERRED_SCOPE_PATTERNS = [
   /_WRITE(?:_|$)/,
