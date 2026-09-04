@@ -17,6 +17,11 @@ export const SQUARE_LOCATION_RESPONSE_CONTRACT_VERSION =
 export const SQUARE_MERCHANT_LOCATION_MINIMIZATION_VERSION =
   "square_merchant_location_minimizer_v1" as const;
 export const SQUARE_MERCHANT_LOCATION_ENTITY_VERSION = 1 as const;
+export const SQUARE_CATALOG_RESPONSE_CONTRACT_VERSION =
+  "square_catalog_response_minimized_v1" as const;
+export const SQUARE_CATALOG_MINIMIZATION_VERSION =
+  "square_catalog_minimizer_v1" as const;
+export const SQUARE_CATALOG_ENTITY_VERSION = 1 as const;
 export const SQUARE_DORMANT_GATE_VERSION =
   "square_phase_2a_dormant_descriptor_only_v1" as const;
 export const SQUARE_MODEL_CALL_COUNT = 0 as const;
@@ -118,6 +123,24 @@ export const SQUARE_ALLOWED_CATALOG_OBJECT_TYPES = [
   "MODIFIER_LIST",
   "DISCOUNT",
   "TAX"
+] as const;
+
+export const SQUARE_PHASE_2B1B1_SUPPORTED_CATALOG_OBJECT_TYPES = [
+  "CATEGORY",
+  "ITEM",
+  "ITEM_VARIATION"
+] as const;
+
+export const SQUARE_CATALOG_RESPONSE_OPERATION_KEYS = [
+  "list_catalog",
+  "catalog_search",
+  "retrieve_catalog_object",
+  "catalog_batch_retrieve"
+] as const;
+
+export const SQUARE_ALLOWED_CATALOG_PRICING_TYPES = [
+  "FIXED_PRICING",
+  "VARIABLE_PRICING"
 ] as const;
 
 export const SQUARE_ALLOWED_ORDER_STATES = [
