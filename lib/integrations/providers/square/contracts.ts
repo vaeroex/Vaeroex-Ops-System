@@ -131,6 +131,32 @@ export const SQUARE_PHASE_2B1B1_SUPPORTED_CATALOG_OBJECT_TYPES = [
   "ITEM_VARIATION"
 ] as const;
 
+export const SQUARE_CATALOG_OBJECT_TYPE_DATA_KEY_BY_TYPE = {
+  ITEM: "item_data",
+  IMAGE: "image_data",
+  CATEGORY: "category_data",
+  ITEM_VARIATION: "item_variation_data",
+  TAX: "tax_data",
+  DISCOUNT: "discount_data",
+  MODIFIER_LIST: "modifier_list_data",
+  MODIFIER: "modifier_data",
+  PRICING_RULE: "pricing_rule_data",
+  PRODUCT_SET: "product_set_data",
+  TIME_PERIOD: "time_period_data",
+  MEASUREMENT_UNIT: "measurement_unit_data",
+  SUBSCRIPTION_PLAN_VARIATION: "subscription_plan_variation_data",
+  ITEM_OPTION: "item_option_data",
+  ITEM_OPTION_VAL: "item_option_value_data",
+  CUSTOM_ATTRIBUTE_DEFINITION: "custom_attribute_definition_data",
+  QUICK_AMOUNTS_SETTINGS: "quick_amounts_settings_data",
+  SUBSCRIPTION_PLAN: "subscription_plan_data",
+  AVAILABILITY_PERIOD: "availability_period_data"
+} as const;
+
+export const SQUARE_CATALOG_OBJECT_TYPE_DATA_KEYS = Object.values(
+  SQUARE_CATALOG_OBJECT_TYPE_DATA_KEY_BY_TYPE
+);
+
 export const SQUARE_CATALOG_RESPONSE_OPERATION_KEYS = [
   "list_catalog",
   "catalog_search",

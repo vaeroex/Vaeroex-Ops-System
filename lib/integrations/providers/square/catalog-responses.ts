@@ -7,6 +7,8 @@ import {
 import {
   SQUARE_ALLOWED_CATALOG_PRICING_TYPES,
   SQUARE_CATALOG_ENTITY_VERSION,
+  SQUARE_CATALOG_OBJECT_TYPE_DATA_KEY_BY_TYPE,
+  SQUARE_CATALOG_OBJECT_TYPE_DATA_KEYS,
   SQUARE_CATALOG_MINIMIZATION_VERSION,
   SQUARE_CATALOG_RESPONSE_CONTRACT_VERSION,
   SQUARE_CATALOG_RESPONSE_OPERATION_KEYS,
@@ -239,6 +241,18 @@ type CatalogObjectBucket = Readonly<{
   includedItems: readonly SquareSafeJsonObject[];
 }>;
 
+type CatalogRelationshipBucket = "primary" | "related" | "included";
+
+type CatalogRelationshipContext =
+  | Readonly<{
+      bucket: CatalogRelationshipBucket;
+    }>
+  | Readonly<{
+      bucket: "nested";
+      parentBucket: CatalogRelationshipBucket | "nested";
+      parentItemId: string;
+    }>;
+
 const CATALOG_CURSOR_PATTERN = /^[A-Za-z0-9._~:+-]{1,4096}={0,2}$/;
 const CONTROL_CHARACTER_PATTERN = /[\u0000-\u001F\u007F-\u009F]/u;
 const BIDIRECTIONAL_CONTROL_PATTERN =
@@ -269,7 +283,8 @@ export function parseSquareCatalogResponse(
     const minimizationState = newCatalogMinimizationState();
     const items = rawObjects.items.map((item) =>
       minimizeSquareCatalogObject(item, provenance, primaryObjectField, {
-        state: minimizationState
+        state: minimizationState,
+        context: { bucket: "primary" }
       })
     );
     const relatedItems = rawObjects.relatedItems.map((item) =>
@@ -277,7 +292,7 @@ export function parseSquareCatalogResponse(
         item,
         provenance,
         "$response.related_objects[]",
-        { state: minimizationState }
+        { state: minimizationState, context: { bucket: "related" } }
       )
     );
     const includedItems = rawObjects.includedItems.map((item) =>
@@ -285,7 +300,7 @@ export function parseSquareCatalogResponse(
         item,
         provenance,
         "$response.included_resources.objects[]",
-        { state: minimizationState }
+        { state: minimizationState, context: { bucket: "included" } }
       )
     );
 
@@ -325,11 +340,13 @@ export function minimizeSquareCatalogObject(
   options: Readonly<{
     state?: SquareCatalogMinimizationState;
     parentItemId?: string | null;
+    context?: CatalogRelationshipContext;
   }> = {}
 ): SquareMinimizedCatalogObject {
   const object = squareSafeJsonObject(input, field);
   const objectType = supportedCatalogObjectType(object, `${field}.type`);
   assertServerCatalogObjectId(object, "id", `${field}.id`);
+  assertCatalogObjectDiscriminator(object, objectType, field);
 
   if (objectType === "CATEGORY") {
     return minimizeSquareCatalogCategory(object, provenance, field, options);
@@ -362,6 +379,7 @@ function minimizeSquareCatalogCategory(
   field: string,
   options: Readonly<{
     state?: SquareCatalogMinimizationState;
+    context?: CatalogRelationshipContext;
   }>
 ): SquareMinimizedCatalogCategory {
   const base = catalogBaseProjection(
@@ -406,7 +424,7 @@ function minimizeSquareCatalogCategory(
             `${field}.category_data.is_top_level`
           )
   });
-  rememberCatalogAuthority(options.state, item.authority, field);
+  rememberCatalogAuthority(options.state, item, field, options.context);
   return item;
 }
 
@@ -416,6 +434,7 @@ function minimizeSquareCatalogItem(
   field: string,
   options: Readonly<{
     state?: SquareCatalogMinimizationState;
+    context?: CatalogRelationshipContext;
   }>
 ): SquareMinimizedCatalogItem {
   const base = catalogBaseProjection(object, provenance, field, "catalog_item");
@@ -431,7 +450,8 @@ function minimizeSquareCatalogItem(
           provenance,
           field,
           options.state,
-          base.id
+          base.id,
+          options.context
         );
 
   const item = SquareMinimizedCatalogItemSchema.parse({
@@ -460,7 +480,7 @@ function minimizeSquareCatalogItem(
     variations,
     variationCount: variations.length
   });
-  rememberCatalogAuthority(options.state, item.authority, field);
+  rememberCatalogAuthority(options.state, item, field, options.context);
   return item;
 }
 
@@ -471,6 +491,7 @@ function minimizeSquareCatalogItemVariation(
   options: Readonly<{
     state?: SquareCatalogMinimizationState;
     parentItemId?: string | null;
+    context?: CatalogRelationshipContext;
   }>
 ): SquareMinimizedCatalogItemVariation {
   const base = catalogBaseProjection(
@@ -583,7 +604,7 @@ function minimizeSquareCatalogItemVariation(
             `${field}.item_variation_data.stockable`
           )
   });
-  rememberCatalogAuthority(options.state, item.authority, field);
+  rememberCatalogAuthority(options.state, item, field, options.context);
   return item;
 }
 
@@ -630,7 +651,7 @@ function catalogResponseObjects(
     };
   }
 
-  const items = requiredCatalogObjectArray(
+  const items = optionalCatalogObjectArray(
     response,
     "objects",
     "$response.objects",
@@ -801,7 +822,8 @@ function catalogItemVariationChildren(
   provenance: SquareResponseProvenance,
   field: string,
   state: SquareCatalogMinimizationState | undefined,
-  parentItemId: string
+  parentItemId: string,
+  parentContext: CatalogRelationshipContext | undefined
 ) {
   const raw = requiredArray(
     itemData,
@@ -820,7 +842,15 @@ function catalogItemVariationChildren(
       item,
       provenance,
       `${field}.item_data.variations[]`,
-      { state, parentItemId }
+      {
+        state,
+        parentItemId,
+        context: {
+          bucket: "nested",
+          parentBucket: parentContext?.bucket ?? "primary",
+          parentItemId
+        }
+      }
     )
   ).sort(compareCatalogObjectsByOrdinalThenId) as SquareMinimizedCatalogItemVariation[];
 }
@@ -909,6 +939,35 @@ function supportedCatalogObjectType(
     "square_catalog_object_type_unsupported",
     field
   );
+}
+
+function assertCatalogObjectDiscriminator(
+  object: SquareSafeJsonObject,
+  objectType: z.infer<typeof SquareCatalogObjectTypeSchema>,
+  field: string
+) {
+  const expectedDataKey = SQUARE_CATALOG_OBJECT_TYPE_DATA_KEY_BY_TYPE[objectType];
+  const isDeleted = requiredBoolean(object, "is_deleted", `${field}.is_deleted`);
+  const presentTypeDataKeys = SQUARE_CATALOG_OBJECT_TYPE_DATA_KEYS.filter((key) =>
+    hasOwn(object, key)
+  );
+
+  for (const dataKey of presentTypeDataKeys) {
+    if (dataKey !== expectedDataKey) {
+      squareRejectResponse(
+        "square_catalog_object_discriminator_conflict",
+        `${field}.${dataKey}`
+      );
+    }
+    squareSafeJsonObject(object[dataKey], `${field}.${dataKey}`);
+  }
+
+  if (!isDeleted && !hasOwn(object, expectedDataKey)) {
+    squareRejectResponse(
+      "square_catalog_object_discriminator_missing",
+      `${field}.${expectedDataKey}`
+    );
+  }
 }
 
 function optionalIncludedResources(response: SquareSafeJsonObject) {
@@ -1156,27 +1215,60 @@ function compareStrings(left: string, right: string) {
   return left < right ? -1 : left > right ? 1 : 0;
 }
 
+type SquareCatalogAuthorityOccurrence = {
+  readonly fingerprint: string;
+  readonly contexts: Set<string>;
+};
+
 type SquareCatalogMinimizationState = {
-  authorities: Set<string>;
+  authorities: Map<string, SquareCatalogAuthorityOccurrence>;
 };
 
 function newCatalogMinimizationState(): SquareCatalogMinimizationState {
   return {
-    authorities: new Set<string>()
+    authorities: new Map<string, SquareCatalogAuthorityOccurrence>()
   };
 }
 
 function rememberCatalogAuthority(
   state: SquareCatalogMinimizationState | undefined,
-  authority: z.infer<typeof SquareCatalogAuthoritySchema>,
-  field: string
+  item: SquareMinimizedCatalogObject,
+  field: string,
+  context: CatalogRelationshipContext | undefined
 ) {
   if (!state) return;
+  const authority = item.authority;
   const identity = `${authority.providerEnvironment}:${authority.entityType}:${authority.providerId}`;
-  if (state.authorities.has(identity)) {
+  const contextKey = catalogRelationshipContextKey(context);
+  const fingerprint = squareCatalogObjectFingerprint(item);
+  const previous = state.authorities.get(identity);
+  if (!previous) {
+    state.authorities.set(identity, {
+      fingerprint,
+      contexts: new Set([contextKey])
+    });
+    return;
+  }
+  if (previous.contexts.has(contextKey)) {
     squareRejectResponse("square_duplicate_authority_identity", `${field}.id`);
   }
-  state.authorities.add(identity);
+  if (previous.fingerprint !== fingerprint) {
+    squareRejectResponse(
+      "square_catalog_authority_identity_conflict",
+      `${field}.id`
+    );
+  }
+  previous.contexts.add(contextKey);
+}
+
+function catalogRelationshipContextKey(
+  context: CatalogRelationshipContext | undefined
+) {
+  if (!context) return "standalone";
+  if (context.bucket === "nested") {
+    return `nested:${context.parentBucket}:${context.parentItemId}`;
+  }
+  return context.bucket;
 }
 
 function hasUnsafeCatalogTrustedText(value: string) {

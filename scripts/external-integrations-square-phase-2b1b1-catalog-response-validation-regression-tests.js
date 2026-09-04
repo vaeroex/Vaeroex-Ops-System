@@ -83,6 +83,27 @@ const EXPECTED_QBO_REGISTRY_FINGERPRINT =
   "sha256:2099f06e90a53e632acbe55ee4d95cfd2f7fac7c2c994bb733ec332f7d09dfad";
 const EXPECTED_SQUARE_DESCRIPTOR_FINGERPRINT =
   "sha256:fe6cc473b1fb529bc07a7c5471baf5eae047ea9500cec7c12840876dfe666771";
+const EXPECTED_CATALOG_OBJECT_TYPE_DATA_KEYS = [
+  "item_data",
+  "image_data",
+  "category_data",
+  "item_variation_data",
+  "tax_data",
+  "discount_data",
+  "modifier_list_data",
+  "modifier_data",
+  "pricing_rule_data",
+  "product_set_data",
+  "time_period_data",
+  "measurement_unit_data",
+  "subscription_plan_variation_data",
+  "item_option_data",
+  "item_option_value_data",
+  "custom_attribute_definition_data",
+  "quick_amounts_settings_data",
+  "subscription_plan_data",
+  "availability_period_data"
+];
 
 const catalogFixtures = square.SQUARE_PHASE_2B1B1_CATALOG_FIXTURES;
 const catalogCanaryPattern = new RegExp(
@@ -208,6 +229,51 @@ function catalogResponseFingerprint(response, operation = "list_catalog") {
     "catalog response fingerprint input accepted"
   );
   return square.squareCatalogResponseFingerprint(value);
+}
+
+function catalogVariationData(overrides = {}) {
+  return {
+    item_id: "SQ2B1B1ITEM001",
+    name: "12 oz",
+    sku: "TEA-12OZ",
+    pricing_type: "FIXED_PRICING",
+    price_money: { amount: 450, currency: "USD" },
+    ordinal: 0,
+    track_inventory: true,
+    sellable: true,
+    stockable: true,
+    ...overrides
+  };
+}
+
+function catalogItemData(overrides = {}) {
+  return {
+    name: "Ceremonial Tea",
+    categories: [
+      { id: "SQ2B1B1CATROOT", ordinal: 1 },
+      { id: "SQ2B1B1CAT001", ordinal: 2 }
+    ],
+    variations: [square.squarePhase2B1B1ItemVariation()],
+    ...overrides
+  };
+}
+
+function singleVariationParentItem(variation, overrides = {}) {
+  return square.squarePhase2B1B1Item({
+    item_data: catalogItemData({ variations: [variation] }),
+    ...overrides
+  });
+}
+
+function duplicateRelationshipSearchEnvelope(nestedVariationOverrides = {}) {
+  const primaryVariation = square.squarePhase2B1B1ItemVariation();
+  const nestedVariation = square.squarePhase2B1B1ItemVariation(
+    nestedVariationOverrides
+  );
+  return {
+    objects: [primaryVariation],
+    related_objects: [singleVariationParentItem(nestedVariation)]
+  };
 }
 
 function testAcceptedEnvelopes() {
@@ -361,6 +427,85 @@ function testAcceptedEnvelopes() {
   equal(emptySearch.relatedItemCount, 0, "empty SearchCatalogObjects has zero related items");
   equal(emptySearch.includedItemCount, 0, "empty SearchCatalogObjects has zero included items");
   equal(Object.prototype.hasOwnProperty.call(emptySearch, "errors"), false, "empty provider errors do not survive");
+
+  const listWithoutObjects = accepted(
+    parseCatalog(
+      { cursor: square.SQUARE_PHASE_2B1B1_SYNTHETIC_CURSOR },
+      "list_catalog"
+    ),
+    "ListCatalog absent objects accepted as empty"
+  );
+  equal(listWithoutObjects.itemCount, 0, "ListCatalog absent objects has zero items");
+  equal(
+    listWithoutObjects.pagination.cursorPresent,
+    true,
+    "ListCatalog absent objects preserves cursor state"
+  );
+  assertFingerprintShape(
+    listWithoutObjects.pagination.cursorFingerprint,
+    "ListCatalog absent objects cursor"
+  );
+
+  const searchWithoutObjects = accepted(
+    parseCatalog(
+      {
+        related_objects: [
+          square.squarePhase2B1B1Category({
+            id: "SQ2B1B1CATREL002",
+            category_data: { name: "Related Empty Search", is_top_level: true }
+          })
+        ],
+        included_resources: { objects: [] },
+        cursor: square.SQUARE_PHASE_2B1B1_SYNTHETIC_CURSOR,
+        latest_time: "2026-08-19T15:10:00.000Z"
+      },
+      "catalog_search"
+    ),
+    "SearchCatalogObjects absent objects accepted as empty"
+  );
+  equal(searchWithoutObjects.itemCount, 0, "Search absent objects has zero primary items");
+  equal(
+    searchWithoutObjects.relatedItemCount,
+    1,
+    "Search absent objects still retains related objects"
+  );
+  equal(
+    searchWithoutObjects.includedItemCount,
+    0,
+    "Search absent objects preserves empty included resources"
+  );
+  equal(
+    searchWithoutObjects.latestTime,
+    "2026-08-19T15:10:00.000Z",
+    "Search absent objects preserves latest_time"
+  );
+  equal(
+    searchWithoutObjects.pagination.cursorPresent,
+    true,
+    "Search absent objects preserves cursor state"
+  );
+
+  const batchWithoutObjects = accepted(
+    parseCatalog(
+      {
+        related_objects: [square.squarePhase2B1B1DeletedVariation()],
+        included_resources: { objects: [] }
+      },
+      "catalog_batch_retrieve"
+    ),
+    "BatchRetrieveCatalogObjects absent objects accepted as empty"
+  );
+  equal(batchWithoutObjects.itemCount, 0, "Batch absent objects has zero primary items");
+  equal(
+    batchWithoutObjects.relatedItemCount,
+    1,
+    "Batch absent objects still retains related objects"
+  );
+  equal(
+    batchWithoutObjects.includedItemCount,
+    0,
+    "Batch absent objects preserves empty included resources"
+  );
 }
 
 function testProviderAndVersionBoundaries() {
@@ -767,6 +912,125 @@ function testMinimizationAndFingerprints() {
   );
 }
 
+function testCatalogRelationshipIdentityOccurrences() {
+  const relatedGraph = accepted(
+    parseCatalog(duplicateRelationshipSearchEnvelope(), "catalog_search"),
+    "Search accepts identical primary variation repeated under related parent item"
+  );
+  equal(relatedGraph.itemCount, 1, "relationship duplicate graph has one primary item");
+  equal(
+    relatedGraph.relatedItemCount,
+    1,
+    "relationship duplicate graph has one related parent item"
+  );
+  equal(
+    relatedGraph.relatedItems[0].variationCount,
+    1,
+    "related parent retains one nested variation"
+  );
+  deepEqual(
+    relatedGraph.relatedItems[0].variations[0],
+    relatedGraph.items[0],
+    "relationship duplicate is accepted only as the same trusted projection"
+  );
+  equal(
+    square.squareCatalogObjectFingerprint(relatedGraph.relatedItems[0].variations[0]),
+    square.squareCatalogObjectFingerprint(relatedGraph.items[0]),
+    "relationship duplicate has the same trusted fingerprint"
+  );
+  assertFingerprintShape(
+    square.squareCatalogResponseFingerprint(relatedGraph),
+    "relationship duplicate response"
+  );
+
+  for (const [overrides, message] of [
+    [
+      {
+        item_variation_data: catalogVariationData({
+          price_money: { amount: 451, currency: "USD" }
+        })
+      },
+      "relationship duplicate with conflicting pricing is rejected"
+    ],
+    [
+      { version: 1_787_142_300_002 },
+      "relationship duplicate with conflicting provider version is rejected"
+    ],
+    [
+      {
+        present_at_location_ids: ["SQ2B1B1LOC003"],
+        item_variation_data: catalogVariationData()
+      },
+      "relationship duplicate with conflicting availability is rejected"
+    ],
+    [
+      {
+        is_deleted: true,
+        item_variation_data: {}
+      },
+      "relationship duplicate with conflicting deletion state is rejected"
+    ]
+  ]) {
+    rejected(
+      parseCatalog(duplicateRelationshipSearchEnvelope(overrides), "catalog_search"),
+      message
+    );
+  }
+
+  for (const [fixture, operation, message] of [
+    [
+      { objects: [square.squarePhase2B1B1Category(), square.squarePhase2B1B1Category()] },
+      "list_catalog",
+      "identical duplicates within the primary bucket are rejected"
+    ],
+    [
+      {
+        objects: [],
+        related_objects: [
+          square.squarePhase2B1B1Category(),
+          square.squarePhase2B1B1Category()
+        ]
+      },
+      "catalog_search",
+      "identical duplicates within the related bucket are rejected"
+    ],
+    [
+      {
+        objects: [],
+        included_resources: {
+          objects: [
+            square.squarePhase2B1B1Category(),
+            square.squarePhase2B1B1Category()
+          ]
+        }
+      },
+      "catalog_search",
+      "identical duplicates within the included bucket are rejected"
+    ]
+  ]) {
+    rejected(parseCatalog(fixture, operation), message);
+  }
+
+  rejected(
+    parseCatalog(
+      {
+        objects: [
+          square.squarePhase2B1B1Item({
+            item_data: catalogItemData({
+              variations: [
+                square.squarePhase2B1B1ItemVariation(),
+                square.squarePhase2B1B1ItemVariation()
+              ]
+            })
+          })
+        ]
+      },
+      "list_catalog"
+    ),
+    "identical duplicate variations within one parent item are rejected"
+  );
+}
+
 function testRejectedAndUnsupportedCatalogPayloads() {
   for (const [fixture, message] of [
     [catalogFixtures.unsupportedModifierList, "deferred MODIFIER_LIST payload is unsupported"],
@@ -781,6 +1045,26 @@ function testRejectedAndUnsupportedCatalogPayloads() {
     ]
   ]) {
     unsupported(parseCatalog(fixture), message);
+  }
+
+  rejected(
+    parseCatalog({}, "retrieve_catalog_object"),
+    "RetrieveCatalogObject still requires a singular object"
+  );
+
+  for (const [operation, envelopeName] of [
+    ["list_catalog", "ListCatalog"],
+    ["catalog_search", "SearchCatalogObjects"],
+    ["catalog_batch_retrieve", "BatchRetrieveCatalogObjects"]
+  ]) {
+    rejected(
+      parseCatalog({ objects: null }, operation),
+      `${envelopeName} present null objects are rejected`
+    );
+    rejected(
+      parseCatalog({ objects: "not-an-array" }, operation),
+      `${envelopeName} present non-array objects are rejected`
+    );
   }
 
   for (const [fixture, message] of [
@@ -1127,6 +1411,214 @@ function testRejectedAndUnsupportedCatalogPayloads() {
   );
 }
 
+function testCatalogObjectDiscriminatorExclusivity() {
+  deepEqual(
+    [...square.SQUARE_CATALOG_OBJECT_TYPE_DATA_KEYS],
+    EXPECTED_CATALOG_OBJECT_TYPE_DATA_KEYS,
+    "Catalog discriminator guard covers pinned type-specific data keys"
+  );
+
+  for (const [fixture, message] of [
+    [
+      {
+        objects: [
+          square.squarePhase2B1B1Category({
+            item_data: catalogItemData()
+          })
+        ]
+      },
+      "CATEGORY with item_data is rejected"
+    ],
+    [
+      {
+        objects: [
+          square.squarePhase2B1B1Item({
+            category_data: { name: "Wrong container" }
+          })
+        ]
+      },
+      "ITEM with category_data is rejected"
+    ],
+    [
+      {
+        objects: [
+          square.squarePhase2B1B1ItemVariation({
+            item_data: catalogItemData()
+          })
+        ]
+      },
+      "ITEM_VARIATION with item_data is rejected"
+    ],
+    [
+      {
+        objects: [
+          square.squarePhase2B1B1Category({
+            tax_data: { name: "Deferred tax container" }
+          })
+        ]
+      },
+      "supported object with deferred type-specific data is rejected"
+    ],
+    [
+      {
+        objects: [withoutKey(square.squarePhase2B1B1Category(), "category_data")]
+      },
+      "non-deleted CATEGORY missing category_data is rejected"
+    ],
+    [
+      {
+        objects: [withoutKey(square.squarePhase2B1B1Item(), "item_data")]
+      },
+      "non-deleted ITEM missing item_data is rejected"
+    ],
+    [
+      {
+        objects: [
+          withoutKey(square.squarePhase2B1B1ItemVariation(), "item_variation_data")
+        ]
+      },
+      "non-deleted ITEM_VARIATION missing item_variation_data is rejected"
+    ]
+  ]) {
+    rejected(parseCatalog(fixture), message);
+  }
+
+  for (const dataKey of square.SQUARE_CATALOG_OBJECT_TYPE_DATA_KEYS) {
+    if (dataKey === "category_data") continue;
+    rejected(
+      parseCatalog({
+        objects: [
+          square.squarePhase2B1B1Category({
+            [dataKey]: { safe: "nonmatching container" }
+          })
+        ]
+      }),
+      `CATEGORY rejects nonmatching ${dataKey}`
+    );
+  }
+
+  const deletedCategoryBase = accepted(
+    parseCatalog({ objects: [square.squarePhase2B1B1DeletedCategory()] }),
+    "deleted category without matching data accepted"
+  ).items[0];
+  const deletedCategoryWithData = accepted(
+    parseCatalog({
+      objects: [
+        square.squarePhase2B1B1DeletedCategory({
+          category_data: {
+            name: "<script>discarded category tombstone data</script>",
+            description: square.SQUARE_PHASE_2B1B1_SYNTHETIC_CANARIES.categoryDescription
+          }
+        })
+      ]
+    }),
+    "deleted category with matching data accepted"
+  ).items[0];
+  deepEqual(
+    deletedCategoryWithData,
+    deletedCategoryBase,
+    "deleted category matching data does not enter trusted projection"
+  );
+  equal(
+    square.squareCatalogObjectFingerprint(deletedCategoryWithData),
+    square.squareCatalogObjectFingerprint(deletedCategoryBase),
+    "deleted category matching data does not change fingerprint"
+  );
+
+  const deletedItemBase = accepted(
+    parseCatalog({ objects: [square.squarePhase2B1B1DeletedItem()] }),
+    "deleted item without matching data accepted"
+  ).items[0];
+  const deletedItemWithData = accepted(
+    parseCatalog({
+      objects: [
+        square.squarePhase2B1B1DeletedItem({
+          item_data: {
+            name: "<script>discarded item tombstone data</script>",
+            variations: [square.squarePhase2B1B1ItemVariation()]
+          }
+        })
+      ]
+    }),
+    "deleted item with matching data accepted"
+  ).items[0];
+  deepEqual(
+    deletedItemWithData,
+    deletedItemBase,
+    "deleted item matching data does not enter trusted projection"
+  );
+  equal(
+    square.squareCatalogObjectFingerprint(deletedItemWithData),
+    square.squareCatalogObjectFingerprint(deletedItemBase),
+    "deleted item matching data does not change fingerprint"
+  );
+
+  const deletedVariationBase = accepted(
+    parseCatalog({ objects: [square.squarePhase2B1B1DeletedVariation()] }),
+    "deleted variation without matching data accepted"
+  ).items[0];
+  const deletedVariationWithData = accepted(
+    parseCatalog({
+      objects: [
+        square.squarePhase2B1B1DeletedVariation({
+          item_variation_data: {
+            item_id: "SQ2B1B1ITEM001",
+            name: "<script>discarded variation tombstone data</script>",
+            pricing_type: "FIXED_PRICING",
+            price_money: { amount: 450, currency: "USD" }
+          }
+        })
+      ]
+    }),
+    "deleted variation with matching data accepted"
+  ).items[0];
+  deepEqual(
+    deletedVariationWithData,
+    deletedVariationBase,
+    "deleted variation matching data does not enter trusted projection"
+  );
+  equal(
+    square.squareCatalogObjectFingerprint(deletedVariationWithData),
+    square.squareCatalogObjectFingerprint(deletedVariationBase),
+    "deleted variation matching data does not change fingerprint"
+  );
+
+  for (const [fixture, message] of [
+    [
+      {
+        objects: [
+          square.squarePhase2B1B1DeletedCategory({
+            item_data: catalogItemData()
+          })
+        ]
+      },
+      "deleted CATEGORY with nonmatching item_data is rejected"
+    ],
+    [
+      {
+        objects: [
+          square.squarePhase2B1B1DeletedItem({
+            category_data: { name: "Wrong tombstone container" }
+          })
+        ]
+      },
+      "deleted ITEM with nonmatching category_data is rejected"
+    ],
+    [
+      {
+        objects: [
+          square.squarePhase2B1B1DeletedVariation({
+            item_data: catalogItemData()
+          })
+        ]
+      },
+      "deleted ITEM_VARIATION with nonmatching item_data is rejected"
+    ]
+  ]) {
+    rejected(parseCatalog(fixture), message);
+  }
+}
+
 function testStructuralJsonBoundaries() {
   accepted(
     parseCatalog(catalogFixtures.hostileExcludedFields),
@@ -1464,7 +1956,9 @@ testAcceptedEnvelopes();
 testProviderAndVersionBoundaries();
 testProviderErrors();
 testMinimizationAndFingerprints();
+testCatalogRelationshipIdentityOccurrences();
 testRejectedAndUnsupportedCatalogPayloads();
+testCatalogObjectDiscriminatorExclusivity();
 testStructuralJsonBoundaries();
 testAcceptedResultImmutability();
 testDormancyAndRegistration();
