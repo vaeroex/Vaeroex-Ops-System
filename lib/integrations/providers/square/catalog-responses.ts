@@ -1749,7 +1749,7 @@ function optionalIncludedResources(response: SquareSafeJsonObject) {
     response.included_resources,
     "$response.included_resources"
   );
-  const nestedModifiers = optionalCatalogObjectArray(
+  const nestedModifiers = optionalNullableCatalogObjectArray(
     includedResources,
     "nested_modifiers",
     "$response.included_resources.nested_modifiers",
@@ -1758,7 +1758,7 @@ function optionalIncludedResources(response: SquareSafeJsonObject) {
     object,
     field: "$response.included_resources.nested_modifiers[]"
   }));
-  const ancestorModifiers = optionalCatalogObjectArray(
+  const ancestorModifiers = optionalNullableCatalogObjectArray(
     includedResources,
     "ancestor_modifiers",
     "$response.included_resources.ancestor_modifiers",
@@ -1784,6 +1784,17 @@ function optionalCatalogObjectArray(
   maximumLength: number
 ) {
   return optionalArray(record, key, field, maximumLength).map((item) =>
+    squareSafeJsonObject(item, `${field}[]`)
+  );
+}
+
+function optionalNullableCatalogObjectArray(
+  record: SquareSafeJsonObject,
+  key: string,
+  field: string,
+  maximumLength: number
+) {
+  return optionalNullableArray(record, key, field, maximumLength).map((item) =>
     squareSafeJsonObject(item, `${field}[]`)
   );
 }

@@ -533,6 +533,28 @@ function testIncludedResourceContract() {
     ),
     "empty official included_resources object is accepted"
   );
+  for (const key of ["nested_modifiers", "ancestor_modifiers"]) {
+    const nullableIncluded = accepted(
+      parseCatalog(
+        {
+          objects: [square.squarePhase2B1B2Tax()],
+          included_resources: { [key]: null }
+        },
+        "catalog_search"
+      ),
+      `nullable official included_resources.${key} is accepted`
+    );
+    deepEqual(
+      nullableIncluded,
+      emptyIncluded,
+      `nullable official included_resources.${key} is normalized as empty`
+    );
+    equal(
+      square.squareCatalogResponseFingerprint(nullableIncluded),
+      square.squareCatalogResponseFingerprint(emptyIncluded),
+      `nullable official included_resources.${key} is fingerprint-neutral`
+    );
+  }
   const undocumentedObjects = accepted(
     parseCatalog(
       {
