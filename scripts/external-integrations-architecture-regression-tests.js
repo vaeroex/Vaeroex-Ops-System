@@ -150,6 +150,11 @@ equal(
   "Square Phase 2B.1B-1 Catalog response validation regression script must be registered"
 );
 equal(
+  packageJson.scripts["test:external-integrations-square-phase-2b1b2"],
+  "node scripts/external-integrations-square-phase-2b1b2-catalog-response-validation-regression-tests.js",
+  "Square Phase 2B.1B-2 Catalog response validation regression script must be registered"
+);
+equal(
   packageJson.scripts["test:external-integrations-architecture"],
   "node scripts/external-integrations-architecture-regression-tests.js",
   "architecture test script must be registered"
@@ -203,6 +208,11 @@ matches(
   ciWorkflow,
   /pnpm test:external-integrations-square-phase-2b1b1/,
   "CI must exercise the Square Phase 2B.1B-1 Catalog response validation suite"
+);
+matches(
+  ciWorkflow,
+  /pnpm test:external-integrations-square-phase-2b1b2/,
+  "CI must exercise the Square Phase 2B.1B-2 Catalog response validation suite"
 );
 matches(
   ciWorkflow,

@@ -3,6 +3,7 @@ export * from "@/lib/integrations/providers/square/contracts";
 export * from "@/lib/integrations/providers/square/descriptor";
 export * from "@/lib/integrations/providers/square/fixtures/phase-2b1a";
 export * from "@/lib/integrations/providers/square/fixtures/phase-2b1b1";
+export * from "@/lib/integrations/providers/square/fixtures/phase-2b1b2";
 export * from "@/lib/integrations/providers/square/location-responses";
 export * from "@/lib/integrations/providers/square/merchant-responses";
 export * from "@/lib/integrations/providers/square/request-validators";
