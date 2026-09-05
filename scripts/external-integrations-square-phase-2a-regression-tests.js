@@ -81,6 +81,12 @@ const EXPECTED_QBO_DESCRIPTOR_FINGERPRINT =
   "sha256:1812bfa5fb9903583a672028aeefb40855211b19f2ce423f608c49f86db77b7f";
 const EXPECTED_QBO_REGISTRY_FINGERPRINT =
   "sha256:2099f06e90a53e632acbe55ee4d95cfd2f7fac7c2c994bb733ec332f7d09dfad";
+const EXPECTED_SQUARE_DESCRIPTOR_FINGERPRINT =
+  "sha256:fe6cc473b1fb529bc07a7c5471baf5eae047ea9500cec7c12840876dfe666771";
+const EXPECTED_ORDERS_SEARCH_REQUEST_FINGERPRINT =
+  "sha256:79b16a44b07c214a0e0f3cf06f36a05bf67000ad27119e1955713d0a64fddd05";
+const EXPECTED_ORDERS_SEARCH_CURSOR_BINDING_FINGERPRINT =
+  "sha256:8a219cd66c389b04e8a84a9b1602b863a75b7bd04ac80d5b5a119eccc09b8b6d";
 const EXPECTED_SQUARE_READ_SCOPES = [
   "MERCHANT_PROFILE_READ",
   "ITEMS_READ",
@@ -96,6 +102,44 @@ const EXPECTED_POST_PATHS = [
   "/v2/inventory/counts/batch-retrieve",
   "/v2/inventory/changes/batch-retrieve"
 ];
+const EXPECTED_POST_BINDINGS = {
+  "/v2/orders/search": {
+    requestValidatorKey: "square_orders_search_request_v1",
+    maximumRequestBodyBytes: 24 * 1024
+  },
+  "/v2/orders/batch-retrieve": {
+    requestValidatorKey: "square_orders_batch_retrieve_request_v1",
+    maximumRequestBodyBytes: 16 * 1024
+  },
+  "/v2/catalog/search": {
+    requestValidatorKey: "square_catalog_search_request_v1",
+    maximumRequestBodyBytes: 24 * 1024
+  },
+  "/v2/catalog/batch-retrieve": {
+    requestValidatorKey: "square_catalog_batch_retrieve_request_v1",
+    maximumRequestBodyBytes: 32 * 1024
+  },
+  "/v2/inventory/counts/batch-retrieve": {
+    requestValidatorKey: "square_inventory_counts_batch_retrieve_request_v1",
+    maximumRequestBodyBytes: 32 * 1024
+  },
+  "/v2/inventory/changes/batch-retrieve": {
+    requestValidatorKey: "square_inventory_changes_batch_retrieve_request_v1",
+    maximumRequestBodyBytes: 32 * 1024
+  }
+};
+const EXPECTED_UNCHANGED_POST_REQUEST_FINGERPRINTS = {
+  "/v2/orders/batch-retrieve":
+    "sha256:b81099ad43af09b7d855a21b024ff391a1c85739b41f56cb55c16e2ced2d9b7f",
+  "/v2/catalog/search":
+    "sha256:4f18f0cbb0523f6853cd4731364a67fcd81ef7bba91037a6a8ff021eeefc5f5b",
+  "/v2/catalog/batch-retrieve":
+    "sha256:37bc81a66ebb6ec5ff47a4e433751d8839752259cb9c020da5c3514263461673",
+  "/v2/inventory/counts/batch-retrieve":
+    "sha256:4cb0aa0e02d46fe8847e2ef788a5c54e1efd2957d2ead9c1e9de5bbe87ea75fc",
+  "/v2/inventory/changes/batch-retrieve":
+    "sha256:8efa4a97d92db5735186794a60cea78c0628521a7b4317bddf2d99f91f42a64e"
+};
 const sensitiveCanaries = [
   "phase2a-access-token-canary",
   "phase2a-refresh-token-canary",
@@ -176,6 +220,26 @@ function body(value) {
 
 function repeatedBodies(count, factory) {
   return Array.from({ length: count }, (_, index) => factory(index));
+}
+
+function ordersSearchValidationResult(requestBody) {
+  const operation = square.SQUARE_READ_ONLY_POST_OPERATIONS.find(
+    (candidate) =>
+      candidate.providerEnvironment === "sandbox" &&
+      candidate.path === "/v2/orders/search"
+  );
+  if (!operation) throw new Error("orders search operation fixture missing");
+  const validator =
+    square.SQUARE_READ_ONLY_POST_REQUEST_VALIDATORS[
+      operationPolicy.providerReadOnlyPostValidatorRegistryKey(operation)
+    ];
+  if (!validator) throw new Error("orders search validator fixture missing");
+  return validator({
+    operation,
+    queryParameters: [],
+    body: requestBody,
+    rawBodyByteLength: Buffer.byteLength(JSON.stringify(requestBody), "utf8")
+  });
 }
 
 function assertSafeDiagnostic(value, message) {
@@ -305,6 +369,11 @@ function testDescriptorAndScopes() {
     "Square descriptor fingerprint is deterministic and canonical"
   );
   equal(
+    squareDescriptorFingerprint,
+    EXPECTED_SQUARE_DESCRIPTOR_FINGERPRINT,
+    "Square descriptor fingerprint remains unchanged"
+  );
+  equal(
     controlPlane.createProviderDescriptorRegistry([descriptor]).descriptors[0]
       .descriptorFingerprint,
     squareDescriptorFingerprint,
@@ -327,6 +396,8 @@ function testDescriptorAndScopes() {
       `Square ${environment} POST inventory is exact`
     );
     for (const operation of environmentOperations) {
+      const expectedBinding = EXPECTED_POST_BINDINGS[operation.path];
+      ok(expectedBinding, "Square POST path has an exact expected binding");
       equal(operation.providerKey, "square", "Square POST operation binds provider");
       equal(operation.hostname, expectedHost, "Square POST operation binds environment host");
       equal(operation.method, "POST", "Square POST operation is method exact");
@@ -340,14 +411,20 @@ function testDescriptorAndScopes() {
         /^square_(orders|catalog|inventory)_[a-z_]+_request_v1$/,
         "Square POST operation binds a provider-owned validator key"
       );
-      ok(
-        operation.maximumRequestBodyBytes > 0 &&
-          operation.maximumRequestBodyBytes <= 32 * 1024,
-        "Square POST operation has a bounded request body"
+      equal(
+        operation.requestValidatorKey,
+        expectedBinding.requestValidatorKey,
+        "Square POST validator binding is unchanged"
       );
-      ok(
-        operation.maximumResponseBytes >= 16 * 1024 * 1024,
-        "Square POST operation has an explicit response ceiling"
+      equal(
+        operation.maximumRequestBodyBytes,
+        expectedBinding.maximumRequestBodyBytes,
+        "Square POST request-body limit is unchanged"
+      );
+      equal(
+        operation.maximumResponseBytes,
+        64 * 1024 * 1024,
+        "Square POST response-body limit is unchanged"
       );
       equal(operation.timeoutMs, 30000, "Square POST operation has a static timeout");
       equal(
@@ -673,6 +750,165 @@ function testGetAuthorization() {
   }
 }
 
+function testOrdersSearchFullResponseGuard() {
+  const omittedBody = JSON.parse(squareRequest().body);
+  const explicitFalseBody = { ...omittedBody, return_entries: false };
+  const omittedValidation = ordersSearchValidationResult(omittedBody);
+  const explicitFalseValidation = ordersSearchValidationResult(explicitFalseBody);
+
+  deepEqual(
+    explicitFalseValidation.normalizedBody,
+    omittedValidation.normalizedBody,
+    "omitted and explicit-false Orders Search bodies normalize identically"
+  );
+  ok(
+    Object.prototype.hasOwnProperty.call(
+      omittedValidation.normalizedBody,
+      "return_entries"
+    ),
+    "Orders Search normalization emits the full-order selector explicitly"
+  );
+  equal(
+    omittedValidation.normalizedBody.return_entries,
+    false,
+    "omitted return_entries normalizes to false"
+  );
+  equal(
+    explicitFalseValidation.normalizedBody.return_entries,
+    false,
+    "explicit-false return_entries remains false"
+  );
+  ok(
+    Object.isFrozen(omittedValidation.normalizedBody),
+    "the normalized Orders Search body is frozen"
+  );
+  ok(
+    Object.isFrozen(explicitFalseValidation.normalizedBody),
+    "the explicit-false normalized Orders Search body is frozen"
+  );
+
+  const omittedDecision = allowedSquare(
+    { body: body(omittedBody) },
+    "omitted return_entries is accepted"
+  );
+  const explicitFalseDecision = allowedSquare(
+    { body: body(explicitFalseBody) },
+    "explicit-false return_entries is accepted"
+  );
+  equal(
+    explicitFalseDecision.requestFingerprint,
+    omittedDecision.requestFingerprint,
+    "omitted and explicit-false Orders Search requests fingerprint identically"
+  );
+  equal(
+    omittedDecision.requestFingerprint,
+    EXPECTED_ORDERS_SEARCH_REQUEST_FINGERPRINT,
+    "the canonical full-response Orders Search request fingerprint is pinned"
+  );
+  equal(
+    explicitFalseDecision.cursorBindingFingerprint,
+    omittedDecision.cursorBindingFingerprint,
+    "omitted and explicit-false Orders Search cursor bindings are identical"
+  );
+  equal(
+    omittedDecision.cursorBindingFingerprint,
+    EXPECTED_ORDERS_SEARCH_CURSOR_BINDING_FINGERPRINT,
+    "the enforced-false Orders Search cursor binding is pinned"
+  );
+
+  const mutableInput = { ...explicitFalseBody };
+  const immutableValidation = ordersSearchValidationResult(mutableInput);
+  mutableInput.return_entries = true;
+  equal(
+    immutableValidation.normalizedBody.return_entries,
+    false,
+    "caller mutation cannot override the normalized full-order selector"
+  );
+  equal(
+    Reflect.set(immutableValidation.normalizedBody, "return_entries", true),
+    false,
+    "normalized body mutation cannot set return_entries to true"
+  );
+  equal(
+    immutableValidation.normalizedBody.return_entries,
+    false,
+    "the normalized full-order selector remains false after mutation attempts"
+  );
+
+  deniedSquare(
+    { body: body({ ...omittedBody, return_entries: true }) },
+    "explicit-true return_entries fails closed"
+  );
+  for (const malformed of [
+    null,
+    "false",
+    "true",
+    "",
+    0,
+    1,
+    -1,
+    [],
+    [false],
+    {},
+    { value: false }
+  ]) {
+    deniedSquare(
+      { body: body({ ...omittedBody, return_entries: malformed }) },
+      "malformed return_entries representations fail closed"
+    );
+  }
+
+  const cursorBody = {
+    ...omittedBody,
+    cursor: "phase2a-cursor-canary"
+  };
+  const cursorOmitted = allowedSquare(
+    {
+      body: body(cursorBody),
+      expectedCursorBindingFingerprint: omittedDecision.cursorBindingFingerprint
+    },
+    "cursor continuation accepts an omitted return_entries selector"
+  );
+  const cursorFalse = allowedSquare(
+    {
+      body: body({ ...cursorBody, return_entries: false }),
+      expectedCursorBindingFingerprint: omittedDecision.cursorBindingFingerprint
+    },
+    "cursor continuation accepts an explicit-false return_entries selector"
+  );
+  equal(
+    cursorOmitted.cursorBindingFingerprint,
+    omittedDecision.cursorBindingFingerprint,
+    "cursor continuation retains the enforced-false binding"
+  );
+  equal(
+    cursorFalse.cursorBindingFingerprint,
+    omittedDecision.cursorBindingFingerprint,
+    "explicit-false cursor continuation retains the original binding"
+  );
+  equal(
+    cursorFalse.requestFingerprint,
+    cursorOmitted.requestFingerprint,
+    "cursor omission and explicit false fingerprint identically"
+  );
+  equal(
+    ordersSearchValidationResult(cursorBody).normalizedBody.return_entries,
+    false,
+    "cursor normalization emits only the full-order selector"
+  );
+  deniedSquare(
+    {
+      body: body({ ...cursorBody, return_entries: true }),
+      expectedCursorBindingFingerprint: omittedDecision.cursorBindingFingerprint
+    },
+    "cursor continuation cannot introduce return_entries true"
+  );
+  deniedSquare(
+    { body: body({ ...omittedBody, unexpected_selector: false }) },
+    "Orders Search unknown fields remain denied"
+  );
+}
+
 function testPostAuthorizationAndValidators() {
   const operations = [
     {
@@ -740,9 +976,28 @@ function testPostAuthorizationAndValidators() {
       `${operation.path} is authorized only as a declared read-only POST`
     );
     equal(decision.operationKey, operation.key, "Square POST operation key is exact");
+    equal(decision.providerKey, "square", "Square POST decision provider is unchanged");
+    equal(
+      decision.providerEnvironment,
+      "sandbox",
+      "Square POST decision environment is unchanged"
+    );
     equal(decision.requestValidatorKey, operation.validator, "Square POST validator key is exact");
     equal(decision.method, "POST", "Square POST method is exact");
     equal(decision.hostname, "connect.squareupsandbox.com", "Square POST host is exact");
+    equal(decision.pathTemplate, operation.path, "Square POST path binding is exact");
+    equal(decision.contentType, "application/json", "Square POST content type is exact");
+    equal(
+      decision.maximumResponseBytes,
+      64 * 1024 * 1024,
+      "Square POST response limit is unchanged"
+    );
+    equal(decision.timeoutMs, 30000, "Square POST timeout is unchanged");
+    equal(
+      decision.retryClassification,
+      "idempotent_read_with_backoff",
+      "Square POST retry binding is unchanged"
+    );
     equal(
       decision.squareVersion,
       "2026-08-19",
@@ -758,6 +1013,13 @@ function testPostAuthorizationAndValidators() {
       /^sha256:[0-9a-f]{64}$/,
       "Square POST request fingerprint is deterministic"
     );
+    if (operation.path !== "/v2/orders/search") {
+      equal(
+        decision.requestFingerprint,
+        EXPECTED_UNCHANGED_POST_REQUEST_FINGERPRINTS[operation.path],
+        "non-Orders-Search POST request fingerprint is unchanged"
+      );
+    }
   }
 
   const firstPage = square.assertSquareReadOperation(squareRequest());
@@ -1016,6 +1278,7 @@ testDescriptorAndScopes();
 testQboAndRegistryDormancy();
 testGenericPostPolicyDefault();
 testGetAuthorization();
+testOrdersSearchFullResponseGuard();
 testPostAuthorizationAndValidators();
 testSensitiveValuesAndDeterminism();
 

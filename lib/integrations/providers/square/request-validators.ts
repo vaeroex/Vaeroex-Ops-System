@@ -807,10 +807,14 @@ function normalizeOrdersSearch(input: ProviderReadOnlyPostRequestValidationInput
     normalizedBody.limit = integerValue(body.limit, 1, 1000);
     bindingBody.limit = normalizedBody.limit;
   }
-  if (body.return_entries !== undefined) {
-    normalizedBody.return_entries = booleanValue(body.return_entries);
-    bindingBody.return_entries = normalizedBody.return_entries;
+  if (
+    body.return_entries !== undefined &&
+    booleanValue(body.return_entries) !== false
+  ) {
+    deny();
   }
+  normalizedBody.return_entries = false;
+  bindingBody.return_entries = false;
   if (body.query !== undefined) {
     const normalizedQuery = normalizeOrdersQuery(body.query);
     normalizedBody.query = normalizedQuery;
@@ -818,9 +822,9 @@ function normalizeOrdersSearch(input: ProviderReadOnlyPostRequestValidationInput
   }
   return {
     normalizedQueryParameters: {},
-    normalizedBody,
+    normalizedBody: Object.freeze(normalizedBody),
     normalizedCursorBindingQueryParameters: {},
-    normalizedCursorBindingBody: bindingBody,
+    normalizedCursorBindingBody: Object.freeze(bindingBody),
     cursorPresent
   };
 }
@@ -1551,7 +1555,20 @@ function assertPostOperation(
     retryClassification: postDecision.retryClassification,
     redirectPolicy: "manual",
     requestValidatorKey: operation.requestValidatorKey,
-    requestFingerprint: postDecision.requestFingerprint,
+    // Full-order omission and explicit false are one canonical Search Orders request.
+    requestFingerprint:
+      operation.requestValidatorKey === "square_orders_search_request_v1"
+        ? requestFingerprint({
+            providerEnvironment,
+            operationKey: operation.operationKey,
+            hostname: parsedUrl.hostname,
+            pathTemplate: operation.path,
+            method: "POST",
+            squareVersion: SQUARE_API_VERSION,
+            normalizedQueryParameters: normalized.normalizedQueryParameters,
+            normalizedBody: normalized.normalizedBody
+          })
+        : postDecision.requestFingerprint,
     cursorBindingFingerprint: bindingFingerprint,
     providerReadOnlyPostPolicyVersion: postDecision.policyVersion
   };
