@@ -321,7 +321,7 @@ function testLifecycleOptionalityAndMoney() {
   const nullableMoney = orderItem(accepted(parseOrder({ order: { ...optionalOrder, total_money: { amount: null, currency: null } } }), "SDK-raw nullable Money members are accepted"));
   deepEqual(nullableMoney.totalMoney, emptyMoney.totalMoney, "absent and null Money members normalize identically");
 
-  for (const version of [0, -7, Number.MAX_SAFE_INTEGER]) {
+  for (const version of [0, -7, -2_147_483_648, 2_147_483_647]) {
     const item = orderItem(accepted(parseOrder({ order: { ...optionalOrder, version } }), `provider version ${version} is accepted without an invented sign rule`));
     equal(item.providerVersion, String(version), `provider version ${version} canonicalizes exactly`);
   }
@@ -452,7 +452,7 @@ function testMalformedCoreFields() {
   for (const location_id of ["", "has space", "<location>", "x".repeat(192), 1, {}, []]) {
     rejected(parseOrder({ order: square.squarePhase2B2AOrder({ location_id }) }), "invalid location ID rejects");
   }
-  for (const version of [1.5, "1", "1e3", Number.MAX_SAFE_INTEGER + 1, {}, []]) {
+  for (const version of [1.5, "1", "1e3", -2_147_483_649, 2_147_483_648, Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER + 1, {}, []]) {
     rejected(parseOrder({ order: square.squarePhase2B2AOrder({ version }) }), "invalid provider version rejects");
   }
   for (const [field, value] of [

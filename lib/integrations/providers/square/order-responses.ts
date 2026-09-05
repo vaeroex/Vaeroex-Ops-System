@@ -100,10 +100,16 @@ const MAXIMUM_BATCH_ORDER_RESPONSE_ITEMS = 100;
 const MAXIMUM_PROVIDER_ERRORS = 100;
 const ORDER_CURSOR_PATTERN = /^[A-Za-z0-9._~:+-]{1,4096}={0,2}$/;
 const MAX_SAFE_INTEGER_TEXT = String(Number.MAX_SAFE_INTEGER);
+const MINIMUM_ORDER_PROVIDER_VERSION = -2_147_483_648;
+const MAXIMUM_ORDER_PROVIDER_VERSION = 2_147_483_647;
 
 const SquareOrderIntegerStringSchema = CanonicalIntegerSchema.refine(
   isSafeIntegerText,
   "Integer must fit JSON safe integer bounds"
+);
+const SquareOrderProviderVersionStringSchema = CanonicalIntegerSchema.refine(
+  isOrderProviderVersionText,
+  "Order provider version must fit signed 32-bit bounds"
 );
 
 export const SquareOrderResponseOperationSchema = z.enum(
@@ -162,7 +168,7 @@ export const SquareMinimizedOrderCoreSchema = z
     locationId: SquareIdentifierSchema,
     state: z.enum(SQUARE_ALLOWED_ORDER_STATES).nullable(),
     lifecycleClass: SquareOrderLifecycleClassSchema,
-    providerVersion: SquareOrderIntegerStringSchema.nullable(),
+    providerVersion: SquareOrderProviderVersionStringSchema.nullable(),
     createdAt: IsoTimestampSchema.nullable(),
     updatedAt: IsoTimestampSchema.nullable(),
     closedAt: IsoTimestampSchema.nullable(),
@@ -414,7 +420,11 @@ function minimizeSquareOrderCore(
     providerVersion: optionalIntegerString(
       input,
       "version",
-      `${field}.version`
+      `${field}.version`,
+      {
+        minimum: MINIMUM_ORDER_PROVIDER_VERSION,
+        maximum: MAXIMUM_ORDER_PROVIDER_VERSION
+      }
     ),
     createdAt: squareOptionalNullableTimestamp(
       input,
@@ -761,11 +771,17 @@ function optionalOrderMoney(
 function optionalIntegerString(
   record: SquareSafeJsonObject,
   key: string,
-  field: string
+  field: string,
+  options: Readonly<{ minimum?: number; maximum?: number }> = {}
 ): string | null {
   if (!hasOwn(record, key) || record[key] === null) return null;
   const value = record[key];
-  if (typeof value !== "number" || !Number.isSafeInteger(value)) {
+  if (
+    typeof value !== "number" ||
+    !Number.isSafeInteger(value) ||
+    (options.minimum !== undefined && value < options.minimum) ||
+    (options.maximum !== undefined && value > options.maximum)
+  ) {
     squareRejectResponse("square_order_integer_invalid", field);
   }
   return String(value);
@@ -998,6 +1014,15 @@ function isSafeIntegerText(value: string) {
     unsigned.length < MAX_SAFE_INTEGER_TEXT.length ||
     (unsigned.length === MAX_SAFE_INTEGER_TEXT.length &&
       unsigned <= MAX_SAFE_INTEGER_TEXT)
+  );
+}
+
+function isOrderProviderVersionText(value: string) {
+  const parsed = Number(value);
+  return (
+    Number.isInteger(parsed) &&
+    parsed >= MINIMUM_ORDER_PROVIDER_VERSION &&
+    parsed <= MAXIMUM_ORDER_PROVIDER_VERSION
   );
 }
 
