@@ -9,6 +9,9 @@ import {
 import {
   SQUARE_ALLOWED_ORDER_STATES,
   SQUARE_ORDER_CORE_ENTITY_VERSION,
+  SQUARE_ORDER_LINE_ITEM_ENTITY_VERSION,
+  SQUARE_ORDER_LINE_ITEM_MINIMIZATION_VERSION,
+  SQUARE_ORDER_LINE_ITEM_RESPONSE_CONTRACT_VERSION,
   SQUARE_ORDER_MINIMIZATION_VERSION,
   SQUARE_ORDER_REQUEST_AUTHORITY_VERSION,
   SQUARE_ORDER_RESPONSE_CONTRACT_VERSION,
@@ -30,8 +33,10 @@ import {
   squareFailureResult,
   squareMinimizedProjectionFingerprint,
   squareOptionalNullableCurrencyCode,
+  squareOptionalNullableDisplayText,
   squareOptionalNullableEnum,
   squareOptionalNullableIdentifier,
+  squareOptionalNullableString,
   squareOptionalNullableTimestamp,
   squareRejectResponse,
   squareRequiredIdentifier,
@@ -57,6 +62,26 @@ export const SQUARE_ORDER_RESPONSE_OFFICIAL_REFERENCES = Object.freeze([
   "https://developer.squareup.com/docs/build-basics/versioning-overview",
   `https://github.com/square/square-nodejs-sdk/tree/${SQUARE_ORDER_RESPONSE_SDK_REVISION}`
 ] as const);
+
+export const SQUARE_ORDER_LINE_ITEM_RESPONSE_OFFICIAL_REFERENCES =
+  Object.freeze([
+    "https://developer.squareup.com/reference/square/objects/OrderLineItem",
+    "https://developer.squareup.com/reference/square/objects/OrderLineItemModifier",
+    "https://developer.squareup.com/reference/square/objects/OrderQuantityUnit",
+    "https://developer.squareup.com/reference/square/objects/MeasurementUnit",
+    "https://developer.squareup.com/reference/square/objects/Money",
+    "https://developer.squareup.com/reference/square/objects/Order",
+    "https://developer.squareup.com/docs/orders-api/create-orders",
+    "https://developer.squareup.com/docs/orders-api/how-it-works",
+    "https://developer.squareup.com/docs/catalog-api/manage-nested-modifiers",
+    `https://github.com/square/square-nodejs-sdk/blob/${SQUARE_ORDER_RESPONSE_SDK_REVISION}/src/api/types/OrderLineItem.ts`,
+    `https://github.com/square/square-nodejs-sdk/blob/${SQUARE_ORDER_RESPONSE_SDK_REVISION}/src/api/types/OrderLineItemModifier.ts`,
+    `https://github.com/square/square-nodejs-sdk/blob/${SQUARE_ORDER_RESPONSE_SDK_REVISION}/src/api/types/OrderQuantityUnit.ts`,
+    `https://github.com/square/square-nodejs-sdk/blob/${SQUARE_ORDER_RESPONSE_SDK_REVISION}/src/api/types/MeasurementUnit.ts`,
+    `https://github.com/square/square-nodejs-sdk/blob/${SQUARE_ORDER_RESPONSE_SDK_REVISION}/src/serialization/types/OrderLineItem.ts`,
+    `https://github.com/square/square-nodejs-sdk/blob/${SQUARE_ORDER_RESPONSE_SDK_REVISION}/src/serialization/types/OrderLineItemModifier.ts`,
+    `https://github.com/square/square-nodejs-sdk/blob/${SQUARE_ORDER_RESPONSE_SDK_REVISION}/src/serialization/types/OrderQuantityUnit.ts`
+  ] as const);
 
 export const SQUARE_ORDER_CORE_TRUSTED_RESPONSE_FIELDS = Object.freeze([
   "id",
@@ -96,20 +121,142 @@ export const SQUARE_ORDER_CORE_DISCARDED_RESPONSE_FIELDS = Object.freeze([
   "rewards"
 ] as const);
 
+export const SQUARE_ORDER_LINE_ITEM_TRUSTED_RESPONSE_FIELDS = Object.freeze([
+  "uid",
+  "catalog_object_id",
+  "catalog_version",
+  "name",
+  "variation_name",
+  "item_type",
+  "quantity",
+  "quantity_unit",
+  "modifiers",
+  "base_price_money",
+  "variation_total_price_money",
+  "gross_sales_money",
+  "total_tax_money",
+  "total_discount_money",
+  "total_service_charge_money",
+  "total_money"
+] as const);
+
+export const SQUARE_ORDER_LINE_ITEM_DISCARDED_RESPONSE_FIELDS = Object.freeze([
+  "note",
+  "metadata",
+  "applied_taxes",
+  "applied_discounts",
+  "applied_service_charges",
+  "pricing_blocklists"
+] as const);
+
+export const SQUARE_ORDER_LINE_ITEM_MODIFIER_TRUSTED_RESPONSE_FIELDS =
+  Object.freeze([
+    "uid",
+    "catalog_object_id",
+    "catalog_version",
+    "name",
+    "quantity",
+    "base_price_money",
+    "total_price_money",
+    "parent_modifier_uid"
+  ] as const);
+
+export const SQUARE_ORDER_LINE_ITEM_MODIFIER_DISCARDED_RESPONSE_FIELDS =
+  Object.freeze(["metadata"] as const);
+
 const MAXIMUM_ORDER_RESPONSE_ITEMS = 1_000;
 const MAXIMUM_BATCH_ORDER_RESPONSE_ITEMS = 100;
+const MAXIMUM_ORDER_LINE_ITEMS = 1_000;
+const MAXIMUM_ORDER_LINE_ITEM_MODIFIERS = 1_000;
+const MAXIMUM_ORDER_LINE_ITEM_QUANTITY_LENGTH = 12;
+const MAXIMUM_ORDER_MODIFIER_QUANTITY_LENGTH = 4_096;
+const MAXIMUM_ORDER_MODIFIER_NESTING_DEPTH = 3;
 const MAXIMUM_PROVIDER_ERRORS = 100;
 const MAXIMUM_RESULT_DIAGNOSTICS = 100;
 const MAXIMUM_FROZEN_RESULT_OBJECTS = 50_000;
 const ORDER_CURSOR_PATTERN = /^[A-Za-z0-9._~:+-]{1,4096}={0,2}$/;
+const ORDER_COMPONENT_UID_PATTERN = /^[A-Za-z0-9._-]{1,60}$/;
+const ORDER_CATALOG_IDENTIFIER_PATTERN = /^[A-Za-z0-9._:-]{1,192}$/;
+const ORDER_QUANTITY_PATTERN = /^(?:\d+(?:\.\d+)?|\.\d+)$/;
 const MAX_SAFE_INTEGER_TEXT = String(Number.MAX_SAFE_INTEGER);
 const MINIMUM_ORDER_PROVIDER_VERSION = -2_147_483_648;
 const MAXIMUM_ORDER_PROVIDER_VERSION = 2_147_483_647;
 
+export const SQUARE_ORDER_LINE_ITEM_ITEM_TYPES = Object.freeze([
+  "ITEM",
+  "CUSTOM_AMOUNT",
+  "GIFT_CARD"
+] as const);
+
+export const SQUARE_ORDER_MEASUREMENT_UNIT_TYPES = Object.freeze([
+  "TYPE_CUSTOM",
+  "TYPE_AREA",
+  "TYPE_LENGTH",
+  "TYPE_VOLUME",
+  "TYPE_WEIGHT",
+  "TYPE_GENERIC"
+] as const);
+
+export const SQUARE_ORDER_MEASUREMENT_AREA_UNITS = Object.freeze([
+  "IMPERIAL_ACRE",
+  "IMPERIAL_SQUARE_INCH",
+  "IMPERIAL_SQUARE_FOOT",
+  "IMPERIAL_SQUARE_YARD",
+  "IMPERIAL_SQUARE_MILE",
+  "METRIC_SQUARE_CENTIMETER",
+  "METRIC_SQUARE_METER",
+  "METRIC_SQUARE_KILOMETER"
+] as const);
+
+export const SQUARE_ORDER_MEASUREMENT_LENGTH_UNITS = Object.freeze([
+  "IMPERIAL_INCH",
+  "IMPERIAL_FOOT",
+  "IMPERIAL_YARD",
+  "IMPERIAL_MILE",
+  "METRIC_MILLIMETER",
+  "METRIC_CENTIMETER",
+  "METRIC_METER",
+  "METRIC_KILOMETER"
+] as const);
+
+export const SQUARE_ORDER_MEASUREMENT_VOLUME_UNITS = Object.freeze([
+  "GENERIC_FLUID_OUNCE",
+  "GENERIC_SHOT",
+  "GENERIC_CUP",
+  "GENERIC_PINT",
+  "GENERIC_QUART",
+  "GENERIC_GALLON",
+  "IMPERIAL_CUBIC_INCH",
+  "IMPERIAL_CUBIC_FOOT",
+  "IMPERIAL_CUBIC_YARD",
+  "METRIC_MILLILITER",
+  "METRIC_LITER"
+] as const);
+
+export const SQUARE_ORDER_MEASUREMENT_WEIGHT_UNITS = Object.freeze([
+  "IMPERIAL_WEIGHT_OUNCE",
+  "IMPERIAL_POUND",
+  "IMPERIAL_STONE",
+  "METRIC_MILLIGRAM",
+  "METRIC_GRAM",
+  "METRIC_KILOGRAM"
+] as const);
+
+export const SQUARE_ORDER_MEASUREMENT_TIME_UNITS = Object.freeze([
+  "GENERIC_MILLISECOND",
+  "GENERIC_SECOND",
+  "GENERIC_MINUTE",
+  "GENERIC_HOUR",
+  "GENERIC_DAY"
+] as const);
+
 const SQUARE_ORDER_DIAGNOSTIC_CODES = new Set([
   "square_api_version_incompatible",
   "square_currency_invalid",
+  "square_display_text_invalid",
   "square_duplicate_order_authority_identity",
+  "square_duplicate_order_line_item_identity",
+  "square_duplicate_order_modifier_identity",
   "square_enum_invalid",
   "square_identifier_invalid",
   "square_order_aggregate_currency_mismatch",
@@ -124,11 +271,31 @@ const SQUARE_ORDER_DIAGNOSTIC_CODES = new Set([
   "square_order_identity_missing",
   "square_order_identity_request_mismatch",
   "square_order_integer_invalid",
+  "square_order_line_item_array_invalid",
+  "square_order_line_item_catalog_reference_invalid",
+  "square_order_line_item_currency_mismatch",
+  "square_order_line_item_identity_missing",
+  "square_order_line_item_modifier_array_invalid",
+  "square_order_line_item_modifier_identity_missing",
+  "square_order_line_item_quantity_invalid",
   "square_order_location_authority_mismatch",
   "square_order_location_request_mismatch",
   "square_order_operation_invalid",
   "square_order_parser_input_invalid",
+  "square_order_modifier_catalog_reference_invalid",
+  "square_order_modifier_parent_cross_line_item",
+  "square_order_modifier_parent_cycle",
+  "square_order_modifier_parent_missing",
+  "square_order_modifier_parent_self",
+  "square_order_modifier_quantity_invalid",
+  "square_order_modifier_price_missing",
+  "square_order_modifier_nesting_depth_invalid",
   "square_order_provider_errors_present",
+  "square_order_quantity_precision_invalid",
+  "square_order_quantity_precision_mismatch",
+  "square_order_quantity_unit_catalog_reference_invalid",
+  "square_order_measurement_unit_invalid",
+  "square_order_measurement_unit_type_unsupported",
   "square_order_request_location_unauthorized",
   "square_order_response_array_invalid",
   "square_order_response_missing",
@@ -178,6 +345,30 @@ const SquareOrderProviderVersionStringSchema = CanonicalIntegerSchema.refine(
   isOrderProviderVersionText,
   "Order provider version must fit signed 32-bit bounds"
 );
+const SquareOrderComponentUidSchema = z
+  .string()
+  .regex(ORDER_COMPONENT_UID_PATTERN);
+const SquareOrderCatalogIdentifierSchema = z
+  .string()
+  .regex(ORDER_CATALOG_IDENTIFIER_PATTERN);
+const SquareOrderCatalogVersionStringSchema = CanonicalIntegerSchema.refine(
+  isSafeIntegerText,
+  "Catalog version must fit JSON safe integer bounds"
+);
+const SquareOrderLineItemQuantitySchema = z
+  .string()
+  .min(1)
+  .max(MAXIMUM_ORDER_LINE_ITEM_QUANTITY_LENGTH)
+  .regex(ORDER_QUANTITY_PATTERN);
+const SquareOrderModifierQuantitySchema = z
+  .string()
+  .min(1)
+  .max(MAXIMUM_ORDER_MODIFIER_QUANTITY_LENGTH)
+  .regex(ORDER_QUANTITY_PATTERN);
+const SquareOrderLineItemNameSchema = squareOrderDisplayTextSchema(512);
+const SquareOrderLineItemVariationNameSchema = squareOrderDisplayTextSchema(400);
+const SquareOrderLineItemModifierNameSchema = squareOrderDisplayTextSchema(255);
+const SquareOrderMeasurementCustomTextSchema = squareOrderDisplayTextSchema(4_096);
 
 export const SquareOrderResponseOperationSchema = z.enum(
   SQUARE_ORDER_RESPONSE_OPERATION_KEYS
@@ -276,6 +467,210 @@ export const SquareOrderCoreResponseSchema = z
   })
   .strict();
 
+export const SquareOrderCatalogReferenceSchema = z
+  .object({
+    providerKey: z.literal(SQUARE_PROVIDER_KEY),
+    providerEnvironment: SquareProviderEnvironmentSchema,
+    referenceKind: z.literal("catalog_object"),
+    reconciliationState: z.literal("unverified"),
+    providerId: SquareOrderCatalogIdentifierSchema,
+    providerVersion: SquareOrderCatalogVersionStringSchema.nullable()
+  })
+  .strict();
+
+const SquareOrderMeasurementCustomUnitSchema = z
+  .object({
+    name: SquareOrderMeasurementCustomTextSchema,
+    abbreviation: SquareOrderMeasurementCustomTextSchema
+  })
+  .strict();
+
+export const SquareOrderMeasurementUnitSchema = z.discriminatedUnion("kind", [
+  z
+    .object({
+      kind: z.literal("custom"),
+      type: z.literal("TYPE_CUSTOM").nullable(),
+      custom: SquareOrderMeasurementCustomUnitSchema
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("area"),
+      type: z.literal("TYPE_AREA").nullable(),
+      unit: z.enum(SQUARE_ORDER_MEASUREMENT_AREA_UNITS)
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("length"),
+      type: z.literal("TYPE_LENGTH").nullable(),
+      unit: z.enum(SQUARE_ORDER_MEASUREMENT_LENGTH_UNITS)
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("volume"),
+      type: z.literal("TYPE_VOLUME").nullable(),
+      unit: z.enum(SQUARE_ORDER_MEASUREMENT_VOLUME_UNITS)
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("weight"),
+      type: z.literal("TYPE_WEIGHT").nullable(),
+      unit: z.enum(SQUARE_ORDER_MEASUREMENT_WEIGHT_UNITS)
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("generic"),
+      type: z.literal("TYPE_GENERIC").nullable(),
+      unit: z.literal("UNIT")
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("time"),
+      type: z.null(),
+      unit: z.enum(SQUARE_ORDER_MEASUREMENT_TIME_UNITS)
+    })
+    .strict()
+]);
+
+export const SquareOrderQuantityUnitSchema = z
+  .object({
+    measurementUnit: SquareOrderMeasurementUnitSchema.nullable(),
+    precision: z.number().int().min(0).max(5).nullable(),
+    catalogReference: SquareOrderCatalogReferenceSchema.nullable()
+  })
+  .strict();
+
+const SquareOrderLineItemAuthoritySchema = z
+  .object({
+    providerKey: z.literal(SQUARE_PROVIDER_KEY),
+    providerEnvironment: SquareProviderEnvironmentSchema,
+    entityType: z.literal("order_line_item"),
+    orderId: SquareIdentifierSchema,
+    lineItemUid: SquareOrderComponentUidSchema
+  })
+  .strict();
+
+const SquareOrderLineItemModifierAuthoritySchema = z
+  .object({
+    providerKey: z.literal(SQUARE_PROVIDER_KEY),
+    providerEnvironment: SquareProviderEnvironmentSchema,
+    entityType: z.literal("order_line_item_modifier"),
+    orderId: SquareIdentifierSchema,
+    lineItemUid: SquareOrderComponentUidSchema,
+    modifierUid: SquareOrderComponentUidSchema
+  })
+  .strict();
+
+// Square may omit UIDs in write shapes, but a trusted response projection needs
+// Order ID plus the returned component UID as its minimum stable authority.
+
+export const SquareOrderLineItemModifierSchema = z
+  .object({
+    entityType: z.literal("order_line_item_modifier"),
+    entityVersion: z.literal(SQUARE_ORDER_LINE_ITEM_ENTITY_VERSION),
+    authority: SquareOrderLineItemModifierAuthoritySchema,
+    sourceKind: z.enum(["catalog_backed", "ad_hoc"]),
+    pricingSource: z.enum([
+      "catalog_default_or_unknown",
+      "catalog_base_price_override",
+      "ad_hoc_base_price"
+    ]),
+    uid: SquareOrderComponentUidSchema,
+    catalogReference: SquareOrderCatalogReferenceSchema.nullable(),
+    name: SquareOrderLineItemModifierNameSchema.nullable(),
+    quantity: SquareOrderModifierQuantitySchema.nullable(),
+    basePriceMoney: SquareOrderMoneySchema.nullable(),
+    totalPriceMoney: SquareOrderMoneySchema.nullable(),
+    parentModifierUid: SquareOrderComponentUidSchema.nullable(),
+    nestingDepth: z
+      .number()
+      .int()
+      .min(1)
+      .max(MAXIMUM_ORDER_MODIFIER_NESTING_DEPTH)
+  })
+  .strict();
+
+export const SquareOrderLineItemSchema = z
+  .object({
+    entityType: z.literal("order_line_item"),
+    entityVersion: z.literal(SQUARE_ORDER_LINE_ITEM_ENTITY_VERSION),
+    authority: SquareOrderLineItemAuthoritySchema,
+    sourceKind: z.enum(["catalog_backed", "ad_hoc"]),
+    uid: SquareOrderComponentUidSchema,
+    catalogReference: SquareOrderCatalogReferenceSchema.nullable(),
+    name: SquareOrderLineItemNameSchema.nullable(),
+    variationName: SquareOrderLineItemVariationNameSchema.nullable(),
+    itemType: z.enum(SQUARE_ORDER_LINE_ITEM_ITEM_TYPES).nullable(),
+    quantity: SquareOrderLineItemQuantitySchema,
+    quantityUnit: SquareOrderQuantityUnitSchema.nullable(),
+    modifiers: z
+      .array(SquareOrderLineItemModifierSchema)
+      .max(MAXIMUM_ORDER_LINE_ITEM_MODIFIERS),
+    modifierCount: z
+      .number()
+      .int()
+      .nonnegative()
+      .max(MAXIMUM_ORDER_LINE_ITEM_MODIFIERS)
+      .safe(),
+    basePriceMoney: SquareOrderMoneySchema.nullable(),
+    variationTotalPriceMoney: SquareOrderMoneySchema.nullable(),
+    grossSalesMoney: SquareOrderMoneySchema.nullable(),
+    totalTaxMoney: SquareOrderMoneySchema.nullable(),
+    totalDiscountMoney: SquareOrderMoneySchema.nullable(),
+    totalServiceChargeMoney: SquareOrderMoneySchema.nullable(),
+    totalMoney: SquareOrderMoneySchema.nullable()
+  })
+  .strict();
+
+export const SquareMinimizedOrderLineItemDetailSchema = z
+  .object({
+    contractVersion: z.literal(
+      SQUARE_ORDER_LINE_ITEM_RESPONSE_CONTRACT_VERSION
+    ),
+    minimizationVersion: z.literal(
+      SQUARE_ORDER_LINE_ITEM_MINIMIZATION_VERSION
+    ),
+    entityType: z.literal("order_line_item_detail"),
+    entityVersion: z.literal(SQUARE_ORDER_LINE_ITEM_ENTITY_VERSION),
+    projectionScope: z.literal("order_core_with_line_items"),
+    core: SquareMinimizedOrderCoreSchema,
+    lineItems: z.array(SquareOrderLineItemSchema).max(MAXIMUM_ORDER_LINE_ITEMS),
+    lineItemCount: z.number().int().nonnegative().max(MAXIMUM_ORDER_LINE_ITEMS).safe()
+  })
+  .strict();
+
+export const SquareOrderLineItemResponseSchema = z
+  .object({
+    contractVersion: z.literal(
+      SQUARE_ORDER_LINE_ITEM_RESPONSE_CONTRACT_VERSION
+    ),
+    minimizationVersion: z.literal(
+      SQUARE_ORDER_LINE_ITEM_MINIMIZATION_VERSION
+    ),
+    entityType: z.literal("order_line_item_detail_response"),
+    operation: SquareOrderResponseOperationSchema,
+    provider: SquareResponseProvenanceSchema,
+    connectionAuthority: SquareOrderConnectionAuthoritySchema,
+    requestAuthorityVersion: z.literal(SQUARE_ORDER_REQUEST_AUTHORITY_VERSION),
+    requestAuthorityFingerprint: Sha256FingerprintSchema,
+    pagination: SquareOrderPaginationStateSchema,
+    items: z
+      .array(SquareMinimizedOrderLineItemDetailSchema)
+      .max(MAXIMUM_ORDER_RESPONSE_ITEMS),
+    itemCount: z
+      .number()
+      .int()
+      .nonnegative()
+      .max(MAXIMUM_ORDER_RESPONSE_ITEMS)
+      .safe()
+  })
+  .strict();
+
 export type SquareOrderResponseOperation = z.infer<
   typeof SquareOrderResponseOperationSchema
 >;
@@ -288,6 +683,27 @@ export type SquareMinimizedOrderCore = Readonly<
 >;
 export type SquareOrderCoreResponse = Readonly<
   z.infer<typeof SquareOrderCoreResponseSchema>
+>;
+export type SquareOrderCatalogReference = Readonly<
+  z.infer<typeof SquareOrderCatalogReferenceSchema>
+>;
+export type SquareOrderMeasurementUnit = Readonly<
+  z.infer<typeof SquareOrderMeasurementUnitSchema>
+>;
+export type SquareOrderQuantityUnit = Readonly<
+  z.infer<typeof SquareOrderQuantityUnitSchema>
+>;
+export type SquareOrderLineItemModifier = Readonly<
+  z.infer<typeof SquareOrderLineItemModifierSchema>
+>;
+export type SquareOrderLineItem = Readonly<
+  z.infer<typeof SquareOrderLineItemSchema>
+>;
+export type SquareMinimizedOrderLineItemDetail = Readonly<
+  z.infer<typeof SquareMinimizedOrderLineItemDetailSchema>
+>;
+export type SquareOrderLineItemResponse = Readonly<
+  z.infer<typeof SquareOrderLineItemResponseSchema>
 >;
 
 type SquareOrderResponseParserInput = SquareResponseParserInput &
@@ -325,11 +741,41 @@ type CanonicalRequestContext =
       authorizedLocationIds: readonly string[];
     }>;
 
+type SquareParsedOrderEnvelope = Readonly<{
+  parserInput: SquareOrderResponseParserInput;
+  provenance: SquareResponseProvenance;
+  response: SquareSafeJsonObject;
+  orders: readonly Readonly<{
+    raw: SquareSafeJsonObject;
+    core: SquareMinimizedOrderCore;
+  }>[];
+  coreResponse: SquareOrderCoreResponse;
+}>;
+
+type SquareUnorderedOrderLineItemModifier = Readonly<
+  Omit<SquareOrderLineItemModifier, "nestingDepth">
+>;
+
+type SquareUnorderedOrderLineItem = Readonly<{
+  projection: Omit<SquareOrderLineItem, "modifiers" | "modifierCount">;
+  modifiers: readonly SquareUnorderedOrderLineItemModifier[];
+}>;
+
 export function parseSquareOrderCoreResponse(
   input: unknown
 ): SquareResponseParserResult<SquareOrderCoreResponse> {
-  return squareOrderResultBoundary(() =>
-    parseSquareOrderCoreResponseResult(input)
+  return squareOrderResultBoundary(
+    () => parseSquareOrderCoreResponseResult(input),
+    SquareOrderCoreResponseSchema
+  );
+}
+
+export function parseSquareOrderLineItemResponse(
+  input: unknown
+): SquareResponseParserResult<SquareOrderLineItemResponse> {
+  return squareOrderResultBoundary(
+    () => parseSquareOrderLineItemResponseResult(input),
+    SquareOrderLineItemResponseSchema
   );
 }
 
@@ -337,61 +783,99 @@ function parseSquareOrderCoreResponseResult(
   input: unknown
 ): SquareResponseParserResult<SquareOrderCoreResponse> {
   try {
-    const parserInput = squareOrderResponseParserInput(input);
-    const provenance = squareResponseProvenance(parserInput);
-    const response = squareSafeJsonObject(parserInput.response);
+    return squareAcceptedResult(parseSquareOrderEnvelope(input).coreResponse);
+  } catch (error) {
+    return squareOrderParserFailureResult(error);
+  }
+}
 
-    if (orderProviderErrorState(response) === "present") {
-      return squareUnsupportedResult(
-        "square_order_provider_errors_present",
-        "$response.errors"
-      );
-    }
-    if (
-      parserInput.operation === "orders_search" &&
-      orderEntriesState(response) === "present"
-    ) {
-      return squareUnsupportedResult(
-        "square_order_entries_unsupported",
-        "$response.order_entries"
-      );
-    }
-    assertOrderEnvelopeShape(response, parserInput.operation);
-
-    const rawOrders = orderResponseItems(response, parserInput.operation);
-    const items = rawOrders.map((order) =>
-      minimizeSquareOrderCore(order, provenance, parserInput)
+function parseSquareOrderLineItemResponseResult(
+  input: unknown
+): SquareResponseParserResult<SquareOrderLineItemResponse> {
+  try {
+    const parsed = parseSquareOrderEnvelope(input);
+    const items = parsed.orders.map(({ raw, core }) =>
+      minimizeSquareOrderLineItemDetail(raw, core, parsed.provenance)
     );
-    assertUniqueOrderAuthorities(items);
-    items.sort(compareOrders);
-
     return squareAcceptedResult(
-      SquareOrderCoreResponseSchema.parse({
-        contractVersion: SQUARE_ORDER_RESPONSE_CONTRACT_VERSION,
-        minimizationVersion: SQUARE_ORDER_MINIMIZATION_VERSION,
-        entityType: "order_core_response",
-        operation: parserInput.operation,
-        provider: provenance,
-        connectionAuthority: parserInput.connectionAuthority,
-        requestAuthorityVersion: SQUARE_ORDER_REQUEST_AUTHORITY_VERSION,
+      SquareOrderLineItemResponseSchema.parse({
+        contractVersion: SQUARE_ORDER_LINE_ITEM_RESPONSE_CONTRACT_VERSION,
+        minimizationVersion: SQUARE_ORDER_LINE_ITEM_MINIMIZATION_VERSION,
+        entityType: "order_line_item_detail_response",
+        operation: parsed.coreResponse.operation,
+        provider: parsed.coreResponse.provider,
+        connectionAuthority: parsed.coreResponse.connectionAuthority,
+        requestAuthorityVersion: parsed.coreResponse.requestAuthorityVersion,
         requestAuthorityFingerprint:
-          parserInput.requestPolicy.requestAuthorityFingerprint,
-        pagination: orderPaginationState(
-          response,
-          parserInput.operation,
-          provenance,
-          parserInput.requestPolicy.requestAuthorityFingerprint
-        ),
+          parsed.coreResponse.requestAuthorityFingerprint,
+        pagination: parsed.coreResponse.pagination,
         items,
         itemCount: items.length
       })
     );
   } catch (error) {
-    if (error instanceof SquareOrderUnsupportedProjectionFailure) {
-      return squareUnsupportedResult(error.code, error.field);
-    }
-    return squareFailureResult(error);
+    return squareOrderParserFailureResult(error);
   }
+}
+
+function parseSquareOrderEnvelope(input: unknown): SquareParsedOrderEnvelope {
+  const parserInput = squareOrderResponseParserInput(input);
+  const provenance = squareResponseProvenance(parserInput);
+  const response = squareSafeJsonObject(parserInput.response);
+
+  if (orderProviderErrorState(response) === "present") {
+    throw new SquareOrderUnsupportedProjectionFailure(
+      "square_order_provider_errors_present",
+      "$response.errors"
+    );
+  }
+  if (
+    parserInput.operation === "orders_search" &&
+    orderEntriesState(response) === "present"
+  ) {
+    throw new SquareOrderUnsupportedProjectionFailure(
+      "square_order_entries_unsupported",
+      "$response.order_entries"
+    );
+  }
+  assertOrderEnvelopeShape(response, parserInput.operation);
+
+  const orders = orderResponseItems(response, parserInput.operation).map(
+    (raw) => ({
+      raw,
+      core: minimizeSquareOrderCore(raw, provenance, parserInput)
+    })
+  );
+  assertUniqueOrderAuthorities(orders.map(({ core }) => core));
+  orders.sort((left, right) => compareOrders(left.core, right.core));
+  const items = orders.map(({ core }) => core);
+  const coreResponse = SquareOrderCoreResponseSchema.parse({
+    contractVersion: SQUARE_ORDER_RESPONSE_CONTRACT_VERSION,
+    minimizationVersion: SQUARE_ORDER_MINIMIZATION_VERSION,
+    entityType: "order_core_response",
+    operation: parserInput.operation,
+    provider: provenance,
+    connectionAuthority: parserInput.connectionAuthority,
+    requestAuthorityVersion: SQUARE_ORDER_REQUEST_AUTHORITY_VERSION,
+    requestAuthorityFingerprint:
+      parserInput.requestPolicy.requestAuthorityFingerprint,
+    pagination: orderPaginationState(
+      response,
+      parserInput.operation,
+      provenance,
+      parserInput.requestPolicy.requestAuthorityFingerprint
+    ),
+    items,
+    itemCount: items.length
+  });
+  return { parserInput, provenance, response, orders, coreResponse };
+}
+
+function squareOrderParserFailureResult(error: unknown) {
+  if (error instanceof SquareOrderUnsupportedProjectionFailure) {
+    return squareUnsupportedResult(error.code, error.field);
+  }
+  return squareFailureResult(error);
 }
 
 export function squareOrderCoreFingerprint(input: SquareMinimizedOrderCore) {
@@ -405,6 +889,22 @@ export function squareOrderCoreResponseFingerprint(
 ) {
   return squareMinimizedProjectionFingerprint(
     SquareOrderCoreResponseSchema.parse(input)
+  );
+}
+
+export function squareOrderLineItemDetailFingerprint(
+  input: SquareMinimizedOrderLineItemDetail
+) {
+  return squareMinimizedProjectionFingerprint(
+    SquareMinimizedOrderLineItemDetailSchema.parse(input)
+  );
+}
+
+export function squareOrderLineItemResponseFingerprint(
+  input: SquareOrderLineItemResponse
+) {
+  return squareMinimizedProjectionFingerprint(
+    SquareOrderLineItemResponseSchema.parse(input)
   );
 }
 
@@ -518,6 +1018,868 @@ function minimizeSquareOrderCore(
     ),
     ...monies
   });
+}
+
+function minimizeSquareOrderLineItemDetail(
+  input: SquareSafeJsonObject,
+  core: SquareMinimizedOrderCore,
+  provenance: SquareResponseProvenance
+): SquareMinimizedOrderLineItemDetail {
+  const field = orderItemField(core.operation);
+  const unorderedLineItems = unorderedOrderLineItems(
+    input,
+    core,
+    provenance,
+    field
+  );
+  assertUniqueLineItemAuthorities(unorderedLineItems);
+
+  const modifierOwners = orderModifierOwners(unorderedLineItems);
+  const lineItems = unorderedLineItems
+    .map(({ projection, modifiers }) => {
+      const orderedModifiers = orderedOrderLineItemModifiers(
+        projection.uid,
+        modifiers,
+        modifierOwners,
+        field
+      );
+      return SquareOrderLineItemSchema.parse({
+        ...projection,
+        modifiers: orderedModifiers,
+        modifierCount: orderedModifiers.length
+      });
+    })
+    .sort((left, right) => compareStrings(left.uid, right.uid));
+
+  assertCompatibleOrderLineItemCurrencies(core, lineItems, field);
+  return SquareMinimizedOrderLineItemDetailSchema.parse({
+    contractVersion: SQUARE_ORDER_LINE_ITEM_RESPONSE_CONTRACT_VERSION,
+    minimizationVersion: SQUARE_ORDER_LINE_ITEM_MINIMIZATION_VERSION,
+    entityType: "order_line_item_detail",
+    entityVersion: SQUARE_ORDER_LINE_ITEM_ENTITY_VERSION,
+    projectionScope: "order_core_with_line_items",
+    core,
+    lineItems,
+    lineItemCount: lineItems.length
+  });
+}
+
+function unorderedOrderLineItems(
+  order: SquareSafeJsonObject,
+  core: SquareMinimizedOrderCore,
+  provenance: SquareResponseProvenance,
+  field: string
+): readonly SquareUnorderedOrderLineItem[] {
+  if (!hasOwn(order, "line_items") || order.line_items === null) return [];
+  if (
+    !Array.isArray(order.line_items) ||
+    order.line_items.length > MAXIMUM_ORDER_LINE_ITEMS
+  ) {
+    squareRejectResponse(
+      "square_order_line_item_array_invalid",
+      `${field}.line_items`
+    );
+  }
+  return order.line_items.map((lineItem) =>
+    unorderedOrderLineItem(
+      squareSafeJsonObject(lineItem, `${field}.line_items[]`),
+      core,
+      provenance,
+      `${field}.line_items[]`
+    )
+  );
+}
+
+function unorderedOrderLineItem(
+  input: SquareSafeJsonObject,
+  core: SquareMinimizedOrderCore,
+  provenance: SquareResponseProvenance,
+  field: string
+): SquareUnorderedOrderLineItem {
+  const uid = requiredOrderComponentUid(
+    input,
+    "uid",
+    `${field}.uid`,
+    "square_order_line_item_identity_missing"
+  );
+  const catalogReference = optionalOrderCatalogReference(
+    input,
+    "catalog_object_id",
+    "catalog_version",
+    provenance,
+    `${field}.catalog_object_id`,
+    `${field}.catalog_version`,
+    "square_order_line_item_catalog_reference_invalid"
+  );
+  const quantity = requiredOrderQuantity(
+    input,
+    "quantity",
+    `${field}.quantity`,
+    MAXIMUM_ORDER_LINE_ITEM_QUANTITY_LENGTH,
+    "square_order_line_item_quantity_invalid"
+  );
+  const quantityUnit = optionalOrderQuantityUnit(
+    input,
+    quantity,
+    provenance,
+    field
+  );
+  const modifiers = unorderedOrderLineItemModifiers(
+    input,
+    core,
+    uid,
+    provenance,
+    field
+  );
+
+  return {
+    projection: {
+      entityType: "order_line_item",
+      entityVersion: SQUARE_ORDER_LINE_ITEM_ENTITY_VERSION,
+      authority: {
+        providerKey: SQUARE_PROVIDER_KEY,
+        providerEnvironment: provenance.providerEnvironment,
+        entityType: "order_line_item",
+        orderId: core.id,
+        lineItemUid: uid
+      },
+      sourceKind: catalogReference === null ? "ad_hoc" : "catalog_backed",
+      uid,
+      catalogReference,
+      name: squareOptionalNullableDisplayText(
+        input,
+        "name",
+        `${field}.name`,
+        512
+      ),
+      variationName: squareOptionalNullableDisplayText(
+        input,
+        "variation_name",
+        `${field}.variation_name`,
+        400
+      ),
+      itemType: squareOptionalNullableEnum(
+        input,
+        "item_type",
+        `${field}.item_type`,
+        SQUARE_ORDER_LINE_ITEM_ITEM_TYPES
+      ),
+      quantity,
+      quantityUnit,
+      basePriceMoney: optionalOrderMoney(
+        input,
+        "base_price_money",
+        `${field}.base_price_money`
+      ),
+      variationTotalPriceMoney: optionalOrderMoney(
+        input,
+        "variation_total_price_money",
+        `${field}.variation_total_price_money`
+      ),
+      grossSalesMoney: optionalOrderMoney(
+        input,
+        "gross_sales_money",
+        `${field}.gross_sales_money`
+      ),
+      totalTaxMoney: optionalOrderMoney(
+        input,
+        "total_tax_money",
+        `${field}.total_tax_money`
+      ),
+      totalDiscountMoney: optionalOrderMoney(
+        input,
+        "total_discount_money",
+        `${field}.total_discount_money`
+      ),
+      totalServiceChargeMoney: optionalOrderMoney(
+        input,
+        "total_service_charge_money",
+        `${field}.total_service_charge_money`
+      ),
+      totalMoney: optionalOrderMoney(
+        input,
+        "total_money",
+        `${field}.total_money`
+      )
+    },
+    modifiers
+  };
+}
+
+function optionalOrderQuantityUnit(
+  lineItem: SquareSafeJsonObject,
+  quantity: string,
+  provenance: SquareResponseProvenance,
+  field: string
+): SquareOrderQuantityUnit | null {
+  if (!hasOwn(lineItem, "quantity_unit") || lineItem.quantity_unit === null) {
+    return null;
+  }
+  const quantityUnit = squareSafeJsonObject(
+    lineItem.quantity_unit,
+    `${field}.quantity_unit`
+  );
+  const precision = optionalOrderSafeInteger(
+    quantityUnit,
+    "precision",
+    `${field}.quantity_unit.precision`,
+    0,
+    5,
+    "square_order_quantity_precision_invalid"
+  );
+  if (precision !== null && orderQuantityFractionalDigits(quantity) > precision) {
+    squareRejectResponse(
+      "square_order_quantity_precision_mismatch",
+      `${field}.quantity`
+    );
+  }
+
+  return SquareOrderQuantityUnitSchema.parse({
+    measurementUnit: optionalOrderMeasurementUnit(quantityUnit, field),
+    precision,
+    catalogReference: optionalOrderCatalogReference(
+      quantityUnit,
+      "catalog_object_id",
+      "catalog_version",
+      provenance,
+      `${field}.quantity_unit.catalog_object_id`,
+      `${field}.quantity_unit.catalog_version`,
+      "square_order_quantity_unit_catalog_reference_invalid"
+    )
+  });
+}
+
+function optionalOrderMeasurementUnit(
+  quantityUnit: SquareSafeJsonObject,
+  field: string
+): SquareOrderMeasurementUnit | null {
+  if (
+    !hasOwn(quantityUnit, "measurement_unit") ||
+    quantityUnit.measurement_unit === null
+  ) {
+    return null;
+  }
+  const measurementUnit = squareSafeJsonObject(
+    quantityUnit.measurement_unit,
+    `${field}.quantity_unit.measurement_unit`
+  );
+  const unitKeys = [
+    "custom_unit",
+    "area_unit",
+    "length_unit",
+    "volume_unit",
+    "weight_unit",
+    "generic_unit",
+    "time_unit"
+  ] as const;
+  const selectedKeys = unitKeys.filter(
+    (key) => hasOwn(measurementUnit, key) && measurementUnit[key] !== null
+  );
+  if (selectedKeys.length !== 1) {
+    squareRejectResponse(
+      "square_order_measurement_unit_invalid",
+      `${field}.quantity_unit.measurement_unit`
+    );
+  }
+
+  const declaredType = optionalOrderMeasurementUnitType(
+    measurementUnit,
+    `${field}.quantity_unit.measurement_unit.type`
+  );
+  const selectedKey = selectedKeys[0];
+  const unitField = `${field}.quantity_unit.measurement_unit.${selectedKey}`;
+
+  if (selectedKey === "custom_unit") {
+    assertOrderMeasurementType(declaredType, "TYPE_CUSTOM", unitField);
+    const custom = squareSafeJsonObject(measurementUnit[selectedKey], unitField);
+    return SquareOrderMeasurementUnitSchema.parse({
+      kind: "custom",
+      type: declaredType,
+      custom: {
+        name: requiredOrderDisplayText(custom, "name", `${unitField}.name`),
+        abbreviation: requiredOrderDisplayText(
+          custom,
+          "abbreviation",
+          `${unitField}.abbreviation`
+        )
+      }
+    });
+  }
+  if (selectedKey === "area_unit") {
+    assertOrderMeasurementType(declaredType, "TYPE_AREA", unitField);
+    return SquareOrderMeasurementUnitSchema.parse({
+      kind: "area",
+      type: declaredType,
+      unit: requiredOrderMeasurementEnum(
+        measurementUnit,
+        selectedKey,
+        unitField,
+        SQUARE_ORDER_MEASUREMENT_AREA_UNITS
+      )
+    });
+  }
+  if (selectedKey === "length_unit") {
+    assertOrderMeasurementType(declaredType, "TYPE_LENGTH", unitField);
+    return SquareOrderMeasurementUnitSchema.parse({
+      kind: "length",
+      type: declaredType,
+      unit: requiredOrderMeasurementEnum(
+        measurementUnit,
+        selectedKey,
+        unitField,
+        SQUARE_ORDER_MEASUREMENT_LENGTH_UNITS
+      )
+    });
+  }
+  if (selectedKey === "volume_unit") {
+    assertOrderMeasurementType(declaredType, "TYPE_VOLUME", unitField);
+    return SquareOrderMeasurementUnitSchema.parse({
+      kind: "volume",
+      type: declaredType,
+      unit: requiredOrderMeasurementEnum(
+        measurementUnit,
+        selectedKey,
+        unitField,
+        SQUARE_ORDER_MEASUREMENT_VOLUME_UNITS
+      )
+    });
+  }
+  if (selectedKey === "weight_unit") {
+    assertOrderMeasurementType(declaredType, "TYPE_WEIGHT", unitField);
+    return SquareOrderMeasurementUnitSchema.parse({
+      kind: "weight",
+      type: declaredType,
+      unit: requiredOrderMeasurementEnum(
+        measurementUnit,
+        selectedKey,
+        unitField,
+        SQUARE_ORDER_MEASUREMENT_WEIGHT_UNITS
+      )
+    });
+  }
+  if (selectedKey === "generic_unit") {
+    assertOrderMeasurementType(declaredType, "TYPE_GENERIC", unitField);
+    return SquareOrderMeasurementUnitSchema.parse({
+      kind: "generic",
+      type: declaredType,
+      unit: requiredOrderMeasurementEnum(
+        measurementUnit,
+        selectedKey,
+        unitField,
+        ["UNIT"] as const
+      )
+    });
+  }
+
+  if (declaredType !== null) {
+    squareRejectResponse("square_order_measurement_unit_invalid", unitField);
+  }
+  return SquareOrderMeasurementUnitSchema.parse({
+    kind: "time",
+    type: null,
+    unit: requiredOrderMeasurementEnum(
+      measurementUnit,
+      selectedKey,
+      unitField,
+      SQUARE_ORDER_MEASUREMENT_TIME_UNITS
+    )
+  });
+}
+
+function optionalOrderMeasurementUnitType(
+  measurementUnit: SquareSafeJsonObject,
+  field: string
+): (typeof SQUARE_ORDER_MEASUREMENT_UNIT_TYPES)[number] | null {
+  const type = squareOptionalNullableString(measurementUnit, "type", field, 128);
+  if (type === null) return null;
+  if (
+    !SQUARE_ORDER_MEASUREMENT_UNIT_TYPES.includes(
+      type as (typeof SQUARE_ORDER_MEASUREMENT_UNIT_TYPES)[number]
+    )
+  ) {
+    throw new SquareOrderUnsupportedProjectionFailure(
+      "square_order_measurement_unit_type_unsupported",
+      field
+    );
+  }
+  return type as (typeof SQUARE_ORDER_MEASUREMENT_UNIT_TYPES)[number];
+}
+
+function assertOrderMeasurementType(
+  actual: (typeof SQUARE_ORDER_MEASUREMENT_UNIT_TYPES)[number] | null,
+  expected: (typeof SQUARE_ORDER_MEASUREMENT_UNIT_TYPES)[number],
+  field: string
+) {
+  if (actual !== null && actual !== expected) {
+    squareRejectResponse("square_order_measurement_unit_invalid", field);
+  }
+}
+
+function requiredOrderMeasurementEnum<T extends string>(
+  record: SquareSafeJsonObject,
+  key: string,
+  field: string,
+  allowed: readonly T[]
+): T {
+  const value = record[key];
+  if (typeof value !== "string" || !allowed.includes(value as T)) {
+    squareRejectResponse("square_order_measurement_unit_invalid", field);
+  }
+  return value as T;
+}
+
+function requiredOrderDisplayText(
+  record: SquareSafeJsonObject,
+  key: string,
+  field: string
+) {
+  const value = squareOptionalNullableDisplayText(record, key, field, 4_096);
+  if (value === null) {
+    squareRejectResponse("square_display_text_invalid", field);
+  }
+  return value;
+}
+
+function squareOrderDisplayTextSchema(maximumLength: number) {
+  return z
+    .string()
+    .min(1)
+    .max(maximumLength)
+    .refine((value) => {
+      try {
+        return (
+          squareOptionalNullableDisplayText(
+            { value },
+            "value",
+            "$response",
+            maximumLength
+          ) === value
+        );
+      } catch {
+        return false;
+      }
+    }, "Display text must be safe and canonical");
+}
+
+function unorderedOrderLineItemModifiers(
+  lineItem: SquareSafeJsonObject,
+  core: SquareMinimizedOrderCore,
+  lineItemUid: string,
+  provenance: SquareResponseProvenance,
+  field: string
+): readonly SquareUnorderedOrderLineItemModifier[] {
+  if (!hasOwn(lineItem, "modifiers") || lineItem.modifiers === null) return [];
+  if (
+    !Array.isArray(lineItem.modifiers) ||
+    lineItem.modifiers.length > MAXIMUM_ORDER_LINE_ITEM_MODIFIERS
+  ) {
+    squareRejectResponse(
+      "square_order_line_item_modifier_array_invalid",
+      `${field}.modifiers`
+    );
+  }
+  return lineItem.modifiers.map((modifier) =>
+    unorderedOrderLineItemModifier(
+      squareSafeJsonObject(modifier, `${field}.modifiers[]`),
+      core,
+      lineItemUid,
+      provenance,
+      `${field}.modifiers[]`
+    )
+  );
+}
+
+function unorderedOrderLineItemModifier(
+  input: SquareSafeJsonObject,
+  core: SquareMinimizedOrderCore,
+  lineItemUid: string,
+  provenance: SquareResponseProvenance,
+  field: string
+): SquareUnorderedOrderLineItemModifier {
+  const uid = requiredOrderComponentUid(
+    input,
+    "uid",
+    `${field}.uid`,
+    "square_order_line_item_modifier_identity_missing"
+  );
+  const catalogReference = optionalOrderCatalogReference(
+    input,
+    "catalog_object_id",
+    "catalog_version",
+    provenance,
+    `${field}.catalog_object_id`,
+    `${field}.catalog_version`,
+    "square_order_modifier_catalog_reference_invalid"
+  );
+  const basePriceMoney = optionalOrderMoney(
+    input,
+    "base_price_money",
+    `${field}.base_price_money`
+  );
+  if (catalogReference === null && basePriceMoney === null) {
+    squareRejectResponse("square_order_modifier_price_missing", field);
+  }
+
+  return {
+    entityType: "order_line_item_modifier",
+    entityVersion: SQUARE_ORDER_LINE_ITEM_ENTITY_VERSION,
+    authority: {
+      providerKey: SQUARE_PROVIDER_KEY,
+      providerEnvironment: provenance.providerEnvironment,
+      entityType: "order_line_item_modifier",
+      orderId: core.id,
+      lineItemUid,
+      modifierUid: uid
+    },
+    sourceKind: catalogReference === null ? "ad_hoc" : "catalog_backed",
+    pricingSource:
+      catalogReference === null
+        ? "ad_hoc_base_price"
+        : basePriceMoney === null
+          ? "catalog_default_or_unknown"
+          : "catalog_base_price_override",
+    uid,
+    catalogReference,
+    name: squareOptionalNullableDisplayText(input, "name", `${field}.name`, 255),
+    quantity: optionalOrderQuantity(
+      input,
+      "quantity",
+      `${field}.quantity`,
+      MAXIMUM_ORDER_MODIFIER_QUANTITY_LENGTH,
+      "square_order_modifier_quantity_invalid"
+    ),
+    basePriceMoney,
+    totalPriceMoney: optionalOrderMoney(
+      input,
+      "total_price_money",
+      `${field}.total_price_money`
+    ),
+    parentModifierUid: optionalOrderComponentUid(
+      input,
+      "parent_modifier_uid",
+      `${field}.parent_modifier_uid`
+    )
+  };
+}
+
+function assertUniqueLineItemAuthorities(
+  lineItems: readonly SquareUnorderedOrderLineItem[]
+) {
+  const seen = new Set<string>();
+  for (const { projection } of lineItems) {
+    if (seen.has(projection.uid)) {
+      squareRejectResponse(
+        "square_duplicate_order_line_item_identity",
+        "$response"
+      );
+    }
+    seen.add(projection.uid);
+  }
+}
+
+function orderModifierOwners(
+  lineItems: readonly SquareUnorderedOrderLineItem[]
+) {
+  const owners = new Map<string, string>();
+  for (const { projection, modifiers } of lineItems) {
+    for (const modifier of modifiers) {
+      if (owners.has(modifier.uid)) {
+        squareRejectResponse(
+          "square_duplicate_order_modifier_identity",
+          "$response"
+        );
+      }
+      owners.set(modifier.uid, projection.uid);
+    }
+  }
+  return owners;
+}
+
+function orderedOrderLineItemModifiers(
+  lineItemUid: string,
+  modifiers: readonly SquareUnorderedOrderLineItemModifier[],
+  modifierOwners: ReadonlyMap<string, string>,
+  field: string
+): readonly SquareOrderLineItemModifier[] {
+  const byUid = new Map(modifiers.map((modifier) => [modifier.uid, modifier]));
+  const ancestry = new Map<
+    string,
+    Readonly<{ depth: number; path: readonly string[] }>
+  >();
+  const visiting = new Set<string>();
+
+  const resolveAncestry = (
+    modifier: SquareUnorderedOrderLineItemModifier
+  ): Readonly<{ depth: number; path: readonly string[] }> => {
+    const resolved = ancestry.get(modifier.uid);
+    if (resolved !== undefined) return resolved;
+    if (visiting.has(modifier.uid)) {
+      squareRejectResponse("square_order_modifier_parent_cycle", field);
+    }
+    visiting.add(modifier.uid);
+    try {
+      const parentUid = modifier.parentModifierUid;
+      let next: Readonly<{ depth: number; path: readonly string[] }>;
+      if (parentUid === null) {
+        next = { depth: 1, path: [modifier.uid] };
+      } else {
+        if (parentUid === modifier.uid) {
+          squareRejectResponse("square_order_modifier_parent_self", field);
+        }
+        const parent = byUid.get(parentUid);
+        if (parent === undefined) {
+          const parentOwner = modifierOwners.get(parentUid);
+          if (parentOwner !== undefined && parentOwner !== lineItemUid) {
+            squareRejectResponse(
+              "square_order_modifier_parent_cross_line_item",
+              field
+            );
+          }
+          squareRejectResponse("square_order_modifier_parent_missing", field);
+        }
+        const parentAncestry = resolveAncestry(parent);
+        next = {
+          depth: parentAncestry.depth + 1,
+          path: [...parentAncestry.path, modifier.uid]
+        };
+      }
+      if (next.depth > MAXIMUM_ORDER_MODIFIER_NESTING_DEPTH) {
+        squareRejectResponse(
+          "square_order_modifier_nesting_depth_invalid",
+          field
+        );
+      }
+      ancestry.set(modifier.uid, next);
+      return next;
+    } finally {
+      visiting.delete(modifier.uid);
+    }
+  };
+
+  for (const modifier of modifiers) resolveAncestry(modifier);
+  return modifiers
+    .map((modifier) =>
+      SquareOrderLineItemModifierSchema.parse({
+        ...modifier,
+        nestingDepth: ancestry.get(modifier.uid)?.depth
+      })
+    )
+    .sort((left, right) =>
+      compareStringPaths(
+        ancestry.get(left.uid)?.path ?? [],
+        ancestry.get(right.uid)?.path ?? []
+      )
+    );
+}
+
+function optionalOrderCatalogReference(
+  record: SquareSafeJsonObject,
+  identifierKey: string,
+  versionKey: string,
+  provenance: SquareResponseProvenance,
+  identifierField: string,
+  versionField: string,
+  diagnosticCode: string
+): SquareOrderCatalogReference | null {
+  const providerId = optionalOrderCatalogIdentifier(
+    record,
+    identifierKey,
+    identifierField,
+    diagnosticCode
+  );
+  const providerVersion = optionalOrderCatalogVersion(
+    record,
+    versionKey,
+    versionField,
+    diagnosticCode
+  );
+  if (providerId === null) {
+    if (providerVersion !== null) {
+      squareRejectResponse(diagnosticCode, versionField);
+    }
+    return null;
+  }
+  return SquareOrderCatalogReferenceSchema.parse({
+    providerKey: SQUARE_PROVIDER_KEY,
+    providerEnvironment: provenance.providerEnvironment,
+    referenceKind: "catalog_object",
+    reconciliationState: "unverified",
+    providerId,
+    providerVersion
+  });
+}
+
+function optionalOrderCatalogIdentifier(
+  record: SquareSafeJsonObject,
+  key: string,
+  field: string,
+  diagnosticCode: string
+) {
+  const value = squareOptionalNullableString(record, key, field, 192);
+  if (value !== null && !ORDER_CATALOG_IDENTIFIER_PATTERN.test(value)) {
+    squareRejectResponse(diagnosticCode, field);
+  }
+  return value;
+}
+
+function optionalOrderCatalogVersion(
+  record: SquareSafeJsonObject,
+  key: string,
+  field: string,
+  diagnosticCode: string
+) {
+  if (!hasOwn(record, key) || record[key] === null) return null;
+  const value = record[key];
+  if (typeof value !== "number" || !Number.isSafeInteger(value)) {
+    squareRejectResponse(diagnosticCode, field);
+  }
+  return String(value);
+}
+
+function requiredOrderComponentUid(
+  record: SquareSafeJsonObject,
+  key: string,
+  field: string,
+  missingCode: string
+) {
+  const value = squareOptionalNullableString(record, key, field, 60);
+  if (value === null) {
+    throw new SquareOrderUnsupportedProjectionFailure(missingCode, field);
+  }
+  if (!ORDER_COMPONENT_UID_PATTERN.test(value)) {
+    squareRejectResponse("square_identifier_invalid", field);
+  }
+  return value;
+}
+
+function optionalOrderComponentUid(
+  record: SquareSafeJsonObject,
+  key: string,
+  field: string
+) {
+  const value = squareOptionalNullableString(record, key, field, 60);
+  if (value !== null && !ORDER_COMPONENT_UID_PATTERN.test(value)) {
+    squareRejectResponse("square_identifier_invalid", field);
+  }
+  return value;
+}
+
+function requiredOrderQuantity(
+  record: SquareSafeJsonObject,
+  key: string,
+  field: string,
+  maximumLength: number,
+  diagnosticCode: string
+) {
+  if (!hasOwn(record, key) || record[key] === null) {
+    squareRejectResponse(diagnosticCode, field);
+  }
+  return validOrderQuantity(record[key], field, maximumLength, diagnosticCode);
+}
+
+function optionalOrderQuantity(
+  record: SquareSafeJsonObject,
+  key: string,
+  field: string,
+  maximumLength: number,
+  diagnosticCode: string
+) {
+  if (!hasOwn(record, key) || record[key] === null) return null;
+  return validOrderQuantity(record[key], field, maximumLength, diagnosticCode);
+}
+
+function validOrderQuantity(
+  value: SquareSafeJsonValue,
+  field: string,
+  maximumLength: number,
+  diagnosticCode: string
+) {
+  if (
+    typeof value !== "string" ||
+    value.length < 1 ||
+    value.length > maximumLength ||
+    !ORDER_QUANTITY_PATTERN.test(value)
+  ) {
+    squareRejectResponse(diagnosticCode, field);
+  }
+  return value;
+}
+
+function optionalOrderSafeInteger(
+  record: SquareSafeJsonObject,
+  key: string,
+  field: string,
+  minimum: number,
+  maximum: number,
+  diagnosticCode: string
+) {
+  if (!hasOwn(record, key) || record[key] === null) return null;
+  const value = record[key];
+  if (
+    typeof value !== "number" ||
+    !Number.isSafeInteger(value) ||
+    value < minimum ||
+    value > maximum
+  ) {
+    squareRejectResponse(diagnosticCode, field);
+  }
+  return value;
+}
+
+function orderQuantityFractionalDigits(quantity: string) {
+  const decimalIndex = quantity.indexOf(".");
+  return decimalIndex === -1 ? 0 : quantity.length - decimalIndex - 1;
+}
+
+function assertCompatibleOrderLineItemCurrencies(
+  core: SquareMinimizedOrderCore,
+  lineItems: readonly SquareOrderLineItem[],
+  field: string
+) {
+  const monies: (SquareOrderMoney | null)[] = [
+    core.totalMoney,
+    core.totalTaxMoney,
+    core.totalDiscountMoney,
+    core.totalTipMoney,
+    core.totalServiceChargeMoney,
+    core.netAmountDueMoney
+  ];
+  for (const lineItem of lineItems) {
+    monies.push(
+      lineItem.basePriceMoney,
+      lineItem.variationTotalPriceMoney,
+      lineItem.grossSalesMoney,
+      lineItem.totalTaxMoney,
+      lineItem.totalDiscountMoney,
+      lineItem.totalServiceChargeMoney,
+      lineItem.totalMoney
+    );
+    for (const modifier of lineItem.modifiers) {
+      monies.push(modifier.basePriceMoney, modifier.totalPriceMoney);
+    }
+  }
+  const currencies = new Set(
+    monies.flatMap((money) =>
+      money?.currency === null || money?.currency === undefined
+        ? []
+        : [money.currency]
+    )
+  );
+  if (currencies.size > 1) {
+    squareRejectResponse(
+      "square_order_line_item_currency_mismatch",
+      `${field}.line_items`
+    );
+  }
+}
+
+function compareStringPaths(left: readonly string[], right: readonly string[]) {
+  const sharedLength = Math.min(left.length, right.length);
+  for (let index = 0; index < sharedLength; index += 1) {
+    const compared = compareStrings(left[index], right[index]);
+    if (compared !== 0) return compared;
+  }
+  return left.length - right.length;
 }
 
 function squareOrderResponseParserInput(
@@ -1103,19 +2465,21 @@ function isOrderProviderVersionText(value: string) {
   );
 }
 
-function squareOrderResultBoundary(
-  produceResult: () => SquareResponseParserResult<SquareOrderCoreResponse>
-): SquareResponseParserResult<SquareOrderCoreResponse> {
+function squareOrderResultBoundary<T>(
+  produceResult: () => SquareResponseParserResult<T>,
+  acceptedSchema: z.ZodType<T>
+): SquareResponseParserResult<T> {
   try {
-    return squareOrderRootDiagnosticResult(produceResult());
+    return squareOrderRootDiagnosticResult(produceResult(), acceptedSchema);
   } catch {
     return SQUARE_ORDER_INTERNAL_REJECTION_RESULT;
   }
 }
 
-function squareOrderRootDiagnosticResult(
-  result: unknown
-): SquareResponseParserResult<SquareOrderCoreResponse> {
+function squareOrderRootDiagnosticResult<T>(
+  result: unknown,
+  acceptedSchema: z.ZodType<T>
+): SquareResponseParserResult<T> {
   if (!squareOrderHasExactDataProperties(result, ["outcome", "diagnostics"])) {
     if (
       !squareOrderHasExactDataProperties(result, [
@@ -1140,12 +2504,12 @@ function squareOrderRootDiagnosticResult(
       !squareOrderIsEmptyFrozenArray(
         squareOrderDataProperty(result, "diagnostics")
       ) ||
-      !SquareOrderCoreResponseSchema.safeParse(value).success ||
+      !acceptedSchema.safeParse(value).success ||
       !squareOrderIsDeeplyFrozen(result)
     ) {
       return SQUARE_ORDER_INTERNAL_REJECTION_RESULT;
     }
-    return result as SquareResponseParserResult<SquareOrderCoreResponse>;
+    return result as SquareResponseParserResult<T>;
   }
 
   if (

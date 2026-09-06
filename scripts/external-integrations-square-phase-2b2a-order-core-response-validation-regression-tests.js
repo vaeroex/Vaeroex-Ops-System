@@ -993,7 +993,7 @@ function testDormancyInvariantsAndSources() {
   ].map(read).join("\n");
   doesNotMatch(orderSources, /\bfetch\s*\(|axios|node:https|node:http|@supabase|supabase-js|process\.env|openai|generateText|streamText|credential|secret|access[_-]?token|refresh[_-]?token/i, "Phase 2B.2A source has no network, database, environment, credential, or model call path");
   const responseSource = read("lib/integrations/providers/square/order-responses.ts");
-  doesNotMatch(responseSource, /lineItems:|payments:|refunds:|fulfillments:|tenders:|webhook|queue|migration|persist/i, "trusted response implementation adds no detailed transaction normalization or runtime scope");
+  doesNotMatch(responseSource, /payments:|refunds:|fulfillments:|tenders:|webhook|queue|migration|persist/i, "trusted response implementation adds no out-of-scope transaction normalization or runtime scope");
 }
 
 function testExportsDocumentationAndRegistration() {
