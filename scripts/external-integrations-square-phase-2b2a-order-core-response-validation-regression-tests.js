@@ -137,6 +137,14 @@ function parseRawInput(input) {
 
 function assertSafeDiagnostics(result, message) {
   const serialized = JSON.stringify(result.diagnostics);
+  equal(
+    result.diagnostics.every(
+      (diagnostic) =>
+        diagnostic.field === "$input" || diagnostic.field === "$response"
+    ),
+    true,
+    `${message}: diagnostics use only static input or response roots`
+  );
   doesNotMatch(
     serialized,
     sensitivePattern,

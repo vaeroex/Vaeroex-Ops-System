@@ -268,7 +268,7 @@ export function parseSquareOrderCoreResponse(
     const response = squareSafeJsonObject(parserInput.response);
 
     if (orderProviderErrorState(response) === "present") {
-      return squareUnsupportedResult(
+      return squareOrderUnsupportedResult(
         "square_order_provider_errors_present",
         "$response.errors"
       );
@@ -277,7 +277,7 @@ export function parseSquareOrderCoreResponse(
       parserInput.operation === "orders_search" &&
       orderEntriesState(response) === "present"
     ) {
-      return squareUnsupportedResult(
+      return squareOrderUnsupportedResult(
         "square_order_entries_unsupported",
         "$response.order_entries"
       );
@@ -314,7 +314,7 @@ export function parseSquareOrderCoreResponse(
     );
   } catch (error) {
     if (error instanceof SquareOrderUnsupportedProjectionFailure) {
-      return squareUnsupportedResult(error.code, error.field);
+      return squareOrderUnsupportedResult(error.code, error.field);
     }
     return squareOrderFailureResult(error);
   }
@@ -1032,7 +1032,21 @@ function isOrderProviderVersionText(value: string) {
 function squareOrderFailureResult(
   error: unknown
 ): SquareResponseFailureResult {
-  const result = squareFailureResult(error);
+  return squareOrderSanitizedFailureResult(squareFailureResult(error));
+}
+
+function squareOrderUnsupportedResult(
+  code: string,
+  field: string
+): SquareResponseFailureResult {
+  return squareOrderSanitizedFailureResult(
+    squareUnsupportedResult(code, field)
+  );
+}
+
+function squareOrderSanitizedFailureResult(
+  result: SquareResponseFailureResult
+): SquareResponseFailureResult {
   return {
     outcome: result.outcome,
     diagnostics: result.diagnostics.map((diagnostic) => ({
