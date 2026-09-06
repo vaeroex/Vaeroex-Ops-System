@@ -2320,7 +2320,7 @@ function testExceptionContainedResultBoundary() {
         return originalBoundedSafeParse(...args);
       };
       squareResponseValidation.squareAcceptedResult = (value) => {
-        const sharedNodes = Array.from({ length: 50 }, () => ({}));
+        const sharedNodes = Array.from({ length: 52 }, () => ({}));
         value.provider = Array.from({ length: 1_000 }, () => sharedNodes);
         return originalAcceptedResult(value);
       };

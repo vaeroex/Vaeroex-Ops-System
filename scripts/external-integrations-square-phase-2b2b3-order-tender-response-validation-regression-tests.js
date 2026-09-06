@@ -138,6 +138,21 @@ function clone(value) {
   return structuredClone(value);
 }
 
+function jsonValueCount(value) {
+  let count = 0;
+  const pending = [value];
+  while (pending.length > 0) {
+    const candidate = pending.pop();
+    count += 1;
+    if (Array.isArray(candidate)) {
+      pending.push(...candidate);
+    } else if (candidate !== null && typeof candidate === "object") {
+      pending.push(...Object.values(candidate));
+    }
+  }
+  return count;
+}
+
 function freezeTreeForTest(value, skipped = new Set(), seen = new Set()) {
   if (
     value === null ||
@@ -864,7 +879,12 @@ function testEnvelopeStructuralAndDiagnosticSafety() {
 function testRawAndProjectionBoundsAcrossParsers() {
   const maximumTenders = Array.from({ length: 1_000 }, (_, index) => ({
     id: `SQ2B2B3MAXTENDER${String(index).padStart(4, "0")}`,
-    type: "NO_SALE"
+    location_id: square.SQUARE_PHASE_2B2A_SYNTHETIC_LOCATION_ID,
+    created_at: "2026-08-19T16:20:21Z",
+    type: "CARD",
+    amount_money: { amount: index, currency: "USD" },
+    tip_money: { amount: 0, currency: "USD" },
+    payment_id: `SQ2B2B3MAXPAYMENT${String(index).padStart(4, "0")}`
   }));
   const maximumTenderResponse = responseWithOrder(
     square.squarePhase2B2B2Order({ tenders: maximumTenders })
@@ -932,6 +952,60 @@ function testRawAndProjectionBoundsAcrossParsers() {
       `${parserName} rejects before projection when the 20,000-value raw budget is exceeded`
     );
   }
+
+  const maximumSearchOrders = Array.from({ length: 1_000 }, (_, index) => ({
+    id: `SQ2B2B3MAXSEARCHORDER${String(index).padStart(4, "0")}`,
+    location_id: square.SQUARE_PHASE_2B2A_SYNTHETIC_LOCATION_ID
+  }));
+  const maximumSearchLineItemCounts = [1_000, 1_000, 1_000, 1_000, 248];
+  maximumSearchLineItemCounts.forEach((count, orderIndex) => {
+    maximumSearchOrders[orderIndex].line_items = Array.from(
+      { length: count },
+      (_, lineIndex) => ({
+        uid: `S${orderIndex}${lineIndex}`,
+        quantity: "1",
+        base_price_money: {}
+      })
+    );
+  });
+  maximumSearchOrders[999].future_provider_field = true;
+  const maximumSearchResponse = { orders: maximumSearchOrders };
+  equal(
+    jsonValueCount(maximumSearchResponse),
+    20_000,
+    "maximum Search regression reaches the accepted raw-value ceiling"
+  );
+  let maximumSearchTender;
+  for (const parserName of exportedOrderParsers()) {
+    const value = accepted(
+      parseWith(
+        parserName,
+        clone(maximumSearchResponse),
+        "orders_search"
+      ),
+      `${parserName} accepts the 20,000-value maximum Search response`
+    );
+    equal(
+      value.itemCount,
+      1_000,
+      `${parserName} retains all maximum Search Orders`
+    );
+    if (parserName === "parseSquareOrderTenderResponse") {
+      maximumSearchTender = value;
+    }
+  }
+  ok(maximumSearchTender, "maximum Search response reaches the Tender parser");
+  ok(
+    maximumSearchTender.items.every(
+      ({ tenderCount, tenders }) => tenderCount === 0 && tenders.length === 0
+    ),
+    "omitted Tenders stay empty across every maximum Search Order"
+  );
+  deepEqual(
+    maximumSearchTender.items[999].tenders,
+    [],
+    "omitted Tenders remain an empty collection at the maximum Search bound"
+  );
 }
 
 function testExceptionContainedAcceptedBoundary() {
@@ -1016,7 +1090,7 @@ function testExceptionContainedAcceptedBoundary() {
         return originalSchemaSafeParse(...args);
       };
       squareResponseValidation.squareAcceptedResult = (value) => {
-        const shared = Array.from({ length: 50 }, () => ({}));
+        const shared = Array.from({ length: 52 }, () => ({}));
         value.provider = Array.from({ length: 1_000 }, () => shared);
         return originalAcceptedResult(value);
       };
