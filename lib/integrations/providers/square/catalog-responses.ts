@@ -1,3 +1,4 @@
+import { isProxy } from "node:util/types";
 import { z } from "zod";
 
 import {
@@ -379,6 +380,16 @@ const HTML_OR_SCRIPT_PATTERN =
 export function parseSquareCatalogResponse(
   input: unknown
 ): SquareResponseParserResult<SquareCatalogResponse> {
+  return parseSquareCatalogResponseWithAcceptance(input, squareAcceptedResult);
+}
+
+// Low-level projection reuse for the separately versioned, request-bound facade.
+// Its caller supplies the current-invocation acceptance boundary; no result from
+// the legacy factory is promoted into trusted connection authority.
+export function parseSquareCatalogResponseWithAcceptance<T>(
+  input: unknown,
+  acceptedResult: (value: SquareCatalogResponse) => SquareResponseParserResult<T>
+): SquareResponseParserResult<T> {
   try {
     const parserInput = squareCatalogResponseParserInput(input);
     const provenance = squareResponseProvenance(parserInput);
@@ -431,7 +442,7 @@ export function parseSquareCatalogResponse(
       })
     );
 
-    return squareAcceptedResult(
+    return acceptedResult(
       SquareCatalogResponseSchema.parse({
         contractVersion: SQUARE_CATALOG_RESPONSE_CONTRACT_VERSION,
         minimizationVersion: SQUARE_CATALOG_MINIMIZATION_VERSION,
@@ -453,6 +464,11 @@ export function parseSquareCatalogResponse(
       })
     );
   } catch (error) {
+    if ((typeof error === "object" && error !== null || typeof error === "function") && isProxy(error)) {
+      return Object.freeze({ outcome: "rejected" as const, diagnostics: Object.freeze([
+        Object.freeze({ code: "square_response_internal_rejection", field: "$response" })
+      ]) });
+    }
     if (error instanceof SquareCatalogUnsupportedObjectFailure) {
       return squareUnsupportedResult(error.code, error.field);
     }
@@ -1304,8 +1320,8 @@ function catalogItemVariationChildren(
       `${field}.item_data.variations`
     );
   }
-  return raw.map((item) =>
-    minimizeSquareCatalogObject(
+  return raw.map((item) => {
+    const minimized = minimizeSquareCatalogObject(
       item,
       provenance,
       `${field}.item_data.variations[]`,
@@ -1318,8 +1334,15 @@ function catalogItemVariationChildren(
           parentItemId
         }
       }
-    )
-  ).sort(compareCatalogObjectsByOrdinalThenId) as SquareMinimizedCatalogItemVariation[];
+    );
+    if (minimized.catalogObjectType !== "ITEM_VARIATION") {
+      squareRejectResponse(
+        "square_catalog_item_child_type_invalid",
+        `${field}.item_data.variations[].type`
+      );
+    }
+    return minimized;
+  }).sort(compareCatalogObjectsByOrdinalThenId) as SquareMinimizedCatalogItemVariation[];
 }
 
 function catalogModifierListChildren(

@@ -192,6 +192,27 @@ equal(
 );
 matches(ciWorkflow, /pnpm test:external-integrations-square-refunds/, "CI exercises dormant Refund responses");
 equal(
+  packageJson.scripts["test:external-integrations-square-catalog"],
+  "node scripts/external-integrations-square-catalog-response-validation-regression-tests.js",
+  "Square request-bound Catalog response regression script must be registered"
+);
+matches(ciWorkflow, /pnpm test:external-integrations-square-catalog/, "CI exercises request-bound Catalog responses");
+equal(
+  packageJson.scripts["test:external-integrations-square-inventory"],
+  "node scripts/external-integrations-square-inventory-response-validation-regression-tests.js",
+  "Square Inventory response regression script must be registered"
+);
+matches(ciWorkflow, /pnpm test:external-integrations-square-inventory/, "CI exercises dormant Inventory responses");
+for (const moduleName of ["catalog-response-validation", "inventory-responses"]) {
+  const source = read(`lib/integrations/providers/square/${moduleName}.ts`);
+  matches(source, /import "server-only"/, `${moduleName} remains server-only`);
+  doesNotMatch(
+    source,
+    /\bfetch\s*\(|axios|node:https|node:http|process\.env|@supabase|supabase-js|app\/api\//,
+    `${moduleName} must not add transport, credentials, database or routes`
+  );
+}
+equal(
   packageJson.scripts["test:external-integrations-phase-2"],
   "node scripts/external-integrations-phase-2-reconciliation-regression-tests.js",
   "Phase 2 reconciliation regression script must be registered"

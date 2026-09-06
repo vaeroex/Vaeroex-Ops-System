@@ -1,4 +1,6 @@
 export * from "@/lib/integrations/providers/square/catalog-responses";
+export * from "@/lib/integrations/providers/square/catalog-response-validation";
+export * from "@/lib/integrations/providers/square/inventory-responses";
 export * from "@/lib/integrations/providers/square/contracts";
 export * from "@/lib/integrations/providers/square/descriptor";
 export * from "@/lib/integrations/providers/square/fixtures/phase-2b1a";
