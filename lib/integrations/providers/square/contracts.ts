@@ -39,6 +39,11 @@ export const SQUARE_ORDER_ADJUSTMENT_RESPONSE_CONTRACT_VERSION =
 export const SQUARE_ORDER_ADJUSTMENT_MINIMIZATION_VERSION =
   "square_order_adjustment_minimizer_v1" as const;
 export const SQUARE_ORDER_ADJUSTMENT_ENTITY_VERSION = 1 as const;
+export const SQUARE_ORDER_TENDER_RESPONSE_CONTRACT_VERSION =
+  "square_order_tender_response_v1" as const;
+export const SQUARE_ORDER_TENDER_MINIMIZATION_VERSION =
+  "square_order_tender_minimizer_v1" as const;
+export const SQUARE_ORDER_TENDER_ENTITY_VERSION = 1 as const;
 export const SQUARE_DORMANT_GATE_VERSION =
   "square_phase_2a_dormant_descriptor_only_v1" as const;
 export const SQUARE_MODEL_CALL_COUNT = 0 as const;

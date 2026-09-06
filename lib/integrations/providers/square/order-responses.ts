@@ -24,6 +24,9 @@ import {
   SQUARE_ORDER_REQUEST_AUTHORITY_VERSION,
   SQUARE_ORDER_RESPONSE_CONTRACT_VERSION,
   SQUARE_ORDER_RESPONSE_OPERATION_KEYS,
+  SQUARE_ORDER_TENDER_ENTITY_VERSION,
+  SQUARE_ORDER_TENDER_MINIMIZATION_VERSION,
+  SQUARE_ORDER_TENDER_RESPONSE_CONTRACT_VERSION,
   SQUARE_PROVIDER_KEY
 } from "@/lib/integrations/providers/square/contracts";
 import {
@@ -47,6 +50,7 @@ import {
   squareOptionalNullableString,
   squareOptionalNullableTimestamp,
   squareRejectResponse,
+  squareRequiredEnum,
   squareRequiredIdentifier,
   squareRequiredString,
   squareResponseParserInput,
@@ -119,6 +123,27 @@ export const SQUARE_ORDER_ADJUSTMENT_RESPONSE_OFFICIAL_REFERENCES =
     `https://github.com/square/square-nodejs-sdk/blob/${SQUARE_ORDER_RESPONSE_SDK_REVISION}/src/serialization/types/OrderLineItemAppliedDiscount.ts`,
     `https://github.com/square/square-nodejs-sdk/blob/${SQUARE_ORDER_RESPONSE_SDK_REVISION}/src/serialization/types/OrderLineItemAppliedServiceCharge.ts`
   ] as const);
+
+export const SQUARE_ORDER_TENDER_RESPONSE_OFFICIAL_REFERENCES = Object.freeze([
+  "https://developer.squareup.com/reference/square/objects/Order",
+  "https://developer.squareup.com/reference/square/objects/Tender",
+  "https://developer.squareup.com/reference/square/enums/TenderType",
+  "https://developer.squareup.com/reference/square/objects/TenderCardDetails",
+  "https://developer.squareup.com/reference/square/objects/TenderCashDetails",
+  "https://developer.squareup.com/reference/square/objects/Money",
+  `https://github.com/square/square-nodejs-sdk/blob/${SQUARE_ORDER_RESPONSE_SDK_REVISION}/src/api/types/Order.ts`,
+  `https://github.com/square/square-nodejs-sdk/blob/${SQUARE_ORDER_RESPONSE_SDK_REVISION}/src/api/types/Tender.ts`,
+  `https://github.com/square/square-nodejs-sdk/blob/${SQUARE_ORDER_RESPONSE_SDK_REVISION}/src/api/types/TenderType.ts`,
+  `https://github.com/square/square-nodejs-sdk/blob/${SQUARE_ORDER_RESPONSE_SDK_REVISION}/src/api/types/TenderCardDetails.ts`,
+  `https://github.com/square/square-nodejs-sdk/blob/${SQUARE_ORDER_RESPONSE_SDK_REVISION}/src/api/types/TenderCashDetails.ts`,
+  `https://github.com/square/square-nodejs-sdk/blob/${SQUARE_ORDER_RESPONSE_SDK_REVISION}/src/api/types/Money.ts`,
+  `https://github.com/square/square-nodejs-sdk/blob/${SQUARE_ORDER_RESPONSE_SDK_REVISION}/src/serialization/types/Order.ts`,
+  `https://github.com/square/square-nodejs-sdk/blob/${SQUARE_ORDER_RESPONSE_SDK_REVISION}/src/serialization/types/Tender.ts`,
+  `https://github.com/square/square-nodejs-sdk/blob/${SQUARE_ORDER_RESPONSE_SDK_REVISION}/src/serialization/types/TenderType.ts`,
+  `https://github.com/square/square-nodejs-sdk/blob/${SQUARE_ORDER_RESPONSE_SDK_REVISION}/src/serialization/types/TenderCardDetails.ts`,
+  `https://github.com/square/square-nodejs-sdk/blob/${SQUARE_ORDER_RESPONSE_SDK_REVISION}/src/serialization/types/TenderCashDetails.ts`,
+  `https://github.com/square/square-nodejs-sdk/blob/${SQUARE_ORDER_RESPONSE_SDK_REVISION}/src/serialization/types/Money.ts`
+] as const);
 
 export const SQUARE_ORDER_CORE_TRUSTED_RESPONSE_FIELDS = Object.freeze([
   "id",
@@ -269,12 +294,36 @@ export const SQUARE_ORDER_APPLIED_DISCOUNT_TRUSTED_RESPONSE_FIELDS =
 export const SQUARE_ORDER_APPLIED_SERVICE_CHARGE_TRUSTED_RESPONSE_FIELDS =
   Object.freeze(["uid", "service_charge_uid", "applied_money"] as const);
 
+export const SQUARE_ORDER_TENDER_TRUSTED_RESPONSE_FIELDS = Object.freeze([
+  "id",
+  "location_id",
+  "created_at",
+  "type",
+  "amount_money",
+  "tip_money",
+  "payment_id"
+] as const);
+
+export const SQUARE_ORDER_TENDER_DISCARDED_RESPONSE_FIELDS = Object.freeze([
+  "transaction_id",
+  "note",
+  "processing_fee_money",
+  "customer_id",
+  "card_details",
+  "cash_details",
+  "bank_account_details",
+  "buy_now_pay_later_details",
+  "square_account_details",
+  "additional_recipients"
+] as const);
+
 const MAXIMUM_ORDER_RESPONSE_ITEMS = 1_000;
 const MAXIMUM_BATCH_ORDER_RESPONSE_ITEMS = 100;
 const MAXIMUM_ORDER_LINE_ITEMS = 1_000;
 const MAXIMUM_ORDER_LINE_ITEM_MODIFIERS = 1_000;
 const MAXIMUM_ORDER_ADJUSTMENTS = 1_000;
 const MAXIMUM_ORDER_APPLIED_ADJUSTMENTS = 1_000;
+const MAXIMUM_ORDER_TENDERS = 1_000;
 const MAXIMUM_ORDER_ADJUSTMENT_PERCENTAGE_LENGTH = 10;
 const MAXIMUM_ORDER_LINE_ITEM_QUANTITY_LENGTH = 12;
 const MAXIMUM_ORDER_MODIFIER_QUANTITY_LENGTH = 4_096;
@@ -349,6 +398,19 @@ export const SQUARE_ORDER_SERVICE_CHARGE_SCOPES = Object.freeze([
   "OTHER_SERVICE_CHARGE_SCOPE",
   "LINE_ITEM",
   "ORDER"
+] as const);
+
+export const SQUARE_ORDER_TENDER_TYPES = Object.freeze([
+  "CARD",
+  "CASH",
+  "THIRD_PARTY_CARD",
+  "SQUARE_GIFT_CARD",
+  "NO_SALE",
+  "BANK_ACCOUNT",
+  "WALLET",
+  "BUY_NOW_PAY_LATER",
+  "SQUARE_ACCOUNT",
+  "OTHER"
 ] as const);
 
 export const SQUARE_ORDER_MEASUREMENT_UNIT_TYPES = Object.freeze([
@@ -431,6 +493,7 @@ const SQUARE_ORDER_DIAGNOSTIC_CODES = new Set([
   "square_duplicate_order_service_charge_applied_tax_reference",
   "square_duplicate_order_service_charge_identity",
   "square_duplicate_order_tax_identity",
+  "square_duplicate_order_tender_identity",
   "square_enum_invalid",
   "square_identifier_invalid",
   "square_order_aggregate_currency_mismatch",
@@ -499,6 +562,9 @@ const SQUARE_ORDER_DIAGNOSTIC_CODES = new Set([
   "square_order_tax_array_invalid",
   "square_order_tax_catalog_reference_invalid",
   "square_order_tax_identity_missing",
+  "square_order_tender_array_invalid",
+  "square_order_tender_currency_mismatch",
+  "square_order_tender_location_mismatch",
   "square_parser_input_invalid",
   "square_provider_environment_invalid",
   "square_provider_errors_invalid",
@@ -553,6 +619,9 @@ const SquareOrderAdjustmentComponentUidSchema =
   squareOrderSafeOpaqueStringSchema(60);
 const SquareOrderAdjustmentCatalogIdentifierSchema =
   squareOrderSafeOpaqueStringSchema(192);
+const SquareOrderTenderIdentifierSchema = squareOrderSafeOpaqueStringSchema(192);
+const SquareOrderTenderLocationIdentifierSchema =
+  squareOrderSafeOpaqueStringSchema(50);
 const SquareOrderCatalogVersionStringSchema = CanonicalIntegerSchema.refine(
   isSafeIntegerText,
   "Catalog version must fit JSON safe integer bounds"
@@ -1195,6 +1264,102 @@ export const SquareOrderAdjustmentResponseSchema = z
   })
   .strict();
 
+const SquareOrderTenderAuthoritySchema = z.discriminatedUnion(
+  "identityState",
+  [
+    z
+      .object({
+        providerKey: z.literal(SQUARE_PROVIDER_KEY),
+        providerEnvironment: SquareProviderEnvironmentSchema,
+        entityType: z.literal("order_tender"),
+        orderId: SquareIdentifierSchema,
+        locationId: SquareIdentifierSchema,
+        identityState: z.literal("provider_id"),
+        tenderId: SquareOrderTenderIdentifierSchema
+      })
+      .strict(),
+    z
+      .object({
+        providerKey: z.literal(SQUARE_PROVIDER_KEY),
+        providerEnvironment: SquareProviderEnvironmentSchema,
+        entityType: z.literal("order_tender"),
+        orderId: SquareIdentifierSchema,
+        locationId: SquareIdentifierSchema,
+        identityState: z.literal("absent"),
+        tenderId: z.null()
+      })
+      .strict()
+  ]
+);
+
+export const SquareOrderPaymentReferenceSchema = z
+  .object({
+    providerKey: z.literal(SQUARE_PROVIDER_KEY),
+    providerEnvironment: SquareProviderEnvironmentSchema,
+    referenceKind: z.literal("payment"),
+    reconciliationState: z.literal("unverified"),
+    providerId: SquareOrderTenderIdentifierSchema
+  })
+  .strict();
+
+export const SquareOrderTenderSchema = z
+  .object({
+    entityType: z.literal("order_tender"),
+    entityVersion: z.literal(SQUARE_ORDER_TENDER_ENTITY_VERSION),
+    authority: SquareOrderTenderAuthoritySchema,
+    id: SquareOrderTenderIdentifierSchema.nullable(),
+    locationId: SquareOrderTenderLocationIdentifierSchema.nullable(),
+    createdAt: IsoTimestampSchema.nullable(),
+    type: z.enum(SQUARE_ORDER_TENDER_TYPES),
+    amountMoney: SquareOrderMoneySchema.nullable(),
+    tipMoney: SquareOrderMoneySchema.nullable(),
+    paymentReference: SquareOrderPaymentReferenceSchema.nullable()
+  })
+  .strict();
+
+export const SquareMinimizedOrderTenderDetailSchema = z
+  .object({
+    contractVersion: z.literal(SQUARE_ORDER_TENDER_RESPONSE_CONTRACT_VERSION),
+    minimizationVersion: z.literal(SQUARE_ORDER_TENDER_MINIMIZATION_VERSION),
+    entityType: z.literal("order_tender_detail"),
+    entityVersion: z.literal(SQUARE_ORDER_TENDER_ENTITY_VERSION),
+    projectionScope: z.literal(
+      "order_core_line_items_adjustments_with_tenders"
+    ),
+    adjustmentDetail: SquareMinimizedOrderAdjustmentDetailSchema,
+    tenders: z.array(SquareOrderTenderSchema).max(MAXIMUM_ORDER_TENDERS),
+    tenderCount: z
+      .number()
+      .int()
+      .nonnegative()
+      .max(MAXIMUM_ORDER_TENDERS)
+      .safe()
+  })
+  .strict();
+
+export const SquareOrderTenderResponseSchema = z
+  .object({
+    contractVersion: z.literal(SQUARE_ORDER_TENDER_RESPONSE_CONTRACT_VERSION),
+    minimizationVersion: z.literal(SQUARE_ORDER_TENDER_MINIMIZATION_VERSION),
+    entityType: z.literal("order_tender_detail_response"),
+    operation: SquareOrderResponseOperationSchema,
+    provider: SquareResponseProvenanceSchema,
+    connectionAuthority: SquareOrderConnectionAuthoritySchema,
+    requestAuthorityVersion: z.literal(SQUARE_ORDER_REQUEST_AUTHORITY_VERSION),
+    requestAuthorityFingerprint: Sha256FingerprintSchema,
+    pagination: SquareOrderPaginationStateSchema,
+    items: z
+      .array(SquareMinimizedOrderTenderDetailSchema)
+      .max(MAXIMUM_ORDER_RESPONSE_ITEMS),
+    itemCount: z
+      .number()
+      .int()
+      .nonnegative()
+      .max(MAXIMUM_ORDER_RESPONSE_ITEMS)
+      .safe()
+  })
+  .strict();
+
 export type SquareOrderResponseOperation = z.infer<
   typeof SquareOrderResponseOperationSchema
 >;
@@ -1259,6 +1424,18 @@ export type SquareMinimizedOrderAdjustmentDetail = Readonly<
 >;
 export type SquareOrderAdjustmentResponse = Readonly<
   z.infer<typeof SquareOrderAdjustmentResponseSchema>
+>;
+export type SquareOrderPaymentReference = Readonly<
+  z.infer<typeof SquareOrderPaymentReferenceSchema>
+>;
+export type SquareOrderTender = Readonly<
+  z.infer<typeof SquareOrderTenderSchema>
+>;
+export type SquareMinimizedOrderTenderDetail = Readonly<
+  z.infer<typeof SquareMinimizedOrderTenderDetailSchema>
+>;
+export type SquareOrderTenderResponse = Readonly<
+  z.infer<typeof SquareOrderTenderResponseSchema>
 >;
 
 type SquareOrderResponseParserInput = SquareResponseParserInput &
@@ -1362,6 +1539,16 @@ export function parseSquareOrderAdjustmentResponse(
   );
 }
 
+export function parseSquareOrderTenderResponse(
+  input: unknown
+): SquareResponseParserResult<SquareOrderTenderResponse> {
+  return squareOrderResultBoundary(
+    (acceptedResult) =>
+      parseSquareOrderTenderResponseResult(input, acceptedResult),
+    SquareOrderTenderResponseSchema
+  );
+}
+
 function parseSquareOrderCoreResponseResult(
   input: unknown,
   acceptedResult: SquareOrderAcceptedResultFactory<SquareOrderCoreResponse>
@@ -1426,6 +1613,51 @@ function parseSquareOrderAdjustmentResponseResult(
         contractVersion: SQUARE_ORDER_ADJUSTMENT_RESPONSE_CONTRACT_VERSION,
         minimizationVersion: SQUARE_ORDER_ADJUSTMENT_MINIMIZATION_VERSION,
         entityType: "order_adjustment_detail_response",
+        operation: parsed.coreResponse.operation,
+        provider: parsed.coreResponse.provider,
+        connectionAuthority: parsed.coreResponse.connectionAuthority,
+        requestAuthorityVersion: parsed.coreResponse.requestAuthorityVersion,
+        requestAuthorityFingerprint:
+          parsed.coreResponse.requestAuthorityFingerprint,
+        pagination: parsed.coreResponse.pagination,
+        items,
+        itemCount: items.length
+      })
+    );
+  } catch (error) {
+    return squareOrderParserFailureResult(error);
+  }
+}
+
+function parseSquareOrderTenderResponseResult(
+  input: unknown,
+  acceptedResult: SquareOrderAcceptedResultFactory<SquareOrderTenderResponse>
+): SquareResponseParserResult<SquareOrderTenderResponse> {
+  try {
+    const parsed = parseSquareOrderEnvelope(input);
+    const items = parsed.orders.map(({ raw, core }) => {
+      const lineItemDetail = minimizeSquareOrderLineItemDetail(
+        raw,
+        core,
+        parsed.provenance
+      );
+      const adjustmentDetail = minimizeSquareOrderAdjustmentDetail(
+        raw,
+        lineItemDetail,
+        parsed.provenance
+      );
+      return minimizeSquareOrderTenderDetail(
+        raw,
+        adjustmentDetail,
+        parsed.provenance
+      );
+    });
+    assertUniqueOrderTenderAuthorities(items);
+    return acceptedResult(
+      SquareOrderTenderResponseSchema.parse({
+        contractVersion: SQUARE_ORDER_TENDER_RESPONSE_CONTRACT_VERSION,
+        minimizationVersion: SQUARE_ORDER_TENDER_MINIMIZATION_VERSION,
+        entityType: "order_tender_detail_response",
         operation: parsed.coreResponse.operation,
         provider: parsed.coreResponse.provider,
         connectionAuthority: parsed.coreResponse.connectionAuthority,
@@ -1552,6 +1784,22 @@ export function squareOrderAdjustmentResponseFingerprint(
 ) {
   return squareMinimizedProjectionFingerprint(
     SquareOrderAdjustmentResponseSchema.parse(input)
+  );
+}
+
+export function squareOrderTenderDetailFingerprint(
+  input: SquareMinimizedOrderTenderDetail
+) {
+  return squareMinimizedProjectionFingerprint(
+    SquareMinimizedOrderTenderDetailSchema.parse(input)
+  );
+}
+
+export function squareOrderTenderResponseFingerprint(
+  input: SquareOrderTenderResponse
+) {
+  return squareMinimizedProjectionFingerprint(
+    SquareOrderTenderResponseSchema.parse(input)
   );
 }
 
@@ -1777,6 +2025,253 @@ function minimizeSquareOrderAdjustmentDetail(
     lineItemApplications,
     lineItemApplicationCount: lineItemApplications.length
   });
+}
+
+function minimizeSquareOrderTenderDetail(
+  input: SquareSafeJsonObject,
+  adjustmentDetail: SquareMinimizedOrderAdjustmentDetail,
+  provenance: SquareResponseProvenance
+): SquareMinimizedOrderTenderDetail {
+  const field = orderItemField(
+    adjustmentDetail.lineItemDetail.core.operation
+  );
+  const tenders = orderTenders(
+    input,
+    adjustmentDetail.lineItemDetail.core,
+    provenance,
+    field
+  );
+  assertCompatibleOrderTenderCurrencies(
+    adjustmentDetail,
+    tenders,
+    field
+  );
+  return SquareMinimizedOrderTenderDetailSchema.parse({
+    contractVersion: SQUARE_ORDER_TENDER_RESPONSE_CONTRACT_VERSION,
+    minimizationVersion: SQUARE_ORDER_TENDER_MINIMIZATION_VERSION,
+    entityType: "order_tender_detail",
+    entityVersion: SQUARE_ORDER_TENDER_ENTITY_VERSION,
+    projectionScope: "order_core_line_items_adjustments_with_tenders",
+    adjustmentDetail,
+    tenders,
+    tenderCount: tenders.length
+  });
+}
+
+function orderTenders(
+  order: SquareSafeJsonObject,
+  core: SquareMinimizedOrderCore,
+  provenance: SquareResponseProvenance,
+  field: string
+): readonly SquareOrderTender[] {
+  if (!hasOwn(order, "tenders") || order.tenders === null) return [];
+  if (
+    !Array.isArray(order.tenders) ||
+    order.tenders.length > MAXIMUM_ORDER_TENDERS
+  ) {
+    squareRejectResponse(
+      "square_order_tender_array_invalid",
+      `${field}.tenders`
+    );
+  }
+  return order.tenders
+    .map((tender) =>
+      orderTender(
+        squareSafeJsonObject(tender, `${field}.tenders[]`),
+        core,
+        provenance,
+        `${field}.tenders[]`
+      )
+    )
+    .map((projection) => ({
+      projection,
+      sortKey: squareMinimizedProjectionFingerprint(projection)
+    }))
+    .sort(
+      (left, right) =>
+        compareStrings(left.projection.id ?? "", right.projection.id ?? "") ||
+        compareStrings(left.sortKey, right.sortKey)
+    )
+    .map(({ projection }) => projection);
+}
+
+function orderTender(
+  tender: SquareSafeJsonObject,
+  core: SquareMinimizedOrderCore,
+  provenance: SquareResponseProvenance,
+  field: string
+): SquareOrderTender {
+  const id = squareOptionalNullableString(tender, "id", `${field}.id`, 192);
+  const locationId = squareOptionalNullableIdentifier(
+    tender,
+    "location_id",
+    `${field}.location_id`,
+    50
+  );
+  if (locationId !== null && locationId !== core.locationId) {
+    squareRejectResponse(
+      "square_order_tender_location_mismatch",
+      `${field}.location_id`
+    );
+  }
+  const amountMoney = optionalOrderMoney(
+    tender,
+    "amount_money",
+    `${field}.amount_money`
+  );
+  const tipMoney = optionalOrderMoney(
+    tender,
+    "tip_money",
+    `${field}.tip_money`
+  );
+  const paymentId = squareOptionalNullableString(
+    tender,
+    "payment_id",
+    `${field}.payment_id`,
+    192
+  );
+  return SquareOrderTenderSchema.parse({
+    entityType: "order_tender",
+    entityVersion: SQUARE_ORDER_TENDER_ENTITY_VERSION,
+    authority: {
+      providerKey: SQUARE_PROVIDER_KEY,
+      providerEnvironment: provenance.providerEnvironment,
+      entityType: "order_tender",
+      orderId: core.id,
+      locationId: core.locationId,
+      identityState: id === null ? "absent" : "provider_id",
+      tenderId: id
+    },
+    id,
+    locationId,
+    createdAt: optionalOrderTenderTimestamp(
+      tender,
+      "created_at",
+      `${field}.created_at`
+    ),
+    type: squareRequiredEnum(
+      tender,
+      "type",
+      `${field}.type`,
+      SQUARE_ORDER_TENDER_TYPES
+    ),
+    amountMoney,
+    tipMoney,
+    paymentReference:
+      paymentId === null
+        ? null
+        : {
+            providerKey: SQUARE_PROVIDER_KEY,
+            providerEnvironment: provenance.providerEnvironment,
+            referenceKind: "payment",
+            reconciliationState: "unverified",
+            providerId: paymentId
+          }
+  });
+}
+
+function optionalOrderTenderTimestamp(
+  record: SquareSafeJsonObject,
+  key: string,
+  field: string
+) {
+  if (!hasOwn(record, key) || record[key] === null) return null;
+  if (typeof record[key] !== "string" || record[key].length > 32) {
+    squareRejectResponse("square_timestamp_invalid", field);
+  }
+  return squareOptionalNullableTimestamp(record, key, field);
+}
+
+function assertUniqueOrderTenderAuthorities(
+  details: readonly SquareMinimizedOrderTenderDetail[]
+) {
+  const seen = new Set<string>();
+  for (const detail of details) {
+    for (const tender of detail.tenders) {
+      if (tender.id === null) continue;
+      const identity = `${tender.authority.providerEnvironment}:${tender.id}`;
+      if (seen.has(identity)) {
+        squareRejectResponse(
+          "square_duplicate_order_tender_identity",
+          "$response.orders[].tenders[].id"
+        );
+      }
+      seen.add(identity);
+    }
+  }
+}
+
+function assertCompatibleOrderTenderCurrencies(
+  adjustmentDetail: SquareMinimizedOrderAdjustmentDetail,
+  tenders: readonly SquareOrderTender[],
+  field: string
+) {
+  const lineItemDetail = adjustmentDetail.lineItemDetail;
+  const core = lineItemDetail.core;
+  const monies: (SquareOrderMoney | null)[] = [
+    core.totalMoney,
+    core.totalTaxMoney,
+    core.totalDiscountMoney,
+    core.totalTipMoney,
+    core.totalServiceChargeMoney,
+    core.netAmountDueMoney
+  ];
+  for (const lineItem of lineItemDetail.lineItems) {
+    monies.push(
+      lineItem.basePriceMoney,
+      lineItem.variationTotalPriceMoney,
+      lineItem.grossSalesMoney,
+      lineItem.totalTaxMoney,
+      lineItem.totalDiscountMoney,
+      lineItem.totalServiceChargeMoney,
+      lineItem.totalMoney
+    );
+    for (const modifier of lineItem.modifiers) {
+      monies.push(modifier.basePriceMoney, modifier.totalPriceMoney);
+    }
+  }
+  for (const tax of adjustmentDetail.taxes) monies.push(tax.appliedMoney);
+  for (const discount of adjustmentDetail.discounts) {
+    monies.push(discount.amountMoney, discount.appliedMoney);
+  }
+  for (const serviceCharge of adjustmentDetail.serviceCharges) {
+    monies.push(
+      serviceCharge.amountMoney,
+      serviceCharge.appliedMoney,
+      serviceCharge.totalMoney,
+      serviceCharge.totalTaxMoney
+    );
+    for (const appliedTax of serviceCharge.appliedTaxes) {
+      monies.push(appliedTax.appliedMoney);
+    }
+  }
+  for (const applications of adjustmentDetail.lineItemApplications) {
+    for (const appliedTax of applications.appliedTaxes) {
+      monies.push(appliedTax.appliedMoney);
+    }
+    for (const appliedDiscount of applications.appliedDiscounts) {
+      monies.push(appliedDiscount.appliedMoney);
+    }
+    for (const appliedServiceCharge of applications.appliedServiceCharges) {
+      monies.push(appliedServiceCharge.appliedMoney);
+    }
+  }
+  for (const tender of tenders) {
+    monies.push(tender.amountMoney, tender.tipMoney);
+  }
+  const currencies = new Set(
+    monies.flatMap((money) =>
+      money?.currency === null || money?.currency === undefined
+        ? []
+        : [money.currency]
+    )
+  );
+  if (currencies.size > 1) {
+    squareRejectResponse(
+      "square_order_tender_currency_mismatch",
+      `${field}.tenders`
+    );
+  }
 }
 
 function orderTaxes(
