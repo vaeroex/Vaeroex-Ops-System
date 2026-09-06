@@ -2324,6 +2324,10 @@ testExceptionContainedResultBoundary();
 testDeepFreezeAndCallerIsolation();
 testPinnedContractsAndDormancy();
 
+fixtureScenarioCount += 1;
+invokedParsers.add("parseSquareOrderAdjustmentResponse");
+observeParserResult(square.parseSquareOrderAdjustmentResponse(null), false);
+
 deepEqual(
   [...detailParserOutcomes].sort(),
   declaredParserOutcomes().sort(),

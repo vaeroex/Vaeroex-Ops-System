@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import {
+  CanonicalDecimalSchema,
   CanonicalIntegerSchema,
   IsoTimestampSchema,
   Sha256FingerprintSchema,
@@ -8,6 +9,9 @@ import {
 } from "@/lib/integrations/contracts/primitives";
 import {
   SQUARE_ALLOWED_ORDER_STATES,
+  SQUARE_ORDER_ADJUSTMENT_ENTITY_VERSION,
+  SQUARE_ORDER_ADJUSTMENT_MINIMIZATION_VERSION,
+  SQUARE_ORDER_ADJUSTMENT_RESPONSE_CONTRACT_VERSION,
   SQUARE_ORDER_CORE_ENTITY_VERSION,
   SQUARE_ORDER_LINE_ITEM_ENTITY_VERSION,
   SQUARE_ORDER_LINE_ITEM_MINIMIZATION_VERSION,
@@ -81,6 +85,35 @@ export const SQUARE_ORDER_LINE_ITEM_RESPONSE_OFFICIAL_REFERENCES =
     `https://github.com/square/square-nodejs-sdk/blob/${SQUARE_ORDER_RESPONSE_SDK_REVISION}/src/serialization/types/OrderLineItem.ts`,
     `https://github.com/square/square-nodejs-sdk/blob/${SQUARE_ORDER_RESPONSE_SDK_REVISION}/src/serialization/types/OrderLineItemModifier.ts`,
     `https://github.com/square/square-nodejs-sdk/blob/${SQUARE_ORDER_RESPONSE_SDK_REVISION}/src/serialization/types/OrderQuantityUnit.ts`
+  ] as const);
+
+export const SQUARE_ORDER_ADJUSTMENT_RESPONSE_OFFICIAL_REFERENCES =
+  Object.freeze([
+    "https://developer.squareup.com/reference/square/objects/OrderLineItemTax",
+    "https://developer.squareup.com/reference/square/objects/OrderLineItemDiscount",
+    "https://developer.squareup.com/reference/square/objects/OrderServiceCharge",
+    "https://developer.squareup.com/reference/square/objects/OrderLineItemAppliedTax",
+    "https://developer.squareup.com/reference/square/objects/OrderLineItemAppliedDiscount",
+    "https://developer.squareup.com/reference/square/objects/OrderLineItemAppliedServiceCharge",
+    "https://developer.squareup.com/reference/square/enums/OrderLineItemTaxType",
+    "https://developer.squareup.com/reference/square/enums/OrderLineItemTaxScope",
+    "https://developer.squareup.com/reference/square/enums/OrderLineItemDiscountType",
+    "https://developer.squareup.com/reference/square/enums/OrderLineItemDiscountScope",
+    "https://developer.squareup.com/reference/square/enums/OrderServiceChargeCalculationPhase",
+    "https://developer.squareup.com/reference/square/enums/OrderServiceChargeType",
+    "https://developer.squareup.com/reference/square/enums/OrderServiceChargeTreatmentType",
+    "https://developer.squareup.com/reference/square/enums/OrderServiceChargeScope",
+    "https://developer.squareup.com/docs/orders-api/apply-taxes-and-discounts",
+    "https://developer.squareup.com/docs/orders-api/service-charges",
+    `https://github.com/square/square-nodejs-sdk/blob/${SQUARE_ORDER_RESPONSE_SDK_REVISION}/src/api/types/OrderLineItemTax.ts`,
+    `https://github.com/square/square-nodejs-sdk/blob/${SQUARE_ORDER_RESPONSE_SDK_REVISION}/src/api/types/OrderLineItemDiscount.ts`,
+    `https://github.com/square/square-nodejs-sdk/blob/${SQUARE_ORDER_RESPONSE_SDK_REVISION}/src/api/types/OrderServiceCharge.ts`,
+    `https://github.com/square/square-nodejs-sdk/blob/${SQUARE_ORDER_RESPONSE_SDK_REVISION}/src/serialization/types/OrderLineItemTax.ts`,
+    `https://github.com/square/square-nodejs-sdk/blob/${SQUARE_ORDER_RESPONSE_SDK_REVISION}/src/serialization/types/OrderLineItemDiscount.ts`,
+    `https://github.com/square/square-nodejs-sdk/blob/${SQUARE_ORDER_RESPONSE_SDK_REVISION}/src/serialization/types/OrderServiceCharge.ts`,
+    `https://github.com/square/square-nodejs-sdk/blob/${SQUARE_ORDER_RESPONSE_SDK_REVISION}/src/serialization/types/OrderLineItemAppliedTax.ts`,
+    `https://github.com/square/square-nodejs-sdk/blob/${SQUARE_ORDER_RESPONSE_SDK_REVISION}/src/serialization/types/OrderLineItemAppliedDiscount.ts`,
+    `https://github.com/square/square-nodejs-sdk/blob/${SQUARE_ORDER_RESPONSE_SDK_REVISION}/src/serialization/types/OrderLineItemAppliedServiceCharge.ts`
   ] as const);
 
 export const SQUARE_ORDER_CORE_TRUSTED_RESPONSE_FIELDS = Object.freeze([
@@ -164,10 +197,81 @@ export const SQUARE_ORDER_LINE_ITEM_MODIFIER_TRUSTED_RESPONSE_FIELDS =
 export const SQUARE_ORDER_LINE_ITEM_MODIFIER_DISCARDED_RESPONSE_FIELDS =
   Object.freeze(["metadata"] as const);
 
+export const SQUARE_ORDER_TAX_TRUSTED_RESPONSE_FIELDS = Object.freeze([
+  "uid",
+  "catalog_object_id",
+  "catalog_version",
+  "name",
+  "type",
+  "percentage",
+  "applied_money",
+  "scope",
+  "auto_applied"
+] as const);
+
+export const SQUARE_ORDER_TAX_DISCARDED_RESPONSE_FIELDS = Object.freeze([
+  "metadata"
+] as const);
+
+export const SQUARE_ORDER_DISCOUNT_TRUSTED_RESPONSE_FIELDS = Object.freeze([
+  "uid",
+  "catalog_object_id",
+  "catalog_version",
+  "name",
+  "type",
+  "percentage",
+  "amount_money",
+  "applied_money",
+  "scope"
+] as const);
+
+export const SQUARE_ORDER_DISCOUNT_DISCARDED_RESPONSE_FIELDS = Object.freeze([
+  "metadata",
+  "reward_ids",
+  "pricing_rule_id"
+] as const);
+
+export const SQUARE_ORDER_SERVICE_CHARGE_TRUSTED_RESPONSE_FIELDS = Object.freeze([
+  "uid",
+  "name",
+  "catalog_object_id",
+  "catalog_version",
+  "percentage",
+  "amount_money",
+  "applied_money",
+  "total_money",
+  "total_tax_money",
+  "calculation_phase",
+  "taxable",
+  "applied_taxes",
+  "type",
+  "treatment_type",
+  "scope"
+] as const);
+
+export const SQUARE_ORDER_SERVICE_CHARGE_DISCARDED_RESPONSE_FIELDS =
+  Object.freeze(["metadata"] as const);
+
+export const SQUARE_ORDER_APPLIED_TAX_TRUSTED_RESPONSE_FIELDS = Object.freeze([
+  "uid",
+  "tax_uid",
+  "applied_money",
+  "auto_applied"
+] as const);
+
+export const SQUARE_ORDER_APPLIED_DISCOUNT_TRUSTED_RESPONSE_FIELDS =
+  Object.freeze(["uid", "discount_uid", "applied_money"] as const);
+
+export const SQUARE_ORDER_APPLIED_SERVICE_CHARGE_TRUSTED_RESPONSE_FIELDS =
+  Object.freeze(["uid", "service_charge_uid", "applied_money"] as const);
+
 const MAXIMUM_ORDER_RESPONSE_ITEMS = 1_000;
 const MAXIMUM_BATCH_ORDER_RESPONSE_ITEMS = 100;
 const MAXIMUM_ORDER_LINE_ITEMS = 1_000;
 const MAXIMUM_ORDER_LINE_ITEM_MODIFIERS = 1_000;
+const MAXIMUM_ORDER_ADJUSTMENTS = 1_000;
+const MAXIMUM_ORDER_APPLIED_ADJUSTMENTS = 1_000;
+const MAXIMUM_ORDER_ADJUSTMENT_PERCENTAGE_LENGTH = 10;
 const MAXIMUM_ORDER_LINE_ITEM_QUANTITY_LENGTH = 12;
 const MAXIMUM_ORDER_MODIFIER_QUANTITY_LENGTH = 4_096;
 const MAXIMUM_ORDER_MODIFIER_NESTING_DEPTH = 3;
@@ -178,6 +282,7 @@ const ORDER_CURSOR_PATTERN = /^[A-Za-z0-9._~:+-]{1,4096}={0,2}$/;
 const ORDER_COMPONENT_UID_PATTERN = /^[A-Za-z0-9._-]{1,60}$/;
 const ORDER_CATALOG_IDENTIFIER_PATTERN = /^[A-Za-z0-9._:-]{1,192}$/;
 const ORDER_QUANTITY_PATTERN = /^(?:\d+(?:\.\d+)?|\.\d+)$/;
+const ORDER_PERCENTAGE_PATTERN = /^-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?$/;
 const MAX_SAFE_INTEGER_TEXT = String(Number.MAX_SAFE_INTEGER);
 const MINIMUM_ORDER_PROVIDER_VERSION = -2_147_483_648;
 const MAXIMUM_ORDER_PROVIDER_VERSION = 2_147_483_647;
@@ -186,6 +291,55 @@ export const SQUARE_ORDER_LINE_ITEM_ITEM_TYPES = Object.freeze([
   "ITEM",
   "CUSTOM_AMOUNT",
   "GIFT_CARD"
+] as const);
+
+export const SQUARE_ORDER_TAX_TYPES = Object.freeze([
+  "UNKNOWN_TAX",
+  "ADDITIVE",
+  "INCLUSIVE"
+] as const);
+
+export const SQUARE_ORDER_TAX_SCOPES = Object.freeze([
+  "OTHER_TAX_SCOPE",
+  "LINE_ITEM",
+  "ORDER"
+] as const);
+
+export const SQUARE_ORDER_DISCOUNT_TYPES = Object.freeze([
+  "UNKNOWN_DISCOUNT",
+  "FIXED_PERCENTAGE",
+  "FIXED_AMOUNT",
+  "VARIABLE_PERCENTAGE",
+  "VARIABLE_AMOUNT"
+] as const);
+
+export const SQUARE_ORDER_DISCOUNT_SCOPES = Object.freeze([
+  "OTHER_DISCOUNT_SCOPE",
+  "LINE_ITEM",
+  "ORDER"
+] as const);
+
+export const SQUARE_ORDER_SERVICE_CHARGE_CALCULATION_PHASES = Object.freeze([
+  "SUBTOTAL_PHASE",
+  "TOTAL_PHASE",
+  "APPORTIONED_PERCENTAGE_PHASE",
+  "APPORTIONED_AMOUNT_PHASE"
+] as const);
+
+export const SQUARE_ORDER_SERVICE_CHARGE_TYPES = Object.freeze([
+  "AUTO_GRATUITY",
+  "CUSTOM"
+] as const);
+
+export const SQUARE_ORDER_SERVICE_CHARGE_TREATMENT_TYPES = Object.freeze([
+  "LINE_ITEM_TREATMENT",
+  "APPORTIONED_TREATMENT"
+] as const);
+
+export const SQUARE_ORDER_SERVICE_CHARGE_SCOPES = Object.freeze([
+  "OTHER_SERVICE_CHARGE_SCOPE",
+  "LINE_ITEM",
+  "ORDER"
 ] as const);
 
 export const SQUARE_ORDER_MEASUREMENT_UNIT_TYPES = Object.freeze([
@@ -254,15 +408,42 @@ const SQUARE_ORDER_DIAGNOSTIC_CODES = new Set([
   "square_api_version_incompatible",
   "square_currency_invalid",
   "square_display_text_invalid",
+  "square_boolean_invalid",
+  "square_duplicate_order_applied_discount_identity",
+  "square_duplicate_order_applied_service_charge_identity",
+  "square_duplicate_order_applied_tax_identity",
   "square_duplicate_order_authority_identity",
+  "square_duplicate_order_discount_identity",
   "square_duplicate_order_line_item_identity",
+  "square_duplicate_order_line_item_applied_discount_reference",
+  "square_duplicate_order_line_item_applied_service_charge_reference",
+  "square_duplicate_order_line_item_applied_tax_reference",
   "square_duplicate_order_modifier_identity",
+  "square_duplicate_order_service_charge_applied_tax_reference",
+  "square_duplicate_order_service_charge_identity",
+  "square_duplicate_order_tax_identity",
   "square_enum_invalid",
   "square_identifier_invalid",
   "square_order_aggregate_currency_mismatch",
+  "square_order_adjustment_currency_mismatch",
+  "square_order_adjustment_percentage_invalid",
+  "square_order_applied_discount_array_invalid",
+  "square_order_applied_discount_reference_dangling",
+  "square_order_applied_discount_reference_missing",
+  "square_order_applied_service_charge_array_invalid",
+  "square_order_applied_service_charge_reference_dangling",
+  "square_order_applied_service_charge_reference_missing",
+  "square_order_applied_tax_array_invalid",
+  "square_order_applied_tax_reference_dangling",
+  "square_order_applied_tax_reference_missing",
   "square_order_connection_authority_invalid",
   "square_order_context_field_invalid",
   "square_order_cursor_invalid",
+  "square_order_discount_array_invalid",
+  "square_order_discount_catalog_reference_invalid",
+  "square_order_discount_identity_missing",
+  "square_order_discount_type_incompatible",
+  "square_order_discount_value_incompatible",
   "square_order_entries_invalid",
   "square_order_entries_request_invalid",
   "square_order_entries_unsupported",
@@ -299,8 +480,16 @@ const SQUARE_ORDER_DIAGNOSTIC_CODES = new Set([
   "square_order_request_location_unauthorized",
   "square_order_response_array_invalid",
   "square_order_response_missing",
+  "square_order_service_charge_array_invalid",
+  "square_order_service_charge_catalog_reference_invalid",
+  "square_order_service_charge_identity_missing",
+  "square_order_service_charge_phase_incompatible",
+  "square_order_service_charge_value_incompatible",
   "square_order_state_array_invalid",
   "square_order_state_request_mismatch",
+  "square_order_tax_array_invalid",
+  "square_order_tax_catalog_reference_invalid",
+  "square_order_tax_identity_missing",
   "square_parser_input_invalid",
   "square_provider_environment_invalid",
   "square_provider_errors_invalid",
@@ -351,6 +540,10 @@ const SquareOrderComponentUidSchema = z
 const SquareOrderCatalogIdentifierSchema = z
   .string()
   .regex(ORDER_CATALOG_IDENTIFIER_PATTERN);
+const SquareOrderAdjustmentComponentUidSchema =
+  squareOrderSafeOpaqueStringSchema(60);
+const SquareOrderAdjustmentCatalogIdentifierSchema =
+  squareOrderSafeOpaqueStringSchema(192);
 const SquareOrderCatalogVersionStringSchema = CanonicalIntegerSchema.refine(
   isSafeIntegerText,
   "Catalog version must fit JSON safe integer bounds"
@@ -369,6 +562,13 @@ const SquareOrderLineItemNameSchema = squareOrderDisplayTextSchema(512);
 const SquareOrderLineItemVariationNameSchema = squareOrderDisplayTextSchema(400);
 const SquareOrderLineItemModifierNameSchema = squareOrderDisplayTextSchema(255);
 const SquareOrderMeasurementCustomTextSchema = squareOrderDisplayTextSchema(4_096);
+const SquareOrderTaxNameSchema = squareOrderDisplayTextSchema(255);
+const SquareOrderDiscountNameSchema = squareOrderDisplayTextSchema(255);
+const SquareOrderServiceChargeNameSchema = squareOrderDisplayTextSchema(512);
+const SquareOrderAdjustmentPercentageSchema = CanonicalDecimalSchema.refine(
+  (value) => value.length <= MAXIMUM_ORDER_ADJUSTMENT_PERCENTAGE_LENGTH,
+  "Order adjustment percentage must fit the Square text bound"
+);
 
 export const SquareOrderResponseOperationSchema = z.enum(
   SQUARE_ORDER_RESPONSE_OPERATION_KEYS
@@ -474,6 +674,17 @@ export const SquareOrderCatalogReferenceSchema = z
     referenceKind: z.literal("catalog_object"),
     reconciliationState: z.literal("unverified"),
     providerId: SquareOrderCatalogIdentifierSchema,
+    providerVersion: SquareOrderCatalogVersionStringSchema.nullable()
+  })
+  .strict();
+
+const SquareOrderAdjustmentCatalogReferenceSchema = z
+  .object({
+    providerKey: z.literal(SQUARE_PROVIDER_KEY),
+    providerEnvironment: SquareProviderEnvironmentSchema,
+    referenceKind: z.literal("catalog_object"),
+    reconciliationState: z.literal("unverified"),
+    providerId: SquareOrderAdjustmentCatalogIdentifierSchema,
     providerVersion: SquareOrderCatalogVersionStringSchema.nullable()
   })
   .strict();
@@ -671,6 +882,310 @@ export const SquareOrderLineItemResponseSchema = z
   })
   .strict();
 
+const SquareOrderTaxAuthoritySchema = z
+  .object({
+    providerKey: z.literal(SQUARE_PROVIDER_KEY),
+    providerEnvironment: SquareProviderEnvironmentSchema,
+    entityType: z.literal("order_tax"),
+    orderId: SquareIdentifierSchema,
+    taxUid: SquareOrderAdjustmentComponentUidSchema
+  })
+  .strict();
+
+const SquareOrderDiscountAuthoritySchema = z
+  .object({
+    providerKey: z.literal(SQUARE_PROVIDER_KEY),
+    providerEnvironment: SquareProviderEnvironmentSchema,
+    entityType: z.literal("order_discount"),
+    orderId: SquareIdentifierSchema,
+    discountUid: SquareOrderAdjustmentComponentUidSchema
+  })
+  .strict();
+
+const SquareOrderServiceChargeAuthoritySchema = z
+  .object({
+    providerKey: z.literal(SQUARE_PROVIDER_KEY),
+    providerEnvironment: SquareProviderEnvironmentSchema,
+    entityType: z.literal("order_service_charge"),
+    orderId: SquareIdentifierSchema,
+    serviceChargeUid: SquareOrderAdjustmentComponentUidSchema
+  })
+  .strict();
+
+const SquareOrderLineItemApplicationAuthoritySchema = z
+  .object({
+    providerKey: z.literal(SQUARE_PROVIDER_KEY),
+    providerEnvironment: SquareProviderEnvironmentSchema,
+    entityType: z.literal("order_line_item_adjustments"),
+    orderId: SquareIdentifierSchema,
+    lineItemUid: SquareOrderComponentUidSchema
+  })
+  .strict();
+
+const SquareOrderLineItemAppliedTaxAuthoritySchema = z
+  .object({
+    providerKey: z.literal(SQUARE_PROVIDER_KEY),
+    providerEnvironment: SquareProviderEnvironmentSchema,
+    entityType: z.literal("order_line_item_applied_tax"),
+    orderId: SquareIdentifierSchema,
+    lineItemUid: SquareOrderComponentUidSchema,
+    taxUid: SquareOrderAdjustmentComponentUidSchema
+  })
+  .strict();
+
+const SquareOrderLineItemAppliedDiscountAuthoritySchema = z
+  .object({
+    providerKey: z.literal(SQUARE_PROVIDER_KEY),
+    providerEnvironment: SquareProviderEnvironmentSchema,
+    entityType: z.literal("order_line_item_applied_discount"),
+    orderId: SquareIdentifierSchema,
+    lineItemUid: SquareOrderComponentUidSchema,
+    discountUid: SquareOrderAdjustmentComponentUidSchema
+  })
+  .strict();
+
+const SquareOrderLineItemAppliedServiceChargeAuthoritySchema = z
+  .object({
+    providerKey: z.literal(SQUARE_PROVIDER_KEY),
+    providerEnvironment: SquareProviderEnvironmentSchema,
+    entityType: z.literal("order_line_item_applied_service_charge"),
+    orderId: SquareIdentifierSchema,
+    lineItemUid: SquareOrderComponentUidSchema,
+    serviceChargeUid: SquareOrderAdjustmentComponentUidSchema
+  })
+  .strict();
+
+const SquareOrderServiceChargeAppliedTaxAuthoritySchema = z
+  .object({
+    providerKey: z.literal(SQUARE_PROVIDER_KEY),
+    providerEnvironment: SquareProviderEnvironmentSchema,
+    entityType: z.literal("order_service_charge_applied_tax"),
+    orderId: SquareIdentifierSchema,
+    serviceChargeUid: SquareOrderAdjustmentComponentUidSchema,
+    taxUid: SquareOrderAdjustmentComponentUidSchema
+  })
+  .strict();
+
+export const SquareOrderTaxSchema = z
+  .object({
+    entityType: z.literal("order_tax"),
+    entityVersion: z.literal(SQUARE_ORDER_ADJUSTMENT_ENTITY_VERSION),
+    authority: SquareOrderTaxAuthoritySchema,
+    sourceKind: z.enum(["catalog_backed", "ad_hoc"]),
+    uid: SquareOrderAdjustmentComponentUidSchema,
+    catalogReference: SquareOrderAdjustmentCatalogReferenceSchema.nullable(),
+    name: SquareOrderTaxNameSchema.nullable(),
+    type: z.enum(SQUARE_ORDER_TAX_TYPES).nullable(),
+    percentage: SquareOrderAdjustmentPercentageSchema.nullable(),
+    appliedMoney: SquareOrderMoneySchema.nullable(),
+    scope: z.enum(SQUARE_ORDER_TAX_SCOPES).nullable(),
+    autoApplied: z.boolean().nullable()
+  })
+  .strict();
+
+export const SquareOrderDiscountSchema = z
+  .object({
+    entityType: z.literal("order_discount"),
+    entityVersion: z.literal(SQUARE_ORDER_ADJUSTMENT_ENTITY_VERSION),
+    authority: SquareOrderDiscountAuthoritySchema,
+    sourceKind: z.enum(["catalog_backed", "ad_hoc"]),
+    uid: SquareOrderAdjustmentComponentUidSchema,
+    catalogReference: SquareOrderAdjustmentCatalogReferenceSchema.nullable(),
+    name: SquareOrderDiscountNameSchema.nullable(),
+    type: z.enum(SQUARE_ORDER_DISCOUNT_TYPES).nullable(),
+    percentage: SquareOrderAdjustmentPercentageSchema.nullable(),
+    amountMoney: SquareOrderMoneySchema.nullable(),
+    appliedMoney: SquareOrderMoneySchema.nullable(),
+    scope: z.enum(SQUARE_ORDER_DISCOUNT_SCOPES).nullable()
+  })
+  .strict();
+
+export const SquareOrderLineItemAppliedTaxSchema = z
+  .object({
+    entityType: z.literal("order_line_item_applied_tax"),
+    entityVersion: z.literal(SQUARE_ORDER_ADJUSTMENT_ENTITY_VERSION),
+    authority: SquareOrderLineItemAppliedTaxAuthoritySchema,
+    uid: SquareOrderAdjustmentComponentUidSchema.nullable(),
+    taxUid: SquareOrderAdjustmentComponentUidSchema,
+    appliedMoney: SquareOrderMoneySchema.nullable(),
+    autoApplied: z.boolean().nullable()
+  })
+  .strict();
+
+export const SquareOrderLineItemAppliedDiscountSchema = z
+  .object({
+    entityType: z.literal("order_line_item_applied_discount"),
+    entityVersion: z.literal(SQUARE_ORDER_ADJUSTMENT_ENTITY_VERSION),
+    authority: SquareOrderLineItemAppliedDiscountAuthoritySchema,
+    uid: SquareOrderAdjustmentComponentUidSchema.nullable(),
+    discountUid: SquareOrderAdjustmentComponentUidSchema,
+    appliedMoney: SquareOrderMoneySchema.nullable()
+  })
+  .strict();
+
+export const SquareOrderLineItemAppliedServiceChargeSchema = z
+  .object({
+    entityType: z.literal("order_line_item_applied_service_charge"),
+    entityVersion: z.literal(SQUARE_ORDER_ADJUSTMENT_ENTITY_VERSION),
+    authority: SquareOrderLineItemAppliedServiceChargeAuthoritySchema,
+    uid: SquareOrderAdjustmentComponentUidSchema.nullable(),
+    serviceChargeUid: SquareOrderAdjustmentComponentUidSchema,
+    appliedMoney: SquareOrderMoneySchema.nullable()
+  })
+  .strict();
+
+export const SquareOrderServiceChargeAppliedTaxSchema = z
+  .object({
+    entityType: z.literal("order_service_charge_applied_tax"),
+    entityVersion: z.literal(SQUARE_ORDER_ADJUSTMENT_ENTITY_VERSION),
+    authority: SquareOrderServiceChargeAppliedTaxAuthoritySchema,
+    uid: SquareOrderAdjustmentComponentUidSchema.nullable(),
+    taxUid: SquareOrderAdjustmentComponentUidSchema,
+    appliedMoney: SquareOrderMoneySchema.nullable(),
+    autoApplied: z.boolean().nullable()
+  })
+  .strict();
+
+export const SquareOrderServiceChargeSchema = z
+  .object({
+    entityType: z.literal("order_service_charge"),
+    entityVersion: z.literal(SQUARE_ORDER_ADJUSTMENT_ENTITY_VERSION),
+    authority: SquareOrderServiceChargeAuthoritySchema,
+    sourceKind: z.enum(["catalog_backed", "ad_hoc"]),
+    uid: SquareOrderAdjustmentComponentUidSchema,
+    catalogReference: SquareOrderAdjustmentCatalogReferenceSchema.nullable(),
+    name: SquareOrderServiceChargeNameSchema.nullable(),
+    percentage: SquareOrderAdjustmentPercentageSchema.nullable(),
+    amountMoney: SquareOrderMoneySchema.nullable(),
+    appliedMoney: SquareOrderMoneySchema.nullable(),
+    totalMoney: SquareOrderMoneySchema.nullable(),
+    totalTaxMoney: SquareOrderMoneySchema.nullable(),
+    calculationPhase: z
+      .enum(SQUARE_ORDER_SERVICE_CHARGE_CALCULATION_PHASES)
+      .nullable(),
+    taxable: z.boolean().nullable(),
+    appliedTaxes: z
+      .array(SquareOrderServiceChargeAppliedTaxSchema)
+      .max(MAXIMUM_ORDER_APPLIED_ADJUSTMENTS),
+    appliedTaxCount: z
+      .number()
+      .int()
+      .nonnegative()
+      .max(MAXIMUM_ORDER_APPLIED_ADJUSTMENTS)
+      .safe(),
+    type: z.enum(SQUARE_ORDER_SERVICE_CHARGE_TYPES).nullable(),
+    treatmentType: z
+      .enum(SQUARE_ORDER_SERVICE_CHARGE_TREATMENT_TYPES)
+      .nullable(),
+    scope: z.enum(SQUARE_ORDER_SERVICE_CHARGE_SCOPES).nullable()
+  })
+  .strict();
+
+export const SquareOrderLineItemAdjustmentApplicationsSchema = z
+  .object({
+    entityType: z.literal("order_line_item_adjustments"),
+    entityVersion: z.literal(SQUARE_ORDER_ADJUSTMENT_ENTITY_VERSION),
+    authority: SquareOrderLineItemApplicationAuthoritySchema,
+    lineItemUid: SquareOrderComponentUidSchema,
+    appliedTaxes: z
+      .array(SquareOrderLineItemAppliedTaxSchema)
+      .max(MAXIMUM_ORDER_APPLIED_ADJUSTMENTS),
+    appliedTaxCount: z
+      .number()
+      .int()
+      .nonnegative()
+      .max(MAXIMUM_ORDER_APPLIED_ADJUSTMENTS)
+      .safe(),
+    appliedDiscounts: z
+      .array(SquareOrderLineItemAppliedDiscountSchema)
+      .max(MAXIMUM_ORDER_APPLIED_ADJUSTMENTS),
+    appliedDiscountCount: z
+      .number()
+      .int()
+      .nonnegative()
+      .max(MAXIMUM_ORDER_APPLIED_ADJUSTMENTS)
+      .safe(),
+    appliedServiceCharges: z
+      .array(SquareOrderLineItemAppliedServiceChargeSchema)
+      .max(MAXIMUM_ORDER_APPLIED_ADJUSTMENTS),
+    appliedServiceChargeCount: z
+      .number()
+      .int()
+      .nonnegative()
+      .max(MAXIMUM_ORDER_APPLIED_ADJUSTMENTS)
+      .safe()
+  })
+  .strict();
+
+export const SquareMinimizedOrderAdjustmentDetailSchema = z
+  .object({
+    contractVersion: z.literal(
+      SQUARE_ORDER_ADJUSTMENT_RESPONSE_CONTRACT_VERSION
+    ),
+    minimizationVersion: z.literal(
+      SQUARE_ORDER_ADJUSTMENT_MINIMIZATION_VERSION
+    ),
+    entityType: z.literal("order_adjustment_detail"),
+    entityVersion: z.literal(SQUARE_ORDER_ADJUSTMENT_ENTITY_VERSION),
+    projectionScope: z.literal("order_core_line_items_with_adjustments"),
+    lineItemDetail: SquareMinimizedOrderLineItemDetailSchema,
+    taxes: z.array(SquareOrderTaxSchema).max(MAXIMUM_ORDER_ADJUSTMENTS),
+    taxCount: z.number().int().nonnegative().max(MAXIMUM_ORDER_ADJUSTMENTS).safe(),
+    discounts: z.array(SquareOrderDiscountSchema).max(MAXIMUM_ORDER_ADJUSTMENTS),
+    discountCount: z
+      .number()
+      .int()
+      .nonnegative()
+      .max(MAXIMUM_ORDER_ADJUSTMENTS)
+      .safe(),
+    serviceCharges: z
+      .array(SquareOrderServiceChargeSchema)
+      .max(MAXIMUM_ORDER_ADJUSTMENTS),
+    serviceChargeCount: z
+      .number()
+      .int()
+      .nonnegative()
+      .max(MAXIMUM_ORDER_ADJUSTMENTS)
+      .safe(),
+    lineItemApplications: z
+      .array(SquareOrderLineItemAdjustmentApplicationsSchema)
+      .max(MAXIMUM_ORDER_LINE_ITEMS),
+    lineItemApplicationCount: z
+      .number()
+      .int()
+      .nonnegative()
+      .max(MAXIMUM_ORDER_LINE_ITEMS)
+      .safe()
+  })
+  .strict();
+
+export const SquareOrderAdjustmentResponseSchema = z
+  .object({
+    contractVersion: z.literal(
+      SQUARE_ORDER_ADJUSTMENT_RESPONSE_CONTRACT_VERSION
+    ),
+    minimizationVersion: z.literal(
+      SQUARE_ORDER_ADJUSTMENT_MINIMIZATION_VERSION
+    ),
+    entityType: z.literal("order_adjustment_detail_response"),
+    operation: SquareOrderResponseOperationSchema,
+    provider: SquareResponseProvenanceSchema,
+    connectionAuthority: SquareOrderConnectionAuthoritySchema,
+    requestAuthorityVersion: z.literal(SQUARE_ORDER_REQUEST_AUTHORITY_VERSION),
+    requestAuthorityFingerprint: Sha256FingerprintSchema,
+    pagination: SquareOrderPaginationStateSchema,
+    items: z
+      .array(SquareMinimizedOrderAdjustmentDetailSchema)
+      .max(MAXIMUM_ORDER_RESPONSE_ITEMS),
+    itemCount: z
+      .number()
+      .int()
+      .nonnegative()
+      .max(MAXIMUM_ORDER_RESPONSE_ITEMS)
+      .safe()
+  })
+  .strict();
+
 export type SquareOrderResponseOperation = z.infer<
   typeof SquareOrderResponseOperationSchema
 >;
@@ -686,6 +1201,9 @@ export type SquareOrderCoreResponse = Readonly<
 >;
 export type SquareOrderCatalogReference = Readonly<
   z.infer<typeof SquareOrderCatalogReferenceSchema>
+>;
+type SquareOrderAdjustmentCatalogReference = Readonly<
+  z.infer<typeof SquareOrderAdjustmentCatalogReferenceSchema>
 >;
 export type SquareOrderMeasurementUnit = Readonly<
   z.infer<typeof SquareOrderMeasurementUnitSchema>
@@ -704,6 +1222,34 @@ export type SquareMinimizedOrderLineItemDetail = Readonly<
 >;
 export type SquareOrderLineItemResponse = Readonly<
   z.infer<typeof SquareOrderLineItemResponseSchema>
+>;
+export type SquareOrderTax = Readonly<z.infer<typeof SquareOrderTaxSchema>>;
+export type SquareOrderDiscount = Readonly<
+  z.infer<typeof SquareOrderDiscountSchema>
+>;
+export type SquareOrderLineItemAppliedTax = Readonly<
+  z.infer<typeof SquareOrderLineItemAppliedTaxSchema>
+>;
+export type SquareOrderLineItemAppliedDiscount = Readonly<
+  z.infer<typeof SquareOrderLineItemAppliedDiscountSchema>
+>;
+export type SquareOrderLineItemAppliedServiceCharge = Readonly<
+  z.infer<typeof SquareOrderLineItemAppliedServiceChargeSchema>
+>;
+export type SquareOrderServiceChargeAppliedTax = Readonly<
+  z.infer<typeof SquareOrderServiceChargeAppliedTaxSchema>
+>;
+export type SquareOrderServiceCharge = Readonly<
+  z.infer<typeof SquareOrderServiceChargeSchema>
+>;
+export type SquareOrderLineItemAdjustmentApplications = Readonly<
+  z.infer<typeof SquareOrderLineItemAdjustmentApplicationsSchema>
+>;
+export type SquareMinimizedOrderAdjustmentDetail = Readonly<
+  z.infer<typeof SquareMinimizedOrderAdjustmentDetailSchema>
+>;
+export type SquareOrderAdjustmentResponse = Readonly<
+  z.infer<typeof SquareOrderAdjustmentResponseSchema>
 >;
 
 type SquareOrderResponseParserInput = SquareResponseParserInput &
@@ -761,6 +1307,18 @@ type SquareUnorderedOrderLineItem = Readonly<{
   modifiers: readonly SquareUnorderedOrderLineItemModifier[];
 }>;
 
+type SquareOrderAdjustmentTargets = Readonly<{
+  taxUids: ReadonlySet<string>;
+  discountUids: ReadonlySet<string>;
+  serviceChargeUids: ReadonlySet<string>;
+}>;
+
+type SquareOrderAppliedIdentityState = {
+  taxUids: Set<string>;
+  discountUids: Set<string>;
+  serviceChargeUids: Set<string>;
+};
+
 export function parseSquareOrderCoreResponse(
   input: unknown
 ): SquareResponseParserResult<SquareOrderCoreResponse> {
@@ -776,6 +1334,15 @@ export function parseSquareOrderLineItemResponse(
   return squareOrderResultBoundary(
     () => parseSquareOrderLineItemResponseResult(input),
     SquareOrderLineItemResponseSchema
+  );
+}
+
+export function parseSquareOrderAdjustmentResponse(
+  input: unknown
+): SquareResponseParserResult<SquareOrderAdjustmentResponse> {
+  return squareOrderResultBoundary(
+    () => parseSquareOrderAdjustmentResponseResult(input),
+    SquareOrderAdjustmentResponseSchema
   );
 }
 
@@ -802,6 +1369,44 @@ function parseSquareOrderLineItemResponseResult(
         contractVersion: SQUARE_ORDER_LINE_ITEM_RESPONSE_CONTRACT_VERSION,
         minimizationVersion: SQUARE_ORDER_LINE_ITEM_MINIMIZATION_VERSION,
         entityType: "order_line_item_detail_response",
+        operation: parsed.coreResponse.operation,
+        provider: parsed.coreResponse.provider,
+        connectionAuthority: parsed.coreResponse.connectionAuthority,
+        requestAuthorityVersion: parsed.coreResponse.requestAuthorityVersion,
+        requestAuthorityFingerprint:
+          parsed.coreResponse.requestAuthorityFingerprint,
+        pagination: parsed.coreResponse.pagination,
+        items,
+        itemCount: items.length
+      })
+    );
+  } catch (error) {
+    return squareOrderParserFailureResult(error);
+  }
+}
+
+function parseSquareOrderAdjustmentResponseResult(
+  input: unknown
+): SquareResponseParserResult<SquareOrderAdjustmentResponse> {
+  try {
+    const parsed = parseSquareOrderEnvelope(input);
+    const items = parsed.orders.map(({ raw, core }) => {
+      const lineItemDetail = minimizeSquareOrderLineItemDetail(
+        raw,
+        core,
+        parsed.provenance
+      );
+      return minimizeSquareOrderAdjustmentDetail(
+        raw,
+        lineItemDetail,
+        parsed.provenance
+      );
+    });
+    return squareAcceptedResult(
+      SquareOrderAdjustmentResponseSchema.parse({
+        contractVersion: SQUARE_ORDER_ADJUSTMENT_RESPONSE_CONTRACT_VERSION,
+        minimizationVersion: SQUARE_ORDER_ADJUSTMENT_MINIMIZATION_VERSION,
+        entityType: "order_adjustment_detail_response",
         operation: parsed.coreResponse.operation,
         provider: parsed.coreResponse.provider,
         connectionAuthority: parsed.coreResponse.connectionAuthority,
@@ -905,6 +1510,22 @@ export function squareOrderLineItemResponseFingerprint(
 ) {
   return squareMinimizedProjectionFingerprint(
     SquareOrderLineItemResponseSchema.parse(input)
+  );
+}
+
+export function squareOrderAdjustmentDetailFingerprint(
+  input: SquareMinimizedOrderAdjustmentDetail
+) {
+  return squareMinimizedProjectionFingerprint(
+    SquareMinimizedOrderAdjustmentDetailSchema.parse(input)
+  );
+}
+
+export function squareOrderAdjustmentResponseFingerprint(
+  input: SquareOrderAdjustmentResponse
+) {
+  return squareMinimizedProjectionFingerprint(
+    SquareOrderAdjustmentResponseSchema.parse(input)
   );
 }
 
@@ -1062,6 +1683,1039 @@ function minimizeSquareOrderLineItemDetail(
     lineItems,
     lineItemCount: lineItems.length
   });
+}
+
+function minimizeSquareOrderAdjustmentDetail(
+  input: SquareSafeJsonObject,
+  lineItemDetail: SquareMinimizedOrderLineItemDetail,
+  provenance: SquareResponseProvenance
+): SquareMinimizedOrderAdjustmentDetail {
+  const field = orderItemField(lineItemDetail.core.operation);
+  const taxes = orderTaxes(input, lineItemDetail.core, provenance, field);
+  const discounts = orderDiscounts(
+    input,
+    lineItemDetail.core,
+    provenance,
+    field
+  );
+  const taxUids = new Set(taxes.map(({ uid }) => uid));
+  const discountUids = new Set(discounts.map(({ uid }) => uid));
+  const appliedIdentityState: SquareOrderAppliedIdentityState = {
+    taxUids: new Set(),
+    discountUids: new Set(),
+    serviceChargeUids: new Set()
+  };
+  const serviceCharges = orderServiceCharges(
+    input,
+    lineItemDetail.core,
+    provenance,
+    taxUids,
+    appliedIdentityState,
+    field
+  );
+  const targets: SquareOrderAdjustmentTargets = {
+    taxUids,
+    discountUids,
+    serviceChargeUids: new Set(serviceCharges.map(({ uid }) => uid))
+  };
+  const lineItemApplications = orderLineItemAdjustmentApplications(
+    input,
+    lineItemDetail,
+    provenance,
+    targets,
+    appliedIdentityState,
+    field
+  );
+  assertCompatibleOrderAdjustmentCurrencies(
+    lineItemDetail,
+    taxes,
+    discounts,
+    serviceCharges,
+    lineItemApplications,
+    field
+  );
+
+  return SquareMinimizedOrderAdjustmentDetailSchema.parse({
+    contractVersion: SQUARE_ORDER_ADJUSTMENT_RESPONSE_CONTRACT_VERSION,
+    minimizationVersion: SQUARE_ORDER_ADJUSTMENT_MINIMIZATION_VERSION,
+    entityType: "order_adjustment_detail",
+    entityVersion: SQUARE_ORDER_ADJUSTMENT_ENTITY_VERSION,
+    projectionScope: "order_core_line_items_with_adjustments",
+    lineItemDetail,
+    taxes,
+    taxCount: taxes.length,
+    discounts,
+    discountCount: discounts.length,
+    serviceCharges,
+    serviceChargeCount: serviceCharges.length,
+    lineItemApplications,
+    lineItemApplicationCount: lineItemApplications.length
+  });
+}
+
+function orderTaxes(
+  order: SquareSafeJsonObject,
+  core: SquareMinimizedOrderCore,
+  provenance: SquareResponseProvenance,
+  field: string
+) {
+  const taxes = optionalOrderAdjustmentObjects(
+    order,
+    "taxes",
+    `${field}.taxes`,
+    "square_order_tax_array_invalid"
+  ).map((tax) => orderTax(tax, core, provenance, `${field}.taxes[]`));
+  assertUniqueOrderAdjustmentIdentities(
+    taxes,
+    "square_duplicate_order_tax_identity"
+  );
+  return taxes.sort((left, right) => compareStrings(left.uid, right.uid));
+}
+
+function orderTax(
+  input: SquareSafeJsonObject,
+  core: SquareMinimizedOrderCore,
+  provenance: SquareResponseProvenance,
+  field: string
+): SquareOrderTax {
+  const uid = requiredOrderAdjustmentComponentUid(
+    input,
+    "uid",
+    `${field}.uid`,
+    "square_order_tax_identity_missing"
+  );
+  const catalogReference = optionalOrderAdjustmentCatalogReference(
+    input,
+    "catalog_object_id",
+    "catalog_version",
+    provenance,
+    `${field}.catalog_object_id`,
+    `${field}.catalog_version`,
+    "square_order_tax_catalog_reference_invalid"
+  );
+  return SquareOrderTaxSchema.parse({
+    entityType: "order_tax",
+    entityVersion: SQUARE_ORDER_ADJUSTMENT_ENTITY_VERSION,
+    authority: {
+      providerKey: SQUARE_PROVIDER_KEY,
+      providerEnvironment: provenance.providerEnvironment,
+      entityType: "order_tax",
+      orderId: core.id,
+      taxUid: uid
+    },
+    sourceKind: catalogReference === null ? "ad_hoc" : "catalog_backed",
+    uid,
+    catalogReference,
+    name: squareOptionalNullableDisplayText(input, "name", `${field}.name`, 255),
+    type: squareOptionalNullableEnum(
+      input,
+      "type",
+      `${field}.type`,
+      SQUARE_ORDER_TAX_TYPES
+    ),
+    percentage: optionalOrderAdjustmentPercentage(
+      input,
+      "percentage",
+      `${field}.percentage`
+    ),
+    appliedMoney: optionalOrderMoney(
+      input,
+      "applied_money",
+      `${field}.applied_money`
+    ),
+    scope: squareOptionalNullableEnum(
+      input,
+      "scope",
+      `${field}.scope`,
+      SQUARE_ORDER_TAX_SCOPES
+    ),
+    autoApplied: optionalOrderBoolean(
+      input,
+      "auto_applied",
+      `${field}.auto_applied`
+    )
+  });
+}
+
+function orderDiscounts(
+  order: SquareSafeJsonObject,
+  core: SquareMinimizedOrderCore,
+  provenance: SquareResponseProvenance,
+  field: string
+) {
+  const discounts = optionalOrderAdjustmentObjects(
+    order,
+    "discounts",
+    `${field}.discounts`,
+    "square_order_discount_array_invalid"
+  ).map((discount) =>
+    orderDiscount(discount, core, provenance, `${field}.discounts[]`)
+  );
+  assertUniqueOrderAdjustmentIdentities(
+    discounts,
+    "square_duplicate_order_discount_identity"
+  );
+  return discounts.sort((left, right) => compareStrings(left.uid, right.uid));
+}
+
+function orderDiscount(
+  input: SquareSafeJsonObject,
+  core: SquareMinimizedOrderCore,
+  provenance: SquareResponseProvenance,
+  field: string
+): SquareOrderDiscount {
+  const uid = requiredOrderAdjustmentComponentUid(
+    input,
+    "uid",
+    `${field}.uid`,
+    "square_order_discount_identity_missing"
+  );
+  const catalogReference = optionalOrderAdjustmentCatalogReference(
+    input,
+    "catalog_object_id",
+    "catalog_version",
+    provenance,
+    `${field}.catalog_object_id`,
+    `${field}.catalog_version`,
+    "square_order_discount_catalog_reference_invalid"
+  );
+  const type = squareOptionalNullableEnum(
+    input,
+    "type",
+    `${field}.type`,
+    SQUARE_ORDER_DISCOUNT_TYPES
+  );
+  const percentage = optionalOrderAdjustmentPercentage(
+    input,
+    "percentage",
+    `${field}.percentage`
+  );
+  const amountMoney = optionalOrderMoney(
+    input,
+    "amount_money",
+    `${field}.amount_money`
+  );
+  assertOrderDiscountCompatibility(
+    catalogReference,
+    type,
+    percentage,
+    amountMoney,
+    field
+  );
+
+  return SquareOrderDiscountSchema.parse({
+    entityType: "order_discount",
+    entityVersion: SQUARE_ORDER_ADJUSTMENT_ENTITY_VERSION,
+    authority: {
+      providerKey: SQUARE_PROVIDER_KEY,
+      providerEnvironment: provenance.providerEnvironment,
+      entityType: "order_discount",
+      orderId: core.id,
+      discountUid: uid
+    },
+    sourceKind: catalogReference === null ? "ad_hoc" : "catalog_backed",
+    uid,
+    catalogReference,
+    name: squareOptionalNullableDisplayText(input, "name", `${field}.name`, 255),
+    type,
+    percentage,
+    amountMoney,
+    appliedMoney: optionalOrderMoney(
+      input,
+      "applied_money",
+      `${field}.applied_money`
+    ),
+    scope: squareOptionalNullableEnum(
+      input,
+      "scope",
+      `${field}.scope`,
+      SQUARE_ORDER_DISCOUNT_SCOPES
+    )
+  });
+}
+
+function assertOrderDiscountCompatibility(
+  catalogReference: SquareOrderAdjustmentCatalogReference | null,
+  type: (typeof SQUARE_ORDER_DISCOUNT_TYPES)[number] | null,
+  percentage: string | null,
+  amountMoney: SquareOrderMoney | null,
+  field: string
+) {
+  if (
+    catalogReference === null &&
+    type !== "FIXED_PERCENTAGE" &&
+    type !== "FIXED_AMOUNT"
+  ) {
+    squareRejectResponse(
+      "square_order_discount_type_incompatible",
+      `${field}.type`
+    );
+  }
+  if (
+    (percentage !== null && amountMoney !== null) ||
+    ((type === "FIXED_PERCENTAGE" || type === "VARIABLE_PERCENTAGE") &&
+      amountMoney !== null) ||
+    ((type === "FIXED_AMOUNT" || type === "VARIABLE_AMOUNT") &&
+      percentage !== null)
+  ) {
+    squareRejectResponse(
+      "square_order_discount_value_incompatible",
+      field
+    );
+  }
+}
+
+function orderServiceCharges(
+  order: SquareSafeJsonObject,
+  core: SquareMinimizedOrderCore,
+  provenance: SquareResponseProvenance,
+  taxUids: ReadonlySet<string>,
+  appliedIdentityState: SquareOrderAppliedIdentityState,
+  field: string
+) {
+  const serviceCharges = optionalOrderAdjustmentObjects(
+    order,
+    "service_charges",
+    `${field}.service_charges`,
+    "square_order_service_charge_array_invalid"
+  ).map((serviceCharge) =>
+    orderServiceCharge(
+      serviceCharge,
+      core,
+      provenance,
+      taxUids,
+      appliedIdentityState,
+      `${field}.service_charges[]`
+    )
+  );
+  assertUniqueOrderAdjustmentIdentities(
+    serviceCharges,
+    "square_duplicate_order_service_charge_identity"
+  );
+  return serviceCharges.sort((left, right) =>
+    compareStrings(left.uid, right.uid)
+  );
+}
+
+function orderServiceCharge(
+  input: SquareSafeJsonObject,
+  core: SquareMinimizedOrderCore,
+  provenance: SquareResponseProvenance,
+  taxUids: ReadonlySet<string>,
+  appliedIdentityState: SquareOrderAppliedIdentityState,
+  field: string
+): SquareOrderServiceCharge {
+  const uid = requiredOrderAdjustmentComponentUid(
+    input,
+    "uid",
+    `${field}.uid`,
+    "square_order_service_charge_identity_missing"
+  );
+  const catalogReference = optionalOrderAdjustmentCatalogReference(
+    input,
+    "catalog_object_id",
+    "catalog_version",
+    provenance,
+    `${field}.catalog_object_id`,
+    `${field}.catalog_version`,
+    "square_order_service_charge_catalog_reference_invalid"
+  );
+  const percentage = optionalOrderAdjustmentPercentage(
+    input,
+    "percentage",
+    `${field}.percentage`
+  );
+  const amountMoney = optionalOrderMoney(
+    input,
+    "amount_money",
+    `${field}.amount_money`
+  );
+  const calculationPhase = squareOptionalNullableEnum(
+    input,
+    "calculation_phase",
+    `${field}.calculation_phase`,
+    SQUARE_ORDER_SERVICE_CHARGE_CALCULATION_PHASES
+  );
+  const taxable = optionalOrderBoolean(input, "taxable", `${field}.taxable`);
+  const treatmentType = squareOptionalNullableEnum(
+    input,
+    "treatment_type",
+    `${field}.treatment_type`,
+    SQUARE_ORDER_SERVICE_CHARGE_TREATMENT_TYPES
+  );
+  const scope = squareOptionalNullableEnum(
+    input,
+    "scope",
+    `${field}.scope`,
+    SQUARE_ORDER_SERVICE_CHARGE_SCOPES
+  );
+  assertOrderServiceChargeCompatibility(
+    percentage,
+    amountMoney,
+    calculationPhase,
+    taxable,
+    treatmentType,
+    scope,
+    field
+  );
+  const appliedTaxes = orderServiceChargeAppliedTaxes(
+    input,
+    core,
+    uid,
+    provenance,
+    taxUids,
+    appliedIdentityState,
+    field
+  );
+
+  return SquareOrderServiceChargeSchema.parse({
+    entityType: "order_service_charge",
+    entityVersion: SQUARE_ORDER_ADJUSTMENT_ENTITY_VERSION,
+    authority: {
+      providerKey: SQUARE_PROVIDER_KEY,
+      providerEnvironment: provenance.providerEnvironment,
+      entityType: "order_service_charge",
+      orderId: core.id,
+      serviceChargeUid: uid
+    },
+    sourceKind: catalogReference === null ? "ad_hoc" : "catalog_backed",
+    uid,
+    catalogReference,
+    name: squareOptionalNullableDisplayText(input, "name", `${field}.name`, 512),
+    percentage,
+    amountMoney,
+    appliedMoney: optionalOrderMoney(
+      input,
+      "applied_money",
+      `${field}.applied_money`
+    ),
+    totalMoney: optionalOrderMoney(
+      input,
+      "total_money",
+      `${field}.total_money`
+    ),
+    totalTaxMoney: optionalOrderMoney(
+      input,
+      "total_tax_money",
+      `${field}.total_tax_money`
+    ),
+    calculationPhase,
+    taxable,
+    appliedTaxes,
+    appliedTaxCount: appliedTaxes.length,
+    type: squareOptionalNullableEnum(
+      input,
+      "type",
+      `${field}.type`,
+      SQUARE_ORDER_SERVICE_CHARGE_TYPES
+    ),
+    treatmentType,
+    scope
+  });
+}
+
+function assertOrderServiceChargeCompatibility(
+  percentage: string | null,
+  amountMoney: SquareOrderMoney | null,
+  calculationPhase:
+    | (typeof SQUARE_ORDER_SERVICE_CHARGE_CALCULATION_PHASES)[number]
+    | null,
+  taxable: boolean | null,
+  treatmentType:
+    | (typeof SQUARE_ORDER_SERVICE_CHARGE_TREATMENT_TYPES)[number]
+    | null,
+  scope: (typeof SQUARE_ORDER_SERVICE_CHARGE_SCOPES)[number] | null,
+  field: string
+) {
+  if ((percentage === null) === (amountMoney === null)) {
+    squareRejectResponse(
+      "square_order_service_charge_value_incompatible",
+      field
+    );
+  }
+  if (
+    (calculationPhase === "TOTAL_PHASE" && taxable === true) ||
+    ((calculationPhase === "SUBTOTAL_PHASE" ||
+      calculationPhase === "TOTAL_PHASE") &&
+      scope === "LINE_ITEM") ||
+    ((calculationPhase === "APPORTIONED_AMOUNT_PHASE" ||
+      calculationPhase === "APPORTIONED_PERCENTAGE_PHASE") &&
+      treatmentType === "LINE_ITEM_TREATMENT") ||
+    (calculationPhase === "APPORTIONED_AMOUNT_PHASE" &&
+      percentage !== null) ||
+    (calculationPhase === "APPORTIONED_PERCENTAGE_PHASE" &&
+      amountMoney !== null)
+  ) {
+    squareRejectResponse(
+      "square_order_service_charge_phase_incompatible",
+      `${field}.calculation_phase`
+    );
+  }
+}
+
+function orderServiceChargeAppliedTaxes(
+  serviceCharge: SquareSafeJsonObject,
+  core: SquareMinimizedOrderCore,
+  serviceChargeUid: string,
+  provenance: SquareResponseProvenance,
+  taxUids: ReadonlySet<string>,
+  appliedIdentityState: SquareOrderAppliedIdentityState,
+  field: string
+) {
+  const seenReferences = new Set<string>();
+  return optionalOrderAdjustmentObjects(
+    serviceCharge,
+    "applied_taxes",
+    `${field}.applied_taxes`,
+    "square_order_applied_tax_array_invalid"
+  )
+    .map((appliedTax) => {
+      const projection = orderAppliedTaxFacts(
+        appliedTax,
+        taxUids,
+        appliedIdentityState,
+        seenReferences,
+        "square_duplicate_order_service_charge_applied_tax_reference",
+        `${field}.applied_taxes[]`
+      );
+      return SquareOrderServiceChargeAppliedTaxSchema.parse({
+        entityType: "order_service_charge_applied_tax",
+        entityVersion: SQUARE_ORDER_ADJUSTMENT_ENTITY_VERSION,
+        authority: {
+          providerKey: SQUARE_PROVIDER_KEY,
+          providerEnvironment: provenance.providerEnvironment,
+          entityType: "order_service_charge_applied_tax",
+          orderId: core.id,
+          serviceChargeUid,
+          taxUid: projection.taxUid
+        },
+        ...projection
+      });
+    })
+    .sort(compareAppliedTaxes);
+}
+
+function orderLineItemAdjustmentApplications(
+  order: SquareSafeJsonObject,
+  lineItemDetail: SquareMinimizedOrderLineItemDetail,
+  provenance: SquareResponseProvenance,
+  targets: SquareOrderAdjustmentTargets,
+  appliedIdentityState: SquareOrderAppliedIdentityState,
+  field: string
+) {
+  const lineItemsByUid = new Map(
+    lineItemDetail.lineItems.map((lineItem) => [lineItem.uid, lineItem])
+  );
+  const rawLineItems = optionalOrderAdjustmentObjects(
+    order,
+    "line_items",
+    `${field}.line_items`,
+    "square_order_line_item_array_invalid"
+  );
+  const applications = rawLineItems.map((lineItem) => {
+    const lineItemUid = requiredOrderComponentUid(
+      lineItem,
+      "uid",
+      `${field}.line_items[].uid`,
+      "square_order_line_item_identity_missing"
+    );
+    if (!lineItemsByUid.has(lineItemUid)) {
+      squareRejectResponse("square_response_internal_rejection", "$response");
+    }
+    return orderLineItemAdjustmentApplication(
+      lineItem,
+      lineItemDetail.core,
+      lineItemUid,
+      provenance,
+      targets,
+      appliedIdentityState,
+      `${field}.line_items[]`
+    );
+  });
+  if (applications.length !== lineItemDetail.lineItems.length) {
+    squareRejectResponse("square_response_internal_rejection", "$response");
+  }
+  return applications.sort((left, right) =>
+    compareStrings(left.lineItemUid, right.lineItemUid)
+  );
+}
+
+function orderLineItemAdjustmentApplication(
+  lineItem: SquareSafeJsonObject,
+  core: SquareMinimizedOrderCore,
+  lineItemUid: string,
+  provenance: SquareResponseProvenance,
+  targets: SquareOrderAdjustmentTargets,
+  appliedIdentityState: SquareOrderAppliedIdentityState,
+  field: string
+): SquareOrderLineItemAdjustmentApplications {
+  const appliedTaxes = orderLineItemAppliedTaxes(
+    lineItem,
+    core,
+    lineItemUid,
+    provenance,
+    targets.taxUids,
+    appliedIdentityState,
+    field
+  );
+  const appliedDiscounts = orderLineItemAppliedDiscounts(
+    lineItem,
+    core,
+    lineItemUid,
+    provenance,
+    targets.discountUids,
+    appliedIdentityState,
+    field
+  );
+  const appliedServiceCharges = orderLineItemAppliedServiceCharges(
+    lineItem,
+    core,
+    lineItemUid,
+    provenance,
+    targets.serviceChargeUids,
+    appliedIdentityState,
+    field
+  );
+  return SquareOrderLineItemAdjustmentApplicationsSchema.parse({
+    entityType: "order_line_item_adjustments",
+    entityVersion: SQUARE_ORDER_ADJUSTMENT_ENTITY_VERSION,
+    authority: {
+      providerKey: SQUARE_PROVIDER_KEY,
+      providerEnvironment: provenance.providerEnvironment,
+      entityType: "order_line_item_adjustments",
+      orderId: core.id,
+      lineItemUid
+    },
+    lineItemUid,
+    appliedTaxes,
+    appliedTaxCount: appliedTaxes.length,
+    appliedDiscounts,
+    appliedDiscountCount: appliedDiscounts.length,
+    appliedServiceCharges,
+    appliedServiceChargeCount: appliedServiceCharges.length
+  });
+}
+
+function orderLineItemAppliedTaxes(
+  lineItem: SquareSafeJsonObject,
+  core: SquareMinimizedOrderCore,
+  lineItemUid: string,
+  provenance: SquareResponseProvenance,
+  taxUids: ReadonlySet<string>,
+  appliedIdentityState: SquareOrderAppliedIdentityState,
+  field: string
+) {
+  const seenReferences = new Set<string>();
+  return optionalOrderAdjustmentObjects(
+    lineItem,
+    "applied_taxes",
+    `${field}.applied_taxes`,
+    "square_order_applied_tax_array_invalid"
+  )
+    .map((appliedTax) => {
+      const projection = orderAppliedTaxFacts(
+        appliedTax,
+        taxUids,
+        appliedIdentityState,
+        seenReferences,
+        "square_duplicate_order_line_item_applied_tax_reference",
+        `${field}.applied_taxes[]`
+      );
+      return SquareOrderLineItemAppliedTaxSchema.parse({
+        entityType: "order_line_item_applied_tax",
+        entityVersion: SQUARE_ORDER_ADJUSTMENT_ENTITY_VERSION,
+        authority: {
+          providerKey: SQUARE_PROVIDER_KEY,
+          providerEnvironment: provenance.providerEnvironment,
+          entityType: "order_line_item_applied_tax",
+          orderId: core.id,
+          lineItemUid,
+          taxUid: projection.taxUid
+        },
+        ...projection
+      });
+    })
+    .sort(compareAppliedTaxes);
+}
+
+function orderAppliedTaxFacts(
+  input: SquareSafeJsonObject,
+  targetUids: ReadonlySet<string>,
+  appliedIdentityState: SquareOrderAppliedIdentityState,
+  seenReferences: Set<string>,
+  duplicateReferenceCode: string,
+  field: string
+) {
+  const uid = optionalOrderAdjustmentComponentUid(
+    input,
+    "uid",
+    `${field}.uid`
+  );
+  trackAppliedIdentity(
+    uid,
+    appliedIdentityState.taxUids,
+    "square_duplicate_order_applied_tax_identity"
+  );
+  const taxUid = requiredOrderAdjustmentReferenceUid(
+    input,
+    "tax_uid",
+    `${field}.tax_uid`,
+    "square_order_applied_tax_reference_missing"
+  );
+  assertOrderAdjustmentReference(
+    taxUid,
+    targetUids,
+    seenReferences,
+    "square_order_applied_tax_reference_dangling",
+    duplicateReferenceCode,
+    field
+  );
+  return {
+    uid,
+    taxUid,
+    appliedMoney: optionalOrderMoney(
+      input,
+      "applied_money",
+      `${field}.applied_money`
+    ),
+    autoApplied: optionalOrderBoolean(
+      input,
+      "auto_applied",
+      `${field}.auto_applied`
+    )
+  } as const;
+}
+
+function orderLineItemAppliedDiscounts(
+  lineItem: SquareSafeJsonObject,
+  core: SquareMinimizedOrderCore,
+  lineItemUid: string,
+  provenance: SquareResponseProvenance,
+  discountUids: ReadonlySet<string>,
+  appliedIdentityState: SquareOrderAppliedIdentityState,
+  field: string
+) {
+  const seenReferences = new Set<string>();
+  return optionalOrderAdjustmentObjects(
+    lineItem,
+    "applied_discounts",
+    `${field}.applied_discounts`,
+    "square_order_applied_discount_array_invalid"
+  )
+    .map((appliedDiscount) => {
+      const uid = optionalOrderAdjustmentComponentUid(
+        appliedDiscount,
+        "uid",
+        `${field}.applied_discounts[].uid`
+      );
+      trackAppliedIdentity(
+        uid,
+        appliedIdentityState.discountUids,
+        "square_duplicate_order_applied_discount_identity"
+      );
+      const discountUid = requiredOrderAdjustmentReferenceUid(
+        appliedDiscount,
+        "discount_uid",
+        `${field}.applied_discounts[].discount_uid`,
+        "square_order_applied_discount_reference_missing"
+      );
+      assertOrderAdjustmentReference(
+        discountUid,
+        discountUids,
+        seenReferences,
+        "square_order_applied_discount_reference_dangling",
+        "square_duplicate_order_line_item_applied_discount_reference",
+        `${field}.applied_discounts[]`
+      );
+      return SquareOrderLineItemAppliedDiscountSchema.parse({
+        entityType: "order_line_item_applied_discount",
+        entityVersion: SQUARE_ORDER_ADJUSTMENT_ENTITY_VERSION,
+        authority: {
+          providerKey: SQUARE_PROVIDER_KEY,
+          providerEnvironment: provenance.providerEnvironment,
+          entityType: "order_line_item_applied_discount",
+          orderId: core.id,
+          lineItemUid,
+          discountUid
+        },
+        uid,
+        discountUid,
+        appliedMoney: optionalOrderMoney(
+          appliedDiscount,
+          "applied_money",
+          `${field}.applied_discounts[].applied_money`
+        )
+      });
+    })
+    .sort((left, right) =>
+      compareAppliedAdjustments(
+        left.discountUid,
+        left.uid,
+        right.discountUid,
+        right.uid
+      )
+    );
+}
+
+function orderLineItemAppliedServiceCharges(
+  lineItem: SquareSafeJsonObject,
+  core: SquareMinimizedOrderCore,
+  lineItemUid: string,
+  provenance: SquareResponseProvenance,
+  serviceChargeUids: ReadonlySet<string>,
+  appliedIdentityState: SquareOrderAppliedIdentityState,
+  field: string
+) {
+  const seenReferences = new Set<string>();
+  return optionalOrderAdjustmentObjects(
+    lineItem,
+    "applied_service_charges",
+    `${field}.applied_service_charges`,
+    "square_order_applied_service_charge_array_invalid"
+  )
+    .map((appliedServiceCharge) => {
+      const uid = optionalOrderAdjustmentComponentUid(
+        appliedServiceCharge,
+        "uid",
+        `${field}.applied_service_charges[].uid`
+      );
+      trackAppliedIdentity(
+        uid,
+        appliedIdentityState.serviceChargeUids,
+        "square_duplicate_order_applied_service_charge_identity"
+      );
+      const serviceChargeUid = requiredOrderAdjustmentReferenceUid(
+        appliedServiceCharge,
+        "service_charge_uid",
+        `${field}.applied_service_charges[].service_charge_uid`,
+        "square_order_applied_service_charge_reference_missing"
+      );
+      assertOrderAdjustmentReference(
+        serviceChargeUid,
+        serviceChargeUids,
+        seenReferences,
+        "square_order_applied_service_charge_reference_dangling",
+        "square_duplicate_order_line_item_applied_service_charge_reference",
+        `${field}.applied_service_charges[]`
+      );
+      return SquareOrderLineItemAppliedServiceChargeSchema.parse({
+        entityType: "order_line_item_applied_service_charge",
+        entityVersion: SQUARE_ORDER_ADJUSTMENT_ENTITY_VERSION,
+        authority: {
+          providerKey: SQUARE_PROVIDER_KEY,
+          providerEnvironment: provenance.providerEnvironment,
+          entityType: "order_line_item_applied_service_charge",
+          orderId: core.id,
+          lineItemUid,
+          serviceChargeUid
+        },
+        uid,
+        serviceChargeUid,
+        appliedMoney: optionalOrderMoney(
+          appliedServiceCharge,
+          "applied_money",
+          `${field}.applied_service_charges[].applied_money`
+        )
+      });
+    })
+    .sort((left, right) =>
+      compareAppliedAdjustments(
+        left.serviceChargeUid,
+        left.uid,
+        right.serviceChargeUid,
+        right.uid
+      )
+    );
+}
+
+function optionalOrderAdjustmentObjects(
+  record: SquareSafeJsonObject,
+  key: string,
+  field: string,
+  diagnosticCode: string
+) {
+  if (!hasOwn(record, key) || record[key] === null) return [];
+  const values = record[key];
+  if (!Array.isArray(values) || values.length > MAXIMUM_ORDER_ADJUSTMENTS) {
+    squareRejectResponse(diagnosticCode, field);
+  }
+  return values.map((value) => squareSafeJsonObject(value, `${field}[]`));
+}
+
+function assertUniqueOrderAdjustmentIdentities(
+  items: readonly Readonly<{ uid: string }>[],
+  diagnosticCode: string
+) {
+  const seen = new Set<string>();
+  for (const { uid } of items) {
+    if (seen.has(uid)) squareRejectResponse(diagnosticCode, "$response");
+    seen.add(uid);
+  }
+}
+
+function requiredOrderAdjustmentReferenceUid(
+  record: SquareSafeJsonObject,
+  key: string,
+  field: string,
+  diagnosticCode: string
+) {
+  if (!hasOwn(record, key)) {
+    squareRejectResponse(diagnosticCode, field);
+  }
+  const parsed = SquareOrderAdjustmentComponentUidSchema.safeParse(record[key]);
+  if (!parsed.success) squareRejectResponse(diagnosticCode, field);
+  return parsed.data;
+}
+
+function assertOrderAdjustmentReference(
+  targetUid: string,
+  targetUids: ReadonlySet<string>,
+  seenReferences: Set<string>,
+  danglingCode: string,
+  duplicateCode: string,
+  field: string
+) {
+  if (!targetUids.has(targetUid)) squareRejectResponse(danglingCode, field);
+  if (seenReferences.has(targetUid)) squareRejectResponse(duplicateCode, field);
+  seenReferences.add(targetUid);
+}
+
+function trackAppliedIdentity(
+  uid: string | null,
+  seen: Set<string>,
+  diagnosticCode: string
+) {
+  if (uid === null) return;
+  if (seen.has(uid)) squareRejectResponse(diagnosticCode, "$response");
+  seen.add(uid);
+}
+
+function optionalOrderAdjustmentPercentage(
+  record: SquareSafeJsonObject,
+  key: string,
+  field: string
+) {
+  if (!hasOwn(record, key) || record[key] === null) return null;
+  const value = record[key];
+  if (
+    typeof value !== "string" ||
+    value.length < 1 ||
+    value.length > MAXIMUM_ORDER_ADJUSTMENT_PERCENTAGE_LENGTH ||
+    !ORDER_PERCENTAGE_PATTERN.test(value)
+  ) {
+    squareRejectResponse("square_order_adjustment_percentage_invalid", field);
+  }
+  const [whole, fractional = ""] = value.split(".");
+  const canonicalFractional = fractional.replace(/0+$/u, "");
+  const canonical =
+    canonicalFractional.length > 0 ? `${whole}.${canonicalFractional}` : whole;
+  if (!SquareOrderAdjustmentPercentageSchema.safeParse(canonical).success) {
+    squareRejectResponse("square_order_adjustment_percentage_invalid", field);
+  }
+  return canonical;
+}
+
+function optionalOrderBoolean(
+  record: SquareSafeJsonObject,
+  key: string,
+  field: string
+) {
+  if (!hasOwn(record, key) || record[key] === null) return null;
+  const value = record[key];
+  if (typeof value !== "boolean") {
+    squareRejectResponse("square_boolean_invalid", field);
+  }
+  return value;
+}
+
+function compareAppliedTaxes(
+  left: Readonly<{ taxUid: string; uid: string | null }>,
+  right: Readonly<{ taxUid: string; uid: string | null }>
+) {
+  return compareAppliedAdjustments(left.taxUid, left.uid, right.taxUid, right.uid);
+}
+
+function compareAppliedAdjustments(
+  leftTargetUid: string,
+  leftUid: string | null,
+  rightTargetUid: string,
+  rightUid: string | null
+) {
+  const targetCompared = compareStrings(leftTargetUid, rightTargetUid);
+  if (targetCompared !== 0) return targetCompared;
+  return compareStrings(leftUid ?? "", rightUid ?? "");
+}
+
+function assertCompatibleOrderAdjustmentCurrencies(
+  lineItemDetail: SquareMinimizedOrderLineItemDetail,
+  taxes: readonly SquareOrderTax[],
+  discounts: readonly SquareOrderDiscount[],
+  serviceCharges: readonly SquareOrderServiceCharge[],
+  lineItemApplications: readonly SquareOrderLineItemAdjustmentApplications[],
+  field: string
+) {
+  const core = lineItemDetail.core;
+  const monies: (SquareOrderMoney | null)[] = [
+    core.totalMoney,
+    core.totalTaxMoney,
+    core.totalDiscountMoney,
+    core.totalTipMoney,
+    core.totalServiceChargeMoney,
+    core.netAmountDueMoney
+  ];
+  for (const lineItem of lineItemDetail.lineItems) {
+    monies.push(
+      lineItem.basePriceMoney,
+      lineItem.variationTotalPriceMoney,
+      lineItem.grossSalesMoney,
+      lineItem.totalTaxMoney,
+      lineItem.totalDiscountMoney,
+      lineItem.totalServiceChargeMoney,
+      lineItem.totalMoney
+    );
+    for (const modifier of lineItem.modifiers) {
+      monies.push(modifier.basePriceMoney, modifier.totalPriceMoney);
+    }
+  }
+  for (const tax of taxes) monies.push(tax.appliedMoney);
+  for (const discount of discounts) {
+    monies.push(discount.amountMoney, discount.appliedMoney);
+  }
+  for (const serviceCharge of serviceCharges) {
+    monies.push(
+      serviceCharge.amountMoney,
+      serviceCharge.appliedMoney,
+      serviceCharge.totalMoney,
+      serviceCharge.totalTaxMoney
+    );
+    for (const appliedTax of serviceCharge.appliedTaxes) {
+      monies.push(appliedTax.appliedMoney);
+    }
+  }
+  for (const applications of lineItemApplications) {
+    for (const appliedTax of applications.appliedTaxes) {
+      monies.push(appliedTax.appliedMoney);
+    }
+    for (const appliedDiscount of applications.appliedDiscounts) {
+      monies.push(appliedDiscount.appliedMoney);
+    }
+    for (const appliedServiceCharge of applications.appliedServiceCharges) {
+      monies.push(appliedServiceCharge.appliedMoney);
+    }
+  }
+  const currencies = new Set(
+    monies.flatMap((money) =>
+      money?.currency === null || money?.currency === undefined
+        ? []
+        : [money.currency]
+    )
+  );
+  if (currencies.size > 1) {
+    squareRejectResponse(
+      "square_order_adjustment_currency_mismatch",
+      `${field}.adjustments`
+    );
+  }
 }
 
 function unorderedOrderLineItems(
@@ -1440,6 +3094,27 @@ function requiredOrderDisplayText(
   return value;
 }
 
+function squareOrderSafeOpaqueStringSchema(maximumLength: number) {
+  return z
+    .string()
+    .min(1)
+    .max(maximumLength)
+    .refine((value) => {
+      try {
+        return (
+          squareOptionalNullableString(
+            { value },
+            "value",
+            "$response",
+            maximumLength
+          ) === value
+        );
+      } catch {
+        return false;
+      }
+    }, "Opaque Square identifier must be bounded and safe");
+}
+
 function squareOrderDisplayTextSchema(maximumLength: number) {
   return z
     .string()
@@ -1709,6 +3384,43 @@ function optionalOrderCatalogReference(
   });
 }
 
+function optionalOrderAdjustmentCatalogReference(
+  record: SquareSafeJsonObject,
+  identifierKey: string,
+  versionKey: string,
+  provenance: SquareResponseProvenance,
+  identifierField: string,
+  versionField: string,
+  diagnosticCode: string
+): SquareOrderAdjustmentCatalogReference | null {
+  const providerId = squareOptionalNullableString(
+    record,
+    identifierKey,
+    identifierField,
+    192
+  );
+  const providerVersion = optionalOrderCatalogVersion(
+    record,
+    versionKey,
+    versionField,
+    diagnosticCode
+  );
+  if (providerId === null) {
+    if (providerVersion !== null) {
+      squareRejectResponse(diagnosticCode, versionField);
+    }
+    return null;
+  }
+  return SquareOrderAdjustmentCatalogReferenceSchema.parse({
+    providerKey: SQUARE_PROVIDER_KEY,
+    providerEnvironment: provenance.providerEnvironment,
+    referenceKind: "catalog_object",
+    reconciliationState: "unverified",
+    providerId,
+    providerVersion
+  });
+}
+
 function optionalOrderCatalogIdentifier(
   record: SquareSafeJsonObject,
   key: string,
@@ -1762,6 +3474,27 @@ function optionalOrderComponentUid(
     squareRejectResponse("square_identifier_invalid", field);
   }
   return value;
+}
+
+function requiredOrderAdjustmentComponentUid(
+  record: SquareSafeJsonObject,
+  key: string,
+  field: string,
+  missingCode: string
+) {
+  const value = squareOptionalNullableString(record, key, field, 60);
+  if (value === null) {
+    throw new SquareOrderUnsupportedProjectionFailure(missingCode, field);
+  }
+  return value;
+}
+
+function optionalOrderAdjustmentComponentUid(
+  record: SquareSafeJsonObject,
+  key: string,
+  field: string
+) {
+  return squareOptionalNullableString(record, key, field, 60);
 }
 
 function requiredOrderQuantity(
