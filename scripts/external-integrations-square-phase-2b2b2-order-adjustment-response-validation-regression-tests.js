@@ -3,6 +3,7 @@ const childProcess = require("node:child_process");
 const fs = require("node:fs");
 const Module = require("node:module");
 const path = require("node:path");
+const nodeUtilTypes = require("node:util/types");
 const ts = require("typescript");
 
 const root = path.resolve(__dirname, "..");
@@ -132,6 +133,26 @@ function escapeRegExp(value) {
 
 function clone(value) {
   return structuredClone(value);
+}
+
+function freezeTreeForTest(value, skipped = new Set(), seen = new Set()) {
+  if (
+    value === null ||
+    (typeof value !== "object" && typeof value !== "function") ||
+    skipped.has(value) ||
+    seen.has(value)
+  ) {
+    return value;
+  }
+  seen.add(value);
+  for (const key of Reflect.ownKeys(value)) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (descriptor && "value" in descriptor) {
+      freezeTreeForTest(descriptor.value, skipped, seen);
+    }
+  }
+  Object.freeze(value);
+  return value;
 }
 
 function parserInput(response, operation = "retrieve_order", overrides = {}) {
@@ -1765,8 +1786,10 @@ function testExceptionContainedResultBoundary() {
     "raw parser exception is contained"
   );
 
+  let hostileThrownProxyTrapCalls = 0;
   const hostileThrownValue = new Proxy({}, {
     getPrototypeOf() {
+      hostileThrownProxyTrapCalls += 1;
       throw new Error("sq2b2b2-provider-secret");
     }
   });
@@ -1779,6 +1802,24 @@ function testExceptionContainedResultBoundary() {
     parseAdjustmentInput(doubleFaultInput),
     "exception-classification double fault is contained"
   );
+  equal(
+    hostileThrownProxyTrapCalls,
+    0,
+    "thrown Proxy traps are never invoked during exception classification"
+  );
+
+  const originalIsProxy = nodeUtilTypes.isProxy;
+  try {
+    nodeUtilTypes.isProxy = () => {
+      throw new Error("sq2b2b2-provider-secret");
+    };
+    assertInternalRejection(
+      parseAdjustmentInput(null),
+      "proxy-detector exception becomes the static fallback"
+    );
+  } finally {
+    nodeUtilTypes.isProxy = originalIsProxy;
+  }
 
   const originalFailureResult = squareResponseValidation.squareFailureResult;
   const originalUnsupportedResult =
@@ -1855,6 +1896,8 @@ function testExceptionContainedResultBoundary() {
   }
 
   const originalAcceptedResult = squareResponseValidation.squareAcceptedResult;
+  const replayCandidate = parseAdjustments(clone(orderFixtures.retrieve));
+  accepted(replayCandidate, "accepted replay candidate is available");
   const exportedOrderParserCases = [
     ["core", () => parseCore(clone(orderFixtures.retrieve))],
     ["line-item", () => parseLineItems(clone(orderFixtures.retrieve))],
@@ -1868,6 +1911,10 @@ function testExceptionContainedResultBoundary() {
           configurable: true,
           enumerable: true,
           get() {
+            acceptedAccessorCalls += 1;
+            throw new Error("sq2b2b2-provider-secret");
+          },
+          set() {
             acceptedAccessorCalls += 1;
             throw new Error("sq2b2b2-provider-secret");
           }
@@ -1944,6 +1991,102 @@ function testExceptionContainedResultBoundary() {
       "nested accepted proxy traps are never invoked"
     );
 
+    let revokedOuterProxyTrapCalls = 0;
+    squareResponseValidation.squareAcceptedResult = (value) => {
+      const revocable = Proxy.revocable(originalAcceptedResult(value), {
+        getPrototypeOf() {
+          revokedOuterProxyTrapCalls += 1;
+          throw new Error("sq2b2b2-provider-secret");
+        }
+      });
+      revocable.revoke();
+      return revocable.proxy;
+    };
+    assertInternalRejection(
+      parseAdjustments(clone(orderFixtures.retrieve)),
+      "revoked accepted-result proxy is rejected without reflection"
+    );
+    equal(
+      revokedOuterProxyTrapCalls,
+      0,
+      "revoked accepted-result proxy traps are never invoked"
+    );
+
+    let revokedNestedProxyTrapCalls = 0;
+    squareResponseValidation.squareAcceptedResult = (value) => {
+      const target = Object.freeze({});
+      const revocable = Proxy.revocable(target, {
+        get() {
+          revokedNestedProxyTrapCalls += 1;
+          throw new Error("sq2b2b2-provider-secret");
+        },
+        getOwnPropertyDescriptor() {
+          revokedNestedProxyTrapCalls += 1;
+          throw new Error("sq2b2b2-provider-secret");
+        },
+        getPrototypeOf() {
+          revokedNestedProxyTrapCalls += 1;
+          throw new Error("sq2b2b2-provider-secret");
+        },
+        isExtensible() {
+          revokedNestedProxyTrapCalls += 1;
+          throw new Error("sq2b2b2-provider-secret");
+        },
+        ownKeys() {
+          revokedNestedProxyTrapCalls += 1;
+          throw new Error("sq2b2b2-provider-secret");
+        }
+      });
+      value.provider = revocable.proxy;
+      freezeTreeForTest(value, new Set([revocable.proxy]));
+      const result = Object.freeze({
+        outcome: "accepted",
+        value,
+        diagnostics: Object.freeze([])
+      });
+      revocable.revoke();
+      return result;
+    };
+    assertInternalRejection(
+      parseAdjustments(clone(orderFixtures.retrieve)),
+      "nested revoked proxy is rejected without reflection"
+    );
+    equal(
+      revokedNestedProxyTrapCalls,
+      0,
+      "nested revoked proxy traps are never invoked"
+    );
+
+    squareResponseValidation.squareAcceptedResult = () => replayCandidate;
+    assertInternalRejection(
+      parseAdjustments(clone(orderFixtures.retrieve)),
+      "a prior canonical accepted result cannot be replayed"
+    );
+
+    const forgedCanonicalValue = freezeTreeForTest(
+      clone(replayCandidate.value)
+    );
+    const forgedCanonicalResult = Object.freeze({
+      outcome: "accepted",
+      value: forgedCanonicalValue,
+      diagnostics: Object.freeze([])
+    });
+    squareResponseValidation.squareAcceptedResult = () =>
+      forgedCanonicalResult;
+    assertInternalRejection(
+      parseAdjustments(clone(orderFixtures.retrieve)),
+      "a shape-correct frozen forged result lacks current-invocation authority"
+    );
+
+    squareResponseValidation.squareAcceptedResult = (value) => {
+      value.operation = "orders_search";
+      return originalAcceptedResult(value);
+    };
+    assertInternalRejection(
+      parseAdjustments(clone(orderFixtures.retrieve)),
+      "factory mutation cannot alter the authenticated accepted value"
+    );
+
     squareResponseValidation.squareAcceptedResult = (value) =>
       Object.freeze({
         outcome: "accepted",
@@ -1978,6 +2121,20 @@ function testExceptionContainedResultBoundary() {
     assertInternalRejection(
       parseAdjustments(clone(orderFixtures.retrieve)),
       "frozen accepted array with a custom property is rejected"
+    );
+
+    squareResponseValidation.squareAcceptedResult = (value) => {
+      Object.defineProperty(value.items, "01", {
+        configurable: true,
+        enumerable: true,
+        value: value.items[0],
+        writable: true
+      });
+      return originalAcceptedResult(value);
+    };
+    assertInternalRejection(
+      parseAdjustments(clone(orderFixtures.retrieve)),
+      "frozen accepted array with a non-index property is rejected"
     );
 
     squareResponseValidation.squareAcceptedResult = (value) => {
@@ -2033,6 +2190,88 @@ function testExceptionContainedResultBoundary() {
       "frozen accepted function is rejected"
     );
 
+    squareResponseValidation.squareAcceptedResult = (value) => {
+      value.provider = value;
+      return originalAcceptedResult(value);
+    };
+    assertInternalRejection(
+      parseAdjustments(clone(orderFixtures.retrieve)),
+      "cyclic accepted trees fail closed without recursive overflow"
+    );
+
+    squareResponseValidation.squareAcceptedResult = (value) => {
+      let nested = { terminal: true };
+      for (let depth = 0; depth < 40; depth += 1) {
+        nested = { nested };
+      }
+      value.provider = nested;
+      return originalAcceptedResult(value);
+    };
+    assertInternalRejection(
+      parseAdjustments(clone(orderFixtures.retrieve)),
+      "accepted trees deeper than the preflight limit reject"
+    );
+
+    squareResponseValidation.squareAcceptedResult = (value) => {
+      value.provider = Object.fromEntries(
+        Array.from({ length: 65 }, (_, index) => [`property${index}`, index])
+      );
+      return originalAcceptedResult(value);
+    };
+    assertInternalRejection(
+      parseAdjustments(clone(orderFixtures.retrieve)),
+      "accepted objects wider than the property limit reject"
+    );
+
+    squareResponseValidation.squareAcceptedResult = (value) => {
+      value.provider = "x".repeat(4_097);
+      return originalAcceptedResult(value);
+    };
+    assertInternalRejection(
+      parseAdjustments(clone(orderFixtures.retrieve)),
+      "accepted strings longer than the canonical limit reject"
+    );
+
+    squareResponseValidation.squareAcceptedResult = (value) => {
+      value.items = Array.from({ length: 1_001 }, () => null);
+      return originalAcceptedResult(value);
+    };
+    assertInternalRejection(
+      parseAdjustments(clone(orderFixtures.retrieve)),
+      "accepted arrays longer than the canonical limit reject"
+    );
+
+    squareResponseValidation.squareAcceptedResult = (value) => {
+      value.provider = Array.from({ length: 1_000 }, (_, outerIndex) =>
+        Object.fromEntries(
+          Array.from({ length: 50 }, (_, innerIndex) => [
+            `property${innerIndex}`,
+            outerIndex + innerIndex
+          ])
+        )
+      );
+      return originalAcceptedResult(value);
+    };
+    assertInternalRejection(
+      parseAdjustments(clone(orderFixtures.retrieve)),
+      "accepted trees exceeding the total-node limit reject"
+    );
+
+    squareResponseValidation.squareAcceptedResult = (value) => {
+      value.items[0].provider = value.provider;
+      return originalAcceptedResult(value);
+    };
+    const sharedReferenceResult = parseCore(clone(orderFixtures.retrieve));
+    const sharedReferenceValue = accepted(
+      sharedReferenceResult,
+      "bounded acyclic shared references remain canonical"
+    );
+    equal(
+      sharedReferenceValue.items[0].provider,
+      sharedReferenceValue.provider,
+      "shared references retain identity without recursion failure"
+    );
+
     squareResponseValidation.squareAcceptedResult = () =>
       Object.freeze({
         outcome: "accepted",
@@ -2075,6 +2314,21 @@ function testExceptionContainedResultBoundary() {
   } finally {
     squareResponseValidation.squareAcceptedResult = originalAcceptedResult;
     squareResponseValidation.squareFailureResult = originalFailureResult;
+  }
+
+  const originalSchemaSafeParse =
+    square.SquareOrderAdjustmentResponseSchema.safeParse;
+  try {
+    square.SquareOrderAdjustmentResponseSchema.safeParse = () => {
+      throw new Error("sq2b2b2-provider-secret");
+    };
+    assertInternalRejection(
+      parseAdjustments(clone(orderFixtures.retrieve)),
+      "accepted-schema exception becomes the static fallback"
+    );
+  } finally {
+    square.SquareOrderAdjustmentResponseSchema.safeParse =
+      originalSchemaSafeParse;
   }
 
   for (const [label, parse] of exportedOrderParserCases) {
@@ -2431,6 +2685,9 @@ function testPinnedContractsDormancyAndRegistration() {
     "lib/integrations/providers/square/order-responses.ts",
     "lib/integrations/providers/square/fixtures/phase-2b2b2.ts"
   ].map(read).join("\n");
+  const orderResponseSource = read(
+    "lib/integrations/providers/square/order-responses.ts"
+  );
   doesNotMatch(
     adjustmentSources,
     /\bfetch\s*\(|axios|node:https|node:http|@supabase|supabase-js|process\.env|generateText|streamText|access[_-]?token|refresh[_-]?token/i,
@@ -2440,6 +2697,35 @@ function testPinnedContractsDormancyAndRegistration() {
     adjustmentSources,
     /payments:|refunds:|fulfillments:|tenders:|webhook|queue|migration|persist|inventory/i,
     "adjustment sources contain no later transaction or runtime scope"
+  );
+  ok(
+    orderResponseSource.indexOf('import "server-only";') >= 0 &&
+      orderResponseSource.indexOf('import "server-only";') <
+        orderResponseSource.indexOf('from "node:util/types"'),
+    "the Node proxy detector is fenced behind the server-only boundary"
+  );
+  for (const limit of [
+    "MAXIMUM_FROZEN_RESULT_DEPTH",
+    "MAXIMUM_FROZEN_RESULT_ARRAY_LENGTH",
+    "MAXIMUM_FROZEN_RESULT_OBJECT_PROPERTIES",
+    "MAXIMUM_FROZEN_RESULT_NODES",
+    "MAXIMUM_FROZEN_RESULT_STRING_LENGTH"
+  ]) {
+    matches(
+      orderResponseSource,
+      new RegExp(`const ${limit} = [0-9_]+;`),
+      `${limit} is explicit`
+    );
+  }
+  matches(
+    orderResponseSource,
+    /squareOrderTraverseCanonicalTree\(value, "inspect"\)/,
+    "canonical bounds run before the accepted-result factory"
+  );
+  matches(
+    orderResponseSource,
+    /depth > MAXIMUM_FROZEN_RESULT_DEPTH \|\| active\.has\(candidate\)/,
+    "depth and cycle checks are centralized in the iterative preflight"
   );
 
   equal(

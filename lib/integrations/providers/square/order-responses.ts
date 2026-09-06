@@ -1,3 +1,5 @@
+import "server-only";
+
 import { isProxy } from "node:util/types";
 
 import { z } from "zod";
@@ -279,7 +281,12 @@ const MAXIMUM_ORDER_MODIFIER_QUANTITY_LENGTH = 4_096;
 const MAXIMUM_ORDER_MODIFIER_NESTING_DEPTH = 3;
 const MAXIMUM_PROVIDER_ERRORS = 100;
 const MAXIMUM_RESULT_DIAGNOSTICS = 100;
-const MAXIMUM_FROZEN_RESULT_OBJECTS = 50_000;
+const MAXIMUM_RESULT_DIAGNOSTIC_CODE_LENGTH = 80;
+const MAXIMUM_FROZEN_RESULT_DEPTH = 32;
+const MAXIMUM_FROZEN_RESULT_ARRAY_LENGTH = 1_000;
+const MAXIMUM_FROZEN_RESULT_OBJECT_PROPERTIES = 64;
+const MAXIMUM_FROZEN_RESULT_NODES = 50_000;
+const MAXIMUM_FROZEN_RESULT_STRING_LENGTH = 4_096;
 const ORDER_CURSOR_PATTERN = /^[A-Za-z0-9._~:+-]{1,4096}={0,2}$/;
 const ORDER_COMPONENT_UID_PATTERN = /^[A-Za-z0-9._-]{1,60}$/;
 const ORDER_CATALOG_IDENTIFIER_PATTERN = /^[A-Za-z0-9._:-]{1,192}$/;
@@ -1321,11 +1328,16 @@ type SquareOrderAppliedIdentityState = {
   serviceChargeUids: Set<string>;
 };
 
+type SquareOrderAcceptedResultFactory<T> = (
+  value: T
+) => SquareResponseParserResult<T>;
+
 export function parseSquareOrderCoreResponse(
   input: unknown
 ): SquareResponseParserResult<SquareOrderCoreResponse> {
   return squareOrderResultBoundary(
-    () => parseSquareOrderCoreResponseResult(input),
+    (acceptedResult) =>
+      parseSquareOrderCoreResponseResult(input, acceptedResult),
     SquareOrderCoreResponseSchema
   );
 }
@@ -1334,7 +1346,8 @@ export function parseSquareOrderLineItemResponse(
   input: unknown
 ): SquareResponseParserResult<SquareOrderLineItemResponse> {
   return squareOrderResultBoundary(
-    () => parseSquareOrderLineItemResponseResult(input),
+    (acceptedResult) =>
+      parseSquareOrderLineItemResponseResult(input, acceptedResult),
     SquareOrderLineItemResponseSchema
   );
 }
@@ -1343,30 +1356,33 @@ export function parseSquareOrderAdjustmentResponse(
   input: unknown
 ): SquareResponseParserResult<SquareOrderAdjustmentResponse> {
   return squareOrderResultBoundary(
-    () => parseSquareOrderAdjustmentResponseResult(input),
+    (acceptedResult) =>
+      parseSquareOrderAdjustmentResponseResult(input, acceptedResult),
     SquareOrderAdjustmentResponseSchema
   );
 }
 
 function parseSquareOrderCoreResponseResult(
-  input: unknown
+  input: unknown,
+  acceptedResult: SquareOrderAcceptedResultFactory<SquareOrderCoreResponse>
 ): SquareResponseParserResult<SquareOrderCoreResponse> {
   try {
-    return squareAcceptedResult(parseSquareOrderEnvelope(input).coreResponse);
+    return acceptedResult(parseSquareOrderEnvelope(input).coreResponse);
   } catch (error) {
     return squareOrderParserFailureResult(error);
   }
 }
 
 function parseSquareOrderLineItemResponseResult(
-  input: unknown
+  input: unknown,
+  acceptedResult: SquareOrderAcceptedResultFactory<SquareOrderLineItemResponse>
 ): SquareResponseParserResult<SquareOrderLineItemResponse> {
   try {
     const parsed = parseSquareOrderEnvelope(input);
     const items = parsed.orders.map(({ raw, core }) =>
       minimizeSquareOrderLineItemDetail(raw, core, parsed.provenance)
     );
-    return squareAcceptedResult(
+    return acceptedResult(
       SquareOrderLineItemResponseSchema.parse({
         contractVersion: SQUARE_ORDER_LINE_ITEM_RESPONSE_CONTRACT_VERSION,
         minimizationVersion: SQUARE_ORDER_LINE_ITEM_MINIMIZATION_VERSION,
@@ -1388,7 +1404,8 @@ function parseSquareOrderLineItemResponseResult(
 }
 
 function parseSquareOrderAdjustmentResponseResult(
-  input: unknown
+  input: unknown,
+  acceptedResult: SquareOrderAcceptedResultFactory<SquareOrderAdjustmentResponse>
 ): SquareResponseParserResult<SquareOrderAdjustmentResponse> {
   try {
     const parsed = parseSquareOrderEnvelope(input);
@@ -1404,7 +1421,7 @@ function parseSquareOrderAdjustmentResponseResult(
         parsed.provenance
       );
     });
-    return squareAcceptedResult(
+    return acceptedResult(
       SquareOrderAdjustmentResponseSchema.parse({
         contractVersion: SQUARE_ORDER_ADJUSTMENT_RESPONSE_CONTRACT_VERSION,
         minimizationVersion: SQUARE_ORDER_ADJUSTMENT_MINIMIZATION_VERSION,
@@ -1479,6 +1496,13 @@ function parseSquareOrderEnvelope(input: unknown): SquareParsedOrderEnvelope {
 }
 
 function squareOrderParserFailureResult(error: unknown) {
+  if (
+    error !== null &&
+    (typeof error === "object" || typeof error === "function") &&
+    isProxy(error)
+  ) {
+    return SQUARE_ORDER_INTERNAL_REJECTION_RESULT;
+  }
   if (error instanceof SquareOrderUnsupportedProjectionFailure) {
     return squareUnsupportedResult(error.code, error.field);
   }
@@ -4201,11 +4225,45 @@ function isOrderProviderVersionText(value: string) {
 }
 
 function squareOrderResultBoundary<T>(
-  produceResult: () => SquareResponseParserResult<T>,
+  produceResult: (
+    acceptedResult: SquareOrderAcceptedResultFactory<T>
+  ) => SquareResponseParserResult<T>,
   acceptedSchema: z.ZodType<T>
 ): SquareResponseParserResult<T> {
+  const acceptance = {
+    present: false,
+    result: null as unknown,
+    value: null as unknown,
+    fingerprint: null as string | null
+  };
   try {
-    return squareOrderRootDiagnosticResult(produceResult(), acceptedSchema);
+    const acceptedResult: SquareOrderAcceptedResultFactory<T> = (value) => {
+      if (!squareOrderTraverseCanonicalTree(value, "inspect")) {
+        return SQUARE_ORDER_INTERNAL_REJECTION_RESULT;
+      }
+      const fingerprint = squareMinimizedProjectionFingerprint(value);
+      const result = squareAcceptedResult(value);
+      if (
+        squareOrderHasExactDataProperties(result, [
+          "outcome",
+          "value",
+          "diagnostics"
+        ]) &&
+        squareOrderDataProperty(result, "outcome") === "accepted" &&
+        squareOrderDataProperty(result, "value") === value
+      ) {
+        acceptance.present = true;
+        acceptance.result = result;
+        acceptance.value = value;
+        acceptance.fingerprint = fingerprint;
+      }
+      return result;
+    };
+    return squareOrderRootDiagnosticResult(
+      produceResult(acceptedResult),
+      acceptedSchema,
+      acceptance
+    );
   } catch {
     return SQUARE_ORDER_INTERNAL_REJECTION_RESULT;
   }
@@ -4213,7 +4271,13 @@ function squareOrderResultBoundary<T>(
 
 function squareOrderRootDiagnosticResult<T>(
   result: unknown,
-  acceptedSchema: z.ZodType<T>
+  acceptedSchema: z.ZodType<T>,
+  acceptance: Readonly<{
+    present: boolean;
+    result: unknown;
+    value: unknown;
+    fingerprint: string | null;
+  }>
 ): SquareResponseParserResult<T> {
   if (!squareOrderHasExactDataProperties(result, ["outcome", "diagnostics"])) {
     if (
@@ -4231,6 +4295,9 @@ function squareOrderRootDiagnosticResult<T>(
   if (outcome === "accepted") {
     const value = squareOrderDataProperty(result, "value");
     if (
+      !acceptance.present ||
+      result !== acceptance.result ||
+      value !== acceptance.value ||
       !squareOrderHasExactDataProperties(result, [
         "outcome",
         "value",
@@ -4240,7 +4307,8 @@ function squareOrderRootDiagnosticResult<T>(
         squareOrderDataProperty(result, "diagnostics")
       ) ||
       !squareOrderIsDeeplyFrozen(result) ||
-      !acceptedSchema.safeParse(value).success
+      !acceptedSchema.safeParse(value).success ||
+      squareMinimizedProjectionFingerprint(value) !== acceptance.fingerprint
     ) {
       return SQUARE_ORDER_INTERNAL_REJECTION_RESULT;
     }
@@ -4272,16 +4340,26 @@ function squareOrderSanitizedDiagnostics(
   if (
     isProxy(value) ||
     !Array.isArray(value) ||
-    Object.getPrototypeOf(value) !== Array.prototype ||
-    value.length < 1 ||
-    value.length > MAXIMUM_RESULT_DIAGNOSTICS ||
-    Reflect.ownKeys(value).length !== value.length + 1
+    Object.getPrototypeOf(value) !== Array.prototype
   ) {
     return null;
   }
+  const lengthDescriptor = Object.getOwnPropertyDescriptor(value, "length");
+  if (
+    !lengthDescriptor ||
+    !("value" in lengthDescriptor) ||
+    lengthDescriptor.enumerable ||
+    !Number.isSafeInteger(lengthDescriptor.value) ||
+    lengthDescriptor.value < 1 ||
+    lengthDescriptor.value > MAXIMUM_RESULT_DIAGNOSTICS
+  ) {
+    return null;
+  }
+  const length = lengthDescriptor.value;
+  if (Reflect.ownKeys(value).length !== length + 1) return null;
 
   const diagnostics = [];
-  for (let index = 0; index < value.length; index += 1) {
+  for (let index = 0; index < length; index += 1) {
     const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
     if (!descriptor?.enumerable || !("value" in descriptor)) return null;
     const diagnostic = descriptor.value;
@@ -4294,6 +4372,7 @@ function squareOrderSanitizedDiagnostics(
     const field = squareOrderDataProperty(diagnostic, "field");
     if (
       typeof code !== "string" ||
+      code.length > MAXIMUM_RESULT_DIAGNOSTIC_CODE_LENGTH ||
       !SQUARE_ORDER_DIAGNOSTIC_CODES.has(code) ||
       typeof field !== "string" ||
       field.length > 160
@@ -4354,82 +4433,133 @@ function squareOrderIsEmptyFrozenArray(value: unknown) {
   if (
     isProxy(value) ||
     !Array.isArray(value) ||
-    Object.getPrototypeOf(value) !== Array.prototype ||
-    !Object.isFrozen(value)
+    Object.getPrototypeOf(value) !== Array.prototype
   ) {
     return false;
   }
   const length = Object.getOwnPropertyDescriptor(value, "length");
   return (
-    Reflect.ownKeys(value).length === 1 &&
     length !== undefined &&
     "value" in length &&
-    length.value === 0
+    !length.enumerable &&
+    length.value === 0 &&
+    Object.isFrozen(value) &&
+    Reflect.ownKeys(value).length === 1
   );
 }
 
 function squareOrderIsDeeplyFrozen(value: unknown) {
-  const seen = new Set<object>();
-  const pending = [value];
-  while (pending.length > 0) {
-    const candidate = pending.pop();
-    if (
-      candidate === null ||
-      (typeof candidate !== "object" && typeof candidate !== "function")
-    ) {
-      continue;
+  return squareOrderTraverseCanonicalTree(value, "verify");
+}
+
+function squareOrderTraverseCanonicalTree(
+  value: unknown,
+  mode: "inspect" | "verify"
+) {
+  type Frame = {
+    readonly value: object;
+    readonly children: readonly unknown[];
+    readonly depth: number;
+    childIndex: number;
+  };
+
+  const active = new Set<object>();
+  const pending: Frame[] = [];
+  let nodeCount = 0;
+
+  const enter = (candidate: unknown, depth: number) => {
+    nodeCount += 1;
+    if (nodeCount > MAXIMUM_FROZEN_RESULT_NODES) return false;
+    if (candidate === null) return true;
+    if (typeof candidate === "string") {
+      return candidate.length <= MAXIMUM_FROZEN_RESULT_STRING_LENGTH;
     }
-    if (typeof candidate === "function" || isProxy(candidate)) return false;
-    if (seen.has(candidate)) continue;
-    if (
-      seen.size >= MAXIMUM_FROZEN_RESULT_OBJECTS ||
-      !Object.isFrozen(candidate) ||
-      !squareOrderHasCanonicalContainerShape(candidate)
-    ) {
+    if (typeof candidate === "boolean") {
+      return true;
+    }
+    if (typeof candidate === "number") {
+      return Number.isFinite(candidate) && !Object.is(candidate, -0);
+    }
+    if (typeof candidate !== "object" && typeof candidate !== "function") {
       return false;
     }
-    seen.add(candidate);
-    for (const key of Reflect.ownKeys(candidate)) {
-      const descriptor = Object.getOwnPropertyDescriptor(candidate, key);
-      if (!descriptor || !("value" in descriptor)) return false;
-      pending.push(descriptor.value);
+    if (typeof candidate === "function" || isProxy(candidate)) return false;
+    if (depth > MAXIMUM_FROZEN_RESULT_DEPTH || active.has(candidate)) {
+      return false;
     }
+    if (mode === "verify" && !Object.isFrozen(candidate)) return false;
+    const children = squareOrderCanonicalDataValues(candidate);
+    if (children === null) return false;
+    active.add(candidate);
+    pending.push({ value: candidate, children, depth, childIndex: 0 });
+    return true;
+  };
+
+  if (!enter(value, 0)) return false;
+  while (pending.length > 0) {
+    const frame = pending[pending.length - 1];
+    if (frame.childIndex < frame.children.length) {
+      const child = frame.children[frame.childIndex];
+      frame.childIndex += 1;
+      if (!enter(child, frame.depth + 1)) return false;
+      continue;
+    }
+    active.delete(frame.value);
+    pending.pop();
   }
   return true;
 }
 
-function squareOrderHasCanonicalContainerShape(value: object) {
-  if (isProxy(value)) return false;
-  const ownKeys = Reflect.ownKeys(value);
+function squareOrderCanonicalDataValues(value: object): readonly unknown[] | null {
+  if (isProxy(value)) return null;
   if (Array.isArray(value)) {
-    if (
-      Object.getPrototypeOf(value) !== Array.prototype ||
-      ownKeys.length !== value.length + 1
-    ) {
-      return false;
-    }
+    if (Object.getPrototypeOf(value) !== Array.prototype) return null;
     const length = Object.getOwnPropertyDescriptor(value, "length");
     if (
       !length ||
       !("value" in length) ||
       length.enumerable ||
-      length.value !== value.length
+      !Number.isSafeInteger(length.value) ||
+      length.value < 0 ||
+      length.value > MAXIMUM_FROZEN_RESULT_ARRAY_LENGTH
     ) {
-      return false;
+      return null;
     }
-    for (let index = 0; index < value.length; index += 1) {
+    const ownKeys = Reflect.ownKeys(value);
+    if (ownKeys.length !== length.value + 1) return null;
+    for (const key of ownKeys) {
+      if (key === "length") continue;
+      if (typeof key !== "string") return null;
+      const index = Number(key);
+      if (
+        !Number.isSafeInteger(index) ||
+        index < 0 ||
+        index >= length.value ||
+        String(index) !== key
+      ) {
+        return null;
+      }
+    }
+    const children = [];
+    for (let index = 0; index < length.value; index += 1) {
       const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
-      if (!descriptor?.enumerable || !("value" in descriptor)) return false;
+      if (!descriptor?.enumerable || !("value" in descriptor)) return null;
+      children.push(descriptor.value);
     }
-    return true;
+    return children;
   }
 
-  if (Object.getPrototypeOf(value) !== Object.prototype) return false;
-  return ownKeys.every((key) => {
-    if (typeof key !== "string") return false;
+  if (Object.getPrototypeOf(value) !== Object.prototype) return null;
+  const ownKeys = Reflect.ownKeys(value);
+  if (ownKeys.length > MAXIMUM_FROZEN_RESULT_OBJECT_PROPERTIES) return null;
+  const children = [];
+  for (const key of ownKeys) {
+    if (typeof key !== "string") return null;
     const descriptor = Object.getOwnPropertyDescriptor(value, key);
-    return descriptor?.enumerable === true && "value" in descriptor;
-  });
+    if (!descriptor?.enumerable || !("value" in descriptor)) return null;
+    children.push(descriptor.value);
+  }
+  return children;
 }
 
 class SquareOrderUnsupportedProjectionFailure extends Error {
