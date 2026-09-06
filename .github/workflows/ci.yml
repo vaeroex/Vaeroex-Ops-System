@@ -87,6 +87,9 @@ jobs:
       - name: External integrations Square Payment response validation regressions
         run: pnpm test:external-integrations-square-payments
 
+      - name: External integrations Square Refund response validation regressions
+        run: pnpm test:external-integrations-square-refunds
+
       - name: External integrations architecture regressions
         run: pnpm test:external-integrations-architecture
 
