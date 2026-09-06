@@ -4371,10 +4371,12 @@ function squareOrderIsDeeplyFrozen(value: unknown) {
     ) {
       continue;
     }
+    if (typeof candidate === "function") return false;
     if (seen.has(candidate)) continue;
     if (
       seen.size >= MAXIMUM_FROZEN_RESULT_OBJECTS ||
-      !Object.isFrozen(candidate)
+      !Object.isFrozen(candidate) ||
+      !squareOrderHasCanonicalContainerShape(candidate)
     ) {
       return false;
     }
@@ -4386,6 +4388,39 @@ function squareOrderIsDeeplyFrozen(value: unknown) {
     }
   }
   return true;
+}
+
+function squareOrderHasCanonicalContainerShape(value: object) {
+  const ownKeys = Reflect.ownKeys(value);
+  if (Array.isArray(value)) {
+    if (
+      Object.getPrototypeOf(value) !== Array.prototype ||
+      ownKeys.length !== value.length + 1
+    ) {
+      return false;
+    }
+    const length = Object.getOwnPropertyDescriptor(value, "length");
+    if (
+      !length ||
+      !("value" in length) ||
+      length.enumerable ||
+      length.value !== value.length
+    ) {
+      return false;
+    }
+    for (let index = 0; index < value.length; index += 1) {
+      const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+      if (!descriptor?.enumerable || !("value" in descriptor)) return false;
+    }
+    return true;
+  }
+
+  if (Object.getPrototypeOf(value) !== Object.prototype) return false;
+  return ownKeys.every((key) => {
+    if (typeof key !== "string") return false;
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    return descriptor?.enumerable === true && "value" in descriptor;
+  });
 }
 
 class SquareOrderUnsupportedProjectionFailure extends Error {

@@ -1879,6 +1879,50 @@ function testExceptionContainedResultBoundary() {
       "mutable nested accepted adjustment value is rejected"
     );
 
+    squareResponseValidation.squareAcceptedResult = (value) => {
+      value.items.providerPayload = "sq2b2b2-provider-secret";
+      return originalAcceptedResult(value);
+    };
+    assertInternalRejection(
+      parseAdjustments(clone(orderFixtures.retrieve)),
+      "frozen accepted array with a custom property is rejected"
+    );
+
+    squareResponseValidation.squareAcceptedResult = (value) => {
+      Object.defineProperty(value.items[0], "providerPayload", {
+        configurable: true,
+        enumerable: false,
+        value: "sq2b2b2-provider-secret",
+        writable: true
+      });
+      return originalAcceptedResult(value);
+    };
+    assertInternalRejection(
+      parseAdjustments(clone(orderFixtures.retrieve)),
+      "frozen accepted object with a hidden property is rejected"
+    );
+
+    squareResponseValidation.squareAcceptedResult = (value) => {
+      value.items[0][Symbol("providerPayload")] =
+        "sq2b2b2-provider-secret";
+      return originalAcceptedResult(value);
+    };
+    assertInternalRejection(
+      parseAdjustments(clone(orderFixtures.retrieve)),
+      "frozen accepted object with a symbol property is rejected"
+    );
+
+    squareResponseValidation.squareAcceptedResult = (value) => {
+      Object.setPrototypeOf(value.items[0].taxes[0], {
+        providerPayload: "sq2b2b2-provider-secret"
+      });
+      return originalAcceptedResult(value);
+    };
+    assertInternalRejection(
+      parseAdjustments(clone(orderFixtures.retrieve)),
+      "frozen accepted object with a custom prototype is rejected"
+    );
+
     squareResponseValidation.squareAcceptedResult = () =>
       Object.freeze({
         outcome: "accepted",
