@@ -334,8 +334,9 @@ const MAXIMUM_RESULT_DIAGNOSTIC_CODE_LENGTH = 80;
 const MAXIMUM_FROZEN_RESULT_DEPTH = 32;
 const MAXIMUM_FROZEN_RESULT_ARRAY_LENGTH = 1_000;
 const MAXIMUM_FROZEN_RESULT_OBJECT_PROPERTIES = 64;
-// Tender details add one wrapper object and one tenders array per Order.
-const MAXIMUM_FROZEN_RESULT_NODES = 52_000;
+// Current Order projections expand a 20,000-value raw response to at most
+// 57,319 containers, including the accepted-result wrapper.
+const MAXIMUM_FROZEN_RESULT_NODES = 60_000;
 const MAXIMUM_FROZEN_RESULT_STRING_LENGTH = 4_096;
 const ORDER_CURSOR_PATTERN = /^[A-Za-z0-9._~:+-]{1,4096}={0,2}$/;
 const ORDER_COMPONENT_UID_PATTERN = /^[A-Za-z0-9._-]{1,60}$/;

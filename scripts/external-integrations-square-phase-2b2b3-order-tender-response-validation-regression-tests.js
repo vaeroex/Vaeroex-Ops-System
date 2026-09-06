@@ -110,6 +110,7 @@ const EXPECTED_ORDER_TENDER_DETAIL_FINGERPRINT =
   "sha256:d2ee980b11131a78e4ea1351f1677720b5b55ae53781a16c2230a02dd469f57c";
 const EXPECTED_ORDER_TENDER_RESPONSE_FINGERPRINT =
   "sha256:dae08df69fe87134902a04b18726604b8d8c84dcceec82a928ebc9d01312a86e";
+const EXPECTED_MAXIMUM_FROZEN_RESULT_CONTAINERS = 60_000;
 
 const orderFixtures = square.SQUARE_PHASE_2B2B3_ORDER_FIXTURES;
 const canaries = Object.values(square.SQUARE_PHASE_2B2B3_SYNTHETIC_CANARIES);
@@ -151,6 +152,40 @@ function jsonValueCount(value) {
     }
   }
   return count;
+}
+
+function expandedContainerCount(value) {
+  let count = 0;
+  const pending = [value];
+  while (pending.length > 0) {
+    const candidate = pending.pop();
+    if (candidate !== null && typeof candidate === "object") {
+      count += 1;
+      pending.push(...Object.values(candidate));
+    }
+  }
+  return count;
+}
+
+function repeatedContainerGraph(containerCount) {
+  const branchContainerCount = 60;
+  const sharedBranch = Array.from(
+    { length: branchContainerCount - 1 },
+    () => ({})
+  );
+  const graph = [];
+  let remaining = containerCount - 1;
+  while (remaining >= branchContainerCount) {
+    graph.push(sharedBranch);
+    remaining -= branchContainerCount;
+  }
+  if (remaining > 0) {
+    graph.push(Array.from({ length: remaining - 1 }, () => ({})));
+  }
+  if (containerCount < 1 || graph.length > 1_000) {
+    throw new Error("test container graph exceeds canonical limits");
+  }
+  return graph;
 }
 
 function freezeTreeForTest(value, skipped = new Set(), seen = new Set()) {
@@ -877,18 +912,28 @@ function testEnvelopeStructuralAndDiagnosticSafety() {
 }
 
 function testRawAndProjectionBoundsAcrossParsers() {
-  const maximumTenders = Array.from({ length: 1_000 }, (_, index) => ({
-    id: `SQ2B2B3MAXTENDER${String(index).padStart(4, "0")}`,
+  const fullyPopulatedTender = (index, prefix = "MAX") => ({
+    id: `SQ2B2B3${prefix}TENDER${String(index).padStart(4, "0")}`,
     location_id: square.SQUARE_PHASE_2B2A_SYNTHETIC_LOCATION_ID,
     created_at: "2026-08-19T16:20:21Z",
     type: "CARD",
     amount_money: { amount: index, currency: "USD" },
     tip_money: { amount: 0, currency: "USD" },
-    payment_id: `SQ2B2B3MAXPAYMENT${String(index).padStart(4, "0")}`
-  }));
-  const maximumTenderResponse = responseWithOrder(
-    square.squarePhase2B2B2Order({ tenders: maximumTenders })
+    payment_id: `SQ2B2B3${prefix}PAYMENT${String(index).padStart(4, "0")}`
+  });
+  const maximumTenders = Array.from({ length: 1_000 }, (_, index) =>
+    fullyPopulatedTender(index)
   );
+  const maximumLineItems = Array.from({ length: 1_000 }, (_, index) => ({
+    uid: `SQ2B2B3MAXLINE${String(index).padStart(4, "0")}`,
+    quantity: "1"
+  }));
+  const maximumTenderResponse = responseWithOrder({
+    id: square.SQUARE_PHASE_2B2A_SYNTHETIC_ORDER_ID,
+    location_id: square.SQUARE_PHASE_2B2A_SYNTHETIC_LOCATION_ID,
+    line_items: maximumLineItems,
+    tenders: maximumTenders
+  });
   for (const parserName of exportedOrderParsers()) {
     const value = accepted(
       parseWith(parserName, clone(maximumTenderResponse)),
@@ -896,6 +941,67 @@ function testRawAndProjectionBoundsAcrossParsers() {
     );
     equal(value.itemCount, 1, `${parserName} retains the containing Order`);
   }
+
+  const maximumFullyPopulatedTenderResponse = {
+    orders: [
+      {
+        id: "SQ2B2B3FULLORDER0000",
+        location_id: square.SQUARE_PHASE_2B2A_SYNTHETIC_LOCATION_ID,
+        total_money: {},
+        total_tax_money: {},
+        total_discount_money: {},
+        total_tip_money: {},
+        total_service_charge_money: {},
+        tenders: Array.from({ length: 1_000 }, (_, index) =>
+          fullyPopulatedTender(index, "FULL")
+        )
+      },
+      {
+        id: "SQ2B2B3FULLORDER0001",
+        location_id: square.SQUARE_PHASE_2B2A_SYNTHETIC_LOCATION_ID,
+        total_money: {},
+        total_tax_money: {},
+        total_discount_money: {},
+        total_tip_money: {},
+        total_service_charge_money: {},
+        tenders: Array.from({ length: 665 }, (_, index) =>
+          fullyPopulatedTender(index + 1_000, "FULL")
+        )
+      }
+    ]
+  };
+  equal(
+    jsonValueCount(maximumFullyPopulatedTenderResponse),
+    20_000,
+    "fully populated Tenders reach the accepted raw-value ceiling"
+  );
+  let maximumFullyPopulatedTenderResult;
+  for (const parserName of exportedOrderParsers()) {
+    const result = parseWith(
+      parserName,
+      clone(maximumFullyPopulatedTenderResponse),
+      "orders_search"
+    );
+    const value = accepted(
+      result,
+      `${parserName} accepts the maximum fully populated Tender response`
+    );
+    equal(value.itemCount, 2, `${parserName} retains both maximum Tender Orders`);
+    if (parserName === "parseSquareOrderTenderResponse") {
+      maximumFullyPopulatedTenderResult = result;
+      equal(
+        value.items.reduce((count, item) => count + item.tenderCount, 0),
+        1_665,
+        "Tender parser retains every fully populated Tender"
+      );
+    }
+  }
+  equal(
+    expandedContainerCount(maximumFullyPopulatedTenderResult),
+    8_366,
+    "maximum fully populated Tender response stays within the result limit"
+  );
+
   const oversizedTenderResponse = responseWithOrder(
     square.squarePhase2B2B2Order({
       tenders: [...maximumTenders, { id: "SQ2B2B3MAXTENDER1000", type: "NO_SALE" }]
@@ -953,22 +1059,30 @@ function testRawAndProjectionBoundsAcrossParsers() {
     );
   }
 
-  const maximumSearchOrders = Array.from({ length: 1_000 }, (_, index) => ({
-    id: `SQ2B2B3MAXSEARCHORDER${String(index).padStart(4, "0")}`,
-    location_id: square.SQUARE_PHASE_2B2A_SYNTHETIC_LOCATION_ID
-  }));
-  const maximumSearchLineItemCounts = [1_000, 1_000, 1_000, 1_000, 248];
-  maximumSearchLineItemCounts.forEach((count, orderIndex) => {
-    maximumSearchOrders[orderIndex].line_items = Array.from(
-      { length: count },
-      (_, lineIndex) => ({
-        uid: `S${orderIndex}${lineIndex}`,
-        quantity: "1",
-        base_price_money: {}
-      })
-    );
-  });
-  maximumSearchOrders[999].future_provider_field = true;
+  const searchOrdersWithLineItems = (counts) => {
+    const orders = Array.from({ length: 1_000 }, (_, index) => ({
+      id: `SQ2B2B3MAXSEARCHORDER${String(index).padStart(4, "0")}`,
+      location_id: square.SQUARE_PHASE_2B2A_SYNTHETIC_LOCATION_ID
+    }));
+    counts.forEach((count, orderIndex) => {
+      orders[orderIndex].line_items = Array.from(
+        { length: count },
+        (_, lineIndex) => ({
+          uid: `S${orderIndex}${lineIndex}`,
+          quantity: "1"
+        })
+      );
+    });
+    return orders;
+  };
+  const maximumSearchOrders = searchOrdersWithLineItems([
+    1_000,
+    1_000,
+    1_000,
+    1_000,
+    1_000,
+    664
+  ]);
   const maximumSearchResponse = { orders: maximumSearchOrders };
   equal(
     jsonValueCount(maximumSearchResponse),
@@ -976,13 +1090,15 @@ function testRawAndProjectionBoundsAcrossParsers() {
     "maximum Search regression reaches the accepted raw-value ceiling"
   );
   let maximumSearchTender;
+  let maximumSearchTenderResult;
   for (const parserName of exportedOrderParsers()) {
+    const result = parseWith(
+      parserName,
+      clone(maximumSearchResponse),
+      "orders_search"
+    );
     const value = accepted(
-      parseWith(
-        parserName,
-        clone(maximumSearchResponse),
-        "orders_search"
-      ),
+      result,
       `${parserName} accepts the 20,000-value maximum Search response`
     );
     equal(
@@ -992,6 +1108,7 @@ function testRawAndProjectionBoundsAcrossParsers() {
     );
     if (parserName === "parseSquareOrderTenderResponse") {
       maximumSearchTender = value;
+      maximumSearchTenderResult = result;
     }
   }
   ok(maximumSearchTender, "maximum Search response reaches the Tender parser");
@@ -1005,6 +1122,55 @@ function testRawAndProjectionBoundsAcrossParsers() {
     maximumSearchTender.items[999].tenders,
     [],
     "omitted Tenders remain an empty collection at the maximum Search bound"
+  );
+  equal(
+    expandedContainerCount(maximumSearchTenderResult),
+    57_319,
+    "maximum current Order projection remains below the frozen-container limit"
+  );
+
+  const combinedMaximumOrders = searchOrdersWithLineItems([
+    1_000,
+    1_000,
+    1_000,
+    1_000,
+    997
+  ]);
+  combinedMaximumOrders[0].tenders = Array.from(
+    { length: 1_000 },
+    () => ({ type: "NO_SALE" })
+  );
+  combinedMaximumOrders[999].future_provider_field = true;
+  const combinedMaximumResponse = { orders: combinedMaximumOrders };
+  equal(
+    jsonValueCount(combinedMaximumResponse),
+    20_000,
+    "maximum Tender combination reaches the accepted raw-value ceiling"
+  );
+  let combinedMaximumTenderResult;
+  for (const parserName of exportedOrderParsers()) {
+    const result = parseWith(
+      parserName,
+      clone(combinedMaximumResponse),
+      "orders_search"
+    );
+    const value = accepted(
+      result,
+      `${parserName} accepts maximum Tenders with a near-limit adjustment projection`
+    );
+    equal(
+      value.itemCount,
+      1_000,
+      `${parserName} preserves the combined maximum Order count`
+    );
+    if (parserName === "parseSquareOrderTenderResponse") {
+      combinedMaximumTenderResult = result;
+    }
+  }
+  equal(
+    expandedContainerCount(combinedMaximumTenderResult),
+    53_983,
+    "maximum Tender combination stays within the accepted-result limit"
   );
 }
 
@@ -1082,25 +1248,68 @@ function testExceptionContainedAcceptedBoundary() {
       "cyclic accepted result rejects deterministically"
     );
 
-    const originalSchemaSafeParse = square.SquareOrderTenderResponseSchema.safeParse;
-    let safeParseCalls = 0;
+    const originalSchemaSafeParse =
+      square.SquareOrderTenderResponseSchema.safeParse;
+    const originalProjectionFingerprint =
+      squareResponseValidation.squareMinimizedProjectionFingerprint;
     try {
-      square.SquareOrderTenderResponseSchema.safeParse = (...args) => {
-        safeParseCalls += 1;
-        return originalSchemaSafeParse(...args);
-      };
-      squareResponseValidation.squareAcceptedResult = (value) => {
-        const shared = Array.from({ length: 52 }, () => ({}));
-        value.provider = Array.from({ length: 1_000 }, () => shared);
-        return originalAcceptedResult(value);
-      };
-      assertInternalRejection(
-        parseTenders(clone(orderFixtures.retrieve)),
-        "expanded shared-container graph rejects at the canonical preflight"
-      );
-      equal(safeParseCalls, 1, "oversized canonical graph rejects before boundary schema revalidation");
+      for (const [containerCount, expectedSafeParseCalls, expectedFingerprintCalls] of [
+        [EXPECTED_MAXIMUM_FROZEN_RESULT_CONTAINERS, 2, 1],
+        [EXPECTED_MAXIMUM_FROZEN_RESULT_CONTAINERS + 1, 1, 0]
+      ]) {
+        let safeParseCalls = 0;
+        let postFactoryFingerprintCalls = 0;
+        let factoryReturned = false;
+        let injectedContainerCount = 0;
+        square.SquareOrderTenderResponseSchema.safeParse = (...args) => {
+          safeParseCalls += 1;
+          if (safeParseCalls === 1) {
+            return originalSchemaSafeParse(...args);
+          }
+          return { success: true, data: args[0] };
+        };
+        squareResponseValidation.squareMinimizedProjectionFingerprint = (
+          ...args
+        ) => {
+          if (factoryReturned) postFactoryFingerprintCalls += 1;
+          return originalProjectionFingerprint(...args);
+        };
+        squareResponseValidation.squareAcceptedResult = (value) => {
+          const originalContainerCount = expandedContainerCount(value);
+          value.provider = repeatedContainerGraph(
+            containerCount - originalContainerCount - 1
+          );
+          const result = originalAcceptedResult(value);
+          injectedContainerCount = expandedContainerCount(result);
+          factoryReturned = true;
+          return result;
+        };
+        assertInternalRejection(
+          parseTenders(clone(orderFixtures.retrieve)),
+          containerCount === EXPECTED_MAXIMUM_FROZEN_RESULT_CONTAINERS
+            ? "the exact frozen-container limit reaches schema and fingerprint validation"
+            : "the first container above the limit rejects at the canonical preflight"
+        );
+        equal(
+          injectedContainerCount,
+          containerCount,
+          "shared-container graph reaches the exact requested traversal count"
+        );
+        equal(
+          safeParseCalls,
+          expectedSafeParseCalls,
+          "container boundary gates schema revalidation at the exact threshold"
+        );
+        equal(
+          postFactoryFingerprintCalls,
+          expectedFingerprintCalls,
+          "container boundary gates post-factory fingerprint traversal"
+        );
+      }
     } finally {
       square.SquareOrderTenderResponseSchema.safeParse = originalSchemaSafeParse;
+      squareResponseValidation.squareMinimizedProjectionFingerprint =
+        originalProjectionFingerprint;
     }
 
     squareResponseValidation.squareAcceptedResult = () => {
