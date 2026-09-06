@@ -45,6 +45,7 @@ const credentials = require("../lib/integrations/credentials/index.ts");
 const qbo = require("../lib/integrations/providers/qbo/index.ts");
 const qboOAuth = require("../lib/integrations/provider-runtime/qbo/oauth-policy.ts");
 const operationPolicy = require("../lib/integrations/provider-runtime/read-only-operation-policy.ts");
+const squareResponseValidation = require("../lib/integrations/providers/square/response-validation.ts");
 const square = require("../lib/integrations/providers/square/index.ts");
 
 let assertionCount = 0;
@@ -212,6 +213,21 @@ function unsupported(result, message) {
 
 function incompatible(result, message) {
   expectOutcome(result, "incompatible-version", message);
+}
+
+function assertInternalRejection(result, message) {
+  rejected(result, message);
+  deepEqual(
+    result.diagnostics,
+    [
+      {
+        code: "square_response_internal_rejection",
+        field: "$response"
+      }
+    ],
+    `${message}: only the static internal diagnostic is emitted`
+  );
+  assertDeeplyFrozen(result, `${message}: fallback result`);
 }
 
 function assertFingerprintShape(fingerprint, message) {
@@ -666,6 +682,114 @@ function testStructuralSafety() {
   equal(doubleFaultResult.diagnostics[0].field, "$response", "double-fault parser exception paths collapse to the static response root");
 }
 
+function testResultBoundaryContainment() {
+  const originalFailureResult = squareResponseValidation.squareFailureResult;
+  try {
+    squareResponseValidation.squareFailureResult = () => {
+      throw new Error("sq2b2a-provider-error-secret");
+    };
+    assertInternalRejection(
+      parseRawInput(null),
+      "failure-factory exceptions remain inside the parser boundary"
+    );
+
+    squareResponseValidation.squareFailureResult = () =>
+      new Proxy(
+        {
+          outcome: "rejected",
+          diagnostics: []
+        },
+        {
+          getOwnPropertyDescriptor(target, key) {
+            if (key === "diagnostics") {
+              throw new Error("sq2b2a-provider-error-secret");
+            }
+            return Reflect.getOwnPropertyDescriptor(target, key);
+          }
+        }
+      );
+    assertInternalRejection(
+      parseRawInput(null),
+      "sanitizer exceptions remain inside the parser boundary"
+    );
+
+    squareResponseValidation.squareFailureResult = () => ({
+      outcome: "rejected",
+      diagnostics: [
+        {
+          code: "sq2b2a-provider-error-secret",
+          field: "$response.sq2b2a-attacker-key"
+        }
+      ]
+    });
+    assertInternalRejection(
+      parseRawInput(null),
+      "malformed diagnostics cannot reflect hostile codes or paths"
+    );
+
+    squareResponseValidation.squareFailureResult = () => ({
+      outcome: "sq2b2a-provider-error-secret",
+      diagnostics: [
+        {
+          code: "square_response_internal_rejection",
+          field: "$response"
+        }
+      ]
+    });
+    assertInternalRejection(
+      parseRawInput(null),
+      "unknown result outcomes fail closed instead of bypassing sanitation"
+    );
+  } finally {
+    squareResponseValidation.squareFailureResult = originalFailureResult;
+  }
+
+  const originalAcceptedResult = squareResponseValidation.squareAcceptedResult;
+  try {
+    squareResponseValidation.squareAcceptedResult = (value) =>
+      Object.freeze({
+        outcome: "accepted",
+        value,
+        diagnostics: Object.freeze([
+          Object.freeze({
+            code: "sq2b2a-provider-error-secret",
+            field: "$response.sq2b2a-attacker-key"
+          })
+        ])
+      });
+    assertInternalRejection(
+      parseOrder(clone(orderFixtures.retrieve)),
+      "accepted outcomes cannot carry diagnostics"
+    );
+
+    squareResponseValidation.squareAcceptedResult = (value) =>
+      Object.freeze({
+        outcome: "accepted",
+        value,
+        diagnostics: Object.freeze([])
+      });
+    assertInternalRejection(
+      parseOrder(clone(orderFixtures.retrieve)),
+      "accepted outcomes cannot bypass deep-freeze guarantees"
+    );
+
+    squareResponseValidation.squareAcceptedResult = () =>
+      Object.freeze({
+        outcome: "accepted",
+        value: Object.freeze({
+          id: "sq2b2a-provider-error-secret"
+        }),
+        diagnostics: Object.freeze([])
+      });
+    assertInternalRejection(
+      parseOrder(clone(orderFixtures.retrieve)),
+      "accepted outcomes cannot bypass the Order response schema"
+    );
+  } finally {
+    squareResponseValidation.squareAcceptedResult = originalAcceptedResult;
+  }
+}
+
 function testMinimizationAndFingerprints() {
   const original = accepted(parseOrder(clone(orderFixtures.retrieve)), "fingerprint baseline is accepted");
   const repeated = accepted(parseOrder(clone(orderFixtures.retrieve)), "fingerprint repeat is accepted");
@@ -896,6 +1020,7 @@ testAuthorityAndRequestFences();
 testEnvelopeErrorsAndOrderEntries();
 testMalformedCoreFields();
 testStructuralSafety();
+testResultBoundaryContainment();
 testMinimizationAndFingerprints();
 testDeepFreeze();
 testMergedFullOrderRequestGuard();

@@ -20,6 +20,7 @@ import {
   SquareIdentifierSchema,
   SquareProviderEnvironmentSchema,
   SquareResponseProvenanceSchema,
+  type SquareResponseFailureResult,
   type SquareResponseParserInput,
   type SquareResponseParserResult,
   type SquareResponseProvenance,
@@ -98,10 +99,76 @@ export const SQUARE_ORDER_CORE_DISCARDED_RESPONSE_FIELDS = Object.freeze([
 const MAXIMUM_ORDER_RESPONSE_ITEMS = 1_000;
 const MAXIMUM_BATCH_ORDER_RESPONSE_ITEMS = 100;
 const MAXIMUM_PROVIDER_ERRORS = 100;
+const MAXIMUM_RESULT_DIAGNOSTICS = 100;
+const MAXIMUM_FROZEN_RESULT_OBJECTS = 50_000;
 const ORDER_CURSOR_PATTERN = /^[A-Za-z0-9._~:+-]{1,4096}={0,2}$/;
 const MAX_SAFE_INTEGER_TEXT = String(Number.MAX_SAFE_INTEGER);
 const MINIMUM_ORDER_PROVIDER_VERSION = -2_147_483_648;
 const MAXIMUM_ORDER_PROVIDER_VERSION = 2_147_483_647;
+
+const SQUARE_ORDER_DIAGNOSTIC_CODES = new Set([
+  "square_api_version_incompatible",
+  "square_currency_invalid",
+  "square_duplicate_order_authority_identity",
+  "square_enum_invalid",
+  "square_identifier_invalid",
+  "square_order_aggregate_currency_mismatch",
+  "square_order_connection_authority_invalid",
+  "square_order_context_field_invalid",
+  "square_order_cursor_invalid",
+  "square_order_entries_invalid",
+  "square_order_entries_request_invalid",
+  "square_order_entries_unsupported",
+  "square_order_envelope_operation_mismatch",
+  "square_order_identifier_array_invalid",
+  "square_order_identity_missing",
+  "square_order_identity_request_mismatch",
+  "square_order_integer_invalid",
+  "square_order_location_authority_mismatch",
+  "square_order_location_request_mismatch",
+  "square_order_operation_invalid",
+  "square_order_parser_input_invalid",
+  "square_order_provider_errors_present",
+  "square_order_request_location_unauthorized",
+  "square_order_response_array_invalid",
+  "square_order_response_missing",
+  "square_order_state_array_invalid",
+  "square_order_state_request_mismatch",
+  "square_parser_input_invalid",
+  "square_provider_environment_invalid",
+  "square_provider_errors_invalid",
+  "square_provider_key_invalid",
+  "square_required_field_missing",
+  "square_response_accessor_rejected",
+  "square_response_array_custom_property",
+  "square_response_array_expected",
+  "square_response_array_invalid",
+  "square_response_array_sparse",
+  "square_response_array_too_large",
+  "square_response_cyclic",
+  "square_response_internal_rejection",
+  "square_response_json_type_invalid",
+  "square_response_key_invalid",
+  "square_response_nesting_too_deep",
+  "square_response_number_invalid",
+  "square_response_object_expected",
+  "square_response_object_too_large",
+  "square_response_string_invalid",
+  "square_response_symbol_key_rejected",
+  "square_response_too_many_values",
+  "square_response_unexpected_prototype",
+  "square_timestamp_invalid"
+]);
+
+const SQUARE_ORDER_INTERNAL_REJECTION_RESULT = Object.freeze({
+  outcome: "rejected" as const,
+  diagnostics: Object.freeze([
+    Object.freeze({
+      code: "square_response_internal_rejection",
+      field: "$response"
+    })
+  ])
+}) satisfies SquareResponseFailureResult;
 
 const SquareOrderIntegerStringSchema = CanonicalIntegerSchema.refine(
   isSafeIntegerText,
@@ -261,13 +328,9 @@ type CanonicalRequestContext =
 export function parseSquareOrderCoreResponse(
   input: unknown
 ): SquareResponseParserResult<SquareOrderCoreResponse> {
-  let result: SquareResponseParserResult<SquareOrderCoreResponse>;
-  try {
-    result = parseSquareOrderCoreResponseResult(input);
-  } catch {
-    result = squareFailureResult(undefined);
-  }
-  return squareOrderRootDiagnosticResult(result);
+  return squareOrderResultBoundary(() =>
+    parseSquareOrderCoreResponseResult(input)
+  );
 }
 
 function parseSquareOrderCoreResponseResult(
@@ -1040,17 +1103,192 @@ function isOrderProviderVersionText(value: string) {
   );
 }
 
-function squareOrderRootDiagnosticResult<T>(
-  result: SquareResponseParserResult<T>
-): SquareResponseParserResult<T> {
-  if (result.outcome === "accepted") return result;
-  return {
-    outcome: result.outcome,
-    diagnostics: result.diagnostics.map((diagnostic) => ({
-      code: diagnostic.code,
-      field: diagnostic.field.startsWith("$input") ? "$input" : "$response"
-    }))
-  };
+function squareOrderResultBoundary(
+  produceResult: () => SquareResponseParserResult<SquareOrderCoreResponse>
+): SquareResponseParserResult<SquareOrderCoreResponse> {
+  try {
+    return squareOrderRootDiagnosticResult(produceResult());
+  } catch {
+    return SQUARE_ORDER_INTERNAL_REJECTION_RESULT;
+  }
+}
+
+function squareOrderRootDiagnosticResult(
+  result: unknown
+): SquareResponseParserResult<SquareOrderCoreResponse> {
+  if (!squareOrderHasExactDataProperties(result, ["outcome", "diagnostics"])) {
+    if (
+      !squareOrderHasExactDataProperties(result, [
+        "outcome",
+        "value",
+        "diagnostics"
+      ])
+    ) {
+      return SQUARE_ORDER_INTERNAL_REJECTION_RESULT;
+    }
+  }
+
+  const outcome = squareOrderDataProperty(result, "outcome");
+  if (outcome === "accepted") {
+    const value = squareOrderDataProperty(result, "value");
+    if (
+      !squareOrderHasExactDataProperties(result, [
+        "outcome",
+        "value",
+        "diagnostics"
+      ]) ||
+      !squareOrderIsEmptyFrozenArray(
+        squareOrderDataProperty(result, "diagnostics")
+      ) ||
+      !SquareOrderCoreResponseSchema.safeParse(value).success ||
+      !squareOrderIsDeeplyFrozen(result)
+    ) {
+      return SQUARE_ORDER_INTERNAL_REJECTION_RESULT;
+    }
+    return result as SquareResponseParserResult<SquareOrderCoreResponse>;
+  }
+
+  if (
+    outcome !== "rejected" &&
+    outcome !== "unsupported" &&
+    outcome !== "incompatible-version"
+  ) {
+    return SQUARE_ORDER_INTERNAL_REJECTION_RESULT;
+  }
+
+  const diagnostics = squareOrderSanitizedDiagnostics(
+    squareOrderDataProperty(result, "diagnostics")
+  );
+  if (diagnostics === null) return SQUARE_ORDER_INTERNAL_REJECTION_RESULT;
+
+  return Object.freeze({
+    outcome,
+    diagnostics: Object.freeze(diagnostics)
+  });
+}
+
+function squareOrderSanitizedDiagnostics(
+  value: unknown
+): SquareResponseFailureResult["diagnostics"] | null {
+  if (
+    !Array.isArray(value) ||
+    Object.getPrototypeOf(value) !== Array.prototype ||
+    value.length < 1 ||
+    value.length > MAXIMUM_RESULT_DIAGNOSTICS ||
+    Reflect.ownKeys(value).length !== value.length + 1
+  ) {
+    return null;
+  }
+
+  const diagnostics = [];
+  for (let index = 0; index < value.length; index += 1) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+    if (!descriptor?.enumerable || !("value" in descriptor)) return null;
+    const diagnostic = descriptor.value;
+    if (
+      !squareOrderHasExactDataProperties(diagnostic, ["code", "field"])
+    ) {
+      return null;
+    }
+    const code = squareOrderDataProperty(diagnostic, "code");
+    const field = squareOrderDataProperty(diagnostic, "field");
+    if (
+      typeof code !== "string" ||
+      !SQUARE_ORDER_DIAGNOSTIC_CODES.has(code) ||
+      typeof field !== "string" ||
+      field.length > 160
+    ) {
+      return null;
+    }
+    diagnostics.push(
+      Object.freeze({
+        code,
+        field: field.startsWith("$input") ? "$input" : "$response"
+      })
+    );
+  }
+  return diagnostics;
+}
+
+function squareOrderHasExactDataProperties(
+  value: unknown,
+  keys: readonly string[]
+): value is Readonly<Record<string, unknown>> {
+  if (
+    value === null ||
+    typeof value !== "object" ||
+    Array.isArray(value) ||
+    Object.getPrototypeOf(value) !== Object.prototype
+  ) {
+    return false;
+  }
+  const ownKeys = Reflect.ownKeys(value);
+  if (
+    ownKeys.length !== keys.length ||
+    ownKeys.some((key) => typeof key !== "string" || !keys.includes(key))
+  ) {
+    return false;
+  }
+  return keys.every((key) => {
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    return descriptor?.enumerable === true && "value" in descriptor;
+  });
+}
+
+function squareOrderDataProperty(
+  value: Readonly<Record<string, unknown>>,
+  key: string
+) {
+  const descriptor = Object.getOwnPropertyDescriptor(value, key);
+  if (!descriptor || !("value" in descriptor)) {
+    throw new TypeError("square_order_result_property_invalid");
+  }
+  return descriptor.value;
+}
+
+function squareOrderIsEmptyFrozenArray(value: unknown) {
+  if (
+    !Array.isArray(value) ||
+    Object.getPrototypeOf(value) !== Array.prototype ||
+    !Object.isFrozen(value)
+  ) {
+    return false;
+  }
+  const length = Object.getOwnPropertyDescriptor(value, "length");
+  return (
+    Reflect.ownKeys(value).length === 1 &&
+    length !== undefined &&
+    "value" in length &&
+    length.value === 0
+  );
+}
+
+function squareOrderIsDeeplyFrozen(value: unknown) {
+  const seen = new Set<object>();
+  const pending = [value];
+  while (pending.length > 0) {
+    const candidate = pending.pop();
+    if (
+      candidate === null ||
+      (typeof candidate !== "object" && typeof candidate !== "function")
+    ) {
+      continue;
+    }
+    if (seen.has(candidate)) continue;
+    if (
+      seen.size >= MAXIMUM_FROZEN_RESULT_OBJECTS ||
+      !Object.isFrozen(candidate)
+    ) {
+      return false;
+    }
+    seen.add(candidate);
+    for (const key of Reflect.ownKeys(candidate)) {
+      const descriptor = Object.getOwnPropertyDescriptor(candidate, key);
+      if (!descriptor || !("value" in descriptor)) return false;
+      pending.push(descriptor.value);
+    }
+  }
+  return true;
 }
 
 class SquareOrderUnsupportedProjectionFailure extends Error {
