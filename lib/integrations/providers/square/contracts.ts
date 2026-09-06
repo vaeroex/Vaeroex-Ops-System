@@ -22,6 +22,13 @@ export const SQUARE_CATALOG_RESPONSE_CONTRACT_VERSION =
 export const SQUARE_CATALOG_MINIMIZATION_VERSION =
   "square_catalog_minimizer_v1" as const;
 export const SQUARE_CATALOG_ENTITY_VERSION = 1 as const;
+export const SQUARE_ORDER_RESPONSE_CONTRACT_VERSION =
+  "square_order_core_response_v1" as const;
+export const SQUARE_ORDER_MINIMIZATION_VERSION =
+  "square_order_core_minimizer_v1" as const;
+export const SQUARE_ORDER_REQUEST_AUTHORITY_VERSION =
+  "square_order_request_authority_v1" as const;
+export const SQUARE_ORDER_CORE_ENTITY_VERSION = 1 as const;
 export const SQUARE_DORMANT_GATE_VERSION =
   "square_phase_2a_dormant_descriptor_only_v1" as const;
 export const SQUARE_MODEL_CALL_COUNT = 0 as const;
@@ -237,6 +244,12 @@ export const SQUARE_ALLOWED_ORDER_STATES = [
   "COMPLETED",
   "CANCELED",
   "DRAFT"
+] as const;
+
+export const SQUARE_ORDER_RESPONSE_OPERATION_KEYS = [
+  "retrieve_order",
+  "orders_batch_retrieve",
+  "orders_search"
 ] as const;
 
 export const SQUARE_ALLOWED_ORDER_SORT_FIELDS = [
