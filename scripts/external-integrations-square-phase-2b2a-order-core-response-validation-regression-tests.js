@@ -49,6 +49,7 @@ const square = require("../lib/integrations/providers/square/index.ts");
 
 let assertionCount = 0;
 let fixtureScenarioCount = 0;
+const observedParserOutcomes = new Set();
 
 function equal(actual, expected, message) {
   assertionCount += 1;
@@ -125,41 +126,75 @@ function parserInput(response, operation = "retrieve_order", overrides = {}) {
 
 function parseOrder(response, operation = "retrieve_order", overrides = {}) {
   fixtureScenarioCount += 1;
-  return square.parseSquareOrderCoreResponse(
-    parserInput(response, operation, overrides)
+  return observeParserResult(
+    square.parseSquareOrderCoreResponse(
+      parserInput(response, operation, overrides)
+    )
   );
 }
 
 function parseRawInput(input) {
   fixtureScenarioCount += 1;
-  return square.parseSquareOrderCoreResponse(input);
+  return observeParserResult(square.parseSquareOrderCoreResponse(input));
 }
 
-function assertSafeDiagnostics(result, message) {
-  const serialized = JSON.stringify(result.diagnostics);
+function observeParserResult(result) {
+  observedParserOutcomes.add(result.outcome);
   equal(
-    result.diagnostics.every(
-      (diagnostic) =>
-        diagnostic.field === "$input" || diagnostic.field === "$response"
-    ),
+    Array.isArray(result.diagnostics),
     true,
-    `${message}: diagnostics use only static input or response roots`
+    "every parser outcome exposes a diagnostic array"
   );
+  for (const diagnostic of result.diagnostics) {
+    equal(
+      diagnostic.field === "$input" || diagnostic.field === "$response",
+      true,
+      "every emitted diagnostic field uses a static input or response root"
+    );
+  }
+  const serialized = JSON.stringify(result.diagnostics);
   doesNotMatch(
     serialized,
     sensitivePattern,
-    `${message}: diagnostics omit caller and provider values`
+    "every parser outcome omits caller and provider values from diagnostics"
   );
   doesNotMatch(
     serialized,
     /bearer|credential|request body|response payload|cursor001|provider-error-secret/i,
-    `${message}: diagnostics remain sanitized`
+    "every parser outcome keeps diagnostics sanitized"
   );
+  return result;
+}
+
+function declaredParserOutcomes() {
+  const source = read(
+    "lib/integrations/providers/square/response-validation.ts"
+  );
+  const sourceFile = ts.createSourceFile(
+    "response-validation.ts",
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TS
+  );
+  const declaration = sourceFile.statements.find(
+    (statement) =>
+      ts.isTypeAliasDeclaration(statement) &&
+      statement.name.text === "SquareResponseParserOutcome"
+  );
+  if (!declaration || !ts.isUnionTypeNode(declaration.type)) {
+    throw new Error("Square parser outcome contract missing");
+  }
+  return declaration.type.types.map((type) => {
+    if (!ts.isLiteralTypeNode(type) || !ts.isStringLiteral(type.literal)) {
+      throw new Error("Square parser outcome contract is not a string union");
+    }
+    return type.literal.text;
+  });
 }
 
 function expectOutcome(result, outcome, message) {
   equal(result.outcome, outcome, message);
-  assertSafeDiagnostics(result, message);
   return result;
 }
 
@@ -604,6 +639,31 @@ function testStructuralSafety() {
     }
   });
   rejected(parseRawInput(inputAccessor), "top-level parser accessor rejects without invocation");
+
+  const throwingInput = new Proxy(parserInput({}), {
+    ownKeys() {
+      throw new Error("sq2b2a-provider-error-secret");
+    }
+  });
+  const fallbackResult = parseRawInput(throwingInput);
+  rejected(fallbackResult, "raw parser exceptions fail closed");
+  equal(fallbackResult.diagnostics[0].code, "square_response_internal_rejection", "raw parser exception messages collapse to a stable code");
+  equal(fallbackResult.diagnostics[0].field, "$response", "raw parser exception paths collapse to the static response root");
+
+  const uninspectableThrownValue = new Proxy({}, {
+    getPrototypeOf() {
+      throw new Error("sq2b2a-provider-error-secret");
+    }
+  });
+  const doubleFaultInput = new Proxy(parserInput({}), {
+    ownKeys() {
+      throw uninspectableThrownValue;
+    }
+  });
+  const doubleFaultResult = parseRawInput(doubleFaultInput);
+  rejected(doubleFaultResult, "exceptions raised while classifying a thrown value fail closed");
+  equal(doubleFaultResult.diagnostics[0].code, "square_response_internal_rejection", "double-fault parser exceptions collapse to a stable code");
+  equal(doubleFaultResult.diagnostics[0].field, "$response", "double-fault parser exception paths collapse to the static response root");
 }
 
 function testMinimizationAndFingerprints() {
@@ -841,6 +901,12 @@ testDeepFreeze();
 testMergedFullOrderRequestGuard();
 testDormancyInvariantsAndSources();
 testExportsDocumentationAndRegistration();
+
+deepEqual(
+  [...observedParserOutcomes].sort(),
+  declaredParserOutcomes().sort(),
+  "suite-wide diagnostic invariant observes every declared parser outcome"
+);
 
 const fixtureInventory = Object.keys(orderFixtures).length + 7;
 

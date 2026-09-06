@@ -21,7 +21,6 @@ import {
   SquareProviderEnvironmentSchema,
   SquareResponseProvenanceSchema,
   type SquareResponseParserInput,
-  type SquareResponseFailureResult,
   type SquareResponseParserResult,
   type SquareResponseProvenance,
   type SquareSafeJsonObject,
@@ -262,13 +261,25 @@ type CanonicalRequestContext =
 export function parseSquareOrderCoreResponse(
   input: unknown
 ): SquareResponseParserResult<SquareOrderCoreResponse> {
+  let result: SquareResponseParserResult<SquareOrderCoreResponse>;
+  try {
+    result = parseSquareOrderCoreResponseResult(input);
+  } catch {
+    result = squareFailureResult(undefined);
+  }
+  return squareOrderRootDiagnosticResult(result);
+}
+
+function parseSquareOrderCoreResponseResult(
+  input: unknown
+): SquareResponseParserResult<SquareOrderCoreResponse> {
   try {
     const parserInput = squareOrderResponseParserInput(input);
     const provenance = squareResponseProvenance(parserInput);
     const response = squareSafeJsonObject(parserInput.response);
 
     if (orderProviderErrorState(response) === "present") {
-      return squareOrderUnsupportedResult(
+      return squareUnsupportedResult(
         "square_order_provider_errors_present",
         "$response.errors"
       );
@@ -277,7 +288,7 @@ export function parseSquareOrderCoreResponse(
       parserInput.operation === "orders_search" &&
       orderEntriesState(response) === "present"
     ) {
-      return squareOrderUnsupportedResult(
+      return squareUnsupportedResult(
         "square_order_entries_unsupported",
         "$response.order_entries"
       );
@@ -314,9 +325,9 @@ export function parseSquareOrderCoreResponse(
     );
   } catch (error) {
     if (error instanceof SquareOrderUnsupportedProjectionFailure) {
-      return squareOrderUnsupportedResult(error.code, error.field);
+      return squareUnsupportedResult(error.code, error.field);
     }
-    return squareOrderFailureResult(error);
+    return squareFailureResult(error);
   }
 }
 
@@ -1029,24 +1040,10 @@ function isOrderProviderVersionText(value: string) {
   );
 }
 
-function squareOrderFailureResult(
-  error: unknown
-): SquareResponseFailureResult {
-  return squareOrderSanitizedFailureResult(squareFailureResult(error));
-}
-
-function squareOrderUnsupportedResult(
-  code: string,
-  field: string
-): SquareResponseFailureResult {
-  return squareOrderSanitizedFailureResult(
-    squareUnsupportedResult(code, field)
-  );
-}
-
-function squareOrderSanitizedFailureResult(
-  result: SquareResponseFailureResult
-): SquareResponseFailureResult {
+function squareOrderRootDiagnosticResult<T>(
+  result: SquareResponseParserResult<T>
+): SquareResponseParserResult<T> {
+  if (result.outcome === "accepted") return result;
   return {
     outcome: result.outcome,
     diagnostics: result.diagnostics.map((diagnostic) => ({
