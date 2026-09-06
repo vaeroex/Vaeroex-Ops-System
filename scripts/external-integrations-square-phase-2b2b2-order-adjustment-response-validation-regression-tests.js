@@ -1775,6 +1775,58 @@ function testEnvelopeFailuresAndStructuralSafety() {
   );
 }
 
+function testMaximumRetainedProjectionCompatibility() {
+  const maximumLineItems = (prefix) =>
+    Array.from({ length: 1_000 }, (_, index) => ({
+      uid: `${prefix}${index}`,
+      quantity: "1",
+      base_price_money: {}
+    }));
+  const orders = [
+    square.squarePhase2B2B2Order({
+      line_items: maximumLineItems("SQ2B2B2MAXA"),
+      taxes: [],
+      discounts: [],
+      service_charges: []
+    }),
+    square.squarePhase2B2B2SecondOrder({
+      line_items: maximumLineItems("SQ2B2B2MAXB"),
+      taxes: [],
+      discounts: [],
+      service_charges: []
+    })
+  ];
+  const response = { orders };
+
+  const core = accepted(
+    parseCore(clone(response), "orders_batch_retrieve"),
+    "raw response bounds permit two maximum retained line-item arrays"
+  );
+  equal(core.itemCount, 2, "maximum retained batch preserves both Order cores");
+
+  const lineItems = accepted(
+    parseLineItems(clone(response), "orders_batch_retrieve"),
+    "canonical preflight permits the schema-maximum retained line-item batch"
+  );
+  deepEqual(
+    lineItems.items.map(({ lineItemCount }) => lineItemCount),
+    [1_000, 1_000],
+    "line-item projection preserves both schema-maximum arrays"
+  );
+
+  const adjustments = accepted(
+    parseAdjustments(clone(response), "orders_batch_retrieve"),
+    "canonical preflight permits the schema-maximum adjustment batch"
+  );
+  deepEqual(
+    adjustments.items.map(
+      ({ lineItemDetail }) => lineItemDetail.lineItemCount
+    ),
+    [1_000, 1_000],
+    "adjustment projection preserves both schema-maximum line-item arrays"
+  );
+}
+
 function testExceptionContainedResultBoundary() {
   const throwingInput = new Proxy(parserInput({}), {
     ownKeys() {
@@ -2241,21 +2293,32 @@ function testExceptionContainedResultBoundary() {
       "accepted arrays longer than the canonical limit reject"
     );
 
-    squareResponseValidation.squareAcceptedResult = (value) => {
-      value.provider = Array.from({ length: 1_000 }, (_, outerIndex) =>
-        Object.fromEntries(
-          Array.from({ length: 50 }, (_, innerIndex) => [
-            `property${innerIndex}`,
-            outerIndex + innerIndex
-          ])
-        )
+    const originalBoundedSafeParse =
+      square.SquareOrderAdjustmentResponseSchema.safeParse;
+    let boundedSafeParseCalls = 0;
+    try {
+      square.SquareOrderAdjustmentResponseSchema.safeParse = (...args) => {
+        boundedSafeParseCalls += 1;
+        return originalBoundedSafeParse(...args);
+      };
+      squareResponseValidation.squareAcceptedResult = (value) => {
+        const sharedNodes = Array.from({ length: 50 }, () => ({}));
+        value.provider = Array.from({ length: 1_000 }, () => sharedNodes);
+        return originalAcceptedResult(value);
+      };
+      assertInternalRejection(
+        parseAdjustments(clone(orderFixtures.retrieve)),
+        "accepted trees exceeding the expanded-node limit reject"
       );
-      return originalAcceptedResult(value);
-    };
-    assertInternalRejection(
-      parseAdjustments(clone(orderFixtures.retrieve)),
-      "accepted trees exceeding the total-node limit reject"
-    );
+      equal(
+        boundedSafeParseCalls,
+        1,
+        "expanded-node preflight rejects before the boundary schema recheck"
+      );
+    } finally {
+      square.SquareOrderAdjustmentResponseSchema.safeParse =
+        originalBoundedSafeParse;
+    }
 
     squareResponseValidation.squareAcceptedResult = (value) => {
       value.items[0].provider = value.provider;
@@ -2772,6 +2835,7 @@ testAppliedRelationshipsAndAuthority();
 testExactNumbersMoneyAndCurrencies();
 testDeterminismMinimizationAndFingerprints();
 testEnvelopeFailuresAndStructuralSafety();
+testMaximumRetainedProjectionCompatibility();
 testExceptionContainedResultBoundary();
 testDeepFreezeAndCallerIsolation();
 testPinnedContractsDormancyAndRegistration();

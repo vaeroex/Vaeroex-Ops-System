@@ -4465,11 +4465,9 @@ function squareOrderTraverseCanonicalTree(
 
   const active = new Set<object>();
   const pending: Frame[] = [];
-  let nodeCount = 0;
+  let expandedNodeCount = 0;
 
   const enter = (candidate: unknown, depth: number) => {
-    nodeCount += 1;
-    if (nodeCount > MAXIMUM_FROZEN_RESULT_NODES) return false;
     if (candidate === null) return true;
     if (typeof candidate === "string") {
       return candidate.length <= MAXIMUM_FROZEN_RESULT_STRING_LENGTH;
@@ -4484,6 +4482,8 @@ function squareOrderTraverseCanonicalTree(
       return false;
     }
     if (typeof candidate === "function" || isProxy(candidate)) return false;
+    expandedNodeCount += 1;
+    if (expandedNodeCount > MAXIMUM_FROZEN_RESULT_NODES) return false;
     if (depth > MAXIMUM_FROZEN_RESULT_DEPTH || active.has(candidate)) {
       return false;
     }
