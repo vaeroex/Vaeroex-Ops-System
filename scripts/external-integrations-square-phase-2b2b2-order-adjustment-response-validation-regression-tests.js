@@ -1792,21 +1792,25 @@ function testExceptionContainedResultBoundary() {
       "failure factory exception is contained"
     );
 
+    let failureProxyTrapCalls = 0;
     squareResponseValidation.squareFailureResult = () =>
       new Proxy(
         { outcome: "rejected", diagnostics: [] },
         {
-          getOwnPropertyDescriptor(target, key) {
-            if (key === "diagnostics") {
-              throw new Error("sq2b2b2-provider-secret");
-            }
-            return Reflect.getOwnPropertyDescriptor(target, key);
+          getPrototypeOf() {
+            failureProxyTrapCalls += 1;
+            throw new Error("sq2b2b2-provider-secret");
           }
         }
       );
     assertInternalRejection(
       parseAdjustmentInput(null),
-      "sanitizer exception is contained"
+      "proxied failure result is rejected"
+    );
+    equal(
+      failureProxyTrapCalls,
+      0,
+      "failure-result proxy traps are never invoked"
     );
 
     squareResponseValidation.squareFailureResult = () => ({
@@ -1851,7 +1855,95 @@ function testExceptionContainedResultBoundary() {
   }
 
   const originalAcceptedResult = squareResponseValidation.squareAcceptedResult;
+  const exportedOrderParserCases = [
+    ["core", () => parseCore(clone(orderFixtures.retrieve))],
+    ["line-item", () => parseLineItems(clone(orderFixtures.retrieve))],
+    ["adjustment", () => parseAdjustments(clone(orderFixtures.retrieve))]
+  ];
   try {
+    for (const [label, parse] of exportedOrderParserCases) {
+      let acceptedAccessorCalls = 0;
+      squareResponseValidation.squareAcceptedResult = (value) => {
+        Object.defineProperty(value, "entityType", {
+          configurable: true,
+          enumerable: true,
+          get() {
+            acceptedAccessorCalls += 1;
+            throw new Error("sq2b2b2-provider-secret");
+          }
+        });
+        return originalAcceptedResult(value);
+      };
+      assertInternalRejection(
+        parse(),
+        `${label} accepted accessor is rejected without invocation`
+      );
+      equal(
+        acceptedAccessorCalls,
+        0,
+        `${label} accepted accessor is never invoked`
+      );
+
+      let acceptedProxyTrapCalls = 0;
+      squareResponseValidation.squareAcceptedResult = (value) =>
+        new Proxy(originalAcceptedResult(value), {
+          getPrototypeOf(target) {
+            acceptedProxyTrapCalls += 1;
+            return Reflect.getPrototypeOf(target);
+          }
+        });
+      assertInternalRejection(
+        parse(),
+        `${label} accepted proxy is rejected without reflection`
+      );
+      equal(
+        acceptedProxyTrapCalls,
+        0,
+        `${label} accepted proxy traps are never invoked`
+      );
+    }
+
+    let nestedProxyTrapCalls = 0;
+    squareResponseValidation.squareAcceptedResult = (value) => {
+      const acceptedResult = originalAcceptedResult(value);
+      const proxiedValue = new Proxy(acceptedResult.value, {
+        get(target, key, receiver) {
+          nestedProxyTrapCalls += 1;
+          return Reflect.get(target, key, receiver);
+        },
+        getOwnPropertyDescriptor(target, key) {
+          nestedProxyTrapCalls += 1;
+          return Reflect.getOwnPropertyDescriptor(target, key);
+        },
+        getPrototypeOf(target) {
+          nestedProxyTrapCalls += 1;
+          return Reflect.getPrototypeOf(target);
+        },
+        isExtensible(target) {
+          nestedProxyTrapCalls += 1;
+          return Reflect.isExtensible(target);
+        },
+        ownKeys(target) {
+          nestedProxyTrapCalls += 1;
+          return Reflect.ownKeys(target);
+        }
+      });
+      return Object.freeze({
+        outcome: "accepted",
+        value: proxiedValue,
+        diagnostics: Object.freeze([])
+      });
+    };
+    assertInternalRejection(
+      parseAdjustments(clone(orderFixtures.retrieve)),
+      "nested accepted proxy is rejected without reflection"
+    );
+    equal(
+      nestedProxyTrapCalls,
+      0,
+      "nested accepted proxy traps are never invoked"
+    );
+
     squareResponseValidation.squareAcceptedResult = (value) =>
       Object.freeze({
         outcome: "accepted",
@@ -1923,6 +2015,24 @@ function testExceptionContainedResultBoundary() {
       "frozen accepted object with a custom prototype is rejected"
     );
 
+    squareResponseValidation.squareAcceptedResult = (value) => {
+      delete value.items[0];
+      return originalAcceptedResult(value);
+    };
+    assertInternalRejection(
+      parseAdjustments(clone(orderFixtures.retrieve)),
+      "frozen accepted sparse array is rejected"
+    );
+
+    squareResponseValidation.squareAcceptedResult = (value) => {
+      value.items[0] = Object.freeze(function forgedAcceptedItem() {});
+      return originalAcceptedResult(value);
+    };
+    assertInternalRejection(
+      parseAdjustments(clone(orderFixtures.retrieve)),
+      "frozen accepted function is rejected"
+    );
+
     squareResponseValidation.squareAcceptedResult = () =>
       Object.freeze({
         outcome: "accepted",
@@ -1967,21 +2077,23 @@ function testExceptionContainedResultBoundary() {
     squareResponseValidation.squareFailureResult = originalFailureResult;
   }
 
-  let legitimateResult;
-  try {
-    squareResponseValidation.squareAcceptedResult = (value) => {
-      legitimateResult = originalAcceptedResult(value);
-      return legitimateResult;
-    };
-    const returned = parseAdjustments(clone(orderFixtures.retrieve));
-    equal(
-      returned,
-      legitimateResult,
-      "legitimate deeply frozen accepted result crosses unchanged"
-    );
-    assertDeeplyFrozen(returned, "legitimate accepted adjustment result");
-  } finally {
-    squareResponseValidation.squareAcceptedResult = originalAcceptedResult;
+  for (const [label, parse] of exportedOrderParserCases) {
+    let legitimateResult;
+    try {
+      squareResponseValidation.squareAcceptedResult = (value) => {
+        legitimateResult = originalAcceptedResult(value);
+        return legitimateResult;
+      };
+      const returned = parse();
+      equal(
+        returned,
+        legitimateResult,
+        `${label} legitimate deeply frozen accepted result crosses unchanged`
+      );
+      assertDeeplyFrozen(returned, `${label} legitimate accepted result`);
+    } finally {
+      squareResponseValidation.squareAcceptedResult = originalAcceptedResult;
+    }
   }
 }
 

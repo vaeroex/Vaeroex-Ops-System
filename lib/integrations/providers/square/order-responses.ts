@@ -1,3 +1,5 @@
+import { isProxy } from "node:util/types";
+
 import { z } from "zod";
 
 import {
@@ -4237,8 +4239,8 @@ function squareOrderRootDiagnosticResult<T>(
       !squareOrderIsEmptyFrozenArray(
         squareOrderDataProperty(result, "diagnostics")
       ) ||
-      !acceptedSchema.safeParse(value).success ||
-      !squareOrderIsDeeplyFrozen(result)
+      !squareOrderIsDeeplyFrozen(result) ||
+      !acceptedSchema.safeParse(value).success
     ) {
       return SQUARE_ORDER_INTERNAL_REJECTION_RESULT;
     }
@@ -4268,6 +4270,7 @@ function squareOrderSanitizedDiagnostics(
   value: unknown
 ): SquareResponseFailureResult["diagnostics"] | null {
   if (
+    isProxy(value) ||
     !Array.isArray(value) ||
     Object.getPrototypeOf(value) !== Array.prototype ||
     value.length < 1 ||
@@ -4314,6 +4317,7 @@ function squareOrderHasExactDataProperties(
   if (
     value === null ||
     typeof value !== "object" ||
+    isProxy(value) ||
     Array.isArray(value) ||
     Object.getPrototypeOf(value) !== Object.prototype
   ) {
@@ -4336,6 +4340,9 @@ function squareOrderDataProperty(
   value: Readonly<Record<string, unknown>>,
   key: string
 ) {
+  if (isProxy(value)) {
+    throw new TypeError("square_order_result_property_invalid");
+  }
   const descriptor = Object.getOwnPropertyDescriptor(value, key);
   if (!descriptor || !("value" in descriptor)) {
     throw new TypeError("square_order_result_property_invalid");
@@ -4345,6 +4352,7 @@ function squareOrderDataProperty(
 
 function squareOrderIsEmptyFrozenArray(value: unknown) {
   if (
+    isProxy(value) ||
     !Array.isArray(value) ||
     Object.getPrototypeOf(value) !== Array.prototype ||
     !Object.isFrozen(value)
@@ -4371,7 +4379,7 @@ function squareOrderIsDeeplyFrozen(value: unknown) {
     ) {
       continue;
     }
-    if (typeof candidate === "function") return false;
+    if (typeof candidate === "function" || isProxy(candidate)) return false;
     if (seen.has(candidate)) continue;
     if (
       seen.size >= MAXIMUM_FROZEN_RESULT_OBJECTS ||
@@ -4391,6 +4399,7 @@ function squareOrderIsDeeplyFrozen(value: unknown) {
 }
 
 function squareOrderHasCanonicalContainerShape(value: object) {
+  if (isProxy(value)) return false;
   const ownKeys = Reflect.ownKeys(value);
   if (Array.isArray(value)) {
     if (
