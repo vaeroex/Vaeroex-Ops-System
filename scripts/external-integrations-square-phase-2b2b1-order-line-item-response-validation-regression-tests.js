@@ -2285,7 +2285,7 @@ function testPinnedContractsAndDormancy() {
   );
   doesNotMatch(
     detailSources,
-    /payments:|refunds:|fulfillments:|tenders:|webhook|queue|migration|persist/i,
+    /payments:|refunds:|fulfillments:|webhook|queue|migration|persist/i,
     "detail sources contain no later transaction or runtime scope"
   );
 
@@ -2327,6 +2327,8 @@ testPinnedContractsAndDormancy();
 fixtureScenarioCount += 1;
 invokedParsers.add("parseSquareOrderAdjustmentResponse");
 observeParserResult(square.parseSquareOrderAdjustmentResponse(null), false);
+invokedParsers.add("parseSquareOrderTenderResponse");
+observeParserResult(square.parseSquareOrderTenderResponse(null), false);
 
 deepEqual(
   [...detailParserOutcomes].sort(),

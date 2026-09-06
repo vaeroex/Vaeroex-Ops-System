@@ -7,6 +7,7 @@ export * from "@/lib/integrations/providers/square/fixtures/phase-2b1b2";
 export * from "@/lib/integrations/providers/square/fixtures/phase-2b2a";
 export * from "@/lib/integrations/providers/square/fixtures/phase-2b2b1";
 export * from "@/lib/integrations/providers/square/fixtures/phase-2b2b2";
+export * from "@/lib/integrations/providers/square/fixtures/phase-2b2b3";
 export * from "@/lib/integrations/providers/square/location-responses";
 export * from "@/lib/integrations/providers/square/merchant-responses";
 export * from "@/lib/integrations/providers/square/order-responses";

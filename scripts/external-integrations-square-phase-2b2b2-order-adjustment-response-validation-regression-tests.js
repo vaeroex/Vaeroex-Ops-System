@@ -228,6 +228,17 @@ function parseCore(response, operation = "retrieve_order", overrides = {}) {
   );
 }
 
+function parseTenders(response, operation = "retrieve_order", overrides = {}) {
+  fixtureScenarioCount += 1;
+  return observeParserResult(
+    square.parseSquareOrderTenderResponse(
+      parserInput(response, operation, overrides)
+    ),
+    "parseSquareOrderTenderResponse",
+    false
+  );
+}
+
 function expectOutcome(result, outcome, message) {
   equal(result.outcome, outcome, message);
   return result;
@@ -1953,7 +1964,14 @@ function testExceptionContainedResultBoundary() {
   const exportedOrderParserCases = [
     ["core", () => parseCore(clone(orderFixtures.retrieve))],
     ["line-item", () => parseLineItems(clone(orderFixtures.retrieve))],
-    ["adjustment", () => parseAdjustments(clone(orderFixtures.retrieve))]
+    ["adjustment", () => parseAdjustments(clone(orderFixtures.retrieve))],
+    [
+      "tender",
+      () =>
+        parseTenders({
+          order: square.squarePhase2B2B2Order({ tenders: null })
+        })
+    ]
   ];
   try {
     for (const [label, parse] of exportedOrderParserCases) {
@@ -2302,7 +2320,7 @@ function testExceptionContainedResultBoundary() {
         return originalBoundedSafeParse(...args);
       };
       squareResponseValidation.squareAcceptedResult = (value) => {
-        const sharedNodes = Array.from({ length: 50 }, () => ({}));
+        const sharedNodes = Array.from({ length: 60 }, () => ({}));
         value.provider = Array.from({ length: 1_000 }, () => sharedNodes);
         return originalAcceptedResult(value);
       };
@@ -2758,7 +2776,7 @@ function testPinnedContractsDormancyAndRegistration() {
   );
   doesNotMatch(
     adjustmentSources,
-    /payments:|refunds:|fulfillments:|tenders:|webhook|queue|migration|persist|inventory/i,
+    /payments:|refunds:|fulfillments:|webhook|queue|migration|persist|inventory/i,
     "adjustment sources contain no later transaction or runtime scope"
   );
   ok(
