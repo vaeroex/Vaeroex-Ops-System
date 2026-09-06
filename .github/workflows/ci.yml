@@ -75,6 +75,9 @@ jobs:
       - name: External integrations Square Phase 2B.2A Order-core response validation regressions
         run: pnpm test:external-integrations-square-phase-2b2a
 
+      - name: External integrations Square Phase 2B.2B-1 Order line-item response validation regressions
+        run: pnpm test:external-integrations-square-phase-2b2b1
+
       - name: External integrations architecture regressions
         run: pnpm test:external-integrations-architecture
 
