@@ -248,10 +248,19 @@ function testAcceptedResponseEnvelopes() {
     doesNotMatch(JSON.stringify(item), /cursor/i, "Order entity projection contains no cursor metadata");
   }
 
+  for (const [response, label] of [
+    [{}, "absent Retrieve order"],
+    [{ order: null }, "null Retrieve order"],
+    [orderFixtures.nullableRetrieve, "nullable Retrieve envelope"],
+    [{ errors: [] }, "empty-error Retrieve envelope without an order"]
+  ]) {
+    const result = parseOrder(clone(response));
+    rejected(result, `${label} fails closed because a successful Retrieve response must contain the requested Order`);
+    equal(result.diagnostics[0].code, "square_order_response_missing", `${label} uses the stable missing-response diagnostic`);
+    equal(result.diagnostics[0].field, "$response", `${label} exposes no provider-controlled diagnostic path`);
+  }
+
   const emptyCases = [
-    [{}, "retrieve_order", "absent Retrieve order"],
-    [{ order: null }, "retrieve_order", "null Retrieve order"],
-    [orderFixtures.nullableRetrieve, "retrieve_order", "nullable Retrieve envelope"],
     [{}, "orders_batch_retrieve", "absent Batch orders"],
     [orderFixtures.emptyBatch, "orders_batch_retrieve", "empty Batch orders"],
     [orderFixtures.nullableBatch, "orders_batch_retrieve", "nullable Batch envelope"],
@@ -340,6 +349,8 @@ function testLifecycleOptionalityAndMoney() {
   equal(missingTotal.totalMoney, null, "missing total remains absent");
   deepEqual(zeroTotal.totalMoney, { amountMinor: "0", currency: "USD" }, "explicit zero total remains present");
   notEqual(square.squareOrderCoreFingerprint(missingTotal), square.squareOrderCoreFingerprint(zeroTotal), "missing and explicit-zero totals fingerprint differently");
+  notEqual(square.squareOrderCoreFingerprint(emptyMoney), square.squareOrderCoreFingerprint(missingTotal), "a present empty Money object remains distinct from an absent total");
+  notEqual(square.squareOrderCoreFingerprint(emptyMoney), square.squareOrderCoreFingerprint(zeroTotal), "a present empty Money object cannot masquerade as explicit zero");
 }
 
 function testAuthorityAndRequestFences() {
@@ -469,7 +480,7 @@ function testMalformedCoreFields() {
   for (const total_money of ["money", 1, [], true]) {
     rejected(parseOrder({ order: square.squarePhase2B2AOrder({ total_money }) }), "malformed Money object rejects");
   }
-  for (const amount of [1.5, "100", "1e3", Number.MAX_SAFE_INTEGER + 1, {}, [], true]) {
+  for (const amount of [1.5, "100", "1e3", Number.MAX_SAFE_INTEGER + 1, 1n, {}, [], true]) {
     rejected(parseOrder({ order: square.squarePhase2B2AOrder({ total_money: { amount, currency: "USD" } }) }), "unsafe, fractional, exponential-string, or malformed Money amount rejects");
   }
   for (const currency of ["usd", "US1", "ZZZ", "", 1, {}, []]) {
@@ -567,6 +578,15 @@ function testStructuralSafety() {
     rejected(parseOrder({ order: square.squarePhase2B2AOrder({ future_field: attack }) }), `${label} in discarded detail rejects during bounded structural inspection`);
   }
   equal(accessorCalls, 0, "rejected accessor is never invoked");
+
+  const providerControlledKey = square.SQUARE_PHASE_2B2A_SYNTHETIC_CANARIES.customerId;
+  const keyedAttack = square.squarePhase2B2AOrder({
+    [providerControlledKey]: "x".repeat(4097)
+  });
+  const keyedAttackResult = parseOrder({ order: keyedAttack });
+  rejected(keyedAttackResult, "provider-controlled JSON keys cannot enter diagnostics");
+  equal(keyedAttackResult.diagnostics[0].code, "square_response_string_invalid", "provider-controlled key attack retains only a stable code");
+  equal(keyedAttackResult.diagnostics[0].field, "$response", "provider-controlled key attack collapses to a static diagnostic root");
 
   const inputAccessor = parserInput({});
   Object.defineProperty(inputAccessor, "operation", {

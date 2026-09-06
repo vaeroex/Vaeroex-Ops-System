@@ -21,6 +21,7 @@ import {
   SquareProviderEnvironmentSchema,
   SquareResponseProvenanceSchema,
   type SquareResponseParserInput,
+  type SquareResponseFailureResult,
   type SquareResponseParserResult,
   type SquareResponseProvenance,
   type SquareSafeJsonObject,
@@ -315,7 +316,7 @@ export function parseSquareOrderCoreResponse(
     if (error instanceof SquareOrderUnsupportedProjectionFailure) {
       return squareUnsupportedResult(error.code, error.field);
     }
-    return squareFailureResult(error);
+    return squareOrderFailureResult(error);
   }
 }
 
@@ -704,7 +705,9 @@ function orderResponseItems(
   operation: SquareOrderResponseOperation
 ): readonly SquareSafeJsonObject[] {
   if (operation === "retrieve_order") {
-    if (!hasOwn(response, "order") || response.order === null) return [];
+    if (!hasOwn(response, "order") || response.order === null) {
+      squareRejectResponse("square_order_response_missing", "$response.order");
+    }
     return [squareSafeJsonObject(response.order, "$response.order")];
   }
 
@@ -1024,6 +1027,19 @@ function isOrderProviderVersionText(value: string) {
     parsed >= MINIMUM_ORDER_PROVIDER_VERSION &&
     parsed <= MAXIMUM_ORDER_PROVIDER_VERSION
   );
+}
+
+function squareOrderFailureResult(
+  error: unknown
+): SquareResponseFailureResult {
+  const result = squareFailureResult(error);
+  return {
+    outcome: result.outcome,
+    diagnostics: result.diagnostics.map((diagnostic) => ({
+      code: diagnostic.code,
+      field: diagnostic.field.startsWith("$input") ? "$input" : "$response"
+    }))
+  };
 }
 
 class SquareOrderUnsupportedProjectionFailure extends Error {
