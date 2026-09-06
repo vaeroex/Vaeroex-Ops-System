@@ -180,6 +180,12 @@ equal(
   "architecture test script must be registered"
 );
 equal(
+  packageJson.scripts["test:external-integrations-square-payments"],
+  "node scripts/external-integrations-square-payment-response-validation-regression-tests.js",
+  "Square Payment response regression script must be registered"
+);
+matches(ciWorkflow, /pnpm test:external-integrations-square-payments/, "CI exercises dormant Payment responses");
+equal(
   packageJson.scripts["test:external-integrations-phase-2"],
   "node scripts/external-integrations-phase-2-reconciliation-regression-tests.js",
   "Phase 2 reconciliation regression script must be registered"
