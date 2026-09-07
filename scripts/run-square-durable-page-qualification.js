@@ -301,8 +301,51 @@ async function durableQualification(database) {
   }
   stage = "sql_structural_boundary_parity";
   const visitor = (await owner.query("select provolatile,proconfig from pg_proc where oid='private.square_walk_page_json_v1(jsonb,text[],bigint[],jsonb,text,text)'::regprocedure")).rows[0];
-  equal(visitor.provolatile, "s", "recursive visitor cannot be constant-folded as immutable");
-  ok(visitor.proconfig.includes("plan_cache_mode=force_generic_plan"), "recursive visitor forces parameterized plans");
+  equal(visitor.provolatile, "s", "page visitor cannot be constant-folded as immutable");
+  ok(visitor.proconfig.includes("plan_cache_mode=force_generic_plan"), "page visitor forces parameterized plans");
+  const visitorBody = (await owner.query("select prosrc from pg_proc where oid='private.square_walk_page_json_v1(jsonb,text[],bigint[],jsonb,text,text)'::regprocedure")).rows[0].prosrc;
+  ok(!visitorBody.includes("private.square_walk_page_json_v1("), "page guard visits containers without recursive function calls");
+  function logicalBudget(value) {
+    let values = 0, containers = 0;
+    const visit = node => { values++; if (node !== null && typeof node === "object") { containers++; for (const child of Object.values(node)) visit(child); } };
+    visit(value);
+    return [7199999 - (values - 1), 66000 - containers, 67108864 - Buffer.byteLength(JSON.stringify(value))];
+  }
+  let deepEmpty = {}, deepScalar = "leaf";
+  for (let depth = 0; depth < 64; depth++) { deepEmpty = [deepEmpty]; deepScalar = [deepScalar]; }
+  const traversalCases = [null, true, false, 0, -9007199254740991, "", "😀", {}, [],
+    { a: [{ a: [], b: [{ c: {} }, []] }, {}], b: { a: [[], { b: [] }], z: [0, false, null, "last"] }, z: {} },
+    [{ left: [{ nested: [[], {}] }] }, [], { right: [{ tail: {} }, []] }], deepEmpty, deepScalar];
+  for (const value of traversalCases) {
+    const result = (await owner.query("select private.square_walk_page_json_v1($1::jsonb,array[]::text[],array[7199999,66000,67108864]::bigint[]) as remaining", [JSON.stringify(value)])).rows[0].remaining;
+    equal(JSON.stringify(result.map(Number)), JSON.stringify(logicalBudget(value)), "iterative pop and scalar/empty roots retain exact expanded value/container/byte charges"); scenarios++;
+  }
+  const entrySubtree = traversalCases[9];
+  const entryBudget = (await owner.query("select private.square_walk_page_json_v1($1::jsonb,array['outer','inner'],array[7199999,66000,67108864]::bigint[]) as remaining", [JSON.stringify({ outer: { inner: entrySubtree }, excluded: [false] })])).rows[0].remaining.map(Number);
+  equal(JSON.stringify(entryBudget), JSON.stringify(logicalBudget(entrySubtree)), "nonempty entry path visits only its subtree and preserves frame-pop accounting");
+  const flatArrayCases = [[], [""], ["L01"], ["A-Za_z.0:9"], Array(3000).fill("L01"),
+    ["x".repeat(255)], ["x".repeat(256)], ["x".repeat(4096)],
+    ['quote"', "back\\slash", "with space", "tab\t", "line\n", "control\u0001", "é", "😀"],
+    ["before", null, true, 1, {}, ["nested"], "after"]];
+  for (const size of [32767, 32768, 32769]) {
+    const value = [...Array(126).fill("x".repeat(255)), "x".repeat(size - 32646)];
+    equal((await owner.query("select pg_column_size($1::jsonb) as bytes", [JSON.stringify(value)])).rows[0].bytes, size, "physical flat-array fast-path threshold fixture is exact");
+    flatArrayCases.push(value);
+  }
+  for (const value of flatArrayCases) {
+    const result = (await owner.query("select private.square_walk_page_json_v1($1::jsonb,array[]::text[],array[7199999,66000,67108864]::bigint[]) as remaining", [JSON.stringify(value)])).rows[0].remaining.map(Number);
+    equal(JSON.stringify(result), JSON.stringify(logicalBudget(value)), "bounded flat ASCII classification and fallback preserve exact logical accounting"); scenarios++;
+  }
+  await denied(() => owner.query("select private.square_assert_page_json_v1($1::jsonb)", [JSON.stringify(["x".repeat(4097)])]), "flat-array classification cannot admit an oversized fallback string");
+  await denied(() => owner.query("select private.square_assert_page_json_v1($1::jsonb)", [JSON.stringify(Array(3001).fill("L01"))]), "flat-array classification cannot bypass immediate cardinality");
+  await denied(() => owner.query("select private.square_walk_page_json_v1($1::jsonb,array[]::text[],array[0,1,100]::bigint[])", [JSON.stringify(["L01"])]), "flat-array classification cannot bypass the raw expanded-value budget");
+  await denied(() => owner.query("select private.square_walk_page_json_v1($1::jsonb,array[]::text[],array[1,1,6]::bigint[])", [JSON.stringify(["L01"])]), "flat-array classification cannot bypass exact compact JSON bytes");
+  await denied(() => owner.query("select private.square_walk_page_json_v1($1::jsonb,array[]::text[],array[7199999,66000,67108864]::bigint[],$2::jsonb)", [JSON.stringify({ a: ["L01"], z: { providerKey: "foreign" } }), JSON.stringify({ environment: "sandbox" })]), "flat sibling shortcut cannot skip later nested authority checks");
+  await denied(() => owner.query("select private.square_assert_page_json_v1('[\"L01\",1e131071]'::jsonb)"), "compact huge numeric cannot reach whole-array string serialization shortcut");
+  let tooDeepFlat = ["L01"]; for (let depth = 0; depth < 64; depth++) tooDeepFlat = [tooDeepFlat];
+  await denied(() => owner.query("select private.square_assert_page_json_v1($1::jsonb)", [JSON.stringify(tooDeepFlat)]), "flat-array shortcut cannot bypass depth64 child-scalar rejection");
+  equal(JSON.stringify((await owner.query("select private.square_walk_page_json_v1('[{},[]]'::jsonb,array[]::text[],array[2,3,7]::bigint[]) as remaining")).rows[0].remaining.map(Number)), "[0,0,0]", "last empty sibling consumes exactly the remaining container and byte budgets");
+  await denied(() => owner.query("select private.square_walk_page_json_v1('[{},[]]'::jsonb,array[]::text[],array[2,2,7]::bigint[])"), "last empty sibling beyond the permitted expanded container count rejects");
   const sharedLeaf = {}, exactContainers = [];
   for (let n = 0; n < 22; n++) exactContainers.push(Array(n === 21 ? 2977 : 3000).fill(sharedLeaf));
   await owner.query("select private.square_assert_page_json_v1($1::jsonb)", [JSON.stringify(exactContainers)]); assertions++;
@@ -655,6 +698,9 @@ async function durableQualification(database) {
   await owner.query(`alter role ${quote(runtime.name)} set track_functions='all'`);
   const largeClient = await connect({ ...runtime.connection, statement_timeout: 29000, query_timeout: 31000 }); openClients.push(largeClient);
   const settings = (await largeClient.query("select current_setting('server_version') as version,current_setting('plan_cache_mode') as plans,current_setting('jit') as jit,pg_jit_available() as jit_available,current_setting('jit_above_cost') as jit_above_cost,current_setting('work_mem') as work_mem,current_setting('default_toast_compression') as compression")).rows[0];
+  // Preload names are superuser-readable metadata. Read them through the
+  // existing fixture owner, never by enlarging the runtime login privileges.
+  settings.ownerExtensionSettings = (await owner.query("select current_setting('shared_preload_libraries') as shared_libraries,current_setting('session_preload_libraries') as session_libraries,current_setting('pg_stat_statements.track',true) as statement_tracking,current_setting('pg_stat_statements.track_planning',true) as planning_tracking,current_setting('pgaudit.log',true) as audit_classes")).rows[0];
   console.log("Catalog qualification database settings: " + JSON.stringify(settings));
   const largeTest = adapter(largeTask, largeRaw, largeClient, { beforeCommit() { catalogTiming.events.push({ phase: "mapped_command_captured", milliseconds: Date.now() - catalogTiming.started }); } });
   const largeStarted = Date.now(); catalogTiming = { started: largeStarted, events: [] };
@@ -675,6 +721,21 @@ async function durableQualification(database) {
   ok(Number(largeState.retained_bytes) < 67108864, "large supported page fits retained byte cap");
   console.log(`Supported Catalog witness: 20,000 raw values; 3,000 roots x 1,000 explicit locations; ${largeElapsed}ms; ${largeState.retained_bytes} retained logical bytes.`);
   await largeClient.end();
+  // Isolate the initial whole-command guard that previously consumed the CI
+  // deadline before source validation. A fresh owner-only diagnostic session
+  // has no application write authority shortcut and keeps the same SQL bound.
+  const guardClient = await connect({ ...database.connection, statement_timeout: 29000, query_timeout: 31000 }); openClients.push(guardClient);
+  await guardClient.query("set track_functions='all'");
+  await guardClient.query("select pg_stat_reset_single_function_counters('private.square_walk_page_json_v1(jsonb,text[],bigint[],jsonb,text,text)'::regprocedure)");
+  const guardStarted = Date.now();
+  const guardBudget = (await guardClient.query("select private.square_walk_page_json_v1($1::jsonb,array[]::text[],array[7199999,66000,67108864]::bigint[]) as remaining", [JSON.stringify(largeTest.command)])).rows[0].remaining.map(Number);
+  const guardElapsed = Date.now() - guardStarted;
+  equal(JSON.stringify(guardBudget), JSON.stringify(logicalBudget(largeTest.command)), "maximum supported command has exact whole-graph accounting in one iterative guard");
+  await guardClient.query("select pg_stat_force_next_flush()");
+  await owner.query("select pg_stat_clear_snapshot()");
+  equal(Number((await owner.query("select calls from pg_stat_user_functions where funcid='private.square_walk_page_json_v1(jsonb,text[],bigint[],jsonb,text,text)'::regprocedure")).rows[0].calls), 1, "whole maximum command requires one visitor invocation rather than one recursive invocation per container");
+  console.log(`Isolated maximum Catalog command guard: ${guardElapsed}ms; exact logical budget; one visitor call.`);
+  await guardClient.end();
 
   stage = "connection_revocation_and_generation";
   const beforeRevocation = (await owner.query("select count(*)::integer as n from private.square_ingestion_versions")).rows[0].n;

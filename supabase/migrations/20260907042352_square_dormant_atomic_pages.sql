@@ -126,16 +126,17 @@ begin
 end;
 $private_tables$;
 
--- Container-only depth-first visitor. Never materialize an expanded recursive
--- CTE or retain ancestor subtrees. Each frame holds a root reference, a <=64-key
--- path and <=3,000 immediate container-key names; scalar children are charged in
--- one shallow aggregate. Release the extracted container before descending.
--- Thus <=66,000 container calls and <=7.2m shallow values are consumed, with
--- <=64 bounded metadata frames, one current subtree and no history-sized spool.
+-- Nonrecursive container-only depth-first visitor. Never materialize an
+-- expanded recursive CTE or retain ancestor subtrees. One invocation holds a
+-- root reference and path; separate expanded arrays retain <=64 metadata frames
+-- of <=3,000 immediate container-key names and traversal indexes, not payloads.
+-- Scalar children are charged in one shallow aggregate. Release the extracted
+-- container before descending. Thus <=66,000 container iterations and <=7.2m
+-- shallow values are consumed, with one current subtree and no history spool.
 -- Invalid depth/cardinality/remaining budget rejects BEFORE descending children.
--- Recursive SPI planning MUST remain generic: custom parameter plans can copy
--- the complete root datum at every active recursion frame. The function-local
--- setting overrides a caller's force_custom_plan before its body executes.
+-- Keep SPI planning generic so a caller's custom-plan preference cannot copy
+-- root parameters into plans. Iteration also avoids recursive PL/pgSQL calls
+-- and reentrant expression execution for every container in a large command.
 create function private.square_utf16_length_v1(p_value text)
 returns integer language sql immutable strict security invoker set search_path = '' as $function$
   -- UTF-8 supplementary characters use four bytes and two JavaScript UTF-16
@@ -145,10 +146,14 @@ returns integer language sql immutable strict security invoker set search_path =
 $function$;
 create function private.square_walk_page_json_v1(p_root jsonb,p_path text[],p_remaining bigint[],p_scope jsonb default null,p_order_id text default null,p_order_location text default null)
 returns bigint[] language plpgsql stable security invoker set search_path = '' set plan_cache_mode = 'force_generic_plan' as $function$
-declare v_node jsonb;v_kind text;v_count bigint;v_keys text[];v_bytes bigint;v_invalid boolean;v_key text;v_budget bigint[]:=p_remaining;
+declare
+  v_node jsonb;v_kind text;v_count bigint;v_keys text[];v_bytes bigint;v_invalid boolean;v_budget bigint[]:=p_remaining;v_flat text;
+  v_frames jsonb[]:=array[]::jsonb[];v_indices integer[]:=array[]::integer[];
+  v_path text[]:=p_path;v_depth integer:=0;
 begin
-  if pg_catalog.cardinality(p_path)>64 or v_budget[1]<0 or v_budget[2]<1 or v_budget[3]<0 then raise exception using errcode='22023',message='square_page_input_invalid';end if;
-  v_node:=p_root#>p_path;v_kind:=pg_catalog.jsonb_typeof(v_node);
+  loop
+  if pg_catalog.cardinality(v_path)>64 or v_budget[1]<0 or v_budget[2]<1 or v_budget[3]<0 then raise exception using errcode='22023',message='square_page_input_invalid';end if;
+  v_node:=p_root#>v_path;v_kind:=pg_catalog.jsonb_typeof(v_node);
   if v_kind not in ('array','object') then
     if (case v_kind when 'string' then (case when pg_catalog.octet_length(v_node#>>'{}')=pg_catalog.char_length(v_node#>>'{}') then pg_catalog.char_length(v_node#>>'{}') else private.square_utf16_length_v1(v_node#>>'{}') end)>4096 when 'number' then (v_node::text)::numeric<>pg_catalog.trunc((v_node::text)::numeric) or pg_catalog.abs((v_node::text)::numeric)>9007199254740991 else false end) then raise exception using errcode='22023',message='square_page_input_invalid';end if;
     v_budget[3]:=v_budget[3]-pg_catalog.octet_length(v_node::text);
@@ -158,7 +163,7 @@ begin
   v_budget[2]:=v_budget[2]-1;
   if v_kind='object' then select count(*) into v_count from pg_catalog.jsonb_object_keys(v_node);
   else v_count:=pg_catalog.jsonb_array_length(v_node);end if;
-  if v_count>(case when v_kind='object' then 64 else 3000 end) or v_count>v_budget[1] or pg_catalog.cardinality(p_path)=64 and v_count>0 then raise exception using errcode='22023',message='square_page_input_invalid';end if;
+  if v_count>(case when v_kind='object' then 64 else 3000 end) or v_count>v_budget[1] or pg_catalog.cardinality(v_path)=64 and v_count>0 then raise exception using errcode='22023',message='square_page_input_invalid';end if;
   v_budget[1]:=v_budget[1]-v_count;
   if p_scope is not null and v_kind='object' and (
     v_node?'providerKey' and v_node->>'providerKey' is distinct from 'square'
@@ -171,6 +176,21 @@ begin
     or p_order_id is not null and v_node?'orderId' and v_node->>'orderId' is distinct from p_order_id
     or p_order_location is not null and v_node?'locationId' and v_node->>'locationId' is not null and v_node->>'locationId' is distinct from p_order_location
   ) then raise exception using errcode='42501',message='square_page_scope_denied';end if;
+  -- A bounded classification shortcut, NEVER a new acceptance limit. First a
+  -- strict immediate-child type check proves ALL elements are strings; without
+  -- it compact Numeric exponents could expand enormously during ::text. #>
+  -- yields a flat JSONB datum; <=32KiB of string data bounds even hostile JSON
+  -- escaping during ::text to <=192KiB. The anchored pattern proves every child is an
+  -- unescaped ASCII string of <=255 UTF-16 units, with no child containers.
+  -- All n values and this container were already charged above. JSONB emits
+  -- exactly one extra space after each array comma, so remove precisely n-1.
+  -- Anything outside this safe subset uses the unchanged general visitor.
+  v_flat:=null;
+  if v_kind='array' and pg_catalog.pg_column_size(v_node)<=32768
+    and not pg_catalog.jsonb_path_exists(v_node,'strict $[*] ? (@.type() != "string")') then v_flat:=v_node::text;end if;
+  if v_flat is not null and v_flat collate "C" ~ '^\[("[A-Za-z0-9._:-]{0,255}"(, "[A-Za-z0-9._:-]{0,255}")*)?\]$' then
+    v_keys:=array[]::text[];v_bytes:=pg_catalog.octet_length(v_flat)-greatest(v_count-1,0);v_invalid:=false;
+  else
   select coalesce(pg_catalog.array_agg(key) filter(where pg_catalog.jsonb_typeof(value) in ('array','object')),array[]::text[]),
     2+greatest(v_count-1,0)+coalesce(sum(case when v_kind='object' then pg_catalog.octet_length(pg_catalog.to_jsonb(key)::text)+1 else 0 end
       +case when pg_catalog.jsonb_typeof(value) in ('array','object') then 0 else pg_catalog.octet_length(value::text) end),0),
@@ -180,10 +200,25 @@ begin
     into v_keys,v_bytes,v_invalid
     from (select key,value from pg_catalog.jsonb_each(case when v_kind='object' then v_node else '{}'::jsonb end)
       union all select (ordinality-1)::text,value from pg_catalog.jsonb_array_elements(case when v_kind='array' then v_node else '[]'::jsonb end) with ordinality) as children;
+  end if;
+  v_flat:=null;
   v_budget[3]:=v_budget[3]-v_bytes;
   if v_invalid or v_budget[3]<0 or pg_catalog.cardinality(v_keys)>v_budget[2] then raise exception using errcode='22023',message='square_page_input_invalid';end if;
   v_node:=null;
-  foreach v_key in array v_keys loop v_budget:=private.square_walk_page_json_v1(p_root,p_path||v_key,v_budget,p_scope,p_order_id,p_order_location);end loop;
+  if pg_catalog.cardinality(v_keys)>0 then
+    v_depth:=v_depth+1;v_frames[v_depth]:=pg_catalog.to_jsonb(v_keys);v_indices[v_depth]:=0;
+  else
+    loop
+      exit when v_depth=0;
+      v_indices[v_depth]:=v_indices[v_depth]+1;
+      v_path:=v_path[1:pg_catalog.cardinality(v_path)-1];
+      exit when v_indices[v_depth]<pg_catalog.jsonb_array_length(v_frames[v_depth]);
+      v_frames[v_depth]:=null;v_depth:=v_depth-1;
+    end loop;
+    exit when v_depth=0;
+  end if;
+  v_path:=v_path||(v_frames[v_depth]->>v_indices[v_depth]);
+  end loop;
   return v_budget;
 end;
 $function$;
