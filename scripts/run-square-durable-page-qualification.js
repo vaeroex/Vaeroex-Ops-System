@@ -9,6 +9,7 @@ const { Client } = require("pg");
 const root = path.resolve(__dirname, "..");
 const baselineVersion = "20260902191322";
 const squareVersions = ["20260907042202", "20260907042352"];
+const accountMigration = "20260907174326_square_dormant_account_connection.sql";
 const fixedPassword = "square-disposable-synthetic-only";
 let stage = "startup", assertions = 0, scenarios = 0;
 let lastRpcFailure = null, lastOutcome = null;
@@ -155,7 +156,7 @@ async function sourceSchemaFingerprint(client) {
 
 async function createDatabase(target, administrator, suffix) {
   const name = `square_qualification_${crypto.randomBytes(10).toString("hex")}_${suffix}`;
-  if (!/^square_qualification_[a-z0-9_]+$/.test(name)) throw new Error("disposable_database_name_invalid");
+  if (!/^square_qualification_[a-z0-9_]+$/.test(name) || name.length > 63) throw new Error("disposable_database_name_invalid");
   await target.verify(administrator); // Must precede CREATE DATABASE.
   await administrator.query(`create database ${quote(name)} template template0 encoding 'UTF8'`);
   const owned = { name, client: null }; ownedDatabases.push(owned);
@@ -172,8 +173,10 @@ async function createDatabase(target, administrator, suffix) {
 async function migrationQualification(target, administrator) {
   const files = migrationFiles(), baseline = files.filter(name => name.slice(0, 14) <= baselineVersion);
   const added = files.filter(name => squareVersions.includes(name.slice(0, 14)));
+  const accountTail = files.filter(name => name === accountMigration);
   equal(added.length, 2, "both additive Square migrations present");
-  equal(baseline.length + added.length, files.length, "migration manifest is explicit");
+  equal(accountTail.length, 1, "account-connection migration present");
+  equal(baseline.length + added.length + accountTail.length, files.length, "migration manifest is explicit");
   const clean = await createDatabase(target, administrator, "clean");
   await applyMigrations(clean.client, baseline);
   const before = await sourceSchemaFingerprint(clean.client);
@@ -216,6 +219,10 @@ async function migrationQualification(target, administrator) {
   try { await upgrade.client.query("update private.external_source_record_versions set normalized_schema_version='forbidden' where source_record_id='99000000-0000-4000-8000-000000000004'"); }
   catch (error) { mutationDenied = error.code === "55000"; }
   ok(mutationDenied, "preexisting immutable-history protection remains active after upgrade");
+  await applyMigrations(clean.client, accountTail);
+  await applyMigrations(upgrade.client, accountTail);
+  equal(await sourceSchemaFingerprint(clean.client), before, "account migration preserves clean non-Square definitions");
+  equal(await sourceSchemaFingerprint(upgrade.client), upgradeBefore, "account migration preserves upgrade non-Square definitions");
   scenarios++;
   return { clean, upgrade };
 }
@@ -245,16 +252,77 @@ async function main() {
     stage = "durable_application_tests";
     await durableQualification(databases.clean);
     console.log(`Square durable database qualification: ${assertions} assertions across ${scenarios} scenarios.`);
-  } finally {
-    for (const client of openClients) await client.end().catch(() => {});
-    for (const database of ownedDatabases) {
-      await database.client?.end().catch(() => {});
-      await administrator.query(`drop database ${quote(database.name)} with (force)`).catch(() => {});
-    }
-    for (const role of ownedRoles) await administrator.query(`drop role ${quote(role)}`).catch(() => {});
-    await administrator?.end().catch(() => {});
-    await target.stop();
+  } finally { await cleanupOwnedQualification(target, administrator); }
+}
+
+async function cleanupOwnedQualification(target, administrator) {
+  for (const client of openClients.splice(0)) await client.end().catch(() => {});
+  for (const database of ownedDatabases.splice(0)) {
+    await database.client?.end().catch(() => {});
+    await administrator?.query(`drop database ${quote(database.name)} with (force)`).catch(() => {});
   }
+  for (const role of ownedRoles.splice(0)) await administrator?.query(`drop role ${quote(role)}`).catch(() => {});
+  await administrator?.end().catch(() => {});
+  await target.stop();
+}
+
+// Additional milestones reuse the same verified local target and owned cleanup.
+// No caller-provided DSN, database name, or external reconnect target is accepted.
+async function runAdditionalQualification(callback) {
+  if (typeof callback !== "function" || process.argv.slice(2).some(arg => !["--supabase-local", "--local-advisors"].includes(arg))) throw new Error("unknown_qualification_argument");
+  if (ownedDatabases.length || ownedRoles.length || openClients.length) throw new Error("qualification_already_active");
+  const target = process.argv.includes("--supabase-local") ? discoverSupabaseTarget() : await createNativeTarget();
+  const databases = new Set(), connections = new Set();
+  let administrator;
+  try {
+    administrator = await connect(target.connection);
+    await target.verify(administrator);
+    console.log(`Verified disposable ${target.kind} account-connection target; no supplied or hosted connection URL accepted.`);
+    const result = await callback({
+      async createDatabase(suffix) {
+        if (!/^[a-z][a-z0-9_]{0,19}$/.test(suffix)) throw new Error("disposable_database_suffix_invalid");
+        const database = await createDatabase(target, administrator, suffix);
+        databases.add(database);
+        return database;
+      },
+      async applyMigrations(client, names) {
+        if (![...databases].some(database => database.client === client) || !Array.isArray(names) || names.some(name => !migrationFiles().includes(name))) throw new Error("unowned_migration_target_forbidden");
+        return applyMigrations(client, names);
+      },
+      migrationFiles, sourceSchemaFingerprint, installTypescriptLoader,
+      async login(database, suffix, roles = []) {
+        if (!databases.has(database) || !/^[a-z][a-z0-9_]{0,19}$/.test(suffix) || !Array.isArray(roles) || roles.some(role => !/^square_[a-z_]+$/.test(role))) throw new Error("unowned_login_target_forbidden");
+        await target.verify(administrator);
+        const name = `square_qualification_${crypto.randomBytes(8).toString("hex")}_${suffix}`;
+        await database.client.query(`create role ${quote(name)} login nosuperuser nobypassrls nocreatedb nocreaterole noreplication inherit password '${fixedPassword}'`);
+        ownedRoles.push(name);
+        for (const role of roles) await database.client.query(`grant ${quote(role)} to ${quote(name)}`);
+        const connection = Object.freeze({ ...database.connection, user: name, password: fixedPassword });
+        connections.add(connection);
+        const client = await connect(connection);
+        openClients.push(client);
+        return { name, client, connection };
+      },
+      async connect(connection) {
+        if (!connections.has(connection)) throw new Error("unowned_reconnect_target_forbidden");
+        await target.verify(administrator);
+        const client = await connect(connection);
+        openClients.push(client);
+        return client;
+      },
+    });
+    if (process.argv.includes("--local-advisors")) {
+      await target.verify(administrator);
+      for (const database of databases) {
+        const config = database.connection, unix = config.host.startsWith("/");
+        const host = unix ? "localhost" : config.host + ":" + config.port;
+        const url = `postgresql://${encodeURIComponent(config.user)}:${encodeURIComponent(config.password)}@${host}/${database.name}${unix ? "?host=" + encodeURIComponent(config.host) : ""}`;
+        const findings = JSON.parse(command(process.env.SUPABASE_CLI_PATH || "supabase", ["db", "advisors", "--db-url", url, "--type", "all", "--level", "warn", "--output", "json"], { diagnostics: true }));
+        console.log("Account-connection verified local advisor summaries: " + JSON.stringify(Array.isArray(findings) ? findings.map(item => ({ name: item.name, level: item.level, schema: item.metadata?.schema, object: item.metadata?.name })) : { count: Object.keys(findings).length }));
+      }
+    }
+    return result;
+  } finally { await cleanupOwnedQualification(target, administrator); }
 }
 
 async function durableQualification(database) {
@@ -765,7 +833,7 @@ async function durableQualification(database) {
   await denied(() => owner.query("update private.square_connection_generations set retention_policy_version='mutated' where connection_id=$1", [scope.connectionId]), "even owner cannot silently mutate authority evidence");
 }
 
-module.exports = { assertNoRemoteConfiguration, assertNoLinkedProject, validateLocalDatabaseUrl };
+module.exports = { assertNoRemoteConfiguration, assertNoLinkedProject, validateLocalDatabaseUrl, runAdditionalQualification };
 if (require.main === module) main().catch(error => {
   process.stderr.write(`Square durable qualification failed at ${stage} (${safeCode(error)}).\n`);
   if (error.code === "ERR_ASSERTION") process.stderr.write(`Assertion: ${String(error.message).split("\n")[0]}\n`);

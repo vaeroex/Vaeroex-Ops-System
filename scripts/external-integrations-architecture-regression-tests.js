@@ -209,6 +209,13 @@ for (const suffix of ["ingestion-client", "ingestion-mapping", "ingestion-recove
   equal(packageJson.scripts[script], `node scripts/external-integrations-square-${suffix}-regression-tests.js`, `${suffix} regression registered`);
   matches(ciWorkflow, new RegExp(`pnpm ${script}(?:\\s|$)`), `${suffix} exercised in CI`);
 }
+for (const suffix of ["account-oauth", "account-discovery", "connection-routes"]) {
+  const script = `test:external-integrations-square-${suffix}`;
+  equal(packageJson.scripts[script], `node scripts/external-integrations-square-${suffix}-regression-tests.js`, `${suffix} regression registered`);
+  matches(ciWorkflow, new RegExp(`pnpm ${script}(?:\\s|$)`), `${suffix} exercised in CI`);
+}
+equal(packageJson.scripts["test:external-integrations-square-account-db"], "node scripts/run-square-account-connection-qualification.js", "checked account lifecycle qualification registered");
+matches(ciWorkflow, /node scripts\/run-square-account-connection-qualification\.js --supabase-local/, "CI exercises account lifecycle in real disposable databases");
 for (const name of ["ingestion-adapter", "ingestion-client", "ingestion-mapping", "ingestion-page-repository"]) {
   const source = read(`lib/integrations/providers/square/${name}.ts`);
   doesNotMatch(source, /\bfetch\s*\(|axios|node:https|node:http|process\.env|@supabase|supabase-js|app\/api\//, `${name} has no live transport/credentials/persistence/routes`);
@@ -373,13 +380,13 @@ matches(
   "the fixture must preserve the exact production-labelled 2-leased/1-pending shape"
 );
 
-equal(approvedSquareQualificationPaths.length, 5, "qualification scope permits exactly two migrations and three fixtures");
+equal(approvedSquareQualificationPaths.length, 15, "dormant scope permits exactly three migrations, three fixtures, seven routes, one page and one panel");
 equal(withoutSquareQualificationPaths(approvedSquareQualificationPaths.join("\n")), "", "exact qualification paths are exempt from legacy phase-only scope assertions");
 for (const protectedPath of [
   ...approvedSquareQualificationPaths.map(file => `${file}.unexpected`),
   "supabase/migrations/20990101000000_square_activation.sql",
   "supabase/tests/fixtures/unreviewed.sql",
-  "app/api/integrations/square/connect/route.ts",
+  "app/api/integrations/square/activate/route.ts",
   "components/integrations/SquarePanel.tsx",
   "services/external-integrations-square/server.ts",
   "lib/supabase/types.ts",

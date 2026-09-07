@@ -108,6 +108,12 @@ jobs:
           pnpm test:external-integrations-square-durable
           pnpm test:external-integrations-square-durable-authority
 
+      - name: Verify dormant Square account connection contracts and closed routes
+        run: |
+          pnpm test:external-integrations-square-account-oauth
+          pnpm test:external-integrations-square-account-discovery
+          pnpm test:external-integrations-square-connection-routes
+
       - name: External integrations architecture regressions
         run: pnpm test:external-integrations-architecture
 
@@ -243,6 +249,12 @@ jobs:
 
       - name: Qualify dormant Square authority and atomic pages in disposable local databases
         run: node scripts/run-square-durable-page-qualification.js --supabase-local
+
+      - name: Qualify dormant Square account lifecycle in disposable local databases
+        # Install only in this explicit disposable test job, never application build/Preview.
+        run: |
+          pnpm exec playwright install --with-deps chromium
+          node scripts/run-square-account-connection-qualification.js --supabase-local
 
       - name: Verify fixture-rich zero-based delivery migration
         run: node scripts/run-phase8b-zero-based-delivery-migration-tests.js
