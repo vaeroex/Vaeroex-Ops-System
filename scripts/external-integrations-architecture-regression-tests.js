@@ -203,6 +203,19 @@ equal(
   "Square Inventory response regression script must be registered"
 );
 matches(ciWorkflow, /pnpm test:external-integrations-square-inventory/, "CI exercises dormant Inventory responses");
+for (const suffix of ["ingestion-client", "ingestion-mapping", "ingestion-recovery", "ingestion"]) {
+  const script = `test:external-integrations-square-${suffix}`;
+  equal(packageJson.scripts[script], `node scripts/external-integrations-square-${suffix}-regression-tests.js`, `${suffix} regression registered`);
+  matches(ciWorkflow, new RegExp(`pnpm ${script}(?:\\s|$)`), `${suffix} exercised in CI`);
+}
+for (const name of ["ingestion-adapter", "ingestion-client", "ingestion-mapping", "ingestion-page-repository"]) {
+  const source = read(`lib/integrations/providers/square/${name}.ts`);
+  doesNotMatch(source, /\bfetch\s*\(|axios|node:https|node:http|process\.env|@supabase|supabase-js|app\/api\//, `${name} has no live transport/credentials/persistence/routes`);
+}
+const squareIngestionAdapter = read("lib/integrations/providers/square/ingestion-adapter.ts");
+matches(squareIngestionAdapter, /parseSquareCatalogValidatedResponse/, "ingestion uses trusted Catalog facade");
+doesNotMatch(squareIngestionAdapter, /parseSquareCatalogResponseWithAcceptance|parseSquareCatalogResponse\(/, "ingestion cannot promote legacy Catalog shape acceptance");
+doesNotMatch(read("lib/integrations/control-plane/registered-provider-registry.ts"), /square/i, "Square stays outside the registered provider registry");
 for (const moduleName of ["catalog-response-validation", "inventory-responses"]) {
   const source = read(`lib/integrations/providers/square/${moduleName}.ts`);
   matches(source, /import "server-only"/, `${moduleName} remains server-only`);

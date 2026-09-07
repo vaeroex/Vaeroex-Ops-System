@@ -96,6 +96,13 @@ jobs:
       - name: External integrations Square Inventory response validation regressions
         run: pnpm test:external-integrations-square-inventory
 
+      - name: External integrations Square dormant ingestion regressions
+        run: |
+          pnpm test:external-integrations-square-ingestion-client
+          pnpm test:external-integrations-square-ingestion-mapping
+          pnpm test:external-integrations-square-ingestion-recovery
+          pnpm test:external-integrations-square-ingestion
+
       - name: External integrations architecture regressions
         run: pnpm test:external-integrations-architecture
 
