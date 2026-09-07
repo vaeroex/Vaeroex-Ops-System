@@ -12,6 +12,7 @@ const squareVersions = ["20260907042202", "20260907042352"];
 const fixedPassword = "square-disposable-synthetic-only";
 let stage = "startup", assertions = 0, scenarios = 0;
 let lastRpcFailure = null, lastOutcome = null;
+let catalogTiming = null;
 const ownedDatabases = [], ownedRoles = [], openClients = [];
 const equal = (actual, expected, label) => { assertions++; assert.ok(actual === expected, label); };
 const ok = (condition, label) => { assertions++; assert.ok(condition, label); };
@@ -279,7 +280,12 @@ async function durableQualification(database) {
       try {
         const fields = Object.keys(args);
         const jsonArguments = new Set(["p_command", "p_binding", "p_lease", "p_release"]);
-        const result = await client.query(`select public.${name}(${fields.map((key, index) => `${key} => $${index + 1}`).join(",")}) as result`, fields.map(key => jsonArguments.has(key) ? JSON.stringify(args[key]) : args[key]));
+        const queryStart = Date.now();
+        if (catalogTiming) catalogTiming.events.push({ phase: name + "_serialize_start", milliseconds: queryStart - catalogTiming.started });
+        const values = fields.map(key => jsonArguments.has(key) ? JSON.stringify(args[key]) : args[key]);
+        if (catalogTiming) catalogTiming.events.push({ phase: name + "_query_start", milliseconds: Date.now() - catalogTiming.started });
+        const result = await client.query(`select public.${name}(${fields.map((key, index) => `${key} => $${index + 1}`).join(",")}) as result`, values);
+        if (catalogTiming) catalogTiming.events.push({ phase: name + "_query_done", milliseconds: Date.now() - catalogTiming.started });
         return { data: result.rows[0].result, error: null };
       } catch (error) { lastRpcFailure = { operation: name, code: safeCode(error) }; return { data: null, error: { code: safeCode(error) } }; }
     } };
@@ -644,10 +650,24 @@ async function durableQualification(database) {
   function rawValues(value) { return 1 + (value !== null && typeof value === "object" ? Object.values(value).reduce((sum, child) => sum + rawValues(child), 0) : 0); }
   equal(rawValues(largeRaw), 20000, "supported large Catalog fixture reaches exact raw response budget");
   const largeTask = await task(grant("catalog", "catalog_search", "/v2/catalog/search", { object_types: ["ITEM"], limit: 1000, include_deleted_objects: true, include_related_objects: true, include_options: { include: ["INCLUDE_NESTED_MODIFIERS"] } }, largeScope));
+  // Owner-only profiling configuration for this disposable login, not extra
+  // application authority. Function timings contain names/counts only, no data.
+  await owner.query(`alter role ${quote(runtime.name)} set track_functions='all'`);
   const largeClient = await connect({ ...runtime.connection, statement_timeout: 29000, query_timeout: 31000 }); openClients.push(largeClient);
-  const largeTest = adapter(largeTask, largeRaw, largeClient);
-  const largeStarted = Date.now(), largeResult = await largeTest.run(), largeElapsed = Date.now() - largeStarted;
+  const settings = (await largeClient.query("select current_setting('server_version') as version,current_setting('plan_cache_mode') as plans,current_setting('jit') as jit,pg_jit_available() as jit_available,current_setting('jit_above_cost') as jit_above_cost,current_setting('work_mem') as work_mem,current_setting('default_toast_compression') as compression")).rows[0];
+  console.log("Catalog qualification database settings: " + JSON.stringify(settings));
+  const largeTest = adapter(largeTask, largeRaw, largeClient, { beforeCommit() { catalogTiming.events.push({ phase: "mapped_command_captured", milliseconds: Date.now() - catalogTiming.started }); } });
+  const largeStarted = Date.now(); catalogTiming = { started: largeStarted, events: [] };
+  const largeResult = await largeTest.run(), largeElapsed = Date.now() - largeStarted;
   console.log(`Supported Catalog bounded attempt: ${largeElapsed}ms; outcome ${largeResult.outcome}.`);
+  console.log("Catalog qualification stage timings: " + JSON.stringify(catalogTiming.events)); catalogTiming = null;
+  // On deadline failure the active SQL statement may still be finishing its
+  // own bounded cancellation. Diagnostics add at most five seconds, not a new
+  // application attempt; a timed-out queued flush is removed by the pg client.
+  await largeClient.query({ text: "select pg_stat_force_next_flush()", query_timeout: 5000 }).catch(() => {});
+  await owner.query("select pg_stat_clear_snapshot()");
+  const functions = (await owner.query("select funcname,calls,total_time,self_time from pg_stat_user_functions where funcname like '%square%' order by self_time desc limit 12")).rows;
+  console.log("Catalog qualification function timings: " + JSON.stringify(functions));
   equal(largeResult.outcome, "committed", "largest supported repeated-location Catalog page commits within finite invocation");
   equal(largeResult.sourceCount, 3000, "all primary/related/included roots durably represented");
   const largeState = await counters(largeScope.connectionId);

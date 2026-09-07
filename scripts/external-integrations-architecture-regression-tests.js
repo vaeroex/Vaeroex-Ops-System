@@ -2,6 +2,7 @@ const assert = require("node:assert/strict");
 const childProcess = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
+const { approvedSquareQualificationPaths, withoutSquareQualificationPaths } = require("./square-dormant-scope-test-support.js");
 
 const root = path.resolve(__dirname, "..");
 const read = (relative) => fs.readFileSync(path.join(root, relative), "utf8");
@@ -372,17 +373,28 @@ matches(
   "the fixture must preserve the exact production-labelled 2-leased/1-pending shape"
 );
 
+equal(approvedSquareQualificationPaths.length, 5, "qualification scope permits exactly two migrations and three fixtures");
+equal(withoutSquareQualificationPaths(approvedSquareQualificationPaths.join("\n")), "", "exact qualification paths are exempt from legacy phase-only scope assertions");
+for (const protectedPath of [
+  ...approvedSquareQualificationPaths.map(file => `${file}.unexpected`),
+  "supabase/migrations/20990101000000_square_activation.sql",
+  "supabase/tests/fixtures/unreviewed.sql",
+  "app/api/integrations/square/connect/route.ts",
+  "components/integrations/SquarePanel.tsx",
+  "services/external-integrations-square/server.ts",
+  "lib/supabase/types.ts",
+  "vercel.json"
+]) {
+  equal(withoutSquareQualificationPaths(protectedPath), protectedPath, "scope exemption cannot hide a neighboring or activation path");
+}
+
 const protectedDiff = childProcess.execFileSync(
   "git",
   ["diff", "--name-only", "origin/main", "--", "app", "components", "supabase", "lib/supabase", "services", "vercel.json"],
   { cwd: root, encoding: "utf8" }
 ).trim();
 const approvedProtectedPaths = new Set([
-  "supabase/migrations/20260907042202_square_dormant_trusted_authority.sql",
-  "supabase/migrations/20260907042352_square_dormant_atomic_pages.sql",
-  "supabase/tests/fixtures/square-durable-platform.sql",
-  "supabase/tests/fixtures/square-durable-process.js",
-  "supabase/tests/fixtures/square-durable-upgrade-history.sql",
+  ...approvedSquareQualificationPaths,
   "app/app/settings/page.tsx",
   "app/api/integrations/qbo/connect/route.ts",
   "app/api/integrations/qbo/disconnect/route.ts",
