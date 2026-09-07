@@ -2,6 +2,14 @@
 
 Audit baseline: `0a4b18be14b01d8d2be8d1e4525b47d7d190e551` (PR #351 merged). This milestone adds **dormant Square account connection**, using the existing checked authority and atomic durable-page persistence. OAuth-verified enrollment is distinct from synthetic disposable enrollment. API `2026-08-19`, SDK `45.1.0` at `e4a5bf7e1a2b97c2b995fde28c55ddbc35dc0e76`, existing fingerprints and shared limits remain unchanged. No new phase identifier is assigned. See the [account contract](square-account-connection-contract.md) and [unresolved sandbox approval worksheet](square-sandbox-approval-worksheet.md).
 
+## Subsequent code-only Sandbox preparation
+
+The [remote Sandbox preparation record](square-remote-sandbox-binding.md) supplements the account-connection baseline below. It adds disabled, **unwired** host identity, checked database binding, operator authentication, bounded transport and an injected enrolled-credential adapter. These are synthetic/local-tested components, not a deployed connection flow. No remote handler is installed and no provider registration, ingestion or economic gate changes.
+
+Under earlier explicit authorization, the canonical 104-migration baseline was installed only in the confirmed Free isolated project `oysjpoondtcrqpghhrbd`. The new remote-binding migration remains repository-only; the current code-only authorization forbids further remote database mutations. Historical “no remote database changes” statements below describe the original account-connection delivery, not that separately approved baseline installation. Production, Preview and QBO databases were not changed.
+
+The current PR must remain open and unmerged, with Git deployments disabled for its exact branch. Before a real run, separately authorize the new migration/LOGINs, real secret/KMS/IAM resources and costs, operator and finite retention policy, reviewed live authority composition (including first consent), dedicated host/deployment, privacy-safe callbacks/webhooks and bounded provider calls. None is implied by synthetic credentials or test enrollment. The unresolved worksheet and acceptance tests below remain applicable.
+
 ## Evidence levels
 
 - **Implemented** means executable code exists for the stated boundary, not merely a descriptor declaration.

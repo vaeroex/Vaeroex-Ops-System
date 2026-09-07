@@ -1,1 +1,7 @@
-{}
+{
+  "git": {
+    "deploymentEnabled": {
+      "codex/square-remote-sandbox-binding": false
+    }
+  }
+}

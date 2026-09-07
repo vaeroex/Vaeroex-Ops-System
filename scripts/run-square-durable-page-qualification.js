@@ -10,6 +10,7 @@ const root = path.resolve(__dirname, "..");
 const baselineVersion = "20260902191322";
 const squareVersions = ["20260907042202", "20260907042352"];
 const accountMigration = "20260907174326_square_dormant_account_connection.sql";
+const remoteBindingMigration = "20260907225626_square_remote_sandbox_binding.sql";
 const fixedPassword = "square-disposable-synthetic-only";
 let stage = "startup", assertions = 0, scenarios = 0;
 let lastRpcFailure = null, lastOutcome = null;
@@ -174,9 +175,11 @@ async function migrationQualification(target, administrator) {
   const files = migrationFiles(), baseline = files.filter(name => name.slice(0, 14) <= baselineVersion);
   const added = files.filter(name => squareVersions.includes(name.slice(0, 14)));
   const accountTail = files.filter(name => name === accountMigration);
+  const remoteTail = files.filter(name => name === remoteBindingMigration);
   equal(added.length, 2, "both additive Square migrations present");
   equal(accountTail.length, 1, "account-connection migration present");
-  equal(baseline.length + added.length + accountTail.length, files.length, "migration manifest is explicit");
+  equal(remoteTail.length, 1, "remote Sandbox binding migration present");
+  equal(baseline.length + added.length + accountTail.length + remoteTail.length, files.length, "migration manifest is explicit");
   const clean = await createDatabase(target, administrator, "clean");
   await applyMigrations(clean.client, baseline);
   const before = await sourceSchemaFingerprint(clean.client);
@@ -221,6 +224,8 @@ async function migrationQualification(target, administrator) {
   ok(mutationDenied, "preexisting immutable-history protection remains active after upgrade");
   await applyMigrations(clean.client, accountTail);
   await applyMigrations(upgrade.client, accountTail);
+  await applyMigrations(clean.client, remoteTail);
+  await applyMigrations(upgrade.client, remoteTail);
   equal(await sourceSchemaFingerprint(clean.client), before, "account migration preserves clean non-Square definitions");
   equal(await sourceSchemaFingerprint(upgrade.client), upgradeBefore, "account migration preserves upgrade non-Square definitions");
   scenarios++;
@@ -290,10 +295,13 @@ async function runAdditionalQualification(callback) {
         return applyMigrations(client, names);
       },
       migrationFiles, sourceSchemaFingerprint, installTypescriptLoader,
-      async login(database, suffix, roles = []) {
-        if (!databases.has(database) || !/^[a-z][a-z0-9_]{0,19}$/.test(suffix) || !Array.isArray(roles) || roles.some(role => !/^square_[a-z_]+$/.test(role))) throw new Error("unowned_login_target_forbidden");
+      async login(database, suffix, roles = [], namespace = "square_qualification") {
+        if (!databases.has(database) || !/^[a-z][a-z0-9_]{0,19}$/.test(suffix) || !Array.isArray(roles) || roles.some(role => !/^square_[a-z_]+$/.test(role)) ||
+            !["square_qualification", "square_sandbox"].includes(namespace) || namespace === "square_sandbox" && !/^[a-z_]{1,19}$/.test(suffix)) throw new Error("unowned_login_target_forbidden");
         await target.verify(administrator);
-        const name = `square_qualification_${crypto.randomBytes(8).toString("hex")}_${suffix}`;
+        const nonce = crypto.randomBytes(8).toString("hex");
+        const identifier = namespace === "square_sandbox" ? [...nonce].map(char => String.fromCharCode(97 + parseInt(char, 16))).join("") : nonce;
+        const name = `${namespace}_${identifier}_${suffix}`;
         await database.client.query(`create role ${quote(name)} login nosuperuser nobypassrls nocreatedb nocreaterole noreplication inherit password '${fixedPassword}'`);
         ownedRoles.push(name);
         for (const role of roles) await database.client.query(`grant ${quote(role)} to ${quote(name)}`);

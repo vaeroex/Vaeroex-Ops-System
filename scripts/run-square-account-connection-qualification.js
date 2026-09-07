@@ -123,7 +123,8 @@ function syntheticProvider(scopes) {
 async function migrationTests(runtime) {
   stage = "migration_clean_install";
   const names = runtime.migrationFiles(), baseline = names.filter(name => name < migrationName);
-  equal(names.filter(name => name >= migrationName), [migrationName], "account migration is the exact additive tail");
+  equal(names.filter(name => name >= migrationName), [migrationName, "20260907225626_square_remote_sandbox_binding.sql"],
+    "account and separately qualified remote Sandbox migrations are the exact additive tail");
   const clean = await runtime.createDatabase("account_clean");
   await runtime.applyMigrations(clean.client, baseline);
   const fingerprint = await runtime.sourceSchemaFingerprint(clean.client);

@@ -117,6 +117,11 @@ jobs:
       - name: External integrations architecture regressions
         run: pnpm test:external-integrations-architecture
 
+      - name: Verify isolated Square remote Sandbox binding and closed Production gates
+        run: |
+          pnpm test:external-integrations-square-remote-sandbox
+          pnpm test:external-integrations-square-remote-credentials
+
       - name: External integrations Phase 1 regressions
         run: pnpm test:external-integrations-phase-1
 
@@ -258,6 +263,9 @@ jobs:
 
       - name: Verify fixture-rich zero-based delivery migration
         run: node scripts/run-phase8b-zero-based-delivery-migration-tests.js
+
+      - name: Qualify remote Sandbox binding in disposable local databases only
+        run: node scripts/run-square-remote-sandbox-qualification.js --supabase-local
 
       - name: Remove isolated database state
         if: always()
