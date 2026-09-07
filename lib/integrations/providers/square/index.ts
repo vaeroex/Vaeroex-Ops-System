@@ -19,3 +19,8 @@ export * from "@/lib/integrations/providers/square/payment-responses";
 export * from "@/lib/integrations/providers/square/refund-responses";
 export * from "@/lib/integrations/providers/square/request-validators";
 export * from "@/lib/integrations/providers/square/response-validation";
+export { createSquareDormantIngestionAdapter } from "@/lib/integrations/providers/square/ingestion-adapter";
+export type {
+  SquareIngestionAuthority, SquareIngestionGrant, SquareIngestionScope, SquareIngestionStream,
+  SquareIngestionOutcome, SquarePageRepository, SquareSyntheticTransport
+} from "@/lib/integrations/providers/square/ingestion-contracts";
