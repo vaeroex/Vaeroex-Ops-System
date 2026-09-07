@@ -721,21 +721,37 @@ async function durableQualification(database) {
   ok(Number(largeState.retained_bytes) < 67108864, "large supported page fits retained byte cap");
   console.log(`Supported Catalog witness: 20,000 raw values; 3,000 roots x 1,000 explicit locations; ${largeElapsed}ms; ${largeState.retained_bytes} retained logical bytes.`);
   await largeClient.end();
+  stage = "isolated_catalog_guard_diagnostic";
   // Isolate the initial whole-command guard that previously consumed the CI
-  // deadline before source validation. A fresh owner-only diagnostic session
-  // has no application write authority shortcut and keeps the same SQL bound.
-  const guardClient = await connect({ ...database.connection, statement_timeout: 29000, query_timeout: 31000 }); openClients.push(guardClient);
-  await guardClient.query("set track_functions='all'");
-  await guardClient.query("select pg_stat_reset_single_function_counters('private.square_walk_page_json_v1(jsonb,text[],bigint[],jsonb,text,text)'::regprocedure)");
+  // deadline before source validation. The fixture owner configures one owned
+  // diagnostic login, not the shared postgres role or an application runtime.
+  // Only the pure JSON helpers are callable; no session SET/reset privilege,
+  // application role membership or table access is needed for profiling.
+  const guardRole = await login("guard", null);
+  await owner.query(`alter role ${quote(guardRole.name)} set track_functions='all'`);
+  await owner.query(`grant usage on schema private to ${quote(guardRole.name)}`);
+  await owner.query(`grant execute on function private.square_walk_page_json_v1(jsonb,text[],bigint[],jsonb,text,text),private.square_utf16_length_v1(text) to ${quote(guardRole.name)}`);
+  await guardRole.client.end();
+  const guardClient = await connect({ ...guardRole.connection, statement_timeout: 29000, query_timeout: 31000 }); openClients.push(guardClient);
+  equal((await guardClient.query("select current_setting('track_functions') as tracking")).rows[0].tracking, "all", "owned diagnostic login inherits profiling without privileged session SET");
+  await denied(() => guardClient.query("set track_functions='none'"), "restricted diagnostic login cannot change privileged session tracking");
+  await denied(() => guardClient.query("select pg_stat_reset_single_function_counters('private.square_walk_page_json_v1(jsonb,text[],bigint[],jsonb,text,text)'::regprocedure)"), "restricted diagnostic login cannot reset shared function statistics");
+  await denied(() => guardClient.query("select 1 from private.square_ingestion_versions limit 1"), "pure guard diagnostic grants do not permit source-table access");
+  const guardPrivileges = (await owner.query("select pg_has_role($1,'square_ingestion_runtime_authority','MEMBER') as runtime,pg_has_role($1,'square_ingestion_qualification_admin','MEMBER') as admin,has_function_privilege($1,'public.commit_square_ingestion_page_v1(uuid,text,jsonb)','EXECUTE') as commit", [guardRole.name])).rows[0];
+  equal(guardPrivileges.runtime, false, "diagnostic login has no runtime authority membership");
+  equal(guardPrivileges.admin, false, "diagnostic login has no qualification admin membership");
+  equal(guardPrivileges.commit, false, "diagnostic login cannot invoke the page commit RPC");
+  await owner.query("select pg_stat_clear_snapshot()");
+  const guardCallsBefore = Number((await owner.query("select calls from pg_stat_user_functions where funcid='private.square_walk_page_json_v1(jsonb,text[],bigint[],jsonb,text,text)'::regprocedure")).rows[0].calls);
   const guardStarted = Date.now();
   const guardBudget = (await guardClient.query("select private.square_walk_page_json_v1($1::jsonb,array[]::text[],array[7199999,66000,67108864]::bigint[]) as remaining", [JSON.stringify(largeTest.command)])).rows[0].remaining.map(Number);
   const guardElapsed = Date.now() - guardStarted;
   equal(JSON.stringify(guardBudget), JSON.stringify(logicalBudget(largeTest.command)), "maximum supported command has exact whole-graph accounting in one iterative guard");
   await guardClient.query("select pg_stat_force_next_flush()");
-  await owner.query("select pg_stat_clear_snapshot()");
-  equal(Number((await owner.query("select calls from pg_stat_user_functions where funcid='private.square_walk_page_json_v1(jsonb,text[],bigint[],jsonb,text,text)'::regprocedure")).rows[0].calls), 1, "whole maximum command requires one visitor invocation rather than one recursive invocation per container");
-  console.log(`Isolated maximum Catalog command guard: ${guardElapsed}ms; exact logical budget; one visitor call.`);
   await guardClient.end();
+  await owner.query("select pg_stat_clear_snapshot()");
+  equal(Number((await owner.query("select calls from pg_stat_user_functions where funcid='private.square_walk_page_json_v1(jsonb,text[],bigint[],jsonb,text,text)'::regprocedure")).rows[0].calls) - guardCallsBefore, 1, "whole maximum command adds exactly one visitor invocation without resetting counters");
+  console.log(`Isolated maximum Catalog command guard: ${guardElapsed}ms; exact logical budget; one visitor call.`);
 
   stage = "connection_revocation_and_generation";
   const beforeRevocation = (await owner.query("select count(*)::integer as n from private.square_ingestion_versions")).rows[0].n;
