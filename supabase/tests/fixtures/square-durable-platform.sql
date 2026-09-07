@@ -30,6 +30,12 @@ create table auth.users (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+-- Synthetic session evidence only, not session/token issuance or validation.
+create table auth.sessions (
+  id uuid primary key,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  not_after timestamptz
+);
 create function auth.jwt() returns jsonb language sql stable as $fn$
   select coalesce(nullif(current_setting('request.jwt.claim',true),''),
     nullif(current_setting('request.jwt.claims',true),''))::jsonb;

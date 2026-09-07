@@ -1045,13 +1045,15 @@ export class IntegrationCredentialBroker {
         scopeEquivalent,
         accessExpiresInSeconds: Math.max(
           1,
-          Math.ceil((Date.parse(next.accessExpiresAt) - now.getTime()) / 1_000)
+          // Provider-issued absolute expiry is relative to validated issuance,
+          // which can occur after the request clock. QBO issuance remains `now`.
+          Math.ceil((Date.parse(next.accessExpiresAt) - Date.parse(next.updatedAt)) / 1_000)
         ),
         refreshExpiresInSeconds: next.refreshExpiresAt === null
           ? null
           : Math.max(
               1,
-              Math.ceil((Date.parse(next.refreshExpiresAt) - now.getTime()) / 1_000)
+              Math.ceil((Date.parse(next.refreshExpiresAt) - Date.parse(next.updatedAt)) / 1_000)
             )
       });
       await reportBoundary({

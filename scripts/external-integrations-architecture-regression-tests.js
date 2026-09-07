@@ -209,6 +209,13 @@ for (const suffix of ["ingestion-client", "ingestion-mapping", "ingestion-recove
   equal(packageJson.scripts[script], `node scripts/external-integrations-square-${suffix}-regression-tests.js`, `${suffix} regression registered`);
   matches(ciWorkflow, new RegExp(`pnpm ${script}(?:\\s|$)`), `${suffix} exercised in CI`);
 }
+for (const suffix of ["account-oauth", "account-discovery", "connection-routes"]) {
+  const script = `test:external-integrations-square-${suffix}`;
+  equal(packageJson.scripts[script], `node scripts/external-integrations-square-${suffix}-regression-tests.js`, `${suffix} regression registered`);
+  matches(ciWorkflow, new RegExp(`pnpm ${script}(?:\\s|$)`), `${suffix} exercised in CI`);
+}
+equal(packageJson.scripts["test:external-integrations-square-account-db"], "node scripts/run-square-account-connection-qualification.js", "checked account lifecycle qualification registered");
+matches(ciWorkflow, /node scripts\/run-square-account-connection-qualification\.js --supabase-local/, "CI exercises account lifecycle in real disposable databases");
 for (const name of ["ingestion-adapter", "ingestion-client", "ingestion-mapping", "ingestion-page-repository"]) {
   const source = read(`lib/integrations/providers/square/${name}.ts`);
   doesNotMatch(source, /\bfetch\s*\(|axios|node:https|node:http|process\.env|@supabase|supabase-js|app\/api\//, `${name} has no live transport/credentials/persistence/routes`);
@@ -357,6 +364,29 @@ matches(
   /run\(cli, \["migration", "up", "--local"\]\)/,
   "the fixture-rich runner must apply the ordered zero-based and retry-identity migrations"
 );
+matches(zeroBasedUpgradeRunner, /const dormantSquareTail = \[\s*"20260907042202_square_dormant_trusted_authority\.sql",\s*"20260907042352_square_dormant_atomic_pages\.sql",\s*"20260907174326_square_dormant_account_connection\.sql"\s*\]/,
+  "fixture-rich QBO upgrade allows exactly the three reviewed dormant Square migrations");
+// Execute only the pure manifest guard, with no database/CLI capability. This
+// catches an omitted additive tail before the real database gate runs in CI.
+const fixtureGuardSource = zeroBasedUpgradeRunner.slice(0, zeroBasedUpgradeRunner.indexOf("async function applyFixture"));
+const currentMigrations = fs.readdirSync(path.join(root, "supabase/migrations"));
+function acceptsFixtureManifest(names) {
+  return require("node:vm").runInNewContext(`${fixtureGuardSource}\nassertTargetIsSinglePendingMigration(); true;`, {
+    __dirname: path.join(root, "scripts"),
+    require(name) {
+      if (name === "node:fs") return { readdirSync: () => names };
+      if (name === "node:path") return path;
+      if (name === "node:child_process") return { spawnSync: () => { throw new Error("manifest_guard_must_not_execute_commands"); } };
+      throw new Error("manifest_guard_dependency_denied");
+    },
+    process: { env: {}, stderr: { write() {} }, exit() { throw new Error("fixture_manifest_denied"); } }
+  });
+}
+equal(acceptsFixtureManifest(currentMigrations), true, "real current migration manifest passes the fixture-rich guard");
+for (const manifest of [currentMigrations.filter(name => name !== "20260907174326_square_dormant_account_connection.sql"),
+  [...currentMigrations, "20990101000000_square_activation.sql"]]) {
+  assertionCount++; assert.throws(() => acceptsFixtureManifest(manifest), /fixture_manifest_denied/, "missing or unreviewed tail still rejects");
+}
 matches(
   zeroBasedUpgradeRunner,
   /external_integrations_phase_6_durable_runtime\.test\.sql[\s\S]*external_integrations_phase_8b_credential_refresh_recovery\.test\.sql[\s\S]*external_integrations_phase_8b_same_generation_reauthorization\.test\.sql[\s\S]*external_integrations_phase_8b_credential_binding_canary\.test\.sql[\s\S]*external_integrations_phase_8b_credential_lineage_recovery\.test\.sql[\s\S]*external_integrations_phase_8b_precontract_retirement\.test\.sql[\s\S]*external_integrations_phase_8b_provider_result_evidence\.test\.sql[\s\S]*external_integrations_qbo_production_convergence\.test\.sql/,
@@ -373,13 +403,13 @@ matches(
   "the fixture must preserve the exact production-labelled 2-leased/1-pending shape"
 );
 
-equal(approvedSquareQualificationPaths.length, 5, "qualification scope permits exactly two migrations and three fixtures");
+equal(approvedSquareQualificationPaths.length, 15, "dormant scope permits exactly three migrations, three fixtures, seven routes, one page and one panel");
 equal(withoutSquareQualificationPaths(approvedSquareQualificationPaths.join("\n")), "", "exact qualification paths are exempt from legacy phase-only scope assertions");
 for (const protectedPath of [
   ...approvedSquareQualificationPaths.map(file => `${file}.unexpected`),
   "supabase/migrations/20990101000000_square_activation.sql",
   "supabase/tests/fixtures/unreviewed.sql",
-  "app/api/integrations/square/connect/route.ts",
+  "app/api/integrations/square/activate/route.ts",
   "components/integrations/SquarePanel.tsx",
   "services/external-integrations-square/server.ts",
   "lib/supabase/types.ts",

@@ -32,6 +32,10 @@
     "test:external-integrations-square-durable": "node scripts/external-integrations-square-durable-regression-tests.js",
     "test:external-integrations-square-durable-authority": "node scripts/external-integrations-square-durable-authority-regression-tests.js",
     "test:external-integrations-square-durable-db": "node scripts/run-square-durable-page-qualification.js",
+    "test:external-integrations-square-account-oauth": "node scripts/external-integrations-square-account-oauth-regression-tests.js",
+    "test:external-integrations-square-account-discovery": "node scripts/external-integrations-square-account-discovery-regression-tests.js",
+    "test:external-integrations-square-connection-routes": "node scripts/external-integrations-square-connection-routes-regression-tests.js",
+    "test:external-integrations-square-account-db": "node scripts/run-square-account-connection-qualification.js",
     "test:external-integrations-architecture": "node scripts/external-integrations-architecture-regression-tests.js",
     "test:external-integrations-phase-1": "node scripts/external-integrations-phase-1-foundation-regression-tests.js",
     "test:external-integrations-phase-2": "node scripts/external-integrations-phase-2-reconciliation-regression-tests.js",
@@ -161,6 +165,7 @@
     "eslint": "^9.14.0",
     "eslint-config-next": "15.5.21",
     "pg": "8.23.0",
+    "playwright": "1.62.1",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.15",
     "typescript": "^5.6.3"
