@@ -4,6 +4,7 @@ const fs = require("node:fs");
 const Module = require("node:module");
 const path = require("node:path");
 const ts = require("typescript");
+const { withoutSquareQualificationPaths } = require("./square-dormant-scope-test-support.js");
 
 const root = path.resolve(__dirname, "..");
 const read = (relative) => fs.readFileSync(path.join(root, relative), "utf8");
@@ -1511,7 +1512,7 @@ function testPinnedContractsDormancyAndRegistration() {
     ["diff", "--name-only", "origin/main"],
     { cwd: root, encoding: "utf8" }
   ).trim();
-  doesNotMatch(changedFiles, /^(app|components|supabase|services|lib\/supabase|vercel\.json)(?:\/|$)/m, "Tender phase adds no runtime, UI, database, or deployment scope");
+  doesNotMatch(withoutSquareQualificationPaths(changedFiles), /^(app|components|supabase|services|lib\/supabase|vercel\.json)(?:\/|$)/m, "Square remains dormant outside the exact authorized database qualification files");
   doesNotMatch(changedFiles, /^lib\/integrations\/providers\/(?:qbo|square\/(?:descriptor|request-validators))\//m, "QBO, Square descriptor, and request validators remain untouched");
   const tenderSources = [
     "lib/integrations/providers/square/order-responses.ts",

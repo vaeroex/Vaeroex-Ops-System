@@ -4,6 +4,7 @@ const fs = require("node:fs");
 const Module = require("node:module");
 const path = require("node:path");
 const ts = require("typescript");
+const { withoutSquareQualificationPaths } = require("./square-dormant-scope-test-support.js");
 
 const root = path.resolve(__dirname, "..");
 const read = (relative) => fs.readFileSync(path.join(root, relative), "utf8");
@@ -2265,9 +2266,9 @@ function testPinnedContractsAndDormancy() {
     })
     .trim();
   doesNotMatch(
-    changedFiles,
+    withoutSquareQualificationPaths(changedFiles),
     /^(app|components|supabase|services|lib\/supabase|vercel\.json)(?:\/|$)/m,
-    "detail phase adds no runtime, UI, database, or deployment scope"
+    "Square remains dormant outside the exact authorized database qualification files"
   );
   doesNotMatch(
     changedFiles,

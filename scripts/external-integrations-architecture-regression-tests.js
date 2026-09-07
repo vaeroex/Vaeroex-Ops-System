@@ -2,6 +2,7 @@ const assert = require("node:assert/strict");
 const childProcess = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
+const { approvedSquareQualificationPaths, withoutSquareQualificationPaths } = require("./square-dormant-scope-test-support.js");
 
 const root = path.resolve(__dirname, "..");
 const read = (relative) => fs.readFileSync(path.join(root, relative), "utf8");
@@ -213,6 +214,17 @@ for (const name of ["ingestion-adapter", "ingestion-client", "ingestion-mapping"
   doesNotMatch(source, /\bfetch\s*\(|axios|node:https|node:http|process\.env|@supabase|supabase-js|app\/api\//, `${name} has no live transport/credentials/persistence/routes`);
 }
 const squareIngestionAdapter = read("lib/integrations/providers/square/ingestion-adapter.ts");
+equal(packageJson.scripts["test:external-integrations-square-durable"], "node scripts/external-integrations-square-durable-regression-tests.js", "dormant durable boundary regressions registered");
+equal(packageJson.scripts["test:external-integrations-square-durable-db"], "node scripts/run-square-durable-page-qualification.js", "local database qualification registered");
+equal(packageJson.scripts["test:external-integrations-square-durable-authority"], "node scripts/external-integrations-square-durable-authority-regression-tests.js", "checked authority regressions registered");
+matches(ciWorkflow, /pnpm test:external-integrations-square-durable(?:\s|$)/, "CI exercises dormant durable application boundary");
+matches(ciWorkflow, /pnpm test:external-integrations-square-durable-authority(?:\s|$)/, "CI exercises checked database authority bridge");
+matches(ciWorkflow, /node scripts\/run-square-durable-page-qualification\.js --supabase-local/, "CI exercises real disposable database qualification");
+for (const name of ["durable-authority", "durable-page-repository", "durable-contracts"]) {
+  const source = read(`lib/integrations/providers/square/${name}.ts`);
+  matches(source, /import "server-only"/, `${name} stays server-only`);
+  doesNotMatch(source, /\bfetch\s*\(|axios|node:https|node:http|process\.env|createClient\s*\(|app\/api\//, `${name} has no default transport, credential lookup, registration or route`);
+}
 matches(squareIngestionAdapter, /parseSquareCatalogValidatedResponse/, "ingestion uses trusted Catalog facade");
 doesNotMatch(squareIngestionAdapter, /parseSquareCatalogResponseWithAcceptance|parseSquareCatalogResponse\(/, "ingestion cannot promote legacy Catalog shape acceptance");
 doesNotMatch(read("lib/integrations/control-plane/registered-provider-registry.ts"), /square/i, "Square stays outside the registered provider registry");
@@ -361,12 +373,28 @@ matches(
   "the fixture must preserve the exact production-labelled 2-leased/1-pending shape"
 );
 
+equal(approvedSquareQualificationPaths.length, 5, "qualification scope permits exactly two migrations and three fixtures");
+equal(withoutSquareQualificationPaths(approvedSquareQualificationPaths.join("\n")), "", "exact qualification paths are exempt from legacy phase-only scope assertions");
+for (const protectedPath of [
+  ...approvedSquareQualificationPaths.map(file => `${file}.unexpected`),
+  "supabase/migrations/20990101000000_square_activation.sql",
+  "supabase/tests/fixtures/unreviewed.sql",
+  "app/api/integrations/square/connect/route.ts",
+  "components/integrations/SquarePanel.tsx",
+  "services/external-integrations-square/server.ts",
+  "lib/supabase/types.ts",
+  "vercel.json"
+]) {
+  equal(withoutSquareQualificationPaths(protectedPath), protectedPath, "scope exemption cannot hide a neighboring or activation path");
+}
+
 const protectedDiff = childProcess.execFileSync(
   "git",
   ["diff", "--name-only", "origin/main", "--", "app", "components", "supabase", "lib/supabase", "services", "vercel.json"],
   { cwd: root, encoding: "utf8" }
 ).trim();
 const approvedProtectedPaths = new Set([
+  ...approvedSquareQualificationPaths,
   "app/app/settings/page.tsx",
   "app/api/integrations/qbo/connect/route.ts",
   "app/api/integrations/qbo/disconnect/route.ts",

@@ -4,6 +4,7 @@ const fs = require("node:fs");
 const Module = require("node:module");
 const path = require("node:path");
 const ts = require("typescript");
+const { withoutSquareQualificationPaths } = require("./square-dormant-scope-test-support.js");
 
 const root = path.resolve(__dirname, "..");
 const read = (relative) => fs.readFileSync(path.join(root, relative), "utf8");
@@ -984,7 +985,7 @@ function testDormancyInvariantsAndSources() {
   throws(() => credentials.providerOAuthPolicy(credentials.createProviderOAuthPolicyRegistry([qboOAuth.QBO_PHASE_8B_OAUTH_POLICY, qboOAuth.QBO_PRODUCTION_OAUTH_POLICY]), "square", "sandbox"), /provider_oauth_policy_not_registered/, "Square OAuth remains unregistered");
 
   const changedFiles = childProcess.execFileSync("git", ["diff", "--name-only", "origin/main"], { cwd: root, encoding: "utf8" }).trim();
-  doesNotMatch(changedFiles, /^(app|components|supabase|services|lib\/supabase|vercel\.json)(?:\/|$)/m, "Phase 2B.2A adds no routes, UI, migrations, services, database, or deployment config");
+  doesNotMatch(withoutSquareQualificationPaths(changedFiles), /^(app|components|supabase|services|lib\/supabase|vercel\.json)(?:\/|$)/m, "Square remains dormant outside the exact authorized database qualification files");
   doesNotMatch(changedFiles, /^lib\/integrations\/providers\/(?:qbo|square\/(?:descriptor|request-validators))\//m, "QBO, Square descriptor, and merged request validator remain untouched");
 
   const orderSources = [

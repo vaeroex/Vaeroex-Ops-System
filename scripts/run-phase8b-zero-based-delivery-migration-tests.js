@@ -233,9 +233,18 @@ function assertTargetIsSinglePendingMigration() {
       `Migration ${targetVersion} no longer immediately follows ${productionConvergenceVersion}.`
     );
   }
-  if (targetIndex !== migrations.length - 1) {
+  // Keep the entire historical QBO upgrade chain pinned. The independently
+  // qualified dormant Square additions run AFTER it and must leave QBO closed
+  // and unchanged; they do not replace the fixture's QBO target or assertions.
+  const dormantSquareTail = [
+    "20260907042202_square_dormant_trusted_authority.sql",
+    "20260907042352_square_dormant_atomic_pages.sql"
+  ];
+  const laterMigrations = migrations.slice(targetIndex + 1);
+  if (laterMigrations.length !== dormantSquareTail.length ||
+      laterMigrations.some((migration, index) => migration !== dormantSquareTail[index])) {
     fail(
-      `Fixture-rich harness requires ${targetVersion} to remain the latest migration.`
+      `Fixture-rich harness requires the reviewed dormant Square tail after ${targetVersion}.`
     );
   }
 }

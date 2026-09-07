@@ -4,6 +4,7 @@ const fs = require("node:fs");
 const Module = require("node:module");
 const path = require("node:path");
 const ts = require("typescript");
+const { withoutSquareQualificationPaths } = require("./square-dormant-scope-test-support.js");
 
 const root = path.resolve(__dirname, "..");
 const read = (relative) => fs.readFileSync(path.join(root, relative), "utf8");
@@ -1896,9 +1897,9 @@ function testDormancyAndRegistration() {
     { cwd: root, encoding: "utf8" }
   ).trim();
   doesNotMatch(
-    changedFiles,
+    withoutSquareQualificationPaths(changedFiles),
     /^(app|components|supabase|services|lib\/supabase|vercel\.json)(?:\/|$)/m,
-    "Square Phase 2B.1B-2 does not add runtime routes, UI, migrations, services, or live config"
+    "Square remains dormant; only the exact authorized database qualification files are exempt"
   );
 
   const squareSources = [
