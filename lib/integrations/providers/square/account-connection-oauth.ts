@@ -198,7 +198,7 @@ function parseBoundedJson(text: string, maximumStringLength: number, check: () =
  * not projected. Each accepted credential has exactly two containers (root + scopes).
  */
 async function post(input: Readonly<{
-  environment: "sandbox" | "production"; path: "/oauth2/token" | "/oauth2/token/status" | "/oauth2/revoke" |
+  environment: "sandbox" | "production"; path: "/oauth2/token" | "/oauth2/token/status" |
     "/v2/merchants/me" | "/v2/locations" | "/v2/locations/main";
   headers?: Readonly<Record<string, string>>; body: Record<string, unknown> | null;
   transport: SquareOAuthTransport; signal?: AbortSignal; timeoutMs?: number;
@@ -267,6 +267,9 @@ async function post(input: Readonly<{
         error && typeof error === "object" ? (error as Record<string, unknown>).code : null) : [];
       if (codes.includes("ACCESS_TOKEN_REVOKED")) fail("provider_revoked");
       if (codes.includes("INVALID_GRANT") || codes.includes("ACCESS_TOKEN_EXPIRED")) fail("invalid_grant");
+      // HTTP authentication failure closes only the current credential scope;
+      // unknown provider error names never establish shared-grant revocation.
+      if (response.status === 401) fail("invalid_grant");
       if (response.status === 429 || response.status >= 500) fail("provider_transient");
       fail();
     }
@@ -377,32 +380,14 @@ export function createSquareOAuthCredentialProvider(input: Readonly<{
           short_lived: true }, value.now, prior, value.reportBoundary);
       } catch (error) { if (error instanceof ProviderCredentialRefreshFailure) throw error; fail(); }
     },
-    async revokeCredential(value) {
-      if (value.credential.providerKey !== "square" || value.credential.environment !== environment) fail();
-      return revokeSquareMerchant({ environment, applicationId,
-        merchantId: MerchantIdSchema.parse(value.credential.externalAuthorizedEntityReference),
-        applicationSecret: value.applicationSecret, transport, signal, timeoutMs });
+    async revokeCredential() {
+      // A connection-bound credential is not grant-level revocation authority.
+      // Square's merchant/default revoke is app-wide; access-token-only revoke
+      // leaves refresh authorization intact and can still affect shared tokens.
+      // No approved grant-level action exists in this dormant milestone.
+      return fail();
     }
   });
-}
-
-/** Safe retry-job metadata needs seller/application, not an expired or decrypted access token.
- * Caller MUST fence local authority first and persist the result, including failure/deferment.
- */
-export async function revokeSquareMerchant(input: Readonly<{
-  environment: "sandbox" | "production"; applicationId: string; merchantId: string;
-  applicationSecret: ProviderApplicationSecret; transport: SquareOAuthTransport; signal?: AbortSignal; timeoutMs?: number;
-}>): Promise<Readonly<{ success: true }>> {
-  try {
-    const environment = SquareAccountEnvironmentSchema.parse(input.environment);
-    const applicationId = ApplicationIdSchema.parse(input.applicationId), merchantId = MerchantIdSchema.parse(input.merchantId);
-    const secret = checkedSecret(input.applicationSecret, environment, applicationId);
-    const result = await post({ environment, path: "/oauth2/revoke", transport: input.transport, signal: input.signal,
-      timeoutMs: input.timeoutMs, headers: { Authorization: `Client ${secret.clientSecret}` },
-      body: { client_id: applicationId, merchant_id: merchantId, revoke_only_access_token: false } });
-    if (result.success !== true) fail();
-    return Object.freeze({ success: true });
-  } catch (error) { if (error instanceof ProviderCredentialRefreshFailure) throw error; fail(); }
 }
 
 const RevocationSchema = z.object({

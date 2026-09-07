@@ -60,8 +60,9 @@ function syntheticProvider(scopes) {
   const issued = new Map();
   const calls = [];
   providerTrace = calls;
-  let tokenSerial = 0, revokeFailure = false, tokenBarrier = null, refreshBarrier = null, nextMerchant = merchantId;
-  let statusChange = null, discoveryChange = null, nextRefreshFailure = null;
+  let tokenSerial = 0, tokenBarrier = null, refreshBarrier = null, nextMerchant = merchantId;
+  let statusChange = null, discoveryChange = null, nextRefreshFailure = null, sharedTokens = false;
+  const tokenFingerprints = [], tokenIssuanceTimes = [];
   function response(value, status = 200) {
     const bytes = Buffer.from(JSON.stringify(value));
     return { status, body: (async function*() {
@@ -81,17 +82,19 @@ function syntheticProvider(scopes) {
     if (input.signal.aborted) throw new Error(CANARY);
     if (operation === "authorization_code" && tokenBarrier) { const hold = tokenBarrier; tokenBarrier = null; await hold.wait(); }
     if (operation === "refresh_token" && refreshBarrier) { const hold = refreshBarrier; refreshBarrier = null; await hold.wait(); }
-    if (refreshFailure) return response({ errors: [{ category: refreshFailure === "ACCESS_TOKEN_REVOKED" ? "AUTHENTICATION_ERROR" : "API_ERROR",
-      code: refreshFailure, detail: CANARY }] }, refreshFailure === "ACCESS_TOKEN_REVOKED" ? 401 : 503);
+    if (refreshFailure) return response({ errors: [{ category: refreshFailure === "INTERNAL_SERVER_ERROR" ? "API_ERROR" : "AUTHENTICATION_ERROR",
+      code: refreshFailure, detail: CANARY }] }, refreshFailure === "INTERNAL_SERVER_ERROR" ? 503 : 401);
     if (url.pathname === "/oauth2/token") {
       const seller = nextMerchant;
       const expiresAt = new Date(Date.now() + 86400_000).toISOString();
-      const accessToken = `ACCESS_${CANARY}_${++tokenSerial}`;
+      tokenIssuanceTimes.push(Date.parse(expiresAt) - 86400_000);
+      const accessToken = `ACCESS_${CANARY}_${sharedTokens ? seller : ++tokenSerial}`;
+      tokenFingerprints.push(crypto.createHash("sha256").update(accessToken).update(`REFRESH_${CANARY}_${seller}`).digest("hex"));
       issued.set(accessToken, { merchantId: seller, expiresAt });
       return response({ access_token: accessToken, refresh_token: `REFRESH_${CANARY}_${seller}`, token_type: "bearer",
         short_lived: true, merchant_id: seller, expires_at: expiresAt });
     }
-    if (url.pathname === "/oauth2/revoke") return revokeFailure ? response({ errors: [{ detail: CANARY }] }, 503) : response({ success: true });
+    if (url.pathname === "/oauth2/revoke") return response({ success: true });
     const token = input.headers.Authorization?.replace(/^Bearer /, "");
     const context = issued.get(token);
     if (!context) return response({ errors: [{ detail: CANARY }] }, 401);
@@ -108,10 +111,11 @@ function syntheticProvider(scopes) {
     else throw new Error("unexpected_synthetic_provider_operation");
     return response(discoveryChange ? discoveryChange(url.pathname, value) : value);
   };
-  return { transport, calls,
+  return { transport, calls, tokenFingerprints, tokenIssuanceTimes,
     set merchant(value) { nextMerchant = value; }, set statusChange(value) { statusChange = value; },
-    set discoveryChange(value) { discoveryChange = value; }, set revokeFailure(value) { revokeFailure = value; },
-    failNextRefresh(code) { assert.ok(["ACCESS_TOKEN_REVOKED", "INTERNAL_SERVER_ERROR"].includes(code)); nextRefreshFailure = code; },
+    set discoveryChange(value) { discoveryChange = value; },
+    set sharedTokens(value) { sharedTokens = value; },
+    failNextRefresh(code) { assert.ok(["ACCESS_TOKEN_REVOKED", "ACCESS_TOKEN_EXPIRED", "INVALID_GRANT", "UNAUTHORIZED", "INTERNAL_SERVER_ERROR"].includes(code)); nextRefreshFailure = code; },
     holdCode() { tokenBarrier = barrier(); return tokenBarrier; }, holdRefresh() { refreshBarrier = barrier(); return refreshBarrier; }
   };
 }
@@ -198,6 +202,24 @@ async function integratedTests(runtime, database) {
     provider: createSquareOAuthCredentialProvider({ policy, applicationId, transport: provider.transport })
   });
   const connectionRow = async connectionId => (await owner.query("select * from private.square_account_connections where connection_id=$1", [connectionId])).rows[0];
+  const connectionFootprint = async connectionId => {
+    const footprint = {};
+    for (const table of ["square_account_connections", "square_account_oauth_states", "square_account_credentials", "square_account_credential_reads",
+      "square_account_enrollments", "square_account_audit_events", "square_connections", "square_connection_generations", "square_location_mappings",
+      "square_ingestion_tasks", "square_ingestion_scans", "square_ingestion_versions"]) {
+      footprint[table] = (await owner.query(`select row_to_json(t) as value from private.${table} t where connection_id=$1 order by row_to_json(t)::text`, [connectionId])).rows;
+    }
+    return footprint;
+  };
+  async function assertDisconnectedRefreshUnavailable(connectionId) {
+    const before = await connectionFootprint(connectionId), callsBefore = provider.calls.length;
+    let secretCalls = 0;
+    const unavailable = await makeService({ secrets: { async access() { secretCalls++; throw new Error(CANARY); } } }).refresh(actor, connectionId);
+    equal(unavailable, { state: "credential_unavailable", refreshed: false, reasonCode: "refresh_not_acquired" }, "disconnected refresh returns the existing safe inactive-credential result");
+    equal(provider.calls.length, callsBefore, "inactive credential performs no provider transport");
+    equal(secretCalls, 0, "inactive credential performs no secret access");
+    equal(await connectionFootprint(connectionId), before, "inactive refresh changes no state, version, credential or durable work");
+  }
   const stateRow = async state => (await owner.query("select s.* from private.square_account_oauth_states s where state_hash=$1", [`sha256:${crypto.createHash("sha256").update(state).digest("hex")}`])).rows[0];
   const start = async (current = service, input = {}) => {
     const result = await current.initiate(actor, { operation: "connect", businessEntityId: entity, ...input });
@@ -390,24 +412,33 @@ async function integratedTests(runtime, database) {
   equal((await owner.query("select count(*)::int as n from private.square_account_credentials where connection_id=$1", [ack.connectionId])).rows[0].n, 1, "lost ACK does not duplicate credential history");
   const ackCalls = provider.calls.length; await denied(() => complete(ack), "lost ACK recovery must not re-exchange consumed code"); equal(provider.calls.length, ackCalls);
 
-  stage = "refresh_disconnect_and_provider_revocation";
+  stage = "refresh_and_connection_local_disconnect";
   const beforeRefresh = Number((await connectionRow(primary.connectionId)).credential_version);
   await service.refresh(actor, primary.connectionId);
   equal(Number((await connectionRow(primary.connectionId)).credential_version), beforeRefresh + 1, "refresh CAS appends one encrypted version");
   const groupCallback = await start(), groupCallbackHold = provider.holdCode(), groupCallbackPending = complete(groupCallback);
   await reach(groupCallbackHold, groupCallbackPending);
+  const callbackBeforeDisconnect = await connectionFootprint(groupCallback.connectionId), racedBeforeDisconnect = await connectionFootprint(raced.connectionId);
   const refreshRace = provider.holdRefresh(), refreshInFlight = service.refresh(actor, primary.connectionId);
   await reach(refreshRace, refreshInFlight);
-  await concurrentService.disconnect(actor, { connectionId: primary.connectionId, confirmation: "disconnect" });
+  const disconnectProviderCalls = provider.calls.length;
+  let disconnectSecretCalls = 0;
+  await makeService({ client: rpc(secondSession), secrets: { async access() { disconnectSecretCalls++; throw new Error(CANARY); } } })
+    .disconnect(actor, { connectionId: primary.connectionId, confirmation: "disconnect" });
+  equal(provider.calls.length, disconnectProviderCalls, "customer disconnect performs no provider call");
+  equal(disconnectSecretCalls, 0, "local disconnect requires no application secret access");
+  equal(await connectionFootprint(groupCallback.connectionId), callbackBeforeDisconnect, "another pending callback is untouched by local disconnect");
+  equal(await connectionFootprint(raced.connectionId), racedBeforeDisconnect, "same seller account state and credential history remain byte-for-byte unchanged");
   refreshRace.release();
   try { await refreshInFlight; } catch (error) { ok(!String(error.message).includes(CANARY), "late refresh failure is redacted"); }
   equal((await owner.query("select state from private.square_connections where connection_id=$1", [primary.connectionId])).rows[0].state, "revoked", "disconnect promptly fences durable ingestion");
-  ok(["disconnected", "disconnecting"].includes((await connectionRow(primary.connectionId)).state), "late refresh cannot restore local authority");
+  equal((await connectionRow(primary.connectionId)).state, "disconnected", "late refresh cannot restore disconnected local authority");
+  equal((await connectionRow(primary.connectionId)).revocation_pending, false, "local disconnect makes no provider revocation claim or retry");
   equal(Number((await connectionRow(primary.connectionId)).credential_version), beforeRefresh + 1, "late refresh does not install returned token");
   groupCallbackHold.release();
-  await denied(() => groupCallbackPending, "callback started before merchant-wide disconnect cannot install late consent");
-  equal((await connectionRow(groupCallback.connectionId)).credential_id, null);
-  ok(!["mapping_required", "authorized"].includes((await connectionRow(raced.connectionId)).state), "merchant/application-wide revoke fences other connected instances too");
+  await groupCallbackPending;
+  equal((await connectionRow(groupCallback.connectionId)).state, "mapping_required", "another same-seller callback may finish after local disconnect");
+  ok((await connectionRow(groupCallback.connectionId)).credential_id, "local disconnect never fences unknown-seller callback in another connection");
   const staleCommit = await rpc(broker.client).rpc("commit_square_ingestion_page_v1", {
     p_task_id: task.taskId, p_lease_owner_fingerprint: task.leaseOwnerFingerprint,
     p_command: { ...capturedPage, lease: staleLease.lease, pageId: contractSha256("late_revoked_page") }
@@ -419,15 +450,15 @@ async function integratedTests(runtime, database) {
   await concurrentService.disconnect(actor, { connectionId: callbackRace.connectionId, confirmation: "disconnect" });
   callbackHold.release(); await denied(() => callbackPending, "late callback cannot restore disconnected authority");
   equal((await connectionRow(callbackRace.connectionId)).credential_id, null);
-  const retry = await connected(); provider.revokeFailure = true;
-  await service.disconnect(actor, { connectionId: retry.connectionId, confirmation: "disconnect" });
-  equal((await connectionRow(retry.connectionId)).revocation_pending, true, "failed provider revocation is reported pending, not complete");
-  ok((await service.snapshot(actor)).connections.find(value => value.connectionId === retry.connectionId).revocationPending);
-  provider.revokeFailure = false;
-  await owner.query("update private.square_account_connections set revocation_not_before=clock_timestamp()-interval '1 second' where connection_id=$1", [retry.connectionId]);
-  await service.retryRevocation(actor, retry.connectionId);
-  equal((await connectionRow(retry.connectionId)).revocation_pending, false, "bounded explicit retry can complete provider revocation");
-  ok((await owner.query("select count(*)::int as n from private.square_account_credentials where connection_id=$1", [retry.connectionId])).rows[0].n > 0, "disconnect does not purge encrypted historical credentials");
+  equal(typeof service.retryRevocation, "undefined", "customer service exposes no merchant revocation retry capability");
+  for (const operation of ["acquire_revocation", "complete_revocation"]) {
+    const attempt = await rpc(broker.client).rpc("square_account_connection_v1", { p_context: context, p_operation: operation,
+      p_command: { connectionId: primary.connectionId, generation: 1, rowVersion: 1, leaseId: uuid(), outcome: "succeeded" } });
+    ok(attempt.error, "configured customer broker cannot invoke a legacy merchant-revocation operation");
+  }
+  await assertDisconnectedRefreshUnavailable(primary.connectionId);
+  await denied(() => service.confirmMapping(actor, mapping), "disconnected account cannot enroll mapping");
+  ok((await owner.query("select count(*)::int as n from private.square_account_credentials where connection_id=$1", [primary.connectionId])).rows[0].n > 0, "disconnect does not purge encrypted historical credentials");
 
   stage = "reauthorization_and_authenticated_notification";
   const reauthorized = await start(service, { operation: "reauthorize", connectionId: primary.connectionId });
@@ -472,7 +503,7 @@ async function integratedTests(runtime, database) {
   const browserEvidence = await runSquareAccountBrowserQualification({
     chromium, browserExecutable: process.env.SQUARE_QUALIFICATION_BROWSER_EXECUTABLE,
     bootstrapPath: "/__square_host_session/start", sessionCookieName: hostCookieName,
-    businessEntityId: browserEntity, locationLabel: "Synthetic location 1",
+    businessEntityId: browserEntity, locationLabel: "Synthetic location 1", disconnectLabel: "Disconnected from this workspace",
     privacyCanaries: [CANARY, RAW_CANARY, browserCode, "PRIVATE_CURSOR_CANARY"],
     createDependencies(origin) {
       return { qualification: "disposable_local_synthetic_only", applicationOrigin: origin, service,
@@ -566,13 +597,16 @@ async function integratedTests(runtime, database) {
   console.log("Square account browser qualification: " + JSON.stringify(browserEvidence));
   scenarios += browserEvidence.scenarios.length;
 
-  stage = "provider_revoked_refresh_merchant_group_fence";
+  stage = "connection_local_disconnect_and_refresh_failure";
   const revokedMerchant = "MERCHANT_REFRESH_REVOKED", unrelatedMerchant = "MERCHANT_REFRESH_UNRELATED";
   provider.merchant = unrelatedMerchant;
   const unrelated = await connected();
   await service.confirmMapping(actor, { ...mapping, connectionId: unrelated.connectionId });
   const unrelatedBefore = await connectionRow(unrelated.connectionId);
   provider.merchant = revokedMerchant;
+  provider.sharedTokens = true;
+  const disconnectedMember = await connected();
+  await service.confirmMapping(actor, { ...mapping, connectionId: disconnectedMember.connectionId });
   const reporting = await connected();
   await service.confirmMapping(actor, { ...mapping, connectionId: reporting.connectionId });
   const siblingStart = await service.initiate(browserActor, { operation: "connect", businessEntityId: browserEntity });
@@ -580,30 +614,32 @@ async function integratedTests(runtime, database) {
   const sibling = { connectionId: (await stateRow(siblingState)).connection_id };
   await service.complete(browserActor, { state: siblingState, code: "synthetic-sibling-code" });
   await service.confirmMapping(browserActor, { ...mapping, connectionId: sibling.connectionId, businessEntityId: browserEntity });
+  equal(new Set(provider.tokenFingerprints.slice(-3)).size, 1, "three independently authorized connections deliberately share exact access and refresh token bytes");
   ok((await connectionRow(reporting.connectionId)).workspace_id !== (await connectionRow(sibling.connectionId)).workspace_id,
-    "revocation regression covers separately authorized workspaces");
+    "local-isolation regression covers separately authorized workspaces");
 
+  const siblingBeforeTransient = await connectionFootprint(sibling.connectionId);
   provider.failNextRefresh("INTERNAL_SERVER_ERROR");
   await service.refresh(actor, reporting.connectionId);
   equal((await connectionRow(reporting.connectionId)).state, "authorized", "ordinary transient refresh failure does not revoke reporting consent");
   equal((await connectionRow(sibling.connectionId)).state, "authorized", "ordinary transient refresh failure remains local to its attempt");
+  equal(await connectionFootprint(sibling.connectionId), siblingBeforeTransient, "generic refresh failure leaves sibling credentials, generations and enrollment unchanged");
   await owner.query("update private.square_account_connections set refresh_not_before=clock_timestamp()-interval '1 second' where connection_id=$1", [reporting.connectionId]);
 
-  const groupReads = [];
-  for (const member of [
-    { connectionId: reporting.connectionId, actor, context, businessEntityId: entity, workspaceId: workspace },
-    { connectionId: sibling.connectionId, actor: browserActor, context: browserContext, businessEntityId: browserEntity, workspaceId: browserWorkspace }
-  ]) {
+  async function captureMemberPage(member) {
+    const account = await connectionRow(member.connectionId);
+    const generation = Number(account.generation), credentialVersion = Number(account.credential_version);
+    const sourceCount = (await owner.query("select count(*)::int as n from private.square_ingestion_versions where connection_id=$1", [member.connectionId])).rows[0].n;
     const memberScope = { ...scope, connectionId: member.connectionId, businessEntityId: member.businessEntityId,
-      workspaceId: member.workspaceId, sellerId: revokedMerchant };
+      workspaceId: member.workspaceId, sellerId: revokedMerchant, generation };
     const memberGrant = { ...grant, scope: memberScope, scanId: uuid(), expiresAt: Date.now() + 1800_000 };
-    const memberBinding = { ...binding, scopeFingerprint: squareIngestionScopeFingerprint(memberScope),
+    const memberBinding = { ...binding, generation, scopeFingerprint: squareIngestionScopeFingerprint(memberScope),
       scanKey: contractSha256({ purpose: "square_ingestion_scan_v1", workspaceId: member.workspaceId,
         businessEntityId: member.businessEntityId, connectionId: member.connectionId, stream: memberGrant.stream, scanId: memberGrant.scanId }) };
     const memberTask = { taskId: uuid(), leaseOwnerFingerprint: contractSha256(uuid()) };
     const enrolled = await rpc(enrollment.client).rpc("enroll_square_verified_task_v1", { p_command: { ...memberTask,
-      connectionId: member.connectionId, generation: 1, runtimeLogin: broker.name, grant: memberGrant, binding: memberBinding } });
-    equal(enrolled.error, null, "both merchant-group members have checked current tasks before revocation");
+      connectionId: member.connectionId, generation, runtimeLogin: broker.name, grant: memberGrant, binding: memberBinding } });
+    equal(enrolled.error, null, "each independently authorized connection has a checked current task");
     const repository = createSquareDurablePageRepository({ ...memberTask, client: rpc(broker.client) });
     const memberAuthority = createSquareDatabaseAuthority({ ...memberTask, client: rpc(broker.client) });
     let heldLease, heldPage;
@@ -612,15 +648,15 @@ async function integratedTests(runtime, database) {
         async acquire(value) { const acquired = await repository.acquire(value); if (acquired.outcome === "leased") heldLease = acquired.lease; return acquired; },
         async commitPage(command) {
           // Capture the actual validated, mapped command at its commit boundary;
-          // do not send it until the provider-revoked fence has been installed.
+          // do not send it until local or authenticated-provider fences are checked.
           heldPage = command;
           return { outcome: "conflict", completeness: null, continuation: false };
         } },
       async transport(request) {
         const access = await credentialBrokerFor(member.context).readProviderAccessCredential({ ...memberTask,
-          leaseId: squareCredentialReadLeaseId(heldLease.leaseId), expectedCredentialVersion: 1,
+          leaseId: squareCredentialReadLeaseId(heldLease.leaseId), expectedCredentialVersion: credentialVersion,
           requiredScopes: SQUARE_OAUTH_SCOPES, minimumValiditySeconds: 30, requestId: uuid() });
-        equal(access.state, "available", "both current tasks can decrypt before the revocation signal");
+        equal(access.state, "available", "each current task can decrypt before a local or provider signal");
         await access.credential.use(({ accessToken }) => ok(accessToken.startsWith("ACCESS_" + CANARY)));
         const bytes = Buffer.from(JSON.stringify({ payments: [squarePaymentFixture()], cursor: cursorCanary }));
         return { status: 200, url: request.url, redirected: false, headers: { "content-type": "application/json" },
@@ -629,8 +665,56 @@ async function integratedTests(runtime, database) {
     });
     equal((await adapter.run({ taskId: memberTask.taskId })).outcome, "conflict");
     ok(heldPage && heldPage.sources.length === 1, "late page is captured after actual supported response validation and mapping");
-    groupReads.push({ ...member, task: memberTask, authority: memberAuthority, lease: heldLease, page: heldPage });
+    return { ...member, generation, credentialVersion, sourceCount, task: memberTask, authority: memberAuthority,
+      lease: heldLease, page: heldPage, grant: memberGrant, binding: memberBinding };
   }
+  const groupReads = [];
+  for (const member of [
+    { connectionId: disconnectedMember.connectionId, actor, context, businessEntityId: entity, workspaceId: workspace },
+    { connectionId: reporting.connectionId, actor, context, businessEntityId: entity, workspaceId: workspace },
+    { connectionId: sibling.connectionId, actor: browserActor, context: browserContext, businessEntityId: browserEntity, workspaceId: browserWorkspace }
+  ]) groupReads.push(await captureMemberPage(member));
+  const [disconnectedRead, reportingRead, siblingRead] = groupReads;
+  async function assertFenced(member, label) {
+    equal((await owner.query("select state from private.square_connections where connection_id=$1", [member.connectionId])).rows[0].state, "revoked", label + " durable authority is fenced");
+    equal(await member.authority.resolve({ taskId: member.task.taskId }), null, label + " cannot resolve task authority");
+    await denied(() => credentialBrokerFor(member.context).readProviderAccessCredential({ ...member.task,
+      leaseId: squareCredentialReadLeaseId(member.lease.leaseId), expectedCredentialVersion: member.credentialVersion,
+      requiredScopes: SQUARE_OAUTH_SCOPES, minimumValiditySeconds: 30, requestId: uuid() }), label + " cannot release credentials");
+    const committed = await rpc(broker.client).rpc("commit_square_ingestion_page_v1", { p_task_id: member.task.taskId,
+      p_lease_owner_fingerprint: member.task.leaseOwnerFingerprint, p_command: member.page });
+    ok(committed.error, label + " rejects a genuine in-flight mapped page");
+    const enrollmentAttempt = await rpc(enrollment.client).rpc("enroll_square_verified_task_v1", { p_command: {
+      taskId: uuid(), leaseOwnerFingerprint: contractSha256(uuid()), connectionId: member.connectionId,
+      generation: member.generation, runtimeLogin: broker.name, grant: member.grant, binding: member.binding } });
+    ok(enrollmentAttempt.error, label + " cannot enroll another task");
+    equal((await owner.query("select count(*)::int as n from private.square_ingestion_versions where connection_id=$1", [member.connectionId])).rows[0].n, member.sourceCount,
+      label + " does not commit late pending sources");
+  }
+  const crossWorkspaceStart = await service.initiate(browserActor, { operation: "connect", businessEntityId: browserEntity });
+  const crossWorkspaceState = new URL(crossWorkspaceStart.authorizationUrl).searchParams.get("state");
+  const crossWorkspaceConnection = (await stateRow(crossWorkspaceState)).connection_id;
+  const crossWorkspaceHold = provider.holdCode();
+  const crossWorkspacePending = service.complete(browserActor, { state: crossWorkspaceState, code: "synthetic-independent-workspace-code" });
+  const crossWorkspaceSettled = crossWorkspacePending.then(value => ({ value }), error => ({ error }));
+  await reach(crossWorkspaceHold, crossWorkspacePending);
+  const crossWorkspaceBeforeDisconnect = await connectionFootprint(crossWorkspaceConnection);
+  const reportingBeforeDisconnect = await connectionFootprint(reporting.connectionId), siblingBeforeDisconnect = await connectionFootprint(sibling.connectionId);
+  const callsBeforeLocalDisconnect = provider.calls.length;
+  try {
+    await service.disconnect(actor, { connectionId: disconnectedMember.connectionId, confirmation: "disconnect" });
+    equal(provider.calls.length, callsBeforeLocalDisconnect, "even shared token bytes do not cause any provider revocation call");
+    equal((await connectionRow(disconnectedMember.connectionId)).state, "disconnected");
+    equal(await connectionFootprint(reporting.connectionId), reportingBeforeDisconnect, "same-workspace same-token sibling remains byte-for-byte unchanged");
+    equal(await connectionFootprint(sibling.connectionId), siblingBeforeDisconnect, "cross-workspace same-token sibling, active lease and enrollment remain byte-for-byte unchanged");
+    equal(await connectionFootprint(crossWorkspaceConnection), crossWorkspaceBeforeDisconnect, "another workspace's outstanding unknown-seller callback is not modified by local disconnect");
+  } finally { crossWorkspaceHold.release(); }
+  ok(!(await crossWorkspaceSettled).error, "same-seller authorization in another workspace can complete after local disconnect");
+  equal((await connectionRow(crossWorkspaceConnection)).state, "mapping_required");
+  await assertFenced(disconnectedRead, "locally disconnected connection");
+  await assertDisconnectedRefreshUnavailable(disconnectedMember.connectionId);
+  ok(await siblingRead.authority.resolve({ taskId: siblingRead.task.taskId }), "cross-workspace sibling retains current task authority after local disconnect");
+  scenarios++;
   const unknownSeller = await start(), unknownHold = provider.holdCode();
   const unknownPending = complete(unknownSeller);
   const unknownSettled = unknownPending.then(value => ({ value }), error => ({ error }));
@@ -640,6 +724,7 @@ async function integratedTests(runtime, database) {
   const siblingSettled = siblingPending.then(value => ({ value }), error => ({ error }));
   await reach(siblingHold, siblingPending);
   const siblingVersion = Number((await connectionRow(sibling.connectionId)).credential_version);
+  const siblingBeforeRevokedRefresh = await connectionFootprint(sibling.connectionId), unknownBeforeRevokedRefresh = await connectionFootprint(unknownSeller.connectionId);
   const revokeCalls = provider.calls.filter(value => value === "/oauth2/revoke").length;
   let revokedFailureArguments;
   const reportingService = makeService({ client: rpc(broker.client, { before(name, args) {
@@ -650,29 +735,29 @@ async function integratedTests(runtime, database) {
     const revokedRefresh = await reportingService.refresh(actor, reporting.connectionId);
     equal(revokedRefresh.state, "reauthorization_required", "terminal provider-revoked result must not report retry_required");
     equal((await connectionRow(reporting.connectionId)).state, "reauthorization_required", "provider-revoked reporting account requires fresh consent");
-    equal((await connectionRow(sibling.connectionId)).state, "reauthorization_required", "provider-revoked refresh conservatively fences same merchant sibling across workspace");
-    for (const member of groupReads) {
-      equal((await owner.query("select state from private.square_connections where connection_id=$1", [member.connectionId])).rows[0].state, "revoked",
-        "matching durable authority is fenced independently of requesting workspace");
-      equal(await member.authority.resolve({ taskId: member.task.taskId }), null, "revoked merchant task cannot resolve authority");
-      await denied(() => credentialBrokerFor(member.context).readProviderAccessCredential({ ...member.task,
-        leaseId: squareCredentialReadLeaseId(member.lease.leaseId), expectedCredentialVersion: 1,
-        requiredScopes: SQUARE_OAUTH_SCOPES, minimumValiditySeconds: 30, requestId: uuid() }), "revoked merchant task cannot release its credential");
-      const committed = await rpc(broker.client).rpc("commit_square_ingestion_page_v1", { p_task_id: member.task.taskId,
-        p_lease_owner_fingerprint: member.task.leaseOwnerFingerprint, p_command: member.page });
-      ok(committed.error, "valid in-flight mapped page cannot commit after merchant-group refresh revocation");
-      equal((await owner.query("select count(*)::int as n from private.square_ingestion_versions where connection_id=$1", [member.connectionId])).rows[0].n, 0,
-        "revocation does not commit a late pending source");
-    }
+    equal(await connectionFootprint(sibling.connectionId), siblingBeforeRevokedRefresh, "provider_revoked refresh does not mutate sibling credential, generation, enrollment, task or outstanding lease");
+    equal(await connectionFootprint(unknownSeller.connectionId), unknownBeforeRevokedRefresh, "generic token failure does not fence another pending unknown-seller callback");
+    await assertFenced(reportingRead, "provider-revoked reporting connection");
     siblingHold.release(); unknownHold.release();
-    await siblingSettled;
-    ok((await unknownSettled).error, "unknown-seller callback started before group fence cannot install late consent");
-    equal((await connectionRow(unknownSeller.connectionId)).credential_id, null);
-    equal(Number((await connectionRow(sibling.connectionId)).credential_version), siblingVersion, "late sibling refresh response cannot append a credential");
-    equal((await connectionRow(sibling.connectionId)).state, "reauthorization_required", "late successful sibling refresh cannot restore authority");
+    ok(!(await siblingSettled).error, "independently authorized sibling refresh completes after another connection's token failure");
+    ok(!(await unknownSettled).error, "unknown-seller callback in another connection may complete after local token failure");
+    equal((await connectionRow(unknownSeller.connectionId)).state, "mapping_required");
+    equal(Number((await connectionRow(sibling.connectionId)).credential_version), siblingVersion + 1, "legitimate late sibling refresh appends its own current credential");
+    equal((await connectionRow(sibling.connectionId)).state, "authorized", "sibling remains authorized after its own successful refresh");
+    ok(await siblingRead.authority.resolve({ taskId: siblingRead.task.taskId }), "sibling task authority remains valid after reporting connection failure");
+    const siblingAccess = await credentialBrokerFor(browserContext).readProviderAccessCredential({ ...siblingRead.task,
+      leaseId: squareCredentialReadLeaseId(siblingRead.lease.leaseId), expectedCredentialVersion: siblingVersion + 1,
+      requiredScopes: SQUARE_OAUTH_SCOPES, minimumValiditySeconds: 30, requestId: uuid() });
+    equal(siblingAccess.state, "available", "independent sibling can still use the shared credential bytes under its own authority");
+    await siblingAccess.credential.use(() => {});
+    const siblingCommit = await rpc(broker.client).rpc("commit_square_ingestion_page_v1", { p_task_id: siblingRead.task.taskId,
+      p_lease_owner_fingerprint: siblingRead.task.leaseOwnerFingerprint, p_command: siblingRead.page });
+    equal(siblingCommit.error, null); equal(siblingCommit.data.outcome, "committed", "actual in-flight sibling page commits after another account's token failure");
     equal(await connectionRow(unrelated.connectionId), unrelatedBefore, "different seller connection remains byte-for-byte unchanged");
     equal(provider.calls.filter(value => value === "/oauth2/revoke").length, revokeCalls,
       "token-level revocation evidence does not claim merchant provider revocation or call revoke");
+    const oldNotificationAt = new Date().toISOString();
+    ok(new Date((await connectionRow(unknownSeller.connectionId)).authorization_issued_at).getTime() <= Date.parse(oldNotificationAt), "old consent predates held authenticated event");
     const freshReporting = await start(service, { operation: "reauthorize", connectionId: reporting.connectionId });
     await complete(freshReporting);
     await service.confirmMapping(actor, { ...mapping, connectionId: reporting.connectionId });
@@ -683,10 +768,67 @@ async function integratedTests(runtime, database) {
     ok(staleFailure.error, "old failure command cannot fence fresh consent after generation replacement");
     equal(await connectionRow(reporting.connectionId), newGeneration, "stale refresh failure preserves newly authorized generation exactly");
     equal(await connectionRow(sibling.connectionId), siblingBeforeReplay, "stale refresh failure cannot mutate sibling state either");
+    for (const failure of ["INVALID_GRANT", "ACCESS_TOKEN_EXPIRED", "UNAUTHORIZED"]) {
+      const siblingBeforeFailure = await connectionFootprint(sibling.connectionId), providerCallsBeforeFailure = provider.calls.filter(value => value === "/oauth2/revoke").length;
+      provider.failNextRefresh(failure);
+      equal((await service.refresh(actor, reporting.connectionId)).state, "reauthorization_required", failure + " closes only reporting consent");
+      equal((await connectionRow(reporting.connectionId)).state, "reauthorization_required");
+      equal((await owner.query("select state from private.square_connections where connection_id=$1", [reporting.connectionId])).rows[0].state, "revoked");
+      equal(await connectionFootprint(sibling.connectionId), siblingBeforeFailure, failure + " leaves another workspace's same-token authority byte-for-byte unchanged");
+      equal(provider.calls.filter(value => value === "/oauth2/revoke").length, providerCallsBeforeFailure, failure + " does not authorize provider revocation");
+      const recovered = await start(service, { operation: "reauthorize", connectionId: reporting.connectionId });
+      await complete(recovered); await service.confirmMapping(actor, { ...mapping, connectionId: reporting.connectionId });
+      scenarios++;
+    }
+    const freshSiblingStart = await service.initiate(browserActor, { operation: "reauthorize", connectionId: sibling.connectionId, businessEntityId: browserEntity });
+    await service.complete(browserActor, { state: new URL(freshSiblingStart.authorizationUrl).searchParams.get("state"), code: "synthetic-fresh-sibling-code" });
+    await service.confirmMapping(browserActor, { ...mapping, connectionId: sibling.connectionId, businessEntityId: browserEntity });
+    for (const connectionId of [reporting.connectionId, sibling.connectionId])
+      ok(new Date((await connectionRow(connectionId)).authorization_issued_at).getTime() > Date.parse(oldNotificationAt), "fresh verified consent strictly postdates held notification");
+    const reportingBeforeOldEvent = await connectionFootprint(reporting.connectionId), siblingBeforeOldEvent = await connectionFootprint(sibling.connectionId);
+    const signedEvent = (eventId, revokedAt) => {
+      const rawBody = JSON.stringify({ merchant_id: revokedMerchant, type: "oauth.authorization.revoked", event_id: eventId,
+        created_at: revokedAt, data: { type: "revocation", object: { revocation: { revoked_at: revokedAt, revoker_type: "MERCHANT" } } } });
+      return { rawBody, notificationUrl, signatureKey, signature: crypto.createHmac("sha256", signatureKey).update(notificationUrl).update(rawBody).digest("base64") };
+    };
+    const oldEvent = signedEvent("synthetic-delayed-first-delivery", oldNotificationAt);
+    await service.handleRevocationNotification(oldEvent);
+    equal((await connectionRow(unknownSeller.connectionId)).state, "revoked", "first delivery of old signed event still fences the matching older consent");
+    equal(await connectionFootprint(reporting.connectionId), reportingBeforeOldEvent, "first delivery of stale signed event preserves newer verified connection exactly");
+    equal(await connectionFootprint(sibling.connectionId), siblingBeforeOldEvent, "stale signed event preserves newer verified consent in another workspace exactly");
+    await service.handleRevocationNotification(oldEvent);
+    equal(await connectionFootprint(reporting.connectionId), reportingBeforeOldEvent, "old event replay cannot revoke a newer generation");
+    equal(await connectionFootprint(sibling.connectionId), siblingBeforeOldEvent, "old event replay cannot affect another workspace's newer generation");
+    const currentGroupReads = [];
+    for (const member of [reportingRead, siblingRead]) currentGroupReads.push(await captureMemberPage(member));
+    const signedCallback = await start(), signedCallbackHold = provider.holdCode();
+    const signedCallbackPending = complete(signedCallback);
+    const signedCallbackSettled = signedCallbackPending.then(value => ({ value }), error => ({ error }));
+    await reach(signedCallbackHold, signedCallbackPending);
+    equal((await connectionRow(signedCallback.connectionId)).merchant_id, null, "signed-event race starts with unknown seller and an outstanding token exchange");
+    const currentRevokedAt = new Date().toISOString();
+    ok(new Date((await stateRow(signedCallback.state)).created_at).getTime() <= Date.parse(currentRevokedAt), "pending callback state predates signed revocation");
+    const currentEvent = signedEvent("synthetic-current-shared-revocation", currentRevokedAt);
+    try { await service.handleRevocationNotification(currentEvent); }
+    finally { signedCallbackHold.release(); }
+    ok((await signedCallbackSettled).error, "signed group event rejects prior pending callback even when token exchange completes afterward");
+    ok(provider.tokenIssuanceTimes.at(-1) > Date.parse(currentRevokedAt), "race actually mints the synthetic token after authenticated revocation");
+    equal((await connectionRow(signedCallback.connectionId)).credential_id, null, "old pending callback installs no credential after signed revocation");
+    equal((await owner.query("select count(*)::int as n from private.square_account_enrollments where connection_id=$1", [signedCallback.connectionId])).rows[0].n, 0,
+      "old pending callback creates no enrollment after signed revocation");
+    for (const connectionId of [reporting.connectionId, sibling.connectionId]) {
+      equal((await connectionRow(connectionId)).state, "revoked", "authenticated current event fences matching seller/app/environment across workspaces");
+      equal((await owner.query("select state from private.square_connections where connection_id=$1", [connectionId])).rows[0].state, "revoked");
+    }
+    for (const member of currentGroupReads) await assertFenced(member, "signed provider revocation of current-generation connection");
+    equal(await connectionRow(unrelated.connectionId), unrelatedBefore, "signed merchant event does not mutate an unrelated seller");
+    equal(provider.calls.filter(value => value === "/oauth2/revoke").length, revokeCalls, "local actions and authenticated notifications never issue merchant revoke POST");
+    scenarios += 2;
   } finally {
     siblingHold.release(); unknownHold.release();
     await Promise.all([siblingSettled, unknownSettled]);
     provider.merchant = merchantId;
+    provider.sharedTokens = false;
   }
   scenarios++;
 

@@ -244,6 +244,11 @@ begin
   if p_command is null or pg_catalog.pg_column_size(p_command)>2097152 then
     raise exception using errcode='22023',message='square_account_command_invalid';
   end if;
+  -- Workspace management has no capability to initiate or complete a provider-
+  -- wide revocation. Those mutations are not part of customer disconnect.
+  if p_operation in ('acquire_revocation','complete_revocation') then
+    raise exception using errcode='42501',message='square_account_operation_denied';
+  end if;
   v_now:=pg_catalog.clock_timestamp();
   if p_operation='status' then
     if p_command<>'{}'::jsonb then raise exception using errcode='22023',message='square_account_command_invalid';end if;
@@ -302,10 +307,10 @@ begin
     v_connection_id:=v_task.connection_id;
   else v_connection_id:=(p_command->>'connectionId')::uuid;
   end if;
-  if p_operation in ('store_credential','disconnect','acquire_revocation','complete_revocation')
-    or p_operation='fail_refresh' and p_command->>'reasonCode'='provider_revoked' then
-    if p_operation='store_credential' then v_merchant:=p_command#>>'{discovery,merchantId}';
-    else select merchant_id into v_merchant from private.square_account_connections where connection_id=v_connection_id;end if;
+  -- Only verified credential storage shares the authenticated provider-event
+  -- merchant lock. Customer disconnect and refresh failures never traverse peers.
+  if p_operation='store_credential' then
+    v_merchant:=p_command#>>'{discovery,merchantId}';
     if v_merchant is not null then perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(v_config.environment||':'||v_config.application_id||':'||v_merchant,0));end if;
   end if;
   v_account:=private.lock_square_account_v1(p_context,v_connection_id);
@@ -363,11 +368,14 @@ begin
       if v_credential.command_fingerprint<>v_hash then raise exception using errcode='23505',message='square_account_receipt_conflict';end if;
       return private.square_account_credential_result_v1(v_credential,v_account.state,true);
     end if;
+    -- A signed revocation spanning an unverified callback is inconclusive even
+    -- if its held code later yields a newly issued token. Require fresh state;
+    -- do not assume Square invalidates every outstanding authorization code.
     if v_state.expires_at<=v_now or v_account.state<>'authorization_required'
-      or exists(select 1 from private.square_account_connections where environment=v_config.environment and application_id=v_config.application_id
-        and merchant_id=v_discovery->>'merchantId' and (revocation_pending or revoked_before>=v_state.created_at))
+      or v_account.revocation_pending or v_account.revoked_before>=v_state.created_at
       or exists(select 1 from private.square_account_revocation_events where environment=v_config.environment and application_id=v_config.application_id
-        and merchant_id=v_discovery->>'merchantId' and revoked_at>=(v_command->>'accessExpiresAt')::timestamptz-interval '24 hours')
+        and merchant_id=v_discovery->>'merchantId' and (revoked_at>=v_state.created_at
+          or revoked_at>=(v_command->>'accessExpiresAt')::timestamptz-interval '24 hours'))
       or (v_command->>'workspaceId')::uuid<>v_account.workspace_id or (v_command->>'businessEntityId')::uuid<>v_account.business_entity_id
       or (v_command->>'connectionGeneration')::bigint<>v_account.generation or (v_command->>'expectedConnectionRowVersion')::bigint<>v_account.row_version
       or v_command->>'providerKey'<>'square' or v_command->>'providerEnvironment'<>v_config.environment
@@ -430,42 +438,15 @@ begin
   if p_operation='disconnect' then
     if not private.jsonb_has_exact_keys_v1(p_command,array['connectionId','confirmation']) or p_command->>'confirmation'<>'disconnect' then
       raise exception using errcode='42501',message='square_account_disconnect_denied';end if;
-    -- Square merchant/application revocation affects every authorization for this
-    -- seller. Fence all local uses, without exposing other tenants in the result.
-    for v_id in select connection_id from private.square_account_connections where connection_id=v_connection_id
-      or environment=v_config.environment and application_id=v_config.application_id and merchant_id=v_account.merchant_id order by connection_id loop
-      perform 1 from private.square_connections where connection_id=v_id for update;
-      perform 1 from private.square_account_connections where connection_id=v_id for update;
-      update private.square_connections set state='revoked',revoked_at=v_now,revocation_reason='qualification_revoked',updated_at=v_now where connection_id=v_id;
-      update private.square_account_oauth_states set status='cancelled' where connection_id=v_id and status in ('pending','exchanging');
-      update private.square_account_connections set state=case when merchant_id is null then 'disconnected' else 'disconnecting' end,
-        row_version=row_version+1,refresh_lease=null,revoked_before=v_now,revocation_pending=merchant_id is not null,revocation_attempts=0,revocation_not_before=v_now,
-        revocation_lease_id=null,revocation_lease_expires_at=null,updated_at=v_now where connection_id=v_id and state not in ('disconnecting','disconnected','revoked');
-    end loop;
+    -- lock_square_account_v1 has already locked this workspace's stable durable
+    -- connection before its account row. Fence only that connection's in-flight
+    -- work; do not revoke a provider token or alter any shared-seller connection.
+    update private.square_connections set state='revoked',revoked_at=v_now,revocation_reason='qualification_revoked',updated_at=v_now where connection_id=v_connection_id;
+    update private.square_account_oauth_states set status='cancelled' where connection_id=v_connection_id and status in ('pending','exchanging');
+    update private.square_account_connections set state='disconnected',row_version=row_version+1,
+      refresh_lease=null,revoked_before=v_now,revocation_pending=false,revocation_attempts=0,revocation_not_before=null,
+      revocation_lease_id=null,revocation_lease_expires_at=null,updated_at=v_now where connection_id=v_connection_id;
     return pg_catalog.jsonb_build_object('fenced',true);
-  end if;
-
-  if p_operation='acquire_revocation' then
-    if not v_account.revocation_pending or v_account.state<>'disconnecting' or v_account.revocation_attempts>=3
-      or v_account.revocation_not_before>v_now or v_account.revocation_lease_expires_at>v_now then return pg_catalog.jsonb_build_object('acquired',false);end if;
-    if exists(select 1 from private.square_account_connections where environment=v_config.environment and application_id=v_config.application_id and merchant_id=v_account.merchant_id
-      and revocation_lease_expires_at>v_now) then return pg_catalog.jsonb_build_object('acquired',false);end if;
-    update private.square_account_connections set revocation_attempts=revocation_attempts+1,revocation_lease_id=pg_catalog.gen_random_uuid(),
-      revocation_lease_expires_at=v_now+interval '30 seconds',updated_at=v_now where connection_id=v_connection_id returning * into v_account;
-    return pg_catalog.jsonb_build_object('acquired',true,'connectionId',v_connection_id,'generation',v_account.generation,'rowVersion',v_account.row_version,
-      'merchantId',v_account.merchant_id,'leaseId',v_account.revocation_lease_id,'expiresAt',v_account.revocation_lease_expires_at);
-  end if;
-  if p_operation='complete_revocation' then
-    if v_account.state<>'disconnecting' or not v_account.revocation_pending or v_account.generation<>(p_command->>'generation')::bigint
-      or v_account.row_version<>(p_command->>'rowVersion')::bigint or v_account.revocation_lease_id is distinct from (p_command->>'leaseId')::uuid
-      or v_account.revocation_lease_expires_at<=v_now or p_command->>'outcome' not in ('succeeded','failed') then
-      raise exception using errcode='42501',message='square_account_revocation_fenced';end if;
-    update private.square_account_connections set state=case when p_command->>'outcome'='succeeded' then 'disconnected' else 'disconnecting' end,
-      revocation_pending=p_command->>'outcome'<>'succeeded',revocation_not_before=v_now+interval '1 second'*least(60,2^v_account.revocation_attempts),
-      revocation_attempts=v_account.revocation_attempts,revoked_before=v_now,
-      revocation_lease_id=null,revocation_lease_expires_at=null,updated_at=v_now
-      where environment=v_config.environment and application_id=v_config.application_id and merchant_id=v_account.merchant_id and state='disconnecting';
-    return '{}'::jsonb;
   end if;
 
   if p_operation in ('audit','refresh_boundary') then
@@ -558,28 +539,18 @@ begin
       or v_account.refresh_lease->>'leaseOwnerFingerprint'<>p_command->>'leaseOwnerFingerprint'
       or (v_account.refresh_lease->>'leaseExpiresAt')::timestamptz<=v_now then raise exception using errcode='42501',message='square_account_refresh_fenced';end if;
     if p_operation='fail_refresh' then
-      if p_command->>'reasonCode'='provider_revoked' then
-        -- A revoked token can be the first observed sign of seller-wide consent
-        -- loss. Conservatively fence matching local authority under the merchant
-        -- lock, only after validating the reporting current credential and lease.
-        -- This is not evidence that all provider tokens were revoked: preserve
-        -- existing disconnect/revocation state and pending provider-revoke work.
-        for v_id in select connection_id from private.square_account_connections
-          where environment=v_config.environment and application_id=v_config.application_id
-            and merchant_id=v_account.merchant_id order by connection_id loop
-          perform 1 from private.square_connections where connection_id=v_id for update;
-          perform 1 from private.square_account_connections where connection_id=v_id for update;
-          update private.square_connections set state='revoked',revoked_at=v_now,revocation_reason='qualification_revoked',updated_at=v_now where connection_id=v_id;
-          update private.square_account_oauth_states set status='cancelled' where connection_id=v_id and status in ('pending','exchanging');
-          update private.square_account_connections set
-            state=case when state in ('disconnecting','disconnected','revoked') then state else 'reauthorization_required' end,
-            row_version=row_version+1,refresh_lease=null,revoked_before=v_now,updated_at=v_now where connection_id=v_id;
-        end loop;
-        select * into strict v_account from private.square_account_connections where connection_id=v_connection_id;
+      if v_account.refresh_attempts>=3 or p_command->>'reasonCode' in ('invalid_grant','scope_loss','credential_binding_invalid','provider_revoked') then
+        -- A current leased token failure is evidence only for this connection.
+        -- The validated task/credential/generation/lease checks above precede the
+        -- local fence; only authenticated provider notifications can fence peers.
+        update private.square_connections set state='revoked',revoked_at=v_now,revocation_reason='qualification_revoked',updated_at=v_now where connection_id=v_connection_id;
+        update private.square_account_oauth_states set status='cancelled' where connection_id=v_connection_id and status in ('pending','exchanging');
+        update private.square_account_connections set state='reauthorization_required',row_version=row_version+1,
+          refresh_lease=null,refresh_not_before=null,revoked_before=v_now,updated_at=v_now where connection_id=v_connection_id returning * into v_account;
         return private.square_account_credential_result_v1(v_credential,v_account.state,false);
       end if;
-      update private.square_account_connections set refresh_lease=null,refresh_not_before=v_now+interval '5 seconds',updated_at=v_now,
-        state=case when refresh_attempts>=3 or p_command->>'reasonCode' in ('invalid_grant','scope_loss','credential_binding_invalid','provider_revoked') then 'reauthorization_required' else state end where connection_id=v_connection_id returning * into v_account;
+      update private.square_account_connections set refresh_lease=null,refresh_not_before=v_now+interval '5 seconds',updated_at=v_now
+        where connection_id=v_connection_id returning * into v_account;
       return private.square_account_credential_result_v1(v_credential,v_account.state,false);
     end if;
     if p_command->'grantedScopes'<>v_credential.granted_scopes or p_command->'refreshExpiresAt'<>'null'::jsonb

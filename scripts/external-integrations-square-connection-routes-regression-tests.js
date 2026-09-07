@@ -159,7 +159,12 @@ async function main() {
   const unsafe = await handlers.handle("status", request("status")); equal(unsafe.status, 400); ok(!(await unsafe.text()).includes("PRIVATE_PROVIDER_CANARY")); currentView = view;
   const rendered = modules.renderToStaticMarkup(modules.React.createElement(modules.SquareConnectionPanel, { view }));
   ok(rendered.includes("Mapping required")); ok(rendered.includes("Confirm location mapping"));
-  ok(rendered.includes("including its other connections"), "confirmed disconnect explains merchant/application-wide revocation");
+  ok(rendered.includes("Other authorized connections and the Square provider authorization are preserved"), "confirmed disconnect explains its workspace-only scope");
+  ok(!rendered.includes("provider revocation pending") && !rendered.includes("including its other connections"), "customer disconnect does not claim remote or shared authorization revocation");
+  const pending = modules.renderToStaticMarkup(modules.React.createElement(modules.SquareConnectionPanel, { view: {
+    ...view, connections: [{ ...view.connections[0], state: "disconnecting", revocationPending: true }]
+  } }));
+  ok(pending.includes("Provider revocation is not confirmed") && !pending.includes("a bounded retry is required"), "legacy pending display does not advertise customer provider-revoke retries");
   ok(!rendered.includes("Last successful sync") && !rendered.includes(">Current<") && !rendered.includes(">Synced<"));
   const escaped = modules.renderToStaticMarkup(modules.React.createElement(modules.SquareConnectionPanel, { view: { ...view, connections: [{ ...view.connections[0], sellerLabel: "<script>PRIVATE_DISPLAY_CANARY</script>" }] } }));
   ok(!escaped.includes("<script>PRIVATE_DISPLAY_CANARY</script>"));

@@ -6,8 +6,8 @@ const labels = {
   mapping_required: "Mapping required",
   authorized: "Authorized · sync not yet qualified",
   reauthorization_required: "Reauthorization required",
-  disconnecting: "Disconnected locally · provider revocation pending",
-  disconnected: "Disconnected",
+  disconnecting: "Local disconnect pending",
+  disconnected: "Disconnected from this workspace",
   revoked: "Authorization revoked",
   recovery_required: "Connection recovery required"
 } as const;
@@ -35,7 +35,7 @@ export function SquareConnectionPanel({ view }: { view: SquareConnectionView }) 
             <p role="status">{labels[connection.state]}</p>
             <p>Business Entity: {entity?.label ?? "Unavailable"}</p>
             {!connection.retentionApproved ? <p>Approved retention and access policy is required before mapping can be enrolled.</p> : null}
-            {connection.revocationPending ? <p role="status">Vaeroex access is disabled. Square revocation has not completed; a bounded retry is required.</p> : null}
+            {connection.revocationPending ? <p role="status">Vaeroex access is disabled. Provider revocation is not confirmed; workspace disconnect does not retry it.</p> : null}
             {connection.mappedLocationIds.length ? (
               <div><h3 className="font-semibold">Confirmed locations</h3><ul>{connection.mappedLocationIds.map((id) => <li key={id}>{locationsById.get(id)?.label ?? "Previously confirmed location"}</li>)}</ul></div>
             ) : null}
@@ -61,7 +61,7 @@ export function SquareConnectionPanel({ view }: { view: SquareConnectionView }) 
             {view.canManage && canDisconnect ? (
               <form action={`${SQUARE_CUSTOMER_API_PATH}/disconnect`} method="post" className="space-y-3">
                 <input type="hidden" name="connectionId" value={connection.connectionId} />
-                <p className="text-sm">Disconnecting immediately disables local work and revokes this Square seller’s access for this application, including its other connections. Provider revocation may require retry. No historical records are deleted.</p>
+                <p className="text-sm">Disconnecting disables this workspace’s credential use, refresh and ingestion. Other authorized connections and the Square provider authorization are preserved. No historical records are deleted.</p>
                 <label className="flex gap-2"><input type="checkbox" name="confirmation" value="disconnect" required /><span>Confirm this Square disconnect.</span></label>
                 <button type="submit" className="rounded-md border border-red-300 px-4 py-2 font-semibold text-red-700">Disconnect Square</button>
               </form>

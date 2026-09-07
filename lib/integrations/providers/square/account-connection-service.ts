@@ -3,7 +3,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { isProxy } from "node:util/types";
 import { z } from "zod";
-import { IsoTimestampSchema, UuidSchema } from "@/lib/integrations/contracts/primitives";
+import { UuidSchema } from "@/lib/integrations/contracts/primitives";
 import {
   IntegrationCredentialBroker,
   type CredentialBrokerStore,
@@ -36,7 +36,6 @@ import {
   createSquareOAuthCredentialProvider,
   createSquareOAuthPolicy,
   readSquareAuthenticatedDiscovery,
-  revokeSquareMerchant,
   squareAuthorizationUrl,
   SQUARE_OAUTH_SCOPES,
   verifySquareRevocationNotification,
@@ -80,12 +79,6 @@ const EnrolledSchema = z.object({ enrolled: z.literal(true), generation: Version
 const DisconnectSchema = z.object({ connectionId: UuidSchema, confirmation: z.literal("disconnect") }).strict();
 const FencedSchema = z.object({ fenced: z.literal(true) }).strict();
 const EmptySchema = z.object({}).strict();
-const RevocationLeaseSchema = z.discriminatedUnion("acquired", [
-  z.object({ acquired: z.literal(false) }).strict(),
-  z.object({ acquired: z.literal(true), connectionId: UuidSchema, generation: VersionSchema,
-    rowVersion: VersionSchema, merchantId: z.string().min(1).max(191).regex(/^[A-Za-z0-9._:-]+$/),
-    leaseId: UuidSchema, expiresAt: IsoTimestampSchema }).strict()
-]);
 const MetadataSchema = z.object({ connectionId: UuidSchema, businessEntityId: UuidSchema,
   generation: VersionSchema, credentialId: UuidSchema, credentialVersion: VersionSchema }).strict();
 const NotificationResultSchema = z.object({ accepted: z.literal(true), replayed: z.boolean() }).strict();
@@ -122,7 +115,6 @@ async function separateRpc(client: ExternalIntegrationsRpcClient | undefined,
 
 export type SquareAccountConnectionService = SquareConnectionService & Readonly<{
   refresh(actor: SquareConnectionActor, connectionId: string, signal?: AbortSignal): Promise<CredentialRefreshResult>;
-  retryRevocation(actor: SquareConnectionActor, connectionId: string, signal?: AbortSignal): Promise<void>;
   handleRevocationNotification(input: Readonly<{
     rawBody: Uint8Array | string; signature: string; notificationUrl: string; signatureKey: string;
   }>): Promise<void>;
@@ -159,27 +151,6 @@ export function createSquareAccountConnectionService(input: Readonly<{
     provider: createSquareOAuthCredentialProvider({ policy, applicationId, transport, signal }),
     ...(verifier ? { authorizedEntityVerifier: verifier } : {})
   });
-
-  async function retry(context: SquareAccountContext, connectionId: string, signal?: AbortSignal) {
-    const lease = checked(RevocationLeaseSchema, await squareAccountRpc(client, context, "acquire_revocation", { connectionId }));
-    if (!lease.acquired) return;
-    if (lease.connectionId !== connectionId) denied();
-    let outcome: "succeeded" | "failed" = "failed";
-    try {
-      checkSignal(signal);
-      const applicationSecret = await secrets.access("square", environment);
-      checkSignal(signal);
-      await revokeSquareMerchant({ environment, applicationId, merchantId: lease.merchantId,
-        applicationSecret, transport, signal });
-      outcome = "succeeded";
-    } catch {
-      // Revocation failure/cancellation does not reopen local authority or purge
-      // ciphertext. Persist the bounded retry outcome even if the request aborted.
-    }
-    checked(EmptySchema, await squareAccountRpc(client, context, "complete_revocation", {
-      connectionId, generation: lease.generation, rowVersion: lease.rowVersion, leaseId: lease.leaseId, outcome
-    }));
-  }
 
   return Object.freeze({
     async initiate(actor, value, signal) {
@@ -284,20 +255,13 @@ export function createSquareAccountConnectionService(input: Readonly<{
       } catch { return denied(); }
     },
 
-    async disconnect(actor, value, signal) {
+    async disconnect(actor, value) {
       try {
         const context = contextFor(actor), command = checked(DisconnectSchema, value, INPUT_LIMITS);
-        // Always finish the local merchant-wide fence before accessing a provider
-        // secret. Even cancellation/provider failure leaves local reads closed.
+        // Finish only this workspace connection's fence, even after cancellation.
+        // Tokens/grants can be shared: customer disconnect must neither access a
+        // provider secret nor revoke a token or the seller/application grant.
         checked(FencedSchema, await squareAccountRpc(client, context, "disconnect", command));
-        await retry(context, command.connectionId, signal);
-      } catch { return denied(); }
-    },
-
-    async retryRevocation(actor, connectionId, signal) {
-      try {
-        const context = contextFor(actor), command = checked(ConnectionIdSchema, { connectionId });
-        await retry(context, command.connectionId, signal);
       } catch { return denied(); }
     },
 

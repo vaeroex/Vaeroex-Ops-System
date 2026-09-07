@@ -211,8 +211,9 @@ async function main() {
     await rejects(() => exchange(provider([], { transport: async () => { calls++; return response({ error: canary }, 500, statusCode); } }).value));
     equal(calls, 1, "OAuth failure never automatically retries a code");
   }
-  for (const [code, expected] of [["ACCESS_TOKEN_REVOKED", "provider_revoked"], ["INVALID_GRANT", "invalid_grant"], ["ACCESS_TOKEN_EXPIRED", "invalid_grant"]])
+  for (const [code, expected] of [["ACCESS_TOKEN_REVOKED", "provider_revoked"], ["INVALID_GRANT", "invalid_grant"], ["ACCESS_TOKEN_EXPIRED", "invalid_grant"], ["UNAUTHORIZED", "invalid_grant"], ["UNKNOWN_PROVIDER_CODE", "invalid_grant"]])
     await rejects(() => exchange(provider([], { transport: async () => response({ errors: [{ code, detail: canary }] }, 500, 401) }).value), expected);
+  await rejects(() => exchange(provider([], { transport: async () => response({}, 500, 401) }).value), "invalid_grant");
   await rejects(() => exchange(provider([], { transport: () => { throw new Error(canary); } }).value), "provider_transient");
 
   const abort = new AbortController(); abort.abort(); let abortedCalls = 0;
@@ -236,14 +237,15 @@ async function main() {
   } }) }).value), "provider_transient"); ok(emptyReads >= 64, "empty-stream cancellation timer is not starved");
 
   const revocationCalls = [];
-  const revocation = await oauth.revokeSquareMerchant({ environment: "sandbox", applicationId, merchantId, applicationSecret: secret,
-    transport: async request => { revocationCalls.push(request); return response({ success: true }); } });
-  equal(revocation, { success: true }); equal(revocationCalls.length, 1);
-  equal(JSON.parse(revocationCalls[0].body), { client_id: applicationId, merchant_id: merchantId, revoke_only_access_token: false });
-  equal(revocationCalls[0].headers.Authorization, `Client ${canary}`);
-  ok(!revocationCalls[0].body.includes("ACCESS_"));
-  for (const bad of [{ success: false }, {}, { success: true, errors: [{ code: "INTERNAL_SERVER_ERROR" }] }])
-    await rejects(() => oauth.revokeSquareMerchant({ environment: "sandbox", applicationId, merchantId, applicationSecret: secret, transport: async () => response(bad) }));
+  const cannotRevoke = provider([], { transport: async request => { revocationCalls.push(request); return response({ success: true }); } });
+  let revocationCredentialReads = 0;
+  await rejects(() => cannotRevoke.value.revokeCredential({
+    get credential() { revocationCredentialReads++; return envelope; },
+    get applicationSecret() { revocationCredentialReads++; return secret; }, now
+  }), "integrity_failure");
+  equal(revocationCalls.length, 0, "connection-bound provider cannot revoke a shared grant or access token");
+  equal(revocationCredentialReads, 0, "denied grant-level revocation never accesses credentials or application secret");
+  equal(oauth.revokeSquareMerchant, undefined, "no unscoped merchant-revocation helper is exposed");
   for (const fixedPath of ["/v2/merchants/me", "/v2/locations", "/v2/locations/main"]) {
     let call;
     equal(await oauth.readSquareAuthenticatedDiscovery({ environment: "sandbox", path: fixedPath, accessToken: envelope.accessToken,
