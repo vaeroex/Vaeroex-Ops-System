@@ -238,7 +238,8 @@ function assertTargetIsSinglePendingMigration() {
   // and unchanged; they do not replace the fixture's QBO target or assertions.
   const dormantSquareTail = [
     "20260907042202_square_dormant_trusted_authority.sql",
-    "20260907042352_square_dormant_atomic_pages.sql"
+    "20260907042352_square_dormant_atomic_pages.sql",
+    "20260907174326_square_dormant_account_connection.sql"
   ];
   const laterMigrations = migrations.slice(targetIndex + 1);
   if (laterMigrations.length !== dormantSquareTail.length ||

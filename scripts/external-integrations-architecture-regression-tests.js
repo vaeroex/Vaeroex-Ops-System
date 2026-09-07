@@ -364,6 +364,29 @@ matches(
   /run\(cli, \["migration", "up", "--local"\]\)/,
   "the fixture-rich runner must apply the ordered zero-based and retry-identity migrations"
 );
+matches(zeroBasedUpgradeRunner, /const dormantSquareTail = \[\s*"20260907042202_square_dormant_trusted_authority\.sql",\s*"20260907042352_square_dormant_atomic_pages\.sql",\s*"20260907174326_square_dormant_account_connection\.sql"\s*\]/,
+  "fixture-rich QBO upgrade allows exactly the three reviewed dormant Square migrations");
+// Execute only the pure manifest guard, with no database/CLI capability. This
+// catches an omitted additive tail before the real database gate runs in CI.
+const fixtureGuardSource = zeroBasedUpgradeRunner.slice(0, zeroBasedUpgradeRunner.indexOf("async function applyFixture"));
+const currentMigrations = fs.readdirSync(path.join(root, "supabase/migrations"));
+function acceptsFixtureManifest(names) {
+  return require("node:vm").runInNewContext(`${fixtureGuardSource}\nassertTargetIsSinglePendingMigration(); true;`, {
+    __dirname: path.join(root, "scripts"),
+    require(name) {
+      if (name === "node:fs") return { readdirSync: () => names };
+      if (name === "node:path") return path;
+      if (name === "node:child_process") return { spawnSync: () => { throw new Error("manifest_guard_must_not_execute_commands"); } };
+      throw new Error("manifest_guard_dependency_denied");
+    },
+    process: { env: {}, stderr: { write() {} }, exit() { throw new Error("fixture_manifest_denied"); } }
+  });
+}
+equal(acceptsFixtureManifest(currentMigrations), true, "real current migration manifest passes the fixture-rich guard");
+for (const manifest of [currentMigrations.filter(name => name !== "20260907174326_square_dormant_account_connection.sql"),
+  [...currentMigrations, "20990101000000_square_activation.sql"]]) {
+  assertionCount++; assert.throws(() => acceptsFixtureManifest(manifest), /fixture_manifest_denied/, "missing or unreviewed tail still rejects");
+}
 matches(
   zeroBasedUpgradeRunner,
   /external_integrations_phase_6_durable_runtime\.test\.sql[\s\S]*external_integrations_phase_8b_credential_refresh_recovery\.test\.sql[\s\S]*external_integrations_phase_8b_same_generation_reauthorization\.test\.sql[\s\S]*external_integrations_phase_8b_credential_binding_canary\.test\.sql[\s\S]*external_integrations_phase_8b_credential_lineage_recovery\.test\.sql[\s\S]*external_integrations_phase_8b_precontract_retirement\.test\.sql[\s\S]*external_integrations_phase_8b_provider_result_evidence\.test\.sql[\s\S]*external_integrations_qbo_production_convergence\.test\.sql/,
