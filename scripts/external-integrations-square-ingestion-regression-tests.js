@@ -197,6 +197,31 @@ async function main() {
   await new Promise(resolve => setImmediate(resolve));
   equal(cancelledRead.model.inspect().sourceVersionCount, 0, "cancellation cannot leave a late committed page");
 
+  // A delayed grant/acquisition starts the lease AFTER the outer deadline clock.
+  // Honor the returned retry delay; it must not encounter the still-active lease.
+  const originalSetTimeout = global.setTimeout, originalClearTimeout = global.clearTimeout;
+  const scheduled = [];
+  let deadlineHarness, openDeadline;
+  const deadlineOpened = new Promise(resolve => { openDeadline = resolve; });
+  deadlineHarness = harness(paymentGrant, { payments: [squarePaymentFixture()] }, {
+    onResolve(count) { if (count === 1) deadlineHarness.advance(2_000); }
+  });
+  const normalTransport = deadlineHarness.deps.transport;
+  deadlineHarness.deps.transport = () => { openDeadline(); return new Promise(() => {}); };
+  let timedOut;
+  try {
+    global.setTimeout = (callback, delay) => { const timer = { callback, delay }; scheduled.push(timer); return timer; };
+    global.clearTimeout = () => {};
+    const running = deadlineHarness.run(); await deadlineOpened;
+    equal(scheduled[0].delay, 30_000, "outer deadline remains bounded");
+    deadlineHarness.advance(28_000); scheduled[0].callback(); timedOut = await running;
+    equal(timedOut.code, "invocation_deadline"); equal(timedOut.retryAfterMs, 30_000);
+  } finally { global.setTimeout = originalSetTimeout; global.clearTimeout = originalClearTimeout; }
+  await new Promise(resolve => setImmediate(resolve));
+  deadlineHarness.advance(timedOut.retryAfterMs); deadlineHarness.deps.transport = normalTransport;
+  equal((await deadlineHarness.run()).outcome, "committed", "deadline retry waits past delayed acquisition lease");
+  equal(deadlineHarness.model.inspect().sourceVersionCount, 1);
+
   let cat = squareCatalogValidationFixture();
   const catGrant = grant("catalog", "retrieve_catalog_object", "/v2/catalog/object/SQ2B1B1CAT001");
   const tombstones = harness(catGrant, () => ({ object: cat })); await tombstones.run();

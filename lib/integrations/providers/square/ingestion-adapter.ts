@@ -223,7 +223,10 @@ export function createSquareDormantIngestionAdapter(dependencies: Readonly<{
       const expired = new Promise<SquareIngestionOutcome>((resolve) => {
         timeout = setTimeout(() => {
           deadline = true; stopped = true; controller.abort();
-          resolve(outcome("retry", "invocation_deadline", { retryAfterMs: 500 }));
+          // Acquisition may have started late (or its acknowledgement may still
+          // be pending). Do not race an active 30s lease or release a possibly
+          // committing page; wait one bounded lease lifetime before retrying.
+          resolve(outcome("retry", "invocation_deadline", { retryAfterMs: 30_000 }));
         }, 30_000);
       });
       const work = async (): Promise<SquareIngestionOutcome> => {
