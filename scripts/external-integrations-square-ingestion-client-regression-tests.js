@@ -3,6 +3,8 @@ const fs=require("node:fs");
 const path=require("node:path");
 const Module=require("node:module");
 const {getEventListeners}=require("node:events");
+const {createHook}=require("node:async_hooks");
+const {spawnSync}=require("node:child_process");
 const ts=require("typescript");
 const root=path.resolve(__dirname,"..");
 require.extensions[".ts"]=function(module,filename){module._compile(ts.transpileModule(fs.readFileSync(filename,"utf8"),{compilerOptions:{esModuleInterop:true,module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022},fileName:filename}).outputText,filename);};
@@ -168,6 +170,63 @@ async function streamingBounds() {
   equal(read(await run("",{}, {body:(async function*(){yield chunk;})()})).a,1);equal(overridden,0,"intrinsic typed-array access bypasses overridden accessors");
 }
 
+async function streamingWaitStateBound() {
+  for(const chunk of [new Uint8Array(0),new Uint8Array([32])]) {
+    // Count unresolved async state, not GC-dependent heap sizes. Repeated races
+    // against a shared pending stop promise retain reactions after each chunk.
+    const pending=new Set(),samples=[];
+    const hook=createHook({
+      init(id,type){if(type==="PROMISE")pending.add(id);},
+      promiseResolve(id){pending.delete(id);}
+    });
+    const body=(async function*(){
+      for(let count=1;count<=4096;count++) {
+        yield chunk;
+        if(count===128||count===4096)samples.push(pending.size);
+      }
+      yield bytes("{}");
+    })();
+    let entry;
+    hook.enable();
+    try {entry=await run("",{}, {body});}
+    finally {hook.disable();}
+    deepEqual(read(entry),Object.freeze(Object.create(null)));
+    equal(samples.length,2);
+    ok(samples[1]<=samples[0]+32,`pending wait state stays bounded for ${chunk.length}-byte chunks: ${samples}`);
+  }
+  // A stopped wait must still observe a later transport rejection.
+  const controller=new AbortController();let rejectOpen,opened;
+  const started=new Promise(resolve=>{opened=resolve;});
+  const late=run("{}",{signal:controller.signal,transport:()=>{opened();return new Promise((_,reject)=>{rejectOpen=reject;});}});
+  await started;controller.abort();failed(await late,"cancelled");
+  rejectOpen(Error(canary));await new Promise(setImmediate);
+  equal(getEventListeners(controller.signal,"abort").length,0);
+}
+
+async function stringRetentionProbe() {
+  // 1,002 raw values; all 1,000 strings reach the supported 4,096-unit limit.
+  // Keep the accepted response alive across GC to measure retained output, not
+  // transient allocation. A wide allowance tolerates runtime bookkeeping while
+  // detecting per-character ConsString chains (about 124 MiB for this 4 MiB body).
+  const text=JSON.stringify({values:Array(1000).fill("A".repeat(4096))});
+  global.gc();const before=process.memoryUsage().heapUsed;
+  const entry=await run(text);
+  global.gc();const retained=process.memoryUsage().heapUsed-before;
+  const value=read(entry);equal(value.values.length,1000);equal(value.values[999].length,4096);
+  ok(retained<=8*text.length+16*1024*1024,`decoded string retention exceeds bound: ${retained}`);
+  console.log(JSON.stringify({wireBytes:Buffer.byteLength(text),retainedBytes:retained}));
+}
+
+function stringRetentionBound() {
+  scenarios++;
+  // Isolated, explicitly collected heap; no dependency on incidental parent GC.
+  const child=spawnSync(process.execPath,["--expose-gc","--max-old-space-size=256",__filename,"--string-retention-check"],{encoding:"utf8",timeout:20000,maxBuffer:1024*1024});
+  equal(child.status,0,child.error?.message??child.stderr);
+  const measurement=JSON.parse(child.stdout);
+  equal(measurement.wireBytes,4099012);
+  console.log("Square decoded string retention:",JSON.stringify(measurement));
+}
+
 async function cancellationAndFaults() {
   const pre=new AbortController();pre.abort();const cancelled=await run("{}",{signal:pre.signal});failed(cancelled,"cancelled");equal(cancelled.calls,0);equal(getEventListeners(pre.signal,"abort").length,0);
   await accelerated(async()=>{failed(await run("{}",{transport:never}),"deadline",500);});
@@ -201,8 +260,8 @@ async function cancellationAndFaults() {
 async function main() {
   let logs=0,network=0;const originalFetch=global.fetch,originalWarn=console.warn,originalError=console.error,originalInfo=console.info;
   global.fetch=()=>{network++;throw Error("no live fallback");};console.warn=console.error=console.info=()=>{logs++;};
-  try {await guards();await statusAndRetry();await exactJsonAndStructure();await fractionalSchemaCompatibility();await streamingBounds();await cancellationAndFaults();equal(network,0);equal(logs,0);}
+  try {await guards();await statusAndRetry();await exactJsonAndStructure();await fractionalSchemaCompatibility();await streamingBounds();await streamingWaitStateBound();stringRetentionBound();await cancellationAndFaults();equal(network,0);equal(logs,0);}
   finally {global.fetch=originalFetch;console.warn=originalWarn;console.error=originalError;console.info=originalInfo;}
   console.log(`Square bounded ingestion client: ${assertions} assertions across ${scenarios} scenarios.`);
 }
-main().catch(error=>{console.error(error);process.exitCode=1;});
+(process.argv.includes("--string-retention-check")?stringRetentionProbe():main()).catch(error=>{console.error(error);process.exitCode=1;});

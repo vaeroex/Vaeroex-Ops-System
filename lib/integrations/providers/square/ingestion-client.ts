@@ -34,6 +34,10 @@ const signalAborted = Object.getOwnPropertyDescriptor(AbortSignal.prototype, "ab
 // coordinates survive, but precision loss/underflow/unsafe integers never do.
 // The injected I/O must be asynchronous/cooperative: JavaScript cannot preempt
 // an injected synchronous infinite loop. Hanging promises do not extend our wait.
+// Sequential waits retain only one cancellation callback, cleared on settlement;
+// tiny/empty chunks cannot accumulate reactions on a shared pending promise.
+// Each decoded string uses <=4,097 temporary character slots and one join,
+// avoiding retained per-character concatenation chains in the accepted graph.
 const failures = new Map<object, SquareReadFailureCode>();
 const failureTokens = Object.fromEntries(([
   "authorization", "rate_limited", "transient", "malformed_response", "provider_error",
@@ -64,13 +68,10 @@ export async function readSquareBoundedResponse(input: SquareBoundedReadInput): 
 
   const controller = new AbortController();
   let stopped: "deadline" | "cancelled" | null = null;
-  let rejectStop!: (value: object) => void;
-  const stop = new Promise<never>((_, reject) => { rejectStop=reject; });
-  // A late cancellation/open rejection must never become an unhandled rejection.
-  void stop.catch(() => undefined);
+  let rejectWait: ((reason: object) => void) | null = null;
   const end = (code: "deadline" | "cancelled") => {
     if (stopped !== null) return;
-    stopped=code; controller.abort(); rejectStop(failureTokens[code]);
+    stopped=code; controller.abort(); rejectWait?.(failureTokens[code]);
   };
   const onAbort = () => end("cancelled");
   const timer=setTimeout(() => end("deadline"),Math.max(0,decision.timeoutMs-(Date.now()-started)));
@@ -81,7 +82,17 @@ export async function readSquareBoundedResponse(input: SquareBoundedReadInput): 
     if (externalSignal && signalAborted.call(externalSignal)) { end("cancelled"); fail("cancelled"); }
     if (Date.now()-started>=decision.timeoutMs) { end("deadline"); fail("deadline"); }
   };
-  const wait = <T>(promise: Promise<T>) => Promise.race([promise,stop]);
+  const wait = <T>(promise: Promise<T>) => new Promise<T>((resolve,reject) => {
+    // There is exactly one sequential open/body/yield/cleanup wait. A shared
+    // Promise.race stop operand would retain a reaction for every tiny chunk.
+    const clear = () => { if(rejectWait===onStop) rejectWait=null; };
+    const onStop = (reason: object) => { clear(); reject(reason); };
+    // Always observe both outcomes, even after stopping, so late I/O rejection
+    // is contained. Identity prevents late I/O from clearing a newer waiter.
+    promise.then(value=>{clear();resolve(value);},error=>{clear();reject(error);});
+    if(stopped!==null) onStop(failureTokens[stopped]);
+    else rejectWait=onStop;
+  });
   let response: SquareSyntheticTransportResponse | null = null;
   let iterator: AsyncIterator<Uint8Array> | null = null;
   let finished=false;
@@ -286,16 +297,16 @@ function decodeBoundedJson(text: string, check:()=>void): Readonly<Record<string
   const whitespace=()=>{while(index<text.length&&/^[\t\n\r ]$/.test(text[index])){index++;tick();}};
   const string=(maximum:number) => {
     if(text[index++]!=='"')fail("malformed_response");
-    let result="";
+    const result:string[]=[];
     while(index<text.length) {
       tick();let character=text[index++];
-      if(character==='"')return result;
+      if(character==='"')return result.join("");
       if(character==="\\") {
         const escaped=text[index++];
         if(escaped==="u") {const hex=text.slice(index,index+4);if(!/^[0-9a-fA-F]{4}$/.test(hex))fail("malformed_response");character=String.fromCharCode(parseInt(hex,16));index+=4;}
         else {const escapes:Record<string,string>={'"':'"',"\\":"\\","/":"/",b:"\b",f:"\f",n:"\n",r:"\r",t:"\t"};if(!Object.hasOwn(escapes,escaped))fail("malformed_response");character=escapes[escaped];}
       } else if(character.charCodeAt(0)<32)fail("malformed_response");
-      result+=character;if(result.length>maximum)fail("malformed_response");
+      result.push(character);if(result.length>maximum)fail("malformed_response");
     }
     return fail("malformed_response");
   };
