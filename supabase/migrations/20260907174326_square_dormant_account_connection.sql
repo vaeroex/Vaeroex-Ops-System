@@ -302,7 +302,8 @@ begin
     v_connection_id:=v_task.connection_id;
   else v_connection_id:=(p_command->>'connectionId')::uuid;
   end if;
-  if p_operation in ('store_credential','disconnect','acquire_revocation','complete_revocation') then
+  if p_operation in ('store_credential','disconnect','acquire_revocation','complete_revocation')
+    or p_operation='fail_refresh' and p_command->>'reasonCode'='provider_revoked' then
     if p_operation='store_credential' then v_merchant:=p_command#>>'{discovery,merchantId}';
     else select merchant_id into v_merchant from private.square_account_connections where connection_id=v_connection_id;end if;
     if v_merchant is not null then perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(v_config.environment||':'||v_config.application_id||':'||v_merchant,0));end if;
@@ -557,6 +558,26 @@ begin
       or v_account.refresh_lease->>'leaseOwnerFingerprint'<>p_command->>'leaseOwnerFingerprint'
       or (v_account.refresh_lease->>'leaseExpiresAt')::timestamptz<=v_now then raise exception using errcode='42501',message='square_account_refresh_fenced';end if;
     if p_operation='fail_refresh' then
+      if p_command->>'reasonCode'='provider_revoked' then
+        -- A revoked token can be the first observed sign of seller-wide consent
+        -- loss. Conservatively fence matching local authority under the merchant
+        -- lock, only after validating the reporting current credential and lease.
+        -- This is not evidence that all provider tokens were revoked: preserve
+        -- existing disconnect/revocation state and pending provider-revoke work.
+        for v_id in select connection_id from private.square_account_connections
+          where environment=v_config.environment and application_id=v_config.application_id
+            and merchant_id=v_account.merchant_id order by connection_id loop
+          perform 1 from private.square_connections where connection_id=v_id for update;
+          perform 1 from private.square_account_connections where connection_id=v_id for update;
+          update private.square_connections set state='revoked',revoked_at=v_now,revocation_reason='qualification_revoked',updated_at=v_now where connection_id=v_id;
+          update private.square_account_oauth_states set status='cancelled' where connection_id=v_id and status in ('pending','exchanging');
+          update private.square_account_connections set
+            state=case when state in ('disconnecting','disconnected','revoked') then state else 'reauthorization_required' end,
+            row_version=row_version+1,refresh_lease=null,revoked_before=v_now,updated_at=v_now where connection_id=v_id;
+        end loop;
+        select * into strict v_account from private.square_account_connections where connection_id=v_connection_id;
+        return private.square_account_credential_result_v1(v_credential,v_account.state,false);
+      end if;
       update private.square_account_connections set refresh_lease=null,refresh_not_before=v_now+interval '5 seconds',updated_at=v_now,
         state=case when refresh_attempts>=3 or p_command->>'reasonCode' in ('invalid_grant','scope_loss','credential_binding_invalid','provider_revoked') then 'reauthorization_required' else state end where connection_id=v_connection_id returning * into v_account;
       return private.square_account_credential_result_v1(v_credential,v_account.state,false);

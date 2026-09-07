@@ -61,7 +61,7 @@ function syntheticProvider(scopes) {
   const calls = [];
   providerTrace = calls;
   let tokenSerial = 0, revokeFailure = false, tokenBarrier = null, refreshBarrier = null, nextMerchant = merchantId;
-  let statusChange = null, discoveryChange = null;
+  let statusChange = null, discoveryChange = null, nextRefreshFailure = null;
   function response(value, status = 200) {
     const bytes = Buffer.from(JSON.stringify(value));
     return { status, body: (async function*() {
@@ -73,10 +73,16 @@ function syntheticProvider(scopes) {
     assert.equal(url.origin, "https://connect.squareupsandbox.com", "injected requests stay exactly sandbox bound");
     const body = input.body === null ? null : JSON.parse(input.body);
     const operation = url.pathname === "/oauth2/token" ? body.grant_type : url.pathname;
+    // Select the synthetic response when this invocation starts. An outstanding
+    // sibling refresh must keep its own successful response while another fails.
+    const refreshFailure = operation === "refresh_token" ? nextRefreshFailure : null;
+    if (operation === "refresh_token") nextRefreshFailure = null;
     calls.push(operation);
     if (input.signal.aborted) throw new Error(CANARY);
     if (operation === "authorization_code" && tokenBarrier) { const hold = tokenBarrier; tokenBarrier = null; await hold.wait(); }
     if (operation === "refresh_token" && refreshBarrier) { const hold = refreshBarrier; refreshBarrier = null; await hold.wait(); }
+    if (refreshFailure) return response({ errors: [{ category: refreshFailure === "ACCESS_TOKEN_REVOKED" ? "AUTHENTICATION_ERROR" : "API_ERROR",
+      code: refreshFailure, detail: CANARY }] }, refreshFailure === "ACCESS_TOKEN_REVOKED" ? 401 : 503);
     if (url.pathname === "/oauth2/token") {
       const seller = nextMerchant;
       const expiresAt = new Date(Date.now() + 86400_000).toISOString();
@@ -105,6 +111,7 @@ function syntheticProvider(scopes) {
   return { transport, calls,
     set merchant(value) { nextMerchant = value; }, set statusChange(value) { statusChange = value; },
     set discoveryChange(value) { discoveryChange = value; }, set revokeFailure(value) { revokeFailure = value; },
+    failNextRefresh(code) { assert.ok(["ACCESS_TOKEN_REVOKED", "INTERNAL_SERVER_ERROR"].includes(code)); nextRefreshFailure = code; },
     holdCode() { tokenBarrier = barrier(); return tokenBarrier; }, holdRefresh() { refreshBarrier = barrier(); return refreshBarrier; }
   };
 }
@@ -558,6 +565,130 @@ async function integratedTests(runtime, database) {
   });
   console.log("Square account browser qualification: " + JSON.stringify(browserEvidence));
   scenarios += browserEvidence.scenarios.length;
+
+  stage = "provider_revoked_refresh_merchant_group_fence";
+  const revokedMerchant = "MERCHANT_REFRESH_REVOKED", unrelatedMerchant = "MERCHANT_REFRESH_UNRELATED";
+  provider.merchant = unrelatedMerchant;
+  const unrelated = await connected();
+  await service.confirmMapping(actor, { ...mapping, connectionId: unrelated.connectionId });
+  const unrelatedBefore = await connectionRow(unrelated.connectionId);
+  provider.merchant = revokedMerchant;
+  const reporting = await connected();
+  await service.confirmMapping(actor, { ...mapping, connectionId: reporting.connectionId });
+  const siblingStart = await service.initiate(browserActor, { operation: "connect", businessEntityId: browserEntity });
+  const siblingState = new URL(siblingStart.authorizationUrl).searchParams.get("state");
+  const sibling = { connectionId: (await stateRow(siblingState)).connection_id };
+  await service.complete(browserActor, { state: siblingState, code: "synthetic-sibling-code" });
+  await service.confirmMapping(browserActor, { ...mapping, connectionId: sibling.connectionId, businessEntityId: browserEntity });
+  ok((await connectionRow(reporting.connectionId)).workspace_id !== (await connectionRow(sibling.connectionId)).workspace_id,
+    "revocation regression covers separately authorized workspaces");
+
+  provider.failNextRefresh("INTERNAL_SERVER_ERROR");
+  await service.refresh(actor, reporting.connectionId);
+  equal((await connectionRow(reporting.connectionId)).state, "authorized", "ordinary transient refresh failure does not revoke reporting consent");
+  equal((await connectionRow(sibling.connectionId)).state, "authorized", "ordinary transient refresh failure remains local to its attempt");
+  await owner.query("update private.square_account_connections set refresh_not_before=clock_timestamp()-interval '1 second' where connection_id=$1", [reporting.connectionId]);
+
+  const groupReads = [];
+  for (const member of [
+    { connectionId: reporting.connectionId, actor, context, businessEntityId: entity, workspaceId: workspace },
+    { connectionId: sibling.connectionId, actor: browserActor, context: browserContext, businessEntityId: browserEntity, workspaceId: browserWorkspace }
+  ]) {
+    const memberScope = { ...scope, connectionId: member.connectionId, businessEntityId: member.businessEntityId,
+      workspaceId: member.workspaceId, sellerId: revokedMerchant };
+    const memberGrant = { ...grant, scope: memberScope, scanId: uuid(), expiresAt: Date.now() + 1800_000 };
+    const memberBinding = { ...binding, scopeFingerprint: squareIngestionScopeFingerprint(memberScope),
+      scanKey: contractSha256({ purpose: "square_ingestion_scan_v1", workspaceId: member.workspaceId,
+        businessEntityId: member.businessEntityId, connectionId: member.connectionId, stream: memberGrant.stream, scanId: memberGrant.scanId }) };
+    const memberTask = { taskId: uuid(), leaseOwnerFingerprint: contractSha256(uuid()) };
+    const enrolled = await rpc(enrollment.client).rpc("enroll_square_verified_task_v1", { p_command: { ...memberTask,
+      connectionId: member.connectionId, generation: 1, runtimeLogin: broker.name, grant: memberGrant, binding: memberBinding } });
+    equal(enrolled.error, null, "both merchant-group members have checked current tasks before revocation");
+    const repository = createSquareDurablePageRepository({ ...memberTask, client: rpc(broker.client) });
+    const memberAuthority = createSquareDatabaseAuthority({ ...memberTask, client: rpc(broker.client) });
+    let heldLease, heldPage;
+    const adapter = createSquareDormantIngestionAdapter({ authority: memberAuthority,
+      repository: { ...repository,
+        async acquire(value) { const acquired = await repository.acquire(value); if (acquired.outcome === "leased") heldLease = acquired.lease; return acquired; },
+        async commitPage(command) {
+          // Capture the actual validated, mapped command at its commit boundary;
+          // do not send it until the provider-revoked fence has been installed.
+          heldPage = command;
+          return { outcome: "conflict", completeness: null, continuation: false };
+        } },
+      async transport(request) {
+        const access = await credentialBrokerFor(member.context).readProviderAccessCredential({ ...memberTask,
+          leaseId: squareCredentialReadLeaseId(heldLease.leaseId), expectedCredentialVersion: 1,
+          requiredScopes: SQUARE_OAUTH_SCOPES, minimumValiditySeconds: 30, requestId: uuid() });
+        equal(access.state, "available", "both current tasks can decrypt before the revocation signal");
+        await access.credential.use(({ accessToken }) => ok(accessToken.startsWith("ACCESS_" + CANARY)));
+        const bytes = Buffer.from(JSON.stringify({ payments: [squarePaymentFixture()], cursor: cursorCanary }));
+        return { status: 200, url: request.url, redirected: false, headers: { "content-type": "application/json" },
+          body: (async function*() { yield bytes; })(), cancel() {} };
+      }
+    });
+    equal((await adapter.run({ taskId: memberTask.taskId })).outcome, "conflict");
+    ok(heldPage && heldPage.sources.length === 1, "late page is captured after actual supported response validation and mapping");
+    groupReads.push({ ...member, task: memberTask, authority: memberAuthority, lease: heldLease, page: heldPage });
+  }
+  const unknownSeller = await start(), unknownHold = provider.holdCode();
+  const unknownPending = complete(unknownSeller);
+  const unknownSettled = unknownPending.then(value => ({ value }), error => ({ error }));
+  await reach(unknownHold, unknownPending);
+  equal((await connectionRow(unknownSeller.connectionId)).merchant_id, null, "outstanding callback seller is not known before exchange completes");
+  const siblingHold = provider.holdRefresh(), siblingPending = service.refresh(browserActor, sibling.connectionId);
+  const siblingSettled = siblingPending.then(value => ({ value }), error => ({ error }));
+  await reach(siblingHold, siblingPending);
+  const siblingVersion = Number((await connectionRow(sibling.connectionId)).credential_version);
+  const revokeCalls = provider.calls.filter(value => value === "/oauth2/revoke").length;
+  let revokedFailureArguments;
+  const reportingService = makeService({ client: rpc(broker.client, { before(name, args) {
+    if (name === "square_account_connection_v1" && args.p_operation === "fail_refresh") revokedFailureArguments = structuredClone(args);
+  } }) });
+  try {
+    provider.failNextRefresh("ACCESS_TOKEN_REVOKED");
+    const revokedRefresh = await reportingService.refresh(actor, reporting.connectionId);
+    equal(revokedRefresh.state, "reauthorization_required", "terminal provider-revoked result must not report retry_required");
+    equal((await connectionRow(reporting.connectionId)).state, "reauthorization_required", "provider-revoked reporting account requires fresh consent");
+    equal((await connectionRow(sibling.connectionId)).state, "reauthorization_required", "provider-revoked refresh conservatively fences same merchant sibling across workspace");
+    for (const member of groupReads) {
+      equal((await owner.query("select state from private.square_connections where connection_id=$1", [member.connectionId])).rows[0].state, "revoked",
+        "matching durable authority is fenced independently of requesting workspace");
+      equal(await member.authority.resolve({ taskId: member.task.taskId }), null, "revoked merchant task cannot resolve authority");
+      await denied(() => credentialBrokerFor(member.context).readProviderAccessCredential({ ...member.task,
+        leaseId: squareCredentialReadLeaseId(member.lease.leaseId), expectedCredentialVersion: 1,
+        requiredScopes: SQUARE_OAUTH_SCOPES, minimumValiditySeconds: 30, requestId: uuid() }), "revoked merchant task cannot release its credential");
+      const committed = await rpc(broker.client).rpc("commit_square_ingestion_page_v1", { p_task_id: member.task.taskId,
+        p_lease_owner_fingerprint: member.task.leaseOwnerFingerprint, p_command: member.page });
+      ok(committed.error, "valid in-flight mapped page cannot commit after merchant-group refresh revocation");
+      equal((await owner.query("select count(*)::int as n from private.square_ingestion_versions where connection_id=$1", [member.connectionId])).rows[0].n, 0,
+        "revocation does not commit a late pending source");
+    }
+    siblingHold.release(); unknownHold.release();
+    await siblingSettled;
+    ok((await unknownSettled).error, "unknown-seller callback started before group fence cannot install late consent");
+    equal((await connectionRow(unknownSeller.connectionId)).credential_id, null);
+    equal(Number((await connectionRow(sibling.connectionId)).credential_version), siblingVersion, "late sibling refresh response cannot append a credential");
+    equal((await connectionRow(sibling.connectionId)).state, "reauthorization_required", "late successful sibling refresh cannot restore authority");
+    equal(await connectionRow(unrelated.connectionId), unrelatedBefore, "different seller connection remains byte-for-byte unchanged");
+    equal(provider.calls.filter(value => value === "/oauth2/revoke").length, revokeCalls,
+      "token-level revocation evidence does not claim merchant provider revocation or call revoke");
+    const freshReporting = await start(service, { operation: "reauthorize", connectionId: reporting.connectionId });
+    await complete(freshReporting);
+    await service.confirmMapping(actor, { ...mapping, connectionId: reporting.connectionId });
+    const newGeneration = await connectionRow(reporting.connectionId), siblingBeforeReplay = await connectionRow(sibling.connectionId);
+    equal(Number(newGeneration.generation), 2); equal(newGeneration.state, "authorized");
+    ok(revokedFailureArguments, "stale witness is the genuine prior failure command, not an invented caller");
+    const staleFailure = await rpc(broker.client).rpc("square_account_connection_v1", revokedFailureArguments);
+    ok(staleFailure.error, "old failure command cannot fence fresh consent after generation replacement");
+    equal(await connectionRow(reporting.connectionId), newGeneration, "stale refresh failure preserves newly authorized generation exactly");
+    equal(await connectionRow(sibling.connectionId), siblingBeforeReplay, "stale refresh failure cannot mutate sibling state either");
+  } finally {
+    siblingHold.release(); unknownHold.release();
+    await Promise.all([siblingSettled, unknownSettled]);
+    provider.merchant = merchantId;
+  }
+  scenarios++;
 
   stage = "stored_privacy_and_immutability";
   for (const table of ["square_account_connections", "square_account_oauth_states", "square_account_credentials", "square_account_enrollments", "square_account_revocation_events", "square_account_audit_events", "square_connections", "square_connection_generations", "square_location_mappings"]) {
