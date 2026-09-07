@@ -738,8 +738,12 @@ async function integratedTests(runtime, database) {
     equal(await connectionFootprint(sibling.connectionId), siblingBeforeRevokedRefresh, "provider_revoked refresh does not mutate sibling credential, generation, enrollment, task or outstanding lease");
     equal(await connectionFootprint(unknownSeller.connectionId), unknownBeforeRevokedRefresh, "generic token failure does not fence another pending unknown-seller callback");
     await assertFenced(reportingRead, "provider-revoked reporting connection");
-    siblingHold.release(); unknownHold.release();
+    // Shared synthetic token bytes have one token-status record. Finish one
+    // exchange before issuing the next, so the fixture cannot replace its expiry
+    // between the response and status verification. Both still span the failure.
+    siblingHold.release();
     ok(!(await siblingSettled).error, "independently authorized sibling refresh completes after another connection's token failure");
+    unknownHold.release();
     ok(!(await unknownSettled).error, "unknown-seller callback in another connection may complete after local token failure");
     equal((await connectionRow(unknownSeller.connectionId)).state, "mapping_required");
     equal(Number((await connectionRow(sibling.connectionId)).credential_version), siblingVersion + 1, "legitimate late sibling refresh appends its own current credential");
@@ -821,6 +825,95 @@ async function integratedTests(runtime, database) {
       equal((await owner.query("select state from private.square_connections where connection_id=$1", [connectionId])).rows[0].state, "revoked");
     }
     for (const member of currentGroupReads) await assertFenced(member, "signed provider revocation of current-generation connection");
+    // Symmetric delivery order: the same old pending state must not survive
+    // merely because token storage/enrollment beat the first signed notification.
+    const lateNotificationCallback = await start(service, { operation: "reauthorize", connectionId: signedCallback.connectionId });
+    const lateNotificationHold = provider.holdCode(), lateNotificationPending = complete(lateNotificationCallback);
+    const lateNotificationSettled = lateNotificationPending.then(value => ({ value }), error => ({ error }));
+    await reach(lateNotificationHold, lateNotificationPending);
+    const lateRevokedAt = new Date().toISOString();
+    ok(new Date((await stateRow(lateNotificationCallback.state)).created_at).getTime() <= Date.parse(lateRevokedAt), "old pending state predates delayed first notification");
+    // A bounded scheduling gap makes strict token-issuance ordering deterministic.
+    await new Promise(resolve => setTimeout(resolve, 5));
+    lateNotificationHold.release();
+    ok(!(await lateNotificationSettled).error, "without the undelivered event the held callback can store its verified token");
+    ok(provider.tokenIssuanceTimes.at(-1) > Date.parse(lateRevokedAt), "delayed-delivery regression really issues the token after revocation");
+    await service.confirmMapping(actor, { ...mapping, connectionId: lateNotificationCallback.connectionId });
+    const lateNotificationRead = await captureMemberPage({ connectionId: lateNotificationCallback.connectionId, actor, context,
+      businessEntityId: entity, workspaceId: workspace });
+    await service.refresh(actor, lateNotificationCallback.connectionId);
+    const lateEvent = signedEvent("synthetic-revocation-after-pending-callback-stored", lateRevokedAt);
+    await service.handleRevocationNotification(lateEvent);
+    equal((await connectionRow(lateNotificationCallback.connectionId)).state, "revoked", "first notification after storage fences old pending consent despite newer token issuance and refresh");
+    await assertFenced(lateNotificationRead, "delayed notification after old pending callback stored");
+    await assertDisconnectedRefreshUnavailable(lateNotificationCallback.connectionId);
+    const afterLateNotification = await connectionFootprint(lateNotificationCallback.connectionId);
+    await service.handleRevocationNotification(lateEvent);
+    equal(await connectionFootprint(lateNotificationCallback.connectionId), afterLateNotification, "duplicate delayed notification has no additional lifecycle effect");
+    const freshAfterLateNotification = await start(service, { operation: "reauthorize", connectionId: lateNotificationCallback.connectionId });
+    await complete(freshAfterLateNotification);
+    await service.confirmMapping(actor, { ...mapping, connectionId: freshAfterLateNotification.connectionId });
+    const freshAfterLateFootprint = await connectionFootprint(freshAfterLateNotification.connectionId);
+    await service.handleRevocationNotification(lateEvent);
+    equal(await connectionFootprint(freshAfterLateNotification.connectionId), freshAfterLateFootprint, "replayed older event preserves a new verified consent state and generation");
+    await service.handleRevocationNotification(signedEvent("synthetic-second-delivery-id-old-revocation", lateRevokedAt));
+    equal(await connectionFootprint(freshAfterLateNotification.connectionId), freshAfterLateFootprint, "first delivery under another event ID also preserves genuinely newer consent");
+    // Hold the actual store transaction after SQL succeeds. A concurrently
+    // delivered old event must wait on the merchant lock and inspect the newly
+    // committed generation, not a snapshot from before its lock wait.
+    const storedHold = barrier();
+    const lockedStoreService = makeService({ client: rpc(secondSession, {
+      async before(name, args) {
+        if (name === "square_account_connection_v1" && args.p_operation === "store_credential") await secondSession.query("begin");
+      },
+      async after(name, args) {
+        if (name === "square_account_connection_v1" && args.p_operation === "store_credential") {
+          await storedHold.wait(); await secondSession.query("commit");
+        }
+      }
+    }) });
+    const lockWaitConsent = await start(lockedStoreService, { operation: "reauthorize", connectionId: lateNotificationCallback.connectionId });
+    const lockWaitCallback = complete(lockWaitConsent, lockedStoreService);
+    const lockWaitSettled = lockWaitCallback.then(value => ({ value }), error => ({ error }));
+    let lockWaitEventSettled;
+    try {
+      await reach(storedHold, lockWaitCallback);
+      const lockWaitEvent = service.handleRevocationNotification(signedEvent("synthetic-old-event-waits-for-new-consent-commit", lateRevokedAt));
+      lockWaitEventSettled = lockWaitEvent.then(value => ({ value }), error => ({ error }));
+      let observedLock = false;
+      const lockDeadline = Date.now() + 5000;
+      while (Date.now() < lockDeadline) {
+        await owner.query("select pg_stat_clear_snapshot()");
+        const activity = (await owner.query("select wait_event_type from pg_stat_activity where pid=$1", [webhook.client.processID])).rows[0];
+        if (activity?.wait_event_type === "Lock") { observedLock = true; break; }
+        await new Promise(resolve => setTimeout(resolve, 10));
+      }
+      ok(observedLock, "authenticated event actually waits for the uncommitted callback store lock");
+    } finally {
+      storedHold.release();
+      await lockWaitSettled;
+      if (lockWaitEventSettled) await lockWaitEventSettled;
+      await secondSession.query("rollback");
+    }
+    ok(!(await lockWaitSettled).error, "new verified callback commits during concurrent old notification");
+    ok(!(await lockWaitEventSettled).error, "old notification completes safely after actual lock wait");
+    equal((await connectionRow(lockWaitConsent.connectionId)).state, "mapping_required", "lock waiter preserves the committed newer generation");
+    await service.confirmMapping(actor, { ...mapping, connectionId: lockWaitConsent.connectionId });
+    equal((await connectionRow(lockWaitConsent.connectionId)).state, "authorized", "newer consent remains enrollable after concurrent old notification");
+    await denied(() => complete(lockWaitConsent), "duplicate delayed callback cannot repeat the committed generation");
+    // Preserve PostgreSQL microseconds in the signed event to hit exact consent
+    // equality; do not round through a JavaScript Date or edit trusted timestamps.
+    const exactStateTime = (await owner.query(`select to_char(created_at at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') as value
+      from private.square_account_oauth_states where state_id=$1`, [(await stateRow(lockWaitConsent.state)).state_id])).rows[0].value;
+    await service.handleRevocationNotification(signedEvent("synthetic-revocation-equals-consent-created-at", exactStateTime));
+    equal((await connectionRow(lockWaitConsent.connectionId)).state, "revoked", "equal consent/revocation timestamps are not evidence of newer consent");
+    const issuanceEqualityConsent = await start(service, { operation: "reauthorize", connectionId: lockWaitConsent.connectionId });
+    await complete(issuanceEqualityConsent);
+    const exactIssuedTime = new Date((await connectionRow(issuanceEqualityConsent.connectionId)).authorization_issued_at).toISOString();
+    await service.handleRevocationNotification(signedEvent("synthetic-revocation-equals-original-issuance", exactIssuedTime));
+    equal((await connectionRow(issuanceEqualityConsent.connectionId)).state, "revoked", "equal original issuance/revocation timestamps also fence unmapped consent");
+    scenarios += 3;
+    scenarios += 2;
     equal(await connectionRow(unrelated.connectionId), unrelatedBefore, "signed merchant event does not mutate an unrelated seller");
     equal(provider.calls.filter(value => value === "/oauth2/revoke").length, revokeCalls, "local actions and authenticated notifications never issue merchant revoke POST");
     scenarios += 2;

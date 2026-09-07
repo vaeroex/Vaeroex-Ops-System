@@ -748,7 +748,18 @@ begin
   for v_id in select connection_id from private.square_account_connections where environment=p_environment and application_id=p_application_id and merchant_id=p_event->>'merchantId' order by connection_id loop
     perform 1 from private.square_connections where connection_id=v_id for update;
     select * into strict v_account from private.square_account_connections where connection_id=v_id for update;
-    if v_account.authorization_issued_at is null or (p_event->>'revokedAt')::timestamptz>=v_account.authorization_issued_at then
+    -- Token exchange/refresh after revocation is not evidence of fresh consent.
+    -- Use the current credential's original DB-created consent state as well as
+    -- original issuance, just as callback storage checks receipts in the reverse
+    -- delivery order. Stable connection/account locks serialize state writers;
+    -- missing or mismatched evidence cannot exempt the connection from fencing.
+    if v_account.authorization_issued_at is null or (p_event->>'revokedAt')::timestamptz>=v_account.authorization_issued_at
+      or not exists(select 1 from private.square_account_credentials c
+        join private.square_account_oauth_states s on s.state_id=c.oauth_state_id
+        where c.credential_id=v_account.credential_id and c.credential_version=v_account.credential_version
+          and c.connection_id=v_id and c.generation=v_account.generation
+          and s.connection_id=v_id and s.generation=v_account.generation and s.status='stored'
+          and s.created_at>(p_event->>'revokedAt')::timestamptz) then
       update private.square_connections set state='revoked',revoked_at=v_now,revocation_reason='qualification_revoked',updated_at=v_now where connection_id=v_id;
       update private.square_account_connections set state='revoked',row_version=row_version+1,revocation_pending=false,refresh_lease=null,updated_at=v_now where connection_id=v_id;
       update private.square_account_oauth_states set status='cancelled' where connection_id=v_id and status in ('pending','exchanging');
