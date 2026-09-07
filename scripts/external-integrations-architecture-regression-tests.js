@@ -213,6 +213,17 @@ for (const name of ["ingestion-adapter", "ingestion-client", "ingestion-mapping"
   doesNotMatch(source, /\bfetch\s*\(|axios|node:https|node:http|process\.env|@supabase|supabase-js|app\/api\//, `${name} has no live transport/credentials/persistence/routes`);
 }
 const squareIngestionAdapter = read("lib/integrations/providers/square/ingestion-adapter.ts");
+equal(packageJson.scripts["test:external-integrations-square-durable"], "node scripts/external-integrations-square-durable-regression-tests.js", "dormant durable boundary regressions registered");
+equal(packageJson.scripts["test:external-integrations-square-durable-db"], "node scripts/run-square-durable-page-qualification.js", "local database qualification registered");
+equal(packageJson.scripts["test:external-integrations-square-durable-authority"], "node scripts/external-integrations-square-durable-authority-regression-tests.js", "checked authority regressions registered");
+matches(ciWorkflow, /pnpm test:external-integrations-square-durable(?:\s|$)/, "CI exercises dormant durable application boundary");
+matches(ciWorkflow, /pnpm test:external-integrations-square-durable-authority(?:\s|$)/, "CI exercises checked database authority bridge");
+matches(ciWorkflow, /node scripts\/run-square-durable-page-qualification\.js --supabase-local/, "CI exercises real disposable database qualification");
+for (const name of ["durable-authority", "durable-page-repository", "durable-contracts"]) {
+  const source = read(`lib/integrations/providers/square/${name}.ts`);
+  matches(source, /import "server-only"/, `${name} stays server-only`);
+  doesNotMatch(source, /\bfetch\s*\(|axios|node:https|node:http|process\.env|createClient\s*\(|app\/api\//, `${name} has no default transport, credential lookup, registration or route`);
+}
 matches(squareIngestionAdapter, /parseSquareCatalogValidatedResponse/, "ingestion uses trusted Catalog facade");
 doesNotMatch(squareIngestionAdapter, /parseSquareCatalogResponseWithAcceptance|parseSquareCatalogResponse\(/, "ingestion cannot promote legacy Catalog shape acceptance");
 doesNotMatch(read("lib/integrations/control-plane/registered-provider-registry.ts"), /square/i, "Square stays outside the registered provider registry");
@@ -367,6 +378,11 @@ const protectedDiff = childProcess.execFileSync(
   { cwd: root, encoding: "utf8" }
 ).trim();
 const approvedProtectedPaths = new Set([
+  "supabase/migrations/20260907042202_square_dormant_trusted_authority.sql",
+  "supabase/migrations/20260907042352_square_dormant_atomic_pages.sql",
+  "supabase/tests/fixtures/square-durable-platform.sql",
+  "supabase/tests/fixtures/square-durable-process.js",
+  "supabase/tests/fixtures/square-durable-upgrade-history.sql",
   "app/app/settings/page.tsx",
   "app/api/integrations/qbo/connect/route.ts",
   "app/api/integrations/qbo/disconnect/route.ts",

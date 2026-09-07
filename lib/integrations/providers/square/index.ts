@@ -20,6 +20,9 @@ export * from "@/lib/integrations/providers/square/refund-responses";
 export * from "@/lib/integrations/providers/square/request-validators";
 export * from "@/lib/integrations/providers/square/response-validation";
 export { createSquareDormantIngestionAdapter } from "@/lib/integrations/providers/square/ingestion-adapter";
+export { createSquareDatabaseAuthority } from "@/lib/integrations/providers/square/durable-authority";
+export { createSquareDurablePageRepository } from "@/lib/integrations/providers/square/durable-page-repository";
+export type { SquareDurableTaskContext, SquareDurableDependencies } from "@/lib/integrations/providers/square/durable-contracts";
 export type {
   SquareIngestionAuthority, SquareIngestionGrant, SquareIngestionScope, SquareIngestionStream,
   SquareIngestionOutcome, SquarePageRepository, SquareSyntheticTransport

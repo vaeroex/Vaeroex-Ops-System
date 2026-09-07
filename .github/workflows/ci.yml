@@ -103,6 +103,11 @@ jobs:
           pnpm test:external-integrations-square-ingestion-recovery
           pnpm test:external-integrations-square-ingestion
 
+      - name: External integrations Square dormant durable boundary regressions
+        run: |
+          pnpm test:external-integrations-square-durable
+          pnpm test:external-integrations-square-durable-authority
+
       - name: External integrations architecture regressions
         run: pnpm test:external-integrations-architecture
 
@@ -235,6 +240,9 @@ jobs:
             supabase/tests/external_integrations_phase_8b_precontract_retirement.test.sql \
             supabase/tests/external_integrations_phase_8b_provider_result_evidence.test.sql \
             supabase/tests/external_integrations_qbo_production_convergence.test.sql
+
+      - name: Qualify dormant Square authority and atomic pages in disposable local databases
+        run: node scripts/run-square-durable-page-qualification.js --supabase-local
 
       - name: Verify fixture-rich zero-based delivery migration
         run: node scripts/run-phase8b-zero-based-delivery-migration-tests.js
