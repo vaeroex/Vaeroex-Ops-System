@@ -1,0 +1,42 @@
+[Unit]
+Description=Isolated Square HTTP-01 certificate bootstrap only
+After=network-online.target
+# Do not use Conflicts=: a timer/start race must never stop an OAuth window.
+# If the portal owns port 80, this bounded bootstrap fails closed on bind.
+
+[Service]
+Type=simple
+User=vaeroex-square-callback
+Group=vaeroex-square-callback
+ExecStart=/opt/vaeroex-square-callback/node/bin/node /opt/vaeroex-square-callback/current/ops/acme-bootstrap.mjs
+RuntimeMaxSec=600
+TimeoutStopSec=5
+Restart=no
+UMask=0077
+StandardInput=null
+StandardOutput=null
+StandardError=null
+LimitCORE=0
+MemoryMax=128M
+MemorySwapMax=0
+TasksMax=16
+LimitNOFILE=64
+NoNewPrivileges=yes
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+ProtectSystem=strict
+ProtectHome=yes
+PrivateDevices=yes
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictAddressFamilies=AF_UNIX AF_INET
+SystemCallArchitectures=native
+ReadOnlyPaths=/var/lib/vaeroex-square-acme
+InaccessiblePaths=/etc/vaeroex-square-callback /etc/letsencrypt /var/log /var/crash /var/lib/systemd/coredump
+IPAddressDeny=169.254.169.254/32
+
+# No Install/WantedBy: manual ten-minute bootstrap only, never OAuth hosting.

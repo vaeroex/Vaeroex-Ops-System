@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "enabled": false,
+  "binding": null,
+  "supabasePublishableKey": null,
+  "tlsCertPath": "/run/credentials/vaeroex-square-callback.service/tls-cert",
+  "tlsKeyPath": "/run/credentials/vaeroex-square-callback.service/tls-key",
+  "challengeWebroot": "/run/vaeroex-square-callback/acme",
+  "hostPolicyPath": "/etc/vaeroex-square-callback/host-policy.json"
+}

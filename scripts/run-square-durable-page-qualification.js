@@ -12,6 +12,7 @@ const squareVersions = ["20260907042202", "20260907042352"];
 const accountMigration = "20260907174326_square_dormant_account_connection.sql";
 const remoteBindingMigration = "20260907225626_square_remote_sandbox_binding.sql";
 const brokerRuntimeMigration = "20260908014713_square_broker_runtime_credential_authority.sql";
+const gcpCallbackMigration = "20260908042529_square_gcp_callback_authority.sql";
 const fixedPassword = "square-disposable-synthetic-only";
 let stage = "startup", assertions = 0, scenarios = 0;
 let lastRpcFailure = null, lastOutcome = null;
@@ -178,11 +179,13 @@ async function migrationQualification(target, administrator) {
   const accountTail = files.filter(name => name === accountMigration);
   const remoteTail = files.filter(name => name === remoteBindingMigration);
   const brokerTail = files.filter(name => name === brokerRuntimeMigration);
+  const gcpTail = files.filter(name => name === gcpCallbackMigration);
   equal(added.length, 2, "both additive Square migrations present");
   equal(accountTail.length, 1, "account-connection migration present");
   equal(remoteTail.length, 1, "remote Sandbox binding migration present");
   equal(brokerTail.length, 1, "separately qualified broker/runtime correction present");
-  equal(baseline.length + added.length + accountTail.length + remoteTail.length + brokerTail.length, files.length, "migration manifest is explicit");
+  equal(gcpTail.length, 1, "separately qualified GCP callback extension present");
+  equal(baseline.length + added.length + accountTail.length + remoteTail.length + brokerTail.length + gcpTail.length, files.length, "migration manifest is explicit");
   const clean = await createDatabase(target, administrator, "clean");
   await applyMigrations(clean.client, baseline);
   const before = await sourceSchemaFingerprint(clean.client);
@@ -236,6 +239,11 @@ async function migrationQualification(target, administrator) {
   equal(await sourceSchemaFingerprint(clean.client), before, "broker correction preserves clean non-Square and QBO definitions");
   equal(await sourceSchemaFingerprint(upgrade.client), upgradeBefore, "broker correction preserves upgraded non-Square and QBO definitions");
   equal(JSON.stringify((await upgrade.client.query(historyQuery)).rows), immutableHistory, "broker correction preserves immutable upgraded source history");
+  await applyMigrations(clean.client, gcpTail);
+  await applyMigrations(upgrade.client, gcpTail);
+  equal(await sourceSchemaFingerprint(clean.client), before, "GCP callback extension preserves clean non-Square and QBO definitions");
+  equal(await sourceSchemaFingerprint(upgrade.client), upgradeBefore, "GCP callback extension preserves upgraded non-Square and QBO definitions");
+  equal(JSON.stringify((await upgrade.client.query(historyQuery)).rows), immutableHistory, "GCP callback extension preserves immutable upgraded source history");
   scenarios++;
   return { clean, upgrade };
 }
