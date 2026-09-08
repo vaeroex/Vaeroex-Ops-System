@@ -242,6 +242,126 @@ async function qualify(runtime) {
   await expiryAfterLock("auth.sessions","not_after","square_account_actor_denied");
   await expiryAfterLock("private.square_remote_sandbox_binding","approval_expires_at","square_ingestion_authority_denied");
   equal((await read()).state,"available","restored live session and host approval permit current lease");
+  stage="runtime_role_after_actual_scan_lock_wait";
+  // This administrative LOGIN exists only inside the harness-owned disposable
+  // database. It never performs application reads or receives private-table ACLs.
+  // Its separately committed DDL must complete before the owner releases the scan.
+  const roleAdmin=await runtime.login(database,"role_admin");
+  const identifier=value=>{if(!/^square_[a-z0-9_]+$/.test(value)) throw new Error("fixture_role_identifier_denied"); return '"'+value+'"';};
+  await owner.query(`alter role ${identifier(roleAdmin.name)} createrole`);
+  for(const name of [worker.name,"square_ingestion_runtime_authority","square_ingestion_qualification_admin"])
+    await owner.query(`grant ${identifier(name)} to ${identifier(roleAdmin.name)} with admin true, inherit false, set false`);
+  // PostgreSQL 17 memberships retain their grantor. Move this disposable grant
+  // to the administrator that must commit its revocation independently.
+  await owner.query(`revoke square_ingestion_runtime_authority from ${identifier(worker.name)}`);
+  await roleAdmin.client.query(`grant square_ingestion_runtime_authority to ${identifier(worker.name)}`);
+  const roleAfterLock=async ({label,mutate,restore,invalid,current=active},isolation="read committed") => {
+    stage="runtime_role_wait_"+label+"_"+isolation.replaceAll(" ","_");
+    const evidenceBefore=(await owner.query("select count(*)::int as n from private.square_account_credential_reads")).rows[0].n;
+    await broker.client.query("begin isolation level "+isolation);
+    await owner.query("begin");
+    let pending,mutated=false;
+    const isBlocked=async () => {
+      await owner.query("select pg_stat_clear_snapshot()");
+      return (await owner.query("select wait_event_type='Lock' and cardinality(pg_blocking_pids(pid))>0 as blocked from pg_stat_activity where pid=$1",[brokerPid])).rows[0]?.blocked;
+    };
+    try {
+      await owner.query("select 1 from private.square_ingestion_scans where scan_key=$1 for update",[current.binding.scanKey]);
+      pending=read(commandFor(current)).then(value=>({value}),error=>({error}));
+      let blocked=false;
+      const deadline=Date.now()+1500;
+      while(Date.now()<deadline) {
+        if(await isBlocked()) {blocked=true;break;}
+        await new Promise(resolve=>setTimeout(resolve,10));
+      }
+      ok(blocked,"broker actually waits on scan before runtime role mutation: "+label);
+      await roleAdmin.client.query(mutate);
+      mutated=true;
+      equal((await roleAdmin.client.query(invalid)).rows[0].invalid,true,"runtime role mutation is committed in the independent admin session: "+label);
+      equal(await isBlocked(),true,"broker still waits after independently committed role mutation: "+label);
+    } finally { await owner.query("rollback"); }
+    try {
+      const result=await pending;
+      equal(result.error?.code,"42501","runtime role mutation during scan wait denies ciphertext: "+label);
+      equal(result.error?.message,"square_broker_credential_authority_denied","runtime role denial stays fail-closed and static: "+label);
+      equal(result.value,undefined,"revoked runtime invocation releases no ciphertext: "+label);
+      equal((await owner.query("select count(*)::int as n from private.square_account_credential_reads")).rows[0].n,evidenceBefore,"revoked runtime invocation creates no credential-read evidence: "+label);
+      await broker.client.query("rollback");
+      await denied(()=>read(commandFor(current)),"already invalid runtime role denies before scan wait: "+label,"square_broker_credential_authority_denied");
+    } finally {
+      await broker.client.query("rollback");
+      if(mutated) { if(typeof restore==="function") await restore(); else await roleAdmin.client.query(restore); }
+    }
+    equal((await read()).state,"available","restored runtime authority permits the unchanged current lease: "+label);
+  };
+  const workerIdentifier=identifier(worker.name);
+  const roleMutations=[
+    {label:"membership_revoked",mutate:`revoke square_ingestion_runtime_authority from ${workerIdentifier}`,
+      restore:`grant square_ingestion_runtime_authority to ${workerIdentifier}`,
+      invalid:`select not pg_has_role('${worker.name}','square_ingestion_runtime_authority','MEMBER') as invalid`},
+    {label:"nologin",mutate:`alter role ${workerIdentifier} nologin`,restore:`alter role ${workerIdentifier} login`,
+      invalid:`select not rolcanlogin as invalid from pg_roles where rolname='${worker.name}'`},
+    {label:"createrole",mutate:`alter role ${workerIdentifier} createrole`,restore:`alter role ${workerIdentifier} nocreaterole`,
+      invalid:`select rolcreaterole as invalid from pg_roles where rolname='${worker.name}'`},
+    {label:"forbidden_membership",mutate:`grant square_ingestion_qualification_admin to ${workerIdentifier}`,
+      restore:`revoke square_ingestion_qualification_admin from ${workerIdentifier}`,
+      invalid:`select pg_has_role('${worker.name}','square_ingestion_qualification_admin','MEMBER') as invalid`},
+    {label:"renamed",mutate:`alter role ${workerIdentifier} rename to ${identifier(worker.name+"_renamed")}`,
+      restore:`alter role ${identifier(worker.name+"_renamed")} rename to ${workerIdentifier}`,
+      invalid:`select not exists(select 1 from pg_roles where rolname='${worker.name}') as invalid`}
+  ];
+  for(const mutation of roleMutations) await roleAfterLock(mutation);
+  // A role name in the approved binding/task is not a catalog dependency. Drop
+  // another owned runtime LOGIN while its already-verified task read is waiting.
+  await owner.query(`grant ${identifier(other.name)} to ${identifier(roleAdmin.name)} with admin true, inherit false, set false`);
+  await owner.query("update private.square_remote_sandbox_binding set runtime_login=$1",[other.name]);
+  await roleAfterLock({label:"dropped",current:foreign,mutate:`drop role ${identifier(other.name)}`,
+    restore:()=>owner.query("update private.square_remote_sandbox_binding set runtime_login=$1",[worker.name]),
+    invalid:`select not exists(select 1 from pg_roles where rolname='${other.name}') as invalid`});
+  // MEMBER includes indirect grants even when neither INHERIT nor SET is allowed.
+  // The fresh catalog graph must preserve that distinction and both directions
+  // of revocation instead of accidentally requiring a direct capability grant.
+  const bridge=await runtime.login(database,"membership_bridge");
+  await owner.query(`grant ${identifier(bridge.name)} to ${identifier(roleAdmin.name)} with admin true, inherit false, set false`);
+  await roleAdmin.client.query(`grant square_ingestion_runtime_authority to ${identifier(bridge.name)}`);
+  await roleAdmin.client.query(`grant ${identifier(bridge.name)} to ${workerIdentifier} with inherit false, set false`);
+  await roleAdmin.client.query(`revoke square_ingestion_runtime_authority from ${workerIdentifier}`);
+  try {
+    equal((await owner.query("select pg_has_role($1,'square_ingestion_runtime_authority','MEMBER') as member,pg_has_role($1,'square_ingestion_runtime_authority','USAGE') as inherited",[worker.name])).rows[0],{member:true,inherited:false},"indirect non-inherited grant retains exactly MEMBER semantics");
+    equal((await read()).state,"available","checked broker supports valid indirect runtime membership");
+    await roleAfterLock({label:"indirect_membership_revoked",mutate:`revoke square_ingestion_runtime_authority from ${identifier(bridge.name)}`,
+      restore:`grant square_ingestion_runtime_authority to ${identifier(bridge.name)}`,
+      invalid:`select not pg_has_role('${worker.name}','square_ingestion_runtime_authority','MEMBER') as invalid`});
+    await roleAfterLock({label:"indirect_forbidden_membership",mutate:`grant square_ingestion_qualification_admin to ${identifier(bridge.name)}`,
+      restore:`revoke square_ingestion_qualification_admin from ${identifier(bridge.name)}`,
+      invalid:`select pg_has_role('${worker.name}','square_ingestion_qualification_admin','MEMBER') as invalid`});
+  } finally {
+    await roleAdmin.client.query(`grant square_ingestion_runtime_authority to ${workerIdentifier}`);
+    await roleAdmin.client.query(`revoke ${identifier(bridge.name)} from ${workerIdentifier}`);
+  }
+  stage="delegated_runtime_isolation_boundary";
+  for(const isolation of ["repeatable read","serializable","read uncommitted"]) {
+    const evidenceBefore=(await owner.query("select count(*)::int as n from private.square_account_credential_reads")).rows[0].n;
+    await broker.client.query("begin isolation level "+isolation);
+    try {
+      equal((await broker.client.query("select rolcanlogin from pg_roles where rolname=$1",[worker.name])).rows[0].rolcanlogin,true,"runtime is LOGIN when transaction snapshot is established");
+      await roleAdmin.client.query(`alter role ${workerIdentifier} nologin`);
+      equal((await roleAdmin.client.query("select rolcanlogin from pg_roles where rolname=$1",[worker.name])).rows[0].rolcanlogin,false,"independent administrator committed NOLOGIN after transaction snapshot");
+      equal((await broker.client.query("select rolcanlogin from pg_roles where rolname=$1",[worker.name])).rows[0].rolcanlogin,isolation!=="read uncommitted","RR/SERIALIZABLE retain stale LOGIN attributes; READ UNCOMMITTED uses fresh snapshots");
+      // Keep the scan locked: unsupported isolation must deny before reaching it.
+      await owner.query("begin");
+      try {
+        await owner.query("select 1 from private.square_ingestion_scans where scan_key=$1 for update",[active.binding.scanKey]);
+        await broker.client.query("set local lock_timeout='250ms'");
+        await denied(()=>read(),"unsupported delegated isolation fails before the scan lock: "+isolation,"square_broker_credential_authority_denied");
+      } finally { await owner.query("rollback"); }
+    } finally {
+      await broker.client.query("rollback");
+      await roleAdmin.client.query(`alter role ${workerIdentifier} login`);
+    }
+    equal((await owner.query("select count(*)::int as n from private.square_account_credential_reads")).rows[0].n,evidenceBefore,"unsupported isolation releases no credential-read evidence");
+    equal((await read()).state,"available","restored READ COMMITTED connection and runtime LOGIN remain supported");
+  }
   stage="privileges_and_generation_fences";
   const privileges=(await owner.query(`select pg_has_role($1,'square_ingestion_runtime_authority','MEMBER') as runtime,
     has_function_privilege($1,'public.commit_square_ingestion_page_v1(uuid,text,jsonb)','EXECUTE') as commit,

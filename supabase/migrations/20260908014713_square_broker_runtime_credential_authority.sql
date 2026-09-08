@@ -20,6 +20,12 @@ begin
   if pg_catalog.pg_has_role(session_user,'square_ingestion_runtime_authority','MEMBER') then
     return private.lock_square_ingestion_authority_v1(p_task_id,p_lease_owner_fingerprint);
   end if;
+  -- Delegated runtime authorization must observe committed catalog changes after
+  -- lock waits. REPEATABLE READ/SERIALIZABLE retain stale pg_roles attributes even
+  -- in this volatile function; this new branch supports READ COMMITTED only.
+  if pg_catalog.current_setting('transaction_isolation')<>'read committed' then
+    raise exception using errcode='42501',message='square_broker_credential_authority_denied';
+  end if;
   v_binding:=public.get_square_remote_sandbox_binding_v1();
   if v_binding->>'brokerLogin' is distinct from session_user::text
     or v_binding->>'operatorId' is distinct from p_context#>>'{actor,actorId}'
@@ -28,10 +34,10 @@ begin
     or v_binding->>'environment' is distinct from p_context->>'environment'
     or v_binding->>'applicationId' is distinct from p_context->>'applicationId'
     or (v_binding->>'applicationOrigin')||'/api/integrations/square/callback' is distinct from p_context->>'redirectUri'
-    or not pg_catalog.pg_has_role(v_binding->>'runtimeLogin','square_ingestion_runtime_authority','MEMBER')
-    or pg_catalog.pg_has_role(v_binding->>'runtimeLogin','square_ingestion_qualification_admin','MEMBER')
-    or not exists(select 1 from pg_catalog.pg_roles where rolname=v_binding->>'runtimeLogin'
-      and rolcanlogin and not rolsuper and not rolbypassrls and not rolcreaterole and not rolcreatedb and not rolreplication) then
+    or not exists(select 1 from pg_catalog.pg_roles r where r.rolname=v_binding->>'runtimeLogin'
+      and r.rolcanlogin and not r.rolsuper and not r.rolbypassrls and not r.rolcreaterole and not r.rolcreatedb and not r.rolreplication
+      and pg_catalog.pg_has_role(r.oid,'square_ingestion_runtime_authority','MEMBER')
+      and not pg_catalog.pg_has_role(r.oid,'square_ingestion_qualification_admin','MEMBER')) then
     raise exception using errcode='42501',message='square_broker_credential_authority_denied';
   end if;
   -- Keep the original connection -> immutable task -> entity lock order.
@@ -48,6 +54,20 @@ begin
   -- A live actor session must still be valid after a page-lock wait, not merely
   -- at entry into the account RPC. This reuses the complete checked boundary.
   perform private.square_account_configuration_v1(p_context);
+  -- Row locks do not stabilize role membership or LOGIN attributes. Recheck after
+  -- every blocking authority lock. pg_has_role can retain a membership cache for
+  -- the blocked statement, so read the complete MEMBER graph from fresh catalogs
+  -- (including non-inherited/non-settable grants). Missing/renamed roles deny.
+  if not exists(with recursive runtime_roles(roleid) as (
+    select r.oid from pg_catalog.pg_roles r where r.rolname=v_binding->>'runtimeLogin'
+    union
+    select m.roleid from pg_catalog.pg_auth_members m join runtime_roles r on m.member=r.roleid
+  ) select 1 from pg_catalog.pg_roles r where r.rolname=v_binding->>'runtimeLogin'
+    and r.rolcanlogin and not r.rolsuper and not r.rolbypassrls and not r.rolcreaterole and not r.rolcreatedb and not r.rolreplication
+    and exists(select 1 from runtime_roles m join pg_catalog.pg_roles c on c.oid=m.roleid where c.rolname='square_ingestion_runtime_authority')
+    and not exists(select 1 from runtime_roles m join pg_catalog.pg_roles c on c.oid=m.roleid where c.rolname='square_ingestion_qualification_admin')) then
+    raise exception using errcode='42501',message='square_broker_credential_authority_denied';
+  end if;
   -- Account/configuration checks above can wait too; read wall time afterwards.
   v_now:=pg_catalog.clock_timestamp();
   if v_connection.state<>'active' or v_connection.current_generation<>v_task.connection_generation

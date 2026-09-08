@@ -104,14 +104,20 @@ The account suite was rerun against the final fixed-hash implementation: 440 ass
 
 | Artifact | SHA-256 |
 | --- | --- |
-| Broker/runtime migration | `deaa435457f7e9d4ce7368344c232e7ee5217c7b9b17477d19ca0a27cecd0d93` |
-| Broker/runtime focused runner | `bdc9487dbdb92344eb538bae8fb55326a1461a57f4186f0b6f29af2f886372ff` |
+| Broker/runtime migration, including role-wait follow-up | `189fc713c102b639780beb9f1eeb4f7597ac75ae1e0d77d36a28916538550dfa` |
+| Broker/runtime focused runner, including role-wait follow-up | `44c4932595f256896c94eeaac89b26972d5676355165c234a56980fef3f226db` |
 | Customer routes | `596beb547dee2647d07ac74d6e67280c18ed53114e2e402736b1f3da8cb4c9b1` |
 | Shared fixed-script policy | `916dfd0e702514d837b2909837b2f841220caa707a0c3c622ddf12a9f440dc6a` |
 | Next configuration | `ab9707ea1b885652c1281f96d314492fa1fc81321c5257f539901dfea8b1a663` |
 | Optimized header/browser runner | `cc250ec388bfd821a8dac16b9e627b4580d89d7980e12dc0e36ac25bc13e6157` |
 
-Independent review also verified that the three historical database-runner tail changes preserve their original rollback/retry assertions and QBO/non-Square checks. The final code has no unresolved material review finding; unresolved live-host prerequisites remain explicit below.
+Independent review also verified that the three historical database-runner tail changes preserve their original rollback/retry assertions and QBO/non-Square checks. The initial correction was delivered as PR #354 at `6b25c2f7df81cfdb8aa432216251969c865e5a7f`, with exact-head Actions run `34180243211` passing both `verify` and `security-database`. Vercel deployment inventories remained empty for the dedicated Sandbox and showed no new deployment on the existing project after this branch push.
+
+Automated PR review then identified a further runtime-role revocation race. Real PostgreSQL 17.6 witnesses confirmed that six independently committed role changes during an observed scan-lock wait still allowed the initial helper to return synthetic ciphertext: removed runtime membership, NOLOGIN, CREATEROLE, forbidden qualification-admin membership, rename and drop. Repeating `pg_has_role` after the wait was empirically insufficient for membership changes in the same invocation because it retained a membership cache. Independent probing and actual-helper tests also confirmed stale `pg_roles` attributes under repeatable-read/serializable snapshots. Only outcome, error code and ciphertext presence were reported; no credential payload was logged.
+
+The final follow-up checks safe runtime LOGIN attributes and a fresh recursive `pg_auth_members` closure after all blocking authority checks. It preserves `MEMBER` semantics for direct and indirect grants, including non-inherited/non-settable grants, uses `UNION` to deduplicate reachable roles, and fails closed for missing/renamed roles. Only the new delegated branch requires the default READ COMMITTED isolation; other isolation labels reject before the scan lock. The existing combined-login branch, account-function body, grants, QBO fingerprints and prior assertions remain unchanged.
+
+The final focused suite passed **232 assertions**: eight actual blocked-invocation/committed-DDL cases, indirect-membership compatibility, retained-snapshot witnesses, fail-fast isolation denials, no ciphertext/read-evidence on denial, and restored-authority positive controls. Independent re-review verified both final hashes above and PostgreSQL 17.6 `MEMBER` semantics with no remaining material findings. The follow-up changes only this document and the existing PR migration/runner; the complete PR remains 17 files. A new exact-head CI run is required and is reported in PR #354 rather than treating the initial run as evidence for changed code. The hosted migration ledger remains 105, and no new migration or real credential use occurred.
 
 ### Delivery manifest and remaining stop conditions
 
