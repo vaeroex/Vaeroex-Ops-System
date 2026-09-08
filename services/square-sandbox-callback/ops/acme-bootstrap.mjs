@@ -57,8 +57,8 @@ export function createAcmeBootstrap({ webroot, hostname, ownerUid = 0 }) {
   return server;
 }
 
-// Node resolves import.meta.url through the installed /current release symlink.
-if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
+// Canonicalize both paths: --preserve-symlinks-main can retain /current in import.meta.url.
+if (process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) {
   try {
     if (process.argv.length !== 2 || process.platform !== 'linux') throw new Error('acme_start_denied');
     const server = createAcmeBootstrap({ webroot: '/var/lib/vaeroex-square-acme', hostname: 'square-sandbox.vaeroex.com' });

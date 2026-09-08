@@ -80,17 +80,26 @@ check(/^mock_provider "google"/m.test(terraformTests), 'Terraform qualification 
 const temporary = mkdtempSync(join(tmpdir(), 'vaeroex-square-acme-test-'));
 let server;
 try {
-  // The installed /current path is a release symlink. CLI entry checks must not
-  // silently skip startup or privacy validation when Node resolves that link.
-  const linkedOps = join(temporary, 'current');
-  symlinkSync(opsDir, linkedOps, 'dir');
+  // Model the installed /current -> release directory, including /current/ops.
+  // Both normal resolution and preserved main-module symlinks must enter the
+  // guard. Invalid startup must refuse silently, never masquerade as exit 0.
+  const linkedRelease = join(temporary, 'current');
+  symlinkSync(serviceRoot, linkedRelease, 'dir');
+  const invocations = [
+    { name: 'default', flags: [], environment: {} },
+    { name: 'CLI preserve-main', flags: ['--preserve-symlinks-main'], environment: {} },
+    { name: 'NODE_OPTIONS preserve-main', flags: [], environment: { NODE_OPTIONS: '--preserve-symlinks-main' } },
+  ];
   for (const file of ['acme-bootstrap.mjs', 'host-preflight.mjs']) {
-    for (const directory of [opsDir, linkedOps]) {
-      const result = spawnSync(process.execPath, [join(directory, file), '--synthetic-invalid-argument'], {
-        encoding: 'utf8', timeout: 5000, env: { PATH: process.env.PATH },
-      });
-      check(!result.error && result.status === 78, `${file} direct/symlink command executes fail-closed validation`);
-      check(result.stdout === '' && result.stderr === '', `${file} refusal is silent`);
+    for (const [pathName, directory] of [['direct', opsDir], ['installed symlink', join(linkedRelease, 'ops')]]) {
+      for (const { name, flags, environment } of invocations) {
+        const result = spawnSync(process.execPath, [...flags, join(directory, file), '--synthetic-invalid-argument'], {
+          encoding: 'utf8', timeout: 5000, env: { PATH: process.env.PATH, ...environment },
+        });
+        const label = `${file}, ${pathName}, ${name}`;
+        check(!result.error && result.status === 78, `${label}: executes fail-closed validation`);
+        check(result.stdout === '' && result.stderr === '', `${label}: refusal is silent`);
+      }
     }
   }
   const webroot = join(temporary, 'webroot');

@@ -126,7 +126,7 @@ export function verifyHost() {
   return true;
 }
 
-// Match the real file even when systemd invokes the /current release symlink.
-if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
+// Canonicalize both paths: --preserve-symlinks-main can retain /current in import.meta.url.
+if (process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) {
   try { verifyHost(); } catch { process.exitCode = 78; }
 }
