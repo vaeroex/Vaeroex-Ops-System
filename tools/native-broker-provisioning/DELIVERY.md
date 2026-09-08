@@ -3,7 +3,11 @@
 Base: `bef41579bc86baa4c71bf43b5a22c5b2e857cb06` (fetched current main;
 no intervening commits at implementation start).
 Branch: `codex/native-broker-provisioning`.
-Disposition: one non-draft code-only PR, **leave unmerged**.
+Disposition: one non-draft PR. The user's subsequent standing authorization
+permits a normal merge after independent review and all exact-head gates pass,
+provided real provisioning remains blocked and application behavior dormant.
+Automatic Vercel Preview and Production deployments are authorized; no Preview
+deletion or branch exclusion was performed.
 
 ## Committed manifest
 
@@ -44,6 +48,13 @@ corrected locally before delivery:
   auditing/cancellation. Restoring the original ordering in a local in-memory
   module reproduced failed compensation; the corrected path fences the new OID
   and supports fresh replacement without recreating it.
+- Preserve that same invocation's authenticated, committed prepare reply when
+  cancellation wins before it is consumed: bounded drain, bounded reply
+  reconciliation, then an exact-OID fresh fence. The subsequent GitHub finding
+  was reproduced against the original coordinator with the actual native worker
+  and a committed local NOLOGIN role. The correction supports same-coordinator
+  recovery; a truly lost or post-finalization reply stays uncertain, with no
+  name/audit-derived identity adoption and no credential generation.
 - Retain overlapping page locks until owned credential buffers are wiped;
   generate entropy directly in the locked candidate buffer. Locks do not stack.
 - Use compile-time-verified lock-free atomics for inter-thread cancellation.
@@ -57,7 +68,7 @@ database tests):
 
 ```text
 native.c    a0c9f35cc18965b0ed3a54a4eea67bc97124e3fadd079735b06b267e91700a98
-lifecycle   cf82dc6b61c70da9501901a456bb6f194140c27e8e0c892a615ad95cac70ddc2
+lifecycle   bf3ce0b74221ef51324d94394175a4abaa44657d9055f2ee4f9ada2a0036125b
 adapter     0d97b56b71097e772893fe4932d006842abb626c281d08f1c2811eb79c1f31dd
 ```
 
@@ -68,8 +79,8 @@ requires the user's decision; it is not permission conferred by this PR.
 
 ## Validation evidence
 
-Final local results: **148 native assertions**, all three owned clusters stopped;
-**54 lifecycle tests**. The native source hash equals the independently reviewed
+Final local results: **167 native assertions**, all three owned clusters stopped;
+**60 lifecycle tests**. The native source hash equals the independently reviewed
 hash above. Linux-only `/proc` locked-memory observation is registered in CI but
 was not executed on the local Darwin host; static deferred-unlock ordering was
 checked locally. No hosted result is implied.
@@ -96,6 +107,16 @@ guest controls 129. Exact-head CI is the authoritative final gate for `verify`,
 `security-database` and the new pinned-source `native-broker-qualification` job.
 The new job uses no cloud credentials or remote DSN and uploads no raw artifacts.
 
+The first exact-head CI run passed `verify` and `security-database` but exposed
+a pgAudit bootstrap build failure. The narrow correction supplies `USE_PGXS=1`
+for pgAudit's out-of-tree build and distinguishes fixed sanitized extension
+failure stages. The old command reproduced the missing contrib-Makefile failure;
+the corrected pinned source compiled locally, and 307 isolated mocked bootstrap
+checks passed. These local controls are not Ubuntu execution evidence; all three
+jobs must pass on the corrected head before merge.
+The two-file bootstrap correction independently passed source review, preserving
+the stripped environment, captured subprocess output and pinned dependencies.
+
 ## Remaining authority and qualification
 
 This is not hosted qualification or a claim of unchanged-policy compliance for
@@ -107,6 +128,7 @@ SU-467250 remains pending but does not block this local code delivery.
 
 The Sandbox VM remains stopped and ingress closed by the existing operational
 hold. This work does not contact or mutate it, any remote database, cloud secret,
-IAM, deployment, Square endpoint, OAuth setting or production gate. QBO and
+IAM, Square endpoint, OAuth setting or production gate. Only the normal
+Git-triggered application deployments are permitted by the delivery workflow. QBO and
 native transactional authority checks remain unchanged. No migration is added,
 merged or remotely applied by this delivery.

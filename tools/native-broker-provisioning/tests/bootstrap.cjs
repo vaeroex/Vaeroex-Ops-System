@@ -41,11 +41,18 @@ try {
   const auditRoot = path.join(root, "pgaudit"), supaRoot = path.join(root, "supautils");
   for (const [name, directory, commit] of [["pgaudit/pgaudit", auditRoot, "538f89a93d8fd0d8913f3d740cacaea7b7eb66d9"],
     ["supabase/supautils", supaRoot, "e35f8affc4467202ff0d98f8dd14cb955bc13c75"]]) {
-    stage = directory === auditRoot ? "pgaudit_source_build" : "supautils_source_build";
+    const extension = directory === auditRoot ? "pgaudit" : "supautils";
+    stage = extension + "_source_clone";
     run("/usr/bin/git", ["-c", "credential.helper=", "clone", "--no-checkout", "https://github.com/" + name + ".git", directory], root);
+    stage = extension + "_source_checkout";
     run("/usr/bin/git", ["checkout", "--detach", commit], directory);
+    stage = extension + "_source_pin";
     if (run("/usr/bin/git", ["rev-parse", "HEAD"], directory).trim() !== commit) throw new Error("extension_source_pin");
-    run("/usr/bin/make", ["-j2", "PG_CONFIG=" + path.join(pgRoot, "bin/pg_config")], directory);
+    stage = extension + "_build";
+    // pgAudit otherwise selects its in-tree contrib Makefiles; PG_CONFIG alone
+    // does not select PGXS. Supautils already uses PGXS unconditionally.
+    run("/usr/bin/make", ["-j2", "PG_CONFIG=" + path.join(pgRoot, "bin/pg_config"),
+      ...(extension === "pgaudit" ? ["USE_PGXS=1"] : [])], directory);
   }
   stage = "record_local_manifest";
   const files = [path.join(pgRoot, "bin/postgres"), path.join(pgRoot, "lib/libpq.so.5"), path.join(auditRoot, "pgaudit.so"),

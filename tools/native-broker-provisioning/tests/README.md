@@ -49,7 +49,9 @@ because the macOS fixture tests pass. Do not upload raw test directories/artifac
 3. Clone the public [pgAudit repository](https://github.com/pgaudit/pgaudit),
    detach at the exact commit above, and verify `git rev-parse HEAD` and
    `pgaudit.control` version `17.1`. Build using
-   `make PG_CONFIG=/absolute/private/install/bin/pg_config`.
+   `make USE_PGXS=1 PG_CONFIG=/absolute/private/install/bin/pg_config`.
+   pgAudit requires `USE_PGXS=1` for this out-of-tree extension build; setting
+   `PG_CONFIG` alone still selects its in-tree PostgreSQL contrib Makefiles.
 4. Clone [Supautils](https://github.com/supabase/supautils), detach and verify the
    exact commit above, then build with that same `PG_CONFIG`. The Makefile uses
    GNU grep (`GREP=/path/to/ggrep` on macOS when needed). It does not need to be
@@ -57,6 +59,10 @@ because the macOS fixture tests pass. Do not upload raw test directories/artifac
 5. Record actual local binary digests. Linux `.so` and macOS `.dylib` products
    have different bytes; never copy the macOS reference hashes into a Linux
    evidence report or claim a source pin attests an arbitrary built binary.
+
+Bootstrap failures identify each extension's clone, checkout, source-pin, or
+build substep using fixed stage names. Subprocess output remains captured and
+is never forwarded, even on failure; no raw build logs are uploaded.
 
 The harness compiles `../native.c` twice into its own mode-0700 temporary root:
 one `-DVAEROEX_SYNTHETIC_ONLY` executable and one ordinary blocked release

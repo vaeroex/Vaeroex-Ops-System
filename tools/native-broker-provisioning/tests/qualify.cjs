@@ -316,6 +316,92 @@ async function main() {
   const finalFence = await native.fence({ target: Object.freeze({ ...nativeTarget, roleOid: integratedOid }), intent: "integrated-final-fence",
     approvalId: "synthetic-only", signal: new AbortController().signal });
   check(finalFence.ack && finalFence.noLogin && finalFence.sessionsTerminated, "integrated_fixture_closed_after_proof");
+
+  stage = "integrated_late_prepare";
+  const lateTarget = Object.freeze({ ...nativeTarget, role: "square_sandbox_late_prepare_broker" });
+  const lateNative = createLocalSyntheticNativeAdapter({ executable: binaries.synthetic, target: lateTarget });
+  const lateController = new AbortController();
+  let releasePrepared, delayedPrepared, preparedOid, stagedCount = 0;
+  const prepareGate = new Promise(resolve => { releasePrepared = resolve; });
+  const compensationOids = [];
+  const delayedNative = {
+    ...lateNative,
+    prepare(context) {
+      delayedPrepared = (async () => {
+        const prepared = await lateNative.prepare(context);
+        // The actual native transaction has committed. Delay only its nonsecret
+        // authenticated ACK across cancellation until the explicit drain barrier.
+        preparedOid = prepared.roleOid;
+        lateController.abort();
+        await prepareGate;
+        return prepared;
+      })();
+      return delayedPrepared;
+    },
+    async abortAndDrain(context) {
+      const drained = await lateNative.abortAndDrain(context);
+      releasePrepared();
+      await delayedPrepared;
+      return drained;
+    },
+    async fence(context) {
+      compensationOids.push(context.target.roleOid);
+      return lateNative.fence(context);
+    },
+  };
+  const lateStore = createInMemorySyntheticSecretStore();
+  const lateCoordinator = createSyntheticProvisioningCoordinator({ target: lateTarget, native: delayedNative,
+    secretStore: { ...lateStore, async stage(handle, bytes) {
+      stagedCount++; secrets.push(bytes.toString("ascii")); return lateStore.stage(handle, bytes);
+    } }, audit: { async append() { return { ack: true }; } } });
+  offsets = fixture.logOffsets();
+  const lateResult = await lateCoordinator.run({ operation: "create", actor: "synthetic-operator", intent: "integrated-late-prepare",
+    approvalId: "synthetic-only", signal: lateController.signal, deadlineMs: 30000, cleanupTimeoutMs: 10000 });
+  const lateRole = (await fixture.control.query("SELECT oid::text,rolcanlogin FROM pg_roles WHERE rolname=$1", [lateTarget.role])).rows[0];
+  check(lateRole?.oid === preparedOid && !lateRole.rolcanlogin, "late_prepare_actual_committed_role_remains_nologin");
+  check(lateResult.outcome === "cancelled" && lateResult.fenceConfirmed && lateResult.requiresFreshReplacement &&
+    !lateResult.credentialPublished && stagedCount === 0, "late_prepare_cancelled_with_confirmed_fence_before_generation");
+  check(compensationOids.length === 1 && compensationOids[0] === preparedOid,
+    "late_prepare_drain_retains_authenticated_oid_for_compensation");
+  // Recovery must use the coordinator's retained identity, not this observer's
+  // catalog read or a name-only rediscovery of a possibly replaced role.
+  const recoveredLate = await lateCoordinator.run({ operation: "recover", actor: "synthetic-operator", intent: "integrated-late-recovery",
+    approvalId: "synthetic-only", deadlineMs: 30000 });
+  check(recoveredLate.outcome === "staged_ready" && !recoveredLate.credentialPublished && stagedCount === 1,
+    "late_prepare_same_coordinator_recovers_with_retained_oid");
+  const lateFinalFence = await lateNative.fence({ target: Object.freeze({ ...lateTarget, roleOid: preparedOid }),
+    intent: "integrated-late-final-fence", approvalId: "synthetic-only", signal: new AbortController().signal });
+  check(lateFinalFence.ack && lateFinalFence.noLogin && lateFinalFence.sessionsTerminated,
+    "late_prepare_recovered_fixture_finally_fenced");
+  await privacy(offsets, "integrated_late_prepare");
+
+  stage = "integrated_lost_prepare_ack";
+  const lostTarget = Object.freeze({ ...nativeTarget, role: "square_sandbox_lost_prepare_broker" });
+  const lostNative = createLocalSyntheticNativeAdapter({ executable: binaries.synthetic, target: lostTarget });
+  let lostPreparedOid, lostStageCount = 0;
+  const lostStore = createInMemorySyntheticSecretStore();
+  const lostCoordinator = createSyntheticProvisioningCoordinator({ target: lostTarget,
+    native: { ...lostNative, async prepare(context) {
+      const prepared = await lostNative.prepare(context);
+      lostPreparedOid = prepared.roleOid;
+      // A rejected result contains no trustworthy ACK for the coordinator.
+      // The test observer retains only the OID for explicit fixture cleanup.
+      throw new Error("synthetic_prepare_ack_lost");
+    } }, secretStore: { ...lostStore, async stage(handle, bytes) {
+      lostStageCount++; return lostStore.stage(handle, bytes);
+    } }, audit: { async append() { return { ack: true }; } } });
+  const lostResult = await lostCoordinator.run({ operation: "create", actor: "synthetic-operator", intent: "integrated-lost-prepare",
+    approvalId: "synthetic-only", deadlineMs: 30000, cleanupTimeoutMs: 10000 });
+  const lostRole = (await fixture.control.query("SELECT oid::text,rolcanlogin FROM pg_roles WHERE rolname=$1", [lostTarget.role])).rows[0];
+  check(lostRole?.oid === lostPreparedOid && !lostRole.rolcanlogin,
+    "lost_prepare_ack_actual_committed_role_stays_nologin");
+  check(lostResult.outcome === "uncertain" && !lostResult.fenceConfirmed && lostResult.requiresFreshReplacement &&
+    !lostResult.credentialPublished && lostStageCount === 0,
+    "lost_prepare_ack_is_not_fabricated_from_role_name_or_drain");
+  const lostFinalFence = await lostNative.fence({ target: Object.freeze({ ...lostTarget, roleOid: lostPreparedOid }),
+    intent: "integrated-lost-fixture-cleanup", approvalId: "synthetic-only", signal: new AbortController().signal });
+  check(lostFinalFence.ack && lostFinalFence.noLogin && lostFinalFence.sessionsTerminated,
+    "lost_prepare_ack_explicit_fixture_cleanup_fenced");
   await fixture.stop();
   check(!fixture.statBytes().includes(Buffer.from("SCRAM-SHA-256$")) && secrets.every(value => !fixture.statBytes().includes(Buffer.from(value))),
     "protected_saved_statistics_before_operator_fixture");

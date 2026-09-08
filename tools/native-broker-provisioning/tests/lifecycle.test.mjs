@@ -30,7 +30,7 @@ function fixture({ nativeOverrides = {}, storeOverrides = {}, auditOverride, con
   };
   const base = {
     async inspect() { return acknowledged(); },
-    async prepare() { login = false; return { ...acknowledged(), noLogin: true, roleOid: "42" }; },
+    async prepare() { login = false; return { ...acknowledged(), committed: true, noLogin: true, roleOid: "42" }; },
     async fence() { login = false; return { ...acknowledged(), noLogin: true, sessionsTerminated: true }; },
     async assign({ deliver }) {
       const bytes = Buffer.alloc(48, ++generation);
@@ -412,5 +412,110 @@ for (const failure of ["audit_rejection", "audit_cancellation"]) {
     const second = await f.coordinator.run({ ...invocation, operation: "recover", intent: `recover-${failure}` });
     assert.equal(second.outcome, "staged_ready");
     assert.equal(f.calls.filter(value => value === "prepare").length, 1);
+  });
+}
+
+test("committed prepare ACK arriving during abort drain is pinned before fresh fence and recovery", async () => {
+  const controller = new AbortController(), delivery = defer();
+  const f = fixture({ nativeOverrides: {
+    async prepare(context, base) {
+      const prepared = await base.prepare(context);
+      controller.abort();
+      await delivery.promise;
+      return prepared;
+    },
+    async abortAndDrain(_context, base) {
+      delivery.resolve();
+      return base.abortAndDrain();
+    },
+    async fence(context, base) {
+      assert.equal(context.target.roleOid, "42", "drained prepare identity must precede compensation");
+      return base.fence(context);
+    },
+  } });
+  const cancelled = await f.coordinator.run({ ...invocation, signal: controller.signal });
+  assert.equal(cancelled.outcome, "cancelled");
+  assert.equal(cancelled.fenceConfirmed, true);
+  assert.equal(f.calls.includes("assign"), false);
+  const recovered = await f.coordinator.run({ ...invocation, operation: "recover", intent: "recover-drained-prepare" });
+  assert.equal(recovered.outcome, "staged_ready");
+  assert.equal(f.calls.filter(value => value === "prepare").length, 1);
+});
+
+test("deadline after prepare commit consumes authenticated ACK within the bounded drain window", async () => {
+  const delivery = defer();
+  const f = fixture({ nativeOverrides: {
+    async prepare(context, base) { const prepared = await base.prepare(context); await delivery.promise; return prepared; },
+    async abortAndDrain(_context, base) { setImmediate(() => delivery.resolve()); return base.abortAndDrain(); },
+    async fence(context, base) {
+      assert.equal(context.target.roleOid, "42");
+      return base.fence(context);
+    },
+  } });
+  const cancelled = await f.coordinator.run({ ...invocation, deadlineMs: 5, cleanupTimeoutMs: 100 });
+  assert.equal(cancelled.outcome, "cancelled");
+  assert.equal(cancelled.fenceConfirmed, true);
+  assert.equal(f.calls.includes("assign"), false);
+  const recovered = await f.coordinator.run({ ...invocation, operation: "recover", intent: "recover-deadline-prepare" });
+  assert.equal(recovered.outcome, "staged_ready");
+  assert.equal(f.calls.filter(value => value === "prepare").length, 1);
+});
+
+test("prepare ACK after bounded drain expiry cannot mutate finalized identity or enable blind recovery", async () => {
+  const controller = new AbortController(), delivery = defer();
+  const seenOids = [];
+  const f = fixture({ nativeOverrides: {
+    async prepare(context, base) {
+      const prepared = await base.prepare(context);
+      controller.abort();
+      await delivery.promise;
+      return prepared;
+    },
+    async fence(context) { seenOids.push(context.target.roleOid); return { ack: false }; },
+    async inspect(context, base) {
+      if (context.operation === "recover") {
+        seenOids.push(context.target.roleOid);
+        return { ack: false }; // Existing role cannot be adopted by its name.
+      }
+      return base.inspect(context);
+    },
+  } });
+  const unresolved = await f.coordinator.run({ ...invocation, signal: controller.signal, cleanupTimeoutMs: 5 });
+  assert.equal(unresolved.outcome, "uncertain");
+  assert.equal(unresolved.fenceConfirmed, false);
+  const snapshot = JSON.stringify(unresolved);
+  delivery.resolve();
+  await new Promise(resolve => setImmediate(resolve));
+  const recovery = await f.coordinator.run({ ...invocation, operation: "recover", intent: "unknown-oid-recovery" });
+  assert.notEqual(recovery.outcome, "staged_ready");
+  assert.deepEqual(seenOids, ["0", "0"]);
+  assert.equal(JSON.stringify(unresolved), snapshot);
+  assert.equal(f.calls.includes("assign"), false);
+  assert.equal(f.calls.filter(value => value === "prepare").length, 1);
+});
+
+for (const proof of ["commit_missing", "commit_false", "drain_missing"]) {
+  test(`late prepare identity is not adopted with ${proof}`, async () => {
+    const controller = new AbortController(), delivery = defer();
+    const f = fixture({ nativeOverrides: {
+      async prepare(context, base) {
+        const prepared = await base.prepare(context);
+        if (proof === "commit_missing") delete prepared.committed;
+        if (proof === "commit_false") prepared.committed = false;
+        controller.abort();
+        await delivery.promise;
+        return prepared;
+      },
+      async abortAndDrain(_context, base) {
+        delivery.resolve();
+        return proof === "drain_missing" ? { ack: true, cancellationRequested: true } : base.abortAndDrain();
+      },
+      async fence(context) { assert.equal(context.target.roleOid, "0"); return { ack: false }; },
+    } });
+    const result = await f.coordinator.run({ ...invocation, signal: controller.signal });
+    assert.equal(result.outcome, "uncertain");
+    assert.equal(result.fenceConfirmed, false);
+    assert.equal(f.calls.includes("assign"), false);
+    if (proof === "drain_missing") assert.equal(f.calls.includes("fence"), false);
   });
 }

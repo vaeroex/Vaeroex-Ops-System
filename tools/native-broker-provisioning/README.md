@@ -123,6 +123,13 @@ server completion before another credential is generated.
 - A missing database or store acknowledgement is **uncertain**. Stop; keep
   authority closed. Neither an audit event, an attempted COMMIT, a staged secret,
   an expired client process nor a log line establishes success.
+- A bounded abort drain may preserve a valid authenticated late `prepare` reply
+  so compensation can fence the exact created OID. If that identity reply is
+  truly lost, do not infer it from a same-name role or an audit event. Keep the
+  operation uncertain and require trusted nonsecret target/OID reconciliation
+  and a newly approved exact-target coordinator before replacement. No password
+  has been generated at this stage; do not blindly retry creation or adopt a
+  concurrently replaced role.
 - Recovery acquires a fresh target fence (waiting for prior transaction locks),
   verifies committed NOLOGIN and drained sessions, reconciles pending store
   versions, then assigns a **new** credential under a new intent. It does not

@@ -140,6 +140,8 @@ export function createSyntheticProvisioningCoordinator({ target: inputTarget, na
     let auditFailed = false;
     let authorityVerified = false;
     let stopped = false;
+    let pendingPreparation;
+    let validPrepared = () => false;
     const borrowedBuffers = new Set();
 
     const check = () => { if (stopped || controller.signal.aborted) throw fault(); };
@@ -182,10 +184,11 @@ export function createSyntheticProvisioningCoordinator({ target: inputTarget, na
       mutationStarted = true;
       if (operation === "create") {
         const initialRoleOid = context.target.roleOid;
-        const validPrepared = value => closed(value) && value.noLogin === true &&
+        validPrepared = value => closed(value) && value.committed === true && value.noLogin === true &&
           /^[1-9][0-9]{0,9}$/.test(value.roleOid) && initialRoleOid === "0";
         await step("prepare_no_login", async () => {
-          const prepared = await native.prepare(context);
+          pendingPreparation = Promise.resolve(native.prepare(context));
+          const prepared = await pendingPreparation;
           // Capture authenticated DB identity before any fallible audit write or
           // cancellation check. An audit failure cannot erase a committed role
           // identity needed for compensation/recovery. Truly late completion
@@ -287,6 +290,18 @@ export function createSyntheticProvisioningCoordinator({ target: inputTarget, na
         const drain = await boundedCleanup(cleanSignal => native.abortAndDrain(Object.freeze({ ...context, signal: cleanSignal })), cleanupTimeoutMs);
         barrier = ack(drain) && drain.drained === true;
         if (barrier) {
+          if (pendingPreparation && context.target.roleOid === "0") {
+            // Abort can win the outer wait after CREATE commits but before its
+            // authenticated ACK is consumed. Reconcile only this invocation's
+            // original bounded completion, after draining and before fencing.
+            // No callback mutates identity after finalization, and a truly lost
+            // ACK cannot be replaced with audit evidence or a same-name lookup.
+            const prepared = await boundedCleanup(() => pendingPreparation, cleanupTimeoutMs);
+            if (validPrepared(prepared)) {
+              pinnedRoleOid = prepared.roleOid;
+              context = Object.freeze({ ...context, target: Object.freeze({ ...target, roleOid: pinnedRoleOid }) });
+            }
+          }
           const fence = await boundedCleanup(cleanSignal => native.fence(Object.freeze({ ...context, signal: cleanSignal })), cleanupTimeoutMs);
           fenceConfirmed = fenced(fence);
         }
