@@ -52,6 +52,11 @@ for (const line of ['Restart=no', 'RuntimeMaxSec=3600', 'StandardOutput=null', '
   check(unit.includes(line), `unit requires ${line}`);
 }
 check(!/^WantedBy=|^ExecReload=|^EnvironmentFile=/m.test(unit), 'no boot activation, unsafe reload, or secret envfile');
+const unsetEnvironment = unit.match(/^UnsetEnvironment=(.*)$/m)?.[1].split(/\s+/) ?? [];
+for (const name of ['NODE_EXTRA_CA_CERTS', 'NODE_TLS_REJECT_UNAUTHORIZED', 'NODE_USE_SYSTEM_CA', 'SSL_CERT_FILE', 'SSL_CERT_DIR',
+  'NODE_USE_ENV_PROXY', 'HTTP_PROXY', 'HTTPS_PROXY', 'http_proxy', 'https_proxy', 'OPENSSL_CONF', 'SQUARE_SANDBOX_DATABASE_CA_PEM']) {
+  check(unsetEnvironment.includes(name), `TLS trust override ${name} removed before Node startup`);
+}
 const bootstrapUnit = readFileSync(join(opsDir, 'vaeroex-square-acme-bootstrap.service'), 'utf8');
 check(!/^Conflicts=/m.test(bootstrapUnit), 'renewal bootstrap race cannot stop an OAuth window');
 const hook = readFileSync(join(opsDir, 'certbot-deploy-hook.sh'), 'utf8');

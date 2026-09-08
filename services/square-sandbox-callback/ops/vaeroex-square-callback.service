@@ -14,7 +14,7 @@ Group=vaeroex-square-callback
 WorkingDirectory=/opt/vaeroex-square-callback/current
 UMask=0077
 Environment=NODE_ENV=production
-UnsetEnvironment=NODE_OPTIONS NODE_V8_COVERAGE SSLKEYLOGFILE GOOGLE_APPLICATION_CREDENTIALS GOOGLE_OAUTH_ACCESS_TOKEN
+UnsetEnvironment=NODE_OPTIONS NODE_V8_COVERAGE NODE_EXTRA_CA_CERTS NODE_TLS_REJECT_UNAUTHORIZED NODE_USE_SYSTEM_CA NODE_USE_ENV_PROXY HTTP_PROXY HTTPS_PROXY http_proxy https_proxy OPENSSL_CONF SSL_CERT_FILE SSL_CERT_DIR SQUARE_SANDBOX_DATABASE_CA_PEM SSLKEYLOGFILE GOOGLE_APPLICATION_CREDENTIALS GOOGLE_OAUTH_ACCESS_TOKEN
 LoadCredential=tls-key:/etc/letsencrypt/live/square-sandbox.vaeroex.com/privkey.pem
 LoadCredential=tls-cert:/etc/letsencrypt/live/square-sandbox.vaeroex.com/fullchain.pem
 ExecStartPre=+/opt/vaeroex-square-callback/node/bin/node /opt/vaeroex-square-callback/current/ops/host-preflight.mjs

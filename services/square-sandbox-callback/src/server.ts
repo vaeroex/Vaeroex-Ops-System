@@ -20,9 +20,14 @@ function readLocal(path: string, maximum: number) {
 }
 function localEnvironment() {
   // Never enable process diagnostics, SDK wire logging or telemetry via ambient
-  // launch settings. Values are not printed even when an environment is refused.
-  for (const name of Object.keys(process.env)) if (/^(?:NODE_OPTIONS|NODE_DEBUG|NODE_V8_COVERAGE|SSLKEYLOGFILE|DEBUG|OTEL_|SENTRY_|DD_|NEW_RELIC_|VERCEL|GOOGLE_APPLICATION_CREDENTIALS|GOOGLE_OAUTH_ACCESS_TOKEN|GCLOUD_KEYFILE_JSON)/.test(name) && process.env[name]) denied();
-  if (process.execArgv.some(arg => /inspect|report|heap|prof|trace|snapshot/.test(arg))) denied();
+  // launch settings. Extra roots are loaded by Node before this function, so
+  // reject the process before any config/credential/network access; deleting the
+  // variable here would not undo that trust. systemd also unsets it before exec.
+  // Values are not printed even when an environment is refused.
+  for (const name of Object.keys(process.env)) if (/^(?:NODE_OPTIONS|NODE_DEBUG|NODE_V8_COVERAGE|NODE_EXTRA_CA_CERTS|NODE_TLS_REJECT_UNAUTHORIZED|NODE_USE_SYSTEM_CA|NODE_USE_ENV_PROXY|HTTP_PROXY|HTTPS_PROXY|http_proxy|https_proxy|OPENSSL_CONF|SSL_CERT_FILE|SSL_CERT_DIR|SQUARE_SANDBOX_DATABASE_CA_PEM|SSLKEYLOGFILE|DEBUG|OTEL_|SENTRY_|DD_|NEW_RELIC_|VERCEL|GOOGLE_APPLICATION_CREDENTIALS|GOOGLE_OAUTH_ACCESS_TOKEN|GCLOUD_KEYFILE_JSON)/.test(name) && process.env[name]) denied();
+  // The reviewed unit has one exact Node argument, not alternate TLS/proxy,
+  // preload, diagnostic or report switches supplied by the operator.
+  if (process.execArgv.length !== 1 || process.execArgv[0] !== "--conditions=react-server") denied();
 }
 
 export function checkedPortalTls(cert: Buffer, key: Buffer, until: number, now = Date.now()) {

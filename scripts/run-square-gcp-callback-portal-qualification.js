@@ -12,7 +12,7 @@ require("./square-account-browser-test-support.js").loadSquareBrowserModules();
 const { createSquareSandboxPortal, PORTAL_PATH, CALLBACK_PATH, PORTAL_SCRIPT } = require("../services/square-sandbox-callback/src/portal.ts");
 const { checkedPortalConfig } = require("../services/square-sandbox-callback/src/config.ts");
 const { createSquarePortalAuth, SESSION_COOKIE } = require("../services/square-sandbox-callback/src/auth.ts");
-const {nativePortalHandler,checkedPortalTls}=require("../services/square-sandbox-callback/src/server.ts");
+const {nativePortalHandler,checkedPortalTls,runSquareSandboxPortalCommand}=require("../services/square-sandbox-callback/src/server.ts");
 const { SQUARE_REMOTE_SANDBOX: constants } = require("../lib/integrations/control-plane/square-remote-sandbox-contracts.ts");
 const root = path.resolve(__dirname, "..");
 const origin = constants.applicationOrigin;
@@ -58,6 +58,7 @@ function privacy(response) {
   for(const value of response.headers.values())ok(!value.includes(canary));
 }
 async function local() {
+  await startupTrustTests();
   const config=JSON.parse(fs.readFileSync(path.join(root,"services/square-sandbox-callback/config.example.json"),"utf8"));
   equal(checkedPortalConfig(config).binding,null); assertions++;assert.throws(()=>checkedPortalConfig(config,true));
   for(const edit of [{enabled:true},{binding:{}},{supabasePublishableKey:"synthetic"},{unknown:true},{hostPolicyPath:"/tmp/any"}]) {
@@ -117,6 +118,34 @@ async function local() {
   const detecting=value=>String(value).includes(canary);
   equal(detecting("deliberately unsafe synthetic log: "+canary),true,"positive control proves privacy detector works");
   equal(detecting(await response.text()),false);
+}
+async function startupTrustTests() {
+  // Exercise the actual command before its first filesystem read. No real
+  // configuration/certificate is opened, and no environment value is reported.
+  const original={env:process.env,argv:process.argv,execArgv:process.execArgv,lstat:fs.lstatSync};
+  let reads=0;
+  try {
+    process.argv=[process.execPath,"synthetic-entry","--preflight","--config","/etc/vaeroex-square-callback/config.json"];
+    process.execArgv=["--conditions=react-server"];
+    fs.lstatSync=()=>{reads++;throw new Error("synthetic_config_read");};
+    for(const name of ["NODE_EXTRA_CA_CERTS","NODE_TLS_REJECT_UNAUTHORIZED","NODE_USE_SYSTEM_CA","SSL_CERT_FILE","SSL_CERT_DIR",
+      "NODE_USE_ENV_PROXY","HTTP_PROXY","HTTPS_PROXY","http_proxy","https_proxy","OPENSSL_CONF","SQUARE_SANDBOX_DATABASE_CA_PEM"]) {
+      process.env={[name]:name==="NODE_TLS_REJECT_UNAUTHORIZED"?"0":"synthetic_only"};
+      assertions++;await assert.rejects(runSquareSandboxPortalCommand(),/^Error: square_portal_startup_denied$/);
+      equal(reads,0,"ambient TLS trust override rejects before config or network");
+    }
+    process.env={};
+    for(const option of ["--use-system-ca","--use-openssl-ca","--use-env-proxy","--openssl-config=synthetic","--inspect","--import=synthetic"]) {
+      process.execArgv=[option];
+      assertions++;await assert.rejects(runSquareSandboxPortalCommand(),/^Error: square_portal_startup_denied$/);
+      equal(reads,0,"CLI trust override rejects before config or network");
+    }
+    process.execArgv=["--conditions=react-server"];
+    assertions++;await assert.rejects(runSquareSandboxPortalCommand(),/^Error: synthetic_config_read$/);
+    equal(reads,1,"clean positive control reaches the intercepted configuration read");
+  } finally {
+    process.env=original.env;process.argv=original.argv;process.execArgv=original.execArgv;fs.lstatSync=original.lstat;
+  }
 }
 async function authTests() {
   const calls=[];const signal=new AbortController().signal;
