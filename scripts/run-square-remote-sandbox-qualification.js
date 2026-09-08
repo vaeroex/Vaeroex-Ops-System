@@ -148,10 +148,21 @@ async function integratedTests(runtime, database) {
     accepted.credentialServiceAccount, accepted.workloadIdentityAudience], Array(5).fill(null), "disabled provider access needs no invented secret resource");
   for (const login of logins) equal(await binding(login.client), accepted, "all four actual LOGINs resolve the same owner-selected binding");
   for (const login of [outsider, wrongLogin]) await denied(() => binding(login.client), "ordinary and foreign capable LOGINs cannot obtain the binding");
+  await denied(() => binding(owner), "the actual administrator LOGIN is not an approved dedicated LOGIN");
+  const ownerIdentity = (await owner.query("select current_user as current,session_user as session")).rows[0];
   for (const role of ["anon", "authenticated", "service_role", "square_account_broker_authority"]) {
-    await owner.query(`set role ${quote(role)}`);
-    try { await denied(() => binding(owner), "SET ROLE and a privileged session are not an approved dedicated LOGIN"); }
-    finally { await owner.query("reset role"); }
+    // PG17 CREATEROLE gives the creator ADMIN, but not SET, by default.
+    // Managed postgres is not the native harness's bootstrap superuser.
+    const canSet = (await owner.query("select pg_has_role(current_user,$1,'SET') as permitted", [role])).rows[0].permitted;
+    if (canSet) {
+      await owner.query(`set role ${quote(role)}`);
+      try { await denied(() => binding(owner), "SET ROLE and a privileged session are not an approved dedicated LOGIN"); }
+      finally { await owner.query("reset role"); }
+    } else {
+      await denied(() => owner.query(`set role ${quote(role)}`), "PostgreSQL itself denies unavailable SET ROLE authority");
+    }
+    equal((await owner.query("select current_user as current,session_user as session")).rows[0], ownerIdentity,
+      "SET ROLE rejection or cleanup preserves the administrator's actual session identity");
   }
   await outsider.client.query("select set_config('request.jwt.claims',$1,false)", [JSON.stringify({ sub: user, role: broker.name, workspace_id: workspace })]);
   await denied(() => binding(outsider.client), "forged JWT/GUC claims cannot establish database authority");
@@ -176,11 +187,37 @@ async function integratedTests(runtime, database) {
   await owner.query(`revoke square_ingestion_runtime_authority from ${quote(ingestion.name)}`);
   await denied(() => binding(ingestion.client), "named LOGIN without its capability is denied");
   await owner.query(`grant square_ingestion_runtime_authority to ${quote(ingestion.name)}`);
-  for (const [flag, restore] of [["bypassrls", "nobypassrls"], ["createdb", "nocreatedb"], ["createrole", "nocreaterole"],
-    ["replication", "noreplication"], ["superuser", "nosuperuser"], ["nologin", "login"]]) {
+  const roleAttributes = async name => (await owner.query(`select rolsuper,rolbypassrls,rolcreatedb,rolcreaterole,rolreplication,rolcanlogin
+    from pg_roles where rolname=$1`, [name])).rows[0];
+  const ownerAttributes = await roleAttributes(ownerIdentity.current);
+  const constrainedAttributes = await roleAttributes(broker.name);
+  if (!ownerAttributes.rolsuper) equal((await owner.query(`select exists(select 1 from pg_auth_members
+    where roleid=(select oid from pg_roles where rolname=$1)
+      and member=(select oid from pg_roles where rolname=current_user) and admin_option) as permitted`, [broker.name])).rows[0].permitted,
+    true, "managed creator holds explicit ADMIN OPTION on its owned qualification LOGIN");
+  for (const [flag, restore, column, value] of [["bypassrls", "nobypassrls", "rolbypassrls", true],
+    ["createdb", "nocreatedb", "rolcreatedb", true], ["createrole", "nocreaterole", "rolcreaterole", true],
+    ["replication", "noreplication", "rolreplication", true], ["superuser", "nosuperuser", "rolsuper", true],
+    ["nologin", "login", "rolcanlogin", false]]) {
+    // PG17 allows CREATEROLE + ADMIN to change ordinary role attributes, but
+    // only attributes the actor itself holds may confer CREATEDB/REPLICATION/
+    // BYPASSRLS; SUPERUSER always requires an actual superuser.
+    const canAlter = ownerAttributes.rolsuper || (ownerAttributes.rolcreaterole && flag !== "superuser"
+      && (!["bypassrls", "createdb", "replication"].includes(flag) || ownerAttributes[column]));
+    if (!canAlter) {
+      await denied(() => owner.query(`alter role ${quote(broker.name)} ${flag}`), "administrator cannot grant an unavailable role attribute");
+      equal(await roleAttributes(broker.name), constrainedAttributes, "rejected attribute alteration leaves every LOGIN restriction intact");
+      equal(await binding(broker.client), accepted, "rejected administrative mutation does not change valid binding behavior");
+      continue;
+    }
     await owner.query(`alter role ${quote(broker.name)} ${flag}`);
-    try { await denied(() => binding(broker.client), "LOGIN must retain every constrained role attribute"); }
+    try {
+      equal((await roleAttributes(broker.name))[column], value, "unsafe role attribute was actually applied before testing the checked boundary");
+      await denied(() => binding(broker.client), "LOGIN must retain every constrained role attribute");
+    }
     finally { await owner.query(`alter role ${quote(broker.name)} ${restore}`); }
+    equal(await roleAttributes(broker.name), constrainedAttributes, "attribute cleanup restores every constrained LOGIN property");
+    equal(await binding(broker.client), accepted, "restored LOGIN retains its legitimate binding");
   }
 
   stage = "current_configuration_membership_and_policy";
