@@ -184,6 +184,7 @@ resource "google_compute_instance" "callback" {
     on_host_maintenance         = "TERMINATE"
     automatic_restart           = false
     provisioning_model          = "SPOT"
+    preemptible                 = true
     instance_termination_action = "STOP"
   }
   shielded_instance_config {

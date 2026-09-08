@@ -70,7 +70,7 @@ const forbiddenResource = /resource\s+"(?:google_(?:service_account|service_acco
 check(!forbiddenResource.test(tf), 'no extra fixed resources, key material, project grants or versions');
 check(!/^\s*(?:data|provisioner|backend)\s+"/m.test(tf), 'no secret reads, provisioner, remote state or provider data reads');
 check(!/^\s*(?:secret_data|credentials|access_token|metadata_startup_script)\s*=/m.test(tf), 'no credential payload or startup write path');
-for (const setting of [/provisioning_model\s*=\s*"SPOT"/, /instance_termination_action\s*=\s*"STOP"/,
+for (const setting of [/provisioning_model\s*=\s*"SPOT"/, /preemptible\s*=\s*true/, /instance_termination_action\s*=\s*"STOP"/,
   /on_host_maintenance\s*=\s*"TERMINATE"/, /automatic_restart\s*=\s*false/, /auto_delete\s*=\s*false/]) {
   check(setting.test(tf), 'Spot stops without migration, restart or disk deletion');
 }

@@ -8,6 +8,8 @@ The template creates one Spot `e2-small`, one 10 GiB `pd-standard` boot disk, on
 
 ### Approved Spot correction — September 8, 2026
 
+Set `preemptible=true` explicitly alongside `provisioning_model=SPOT`: provider8.1.0 otherwise sends false and Google rejects the contradictory request. The live rejected request created no VM or disk; both mock and live-plan assertions now cover this compatibility flag. It does not select the legacy provisioning model or alter STOP/restart behavior.
+
 The first authorized hosted plan exposed a real provider constraint: standard E2 rejects `onHostMaintenance=TERMINATE`. The operator explicitly approved changing only the provisioning model to Spot within the existing USD20 ceiling, accepting interrupted synthetic windows. The template now requires `SPOT`, termination action `STOP`, maintenance `TERMINATE`, automatic restart false, retained disk and deletion protection. No migration, automatic recovery, replacement instance, paid commitment or weaker privacy control is introduced. [E2 maintenance limitation](https://docs.cloud.google.com/compute/docs/instances/setting-vm-host-options), [Spot behavior](https://docs.cloud.google.com/compute/docs/instances/spot).
 
 This source template still includes later secret/IAM permissions. The no-secret hosted execution must use its reviewed isolated operational plan that omits those blocks; the Spot approval does not authorize granting application-secret access. Do not apply the whole source template merely to create the synthetic host.
