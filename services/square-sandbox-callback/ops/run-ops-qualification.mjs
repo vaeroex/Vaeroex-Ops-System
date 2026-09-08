@@ -70,12 +70,38 @@ const forbiddenResource = /resource\s+"(?:google_(?:service_account|service_acco
 check(!forbiddenResource.test(tf), 'no extra fixed resources, key material, project grants or versions');
 check(!/^\s*(?:data|provisioner|backend)\s+"/m.test(tf), 'no secret reads, provisioner, remote state or provider data reads');
 check(!/^\s*(?:secret_data|credentials|access_token|metadata_startup_script)\s*=/m.test(tf), 'no credential payload or startup write path');
+for (const setting of [/provisioning_model\s*=\s*"SPOT"/, /preemptible\s*=\s*true/, /instance_termination_action\s*=\s*"STOP"/,
+  /on_host_maintenance\s*=\s*"TERMINATE"/, /automatic_restart\s*=\s*false/, /auto_delete\s*=\s*false/]) {
+  check(setting.test(tf), 'Spot stops without migration, restart or disk deletion');
+}
 const terraformTests = readFileSync(join(serviceRoot, 'infra/tests/sandbox.tftest.hcl'), 'utf8');
 check(/^mock_provider "google"/m.test(terraformTests), 'Terraform qualification uses only mocked Google');
 
 const temporary = mkdtempSync(join(tmpdir(), 'vaeroex-square-acme-test-'));
 let server;
 try {
+  // Model the installed /current -> release directory, including /current/ops.
+  // Both normal resolution and preserved main-module symlinks must enter the
+  // guard. Invalid startup must refuse silently, never masquerade as exit 0.
+  const linkedRelease = join(temporary, 'current');
+  symlinkSync(serviceRoot, linkedRelease, 'dir');
+  const invocations = [
+    { name: 'default', flags: [], environment: {} },
+    { name: 'CLI preserve-main', flags: ['--preserve-symlinks-main'], environment: {} },
+    { name: 'NODE_OPTIONS preserve-main', flags: [], environment: { NODE_OPTIONS: '--preserve-symlinks-main' } },
+  ];
+  for (const file of ['acme-bootstrap.mjs', 'host-preflight.mjs']) {
+    for (const [pathName, directory] of [['direct', opsDir], ['installed symlink', join(linkedRelease, 'ops')]]) {
+      for (const { name, flags, environment } of invocations) {
+        const result = spawnSync(process.execPath, [...flags, join(directory, file), '--synthetic-invalid-argument'], {
+          encoding: 'utf8', timeout: 5000, env: { PATH: process.env.PATH, ...environment },
+        });
+        const label = `${file}, ${pathName}, ${name}`;
+        check(!result.error && result.status === 78, `${label}: executes fail-closed validation`);
+        check(result.stdout === '' && result.stderr === '', `${label}: refusal is silent`);
+      }
+    }
+  }
   const webroot = join(temporary, 'webroot');
   const challenges = join(webroot, '.well-known', 'acme-challenge');
   mkdirSync(challenges, { recursive: true, mode: 0o755 });

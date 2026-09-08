@@ -1,7 +1,7 @@
 // Temporary HTTP-01 bootstrap only. No OAuth, credentials, outbound network,
 // request logging, environment-dependent configuration, or HTTP redirects.
 import { createServer } from 'node:http';
-import { openSync, closeSync, fstatSync, lstatSync, readSync, constants } from 'node:fs';
+import { openSync, closeSync, fstatSync, lstatSync, readSync, realpathSync, constants } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 export function createAcmeBootstrap({ webroot, hostname, ownerUid = 0 }) {
@@ -57,7 +57,8 @@ export function createAcmeBootstrap({ webroot, hostname, ownerUid = 0 }) {
   return server;
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+// Canonicalize both paths: --preserve-symlinks-main can retain /current in import.meta.url.
+if (process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) {
   try {
     if (process.argv.length !== 2 || process.platform !== 'linux') throw new Error('acme_start_denied');
     const server = createAcmeBootstrap({ webroot: '/var/lib/vaeroex-square-acme', hostname: 'square-sandbox.vaeroex.com' });
