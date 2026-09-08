@@ -11,6 +11,7 @@ const baselineVersion = "20260902191322";
 const squareVersions = ["20260907042202", "20260907042352"];
 const accountMigration = "20260907174326_square_dormant_account_connection.sql";
 const remoteBindingMigration = "20260907225626_square_remote_sandbox_binding.sql";
+const brokerRuntimeMigration = "20260908014713_square_broker_runtime_credential_authority.sql";
 const fixedPassword = "square-disposable-synthetic-only";
 let stage = "startup", assertions = 0, scenarios = 0;
 let lastRpcFailure = null, lastOutcome = null;
@@ -176,10 +177,12 @@ async function migrationQualification(target, administrator) {
   const added = files.filter(name => squareVersions.includes(name.slice(0, 14)));
   const accountTail = files.filter(name => name === accountMigration);
   const remoteTail = files.filter(name => name === remoteBindingMigration);
+  const brokerTail = files.filter(name => name === brokerRuntimeMigration);
   equal(added.length, 2, "both additive Square migrations present");
   equal(accountTail.length, 1, "account-connection migration present");
   equal(remoteTail.length, 1, "remote Sandbox binding migration present");
-  equal(baseline.length + added.length + accountTail.length + remoteTail.length, files.length, "migration manifest is explicit");
+  equal(brokerTail.length, 1, "separately qualified broker/runtime correction present");
+  equal(baseline.length + added.length + accountTail.length + remoteTail.length + brokerTail.length, files.length, "migration manifest is explicit");
   const clean = await createDatabase(target, administrator, "clean");
   await applyMigrations(clean.client, baseline);
   const before = await sourceSchemaFingerprint(clean.client);
@@ -228,6 +231,11 @@ async function migrationQualification(target, administrator) {
   await applyMigrations(upgrade.client, remoteTail);
   equal(await sourceSchemaFingerprint(clean.client), before, "account migration preserves clean non-Square definitions");
   equal(await sourceSchemaFingerprint(upgrade.client), upgradeBefore, "account migration preserves upgrade non-Square definitions");
+  await applyMigrations(clean.client, brokerTail);
+  await applyMigrations(upgrade.client, brokerTail);
+  equal(await sourceSchemaFingerprint(clean.client), before, "broker correction preserves clean non-Square and QBO definitions");
+  equal(await sourceSchemaFingerprint(upgrade.client), upgradeBefore, "broker correction preserves upgraded non-Square and QBO definitions");
+  equal(JSON.stringify((await upgrade.client.query(historyQuery)).rows), immutableHistory, "broker correction preserves immutable upgraded source history");
   scenarios++;
   return { clean, upgrade };
 }

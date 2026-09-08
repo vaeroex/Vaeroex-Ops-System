@@ -5,6 +5,7 @@ const approvedSquareQualificationPaths = Object.freeze([
   "supabase/migrations/20260907042352_square_dormant_atomic_pages.sql",
   "supabase/migrations/20260907174326_square_dormant_account_connection.sql",
   "supabase/migrations/20260907225626_square_remote_sandbox_binding.sql",
+  "supabase/migrations/20260908014713_square_broker_runtime_credential_authority.sql",
   "supabase/tests/fixtures/square-durable-platform.sql",
   "supabase/tests/fixtures/square-durable-process.js",
   "supabase/tests/fixtures/square-durable-upgrade-history.sql",

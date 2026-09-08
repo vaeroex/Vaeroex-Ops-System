@@ -42,7 +42,8 @@ async function migrationTests(runtime) {
   stage = "canonical_migrations_and_atomic_additive_install";
   const files = runtime.migrationFiles(), baseline = files.filter(name => name < migrationName);
   equal(baseline.length, 104, "complete canonical prerequisite chain contains exactly 104 migrations");
-  equal(files.filter(name => name >= migrationName), [migrationName], "remote binding is the sole explicit additive tail");
+  equal(files.filter(name => name >= migrationName), [migrationName, "20260908014713_square_broker_runtime_credential_authority.sql"],
+    "remote binding and separately qualified broker correction are the exact additive tail");
   const database = await runtime.createDatabase("remote_sandbox");
   const owner = database.client;
   await runtime.applyMigrations(owner, baseline);
@@ -93,6 +94,14 @@ async function migrationTests(runtime) {
   equal((await owner.query(`select count(*)::int as n from pg_auth_members m join pg_roles r on r.oid=m.roleid
     join pg_roles u on u.oid=m.member where r.rolname like 'square_%'
     and u.rolname in ('anon','authenticated','service_role')`)).rows[0].n, 0, "API roles acquire no Square capability membership");
+  // Preserve every binding-only migration assertion, then exercise the existing
+  // four-LOGIN and lock-wait scenarios against the complete reviewed chain.
+  const beforeCorrection = await runtime.sourceSchemaFingerprint(owner);
+  const unchangedSquare = rows => rows.filter(row => !["square_account_connection_v1", "lock_square_broker_credential_authority_v1"].includes(row.proname));
+  const squareBeforeCorrection = unchangedSquare(await existingSquareDefinitions(owner));
+  await runtime.applyMigrations(owner, ["20260908014713_square_broker_runtime_credential_authority.sql"]);
+  equal(await runtime.sourceSchemaFingerprint(owner), beforeCorrection, "broker correction preserves non-Square and QBO definitions/ACLs");
+  equal(unchangedSquare(await existingSquareDefinitions(owner)), squareBeforeCorrection, "broker correction preserves every unrelated Square routine/ACL");
   scenarios++;
   return database;
 }

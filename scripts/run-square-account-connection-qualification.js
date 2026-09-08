@@ -123,8 +123,8 @@ function syntheticProvider(scopes) {
 async function migrationTests(runtime) {
   stage = "migration_clean_install";
   const names = runtime.migrationFiles(), baseline = names.filter(name => name < migrationName);
-  equal(names.filter(name => name >= migrationName), [migrationName, "20260907225626_square_remote_sandbox_binding.sql"],
-    "account and separately qualified remote Sandbox migrations are the exact additive tail");
+  equal(names.filter(name => name >= migrationName), [migrationName, "20260907225626_square_remote_sandbox_binding.sql", "20260908014713_square_broker_runtime_credential_authority.sql"],
+    "account and separately qualified remote Sandbox and broker corrections are the exact additive tail");
   const clean = await runtime.createDatabase("account_clean");
   await runtime.applyMigrations(clean.client, baseline);
   const fingerprint = await runtime.sourceSchemaFingerprint(clean.client);
@@ -155,6 +155,16 @@ async function migrationTests(runtime) {
   equal((await upgrade.client.query("select current_version_id from private.external_source_records where id='99000000-0000-4000-8000-000000000004'")).rows[0].current_version_id,
     "99000000-0000-4000-8000-000000000007", "existing tombstone/current pointer remains exact");
   await denied(() => upgrade.client.query("update private.external_source_record_versions set normalized_schema_version='forbidden' where source_record_id='99000000-0000-4000-8000-000000000004'"), "historical mutation protection survives");
+  // Historical account installation/rollback assertions above retain their
+  // original baseline. Existing lifecycle/browser scenarios run the final chain.
+  for (const tail of ["20260907225626_square_remote_sandbox_binding.sql", "20260908014713_square_broker_runtime_credential_authority.sql"]) {
+    for (const database of [clean, upgrade]) {
+      const prior = await runtime.sourceSchemaFingerprint(database.client);
+      await runtime.applyMigrations(database.client, [tail]);
+      equal(await runtime.sourceSchemaFingerprint(database.client), prior, "each explicit tail preserves non-Square and QBO definitions/ACLs");
+    }
+  }
+  equal((await upgrade.client.query(historySql)).rows, history, "final migration chain preserves immutable historical bytes");
   return clean;
 }
 

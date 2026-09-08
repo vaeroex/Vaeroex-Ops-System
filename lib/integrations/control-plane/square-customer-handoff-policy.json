@@ -1,0 +1,4 @@
+{
+  "script": "const handoff=document.getElementById(\"square-handoff\");history.replaceState(null,\"\",handoff.dataset.cleanPath);location.replace(handoff.dataset.target);",
+  "csp": "default-src 'none'; script-src 'sha256-J14/bhX2nWEq/vCN4PNpRufR0t4nHGzG6jKmMYU1nL0='; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+}

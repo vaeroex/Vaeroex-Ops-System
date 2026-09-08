@@ -38,6 +38,8 @@
     "test:external-integrations-square-remote-sandbox": "node scripts/external-integrations-square-remote-sandbox-regression-tests.js",
     "test:external-integrations-square-remote-credentials": "node scripts/external-integrations-square-remote-credentials-regression-tests.js",
     "test:external-integrations-square-remote-sandbox-db": "node scripts/run-square-remote-sandbox-qualification.js",
+    "test:external-integrations-square-broker-runtime-db": "node scripts/run-square-broker-runtime-qualification.js",
+    "test:external-integrations-square-handoff-headers": "node scripts/run-square-handoff-header-qualification.js",
     "test:external-integrations-square-account-db": "node scripts/run-square-account-connection-qualification.js",
     "test:external-integrations-architecture": "node scripts/external-integrations-architecture-regression-tests.js",
     "test:external-integrations-phase-1": "node scripts/external-integrations-phase-1-foundation-regression-tests.js",

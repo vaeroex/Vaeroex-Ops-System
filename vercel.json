@@ -1,7 +1,8 @@
 {
   "git": {
     "deploymentEnabled": {
-      "codex/square-remote-sandbox-binding": false
+      "codex/square-remote-sandbox-binding": false,
+      "codex/square-sandbox-qualification": false
     }
   }
 }

@@ -1,3 +1,7 @@
+import { createRequire } from "node:module";
+
+const squareHandoffPolicy = createRequire(import.meta.url)("./lib/integrations/control-plane/square-customer-handoff-policy.json");
+
 function securityHeaders() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const enforceFullCsp = process.env.VAEROEX_ENFORCE_CSP === "true";
@@ -88,6 +92,18 @@ const nextConfig = {
       {
         source: "/:path*",
         headers: securityHeaders()
+      },
+      {
+        // Next 15 preserves configured headers over Route Handler headers, and
+        // custom header matching is case-insensitive. Keep the global policy,
+        // then apply one fixed script hash even to case-variant not-found paths.
+        source: "/api/integrations/square/:handoff(connect|reauthorize|callback)",
+        headers: [
+          { key: "Content-Security-Policy", value: squareHandoffPolicy.csp },
+          { key: "Content-Security-Policy-Report-Only", value: squareHandoffPolicy.csp },
+          { key: "Referrer-Policy", value: "no-referrer" },
+          { key: "Cache-Control", value: "no-store, max-age=0" }
+        ]
       },
       {
         source: "/sw.js",

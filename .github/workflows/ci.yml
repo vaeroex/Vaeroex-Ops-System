@@ -122,6 +122,11 @@ jobs:
           pnpm test:external-integrations-square-remote-sandbox
           pnpm test:external-integrations-square-remote-credentials
 
+      - name: Verify optimized Square handoff headers and isolated synthetic browser navigation
+        run: |
+          pnpm exec playwright install --with-deps chromium
+          pnpm test:external-integrations-square-handoff-headers --browser
+
       - name: External integrations Phase 1 regressions
         run: pnpm test:external-integrations-phase-1
 
@@ -266,6 +271,9 @@ jobs:
 
       - name: Qualify remote Sandbox binding in disposable local databases only
         run: node scripts/run-square-remote-sandbox-qualification.js --supabase-local
+
+      - name: Qualify separate Square broker and runtime authority in disposable databases only
+        run: node scripts/run-square-broker-runtime-qualification.js --supabase-local
 
       - name: Remove isolated database state
         if: always()
