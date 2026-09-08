@@ -85,6 +85,10 @@ Rebuild only from immutable code/configuration; no raw-memory restore or secret-
 
 At approval expiry close the service and review expiring IAM/DB approval; access expiry is not deletion. Keep the existing source-retention policy and unresolved credential/discovery/audit disposition explicit. Stopping a VM still charges for disk/static IP. Destruction, secret-version rotation/deletion, snapshots or any retention job requires exact itemized authority; do not use a broad cleanup command. Production and QBO remain out of scope.
 
+## Release-symlink entry validation
+
+Operations commands resolve their invoked script path before comparing it with the module URL. The installed `current` symlink must not turn the ACME command or host preflight into a silent successful no-op. Test direct and symlinked entry points with invalid arguments/missing approval and require silent exit78, then verify an actual listener after startup; systemd's immediate `active` status for a simple service alone is insufficient. This defect was reproduced during no-secret hosted staging before any OAuth listener or credential access.
+
 ## Local checks
 
 `node services/square-sandbox-callback/ops/run-ops-qualification.mjs` uses synthetic files and loopback only, checks the policy's denied defaults, static resource/unit scope, shell syntax, actual bounded ACME HTTP behavior and a reflection detector positive control. It never runs Certbot/systemctl/cloud tools or reads credentials. Linux systemd execution, actual Google IAM and hosted renewal/privacy remain pending even when this suite passes.

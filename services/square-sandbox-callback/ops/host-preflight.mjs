@@ -126,6 +126,7 @@ export function verifyHost() {
   return true;
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+// Match the real file even when systemd invokes the /current release symlink.
+if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try { verifyHost(); } catch { process.exitCode = 78; }
 }

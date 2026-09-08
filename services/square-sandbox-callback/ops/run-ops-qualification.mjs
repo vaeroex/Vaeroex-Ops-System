@@ -80,6 +80,19 @@ check(/^mock_provider "google"/m.test(terraformTests), 'Terraform qualification 
 const temporary = mkdtempSync(join(tmpdir(), 'vaeroex-square-acme-test-'));
 let server;
 try {
+  // The installed /current path is a release symlink. CLI entry checks must not
+  // silently skip startup or privacy validation when Node resolves that link.
+  const linkedOps = join(temporary, 'current');
+  symlinkSync(opsDir, linkedOps, 'dir');
+  for (const file of ['acme-bootstrap.mjs', 'host-preflight.mjs']) {
+    for (const directory of [opsDir, linkedOps]) {
+      const result = spawnSync(process.execPath, [join(directory, file), '--synthetic-invalid-argument'], {
+        encoding: 'utf8', timeout: 5000, env: { PATH: process.env.PATH },
+      });
+      check(!result.error && result.status === 78, `${file} direct/symlink command executes fail-closed validation`);
+      check(result.stdout === '' && result.stderr === '', `${file} refusal is silent`);
+    }
+  }
   const webroot = join(temporary, 'webroot');
   const challenges = join(webroot, '.well-known', 'acme-challenge');
   mkdirSync(challenges, { recursive: true, mode: 0o755 });
