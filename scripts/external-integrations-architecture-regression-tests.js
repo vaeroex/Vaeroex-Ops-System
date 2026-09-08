@@ -209,13 +209,19 @@ for (const suffix of ["ingestion-client", "ingestion-mapping", "ingestion-recove
   equal(packageJson.scripts[script], `node scripts/external-integrations-square-${suffix}-regression-tests.js`, `${suffix} regression registered`);
   matches(ciWorkflow, new RegExp(`pnpm ${script}(?:\\s|$)`), `${suffix} exercised in CI`);
 }
-for (const suffix of ["account-oauth", "account-discovery", "connection-routes"]) {
+for (const suffix of ["account-oauth", "account-discovery", "connection-routes", "remote-sandbox", "remote-credentials"]) {
   const script = `test:external-integrations-square-${suffix}`;
   equal(packageJson.scripts[script], `node scripts/external-integrations-square-${suffix}-regression-tests.js`, `${suffix} regression registered`);
   matches(ciWorkflow, new RegExp(`pnpm ${script}(?:\\s|$)`), `${suffix} exercised in CI`);
 }
 equal(packageJson.scripts["test:external-integrations-square-account-db"], "node scripts/run-square-account-connection-qualification.js", "checked account lifecycle qualification registered");
 matches(ciWorkflow, /node scripts\/run-square-account-connection-qualification\.js --supabase-local/, "CI exercises account lifecycle in real disposable databases");
+equal(packageJson.scripts["test:external-integrations-square-remote-sandbox-db"], "node scripts/run-square-remote-sandbox-qualification.js", "checked Sandbox binding qualification registered");
+matches(ciWorkflow, /node scripts\/run-square-remote-sandbox-qualification\.js --supabase-local/, "CI exercises Sandbox binding only in disposable databases");
+const sandboxCredentials = read("lib/integrations/control-plane/square-remote-sandbox-credentials.ts");
+matches(sandboxCredentials, /import "server-only"/, "Sandbox credential adapter is server-only");
+doesNotMatch(sandboxCredentials, /process\.env|\bfetch\s*\(|node:fs|node:child_process|metadata\.google\.internal|169\.254\.169\.254/, "credential adapter has no ambient credential, network or metadata fallback");
+doesNotMatch(read("lib/integrations/control-plane/square-customer-availability.ts"), /square-remote-sandbox|createSquareRemoteSandbox/, "remote Sandbox capabilities remain unwired at public availability gate");
 for (const name of ["ingestion-adapter", "ingestion-client", "ingestion-mapping", "ingestion-page-repository"]) {
   const source = read(`lib/integrations/providers/square/${name}.ts`);
   doesNotMatch(source, /\bfetch\s*\(|axios|node:https|node:http|process\.env|@supabase|supabase-js|app\/api\//, `${name} has no live transport/credentials/persistence/routes`);
@@ -364,8 +370,8 @@ matches(
   /run\(cli, \["migration", "up", "--local"\]\)/,
   "the fixture-rich runner must apply the ordered zero-based and retry-identity migrations"
 );
-matches(zeroBasedUpgradeRunner, /const dormantSquareTail = \[\s*"20260907042202_square_dormant_trusted_authority\.sql",\s*"20260907042352_square_dormant_atomic_pages\.sql",\s*"20260907174326_square_dormant_account_connection\.sql"\s*\]/,
-  "fixture-rich QBO upgrade allows exactly the three reviewed dormant Square migrations");
+matches(zeroBasedUpgradeRunner, /const dormantSquareTail = \[\s*"20260907042202_square_dormant_trusted_authority\.sql",\s*"20260907042352_square_dormant_atomic_pages\.sql",\s*"20260907174326_square_dormant_account_connection\.sql",\s*"20260907225626_square_remote_sandbox_binding\.sql"\s*\]/,
+  "fixture-rich QBO upgrade allows exactly the four dormant Square migrations");
 // Execute only the pure manifest guard, with no database/CLI capability. This
 // catches an omitted additive tail before the real database gate runs in CI.
 const fixtureGuardSource = zeroBasedUpgradeRunner.slice(0, zeroBasedUpgradeRunner.indexOf("async function applyFixture"));
@@ -384,6 +390,7 @@ function acceptsFixtureManifest(names) {
 }
 equal(acceptsFixtureManifest(currentMigrations), true, "real current migration manifest passes the fixture-rich guard");
 for (const manifest of [currentMigrations.filter(name => name !== "20260907174326_square_dormant_account_connection.sql"),
+  currentMigrations.filter(name => name !== "20260907225626_square_remote_sandbox_binding.sql"),
   [...currentMigrations, "20990101000000_square_activation.sql"]]) {
   assertionCount++; assert.throws(() => acceptsFixtureManifest(manifest), /fixture_manifest_denied/, "missing or unreviewed tail still rejects");
 }
@@ -403,7 +410,11 @@ matches(
   "the fixture must preserve the exact production-labelled 2-leased/1-pending shape"
 );
 
-equal(approvedSquareQualificationPaths.length, 15, "dormant scope permits exactly three migrations, three fixtures, seven routes, one page and one panel");
+equal(approvedSquareQualificationPaths.length, 17, "dormant scope permits the exact migration/UI files and branch-only deployment guard");
+assertionCount++;
+assert.deepEqual(JSON.parse(read("vercel.json")), {
+  git: { deploymentEnabled: { "codex/square-remote-sandbox-binding": false } }
+}, "code-only review branch cannot deploy; main and every other branch keep Vercel's default behavior");
 equal(withoutSquareQualificationPaths(approvedSquareQualificationPaths.join("\n")), "", "exact qualification paths are exempt from legacy phase-only scope assertions");
 for (const protectedPath of [
   ...approvedSquareQualificationPaths.map(file => `${file}.unexpected`),
@@ -413,7 +424,7 @@ for (const protectedPath of [
   "components/integrations/SquarePanel.tsx",
   "services/external-integrations-square/server.ts",
   "lib/supabase/types.ts",
-  "vercel.json"
+  "vercel.ts"
 ]) {
   equal(withoutSquareQualificationPaths(protectedPath), protectedPath, "scope exemption cannot hide a neighboring or activation path");
 }

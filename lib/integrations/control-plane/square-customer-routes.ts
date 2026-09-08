@@ -9,6 +9,8 @@ import {
   type SquareConnectionView
 } from "@/lib/integrations/providers/square/account-connection-contracts";
 import { parseSquareOAuthCallback } from "@/lib/integrations/providers/square/account-connection-oauth";
+import { SQUARE_REMOTE_SANDBOX } from "@/lib/integrations/control-plane/square-remote-sandbox-contracts";
+import { SQUARE_OAUTH_SCOPES } from "@/lib/integrations/providers/square/account-connection-oauth";
 
 export const SQUARE_CUSTOMER_SETTINGS_PATH = "/app/settings/integrations/square" as const;
 export const SQUARE_CUSTOMER_API_PATH = "/api/integrations/square" as const;
@@ -150,11 +152,11 @@ async function boundedForm(request: Request) {
   }
 }
 
-function callbackInput(url: URL) {
+function callbackInput(url: URL, expectedRedirect?: string) {
   // The local fixture URL has already matched the exact host/path gate. Reuse
   // the authoritative Square query parser without relaxing its HTTPS policy.
   // Actual application/redirect binding is checked again by consumed state.
-  const logicalCallback = `https://square-callback.synthetic.invalid${SQUARE_CUSTOMER_CALLBACK_PATH}`;
+  const logicalCallback = expectedRedirect ?? `https://square-callback.synthetic.invalid${SQUARE_CUSTOMER_CALLBACK_PATH}`;
   const result = parseSquareOAuthCallback(logicalCallback + url.search, logicalCallback);
   return result.kind === "authorized"
     ? { state: result.state, code: result.authorizationCode }
@@ -164,11 +166,60 @@ function callbackInput(url: URL) {
 export function createSquareCustomerHandlers(dependencies: SquareLocalCustomerDependencies) {
   if (dependencies.qualification !== "disposable_local_synthetic_only" || !squareLocalQualificationEnvironmentAllowed()) throw new Error("square_local_customer_configuration_invalid");
   const origin = squareLocalQualificationOrigin(dependencies.applicationOrigin);
+  return customerHandlers({ ...dependencies, origin,
+    enabled: request => squareLocalQualificationEnvironmentAllowed() && new URL(request.url).origin === origin,
+    authorizationNavigation(authorizationUrl) {
+      const navigation = new URL(dependencies.resolveAuthorizationNavigation(authorizationUrl));
+      if (navigation.origin !== origin || navigation.pathname !== "/__square_synthetic_provider/authorize" || navigation.username || navigation.password || navigation.hash) throw new Error("square_customer_navigation_denied");
+      return navigation.toString();
+    }, openingMessage: "Opening the local Square authorization fixture."
+  });
+}
+
+/** Only the server's checked remote binding supplies these capabilities. A flag,
+ * host, request header or serialized binding cannot install a remote handler. */
+export function createSquareRemoteSandboxCustomerHandlers(dependencies: Readonly<{
+  authenticate(request: Request): Promise<SquareConnectionActor | null>;
+  service: SquareConnectionService;
+  enabled(request: Request): Promise<boolean>;
+  notify(request: Request): Promise<Response>;
+}>) {
+  return customerHandlers({ ...dependencies, origin: SQUARE_REMOTE_SANDBOX.applicationOrigin,
+    expectedRedirect: SQUARE_REMOTE_SANDBOX.applicationOrigin + SQUARE_CUSTOMER_CALLBACK_PATH,
+    authorizationNavigation(authorizationUrl) {
+      const navigation = new URL(authorizationUrl);
+      const entries = [...navigation.searchParams.keys()];
+      const keys = ["client_id", "redirect_uri", "scope", "state", "session"];
+      if (navigation.origin !== SQUARE_REMOTE_SANDBOX.providerOrigin || navigation.pathname !== "/oauth2/authorize" ||
+        navigation.username || navigation.password || navigation.hash || entries.length !== keys.length ||
+        keys.some(key => navigation.searchParams.getAll(key).length !== 1) ||
+        navigation.searchParams.get("client_id") !== SQUARE_REMOTE_SANDBOX.applicationId ||
+        navigation.searchParams.get("redirect_uri") !== SQUARE_REMOTE_SANDBOX.applicationOrigin + SQUARE_CUSTOMER_CALLBACK_PATH ||
+        navigation.searchParams.get("scope") !== SQUARE_OAUTH_SCOPES.join(" ") ||
+        !/^[A-Za-z0-9_-]{43}$/.test(navigation.searchParams.get("state") ?? "") ||
+        navigation.searchParams.get("session") !== "false") throw new Error("square_customer_navigation_denied");
+      return navigation.toString();
+    }, openingMessage: "Opening Square Sandbox authorization."
+  });
+}
+
+function customerHandlers(dependencies: Readonly<{
+  origin: string;
+  authenticate(request: Request): Promise<SquareConnectionActor | null>;
+  service: SquareConnectionService;
+  enabled(request: Request): boolean | Promise<boolean>;
+  authorizationNavigation(authorizationUrl: string): string;
+  expectedRedirect?: string;
+  openingMessage: string;
+  notify?(request: Request): Promise<Response>;
+}>) {
+  const origin = dependencies.origin;
   const authenticate = dependencies.authenticate;
   const service = dependencies.service;
-  const resolveAuthorizationNavigation = dependencies.resolveAuthorizationNavigation;
   const notify = dependencies.notify;
-  const enabled = (request: Request) => squareLocalQualificationEnvironmentAllowed() && new URL(request.url).origin === origin;
+  const enabled = async (request: Request) => {
+    try { return await dependencies.enabled(request); } catch { return false; }
+  };
   const actorFor = async (request: Request) => {
     const actor = SquareConnectionActorSchema.parse(await authenticate(request));
     return Object.freeze(actor);
@@ -179,12 +230,12 @@ export function createSquareCustomerHandlers(dependencies: SquareLocalCustomerDe
   };
   return Object.freeze({
     async view(request: Request) {
-      if (!enabled(request)) return null;
+      if (!await enabled(request)) return null;
       return viewFor(await actorFor(request));
     },
     async handle(action: SquareCustomerAction, request: Request): Promise<Response> {
       // No authentication, parsing, provider call or configuration lookup precedes the closed gate.
-      if (!enabled(request)) return squareCustomerConnectionsUnavailableResponse();
+      if (!await enabled(request)) return squareCustomerConnectionsUnavailableResponse();
       const url = new URL(request.url);
       if (url.pathname !== `${SQUARE_CUSTOMER_API_PATH}/${action}` || url.hash ||
         request.method !== (action === "callback" || action === "status" ? "GET" : "POST")) return failure();
@@ -202,7 +253,7 @@ export function createSquareCustomerHandlers(dependencies: SquareLocalCustomerDe
       if (action === "callback") {
         // A genuine OAuth top-level GET is cross-site and usually has no Origin header.
         try {
-          const input = callbackInput(url);
+          const input = callbackInput(url, dependencies.expectedRedirect);
           const actor = await actorFor(request);
           if (!managementRoles.has(actor.role)) throw new Error("square_customer_actor_denied");
           await service.complete(actor, input, request.signal);
@@ -222,9 +273,8 @@ export function createSquareCustomerHandlers(dependencies: SquareLocalCustomerDe
         if (action === "connect" || action === "reauthorize") {
           const checked = action === "connect" ? ConnectSchema.parse(input) : ReauthorizeSchema.parse(input);
           const result = await service.initiate(actor, { ...checked, operation: action === "connect" ? "connect" : "reauthorize" }, request.signal);
-          const navigation = new URL(resolveAuthorizationNavigation(result.authorizationUrl));
-          if (navigation.origin !== origin || navigation.pathname !== "/__square_synthetic_provider/authorize" || navigation.username || navigation.password || navigation.hash) throw new Error("square_customer_navigation_denied");
-          return handoff(navigation.toString(), SQUARE_CUSTOMER_SETTINGS_PATH, "Opening the local Square authorization fixture.");
+          const navigation = dependencies.authorizationNavigation(result.authorizationUrl);
+          return handoff(navigation, SQUARE_CUSTOMER_SETTINGS_PATH, dependencies.openingMessage);
         }
         if (action === "mapping") await service.confirmMapping(actor, MappingSchema.parse(input));
         else await service.disconnect(actor, DisconnectSchema.parse(input), request.signal);
