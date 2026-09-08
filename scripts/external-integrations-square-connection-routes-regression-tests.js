@@ -3,6 +3,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { loadSquareBrowserModules } = require("./square-account-browser-test-support.js");
 const modules = loadSquareBrowserModules();
+const handoffPolicy = require("../lib/integrations/control-plane/square-customer-handoff-policy.json");
 const { createSquareCustomerHandlers, SQUARE_CUSTOMER_SETTINGS_PATH, SQUARE_CUSTOMER_API_PATH } = modules;
 const root = path.resolve(__dirname, "..");
 const origin = "http://127.0.0.1:31999";
@@ -82,6 +83,20 @@ async function main() {
   ok(connected.headers.get("content-security-policy").includes("default-src 'none'"));
   const good = calls.at(-1); equal(good.actor.actorId, actor.actorId); equal(good.actor.sessionId, actor.sessionId);
   equal(good.input.businessEntityId, businessEntityId);
+  const inertTarget = `${origin}/__square_synthetic_provider/authorize?marker=%22%3E%3Cscript%3EINERT_DATA_CANARY%3C%2Fscript%3E&check=1`;
+  const inertHandlers = createSquareCustomerHandlers({ ...configuration, resolveAuthorizationNavigation: () => inertTarget });
+  const inertResponse = await inertHandlers.handle("connect", request("connect", form({ businessEntityId })));
+  equal(inertResponse.status, 200);
+  const inertHtml = await inertResponse.text();
+  equal([...inertHtml.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(match => match[1]).join(""), handoffPolicy.script, "input never changes hash-authorized executable bytes");
+  ok(inertHtml.includes(`data-target="${inertTarget.replace(/&/g, "&amp;")}"`), "navigation is escaped inert data, not an executable interpolation");
+  ok(!inertHtml.includes("<script>INERT_DATA_CANARY"));
+  for (const target of ["javascript:INERT_DATA_CANARY", "https://foreign.invalid/__square_synthetic_provider/authorize", `${origin}/__square_synthetic_provider/authorize#INERT_DATA_CANARY`]) {
+    const deniedHandlers = createSquareCustomerHandlers({ ...configuration, resolveAuthorizationNavigation: () => target });
+    const deniedResponse = await deniedHandlers.handle("connect", request("connect", form({ businessEntityId })));
+    equal(deniedResponse.status, 400, "unvalidated navigation never enters a handoff");
+    ok(!(await deniedResponse.text()).includes("INERT_DATA_CANARY"));
+  }
   for (const [body, headers] of [
     [form({ businessEntityId }), { origin: "https://foreign.example" }],
     [form({ businessEntityId }), { "sec-fetch-site": "cross-site" }],
@@ -110,8 +125,8 @@ async function main() {
   const html = await result.text();
   for (const canary of [state, code, "PRIVATE_PROVIDER_ERROR_CANARY"]) ok(!html.includes(canary));
   equal(result.headers.get("location"), null);
-  ok(html.includes(`history.replaceState(null,\"\",\"${SQUARE_CUSTOMER_API_PATH}/callback\")`));
-  ok(html.includes(`location.replace(\"${SQUARE_CUSTOMER_SETTINGS_PATH}\")`));
+  ok(html.includes(`data-clean-path="${SQUARE_CUSTOMER_API_PATH}/callback"`));
+  ok(html.includes(`data-target="${SQUARE_CUSTOMER_SETTINGS_PATH}"`));
   await handlers.handle("callback", callback(form({ state, error: "access_denied", error_description: "PRIVATE_PROVIDER_ERROR_CANARY" })));
   equal(calls.at(-1).input.error, "access_denied"); ok(!JSON.stringify(calls.at(-1)).includes("PRIVATE_PROVIDER_ERROR_CANARY"));
   await handlers.handle("callback", callback(form({ state, code, response_type: "code" })));

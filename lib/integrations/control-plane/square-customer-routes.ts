@@ -1,6 +1,5 @@
-import { randomBytes } from "node:crypto";
-
 import { z } from "zod";
+import squareHandoffPolicy from "@/lib/integrations/control-plane/square-customer-handoff-policy.json";
 import {
   SquareConnectionActorSchema,
   SquareConnectionViewSchema,
@@ -63,6 +62,7 @@ export function squareLocalQualificationOrigin(value: string) {
 }
 
 const privateHeaders = {
+  "content-security-policy": "default-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
   "cache-control": "no-store, max-age=0",
   pragma: "no-cache",
   "referrer-policy": "no-referrer",
@@ -80,17 +80,17 @@ function failure(status = 400) {
   return Response.json({ ok: false, error: "Square connection request could not be completed." }, { status, headers: privateHeaders });
 }
 
-function scriptString(value: string) {
-  return JSON.stringify(value).replace(/</g, "\\u003c").replace(/>/g, "\\u003e").replace(/&/g, "\\u0026").replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029");
+function attributeString(value: string) {
+  return value.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/'/g, "&#39;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 /** Standalone documents never load the app layout, React, telemetry or third-party assets. */
 function handoff(target: string, cleanPath: string, message: string) {
-  const nonce = randomBytes(24).toString("base64url");
-  const script = `history.replaceState(null,"",${scriptString(cleanPath)});location.replace(${scriptString(target)});`;
-  return new Response(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="referrer" content="no-referrer"><meta name="robots" content="noindex,nofollow"><title>Square connection</title></head><body><p>${message}</p><noscript>Enable JavaScript, then return to Square connection settings. Do not share this address.</noscript><script nonce="${nonce}">${script}</script></body></html>`, {
+  // Only already-validated navigation and fixed clean paths enter inert data.
+  // The executable bytes are shared with Next's fixed hash policy, never input.
+  return new Response(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="referrer" content="no-referrer"><meta name="robots" content="noindex,nofollow"><title>Square connection</title></head><body><p id="square-handoff" data-target="${attributeString(target)}" data-clean-path="${attributeString(cleanPath)}">${message}</p><noscript>Enable JavaScript, then return to Square connection settings. Do not share this address.</noscript><script>${squareHandoffPolicy.script}</script></body></html>`, {
     status: 200,
-    headers: { ...privateHeaders, "content-type": "text/html; charset=utf-8", "content-security-policy": `default-src 'none'; script-src 'nonce-${nonce}'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'` }
+    headers: { ...privateHeaders, "content-type": "text/html; charset=utf-8", "content-security-policy": squareHandoffPolicy.csp }
   });
 }
 

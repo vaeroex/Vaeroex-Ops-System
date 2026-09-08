@@ -240,7 +240,8 @@ function assertTargetIsSinglePendingMigration() {
     "20260907042202_square_dormant_trusted_authority.sql",
     "20260907042352_square_dormant_atomic_pages.sql",
     "20260907174326_square_dormant_account_connection.sql",
-    "20260907225626_square_remote_sandbox_binding.sql"
+    "20260907225626_square_remote_sandbox_binding.sql",
+    "20260908014713_square_broker_runtime_credential_authority.sql"
   ];
   const laterMigrations = migrations.slice(targetIndex + 1);
   if (laterMigrations.length !== dormantSquareTail.length ||
