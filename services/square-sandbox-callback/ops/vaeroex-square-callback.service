@@ -1,0 +1,66 @@
+[Unit]
+Description=Vaeroex isolated Square Sandbox callback
+After=network-online.target time-sync.target
+Wants=network-online.target
+ConditionPathExists=/etc/vaeroex-square-callback/config.json
+ConditionPathExists=/etc/vaeroex-square-callback/host-policy.json
+StartLimitIntervalSec=300
+StartLimitBurst=2
+
+[Service]
+Type=simple
+User=vaeroex-square-callback
+Group=vaeroex-square-callback
+WorkingDirectory=/opt/vaeroex-square-callback/current
+UMask=0077
+Environment=NODE_ENV=production
+UnsetEnvironment=NODE_OPTIONS NODE_V8_COVERAGE NODE_EXTRA_CA_CERTS NODE_TLS_REJECT_UNAUTHORIZED NODE_USE_SYSTEM_CA NODE_USE_ENV_PROXY HTTP_PROXY HTTPS_PROXY http_proxy https_proxy OPENSSL_CONF SSL_CERT_FILE SSL_CERT_DIR SQUARE_SANDBOX_DATABASE_CA_PEM SSLKEYLOGFILE GOOGLE_APPLICATION_CREDENTIALS GOOGLE_OAUTH_ACCESS_TOKEN
+LoadCredential=tls-key:/etc/letsencrypt/live/square-sandbox.vaeroex.com/privkey.pem
+LoadCredential=tls-cert:/etc/letsencrypt/live/square-sandbox.vaeroex.com/fullchain.pem
+ExecStartPre=+/opt/vaeroex-square-callback/node/bin/node /opt/vaeroex-square-callback/current/ops/host-preflight.mjs
+ExecStartPre=/opt/vaeroex-square-callback/node/bin/node --conditions=react-server dist/index.js --preflight --config /etc/vaeroex-square-callback/config.json
+ExecStart=/opt/vaeroex-square-callback/node/bin/node --conditions=react-server dist/index.js --serve --config /etc/vaeroex-square-callback/config.json
+Restart=no
+RuntimeMaxSec=3600
+KillSignal=SIGTERM
+KillMode=control-group
+TimeoutStartSec=20
+TimeoutStopSec=70
+SendSIGKILL=yes
+LimitCORE=0
+LimitNOFILE=256
+TasksMax=64
+MemoryHigh=1280M
+MemoryMax=1536M
+MemorySwapMax=0
+OOMPolicy=stop
+StandardInput=null
+StandardOutput=null
+StandardError=null
+NoNewPrivileges=yes
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+ProtectSystem=strict
+ProtectHome=yes
+PrivateDevices=yes
+PrivateTmp=yes
+# No writable app scratch paths: neither /tmp nor the runtime directory is a
+# permitted OAuth store. The application must not write request material there.
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+LockPersonality=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+SystemCallArchitectures=native
+RuntimeDirectory=vaeroex-square-callback
+RuntimeDirectoryMode=0700
+ReadOnlyPaths=/var/lib/vaeroex-square-acme
+BindReadOnlyPaths=/var/lib/vaeroex-square-acme:/run/vaeroex-square-callback/acme
+InaccessiblePaths=/var/log /var/crash /var/lib/systemd/coredump /etc/letsencrypt
+
+# No Install/WantedBy: installation does not enable the service at boot.
+# Any operator restart must rerun both preflights and current binding checks.

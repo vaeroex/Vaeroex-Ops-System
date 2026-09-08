@@ -127,6 +127,13 @@ jobs:
           pnpm exec playwright install --with-deps chromium
           pnpm test:external-integrations-square-handoff-headers --browser
 
+      - name: Verify isolated native Square callback credentials, portal and guest controls
+        run: |
+          pnpm test:external-integrations-square-gcp-credentials
+          pnpm test:external-integrations-square-gcp-portal --browser
+          pnpm test:external-integrations-square-gcp-ops
+          pnpm build:external-integrations-square-gcp-callback
+
       - name: External integrations Phase 1 regressions
         run: pnpm test:external-integrations-phase-1
 
@@ -183,6 +190,20 @@ jobs:
 
       - name: Build external integrations QBO sandbox runtime
         run: pnpm build:external-integrations-qbo-sandbox
+
+      - name: Set up pinned Terraform for isolated Square template tests
+        uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: 1.16.1
+          terraform_wrapper: false
+
+      - name: Validate dormant Square resources with mocked provider only
+        working-directory: services/square-sandbox-callback/infra
+        run: |
+          terraform fmt -check -recursive
+          terraform init -backend=false -input=false
+          terraform validate
+          terraform test
 
       - name: Build external integrations QBO Production runtime
         run: pnpm build:external-integrations-qbo
@@ -274,6 +295,9 @@ jobs:
 
       - name: Qualify separate Square broker and runtime authority in disposable databases only
         run: node scripts/run-square-broker-runtime-qualification.js --supabase-local
+
+      - name: Qualify native GCP callback first-consent authority in disposable databases only
+        run: node scripts/run-square-gcp-callback-database-qualification.js --supabase-local
 
       - name: Remove isolated database state
         if: always()
