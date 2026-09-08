@@ -71,6 +71,14 @@ For normal shutdown/patching, close new admission, SIGTERM, await bounded cancel
 
 ## Patching, recovery and end of approval
 
+### Spot interruption acceptance
+
+The operator approved Spot E2 with `STOP`, maintenance `TERMINATE` and no automatic restart. Treat the shutdown notice as unavailable: acceptance must include an outstanding synthetic request interrupted by an immediate process kill and a guest reset that does not deliver a graceful application drain. Neither a SIGTERM-only test nor a clean VM stop establishes abrupt-loss recovery. Use no real credentials/callbacks in these tests, and record interrupted cases as incomplete rather than passed. Do not introduce crash dumps, memory snapshots, packet capture or request-bearing logs for diagnosis.
+
+After reboot, confirm neither the real daemon nor the mock fixture starts automatically. Keep the real config disabled and provider calls false. Revalidate the exact host/resource identity, privacy settings, root-owned immutable artifact, effective unit, certificate coverage, approved one-hour window, budget and durable aggregate usage ledger before manually starting another synthetic window. The ledger contains only nonsecret aggregate counters/run outcome; it must survive restart and mark a run incomplete unless its completion was explicitly recorded. Reserve bounded usage before admission so abrupt loss cannot reset accounting. Old in-memory sessions, states and receipts must fail on the new process; no raw values are persisted to achieve recovery.
+
+For later authorized database/native testing, inspect checked current authority after an uncertain commit and preserve consume/generation/CAS fencing. Do not retry an old code or infer success from a terminated process. First real consent remains prohibited by this execution. Spot availability, shorter shutdown opportunities and partial test runs are accepted; silently skipping startup checks is not.
+
 Name an operator. Check advisories weekly and before every window, schedule OS/Node/Certbot updates, and keep the service closed for applicable critical remotely exploitable defects until patched/reviewed. Avoid uncoordinated automatic restarts during consent; updates themselves must not be neglected. Use native OS updates, not a new paid VM Manager pipeline. Review package repository HTTPS egress and exact release pins before preparation. After patch/reboot, rerun host preflight and focused privacy/lifecycle/renewal smoke tests; any changed effective artifact/configuration needs fresh evidence.
 
 Rebuild only from immutable code/configuration; no raw-memory restore or secret-bearing image. No backup/PITR/database upgrade is included. One VM/zone and a Free database can interrupt qualification; accept rescheduling. Reserve two operator hours/month plus incident time. Implementation/maintenance labor is not included in the USD 20 provider envelope.

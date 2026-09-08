@@ -28,6 +28,10 @@ run "closed_metadata_only_plan" {
     error_message = "Dedicated keyless identity and no-memory-migration maintenance are mandatory."
   }
   assert {
+    condition     = google_compute_instance.callback.scheduling[0].provisioning_model == "SPOT" && google_compute_instance.callback.scheduling[0].instance_termination_action == "STOP" && !google_compute_instance.callback.boot_disk[0].auto_delete && google_compute_instance.callback.deletion_protection
+    error_message = "E2 must be Spot with STOP, retained disk and deletion protection; standard E2 cannot terminate on maintenance."
+  }
+  assert {
     condition     = google_compute_firewall.https.disabled && google_compute_firewall.acme.disabled
     error_message = "Templates must leave ingress closed."
   }

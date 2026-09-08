@@ -4,7 +4,15 @@ The user approved this resource envelope within **USD 20/month before tax**, but
 
 ## Scope
 
-The template creates one `e2-small`, one 10 GiB `pd-standard` boot disk, one Premium external IPv4, one custom VPC/subnet, narrowly targeted firewall rules, the DB-secret metadata container and a project-wide USD 20 budget. Compute and Billing Budgets API enablement is explicit; existing IAM/KMS/Secret Manager prerequisites are references, not replacements. No startup script or artifact is installed. Both ingress rules start disabled.
+The template creates one Spot `e2-small`, one 10 GiB `pd-standard` boot disk, one Premium external IPv4, one custom VPC/subnet, narrowly targeted firewall rules, the DB-secret metadata container and a project-wide USD 20 budget. Compute and Billing Budgets API enablement is explicit; existing IAM/KMS/Secret Manager prerequisites are references, not replacements. No startup script or artifact is installed. Both ingress rules start disabled.
+
+### Approved Spot correction — September 8, 2026
+
+The first authorized hosted plan exposed a real provider constraint: standard E2 rejects `onHostMaintenance=TERMINATE`. The operator explicitly approved changing only the provisioning model to Spot within the existing USD20 ceiling, accepting interrupted synthetic windows. The template now requires `SPOT`, termination action `STOP`, maintenance `TERMINATE`, automatic restart false, retained disk and deletion protection. No migration, automatic recovery, replacement instance, paid commitment or weaker privacy control is introduced. [E2 maintenance limitation](https://docs.cloud.google.com/compute/docs/instances/setting-vm-host-options), [Spot behavior](https://docs.cloud.google.com/compute/docs/instances/spot).
+
+This source template still includes later secret/IAM permissions. The no-secret hosted execution must use its reviewed isolated operational plan that omits those blocks; the Spot approval does not authorize granting application-secret access. Do not apply the whole source template merely to create the synthetic host.
+
+Preemption can be abrupt. No correctness argument or completed-test claim may depend on Google's best-effort shutdown interval. Record an interrupted window as incomplete; before manual restart rerun host, artifact, certificate, authority, spend and cumulative-usage checks. No daemon is boot-enabled and no old browser session/consent may be restored from a memory snapshot. The guest runbook specifies the abrupt-loss acceptance test.
 
 Existing references are fixed, not caller-selectable:
 
@@ -54,4 +62,6 @@ terraform test
 
 The budget covers **all services in this project**, including the existing key/secret baseline, excludes credits and sends actual-spend thresholds at USD 10/15/18/20. It depends on verified account/channel configuration, and cost-bearing resources depend on the budget resource. This is an alert, not an enforceable monthly stop. Quotas, one-instance inventory, finite per-run admission and an operator's usage review supplement it. Billing lag, taxes, unexpected egress or abusive traffic can exceed a modeled invoice. [Budget behavior](https://docs.cloud.google.com/billing/docs/how-to/budgets).
 
-No scheduled resource deletion is installed. The VM has automatic restart disabled, no consent listener/artifact on initial creation and no enabled ingress. Stopping compute does not remove disk/static-IP cost; unused reserved IP pricing may differ. Deletion protection and `prevent_destroy` require an explicit, itemized decommission decision. An expired grant does not destroy secrets, credentials, audit evidence, disks or IPs. The source-retention/disposition decision remains separate.
+No scheduled resource deletion is installed. The VM has automatic restart disabled, no consent listener/artifact on initial creation and no enabled ingress. Spot compute is charged only while running; the retained disk and assigned static IP remain charged while stopped. An unattached reserved IPv4 is currently USD0.01/hour (USD0.24/day); an IP attached to Spot is USD0.0025/hour, including when the VM is stopped. Track each state interval rather than dropping stopped-resource charges. Verify current regional Spot compute pricing before applying; the USD20 total ceiling is unchanged. [IPv4 rates and in-use definition](https://cloud.google.com/vpc/pricing), [Spot pricing](https://cloud.google.com/spot-vms/pricing).
+
+Deletion protection and `prevent_destroy` require an explicit, itemized decommission decision. An expired grant does not destroy secrets, credentials, audit evidence, disks or IPs. The source-retention/disposition decision remains separate.

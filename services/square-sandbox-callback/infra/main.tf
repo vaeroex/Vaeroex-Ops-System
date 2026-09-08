@@ -179,9 +179,12 @@ resource "google_compute_instance" "callback" {
     scopes = ["https://www.googleapis.com/auth/cloud-platform"]
   }
   scheduling {
-    on_host_maintenance = "TERMINATE"
-    automatic_restart   = false
-    provisioning_model  = "STANDARD"
+    # Standard E2 requires live migration; approved Spot preserves no migration.
+    # STOP retains disk/IP. Recovery must not depend on a preemption grace period.
+    on_host_maintenance         = "TERMINATE"
+    automatic_restart           = false
+    provisioning_model          = "SPOT"
+    instance_termination_action = "STOP"
   }
   shielded_instance_config {
     enable_secure_boot          = true
