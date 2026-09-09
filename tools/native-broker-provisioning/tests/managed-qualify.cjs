@@ -81,6 +81,7 @@ async function main() {
   const versionSource = path.join(fixture.root, "managed-libpq-version.c");
   const versionProbe = path.join(fixture.root, "managed-libpq-version");
   fs.writeFileSync(versionSource, '#include <libpq-fe.h>\n#include <stdio.h>\nint main(void){printf("%d\\n",PQlibVersion());return 0;}\n');
+  stage = "build_managed_version_probe";
   command("/usr/bin/cc", [...managedFlags.map(value => value === source ? versionSource : value), "-o", versionProbe]);
   check(command(versionProbe, []).trim() === (systemLibpq ? "160015" : "170006"), "actual_managed_libpq_runtime_" + (systemLibpq ? "160015" : "170006"));
   // The fixture has already verified exact dependency digests. Its generated
@@ -90,21 +91,27 @@ async function main() {
   const auditPath = preloads.find(value => value.endsWith("/pgaudit"));
   const utilsPath = preloads.find(value => value.endsWith("/supautils"));
   check([auditPath, utilsPath].every(value => typeof value === "string" && path.isAbsolute(value) && !/[\s"\\]/.test(value)), "exact_local_hook_paths");
+  stage = "build_strict_client";
   command("/usr/bin/cc", [...flags, "-DVAEROEX_SYNTHETIC_ONLY", "-o", strict]);
+  stage = "build_managed_local_client";
   command("/usr/bin/cc", [...managedFlags, "-DVAEROEX_SYNTHETIC_ONLY", "-DVAEROEX_MANAGED_PROFILE_TEST",
     '-DVAEROEX_TEST_AUDIT_PRELOAD="' + auditPath + '"', '-DVAEROEX_TEST_UTILS_PRELOAD="' + utilsPath + '"', "-o", managed]);
+  stage = "build_closed_release";
   command("/usr/bin/cc", [...flags, "-o", release]);
   const pinned = path.join(fixture.root, "native-managed-pinned-never-connected");
   const managedPins = { HOST: "managed.synthetic.invalid", PORT: "5432", DATABASE: "postgres",
     ADMIN: "synthetic_lane_admin", TARGET: target, SYSTEM_ID: fixture.systemId,
     DATABASE_OID: fixture.databaseOid, CA: fixture.cert,
     ADMIN_USER: "synthetic_lane_admin.synthetic", TARGET_USER: target + ".synthetic" };
+  stage = "build_pinned_managed_client";
   command("/usr/bin/cc", [...managedFlags, "-DVAEROEX_MANAGED_SUPABASE",
     ...Object.entries(managedPins).map(([name, value]) => `-DVAEROEX_MANAGED_${name}="${value}"`), "-o", pinned]);
   const missingPins = spawnSync("/usr/bin/cc", [...managedFlags, "-DVAEROEX_MANAGED_SUPABASE", "-o", path.join(fixture.root, "missing-pins")], { env });
   check(missingPins.status !== 0, "managed_build_without_immutable_pins_rejected");
   const profileTest = path.join(fixture.root, "managed-profile-test");
-  command("/usr/bin/cc", ["-std=c11", "-Wall", "-Wextra", "-Werror", "-pthread", "-I" + managedInclude,
+  stage = "build_managed_profile_test";
+  // Exercise glibc's normalized feature macro even on non-glibc local builds.
+  command("/usr/bin/cc", ["-std=c11", "-Wall", "-Wextra", "-Werror", "-pthread", "-D_DEFAULT_SOURCE=1", "-I" + managedInclude,
     "-L" + managedLibrary, "-Wl,-rpath," + managedLibrary, path.join(__dirname, "managed-profile-test.c"), "-lpq", "-o", profileTest]);
   check(command(profileTest, []).includes("12 managed profile observations PASS"), "fixed_managed_preloads_and_effective_setting_boundaries");
   const blocked = spawnSync(release, [], { env: nativeEnv, encoding: "utf8" });

@@ -1,7 +1,9 @@
 /* Offline profile/loader-namespace boundary tests. Actual libpq result objects,
  * fixed in-memory observations; no connection or credential is ever created. */
 #define _POSIX_C_SOURCE 200809L
-#define _DEFAULT_SOURCE
+/* glibc normalizes this to 1 before native.c is included below. Use the same
+ * definition so -Werror also permits the real Linux translation unit. */
+#define _DEFAULT_SOURCE 1
 #define _DARWIN_C_SOURCE
 #include <assert.h>
 #include <libpq-fe.h>

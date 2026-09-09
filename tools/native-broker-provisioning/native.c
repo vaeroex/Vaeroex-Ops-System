@@ -5,7 +5,7 @@
  * builds can connect only to a private local socket or loopback TLS fixture.
  */
 #define _POSIX_C_SOURCE 200809L
-#define _DEFAULT_SOURCE
+#define _DEFAULT_SOURCE 1
 #define _DARWIN_C_SOURCE
 #include <libpq-fe.h>
 #include <ctype.h>

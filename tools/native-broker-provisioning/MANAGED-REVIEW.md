@@ -58,6 +58,13 @@ Exact-head GitHub checks, actual Linux16.15 qualification and automatic
 deployment verification are recorded in the PR/check runs. No test in this
 delivery uses a hosted credential or starts the Sandbox VM.
 
+The first Linux CI run passed168 strict native assertions but exposed a glibc
+feature-macro redefinition in the included managed-profile test translation
+unit. The macro now consistently uses value1; an explicit normalized-macro
+compile regression and12 profile observations pass locally. Fixed finite build
+substage labels distinguish subsequent compiler boundaries without printing raw
+errors. The corrected Linux CI result remains the delivery gate.
+
 ## Hosted preparation status
 
 Read-only recheck: exact VM `9094944541973315575` remains TERMINATED. The planned
