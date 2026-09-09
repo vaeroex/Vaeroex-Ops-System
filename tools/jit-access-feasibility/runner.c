@@ -43,6 +43,8 @@ static struct { char token[4097]; char authorization[4140]; } sensitive;
 #define credential sensitive.token
 static char pooler_address[INET_ADDRSTRLEN], api_address[INET_ADDRSTRLEN];
 static volatile sig_atomic_t interrupted;
+enum { PRIVATE_ENTRY_SECONDS = 300 };
+static int input_timed_out;
 static int tty = -1, tty_changed, locked;
 static struct termios saved_tty;
 static PGconn *held, *fresh;
@@ -168,6 +170,7 @@ static int tty_byte(char *out, time_t until) {
     int n = select(tty+1, &reads, NULL, NULL, &wait);
     if (n < 0 && errno != EINTR) return 0;
     if (n > 0 && FD_ISSET(tty,&reads)) {
+      if (!alive() || monotonic_now() >= until) return 0;
       ssize_t got = read(tty, out, 1);
       if (got == 1) return 1;
       if (got == 0 || (errno != EINTR && errno != EAGAIN)) return 0;
@@ -184,9 +187,11 @@ static int read_credential(void) {
   private_tty.c_cc[VMIN] = 1; private_tty.c_cc[VTIME] = 0;
   if (tcsetattr(tty, TCSAFLUSH, &private_tty)) return 0;
   tty_changed = 1;
+  time_t until = monotonic_now() + PRIVATE_ENTRY_SECONDS;
+  if (until > deadline) until = deadline;
+  puts("private_entry_maximum_300_seconds_or_remaining_window");
   puts("private_token_entry"); fflush(stdout);
   size_t count = 0; char ch = 0; int valid = 1;
-  time_t until = monotonic_now() + 60;
   while (tty_byte(&ch, until)) {
     if (ch == '\n' || ch == '\r') {
       wipe(&ch, sizeof ch); credential[count] = 0;
@@ -199,7 +204,9 @@ static int read_credential(void) {
     }
     credential[count++] = ch; wipe(&ch, sizeof ch);
   }
-  wipe(&ch, sizeof ch); return 0;
+  wipe(&ch, sizeof ch);
+  input_timed_out = !interrupted && monotonic_now() >= until;
+  return 0;
 }
 static int wait_socket(PGconn *connection, short events, time_t until) {
   int fd = PQsocket(connection);
@@ -377,7 +384,8 @@ int main(int argc, char **argv) {
   deadline = monotonic_now() + 1800;
   if (!harden()) return finish("privacy_preflight_failed",70);
   if (!transport_preflight()) return finish("transport_preflight_failed",70);
-  if (!read_credential()) return finish(interrupted ? "cancelled" : "private_input_rejected",65);
+  if (!read_credential()) return finish(interrupted ? "cancelled" :
+    input_timed_out ? "private_input_timed_out" : "private_input_rejected",65);
   held = connect_private();
   if (!held) return finish("connection_rejected",69);
   if (!checks(held,argv[2])) return finish("scope_assertion_failed",1);

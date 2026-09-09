@@ -91,10 +91,15 @@ normal-host and wrong-host tests; follow the
   zeroization. Real execution additionally requires reviewed no-swap, no-dump,
   no-recording host controls. macOS local tests do not qualify Linux controls.
 - Malformed/oversized input is drained to its newline without retaining excess
-  input before terminal echo is restored. Cancellation, EOF and the 60-second
+  input before terminal echo is restored. Cancellation, EOF and the 300-second
   entry deadline restore terminal state and wipe owned secret memory. Operators
   must stop entry when cancellation is requested; this is not protection against
   an external recorder or subsequent input typed into a restored terminal.
+  The entry allowance is capped by the original process deadline and never
+  renewed per character. `private_input_timed_out` distinguishes expiry from
+  `private_input_rejected`; neither establishes how many bytes arrived. Both
+  exit before credential-bearing DB/API work. Follow the
+  [private-entry handoff](PRIVATE-ENTRY.md), including its disposable outer shell.
 - libpq parameters are fixed, with expansion disabled, `/dev/null` passfile,
   `verify-full`, client-certificate use disabled and finite connection/query
   deadlines. Notices and server error payloads are never printed. Only fixed

@@ -37,6 +37,8 @@ extern time_t jit_admin_mock_wall(void);
 #define CIDR "8.229.223.109/32"
 static struct { char token[4097],header[4140],response[16385]; } private_memory;
 static volatile sig_atomic_t interrupted;
+enum { PRIVATE_ENTRY_SECONDS = 300 };
+static int input_timed_out;
 static int tty=-1,tty_changed,locked,curl_initialized,uncertain,owned,stage;
 static struct termios saved_tty;
 static time_t deadline,window_end,expected_expiry;
@@ -113,7 +115,10 @@ static int byte(char *c,time_t until) {
     fd_set rd;FD_ZERO(&rd);FD_SET(tty,&rd);struct timeval t={0,100000};
     int n=select(tty+1,&rd,NULL,NULL,&t);
     if(n<0&&errno!=EINTR)return 0;
-    if(n>0&&FD_ISSET(tty,&rd)){ssize_t z=read(tty,c,1);if(z==1)return 1;if(!z)return 0;}
+    if(n>0&&FD_ISSET(tty,&rd)){
+      if(!alive()||monotonic_now()>=until)return 0;
+      ssize_t z=read(tty,c,1);if(z==1)return 1;if(!z)return 0;
+    }
   }return 0;
 }
 static int read_token(void) {
@@ -122,14 +127,17 @@ static int read_token(void) {
   if(tty<0||!isatty(tty)||tcgetattr(tty,&saved_tty))return 0;
   struct termios t=saved_tty;t.c_lflag&=(tcflag_t)~(ECHO|ECHONL|ICANON);
   t.c_cc[VMIN]=1;t.c_cc[VTIME]=0;if(tcsetattr(tty,TCSAFLUSH,&t))return 0;tty_changed=1;
+  time_t until=monotonic_now()+PRIVATE_ENTRY_SECONDS;
+  if(until>deadline)until=deadline;
+  puts("jit_admin_private_entry_maximum_300_seconds_or_remaining_window");
   puts("jit_admin_private_token_entry");fflush(stdout);
-  size_t n=0;char c=0;int valid=1;time_t until=monotonic_now()+60;
+  size_t n=0;char c=0;int valid=1;
   while(byte(&c,until)){
     if(c=='\r'||c=='\n'){wipe(&c,1);restore();return valid&&n>6&&!strncmp(private_memory.token,"sbp_fc",6);}
     if(n==4096||!((c>='A'&&c<='Z')||(c>='a'&&c<='z')||(c>='0'&&c<='9')||c=='_'||c=='-'))valid=0;
     else private_memory.token[n++]=c;
     wipe(&c,1);
-  }wipe(&c,1);return 0;
+  }wipe(&c,1);input_timed_out=!interrupted&&monotonic_now()>=until;return 0;
 }
 
 /* Strict, bounded response parser. Strings are slices; no payload is printed.
@@ -380,7 +388,8 @@ int main(int argc,char **argv){
   deadline=monotonic_now()+(window_end-current);
   if(!harden())return finish("jit_admin_privacy_preflight_failed",70);
   if(!transport_preflight())return finish("jit_admin_transport_preflight_failed",70);
-  if(!read_token())return finish(interrupted?"jit_admin_cancelled_no_mutation":"jit_admin_private_input_rejected",65);
+  if(!read_token())return finish(interrupted?"jit_admin_cancelled_no_mutation":
+    input_timed_out?"jit_admin_private_input_timed_out":"jit_admin_private_input_rejected",65);
   struct snapshot initial;
   if(!readback(&initial,0)||initial.kind)return finish("jit_admin_pristine_baseline_required",1);
   puts("jit_admin_ready_i_invite_r_read_t_ten_minute_f_final_x_revoke_q_quit");fflush(stdout);
