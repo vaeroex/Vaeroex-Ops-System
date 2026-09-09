@@ -34,7 +34,7 @@ int main(void) { puts("native_canary_hosted_execution_blocked"); return 78; }
 #define CANARY_ATTEMPT_SECONDS 2
 #else
 #define CANARY_PORT "5432"
-#define CANARY_CA "/etc/ssl/certs/ca-certificates.crt"
+#define CANARY_CA "/etc/vaeroex-jit/supabase-root-2021.crt"
 #define CANARY_ATTEMPT_SECONDS 7
 #endif
 static const char HOST[]="aws-0-us-west-2.pooler.supabase.com";

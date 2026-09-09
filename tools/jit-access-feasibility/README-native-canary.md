@@ -130,7 +130,7 @@ a privacy pass. Do not export raw records or silently waive the unchanged policy
 ## Transport and process controls
 
 Only reviewed libpq 16.15/17.6 are accepted, with exact fixed-option capability
-readback before DNS. `verify-full`, explicit distribution CA trust,
+readback before DNS. `verify-full`, explicit scoped Supabase CA trust,
 `sslcertmode=disable`, `gssencmode=disable`,
 `require_auth=password,scram-sha-256`, `/dev/null` passfile and disabled DSN
 expansion preserve the existing runner's boundaries. The public marker is always
@@ -151,6 +151,46 @@ process alarm includes DNS and exits with a fixed label. Normal cancellation
 closes the connection; the absolute alarm is a fail-stop for blocked resolution.
 There are no retries or hidden follow-up queries. The one-hour VM deadline and
 cleanup reserve remain separate operational controls.
+
+## Scoped PostgreSQL trust installation
+
+The 2026-09-09 TLS-only test on the approved VM established the configuration
+defect: OpenSSL3.0.13 rejected the real pooler chain with the unchanged Ubuntu
+bundle (verification19, self-signed chain). The independently obtained official
+Supabase root verified the same endpoint (code0); a wrong hostname rejected
+with code62. No credential was used. This is not JIT authentication or diagnostic
+nonrecording evidence. Never trust a root merely because the peer presents it.
+
+Both native PostgreSQL clients use `/etc/vaeroex-jit/supabase-root-2021.crt`.
+Management API HTTPS retains the unchanged distribution bundle/directory.
+No build/deployment hook installs this file or starts a test. Ordinary binaries
+remain disabled; Production selection and credential admission stay separate.
+
+The checked-in CA is public, not a secret or client certificate:
+
+- Source: authenticated dashboard Database Settings → SSL Configuration →
+  Download certificate, HTTPS `https://supabase-downloads.s3-ap-southeast-1.amazonaws.com/prod/ssl/prod-ca-2021.crt`.
+- PEM SHA256: `700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7`.
+- Certificate SHA256: `807025AD50D4ED219D2C9C7D299C004F824EB00CF7F65AFEF607D07B72E6CAFA`.
+- Root expiry:2031-04-26T10:56:53Z. Leaf validity remains independently enforced.
+
+On the independently verified isolated host, verify that public file's hash,
+then install it root-owned0644 under root-owned0755 `/etc/vaeroex-jit`. Reject
+symlinks at both paths, non-root ownership, and group/other-writable directory
+ancestry. Read back hash/ownership/modes before execution; do not overwrite an
+unexpected existing file. Never modify global HTTPS trust. Keep this scoped
+configuration across restarts; cleanup of temporary test access does not delete
+the public root. Installation is an authorized operator action, not a CI hook.
+
+Before private entry, separately verify the installed CA and corrected native
+transport. Missing/untrusted/expired trust fails closed without fallback.
+Maintenance: obtain renewed trust only from authenticated provider controls and
+current primary docs, review fingerprint/expiry, run trust and hostname-negative
+tests, then replace through the same reviewed release process. Do not pin the
+current leaf, silently download replacement trust at runtime, or disable checks.
+
+Primary guidance: [Supabase SSL enforcement](https://supabase.com/docs/guides/platform/ssl-enforcement)
+prescribes the dashboard CA for `verify-full`, including a shared-pooler example.
 
 ## Focused local validation
 

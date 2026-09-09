@@ -5,6 +5,7 @@ No database server, remote network target, PAT, broker credential, or SQL.
 Only ephemeral synthetic TLS fixture keys/certificates are generated.
 """
 import argparse
+import hashlib
 import pathlib
 import signal
 import socket
@@ -355,6 +356,8 @@ def main():
     if not (include/'libpq-fe.h').is_file():
         include = prefix/'include/postgresql'
     assert (include/'libpq-fe.h').is_file()
+    assert hashlib.sha256((ROOT/'supabase-root-2021.crt').read_bytes()).hexdigest() == '700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7'
+    assert '#define CANARY_CA "/etc/vaeroex-jit/supabase-root-2021.crt"' in (ROOT/'native-canary.c').read_text()
     with tempfile.TemporaryDirectory(prefix='vaeroex-native-canary-') as value:
         tmp = pathlib.Path(value)
         assert "'" not in str(tmp)
@@ -377,6 +380,33 @@ def main():
         checked(base+['-DJIT_CANARY_APPROVED_SANDBOX_20260908', '-c', source,
                       '-o', str(tmp/'approved-not-executed.o')], 'approved-profile compile only')
         count = 2
+        # Reproduce the hosted trust failure with an independent, untrusted CA.
+        # Both failures must stop before any password/SQL; no system-root fallback.
+        wrong_ca = tmp/'untrusted-local-ca.pem'
+        checked(['openssl', 'req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '1',
+                 '-subj', '/CN=unrelated-local-root', '-keyout', str(tmp/'unrelated.key'),
+                 '-out', str(wrong_ca)], 'unrelated synthetic trust root')
+        for trust in (wrong_ca, tmp/'missing-ca.pem'):
+            fixture = Fixture(ctx, 'reject_28p01')
+            binary = tmp/'trust-negative'
+            checked(base+['-DJIT_CANARY_LOCAL_PROTOCOL',
+                          '-DJIT_CANARY_LOCAL_PORT="'+str(fixture.port)+'"',
+                          '-DJIT_CANARY_LOCAL_CA="'+str(trust)+'"', source,
+                          '-L'+str(prefix/'lib'), '-Wl,-rpath,'+str(prefix/'lib'),
+                          '-lpq', '-o', str(binary)], 'untrusted/missing CA compile')
+            fixture.start()
+            try:
+                result = subprocess.run([str(binary)], env=CLEAN, stdin=subprocess.DEVNULL,
+                                        capture_output=True, timeout=10)
+                parsed = finite_output(result.stdout, result.stderr)
+                assert result.returncode == 1
+                assert parsed['primary']['completion'] == 'connect_failed'
+                assert parsed['primary']['password_used'] == 'no'
+                assert 'native_canary_transport_observed_diagnostics_pending' not in parsed['labels']
+                assert fixture.passwords == 0 and fixture.queries == 0
+            finally:
+                fixture.close()
+            count += 1
         for mode in MODES:
             fixture = Fixture(ctx, mode)
             binary = tmp/'canary'

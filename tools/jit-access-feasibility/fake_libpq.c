@@ -26,7 +26,8 @@ PQconninfoOption *PQconninfoParse(const char *input,char **error) {
   assert(strstr(input,"require_auth=password,scram-sha-256"));
   if(is("pq_parse_failure"))return NULL;
   const char *keys[]={"sslmode","sslcertmode","gssencmode","require_auth","passfile","sslrootcert","hostaddr"};
-  const char *values[]={"verify-full","disable","disable","password,scram-sha-256","/dev/null","/etc/ssl/certs/ca-certificates.crt","127.0.0.1"};
+  assert(strstr(input,"sslrootcert=/etc/vaeroex-jit/supabase-root-2021.crt"));
+  const char *values[]={"verify-full","disable","disable","password,scram-sha-256","/dev/null","/etc/vaeroex-jit/supabase-root-2021.crt","127.0.0.1"};
   PQconninfoOption *options=calloc(8,sizeof *options);assert(options);
   for(int i=0;i<7;++i){options[i].keyword=strdup(keys[i]);options[i].val=strdup(values[i]);assert(options[i].keyword&&options[i].val);}
   if(is("pq_missing_sslcertmode")){free(options[1].val);options[1].val=NULL;}
@@ -40,7 +41,7 @@ void PQconninfoFree(PQconninfoOption *options) {
 PGconn *PQconnectStartParams(const char *const *keys,const char *const *values,int expand) {
   assert(expand == 0); assert(open_connections < 2);
   PGconn *c=calloc(1,sizeof *c); assert(c); c->number=++connections; ++open_connections;
-  int host=0, tls=0, pass=0, file=0;
+  int host=0, tls=0, pass=0, file=0, ca=0;
   for(int i=0;keys[i];++i) {
     if(!strcmp(keys[i],"host")) { assert(!strcmp(values[i],"aws-0-us-west-2.pooler.supabase.com")); host=1; }
     if(!strcmp(keys[i],"hostaddr")) assert(!strcmp(values[i],"127.0.0.1"));
@@ -48,10 +49,11 @@ PGconn *PQconnectStartParams(const char *const *keys,const char *const *values,i
     if(!strcmp(keys[i],"options")) assert(strstr(values[i],"-c jit=true") && strstr(values[i],"-c search_path=pg_catalog"));
     if(!strcmp(keys[i],"require_auth"))assert(!strcmp(values[i],"password,scram-sha-256"));
     if(!strcmp(keys[i],"sslmode")) { assert(!strcmp(values[i],"verify-full")); tls=1; }
+    if(!strcmp(keys[i],"sslrootcert")) { assert(!strcmp(values[i],"/etc/vaeroex-jit/supabase-root-2021.crt")); ca=1; }
     if(!strcmp(keys[i],"passfile")) { assert(!strcmp(values[i],"/dev/null")); file=1; }
     if(!strcmp(keys[i],"password")) { assert(strlen(values[i])<=4096); strcpy(c->secret,values[i]); pass=1; }
   }
-  assert(host&&tls&&pass&&file); return c;
+  assert(host&&tls&&pass&&file&&ca); return c;
 }
 PQnoticeProcessor PQsetNoticeProcessor(PGconn *c,PQnoticeProcessor p,void *arg) {
   c->notice=p;c->arg=arg; p(arg,c->secret); return NULL;
