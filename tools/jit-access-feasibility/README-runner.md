@@ -17,7 +17,8 @@ No existing native-provisioning release gate is changed.
 The approved profile pins:
 `aws-0-us-west-2.pooler.supabase.com:5432`, database `postgres`, username
 `vaeroex_jit_feasibility_20260908.oysjpoondtcrqpghhrbd`, `sslmode=verify-full`
-with a public/system CA, and startup `options=-c jit=true`. The authenticated
+with the scoped public Supabase CA at `/etc/vaeroex-jit/supabase-root-2021.crt`,
+and startup `options=-c jit=true`. The authenticated
 `session_user` must be `vaeroex_jit_feasibility_20260908`, not that transport
 username suffix. It also checks database OID `5`, exact supplied role OID,
 nonprivileged attributes, no capability memberships and connection limit two.
@@ -52,8 +53,12 @@ Evidence: [16.15 TLS implementation](https://github.com/postgres/postgres/blob/R
 
 The two exact DNS names are resolved to IPv4 **before token entry**. Subsequent
 libpq uses hostaddr and libcurl uses RESOLVE while preserving original hostname
-TLS verification. No DNS lookup occurs inside libpq's token-bearing I/O. Explicit
-trusted distribution CA bundle/directory are used; failure has no fallback host.
+TLS verification. No DNS lookup occurs inside libpq's token-bearing I/O.
+PostgreSQL uses the scoped Supabase root; Management API HTTPS retains its
+explicit distribution bundle/directory. Neither has a fallback or verification
+bypass. Before token entry verify the public CA hash/ownership and corrected
+normal-host and wrong-host tests; follow the
+[scoped trust installation](README-native-canary.md#scoped-postgresql-trust-installation).
 
 ## Prepared client boundary
 

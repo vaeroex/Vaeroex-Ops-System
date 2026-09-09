@@ -137,11 +137,11 @@ static int transport_preflight(void) {
   static const char *required[][2] = {
     {"sslmode","verify-full"}, {"sslcertmode","disable"}, {"gssencmode","disable"},
     {"require_auth","password,scram-sha-256"}, {"passfile","/dev/null"},
-    {"sslrootcert","/etc/ssl/certs/ca-certificates.crt"}, {"hostaddr","127.0.0.1"}
+    {"sslrootcert","/etc/vaeroex-jit/supabase-root-2021.crt"}, {"hostaddr","127.0.0.1"}
   };
   PQconninfoOption *options=PQconninfoParse("sslmode=verify-full sslcertmode=disable "
     "gssencmode=disable require_auth=password,scram-sha-256 passfile=/dev/null "
-    "sslrootcert=/etc/ssl/certs/ca-certificates.crt hostaddr=127.0.0.1",NULL);
+    "sslrootcert=/etc/vaeroex-jit/supabase-root-2021.crt hostaddr=127.0.0.1",NULL);
   if (!options) return 0;
   int supported=1;
   for (size_t i=0;i<sizeof required/sizeof required[0];++i) {
@@ -219,7 +219,7 @@ static PGconn *connect_private(void) {
     "sslmode", "sslrootcert", "sslcertmode", "gssencmode", "require_auth", "application_name",
     "connect_timeout", "options", NULL};
   const char *values[] = {POOLER, pooler_address, "5432", "postgres", TRANSPORT_USER, credential, "/dev/null",
-    "verify-full", "/etc/ssl/certs/ca-certificates.crt", "disable", "disable", "password,scram-sha-256",
+    "verify-full", "/etc/vaeroex-jit/supabase-root-2021.crt", "disable", "disable", "password,scram-sha-256",
     "vaeroex-jit-feasibility", "5", "-c jit=true -c search_path=pg_catalog -c statement_timeout=4000 -c lock_timeout=1000", NULL};
   PGconn *c = PQconnectStartParams(keys, values, 0);
   if (!c) return NULL;
