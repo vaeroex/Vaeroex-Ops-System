@@ -273,6 +273,7 @@ jobs:
           VAEROEX_NATIVE_TEST_DEPENDENCIES="$native_manifest" VAEROEX_MANAGED_TEST_SYSTEM_LIBPQ=16.15 node tools/native-broker-provisioning/tests/managed-qualify.cjs
           node tools/native-broker-provisioning/build-managed.mjs "$RUNNER_TEMP/native-managed-sandbox"
           # Explicit build only: never execute this hosted-profile binary in CI.
+          node --test tools/native-broker-provisioning/tests/maintenance-launcher.test.mjs
           python3 -S tools/native-broker-provisioning/tests/private-pty.py
 
       - name: Qualify parked JIT regression tools offline only

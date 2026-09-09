@@ -33,6 +33,15 @@ Concrete findings corrected before delivery:
 No remaining material finding in the completed targeted reviews. Later changes
 require review of their affected boundary, not a repeat of unrelated audits.
 
+GitHub review then identified a concrete privileged-entry gap: an in-process
+NODE_OPTIONS check is too late to prevent interpreter preload. The correction
+adds the sole supported static native launcher, fixed root-owned Node/module
+paths, exact public arguments and a fresh three-variable exec environment.
+Build inspection rejects dynamic-loader dependencies. Independent review found
+no remaining material launcher finding; Linux positive/negative Node and loader
+hook regressions are required before delivery. Direct Node invocation is
+explicitly unsupported; existing root/sudo/OSLogin authority is not bypassed.
+
 ## Local evidence (not hosted qualification)
 
 - 241 Node regressions passed across lifecycle, private adapter, staging, codec,
@@ -67,10 +76,11 @@ errors. The corrected Linux CI result remains the delivery gate.
 
 ## Hosted preparation status
 
-Read-only recheck: exact VM `9094944541973315575` remains TERMINATED. The planned
-`square-sandbox-callback-db` secret container is not yet present. Creating its
-metadata and the separate scoped maintenance service identity, installing public
-artifacts, private native administrator entry and actual hosted qualification
-remain distinct steps under the standing Sandbox authorization. No new database
+The exact VM `9094944541973315575` remains TERMINATED. Reviewed preparation
+created only the separate maintenance service-account/custom-role definitions
+and empty `square-sandbox-callback-db` container; zero versions and no secret
+IAM bindings were read back. No key or credential was created. Timed permissions,
+reviewed host installation, private native administrator entry and actual hosted
+qualification remain distinct steps under the standing Sandbox authorization. No new database
 migration, JIT/PAT, application-secret read, live Square call or Production
 activation is introduced by merging this code.

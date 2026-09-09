@@ -15,6 +15,8 @@ import { maintenanceWindow, requireMutationWindow, requiresClearance, checkRecov
 
 // Dedicated operator CLI. Never imported by an application or invoked on boot.
 // All command arguments are public correlation/target metadata, not credentials.
+// Enter only through the reviewed static maintenance-launcher. The checks below
+// are defense in depth, not protection from hooks that ran before JavaScript.
 const install = "/opt/vaeroex-native-broker";
 const executable = `${install}/native-managed`;
 const journal = "/var/lib/vaeroex-native-broker/maintenance.jsonl";

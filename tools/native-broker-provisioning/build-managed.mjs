@@ -22,5 +22,15 @@ try {
     "-DVAEROEX_MANAGED_SUPABASE", ...Object.entries(pins).map(([key, value]) => `-DVAEROEX_MANAGED_${key}=${JSON.stringify(value)}`),
     resolve(dirname(fileURLToPath(import.meta.url)), "native.c"), "-lpq", "-o", process.argv[2]],
   { env: environment, stdio: "pipe", timeout: 30000 });
+  const launcher = process.argv[2] + ".launcher";
+  execFileSync("/usr/bin/cc", ["-std=c11", "-O2", "-Wall", "-Wextra", "-Werror", "-static",
+    "-D_FORTIFY_SOURCE=2", "-fstack-protector-strong", "-Wl,-z,relro,-z,now",
+    resolve(dirname(fileURLToPath(import.meta.url)), "maintenance-launcher.c"), "-o", launcher],
+  { env: environment, stdio: "pipe", timeout: 30000 });
+  // A dynamic launcher would itself honor LD_PRELOAD before main. Verify the
+  // produced ELF, not just the compiler flag, before admitting this output.
+  const programHeaders = execFileSync("/usr/bin/readelf", ["-lW", launcher], { env: environment, encoding: "utf8" });
+  const dynamicEntries = execFileSync("/usr/bin/readelf", ["-dW", launcher], { env: environment, encoding: "utf8" });
+  if (/\bINTERP\b/.test(programHeaders) || /\bNEEDED\b/.test(dynamicEntries)) throw new Error();
   process.stdout.write("managed_pinned_binary_built_no_hosted_qualification\n");
 } catch { process.stdout.write("managed_build_failed\n"); process.exitCode = 2; }

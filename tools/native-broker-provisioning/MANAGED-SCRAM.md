@@ -61,13 +61,14 @@ are an accepted provider trust boundary, not a reason for another research cycle
   `square_account_broker_authority`, no admin membership, BYPASSRLS, CREATE or
   replication privileges. New role OID is recorded from native acknowledgements;
   rotation/recovery must pin the actual existing OID.
-- Maintenance cloud identity: proposed keyless
+- Maintenance cloud identity: dedicated keyless
   `vx-square-sandbox-provisioner@vaeroex-square-sandbox.iam.gserviceaccount.com`.
   No key, Owner PAT or ambient ADC. Give only versions `add/access/get/disable`
   on dedicated `square-sandbox-callback-db`, using an expiring grant for the
   maintenance window. No application-secret, KMS, IAM-management or other-project
-  rights. Read-only inventory on September 9 found this planned container is
-  not yet created; create its metadata only during reviewed hosted preparation.
+  rights. Reviewed September 9 preparation created only this service-account,
+  role-definition and empty secret-container metadata. No key, secret version or
+  permission binding was created; timed access remains a hosted-window step.
   The callback reader's existing permissions remain unchanged.
 - Temporarily attach that identity only to the exact stopped isolated VM
   `9094944541973315575`; restore the callback identity while stopped afterward.
@@ -76,7 +77,8 @@ are an accepted provider trust boundary, not a reason for another research cycle
   credential tenants.
 - No new VM, disk, IP, KMS key or paid commitment. A service account/custom IAM
   role has no fixed resource charge. One enabled Secret Manager version may add
-  approximately $0.06/month outside shared free allowance; existing VM, retained
+  approximately $0.06/month outside shared free allowance; retained disabled or
+  uncertain-recovery versions also count. Existing VM, retained
   disk/IP and existing KMS/secret charges remain in the approved $20/month total.
   Inspect the actual plan and current billing before hosted execution. Alerts
   are notifications, not a hard cap; preserve the approved bounded window and
@@ -84,18 +86,27 @@ are an accepted provider trust boundary, not a reason for another research cycle
 
 ## Fixed lifecycle and deployment
 
-`build-managed.mjs` explicitly compiles the immutable public Sandbox pins on
-Linux. Ordinary builds still refuse execution. Install reviewed files and the
-binary under root-owned `/opt/vaeroex-native-broker`; create the public binary
+`build-managed.mjs` explicitly compiles the immutable public Sandbox pins and a
+statically linked pre-interpreter launcher on Linux. It verifies the launcher
+has no dynamic interpreter or needed libraries. Ordinary builds still refuse
+execution. Install reviewed files, `native-managed` and its sibling build output
+as `maintenance-launcher` under root-owned `/opt/vaeroex-native-broker`; create the public binary
 SHA256 file, trusted public CA at the pinned path, and an empty root-only mode0600
 `/var/lib/vaeroex-native-broker/maintenance.jsonl`. Never put a password in those
 files. Review artifact/dependency hashes and host recovery/security settings;
 installation is manual, not a boot, CI, app build or deployment hook.
 
-The operator runs the installed CLI in a private **exec-replaced** SSH terminal
-with arguments `OP ROLE_OID INTENT APPROVAL_ID DEADLINE_EPOCH_MILLISECONDS`.
-All five are nonsecret. Use a clean environment, core dumps disabled and no
-terminal recording. The launcher checks target host identity, separate metadata
+The sole supported operator entry is the fixed native
+`/opt/vaeroex-native-broker/maintenance-launcher` in a private **exec-replaced**
+SSH terminal, with arguments `OP ROLE_OID INTENT APPROVAL_ID DEADLINE_EPOCH_MILLISECONDS`.
+All five are nonsecret. Do not invoke `node maintenance.mjs` directly: Node
+startup hooks run before JavaScript checks. The static launcher ignores inherited
+loader variables, validates fixed root-owned install paths, disables core dumps,
+closes inherited non-stdio descriptors, and execs only `/usr/bin/node` with a
+fresh PATH/LANG/LC_ALL environment. Use the existing restricted sudo/OSLogin
+administrative boundary and no terminal recording. This is not protection from
+an already-compromised root administrator or modified root-owned binaries.
+The CLI then checks target host identity, separate metadata
 service account, exact secret permission preflight, trusted CA/hash and actual
 hostname-verified PostgreSQL TLS before prompting. The private prompt accepts
 one line, with echo suppressed; subsequent input is discarded until exit. Do not

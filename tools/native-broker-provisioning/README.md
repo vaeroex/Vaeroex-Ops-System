@@ -11,7 +11,9 @@ substitute, or a Sandbox credential shortcut. The ordinary executable exits
 `policy_blocked` before connecting or reading credential input. There is no
 runtime override. Local synthetic builds reject remote targets. The separately
 compiled managed build pins exactly the approved isolated Sandbox target;
-`maintenance.mjs` is an explicit operator tool, never an app/startup hook.
+`maintenance.mjs` is an explicit operator tool, never an app/startup hook. Its
+only supported entry is the fixed static `maintenance-launcher`, which clears
+startup environment before Node executes; direct Node invocation is unsupported.
 
 Read [the privacy decision and evidence](PRIVACY.md) before interpreting a green
 test as permission to provision. Supabase ticket **SU-467250** is pending; its
