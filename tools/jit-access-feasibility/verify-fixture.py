@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Local-only PostgreSQL 17.6 fixture test. No credential input or remote option."""
 import json
+import hashlib
 import importlib.util
 import os
 from pathlib import Path
@@ -147,6 +148,114 @@ def main(dashboard=False, pg_prefix=DEFAULT_PG):
         check(sql('SELECT 1', ROLE).returncode != 0, 'nologin_before_activation')
         check(script('activate.sql', system_id, database_oid, '0').returncode != 0,
               'activation_wrong_oid_rejected')
+        result = sql('BEGIN ISOLATION LEVEL REPEATABLE READ; SELECT 1; ' +
+                     renderer.render('activate', system_id, database_oid, role_oid))
+        check(result.returncode != 0, 'preexisting_snapshot_transaction_rejected')
+        check(command(f'SELECT NOT rolcanlogin FROM pg_roles WHERE oid={role_oid}',
+                      'preexisting_snapshot_role_readback') == 't', 'preexisting_snapshot_preserves_nologin')
+
+        # Fixed original-code counterfactual, never a hosted execution option.
+        # This exact prior activation is exercised only in this fresh UNIX-only
+        # cluster; no general SQL/source override is accepted by the harness.
+        activation_raw = (SOURCE / 'activate.sql').read_text()
+        boundary_start = '-- BEGIN exact fixture RLS activation boundary\n'
+        boundary_end = '-- END exact fixture RLS activation boundary\n'
+        boundary = activation_raw[activation_raw.index(boundary_start):
+                                  activation_raw.index(boundary_end) + len(boundary_end)]
+        original_raw = activation_raw.replace(boundary, '', 1).replace(
+            'BEGIN ISOLATION LEVEL READ COMMITTED;\n', 'BEGIN;\n', 1)
+        check(hashlib.sha256(original_raw.encode()).hexdigest() ==
+              '74c066cd5dddb2d677e6a1478e71190c966dab9f1f22f0c0d4baf1257385960d',
+              'original_activation_counterfactual_exact_source')
+        original_activation = renderer.render('activate', system_id, database_oid, role_oid).replace(
+            boundary, '', 1).replace('BEGIN ISOLATION LEVEL READ COMMITTED;\n', 'BEGIN;\n', 1)
+        exact_qual = (f"session_user = '{ROLE}' AND "
+                      "workspace_id = '11111111-1111-4111-8111-111111111111'::uuid")
+        restore_policy = ("DROP POLICY IF EXISTS exact_test_identity ON vaeroex_jit_feasibility.rows; "
+                          f"CREATE POLICY exact_test_identity ON vaeroex_jit_feasibility.rows "
+                          f"FOR SELECT TO {ROLE} USING ({exact_qual})")
+        drifts = [
+            ('rows_rls_disabled', 'ALTER TABLE vaeroex_jit_feasibility.rows DISABLE ROW LEVEL SECURITY',
+             'ALTER TABLE vaeroex_jit_feasibility.rows ENABLE ROW LEVEL SECURITY', True),
+            ('rows_force_removed', 'ALTER TABLE vaeroex_jit_feasibility.rows NO FORCE ROW LEVEL SECURITY',
+             'ALTER TABLE vaeroex_jit_feasibility.rows FORCE ROW LEVEL SECURITY', False),
+            ('denied_rls_disabled', 'ALTER TABLE vaeroex_jit_feasibility.denied DISABLE ROW LEVEL SECURITY',
+             'ALTER TABLE vaeroex_jit_feasibility.denied ENABLE ROW LEVEL SECURITY', False),
+            ('denied_force_removed', 'ALTER TABLE vaeroex_jit_feasibility.denied NO FORCE ROW LEVEL SECURITY',
+             'ALTER TABLE vaeroex_jit_feasibility.denied FORCE ROW LEVEL SECURITY', False),
+            ('policy_widened', 'ALTER POLICY exact_test_identity ON vaeroex_jit_feasibility.rows USING (true)',
+             restore_policy, True),
+            ('native_identity_removed', "ALTER POLICY exact_test_identity ON vaeroex_jit_feasibility.rows "
+             "USING (workspace_id = '11111111-1111-4111-8111-111111111111'::uuid)", restore_policy, False),
+            ('policy_wrong_role', 'ALTER POLICY exact_test_identity ON vaeroex_jit_feasibility.rows TO PUBLIC',
+             restore_policy, False),
+            ('policy_missing', 'DROP POLICY exact_test_identity ON vaeroex_jit_feasibility.rows', restore_policy, False),
+            ('policy_wrong_command', 'DROP POLICY exact_test_identity ON vaeroex_jit_feasibility.rows; '
+             f'CREATE POLICY exact_test_identity ON vaeroex_jit_feasibility.rows FOR ALL TO {ROLE} '
+             f'USING ({exact_qual})', restore_policy, False),
+            ('extra_permissive_policy', 'CREATE POLICY fixture_wide ON vaeroex_jit_feasibility.rows '
+             f'FOR SELECT TO {ROLE} USING (true)', 'DROP POLICY fixture_wide ON vaeroex_jit_feasibility.rows', True),
+            ('denied_policy_added', 'CREATE POLICY fixture_wide ON vaeroex_jit_feasibility.denied '
+             f'FOR SELECT TO {ROLE} USING (true)', 'DROP POLICY fixture_wide ON vaeroex_jit_feasibility.denied', False),
+        ]
+        for label, drift, restore, reproduce in drifts:
+            command(drift, label + '_installed_locally')
+            result = script('activate.sql', system_id, database_oid, role_oid)
+            check(result.returncode != 0 and '42501' in result.stderr, label + '_activation_rejected')
+            check(command(f'SELECT NOT rolcanlogin FROM pg_roles WHERE oid={role_oid}',
+                          label + '_readback') == 't', label + '_nologin_preserved')
+            if reproduce:
+                check(sql(original_activation).returncode == 0, label + '_original_activation_reproduced')
+                check(sql('SELECT count(DISTINCT workspace_id) FROM vaeroex_jit_feasibility.rows',
+                          ROLE).stdout.strip() == '2', label + '_original_exposes_both_workspaces')
+                check(script('fence.sql', system_id, database_oid, role_oid).returncode == 0,
+                      label + '_counterfactual_fenced')
+            command(restore, label + '_restored_only_in_local_fixture')
+
+        # An uncommitted RLS writer owns AccessExclusiveLock; activation must
+        # reject immediately rather than check an older visible catalog row.
+        holder = subprocess.Popen([str(x) for x in [*base, '-U', 'fixture_admin']], env=env,
+                                  stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        clients.append(holder)
+        holder.stdin.write('BEGIN; ALTER TABLE vaeroex_jit_feasibility.rows DISABLE ROW LEVEL SECURITY; '
+                           'SELECT pg_backend_pid();\n')
+        holder.stdin.flush()
+        check(holder.stdout.readline().strip().isdecimal(), 'rls_writer_lock_acquired')
+        result = script('activate.sql', system_id, database_oid, role_oid)
+        check(result.returncode != 0 and '55P03' in result.stderr, 'concurrent_rls_writer_rejects_activation')
+        check(command(f'SELECT NOT rolcanlogin FROM pg_roles WHERE oid={role_oid}',
+                      'contended_activation_role_readback') == 't', 'contended_activation_remains_nologin')
+        holder.communicate(input='ROLLBACK;\n\\q\n', timeout=3)
+        clients.remove(holder)
+
+        # Test inherited snapshot settings and locks through uncommitted LOGIN.
+        command("ALTER ROLE fixture_admin SET default_transaction_isolation = 'repeatable read'",
+                'local_operator_repeatable_read_default')
+        held_activation = renderer.render('activate', system_id, database_oid, role_oid)
+        check(held_activation.rstrip().endswith('COMMIT;'), 'activation_commit_boundary_located')
+        held_activation = held_activation.rstrip()[:-len('COMMIT;')]
+        holder = subprocess.Popen([str(x) for x in [*base, '-U', 'fixture_admin']], env=env,
+                                  stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        clients.append(holder)
+        holder.stdin.write(held_activation + "SELECT 'fixture_isolation_' || current_setting('transaction_isolation');\n")
+        holder.stdin.flush()
+        seen = []
+        for _ in range(5):
+            line = holder.stdout.readline().strip()
+            seen.append(line)
+            if line.startswith('fixture_isolation_'):
+                break
+        check(seen[-1] == 'fixture_isolation_read committed', 'activation_overrides_inherited_snapshot_isolation')
+        for statement in ['ALTER POLICY exact_test_identity ON vaeroex_jit_feasibility.rows USING (true)',
+                          'ALTER TABLE vaeroex_jit_feasibility.denied DISABLE ROW LEVEL SECURITY']:
+            result = sql("SET lock_timeout='100ms'; " + statement)
+            check(result.returncode != 0 and '55P03' in result.stderr, 'rls_policy_ddl_blocked_through_login_transaction')
+        holder.communicate(input='ROLLBACK;\n\\q\n', timeout=3)
+        clients.remove(holder)
+        check(command(f'SELECT NOT rolcanlogin FROM pg_roles WHERE oid={role_oid}',
+                      'uncommitted_activation_role_readback') == 't', 'activation_rollback_preserves_nologin')
+        command('ALTER ROLE fixture_admin RESET default_transaction_isolation', 'local_operator_default_restored')
+
         command('CREATE SCHEMA fixture_hazard; GRANT USAGE ON SCHEMA fixture_hazard TO PUBLIC; '
                 'CREATE TABLE fixture_hazard.rows(n integer); GRANT SELECT ON fixture_hazard.rows TO PUBLIC',
                 'local_public_table_hazard_installed')

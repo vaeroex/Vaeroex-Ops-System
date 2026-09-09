@@ -1,7 +1,37 @@
 \set ON_ERROR_STOP on
-BEGIN;
+BEGIN ISOLATION LEVEL READ COMMITTED;
 \ir target-gate.sql
 SELECT pg_catalog.set_config('vaeroex_jit.expected_role_oid', :'expected_role_oid', true);
+-- BEGIN exact fixture RLS activation boundary
+-- Stable deparsing; these settings and locks last only through this transaction.
+SET LOCAL search_path = pg_catalog;
+-- Relevant RLS/policy DDL takes AccessExclusiveLock. Reject an active writer;
+-- hold these locks through the checks, LOGIN change and COMMIT below.
+LOCK TABLE vaeroex_jit_feasibility.rows, vaeroex_jit_feasibility.denied
+  IN ACCESS SHARE MODE NOWAIT;
+DO $fixture_rls$
+DECLARE
+  target_oid oid := current_setting('vaeroex_jit.expected_role_oid')::oid;
+  rows_oid oid := 'vaeroex_jit_feasibility.rows'::regclass;
+  denied_oid oid := 'vaeroex_jit_feasibility.denied'::regclass;
+BEGIN
+  IF current_setting('transaction_isolation') <> 'read committed'
+     OR (SELECT count(*) FROM pg_catalog.pg_class c
+        WHERE c.oid IN (rows_oid, denied_oid) AND c.relkind = 'r'
+          AND c.relrowsecurity AND c.relforcerowsecurity) <> 2
+     OR (SELECT count(*) FROM pg_catalog.pg_policy p
+         WHERE p.polrelid IN (rows_oid, denied_oid)) <> 1
+     OR NOT EXISTS (SELECT 1 FROM pg_catalog.pg_policy p
+       WHERE p.polrelid = rows_oid AND p.polname = 'exact_test_identity'
+         AND p.polcmd = 'r' AND p.polpermissive
+         AND p.polroles = ARRAY[target_oid]::oid[] AND p.polwithcheck IS NULL
+         AND pg_catalog.pg_get_expr(p.polqual, p.polrelid, false) =
+           '((SESSION_USER = ''vaeroex_jit_feasibility_20260908''::name) AND (workspace_id = ''11111111-1111-4111-8111-111111111111''::uuid))') THEN
+    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'fixture_rls_policy_drift_rejected';
+  END IF;
+END
+$fixture_rls$;
+-- END exact fixture RLS activation boundary
 DO $activate$
 DECLARE
   target_oid oid := current_setting('vaeroex_jit.expected_role_oid')::oid;

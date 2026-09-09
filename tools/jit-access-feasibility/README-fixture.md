@@ -44,6 +44,23 @@ are mandatory separate execution gates. Do not bypass a gate to accommodate a
 pooler. A cooperating advisory lock serializes these scripts, but the operator
 must also exclude concurrent administrative role replacement/grant changes.
 
+Activation does not trust RLS state from the separately committed setup. It
+begins READ COMMITTED before target inspection, verifies that effective isolation,
+and takes ACCESS SHARE NOWAIT locks on both fixture tables through LOGIN/COMMIT.
+It rechecks ENABLE/FORCE RLS on both ordinary tables and exactly one SELECT,
+permissive policy: the pinned role alone, native `SESSION_USER` plus the fixed
+workspace UUID, no WITH CHECK and no extra policy on either table. Deparsing uses
+transaction-local `search_path=pg_catalog`. Drift or lock contention rejects while
+the role stays NOLOGIN; no hosted policy is silently repaired. PostgreSQL17.6
+[policy DDL](https://github.com/postgres/postgres/blob/REL_17_6/src/backend/commands/policy.c)
+and [RLS flag DDL](https://github.com/postgres/postgres/blob/REL_17_6/src/backend/commands/tablecmds.c)
+take conflicting AccessExclusive locks. These locks protect this interval, not
+later privileged changes or unrelated role grants; operator exclusivity remains
+required. Local regressions cover flag/policy drift, DDL contention, inherited
+snapshot isolation, rollback and clean activation. A hash-verified original-code
+counterfactual reproduces both-workspace exposure for disabled RLS, `USING(true)`
+and an extra permissive policy, then fences the local test role.
+
 `activate.sql` is a distinct future action. It rejects unexpected reachable
 user-schema relations, sequences, schema CREATE privileges, and SECURITY DEFINER
 functions, with one narrow supported exception: the separately reviewed

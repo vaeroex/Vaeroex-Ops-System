@@ -14,7 +14,7 @@ or QBO permission is added by this directory.
 | External PAT client |69 fake-library cases passed locally and on the isolated Ubuntu host with GCC/libpq16.15 headers |Actual PAT authentication, provider API denials or expiry |
 | Public invalid canary |20 cases passed against actual libpq17.6 locally and libpq16.15 on Ubuntu, loopback TLS only |Hosted pooler TLS/password handling or diagnostic nonrecording |
 | Fixed administrative helper |74 cases passed normally and under UBSan locally; the same 74 passed normal/UBSan/ASan+UBSan on Ubuntu |Real invitation acceptance, grant update/removal or provider response contract |
-| Native synthetic fixture |84 assertions passed in each of psql and separately rendered Dashboard modes against private local PostgreSQL17.6: 74 existing plus 10 delivery portability checks |Hosted JIT identity, application authority, provider revocation/session behavior |
+| Native synthetic fixture |164 assertions passed independently in each of psql and separately rendered Dashboard modes against private local PostgreSQL17.6, including the corrected activation boundary |Hosted JIT identity, application authority, provider revocation/session behavior |
 
 Independent reviews covered the client, fixture and canary when prepared, and
 the new helper separately. A concrete helper finding was fixed: unsuccessful
@@ -25,6 +25,21 @@ signal-handler `write()` result. Independently reviewed narrow corrections
 preserved control flow and strict `-Werror`; actual Linux suites subsequently
 passed. macOS ASan aborted inside sanitizer initialization before helper main;
 that failed attempt is not counted as a pass or used to waive Linux testing.
+
+The first remote code review identified a separate concrete fixture-activation
+gap. Independent local counterfactuals using the original activation guard
+reproduced LOGIN plus two-workspace visibility after disabling RLS, changing
+the policy to `USING (true)`, or adding a permissive policy. Removing FORCE alone
+also passed the original guard but still returned one row for this nonowner
+role: that case is contract drift, not a separately reproduced row leak.
+All records and identities in these reproductions were synthetic; no hosted
+activation or credential existed. The narrow correction checks both RLS flags
+and the exact native-identity/workspace policy, rejecting drift before LOGIN;
+verified READ COMMITTED isolation and transaction-held relation locks protect
+that check through commit against the relevant policy/RLS DDL. An already-open
+incompatible snapshot transaction rejects. Eleven drift variants preserve
+NOLOGIN; independent reruns also cover lock contention and rollback. It never
+repairs or broadens a hosted policy.
 
 The initial Linux Python test failure activated Ubuntu's site-installed Apport
 exception hook, which attempted a crash-report write. Existing permissions
