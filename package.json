@@ -10,7 +10,7 @@
     "start": "next start",
     "lint": "eslint . --max-warnings=59",
     "typecheck": "tsc --noEmit",
-    "test:native-broker-provisioning": "node --test tools/native-broker-provisioning/tests/lifecycle.test.mjs",
+    "test:native-broker-provisioning": "node --test tools/native-broker-provisioning/tests/*.test.mjs",
     "test:native-broker-provisioning-db": "node tools/native-broker-provisioning/tests/qualify.cjs",
     "test:external-integrations-contracts": "node scripts/external-integrations-contract-regression-tests.js",
     "test:external-integrations-phase-1a": "node scripts/external-integrations-phase-1a-operation-policy-regression-tests.js",

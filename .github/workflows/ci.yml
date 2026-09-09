@@ -227,7 +227,7 @@ jobs:
         run: git diff --check origin/main...HEAD
 
   native-broker-qualification:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - name: Check out repository
@@ -248,7 +248,10 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Install public native build dependencies
-        run: sudo apt-get update && sudo apt-get install -y build-essential libssl-dev libcurl4-openssl-dev zlib1g-dev bison flex curl git bzip2 python3 openssl
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --allow-downgrades build-essential libssl-dev libcurl4-openssl-dev zlib1g-dev bison flex curl git bzip2 python3 openssl libpq5=16.15-0ubuntu0.24.04.1 libpq-dev=16.15-0ubuntu0.24.04.1
+          test "$(dpkg-query -W -f='${Version}' libpq5)" = 16.15-0ubuntu0.24.04.1
 
       - name: Qualify fixed native provisioning against private local PostgreSQL
         # No remote DSN, provider credential, cloud identity or artifact upload.
@@ -261,7 +264,19 @@ jobs:
           # sanitized synthetic counts, never credentials or database logs.
           node tools/native-broker-provisioning/tests/bootstrap.cjs --qualify | tee "$RUNNER_TEMP/native-broker-qualification.jsonl"
 
-      - name: Qualify isolated JIT tools with fake APIs and loopback fixtures only
+      - name: Qualify managed SCRAM profile using the same private local database build
+        shell: bash
+        run: |
+          set -euo pipefail
+          native_manifest="$(node -e 'const fs=require("node:fs"); const rows=fs.readFileSync(process.argv[1],"utf8").trim().split("\n").map(JSON.parse); if(rows.length!==2 || rows[1].failure!==null) process.exit(2); process.stdout.write(rows[0].manifestPath)' "$RUNNER_TEMP/native-broker-qualification.jsonl")"
+          VAEROEX_NATIVE_TEST_DEPENDENCIES="$native_manifest" node tools/native-broker-provisioning/tests/managed-qualify.cjs
+          VAEROEX_NATIVE_TEST_DEPENDENCIES="$native_manifest" VAEROEX_MANAGED_TEST_SYSTEM_LIBPQ=16.15 node tools/native-broker-provisioning/tests/managed-qualify.cjs
+          node tools/native-broker-provisioning/build-managed.mjs "$RUNNER_TEMP/native-managed-sandbox"
+          # Explicit build only: never execute this hosted-profile binary in CI.
+          node --test tools/native-broker-provisioning/tests/maintenance-launcher.test.mjs
+          python3 -S tools/native-broker-provisioning/tests/private-pty.py
+
+      - name: Qualify parked JIT regression tools offline only
         shell: bash
         run: |
           set -euo pipefail

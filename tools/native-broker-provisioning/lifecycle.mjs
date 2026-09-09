@@ -101,6 +101,23 @@ async function boundedCleanup(action, timeoutMs) {
  * to the application. All adapters are trusted injected synthetic test doubles.
  */
 export function createSyntheticProvisioningCoordinator({ target: inputTarget, native, secretStore, audit, now = Date.now }) {
+  return createProvisioningCoordinator({ target: inputTarget, native, secretStore, audit, now });
+}
+
+// This explicit composition is for operator-mediated isolated maintenance, not
+// application startup. Hosted qualification and private operator entry remain
+// prerequisites; no application binding is enabled by this state machine.
+export function createManagedSupabaseProvisioningCoordinator(options) {
+  const target = options?.target;
+  if (target?.projectReference !== "oysjpoondtcrqpghhrbd" ||
+      target.host !== "aws-0-us-west-2.pooler.supabase.com" || target.port !== 5432 ||
+      target.database !== "postgres" || target.adminRole !== "postgres" ||
+      target.systemIdentifier !== "7678069749886157684" || target.databaseOid !== "5" ||
+      !/^square_sandbox_[a-z_]{1,40}$/.test(target.role)) throw fault();
+  return createProvisioningCoordinator(options);
+}
+
+function createProvisioningCoordinator({ target: inputTarget, native, secretStore, audit, now = Date.now }) {
   const target = snapshotTarget(inputTarget);
   requireMethods(native, nativeMethods);
   requireMethods(secretStore, storeMethods);
@@ -168,6 +185,7 @@ export function createSyntheticProvisioningCoordinator({ target: inputTarget, na
     };
     const result = (outcome, fenceConfirmed, replacement) => Object.freeze({
       outcome, phase, intent, fenceConfirmed, requiresFreshReplacement: replacement,
+      roleOid: context.target.roleOid,
       databaseCommit: commitAcknowledged ? "acknowledged" : commitAttempted ? "uncertain" : "not_attempted",
       applicationAuthority: authorityVerified ? "verified_closed" : "unverified", credentialPublished: false,
     });

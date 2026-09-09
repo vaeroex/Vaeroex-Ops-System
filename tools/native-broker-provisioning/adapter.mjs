@@ -33,8 +33,25 @@ function terminal(line, operation) {
  * No process output or error is used as a secret or a commit-status oracle.
  */
 export function createLocalSyntheticNativeAdapter({ executable, target: suppliedTarget, timeoutMs = 20000 }) {
+  if (!suppliedTarget || suppliedTarget.host !== "127.0.0.1" || !/^synthetic(?:-|$)/.test(suppliedTarget.projectReference)) throw safeFailure();
+  return createNativeAdapter({ executable, target: suppliedTarget, timeoutMs });
+}
+
+// Explicit maintenance lane. The separately compiled executable pins the same
+// endpoint, physical database and SQL/transport identities before reading FD3.
+// No ambient password, URL, environment credential or arbitrary SQL is accepted.
+export function createManagedSupabaseNativeAdapter({ executable, target, withAdministrator, timeoutMs = 20000 }) {
+  if (target?.projectReference !== "oysjpoondtcrqpghhrbd" ||
+      target.host !== "aws-0-us-west-2.pooler.supabase.com" || target.port !== 5432 ||
+      target.database !== "postgres" || target.adminRole !== "postgres" ||
+      target.systemIdentifier !== "7678069749886157684" || target.databaseOid !== "5" ||
+      !/^square_sandbox_[a-z_]{1,40}$/.test(target.role) || typeof withAdministrator !== "function") throw safeFailure();
+  return createNativeAdapter({ executable, target, timeoutMs, withAdministrator });
+}
+
+function createNativeAdapter({ executable, target: suppliedTarget, timeoutMs, withAdministrator }) {
   if (typeof executable !== "string" || !isAbsolute(executable) || /[\u0000-\u001f\u007f]/.test(executable) ||
-      !suppliedTarget || suppliedTarget.host !== "127.0.0.1" || !/^synthetic(?:-|$)/.test(suppliedTarget.projectReference) ||
+      !suppliedTarget ||
       Object.keys(suppliedTarget).length !== targetFields.length || !targetFields.every(key => Object.hasOwn(suppliedTarget, key)) ||
       !Number.isInteger(suppliedTarget.port) || suppliedTarget.port < 1 || suppliedTarget.port > 65535 ||
       !["database", "role", "adminRole"].every(key => typeof suppliedTarget[key] === "string" && /^[a-z][a-z0-9_]{0,62}$/.test(suppliedTarget[key])) ||
@@ -65,6 +82,8 @@ export function createLocalSyntheticNativeAdapter({ executable, target: supplied
       const output = Buffer.alloc(1024), frame = Buffer.alloc(129);
       let outputUsed = 0, frameUsed = 0, totalOutput = 0, invalid = false, finished = false;
       let terminalOid, progressSeen = false, delivered = false, stored = false, authenticatedInput = false;
+      const administratorSignal = new AbortController();
+      let administratorAcknowledged = !withAdministrator;
       let privateBorrow;
       const outgoingFrames = new Set();
       let killTimer;
@@ -74,6 +93,7 @@ export function createLocalSyntheticNativeAdapter({ executable, target: supplied
       const stop = () => {
         if (finished) return;
         invalid = true;
+        administratorSignal.abort();
         privateBorrow?.fill(0); frame.fill(0);
         for (const bytes of outgoingFrames) bytes.fill(0);
         child.kill("SIGTERM");
@@ -126,8 +146,23 @@ export function createLocalSyntheticNativeAdapter({ executable, target: supplied
           }, stop);
         } finally { bytes.fill(0); }
       });
-      // Empty synthetic trust-auth input, never a secret supplier.
-      child.stdio[3].end(staticLine("\n"));
+      if (!withAdministrator) child.stdio[3].end(staticLine("\n"));
+      else Promise.resolve().then(async () => {
+        let calls = 0;
+        const supplied = await withAdministrator(async bytes => {
+          if (++calls !== 1 || invalid || finished || context.signal.aborted || !Buffer.isBuffer(bytes) ||
+              bytes.length < 1 || bytes.length > 510 || bytes.some(value => value < 32 || value === 127)) throw safeFailure();
+          const adminFrame = Buffer.alloc(bytes.length + 1);
+          outgoingFrames.add(adminFrame);
+          bytes.copy(adminFrame); adminFrame[bytes.length] = 10;
+          try {
+            await new Promise((done, denied) => child.stdio[3].end(adminFrame, error => error ? denied(safeFailure()) : done()));
+          } finally { adminFrame.fill(0); outgoingFrames.delete(adminFrame); }
+        }, administratorSignal.signal);
+        if (calls !== 1 || supplied?.ack !== true) throw safeFailure();
+        if (invalid || finished || administratorSignal.signal.aborted) throw safeFailure();
+        administratorAcknowledged = true;
+      }).catch(stop);
       if (operation === "authenticate") {
         Promise.resolve().then(async () => {
           if (typeof context.withCredential !== "function") throw safeFailure();
@@ -147,6 +182,7 @@ export function createLocalSyntheticNativeAdapter({ executable, target: supplied
       }
       child.once("close", (code, signal) => {
         finished = true;
+        administratorSignal.abort();
         clearTimeout(timer); clearTimeout(killTimer);
         context.signal.removeEventListener("abort", stop);
         output.fill(0); frame.fill(0); privateBorrow?.fill(0); privateBorrow = undefined;
@@ -155,7 +191,7 @@ export function createLocalSyntheticNativeAdapter({ executable, target: supplied
         active.delete(record); reapResolve();
         for (const pipe of child.stdio.slice(1)) pipe?.destroy();
         const expectedOid = operation === "prepare" ? terminalOid !== "0" : terminalOid === roleOid;
-        if (invalid || code !== 0 || signal || outputUsed || terminalOid === undefined || !expectedOid ||
+        if (invalid || !administratorAcknowledged || code !== 0 || signal || outputUsed || terminalOid === undefined || !expectedOid ||
             (operation === "assign" && (!delivered || !stored)) || (operation === "authenticate" && !authenticatedInput)) {
           reject(safeFailure()); return;
         }

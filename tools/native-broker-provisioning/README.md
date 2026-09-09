@@ -1,17 +1,25 @@
 # Native PostgreSQL broker provisioning
 
-Status: **code-only qualification; real provisioning blocked**. This is the
+Status: **managed SCRAM maintenance implementation; hosted qualification pending**.
+The September 9 production-grade policy supersedes the historical absolute
+nonrecording gate. Read [the current maintenance runbook](MANAGED-SCRAM.md).
+Temporary Access/JIT is permanently parked and is not a dependency.
+
+This is the
 permanent native-role lifecycle, not a second database, administrative API-token
 substitute, or a Sandbox credential shortcut. The ordinary executable exits
 `policy_blocked` before connecting or reading credential input. There is no
-runtime override. Only a separately compiled local synthetic executable can run
-the operations below, and it rejects remote targets.
+runtime override. Local synthetic builds reject remote targets. The separately
+compiled managed build pins exactly the approved isolated Sandbox target;
+`maintenance.mjs` is an explicit operator tool, never an app/startup hook. Its
+only supported entry is the fixed static `maintenance-launcher`, which clears
+startup environment before Node executes; direct Node invocation is unsupported.
 
 Read [the privacy decision and evidence](PRIVACY.md) before interpreting a green
 test as permission to provision. Supabase ticket **SU-467250** is pending; its
 response is not a prerequisite for code or local qualification. Known PANIC
-statement capture is a blocker under the unchanged policy, not accepted provider
-uncertainty. This change neither modifies the broker's runtime authority nor
+statement capture is a restricted diagnostic risk under the revised policy, not
+a claim of zero recording. Plaintext exposure remains a blocker. This change neither modifies the broker's runtime authority nor
 enables Square.
 
 ## Fixed operation and target
@@ -40,7 +48,7 @@ transport and effective controls. Missing-role inspection uses OID `0`; creation
 returns the actual OID for subsequent exact-target operations. A dropped and
 recreated same-name role is not the same target.
 
-The current version profile is PostgreSQL/libpq 17.6, pgAudit 17.1,
+The original synthetic version profile is PostgreSQL/libpq 17.6, pgAudit 17.1,
 pg_stat_statements 1.11 and the pinned Supautils source in `tests/README.md`.
 This matches the relevant evidence, **not a recommendation to run an old minor
 release in Production**. A server/library/hook upgrade requires qualification

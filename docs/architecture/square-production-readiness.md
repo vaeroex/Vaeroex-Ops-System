@@ -1,5 +1,18 @@
 # Square production-readiness checklist
 
+## Current broker-authentication decision — September 9, 2026
+
+The permanent path is native PostgreSQL SCRAM plus Secret Manager, preserving
+native `session_user` and the existing transactional authority model. See the
+[managed maintenance runbook](../../tools/native-broker-provisioning/MANAGED-SCRAM.md)
+for reviewed scope, practical security policy, operations and remaining hosted
+gates. Temporary Access/JIT is permanently parked after the scoped invitation
+HTTP500 and verified cleanup; it is not a Sandbox or Production prerequisite.
+Local qualification is not hosted qualification. Production Square remains
+disabled and QBO is unchanged. Historical milestone statements below retain
+their original scope/date; they do not reinstate superseded authorization or
+absolute provider-diagnostic nonrecording gates.
+
 Audit baseline: `0a4b18be14b01d8d2be8d1e4525b47d7d190e551` (PR #351 merged). This milestone adds **dormant Square account connection**, using the existing checked authority and atomic durable-page persistence. OAuth-verified enrollment is distinct from synthetic disposable enrollment. API `2026-08-19`, SDK `45.1.0` at `e4a5bf7e1a2b97c2b995fde28c55ddbc35dc0e76`, existing fingerprints and shared limits remain unchanged. No new phase identifier is assigned. See the [account contract](square-account-connection-contract.md) and [unresolved sandbox approval worksheet](square-sandbox-approval-worksheet.md).
 
 ## Subsequent code-only Sandbox preparation

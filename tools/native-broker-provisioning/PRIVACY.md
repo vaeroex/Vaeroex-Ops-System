@@ -1,5 +1,23 @@
 # Fixed native provisioning: evidence and policy boundary
 
+## Current policy — September 9, 2026
+
+The user explicitly replaced the absolute diagnostic-nonrecording requirement
+with practical production-grade controls. [MANAGED-SCRAM.md](MANAGED-SCRAM.md)
+is authoritative for the new managed lane. The analysis below is retained as
+historical evidence, **not an outstanding PANIC-policy approval gate**.
+
+The managed lane prohibits plaintext credentials in SQL, arguments, files,
+application logs and ordinary statement/statistics capture. It uses supported
+client-side SCRAM hashing, encrypted private secret storage, separate maintenance
+and runtime identities, tenant/transaction fencing and useful sanitized audits.
+Privileged activity inspection and exceptional provider diagnostics can expose a
+SCRAM verifier; this is explicitly documented administrative attack surface,
+not plaintext and not a zero-recording promise. Access restriction, retention
+inventory and incident recovery replace theoretical perfect-nonrecording tests.
+
+## Historical evidence under the previous policy
+
 Reviewed baseline: `bef41579bc86baa4c71bf43b5a22c5b2e857cb06`.
 This report supersedes the inference that arbitrary parameter-conversion or
 dynamic-SQL errors automatically disqualify a constrained native operation.
