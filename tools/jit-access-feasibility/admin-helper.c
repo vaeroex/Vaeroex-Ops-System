@@ -254,32 +254,59 @@ static int list_snapshot(struct snapshot *s){
 struct response_limit {size_t bytes;int invalid;};
 static size_t body(char *p,size_t size,size_t count,void *arg){
   struct response_limit *r=arg;
-  if(!alive()||(size&&count>16384/size))return 0;
+  if(!alive())return 0;
+  if(size&&count>16384/size){r->invalid=1;return 0;}
   size_t n=size*count;
-  if(r->bytes>16384-n)return 0;
+  if(r->bytes>16384-n){r->invalid=1;return 0;}
   memcpy(private_memory.response+r->bytes,p,n);r->bytes+=n;return n;
 }
 static size_t headers(char *p,size_t size,size_t count,void *arg){
   struct response_limit *r=arg;
-  if(!alive()||(size&&count>16384/size))return 0;
+  if(!alive())return 0;
+  if(size&&count>16384/size){r->invalid=1;return 0;}
   size_t n=size*count;
-  if(r->bytes>16384-n)return 0;
+  if(r->bytes>16384-n){r->invalid=1;return 0;}
   r->bytes+=n;
-  if((n>=5&&!strncasecmp(p,"Link:",5))||(n>=14&&!strncasecmp(p,"Content-Range:",14))){r->invalid=1;return 0;}
+  if((n>=5&&!strncasecmp(p,"Link:",5))||(n>=14&&!strncasecmp(p,"Content-Range:",14))){r->invalid=2;return 0;}
   return n;
 }
 static int progress(void *arg,curl_off_t a,curl_off_t b,curl_off_t c,curl_off_t d){
   (void)arg;(void)a;(void)b;(void)c;(void)d;return !alive();
 }
+/* Only local enums and a range-checked HTTP status may cross this boundary.
+ * Never print curl error strings, response/header bytes, URLs or payloads.
+ * An HTTP status is an observation, not proof of mutation or cleanup success. */
+static void request_diagnostic(const char *method,const char *outcome,long status){
+  const char *operation=!strcmp(method,"GET")?"list":!strcmp(method,"POST")?"invite":
+    !strcmp(method,"PUT")?"update":!strcmp(method,"DELETE")?"revoke":"unknown";
+  printf("jit_admin_request_operation_%s\njit_admin_request_%s\n",operation,outcome);
+  if(status>=100&&status<=599)printf("jit_admin_http_status_%ld\n",status);
+  else puts("jit_admin_http_status_unknown");
+}
+static const char *transport_outcome(CURLcode result){
+  switch(result){
+    case CURLE_OK:return "http_status_rejected";
+    case CURLE_OPERATION_TIMEDOUT:return "transport_timeout";
+    case CURLE_PEER_FAILED_VERIFICATION:return "tls_verification_failed";
+    case CURLE_SSL_CONNECT_ERROR:return "tls_handshake_failed";
+    case CURLE_COULDNT_RESOLVE_HOST:return "dns_resolution_failed";
+    case CURLE_COULDNT_CONNECT:return "connection_failed";
+    case CURLE_SEND_ERROR:return "send_failed";
+    case CURLE_RECV_ERROR:return "receive_failed";
+    default:return "transport_failure_unclassified";
+  }
+}
 static int request(const char *url,const char *method,const char *payload,int cleanup){
-  if(!alive()||requests>=(cleanup?60u:40u))return 0;
+  if(!alive()||requests>=(cleanup?60u:40u)){
+    request_diagnostic(method,!alive()?"deadline_or_cancelled":"request_budget_exhausted",0);return 0;
+  }
   ++requests;
   wipe(private_memory.response,sizeof private_memory.response);response_size=0;
-  CURL *h=curl_easy_init();if(!h)return 0;
+  CURL *h=curl_easy_init();if(!h){request_diagnostic(method,"setup_failed",0);return 0;}
   int n=snprintf(private_memory.header,sizeof private_memory.header,"Authorization: Bearer %s",private_memory.token);
-  if(n<0||(size_t)n>=sizeof private_memory.header){curl_easy_cleanup(h);return 0;}
+  if(n<0||(size_t)n>=sizeof private_memory.header){curl_easy_cleanup(h);request_diagnostic(method,"setup_failed",0);return 0;}
   struct curl_slist *auth=curl_slist_append(NULL,private_memory.header);
-  if(!auth){curl_easy_cleanup(h);return 0;}
+  if(!auth){curl_easy_cleanup(h);request_diagnostic(method,"setup_failed",0);return 0;}
   size_t auth_size=(size_t)n+1;int auth_locked=mlock(auth->data,auth_size)==0,ok=auth_locked;
   struct curl_slist *next=curl_slist_append(auth,"Content-Type: application/json");
   if(next)auth=next;else ok=0;
@@ -298,19 +325,30 @@ static int request(const char *url,const char *method,const char *payload,int cl
   OPT(CURLOPT_WRITEFUNCTION,body);OPT(CURLOPT_WRITEDATA,&b);OPT(CURLOPT_HEADERFUNCTION,headers);OPT(CURLOPT_HEADERDATA,&hd);
   OPT(CURLOPT_NOPROGRESS,0L);OPT(CURLOPT_XFERINFOFUNCTION,progress);
   if(payload){OPT(CURLOPT_POSTFIELDS,payload);OPT(CURLOPT_POSTFIELDSIZE,(long)strlen(payload));}
-  if(ok)ok=curl_easy_perform(h)==CURLE_OK&&alive()&&!hd.invalid&&
-    curl_easy_getinfo(h,CURLINFO_RESPONSE_CODE,&status)==CURLE_OK&&status==200;
+  const char *outcome="setup_failed";
+  if(ok){
+    CURLcode result=curl_easy_perform(h);
+    int observed=curl_easy_getinfo(h,CURLINFO_RESPONSE_CODE,&status)==CURLE_OK;
+    if(!observed)status=0;
+    ok=result==CURLE_OK&&alive()&&!hd.invalid&&!b.invalid&&observed&&status==200;
+    outcome=!alive()?"deadline_or_cancelled":hd.invalid==2?"pagination_rejected":
+      hd.invalid?"header_limit_rejected":b.invalid?"body_limit_rejected":
+      result!=CURLE_OK?transport_outcome(result):!observed?"http_status_unavailable":"http_status_rejected";
+  }
   response_size=b.bytes;curl_easy_cleanup(h);wipe(auth->data,auth_size);
 #ifdef JIT_ADMIN_LOCAL_MOCK
   jit_admin_mock_wipe(auth->data,auth_size);
 #endif
   if(auth_locked)munlock(auth->data,auth_size);
   curl_slist_free_all(auth);curl_slist_free_all(addresses);
-  wipe(private_memory.header,sizeof private_memory.header);return ok;
+  wipe(private_memory.header,sizeof private_memory.header);
+  if(!ok)request_diagnostic(method,outcome,status);
+  return ok;
 #undef OPT
 }
 static int readback(struct snapshot *s,int cleanup){
-  int ok=request(BASE "/list","GET",NULL,cleanup)&&list_snapshot(s);
+  int ok=request(BASE "/list","GET",NULL,cleanup);
+  if(ok&&!list_snapshot(s)){puts("jit_admin_list_response_contract_rejected");ok=0;}
   wipe(private_memory.response,sizeof private_memory.response);return ok;
 }
 static int matches(const struct snapshot *s){
@@ -351,14 +389,21 @@ static int grant(int mode){
     mode==0?"email":"user_id",mode==0?EMAIL:user_id,(long long)expiry);
   if(n<0||(size_t)n>=sizeof payload)return 0;
   owned=1;expected_expiry=expiry;stage=mode==0?1:mode==1?2:4;
-  int ack=request(mode==0?BASE "/invite":BASE,mode==0?"POST":"PUT",payload,0)&&mutation_response(mode==0,expiry);
+  int ack=request(mode==0?BASE "/invite":BASE,mode==0?"POST":"PUT",payload,0);
+  if(ack&&!mutation_response(mode==0,expiry)){
+    puts(mode==0?"jit_admin_invite_response_contract_rejected":"jit_admin_update_response_contract_rejected");ack=0;
+  }
   wipe(private_memory.response,sizeof private_memory.response);
   if(!ack)uncertain=1;
   if(!readback(&s,1)){uncertain=1;puts("jit_admin_mutation_uncertain_readback_required");return 0;}
   /* A lost invite response can identify cleanup scope only via pristine-baseline
    * exact email/role/expiry readback. It never clears the acknowledgement latch. */
   if(mode==0&&!invite_id[0]&&s.kind==1&&s.expiry==expiry)strcpy(invite_id,s.id);
-  if(!s.kind||!matches(&s)){uncertain=1;puts("jit_admin_mutation_scope_unconfirmed_stop");return 0;}
+  if(!s.kind||!matches(&s)){
+    uncertain=1;
+    puts(!s.kind?"jit_admin_mutation_readback_absent":"jit_admin_mutation_readback_scope_mismatch");
+    puts("jit_admin_mutation_scope_unconfirmed_stop");return 0;
+  }
   if(s.kind==2&&!user_id[0])strcpy(user_id,s.id);
   puts(uncertain?"jit_admin_mutation_observed_ack_uncertain":"jit_admin_grant_and_readback_confirmed");
   printf("jit_admin_grant_expires_unix_seconds %lld\n",(long long)expiry);return !uncertain;

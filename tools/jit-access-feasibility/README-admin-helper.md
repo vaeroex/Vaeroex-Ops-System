@@ -104,7 +104,29 @@ after `window_end - 600`, reserving at least ten minutes for cleanup. Keep the
 independent native NOLOGIN/session-fence path available throughout the window.
 
 The initial complete project list must be empty. Never adopt an existing grant
-or pending invitation. After the private prompt, enter only these nonsecret cues:
+or pending invitation. The provider Dashboard's current role selector requires
+LOGIN eligibility. After the helper reaches its private ready state and before
+`i`, the coordinator must run the **existing, unchanged** reviewed `activate.sql`
+through the isolated administrative path. It verifies physical/database identity,
+the exact newly created role OID/flags/memberships and locked FORCE-RLS/privilege
+boundaries before changing only LOGIN. Require fresh LOGIN/zero-session readback.
+Retain the exclusive test-role setup evidence: `setup.sql` created NOLOGIN with
+no PASSWORD, and no password-assignment path has run. Do not adopt an existing
+role or claim that the masked `pg_roles.rolpassword` proves password absence.
+Unknown credential assignment or concurrent administration blocks activation;
+do not reset passwords, read verifiers or broaden access to satisfy this gate.
+
+This moves the already-authorized activation immediately before invitation,
+not before the initial nonsecret NOLOGIN or public-canary checks. LOGIN alone
+does not create a JIT mapping or external token. The helper independently
+rechecks its empty-list precondition before its one invitation. Do not create
+an external PAT or attempt database authentication until the invitation's
+matching response, exact readback and private recipient acceptance are confirmed.
+If invitation/acceptance fails or is uncertain, immediately commit the unchanged
+exact-role NOLOGIN fence, run its bounded drain, verify zero sessions and finish
+the existing credential/grant/feature/network/VM cleanup. Do not widen permissions
+or repeat invitation in that window. After the private prompt and this activation
+gate, enter only these nonsecret cues:
 
 1. `i`: send one eight-minute invitation; require mutation response **and** exact
    independent list readback. The recipient accepts privately.
@@ -128,6 +150,50 @@ attempts plus 20 reserved cleanup attempts are allowed. Cancellation/timeouts
 restore the TTY and wipe owned buffers; they cannot guarantee remote cleanup.
 The helper never revokes its own administrative PAT: that is a mandatory private
 provider-controlled operator action, separate from its five allowed endpoints.
+
+## Bounded failure diagnostics
+
+On a failed request the helper prints only a fixed operation (`list`, `invite`,
+`update`, `revoke`), a local failure-category label, and a range-checked HTTP
+status (100–599) or `unknown`. It never prints response bodies, header values,
+curl error strings, request URLs, tokens, payloads or byte counts. Status can be
+observed even when the transfer later fails; that is not a complete response or
+proof of mutation success. TLS/connection/send/receive/timeout failures remain
+distinct from a completed non-200 HTTP response. Unknown transport failures stay
+unclassified rather than being interpreted as a provider rejection. A deadline,
+request budget, setup failure, forbidden pagination or response-size limit has
+its own fixed category. The existing five-second requests, request budgets,
+strict HTTP200 requirement and independent authority readback are unchanged.
+
+HTTP200 with a rejected response contract is labeled separately for list,
+invitation and update. An empty mutation readback is distinguished from a
+nonempty mismatched scope. Neither clears the uncertainty latch, authorizes a
+retry or establishes why the provider did not leave the expected mapping.
+Cleanup absence is a current readback observation, not acknowledgement evidence.
+
+The isolated 2026-09-09 attempt reached the private ready state, but its single
+invitation produced `jit_admin_mutation_scope_unconfirmed_stop`; cleanup found
+absence while retaining acknowledgement uncertainty. The old binary did not
+retain/report its HTTP/transport category, so that cause cannot be reconstructed
+from these labels. No external credential or PostgreSQL session was created;
+the operator revoked the administrative PAT and the isolated host/access path
+was closed. Synthetic cases reproduce that formerly indistinguishable sequence
+for HTTP400/403/409/429/500, unexpected201, timeout-before-commit and missing
+readback, without asserting which happened on the provider.
+
+Current Dashboard [role eligibility](https://github.com/supabase/supabase/blob/master/apps/studio/components/interfaces/Settings/Database/JitDatabaseAccess/JitDbAccess.utils.ts)
+also excludes NOLOGIN roles via `isAssignableJitRole`. The prior attempt kept the
+test role NOLOGIN. That is a concrete Dashboard prerequisite discrepancy, not
+proof of this hosted API failure's cause. The preparation sequence above moves
+the existing checked LOGIN activation before invitation; no role has been
+activated by this code-only correction, and no SQL, privilege, PAT permission,
+native request scope or automatic grant ordering is changed. The prior HTTP
+outcome remains unknown. The next admitted attempt tests this supported
+prerequisite with finite diagnostics; do not rerun the NOLOGIN sequence or use
+wider authority merely to obtain a pass. A completed non-200 response requires
+status-specific contract/permission analysis; a transport failure requires that
+transport diagnosis; a rejected response contract requires exact nonsecret
+contract evidence. None authorizes a blind retry or broader grant.
 
 ## Uncertain acknowledgements, scope changes and recovery
 
