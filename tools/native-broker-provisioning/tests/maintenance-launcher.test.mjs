@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { chmodSync, closeSync, fstatSync, mkdtempSync, mkdirSync, openSync, realpathSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, closeSync, copyFileSync, fstatSync, mkdtempSync, mkdirSync, openSync, realpathSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -29,7 +29,11 @@ test("fixed native entry clears interpreter/loader hooks before Node and preserv
     const install = join(root, "install");mkdirSync(install, { mode: 0o700 });
     const launcher = join(root, "launcher");
     const source = resolve(directory, "../maintenance-launcher.c");
-    const node = realpathSync(process.execPath);
+    // Hosted-toolcache ancestors may deliberately be group-writable. Preserve
+    // production's parent checks and place this actual public Node executable
+    // in the test-owned immutable runtime directory instead.
+    const runtime = join(root, "runtime");mkdirSync(runtime, { mode: 0o700 });
+    const node = join(runtime, "node");copyFileSync(realpathSync(process.execPath), node);chmodSync(node, 0o700);
     const fdPath = join(root, "public-inherited-fd");writeFileSync(fdPath, "PUBLIC_SYNTHETIC_FD", { mode: 0o600 });
     inherited = openSync(fdPath, "r");
     const identity = fstatSync(inherited);
@@ -64,6 +68,12 @@ process.stdout.write('synthetic_fixed_entry_passed\\n');
       success(result);
       assert.equal(result.stdout === "synthetic_fixed_entry_passed\n" && result.stderr === "", true, "fixed response only; no preload executes");
     };
+    accepted(invoke());
+    chmodSync(runtime, 0o722);
+    const writableRuntime = invoke();
+    assert.equal(writableRuntime.status === 2 && writableRuntime.stdout === denied && writableRuntime.stderr === "", true,
+      "writable Node ancestor rejected without weakening installation checks");
+    chmodSync(runtime, 0o700);
     accepted(invoke());
     for (const kind of ["require", "import"]) {
       const preload = join(root, kind === "require" ? "public-preload.cjs" : "public-preload.mjs");
