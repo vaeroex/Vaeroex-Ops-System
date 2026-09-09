@@ -2,10 +2,11 @@
 
 This closes one missing **test-tooling** gap: an actual libpq TLS/password-failure
 exercise before PAT creation. It does not select Temporary Access for Production,
-qualify hosted diagnostics, or enable the credential-bearing runner. The current
-user authorization includes this isolated pre-token preparation. No provider-facing
-canary or credential-bearing execution occurred; Ubuntu loopback tests are
-reported separately below.
+qualify hosted diagnostics, or enable the credential-bearing runner. The
+previous binary produced an undifferentiated inconclusive result in two
+public-invalid hosted attempts, including one with project Temporary Access
+enabled. No PAT or grant was created; cleanup was verified. This correction
+adds finite observations, not a diagnosis of those attempts or a privacy waiver.
 
 ## Fixed scope and execution gates
 
@@ -28,15 +29,17 @@ At most **two sequential connection attempts**, one open connection at a time:
 
 1. Normal `verify-full` with the real pinned hostname, then the public invalid
    marker only if libpq negotiates an allowed password authentication method.
-2. Only after the expected first observation, a deliberate name-negative TLS
+2. After a terminal failed primary connection with TLS observed, a deliberate name-negative TLS
    attempt to the **same resolved IP and port**. The verification name is
    `vaeroex-jit-tls-negative.invalid`; it is never resolved or used to select a
    different network endpoint. This attempt must fail before password use.
 
-The normal attempt must observe TLS in use, a password challenge/use, failure,
-and the expected formatted 28P01 hint. Unexpected successful authentication,
-wrong SQLSTATE, TLS refusal, unsupported authentication, disconnection, timeout,
-or other ambiguous failure never establishes successful qualification.
+The independent name-negative diagnostic can run even if the primary rejection
+has another hint or precedes password use. It does not turn that primary failure
+into an authentication pass. Timeout, cancellation, unobserved TLS or unexpected
+authentication skips the second attempt. The unchanged positive transport label
+still requires TLS, password use, terminal failed polling and the formatted
+28P01 hint. Other failures are classified separately and remain inconclusive.
 
 The current VM's firewall may not permit port 5432. A blocked connection is not
 authentication rejection. Complete the separately reviewed network/admission
@@ -44,6 +47,61 @@ gate before execution; this artifact changes no firewall, role, feature or grant
 Keep the role NOLOGIN during the canary; do not activate it or create a grant/PAT
 to force this check to pass. A provider refusal before the password challenge is
 an inconclusive result to report.
+
+## Finite diagnostic contract
+
+Each completed attempt emits these `native_canary_primary_` or
+`native_canary_hostname_negative_` fields. Values come only from fixed source
+literals, never raw errors, arbitrary SQLSTATEs, protocol data, endpoints or
+credentials:
+
+| Field | Values / meaning |
+|---|---|
+| `completion` | `connect_failed`, `authenticated`, `timeout`, `cancelled`, `io_failed`, `socket_unavailable`, `allocation_failed`, `unknown` |
+| `polling` | Last libpq poll result: `not_polled`, `reading`, `writing`, `active`, `failed`, `ok`, `unknown` |
+| `timeout` | `yes` when the attempt deadline wins; `no` when completion is observed before it; `unknown` on cancellation or absent observation |
+| `tls_observed` | `yes` if libpq reported TLS in use during polling; otherwise `unknown`, not a claim that TLS never existed or certificate checks completed |
+| `password_used` | `yes`/`no` from the supported libpq status API, or `unknown` without a connection observation |
+| `rejection_hint` | Bounded formatted `28P01`, `28000`, `XX000`, `unclassified` or `unknown`; not structured error provenance |
+| `expected_rejection_hint` | Whether the bounded `28P01` hint matched (`yes`/`no`/`unknown`); not a verdict on whether other rejection is legitimate |
+| `hostname_mismatch_hint` | Whether the fixed libpq hostname-mismatch phrase was observed (`yes`/`no`/`unknown`) |
+
+`native_canary_hostname_negative_ran=yes/no` distinguishes attempted from
+skipped testing. Default-disabled and other early precondition exits retain
+their existing fixed labels without performing either connection. An absolute
+process alarm emits `native_canary_window_exhausted`, marks the interrupted
+attempt's observations `unknown`, reports whether negative testing started and
+exits75 using async-signal-safe writes. It does not invent observations from
+partially processed connection state. Previously completed records remain valid.
+
+### Expected rejection for no grant and NOLOGIN
+
+The documented requirements are enabled project Temporary Access, enforced SSL
+and the IPv4 pooler option. Documentation does **not** guarantee a SQLSTATE for
+an arbitrary never-issued token. At public Supavisor commit
+`a16d27155d894c1ff0977cd9eebd999f51aede08`, JIT is selected only after tenant and
+connection checks; it challenges for a password over TLS and then requests JIT
+authorization before upstream setup:
+
+- JIT-provider401/403 or a different authorized role maps to28P01.
+- An unexpected/malformed provider response or request failure maps toXX000.
+  Tenant/configuration checks can also reject before a password challenge.
+- PostgreSQL NOLOGIN rejection is28000 and follows authentication in the normal
+  PostgreSQL startup order. NOLOGIN does not imply no password challenge.
+
+Thus XX000 or28000 can represent legitimate fail-closed behavior, but neither
+proves invalid-token denial, JIT routing or successful authentication. They are
+**not** added to the transport-pass allowlist. Project PostgreSQL build17.6.1.166
+does not identify the deployed Supavisor commit; the actual proxy build and JIT
+provider response remain unverified. Keep the exact role/grant state unchanged.
+
+Pinned primary source:
+[JIT mapping](https://github.com/supabase/supavisor/blob/a16d27155d894c1ff0977cd9eebd999f51aede08/lib/supavisor/client_handler/auth_methods/jit.ex),
+[28P01 override](https://github.com/supabase/supavisor/blob/a16d27155d894c1ff0977cd9eebd999f51aede08/lib/supavisor/errors/jit_unauthorized_error.ex),
+[defaultXX000](https://github.com/supabase/supavisor/blob/a16d27155d894c1ff0977cd9eebd999f51aede08/lib/supavisor/error.ex),
+[connection ordering](https://github.com/supabase/supavisor/blob/a16d27155d894c1ff0977cd9eebd999f51aede08/lib/supavisor/client_handler.ex),
+[PostgreSQL17.6 authentication ordering](https://github.com/postgres/postgres/blob/7885b94dd81b98bbab9ed878680d156df7bf857f/src/backend/utils/init/postinit.c#L926),
+[NOLOGIN check](https://github.com/postgres/postgres/blob/7885b94dd81b98bbab9ed878680d156df7bf857f/src/backend/utils/init/miscinit.c#L850).
 
 ## Evidence boundaries
 
@@ -133,9 +191,29 @@ missing error states (including an explicitly indistinguishable malformed
 lookalike); unexpected authentication; disconnect; TLS refusal; forbidden GSS/
 no-auth; timeout/cancellation; unaccepted arguments; credential, loader,
 proxy and TLS-keylog/config environment rejection. It suppresses hostile public
-marker echoes and issues no SQL. All 20 cases also passed on the isolated Ubuntu
-host with actual libpq16.15 on 2026-09-09. This is loopback TLS evidence only;
-the provider-facing canary was not run. See [QUALIFICATION.md](QUALIFICATION.md).
+marker echoes and issues no SQL. The earlier 20-case suite passed on the isolated
+Ubuntu host with actual libpq16.15 on 2026-09-09; that historical result applies
+to the earlier binary, not this diagnostic correction. Its later provider-facing
+attempts were inconclusive. The corrected binary has not yet been run against
+the provider. Loopback TLS validation is not hosted authentication or diagnostic
+nonrecording evidence. See [QUALIFICATION.md](QUALIFICATION.md).
+
+The changed suite checks complete finite records for pre/post-password
+rejections, disconnects, deadlines and cancellation, plus the negative phase
+and absolute alarm. It does not claim wire fixtures can force libpq allocation
+failure or every operating-system polling failure. Those paths have explicit
+unknown-preserving results and remain source-reviewed, not fault-injection
+evidence.
+
+The separate `jit-canary-linux-qualification` CI job runs the focused suite
+normally, with `--ubsan`, and with `--sanitize` (ASan plus UBSan), on Ubuntu24.04
+with the isolated host's exact libpq16.15 package. It fails closed if that package
+is unavailable. It also builds, but never executes, the approved hosted profile.
+Its seven-day artifact contains only that public binary and nonsecret provenance
+(exact checkout/tree, dependency/source/binary hashes and run identity), not
+fixture keys, diagnostics or test credentials. Require successful exact-head
+qualification, independent review and artifact/host compatibility verification
+before scheduling another VM window. A CI binary is not hosted qualification.
 
 ## Approved Linux build, not an execution instruction
 

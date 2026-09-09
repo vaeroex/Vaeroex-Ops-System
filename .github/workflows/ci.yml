@@ -288,6 +288,117 @@ jobs:
           python3 -S tools/jit-access-feasibility/verify-fixture.py --pg-prefix "$jit_pg_prefix"
           python3 -S tools/jit-access-feasibility/verify-fixture.py --pg-prefix "$jit_pg_prefix" --dashboard
 
+  jit-canary-linux-qualification:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact canary source revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Install and verify exact isolated-host libpq packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          . /etc/os-release
+          test "$ID" = ubuntu
+          test "$VERSION_ID" = 24.04
+          test "$(dpkg --print-architecture)" = amd64
+          sudo apt-get update
+          # Only this disposable CI runner is changed. A newer preinstalled
+          # package must not silently substitute for the reviewed host build.
+          sudo apt-get install -y --no-install-recommends --allow-downgrades \
+            build-essential libssl-dev python3 openssl \
+            libpq5=16.15-0ubuntu0.24.04.1 libpq-dev=16.15-0ubuntu0.24.04.1
+          test "$(dpkg-query -W -f='${Version}' libpq5)" = 16.15-0ubuntu0.24.04.1
+          test "$(dpkg-query -W -f='${Version}' libpq-dev)" = 16.15-0ubuntu0.24.04.1
+          python3 -S -c 'import ctypes; p = ctypes.CDLL("/usr/lib/x86_64-linux-gnu/libpq.so.5"); assert p.PQlibVersion() == 160015; print("exact_libpq_16_15_verified")'
+
+      - name: Qualify changed canary with native loopback TLS only
+        shell: bash
+        run: |
+          set -euo pipefail
+          # No PAT, database, remote connection, VM, or approved-profile run.
+          # -S excludes optional Python site/crash-report hooks.
+          python3 -S tools/jit-access-feasibility/validate-native-canary.py --pg-prefix /usr
+          python3 -S tools/jit-access-feasibility/validate-native-canary.py --pg-prefix /usr --ubsan
+          python3 -S tools/jit-access-feasibility/validate-native-canary.py --pg-prefix /usr --sanitize
+
+      - name: Build inert public canary artifact and record provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir "$RUNNER_TEMP/jit-native-canary-public"
+          # Build only: never execute this hosted profile in CI. The preceding
+          # tests execute a separate loopback-only profile with public fixtures.
+          cc -std=c11 -Wall -Wextra -Werror -O2 \
+            -DJIT_CANARY_APPROVED_SANDBOX_20260908 -I/usr/include/postgresql \
+            tools/jit-access-feasibility/native-canary.c \
+            /usr/lib/x86_64-linux-gnu/libpq.so.5 \
+            -o "$RUNNER_TEMP/jit-native-canary-public/jit-native-canary-approved"
+          python3 -S - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+          import subprocess
+
+          artifact = Path(os.environ['RUNNER_TEMP']) / 'jit-native-canary-public'
+          binary = artifact / 'jit-native-canary-approved'
+          assert binary.is_file() and not binary.is_symlink()
+          assert 0 < binary.stat().st_size <= 1048576
+          def output(*args):
+              return subprocess.check_output(args, text=True, timeout=10).strip()
+          def digest(path):
+              path = Path(path)
+              return {'path': str(path), 'sha256': hashlib.sha256(path.read_bytes()).hexdigest()}
+          sources = ['.github/workflows/ci.yml',
+                     'tools/jit-access-feasibility/native-canary.c',
+                     'tools/jit-access-feasibility/validate-native-canary.py']
+          manifest = {
+              'schema': 'vaeroex_public_native_canary_build_v1',
+              'checkout_sha': output('git', 'rev-parse', 'HEAD'),
+              'checkout_tree': output('git', 'rev-parse', 'HEAD^{tree}'),
+              'actions_run_id': os.environ['GITHUB_RUN_ID'],
+              'actions_run_attempt': os.environ['GITHUB_RUN_ATTEMPT'],
+              'platform': 'ubuntu-24.04-amd64',
+              'profile': 'JIT_CANARY_APPROVED_SANDBOX_20260908',
+              'hosted_profile_executed': False,
+              'hosted_qualification': False,
+              'qualification': ['loopback-normal', 'loopback-ubsan', 'loopback-asan-ubsan'],
+              'compiler': output('cc', '--version'),
+              'packages': {name: output('dpkg-query', '-W', '-f=${Version}', name)
+                           for name in ['libpq5', 'libpq-dev', 'libssl3t64', 'libc6',
+                                        'gcc', 'binutils', 'python3', 'openssl']},
+              'sources': [digest(path) for path in sources],
+              'libpq': digest(Path('/usr/lib/x86_64-linux-gnu/libpq.so.5').resolve(strict=True)),
+              'binary': {'name': binary.name, 'sha256': digest(binary)['sha256']},
+              # readelf inspects the file; unlike a loader-based probe it does
+              # not execute the approved hosted-profile artifact.
+              'elf_dependencies': output('readelf', '--dynamic', str(binary)),
+              'elf_symbol_versions': output('readelf', '--version-info', str(binary)),
+          }
+          encoded = json.dumps(manifest, indent=2, sort_keys=True) + '\n'
+          assert len(encoded.encode()) <= 131072
+          (artifact / 'provenance.json').write_text(encoded)
+          assert sorted(path.name for path in artifact.iterdir()) == [binary.name, 'provenance.json']
+          PY
+
+      - name: Upload only public canary binary and nonsecret provenance
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: jit-native-canary-ubuntu24-libpq1615-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/jit-native-canary-public/jit-native-canary-approved
+            ${{ runner.temp }}/jit-native-canary-public/provenance.json
+          if-no-files-found: error
+          include-hidden-files: false
+          overwrite: false
+          retention-days: 7
+
   security-database:
     runs-on: ubuntu-latest
     timeout-minutes: 30
