@@ -72,6 +72,13 @@ clipboard/history/synchronization mechanism. For this run the operator manually
 transcribes the new credential directly into the native no-echo TTY only after
 the full hosted pre-token privacy gates pass; copying and pasting is not allowed.
 
+Follow [the private-entry handoff](PRIVATE-ENTRY.md). Entry permits at most
+300 seconds, capped by the original process deadline, with no per-character
+extension. `jit_admin_private_input_timed_out` distinguishes expiry from
+`jit_admin_private_input_rejected`; neither reports received bytes or their
+length. Both exit before the first authenticated API request and wipe owned
+input memory. A rejected/expired attempt cannot prove that no bytes arrived.
+
 Require no swap, no core/crash-memory persistence, no request/header capture,
 no TLS key logging, no process tracing/recording, and trusted host/launch access.
 Environment injection can run before `main`: an environment check is not a
@@ -180,6 +187,7 @@ Run only its new offline suite:
 python3 -S tools/jit-access-feasibility/validate-admin-helper.py
 python3 -S tools/jit-access-feasibility/validate-admin-helper.py --ubsan
 python3 -S tools/jit-access-feasibility/validate-admin-helper.py --sanitize
+python3 -S tools/jit-access-feasibility/validate-private-entry.py
 ```
 
 The suite links a fake libcurl, so no network library or socket path exists. It

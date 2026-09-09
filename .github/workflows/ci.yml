@@ -285,6 +285,7 @@ jobs:
           python3 -S tools/jit-access-feasibility/validate-admin-helper.py
           python3 -S tools/jit-access-feasibility/validate-admin-helper.py --ubsan
           python3 -S tools/jit-access-feasibility/validate-admin-helper.py --sanitize
+          python3 -S tools/jit-access-feasibility/validate-private-entry.py --include "$jit_pg_prefix/include"
           python3 -S tools/jit-access-feasibility/verify-fixture.py --pg-prefix "$jit_pg_prefix"
           python3 -S tools/jit-access-feasibility/verify-fixture.py --pg-prefix "$jit_pg_prefix" --dashboard
 
@@ -310,7 +311,7 @@ jobs:
           # Only this disposable CI runner is changed. A newer preinstalled
           # package must not silently substitute for the reviewed host build.
           sudo apt-get install -y --no-install-recommends --allow-downgrades \
-            build-essential libssl-dev python3 openssl \
+            build-essential libssl-dev libcurl4-openssl-dev python3 openssl \
             libpq5=16.15-0ubuntu0.24.04.1 libpq-dev=16.15-0ubuntu0.24.04.1
           test "$(dpkg-query -W -f='${Version}' libpq5)" = 16.15-0ubuntu0.24.04.1
           test "$(dpkg-query -W -f='${Version}' libpq-dev)" = 16.15-0ubuntu0.24.04.1
@@ -325,6 +326,78 @@ jobs:
           python3 -S tools/jit-access-feasibility/validate-native-canary.py --pg-prefix /usr
           python3 -S tools/jit-access-feasibility/validate-native-canary.py --pg-prefix /usr --ubsan
           python3 -S tools/jit-access-feasibility/validate-native-canary.py --pg-prefix /usr --sanitize
+
+      - name: Qualify private entry on the exact Linux client profile
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Fake libraries and synthetic PTYs only; no credential or remote I/O.
+          python3 -S tools/jit-access-feasibility/validate-private-entry.py --include /usr/include/postgresql
+          python3 -S tools/jit-access-feasibility/validate-private-entry.py --include /usr/include/postgresql --ubsan
+          python3 -S tools/jit-access-feasibility/validate-private-entry.py --include /usr/include/postgresql --sanitize
+
+      - name: Build inert private-entry clients and record nonsecret provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir "$RUNNER_TEMP/jit-private-entry-public"
+          cc -std=c11 -Wall -Wextra -Werror -O2 \
+            -DJIT_ADMIN_APPROVED_SANDBOX_20260909 \
+            tools/jit-access-feasibility/admin-helper.c -lcurl \
+            -o "$RUNNER_TEMP/jit-private-entry-public/jit-admin-helper-approved"
+          cc -std=c11 -Wall -Wextra -Werror -O2 \
+            -DJIT_APPROVED_SANDBOX_20260908 -I/usr/include/postgresql \
+            tools/jit-access-feasibility/runner.c -lpq -lcurl \
+            -o "$RUNNER_TEMP/jit-private-entry-public/jit-runner-approved"
+          python3 -S - <<'PY'
+          import hashlib, json, os, subprocess
+          from pathlib import Path
+          folder = Path(os.environ['RUNNER_TEMP']) / 'jit-private-entry-public'
+          names = ['jit-admin-helper-approved', 'jit-runner-approved']
+          assert sorted(p.name for p in folder.iterdir()) == names
+          def output(*args):
+              return subprocess.check_output(args, text=True, timeout=10).strip()
+          def digest(p):
+              p = Path(p)
+              assert p.is_file() and not p.is_symlink()
+              return hashlib.sha256(p.read_bytes()).hexdigest()
+          evidence = {
+              'schema': 'vaeroex_private_entry_build_v1',
+              'checkout_sha': output('git', 'rev-parse', 'HEAD'),
+              'checkout_tree': output('git', 'rev-parse', 'HEAD^{tree}'),
+              'actions_run_id': os.environ['GITHUB_RUN_ID'],
+              'actions_run_attempt': os.environ['GITHUB_RUN_ATTEMPT'],
+              'hosted_profiles_executed': False,
+              'hosted_qualification': False,
+              'platform': 'ubuntu-24.04-amd64',
+              'compiler': output('cc', '--version'),
+              'packages': {n: output('dpkg-query', '-W', '-f=${Version}', n)
+                           for n in ['libpq5', 'libpq-dev', 'libcurl4t64', 'libssl3t64', 'libc6']},
+              'sources': {str(p): digest(p) for p in [
+                  Path('.github/workflows/ci.yml'),
+                  *[Path('tools/jit-access-feasibility') / n for n in [
+                    'admin-helper.c', 'runner.c', 'private-entry-clock-test.c',
+                    'validate-private-entry.py']]]},
+              'binaries': {n: {'sha256': digest(folder / n),
+                              'elf_dependencies': output('readelf', '--dynamic', str(folder / n)),
+                              'elf_symbol_versions': output('readelf', '--version-info', str(folder / n))}
+                           for n in names},
+          }
+          (folder / 'provenance.json').write_text(json.dumps(evidence, indent=2, sort_keys=True) + '\n')
+          PY
+
+      - name: Upload only inert private-entry binaries and provenance
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: jit-private-entry-ubuntu24-libpq1615-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/jit-private-entry-public/jit-admin-helper-approved
+            ${{ runner.temp }}/jit-private-entry-public/jit-runner-approved
+            ${{ runner.temp }}/jit-private-entry-public/provenance.json
+          if-no-files-found: error
+          include-hidden-files: false
+          overwrite: false
 
       - name: Build inert public canary artifact and record provenance
         shell: bash
