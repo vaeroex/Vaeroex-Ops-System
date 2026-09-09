@@ -63,8 +63,8 @@ def run_pty(command, payload=SENTINEL + b'\n', admin=False):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--include', type=pathlib.Path,
-                        default=pathlib.Path('/private/tmp/vaeroex-square-pg176.ArIWfz/install/include'))
+    parser.add_argument('--include', type=pathlib.Path, required=True,
+                        help='Explicit local libpq header directory (no machine-specific default)')
     parser.add_argument('--ubsan', action='store_true')
     parser.add_argument('--sanitize', action='store_true')
     args = parser.parse_args()

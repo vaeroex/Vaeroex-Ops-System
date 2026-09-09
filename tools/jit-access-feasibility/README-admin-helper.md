@@ -187,7 +187,7 @@ Run only its new offline suite:
 python3 -S tools/jit-access-feasibility/validate-admin-helper.py
 python3 -S tools/jit-access-feasibility/validate-admin-helper.py --ubsan
 python3 -S tools/jit-access-feasibility/validate-admin-helper.py --sanitize
-python3 -S tools/jit-access-feasibility/validate-private-entry.py
+python3 -S tools/jit-access-feasibility/validate-private-entry.py --include /usr/include/postgresql
 ```
 
 The suite links a fake libcurl, so no network library or socket path exists. It

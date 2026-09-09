@@ -67,3 +67,12 @@ no credential-bearing calls after input failure. The disposable-shell test check
 no parent-shell continuation, not universal terminal nonrecording. Test clock
 substitution belongs only to the offline test translation unit; approved builds
 have no clock-override runtime input. These tests are not hosted authentication.
+
+Pass the installed local libpq headers explicitly; the runner has no developer-
+machine path default. On the reviewed Ubuntu package profile:
+
+```sh
+python3 -S tools/jit-access-feasibility/validate-private-entry.py --include /usr/include/postgresql
+```
+
+For another already-qualified local build, use its verified include directory.
