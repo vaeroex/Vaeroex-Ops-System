@@ -248,13 +248,45 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Install public native build dependencies
-        run: sudo apt-get update && sudo apt-get install -y build-essential libssl-dev zlib1g-dev bison flex curl git bzip2
+        run: sudo apt-get update && sudo apt-get install -y build-essential libssl-dev libcurl4-openssl-dev zlib1g-dev bison flex curl git bzip2 python3 openssl
 
       - name: Qualify fixed native provisioning against private local PostgreSQL
         # No remote DSN, provider credential, cloud identity or artifact upload.
         # The release binary is unconditionally closed; only a local-only test
         # build exercises generated synthetic credentials in disposable clusters.
-        run: node tools/native-broker-provisioning/tests/bootstrap.cjs --qualify
+        shell: bash
+        run: |
+          set -euo pipefail
+          # This file contains only the public dependency manifest path and
+          # sanitized synthetic counts, never credentials or database logs.
+          node tools/native-broker-provisioning/tests/bootstrap.cjs --qualify | tee "$RUNNER_TEMP/native-broker-qualification.jsonl"
+
+      - name: Qualify isolated JIT tools with fake APIs and loopback fixtures only
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Reuse the exact PostgreSQL 17.6 build above. No second download,
+          # remote DSN, PAT, cloud identity, or approved hosted executable run.
+          jit_pg_prefix="$(node -e '
+            const fs = require("node:fs");
+            const path = require("node:path");
+            const rows = fs.readFileSync(process.argv[1], "utf8").trim().split("\n").map(line => JSON.parse(line));
+            if (rows.length !== 2 || rows[0].publicSourceBuildOnly !== true || rows[0].postgres !== "17.6" || rows[1].failure !== null)
+              throw new Error("pinned_local_build_required");
+            const manifest = JSON.parse(fs.readFileSync(rows[0].manifestPath, "utf8"));
+            const prefix = fs.realpathSync(manifest.pgRoot);
+            if (!path.isAbsolute(prefix) || /[\r\n]/.test(prefix)) throw new Error("local_prefix_required");
+            process.stdout.write(prefix);
+          ' "$RUNNER_TEMP/native-broker-qualification.jsonl")"
+          # -S excludes optional site/crash-report hooks; all Python inputs are
+          # synthetic, and the real credential boundary remains native C only.
+          python3 -S tools/jit-access-feasibility/validate.py --include "$jit_pg_prefix/include"
+          python3 -S tools/jit-access-feasibility/validate-native-canary.py --pg-prefix "$jit_pg_prefix"
+          python3 -S tools/jit-access-feasibility/validate-admin-helper.py
+          python3 -S tools/jit-access-feasibility/validate-admin-helper.py --ubsan
+          python3 -S tools/jit-access-feasibility/validate-admin-helper.py --sanitize
+          python3 -S tools/jit-access-feasibility/verify-fixture.py --pg-prefix "$jit_pg_prefix"
+          python3 -S tools/jit-access-feasibility/verify-fixture.py --pg-prefix "$jit_pg_prefix" --dashboard
 
   security-database:
     runs-on: ubuntu-latest
