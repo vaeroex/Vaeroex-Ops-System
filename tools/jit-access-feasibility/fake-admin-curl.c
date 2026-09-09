@@ -107,6 +107,12 @@ CURLcode curl_easy_perform(CURL *handle){
  if(is("cancel_http"))raise(SIGTERM);
  if(h->progress(NULL,0,0,0,0))return CURLE_ABORTED_BY_CALLBACK;
  if(is("tls_failure"))return CURLE_PEER_FAILED_VERIFICATION;
+ if(is("tls_handshake_failure"))return CURLE_SSL_CONNECT_ERROR;
+ if(is("dns_failure"))return CURLE_COULDNT_RESOLVE_HOST;
+ if(is("connect_failure"))return CURLE_COULDNT_CONNECT;
+ if(is("send_failure"))return CURLE_SEND_ERROR;
+ if(is("receive_failure"))return CURLE_RECV_ERROR;
+ if(is("other_transport_failure"))return CURLE_GOT_NOTHING;
  if(is("timeout"))return CURLE_OPERATION_TIMEDOUT;
  h->status=is("redirect")?302:is("forbidden")?403:is("rate_limit")?429:is("server_error")?500:200;
  char out[16385]={0};
@@ -118,10 +124,21 @@ CURLcode curl_easy_perform(CURL *handle){
   list(out,sizeof out);
   if(is("malformed_then_restored")&&post_lists==2)strcpy(out,"{\"items\":");
  }else if(!strcmp(h->method,"POST")){
-  assert(!strcmp(h->url,BASE "/invite")&&!kind&&++posts==1);validate_payload(h,1);kind=1;
+  assert(!strcmp(h->url,BASE "/invite")&&!kind&&++posts==1);validate_payload(h,1);
+  if(is("invite_bad_request")||is("invite_forbidden")||is("invite_conflict")||is("invite_rate_limit")||is("invite_server_error")||is("invite_unexpected_success")){
+   h->status=is("invite_bad_request")?400:is("invite_forbidden")?403:is("invite_conflict")?409:is("invite_rate_limit")?429:is("invite_server_error")?500:201;
+   /* Failure payload deliberately echoes the synthetic bearer: never diagnostic data. */
+   size_t bytes=strlen(h->headers->data);
+   assert(h->header(h->headers->data,1,bytes,h->header_data)==bytes);
+   assert(h->write(h->headers->data,1,bytes,h->write_data)==bytes);
+   return CURLE_OK;
+  }
+  if(is("invite_timeout_before_commit"))return CURLE_OPERATION_TIMEDOUT;
+  kind=1;
   char r[768];roles(r,sizeof r);snprintf(out,sizeof out,"{\"email\":\"" EMAIL "\",\"invite_id\":\"" INVITE "\",\"user_roles\":%s}",r);
   if(is("lost_invite_ack"))return CURLE_OPERATION_TIMEDOUT;
   if(is("missing_invite_id"))snprintf(out,sizeof out,"{\"email\":\"" EMAIL "\",\"user_roles\":%s}",r);
+  if(is("invite_readback_absent"))kind=0;
  }else if(!strcmp(h->method,"PUT")){
   assert(!strcmp(h->url,BASE)&&posts==1&&++puts_<=2);validate_payload(h,0);kind=2;
   char r[768];roles(r,sizeof r);snprintf(out,sizeof out,"{\"user_id\":\"" USER "\",\"user_roles\":%s}",r);
@@ -151,5 +168,7 @@ CURLcode curl_easy_perform(CURL *handle){
  return CURLE_OK;
 }
 CURLcode curl_easy_getinfo(CURL *handle,CURLINFO i,...){
+ if(is("http_info_failure"))return CURLE_UNKNOWN_OPTION;
+ if(is("http_status_out_of_range"))((struct mock*)handle)->status=987654321;
  assert(i==CURLINFO_RESPONSE_CODE);va_list a;va_start(a,i);*va_arg(a,long*)=((struct mock*)handle)->status;va_end(a);return CURLE_OK;
 }

@@ -104,7 +104,29 @@ after `window_end - 600`, reserving at least ten minutes for cleanup. Keep the
 independent native NOLOGIN/session-fence path available throughout the window.
 
 The initial complete project list must be empty. Never adopt an existing grant
-or pending invitation. After the private prompt, enter only these nonsecret cues:
+or pending invitation. The provider Dashboard's current role selector requires
+LOGIN eligibility. After the helper reaches its private ready state and before
+`i`, the coordinator must run the **existing, unchanged** reviewed `activate.sql`
+through the isolated administrative path. It verifies physical/database identity,
+the exact newly created role OID/flags/memberships and locked FORCE-RLS/privilege
+boundaries before changing only LOGIN. Require fresh LOGIN/zero-session readback.
+Retain the exclusive test-role setup evidence: `setup.sql` created NOLOGIN with
+no PASSWORD, and no password-assignment path has run. Do not adopt an existing
+role or claim that the masked `pg_roles.rolpassword` proves password absence.
+Unknown credential assignment or concurrent administration blocks activation;
+do not reset passwords, read verifiers or broaden access to satisfy this gate.
+
+This moves the already-authorized activation immediately before invitation,
+not before the initial nonsecret NOLOGIN or public-canary checks. LOGIN alone
+does not create a JIT mapping or external token. The helper independently
+rechecks its empty-list precondition before its one invitation. Do not create
+an external PAT or attempt database authentication until the invitation's
+matching response, exact readback and private recipient acceptance are confirmed.
+If invitation/acceptance fails or is uncertain, immediately commit the unchanged
+exact-role NOLOGIN fence, run its bounded drain, verify zero sessions and finish
+the existing credential/grant/feature/network/VM cleanup. Do not widen permissions
+or repeat invitation in that window. After the private prompt and this activation
+gate, enter only these nonsecret cues:
 
 1. `i`: send one eight-minute invitation; require mutation response **and** exact
    independent list readback. The recipient accepts privately.
@@ -128,6 +150,50 @@ attempts plus 20 reserved cleanup attempts are allowed. Cancellation/timeouts
 restore the TTY and wipe owned buffers; they cannot guarantee remote cleanup.
 The helper never revokes its own administrative PAT: that is a mandatory private
 provider-controlled operator action, separate from its five allowed endpoints.
+
+## Bounded failure diagnostics
+
+On a failed request the helper prints only a fixed operation (`list`, `invite`,
+`update`, `revoke`), a local failure-category label, and a range-checked HTTP
+status (100–599) or `unknown`. It never prints response bodies, header values,
+curl error strings, request URLs, tokens, payloads or byte counts. Status can be
+observed even when the transfer later fails; that is not a complete response or
+proof of mutation success. TLS/connection/send/receive/timeout failures remain
+distinct from a completed non-200 HTTP response. Unknown transport failures stay
+unclassified rather than being interpreted as a provider rejection. A deadline,
+request budget, setup failure, forbidden pagination or response-size limit has
+its own fixed category. The existing five-second requests, request budgets,
+strict HTTP200 requirement and independent authority readback are unchanged.
+
+HTTP200 with a rejected response contract is labeled separately for list,
+invitation and update. An empty mutation readback is distinguished from a
+nonempty mismatched scope. Neither clears the uncertainty latch, authorizes a
+retry or establishes why the provider did not leave the expected mapping.
+Cleanup absence is a current readback observation, not acknowledgement evidence.
+
+The isolated 2026-09-09 attempt reached the private ready state, but its single
+invitation produced `jit_admin_mutation_scope_unconfirmed_stop`; cleanup found
+absence while retaining acknowledgement uncertainty. The old binary did not
+retain/report its HTTP/transport category, so that cause cannot be reconstructed
+from these labels. No external credential or PostgreSQL session was created;
+the operator revoked the administrative PAT and the isolated host/access path
+was closed. Synthetic cases reproduce that formerly indistinguishable sequence
+for HTTP400/403/409/429/500, unexpected201, timeout-before-commit and missing
+readback, without asserting which happened on the provider.
+
+Current Dashboard [role eligibility](https://github.com/supabase/supabase/blob/master/apps/studio/components/interfaces/Settings/Database/JitDatabaseAccess/JitDbAccess.utils.ts)
+also excludes NOLOGIN roles via `isAssignableJitRole`. The prior attempt kept the
+test role NOLOGIN. That is a concrete Dashboard prerequisite discrepancy, not
+proof of this hosted API failure's cause. The preparation sequence above moves
+the existing checked LOGIN activation before invitation; no role has been
+activated by this code-only correction, and no SQL, privilege, PAT permission,
+native request scope or automatic grant ordering is changed. The prior HTTP
+outcome remains unknown. The next admitted attempt tests this supported
+prerequisite with finite diagnostics; do not rerun the NOLOGIN sequence or use
+wider authority merely to obtain a pass. A completed non-200 response requires
+status-specific contract/permission analysis; a transport failure requires that
+transport diagnosis; a rejected response contract requires exact nonsecret
+contract evidence. None authorizes a blind retry or broader grant.
 
 ## Uncertain acknowledgements, scope changes and recovery
 
@@ -164,7 +230,7 @@ The helper has a 4,097-byte token buffer, bounded owned Authorization header and
 16-KiB body buffer, all in one locked region. Each libcurl slist header copy is
 locked and wiped before freeing; the owned token/header/body are wiped at exit.
 Bodies and headers are never printed; output is a finite set of sanitized labels,
-the already nonsecret bound user UUID and grant expiry timestamp. Parser state is
+range-checked HTTP status, the already nonsecret bound user UUID and grant expiry timestamp. Parser state is
 bounded to 128 nodes/depth eight and holds offsets, not copied string values.
 The format prefix check only rejects obvious wrong input; it is not token
 validation and invents no undocumented minimum PAT length.
@@ -192,16 +258,21 @@ python3 -S tools/jit-access-feasibility/validate-private-entry.py --include /usr
 
 The suite links a fake libcurl, so no network library or socket path exists. It
 exercises the real private TTY/memory/parser/lifecycle code using synthetic strings:
-74 checks cover three grants, invitation acceptance, exact private ID binding,
+98 counted checks cover three grants, invitation acceptance, exact private ID binding,
 both removal paths, hostile/oversized/embedded-NUL responses, pagination/unknown
 schema rejection, TLS/HTTP/timeout/cancellation failures, lost acknowledgements,
 foreign-then-restored fail-stop sequences, bounds, input and environment rejection.
+The additional24 counted executions assert operation/status/category diagnostics
+and formerly indistinguishable invitation outcomes; some repeat existing failure
+fixtures with more precise assertions, not24 wholly new independent behaviors.
 Sanitizers instrument only this new suite; existing settled runner/canary tests
 are not repeated. The macOS AddressSanitizer attempt aborted in its own malloc
 initialization (`sanitizer_malloc_mac.inc:189`) before helper `main`; it is not a
 passing sanitizer result. The isolated Ubuntu/GCC run on 2026-09-09 subsequently
-passed all 74 cases in normal, UBSan and ASan/UBSan profiles. These are the same
-74 behaviors under three profiles, not 222 distinct behaviors. They establish
+passed the then-current74 checks. Exact-head CI34391866527 on the diagnostic
+correction subsequently passed all98 checks in normal, UBSan and ASan/UBSan
+profiles. These repeat the same suite under three profiles, not294 distinct
+behaviors. They establish
 neither real Management API behavior nor provider privacy. See
 [QUALIFICATION.md](QUALIFICATION.md) for hosted gaps and the site-hook precaution.
 

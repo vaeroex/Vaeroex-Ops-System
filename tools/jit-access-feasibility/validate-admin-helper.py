@@ -105,6 +105,54 @@ def main():
             output,status=tty_run(local,case=case)
             assert status!=0 and b'private_token_entry' not in output
             count+=1
+        # Previously different failures collapsed into one scope/acknowledgement label.
+        # Exercise actual main with fake HTTP only; no provider payload is diagnostic.
+        for case,label in [
+            ('tls_failure','tls_verification_failed'),
+            ('tls_handshake_failure','tls_handshake_failed'),
+            ('dns_failure','dns_resolution_failed'),
+            ('connect_failure','connection_failed'),
+            ('send_failure','send_failed'),
+            ('receive_failure','receive_failed'),
+            ('other_transport_failure','transport_failure_unclassified'),
+            ('timeout','transport_timeout'),
+            ('option_failure','setup_failed'),
+            ('http_info_failure','http_status_unavailable'),
+            ('http_status_out_of_range','http_status_rejected'),
+            ('pagination_header','pagination_rejected'),
+            ('oversized_header','header_limit_rejected'),
+            ('oversized_body','body_limit_rejected'),
+        ]:
+            output,status=tty_run(local,case=case)
+            assert status!=0 and b'jit_admin_ready_' not in output,(case,output)
+            assert b'jit_admin_request_operation_list' in output and ('jit_admin_request_'+label).encode() in output,(case,output)
+            assert b'987654321' not in output and b'Authorization:' not in output
+            if case not in ['pagination_header','oversized_header','oversized_body']:
+                assert b'jit_admin_http_status_unknown' in output,(case,output)
+            count+=1
+        for case,http_status in [
+            ('invite_bad_request',400),('invite_forbidden',403),('invite_conflict',409),
+            ('invite_rate_limit',429),('invite_server_error',500),('invite_unexpected_success',201),
+        ]:
+            output,status=tty_run(local,case=case,cues=b'i\nx\nq\n')
+            assert status!=0 and b'jit_admin_ready_' in output,(case,output)
+            assert b'jit_admin_request_operation_invite' in output
+            assert b'jit_admin_request_http_status_rejected' in output
+            assert f'jit_admin_http_status_{http_status}'.encode() in output
+            assert b'jit_admin_mutation_readback_absent' in output
+            assert b'jit_admin_absent_but_ack_uncertain' in output
+            assert b'grant_and_readback_confirmed' not in output and b'Authorization:' not in output
+            count+=1
+        for case,label in [
+            ('invite_timeout_before_commit','jit_admin_request_transport_timeout'),
+            ('invite_readback_absent','jit_admin_mutation_readback_absent'),
+            ('missing_invite_id','jit_admin_invite_response_contract_rejected'),
+            ('unknown_key','jit_admin_list_response_contract_rejected'),
+        ]:
+            output,status=tty_run(local,case=case,cues=b'i\nx\nq\n')
+            assert status!=0 and label.encode() in output,(case,output)
+            assert b'grant_and_readback_confirmed' not in output
+            count+=1
         for case in ['foreign_role','foreign_email','wide_network','branches','string_boolean','ipv6','changed_user']:
             output,status=tty_run(local,case=case,cues=b'i\nr\nt\nx\nq\n')
             assert status!=0 and b'cleanup_unknown_independent_owner_required' in output,(case,output)
