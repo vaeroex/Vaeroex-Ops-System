@@ -13,7 +13,7 @@ or QBO permission is added by this directory.
 | --- | --- | --- |
 | External PAT client |69 fake-library cases passed locally and on the isolated Ubuntu host with GCC/libpq16.15 headers |Actual PAT authentication, provider API denials or expiry |
 | Public invalid canary |20 cases passed against actual libpq17.6 locally and libpq16.15 on Ubuntu, loopback TLS only |Hosted pooler TLS/password handling or diagnostic nonrecording |
-| Fixed administrative helper |74 cases passed normally and under UBSan locally; the same 74 passed normal/UBSan/ASan+UBSan on Ubuntu |Real invitation acceptance, grant update/removal or provider response contract |
+| Fixed administrative helper |98 counted checks passed normal/UBSan locally and normal/UBSan/ASan+UBSan in exact-head Linux CI34391866527; repeated profiles/cases are not distinct behaviors |Real invitation acceptance, grant update/removal or complete provider response contract |
 | Native synthetic fixture |164 assertions passed independently in each of psql and separately rendered Dashboard modes against private local PostgreSQL17.6, including the corrected activation boundary |Hosted JIT identity, application authority, provider revocation/session behavior |
 
 Independent reviews covered the client, fixture and canary when prepared, and
@@ -60,7 +60,7 @@ inspected distribution libraries, with no RPATH/RUNPATH; root-owned inert
 installation hashes matched. No credential-bearing binary was executed.
 Those observations apply to that boot only and must be refreshed before use.
 
-## Actual hosted run outcome
+## First historical hosted run outcome
 
 The one-hour admission started 03:25:11 UTC. The 15-minute credential-admission
 cutoff was missed during Linux portability corrections. No PAT, external JIT
@@ -80,26 +80,53 @@ provider charge. Existing stopped disk/IP costs remain; alerts are not a hard
 spending cap. Production, QBO and the password-provisioning release gate were
 not changed.
 
+## Latest bounded hosted observation
+
+The later2026-09-09 window at18:30:15–18:43:36.912UTC reached private administrative
+entry/readiness and the authenticated empty-list baseline. One invitation could
+not confirm mutation scope. Subsequent helper and independent Dashboard readback
+showed no access entry, but the original HTTP/transport outcome was not retained.
+No external PAT, LOGIN activation or PostgreSQL authentication occurred. The
+operator revoked the adminPAT; roleNOLOGIN/zero sessions, Temporary Access and
+UIpreviewOFF, removed temporary egress, stopped exactVM and closed public ingress
+were confirmed. This is not a successful external authentication qualification.
+Fixed non-payload diagnostics now separate the request failure categories.
+
 ## Finite remaining hosted gates
 
 1. Refresh exact isolated resource/role/feature identity, private operator and
    recovery access, no-recording host/launch controls, budget admission and the
    hard cleanup deadline. Reuse successful immutable-source synthetic evidence;
    do not reset process, attempt or window budgets to fit unfinished tests.
-2. Run the fixed **public invalid** native canary while the role stays NOLOGIN
+2. Reuse the completed corrected **public invalid** native canary evidence when
+   its dependencies and required freshness conditions are unchanged. If a concrete
+   changed dependency or failed check requires a rerun, keep the role NOLOGIN
    and before any PAT exists. Correlate available authentication/pooler/host
    diagnostics using only its public marker, role and time window. A known
    sensitive recording path blocks real credentials; an inaccessible surface
    remains unknown, not an approved privacy exception. Dashboard log-search SQL
    enters its URL: never search using a PAT or credential-derived value.
-3. Privately issue at most one new target-only administrative JIT Read-write PAT
-   and two external-identity target-only JIT Read PATs, all other capabilities
-   None, only after every pre-token gate passes. No existing Owner token or
+3. Privately issue at most one new target-only administrative JIT Read-write PAT,
+   all other capabilities None, only after every pre-token gate passes. No existing Owner token or
    ordinary membership substitution. The administrative helper cannot query
    PostgreSQL or grant database access to its Owner. Its actual provider scope
    includes both JIT Read and Write; it is not falsely described as Write-only.
-4. Complete the fixed bounded grant/recipient acceptance, exact-OID activation,
-   actual session_user/RLS/denial/reconnect matrix, grant expiry, renewal,
+4. After private administrative readiness and an empty access-list baseline,
+   run the unchanged physical/database/OID/locked-FORCE-RLS `activate.sql`
+   **before** the single invitation; read back LOGIN and zero sessions. Current
+   Dashboard role eligibility excludes NOLOGIN. Preserve exclusive administrative
+   control and the exact new-role/no-password setup provenance; unknown credential
+   assignment or concurrent changes block this gate. Never adopt/reset a role or
+   broaden privileges. The helper rechecks the pristine list before invitation.
+   Require matching invitation acknowledgement, exact readback and private
+   recipient acceptance before issuing external PAT A or native authentication.
+   At most two sequential external-identity target-only JIT Read PATs (A then B
+   at its replacement phase) may be issued, all other permissions None.
+   Any invitation/acceptance failure immediately requires committed exact-role
+   NOLOGIN, bounded drain/zero-session readback and the cleanup in step5; no blind
+   retry or widened authority. This sequencing satisfies the known prerequisite,
+   not proof of the previous hosted failure's cause.
+   Then complete the actual session_user/RLS/denial/reconnect matrix, grant expiry, renewal,
    revocation, PAT replacement and independent NOLOGIN/session drain. Treat
    failed acknowledgements or generic failed connections as inconclusive until
    reconciled. Observe held-session behavior separately from new connections.

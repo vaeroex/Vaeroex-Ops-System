@@ -230,7 +230,7 @@ The helper has a 4,097-byte token buffer, bounded owned Authorization header and
 16-KiB body buffer, all in one locked region. Each libcurl slist header copy is
 locked and wiped before freeing; the owned token/header/body are wiped at exit.
 Bodies and headers are never printed; output is a finite set of sanitized labels,
-the already nonsecret bound user UUID and grant expiry timestamp. Parser state is
+range-checked HTTP status, the already nonsecret bound user UUID and grant expiry timestamp. Parser state is
 bounded to 128 nodes/depth eight and holds offsets, not copied string values.
 The format prefix check only rejects obvious wrong input; it is not token
 validation and invents no undocumented minimum PAT length.
@@ -258,16 +258,21 @@ python3 -S tools/jit-access-feasibility/validate-private-entry.py --include /usr
 
 The suite links a fake libcurl, so no network library or socket path exists. It
 exercises the real private TTY/memory/parser/lifecycle code using synthetic strings:
-74 checks cover three grants, invitation acceptance, exact private ID binding,
+98 counted checks cover three grants, invitation acceptance, exact private ID binding,
 both removal paths, hostile/oversized/embedded-NUL responses, pagination/unknown
 schema rejection, TLS/HTTP/timeout/cancellation failures, lost acknowledgements,
 foreign-then-restored fail-stop sequences, bounds, input and environment rejection.
+The additional24 counted executions assert operation/status/category diagnostics
+and formerly indistinguishable invitation outcomes; some repeat existing failure
+fixtures with more precise assertions, not24 wholly new independent behaviors.
 Sanitizers instrument only this new suite; existing settled runner/canary tests
 are not repeated. The macOS AddressSanitizer attempt aborted in its own malloc
 initialization (`sanitizer_malloc_mac.inc:189`) before helper `main`; it is not a
 passing sanitizer result. The isolated Ubuntu/GCC run on 2026-09-09 subsequently
-passed all 74 cases in normal, UBSan and ASan/UBSan profiles. These are the same
-74 behaviors under three profiles, not 222 distinct behaviors. They establish
+passed the then-current74 checks. Exact-head CI34391866527 on the diagnostic
+correction subsequently passed all98 checks in normal, UBSan and ASan/UBSan
+profiles. These repeat the same suite under three profiles, not294 distinct
+behaviors. They establish
 neither real Management API behavior nor provider privacy. See
 [QUALIFICATION.md](QUALIFICATION.md) for hosted gaps and the site-hook precaution.
 
