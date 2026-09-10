@@ -200,6 +200,46 @@ async function qualify(runtime) {
   const stale=(await call("read_credential",{...readCommand,expectedCredentialVersion:2})).rows[0].value;
   equal(stale.state,"credential_version_stale","stale credential version preserves existing recovery contract");
   equal(stale.ciphertextBase64,undefined,"stale version releases no encrypted credential");
+  stage="remote_mapped_coexistence";
+  // The same broker may already serve a supported Vercel binding. A disabled
+  // or enabled GCP row for another connection cannot intercept those tasks.
+  await owner.query(`insert into private.square_remote_sandbox_binding(deployment_key,project_ref,vercel_team_id,vercel_team_slug,vercel_project_id,application_origin,environment,application_id,api_version,
+    operator_id,workspace_id,business_entity_id,broker_login,enroller_login,webhook_login,runtime_login,enabled,approval_expires_at,policy_version,policy_fingerprint)
+    values('vaeroex-square-sandbox','oysjpoondtcrqpghhrbd','team_uORtrMvad77Qz6HikOgD4cnp','vaeroex-2167s-projects','prj_SYNTHETICLOCALONLY1234',$1,'sandbox',$2,'2026-08-19',
+    $3,$4,$5,$6,$7,$8,$9,true,clock_timestamp()+interval '1 day','synthetic_broker_v1',$10)`,
+    [origin,applicationId,user,workspace,entity,broker.name,enroller.name,webhook.name,other.name,fingerprint]);
+  const remoteAuthorization=await service.initiate(actor,{operation:"connect",businessEntityId:entity});
+  await service.complete(actor,{state:new URL(remoteAuthorization.authorizationUrl).searchParams.get("state"),code:"synthetic-remote-authorization-code"});
+  const remoteConnection=(await owner.query("select connection_id from private.square_account_connections where connection_id<>$1",[connection.connectionId])).rows[0].connection_id;
+  await service.confirmMapping(actor,{connectionId:remoteConnection,businessEntityId:entity,locationIds:["LOC_SYNTHETIC_1"],confirmation:"map"});
+  const remoteScope={...scope,connectionId:remoteConnection},remoteGrant={...grant,scope:remoteScope,scanId:uuid()};
+  const remoteBinding={...binding,
+    scanKey:contractSha256({purpose:"square_ingestion_scan_v1",workspaceId:workspace,businessEntityId:entity,connectionId:remoteConnection,stream:remoteGrant.stream,scanId:remoteGrant.scanId}),
+    scopeFingerprint:squareIngestionScopeFingerprint(remoteScope)};
+  const remoteTask={taskId:uuid(),leaseOwnerFingerprint:contractSha256(uuid())};
+  equal((await rpc(enroller.client).rpc("enroll_square_verified_task_v1",{p_command:{...remoteTask,connectionId:remoteConnection,generation:1,runtimeLogin:other.name,grant:remoteGrant,binding:remoteBinding}})).error,null,"separate existing remote task enrolled");
+  const remoteRepository=createSquareDurablePageRepository({...remoteTask,client:rpc(other.client)}),remotePage=await remoteRepository.acquire(remoteBinding);
+  equal(remotePage.outcome,"leased","existing remote runtime acquires its own lease");
+  const remoteReadCommand={...readCommand,...remoteTask,leaseId:squareCredentialReadLeaseId(remotePage.lease.leaseId)};
+  const legacyRead=command=>broker.client.query("select public.square_account_connection_v1($1::jsonb,'read_credential',$2::jsonb) as value",[JSON.stringify(context),JSON.stringify(command)]);
+  const currentHelper=(await owner.query("select pg_get_functiondef('private.lock_square_broker_credential_authority_v1(jsonb,uuid,text)'::regprocedure) as body")).rows[0].body;
+  const originalDispatch=currentHelper.replace("join private.square_ingestion_tasks t on t.connection_id=m.connection_id\n      where b.broker_login=session_user::name and t.task_id=p_task_id","where b.broker_login=session_user::name");
+  ok(originalDispatch!==currentHelper,"negative control restores exact prior shared-broker dispatch");
+  await owner.query("begin");await owner.query(originalDispatch);await owner.query("commit");
+  try {await denied(()=>legacyRead(remoteReadCommand),"original dispatch reproduces unrelated remote credential rejection");}
+  finally {await owner.query(currentHelper);}
+  for(const enabled of [false,true]) {
+    await owner.query("update private.square_gcp_mapped_runtime_binding set enabled=$1",[enabled]);
+    equal((await legacyRead(remoteReadCommand)).rows[0].value.state,"available","unrelated remote credential remains available with disabled/enabled mapped binding");
+    if(!enabled)await denied(()=>legacyRead(readCommand),"disabled mapped task never falls back to existing remote host","square_gcp_mapped_runtime_denied");
+  }
+  await owner.query("update private.square_gcp_mapped_runtime_binding set connection_generation=2");
+  await denied(()=>legacyRead(readCommand),"stale mapped generation cannot fall back","square_gcp_mapped_runtime_denied");
+  equal((await legacyRead(remoteReadCommand)).rows[0].value.state,"available","unrelated remote task remains valid after mapped generation mismatch");
+  await owner.query("update private.square_gcp_mapped_runtime_binding set connection_generation=1");
+  await owner.query("update private.square_gcp_mapped_runtime_binding set runtime_login=$1",[other.name]);
+  await denied(()=>legacyRead(readCommand),"mismatched mapped runtime cannot fall back","square_gcp_mapped_operation_denied");
+  await owner.query("update private.square_gcp_mapped_runtime_binding set runtime_login=$1",[worker.name]);
   stage="mutable_authority_recovery";
   await owner.query("update private.square_gcp_mapped_runtime_binding set enabled=false");
   await denied(read,"disabled binding fences an existing broker session");
@@ -247,7 +287,7 @@ async function qualify(runtime) {
   equal((await owner.query("select checkpoint_version::int as n from private.square_ingestion_scans where connection_id=$1",[connection.connectionId])).rows[0].n,1,"single atomic checkpoint after recovery");
   await owner.query("update private.square_account_connections set state='disconnected' where connection_id=$1",[connection.connectionId]);
   await denied(read,"local disconnect fences existing broker session");
-  equal(providerCalls,5,"no actual provider network or repeated consent used for mapped qualification");
+  equal(providerCalls,10,"only two injected synthetic consent fixtures; no actual provider network");
   equal(await runtime.sourceSchemaFingerprint(owner),before,"QBO remains exact after mapped cases");
   console.log(`Square GCP mapped database qualification passed (${assertions} assertions).`);
 }

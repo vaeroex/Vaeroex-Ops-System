@@ -92,7 +92,7 @@ export type SquarePortalScope = Readonly<{
   service: Pick<SquareConnectionService, "initiate" | "complete" | "snapshot" | "disconnect">;
   // Installed only by the separately checked Sandbox mapping composition.
   // This callback confirms mapping, not enrollment or provider access.
-  mapping?: Readonly<{ enabled: true; confirmMapping: SquareConnectionService["confirmMapping"] }>;
+  mapping?: Readonly<{ enabled: true; approvedConnectionId: string; approvedLocationId: string; confirmMapping: SquareConnectionService["confirmMapping"] }>;
   close(): Promise<void>;
 }>;
 
@@ -135,9 +135,10 @@ export function createSquareSandboxPortal(input: Readonly<{
             disconnecting: "Disconnect in progress", authorized: "Existing authorization — enrollment is unavailable here" } as const)[connection.state];
           if (!label) throw new Error("denied");
           content += `<article><p>${label}</p>${scope.binding.providerCallsEnabled ? form("reauthorize", csrf, `<input type="hidden" name="connectionId" value="${connection.connectionId}"><button>Reauthorize this connection</button>`) : ""}${form("disconnect", csrf, `<input type="hidden" name="connectionId" value="${connection.connectionId}"><input type="hidden" name="confirmation" value="disconnect"><button>Disconnect this connection locally</button>`)}</article>`;
-          if (scope.mapping?.enabled === true && connection.state === "mapping_required" && !connection.revocationPending) {
+          if (scope.mapping?.enabled === true && connection.connectionId === scope.mapping.approvedConnectionId && connection.state === "mapping_required" && !connection.revocationPending) {
             if (new Set(connection.locations.map(location => location.id)).size !== connection.locations.length) throw new Error("denied");
-            for (const location of connection.locations) {
+            if (!locationPattern.test(scope.mapping.approvedLocationId)) throw new Error("denied");
+            for (const location of connection.locations.filter(location => location.id === scope!.mapping!.approvedLocationId)) {
               if (!locationPattern.test(location.id)) throw new Error("denied");
               content += form("map", csrf, `<p>Seller: ${escapeHtml(connection.sellerLabel ?? "Verified Sandbox seller")}</p><p>Location: ${escapeHtml(location.label)}</p><input type="hidden" name="connectionId" value="${connection.connectionId}"><input type="hidden" name="locationId" value="${location.id}"><input type="hidden" name="confirmation" value="map"><button>Confirm location mapping</button>`);
             }
@@ -185,6 +186,7 @@ export function createSquareSandboxPortal(input: Readonly<{
         if (scope.mapping?.enabled !== true) return portalUnavailable();
         const locationId = data.get("locationId")!;
         if (data.get("confirmation") !== "map" || !locationPattern.test(locationId)) return portalUnavailable(400);
+        if (connectionId !== scope.mapping.approvedConnectionId || locationId !== scope.mapping.approvedLocationId) return portalUnavailable(403);
         // Re-read authority and discovery on this invocation; never trust a
         // hidden form field, earlier GET or browser-provided entity selector.
         const view = await scope.service.snapshot(actor);

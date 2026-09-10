@@ -130,8 +130,8 @@ async function mappingTests() {
     const handler = createSquareSandboxPortal({ async open() { opens++; return {
       binding, auth: { async authenticate(token) { return options.signedOut || token !== jwt ? null : actor; } },
       service: { async snapshot(value) { equal(value, actor); return { canManage: options.canManage !== false,
-        businessEntities: [], connections: options.duplicateConnection ? [connection, connection] : [connection] }; } },
-      ...(options.disabled ? {} : { mapping: { enabled: true, async confirmMapping(value, input) {
+        businessEntities: [], connections: options.duplicateConnection ? [connection, connection] : options.secondConnection ? [connection, { ...connection, connectionId: uuid(6) }] : [connection] }; } },
+      ...(options.disabled ? {} : { mapping: { enabled: true, approvedConnectionId: uuid(5), approvedLocationId: "L_TEST", async confirmMapping(value, input) {
         equal(value, actor); equal(input, { connectionId: uuid(5), businessEntityId: uuid(3), locationIds: ["L_TEST"], confirmation: "map" }); calls++;
       } } }), async close() { closes++; }
     }; } });
@@ -147,6 +147,18 @@ async function mappingTests() {
   response = await good.handler(post("map", command)); equal(response.status, 200); privacy(response);
   equal(await response.json(), { navigate: PORTAL_PATH }); equal(good.counts().calls, 1);
   equal(good.counts().opens, good.counts().closes);
+  const multiple = make({ connection: { locations: [{ id: "L_TEST", label: "Approved default" }, { id: "OTHER_ACTIVE", label: "Other active location" }] } });
+  response = await multiple.handler(request(PORTAL_PATH)); html = await response.text();
+  equal((html.match(/action="\/actions\/map"/g) ?? []).length, 1, "only trusted approved location has a mapping action");
+  ok(html.includes("Approved default")); ok(!html.includes("Other active location")); ok(!html.includes('value="OTHER_ACTIVE"'));
+  response = await multiple.handler(post("map", { ...command, locationId: "OTHER_ACTIVE" })); equal(response.status, 403);
+  equal(multiple.counts().calls, 0, "discovery alone cannot expand approved mapping scope");
+  response = await multiple.handler(post("map", command)); equal(response.status, 200); equal(multiple.counts().calls, 1);
+  const otherConnection = make({ secondConnection: true });
+  response = await otherConnection.handler(request(PORTAL_PATH)); html = await response.text();
+  equal((html.match(/action="\/actions\/map"/g) ?? []).length, 1, "same entity/location cannot expose a different connection's mapping action");
+  response = await otherConnection.handler(post("map", { ...command, connectionId: uuid(6) })); equal(response.status, 403);
+  equal(otherConnection.counts().calls, 0);
   for (const options of [{ disabled: true }, { signedOut: true }, { canManage: false },
     { connection: { businessEntityId: uuid(99) } }, { duplicateConnection: true },
     { connection: { state: "authorized" } }, { connection: { state: "revoked" } },

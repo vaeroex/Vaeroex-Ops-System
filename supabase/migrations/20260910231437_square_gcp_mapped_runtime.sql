@@ -273,8 +273,13 @@ begin
   if pg_catalog.current_setting('transaction_isolation')<>'read committed' then
     raise exception using errcode='42501',message='square_broker_credential_authority_denied';
   end if;
+  -- Dispatch by the task's immutable connection, not merely a broker shared
+  -- with another supported host. Do not predicate this routing decision on an
+  -- enabled gate, current generation, runtime LOGIN or unexpired session: a
+  -- mapped connection that fails those checks must deny, never fall back.
   if exists(select 1 from private.square_gcp_callback_binding b join private.square_gcp_mapped_runtime_binding m using(deployment_key)
-      where b.broker_login=session_user::name) then
+      join private.square_ingestion_tasks t on t.connection_id=m.connection_id
+      where b.broker_login=session_user::name and t.task_id=p_task_id) then
     v_binding:=private.square_gcp_mapped_context_v1(p_context,'broker');
     perform private.square_gcp_mapped_task_v1(p_task_id,'broker');
   else

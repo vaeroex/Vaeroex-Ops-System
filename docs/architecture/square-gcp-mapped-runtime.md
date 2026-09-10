@@ -88,8 +88,12 @@ Independent review covered the new SQL/native role interfaces, credential adapte
 composition and integrated page runner. Two concrete integration findings were corrected before
 delivery: the binding probe now verifies the optional mapped binding, and the runner unwraps the
 existing broker's `available` result before consuming its credential. Focused regressions cover both.
-Local results: 100 mapped-database assertions, 234 existing broker/runtime assertions, 27 native
-adapter assertions, 438 credential assertions, 277 integrated page assertions and 869 portal/CLI
+PR review additionally corrected shared-broker dispatch to use the task's immutable connection,
+preserving unrelated remote tasks while denying invalid mapped tasks without fallback. Portal
+mapping choices now match the exact approved connection and location. Coexistence counterfactual
+and multi-location/connection regressions pass; the corrections were independently reviewed.
+Local results: 122 mapped-database assertions, 234 existing broker/runtime assertions, 27 native
+adapter assertions, 438 credential assertions, 277 integrated page assertions and 883 portal/CLI
 assertions. Architecture checks, typecheck, application build and standalone release packaging passed.
 The legacy dormant-scope allowlist includes only this exact new migration; neighboring paths remain denied.
 CI remains the authoritative exact-commit gate; no hosted result is inferred from these counts.

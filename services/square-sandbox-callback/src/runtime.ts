@@ -133,6 +133,7 @@ export function createNativeSquareSandboxPortal(input: NativePortalInput,
         });
         return Object.freeze({ binding: db.binding,
           ...(mapped && mappedDatabase ? { mapping: Object.freeze({ enabled: true as const,
+            approvedConnectionId: mapped.connectionId, approvedLocationId: mapped.defaultLocationId,
             confirmMapping: async (actor: Parameters<ReturnType<typeof createSquareAccountConnectionService>["confirmMapping"]>[0], command: Parameters<ReturnType<typeof createSquareAccountConnectionService>["confirmMapping"]>[1]) => {
               if (closed || signal.aborted || actor.actorId !== mapped.operatorId || actor.sessionId !== mapped.operatorSessionId ||
                 actor.workspaceId !== mapped.workspaceId || actor.role !== mapped.operatorRole || command.connectionId !== mapped.connectionId ||
