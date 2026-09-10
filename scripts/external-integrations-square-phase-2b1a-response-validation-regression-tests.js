@@ -370,9 +370,13 @@ function testRejectedAndUnsupportedPayloads() {
   );
   deepEqual(emptyMerchantErrors, accepted(parseMerchant(merchantFixtures.active), "merchant without errors accepted"), "empty merchant errors do not enter trusted output");
 
+  equal(
+    accepted(parseLocation(locationFixtures.unsupportedTimezoneAlias), "IANA backward link is supported").items[0].timeZone,
+    "US/Pacific",
+    "formerly rejected alias retains its exact provider value"
+  );
   for (const [name, fixture] of [
     ["invalid location timezone", locationFixtures.invalidTimezone],
-    ["unsupported location timezone alias", locationFixtures.unsupportedTimezoneAlias],
     ["missing required location", locationFixtures.missingRequired],
     ["unknown location status", locationFixtures.unknownStatus],
     ["unknown location type", locationFixtures.unknownType],

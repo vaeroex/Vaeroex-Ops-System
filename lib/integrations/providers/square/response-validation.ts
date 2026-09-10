@@ -397,7 +397,7 @@ export const SquareTimeZoneSchema = z
   .string()
   .min(1)
   .max(30)
-  .regex(/^[A-Za-z_+-]+(?:\/[A-Za-z0-9_+-]+)+$/)
+  .regex(/^[A-Za-z][A-Za-z0-9_+-]*(?:\/[A-Za-z0-9_+-]+)*$/)
   .refine(isSupportedIanaTimeZone, "Timezone must be a supported IANA zone");
 export const SquareResponseProvenanceSchema = z
   .object({
@@ -1219,7 +1219,7 @@ function squareTimeZone(value: SquareSafeJsonValue, field: string) {
     maximumLength: 30
   });
   if (
-    !/^[A-Za-z_+-]+(?:\/[A-Za-z0-9_+-]+)+$/.test(candidate) ||
+    !/^[A-Za-z][A-Za-z0-9_+-]*(?:\/[A-Za-z0-9_+-]+)*$/.test(candidate) ||
     !isSupportedIanaTimeZone(candidate)
   ) {
     throw new SquareResponseValidationFailure(
@@ -1280,17 +1280,16 @@ function isSquareCurrencyCode(value: string) {
 }
 
 function isSupportedIanaTimeZone(value: string) {
-  if (supportedTimeZones === null) {
-    try {
-      const resolved = new Intl.DateTimeFormat("en-US", {
-        timeZone: value
-      }).resolvedOptions().timeZone;
-      return resolved === value;
-    } catch {
-      return false;
-    }
+  if (supportedTimeZones?.has(value)) return true;
+  // supportedValuesOf lists primary zones, not every valid IANA identifier:
+  // UTC and backward-compatible links are valid Square location timezones too.
+  // Validate through ICU without canonicalizing the trusted value/fingerprint.
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: value });
+    return true;
+  } catch {
+    return false;
   }
-  return supportedTimeZones.has(value);
 }
 
 class SquareResponseValidationFailure extends Error {

@@ -67,6 +67,28 @@ function frozen(value) {
   return Object.isFrozen(value) && Object.values(value).every(frozen);
 }
 async function main() {
+  // Square's IANA contract includes UTC and tzdb links, not only the primary
+  // zones returned by Intl.supportedValuesOf. Exercise both operation envelopes
+  // and the complete authenticated discovery handoff using synthetic data.
+  for (const timezone of ["UTC", "Etc/UTC", "US/Pacific", "America/Argentina/Buenos_Aires", "America/Los_Angeles", "EST5EDT", "GMT0", "Etc/GMT+5"]) {
+    const data = fixtures();
+    data["/v2/locations"].locations[0].timezone = timezone;
+    data["/v2/locations/main"].location.timezone = timezone;
+    for (const response of [data["/v2/locations"], data["/v2/locations/main"]]) {
+      const parsed = parseSquareLocationResponse({ providerKey: "square", providerEnvironment: "sandbox", apiVersion: SQUARE_API_VERSION, response });
+      eq(parsed.outcome, "accepted", "IANA timezone accepted: " + timezone);
+      eq(parsed.value.items[0].timeZone, timezone, "timezone identity preserved");
+      ok(frozen(parsed.value), "accepted timezone projection remains deeply frozen");
+    }
+    const supported = factory(data);
+    await verify(supported.discovery);
+    ok(frozen(supported.discovery.consumeVerifiedDiscovery()));
+    eq(supported.calls.length, 3, "UTC/alias discovery reaches main-location verification");
+  }
+  for (const timezone of ["Mars/Olympus", "+01:00", "-05", " UTC", "UTC\n", "A".repeat(31)]) {
+    const data = fixtures(); data["/v2/locations"].locations[0].timezone = timezone;
+    await rejects(() => verify(factory(data).discovery));
+  }
   const first = factory();
   throws(() => first.discovery.consumeVerifiedDiscovery());
   const token = credential();
