@@ -146,6 +146,12 @@ export async function runSquareSandboxPortalCommand() {
       await checkNativeSquareSandboxPortalBinding(input, controller.signal);
       if (controller.signal.aborted || Date.now() >= expiry) denied();
     }
+    catch {
+      // An abort may already have started a detached close whose idempotent
+      // second call returns before pg.end() settles. A rejected read-only probe
+      // must terminate its process, not disarm the deadline and retain sockets.
+      controller.abort();process.exit(78);
+    }
     finally { clearTimeout(timer);clearTimeout(hardTimer);controller.abort(); }
     process.stdout.write("square_portal_binding_checked\n");
     return;

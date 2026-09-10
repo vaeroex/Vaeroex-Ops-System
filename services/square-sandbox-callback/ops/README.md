@@ -49,6 +49,9 @@ abort and up to two seconds reserved for cleanup. A peer can stall graceful
 `pg.end()` indefinitely; this standalone read-only check therefore exits78
 silently at its hard deadline so the OS closes its sockets and unfinished read
 transactions. It must not print the success label after interrupted cleanup.
+Any rejected binding probe also exits78 immediately: an abort-triggered detached
+close may still own a live socket even when a second idempotent close returns.
+Failure never clears the deadline and leaves that process running.
 Normal callback cleanup is not changed. The check creates no listener, portal user session,
 application-secret/KMS access or Square OAuth call, including when
 `providerCallsEnabled=false`. Failure is not consent or hosted qualification;

@@ -112,8 +112,7 @@ async function qualifyCallbackDatabaseCa() {
       };
       process.stdout.write = bytes => { output += String(bytes);return true; };
       await runSquareSandboxPortalCommand();equal(output, "square_portal_binding_checked\n");equal(probeSignal.aborted, true);
-      mode = "probe_failure";output = "";await rejects(runSquareSandboxPortalCommand);equal(output, "");equal(probeSignal.aborted, true);
-      policy.approvedUntil = new Date(Date.now()-1).toISOString();await rejects(runSquareSandboxPortalCommand);equal(probes, 2, "expired policy stops before DB-secret probe");
+      policy.approvedUntil = new Date(Date.now()-1).toISOString();await rejects(runSquareSandboxPortalCommand);equal(probes, 1, "expired policy stops before DB-secret probe");
       equal(network, 0, "binding command creates no listener or other network path");
     } finally { runtimeModule.checkNativeSquareSandboxPortalBinding = originalProbe;process.stdout.write = originalWrite; }
     fs.lstatSync = original.lstat;fs.readFileSync = original.read;global.fetch = original.network;
@@ -236,6 +235,60 @@ runSquareSandboxPortalCommand().then(()=>process.exit(79),()=>process.exit(79));
         equal(stdout, "", "no checked-success label on hard termination");equal(stderr, "", "hard termination is silent");equal(control, "aborted", "cooperative abort precedes exit");
         assertions++;assert.ok(Date.now()-started >= bound-100 && Date.now()-started < bound+10000, "finite maximum or approval-expiry bound");
       } finally { clearTimeout(watchdog);if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL"); }
+    }
+    // Actual callback DB close guard + real half-open loopback sockets. Abort
+    // starts the first detached close; the runtime's second close returns while
+    // that socket still waits for EOF. Only the new command catch is removed in
+    // memory for the counterfactual; no repository file or production hook changes.
+    const failureExit = `    catch {
+      // An abort may already have started a detached close whose idempotent
+      // second call returns before pg.end() settles. A rejected read-only probe
+      // must terminate its process, not disarm the deadline and retain sockets.
+      controller.abort();process.exit(78);
+    }
+`;
+    for (const counterfactual of [false, true]) {
+      const source = `
+(async()=>{
+const fs=require('node:fs'),net=require('node:net'),crypto=require('node:crypto'),{EventEmitter}=require('node:events');
+require(${JSON.stringify(path.join(__dirname, "square-account-browser-test-support.js"))}).loadSquareBrowserModules();
+const serverPath=${JSON.stringify(path.join(__dirname, "../services/square-sandbox-callback/src/server.ts"))};
+const read=fs.readFileSync;
+fs.readFileSync=(p,...args)=>{const value=read(p,...args);if(${counterfactual}&&p===serverPath){const fragment=${JSON.stringify(failureExit)};if(typeof value!=='string'||value.split(fragment).length!==2)process.exit(80);return value.replace(fragment,'');}return value;};
+const {runSquareSandboxPortalCommand}=require(serverPath);fs.readFileSync=read;
+const ids=require(${JSON.stringify(path.join(__dirname, "../lib/integrations/control-plane/square-gcp-callback-identity.ts"))});
+const secrets=require(${JSON.stringify(path.join(__dirname, "../lib/integrations/control-plane/square-gcp-callback-credentials.ts"))});
+const db=require(${JSON.stringify(path.join(__dirname, "../lib/integrations/control-plane/square-gcp-callback-database.ts"))});
+const pg=require('pg'),config=${JSON.stringify(config)},ca=Buffer.from(${JSON.stringify(fixture.ca)}),artifact=Buffer.from('PUBLIC DETACHED CLOSE ARTIFACT');
+const peer=net.createServer({allowHalfOpen:true},socket=>{socket.on('error',()=>{});socket.on('end',()=>{});});
+await new Promise(resolve=>peer.listen(0,'127.0.0.1',resolve));
+pg.Client=class extends EventEmitter {
+ async connect(){this.socket=net.createConnection({host:'127.0.0.1',port:peer.address().port});await new Promise((resolve,reject)=>{this.socket.once('connect',resolve);this.socket.once('error',reject);});}
+ async query(sql){if(sql!=='select public.get_square_gcp_callback_binding_v1()::text as value')throw new Error('unexpected_synthetic_query');return {rows:[{value:JSON.stringify(config.binding)}]};}
+ async end(){fs.writeSync(3,'end_started;');this.socket.end();await new Promise(resolve=>this.socket.once('close',resolve));fs.writeSync(3,'end_resolved;');}
+};
+ids.createSquareGcpCallbackIdentity=({signal})=>({verify:async()=>{await new Promise(resolve=>signal.addEventListener('abort',resolve,{once:true}));},dispose(){}});
+secrets.readSquareGcpCallbackDatabaseSecret=async({identity})=>{identity.dispose();return ${JSON.stringify(dsn)};};
+const open=db.openSquareGcpCallbackDatabase;
+db.openSquareGcpCallbackDatabase=async(...args)=>{const value=await open(...args);return {...value,close:async()=>{await value.close();fs.writeSync(3,'second_returned;');}};};
+const policy={schemaVersion:1,approvedUntil:new Date(Date.now()+2500).toISOString(),operator:'synthetic',configurationEvidenceId:'synthetic',budgetDeliveryEvidenceId:'synthetic',nodeVersion:process.version,artifactSha256:crypto.createHash('sha256').update(artifact).digest('hex'),hostConfigurationReviewed:true,syntheticPrivacyPassed:true};
+process.argv=[process.execPath,'synthetic-child-entry','--check-binding','--config','/etc/vaeroex-square-callback/config.json'];process.execArgv=['--conditions=react-server'];
+fs.lstatSync=p=>{if(![process.argv[4],config.databaseCaPath,config.hostPolicyPath,process.argv[1]].includes(p))throw new Error('denied');return {isFile:()=>true,isSymbolicLink:()=>false,uid:0,mode:420,size:8192};};
+fs.readFileSync=p=>p===process.argv[4]?Buffer.from(JSON.stringify(config)):p===config.databaseCaPath?ca:p===config.hostPolicyPath?Buffer.from(JSON.stringify(policy)):artifact;
+await runSquareSandboxPortalCommand().then(()=>process.exit(79),()=>{fs.writeSync(3,'rejected_returned;');process.exitCode=78;});
+})().catch(()=>process.exit(79));
+`;
+      const child = spawn(process.execPath, ["-e", source], { env: { PATH: "/usr/bin:/bin", LANG: "C", LC_ALL: "C" }, stdio: ["ignore", "pipe", "pipe", "pipe"] });
+      let stdout = "", stderr = "", control = "", watched = false;
+      const collect = setter => bytes => { if (bytes.length>256) {child.kill("SIGKILL");return;}setter(bytes.toString()); };
+      child.stdout.on("data",collect(value=>{stdout+=value;}));child.stderr.on("data",collect(value=>{stderr+=value;}));child.stdio[3].on("data",collect(value=>{control+=value;}));
+      const watchdog=setTimeout(()=>{watched=true;child.kill("SIGKILL");},5000);
+      try {
+        const result=await new Promise((resolve,reject)=>{child.once("error",reject);child.once("close",(code,signal)=>resolve({code,signal}));});
+        equal(result,counterfactual?{code:null,signal:"SIGKILL"}:{code:78,signal:null},"detached cleanup correction/counterfactual process result");
+        equal(watched,counterfactual,"only original command survives beyond its deadline");equal(stdout,"");equal(stderr,"");
+        equal(control,"end_started;second_returned;"+(counterfactual?"rejected_returned;":""),"first close pending when second close returns");
+      } finally {clearTimeout(watchdog);if(child.exitCode===null&&child.signalCode===null)child.kill("SIGKILL");}
     }
     return assertions;
   } finally {
