@@ -2,6 +2,12 @@
 
 Nothing here installs, enables, starts or deploys itself. These files are for one isolated Oregon guest after code review and separate action-time authorization. Names, fixed paths and evidence below are operational contracts, not evidence of an existing host. The daemon ends at `authorized_unmapped`; no mapping, enrollment, runtime, refresh, webhook or ingestion work is permitted.
 
+## Sandbox seller consent prerequisite
+
+Use a separate Sandbox test seller, **not the Default Test Account**, with **Automatically create authorizations for all my current apps** cleared. Open that seller's Sandbox Square Dashboard and keep it signed in in the same dedicated private browser session used for consent. Square supports only `session=true` (the default) for Sandbox authorization; the application sends it explicitly. Production continues to require `session=false`. Neither environment may substitute the other's authorization origin or session behavior. These provider session rules do not replace Vaeroex's current actor/workspace/connection-generation checks or single-use expiring OAuth state. [Square's OAuth web-server walkthrough](https://developer.squareup.com/docs/oauth-api/walkthrough).
+
+Do not auto-authorize the seller or alter scope/state to bypass a failed consent page. After an incomplete attempt, return to the clean portal and follow the existing expiry/cancellation and fresh-authorization process; never replay or record the authorization URL or raw state. Successful consent still stops at `authorized_unmapped` and grants no mapping, enrollment or ingestion authority.
+
 ## Release and configuration contract
 
 | Location | Ownership and content |

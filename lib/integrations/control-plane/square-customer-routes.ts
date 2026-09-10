@@ -197,7 +197,7 @@ export function createSquareRemoteSandboxCustomerHandlers(dependencies: Readonly
         navigation.searchParams.get("redirect_uri") !== SQUARE_REMOTE_SANDBOX.applicationOrigin + SQUARE_CUSTOMER_CALLBACK_PATH ||
         navigation.searchParams.get("scope") !== SQUARE_OAUTH_SCOPES.join(" ") ||
         !/^[A-Za-z0-9_-]{43}$/.test(navigation.searchParams.get("state") ?? "") ||
-        navigation.searchParams.get("session") !== "false") throw new Error("square_customer_navigation_denied");
+        navigation.searchParams.get("session") !== "true") throw new Error("square_customer_navigation_denied");
       return navigation.toString();
     }, openingMessage: "Opening Square Sandbox authorization."
   });

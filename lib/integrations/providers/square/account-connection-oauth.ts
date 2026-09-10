@@ -114,8 +114,8 @@ export function squareAuthorizationUrl(input: Readonly<{ policy: ProviderOAuthPo
   url.searchParams.set("redirect_uri", policy.callbackUri);
   url.searchParams.set("scope", policy.requestedScopes.join(" "));
   url.searchParams.set("state", StateSchema.parse(input.state));
-  // Square documents that this forces production login and has no effect in Sandbox.
-  url.searchParams.set("session", "false");
+  // Square supports only session=true in Sandbox; Production requires false.
+  url.searchParams.set("session", policy.providerEnvironment === "sandbox" ? "true" : "false");
   return url.href;
 }
 

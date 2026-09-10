@@ -65,7 +65,7 @@ async function responses() {
   const connectionId = "55555555-5555-4555-8555-555555555555";
   let calls = 0;
   const authorization = new URL(SQUARE_REMOTE_SANDBOX.providerOrigin + "/oauth2/authorize");
-  for (const [key, value] of Object.entries({ client_id: SQUARE_REMOTE_SANDBOX.applicationId, redirect_uri: origin + prefix + "callback", scope: SQUARE_OAUTH_SCOPES.join(" "), state: syntheticState, session: "false" })) authorization.searchParams.set(key, value);
+  for (const [key, value] of Object.entries({ client_id: SQUARE_REMOTE_SANDBOX.applicationId, redirect_uri: origin + prefix + "callback", scope: SQUARE_OAUTH_SCOPES.join(" "), state: syntheticState, session: "true" })) authorization.searchParams.set(key, value);
   const service = {
     async initiate() { calls++; return { authorizationUrl: authorization.toString() }; },
     async complete() { calls++; },

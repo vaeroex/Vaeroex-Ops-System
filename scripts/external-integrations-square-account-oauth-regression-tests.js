@@ -72,7 +72,16 @@ async function main() {
   equal(authorization.origin, "https://connect.squareupsandbox.com");
   equal(authorization.searchParams.get("scope"), oauth.SQUARE_OAUTH_SCOPES.join(" "));
   equal(authorization.searchParams.get("redirect_uri"), redirectUri);
-  equal(authorization.searchParams.get("session"), "false");
+  equal(authorization.searchParams.get("session"), "true", "Sandbox supports only the existing seller session");
+  equal(authorization.searchParams.getAll("session"), ["true"]);
+  const productionPolicy = oauth.createSquareOAuthPolicy({ environment: "production", applicationId, redirectUri, returnPath });
+  const productionAuthorization = new URL(oauth.squareAuthorizationUrl({ policy: productionPolicy, applicationId, state }));
+  equal(productionAuthorization.origin, "https://connect.squareup.com");
+  equal(productionAuthorization.searchParams.getAll("session"), ["false"], "Production still forces seller login");
+  for (const key of ["client_id", "redirect_uri", "scope", "state"]) equal(productionAuthorization.searchParams.get(key), authorization.searchParams.get(key));
+  for (const [checked, foreign] of [[policy, productionPolicy], [productionPolicy, policy]]) {
+    throws(() => oauth.squareAuthorizationUrl({ policy: { ...checked, authorizationEndpoint: foreign.authorizationEndpoint }, applicationId, state }));
+  }
   equal(authorization.searchParams.has("code_challenge"), false);
   throws(() => oauth.createSquareOAuthPolicy({ environment: "sandbox", applicationId, redirectUri: "http://example.com/callback", returnPath }));
   throws(() => oauth.createSquareOAuthCredentialProvider({ policy: { ...policy, tokenEndpoint: "https://example.com/token" }, applicationId, transport: async () => response({}) }));
