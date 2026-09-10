@@ -20,6 +20,8 @@ const { createSquareAccountMapping } = require("../lib/integrations/providers/sq
 const { SQUARE_MINIMUM_READ_SCOPES, SQUARE_API_VERSION } = require("../lib/integrations/providers/square/contracts.ts");
 const { parseSquareMerchantResponse } = require("../lib/integrations/providers/square/merchant-responses.ts");
 const { parseSquareLocationResponse } = require("../lib/integrations/providers/square/location-responses.ts");
+const { SquareTimeZoneSchema } = require("../lib/integrations/providers/square/response-validation.ts");
+const { SQUARE_IANA_TIME_ZONE_NAMES } = require("../lib/integrations/providers/square/iana-time-zone-names.ts");
 const NOW = new Date("2026-09-08T00:00:00.000Z");
 const TOKEN = "synthetic_square_discovery_secret_canary";
 const PRIVATE = "PRIVATE_PROVIDER_RAW_CANARY";
@@ -67,6 +69,13 @@ function frozen(value) {
   return Object.isFrozen(value) && Object.values(value).every(frozen);
 }
 async function main() {
+  ok(Object.isFrozen(SQUARE_IANA_TIME_ZONE_NAMES));
+  eq([...new Set(SQUARE_IANA_TIME_ZONE_NAMES)].sort(), SQUARE_IANA_TIME_ZONE_NAMES, "pinned names are unique and sorted");
+  for (const timezone of SQUARE_IANA_TIME_ZONE_NAMES) {
+    let runtimeSupported = true;
+    try { new Intl.DateTimeFormat("en-US", { timeZone: timezone }); } catch { runtimeSupported = false; }
+    eq(SquareTimeZoneSchema.safeParse(timezone).success, runtimeSupported && timezone.length <= 30, "all pinned IANA names respect runtime and Square length bounds");
+  }
   // Square's IANA contract includes UTC and tzdb links, not only the primary
   // zones returned by Intl.supportedValuesOf. Exercise both operation envelopes
   // and the complete authenticated discovery handoff using synthetic data.
@@ -85,7 +94,7 @@ async function main() {
     ok(frozen(supported.discovery.consumeVerifiedDiscovery()));
     eq(supported.calls.length, 3, "UTC/alias discovery reaches main-location verification");
   }
-  for (const timezone of ["Mars/Olympus", "+01:00", "-05", " UTC", "UTC\n", "A".repeat(31)]) {
+  for (const timezone of ["Mars/Olympus", "+01:00", "-05", " UTC", "UTC\n", "A".repeat(31), "ACT", "AET", "BET", "SystemV/PST8PDT", "utc"]) {
     const data = fixtures(); data["/v2/locations"].locations[0].timezone = timezone;
     await rejects(() => verify(factory(data).discovery));
   }

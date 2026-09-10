@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { contractSha256 } from "@/lib/integrations/contracts/canonical";
+import { SQUARE_IANA_TIME_ZONE_NAMES } from "@/lib/integrations/providers/square/iana-time-zone-names";
 import {
   CurrencyCodeSchema,
   IsoTimestampSchema,
@@ -356,6 +357,7 @@ const SQUARE_ENVIRONMENT_KEYS = Object.keys(
 
 const supportedCurrencyCodes = supportedIntlValues("currency");
 const supportedTimeZones = supportedIntlValues("timeZone");
+const ianaTimeZoneNames = new Set(SQUARE_IANA_TIME_ZONE_NAMES);
 
 export const SquareProviderEnvironmentSchema = z.enum(["production", "sandbox"]);
 export const SquareApiVersionSchema = z.literal(SQUARE_API_VERSION);
@@ -1280,10 +1282,12 @@ function isSquareCurrencyCode(value: string) {
 }
 
 function isSupportedIanaTimeZone(value: string) {
+  if (!ianaTimeZoneNames.has(value)) return false;
   if (supportedTimeZones?.has(value)) return true;
   // supportedValuesOf lists primary zones, not every valid IANA identifier:
   // UTC and backward-compatible links are valid Square location timezones too.
-  // Validate through ICU without canonicalizing the trusted value/fingerprint.
+  // After exact IANA membership, check runtime support without canonicalizing
+  // the trusted value/fingerprint. ICU acceptance alone also admits non-IANA IDs.
   try {
     new Intl.DateTimeFormat("en-US", { timeZone: value });
     return true;
