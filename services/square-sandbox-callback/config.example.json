@@ -3,6 +3,8 @@
   "enabled": false,
   "binding": null,
   "supabasePublishableKey": null,
+  "databaseCaPath": null,
+  "databaseCaSha256": null,
   "tlsCertPath": "/run/credentials/vaeroex-square-callback.service/tls-cert",
   "tlsKeyPath": "/run/credentials/vaeroex-square-callback.service/tls-key",
   "challengeWebroot": "/run/vaeroex-square-callback/acme",

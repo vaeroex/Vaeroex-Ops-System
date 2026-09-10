@@ -11,6 +11,7 @@ Nothing here installs, enables, starts or deploys itself. These files are for on
 | `/opt/vaeroex-square-callback/node/bin/node` | Pinned supported Node 24 patch, publisher signature/digest verified; root-owned, not writable by the daemon |
 | `/etc/vaeroex-square-callback/config.json` | Nonsecret exact configuration only, root:service-group `0640`; top-level `enabled=false` and null unknown fields until authorized completion |
 | `/etc/vaeroex-square-callback/host-policy.json` | Root:service-group `0640`; start-time evidence/expiry record using `host-policy.example.json`; no secrets or request identifiers |
+| `/etc/vaeroex-square-callback/supabase-root-2021.crt` | Root-owned public Supabase CA certificate, regular non-symlink file, at most16KiB, not group/world writable; approved SHA256 in config |
 | `/etc/letsencrypt/` | Root-owned protected TLS/ACME state on the encrypted boot disk; private keys `0600`; no Square or DB material |
 | `/var/lib/vaeroex-square-acme/.well-known/acme-challenge/` | Root-owned non-writable-by-service directories `0755`, public challenge files `0644`; ACME-only content |
 | `/run/vaeroex-square-callback/acme` | Read-only systemd bind mount of the preceding webroot; matches the daemon's fixed `challengeWebroot` without copying challenge material |
@@ -19,6 +20,39 @@ Nothing here installs, enables, starts or deploys itself. These files are for on
 Only root installs files after review; no command is authorized by this runbook's presence. The service gets only `CAP_NET_BIND_SERVICE`, not root. Its systemd output is `/dev/null`; source code also avoids serializing protected values. No secret is placed in environment variables, command arguments, Terraform, build metadata, shell history, images, logs or support bundles. The DB-login secret is fetched in memory through the attached broker identity, not downloaded by this runbook. Its exact private payload contract belongs to runtime composition and must be verified before private delivery; no placeholder password is usable.
 
 `node --conditions=react-server dist/index.js --preflight --config /etc/vaeroex-square-callback/config.json` validates local configuration without secret/network access. `--serve` additionally requires enabled, complete, current binding and host-policy checks. systemd first runs `ops/host-preflight.mjs` as root, then runtime preflight, then serve. The host helper exits `78` silently on denial and does not call metadata, Google, Supabase or Square.
+
+Enabled configuration must set `databaseCaPath` to the exact public path above
+and `databaseCaSha256` to the approved certificate-file digest. Obtain/verify
+the public CA through the authenticated Supabase database SSL settings, never
+by trusting the certificate presented by an unverified connection. CA rotation
+requires separately reviewing the replacement and updating its digest; the
+digest is configurable, not permanently fixed to one vendor certificate.
+Disabled configurations keep both fields null; older disabled configs without
+these fields remain valid and perform no CA reads. Enabled preflight rejects a
+missing, writable, non-root-owned, malformed, non-CA, expired or digest-mismatched
+file before credential/network access. The database receives that CA explicitly
+with `rejectUnauthorized:true` and Node/pg's unchanged hostname verification.
+The existing DSN v1 is unchanged; no CA, TLS options or trust override is added
+to secret payloads. `SQUARE_SANDBOX_DATABASE_CA_PEM` and other ambient TLS
+overrides remain rejected, not reinstated. [Supabase CA/hostname verification](https://supabase.com/docs/guides/platform/ssl-enforcement),
+[node-postgres explicit SSL configuration](https://node-postgres.com/features/ssl).
+
+After separately authorized host preparation, use the same reviewed entry and
+config with `--check-binding` instead of `--serve` for a bounded native check
+before asking the operator to sign in to the portal. This mode requires the
+same enabled config, CA and current artifact/host policy, reads only the pinned
+DB secret through verified Google identity, opens the native broker connection,
+compares/rechecks canonical database authority, and closes the connection and
+identities. It prints only `square_portal_binding_checked` on success. It has a
+30-second process deadline (or earlier host-policy expiry), with cooperative
+abort and up to two seconds reserved for cleanup. A peer can stall graceful
+`pg.end()` indefinitely; this standalone read-only check therefore exits78
+silently at its hard deadline so the OS closes its sockets and unfinished read
+transactions. It must not print the success label after interrupted cleanup.
+Normal callback cleanup is not changed. The check creates no listener, portal user session,
+application-secret/KMS access or Square OAuth call, including when
+`providerCallsEnabled=false`. Failure is not consent or hosted qualification;
+preserve existing privacy controls and approval/budget limits when invoking it.
 
 Host policy has exactly nine keys: `schemaVersion: 1`, finite `approvedUntil`, nonsecret `operator`, `configurationEvidenceId`, `budgetDeliveryEvidenceId`, exact `nodeVersion`, `artifactSha256`, `hostConfigurationReviewed: true`, `syntheticPrivacyPassed: true`. The example's nulls/false values deliberately cannot pass. This record is a local evidence gate, **not** a substitute for Google-signed host identity or current database authority. Its maximum remaining approval is 31 days; actual approved policy can be shorter. Do not fabricate evidence to start the daemon.
 

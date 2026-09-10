@@ -12,7 +12,7 @@ const origin = "https://square-sandbox.vaeroex.com", applicationId = "sandbox-sq
 const redirectUri = origin + "/api/integrations/square/callback";
 const kmsKeyResource = "projects/vaeroex-square-sandbox/locations/us-west1/keyRings/synthetic/cryptoKeys/credential";
 const canary = "SYNTHETIC_GCP_CALLBACK_CREDENTIAL_NOT_REAL";
-let assertions = 0, stage = "startup", lastDatabaseFailure;
+let assertions = 0, stage = "startup", lastDatabaseFailure, publicCaFixture;
 const equal = (a, b, message) => { assertions++; assert.deepEqual(a, b, message); };
 const ok = (a, message) => { assertions++; assert.ok(a, message); };
 async function rejects(run, message, sql = false) {
@@ -109,7 +109,7 @@ async function qualify(runtime) {
   let abortOnQuery, storeWait=false, loseStoreAck=false, storedAwaitingCommit=false;
   const open = async signal => {
     pg.Client = class {
-      constructor(options) { equal(options.ssl.rejectUnauthorized,true,"production TLS verification remains enabled"); }
+      constructor(options) { equal(options.ssl,{rejectUnauthorized:true,ca:publicCaFixture.ca},"production explicit CA and TLS verification remain enabled"); }
       on() {} async connect() { this.local = await runtime.connect(broker.connection); }
       async query(...args) { try {
         const storing=args[0].includes("square_gcp_callback_account_v1")&&args[1]?.[1]==="store_credential";
@@ -133,7 +133,7 @@ async function qualify(runtime) {
       } }
       async end() { if(this.local) await this.local.end(); }
     };
-    try { return await openSquareGcpCallbackDatabase(`postgresql://${broker.name}:synthetic-not-real@db.oysjpoondtcrqpghhrbd.supabase.co:5432/postgres`,signal); }
+    try { return await openSquareGcpCallbackDatabase(`postgresql://${broker.name}:synthetic-not-real@db.oysjpoondtcrqpghhrbd.supabase.co:5432/postgres`,publicCaFixture.ca,signal); }
     finally { pg.Client = OriginalClient; }
   };
   const signal = new AbortController().signal;
@@ -303,9 +303,12 @@ async function qualify(runtime) {
   equal(await squareMetadata(),squareBefore,"existing Square routines remain untouched after all cases");
   console.log(`Square GCP callback database qualification passed (${assertions} assertions).`);
 }
-runAdditionalQualification(qualify).catch(error=>{
+runAdditionalQualification(async runtime=>{
+  publicCaFixture=require("./square-gcp-callback-ca-test-support.js").createSyntheticCallbackCa();
+  await qualify(runtime);
+}).catch(error=>{
   process.stderr.write(`Square GCP callback database qualification failed at ${stage} (${typeof error.code==="string"&&/^[A-Z0-9_]+$/.test(error.code)?error.code:"fixed_failure"}).\n`);
   if(error.code==="ERR_ASSERTION")process.stderr.write(String(error.message).split("\n")[0]+"\n");
   if(lastDatabaseFailure)process.stderr.write("Checked database failure: "+JSON.stringify(lastDatabaseFailure)+"\n");
   process.exitCode=1;
-});
+}).finally(()=>publicCaFixture?.close());
