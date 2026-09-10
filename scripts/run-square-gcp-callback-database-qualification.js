@@ -7,6 +7,7 @@ const path = require("node:path");
 const { runAdditionalQualification } = require("./run-square-durable-page-qualification.js");
 const root = path.resolve(__dirname, "..");
 const migration = "20260908042529_square_gcp_callback_authority.sql";
+const recoveryMigration = "20260910193429_square_gcp_callback_oregon_recovery.sql";
 const uuid = () => crypto.randomUUID();
 const origin = "https://square-sandbox.vaeroex.com", applicationId = "sandbox-sq0idb-9K0xgcatxe0ABuUmkSNjFw";
 const redirectUri = origin + "/api/integrations/square/callback";
@@ -33,7 +34,7 @@ async function qualify(runtime) {
   const database = await runtime.createDatabase("gcp_callback"), owner = database.client;
   const files = runtime.migrationFiles(), baseline = files.filter(name => name < migration);
   equal(baseline.length, 106, "exact complete PR354 baseline");
-  equal(files.filter(name => name >= migration), [migration], "sole additive callback tail");
+  equal(files.filter(name => name >= migration), [migration, recoveryMigration], "explicit callback and Oregon recovery tail");
   await runtime.applyMigrations(owner, baseline);
   const sourceBefore = await runtime.sourceSchemaFingerprint(owner);
   const squareMetadata = async () => (await owner.query(`select n.nspname,p.proname,pg_get_function_identity_arguments(p.oid) as args,
@@ -80,6 +81,27 @@ async function qualify(runtime) {
     'synthetic_gcp_v1',$8,$9,'projects/vaeroex-square-sandbox/secrets/square-app/versions/1','projects/vaeroex-square-sandbox/secrets/square-sandbox-callback-db/versions/1')`,
     [origin,applicationId,origin+"/_identity/square-callback",user,workspace,entity,broker.name,fingerprint,kmsKeyResource]);
   const binding = (await getBinding(broker.client)).rows[0].value;
+  stage="oregon_recovery_constraint";
+  const existingRow=(await owner.query("select to_jsonb(b) as value from private.square_gcp_callback_binding b")).rows;
+  const recoverySql=fs.readFileSync(path.join(root,"supabase/migrations",recoveryMigration),"utf8"), recoveryEnd=recoverySql.lastIndexOf("commit;");
+  let recoveryRollback=false;
+  try { await owner.query(recoverySql.slice(0,recoveryEnd)+"select 1/0;\n"+recoverySql.slice(recoveryEnd)); }
+  catch(error) { recoveryRollback=error.code==="22012"; await owner.query("rollback"); }
+  ok(recoveryRollback,"recovery constraint change rolls back atomically");
+  await assert.rejects(()=>owner.query("update private.square_gcp_callback_binding set gcp_zone='us-west1-b'"),{code:"23514"}); assertions++;
+  await runtime.applyMigrations(owner,[recoveryMigration]);
+  equal((await owner.query("select to_jsonb(b) as value from private.square_gcp_callback_binding b")).rows,existingRow,"migration preserves approval, identity, expiry and every existing field");
+  equal(await runtime.sourceSchemaFingerprint(owner),sourceBefore,"recovery leaves QBO and non-Square metadata exact");
+  equal(await squareMetadata(),squareBefore,"recovery leaves all existing Square routines exact");
+  for(const zone of ["us-west1-b","us-west1-c"]) {
+    await owner.query("update private.square_gcp_callback_binding set gcp_zone=$1",[zone]);
+    equal((await getBinding(broker.client)).rows[0].value,{...binding,gcpZone:zone},"checked broker returns only the explicitly selected canonical zone");
+  }
+  for(const zone of ["us-east1-b","us-west2-a","us-west1-z","us-west1"]) {
+    await assert.rejects(()=>owner.query("update private.square_gcp_callback_binding set gcp_zone=$1",[zone]),{code:"23514"}); assertions++;
+  }
+  await owner.query("update private.square_gcp_callback_binding set gcp_zone='us-west1-a'");
+  equal((await getBinding(broker.client)).rows[0].value,binding,"original host binding remains supported without other authority changes");
   equal(binding.brokerLogin,broker.name,"actual configured broker obtains exact GCP host tuple");
   equal(binding.gcpInstanceId,"1234567890123456","instance numeric identity preserved as string");
   for(const login of [enroller,webhook,worker,locker]) await rejects(()=>getBinding(login.client),"wrong distinct LOGIN denied",true);

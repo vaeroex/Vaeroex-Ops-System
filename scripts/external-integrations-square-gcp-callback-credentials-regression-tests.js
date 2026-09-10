@@ -55,12 +55,12 @@ async function until(check) {
     await new Promise(resolve => setTimeout(resolve, 1));
   }
 }
-function claims() {
+function claims(expected = binding) {
   const now = Math.floor(Date.now() / 1000);
-  return { iss: "https://accounts.google.com", aud: binding.identityAudience, iat: now - 2, exp: now + 3598,
-    sub: binding.serviceAccountSubject, azp: binding.serviceAccountSubject, email: binding.serviceAccountEmail, email_verified: true,
-    google: { compute_engine: { project_id: binding.gcpProjectId, project_number: Number(binding.gcpProjectNumber),
-      zone: binding.gcpZone, instance_id: binding.gcpInstanceId, instance_name: binding.gcpInstanceName, instance_creation_timestamp: now - 3600 } } };
+  return { iss: "https://accounts.google.com", aud: expected.identityAudience, iat: now - 2, exp: now + 3598,
+    sub: expected.serviceAccountSubject, azp: expected.serviceAccountSubject, email: expected.serviceAccountEmail, email_verified: true,
+    google: { compute_engine: { project_id: expected.gcpProjectId, project_number: Number(expected.gcpProjectNumber),
+      zone: expected.gcpZone, instance_id: expected.gcpInstanceId, instance_name: expected.gcpInstanceName, instance_creation_timestamp: now - 3600 } } };
 }
 function sign(payload = claims(), header = { alg: "RS256", typ: "JWT", kid: jwk.kid }, signingKey = privateKey) {
   const unsigned = [header, payload].map(value => Buffer.from(JSON.stringify(value)).toString("base64url")).join(".");
@@ -80,6 +80,7 @@ global.fetch = () => assert.fail("No default network is authorized in this synth
 
 function fixture(options = {}) {
   const calls = [], checks = [], abort = new AbortController();
+  const expected = options.binding ?? binding;
   let consumed = options.consumed ?? true;
   const network = async (url, init) => {
     calls.push({ url, method: init.method });
@@ -91,7 +92,7 @@ function fixture(options = {}) {
     }
     if (url === identityUrl) {
       equal(init.headers["Metadata-Flavor"], "Google"); equal(init.headers.Authorization, undefined);
-      return metadataResponse(options.jwt ?? sign(options.payload ?? claims(), options.header));
+      return metadataResponse(options.jwt ?? sign(options.payload ?? claims(expected), options.header));
     }
     if (url === jwksUrl) { equal(init.headers, undefined); return json(options.jwks ?? { keys: [jwk] }); }
     if (url === `${metadata}token`) {
@@ -116,14 +117,14 @@ function fixture(options = {}) {
     }
     assert.fail("Only exact synthetic metadata/JWKS/app-secret/KMS/DB-secret URLs may be requested");
   };
-  const identity = createIdentity({ binding, network, signal: abort.signal, ...(options.clock ? { clock: options.clock } : {}) });
-  const dependencies = { binding, identity, network, signal: abort.signal, authorizeFirstConsent: async request => {
+  const identity = createIdentity({ binding: expected, network, signal: abort.signal, ...(options.clock ? { clock: options.clock } : {}) });
+  const dependencies = { binding: expected, identity, network, signal: abort.signal, authorizeFirstConsent: async request => {
     checks.push(request.purpose);
     ok(Object.isFrozen(request)); equal(request.signal, abort.signal);
     if (!consumed || request.signal.aborted) throw new Error(`denied_${canary}`);
     if (request.purpose === "credential_encrypt") equal(request.aadContext, aadContext);
     else equal(request.aadContext, undefined);
-    return options.authorize ? options.authorize(request, checks.length) : binding;
+    return options.authorize ? options.authorize(request, checks.length) : expected;
   } };
   const credentials = createCredentials(dependencies);
   return { calls, checks, abort, network, identity, credentials, dependencies, setConsumed(value) { consumed = value; } };
@@ -139,7 +140,8 @@ const decodeCipher = value => {
 
 async function main() {
   equal(checkedBinding(binding), binding); ok(Object.isFrozen(checkedBinding(binding)));
-  for (const [key, value] of [["gcpProjectId", "Production"], ["gcpProjectId", "foreign-project"], ["gcpZone", "us-west1-b"], ["gcpInstanceId", "PENDING"],
+  for (const [key, value] of [["gcpProjectId", "Production"], ["gcpProjectId", "foreign-project"],
+    ...["us-west1-d", "us-west2-a", "us-east1-b", "us-west1", "US-WEST1-B"].map(zone => ["gcpZone", zone]), ["gcpInstanceId", "PENDING"],
     ["gcpInstanceName", "another-sandbox-host"],
     ["serviceAccountEmail", "foreign@foreign-project.iam.gserviceaccount.com"], ["identityAudience", binding.applicationOrigin],
     ["applicationId", "production-app"], ["environment", "production"], ["enabled", false],
@@ -153,6 +155,22 @@ async function main() {
   Object.defineProperty(accessor, "gcpProjectId", { enumerable: true, get() { getters++; return "vaeroex-square-sandbox"; } });
   throws(() => checkedBinding(accessor)); equal(getters, 0);
   throws(() => checkedBinding(new Proxy(binding, { ownKeys() { getters++; return []; } }))); equal(getters, 0);
+
+  for (const [zone, instanceId] of [["us-west1-b", "9876543210987654322"], ["us-west1-c", "9876543210987654323"]]) {
+    const replacement = checkedBinding({ ...binding, gcpZone: zone, gcpInstanceId: instanceId });
+    equal(replacement.gcpZone, zone); equal(replacement.gcpInstanceId, instanceId); ok(Object.isFrozen(replacement));
+    equal(replacement.policyFingerprint, binding.policyFingerprint, "zonal recovery does not replace retention authority");
+    const current = fixture({ binding: replacement });
+    await current.identity.verify(); equal(current.calls.length, 2, "real synthetic RSA signature accepts the exact new canonical zone and instance");
+    const wrongZone = claims(replacement); wrongZone.google.compute_engine.zone = "us-west1-a";
+    const wrongInstance = claims(replacement); wrongInstance.google.compute_engine.instance_id = binding.gcpInstanceId;
+    for (const payload of [wrongZone, wrongInstance, claims()]) {
+      const stale = fixture({ binding: replacement, payload });
+      await rejects(() => secret(stale), "signed wrong-zone, old-instance or old-host claims reject against the replacement binding");
+      equal(stale.calls.filter(call => call.url.endsWith("/token") || call.url.includes("secretmanager") || call.url.includes("cloudkms")).length, 0,
+        "a valid provider signature never substitutes for exact current host authority");
+    }
+  }
 
   const good = fixture(); equal(good.calls.length, 0, "constructors/imports are inert");
   await good.identity.verify(); equal(good.calls.length, 2, "real RSA signature + full instance claims verified with synthetic Google key reply");

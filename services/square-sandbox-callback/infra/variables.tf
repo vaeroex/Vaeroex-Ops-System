@@ -50,8 +50,8 @@ variable "zone" {
   description = "Exact Oregon zone supported by the native binding and database contract."
   type        = string
   validation {
-    condition     = var.zone == "us-west1-a"
-    error_message = "Only us-west1-a matches the pinned native host and database contract."
+    condition     = contains(["us-west1-a", "us-west1-b", "us-west1-c"], var.zone)
+    error_message = "Only the explicitly supported Oregon zones are permitted; each replacement needs its own verified VM identity binding."
   }
 }
 
