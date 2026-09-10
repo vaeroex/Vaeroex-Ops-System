@@ -7,6 +7,7 @@ const approvedSquareQualificationPaths = Object.freeze([
   "supabase/migrations/20260907225626_square_remote_sandbox_binding.sql",
   "supabase/migrations/20260908014713_square_broker_runtime_credential_authority.sql",
   "supabase/migrations/20260908042529_square_gcp_callback_authority.sql",
+  "supabase/migrations/20260910193429_square_gcp_callback_oregon_recovery.sql",
   "services/square-sandbox-callback/config.example.json",
   "services/square-sandbox-callback/infra/.gitignore",
   "services/square-sandbox-callback/infra/.terraform.lock.hcl",

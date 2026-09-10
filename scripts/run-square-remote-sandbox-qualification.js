@@ -42,7 +42,7 @@ async function migrationTests(runtime) {
   stage = "canonical_migrations_and_atomic_additive_install";
   const files = runtime.migrationFiles(), baseline = files.filter(name => name < migrationName);
   equal(baseline.length, 104, "complete canonical prerequisite chain contains exactly 104 migrations");
-  equal(files.filter(name => name >= migrationName), [migrationName, "20260908014713_square_broker_runtime_credential_authority.sql", "20260908042529_square_gcp_callback_authority.sql"],
+  equal(files.filter(name => name >= migrationName), [migrationName, "20260908014713_square_broker_runtime_credential_authority.sql", "20260908042529_square_gcp_callback_authority.sql", "20260910193429_square_gcp_callback_oregon_recovery.sql"],
     "remote binding and separately qualified broker correction are the exact additive tail");
   const database = await runtime.createDatabase("remote_sandbox");
   const owner = database.client;
@@ -104,7 +104,7 @@ async function migrationTests(runtime) {
   equal(unchangedSquare(await existingSquareDefinitions(owner)), squareBeforeCorrection, "broker correction preserves every unrelated Square routine/ACL");
   const beforeGcp = await runtime.sourceSchemaFingerprint(owner);
   const squareBeforeGcp = await existingSquareDefinitions(owner);
-  await runtime.applyMigrations(owner, ["20260908042529_square_gcp_callback_authority.sql"]);
+  await runtime.applyMigrations(owner, ["20260908042529_square_gcp_callback_authority.sql", "20260910193429_square_gcp_callback_oregon_recovery.sql"]);
   equal(await runtime.sourceSchemaFingerprint(owner), beforeGcp, "GCP extension preserves non-Square and QBO definitions/ACLs");
   equal((await existingSquareDefinitions(owner)).filter(row => !row.proname.includes("gcp_callback")), squareBeforeGcp,
     "GCP extension preserves every existing Square routine/ACL");
