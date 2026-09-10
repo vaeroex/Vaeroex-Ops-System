@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { contractSha256 } from "@/lib/integrations/contracts/canonical";
+import { SQUARE_IANA_TIME_ZONE_NAMES } from "@/lib/integrations/providers/square/iana-time-zone-names";
 import {
   CurrencyCodeSchema,
   IsoTimestampSchema,
@@ -356,6 +357,7 @@ const SQUARE_ENVIRONMENT_KEYS = Object.keys(
 
 const supportedCurrencyCodes = supportedIntlValues("currency");
 const supportedTimeZones = supportedIntlValues("timeZone");
+const ianaTimeZoneNames = new Set(SQUARE_IANA_TIME_ZONE_NAMES);
 
 export const SquareProviderEnvironmentSchema = z.enum(["production", "sandbox"]);
 export const SquareApiVersionSchema = z.literal(SQUARE_API_VERSION);
@@ -397,7 +399,7 @@ export const SquareTimeZoneSchema = z
   .string()
   .min(1)
   .max(30)
-  .regex(/^[A-Za-z_+-]+(?:\/[A-Za-z0-9_+-]+)+$/)
+  .regex(/^[A-Za-z][A-Za-z0-9_+-]*(?:\/[A-Za-z0-9_+-]+)*$/)
   .refine(isSupportedIanaTimeZone, "Timezone must be a supported IANA zone");
 export const SquareResponseProvenanceSchema = z
   .object({
@@ -1219,7 +1221,7 @@ function squareTimeZone(value: SquareSafeJsonValue, field: string) {
     maximumLength: 30
   });
   if (
-    !/^[A-Za-z_+-]+(?:\/[A-Za-z0-9_+-]+)+$/.test(candidate) ||
+    !/^[A-Za-z][A-Za-z0-9_+-]*(?:\/[A-Za-z0-9_+-]+)*$/.test(candidate) ||
     !isSupportedIanaTimeZone(candidate)
   ) {
     throw new SquareResponseValidationFailure(
@@ -1280,17 +1282,18 @@ function isSquareCurrencyCode(value: string) {
 }
 
 function isSupportedIanaTimeZone(value: string) {
-  if (supportedTimeZones === null) {
-    try {
-      const resolved = new Intl.DateTimeFormat("en-US", {
-        timeZone: value
-      }).resolvedOptions().timeZone;
-      return resolved === value;
-    } catch {
-      return false;
-    }
+  if (!ianaTimeZoneNames.has(value)) return false;
+  if (supportedTimeZones?.has(value)) return true;
+  // supportedValuesOf lists primary zones, not every valid IANA identifier:
+  // UTC and backward-compatible links are valid Square location timezones too.
+  // After exact IANA membership, check runtime support without canonicalizing
+  // the trusted value/fingerprint. ICU acceptance alone also admits non-IANA IDs.
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: value });
+    return true;
+  } catch {
+    return false;
   }
-  return supportedTimeZones.has(value);
 }
 
 class SquareResponseValidationFailure extends Error {
