@@ -8,6 +8,77 @@ Use a separate Sandbox test seller, **not the Default Test Account**, with **Aut
 
 Do not auto-authorize the seller or alter scope/state to bypass a failed consent page. After an incomplete attempt, return to the clean portal and follow the existing expiry/cancellation and fresh-authorization process; never replay or record the authorization URL or raw state. Successful consent still stops at `authorized_unmapped` and grants no mapping, enrollment or ingestion authority.
 
+## Application-secret payload contract
+
+The pinned application-secret version must contain this strict JSON envelope,
+not a raw Square secret string. This is a placeholder-only example; replace
+both placeholder values privately in the authorized Secret Manager delivery UI.
+The application ID must exactly match the approved Sandbox binding. Do not put
+real values in chat, command arguments, shell history, files or diagnostic output.
+No new secret read or version creation is authorized by this example.
+
+```json
+{
+  "schemaVersion": "provider_application_secret_v1",
+  "providerKey": "square",
+  "environment": "sandbox",
+  "clientId": "<approved-Sandbox-application-ID>",
+  "clientSecret": "<private-Square-Sandbox-application-secret>"
+}
+```
+
+The decoder rejects missing/extra fields or a different provider/environment.
+The existing checks also reject a mismatched application ID, an unsupported
+secret length, or whitespace/control characters. The DB secret is different: it
+remains the pinned PostgreSQL DSN, not this JSON envelope. Never infer the content
+of an existing version from this example or bypass consumed-intent authority to
+probe the application secret.
+
+## Fixed-label consent diagnostics
+
+Only the dedicated native Sandbox `--serve` composition writes
+`/run/vaeroex-square-callback/consent-diagnostic.json`. The default sink requires
+Linux tmpfs, a service-owned `0700` directory and a regular singly linked `0600`
+file; unsafe targets disable diagnostics without changing authorization. Atomic
+replacement uses one fixed `0600` temporary filename in that same directory.
+There is no new endpoint, database record, remote export, stdout/stderr output or
+request-derived filename. The existing unit and authority gates are unchanged.
+
+Each snapshot is at most2048 bytes: fixed stage/outcome enums and aggregate
+started/completed/active counters only. No errors, URLs, IDs, tokens, scopes,
+headers, request bodies or provider snippets are accepted. At most two attempts
+are active and100 begin/finish pairs are recorded per process, within the native
+listener's existing limits. Only initial, begin and finalized snapshots are
+written; stage updates stay in memory. A nonzero `active` count in a leftover
+snapshot is incomplete, not a completed attempt. `lastFailure:null` means no
+failure was finalized by this collector; it does not establish successful consent.
+
+Stages identify the last observed boundary, not a diagnosis. In particular,
+response-body receipt is not schema validation; `*_validation` means the check
+was entered, while verified labels follow the existing corresponding checks.
+`fenced_store_returned` means the checked store call returned, not independent
+proof of a database commit. `callback_returned` can include seller denial and
+must never be treated as `authorized_unmapped`. A later returned callback keeps
+the preceding last-failure snapshot and increments the completion counter.
+Cancellation finalizes once; late callbacks cannot rewrite that attempt.
+
+Collection starts when the authenticated portal invokes `complete()`. Failures
+before that boundary (URL parsing, host/bootstrap/session checks) are not covered.
+`unknown` means no more-specific stage was observed. Observer/sink failures never
+throw into authorization or trigger retries. A write failure can leave a stale
+file; persistence availability is process-local, not attested by the file itself.
+Before a future authorized attempt, independently read back the initial snapshot
+for the current process and use operator timing/counters, not mere file presence.
+Abrupt process/VM loss can prevent final publication; tmpfs is volatile and no
+crash-proof, cross-restart history or durable audit guarantee is claimed. Existing
+checked database status and audit remain authoritative. Missing/stale diagnostics
+do not justify credential probes, replay, broader access or invented failure causes.
+
+`node scripts/run-square-consent-diagnostics-qualification.js` exercises fixed
+labels, concurrent completion/cancellation, writer failures, and actual Square
+OAuth/discovery/service parsers using synthetic injected dependencies. Its private
+temporary-directory file tests do not claim hosted tmpfs/systemd qualification.
+
 ## Release and configuration contract
 
 | Location | Ownership and content |

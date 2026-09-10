@@ -13,6 +13,7 @@ import { snapshotSquareDurableJson } from "@/lib/integrations/providers/square/d
 import { parseSquareLocationResponse } from "@/lib/integrations/providers/square/location-responses";
 import { parseSquareMerchantResponse } from "@/lib/integrations/providers/square/merchant-responses";
 import { squareSafeJsonObject } from "@/lib/integrations/providers/square/response-validation";
+import { reportSquareConsentProgress, type SquareConsentObserver } from "./account-connection-progress";
 
 export type SquareAccountDiscoveryPath = "/v2/merchants/me" | "/v2/locations" | "/v2/locations/main";
 /** An injected bounded GET adapter, never a default fetch or credential lookup. */
@@ -110,12 +111,14 @@ export function createSquareAccountDiscovery(input: Readonly<{
   readAuthenticated: SquareAccountAuthenticatedRead;
   clock?: () => Date;
   signal?: AbortSignal;
+  observeConsent?: SquareConsentObserver;
 }>): AuthorizedProviderEntityVerifier & Readonly<{ consumeVerifiedDiscovery(): SquareVerifiedDiscovery }> {
   const environment = SquareAccountEnvironmentSchema.parse(input.environment);
   const applicationId = input.applicationId;
   if (typeof applicationId !== "string" || applicationId.length < 8 || applicationId.length > 512 ||
       typeof input.readAuthenticated !== "function" || isProxy(input.readAuthenticated)) denied();
   const read = input.readAuthenticated, clock = input.clock ?? (() => new Date()), signal = input.signal;
+  const observeConsent = environment === "sandbox" ? input.observeConsent : undefined;
   let state: "fresh" | "running" | "ready" | "consumed" | "failed" = "fresh";
   let discovery: SquareVerifiedDiscovery | null = null;
   const check = () => { if (signal?.aborted) denied(); };
@@ -152,7 +155,9 @@ export function createSquareAccountDiscovery(input: Readonly<{
         const value = await ProviderAccessCredential.prototype.use.call(credential, async ({ accessToken }) => {
           const request = async (path: SquareAccountDiscoveryPath, key: "merchant" | "locations" | "location") => {
             validCredential();
+            reportSquareConsentProgress(observeConsent, key === "merchant" ? "merchant_request" : key === "locations" ? "locations_request" : "main_location_request");
             const raw = await read(Object.freeze({ environment, path, accessToken, ...(signal ? { signal } : {}) }));
+            reportSquareConsentProgress(observeConsent, key === "merchant" ? "merchant_validation" : key === "locations" ? "locations_validation" : "main_location_validation");
             validCredential(); return envelope(raw, key);
           };
           const parser = (response: unknown) => ({ providerKey: "square" as const, providerEnvironment: environment, apiVersion: SQUARE_API_VERSION, response });
@@ -160,10 +165,13 @@ export function createSquareAccountDiscovery(input: Readonly<{
           if (merchant.outcome !== "accepted" || merchant.value.items.length !== 1) denied();
           const seller = merchant.value.items[0];
           if (seller.id !== merchantId || seller.status !== "ACTIVE") denied();
+          reportSquareConsentProgress(observeConsent, "merchant_verified");
           const listed = parseSquareLocationResponse(parser(await request("/v2/locations", "locations")));
           if (listed.outcome !== "accepted" || listed.value.items.length === 0) denied();
+          reportSquareConsentProgress(observeConsent, "locations_validated");
           const main = parseSquareLocationResponse(parser(await request("/v2/locations/main", "location")));
           if (main.outcome !== "accepted" || main.value.items.length !== 1) denied();
+          reportSquareConsentProgress(observeConsent, "discovery_verification");
           const primary = main.value.items[0];
           if (primary.status !== "ACTIVE" || primary.merchantId !== null && primary.merchantId !== seller.id ||
               seller.mainLocationId !== null && seller.mainLocationId !== primary.id ||
@@ -188,6 +196,7 @@ export function createSquareAccountDiscovery(input: Readonly<{
           providerEntityType: "merchant", safeDisplayName: discovery.merchantLabel, verificationFingerprint: discovery.fingerprint
         }));
         state = "ready";
+        reportSquareConsentProgress(observeConsent, "discovery_verified");
         return evidence;
       } catch {
         discovery = null; state = "failed"; denied();

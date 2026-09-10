@@ -126,7 +126,7 @@ function fixture(options = {}) {
     else equal(request.aadContext, undefined);
     return options.authorize ? options.authorize(request, checks.length) : expected;
   } };
-  const credentials = createCredentials(dependencies);
+  const credentials = createCredentials(dependencies, options.observeConsent);
   return { calls, checks, abort, network, identity, credentials, dependencies, setConsumed(value) { consumed = value; } };
 }
 const secret = f => f.credentials.secrets.access("square", "sandbox");
@@ -139,6 +139,34 @@ const decodeCipher = value => {
 };
 
 async function main() {
+  // Exact new diagnostic boundaries; the adapter input descriptor shape, one-use
+  // latch and consumed-state prerequisite are unchanged. No raw values emitted.
+  for (const [kind, expected] of [["payload", "application_secret_payload_validation"],
+    ["decode", "application_secret_decode_validation"], ["binding", "application_secret_binding_validation"],
+    ["valid", "application_secret_binding_validation"]]) {
+    const stages = [];
+    const f = fixture({ observeConsent: stage => stages.push(stage), network: async url => {
+      if (!url.includes("secretmanager")) return undefined;
+      if (kind === "payload") return json(secretReply("foreign-synthetic-resource", appSecret));
+      if (kind === "decode") return json(secretReply(binding.appSecretVersionResource, canary));
+      if (kind === "binding") return json(secretReply(binding.appSecretVersionResource,
+        JSON.stringify({ ...JSON.parse(appSecret), clientId: "foreign-synthetic-app" })));
+      return undefined;
+    } });
+    if (kind === "valid") await secret(f); else await rejects(() => secret(f));
+    equal(stages.at(-1), expected); ok(!JSON.stringify(stages).includes(canary));
+    await rejects(() => secret(f));
+    equal(f.calls.filter(call => call.url.includes("secretmanager")).length, 1, "diagnostics never permit an app-secret retry");
+    f.credentials.dispose();
+  }
+  for (const observeConsent of [() => { throw new Error(canary); }, async () => { throw new Error(canary); }]) {
+    const f = fixture({ observeConsent }); await secret(f); await encrypt(f);
+    equal(f.calls.filter(call => call.url.includes("secretmanager")).length, 1);
+    equal(f.calls.filter(call => call.url.includes("cloudkms")).length, 1); f.credentials.dispose();
+  }
+  const unconsumedStages = [], unconsumed = fixture({ consumed: false, observeConsent: stage => unconsumedStages.push(stage) });
+  await rejects(() => secret(unconsumed)); equal(unconsumedStages, []);
+  equal(unconsumed.calls.length, 0, "no diagnostic probe bypasses consumed-intent authority");
   equal(checkedBinding(binding), binding); ok(Object.isFrozen(checkedBinding(binding)));
   for (const [key, value] of [["gcpProjectId", "Production"], ["gcpProjectId", "foreign-project"],
     ...["us-west1-d", "us-west2-a", "us-east1-b", "us-west1", "US-WEST1-B"].map(zone => ["gcpZone", zone]), ["gcpInstanceId", "PENDING"],
