@@ -8,6 +8,8 @@ import { Readable } from "node:stream";
 import { resolve } from "node:path";
 import { SQUARE_REMOTE_SANDBOX } from "@/lib/integrations/control-plane/square-remote-sandbox-contracts";
 import { checkedSquareGcpCallbackDatabaseCa } from "@/lib/integrations/control-plane/square-gcp-callback-database";
+import { checkedSquareGcpMappedBinding } from "@/lib/integrations/control-plane/square-gcp-mapped-contracts";
+import { confirmNativeSquareGcpMappedLocation, enrollNativeSquareGcpMappedConnection, enrollNativeSquareGcpMappedTask, runNativeSquareGcpMappedPage } from "@/lib/integrations/control-plane/square-gcp-mapped-runtime";
 import { checkedPortalConfig, HostPolicySchema } from "./config";
 import { checkNativeSquareSandboxPortalBinding, createNativeSquareSandboxPortal } from "./runtime";
 import { CALLBACK_PATH, PORTAL_PATH, portalHeaders, portalUnavailable } from "./portal";
@@ -115,9 +117,9 @@ export function nativePortalHandler(handle: (request: Request) => Promise<Respon
 
 export async function runSquareSandboxPortalCommand() {
   const args = process.argv.slice(2);
-  if (args.length !== 3 || !["--preflight", "--check-binding", "--serve"].includes(args[0]) || args[1] !== "--config" || args[2] !== configPath) denied();
+  if (args.length !== 3 || !["--preflight", "--check-binding", "--serve", "--confirm-mapping", "--enroll-mapped", "--enroll-task", "--run-page"].includes(args[0]) || args[1] !== "--config" || args[2] !== configPath) denied();
   localEnvironment();
-  const config = checkedPortalConfig(JSON.parse(readLocal(configPath, 32_768).toString()), args[0] !== "--preflight");
+  const config = checkedPortalConfig(JSON.parse(readLocal(configPath, 65_536).toString()), args[0] !== "--preflight");
   // Both enabled preflight and serving validate public trust before metadata,
   // Secret Manager, database IO or listener creation. Disabled legacy configs
   // remain valid and never load a CA or regain an ambient trust override.
@@ -132,7 +134,40 @@ export async function runSquareSandboxPortalCommand() {
   if (expiry <= now || expiry > now + 31 * 86_400_000 || policy.nodeVersion !== process.version ||
     createHash("sha256").update(readLocal(process.argv[1], 64 * 1_024 * 1_024)).digest("hex") !== policy.artifactSha256 ||
     !config.binding || !config.supabasePublishableKey || !databaseCa) denied();
-  const input = { binding: config.binding, publishableKey: config.supabasePublishableKey, databaseCa, network: fetch };
+  const input = { binding: config.binding, publishableKey: config.supabasePublishableKey, databaseCa, network: fetch,
+    ...(config.mappedBinding ? { mappedBinding: checkedSquareGcpMappedBinding(config.mappedBinding) } : {}) };
+  if (["--confirm-mapping", "--enroll-mapped", "--enroll-task", "--run-page"].includes(args[0])) {
+    if (!input.mappedBinding) denied();
+    const mapped = { binding: input.mappedBinding, databaseCa, network: fetch };
+    const remaining = Math.min(60_000, expiry - Date.now(), Date.parse(mapped.binding.mappedApprovalExpiresAt) - Date.now());
+    if (remaining < 5_000) denied();
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), remaining - 2_000);
+    const hardTimer = setTimeout(() => { controller.abort(); process.exit(78); }, remaining);
+    try {
+      if (args[0] === "--confirm-mapping") await confirmNativeSquareGcpMappedLocation(mapped, controller.signal);
+      else if (args[0] === "--enroll-mapped") await enrollNativeSquareGcpMappedConnection(mapped, controller.signal);
+      else {
+        const taskPath = "/etc/vaeroex-square-callback/mapped-task.json";
+        if (lstatSync(taskPath).uid !== 0) denied();
+        const task = JSON.parse(readLocal(taskPath, 65_536).toString());
+        if (args[0] === "--enroll-task") await enrollNativeSquareGcpMappedTask(mapped, task, controller.signal);
+        else {
+          if (!task || Object.keys(task).sort().join(",") !== "leaseOwnerFingerprint,taskId") denied();
+          const outcome = await runNativeSquareGcpMappedPage(mapped, task, controller.signal);
+          if (controller.signal.aborted) denied();
+          // Fixed status only: no provider data, cursor, task or credential metadata.
+          if (!["committed", "finished", "retry", "blocked", "rejected", "conflict"].includes(outcome.outcome)) denied();
+          process.stdout.write(`square_mapped_page_${outcome.outcome}\n`);
+          return;
+        }
+      }
+      if (controller.signal.aborted) denied();
+      process.stdout.write(args[0] === "--confirm-mapping" ? "square_mapped_location_confirmed\n" : args[0] === "--enroll-mapped" ? "square_mapped_connection_enrolled\n" : "square_mapped_task_enrolled\n");
+    } catch { controller.abort(); process.exit(78); }
+    finally { controller.abort(); clearTimeout(timer); clearTimeout(hardTimer); }
+    return;
+  }
   if (args[0] === "--check-binding") {
     const remaining = expiry - Date.now();
     if (remaining <= 0) denied();

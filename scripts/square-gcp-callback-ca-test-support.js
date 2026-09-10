@@ -126,9 +126,10 @@ async function qualifyCallbackDatabaseCa() {
     // Binding-only runtime uses the established identity/DB-secret interfaces,
     // not application credentials, OAuth, KMS, user Auth or a listener.
     const dbModule = require("../lib/integrations/control-plane/square-gcp-callback-database.ts");
+    const mappedDbModule = require("../lib/integrations/control-plane/square-gcp-mapped-database.ts");
     const identities = require("../lib/integrations/control-plane/square-gcp-callback-identity.ts");
     const credentials = require("../lib/integrations/control-plane/square-gcp-callback-credentials.ts");
-    const saved = { open: dbModule.openSquareGcpCallbackDatabase, identity: identities.createSquareGcpCallbackIdentity,
+    const saved = { open: dbModule.openSquareGcpCallbackDatabase, mappedOpen: mappedDbModule.openSquareGcpMappedDatabase, identity: identities.createSquareGcpCallbackIdentity,
       secret: credentials.readSquareGcpCallbackDatabaseSecret, credentials: credentials.createSquareGcpCallbackCredentials };
     try {
       for (const mode of ["success", "identity", "binding", "recheck", "abort"]) {
@@ -153,8 +154,80 @@ async function qualifyCallbackDatabaseCa() {
         equal(secrets, 1);equal(applications, 0);equal(network, 0);
         equal(rechecked, mode === "success" || mode === "recheck" ? 1 : 0);
       }
+      const mappedBinding = { ...binding, contractVersion: "square_gcp_mapped_runtime_binding_v1", capability: "broker",
+        enrollerLogin: "square_sandbox_enroller", runtimeLogin: "square_sandbox_runtime",
+        connectionId: "44444444-4444-4444-8444-444444444444", connectionGeneration: 4,
+        operatorSessionId: "55555555-5555-4555-8555-555555555555", defaultLocationId: "LOC_SYNTHETIC",
+        discoveryFingerprint: "sha256:" + "2".repeat(64), mappedProviderCallsEnabled: false,
+        mappedApprovalExpiresAt: binding.approvalExpiresAt,
+        enrollerDatabaseSecretVersionResource: "projects/vaeroex-square-sandbox/secrets/square-sandbox-enroller-db/versions/1",
+        runtimeDatabaseSecretVersionResource: "projects/vaeroex-square-sandbox/secrets/square-sandbox-runtime-db/versions/1" };
+      // Exercise the actual CLI dispatcher in isolated children. Native work is
+      // replaced only at its exported boundary; failure exits cannot kill this
+      // test runner and no listener/network or real credential is available.
+      for (const [command, mode, expectedCode, expectedOutput] of [
+        ["--confirm-mapping", "valid", 0, "square_mapped_location_confirmed\n"],
+        ["--confirm-mapping", "missing_binding", 79, ""], ["--confirm-mapping", "runtime_failure", 78, ""],
+        ["--enroll-mapped", "valid", 0, "square_mapped_connection_enrolled\n"],
+        ["--enroll-task", "valid", 0, "square_mapped_task_enrolled\n"],
+        ["--run-page", "valid", 0, "square_mapped_page_committed\n"],
+        ["--run-page", "extra_task_field", 78, ""], ["--run-page", "task_owner", 78, ""],
+        ["--enroll-task", "task_symlink", 78, ""], ["--run-page", "unknown_outcome", 78, ""],
+        ["--enroll-mapped", "runtime_failure", 78, ""], ["--enroll-mapped", "missing_binding", 79, ""],
+        ["--enroll-mapped", "expired_window", 79, ""], ["--enroll-mapped", "bounded_hang", 78, ""]
+      ]) {
+        const child = `
+require(${JSON.stringify(path.join(__dirname, "square-account-browser-test-support.js"))}).loadSquareBrowserModules();
+const fs=require('node:fs'),https=require('node:https'),http=require('node:http');
+const mapped=require(${JSON.stringify(path.join(__dirname, "../lib/integrations/control-plane/square-gcp-mapped-runtime.ts"))});
+const {runSquareSandboxPortalCommand}=require(${JSON.stringify(path.join(__dirname, "../services/square-sandbox-callback/src/server.ts"))});
+const mode=${JSON.stringify(mode)},command=${JSON.stringify(command)},config=${JSON.stringify({ ...config, mappedBinding })};
+if(mode==='missing_binding')delete config.mappedBinding;
+const ca=Buffer.from(${JSON.stringify(fixture.ca)}),artifact=Buffer.from('SYNTHETIC MAPPED CLI');
+const policy={schemaVersion:1,approvedUntil:new Date(Date.now()+(mode==='expired_window'?4000:mode==='bounded_hang'?6000:60000)).toISOString(),operator:'synthetic',configurationEvidenceId:'synthetic',budgetDeliveryEvidenceId:'synthetic',nodeVersion:process.version,artifactSha256:require('node:crypto').createHash('sha256').update(artifact).digest('hex'),hostConfigurationReviewed:true,syntheticPrivacyPassed:true};
+const task={taskId:'44444444-4444-4444-8444-444444444444',leaseOwnerFingerprint:'sha256:'+'3'.repeat(64)};
+if(mode==='extra_task_field')task.extra='forbidden';
+process.argv=[process.execPath,'synthetic-mapped-cli',command,'--config','/etc/vaeroex-square-callback/config.json'];process.execArgv=['--conditions=react-server'];
+const taskPath='/etc/vaeroex-square-callback/mapped-task.json';let calls=0;
+fs.lstatSync=p=>{if(![process.argv[4],config.databaseCaPath,config.hostPolicyPath,process.argv[1],taskPath].includes(p))throw Error('unexpected_path');return {isFile:()=>true,isSymbolicLink:()=>mode==='task_symlink'&&p===taskPath,uid:mode==='task_owner'&&p===taskPath?1:0,mode:420,size:8192};};
+fs.readFileSync=p=>p===process.argv[4]?Buffer.from(JSON.stringify(config)):p===config.databaseCaPath?ca:p===config.hostPolicyPath?Buffer.from(JSON.stringify(policy)):p===taskPath?Buffer.from(JSON.stringify(task)):artifact;
+global.fetch=async()=>{throw Error('unexpected_network');};https.createServer=http.createServer=()=>{throw Error('unexpected_listener');};
+const run=async(input,value,signal)=>{calls++;if(input.binding.connectionGeneration!==4||input.databaseCa!==ca.toString()||signal.aborted)throw Error('wrong_bound_input');if(!['--enroll-mapped','--confirm-mapping'].includes(command)&&JSON.stringify(value)!==JSON.stringify(task))throw Error('wrong_task');if(mode==='runtime_failure')throw Error('SYNTHETIC PRIVATE FAILURE');if(mode==='bounded_hang')return new Promise(()=>{});return {outcome:mode==='unknown_outcome'?'SYNTHETIC PRIVATE FAILURE':'committed'};};
+mapped.confirmNativeSquareGcpMappedLocation=(input,signal)=>run(input,null,signal);
+mapped.enrollNativeSquareGcpMappedConnection=(input,signal)=>run(input,null,signal);
+mapped.enrollNativeSquareGcpMappedTask=run;mapped.runNativeSquareGcpMappedPage=run;
+process.env={};runSquareSandboxPortalCommand().then(()=>{if(calls!==1)process.exit(80);}).catch(()=>process.exit(79));
+`;
+        const result = require("node:child_process").spawnSync(process.execPath, ["-e", child], { encoding: "utf8", timeout: 10000 });
+        equal(result.status, expectedCode, command + " " + mode); equal(result.stdout, expectedOutput);
+        equal(result.stderr, "", "mapped commands expose no diagnostic/private runtime payload");
+      }
+      for (const mode of ["valid", "missing", "stale", "recheck", "absent"]) {
+        let closed = 0, mappedClosed = 0, mappedOpened = 0, mappedRechecked = 0, applications = 0;
+        const controller = new AbortController();
+        identities.createSquareGcpCallbackIdentity = () => ({ verify: async () => {}, dispose: () => {} });
+        credentials.readSquareGcpCallbackDatabaseSecret = async input => { input.identity.dispose(); return dsn; };
+        credentials.createSquareGcpCallbackCredentials = () => { applications++; throw new Error("unexpected_application_credential"); };
+        dbModule.openSquareGcpCallbackDatabase = async () => ({ binding, recheckBinding: async () => binding, close: async () => { closed++; } });
+        mappedDbModule.openSquareGcpMappedDatabase = async (role, value, ca, signal) => {
+          mappedOpened++; equal(role, "broker"); equal(value, dsn); equal(ca, fixture.ca); equal(signal, controller.signal);
+          if (mode === "missing") throw new Error("synthetic_missing_mapped_getter");
+          return { binding: mode === "stale" ? { ...mappedBinding, connectionGeneration: 3 } : mappedBinding,
+            recheckBinding: async () => { mappedRechecked++; if (mode === "recheck") throw new Error("synthetic_mapped_recheck_denied"); return mappedBinding; },
+            close: async () => { mappedClosed++; } };
+        };
+        const run = () => runtimeModule.checkNativeSquareSandboxPortalBinding({ binding,
+          ...(mode === "absent" ? {} : { mappedBinding }), publishableKey: config.supabasePublishableKey,
+          databaseCa: fixture.ca, network: async () => { throw new Error("unexpected_network"); } }, controller.signal);
+        if (mode === "valid" || mode === "absent") equal(await run(), { checked: true }); else await rejects(run);
+        equal(closed, 1); equal(mappedOpened, mode === "absent" ? 0 : 1);
+        equal(mappedClosed, mode === "absent" || mode === "missing" ? 0 : 1);
+        equal(mappedRechecked, mode === "valid" || mode === "recheck" ? 1 : 0);
+        equal(applications, 0, "mapping binding probe never constructs application credential capability");
+      }
     } finally {
       dbModule.openSquareGcpCallbackDatabase = saved.open;identities.createSquareGcpCallbackIdentity = saved.identity;
+      mappedDbModule.openSquareGcpMappedDatabase = saved.mappedOpen;
       credentials.readSquareGcpCallbackDatabaseSecret = saved.secret;credentials.createSquareGcpCallbackCredentials = saved.credentials;
     }
     // Direct DB construction also cannot replace its explicit root from this

@@ -11,9 +11,13 @@ export const PORTAL_PATH = "/app/settings/integrations/square";
 export const CALLBACK_PATH = "/api/integrations/square/callback";
 const CSRF_COOKIE = "__Host-vaeroex-square-csrf";
 const origin = SQUARE_REMOTE_SANDBOX.applicationOrigin;
-const actions = new Set(["login", "logout", "connect", "reauthorize", "disconnect"]);
+const actions = new Set(["login", "logout", "connect", "reauthorize", "disconnect", "map"]);
 const tokenPattern = /^[A-Za-z0-9_-]{43}$/;
 const idPattern = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
+const locationPattern = /^[A-Za-z0-9._:-]{1,32}$/;
+function escapeHtml(value: string) {
+  return value.replace(/[&<>"']/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character]!);
+}
 
 // Ordinary form navigation under no-referrer sends Origin:null in Chromium.
 // A fixed hash-pinned fetch preserves the real Origin and sends no Referer.
@@ -86,6 +90,9 @@ async function fields(request: Request) {
 export type SquarePortalScope = Readonly<{
   binding: SquareGcpCallbackBinding; auth: SquarePortalAuth;
   service: Pick<SquareConnectionService, "initiate" | "complete" | "snapshot" | "disconnect">;
+  // Installed only by the separately checked Sandbox mapping composition.
+  // This callback confirms mapping, not enrollment or provider access.
+  mapping?: Readonly<{ enabled: true; confirmMapping: SquareConnectionService["confirmMapping"] }>;
   close(): Promise<void>;
 }>;
 
@@ -117,6 +124,7 @@ export function createSquareSandboxPortal(input: Readonly<{
         const view = await scope.service.snapshot(actor);
         if (!view.canManage) return portalUnavailable();
         let content = "<h2>Consent only</h2><p>Successful consent stops at authorized_unmapped. Location mapping, enrollment, refresh, webhooks, ingestion and economic contributions remain unavailable.</p>";
+        if (scope.mapping?.enabled === true) content = "<h2>Sandbox location mapping</h2><p>Confirm one verified location for this business entity. Mapping does not start enrollment, ingestion or economic contributions.</p>";
         if (scope.binding.providerCallsEnabled) content += form("connect", csrf, "<button>Connect a Sandbox seller</button>");
         for (const connection of view.connections.filter(item => item.businessEntityId === scope!.binding.businessEntityId)) {
           if (!idPattern.test(connection.connectionId)) throw new Error("denied");
@@ -127,6 +135,13 @@ export function createSquareSandboxPortal(input: Readonly<{
             disconnecting: "Disconnect in progress", authorized: "Existing authorization — enrollment is unavailable here" } as const)[connection.state];
           if (!label) throw new Error("denied");
           content += `<article><p>${label}</p>${scope.binding.providerCallsEnabled ? form("reauthorize", csrf, `<input type="hidden" name="connectionId" value="${connection.connectionId}"><button>Reauthorize this connection</button>`) : ""}${form("disconnect", csrf, `<input type="hidden" name="connectionId" value="${connection.connectionId}"><input type="hidden" name="confirmation" value="disconnect"><button>Disconnect this connection locally</button>`)}</article>`;
+          if (scope.mapping?.enabled === true && connection.state === "mapping_required" && !connection.revocationPending) {
+            if (new Set(connection.locations.map(location => location.id)).size !== connection.locations.length) throw new Error("denied");
+            for (const location of connection.locations) {
+              if (!locationPattern.test(location.id)) throw new Error("denied");
+              content += form("map", csrf, `<p>Seller: ${escapeHtml(connection.sellerLabel ?? "Verified Sandbox seller")}</p><p>Location: ${escapeHtml(location.label)}</p><input type="hidden" name="connectionId" value="${connection.connectionId}"><input type="hidden" name="locationId" value="${location.id}"><input type="hidden" name="confirmation" value="map"><button>Confirm location mapping</button>`);
+            }
+          }
         }
         return page(content + form("logout", csrf, "<button>Sign out of this Sandbox session</button>"), headers);
       }
@@ -148,7 +163,7 @@ export function createSquareSandboxPortal(input: Readonly<{
       const data = await fields(request), csrf = data.get("csrf") ?? "", expected = jar.get(CSRF_COOKIE) ?? "";
       if (!tokenPattern.test(csrf) || !tokenPattern.test(expected) || !timingSafeEqual(Buffer.from(csrf), Buffer.from(expected))) return portalUnavailable(403);
       const keys = action === "login" ? ["csrf", "email", "password"] : action === "reauthorize" ? ["csrf", "connectionId"]
-        : action === "disconnect" ? ["csrf", "connectionId", "confirmation"] : ["csrf"];
+        : action === "disconnect" ? ["csrf", "connectionId", "confirmation"] : action === "map" ? ["csrf", "connectionId", "locationId", "confirmation"] : ["csrf"];
       if ([...data.keys()].some(key => !keys.includes(key)) || keys.some(key => !data.has(key))) return portalUnavailable(400);
       scope = await input.open(request.signal);
       const headers = portalHeaders();
@@ -166,6 +181,21 @@ export function createSquareSandboxPortal(input: Readonly<{
       }
       const connectionId = data.get("connectionId");
       if (connectionId !== null && !idPattern.test(connectionId)) return portalUnavailable(400);
+      if (action === "map") {
+        if (scope.mapping?.enabled !== true) return portalUnavailable();
+        const locationId = data.get("locationId")!;
+        if (data.get("confirmation") !== "map" || !locationPattern.test(locationId)) return portalUnavailable(400);
+        // Re-read authority and discovery on this invocation; never trust a
+        // hidden form field, earlier GET or browser-provided entity selector.
+        const view = await scope.service.snapshot(actor);
+        const matches = view.connections.filter(connection => connection.connectionId === connectionId && connection.businessEntityId === scope!.binding.businessEntityId);
+        const connection = matches[0];
+        if (!view.canManage || matches.length !== 1 || connection.state !== "mapping_required" || connection.revocationPending ||
+          new Set(connection.locations.map(location => location.id)).size !== connection.locations.length ||
+          !connection.locations.some(location => location.id === locationId)) return portalUnavailable(403);
+        await scope.mapping.confirmMapping(actor, { connectionId: connectionId!, businessEntityId: scope.binding.businessEntityId, locationIds: [locationId], confirmation: "map" });
+        return navigate();
+      }
       if (action === "disconnect") {
         if (data.get("confirmation") !== "disconnect") return portalUnavailable(400);
         await scope.service.disconnect(actor, { connectionId: connectionId!, confirmation: "disconnect" }, request.signal);

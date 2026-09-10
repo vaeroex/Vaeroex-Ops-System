@@ -243,7 +243,8 @@ function assertTargetIsSinglePendingMigration() {
     "20260907225626_square_remote_sandbox_binding.sql",
     "20260908014713_square_broker_runtime_credential_authority.sql",
     "20260908042529_square_gcp_callback_authority.sql",
-    "20260910193429_square_gcp_callback_oregon_recovery.sql"
+  "20260910193429_square_gcp_callback_oregon_recovery.sql",
+  "20260910231437_square_gcp_mapped_runtime.sql"
   ];
   const laterMigrations = migrations.slice(targetIndex + 1);
   if (laterMigrations.length !== dormantSquareTail.length ||

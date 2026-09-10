@@ -133,6 +133,7 @@ jobs:
       - name: Verify isolated native Square callback credentials, portal and guest controls
         run: |
           pnpm test:external-integrations-square-gcp-credentials
+          pnpm test:external-integrations-square-mapped
           pnpm test:external-integrations-square-consent-diagnostics
           pnpm test:external-integrations-square-gcp-portal --browser
           pnpm test:external-integrations-square-gcp-ops
@@ -563,6 +564,9 @@ jobs:
 
       - name: Qualify native GCP callback first-consent authority in disposable databases only
         run: node scripts/run-square-gcp-callback-database-qualification.js --supabase-local
+
+      - name: Qualify mapped Square native role and recovery boundaries in disposable databases only
+        run: node scripts/run-square-gcp-mapped-database-qualification.js --supabase-local
 
       - name: Remove isolated database state
         if: always()

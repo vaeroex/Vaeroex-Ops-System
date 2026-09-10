@@ -374,8 +374,8 @@ matches(
   /run\(cli, \["migration", "up", "--local"\]\)/,
   "the fixture-rich runner must apply the ordered zero-based and retry-identity migrations"
 );
-matches(zeroBasedUpgradeRunner, /const dormantSquareTail = \[\s*"20260907042202_square_dormant_trusted_authority\.sql",\s*"20260907042352_square_dormant_atomic_pages\.sql",\s*"20260907174326_square_dormant_account_connection\.sql",\s*"20260907225626_square_remote_sandbox_binding\.sql",\s*"20260908014713_square_broker_runtime_credential_authority\.sql",\s*"20260908042529_square_gcp_callback_authority\.sql",\s*"20260910193429_square_gcp_callback_oregon_recovery\.sql"\s*\]/,
-  "fixture-rich QBO upgrade allows exactly the seven dormant Square migrations");
+matches(zeroBasedUpgradeRunner, /const dormantSquareTail = \[\s*"20260907042202_square_dormant_trusted_authority\.sql",\s*"20260907042352_square_dormant_atomic_pages\.sql",\s*"20260907174326_square_dormant_account_connection\.sql",\s*"20260907225626_square_remote_sandbox_binding\.sql",\s*"20260908014713_square_broker_runtime_credential_authority\.sql",\s*"20260908042529_square_gcp_callback_authority\.sql",\s*"20260910193429_square_gcp_callback_oregon_recovery\.sql",\s*"20260910231437_square_gcp_mapped_runtime\.sql"\s*\]/,
+  "fixture-rich QBO upgrade allows exactly the eight dormant Square migrations");
 // Execute only the pure manifest guard, with no database/CLI capability. This
 // catches an omitted additive tail before the real database gate runs in CI.
 const fixtureGuardSource = zeroBasedUpgradeRunner.slice(0, zeroBasedUpgradeRunner.indexOf("async function applyFixture"));
@@ -398,6 +398,7 @@ for (const manifest of [currentMigrations.filter(name => name !== "2026090717432
   currentMigrations.filter(name => name !== "20260908014713_square_broker_runtime_credential_authority.sql"),
   currentMigrations.filter(name => name !== "20260908042529_square_gcp_callback_authority.sql"),
   currentMigrations.filter(name => name !== "20260910193429_square_gcp_callback_oregon_recovery.sql"),
+  currentMigrations.filter(name => name !== "20260910231437_square_gcp_mapped_runtime.sql"),
   [...currentMigrations, "20990101000000_square_activation.sql"]]) {
   assertionCount++; assert.throws(() => acceptsFixtureManifest(manifest), /fixture_manifest_denied/, "missing or unreviewed tail still rejects");
 }
@@ -484,6 +485,7 @@ const approvedProtectedPaths = new Set([
   "supabase/migrations/20260826222000_qbo_provider_result_evidence_and_ar_aging_recovery.sql",
   "supabase/migrations/20260827033058_qbo_production_convergence.sql",
   "supabase/migrations/20260902191322_qbo_production_dormant_connection_gate.sql",
+  "supabase/migrations/20260910231437_square_gcp_mapped_runtime.sql",
   "supabase/tests/external_integrations_phase_8b_qbo_sandbox_validation.test.sql",
   "supabase/tests/external_integrations_phase_8b_credential_refresh_recovery.test.sql",
   "supabase/tests/external_integrations_phase_8b_same_generation_reauthorization.test.sql",

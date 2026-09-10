@@ -58,6 +58,7 @@ function privacy(response) {
   for(const value of response.headers.values())ok(!value.includes(canary));
 }
 async function local() {
+  await mappingTests();
   await startupTrustTests();
   assertions += await require("./square-gcp-callback-ca-test-support.js").qualifyCallbackDatabaseCa();
   const config=JSON.parse(fs.readFileSync(path.join(root,"services/square-sandbox-callback/config.example.json"),"utf8"));
@@ -119,6 +120,56 @@ async function local() {
   const detecting=value=>String(value).includes(canary);
   equal(detecting("deliberately unsafe synthetic log: "+canary),true,"positive control proves privacy detector works");
   equal(detecting(await response.text()),false);
+}
+async function mappingTests() {
+  const make = (options = {}) => {
+    let calls = 0, opens = 0, closes = 0;
+    const connection = { connectionId: uuid(5), businessEntityId: uuid(3), state: "mapping_required",
+      sellerLabel: '<img src=x onerror="bad">', locations: [{ id: "L_TEST", label: "<script>bad</script>&\"'" }],
+      mappedLocationIds: [], retentionApproved: true, revocationPending: false, ...options.connection };
+    const handler = createSquareSandboxPortal({ async open() { opens++; return {
+      binding, auth: { async authenticate(token) { return options.signedOut || token !== jwt ? null : actor; } },
+      service: { async snapshot(value) { equal(value, actor); return { canManage: options.canManage !== false,
+        businessEntities: [], connections: options.duplicateConnection ? [connection, connection] : [connection] }; } },
+      ...(options.disabled ? {} : { mapping: { enabled: true, async confirmMapping(value, input) {
+        equal(value, actor); equal(input, { connectionId: uuid(5), businessEntityId: uuid(3), locationIds: ["L_TEST"], confirmation: "map" }); calls++;
+      } } }), async close() { closes++; }
+    }; } });
+    return { handler, counts: () => ({ calls, opens, closes }) };
+  };
+  const command = { connectionId: uuid(5), locationId: "L_TEST", confirmation: "map" };
+  const good = make();
+  let response = await good.handler(request(PORTAL_PATH)), html = await response.text();
+  equal(response.status, 200); privacy(response);
+  ok(html.includes("/actions/map")); ok(html.includes("&lt;img src=x onerror=&quot;bad&quot;&gt;"));
+  ok(html.includes("&lt;script&gt;bad&lt;/script&gt;&amp;&quot;&#39;"));
+  ok(!html.includes('<img src=x')); ok(!html.includes('<script>bad'));
+  response = await good.handler(post("map", command)); equal(response.status, 200); privacy(response);
+  equal(await response.json(), { navigate: PORTAL_PATH }); equal(good.counts().calls, 1);
+  equal(good.counts().opens, good.counts().closes);
+  for (const options of [{ disabled: true }, { signedOut: true }, { canManage: false },
+    { connection: { businessEntityId: uuid(99) } }, { duplicateConnection: true },
+    { connection: { state: "authorized" } }, { connection: { state: "revoked" } },
+    { connection: { revocationPending: true } }, { connection: { locations: [] } },
+    { connection: { locations: [{ id: "L_TEST", label: "A" }, { id: "L_TEST", label: "B" }] } }]) {
+    const f = make(options); response = await f.handler(post("map", command)); ok(response.status >= 400);
+    equal(f.counts().calls, 0); equal(f.counts().opens, f.counts().closes);
+  }
+  for (const input of [{ ...command, locationId: "FOREIGN" }, { ...command, locationId: "x".repeat(33) },
+    { ...command, locationId: '<"bad>' }, { ...command, connectionId: uuid(99) },
+    { ...command, businessEntityId: uuid(99) }, { ...command, confirmation: "enroll" },
+    { ...command, mappingEnabled: "true" }]) {
+    const f = make(); response = await f.handler(post("map", input)); ok(response.status >= 400); equal(f.counts().calls, 0);
+  }
+  for (const options of [{ cookie: "" }, { headers: { origin: "https://foreign.invalid" } },
+    { headers: { "sec-fetch-site": "cross-site" } },
+    { body: new URLSearchParams({ ...command, csrf: "x".repeat(43) }) },
+    { body: new URLSearchParams([["csrf", csrf], ...Object.entries(command), ["locationId", "FOREIGN"]]) }]) {
+    const f = make(); response = await f.handler(post("map", command, options)); ok(response.status >= 400);
+    equal(f.counts().calls, 0); equal(f.counts().opens, 0, "mapping CSRF/ambiguous fields reject before IO");
+  }
+  const absent = make({ disabled: true }); response = await absent.handler(request(PORTAL_PATH));
+  html = await response.text(); ok(html.includes("Consent only")); ok(!html.includes("/actions/map"));
 }
 async function startupTrustTests() {
   // Exercise the actual command before its first filesystem read. No real
