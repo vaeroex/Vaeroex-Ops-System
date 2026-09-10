@@ -17,7 +17,7 @@ const BindingSchema = z.object({
   applicationOrigin: z.literal(SQUARE_REMOTE_SANDBOX.applicationOrigin),
   environment: z.literal("sandbox"), applicationId: z.literal(SQUARE_REMOTE_SANDBOX.applicationId),
   apiVersion: z.literal(SQUARE_REMOTE_SANDBOX.apiVersion),
-  gcpProjectId: z.literal(SQUARE_GCP_CALLBACK_PROJECT_ID), gcpProjectNumber: decimal, gcpZone: z.literal("us-west1-a"),
+  gcpProjectId: z.literal(SQUARE_GCP_CALLBACK_PROJECT_ID), gcpProjectNumber: decimal, gcpZone: z.enum(["us-west1-a", "us-west1-b", "us-west1-c"]),
   gcpInstanceId: decimal, gcpInstanceName: z.literal(SQUARE_GCP_CALLBACK_INSTANCE_NAME),
   serviceAccountEmail: z.string().max(254).regex(/^[a-z][a-z0-9-]{4,28}[a-z0-9]@[a-z][a-z0-9-]{4,28}[a-z0-9]\.iam\.gserviceaccount\.com$/),
   serviceAccountSubject: decimal, identityAudience: z.literal(SQUARE_GCP_CALLBACK_IDENTITY_AUDIENCE),

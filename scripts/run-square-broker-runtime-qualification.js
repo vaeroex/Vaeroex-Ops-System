@@ -55,7 +55,7 @@ async function qualify(runtime) {
   const { contractSha256 } = require(path.join(root, "lib/integrations/contracts/canonical.ts"));
   const files = runtime.migrationFiles(), baseline = files.filter(name => name < migrationName);
   equal(baseline.length, 105, "complete canonical remote-binding baseline");
-  equal(files.filter(name => name >= migrationName), [migrationName, "20260908042529_square_gcp_callback_authority.sql"], "exact reviewed corrective and GCP callback tail");
+  equal(files.filter(name => name >= migrationName), [migrationName, "20260908042529_square_gcp_callback_authority.sql", "20260910193429_square_gcp_callback_oregon_recovery.sql"], "exact reviewed corrective and GCP callback tail");
   const database = await runtime.createDatabase("broker_runtime");
   const owner = database.client;
   await runtime.applyMigrations(owner, baseline);
@@ -165,7 +165,7 @@ async function qualify(runtime) {
   equal(corrected.proowner,originalFunction.proowner,"account function owner remains unchanged");
   equal(corrected.body.replace("private.lock_square_broker_credential_authority_v1(p_context,","private.lock_square_ingestion_authority_v1("),originalFunction.body,"the read authority call is the sole account-body change");
   const preGcp = await runtime.sourceSchemaFingerprint(owner), squarePreGcp = await existing();
-  await runtime.applyMigrations(owner,["20260908042529_square_gcp_callback_authority.sql"]);
+  await runtime.applyMigrations(owner,["20260908042529_square_gcp_callback_authority.sql", "20260910193429_square_gcp_callback_oregon_recovery.sql"]);
   equal(await runtime.sourceSchemaFingerprint(owner),preGcp,"GCP callback extension preserves QBO/source schema and ACLs");
   equal((await existing()).filter(row=>!row.proname.includes("gcp_callback")),squarePreGcp,"GCP extension preserves all existing Square functions/owners/ACLs");
   stage="corrected_read_and_negative_boundaries";

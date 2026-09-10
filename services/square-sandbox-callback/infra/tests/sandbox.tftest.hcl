@@ -89,9 +89,27 @@ run "foreign_region_denied" {
   expect_failures = [var.zone]
 }
 
-run "unsupported_oregon_zone_denied" {
+run "oregon_recovery_b" {
   command = plan
   variables { zone = "us-west1-b" }
+  assert {
+    condition     = google_compute_instance.callback.zone == "us-west1-b" && google_compute_firewall.https.disabled
+    error_message = "Recovery zone must be explicit and ingress must remain closed."
+  }
+}
+
+run "oregon_recovery_c" {
+  command = plan
+  variables { zone = "us-west1-c" }
+  assert {
+    condition     = google_compute_instance.callback.zone == "us-west1-c" && google_compute_firewall.https.disabled
+    error_message = "Recovery zone must be explicit and ingress must remain closed."
+  }
+}
+
+run "unknown_oregon_zone_denied" {
+  command = plan
+  variables { zone = "us-west1-z" }
   expect_failures = [var.zone]
 }
 
