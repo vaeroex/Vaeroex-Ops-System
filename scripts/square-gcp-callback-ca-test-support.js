@@ -260,8 +260,8 @@ const ids=require(${JSON.stringify(path.join(__dirname, "../lib/integrations/con
 const secrets=require(${JSON.stringify(path.join(__dirname, "../lib/integrations/control-plane/square-gcp-callback-credentials.ts"))});
 const db=require(${JSON.stringify(path.join(__dirname, "../lib/integrations/control-plane/square-gcp-callback-database.ts"))});
 const pg=require('pg'),config=${JSON.stringify(config)},ca=Buffer.from(${JSON.stringify(fixture.ca)}),artifact=Buffer.from('PUBLIC DETACHED CLOSE ARTIFACT');
-const peer=net.createServer({allowHalfOpen:true},socket=>{socket.on('error',()=>{});socket.on('end',()=>{});});
-await new Promise(resolve=>peer.listen(0,'127.0.0.1',resolve));
+const peer=net.createServer({allowHalfOpen:true},socket=>{socket.unref();socket.on('error',()=>{});socket.on('end',()=>{});});
+await new Promise(resolve=>peer.listen(0,'127.0.0.1',resolve));peer.unref();
 pg.Client=class extends EventEmitter {
  async connect(){this.socket=net.createConnection({host:'127.0.0.1',port:peer.address().port});await new Promise((resolve,reject)=>{this.socket.once('connect',resolve);this.socket.once('error',reject);});}
  async query(sql){if(sql!=='select public.get_square_gcp_callback_binding_v1()::text as value')throw new Error('unexpected_synthetic_query');return {rows:[{value:JSON.stringify(config.binding)}]};}
