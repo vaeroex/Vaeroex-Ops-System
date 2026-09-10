@@ -11,10 +11,14 @@ import { createSquarePortalAuth } from "./auth";
 import { CALLBACK_PATH, createSquareSandboxPortal, type SquarePortalScope } from "./portal";
 import { reportSquareConsentProgress, type SquareConsentObserver } from "@/lib/integrations/providers/square/account-connection-progress";
 import { createSquareConsentDiagnostics } from "./consent-diagnostics";
+import { checkedSquareGcpMappedBinding, squareGcpMappedHost, type SquareGcpMappedBinding } from "@/lib/integrations/control-plane/square-gcp-mapped-contracts";
+import { openSquareGcpMappedDatabase } from "@/lib/integrations/control-plane/square-gcp-mapped-database";
+import { createSquareAccountMapping } from "@/lib/integrations/providers/square/account-mapping";
 
 function denied(): never { throw new Error("square_portal_runtime_denied"); }
 type NativePortalInput = Readonly<{
   binding: SquareGcpCallbackBinding; publishableKey: string; databaseCa: string; network: typeof fetch;
+  mappedBinding?: SquareGcpMappedBinding;
 }>;
 
 /** Explicit operator binding probe only. No portal listener, user session,
@@ -22,14 +26,22 @@ type NativePortalInput = Readonly<{
 export async function checkNativeSquareSandboxPortalBinding(input: NativePortalInput, signal: AbortSignal) {
   const databaseCa = checkedSquareGcpCallbackDatabaseCa(input.databaseCa);
   const binding = checkedSquareGcpCallbackBinding(input.binding), expected = canonicalContractJson(binding);
+  const mapped = input.mappedBinding ? checkedSquareGcpMappedBinding(input.mappedBinding) : undefined;
+  if (mapped && (mapped.capability !== "broker" || canonicalContractJson(squareGcpMappedHost(mapped)) !== expected)) denied();
   if (signal.aborted) denied();
   const identity = createSquareGcpCallbackIdentity({ binding, network: input.network, signal });
   let database: Awaited<ReturnType<typeof openSquareGcpCallbackDatabase>> | undefined;
+  let mappedDatabase: Awaited<ReturnType<typeof openSquareGcpMappedDatabase>> | undefined;
   let dsn = "";
   try {
     const bootstrap = createSquareGcpCallbackIdentity({ binding, network: input.network, signal });
     dsn = await readSquareGcpCallbackDatabaseSecret({ binding, identity: bootstrap, network: input.network, signal });
     database = await openSquareGcpCallbackDatabase(dsn, databaseCa, signal);
+    if (mapped) {
+      mappedDatabase = await openSquareGcpMappedDatabase("broker", dsn, databaseCa, signal);
+      if (canonicalContractJson(mappedDatabase.binding) !== canonicalContractJson(mapped)) denied();
+      await mappedDatabase.recheckBinding();
+    }
     dsn = "";
     if (signal.aborted || canonicalContractJson(database.binding) !== expected) denied();
     await identity.verify();
@@ -38,7 +50,7 @@ export async function checkNativeSquareSandboxPortalBinding(input: NativePortalI
     if (signal.aborted || canonicalContractJson(current) !== expected) denied();
     return Object.freeze({ checked: true as const });
   } catch { return denied(); }
-  finally { dsn = "";identity.dispose();await database?.close(); }
+  finally { dsn = "";identity.dispose();await database?.close();await mappedDatabase?.close(); }
 }
 
 /** Native composition, never imported by Next/Vercel and never installed in the
@@ -50,6 +62,8 @@ export function createNativeSquareSandboxPortal(input: NativePortalInput,
   const databaseCa = checkedSquareGcpCallbackDatabaseCa(input.databaseCa);
   const binding = checkedSquareGcpCallbackBinding(input.binding);
   const expected = canonicalContractJson(binding);
+  const mapped = input.mappedBinding ? checkedSquareGcpMappedBinding(input.mappedBinding) : undefined;
+  if (mapped && (mapped.capability !== "broker" || canonicalContractJson(squareGcpMappedHost(mapped)) !== expected)) denied();
   let opened = 0, initiations = 0;
   return createSquareSandboxPortal({
     async open(signal): Promise<SquarePortalScope> {
@@ -60,6 +74,7 @@ export function createNativeSquareSandboxPortal(input: NativePortalInput,
       const bootstrap = createSquareGcpCallbackIdentity({ binding, network: input.network, signal });
       let dsn = await readSquareGcpCallbackDatabaseSecret({ binding, identity: bootstrap, network: input.network, signal });
       let database: Awaited<ReturnType<typeof openSquareGcpCallbackDatabase>> | undefined;
+      let mappedDatabase: Awaited<ReturnType<typeof openSquareGcpMappedDatabase>> | undefined;
       const identity = createSquareGcpCallbackIdentity({ binding, network: input.network, signal });
       let credentials: ReturnType<typeof createSquareGcpCallbackCredentials> | undefined;
       let attempt: ReturnType<typeof diagnostics.begin> | undefined;
@@ -68,12 +83,16 @@ export function createNativeSquareSandboxPortal(input: NativePortalInput,
       const close = async () => {
         if (closed) return;
         closed = true; signal.removeEventListener("abort", abort);
-        credentials?.dispose(); identity.dispose(); await database?.close();
+        credentials?.dispose(); identity.dispose(); await database?.close(); await mappedDatabase?.close();
       };
       const abort = () => { void close(); };
       signal.addEventListener("abort", abort, { once: true });
       try {
         database = await openSquareGcpCallbackDatabase(dsn, databaseCa, signal);
+        if (mapped) {
+          mappedDatabase = await openSquareGcpMappedDatabase("broker", dsn, databaseCa, signal);
+          if (canonicalContractJson(mappedDatabase.binding) !== canonicalContractJson(mapped)) denied();
+        }
         dsn = "";
         if (closed || signal.aborted || canonicalContractJson(database.binding) !== expected) denied();
         await identity.verify();
@@ -113,6 +132,20 @@ export function createNativeSquareSandboxPortal(input: NativePortalInput,
           }
         });
         return Object.freeze({ binding: db.binding,
+          ...(mapped && mappedDatabase ? { mapping: Object.freeze({ enabled: true as const,
+            approvedConnectionId: mapped.connectionId, approvedLocationId: mapped.defaultLocationId,
+            confirmMapping: async (actor: Parameters<ReturnType<typeof createSquareAccountConnectionService>["confirmMapping"]>[0], command: Parameters<ReturnType<typeof createSquareAccountConnectionService>["confirmMapping"]>[1]) => {
+              if (closed || signal.aborted || actor.actorId !== mapped.operatorId || actor.sessionId !== mapped.operatorSessionId ||
+                actor.workspaceId !== mapped.workspaceId || actor.role !== mapped.operatorRole || command.connectionId !== mapped.connectionId ||
+                command.businessEntityId !== mapped.businessEntityId || command.locationIds.length !== 1 || command.locationIds[0] !== mapped.defaultLocationId) denied();
+              await identity.verify();
+              await mappedDatabase!.recheckBinding();
+              const result = await createSquareAccountMapping({ client: mappedDatabase!.client,
+                context: { actor, environment: "sandbox", applicationId: mapped.applicationId, redirectUri: mapped.applicationOrigin + CALLBACK_PATH }
+              }).confirm(command) as { confirmed?: unknown; generation?: unknown };
+              if (closed || signal.aborted || result.confirmed !== true || result.generation !== mapped.connectionGeneration) denied();
+            }
+          }) } : {}),
           auth: createSquarePortalAuth({ binding: db.binding, publishableKey: input.publishableKey, network: input.network, signal }),
           service: Object.freeze({
             snapshot: service.snapshot, disconnect: service.disconnect,
