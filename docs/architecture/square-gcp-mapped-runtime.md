@@ -91,6 +91,7 @@ existing broker's `available` result before consuming its credential. Focused re
 Local results: 100 mapped-database assertions, 234 existing broker/runtime assertions, 27 native
 adapter assertions, 438 credential assertions, 277 integrated page assertions and 869 portal/CLI
 assertions. Architecture checks, typecheck, application build and standalone release packaging passed.
+The legacy dormant-scope allowlist includes only this exact new migration; neighboring paths remain denied.
 CI remains the authoritative exact-commit gate; no hosted result is inferred from these counts.
 
 The approved $20/month total budget remains in force, not a hard spending cap. This code provisions no
