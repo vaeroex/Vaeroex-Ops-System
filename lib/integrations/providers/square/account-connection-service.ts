@@ -19,6 +19,7 @@ import type { CredentialKms } from "@/lib/integrations/credentials/kms";
 import { oauthStateHash } from "@/lib/integrations/credentials/oauth-state";
 import type { ExternalIntegrationsRpcClient } from "@/lib/integrations/persistence/repository";
 import { createSquareAccountDiscovery } from "@/lib/integrations/providers/square/account-discovery";
+import { reportSquareConsentProgress, type SquareConsentObserver } from "./account-connection-progress";
 import { createSquareAccountMapping } from "@/lib/integrations/providers/square/account-mapping";
 import {
   createSquareAccountBrokerStore,
@@ -136,19 +137,21 @@ export function createSquareAccountConnectionService(input: Readonly<{
   kmsKeyResource: string;
   transport: SquareOAuthTransport;
   clock?: () => Date;
+  observeConsent?: SquareConsentObserver;
 }>): SquareAccountConnectionService {
   const { client, enrollmentClient, webhookClient, environment, applicationId, redirectUri,
     secrets, kms, kmsKeyResource, transport } = input;
   const clock = input.clock ?? (() => new Date());
+  const observeConsent = environment === "sandbox" ? input.observeConsent : undefined;
   let policy: ReturnType<typeof createSquareOAuthPolicy>;
   try { policy = createSquareOAuthPolicy({ environment, applicationId, redirectUri, returnPath: RETURN_PATH }); }
   catch { return denied(); }
   const contextFor = (actor: SquareConnectionActor): SquareAccountContext =>
     checked(SquareAccountContextSchema, { actor, environment, applicationId, redirectUri });
   const brokerFor = (store: CredentialBrokerStore, signal?: AbortSignal,
-    verifier?: ReturnType<typeof createSquareAccountDiscovery>) => new IntegrationCredentialBroker({
+    verifier?: ReturnType<typeof createSquareAccountDiscovery>, observer?: SquareConsentObserver) => new IntegrationCredentialBroker({
     store, kms, kmsKeyResource, secrets, clock, providerOAuthPolicy: policy,
-    provider: createSquareOAuthCredentialProvider({ policy, applicationId, transport, signal }),
+    provider: createSquareOAuthCredentialProvider({ policy, applicationId, transport, signal, observeConsent: observer }),
     ...(verifier ? { authorizedEntityVerifier: verifier } : {})
   });
 
@@ -177,6 +180,7 @@ export function createSquareAccountConnectionService(input: Readonly<{
 
     async complete(actor, value, signal) {
       try {
+        reportSquareConsentProgress(observeConsent, "callback_authority_checks");
         checkSignal(signal);
         const context = contextFor(actor), callback = checked(CallbackSchema, value, INPUT_LIMITS);
         const stateHash = oauthStateHash(callback.state);
@@ -192,25 +196,30 @@ export function createSquareAccountConnectionService(input: Readonly<{
           checked(DeniedStateSchema, await squareAccountRpc(client, context, "deny_state", { stateHash }));
           return;
         }
-        const discovery = createSquareAccountDiscovery({ environment, applicationId, clock, signal,
+        const discovery = createSquareAccountDiscovery({ environment, applicationId, clock, signal, observeConsent,
           readAuthenticated: request => readSquareAuthenticatedDiscovery({ ...request, transport }) });
         const baseStore = createSquareAccountBrokerStore({ client, context,
           consumeVerifiedDiscovery: () => discovery.consumeVerifiedDiscovery() });
         let consumedHere = false;
         const store: CredentialBrokerStore = Object.freeze({ ...baseStore,
           async consumeOAuthState(consume, requestId) {
+            reportSquareConsentProgress(observeConsent, "state_consume");
             checkSignal(signal);
             const result = checked(OAuthStateConsumeResultSchema, await baseStore.consumeOAuthState(consume, requestId));
             consumedHere = result.accepted;
+            if (consumedHere) reportSquareConsentProgress(observeConsent, "state_consumed");
             return result;
           },
           async storeCredential(credential, requestId) {
+            reportSquareConsentProgress(observeConsent, "fenced_store_requested");
             checkSignal(signal);
-            return baseStore.storeCredential(credential, requestId);
+            const result = await baseStore.storeCredential(credential, requestId);
+            reportSquareConsentProgress(observeConsent, "fenced_store_returned");
+            return result;
           }
         });
         try {
-          await brokerFor(store, signal, discovery).completeAuthorization({
+          await brokerFor(store, signal, discovery, observeConsent).completeAuthorization({
             state: callback.state, authorizationCode: callback.code,
             workspaceId: command.workspaceId, businessEntityId: command.businessEntityId,
             connectionId: command.connectionId, connectionGeneration: command.connectionGeneration,

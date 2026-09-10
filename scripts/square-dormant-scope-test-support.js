@@ -33,6 +33,7 @@ const approvedSquareQualificationPaths = Object.freeze([
   "services/square-sandbox-callback/ops/vaeroex-square-certbot.timer",
   "services/square-sandbox-callback/src/auth.ts",
   "services/square-sandbox-callback/src/config.ts",
+  "services/square-sandbox-callback/src/consent-diagnostics.ts",
   "services/square-sandbox-callback/src/entry.ts",
   "services/square-sandbox-callback/src/portal.ts",
   "services/square-sandbox-callback/src/runtime.ts",

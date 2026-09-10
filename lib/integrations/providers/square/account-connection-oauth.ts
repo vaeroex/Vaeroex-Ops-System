@@ -21,6 +21,7 @@ import { ProviderCredentialRefreshFailure } from "@/lib/integrations/credentials
 import type { ProviderApplicationSecret } from "@/lib/integrations/credentials/secret-manager";
 import { SquareAccountEnvironmentSchema } from "@/lib/integrations/providers/square/account-connection-contracts";
 import { SQUARE_ENVIRONMENTS, SQUARE_MINIMUM_READ_SCOPES } from "@/lib/integrations/providers/square/contracts";
+import { reportSquareConsentProgress, type SquareConsentObserver } from "./account-connection-progress";
 
 /** API 2026-08-19; square-nodejs-sdk 45.1.0, e4a5bf7e1a2b97c2b995fde28c55ddbc35dc0e76.
  * Confidential code flow, not PKCE: short-lived access, multi-use non-expiring refresh.
@@ -202,6 +203,7 @@ async function post(input: Readonly<{
     "/v2/merchants/me" | "/v2/locations" | "/v2/locations/main";
   headers?: Readonly<Record<string, string>>; body: Record<string, unknown> | null;
   transport: SquareOAuthTransport; signal?: AbortSignal; timeoutMs?: number;
+  observeConsent?: SquareConsentObserver;
 }>): Promise<Record<string, unknown>> {
   const timeoutMs = input.timeoutMs ?? SQUARE_OAUTH_TIMEOUT_MS;
   if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > SQUARE_OAUTH_TIMEOUT_MS) fail();
@@ -246,6 +248,8 @@ async function post(input: Readonly<{
     if (!Number.isInteger(response.status) || response.status < 100 || response.status > 599) fail();
     if (response.status >= 300 && response.status < 400) fail();
     if (response.status === 429 || response.status >= 500) fail("provider_transient");
+    if (input.path === "/oauth2/token") reportSquareConsentProgress(input.observeConsent, "token_response_body");
+    if (input.path === "/oauth2/token/status") reportSquareConsentProgress(input.observeConsent, "token_status_response_body");
     const iterator = response.body[Symbol.asyncIterator]();
     let length = 0, reads = 0;
     while (true) {
@@ -323,22 +327,31 @@ function checkedSecret(secret: ProviderApplicationSecret, environment: "sandbox"
 export function createSquareOAuthCredentialProvider(input: Readonly<{
   policy: ProviderOAuthPolicy; applicationId: string; transport: SquareOAuthTransport;
   signal?: AbortSignal; timeoutMs?: number;
+  observeConsent?: SquareConsentObserver;
 }>): OAuthCredentialProvider {
   const applicationId = ApplicationIdSchema.parse(input.applicationId);
   const policy = checkedPolicy(input.policy, applicationId);
   const environment = SquareAccountEnvironmentSchema.parse(policy.providerEnvironment);
   const { transport, signal, timeoutMs } = input;
+  const observeConsent = environment === "sandbox" ? input.observeConsent : undefined;
   const obtain = async (request: Record<string, unknown>, now: Date, prior?: CredentialEnvelope, reporter?: CredentialRefreshBoundaryReporter) => {
     const report = async (stage: "provider_token_request" | "provider_response_parse", outcome: "started" | "succeeded") => {
       try { await reporter?.({ stage, outcome, reasonCode: outcome }); } catch { /* Telemetry never grants or denies credentials. */ }
     };
     await report("provider_token_request", "started");
-    const raw = await post({ environment, path: "/oauth2/token", body: request, transport, signal, timeoutMs });
+    reportSquareConsentProgress(observeConsent, "token_request");
+    const raw = await post({ environment, path: "/oauth2/token", body: request, transport, signal, timeoutMs, observeConsent });
     await report("provider_token_request", "succeeded");
     await report("provider_response_parse", "started");
+    reportSquareConsentProgress(observeConsent, "token_schema_validation");
     const token = TokenSchema.parse(raw);
-    const status = StatusSchema.parse(await post({ environment, path: "/oauth2/token/status", body: null,
-      headers: { Authorization: `Bearer ${token.access_token}` }, transport, signal, timeoutMs }));
+    reportSquareConsentProgress(observeConsent, "token_schema_validated");
+    reportSquareConsentProgress(observeConsent, "token_status_request");
+    const rawStatus = await post({ environment, path: "/oauth2/token/status", body: null,
+      headers: { Authorization: `Bearer ${token.access_token}` }, transport, signal, timeoutMs, observeConsent });
+    reportSquareConsentProgress(observeConsent, "token_status_schema_validation");
+    const status = StatusSchema.parse(rawStatus);
+    reportSquareConsentProgress(observeConsent, "token_status_verification");
     if (!exactScopes(status.scopes)) fail("scope_loss");
     if (status.client_id !== applicationId || status.merchant_id !== token.merchant_id ||
       Date.parse(status.expires_at) !== Date.parse(token.expires_at)) fail();
@@ -353,6 +366,7 @@ export function createSquareOAuthCredentialProvider(input: Readonly<{
       issuedAt: prior?.issuedAt ?? new Date(issuedMs).toISOString(), updatedAt: new Date(issuedMs).toISOString()
     });
     if (Buffer.byteLength(canonicalContractJson(envelope)) > PHASE_5_DIRECT_KMS_MAX_PLAINTEXT_BYTES) fail();
+    reportSquareConsentProgress(observeConsent, "token_verified");
     await report("provider_response_parse", "succeeded");
     return envelope;
   };
@@ -362,7 +376,9 @@ export function createSquareOAuthCredentialProvider(input: Readonly<{
     async exchangeAuthorizationCode(value) {
       try {
         if (!exactScopes(value.requestedScopes)) fail("scope_loss");
+        reportSquareConsentProgress(observeConsent, "application_secret_validation");
         const secret = checkedSecret(value.applicationSecret, environment, applicationId);
+        reportSquareConsentProgress(observeConsent, "application_secret_verified");
         const envelope = await obtain({ client_id: applicationId, client_secret: secret.clientSecret,
           code: CodeSchema.parse(value.authorizationCode), redirect_uri: policy.callbackUri,
           grant_type: "authorization_code", short_lived: true }, value.now);

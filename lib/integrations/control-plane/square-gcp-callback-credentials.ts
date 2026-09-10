@@ -11,6 +11,7 @@ import {
   type SquareGcpFirstConsentPurpose
 } from "./square-gcp-callback-contracts";
 import { createSquareGcpCallbackIo, squareGcpCallbackDependencies, type SquareGcpCallbackIdentity } from "./square-gcp-callback-identity";
+import { reportSquareConsentProgress, type SquareConsentObserver } from "@/lib/integrations/providers/square/account-connection-progress";
 
 const DENIED = "square_gcp_callback_credentials_denied";
 const WIRE_BYTES = 262_144;
@@ -49,7 +50,7 @@ function secretData(reply: Record<string, unknown>, resource: string, binding: S
 export function createSquareGcpCallbackCredentials(input: Readonly<{
   binding: SquareGcpCallbackBinding; identity: SquareGcpCallbackIdentity;
   authorizeFirstConsent: SquareGcpFirstConsentAuthority; network: typeof fetch; signal: AbortSignal;
-}>) {
+}>, observeConsent?: SquareConsentObserver) {
   try {
     const args = squareGcpCallbackDependencies(input, ["binding", "identity", "authorizeFirstConsent", "network", "signal"]);
     const binding = checkedSquareGcpCallbackBinding(args.binding);
@@ -97,12 +98,15 @@ export function createSquareGcpCallbackCredentials(input: Readonly<{
     const secrets = new GoogleSecretManagerProviderSecrets({ resources: { "square:sandbox": binding.appSecretVersionResource },
       transport: { accessSecretVersion: async ({ name }) => {
         if (name !== binding.appSecretVersionResource) return deny();
-        return operation("application_secret", async access => {
+        const result = await operation("application_secret", async access => {
           const reply = await io.json(`https://secretmanager.googleapis.com/v1/${name}:access`, {
             method: "GET", headers: { Authorization: `Bearer ${access}` }
           }, WIRE_BYTES);
+          reportSquareConsentProgress(observeConsent, "application_secret_payload_validation");
           return { payload: { data: secretData(reply, name, binding) } };
         });
+        reportSquareConsentProgress(observeConsent, "application_secret_decode_validation");
+        return result;
       } }
     });
     const kms = new GoogleCloudKmsCredentialAdapter({ allowedKeyResource: binding.kmsKeyResource, transport: {
@@ -145,6 +149,7 @@ export function createSquareGcpCallbackCredentials(input: Readonly<{
         try {
           if (provider !== "square" || environment !== "sandbox") return deny();
           const secret = await secrets.access(provider, environment);
+          reportSquareConsentProgress(observeConsent, "application_secret_binding_validation");
           if (!secret.use(value => value.clientId === binding.applicationId)) return deny();
           return secret;
         } catch { dispose(); return deny(); }

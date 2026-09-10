@@ -11,6 +11,7 @@ import { checkedSquareGcpCallbackDatabaseCa } from "@/lib/integrations/control-p
 import { checkedPortalConfig, HostPolicySchema } from "./config";
 import { checkNativeSquareSandboxPortalBinding, createNativeSquareSandboxPortal } from "./runtime";
 import { CALLBACK_PATH, PORTAL_PATH, portalHeaders, portalUnavailable } from "./portal";
+import { createSquareConsentDiagnostics, createSquareConsentFileSink } from "./consent-diagnostics";
 
 const configPath = "/etc/vaeroex-square-callback/config.json";
 function denied(): never { throw new Error("square_portal_startup_denied"); }
@@ -156,7 +157,8 @@ export async function runSquareSandboxPortalCommand() {
     process.stdout.write("square_portal_binding_checked\n");
     return;
   }
-  const portal = createNativeSquareSandboxPortal(input);
+  const diagnostics = createSquareConsentDiagnostics(createSquareConsentFileSink());
+  const portal = createNativeSquareSandboxPortal(input, diagnostics);
   const tls = checkedPortalTls(readLocal(config.tlsCertPath, 65_536), readLocal(config.tlsKeyPath, 65_536), Math.min(now + 3_600_000, expiry));
   const server = createServer({ ...tls,
     minVersion: "TLSv1.2", maxHeaderSize: 16_384, requestTimeout: 60_000, headersTimeout: 10_000 }, nativePortalHandler(portal));

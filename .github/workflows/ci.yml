@@ -133,6 +133,7 @@ jobs:
       - name: Verify isolated native Square callback credentials, portal and guest controls
         run: |
           pnpm test:external-integrations-square-gcp-credentials
+          pnpm test:external-integrations-square-consent-diagnostics
           pnpm test:external-integrations-square-gcp-portal --browser
           pnpm test:external-integrations-square-gcp-ops
           pnpm build:external-integrations-square-gcp-callback

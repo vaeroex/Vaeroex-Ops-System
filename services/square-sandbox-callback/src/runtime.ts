@@ -9,6 +9,8 @@ import { checkedSquareGcpCallbackBinding, type SquareGcpCallbackBinding } from "
 import { checkedSquareGcpCallbackDatabaseCa, openSquareGcpCallbackDatabase } from "@/lib/integrations/control-plane/square-gcp-callback-database";
 import { createSquarePortalAuth } from "./auth";
 import { CALLBACK_PATH, createSquareSandboxPortal, type SquarePortalScope } from "./portal";
+import { reportSquareConsentProgress, type SquareConsentObserver } from "@/lib/integrations/providers/square/account-connection-progress";
+import { createSquareConsentDiagnostics } from "./consent-diagnostics";
 
 function denied(): never { throw new Error("square_portal_runtime_denied"); }
 type NativePortalInput = Readonly<{
@@ -43,7 +45,8 @@ export async function checkNativeSquareSandboxPortalBinding(input: NativePortalI
  * shared provider registry. Explicit server startup is the sole caller. Every
  * request has independent host verification, actual broker LOGIN, consumed-intent
  * closure, credentials, cancellation and cleanup. No ADC/WIF/service-key fallback. */
-export function createNativeSquareSandboxPortal(input: NativePortalInput) {
+export function createNativeSquareSandboxPortal(input: NativePortalInput,
+  diagnostics = createSquareConsentDiagnostics()) {
   const databaseCa = checkedSquareGcpCallbackDatabaseCa(input.databaseCa);
   const binding = checkedSquareGcpCallbackBinding(input.binding);
   const expected = canonicalContractJson(binding);
@@ -59,6 +62,8 @@ export function createNativeSquareSandboxPortal(input: NativePortalInput) {
       let database: Awaited<ReturnType<typeof openSquareGcpCallbackDatabase>> | undefined;
       const identity = createSquareGcpCallbackIdentity({ binding, network: input.network, signal });
       let credentials: ReturnType<typeof createSquareGcpCallbackCredentials> | undefined;
+      let attempt: ReturnType<typeof diagnostics.begin> | undefined;
+      const observeConsent: SquareConsentObserver = stage => attempt?.observe(stage);
       let closed = false;
       const close = async () => {
         if (closed) return;
@@ -75,7 +80,7 @@ export function createNativeSquareSandboxPortal(input: NativePortalInput) {
         if (signal.aborted) denied();
         const db = database;
         credentials = binding.providerCallsEnabled ? createSquareGcpCallbackCredentials({ binding, identity,
-          authorizeFirstConsent: db.authorizeFirstConsent, network: input.network, signal }) : undefined;
+          authorizeFirstConsent: db.authorizeFirstConsent, network: input.network, signal }, observeConsent) : undefined;
         const transport = createSquareSandboxOAuthTransport({ network: input.network, authorize: async () => {
           if (!binding.providerCallsEnabled || closed || signal.aborted) denied();
           const current = await db.authorizeFirstConsent({ purpose: "application_secret", signal });
@@ -86,8 +91,19 @@ export function createNativeSquareSandboxPortal(input: NativePortalInput) {
           enrollmentClient: Object.freeze({ rpc: async () => denied() }),
           environment: "sandbox", applicationId: binding.applicationId,
           redirectUri: binding.applicationOrigin + CALLBACK_PATH, kmsKeyResource: binding.kmsKeyResource,
-          secrets: credentials?.secrets ?? Object.freeze({ access: async () => denied() }),
-          kms: credentials?.kms ?? Object.freeze({ encrypt: async () => denied(), decrypt: async () => denied() }),
+          secrets: Object.freeze({ access: async (provider, environment) => {
+            reportSquareConsentProgress(observeConsent, "application_secret_access");
+            const value = credentials ? await credentials.secrets.access(provider, environment) : denied();
+            reportSquareConsentProgress(observeConsent, "application_secret_returned");
+            return value;
+          } }),
+          kms: Object.freeze({ encrypt: async value => {
+            reportSquareConsentProgress(observeConsent, "credential_encrypt_requested");
+            const result = credentials ? await credentials.kms.encrypt(value) : denied();
+            reportSquareConsentProgress(observeConsent, "credential_encrypt_returned");
+            return result;
+          }, decrypt: async value => credentials ? credentials.kms.decrypt(value) : denied() }),
+          observeConsent,
           transport: async request => {
             // The established wire/decoder implementation is reused, with its
             // refresh grant explicitly removed from this first-consent surface.
@@ -99,7 +115,20 @@ export function createNativeSquareSandboxPortal(input: NativePortalInput) {
         return Object.freeze({ binding: db.binding,
           auth: createSquarePortalAuth({ binding: db.binding, publishableKey: input.publishableKey, network: input.network, signal }),
           service: Object.freeze({
-            snapshot: service.snapshot, complete: service.complete, disconnect: service.disconnect,
+            snapshot: service.snapshot, disconnect: service.disconnect,
+            complete: async (...args: Parameters<typeof service.complete>) => {
+              // Created only for complete(), never login/bootstrap/status. No
+              // callback input or error is passed to the diagnostic collector.
+              const current = diagnostics.begin(signal); attempt = current;
+              try {
+                const result = await service.complete(...args);
+                current.finish(signal.aborted ? "cancelled" : "callback_returned");
+                return result;
+              } catch (error) {
+                current.finish(signal.aborted ? "cancelled" : "failed");
+                throw error;
+              } finally { if (attempt === current) attempt = undefined; }
+            },
             initiate: async (...args: Parameters<typeof service.initiate>) => {
               if (++initiations > 10 || closed || signal.aborted) denied();
               return service.initiate(...args);

@@ -417,7 +417,7 @@ matches(
   "the fixture must preserve the exact production-labelled 2-leased/1-pending shape"
 );
 
-equal(approvedSquareQualificationPaths.length, 49, "dormant scope permits only exact reviewed migrations, UI, native service/templates and branch-only deployment guard");
+equal(approvedSquareQualificationPaths.length, 50, "dormant scope permits only exact reviewed migrations, UI, native service/templates and branch-only deployment guard");
 assertionCount++;
 assert.deepEqual(JSON.parse(read("vercel.json")), {
   git: { deploymentEnabled: { "codex/square-remote-sandbox-binding": false, "codex/square-sandbox-qualification": false, "codex/square-gcp-sandbox-callback": false } }
