@@ -6,19 +6,45 @@ import { createSquareSandboxOAuthTransport } from "@/lib/integrations/control-pl
 import { createSquareGcpCallbackIdentity } from "@/lib/integrations/control-plane/square-gcp-callback-identity";
 import { createSquareGcpCallbackCredentials, readSquareGcpCallbackDatabaseSecret } from "@/lib/integrations/control-plane/square-gcp-callback-credentials";
 import { checkedSquareGcpCallbackBinding, type SquareGcpCallbackBinding } from "@/lib/integrations/control-plane/square-gcp-callback-contracts";
-import { openSquareGcpCallbackDatabase } from "@/lib/integrations/control-plane/square-gcp-callback-database";
+import { checkedSquareGcpCallbackDatabaseCa, openSquareGcpCallbackDatabase } from "@/lib/integrations/control-plane/square-gcp-callback-database";
 import { createSquarePortalAuth } from "./auth";
 import { CALLBACK_PATH, createSquareSandboxPortal, type SquarePortalScope } from "./portal";
 
 function denied(): never { throw new Error("square_portal_runtime_denied"); }
+type NativePortalInput = Readonly<{
+  binding: SquareGcpCallbackBinding; publishableKey: string; databaseCa: string; network: typeof fetch;
+}>;
+
+/** Explicit operator binding probe only. No portal listener, user session,
+ * application secret, KMS or Square transport is constructed by this path. */
+export async function checkNativeSquareSandboxPortalBinding(input: NativePortalInput, signal: AbortSignal) {
+  const databaseCa = checkedSquareGcpCallbackDatabaseCa(input.databaseCa);
+  const binding = checkedSquareGcpCallbackBinding(input.binding), expected = canonicalContractJson(binding);
+  if (signal.aborted) denied();
+  const identity = createSquareGcpCallbackIdentity({ binding, network: input.network, signal });
+  let database: Awaited<ReturnType<typeof openSquareGcpCallbackDatabase>> | undefined;
+  let dsn = "";
+  try {
+    const bootstrap = createSquareGcpCallbackIdentity({ binding, network: input.network, signal });
+    dsn = await readSquareGcpCallbackDatabaseSecret({ binding, identity: bootstrap, network: input.network, signal });
+    database = await openSquareGcpCallbackDatabase(dsn, databaseCa, signal);
+    dsn = "";
+    if (signal.aborted || canonicalContractJson(database.binding) !== expected) denied();
+    await identity.verify();
+    if (signal.aborted) denied();
+    const current = await database.recheckBinding();
+    if (signal.aborted || canonicalContractJson(current) !== expected) denied();
+    return Object.freeze({ checked: true as const });
+  } catch { return denied(); }
+  finally { dsn = "";identity.dispose();await database?.close(); }
+}
 
 /** Native composition, never imported by Next/Vercel and never installed in the
  * shared provider registry. Explicit server startup is the sole caller. Every
  * request has independent host verification, actual broker LOGIN, consumed-intent
  * closure, credentials, cancellation and cleanup. No ADC/WIF/service-key fallback. */
-export function createNativeSquareSandboxPortal(input: Readonly<{
-  binding: SquareGcpCallbackBinding; publishableKey: string; network: typeof fetch;
-}>) {
+export function createNativeSquareSandboxPortal(input: NativePortalInput) {
+  const databaseCa = checkedSquareGcpCallbackDatabaseCa(input.databaseCa);
   const binding = checkedSquareGcpCallbackBinding(input.binding);
   const expected = canonicalContractJson(binding);
   let opened = 0, initiations = 0;
@@ -42,7 +68,7 @@ export function createNativeSquareSandboxPortal(input: Readonly<{
       const abort = () => { void close(); };
       signal.addEventListener("abort", abort, { once: true });
       try {
-        database = await openSquareGcpCallbackDatabase(dsn, signal);
+        database = await openSquareGcpCallbackDatabase(dsn, databaseCa, signal);
         dsn = "";
         if (closed || signal.aborted || canonicalContractJson(database.binding) !== expected) denied();
         await identity.verify();

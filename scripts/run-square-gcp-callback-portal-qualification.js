@@ -59,6 +59,7 @@ function privacy(response) {
 }
 async function local() {
   await startupTrustTests();
+  assertions += await require("./square-gcp-callback-ca-test-support.js").qualifyCallbackDatabaseCa();
   const config=JSON.parse(fs.readFileSync(path.join(root,"services/square-sandbox-callback/config.example.json"),"utf8"));
   equal(checkedPortalConfig(config).binding,null); assertions++;assert.throws(()=>checkedPortalConfig(config,true));
   for(const edit of [{enabled:true},{binding:{}},{supabasePublishableKey:"synthetic"},{unknown:true},{hostPolicyPath:"/tmp/any"}]) {

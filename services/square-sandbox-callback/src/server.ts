@@ -7,8 +7,9 @@ import { createServer } from "node:https";
 import { Readable } from "node:stream";
 import { resolve } from "node:path";
 import { SQUARE_REMOTE_SANDBOX } from "@/lib/integrations/control-plane/square-remote-sandbox-contracts";
+import { checkedSquareGcpCallbackDatabaseCa } from "@/lib/integrations/control-plane/square-gcp-callback-database";
 import { checkedPortalConfig, HostPolicySchema } from "./config";
-import { createNativeSquareSandboxPortal } from "./runtime";
+import { checkNativeSquareSandboxPortalBinding, createNativeSquareSandboxPortal } from "./runtime";
 import { CALLBACK_PATH, PORTAL_PATH, portalHeaders, portalUnavailable } from "./portal";
 
 const configPath = "/etc/vaeroex-square-callback/config.json";
@@ -17,6 +18,13 @@ function readLocal(path: string, maximum: number) {
   const stat = lstatSync(path);
   if (!stat.isFile() || stat.isSymbolicLink() || stat.size > maximum || (stat.mode & 0o022) !== 0) denied();
   return readFileSync(path);
+}
+export function checkedPortalDatabaseCa(bytes: Buffer, expectedSha256: string) {
+  try {
+    if (!Buffer.isBuffer(bytes) || bytes.length > 16_384 || !/^[a-f0-9]{64}$/.test(expectedSha256) ||
+      createHash("sha256").update(bytes).digest("hex") !== expectedSha256) denied();
+    return checkedSquareGcpCallbackDatabaseCa(bytes.toString("utf8"));
+  } catch { return denied(); }
 }
 function localEnvironment() {
   // Never enable process diagnostics, SDK wire logging or telemetry via ambient
@@ -106,16 +114,49 @@ export function nativePortalHandler(handle: (request: Request) => Promise<Respon
 
 export async function runSquareSandboxPortalCommand() {
   const args = process.argv.slice(2);
-  if (args.length !== 3 || !["--preflight", "--serve"].includes(args[0]) || args[1] !== "--config" || args[2] !== configPath) denied();
+  if (args.length !== 3 || !["--preflight", "--check-binding", "--serve"].includes(args[0]) || args[1] !== "--config" || args[2] !== configPath) denied();
   localEnvironment();
-  const config = checkedPortalConfig(JSON.parse(readLocal(configPath, 32_768).toString()), args[0] === "--serve");
+  const config = checkedPortalConfig(JSON.parse(readLocal(configPath, 32_768).toString()), args[0] !== "--preflight");
+  // Both enabled preflight and serving validate public trust before metadata,
+  // Secret Manager, database IO or listener creation. Disabled legacy configs
+  // remain valid and never load a CA or regain an ambient trust override.
+  let databaseCa: string | undefined;
+  if (config.enabled) {
+    if (!config.databaseCaPath || !config.databaseCaSha256 || lstatSync(config.databaseCaPath).uid !== 0) denied();
+    databaseCa = checkedPortalDatabaseCa(readLocal(config.databaseCaPath, 16_384), config.databaseCaSha256);
+  }
   if (args[0] === "--preflight") return;
   const now = Date.now(), policy = HostPolicySchema.parse(JSON.parse(readLocal(config.hostPolicyPath, 8_192).toString()));
   const expiry = Date.parse(policy.approvedUntil);
   if (expiry <= now || expiry > now + 31 * 86_400_000 || policy.nodeVersion !== process.version ||
     createHash("sha256").update(readLocal(process.argv[1], 64 * 1_024 * 1_024)).digest("hex") !== policy.artifactSha256 ||
-    !config.binding || !config.supabasePublishableKey) denied();
-  const portal = createNativeSquareSandboxPortal({ binding: config.binding, publishableKey: config.supabasePublishableKey, network: fetch });
+    !config.binding || !config.supabasePublishableKey || !databaseCa) denied();
+  const input = { binding: config.binding, publishableKey: config.supabasePublishableKey, databaseCa, network: fetch };
+  if (args[0] === "--check-binding") {
+    const remaining = expiry - Date.now();
+    if (remaining <= 0) denied();
+    const window = Math.min(30_000, remaining), controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), Math.max(1, window - 2_000));
+    // This explicit, read-only operator process cannot depend on a peer sending
+    // EOF during pg.end(). Abort first, then let OS process teardown close any
+    // stalled socket/unfinished read transaction at the absolute deadline.
+    // No normal portal request or callback cleanup behavior is changed here.
+    const hardTimer = setTimeout(() => { controller.abort();process.exit(78); }, window);
+    try {
+      await checkNativeSquareSandboxPortalBinding(input, controller.signal);
+      if (controller.signal.aborted || Date.now() >= expiry) denied();
+    }
+    catch {
+      // An abort may already have started a detached close whose idempotent
+      // second call returns before pg.end() settles. A rejected read-only probe
+      // must terminate its process, not disarm the deadline and retain sockets.
+      controller.abort();process.exit(78);
+    }
+    finally { clearTimeout(timer);clearTimeout(hardTimer);controller.abort(); }
+    process.stdout.write("square_portal_binding_checked\n");
+    return;
+  }
+  const portal = createNativeSquareSandboxPortal(input);
   const tls = checkedPortalTls(readLocal(config.tlsCertPath, 65_536), readLocal(config.tlsKeyPath, 65_536), Math.min(now + 3_600_000, expiry));
   const server = createServer({ ...tls,
     minVersion: "TLSv1.2", maxHeaderSize: 16_384, requestTimeout: 60_000, headersTimeout: 10_000 }, nativePortalHandler(portal));

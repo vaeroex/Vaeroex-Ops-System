@@ -1,6 +1,7 @@
 import "server-only";
 
 import { Client } from "pg";
+import { X509Certificate } from "node:crypto";
 import { canonicalContractJson } from "@/lib/integrations/contracts/canonical";
 import { CredentialAadContextSchema, OAuthStateConsumeResultSchema } from "@/lib/integrations/credentials/contracts";
 import { credentialAadDigest } from "@/lib/integrations/credentials/kms";
@@ -19,6 +20,18 @@ const commandLimits = { containers: 1_055, values: 5_015, bytes: 2_113_536, dept
 type Consumed = Readonly<{ stateId: string; connectionId: string; connectionGeneration: number;
   expectedConnectionRowVersion: number; consumedAt: string }>;
 function denied(): never { throw new Error("square_gcp_callback_database_denied"); }
+/** Explicit public trust material only; never load roots from ambient launch
+ * variables or a private DSN. The standalone server separately verifies the
+ * root-owned file against its approved public SHA256 configuration. */
+export function checkedSquareGcpCallbackDatabaseCa(value: unknown, now = Date.now()): string {
+  try {
+    if (typeof value !== "string" || value.length > 16_384 || !Number.isSafeInteger(now) ||
+      !/^-----BEGIN CERTIFICATE-----\r?\n[A-Za-z0-9+/=\r\n]+-----END CERTIFICATE-----\r?\n?$/.test(value)) denied();
+    const certificate = new X509Certificate(value);
+    if (!certificate.ca || Date.parse(certificate.validFrom) > now || Date.parse(certificate.validTo) <= now) denied();
+    return value;
+  } catch { return denied(); }
+}
 function json(value: unknown) {
   if (typeof value !== "string" || Buffer.byteLength(value) > 32 * 1_024 * 1_024) denied();
   try { return JSON.parse(value) as unknown; } catch { return denied(); }
@@ -27,12 +40,11 @@ function json(value: unknown) {
 /** Request-owned actual broker LOGIN only. There is no raw SQL, SET ROLE,
  * service-role fallback, generic RPC, runtime/enroller capability or retry API.
  * Database connection material is never returned or used as a log message. */
-export async function openSquareGcpCallbackDatabase(value: string, signal?: AbortSignal) {
+export async function openSquareGcpCallbackDatabase(value: string, databaseCa: string, signal?: AbortSignal) {
   if (signal?.aborted) denied();
+  const ca = checkedSquareGcpCallbackDatabaseCa(databaseCa);
   const { connectionString, login } = checkedSquareSandboxDatabaseUrl(value);
-  const ca = process.env.SQUARE_SANDBOX_DATABASE_CA_PEM;
-  if (ca && (ca.length > 16_384 || !ca.startsWith("-----BEGIN CERTIFICATE-----"))) denied();
-  const database = new Client({ connectionString, ssl: { rejectUnauthorized: true, ...(ca ? { ca } : {}) },
+  const database = new Client({ connectionString, ssl: { rejectUnauthorized: true, ca },
     connectionTimeoutMillis: 5_000, statement_timeout: 5_000, query_timeout: 6_000,
     application_name: "square_gcp_callback_v1", idle_in_transaction_session_timeout: 10_000 });
   let closed = false, active = false;

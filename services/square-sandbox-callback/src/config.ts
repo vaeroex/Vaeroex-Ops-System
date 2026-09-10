@@ -7,6 +7,8 @@ import { snapshotSquareDurableJson } from "@/lib/integrations/providers/square/d
 const Schema = z.object({
   schemaVersion: z.literal(1), enabled: z.boolean(), binding: z.unknown().nullable(),
   supabasePublishableKey: z.string().min(20).max(2_048).nullable(),
+  databaseCaPath: z.literal("/etc/vaeroex-square-callback/supabase-root-2021.crt").nullable().default(null),
+  databaseCaSha256: z.string().regex(/^[a-f0-9]{64}$/).nullable().default(null),
   tlsCertPath: z.literal("/run/credentials/vaeroex-square-callback.service/tls-cert"),
   tlsKeyPath: z.literal("/run/credentials/vaeroex-square-callback.service/tls-key"),
   challengeWebroot: z.literal("/run/vaeroex-square-callback/acme"),
@@ -19,11 +21,12 @@ export function checkedPortalConfig(value: unknown, serving = false) {
     const config = Schema.parse(raw);
     if (!Object.prototype.hasOwnProperty.call(config, "binding")) throw new Error();
     if (!config.enabled) {
-      if (serving || config.binding !== null || config.supabasePublishableKey !== null) throw new Error();
+      if (serving || config.binding !== null || config.supabasePublishableKey !== null ||
+        config.databaseCaPath !== null || config.databaseCaSha256 !== null) throw new Error();
       return Object.freeze({ ...config, binding: null });
     }
     const binding = checkedSquareGcpCallbackBinding(config.binding);
-    if (!config.supabasePublishableKey) throw new Error();
+    if (!config.supabasePublishableKey || !config.databaseCaPath || !config.databaseCaSha256) throw new Error();
     const key = config.supabasePublishableKey;
     if (!/^sb_publishable_[A-Za-z0-9_-]+$/.test(key)) {
       const parts = key.split(".");
