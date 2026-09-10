@@ -279,7 +279,9 @@ async function main() {
   enabled = true; equal((await handlers.handle("status", request("status"))).status, 200);
   const connect = new URLSearchParams({ businessEntityId: binding.businessEntityId }).toString();
   equal((await handlers.handle("connect", request("connect", connect))).status, 200);
-  for (const next of [navigation.replace("connect.squareupsandbox.com", "connect.squareup.com"), navigation + "&scope=PAYMENTS_WRITE", navigation.replace("session=false", "session=true")]) {
+  equal(new URL(navigation).searchParams.get("session"), "true");
+  for (const next of [navigation.replace("connect.squareupsandbox.com", "connect.squareup.com"), navigation + "&scope=PAYMENTS_WRITE",
+    navigation.replace("session=true", "session=false"), navigation.replace("&session=true", ""), navigation + "&session=true"]) {
     const original = navigation; navigation = next; equal((await handlers.handle("connect", request("connect", connect))).status, 400); navigation = original;
   }
   equal(SQUARE_OAUTH_SCOPES.join(","), "INVENTORY_READ,ITEMS_READ,MERCHANT_PROFILE_READ,ORDERS_READ,PAYMENTS_READ");
