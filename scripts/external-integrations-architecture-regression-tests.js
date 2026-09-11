@@ -374,8 +374,8 @@ matches(
   /run\(cli, \["migration", "up", "--local"\]\)/,
   "the fixture-rich runner must apply the ordered zero-based and retry-identity migrations"
 );
-matches(zeroBasedUpgradeRunner, /const dormantSquareTail = \[\s*"20260907042202_square_dormant_trusted_authority\.sql",\s*"20260907042352_square_dormant_atomic_pages\.sql",\s*"20260907174326_square_dormant_account_connection\.sql",\s*"20260907225626_square_remote_sandbox_binding\.sql",\s*"20260908014713_square_broker_runtime_credential_authority\.sql",\s*"20260908042529_square_gcp_callback_authority\.sql",\s*"20260910193429_square_gcp_callback_oregon_recovery\.sql",\s*"20260910231437_square_gcp_mapped_runtime\.sql",\s*"20260911000915_square_gcp_mapped_legacy_fencing\.sql",\s*"20260911151334_square_verified_provider_observations\.sql",\s*"20260911205108_square_canonical_interpretation\.sql"\s*\]/,
-  "fixture-rich QBO upgrade allows exactly the eleven dormant Square migrations");
+matches(zeroBasedUpgradeRunner, /const dormantSquareTail = \[\s*"20260907042202_square_dormant_trusted_authority\.sql",\s*"20260907042352_square_dormant_atomic_pages\.sql",\s*"20260907174326_square_dormant_account_connection\.sql",\s*"20260907225626_square_remote_sandbox_binding\.sql",\s*"20260908014713_square_broker_runtime_credential_authority\.sql",\s*"20260908042529_square_gcp_callback_authority\.sql",\s*"20260910193429_square_gcp_callback_oregon_recovery\.sql",\s*"20260910231437_square_gcp_mapped_runtime\.sql",\s*"20260911000915_square_gcp_mapped_legacy_fencing\.sql",\s*"20260911151334_square_verified_provider_observations\.sql",\s*"20260911205108_square_canonical_interpretation\.sql",\s*"20260911222230_square_workspace_evidence\.sql"\s*\]/,
+  "fixture-rich QBO upgrade allows exactly the twelve dormant Square migrations");
 // Execute only the pure manifest guard, with no database/CLI capability. This
 // catches an omitted additive tail before the real database gate runs in CI.
 const fixtureGuardSource = zeroBasedUpgradeRunner.slice(0, zeroBasedUpgradeRunner.indexOf("async function applyFixture"));
@@ -421,7 +421,7 @@ matches(
   "the fixture must preserve the exact production-labelled 2-leased/1-pending shape"
 );
 
-equal(approvedSquareQualificationPaths.length, 54, "dormant scope permits only exact reviewed migrations, UI, native service/templates and branch-only deployment guard");
+equal(approvedSquareQualificationPaths.length, 58, "dormant scope permits only exact reviewed migrations, UI, native service/templates and branch-only deployment guard");
 assertionCount++;
 assert.deepEqual(JSON.parse(read("vercel.json")), {
   git: { deploymentEnabled: { "codex/square-remote-sandbox-binding": false, "codex/square-sandbox-qualification": false, "codex/square-gcp-sandbox-callback": false } }
@@ -434,7 +434,7 @@ for (const protectedPath of [
   "app/api/integrations/square/activate/route.ts",
   "components/integrations/SquarePanel.tsx",
   "services/external-integrations-square/server.ts",
-  "lib/supabase/types.ts",
+  "lib/supabase/server.ts",
   "vercel.ts"
 ]) {
   equal(withoutSquareQualificationPaths(protectedPath), protectedPath, "scope exemption cannot hide a neighboring or activation path");
@@ -492,6 +492,7 @@ const approvedProtectedPaths = new Set([
   "supabase/migrations/20260911000915_square_gcp_mapped_legacy_fencing.sql",
   "supabase/migrations/20260911151334_square_verified_provider_observations.sql",
   "supabase/migrations/20260911205108_square_canonical_interpretation.sql",
+  "supabase/migrations/20260911222230_square_workspace_evidence.sql",
   "supabase/tests/external_integrations_phase_8b_qbo_sandbox_validation.test.sql",
   "supabase/tests/external_integrations_phase_8b_credential_refresh_recovery.test.sql",
   "supabase/tests/external_integrations_phase_8b_same_generation_reauthorization.test.sql",

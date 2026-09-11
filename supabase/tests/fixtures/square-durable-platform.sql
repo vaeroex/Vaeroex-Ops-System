@@ -25,6 +25,8 @@ create schema auth;
 create table auth.users (
   id uuid primary key,
   email text,
+  deleted_at timestamptz,
+  banned_until timestamptz,
   raw_user_meta_data jsonb not null default '{}',
   raw_app_meta_data jsonb not null default '{}',
   created_at timestamptz not null default now(),

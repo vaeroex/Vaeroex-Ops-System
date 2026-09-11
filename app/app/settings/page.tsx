@@ -6,6 +6,9 @@ import { SectionCard } from "@/components/operations/SectionCard";
 import { changePasswordAction } from "@/lib/auth/actions";
 import { qboProductionCustomerConnectionsEnabled } from "@/lib/integrations/control-plane/qbo-customer-availability";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
+import { SquareEvidenceCard } from "@/components/integrations/SquareEvidenceCard";
+import { readSquareWorkspaceEvidence } from "@/lib/integrations/control-plane/square-workspace-evidence";
+import { headers } from "next/headers";
 
 type SettingsPageProps = {
   searchParams?: Promise<{
@@ -14,9 +17,12 @@ type SettingsPageProps = {
   }>;
 };
 
+export const dynamic = "force-dynamic";
+
 export default async function SettingsPage({ searchParams }: SettingsPageProps) {
   const params = await searchParams;
   const { context, supabase, workspaceId } = await requireWorkspacePage();
+  const squareEvidence = await readSquareWorkspaceEvidence(supabase, workspaceId, await headers());
   const qboConnectionsEnabled = qboProductionCustomerConnectionsEnabled();
   const { data: connections } = qboConnectionsEnabled
     ? await supabase
@@ -56,6 +62,8 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
       />
 
       <ThemeControls />
+
+      {squareEvidence ? <SquareEvidenceCard evidence={squareEvidence} /> : null}
 
       {qboConnectionsEnabled ? (
         <SectionCard

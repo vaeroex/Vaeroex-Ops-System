@@ -1,6 +1,11 @@
 // Exact additive dormant qualification/connection scope. Legacy parser suites still reject
 // every other database/runtime path; no directory-wide exemption is permitted.
 const approvedSquareQualificationPaths = Object.freeze([
+  // Read-only Sandbox workspace evidence; no broad app/schema exemption.
+  "app/app/settings/page.tsx",
+  "components/integrations/SquareEvidenceCard.tsx",
+  "lib/supabase/types.ts",
+  "supabase/migrations/20260911222230_square_workspace_evidence.sql",
   "supabase/migrations/20260907042202_square_dormant_trusted_authority.sql",
   "supabase/migrations/20260907042352_square_dormant_atomic_pages.sql",
   "supabase/migrations/20260907174326_square_dormant_account_connection.sql",
