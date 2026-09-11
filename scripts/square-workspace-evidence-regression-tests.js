@@ -33,14 +33,38 @@ async function main(){
   assert.equal(await readSquareWorkspaceEvidence(client,workspace),null);assert.equal(calls,0);
   process.env.NEXT_PUBLIC_SUPABASE_URL="https://oysjpoondtcrqpghhrbd.supabase.co";
   process.env.NEXT_PUBLIC_APP_URL="https://square-sandbox.vaeroex.com";
-  assert.deepEqual(await readSquareWorkspaceEvidence(client,workspace),view);
+  const approvedHeaders=new Headers({host:"square-sandbox.vaeroex.com","x-forwarded-host":"square-sandbox.vaeroex.com","x-forwarded-proto":"https"});
+  assert.equal(await readSquareWorkspaceEvidence(client,workspace,approvedHeaders),null);assert.equal(calls,0);
+  process.env.SQUARE_EVIDENCE_HOST="gcp-square-sandbox-workspace-v1";
+  process.env.NODE_ENV="production";
+  for(const key of ["VERCEL","VERCEL_ENV","VERCEL_TARGET_ENV","VERCEL_PROJECT_ID","VERCEL_URL"])delete process.env[key];
+  assert.equal(await readSquareWorkspaceEvidence(client,workspace),null);assert.equal(calls,0);
+  for(const host of ["vaeroex.com","www.vaeroex.com","localhost","localhost:3000","127.0.0.1","[::1]","192.0.2.1","preview.vercel.app","unapproved.example","square-sandbox.vaeroex.com.evil.example","square-sandbox.vaeroex.com:443","square-sandbox.vaeroex.com.","square-sandbox.vaeroex.com, evil.example"]){
+    for(const key of ["host","x-forwarded-host"]){
+      const h=new Headers(approvedHeaders);h.set(key,host);
+      assert.equal(await readSquareWorkspaceEvidence(client,workspace,h),null,`${key}: ${host}`);
+    }
+  }
+  for(const key of ["host","x-forwarded-host","x-forwarded-proto"]){
+    const h=new Headers(approvedHeaders);h.delete(key);assert.equal(await readSquareWorkspaceEvidence(client,workspace,h),null);
+  }
+  for(const proto of ["http","https,http",""]){const h=new Headers(approvedHeaders);h.set("x-forwarded-proto",proto);assert.equal(await readSquareWorkspaceEvidence(client,workspace,h),null);}
+  const forwarded=new Headers(approvedHeaders);forwarded.set("forwarded","host=square-sandbox.vaeroex.com;proto=https");
+  assert.equal(await readSquareWorkspaceEvidence(client,workspace,forwarded),null);
+  for(const [key,value] of [["VERCEL","1"],["VERCEL_ENV","preview"],["VERCEL_ENV","production"],["VERCEL_TARGET_ENV","development"],["VERCEL_PROJECT_ID","prj_J810bZ9ECoN4CyLKujUoEEH8N6ja"],["VERCEL_URL","custom.example"]]){
+    process.env[key]=value;assert.equal(await readSquareWorkspaceEvidence(client,workspace,approvedHeaders),null);delete process.env[key];
+  }
+  for(const mode of ["development","test"]){process.env.NODE_ENV=mode;assert.equal(await readSquareWorkspaceEvidence(client,workspace,approvedHeaders),null);}
+  process.env.NODE_ENV="production";
+  assert.equal(calls,0,"all rejected hosts stop before database IO");
+  assert.deepEqual(await readSquareWorkspaceEvidence(client,workspace,approvedHeaders),view);
   process.env.VERCEL_PROJECT_ID="prj_J810bZ9ECoN4CyLKujUoEEH8N6ja";
-  assert.equal(await readSquareWorkspaceEvidence(client,workspace),null);assert.equal(calls,1);delete process.env.VERCEL_PROJECT_ID;
-  assert.equal(await readSquareWorkspaceEvidence({rpc:async()=>({data:view,error:{message:"SECRET_SENTINEL"}})},workspace),null);
-  assert.equal(await readSquareWorkspaceEvidence({rpc:async()=>{throw new Error("SECRET_SENTINEL");}},workspace),null);
-  assert.equal(await readSquareWorkspaceEvidence({rpc:async()=>({data:{...view,token:"SECRET_SENTINEL"},error:null})},workspace),null);
-  assert.equal(await readSquareWorkspaceEvidence(client,"invalid"),null);
-  assert.equal(render(await readSquareWorkspaceEvidence(client,workspace)),html,"replay/render deterministic");
+  assert.equal(await readSquareWorkspaceEvidence(client,workspace,approvedHeaders),null);assert.equal(calls,1);delete process.env.VERCEL_PROJECT_ID;
+  assert.equal(await readSquareWorkspaceEvidence({rpc:async()=>({data:view,error:{message:"SECRET_SENTINEL"}})},workspace,approvedHeaders),null);
+  assert.equal(await readSquareWorkspaceEvidence({rpc:async()=>{throw new Error("SECRET_SENTINEL");}},workspace,approvedHeaders),null);
+  assert.equal(await readSquareWorkspaceEvidence({rpc:async()=>({data:{...view,token:"SECRET_SENTINEL"},error:null})},workspace,approvedHeaders),null);
+  assert.equal(await readSquareWorkspaceEvidence(client,"invalid",approvedHeaders),null);
+  assert.equal(render(await readSquareWorkspaceEvidence(client,workspace,approvedHeaders)),html,"replay/render deterministic");
   console.log("Square workspace evidence: UI, privacy, uncertainty, deployment gate, fail-closed reads and deterministic rendering passed.");
 }
 if(require.main===module)main().catch(()=>{console.error("Square evidence regression failed");process.exitCode=1;});

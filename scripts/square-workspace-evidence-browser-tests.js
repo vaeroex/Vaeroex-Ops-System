@@ -28,7 +28,7 @@ async function main(){
     assert.equal(requests,0);
     if(process.env.SQUARE_EVIDENCE_SCREENSHOT)await page.screenshot({path:process.env.SQUARE_EVIDENCE_SCREENSHOT,fullPage:true});
     // Actual app CSS and server component; synthetic data, not a hosted page.
-    assert.ok(fs.readFileSync("app/app/settings/page.tsx","utf8").includes("readSquareWorkspaceEvidence(supabase, workspaceId)"));
+    assert.ok(fs.readFileSync("app/app/settings/page.tsx","utf8").includes("readSquareWorkspaceEvidence(supabase, workspaceId, await headers())"));
     console.log("Square evidence browser: desktop/mobile disclosure, no overflow, no mutations, zero network requests passed.");
   }finally{await browser.close();}
 }

@@ -8,6 +8,7 @@ import { qboProductionCustomerConnectionsEnabled } from "@/lib/integrations/cont
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
 import { SquareEvidenceCard } from "@/components/integrations/SquareEvidenceCard";
 import { readSquareWorkspaceEvidence } from "@/lib/integrations/control-plane/square-workspace-evidence";
+import { headers } from "next/headers";
 
 type SettingsPageProps = {
   searchParams?: Promise<{
@@ -21,7 +22,7 @@ export const dynamic = "force-dynamic";
 export default async function SettingsPage({ searchParams }: SettingsPageProps) {
   const params = await searchParams;
   const { context, supabase, workspaceId } = await requireWorkspacePage();
-  const squareEvidence = await readSquareWorkspaceEvidence(supabase, workspaceId);
+  const squareEvidence = await readSquareWorkspaceEvidence(supabase, workspaceId, await headers());
   const qboConnectionsEnabled = qboProductionCustomerConnectionsEnabled();
   const { data: connections } = qboConnectionsEnabled
     ? await supabase
