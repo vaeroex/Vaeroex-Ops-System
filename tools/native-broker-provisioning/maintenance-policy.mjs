@@ -1,4 +1,4 @@
-import { sandboxTarget } from "./sandbox-profile.mjs";
+import { sandboxProvisioningProfile } from "./sandbox-profile.mjs";
 const denied = () => new Error("maintenance_policy_denied");
 
 export function maintenanceWindow(deadline, now) {
@@ -17,7 +17,8 @@ export function requiresClearance(last, operation) {
   return operation === "recover" || Boolean(last && !(last.kind === "maintenance_finished" &&
     (last.outcome === "staged_ready" || last.databaseCommit === "not_attempted" && last.requiresFreshReplacement === false)));
 }
-export function checkRecoveryClearance({ last, operation, roleOid, intent, approvalId, clearance, now }) {
+export function checkRecoveryClearance({ last, operation, roleOid, intent, approvalId, clearance, now, profile = "callback" }) {
+  const { target: sandboxTarget } = sandboxProvisioningProfile(profile);
   if (!requiresClearance(last, operation)) return Infinity;
   if (!last || !["create", "recover"].includes(operation) || !clearance ||
       clearance.priorIntent !== last.intent || clearance.nextIntent !== intent || clearance.approvalId !== approvalId ||

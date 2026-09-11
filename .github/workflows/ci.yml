@@ -273,10 +273,42 @@ jobs:
           native_manifest="$(node -e 'const fs=require("node:fs"); const rows=fs.readFileSync(process.argv[1],"utf8").trim().split("\n").map(JSON.parse); if(rows.length!==2 || rows[1].failure!==null) process.exit(2); process.stdout.write(rows[0].manifestPath)' "$RUNNER_TEMP/native-broker-qualification.jsonl")"
           VAEROEX_NATIVE_TEST_DEPENDENCIES="$native_manifest" node tools/native-broker-provisioning/tests/managed-qualify.cjs
           VAEROEX_NATIVE_TEST_DEPENDENCIES="$native_manifest" VAEROEX_MANAGED_TEST_SYSTEM_LIBPQ=16.15 node tools/native-broker-provisioning/tests/managed-qualify.cjs
+          VAEROEX_NATIVE_TEST_DEPENDENCIES="$native_manifest" node tools/native-broker-provisioning/tests/mapped-qualify.cjs
           node tools/native-broker-provisioning/build-managed.mjs "$RUNNER_TEMP/native-managed-sandbox"
+          node tools/native-broker-provisioning/build-managed.mjs "$RUNNER_TEMP/native-managed-enroller" enroller
+          node tools/native-broker-provisioning/build-managed.mjs "$RUNNER_TEMP/native-managed-runtime" runtime
           # Explicit build only: never execute this hosted-profile binary in CI.
           node --test tools/native-broker-provisioning/tests/maintenance-launcher.test.mjs
           python3 -S tools/native-broker-provisioning/tests/private-pty.py
+
+      - name: Record public mapped-maintenance binary provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+          sha256sum native-managed-enroller native-managed-enroller.launcher native-managed-runtime native-managed-runtime.launcher > mapped-maintenance.sha256
+          {
+            printf 'source_commit=%s\n' "$GITHUB_SHA"
+            printf 'run_id=%s\n' "$GITHUB_RUN_ID"
+            printf 'run_attempt=%s\n' "$GITHUB_RUN_ATTEMPT"
+            dpkg-query -W -f='${Package}=${Version}\n' libpq5 libpq-dev libc6
+          } > mapped-maintenance-build.txt
+
+      - name: Preserve only public mapped-maintenance binaries for later installation
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: square-mapped-maintenance-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/native-managed-enroller
+            ${{ runner.temp }}/native-managed-enroller.launcher
+            ${{ runner.temp }}/native-managed-runtime
+            ${{ runner.temp }}/native-managed-runtime.launcher
+            ${{ runner.temp }}/mapped-maintenance.sha256
+            ${{ runner.temp }}/mapped-maintenance-build.txt
+          if-no-files-found: error
+          include-hidden-files: false
+          overwrite: false
+          retention-days: 7
 
       - name: Qualify parked JIT regression tools offline only
         shell: bash

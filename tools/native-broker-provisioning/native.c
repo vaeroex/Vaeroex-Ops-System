@@ -33,7 +33,17 @@
 #include <sys/random.h>
 #endif
 
+#if defined(VAEROEX_MAPPED_ENROLLER) && defined(VAEROEX_MAPPED_RUNTIME)
+#error Choose one fixed mapped capability
+#elif defined(VAEROEX_MAPPED_ENROLLER)
+#define CAPABILITY "square_verified_enrollment_authority"
+#define MAPPED_ROLE "square_sandbox_enroller"
+#elif defined(VAEROEX_MAPPED_RUNTIME)
+#define CAPABILITY "square_ingestion_runtime_authority"
+#define MAPPED_ROLE "square_sandbox_runtime"
+#else
 #define CAPABILITY "square_account_broker_authority"
+#endif
 #define PASSWORD_BYTES 64
 #define PASSWORD_CHARS (PASSWORD_BYTES * 2)
 #define DEADLINE_SECONDS 15
@@ -339,6 +349,39 @@ static bool candidate_identity(const char *host,const char *database,const char 
 }
 static bool closed_authority(const char *target) {
   const char *values[] = {target};
+#ifdef MAPPED_ROLE
+  /* Mapped maintenance requires the additive schema and known-disabled joined
+   * gates. SHARE locks fence concurrent activation through credential commit.
+   * FORCE RLS visibility must be established; hidden rows cannot prove closure. */
+  if(strcmp(target,MAPPED_ROLE))return false;
+  return command("LOCK TABLE private.square_account_configuration, private.square_remote_sandbox_binding, "
+    "private.square_gcp_callback_binding, private.square_gcp_mapped_runtime_binding, "
+    "private.square_qualification_gate IN SHARE MODE") &&
+    (!managed_profile() || true_query("SELECT NOT row_security_active('private.square_account_configuration') "
+      "AND NOT row_security_active('private.square_remote_sandbox_binding') "
+      "AND NOT row_security_active('private.square_gcp_callback_binding') "
+      "AND NOT row_security_active('private.square_gcp_mapped_runtime_binding') "
+      "AND NOT row_security_active('private.square_qualification_gate')",0,NULL)) &&
+    true_query("SELECT NOT EXISTS (SELECT FROM private.square_account_configuration "
+      "WHERE broker_login=$1 OR webhook_login=$1 OR (enrollment_login=$1 AND "
+      "(enrollment_enabled IS NOT FALSE OR (surface_enabled IS NOT FALSE AND blocked IS NOT TRUE)))) "
+      /* Require independent account/qualification closure during provisioning,
+       * including before any mapped binding exists. Do not depend solely on
+       * a runtime wrapper: all isolated account gates must be known closed
+       * while these maintenance locks are held, without mutating their state. */
+      "AND NOT EXISTS (SELECT FROM private.square_account_configuration "
+      "WHERE enrollment_enabled IS NOT FALSE AND blocked IS NOT TRUE) "
+      "AND NOT EXISTS (SELECT FROM private.square_qualification_gate "
+      "WHERE expires_at IS NULL OR expires_at>clock_timestamp()) "
+      "AND NOT EXISTS (SELECT FROM private.square_remote_sandbox_binding "
+      "WHERE broker_login=$1 OR enroller_login=$1 OR webhook_login=$1 OR runtime_login=$1) "
+      "AND NOT EXISTS (SELECT FROM private.square_gcp_callback_binding WHERE broker_login=$1) "
+      "AND NOT EXISTS (SELECT FROM private.square_gcp_mapped_runtime_binding m "
+      "LEFT JOIN private.square_gcp_callback_binding b ON b.deployment_key=m.deployment_key "
+      "WHERE (m.enroller_login=$1 OR m.runtime_login=$1) AND "
+      "(m.enabled IS NOT FALSE OR m.provider_calls_enabled IS NOT FALSE "
+      "OR b.enabled IS NOT FALSE OR b.provider_calls_enabled IS NOT FALSE))",1,values);
+#else
   /* These predicates select DENIAL rows inside NOT EXISTS. Including a NULL
    * flag as a denial therefore rejects unknown authority; it never enables it.
    * Acceptance requires known surface=false or blocked=true, and enabled=false. */
@@ -352,25 +395,26 @@ static bool closed_authority(const char *target) {
       "AND NOT EXISTS (SELECT FROM private.square_remote_sandbox_binding "
       "WHERE (broker_login=$1 AND enabled IS NOT FALSE) OR enroller_login=$1 OR webhook_login=$1 OR runtime_login=$1) "
       "AND NOT EXISTS (SELECT FROM private.square_gcp_callback_binding WHERE broker_login=$1 AND enabled IS NOT FALSE)", 1, values);
+#endif
 }
 static bool role_valid(const char *target, const char *oid, bool allow_login) {
-  const char *values[] = {target, oid, allow_login ? "true" : "false"};
+  const char *values[] = {target, oid, allow_login ? "true" : "false", CAPABILITY};
   return true_query("SELECT EXISTS (SELECT FROM pg_roles r WHERE r.rolname=$1 AND r.oid::text=$2 "
     "AND NOT r.rolsuper AND NOT r.rolcreaterole AND NOT r.rolcreatedb AND NOT r.rolreplication "
     "AND NOT r.rolbypassrls AND r.rolinherit AND (NOT r.rolcanlogin OR $3::boolean) "
     "AND r.rolconfig IS NULL) "
-    "AND EXISTS (SELECT FROM pg_roles c WHERE c.rolname='square_account_broker_authority' "
+    "AND EXISTS (SELECT FROM pg_roles c WHERE c.rolname=$4 "
     "AND NOT c.rolcanlogin AND NOT c.rolsuper AND NOT c.rolcreaterole AND NOT c.rolcreatedb "
     "AND NOT c.rolreplication AND NOT c.rolbypassrls AND c.rolconfig IS NULL) "
     "AND EXISTS (SELECT FROM pg_auth_members m JOIN pg_roles r ON r.oid=m.member "
-    "JOIN pg_roles c ON c.oid=m.roleid WHERE r.rolname=$1 AND c.rolname='square_account_broker_authority' "
+    "JOIN pg_roles c ON c.oid=m.roleid WHERE r.rolname=$1 AND c.rolname=$4 "
     "AND NOT m.admin_option AND m.inherit_option AND m.set_option) "
     /* Grants are keyed by grantor too: one good row must not hide a second
      * ADMIN-capable grant of the same capability from another grantor. */
     "AND NOT EXISTS (SELECT FROM pg_auth_members m JOIN pg_roles r ON r.oid=m.member "
     "JOIN pg_roles c ON c.oid=m.roleid WHERE r.rolname=$1 AND "
-    "(c.rolname<>'square_account_broker_authority' OR m.admin_option OR NOT m.inherit_option OR NOT m.set_option)) "
-    "AND NOT EXISTS (SELECT FROM pg_roles c WHERE c.rolname NOT IN ($1,'square_account_broker_authority') "
+    "(c.rolname<>$4 OR m.admin_option OR NOT m.inherit_option OR NOT m.set_option)) "
+    "AND NOT EXISTS (SELECT FROM pg_roles c WHERE c.rolname NOT IN ($1,$4) "
     "AND pg_has_role($1,c.oid,'MEMBER')) "
     /* PG16+ gives a non-superuser CREATEROLE operator an inherent ADMIN-only
      * membership. That exact authenticated operator may manage this role but
@@ -383,7 +427,7 @@ static bool role_valid(const char *target, const char *oid, bool allow_login) {
      * A dedicated login may inherit the capability, not own extra authority. */
     "AND NOT EXISTS (SELECT FROM pg_shdepend d WHERE d.refclassid='pg_authid'::regclass "
     "AND d.refobjid=(SELECT oid FROM pg_roles WHERE rolname=$1) AND d.deptype IN ('o','a','i','r')) "
-    "AND NOT EXISTS (SELECT FROM pg_db_role_setting WHERE setrole=(SELECT oid FROM pg_roles WHERE rolname=$1))", 3, values);
+    "AND NOT EXISTS (SELECT FROM pg_db_role_setting WHERE setrole=(SELECT oid FROM pg_roles WHERE rolname=$1))", 4, values);
 }
 static bool no_sessions(const char *target) {
   const char *values[] = {target};
@@ -499,13 +543,13 @@ static int run(int argc, char **argv) {
   if (ok) { ok = command("BEGIN"); transaction = ok; }
   if (ok) ok = closed_authority(target) && lock_target(target);
   if (ok && !strcmp(op,"prepare")) {
-    const char *values[] = {target};
+    const char *values[] = {target,CAPABILITY};
     ok = !strcmp(role_oid,"0") && true_query("SELECT NOT EXISTS (SELECT FROM pg_roles WHERE rolname=$1) "
-      "AND EXISTS (SELECT FROM pg_roles WHERE rolname='square_account_broker_authority' AND NOT rolcanlogin "
+      "AND EXISTS (SELECT FROM pg_roles WHERE rolname=$2 AND NOT rolcanlogin "
       "AND NOT rolsuper AND NOT rolcreaterole AND NOT rolcreatedb AND NOT rolreplication AND NOT rolbypassrls "
-      "AND rolconfig IS NULL)",1,values);
+      "AND rolconfig IS NULL)",2,values);
     if (ok) ok = role_command("CREATE ROLE",target,"NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE INHERIT NOREPLICATION NOBYPASSRLS");
-    if (ok) ok = role_command("GRANT square_account_broker_authority TO",target,"WITH ADMIN FALSE, INHERIT TRUE, SET TRUE");
+    if (ok) ok = role_command("GRANT " CAPABILITY " TO",target,"WITH ADMIN FALSE, INHERIT TRUE, SET TRUE");
   } else if (ok && !strcmp(op,"inspect") && !strcmp(role_oid,"0")) {
     const char *values[]={target};
     ok=true_query("SELECT NOT EXISTS (SELECT FROM pg_roles WHERE rolname=$1)",1,values);

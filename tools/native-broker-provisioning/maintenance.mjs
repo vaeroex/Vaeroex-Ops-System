@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
 import { constants, closeSync, fsyncSync, fstatSync, lstatSync, openSync, readFileSync, unlinkSync, writeSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { dirname } from "node:path";
 import { promisify } from "node:util";
 import { createManagedSupabaseNativeAdapter } from "./adapter.mjs";
 import { createManagedSupabaseProvisioningCoordinator } from "./lifecycle.mjs";
@@ -10,19 +11,22 @@ import { createSandboxSecretManagerRestClient } from "./secret-manager-rest.mjs"
 import { createManagedSupabaseDsnCodec } from "./dsn-codec.mjs";
 import { createGceMaintenanceIdentity } from "./maintenance-identity.mjs";
 import { readPrivateAdministrator, releasePrivateAdministratorInput } from "./private-entry.mjs";
-import { sandboxTarget, sandboxMaintenance as pin } from "./sandbox-profile.mjs";
+import { sandboxProvisioningInstallation } from "./sandbox-profile.mjs";
 import { maintenanceWindow, requireMutationWindow, requiresClearance, checkRecoveryClearance } from "./maintenance-policy.mjs";
 
 // Dedicated operator CLI. Never imported by an application or invoked on boot.
 // All command arguments are public correlation/target metadata, not credentials.
 // Enter only through the reviewed static maintenance-launcher. The checks below
 // are defense in depth, not protection from hooks that ran before JavaScript.
-const install = "/opt/vaeroex-native-broker";
+let profile;
+try { profile = sandboxProvisioningInstallation(dirname(fileURLToPath(import.meta.url))); }
+catch { process.stdout.write("native_maintenance_denied\n"); process.exit(2); }
+const { install, target: sandboxTarget, maintenance: pin } = profile;
 const executable = `${install}/native-managed`;
-const journal = "/var/lib/vaeroex-native-broker/maintenance.jsonl";
+const journal = `${profile.state}/maintenance.jsonl`;
 const denied = () => new Error("native_maintenance_denied");
 let password, journalFd, lockFd, lockIdentity, native, reservation, store, softTimer, hardTimer, clearanceExpiry = Infinity, finished = false;
-const lockPath = "/var/lib/vaeroex-native-broker/maintenance.lock";
+const lockPath = `${profile.state}/maintenance.lock`;
 const cancellation = new AbortController();
 const cancel = () => cancellation.abort();
 process.on("SIGINT", cancel); process.on("SIGTERM", cancel);
@@ -73,15 +77,15 @@ async function main() {
   // Recovery requires independent exact-role/version reconciliation recorded by
   // the operator in the runbook, not a successful-looking audit event.
   if (requiresClearance(last, operation)) {
-    const clearancePath = "/var/lib/vaeroex-native-broker/recovery-clearance.json";
+    const clearancePath = `${profile.state}/recovery-clearance.json`;
     trustedFile(clearancePath, 4096, true);
     const clearance = JSON.parse(readFileSync(clearancePath, "utf8"));
-    clearanceExpiry = checkRecoveryClearance({ last, operation, roleOid, intent, approvalId, clearance, now: Date.now() });
+    clearanceExpiry = checkRecoveryClearance({ last, operation, roleOid, intent, approvalId, clearance, now: Date.now(), profile: profile.name });
   }
   journalFd = openSync(journal, constants.O_WRONLY | constants.O_APPEND | constants.O_NOFOLLOW);
   const identity = createGceMaintenanceIdentity();
   await identity.verify();
-  const client = createSandboxSecretManagerRestClient({ withAccessToken: identity.withAccessToken });
+  const client = createSandboxSecretManagerRestClient({ withAccessToken: identity.withAccessToken, profile: profile.name });
   await client.preflight();
   // Public TLS evidence only, before private administrator entry. The presented
   // chain is never itself promoted to a trust root.

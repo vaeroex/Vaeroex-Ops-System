@@ -1,15 +1,16 @@
 import https from "node:https";
+import { sandboxProvisioningProfile } from "./sandbox-profile.mjs";
 
 const fail = () => new Error("secret_manager_transport_denied");
-const parent = "projects/vaeroex-square-sandbox/secrets/square-sandbox-callback-db";
-const numericParent = "projects/112579468800/secrets/square-sandbox-callback-db";
 const permissions = Object.freeze(["secretmanager.versions.add", "secretmanager.versions.access", "secretmanager.versions.get", "secretmanager.versions.disable"]);
 
 /** Fixed isolated maintenance transport. No redirects, retries, arbitrary URLs,
  * SDK logging or ambient credential lookup. withAccessToken supplies a borrowed
  * private Buffer; HTTPS necessarily makes transient header/JSON string copies.
  * These are not persisted or included in any returned failure. */
-export function createSandboxSecretManagerRestClient({ withAccessToken, request = https.request } = {}) {
+export function createSandboxSecretManagerRestClient({ withAccessToken, request = https.request, profile = "callback" } = {}) {
+  const parent = sandboxProvisioningProfile(profile).maintenance.secretParent;
+  const numericParent = parent.replace("projects/vaeroex-square-sandbox/", "projects/112579468800/");
   if (typeof withAccessToken !== "function" || typeof request !== "function") throw fail();
   const version = name => {
     const match = typeof name === "string" && /^(projects\/[^/]+\/secrets\/[^/]+)\/versions\/([1-9][0-9]{0,20})$/.exec(name);
