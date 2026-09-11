@@ -134,13 +134,23 @@ async function qualify(runtime) {
     rejected=false;try{await c.query(`update private.${table} set approval_fingerprint=approval_fingerprint`);}catch{rejected=true;}eq(rejected,true,"immutable history rejects even no-op update");
     const r=(await c.query("select relrowsecurity,relforcerowsecurity from pg_class where oid=$1::regclass",['private.'+table])).rows[0];eq(r,{relrowsecurity:true,relforcerowsecurity:true},"forced RLS");
   }
-  for(const role of ["anon","authenticated","service_role","square_ingestion_runtime_authority"]) {
-    await c.query(`set role ${role}`);try{await denied(()=>register(approval),"application role cannot register");await denied(()=>admit(fingerprint),"application role cannot admit");await denied(()=>c.query("select * from private.square_observation_admissions"),"application role cannot read private admissions");}finally{await c.query("reset role");}
+  for(const role of ["anon","authenticated","service_role"]) {
+    stage="application_role_switch_"+role;
+    await c.query(`set role ${role}`);try{stage="application_denials_"+role;await denied(()=>register(approval),"application role cannot register");await denied(()=>admit(fingerprint),"application role cannot admit");await denied(()=>c.query("select * from private.square_observation_admissions"),"application role cannot read private admissions");}finally{stage="application_role_reset_"+role;await c.query("reset role");}
   }
+  // Supabase postgres may administer a custom role without permission to SET ROLE
+  // to it. Exercise its actual dedicated LOGIN instead of broadening that operator.
+  stage="native_runtime_login_setup";
   const runtimeLogin=await runtime.login(db,"observation_worker",["square_ingestion_runtime_authority"],"square_sandbox");
+  stage="native_runtime_denials";
   eq((await runtimeLogin.client.query("select session_user as value")).rows[0].value,runtimeLogin.name,"distinct native runtime identity");
+  eq((await runtimeLogin.client.query("select pg_has_role(session_user,'square_ingestion_runtime_authority','USAGE') as value")).rows[0].value,true,"native runtime inherits the intended capability");
+  await denied(()=>runtimeLogin.client.query("select public.register_square_observation_approval_v1($1::jsonb)",[JSON.stringify(approval)]),"native runtime cannot register approval");
   await denied(()=>runtimeLogin.client.query("select public.admit_square_provider_observations_v1($1)",[fingerprint]),"native runtime cannot admit observations");
+  await denied(()=>runtimeLogin.client.query("select * from private.square_observation_admissions"),"native runtime cannot read private admissions");
+  stage="post_admission_revocation";
   await c.query("begin");await c.query("update private.square_account_configuration set blocked=false");await c.query("update private.square_account_connections set revocation_pending=true");await denied(()=>admit(fingerprint),"post-admission revocation fences replay");await c.query("rollback");
+  stage="final_preservation";
   eq(await genericCounts(),genericBefore,"no generic canonical source/fact/contribution records minted");
   eq(await runtime.sourceSchemaFingerprint(c),schemaBefore,"canonical/QBO schema unchanged");
   eq((await c.query("select surface_enabled,enrollment_enabled from private.square_account_configuration")).rows[0],{surface_enabled:false,enrollment_enabled:false},"admission never opens runtime gates");
