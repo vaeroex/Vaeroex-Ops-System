@@ -48,7 +48,7 @@
     "test:external-integrations-square-gcp-db": "node scripts/run-square-gcp-callback-database-qualification.js",
     "test:external-integrations-square-mapped": "node scripts/external-integrations-square-gcp-mapped-database-regression-tests.js && node scripts/external-integrations-square-gcp-mapped-credentials-regression-tests.js && node scripts/external-integrations-square-gcp-mapped-runtime-regression-tests.js && node scripts/external-integrations-square-bounded-sync-regression-tests.js",
     "test:external-integrations-square-mapped-db": "node scripts/run-square-gcp-mapped-database-qualification.js",
-    "test:external-integrations-square-observations": "node scripts/external-integrations-square-observation-admission-regression-tests.js",
+    "test:external-integrations-square-observations": "node scripts/external-integrations-square-observation-admission-regression-tests.js && node --require ./scripts/square-no-ai-runtime-test-guard.js scripts/external-integrations-square-canonical-regression-tests.js && node --require ./scripts/square-no-ai-runtime-test-guard.js scripts/external-integrations-square-ingestion-regression-tests.js",
     "test:external-integrations-square-observations-db": "node scripts/run-square-observation-database-qualification.js",
     "test:external-integrations-square-gcp-ops": "node services/square-sandbox-callback/ops/run-ops-qualification.mjs",
     "build:external-integrations-square-gcp-callback": "ncc build services/square-sandbox-callback/src/entry.ts -o services/square-sandbox-callback/dist --minify --no-cache --license licenses.txt --external server-only && node scripts/package-square-gcp-callback.js",
