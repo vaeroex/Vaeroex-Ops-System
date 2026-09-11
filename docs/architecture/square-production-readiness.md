@@ -21,13 +21,20 @@ deadline, cancellation, retry deferral, recovery, blocked/rejected and conflict.
 Observation counts are acknowledged page observations, not new record counts.
 No new database privileges, scheduler, refresh, consent or admission is added.
 
-Remaining operational dependencies: install the reviewed artifact in a fresh
-bounded Sandbox window, verify the new command against existing durable tasks,
-then separately qualify ongoing query-window planning, credential refresh and
+The bounded multi-page command has since passed the hosted Catalog pagination
+and fresh-process replay window without adding duplicate source versions.
+Remaining operational dependencies: separately qualify ongoing query-window planning, credential refresh and
 distributed scheduling/rate fairness before unattended operation. Never advance
 a time watermark from local wall time, interpret a finished cursor as complete
 history, or retain old admission as proof of current authorization. The current
 command deliberately does not mint follow-up tasks or claim freshness.
+
+The next code slice is [canonical interpretation and reconciliation v1](square-canonical-interpretation.md):
+immutable non-economic interpretations, evidence-only reference relationships,
+incremental descriptive counts and a no-dispatch explanation policy. It reuses
+the admitted baseline; it does not enable economics or Production. Its additive
+private migration and checked native worker require hosted qualification after
+review/CI. Source observation age is not a claim of current synchronization health.
 
 The remainder of this file is the historical account-connection audit baseline,
 not a directive to recreate or requalify completed Sandbox setup.

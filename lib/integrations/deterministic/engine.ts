@@ -1081,6 +1081,29 @@ export function incrementalChangeSetFingerprint({
   });
 }
 
+/** Committed-change production path. Full recomputation remains an explicit
+ * oracle below, not hidden work on every ordinary incremental update. */
+export function runDeterministicIncremental({
+  prior: rawPrior, contributions: rawContributions, mutations: rawMutations, registry: rawRegistry, asOfDate
+}: {
+  prior: DeterministicStateSnapshot; contributions: readonly ActiveContribution[];
+  mutations: readonly ContributionMutation[]; registry: DependencyRegistry; asOfDate: string;
+}) {
+  IsoDateSchema.parse(asOfDate);
+  const prior = DeterministicStateSnapshotSchema.parse(rawPrior);
+  const registry = assertDependencyRegistry(rawRegistry);
+  const contributions = ActiveContributionSchema.array().max(100_000).parse(rawContributions);
+  const mutations = ContributionMutationSchema.array().max(10_000).parse(rawMutations);
+  validateContributionScope(contributions, prior.workspaceId, prior.businessEntityId);
+  for (const mutation of mutations) {
+    for (const value of [mutation.prior, mutation.next]) if (value &&
+      (value.workspaceId !== prior.workspaceId || value.businessEntityId !== prior.businessEntityId)) {
+      throw new Error("deterministic_change_set_scope_mismatch");
+    }
+  }
+  return calculateIncremental({ prior, contributions, mutations, registry, asOfDate });
+}
+
 export function runIncrementalFullEquivalence({
   prior: rawPrior,
   contributions: rawContributions,

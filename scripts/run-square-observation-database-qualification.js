@@ -11,11 +11,11 @@ async function qualify(runtime) {
   const policy=require("../lib/integrations/providers/square/observation-admission.ts");
   const db=await runtime.createDatabase("observations"), c=db.client;
   const files=runtime.migrationFiles();
-  eq(files.length,111,"full canonical chain, including admission migration");
+  eq(files.length,112,"full canonical chain, including interpretation migration");
   stage="migrations";
-  await runtime.applyMigrations(c,files.slice(0,-1));
+  await runtime.applyMigrations(c,files.slice(0,-2));
   const schemaBefore=await runtime.sourceSchemaFingerprint(c);
-  await runtime.applyMigrations(c,files.slice(-1));
+  await runtime.applyMigrations(c,files.slice(-2));
   eq(await runtime.sourceSchemaFingerprint(c),schemaBefore,"additive migration preserves canonical/QBO schema");
   const genericCounts=async()=>{const counts={};for(const table of ["external_source_records","external_source_record_versions","canonical_business_facts","canonical_business_fact_versions","business_fact_sources","fact_contribution_batches","fact_contribution_events"])counts[table]=(await c.query(`select count(*)::int n from private.${table}`)).rows[0].n;return counts;};
   const genericBefore=await genericCounts();
@@ -43,24 +43,24 @@ async function qualify(runtime) {
   await insert("private.square_connection_generations",{...scopeCols,connection_generation:4,identity_mode:"oauth_verified",identity_evidence_fingerprint:fp,default_location_id:"LOC_SYNTHETIC",default_discovery_fingerprint:fp,retention_policy_version:"synthetic_observation_v1",retention_approval_fingerprint:fp,retention_expires_at:later,enrolled_by:"postgres",enrolled_at:now});
   await insert("private.square_account_enrollments",{connection_id:connection,generation:4,credential_id:credential,discovery_fingerprint:fp,retention_policy_version:"synthetic_observation_v1",retention_approval_fingerprint:fp,source_retention_seconds:86400,cursor_retention_seconds:3600,revocation_access_policy:"deny_source_access",confirmed_by:actor,confirmed_session:session,enrolled_by:"postgres",enrolled_at:now});
   const inputs=[],manifest=[];
+  const fixtures=require("./square-canonical-test-support.js");
+  const parsedFixtures=[fixtures.payment(),fixtures.refund(),fixtures.order(),fixtures.catalog(),fixtures.inventory("count"),fixtures.inventory("physical"),fixtures.inventory("adjustment")];
+  const replacements=new Map([[fixtures.scope.workspaceId,workspace],[fixtures.scope.connectionId,connection],
+    [fixtures.scope.sellerId,scope.sellerId],...fixtures.scope.authorizedLocationIds.map(x=>[x,"LOC_SYNTHETIC"])]);
+  const bind=value=>typeof value==="string"?(replacements.get(value)??value):Array.isArray(value)?value.map(bind):value&&typeof value==="object"?Object.fromEntries(Object.entries(value).map(([k,v])=>[k,bind(v)])):value;
   stage="synthetic_immutable_sources";
   for(const type of policy.SQUARE_OBSERVATION_RECORD_TYPES) {
     const stream=type.startsWith("square_catalog")?"catalog":type.startsWith("square_inventory")?"inventory":type==="square_payment"?"payments":type==="square_refund"?"refunds":"order_tenders";
-    // Minimal synthetic checked-source fixture, not a claim of full provider parser coverage.
-    const provider={providerKey:"square",providerEnvironment:"sandbox",apiVersion:"2026-08-19"};
-    const authority={providerKey:"square",providerEnvironment:"sandbox",connectionId:connection,providerEntityId:scope.sellerId,providerEntityType:"merchant",workspaceId:workspace,providerId:"SYNTHETIC",locationId:"LOC_SYNTHETIC"};
-    const core={id:"SYNTHETIC",provider,authority,locationId:"LOC_SYNTHETIC",updatedAt:null};
-    let data=core;
-    if(stream==="catalog")data={...core,catalogObjectType:"ITEM_VARIATION",catalogVersion:"1",isDeleted:false,availability:{kind:"all_locations_except",absentLocationIds:[]}};
-    if(stream==="order_tenders")data={adjustmentDetail:{lineItemDetail:{core:{...core,entityType:"order_core",providerVersion:"1"}}}};
-    if(stream==="inventory")data={...core,entityType:type.slice(7),calculatedAt:null,...(type==="square_inventory_count_snapshot"?{authority:{...authority,snapshotIdentityFingerprint:"SYNTHETIC"}}:{})};
+    // Real parser/mapper projections rebound to this disposable database's UUIDs.
+    const base=parsedFixtures.find(x=>x.pending.providerRecordType===type).pending;
+    const data=bind(base.projection.data),providerRecordId=base.providerRecordId;
     const stableScope={...scope};delete stableScope.authorizedLocationIds;delete stableScope.generation;
-    const pending={resourceKey:contractSha256({purpose:"square_source_resource_identity_v1",scope:stableScope,stream,providerRecordType:type,providerRecordId:"SYNTHETIC"}),scope,stream,providerRecordId:"SYNTHETIC",providerRecordType:type,providerRevision:{version:["catalog","order_tenders"].includes(stream)?"1":null,updatedAt:null},observedAt:now,deleted:false,projection:{mappingVersion:mapping.SQUARE_SOURCE_MAPPING_VERSION,stream,role:"primary",authority:"pending_provider_observation_not_economic_authority",data}};
+    const pending={resourceKey:contractSha256({purpose:"square_source_resource_identity_v1",scope:stableScope,stream,providerRecordType:type,providerRecordId}),scope,stream,providerRecordId,providerRecordType:type,providerRevision:base.providerRevision,observedAt:now,deleted:false,projection:{mappingVersion:mapping.SQUARE_SOURCE_MAPPING_VERSION,stream,role:"primary",authority:"pending_provider_observation_not_economic_authority",data}};
     pending.versionKey=contractSha256({purpose:"square_source_observed_version_v1",mappingVersion:mapping.SQUARE_SOURCE_MAPPING_VERSION,resourceKey:pending.resourceKey,providerRevision:pending.providerRevision,deleted:false,projection:pending.projection});
     const sourceVersion=mapping.materializeSquarePendingSource(pending,1,null),task=id(),scan=contractSha256({task}),page=contractSha256({page:task});
     await insert("private.square_ingestion_tasks",{...scopeCols,connection_generation:4,task_id:task,runtime_login:"postgres",lease_owner_fingerprint:fp,grant:{scope,stream},binding:{},expires_at:later,retention_policy_version:"synthetic_observation_v1",retention_expires_at:later,created_at:now});
     await insert("private.square_ingestion_scans",{...scopeCols,connection_generation:4,scan_key:scan,initial_task_id:task,binding:{},stream,status:"finished",not_before:now,retention_policy_version:"synthetic_observation_v1",retention_expires_at:later,created_at:now,updated_at:now});
-    await insert("private.square_ingestion_resources",{...scopeCols,resource_key:pending.resourceKey,stream,provider_record_type:type,provider_record_id:"SYNTHETIC"});
+    await insert("private.square_ingestion_resources",{...scopeCols,resource_key:pending.resourceKey,stream,provider_record_type:type,provider_record_id:providerRecordId});
     await c.query("begin");
     await insert("private.square_ingestion_versions",{...scopeCols,version_key:pending.versionKey,resource_key:pending.resourceKey,ordinal:1,version_id:sourceVersion.id,pending,version:sourceVersion,ordering:"newer",retention_policy_version:"synthetic_observation_v1",retention_expires_at:later,created_at:now});
     await insert("private.square_ingestion_page_receipts",{...scopeCols,scan_key:scan,page_id:page,task_id:task,command_fingerprint:fp,checkpoint_version:1,retention_policy_version:"synthetic_observation_v1",retention_expires_at:later,created_at:now});
@@ -128,15 +128,88 @@ async function qualify(runtime) {
   const facts=(await c.query("select version_key,fact from private.square_observation_admissions")).rows;
   for(const {version_key,fact} of facts){const input=inputs.find(x=>x.pending.versionKey===version_key);const result=policy.prepareSquareObservationAdmission({...input,currentAuthority:{scopeFingerprint:contractSha256(scope),resourceKey:input.pending.resourceKey,currentVersionKey:version_key,sourceFingerprint:input.sourceVersion.sourceFingerprint,ordering:"newer",admittedAt:fact.createdAt}});eq(fact,result.fact,"SQL/TS entire canonical fact parity");}
   eq((await c.query("select version_key,pending,version from private.square_ingestion_versions order by version_key")).rows,pendingBefore,"pending sources remain byte-semantically unchanged");
+  stage="canonical_interpretation_transaction";
+  const {interpretAdmittedSquareSources}=require("../lib/integrations/providers/square/canonical-repository.ts");
+  eq((await interpretAdmittedSquareSources(c,fingerprint)).outcome,"rejected","closed authority blocks interpretation");
+  await c.query("update private.square_account_configuration set blocked=false");
+  const lostAck={query:async(sql,values)=>{const r=await c.query(sql,values);if(sql==="commit")throw new Error("synthetic_ack_lost");return r;}};
+  eq((await interpretAdmittedSquareSources(lostAck,fingerprint)).outcome,"commit_uncertain","actual committed transaction with lost acknowledgement remains uncertain");
+  eq((await interpretAdmittedSquareSources(c,fingerprint)).outcome,"replayed","fresh checked replay reconciles committed state without duplicate facts");
+  eq((await c.query("select count(*)::int n from private.square_interpretation_facts")).rows[0].n,7,"one immutable interpretation per source version");
+  eq((await c.query("select count(*)::int n from private.square_interpretation_runs")).rows[0].n,1,"one committed incremental run");
+  const interpreted=(await c.query("select output from private.square_interpretation_runs")).rows[0].output;
+  eq(interpreted.facts.length,7,"all distinct types persisted");
+  eq(interpreted.intelligence.assessment.economic,"blocked","intelligence remains descriptive");
+  eq(interpreted.intelligence.assessment.historical,"unknown","scan never claims history completeness");
+  let casError;try{await c.query("select public.commit_square_interpretation_v1($1,0,$2,$3::jsonb)",[fingerprint,fp,JSON.stringify(interpreted)]);}catch(e){casError=e.code;}
+  eq(casError,"40001","stale incremental writer rejected");
+  stage="canonical_manifest_partitions";
+  const originalPartition=interpreted.coverage.partitionFingerprint;
+  const subsetFingerprints=[];
+  for(const subset of [manifest.slice(0,1),manifest.slice(1,3),manifest.slice(0,3)]) {
+    const subsetFingerprint=await register({...approval,manifest:subset});
+    subsetFingerprints.push(subsetFingerprint);
+    const subsetRun=await interpretAdmittedSquareSources(c,subsetFingerprint);
+    eq(subsetRun.outcome,"committed","different and overlapping approved subsets commit independently");
+    eq(subsetRun.revision,1,"each resource-set partition starts at its own revision");
+    const subsetRead=(await c.query("select public.read_square_interpretation_inputs_v1($1) as value",[subsetFingerprint])).rows[0].value;
+    eq(subsetRead.prior.output.controls.length,subset.length,"partition controls contain only its approved resources");
+    eq(subsetRead.prior.output.coverage.kind,"approval_resource_set","counts explicitly disclose manifest coverage");
+    eq(subsetRead.partitionFingerprint!==originalPartition,true,"subset cannot select the full-manifest checkpoint");
+  }
+  eq((await interpretAdmittedSquareSources(c,fingerprint)).outcome,"replayed","subset runs do not overwrite full-manifest state");
+  for(const subsetFingerprint of subsetFingerprints)eq((await interpretAdmittedSquareSources(c,subsetFingerprint)).outcome,"replayed","interleaved subset replay stays independent");
+  eq((await c.query("select count(*)::int n from private.square_interpretation_facts")).rows[0].n,7,"overlapping partitions do not duplicate immutable facts");
+  stage="canonical_provider_correction";
+  const oldPayment=inputs.find(x=>x.pending.providerRecordType==="square_payment");
+  const updated=JSON.parse(JSON.stringify(oldPayment.pending));
+  updated.providerRevision.updatedAt="2026-09-02T12:01:00Z";
+  updated.projection.data.updatedAt="2026-09-02T12:01:00Z";updated.projection.data.status="CANCELED";
+  updated.versionKey=contractSha256({purpose:"square_source_observed_version_v1",mappingVersion:mapping.SQUARE_SOURCE_MAPPING_VERSION,resourceKey:updated.resourceKey,providerRevision:updated.providerRevision,deleted:false,projection:updated.projection});
+  const corrected=mapping.materializeSquarePendingSource(updated,2,oldPayment.sourceVersion.id);
+  const oldManifest=manifest.find(m=>m.resourceKey===updated.resourceKey),page=contractSha256({synthetic:"correction_receipt"});
+  await c.query("begin");
+  await insert("private.square_ingestion_versions",{...scopeCols,version_key:updated.versionKey,resource_key:updated.resourceKey,ordinal:2,version_id:corrected.id,prior_version_id:oldPayment.sourceVersion.id,pending:updated,version:corrected,ordering:"newer",retention_policy_version:"synthetic_observation_v1",retention_expires_at:later,created_at:now});
+  await c.query(`insert into private.square_ingestion_page_receipts select scan_key,$1,workspace_id,business_entity_id,connection_id,task_id,command_fingerprint,3,retention_policy_version,retention_expires_at,clock_timestamp()
+    from private.square_ingestion_page_receipts where scan_key=$2 and page_id=$3`,[page,oldManifest.receiptScanKey,oldManifest.receiptPageId]);
+  await c.query("update private.square_ingestion_resources set current_version_key=$1,observed_version_key=$1,version_count=2 where resource_key=$2",[updated.versionKey,updated.resourceKey]);
+  await c.query("commit");
+  const updatedApproval={...approval,manifest:manifest.map(m=>m===oldManifest?{...m,versionKey:updated.versionKey,sourceRecordVersionId:corrected.id,sourceFingerprint:corrected.sourceFingerprint,expectedCurrentVersionKey:updated.versionKey,receiptPageId:page}:m)};
+  const updatedFingerprint=await register(updatedApproval);await admit(updatedFingerprint);
+  // Simulate elapsed retention only in this owned disposable fixture. The
+  // immutable trigger is restored before the checked read and rollback restores
+  // the row; no production migration or worker can alter this deadline.
+  await c.query("begin");
+  await c.query("alter table private.square_interpretation_runs disable trigger square_interpretation_immutable");
+  await c.query("update private.square_interpretation_runs set retention_expires_at=clock_timestamp()-interval '1 second'");
+  await c.query("alter table private.square_interpretation_runs enable trigger square_interpretation_immutable");
+  const expiredPrior=(await c.query("select public.read_square_interpretation_inputs_v1($1) as value",[updatedFingerprint])).rows[0].value;
+  eq(expiredPrior.prior.revision,1,"expired prior retains CAS revision");
+  eq(expiredPrior.prior.output,null,"expired prior facts are not returned for a valid corrected manifest");
+  await c.query("rollback");
+  const correction=await interpretAdmittedSquareSources(c,updatedFingerprint);
+  eq(correction.outcome,"committed","changed committed source is interpreted");eq(correction.revision,2,"derived checkpoint advances once");
+  eq((await c.query("select count(*)::int n from private.square_interpretation_facts")).rows[0].n,8,"correction preserves old fact and adds one version");
+  eq((await interpretAdmittedSquareSources(c,updatedFingerprint)).outcome,"replayed","correction replay is idempotent");
+  eq((await interpretAdmittedSquareSources(c,fingerprint)).outcome,"rejected","out-of-order old manifest cannot restore previous current fact");
+  const latest=(await c.query("select output from private.square_interpretation_runs order by revision desc limit 1")).rows[0].output;
+  eq(latest.intelligence.assessment.counts.payment,1,"correction is not a second payment");
+  eq(latest.intelligence.assessment.statuses["payment:CANCELED"],1,"provider reversal changes description only");
+  eq(latest.intelligence.assessment.economic,"blocked","reversal never creates netting");
+  eq(latest.work.nodesRecalculated<=2,true,"only old and new payment status buckets recomputed");
+  await c.query("update private.square_account_connections set revocation_pending=true");
+  eq((await interpretAdmittedSquareSources(c,updatedFingerprint)).outcome,"rejected","revocation fences even idempotent replay");
+  await c.query("update private.square_account_connections set revocation_pending=false");
+  await c.query("update private.square_account_configuration set blocked=true");
   stage="immutable_and_privilege_denials";
-  for(const table of ["square_observation_approvals","square_observation_admissions"]) {
+  for(const table of ["square_observation_approvals","square_observation_admissions","square_interpretation_facts","square_interpretation_runs"]) {
     let rejected=false;try{await c.query(`delete from private.${table}`);}catch{rejected=true;}eq(rejected,true,"immutable observation history");
-    rejected=false;try{await c.query(`update private.${table} set approval_fingerprint=approval_fingerprint`);}catch{rejected=true;}eq(rejected,true,"immutable history rejects even no-op update");
+    rejected=false;try{await c.query(`update private.${table} set workspace_id=workspace_id`);}catch{rejected=true;}eq(rejected,true,"immutable history rejects even no-op update");
     const r=(await c.query("select relrowsecurity,relforcerowsecurity from pg_class where oid=$1::regclass",['private.'+table])).rows[0];eq(r,{relrowsecurity:true,relforcerowsecurity:true},"forced RLS");
   }
   for(const role of ["anon","authenticated","service_role"]) {
     stage="application_role_switch_"+role;
-    await c.query(`set role ${role}`);try{stage="application_denials_"+role;await denied(()=>register(approval),"application role cannot register");await denied(()=>admit(fingerprint),"application role cannot admit");await denied(()=>c.query("select * from private.square_observation_admissions"),"application role cannot read private admissions");}finally{stage="application_role_reset_"+role;await c.query("reset role");}
+    await c.query(`set role ${role}`);try{stage="application_denials_"+role;await denied(()=>register(approval),"application role cannot register");await denied(()=>admit(fingerprint),"application role cannot admit");await denied(()=>c.query("select * from private.square_observation_admissions"),"application role cannot read private admissions");await denied(()=>c.query("select public.read_square_interpretation_inputs_v1($1)",[fingerprint]),"application role cannot read interpretation inputs");await denied(()=>c.query("select * from private.square_interpretation_runs"),"application role cannot read private intelligence");}finally{stage="application_role_reset_"+role;await c.query("reset role");}
   }
   // Supabase postgres may administer a custom role without permission to SET ROLE
   // to it. Exercise its actual dedicated LOGIN instead of broadening that operator.
@@ -154,6 +227,6 @@ async function qualify(runtime) {
   eq(await genericCounts(),genericBefore,"no generic canonical source/fact/contribution records minted");
   eq(await runtime.sourceSchemaFingerprint(c),schemaBefore,"canonical/QBO schema unchanged");
   eq((await c.query("select surface_enabled,enrollment_enabled from private.square_account_configuration")).rows[0],{surface_enabled:false,enrollment_enabled:false},"admission never opens runtime gates");
-  console.log(`Square observation database qualification passed (${assertions} assertions; 111 migrations; seven SQL/TS parity cases).`);
+  console.log(`Square observation database qualification passed (${assertions} assertions; 112 migrations; seven SQL/TS parity cases).`);
 }
 runAdditionalQualification(qualify).catch(error=>{process.stderr.write(`Square observation database qualification failed at ${stage} (${typeof error.code==="string"&&/^[A-Z0-9_]+$/.test(error.code)?error.code:"fixed_failure"}).\n`);if(/^[a-z_]{1,100}$/.test(error.message))process.stderr.write(error.message+"\n");if(error.code==="ERR_ASSERTION")process.stderr.write(String(error.message).split("\n")[0]+"\n");process.exitCode=1;});
