@@ -46,7 +46,7 @@
     "test:external-integrations-square-consent-diagnostics": "node scripts/run-square-consent-diagnostics-qualification.js",
     "test:external-integrations-square-gcp-portal": "node scripts/run-square-gcp-callback-portal-qualification.js",
     "test:external-integrations-square-gcp-db": "node scripts/run-square-gcp-callback-database-qualification.js",
-    "test:external-integrations-square-mapped": "node scripts/external-integrations-square-gcp-mapped-database-regression-tests.js && node scripts/external-integrations-square-gcp-mapped-credentials-regression-tests.js && node scripts/external-integrations-square-gcp-mapped-runtime-regression-tests.js",
+    "test:external-integrations-square-mapped": "node scripts/external-integrations-square-gcp-mapped-database-regression-tests.js && node scripts/external-integrations-square-gcp-mapped-credentials-regression-tests.js && node scripts/external-integrations-square-gcp-mapped-runtime-regression-tests.js && node scripts/external-integrations-square-bounded-sync-regression-tests.js",
     "test:external-integrations-square-mapped-db": "node scripts/run-square-gcp-mapped-database-qualification.js",
     "test:external-integrations-square-observations": "node scripts/external-integrations-square-observation-admission-regression-tests.js",
     "test:external-integrations-square-observations-db": "node scripts/run-square-observation-database-qualification.js",

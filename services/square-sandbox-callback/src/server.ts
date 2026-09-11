@@ -10,6 +10,7 @@ import { SQUARE_REMOTE_SANDBOX } from "@/lib/integrations/control-plane/square-r
 import { checkedSquareGcpCallbackDatabaseCa } from "@/lib/integrations/control-plane/square-gcp-callback-database";
 import { checkedSquareGcpMappedBinding } from "@/lib/integrations/control-plane/square-gcp-mapped-contracts";
 import { confirmNativeSquareGcpMappedLocation, enrollNativeSquareGcpMappedConnection, enrollNativeSquareGcpMappedTask, runNativeSquareGcpMappedPage } from "@/lib/integrations/control-plane/square-gcp-mapped-runtime";
+import { runSquareMappedSync } from "@/lib/integrations/control-plane/square-gcp-mapped-sync";
 import { checkedPortalConfig, HostPolicySchema } from "./config";
 import { checkNativeSquareSandboxPortalBinding, createNativeSquareSandboxPortal } from "./runtime";
 import { CALLBACK_PATH, PORTAL_PATH, portalHeaders, portalUnavailable } from "./portal";
@@ -117,7 +118,7 @@ export function nativePortalHandler(handle: (request: Request) => Promise<Respon
 
 export async function runSquareSandboxPortalCommand() {
   const args = process.argv.slice(2);
-  if (args.length !== 3 || !["--preflight", "--check-binding", "--serve", "--confirm-mapping", "--enroll-mapped", "--enroll-task", "--run-page"].includes(args[0]) || args[1] !== "--config" || args[2] !== configPath) denied();
+  if (args.length !== 3 || !["--preflight", "--check-binding", "--serve", "--confirm-mapping", "--enroll-mapped", "--enroll-task", "--run-page", "--run-sync"].includes(args[0]) || args[1] !== "--config" || args[2] !== configPath) denied();
   localEnvironment();
   const config = checkedPortalConfig(JSON.parse(readLocal(configPath, 65_536).toString()), args[0] !== "--preflight");
   // Both enabled preflight and serving validate public trust before metadata,
@@ -136,10 +137,10 @@ export async function runSquareSandboxPortalCommand() {
     !config.binding || !config.supabasePublishableKey || !databaseCa) denied();
   const input = { binding: config.binding, publishableKey: config.supabasePublishableKey, databaseCa, network: fetch,
     ...(config.mappedBinding ? { mappedBinding: checkedSquareGcpMappedBinding(config.mappedBinding) } : {}) };
-  if (["--confirm-mapping", "--enroll-mapped", "--enroll-task", "--run-page"].includes(args[0])) {
+  if (["--confirm-mapping", "--enroll-mapped", "--enroll-task", "--run-page", "--run-sync"].includes(args[0])) {
     if (!input.mappedBinding) denied();
     const mapped = { binding: input.mappedBinding, databaseCa, network: fetch };
-    const remaining = Math.min(60_000, expiry - Date.now(), Date.parse(mapped.binding.mappedApprovalExpiresAt) - Date.now());
+    const remaining = Math.min(args[0] === "--run-sync" ? 300_000 : 60_000, expiry - Date.now(), Date.parse(mapped.binding.mappedApprovalExpiresAt) - Date.now());
     if (remaining < 5_000) denied();
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), remaining - 2_000);
@@ -154,6 +155,18 @@ export async function runSquareSandboxPortalCommand() {
         if (args[0] === "--enroll-task") await enrollNativeSquareGcpMappedTask(mapped, task, controller.signal);
         else {
           if (!task || Object.keys(task).sort().join(",") !== "leaseOwnerFingerprint,taskId") denied();
+          if (args[0] === "--run-sync") {
+            const summary = await runSquareMappedSync({ runPage: async signal => {
+              // Preserve the old per-command hard bound for every page,
+              // including native connection close before another page starts.
+              const pageAbort = setTimeout(() => controller.abort(), 58_000);
+              const pageHard = setTimeout(() => { controller.abort(); process.exit(78); }, 60_000);
+              try { return await runNativeSquareGcpMappedPage(mapped, task, signal); }
+              finally { clearTimeout(pageAbort); clearTimeout(pageHard); }
+            } }, Math.max(1, remaining - 2_000), controller.signal);
+            process.stdout.write(JSON.stringify(summary) + "\n");
+            return;
+          }
           const outcome = await runNativeSquareGcpMappedPage(mapped, task, controller.signal);
           if (controller.signal.aborted) denied();
           // Fixed status only: no provider data, cursor, task or credential metadata.

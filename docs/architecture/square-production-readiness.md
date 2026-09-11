@@ -1,5 +1,37 @@
 # Square production-readiness checklist
 
+## Current operational baseline — September 11, 2026
+
+PR384/main `7b2584a0fce916065d4241b165826ae1c4aa69e9` supersedes the historical
+"no Sandbox evidence" statements below. Isolated generation4 consent, explicit
+mapping/enrollment, encrypted native broker credentials and read-only populated
+sync have been qualified. Thirteen immutable source versions have separate
+verified non-economic admissions: Payment1, Refund1, Orders3, Catalog variations2,
+and six distinct Inventory observations. Replay and descriptive reconciliation
+are qualified; original sources remain pending/untrusted. Economics and history
+completeness remain blocked/unknown. This is not Production activation.
+
+The next implemented operational slice is `--run-sync` in the dedicated Sandbox
+runtime: at most10 sequential page invocations within five minutes, using only
+the existing root-owned task, current operator session, mapped generation and
+native authority. It retains per-page hard deadlines, a500ms minimum separation,
+and stops on any retry/uncertain result instead of guessing commit success.
+Its bounded nonsecret summary distinguishes exhausted scan, partial page budget,
+deadline, cancellation, retry deferral, recovery, blocked/rejected and conflict.
+Observation counts are acknowledged page observations, not new record counts.
+No new database privileges, scheduler, refresh, consent or admission is added.
+
+Remaining operational dependencies: install the reviewed artifact in a fresh
+bounded Sandbox window, verify the new command against existing durable tasks,
+then separately qualify ongoing query-window planning, credential refresh and
+distributed scheduling/rate fairness before unattended operation. Never advance
+a time watermark from local wall time, interpret a finished cursor as complete
+history, or retain old admission as proof of current authorization. The current
+command deliberately does not mint follow-up tasks or claim freshness.
+
+The remainder of this file is the historical account-connection audit baseline,
+not a directive to recreate or requalify completed Sandbox setup.
+
 ## Current broker-authentication decision — September 9, 2026
 
 The permanent path is native PostgreSQL SCRAM plus Secret Manager, preserving

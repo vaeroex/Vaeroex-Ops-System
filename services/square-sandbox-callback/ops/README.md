@@ -177,6 +177,37 @@ Run maximum-size, query/error, malformed HTTP/TLS, overload, slow-chunk, timeout
 
 ## One bounded operator window
 
+### Bounded existing-task sync
+
+After the existing host, budget, session, mapped binding and shutdown controls
+pass, `--run-sync --config /etc/vaeroex-square-callback/config.json` uses the same
+root-owned `/etc/vaeroex-square-callback/mapped-task.json` as `--run-page`. No
+credentials or task identifiers belong in command arguments. The command never
+enrolls a task, changes mapping, refreshes consent, or starts a listener.
+
+Limits: ten sequential attempts, five minutes or the earlier approved host/mapped
+deadline, sixty-two seconds remaining before admitting another page,500ms
+between acknowledged pages. The existing sixty-second hard native bound remains
+per page and includes connection cleanup. Existing page/lease deadlines and
+generation/session rechecks remain authoritative. External window cleanup is
+still required; this command does not start a new window or change its deadline.
+
+The JSON summary contains finite stop labels and counters only—no URL, cursor,
+credential, seller/workspace identifier or provider error. `scan_exhausted` means
+only this durable query's cursor is exhausted; never display it as Current or
+history-complete. `sourceObservations` is not a count of newly stored versions.
+`page_budget` and `deadline` are partial runs. For `retry_deferred`, respect the
+reported delay before another invocation of the same task. For
+`recovery_required`, wait at least its delay and inspect/reinvoke the existing
+durable task; never recreate it or replay a possibly committed transaction.
+Blocked/rejected/conflict stops require resolving the actual cause, not retries
+or broader authority. Abrupt exit yields no successful summary and is uncertain.
+
+Local synthetic tests qualify orchestration and native integration; hosted use
+of this new command remains pending until an approved installed-runtime window.
+No systemd timer, unattended schedule, refresh privilege or Production gate is
+enabled by installation.
+
 Before each manual start, check spend/aggregate usage, remaining approval, isolated Free database health, actual operator authentication, patch advisories, certificate coverage, exact artifact/configuration and live-run authority. No traffic may be sent just to defeat Free database inactivity pauses. Confirm actual budget email delivery before qualification, not just template syntax.
 
 The daemon has at most two active requests, a global 12-request burst token bucket refilling at six requests/minute (not a strict per-minute ceiling), 100 sensitive open attempts, 10 initiation attempts per run, and a one-hour process window. Failed attempts also consume their budgets. The runtime owns exact enforcement/cancellation tests; systemd adds `RuntimeMaxSec=3600`, `Restart=no`, memory/no-swap and stop bounds. Record only aggregate counts/outcomes. Reaching a cap closes the window. **An operator restart requires cumulative monthly/run-budget review; it is not permission to reset limits indefinitely.** Keep a nonsecret aggregate cumulative usage ledger; no personal IP/request/callback identifiers. Defaults in the cost model are 10,000 KMS operations, 10,000 total secret accesses and 5 GiB US/Canada egress per month, not vendor-enforced caps.

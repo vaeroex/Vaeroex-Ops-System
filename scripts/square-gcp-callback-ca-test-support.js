@@ -171,6 +171,10 @@ async function qualifyCallbackDatabaseCa() {
         ["--enroll-mapped", "valid", 0, "square_mapped_connection_enrolled\n"],
         ["--enroll-task", "valid", 0, "square_mapped_task_enrolled\n"],
         ["--run-page", "valid", 0, "square_mapped_page_committed\n"],
+        ["--run-sync", "valid", 0, JSON.stringify({contractVersion:"square_bounded_sync_v1",stop:"scan_exhausted",attempts:1,acknowledgedPages:1,sourceObservations:0,retryAfterMs:null,historical:"unknown",economic:"blocked"})+"\n"],
+        ["--run-sync", "unknown_outcome", 0, JSON.stringify({contractVersion:"square_bounded_sync_v1",stop:"recovery_required",attempts:1,acknowledgedPages:0,sourceObservations:0,retryAfterMs:30000,historical:"unknown",economic:"blocked"})+"\n"],
+        ["--run-sync", "missing_binding", 79, ""], ["--run-sync", "task_owner", 78, ""],
+        ["--run-sync", "task_symlink", 78, ""], ["--run-sync", "extra_task_field", 78, ""],
         ["--run-page", "extra_task_field", 78, ""], ["--run-page", "task_owner", 78, ""],
         ["--enroll-task", "task_symlink", 78, ""], ["--run-page", "unknown_outcome", 78, ""],
         ["--enroll-mapped", "runtime_failure", 78, ""], ["--enroll-mapped", "missing_binding", 79, ""],
@@ -184,7 +188,7 @@ const {runSquareSandboxPortalCommand}=require(${JSON.stringify(path.join(__dirna
 const mode=${JSON.stringify(mode)},command=${JSON.stringify(command)},config=${JSON.stringify({ ...config, mappedBinding })};
 if(mode==='missing_binding')delete config.mappedBinding;
 const ca=Buffer.from(${JSON.stringify(fixture.ca)}),artifact=Buffer.from('SYNTHETIC MAPPED CLI');
-const policy={schemaVersion:1,approvedUntil:new Date(Date.now()+(mode==='expired_window'?4000:mode==='bounded_hang'?6000:60000)).toISOString(),operator:'synthetic',configurationEvidenceId:'synthetic',budgetDeliveryEvidenceId:'synthetic',nodeVersion:process.version,artifactSha256:require('node:crypto').createHash('sha256').update(artifact).digest('hex'),hostConfigurationReviewed:true,syntheticPrivacyPassed:true};
+const policy={schemaVersion:1,approvedUntil:new Date(Date.now()+(mode==='expired_window'?4000:mode==='bounded_hang'?6000:command==='--run-sync'?120000:60000)).toISOString(),operator:'synthetic',configurationEvidenceId:'synthetic',budgetDeliveryEvidenceId:'synthetic',nodeVersion:process.version,artifactSha256:require('node:crypto').createHash('sha256').update(artifact).digest('hex'),hostConfigurationReviewed:true,syntheticPrivacyPassed:true};
 const task={taskId:'44444444-4444-4444-8444-444444444444',leaseOwnerFingerprint:'sha256:'+'3'.repeat(64)};
 if(mode==='extra_task_field')task.extra='forbidden';
 process.argv=[process.execPath,'synthetic-mapped-cli',command,'--config','/etc/vaeroex-square-callback/config.json'];process.execArgv=['--conditions=react-server'];
@@ -192,7 +196,7 @@ const taskPath='/etc/vaeroex-square-callback/mapped-task.json';let calls=0;
 fs.lstatSync=p=>{if(![process.argv[4],config.databaseCaPath,config.hostPolicyPath,process.argv[1],taskPath].includes(p))throw Error('unexpected_path');return {isFile:()=>true,isSymbolicLink:()=>mode==='task_symlink'&&p===taskPath,uid:mode==='task_owner'&&p===taskPath?1:0,mode:420,size:8192};};
 fs.readFileSync=p=>p===process.argv[4]?Buffer.from(JSON.stringify(config)):p===config.databaseCaPath?ca:p===config.hostPolicyPath?Buffer.from(JSON.stringify(policy)):p===taskPath?Buffer.from(JSON.stringify(task)):artifact;
 global.fetch=async()=>{throw Error('unexpected_network');};https.createServer=http.createServer=()=>{throw Error('unexpected_listener');};
-const run=async(input,value,signal)=>{calls++;if(input.binding.connectionGeneration!==4||input.databaseCa!==ca.toString()||signal.aborted)throw Error('wrong_bound_input');if(!['--enroll-mapped','--confirm-mapping'].includes(command)&&JSON.stringify(value)!==JSON.stringify(task))throw Error('wrong_task');if(mode==='runtime_failure')throw Error('SYNTHETIC PRIVATE FAILURE');if(mode==='bounded_hang')return new Promise(()=>{});return {outcome:mode==='unknown_outcome'?'SYNTHETIC PRIVATE FAILURE':'committed'};};
+const run=async(input,value,signal)=>{calls++;if(input.binding.connectionGeneration!==4||input.databaseCa!==ca.toString()||signal.aborted)throw Error('wrong_bound_input');if(!['--enroll-mapped','--confirm-mapping'].includes(command)&&JSON.stringify(value)!==JSON.stringify(task))throw Error('wrong_task');if(mode==='runtime_failure')throw Error('SYNTHETIC PRIVATE FAILURE');if(mode==='bounded_hang')return new Promise(()=>{});return {outcome:mode==='unknown_outcome'?'SYNTHETIC PRIVATE FAILURE':'committed',code:'page_committed',sourceCount:0,continuation:false,retryAfterMs:null,completeness:null};};
 mapped.confirmNativeSquareGcpMappedLocation=(input,signal)=>run(input,null,signal);
 mapped.enrollNativeSquareGcpMappedConnection=(input,signal)=>run(input,null,signal);
 mapped.enrollNativeSquareGcpMappedTask=run;mapped.runNativeSquareGcpMappedPage=run;
