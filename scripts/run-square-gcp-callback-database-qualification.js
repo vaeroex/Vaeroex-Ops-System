@@ -34,7 +34,7 @@ async function qualify(runtime) {
   const database = await runtime.createDatabase("gcp_callback"), owner = database.client;
   const files = runtime.migrationFiles(), baseline = files.filter(name => name < migration);
   equal(baseline.length, 106, "exact complete PR354 baseline");
-  equal(files.filter(name => name >= migration), [migration, recoveryMigration, "20260910231437_square_gcp_mapped_runtime.sql", "20260911000915_square_gcp_mapped_legacy_fencing.sql", "20260911151334_square_verified_provider_observations.sql", "20260911205108_square_canonical_interpretation.sql"], "explicit callback, Oregon recovery and separately qualified mapped runtime tail");
+  equal(files.filter(name => name >= migration), [migration, recoveryMigration, "20260910231437_square_gcp_mapped_runtime.sql", "20260911000915_square_gcp_mapped_legacy_fencing.sql", "20260911151334_square_verified_provider_observations.sql", "20260911205108_square_canonical_interpretation.sql", "20260911222230_square_workspace_evidence.sql"], "explicit callback, Oregon recovery and separately qualified mapped runtime tail");
   await runtime.applyMigrations(owner, baseline);
   const sourceBefore = await runtime.sourceSchemaFingerprint(owner);
   const squareMetadata = async () => (await owner.query(`select n.nspname,p.proname,pg_get_function_identity_arguments(p.oid) as args,
