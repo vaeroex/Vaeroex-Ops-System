@@ -62,7 +62,11 @@ observation approval is reused, including actor membership, current mapped
 generation, revocation, retention, source-current-pointer and receipt checks.
 
 The v1 execution partition is the existing finite approval manifest (at most 13
-sources), not an entire business. It reads checked inputs, derives facts and
+sources), not an entire business or connection-wide total. Checkpoints are keyed
+by connection, generation and the sorted resource-key set hash. Renewed approvals
+and corrected versions reuse that partition; different or overlapping subsets
+have separate checkpoints and must never be summed as independent totals. Stored
+output labels this manifest-limited coverage explicitly. It reads checked inputs, derives facts and
 reference assessments, compares the prior input fingerprint, and atomically
 commits immutable facts plus a revision-CAS derived checkpoint. Connection-local
 serialization and authority/source locks span the transaction. Revocation blocks

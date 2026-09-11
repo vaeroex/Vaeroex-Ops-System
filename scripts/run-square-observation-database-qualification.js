@@ -143,6 +143,23 @@ async function qualify(runtime) {
   eq(interpreted.intelligence.assessment.historical,"unknown","scan never claims history completeness");
   let casError;try{await c.query("select public.commit_square_interpretation_v1($1,0,$2,$3::jsonb)",[fingerprint,fp,JSON.stringify(interpreted)]);}catch(e){casError=e.code;}
   eq(casError,"40001","stale incremental writer rejected");
+  stage="canonical_manifest_partitions";
+  const originalPartition=interpreted.coverage.partitionFingerprint;
+  const subsetFingerprints=[];
+  for(const subset of [manifest.slice(0,1),manifest.slice(1,3),manifest.slice(0,3)]) {
+    const subsetFingerprint=await register({...approval,manifest:subset});
+    subsetFingerprints.push(subsetFingerprint);
+    const subsetRun=await interpretAdmittedSquareSources(c,subsetFingerprint);
+    eq(subsetRun.outcome,"committed","different and overlapping approved subsets commit independently");
+    eq(subsetRun.revision,1,"each resource-set partition starts at its own revision");
+    const subsetRead=(await c.query("select public.read_square_interpretation_inputs_v1($1) as value",[subsetFingerprint])).rows[0].value;
+    eq(subsetRead.prior.output.controls.length,subset.length,"partition controls contain only its approved resources");
+    eq(subsetRead.prior.output.coverage.kind,"approval_resource_set","counts explicitly disclose manifest coverage");
+    eq(subsetRead.partitionFingerprint!==originalPartition,true,"subset cannot select the full-manifest checkpoint");
+  }
+  eq((await interpretAdmittedSquareSources(c,fingerprint)).outcome,"replayed","subset runs do not overwrite full-manifest state");
+  for(const subsetFingerprint of subsetFingerprints)eq((await interpretAdmittedSquareSources(c,subsetFingerprint)).outcome,"replayed","interleaved subset replay stays independent");
+  eq((await c.query("select count(*)::int n from private.square_interpretation_facts")).rows[0].n,7,"overlapping partitions do not duplicate immutable facts");
   stage="canonical_provider_correction";
   const oldPayment=inputs.find(x=>x.pending.providerRecordType==="square_payment");
   const updated=JSON.parse(JSON.stringify(oldPayment.pending));

@@ -26,7 +26,7 @@ export async function interpretAdmittedSquareSources(client:SquareCanonicalTrans
     await client.query("set local lock_timeout='5s'");
     await client.query("set local statement_timeout='20s'");
     const response=await client.query("select public.read_square_interpretation_inputs_v1($1) as value",[approvalFingerprint]);
-    const value=z.object({inputs:z.array(z.unknown()).min(1).max(13),prior:Prior,asOf:IsoTimestampSchema}).strict().parse(response.rows[0]?.value);
+    const value=z.object({inputs:z.array(z.unknown()).min(1).max(13),prior:Prior,asOf:IsoTimestampSchema,partitionFingerprint:Sha256FingerprintSchema}).strict().parse(response.rows[0]?.value);
     const inputs=value.inputs as SquareObservationInput[];
     const items=inputs.map(input=>{
       const age=Date.parse(value.asOf)-Date.parse(input.pending.observedAt);
@@ -45,6 +45,7 @@ export async function interpretAdmittedSquareSources(client:SquareCanonicalTrans
     const prior=value.prior?.output?.state ?? emptyDeterministicStateSnapshot(items[0].scope);
     const result=updateSquareDescriptiveControls(prior,value.prior?.output?.controls??[],controls,value.asOf.slice(0,10));
     const output={policyVersion:SQUARE_INTERPRETATION_POLICY,economic:"blocked",historical:"unknown",
+      coverage:{kind:"approval_resource_set",partitionFingerprint:value.partitionFingerprint},
       facts:items.map(i=>i.fact),relationships,controls,state:result.snapshot,
       intelligence:squareVerifiedIntelligenceSnapshot(items,value.asOf),work:result.metrics};
     const committed=await client.query("select public.commit_square_interpretation_v1($1,$2,$3,$4::jsonb) as value",

@@ -41,6 +41,7 @@ const approvedSquareQualificationPaths = Object.freeze([
   "services/square-sandbox-callback/src/portal.ts",
   "services/square-sandbox-callback/src/runtime.ts",
   "services/square-sandbox-callback/src/server.ts",
+  "supabase/migrations/20260911205108_square_canonical_interpretation.sql",
   "supabase/tests/fixtures/square-durable-platform.sql",
   "supabase/tests/fixtures/square-durable-process.js",
   "supabase/tests/fixtures/square-durable-upgrade-history.sql",
