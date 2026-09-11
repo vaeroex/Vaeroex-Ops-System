@@ -77,6 +77,11 @@ async function qualify(runtime) {
   stage="authority_denials";
   await denied(()=>register(approval),"source authorized location requires existing verified mapping");
   await insert("private.square_location_mappings",{...scopeCols,connection_generation:4,location_id:"LOC_SYNTHETIC",verification_fingerprint:fp,mapped_by:"postgres",mapped_at:now});
+  const unrelatedReceipt=contractSha256({synthetic:"later_receipt"});
+  await c.query(`insert into private.square_ingestion_page_receipts(scan_key,page_id,workspace_id,business_entity_id,connection_id,task_id,command_fingerprint,checkpoint_version,retention_policy_version,retention_expires_at,created_at)
+    select scan_key,$1,workspace_id,business_entity_id,connection_id,task_id,command_fingerprint,2,retention_policy_version,retention_expires_at,clock_timestamp()
+    from private.square_ingestion_page_receipts where scan_key=$2 and page_id=$3`,[unrelatedReceipt,manifest[0].receiptScanKey,manifest[0].receiptPageId]);
+  await denied(()=>register({...approval,manifest:[{...manifest[0],receiptPageId:unrelatedReceipt}]}),"valid same-scan receipt from another transaction does not corroborate source");
   for(const patch of [{workspaceId:id()},{businessEntityId:id()},{generation:3},{actorId:id()},{expiresAt:"2000-01-01T00:00:00Z"}])await denied(()=>register({...approval,...patch}),"approval tenant/generation/actor/expiry denied");
   await changed("update private.square_account_configuration set blocked=true",[],()=>register(approval),"blocked configuration denied");
   await changed("insert into private.square_account_capacity_blocks values('sandbox','sandbox-observation-synthetic',clock_timestamp())",[],()=>register(approval),"capacity fence denied");
