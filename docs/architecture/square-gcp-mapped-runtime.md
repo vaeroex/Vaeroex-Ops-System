@@ -1,6 +1,10 @@
 # Isolated mapped Square runtime
 
-This is code and local qualification, not hosted sync evidence or Production activation.
+Historical mapped-runtime delivery is described below. The current hosted baseline
+is recorded in [production readiness](square-production-readiness.md): generation4
+mapping/enrollment and populated read-only sync are qualified. The new bounded
+`--run-sync` command is locally qualified; its hosted execution remains pending.
+Neither level of evidence is Production activation.
 The existing first-consent runtime remains unchanged when `mappedBinding` is absent.
 No default binding, LOGIN, grant, task, mapping or provider call is installed by the migration.
 
@@ -43,15 +47,24 @@ Provider response limits, private 4,096-character cursor, exact Money/quantity p
 identity, cumulative completeness and lease/generation/CAS fences are reused. A completed empty page
 is evidence of that query only, not history completeness or economic authority.
 
-The installed entrypoint supports four fixed noninteractive commands with
+The installed entrypoint supports five fixed mapped-runtime commands with
 `--config /etc/vaeroex-square-callback/config.json`: `--confirm-mapping`, `--enroll-mapped`, `--enroll-task`,
-and `--run-page`. The latter two read only the root-owned, non-symlink
+`--run-page`, and `--run-sync`. The latter three read only the root-owned, non-symlink
 `/etc/vaeroex-square-callback/mapped-task.json`; page execution accepts exactly `taskId`
 and `leaseOwnerFingerprint`. These commands reuse startup/host checks, open no HTTP listener,
-emit finite sanitized outcome labels, and have a hard deadline of at most 60 seconds.
+and emit finite sanitized outcomes. The first four have a hard deadline of at most60seconds.
+`--run-sync` has a total hard deadline of at most300seconds, at most10 sequential
+attempts, a62second admission reserve, and a500ms separation between pages. Each
+native page still has its own60second hard bound including setup and cleanup.
+Every retry stops; uncertain acknowledgements are never replayed automatically.
+Its JSON counters describe acknowledged page observations, not newly inserted versions.
 They cannot extend the host or mapped approval window.
 
-## Remaining hosted steps (not executed by builds or tests)
+## Historical hosted sequence (not executed by builds or tests)
+
+Do not repeat completed provisioning, consent, mapping or fixture qualification.
+For the bounded command only, install the reviewed artifact and use a fresh
+authorized portal session within the existing window/cleanup controls.
 
 1. Review/merge code and verify normal CI. Apply only the reviewed additive migration to the isolated
    project after canonical-ledger verification, with all gates closed. Never apply remotely in build hooks.

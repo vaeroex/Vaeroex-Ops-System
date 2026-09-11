@@ -26,6 +26,7 @@ mappedCredentials.readSquareGcpMappedDatabaseSecret = async input => { eq(input.
 mappedDatabase.openSquareGcpMappedDatabase = async role => active.open(role);
 global.fetch = () => assert.fail("No default network permitted");
 const { runNativeSquareGcpMappedPage, confirmNativeSquareGcpMappedLocation } = require("../lib/integrations/control-plane/square-gcp-mapped-runtime.ts");
+const { runSquareMappedSync } = require("../lib/integrations/control-plane/square-gcp-mapped-sync.ts");
 
 function fixture(options = {}) {
   const abort = new AbortController(), now = Date.now(), persisted = new Date(now).toISOString(), expiry = new Date(now + 86400_000).toISOString();
@@ -119,6 +120,26 @@ function fixture(options = {}) {
 }
 async function main() {
   try {
+    const sync = f => runSquareMappedSync({ runPage: () => f.run(), monotonicNow: () => 0,
+      wait: async milliseconds => { eq(milliseconds,500); eq(f.closed.length % 2,0,"both native DB roles closed before next page"); } },300000,f.abort.signal);
+    const synced=fixture({catalog:true}), summary=await sync(synced);
+    eq(summary.stop,"scan_exhausted");eq(summary.attempts,2);eq(summary.acknowledgedPages,2);
+    eq(synced.counts().provider,2);eq(synced.counts().kms,2);eq(synced.counts().commits,2);
+    eq(synced.closed,["broker","runtime","broker","runtime"]);
+    eq(summary.economic,"blocked");eq(summary.historical,"unknown");eq(JSON.stringify(summary).includes("SYNTHETIC_PRIVATE_CURSOR"),false);
+    const completed=await sync(synced);eq(completed.stop,"scan_exhausted");eq(completed.acknowledgedPages,0);eq(synced.counts().provider,2);
+    const lost=fixture({lostAck:true}), uncertainSummary=await sync(lost);
+    eq(uncertainSummary.stop,"recovery_required");eq(uncertainSummary.attempts,1);eq(uncertainSummary.acknowledgedPages,0);
+    eq(lost.counts().provider,1);eq(lost.counts().commits,1);eq(JSON.stringify(uncertainSummary).includes(canary),false);
+    const recoveredSummary=await sync(lost);eq(recoveredSummary.stop,"scan_exhausted");eq(lost.counts().provider,1);
+    const revoked=fixture({revokeBindingAt:1}), revokedSummary=await sync(revoked);
+    eq(revokedSummary.attempts,1);eq(revokedSummary.acknowledgedPages,0);eq(revoked.counts().provider,0);eq(revoked.counts().kms,0);
+    eq(revoked.closed,["broker","runtime"]);eq(JSON.stringify(revokedSummary).includes(canary),false);
+    const revokedBetweenPages=fixture({catalog:true});
+    const fenced=await runSquareMappedSync({runPage:()=>revokedBetweenPages.run(),monotonicNow:()=>0,
+      wait:async()=>{revokedBetweenPages.options.revokeBindingAt=revokedBetweenPages.counts().rechecks+1;}},300000,revokedBetweenPages.abort.signal);
+    eq(fenced.attempts,2);eq(fenced.acknowledgedPages,1);eq(revokedBetweenPages.counts().provider,1);
+    eq(revokedBetweenPages.counts().commits,1);eq(fenced.stop==="scan_exhausted",false);
     const success = fixture(), result = await success.run();
     eq(result.outcome, "committed"); eq(result.sourceCount, 0); eq(result.completeness.economic, "blocked"); eq(result.completeness.historical, "unknown");
     eq(success.counts().provider, 1); eq(success.counts().kms, 1); eq(success.counts().commits, 1); eq(success.counts().reads, 5);
