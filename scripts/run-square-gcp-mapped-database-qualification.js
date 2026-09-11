@@ -7,6 +7,7 @@ const { runAdditionalQualification } = require("./run-square-durable-page-qualif
 
 const root = path.resolve(__dirname, "..");
 const migrationName = "20260910231437_square_gcp_mapped_runtime.sql";
+const fencingMigration = "20260911000915_square_gcp_mapped_legacy_fencing.sql";
 const applicationId = "sandbox-sq0idb-9K0xgcatxe0ABuUmkSNjFw";
 const origin = "https://square-sandbox.vaeroex.com";
 const redirectUri = origin + "/api/integrations/square/callback";
@@ -20,7 +21,7 @@ async function denied(run, label, message) {
   let caught;
   try { await run(); } catch (error) { caught = error; }
   equal(caught?.code, "42501", label);
-  if (message) equal(caught?.message, message, "denial reaches the intended checked predicate");
+  if (message) equal(caught?.message, message, label+" reaches the intended checked predicate");
   ok(!String(caught?.message).includes(CANARY), "denial excludes credential material");
 }
 function rpc(client) {
@@ -56,7 +57,7 @@ async function qualify(runtime) {
   const { contractSha256 } = require(path.join(root, "lib/integrations/contracts/canonical.ts"));
   const files = runtime.migrationFiles(), baseline = files.filter(name => name < migrationName);
   equal(baseline.length, 108, "complete canonical callback baseline");
-  equal(files.filter(name => name >= migrationName), [migrationName], "exact mapped extension");
+  equal(files.filter(name => name >= migrationName), [migrationName,fencingMigration], "exact mapped extension and inherited-entry fencing correction");
   const database = await runtime.createDatabase("broker_runtime");
   const owner = database.client;
   await runtime.applyMigrations(owner, baseline);
@@ -244,8 +245,46 @@ async function qualify(runtime) {
   await owner.query("update private.square_gcp_mapped_runtime_binding set enabled=false");
   await denied(read,"disabled binding fences an existing broker session");
   equal((await mappedRpc(worker.client).rpc("resolve_square_ingestion_authority_v1",{p_task_id:task.taskId,p_lease_owner_fingerprint:task.leaseOwnerFingerprint})).error.code,"42501","disabled binding fences runtime session");
+  const legacyResolve=()=>worker.client.query("select public.resolve_square_ingestion_authority_v1($1,$2) as value",[task.taskId,task.leaseOwnerFingerprint]);
+  const legacyEnrollConnection=()=>enroller.client.query("select public.enroll_square_verified_connection_v1($1::jsonb,$2::jsonb) as value",[JSON.stringify(context),JSON.stringify({connectionId:connection.connectionId,generation:1})]);
+  equal((await legacyResolve()).rows[0].value,grant,"negative control proves inherited runtime bypass before correction");
+  equal((await legacyEnrollConnection()).rows[0].value.enrolled,true,"negative control proves inherited enroller bypass before correction");
+  await enroller.client.query("begin");
+  try {
+    const beforeFenceTask=await enroller.client.query("select public.enroll_square_verified_task_v1($1::jsonb) as value",[JSON.stringify({...taskCommand,taskId:uuid()})]);
+    ok(beforeFenceTask.rows[0].value,"negative control proves inherited task creation bypass before correction");
+  } finally {await enroller.client.query("rollback");}
+  const fenceSql=fs.readFileSync(path.join(root,"supabase/migrations",fencingMigration),"utf8"), fenceEnd=fenceSql.lastIndexOf("commit;");
+  await assert.rejects(()=>owner.query(fenceSql.slice(0,fenceEnd)+"select 1/0;\n"+fenceSql.slice(fenceEnd)),{code:"22012"});assertions++;
+  await owner.query("rollback");
+  equal((await legacyResolve()).rows[0].value,grant,"failed correction install leaves original behavior atomically");
+  const beforeFencingRoutines=await existing();
+  await runtime.applyMigrations(owner,[fencingMigration]);
+  const changedRoutines=new Set(["assert_square_verified_account_v1","enroll_square_verified_connection_v1"]);
+  const afterFencingRoutines=(await existing()).filter(row=>row.proname!=="assert_square_gcp_mapped_connection_v1");
+  equal(afterFencingRoutines.filter(row=>!changedRoutines.has(row.proname)),beforeFencingRoutines.filter(row=>!changedRoutines.has(row.proname)),"fencing changes only the two intended existing routine bodies");
+  const withoutBody=row=>Object.fromEntries(Object.entries(row).filter(([key])=>key!=="body"));
+  equal(afterFencingRoutines.filter(row=>changedRoutines.has(row.proname)).map(withoutBody),beforeFencingRoutines.filter(row=>changedRoutines.has(row.proname)).map(withoutBody),"changed routines retain exact owners and execution grants");
+  const legacyRuntimeCalls=[
+    ()=>legacyResolve(),
+    ()=>worker.client.query("select public.acquire_square_ingestion_page_v1($1,$2,$3::jsonb)",[task.taskId,task.leaseOwnerFingerprint,JSON.stringify(binding)]),
+    ()=>worker.client.query("select public.commit_square_ingestion_page_v1($1,$2,'{}'::jsonb)",[task.taskId,task.leaseOwnerFingerprint]),
+    ()=>worker.client.query("select public.release_square_ingestion_page_v1($1,$2,'{}'::jsonb,'{}'::jsonb)",[task.taskId,task.leaseOwnerFingerprint])
+  ];
+  for(const run of legacyRuntimeCalls)await denied(run,"all inherited runtime endpoints honor mapped disabled gate","square_gcp_mapped_runtime_denied");
+  await denied(legacyEnrollConnection,"inherited connection enrollment honors mapped gate","square_gcp_mapped_runtime_denied");
+  const legacyEnrollTask=()=>enroller.client.query("select public.enroll_square_verified_task_v1($1::jsonb)",[JSON.stringify({...taskCommand,taskId:uuid()})]);
+  await denied(legacyEnrollTask,"inherited task enrollment honors mapped gate","square_gcp_mapped_runtime_denied");
+  equal((await legacyRead(remoteReadCommand)).rows[0].value.state,"available","correction preserves unrelated Vercel credential authority");
+  equal((await other.client.query("select public.resolve_square_ingestion_authority_v1($1,$2) as value",[remoteTask.taskId,remoteTask.leaseOwnerFingerprint])).rows[0].value,remoteGrant,"unrelated remote runtime unaffected by mapped disabled gate");
   await owner.query("update private.square_gcp_mapped_runtime_binding set enabled=true");
   equal((await read()).rows[0].value.state,"available","recovery does not recreate consent or credential");
+  equal((await legacyResolve()).rows[0].value,grant,"valid mapped legacy entry retains supported behavior");
+  await owner.query("update private.square_gcp_mapped_runtime_binding set provider_calls_enabled=false");
+  await denied(legacyResolve,"inherited runtime cannot bypass provider-call gate","square_gcp_mapped_runtime_denied");
+  await denied(legacyEnrollTask,"inherited task enrollment cannot bypass provider-call gate","square_gcp_mapped_runtime_denied");
+  equal((await legacyEnrollConnection()).rows[0].value.enrolled,true,"non-provider connection enrollment remains supported when provider gate closed");
+  await owner.query("update private.square_gcp_mapped_runtime_binding set provider_calls_enabled=true");
   await owner.query(`alter role "${broker.name}" nologin`);
   await denied(read,"NOLOGIN fences existing broker connections");
   await owner.query(`alter role "${broker.name}" login`);
@@ -268,7 +307,26 @@ async function qualify(runtime) {
   ok(waiting,"read reached actual session lock wait");
   await locker.query("update auth.sessions set not_after=clock_timestamp()-interval '1 second' where id=$1",[session]);await locker.query("commit");
   equal((await pending)?.code,"42501","session expiration during lock wait fences credential read");await locker.end();
+  await denied(legacyResolve,"inherited runtime honors expired operator session","square_gcp_mapped_runtime_denied");
+  await denied(legacyEnrollConnection,"inherited enroller honors expired operator session","square_account_actor_denied");
   await owner.query("update auth.sessions set not_after=clock_timestamp()+interval '1 day' where id=$1",[session]);
+  await owner.query(`alter role "${worker.name}" nologin`);
+  await denied(legacyResolve,"inherited existing runtime session honors NOLOGIN","square_gcp_mapped_runtime_denied");
+  await owner.query(`alter role "${worker.name}" login`);
+  const scanLocker=await runtime.login(database,"scan_lock",[],"square_sandbox");
+  await owner.query(`grant usage on schema private to "${scanLocker.name}"`);
+  await owner.query(`grant select,update on private.square_ingestion_scans to "${scanLocker.name}"`);
+  await owner.query(`create policy synthetic_mapped_scan_lock on private.square_ingestion_scans to "${scanLocker.name}" using(true) with check(true)`);
+  const approval=(await owner.query("select approval_expires_at::text as value from private.square_gcp_mapped_runtime_binding")).rows[0].value;
+  await scanLocker.client.query("begin");await scanLocker.client.query("select 1 from private.square_ingestion_scans where scan_key=$1 for update",[binding.scanKey]);
+  await owner.query("update private.square_gcp_mapped_runtime_binding set approval_expires_at=clock_timestamp()+interval '600 milliseconds'");
+  const pendingAcquire=legacyRuntimeCalls[1]().then(()=>null,error=>error);
+  let scanWaiting=false;
+  for(let i=0;!scanWaiting&&i<50;i++){await new Promise(r=>setTimeout(r,10));scanWaiting=(await owner.query("select 1 from pg_stat_activity where usename=$1 and wait_event_type='Lock'",[worker.name])).rowCount>0;}
+  ok(scanWaiting,"original acquire reached actual scan lock wait");
+  await new Promise(r=>setTimeout(r,650));await scanLocker.client.query("commit");
+  equal((await pendingAcquire)?.code,"42501","mapped wall-time expiry rechecked after original scan lock wait");
+  await owner.query("update private.square_gcp_mapped_runtime_binding set approval_expires_at=$1::timestamptz",[approval]);
   stage="atomic_page_and_recovery";
   await repository.release(acquired.lease,{now:Date.now(),retryAfterMs:0,blocked:false});
   const {createSquareDatabaseAuthority}=require(path.join(root,"lib/integrations/providers/square/durable-authority.ts"));

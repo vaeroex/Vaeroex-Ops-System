@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import { isAbsolute } from "node:path";
+import { nativeCapabilityAllowed } from "./sandbox-profile.mjs";
 
 const outcomes = Object.freeze({ inspect: "inspected", prepare: "prepared", fence: "fenced", assign: "assigned", activate: "activated", authenticate: "authenticated" });
 const targetFields = Object.freeze(["projectReference", "host", "port", "database", "role", "systemIdentifier", "databaseOid", "adminRole", "capabilityRole", "rootCertificate", "roleOid"]);
@@ -56,7 +57,7 @@ function createNativeAdapter({ executable, target: suppliedTarget, timeoutMs, wi
       !Number.isInteger(suppliedTarget.port) || suppliedTarget.port < 1 || suppliedTarget.port > 65535 ||
       !["database", "role", "adminRole"].every(key => typeof suppliedTarget[key] === "string" && /^[a-z][a-z0-9_]{0,62}$/.test(suppliedTarget[key])) ||
       !/^(?:square_|vaeroex_)/.test(suppliedTarget.role) || /qbo|password/.test(suppliedTarget.role) ||
-      suppliedTarget.role === suppliedTarget.adminRole || suppliedTarget.capabilityRole !== "square_account_broker_authority" ||
+      suppliedTarget.role === suppliedTarget.adminRole || !nativeCapabilityAllowed(suppliedTarget) ||
       !["systemIdentifier", "databaseOid", "roleOid"].every(key => typeof suppliedTarget[key] === "string" && /^(?:0|[1-9][0-9]{0,19})$/.test(suppliedTarget[key])) ||
       typeof suppliedTarget.rootCertificate !== "string" || !isAbsolute(suppliedTarget.rootCertificate) ||
       /[\u0000-\u001f\u007f]/.test(suppliedTarget.rootCertificate) || suppliedTarget.rootCertificate.length > 1024 ||

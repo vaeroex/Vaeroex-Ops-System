@@ -1,4 +1,5 @@
 import { timingSafeEqual } from "node:crypto";
+import { nativeCapabilityAllowed } from "./sandbox-profile.mjs";
 
 // This file has no network, process-spawn, SQL or cloud-store implementation.
 // A reviewed synthetic adapter is not a supported provider provisioning lane.
@@ -29,7 +30,7 @@ function snapshotTarget(value) {
       !identifier(value.projectReference) || !identifier(value.host) ||
       !/^[a-z_][a-z0-9_]{0,62}$/.test(value.role) ||
       !/^[a-z_][a-z0-9_]{0,62}$/.test(value.adminRole) || value.adminRole === value.role ||
-      value.capabilityRole !== "square_account_broker_authority" ||
+      !nativeCapabilityAllowed(value) ||
       typeof value.rootCertificate !== "string" || !value.rootCertificate.startsWith("/") ||
       value.rootCertificate.length > 1024 || /[\u0000-\u001f\u007f]/.test(value.rootCertificate) ||
       !/^[a-zA-Z0-9_]{1,63}$/.test(value.database) ||
@@ -289,6 +290,9 @@ function createProvisioningCoordinator({ target: inputTarget, native, secretStor
         },
       })), value => closed(value) && value.sessionUser === target.role && sameTarget(value.target, context.target) &&
         authenticationReads === 1 && authenticationVerified);
+      if (target.capabilityRole !== "square_account_broker_authority") {
+        await step("fence_after_authentication", () => native.fence(context), fenced);
+      }
       // Native auth connection is closed before a staged-ready result exists.
       await step("close", () => native.abortAndDrain(context), value => ack(value) && value.drained === true);
       await step("staged_ready", () => secretStore.markStagedReady(reservation));

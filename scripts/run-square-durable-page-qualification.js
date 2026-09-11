@@ -183,6 +183,7 @@ async function migrationQualification(target, administrator) {
   const gcpTail = files.filter(name => name === gcpCallbackMigration);
   const recoveryTail = files.filter(name => name === gcpRecoveryMigration);
   const mappedTail = files.filter(name => name === "20260910231437_square_gcp_mapped_runtime.sql");
+  const mappedFenceTail = files.filter(name => name === "20260911000915_square_gcp_mapped_legacy_fencing.sql");
   equal(added.length, 2, "both additive Square migrations present");
   equal(accountTail.length, 1, "account-connection migration present");
   equal(remoteTail.length, 1, "remote Sandbox binding migration present");
@@ -190,7 +191,8 @@ async function migrationQualification(target, administrator) {
   equal(gcpTail.length, 1, "separately qualified GCP callback extension present");
   equal(recoveryTail.length, 1, "separately qualified Oregon recovery constraint present");
   equal(mappedTail.length, 1, "separately qualified GCP mapped runtime extension present");
-  equal(baseline.length + added.length + accountTail.length + remoteTail.length + brokerTail.length + gcpTail.length + recoveryTail.length + mappedTail.length, files.length, "migration manifest is explicit");
+  equal(mappedFenceTail.length, 1, "separately qualified mapped inherited-entry fencing present");
+  equal(baseline.length + added.length + accountTail.length + remoteTail.length + brokerTail.length + gcpTail.length + recoveryTail.length + mappedTail.length + mappedFenceTail.length, files.length, "migration manifest is explicit");
   const clean = await createDatabase(target, administrator, "clean");
   await applyMigrations(clean.client, baseline);
   const before = await sourceSchemaFingerprint(clean.client);

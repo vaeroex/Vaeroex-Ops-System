@@ -29,7 +29,15 @@
 #define INSTALL_PATH VAEROEX_TEST_INSTALL
 #else
 #define NODE_PATH "/usr/bin/node"
+#if defined(VAEROEX_MAPPED_ENROLLER) && defined(VAEROEX_MAPPED_RUNTIME)
+#error Select one fixed mapped maintenance installation
+#elif defined(VAEROEX_MAPPED_ENROLLER)
+#define INSTALL_PATH "/opt/vaeroex-native-enroller"
+#elif defined(VAEROEX_MAPPED_RUNTIME)
+#define INSTALL_PATH "/opt/vaeroex-native-runtime"
+#else
 #define INSTALL_PATH "/opt/vaeroex-native-broker"
+#endif
 #endif
 #define SCRIPT_PATH INSTALL_PATH "/maintenance.mjs"
 

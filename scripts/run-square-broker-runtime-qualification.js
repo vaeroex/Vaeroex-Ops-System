@@ -55,7 +55,7 @@ async function qualify(runtime) {
   const { contractSha256 } = require(path.join(root, "lib/integrations/contracts/canonical.ts"));
   const files = runtime.migrationFiles(), baseline = files.filter(name => name < migrationName);
   equal(baseline.length, 105, "complete canonical remote-binding baseline");
-  equal(files.filter(name => name >= migrationName), [migrationName, "20260908042529_square_gcp_callback_authority.sql", "20260910193429_square_gcp_callback_oregon_recovery.sql", "20260910231437_square_gcp_mapped_runtime.sql"], "exact reviewed corrective and GCP callback tail");
+  equal(files.filter(name => name >= migrationName), [migrationName, "20260908042529_square_gcp_callback_authority.sql", "20260910193429_square_gcp_callback_oregon_recovery.sql", "20260910231437_square_gcp_mapped_runtime.sql", "20260911000915_square_gcp_mapped_legacy_fencing.sql"], "exact reviewed corrective and GCP callback tail");
   const database = await runtime.createDatabase("broker_runtime");
   const owner = database.client;
   await runtime.applyMigrations(owner, baseline);
