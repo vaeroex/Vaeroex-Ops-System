@@ -44,6 +44,10 @@ function fixture(options = {}) {
     environment: "sandbox", authorizedLocationIds: [b.defaultLocationId], generation: b.connectionGeneration }, stream: "payments", operation: "list_payments",
     scanId: uuid(21), expiresAt: now + 3600_000, request: { method: "GET", url: `https://connect.squareupsandbox.com/v2/payments?location_id=${b.defaultLocationId}`, body: null } };
   const model = createSquareSyntheticPageRepository(); model.setCurrentGeneration(squareIngestionScopeFingerprint(grant.scope), grant.scope.generation);
+  if (options.catalog) {
+    grant.stream = "catalog"; grant.operation = "catalog_search";
+    grant.request = { method: "POST", url: "https://connect.squareupsandbox.com/v2/catalog/search", body: JSON.stringify({ object_types: ["ITEM"], limit: 1 }) };
+  }
   let reads = 0, resolves = 0, provider = 0, kms = 0, commits = 0, releases = 0, rechecks = 0;
   const closed = [], operations = [];
   const f = { abort, model, identityDisposed: 0, options,
@@ -76,7 +80,13 @@ function fixture(options = {}) {
         }
         eq(role, "runtime"); eq(args.p_task_id, taskId); eq(args.p_lease_owner_fingerprint, owner);
         if (name === "resolve_square_ingestion_authority_v1") { resolves++; return { data: options.denyAuthority ? null : grant, error: null }; }
-        if (name === "acquire_square_ingestion_page_v1") return { data: await model.repository.acquire(args.p_binding, Date.now()), error: null };
+        if (name === "acquire_square_ingestion_page_v1") {
+          const data = await model.repository.acquire(args.p_binding, Date.now());
+          if (options.forgedContinuationBinding && data.outcome === "leased" && data.lease.cursor) {
+            return { data: { ...data, lease: { ...data.lease, binding: { ...data.lease.binding, cursorBindingFingerprint: `sha256:${"f".repeat(64)}` } } }, error: null };
+          }
+          return { data, error: null };
+        }
         if (name === "commit_square_ingestion_page_v1") {
           commits++; const result = await model.repository.commitPage(args.p_command);
           if (options.lostAck) throw Error(canary);
@@ -92,10 +102,14 @@ function fixture(options = {}) {
         if (options.abortKms) abort.abort();
         return new Response(JSON.stringify({ plaintext: Buffer.from(JSON.stringify(envelope)).toString("base64"), protectionLevel: "SOFTWARE" }));
       }
-      provider++; eq(url, grant.request.url); eq(init.method, "GET"); eq(init.headers.Authorization, `Bearer ${canary}`);
+      provider++; eq(url, grant.request.url); eq(init.method, grant.request.method); eq(init.headers.Authorization, `Bearer ${canary}`);
       eq(init.redirect, "manual"); eq(init.cache, "no-store"); eq(init.credentials, "omit");
       if (options.abortProvider) abort.abort();
       if (options.providerFailure) throw Error(canary);
+      if (options.catalog) {
+        eq(JSON.parse(init.body), { object_types: ["ITEM"], limit: 1, ...(provider === 2 ? { cursor: "SYNTHETIC_PRIVATE_CURSOR" } : {}) });
+        return new Response(JSON.stringify({ objects: [], ...(provider === 1 ? { cursor: "SYNTHETIC_PRIVATE_CURSOR" } : {}) }));
+      }
       return new Response(JSON.stringify({ payments: [] }), { status: options.status ?? 200 });
     },
     async run() { active = f; return runNativeSquareGcpMappedPage({ binding: b, databaseCa: "synthetic-ca", network: f.network }, { taskId, leaseOwnerFingerprint: owner }, abort.signal); },
@@ -110,6 +124,14 @@ async function main() {
     eq(success.counts().provider, 1); eq(success.counts().kms, 1); eq(success.counts().commits, 1); eq(success.counts().reads, 5);
     eq(success.closed.sort(), ["broker", "runtime"]); eq(JSON.stringify(result).includes(canary), false);
     eq(success.operations.some(v => /refresh|rotate|enroll|consume_state|create_state/.test(v)), false);
+    const paginated = fixture({ catalog: true });
+    const pageOne = await paginated.run(); eq(pageOne.outcome, "committed"); eq(pageOne.continuation, true);
+    const pageTwo = await paginated.run(); eq(pageTwo.outcome, "committed"); eq(pageTwo.continuation, false);
+    eq(paginated.counts().provider, 2); eq(paginated.counts().kms, 2); eq(paginated.counts().commits, 2);
+    eq((await paginated.run()).outcome, "finished"); eq(paginated.counts().provider, 2);
+    const forged = fixture({ catalog: true, forgedContinuationBinding: true });
+    eq((await forged.run()).outcome, "committed");
+    eq((await forged.run()).outcome === "committed", false); eq(forged.counts().provider, 1); eq(forged.counts().kms, 1);
     for (const options of [{ denyAuthority: true }, { revokeReadAt: 2 }, { revokeReadAt: 4 }, { revokeBindingAt: 1 }, { abortKms: true }]) {
       const f = fixture(options), value = await f.run(); eq(value.outcome === "committed", false); eq(f.counts().provider, 0); eq(f.counts().commits, 0);
       eq(f.closed.sort(), ["broker", "runtime"]); eq(JSON.stringify(value).includes(canary), false);
