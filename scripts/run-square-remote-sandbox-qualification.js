@@ -42,7 +42,7 @@ async function migrationTests(runtime) {
   stage = "canonical_migrations_and_atomic_additive_install";
   const files = runtime.migrationFiles(), baseline = files.filter(name => name < migrationName);
   equal(baseline.length, 104, "complete canonical prerequisite chain contains exactly 104 migrations");
-  equal(files.filter(name => name >= migrationName), [migrationName, "20260908014713_square_broker_runtime_credential_authority.sql", "20260908042529_square_gcp_callback_authority.sql", "20260910193429_square_gcp_callback_oregon_recovery.sql", "20260910231437_square_gcp_mapped_runtime.sql", "20260911000915_square_gcp_mapped_legacy_fencing.sql"],
+  equal(files.filter(name => name >= migrationName), [migrationName, "20260908014713_square_broker_runtime_credential_authority.sql", "20260908042529_square_gcp_callback_authority.sql", "20260910193429_square_gcp_callback_oregon_recovery.sql", "20260910231437_square_gcp_mapped_runtime.sql", "20260911000915_square_gcp_mapped_legacy_fencing.sql", "20260911151334_square_verified_provider_observations.sql"],
     "remote binding and separately qualified broker correction are the exact additive tail");
   const database = await runtime.createDatabase("remote_sandbox");
   const owner = database.client;

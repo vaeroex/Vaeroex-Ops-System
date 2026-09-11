@@ -245,7 +245,8 @@ function assertTargetIsSinglePendingMigration() {
     "20260908042529_square_gcp_callback_authority.sql",
   "20260910193429_square_gcp_callback_oregon_recovery.sql",
   "20260910231437_square_gcp_mapped_runtime.sql",
-  "20260911000915_square_gcp_mapped_legacy_fencing.sql"
+  "20260911000915_square_gcp_mapped_legacy_fencing.sql",
+  "20260911151334_square_verified_provider_observations.sql"
   ];
   const laterMigrations = migrations.slice(targetIndex + 1);
   if (laterMigrations.length !== dormantSquareTail.length ||
