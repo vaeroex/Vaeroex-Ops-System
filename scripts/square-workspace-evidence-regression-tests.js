@@ -11,6 +11,10 @@ const view={version:"square_workspace_evidence_v1",source:"Square Sandbox",statu
   provenance:Object.entries(counts).flatMap(([kind,n])=>Array.from({length:n},()=>({kind,sourceVersion:1,observedAt:time,scope:kind==="catalog"?"seller_with_location_applicability":"mapped_location_or_explicitly_unresolved"})))};
 const render=x=>renderToStaticMarkup(React.createElement(SquareEvidenceCard,{evidence:x}));
 async function main(){
+  const {withoutSquareQualificationPaths}=require("./square-dormant-scope-test-support.js");
+  assert.equal(withoutSquareQualificationPaths("app/app/settings/page.tsx\ncomponents/integrations/SquareEvidenceCard.tsx\nlib/supabase/types.ts\nsupabase/migrations/20260911222230_square_workspace_evidence.sql"),"");
+  for(const path of ["app/api/unapproved/route.ts","components/integrations/Unapproved.tsx","supabase/migrations/unapproved.sql","lib/supabase/admin.ts","services/external-integrations-qbo/src/server.ts"])
+    assert.equal(withoutSquareQualificationPaths(path),path,"unrelated scope remains denied");
   assert.deepEqual(parseSquareWorkspaceEvidence(view),view);
   const html=render(view);
   for(const copy of ["Square Sandbox","Verified, non-economic","1 reference conflict","2 unresolved location relationships","Historical completeness: unknown","No revenue, profit, netting, inventory valuation, stock calculation","Current sync health: unknown","Source-version provenance"])assert.ok(html.includes(copy),copy);
