@@ -131,7 +131,8 @@ export async function runNativeSquareGcpMappedPage(input: Input, task: Readonly<
       if (++requests !== 1 || !lease || signal.aborted || request.signal.aborted || request.headers.Authorization !== "Bearer square-synthetic-fixture") denied();
       const headers = { ...request.headers }; delete headers.Authorization;
       const decision = assertSquareReadOperation({ providerKey: "square", providerEnvironment: "sandbox",
-        url: request.url, method: request.method, headers, body: request.body });
+        url: request.url, method: request.method, headers, body: request.body,
+        expectedCursorBindingFingerprint: lease.binding.cursorBindingFingerprint });
       if (decision.providerEnvironment !== "sandbox") denied();
       const metadata = z.object({ connectionId: z.literal(b.connectionId), businessEntityId: z.literal(b.businessEntityId),
         generation: z.literal(b.connectionGeneration), credentialId: z.string().uuid(), credentialVersion: z.number().int().positive().safe()
