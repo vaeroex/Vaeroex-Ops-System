@@ -17,16 +17,21 @@ unchanged. Two separate fixed installations add no arbitrary-role interface:
 Build explicitly on Linux with `node build-managed.mjs /absolute/output enroller`
 or `runtime`. Omitted profile keeps the existing callback build.
 CI preserves only these two public fixed binaries, their static launchers,
-SHA-256 manifest and public build provenance for seven days in the
+individual raw digest files, SHA-256 manifest and public build provenance for seven days in the
 `square-mapped-maintenance-<run-id>-<attempt>` artifact. It never executes those
 hosted binaries or uploads synthetic database state. Verify the exact reviewed
 commit, successful job, hashes and host ABI/package compatibility before using
 that artifact; expiry requires another reviewed build, not an unverified binary.
 
-Install the
-corresponding immutable native binary, static launcher, digest and reviewed
-modules in that profile's root-owned directory. Each has a separate root-private
-state directory (`/var/lib/vaeroex-native-enroller` or
+Install the corresponding immutable native binary, static launcher, digest and
+reviewed modules in that profile's root-owned directory.
+The profile's `native-managed-<profile>.sha256` is installed as
+`native-managed.sha256` alongside its binary renamed `native-managed`; its entire
+content is one raw 64-character digest plus newline, as required by maintenance.
+The multi-entry `mapped-maintenance.sha256` is only an artifact verification
+manifest and must not be used as that installed raw digest.
+
+Each has a separate root-private state directory (`/var/lib/vaeroex-native-enroller` or
 `/var/lib/vaeroex-native-runtime`), lock, append-only sanitized journal and recovery
 clearance. Never substitute a binary, secret parent or clearance across profiles.
 

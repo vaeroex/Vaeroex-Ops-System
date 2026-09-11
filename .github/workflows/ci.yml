@@ -287,6 +287,11 @@ jobs:
           set -euo pipefail
           cd "$RUNNER_TEMP"
           sha256sum native-managed-enroller native-managed-enroller.launcher native-managed-runtime native-managed-runtime.launcher > mapped-maintenance.sha256
+          for profile in enroller runtime; do
+            sha256sum "native-managed-$profile" | cut -d ' ' -f 1 > "native-managed-$profile.sha256"
+            test "$(wc -c < "native-managed-$profile.sha256")" -eq 65
+            grep -Eq '^[0-9a-f]{64}$' "native-managed-$profile.sha256"
+          done
           {
             printf 'source_commit=%s\n' "$GITHUB_SHA"
             printf 'run_id=%s\n' "$GITHUB_RUN_ID"
@@ -301,8 +306,10 @@ jobs:
           path: |
             ${{ runner.temp }}/native-managed-enroller
             ${{ runner.temp }}/native-managed-enroller.launcher
+            ${{ runner.temp }}/native-managed-enroller.sha256
             ${{ runner.temp }}/native-managed-runtime
             ${{ runner.temp }}/native-managed-runtime.launcher
+            ${{ runner.temp }}/native-managed-runtime.sha256
             ${{ runner.temp }}/mapped-maintenance.sha256
             ${{ runner.temp }}/mapped-maintenance-build.txt
           if-no-files-found: error
