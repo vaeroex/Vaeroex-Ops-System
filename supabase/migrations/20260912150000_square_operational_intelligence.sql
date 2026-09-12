@@ -12,6 +12,10 @@ begin
     or (p_location is not null and p_location not in ('mapped_location','seller_scoped','explicitly_unresolved'))
     or (p_from is not null and p_from!~'^\d{4}-\d{2}-\d{2}$') or (p_to is not null and p_to!~'^\d{4}-\d{2}-\d{2}$')
     or (p_from is not null and p_to is not null and p_from>p_to) or p_sort not in ('newest','oldest') then return null; end if;
+  -- Freeze the admitted resource set across the nested card read and the
+  -- operational-run lookup. SHARE conflicts with admission INSERT's
+  -- ROW EXCLUSIVE lock; the existing 2s/5s timeouts keep contention bounded.
+  lock table private.square_observation_admissions in share mode;
   -- This performs and locks the complete session, membership, subscription,
   -- entity, generation, mapping, source-version and retention authority chain.
   card:=private.square_workspace_card_v1(p_workspace_name);
