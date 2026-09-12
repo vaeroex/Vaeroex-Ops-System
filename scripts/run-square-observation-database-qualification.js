@@ -11,7 +11,7 @@ async function qualify(runtime) {
   const policy=require("../lib/integrations/providers/square/observation-admission.ts");
   const db=await runtime.createDatabase("observations"), c=db.client;
   const files=runtime.migrationFiles();
-  eq(files.length,114,"full canonical chain, including restricted workspace card contract");
+  eq(files.length,115,"full canonical chain, including deterministic Square operational intelligence");
   stage="migrations";
   await runtime.applyMigrations(c,files.slice(0,-4));
   const schemaBefore=await runtime.sourceSchemaFingerprint(c);
