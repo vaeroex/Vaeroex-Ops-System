@@ -20,6 +20,7 @@ const approvedSquareQualificationPaths = Object.freeze([
   "components/integrations/SquareEvidenceCard.tsx",
   "lib/supabase/types.ts",
   "supabase/migrations/20260911222230_square_workspace_evidence.sql",
+  "supabase/migrations/20260912034447_square_workspace_card_contract.sql",
   "supabase/migrations/20260907042202_square_dormant_trusted_authority.sql",
   "supabase/migrations/20260907042352_square_dormant_atomic_pages.sql",
   "supabase/migrations/20260907174326_square_dormant_account_connection.sql",

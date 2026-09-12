@@ -55,5 +55,6 @@ module.exports=async function({c,eq,workspace,actor,session,connection,entity,ma
     }
     await reject(async()=>{await c.query("set local role authenticated");await c.query("select output from private.square_interpretation_runs");},"no raw table access");
     eq((await c.query("select has_schema_privilege('authenticated','private','usage') ok")).rows[0].ok,false,"reader grants no private schema usage");
+    await require('./square-workspace-card-database-tests.js')({c,eq,workspace,actor,session,connection,entity,claims,view});
   } finally {await c.query("rollback");}
 };

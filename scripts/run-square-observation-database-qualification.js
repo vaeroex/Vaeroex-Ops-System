@@ -11,11 +11,11 @@ async function qualify(runtime) {
   const policy=require("../lib/integrations/providers/square/observation-admission.ts");
   const db=await runtime.createDatabase("observations"), c=db.client;
   const files=runtime.migrationFiles();
-  eq(files.length,113,"full canonical chain, including workspace evidence reader");
+  eq(files.length,114,"full canonical chain, including restricted workspace card contract");
   stage="migrations";
-  await runtime.applyMigrations(c,files.slice(0,-3));
+  await runtime.applyMigrations(c,files.slice(0,-4));
   const schemaBefore=await runtime.sourceSchemaFingerprint(c);
-  await runtime.applyMigrations(c,files.slice(-3));
+  await runtime.applyMigrations(c,files.slice(-4));
   eq(await runtime.sourceSchemaFingerprint(c),schemaBefore,"additive migration preserves canonical/QBO schema");
   const genericCounts=async()=>{const counts={};for(const table of ["external_source_records","external_source_record_versions","canonical_business_facts","canonical_business_fact_versions","business_fact_sources","fact_contribution_batches","fact_contribution_events"])counts[table]=(await c.query(`select count(*)::int n from private.${table}`)).rows[0].n;return counts;};
   const genericBefore=await genericCounts();
@@ -229,6 +229,6 @@ async function qualify(runtime) {
   eq(await genericCounts(),genericBefore,"no generic canonical source/fact/contribution records minted");
   eq(await runtime.sourceSchemaFingerprint(c),schemaBefore,"canonical/QBO schema unchanged");
   eq((await c.query("select surface_enabled,enrollment_enabled from private.square_account_configuration")).rows[0],{surface_enabled:false,enrollment_enabled:false},"admission never opens runtime gates");
-  console.log(`Square observation database qualification passed (${assertions} assertions; 113 migrations; seven SQL/TS parity cases).`);
+  console.log(`Square observation database qualification passed (${assertions} assertions; 114 migrations; seven SQL/TS parity cases).`);
 }
 runAdditionalQualification(qualify).catch(error=>{process.stderr.write(`Square observation database qualification failed at ${stage} (${typeof error.code==="string"&&/^[A-Z0-9_]+$/.test(error.code)?error.code:"fixed_failure"}).\n`);if(/^[a-z_]{1,100}$/.test(error.message))process.stderr.write(error.message+"\n");if(error.code==="ERR_ASSERTION")process.stderr.write(String(error.message).split("\n")[0]+"\n");process.exitCode=1;});

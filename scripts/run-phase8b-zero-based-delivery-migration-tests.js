@@ -247,7 +247,8 @@ function assertTargetIsSinglePendingMigration() {
   "20260910231437_square_gcp_mapped_runtime.sql",
   "20260911000915_square_gcp_mapped_legacy_fencing.sql",
   "20260911151334_square_verified_provider_observations.sql",
-  "20260911205108_square_canonical_interpretation.sql", "20260911222230_square_workspace_evidence.sql"
+  "20260911205108_square_canonical_interpretation.sql", "20260911222230_square_workspace_evidence.sql",
+  "20260912034447_square_workspace_card_contract.sql"
   ];
   const laterMigrations = migrations.slice(targetIndex + 1);
   if (laterMigrations.length !== dormantSquareTail.length ||

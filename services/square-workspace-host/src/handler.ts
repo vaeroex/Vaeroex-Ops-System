@@ -1,11 +1,12 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextRequest, NextResponse } from "next/server";
 import type { Database } from "@/lib/supabase/types";
-import { squareWorkspaceEvidenceCandidate, readSquareWorkspaceEvidence } from "@/lib/integrations/control-plane/square-workspace-evidence";
-import { getSubscriptionStatus } from "@/lib/billing/get-subscription-status";
+import { squareWorkspaceEvidenceCandidate, readSquareWorkspaceCard } from "@/lib/integrations/control-plane/square-workspace-evidence";
 import { publicKey } from "./config";
 
 const origin = "https://square-sandbox.vaeroex.com";
+// Qualification labels only, not discovered memberships or authority grants.
+const workspaceLabels = ["Vaeroex Square Sandbox", "Vaeroex Square Evidence Denial Test"] as const;
 const escape = (s: unknown) => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]!));
 const document = (body: string) => `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Vaeroex Square Sandbox evidence</title><style>body{font:16px system-ui;max-width:800px;margin:3rem auto;padding:1rem}label,input,button,select{display:block;margin:.7rem 0}table{border-collapse:collapse}td,th{padding:.5rem;text-align:left;border:1px solid #bbb}</style><body><h1>Vaeroex Square Sandbox</h1><p>Read-only evidence qualification. Production and QBO are not connected here.</p>${body}</body></html>`;
 
@@ -49,33 +50,23 @@ export async function handle(req: NextRequest) {
     }
     const {data:{user},error} = await client.auth.getUser();
     if (error || !user || user.is_anonymous) return redirect("/signin");
-    // Workspace names select among current memberships, never grant authority.
     signal.throwIfAborted();
-    const members = await client.from("workspace_members").select("workspace_id, workspaces(id,name)").eq("user_id",user.id).eq("status","active").limit(3);
-    if (members.error || !members.data || members.data.length > 2) return finish("Evidence unavailable",403);
-    const choices = members.data.flatMap(member => {
-      const w = Array.isArray(member.workspaces) ? member.workspaces[0] : member.workspaces;
-      return w && w.id === member.workspace_id ? [w] : [];
-    });
-    if (choices.length !== members.data.length || new Set(choices.map(w=>w.name)).size !== choices.length) return finish("Evidence unavailable",403);
     if (path === "/workspace") {
       const text = await req.text();
       const form = new URLSearchParams(text);
-      if (Buffer.byteLength(text)>4096 || [...form.keys()].join(',') !== 'workspace' || !choices.some(w=>w.name===form.get('workspace'))) return finish("Unavailable",403);
+      if (Buffer.byteLength(text)>4096 || [...form.keys()].join(',') !== 'workspace' || !workspaceLabels.some(name=>name===form.get('workspace'))) return finish("Unavailable",403);
       response.cookies.set('square-evidence-workspace',form.get('workspace')!,{secure:true,httpOnly:true,sameSite:'strict',path:'/',maxAge:3600});
       return redirect('/evidence');
     }
     let body = '<form method="post" action="/signout"><button>Sign out</button></form>';
-    body += '<form method="post" action="/workspace"><label>Workspace<select name="workspace">'+choices.map(w=>`<option>${escape(w.name)}</option>`).join('')+'</select></label><button>View workspace</button></form>';
+    body += '<form method="post" action="/workspace"><label>Workspace<select name="workspace">'+workspaceLabels.map(name=>`<option>${escape(name)}</option>`).join('')+'</select></label><button>View workspace</button></form>';
     const selected = req.cookies.get('square-evidence-workspace')?.value;
-    const workspace = selected ? choices.find(w=>w.name===selected) : choices[0];
+    const workspace = selected ? workspaceLabels.find(name=>name===selected) : workspaceLabels[0];
     if (workspace) {
-      body += `<section><h2>${escape(workspace.name)}</h2>`;
+      body += `<section><h2>${escape(workspace)}</h2>`;
       signal.throwIfAborted();
-      // Deliberately omit email: no admin-email bypass; all billing lookups scoped to workspace.
-      const subscription = await getSubscriptionStatus({supabase:client,workspaceId:workspace.id});
-      signal.throwIfAborted();
-      const evidence = subscription.allowed ? await readSquareWorkspaceEvidence(client,workspace.id,req.headers) : null;
+      // Membership, subscription and complete evidence authority are one RPC.
+      const evidence = await readSquareWorkspaceCard(client,workspace,req.headers);
       if (!evidence) return finish(body+'<p>No Square evidence available.</p></section>');
       body += '<h3>Square Sandbox evidence</h3><p>Verified, non-economic provider observations · Read-only</p><ul>';
       for (const [kind,label] of Object.entries({payment:"Payment",refund:"Refund",order:"Orders",catalog:"Catalog variations",inventory:"Inventory observations"})) body += `<li>${label}: ${evidence.counts[kind as keyof typeof evidence.counts]}</li>`;

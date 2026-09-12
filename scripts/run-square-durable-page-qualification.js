@@ -187,6 +187,7 @@ async function migrationQualification(target, administrator) {
   const observationTail = files.filter(name => name === "20260911151334_square_verified_provider_observations.sql");
   const interpretationTail = files.filter(name => name === "20260911205108_square_canonical_interpretation.sql");
   const evidenceTail = files.filter(name => name === "20260911222230_square_workspace_evidence.sql");
+  const cardTail = files.filter(name => name === "20260912034447_square_workspace_card_contract.sql");
   equal(added.length, 2, "both additive Square migrations present");
   equal(accountTail.length, 1, "account-connection migration present");
   equal(remoteTail.length, 1, "remote Sandbox binding migration present");
@@ -198,7 +199,8 @@ async function migrationQualification(target, administrator) {
   equal(observationTail.length, 1, "separately qualified non-economic observation admission present");
   equal(interpretationTail.length, 1, "separately qualified deterministic interpretation migration present");
   equal(evidenceTail.length, 1, "separately qualified read-only evidence reader present");
-  equal(baseline.length + added.length + accountTail.length + remoteTail.length + brokerTail.length + gcpTail.length + recoveryTail.length + mappedTail.length + mappedFenceTail.length + observationTail.length + interpretationTail.length + evidenceTail.length, files.length, "migration manifest is explicit");
+  equal(cardTail.length, 1, "separately qualified restricted workspace card contract present");
+  equal(baseline.length + added.length + accountTail.length + remoteTail.length + brokerTail.length + gcpTail.length + recoveryTail.length + mappedTail.length + mappedFenceTail.length + observationTail.length + interpretationTail.length + evidenceTail.length + cardTail.length, files.length, "migration manifest is explicit");
   const clean = await createDatabase(target, administrator, "clean");
   await applyMigrations(clean.client, baseline);
   const before = await sourceSchemaFingerprint(clean.client);

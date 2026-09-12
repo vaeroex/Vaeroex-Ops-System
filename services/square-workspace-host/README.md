@@ -35,10 +35,15 @@ normalizes the proven request's Origin for the private upstream; the upstream
 itself never accepts `null`. `Referrer-Policy: no-referrer` is unchanged.
 Signout clears local
 session cookies even if the provider operation fails. The workspace selector
-resolves names against current active memberships; it is not an authority grant.
-Only the selected workspace is read. Existing subscription logic (without email
-or admin bypass) runs before the existing JWT/session/entity/generation-fenced
-evidence RPC. Missing authority or malformed DTO yields no evidence card.
+contains only the two fixed qualification labels, not a discovered membership
+list. Labels/cookies are never authority. `read_square_workspace_card_v1(text)`
+resolves exactly one current caller membership inside the database, applies the
+workspace-only subscription policy (no email/admin bypass), then delegates to the
+existing JWT/session/entity/generation-fenced evidence projection. It returns only
+that projection or JSON null. Missing, ambiguous, revoked, unpaid and unmapped
+cases have the same no-card response. The host performs no table reads and obtains
+no workspace IDs, membership rows or billing records. FORCE RLS and table ACLs are
+unchanged; only the constrained function is executable by authenticated users.
 
 No raw identifiers, cursors, source payloads or error details enter HTML. No
 application request logs, browser storage, scripts or telemetry are configured.
@@ -66,11 +71,22 @@ provider. The same commands run in the existing Linux `verify` job. Handler test
 inject Auth/database mocks and the existing strict 13-observation DTO. Existing
 database authority qualification is reused; these tests do not claim hosted proof.
 
+The workspace-card correction additionally reproduces the hosted denial by
+revoking direct SELECT in its disposable database fixture. The 114-migration
+qualification passes 230 assertions, including caller/session/membership changes,
+ambiguous labels, entity/generation/revocation fencing, subscription precedence,
+and identifier-free DTO output. `SQUARE_HOST_BROWSER_TEST=1` runs real synthetic
+Chromium sign-in, workspace-switch and revoked-read cases with mocked Auth/RPC;
+all table access throws and the zero-AI tripwire remains installed. CI executes
+this browser path after installing its pinned Chromium. No hosted proof or
+remote permission change is claimed by this implementation.
+
 ## Exact later bounded qualification plan (not executed by this PR)
 
-1. Verify reviewed commit/build, existing migration 113 ledger, two prepared
-   workspaces and closed broker/consent/provider gates. Do not reapply migrations,
-   recreate onboarding, or obtain database passwords.
+1. After separate hosted authorization, verify the migration 113 ledger and apply
+   only additive migration 114 (workspace-card contract) to the isolated Sandbox.
+   Verify reviewed commit/build, two prepared workspaces and closed broker/consent/
+   provider gates. Do not grant table SELECT, recreate onboarding, or obtain passwords.
 2. Recheck budget and current operator IPv4, arm approved cleanup, start only the
    existing isolated replacement VM for <=1 hour. Keep original VM stopped.
 3. Install the dedicated build under `/opt/vaeroex-square-evidence` with pinned
