@@ -34,7 +34,7 @@ const mixed=op.summarizeSquareOperationalAmounts([{amountMinor:'1',currency:'USD
 assert.equal(mixed.averageState,'mixed_currency');assert.equal(mixed.total,null);
 assert.equal(op.pageSquareOperationalActivity(a,{kind:'inventory',location:'mapped_location',page:1,pageSize:2}).rows.length,2);
 assert.equal(op.pageSquareOperationalActivity(a,{kind:'inventory',page:2,pageSize:2}).rows.length,1);
-const dated=op.pageSquareOperationalActivity(a,{from:'2026-09-01',to:'2026-09-01',sort:'oldest'});assert.ok(dated.rows.length>0);for(let i=1;i<dated.rows.length;i++)assert.ok(Date.parse(dated.rows[i-1].occurredAt)<=Date.parse(dated.rows[i].occurredAt));
+const dated=op.pageSquareOperationalActivity(a,{from:'2026-09-01',to:'2026-09-01',sort:'oldest'});assert.ok(dated.rows.length>0);for(let i=1;i<dated.rows.length;i++){assert.ok(Date.parse(dated.rows[i-1].occurredAt)<=Date.parse(dated.rows[i].occurredAt));if(dated.rows[i-1].occurredAt===dated.rows[i].occurredAt)assert.ok(dated.rows[i-1].evidenceRef<dated.rows[i].evidenceRef,'oldest ties retain stable evidence ordering');}
 assert.throws(()=>op.pageSquareOperationalActivity(a,{from:'2026-09-12',to:'2026-09-11'}),/filter_denied/);
 assert.equal(a.kpiEvidence.payment.admission,'verified_non_economic');assert.equal(a.kpiEvidence.payment.completeness,'unknown');assert.equal(a.kpiEvidence.inventory.evidenceRefs.length,3);
 assert.throws(()=>op.deriveSquareOperationalIntelligence(Array(1001).fill(items[0]),[]),/capacity/);
