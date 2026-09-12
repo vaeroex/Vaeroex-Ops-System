@@ -4,7 +4,7 @@ import { SquareWorkspaceEvidenceSchema } from "./workspace-evidence";
 const Activity=z.object({evidenceRef:z.string().regex(/^sqe_[a-f0-9]{16}$/),kind:z.enum(["payment","refund","order","catalog","inventory"]),
   status:z.string().min(1).max(80),occurredAt:z.string().datetime({offset:true}).nullable(),location:z.enum(["mapped_location","seller_scoped","explicitly_unresolved"]),
   amount:z.object({amountMinor:z.string().regex(/^-?(0|[1-9][0-9]{0,39})$/),currency:z.string().regex(/^[A-Z]{3}$/)}).strict().nullable(),
-  quantity:z.string().max(80).nullable(),unitState:z.enum(["not_applicable","unverified"]),label:z.string().min(1).max(255).nullable(),
+  quantity:z.string().max(80).nullable(),unitState:z.enum(["not_applicable","unverified"]),label:z.string().min(1).max(512).nullable(),
   relationship:z.enum(["not_applicable","observed_id_match","unresolved","conflict"]),admission:z.literal("verified_non_economic")}).strict();
 const Summary=z.object({count:z.number().int().min(0).max(1000),total:Activity.shape.amount,exactAverageMinor:z.string().regex(/^-?(0|[1-9][0-9]{0,39})$/).nullable(),
   averageState:z.enum(["exact","no_observations","mixed_currency","non_integral_minor_unit","amount_unavailable"])}).strict();

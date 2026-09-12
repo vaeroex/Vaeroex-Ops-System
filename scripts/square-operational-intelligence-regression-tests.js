@@ -2,6 +2,7 @@ const assert=require('node:assert/strict');
 const {payment,refund,catalog,order,inventory,context}=require('./square-canonical-test-support.js');
 const {interpretSquareObservation:interpret,reconcileSquareInterpretations:reconcile}=require('../lib/integrations/providers/square/canonical-interpretation.ts');
 const op=require('../lib/integrations/providers/square/operational-intelligence.ts');
+const {parseSquareWorkspaceOperational}=require('../lib/integrations/providers/square/workspace-operational.ts');
 const items=[interpret(payment(),context),interpret(refund(),context),interpret(catalog(),context),interpret(order(),context),
   interpret(inventory('count'),context),interpret(inventory('physical'),context),interpret(inventory('adjustment'),context)];
 const links=reconcile(items).links;
@@ -16,6 +17,9 @@ assert.ok(a.activity.every(row=>!JSON.stringify(row).includes('PAY_SYNTHETIC')&&
 assert.ok(a.activity.some(row=>row.kind==='catalog'&&row.label));
 const longLabel='L'.repeat(512), longCatalog=interpret(catalog({item_variation_data:{item_id:'SQ2B1B1ITEM001',name:longLabel,sku:'TEA-12OZ',pricing_type:'FIXED_PRICING',price_money:{amount:450,currency:'USD'},ordinal:0,track_inventory:true,sellable:true,stockable:true}}),context);
 assert.equal(op.deriveSquareOperationalIntelligence([longCatalog],[]).activity[0].label,longLabel,'full admitted catalog label is preserved');
+const longCatalogOperational=op.deriveSquareOperationalIntelligence([longCatalog],[]);
+const checkedDto=parseSquareWorkspaceOperational({version:'square_workspace_operational_v1',evidence:{version:'square_workspace_evidence_v1',source:'Square Sandbox',status:'verified_non_economic',policy:'square_canonical_interpretation_v1',counts:{payment:0,refund:0,order:0,catalog:1,inventory:0},relationships:{unresolvedLocation:0,conflict:0,idMatch:0,otherUncertain:0},historical:'unknown',economic:'blocked',checkpointRevision:1,interpretedAt:'2026-09-11T16:00:00Z',lastObservedAt:'2026-09-11T15:00:00Z',checkedAt:'2026-09-11T16:00:00Z',syncStatus:'unknown',provenance:[{kind:'catalog',sourceVersion:1,observedAt:'2026-09-11T15:00:00Z',scope:'seller_with_location_applicability'}]},calculation:{policyVersion:longCatalogOperational.policyVersion,economic:longCatalogOperational.economic,historical:longCatalogOperational.historical,aiDispatch:longCatalogOperational.aiDispatch,payment:longCatalogOperational.payment,refund:longCatalogOperational.refund,order:longCatalogOperational.order,groups:longCatalogOperational.groups,refundRate:longCatalogOperational.refundRate,statusMix:longCatalogOperational.statusMix,orderStatusMix:longCatalogOperational.orderStatusMix,catalog:longCatalogOperational.catalog,inventory:longCatalogOperational.inventory,fulfillment:longCatalogOperational.fulfillment,insights:longCatalogOperational.insights},page:{rows:longCatalogOperational.activity,page:1,pageSize:25,total:1,pages:1}});
+assert.equal(checkedDto?.page.rows[0].label,longLabel,'checked workspace DTO accepts the full admitted catalog label');
 const offsetPayment=interpret(payment({created_at:'2026-09-11T09:30:00Z',updated_at:'2026-09-11T10:00:00+02:00'}),context);
 assert.equal(op.deriveSquareOperationalIntelligence([offsetPayment],[]).activity[0].occurredAt,'2026-09-11T09:30:00Z','latest timestamp compares instants, not offset text');
 const paymentOnly=op.deriveSquareOperationalIntelligence([items[0]],reconcile([items[0]]).links);
