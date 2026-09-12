@@ -18,7 +18,7 @@ const metric = z.object({ count: z.number().int().min(0).max(SQUARE_OPERATIONAL_
 const Activity = z.object({ evidenceRef: z.string().regex(/^sqe_[a-f0-9]{16}$/), kind: z.enum(kinds), status: z.string().min(1).max(80),
   occurredAt: IsoTimestampSchema.nullable(), location: z.enum(["mapped_location", "seller_scoped", "explicitly_unresolved"]),
   amount: amount.nullable(), quantity: z.string().max(80).nullable(), unitState: z.enum(["not_applicable", "unverified"]),
-  label: z.string().min(1).max(255).nullable(), relationship: z.enum(["not_applicable", "observed_id_match", "unresolved", "conflict"]),
+  label: z.string().min(1).max(512).nullable(), relationship: z.enum(["not_applicable", "observed_id_match", "unresolved", "conflict"]),
   admission: z.literal("verified_non_economic") }).strict();
 const Group=z.object({kind:z.enum(["payment","refund","order"]),locationGroup:z.string().regex(/^(seller_scoped|explicitly_unresolved|sqg_[a-f0-9]{16})$/),currency:z.string().regex(/^[A-Z]{3}$/).nullable(),summary:metric}).strict();
 export const SquareOperationalIntelligenceSchema = z.object({
@@ -41,7 +41,11 @@ export const SquareOperationalIntelligenceSchema = z.object({
 export type SquareOperationalIntelligence = z.infer<typeof SquareOperationalIntelligenceSchema>;
 
 const compare = (a:string,b:string) => a < b ? -1 : a > b ? 1 : 0;
-const timestamp = (item:SquareInterpretation) => Object.values(item.timestamps).filter((v):v is string=>typeof v === "string").sort(compare).at(-1) ?? null;
+const compareTimestamp = (a:string,b:string) => Date.parse(a)-Date.parse(b) || compare(a,b);
+const timestamp = (item:SquareInterpretation) => Object.values(item.timestamps).filter((v):v is string=>typeof v === "string").sort(compareTimestamp).at(-1) ?? null;
+const compareActivity = (a:{occurredAt:string|null;evidenceRef:string},b:{occurredAt:string|null;evidenceRef:string}) =>
+  a.occurredAt === null ? b.occurredAt === null ? compare(a.evidenceRef,b.evidenceRef) : 1
+    : b.occurredAt === null ? -1 : compareTimestamp(b.occurredAt,a.occurredAt) || compare(a.evidenceRef,b.evidenceRef);
 const moneyFor = (item:SquareInterpretation) => item.kind === "payment" ? item.money.total : item.kind === "refund" ? item.money.amount : item.kind === "order" ? item.money.total : null;
 const displayMoney=(item:SquareInterpretation)=>{const value=moneyFor(item);return value?.amountMinor&&value.currency?{amountMinor:value.amountMinor,currency:value.currency}:null;};
 export function summarizeSquareOperationalAmounts(values:readonly (Money|null)[]) {
@@ -73,7 +77,7 @@ export function deriveSquareOperationalIntelligence(items:readonly SquareInterpr
     occurredAt:timestamp(item),location:item.locationId?"mapped_location":item.kind==="catalog"?"seller_scoped":"explicitly_unresolved",
     amount:displayMoney(item),quantity:item.kind==="inventory"?item.quantity:null,unitState:item.kind==="inventory"?"unverified":"not_applicable",
     label:item.kind==="catalog"&&item.detail&&typeof item.detail==="object"&&"displayName" in item.detail&&typeof item.detail.displayName==="string"?item.detail.displayName:null,
-    relationship:linkState(item),admission:"verified_non_economic"})).sort((a,b)=>compare(b.occurredAt??"",a.occurredAt??"")||compare(a.evidenceRef,b.evidenceRef));
+    relationship:linkState(item),admission:"verified_non_economic"})).sort(compareActivity);
   const orderStatusMix=Object.fromEntries([...new Set(byKind.order.map(i=>i.status??"unknown"))].sort(compare).map(s=>[s,byKind.order.filter(i=>(i.status??"unknown")===s).length]));
   const statusMix=Object.fromEntries(kinds.map(kind=>[kind,Object.fromEntries([...new Set(byKind[kind].map(i=>i.status??"unknown"))].sort(compare).map(status=>[status,byKind[kind].filter(i=>(i.status??"unknown")===status).length]))]));
   const completedPayments=byKind.payment.filter(i=>i.status==="COMPLETED"), completedRefunds=byKind.refund.filter(i=>i.status==="COMPLETED");

@@ -14,6 +14,10 @@ assert.equal(a.order.count,1);assert.equal(a.economic,'blocked');assert.equal(a.
 assert.equal(a.catalog.activeVariations,null);assert.equal(a.inventory.movementTotal,null);assert.equal(a.fulfillment.activity,null);
 assert.ok(a.activity.every(row=>!JSON.stringify(row).includes('PAY_SYNTHETIC')&&!JSON.stringify(row).includes('LOC_SYNTHETIC')));
 assert.ok(a.activity.some(row=>row.kind==='catalog'&&row.label));
+const longLabel='L'.repeat(512), longCatalog=interpret(catalog({item_variation_data:{item_id:'SQ2B1B1ITEM001',name:longLabel,sku:'TEA-12OZ',pricing_type:'FIXED_PRICING',price_money:{amount:450,currency:'USD'},ordinal:0,track_inventory:true,sellable:true,stockable:true}}),context);
+assert.equal(op.deriveSquareOperationalIntelligence([longCatalog],[]).activity[0].label,longLabel,'full admitted catalog label is preserved');
+const offsetPayment=interpret(payment({created_at:'2026-09-11T09:30:00Z',updated_at:'2026-09-11T10:00:00+02:00'}),context);
+assert.equal(op.deriveSquareOperationalIntelligence([offsetPayment],[]).activity[0].occurredAt,'2026-09-11T09:30:00Z','latest timestamp compares instants, not offset text');
 const paymentOnly=op.deriveSquareOperationalIntelligence([items[0]],reconcile([items[0]]).links);
 assert.equal(paymentOnly.activity[0].relationship,'unresolved','non-refund outgoing references retain uncertainty');
 assert.deepEqual(op.authorizeSquareAiDispatch(),{allowed:false,reason:'square_ai_dispatch_disabled'});

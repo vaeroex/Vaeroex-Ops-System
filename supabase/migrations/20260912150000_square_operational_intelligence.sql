@@ -22,7 +22,8 @@ begin
     (select distinct resource_key from private.square_observation_admissions where workspace_id=w.id
       and business_entity_id=ac.business_entity_id and connection_id=ac.connection_id and generation=ac.generation) resources;
   select * into r from private.square_interpretation_runs where workspace_id=w.id and business_entity_id=ac.business_entity_id
-    and connection_id=ac.connection_id and generation=ac.generation and partition_fingerprint=partition order by revision desc limit 1 for share;
+    and connection_id=ac.connection_id and generation=ac.generation and partition_fingerprint=partition
+    and revision=(card->>'checkpointRevision')::bigint limit 1 for share;
   op:=r.output->'operational';
   if op is null or op->>'policyVersion' is distinct from 'square_operational_intelligence_v1'
     or op->>'economic' is distinct from 'blocked' or op->>'historical' is distinct from 'unknown'
@@ -30,10 +31,10 @@ begin
     or jsonb_array_length(op->'activity')>1000 then return null; end if;
   select count(*)::integer into total from jsonb_array_elements(op->'activity') value
     where (p_kind is null or value->>'kind'=p_kind) and (p_status is null or value->>'status'=p_status);
-  select coalesce(jsonb_agg(value order by value->>'occurredAt' desc nulls last,value->>'evidenceRef'),'[]'::jsonb) into rows from
+  select coalesce(jsonb_agg(value order by (value->>'occurredAt')::timestamptz desc nulls last,value->>'occurredAt' desc nulls last,value->>'evidenceRef'),'[]'::jsonb) into rows from
     (select value from jsonb_array_elements(op->'activity') value
       where (p_kind is null or value->>'kind'=p_kind) and (p_status is null or value->>'status'=p_status)
-      order by value->>'occurredAt' desc nulls last,value->>'evidenceRef' offset (p_page-1)*page_size limit page_size) page_rows;
+      order by (value->>'occurredAt')::timestamptz desc nulls last,value->>'occurredAt' desc nulls last,value->>'evidenceRef' offset (p_page-1)*page_size limit page_size) page_rows;
   return jsonb_build_object('version','square_workspace_operational_v1','evidence',card,'calculation',jsonb_build_object(
     'policyVersion',op->'policyVersion','economic',op->'economic','historical',op->'historical','aiDispatch',op->'aiDispatch',
     'payment',op->'payment','refund',op->'refund','order',op->'order','groups',op->'groups','refundRate',op->'refundRate','statusMix',op->'statusMix','orderStatusMix',op->'orderStatusMix',

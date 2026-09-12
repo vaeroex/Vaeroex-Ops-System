@@ -1,7 +1,8 @@
 const assert=require('node:assert/strict'),fs=require('node:fs');
 const migration=fs.readFileSync('supabase/migrations/20260912150000_square_operational_intelligence.sql','utf8');
 assert.match(migration,/card:=private\.square_workspace_card_v1\(p_workspace_name\)/);
-assert.match(migration,/partition_fingerprint=partition order by revision desc/);
+assert.match(migration,/partition_fingerprint=partition\s+and revision=\(card->>'checkpointRevision'\)::bigint limit 1 for share/);
+assert.match(migration,/order by \(value->>'occurredAt'\)::timestamptz desc nulls last/);
 assert.match(migration,/jsonb_array_length\(op->'activity'\)>1000/);
 assert.match(migration,/offset \(p_page-1\)\*page_size limit page_size/);
 assert.match(migration,/grant execute on function public\.read_square_workspace_operational_v1/);
