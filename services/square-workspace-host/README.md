@@ -1,5 +1,67 @@
 # Restricted Sandbox workspace evidence host
 
+## Executive Intelligence Sandbox experience
+
+The private experience is titled **Vaeroex Executive Intelligence Sandbox**.
+It mirrors AppShell's navy sidebar/header, light workspace canvas, section
+navigation, panels and metrics using the existing inert Tailwind palette. It does
+**not** import AppShell, AppNavigation, ExecutiveHomepage, GlobalSearch or their
+actions/client components: those bring Production routes, session/data discovery,
+Business Health or model-interaction dependencies. The approved five routes are
+unchanged. Navigation uses only local evidence-page anchors, with no scripts,
+hydration, assets, external fonts, analytics, recommendations or financial widgets.
+
+All metric cards come from the already validated `read_square_workspace_card_v1`
+DTO, after current workspace/subscription/entity/generation authority succeeds.
+No hardcoded fixture counts, wall-clock freshness threshold, SQL/table grants,
+new migration, sync trigger or aggregate inference is added. Counts describe
+admitted observations, not transaction volume. Provider observation time,
+interpretation time and authority-check time are separately labeled; sync health
+and historical completeness stay unknown. A denied workspace shows no metrics,
+provenance or uncertainty counts. The selector reflects the current selected
+label but continues to confer no authority.
+
+### Reusable on-demand sessions
+
+Hosting stays **off by default**, not an always-on service. No new cloud resource,
+identity, database, credential or paid commitment is needed. For each requested
+session, use the existing qualified host/bindings and the bounded plan below.
+Generate a fresh nonsecret plan before startup:
+
+```
+node services/square-workspace-host/window-plan.mjs '<UTC deadline within 20–60 minutes>' '<current approved public IPv4>' '<full reviewed merge SHA>'
+```
+
+The planner performs no cloud/SQL action and does not claim the revision is
+deployed. Verify it against Git and the installed artifact. It pins the isolated
+project, replacement VM, host and database; sets admission cutoff 15 minutes and
+cleanup 10 minutes before hard STOP; forbids broker login, provider calls, new IAM
+and automatic restart. Never reuse an expired plan. Keep the original VM stopped.
+
+Before starting: verify the monthly USD20 budget/notification controls and current
+cost forecast (alerts are not a cap), reserve no more than the approved USD0.25
+increment, verify migration114 and preserved generation4, arm the one-time cleanup
+and provider STOP, then set the fresh runtime deadline. Install only this dedicated
+build, keep consent/synthetic services and timers stopped under the existing
+temporary Conditions, and preserve Unix0700/0600 isolation. Verify TLS/Host/form
+boundaries before opening exact operator `/32` and Supabase-only HTTPS egress.
+Only the evidence-read gate may open; callback/enrollment/provider bindings and
+all three native roles remain fenced. Use the existing portal account at `/signin`;
+never request Square consent or a database password for viewing evidence.
+
+On signout/completion/failure, and no later than cleanupAt: close the evidence-read
+gate and verify a refreshed authorized page returns no card; sign out normally;
+close operator ingress; stop the host; restore temporary closed service Conditions;
+delete only recorded window-specific egress; verify all roles NOLOGIN/zero sessions;
+stop replacement VM and verify both VMs TERMINATED. Pause the one-time cleanup
+after verified completion. Preserve consent, mapping, enrollment, encrypted
+credentials and facts. A crash or interrupted session must not cause automatic
+restart: recover by checking closed gates first, then create a new bounded plan.
+
+This PR implements and locally verifies the UX; deployment/visual acceptance of
+this revision remains a subsequent bounded session. PR390's database/hosted
+authority evidence is reused, not claimed as hosted UX evidence for this revision.
+
 This is a separate Next.js 15 application, not the normal Vaeroex application.
 Only its five fixed routes are reachable: GET `/signin`, GET `/evidence`, and
 POST `/session`, `/workspace`, `/signout`. There are no Server Actions, client
@@ -81,10 +143,10 @@ all table access throws and the zero-AI tripwire remains installed. CI executes
 this browser path after installing its pinned Chromium. No hosted proof or
 remote permission change is claimed by this implementation.
 
-## Exact later bounded qualification plan (not executed by this PR)
+## Bounded hosted verification checklist
 
-1. After separate hosted authorization, verify the migration 113 ledger and apply
-   only additive migration 114 (workspace-card contract) to the isolated Sandbox.
+1. Verify the existing migration 114 ledger (workspace-card contract), already
+   applied and hosted-qualified with PR390. Do not reapply it or change grants.
    Verify reviewed commit/build, two prepared workspaces and closed broker/consent/
    provider gates. Do not grant table SELECT, recreate onboarding, or obtain passwords.
 2. Recheck budget and current operator IPv4, arm approved cleanup, start only the

@@ -24,10 +24,21 @@ for(const name of ['VERCEL','VERCEL_ENV','VERCEL_TARGET_ENV','VERCEL_PROJECT_ID'
  for(const p of ['/admin','/api','/_next/static/a.js'])assert.equal((await handle(request(p))).status,404);
  assert.equal(queries+authCalls+rpcCalls,0);
  const valid=await (await handle(request())).text();assert.match(valid,/Payment: 1/);assert.match(valid,/Inventory observations: 6/);assert.match(valid,/2 unresolved location relationships; 1 reference conflict/);assert(!valid.includes(workspace));assert(!/<script|src=|PRIVATE_SENTINEL/.test(valid));
+ assert.match(valid,/<title>Vaeroex Executive Intelligence Sandbox<\/title>/);
+ assert.match(valid,/Authority checked at/);assert.match(valid,/page retrieval is not a sync/);
+ assert.match(valid,/Admitted observations/);assert.match(valid,/Economic contributions remain blocked/);
+ assert.match(valid,/Seller; location applicability/);
+ const {card,escape}=require('../services/square-workspace-host/src/presentation.ts');
+ assert.equal(escape('<script>"&'), '&lt;script&gt;&quot;&amp;');
+ assert.equal(card(view),card(view),'presentation is deterministic, with no wall-clock freshness guess');
+ assert(!/https?:\/\//.test(valid),'navigation has no Production or external links');
+ assert(!/\$\d|Business Health|Ask Vaeroex/.test(valid),'no economics or model interaction');
  for(mode of ['nonmember','unsubscribed','revoked','forged']){const body=await(await handle(request())).text();assert(!body.includes('Square Sandbox evidence</h3>'));assert(!body.includes('PRIVATE_SENTINEL'));}
  mode='valid';
  const denied=await(await handle(request('/evidence',{cookie:'square-evidence-workspace=Vaeroex%20Square%20Evidence%20Denial%20Test'}))).text();
  assert.match(denied,/No Square evidence available/);assert(!denied.includes('Payment: 1'));assert.equal(queries,0,'host never needs table SELECT');
+ assert.match(denied,/<option selected>Vaeroex Square Evidence Denial Test/);
+ for(const label of ['Admitted observations','Interpretation checkpoint','unresolved location relationships','Source &amp; provenance'])assert(!denied.includes(label),'denial reveals no evidence');
  mode='unauth';assert.equal((await handle(request())).status,303);
  mode='valid';
  const controller=new AbortController();controller.abort();const before=queries+authCalls+rpcCalls;
@@ -54,9 +65,25 @@ for(const name of ['VERCEL','VERCEL_ENV','VERCEL_TARGET_ENV','VERCEL_PROJECT_ID'
    const page=await browser.newPage();let external=0;
    await page.route('**/*',r=>r.request().url().startsWith(url+'/')?r.continue():(external++,r.abort()));
    await page.goto(url+'/signin');await page.getByLabel('Email').fill('synthetic@example.invalid');await page.getByLabel('Password').fill('synthetic-not-a-credential');await page.getByRole('button',{name:'Sign in',exact:true}).click();
-   await page.waitForURL(url+'/evidence');assert.match(await page.locator('body').innerText(),/Inventory observations: 6/);
+   await page.waitForURL(url+'/evidence');assert.equal(await page.getByRole('article',{name:'Inventory observations: 6',exact:true}).count(),1);
+   assert.equal(await page.title(),'Vaeroex Executive Intelligence Sandbox');
+   for(const width of [1440,390]) {
+    await page.setViewportSize({width,height:1000});
+    assert(await page.getByRole('heading',{name:'Vaeroex Executive Intelligence Sandbox',exact:true}).isVisible());
+    assert(await page.getByRole('heading',{name:'Square Sandbox evidence',exact:true}).isVisible());
+    assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'no horizontal page overflow');
+    await page.getByText('Inspect 13 admitted source versions',{exact:true}).click();
+    assert.equal(await page.locator('tbody tr').count(),13);
+    await page.evaluate(()=>window.scrollTo(0,document.body.scrollHeight));
+    assert(await page.locator('header .badge').isVisible(),'Sandbox label remains visible');
+    await page.evaluate(()=>window.scrollTo({top:0,behavior:'instant'}));
+    if(process.env.SQUARE_HOST_SCREENSHOTS)await page.screenshot({path:process.env.SQUARE_HOST_SCREENSHOTS+`/sandbox-${width}.png`,fullPage:true});
+    await page.getByText('Inspect 13 admitted source versions',{exact:true}).click();
+   }
    await page.getByRole('combobox').selectOption('Vaeroex Square Evidence Denial Test');await page.getByRole('button',{name:'View workspace',exact:true}).click();
    assert.match(await page.locator('body').innerText(),/No Square evidence available/);assert.equal(await page.getByRole('heading',{name:'Square Sandbox evidence',exact:true}).count(),0);
+   assert.equal(await page.getByRole('combobox').inputValue(),'Vaeroex Square Evidence Denial Test');
+   assert.equal(await page.locator('.kpi,table').count(),0);
    await page.getByRole('combobox').selectOption('Vaeroex Square Sandbox');await page.getByRole('button',{name:'View workspace',exact:true}).click();
    assert.match(await page.locator('body').innerText(),/2 unresolved location relationships; 1 reference conflict/);
    mode='revoked';await page.reload();assert.match(await page.locator('body').innerText(),/No Square evidence available/);
