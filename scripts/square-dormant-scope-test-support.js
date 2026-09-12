@@ -1,6 +1,20 @@
 // Exact additive dormant qualification/connection scope. Legacy parser suites still reject
 // every other database/runtime path; no directory-wide exemption is permitted.
 const approvedSquareQualificationPaths = Object.freeze([
+  // Dedicated read-only Sandbox host; exact files, not a service-directory exemption.
+  "services/square-workspace-host/.gitignore",
+  "services/square-workspace-host/README.md",
+  "services/square-workspace-host/app/[route]/route.ts",
+  "services/square-workspace-host/boundary.mjs",
+  "services/square-workspace-host/boundary.test.mjs",
+  "services/square-workspace-host/evidence.service",
+  "services/square-workspace-host/next.config.mjs",
+  "services/square-workspace-host/next.test.mjs",
+  "services/square-workspace-host/src/config.ts",
+  "services/square-workspace-host/src/handler.ts",
+  "services/square-workspace-host/start.mjs",
+  "services/square-workspace-host/tsconfig.json",
+  "services/square-workspace-host/wire.test.mjs",
   // Read-only Sandbox workspace evidence; no broad app/schema exemption.
   "app/app/settings/page.tsx",
   "components/integrations/SquareEvidenceCard.tsx",

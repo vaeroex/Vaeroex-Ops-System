@@ -19,6 +19,9 @@ const request=(path='/evidence',h={})=>new NextRequest(`https://${host}${path}`,
 Object.assign(process.env,{NODE_ENV:'production',SQUARE_EVIDENCE_HOST:'gcp-square-sandbox-workspace-v1',NEXT_PUBLIC_SUPABASE_URL:'https://oysjpoondtcrqpghhrbd.supabase.co',NEXT_PUBLIC_APP_URL:`https://${host}`,NEXT_PUBLIC_SUPABASE_ANON_KEY:'sb_publishable_SYNTHETIC_NEVER_ISSUED_123456789'});
 for(const name of ['VERCEL','VERCEL_ENV','VERCEL_TARGET_ENV','VERCEL_PROJECT_ID','VERCEL_URL','VAEROEX_ADMIN_EMAILS'])delete process.env[name];
 (async()=>{
+ const {withoutSquareQualificationPaths}=require('./square-dormant-scope-test-support.js');
+ assert.equal(withoutSquareQualificationPaths('services/square-workspace-host/src/handler.ts'),'');
+ for(const p of ['services/square-workspace-host/app/admin/route.ts','services/square-workspace-host/src/unapproved.ts','services/external-integrations-qbo/src/server.ts'])assert.equal(withoutSquareQualificationPaths(p),p);
  const {publicKey}=require('../services/square-workspace-host/src/config.ts');
  for(const key of [undefined,'sb_secret_PRIVATE','plain-secret','a.'+Buffer.from(JSON.stringify({role:'service_role',ref:'oysjpoondtcrqpghhrbd',iss:'supabase'})).toString('base64url')+'.s'])assert.equal(publicKey(key),false);
  for(const h of [{host:'localhost'},{host:'preview.vercel.app'},{'x-forwarded-proto':'http'},{forwarded:'host=x'}])assert.equal((await handle(request('/evidence',h))).status,404);
