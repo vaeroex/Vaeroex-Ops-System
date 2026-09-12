@@ -229,6 +229,6 @@ async function qualify(runtime) {
   eq(await genericCounts(),genericBefore,"no generic canonical source/fact/contribution records minted");
   eq(await runtime.sourceSchemaFingerprint(c),schemaBefore,"canonical/QBO schema unchanged");
   eq((await c.query("select surface_enabled,enrollment_enabled from private.square_account_configuration")).rows[0],{surface_enabled:false,enrollment_enabled:false},"admission never opens runtime gates");
-  console.log(`Square observation database qualification passed (${assertions} assertions; 114 migrations; seven SQL/TS parity cases).`);
+  console.log(`Square observation database qualification passed (${assertions} assertions; 115 migrations; seven SQL/TS parity cases).`);
 }
 runAdditionalQualification(qualify).catch(error=>{process.stderr.write(`Square observation database qualification failed at ${stage} (${typeof error.code==="string"&&/^[A-Z0-9_]+$/.test(error.code)?error.code:"fixed_failure"}).\n`);if(/^[a-z_]{1,100}$/.test(error.message))process.stderr.write(error.message+"\n");if(error.code==="ERR_ASSERTION")process.stderr.write(String(error.message).split("\n")[0]+"\n");process.exitCode=1;});
