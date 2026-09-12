@@ -5,6 +5,7 @@ assert.match(migration,/partition_fingerprint=partition\s+and revision=\(card->>
 assert.match(migration,/case when p_sort='newest' then \(value->>'occurredAt'\)::timestamptz end desc nulls last/);
 assert.match(migration,/p_location is null or value->>'location'=p_location/);
 assert.match(migration,/p_from\|\|'T00:00:00Z'/);assert.match(migration,/p_sort='oldest'/);
+assert.match(migration,/set timezone='UTC'/);
 assert.match(migration,/jsonb_array_length\(op->'activity'\)>1000/);
 assert.match(migration,/offset \(p_page-1\)\*page_size limit page_size/);
 assert.match(migration,/grant execute on function public\.read_square_workspace_operational_v1/);

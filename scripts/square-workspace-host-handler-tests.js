@@ -45,6 +45,9 @@ for(const name of ['VERCEL','VERCEL_ENV','VERCEL_TARGET_ENV','VERCEL_PROJECT_ID'
  assert(!/https?:\/\//.test(valid),'navigation has no Production or external links');
  assert(!/\$\d|Business Health|Ask Vaeroex/.test(valid),'no economics or model interaction');
  const activity=await(await handle(request('/activity'))).text();assert.match(activity,/Operational activity/);assert.match(activity,/USD 100 minor units/);assert.match(activity,/AI dispatch: disabled/);assert(!activity.includes('PAY_SYNTHETIC'));
+ assert.match(activity,/name="kind" value="payment"><input type="hidden" name="status" value="COMPLETED"/,'completed payment KPI drills only to completed observations');
+ assert.match(activity,/name="kind" value="refund"><input type="hidden" name="status" value="COMPLETED"/,'completed refund KPI drills only to completed observations');
+ assert.match(activity,/name="kind" value="order"><input type="hidden" name="status" value=""/,'order KPI retains its all-status definition');
  const filterCookie=encodeURIComponent(JSON.stringify({kind:'payment',status:'COMPLETED',location:'mapped_location',from:'2026-09-01',to:'2026-09-11',sort:'oldest',page:1}));
  await handle(request('/activity',{cookie:`square-activity-filter=${filterCookie}`}));
  assert.deepEqual(lastOperationalArgs,{p_workspace_name:'Vaeroex Square Sandbox',p_kind:'payment',p_status:'COMPLETED',p_location:'mapped_location',p_from:'2026-09-01',p_to:'2026-09-11',p_sort:'oldest',p_page:1});

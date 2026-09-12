@@ -3,7 +3,7 @@
 begin;
 create function private.square_workspace_operational_v1(p_workspace_name text,p_kind text,p_status text,p_location text,p_from text,p_to text,p_sort text,p_page integer)
 returns jsonb language plpgsql security definer set search_path=pg_catalog,private,public
-set statement_timeout='5s' set lock_timeout='2s' as $$
+set statement_timeout='5s' set lock_timeout='2s' set timezone='UTC' as $$
 declare card jsonb; actor uuid; w public.workspaces; ac private.square_account_connections;
   r private.square_interpretation_runs; op jsonb; rows jsonb; total integer; page_size integer:=25; partition text;
 begin
