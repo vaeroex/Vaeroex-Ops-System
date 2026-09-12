@@ -50,6 +50,9 @@ const timestamp = (item:SquareInterpretation) => Object.values(item.timestamps).
 const compareActivity = (a:{occurredAt:string|null;evidenceRef:string},b:{occurredAt:string|null;evidenceRef:string}) =>
   a.occurredAt === null ? b.occurredAt === null ? compare(a.evidenceRef,b.evidenceRef) : 1
     : b.occurredAt === null ? -1 : compareTimestamp(b.occurredAt,a.occurredAt) || compare(a.evidenceRef,b.evidenceRef);
+const compareActivityOldest = (a:{occurredAt:string|null;evidenceRef:string},b:{occurredAt:string|null;evidenceRef:string}) =>
+  a.occurredAt === null ? b.occurredAt === null ? compare(a.evidenceRef,b.evidenceRef) : 1
+    : b.occurredAt === null ? -1 : compareTimestamp(a.occurredAt,b.occurredAt) || compare(a.evidenceRef,b.evidenceRef);
 const moneyFor = (item:SquareInterpretation) => item.kind === "payment" ? item.money.total : item.kind === "refund" ? item.money.amount : item.kind === "order" ? item.money.total : null;
 const displayMoney=(item:SquareInterpretation)=>{const value=moneyFor(item);return value?.amountMinor&&value.currency?{amountMinor:value.amountMinor,currency:value.currency}:null;};
 export function summarizeSquareOperationalAmounts(values:readonly (Money|null)[]) {
@@ -116,7 +119,7 @@ export function pageSquareOperationalActivity(intelligence:SquareOperationalInte
   const from=input.from?Date.parse(`${input.from}T00:00:00Z`):null,to=input.to?Date.parse(`${input.to}T00:00:00Z`)+86_400_000:null;
   const rows=parsed.activity.filter(row=>(!input.kind||row.kind===input.kind)&&(!input.status||row.status===input.status)&&(!input.location||row.location===input.location)&&
     (from===null||(row.occurredAt!==null&&Date.parse(row.occurredAt)>=from))&&(to===null||(row.occurredAt!==null&&Date.parse(row.occurredAt)<to)))
-    .sort(input.sort==="oldest"?(a,b)=>compareActivity(b,a):compareActivity);
+    .sort(input.sort==="oldest"?compareActivityOldest:compareActivity);
   return {rows:rows.slice((page-1)*size,page*size),page,pageSize:size,total:rows.length,pages:Math.max(1,Math.ceil(rows.length/size))};
 }
 
