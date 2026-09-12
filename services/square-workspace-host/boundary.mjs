@@ -5,7 +5,7 @@ import tls from 'node:tls';
 export const HOST = 'square-sandbox.vaeroex.com';
 export const ORIGIN = `https://${HOST}`;
 export const CARD = '/evidence';
-const routes = new Map([['/signin', 'GET'], ['/session', 'POST'], ['/signout', 'POST'], ['/workspace', 'POST'], [CARD, 'GET']]);
+const routes = new Map([['/signin', 'GET'], ['/session', 'POST'], ['/signout', 'POST'], ['/workspace', 'POST'], ['/activity-filter', 'POST'], [CARD, 'GET'], ['/activity', 'GET']]);
 export const privacyHeaders = {
   'cache-control': 'no-store', 'referrer-policy': 'no-referrer',
   'x-content-type-options': 'nosniff',
@@ -69,7 +69,7 @@ export function createFront({ key, cert, socketPath, deadline }) {
       // Never forward arbitrary upstream headers, redirects, debug or cache metadata.
       const headers = { ...privacyHeaders, 'content-type': 'text/html; charset=utf-8' };
       if (reply.headers['set-cookie']) headers['set-cookie'] = reply.headers['set-cookie'];
-      if (reply.headers.location && ['/signin', CARD].includes(reply.headers.location)) headers.location = reply.headers.location;
+      if (reply.headers.location && ['/signin', CARD, '/activity'].includes(reply.headers.location)) headers.location = reply.headers.location;
       res.writeHead(reply.statusCode || 503, headers);
       reply.pipe(res);
     });

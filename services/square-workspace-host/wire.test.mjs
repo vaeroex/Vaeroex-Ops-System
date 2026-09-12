@@ -35,18 +35,18 @@ try {
   // Browser-generated signout form has no successful controls: an empty body.
   assert.match(await send(raw('/signout',`Origin: https://${HOST}\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: 0\r\n`,HOST,'POST')),/200 OK/);
   assert.equal(calls,2,'empty signout reaches the handler');
-  for (const route of ['/session','/workspace']) assert.doesNotMatch(await send(raw(route,`Origin: https://${HOST}\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: 0\r\n`,HOST,'POST')),/200 OK/);
+  for (const route of ['/session','/workspace','/activity-filter']) assert.doesNotMatch(await send(raw(route,`Origin: https://${HOST}\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: 0\r\n`,HOST,'POST')),/200 OK/);
   assert.equal(calls,2);
   // Actual Fetch-standard no-referrer navigation shape, with only public data.
   const form=(route,site='same-origin',mode='navigate',dest='document')=>raw(route,`Origin: null\r\nSec-Fetch-Site: ${site}\r\nSec-Fetch-Mode: ${mode}\r\nSec-Fetch-Dest: ${dest}\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: ${route==='/signout'?0:3}\r\n`,HOST,'POST')+(route==='/signout'?'':'x=1');
-  for(const route of ['/session','/workspace','/signout']) assert.match(await send(form(route)),/200 OK/);
-  assert.equal(calls,5,'same-origin opaque forms are normalized for checked private upstream');
-  for(const route of ['/session','/workspace','/signout']) {
+  for(const route of ['/session','/workspace','/activity-filter','/signout']) assert.match(await send(form(route)),/200 OK/);
+  assert.equal(calls,6,'same-origin opaque forms are normalized for checked private upstream');
+  for(const route of ['/session','/workspace','/activity-filter','/signout']) {
     for(const site of ['same-site','cross-site','none','']) assert.doesNotMatch(await send(form(route,site)),/200 OK/);
     assert.doesNotMatch(await send(form(route,'same-origin','cors')),/200 OK/);
     assert.doesNotMatch(await send(form(route,'same-origin','navigate','iframe')),/200 OK/);
   }
-  assert.equal(calls,5,'unproven opaque forms stop before upstream/database');
+  assert.equal(calls,6,'unproven opaque forms stop before upstream/database');
   assert.equal(typeof upstream.address(),'string','upstream has no TCP listener');
   console.log('square_workspace_host_tls_wire_passed');
 } finally {
