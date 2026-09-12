@@ -12,9 +12,12 @@ const approvedSquareQualificationPaths = Object.freeze([
   "services/square-workspace-host/next.test.mjs",
   "services/square-workspace-host/src/config.ts",
   "services/square-workspace-host/src/handler.ts",
+  "services/square-workspace-host/src/presentation.ts",
   "services/square-workspace-host/start.mjs",
   "services/square-workspace-host/tsconfig.json",
   "services/square-workspace-host/wire.test.mjs",
+  "services/square-workspace-host/window-plan.mjs",
+  "services/square-workspace-host/window-plan.test.mjs",
   // Read-only Sandbox workspace evidence; no broad app/schema exemption.
   "app/app/settings/page.tsx",
   "components/integrations/SquareEvidenceCard.tsx",

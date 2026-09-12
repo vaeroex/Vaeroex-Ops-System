@@ -53,6 +53,7 @@ jobs:
 
       - name: Restricted Square workspace host Linux qualification
         run: |
+          node services/square-workspace-host/window-plan.test.mjs
           node services/square-workspace-host/boundary.test.mjs
           node services/square-workspace-host/wire.test.mjs
           node --require ./scripts/square-no-ai-runtime-test-guard.js scripts/square-workspace-host-handler-tests.js

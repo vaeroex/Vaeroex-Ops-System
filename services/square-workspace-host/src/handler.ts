@@ -3,12 +3,11 @@ import { NextRequest, NextResponse } from "next/server";
 import type { Database } from "@/lib/supabase/types";
 import { squareWorkspaceEvidenceCandidate, readSquareWorkspaceCard } from "@/lib/integrations/control-plane/square-workspace-evidence";
 import { publicKey } from "./config";
+import { card, controls, document, escape } from "./presentation";
 
 const origin = "https://square-sandbox.vaeroex.com";
 // Qualification labels only, not discovered memberships or authority grants.
 const workspaceLabels = ["Vaeroex Square Sandbox", "Vaeroex Square Evidence Denial Test"] as const;
-const escape = (s: unknown) => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]!));
-const document = (body: string) => `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Vaeroex Square Sandbox evidence</title><style>body{font:16px system-ui;max-width:800px;margin:3rem auto;padding:1rem}label,input,button,select{display:block;margin:.7rem 0}table{border-collapse:collapse}td,th{padding:.5rem;text-align:left;border:1px solid #bbb}</style><body><h1>Vaeroex Square Sandbox</h1><p>Read-only evidence qualification. Production and QBO are not connected here.</p>${body}</body></html>`;
 
 export async function handle(req: NextRequest) {
   // Redundant gate: the raw HTTP/TLS guard executes before Next normalization.
@@ -25,7 +24,7 @@ export async function handle(req: NextRequest) {
   };
   const redirect = (location: string) => { const result = finish("",303); result.headers.set("location",location); return result; };
   try {
-    if (path === "/signin") return finish('<h2>Private portal sign-in</h2><form method="post" action="/session"><label>Email<input name="email" type="email" maxlength="254" autocomplete="username" required></label><label>Password<input name="password" type="password" maxlength="1024" autocomplete="current-password" required></label><button>Sign in</button></form>');
+    if (path === "/signin") return finish('<section class="panel signin"><span class="eyebrow">Isolated account only</span><h2>Private portal sign-in</h2><p class="muted">Use your existing Vaeroex Sandbox account. No Square consent or database password is needed.</p><form method="post" action="/session"><label>Email<input name="email" type="email" maxlength="254" autocomplete="username" required></label><label>Password<input name="password" type="password" maxlength="1024" autocomplete="current-password" required></label><button class="primary">Sign in</button></form></section>');
     const client = createServerClient<Database>(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
       global: { fetch: (input, init) => { signal.throwIfAborted(); return fetch(input, {...init, cache:"no-store", signal:AbortSignal.any([signal, AbortSignal.timeout(8000)])}); } },
       cookies: { getAll: () => req.cookies.getAll(), setAll: entries => entries.forEach(({name,value,options}) => response.cookies.set(name,value,{...options,secure:true,httpOnly:true,sameSite:"strict",path:"/"})) },
@@ -58,22 +57,17 @@ export async function handle(req: NextRequest) {
       response.cookies.set('square-evidence-workspace',form.get('workspace')!,{secure:true,httpOnly:true,sameSite:'strict',path:'/',maxAge:3600});
       return redirect('/evidence');
     }
-    let body = '<form method="post" action="/signout"><button>Sign out</button></form>';
-    body += '<form method="post" action="/workspace"><label>Workspace<select name="workspace">'+workspaceLabels.map(name=>`<option>${escape(name)}</option>`).join('')+'</select></label><button>View workspace</button></form>';
     const selected = req.cookies.get('square-evidence-workspace')?.value;
     const workspace = selected ? workspaceLabels.find(name=>name===selected) : workspaceLabels[0];
+    let body = controls(workspaceLabels, workspace);
     if (workspace) {
-      body += `<section><h2>${escape(workspace)}</h2>`;
+      body += `<section id="overview" class="panel"><span class="eyebrow">Workspace overview · Sandbox</span><h2>${escape(workspace)}</h2><p class="muted">Inspect deterministic provider evidence in an isolated Executive Intelligence experience. Production and QBO are not connected here.</p></section>`;
       signal.throwIfAborted();
       // Membership, subscription and complete evidence authority are one RPC.
       const evidence = await readSquareWorkspaceCard(client,workspace,req.headers);
-      if (!evidence) return finish(body+'<p>No Square evidence available.</p></section>');
-      body += '<h3>Square Sandbox evidence</h3><p>Verified, non-economic provider observations · Read-only</p><ul>';
-      for (const [kind,label] of Object.entries({payment:"Payment",refund:"Refund",order:"Orders",catalog:"Catalog variations",inventory:"Inventory observations"})) body += `<li>${label}: ${evidence.counts[kind as keyof typeof evidence.counts]}</li>`;
-      body += `</ul><p>Interpretation checkpoint ${evidence.checkpointRevision} · ${escape(evidence.interpretedAt)}</p><p>Last verified observation: ${escape(evidence.lastObservedAt)}. Current sync health: unknown.</p><p>${evidence.relationships.unresolvedLocation} unresolved location relationships; ${evidence.relationships.conflict} reference conflict. Historical completeness: unknown.</p><p>Catalog is seller-scoped with location applicability. Payments, Refunds, Orders and Inventory remain distinct observations.</p><p>No revenue, profit, netting, inventory valuation, stock calculation, or complete-history claim. Economic contributions remain blocked.</p><p>Immutable source provenance · ${escape(evidence.policy)}</p><table><tr><th>Resource</th><th>Version</th><th>Observed</th></tr>`;
-      for (const item of evidence.provenance) body += `<tr><td>${escape(item.kind)}</td><td>${item.sourceVersion}</td><td>${escape(item.observedAt)}</td></tr>`;
-      body += '</table></section>';
-    }
+      if (!evidence) return finish(body+'<section class="panel"><p>No Square evidence available.</p></section>');
+      body += card(evidence);
+    } else body += '<section class="panel"><p>No Square evidence available.</p></section>';
     return finish(body);
   } catch { return finish("Evidence unavailable",503); }
 }
