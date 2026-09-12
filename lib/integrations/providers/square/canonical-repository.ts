@@ -7,6 +7,7 @@ import { ActiveContributionSchema, DeterministicStateSnapshotSchema } from "@/li
 import { interpretSquareObservation, reconcileSquareInterpretations, SQUARE_INTERPRETATION_POLICY, SquareInterpretationContextSchema, type SquareObservationInput } from "./canonical-interpretation";
 import { squareDescriptiveControl, updateSquareDescriptiveControls } from "./canonical-incremental";
 import { squareVerifiedIntelligenceSnapshot } from "./canonical-explanation";
+import { deriveSquareOperationalIntelligence, SQUARE_OPERATIONAL_POLICY } from "./operational-intelligence";
 
 export interface SquareCanonicalTransactionClient {
   query(text:string,values?:unknown[]):Promise<{rows:Record<string,unknown>[]}>
@@ -36,7 +37,7 @@ export async function interpretAdmittedSquareSources(client:SquareCanonicalTrans
       return item;
     });
     const relationships=reconcileSquareInterpretations(items);
-    const fingerprint=contractSha256({policy:SQUARE_INTERPRETATION_POLICY,
+    const fingerprint=contractSha256({policy:SQUARE_INTERPRETATION_POLICY,operationalPolicy:SQUARE_OPERATIONAL_POLICY,
       evidence:items.map(i=>({fact:i.fact.factFingerprint,freshness:i.freshness,scan:i.scan})).sort((a,b)=>a.fact.localeCompare(b.fact))});
     if(value.prior?.output && value.prior.inputFingerprint===fingerprint) {
       await client.query("commit");return {outcome:"replayed" as const,revision:value.prior.revision,modelCalls:0 as const};
@@ -44,10 +45,11 @@ export async function interpretAdmittedSquareSources(client:SquareCanonicalTrans
     const controls=items.map(squareDescriptiveControl);
     const prior=value.prior?.output?.state ?? emptyDeterministicStateSnapshot(items[0].scope);
     const result=updateSquareDescriptiveControls(prior,value.prior?.output?.controls??[],controls,value.asOf.slice(0,10));
+    const operational=deriveSquareOperationalIntelligence(items,relationships.links);
     const output={policyVersion:SQUARE_INTERPRETATION_POLICY,economic:"blocked",historical:"unknown",
       coverage:{kind:"approval_resource_set",partitionFingerprint:value.partitionFingerprint},
       facts:items.map(i=>i.fact),relationships,controls,state:result.snapshot,
-      intelligence:squareVerifiedIntelligenceSnapshot(items,value.asOf),work:result.metrics};
+      intelligence:squareVerifiedIntelligenceSnapshot(items,value.asOf),operational,work:result.metrics};
     const committed=await client.query("select public.commit_square_interpretation_v1($1,$2,$3,$4::jsonb) as value",
       [approvalFingerprint,value.prior?.revision??0,fingerprint,JSON.stringify(output)]);
     const receipt=z.object({outcome:z.enum(["committed","replayed"]),revision:z.number().int().positive().safe()}).strict().parse(committed.rows[0]?.value);

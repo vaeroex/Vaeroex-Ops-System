@@ -1,5 +1,6 @@
 import "server-only";
 import { parseSquareWorkspaceEvidence } from "@/lib/integrations/providers/square/workspace-evidence";
+import { parseSquareWorkspaceOperational } from "@/lib/integrations/providers/square/workspace-operational";
 
 /** Negative deployment gate, never an authorization grant. Production uses a
  * different database and cannot query this Sandbox-only reader. */
@@ -40,4 +41,11 @@ export async function readSquareWorkspaceCard(client: CardReader, workspaceName:
     const result = await client.rpc("read_square_workspace_card_v1", { p_workspace_name: workspaceName });
     return result.error ? null : parseSquareWorkspaceEvidence(result.data);
   } catch { return null; }
+}
+
+type OperationalReader={rpc(name:"read_square_workspace_operational_v1",args:{p_workspace_name:string;p_kind:string|null;p_status:string|null;p_page:number}):PromiseLike<{data:unknown;error:unknown}>};
+export async function readSquareWorkspaceOperational(client:OperationalReader,workspaceName:string,filter:{kind:string|null;status:string|null;page:number},headers?:RequestHeaders){
+  if(!squareWorkspaceEvidenceCandidate(headers)||workspaceName.length<1||workspaceName.length>200||filter.page<1||filter.page>40) return null;
+  try{const result=await client.rpc("read_square_workspace_operational_v1",{p_workspace_name:workspaceName,p_kind:filter.kind,p_status:filter.status,p_page:filter.page});
+    return result.error?null:parseSquareWorkspaceOperational(result.data);}catch{return null;}
 }

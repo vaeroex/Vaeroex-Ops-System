@@ -1,0 +1,16 @@
+const assert=require('node:assert/strict'),fs=require('node:fs');
+const migration=fs.readFileSync('supabase/migrations/20260912150000_square_operational_intelligence.sql','utf8');
+assert.match(migration,/card:=private\.square_workspace_card_v1\(p_workspace_name\)/);
+assert.match(migration,/partition_fingerprint=partition order by revision desc/);
+assert.match(migration,/jsonb_array_length\(op->'activity'\)>1000/);
+assert.match(migration,/offset \(p_page-1\)\*page_size limit page_size/);
+assert.match(migration,/grant execute on function public\.read_square_workspace_operational_v1/);
+assert.doesNotMatch(migration,/grant\s+(?:select|insert|update|delete|all)\s+on\s+(?:table\s+)?(?:public|private)\./i);
+assert.doesNotMatch(migration,/disable row level security|no force row level security/i);
+const boundary=fs.readFileSync('services/square-workspace-host/boundary.mjs','utf8');
+for(const route of ["['/activity', 'GET']","['/activity-filter', 'POST']"])assert.ok(boundary.includes(route));
+const handler=fs.readFileSync('services/square-workspace-host/src/handler.ts','utf8');
+assert.match(handler,/readSquareWorkspaceOperational/);assert.doesNotMatch(handler,/\.from\(/);
+const policy=fs.readFileSync('lib/integrations/providers/square/operational-intelligence.ts','utf8');
+assert.match(policy,/SQUARE_AI_DISPATCH_ENABLED = false/);assert.doesNotMatch(policy,/@ai-sdk|from ["']openai|fetch\(/);
+console.log('Square operational database grant, restricted-host and zero-AI source contracts passed');

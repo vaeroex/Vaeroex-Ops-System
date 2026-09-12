@@ -92,7 +92,8 @@ export function interpretSquareObservation(input: SquareObservationInput, rawCon
     money = { listedPrice: p.price }; timestamps = { updatedAt: p.updatedAt };
     applicableLocationIds = context.authorizedLocationIds.filter(id => p.availability.mode === "specific_locations"
       ? p.availability.presentLocationIds.includes(id) : !p.availability.absentLocationIds.includes(id)).sort();
-    detail = { availability: p.availability, trackInventory: p.trackInventory, sellable: p.sellable, stockable: p.stockable };
+    detail = { availability: p.availability, displayName: p.displayName, sku: p.sku,
+      trackInventory: p.trackInventory, sellable: p.sellable, stockable: p.stockable };
     meaning = "seller_catalog_with_location_applicability_not_stock";
   } else {
     const p = SquareMinimizedInventoryRecordSchema.parse(data); kind = "inventory";

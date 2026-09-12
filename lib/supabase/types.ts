@@ -5,6 +5,10 @@ export type WorkspaceRole = "owner" | "admin" | "manager" | "staff" | "viewer";
 export type Database = {
   public: {
     Functions: {
+      read_square_workspace_operational_v1: {
+        Args: { p_workspace_name: string; p_kind: string | null; p_status: string | null; p_page: number };
+        Returns: Json;
+      };
       read_square_workspace_card_v1: {
         Args: { p_workspace_name: string };
         Returns: Json;

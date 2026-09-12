@@ -11,7 +11,10 @@ Business Health or model-interaction dependencies. The approved five routes are
 unchanged. Navigation uses only local evidence-page anchors, with no scripts,
 hydration, assets, external fonts, analytics, recommendations or financial widgets.
 
-All metric cards come from the already validated `read_square_workspace_card_v1`
+The overview cards come from the already validated `read_square_workspace_card_v1`.
+The bounded activity explorer uses only `read_square_workspace_operational_v1`,
+which first executes the same complete authority contract and returns a maximum
+of 25 sanitized rows. Neither RPC grants table access.
 DTO, after current workspace/subscription/entity/generation authority succeeds.
 No hardcoded fixture counts, wall-clock freshness threshold, SQL/table grants,
 new migration, sync trigger or aggregate inference is added. Counts describe
@@ -126,6 +129,12 @@ node services/square-workspace-host/wire.test.mjs
 node --require ./scripts/square-no-ai-runtime-test-guard.js scripts/square-workspace-host-handler-tests.js
 NEXT_TELEMETRY_DISABLED=1 pnpm exec next build services/square-workspace-host
 ```
+
+The raw TLS front end admits only `GET /signin`, `GET /evidence`, `GET /activity`
+and the exact same-origin form posts for session, workspace selection, activity
+filters and sign-out. It continues to reject query strings, direct Next assets,
+server actions, unknown methods, alternate hosts and forwarding spoofing before
+the private Unix-socket upstream or database can be reached.
 
 The wire harness generates disposable synthetic TLS material and listens only on
 loopback plus a temporary Unix socket. It never reads credentials or calls a

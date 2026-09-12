@@ -4,9 +4,19 @@ const {NextRequest}=require('next/server');
 const Module=require('node:module');const original=Module._load;
 let queries=0, authCalls=0, rpcCalls=0, mode='valid';
 const {view}=require('./square-workspace-evidence-regression-tests.js');
+const calculation={policyVersion:'square_operational_intelligence_v1',economic:'blocked',historical:'unknown',aiDispatch:'disabled',
+ payment:{count:1,total:{amountMinor:'100',currency:'USD'},exactAverageMinor:'100',averageState:'exact'},refund:{count:1,total:{amountMinor:'100',currency:'USD'},exactAverageMinor:'100',averageState:'exact'},order:{count:3,total:null,exactAverageMinor:null,averageState:'amount_unavailable'},groups:[],
+ refundRate:{numerator:1,denominator:1,state:'observed_count_ratio_not_financial_rate'},statusMix:{payment:{COMPLETED:1},refund:{COMPLETED:1},order:{OPEN:2,COMPLETED:1},catalog:{unknown:2},inventory:{IN_STOCK:6}},orderStatusMix:{OPEN:2,COMPLETED:1},catalog:{admittedVariations:2,activeVariations:null,activeState:'lifecycle_state_not_admitted'},inventory:{observations:6,movementTotal:null,movementState:'unit_compatibility_and_completeness_unverified'},fulfillment:{activity:null,state:'fulfillment_state_not_admitted'},
+ insights:[{code:'history_required_for_trend',state:'insufficient_evidence',rule:'compare only when both bounded periods are proven complete',text:'Trend comparisons are unavailable because historical completeness is unknown.',blockedReason:'historical_completeness_unknown',evidenceRefs:[]}]};
+const row={evidenceRef:'sqe_0123456789abcdef',kind:'payment',status:'COMPLETED',occurredAt:'2026-09-11T12:00:00.000Z',location:'mapped_location',amount:{amountMinor:'100',currency:'USD'},quantity:null,unitState:'not_applicable',label:null,relationship:'not_applicable',admission:'verified_non_economic'};
+const operationalView={version:'square_workspace_operational_v1',evidence:view,calculation,page:{rows:[row],page:1,pageSize:25,total:1,pages:1}};
 const workspace='10000000-0000-4000-8000-000000000001';
 const fake={auth:{getUser:async()=>{authCalls++;return {data:{user:mode==='unauth'?null:{id:'10000000-0000-4000-8000-000000000002'}},error:null};},signInWithPassword:async()=>({error:null}),signOut:async()=>({error:null})},
-  rpc:async(name,args)=>{rpcCalls++;assert.equal(name,'read_square_workspace_card_v1');assert.deepEqual(Object.keys(args),['p_workspace_name']);return {data:['nonmember','unsubscribed','revoked'].includes(mode)||args.p_workspace_name==='Vaeroex Square Evidence Denial Test'?null:mode==='forged'?{...view,secret:'PRIVATE_SENTINEL'}:view,error:null};},
+  rpc:async(name,args)=>{rpcCalls++;assert.ok(['read_square_workspace_card_v1','read_square_workspace_operational_v1'].includes(name));
+   if(name==='read_square_workspace_card_v1')assert.deepEqual(Object.keys(args),['p_workspace_name']);
+   else assert.deepEqual(Object.keys(args),['p_workspace_name','p_kind','p_status','p_page']);
+   const value=name==='read_square_workspace_card_v1'?view:operationalView;
+   return {data:['nonmember','unsubscribed','revoked'].includes(mode)||args.p_workspace_name==='Vaeroex Square Evidence Denial Test'?null:mode==='forged'?{...value,secret:'PRIVATE_SENTINEL'}:value,error:null};},
   from(){queries++;throw Error('direct_table_access_forbidden');}};
 Module._load=function(name,parent,main){if(name==='@supabase/ssr')return {createServerClient:()=>fake};return original.call(this,name,parent,main);};
 const {handle}=require('../services/square-workspace-host/src/handler.ts');
@@ -33,6 +43,7 @@ for(const name of ['VERCEL','VERCEL_ENV','VERCEL_TARGET_ENV','VERCEL_PROJECT_ID'
  assert.equal(card(view),card(view),'presentation is deterministic, with no wall-clock freshness guess');
  assert(!/https?:\/\//.test(valid),'navigation has no Production or external links');
  assert(!/\$\d|Business Health|Ask Vaeroex/.test(valid),'no economics or model interaction');
+ const activity=await(await handle(request('/activity'))).text();assert.match(activity,/Operational activity/);assert.match(activity,/USD 100 minor units/);assert.match(activity,/AI dispatch: disabled/);assert(!activity.includes('PAY_SYNTHETIC'));
  for(mode of ['nonmember','unsubscribed','revoked','forged']){const body=await(await handle(request())).text();assert(!body.includes('Square Sandbox evidence</h3>'));assert(!body.includes('PRIVATE_SENTINEL'));}
  mode='valid';
  const denied=await(await handle(request('/evidence',{cookie:'square-evidence-workspace=Vaeroex%20Square%20Evidence%20Denial%20Test'}))).text();
