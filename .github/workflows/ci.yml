@@ -51,6 +51,14 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Restricted Square workspace host Linux qualification
+        run: |
+          node services/square-workspace-host/boundary.test.mjs
+          node services/square-workspace-host/wire.test.mjs
+          node --require ./scripts/square-no-ai-runtime-test-guard.js scripts/square-workspace-host-handler-tests.js
+          NEXT_TELEMETRY_DISABLED=1 pnpm exec next build services/square-workspace-host
+          NEXT_TELEMETRY_DISABLED=1 node services/square-workspace-host/next.test.mjs
+
       - name: External integrations contract regressions
         run: pnpm test:external-integrations-contracts
 
