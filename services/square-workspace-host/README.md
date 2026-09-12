@@ -22,7 +22,18 @@ cannot reach the upstream. Certificate name/validity are checked at startup.
 Supabase uses only a publishable key or project-matched legacy anon key and the
 user's session. No service-role, broker, KMS, Secret Manager, cloud metadata or
 Square credential is needed. Cookies are Secure, HttpOnly, SameSite=Strict.
-POST requires same-origin Origin and bounded form encoding. Signout clears local
+POST requires bounded form encoding and proven same-origin initiation. Under
+`no-referrer`, the [Fetch append-Origin algorithm](https://fetch.spec.whatwg.org/#append-a-request-origin-header)
+sets a navigation POST's Origin to `null`. That browser form is accepted only
+with all three browser-controlled [Fetch Metadata](https://www.w3.org/TR/fetch-metadata/)
+values: `Sec-Fetch-Site: same-origin`, `Sec-Fetch-Mode: navigate`, and
+`Sec-Fetch-Dest: document`. Missing/opaque-origin-only, same-site, cross-site and
+contradictory metadata requests are rejected before upstream access. This is a
+CSRF initiation check, never authentication: current session, workspace, entity,
+generation and subscription authority remain independently required. The front
+normalizes the proven request's Origin for the private upstream; the upstream
+itself never accepts `null`. `Referrer-Policy: no-referrer` is unchanged.
+Signout clears local
 session cookies even if the provider operation fails. The workspace selector
 resolves names against current active memberships; it is not an authority grant.
 Only the selected workspace is read. Existing subscription logic (without email

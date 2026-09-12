@@ -10,6 +10,16 @@ for (const path of ['/','/app/settings','/admin','/api','/_next/static/test.js',
 for (const method of ['HEAD','OPTIONS','PUT','PATCH','DELETE','TRACE','CONNECT','POST']) assert(!permitted(request('/evidence',method)));
 for (const h of ['Forwarded','X-Forwarded-Host','X-Forwarded-Proto','X-Forwarded-For','Next-Action','RSC','Next-Router-State-Tree','Next-Router-Prefetch','X-Middleware-Subrequest','Upgrade','Transfer-Encoding','Host']) assert(!permitted(request('/evidence','GET',['Host',HOST,h,'x'])));
 assert(!permitted(request('/session','POST')));
+const formHeaders = ['Host',HOST,'Origin','null','Sec-Fetch-Site','same-origin','Sec-Fetch-Mode','navigate','Sec-Fetch-Dest','document','Content-Type','application/x-www-form-urlencoded','Content-Length','5'];
+for (const route of ['/session','/workspace','/signout']) {
+  assert(permitted(request(route,'POST',formHeaders)), 'no-referrer same-origin browser form');
+  for (const [header, values] of Object.entries({'Origin':['',ORIGIN+'.evil','https://evil.example'],'Sec-Fetch-Site':['same-site','cross-site','none',''],'Sec-Fetch-Mode':['cors','no-cors','same-origin',''],'Sec-Fetch-Dest':['iframe','empty','']})) {
+    for(const value of values){const pairs=[...formHeaders];pairs[pairs.indexOf(header)+1]=value;assert(!permitted(request(route,'POST',pairs)),`${header}=${value} rejected`);}
+    const pairs=[...formHeaders];pairs.splice(pairs.indexOf(header),2);assert(!permitted(request(route,'POST',pairs)),`${header} absent rejected`);
+  }
+}
+assert(!permitted(request('/session','POST',[...formHeaders,'X-Forwarded-Host',HOST,'X-Forwarded-Proto','https']),true),'private upstream cannot accept opaque origin');
+for (const site of ['same-site','cross-site','none']) assert(!permitted(request('/session','POST',['Host',HOST,'Origin',ORIGIN,'Sec-Fetch-Site',site,'Content-Type','application/x-www-form-urlencoded','Content-Length','5'])));
 for (const route of ['/signout','/session','/workspace']) assert.equal(permitted(request(route,'POST',['Host',HOST,'Origin',ORIGIN,'Content-Type','application/x-www-form-urlencoded','Content-Length','0'])),route==='/signout');
 assert(!permitted(request('/evidence','GET',['Host',HOST,'Content-Length','1'])));
 assert(!permitted(request(),true));

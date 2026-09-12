@@ -29,7 +29,16 @@ export function permitted(req, trusted = false) {
   // No query strings, escapes, dot segments, absolute targets, or route normalization.
   if (routes.get(req.url) !== req.method) return false;
   if (req.method === 'POST') {
-    if (req.headers.origin !== ORIGIN || req.headers['content-type'] !== 'application/x-www-form-urlencoded') return false;
+    // Fetch's append-Origin algorithm makes no-referrer navigation POSTs opaque.
+    // Never accept null Origin alone: browser-controlled Fetch Metadata must prove
+    // a same-origin document form. Same-site, cross-site, missing and contradictory
+    // metadata fail closed. The front normalizes only this proven request for the
+    // private upstream; metadata does not grant session/workspace authority.
+    const site = req.headers['sec-fetch-site'];
+    const exactOrigin = req.headers.origin === ORIGIN && (site === undefined || site === 'same-origin');
+    const privateForm = !trusted && req.headers.origin === 'null' && site === 'same-origin' &&
+      req.headers['sec-fetch-mode'] === 'navigate' && req.headers['sec-fetch-dest'] === 'document';
+    if ((!exactOrigin && !privateForm) || req.headers['content-type'] !== 'application/x-www-form-urlencoded') return false;
     const length = req.headers['content-length'];
     if (!(req.url === '/signout' && length === '0') &&
         (!/^[1-9][0-9]{0,3}$/.test(length || '') || Number(length) > 4096)) return false;
