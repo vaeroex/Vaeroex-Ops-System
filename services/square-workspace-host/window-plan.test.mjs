@@ -6,4 +6,7 @@ for(const delta of [-1,0,1199999,3600001])assert.throws(()=>planWindow({...input
 for(const ipv4 of ['0.0.0.0','127.0.0.1','10.0.0.1','192.168.1.2','172.16.0.1','169.254.1.1','100.64.0.1','224.1.1.1','172.58.208.32/0','172.58.208.032','256.1.1.1','::1','1.2.3.4;echo x'])assert.throws(()=>planWindow({...input,ipv4}));
 for(const revision of ['main','a'.repeat(39),'a'.repeat(40)+'\n'])assert.throws(()=>planWindow({...input,revision}));
 assert.equal(plan.providerCalls,false);assert.equal(plan.brokerLogins,false);assert.equal(plan.temporaryIam,false);assert.equal(plan.automaticRestart,false);
+for(const prefix of ['192.0.0','192.0.2','192.88.99','198.51.100','203.0.113'])for(const last of [0,1,255])assert.throws(()=>planWindow({...input,ipv4:`${prefix}.${last}`}),/operator_ipv4_rejected/);
+for(const ipv4 of ['198.18.0.0','198.18.0.1','198.18.255.255','198.19.0.0','198.19.255.255'])assert.throws(()=>planWindow({...input,ipv4}),/operator_ipv4_rejected/);
+for(const ipv4 of ['192.0.1.1','192.0.3.1','198.17.255.255','198.20.0.0','198.51.99.255','198.51.101.0','203.0.112.255','203.0.114.0'])assert.equal(planWindow({...input,ipv4}).operatorCidr,ipv4+'/32');
 console.log('square_workspace_repeatable_window_plan_passed');
