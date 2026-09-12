@@ -86,7 +86,7 @@ export function deriveSquareOperationalIntelligence(items:readonly SquareInterpr
   const activity=items.map(item=>Activity.parse({evidenceRef:`sqe_${item.fact.factFingerprint.slice(7,23)}`,kind:item.kind,status:item.status??"unknown",
     occurredAt:timestamp(item),location:item.locationId?"mapped_location":item.kind==="catalog"?"seller_scoped":"explicitly_unresolved",
     amount:displayMoney(item),quantity:item.kind==="inventory"?item.quantity:null,unitState:item.kind==="inventory"?"unverified":"not_applicable",
-    label:item.kind==="catalog"&&item.detail&&typeof item.detail==="object"&&"displayName" in item.detail&&typeof item.detail.displayName==="string"?item.detail.displayName:null,
+    label:item.kind==="catalog"?item.presentationLabel:null,
     relationship:linkState(item),admission:"verified_non_economic"})).sort(compareActivity);
   const orderStatusMix=Object.fromEntries([...new Set(byKind.order.map(i=>i.status??"unknown"))].sort(compare).map(s=>[s,byKind.order.filter(i=>(i.status??"unknown")===s).length]));
   const statusMix=Object.fromEntries(kinds.map(kind=>[kind,Object.fromEntries([...new Set(byKind[kind].map(i=>i.status??"unknown"))].sort(compare).map(status=>[status,byKind[kind].filter(i=>(i.status??"unknown")===status).length]))]));
