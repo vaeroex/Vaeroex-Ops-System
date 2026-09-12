@@ -29,3 +29,15 @@ export async function readSquareWorkspaceEvidence(client: Reader, workspaceId: s
     return result.error ? null : parseSquareWorkspaceEvidence(result.data);
   } catch { return null; }
 }
+
+type CardReader = { rpc(name: "read_square_workspace_card_v1", args: { p_workspace_name: string }):
+  PromiseLike<{ data: unknown; error: unknown }> };
+
+/** Restricted host: never discovers rows/IDs or performs a billing table read. */
+export async function readSquareWorkspaceCard(client: CardReader, workspaceName: string, headers?: RequestHeaders) {
+  if (!squareWorkspaceEvidenceCandidate(headers) || workspaceName.length < 1 || workspaceName.length > 200) return null;
+  try {
+    const result = await client.rpc("read_square_workspace_card_v1", { p_workspace_name: workspaceName });
+    return result.error ? null : parseSquareWorkspaceEvidence(result.data);
+  } catch { return null; }
+}

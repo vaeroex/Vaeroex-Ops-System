@@ -136,6 +136,7 @@ jobs:
       - name: Verify optimized Square handoff headers and isolated synthetic browser navigation
         run: |
           pnpm exec playwright install --with-deps chromium
+          SQUARE_HOST_BROWSER_TEST=1 node --require ./scripts/square-no-ai-runtime-test-guard.js scripts/square-workspace-host-handler-tests.js
           pnpm test:external-integrations-square-handoff-headers --browser
 
       - name: Verify isolated native Square callback credentials, portal and guest controls
