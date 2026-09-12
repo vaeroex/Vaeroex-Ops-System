@@ -32,6 +32,11 @@ try {
   assert.doesNotMatch(await send(raw(),'other.example'),/200 OK/);
   assert.doesNotMatch(await send(raw(),''),/200 OK/);
   assert.equal(calls,1,'all rejected wire requests stop before upstream/database');
+  // Browser-generated signout form has no successful controls: an empty body.
+  assert.match(await send(raw('/signout',`Origin: https://${HOST}\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: 0\r\n`,HOST,'POST')),/200 OK/);
+  assert.equal(calls,2,'empty signout reaches the handler');
+  for (const route of ['/session','/workspace']) assert.doesNotMatch(await send(raw(route,`Origin: https://${HOST}\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: 0\r\n`,HOST,'POST')),/200 OK/);
+  assert.equal(calls,2);
   assert.equal(typeof upstream.address(),'string','upstream has no TCP listener');
   console.log('square_workspace_host_tls_wire_passed');
 } finally {

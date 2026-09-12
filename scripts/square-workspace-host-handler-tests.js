@@ -35,7 +35,7 @@ for(const name of ['VERCEL','VERCEL_ENV','VERCEL_TARGET_ENV','VERCEL_PROJECT_ID'
  assert.equal((await handle(new NextRequest(`https://${host}/evidence`,{signal:controller.signal,headers:{host,'x-forwarded-host':host,'x-forwarded-proto':'https'}}))).status,503);
  assert.equal(queries+authCalls+rpcCalls,before,'aborted request does not query');
  fake.auth.signOut=async()=>({error:{message:'PRIVATE_SENTINEL'}});
- const logout=await handle(new NextRequest(`https://${host}/signout`,{method:'POST',headers:{host,'x-forwarded-host':host,'x-forwarded-proto':'https',origin:`https://${host}`,'content-type':'application/x-www-form-urlencoded',cookie:'sb-test-auth-token=SYNTHETIC'},body:'x=1'}));
+ const logout=await handle(new NextRequest(`https://${host}/signout`,{method:'POST',headers:{host,'x-forwarded-host':host,'x-forwarded-proto':'https',origin:`https://${host}`,'content-type':'application/x-www-form-urlencoded','content-length':'0',cookie:'sb-test-auth-token=SYNTHETIC'},body:''}));
  assert.equal(logout.status,303);assert.equal(logout.cookies.get('sb-test-auth-token').value,'');assert.match(logout.headers.get('set-cookie'),/Max-Age=0/);
  console.log('square_workspace_host_handler_authority_privacy_passed');
 })().catch(()=>{process.exitCode=1;console.error('square_workspace_host_handler_failed');});

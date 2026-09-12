@@ -10,6 +10,7 @@ for (const path of ['/','/app/settings','/admin','/api','/_next/static/test.js',
 for (const method of ['HEAD','OPTIONS','PUT','PATCH','DELETE','TRACE','CONNECT','POST']) assert(!permitted(request('/evidence',method)));
 for (const h of ['Forwarded','X-Forwarded-Host','X-Forwarded-Proto','X-Forwarded-For','Next-Action','RSC','Next-Router-State-Tree','Next-Router-Prefetch','X-Middleware-Subrequest','Upgrade','Transfer-Encoding','Host']) assert(!permitted(request('/evidence','GET',['Host',HOST,h,'x'])));
 assert(!permitted(request('/session','POST')));
+for (const route of ['/signout','/session','/workspace']) assert.equal(permitted(request(route,'POST',['Host',HOST,'Origin',ORIGIN,'Content-Type','application/x-www-form-urlencoded','Content-Length','0'])),route==='/signout');
 assert(!permitted(request('/evidence','GET',['Host',HOST,'Content-Length','1'])));
 assert(!permitted(request(),true));
 assert(permitted(request('/evidence','GET',['Host',HOST,'X-Forwarded-Host',HOST,'X-Forwarded-Proto','https']),true));

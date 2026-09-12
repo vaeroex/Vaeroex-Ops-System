@@ -30,7 +30,9 @@ export function permitted(req, trusted = false) {
   if (routes.get(req.url) !== req.method) return false;
   if (req.method === 'POST') {
     if (req.headers.origin !== ORIGIN || req.headers['content-type'] !== 'application/x-www-form-urlencoded') return false;
-    if (!/^[1-9][0-9]{0,3}$/.test(req.headers['content-length'] || '') || Number(req.headers['content-length']) > 4096) return false;
+    const length = req.headers['content-length'];
+    if (!(req.url === '/signout' && length === '0') &&
+        (!/^[1-9][0-9]{0,3}$/.test(length || '') || Number(length) > 4096)) return false;
   } else if (req.headers['content-length'] && req.headers['content-length'] !== '0') return false;
   return true;
 }
