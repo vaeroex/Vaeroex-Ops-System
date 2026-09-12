@@ -43,9 +43,9 @@ export async function readSquareWorkspaceCard(client: CardReader, workspaceName:
   } catch { return null; }
 }
 
-type OperationalReader={rpc(name:"read_square_workspace_operational_v1",args:{p_workspace_name:string;p_kind:string|null;p_status:string|null;p_page:number}):PromiseLike<{data:unknown;error:unknown}>};
-export async function readSquareWorkspaceOperational(client:OperationalReader,workspaceName:string,filter:{kind:string|null;status:string|null;page:number},headers?:RequestHeaders){
+type OperationalReader={rpc(name:"read_square_workspace_operational_v1",args:{p_workspace_name:string;p_kind:string|null;p_status:string|null;p_location:string|null;p_from:string|null;p_to:string|null;p_sort:string;p_page:number}):PromiseLike<{data:unknown;error:unknown}>};
+export async function readSquareWorkspaceOperational(client:OperationalReader,workspaceName:string,filter:{kind:string|null;status:string|null;location:string|null;from:string|null;to:string|null;sort:"newest"|"oldest";page:number},headers?:RequestHeaders){
   if(!squareWorkspaceEvidenceCandidate(headers)||workspaceName.length<1||workspaceName.length>200||filter.page<1||filter.page>40) return null;
-  try{const result=await client.rpc("read_square_workspace_operational_v1",{p_workspace_name:workspaceName,p_kind:filter.kind,p_status:filter.status,p_page:filter.page});
+  try{const result=await client.rpc("read_square_workspace_operational_v1",{p_workspace_name:workspaceName,p_kind:filter.kind,p_status:filter.status,p_location:filter.location,p_from:filter.from,p_to:filter.to,p_sort:filter.sort,p_page:filter.page});
     return result.error?null:parseSquareWorkspaceOperational(result.data);}catch{return null;}
 }

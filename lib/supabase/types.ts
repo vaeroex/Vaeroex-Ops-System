@@ -6,7 +6,7 @@ export type Database = {
   public: {
     Functions: {
       read_square_workspace_operational_v1: {
-        Args: { p_workspace_name: string; p_kind: string | null; p_status: string | null; p_page: number };
+        Args: { p_workspace_name: string; p_kind: string | null; p_status: string | null; p_location: string | null; p_from: string | null; p_to: string | null; p_sort: string; p_page: number };
         Returns: Json;
       };
       read_square_workspace_card_v1: {

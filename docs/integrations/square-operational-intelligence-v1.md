@@ -14,7 +14,9 @@ and 20 relationship-derived states. The pure calculation is additionally capped
 at 1,000 distinct facts and 20,000 checked relationship occurrences so a future
 schema expansion fails closed rather than becoming unbounded. The authenticated
 RPC returns at most 25 activity rows per request, permits no more than 40 pages,
-and applies type/status filtering and pagination inside the database. These are
+and applies resource type, provider status, generic authority-location class,
+inclusive UTC date-range filtering, allowlisted chronological sorting, and
+pagination inside the database. These are
 defence-in-depth ceilings; the current 13-entry approval contract is the tighter
 reachable bound.
 
@@ -45,6 +47,10 @@ table or private-schema read grants.
 - Historical completeness is unknown. Day-over-day, prior-period and trend claims
   are therefore withheld. The deterministic insight layer says why rather than
   guessing.
+- Every KPI exposes its synthetic evidence references, current
+  workspace/entity/generation dimensional scope, freshness, verified admission,
+  unknown completeness, and stable reason codes. Exact currency/location groups
+  additionally carry the references supporting that group.
 
 ## Incremental and replay behavior
 
@@ -63,7 +69,11 @@ The explorer exposes only: a synthetic evidence reference, resource type, provid
 status, admitted timestamp, a generic authority-location label, exact amount and
 currency where admitted, individual quantity with an unverified-unit warning,
 admitted Catalog label, relationship state, and non-economic admission state.
-Provider IDs, workspace/entity/connection/generation IDs, private cursors, source
+Filters are same-origin form fields, stored for at most one hour in a secure,
+HTTP-only cookie, and validated again by the checked RPC. Dates are explicit UTC
+calendar bounds; location values are only the generic mapped, seller-scoped, or
+unresolved classes, never provider location IDs. Provider IDs,
+workspace/entity/connection/generation IDs, private cursors, source
 payloads, credentials, request fingerprints and raw relationship targets are not
 returned. Unknown or ambiguous authority returns the same null result as no data.
 
