@@ -592,7 +592,8 @@ jobs:
             supabase/tests/external_integrations_phase_8b_credential_lineage_recovery.test.sql \
             supabase/tests/external_integrations_phase_8b_precontract_retirement.test.sql \
             supabase/tests/external_integrations_phase_8b_provider_result_evidence.test.sql \
-            supabase/tests/external_integrations_qbo_production_convergence.test.sql
+            supabase/tests/external_integrations_qbo_production_convergence.test.sql \
+            supabase/tests/square_production_runtime_foundation.test.sql
 
       - name: Qualify dormant Square authority and atomic pages in disposable local databases
         run: node scripts/run-square-durable-page-qualification.js --supabase-local
