@@ -115,7 +115,8 @@ export function deriveSquareOperationalIntelligence(items:readonly SquareInterpr
 
 export function pageSquareOperationalActivity(intelligence:SquareOperationalIntelligence, input:{kind?:string;status?:string;location?:string;from?:string;to?:string;sort?:"newest"|"oldest";page?:number;pageSize?:number}) {
   const parsed=SquareOperationalIntelligenceSchema.parse(intelligence), page=Math.max(1,Math.min(40,Math.trunc(input.page??1))), size=Math.max(1,Math.min(SQUARE_OPERATIONAL_PAGE_SIZE,Math.trunc(input.pageSize??SQUARE_OPERATIONAL_PAGE_SIZE)));
-  const date=/^\d{4}-\d{2}-\d{2}$/;if((input.from&&!date.test(input.from))||(input.to&&!date.test(input.to))||(input.from&&input.to&&input.from>input.to))throw new Error("square_operational_filter_denied");
+  const validDate=(value:string)=>{const instant=Date.parse(`${value}T00:00:00Z`);return /^\d{4}-\d{2}-\d{2}$/.test(value)&&Number.isFinite(instant)&&new Date(instant).toISOString().slice(0,10)===value;};
+  if((input.from&&!validDate(input.from))||(input.to&&!validDate(input.to))||(input.from&&input.to&&input.from>input.to))throw new Error("square_operational_filter_denied");
   const from=input.from?Date.parse(`${input.from}T00:00:00Z`):null,to=input.to?Date.parse(`${input.to}T00:00:00Z`)+86_400_000:null;
   const rows=parsed.activity.filter(row=>(!input.kind||row.kind===input.kind)&&(!input.status||row.status===input.status)&&(!input.location||row.location===input.location)&&
     (from===null||(row.occurredAt!==null&&Date.parse(row.occurredAt)>=from))&&(to===null||(row.occurredAt!==null&&Date.parse(row.occurredAt)<to)))

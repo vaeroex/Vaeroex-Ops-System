@@ -6,6 +6,7 @@ import { publicKey } from "./config";
 import { card, controls, document, escape, operational } from "./presentation";
 
 const origin = "https://square-sandbox.vaeroex.com";
+const validUtcDate=(value:string)=>!value||(/^\d{4}-\d{2}-\d{2}$/.test(value)&&Number.isFinite(Date.parse(`${value}T00:00:00Z`))&&new Date(`${value}T00:00:00Z`).toISOString().slice(0,10)===value);
 // Qualification labels only, not discovered memberships or authority grants.
 const workspaceLabels = ["Vaeroex Square Sandbox", "Vaeroex Square Evidence Denial Test"] as const;
 
@@ -62,7 +63,7 @@ export async function handle(req: NextRequest) {
       const keys=[...form.keys()].sort().join(','),kind=form.get('kind')||'',status=form.get('status')||'',location=form.get('location')||'',from=form.get('from')||'',to=form.get('to')||'',sort=form.get('sort')||'',page=Number(form.get('page')||'1');
       if(Buffer.byteLength(text)>4096||keys!=="from,kind,location,page,sort,status,to"||!['','payment','refund','order','catalog','inventory'].includes(kind)||
         !['','mapped_location','seller_scoped','explicitly_unresolved'].includes(location)||!['newest','oldest'].includes(sort)||
-        !/^[A-Za-z0-9_-]{0,80}$/.test(status)||!/^\d{4}-\d{2}-\d{2}$|^$/.test(from)||!/^\d{4}-\d{2}-\d{2}$|^$/.test(to)||(from&&to&&from>to)||!Number.isInteger(page)||page<1||page>40)return finish("Unavailable",403);
+        !/^[A-Za-z0-9_-]{0,80}$/.test(status)||!validUtcDate(from)||!validUtcDate(to)||(from&&to&&from>to)||!Number.isInteger(page)||page<1||page>40)return finish("Unavailable",403);
       response.cookies.set('square-activity-filter',JSON.stringify({kind,status,location,from,to,sort,page}),{secure:true,httpOnly:true,sameSite:'strict',path:'/',maxAge:3600});
       return redirect('/activity');
     }
@@ -77,7 +78,7 @@ export async function handle(req: NextRequest) {
         let filter:{kind:string;status:string;location:string;from:string;to:string;sort:"newest"|"oldest";page:number}={kind:"",status:"",location:"",from:"",to:"",sort:"newest",page:1};
         try{const candidate=JSON.parse(req.cookies.get('square-activity-filter')?.value||'{}');if(candidate&&['','payment','refund','order','catalog','inventory'].includes(candidate.kind)&&
           ['','mapped_location','seller_scoped','explicitly_unresolved'].includes(candidate.location)&&['newest','oldest'].includes(candidate.sort)&&
-          /^[A-Za-z0-9_-]{0,80}$/.test(candidate.status)&&/^\d{4}-\d{2}-\d{2}$|^$/.test(candidate.from)&&/^\d{4}-\d{2}-\d{2}$|^$/.test(candidate.to)&&
+          /^[A-Za-z0-9_-]{0,80}$/.test(candidate.status)&&validUtcDate(candidate.from)&&validUtcDate(candidate.to)&&
           !(candidate.from&&candidate.to&&candidate.from>candidate.to)&&Number.isInteger(candidate.page)&&candidate.page>=1&&candidate.page<=40)filter=candidate;}catch{}
         const view=await readSquareWorkspaceOperational(client,workspace,{kind:filter.kind||null,status:filter.status||null,location:filter.location||null,from:filter.from||null,to:filter.to||null,sort:filter.sort,page:filter.page},req.headers);
         return finish(view?body+operational(view,filter):body+'<section class="panel"><p>No Square evidence available.</p></section>');

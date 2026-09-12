@@ -53,6 +53,11 @@ for(const name of ['VERCEL','VERCEL_ENV','VERCEL_TARGET_ENV','VERCEL_PROJECT_ID'
  assert.deepEqual(lastOperationalArgs,{p_workspace_name:'Vaeroex Square Sandbox',p_kind:'payment',p_status:'COMPLETED',p_location:'mapped_location',p_from:'2026-09-01',p_to:'2026-09-11',p_sort:'oldest',p_page:1});
  const invalidCookie=encodeURIComponent(JSON.stringify({kind:'payment',status:'COMPLETED',location:'mapped_location',from:'2026-09-12',to:'2026-09-11',sort:'oldest',page:1}));
  await handle(request('/activity',{cookie:`square-activity-filter=${invalidCookie}`}));assert.equal(lastOperationalArgs.p_kind,null,'invalid date range fails back to bounded defaults');
+ const impossibleCookie=encodeURIComponent(JSON.stringify({kind:'payment',status:'COMPLETED',location:'mapped_location',from:'2026-02-30',to:'',sort:'oldest',page:1}));
+ await handle(request('/activity',{cookie:`square-activity-filter=${impossibleCookie}`}));assert.equal(lastOperationalArgs.p_kind,null,'impossible date fails back to bounded defaults');
+ const beforeInvalidPost=rpcCalls,invalidBody='from=2026-02-30&kind=payment&location=mapped_location&page=1&sort=oldest&status=COMPLETED&to=';
+ const invalidPost=await handle(new NextRequest(`https://${host}/activity-filter`,{method:'POST',headers:{host,'x-forwarded-host':host,'x-forwarded-proto':'https',origin:`https://${host}`,'content-type':'application/x-www-form-urlencoded'},body:invalidBody}));
+ assert.equal(invalidPost.status,403);assert.equal(rpcCalls,beforeInvalidPost,'invalid calendar date is rejected before the operational RPC');
  for(mode of ['nonmember','unsubscribed','revoked','forged']){const body=await(await handle(request())).text();assert(!body.includes('Square Sandbox evidence</h3>'));assert(!body.includes('PRIVATE_SENTINEL'));}
  mode='valid';
  const denied=await(await handle(request('/evidence',{cookie:'square-evidence-workspace=Vaeroex%20Square%20Evidence%20Denial%20Test'}))).text();
