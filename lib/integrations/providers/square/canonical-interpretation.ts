@@ -63,7 +63,7 @@ export function interpretSquareObservation(input: SquareObservationInput, rawCon
   let money: Record<string, Money | null> = {}, quantity: string | null = null;
   let timestamps: Record<string, string | null> = {};
   let references: Reference[] = [], applicableLocationIds: string[] = [];
-  let units: unknown = null, detail: unknown = null;
+  let units: unknown = null, detail: unknown = null, presentationLabel: string | null = null;
   let meaning: string, unlinked = false;
   const type = input.pending.providerRecordType;
   if (type === "square_payment") {
@@ -92,8 +92,8 @@ export function interpretSquareObservation(input: SquareObservationInput, rawCon
     money = { listedPrice: p.price }; timestamps = { updatedAt: p.updatedAt };
     applicableLocationIds = context.authorizedLocationIds.filter(id => p.availability.mode === "specific_locations"
       ? p.availability.presentLocationIds.includes(id) : !p.availability.absentLocationIds.includes(id)).sort();
-    detail = { availability: p.availability, displayName: p.displayName, sku: p.sku,
-      trackInventory: p.trackInventory, sellable: p.sellable, stockable: p.stockable };
+    detail = { availability: p.availability, trackInventory: p.trackInventory, sellable: p.sellable, stockable: p.stockable };
+    presentationLabel = p.displayName;
     meaning = "seller_catalog_with_location_applicability_not_stock";
   } else {
     const p = SquareMinimizedInventoryRecordSchema.parse(data); kind = "inventory";
@@ -127,7 +127,11 @@ export function interpretSquareObservation(input: SquareObservationInput, rawCon
     transformationVersion: SQUARE_INTERPRETATION_POLICY,
     decision: { ...admitted.fact.decision, policyVersion: SQUARE_INTERPRETATION_POLICY, reasonCodes: semantic.rationale }
   }).version;
-  const result = frozen({ outcome: "interpreted" as const, ...semantic, freshness: context.freshness, scan: context.scan, fact });
+  // Presentation text is intentionally outside the immutable canonical fact.
+  // It remains available to the versioned operational projection, whose own
+  // fingerprint captures it, without rewriting an existing v1 fact version.
+  const result = frozen({ outcome: "interpreted" as const, ...semantic, presentationLabel,
+    freshness: context.freshness, scan: context.scan, fact });
   interpretations.add(result);
   return result;
 }
