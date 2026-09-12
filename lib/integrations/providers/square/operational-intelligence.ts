@@ -49,10 +49,10 @@ export function summarizeSquareOperationalAmounts(values:readonly (Money|null)[]
   if (values.some(v=>!v?.amountMinor || !v.currency)) return {count:values.length,total:null,exactAverageMinor:null,averageState:"amount_unavailable" as const};
   const currencies=new Set(values.map(v=>v!.currency!));
   if(currencies.size!==1) return {count:values.length,total:null,exactAverageMinor:null,averageState:"mixed_currency" as const};
-  const sum=values.reduce((n,v)=>n+BigInt(v!.amountMinor!),0n), count=BigInt(values.length);
+  const sum=values.reduce((n,v)=>n+BigInt(v!.amountMinor!),BigInt(0)), count=BigInt(values.length);
   return {count:values.length,total:{amountMinor:String(sum),currency:values[0]!.currency!},
-    exactAverageMinor:sum%count===0n?String(sum/count):null,
-    averageState:sum%count===0n?"exact" as const:"non_integral_minor_unit" as const};
+    exactAverageMinor:sum%count===BigInt(0)?String(sum/count):null,
+    averageState:sum%count===BigInt(0)?"exact" as const:"non_integral_minor_unit" as const};
 }
 
 /** Deterministic, bounded projection of already authenticated interpretations.
