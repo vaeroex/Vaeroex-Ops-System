@@ -12,6 +12,9 @@ const outputs = read("services/external-integrations-production/infra/activation
 const backend = read("services/external-integrations-production/infra/activation/backend.tf");
 const dockerfile = read("services/external-integrations-production/bootstrap-runtime/Dockerfile");
 const serverPath = path.join(root, "services/external-integrations-production/bootstrap-runtime/server.mjs");
+const edgeCallback = read("services/external-integrations-production/callback-edge/callback.go");
+const edgePlugin = read("services/external-integrations-production/callback-edge/plugin/main.go");
+const edgeCloudBuild = read("services/external-integrations-production/callback-edge/cloudbuild.yaml");
 const activationPath = path.join(root, "services/external-integrations-production/infra/activation");
 
 function runTerraform(args) {
@@ -32,6 +35,8 @@ assert.match(variables, /var\.project_id == "vaeroex-integrations-prod"/, "the a
 assert.match(variables, /var\.region == "us-west1"/, "the activation cannot create an extra region");
 assert.match(variables, /bootstrap_image_digest == null/, "the first apply creates no runtime");
 assert.match(variables, /production-bootstrap@sha256:\[a-f0-9\]\{64\}/, "a runtime image must be an immutable digest in the isolated repository");
+assert.match(variables, /square-callback-edge@sha256:\[a-f0-9\]\{64\}/, "the callback edge image must be an immutable digest in the isolated repository");
+assert.match(main, /deployment_inputs_valid/, "runtime and callback-edge artifacts must be deployed together");
 
 for (const gate of [
   "runtime_enabled",
@@ -77,6 +82,16 @@ assert.match(main, /request\.path == '\/api\/integrations\/square\/callback'.*re
 assert.match(main, /request\.path == '\/api\/integrations\/square\/webhook'.*request\.method != 'POST'/, "the webhook accepts only POST");
 assert.match(main, /action\s*=\s*"rate_based_ban"/, "public paths are rate bounded");
 assert.match(main, /log_config\s*\{\s*enable\s*=\s*false\s*\}/, "callback query strings are not written to load-balancer request logs");
+assert.match(main, /google_network_services_wasm_plugin" "square_callback"/, "Square callbacks use a managed immutable query-stripping edge");
+assert.match(main, /google_network_services_lb_edge_extension" "square_callback"[\s\S]*fail_open\s*=\s*false/, "the callback edge fails closed");
+assert.match(main, /forward_headers = \[[\s\S]*x-vaeroex-oauth-code[\s\S]*x-vaeroex-oauth-state[\s\S]*\]/, "only the bounded internal OAuth handoff headers cross the edge");
+assert.match(edgeCallback, /CallbackPath\s*=\s*"\/api\/integrations\/square\/callback"/, "the edge accepts only the Square callback path");
+assert.match(edgeCallback, /WebhookPath\s*=\s*"\/api\/integrations\/square\/webhook"/, "the edge permits only the exact queryless Square webhook pass-through");
+assert.match(edgeCallback, /error_description/, "the edge recognizes provider denial descriptions without forwarding them");
+assert.match(edgePlugin, /ReplaceHttpRequestHeader\(":path", callbackedge\.CallbackPath\)/, "the edge strips the OAuth query before Cloud Run request logging");
+assert.match(edgePlugin, /clearReservedHandoffHeaders\(\)/, "client-forged handoff headers are removed before forwarding");
+assert.doesNotMatch(edgePlugin, /AddHttpRequestHeader\([^\n]*error_description/, "provider error descriptions never enter the internal request");
+assert.match(edgeCloudBuild, /_SOURCE_COMMIT[\s\S]*\^\[a-f0-9\]\{40\}\$/, "callback-edge publication validates the reviewed source revision");
 
 assert.match(main, /rotation_period\s*=\s*"7776000s"/);
 assert.match(main, /roles\/cloudkms\.cryptoKeyEncrypterDecrypter/);

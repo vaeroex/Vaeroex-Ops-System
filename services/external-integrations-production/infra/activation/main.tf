@@ -19,6 +19,7 @@ locals {
     "iam.googleapis.com",
     "logging.googleapis.com",
     "monitoring.googleapis.com",
+    "networkservices.googleapis.com",
     "run.googleapis.com",
     "secretmanager.googleapis.com",
     "serviceusage.googleapis.com",
@@ -46,7 +47,12 @@ locals {
       mode => "projects/${data.google_project.current.number}/secrets/${secret_id}/versions/1"
     }
   }
-  deployment_enabled = var.bootstrap_image_digest != null
+  callback_edge_version = "v${substr(var.source_commit, 0, 12)}"
+  deployment_enabled    = var.bootstrap_image_digest != null && var.callback_edge_image_digest != null
+  deployment_inputs_valid = (
+    (var.bootstrap_image_digest == null && var.callback_edge_image_digest == null) ||
+    (var.bootstrap_image_digest != null && var.callback_edge_image_digest != null)
+  )
 }
 
 resource "google_project_service" "required" {
@@ -61,7 +67,13 @@ resource "google_compute_network" "platform" {
   auto_create_subnetworks = false
   routing_mode            = "REGIONAL"
   mtu                     = 1460
-  lifecycle { prevent_destroy = true }
+  lifecycle {
+    prevent_destroy = true
+    precondition {
+      condition     = local.deployment_inputs_valid
+      error_message = "The bootstrap runtime and callback edge must be omitted or deployed together by immutable digest."
+    }
+  }
   depends_on = [google_project_service.required]
 }
 
@@ -582,6 +594,59 @@ resource "google_compute_global_forwarding_rule" "square" {
   load_balancing_scheme = "EXTERNAL_MANAGED"
   network_tier          = "PREMIUM"
   lifecycle { prevent_destroy = true }
+}
+
+resource "google_network_services_wasm_plugin" "square_callback" {
+  count           = local.deployment_enabled ? 1 : 0
+  name            = "square-production-callback"
+  location        = "global"
+  description     = "Vaeroex Square bounded OAuth callback query-stripping edge"
+  main_version_id = local.callback_edge_version
+  deletion_policy = "PREVENT"
+
+  log_config {
+    enable = false
+  }
+
+  versions {
+    version_name = local.callback_edge_version
+    description  = "Immutable Square callback edge for source ${var.source_commit}"
+    image_uri    = var.callback_edge_image_digest
+  }
+}
+
+resource "google_network_services_lb_edge_extension" "square_callback" {
+  count                 = local.deployment_enabled ? 1 : 0
+  name                  = "square-production-callback"
+  location              = "global"
+  description           = "Fail-closed Square callback query handoff and webhook boundary"
+  load_balancing_scheme = "EXTERNAL_MANAGED"
+  forwarding_rules      = [google_compute_global_forwarding_rule.square[0].self_link]
+  deletion_policy       = "PREVENT"
+
+  extension_chains {
+    name = "square-public-edge"
+
+    match_condition {
+      cel_expression = "request.host == '${var.production_hostname}'"
+    }
+
+    extensions {
+      name             = "sanitize-square-ingress"
+      service          = google_network_services_wasm_plugin.square_callback[0].id
+      fail_open        = false
+      supported_events = ["REQUEST_HEADERS"]
+      forward_headers = [
+        "content-length",
+        "expect",
+        "transfer-encoding",
+        "x-vaeroex-oauth-code",
+        "x-vaeroex-oauth-denied",
+        "x-vaeroex-oauth-handoff-version",
+        "x-vaeroex-oauth-state",
+      ]
+    }
+  }
 }
 
 resource "google_monitoring_uptime_check_config" "bootstrap" {

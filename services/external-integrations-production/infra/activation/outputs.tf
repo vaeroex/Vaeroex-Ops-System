@@ -6,6 +6,7 @@ output "sanitized_activation" {
     source_commit          = var.source_commit
     production_hostname    = var.production_hostname
     runtime_deployed       = local.deployment_enabled
+    callback_edge          = local.deployment_enabled ? google_network_services_wasm_plugin.square_callback[0].id : null
     runtime_enabled        = var.runtime_enabled
     provider_calls_enabled = var.provider_calls_enabled
     onboarding_enabled     = var.customer_onboarding_enabled

@@ -7,6 +7,7 @@ alert_email    = "isaac@vaeroex.com"
 # First apply keeps this null and creates no Cloud Run/LB runtime path. After
 # the reviewed bootstrap image is built, replace with its immutable digest.
 bootstrap_image_digest = null
+callback_edge_image_digest = null
 
 production_hostname            = "square.vaeroex.com"
 runtime_enabled                 = false

@@ -4,9 +4,9 @@ This directory is the deployable, reviewed activation layer for the shared Vaero
 
 ## Safety state
 
-The first apply must leave `bootstrap_image_digest = null`. It creates the shared network, static ingress and egress addresses, NAT, task queue, image repository, bounded logging, Cloud Armor policy, Square-specific identities, one KMS key, and empty Secret Manager containers. It creates no Cloud Run service, load balancer, DNS record, secret version, database LOGIN, database grant, or migration.
+The first apply must leave both `bootstrap_image_digest = null` and `callback_edge_image_digest = null`. It creates the shared network, static ingress and egress addresses, NAT, task queue, image repository, bounded logging, Cloud Armor policy, Square-specific identities, one KMS key, and empty Secret Manager containers. It creates no Cloud Run service, load balancer, callback edge, DNS record, secret version, database LOGIN, database grant, or migration.
 
-After the bootstrap image is built and independently verified, a second reviewed plan may pin its immutable Artifact Registry digest. The image always returns `404 production_integration_runtime_disabled`; it contains no OAuth, webhook, provider, database, evidence, economics, or AI implementation. All runtime gates are Terraform validations fixed to `false`.
+After the bootstrap and Square callback-edge images are built and independently verified, a second reviewed plan may pin both immutable Artifact Registry digests. They must be supplied together. The fail-closed edge validates the exact callback shape, removes the query before Cloud Run request logging, forwards only bounded internal handoff headers, drops provider denial descriptions, and passes only exact queryless health/webhook traffic. Edge and load-balancer request logging remain disabled. The runtime image always returns `404 production_integration_runtime_disabled`; it contains no OAuth, webhook, provider, database, evidence, economics, or AI implementation. All runtime gates are Terraform validations fixed to `false`.
 
 Secret Manager grants are provider- and runtime-specific and are conditional on exact version `1`. Terraform never creates or reads a secret version. Credential delivery, database LOGIN creation, migration application, DNS, and activation are separate checked operations.
 
@@ -18,7 +18,7 @@ Secret Manager grants are provider- and runtime-specific and are conditional on 
 4. Run `pnpm test:external-integrations-square-production-foundation`.
 5. Create a saved plan with `bootstrap_image_digest = null`; inspect every resource and cost-bearing effect before applying.
 6. Apply the infrastructure-only plan and verify sanitized outputs and IAM policies.
-7. Build the disabled bootstrap image from the reviewed Git SHA, inspect its digest and vulnerability result, then use only the immutable digest in a new reviewed plan.
+7. Build the disabled bootstrap and Square callback-edge images from the reviewed Git SHA, run the callback parser/Wasm tests, inspect both digests and vulnerability results, then use only those immutable digests in a new reviewed plan.
 8. Apply the runtime/LB plan while gates remain closed. Configure DNS only after the managed-certificate target is verified.
 9. Verify exact TLS host routing, direct Cloud Run denial, alternate-host denial, rate limiting, disabled endpoints, log retention, rollback and alert delivery.
 10. Independently verify the canonical Production database ledger and existing Supabase Pro backup coverage before applying only the reviewed Square Production foundation migration.

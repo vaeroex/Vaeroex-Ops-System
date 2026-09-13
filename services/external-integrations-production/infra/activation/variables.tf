@@ -55,6 +55,20 @@ variable "bootstrap_image_digest" {
   }
 }
 
+variable "callback_edge_image_digest" {
+  type      = string
+  default   = null
+  nullable  = true
+  sensitive = false
+  validation {
+    condition = (
+      var.callback_edge_image_digest == null ||
+      can(regex("^us-west1-docker\\.pkg\\.dev/vaeroex-integrations-prod/vaeroex-integrations-images/square-callback-edge@sha256:[a-f0-9]{64}$", var.callback_edge_image_digest))
+    )
+    error_message = "The callback edge must be an immutable digest in the reviewed Production repository."
+  }
+}
+
 variable "production_hostname" {
   type    = string
   default = "square.vaeroex.com"
