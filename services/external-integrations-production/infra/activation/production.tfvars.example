@@ -1,0 +1,17 @@
+project_id    = "vaeroex-integrations-prod"
+region        = "us-west1"
+source_commit = "0000000000000000000000000000000000000000"
+operator_email = "isaac@vaeroex.com"
+alert_email    = "isaac@vaeroex.com"
+
+# First apply keeps this null and creates no Cloud Run/LB runtime path. After
+# the reviewed bootstrap image is built, replace with its immutable digest.
+bootstrap_image_digest = null
+
+production_hostname            = "square.vaeroex.com"
+runtime_enabled                 = false
+provider_calls_enabled          = false
+customer_onboarding_enabled     = false
+webhook_intake_enabled          = false
+economic_contributions_enabled = false
+ai_dispatch_enabled             = false

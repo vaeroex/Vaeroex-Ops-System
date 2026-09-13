@@ -212,6 +212,13 @@ jobs:
           terraform validate
           terraform test
 
+      - name: Validate authorized closed Production integration activation
+        working-directory: services/external-integrations-production/infra/activation
+        run: |
+          terraform fmt -check -recursive
+          terraform init -backend=false -input=false
+          terraform validate
+
       - name: Test provider-neutral and Square Production contracts
         run: pnpm test:external-integrations-square-production-foundation
 
