@@ -3,12 +3,14 @@ const fs = require("node:fs");
 const path = require("node:path");
 const Module = require("node:module");
 const ts = require("typescript");
+const { Client: PostgresClient } = require("pg");
 
 const root = path.resolve(__dirname, "..");
 const sourcePath = path.join(root, "lib/integrations/control-plane/square-production-contracts.ts");
 const migrationPath = path.join(root, "supabase/migrations/20260912190000_square_production_runtime_foundation.sql");
 const migration = fs.readFileSync(migrationPath, "utf8");
 const evidenceDatabaseTest = fs.readFileSync(path.join(root, "scripts/square-workspace-evidence-database-tests.js"), "utf8");
+const fixtureRichMigrationTest = fs.readFileSync(path.join(root, "scripts/run-phase8b-zero-based-delivery-migration-tests.js"), "utf8");
 
 for (const extension of [".ts", ".tsx"]) require.extensions[extension] = function(loaded, filename) {
   loaded._compile(ts.transpileModule(fs.readFileSync(filename, "utf8"), {
@@ -21,6 +23,7 @@ Module._resolveFilename = function(request, parent, isMain, options) {
   return resolve.call(this, request.startsWith("@/") ? path.join(root, request.slice(2)) : request, parent, isMain, options);
 };
 const contract = require(sourcePath);
+const { localMigrationAdministratorUrl } = require("./run-phase8b-zero-based-delivery-migration-tests.js");
 
 function fixture(overrides = {}) {
   const project = "vaeroex-square-production";
@@ -140,6 +143,32 @@ assert.match(migration, /production_provider_secret_resource_key/);
 assert.doesNotMatch(migration, /grant (?:select|insert|update|delete|all) on table private\.(?:square|integration)_production_/i);
 assert.doesNotMatch(migration, /create role\s+square_production_\w+\s+login/i);
 assert.doesNotMatch(migration, /squareupsandbox|oysjpoondtcrqpghhrbd|sandbox-sq0idb/i);
+assert.match(fixtureRichMigrationTest, /\["127\.0\.0\.1", "localhost"\]\.includes\(parsed\.hostname\)/,
+  "fixture-rich role mutation remains restricted to disposable local Supabase");
+assert.match(fixtureRichMigrationTest, /parsed\.username = "supabase_admin"/,
+  "fixture-rich role drift uses the local migration actor that owns PostgreSQL 17's creator edge");
+assert.match(fixtureRichMigrationTest, /qualifyProductionRoleDrift\(localMigrationAdministratorDatabaseUrl\)/,
+  "only the role-drift witness uses the local migration-administrator connection");
+assert.ok(
+  fixtureRichMigrationTest.indexOf("const localMigrationAdministratorDatabaseUrl = localMigrationAdministratorUrl(databaseUrl)") <
+    fixtureRichMigrationTest.indexOf("run(cli, [\n    \"db\",\n    \"reset\""),
+  "the canonical local URL is validated before reset and every database connection"
+);
+const localAdminUrl = localMigrationAdministratorUrl("postgresql://postgres:synthetic-local@127.0.0.1:54322/postgres");
+assert.deepEqual(
+  (({ host, port, user, password, database }) => ({ host, port, user, password, database }))(
+    new PostgresClient({ connectionString: localAdminUrl }).connectionParameters
+  ),
+  { host: "127.0.0.1", port: 54322, user: "supabase_admin", password: "synthetic-local", database: "postgres" },
+  "the pinned PostgreSQL parser sees only the intended local migration identity"
+);
+for (const unsafeUrl of [
+  "postgresql://postgres:synthetic-local@127.0.0.1:54322/postgres?host=remote.example&user=remote_actor",
+  "postgresql://postgres:synthetic-local@localhost:54322/postgres?hostaddr=203.0.113.10",
+  "https://postgres:synthetic-local@127.0.0.1:54322/postgres",
+  "postgresql://postgres:synthetic-local@remote.example:54322/postgres"
+]) assert.throws(() => localMigrationAdministratorUrl(unsafeUrl),
+  "routing/authentication overrides and nonlocal/non-PostgreSQL URLs fail closed");
 assert.match(evidenceDatabaseTest, /insert into private\.square_account_configuration\(\s*environment,application_id,redirect_uri/,
   "existing qualification clones only writable configuration columns");
 assert.doesNotMatch(evidenceDatabaseTest, /jsonb_populate_record\(null::private\.square_account_configuration/,

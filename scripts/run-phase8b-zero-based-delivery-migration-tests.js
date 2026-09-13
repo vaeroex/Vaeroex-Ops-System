@@ -66,6 +66,28 @@ function parseEnvValue(output, name) {
     : value;
 }
 
+function localMigrationAdministratorUrl(databaseUrl) {
+  const parsed = new URL(databaseUrl);
+  if (!["postgres:", "postgresql:"].includes(parsed.protocol)) {
+    throw new Error("Migration-administrator qualification requires a PostgreSQL URL.");
+  }
+  if (!["127.0.0.1", "localhost"].includes(parsed.hostname)) {
+    throw new Error("Migration-administrator qualification is restricted to local Supabase only.");
+  }
+  // node-postgres connection query parameters override URI authority fields.
+  // Reject every parameter and fragment rather than trying to enumerate current
+  // and future routing/auth aliases before preserving the disposable password.
+  if (parsed.search || parsed.hash) {
+    throw new Error("Migration-administrator qualification requires a canonical local URL.");
+  }
+  // PostgreSQL 16+ assigns the automatic ADMIN-only creator edge to the role
+  // that applied the migration. Local Supabase applies migrations as its fixed
+  // supabase_admin role; retain the disposable local password and change only
+  // the identity so the drift witness is created and recovered by its owner.
+  parsed.username = "supabase_admin";
+  return parsed.toString();
+}
+
 function assertTargetIsSinglePendingMigration() {
   const migrations = fs
     .readdirSync(path.join(root, "supabase/migrations"))
@@ -359,16 +381,9 @@ async function main() {
   const status = run(cli, ["status", "-o", "env"], { capture: true });
   const databaseUrl = parseEnvValue(status.stdout, "DB_URL");
   if (!databaseUrl) fail("The isolated local database URL is unavailable.");
-
-  let parsed;
-  try {
-    parsed = new URL(databaseUrl);
-  } catch {
-    fail("The isolated local database URL is invalid.");
-  }
-  if (!["127.0.0.1", "localhost"].includes(parsed.hostname)) {
-    fail("Fixture-rich migration reset is restricted to local Supabase only.");
-  }
+  // Validate every effective routing/authentication field before the reset or
+  // any node-postgres connection, then retain the checked migration identity.
+  const localMigrationAdministratorDatabaseUrl = localMigrationAdministratorUrl(databaseUrl);
 
   run(cli, [
     "db",
@@ -379,7 +394,7 @@ async function main() {
     fixtureBaseVersion
   ]);
   await applyFixture(databaseUrl);
-  await qualifyProductionRoleDrift(databaseUrl);
+  await qualifyProductionRoleDrift(localMigrationAdministratorDatabaseUrl);
   run(cli, ["migration", "up", "--local"]);
   await verifyProductionFingerprintUpgrade(databaseUrl);
   run(process.execPath, [
@@ -388,6 +403,10 @@ async function main() {
   ]);
 }
 
-main().catch((error) => {
-  fail(error instanceof Error ? error.message : "Fixture-rich migration test failed.");
-});
+if (require.main === module) {
+  main().catch((error) => {
+    fail(error instanceof Error ? error.message : "Fixture-rich migration test failed.");
+  });
+}
+
+module.exports = { localMigrationAdministratorUrl };
