@@ -8,6 +8,7 @@ const root = path.resolve(__dirname, "..");
 const sourcePath = path.join(root, "lib/integrations/control-plane/square-production-contracts.ts");
 const migrationPath = path.join(root, "supabase/migrations/20260912190000_square_production_runtime_foundation.sql");
 const migration = fs.readFileSync(migrationPath, "utf8");
+const evidenceDatabaseTest = fs.readFileSync(path.join(root, "scripts/square-workspace-evidence-database-tests.js"), "utf8");
 
 for (const extension of [".ts", ".tsx"]) require.extensions[extension] = function(loaded, filename) {
   loaded._compile(ts.transpileModule(fs.readFileSync(filename, "utf8"), {
@@ -27,6 +28,21 @@ function fixture(overrides = {}) {
   const account = (name) => `${name}@${project}.iam.gserviceaccount.com`;
   return {
     contractVersion: "square_production_runtime_binding_v1",
+    platform: {
+      contractVersion: "production_integration_platform_v1", environment: "production",
+      projectId: project, projectNumber: "123456789012", region: "us-west1",
+      sharedResources: {
+        network: "vaeroex-integrations-production", subnet: "vaeroex-integrations-us-west1",
+        router: "vaeroex-integrations-router", nat: "vaeroex-integrations-nat",
+        egressAddress: "vaeroex-integrations-egress", ingressAddress: "vaeroex-integrations-ingress",
+        taskQueue: "vaeroex-integrations-tasks", artifactRepository: "vaeroex-integrations-images"
+      },
+      databaseAuthorityTarget: "existing_production_postgres",
+      runtimePolicyVersion: "production_runtime_v1", retentionPolicyVersion: "production_retention_v1",
+      observabilityPolicyVersion: "production_observability_v1", backupPolicyVersion: "production_backup_v1",
+      sourceCommit: "a".repeat(40), infrastructureProvisioned: false, runtimeEnabled: false,
+      economicContributionsEnabled: false, aiDispatchEnabled: false
+    },
     environment: "production", apiVersion: "2026-08-19",
     applicationId: "sq0idp-production-fixture",
     applicationOrigin: "https://www.vaeroex.com",
@@ -35,16 +51,14 @@ function fixture(overrides = {}) {
     authorizationEndpoint: "https://connect.squareup.com/oauth2/authorize",
     providerOrigin: "https://connect.squareup.com",
     scopes: ["INVENTORY_READ","ITEMS_READ","MERCHANT_PROFILE_READ","ORDERS_READ","PAYMENTS_READ"],
-    projectId: project, projectNumber: "123456789012", region: "us-west1",
     kmsKeyResource: `projects/${project}/locations/us-west1/keyRings/square-production/cryptoKeys/provider-credentials`,
     applicationSecretVersionResource: secret("square-production-application"),
     webhookSignatureVersionResource: secret("square-production-webhook-signature"),
     databaseSecretVersionResources: Object.fromEntries(["oauth","broker","scheduler","webhook","runtime","evidence"].map((name) => [name, secret(`square-production-${name}-db`)])),
     serviceAccounts: Object.fromEntries(["oauth","broker","scheduler","webhook","runtime","evidence","taskInvoker"].map((name) => [name, account(`sq-${name.toLowerCase().replace("taskinvoker","task-invoker")}`)])),
     databaseLogins: Object.fromEntries(["oauth","broker","scheduler","webhook","runtime","evidence"].map((name) => [name, `square_production_${name}`])),
-    queueResource: `projects/${project}/locations/us-west1/queues/square-production-sync`,
-    sourceCommit: "a".repeat(40), enabled: true, providerCallsEnabled: false,
-    customerOnboardingEnabled: false, evidenceEnabled: false,
+    sourceCommit: "a".repeat(40), enabled: false, providerCallsEnabled: false,
+    customerOnboardingEnabled: false, webhookIntakeEnabled: false, evidenceEnabled: false,
     economicContributionsEnabled: false, aiDispatchEnabled: false,
     approvalExpiresAt: "2099-01-01T00:00:00.000Z", ...overrides
   };
@@ -64,14 +78,14 @@ for (const changes of [
   { aiDispatchEnabled: true },
   { providerCallsEnabled: false, customerOnboardingEnabled: true },
   { applicationSecretVersionResource: "projects/vaeroex-square-production/secrets/app/versions/latest" },
-  { projectId: "vaeroex-square-sandbox" }
+  { platform: { ...fixture().platform, projectId: "vaeroex-square-sandbox" } }
 ]) assert.throws(() => contract.checkedSquareProductionBinding(fixture(changes)), Object.keys(changes).join(","));
 
 for (const mismatch of [
   { kmsKeyResource: "projects/vaeroex-square-qualification/locations/us-west1/keyRings/square-production/cryptoKeys/provider-credentials" },
   { kmsKeyResource: "projects/vaeroex-square-production/locations/us-east1/keyRings/square-production/cryptoKeys/provider-credentials" },
   { applicationSecretVersionResource: "projects/vaeroex-square-qualification/secrets/app/versions/1" },
-  { queueResource: "projects/vaeroex-square-production/locations/us-east1/queues/square-production-sync" }
+  { platform: { ...fixture().platform, sourceCommit: "b".repeat(40) } }
 ]) assert.throws(() => contract.checkedSquareProductionBinding(fixture(mismatch)));
 
 const wrongSecret = fixture();
@@ -90,20 +104,34 @@ assert.match(migration, /pg_catalog\.pg_auth_members/);
 assert.match(migration, /economic_contributions_enabled boolean not null default false check\(not economic_contributions_enabled\)/);
 assert.match(migration, /ai_dispatch_enabled boolean not null default false check\(not ai_dispatch_enabled\)/);
 assert.match(migration, /alter table private\.square_production_runtime_binding force row level security/);
-assert.match(migration, /alter table private\.square_production_sync_schedule force row level security/);
-assert.match(migration, /alter table private\.square_production_webhook_receipts force row level security/);
-assert.match(migration, /square_production_sync_schedule_due_idx[\s\S]*where state='ready'/);
-assert.match(migration, /square_production_webhook_application_idx[\s\S]*\(environment,application_id,received_at\)/);
-assert.match(migration, /square_account_connections_production_schedule_authority_idx/);
-assert.match(migration, /square_connections_production_schedule_environment_idx/);
-assert.match(migration, /foreign key\(workspace_id,business_entity_id,connection_id,connection_generation,environment,application_id\)/);
+assert.match(migration, /alter table private\.integration_production_platform_bindings force row level security/);
+assert.match(migration, /alter table private\.integration_production_provider_bindings force row level security/);
+assert.match(migration, /alter table private\.integration_production_provider_secrets force row level security/);
+assert.match(migration, /alter table private\.integration_production_provider_capabilities force row level security/);
+assert.doesNotMatch(migration, /create table private\.square_production_(?:sync_schedule|webhook_receipts)/);
+assert.match(migration, /private\.integration_sync_tasks/);
+assert.match(migration, /private\.integration_sync_checkpoints/);
+assert.match(migration, /private\.integration_webhook_events/);
+assert.match(migration, /private\.integration_rate_limit_states/);
 assert.match(migration, /square_production_runtime_binding_configuration_fkey/);
-assert.match(migration, /square_production_binding_fingerprint text generated always/);
-assert.match(migration, /square_account_configuration_production_binding_idx[\s\S]*environment,application_id,square_production_binding_fingerprint/);
-assert.doesNotMatch(migration, /on private\.square_account_configuration\([^\n]*redirect_uri/);
+assert.match(migration, /square_production_binding_fingerprint text\s+generated always/);
+assert.match(migration, /square_production_authority_fingerprint text\s+generated always/);
+assert.match(migration, /square_account_configuration_production_binding_idx[\s\S]*environment,square_production_authority_fingerprint,square_production_binding_fingerprint/);
+assert.match(migration, /foreign key\(provider_key,environment,provider_authority_fingerprint\)[\s\S]*integration_production_provider_bindings/);
+assert.match(migration, /foreign key\(environment,square_configuration_authority_fingerprint,square_configuration_fingerprint\)/);
+assert.doesNotMatch(migration, /create unique index[^;]+redirect_uri/);
+assert.match(migration, /foreign key\(platform_binding_key,project_id,region,source_commit\)/);
 assert.match(migration, /split_part\(kms_key_resource,'\/',2\)=project_id/);
-assert.match(migration, /split_part\(queue_resource,'\/',4\)=region/);
-assert.doesNotMatch(migration, /grant (?:select|insert|update|delete|all) on table private\.square_production_/i);
+assert.match(migration, /project_id text not null check\(project_id ~ '\^\[a-z\]\[a-z0-9-\]\{4,28\}\[a-z0-9\]\$'/);
+assert.match(migration, /kms_key_resource text not null unique check\(kms_key_resource ~[\s\S]*\/keyRings\/\[A-Za-z0-9_-\]\{1,63\}/);
+assert.match(migration, /production_provider_capability_service_account_key/);
+assert.match(migration, /production_provider_capability_database_login_key/);
+assert.match(migration, /production_provider_secret_resource_key/);
+assert.doesNotMatch(migration, /grant (?:select|insert|update|delete|all) on table private\.(?:square|integration)_production_/i);
 assert.doesNotMatch(migration, /create role\s+square_production_\w+\s+login/i);
 assert.doesNotMatch(migration, /squareupsandbox|oysjpoondtcrqpghhrbd|sandbox-sq0idb/i);
+assert.match(evidenceDatabaseTest, /insert into private\.square_account_configuration\(\s*environment,application_id,redirect_uri/,
+  "existing qualification clones only writable configuration columns");
+assert.doesNotMatch(evidenceDatabaseTest, /jsonb_populate_record\(null::private\.square_account_configuration/,
+  "existing qualification never supplies generated Production fingerprints");
 console.log("square production foundation regression tests passed");

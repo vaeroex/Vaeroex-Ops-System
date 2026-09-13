@@ -6,6 +6,11 @@ import {
   KmsCryptoKeyResourceSchema,
   SecretManagerVersionResourceSchema
 } from "@/lib/integrations/credentials/contracts";
+import {
+  ProductionPlatformBindingSchema,
+  checkedProductionPlatformBinding,
+  checkedProductionProviderIsolation
+} from "@/lib/integrations/control-plane/production-platform-contracts";
 import { snapshotSquareDurableJson } from "@/lib/integrations/providers/square/durable-contracts";
 import { SQUARE_OAUTH_SCOPES } from "@/lib/integrations/providers/square/account-connection-oauth";
 
@@ -47,6 +52,7 @@ const HttpsCallbackSchema = z.string().url().max(2_048).refine((value) => {
 
 const ProductionBindingSchema = z.object({
   contractVersion: z.literal(SQUARE_PRODUCTION_BINDING_VERSION),
+  platform: ProductionPlatformBindingSchema,
   environment: z.literal("production"),
   apiVersion: z.literal(SQUARE_PRODUCTION_API_VERSION),
   applicationId: z.string().min(8).max(191).regex(/^sq0idp-[A-Za-z0-9_-]+$/),
@@ -60,9 +66,6 @@ const ProductionBindingSchema = z.object({
     z.literal("MERCHANT_PROFILE_READ"), z.literal("ORDERS_READ"),
     z.literal("PAYMENTS_READ")
   ]),
-  projectId: z.string().min(6).max(30).regex(/^[a-z][a-z0-9-]+[a-z0-9]$/),
-  projectNumber: z.string().regex(/^[1-9][0-9]{5,19}$/),
-  region: z.string().regex(/^[a-z]+-[a-z]+[0-9]$/),
   kmsKeyResource: KmsCryptoKeyResourceSchema,
   applicationSecretVersionResource: SecretManagerVersionResourceSchema,
   webhookSignatureVersionResource: SecretManagerVersionResourceSchema,
@@ -91,12 +94,12 @@ const ProductionBindingSchema = z.object({
     runtime: LoginSchema,
     evidence: LoginSchema
   }).strict(),
-  queueResource: z.string().max(512).regex(/^projects\/[a-z][a-z0-9-]+[a-z0-9]\/locations\/[a-z]+-[a-z]+[0-9]\/queues\/square-production-[a-z0-9-]+$/),
   sourceCommit: z.string().regex(/^[a-f0-9]{40}$/),
-  enabled: z.literal(true),
-  providerCallsEnabled: z.boolean(),
-  customerOnboardingEnabled: z.boolean(),
-  evidenceEnabled: z.boolean(),
+  enabled: z.literal(false),
+  providerCallsEnabled: z.literal(false),
+  customerOnboardingEnabled: z.literal(false),
+  webhookIntakeEnabled: z.literal(false),
+  evidenceEnabled: z.literal(false),
   economicContributionsEnabled: z.literal(false),
   aiDispatchEnabled: z.literal(false),
   approvalExpiresAt: z.string().datetime({ offset: true })
@@ -110,9 +113,9 @@ const ProductionBindingSchema = z.object({
   if (new URL(value.callbackUri).origin !== value.callbackOrigin) {
     context.addIssue({ code: "custom", message: "callback origin mismatch" });
   }
-  const expectedProjectPrefix = `projects/${value.projectId}/`;
-  const expectedServiceAccountSuffix = `@${value.projectId}.iam.gserviceaccount.com`;
-  if (!value.kmsKeyResource.startsWith(`${expectedProjectPrefix}locations/${value.region}/`)) {
+  const expectedProjectPrefix = `projects/${value.platform.projectId}/`;
+  const expectedServiceAccountSuffix = `@${value.platform.projectId}.iam.gserviceaccount.com`;
+  if (!value.kmsKeyResource.startsWith(`${expectedProjectPrefix}locations/${value.platform.region}/`)) {
     context.addIssue({ code: "custom", message: "KMS project or region mismatch" });
   }
   for (const resource of [value.applicationSecretVersionResource, value.webhookSignatureVersionResource,
@@ -126,12 +129,6 @@ const ProductionBindingSchema = z.object({
       context.addIssue({ code: "custom", message: "service identity project mismatch" });
     }
   }
-  if (!value.queueResource.startsWith(`${expectedProjectPrefix}locations/${value.region}/`)) {
-    context.addIssue({ code: "custom", message: "queue project or region mismatch" });
-  }
-  if ((value.customerOnboardingEnabled || value.evidenceEnabled) && !value.providerCallsEnabled) {
-    context.addIssue({ code: "custom", message: "dependent gate opened without provider calls" });
-  }
 });
 
 export type SquareProductionBinding = Readonly<z.infer<typeof ProductionBindingSchema>>;
@@ -140,21 +137,49 @@ export type SquareProductionBinding = Readonly<z.infer<typeof ProductionBindingS
  * identity establish authority; no serialized binding grants a capability. */
 export function checkedSquareProductionBinding(raw: unknown, now = Date.now()): SquareProductionBinding {
   const value = snapshotSquareDurableJson(raw, {
-    containers: 5,
-    values: 80,
+    containers: 24,
+    values: 128,
     bytes: 65_536,
-    depth: 2,
-    arrayLength: 5,
-    properties: 48,
+    depth: 4,
+    arrayLength: 8,
+    properties: 64,
     stringLength: 2_048
   });
   const checked = ProductionBindingSchema.parse(value);
+  const platform = checkedProductionPlatformBinding(checked.platform);
+  const { taskInvoker, ...serviceAccounts } = checked.serviceAccounts;
+  checkedProductionProviderIsolation({
+    contractVersion: "production_provider_isolation_v1",
+    providerKey: "square",
+    environment: checked.environment,
+    applicationId: checked.applicationId,
+    routeNamespace: "/api/integrations/square",
+    callbackUri: checked.callbackUri,
+    kmsKeyResource: checked.kmsKeyResource,
+    secretVersionResources: {
+      application: checked.applicationSecretVersionResource,
+      webhook_signature: checked.webhookSignatureVersionResource,
+      ...Object.fromEntries(Object.entries(checked.databaseSecretVersionResources)
+        .map(([key, resource]) => [`database_${key}`, resource]))
+    },
+    serviceAccounts: { ...serviceAccounts, task_invoker: taskInvoker },
+    databaseLogins: checked.databaseLogins,
+    sourceCommit: checked.sourceCommit,
+    enabled: checked.enabled,
+    providerCallsEnabled: checked.providerCallsEnabled,
+    customerOnboardingEnabled: checked.customerOnboardingEnabled,
+    webhookIntakeEnabled: checked.webhookIntakeEnabled,
+    evidenceEnabled: checked.evidenceEnabled,
+    economicContributionsEnabled: checked.economicContributionsEnabled,
+    aiDispatchEnabled: checked.aiDispatchEnabled
+  }, platform);
   if (!Number.isSafeInteger(now) || Date.parse(checked.approvalExpiresAt) <= now ||
     checked.applicationSecretVersionResource.endsWith("/latest") ||
     checked.webhookSignatureVersionResource.endsWith("/latest") ||
     Object.values(checked.databaseSecretVersionResources).some((resource) => resource.endsWith("/latest")) ||
     checked.kmsKeyResource.includes("vaeroex-square-sandbox") ||
-    checked.projectId.includes("sandbox")) {
+    checked.platform.projectId.includes("sandbox") ||
+    checked.sourceCommit !== checked.platform.sourceCommit) {
     throw new Error("square_production_binding_denied");
   }
   if (JSON.stringify(SQUARE_PRODUCTION_REQUIRED_SCOPES) !== JSON.stringify(SQUARE_OAUTH_SCOPES)) {

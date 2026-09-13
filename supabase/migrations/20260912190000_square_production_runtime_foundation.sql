@@ -1,6 +1,8 @@
--- Separate, closed-by-default Square Production deployment authority. This
--- migration creates no LOGIN, secret, mapping, consent, task, provider call,
--- customer surface, economic contribution or AI dispatch.
+-- Closed-by-default Production Integration Platform composition authority.
+-- Existing provider-neutral connection, task, checkpoint, webhook, rate-limit,
+-- source, reconciliation and KPI tables remain the only durable data plane.
+-- This migration creates no LOGIN, secret, connection, mapping, task, provider
+-- call, customer surface, economic contribution or AI dispatch.
 begin;
 
 do $roles$
@@ -8,12 +10,9 @@ declare role_name text;
 declare role_record pg_catalog.pg_roles;
 begin
   foreach role_name in array array[
-    'square_production_oauth_authority',
-    'square_production_broker_authority',
-    'square_production_scheduler_authority',
-    'square_production_webhook_authority',
-    'square_production_runtime_authority',
-    'square_production_evidence_authority'
+    'square_production_oauth_authority','square_production_broker_authority',
+    'square_production_scheduler_authority','square_production_webhook_authority',
+    'square_production_runtime_authority','square_production_evidence_authority'
   ] loop
     select * into role_record from pg_catalog.pg_roles where rolname=role_name;
     if not found then
@@ -39,6 +38,145 @@ grant usage on schema public to
   square_production_scheduler_authority,square_production_webhook_authority,
   square_production_runtime_authority,square_production_evidence_authority;
 
+create table private.integration_production_platform_bindings (
+  binding_key text primary key check(binding_key='vaeroex-production-integrations-v1'),
+  environment text not null check(environment='production'),
+  project_id text not null check(project_id ~ '^[a-z][a-z0-9-]{4,28}[a-z0-9]$' and project_id !~* '(sandbox|preview|qualification)'),
+  project_number text not null check(project_number ~ '^[1-9][0-9]{5,19}$'),
+  region text not null check(region ~ '^[a-z]+-[a-z]+[0-9]$'),
+  network_name text not null check(network_name ~ '^[a-z][a-z0-9-]{0,61}[a-z0-9]$'),
+  subnet_name text not null check(subnet_name ~ '^[a-z][a-z0-9-]{0,61}[a-z0-9]$'),
+  router_name text not null check(router_name ~ '^[a-z][a-z0-9-]{0,61}[a-z0-9]$'),
+  nat_name text not null check(nat_name ~ '^[a-z][a-z0-9-]{0,61}[a-z0-9]$'),
+  egress_address_name text not null check(egress_address_name ~ '^[a-z][a-z0-9-]{0,61}[a-z0-9]$'),
+  ingress_address_name text not null check(ingress_address_name ~ '^[a-z][a-z0-9-]{0,61}[a-z0-9]$'),
+  task_queue_name text not null check(task_queue_name ~ '^[a-z][a-z0-9-]{0,61}[a-z0-9]$'),
+  artifact_repository_name text not null check(artifact_repository_name ~ '^[a-z][a-z0-9-]{0,61}[a-z0-9]$'),
+  database_authority_target text not null check(database_authority_target='existing_production_postgres'),
+  runtime_policy_version text not null check(length(runtime_policy_version) between 1 and 128),
+  retention_policy_version text not null check(length(retention_policy_version) between 1 and 128),
+  observability_policy_version text not null check(length(observability_policy_version) between 1 and 128),
+  backup_policy_version text not null check(length(backup_policy_version) between 1 and 128),
+  source_commit text not null check(source_commit ~ '^[a-f0-9]{40}$'),
+  infrastructure_provisioned boolean not null default false check(not infrastructure_provisioned),
+  runtime_enabled boolean not null default false check(not runtime_enabled),
+  economic_contributions_enabled boolean not null default false check(not economic_contributions_enabled),
+  ai_dispatch_enabled boolean not null default false check(not ai_dispatch_enabled),
+  platform_fingerprint text generated always as ('sha256:'||pg_catalog.encode(extensions.digest(pg_catalog.convert_to(
+    pg_catalog.length(binding_key)::text||':'||binding_key||
+    pg_catalog.length(project_id)::text||':'||project_id||
+    pg_catalog.length(project_number)::text||':'||project_number||
+    pg_catalog.length(region)::text||':'||region||
+    pg_catalog.length(source_commit)::text||':'||source_commit,'UTF8'),'sha256'),'hex')) stored,
+  unique(binding_key,project_id,region),
+  unique(binding_key,project_id,region,source_commit),
+  unique(binding_key,platform_fingerprint),
+  check(network_name<>subnet_name and network_name<>router_name and network_name<>nat_name and
+    network_name<>egress_address_name and network_name<>ingress_address_name and network_name<>task_queue_name and
+    network_name<>artifact_repository_name)
+);
+alter table private.integration_production_platform_bindings enable row level security;
+alter table private.integration_production_platform_bindings force row level security;
+revoke all on table private.integration_production_platform_bindings from public,anon,authenticated,service_role,
+  square_production_oauth_authority,square_production_broker_authority,
+  square_production_scheduler_authority,square_production_webhook_authority,
+  square_production_runtime_authority,square_production_evidence_authority;
+
+create table private.integration_production_provider_bindings (
+  provider_key text not null check(provider_key ~ '^[a-z][a-z0-9_]{0,63}$'),
+  environment text not null check(environment='production'),
+  platform_binding_key text not null,
+  project_id text not null,
+  region text not null,
+  application_id text not null check(length(application_id) between 8 and 512 and application_id ~ '^[A-Za-z0-9._-]+$'),
+  route_namespace text not null check(route_namespace ~ '^/api/integrations/[a-z][a-z0-9_-]*$'),
+  callback_uri text not null check(length(callback_uri) between 12 and 2048
+    and callback_uri ~ '^https://[a-z0-9][a-z0-9.-]*[a-z0-9]/api/integrations/[a-z][a-z0-9_-]*/callback$'
+    and callback_uri ~ '^https://[^/]+\.[^/]+/'
+    and callback_uri !~* '(sandbox|preview|localhost|sslip\.io)'
+    and callback_uri !~ '^https://[0-9]+(?:\.[0-9]+){3}/'
+    and callback_uri !~ '^https://(?:127\.|10\.|192\.168\.|169\.254\.|172\.(?:1[6-9]|2[0-9]|3[01])\.)'
+    and callback_uri not like '%..%'),
+  kms_key_resource text not null unique check(kms_key_resource ~
+    '^projects/[a-z][a-z0-9-]{4,28}[a-z0-9]/locations/[a-z]+-[a-z]+[0-9]/keyRings/[A-Za-z0-9_-]{1,63}/cryptoKeys/[A-Za-z0-9_-]{1,63}$'),
+  source_commit text not null check(source_commit ~ '^[a-f0-9]{40}$'),
+  provider_authority_fingerprint text generated always as ('sha256:'||pg_catalog.encode(extensions.digest(pg_catalog.convert_to(
+    pg_catalog.length(provider_key)::text||':'||provider_key||
+    pg_catalog.length(environment)::text||':'||environment||
+    pg_catalog.length(application_id)::text||':'||application_id||
+    pg_catalog.length(callback_uri)::text||':'||callback_uri||
+    pg_catalog.length(kms_key_resource)::text||':'||kms_key_resource,'UTF8'),'sha256'),'hex')) stored,
+  enabled boolean not null default false check(not enabled),
+  provider_calls_enabled boolean not null default false check(not provider_calls_enabled),
+  customer_onboarding_enabled boolean not null default false check(not customer_onboarding_enabled),
+  webhook_intake_enabled boolean not null default false check(not webhook_intake_enabled),
+  evidence_enabled boolean not null default false check(not evidence_enabled),
+  economic_contributions_enabled boolean not null default false check(not economic_contributions_enabled),
+  ai_dispatch_enabled boolean not null default false check(not ai_dispatch_enabled),
+  primary key(provider_key,environment),
+  unique(provider_key,environment,project_id),
+  unique(provider_key,environment,provider_authority_fingerprint),
+  foreign key(platform_binding_key,project_id,region,source_commit)
+    references private.integration_production_platform_bindings(binding_key,project_id,region,source_commit) on delete restrict,
+  check(route_namespace='/api/integrations/'||replace(provider_key,'_','-')),
+  check(split_part(kms_key_resource,'/',2)=project_id and split_part(kms_key_resource,'/',4)=region)
+);
+alter table private.integration_production_provider_bindings enable row level security;
+alter table private.integration_production_provider_bindings force row level security;
+revoke all on table private.integration_production_provider_bindings from public,anon,authenticated,service_role,
+  square_production_oauth_authority,square_production_broker_authority,
+  square_production_scheduler_authority,square_production_webhook_authority,
+  square_production_runtime_authority,square_production_evidence_authority;
+
+create table private.integration_production_provider_secrets (
+  provider_key text not null,
+  environment text not null,
+  project_id text not null,
+  secret_purpose text not null check(secret_purpose ~ '^[a-z][a-z0-9_]{0,63}$'),
+  secret_version_resource text not null,
+  primary key(provider_key,environment,secret_purpose),
+  foreign key(provider_key,environment,project_id)
+    references private.integration_production_provider_bindings(provider_key,environment,project_id) on delete restrict,
+  constraint production_provider_secret_resource_key unique(secret_version_resource),
+  check(secret_version_resource ~ '^projects/[a-z][a-z0-9-]{4,28}[a-z0-9]/secrets/[A-Za-z0-9_-]{1,255}/versions/[1-9][0-9]*$'
+    and split_part(secret_version_resource,'/',2)=project_id and secret_version_resource !~ '/latest$')
+);
+alter table private.integration_production_provider_secrets enable row level security;
+alter table private.integration_production_provider_secrets force row level security;
+revoke all on table private.integration_production_provider_secrets from public,anon,authenticated,service_role,
+  square_production_oauth_authority,square_production_broker_authority,
+  square_production_scheduler_authority,square_production_webhook_authority,
+  square_production_runtime_authority,square_production_evidence_authority;
+
+create table private.integration_production_provider_capabilities (
+  provider_key text not null,
+  environment text not null,
+  project_id text not null,
+  capability text not null check(capability in ('oauth','broker','scheduler','webhook','runtime','evidence','task_invoker')),
+  service_account text not null,
+  database_login name,
+  database_secret_purpose text,
+  primary key(provider_key,environment,capability),
+  foreign key(provider_key,environment,project_id)
+    references private.integration_production_provider_bindings(provider_key,environment,project_id) on delete restrict,
+  foreign key(provider_key,environment,database_secret_purpose)
+    references private.integration_production_provider_secrets(provider_key,environment,secret_purpose) on delete restrict,
+  constraint production_provider_capability_service_account_key unique(service_account),
+  constraint production_provider_capability_database_login_key unique(database_login),
+  check(length(service_account) <= 254
+    and service_account ~ '^[a-z][a-z0-9-]{4,28}[a-z0-9]@[a-z][a-z0-9-]{4,28}[a-z0-9]\.iam\.gserviceaccount\.com$'
+    and split_part(service_account,'@',2)=project_id||'.iam.gserviceaccount.com'),
+  check((capability='task_invoker' and database_login is null and database_secret_purpose is null) or
+    (capability<>'task_invoker' and database_login::text like provider_key||'_production_%'
+      and database_secret_purpose='database_'||capability))
+);
+alter table private.integration_production_provider_capabilities enable row level security;
+alter table private.integration_production_provider_capabilities force row level security;
+revoke all on table private.integration_production_provider_capabilities from public,anon,authenticated,service_role,
+  square_production_oauth_authority,square_production_broker_authority,
+  square_production_scheduler_authority,square_production_webhook_authority,
+  square_production_runtime_authority,square_production_evidence_authority;
+
 alter table private.square_account_configuration add column square_production_binding_fingerprint text
   generated always as ('sha256:'||pg_catalog.encode(extensions.digest(pg_catalog.convert_to(
     pg_catalog.length(environment)::text||':'||environment||
@@ -48,191 +186,64 @@ alter table private.square_account_configuration add column square_production_bi
     pg_catalog.length(enrollment_login::text)::text||':'||enrollment_login::text||
     pg_catalog.length(webhook_login::text)::text||':'||webhook_login::text||
     pg_catalog.length(kms_key_resource)::text||':'||kms_key_resource,'UTF8'),'sha256'),'hex')) stored;
+alter table private.square_account_configuration add column square_production_authority_fingerprint text
+  generated always as ('sha256:'||pg_catalog.encode(extensions.digest(pg_catalog.convert_to(
+    pg_catalog.length('square')::text||':square'||
+    pg_catalog.length(environment)::text||':'||environment||
+    pg_catalog.length(application_id)::text||':'||application_id||
+    pg_catalog.length(redirect_uri)::text||':'||redirect_uri||
+    pg_catalog.length(kms_key_resource)::text||':'||kms_key_resource,'UTF8'),'sha256'),'hex')) stored;
 alter table private.square_account_configuration add constraint square_account_configuration_production_fingerprint_check
-  check(square_production_binding_fingerprint ~ '^sha256:[a-f0-9]{64}$');
+  check(square_production_binding_fingerprint ~ '^sha256:[a-f0-9]{64}$'
+    and square_production_authority_fingerprint ~ '^sha256:[a-f0-9]{64}$');
 create unique index square_account_configuration_production_binding_idx
-  on private.square_account_configuration(environment,application_id,square_production_binding_fingerprint);
+  on private.square_account_configuration(environment,square_production_authority_fingerprint,square_production_binding_fingerprint);
 
 create table private.square_production_runtime_binding (
-  binding_key text primary key check(binding_key='square-production-v1'),
-  environment text not null check(environment='production'),
-  api_version text not null check(api_version='2026-08-19'),
+  provider_key text not null default 'square' check(provider_key='square'),
+  environment text not null default 'production' check(environment='production'),
   application_id text not null check(application_id ~ '^sq0idp-[A-Za-z0-9_-]+$'),
-  application_origin text not null check(
-    application_origin ~ '^https://[a-z0-9][a-z0-9.-]*[a-z0-9]$' and application_origin ~ '^https://[^.]+\..+$'
-    and application_origin !~* '(sandbox|preview|localhost|sslip\.io)'
-    and application_origin !~ '^https://[0-9]+(?:\.[0-9]+){3}$'
-    and application_origin !~ '^https://(?:127\.|10\.|192\.168\.|169\.254\.|172\.(?:1[6-9]|2[0-9]|3[01])\.)'
-    and application_origin not like '%..%'),
-  callback_origin text not null check(
-    callback_origin ~ '^https://[a-z0-9][a-z0-9.-]*[a-z0-9]$' and callback_origin ~ '^https://[^.]+\..+$'
-    and callback_origin !~* '(sandbox|preview|localhost|sslip\.io)'
-    and callback_origin !~ '^https://[0-9]+(?:\.[0-9]+){3}$'
-    and callback_origin !~ '^https://(?:127\.|10\.|192\.168\.|169\.254\.|172\.(?:1[6-9]|2[0-9]|3[01])\.)'
-    and callback_origin not like '%..%'),
-  callback_uri text not null check(callback_uri=callback_origin||'/api/integrations/square/callback'),
-  project_id text not null check(project_id ~ '^[a-z][a-z0-9-]+[a-z0-9]$' and project_id !~* 'sandbox'),
-  project_number text not null check(project_number ~ '^[1-9][0-9]{5,19}$'),
-  region text not null check(region ~ '^[a-z]+-[a-z]+[0-9]$'),
+  callback_uri text not null,
+  api_version text not null check(api_version='2026-08-19'),
+  authorization_endpoint text not null check(authorization_endpoint='https://connect.squareup.com/oauth2/authorize'),
+  provider_origin text not null check(provider_origin='https://connect.squareup.com'),
+  requested_scopes text[] not null check(requested_scopes=array['INVENTORY_READ','ITEMS_READ','MERCHANT_PROFILE_READ','ORDERS_READ','PAYMENTS_READ']::text[]),
   kms_key_resource text not null,
-  application_secret_version_resource text not null,
-  webhook_signature_version_resource text not null,
-  oauth_database_secret_version_resource text not null,
-  broker_database_secret_version_resource text not null,
-  scheduler_database_secret_version_resource text not null,
-  webhook_database_secret_version_resource text not null,
-  runtime_database_secret_version_resource text not null,
-  evidence_database_secret_version_resource text not null,
-  oauth_service_account text not null,
-  broker_service_account text not null,
-  scheduler_service_account text not null,
-  webhook_service_account text not null,
-  runtime_service_account text not null,
-  evidence_service_account text not null,
-  task_invoker_service_account text not null,
-  queue_resource text not null,
-  oauth_login name not null check(oauth_login::text ~ '^square_production_[a-z_]{1,39}$'),
-  broker_login name not null check(broker_login::text ~ '^square_production_[a-z_]{1,39}$'),
-  scheduler_login name not null check(scheduler_login::text ~ '^square_production_[a-z_]{1,39}$'),
-  webhook_login name not null check(webhook_login::text ~ '^square_production_[a-z_]{1,39}$'),
-  runtime_login name not null check(runtime_login::text ~ '^square_production_[a-z_]{1,39}$'),
-  evidence_login name not null check(evidence_login::text ~ '^square_production_[a-z_]{1,39}$'),
-  enabled boolean not null default false,
-  provider_calls_enabled boolean not null default false,
-  customer_onboarding_enabled boolean not null default false,
-  evidence_enabled boolean not null default false,
-  economic_contributions_enabled boolean not null default false check(not economic_contributions_enabled),
-  ai_dispatch_enabled boolean not null default false check(not ai_dispatch_enabled),
-  approval_expires_at timestamptz not null check(isfinite(approval_expires_at)),
-  source_commit text not null check(source_commit ~ '^[a-f0-9]{40}$'),
-  policy_version text not null check(length(policy_version) between 1 and 128),
-  policy_fingerprint text not null check(policy_fingerprint ~ '^sha256:[a-f0-9]{64}$'),
-  square_production_binding_fingerprint text generated always as ('sha256:'||pg_catalog.encode(extensions.digest(pg_catalog.convert_to(
+  provider_authority_fingerprint text generated always as ('sha256:'||pg_catalog.encode(extensions.digest(pg_catalog.convert_to(
+    pg_catalog.length(provider_key)::text||':'||provider_key||
     pg_catalog.length(environment)::text||':'||environment||
     pg_catalog.length(application_id)::text||':'||application_id||
     pg_catalog.length(callback_uri)::text||':'||callback_uri||
-    pg_catalog.length(broker_login::text)::text||':'||broker_login::text||
-    pg_catalog.length(oauth_login::text)::text||':'||oauth_login::text||
-    pg_catalog.length(webhook_login::text)::text||':'||webhook_login::text||
     pg_catalog.length(kms_key_resource)::text||':'||kms_key_resource,'UTF8'),'sha256'),'hex')) stored,
-  check(kms_key_resource ~ '^projects/[a-z][a-z0-9-]+[a-z0-9]/locations/[a-z]+-[a-z]+[0-9]/keyRings/[A-Za-z0-9_-]+/cryptoKeys/[A-Za-z0-9_-]+$'
-    and split_part(kms_key_resource,'/',2)=project_id and split_part(kms_key_resource,'/',4)=region),
-  check(application_secret_version_resource ~ '^projects/[a-z][a-z0-9-]+[a-z0-9]/secrets/[A-Za-z0-9_-]+/versions/[1-9][0-9]*$'
-    and split_part(application_secret_version_resource,'/',2)=project_id),
-  check(webhook_signature_version_resource ~ '^projects/[a-z][a-z0-9-]+[a-z0-9]/secrets/[A-Za-z0-9_-]+/versions/[1-9][0-9]*$'
-    and split_part(webhook_signature_version_resource,'/',2)=project_id),
-  check(oauth_database_secret_version_resource ~ '^projects/[a-z][a-z0-9-]+[a-z0-9]/secrets/[A-Za-z0-9_-]+/versions/[1-9][0-9]*$'
-    and split_part(oauth_database_secret_version_resource,'/',2)=project_id),
-  check(broker_database_secret_version_resource ~ '^projects/[a-z][a-z0-9-]+[a-z0-9]/secrets/[A-Za-z0-9_-]+/versions/[1-9][0-9]*$'
-    and split_part(broker_database_secret_version_resource,'/',2)=project_id),
-  check(scheduler_database_secret_version_resource ~ '^projects/[a-z][a-z0-9-]+[a-z0-9]/secrets/[A-Za-z0-9_-]+/versions/[1-9][0-9]*$'
-    and split_part(scheduler_database_secret_version_resource,'/',2)=project_id),
-  check(webhook_database_secret_version_resource ~ '^projects/[a-z][a-z0-9-]+[a-z0-9]/secrets/[A-Za-z0-9_-]+/versions/[1-9][0-9]*$'
-    and split_part(webhook_database_secret_version_resource,'/',2)=project_id),
-  check(runtime_database_secret_version_resource ~ '^projects/[a-z][a-z0-9-]+[a-z0-9]/secrets/[A-Za-z0-9_-]+/versions/[1-9][0-9]*$'
-    and split_part(runtime_database_secret_version_resource,'/',2)=project_id),
-  check(evidence_database_secret_version_resource ~ '^projects/[a-z][a-z0-9-]+[a-z0-9]/secrets/[A-Za-z0-9_-]+/versions/[1-9][0-9]*$'
-    and split_part(evidence_database_secret_version_resource,'/',2)=project_id),
-  check(oauth_service_account ~ '^[a-z][a-z0-9-]+@[a-z][a-z0-9-]+\.iam\.gserviceaccount\.com$'
-    and split_part(oauth_service_account,'@',2)=project_id||'.iam.gserviceaccount.com'),
-  check(broker_service_account ~ '^[a-z][a-z0-9-]+@[a-z][a-z0-9-]+\.iam\.gserviceaccount\.com$'
-    and split_part(broker_service_account,'@',2)=project_id||'.iam.gserviceaccount.com'),
-  check(scheduler_service_account ~ '^[a-z][a-z0-9-]+@[a-z][a-z0-9-]+\.iam\.gserviceaccount\.com$'
-    and split_part(scheduler_service_account,'@',2)=project_id||'.iam.gserviceaccount.com'),
-  check(webhook_service_account ~ '^[a-z][a-z0-9-]+@[a-z][a-z0-9-]+\.iam\.gserviceaccount\.com$'
-    and split_part(webhook_service_account,'@',2)=project_id||'.iam.gserviceaccount.com'),
-  check(runtime_service_account ~ '^[a-z][a-z0-9-]+@[a-z][a-z0-9-]+\.iam\.gserviceaccount\.com$'
-    and split_part(runtime_service_account,'@',2)=project_id||'.iam.gserviceaccount.com'),
-  check(evidence_service_account ~ '^[a-z][a-z0-9-]+@[a-z][a-z0-9-]+\.iam\.gserviceaccount\.com$'
-    and split_part(evidence_service_account,'@',2)=project_id||'.iam.gserviceaccount.com'),
-  check(task_invoker_service_account ~ '^[a-z][a-z0-9-]+@[a-z][a-z0-9-]+\.iam\.gserviceaccount\.com$'
-    and split_part(task_invoker_service_account,'@',2)=project_id||'.iam.gserviceaccount.com'),
-  check(queue_resource ~ '^projects/[a-z][a-z0-9-]+[a-z0-9]/locations/[a-z]+-[a-z]+[0-9]/queues/square-production-[a-z0-9-]+$'
-    and split_part(queue_resource,'/',2)=project_id and split_part(queue_resource,'/',4)=region),
-  check(oauth_login<>all(array[broker_login,scheduler_login,webhook_login,runtime_login,evidence_login])
-    and broker_login<>all(array[scheduler_login,webhook_login,runtime_login,evidence_login])
-    and scheduler_login<>all(array[webhook_login,runtime_login,evidence_login])
-    and webhook_login<>all(array[runtime_login,evidence_login])
-    and runtime_login<>evidence_login),
-  check(not customer_onboarding_enabled or provider_calls_enabled),
-  check(not evidence_enabled or provider_calls_enabled),
+  square_configuration_authority_fingerprint text generated always as ('sha256:'||pg_catalog.encode(extensions.digest(pg_catalog.convert_to(
+    pg_catalog.length('square')::text||':square'||
+    pg_catalog.length(environment)::text||':'||environment||
+    pg_catalog.length(application_id)::text||':'||application_id||
+    pg_catalog.length(callback_uri)::text||':'||callback_uri||
+    pg_catalog.length(kms_key_resource)::text||':'||kms_key_resource,'UTF8'),'sha256'),'hex')) stored,
+  square_configuration_fingerprint text not null,
+  provider_policy_version text not null check(length(provider_policy_version) between 1 and 128),
+  provider_policy_fingerprint text not null check(provider_policy_fingerprint ~ '^sha256:[a-f0-9]{64}$'),
+  primary key(provider_key,environment,application_id),
+  foreign key(provider_key,environment)
+    references private.integration_production_provider_bindings(provider_key,environment) on delete restrict,
+  foreign key(provider_key,environment,provider_authority_fingerprint)
+    references private.integration_production_provider_bindings(provider_key,environment,provider_authority_fingerprint) on delete restrict,
   constraint square_production_runtime_binding_configuration_fkey
-    foreign key(environment,application_id,square_production_binding_fingerprint)
-    references private.square_account_configuration(environment,application_id,square_production_binding_fingerprint)
+    foreign key(environment,square_configuration_authority_fingerprint,square_configuration_fingerprint)
+    references private.square_account_configuration(environment,square_production_authority_fingerprint,square_production_binding_fingerprint)
     on update restrict on delete restrict
 );
 alter table private.square_production_runtime_binding enable row level security;
 alter table private.square_production_runtime_binding force row level security;
-create unique index square_production_runtime_binding_application_idx
-  on private.square_production_runtime_binding(environment,application_id);
 revoke all on table private.square_production_runtime_binding from public,anon,authenticated,service_role,
   square_production_oauth_authority,square_production_broker_authority,
   square_production_scheduler_authority,square_production_webhook_authority,
   square_production_runtime_authority,square_production_evidence_authority;
 
-create unique index square_account_connections_production_schedule_authority_idx
-  on private.square_account_connections(workspace_id,business_entity_id,connection_id,generation,environment,application_id);
-create unique index square_connections_production_schedule_environment_idx
-  on private.square_connections(workspace_id,business_entity_id,connection_id,environment);
-
-create table private.square_production_sync_schedule (
-  connection_id uuid not null,
-  connection_generation bigint not null check(connection_generation>0),
-  workspace_id uuid not null,
-  business_entity_id uuid not null,
-  environment text not null default 'production' check(environment='production'),
-  application_id text not null check(application_id ~ '^sq0idp-[A-Za-z0-9_-]+$'),
-  next_refresh_at timestamptz not null,
-  next_sync_at timestamptz not null,
-  schedule_version bigint not null default 1 check(schedule_version>0),
-  state text not null check(state in ('ready','leased','blocked','revoked')),
-  updated_at timestamptz not null default clock_timestamp(),
-  primary key(connection_id,connection_generation),
-  foreign key(workspace_id,business_entity_id,connection_id,connection_generation)
-    references private.square_connection_generations(workspace_id,business_entity_id,connection_id,connection_generation) on delete restrict,
-  foreign key(workspace_id,business_entity_id,connection_id,connection_generation,environment,application_id)
-    references private.square_account_connections(workspace_id,business_entity_id,connection_id,generation,environment,application_id) on delete restrict,
-  foreign key(workspace_id,business_entity_id,connection_id,environment)
-    references private.square_connections(workspace_id,business_entity_id,connection_id,environment) on update restrict on delete restrict
-);
-alter table private.square_production_sync_schedule enable row level security;
-alter table private.square_production_sync_schedule force row level security;
-create index square_production_sync_schedule_due_idx
-  on private.square_production_sync_schedule(next_sync_at,connection_id,connection_generation)
-  where state='ready';
-create index square_production_refresh_due_idx
-  on private.square_production_sync_schedule(next_refresh_at,connection_id,connection_generation)
-  where state='ready';
-revoke all on table private.square_production_sync_schedule from public,anon,authenticated,service_role,
-  square_production_oauth_authority,square_production_broker_authority,
-  square_production_scheduler_authority,square_production_webhook_authority,
-  square_production_runtime_authority,square_production_evidence_authority;
-
-create table private.square_production_webhook_receipts (
-  event_id text primary key check(length(event_id) between 1 and 191),
-  event_type text not null check(event_type in (
-    'oauth.authorization.revoked','payment.created','payment.updated',
-    'refund.created','refund.updated','order.created','order.updated',
-    'order.fulfillment.updated','catalog.version.updated','inventory.count.updated')),
-  environment text not null default 'production' check(environment='production'),
-  application_id text not null,
-  merchant_id text,
-  received_at timestamptz not null default clock_timestamp(),
-  payload_fingerprint text not null check(payload_fingerprint ~ '^sha256:[a-f0-9]{64}$'),
-  processing_state text not null check(processing_state in ('accepted','duplicate','scheduled','blocked','rejected')),
-  processing_reason text not null check(length(processing_reason) between 1 and 96),
-  foreign key(environment,application_id) references private.square_account_configuration(environment,application_id) on delete restrict
-);
-alter table private.square_production_webhook_receipts enable row level security;
-alter table private.square_production_webhook_receipts force row level security;
-create index square_production_webhook_application_idx
-  on private.square_production_webhook_receipts(environment,application_id,received_at);
-revoke all on table private.square_production_webhook_receipts from public,anon,authenticated,service_role,
-  square_production_oauth_authority,square_production_broker_authority,
-  square_production_scheduler_authority,square_production_webhook_authority,
-  square_production_runtime_authority,square_production_evidence_authority;
-
--- No function or table grant is installed yet. A later reviewed composition
--- migration grants each role only its fixed checked RPC after hosted identities,
--- retention and recovery controls are approved.
+-- The shared data plane remains private.integration_sync_tasks,
+-- private.integration_sync_checkpoints, private.integration_webhook_events and
+-- private.integration_rate_limit_states. Square cannot enter it until a later
+-- reviewed adapter proves provider/environment/workspace/entity/connection/
+-- generation authority and grants each exact RPC to an exact native LOGIN.
 commit;

@@ -345,7 +345,8 @@ async function verifyProductionFingerprintUpgrade(databaseUrl) {
   try {
     const result = await client.query(`select count(*)::integer as count from private.square_account_configuration
       where length(application_id)=512 and length(redirect_uri)=2048 and length(kms_key_resource)=8192
-        and square_production_binding_fingerprint~'^sha256:[a-f0-9]{64}$'`);
+        and square_production_binding_fingerprint~'^sha256:[a-f0-9]{64}$'
+        and square_production_authority_fingerprint~'^sha256:[a-f0-9]{64}$'`);
     if (result.rows[0]?.count !== 1) fail("Long existing configuration did not survive compact Production fingerprint upgrade.");
   } finally {
     await client.end();

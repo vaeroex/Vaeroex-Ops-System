@@ -20,8 +20,15 @@ module.exports=async function({c,eq,workspace,actor,session,connection,entity,ma
   await c.query("begin");
   try {
     // Isolated fixture configuration only; no hosted identity or record copied.
-    await c.query(`insert into private.square_account_configuration select (jsonb_populate_record(null::private.square_account_configuration,
-      to_jsonb(c)||jsonb_build_object('application_id','sandbox-sq0idb-9K0xgcatxe0ABuUmkSNjFw'))).* from private.square_account_configuration c`);
+    await c.query(`insert into private.square_account_configuration(
+      environment,application_id,redirect_uri,broker_login,enrollment_login,webhook_login,kms_key_resource,
+      surface_enabled,enrollment_enabled,blocked,approval_expires_at,retention_policy_version,
+      retention_approval_fingerprint,source_retention_seconds,cursor_retention_seconds,revocation_access_policy)
+      select environment,'sandbox-sq0idb-9K0xgcatxe0ABuUmkSNjFw',redirect_uri,broker_login,enrollment_login,
+        webhook_login,kms_key_resource,surface_enabled,enrollment_enabled,blocked,approval_expires_at,
+        retention_policy_version,retention_approval_fingerprint,source_retention_seconds,cursor_retention_seconds,
+        revocation_access_policy
+      from private.square_account_configuration`);
     await c.query("update private.square_account_connections set application_id='sandbox-sq0idb-9K0xgcatxe0ABuUmkSNjFw' where connection_id=$1",[connection]);
     const before=(await c.query("select count(*)::int n from private.square_interpretation_runs")).rows[0].n;
     const view=await read();
