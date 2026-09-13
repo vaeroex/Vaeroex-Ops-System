@@ -29,6 +29,15 @@ select ok((select relrowsecurity and relforcerowsecurity from pg_catalog.pg_clas
   where oid='private.integration_production_provider_capabilities'::regclass),'Provider capabilities use FORCE RLS');
 select ok((select relrowsecurity and relforcerowsecurity from pg_catalog.pg_class
   where oid='private.square_production_runtime_binding'::regclass),'Square overlay uses FORCE RLS');
+select is((select provolatile::text from pg_catalog.pg_proc
+  where oid='private.integration_production_fingerprint_v1(text[])'::regprocedure),'i',
+  'Production fingerprint helper is explicitly immutable for stored generated columns');
+select is((select provolatile::text from pg_catalog.pg_proc
+  where oid='private.square_production_configuration_fingerprint_v1(text,text,text,name,name,name,text)'::regprocedure),'i',
+  'Square configuration fingerprint helper is explicitly immutable for stored generated columns');
+select ok(not pg_catalog.has_function_privilege('authenticated',
+  'private.integration_production_fingerprint_v1(text[])','execute'),
+  'Authenticated callers cannot invoke the private production fingerprint helper');
 
 insert into private.integration_production_platform_bindings(
   binding_key,environment,project_id,project_number,region,network_name,subnet_name,router_name,nat_name,
@@ -42,6 +51,10 @@ values ('vaeroex-production-integrations-v1','production','vaeroex-integrations-
 
 select is((select infrastructure_provisioned::text||':'||runtime_enabled::text||':'||economic_contributions_enabled::text||':'||ai_dispatch_enabled::text
   from private.integration_production_platform_bindings),'false:false:false:false','Shared platform starts completely dormant');
+select is((select platform_fingerprint from private.integration_production_platform_bindings),
+  private.integration_production_fingerprint_v1(array[
+    'vaeroex-production-integrations-v1','vaeroex-integrations-prod','123456789012','us-west1',repeat('a',40)
+  ]),'Platform fingerprint is generated from the exact ordered authority tuple');
 select is(pg_temp.error_state($sql$
   update private.integration_production_platform_bindings set project_id='p'||repeat('x',30)
 $sql$),'23514','Project IDs longer than the checked 30-character platform bound are rejected');

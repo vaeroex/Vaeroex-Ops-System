@@ -38,6 +38,74 @@ grant usage on schema public to
   square_production_scheduler_authority,square_production_webhook_authority,
   square_production_runtime_authority,square_production_evidence_authority;
 
+-- PostgreSQL generated columns reject otherwise deterministic expression trees
+-- containing casts whose catalog volatility is not immutable. Keep the compact
+-- length-prefixed fingerprint in one explicitly immutable, private helper. Text
+-- values cannot contain NUL, so the array preserves an unambiguous ordered input.
+create function private.integration_production_fingerprint_v1(p_parts text[])
+returns text
+language sql
+immutable
+strict
+parallel safe
+set search_path=''
+as $function$
+  select 'sha256:'||pg_catalog.encode(
+    extensions.digest(
+      pg_catalog.convert_to(
+        pg_catalog.string_agg(
+          pg_catalog.length(part)::text||':'||part,
+          '' order by ordinal
+        ),
+        'UTF8'
+      ),
+      'sha256'
+    ),
+    'hex'
+  )
+  from pg_catalog.unnest(p_parts) with ordinality as ordered_parts(part,ordinal)
+$function$;
+
+-- The existing configuration stores checked login names in PostgreSQL's name
+-- type. Keep their conversions inside this immutable helper so generated-column
+-- validation sees one immutable call and the fingerprint tracks the stored tuple.
+create function private.square_production_configuration_fingerprint_v1(
+  p_environment text,
+  p_application_id text,
+  p_redirect_uri text,
+  p_broker_login name,
+  p_enrollment_login name,
+  p_webhook_login name,
+  p_kms_key_resource text
+)
+returns text
+language sql
+immutable
+strict
+parallel safe
+set search_path=''
+as $function$
+  select private.integration_production_fingerprint_v1(array[
+    p_environment,
+    p_application_id,
+    p_redirect_uri,
+    p_broker_login::text,
+    p_enrollment_login::text,
+    p_webhook_login::text,
+    p_kms_key_resource
+  ])
+$function$;
+
+revoke all on function private.integration_production_fingerprint_v1(text[]) from public,anon,authenticated,service_role,
+  square_production_oauth_authority,square_production_broker_authority,
+  square_production_scheduler_authority,square_production_webhook_authority,
+  square_production_runtime_authority,square_production_evidence_authority;
+revoke all on function private.square_production_configuration_fingerprint_v1(text,text,text,name,name,name,text)
+  from public,anon,authenticated,service_role,
+  square_production_oauth_authority,square_production_broker_authority,
+  square_production_scheduler_authority,square_production_webhook_authority,
+  square_production_runtime_authority,square_production_evidence_authority;
+
 create table private.integration_production_platform_bindings (
   binding_key text primary key check(binding_key='vaeroex-production-integrations-v1'),
   environment text not null check(environment='production'),
@@ -62,12 +130,9 @@ create table private.integration_production_platform_bindings (
   runtime_enabled boolean not null default false check(not runtime_enabled),
   economic_contributions_enabled boolean not null default false check(not economic_contributions_enabled),
   ai_dispatch_enabled boolean not null default false check(not ai_dispatch_enabled),
-  platform_fingerprint text generated always as ('sha256:'||pg_catalog.encode(extensions.digest(pg_catalog.convert_to(
-    pg_catalog.length(binding_key)::text||':'||binding_key||
-    pg_catalog.length(project_id)::text||':'||project_id||
-    pg_catalog.length(project_number)::text||':'||project_number||
-    pg_catalog.length(region)::text||':'||region||
-    pg_catalog.length(source_commit)::text||':'||source_commit,'UTF8'),'sha256'),'hex')) stored,
+  platform_fingerprint text generated always as (private.integration_production_fingerprint_v1(array[
+    binding_key,project_id,project_number,region,source_commit
+  ])) stored,
   unique(binding_key,project_id,region),
   unique(binding_key,project_id,region,source_commit),
   unique(binding_key,platform_fingerprint),
@@ -100,12 +165,9 @@ create table private.integration_production_provider_bindings (
   kms_key_resource text not null unique check(kms_key_resource ~
     '^projects/[a-z][a-z0-9-]{4,28}[a-z0-9]/locations/[a-z]+-[a-z]+[0-9]/keyRings/[A-Za-z0-9_-]{1,63}/cryptoKeys/[A-Za-z0-9_-]{1,63}$'),
   source_commit text not null check(source_commit ~ '^[a-f0-9]{40}$'),
-  provider_authority_fingerprint text generated always as ('sha256:'||pg_catalog.encode(extensions.digest(pg_catalog.convert_to(
-    pg_catalog.length(provider_key)::text||':'||provider_key||
-    pg_catalog.length(environment)::text||':'||environment||
-    pg_catalog.length(application_id)::text||':'||application_id||
-    pg_catalog.length(callback_uri)::text||':'||callback_uri||
-    pg_catalog.length(kms_key_resource)::text||':'||kms_key_resource,'UTF8'),'sha256'),'hex')) stored,
+  provider_authority_fingerprint text generated always as (private.integration_production_fingerprint_v1(array[
+    provider_key,environment,application_id,callback_uri,kms_key_resource
+  ])) stored,
   enabled boolean not null default false check(not enabled),
   provider_calls_enabled boolean not null default false check(not provider_calls_enabled),
   customer_onboarding_enabled boolean not null default false check(not customer_onboarding_enabled),
@@ -178,21 +240,13 @@ revoke all on table private.integration_production_provider_capabilities from pu
   square_production_runtime_authority,square_production_evidence_authority;
 
 alter table private.square_account_configuration add column square_production_binding_fingerprint text
-  generated always as ('sha256:'||pg_catalog.encode(extensions.digest(pg_catalog.convert_to(
-    pg_catalog.length(environment)::text||':'||environment||
-    pg_catalog.length(application_id)::text||':'||application_id||
-    pg_catalog.length(redirect_uri)::text||':'||redirect_uri||
-    pg_catalog.length(broker_login::text)::text||':'||broker_login::text||
-    pg_catalog.length(enrollment_login::text)::text||':'||enrollment_login::text||
-    pg_catalog.length(webhook_login::text)::text||':'||webhook_login::text||
-    pg_catalog.length(kms_key_resource)::text||':'||kms_key_resource,'UTF8'),'sha256'),'hex')) stored;
+  generated always as (private.square_production_configuration_fingerprint_v1(
+    environment,application_id,redirect_uri,broker_login,enrollment_login,webhook_login,kms_key_resource
+  )) stored;
 alter table private.square_account_configuration add column square_production_authority_fingerprint text
-  generated always as ('sha256:'||pg_catalog.encode(extensions.digest(pg_catalog.convert_to(
-    pg_catalog.length('square')::text||':square'||
-    pg_catalog.length(environment)::text||':'||environment||
-    pg_catalog.length(application_id)::text||':'||application_id||
-    pg_catalog.length(redirect_uri)::text||':'||redirect_uri||
-    pg_catalog.length(kms_key_resource)::text||':'||kms_key_resource,'UTF8'),'sha256'),'hex')) stored;
+  generated always as (private.integration_production_fingerprint_v1(array[
+    'square',environment,application_id,redirect_uri,kms_key_resource
+  ])) stored;
 alter table private.square_account_configuration add constraint square_account_configuration_production_fingerprint_check
   check(square_production_binding_fingerprint ~ '^sha256:[a-f0-9]{64}$'
     and square_production_authority_fingerprint ~ '^sha256:[a-f0-9]{64}$');
@@ -209,18 +263,12 @@ create table private.square_production_runtime_binding (
   provider_origin text not null check(provider_origin='https://connect.squareup.com'),
   requested_scopes text[] not null check(requested_scopes=array['INVENTORY_READ','ITEMS_READ','MERCHANT_PROFILE_READ','ORDERS_READ','PAYMENTS_READ']::text[]),
   kms_key_resource text not null,
-  provider_authority_fingerprint text generated always as ('sha256:'||pg_catalog.encode(extensions.digest(pg_catalog.convert_to(
-    pg_catalog.length(provider_key)::text||':'||provider_key||
-    pg_catalog.length(environment)::text||':'||environment||
-    pg_catalog.length(application_id)::text||':'||application_id||
-    pg_catalog.length(callback_uri)::text||':'||callback_uri||
-    pg_catalog.length(kms_key_resource)::text||':'||kms_key_resource,'UTF8'),'sha256'),'hex')) stored,
-  square_configuration_authority_fingerprint text generated always as ('sha256:'||pg_catalog.encode(extensions.digest(pg_catalog.convert_to(
-    pg_catalog.length('square')::text||':square'||
-    pg_catalog.length(environment)::text||':'||environment||
-    pg_catalog.length(application_id)::text||':'||application_id||
-    pg_catalog.length(callback_uri)::text||':'||callback_uri||
-    pg_catalog.length(kms_key_resource)::text||':'||kms_key_resource,'UTF8'),'sha256'),'hex')) stored,
+  provider_authority_fingerprint text generated always as (private.integration_production_fingerprint_v1(array[
+    provider_key,environment,application_id,callback_uri,kms_key_resource
+  ])) stored,
+  square_configuration_authority_fingerprint text generated always as (private.integration_production_fingerprint_v1(array[
+    'square',environment,application_id,callback_uri,kms_key_resource
+  ])) stored,
   square_configuration_fingerprint text not null,
   provider_policy_version text not null check(length(provider_policy_version) between 1 and 128),
   provider_policy_fingerprint text not null check(provider_policy_fingerprint ~ '^sha256:[a-f0-9]{64}$'),
