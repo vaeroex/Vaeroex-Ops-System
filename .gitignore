@@ -14,6 +14,3 @@ outputs
 .visual-qa/
 .vercel
 .env*
-.terraform/
-*.tfstate
-*.tfstate.*

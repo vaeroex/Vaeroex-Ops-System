@@ -1,6 +1,20 @@
 // Exact additive dormant qualification/connection scope. Legacy parser suites still reject
 // every other database/runtime path; no directory-wide exemption is permitted.
 const approvedSquareQualificationPaths = Object.freeze([
+  // Closed Production activation; exact infrastructure/runtime files only.
+  "scripts/external-integrations-production-activation-regression-tests.js",
+  "services/external-integrations-production/bootstrap-runtime/.dockerignore",
+  "services/external-integrations-production/bootstrap-runtime/Dockerfile",
+  "services/external-integrations-production/bootstrap-runtime/package.json",
+  "services/external-integrations-production/bootstrap-runtime/server.mjs",
+  "services/external-integrations-production/infra/activation/.terraform.lock.hcl",
+  "services/external-integrations-production/infra/activation/README.md",
+  "services/external-integrations-production/infra/activation/backend.tf",
+  "services/external-integrations-production/infra/activation/main.tf",
+  "services/external-integrations-production/infra/activation/outputs.tf",
+  "services/external-integrations-production/infra/activation/production.tfvars.example",
+  "services/external-integrations-production/infra/activation/variables.tf",
+  "services/external-integrations-production/infra/activation/versions.tf",
   // Dedicated read-only Sandbox host; exact files, not a service-directory exemption.
   "services/square-workspace-host/.gitignore",
   "services/square-workspace-host/README.md",

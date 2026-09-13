@@ -1,7 +1,7 @@
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
-const { spawn } = require("node:child_process");
+const { spawn, spawnSync } = require("node:child_process");
 
 const root = path.resolve(__dirname, "..");
 const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), "utf8");
@@ -12,6 +12,20 @@ const outputs = read("services/external-integrations-production/infra/activation
 const backend = read("services/external-integrations-production/infra/activation/backend.tf");
 const dockerfile = read("services/external-integrations-production/bootstrap-runtime/Dockerfile");
 const serverPath = path.join(root, "services/external-integrations-production/bootstrap-runtime/server.mjs");
+const activationPath = path.join(root, "services/external-integrations-production/infra/activation");
+
+function runTerraform(args) {
+  const result = spawnSync(process.env.TERRAFORM_BIN || "terraform", args, {
+    cwd: activationPath,
+    encoding: "utf8",
+    env: { PATH: process.env.PATH },
+  });
+  assert.equal(result.status, 0, `terraform ${args[0]} failed: ${(result.stderr || result.stdout || "unknown").slice(0, 500)}`);
+}
+
+runTerraform(["fmt", "-check", "-recursive"]);
+runTerraform(["init", "-backend=false", "-input=false"]);
+runTerraform(["validate"]);
 
 assert.match(versions, /version\s*=\s*"7\.34\.0"/, "the Google provider is pinned exactly");
 assert.match(variables, /var\.project_id == "vaeroex-integrations-prod"/, "the activation cannot target another project");
