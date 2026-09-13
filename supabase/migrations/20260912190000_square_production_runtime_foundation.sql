@@ -171,7 +171,7 @@ create table private.integration_production_provider_bindings (
   platform_binding_key text not null,
   project_id text not null,
   region text not null,
-  application_id text not null check(length(application_id) between 8 and 512 and application_id ~ '^[A-Za-z0-9._-]+$'),
+  application_id text not null unique check(length(application_id) between 8 and 512 and application_id ~ '^[A-Za-z0-9._-]+$'),
   route_namespace text not null check(route_namespace ~ '^/api/integrations/[a-z][a-z0-9_-]*$'),
   callback_uri text not null check(length(callback_uri) between 12 and 2048
     and callback_uri ~ '^https://[a-z0-9][a-z0-9.-]*[a-z0-9]/api/integrations/[a-z][a-z0-9_-]*/callback$'
@@ -199,6 +199,7 @@ create table private.integration_production_provider_bindings (
   foreign key(platform_binding_key,project_id,region,source_commit)
     references private.integration_production_platform_bindings(binding_key,project_id,region,source_commit) on delete restrict,
   check(route_namespace='/api/integrations/'||replace(provider_key,'_','-')),
+  check(callback_uri ~ ('^https://[^/]+'||route_namespace||'/callback$')),
   check(split_part(kms_key_resource,'/',2)=project_id and split_part(kms_key_resource,'/',4)=region)
 );
 alter table private.integration_production_provider_bindings enable row level security;

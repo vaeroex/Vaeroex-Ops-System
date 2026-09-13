@@ -212,6 +212,9 @@ jobs:
           terraform validate
           terraform test
 
+      - name: Test provider-neutral and Square Production contracts
+        run: pnpm test:external-integrations-square-production-foundation
+
       - name: Build external integrations QBO sandbox runtime
         run: pnpm build:external-integrations-qbo-sandbox
 

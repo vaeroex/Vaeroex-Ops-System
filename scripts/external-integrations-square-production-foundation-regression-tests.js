@@ -9,6 +9,7 @@ const root = path.resolve(__dirname, "..");
 const sourcePath = path.join(root, "lib/integrations/control-plane/square-production-contracts.ts");
 const migrationPath = path.join(root, "supabase/migrations/20260912190000_square_production_runtime_foundation.sql");
 const migration = fs.readFileSync(migrationPath, "utf8");
+const ciWorkflow = fs.readFileSync(path.join(root, ".github/workflows/ci.yml"), "utf8");
 const evidenceDatabaseTest = fs.readFileSync(path.join(root, "scripts/square-workspace-evidence-database-tests.js"), "utf8");
 const fixtureRichMigrationTest = fs.readFileSync(path.join(root, "scripts/run-phase8b-zero-based-delivery-migration-tests.js"), "utf8");
 
@@ -140,9 +141,13 @@ assert.match(migration, /kms_key_resource text not null unique check\(kms_key_re
 assert.match(migration, /production_provider_capability_service_account_key/);
 assert.match(migration, /production_provider_capability_database_login_key/);
 assert.match(migration, /production_provider_secret_resource_key/);
+assert.match(migration, /application_id text not null unique check/);
+assert.match(migration, /callback_uri ~ \('\^https:\/\/\[\^\/\]\+'\|\|route_namespace\|\|'\/callback\$'\)/);
 assert.doesNotMatch(migration, /grant (?:select|insert|update|delete|all) on table private\.(?:square|integration)_production_/i);
 assert.doesNotMatch(migration, /create role\s+square_production_\w+\s+login/i);
 assert.doesNotMatch(migration, /squareupsandbox|oysjpoondtcrqpghhrbd|sandbox-sq0idb/i);
+assert.match(ciWorkflow, /run: pnpm test:external-integrations-square-production-foundation/,
+  "CI executes the provider-neutral and Square Production runtime regressions");
 assert.match(fixtureRichMigrationTest, /\["127\.0\.0\.1", "localhost"\]\.includes\(parsed\.hostname\)/,
   "fixture-rich role mutation remains restricted to disposable local Supabase");
 assert.match(fixtureRichMigrationTest, /parsed\.username = "supabase_admin"/,

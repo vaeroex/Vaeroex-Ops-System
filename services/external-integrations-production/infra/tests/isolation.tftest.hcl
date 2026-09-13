@@ -58,6 +58,57 @@ run "valid_dormant_composition" {
   }
 }
 
+run "shared_application_identity_denied" {
+  command = plan
+  variables {
+    provider_bindings = {
+      square = {
+        contract_version = "production_provider_isolation_v1"
+        environment      = "production"
+        application_id   = "shared-production-application"
+        route_namespace  = "/api/integrations/square"
+        callback_uri     = "https://square.vaeroex.com/api/integrations/square/callback"
+        kms_key_resource = "projects/vaeroex-integrations-prod/locations/us-west1/keyRings/square-production/cryptoKeys/provider-credentials"
+        secret_version_resources = {
+          application = "projects/vaeroex-integrations-prod/secrets/square-application/versions/1"
+        }
+        service_accounts               = { broker = "square-broker@vaeroex-integrations-prod.iam.gserviceaccount.com" }
+        database_logins                = { broker = "square_production_broker" }
+        source_commit                  = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        enabled                        = false
+        provider_calls_enabled         = false
+        customer_onboarding_enabled    = false
+        webhook_intake_enabled         = false
+        evidence_enabled               = false
+        economic_contributions_enabled = false
+        ai_dispatch_enabled            = false
+      }
+      quickbooks_online = {
+        contract_version = "production_provider_isolation_v1"
+        environment      = "production"
+        application_id   = "shared-production-application"
+        route_namespace  = "/api/integrations/quickbooks-online"
+        callback_uri     = "https://qbo.vaeroex.com/api/integrations/quickbooks-online/callback"
+        kms_key_resource = "projects/vaeroex-integrations-prod/locations/us-west1/keyRings/qbo-production/cryptoKeys/provider-credentials"
+        secret_version_resources = {
+          application = "projects/vaeroex-integrations-prod/secrets/qbo-application/versions/1"
+        }
+        service_accounts               = { broker = "quickbooks-online-broker@vaeroex-integrations-prod.iam.gserviceaccount.com" }
+        database_logins                = { broker = "quickbooks_online_production_broker" }
+        source_commit                  = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        enabled                        = false
+        provider_calls_enabled         = false
+        customer_onboarding_enabled    = false
+        webhook_intake_enabled         = false
+        evidence_enabled               = false
+        economic_contributions_enabled = false
+        ai_dispatch_enabled            = false
+      }
+    }
+  }
+  expect_failures = [terraform_data.validated_source_only_composition]
+}
+
 run "single_label_callback_denied" {
   command = plan
   variables {

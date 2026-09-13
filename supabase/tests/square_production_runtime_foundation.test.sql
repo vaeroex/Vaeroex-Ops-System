@@ -88,6 +88,13 @@ $sql$),'23514','Malformed provider KMS resource paths are rejected');
 select is(pg_temp.error_state($sql$
   insert into private.integration_production_provider_bindings(
     provider_key,environment,platform_binding_key,project_id,region,application_id,route_namespace,callback_uri,kms_key_resource,source_commit)
+  values ('misrouted','production','vaeroex-production-integrations-v1','vaeroex-integrations-prod','us-west1',
+    'misrouted-production-test','/api/integrations/misrouted','https://integrations.vaeroex.com/api/integrations/square/callback',
+    'projects/vaeroex-integrations-prod/locations/us-west1/keyRings/misrouted-production/cryptoKeys/provider-credentials',repeat('a',40))
+$sql$),'23514','Database provider bindings reject a foreign callback namespace');
+select is(pg_temp.error_state($sql$
+  insert into private.integration_production_provider_bindings(
+    provider_key,environment,platform_binding_key,project_id,region,application_id,route_namespace,callback_uri,kms_key_resource,source_commit)
   values ('longkms','production','vaeroex-production-integrations-v1','vaeroex-integrations-prod','us-west1',
     'longkms-production-test','/api/integrations/longkms','https://longkms.vaeroex.com/api/integrations/longkms/callback',
     'projects/vaeroex-integrations-prod/locations/us-west1/keyRings/longkms-production/cryptoKeys/'||repeat('x',64),repeat('a',40))
@@ -100,6 +107,13 @@ values ('square','production','vaeroex-production-integrations-v1','vaeroex-inte
   '/api/integrations/square','https://square.vaeroex.com/api/integrations/square/callback',
   'projects/vaeroex-integrations-prod/locations/us-west1/keyRings/square-production/cryptoKeys/provider-credentials',
   repeat('a',40));
+select is(pg_temp.error_state($sql$
+  insert into private.integration_production_provider_bindings(
+    provider_key,environment,platform_binding_key,project_id,region,application_id,route_namespace,callback_uri,kms_key_resource,source_commit)
+  values ('duplicate_app','production','vaeroex-production-integrations-v1','vaeroex-integrations-prod','us-west1',
+    'sq0idp-production-test','/api/integrations/duplicate-app','https://integrations.vaeroex.com/api/integrations/duplicate-app/callback',
+    'projects/vaeroex-integrations-prod/locations/us-west1/keyRings/duplicate-app-production/cryptoKeys/provider-credentials',repeat('a',40))
+$sql$),'23505','Different providers cannot reuse an OAuth application identity');
 
 insert into private.integration_production_provider_secrets(provider_key,environment,project_id,secret_purpose,secret_version_resource)
 values

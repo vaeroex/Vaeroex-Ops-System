@@ -1,6 +1,7 @@
 locals {
-  all_kms_keys  = [for binding in values(var.provider_bindings) : binding.kms_key_resource]
-  all_callbacks = [for binding in values(var.provider_bindings) : binding.callback_uri]
+  all_application_ids = [for binding in values(var.provider_bindings) : binding.application_id]
+  all_kms_keys        = [for binding in values(var.provider_bindings) : binding.kms_key_resource]
+  all_callbacks       = [for binding in values(var.provider_bindings) : binding.callback_uri]
   all_secret_versions = flatten([
     for binding in values(var.provider_bindings) : values(binding.secret_version_resources)
   ])
@@ -32,6 +33,7 @@ resource "terraform_data" "validated_source_only_composition" {
   lifecycle {
     precondition {
       condition = (
+        length(distinct(local.all_application_ids)) == length(local.all_application_ids) &&
         length(distinct(local.all_kms_keys)) == length(local.all_kms_keys) &&
         length(distinct(local.all_callbacks)) == length(local.all_callbacks) &&
         length(distinct(local.all_secret_versions)) == length(local.all_secret_versions) &&

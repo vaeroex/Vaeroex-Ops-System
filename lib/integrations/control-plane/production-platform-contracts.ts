@@ -141,7 +141,7 @@ export function assertProductionProviderSetIsolation(
   if (new Set(providers.map(tuple)).size !== providers.length) {
     throw new Error("production_provider_binding_duplicate");
   }
-  for (const field of ["callbackUri", "kmsKeyResource"] as const) {
+  for (const field of ["applicationId", "callbackUri", "kmsKeyResource"] as const) {
     if (new Set(providers.map((value) => value[field])).size !== providers.length) {
       throw new Error("production_provider_authority_overlap");
     }

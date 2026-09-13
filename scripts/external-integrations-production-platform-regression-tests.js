@@ -47,7 +47,7 @@ const provider = (key) => ({
 });
 
 assert.equal(contract.assertProductionProviderSetIsolation(platform, [provider("square"), provider("quickbooks_online")]).length, 2);
-for (const field of ["kmsKeyResource", "callbackUri"]) {
+for (const field of ["applicationId", "kmsKeyResource", "callbackUri"]) {
   const qbo = provider("quickbooks_online"); qbo[field] = provider("square")[field];
   assert.throws(() => contract.assertProductionProviderSetIsolation(platform, [provider("square"), qbo]));
 }
