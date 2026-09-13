@@ -11,12 +11,25 @@ async function qualify(runtime) {
   const policy=require("../lib/integrations/providers/square/observation-admission.ts");
   const db=await runtime.createDatabase("observations"), c=db.client;
   const files=runtime.migrationFiles();
-  eq(files.length,115,"full canonical chain, including deterministic Square operational intelligence");
+  const additiveSquareTail=[
+    "20260911205108_square_canonical_interpretation.sql",
+    "20260911222230_square_workspace_evidence.sql",
+    "20260912034447_square_workspace_card_contract.sql",
+    "20260912150000_square_operational_intelligence.sql",
+    "20260912190000_square_production_runtime_foundation.sql"
+  ];
+  eq(files.length,116,"full canonical chain, including dormant Square Production foundation");
+  eq(files.slice(-additiveSquareTail.length).map(file=>require("node:path").basename(file)),additiveSquareTail,
+    "observation qualification pins the exact additive Square interpretation and foundation tail");
+  const interpretationTail=files.slice(-additiveSquareTail.length,-1);
+  const productionFoundation=files.slice(-1);
   stage="migrations";
-  await runtime.applyMigrations(c,files.slice(0,-4));
+  await runtime.applyMigrations(c,files.slice(0,-additiveSquareTail.length));
   const schemaBefore=await runtime.sourceSchemaFingerprint(c);
-  await runtime.applyMigrations(c,files.slice(-4));
-  eq(await runtime.sourceSchemaFingerprint(c),schemaBefore,"additive migration preserves canonical/QBO schema");
+  await runtime.applyMigrations(c,interpretationTail);
+  eq(await runtime.sourceSchemaFingerprint(c),schemaBefore,"Square interpretation migrations preserve canonical/QBO schema");
+  await runtime.applyMigrations(c,productionFoundation);
+  const installedSchema=await runtime.sourceSchemaFingerprint(c);
   const genericCounts=async()=>{const counts={};for(const table of ["external_source_records","external_source_record_versions","canonical_business_facts","canonical_business_fact_versions","business_fact_sources","fact_contribution_batches","fact_contribution_events"])counts[table]=(await c.query(`select count(*)::int n from private.${table}`)).rows[0].n;return counts;};
   const genericBefore=await genericCounts();
   const id=()=>crypto.randomUUID(), fp=contractSha256({synthetic:"observation"});
@@ -227,8 +240,8 @@ async function qualify(runtime) {
   await c.query("begin");await c.query("update private.square_account_configuration set blocked=false");await c.query("update private.square_account_connections set revocation_pending=true");await denied(()=>admit(fingerprint),"post-admission revocation fences replay");await c.query("rollback");
   stage="final_preservation";
   eq(await genericCounts(),genericBefore,"no generic canonical source/fact/contribution records minted");
-  eq(await runtime.sourceSchemaFingerprint(c),schemaBefore,"canonical/QBO schema unchanged");
+  eq(await runtime.sourceSchemaFingerprint(c),installedSchema,"observation qualification does not mutate the installed schema");
   eq((await c.query("select surface_enabled,enrollment_enabled from private.square_account_configuration")).rows[0],{surface_enabled:false,enrollment_enabled:false},"admission never opens runtime gates");
-  console.log(`Square observation database qualification passed (${assertions} assertions; 115 migrations; seven SQL/TS parity cases).`);
+  console.log(`Square observation database qualification passed (${assertions} assertions; 116 migrations; seven SQL/TS parity cases).`);
 }
 runAdditionalQualification(qualify).catch(error=>{process.stderr.write(`Square observation database qualification failed at ${stage} (${typeof error.code==="string"&&/^[A-Z0-9_]+$/.test(error.code)?error.code:"fixed_failure"}).\n`);if(/^[a-z_]{1,100}$/.test(error.message))process.stderr.write(error.message+"\n");if(error.code==="ERR_ASSERTION")process.stderr.write(String(error.message).split("\n")[0]+"\n");process.exitCode=1;});
