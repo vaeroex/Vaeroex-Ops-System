@@ -17,11 +17,29 @@ begin
     select * into role_record from pg_catalog.pg_roles where rolname=role_name;
     if not found then
       execute format('create role %I nologin noinherit nosuperuser nocreatedb nocreaterole noreplication nobypassrls',role_name);
-    elsif role_record.rolcanlogin or role_record.rolinherit or role_record.rolsuper or
+      select * into strict role_record from pg_catalog.pg_roles where rolname=role_name;
+    end if;
+
+    -- PostgreSQL 16+ records one automatic ADMIN-only membership for a
+    -- non-superuser CREATEROLE actor. Its bootstrap-superuser grantor prevents
+    -- that actor from revoking it. It grants neither INHERIT nor SET authority,
+    -- and the member is already a role administrator. Permit at most that exact
+    -- administrative edge; reject all assumable, inheritable, outbound,
+    -- non-administrative, or additional memberships.
+    if role_record.rolcanlogin or role_record.rolinherit or role_record.rolsuper or
       role_record.rolcreatedb or role_record.rolcreaterole or role_record.rolreplication or
       role_record.rolbypassrls or exists(
-        select 1 from pg_catalog.pg_auth_members
-        where roleid=role_record.oid or member=role_record.oid
+        select 1
+        from pg_catalog.pg_auth_members m
+        left join pg_catalog.pg_roles member_role on member_role.oid=m.member
+        where m.member=role_record.oid or (
+          m.roleid=role_record.oid and (
+            m.inherit_option or m.set_option or not m.admin_option or
+            not (member_role.rolsuper or member_role.rolcreaterole)
+          )
+        )
+      ) or 1 < (
+        select count(*) from pg_catalog.pg_auth_members where roleid=role_record.oid
       ) then
       raise exception using errcode='42501',message='square_production_authority_role_drift';
     end if;

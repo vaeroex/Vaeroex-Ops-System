@@ -101,6 +101,10 @@ assert.throws(() => contract.checkedSquareProductionBinding(duplicated));
 
 assert.match(migration, /square_production_authority_role_drift/);
 assert.match(migration, /pg_catalog\.pg_auth_members/);
+assert.match(migration, /m\.inherit_option or m\.set_option or not m\.admin_option/);
+assert.match(migration, /member_role\.rolsuper or member_role\.rolcreaterole/);
+assert.match(migration, /1 < \(\s*select count\(\*\) from pg_catalog\.pg_auth_members where roleid=role_record\.oid/);
+assert.doesNotMatch(migration, /revoke %I from %I/);
 assert.match(migration, /economic_contributions_enabled boolean not null default false check\(not economic_contributions_enabled\)/);
 assert.match(migration, /ai_dispatch_enabled boolean not null default false check\(not ai_dispatch_enabled\)/);
 assert.match(migration, /alter table private\.square_production_runtime_binding force row level security/);

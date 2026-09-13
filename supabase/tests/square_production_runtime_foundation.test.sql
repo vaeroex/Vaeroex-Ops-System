@@ -15,9 +15,21 @@ select is((select count(*)::integer from pg_catalog.pg_roles where rolname in (
   and not rolcanlogin and not rolinherit and not rolsuper and not rolcreatedb and
   not rolcreaterole and not rolreplication and not rolbypassrls),6,
   'Square provider roles are fixed NOLOGIN least-privilege capabilities');
-select is((select count(*)::integer from pg_catalog.pg_auth_members m join pg_catalog.pg_roles r
-  on r.oid in (m.roleid,m.member) where r.rolname like 'square_production_%_authority'),0,
-  'Square provider roles start with no memberships');
+select is((select count(*)::integer
+  from pg_catalog.pg_auth_members m
+  join pg_catalog.pg_roles provider_role on provider_role.oid in (m.roleid,m.member)
+  left join pg_catalog.pg_roles member_role on member_role.oid=m.member
+  where provider_role.rolname like 'square_production_%_authority' and (
+    m.member=provider_role.oid or m.inherit_option or m.set_option or not m.admin_option or
+    not (member_role.rolsuper or member_role.rolcreaterole)
+  )),0,'Square provider roles have no assumable, inheritable, outbound, or non-administrative memberships');
+select ok((select coalesce(max(membership_count),0)<=1 from (
+  select count(*) membership_count
+  from pg_catalog.pg_roles provider_role
+  left join pg_catalog.pg_auth_members m on m.roleid=provider_role.oid
+  where provider_role.rolname like 'square_production_%_authority'
+  group by provider_role.oid
+) provider_memberships),'Each Square provider role has at most the PostgreSQL creator administration edge');
 
 select ok((select relrowsecurity and relforcerowsecurity from pg_catalog.pg_class
   where oid='private.integration_production_platform_bindings'::regclass),'Platform binding uses FORCE RLS');
