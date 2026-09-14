@@ -61,6 +61,7 @@ assert.match(scans, /requiredStableScanReads: 3/);
 assert.match(scans, /scanEvidenceFingerprint/);
 assert.match(scans, /ifGenerationMatch: "0"/);
 assert.match(scans, /release-candidates\/\$\{manifest\.source\.commit\}\/\$\{manifest\.build\.id\}\.json/);
+assert.match(scans, /secretAnalysisQualified: false[\s\S]*secretAnalysisRequiredBeforeEligibility: true/);
 assert.match(scans, /deploymentEligible: false[\s\S]*requiresReviewedDigestPin: true[\s\S]*automaticRuntimeRollout: false/);
 assert.match(scans, /bootstrapException: "CVE-2026-85091"/);
 assert.match(scans, /bootstrapDockerfileSha256: "628ac2a6fd58b0ac33ca95c1af9a5717f2c3b26f6bf353853c0d56a6ca57e35f"/);
@@ -82,6 +83,7 @@ assert.match(codeowners, /^\/services\/external-integrations-production\/ @vaero
 assert.match(readme, /Direct human build submission remains closed/);
 assert.match(readme, /mandatory approval/);
 assert.match(readme, /deploymentEligible = false/);
+assert.match(readme, /secretAnalysisQualified = false/);
 assert.match(readme, /automaticRuntimeRollout = false/);
 assert.match(readme, /separate reviewed PR/);
 

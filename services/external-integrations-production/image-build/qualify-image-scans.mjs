@@ -124,6 +124,8 @@ export function buildCandidateManifest({ buildId, sourceCommit, callback, bootst
     build: Object.freeze({ id: buildId, trigger: POLICY.triggerName, approved: true }),
     images: Object.freeze({ callback: callback.reference, bootstrap: bootstrap.reference }),
     scans: Object.freeze({ callback: callbackScan, bootstrap: bootstrapScan }),
+    secretAnalysisQualified: false,
+    secretAnalysisRequiredBeforeEligibility: true,
     deploymentEligible: false,
     requiresReviewedDigestPin: true,
     automaticRuntimeRollout: false,

@@ -193,6 +193,8 @@ test("candidate records remain immutable-review inputs and never deployment auth
   });
   assert.equal(manifest.source.repository, POLICY.repositoryFullName);
   assert.equal(manifest.source.branch, "main");
+  assert.equal(manifest.secretAnalysisQualified, false);
+  assert.equal(manifest.secretAnalysisRequiredBeforeEligibility, true);
   assert.equal(manifest.deploymentEligible, false);
   assert.equal(manifest.requiresReviewedDigestPin, true);
   assert.equal(manifest.automaticRuntimeRollout, false);
