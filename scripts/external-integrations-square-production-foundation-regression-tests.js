@@ -178,4 +178,5 @@ assert.match(evidenceDatabaseTest, /insert into private\.square_account_configur
   "existing qualification clones only writable configuration columns");
 assert.doesNotMatch(evidenceDatabaseTest, /jsonb_populate_record\(null::private\.square_account_configuration/,
   "existing qualification never supplies generated Production fingerprints");
+require("./external-integrations-production-activation-regression-tests.js");
 console.log("square production foundation regression tests passed");

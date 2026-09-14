@@ -1,14 +1,15 @@
 # Production Integration Platform operations
 
-This runbook is a source-only template. It must not be used to provision or activate anything until the itemized Production cost/resource plan, exact identities and rollout window are approved.
+This runbook governs the approved single-region hardened configuration. The recurring gross ceiling is USD 150 per month; paid Supabase PITR, reservations, commitments, extra regions/replicas, Enterprise products, AI usage and Marketplace resources are excluded. Budget notifications are not a hard cap.
 
 ## Preflight and launch
 
-1. Pin the reviewed Git commit, immutable image digests, migration ledger and provider policy fingerprints. Confirm the plan changes no existing QBO resource or Terraform address.
-2. Read back the Production project/region, DNS/TLS host, WAF rules, VPC/NAT egress, queue limits, service identities, numbered secret versions, KMS IAM, database target, backup policy, log retention and budget alerts. Reject Sandbox, Preview, `/latest`, cross-project and shared provider identities.
-3. Apply migrations with a checksumed ledger. Create provider LOGINs separately; grant each only its checked RPC. Confirm FORCE RLS, no direct table access, no `service_role` shortcut, and closed platform/provider/economic/AI gates.
-4. Deploy by immutable digest with direct `run.app` ingress denied. Prove exact Host/SNI/routes, OIDC audience/invoker, provider egress allowlist, database `session_user`, callback/webhook raw-body handling, sanitization, bounded concurrency/rate/retry, and zero transaction-level AI.
-5. Enter secrets privately, verify versions without reading values, then run one allowlisted controlled consent. Open provider calls only after current seller/location/workspace/entity/generation authority is durable.
+1. Pin the reviewed Git commit, immutable image digests, migration ledger and provider policy fingerprints. Confirm the plan changes no existing QBO resource or Terraform address. Store state only in the versioned, private `vaeroex-integrations-prod-terraform-state` bucket.
+2. Read back project `vaeroex-integrations-prod`, region `us-west1`, credit-bearing billing account, gross-spend budget, DNS/TLS host, WAF rules, VPC/NAT egress, queue limits, service identities, numbered secret versions, KMS IAM, database target, existing Supabase Pro backup policy, 30-day configured log retention and alert channel. Reject Sandbox, Preview, `/latest`, cross-project and shared provider identities.
+3. Apply the infrastructure-only plan first with no image digests. It may create empty secret containers but never secret versions. Build the disabled bootstrap and Square callback edge as the dedicated build identity, test both, pin both Artifact Registry digests, then apply the runtime/LB plan with every gate false. The runtime and query-stripping edge must never be deployed independently.
+4. Verify the canonical Production ledger and apply only the reviewed migration with a checksumed ledger. Create provider LOGINs separately; grant each only its reviewed capability role and checked RPC set. Confirm FORCE RLS, `session_user`, no direct table access, no `service_role` shortcut, and closed platform/provider/economic/AI gates. If no reviewed RPC exists for a capability, it receives no executable database authority.
+5. Deploy by immutable digest with direct `run.app` ingress denied. Prove exact Host/SNI/routes, forwarded-authority rejection, query removal before Cloud Run request logging, forged-handoff-header removal, denial-description omission, OIDC audience/invoker, provider egress allowlist, database `session_user`, webhook raw-body handling, sanitization, bounded concurrency/rate/retry, and zero transaction-level AI.
+6. Enter secrets privately, verify versions without reading values, then run one allowlisted controlled consent. Open provider calls only after current seller/location/workspace/entity/connection/generation authority is durable.
 
 ## Recovery and rollback
 

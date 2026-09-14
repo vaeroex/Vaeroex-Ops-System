@@ -1,6 +1,20 @@
 // Exact additive dormant qualification/connection scope. Legacy parser suites still reject
 // every other database/runtime path; no directory-wide exemption is permitted.
 const approvedSquareQualificationPaths = Object.freeze([
+  // Closed Production activation; exact infrastructure/runtime files only.
+  "scripts/external-integrations-production-activation-regression-tests.js",
+  "services/external-integrations-production/bootstrap-runtime/.dockerignore",
+  "services/external-integrations-production/bootstrap-runtime/Dockerfile",
+  "services/external-integrations-production/bootstrap-runtime/package.json",
+  "services/external-integrations-production/bootstrap-runtime/server.mjs",
+  "services/external-integrations-production/infra/activation/.terraform.lock.hcl",
+  "services/external-integrations-production/infra/activation/README.md",
+  "services/external-integrations-production/infra/activation/backend.tf",
+  "services/external-integrations-production/infra/activation/main.tf",
+  "services/external-integrations-production/infra/activation/outputs.tf",
+  "services/external-integrations-production/infra/activation/production.tfvars.example",
+  "services/external-integrations-production/infra/activation/variables.tf",
+  "services/external-integrations-production/infra/activation/versions.tf",
   // Dedicated read-only Sandbox host; exact files, not a service-directory exemption.
   "services/square-workspace-host/.gitignore",
   "services/square-workspace-host/README.md",
@@ -44,6 +58,14 @@ const approvedSquareQualificationPaths = Object.freeze([
   "services/external-integrations-production/infra/outputs.tf",
   "services/external-integrations-production/infra/production.example.tfvars",
   "services/external-integrations-production/infra/tests/isolation.tftest.hcl",
+  ".github/workflows/ci.yml",
+  "services/external-integrations-production/callback-edge/callback.go",
+  "services/external-integrations-production/callback-edge/callback_test.go",
+  "services/external-integrations-production/callback-edge/cloudbuild.yaml",
+  "services/external-integrations-production/callback-edge/go.mod",
+  "services/external-integrations-production/callback-edge/go.sum",
+  "services/external-integrations-production/callback-edge/package/Dockerfile",
+  "services/external-integrations-production/callback-edge/plugin/main.go",
   "supabase/migrations/20260907042202_square_dormant_trusted_authority.sql",
   "supabase/migrations/20260907042352_square_dormant_atomic_pages.sql",
   "supabase/migrations/20260907174326_square_dormant_account_connection.sql",

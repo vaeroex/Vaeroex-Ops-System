@@ -1,0 +1,8 @@
+{
+  "name": "vaeroex-production-integrations-bootstrap-runtime",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22 <23"
+  }
+}
