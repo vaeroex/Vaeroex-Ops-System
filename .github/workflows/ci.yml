@@ -223,6 +223,9 @@ jobs:
       - name: Test provider-neutral and Square Production contracts
         run: pnpm test:external-integrations-square-production-foundation
 
+      - name: Test repository-bound Production image trigger
+        run: pnpm test:external-integrations-production-image-trigger
+
       - name: Build external integrations QBO sandbox runtime
         run: pnpm build:external-integrations-qbo-sandbox
 

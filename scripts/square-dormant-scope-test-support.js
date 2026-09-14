@@ -15,6 +15,11 @@ const approvedSquareQualificationPaths = Object.freeze([
   "services/external-integrations-production/infra/activation/production.tfvars.example",
   "services/external-integrations-production/infra/activation/variables.tf",
   "services/external-integrations-production/infra/activation/versions.tf",
+  "services/external-integrations-production/image-build/cloudbuild.yaml",
+  "services/external-integrations-production/image-build/qualify-image-scans.mjs",
+  "services/external-integrations-production/image-build/qualify-image-scans.test.mjs",
+  "services/external-integrations-production/image-build/verify-trigger-context.mjs",
+  "services/external-integrations-production/image-build/verify-trigger-context.test.mjs",
   // Dedicated read-only Sandbox host; exact files, not a service-directory exemption.
   "services/square-workspace-host/.gitignore",
   "services/square-workspace-host/README.md",

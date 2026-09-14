@@ -16,6 +16,7 @@ locals {
     "cloudscheduler.googleapis.com",
     "cloudtasks.googleapis.com",
     "compute.googleapis.com",
+    "containeranalysis.googleapis.com",
     "containerscanning.googleapis.com",
     "iam.googleapis.com",
     "logging.googleapis.com",
@@ -171,10 +172,15 @@ resource "google_artifact_registry_repository_iam_member" "build_writer" {
   member     = google_service_account.build.member
 }
 
-resource "google_storage_bucket_iam_member" "build_source_reader" {
+resource "google_storage_bucket_iam_member" "build_candidate_writer" {
   bucket = google_storage_bucket.build.name
-  role   = "roles/storage.objectViewer"
+  role   = "roles/storage.objectCreator"
   member = google_service_account.build.member
+  condition {
+    title       = "production-image-scan-candidates-only"
+    description = "The reviewed builder may create, but never read, replace, or delete, scan-qualified candidate manifests."
+    expression  = "resource.name.startsWith('projects/_/buckets/${google_storage_bucket.build.name}/objects/release-candidates/')"
+  }
 }
 
 resource "google_project_iam_member" "build_log_writer" {
@@ -183,11 +189,76 @@ resource "google_project_iam_member" "build_log_writer" {
   member  = google_service_account.build.member
 }
 
+resource "google_project_iam_member" "build_metadata_viewer" {
+  project = var.project_id
+  role    = "roles/cloudbuild.builds.viewer"
+  member  = google_service_account.build.member
+}
+
+resource "google_project_iam_member" "build_scan_viewer" {
+  project = var.project_id
+  role    = "roles/containeranalysis.occurrences.viewer"
+  member  = google_service_account.build.member
+}
+
+resource "google_project_iam_member" "build_service_usage" {
+  project = var.project_id
+  role    = "roles/serviceusage.serviceUsageConsumer"
+  member  = google_service_account.build.member
+}
+
+resource "google_project_iam_member" "operator_build_approver" {
+  project = var.project_id
+  role    = "roles/cloudbuild.builds.approver"
+  member  = "user:${var.operator_email}"
+}
+
 resource "google_service_account_iam_member" "cloudbuild_token_creator" {
   service_account_id = google_service_account.build.name
   role               = "roles/iam.serviceAccountTokenCreator"
   member             = "serviceAccount:service-${data.google_project.current.number}@gcp-sa-cloudbuild.iam.gserviceaccount.com"
   depends_on         = [google_project_service.required]
+}
+
+resource "google_cloudbuild_trigger" "production_images" {
+  project         = var.project_id
+  location        = var.region
+  name            = "vaeroex-production-images"
+  description     = "Approved protected-main rebuilds of dormant Production integration images"
+  service_account = google_service_account.build.id
+  filename        = "services/external-integrations-production/image-build/cloudbuild.yaml"
+  included_files = [
+    "services/external-integrations-production/bootstrap-runtime/**",
+    "services/external-integrations-production/callback-edge/**",
+    "services/external-integrations-production/image-build/**",
+  ]
+  tags = ["production-image-build"]
+
+  github {
+    owner = "vaeroex"
+    name  = "Vaeroex-Ops-System"
+    push {
+      branch = "^main$"
+    }
+  }
+
+  approval_config {
+    approval_required = true
+  }
+
+  lifecycle {
+    prevent_destroy = true
+  }
+
+  depends_on = [
+    google_artifact_registry_repository_iam_member.build_writer,
+    google_project_iam_member.build_log_writer,
+    google_project_iam_member.build_metadata_viewer,
+    google_project_iam_member.build_scan_viewer,
+    google_project_iam_member.build_service_usage,
+    google_service_account_iam_member.cloudbuild_token_creator,
+    google_storage_bucket_iam_member.build_candidate_writer,
+  ]
 }
 
 resource "google_cloud_tasks_queue" "provider" {
