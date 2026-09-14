@@ -637,6 +637,11 @@ resource "google_network_services_lb_edge_extension" "square_callback" {
       service          = google_network_services_wasm_plugin.square_callback[0].id
       fail_open        = false
       supported_events = ["REQUEST_HEADERS"]
+      forward_attributes = [
+        "request.method",
+        "request.path",
+        "request.query",
+      ]
       forward_headers = [
         "content-length",
         "expect",

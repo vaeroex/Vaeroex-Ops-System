@@ -1,13 +1,15 @@
 project_id    = "vaeroex-integrations-prod"
 region        = "us-west1"
-source_commit = "0000000000000000000000000000000000000000"
+source_commit = "f4915edadbe2abddd7993c74c1fc3e80e1d1f821"
 operator_email = "isaac@vaeroex.com"
 alert_email    = "isaac@vaeroex.com"
 
-# First apply keeps this null and creates no Cloud Run/LB runtime path. After
-# the reviewed bootstrap image is built, replace with its immutable digest.
-bootstrap_image_digest = null
-callback_edge_image_digest = null
+# Reviewed second-stage release pins. The first-stage infrastructure apply used
+# null for both values and created no Cloud Run or load-balancer runtime path.
+# Change either digest only after rebuilding from reviewed source, scanning the
+# exact digest, and updating the release-pin regressions in the same review.
+bootstrap_image_digest = "us-west1-docker.pkg.dev/vaeroex-integrations-prod/vaeroex-integrations-images/production-bootstrap@sha256:d56fe933eab1322bb4fe905b183964a980d641af23d69904e15989add501dc6f"
+callback_edge_image_digest = "us-west1-docker.pkg.dev/vaeroex-integrations-prod/vaeroex-integrations-images/square-callback-edge@sha256:a169544f0ae3ff36248a90aa686c0858f9afde9a10302041aed2d23088bd0cd8"
 
 production_hostname            = "square.vaeroex.com"
 runtime_enabled                 = false

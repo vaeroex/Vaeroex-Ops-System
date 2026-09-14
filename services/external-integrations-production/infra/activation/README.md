@@ -6,7 +6,7 @@ This directory is the deployable, reviewed activation layer for the shared Vaero
 
 The first apply must leave both `bootstrap_image_digest = null` and `callback_edge_image_digest = null`. It creates the shared network, static ingress and egress addresses, NAT, task queue, image repository, bounded logging, Cloud Armor policy, Square-specific identities, one KMS key, and empty Secret Manager containers. It creates no Cloud Run service, load balancer, callback edge, DNS record, secret version, database LOGIN, database grant, or migration.
 
-After the bootstrap and Square callback-edge images are built and independently verified, a second reviewed plan may pin both immutable Artifact Registry digests. They must be supplied together. The fail-closed edge validates the exact callback shape, removes the query before Cloud Run request logging, forwards only bounded internal handoff headers, drops provider denial descriptions, and passes only exact queryless health/webhook traffic. Edge and load-balancer request logging remain disabled. The runtime image always returns `404 production_integration_runtime_disabled`; it contains no OAuth, webhook, provider, database, evidence, economics, or AI implementation. All runtime gates are Terraform validations fixed to `false`.
+After the bootstrap and Square callback-edge images are built and independently verified, a second reviewed plan may pin both immutable Artifact Registry digests. They must be supplied together. The fail-closed edge validates the exact callback shape, removes the query before Cloud Run request logging, forwards only bounded internal handoff headers, drops provider denial descriptions, and passes only exact queryless health/webhook traffic. The edge extension explicitly forwards only the method, path, and undecoded query attributes required by that validator; an omitted attribute must fail validation rather than produce an unusable deployment. Edge and load-balancer request logging remain disabled. The runtime image always returns `404 production_integration_runtime_disabled`; it contains no OAuth, webhook, provider, database, evidence, economics, or AI implementation. All runtime gates are Terraform validations fixed to `false`.
 
 Secret Manager grants are provider- and runtime-specific and are conditional on exact version `1`. Terraform never creates or reads a secret version. Credential delivery, database LOGIN creation, migration application, DNS, and activation are separate checked operations.
 
@@ -24,6 +24,19 @@ Secret Manager grants are provider- and runtime-specific and are conditional on 
 10. Independently verify the canonical Production database ledger and existing Supabase Pro backup coverage before applying only the reviewed Square Production foundation migration.
 11. Create the exact six LOGIN-to-capability-role bindings using a separately reviewed, password-private operation. Do not grant table access. Deliver each numbered database credential only to its matching secret and identity.
 12. Keep Square credentials absent and provider calls, onboarding, webhook intake, evidence, economics and AI dispatch closed until their individual activation gates pass.
+
+The callback-edge build must use the dedicated reviewed builder and staging bucket. Run it from the repository root with an exact reviewed Git SHA and a tag in the isolated Production repository:
+
+```sh
+gcloud builds submit services/external-integrations-production/callback-edge \
+  --project=vaeroex-integrations-prod \
+  --config=services/external-integrations-production/callback-edge/cloudbuild.yaml \
+  --service-account=projects/vaeroex-integrations-prod/serviceAccounts/vx-int-prod-build@vaeroex-integrations-prod.iam.gserviceaccount.com \
+  --gcs-source-staging-dir=gs://vaeroex-integrations-prod-build/callback-edge-source \
+  --substitutions=_SOURCE_COMMIT=REVIEWED_FULL_GIT_SHA,_PLUGIN_IMAGE=us-west1-docker.pkg.dev/vaeroex-integrations-prod/vaeroex-integrations-images/square-callback-edge:REVIEWED_FULL_GIT_SHA
+```
+
+Do not omit the explicit service account or staging directory. Resolve the published tag to its immutable digest, verify the exact-digest vulnerability result, and update `production.tfvars.example` plus its release-pin regression in the same review. A tag is never a deployable input.
 
 ## Excluded
 
