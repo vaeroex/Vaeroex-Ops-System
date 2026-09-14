@@ -25,13 +25,7 @@ Secret Manager grants are provider- and runtime-specific and are conditional on 
 11. Create the exact six LOGIN-to-capability-role bindings using a separately reviewed, password-private operation. Do not grant table access. Deliver each numbered database credential only to its matching secret and identity.
 12. Keep Square credentials absent and provider calls, onboarding, webhook intake, evidence, economics and AI dispatch closed until their individual activation gates pass.
 
-The callback-edge build must use the dedicated reviewed builder and staging bucket. The checked helper exports the callback source from the exact committed Git object, so neither a dirty worktree nor a different checkout can be labeled as the reviewed revision. Run it with an exact reviewed Git SHA:
-
-```sh
-./services/external-integrations-production/infra/activation/submit-reviewed-callback-edge.sh REVIEWED_FULL_GIT_SHA
-```
-
-The operator has conditional object-creation access only below `callback-edge-source/`; the build identity has read access and writes the image. Do not bypass the helper or replace its explicit service account or staging directory. Resolve the published tag to its immutable digest, verify the exact-digest vulnerability result, and update `production.tfvars.example` plus its release-pin regression in the same review. A tag is never a deployable input.
+The two reviewed release images are already pinned by immutable digest. Direct human build submission is closed: the operator receives neither Cloud Build Editor, permission to act as the builder, nor staging-object creation authority. Any future rebuild requires a separately reviewed repository-bound trigger that obtains source from the protected Vaeroex repository revision and uses the dedicated builder without granting the initiating human arbitrary build authority. Resolve every published artifact to its immutable digest, verify the exact-digest vulnerability result, and update `production.tfvars.example` plus its release-pin regression in the same review. A tag is never a deployable input.
 
 ## Excluded
 
