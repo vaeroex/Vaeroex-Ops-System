@@ -51,6 +51,7 @@ const approvedSquareQualificationPaths = Object.freeze([
   "supabase/migrations/20260912034447_square_workspace_card_contract.sql",
   "supabase/migrations/20260912150000_square_operational_intelligence.sql",
   "supabase/migrations/20260912190000_square_production_runtime_foundation.sql",
+  "supabase/migrations/20260914234546_square_production_runtime_overlay.sql",
   "supabase/tests/square_production_runtime_foundation.test.sql",
   "lib/integrations/control-plane/production-platform-contracts.ts",
   "scripts/external-integrations-production-platform-regression-tests.js",

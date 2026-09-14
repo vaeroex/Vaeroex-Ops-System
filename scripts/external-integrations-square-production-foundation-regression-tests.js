@@ -9,6 +9,8 @@ const root = path.resolve(__dirname, "..");
 const sourcePath = path.join(root, "lib/integrations/control-plane/square-production-contracts.ts");
 const migrationPath = path.join(root, "supabase/migrations/20260912190000_square_production_runtime_foundation.sql");
 const migration = fs.readFileSync(migrationPath, "utf8");
+const overlayPath = path.join(root, "supabase/migrations/20260914234546_square_production_runtime_overlay.sql");
+const overlay = fs.readFileSync(overlayPath, "utf8");
 const ciWorkflow = fs.readFileSync(path.join(root, ".github/workflows/ci.yml"), "utf8");
 const evidenceDatabaseTest = fs.readFileSync(path.join(root, "scripts/square-workspace-evidence-database-tests.js"), "utf8");
 const fixtureRichMigrationTest = fs.readFileSync(path.join(root, "scripts/run-phase8b-zero-based-delivery-migration-tests.js"), "utf8");
@@ -111,7 +113,6 @@ assert.match(migration, /1 < \(\s*select count\(\*\) from pg_catalog\.pg_auth_me
 assert.doesNotMatch(migration, /revoke %I from %I/);
 assert.match(migration, /economic_contributions_enabled boolean not null default false check\(not economic_contributions_enabled\)/);
 assert.match(migration, /ai_dispatch_enabled boolean not null default false check\(not ai_dispatch_enabled\)/);
-assert.match(migration, /alter table private\.square_production_runtime_binding force row level security/);
 assert.match(migration, /alter table private\.integration_production_platform_bindings force row level security/);
 assert.match(migration, /alter table private\.integration_production_provider_bindings force row level security/);
 assert.match(migration, /alter table private\.integration_production_provider_secrets force row level security/);
@@ -121,18 +122,10 @@ assert.match(migration, /private\.integration_sync_tasks/);
 assert.match(migration, /private\.integration_sync_checkpoints/);
 assert.match(migration, /private\.integration_webhook_events/);
 assert.match(migration, /private\.integration_rate_limit_states/);
-assert.match(migration, /square_production_runtime_binding_configuration_fkey/);
-assert.match(migration, /square_production_binding_fingerprint text\s+generated always/);
-assert.match(migration, /square_production_authority_fingerprint text\s+generated always/);
 assert.match(migration, /integration_production_fingerprint_v1\(p_parts text\[\]\)[\s\S]*language sql[\s\S]*immutable[\s\S]*strict[\s\S]*parallel safe/);
-assert.match(migration, /square_production_configuration_fingerprint_v1\([\s\S]*p_broker_login name[\s\S]*p_enrollment_login name[\s\S]*p_webhook_login name[\s\S]*immutable/);
 assert.match(migration, /revoke all on function private\.integration_production_fingerprint_v1\(text\[\]\) from public,anon,authenticated,service_role/);
 assert.match(migration, /platform_fingerprint text generated always as \(private\.integration_production_fingerprint_v1/);
 assert.match(migration, /provider_authority_fingerprint text generated always as \(private\.integration_production_fingerprint_v1/);
-assert.match(migration, /square_production_binding_fingerprint text[\s\S]*private\.square_production_configuration_fingerprint_v1/);
-assert.match(migration, /square_account_configuration_production_binding_idx[\s\S]*environment,square_production_authority_fingerprint,square_production_binding_fingerprint/);
-assert.match(migration, /foreign key\(provider_key,environment,provider_authority_fingerprint\)[\s\S]*integration_production_provider_bindings/);
-assert.match(migration, /foreign key\(environment,square_configuration_authority_fingerprint,square_configuration_fingerprint\)/);
 assert.doesNotMatch(migration, /create unique index[^;]+redirect_uri/);
 assert.match(migration, /foreign key\(platform_binding_key,project_id,region,source_commit\)/);
 assert.match(migration, /split_part\(kms_key_resource,'\/',2\)=project_id/);
@@ -146,6 +139,32 @@ assert.match(migration, /callback_uri ~ \('\^https:\/\/\[\^\/\]\+'\|\|route_name
 assert.doesNotMatch(migration, /grant (?:select|insert|update|delete|all) on table private\.(?:square|integration)_production_/i);
 assert.doesNotMatch(migration, /create role\s+square_production_\w+\s+login/i);
 assert.doesNotMatch(migration, /squareupsandbox|oysjpoondtcrqpghhrbd|sandbox-sq0idb/i);
+assert.doesNotMatch(migration, /square_account_configuration|square_production_runtime_binding/,
+  "the provider-neutral foundation must apply without the separately qualified Square lifecycle schema");
+assert.ok(migration.trimStart().startsWith("-- Closed-by-default Production Integration Platform composition authority."));
+assert.ok(migration.trimEnd().endsWith("commit;"), "the self-contained foundation is one explicit transaction");
+
+assert.match(overlay, /square_production_runtime_overlay_prerequisite_missing/);
+assert.match(overlay, /to_regclass\('private\.integration_production_provider_bindings'\)/);
+assert.match(overlay, /to_regclass\('private\.square_account_configuration'\)/);
+assert.match(overlay, /rolname='square_production_runtime_authority'/);
+assert.match(overlay, /alter table private\.square_production_runtime_binding force row level security/);
+assert.match(overlay, /square_production_runtime_binding_configuration_fkey/);
+assert.match(overlay, /square_production_binding_fingerprint text\s+generated always/);
+assert.match(overlay, /square_production_authority_fingerprint text\s+generated always/);
+assert.match(overlay, /square_production_configuration_fingerprint_v1\([\s\S]*p_broker_login name[\s\S]*p_enrollment_login name[\s\S]*p_webhook_login name[\s\S]*immutable/);
+assert.match(overlay, /square_production_binding_fingerprint text[\s\S]*private\.square_production_configuration_fingerprint_v1/);
+assert.match(overlay, /square_account_configuration_production_binding_idx[\s\S]*environment,square_production_authority_fingerprint,square_production_binding_fingerprint/);
+assert.match(overlay, /foreign key\(provider_key,environment,provider_authority_fingerprint\)[\s\S]*integration_production_provider_bindings/);
+assert.match(overlay, /foreign key\(environment,square_configuration_authority_fingerprint,square_configuration_fingerprint\)/);
+assert.doesNotMatch(overlay, /grant (?:select|insert|update|delete|all) on table/i);
+assert.doesNotMatch(overlay, /create role\s+\w+\s+login/i);
+assert.doesNotMatch(overlay, /squareupsandbox|oysjpoondtcrqpghhrbd|sandbox-sq0idb/i);
+assert.doesNotMatch(overlay, /create table private\.integration_production_(?:platform_bindings|provider_bindings|provider_secrets|provider_capabilities)/);
+assert.ok(overlay.indexOf("square_production_runtime_overlay_prerequisite_missing") <
+  overlay.indexOf("create function private.square_production_configuration_fingerprint_v1"),
+"the overlay validates every prerequisite before its first durable mutation");
+assert.ok(overlay.trimEnd().endsWith("commit;"), "the prerequisite gate and Square overlay are one explicit transaction");
 assert.match(ciWorkflow, /run: pnpm test:external-integrations-square-production-foundation/,
   "CI executes the provider-neutral and Square Production runtime regressions");
 assert.match(fixtureRichMigrationTest, /\["127\.0\.0\.1", "localhost"\]\.includes\(parsed\.hostname\)/,
