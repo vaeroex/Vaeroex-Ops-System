@@ -18,7 +18,7 @@ Secret Manager grants are provider- and runtime-specific and are conditional on 
 4. Run `pnpm test:external-integrations-square-production-foundation`.
 5. Create a saved plan with `bootstrap_image_digest = null`; inspect every resource and cost-bearing effect before applying.
 6. Apply the infrastructure-only plan and verify sanitized outputs and IAM policies.
-7. Build the disabled bootstrap and Square callback-edge images from the reviewed Git SHA, run the callback parser/Wasm tests, inspect both digests and vulnerability results, then use only those immutable digests in a new reviewed plan.
+7. Enable the Terraform-managed Container Scanning API before publishing release images. Build the disabled bootstrap and Square callback-edge images from the reviewed Git SHA, run the callback parser/Wasm tests, inspect both digests and vulnerability results, then use only those immutable digests in a new reviewed plan. Automatic scanning is usage-billed per new digest; it is not a fixed monthly resource.
 8. Apply the runtime/LB plan while gates remain closed. Configure DNS only after the managed-certificate target is verified.
 9. Verify exact TLS host routing, direct Cloud Run denial, alternate-host denial, rate limiting, disabled endpoints, log retention, rollback and alert delivery.
 10. Independently verify the canonical Production database ledger and existing Supabase Pro backup coverage before applying only the reviewed Square Production foundation migration.

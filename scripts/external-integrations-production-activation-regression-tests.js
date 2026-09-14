@@ -37,6 +37,7 @@ assert.match(variables, /bootstrap_image_digest == null/, "the first apply creat
 assert.match(variables, /production-bootstrap@sha256:\[a-f0-9\]\{64\}/, "a runtime image must be an immutable digest in the isolated repository");
 assert.match(variables, /square-callback-edge@sha256:\[a-f0-9\]\{64\}/, "the callback edge image must be an immutable digest in the isolated repository");
 assert.match(main, /deployment_inputs_valid/, "runtime and callback-edge artifacts must be deployed together");
+assert.match(main, /"containerscanning\.googleapis\.com"/, "release images require automatic vulnerability scanning");
 
 for (const gate of [
   "runtime_enabled",
