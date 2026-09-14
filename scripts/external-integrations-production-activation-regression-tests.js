@@ -1,4 +1,5 @@
 const assert = require("node:assert/strict");
+const { createHash } = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
 const { spawn, spawnSync } = require("node:child_process");
@@ -12,6 +13,8 @@ const outputs = read("services/external-integrations-production/infra/activation
 const backend = read("services/external-integrations-production/infra/activation/backend.tf");
 const dockerfile = read("services/external-integrations-production/bootstrap-runtime/Dockerfile");
 const serverPath = path.join(root, "services/external-integrations-production/bootstrap-runtime/server.mjs");
+const serverSource = read("services/external-integrations-production/bootstrap-runtime/server.mjs");
+const bootstrapPackage = JSON.parse(read("services/external-integrations-production/bootstrap-runtime/package.json"));
 const edgeCallback = read("services/external-integrations-production/callback-edge/callback.go");
 const edgePlugin = read("services/external-integrations-production/callback-edge/plugin/main.go");
 const edgeCloudBuild = read("services/external-integrations-production/callback-edge/cloudbuild.yaml");
@@ -127,8 +130,23 @@ assert.doesNotMatch(main, /quickbooks|qbo/i, "activation cannot mutate QBO resou
 assert.doesNotMatch(main, /supabase|migration|postgres/i, "cloud activation cannot apply database changes");
 assert.doesNotMatch(outputs, /secret_data|password|token/i, "outputs remain non-secret");
 
-assert.match(dockerfile, /^FROM mirror\.gcr\.io\/library\/node@sha256:[a-f0-9]{64}$/m, "the bootstrap base image is immutable");
-assert.match(dockerfile, /^USER node$/m, "the bootstrap does not run as root");
+assert.match(dockerfile, /^FROM gcr\.io\/distroless\/nodejs22-debian13@sha256:[a-f0-9]{64}$/m, "the bootstrap uses an immutable minimal runtime-only base image");
+assert.match(dockerfile, /^COPY --chown=nonroot:nonroot package\.json server\.mjs \.\/$/m, "the bootstrap copies only its runtime files as the unprivileged identity");
+assert.match(dockerfile, /^USER nonroot$/m, "the bootstrap does not run as root");
+assert.match(dockerfile, /^CMD \["server\.mjs"\]$/m, "the distroless Node entrypoint receives only the reviewed runtime module");
+// The remaining no-fix CVE-2026-85091 finding requires zlib's non-blocking
+// gzwrite path. This dormant HTTP responder must not make that path reachable.
+assert.equal(
+  createHash("sha256").update(dockerfile).digest("hex"),
+  "628ac2a6fd58b0ac33ca95c1af9a5717f2c3b26f6bf353853c0d56a6ca57e35f",
+  "every executable bootstrap image change requires an explicit reviewed fingerprint update",
+);
+assert.equal(
+  createHash("sha256").update(serverSource).digest("hex"),
+  "c724529d24e8338bdfff14b51557a72cedb332abddc6d705a0cecca07e08c110",
+  "every executable bootstrap server change requires an explicit reviewed fingerprint update",
+);
+assert.deepEqual(bootstrapPackage.dependencies ?? {}, {}, "the bootstrap has no runtime package dependency that could add compression");
 
 async function exerciseBootstrap() {
   const port = 19_000 + Math.floor(Math.random() * 1_000);
