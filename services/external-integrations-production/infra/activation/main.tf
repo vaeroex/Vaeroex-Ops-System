@@ -511,11 +511,12 @@ resource "google_compute_global_address" "ingress" {
 resource "google_cloud_run_v2_service" "square" {
   for_each = local.deployment_enabled ? local.modes : toset([])
 
-  name                = "square-production-${each.key}"
-  location            = var.region
-  ingress             = contains(local.public_modes, each.key) ? "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER" : "INGRESS_TRAFFIC_INTERNAL_ONLY"
-  deletion_protection = true
-  labels              = local.labels
+  name                 = "square-production-${each.key}"
+  location             = var.region
+  ingress              = contains(local.public_modes, each.key) ? "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER" : "INGRESS_TRAFFIC_INTERNAL_ONLY"
+  invoker_iam_disabled = contains(local.public_modes, each.key) ? true : null
+  deletion_protection  = true
+  labels               = local.labels
 
   template {
     service_account                  = google_service_account.square[each.key].email
@@ -574,14 +575,6 @@ resource "google_cloud_run_v2_service" "square" {
     }
   }
   lifecycle { prevent_destroy = true }
-}
-
-resource "google_cloud_run_v2_service_iam_member" "public_ingress" {
-  for_each = local.deployment_enabled ? local.public_modes : toset([])
-  name     = google_cloud_run_v2_service.square[each.key].name
-  location = var.region
-  role     = "roles/run.invoker"
-  member   = "allUsers"
 }
 
 resource "google_compute_region_network_endpoint_group" "public" {
@@ -663,10 +656,6 @@ resource "google_network_services_wasm_plugin" "square_callback" {
   description     = "Vaeroex Square bounded OAuth callback query-stripping edge"
   main_version_id = local.callback_edge_version
   deletion_policy = "PREVENT"
-
-  log_config {
-    enable = false
-  }
 
   versions {
     version_name = local.callback_edge_version

@@ -79,11 +79,11 @@ for (const mode of ["oauth", "broker", "scheduler", "webhook", "runtime", "evide
 }
 assert.match(main, /task_invoker\s*=\s*"sq-prod-task-invoker"/);
 assert.match(main, /local\.deployment_enabled \? local\.modes : toset\(\[\]\)/, "no image means no Cloud Run services");
-assert.match(main, /local\.deployment_enabled \? local\.public_modes : toset\(\[\]\)/, "only the two public modes can receive invoker bindings");
 assert.match(main, /public_modes = toset\(\["oauth", "webhook"\]\)/);
 assert.match(main, /INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER/);
 assert.match(main, /INGRESS_TRAFFIC_INTERNAL_ONLY/);
-assert.match(main, /member\s*=\s*"allUsers"/);
+assert.match(main, /invoker_iam_disabled\s*=\s*contains\(local\.public_modes, each\.key\) \? true : null/, "only load-balancer-backed public modes disable the Cloud Run invoker check");
+assert.doesNotMatch(main, /google_cloud_run_v2_service_iam_(?:member|binding)[\s\S]*allUsers/, "domain-restricted projects never require an allUsers IAM grant");
 
 assert.match(main, /request\.headers\['host'\] != '\$\{var\.production_hostname\}'/, "Cloud Armor requires the exact approved host");
 assert.match(main, /has\(request\.headers\['forwarded'\]\).*has\(request\.headers\['x-forwarded-host'\]\)/, "client-supplied forwarding authority is rejected");
@@ -96,8 +96,11 @@ assert.match(main, /request\.path == '\/api\/integrations\/square\/webhook'.*req
 assert.match(main, /action\s*=\s*"deny\(404\)"\s*\n\s*priority\s*=\s*1150/, "unsupported methods use a Cloud Armor-supported fail-closed status");
 assert.doesNotMatch(main, /action\s*=\s*"deny\(405\)"/, "Cloud Armor does not support deny(405)");
 assert.match(main, /action\s*=\s*"rate_based_ban"/, "public paths are rate bounded");
-assert.match(main, /log_config\s*\{\s*enable\s*=\s*false\s*\}/, "callback query strings are not written to load-balancer request logs");
+assert.match(main, /google_compute_backend_service" "public"[\s\S]*log_config\s*\{\s*enable\s*=\s*false\s*\}/, "callback query strings are not written to load-balancer request logs");
 assert.match(main, /google_network_services_wasm_plugin" "square_callback"/, "Square callbacks use a managed immutable query-stripping edge");
+assert.doesNotMatch(main, /google_network_services_wasm_plugin" "square_callback"[\s\S]*?log_config\s*\{/, "the Wasm plugin relies on the API's fail-closed default-disabled logging state without a non-round-tripping block");
+assert.match(activationReadme, /Network Services API defaults it to disabled/, "the provider-convergent default-disabled Wasm logging contract is documented");
+assert.match(activationReadme, /No `allUsers` IAM binding is created/, "the domain-restricted public ingress contract is documented");
 assert.match(main, /google_network_services_lb_edge_extension" "square_callback"[\s\S]*fail_open\s*=\s*false/, "the callback edge fails closed");
 for (const attribute of ["request.method", "request.path", "request.query"]) {
   assert.match(main, new RegExp(`forward_attributes = \\[[\\s\\S]*"${attribute.replace(".", "\\.")}"`), `${attribute} is explicitly forwarded to the callback plugin`);
