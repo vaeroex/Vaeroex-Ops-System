@@ -391,7 +391,7 @@ resource "google_compute_security_policy" "ingress" {
     description = "Reject every unapproved route before runtime"
   }
   rule {
-    action   = "deny(405)"
+    action   = "deny(404)"
     priority = 1150
     match {
       expr {

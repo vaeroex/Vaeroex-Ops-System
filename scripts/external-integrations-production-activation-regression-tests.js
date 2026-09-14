@@ -80,6 +80,8 @@ for (const allowedPath of ["/healthz", "/api/integrations/square/callback", "/ap
 assert.match(main, /request\.path == '\/healthz'.*request\.method != 'GET'.*request\.method != 'HEAD'/, "health accepts only GET and HEAD");
 assert.match(main, /request\.path == '\/api\/integrations\/square\/callback'.*request\.method != 'GET'/, "the callback accepts only GET");
 assert.match(main, /request\.path == '\/api\/integrations\/square\/webhook'.*request\.method != 'POST'/, "the webhook accepts only POST");
+assert.match(main, /action\s*=\s*"deny\(404\)"\s*\n\s*priority\s*=\s*1150/, "unsupported methods use a Cloud Armor-supported fail-closed status");
+assert.doesNotMatch(main, /action\s*=\s*"deny\(405\)"/, "Cloud Armor does not support deny(405)");
 assert.match(main, /action\s*=\s*"rate_based_ban"/, "public paths are rate bounded");
 assert.match(main, /log_config\s*\{\s*enable\s*=\s*false\s*\}/, "callback query strings are not written to load-balancer request logs");
 assert.match(main, /google_network_services_wasm_plugin" "square_callback"/, "Square callbacks use a managed immutable query-stripping edge");
