@@ -13,6 +13,7 @@ const backend = read("services/external-integrations-production/infra/activation
 const dockerfile = read("services/external-integrations-production/bootstrap-runtime/Dockerfile");
 const serverPath = path.join(root, "services/external-integrations-production/bootstrap-runtime/server.mjs");
 const serverSource = read("services/external-integrations-production/bootstrap-runtime/server.mjs");
+const bootstrapPackage = JSON.parse(read("services/external-integrations-production/bootstrap-runtime/package.json"));
 const edgeCallback = read("services/external-integrations-production/callback-edge/callback.go");
 const edgePlugin = read("services/external-integrations-production/callback-edge/plugin/main.go");
 const edgeCloudBuild = read("services/external-integrations-production/callback-edge/cloudbuild.yaml");
@@ -134,7 +135,14 @@ assert.match(dockerfile, /^USER nonroot$/m, "the bootstrap does not run as root"
 assert.match(dockerfile, /^CMD \["server\.mjs"\]$/m, "the distroless Node entrypoint receives only the reviewed runtime module");
 // The remaining no-fix CVE-2026-85091 finding requires zlib's non-blocking
 // gzwrite path. This dormant HTTP responder must not make that path reachable.
-assert.doesNotMatch(serverSource, /node:zlib|createGzip|createDeflate|gzipSync|deflateSync|content-encoding/i, "the bootstrap cannot invoke compression or zlib");
+assert.deepEqual(
+  [...serverSource.matchAll(/\bfrom\s+["']([^"']+)["']/g)].map((match) => match[1]),
+  ["node:http"],
+  "the bootstrap may statically import only the built-in HTTP server",
+);
+assert.doesNotMatch(serverSource, /\b(?:import\s*\(|require\s*\(|createRequire\b)/, "the bootstrap cannot load another module dynamically");
+assert.doesNotMatch(serverSource, /\b(?:zlib|gzip|gunzip|deflate|inflate|brotli|compression|content-encoding|accept-encoding)\b/i, "the bootstrap cannot invoke or advertise compression");
+assert.deepEqual(bootstrapPackage.dependencies ?? {}, {}, "the bootstrap has no runtime package dependency that could add compression");
 
 async function exerciseBootstrap() {
   const port = 19_000 + Math.floor(Math.random() * 1_000);
