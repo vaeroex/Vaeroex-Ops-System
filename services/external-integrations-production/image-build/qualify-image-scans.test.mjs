@@ -1,0 +1,119 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import {
+  buildCandidateManifest,
+  evaluateScanOccurrences,
+  IMAGE_POLICY,
+  listOccurrences,
+  parseDigestReference,
+} from "./qualify-image-scans.mjs";
+import { POLICY } from "./verify-trigger-context.mjs";
+
+const callbackReference = `${IMAGE_POLICY.callback}@sha256:${"a".repeat(64)}`;
+const bootstrapReference = `${IMAGE_POLICY.bootstrap}@sha256:${"b".repeat(64)}`;
+const callback = parseDigestReference(callbackReference, IMAGE_POLICY.callback);
+const bootstrap = parseDigestReference(bootstrapReference, IMAGE_POLICY.bootstrap);
+const integrity = Object.freeze({
+  bootstrapFingerprintsVerified: true,
+  runtimeDependenciesEmpty: true,
+  compressionPathAbsent: true,
+});
+const occurrence = (kind, details = {}, resourceUri = callback.resourceUrl) => ({ kind, resourceUri, ...details });
+const discovery = (resourceUri = callback.resourceUrl) => occurrence("DISCOVERY", { discovery: { analysisStatus: "FINISHED_SUCCESS" } }, resourceUri);
+const vulnerability = (severity, identifier, resourceUri = callback.resourceUrl) => occurrence("VULNERABILITY", {
+  noteName: `projects/goog-vulnz/notes/${identifier}`,
+  vulnerability: { effectiveSeverity: severity },
+}, resourceUri);
+
+test("accepts only exact immutable image references", () => {
+  assert.deepEqual(callback, {
+    reference: callbackReference,
+    digest: "a".repeat(64),
+    resourceUrl: `https://${callbackReference}`,
+  });
+  for (const bad of [
+    `${IMAGE_POLICY.callback}:latest`,
+    `${IMAGE_POLICY.callback}@sha256:${"A".repeat(64)}`,
+    `${IMAGE_POLICY.bootstrap}@sha256:${"a".repeat(64)}`,
+    `${callbackReference}extra`,
+  ]) assert.throws(() => parseDigestReference(bad, IMAGE_POLICY.callback), /image_digest_invalid/);
+});
+
+test("requires a completed scan and rejects secrets, criticals and callback highs", () => {
+  assert.deepEqual(evaluateScanOccurrences("callback", [discovery()], null).severityCounts, {
+    CRITICAL: 0,
+    HIGH: 0,
+    MEDIUM: 0,
+    LOW: 0,
+    MINIMAL: 0,
+    SEVERITY_UNSPECIFIED: 0,
+  });
+  assert.throws(() => evaluateScanOccurrences("callback", [], null), /scan_not_observed/);
+  assert.throws(() => evaluateScanOccurrences("callback", [occurrence("DISCOVERY", { discovery: { analysisStatus: "SCANNING" } })], null), /scan_not_complete/);
+  assert.throws(() => evaluateScanOccurrences("callback", [discovery(), occurrence("SECRET")], null), /secret_finding/);
+  assert.throws(() => evaluateScanOccurrences("callback", [discovery(), vulnerability("CRITICAL", "CVE-2099-1")], null), /critical_vulnerability/);
+  assert.throws(() => evaluateScanOccurrences("callback", [discovery(), vulnerability("HIGH", IMAGE_POLICY.bootstrapException)], null), /high_vulnerability/);
+});
+
+test("permits only the exact reviewed bootstrap high-severity exception", () => {
+  const bootstrapDiscovery = discovery(bootstrap.resourceUrl);
+  const accepted = vulnerability("HIGH", IMAGE_POLICY.bootstrapException, bootstrap.resourceUrl);
+  assert.deepEqual(
+    evaluateScanOccurrences("bootstrap", [bootstrapDiscovery, accepted], integrity).acceptedExceptions,
+    [IMAGE_POLICY.bootstrapException],
+  );
+  for (const badIntegrity of [null, {}, { ...integrity, runtimeDependenciesEmpty: false }, { ...integrity, compressionPathAbsent: false }]) {
+    assert.throws(() => evaluateScanOccurrences("bootstrap", [bootstrapDiscovery, accepted], badIntegrity), /high_vulnerability/);
+  }
+  assert.throws(
+    () => evaluateScanOccurrences("bootstrap", [bootstrapDiscovery, vulnerability("HIGH", "CVE-2099-2", bootstrap.resourceUrl)], integrity),
+    /high_vulnerability/,
+  );
+  assert.throws(
+    () => evaluateScanOccurrences("bootstrap", [bootstrapDiscovery, accepted, accepted], integrity),
+    /duplicate_vulnerability_exception/,
+  );
+});
+
+test("paginates bounded scan evidence and rejects a mismatched resource or unreachable region", async () => {
+  const pages = [
+    { occurrences: [discovery()], nextPageToken: "next" },
+    { occurrences: [vulnerability("LOW", "CVE-2099-3")] },
+  ];
+  const urls = [];
+  const fetched = await listOccurrences(callback.resourceUrl, "synthetic-token", async (url) => {
+    urls.push(String(url));
+    return new Response(JSON.stringify(pages.shift()), { status: 200 });
+  });
+  assert.equal(fetched.length, 2);
+  assert.match(urls[0], /pageSize=100/);
+  assert.match(urls[1], /pageToken=next/);
+
+  await assert.rejects(
+    listOccurrences(callback.resourceUrl, "synthetic-token", async () => new Response(JSON.stringify({ occurrences: [discovery("https://foreign.invalid/image@sha256:" + "c".repeat(64))] }))),
+    /scan_resource_mismatch/,
+  );
+  await assert.rejects(
+    listOccurrences(callback.resourceUrl, "synthetic-token", async () => new Response(JSON.stringify({ occurrences: [], unreachable: ["us-east1"] }))),
+    /scan_regions_unreachable/,
+  );
+});
+
+test("candidate records remain immutable-review inputs and never deployment authority", () => {
+  const clean = evaluateScanOccurrences("callback", [discovery()], null);
+  const manifest = buildCandidateManifest({
+    buildId: "01234567-89ab-cdef-0123-456789abcdef",
+    sourceCommit: "c".repeat(40),
+    callback,
+    bootstrap,
+    callbackScan: clean,
+    bootstrapScan: clean,
+  });
+  assert.equal(manifest.source.repository, POLICY.repositoryFullName);
+  assert.equal(manifest.source.branch, "main");
+  assert.equal(manifest.deploymentEligible, false);
+  assert.equal(manifest.requiresReviewedDigestPin, true);
+  assert.equal(manifest.automaticRuntimeRollout, false);
+  assert.match(manifest.images.callback, /@sha256:[a-f0-9]{64}$/);
+  assert.match(manifest.images.bootstrap, /@sha256:[a-f0-9]{64}$/);
+});

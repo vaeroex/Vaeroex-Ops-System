@@ -18,6 +18,9 @@ output "sanitized_activation" {
     artifact_repository    = google_artifact_registry_repository.images.name
     build_bucket           = google_storage_bucket.build.name
     build_service_account  = google_service_account.build.email
+    image_build_trigger    = google_cloudbuild_trigger.production_images.name
+    image_build_approval   = true
+    automatic_rollout      = false
     task_queue             = google_cloud_tasks_queue.provider.id
     kms_key                = google_kms_crypto_key.square_credentials.id
     alert_channel          = google_monitoring_notification_channel.operator_email.name

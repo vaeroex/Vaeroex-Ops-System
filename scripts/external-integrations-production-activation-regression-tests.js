@@ -30,7 +30,10 @@ function runTerraform(args) {
   const result = spawnSync(process.env.TERRAFORM_BIN || "terraform", args, {
     cwd: activationPath,
     encoding: "utf8",
-    env: { PATH: process.env.PATH },
+    env: {
+      PATH: process.env.PATH,
+      ...(process.env.TF_DATA_DIR ? { TF_DATA_DIR: process.env.TF_DATA_DIR } : {}),
+    },
   });
   assert.equal(result.status, 0, `terraform ${args[0]} failed: ${(result.stderr || result.stdout || "unknown").slice(0, 500)}`);
 }
@@ -107,8 +110,8 @@ assert.match(edgePlugin, /ReplaceHttpRequestHeader\(":path", callbackedge\.Callb
 assert.match(edgePlugin, /clearReservedHandoffHeaders\(\)/, "client-forged handoff headers are removed before forwarding");
 assert.doesNotMatch(edgePlugin, /AddHttpRequestHeader\([^\n]*error_description/, "provider error descriptions never enter the internal request");
 assert.match(edgeCloudBuild, /_SOURCE_COMMIT[\s\S]*\^\[a-f0-9\]\{40\}\$/, "callback-edge publication validates the reviewed source revision");
-assert.match(activationReadme, /Direct human build submission is closed/, "manual callback-edge publication is explicitly closed");
-assert.match(activationReadme, /repository-bound trigger/, "future publication requires a source-bound reviewed trigger");
+assert.match(activationReadme, /Direct human build submission remains closed/, "manual callback-edge publication is explicitly closed");
+assert.match(activationReadme, /only configured rebuild path is the `vaeroex-production-images` GitHub push trigger/, "future publication requires the source-bound reviewed trigger");
 assert.match(releasePins, new RegExp(`source_commit\\s*=\\s*"${reviewedSourceCommit}"`), "the second-stage release is pinned to the reviewed source revision");
 assert.match(releasePins, new RegExp(`bootstrap_image_digest\\s*=\\s*"${reviewedBootstrapDigest}"`), "the reviewed bootstrap digest is pinned exactly");
 assert.match(releasePins, new RegExp(`callback_edge_image_digest\\s*=\\s*"${reviewedCallbackEdgeDigest}"`), "the independently scanned callback edge digest is pinned exactly");
@@ -144,7 +147,8 @@ assert.match(main, /roles\/iam\.serviceAccountUser/);
 assert.match(main, /roles\/iam\.serviceAccountTokenCreator/);
 assert.doesNotMatch(main, /roles\/cloudbuild\.builds\.editor/, "the operator cannot submit arbitrary builds");
 assert.doesNotMatch(main, /operator_build_user/, "the operator cannot act as the dedicated builder");
-assert.doesNotMatch(main, /roles\/storage\.objectCreator/, "the operator cannot upload arbitrary staging source");
+assert.match(main, /resource "google_storage_bucket_iam_member" "build_candidate_writer"[\s\S]*role\s*=\s*"roles\/storage\.objectCreator"[\s\S]*release-candidates\//, "the builder can create only reviewed candidate records");
+assert.doesNotMatch(main, /member\s*=\s*"user:\$\{var\.operator_email\}"[\s\S]{0,250}roles\/storage\.objectCreator|roles\/storage\.objectCreator[\s\S]{0,250}member\s*=\s*"user:\$\{var\.operator_email\}"/, "the operator cannot upload arbitrary staging source");
 assert.match(main, /google_monitoring_notification_channel/);
 assert.match(main, /validate_ssl\s*=\s*true/);
 assert.match(main, /monitoring\.googleapis\.com\/uptime_check\/check_passed/);
