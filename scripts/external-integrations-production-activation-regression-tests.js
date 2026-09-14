@@ -18,7 +18,13 @@ const bootstrapPackage = JSON.parse(read("services/external-integrations-product
 const edgeCallback = read("services/external-integrations-production/callback-edge/callback.go");
 const edgePlugin = read("services/external-integrations-production/callback-edge/plugin/main.go");
 const edgeCloudBuild = read("services/external-integrations-production/callback-edge/cloudbuild.yaml");
+const activationReadme = read("services/external-integrations-production/infra/activation/README.md");
+const releasePins = read("services/external-integrations-production/infra/activation/production.tfvars.example");
 const activationPath = path.join(root, "services/external-integrations-production/infra/activation");
+
+const reviewedSourceCommit = "f4915edadbe2abddd7993c74c1fc3e80e1d1f821";
+const reviewedBootstrapDigest = "us-west1-docker.pkg.dev/vaeroex-integrations-prod/vaeroex-integrations-images/production-bootstrap@sha256:d56fe933eab1322bb4fe905b183964a980d641af23d69904e15989add501dc6f";
+const reviewedCallbackEdgeDigest = "us-west1-docker.pkg.dev/vaeroex-integrations-prod/vaeroex-integrations-images/square-callback-edge@sha256:a169544f0ae3ff36248a90aa686c0858f9afde9a10302041aed2d23088bd0cd8";
 
 function runTerraform(args) {
   const result = spawnSync(process.env.TERRAFORM_BIN || "terraform", args, {
@@ -33,7 +39,7 @@ runTerraform(["fmt", "-check", "-recursive"]);
 runTerraform(["init", "-backend=false", "-input=false"]);
 runTerraform(["validate"]);
 
-assert.match(versions, /version\s*=\s*"7\.34\.0"/, "the Google provider is pinned exactly");
+assert.match(versions, /version\s*=\s*"7\.39\.0"/, "the Google provider is pinned to the first release supporting explicit edge-extension attributes");
 assert.match(variables, /var\.project_id == "vaeroex-integrations-prod"/, "the activation cannot target another project");
 assert.match(variables, /var\.region == "us-west1"/, "the activation cannot create an extra region");
 assert.match(variables, /bootstrap_image_digest == null/, "the first apply creates no runtime");
@@ -90,6 +96,9 @@ assert.match(main, /action\s*=\s*"rate_based_ban"/, "public paths are rate bound
 assert.match(main, /log_config\s*\{\s*enable\s*=\s*false\s*\}/, "callback query strings are not written to load-balancer request logs");
 assert.match(main, /google_network_services_wasm_plugin" "square_callback"/, "Square callbacks use a managed immutable query-stripping edge");
 assert.match(main, /google_network_services_lb_edge_extension" "square_callback"[\s\S]*fail_open\s*=\s*false/, "the callback edge fails closed");
+for (const attribute of ["request.method", "request.path", "request.query"]) {
+  assert.match(main, new RegExp(`forward_attributes = \\[[\\s\\S]*"${attribute.replace(".", "\\.")}"`), `${attribute} is explicitly forwarded to the callback plugin`);
+}
 assert.match(main, /forward_headers = \[[\s\S]*x-vaeroex-oauth-code[\s\S]*x-vaeroex-oauth-state[\s\S]*\]/, "only the bounded internal OAuth handoff headers cross the edge");
 assert.match(edgeCallback, /CallbackPath\s*=\s*"\/api\/integrations\/square\/callback"/, "the edge accepts only the Square callback path");
 assert.match(edgeCallback, /WebhookPath\s*=\s*"\/api\/integrations\/square\/webhook"/, "the edge permits only the exact queryless Square webhook pass-through");
@@ -98,6 +107,21 @@ assert.match(edgePlugin, /ReplaceHttpRequestHeader\(":path", callbackedge\.Callb
 assert.match(edgePlugin, /clearReservedHandoffHeaders\(\)/, "client-forged handoff headers are removed before forwarding");
 assert.doesNotMatch(edgePlugin, /AddHttpRequestHeader\([^\n]*error_description/, "provider error descriptions never enter the internal request");
 assert.match(edgeCloudBuild, /_SOURCE_COMMIT[\s\S]*\^\[a-f0-9\]\{40\}\$/, "callback-edge publication validates the reviewed source revision");
+assert.match(activationReadme, /Direct human build submission is closed/, "manual callback-edge publication is explicitly closed");
+assert.match(activationReadme, /repository-bound trigger/, "future publication requires a source-bound reviewed trigger");
+assert.match(releasePins, new RegExp(`source_commit\\s*=\\s*"${reviewedSourceCommit}"`), "the second-stage release is pinned to the reviewed source revision");
+assert.match(releasePins, new RegExp(`bootstrap_image_digest\\s*=\\s*"${reviewedBootstrapDigest}"`), "the reviewed bootstrap digest is pinned exactly");
+assert.match(releasePins, new RegExp(`callback_edge_image_digest\\s*=\\s*"${reviewedCallbackEdgeDigest}"`), "the independently scanned callback edge digest is pinned exactly");
+for (const gate of [
+  "runtime_enabled",
+  "provider_calls_enabled",
+  "customer_onboarding_enabled",
+  "webhook_intake_enabled",
+  "economic_contributions_enabled",
+  "ai_dispatch_enabled",
+]) {
+  assert.match(releasePins, new RegExp(`${gate}\\s*=\\s*false`), `${gate} remains false in the pinned second-stage release`);
+}
 
 assert.match(main, /rotation_period\s*=\s*"7776000s"/);
 assert.match(main, /roles\/cloudkms\.cryptoKeyEncrypterDecrypter/);
@@ -116,9 +140,11 @@ assert.match(main, /name\s*=\s*"vaeroex-integrations-prod-build"/);
 assert.match(main, /public_access_prevention\s*=\s*"enforced"/);
 assert.match(main, /uniform_bucket_level_access\s*=\s*true/);
 assert.match(main, /roles\/artifactregistry\.writer/);
-assert.match(main, /roles\/cloudbuild\.builds\.editor/);
 assert.match(main, /roles\/iam\.serviceAccountUser/);
 assert.match(main, /roles\/iam\.serviceAccountTokenCreator/);
+assert.doesNotMatch(main, /roles\/cloudbuild\.builds\.editor/, "the operator cannot submit arbitrary builds");
+assert.doesNotMatch(main, /operator_build_user/, "the operator cannot act as the dedicated builder");
+assert.doesNotMatch(main, /roles\/storage\.objectCreator/, "the operator cannot upload arbitrary staging source");
 assert.match(main, /google_monitoring_notification_channel/);
 assert.match(main, /validate_ssl\s*=\s*true/);
 assert.match(main, /monitoring\.googleapis\.com\/uptime_check\/check_passed/);

@@ -190,18 +190,6 @@ resource "google_service_account_iam_member" "cloudbuild_token_creator" {
   depends_on         = [google_project_service.required]
 }
 
-resource "google_service_account_iam_member" "operator_build_user" {
-  service_account_id = google_service_account.build.name
-  role               = "roles/iam.serviceAccountUser"
-  member             = "user:${var.operator_email}"
-}
-
-resource "google_project_iam_member" "operator_build_editor" {
-  project = var.project_id
-  role    = "roles/cloudbuild.builds.editor"
-  member  = "user:${var.operator_email}"
-}
-
 resource "google_cloud_tasks_queue" "provider" {
   name     = "vaeroex-integrations-tasks"
   location = var.region
@@ -637,6 +625,11 @@ resource "google_network_services_lb_edge_extension" "square_callback" {
       service          = google_network_services_wasm_plugin.square_callback[0].id
       fail_open        = false
       supported_events = ["REQUEST_HEADERS"]
+      forward_attributes = [
+        "request.method",
+        "request.path",
+        "request.query",
+      ]
       forward_headers = [
         "content-length",
         "expect",
