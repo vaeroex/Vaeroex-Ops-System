@@ -137,9 +137,14 @@ assert.match(dockerfile, /^CMD \["server\.mjs"\]$/m, "the distroless Node entryp
 // The remaining no-fix CVE-2026-85091 finding requires zlib's non-blocking
 // gzwrite path. This dormant HTTP responder must not make that path reachable.
 assert.equal(
+  createHash("sha256").update(dockerfile).digest("hex"),
+  "628ac2a6fd58b0ac33ca95c1af9a5717f2c3b26f6bf353853c0d56a6ca57e35f",
+  "every executable bootstrap image change requires an explicit reviewed fingerprint update",
+);
+assert.equal(
   createHash("sha256").update(serverSource).digest("hex"),
   "c724529d24e8338bdfff14b51557a72cedb332abddc6d705a0cecca07e08c110",
-  "every executable bootstrap change requires an explicit reviewed fingerprint update",
+  "every executable bootstrap server change requires an explicit reviewed fingerprint update",
 );
 assert.deepEqual(bootstrapPackage.dependencies ?? {}, {}, "the bootstrap has no runtime package dependency that could add compression");
 
