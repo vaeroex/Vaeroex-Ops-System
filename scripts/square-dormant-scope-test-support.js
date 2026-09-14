@@ -13,6 +13,7 @@ const approvedSquareQualificationPaths = Object.freeze([
   "services/external-integrations-production/infra/activation/main.tf",
   "services/external-integrations-production/infra/activation/outputs.tf",
   "services/external-integrations-production/infra/activation/production.tfvars.example",
+  "services/external-integrations-production/infra/activation/submit-reviewed-callback-edge.sh",
   "services/external-integrations-production/infra/activation/variables.tf",
   "services/external-integrations-production/infra/activation/versions.tf",
   // Dedicated read-only Sandbox host; exact files, not a service-directory exemption.
