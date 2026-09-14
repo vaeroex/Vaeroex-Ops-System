@@ -12,6 +12,7 @@ const outputs = read("services/external-integrations-production/infra/activation
 const backend = read("services/external-integrations-production/infra/activation/backend.tf");
 const dockerfile = read("services/external-integrations-production/bootstrap-runtime/Dockerfile");
 const serverPath = path.join(root, "services/external-integrations-production/bootstrap-runtime/server.mjs");
+const serverSource = read("services/external-integrations-production/bootstrap-runtime/server.mjs");
 const edgeCallback = read("services/external-integrations-production/callback-edge/callback.go");
 const edgePlugin = read("services/external-integrations-production/callback-edge/plugin/main.go");
 const edgeCloudBuild = read("services/external-integrations-production/callback-edge/cloudbuild.yaml");
@@ -131,6 +132,9 @@ assert.match(dockerfile, /^FROM gcr\.io\/distroless\/nodejs22-debian13@sha256:[a
 assert.match(dockerfile, /^COPY --chown=nonroot:nonroot package\.json server\.mjs \.\/$/m, "the bootstrap copies only its runtime files as the unprivileged identity");
 assert.match(dockerfile, /^USER nonroot$/m, "the bootstrap does not run as root");
 assert.match(dockerfile, /^CMD \["server\.mjs"\]$/m, "the distroless Node entrypoint receives only the reviewed runtime module");
+// The remaining no-fix CVE-2026-85091 finding requires zlib's non-blocking
+// gzwrite path. This dormant HTTP responder must not make that path reachable.
+assert.doesNotMatch(serverSource, /node:zlib|createGzip|createDeflate|gzipSync|deflateSync|content-encoding/i, "the bootstrap cannot invoke compression or zlib");
 
 async function exerciseBootstrap() {
   const port = 19_000 + Math.floor(Math.random() * 1_000);
