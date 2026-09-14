@@ -1,8 +1,8 @@
-FROM mirror.gcr.io/library/node@sha256:c610fcdfb1d5b4740dd70c284ed3cb16bb857e0f7166196e36a5501df7a3aa32
+FROM gcr.io/distroless/nodejs22-debian13@sha256:5e9868cc8ef163e86378ff90de23ca031f5bb8b2023d4f3288a5e740698919d4
 
 ENV NODE_ENV=production
 WORKDIR /srv
-COPY --chown=node:node package.json server.mjs ./
-USER node
+COPY --chown=nonroot:nonroot package.json server.mjs ./
+USER nonroot
 EXPOSE 8080
-CMD ["node", "server.mjs"]
+CMD ["server.mjs"]

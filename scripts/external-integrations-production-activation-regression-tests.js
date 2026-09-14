@@ -127,8 +127,10 @@ assert.doesNotMatch(main, /quickbooks|qbo/i, "activation cannot mutate QBO resou
 assert.doesNotMatch(main, /supabase|migration|postgres/i, "cloud activation cannot apply database changes");
 assert.doesNotMatch(outputs, /secret_data|password|token/i, "outputs remain non-secret");
 
-assert.match(dockerfile, /^FROM mirror\.gcr\.io\/library\/node@sha256:[a-f0-9]{64}$/m, "the bootstrap base image is immutable");
-assert.match(dockerfile, /^USER node$/m, "the bootstrap does not run as root");
+assert.match(dockerfile, /^FROM gcr\.io\/distroless\/nodejs22-debian13@sha256:[a-f0-9]{64}$/m, "the bootstrap uses an immutable minimal runtime-only base image");
+assert.match(dockerfile, /^COPY --chown=nonroot:nonroot package\.json server\.mjs \.\/$/m, "the bootstrap copies only its runtime files as the unprivileged identity");
+assert.match(dockerfile, /^USER nonroot$/m, "the bootstrap does not run as root");
+assert.match(dockerfile, /^CMD \["server\.mjs"\]$/m, "the distroless Node entrypoint receives only the reviewed runtime module");
 
 async function exerciseBootstrap() {
   const port = 19_000 + Math.floor(Math.random() * 1_000);
