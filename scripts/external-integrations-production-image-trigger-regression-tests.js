@@ -55,6 +55,9 @@ for (const image of ["square-callback-edge", "production-bootstrap"]) {
 assert.match(cloudbuild, /id: verify-trigger-context[\s\S]*id: require-completed-scans/);
 assert.match(cloudbuild, /sourceProvenanceHash: \[SHA256\]/);
 assert.match(scans, /FINISHED_SUCCESS/);
+assert.match(scans, /vulnerabilityDiscoveryNote: "projects\/goog-analysis\/notes\/PACKAGE_VULNERABILITY"/);
+assert.match(scans, /requiredStableScanReads: 3/);
+assert.match(scans, /scanEvidenceFingerprint/);
 assert.match(scans, /ifGenerationMatch: "0"/);
 assert.match(scans, /release-candidates\/\$\{manifest\.source\.commit\}\/\$\{manifest\.build\.id\}\.json/);
 assert.match(scans, /deploymentEligible: false[\s\S]*requiresReviewedDigestPin: true[\s\S]*automaticRuntimeRollout: false/);

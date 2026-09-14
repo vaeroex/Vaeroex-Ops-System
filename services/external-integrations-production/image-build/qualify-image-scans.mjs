@@ -10,6 +10,11 @@ const IMAGE_POLICY = Object.freeze({
   bootstrapException: "CVE-2026-85091",
   bootstrapDockerfileSha256: "628ac2a6fd58b0ac33ca95c1af9a5717f2c3b26f6bf353853c0d56a6ca57e35f",
   bootstrapServerSha256: "c724529d24e8338bdfff14b51557a72cedb332abddc6d705a0cecca07e08c110",
+  vulnerabilityDiscoveryNote: "projects/goog-analysis/notes/PACKAGE_VULNERABILITY",
+  vulnerabilityNotePrefix: "projects/goog-vulnz/notes/",
+  requiredStableScanReads: 3,
+  scanPollMilliseconds: 10_000,
+  scanTimeoutMilliseconds: 10 * 60_000,
 });
 
 function reject(code) {
@@ -41,8 +46,11 @@ export function evaluateScanOccurrences(kind, occurrences, sourceIntegrity) {
   if (!Array.isArray(occurrences)) reject("scan_shape");
   if (occurrences.some((entry) => !entry || typeof entry !== "object")) reject("scan_shape");
 
-  const discovery = occurrences.filter((entry) => entry.kind === "DISCOVERY");
+  const discovery = occurrences.filter(
+    (entry) => entry.kind === "DISCOVERY" && entry.noteName === IMAGE_POLICY.vulnerabilityDiscoveryNote,
+  );
   if (discovery.length === 0) reject("scan_not_observed");
+  if (discovery.length !== 1) reject("scan_discovery_ambiguous");
   const statuses = discovery.map((entry) => entry.discovery?.analysisStatus);
   if (statuses.some((status) => status !== "FINISHED_SUCCESS")) reject("scan_not_complete");
   if (occurrences.some((entry) => entry.kind === "SECRET")) reject("secret_finding");
@@ -51,6 +59,9 @@ export function evaluateScanOccurrences(kind, occurrences, sourceIntegrity) {
   const severityCounts = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0, MINIMAL: 0, SEVERITY_UNSPECIFIED: 0 };
   const acceptedExceptions = [];
   for (const occurrence of vulnerabilities) {
+    if (typeof occurrence.noteName !== "string" || !occurrence.noteName.startsWith(IMAGE_POLICY.vulnerabilityNotePrefix)) {
+      reject("vulnerability_source_invalid");
+    }
     const severity = occurrence.vulnerability?.effectiveSeverity ?? occurrence.vulnerability?.severity ?? "UNSPECIFIED";
     if (!(severity in severityCounts)) reject("scan_severity_unknown");
     severityCounts[severity] += 1;
@@ -74,6 +85,34 @@ export function evaluateScanOccurrences(kind, occurrences, sourceIntegrity) {
     severityCounts: Object.freeze(severityCounts),
     acceptedExceptions: Object.freeze(acceptedExceptions),
   });
+}
+
+export function scanEvidenceFingerprint(occurrences) {
+  if (!Array.isArray(occurrences)) reject("scan_shape");
+  const evidence = occurrences
+    .filter((entry) =>
+      (entry.kind === "DISCOVERY" && entry.noteName === IMAGE_POLICY.vulnerabilityDiscoveryNote) ||
+      entry.kind === "VULNERABILITY" ||
+      entry.kind === "SECRET")
+    .map((entry) => {
+      if (!entry || typeof entry !== "object" ||
+          !/^projects\/[a-z][a-z0-9-]{4,62}\/occurrences\/[A-Za-z0-9._~-]{1,256}$/.test(entry.name ?? "") ||
+          typeof entry.updateTime !== "string" || !Number.isFinite(Date.parse(entry.updateTime)) ||
+          typeof entry.noteName !== "string") {
+        reject("scan_evidence_identity_invalid");
+      }
+      return Object.freeze({
+        name: entry.name,
+        kind: entry.kind,
+        noteName: entry.noteName,
+        updateTime: entry.updateTime,
+        analysisStatus: entry.discovery?.analysisStatus ?? null,
+        lastScanTime: entry.discovery?.lastScanTime ?? null,
+        severity: entry.vulnerability?.effectiveSeverity ?? entry.vulnerability?.severity ?? null,
+      });
+    })
+    .sort((left, right) => left.name.localeCompare(right.name));
+  return createHash("sha256").update(JSON.stringify(evidence)).digest("hex");
 }
 
 export function buildCandidateManifest({ buildId, sourceCommit, callback, bootstrap, callbackScan, bootstrapScan }) {
@@ -157,16 +196,44 @@ export async function listOccurrences(resourceUrl, accessToken, fetchImpl) {
   reject("scan_page_limit");
 }
 
-async function waitForCompletedScan(kind, image, sourceIntegrity, accessToken, fetchImpl = fetch) {
-  const deadline = Date.now() + 10 * 60_000;
-  while (Date.now() < deadline) {
+export async function waitForCompletedScan(
+  kind,
+  image,
+  sourceIntegrity,
+  accessToken,
+  fetchImpl = fetch,
+  timing = {},
+) {
+  const now = timing.now ?? Date.now;
+  const sleep = timing.sleep ?? ((milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)));
+  const deadline = now() + IMAGE_POLICY.scanTimeoutMilliseconds;
+  let previousFingerprint = null;
+  let stableReadCount = 0;
+  while (now() < deadline) {
     const occurrences = await listOccurrences(image.resourceUrl, accessToken, fetchImpl);
     try {
-      return evaluateScanOccurrences(kind, occurrences, sourceIntegrity);
+      const result = evaluateScanOccurrences(kind, occurrences, sourceIntegrity);
+      const fingerprint = scanEvidenceFingerprint(occurrences);
+      if (fingerprint === previousFingerprint) {
+        stableReadCount += 1;
+      } else {
+        previousFingerprint = fingerprint;
+        stableReadCount = 1;
+      }
+      if (stableReadCount >= IMAGE_POLICY.requiredStableScanReads) {
+        return Object.freeze({
+          ...result,
+          vulnerabilityDiscoveryNote: IMAGE_POLICY.vulnerabilityDiscoveryNote,
+          stableReadCount,
+          evidenceFingerprint: fingerprint,
+        });
+      }
     } catch (error) {
       if (!(error instanceof Error) || (error.message !== "scan_not_observed" && error.message !== "scan_not_complete")) throw error;
+      previousFingerprint = null;
+      stableReadCount = 0;
     }
-    await new Promise((resolve) => setTimeout(resolve, 10_000));
+    await sleep(IMAGE_POLICY.scanPollMilliseconds);
   }
   reject("scan_timeout");
 }

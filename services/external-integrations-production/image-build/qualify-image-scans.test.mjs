@@ -6,6 +6,8 @@ import {
   IMAGE_POLICY,
   listOccurrences,
   parseDigestReference,
+  scanEvidenceFingerprint,
+  waitForCompletedScan,
 } from "./qualify-image-scans.mjs";
 import { POLICY } from "./verify-trigger-context.mjs";
 
@@ -18,8 +20,20 @@ const integrity = Object.freeze({
   runtimeDependenciesEmpty: true,
   compressionPathAbsent: true,
 });
-const occurrence = (kind, details = {}, resourceUri = callback.resourceUrl) => ({ kind, resourceUri, ...details });
-const discovery = (resourceUri = callback.resourceUrl) => occurrence("DISCOVERY", { discovery: { analysisStatus: "FINISHED_SUCCESS" } }, resourceUri);
+let occurrenceSequence = 0;
+const occurrence = (kind, details = {}, resourceUri = callback.resourceUrl) => ({
+  name: `projects/vaeroex-integrations-prod/occurrences/test-${++occurrenceSequence}`,
+  kind,
+  resourceUri,
+  noteName: `projects/goog-${kind.toLowerCase()}/notes/test`,
+  updateTime: "2026-09-14T12:00:00Z",
+  ...details,
+});
+const discovery = (resourceUri = callback.resourceUrl, details = {}) => occurrence("DISCOVERY", {
+  noteName: IMAGE_POLICY.vulnerabilityDiscoveryNote,
+  discovery: { analysisStatus: "FINISHED_SUCCESS", lastScanTime: "2026-09-14T12:00:00Z" },
+  ...details,
+}, resourceUri);
 const vulnerability = (severity, identifier, resourceUri = callback.resourceUrl) => occurrence("VULNERABILITY", {
   noteName: `projects/goog-vulnz/notes/${identifier}`,
   vulnerability: { effectiveSeverity: severity },
@@ -49,10 +63,78 @@ test("requires a completed scan and rejects secrets, criticals and callback high
     SEVERITY_UNSPECIFIED: 0,
   });
   assert.throws(() => evaluateScanOccurrences("callback", [], null), /scan_not_observed/);
-  assert.throws(() => evaluateScanOccurrences("callback", [occurrence("DISCOVERY", { discovery: { analysisStatus: "SCANNING" } })], null), /scan_not_complete/);
+  assert.throws(() => evaluateScanOccurrences("callback", [discovery(callback.resourceUrl, { discovery: { analysisStatus: "SCANNING" } })], null), /scan_not_complete/);
   assert.throws(() => evaluateScanOccurrences("callback", [discovery(), occurrence("SECRET")], null), /secret_finding/);
   assert.throws(() => evaluateScanOccurrences("callback", [discovery(), vulnerability("CRITICAL", "CVE-2099-1")], null), /critical_vulnerability/);
   assert.throws(() => evaluateScanOccurrences("callback", [discovery(), vulnerability("HIGH", IMAGE_POLICY.bootstrapException)], null), /high_vulnerability/);
+});
+
+test("ignores foreign discovery completion and rejects ambiguous or foreign vulnerability evidence", () => {
+  const foreignDiscovery = occurrence("DISCOVERY", {
+    noteName: "projects/foreign-analysis/notes/PACKAGE_VULNERABILITY",
+    discovery: { analysisStatus: "FINISHED_SUCCESS" },
+  });
+  assert.throws(() => evaluateScanOccurrences("callback", [foreignDiscovery], null), /scan_not_observed/);
+  assert.throws(() => evaluateScanOccurrences("callback", [discovery(), discovery()], null), /scan_discovery_ambiguous/);
+  assert.throws(
+    () => evaluateScanOccurrences("callback", [discovery(), occurrence("VULNERABILITY", {
+      noteName: "projects/foreign-vulnz/notes/CVE-2099-4",
+      vulnerability: { effectiveSeverity: "LOW" },
+    })], null),
+    /vulnerability_source_invalid/,
+  );
+});
+
+test("requires a stable completed vulnerability result set and rechecks before qualification", async () => {
+  const completed = discovery();
+  const low = vulnerability("LOW", "CVE-2099-5");
+  const responses = [
+    { occurrences: [completed] },
+    { occurrences: [completed, low] },
+    { occurrences: [completed, low] },
+    { occurrences: [completed, low] },
+  ];
+  let clock = 0;
+  let reads = 0;
+  const result = await waitForCompletedScan("callback", callback, null, "synthetic-token", async () => {
+    reads += 1;
+    return new Response(JSON.stringify(responses.shift()), { status: 200 });
+  }, {
+    now: () => clock,
+    sleep: async (milliseconds) => { clock += milliseconds; },
+  });
+  assert.equal(reads, 4);
+  assert.equal(result.stableReadCount, IMAGE_POLICY.requiredStableScanReads);
+  assert.equal(result.vulnerabilityCount, 1);
+  assert.equal(result.vulnerabilityDiscoveryNote, IMAGE_POLICY.vulnerabilityDiscoveryNote);
+  assert.match(result.evidenceFingerprint, /^[a-f0-9]{64}$/);
+});
+
+test("fails when a critical finding appears during the post-completion stability reads", async () => {
+  const completed = discovery();
+  const responses = [
+    { occurrences: [completed] },
+    { occurrences: [completed, vulnerability("CRITICAL", "CVE-2099-6")] },
+  ];
+  let clock = 0;
+  await assert.rejects(
+    waitForCompletedScan("callback", callback, null, "synthetic-token", async () =>
+      new Response(JSON.stringify(responses.shift()), { status: 200 }), {
+      now: () => clock,
+      sleep: async (milliseconds) => { clock += milliseconds; },
+    }),
+    /critical_vulnerability/,
+  );
+});
+
+test("scan stability fingerprints require immutable occurrence identity and update time", () => {
+  const completed = discovery();
+  assert.equal(scanEvidenceFingerprint([completed]), scanEvidenceFingerprint([completed]));
+  assert.notEqual(
+    scanEvidenceFingerprint([completed]),
+    scanEvidenceFingerprint([{ ...completed, updateTime: "2026-09-14T12:01:00Z" }]),
+  );
+  assert.throws(() => scanEvidenceFingerprint([{ ...completed, name: undefined }]), /scan_evidence_identity_invalid/);
 });
 
 test("permits only the exact reviewed bootstrap high-severity exception", () => {
