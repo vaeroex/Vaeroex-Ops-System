@@ -69,6 +69,10 @@ test("rejects manual, unapproved, foreign-source, wrong-revision and impersonate
 
 test("rejects trigger drift and broader source scope", () => {
   rejected((_, trigger) => { trigger.github.owner = "attacker"; }, "trigger_repository_owner");
+  rejected((_, trigger) => {
+    trigger.github.enterpriseConfigResourceName = "projects/vaeroex-integrations-prod/locations/us-west1/githubEnterpriseConfigs/foreign";
+  }, "trigger_enterprise_repository");
+  rejected((_, trigger) => { trigger.github.enterpriseConfigResourceName = ""; }, "trigger_enterprise_repository");
   rejected((_, trigger) => { trigger.resourceName = `projects/foreign/locations/${POLICY.location}/triggers/${triggerId}`; }, "trigger_resource_name");
   rejected((_, trigger) => { trigger.github.push.branch = ".*"; }, "trigger_branch");
   rejected((_, trigger) => { trigger.filename = "cloudbuild.yaml"; }, "trigger_build_config");

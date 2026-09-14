@@ -73,6 +73,7 @@ export function validateTriggerContext(build, trigger) {
   exactString(trigger.github?.owner, POLICY.repositoryOwner, "trigger_repository_owner");
   exactString(trigger.github?.name, POLICY.repositoryName, "trigger_repository_name");
   exactString(trigger.github?.push?.branch, POLICY.branchPattern, "trigger_branch");
+  if (Object.hasOwn(trigger.github ?? {}, "enterpriseConfigResourceName")) reject("trigger_enterprise_repository");
   exactStringSet(trigger.includedFiles, POLICY.includedFiles, "trigger_file_scope");
   exactStringSet(trigger.ignoredFiles ?? [], [], "trigger_ignored_file_scope");
   exactStringSet(Object.keys(trigger.substitutions ?? {}), [], "trigger_substitutions");

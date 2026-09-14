@@ -40,6 +40,7 @@ for (const role of [
 ]) assert.match(main, new RegExp(role.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
 
 assert.match(context, /sourceProvenance\?\.resolvedRepoSource\?\.commitSha/);
+assert.match(context, /Object\.hasOwn\(trigger\.github \?\? \{\}, "enterpriseConfigResourceName"\)/);
 assert.match(context, /approval\?\.state !== "APPROVED"/);
 assert.match(context, /resolvedStorageSource[\s\S]*resolvedStorageSourceManifest[\s\S]*resolvedGitSource[\s\S]*resolvedConnectedRepository/);
 assert.match(context, /REPO_FULL_NAME[\s\S]*REPO_NAME[\s\S]*BRANCH_NAME[\s\S]*TRIGGER_NAME[\s\S]*TRIGGER_BUILD_CONFIG_PATH/);
