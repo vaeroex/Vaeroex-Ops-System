@@ -27,6 +27,7 @@ function fixture() {
   };
   const trigger = {
     id: triggerId,
+    resourceName: `projects/${POLICY.projectId}/locations/${POLICY.location}/triggers/${triggerId}`,
     name: POLICY.triggerName,
     serviceAccount: POLICY.serviceAccount,
     filename: POLICY.buildConfigPath,
@@ -68,10 +69,13 @@ test("rejects manual, unapproved, foreign-source, wrong-revision and impersonate
 
 test("rejects trigger drift and broader source scope", () => {
   rejected((_, trigger) => { trigger.github.owner = "attacker"; }, "trigger_repository_owner");
+  rejected((_, trigger) => { trigger.resourceName = `projects/foreign/locations/${POLICY.location}/triggers/${triggerId}`; }, "trigger_resource_name");
   rejected((_, trigger) => { trigger.github.push.branch = ".*"; }, "trigger_branch");
   rejected((_, trigger) => { trigger.filename = "cloudbuild.yaml"; }, "trigger_build_config");
   rejected((_, trigger) => { trigger.serviceAccount = "projects/vaeroex-integrations-prod/serviceAccounts/other@example.invalid"; }, "trigger_identity_binding");
   rejected((_, trigger) => { trigger.includedFiles.push("**"); }, "trigger_file_scope");
+  rejected((_, trigger) => { trigger.ignoredFiles = ["services/external-integrations-production/image-build/**"]; }, "trigger_ignored_file_scope");
+  rejected((_, trigger) => { trigger.substitutions = { _UNREVIEWED_SOURCE: "true" }; }, "trigger_substitutions");
   rejected((_, trigger) => { trigger.approvalConfig.approvalRequired = false; }, "trigger_approval_config");
   rejected((_, trigger) => { trigger.disabled = true; }, "trigger_disabled");
   rejected((_, trigger) => { trigger.repositoryEventConfig = {}; }, "trigger_foreign_source");

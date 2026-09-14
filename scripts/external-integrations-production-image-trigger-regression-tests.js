@@ -43,6 +43,9 @@ assert.match(context, /sourceProvenance\?\.resolvedRepoSource\?\.commitSha/);
 assert.match(context, /approval\?\.state !== "APPROVED"/);
 assert.match(context, /resolvedStorageSource[\s\S]*resolvedStorageSourceManifest[\s\S]*resolvedGitSource[\s\S]*resolvedConnectedRepository/);
 assert.match(context, /REPO_FULL_NAME[\s\S]*REPO_NAME[\s\S]*BRANCH_NAME[\s\S]*TRIGGER_NAME[\s\S]*TRIGGER_BUILD_CONFIG_PATH/);
+assert.match(context, /trigger\.resourceName[\s\S]*projects\/\$\{POLICY\.projectId\}\/locations\/\$\{POLICY\.location\}\/triggers/);
+assert.match(context, /Object\.keys\(trigger\.substitutions \?\? \{\}\)/);
+assert.match(context, /trigger\.triggerTemplate[\s\S]*trigger\.repositoryEventConfig[\s\S]*trigger\.developerConnectEventConfig[\s\S]*trigger\.sourceToBuild/);
 assert.match(context, /projects\/\$\{POLICY\.projectId\}\/locations\/\$\{POLICY\.location\}\/builds/);
 
 for (const image of ["square-callback-edge", "production-bootstrap"]) {

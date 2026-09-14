@@ -62,6 +62,11 @@ export function validateTriggerContext(build, trigger) {
   exactStringSet(build.tags, ["production-image-build"], "build_tags");
 
   exactString(trigger.id, build.buildTriggerId, "trigger_identity");
+  exactString(
+    trigger.resourceName,
+    `projects/${POLICY.projectId}/locations/${POLICY.location}/triggers/${build.buildTriggerId}`,
+    "trigger_resource_name",
+  );
   exactString(trigger.name, POLICY.triggerName, "trigger_name");
   exactString(trigger.serviceAccount, POLICY.serviceAccount, "trigger_identity_binding");
   exactString(trigger.filename, POLICY.buildConfigPath, "trigger_build_config");
@@ -69,10 +74,14 @@ export function validateTriggerContext(build, trigger) {
   exactString(trigger.github?.name, POLICY.repositoryName, "trigger_repository_name");
   exactString(trigger.github?.push?.branch, POLICY.branchPattern, "trigger_branch");
   exactStringSet(trigger.includedFiles, POLICY.includedFiles, "trigger_file_scope");
+  exactStringSet(trigger.ignoredFiles ?? [], [], "trigger_ignored_file_scope");
+  exactStringSet(Object.keys(trigger.substitutions ?? {}), [], "trigger_substitutions");
   exactStringSet(trigger.tags, ["production-image-build"], "trigger_tags");
   if (trigger.disabled === true) reject("trigger_disabled");
   if (trigger.approvalConfig?.approvalRequired !== true) reject("trigger_approval_config");
-  if (trigger.repositoryEventConfig || trigger.sourceToBuild || trigger.pubsubConfig || trigger.webhookConfig) {
+  if (trigger.triggerTemplate || trigger.repositoryEventConfig || trigger.developerConnectEventConfig ||
+      trigger.sourceToBuild || trigger.pubsubConfig || trigger.webhookConfig ||
+      trigger.bitbucketServerTriggerConfig || trigger.autodetect || trigger.build || trigger.gitFileSource) {
     reject("trigger_foreign_source");
   }
 
