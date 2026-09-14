@@ -1,6 +1,7 @@
 const assert = require("node:assert/strict");
 const { createHash } = require("node:crypto");
 const fs = require("node:fs");
+const os = require("node:os");
 const path = require("node:path");
 const { spawn, spawnSync } = require("node:child_process");
 
@@ -19,6 +20,8 @@ const edgeCallback = read("services/external-integrations-production/callback-ed
 const edgePlugin = read("services/external-integrations-production/callback-edge/plugin/main.go");
 const edgeCloudBuild = read("services/external-integrations-production/callback-edge/cloudbuild.yaml");
 const activationReadme = read("services/external-integrations-production/infra/activation/README.md");
+const reviewedBuildHelperPath = path.join(root, "services/external-integrations-production/infra/activation/submit-reviewed-callback-edge.sh");
+const reviewedBuildHelper = fs.readFileSync(reviewedBuildHelperPath, "utf8");
 const releasePins = read("services/external-integrations-production/infra/activation/production.tfvars.example");
 const activationPath = path.join(root, "services/external-integrations-production/infra/activation");
 
@@ -107,10 +110,12 @@ assert.match(edgePlugin, /ReplaceHttpRequestHeader\(":path", callbackedge\.Callb
 assert.match(edgePlugin, /clearReservedHandoffHeaders\(\)/, "client-forged handoff headers are removed before forwarding");
 assert.doesNotMatch(edgePlugin, /AddHttpRequestHeader\([^\n]*error_description/, "provider error descriptions never enter the internal request");
 assert.match(edgeCloudBuild, /_SOURCE_COMMIT[\s\S]*\^\[a-f0-9\]\{40\}\$/, "callback-edge publication validates the reviewed source revision");
-assert.match(activationReadme, /--service-account=projects\/vaeroex-integrations-prod\/serviceAccounts\/vx-int-prod-build@vaeroex-integrations-prod\.iam\.gserviceaccount\.com/, "callback-edge publication uses only the reviewed build identity");
-assert.match(activationReadme, /--gcs-source-staging-dir=gs:\/\/vaeroex-integrations-prod-build\/callback-edge-source/, "callback-edge publication uses only the reviewed staging bucket");
-assert.match(activationReadme, /_SOURCE_COMMIT=REVIEWED_FULL_GIT_SHA/, "callback-edge publication receives the reviewed source revision");
-assert.match(activationReadme, /_PLUGIN_IMAGE=us-west1-docker\.pkg\.dev\/vaeroex-integrations-prod\/vaeroex-integrations-images\/square-callback-edge:REVIEWED_FULL_GIT_SHA/, "callback-edge publication can write only the reviewed repository path");
+assert.match(activationReadme, /submit-reviewed-callback-edge\.sh REVIEWED_FULL_GIT_SHA/, "the documented publication path uses the checked exact-commit helper");
+assert.match(reviewedBuildHelper, /git -C "\$repository_root" archive[\s\S]*"\$reviewed_commit" "\$source_path"/, "callback-edge source is exported from the reviewed commit rather than copied from the worktree");
+assert.match(reviewedBuildHelper, /--service-account="\$builder"/, "callback-edge publication uses only the reviewed build identity");
+assert.match(reviewedBuildHelper, /--gcs-source-staging-dir="\$staging_dir"/, "callback-edge publication uses only the reviewed staging bucket");
+assert.match(reviewedBuildHelper, /_SOURCE_COMMIT=\$\{reviewed_commit\}/, "callback-edge publication receives the exact archived revision");
+assert.match(reviewedBuildHelper, /_PLUGIN_IMAGE=\$\{image_repository\}:\$\{reviewed_commit\}/, "callback-edge publication can write only the reviewed repository path and tag");
 assert.match(releasePins, new RegExp(`source_commit\\s*=\\s*"${reviewedSourceCommit}"`), "the second-stage release is pinned to the reviewed source revision");
 assert.match(releasePins, new RegExp(`bootstrap_image_digest\\s*=\\s*"${reviewedBootstrapDigest}"`), "the reviewed bootstrap digest is pinned exactly");
 assert.match(releasePins, new RegExp(`callback_edge_image_digest\\s*=\\s*"${reviewedCallbackEdgeDigest}"`), "the independently scanned callback edge digest is pinned exactly");
@@ -145,6 +150,9 @@ assert.match(main, /roles\/artifactregistry\.writer/);
 assert.match(main, /roles\/cloudbuild\.builds\.editor/);
 assert.match(main, /roles\/iam\.serviceAccountUser/);
 assert.match(main, /roles\/iam\.serviceAccountTokenCreator/);
+assert.match(main, /roles\/storage\.objectCreator/);
+assert.match(main, /callback-edge-source-only/);
+assert.match(main, /objects\/callback-edge-source\//, "operator source upload authority is restricted to the callback-edge staging prefix");
 assert.match(main, /google_monitoring_notification_channel/);
 assert.match(main, /validate_ssl\s*=\s*true/);
 assert.match(main, /monitoring\.googleapis\.com\/uptime_check\/check_passed/);
@@ -155,6 +163,61 @@ assert.match(main, /prevent_destroy\s*=\s*true/g);
 assert.doesNotMatch(main, /quickbooks|qbo/i, "activation cannot mutate QBO resources");
 assert.doesNotMatch(main, /supabase|migration|postgres/i, "cloud activation cannot apply database changes");
 assert.doesNotMatch(outputs, /secret_data|password|token/i, "outputs remain non-secret");
+
+function exerciseReviewedBuildHelper() {
+  const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), "vaeroex-reviewed-build-test-"));
+  try {
+    const capturePath = path.join(temporaryRoot, "capture.json");
+    const fakeGcloudPath = path.join(temporaryRoot, "gcloud");
+    fs.writeFileSync(fakeGcloudPath, `#!/usr/bin/env node
+const fs = require("node:fs");
+const crypto = require("node:crypto");
+const path = require("node:path");
+const args = process.argv.slice(2);
+const source = args[2];
+const callback = fs.readFileSync(path.join(source, "callback.go"));
+fs.writeFileSync(process.env.VAEROEX_BUILD_CAPTURE, JSON.stringify({
+  args,
+  callbackSha256: crypto.createHash("sha256").update(callback).digest("hex"),
+}));
+`);
+    fs.chmodSync(fakeGcloudPath, 0o700);
+
+    const head = spawnSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" });
+    assert.equal(head.status, 0, head.stderr);
+    const reviewedCommit = head.stdout.trim();
+    const expected = spawnSync("git", ["show", `${reviewedCommit}:services/external-integrations-production/callback-edge/callback.go`], { cwd: root });
+    assert.equal(expected.status, 0, expected.stderr?.toString());
+
+    const result = spawnSync(reviewedBuildHelperPath, [reviewedCommit], {
+      cwd: temporaryRoot,
+      encoding: "utf8",
+      env: {
+        PATH: `${temporaryRoot}:${process.env.PATH}`,
+        VAEROEX_BUILD_CAPTURE: capturePath,
+      },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    const capture = JSON.parse(fs.readFileSync(capturePath, "utf8"));
+    assert.deepEqual(capture.args.slice(0, 2), ["builds", "submit"]);
+    assert.equal(capture.callbackSha256, createHash("sha256").update(expected.stdout).digest("hex"), "submitted callback source comes from the exact reviewed commit object");
+    assert.ok(capture.args.includes("--project=vaeroex-integrations-prod"));
+    assert.ok(capture.args.includes("--service-account=projects/vaeroex-integrations-prod/serviceAccounts/vx-int-prod-build@vaeroex-integrations-prod.iam.gserviceaccount.com"));
+    assert.ok(capture.args.includes("--gcs-source-staging-dir=gs://vaeroex-integrations-prod-build/callback-edge-source"));
+    assert.ok(capture.args.includes(`--substitutions=_SOURCE_COMMIT=${reviewedCommit},_PLUGIN_IMAGE=us-west1-docker.pkg.dev/vaeroex-integrations-prod/vaeroex-integrations-images/square-callback-edge:${reviewedCommit}`));
+
+    const invalid = spawnSync(reviewedBuildHelperPath, ["not-a-commit"], {
+      cwd: temporaryRoot,
+      encoding: "utf8",
+      env: { PATH: `${temporaryRoot}:${process.env.PATH}`, VAEROEX_BUILD_CAPTURE: capturePath },
+    });
+    assert.notEqual(invalid.status, 0, "invalid source revisions fail before submission");
+  } finally {
+    fs.rmSync(temporaryRoot, { recursive: true, force: true });
+  }
+}
+
+exerciseReviewedBuildHelper();
 
 assert.match(dockerfile, /^FROM gcr\.io\/distroless\/nodejs22-debian13@sha256:[a-f0-9]{64}$/m, "the bootstrap uses an immutable minimal runtime-only base image");
 assert.match(dockerfile, /^COPY --chown=nonroot:nonroot package\.json server\.mjs \.\/$/m, "the bootstrap copies only its runtime files as the unprivileged identity");

@@ -177,6 +177,18 @@ resource "google_storage_bucket_iam_member" "build_source_reader" {
   member = google_service_account.build.member
 }
 
+resource "google_storage_bucket_iam_member" "operator_callback_source_creator" {
+  bucket = google_storage_bucket.build.name
+  role   = "roles/storage.objectCreator"
+  member = "user:${var.operator_email}"
+
+  condition {
+    title       = "callback-edge-source-only"
+    description = "Permit the reviewed operator to upload callback-edge source archives only"
+    expression  = "resource.name.startsWith('projects/_/buckets/${google_storage_bucket.build.name}/objects/callback-edge-source/')"
+  }
+}
+
 resource "google_project_iam_member" "build_log_writer" {
   project = var.project_id
   role    = "roles/logging.logWriter"

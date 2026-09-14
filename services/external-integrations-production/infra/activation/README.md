@@ -25,18 +25,13 @@ Secret Manager grants are provider- and runtime-specific and are conditional on 
 11. Create the exact six LOGIN-to-capability-role bindings using a separately reviewed, password-private operation. Do not grant table access. Deliver each numbered database credential only to its matching secret and identity.
 12. Keep Square credentials absent and provider calls, onboarding, webhook intake, evidence, economics and AI dispatch closed until their individual activation gates pass.
 
-The callback-edge build must use the dedicated reviewed builder and staging bucket. Run it from the repository root with an exact reviewed Git SHA and a tag in the isolated Production repository:
+The callback-edge build must use the dedicated reviewed builder and staging bucket. The checked helper exports the callback source from the exact committed Git object, so neither a dirty worktree nor a different checkout can be labeled as the reviewed revision. Run it with an exact reviewed Git SHA:
 
 ```sh
-gcloud builds submit services/external-integrations-production/callback-edge \
-  --project=vaeroex-integrations-prod \
-  --config=services/external-integrations-production/callback-edge/cloudbuild.yaml \
-  --service-account=projects/vaeroex-integrations-prod/serviceAccounts/vx-int-prod-build@vaeroex-integrations-prod.iam.gserviceaccount.com \
-  --gcs-source-staging-dir=gs://vaeroex-integrations-prod-build/callback-edge-source \
-  --substitutions=_SOURCE_COMMIT=REVIEWED_FULL_GIT_SHA,_PLUGIN_IMAGE=us-west1-docker.pkg.dev/vaeroex-integrations-prod/vaeroex-integrations-images/square-callback-edge:REVIEWED_FULL_GIT_SHA
+./services/external-integrations-production/infra/activation/submit-reviewed-callback-edge.sh REVIEWED_FULL_GIT_SHA
 ```
 
-Do not omit the explicit service account or staging directory. Resolve the published tag to its immutable digest, verify the exact-digest vulnerability result, and update `production.tfvars.example` plus its release-pin regression in the same review. A tag is never a deployable input.
+The operator has conditional object-creation access only below `callback-edge-source/`; the build identity has read access and writes the image. Do not bypass the helper or replace its explicit service account or staging directory. Resolve the published tag to its immutable digest, verify the exact-digest vulnerability result, and update `production.tfvars.example` plus its release-pin regression in the same review. A tag is never a deployable input.
 
 ## Excluded
 
