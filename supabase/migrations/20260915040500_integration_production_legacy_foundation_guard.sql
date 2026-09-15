@@ -161,6 +161,7 @@ begin
       or role_record.rolcanlogin or role_record.rolinherit or role_record.rolsuper
       or role_record.rolcreatedb or role_record.rolcreaterole
       or role_record.rolreplication or role_record.rolbypassrls
+      or role_record.rolconfig is not null
       or exists (
         select 1
         from pg_catalog.pg_auth_members membership
@@ -173,6 +174,30 @@ begin
           )
         )
       )
+      or exists (
+        select 1
+        from pg_catalog.pg_shdepend dependency
+        where dependency.refclassid='pg_authid'::regclass
+          and dependency.refobjid=role_record.oid
+          and dependency.deptype in ('a','o')
+          and not (
+            dependency.deptype='a'
+            and dependency.dbid=(select oid from pg_catalog.pg_database where datname=current_database())
+            and dependency.classid='pg_namespace'::regclass
+            and dependency.objid='public'::regnamespace
+            and dependency.objsubid=0
+          )
+      )
+      or 1 <> (
+        select count(*)
+        from pg_catalog.pg_namespace public_schema
+        cross join lateral pg_catalog.aclexplode(public_schema.nspacl) schema_acl
+        where public_schema.oid='public'::regnamespace
+          and schema_acl.grantee=role_record.oid
+          and schema_acl.privilege_type='USAGE'
+          and not schema_acl.is_grantable
+      )
+      or pg_catalog.has_schema_privilege(role_name,'public','CREATE')
       or 1 < (select count(*) from pg_catalog.pg_auth_members where roleid=role_record.oid)
     then
       raise exception 'integration_production_foundation_role_drift'

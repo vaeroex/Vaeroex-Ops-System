@@ -82,6 +82,21 @@ async function qualify(runtime) {
   catch (error) { legacyGuardError=error; }
   eq(legacyGuardError?.code,"55000","forward guard rejects retained fingerprint implementation drift");
   await c.query("rollback");
+  await c.query("begin");
+  await c.query("create table public.production_role_owned_guard_test(marker integer)");
+  await c.query("alter table public.production_role_owned_guard_test owner to square_production_runtime_authority");
+  legacyGuardError=undefined;
+  try { await runtime.applyMigrations(c,[productionCompatibility.at(-1)]); }
+  catch (error) { legacyGuardError=error; }
+  eq(legacyGuardError?.code,"55000","forward guard rejects unrelated object ownership by an authority role");
+  await c.query("rollback");
+  await c.query("begin");
+  await c.query("grant select on public.workspaces to square_production_runtime_authority");
+  legacyGuardError=undefined;
+  try { await runtime.applyMigrations(c,[productionCompatibility.at(-1)]); }
+  catch (error) { legacyGuardError=error; }
+  eq(legacyGuardError?.code,"55000","forward guard rejects unrelated ACL privileges held by an authority role");
+  await c.query("rollback");
   const installedSchema=await runtime.sourceSchemaFingerprint(c);
   const genericCounts=async()=>{const counts={};for(const table of ["external_source_records","external_source_record_versions","canonical_business_facts","canonical_business_fact_versions","business_fact_sources","fact_contribution_batches","fact_contribution_events"])counts[table]=(await c.query(`select count(*)::int n from private.${table}`)).rows[0].n;return counts;};
   const genericBefore=await genericCounts();

@@ -112,6 +112,8 @@ assert.match(migration, /square_production_authority_role_drift/);
 assert.match(migration, /pg_catalog\.pg_auth_members/);
 assert.match(migration, /m\.inherit_option or m\.set_option or not m\.admin_option/);
 assert.match(migration, /member_role\.rolsuper or member_role\.rolcreaterole/);
+assert.match(migration, /pg_catalog\.pg_shdepend[\s\S]*dependency\.deptype in \('a','o'\)/,
+  "pre-existing capability roles cannot own or hold ACL privileges on database objects");
 assert.match(migration, /1 < \(\s*select count\(\*\) from pg_catalog\.pg_auth_members where roleid=role_record\.oid/);
 assert.doesNotMatch(migration, /revoke %I from %I/);
 assert.match(migration, /economic_contributions_enabled boolean not null default false check\(not economic_contributions_enabled\)/);
@@ -182,6 +184,10 @@ assert.match(legacyGuard, /convert_to\(object_record\.prosrc,'UTF8'\)[\s\S]*98a8
   "forward guard binds the retained fingerprint helper to its reviewed implementation bytes");
 assert.match(legacyGuard, /integration_production_foundation_role_drift/,
   "forward guard revalidates dormant authority role attributes and memberships");
+assert.match(legacyGuard, /pg_catalog\.pg_shdepend[\s\S]*dependency\.classid='pg_namespace'::regclass[\s\S]*dependency\.objid='public'::regnamespace/,
+  "forward guard permits only the reviewed public-schema ACL dependency");
+assert.match(legacyGuard, /aclexplode\(public_schema\.nspacl\)[\s\S]*privilege_type='USAGE'[\s\S]*has_schema_privilege\(role_name,'public','CREATE'\)/,
+  "forward guard requires exact non-grantable public USAGE without CREATE");
 assert.doesNotMatch(legacyGuard, /drop\s+|delete\s+from|alter\s+table/i,
   "the forward guard never mutates legacy authority state while rejecting it");
 

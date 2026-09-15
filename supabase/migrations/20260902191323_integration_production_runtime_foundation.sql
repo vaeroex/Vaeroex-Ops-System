@@ -28,7 +28,7 @@ begin
     -- non-administrative, or additional memberships.
     if role_record.rolcanlogin or role_record.rolinherit or role_record.rolsuper or
       role_record.rolcreatedb or role_record.rolcreaterole or role_record.rolreplication or
-      role_record.rolbypassrls or exists(
+      role_record.rolbypassrls or role_record.rolconfig is not null or exists(
         select 1
         from pg_catalog.pg_auth_members m
         left join pg_catalog.pg_roles member_role on member_role.oid=m.member
@@ -38,6 +38,12 @@ begin
             not (member_role.rolsuper or member_role.rolcreaterole)
           )
         )
+      ) or exists(
+        select 1
+        from pg_catalog.pg_shdepend dependency
+        where dependency.refclassid='pg_authid'::regclass
+          and dependency.refobjid=role_record.oid
+          and dependency.deptype in ('a','o')
       ) or 1 < (
         select count(*) from pg_catalog.pg_auth_members where roleid=role_record.oid
       ) then
