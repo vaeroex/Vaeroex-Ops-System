@@ -303,7 +303,6 @@ async function applyFixture(databaseUrl) {
 
 async function qualifyProductionRoleDrift(databaseUrl) {
   const { Client } = require("pg");
-  const crypto = require("node:crypto");
   const client = new Client({ connectionString: databaseUrl });
   await client.connect();
   try {
