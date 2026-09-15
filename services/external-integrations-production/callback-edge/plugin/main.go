@@ -17,6 +17,11 @@ type vmContext struct{ types.DefaultVMContext }
 type pluginContext struct{ types.DefaultPluginContext }
 type httpContext struct{ types.DefaultHttpContext }
 
+const (
+	diagnosticMarker = "vaeroex_public_synthetic_predicate_v1"
+	diagnosticTarget = callbackedge.CallbackPath + "?state=0123456789_abcdefghijklmnopqrstuvwxyz-ABCDE&code=vaeroex-edge-diagnostic"
+)
+
 func (*vmContext) NewPluginContext(uint32) types.PluginContext { return &pluginContext{} }
 func (*pluginContext) NewHttpContext(uint32) types.HttpContext { return &httpContext{} }
 
@@ -58,10 +63,19 @@ func (*httpContext) OnHttpRequestHeaders(headerCount int, _ bool) (action types.
 		sendFixedResponse(400, "invalid integration callback")
 		return action
 	}
-	handoff, err := callbackedge.ParseForwardedHeaderCallback(
+	requestTarget, requestTargetError := proxywasm.GetHttpRequestHeader(":path")
+	handoff, reason := callbackedge.DiagnoseForwardedHeaderCallback(
 		string(method), string(path), string(rawQuery), headers,
 	)
-	if err != nil {
+	if requestTargetError == nil && isExactDiagnosticCanary(headers, requestTarget) {
+		status := uint32(200)
+		if reason != callbackedge.RejectionNone {
+			status = 400
+		}
+		sendFixedResponse(status, "callback_predicate_"+string(reason))
+		return action
+	}
+	if reason != callbackedge.RejectionNone {
 		sendFixedResponse(400, "invalid integration callback")
 		return action
 	}
@@ -85,6 +99,22 @@ func (*httpContext) OnHttpRequestHeaders(headerCount int, _ bool) (action types.
 		return action
 	}
 	return types.ActionContinue
+}
+
+func isExactDiagnosticCanary(headers [][2]string, requestTarget string) bool {
+	if requestTarget != diagnosticTarget {
+		return false
+	}
+	markerCount := 0
+	for _, header := range headers {
+		if header[0] == callbackedge.HandoffVersionHeader {
+			markerCount++
+			if header[1] != diagnosticMarker {
+				return false
+			}
+		}
+	}
+	return markerCount == 1
 }
 
 func clearReservedHandoffHeaders() bool {
