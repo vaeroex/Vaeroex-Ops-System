@@ -154,6 +154,9 @@ assert.ok(migration.trimEnd().endsWith("commit;"), "the self-contained foundatio
 
 assert.match(overlay, /square_production_runtime_overlay_prerequisite_missing/);
 assert.match(overlay, /square_production_runtime_overlay_configuration_authority_drifted/);
+assert.match(overlay, /square_production_runtime_overlay_configuration_gate_open/);
+assert.match(overlay, /configuration\.environment='production'[\s\S]*configuration\.surface_enabled is distinct from false[\s\S]*configuration\.enrollment_enabled is distinct from false/,
+  "the legacy overlay refuses an already-open Production lifecycle surface");
 assert.match(overlay, /configuration_relation\.relforcerowsecurity[\s\S]*configuration_relation\.relowner=/);
 assert.match(overlay, /configuration_column\.attacl/,
   "the retained lifecycle configuration exposes no table or column ACL to a non-owner");

@@ -53,6 +53,17 @@ begin
       errcode='55000',
       message='square_production_runtime_overlay_configuration_authority_drifted';
   end if;
+  if exists(
+       select 1
+       from private.square_account_configuration configuration
+       where configuration.environment='production'
+         and (configuration.surface_enabled is distinct from false or
+           configuration.enrollment_enabled is distinct from false)
+     ) then
+    raise exception using
+      errcode='55000',
+      message='square_production_runtime_overlay_configuration_gate_open';
+  end if;
 
   foreach authority_role_name in array array[
     'square_production_oauth_authority','square_production_broker_authority',
