@@ -7,6 +7,7 @@ begin;
 do $legacy_overlay_guard$
 declare
   marker_owner oid;
+  marker_record record;
   object_name text;
   object_record record;
   role_name text;
@@ -16,8 +17,38 @@ begin
     raise exception 'integration_production_legacy_foundation_requires_review'
       using errcode = '55000';
   end if;
-  if private.integration_production_foundation_split_marker_v1()
-      is distinct from '20260902191323_provider_neutral' then
+  select marker_function.proowner,marker_function.provolatile,
+      marker_function.proisstrict,marker_function.proparallel,
+      marker_function.prosecdef,marker_function.proconfig,marker_function.prosrc,
+      marker_function.prokind,marker_function.pronargs,marker_function.prorettype,
+      marker_language.lanname
+    into strict marker_record
+  from pg_catalog.pg_proc marker_function
+  join pg_catalog.pg_language marker_language on marker_language.oid=marker_function.prolang
+  where marker_function.oid=
+    'private.integration_production_foundation_split_marker_v1()'::regprocedure;
+  if marker_record.proowner <> current_user::regrole::oid
+    or marker_record.provolatile <> 'i'
+    or marker_record.proisstrict
+    or marker_record.proparallel <> 's'
+    or marker_record.prosecdef
+    or marker_record.proconfig is distinct from array['search_path=""']
+    or marker_record.prokind <> 'f'
+    or marker_record.pronargs <> 0
+    or marker_record.prorettype <> 'text'::regtype
+    or marker_record.lanname <> 'sql'
+    or pg_catalog.encode(
+      extensions.digest(pg_catalog.convert_to(marker_record.prosrc,'UTF8'),'sha256'),
+      'hex'
+    ) <> 'dfd23104a61cf287a6f4425453ff83008c80fa1214884ac13f0c8bf948723ecf'
+    or exists (
+      select 1
+      from pg_catalog.pg_proc marker_function
+      cross join lateral pg_catalog.aclexplode(marker_function.proacl) marker_acl
+      where marker_function.oid=
+        'private.integration_production_foundation_split_marker_v1()'::regprocedure
+        and marker_acl.grantee<>marker_function.proowner
+    ) then
     raise exception 'integration_production_legacy_foundation_requires_review'
       using errcode = '55000';
   end if;
@@ -47,13 +78,7 @@ begin
       using errcode = '55000';
   end if;
 
-  select proowner into strict marker_owner
-  from pg_catalog.pg_proc
-  where oid = 'private.integration_production_foundation_split_marker_v1()'::regprocedure;
-  if marker_owner <> current_user::regrole::oid then
-    raise exception 'integration_production_foundation_owner_drift'
-      using errcode = '55000';
-  end if;
+  marker_owner := marker_record.proowner;
 
   foreach object_name in array array[
     'private.integration_production_platform_bindings',

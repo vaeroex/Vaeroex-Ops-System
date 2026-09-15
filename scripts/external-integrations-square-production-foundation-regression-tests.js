@@ -162,8 +162,12 @@ assert.match(historicalMarker, /create function private\.integration_production_
   "fresh installs leave an explicit split-foundation ledger marker");
 assert.doesNotMatch(historicalMarker, /square_production_(?:runtime_binding|configuration_fingerprint|binding_fingerprint|authority_fingerprint)|create\s+(?:table|role)|alter\s+table|drop\s+/i,
   "fresh installs do not recreate any historical Square overlay authority");
-assert.match(legacyGuard, /to_regprocedure\('private\.integration_production_foundation_split_marker_v1\(\)'\) is null[\s\S]*integration_production_legacy_foundation_requires_review[\s\S]*integration_production_foundation_split_marker_v1\(\)[\s\S]*is distinct from '20260902191323_provider_neutral'/,
+assert.match(legacyGuard, /to_regprocedure\('private\.integration_production_foundation_split_marker_v1\(\)'\) is null[\s\S]*integration_production_legacy_foundation_requires_review/,
   "a previously recorded all-in-one migration cannot pass without the new split marker");
+assert.match(legacyGuard, /marker_record\.proowner <> current_user::regrole::oid[\s\S]*marker_record\.lanname <> 'sql'[\s\S]*convert_to\(marker_record\.prosrc,'UTF8'\)[\s\S]*dfd23104a61cf287a6f4425453ff83008c80fa1214884ac13f0c8bf948723ecf/,
+  "the split marker's owner, execution metadata and exact body are authenticated before use");
+assert.doesNotMatch(legacyGuard, /private\.integration_production_foundation_split_marker_v1\(\)\s*(?:is|=|<>)/,
+  "the forward guard never invokes an untrusted split-marker body");
 for (const legacyArtifact of [
   "square_production_runtime_binding",
   "square_production_configuration_fingerprint_v1",

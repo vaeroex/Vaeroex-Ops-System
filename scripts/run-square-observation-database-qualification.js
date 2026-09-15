@@ -41,6 +41,15 @@ async function qualify(runtime) {
   catch (error) { legacyGuardError=error; }
   eq(legacyGuardError?.code,"55000","a previously recorded all-in-one migration fails without the split marker");
   await runtime.applyMigrations(c,[productionCompatibility.at(0)]);
+  await c.query("begin");
+  await c.query(`create or replace function private.integration_production_foundation_split_marker_v1()
+    returns text language sql immutable parallel safe set search_path=''
+    as $function$ select '20260902191323_'||'provider_neutral' $function$`);
+  legacyGuardError=undefined;
+  try { await runtime.applyMigrations(c,[productionCompatibility.at(-1)]); }
+  catch (error) { legacyGuardError=error; }
+  eq(legacyGuardError?.code,"55000","forward guard rejects a changed split-marker implementation without invoking it");
+  await c.query("rollback");
   await c.query("create table private.square_production_runtime_binding(legacy_marker integer)");
   legacyGuardError=undefined;
   try { await runtime.applyMigrations(c,[productionCompatibility.at(-1)]); }
