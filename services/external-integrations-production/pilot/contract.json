@@ -17,6 +17,7 @@
   ],
   "database": {
     "requiredFoundationVersion": "20260902191323",
+    "requiredOverlayVersion": "20260902191324",
     "squareOverlayRequired": true,
     "loginBindings": {
       "square_production_oauth": "square_production_oauth_authority",

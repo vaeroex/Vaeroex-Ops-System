@@ -27,6 +27,7 @@ assert.equal(contract.hostname, "square.vaeroex.com");
 assert.equal(contract.callbackUrl, "https://square.vaeroex.com/api/integrations/square/callback");
 assert.equal(contract.webhookUrl, "https://square.vaeroex.com/api/integrations/square/webhook");
 assert.equal(contract.database.requiredFoundationVersion, "20260902191323");
+assert.equal(contract.database.requiredOverlayVersion, "20260902191324");
 assert.equal(contract.database.squareOverlayRequired, true);
 assert.equal(contract.pilotPolicy.maximumAllowlistedWorkspaces, 1);
 assert.equal(contract.pilotPolicy.maximumAllowlistedSellers, 1);
@@ -89,6 +90,7 @@ const blockedOutput = run(process.execPath, [
 const blocked = JSON.parse(blockedOutput);
 assert.equal(blocked.readyForOneCustomerActivationReview, false);
 assert.equal(blocked.gatesRemainClosed, true);
+assert.ok(blocked.findings.includes("database_ledger_not_exact_overlay"));
 assert.ok(blocked.findings.includes("square_overlay_missing"));
 
 console.log("Production Square pilot package regression tests passed");

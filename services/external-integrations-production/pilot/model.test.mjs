@@ -18,6 +18,7 @@ test("the checked-in Production baseline is closed and accurately blocked", () =
   const result = qualifyPilotEvidence(contract, baseline, head);
   assert.equal(result.readyForOneCustomerActivationReview, false);
   assert.equal(result.gatesRemainClosed, true);
+  assert.ok(result.findings.includes("database_ledger_not_exact_overlay"));
   assert.ok(result.findings.includes("square_overlay_missing"));
   assert.ok(result.findings.includes("callback_layer_unqualified"));
   assert.ok(result.findings.includes("exactly_one_workspace_required"));
@@ -26,6 +27,7 @@ test("the checked-in Production baseline is closed and accurately blocked", () =
 
 test("one mapped internal seller can reach review while every gate stays closed", () => {
   const evidence = structuredClone(baseline);
+  evidence.database.ledgerHead = contract.database.requiredOverlayVersion;
   evidence.database.squareOverlayApplied = true;
   evidence.database.loginBindingsVerified = true;
   evidence.callbackLayerQualified = true;

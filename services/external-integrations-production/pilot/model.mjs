@@ -57,7 +57,7 @@ export function qualifyPilotEvidence(contract, evidence, expectedHead) {
   }
 
   exactKeys(evidence.database, ["ledgerHead", "foundationApplied", "squareOverlayApplied", "loginBindingsVerified", "directTablePrivilegesAbsent"], "database evidence");
-  requireEqual(evidence.database.ledgerHead, contract.database.requiredFoundationVersion, "database_ledger_not_exact_foundation");
+  requireEqual(evidence.database.ledgerHead, contract.database.requiredOverlayVersion, "database_ledger_not_exact_overlay");
   requireEqual(evidence.database.foundationApplied, true, "production_foundation_missing");
   requireEqual(evidence.database.squareOverlayApplied, true, "square_overlay_missing");
   requireEqual(evidence.database.loginBindingsVerified, true, "login_bindings_unverified");

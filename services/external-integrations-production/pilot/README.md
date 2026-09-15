@@ -7,6 +7,10 @@ describes the current blocked state: Production database foundation
 credential containers are empty, the allowlist is empty, and every gate is
 false.
 
+An activation-review candidate must have the adjacent reviewed Square overlay
+as its exact ledger head, `20260902191324`. Merely setting an “overlay applied”
+flag while the ledger remains at the foundation is rejected.
+
 The immutable network contract is:
 
 - project `vaeroex-integrations-prod`, region `us-west1`;

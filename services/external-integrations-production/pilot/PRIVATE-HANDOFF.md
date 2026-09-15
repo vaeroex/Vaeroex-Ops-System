@@ -14,7 +14,8 @@ into Git, CI, an issue, a PR, chat or a recorded terminal.
    or stale readback.
 
 2. After the separate overlay review approves its exact migration, apply only
-   that migration with the normal migration tool and exact-version bound. Do not
+   adjacent version `20260902191324` with the normal migration tool and
+   exact-version bound. Verify the ledger head is exactly that version. Do not
    apply Sandbox migrations or change QBO. Record only its version and hash.
 
 3. Provision the six native LOGINs only after the overlay RPC allowlist is
