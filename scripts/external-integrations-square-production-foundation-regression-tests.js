@@ -145,6 +145,10 @@ assert.ok(migration.trimStart().startsWith("-- Closed-by-default Production Inte
 assert.ok(migration.trimEnd().endsWith("commit;"), "the self-contained foundation is one explicit transaction");
 
 assert.match(overlay, /square_production_runtime_overlay_prerequisite_missing/);
+assert.match(overlay, /square_production_runtime_overlay_configuration_authority_drifted/);
+assert.match(overlay, /configuration_relation\.relforcerowsecurity[\s\S]*configuration_relation\.relowner=/);
+assert.match(overlay, /configuration_column\.attacl/,
+  "the retained lifecycle configuration exposes no table or column ACL to a non-owner");
 assert.match(overlay, /square_production_runtime_overlay_partial_or_drifted/);
 assert.match(overlay, /square_production_runtime_overlay_shared_foundation_attributes_drifted/);
 assert.match(overlay, /square_production_runtime_overlay_shared_foundation_semantics_drifted/);
@@ -184,8 +188,8 @@ assert.match(overlay, /provider_platform_fk\.confmatchtype='s'/);
 assert.match(overlay, /array\['platform_binding_key','project_id','region','source_commit'\]::text\[\]/);
 assert.match(overlay, /array\['binding_key','project_id','region','source_commit'\]::text\[\]/,
   "the retained provider row must preserve its exact provider-to-platform authority chain");
-assert.match(overlay, /provider_column\.attname=any\(array\[[\s\S]*'platform_binding_key','project_id','region','source_commit'[\s\S]*provider_column\.attnotnull/,
-  "every provider-to-platform FK column remains non-null");
+assert.match(overlay, /provider_column\.attname=any\(array\[[\s\S]*'platform_binding_key','project_id','region','source_commit','route_namespace'[\s\S]*provider_column\.attnotnull/,
+  "every provider-to-platform FK column and the callback route namespace remain non-null");
 assert.match(overlay, /square_production_runtime_overlay_platform_authority_target_drifted/);
 assert.match(overlay, /platform_binding\.binding_key is distinct from 'vaeroex-production-integrations-v1'/);
 assert.match(overlay, /platform_binding\.runtime_enabled is distinct from false[\s\S]*platform_binding\.economic_contributions_enabled is distinct from false[\s\S]*platform_binding\.ai_dispatch_enabled is distinct from false/,
@@ -205,6 +209,10 @@ assert.match(overlay, /add constraint integration_production_platform_overlay_gu
   "one validated platform guard scans all retained rows and pins future closed-state authority");
 assert.match(overlay, /add constraint integration_production_provider_overlay_guard check\([\s\S]*callback_uri !~\* '\(sandbox\|preview\|localhost\|sslip\\\.io\)'[\s\S]*split_part\(kms_key_resource,'\/',2\)=project_id[\s\S]*not ai_dispatch_enabled/,
   "one validated provider guard scans all retained rows and pins endpoints, KMS scope, and gates");
+assert.match(overlay, /closed_created_object_acls/);
+assert.match(overlay, /object_acl\.grantee<>object_relation\.relowner/);
+assert.match(overlay, /function_acl\.grantee<>created_function\.proowner/,
+  "all custom default grants are stripped from newly created authority objects");
 assert.match(overlay, /conname='integration_production_platform_overlay_guard'[\s\S]*convalidated/);
 assert.match(overlay, /conname='integration_production_provider_overlay_guard'[\s\S]*convalidated/,
   "postflight retains both complete shared-table authority guards");

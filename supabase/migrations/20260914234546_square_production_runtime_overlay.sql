@@ -26,6 +26,37 @@ begin
       errcode='55000',
       message='square_production_runtime_overlay_prerequisite_missing';
   end if;
+  if not exists(
+       select 1
+       from pg_catalog.pg_class configuration_relation
+       where configuration_relation.oid='private.square_account_configuration'::regclass
+         and configuration_relation.relkind='r'
+         and configuration_relation.relrowsecurity
+         and configuration_relation.relforcerowsecurity
+         and configuration_relation.relowner=(select oid from pg_catalog.pg_roles where rolname=current_user)
+     ) or exists(
+       select 1
+       from pg_catalog.pg_class configuration_relation
+       cross join lateral pg_catalog.aclexplode(
+         coalesce(configuration_relation.relacl,'{}'::aclitem[])
+       ) configuration_acl
+       where configuration_relation.oid='private.square_account_configuration'::regclass
+         and configuration_acl.grantee<>configuration_relation.relowner
+     ) or exists(
+       select 1
+       from pg_catalog.pg_attribute configuration_column
+       cross join lateral pg_catalog.aclexplode(
+         coalesce(configuration_column.attacl,'{}'::aclitem[])
+       ) configuration_column_acl
+       where configuration_column.attrelid='private.square_account_configuration'::regclass
+         and not configuration_column.attisdropped
+         and configuration_column_acl.grantee<>(select relowner from pg_catalog.pg_class
+           where oid='private.square_account_configuration'::regclass)
+     ) then
+    raise exception using
+      errcode='55000',
+      message='square_production_runtime_overlay_configuration_authority_drifted';
+  end if;
 
   foreach authority_role_name in array array[
     'square_production_oauth_authority','square_production_broker_authority',
@@ -182,12 +213,12 @@ begin
            join pg_catalog.pg_attribute attribute
              on attribute.attrelid=provider_platform_fk.confrelid and attribute.attnum=key_part.attnum)
            =array['binding_key','project_id','region','source_commit']::text[]
-     ) or 4<>(
+     ) or 5<>(
        select pg_catalog.count(*)
        from pg_catalog.pg_attribute provider_column
        where provider_column.attrelid='private.integration_production_provider_bindings'::regclass
          and provider_column.attname=any(array[
-           'platform_binding_key','project_id','region','source_commit'
+           'platform_binding_key','project_id','region','source_commit','route_namespace'
          ]::text[])
          and provider_column.attnotnull
          and not provider_column.attisdropped
@@ -461,6 +492,56 @@ revoke all on table private.square_production_runtime_binding from public,anon,a
   square_production_scheduler_authority,square_production_webhook_authority,
   square_production_runtime_authority,square_production_evidence_authority;
 
+-- PostgreSQL default privileges can name roles outside the reviewed runtime
+-- list. Strip every explicit non-owner grant introduced at object creation,
+-- including custom default grants, before postflight acceptance.
+do $closed_created_object_acls$
+declare
+  grantee_oid oid;
+  grantee_name name;
+begin
+  for grantee_oid in
+    select distinct object_acl.grantee
+    from pg_catalog.pg_class object_relation
+    cross join lateral pg_catalog.aclexplode(
+      coalesce(object_relation.relacl,'{}'::aclitem[])
+    ) object_acl
+    where object_relation.oid='private.square_production_runtime_binding'::regclass
+      and object_acl.grantee<>object_relation.relowner
+  loop
+    if grantee_oid=0 then
+      execute 'revoke all on table private.square_production_runtime_binding from public';
+    else
+      select rolname into strict grantee_name from pg_catalog.pg_roles where oid=grantee_oid;
+      execute pg_catalog.format(
+        'revoke all on table private.square_production_runtime_binding from %I',grantee_name
+      );
+    end if;
+  end loop;
+
+  for grantee_oid in
+    select distinct function_acl.grantee
+    from pg_catalog.pg_proc created_function
+    cross join lateral pg_catalog.aclexplode(
+      coalesce(created_function.proacl,'{}'::aclitem[])
+    ) function_acl
+    where created_function.oid=
+      'private.square_production_configuration_fingerprint_v1(text,text,text,name,name,name,text)'::regprocedure
+      and function_acl.grantee<>created_function.proowner
+  loop
+    if grantee_oid=0 then
+      execute 'revoke all on function private.square_production_configuration_fingerprint_v1(text,text,text,name,name,name,text) from public';
+    else
+      select rolname into strict grantee_name from pg_catalog.pg_roles where oid=grantee_oid;
+      execute pg_catalog.format(
+        'revoke all on function private.square_production_configuration_fingerprint_v1(text,text,text,name,name,name,text) from %I',
+        grantee_name
+      );
+    end if;
+  end loop;
+end
+$closed_created_object_acls$;
+
 do $validated$
 declare
   fingerprint_proc pg_catalog.pg_proc;
@@ -501,6 +582,21 @@ begin
        where conrelid='private.integration_production_provider_bindings'::regclass
          and conname='integration_production_provider_overlay_guard'
          and contype='c' and convalidated) or
+     exists(select 1
+       from pg_catalog.pg_class runtime_relation
+       cross join lateral pg_catalog.aclexplode(
+         coalesce(runtime_relation.relacl,'{}'::aclitem[])
+       ) runtime_acl
+       where runtime_relation.oid='private.square_production_runtime_binding'::regclass
+         and runtime_acl.grantee<>runtime_relation.relowner) or
+     exists(select 1
+       from pg_catalog.pg_proc created_function
+       cross join lateral pg_catalog.aclexplode(
+         coalesce(created_function.proacl,'{}'::aclitem[])
+       ) function_acl
+       where created_function.oid=
+         'private.square_production_configuration_fingerprint_v1(text,text,text,name,name,name,text)'::regprocedure
+         and function_acl.grantee<>created_function.proowner) or
      not exists(select 1 from pg_catalog.pg_constraint c
        where c.conrelid='private.square_production_runtime_binding'::regclass
          and c.contype='p' and c.convalidated
