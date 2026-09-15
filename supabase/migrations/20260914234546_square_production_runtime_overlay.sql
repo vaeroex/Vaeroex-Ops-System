@@ -135,7 +135,14 @@ begin
   if exists(
        select 1
        from private.integration_production_provider_bindings provider_binding
-       where provider_binding.provider_authority_fingerprint is distinct from
+       where provider_binding.enabled is distinct from false
+          or provider_binding.provider_calls_enabled is distinct from false
+          or provider_binding.customer_onboarding_enabled is distinct from false
+          or provider_binding.webhook_intake_enabled is distinct from false
+          or provider_binding.evidence_enabled is distinct from false
+          or provider_binding.economic_contributions_enabled is distinct from false
+          or provider_binding.ai_dispatch_enabled is distinct from false
+          or provider_binding.provider_authority_fingerprint is distinct from
          private.integration_production_fingerprint_v1(array[
            provider_binding.provider_key,
            provider_binding.environment,
@@ -147,6 +154,25 @@ begin
     raise exception using
       errcode='55000',
       message='square_production_runtime_overlay_provider_fingerprint_value_drifted';
+  end if;
+  if 7<>(
+       select pg_catalog.count(*)
+       from pg_catalog.pg_constraint provider_gate_check
+       where provider_gate_check.conrelid='private.integration_production_provider_bindings'::regclass
+         and provider_gate_check.contype='c'
+         and provider_gate_check.convalidated
+         and pg_catalog.regexp_replace(
+           pg_catalog.pg_get_expr(provider_gate_check.conbin,provider_gate_check.conrelid,false),
+           '[[:space:]]','','g'
+         )=any(array[
+           '(NOTenabled)','(NOTprovider_calls_enabled)','(NOTcustomer_onboarding_enabled)',
+           '(NOTwebhook_intake_enabled)','(NOTevidence_enabled)',
+           '(NOTeconomic_contributions_enabled)','(NOTai_dispatch_enabled)'
+         ]::text[])
+     ) then
+    raise exception using
+      errcode='55000',
+      message='square_production_runtime_overlay_provider_gate_constraint_drifted';
   end if;
   if not exists(
        select 1
@@ -198,18 +224,28 @@ begin
          and platform_relation.relforcerowsecurity
      ) or exists(
        select 1
-       from private.integration_production_provider_bindings provider_binding
-       join private.integration_production_platform_bindings platform_binding
-         on platform_binding.binding_key=provider_binding.platform_binding_key
-        and platform_binding.project_id=provider_binding.project_id
-        and platform_binding.region=provider_binding.region
-        and platform_binding.source_commit=provider_binding.source_commit
+       from private.integration_production_platform_bindings platform_binding
        where platform_binding.binding_key is distinct from 'vaeroex-production-integrations-v1'
           or platform_binding.environment is distinct from 'production'
           or platform_binding.infrastructure_provisioned is distinct from false
           or platform_binding.runtime_enabled is distinct from false
           or platform_binding.economic_contributions_enabled is distinct from false
           or platform_binding.ai_dispatch_enabled is distinct from false
+     ) or 6<>(
+       select pg_catalog.count(*)
+       from pg_catalog.pg_constraint platform_gate_check
+       where platform_gate_check.conrelid='private.integration_production_platform_bindings'::regclass
+         and platform_gate_check.contype='c'
+         and platform_gate_check.convalidated
+         and pg_catalog.regexp_replace(
+           pg_catalog.pg_get_expr(platform_gate_check.conbin,platform_gate_check.conrelid,false),
+           '[[:space:]]','','g'
+         )=any(array[
+           '(binding_key=''vaeroex-production-integrations-v1''::text)',
+           '(environment=''production''::text)',
+           '(NOTinfrastructure_provisioned)','(NOTruntime_enabled)',
+           '(NOTeconomic_contributions_enabled)','(NOTai_dispatch_enabled)'
+         ]::text[])
      ) then
     raise exception using
       errcode='55000',

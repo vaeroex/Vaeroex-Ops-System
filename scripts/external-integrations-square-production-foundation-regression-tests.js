@@ -176,6 +176,11 @@ assert.match(overlay, /private\.integration_production_fingerprint_v1\(ARRAY\[pr
 assert.match(overlay, /square_production_runtime_overlay_provider_fingerprint_value_drifted/);
 assert.match(overlay, /provider_binding\.provider_authority_fingerprint is distinct from[\s\S]*provider_binding\.provider_key[\s\S]*provider_binding\.kms_key_resource/,
   "stored generated values are revalidated after any temporarily drifted helper definition");
+assert.match(overlay, /provider_binding\.enabled is distinct from false[\s\S]*provider_binding\.provider_calls_enabled is distinct from false[\s\S]*provider_binding\.ai_dispatch_enabled is distinct from false/,
+  "every retained provider row remains closed before runtime authority is composed");
+assert.match(overlay, /square_production_runtime_overlay_provider_gate_constraint_drifted/);
+assert.match(overlay, /'\(NOTenabled\)'[\s\S]*'\(NOTai_dispatch_enabled\)'/,
+  "all seven provider gate constraints remain fail-closed for future rows");
 assert.match(overlay, /square_production_runtime_overlay_provider_authority_chain_drifted/);
 assert.match(overlay, /provider_platform_fk\.confrelid='private\.integration_production_platform_bindings'::regclass/);
 assert.match(overlay, /provider_platform_fk\.confmatchtype='s'/);
@@ -188,6 +193,9 @@ assert.match(overlay, /square_production_runtime_overlay_platform_authority_targ
 assert.match(overlay, /platform_binding\.binding_key is distinct from 'vaeroex-production-integrations-v1'/);
 assert.match(overlay, /platform_binding\.runtime_enabled is distinct from false[\s\S]*platform_binding\.economic_contributions_enabled is distinct from false[\s\S]*platform_binding\.ai_dispatch_enabled is distinct from false/,
   "retained platform authority remains canonical and closed");
+assert.match(overlay, /platform_gate_check\.conrelid='private\.integration_production_platform_bindings'::regclass/);
+assert.match(overlay, /'\(binding_key=''vaeroex-production-integrations-v1''::text\)'[\s\S]*'\(NOTai_dispatch_enabled\)'/,
+  "all retained and future platform rows remain on the canonical closed Production target");
 assert.match(overlay, /square_production_runtime_overlay_provider_acl_drifted/);
 assert.match(overlay, /private\.integration_production_provider_bindings',privilege_name/,
   "no denied runtime role may retain effective provider-table authority");
