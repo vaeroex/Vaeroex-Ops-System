@@ -189,7 +189,7 @@ async function migrationQualification(target, administrator) {
   const evidenceTail = files.filter(name => name === "20260911222230_square_workspace_evidence.sql");
   const cardTail = files.filter(name => name === "20260912034447_square_workspace_card_contract.sql");
   const operationalTail = files.filter(name => name === "20260912150000_square_operational_intelligence.sql");
-  const productionFoundationTail = files.filter(name => name === "20260912190000_square_production_runtime_foundation.sql");
+  const productionFoundationTail = files.filter(name => name === "20260902191323_integration_production_runtime_foundation.sql");
   equal(added.length, 2, "both additive Square migrations present");
   equal(accountTail.length, 1, "account-connection migration present");
   equal(remoteTail.length, 1, "remote Sandbox binding migration present");

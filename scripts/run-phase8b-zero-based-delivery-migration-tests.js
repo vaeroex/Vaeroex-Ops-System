@@ -260,6 +260,7 @@ function assertTargetIsSinglePendingMigration() {
   // qualified dormant Square additions run AFTER it and must leave QBO closed
   // and unchanged; they do not replace the fixture's QBO target or assertions.
   const dormantSquareTail = [
+    "20260902191323_integration_production_runtime_foundation.sql",
     "20260907042202_square_dormant_trusted_authority.sql",
     "20260907042352_square_dormant_atomic_pages.sql",
     "20260907174326_square_dormant_account_connection.sql",
@@ -272,8 +273,7 @@ function assertTargetIsSinglePendingMigration() {
   "20260911151334_square_verified_provider_observations.sql",
   "20260911205108_square_canonical_interpretation.sql", "20260911222230_square_workspace_evidence.sql",
   "20260912034447_square_workspace_card_contract.sql",
-  "20260912150000_square_operational_intelligence.sql",
-  "20260912190000_square_production_runtime_foundation.sql"
+  "20260912150000_square_operational_intelligence.sql"
   ];
   const laterMigrations = migrations.slice(targetIndex + 1);
   if (laterMigrations.length !== dormantSquareTail.length ||
@@ -341,7 +341,7 @@ async function qualifyProductionRoleDrift(databaseUrl) {
   await recovery.connect();
   try {
     const state = (await recovery.query(
-      "select r.rolcanlogin, to_regclass('private.integration_production_platform_bindings') is null as rolled_back from pg_roles r where r.rolname='square_production_evidence_authority'"
+      "select r.rolcanlogin, to_regrole('square_production_oauth_authority') is null as rolled_back from pg_roles r where r.rolname='square_production_evidence_authority'"
     )).rows[0];
     if (!state?.rolcanlogin || !state?.rolled_back) {
       fail("Production foundation drift rejection did not preserve atomic rollback.");

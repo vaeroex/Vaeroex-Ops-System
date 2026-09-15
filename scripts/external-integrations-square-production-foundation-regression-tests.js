@@ -7,7 +7,7 @@ const { Client: PostgresClient } = require("pg");
 
 const root = path.resolve(__dirname, "..");
 const sourcePath = path.join(root, "lib/integrations/control-plane/square-production-contracts.ts");
-const migrationPath = path.join(root, "supabase/migrations/20260912190000_square_production_runtime_foundation.sql");
+const migrationPath = path.join(root, "supabase/migrations/20260902191323_integration_production_runtime_foundation.sql");
 const migration = fs.readFileSync(migrationPath, "utf8");
 const ciWorkflow = fs.readFileSync(path.join(root, ".github/workflows/ci.yml"), "utf8");
 const activationReadme = fs.readFileSync(path.join(root, "services/external-integrations-production/infra/activation/README.md"), "utf8");
@@ -153,8 +153,8 @@ assert.ok(migration.trimEnd().endsWith("commit;"), "the self-contained foundatio
 
 assert.match(ciWorkflow, /run: pnpm test:external-integrations-square-production-foundation/,
   "CI executes the provider-neutral and Square Production runtime regressions");
-assert.match(activationReadme, /must not already record version `20260912190000`[\s\S]*stop and ship a separately reviewed additive reconciliation/,
-  "activation fails closed if any target has already recorded the superseded all-in-one migration");
+assert.match(activationReadme, /end at `20260902191322_qbo_production_dormant_connection_gate`[\s\S]*apply only the immediately following `20260902191323_integration_production_runtime_foundation\.sql`[\s\S]*exact-version bound/,
+  "activation records only the provider-neutral migration immediately after the verified Production ledger");
 assert.match(fixtureRichMigrationTest, /\["127\.0\.0\.1", "localhost"\]\.includes\(parsed\.hostname\)/,
   "fixture-rich role mutation remains restricted to disposable local Supabase");
 assert.match(fixtureRichMigrationTest, /parsed\.username = "supabase_admin"/,
