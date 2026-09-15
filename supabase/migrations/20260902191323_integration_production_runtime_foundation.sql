@@ -220,7 +220,9 @@ create table private.integration_production_provider_capabilities (
     and split_part(service_account,'@',2)=project_id||'.iam.gserviceaccount.com'),
   check((capability='task_invoker' and database_login is null and database_secret_purpose is null) or
     (capability<>'task_invoker' and database_login is not null and database_secret_purpose is not null
-      and database_login::text like provider_key||'_production_%'
+      and pg_catalog.starts_with(database_login::text,provider_key||'_production_')
+      and pg_catalog.length(database_login::text)>pg_catalog.length(provider_key)+12
+      and database_login::text ~ '^[a-z][a-z0-9_]{0,62}$'
       and database_secret_purpose='database_'||capability))
 );
 alter table private.integration_production_provider_capabilities enable row level security;
@@ -279,6 +281,18 @@ begin
         and column_acl.grantee<>object_owner
     ) then
       raise exception using errcode='42501',message='integration_production_foundation_acl_not_closed';
+    end if;
+    if exists(
+      select 1 from pg_catalog.pg_publication publication
+      where publication.puballtables
+    ) or exists(
+      select 1 from pg_catalog.pg_publication_rel publication_relation
+      where publication_relation.prrelid=object_name::regclass
+    ) or exists(
+      select 1 from pg_catalog.pg_publication_namespace publication_namespace
+      where publication_namespace.pnnspid='private'::regnamespace
+    ) then
+      raise exception using errcode='42501',message='integration_production_foundation_publication_not_closed';
     end if;
   end loop;
 

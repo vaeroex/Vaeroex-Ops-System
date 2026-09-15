@@ -28,23 +28,40 @@ async function qualify(runtime) {
   stage="migrations";
   const staged=new Set([...additiveSquareTail,...productionFoundation,...productionCompatibility]);
   await runtime.applyMigrations(c,files.filter(file=>!staged.has(file)));
-  const foreignDatabase=await runtime.createDatabase("prod_role_collision");
-  await c.query("create role square_production_runtime_authority nologin noinherit nosuperuser nocreatedb nocreaterole noreplication nobypassrls");
-  await foreignDatabase.client.query("create table public.production_role_cross_database_guard(marker integer)");
-  await foreignDatabase.client.query("alter table public.production_role_cross_database_guard owner to square_production_runtime_authority");
-  let foundationError;
-  try { await runtime.applyMigrations(c,productionFoundation); }
-  catch (error) { foundationError=error; }
-  eq(foundationError?.code,"42501","foundation rejects authority-role ownership in another database");
-  eq((await c.query("select to_regprocedure('private.integration_production_fingerprint_v1(text[])')::text as value")).rows[0].value,
-    null,"cross-database role collision rejection rolls back the foundation atomically");
-  await foreignDatabase.client.query("drop table public.production_role_cross_database_guard");
-  await c.query("drop role square_production_runtime_authority");
-  await runtime.applyMigrations(c,productionFoundation);
+  // Production authority roles are cluster-wide. A Supabase-local `db start`
+  // has already installed this separately tested foundation in its canonical
+  // database, so reapplying it inside a fixture database would correctly trip
+  // the cross-database dependency guard. Exercise foundation mutation cases
+  // only in the per-process native cluster; keep hosted-shaped Square fixtures
+  // isolated from the unrelated Production authority migration.
+  if(runtime.targetKind==="native-postgres") {
+    await c.query("create publication production_foundation_all_tables_pub for all tables");
+    let foundationError;
+    try { await runtime.applyMigrations(c,productionFoundation); }
+    catch (error) { foundationError=error; }
+    eq(foundationError?.code,"42501","foundation rejects pre-existing all-table logical publication exposure");
+    eq((await c.query("select to_regprocedure('private.integration_production_fingerprint_v1(text[])')::text as value")).rows[0].value,
+      null,"publication rejection rolls back the foundation atomically");
+    await c.query("drop publication production_foundation_all_tables_pub");
+    const foreignDatabase=await runtime.createDatabase("prod_role_collision");
+    await c.query("create role square_production_runtime_authority nologin noinherit nosuperuser nocreatedb nocreaterole noreplication nobypassrls");
+    await foreignDatabase.client.query("create table public.production_role_cross_database_guard(marker integer)");
+    await foreignDatabase.client.query("alter table public.production_role_cross_database_guard owner to square_production_runtime_authority");
+    foundationError=undefined;
+    try { await runtime.applyMigrations(c,productionFoundation); }
+    catch (error) { foundationError=error; }
+    eq(foundationError?.code,"42501","foundation rejects authority-role ownership in another database");
+    eq((await c.query("select to_regprocedure('private.integration_production_fingerprint_v1(text[])')::text as value")).rows[0].value,
+      null,"cross-database role collision rejection rolls back the foundation atomically");
+    await foreignDatabase.client.query("drop table public.production_role_cross_database_guard");
+    await c.query("drop role square_production_runtime_authority");
+    await runtime.applyMigrations(c,productionFoundation);
+  }
   const schemaBefore=await runtime.sourceSchemaFingerprint(c);
   await runtime.applyMigrations(c,additiveSquareTail);
   eq(await runtime.sourceSchemaFingerprint(c),schemaBefore,"Square interpretation preserves canonical/QBO schema");
-  await runtime.applyMigrations(c,productionCompatibility);
+  if(runtime.targetKind==="native-postgres") {
+    await runtime.applyMigrations(c,productionCompatibility);
   eq((await c.query("select private.integration_production_foundation_split_marker_v1() as value")).rows[0].value,
     "20260902191323_provider_neutral","compatibility path records the reviewed split foundation identity");
   await c.query("drop function private.integration_production_foundation_split_marker_v1()");
@@ -166,7 +183,15 @@ async function qualify(runtime) {
   try { await runtime.applyMigrations(c,[productionCompatibility.at(-1)]); }
   catch (error) { legacyGuardError=error; }
   eq(legacyGuardError?.code,"55000","forward guard rejects retained authority rewrite rules");
-  await c.query("rollback");
+    await c.query("rollback");
+    await c.query("begin");
+    await c.query("create publication production_authority_guard_pub for table private.integration_production_provider_bindings");
+    legacyGuardError=undefined;
+    try { await runtime.applyMigrations(c,[productionCompatibility.at(-1)]); }
+    catch (error) { legacyGuardError=error; }
+    eq(legacyGuardError?.code,"55000","forward guard rejects retained authority-table publication membership");
+    await c.query("rollback");
+  }
   const installedSchema=await runtime.sourceSchemaFingerprint(c);
   const genericCounts=async()=>{const counts={};for(const table of ["external_source_records","external_source_record_versions","canonical_business_facts","canonical_business_fact_versions","business_fact_sources","fact_contribution_batches","fact_contribution_events"])counts[table]=(await c.query(`select count(*)::int n from private.${table}`)).rows[0].n;return counts;};
   const genericBefore=await genericCounts();

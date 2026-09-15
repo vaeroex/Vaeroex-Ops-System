@@ -333,7 +333,7 @@ async function runAdditionalQualification(callback) {
         if (![...databases].some(database => database.client === client) || !Array.isArray(names) || names.some(name => !migrationFiles().includes(name))) throw new Error("unowned_migration_target_forbidden");
         return applyMigrations(client, names);
       },
-      migrationFiles, sourceSchemaFingerprint, installTypescriptLoader,
+      migrationFiles, sourceSchemaFingerprint, installTypescriptLoader, targetKind: target.kind,
       async login(database, suffix, roles = [], namespace = "square_qualification") {
         if (!databases.has(database) || !/^[a-z][a-z0-9_]{0,19}$/.test(suffix) || !Array.isArray(roles) || roles.some(role => !/^square_[a-z_]+$/.test(role)) ||
             !["square_qualification", "square_sandbox"].includes(namespace) || namespace === "square_sandbox" && !/^[a-z_]{1,19}$/.test(suffix)) throw new Error("unowned_login_target_forbidden");

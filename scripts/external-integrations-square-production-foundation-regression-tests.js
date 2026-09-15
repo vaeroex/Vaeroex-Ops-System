@@ -17,6 +17,14 @@ const ciWorkflow = fs.readFileSync(path.join(root, ".github/workflows/ci.yml"), 
 const activationReadme = fs.readFileSync(path.join(root, "services/external-integrations-production/infra/activation/README.md"), "utf8");
 const evidenceDatabaseTest = fs.readFileSync(path.join(root, "scripts/square-workspace-evidence-database-tests.js"), "utf8");
 const fixtureRichMigrationTest = fs.readFileSync(path.join(root, "scripts/run-phase8b-zero-based-delivery-migration-tests.js"), "utf8");
+const observationDatabaseTest = fs.readFileSync(path.join(root, "scripts/run-square-observation-database-qualification.js"), "utf8");
+const separatedDatabaseQualifications = [
+  "scripts/run-square-account-connection-qualification.js",
+  "scripts/run-square-broker-runtime-qualification.js",
+  "scripts/run-square-gcp-callback-database-qualification.js",
+  "scripts/run-square-gcp-mapped-database-qualification.js",
+  "scripts/run-square-remote-sandbox-qualification.js"
+].map(file => fs.readFileSync(path.join(root, file), "utf8"));
 
 for (const extension of [".ts", ".tsx"]) require.extensions[extension] = function(loaded, filename) {
   loaded._compile(ts.transpileModule(fs.readFileSync(filename, "utf8"), {
@@ -142,6 +150,12 @@ assert.match(migration, /production_provider_capability_service_account_key/);
 assert.match(migration, /production_provider_capability_database_login_key/);
 assert.match(migration, /capability<>'task_invoker' and database_login is not null and database_secret_purpose is not null/,
   "every database-backed capability requires both its native login and private secret binding");
+assert.match(migration, /pg_catalog\.starts_with\(database_login::text,provider_key\|\|'_production_'\)/,
+  "database LOGINs use a literal provider namespace prefix");
+assert.match(migration, /database_login::text ~ '\^\[a-z\]\[a-z0-9_\]\{0,62\}\$'/,
+  "database LOGINs retain the provider-neutral ASCII identifier contract");
+assert.doesNotMatch(migration, /database_login::text\s+like\s+provider_key/,
+  "SQL LIKE wildcards cannot cross a provider LOGIN boundary");
 assert.match(migration, /production_provider_secret_resource_key/);
 assert.match(migration, /application_id text not null unique check/);
 assert.match(migration, /callback_uri ~ \('\^https:\/\/\[\^\/\]\+'\|\|route_namespace\|\|'\/callback\$'\)/);
@@ -188,6 +202,12 @@ assert.match(legacyGuard, /pg_catalog\.pg_inherits[\s\S]*inhrelid=object_name::r
   "forward guard rejects inheritance parents and children for retained authority tables");
 assert.match(legacyGuard, /pg_catalog\.pg_rewrite[\s\S]*ev_class=object_name::regclass/,
   "forward guard rejects user rewrite rules on retained authority tables");
+for (const catalog of ["pg_publication", "pg_publication_rel", "pg_publication_namespace"]) {
+  assert.match(migration, new RegExp(`pg_catalog\\.${catalog}`),
+    `new foundation rejects logical-publication exposure through ${catalog}`);
+  assert.match(legacyGuard, new RegExp(`pg_catalog\\.${catalog}`),
+    `retained foundation rejects logical-publication exposure through ${catalog}`);
+}
 assert.match(legacyGuard, /aclexplode\(relation\.relacl\)[\s\S]*aclexplode\(attribute\.attacl\)/,
   "forward guard validates retained table and column ACLs");
 assert.match(legacyGuard, /has_table_privilege[\s\S]*has_column_privilege[\s\S]*integration_production_foundation_effective_acl_drift/,
@@ -202,7 +222,7 @@ assert.match(legacyGuard, /pg_catalog\.pg_shdepend[\s\S]*dependency\.classid='pg
   "forward guard permits only the reviewed public-schema ACL dependency");
 assert.match(legacyGuard, /aclexplode\(public_schema\.nspacl\)[\s\S]*privilege_type='USAGE'[\s\S]*has_schema_privilege\(role_name,'public','CREATE'\)/,
   "forward guard requires exact non-grantable public USAGE without CREATE");
-assert.match(legacyGuard, /jsonb_build_object\([\s\S]*'columns'[\s\S]*'constraints'[\s\S]*'indexes'[\s\S]*'policy_count'[\s\S]*'trigger_count'[\s\S]*539bfa64d5183a56ccf4a4ba0337ee932e389891bf216d49d5e79b4b4cd3d326/,
+assert.match(legacyGuard, /jsonb_build_object\([\s\S]*'columns'[\s\S]*'constraints'[\s\S]*'indexes'[\s\S]*'policy_count'[\s\S]*'trigger_count'[\s\S]*0fe4e1c2080fed1725db60ddb1643f4cd2d979a1a261c3445aae54c56788897e/,
   "forward guard authenticates the complete retained table schema contract");
 assert.match(legacyGuard, /set_config\('row_security','off',true\)[\s\S]*platform_fingerprint is distinct from[\s\S]*provider_authority_fingerprint is distinct from[\s\S]*integration_production_foundation_stored_fingerprint_drift/,
   "forward guard recomputes every retained generated authority fingerprint");
@@ -221,6 +241,17 @@ assert.match(fixtureRichMigrationTest, /parsed\.username = "supabase_admin"/,
   "fixture-rich role drift uses the local migration actor that owns PostgreSQL 17's creator edge");
 assert.match(fixtureRichMigrationTest, /qualifyProductionRoleDrift\(localMigrationAdministratorDatabaseUrl\)/,
   "only the role-drift witness uses the local migration-administrator connection");
+for (const qualification of separatedDatabaseQualifications) {
+  assert.match(qualification,
+    /baseline = (?:names|files)\.filter\(name => name < (?:migrationName|migration) && name !== productionFoundation\)/,
+    "legacy Square database qualifications do not reapply cluster-wide Production authority roles");
+}
+assert.match(observationDatabaseTest, /if\(runtime\.targetKind==="native-postgres"\)[\s\S]*foundation rejects authority-role ownership in another database/,
+  "foundation mutation tests run only in their isolated per-process native cluster");
+assert.match(observationDatabaseTest, /create publication production_foundation_all_tables_pub for all tables[\s\S]*foundation rejects pre-existing all-table logical publication exposure/,
+  "native PostgreSQL qualification exercises new-foundation publication rejection");
+assert.match(observationDatabaseTest, /create publication production_authority_guard_pub[\s\S]*rejects retained authority-table publication membership/,
+  "native PostgreSQL qualification exercises logical-publication rejection");
 assert.ok(
   fixtureRichMigrationTest.indexOf("const localMigrationAdministratorDatabaseUrl = localMigrationAdministratorUrl(databaseUrl)") <
     fixtureRichMigrationTest.indexOf("run(cli, [\n    \"db\",\n    \"reset\""),

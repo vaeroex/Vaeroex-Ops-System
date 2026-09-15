@@ -39,6 +39,19 @@ select ok((select relrowsecurity and relforcerowsecurity from pg_catalog.pg_clas
   where oid='private.integration_production_provider_secrets'::regclass),'Provider secrets use FORCE RLS');
 select ok((select relrowsecurity and relforcerowsecurity from pg_catalog.pg_class
   where oid='private.integration_production_provider_capabilities'::regclass),'Provider capabilities use FORCE RLS');
+select is((select count(*)::integer
+  from (values
+    ('private.integration_production_platform_bindings'::regclass),
+    ('private.integration_production_provider_bindings'::regclass),
+    ('private.integration_production_provider_secrets'::regclass),
+    ('private.integration_production_provider_capabilities'::regclass)
+  ) authority_table(object_id)
+  where exists(select 1 from pg_catalog.pg_publication publication where publication.puballtables)
+    or exists(select 1 from pg_catalog.pg_publication_rel publication_relation
+      where publication_relation.prrelid=authority_table.object_id)
+    or exists(select 1 from pg_catalog.pg_publication_namespace publication_namespace
+      where publication_namespace.pnnspid='private'::regnamespace)),0,
+  'Production authority rows cannot enter logical publications');
 select is((select provolatile::text from pg_catalog.pg_proc
   where oid='private.integration_production_fingerprint_v1(text[])'::regprocedure),'i',
   'Production fingerprint helper is explicitly immutable for stored generated columns');
@@ -119,6 +132,21 @@ select 'square','production','vaeroex-integrations-prod','database_'||capability
   'projects/vaeroex-integrations-prod/secrets/square-'||replace(capability,'_','-')||'-db/versions/1'
 from unnest(array['oauth','broker','scheduler','webhook','runtime','evidence']::text[]) capability;
 
+select is(pg_temp.error_state($sql$
+  insert into private.integration_production_provider_capabilities(
+    provider_key,environment,project_id,capability,service_account,database_login,database_secret_purpose)
+  values ('square','production','vaeroex-integrations-prod','oauth',
+    'square-prefix-test@vaeroex-integrations-prod.iam.gserviceaccount.com',
+    'squareXproductionYoauth','database_oauth')
+$sql$),'23514','Database LOGIN namespace separators are compared literally');
+select is(pg_temp.error_state($sql$
+  insert into private.integration_production_provider_capabilities(
+    provider_key,environment,project_id,capability,service_account,database_login,database_secret_purpose)
+  values ('square','production','vaeroex-integrations-prod','oauth',
+    'square-character-test@vaeroex-integrations-prod.iam.gserviceaccount.com',
+    'square_production_bad-login','database_oauth')
+$sql$),'23514','Database LOGINs retain the provider-neutral ASCII identifier contract');
+
 insert into private.integration_production_provider_capabilities(
   provider_key,environment,project_id,capability,service_account,database_login,database_secret_purpose)
 select 'square','production','vaeroex-integrations-prod',capability,'square-'||replace(capability,'_','-')||'@vaeroex-integrations-prod.iam.gserviceaccount.com',
@@ -142,6 +170,13 @@ $sql$),'23505','A future provider cannot reuse a Square application secret');
 insert into private.integration_production_provider_secrets(provider_key,environment,project_id,secret_purpose,secret_version_resource)
 values ('quickbooks_online','production','vaeroex-integrations-prod','database_runtime',
   'projects/vaeroex-integrations-prod/secrets/qbo-runtime-db/versions/1');
+select is(pg_temp.error_state($sql$
+  insert into private.integration_production_provider_capabilities(
+    provider_key,environment,project_id,capability,service_account,database_login,database_secret_purpose)
+  values ('quickbooks_online','production','vaeroex-integrations-prod','runtime',
+    'qbo-prefix-test@vaeroex-integrations-prod.iam.gserviceaccount.com',
+    'quickbooksXonline_production_runtime','database_runtime')
+$sql$),'23514','Provider underscores cannot wildcard a foreign database LOGIN namespace');
 select is(pg_temp.error_state($sql$
   insert into private.integration_production_provider_capabilities(
     provider_key,environment,project_id,capability,service_account,database_login,database_secret_purpose)

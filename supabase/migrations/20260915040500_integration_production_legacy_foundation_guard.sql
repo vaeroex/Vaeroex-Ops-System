@@ -108,6 +108,21 @@ begin
       )
       or exists (
         select 1
+        from pg_catalog.pg_publication publication
+        where publication.puballtables
+      )
+      or exists (
+        select 1
+        from pg_catalog.pg_publication_rel publication_relation
+        where publication_relation.prrelid=object_name::regclass
+      )
+      or exists (
+        select 1
+        from pg_catalog.pg_publication_namespace publication_namespace
+        where publication_namespace.pnnspid='private'::regnamespace
+      )
+      or exists (
+        select 1
         from pg_catalog.pg_class relation
         cross join lateral pg_catalog.aclexplode(relation.relacl) relation_acl
         where relation.oid=object_name::regclass
@@ -213,7 +228,7 @@ begin
         'private.integration_production_provider_capabilities'::regclass
       ]))
   ))::text,'UTF8'),'sha256'),'hex') into strict schema_digest;
-  if schema_digest <> '539bfa64d5183a56ccf4a4ba0337ee932e389891bf216d49d5e79b4b4cd3d326' then
+  if schema_digest <> '0fe4e1c2080fed1725db60ddb1643f4cd2d979a1a261c3445aae54c56788897e' then
     raise exception 'integration_production_foundation_schema_drift'
       using errcode='55000';
   end if;
