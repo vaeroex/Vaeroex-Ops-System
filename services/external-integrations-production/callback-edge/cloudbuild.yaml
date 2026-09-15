@@ -2,7 +2,7 @@ steps:
   - name: mirror.gcr.io/library/golang@sha256:b970e6d47c09fdd34179acef5c4fecaf6410f0b597a759733b3cbea04b4e604a
     id: test
     entrypoint: /bin/bash
-    args: ["-ceu", "[[ \"${_SOURCE_COMMIT}\" =~ ^[a-f0-9]{40}$ ]] && test -z \"$(gofmt -l .)\" && go test -count=1 ."]
+    args: ["-ceu", "[[ \"${_SOURCE_COMMIT}\" =~ ^[a-f0-9]{40}$ ]] && test -z \"$(gofmt -l .)\" && go test -count=1 ./..."]
   - name: mirror.gcr.io/library/golang@sha256:b970e6d47c09fdd34179acef5c4fecaf6410f0b597a759733b3cbea04b4e604a
     id: compile
     entrypoint: /bin/bash

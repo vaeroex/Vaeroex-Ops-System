@@ -18,6 +18,7 @@ const bootstrapPackage = JSON.parse(read("services/external-integrations-product
 const edgeCallback = read("services/external-integrations-production/callback-edge/callback.go");
 const edgePlugin = read("services/external-integrations-production/callback-edge/plugin/main.go");
 const edgeCloudBuild = read("services/external-integrations-production/callback-edge/cloudbuild.yaml");
+const workflow = read(".github/workflows/ci.yml");
 const activationReadme = read("services/external-integrations-production/infra/activation/README.md");
 const releasePins = read("services/external-integrations-production/infra/activation/production.tfvars.example");
 const activationPath = path.join(root, "services/external-integrations-production/infra/activation");
@@ -102,17 +103,23 @@ assert.doesNotMatch(main, /google_network_services_wasm_plugin" "square_callback
 assert.match(activationReadme, /Network Services API defaults it to disabled/, "the provider-convergent default-disabled Wasm logging contract is documented");
 assert.match(activationReadme, /No `allUsers` IAM binding is created/, "the domain-restricted public ingress contract is documented");
 assert.match(main, /google_network_services_lb_edge_extension" "square_callback"[\s\S]*fail_open\s*=\s*false/, "the callback edge fails closed");
-for (const attribute of ["request.method", "request.path", "request.query"]) {
-  assert.match(main, new RegExp(`forward_attributes = \\[[\\s\\S]*"${attribute.replace(".", "\\.")}"`), `${attribute} is explicitly forwarded to the callback plugin`);
-}
-assert.match(main, /forward_headers = \[[\s\S]*x-vaeroex-oauth-code[\s\S]*x-vaeroex-oauth-state[\s\S]*\]/, "only the bounded internal OAuth handoff headers cross the edge");
+assert.match(main, /forward_attributes = \[\s*"request.method",\s*"request.path",\s*"request.query",\s*\]/, "only the exact method, path, and query attributes are forwarded to the callback plugin");
+assert.match(main, /forward_headers = \[\s*"content-length",\s*"expect",\s*"transfer-encoding",\s*"x-vaeroex-oauth-code",\s*"x-vaeroex-oauth-denied",\s*"x-vaeroex-oauth-handoff-version",\s*"x-vaeroex-oauth-state",\s*\]/, "only the exact body-indicator and bounded internal OAuth handoff headers cross the edge");
 assert.match(edgeCallback, /CallbackPath\s*=\s*"\/api\/integrations\/square\/callback"/, "the edge accepts only the Square callback path");
 assert.match(edgeCallback, /WebhookPath\s*=\s*"\/api\/integrations\/square\/webhook"/, "the edge permits only the exact queryless Square webhook pass-through");
 assert.match(edgeCallback, /error_description/, "the edge recognizes provider denial descriptions without forwarding them");
+assert.doesNotMatch(edgeCallback, /endOfStream/, "the header-only managed extension does not mistake its platform callback flag for request-body evidence");
+assert.match(edgeCallback, /HasForbiddenCallbackBodyHeaders/, "request-body indicators are rejected by a unit-tested bounded header contract");
 assert.match(edgePlugin, /ReplaceHttpRequestHeader\(":path", callbackedge\.CallbackPath\)/, "the edge strips the OAuth query before Cloud Run request logging");
+assert.match(edgePlugin, /GetHttpRequestHeaders\(\)/, "the edge reads the complete bounded header map before parsing callbacks");
+assert.match(edgePlugin, /headersError != nil/, "header retrieval failure fails closed");
+assert.match(edgePlugin, /callbackedge\.ParseForwardedHeaderCallback\([\s\S]*headers,/, "the plugin uses the unit-tested combined query and body-indicator contract");
+assert.match(edgePlugin, /if err := proxywasm\.SendHttpResponse\([\s\S]*err != nil \{[\s\S]*panic\(err\)/, "a failed local rejection response escalates to fail_open=false plugin failure");
 assert.match(edgePlugin, /clearReservedHandoffHeaders\(\)/, "client-forged handoff headers are removed before forwarding");
 assert.doesNotMatch(edgePlugin, /AddHttpRequestHeader\([^\n]*error_description/, "provider error descriptions never enter the internal request");
 assert.match(edgeCloudBuild, /_SOURCE_COMMIT[\s\S]*\^\[a-f0-9\]\{40\}\$/, "callback-edge publication validates the reviewed source revision");
+assert.match(edgeCloudBuild, /go test -count=1 \.\/\.\.\./, "the source-bound callback-edge build runs parser and plugin orchestration tests");
+assert.match(workflow, /External integrations Square Production callback edge tests[\s\S]*go test -count=1 \.\/\.\.\./, "required CI runs parser and plugin orchestration tests");
 assert.match(activationReadme, /Direct human build submission remains closed/, "manual callback-edge publication is explicitly closed");
 assert.match(activationReadme, /only configured rebuild path is the `vaeroex-production-images` GitHub push trigger/, "future publication requires the source-bound reviewed trigger");
 assert.match(releasePins, new RegExp(`source_commit\\s*=\\s*"${reviewedSourceCommit}"`), "the second-stage release is pinned to the reviewed source revision");

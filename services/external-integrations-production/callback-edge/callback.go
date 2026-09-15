@@ -35,9 +35,20 @@ type Handoff struct {
 	Denied bool
 }
 
-func ParseForwardedCallback(method, pathAttribute, queryAttribute string, endOfStream bool) (Handoff, error) {
+// ParseForwardedHeaderCallback validates the complete request contract visible
+// to the REQUEST_HEADERS-only managed edge extension. Body-indicator headers
+// are rejected before any callback material can be converted into an internal
+// handoff.
+func ParseForwardedHeaderCallback(method, pathAttribute, queryAttribute string, headers [][2]string) (Handoff, error) {
+	if HasForbiddenCallbackBodyHeaders(headers) {
+		return Handoff{}, ErrInvalidRequest
+	}
+	return ParseForwardedCallback(method, pathAttribute, queryAttribute)
+}
+
+func ParseForwardedCallback(method, pathAttribute, queryAttribute string) (Handoff, error) {
 	path, rawQuery, valid := normalizeForwardedTarget(pathAttribute, queryAttribute)
-	if !valid || method != "GET" || !endOfStream || path != CallbackPath ||
+	if !valid || method != "GET" || path != CallbackPath ||
 		len(rawQuery) == 0 || len(rawQuery) > MaxRawQueryBytes || hasUnsafeRawQuery(rawQuery) {
 		return Handoff{}, ErrInvalidRequest
 	}
@@ -86,6 +97,23 @@ func ParseForwardedCallback(method, pathAttribute, queryAttribute string, endOfS
 		return Handoff{}, ErrInvalidRequest
 	}
 	return Handoff{Code: code, State: state}, nil
+}
+
+func HasForbiddenCallbackBodyHeaders(headers [][2]string) bool {
+	contentLengthCount := 0
+	for _, header := range headers {
+		name := strings.ToLower(header[0])
+		switch name {
+		case "transfer-encoding", "expect":
+			return true
+		case "content-length":
+			contentLengthCount++
+			if contentLengthCount > 1 || strings.TrimSpace(header[1]) != "0" {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func IsWebhookRequest(method, pathAttribute, queryAttribute string) bool {
@@ -139,7 +167,7 @@ func validCode(value string) bool {
 		return false
 	}
 	for index := 0; index < len(value); index++ {
-		if value[index] <= 0x20 || value[index] == 0x7f {
+		if value[index] <= 0x20 || value[index] > 0x7e {
 			return false
 		}
 	}

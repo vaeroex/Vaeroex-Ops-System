@@ -1,8 +1,6 @@
 package main
 
 import (
-	"strings"
-
 	callbackedge "vaeroex.local/square-oauth-callback-edge"
 
 	"github.com/proxy-wasm/proxy-wasm-go-sdk/proxywasm"
@@ -22,7 +20,7 @@ type httpContext struct{ types.DefaultHttpContext }
 func (*vmContext) NewPluginContext(uint32) types.PluginContext { return &pluginContext{} }
 func (*pluginContext) NewHttpContext(uint32) types.HttpContext { return &httpContext{} }
 
-func (*httpContext) OnHttpRequestHeaders(headerCount int, endOfStream bool) (action types.Action) {
+func (*httpContext) OnHttpRequestHeaders(headerCount int, _ bool) (action types.Action) {
 	action = types.ActionPause
 	defer func() {
 		if recover() != nil {
@@ -52,12 +50,16 @@ func (*httpContext) OnHttpRequestHeaders(headerCount int, endOfStream bool) (act
 		}
 		return types.ActionContinue
 	}
-	if hasForbiddenCallbackBodyHeaders() {
+	// LbEdgeExtension invokes only REQUEST_HEADERS and does not expose request
+	// bodies to the plugin. Its callback flag is therefore not body evidence.
+	// Reject every forwarded HTTP body indicator instead.
+	headers, headersError := proxywasm.GetHttpRequestHeaders()
+	if headersError != nil {
 		sendFixedResponse(400, "invalid integration callback")
 		return action
 	}
-	handoff, err := callbackedge.ParseForwardedCallback(
-		string(method), string(path), string(rawQuery), endOfStream,
+	handoff, err := callbackedge.ParseForwardedHeaderCallback(
+		string(method), string(path), string(rawQuery), headers,
 	)
 	if err != nil {
 		sendFixedResponse(400, "invalid integration callback")
@@ -85,27 +87,6 @@ func (*httpContext) OnHttpRequestHeaders(headerCount int, endOfStream bool) (act
 	return types.ActionContinue
 }
 
-func hasForbiddenCallbackBodyHeaders() bool {
-	headers, err := proxywasm.GetHttpRequestHeaders()
-	if err != nil {
-		return true
-	}
-	contentLengthCount := 0
-	for _, header := range headers {
-		name := strings.ToLower(header[0])
-		switch name {
-		case "transfer-encoding", "expect":
-			return true
-		case "content-length":
-			contentLengthCount++
-			if contentLengthCount > 1 || strings.TrimSpace(header[1]) != "0" {
-				return true
-			}
-		}
-	}
-	return false
-}
-
 func clearReservedHandoffHeaders() bool {
 	for _, name := range callbackedge.ReservedHandoffHeaders {
 		err := proxywasm.RemoveHttpRequestHeader(name)
@@ -126,10 +107,15 @@ func zeroBytes(value []byte) {
 }
 
 func sendFixedResponse(status uint32, body string) {
-	proxywasm.SendHttpResponse(status, [][2]string{
+	if err := proxywasm.SendHttpResponse(status, [][2]string{
 		{"content-type", "text/plain; charset=utf-8"},
 		{"cache-control", "no-store"},
 		{"referrer-policy", "no-referrer"},
 		{"x-content-type-options", "nosniff"},
-	}, []byte(body), -1)
+	}, []byte(body), -1); err != nil {
+		// The managed extension ignores a pause return value. Escalate a failed
+		// local response to a plugin failure so fail_open=false remains the
+		// authoritative rejection boundary.
+		panic(err)
+	}
 }

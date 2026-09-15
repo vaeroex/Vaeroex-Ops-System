@@ -202,7 +202,7 @@ jobs:
         working-directory: services/external-integrations-production/callback-edge
         run: |
           test -z "$(gofmt -l .)"
-          go test -count=1 .
+          go test -count=1 ./...
           GOOS=wasip1 GOARCH=wasm go build -buildvcs=false -buildmode=c-shared -trimpath -o /tmp/square-production-callback-edge.wasm ./plugin
 
       - name: Validate external integrations QBO Production infrastructure
