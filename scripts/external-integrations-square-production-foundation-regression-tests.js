@@ -140,6 +140,8 @@ assert.match(migration, /project_id text not null check\(project_id ~ '\^\[a-z\]
 assert.match(migration, /kms_key_resource text not null unique check\(kms_key_resource ~[\s\S]*\/keyRings\/\[A-Za-z0-9_-\]\{1,63\}/);
 assert.match(migration, /production_provider_capability_service_account_key/);
 assert.match(migration, /production_provider_capability_database_login_key/);
+assert.match(migration, /capability<>'task_invoker' and database_login is not null and database_secret_purpose is not null/,
+  "every database-backed capability requires both its native login and private secret binding");
 assert.match(migration, /production_provider_secret_resource_key/);
 assert.match(migration, /application_id text not null unique check/);
 assert.match(migration, /callback_uri ~ \('\^https:\/\/\[\^\/\]\+'\|\|route_namespace\|\|'\/callback\$'\)/);
@@ -198,7 +200,7 @@ assert.match(legacyGuard, /pg_catalog\.pg_shdepend[\s\S]*dependency\.classid='pg
   "forward guard permits only the reviewed public-schema ACL dependency");
 assert.match(legacyGuard, /aclexplode\(public_schema\.nspacl\)[\s\S]*privilege_type='USAGE'[\s\S]*has_schema_privilege\(role_name,'public','CREATE'\)/,
   "forward guard requires exact non-grantable public USAGE without CREATE");
-assert.match(legacyGuard, /jsonb_build_object\([\s\S]*'columns'[\s\S]*'constraints'[\s\S]*'indexes'[\s\S]*'policy_count'[\s\S]*'trigger_count'[\s\S]*e4ee030adb2300c1c360569d45e5f057066539d60b9522c08cfa6e2f43c28dc8/,
+assert.match(legacyGuard, /jsonb_build_object\([\s\S]*'columns'[\s\S]*'constraints'[\s\S]*'indexes'[\s\S]*'policy_count'[\s\S]*'trigger_count'[\s\S]*539bfa64d5183a56ccf4a4ba0337ee932e389891bf216d49d5e79b4b4cd3d326/,
   "forward guard authenticates the complete retained table schema contract");
 assert.match(legacyGuard, /set_config\('row_security','off',true\)[\s\S]*platform_fingerprint is distinct from[\s\S]*provider_authority_fingerprint is distinct from[\s\S]*integration_production_foundation_stored_fingerprint_drift/,
   "forward guard recomputes every retained generated authority fingerprint");

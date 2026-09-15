@@ -219,7 +219,8 @@ create table private.integration_production_provider_capabilities (
     and service_account ~ '^[a-z][a-z0-9-]{4,28}[a-z0-9]@[a-z][a-z0-9-]{4,28}[a-z0-9]\.iam\.gserviceaccount\.com$'
     and split_part(service_account,'@',2)=project_id||'.iam.gserviceaccount.com'),
   check((capability='task_invoker' and database_login is null and database_secret_purpose is null) or
-    (capability<>'task_invoker' and database_login::text like provider_key||'_production_%'
+    (capability<>'task_invoker' and database_login is not null and database_secret_purpose is not null
+      and database_login::text like provider_key||'_production_%'
       and database_secret_purpose='database_'||capability))
 );
 alter table private.integration_production_provider_capabilities enable row level security;

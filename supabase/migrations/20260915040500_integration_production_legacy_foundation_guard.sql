@@ -208,7 +208,7 @@ begin
         'private.integration_production_provider_capabilities'::regclass
       ]))
   ))::text,'UTF8'),'sha256'),'hex') into strict schema_digest;
-  if schema_digest <> 'e4ee030adb2300c1c360569d45e5f057066539d60b9522c08cfa6e2f43c28dc8' then
+  if schema_digest <> '539bfa64d5183a56ccf4a4ba0337ee932e389891bf216d49d5e79b4b4cd3d326' then
     raise exception 'integration_production_foundation_schema_drift'
       using errcode='55000';
   end if;

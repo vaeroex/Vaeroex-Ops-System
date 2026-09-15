@@ -145,6 +145,18 @@ values ('quickbooks_online','production','vaeroex-integrations-prod','database_r
 select is(pg_temp.error_state($sql$
   insert into private.integration_production_provider_capabilities(
     provider_key,environment,project_id,capability,service_account,database_login,database_secret_purpose)
+  values ('quickbooks_online','production','vaeroex-integrations-prod','oauth',
+    'qbo-oauth@vaeroex-integrations-prod.iam.gserviceaccount.com',null,'database_runtime')
+$sql$),'23514','A database-backed capability cannot omit its native LOGIN');
+select is(pg_temp.error_state($sql$
+  insert into private.integration_production_provider_capabilities(
+    provider_key,environment,project_id,capability,service_account,database_login,database_secret_purpose)
+  values ('quickbooks_online','production','vaeroex-integrations-prod','oauth',
+    'qbo-oauth@vaeroex-integrations-prod.iam.gserviceaccount.com','quickbooks_online_production_oauth',null)
+$sql$),'23514','A database-backed capability cannot omit its credential binding');
+select is(pg_temp.error_state($sql$
+  insert into private.integration_production_provider_capabilities(
+    provider_key,environment,project_id,capability,service_account,database_login,database_secret_purpose)
   values ('quickbooks_online','production','vaeroex-integrations-prod','runtime',
     'square-runtime@vaeroex-integrations-prod.iam.gserviceaccount.com',
     'quickbooks_online_production_runtime','database_runtime')
