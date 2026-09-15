@@ -245,6 +245,36 @@ begin
     end if;
   end loop;
 
+  -- Stored generated values are not recomputed when an immutable helper is
+  -- replaced and later restored. Authenticate every retained value against the
+  -- reviewed helper before a later provider overlay may rely on these columns.
+  -- `row_security=off` never weakens access: PostgreSQL either gives a
+  -- BYPASSRLS-capable migration actor the physical rows or raises rather than
+  -- silently applying a policy. Thus inability to prove the values aborts.
+  perform pg_catalog.set_config('row_security','off',true);
+  if exists (
+    select 1
+    from private.integration_production_platform_bindings platform_binding
+    where platform_binding.platform_fingerprint is distinct from
+      private.integration_production_fingerprint_v1(array[
+        platform_binding.binding_key,platform_binding.project_id,
+        platform_binding.project_number,platform_binding.region,
+        platform_binding.source_commit
+      ])
+  ) or exists (
+    select 1
+    from private.integration_production_provider_bindings provider_binding
+    where provider_binding.provider_authority_fingerprint is distinct from
+      private.integration_production_fingerprint_v1(array[
+        provider_binding.provider_key,provider_binding.environment,
+        provider_binding.application_id,provider_binding.callback_uri,
+        provider_binding.kms_key_resource
+      ])
+  ) then
+    raise exception 'integration_production_foundation_stored_fingerprint_drift'
+      using errcode = '55000';
+  end if;
+
   foreach role_name in array array[
     'square_production_oauth_authority','square_production_broker_authority',
     'square_production_scheduler_authority','square_production_webhook_authority',

@@ -28,6 +28,18 @@ async function qualify(runtime) {
   stage="migrations";
   const staged=new Set([...additiveSquareTail,...productionFoundation,...productionCompatibility]);
   await runtime.applyMigrations(c,files.filter(file=>!staged.has(file)));
+  const foreignDatabase=await runtime.createDatabase("prod_role_collision");
+  await c.query("create role square_production_runtime_authority nologin noinherit nosuperuser nocreatedb nocreaterole noreplication nobypassrls");
+  await foreignDatabase.client.query("create table public.production_role_cross_database_guard(marker integer)");
+  await foreignDatabase.client.query("alter table public.production_role_cross_database_guard owner to square_production_runtime_authority");
+  let foundationError;
+  try { await runtime.applyMigrations(c,productionFoundation); }
+  catch (error) { foundationError=error; }
+  eq(foundationError?.code,"42501","foundation rejects authority-role ownership in another database");
+  eq((await c.query("select to_regprocedure('private.integration_production_fingerprint_v1(text[])')::text as value")).rows[0].value,
+    null,"cross-database role collision rejection rolls back the foundation atomically");
+  await foreignDatabase.client.query("drop table public.production_role_cross_database_guard");
+  await c.query("drop role square_production_runtime_authority");
   await runtime.applyMigrations(c,productionFoundation);
   const schemaBefore=await runtime.sourceSchemaFingerprint(c);
   await runtime.applyMigrations(c,additiveSquareTail);
@@ -95,6 +107,29 @@ async function qualify(runtime) {
   catch (error) { legacyGuardError=error; }
   eq(legacyGuardError?.code,"55000","forward guard rejects retained fingerprint implementation drift");
   await c.query("rollback");
+  const canonicalFingerprintDefinition=(await c.query(
+    "select pg_catalog.pg_get_functiondef('private.integration_production_fingerprint_v1(text[])'::regprocedure) as definition"
+  )).rows[0].definition;
+  await c.query("begin");
+  await c.query(`create or replace function private.integration_production_fingerprint_v1(p_parts text[])
+    returns text language sql immutable strict parallel safe set search_path=''
+    as 'select ''sha256:''||repeat(''0'',64)'`);
+  await c.query(`insert into private.integration_production_platform_bindings(
+    binding_key,environment,project_id,project_number,region,network_name,subnet_name,router_name,nat_name,
+    egress_address_name,ingress_address_name,task_queue_name,artifact_repository_name,database_authority_target,
+    runtime_policy_version,retention_policy_version,observability_policy_version,backup_policy_version,source_commit)
+    values ('vaeroex-production-integrations-v1','production','vaeroex-integrations-prod','123456789012','us-west1',
+      'vaeroex-integrations-production','vaeroex-integrations-us-west1','vaeroex-integrations-router','vaeroex-integrations-nat',
+      'vaeroex-integrations-egress','vaeroex-integrations-ingress','vaeroex-integrations-tasks','vaeroex-integrations-images',
+      'existing_production_postgres','production_runtime_v1','production_retention_v1','production_observability_v1',
+      'production_backup_v1',repeat('a',40))`);
+  await c.query(canonicalFingerprintDefinition);
+  legacyGuardError=undefined;
+  try { await runtime.applyMigrations(c,[productionCompatibility.at(-1)]); }
+  catch (error) { legacyGuardError=error; }
+  eq(legacyGuardError?.code,"55000","forward guard rejects retained generated fingerprint drift after helper restoration");
+  eq((await c.query("select count(*)::int as value from private.integration_production_platform_bindings")).rows[0].value,
+    0,"stale generated-fingerprint rejection preserves the pre-test foundation state");
   await c.query("begin");
   await c.query("create table public.production_role_owned_guard_test(marker integer)");
   await c.query("alter table public.production_role_owned_guard_test owner to square_production_runtime_authority");

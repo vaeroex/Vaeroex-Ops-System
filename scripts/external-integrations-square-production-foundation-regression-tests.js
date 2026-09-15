@@ -114,6 +114,8 @@ assert.match(migration, /m\.inherit_option or m\.set_option or not m\.admin_opti
 assert.match(migration, /member_role\.rolsuper or member_role\.rolcreaterole/);
 assert.match(migration, /pg_catalog\.pg_shdepend[\s\S]*dependency\.deptype in \('a','o'\)/,
   "pre-existing capability roles cannot own or hold ACL privileges on database objects");
+assert.doesNotMatch(migration, /dependency\.dbid\s+in/,
+  "pre-existing capability-role ownership and ACL dependencies are rejected cluster-wide");
 assert.match(migration, /1 < \(\s*select count\(\*\) from pg_catalog\.pg_auth_members where roleid=role_record\.oid/);
 assert.doesNotMatch(migration, /revoke %I from %I/);
 assert.match(migration, /economic_contributions_enabled boolean not null default false check\(not economic_contributions_enabled\)/);
@@ -196,6 +198,8 @@ assert.match(legacyGuard, /aclexplode\(public_schema\.nspacl\)[\s\S]*privilege_t
   "forward guard requires exact non-grantable public USAGE without CREATE");
 assert.match(legacyGuard, /jsonb_build_object\([\s\S]*'columns'[\s\S]*'constraints'[\s\S]*'indexes'[\s\S]*'policy_count'[\s\S]*'trigger_count'[\s\S]*e4ee030adb2300c1c360569d45e5f057066539d60b9522c08cfa6e2f43c28dc8/,
   "forward guard authenticates the complete retained table schema contract");
+assert.match(legacyGuard, /set_config\('row_security','off',true\)[\s\S]*platform_fingerprint is distinct from[\s\S]*provider_authority_fingerprint is distinct from[\s\S]*integration_production_foundation_stored_fingerprint_drift/,
+  "forward guard recomputes every retained generated authority fingerprint");
 assert.doesNotMatch(legacyGuard, /drop\s+|delete\s+from|alter\s+table/i,
   "the forward guard never mutates legacy authority state while rejecting it");
 

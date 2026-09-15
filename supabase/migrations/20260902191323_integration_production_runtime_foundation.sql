@@ -44,9 +44,6 @@ begin
         where dependency.refclassid='pg_authid'::regclass
           and dependency.refobjid=role_record.oid
           and dependency.deptype in ('a','o')
-          and dependency.dbid in (
-            0,(select oid from pg_catalog.pg_database where datname=current_database())
-          )
       ) or 1 < (
         select count(*) from pg_catalog.pg_auth_members where roleid=role_record.oid
       ) then
