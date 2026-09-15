@@ -40,7 +40,11 @@ async function qualify(runtime) {
   try { await runtime.applyMigrations(c,[productionCompatibility.at(-1)]); }
   catch (error) { legacyGuardError=error; }
   eq(legacyGuardError?.code,"55000","a previously recorded all-in-one migration fails without the split marker");
+  await c.query("alter default privileges in schema private grant execute on functions to square_ingestion_runtime_authority");
   await runtime.applyMigrations(c,[productionCompatibility.at(0)]);
+  eq((await c.query("select has_function_privilege('square_ingestion_runtime_authority','private.integration_production_foundation_split_marker_v1()','execute') as value")).rows[0].value,
+    false,"historical marker strips custom default EXECUTE grants");
+  await c.query("alter default privileges in schema private revoke execute on functions from square_ingestion_runtime_authority");
   await c.query("begin");
   await c.query(`create or replace function private.integration_production_foundation_split_marker_v1()
     returns text language sql immutable parallel safe set search_path=''
@@ -105,6 +109,13 @@ async function qualify(runtime) {
   try { await runtime.applyMigrations(c,[productionCompatibility.at(-1)]); }
   catch (error) { legacyGuardError=error; }
   eq(legacyGuardError?.code,"55000","forward guard rejects unrelated ACL privileges held by an authority role");
+  await c.query("rollback");
+  await c.query("begin");
+  await c.query("alter table private.integration_production_provider_bindings alter column enabled drop not null");
+  legacyGuardError=undefined;
+  try { await runtime.applyMigrations(c,[productionCompatibility.at(-1)]); }
+  catch (error) { legacyGuardError=error; }
+  eq(legacyGuardError?.code,"55000","forward guard rejects retained foundation column-contract drift");
   await c.query("rollback");
   const installedSchema=await runtime.sourceSchemaFingerprint(c);
   const genericCounts=async()=>{const counts={};for(const table of ["external_source_records","external_source_record_versions","canonical_business_facts","canonical_business_fact_versions","business_fact_sources","fact_contribution_batches","fact_contribution_events"])counts[table]=(await c.query(`select count(*)::int n from private.${table}`)).rows[0].n;return counts;};

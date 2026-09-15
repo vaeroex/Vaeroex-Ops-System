@@ -160,6 +160,8 @@ assert.match(historicalMarker, /integration_production_foundation_missing/,
   "the recorded historical version validates that the earlier provider-neutral foundation ran");
 assert.match(historicalMarker, /create function private\.integration_production_foundation_split_marker_v1\(\)/,
   "fresh installs leave an explicit split-foundation ledger marker");
+assert.match(historicalMarker, /closed_marker_acl[\s\S]*aclexplode\(marker_function\.proacl\)[\s\S]*revoke all on function private\.integration_production_foundation_split_marker_v1\(\) from %I/,
+  "the split marker strips custom default EXECUTE grants from every non-owner");
 assert.doesNotMatch(historicalMarker, /square_production_(?:runtime_binding|configuration_fingerprint|binding_fingerprint|authority_fingerprint)|create\s+(?:table|role)|alter\s+table|drop\s+/i,
   "fresh installs do not recreate any historical Square overlay authority");
 assert.match(legacyGuard, /to_regprocedure\('private\.integration_production_foundation_split_marker_v1\(\)'\) is null[\s\S]*integration_production_legacy_foundation_requires_review/,
@@ -192,6 +194,8 @@ assert.match(legacyGuard, /pg_catalog\.pg_shdepend[\s\S]*dependency\.classid='pg
   "forward guard permits only the reviewed public-schema ACL dependency");
 assert.match(legacyGuard, /aclexplode\(public_schema\.nspacl\)[\s\S]*privilege_type='USAGE'[\s\S]*has_schema_privilege\(role_name,'public','CREATE'\)/,
   "forward guard requires exact non-grantable public USAGE without CREATE");
+assert.match(legacyGuard, /jsonb_build_object\([\s\S]*'columns'[\s\S]*'constraints'[\s\S]*'indexes'[\s\S]*'policy_count'[\s\S]*'trigger_count'[\s\S]*e4ee030adb2300c1c360569d45e5f057066539d60b9522c08cfa6e2f43c28dc8/,
+  "forward guard authenticates the complete retained table schema contract");
 assert.doesNotMatch(legacyGuard, /drop\s+|delete\s+from|alter\s+table/i,
   "the forward guard never mutates legacy authority state while rejecting it");
 

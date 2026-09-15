@@ -30,4 +30,45 @@ $function$;
 revoke all on function private.integration_production_foundation_split_marker_v1()
   from public, anon, authenticated, service_role;
 
+do $closed_marker_acl$
+declare
+  marker_owner oid;
+  grantee_oid oid;
+  grantee_name name;
+begin
+  select proowner into strict marker_owner
+  from pg_catalog.pg_proc
+  where oid='private.integration_production_foundation_split_marker_v1()'::regprocedure;
+  for grantee_oid in
+    select distinct marker_acl.grantee
+    from pg_catalog.pg_proc marker_function
+    cross join lateral pg_catalog.aclexplode(marker_function.proacl) marker_acl
+    where marker_function.oid=
+      'private.integration_production_foundation_split_marker_v1()'::regprocedure
+      and marker_acl.grantee<>marker_function.proowner
+  loop
+    if grantee_oid=0 then
+      execute 'revoke all on function private.integration_production_foundation_split_marker_v1() from public';
+    else
+      select rolname into strict grantee_name from pg_catalog.pg_roles where oid=grantee_oid;
+      execute pg_catalog.format(
+        'revoke all on function private.integration_production_foundation_split_marker_v1() from %I',
+        grantee_name
+      );
+    end if;
+  end loop;
+  if exists (
+    select 1
+    from pg_catalog.pg_proc marker_function
+    cross join lateral pg_catalog.aclexplode(marker_function.proacl) marker_acl
+    where marker_function.oid=
+      'private.integration_production_foundation_split_marker_v1()'::regprocedure
+      and marker_acl.grantee<>marker_owner
+  ) then
+    raise exception 'integration_production_foundation_marker_acl_not_closed'
+      using errcode='42501';
+  end if;
+end
+$closed_marker_acl$;
+
 commit;

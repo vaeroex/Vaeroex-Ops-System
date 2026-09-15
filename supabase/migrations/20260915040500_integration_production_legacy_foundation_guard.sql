@@ -12,6 +12,7 @@ declare
   object_record record;
   role_name text;
   role_record record;
+  schema_digest text;
 begin
   if to_regprocedure('private.integration_production_foundation_split_marker_v1()') is null then
     raise exception 'integration_production_legacy_foundation_requires_review'
@@ -137,6 +138,74 @@ begin
       end if;
     end loop;
   end loop;
+
+  select pg_catalog.encode(extensions.digest(pg_catalog.convert_to((pg_catalog.jsonb_build_object(
+    'columns',coalesce((
+      select pg_catalog.jsonb_agg(pg_catalog.jsonb_build_array(
+        relation.relname,attribute.attnum,attribute.attname,
+        pg_catalog.format_type(attribute.atttypid,attribute.atttypmod),
+        attribute.attnotnull,attribute.attidentity,attribute.attgenerated,
+        pg_catalog.pg_get_expr(default_value.adbin,default_value.adrelid,true)
+      ) order by relation.relname,attribute.attnum)
+      from pg_catalog.pg_class relation
+      join pg_catalog.pg_namespace namespace on namespace.oid=relation.relnamespace
+      join pg_catalog.pg_attribute attribute on attribute.attrelid=relation.oid
+      left join pg_catalog.pg_attrdef default_value
+        on default_value.adrelid=relation.oid and default_value.adnum=attribute.attnum
+      where namespace.nspname='private'
+        and relation.relname=any(array[
+          'integration_production_platform_bindings','integration_production_provider_bindings',
+          'integration_production_provider_secrets','integration_production_provider_capabilities'
+        ]) and attribute.attnum>0 and not attribute.attisdropped
+    ),'[]'::jsonb),
+    'constraints',coalesce((
+      select pg_catalog.jsonb_agg(pg_catalog.jsonb_build_array(
+        relation.relname,constraint_record.conname,constraint_record.contype,
+        constraint_record.condeferrable,constraint_record.condeferred,
+        constraint_record.convalidated,
+        pg_catalog.pg_get_constraintdef(constraint_record.oid,true)
+      ) order by relation.relname,constraint_record.conname)
+      from pg_catalog.pg_constraint constraint_record
+      join pg_catalog.pg_class relation on relation.oid=constraint_record.conrelid
+      join pg_catalog.pg_namespace namespace on namespace.oid=relation.relnamespace
+      where namespace.nspname='private' and relation.relname=any(array[
+        'integration_production_platform_bindings','integration_production_provider_bindings',
+        'integration_production_provider_secrets','integration_production_provider_capabilities'
+      ])
+    ),'[]'::jsonb),
+    'indexes',coalesce((
+      select pg_catalog.jsonb_agg(pg_catalog.jsonb_build_array(
+        relation.relname,index_relation.relname,
+        pg_catalog.pg_get_indexdef(index_record.indexrelid,0,true)
+      ) order by relation.relname,index_relation.relname)
+      from pg_catalog.pg_index index_record
+      join pg_catalog.pg_class relation on relation.oid=index_record.indrelid
+      join pg_catalog.pg_class index_relation on index_relation.oid=index_record.indexrelid
+      join pg_catalog.pg_namespace namespace on namespace.oid=relation.relnamespace
+      where namespace.nspname='private' and relation.relname=any(array[
+        'integration_production_platform_bindings','integration_production_provider_bindings',
+        'integration_production_provider_secrets','integration_production_provider_capabilities'
+      ])
+    ),'[]'::jsonb),
+    'policy_count',(select count(*) from pg_catalog.pg_policy policy_record
+      where policy_record.polrelid=any(array[
+        'private.integration_production_platform_bindings'::regclass,
+        'private.integration_production_provider_bindings'::regclass,
+        'private.integration_production_provider_secrets'::regclass,
+        'private.integration_production_provider_capabilities'::regclass
+      ])),
+    'trigger_count',(select count(*) from pg_catalog.pg_trigger trigger_record
+      where not trigger_record.tgisinternal and trigger_record.tgrelid=any(array[
+        'private.integration_production_platform_bindings'::regclass,
+        'private.integration_production_provider_bindings'::regclass,
+        'private.integration_production_provider_secrets'::regclass,
+        'private.integration_production_provider_capabilities'::regclass
+      ]))
+  ))::text,'UTF8'),'sha256'),'hex') into strict schema_digest;
+  if schema_digest <> 'e4ee030adb2300c1c360569d45e5f057066539d60b9522c08cfa6e2f43c28dc8' then
+    raise exception 'integration_production_foundation_schema_drift'
+      using errcode='55000';
+  end if;
 
   select proowner,provolatile,proisstrict,proparallel,prosecdef,proconfig,prosrc
     into strict object_record
