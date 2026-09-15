@@ -15,6 +15,8 @@ do $prerequisites$
 declare
   existing_objects integer;
   legacy_has_rows boolean;
+  authority_role_name text;
+  authority_role_record pg_catalog.pg_roles;
   shared_fingerprint_proc pg_catalog.pg_proc;
 begin
   if pg_catalog.to_regclass('private.integration_production_provider_bindings') is null or
@@ -24,6 +26,36 @@ begin
       errcode='55000',
       message='square_production_runtime_overlay_prerequisite_missing';
   end if;
+
+  foreach authority_role_name in array array[
+    'square_production_oauth_authority','square_production_broker_authority',
+    'square_production_scheduler_authority','square_production_webhook_authority',
+    'square_production_runtime_authority','square_production_evidence_authority'
+  ] loop
+    select * into strict authority_role_record
+      from pg_catalog.pg_roles where rolname=authority_role_name;
+    if authority_role_record.rolcanlogin or authority_role_record.rolinherit or
+       authority_role_record.rolsuper or authority_role_record.rolcreatedb or
+       authority_role_record.rolcreaterole or authority_role_record.rolreplication or
+       authority_role_record.rolbypassrls or exists(
+         select 1
+         from pg_catalog.pg_auth_members membership
+         left join pg_catalog.pg_roles member_role on member_role.oid=membership.member
+         where membership.member=authority_role_record.oid or (
+           membership.roleid=authority_role_record.oid and (
+             membership.inherit_option or membership.set_option or not membership.admin_option or
+             not (member_role.rolsuper or member_role.rolcreaterole)
+           )
+         )
+       ) or 1 < (
+         select pg_catalog.count(*) from pg_catalog.pg_auth_members
+         where roleid=authority_role_record.oid
+       ) then
+      raise exception using
+        errcode='42501',
+        message='square_production_runtime_overlay_authority_role_drifted';
+    end if;
+  end loop;
 
   select * into strict shared_fingerprint_proc from pg_catalog.pg_proc
     where oid='private.integration_production_fingerprint_v1(text[])'::regprocedure;
@@ -132,6 +164,7 @@ begin
          and provider_platform_fk.confrelid='private.integration_production_platform_bindings'::regclass
          and provider_platform_fk.confupdtype='a'
          and provider_platform_fk.confdeltype='r'
+         and provider_platform_fk.confmatchtype='s'
          and (select pg_catalog.array_agg(attribute.attname::text order by key_part.ordinality)
            from pg_catalog.unnest(provider_platform_fk.conkey) with ordinality key_part(attnum,ordinality)
            join pg_catalog.pg_attribute attribute
@@ -142,10 +175,45 @@ begin
            join pg_catalog.pg_attribute attribute
              on attribute.attrelid=provider_platform_fk.confrelid and attribute.attnum=key_part.attnum)
            =array['binding_key','project_id','region','source_commit']::text[]
+     ) or 4<>(
+       select pg_catalog.count(*)
+       from pg_catalog.pg_attribute provider_column
+       where provider_column.attrelid='private.integration_production_provider_bindings'::regclass
+         and provider_column.attname=any(array[
+           'platform_binding_key','project_id','region','source_commit'
+         ]::text[])
+         and provider_column.attnotnull
+         and not provider_column.attisdropped
      ) then
     raise exception using
       errcode='55000',
       message='square_production_runtime_overlay_provider_authority_chain_drifted';
+  end if;
+  if not exists(
+       select 1
+       from pg_catalog.pg_class platform_relation
+       where platform_relation.oid='private.integration_production_platform_bindings'::regclass
+         and platform_relation.relkind='r'
+         and platform_relation.relrowsecurity
+         and platform_relation.relforcerowsecurity
+     ) or exists(
+       select 1
+       from private.integration_production_provider_bindings provider_binding
+       join private.integration_production_platform_bindings platform_binding
+         on platform_binding.binding_key=provider_binding.platform_binding_key
+        and platform_binding.project_id=provider_binding.project_id
+        and platform_binding.region=provider_binding.region
+        and platform_binding.source_commit=provider_binding.source_commit
+       where platform_binding.binding_key is distinct from 'vaeroex-production-integrations-v1'
+          or platform_binding.environment is distinct from 'production'
+          or platform_binding.infrastructure_provisioned is distinct from false
+          or platform_binding.runtime_enabled is distinct from false
+          or platform_binding.economic_contributions_enabled is distinct from false
+          or platform_binding.ai_dispatch_enabled is distinct from false
+     ) then
+    raise exception using
+      errcode='55000',
+      message='square_production_runtime_overlay_platform_authority_target_drifted';
   end if;
   if exists(
        select 1
@@ -179,6 +247,39 @@ begin
     raise exception using
       errcode='55000',
       message='square_production_runtime_overlay_provider_acl_drifted';
+  end if;
+  if exists(
+       select 1
+       from pg_catalog.unnest(array[
+         'anon','authenticated','service_role',
+         'square_production_oauth_authority','square_production_broker_authority',
+         'square_production_scheduler_authority','square_production_webhook_authority',
+         'square_production_runtime_authority','square_production_evidence_authority'
+       ]::text[]) denied_role(role_name)
+       cross join pg_catalog.unnest(array[
+         'SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER'
+       ]::text[]) denied_privilege(privilege_name)
+       where pg_catalog.has_table_privilege(
+         role_name,'private.integration_production_platform_bindings',privilege_name
+       )
+     ) or exists(
+       select 1
+       from pg_catalog.unnest(array[
+         'anon','authenticated','service_role',
+         'square_production_oauth_authority','square_production_broker_authority',
+         'square_production_scheduler_authority','square_production_webhook_authority',
+         'square_production_runtime_authority','square_production_evidence_authority'
+       ]::text[]) denied_role(role_name)
+       cross join pg_catalog.unnest(array[
+         'SELECT','INSERT','UPDATE','REFERENCES'
+       ]::text[]) denied_column_privilege(privilege_name)
+       where pg_catalog.has_any_column_privilege(
+         role_name,'private.integration_production_platform_bindings',privilege_name
+       )
+     ) then
+    raise exception using
+      errcode='55000',
+      message='square_production_runtime_overlay_platform_acl_drifted';
   end if;
   if exists(select 1
        from pg_catalog.unnest(array[

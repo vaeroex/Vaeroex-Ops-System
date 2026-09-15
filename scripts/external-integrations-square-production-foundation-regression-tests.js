@@ -178,12 +178,25 @@ assert.match(overlay, /provider_binding\.provider_authority_fingerprint is disti
   "stored generated values are revalidated after any temporarily drifted helper definition");
 assert.match(overlay, /square_production_runtime_overlay_provider_authority_chain_drifted/);
 assert.match(overlay, /provider_platform_fk\.confrelid='private\.integration_production_platform_bindings'::regclass/);
+assert.match(overlay, /provider_platform_fk\.confmatchtype='s'/);
 assert.match(overlay, /array\['platform_binding_key','project_id','region','source_commit'\]::text\[\]/);
 assert.match(overlay, /array\['binding_key','project_id','region','source_commit'\]::text\[\]/,
   "the retained provider row must preserve its exact provider-to-platform authority chain");
+assert.match(overlay, /provider_column\.attname=any\(array\[[\s\S]*'platform_binding_key','project_id','region','source_commit'[\s\S]*provider_column\.attnotnull/,
+  "every provider-to-platform FK column remains non-null");
+assert.match(overlay, /square_production_runtime_overlay_platform_authority_target_drifted/);
+assert.match(overlay, /platform_binding\.binding_key is distinct from 'vaeroex-production-integrations-v1'/);
+assert.match(overlay, /platform_binding\.runtime_enabled is distinct from false[\s\S]*platform_binding\.economic_contributions_enabled is distinct from false[\s\S]*platform_binding\.ai_dispatch_enabled is distinct from false/,
+  "retained platform authority remains canonical and closed");
 assert.match(overlay, /square_production_runtime_overlay_provider_acl_drifted/);
 assert.match(overlay, /private\.integration_production_provider_bindings',privilege_name/,
   "no denied runtime role may retain effective provider-table authority");
+assert.match(overlay, /square_production_runtime_overlay_platform_acl_drifted/);
+assert.match(overlay, /private\.integration_production_platform_bindings',privilege_name/,
+  "no denied runtime role may retain effective platform-table authority");
+assert.match(overlay, /square_production_runtime_overlay_authority_role_drifted/);
+assert.match(overlay, /authority_role_record\.rolcanlogin[\s\S]*membership\.set_option[\s\S]*member_role\.rolsuper/,
+  "all six retained authority roles preserve exact non-login, non-assumable attributes");
 assert.match(overlay, /to_regclass\('private\.integration_production_provider_bindings'\)/);
 assert.match(overlay, /to_regclass\('private\.square_account_configuration'\)/);
 assert.match(overlay, /rolname='square_production_runtime_authority'/);
