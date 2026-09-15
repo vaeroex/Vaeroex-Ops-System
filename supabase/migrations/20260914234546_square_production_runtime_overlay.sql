@@ -23,17 +23,23 @@ begin
     where oid='private.integration_production_fingerprint_v1(text[])'::regprocedure;
   if shared_fingerprint_proc.provolatile<>'i' or not shared_fingerprint_proc.proisstrict or
      shared_fingerprint_proc.proparallel<>'s' or shared_fingerprint_proc.prosecdef or
+     shared_fingerprint_proc.prolang<>(select oid from pg_catalog.pg_language where lanname='sql') or
+     shared_fingerprint_proc.prorettype<>'text'::regtype or shared_fingerprint_proc.proretset or
      (shared_fingerprint_proc.proconfig<>array['search_path=']::text[] and
        shared_fingerprint_proc.proconfig<>array['search_path=""']::text[]) then
     raise exception using
       errcode='55000',
       message='square_production_runtime_overlay_shared_foundation_attributes_drifted';
   end if;
-  if pg_catalog.regexp_replace(pg_catalog.btrim(shared_fingerprint_proc.prosrc),'[[:space:]]+',' ','g')<>
-     'select ''sha256:''||pg_catalog.encode( extensions.digest( pg_catalog.convert_to( pg_catalog.string_agg( pg_catalog.length(part)::text||'':''||part, '''' order by ordinal ), ''UTF8'' ), ''sha256'' ), ''hex'' ) from pg_catalog.unnest(p_parts) with ordinality as ordered_parts(part,ordinal)' then
+  if private.integration_production_fingerprint_v1(array['a','bc'])<>
+       'sha256:5310a58788781ab25d5ad7c3f85035824b4eb7bdfa394e0ac2186271472b5492' or
+     private.integration_production_fingerprint_v1(array['ab','c'])<>
+       'sha256:430fb1b4ac43316eca81fab27a1930ab8eff8fef6a1dc7903dce44bbc2790dc5' or
+     private.integration_production_fingerprint_v1(array['😀','é'])<>
+       'sha256:593164a79cde1d1952d300c7b69debdd616ca5be29a3acd918edc768cda6a719' then
     raise exception using
       errcode='55000',
-      message='square_production_runtime_overlay_shared_foundation_definition_drifted';
+      message='square_production_runtime_overlay_shared_foundation_semantics_drifted';
   end if;
   if exists(select 1
        from pg_catalog.unnest(array[

@@ -147,10 +147,12 @@ assert.ok(migration.trimEnd().endsWith("commit;"), "the self-contained foundatio
 assert.match(overlay, /square_production_runtime_overlay_prerequisite_missing/);
 assert.match(overlay, /square_production_runtime_overlay_partial_or_drifted/);
 assert.match(overlay, /square_production_runtime_overlay_shared_foundation_attributes_drifted/);
-assert.match(overlay, /square_production_runtime_overlay_shared_foundation_definition_drifted/);
+assert.match(overlay, /square_production_runtime_overlay_shared_foundation_semantics_drifted/);
 assert.match(overlay, /square_production_runtime_overlay_shared_foundation_acl_drifted/);
-assert.match(overlay, /shared_fingerprint_proc\.prosrc/);
 assert.match(overlay, /integration_production_fingerprint_v1\(text\[\]\)'::regprocedure/);
+assert.match(overlay, /array\['a','bc'\]/);
+assert.match(overlay, /array\['ab','c'\]/);
+assert.match(overlay, /array\['😀','é'\]/);
 assert.match(overlay, /to_regclass\('private\.integration_production_provider_bindings'\)/);
 assert.match(overlay, /to_regclass\('private\.square_account_configuration'\)/);
 assert.match(overlay, /rolname='square_production_runtime_authority'/);
