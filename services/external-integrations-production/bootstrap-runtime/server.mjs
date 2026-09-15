@@ -1,7 +1,6 @@
 import http from "node:http";
 import {
   evaluateSquareProductionCallback,
-  SQUARE_BACKEND_MAX_HEADER_COUNT,
   SQUARE_CALLBACK_PATH,
 } from "./callback-boundary.mjs";
 
@@ -17,7 +16,7 @@ const disabledCallbackAuthority = Object.freeze({
   consumeState: async () => null,
 });
 
-const server = http.createServer(async (request, response) => {
+const server = http.createServer({ maxHeaderSize: 32_768 }, async (request, response) => {
   // This image is deliberately incapable of handling OAuth, webhooks, tasks,
   // database access, provider calls, evidence, economics, or AI dispatch.
   request.resume();
@@ -47,7 +46,10 @@ const server = http.createServer(async (request, response) => {
 server.requestTimeout = 15_000;
 server.headersTimeout = 10_000;
 server.keepAliveTimeout = 5_000;
-server.maxHeadersCount = SQUARE_BACKEND_MAX_HEADER_COUNT;
+// Preserve the complete parser-owned rawHeaders array. The HTTP parser retains
+// its explicit 32 KiB byte ceiling above; the callback boundary then applies
+// the exact 66-header limit without Node silently truncating a 67th header.
+server.maxHeadersCount = 0;
 
 server.listen(port, "0.0.0.0");
 

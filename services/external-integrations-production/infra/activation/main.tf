@@ -694,16 +694,6 @@ resource "google_network_services_lb_edge_extension" "square_callback" {
         "request.path",
         "request.query",
       ]
-      forward_headers = [
-        "content-length",
-        "expect",
-        "transfer-encoding",
-        "x-vaeroex-oauth-code",
-        "x-vaeroex-oauth-denied",
-        "x-vaeroex-oauth-handoff-version",
-        "x-vaeroex-oauth-query",
-        "x-vaeroex-oauth-state",
-      ]
     }
   }
 }

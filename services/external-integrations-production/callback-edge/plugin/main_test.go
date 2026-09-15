@@ -13,7 +13,7 @@ import (
 
 const validStateFixture = "0123456789_abcdefghijklmnopqrstuvwxyz-ABCDE"
 
-func TestManagedHeaderEventForwardsExactEncodedQueryAndClearsForgedHandoffs(t *testing.T) {
+func TestManagedHeaderEventForwardsExactEncodedQuery(t *testing.T) {
 	rawQuery := "state=" + validStateFixture + "&code=synthetic-code"
 	host, reset := newCallbackHost("GET", callbackedge.CallbackPath, rawQuery)
 	defer reset()
@@ -23,9 +23,6 @@ func TestManagedHeaderEventForwardsExactEncodedQueryAndClearsForgedHandoffs(t *t
 		{":method", "GET"},
 		{":path", callbackedge.CallbackPath + "?redacted-at-edge"},
 		{"content-length", "0"},
-		{callbackedge.HandoffCodeHeader, "forged"},
-		{callbackedge.HandoffStateHeader, "forged"},
-		{callbackedge.HandoffQueryHeader, "forged"},
 	}, false)
 	if action != types.ActionContinue {
 		t.Fatalf("expected the managed header event to continue, got %v", action)
@@ -41,6 +38,30 @@ func TestManagedHeaderEventForwardsExactEncodedQueryAndClearsForgedHandoffs(t *t
 		string(decoded) != rawQuery || headers[callbackedge.HandoffStateHeader] != "" ||
 		headers[callbackedge.HandoffCodeHeader] != "" {
 		t.Fatalf("unexpected bounded query handoff: %#v", headers)
+	}
+}
+
+func TestManagedHeaderEventRejectsClientAuthorityAliasesAndForgedHandoffs(t *testing.T) {
+	for _, name := range []string{
+		"forwarded",
+		"x-forwarded-host",
+		"x-original-url",
+		"x-rewrite-url",
+		callbackedge.HandoffVersionHeader,
+		callbackedge.HandoffQueryHeader,
+		callbackedge.HandoffCodeHeader,
+		callbackedge.HandoffStateHeader,
+		callbackedge.HandoffDeniedHeader,
+	} {
+		host, reset := newCallbackHost("GET", callbackedge.CallbackPath, "state="+validStateFixture+"&code=synthetic-code")
+		contextID := host.InitializeHttpContext()
+		action := host.CallOnRequestHeaders(contextID, [][2]string{{name, "synthetic"}}, false)
+		response := host.GetSentLocalResponse(contextID)
+		if action != types.ActionPause || response == nil || response.StatusCode != 400 {
+			reset()
+			t.Fatalf("expected %s to fail before forwarding, got %v %#v", name, action, response)
+		}
+		reset()
 	}
 }
 

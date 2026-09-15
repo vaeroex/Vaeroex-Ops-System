@@ -42,6 +42,12 @@ func (*httpContext) OnHttpRequestHeaders(headerCount int, _ bool) (action types.
 	defer zeroBytes(path)
 	defer zeroBytes(rawQuery)
 
+	headers, headersError := proxywasm.GetHttpRequestHeaders()
+	if headersError != nil || !callbackedge.IsBoundedClientHeaderMap(headers) || callbackedge.HasForbiddenClientHeaders(headers) {
+		sendFixedResponse(400, "invalid integration request")
+		return action
+	}
+
 	if callbackedge.IsHealthRequest(string(method), string(path), string(rawQuery)) ||
 		callbackedge.IsWebhookRequest(string(method), string(path), string(rawQuery)) {
 		if !clearReservedHandoffHeaders() {
@@ -53,11 +59,6 @@ func (*httpContext) OnHttpRequestHeaders(headerCount int, _ bool) (action types.
 	// LbEdgeExtension invokes only REQUEST_HEADERS and does not expose request
 	// bodies to the plugin. Its callback flag is therefore not body evidence.
 	// Reject every forwarded HTTP body indicator instead.
-	headers, headersError := proxywasm.GetHttpRequestHeaders()
-	if headersError != nil || len(headers) > callbackedge.MaxInputHeaderCount {
-		sendFixedResponse(400, "invalid integration callback")
-		return action
-	}
 	handoff, parseError := callbackedge.ParseForwardedHeaderCallback(
 		string(method), string(path), string(rawQuery), headers,
 	)

@@ -12,6 +12,7 @@ const (
 	HealthPath            = "/healthz"
 	HandoffVersion        = "square_oauth_callback_handoff_v1"
 	MaxInputHeaderCount   = 64
+	MaxInputHeaderBytes   = 16384
 	MaxRawQueryBytes      = 8192
 	MaxRequestTargetBytes = len(CallbackPath) + 1 + MaxRawQueryBytes
 	HandoffVersionHeader  = "x-vaeroex-oauth-handoff-version"
@@ -40,10 +41,49 @@ type Handoff struct {
 // are rejected before any callback material can be converted into an internal
 // handoff.
 func ParseForwardedHeaderCallback(method, pathAttribute, queryAttribute string, headers [][2]string) (Handoff, error) {
-	if HasForbiddenCallbackBodyHeaders(headers) {
+	if !IsBoundedClientHeaderMap(headers) || HasForbiddenClientHeaders(headers) || HasForbiddenCallbackBodyHeaders(headers) {
 		return Handoff{}, ErrInvalidRequest
 	}
 	return ParseForwardedCallback(method, pathAttribute, queryAttribute)
+}
+
+// IsBoundedClientHeaderMap applies the input count and byte limits before the
+// edge derives or appends any internal handoff header.
+func IsBoundedClientHeaderMap(headers [][2]string) bool {
+	if len(headers) > MaxInputHeaderCount {
+		return false
+	}
+	totalBytes := 0
+	for _, header := range headers {
+		if len(header[0]) == 0 || len(header[0]) > 256 || len(header[1]) > 8192 {
+			return false
+		}
+		totalBytes += len(header[0]) + len(header[1])
+		if totalBytes > MaxInputHeaderBytes {
+			return false
+		}
+	}
+	return true
+}
+
+// HasForbiddenClientHeaders rejects every client-controlled authority alias
+// and every header reserved for the trusted edge-to-backend handoff.
+// LbEdgeExtension must omit forward_headers so this check receives the complete
+// client header map rather than an allowlisted subset.
+func HasForbiddenClientHeaders(headers [][2]string) bool {
+	for _, header := range headers {
+		name := strings.ToLower(header[0])
+		switch name {
+		case "forwarded", "x-forwarded-host", "x-original-url", "x-rewrite-url":
+			return true
+		}
+		for _, reserved := range ReservedHandoffHeaders {
+			if name == reserved {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func ParseForwardedCallback(method, pathAttribute, queryAttribute string) (Handoff, error) {

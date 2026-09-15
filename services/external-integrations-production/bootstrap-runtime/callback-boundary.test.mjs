@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
+import http from "node:http";
+import net from "node:net";
 import test from "node:test";
 import {
   CallbackBoundaryError,
@@ -60,6 +62,73 @@ function authority(overrides = {}) {
   };
 }
 
+async function throughRealNodeParser(headerCount) {
+  const headers = [
+    ["Host", SQUARE_PRODUCTION_HOST],
+    ["Content-Length", "0"],
+    ["x-vaeroex-oauth-handoff-version", SQUARE_HANDOFF_VERSION],
+    ["x-vaeroex-oauth-query", encodeQuery(authorizedQuery)],
+  ];
+  while (headers.length < headerCount) headers.push([`x-vaeroex-padding-${headers.length}`, "x"]);
+
+  let finishObservation;
+  let failObservation;
+  const observation = new Promise((resolve, reject) => {
+    finishObservation = resolve;
+    failObservation = reject;
+  });
+  const server = http.createServer({ maxHeaderSize: 32_768 }, async (incoming, outgoing) => {
+    incoming.resume();
+    let accepted = true;
+    try {
+      await evaluateSquareProductionCallback({
+        method: incoming.method,
+        url: incoming.url,
+        rawHeaders: incoming.rawHeaders,
+      }, authority());
+    } catch (error) {
+      assert.ok(error instanceof CallbackBoundaryError);
+      accepted = false;
+    }
+    finishObservation({ accepted, observedHeaderCount: incoming.rawHeaders.length / 2 });
+    outgoing.writeHead(accepted ? 204 : 400, { "connection": "close" });
+    outgoing.end();
+  });
+  server.maxHeadersCount = 0;
+  server.on("clientError", failObservation);
+  await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", resolve);
+  });
+
+  try {
+    const { port } = server.address();
+    const payload = [
+      `GET ${SQUARE_CALLBACK_PATH} HTTP/1.0`,
+      ...headers.map(([name, value]) => `${name}: ${value}`),
+      "",
+      "",
+    ].join("\r\n");
+    await new Promise((resolve, reject) => {
+      const socket = net.createConnection({ host: "127.0.0.1", port });
+      const timeout = setTimeout(() => {
+        socket.destroy();
+        reject(new Error("node_parser_harness_timeout"));
+      }, 5_000);
+      socket.once("connect", () => socket.end(payload));
+      socket.on("data", () => {});
+      socket.once("error", reject);
+      socket.once("close", () => {
+        clearTimeout(timeout);
+        resolve();
+      });
+    });
+    return await observation;
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+}
+
 async function rejected(input, dependencies = authority()) {
   await assert.rejects(() => evaluateSquareProductionCallback(input, dependencies), CallbackBoundaryError);
 }
@@ -92,6 +161,11 @@ test("accepts the 64-header edge envelope plus two handoff headers and rejects a
     consumeState: async () => { calls++; return null; },
   });
   assert.equal(calls, 0);
+});
+
+test("the real Node HTTP parser preserves 66 headers and exposes the 67th for explicit rejection", async () => {
+  assert.deepEqual(await throughRealNodeParser(66), { accepted: true, observedHeaderCount: 66 });
+  assert.deepEqual(await throughRealNodeParser(67), { accepted: false, observedHeaderCount: 67 });
 });
 
 test("accepts the optional exact code response type", async () => {

@@ -112,19 +112,24 @@ assert.match(activationReadme, /Network Services API defaults it to disabled/, "
 assert.match(activationReadme, /No `allUsers` IAM binding is created/, "the domain-restricted public ingress contract is documented");
 assert.match(main, /google_network_services_lb_edge_extension" "square_callback"[\s\S]*fail_open\s*=\s*false/, "the callback edge fails closed");
 assert.match(main, /forward_attributes = \[\s*"request.method",\s*"request.path",\s*"request.query",\s*\]/, "only the exact method, path, and query attributes are forwarded to the callback plugin");
-assert.match(main, /forward_headers = \[\s*"content-length",\s*"expect",\s*"transfer-encoding",\s*"x-vaeroex-oauth-code",\s*"x-vaeroex-oauth-denied",\s*"x-vaeroex-oauth-handoff-version",\s*"x-vaeroex-oauth-query",\s*"x-vaeroex-oauth-state",\s*\]/, "only the exact body-indicator and bounded internal OAuth handoff headers cross the edge");
+assert.doesNotMatch(main, /forward_headers\s*=/, "the edge plugin receives the complete client header map instead of a selected subset");
 assert.match(edgeCallback, /CallbackPath\s*=\s*"\/api\/integrations\/square\/callback"/, "the edge accepts only the Square callback path");
 assert.match(edgeCallback, /WebhookPath\s*=\s*"\/api\/integrations\/square\/webhook"/, "the edge permits only the exact queryless Square webhook pass-through");
 assert.doesNotMatch(edgeCallback, /error_description|response_type|QueryUnescape|validState|validCode/, "OAuth query semantics are not interpreted at the edge");
 assert.doesNotMatch(edgeCallback, /endOfStream/, "the header-only managed extension does not mistake its platform callback flag for request-body evidence");
 assert.match(edgeCallback, /HasForbiddenCallbackBodyHeaders/, "request-body indicators are rejected by a unit-tested bounded header contract");
+assert.match(edgeCallback, /MaxInputHeaderBytes\s*=\s*16384/, "the complete edge header map retains an aggregate byte bound");
+for (const header of ["forwarded", "x-forwarded-host", "x-original-url", "x-rewrite-url"]) {
+  assert.match(edgeCallback, new RegExp(`"${header}"`), `${header} is rejected from the complete client header map`);
+}
+assert.match(edgeCallback, /for _, reserved := range ReservedHandoffHeaders/, "client-supplied internal handoff headers fail closed");
 assert.match(edgePlugin, /ReplaceHttpRequestHeader\(":path", callbackedge\.CallbackPath\)/, "the edge strips the OAuth query before Cloud Run request logging");
 assert.match(edgePlugin, /GetHttpRequestHeaders\(\)/, "the edge reads the complete bounded header map before parsing callbacks");
 assert.match(edgePlugin, /headersError != nil/, "header retrieval failure fails closed");
 assert.match(edgePlugin, /callbackedge\.ParseForwardedHeaderCallback\([\s\S]*headers,/, "the plugin uses the unit-tested combined query and body-indicator contract");
 assert.doesNotMatch(edgePlugin, /diagnostic|callback_predicate|vaeroex_public_synthetic_predicate/, "the temporary public callback diagnostic is absent");
 assert.match(edgePlugin, /if err := proxywasm\.SendHttpResponse\([\s\S]*err != nil \{[\s\S]*panic\(err\)/, "a failed local rejection response escalates to fail_open=false plugin failure");
-assert.match(edgePlugin, /clearReservedHandoffHeaders\(\)/, "client-forged handoff headers are removed before forwarding");
+assert.match(edgePlugin, /clearReservedHandoffHeaders\(\)/, "reserved handoff headers receive a defense-in-depth purge before the trusted pair is appended");
 assert.match(edgePlugin, /AddHttpRequestHeader\(callbackedge\.HandoffQueryHeader, handoff\.EncodedQuery\)/, "the edge forwards one safely encoded raw-query handoff");
 assert.doesNotMatch(edgePlugin, /AddHttpRequestHeader\([^\n]*error_description/, "provider error descriptions never enter the internal request");
 assert.match(edgeCloudBuild, /_SOURCE_COMMIT[\s\S]*\^\[a-f0-9\]\{40\}\$/, "callback-edge publication validates the reviewed source revision");
@@ -195,7 +200,7 @@ assert.equal(
 );
 assert.equal(
   createHash("sha256").update(serverSource).digest("hex"),
-  "622d6601ec2cab851a802d307cfa9dc6da6f75dbe8aa85de03087590dac8a5ed",
+  "9df82e10ee028ccb895ec4b95452d1a0b635013135821f444f1e7a2fd2f582f0",
   "every executable bootstrap server change requires an explicit reviewed fingerprint update",
 );
 assert.equal(
@@ -207,7 +212,8 @@ assert.deepEqual(bootstrapPackage.dependencies ?? {}, {}, "the bootstrap has no 
 assert.match(callbackBoundarySource, /SQUARE_PRODUCTION_HOST = "square\.vaeroex\.com"/, "the backend accepts only the exact Production TLS host");
 assert.match(callbackBoundarySource, /SQUARE_EDGE_INPUT_MAX_HEADER_COUNT = 64/, "the edge input envelope is explicitly bounded at 64 headers");
 assert.match(callbackBoundarySource, /SQUARE_BACKEND_MAX_HEADER_COUNT = SQUARE_EDGE_INPUT_MAX_HEADER_COUNT \+ 2/, "the backend admits only the edge envelope plus its two trusted handoff headers");
-assert.match(serverSource, /server\.maxHeadersCount = SQUARE_BACKEND_MAX_HEADER_COUNT/, "the Node parser and callback boundary share the exact 66-header cap");
+assert.match(serverSource, /http\.createServer\(\{ maxHeaderSize: 32_768 \}/, "the Node parser retains an explicit 32 KiB aggregate header byte ceiling");
+assert.match(serverSource, /server\.maxHeadersCount = 0/, "Node preserves complete raw headers so the callback boundary can apply the explicit 66-header cap without truncation");
 assert.match(callbackBoundarySource, /input\.method !== "GET" \|\| input\.url !== SQUARE_CALLBACK_PATH/, "the backend independently requires the exact queryless GET callback route");
 assert.match(callbackBoundarySource, /\["forwarded", "x-forwarded-host", "x-original-url", "x-rewrite-url"\]/, "forwarded authority cannot select the Production callback backend");
 assert.match(callbackBoundarySource, /csrfVerified !== true[\s\S]*currentGeneration !== value\.generation[\s\S]*expiresAtMs <= nowMs[\s\S]*consumedAtMs !== nowMs/, "state consumption binds CSRF, current generation, expiry, and first-use time");

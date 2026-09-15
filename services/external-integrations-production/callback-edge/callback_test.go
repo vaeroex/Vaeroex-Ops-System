@@ -110,6 +110,52 @@ func TestBodyIndicatorHeadersFailClosed(t *testing.T) {
 	}
 }
 
+func TestCompleteClientHeaderMapRejectsAuthorityAliasesAndReservedHandoffs(t *testing.T) {
+	for _, name := range []string{
+		"forwarded",
+		"x-forwarded-host",
+		"x-original-url",
+		"x-rewrite-url",
+		HandoffVersionHeader,
+		HandoffQueryHeader,
+		HandoffCodeHeader,
+		HandoffStateHeader,
+		HandoffDeniedHeader,
+	} {
+		headers := [][2]string{{name, "synthetic"}}
+		if !HasForbiddenClientHeaders(headers) {
+			t.Fatalf("expected %s to fail the complete client header contract", name)
+		}
+		if _, err := ParseForwardedHeaderCallback(
+			"GET", CallbackPath, "state="+validStateFixture+"&code=synthetic-code", headers,
+		); err == nil {
+			t.Fatalf("expected %s to fail before handoff", name)
+		}
+	}
+	if HasForbiddenClientHeaders([][2]string{{"accept", "text/html"}}) {
+		t.Fatal("ordinary client headers must remain permitted within the explicit bounds")
+	}
+}
+
+func TestCompleteClientHeaderMapHasExactCountAndByteBounds(t *testing.T) {
+	headers := make([][2]string, MaxInputHeaderCount)
+	for index := range headers {
+		headers[index] = [2]string{"x", "y"}
+	}
+	if !IsBoundedClientHeaderMap(headers) {
+		t.Fatalf("expected exactly %d small headers to remain permitted", MaxInputHeaderCount)
+	}
+	if IsBoundedClientHeaderMap(append(headers, [2]string{"x", "y"})) {
+		t.Fatalf("expected a %dth input header to fail", MaxInputHeaderCount+1)
+	}
+	if !IsBoundedClientHeaderMap([][2]string{{"x", strings.Repeat("y", 8191)}, {"z", strings.Repeat("w", 8191)}}) {
+		t.Fatalf("expected exactly %d aggregate bytes to remain permitted", MaxInputHeaderBytes)
+	}
+	if IsBoundedClientHeaderMap([][2]string{{"x", strings.Repeat("y", 8192)}, {"z", strings.Repeat("w", 8191)}}) {
+		t.Fatalf("expected aggregate bytes above %d to fail", MaxInputHeaderBytes)
+	}
+}
+
 func TestOnlyExactQuerylessHealthAndWebhookPassThrough(t *testing.T) {
 	if !IsHealthRequest("GET", HealthPath, "") || !IsHealthRequest("HEAD", HealthPath, "") {
 		t.Fatal("expected exact health requests to pass")
