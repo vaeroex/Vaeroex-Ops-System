@@ -68,6 +68,20 @@ variable "bootstrap_image_digest" {
   }
 }
 
+variable "oauth_callback_image_digest" {
+  type      = string
+  default   = null
+  nullable  = true
+  sensitive = false
+  validation {
+    condition = (
+      var.oauth_callback_image_digest == null ||
+      can(regex("^us-west1-docker\\.pkg\\.dev/vaeroex-integrations-prod/vaeroex-integrations-images/production-bootstrap@sha256:[a-f0-9]{64}$", var.oauth_callback_image_digest))
+    )
+    error_message = "The OAuth callback image must be an immutable disabled-bootstrap digest in the reviewed Production repository."
+  }
+}
+
 variable "callback_edge_image_digest" {
   type      = string
   default   = null

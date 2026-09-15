@@ -17,11 +17,6 @@ type vmContext struct{ types.DefaultVMContext }
 type pluginContext struct{ types.DefaultPluginContext }
 type httpContext struct{ types.DefaultHttpContext }
 
-const (
-	diagnosticMarker = "vaeroex_public_synthetic_predicate_v1"
-	diagnosticTarget = callbackedge.CallbackPath + "?state=0123456789_abcdefghijklmnopqrstuvwxyz-ABCDE&code=vaeroex-edge-diagnostic"
-)
-
 func (*vmContext) NewPluginContext(uint32) types.PluginContext { return &pluginContext{} }
 func (*pluginContext) NewHttpContext(uint32) types.HttpContext { return &httpContext{} }
 
@@ -59,23 +54,14 @@ func (*httpContext) OnHttpRequestHeaders(headerCount int, _ bool) (action types.
 	// bodies to the plugin. Its callback flag is therefore not body evidence.
 	// Reject every forwarded HTTP body indicator instead.
 	headers, headersError := proxywasm.GetHttpRequestHeaders()
-	if headersError != nil {
+	if headersError != nil || len(headers) > callbackedge.MaxHeaderCount {
 		sendFixedResponse(400, "invalid integration callback")
 		return action
 	}
-	requestTarget, requestTargetError := proxywasm.GetHttpRequestHeader(":path")
-	handoff, reason := callbackedge.DiagnoseForwardedHeaderCallback(
+	handoff, parseError := callbackedge.ParseForwardedHeaderCallback(
 		string(method), string(path), string(rawQuery), headers,
 	)
-	if requestTargetError == nil && isExactDiagnosticCanary(headers, requestTarget) {
-		status := uint32(200)
-		if reason != callbackedge.RejectionNone {
-			status = 400
-		}
-		sendFixedResponse(status, "callback_predicate_"+string(reason))
-		return action
-	}
-	if reason != callbackedge.RejectionNone {
+	if parseError != nil {
 		sendFixedResponse(400, "invalid integration callback")
 		return action
 	}
@@ -85,36 +71,11 @@ func (*httpContext) OnHttpRequestHeaders(headerCount int, _ bool) (action types.
 	}
 	if proxywasm.ReplaceHttpRequestHeader(":path", callbackedge.CallbackPath) != nil ||
 		proxywasm.AddHttpRequestHeader(callbackedge.HandoffVersionHeader, callbackedge.HandoffVersion) != nil ||
-		proxywasm.AddHttpRequestHeader(callbackedge.HandoffStateHeader, handoff.State) != nil {
-		sendFixedResponse(500, "integration callback unavailable")
-		return action
-	}
-	if handoff.Denied {
-		if proxywasm.AddHttpRequestHeader(callbackedge.HandoffDeniedHeader, "1") != nil {
-			sendFixedResponse(500, "integration callback unavailable")
-			return action
-		}
-	} else if proxywasm.AddHttpRequestHeader(callbackedge.HandoffCodeHeader, handoff.Code) != nil {
+		proxywasm.AddHttpRequestHeader(callbackedge.HandoffQueryHeader, handoff.EncodedQuery) != nil {
 		sendFixedResponse(500, "integration callback unavailable")
 		return action
 	}
 	return types.ActionContinue
-}
-
-func isExactDiagnosticCanary(headers [][2]string, requestTarget string) bool {
-	if requestTarget != diagnosticTarget {
-		return false
-	}
-	markerCount := 0
-	for _, header := range headers {
-		if header[0] == callbackedge.HandoffVersionHeader {
-			markerCount++
-			if header[1] != diagnosticMarker {
-				return false
-			}
-		}
-	}
-	return markerCount == 1
 }
 
 func clearReservedHandoffHeaders() bool {
