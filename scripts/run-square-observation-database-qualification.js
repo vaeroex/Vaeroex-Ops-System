@@ -63,10 +63,47 @@ async function qualify(runtime) {
   eq(await runtime.sourceSchemaFingerprint(c),schemaBefore,"Square interpretation preserves canonical/QBO schema");
   if(runtime.targetKind==="native-postgres") {
     await runtime.applyMigrations(c,productionCompatibility);
+  const productionPreflightCapabilities=["oauth","broker","scheduler","webhook","runtime","evidence"];
+  const productionAuthorityRoles=productionPreflightCapabilities.map(
+    capability=>`square_production_${capability}_authority`
+  );
+  await c.query("create table private.square_production_configuration_generations(fixture_marker integer)");
+  for(const capability of productionPreflightCapabilities) {
+    const rpc=`public.check_square_production_${capability}_authority_v1(text,text,text,bigint,text)`;
+    const authority=`square_production_${capability}_authority`;
+    await c.query(`create function ${rpc} returns void language sql as 'select null::void'`);
+    await c.query(`revoke all on function ${rpc} from public,anon,authenticated,service_role,${productionAuthorityRoles.join(",")}`);
+    await c.query(`grant execute on function ${rpc} to ${authority}`);
+  }
+  await runtime.applyMigrations(c,[productionCompatibility.at(-1)]);
+  const runtimePreflight="public.check_square_production_runtime_authority_v1(text,text,text,bigint,text)";
+  await c.query(`revoke execute on function ${runtimePreflight} from square_production_runtime_authority`);
+  let legacyGuardError;
+  try { await runtime.applyMigrations(c,[productionCompatibility.at(-1)]); }
+  catch (error) { legacyGuardError=error; }
+  eq(legacyGuardError?.code,"55000","forward guard rejects revoked authority RPC EXECUTE");
+  await c.query(`grant execute on function ${runtimePreflight} to square_production_runtime_authority`);
+  const brokerPreflight="public.check_square_production_broker_authority_v1(text,text,text,bigint,text)";
+  await c.query(`grant execute on function ${brokerPreflight} to square_production_broker_authority with grant option`);
+  legacyGuardError=undefined;
+  try { await runtime.applyMigrations(c,[productionCompatibility.at(-1)]); }
+  catch (error) { legacyGuardError=error; }
+  eq(legacyGuardError?.code,"55000","forward guard rejects grant-option authority RPC EXECUTE");
+  await c.query(`revoke grant option for execute on function ${brokerPreflight} from square_production_broker_authority`);
+  const oauthPreflight="public.check_square_production_oauth_authority_v1(text,text,text,bigint,text)";
+  await c.query(`grant execute on function ${oauthPreflight} to service_role`);
+  legacyGuardError=undefined;
+  try { await runtime.applyMigrations(c,[productionCompatibility.at(-1)]); }
+  catch (error) { legacyGuardError=error; }
+  eq(legacyGuardError?.code,"55000","forward guard rejects a foreign RPC grantee");
+  await c.query(`revoke execute on function ${oauthPreflight} from service_role`);
+  for(const capability of productionPreflightCapabilities)
+    await c.query(`drop function public.check_square_production_${capability}_authority_v1(text,text,text,bigint,text)`);
+  await c.query("drop table private.square_production_configuration_generations");
   eq((await c.query("select private.integration_production_foundation_split_marker_v1() as value")).rows[0].value,
     "20260902191323_provider_neutral","compatibility path records the reviewed split foundation identity");
   await c.query("drop function private.integration_production_foundation_split_marker_v1()");
-  let legacyGuardError;
+  legacyGuardError=undefined;
   try { await runtime.applyMigrations(c,[productionCompatibility.at(-1)]); }
   catch (error) { legacyGuardError=error; }
   eq(legacyGuardError?.code,"55000","a previously recorded all-in-one migration fails without the split marker");

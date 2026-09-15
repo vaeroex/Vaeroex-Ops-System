@@ -168,9 +168,11 @@ assert.match(legacyGuard, /relkind <> 'r'[\s\S]*relpersistence <> 'p'[\s\S]*relo
   "later legacy guard continues requiring permanent provider-neutral relations");
 for (const capability of ["oauth","broker","scheduler","webhook","runtime","evidence"]) {
   assert.match(legacyGuard, new RegExp(
-    `when 'square_production_${capability}_authority' then pg_catalog\\.to_regprocedure\\('public\\.check_square_production_${capability}_authority_v1\\(text,text,text,bigint,text\\)'\\)::oid`
+    `when 'square_production_${capability}_authority' then pg_catalog\\.to_regprocedure\\('public\\.check_square_production_${capability}_authority_v1\\(text,text,text,bigint,text\\)'\\)`
   ), `${capability} authority maps only to its distinct preflight RPC dependency`);
 }
+assert.match(legacyGuard, /expected_rpc is null[\s\S]*aclexplode\(rpc\.proacl\)[\s\S]*rpc_acl\.grantee<>rpc\.proowner[\s\S]*rpc_acl\.grantee=role_record\.oid[\s\S]*not rpc_acl\.is_grantable/,
+  "later legacy guard requires the exact non-grantable sole non-owner RPC ACL");
 
 assert.equal(
   packageJson.scripts["test:external-integrations-square-production-overlay"],

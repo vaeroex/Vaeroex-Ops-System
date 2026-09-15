@@ -224,9 +224,11 @@ assert.match(legacyGuard, /dependency\.classid='pg_proc'::regclass/,
   "forward guard can preserve only exact reviewed preflight-function ACL dependencies");
 for (const capability of ["oauth", "broker", "scheduler", "webhook", "runtime", "evidence"]) {
   assert.match(legacyGuard, new RegExp(
-    `when 'square_production_${capability}_authority' then pg_catalog\\.to_regprocedure\\('public\\.check_square_production_${capability}_authority_v1\\(text,text,text,bigint,text\\)'\\)::oid`
+    `when 'square_production_${capability}_authority' then pg_catalog\\.to_regprocedure\\('public\\.check_square_production_${capability}_authority_v1\\(text,text,text,bigint,text\\)'\\)`
   ), `forward guard binds ${capability} authority only to its exact preflight RPC dependency`);
 }
+assert.match(legacyGuard, /square_overlay_present[\s\S]*expected_rpc is null[\s\S]*aclexplode\(rpc\.proacl\)[\s\S]*rpc_acl\.grantee<>rpc\.proowner[\s\S]*rpc_acl\.grantee=role_record\.oid[\s\S]*rpc_acl\.grantor=rpc\.proowner[\s\S]*privilege_type='EXECUTE'[\s\S]*not rpc_acl\.is_grantable/,
+  "forward guard requires one exact non-grantable authority RPC ACL and no other non-owner grantee");
 assert.match(legacyGuard, /aclexplode\(public_schema\.nspacl\)[\s\S]*privilege_type='USAGE'[\s\S]*has_schema_privilege\(role_name,'public','CREATE'\)/,
   "forward guard requires exact non-grantable public USAGE without CREATE");
 assert.match(legacyGuard, /jsonb_build_object\([\s\S]*'columns'[\s\S]*'constraints'[\s\S]*'indexes'[\s\S]*'policy_count'[\s\S]*'trigger_count'[\s\S]*0fe4e1c2080fed1725db60ddb1643f4cd2d979a1a261c3445aae54c56788897e/,
@@ -259,6 +261,8 @@ assert.match(observationDatabaseTest, /create publication production_foundation_
   "native PostgreSQL qualification exercises new-foundation publication rejection");
 assert.match(observationDatabaseTest, /create publication production_authority_guard_pub[\s\S]*rejects retained authority-table publication membership/,
   "native PostgreSQL qualification exercises logical-publication rejection");
+assert.match(observationDatabaseTest, /revoked authority RPC EXECUTE[\s\S]*grant-option authority RPC EXECUTE[\s\S]*foreign RPC grantee/,
+  "native PostgreSQL qualification rejects missing, delegable and foreign preflight RPC ACLs");
 assert.ok(
   fixtureRichMigrationTest.indexOf("const localMigrationAdministratorDatabaseUrl = localMigrationAdministratorUrl(databaseUrl)") <
     fixtureRichMigrationTest.indexOf("run(cli, [\n    \"db\",\n    \"reset\""),

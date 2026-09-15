@@ -96,8 +96,8 @@ select ok(not pg_catalog.has_function_privilege('service_role',
 select ok(not pg_catalog.has_function_privilege('square_production_runtime_authority',
   'private.check_square_production_operational_generation_v1(text,text,text,bigint,text,text)','execute'),
   'dormant runtime authority cannot invoke the shared private generation check');
-select is((select function_record.provolatile||':'||function_record.proisstrict::text||':'||
-    function_record.proparallel||':'||function_record.prosecdef::text
+select is((select function_record.provolatile::text||':'||function_record.proisstrict::text||':'||
+    function_record.proparallel::text||':'||function_record.prosecdef::text
   from pg_catalog.pg_proc function_record
   where function_record.oid=
     'private.square_production_configuration_fingerprint_v1(bigint,text,text,text,text,text,text,text,text,text,text,text,text,text,text,text,text,text[],text,text,text,text[],text,text,boolean,boolean,boolean,boolean,boolean,boolean,boolean)'::regprocedure),
