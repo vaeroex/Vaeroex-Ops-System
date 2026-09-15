@@ -100,6 +100,22 @@ begin
       errcode='55000',
       message='square_production_runtime_overlay_provider_fingerprint_definition_drifted';
   end if;
+  if exists(
+       select 1
+       from private.integration_production_provider_bindings provider_binding
+       where provider_binding.provider_authority_fingerprint is distinct from
+         private.integration_production_fingerprint_v1(array[
+           provider_binding.provider_key,
+           provider_binding.environment,
+           provider_binding.application_id,
+           provider_binding.callback_uri,
+           provider_binding.kms_key_resource
+         ])
+     ) then
+    raise exception using
+      errcode='55000',
+      message='square_production_runtime_overlay_provider_fingerprint_value_drifted';
+  end if;
   if exists(select 1
        from pg_catalog.unnest(array[
          'anon','authenticated','service_role',

@@ -173,6 +173,9 @@ assert.match(overlay, /attribute\.attgenerated='s'/);
 assert.match(overlay, /pg_catalog\.pg_get_expr\(definition\.adbin,definition\.adrelid,false\)/);
 assert.match(overlay, /private\.integration_production_fingerprint_v1\(ARRAY\[provider_key,environment,application_id,callback_uri,kms_key_resource\]\)/,
   "the provider authority column must preserve the exact five-part generated expression");
+assert.match(overlay, /square_production_runtime_overlay_provider_fingerprint_value_drifted/);
+assert.match(overlay, /provider_binding\.provider_authority_fingerprint is distinct from[\s\S]*provider_binding\.provider_key[\s\S]*provider_binding\.kms_key_resource/,
+  "stored generated values are revalidated after any temporarily drifted helper definition");
 assert.match(overlay, /to_regclass\('private\.integration_production_provider_bindings'\)/);
 assert.match(overlay, /to_regclass\('private\.square_account_configuration'\)/);
 assert.match(overlay, /rolname='square_production_runtime_authority'/);
