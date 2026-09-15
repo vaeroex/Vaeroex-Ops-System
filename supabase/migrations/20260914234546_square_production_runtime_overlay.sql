@@ -57,6 +57,25 @@ begin
       errcode='55000',
       message='square_production_runtime_overlay_shared_foundation_semantics_drifted';
   end if;
+  if not exists(
+       select 1
+       from pg_catalog.pg_attribute attribute
+       join pg_catalog.pg_attrdef definition
+         on definition.adrelid=attribute.attrelid and definition.adnum=attribute.attnum
+       where attribute.attrelid='private.integration_production_provider_bindings'::regclass
+         and attribute.attname='provider_authority_fingerprint'
+         and attribute.atttypid='text'::regtype
+         and attribute.attgenerated='s'
+         and not attribute.attisdropped
+         and pg_catalog.regexp_replace(
+           pg_catalog.pg_get_expr(definition.adbin,definition.adrelid,false),
+           '[[:space:]]','','g'
+         )='private.integration_production_fingerprint_v1(ARRAY[provider_key,environment,application_id,callback_uri,kms_key_resource])'
+     ) then
+    raise exception using
+      errcode='55000',
+      message='square_production_runtime_overlay_provider_fingerprint_definition_drifted';
+  end if;
   if exists(select 1
        from pg_catalog.unnest(array[
          'anon','authenticated','service_role',

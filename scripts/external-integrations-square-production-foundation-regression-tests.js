@@ -163,6 +163,11 @@ assert.match(overlay, /integration_production_fingerprint_v1\(array\[[\s\S]*'squ
   "the semantic oracle covers the complete seven-part Square configuration shape");
 assert.doesNotMatch(overlay, /integration_production_fingerprint_v1\([^;]*\)<>\s*'sha256:/,
   "semantic probes reject NULL results with NULL-safe comparisons");
+assert.match(overlay, /square_production_runtime_overlay_provider_fingerprint_definition_drifted/);
+assert.match(overlay, /attribute\.attgenerated='s'/);
+assert.match(overlay, /pg_catalog\.pg_get_expr\(definition\.adbin,definition\.adrelid,false\)/);
+assert.match(overlay, /private\.integration_production_fingerprint_v1\(ARRAY\[provider_key,environment,application_id,callback_uri,kms_key_resource\]\)/,
+  "the provider authority column must preserve the exact five-part generated expression");
 assert.match(overlay, /to_regclass\('private\.integration_production_provider_bindings'\)/);
 assert.match(overlay, /to_regclass\('private\.square_account_configuration'\)/);
 assert.match(overlay, /rolname='square_production_runtime_authority'/);
