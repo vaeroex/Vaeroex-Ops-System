@@ -49,6 +49,21 @@ begin
          and not configuration_column.attisdropped
          and configuration_column_acl.grantee<>(select relowner from pg_catalog.pg_class
            where oid='private.square_account_configuration'::regclass)
+     ) or exists(
+       select 1
+       from (values
+         ('surface_enabled','boolean'::regtype),
+         ('enrollment_enabled','boolean'::regtype),
+         ('blocked','boolean'::regtype),
+         ('approval_expires_at','timestamp with time zone'::regtype)
+       ) required_configuration_column(column_name,column_type)
+       left join pg_catalog.pg_attribute configuration_gate_column
+         on configuration_gate_column.attrelid='private.square_account_configuration'::regclass
+        and configuration_gate_column.attname=required_configuration_column.column_name
+        and not configuration_gate_column.attisdropped
+       where configuration_gate_column.attnum is null
+          or not configuration_gate_column.attnotnull
+          or configuration_gate_column.atttypid<>required_configuration_column.column_type
      ) then
     raise exception using
       errcode='55000',

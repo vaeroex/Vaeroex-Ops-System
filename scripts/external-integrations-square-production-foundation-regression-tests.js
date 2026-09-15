@@ -167,6 +167,9 @@ assert.match(overlay, /pg_catalog\.aclexplode\(retained_column\.attacl\)/,
 assert.match(overlay, /configuration_relation\.relforcerowsecurity[\s\S]*configuration_relation\.relowner=/);
 assert.match(overlay, /configuration_column\.attacl/,
   "the retained lifecycle configuration exposes no table or column ACL to a non-owner");
+assert.match(overlay, /'surface_enabled','boolean'::regtype[\s\S]*'enrollment_enabled','boolean'::regtype[\s\S]*'blocked','boolean'::regtype[\s\S]*'approval_expires_at','timestamp with time zone'::regtype/);
+assert.match(overlay, /configuration_gate_column\.attnum is null[\s\S]*not configuration_gate_column\.attnotnull[\s\S]*configuration_gate_column\.atttypid<>required_configuration_column\.column_type/,
+  "the retained lifecycle gates keep their non-null Boolean and timestamp contract");
 assert.match(overlay, /square_production_runtime_overlay_partial_or_drifted/);
 assert.match(overlay, /square_production_runtime_overlay_shared_foundation_attributes_drifted/);
 assert.match(overlay, /square_production_runtime_overlay_shared_foundation_semantics_drifted/);
