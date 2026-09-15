@@ -160,21 +160,61 @@ begin
      not exists(select 1 from pg_catalog.pg_class
        where oid='private.square_production_runtime_binding'::regclass
          and relkind='r' and relrowsecurity and relforcerowsecurity) or
-     1<>(select count(*) from pg_catalog.pg_constraint
-       where conrelid='private.square_production_runtime_binding'::regclass
-         and contype='p' and convalidated) or
-     2<>(select count(*) from pg_catalog.pg_constraint
-       where conrelid='private.square_production_runtime_binding'::regclass
-         and contype='f' and convalidated
-         and confrelid='private.integration_production_provider_bindings'::regclass) or
-     1<>(select count(*) from pg_catalog.pg_constraint
-       where conrelid='private.square_production_runtime_binding'::regclass
-         and conname='square_production_runtime_binding_configuration_fkey'
-         and contype='f' and convalidated
-         and confrelid='private.square_account_configuration'::regclass) or
-     pg_catalog.has_table_privilege('anon','private.square_production_runtime_binding','select,insert,update,delete') or
-     pg_catalog.has_table_privilege('authenticated','private.square_production_runtime_binding','select,insert,update,delete') or
-     pg_catalog.has_table_privilege('service_role','private.square_production_runtime_binding','select,insert,update,delete') then
+     not exists(select 1 from pg_catalog.pg_constraint c
+       where c.conrelid='private.square_production_runtime_binding'::regclass
+         and c.contype='p' and c.convalidated
+         and (select pg_catalog.array_agg(a.attname::text order by k.ordinality)
+           from pg_catalog.unnest(c.conkey) with ordinality k(attnum,ordinality)
+           join pg_catalog.pg_attribute a on a.attrelid=c.conrelid and a.attnum=k.attnum)
+           =array['provider_key','environment','application_id']::text[]) or
+     not exists(select 1 from pg_catalog.pg_constraint c
+       where c.conrelid='private.square_production_runtime_binding'::regclass
+         and c.contype='f' and c.convalidated
+         and c.confrelid='private.integration_production_provider_bindings'::regclass
+         and (select pg_catalog.array_agg(a.attname::text order by k.ordinality)
+           from pg_catalog.unnest(c.conkey) with ordinality k(attnum,ordinality)
+           join pg_catalog.pg_attribute a on a.attrelid=c.conrelid and a.attnum=k.attnum)
+           =array['provider_key','environment']::text[]
+         and (select pg_catalog.array_agg(a.attname::text order by k.ordinality)
+           from pg_catalog.unnest(c.confkey) with ordinality k(attnum,ordinality)
+           join pg_catalog.pg_attribute a on a.attrelid=c.confrelid and a.attnum=k.attnum)
+           =array['provider_key','environment']::text[]) or
+     not exists(select 1 from pg_catalog.pg_constraint c
+       where c.conrelid='private.square_production_runtime_binding'::regclass
+         and c.contype='f' and c.convalidated
+         and c.confrelid='private.integration_production_provider_bindings'::regclass
+         and (select pg_catalog.array_agg(a.attname::text order by k.ordinality)
+           from pg_catalog.unnest(c.conkey) with ordinality k(attnum,ordinality)
+           join pg_catalog.pg_attribute a on a.attrelid=c.conrelid and a.attnum=k.attnum)
+           =array['provider_key','environment','provider_authority_fingerprint']::text[]
+         and (select pg_catalog.array_agg(a.attname::text order by k.ordinality)
+           from pg_catalog.unnest(c.confkey) with ordinality k(attnum,ordinality)
+           join pg_catalog.pg_attribute a on a.attrelid=c.confrelid and a.attnum=k.attnum)
+           =array['provider_key','environment','provider_authority_fingerprint']::text[]) or
+     not exists(select 1 from pg_catalog.pg_constraint c
+       where c.conrelid='private.square_production_runtime_binding'::regclass
+         and c.conname='square_production_runtime_binding_configuration_fkey'
+         and c.contype='f' and c.convalidated
+         and c.confrelid='private.square_account_configuration'::regclass
+         and (select pg_catalog.array_agg(a.attname::text order by k.ordinality)
+           from pg_catalog.unnest(c.conkey) with ordinality k(attnum,ordinality)
+           join pg_catalog.pg_attribute a on a.attrelid=c.conrelid and a.attnum=k.attnum)
+           =array['environment','square_configuration_authority_fingerprint','square_configuration_fingerprint']::text[]
+         and (select pg_catalog.array_agg(a.attname::text order by k.ordinality)
+           from pg_catalog.unnest(c.confkey) with ordinality k(attnum,ordinality)
+           join pg_catalog.pg_attribute a on a.attrelid=c.confrelid and a.attnum=k.attnum)
+           =array['environment','square_production_authority_fingerprint','square_production_binding_fingerprint']::text[]) or
+     exists(select 1
+       from pg_catalog.unnest(array[
+         'anon','authenticated','service_role',
+         'square_production_oauth_authority','square_production_broker_authority',
+         'square_production_scheduler_authority','square_production_webhook_authority',
+         'square_production_runtime_authority','square_production_evidence_authority'
+       ]::text[]) denied_role(role_name)
+       cross join pg_catalog.unnest(array[
+         'SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER'
+       ]::text[]) denied_privilege(privilege_name)
+       where pg_catalog.has_table_privilege(role_name,'private.square_production_runtime_binding',privilege_name)) then
     raise exception using
       errcode='55000',
       message='square_production_runtime_overlay_partial_or_drifted';

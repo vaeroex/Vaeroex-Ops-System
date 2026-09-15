@@ -169,7 +169,13 @@ assert.match(overlay, /create table if not exists private\.square_production_run
 assert.match(overlay, /existing_objects not in \(0,6\)/,
   "the overlay accepts only a fresh install or the complete legacy all-in-one shape");
 assert.match(overlay, /relrowsecurity and relforcerowsecurity/);
-assert.match(overlay, /has_table_privilege\('service_role','private\.square_production_runtime_binding'/);
+assert.match(overlay, /pg_catalog\.unnest\(c\.conkey\)/);
+assert.match(overlay, /pg_catalog\.unnest\(c\.confkey\)/);
+assert.match(overlay, /provider_authority_fingerprint'\]::text\[\]/);
+assert.match(overlay, /square_production_binding_fingerprint'\]::text\[\]/);
+assert.match(overlay, /'SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER'/,
+  "legacy acceptance rejects every effective table privilege, including operations outside RLS");
+assert.match(overlay, /square_production_runtime_authority','square_production_evidence_authority'/);
 assert.ok(overlay.indexOf("square_production_runtime_overlay_prerequisite_missing") <
   overlay.indexOf("create or replace function private.square_production_configuration_fingerprint_v1"),
 "the overlay validates every prerequisite before its first durable mutation");
