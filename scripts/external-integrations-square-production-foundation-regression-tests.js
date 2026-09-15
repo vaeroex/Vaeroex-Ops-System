@@ -153,10 +153,15 @@ assert.match(overlay, /integration_production_fingerprint_v1\(text\[\]\)'::regpr
 assert.match(overlay, /array\['a','bc'\]/);
 assert.match(overlay, /array\['ab','c'\]/);
 assert.match(overlay, /array\['😀','é'\]/);
+assert.match(overlay, /shared_fingerprint_proc\.proowner<>\(select oid from pg_catalog\.pg_roles where rolname=current_user\)/,
+  "the shared helper must remain owned by the active migration administrator");
 assert.match(overlay, /shared_fingerprint_proc\.proowner<>\(select relowner/,
-  "the shared helper must remain owned by the provider-authority table owner");
+  "the shared helper and provider-authority table must retain one trusted owner");
 assert.match(overlay, /proconfig is distinct from array\['search_path='\]/,
   "a NULL or altered function configuration must fail closed");
+assert.match(overlay, /square_production_runtime_overlay_shared_foundation_definition_drifted/);
+assert.match(overlay, /f08697ddaaf6d4af4faf77d0e5a2de67a87cc5bbee5f9579cecd403161edca8f/,
+  "the exact canonical shared-helper body is pinned independently of its outputs");
 assert.match(overlay, /integration_production_fingerprint_v1\(array\[[\s\S]*'square','production','sq0idp-Authority_App'[\s\S]*is distinct from[\s\S]*92e720a00023fd7fcfc813e41d43db2339591f8bfabd0da3292e465f7159d34a/,
   "the semantic oracle covers the complete five-part provider authority shape");
 assert.match(overlay, /integration_production_fingerprint_v1\(array\[[\s\S]*'square_production_webhook_login'[\s\S]*is distinct from[\s\S]*8e1b2ec3f53655304d7ed20ae67243fd8b8f1e8ad846148d7ce617006e5df1f0/,
@@ -186,6 +191,8 @@ assert.doesNotMatch(overlay, /squareupsandbox|oysjpoondtcrqpghhrbd|sandbox-sq0id
 assert.doesNotMatch(overlay, /create table private\.integration_production_(?:platform_bindings|provider_bindings|provider_secrets|provider_capabilities)/);
 assert.match(overlay, /square_production_runtime_overlay_nonempty_reconciliation_required/);
 assert.match(overlay, /lock table private\.square_production_runtime_binding in access exclusive mode/);
+assert.match(overlay, /set local row_security=off/,
+  "legacy emptiness checks abort rather than silently filtering rows through FORCE RLS");
 assert.match(overlay, /drop table if exists private\.square_production_runtime_binding/);
 assert.doesNotMatch(overlay, /drop[^;]*cascade/i,
   "unknown dependencies abort the legacy rebuild instead of being deleted");

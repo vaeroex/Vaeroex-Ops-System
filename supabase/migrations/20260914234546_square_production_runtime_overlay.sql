@@ -5,6 +5,11 @@
 -- independently to the existing Production database baseline.
 begin;
 
+-- A legacy empty-table rebuild is permitted only when the migration actor can
+-- observe physical rows. With row_security=off PostgreSQL raises an error
+-- instead of silently applying an RLS filter when the actor cannot bypass it.
+set local row_security=off;
+
 do $prerequisites$
 declare
   existing_objects integer;
@@ -25,6 +30,7 @@ begin
      shared_fingerprint_proc.proparallel<>'s' or shared_fingerprint_proc.prosecdef or
      shared_fingerprint_proc.prolang<>(select oid from pg_catalog.pg_language where lanname='sql') or
      shared_fingerprint_proc.prorettype<>'text'::regtype or shared_fingerprint_proc.proretset or
+     shared_fingerprint_proc.proowner<>(select oid from pg_catalog.pg_roles where rolname=current_user) or
      shared_fingerprint_proc.proowner<>(select relowner from pg_catalog.pg_class
        where oid='private.integration_production_provider_bindings'::regclass) or
      (shared_fingerprint_proc.proconfig is distinct from array['search_path=']::text[] and
@@ -32,6 +38,23 @@ begin
     raise exception using
       errcode='55000',
       message='square_production_runtime_overlay_shared_foundation_attributes_drifted';
+  end if;
+  if pg_catalog.encode(
+       extensions.digest(
+         pg_catalog.convert_to(
+           pg_catalog.regexp_replace(
+             pg_catalog.regexp_replace(shared_fingerprint_proc.prosrc,'^[[:space:]]+','',''),
+             '[[:space:]]+$','',''
+           ),
+           'UTF8'
+         ),
+         'sha256'
+       ),
+       'hex'
+     ) is distinct from 'f08697ddaaf6d4af4faf77d0e5a2de67a87cc5bbee5f9579cecd403161edca8f' then
+    raise exception using
+      errcode='55000',
+      message='square_production_runtime_overlay_shared_foundation_definition_drifted';
   end if;
   if private.integration_production_fingerprint_v1(array['a','bc']) is distinct from
        'sha256:5310a58788781ab25d5ad7c3f85035824b4eb7bdfa394e0ac2186271472b5492' or
