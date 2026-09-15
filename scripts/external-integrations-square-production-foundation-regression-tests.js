@@ -9,6 +9,10 @@ const root = path.resolve(__dirname, "..");
 const sourcePath = path.join(root, "lib/integrations/control-plane/square-production-contracts.ts");
 const migrationPath = path.join(root, "supabase/migrations/20260902191323_integration_production_runtime_foundation.sql");
 const migration = fs.readFileSync(migrationPath, "utf8");
+const historicalMarker = fs.readFileSync(path.join(root,
+  "supabase/migrations/20260912190000_square_production_runtime_foundation.sql"), "utf8");
+const legacyGuard = fs.readFileSync(path.join(root,
+  "supabase/migrations/20260915040500_integration_production_legacy_foundation_guard.sql"), "utf8");
 const ciWorkflow = fs.readFileSync(path.join(root, ".github/workflows/ci.yml"), "utf8");
 const activationReadme = fs.readFileSync(path.join(root, "services/external-integrations-production/infra/activation/README.md"), "utf8");
 const evidenceDatabaseTest = fs.readFileSync(path.join(root, "scripts/square-workspace-evidence-database-tests.js"), "utf8");
@@ -150,11 +154,27 @@ assert.doesNotMatch(migration, /square_account_configuration|square_production_r
   "the provider-neutral foundation must apply without the separately qualified Square lifecycle schema");
 assert.ok(migration.trimStart().startsWith("-- Closed-by-default Production Integration Platform composition authority."));
 assert.ok(migration.trimEnd().endsWith("commit;"), "the self-contained foundation is one explicit transaction");
+assert.match(historicalMarker, /integration_production_foundation_missing/,
+  "the recorded historical version validates that the earlier provider-neutral foundation ran");
+assert.doesNotMatch(historicalMarker, /create\s+(?:table|function|role)|alter\s+table|drop\s+/i,
+  "fresh installs do not recreate the historical Square overlay");
+for (const legacyArtifact of [
+  "square_production_runtime_binding",
+  "square_production_fingerprint_v1",
+  "square_production_binding_fingerprint",
+  "square_production_authority_fingerprint"
+]) assert.match(legacyGuard, new RegExp(legacyArtifact), `forward guard detects legacy artifact ${legacyArtifact}`);
+assert.match(legacyGuard, /integration_production_legacy_overlay_requires_review/,
+  "legacy all-in-one installations stop for a separately reviewed reconciliation");
+assert.doesNotMatch(legacyGuard, /drop\s+|delete\s+from|alter\s+table/i,
+  "the forward guard never mutates legacy authority state while rejecting it");
 
 assert.match(ciWorkflow, /run: pnpm test:external-integrations-square-production-foundation/,
   "CI executes the provider-neutral and Square Production runtime regressions");
 assert.match(activationReadme, /end at `20260902191322_qbo_production_dormant_connection_gate`[\s\S]*apply only the immediately following `20260902191323_integration_production_runtime_foundation\.sql`[\s\S]*exact-version bound/,
   "activation records only the provider-neutral migration immediately after the verified Production ledger");
+assert.match(activationReadme, /recorded the former all-in-one `20260912190000`[\s\S]*forward guard[\s\S]*abort/,
+  "runbook preserves and safely rejects the historical all-in-one upgrade state");
 assert.match(fixtureRichMigrationTest, /\["127\.0\.0\.1", "localhost"\]\.includes\(parsed\.hostname\)/,
   "fixture-rich role mutation remains restricted to disposable local Supabase");
 assert.match(fixtureRichMigrationTest, /parsed\.username = "supabase_admin"/,

@@ -374,7 +374,7 @@ matches(
   /run\(cli, \["migration", "up", "--local"\]\)/,
   "the fixture-rich runner must apply the ordered zero-based and retry-identity migrations"
 );
-matches(zeroBasedUpgradeRunner, /const dormantSquareTail = \[\s*"20260902191323_integration_production_runtime_foundation\.sql",\s*"20260907042202_square_dormant_trusted_authority\.sql",\s*"20260907042352_square_dormant_atomic_pages\.sql",\s*"20260907174326_square_dormant_account_connection\.sql",\s*"20260907225626_square_remote_sandbox_binding\.sql",\s*"20260908014713_square_broker_runtime_credential_authority\.sql",\s*"20260908042529_square_gcp_callback_authority\.sql",\s*"20260910193429_square_gcp_callback_oregon_recovery\.sql",\s*"20260910231437_square_gcp_mapped_runtime\.sql",\s*"20260911000915_square_gcp_mapped_legacy_fencing\.sql",\s*"20260911151334_square_verified_provider_observations\.sql",\s*"20260911205108_square_canonical_interpretation\.sql",\s*"20260911222230_square_workspace_evidence\.sql",\s*"20260912034447_square_workspace_card_contract\.sql",\s*"20260912150000_square_operational_intelligence\.sql"\s*\]/,
+matches(zeroBasedUpgradeRunner, /const dormantSquareTail = \[\s*"20260902191323_integration_production_runtime_foundation\.sql",\s*"20260907042202_square_dormant_trusted_authority\.sql",\s*"20260907042352_square_dormant_atomic_pages\.sql",\s*"20260907174326_square_dormant_account_connection\.sql",\s*"20260907225626_square_remote_sandbox_binding\.sql",\s*"20260908014713_square_broker_runtime_credential_authority\.sql",\s*"20260908042529_square_gcp_callback_authority\.sql",\s*"20260910193429_square_gcp_callback_oregon_recovery\.sql",\s*"20260910231437_square_gcp_mapped_runtime\.sql",\s*"20260911000915_square_gcp_mapped_legacy_fencing\.sql",\s*"20260911151334_square_verified_provider_observations\.sql",\s*"20260911205108_square_canonical_interpretation\.sql",\s*"20260911222230_square_workspace_evidence\.sql",\s*"20260912034447_square_workspace_card_contract\.sql",\s*"20260912150000_square_operational_intelligence\.sql",\s*"20260912190000_square_production_runtime_foundation\.sql",\s*"20260915040500_integration_production_legacy_foundation_guard\.sql"\s*\]/,
   "fixture-rich QBO upgrade allows exactly the reviewed dormant Square migrations");
 // Execute only the pure manifest guard, with no database/CLI capability. This
 // catches an omitted additive tail before the real database gate runs in CI.
@@ -421,7 +421,7 @@ matches(
   "the fixture must preserve the exact production-labelled 2-leased/1-pending shape"
 );
 
-equal(approvedSquareQualificationPaths.length, 121, "dormant scope permits only exact reviewed migrations, UI, native service/templates, provider-neutral Production composition and activation, restricted evidence host, query-stripping callback edge and repository-bound image trigger");
+equal(approvedSquareQualificationPaths.length, 123, "dormant scope permits only exact reviewed migrations, UI, native service/templates, provider-neutral Production composition and activation, restricted evidence host, query-stripping callback edge and repository-bound image trigger");
 assertionCount++;
 assert.deepEqual(JSON.parse(read("vercel.json")), {
   git: { deploymentEnabled: { "codex/square-remote-sandbox-binding": false, "codex/square-sandbox-qualification": false, "codex/square-gcp-sandbox-callback": false } }

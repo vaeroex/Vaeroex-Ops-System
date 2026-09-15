@@ -17,17 +17,30 @@ async function qualify(runtime) {
     "20260912034447_square_workspace_card_contract.sql",
     "20260912150000_square_operational_intelligence.sql"
   ];
-  eq(files.length,116,"full canonical chain, including dormant Square Production foundation");
-  eq(files.slice(-additiveSquareTail.length).map(file=>require("node:path").basename(file)),additiveSquareTail,
-    "observation qualification pins the exact additive Square interpretation and foundation tail");
-  const interpretationTail=files.slice(-additiveSquareTail.length,-1);
-  const productionFoundation=files.slice(-1);
+  const productionFoundation=["20260902191323_integration_production_runtime_foundation.sql"];
+  const productionCompatibility=[
+    "20260912190000_square_production_runtime_foundation.sql",
+    "20260915040500_integration_production_legacy_foundation_guard.sql"
+  ];
+  eq(files.length,118,"full canonical chain, including dormant Production foundation compatibility guards");
+  for (const name of [...additiveSquareTail,...productionFoundation,...productionCompatibility])
+    eq(files.filter(file=>file===name).length,1,`canonical manifest contains ${name} exactly once`);
   stage="migrations";
-  await runtime.applyMigrations(c,files.slice(0,-additiveSquareTail.length));
-  const schemaBefore=await runtime.sourceSchemaFingerprint(c);
-  await runtime.applyMigrations(c,interpretationTail);
-  eq(await runtime.sourceSchemaFingerprint(c),schemaBefore,"Square interpretation migrations preserve canonical/QBO schema");
+  const staged=new Set([...additiveSquareTail,...productionFoundation,...productionCompatibility]);
+  await runtime.applyMigrations(c,files.filter(file=>!staged.has(file)));
   await runtime.applyMigrations(c,productionFoundation);
+  const schemaBefore=await runtime.sourceSchemaFingerprint(c);
+  await runtime.applyMigrations(c,additiveSquareTail);
+  await runtime.applyMigrations(c,productionCompatibility);
+  eq(await runtime.sourceSchemaFingerprint(c),schemaBefore,"Square interpretation and compatibility guards preserve canonical/QBO schema");
+  await c.query("create table private.square_production_runtime_binding(legacy_marker integer)");
+  let legacyGuardError;
+  try { await runtime.applyMigrations(c,[productionCompatibility.at(-1)]); }
+  catch (error) { legacyGuardError=error; }
+  eq(legacyGuardError?.code,"55000","forward guard rejects a recorded legacy all-in-one overlay");
+  eq((await c.query("select to_regclass('private.square_production_runtime_binding')::text as value")).rows[0].value,
+    "private.square_production_runtime_binding","rejection preserves legacy state for reviewed recovery");
+  await c.query("drop table private.square_production_runtime_binding");
   const installedSchema=await runtime.sourceSchemaFingerprint(c);
   const genericCounts=async()=>{const counts={};for(const table of ["external_source_records","external_source_record_versions","canonical_business_facts","canonical_business_fact_versions","business_fact_sources","fact_contribution_batches","fact_contribution_events"])counts[table]=(await c.query(`select count(*)::int n from private.${table}`)).rows[0].n;return counts;};
   const genericBefore=await genericCounts();
