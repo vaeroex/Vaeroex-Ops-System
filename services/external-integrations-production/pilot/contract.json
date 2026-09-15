@@ -1,0 +1,108 @@
+{
+  "contractVersion": "square_production_internal_seller_pilot_v1",
+  "environment": "production",
+  "projectId": "vaeroex-integrations-prod",
+  "region": "us-west1",
+  "hostname": "square.vaeroex.com",
+  "callbackUrl": "https://square.vaeroex.com/api/integrations/square/callback",
+  "webhookUrl": "https://square.vaeroex.com/api/integrations/square/webhook",
+  "providerOrigin": "https://connect.squareup.com",
+  "apiVersion": "2026-08-19",
+  "requiredScopes": [
+    "INVENTORY_READ",
+    "ITEMS_READ",
+    "MERCHANT_PROFILE_READ",
+    "ORDERS_READ",
+    "PAYMENTS_READ"
+  ],
+  "database": {
+    "requiredFoundationVersion": "20260902191323",
+    "squareOverlayRequired": true,
+    "loginBindings": {
+      "square_production_oauth": "square_production_oauth_authority",
+      "square_production_broker": "square_production_broker_authority",
+      "square_production_scheduler": "square_production_scheduler_authority",
+      "square_production_webhook": "square_production_webhook_authority",
+      "square_production_runtime": "square_production_runtime_authority",
+      "square_production_evidence": "square_production_evidence_authority"
+    },
+    "loginPolicy": {
+      "superuser": false,
+      "createDatabase": false,
+      "createRole": false,
+      "replication": false,
+      "bypassRls": false,
+      "inherit": true,
+      "directTablePrivileges": false,
+      "authorityMembershipsPerLogin": 1
+    }
+  },
+  "activationGates": [
+    "runtimeEnabled",
+    "providerCallsEnabled",
+    "customerOnboardingEnabled",
+    "webhookIntakeEnabled",
+    "evidenceEnabled",
+    "economicContributionsEnabled",
+    "aiDispatchEnabled"
+  ],
+  "credentialSlots": [
+    "application",
+    "webhookSignature",
+    "databaseOauth",
+    "databaseBroker",
+    "databaseScheduler",
+    "databaseWebhook",
+    "databaseRuntime",
+    "databaseEvidence"
+  ],
+  "pilotPolicy": {
+    "maximumAllowlistedWorkspaces": 1,
+    "maximumAllowlistedSellers": 1,
+    "requiresInternalSeller": true,
+    "requiresExplicitBusinessEntityMapping": true,
+    "requiresExplicitLocationMapping": true,
+    "automaticMapping": false,
+    "economicContributionsAllowed": false,
+    "aiDispatchAllowed": false
+  },
+  "requiredOperationalChecks": [
+    "callbackHealthAlert",
+    "signatureFailureAlert",
+    "credentialRefreshAlert",
+    "providerAuthAlert",
+    "rateLimitAlert",
+    "providerServerErrorAlert",
+    "taskAgeRetryDeadLetterAlert",
+    "staleIncompleteSyncAlert",
+    "backupFailureAlert",
+    "primaryAndBackupAlertDelivery",
+    "backupReadback",
+    "restoreDrill",
+    "rollbackDrill",
+    "incidentContacts",
+    "productionWorkspaceReadback"
+  ],
+  "requiredSyntheticScenarios": [
+    "initialSync",
+    "incrementalSync",
+    "pagination",
+    "replay",
+    "refresh",
+    "webhookDeduplication",
+    "disconnect",
+    "providerRevocation",
+    "cancellation",
+    "timeout",
+    "lostAcknowledgement"
+  ],
+  "prohibitedActions": [
+    "activateGate",
+    "createCredential",
+    "readCredential",
+    "providerCall",
+    "customerConsent",
+    "quickBooksMutation",
+    "infrastructureMutation"
+  ]
+}
