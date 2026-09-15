@@ -260,6 +260,7 @@ function assertTargetIsSinglePendingMigration() {
   // qualified dormant Square additions run AFTER it and must leave QBO closed
   // and unchanged; they do not replace the fixture's QBO target or assertions.
   const dormantSquareTail = [
+    "20260902191323_integration_production_runtime_foundation.sql",
     "20260907042202_square_dormant_trusted_authority.sql",
     "20260907042352_square_dormant_atomic_pages.sql",
     "20260907174326_square_dormant_account_connection.sql",
@@ -273,7 +274,8 @@ function assertTargetIsSinglePendingMigration() {
   "20260911205108_square_canonical_interpretation.sql", "20260911222230_square_workspace_evidence.sql",
   "20260912034447_square_workspace_card_contract.sql",
   "20260912150000_square_operational_intelligence.sql",
-  "20260912190000_square_production_runtime_foundation.sql"
+  "20260912190000_square_production_runtime_foundation.sql",
+  "20260915040500_integration_production_legacy_foundation_guard.sql"
   ];
   const laterMigrations = migrations.slice(targetIndex + 1);
   if (laterMigrations.length !== dormantSquareTail.length ||
@@ -303,7 +305,6 @@ async function applyFixture(databaseUrl) {
 
 async function qualifyProductionRoleDrift(databaseUrl) {
   const { Client } = require("pg");
-  const crypto = require("node:crypto");
   const client = new Client({ connectionString: databaseUrl });
   await client.connect();
   try {
@@ -342,36 +343,14 @@ async function qualifyProductionRoleDrift(databaseUrl) {
   await recovery.connect();
   try {
     const state = (await recovery.query(
-      "select r.rolcanlogin, to_regclass('private.square_production_runtime_binding') is null as rolled_back from pg_roles r where r.rolname='square_production_evidence_authority'"
+      "select r.rolcanlogin, to_regrole('square_production_oauth_authority') is null as rolled_back from pg_roles r where r.rolname='square_production_evidence_authority'"
     )).rows[0];
     if (!state?.rolcanlogin || !state?.rolled_back) {
       fail("Production foundation drift rejection did not preserve atomic rollback.");
     }
     await recovery.query("alter role square_production_evidence_authority nologin noinherit nosuperuser nocreatedb nocreaterole noreplication nobypassrls");
-    const applicationId = crypto.randomBytes(256).toString("hex");
-    const redirectUri = `https://${crypto.randomBytes(1018).toString("hex")}.com`;
-    const kmsResource = crypto.randomBytes(4096).toString("hex");
-    await recovery.query(`insert into private.square_account_configuration(environment,application_id,redirect_uri,broker_login,
-      enrollment_login,webhook_login,kms_key_resource,approval_expires_at)
-      values('sandbox',$1,$2,'square_long_broker','square_long_enrollment','square_long_webhook',$3,'2099-01-01T00:00:00Z')`,
-      [applicationId,redirectUri,kmsResource]);
   } finally {
     await recovery.end();
-  }
-}
-
-async function verifyProductionFingerprintUpgrade(databaseUrl) {
-  const { Client } = require("pg");
-  const client = new Client({ connectionString: databaseUrl });
-  await client.connect();
-  try {
-    const result = await client.query(`select count(*)::integer as count from private.square_account_configuration
-      where length(application_id)=512 and length(redirect_uri)=2048 and length(kms_key_resource)=8192
-        and square_production_binding_fingerprint~'^sha256:[a-f0-9]{64}$'
-        and square_production_authority_fingerprint~'^sha256:[a-f0-9]{64}$'`);
-    if (result.rows[0]?.count !== 1) fail("Long existing configuration did not survive compact Production fingerprint upgrade.");
-  } finally {
-    await client.end();
   }
 }
 
@@ -396,7 +375,6 @@ async function main() {
   await applyFixture(databaseUrl);
   await qualifyProductionRoleDrift(localMigrationAdministratorDatabaseUrl);
   run(cli, ["migration", "up", "--local"]);
-  await verifyProductionFingerprintUpgrade(databaseUrl);
   run(process.execPath, [
     "scripts/run-isolated-database-tests.js",
     ...testPaths

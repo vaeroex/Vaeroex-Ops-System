@@ -39,14 +39,22 @@ select ok((select relrowsecurity and relforcerowsecurity from pg_catalog.pg_clas
   where oid='private.integration_production_provider_secrets'::regclass),'Provider secrets use FORCE RLS');
 select ok((select relrowsecurity and relforcerowsecurity from pg_catalog.pg_class
   where oid='private.integration_production_provider_capabilities'::regclass),'Provider capabilities use FORCE RLS');
-select ok((select relrowsecurity and relforcerowsecurity from pg_catalog.pg_class
-  where oid='private.square_production_runtime_binding'::regclass),'Square overlay uses FORCE RLS');
+select is((select count(*)::integer
+  from (values
+    ('private.integration_production_platform_bindings'::regclass),
+    ('private.integration_production_provider_bindings'::regclass),
+    ('private.integration_production_provider_secrets'::regclass),
+    ('private.integration_production_provider_capabilities'::regclass)
+  ) authority_table(object_id)
+  where exists(select 1 from pg_catalog.pg_publication publication where publication.puballtables)
+    or exists(select 1 from pg_catalog.pg_publication_rel publication_relation
+      where publication_relation.prrelid=authority_table.object_id)
+    or exists(select 1 from pg_catalog.pg_publication_namespace publication_namespace
+      where publication_namespace.pnnspid='private'::regnamespace)),0,
+  'Production authority rows cannot enter logical publications');
 select is((select provolatile::text from pg_catalog.pg_proc
   where oid='private.integration_production_fingerprint_v1(text[])'::regprocedure),'i',
   'Production fingerprint helper is explicitly immutable for stored generated columns');
-select is((select provolatile::text from pg_catalog.pg_proc
-  where oid='private.square_production_configuration_fingerprint_v1(text,text,text,name,name,name,text)'::regprocedure),'i',
-  'Square configuration fingerprint helper is explicitly immutable for stored generated columns');
 select ok(not pg_catalog.has_function_privilege('authenticated',
   'private.integration_production_fingerprint_v1(text[])','execute'),
   'Authenticated callers cannot invoke the private production fingerprint helper');
@@ -124,6 +132,21 @@ select 'square','production','vaeroex-integrations-prod','database_'||capability
   'projects/vaeroex-integrations-prod/secrets/square-'||replace(capability,'_','-')||'-db/versions/1'
 from unnest(array['oauth','broker','scheduler','webhook','runtime','evidence']::text[]) capability;
 
+select is(pg_temp.error_state($sql$
+  insert into private.integration_production_provider_capabilities(
+    provider_key,environment,project_id,capability,service_account,database_login,database_secret_purpose)
+  values ('square','production','vaeroex-integrations-prod','oauth',
+    'square-prefix-test@vaeroex-integrations-prod.iam.gserviceaccount.com',
+    'squareXproductionYoauth','database_oauth')
+$sql$),'23514','Database LOGIN namespace separators are compared literally');
+select is(pg_temp.error_state($sql$
+  insert into private.integration_production_provider_capabilities(
+    provider_key,environment,project_id,capability,service_account,database_login,database_secret_purpose)
+  values ('square','production','vaeroex-integrations-prod','oauth',
+    'square-character-test@vaeroex-integrations-prod.iam.gserviceaccount.com',
+    'square_production_bad-login','database_oauth')
+$sql$),'23514','Database LOGINs retain the provider-neutral ASCII identifier contract');
+
 insert into private.integration_production_provider_capabilities(
   provider_key,environment,project_id,capability,service_account,database_login,database_secret_purpose)
 select 'square','production','vaeroex-integrations-prod',capability,'square-'||replace(capability,'_','-')||'@vaeroex-integrations-prod.iam.gserviceaccount.com',
@@ -151,62 +174,32 @@ select is(pg_temp.error_state($sql$
   insert into private.integration_production_provider_capabilities(
     provider_key,environment,project_id,capability,service_account,database_login,database_secret_purpose)
   values ('quickbooks_online','production','vaeroex-integrations-prod','runtime',
+    'qbo-prefix-test@vaeroex-integrations-prod.iam.gserviceaccount.com',
+    'quickbooksXonline_production_runtime','database_runtime')
+$sql$),'23514','Provider underscores cannot wildcard a foreign database LOGIN namespace');
+select is(pg_temp.error_state($sql$
+  insert into private.integration_production_provider_capabilities(
+    provider_key,environment,project_id,capability,service_account,database_login,database_secret_purpose)
+  values ('quickbooks_online','production','vaeroex-integrations-prod','oauth',
+    'qbo-oauth@vaeroex-integrations-prod.iam.gserviceaccount.com',null,'database_runtime')
+$sql$),'23514','A database-backed capability cannot omit its native LOGIN');
+select is(pg_temp.error_state($sql$
+  insert into private.integration_production_provider_capabilities(
+    provider_key,environment,project_id,capability,service_account,database_login,database_secret_purpose)
+  values ('quickbooks_online','production','vaeroex-integrations-prod','oauth',
+    'qbo-oauth@vaeroex-integrations-prod.iam.gserviceaccount.com','quickbooks_online_production_oauth',null)
+$sql$),'23514','A database-backed capability cannot omit its credential binding');
+select is(pg_temp.error_state($sql$
+  insert into private.integration_production_provider_capabilities(
+    provider_key,environment,project_id,capability,service_account,database_login,database_secret_purpose)
+  values ('quickbooks_online','production','vaeroex-integrations-prod','runtime',
     'square-runtime@vaeroex-integrations-prod.iam.gserviceaccount.com',
     'quickbooks_online_production_runtime','database_runtime')
 $sql$),'23505','A capability cannot replace an existing Square capability');
 
-insert into public.profiles(id,email,full_name) values
-  ('a9120000-0000-4000-8000-000000000001','square-production-foundation@example.test','Square Production Foundation');
-insert into public.workspaces(id,name,created_by) values
-  ('b9120000-0000-4000-8000-000000000001','Square Production Foundation','a9120000-0000-4000-8000-000000000001');
-insert into public.business_entities(id,workspace_id,entity_key,display_name,base_currency,timezone,status,created_by,updated_by)
-values ('d9120000-0000-4000-8000-000000000001','b9120000-0000-4000-8000-000000000001',
-  'square_production_foundation','Square Production Foundation','USD','UTC','active',
-  'a9120000-0000-4000-8000-000000000001','a9120000-0000-4000-8000-000000000001');
-insert into private.square_account_configuration(environment,application_id,redirect_uri,broker_login,enrollment_login,
-  webhook_login,kms_key_resource,approval_expires_at)
-values ('production','sq0idp-production-test','https://square.vaeroex.com/api/integrations/square/callback',
-  'square_production_broker','square_production_oauth','square_production_webhook',
-  'projects/vaeroex-integrations-prod/locations/us-west1/keyRings/square-production/cryptoKeys/mismatched-provider-credentials',
-  '2099-01-01T00:00:00Z');
-
-select is(pg_temp.error_state($sql$
-  insert into private.square_production_runtime_binding(provider_key,environment,application_id,callback_uri,api_version,
-    authorization_endpoint,provider_origin,requested_scopes,kms_key_resource,square_configuration_fingerprint,
-    provider_policy_version,provider_policy_fingerprint)
-  select 'square','production','sq0idp-production-test','https://square.vaeroex.com/api/integrations/square/callback',
-    '2026-08-19','https://connect.squareup.com/oauth2/authorize','https://connect.squareup.com',
-    array['INVENTORY_READ','ITEMS_READ','MERCHANT_PROFILE_READ','ORDERS_READ','PAYMENTS_READ']::text[],
-    'projects/vaeroex-integrations-prod/locations/us-west1/keyRings/square-production/cryptoKeys/provider-credentials',
-    square_production_binding_fingerprint,'square_production_policy_v1','sha256:'||repeat('b',64)
-  from private.square_account_configuration where environment='production' and application_id='sq0idp-production-test'
-$sql$),'23503','Square overlay cannot split provider and account KMS authority');
-
-update private.square_account_configuration
-set kms_key_resource='projects/vaeroex-integrations-prod/locations/us-west1/keyRings/square-production/cryptoKeys/provider-credentials'
-where environment='production' and application_id='sq0idp-production-test';
-
-insert into private.square_production_runtime_binding(provider_key,environment,application_id,callback_uri,api_version,
-  authorization_endpoint,provider_origin,requested_scopes,kms_key_resource,square_configuration_fingerprint,
-  provider_policy_version,provider_policy_fingerprint)
-select 'square','production','sq0idp-production-test','https://square.vaeroex.com/api/integrations/square/callback',
-  '2026-08-19','https://connect.squareup.com/oauth2/authorize',
-  'https://connect.squareup.com',array['INVENTORY_READ','ITEMS_READ','MERCHANT_PROFILE_READ','ORDERS_READ','PAYMENTS_READ']::text[],
-  'projects/vaeroex-integrations-prod/locations/us-west1/keyRings/square-production/cryptoKeys/provider-credentials',
-  square_production_binding_fingerprint,'square_production_policy_v1','sha256:'||repeat('b',64)
-from private.square_account_configuration where environment='production' and application_id='sq0idp-production-test';
-select is((select count(*)::integer from private.square_production_runtime_binding),1,
-  'Exact Square overlay binds to the provider-neutral platform');
-select is((select (provider_authority_fingerprint=(select provider_authority_fingerprint
-    from private.integration_production_provider_bindings where provider_key='square'))::text||':'||
-    (square_configuration_authority_fingerprint=(select square_production_authority_fingerprint
-      from private.square_account_configuration where environment='production' and application_id='sq0idp-production-test'))::text
-  from private.square_production_runtime_binding),'true:true',
-  'Compact fingerprints preserve exact provider and Square callback/KMS authority');
-
 select is((select count(*)::integer from information_schema.role_table_grants where table_schema='private'
   and table_name in ('integration_production_platform_bindings','integration_production_provider_bindings',
-    'integration_production_provider_secrets','integration_production_provider_capabilities','square_production_runtime_binding')
+    'integration_production_provider_secrets','integration_production_provider_capabilities')
   and grantee in ('anon','authenticated','service_role','square_production_runtime_authority')),0,
   'No public, service-role or dormant provider capability receives table access');
 

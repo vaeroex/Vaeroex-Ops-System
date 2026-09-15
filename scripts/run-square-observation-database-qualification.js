@@ -15,20 +15,183 @@ async function qualify(runtime) {
     "20260911205108_square_canonical_interpretation.sql",
     "20260911222230_square_workspace_evidence.sql",
     "20260912034447_square_workspace_card_contract.sql",
-    "20260912150000_square_operational_intelligence.sql",
-    "20260912190000_square_production_runtime_foundation.sql"
+    "20260912150000_square_operational_intelligence.sql"
   ];
-  eq(files.length,116,"full canonical chain, including dormant Square Production foundation");
-  eq(files.slice(-additiveSquareTail.length).map(file=>require("node:path").basename(file)),additiveSquareTail,
-    "observation qualification pins the exact additive Square interpretation and foundation tail");
-  const interpretationTail=files.slice(-additiveSquareTail.length,-1);
-  const productionFoundation=files.slice(-1);
+  const productionFoundation=["20260902191323_integration_production_runtime_foundation.sql"];
+  const productionCompatibility=[
+    "20260912190000_square_production_runtime_foundation.sql",
+    "20260915040500_integration_production_legacy_foundation_guard.sql"
+  ];
+  eq(files.length,118,"full canonical chain, including dormant Production foundation compatibility guards");
+  for (const name of [...additiveSquareTail,...productionFoundation,...productionCompatibility])
+    eq(files.filter(file=>file===name).length,1,`canonical manifest contains ${name} exactly once`);
   stage="migrations";
-  await runtime.applyMigrations(c,files.slice(0,-additiveSquareTail.length));
+  const staged=new Set([...additiveSquareTail,...productionFoundation,...productionCompatibility]);
+  await runtime.applyMigrations(c,files.filter(file=>!staged.has(file)));
+  // Production authority roles are cluster-wide. A Supabase-local `db start`
+  // has already installed this separately tested foundation in its canonical
+  // database, so reapplying it inside a fixture database would correctly trip
+  // the cross-database dependency guard. Exercise foundation mutation cases
+  // only in the per-process native cluster; keep hosted-shaped Square fixtures
+  // isolated from the unrelated Production authority migration.
+  if(runtime.targetKind==="native-postgres") {
+    await c.query("create publication production_foundation_all_tables_pub for all tables");
+    let foundationError;
+    try { await runtime.applyMigrations(c,productionFoundation); }
+    catch (error) { foundationError=error; }
+    eq(foundationError?.code,"42501","foundation rejects pre-existing all-table logical publication exposure");
+    eq((await c.query("select to_regprocedure('private.integration_production_fingerprint_v1(text[])')::text as value")).rows[0].value,
+      null,"publication rejection rolls back the foundation atomically");
+    await c.query("drop publication production_foundation_all_tables_pub");
+    const foreignDatabase=await runtime.createDatabase("prod_role_collision");
+    await c.query("create role square_production_runtime_authority nologin noinherit nosuperuser nocreatedb nocreaterole noreplication nobypassrls");
+    await foreignDatabase.client.query("create table public.production_role_cross_database_guard(marker integer)");
+    await foreignDatabase.client.query("alter table public.production_role_cross_database_guard owner to square_production_runtime_authority");
+    foundationError=undefined;
+    try { await runtime.applyMigrations(c,productionFoundation); }
+    catch (error) { foundationError=error; }
+    eq(foundationError?.code,"42501","foundation rejects authority-role ownership in another database");
+    eq((await c.query("select to_regprocedure('private.integration_production_fingerprint_v1(text[])')::text as value")).rows[0].value,
+      null,"cross-database role collision rejection rolls back the foundation atomically");
+    await foreignDatabase.client.query("drop table public.production_role_cross_database_guard");
+    await c.query("drop role square_production_runtime_authority");
+    await runtime.applyMigrations(c,productionFoundation);
+  }
   const schemaBefore=await runtime.sourceSchemaFingerprint(c);
-  await runtime.applyMigrations(c,interpretationTail);
-  eq(await runtime.sourceSchemaFingerprint(c),schemaBefore,"Square interpretation migrations preserve canonical/QBO schema");
-  await runtime.applyMigrations(c,productionFoundation);
+  await runtime.applyMigrations(c,additiveSquareTail);
+  eq(await runtime.sourceSchemaFingerprint(c),schemaBefore,"Square interpretation preserves canonical/QBO schema");
+  if(runtime.targetKind==="native-postgres") {
+    await runtime.applyMigrations(c,productionCompatibility);
+  eq((await c.query("select private.integration_production_foundation_split_marker_v1() as value")).rows[0].value,
+    "20260902191323_provider_neutral","compatibility path records the reviewed split foundation identity");
+  await c.query("drop function private.integration_production_foundation_split_marker_v1()");
+  let legacyGuardError;
+  try { await runtime.applyMigrations(c,[productionCompatibility.at(-1)]); }
+  catch (error) { legacyGuardError=error; }
+  eq(legacyGuardError?.code,"55000","a previously recorded all-in-one migration fails without the split marker");
+  await c.query("alter default privileges in schema private grant execute on functions to square_ingestion_runtime_authority");
+  await runtime.applyMigrations(c,[productionCompatibility.at(0)]);
+  eq((await c.query("select has_function_privilege('square_ingestion_runtime_authority','private.integration_production_foundation_split_marker_v1()','execute') as value")).rows[0].value,
+    false,"historical marker strips custom default EXECUTE grants");
+  await c.query("alter default privileges in schema private revoke execute on functions from square_ingestion_runtime_authority");
+  await c.query("begin");
+  await c.query(`create or replace function private.integration_production_foundation_split_marker_v1()
+    returns text language sql immutable parallel safe set search_path=''
+    as $function$ select '20260902191323_'||'provider_neutral' $function$`);
+  legacyGuardError=undefined;
+  try { await runtime.applyMigrations(c,[productionCompatibility.at(-1)]); }
+  catch (error) { legacyGuardError=error; }
+  eq(legacyGuardError?.code,"55000","forward guard rejects a changed split-marker implementation without invoking it");
+  await c.query("rollback");
+  await c.query("create table private.square_production_runtime_binding(legacy_marker integer)");
+  legacyGuardError=undefined;
+  try { await runtime.applyMigrations(c,[productionCompatibility.at(-1)]); }
+  catch (error) { legacyGuardError=error; }
+  eq(legacyGuardError?.code,"55000","forward guard rejects a recorded legacy all-in-one overlay");
+  eq((await c.query("select to_regclass('private.square_production_runtime_binding')::text as value")).rows[0].value,
+    "private.square_production_runtime_binding","rejection preserves legacy state for reviewed recovery");
+  await c.query("drop table private.square_production_runtime_binding");
+  await c.query(`create function private.square_production_configuration_fingerprint_v1(text,text,text,name,name,name,text)
+    returns text language sql immutable as 'select null::text'`);
+  legacyGuardError=undefined;
+  try { await runtime.applyMigrations(c,[productionCompatibility.at(-1)]); }
+  catch (error) { legacyGuardError=error; }
+  eq(legacyGuardError?.code,"55000","forward guard rejects the historical seven-argument overlay helper");
+  eq((await c.query("select to_regprocedure('private.square_production_configuration_fingerprint_v1(text,text,text,name,name,name,text)')::text as value")).rows[0].value,
+    "private.square_production_configuration_fingerprint_v1(text,text,text,name,name,name,text)",
+    "helper rejection preserves legacy state for reviewed recovery");
+  await c.query("drop function private.square_production_configuration_fingerprint_v1(text,text,text,name,name,name,text)");
+  await c.query("begin");
+  await c.query("grant update on private.integration_production_provider_bindings to service_role");
+  legacyGuardError=undefined;
+  try { await runtime.applyMigrations(c,[productionCompatibility.at(-1)]); }
+  catch (error) { legacyGuardError=error; }
+  eq(legacyGuardError?.code,"55000","forward guard rejects retained foundation table privilege drift");
+  await c.query("rollback");
+  await c.query("begin");
+  await c.query("alter table private.integration_production_provider_bindings no force row level security");
+  legacyGuardError=undefined;
+  try { await runtime.applyMigrations(c,[productionCompatibility.at(-1)]); }
+  catch (error) { legacyGuardError=error; }
+  eq(legacyGuardError?.code,"55000","forward guard rejects retained foundation FORCE RLS drift");
+  await c.query("rollback");
+  await c.query("begin");
+  await c.query(`create or replace function private.integration_production_fingerprint_v1(p_parts text[])
+    returns text language sql immutable strict parallel safe set search_path=''
+    as 'select ''sha256:''||repeat(''0'',64)'`);
+  legacyGuardError=undefined;
+  try { await runtime.applyMigrations(c,[productionCompatibility.at(-1)]); }
+  catch (error) { legacyGuardError=error; }
+  eq(legacyGuardError?.code,"55000","forward guard rejects retained fingerprint implementation drift");
+  await c.query("rollback");
+  const canonicalFingerprintDefinition=(await c.query(
+    "select pg_catalog.pg_get_functiondef('private.integration_production_fingerprint_v1(text[])'::regprocedure) as definition"
+  )).rows[0].definition;
+  await c.query("begin");
+  await c.query(`create or replace function private.integration_production_fingerprint_v1(p_parts text[])
+    returns text language sql immutable strict parallel safe set search_path=''
+    as 'select ''sha256:''||repeat(''0'',64)'`);
+  await c.query(`insert into private.integration_production_platform_bindings(
+    binding_key,environment,project_id,project_number,region,network_name,subnet_name,router_name,nat_name,
+    egress_address_name,ingress_address_name,task_queue_name,artifact_repository_name,database_authority_target,
+    runtime_policy_version,retention_policy_version,observability_policy_version,backup_policy_version,source_commit)
+    values ('vaeroex-production-integrations-v1','production','vaeroex-integrations-prod','123456789012','us-west1',
+      'vaeroex-integrations-production','vaeroex-integrations-us-west1','vaeroex-integrations-router','vaeroex-integrations-nat',
+      'vaeroex-integrations-egress','vaeroex-integrations-ingress','vaeroex-integrations-tasks','vaeroex-integrations-images',
+      'existing_production_postgres','production_runtime_v1','production_retention_v1','production_observability_v1',
+      'production_backup_v1',repeat('a',40))`);
+  await c.query(canonicalFingerprintDefinition);
+  legacyGuardError=undefined;
+  try { await runtime.applyMigrations(c,[productionCompatibility.at(-1)]); }
+  catch (error) { legacyGuardError=error; }
+  eq(legacyGuardError?.code,"55000","forward guard rejects retained generated fingerprint drift after helper restoration");
+  eq((await c.query("select count(*)::int as value from private.integration_production_platform_bindings")).rows[0].value,
+    0,"stale generated-fingerprint rejection preserves the pre-test foundation state");
+  await c.query("begin");
+  await c.query("create table public.production_role_owned_guard_test(marker integer)");
+  await c.query("alter table public.production_role_owned_guard_test owner to square_production_runtime_authority");
+  legacyGuardError=undefined;
+  try { await runtime.applyMigrations(c,[productionCompatibility.at(-1)]); }
+  catch (error) { legacyGuardError=error; }
+  eq(legacyGuardError?.code,"55000","forward guard rejects unrelated object ownership by an authority role");
+  await c.query("rollback");
+  await c.query("begin");
+  await c.query("grant select on public.workspaces to square_production_runtime_authority");
+  legacyGuardError=undefined;
+  try { await runtime.applyMigrations(c,[productionCompatibility.at(-1)]); }
+  catch (error) { legacyGuardError=error; }
+  eq(legacyGuardError?.code,"55000","forward guard rejects unrelated ACL privileges held by an authority role");
+  await c.query("rollback");
+  await c.query("begin");
+  await c.query("alter table private.integration_production_provider_bindings alter column enabled drop not null");
+  legacyGuardError=undefined;
+  try { await runtime.applyMigrations(c,[productionCompatibility.at(-1)]); }
+  catch (error) { legacyGuardError=error; }
+  eq(legacyGuardError?.code,"55000","forward guard rejects retained foundation column-contract drift");
+  await c.query("rollback");
+  await c.query("begin");
+  await c.query("create table public.production_authority_parent(provider_key text not null)");
+  await c.query("alter table private.integration_production_provider_bindings inherit public.production_authority_parent");
+  legacyGuardError=undefined;
+  try { await runtime.applyMigrations(c,[productionCompatibility.at(-1)]); }
+  catch (error) { legacyGuardError=error; }
+  eq(legacyGuardError?.code,"55000","forward guard rejects inherited retained authority tables");
+  await c.query("rollback");
+  await c.query("begin");
+  await c.query("create rule production_authority_delete_guard as on delete to private.integration_production_provider_bindings do instead nothing");
+  legacyGuardError=undefined;
+  try { await runtime.applyMigrations(c,[productionCompatibility.at(-1)]); }
+  catch (error) { legacyGuardError=error; }
+  eq(legacyGuardError?.code,"55000","forward guard rejects retained authority rewrite rules");
+    await c.query("rollback");
+    await c.query("begin");
+    await c.query("create publication production_authority_guard_pub for table private.integration_production_provider_bindings");
+    legacyGuardError=undefined;
+    try { await runtime.applyMigrations(c,[productionCompatibility.at(-1)]); }
+    catch (error) { legacyGuardError=error; }
+    eq(legacyGuardError?.code,"55000","forward guard rejects retained authority-table publication membership");
+    await c.query("rollback");
+  }
   const installedSchema=await runtime.sourceSchemaFingerprint(c);
   const genericCounts=async()=>{const counts={};for(const table of ["external_source_records","external_source_record_versions","canonical_business_facts","canonical_business_fact_versions","business_fact_sources","fact_contribution_batches","fact_contribution_events"])counts[table]=(await c.query(`select count(*)::int n from private.${table}`)).rows[0].n;return counts;};
   const genericBefore=await genericCounts();

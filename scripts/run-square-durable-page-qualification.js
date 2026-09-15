@@ -189,7 +189,9 @@ async function migrationQualification(target, administrator) {
   const evidenceTail = files.filter(name => name === "20260911222230_square_workspace_evidence.sql");
   const cardTail = files.filter(name => name === "20260912034447_square_workspace_card_contract.sql");
   const operationalTail = files.filter(name => name === "20260912150000_square_operational_intelligence.sql");
-  const productionFoundationTail = files.filter(name => name === "20260912190000_square_production_runtime_foundation.sql");
+  const productionFoundationTail = files.filter(name => name === "20260902191323_integration_production_runtime_foundation.sql");
+  const productionFoundationMarkerTail = files.filter(name => name === "20260912190000_square_production_runtime_foundation.sql");
+  const productionLegacyGuardTail = files.filter(name => name === "20260915040500_integration_production_legacy_foundation_guard.sql");
   equal(added.length, 2, "both additive Square migrations present");
   equal(accountTail.length, 1, "account-connection migration present");
   equal(remoteTail.length, 1, "remote Sandbox binding migration present");
@@ -204,7 +206,9 @@ async function migrationQualification(target, administrator) {
   equal(cardTail.length, 1, "separately qualified restricted workspace card contract present");
   equal(operationalTail.length, 1, "separately qualified operational intelligence contract present");
   equal(productionFoundationTail.length, 1, "dormant Production runtime foundation present");
-  equal(baseline.length + added.length + accountTail.length + remoteTail.length + brokerTail.length + gcpTail.length + recoveryTail.length + mappedTail.length + mappedFenceTail.length + observationTail.length + interpretationTail.length + evidenceTail.length + cardTail.length + operationalTail.length + productionFoundationTail.length, files.length, "migration manifest is explicit");
+  equal(productionFoundationMarkerTail.length, 1, "historical Production foundation ledger marker remains present");
+  equal(productionLegacyGuardTail.length, 1, "legacy all-in-one Production state has a forward rejection guard");
+  equal(baseline.length + added.length + accountTail.length + remoteTail.length + brokerTail.length + gcpTail.length + recoveryTail.length + mappedTail.length + mappedFenceTail.length + observationTail.length + interpretationTail.length + evidenceTail.length + cardTail.length + operationalTail.length + productionFoundationTail.length + productionFoundationMarkerTail.length + productionLegacyGuardTail.length, files.length, "migration manifest is explicit");
   const clean = await createDatabase(target, administrator, "clean");
   await applyMigrations(clean.client, baseline);
   const before = await sourceSchemaFingerprint(clean.client);
@@ -329,7 +333,7 @@ async function runAdditionalQualification(callback) {
         if (![...databases].some(database => database.client === client) || !Array.isArray(names) || names.some(name => !migrationFiles().includes(name))) throw new Error("unowned_migration_target_forbidden");
         return applyMigrations(client, names);
       },
-      migrationFiles, sourceSchemaFingerprint, installTypescriptLoader,
+      migrationFiles, sourceSchemaFingerprint, installTypescriptLoader, targetKind: target.kind,
       async login(database, suffix, roles = [], namespace = "square_qualification") {
         if (!databases.has(database) || !/^[a-z][a-z0-9_]{0,19}$/.test(suffix) || !Array.isArray(roles) || roles.some(role => !/^square_[a-z_]+$/.test(role)) ||
             !["square_qualification", "square_sandbox"].includes(namespace) || namespace === "square_sandbox" && !/^[a-z_]{1,19}$/.test(suffix)) throw new Error("unowned_login_target_forbidden");

@@ -7,11 +7,24 @@ const { Client: PostgresClient } = require("pg");
 
 const root = path.resolve(__dirname, "..");
 const sourcePath = path.join(root, "lib/integrations/control-plane/square-production-contracts.ts");
-const migrationPath = path.join(root, "supabase/migrations/20260912190000_square_production_runtime_foundation.sql");
+const migrationPath = path.join(root, "supabase/migrations/20260902191323_integration_production_runtime_foundation.sql");
 const migration = fs.readFileSync(migrationPath, "utf8");
+const historicalMarker = fs.readFileSync(path.join(root,
+  "supabase/migrations/20260912190000_square_production_runtime_foundation.sql"), "utf8");
+const legacyGuard = fs.readFileSync(path.join(root,
+  "supabase/migrations/20260915040500_integration_production_legacy_foundation_guard.sql"), "utf8");
 const ciWorkflow = fs.readFileSync(path.join(root, ".github/workflows/ci.yml"), "utf8");
+const activationReadme = fs.readFileSync(path.join(root, "services/external-integrations-production/infra/activation/README.md"), "utf8");
 const evidenceDatabaseTest = fs.readFileSync(path.join(root, "scripts/square-workspace-evidence-database-tests.js"), "utf8");
 const fixtureRichMigrationTest = fs.readFileSync(path.join(root, "scripts/run-phase8b-zero-based-delivery-migration-tests.js"), "utf8");
+const observationDatabaseTest = fs.readFileSync(path.join(root, "scripts/run-square-observation-database-qualification.js"), "utf8");
+const separatedDatabaseQualifications = [
+  "scripts/run-square-account-connection-qualification.js",
+  "scripts/run-square-broker-runtime-qualification.js",
+  "scripts/run-square-gcp-callback-database-qualification.js",
+  "scripts/run-square-gcp-mapped-database-qualification.js",
+  "scripts/run-square-remote-sandbox-qualification.js"
+].map(file => fs.readFileSync(path.join(root, file), "utf8"));
 
 for (const extension of [".ts", ".tsx"]) require.extensions[extension] = function(loaded, filename) {
   loaded._compile(ts.transpileModule(fs.readFileSync(filename, "utf8"), {
@@ -107,11 +120,14 @@ assert.match(migration, /square_production_authority_role_drift/);
 assert.match(migration, /pg_catalog\.pg_auth_members/);
 assert.match(migration, /m\.inherit_option or m\.set_option or not m\.admin_option/);
 assert.match(migration, /member_role\.rolsuper or member_role\.rolcreaterole/);
+assert.match(migration, /pg_catalog\.pg_shdepend[\s\S]*dependency\.deptype in \('a','o'\)/,
+  "pre-existing capability roles cannot own or hold ACL privileges on database objects");
+assert.doesNotMatch(migration, /dependency\.dbid\s+in/,
+  "pre-existing capability-role ownership and ACL dependencies are rejected cluster-wide");
 assert.match(migration, /1 < \(\s*select count\(\*\) from pg_catalog\.pg_auth_members where roleid=role_record\.oid/);
 assert.doesNotMatch(migration, /revoke %I from %I/);
 assert.match(migration, /economic_contributions_enabled boolean not null default false check\(not economic_contributions_enabled\)/);
 assert.match(migration, /ai_dispatch_enabled boolean not null default false check\(not ai_dispatch_enabled\)/);
-assert.match(migration, /alter table private\.square_production_runtime_binding force row level security/);
 assert.match(migration, /alter table private\.integration_production_platform_bindings force row level security/);
 assert.match(migration, /alter table private\.integration_production_provider_bindings force row level security/);
 assert.match(migration, /alter table private\.integration_production_provider_secrets force row level security/);
@@ -121,18 +137,10 @@ assert.match(migration, /private\.integration_sync_tasks/);
 assert.match(migration, /private\.integration_sync_checkpoints/);
 assert.match(migration, /private\.integration_webhook_events/);
 assert.match(migration, /private\.integration_rate_limit_states/);
-assert.match(migration, /square_production_runtime_binding_configuration_fkey/);
-assert.match(migration, /square_production_binding_fingerprint text\s+generated always/);
-assert.match(migration, /square_production_authority_fingerprint text\s+generated always/);
 assert.match(migration, /integration_production_fingerprint_v1\(p_parts text\[\]\)[\s\S]*language sql[\s\S]*immutable[\s\S]*strict[\s\S]*parallel safe/);
-assert.match(migration, /square_production_configuration_fingerprint_v1\([\s\S]*p_broker_login name[\s\S]*p_enrollment_login name[\s\S]*p_webhook_login name[\s\S]*immutable/);
 assert.match(migration, /revoke all on function private\.integration_production_fingerprint_v1\(text\[\]\) from public,anon,authenticated,service_role/);
 assert.match(migration, /platform_fingerprint text generated always as \(private\.integration_production_fingerprint_v1/);
 assert.match(migration, /provider_authority_fingerprint text generated always as \(private\.integration_production_fingerprint_v1/);
-assert.match(migration, /square_production_binding_fingerprint text[\s\S]*private\.square_production_configuration_fingerprint_v1/);
-assert.match(migration, /square_account_configuration_production_binding_idx[\s\S]*environment,square_production_authority_fingerprint,square_production_binding_fingerprint/);
-assert.match(migration, /foreign key\(provider_key,environment,provider_authority_fingerprint\)[\s\S]*integration_production_provider_bindings/);
-assert.match(migration, /foreign key\(environment,square_configuration_authority_fingerprint,square_configuration_fingerprint\)/);
 assert.doesNotMatch(migration, /create unique index[^;]+redirect_uri/);
 assert.match(migration, /foreign key\(platform_binding_key,project_id,region,source_commit\)/);
 assert.match(migration, /split_part\(kms_key_resource,'\/',2\)=project_id/);
@@ -140,20 +148,110 @@ assert.match(migration, /project_id text not null check\(project_id ~ '\^\[a-z\]
 assert.match(migration, /kms_key_resource text not null unique check\(kms_key_resource ~[\s\S]*\/keyRings\/\[A-Za-z0-9_-\]\{1,63\}/);
 assert.match(migration, /production_provider_capability_service_account_key/);
 assert.match(migration, /production_provider_capability_database_login_key/);
+assert.match(migration, /capability<>'task_invoker' and database_login is not null and database_secret_purpose is not null/,
+  "every database-backed capability requires both its native login and private secret binding");
+assert.match(migration, /pg_catalog\.starts_with\(database_login::text,provider_key\|\|'_production_'\)/,
+  "database LOGINs use a literal provider namespace prefix");
+assert.match(migration, /database_login::text ~ '\^\[a-z\]\[a-z0-9_\]\{0,62\}\$'/,
+  "database LOGINs retain the provider-neutral ASCII identifier contract");
+assert.doesNotMatch(migration, /database_login::text\s+like\s+provider_key/,
+  "SQL LIKE wildcards cannot cross a provider LOGIN boundary");
 assert.match(migration, /production_provider_secret_resource_key/);
 assert.match(migration, /application_id text not null unique check/);
 assert.match(migration, /callback_uri ~ \('\^https:\/\/\[\^\/\]\+'\|\|route_namespace\|\|'\/callback\$'\)/);
+assert.match(migration, /closed_created_object_acls/);
+assert.match(migration, /integration_production_foundation_acl_not_closed/);
+assert.match(migration, /integration_production_foundation_function_acl_not_closed/);
+assert.match(migration, /pg_catalog\.aclexplode\(object_relation\.relacl\)/);
+assert.match(migration, /pg_catalog\.aclexplode\(object_column\.attacl\)/);
+assert.match(migration, /pg_catalog\.aclexplode\(fingerprint_function\.proacl\)/);
+assert.doesNotMatch(migration, /pg_catalog\.aclexplode\([\s\S]{0,120}coalesce\([^)]*'\{\}'::aclitem\[\]\)/,
+  "foundation ACL closure must handle nullable native catalogs without zero-dimensional arrays");
 assert.doesNotMatch(migration, /grant (?:select|insert|update|delete|all) on table private\.(?:square|integration)_production_/i);
 assert.doesNotMatch(migration, /create role\s+square_production_\w+\s+login/i);
 assert.doesNotMatch(migration, /squareupsandbox|oysjpoondtcrqpghhrbd|sandbox-sq0idb/i);
+assert.doesNotMatch(migration, /square_account_configuration|square_production_runtime_binding/,
+  "the provider-neutral foundation must apply without the separately qualified Square lifecycle schema");
+assert.ok(migration.trimStart().startsWith("-- Closed-by-default Production Integration Platform composition authority."));
+assert.ok(migration.trimEnd().endsWith("commit;"), "the self-contained foundation is one explicit transaction");
+assert.match(historicalMarker, /integration_production_foundation_missing/,
+  "the recorded historical version validates that the earlier provider-neutral foundation ran");
+assert.match(historicalMarker, /create function private\.integration_production_foundation_split_marker_v1\(\)/,
+  "fresh installs leave an explicit split-foundation ledger marker");
+assert.match(historicalMarker, /closed_marker_acl[\s\S]*aclexplode\(marker_function\.proacl\)[\s\S]*revoke all on function private\.integration_production_foundation_split_marker_v1\(\) from %I/,
+  "the split marker strips custom default EXECUTE grants from every non-owner");
+assert.doesNotMatch(historicalMarker, /square_production_(?:runtime_binding|configuration_fingerprint|binding_fingerprint|authority_fingerprint)|create\s+(?:table|role)|alter\s+table|drop\s+/i,
+  "fresh installs do not recreate any historical Square overlay authority");
+assert.match(legacyGuard, /to_regprocedure\('private\.integration_production_foundation_split_marker_v1\(\)'\) is null[\s\S]*integration_production_legacy_foundation_requires_review/,
+  "a previously recorded all-in-one migration cannot pass without the new split marker");
+assert.match(legacyGuard, /marker_record\.proowner <> current_user::regrole::oid[\s\S]*marker_record\.lanname <> 'sql'[\s\S]*convert_to\(marker_record\.prosrc,'UTF8'\)[\s\S]*dfd23104a61cf287a6f4425453ff83008c80fa1214884ac13f0c8bf948723ecf/,
+  "the split marker's owner, execution metadata and exact body are authenticated before use");
+assert.doesNotMatch(legacyGuard, /private\.integration_production_foundation_split_marker_v1\(\)\s*(?:is|=|<>)/,
+  "the forward guard never invokes an untrusted split-marker body");
+for (const legacyArtifact of [
+  "square_production_runtime_binding",
+  "square_production_configuration_fingerprint_v1",
+  "square_production_binding_fingerprint",
+  "square_production_authority_fingerprint"
+]) assert.match(legacyGuard, new RegExp(legacyArtifact), `forward guard detects legacy artifact ${legacyArtifact}`);
+assert.match(legacyGuard, /integration_production_legacy_overlay_requires_review/,
+  "legacy all-in-one installations stop for a separately reviewed reconciliation");
+assert.match(legacyGuard, /relkind <> 'r'[\s\S]*relowner <> marker_owner[\s\S]*relrowsecurity[\s\S]*relforcerowsecurity/,
+  "forward guard validates retained relation type, owner and FORCE RLS posture");
+assert.match(legacyGuard, /pg_catalog\.pg_inherits[\s\S]*inhrelid=object_name::regclass[\s\S]*inhparent=object_name::regclass/,
+  "forward guard rejects inheritance parents and children for retained authority tables");
+assert.match(legacyGuard, /pg_catalog\.pg_rewrite[\s\S]*ev_class=object_name::regclass/,
+  "forward guard rejects user rewrite rules on retained authority tables");
+for (const catalog of ["pg_publication", "pg_publication_rel", "pg_publication_namespace"]) {
+  assert.match(migration, new RegExp(`pg_catalog\\.${catalog}`),
+    `new foundation rejects logical-publication exposure through ${catalog}`);
+  assert.match(legacyGuard, new RegExp(`pg_catalog\\.${catalog}`),
+    `retained foundation rejects logical-publication exposure through ${catalog}`);
+}
+assert.match(legacyGuard, /aclexplode\(relation\.relacl\)[\s\S]*aclexplode\(attribute\.attacl\)/,
+  "forward guard validates retained table and column ACLs");
+assert.match(legacyGuard, /has_table_privilege[\s\S]*has_column_privilege[\s\S]*integration_production_foundation_effective_acl_drift/,
+  "forward guard rejects effective privileges for every dormant runtime identity");
+assert.match(legacyGuard, /provolatile <> 'i'[\s\S]*proisstrict[\s\S]*proparallel <> 's'[\s\S]*prosecdef[\s\S]*proconfig/,
+  "forward guard validates retained fingerprint helper execution properties");
+assert.match(legacyGuard, /convert_to\(object_record\.prosrc,'UTF8'\)[\s\S]*98a86fc4d75c479b10ae63900cdf1c03a5083fb59a52d61636cc3a886acfa096/,
+  "forward guard binds the retained fingerprint helper to its reviewed implementation bytes");
+assert.match(legacyGuard, /integration_production_foundation_role_drift/,
+  "forward guard revalidates dormant authority role attributes and memberships");
+assert.match(legacyGuard, /pg_catalog\.pg_shdepend[\s\S]*dependency\.classid='pg_namespace'::regclass[\s\S]*dependency\.objid='public'::regnamespace/,
+  "forward guard permits only the reviewed public-schema ACL dependency");
+assert.match(legacyGuard, /aclexplode\(public_schema\.nspacl\)[\s\S]*privilege_type='USAGE'[\s\S]*has_schema_privilege\(role_name,'public','CREATE'\)/,
+  "forward guard requires exact non-grantable public USAGE without CREATE");
+assert.match(legacyGuard, /jsonb_build_object\([\s\S]*'columns'[\s\S]*'constraints'[\s\S]*'indexes'[\s\S]*'policy_count'[\s\S]*'trigger_count'[\s\S]*0fe4e1c2080fed1725db60ddb1643f4cd2d979a1a261c3445aae54c56788897e/,
+  "forward guard authenticates the complete retained table schema contract");
+assert.match(legacyGuard, /set_config\('row_security','off',true\)[\s\S]*platform_fingerprint is distinct from[\s\S]*provider_authority_fingerprint is distinct from[\s\S]*integration_production_foundation_stored_fingerprint_drift/,
+  "forward guard recomputes every retained generated authority fingerprint");
+assert.doesNotMatch(legacyGuard, /drop\s+|delete\s+from|alter\s+table/i,
+  "the forward guard never mutates legacy authority state while rejecting it");
+
 assert.match(ciWorkflow, /run: pnpm test:external-integrations-square-production-foundation/,
   "CI executes the provider-neutral and Square Production runtime regressions");
+assert.match(activationReadme, /end at `20260902191322_qbo_production_dormant_connection_gate`[\s\S]*apply only the immediately following `20260902191323_integration_production_runtime_foundation\.sql`[\s\S]*exact-version bound/,
+  "activation records only the provider-neutral migration immediately after the verified Production ledger");
+assert.match(activationReadme, /recorded the former all-in-one `20260912190000`[\s\S]*forward guard[\s\S]*abort/,
+  "runbook preserves and safely rejects the historical all-in-one upgrade state");
 assert.match(fixtureRichMigrationTest, /\["127\.0\.0\.1", "localhost"\]\.includes\(parsed\.hostname\)/,
   "fixture-rich role mutation remains restricted to disposable local Supabase");
 assert.match(fixtureRichMigrationTest, /parsed\.username = "supabase_admin"/,
   "fixture-rich role drift uses the local migration actor that owns PostgreSQL 17's creator edge");
 assert.match(fixtureRichMigrationTest, /qualifyProductionRoleDrift\(localMigrationAdministratorDatabaseUrl\)/,
   "only the role-drift witness uses the local migration-administrator connection");
+for (const qualification of separatedDatabaseQualifications) {
+  assert.match(qualification,
+    /baseline = (?:names|files)\.filter\(name => name < (?:migrationName|migration) && name !== productionFoundation\)/,
+    "legacy Square database qualifications do not reapply cluster-wide Production authority roles");
+}
+assert.match(observationDatabaseTest, /if\(runtime\.targetKind==="native-postgres"\)[\s\S]*foundation rejects authority-role ownership in another database/,
+  "foundation mutation tests run only in their isolated per-process native cluster");
+assert.match(observationDatabaseTest, /create publication production_foundation_all_tables_pub for all tables[\s\S]*foundation rejects pre-existing all-table logical publication exposure/,
+  "native PostgreSQL qualification exercises new-foundation publication rejection");
+assert.match(observationDatabaseTest, /create publication production_authority_guard_pub[\s\S]*rejects retained authority-table publication membership/,
+  "native PostgreSQL qualification exercises logical-publication rejection");
 assert.ok(
   fixtureRichMigrationTest.indexOf("const localMigrationAdministratorDatabaseUrl = localMigrationAdministratorUrl(databaseUrl)") <
     fixtureRichMigrationTest.indexOf("run(cli, [\n    \"db\",\n    \"reset\""),
