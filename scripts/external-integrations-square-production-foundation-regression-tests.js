@@ -176,6 +176,14 @@ assert.match(overlay, /private\.integration_production_fingerprint_v1\(ARRAY\[pr
 assert.match(overlay, /square_production_runtime_overlay_provider_fingerprint_value_drifted/);
 assert.match(overlay, /provider_binding\.provider_authority_fingerprint is distinct from[\s\S]*provider_binding\.provider_key[\s\S]*provider_binding\.kms_key_resource/,
   "stored generated values are revalidated after any temporarily drifted helper definition");
+assert.match(overlay, /square_production_runtime_overlay_provider_authority_chain_drifted/);
+assert.match(overlay, /provider_platform_fk\.confrelid='private\.integration_production_platform_bindings'::regclass/);
+assert.match(overlay, /array\['platform_binding_key','project_id','region','source_commit'\]::text\[\]/);
+assert.match(overlay, /array\['binding_key','project_id','region','source_commit'\]::text\[\]/,
+  "the retained provider row must preserve its exact provider-to-platform authority chain");
+assert.match(overlay, /square_production_runtime_overlay_provider_acl_drifted/);
+assert.match(overlay, /private\.integration_production_provider_bindings',privilege_name/,
+  "no denied runtime role may retain effective provider-table authority");
 assert.match(overlay, /to_regclass\('private\.integration_production_provider_bindings'\)/);
 assert.match(overlay, /to_regclass\('private\.square_account_configuration'\)/);
 assert.match(overlay, /rolname='square_production_runtime_authority'/);
