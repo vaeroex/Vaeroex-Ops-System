@@ -37,17 +37,13 @@ begin
      ) or exists(
        select 1
        from pg_catalog.pg_class configuration_relation
-       cross join lateral pg_catalog.aclexplode(
-         coalesce(configuration_relation.relacl,'{}'::aclitem[])
-       ) configuration_acl
+       cross join lateral pg_catalog.aclexplode(configuration_relation.relacl) configuration_acl
        where configuration_relation.oid='private.square_account_configuration'::regclass
          and configuration_acl.grantee<>configuration_relation.relowner
      ) or exists(
        select 1
        from pg_catalog.pg_attribute configuration_column
-       cross join lateral pg_catalog.aclexplode(
-         coalesce(configuration_column.attacl,'{}'::aclitem[])
-       ) configuration_column_acl
+       cross join lateral pg_catalog.aclexplode(configuration_column.attacl) configuration_column_acl
        where configuration_column.attrelid='private.square_account_configuration'::regclass
          and not configuration_column.attisdropped
          and configuration_column_acl.grantee<>(select relowner from pg_catalog.pg_class
@@ -503,9 +499,7 @@ begin
   for grantee_oid in
     select distinct object_acl.grantee
     from pg_catalog.pg_class object_relation
-    cross join lateral pg_catalog.aclexplode(
-      coalesce(object_relation.relacl,'{}'::aclitem[])
-    ) object_acl
+    cross join lateral pg_catalog.aclexplode(object_relation.relacl) object_acl
     where object_relation.oid='private.square_production_runtime_binding'::regclass
       and object_acl.grantee<>object_relation.relowner
   loop
@@ -522,9 +516,7 @@ begin
   for grantee_oid in
     select distinct function_acl.grantee
     from pg_catalog.pg_proc created_function
-    cross join lateral pg_catalog.aclexplode(
-      coalesce(created_function.proacl,'{}'::aclitem[])
-    ) function_acl
+    cross join lateral pg_catalog.aclexplode(created_function.proacl) function_acl
     where created_function.oid=
       'private.square_production_configuration_fingerprint_v1(text,text,text,name,name,name,text)'::regprocedure
       and function_acl.grantee<>created_function.proowner
@@ -584,16 +576,12 @@ begin
          and contype='c' and convalidated) or
      exists(select 1
        from pg_catalog.pg_class runtime_relation
-       cross join lateral pg_catalog.aclexplode(
-         coalesce(runtime_relation.relacl,'{}'::aclitem[])
-       ) runtime_acl
+       cross join lateral pg_catalog.aclexplode(runtime_relation.relacl) runtime_acl
        where runtime_relation.oid='private.square_production_runtime_binding'::regclass
          and runtime_acl.grantee<>runtime_relation.relowner) or
      exists(select 1
        from pg_catalog.pg_proc created_function
-       cross join lateral pg_catalog.aclexplode(
-         coalesce(created_function.proacl,'{}'::aclitem[])
-       ) function_acl
+       cross join lateral pg_catalog.aclexplode(created_function.proacl) function_acl
        where created_function.oid=
          'private.square_production_configuration_fingerprint_v1(text,text,text,name,name,name,text)'::regprocedure
          and function_acl.grantee<>created_function.proowner) or

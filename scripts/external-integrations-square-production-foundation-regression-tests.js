@@ -213,6 +213,10 @@ assert.match(overlay, /closed_created_object_acls/);
 assert.match(overlay, /object_acl\.grantee<>object_relation\.relowner/);
 assert.match(overlay, /function_acl\.grantee<>created_function\.proowner/,
   "all custom default grants are stripped from newly created authority objects");
+assert.match(overlay, /pg_catalog\.aclexplode\(configuration_relation\.relacl\)/);
+assert.match(overlay, /pg_catalog\.aclexplode\(created_function\.proacl\)/);
+assert.doesNotMatch(overlay, /pg_catalog\.aclexplode\([\s\S]{0,120}coalesce\([^)]*'\{\}'::aclitem\[\]\)/,
+  "nullable ACL catalogs must not be converted to PostgreSQL's zero-dimensional empty array");
 assert.match(overlay, /conname='integration_production_platform_overlay_guard'[\s\S]*convalidated/);
 assert.match(overlay, /conname='integration_production_provider_overlay_guard'[\s\S]*convalidated/,
   "postflight retains both complete shared-table authority guards");
