@@ -160,14 +160,18 @@ begin
      not exists(select 1 from pg_catalog.pg_class
        where oid='private.square_production_runtime_binding'::regclass
          and relkind='r' and relrowsecurity and relforcerowsecurity) or
-     4<>(select count(*) from pg_catalog.pg_constraint
+     1<>(select count(*) from pg_catalog.pg_constraint
        where conrelid='private.square_production_runtime_binding'::regclass
-         and conname in (
-           'square_production_runtime_binding_pkey',
-           'square_production_runtime_binding_provider_key_environment_fkey',
-           'square_production_runtime_binding_provider_key_environment_prov',
-           'square_production_runtime_binding_configuration_fkey'
-         ) and contype in ('p','f') and convalidated) or
+         and contype='p' and convalidated) or
+     2<>(select count(*) from pg_catalog.pg_constraint
+       where conrelid='private.square_production_runtime_binding'::regclass
+         and contype='f' and convalidated
+         and confrelid='private.integration_production_provider_bindings'::regclass) or
+     1<>(select count(*) from pg_catalog.pg_constraint
+       where conrelid='private.square_production_runtime_binding'::regclass
+         and conname='square_production_runtime_binding_configuration_fkey'
+         and contype='f' and convalidated
+         and confrelid='private.square_account_configuration'::regclass) or
      pg_catalog.has_table_privilege('anon','private.square_production_runtime_binding','select,insert,update,delete') or
      pg_catalog.has_table_privilege('authenticated','private.square_production_runtime_binding','select,insert,update,delete') or
      pg_catalog.has_table_privilege('service_role','private.square_production_runtime_binding','select,insert,update,delete') then
