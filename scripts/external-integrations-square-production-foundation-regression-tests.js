@@ -157,6 +157,13 @@ assert.match(overlay, /square_production_runtime_overlay_configuration_authority
 assert.match(overlay, /square_production_runtime_overlay_configuration_gate_open/);
 assert.match(overlay, /configuration\.environment='production'[\s\S]*configuration\.surface_enabled is distinct from false[\s\S]*configuration\.enrollment_enabled is distinct from false/,
   "the legacy overlay refuses an already-open Production lifecycle surface");
+assert.match(overlay, /square_production_runtime_overlay_retained_authority_acl_drifted/);
+assert.match(overlay, /integration_production_provider_secrets/);
+assert.match(overlay, /integration_production_provider_capabilities/);
+assert.match(overlay, /retained_relation\.relowner=\(select oid from pg_catalog\.pg_roles where rolname=current_user\)/);
+assert.match(overlay, /pg_catalog\.aclexplode\(retained_relation\.relacl\)/);
+assert.match(overlay, /pg_catalog\.aclexplode\(retained_column\.attacl\)/,
+  "every retained provider-neutral authority table is owner-bound, FORCE-RLS, and free of non-owner ACLs");
 assert.match(overlay, /configuration_relation\.relforcerowsecurity[\s\S]*configuration_relation\.relowner=/);
 assert.match(overlay, /configuration_column\.attacl/,
   "the retained lifecycle configuration exposes no table or column ACL to a non-owner");

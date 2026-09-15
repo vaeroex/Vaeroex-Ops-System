@@ -18,6 +18,7 @@ declare
   authority_role_name text;
   authority_role_record pg_catalog.pg_roles;
   shared_fingerprint_proc pg_catalog.pg_proc;
+  retained_authority_object text;
 begin
   if pg_catalog.to_regclass('private.integration_production_provider_bindings') is null or
      pg_catalog.to_regclass('private.square_account_configuration') is null or
@@ -64,6 +65,41 @@ begin
       errcode='55000',
       message='square_production_runtime_overlay_configuration_gate_open';
   end if;
+
+  foreach retained_authority_object in array array[
+    'private.integration_production_platform_bindings',
+    'private.integration_production_provider_bindings',
+    'private.integration_production_provider_secrets',
+    'private.integration_production_provider_capabilities'
+  ] loop
+    if not exists(
+         select 1
+         from pg_catalog.pg_class retained_relation
+         where retained_relation.oid=retained_authority_object::regclass
+           and retained_relation.relkind='r'
+           and retained_relation.relrowsecurity
+           and retained_relation.relforcerowsecurity
+           and retained_relation.relowner=(select oid from pg_catalog.pg_roles where rolname=current_user)
+       ) or exists(
+         select 1
+         from pg_catalog.pg_class retained_relation
+         cross join lateral pg_catalog.aclexplode(retained_relation.relacl) retained_acl
+         where retained_relation.oid=retained_authority_object::regclass
+           and retained_acl.grantee<>retained_relation.relowner
+       ) or exists(
+         select 1
+         from pg_catalog.pg_attribute retained_column
+         cross join lateral pg_catalog.aclexplode(retained_column.attacl) retained_column_acl
+         where retained_column.attrelid=retained_authority_object::regclass
+           and not retained_column.attisdropped
+           and retained_column_acl.grantee<>(select relowner from pg_catalog.pg_class
+             where oid=retained_authority_object::regclass)
+       ) then
+      raise exception using
+        errcode='55000',
+        message='square_production_runtime_overlay_retained_authority_acl_drifted';
+    end if;
+  end loop;
 
   foreach authority_role_name in array array[
     'square_production_oauth_authority','square_production_broker_authority',
