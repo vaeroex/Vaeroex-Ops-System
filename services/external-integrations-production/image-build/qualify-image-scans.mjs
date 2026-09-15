@@ -21,6 +21,10 @@ function reject(code) {
   throw new Error(code);
 }
 
+function isExactOccurrenceName(value) {
+  return /^projects\/vaeroex-integrations-prod\/locations\/us-west1\/occurrences\/[A-Za-z0-9._~-]{1,256}$/.test(value ?? "");
+}
+
 export function parseDigestReference(value, repository) {
   const pattern = new RegExp(`^${repository.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}@sha256:([a-f0-9]{64})$`);
   const match = pattern.exec(value);
@@ -45,6 +49,10 @@ export function evaluateScanOccurrences(kind, occurrences, sourceIntegrity) {
   if (kind !== "callback" && kind !== "bootstrap") reject("image_kind");
   if (!Array.isArray(occurrences)) reject("scan_shape");
   if (occurrences.some((entry) => !entry || typeof entry !== "object")) reject("scan_shape");
+  if (occurrences.some(
+    (entry) => entry.kind === "DISCOVERY" &&
+      (entry.noteName !== IMAGE_POLICY.vulnerabilityDiscoveryNote || !isExactOccurrenceName(entry.name)),
+  )) reject("scan_discovery_foreign");
 
   const discovery = occurrences.filter(
     (entry) => entry.kind === "DISCOVERY" && entry.noteName === IMAGE_POLICY.vulnerabilityDiscoveryNote,
@@ -96,7 +104,7 @@ export function scanEvidenceFingerprint(occurrences) {
       entry.kind === "SECRET")
     .map((entry) => {
       if (!entry || typeof entry !== "object" ||
-          !/^projects\/vaeroex-integrations-prod\/locations\/us-west1\/occurrences\/[A-Za-z0-9._~-]{1,256}$/.test(entry.name ?? "") ||
+          !isExactOccurrenceName(entry.name) ||
           typeof entry.updateTime !== "string" || !Number.isFinite(Date.parse(entry.updateTime)) ||
           typeof entry.noteName !== "string") {
         reject("scan_evidence_identity_invalid");

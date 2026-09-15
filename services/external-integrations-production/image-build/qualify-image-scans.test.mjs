@@ -78,8 +78,23 @@ test("ignores foreign discovery completion and rejects ambiguous or foreign vuln
     noteName: "projects/foreign-analysis/notes/PACKAGE_VULNERABILITY",
     discovery: { analysisStatus: "FINISHED_SUCCESS" },
   });
-  assert.throws(() => evaluateScanOccurrences("callback", [legacyGlobalDiscovery], null), /scan_not_observed/);
-  assert.throws(() => evaluateScanOccurrences("callback", [foreignDiscovery], null), /scan_not_observed/);
+  assert.throws(() => evaluateScanOccurrences("callback", [legacyGlobalDiscovery], null), /scan_discovery_foreign/);
+  assert.throws(() => evaluateScanOccurrences("callback", [foreignDiscovery], null), /scan_discovery_foreign/);
+  assert.throws(
+    () => evaluateScanOccurrences("callback", [discovery(), legacyGlobalDiscovery], null),
+    /scan_discovery_foreign/,
+  );
+  assert.throws(
+    () => evaluateScanOccurrences("callback", [discovery(), foreignDiscovery], null),
+    /scan_discovery_foreign/,
+  );
+  assert.throws(
+    () => evaluateScanOccurrences("callback", [{
+      ...discovery(),
+      name: "projects/vaeroex-integrations-prod/locations/us-east1/occurrences/foreign-region",
+    }], null),
+    /scan_discovery_foreign/,
+  );
   assert.throws(() => evaluateScanOccurrences("callback", [discovery(), discovery()], null), /scan_discovery_ambiguous/);
   assert.throws(
     () => evaluateScanOccurrences("callback", [discovery(), occurrence("VULNERABILITY", {
