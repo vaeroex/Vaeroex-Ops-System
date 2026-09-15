@@ -97,6 +97,12 @@ begin
       or not object_record.relforcerowsecurity
       or exists (
         select 1
+        from pg_catalog.pg_inherits inheritance
+        where inheritance.inhrelid=object_name::regclass
+          or inheritance.inhparent=object_name::regclass
+      )
+      or exists (
+        select 1
         from pg_catalog.pg_class relation
         cross join lateral pg_catalog.aclexplode(relation.relacl) relation_acl
         where relation.oid=object_name::regclass

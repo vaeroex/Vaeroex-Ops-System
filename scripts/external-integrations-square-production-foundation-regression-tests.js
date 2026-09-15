@@ -182,6 +182,8 @@ assert.match(legacyGuard, /integration_production_legacy_overlay_requires_review
   "legacy all-in-one installations stop for a separately reviewed reconciliation");
 assert.match(legacyGuard, /relkind <> 'r'[\s\S]*relowner <> marker_owner[\s\S]*relrowsecurity[\s\S]*relforcerowsecurity/,
   "forward guard validates retained relation type, owner and FORCE RLS posture");
+assert.match(legacyGuard, /pg_catalog\.pg_inherits[\s\S]*inhrelid=object_name::regclass[\s\S]*inhparent=object_name::regclass/,
+  "forward guard rejects inheritance parents and children for retained authority tables");
 assert.match(legacyGuard, /aclexplode\(relation\.relacl\)[\s\S]*aclexplode\(attribute\.attacl\)/,
   "forward guard validates retained table and column ACLs");
 assert.match(legacyGuard, /has_table_privilege[\s\S]*has_column_privilege[\s\S]*integration_production_foundation_effective_acl_drift/,
