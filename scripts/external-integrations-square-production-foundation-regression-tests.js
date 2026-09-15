@@ -160,7 +160,7 @@ assert.match(historicalMarker, /create function private\.integration_production_
   "fresh installs leave an explicit split-foundation ledger marker");
 assert.doesNotMatch(historicalMarker, /square_production_(?:runtime_binding|configuration_fingerprint|binding_fingerprint|authority_fingerprint)|create\s+(?:table|role)|alter\s+table|drop\s+/i,
   "fresh installs do not recreate any historical Square overlay authority");
-assert.match(legacyGuard, /integration_production_foundation_split_marker_v1\(\)[\s\S]*is distinct from '20260902191323_provider_neutral'[\s\S]*integration_production_legacy_foundation_requires_review/,
+assert.match(legacyGuard, /to_regprocedure\('private\.integration_production_foundation_split_marker_v1\(\)'\) is null[\s\S]*integration_production_legacy_foundation_requires_review[\s\S]*integration_production_foundation_split_marker_v1\(\)[\s\S]*is distinct from '20260902191323_provider_neutral'/,
   "a previously recorded all-in-one migration cannot pass without the new split marker");
 for (const legacyArtifact of [
   "square_production_runtime_binding",
@@ -170,6 +170,16 @@ for (const legacyArtifact of [
 ]) assert.match(legacyGuard, new RegExp(legacyArtifact), `forward guard detects legacy artifact ${legacyArtifact}`);
 assert.match(legacyGuard, /integration_production_legacy_overlay_requires_review/,
   "legacy all-in-one installations stop for a separately reviewed reconciliation");
+assert.match(legacyGuard, /relkind <> 'r'[\s\S]*relowner <> marker_owner[\s\S]*relrowsecurity[\s\S]*relforcerowsecurity/,
+  "forward guard validates retained relation type, owner and FORCE RLS posture");
+assert.match(legacyGuard, /aclexplode\(relation\.relacl\)[\s\S]*aclexplode\(attribute\.attacl\)/,
+  "forward guard validates retained table and column ACLs");
+assert.match(legacyGuard, /has_table_privilege[\s\S]*has_column_privilege[\s\S]*integration_production_foundation_effective_acl_drift/,
+  "forward guard rejects effective privileges for every dormant runtime identity");
+assert.match(legacyGuard, /provolatile <> 'i'[\s\S]*proisstrict[\s\S]*proparallel <> 's'[\s\S]*prosecdef[\s\S]*proconfig/,
+  "forward guard validates retained fingerprint helper execution properties");
+assert.match(legacyGuard, /integration_production_foundation_role_drift/,
+  "forward guard revalidates dormant authority role attributes and memberships");
 assert.doesNotMatch(legacyGuard, /drop\s+|delete\s+from|alter\s+table/i,
   "the forward guard never mutates legacy authority state while rejecting it");
 

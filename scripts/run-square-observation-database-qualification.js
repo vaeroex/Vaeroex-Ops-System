@@ -31,8 +31,10 @@ async function qualify(runtime) {
   await runtime.applyMigrations(c,productionFoundation);
   const schemaBefore=await runtime.sourceSchemaFingerprint(c);
   await runtime.applyMigrations(c,additiveSquareTail);
+  eq(await runtime.sourceSchemaFingerprint(c),schemaBefore,"Square interpretation preserves canonical/QBO schema");
   await runtime.applyMigrations(c,productionCompatibility);
-  eq(await runtime.sourceSchemaFingerprint(c),schemaBefore,"Square interpretation and compatibility guards preserve canonical/QBO schema");
+  eq((await c.query("select private.integration_production_foundation_split_marker_v1() as value")).rows[0].value,
+    "20260902191323_provider_neutral","compatibility path records the reviewed split foundation identity");
   await c.query("drop function private.integration_production_foundation_split_marker_v1()");
   let legacyGuardError;
   try { await runtime.applyMigrations(c,[productionCompatibility.at(-1)]); }
@@ -57,6 +59,20 @@ async function qualify(runtime) {
     "private.square_production_configuration_fingerprint_v1(text,text,text,name,name,name,text)",
     "helper rejection preserves legacy state for reviewed recovery");
   await c.query("drop function private.square_production_configuration_fingerprint_v1(text,text,text,name,name,name,text)");
+  await c.query("begin");
+  await c.query("grant update on private.integration_production_provider_bindings to service_role");
+  legacyGuardError=undefined;
+  try { await runtime.applyMigrations(c,[productionCompatibility.at(-1)]); }
+  catch (error) { legacyGuardError=error; }
+  eq(legacyGuardError?.code,"55000","forward guard rejects retained foundation table privilege drift");
+  await c.query("rollback");
+  await c.query("begin");
+  await c.query("alter table private.integration_production_provider_bindings no force row level security");
+  legacyGuardError=undefined;
+  try { await runtime.applyMigrations(c,[productionCompatibility.at(-1)]); }
+  catch (error) { legacyGuardError=error; }
+  eq(legacyGuardError?.code,"55000","forward guard rejects retained foundation FORCE RLS drift");
+  await c.query("rollback");
   const installedSchema=await runtime.sourceSchemaFingerprint(c);
   const genericCounts=async()=>{const counts={};for(const table of ["external_source_records","external_source_record_versions","canonical_business_facts","canonical_business_fact_versions","business_fact_sources","fact_contribution_batches","fact_contribution_events"])counts[table]=(await c.query(`select count(*)::int n from private.${table}`)).rows[0].n;return counts;};
   const genericBefore=await genericCounts();
