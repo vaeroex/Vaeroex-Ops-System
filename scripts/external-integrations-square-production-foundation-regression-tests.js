@@ -146,6 +146,9 @@ assert.ok(migration.trimEnd().endsWith("commit;"), "the self-contained foundatio
 
 assert.match(overlay, /square_production_runtime_overlay_prerequisite_missing/);
 assert.match(overlay, /square_production_runtime_overlay_partial_or_drifted/);
+assert.match(overlay, /square_production_runtime_overlay_shared_foundation_drifted/);
+assert.match(overlay, /shared_fingerprint_proc\.prosrc/);
+assert.match(overlay, /integration_production_fingerprint_v1\(text\[\]\)'::regprocedure/);
 assert.match(overlay, /to_regclass\('private\.integration_production_provider_bindings'\)/);
 assert.match(overlay, /to_regclass\('private\.square_account_configuration'\)/);
 assert.match(overlay, /rolname='square_production_runtime_authority'/);
@@ -176,11 +179,14 @@ assert.match(overlay, /existing_objects not in \(0,6\)/,
 assert.match(overlay, /relrowsecurity and relforcerowsecurity/);
 assert.match(overlay, /pg_catalog\.unnest\(c\.conkey\)/);
 assert.match(overlay, /pg_catalog\.unnest\(c\.confkey\)/);
+assert.match(overlay, /c\.confupdtype='a' and c\.confdeltype='r'/);
+assert.match(overlay, /c\.confupdtype='r' and c\.confdeltype='r'/);
 assert.match(overlay, /provider_authority_fingerprint'\]::text\[\]/);
 assert.match(overlay, /square_production_binding_fingerprint'\]::text\[\]/);
 assert.match(overlay, /'SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER'/,
   "legacy acceptance rejects every effective table privilege, including operations outside RLS");
 assert.match(overlay, /square_production_runtime_authority','square_production_evidence_authority'/);
+assert.match(overlay, /pg_catalog\.has_any_column_privilege/);
 assert.ok(overlay.indexOf("square_production_runtime_overlay_prerequisite_missing") <
   overlay.indexOf("create function private.square_production_configuration_fingerprint_v1"),
 "the overlay validates every prerequisite before its first durable mutation");

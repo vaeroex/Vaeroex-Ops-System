@@ -9,6 +9,7 @@ do $prerequisites$
 declare
   existing_objects integer;
   legacy_has_rows boolean;
+  shared_fingerprint_proc pg_catalog.pg_proc;
 begin
   if pg_catalog.to_regclass('private.integration_production_provider_bindings') is null or
      pg_catalog.to_regclass('private.square_account_configuration') is null or
@@ -16,6 +17,31 @@ begin
     raise exception using
       errcode='55000',
       message='square_production_runtime_overlay_prerequisite_missing';
+  end if;
+
+  select * into strict shared_fingerprint_proc from pg_catalog.pg_proc
+    where oid='private.integration_production_fingerprint_v1(text[])'::regprocedure;
+  if shared_fingerprint_proc.provolatile<>'i' or not shared_fingerprint_proc.proisstrict or
+     shared_fingerprint_proc.proparallel<>'s' or shared_fingerprint_proc.prosecdef or
+     (shared_fingerprint_proc.proconfig<>array['search_path=']::text[] and
+       shared_fingerprint_proc.proconfig<>array['search_path=""']::text[]) or
+     pg_catalog.regexp_replace(pg_catalog.btrim(shared_fingerprint_proc.prosrc),'[[:space:]]+',' ','g')<>
+       'select ''sha256:''||pg_catalog.encode( extensions.digest( pg_catalog.convert_to( pg_catalog.string_agg( pg_catalog.length(part)::text||'':''||part, '''' order by ordinal ), ''UTF8'' ), ''sha256'' ), ''hex'' ) from pg_catalog.unnest(p_parts) with ordinality as ordered_parts(part,ordinal)' or
+     exists(select 1
+       from pg_catalog.unnest(array[
+         'anon','authenticated','service_role',
+         'square_production_oauth_authority','square_production_broker_authority',
+         'square_production_scheduler_authority','square_production_webhook_authority',
+         'square_production_runtime_authority','square_production_evidence_authority'
+       ]::text[]) denied_role(role_name)
+       where pg_catalog.has_function_privilege(
+         role_name,
+         'private.integration_production_fingerprint_v1(text[])',
+         'EXECUTE'
+       )) then
+    raise exception using
+      errcode='55000',
+      message='square_production_runtime_overlay_shared_foundation_drifted';
   end if;
 
   select
@@ -189,6 +215,7 @@ begin
        where c.conrelid='private.square_production_runtime_binding'::regclass
          and c.contype='f' and c.convalidated
          and c.confrelid='private.integration_production_provider_bindings'::regclass
+         and c.confupdtype='a' and c.confdeltype='r'
          and (select pg_catalog.array_agg(a.attname::text order by k.ordinality)
            from pg_catalog.unnest(c.conkey) with ordinality k(attnum,ordinality)
            join pg_catalog.pg_attribute a on a.attrelid=c.conrelid and a.attnum=k.attnum)
@@ -201,6 +228,7 @@ begin
        where c.conrelid='private.square_production_runtime_binding'::regclass
          and c.contype='f' and c.convalidated
          and c.confrelid='private.integration_production_provider_bindings'::regclass
+         and c.confupdtype='a' and c.confdeltype='r'
          and (select pg_catalog.array_agg(a.attname::text order by k.ordinality)
            from pg_catalog.unnest(c.conkey) with ordinality k(attnum,ordinality)
            join pg_catalog.pg_attribute a on a.attrelid=c.conrelid and a.attnum=k.attnum)
@@ -214,6 +242,7 @@ begin
          and c.conname='square_production_runtime_binding_configuration_fkey'
          and c.contype='f' and c.convalidated
          and c.confrelid='private.square_account_configuration'::regclass
+         and c.confupdtype='r' and c.confdeltype='r'
          and (select pg_catalog.array_agg(a.attname::text order by k.ordinality)
            from pg_catalog.unnest(c.conkey) with ordinality k(attnum,ordinality)
            join pg_catalog.pg_attribute a on a.attrelid=c.conrelid and a.attnum=k.attnum)
@@ -232,7 +261,18 @@ begin
        cross join pg_catalog.unnest(array[
          'SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER'
        ]::text[]) denied_privilege(privilege_name)
-       where pg_catalog.has_table_privilege(role_name,'private.square_production_runtime_binding',privilege_name)) then
+       where pg_catalog.has_table_privilege(role_name,'private.square_production_runtime_binding',privilege_name)) or
+     exists(select 1
+       from pg_catalog.unnest(array[
+         'anon','authenticated','service_role',
+         'square_production_oauth_authority','square_production_broker_authority',
+         'square_production_scheduler_authority','square_production_webhook_authority',
+         'square_production_runtime_authority','square_production_evidence_authority'
+       ]::text[]) denied_role(role_name)
+       cross join pg_catalog.unnest(array[
+         'SELECT','INSERT','UPDATE','REFERENCES'
+       ]::text[]) denied_column_privilege(privilege_name)
+       where pg_catalog.has_any_column_privilege(role_name,'private.square_production_runtime_binding',privilege_name)) then
     raise exception using
       errcode='55000',
       message='square_production_runtime_overlay_partial_or_drifted';
