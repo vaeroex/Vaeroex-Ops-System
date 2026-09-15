@@ -12,7 +12,7 @@ function fixture() {
     projectId: POLICY.projectId,
     buildTriggerId: triggerId,
     serviceAccount: POLICY.serviceAccount,
-    tags: ["production-image-build"],
+    tags: ["production-image-build", `trigger-${triggerId}`],
     substitutions: {
       COMMIT_SHA: commit,
       REVISION_ID: commit,
@@ -23,7 +23,7 @@ function fixture() {
       TRIGGER_BUILD_CONFIG_PATH: POLICY.buildConfigPath,
     },
     approval: { state: "APPROVED", result: { decision: "APPROVED" } },
-    sourceProvenance: { resolvedRepoSource: { commitSha: commit } },
+    sourceProvenance: { resolvedGitSource: { url: POLICY.repositoryUrl, revision: commit } },
   };
   const trigger = {
     id: triggerId,
@@ -60,11 +60,14 @@ test("rejects manual, unapproved, foreign-source, wrong-revision and impersonate
   rejected((build) => { build.approval.state = "PENDING"; }, "build_approval");
   rejected((build) => { build.serviceAccount = "projects/vaeroex-integrations-prod/serviceAccounts/human@example.invalid"; }, "build_identity");
   rejected((build) => { build.sourceProvenance.resolvedStorageSource = { bucket: "foreign" }; }, "foreign_source_transport");
-  rejected((build) => { build.sourceProvenance.resolvedRepoSource.commitSha = "b".repeat(40); }, "resolved_source_commit");
+  rejected((build) => { build.sourceProvenance.resolvedRepoSource = { commitSha: commit }; }, "foreign_source_transport");
+  rejected((build) => { build.sourceProvenance.resolvedGitSource.url = "https://github.com/attacker/fork.git"; }, "resolved_source_repository");
+  rejected((build) => { build.sourceProvenance.resolvedGitSource.revision = "b".repeat(40); }, "resolved_source_commit");
   rejected((build) => { build.substitutions.REVISION_ID = "b".repeat(40); }, "source_revision");
   rejected((build) => { build.substitutions.REPO_FULL_NAME = "attacker/fork"; }, "source_repository");
   rejected((build) => { build.substitutions.BRANCH_NAME = "feature"; }, "source_branch");
   rejected((build) => { build.tags.push("unexpected"); }, "build_tags");
+  rejected((build) => { build.tags[1] = "trigger-foreign"; }, "build_tags");
 });
 
 test("rejects trigger drift and broader source scope", () => {

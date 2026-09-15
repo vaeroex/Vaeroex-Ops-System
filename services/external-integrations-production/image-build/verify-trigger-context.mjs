@@ -5,6 +5,7 @@ const POLICY = Object.freeze({
   repositoryOwner: "vaeroex",
   repositoryName: "Vaeroex-Ops-System",
   repositoryFullName: "vaeroex/Vaeroex-Ops-System",
+  repositoryUrl: "https://github.com/vaeroex/Vaeroex-Ops-System.git",
   branchName: "main",
   branchPattern: "^main$",
   buildConfigPath: "services/external-integrations-production/image-build/cloudbuild.yaml",
@@ -54,12 +55,17 @@ export function validateTriggerContext(build, trigger) {
   }
   if (build.sourceProvenance?.resolvedStorageSource ||
       build.sourceProvenance?.resolvedStorageSourceManifest ||
-      build.sourceProvenance?.resolvedGitSource ||
+      build.sourceProvenance?.resolvedRepoSource ||
       build.sourceProvenance?.resolvedConnectedRepository) {
     reject("foreign_source_transport");
   }
-  exactString(build.sourceProvenance?.resolvedRepoSource?.commitSha, commitSha, "resolved_source_commit");
-  exactStringSet(build.tags, ["production-image-build"], "build_tags");
+  exactString(build.sourceProvenance?.resolvedGitSource?.url, POLICY.repositoryUrl, "resolved_source_repository");
+  exactString(build.sourceProvenance?.resolvedGitSource?.revision, commitSha, "resolved_source_commit");
+  exactStringSet(
+    build.tags,
+    ["production-image-build", `trigger-${build.buildTriggerId}`],
+    "build_tags",
+  );
 
   exactString(trigger.id, build.buildTriggerId, "trigger_identity");
   exactString(
