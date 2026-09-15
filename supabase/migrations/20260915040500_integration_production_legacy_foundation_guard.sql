@@ -103,6 +103,11 @@ begin
       )
       or exists (
         select 1
+        from pg_catalog.pg_rewrite rewrite_rule
+        where rewrite_rule.ev_class=object_name::regclass
+      )
+      or exists (
+        select 1
         from pg_catalog.pg_class relation
         cross join lateral pg_catalog.aclexplode(relation.relacl) relation_acl
         where relation.oid=object_name::regclass

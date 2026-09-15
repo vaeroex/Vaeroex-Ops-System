@@ -186,6 +186,8 @@ assert.match(legacyGuard, /relkind <> 'r'[\s\S]*relowner <> marker_owner[\s\S]*r
   "forward guard validates retained relation type, owner and FORCE RLS posture");
 assert.match(legacyGuard, /pg_catalog\.pg_inherits[\s\S]*inhrelid=object_name::regclass[\s\S]*inhparent=object_name::regclass/,
   "forward guard rejects inheritance parents and children for retained authority tables");
+assert.match(legacyGuard, /pg_catalog\.pg_rewrite[\s\S]*ev_class=object_name::regclass/,
+  "forward guard rejects user rewrite rules on retained authority tables");
 assert.match(legacyGuard, /aclexplode\(relation\.relacl\)[\s\S]*aclexplode\(attribute\.attacl\)/,
   "forward guard validates retained table and column ACLs");
 assert.match(legacyGuard, /has_table_privilege[\s\S]*has_column_privilege[\s\S]*integration_production_foundation_effective_acl_drift/,
