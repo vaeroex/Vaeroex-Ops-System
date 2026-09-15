@@ -39,10 +39,12 @@ for (const role of [
   "roles/serviceusage.serviceUsageConsumer",
 ]) assert.match(main, new RegExp(role.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
 
-assert.match(context, /sourceProvenance\?\.resolvedRepoSource\?\.commitSha/);
+assert.match(context, /sourceProvenance\?\.resolvedGitSource\?\.url[\s\S]*POLICY\.repositoryUrl/);
+assert.match(context, /sourceProvenance\?\.resolvedGitSource\?\.revision[\s\S]*commitSha/);
+assert.match(context, /production-image-build[\s\S]*trigger-\$\{build\.buildTriggerId\}/);
 assert.match(context, /Object\.hasOwn\(trigger\.github \?\? \{\}, "enterpriseConfigResourceName"\)/);
 assert.match(context, /approval\?\.state !== "APPROVED"/);
-assert.match(context, /resolvedStorageSource[\s\S]*resolvedStorageSourceManifest[\s\S]*resolvedGitSource[\s\S]*resolvedConnectedRepository/);
+assert.match(context, /resolvedStorageSource[\s\S]*resolvedStorageSourceManifest[\s\S]*resolvedRepoSource[\s\S]*resolvedConnectedRepository/);
 assert.match(context, /REPO_FULL_NAME[\s\S]*REPO_NAME[\s\S]*BRANCH_NAME[\s\S]*TRIGGER_NAME[\s\S]*TRIGGER_BUILD_CONFIG_PATH/);
 assert.match(context, /trigger\.resourceName[\s\S]*projects\/\$\{POLICY\.projectId\}\/locations\/\$\{POLICY\.location\}\/triggers/);
 assert.match(context, /Object\.keys\(trigger\.substitutions \?\? \{\}\)/);
