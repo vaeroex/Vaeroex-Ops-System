@@ -22,7 +22,7 @@ const integrity = Object.freeze({
 });
 let occurrenceSequence = 0;
 const occurrence = (kind, details = {}, resourceUri = callback.resourceUrl) => ({
-  name: `projects/vaeroex-integrations-prod/occurrences/test-${++occurrenceSequence}`,
+  name: `projects/vaeroex-integrations-prod/locations/us-west1/occurrences/test-${++occurrenceSequence}`,
   kind,
   resourceUri,
   noteName: `projects/goog-${kind.toLowerCase()}/notes/test`,
@@ -70,10 +70,15 @@ test("requires a completed scan and rejects secrets, criticals and callback high
 });
 
 test("ignores foreign discovery completion and rejects ambiguous or foreign vulnerability evidence", () => {
+  const legacyGlobalDiscovery = occurrence("DISCOVERY", {
+    noteName: "projects/goog-analysis/notes/PACKAGE_VULNERABILITY",
+    discovery: { analysisStatus: "FINISHED_SUCCESS" },
+  });
   const foreignDiscovery = occurrence("DISCOVERY", {
     noteName: "projects/foreign-analysis/notes/PACKAGE_VULNERABILITY",
     discovery: { analysisStatus: "FINISHED_SUCCESS" },
   });
+  assert.throws(() => evaluateScanOccurrences("callback", [legacyGlobalDiscovery], null), /scan_not_observed/);
   assert.throws(() => evaluateScanOccurrences("callback", [foreignDiscovery], null), /scan_not_observed/);
   assert.throws(() => evaluateScanOccurrences("callback", [discovery(), discovery()], null), /scan_discovery_ambiguous/);
   assert.throws(
@@ -135,6 +140,14 @@ test("scan stability fingerprints require immutable occurrence identity and upda
     scanEvidenceFingerprint([{ ...completed, updateTime: "2026-09-14T12:01:00Z" }]),
   );
   assert.throws(() => scanEvidenceFingerprint([{ ...completed, name: undefined }]), /scan_evidence_identity_invalid/);
+  assert.throws(
+    () => scanEvidenceFingerprint([{ ...completed, name: completed.name.replace("/locations/us-west1", "") }]),
+    /scan_evidence_identity_invalid/,
+  );
+  assert.throws(
+    () => scanEvidenceFingerprint([{ ...completed, name: completed.name.replace("/us-west1/", "/us-east1/") }]),
+    /scan_evidence_identity_invalid/,
+  );
 });
 
 test("permits only the exact reviewed bootstrap high-severity exception", () => {

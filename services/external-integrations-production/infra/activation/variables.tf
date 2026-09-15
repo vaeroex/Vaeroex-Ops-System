@@ -23,6 +23,19 @@ variable "source_commit" {
   }
 }
 
+variable "callback_edge_source_commit" {
+  type     = string
+  default  = null
+  nullable = true
+  validation {
+    condition = (
+      var.callback_edge_source_commit == null ||
+      can(regex("^[a-f0-9]{40}$", var.callback_edge_source_commit))
+    )
+    error_message = "callback_edge_source_commit must be null or an exact full Git SHA."
+  }
+}
+
 variable "operator_email" {
   type    = string
   default = "isaac@vaeroex.com"

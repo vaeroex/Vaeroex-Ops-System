@@ -24,8 +24,9 @@ const releasePins = read("services/external-integrations-production/infra/activa
 const activationPath = path.join(root, "services/external-integrations-production/infra/activation");
 
 const reviewedSourceCommit = "f4915edadbe2abddd7993c74c1fc3e80e1d1f821";
+const reviewedCallbackEdgeSourceCommit = "9eff5ed807641747255f68b17e3ec83faeb8dde5";
 const reviewedBootstrapDigest = "us-west1-docker.pkg.dev/vaeroex-integrations-prod/vaeroex-integrations-images/production-bootstrap@sha256:d56fe933eab1322bb4fe905b183964a980d641af23d69904e15989add501dc6f";
-const reviewedCallbackEdgeDigest = "us-west1-docker.pkg.dev/vaeroex-integrations-prod/vaeroex-integrations-images/square-callback-edge@sha256:a169544f0ae3ff36248a90aa686c0858f9afde9a10302041aed2d23088bd0cd8";
+const reviewedCallbackEdgeDigest = "us-west1-docker.pkg.dev/vaeroex-integrations-prod/vaeroex-integrations-images/square-callback-edge@sha256:2c31f3e3e7cca63d6173ceddd8187a49d071175ec805ab6e29a7dd559f5faaa6";
 
 function runTerraform(args) {
   const result = spawnSync(process.env.TERRAFORM_BIN || "terraform", args, {
@@ -50,6 +51,7 @@ assert.match(variables, /bootstrap_image_digest == null/, "the first apply creat
 assert.match(variables, /production-bootstrap@sha256:\[a-f0-9\]\{64\}/, "a runtime image must be an immutable digest in the isolated repository");
 assert.match(variables, /square-callback-edge@sha256:\[a-f0-9\]\{64\}/, "the callback edge image must be an immutable digest in the isolated repository");
 assert.match(main, /deployment_inputs_valid/, "runtime and callback-edge artifacts must be deployed together");
+assert.match(main, /callback_edge_source_commit == null/, "a callback edge cannot be deployed without exact source provenance");
 assert.match(main, /"containerscanning\.googleapis\.com"/, "release images require automatic vulnerability scanning");
 
 for (const gate of [
@@ -123,6 +125,7 @@ assert.match(workflow, /External integrations Square Production callback edge te
 assert.match(activationReadme, /Direct human build submission remains closed/, "manual callback-edge publication is explicitly closed");
 assert.match(activationReadme, /only configured rebuild path is the `vaeroex-production-images` GitHub push trigger/, "future publication requires the source-bound reviewed trigger");
 assert.match(releasePins, new RegExp(`source_commit\\s*=\\s*"${reviewedSourceCommit}"`), "the second-stage release is pinned to the reviewed source revision");
+assert.match(releasePins, new RegExp(`callback_edge_source_commit\\s*=\\s*"${reviewedCallbackEdgeSourceCommit}"`), "the callback edge is pinned to its distinct reviewed source revision");
 assert.match(releasePins, new RegExp(`bootstrap_image_digest\\s*=\\s*"${reviewedBootstrapDigest}"`), "the reviewed bootstrap digest is pinned exactly");
 assert.match(releasePins, new RegExp(`callback_edge_image_digest\\s*=\\s*"${reviewedCallbackEdgeDigest}"`), "the independently scanned callback edge digest is pinned exactly");
 for (const gate of [
