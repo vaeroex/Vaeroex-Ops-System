@@ -8,6 +8,7 @@ begin;
 do $prerequisites$
 declare
   existing_objects integer;
+  legacy_has_rows boolean;
 begin
   if pg_catalog.to_regclass('private.integration_production_provider_bindings') is null or
      pg_catalog.to_regclass('private.square_account_configuration') is null or
@@ -31,13 +32,38 @@ begin
       errcode='55000',
       message='square_production_runtime_overlay_partial_or_drifted';
   end if;
+
+  if existing_objects=6 then
+    execute 'lock table private.square_production_runtime_binding in access exclusive mode';
+    execute 'select exists(select 1 from private.square_production_runtime_binding)' into legacy_has_rows;
+    if legacy_has_rows then
+      raise exception using
+        errcode='55000',
+        message='square_production_runtime_overlay_nonempty_reconciliation_required';
+    end if;
+  end if;
 end
 $prerequisites$;
+
+-- A previous repository revision installed the Square overlay inside the
+-- historical foundation migration. Its dormant table was required to remain
+-- empty. Rebuild that exact empty overlay transactionally so ACL, column,
+-- generated-expression and constraint drift cannot survive this split. No
+-- CASCADE is used: any unknown dependency aborts the migration intact.
+drop table if exists private.square_production_runtime_binding;
+drop index if exists private.square_account_configuration_production_binding_idx;
+alter table private.square_account_configuration
+  drop constraint if exists square_account_configuration_production_fingerprint_check;
+alter table private.square_account_configuration
+  drop column if exists square_production_binding_fingerprint;
+alter table private.square_account_configuration
+  drop column if exists square_production_authority_fingerprint;
+drop function if exists private.square_production_configuration_fingerprint_v1(text,text,text,name,name,name,text);
 
 -- The lifecycle configuration stores checked login names in PostgreSQL's name
 -- type. Keep their conversions inside this immutable helper so generated-column
 -- validation sees one immutable call and the fingerprint tracks the stored tuple.
-create or replace function private.square_production_configuration_fingerprint_v1(
+create function private.square_production_configuration_fingerprint_v1(
   p_environment text,
   p_application_id text,
   p_redirect_uri text,
@@ -70,29 +96,21 @@ revoke all on function private.square_production_configuration_fingerprint_v1(te
   square_production_scheduler_authority,square_production_webhook_authority,
   square_production_runtime_authority,square_production_evidence_authority;
 
-alter table private.square_account_configuration add column if not exists square_production_binding_fingerprint text
+alter table private.square_account_configuration add column square_production_binding_fingerprint text
   generated always as (private.square_production_configuration_fingerprint_v1(
     environment,application_id,redirect_uri,broker_login,enrollment_login,webhook_login,kms_key_resource
   )) stored;
-alter table private.square_account_configuration add column if not exists square_production_authority_fingerprint text
+alter table private.square_account_configuration add column square_production_authority_fingerprint text
   generated always as (private.integration_production_fingerprint_v1(array[
     'square',environment,application_id,redirect_uri,kms_key_resource
   ])) stored;
-do $constraint$
-begin
-  if not exists(select 1 from pg_catalog.pg_constraint
-    where conrelid='private.square_account_configuration'::regclass
-      and conname='square_account_configuration_production_fingerprint_check') then
-    alter table private.square_account_configuration add constraint square_account_configuration_production_fingerprint_check
-      check(square_production_binding_fingerprint ~ '^sha256:[a-f0-9]{64}$'
-        and square_production_authority_fingerprint ~ '^sha256:[a-f0-9]{64}$');
-  end if;
-end
-$constraint$;
-create unique index if not exists square_account_configuration_production_binding_idx
+alter table private.square_account_configuration add constraint square_account_configuration_production_fingerprint_check
+  check(square_production_binding_fingerprint ~ '^sha256:[a-f0-9]{64}$'
+    and square_production_authority_fingerprint ~ '^sha256:[a-f0-9]{64}$');
+create unique index square_account_configuration_production_binding_idx
   on private.square_account_configuration(environment,square_production_authority_fingerprint,square_production_binding_fingerprint);
 
-create table if not exists private.square_production_runtime_binding (
+create table private.square_production_runtime_binding (
   provider_key text not null default 'square' check(provider_key='square'),
   environment text not null default 'production' check(environment='production'),
   application_id text not null check(application_id ~ '^sq0idp-[A-Za-z0-9_-]+$'),
