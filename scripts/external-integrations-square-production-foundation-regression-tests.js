@@ -160,7 +160,7 @@ assert.doesNotMatch(historicalMarker, /create\s+(?:table|function|role)|alter\s+
   "fresh installs do not recreate the historical Square overlay");
 for (const legacyArtifact of [
   "square_production_runtime_binding",
-  "square_production_fingerprint_v1",
+  "square_production_configuration_fingerprint_v1",
   "square_production_binding_fingerprint",
   "square_production_authority_fingerprint"
 ]) assert.match(legacyGuard, new RegExp(legacyArtifact), `forward guard detects legacy artifact ${legacyArtifact}`);

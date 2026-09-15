@@ -7,7 +7,7 @@ begin;
 do $legacy_overlay_guard$
 begin
   if to_regclass('private.square_production_runtime_binding') is not null
-    or to_regprocedure('private.square_production_fingerprint_v1(text[])') is not null
+    or to_regprocedure('private.square_production_configuration_fingerprint_v1(text,text,text,name,name,name,text)') is not null
     or exists (
       select 1
       from pg_catalog.pg_attribute

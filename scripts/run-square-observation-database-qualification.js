@@ -41,6 +41,16 @@ async function qualify(runtime) {
   eq((await c.query("select to_regclass('private.square_production_runtime_binding')::text as value")).rows[0].value,
     "private.square_production_runtime_binding","rejection preserves legacy state for reviewed recovery");
   await c.query("drop table private.square_production_runtime_binding");
+  await c.query(`create function private.square_production_configuration_fingerprint_v1(text,text,text,name,name,name,text)
+    returns text language sql immutable as 'select null::text'`);
+  legacyGuardError=undefined;
+  try { await runtime.applyMigrations(c,[productionCompatibility.at(-1)]); }
+  catch (error) { legacyGuardError=error; }
+  eq(legacyGuardError?.code,"55000","forward guard rejects the historical seven-argument overlay helper");
+  eq((await c.query("select to_regprocedure('private.square_production_configuration_fingerprint_v1(text,text,text,name,name,name,text)')::text as value")).rows[0].value,
+    "private.square_production_configuration_fingerprint_v1(text,text,text,name,name,name,text)",
+    "helper rejection preserves legacy state for reviewed recovery");
+  await c.query("drop function private.square_production_configuration_fingerprint_v1(text,text,text,name,name,name,text)");
   const installedSchema=await runtime.sourceSchemaFingerprint(c);
   const genericCounts=async()=>{const counts={};for(const table of ["external_source_records","external_source_record_versions","canonical_business_facts","canonical_business_fact_versions","business_fact_sources","fact_contribution_batches","fact_contribution_events"])counts[table]=(await c.query(`select count(*)::int n from private.${table}`)).rows[0].n;return counts;};
   const genericBefore=await genericCounts();
