@@ -95,7 +95,8 @@ begin
       'private.integration_production_provider_secrets'::regclass,
       'private.integration_production_provider_capabilities'::regclass
     ])
-      and (relation.relkind <> 'r' or relation.relowner <> current_user::regrole::oid
+      and (relation.relkind <> 'r' or relation.relpersistence <> 'p'
+        or relation.relowner <> current_user::regrole::oid
         or not relation.relrowsecurity or not relation.relforcerowsecurity
         or relation.relhassubclass)
   ) or exists (
@@ -324,6 +325,61 @@ as $function$
   )
 $function$;
 
+create function private.square_production_configuration_fingerprint_v1(
+  p_generation bigint,
+  p_provider_key text,
+  p_environment text,
+  p_project_id text,
+  p_region text,
+  p_lifecycle_state text,
+  p_application_id text,
+  p_callback_origin text,
+  p_callback_method text,
+  p_callback_path text,
+  p_callback_uri text,
+  p_webhook_method text,
+  p_webhook_path text,
+  p_webhook_uri text,
+  p_api_version text,
+  p_authorization_endpoint text,
+  p_provider_origin text,
+  p_requested_scopes text[],
+  p_kms_key_resource text,
+  p_application_secret_purpose text,
+  p_webhook_signature_secret_purpose text,
+  p_database_secret_purposes text[],
+  p_provider_policy_version text,
+  p_source_commit text,
+  p_runtime_enabled boolean,
+  p_provider_calls_enabled boolean,
+  p_customer_onboarding_enabled boolean,
+  p_webhook_intake_enabled boolean,
+  p_evidence_enabled boolean,
+  p_economic_contributions_enabled boolean,
+  p_ai_dispatch_enabled boolean
+)
+returns text
+language sql
+immutable
+strict
+parallel safe
+security invoker
+set search_path=''
+as $function$
+  select private.square_production_generation_fingerprint_v1(p_generation,array[
+    p_provider_key,p_environment,p_project_id,p_region,p_lifecycle_state,p_application_id,
+    p_callback_origin,p_callback_method,p_callback_path,p_callback_uri,
+    p_webhook_method,p_webhook_path,p_webhook_uri,p_api_version,
+    p_authorization_endpoint,p_provider_origin,
+    pg_catalog.array_to_string(p_requested_scopes,','),p_kms_key_resource,
+    p_application_secret_purpose,p_webhook_signature_secret_purpose,
+    pg_catalog.array_to_string(p_database_secret_purposes,','),p_provider_policy_version,p_source_commit,
+    p_runtime_enabled::text,p_provider_calls_enabled::text,p_customer_onboarding_enabled::text,
+    p_webhook_intake_enabled::text,p_evidence_enabled::text,
+    p_economic_contributions_enabled::text,p_ai_dispatch_enabled::text
+  ])
+$function$;
+
 create table private.square_production_configuration_generations (
   provider_key text not null default 'square' check(provider_key='square'),
   environment text not null default 'production' check(environment='production'),
@@ -377,18 +433,16 @@ create table private.square_production_configuration_generations (
     ])
   ) stored,
   configuration_fingerprint text generated always as (
-    private.square_production_generation_fingerprint_v1(generation,array[
-      provider_key,environment,project_id,region,lifecycle_state,application_id,
+    private.square_production_configuration_fingerprint_v1(
+      generation,provider_key,environment,project_id,region,lifecycle_state,application_id,
       callback_origin,callback_method,callback_path,callback_uri,
       webhook_method,webhook_path,webhook_uri,api_version,
-      authorization_endpoint,provider_origin,
-      array_to_string(requested_scopes,','),kms_key_resource,
+      authorization_endpoint,provider_origin,requested_scopes,kms_key_resource,
       application_secret_purpose,webhook_signature_secret_purpose,
-      array_to_string(database_secret_purposes,','),provider_policy_version,source_commit,
-      runtime_enabled::text,provider_calls_enabled::text,customer_onboarding_enabled::text,
-      webhook_intake_enabled::text,evidence_enabled::text,
-      economic_contributions_enabled::text,ai_dispatch_enabled::text
-    ])
+      database_secret_purposes,provider_policy_version,source_commit,
+      runtime_enabled,provider_calls_enabled,customer_onboarding_enabled,
+      webhook_intake_enabled,evidence_enabled,economic_contributions_enabled,ai_dispatch_enabled
+    )
   ) stored,
   primary key(provider_key,environment,project_id,generation),
   unique(provider_key,environment,project_id,generation,configuration_fingerprint),
@@ -597,7 +651,26 @@ begin
 
   if observed_capabilities is distinct from array[
     'broker','evidence','oauth','runtime','scheduler','task_invoker','webhook'
-  ]::text[] then
+  ]::text[] or 7 <> (
+    select count(*)
+    from private.integration_production_provider_capabilities capability
+    join (values
+      ('broker','square-broker@vaeroex-integrations-prod.iam.gserviceaccount.com','square_production_broker','database_broker'),
+      ('evidence','square-evidence@vaeroex-integrations-prod.iam.gserviceaccount.com','square_production_evidence','database_evidence'),
+      ('oauth','square-oauth@vaeroex-integrations-prod.iam.gserviceaccount.com','square_production_oauth','database_oauth'),
+      ('runtime','square-runtime@vaeroex-integrations-prod.iam.gserviceaccount.com','square_production_runtime','database_runtime'),
+      ('scheduler','square-scheduler@vaeroex-integrations-prod.iam.gserviceaccount.com','square_production_scheduler','database_scheduler'),
+      ('task_invoker','square-task-invoker@vaeroex-integrations-prod.iam.gserviceaccount.com',null,null),
+      ('webhook','square-webhook@vaeroex-integrations-prod.iam.gserviceaccount.com','square_production_webhook','database_webhook')
+    ) expected(capability,service_account,database_login,database_secret_purpose)
+      on capability.capability=expected.capability
+      and capability.service_account=expected.service_account
+      and capability.database_login::text is not distinct from expected.database_login
+      and capability.database_secret_purpose is not distinct from expected.database_secret_purpose
+    where capability.provider_key=new.provider_key
+      and capability.environment=new.environment
+      and capability.project_id=new.project_id
+  ) then
     raise exception 'square_production_binding_capabilities_incomplete' using errcode='23514';
   end if;
 
@@ -861,6 +934,7 @@ from public,anon,authenticated,service_role,
 
 revoke all on function
   private.square_production_generation_fingerprint_v1(bigint,text[]),
+  private.square_production_configuration_fingerprint_v1(bigint,text,text,text,text,text,text,text,text,text,text,text,text,text,text,text,text,text[],text,text,text,text[],text,text,boolean,boolean,boolean,boolean,boolean,boolean,boolean),
   private.reject_square_production_immutable_mutation_v1(),
   private.validate_square_production_runtime_binding_v1(),
   private.record_square_production_lifecycle_audit_v1(),
@@ -981,6 +1055,7 @@ begin
 
   foreach function_name in array array[
     'private.square_production_generation_fingerprint_v1(bigint,text[])',
+    'private.square_production_configuration_fingerprint_v1(bigint,text,text,text,text,text,text,text,text,text,text,text,text,text,text,text,text,text[],text,text,text,text[],text,text,boolean,boolean,boolean,boolean,boolean,boolean,boolean)',
     'private.reject_square_production_immutable_mutation_v1()',
     'private.validate_square_production_runtime_binding_v1()',
     'private.record_square_production_lifecycle_audit_v1()',

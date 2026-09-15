@@ -48,6 +48,14 @@ where relation.relkind='r' and relation.relpersistence='p'
   and relation.relrowsecurity and relation.relforcerowsecurity
   and not relation.relhassubclass),4,
   'every overlay relation is permanent, non-inherited and FORCE RLS');
+select is((select count(*)::integer from pg_catalog.pg_class relation
+  where relation.oid=any(array[
+    'private.integration_production_platform_bindings'::regclass,
+    'private.integration_production_provider_bindings'::regclass,
+    'private.integration_production_provider_secrets'::regclass,
+    'private.integration_production_provider_capabilities'::regclass
+  ]) and relation.relkind='r' and relation.relpersistence='p'),4,
+  'the authenticated provider-neutral foundation contains only permanent relations');
 select is((select count(*)::integer from pg_catalog.pg_inherits inheritance
   where inheritance.inhrelid=any(array[
     'private.square_production_configuration_generations'::regclass,
@@ -88,6 +96,12 @@ select ok(not pg_catalog.has_function_privilege('service_role',
 select ok(not pg_catalog.has_function_privilege('square_production_runtime_authority',
   'private.check_square_production_operational_generation_v1(text,text,text,bigint,text,text)','execute'),
   'dormant runtime authority cannot invoke the shared private generation check');
+select is((select function_record.provolatile||':'||function_record.proisstrict::text||':'||
+    function_record.proparallel||':'||function_record.prosecdef::text
+  from pg_catalog.pg_proc function_record
+  where function_record.oid=
+    'private.square_production_configuration_fingerprint_v1(bigint,text,text,text,text,text,text,text,text,text,text,text,text,text,text,text,text,text[],text,text,text,text[],text,text,boolean,boolean,boolean,boolean,boolean,boolean,boolean)'::regprocedure),
+  'i:true:s:false','typed configuration fingerprint helper is immutable, strict, parallel safe and invoker scoped');
 select is((select count(*)::integer from (values
   ('square_production_oauth_authority','public.check_square_production_oauth_authority_v1(text,text,text,bigint,text)'::regprocedure),
   ('square_production_broker_authority','public.check_square_production_broker_authority_v1(text,text,text,bigint,text)'::regprocedure),
@@ -236,6 +250,37 @@ select 'square','production','vaeroex-integrations-prod',capability,
   case when capability='task_invoker' then null else ('square_production_'||capability)::name end,
   case when capability='task_invoker' then null else 'database_'||capability end
 from unnest(array['broker','evidence','oauth','runtime','scheduler','task_invoker','webhook']::text[]) capability;
+
+update private.integration_production_provider_capabilities
+set service_account='square-broker-drift@vaeroex-integrations-prod.iam.gserviceaccount.com',
+  database_login='square_production_broker_drift',
+  database_secret_purpose='database_evidence'
+where provider_key='square' and environment='production'
+  and project_id='vaeroex-integrations-prod' and capability='broker';
+
+select like(pg_temp.statement_error($sql$
+  insert into private.square_production_runtime_bindings(
+    provider_key,environment,project_id,region,generation,configuration_fingerprint,
+    platform_binding_key,platform_fingerprint,provider_authority_fingerprint,source_commit,bound_at
+  )
+  select configuration.provider_key,configuration.environment,configuration.project_id,configuration.region,
+    configuration.generation,configuration.configuration_fingerprint,platform.binding_key,
+    platform.platform_fingerprint,configuration.provider_authority_fingerprint,configuration.source_commit,
+    '2026-09-15T00:01:00Z'
+  from private.square_production_configuration_generations configuration
+  cross join private.integration_production_platform_bindings platform
+  where configuration.generation=1
+$sql$),'23514:square_production_binding_capabilities_incomplete',
+  'binding rejects drift in the capability service account, database login and secret purpose mapping');
+select is((select count(*)::integer from private.square_production_runtime_bindings),0,
+  'capability mapping rejection leaves no partial runtime binding');
+
+update private.integration_production_provider_capabilities
+set service_account='square-broker@vaeroex-integrations-prod.iam.gserviceaccount.com',
+  database_login='square_production_broker',
+  database_secret_purpose='database_broker'
+where provider_key='square' and environment='production'
+  and project_id='vaeroex-integrations-prod' and capability='broker';
 
 insert into private.square_production_runtime_bindings(
   provider_key,environment,project_id,region,generation,configuration_fingerprint,

@@ -12,6 +12,10 @@ const migrations = fs.readdirSync(migrationDirectory)
   .filter((name) => /^\d+_.+\.sql$/.test(name))
   .sort();
 const overlay = fs.readFileSync(path.join(migrationDirectory, overlayName), "utf8");
+const legacyGuard = fs.readFileSync(
+  path.join(migrationDirectory, "20260915040500_integration_production_legacy_foundation_guard.sql"),
+  "utf8"
+);
 const packageJson = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
 const ci = fs.readFileSync(path.join(root, ".github/workflows/ci.yml"), "utf8");
 const runner = fs.readFileSync(
@@ -46,6 +50,8 @@ assert.match(overlay, /sha256:3326a738d016df98e0fd22830b8c950dac3cc6d50bd26b61de
 assert.match(overlay, /version='20260902191323'/);
 assert.match(overlay, /version <> '20260902191324'/);
 assert.match(overlay, /square_production_overlay_requires_postgresql_17/);
+assert.match(overlay, /relation\.relkind <> 'r' or relation\.relpersistence <> 'p'/,
+  "overlay rejects non-permanent provider-neutral foundation relations");
 assert.match(overlay, /to_regclass\('private\.square_account_configuration'\) is not null/);
 assert.match(overlay, /to_regclass\('private\.square_production_runtime_binding'\) is not null/);
 assert.doesNotMatch(overlay, /create table private\.square_account_/i);
@@ -112,6 +118,29 @@ assert.doesNotMatch(overlay,
 );
 assert.match(overlay, /square_production_binding_secret_references_incomplete/);
 assert.match(overlay, /square_production_binding_capabilities_incomplete/);
+assert.match(overlay, /create function private\.square_production_configuration_fingerprint_v1\(/);
+assert.match(overlay, /language sql\s+immutable\s+strict\s+parallel safe\s+security invoker/);
+const configurationTable = /create table private\.square_production_configuration_generations \([\s\S]*?\n\);/.exec(overlay)?.[0];
+assert.ok(configurationTable, "typed configuration table is present");
+assert.match(configurationTable, /private\.square_production_configuration_fingerprint_v1\(/);
+const generatedConfigurationFingerprint = /configuration_fingerprint text generated always as \([\s\S]*?\n  \) stored,/.exec(configurationTable)?.[0];
+assert.ok(generatedConfigurationFingerprint, "configuration generated expression is present");
+assert.doesNotMatch(generatedConfigurationFingerprint, /array_to_string|::text/,
+  "generated configuration fingerprint delegates all normalization to its immutable typed helper");
+for (const [capability, serviceAccount, databaseLogin, secretPurpose] of [
+  ["broker", "square-broker@vaeroex-integrations-prod.iam.gserviceaccount.com", "square_production_broker", "database_broker"],
+  ["evidence", "square-evidence@vaeroex-integrations-prod.iam.gserviceaccount.com", "square_production_evidence", "database_evidence"],
+  ["oauth", "square-oauth@vaeroex-integrations-prod.iam.gserviceaccount.com", "square_production_oauth", "database_oauth"],
+  ["runtime", "square-runtime@vaeroex-integrations-prod.iam.gserviceaccount.com", "square_production_runtime", "database_runtime"],
+  ["scheduler", "square-scheduler@vaeroex-integrations-prod.iam.gserviceaccount.com", "square_production_scheduler", "database_scheduler"],
+  ["task_invoker", "square-task-invoker@vaeroex-integrations-prod.iam.gserviceaccount.com", "null", "null"],
+  ["webhook", "square-webhook@vaeroex-integrations-prod.iam.gserviceaccount.com", "square_production_webhook", "database_webhook"]
+]) {
+  assert.ok(
+    overlay.includes(`('${capability}','${serviceAccount}',${databaseLogin === "null" ? "null" : `'${databaseLogin}'`},${secretPurpose === "null" ? "null" : `'${secretPurpose}'`})`),
+    `${capability} capability is pinned to its exact service account, database login and secret purpose`
+  );
+}
 assert.match(overlay, /create table private\.square_production_lifecycle_audit_events/);
 const auditTable = /create table private\.square_production_lifecycle_audit_events \([\s\S]*?\n\);/.exec(overlay)?.[0];
 assert.ok(auditTable, "sanitized lifecycle audit table is present");
@@ -132,6 +161,15 @@ for (const capability of ["oauth","broker","scheduler","webhook","runtime","evid
   assert.match(overlay, new RegExp(
     `pg_has_role\\(session_user,'square_production_${capability}_authority','MEMBER'\\)`
   ));
+}
+assert.match(legacyGuard, /dependency\.classid='pg_proc'::regclass/,
+  "later legacy guard recognizes only reviewed function ACL dependencies");
+assert.match(legacyGuard, /relkind <> 'r'[\s\S]*relpersistence <> 'p'[\s\S]*relowner <> marker_owner/,
+  "later legacy guard continues requiring permanent provider-neutral relations");
+for (const capability of ["oauth","broker","scheduler","webhook","runtime","evidence"]) {
+  assert.match(legacyGuard, new RegExp(
+    `when 'square_production_${capability}_authority' then pg_catalog\\.to_regprocedure\\('public\\.check_square_production_${capability}_authority_v1\\(text,text,text,bigint,text\\)'\\)::oid`
+  ), `${capability} authority maps only to its distinct preflight RPC dependency`);
 }
 
 assert.equal(

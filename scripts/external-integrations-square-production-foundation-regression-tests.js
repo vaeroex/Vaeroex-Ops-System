@@ -196,8 +196,8 @@ for (const legacyArtifact of [
 ]) assert.match(legacyGuard, new RegExp(legacyArtifact), `forward guard detects legacy artifact ${legacyArtifact}`);
 assert.match(legacyGuard, /integration_production_legacy_overlay_requires_review/,
   "legacy all-in-one installations stop for a separately reviewed reconciliation");
-assert.match(legacyGuard, /relkind <> 'r'[\s\S]*relowner <> marker_owner[\s\S]*relrowsecurity[\s\S]*relforcerowsecurity/,
-  "forward guard validates retained relation type, owner and FORCE RLS posture");
+assert.match(legacyGuard, /relkind <> 'r'[\s\S]*relpersistence <> 'p'[\s\S]*relowner <> marker_owner[\s\S]*relrowsecurity[\s\S]*relforcerowsecurity/,
+  "forward guard validates retained permanent relation type, owner and FORCE RLS posture");
 assert.match(legacyGuard, /pg_catalog\.pg_inherits[\s\S]*inhrelid=object_name::regclass[\s\S]*inhparent=object_name::regclass/,
   "forward guard rejects inheritance parents and children for retained authority tables");
 assert.match(legacyGuard, /pg_catalog\.pg_rewrite[\s\S]*ev_class=object_name::regclass/,
@@ -219,7 +219,14 @@ assert.match(legacyGuard, /convert_to\(object_record\.prosrc,'UTF8'\)[\s\S]*98a8
 assert.match(legacyGuard, /integration_production_foundation_role_drift/,
   "forward guard revalidates dormant authority role attributes and memberships");
 assert.match(legacyGuard, /pg_catalog\.pg_shdepend[\s\S]*dependency\.classid='pg_namespace'::regclass[\s\S]*dependency\.objid='public'::regnamespace/,
-  "forward guard permits only the reviewed public-schema ACL dependency");
+  "forward guard permits the reviewed public-schema ACL dependency");
+assert.match(legacyGuard, /dependency\.classid='pg_proc'::regclass/,
+  "forward guard can preserve only exact reviewed preflight-function ACL dependencies");
+for (const capability of ["oauth", "broker", "scheduler", "webhook", "runtime", "evidence"]) {
+  assert.match(legacyGuard, new RegExp(
+    `when 'square_production_${capability}_authority' then pg_catalog\\.to_regprocedure\\('public\\.check_square_production_${capability}_authority_v1\\(text,text,text,bigint,text\\)'\\)::oid`
+  ), `forward guard binds ${capability} authority only to its exact preflight RPC dependency`);
+}
 assert.match(legacyGuard, /aclexplode\(public_schema\.nspacl\)[\s\S]*privilege_type='USAGE'[\s\S]*has_schema_privilege\(role_name,'public','CREATE'\)/,
   "forward guard requires exact non-grantable public USAGE without CREATE");
 assert.match(legacyGuard, /jsonb_build_object\([\s\S]*'columns'[\s\S]*'constraints'[\s\S]*'indexes'[\s\S]*'policy_count'[\s\S]*'trigger_count'[\s\S]*0fe4e1c2080fed1725db60ddb1643f4cd2d979a1a261c3445aae54c56788897e/,

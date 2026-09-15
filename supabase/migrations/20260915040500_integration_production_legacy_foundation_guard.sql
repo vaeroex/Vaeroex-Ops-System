@@ -87,11 +87,12 @@ begin
     'private.integration_production_provider_secrets',
     'private.integration_production_provider_capabilities'
   ] loop
-    select relkind,relowner,relrowsecurity,relforcerowsecurity
+    select relkind,relpersistence,relowner,relrowsecurity,relforcerowsecurity
       into strict object_record
     from pg_catalog.pg_class
     where oid=object_name::regclass;
     if object_record.relkind <> 'r'
+      or object_record.relpersistence <> 'p'
       or object_record.relowner <> marker_owner
       or not object_record.relrowsecurity
       or not object_record.relforcerowsecurity
@@ -331,11 +332,24 @@ begin
           and dependency.refobjid=role_record.oid
           and dependency.deptype in ('a','o')
           and not (
-            dependency.deptype='a'
+            dependency.deptype='a' and dependency.objsubid=0
             and dependency.dbid=(select oid from pg_catalog.pg_database where datname=current_database())
-            and dependency.classid='pg_namespace'::regclass
-            and dependency.objid='public'::regnamespace
-            and dependency.objsubid=0
+            and (
+              (
+                dependency.classid='pg_namespace'::regclass
+                and dependency.objid='public'::regnamespace
+              ) or (
+                dependency.classid='pg_proc'::regclass
+                and dependency.objid=case role_name
+                  when 'square_production_oauth_authority' then pg_catalog.to_regprocedure('public.check_square_production_oauth_authority_v1(text,text,text,bigint,text)')::oid
+                  when 'square_production_broker_authority' then pg_catalog.to_regprocedure('public.check_square_production_broker_authority_v1(text,text,text,bigint,text)')::oid
+                  when 'square_production_scheduler_authority' then pg_catalog.to_regprocedure('public.check_square_production_scheduler_authority_v1(text,text,text,bigint,text)')::oid
+                  when 'square_production_webhook_authority' then pg_catalog.to_regprocedure('public.check_square_production_webhook_authority_v1(text,text,text,bigint,text)')::oid
+                  when 'square_production_runtime_authority' then pg_catalog.to_regprocedure('public.check_square_production_runtime_authority_v1(text,text,text,bigint,text)')::oid
+                  when 'square_production_evidence_authority' then pg_catalog.to_regprocedure('public.check_square_production_evidence_authority_v1(text,text,text,bigint,text)')::oid
+                end
+              )
+            )
           )
       )
       or 1 <> (
