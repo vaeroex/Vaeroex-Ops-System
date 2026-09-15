@@ -10,6 +10,7 @@ const sourcePath = path.join(root, "lib/integrations/control-plane/square-produc
 const migrationPath = path.join(root, "supabase/migrations/20260912190000_square_production_runtime_foundation.sql");
 const migration = fs.readFileSync(migrationPath, "utf8");
 const ciWorkflow = fs.readFileSync(path.join(root, ".github/workflows/ci.yml"), "utf8");
+const activationReadme = fs.readFileSync(path.join(root, "services/external-integrations-production/infra/activation/README.md"), "utf8");
 const evidenceDatabaseTest = fs.readFileSync(path.join(root, "scripts/square-workspace-evidence-database-tests.js"), "utf8");
 const fixtureRichMigrationTest = fs.readFileSync(path.join(root, "scripts/run-phase8b-zero-based-delivery-migration-tests.js"), "utf8");
 
@@ -152,6 +153,8 @@ assert.ok(migration.trimEnd().endsWith("commit;"), "the self-contained foundatio
 
 assert.match(ciWorkflow, /run: pnpm test:external-integrations-square-production-foundation/,
   "CI executes the provider-neutral and Square Production runtime regressions");
+assert.match(activationReadme, /must not already record version `20260912190000`[\s\S]*stop and ship a separately reviewed additive reconciliation/,
+  "activation fails closed if any target has already recorded the superseded all-in-one migration");
 assert.match(fixtureRichMigrationTest, /\["127\.0\.0\.1", "localhost"\]\.includes\(parsed\.hostname\)/,
   "fixture-rich role mutation remains restricted to disposable local Supabase");
 assert.match(fixtureRichMigrationTest, /parsed\.username = "supabase_admin"/,
