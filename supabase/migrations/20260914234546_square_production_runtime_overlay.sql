@@ -24,10 +24,18 @@ begin
   if shared_fingerprint_proc.provolatile<>'i' or not shared_fingerprint_proc.proisstrict or
      shared_fingerprint_proc.proparallel<>'s' or shared_fingerprint_proc.prosecdef or
      (shared_fingerprint_proc.proconfig<>array['search_path=']::text[] and
-       shared_fingerprint_proc.proconfig<>array['search_path=""']::text[]) or
-     pg_catalog.regexp_replace(pg_catalog.btrim(shared_fingerprint_proc.prosrc),'[[:space:]]+',' ','g')<>
-       'select ''sha256:''||pg_catalog.encode( extensions.digest( pg_catalog.convert_to( pg_catalog.string_agg( pg_catalog.length(part)::text||'':''||part, '''' order by ordinal ), ''UTF8'' ), ''sha256'' ), ''hex'' ) from pg_catalog.unnest(p_parts) with ordinality as ordered_parts(part,ordinal)' or
-     exists(select 1
+       shared_fingerprint_proc.proconfig<>array['search_path=""']::text[]) then
+    raise exception using
+      errcode='55000',
+      message='square_production_runtime_overlay_shared_foundation_attributes_drifted';
+  end if;
+  if pg_catalog.regexp_replace(pg_catalog.btrim(shared_fingerprint_proc.prosrc),'[[:space:]]+',' ','g')<>
+     'select ''sha256:''||pg_catalog.encode( extensions.digest( pg_catalog.convert_to( pg_catalog.string_agg( pg_catalog.length(part)::text||'':''||part, '''' order by ordinal ), ''UTF8'' ), ''sha256'' ), ''hex'' ) from pg_catalog.unnest(p_parts) with ordinality as ordered_parts(part,ordinal)' then
+    raise exception using
+      errcode='55000',
+      message='square_production_runtime_overlay_shared_foundation_definition_drifted';
+  end if;
+  if exists(select 1
        from pg_catalog.unnest(array[
          'anon','authenticated','service_role',
          'square_production_oauth_authority','square_production_broker_authority',
@@ -41,7 +49,7 @@ begin
        )) then
     raise exception using
       errcode='55000',
-      message='square_production_runtime_overlay_shared_foundation_drifted';
+      message='square_production_runtime_overlay_shared_foundation_acl_drifted';
   end if;
 
   select
