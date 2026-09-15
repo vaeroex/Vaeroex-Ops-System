@@ -4,7 +4,9 @@ import test from "node:test";
 import {
   CallbackBoundaryError,
   evaluateSquareProductionCallback,
+  SQUARE_BACKEND_MAX_HEADER_COUNT,
   SQUARE_CALLBACK_PATH,
+  SQUARE_EDGE_INPUT_MAX_HEADER_COUNT,
   SQUARE_HANDOFF_VERSION,
   SQUARE_PRODUCTION_HOST,
 } from "./callback-boundary.mjs";
@@ -16,6 +18,10 @@ const authorizedQuery = `state=${state}&code=synthetic-code`;
 
 function encodeQuery(query) {
   return Buffer.from(query, "utf8").toString("base64url");
+}
+
+function paddingHeaders(count) {
+  return Array.from({ length: count }, (_, index) => [`x-vaeroex-padding-${index}`, "x"]).flat();
 }
 
 function request(extra = [], overrides = {}, query = authorizedQuery) {
@@ -66,6 +72,26 @@ test("accepts one exact edge handoff and atomically rejects replay", async () =>
     generation: 7,
   });
   await rejected(request(), stateAuthority);
+});
+
+test("accepts the 64-header edge envelope plus two handoff headers and rejects a 67th backend header", async () => {
+  assert.equal(SQUARE_EDGE_INPUT_MAX_HEADER_COUNT, 64);
+  assert.equal(SQUARE_BACKEND_MAX_HEADER_COUNT, 66);
+
+  // The request fixture already has four backend headers, including the two
+  // headers appended by the edge. Add 62 ordinary inputs to exercise all 66.
+  assert.deepEqual(await evaluateSquareProductionCallback(request(paddingHeaders(62)), authority()), {
+    kind: "authorized",
+    authorizationCode: "synthetic-code",
+    generation: 7,
+  });
+
+  let calls = 0;
+  await rejected(request(paddingHeaders(63)), {
+    now: () => nowMs,
+    consumeState: async () => { calls++; return null; },
+  });
+  assert.equal(calls, 0);
 });
 
 test("accepts the optional exact code response type", async () => {

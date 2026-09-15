@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/base64"
+	"fmt"
 	"testing"
 
 	callbackedge "vaeroex.local/square-oauth-callback-edge"
@@ -40,6 +41,42 @@ func TestManagedHeaderEventForwardsExactEncodedQueryAndClearsForgedHandoffs(t *t
 		string(decoded) != rawQuery || headers[callbackedge.HandoffStateHeader] != "" ||
 		headers[callbackedge.HandoffCodeHeader] != "" {
 		t.Fatalf("unexpected bounded query handoff: %#v", headers)
+	}
+}
+
+func TestManagedHeaderEventBounds64InputsBeforeAppendingTwoHandoffHeaders(t *testing.T) {
+	rawQuery := "state=" + validStateFixture + "&code=synthetic-code"
+	headers := [][2]string{
+		{":method", "GET"},
+		{":path", callbackedge.CallbackPath + "?redacted-at-edge"},
+		{"host", "square.vaeroex.com"},
+		{"content-length", "0"},
+	}
+	for len(headers) < callbackedge.MaxInputHeaderCount {
+		headers = append(headers, [2]string{fmt.Sprintf("x-vaeroex-padding-%d", len(headers)), "x"})
+	}
+
+	host, reset := newCallbackHost("GET", callbackedge.CallbackPath, rawQuery)
+	contextID := host.InitializeHttpContext()
+	action := host.CallOnRequestHeaders(contextID, headers, false)
+	if action != types.ActionContinue || host.GetSentLocalResponse(contextID) != nil {
+		reset()
+		t.Fatalf("expected exactly %d edge input headers to continue", callbackedge.MaxInputHeaderCount)
+	}
+	forwarded := host.GetCurrentRequestHeaders(contextID)
+	if len(forwarded) != callbackedge.MaxInputHeaderCount+2 {
+		reset()
+		t.Fatalf("expected exactly two trusted handoff headers, got %d total headers", len(forwarded))
+	}
+	reset()
+
+	host, reset = newCallbackHost("GET", callbackedge.CallbackPath, rawQuery)
+	defer reset()
+	contextID = host.InitializeHttpContext()
+	action = host.CallOnRequestHeaders(contextID, append(headers, [2]string{"x-vaeroex-over-limit", "x"}), false)
+	response := host.GetSentLocalResponse(contextID)
+	if action != types.ActionPause || response == nil || response.StatusCode != 400 {
+		t.Fatalf("expected a 65th edge input header to fail closed, got %v %#v", action, response)
 	}
 }
 

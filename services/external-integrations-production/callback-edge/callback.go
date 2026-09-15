@@ -11,7 +11,7 @@ const (
 	WebhookPath           = "/api/integrations/square/webhook"
 	HealthPath            = "/healthz"
 	HandoffVersion        = "square_oauth_callback_handoff_v1"
-	MaxHeaderCount        = 64
+	MaxInputHeaderCount   = 64
 	MaxRawQueryBytes      = 8192
 	MaxRequestTargetBytes = len(CallbackPath) + 1 + MaxRawQueryBytes
 	HandoffVersionHeader  = "x-vaeroex-oauth-handoff-version"

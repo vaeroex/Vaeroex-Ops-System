@@ -195,16 +195,19 @@ assert.equal(
 );
 assert.equal(
   createHash("sha256").update(serverSource).digest("hex"),
-  "13fa6359e56554efcdfd1b2238d4c7015f8048fd9538986dbd4c69043d5c6457",
+  "622d6601ec2cab851a802d307cfa9dc6da6f75dbe8aa85de03087590dac8a5ed",
   "every executable bootstrap server change requires an explicit reviewed fingerprint update",
 );
 assert.equal(
   createHash("sha256").update(callbackBoundarySource).digest("hex"),
-  "4951013cfb7575ffe5a15571a0ad2257eb1d447ea1cd29bd7950911306f8f148",
+  "dcad858b2abd699ee64f0b2b566a3d70f818fad2ceb3e2fbeee252efb673a69a",
   "every executable callback boundary change requires an explicit reviewed fingerprint update",
 );
 assert.deepEqual(bootstrapPackage.dependencies ?? {}, {}, "the bootstrap has no runtime package dependency that could add compression");
 assert.match(callbackBoundarySource, /SQUARE_PRODUCTION_HOST = "square\.vaeroex\.com"/, "the backend accepts only the exact Production TLS host");
+assert.match(callbackBoundarySource, /SQUARE_EDGE_INPUT_MAX_HEADER_COUNT = 64/, "the edge input envelope is explicitly bounded at 64 headers");
+assert.match(callbackBoundarySource, /SQUARE_BACKEND_MAX_HEADER_COUNT = SQUARE_EDGE_INPUT_MAX_HEADER_COUNT \+ 2/, "the backend admits only the edge envelope plus its two trusted handoff headers");
+assert.match(serverSource, /server\.maxHeadersCount = SQUARE_BACKEND_MAX_HEADER_COUNT/, "the Node parser and callback boundary share the exact 66-header cap");
 assert.match(callbackBoundarySource, /input\.method !== "GET" \|\| input\.url !== SQUARE_CALLBACK_PATH/, "the backend independently requires the exact queryless GET callback route");
 assert.match(callbackBoundarySource, /\["forwarded", "x-forwarded-host", "x-original-url", "x-rewrite-url"\]/, "forwarded authority cannot select the Production callback backend");
 assert.match(callbackBoundarySource, /csrfVerified !== true[\s\S]*currentGeneration !== value\.generation[\s\S]*expiresAtMs <= nowMs[\s\S]*consumedAtMs !== nowMs/, "state consumption binds CSRF, current generation, expiry, and first-use time");

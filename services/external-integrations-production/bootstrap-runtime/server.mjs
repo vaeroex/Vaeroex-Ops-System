@@ -1,5 +1,9 @@
 import http from "node:http";
-import { evaluateSquareProductionCallback, SQUARE_CALLBACK_PATH } from "./callback-boundary.mjs";
+import {
+  evaluateSquareProductionCallback,
+  SQUARE_BACKEND_MAX_HEADER_COUNT,
+  SQUARE_CALLBACK_PATH,
+} from "./callback-boundary.mjs";
 
 const port = Number.parseInt(process.env.PORT ?? "8080", 10);
 const sourceCommit = process.env.VAEROEX_SOURCE_COMMIT ?? "unbound";
@@ -43,7 +47,7 @@ const server = http.createServer(async (request, response) => {
 server.requestTimeout = 15_000;
 server.headersTimeout = 10_000;
 server.keepAliveTimeout = 5_000;
-server.maxHeadersCount = 32;
+server.maxHeadersCount = SQUARE_BACKEND_MAX_HEADER_COUNT;
 
 server.listen(port, "0.0.0.0");
 

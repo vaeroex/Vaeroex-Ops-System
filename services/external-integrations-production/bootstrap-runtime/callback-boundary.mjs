@@ -3,8 +3,9 @@ import { createHash, timingSafeEqual } from "node:crypto";
 export const SQUARE_PRODUCTION_HOST = "square.vaeroex.com";
 export const SQUARE_CALLBACK_PATH = "/api/integrations/square/callback";
 export const SQUARE_HANDOFF_VERSION = "square_oauth_callback_handoff_v1";
+export const SQUARE_EDGE_INPUT_MAX_HEADER_COUNT = 64;
+export const SQUARE_BACKEND_MAX_HEADER_COUNT = SQUARE_EDGE_INPUT_MAX_HEADER_COUNT + 2;
 
-const MAX_HEADER_COUNT = 64;
 const MAX_RAW_QUERY_BYTES = 8_192;
 const STATE_PATTERN = /^(?:r1_)?[A-Za-z0-9_-]{43}$/;
 const CODE_PATTERN = /^[\x21-\x7e]{1,191}$/;
@@ -26,7 +27,7 @@ function reject() {
 }
 
 function exactRawHeaders(rawHeaders) {
-  if (!Array.isArray(rawHeaders) || rawHeaders.length % 2 !== 0 || rawHeaders.length / 2 > MAX_HEADER_COUNT) reject();
+  if (!Array.isArray(rawHeaders) || rawHeaders.length % 2 !== 0 || rawHeaders.length / 2 > SQUARE_BACKEND_MAX_HEADER_COUNT) reject();
   const values = new Map();
   for (let index = 0; index < rawHeaders.length; index += 2) {
     const rawName = rawHeaders[index], value = rawHeaders[index + 1];

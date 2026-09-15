@@ -27,7 +27,7 @@ func (*httpContext) OnHttpRequestHeaders(headerCount int, _ bool) (action types.
 			sendFixedResponse(500, "integration callback unavailable")
 		}
 	}()
-	if headerCount > callbackedge.MaxHeaderCount {
+	if headerCount > callbackedge.MaxInputHeaderCount {
 		sendFixedResponse(400, "invalid integration request")
 		return action
 	}
@@ -54,7 +54,7 @@ func (*httpContext) OnHttpRequestHeaders(headerCount int, _ bool) (action types.
 	// bodies to the plugin. Its callback flag is therefore not body evidence.
 	// Reject every forwarded HTTP body indicator instead.
 	headers, headersError := proxywasm.GetHttpRequestHeaders()
-	if headersError != nil || len(headers) > callbackedge.MaxHeaderCount {
+	if headersError != nil || len(headers) > callbackedge.MaxInputHeaderCount {
 		sendFixedResponse(400, "invalid integration callback")
 		return action
 	}
