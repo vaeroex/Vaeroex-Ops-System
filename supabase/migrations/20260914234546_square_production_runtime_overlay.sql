@@ -25,18 +25,34 @@ begin
      shared_fingerprint_proc.proparallel<>'s' or shared_fingerprint_proc.prosecdef or
      shared_fingerprint_proc.prolang<>(select oid from pg_catalog.pg_language where lanname='sql') or
      shared_fingerprint_proc.prorettype<>'text'::regtype or shared_fingerprint_proc.proretset or
-     (shared_fingerprint_proc.proconfig<>array['search_path=']::text[] and
-       shared_fingerprint_proc.proconfig<>array['search_path=""']::text[]) then
+     shared_fingerprint_proc.proowner<>(select relowner from pg_catalog.pg_class
+       where oid='private.integration_production_provider_bindings'::regclass) or
+     (shared_fingerprint_proc.proconfig is distinct from array['search_path=']::text[] and
+       shared_fingerprint_proc.proconfig is distinct from array['search_path=""']::text[]) then
     raise exception using
       errcode='55000',
       message='square_production_runtime_overlay_shared_foundation_attributes_drifted';
   end if;
-  if private.integration_production_fingerprint_v1(array['a','bc'])<>
+  if private.integration_production_fingerprint_v1(array['a','bc']) is distinct from
        'sha256:5310a58788781ab25d5ad7c3f85035824b4eb7bdfa394e0ac2186271472b5492' or
-     private.integration_production_fingerprint_v1(array['ab','c'])<>
+     private.integration_production_fingerprint_v1(array['ab','c']) is distinct from
        'sha256:430fb1b4ac43316eca81fab27a1930ab8eff8fef6a1dc7903dce44bbc2790dc5' or
-     private.integration_production_fingerprint_v1(array['😀','é'])<>
-       'sha256:593164a79cde1d1952d300c7b69debdd616ca5be29a3acd918edc768cda6a719' then
+     private.integration_production_fingerprint_v1(array['😀','é']) is distinct from
+       'sha256:593164a79cde1d1952d300c7b69debdd616ca5be29a3acd918edc768cda6a719' or
+     private.integration_production_fingerprint_v1(array[
+       'square','production','sq0idp-Authority_App',
+       'https://square.vaeroex.com/api/integrations/square/callback',
+       'projects/vaeroex-integrations-prod/locations/us-west1/keyRings/integration-production/cryptoKeys/square'
+     ]) is distinct from
+       'sha256:92e720a00023fd7fcfc813e41d43db2339591f8bfabd0da3292e465f7159d34a' or
+     private.integration_production_fingerprint_v1(array[
+       'production','sq0idp-Authority_App',
+       'https://square.vaeroex.com/api/integrations/square/callback',
+       'square_production_broker_login','square_production_enrollment_login',
+       'square_production_webhook_login',
+       'projects/vaeroex-integrations-prod/locations/us-west1/keyRings/integration-production/cryptoKeys/square'
+     ]) is distinct from
+       'sha256:8e1b2ec3f53655304d7ed20ae67243fd8b8f1e8ad846148d7ce617006e5df1f0' then
     raise exception using
       errcode='55000',
       message='square_production_runtime_overlay_shared_foundation_semantics_drifted';

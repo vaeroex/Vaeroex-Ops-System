@@ -153,6 +153,16 @@ assert.match(overlay, /integration_production_fingerprint_v1\(text\[\]\)'::regpr
 assert.match(overlay, /array\['a','bc'\]/);
 assert.match(overlay, /array\['ab','c'\]/);
 assert.match(overlay, /array\['😀','é'\]/);
+assert.match(overlay, /shared_fingerprint_proc\.proowner<>\(select relowner/,
+  "the shared helper must remain owned by the provider-authority table owner");
+assert.match(overlay, /proconfig is distinct from array\['search_path='\]/,
+  "a NULL or altered function configuration must fail closed");
+assert.match(overlay, /integration_production_fingerprint_v1\(array\[[\s\S]*'square','production','sq0idp-Authority_App'[\s\S]*is distinct from[\s\S]*92e720a00023fd7fcfc813e41d43db2339591f8bfabd0da3292e465f7159d34a/,
+  "the semantic oracle covers the complete five-part provider authority shape");
+assert.match(overlay, /integration_production_fingerprint_v1\(array\[[\s\S]*'square_production_webhook_login'[\s\S]*is distinct from[\s\S]*8e1b2ec3f53655304d7ed20ae67243fd8b8f1e8ad846148d7ce617006e5df1f0/,
+  "the semantic oracle covers the complete seven-part Square configuration shape");
+assert.doesNotMatch(overlay, /integration_production_fingerprint_v1\([^;]*\)<>\s*'sha256:/,
+  "semantic probes reject NULL results with NULL-safe comparisons");
 assert.match(overlay, /to_regclass\('private\.integration_production_provider_bindings'\)/);
 assert.match(overlay, /to_regclass\('private\.square_account_configuration'\)/);
 assert.match(overlay, /rolname='square_production_runtime_authority'/);
