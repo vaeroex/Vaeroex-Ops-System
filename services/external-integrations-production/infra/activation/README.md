@@ -24,7 +24,7 @@ Secret Manager grants are provider- and runtime-specific and are conditional on 
 8. Apply the runtime/LB plan while gates remain closed. Configure DNS only after the managed-certificate target is verified.
 9. Verify exact TLS host routing, direct Cloud Run denial, alternate-host denial, rate limiting, disabled endpoints, log retention, rollback and alert delivery.
 10. Independently verify the canonical Production database ledger and existing Supabase Pro backup coverage before applying only `20260912190000_square_production_runtime_foundation.sql`. That migration is deliberately provider-neutral and self-contained on the current Production baseline.
-11. Keep `20260914234546_square_production_runtime_overlay.sql` unapplied until the complete Square lifecycle schema is separately present and qualified. The overlay fails before mutation when either its shared foundation or `private.square_account_configuration` prerequisite is absent.
+11. Add a separately reviewed Square runtime overlay only after the complete Square lifecycle schema is present and qualified; no Square-specific overlay is part of this foundation migration.
 12. Create the exact six LOGIN-to-capability-role bindings using a separately reviewed, password-private operation. Do not grant table access. Deliver each numbered database credential only to its matching secret and identity.
 13. Keep Square credentials absent and provider calls, onboarding, webhook intake, evidence, economics and AI dispatch closed until their individual activation gates pass.
 

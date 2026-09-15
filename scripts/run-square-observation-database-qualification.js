@@ -16,22 +16,19 @@ async function qualify(runtime) {
     "20260911222230_square_workspace_evidence.sql",
     "20260912034447_square_workspace_card_contract.sql",
     "20260912150000_square_operational_intelligence.sql",
-    "20260912190000_square_production_runtime_foundation.sql",
-    "20260914234546_square_production_runtime_overlay.sql"
+    "20260912190000_square_production_runtime_foundation.sql"
   ];
-  eq(files.length,117,"full canonical chain, including dormant Square Production foundation and overlay");
+  eq(files.length,116,"full canonical chain, including dormant Square Production foundation");
   eq(files.slice(-additiveSquareTail.length).map(file=>require("node:path").basename(file)),additiveSquareTail,
     "observation qualification pins the exact additive Square interpretation and foundation tail");
-  const interpretationTail=files.slice(-additiveSquareTail.length,-2);
-  const productionFoundation=files.slice(-2,-1);
-  const productionOverlay=files.slice(-1);
+  const interpretationTail=files.slice(-additiveSquareTail.length,-1);
+  const productionFoundation=files.slice(-1);
   stage="migrations";
   await runtime.applyMigrations(c,files.slice(0,-additiveSquareTail.length));
   const schemaBefore=await runtime.sourceSchemaFingerprint(c);
   await runtime.applyMigrations(c,interpretationTail);
   eq(await runtime.sourceSchemaFingerprint(c),schemaBefore,"Square interpretation migrations preserve canonical/QBO schema");
   await runtime.applyMigrations(c,productionFoundation);
-  await runtime.applyMigrations(c,productionOverlay);
   const installedSchema=await runtime.sourceSchemaFingerprint(c);
   const genericCounts=async()=>{const counts={};for(const table of ["external_source_records","external_source_record_versions","canonical_business_facts","canonical_business_fact_versions","business_fact_sources","fact_contribution_batches","fact_contribution_events"])counts[table]=(await c.query(`select count(*)::int n from private.${table}`)).rows[0].n;return counts;};
   const genericBefore=await genericCounts();
