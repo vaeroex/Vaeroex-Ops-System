@@ -6,6 +6,8 @@
 begin;
 
 do $prerequisites$
+declare
+  existing_objects integer;
 begin
   if pg_catalog.to_regclass('private.integration_production_provider_bindings') is null or
      pg_catalog.to_regclass('private.square_account_configuration') is null or
@@ -14,13 +16,28 @@ begin
       errcode='55000',
       message='square_production_runtime_overlay_prerequisite_missing';
   end if;
+
+  select
+    (pg_catalog.to_regprocedure('private.square_production_configuration_fingerprint_v1(text,text,text,name,name,name,text)') is not null)::integer +
+    exists(select 1 from pg_catalog.pg_attribute where attrelid='private.square_account_configuration'::regclass and attname='square_production_binding_fingerprint' and not attisdropped)::integer +
+    exists(select 1 from pg_catalog.pg_attribute where attrelid='private.square_account_configuration'::regclass and attname='square_production_authority_fingerprint' and not attisdropped)::integer +
+    exists(select 1 from pg_catalog.pg_constraint where conrelid='private.square_account_configuration'::regclass and conname='square_account_configuration_production_fingerprint_check')::integer +
+    (pg_catalog.to_regclass('private.square_account_configuration_production_binding_idx') is not null)::integer +
+    (pg_catalog.to_regclass('private.square_production_runtime_binding') is not null)::integer
+  into existing_objects;
+
+  if existing_objects not in (0,6) then
+    raise exception using
+      errcode='55000',
+      message='square_production_runtime_overlay_partial_or_drifted';
+  end if;
 end
 $prerequisites$;
 
 -- The lifecycle configuration stores checked login names in PostgreSQL's name
 -- type. Keep their conversions inside this immutable helper so generated-column
 -- validation sees one immutable call and the fingerprint tracks the stored tuple.
-create function private.square_production_configuration_fingerprint_v1(
+create or replace function private.square_production_configuration_fingerprint_v1(
   p_environment text,
   p_application_id text,
   p_redirect_uri text,
@@ -53,21 +70,29 @@ revoke all on function private.square_production_configuration_fingerprint_v1(te
   square_production_scheduler_authority,square_production_webhook_authority,
   square_production_runtime_authority,square_production_evidence_authority;
 
-alter table private.square_account_configuration add column square_production_binding_fingerprint text
+alter table private.square_account_configuration add column if not exists square_production_binding_fingerprint text
   generated always as (private.square_production_configuration_fingerprint_v1(
     environment,application_id,redirect_uri,broker_login,enrollment_login,webhook_login,kms_key_resource
   )) stored;
-alter table private.square_account_configuration add column square_production_authority_fingerprint text
+alter table private.square_account_configuration add column if not exists square_production_authority_fingerprint text
   generated always as (private.integration_production_fingerprint_v1(array[
     'square',environment,application_id,redirect_uri,kms_key_resource
   ])) stored;
-alter table private.square_account_configuration add constraint square_account_configuration_production_fingerprint_check
-  check(square_production_binding_fingerprint ~ '^sha256:[a-f0-9]{64}$'
-    and square_production_authority_fingerprint ~ '^sha256:[a-f0-9]{64}$');
-create unique index square_account_configuration_production_binding_idx
+do $constraint$
+begin
+  if not exists(select 1 from pg_catalog.pg_constraint
+    where conrelid='private.square_account_configuration'::regclass
+      and conname='square_account_configuration_production_fingerprint_check') then
+    alter table private.square_account_configuration add constraint square_account_configuration_production_fingerprint_check
+      check(square_production_binding_fingerprint ~ '^sha256:[a-f0-9]{64}$'
+        and square_production_authority_fingerprint ~ '^sha256:[a-f0-9]{64}$');
+  end if;
+end
+$constraint$;
+create unique index if not exists square_account_configuration_production_binding_idx
   on private.square_account_configuration(environment,square_production_authority_fingerprint,square_production_binding_fingerprint);
 
-create table private.square_production_runtime_binding (
+create table if not exists private.square_production_runtime_binding (
   provider_key text not null default 'square' check(provider_key='square'),
   environment text not null default 'production' check(environment='production'),
   application_id text not null check(application_id ~ '^sq0idp-[A-Za-z0-9_-]+$'),
@@ -102,5 +127,55 @@ revoke all on table private.square_production_runtime_binding from public,anon,a
   square_production_oauth_authority,square_production_broker_authority,
   square_production_scheduler_authority,square_production_webhook_authority,
   square_production_runtime_authority,square_production_evidence_authority;
+
+do $validated$
+declare
+  fingerprint_proc pg_catalog.pg_proc;
+  binding_column pg_catalog.pg_attribute;
+  authority_column pg_catalog.pg_attribute;
+begin
+  select * into strict fingerprint_proc from pg_catalog.pg_proc
+    where oid='private.square_production_configuration_fingerprint_v1(text,text,text,name,name,name,text)'::regprocedure;
+  select * into strict binding_column from pg_catalog.pg_attribute
+    where attrelid='private.square_account_configuration'::regclass
+      and attname='square_production_binding_fingerprint' and not attisdropped;
+  select * into strict authority_column from pg_catalog.pg_attribute
+    where attrelid='private.square_account_configuration'::regclass
+      and attname='square_production_authority_fingerprint' and not attisdropped;
+
+  if fingerprint_proc.provolatile<>'i' or not fingerprint_proc.proisstrict or
+     fingerprint_proc.proparallel<>'s' or fingerprint_proc.prosecdef or
+     fingerprint_proc.proconfig<>array['search_path=']::text[] and
+       fingerprint_proc.proconfig<>array['search_path=""']::text[] or
+     binding_column.atttypid<>'text'::regtype or binding_column.attgenerated<>'s' or
+     authority_column.atttypid<>'text'::regtype or authority_column.attgenerated<>'s' or
+     not exists(select 1 from pg_catalog.pg_constraint
+       where conrelid='private.square_account_configuration'::regclass
+         and conname='square_account_configuration_production_fingerprint_check'
+         and contype='c' and convalidated) or
+     not exists(select 1 from pg_catalog.pg_index
+       where indexrelid='private.square_account_configuration_production_binding_idx'::regclass
+         and indrelid='private.square_account_configuration'::regclass
+         and indisunique and indisvalid and indislive) or
+     not exists(select 1 from pg_catalog.pg_class
+       where oid='private.square_production_runtime_binding'::regclass
+         and relkind='r' and relrowsecurity and relforcerowsecurity) or
+     4<>(select count(*) from pg_catalog.pg_constraint
+       where conrelid='private.square_production_runtime_binding'::regclass
+         and conname in (
+           'square_production_runtime_binding_pkey',
+           'square_production_runtime_binding_provider_key_environment_fkey',
+           'square_production_runtime_binding_provider_key_environment_prov',
+           'square_production_runtime_binding_configuration_fkey'
+         ) and contype in ('p','f') and convalidated) or
+     pg_catalog.has_table_privilege('anon','private.square_production_runtime_binding','select,insert,update,delete') or
+     pg_catalog.has_table_privilege('authenticated','private.square_production_runtime_binding','select,insert,update,delete') or
+     pg_catalog.has_table_privilege('service_role','private.square_production_runtime_binding','select,insert,update,delete') then
+    raise exception using
+      errcode='55000',
+      message='square_production_runtime_overlay_partial_or_drifted';
+  end if;
+end
+$validated$;
 
 commit;

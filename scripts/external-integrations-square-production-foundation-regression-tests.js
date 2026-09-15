@@ -145,6 +145,7 @@ assert.ok(migration.trimStart().startsWith("-- Closed-by-default Production Inte
 assert.ok(migration.trimEnd().endsWith("commit;"), "the self-contained foundation is one explicit transaction");
 
 assert.match(overlay, /square_production_runtime_overlay_prerequisite_missing/);
+assert.match(overlay, /square_production_runtime_overlay_partial_or_drifted/);
 assert.match(overlay, /to_regclass\('private\.integration_production_provider_bindings'\)/);
 assert.match(overlay, /to_regclass\('private\.square_account_configuration'\)/);
 assert.match(overlay, /rolname='square_production_runtime_authority'/);
@@ -161,8 +162,16 @@ assert.doesNotMatch(overlay, /grant (?:select|insert|update|delete|all) on table
 assert.doesNotMatch(overlay, /create role\s+\w+\s+login/i);
 assert.doesNotMatch(overlay, /squareupsandbox|oysjpoondtcrqpghhrbd|sandbox-sq0idb/i);
 assert.doesNotMatch(overlay, /create table private\.integration_production_(?:platform_bindings|provider_bindings|provider_secrets|provider_capabilities)/);
+assert.match(overlay, /create or replace function private\.square_production_configuration_fingerprint_v1/);
+assert.match(overlay, /add column if not exists square_production_binding_fingerprint/);
+assert.match(overlay, /create unique index if not exists square_account_configuration_production_binding_idx/);
+assert.match(overlay, /create table if not exists private\.square_production_runtime_binding/);
+assert.match(overlay, /existing_objects not in \(0,6\)/,
+  "the overlay accepts only a fresh install or the complete legacy all-in-one shape");
+assert.match(overlay, /relrowsecurity and relforcerowsecurity/);
+assert.match(overlay, /has_table_privilege\('service_role','private\.square_production_runtime_binding'/);
 assert.ok(overlay.indexOf("square_production_runtime_overlay_prerequisite_missing") <
-  overlay.indexOf("create function private.square_production_configuration_fingerprint_v1"),
+  overlay.indexOf("create or replace function private.square_production_configuration_fingerprint_v1"),
 "the overlay validates every prerequisite before its first durable mutation");
 assert.ok(overlay.trimEnd().endsWith("commit;"), "the prerequisite gate and Square overlay are one explicit transaction");
 assert.match(ciWorkflow, /run: pnpm test:external-integrations-square-production-foundation/,
