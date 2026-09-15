@@ -1,0 +1,54 @@
+{
+  "contractVersion": "square_production_internal_seller_pilot_evidence_v1",
+  "sourceCommit": "6b5ccc4513150312e5c3a1dbcce81fab111571e7",
+  "projectId": "vaeroex-integrations-prod",
+  "region": "us-west1",
+  "hostname": "square.vaeroex.com",
+  "callbackUrl": "https://square.vaeroex.com/api/integrations/square/callback",
+  "webhookUrl": "https://square.vaeroex.com/api/integrations/square/webhook",
+  "database": {
+    "ledgerHead": "20260902191323",
+    "foundationApplied": true,
+    "squareOverlayApplied": false,
+    "loginBindingsVerified": false,
+    "directTablePrivilegesAbsent": true
+  },
+  "callbackLayerQualified": false,
+  "credentialVersionsPresent": {
+    "application": false,
+    "webhookSignature": false,
+    "databaseOauth": false,
+    "databaseBroker": false,
+    "databaseScheduler": false,
+    "databaseWebhook": false,
+    "databaseRuntime": false,
+    "databaseEvidence": false
+  },
+  "activationGates": {
+    "runtimeEnabled": false,
+    "providerCallsEnabled": false,
+    "customerOnboardingEnabled": false,
+    "webhookIntakeEnabled": false,
+    "evidenceEnabled": false,
+    "economicContributionsEnabled": false,
+    "aiDispatchEnabled": false
+  },
+  "pilotAllowlist": [],
+  "operationalChecks": {
+    "callbackHealthAlert": false,
+    "signatureFailureAlert": false,
+    "credentialRefreshAlert": false,
+    "providerAuthAlert": false,
+    "rateLimitAlert": false,
+    "providerServerErrorAlert": false,
+    "taskAgeRetryDeadLetterAlert": false,
+    "staleIncompleteSyncAlert": false,
+    "backupFailureAlert": false,
+    "primaryAndBackupAlertDelivery": false,
+    "backupReadback": false,
+    "restoreDrill": false,
+    "rollbackDrill": false,
+    "incidentContacts": false,
+    "productionWorkspaceReadback": false
+  }
+}
