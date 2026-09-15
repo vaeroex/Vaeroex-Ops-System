@@ -33,8 +33,14 @@ async function qualify(runtime) {
   await runtime.applyMigrations(c,additiveSquareTail);
   await runtime.applyMigrations(c,productionCompatibility);
   eq(await runtime.sourceSchemaFingerprint(c),schemaBefore,"Square interpretation and compatibility guards preserve canonical/QBO schema");
-  await c.query("create table private.square_production_runtime_binding(legacy_marker integer)");
+  await c.query("drop function private.integration_production_foundation_split_marker_v1()");
   let legacyGuardError;
+  try { await runtime.applyMigrations(c,[productionCompatibility.at(-1)]); }
+  catch (error) { legacyGuardError=error; }
+  eq(legacyGuardError?.code,"55000","a previously recorded all-in-one migration fails without the split marker");
+  await runtime.applyMigrations(c,[productionCompatibility.at(0)]);
+  await c.query("create table private.square_production_runtime_binding(legacy_marker integer)");
+  legacyGuardError=undefined;
   try { await runtime.applyMigrations(c,[productionCompatibility.at(-1)]); }
   catch (error) { legacyGuardError=error; }
   eq(legacyGuardError?.code,"55000","forward guard rejects a recorded legacy all-in-one overlay");

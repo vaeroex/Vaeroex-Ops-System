@@ -156,8 +156,12 @@ assert.ok(migration.trimStart().startsWith("-- Closed-by-default Production Inte
 assert.ok(migration.trimEnd().endsWith("commit;"), "the self-contained foundation is one explicit transaction");
 assert.match(historicalMarker, /integration_production_foundation_missing/,
   "the recorded historical version validates that the earlier provider-neutral foundation ran");
-assert.doesNotMatch(historicalMarker, /create\s+(?:table|function|role)|alter\s+table|drop\s+/i,
-  "fresh installs do not recreate the historical Square overlay");
+assert.match(historicalMarker, /create function private\.integration_production_foundation_split_marker_v1\(\)/,
+  "fresh installs leave an explicit split-foundation ledger marker");
+assert.doesNotMatch(historicalMarker, /square_production_(?:runtime_binding|configuration_fingerprint|binding_fingerprint|authority_fingerprint)|create\s+(?:table|role)|alter\s+table|drop\s+/i,
+  "fresh installs do not recreate any historical Square overlay authority");
+assert.match(legacyGuard, /integration_production_foundation_split_marker_v1\(\)[\s\S]*is distinct from '20260902191323_provider_neutral'[\s\S]*integration_production_legacy_foundation_requires_review/,
+  "a previously recorded all-in-one migration cannot pass without the new split marker");
 for (const legacyArtifact of [
   "square_production_runtime_binding",
   "square_production_configuration_fingerprint_v1",

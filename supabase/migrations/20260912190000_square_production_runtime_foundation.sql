@@ -17,4 +17,17 @@ begin
 end
 $foundation_present$;
 
+create function private.integration_production_foundation_split_marker_v1()
+returns text
+language sql
+immutable
+parallel safe
+set search_path = ''
+as $function$
+  select '20260902191323_provider_neutral'::text
+$function$;
+
+revoke all on function private.integration_production_foundation_split_marker_v1()
+  from public, anon, authenticated, service_role;
+
 commit;

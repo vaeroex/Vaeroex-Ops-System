@@ -6,6 +6,13 @@ begin;
 
 do $legacy_overlay_guard$
 begin
+  if to_regprocedure('private.integration_production_foundation_split_marker_v1()') is null
+    or private.integration_production_foundation_split_marker_v1()
+      is distinct from '20260902191323_provider_neutral' then
+    raise exception 'integration_production_legacy_foundation_requires_review'
+      using errcode = '55000';
+  end if;
+
   if to_regclass('private.square_production_runtime_binding') is not null
     or to_regprocedure('private.square_production_configuration_fingerprint_v1(text,text,text,name,name,name,text)') is not null
     or exists (
