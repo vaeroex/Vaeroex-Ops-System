@@ -115,7 +115,9 @@ assert.match(edgeCallback, /HasForbiddenCallbackBodyHeaders/, "request-body indi
 assert.match(edgePlugin, /ReplaceHttpRequestHeader\(":path", callbackedge\.CallbackPath\)/, "the edge strips the OAuth query before Cloud Run request logging");
 assert.match(edgePlugin, /GetHttpRequestHeaders\(\)/, "the edge reads the complete bounded header map before parsing callbacks");
 assert.match(edgePlugin, /headersError != nil/, "header retrieval failure fails closed");
-assert.match(edgePlugin, /callbackedge\.ParseForwardedHeaderCallback\([\s\S]*headers,/, "the plugin uses the unit-tested combined query and body-indicator contract");
+assert.match(edgePlugin, /callbackedge\.(?:Parse|Diagnose)ForwardedHeaderCallback\([\s\S]*headers,/, "the plugin uses the unit-tested combined query and body-indicator contract");
+assert.match(edgePlugin, /requestTarget != diagnosticTarget[\s\S]*markerCount == 1/, "the finite diagnostic is reachable only for the exact synthetic request target and one exact marker");
+assert.match(edgePlugin, /sendFixedResponse\(status, "callback_predicate_"\+string\(reason\)\)/, "the synthetic diagnostic emits only a finite predicate label");
 assert.match(edgePlugin, /if err := proxywasm\.SendHttpResponse\([\s\S]*err != nil \{[\s\S]*panic\(err\)/, "a failed local rejection response escalates to fail_open=false plugin failure");
 assert.match(edgePlugin, /clearReservedHandoffHeaders\(\)/, "client-forged handoff headers are removed before forwarding");
 assert.doesNotMatch(edgePlugin, /AddHttpRequestHeader\([^\n]*error_description/, "provider error descriptions never enter the internal request");

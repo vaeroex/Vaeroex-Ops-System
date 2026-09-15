@@ -89,6 +89,64 @@ func TestManagedHeaderEventRejectsMalformedAndBodyIndicatedCallbacks(t *testing.
 	}
 }
 
+func TestExactSyntheticDiagnosticReturnsOnlyFinitePredicate(t *testing.T) {
+	for _, test := range []struct {
+		name       string
+		query      string
+		extra      [][2]string
+		statusCode uint32
+		body       string
+	}{
+		{name: "accepted", query: "state=" + validStateFixture + "&code=vaeroex-edge-diagnostic", statusCode: 200, body: "callback_predicate_accepted"},
+		{name: "body indicator", query: "state=" + validStateFixture + "&code=vaeroex-edge-diagnostic", extra: [][2]string{{"content-length", "1"}}, statusCode: 400, body: "callback_predicate_body_indicator"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			host, reset := newCallbackHost("GET", callbackedge.CallbackPath, test.query)
+			defer reset()
+			contextID := host.InitializeHttpContext()
+			headers := append([][2]string{{":path", diagnosticTarget}, {callbackedge.HandoffVersionHeader, diagnosticMarker}}, test.extra...)
+			if action := host.CallOnRequestHeaders(contextID, headers, false); action != types.ActionPause {
+				t.Fatalf("diagnostic must terminate at the edge, got %v", action)
+			}
+			response := host.GetSentLocalResponse(contextID)
+			if response == nil || response.StatusCode != test.statusCode || string(response.Data) != test.body {
+				t.Fatalf("unexpected finite diagnostic response: %#v", response)
+			}
+		})
+	}
+}
+
+func TestDiagnosticMarkerMustBeExactAndUnique(t *testing.T) {
+	for _, headers := range [][][2]string{
+		{{":path", diagnosticTarget}, {callbackedge.HandoffVersionHeader, "wrong"}},
+		{{":path", callbackedge.CallbackPath + "?state=" + validStateFixture + "&code=other"}, {callbackedge.HandoffVersionHeader, diagnosticMarker}},
+	} {
+		host, reset := newCallbackHost("GET", callbackedge.CallbackPath, "state="+validStateFixture+"&code=synthetic-code")
+		contextID := host.InitializeHttpContext()
+		if action := host.CallOnRequestHeaders(contextID, headers, false); action != types.ActionContinue {
+			reset()
+			t.Fatalf("non-diagnostic request should follow the normal path, got %v", action)
+		}
+		if response := host.GetSentLocalResponse(contextID); response != nil {
+			reset()
+			t.Fatalf("non-diagnostic request received diagnostic response: %#v", response)
+		}
+		reset()
+	}
+
+	host, reset := newCallbackHost("GET", callbackedge.CallbackPath, "state="+validStateFixture+"&code=synthetic-code")
+	defer reset()
+	contextID := host.InitializeHttpContext()
+	action := host.CallOnRequestHeaders(contextID, [][2]string{
+		{":path", diagnosticTarget},
+		{callbackedge.HandoffVersionHeader, diagnosticMarker},
+		{callbackedge.HandoffVersionHeader, diagnosticMarker},
+	}, false)
+	if action != types.ActionPause || host.GetSentLocalResponse(contextID) == nil {
+		t.Fatalf("duplicate reserved diagnostic markers must fail closed, got %v %#v", action, host.GetSentLocalResponse(contextID))
+	}
+}
+
 func newCallbackHost(method, path, query string) (proxytest.HostEmulator, func()) {
 	options := proxytest.NewEmulatorOption().
 		WithVMContext(&vmContext{}).

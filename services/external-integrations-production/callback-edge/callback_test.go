@@ -32,6 +32,28 @@ func TestForwardedHeaderEventAcceptsStructurallyValidBodylessCallback(t *testing
 	}
 }
 
+func TestFiniteDiagnosticReasonsNeverContainRequestValues(t *testing.T) {
+	tests := []struct {
+		query   string
+		headers [][2]string
+		reason  RejectionReason
+	}{
+		{query: "state=" + validStateFixture + "&code=synthetic-code", reason: RejectionNone},
+		{query: "state=" + validStateFixture + "&code=synthetic-code", headers: [][2]string{{"content-length", "1"}}, reason: RejectionBodyIndicator},
+		{query: "state=" + validStateFixture + "&code=x&code=y", reason: RejectionDuplicateKey},
+		{query: "state=short&code=synthetic-code", reason: RejectionState},
+	}
+	for _, test := range tests {
+		_, reason := DiagnoseForwardedHeaderCallback("GET", CallbackPath, test.query, test.headers)
+		if reason != test.reason {
+			t.Fatalf("expected %q, got %q", test.reason, reason)
+		}
+		if strings.Contains(string(reason), "synthetic") || strings.Contains(string(reason), validStateFixture) {
+			t.Fatalf("diagnostic reason exposed request material: %q", reason)
+		}
+	}
+}
+
 func TestEquivalentForwardedTargetRepresentationsAreAccepted(t *testing.T) {
 	rawQuery := "state=" + validStateFixture + "&code=" + strings.Repeat("x", 191)
 	for _, target := range []struct{ path, query string }{
