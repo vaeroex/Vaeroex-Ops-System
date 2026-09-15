@@ -178,6 +178,8 @@ assert.match(legacyGuard, /has_table_privilege[\s\S]*has_column_privilege[\s\S]*
   "forward guard rejects effective privileges for every dormant runtime identity");
 assert.match(legacyGuard, /provolatile <> 'i'[\s\S]*proisstrict[\s\S]*proparallel <> 's'[\s\S]*prosecdef[\s\S]*proconfig/,
   "forward guard validates retained fingerprint helper execution properties");
+assert.match(legacyGuard, /convert_to\(object_record\.prosrc,'UTF8'\)[\s\S]*98a86fc4d75c479b10ae63900cdf1c03a5083fb59a52d61636cc3a886acfa096/,
+  "forward guard binds the retained fingerprint helper to its reviewed implementation bytes");
 assert.match(legacyGuard, /integration_production_foundation_role_drift/,
   "forward guard revalidates dormant authority role attributes and memberships");
 assert.doesNotMatch(legacyGuard, /drop\s+|delete\s+from|alter\s+table/i,

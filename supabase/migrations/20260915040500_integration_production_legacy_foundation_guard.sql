@@ -113,7 +113,7 @@ begin
     end loop;
   end loop;
 
-  select proowner,provolatile,proisstrict,proparallel,prosecdef,proconfig
+  select proowner,provolatile,proisstrict,proparallel,prosecdef,proconfig,prosrc
     into strict object_record
   from pg_catalog.pg_proc
   where oid='private.integration_production_fingerprint_v1(text[])'::regprocedure;
@@ -123,6 +123,10 @@ begin
     or object_record.proparallel <> 's'
     or object_record.prosecdef
     or object_record.proconfig is distinct from array['search_path=""']
+    or pg_catalog.encode(
+      extensions.digest(pg_catalog.convert_to(object_record.prosrc,'UTF8'),'sha256'),
+      'hex'
+    ) <> '98a86fc4d75c479b10ae63900cdf1c03a5083fb59a52d61636cc3a886acfa096'
     or exists (
       select 1
       from pg_catalog.pg_proc function_record
