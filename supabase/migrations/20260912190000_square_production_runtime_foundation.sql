@@ -223,6 +223,88 @@ revoke all on table private.integration_production_provider_capabilities from pu
   square_production_scheduler_authority,square_production_webhook_authority,
   square_production_runtime_authority,square_production_evidence_authority;
 
+-- Custom default privileges in the pre-existing private schema can name roles
+-- outside the reviewed runtime list. Remove every explicit non-owner grant from
+-- each newly created authority object, then prove that no table, column, or
+-- function ACL remains for a non-owner.
+do $closed_created_object_acls$
+declare
+  object_name text;
+  object_owner oid;
+  grantee_oid oid;
+  grantee_name name;
+  fingerprint_owner oid;
+begin
+  foreach object_name in array array[
+    'private.integration_production_platform_bindings',
+    'private.integration_production_provider_bindings',
+    'private.integration_production_provider_secrets',
+    'private.integration_production_provider_capabilities'
+  ] loop
+    select relowner into strict object_owner
+      from pg_catalog.pg_class where oid=object_name::regclass;
+    for grantee_oid in
+      select distinct object_acl.grantee
+      from pg_catalog.pg_class object_relation
+      cross join lateral pg_catalog.aclexplode(object_relation.relacl) object_acl
+      where object_relation.oid=object_name::regclass
+        and object_acl.grantee<>object_relation.relowner
+    loop
+      if grantee_oid=0 then
+        execute pg_catalog.format('revoke all on table %s from public',object_name);
+      else
+        select rolname into strict grantee_name from pg_catalog.pg_roles where oid=grantee_oid;
+        execute pg_catalog.format('revoke all on table %s from %I',object_name,grantee_name);
+      end if;
+    end loop;
+    if exists(
+      select 1
+      from pg_catalog.pg_class object_relation
+      cross join lateral pg_catalog.aclexplode(object_relation.relacl) object_acl
+      where object_relation.oid=object_name::regclass
+        and object_acl.grantee<>object_owner
+    ) or exists(
+      select 1
+      from pg_catalog.pg_attribute object_column
+      cross join lateral pg_catalog.aclexplode(object_column.attacl) column_acl
+      where object_column.attrelid=object_name::regclass
+        and not object_column.attisdropped
+        and column_acl.grantee<>object_owner
+    ) then
+      raise exception using errcode='42501',message='integration_production_foundation_acl_not_closed';
+    end if;
+  end loop;
+
+  select proowner into strict fingerprint_owner from pg_catalog.pg_proc
+    where oid='private.integration_production_fingerprint_v1(text[])'::regprocedure;
+  for grantee_oid in
+    select distinct function_acl.grantee
+    from pg_catalog.pg_proc fingerprint_function
+    cross join lateral pg_catalog.aclexplode(fingerprint_function.proacl) function_acl
+    where fingerprint_function.oid='private.integration_production_fingerprint_v1(text[])'::regprocedure
+      and function_acl.grantee<>fingerprint_function.proowner
+  loop
+    if grantee_oid=0 then
+      execute 'revoke all on function private.integration_production_fingerprint_v1(text[]) from public';
+    else
+      select rolname into strict grantee_name from pg_catalog.pg_roles where oid=grantee_oid;
+      execute pg_catalog.format(
+        'revoke all on function private.integration_production_fingerprint_v1(text[]) from %I',grantee_name
+      );
+    end if;
+  end loop;
+  if exists(
+    select 1
+    from pg_catalog.pg_proc fingerprint_function
+    cross join lateral pg_catalog.aclexplode(fingerprint_function.proacl) function_acl
+    where fingerprint_function.oid='private.integration_production_fingerprint_v1(text[])'::regprocedure
+      and function_acl.grantee<>fingerprint_owner
+  ) then
+    raise exception using errcode='42501',message='integration_production_foundation_function_acl_not_closed';
+  end if;
+end
+$closed_created_object_acls$;
+
 -- The shared data plane remains private.integration_sync_tasks,
 -- private.integration_sync_checkpoints, private.integration_webhook_events and
 -- private.integration_rate_limit_states. Square cannot enter it until a later

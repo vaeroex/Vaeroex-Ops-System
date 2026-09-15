@@ -247,6 +247,20 @@ begin
   end if;
   if exists(
        select 1
+       from pg_catalog.pg_class provider_relation
+       cross join lateral pg_catalog.aclexplode(provider_relation.relacl) provider_acl
+       where provider_relation.oid='private.integration_production_provider_bindings'::regclass
+         and provider_acl.grantee<>provider_relation.relowner
+     ) or exists(
+       select 1
+       from pg_catalog.pg_attribute provider_column_acl_source
+       cross join lateral pg_catalog.aclexplode(provider_column_acl_source.attacl) provider_column_acl
+       where provider_column_acl_source.attrelid='private.integration_production_provider_bindings'::regclass
+         and not provider_column_acl_source.attisdropped
+         and provider_column_acl.grantee<>(select relowner from pg_catalog.pg_class
+           where oid='private.integration_production_provider_bindings'::regclass)
+     ) or exists(
+       select 1
        from pg_catalog.unnest(array[
          'anon','authenticated','service_role',
          'square_production_oauth_authority','square_production_broker_authority',
@@ -280,6 +294,20 @@ begin
   end if;
   if exists(
        select 1
+       from pg_catalog.pg_class platform_acl_relation
+       cross join lateral pg_catalog.aclexplode(platform_acl_relation.relacl) platform_acl
+       where platform_acl_relation.oid='private.integration_production_platform_bindings'::regclass
+         and platform_acl.grantee<>platform_acl_relation.relowner
+     ) or exists(
+       select 1
+       from pg_catalog.pg_attribute platform_column_acl_source
+       cross join lateral pg_catalog.aclexplode(platform_column_acl_source.attacl) platform_column_acl
+       where platform_column_acl_source.attrelid='private.integration_production_platform_bindings'::regclass
+         and not platform_column_acl_source.attisdropped
+         and platform_column_acl.grantee<>(select relowner from pg_catalog.pg_class
+           where oid='private.integration_production_platform_bindings'::regclass)
+     ) or exists(
+       select 1
        from pg_catalog.unnest(array[
          'anon','authenticated','service_role',
          'square_production_oauth_authority','square_production_broker_authority',
@@ -311,7 +339,13 @@ begin
       errcode='55000',
       message='square_production_runtime_overlay_platform_acl_drifted';
   end if;
-  if exists(select 1
+  if exists(
+       select 1
+       from pg_catalog.pg_proc retained_function
+       cross join lateral pg_catalog.aclexplode(retained_function.proacl) retained_function_acl
+       where retained_function.oid='private.integration_production_fingerprint_v1(text[])'::regprocedure
+         and retained_function_acl.grantee<>retained_function.proowner
+     ) or exists(select 1
        from pg_catalog.unnest(array[
          'anon','authenticated','service_role',
          'square_production_oauth_authority','square_production_broker_authority',
@@ -374,6 +408,7 @@ alter table private.integration_production_provider_bindings
     length(application_id) between 8 and 512 and application_id ~ '^[A-Za-z0-9._-]+$' and
     route_namespace='/api/integrations/'||replace(provider_key,'_','-') and
     callback_uri ~ '^https://[a-z0-9][a-z0-9.-]*[a-z0-9]/api/integrations/[a-z][a-z0-9_-]*/callback$' and
+    callback_uri ~ '^https://[^/]+\.[^/]+/' and
     callback_uri ~ ('^https://[^/]+'||route_namespace||'/callback$') and
     callback_uri !~* '(sandbox|preview|localhost|sslip\.io)' and
     callback_uri !~ '^https://[0-9]+(?:\.[0-9]+){3}/' and

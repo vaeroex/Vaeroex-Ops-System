@@ -136,6 +136,14 @@ assert.match(migration, /production_provider_capability_database_login_key/);
 assert.match(migration, /production_provider_secret_resource_key/);
 assert.match(migration, /application_id text not null unique check/);
 assert.match(migration, /callback_uri ~ \('\^https:\/\/\[\^\/\]\+'\|\|route_namespace\|\|'\/callback\$'\)/);
+assert.match(migration, /closed_created_object_acls/);
+assert.match(migration, /integration_production_foundation_acl_not_closed/);
+assert.match(migration, /integration_production_foundation_function_acl_not_closed/);
+assert.match(migration, /pg_catalog\.aclexplode\(object_relation\.relacl\)/);
+assert.match(migration, /pg_catalog\.aclexplode\(object_column\.attacl\)/);
+assert.match(migration, /pg_catalog\.aclexplode\(fingerprint_function\.proacl\)/);
+assert.doesNotMatch(migration, /pg_catalog\.aclexplode\([\s\S]{0,120}coalesce\([^)]*'\{\}'::aclitem\[\]\)/,
+  "foundation ACL closure must handle nullable native catalogs without zero-dimensional arrays");
 assert.doesNotMatch(migration, /grant (?:select|insert|update|delete|all) on table private\.(?:square|integration)_production_/i);
 assert.doesNotMatch(migration, /create role\s+square_production_\w+\s+login/i);
 assert.doesNotMatch(migration, /squareupsandbox|oysjpoondtcrqpghhrbd|sandbox-sq0idb/i);
@@ -209,6 +217,14 @@ assert.match(overlay, /add constraint integration_production_platform_overlay_gu
   "one validated platform guard scans all retained rows and pins future closed-state authority");
 assert.match(overlay, /add constraint integration_production_provider_overlay_guard check\([\s\S]*callback_uri !~\* '\(sandbox\|preview\|localhost\|sslip\\\.io\)'[\s\S]*split_part\(kms_key_resource,'\/',2\)=project_id[\s\S]*not ai_dispatch_enabled/,
   "one validated provider guard scans all retained rows and pins endpoints, KMS scope, and gates");
+assert.match(overlay, /callback_uri ~ '\^https:\/\/\[\^\/\]\+\\\.\[\^\/\]\+\/'/,
+  "the replacement provider guard retains the required dotted public callback host");
+assert.match(overlay, /pg_catalog\.aclexplode\(provider_relation\.relacl\)/);
+assert.match(overlay, /pg_catalog\.aclexplode\(provider_column_acl_source\.attacl\)/);
+assert.match(overlay, /pg_catalog\.aclexplode\(platform_acl_relation\.relacl\)/);
+assert.match(overlay, /pg_catalog\.aclexplode\(platform_column_acl_source\.attacl\)/);
+assert.match(overlay, /pg_catalog\.aclexplode\(retained_function\.proacl\)/,
+  "the legacy overlay rejects every explicit non-owner grant, including unlisted roles");
 assert.match(overlay, /closed_created_object_acls/);
 assert.match(overlay, /object_acl\.grantee<>object_relation\.relowner/);
 assert.match(overlay, /function_acl\.grantee<>created_function\.proowner/,
