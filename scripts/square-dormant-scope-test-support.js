@@ -73,6 +73,7 @@ const approvedSquareQualificationPaths = Object.freeze([
   "services/external-integrations-production/callback-edge/go.sum",
   "services/external-integrations-production/callback-edge/package/Dockerfile",
   "services/external-integrations-production/callback-edge/plugin/main.go",
+  "services/external-integrations-production/callback-edge/plugin/main_test.go",
   "supabase/migrations/20260907042202_square_dormant_trusted_authority.sql",
   "supabase/migrations/20260907042352_square_dormant_atomic_pages.sql",
   "supabase/migrations/20260907174326_square_dormant_account_connection.sql",

@@ -8,6 +8,17 @@ The first apply must leave both `bootstrap_image_digest = null` and `callback_ed
 
 After the bootstrap and Square callback-edge images are built and independently verified, a second reviewed plan may pin both immutable Artifact Registry digests. They must be supplied together. The fail-closed edge validates the exact callback shape, removes the query before Cloud Run request logging, forwards only bounded internal handoff headers, drops provider denial descriptions, and passes only exact queryless health/webhook traffic. The edge extension explicitly forwards only the method, path, and undecoded query attributes required by that validator; an omitted attribute must fail validation rather than produce an unusable deployment. Load-balancer request logging is explicitly disabled. Wasm activity logging is omitted because the Network Services API defaults it to disabled and the provider does not round-trip an explicit disabled block; a plan must therefore remain converged without that block. The runtime image always returns `404 production_integration_runtime_disabled`; it contains no OAuth, webhook, provider, database, evidence, economics, or AI implementation. All runtime gates are Terraform validations fixed to `false`.
 
+Google's managed `LbEdgeExtension` invokes only `REQUEST_HEADERS`; its Proxy-Wasm
+`endOfStream` callback flag is not a reliable body-presence signal. The edge
+therefore rejects every observable callback body indicator from the complete
+bounded forwarded header map: `Transfer-Encoding` or `Expect`, any nonzero
+`Content-Length`, and duplicate `Content-Length` all fail closed. The header-only
+extension cannot itself prove that an HTTP/2 or HTTP/3 client omitted an
+indicator-free DATA frame. The downstream OAuth handler must not read a GET
+body and must reject one if its runtime exposes one; the currently pinned
+disabled bootstrap never reads request bodies. An absent body indicator or one
+canonical zero `Content-Length` can proceed to the exact GET/path/query parser.
+
 The OAuth and webhook services disable the Cloud Run Invoker IAM check only while retaining `INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER`. This is Google Cloud's supported public-load-balancer pattern for organizations with domain-restricted sharing. No `allUsers` IAM binding is created, and direct internet access to the generated `run.app` host remains rejected by the ingress restriction. Broker, scheduler, runtime, and evidence services retain the Invoker IAM check and internal-only ingress.
 
 Secret Manager grants are provider- and runtime-specific and are conditional on exact version `1`. Terraform never creates or reads a secret version. Credential delivery, database LOGIN creation, migration application, DNS, and activation are separate checked operations.

@@ -54,6 +54,7 @@ for (const image of ["square-callback-edge", "production-bootstrap"]) {
   assert.match(cloudbuild, new RegExp(`${image}@sha256:\\[a-f0-9\\]\\{64\\}`));
 }
 assert.match(cloudbuild, /id: verify-trigger-context[\s\S]*id: require-completed-scans/);
+assert.match(cloudbuild, /id: test-callback-edge[\s\S]*go test -count=1 \.\/\.\.\./, "the approved repository-bound build runs parser and plugin orchestration tests");
 assert.match(cloudbuild, /sourceProvenanceHash: \[SHA256\]/);
 assert.match(scans, /FINISHED_SUCCESS/);
 assert.match(scans, /vulnerabilityDiscoveryNote: "projects\/goog-analysis\/notes\/PACKAGE_VULNERABILITY"/);

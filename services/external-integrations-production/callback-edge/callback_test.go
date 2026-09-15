@@ -1,6 +1,9 @@
 package callbackedge
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 const validStateFixture = "0123456789_abcdefghijklmnopqrstuvwxyz-ABCDE"
 
@@ -10,9 +13,36 @@ func TestSuccessHandoffStripsQueryAndNormalizesShape(t *testing.T) {
 		"state=" + validStateFixture + "&code=synthetic?code",
 		"code=synthetic-code&response_type=code&state=r1_" + validStateFixture,
 	} {
-		handoff, err := ParseForwardedCallback("GET", CallbackPath, query, true)
+		handoff, err := ParseForwardedCallback("GET", CallbackPath, query)
 		if err != nil || handoff.Denied || handoff.Code == "" || handoff.State == "" {
 			t.Fatalf("expected bounded success handoff for %q: %#v %v", query, handoff, err)
+		}
+	}
+}
+
+func TestForwardedHeaderEventAcceptsStructurallyValidBodylessCallback(t *testing.T) {
+	handoff, err := ParseForwardedHeaderCallback(
+		"GET",
+		CallbackPath,
+		"state="+validStateFixture+"&code=synthetic-code",
+		[][2]string{{"content-length", "0"}},
+	)
+	if err != nil || handoff.Denied || handoff.Code != "synthetic-code" || handoff.State != validStateFixture {
+		t.Fatalf("expected the bodyless forwarded callback to pass the header event: %#v %v", handoff, err)
+	}
+}
+
+func TestEquivalentForwardedTargetRepresentationsAreAccepted(t *testing.T) {
+	rawQuery := "state=" + validStateFixture + "&code=" + strings.Repeat("x", 191)
+	for _, target := range []struct{ path, query string }{
+		{path: CallbackPath, query: rawQuery},
+		{path: CallbackPath, query: "?" + rawQuery},
+		{path: CallbackPath + "?" + rawQuery, query: rawQuery},
+		{path: CallbackPath + "?" + rawQuery, query: "?" + rawQuery},
+	} {
+		handoff, err := ParseForwardedCallback("GET", target.path, target.query)
+		if err != nil || handoff.Code != strings.Repeat("x", 191) || handoff.State != validStateFixture {
+			t.Fatalf("expected equivalent forwarded target to pass: %#v %#v %v", target, handoff, err)
 		}
 	}
 }
@@ -21,7 +51,6 @@ func TestDeniedHandoffDropsProviderDescription(t *testing.T) {
 	handoff, err := ParseForwardedCallback(
 		"GET", CallbackPath,
 		"error=access_denied&error_description=provider%20text&state="+validStateFixture,
-		true,
 	)
 	if err != nil || !handoff.Denied || handoff.Code != "" || handoff.State != validStateFixture {
 		t.Fatalf("unexpected denial handoff: %#v %v", handoff, err)
@@ -33,24 +62,78 @@ func TestMalformedCallbacksFailClosed(t *testing.T) {
 		"",
 		"state=" + validStateFixture,
 		"state=" + validStateFixture + "&code=x&code=y",
+		"state=" + validStateFixture + "&code=x&state=" + validStateFixture,
 		"state=" + validStateFixture + "&code=x&error=denied",
 		"state=" + validStateFixture + "&code=x&response_type=token",
 		"state=" + validStateFixture + "&code=x&error_description=forbidden",
 		"state=" + validStateFixture + "&code=x&scope=forbidden",
 		"state=short&code=x",
+		"state=" + validStateFixture + "%2F&code=x",
 		"state=" + validStateFixture + "&code=encoded%20space",
+		"state=" + validStateFixture + "&code=encoded+space",
 		"state=" + validStateFixture + "&code=%0d%0aforged",
+		"state=" + validStateFixture + "&code=%ZZ",
+		"state=" + validStateFixture + "&code=%FF",
+		"state=" + validStateFixture + "&code=x#fragment",
+		"state=" + validStateFixture + "&code=x\\suffix",
+		"state=" + validStateFixture + "&code=x&",
+		"state=" + validStateFixture + "&error=",
+		"state=" + validStateFixture + "&error=access_denied&error=other",
+		"state=" + validStateFixture + "&error=access_denied&error_description=x&error_description=y",
+		"state=" + validStateFixture + "&error=access_denied&response_type=code",
+		"state=" + validStateFixture + "&code=" + strings.Repeat("x", 192),
+		"state=" + validStateFixture + "&code=" + strings.Repeat("x", MaxRawQueryBytes),
 	}
 	for _, query := range queries {
-		if _, err := ParseForwardedCallback("GET", CallbackPath, query, true); err == nil {
+		if _, err := ParseForwardedCallback("GET", CallbackPath, query); err == nil {
 			t.Fatalf("expected malformed callback to fail: %q", query)
 		}
 	}
-	if _, err := ParseForwardedCallback("POST", CallbackPath, "state="+validStateFixture+"&code=x", true); err == nil {
+	if _, err := ParseForwardedCallback("POST", CallbackPath, "state="+validStateFixture+"&code=x"); err == nil {
 		t.Fatal("expected unsupported method to fail")
 	}
-	if _, err := ParseForwardedCallback("GET", CallbackPath, "state="+validStateFixture+"&code=x", false); err == nil {
-		t.Fatal("expected request body to fail")
+	for _, target := range []struct{ path, query string }{
+		{path: "/", query: "state=" + validStateFixture + "&code=x"},
+		{path: CallbackPath + "?state=" + validStateFixture + "&code=x", query: "state=" + validStateFixture + "&code=y"},
+		{path: CallbackPath + "?state=" + validStateFixture + "&code=x", query: ""},
+	} {
+		if _, err := ParseForwardedCallback("GET", target.path, target.query); err == nil {
+			t.Fatalf("expected mismatched forwarded target to fail: %#v", target)
+		}
+	}
+}
+
+func TestBodyIndicatorHeadersFailClosed(t *testing.T) {
+	for _, headers := range [][][2]string{
+		{{"content-length", "1"}},
+		{{"content-length", "0"}, {"Content-Length", "0"}},
+		{{"transfer-encoding", "chunked"}},
+		{{"Transfer-Encoding", "identity"}},
+		{{"expect", "100-continue"}},
+	} {
+		if !HasForbiddenCallbackBodyHeaders(headers) {
+			t.Fatalf("expected body-indicator headers to fail: %#v", headers)
+		}
+		if _, err := ParseForwardedHeaderCallback(
+			"GET", CallbackPath, "state="+validStateFixture+"&code=synthetic-code", headers,
+		); err == nil {
+			t.Fatalf("expected complete forwarded-header contract to fail: %#v", headers)
+		}
+	}
+	for _, headers := range [][][2]string{
+		nil,
+		{{"content-length", "0"}},
+		{{"Content-Length", " 0 "}},
+		{{"accept", "text/html"}},
+	} {
+		if HasForbiddenCallbackBodyHeaders(headers) {
+			t.Fatalf("expected bodyless headers to pass: %#v", headers)
+		}
+		if handoff, err := ParseForwardedHeaderCallback(
+			"GET", CallbackPath, "state="+validStateFixture+"&code=synthetic-code", headers,
+		); err != nil || handoff.Code != "synthetic-code" {
+			t.Fatalf("expected complete forwarded-header contract to pass: %#v %#v %v", headers, handoff, err)
+		}
 	}
 }
 
