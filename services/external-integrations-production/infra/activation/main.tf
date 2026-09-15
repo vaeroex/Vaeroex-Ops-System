@@ -49,11 +49,11 @@ locals {
       mode => "projects/${data.google_project.current.number}/secrets/${secret_id}/versions/1"
     }
   }
-  callback_edge_version = "v${substr(var.source_commit, 0, 12)}"
+  callback_edge_version = var.callback_edge_source_commit == null ? null : "v${substr(var.callback_edge_source_commit, 0, 12)}"
   deployment_enabled    = var.bootstrap_image_digest != null && var.callback_edge_image_digest != null
   deployment_inputs_valid = (
-    (var.bootstrap_image_digest == null && var.callback_edge_image_digest == null) ||
-    (var.bootstrap_image_digest != null && var.callback_edge_image_digest != null)
+    (var.bootstrap_image_digest == null && var.callback_edge_image_digest == null && var.callback_edge_source_commit == null) ||
+    (var.bootstrap_image_digest != null && var.callback_edge_image_digest != null && var.callback_edge_source_commit != null)
   )
 }
 
@@ -659,7 +659,7 @@ resource "google_network_services_wasm_plugin" "square_callback" {
 
   versions {
     version_name = local.callback_edge_version
-    description  = "Immutable Square callback edge for source ${var.source_commit}"
+    description  = "Immutable Square callback edge for source ${var.callback_edge_source_commit}"
     image_uri    = var.callback_edge_image_digest
   }
 }

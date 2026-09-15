@@ -10,7 +10,7 @@ const IMAGE_POLICY = Object.freeze({
   bootstrapException: "CVE-2026-85091",
   bootstrapDockerfileSha256: "628ac2a6fd58b0ac33ca95c1af9a5717f2c3b26f6bf353853c0d56a6ca57e35f",
   bootstrapServerSha256: "c724529d24e8338bdfff14b51557a72cedb332abddc6d705a0cecca07e08c110",
-  vulnerabilityDiscoveryNote: "projects/goog-analysis/notes/PACKAGE_VULNERABILITY",
+  vulnerabilityDiscoveryNote: "projects/goog-analysis/locations/us-west1/notes/PACKAGE_VULNERABILITY",
   vulnerabilityNotePrefix: "projects/goog-vulnz/notes/",
   requiredStableScanReads: 3,
   scanPollMilliseconds: 10_000,
@@ -19,6 +19,10 @@ const IMAGE_POLICY = Object.freeze({
 
 function reject(code) {
   throw new Error(code);
+}
+
+function isExactOccurrenceName(value) {
+  return /^projects\/vaeroex-integrations-prod\/locations\/us-west1\/occurrences\/[A-Za-z0-9._~-]{1,256}$/.test(value ?? "");
 }
 
 export function parseDigestReference(value, repository) {
@@ -45,6 +49,10 @@ export function evaluateScanOccurrences(kind, occurrences, sourceIntegrity) {
   if (kind !== "callback" && kind !== "bootstrap") reject("image_kind");
   if (!Array.isArray(occurrences)) reject("scan_shape");
   if (occurrences.some((entry) => !entry || typeof entry !== "object")) reject("scan_shape");
+  if (occurrences.some(
+    (entry) => entry.kind === "DISCOVERY" &&
+      (entry.noteName !== IMAGE_POLICY.vulnerabilityDiscoveryNote || !isExactOccurrenceName(entry.name)),
+  )) reject("scan_discovery_foreign");
 
   const discovery = occurrences.filter(
     (entry) => entry.kind === "DISCOVERY" && entry.noteName === IMAGE_POLICY.vulnerabilityDiscoveryNote,
@@ -96,7 +104,7 @@ export function scanEvidenceFingerprint(occurrences) {
       entry.kind === "SECRET")
     .map((entry) => {
       if (!entry || typeof entry !== "object" ||
-          !/^projects\/[a-z][a-z0-9-]{4,62}\/occurrences\/[A-Za-z0-9._~-]{1,256}$/.test(entry.name ?? "") ||
+          !isExactOccurrenceName(entry.name) ||
           typeof entry.updateTime !== "string" || !Number.isFinite(Date.parse(entry.updateTime)) ||
           typeof entry.noteName !== "string") {
         reject("scan_evidence_identity_invalid");

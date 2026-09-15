@@ -59,7 +59,8 @@ assert.match(cloudbuild, /id: verify-trigger-context[\s\S]*id: require-completed
 assert.match(cloudbuild, /id: test-callback-edge[\s\S]*go test -count=1 \.\/\.\.\./, "the approved repository-bound build runs parser and plugin orchestration tests");
 assert.match(cloudbuild, /sourceProvenanceHash: \[SHA256\]/);
 assert.match(scans, /FINISHED_SUCCESS/);
-assert.match(scans, /vulnerabilityDiscoveryNote: "projects\/goog-analysis\/notes\/PACKAGE_VULNERABILITY"/);
+assert.match(scans, /vulnerabilityDiscoveryNote: "projects\/goog-analysis\/locations\/us-west1\/notes\/PACKAGE_VULNERABILITY"/);
+assert.match(scans, /projects\\\/vaeroex-integrations-prod\\\/locations\\\/us-west1\\\/occurrences/);
 assert.match(scans, /requiredStableScanReads: 3/);
 assert.match(scans, /scanEvidenceFingerprint/);
 assert.match(scans, /ifGenerationMatch: "0"/);
