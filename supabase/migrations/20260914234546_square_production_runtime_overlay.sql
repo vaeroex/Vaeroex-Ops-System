@@ -9,6 +9,7 @@ begin;
 -- observe physical rows. With row_security=off PostgreSQL raises an error
 -- instead of silently applying an RLS filter when the actor cannot bypass it.
 set local row_security=off;
+set local search_path='';
 
 do $prerequisites$
 declare

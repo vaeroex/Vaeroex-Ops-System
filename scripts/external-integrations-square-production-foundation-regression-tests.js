@@ -193,6 +193,8 @@ assert.match(overlay, /square_production_runtime_overlay_nonempty_reconciliation
 assert.match(overlay, /lock table private\.square_production_runtime_binding in access exclusive mode/);
 assert.match(overlay, /set local row_security=off/,
   "legacy emptiness checks abort rather than silently filtering rows through FORCE RLS");
+assert.match(overlay, /set local search_path=''/,
+  "catalog expression deparsing is independent of the caller's search path");
 assert.match(overlay, /drop table if exists private\.square_production_runtime_binding/);
 assert.doesNotMatch(overlay, /drop[^;]*cascade/i,
   "unknown dependencies abort the legacy rebuild instead of being deleted");
