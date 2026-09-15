@@ -120,12 +120,14 @@ select is((select count(*)::integer from (values
   ('square_production_evidence_authority','public.check_square_production_broker_authority_v1(text,text,text,bigint,text)'::regprocedure)
 ) denied(role_name,rpc) where pg_catalog.has_function_privilege(role_name,rpc,'execute')),0,
   'no authority inherits a different capability preflight RPC');
-select unlike(pg_catalog.pg_get_functiondef(
-  'private.check_square_production_operational_generation_v1(text,text,text,bigint,text,text)'::regprocedure),
-  '%economic_contributions_enabled%','operational authority is independent from economic contribution');
-select unlike(pg_catalog.pg_get_functiondef(
-  'private.check_square_production_operational_generation_v1(text,text,text,bigint,text,text)'::regprocedure),
-  '%ai_dispatch_enabled%','operational authority is independent from AI dispatch');
+select ok(pg_catalog.pg_get_functiondef(
+  'private.check_square_production_operational_generation_v1(text,text,text,bigint,text,text)'::regprocedure)
+  not like '%economic_contributions_enabled%',
+  'operational authority is independent from economic contribution');
+select ok(pg_catalog.pg_get_functiondef(
+  'private.check_square_production_operational_generation_v1(text,text,text,bigint,text,text)'::regprocedure)
+  not like '%ai_dispatch_enabled%',
+  'operational authority is independent from AI dispatch');
 
 select is((select count(*)::integer from information_schema.columns
   where table_schema='private'
