@@ -24,9 +24,9 @@ const releasePins = read("services/external-integrations-production/infra/activa
 const activationPath = path.join(root, "services/external-integrations-production/infra/activation");
 
 const reviewedSourceCommit = "f4915edadbe2abddd7993c74c1fc3e80e1d1f821";
-const reviewedCallbackEdgeSourceCommit = "9eff5ed807641747255f68b17e3ec83faeb8dde5";
+const reviewedCallbackEdgeSourceCommit = "bb4ad8d3653ca0eecdada88eeeea8a86fa76fc81";
 const reviewedBootstrapDigest = "us-west1-docker.pkg.dev/vaeroex-integrations-prod/vaeroex-integrations-images/production-bootstrap@sha256:d56fe933eab1322bb4fe905b183964a980d641af23d69904e15989add501dc6f";
-const reviewedCallbackEdgeDigest = "us-west1-docker.pkg.dev/vaeroex-integrations-prod/vaeroex-integrations-images/square-callback-edge@sha256:2c31f3e3e7cca63d6173ceddd8187a49d071175ec805ab6e29a7dd559f5faaa6";
+const reviewedCallbackEdgeDigest = "us-west1-docker.pkg.dev/vaeroex-integrations-prod/vaeroex-integrations-images/square-callback-edge@sha256:f9ef2ebc1669e86f549cb7d24f5bb8f40b4a54e4cd14a70a2d3cfb1b6e8e8012";
 
 function runTerraform(args) {
   const result = spawnSync(process.env.TERRAFORM_BIN || "terraform", args, {
