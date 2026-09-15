@@ -155,25 +155,6 @@ begin
       errcode='55000',
       message='square_production_runtime_overlay_provider_fingerprint_value_drifted';
   end if;
-  if 7<>(
-       select pg_catalog.count(*)
-       from pg_catalog.pg_constraint provider_gate_check
-       where provider_gate_check.conrelid='private.integration_production_provider_bindings'::regclass
-         and provider_gate_check.contype='c'
-         and provider_gate_check.convalidated
-         and pg_catalog.regexp_replace(
-           pg_catalog.pg_get_expr(provider_gate_check.conbin,provider_gate_check.conrelid,false),
-           '[[:space:]]','','g'
-         )=any(array[
-           '(NOTenabled)','(NOTprovider_calls_enabled)','(NOTcustomer_onboarding_enabled)',
-           '(NOTwebhook_intake_enabled)','(NOTevidence_enabled)',
-           '(NOTeconomic_contributions_enabled)','(NOTai_dispatch_enabled)'
-         ]::text[])
-     ) then
-    raise exception using
-      errcode='55000',
-      message='square_production_runtime_overlay_provider_gate_constraint_drifted';
-  end if;
   if not exists(
        select 1
        from pg_catalog.pg_class provider_relation
@@ -222,6 +203,7 @@ begin
          and platform_relation.relkind='r'
          and platform_relation.relrowsecurity
          and platform_relation.relforcerowsecurity
+         and platform_relation.relowner=(select oid from pg_catalog.pg_roles where rolname=current_user)
      ) or exists(
        select 1
        from private.integration_production_platform_bindings platform_binding
@@ -231,21 +213,6 @@ begin
           or platform_binding.runtime_enabled is distinct from false
           or platform_binding.economic_contributions_enabled is distinct from false
           or platform_binding.ai_dispatch_enabled is distinct from false
-     ) or 6<>(
-       select pg_catalog.count(*)
-       from pg_catalog.pg_constraint platform_gate_check
-       where platform_gate_check.conrelid='private.integration_production_platform_bindings'::regclass
-         and platform_gate_check.contype='c'
-         and platform_gate_check.convalidated
-         and pg_catalog.regexp_replace(
-           pg_catalog.pg_get_expr(platform_gate_check.conbin,platform_gate_check.conrelid,false),
-           '[[:space:]]','','g'
-         )=any(array[
-           '(binding_key=''vaeroex-production-integrations-v1''::text)',
-           '(environment=''production''::text)',
-           '(NOTinfrastructure_provisioned)','(NOTruntime_enabled)',
-           '(NOTeconomic_contributions_enabled)','(NOTai_dispatch_enabled)'
-         ]::text[])
      ) then
     raise exception using
       errcode='55000',
@@ -360,6 +327,38 @@ begin
   end if;
 end
 $prerequisites$;
+
+-- Re-establish one complete, named authority guard on each retained shared
+-- table before the legacy overlay rebuild. Adding a validated constraint scans
+-- every existing row; the owner and ACL checks above keep these guards outside
+-- all runtime identities' mutation authority.
+alter table private.integration_production_platform_bindings
+  add constraint integration_production_platform_overlay_guard check(
+    binding_key='vaeroex-production-integrations-v1' and
+    environment='production' and
+    not infrastructure_provisioned and not runtime_enabled and
+    not economic_contributions_enabled and not ai_dispatch_enabled
+  );
+
+alter table private.integration_production_provider_bindings
+  add constraint integration_production_provider_overlay_guard check(
+    provider_key ~ '^[a-z][a-z0-9_]{0,63}$' and
+    environment='production' and
+    length(application_id) between 8 and 512 and application_id ~ '^[A-Za-z0-9._-]+$' and
+    route_namespace='/api/integrations/'||replace(provider_key,'_','-') and
+    callback_uri ~ '^https://[a-z0-9][a-z0-9.-]*[a-z0-9]/api/integrations/[a-z][a-z0-9_-]*/callback$' and
+    callback_uri ~ ('^https://[^/]+'||route_namespace||'/callback$') and
+    callback_uri !~* '(sandbox|preview|localhost|sslip\.io)' and
+    callback_uri !~ '^https://[0-9]+(?:\.[0-9]+){3}/' and
+    callback_uri !~ '^https://(?:127\.|10\.|192\.168\.|169\.254\.|172\.(?:1[6-9]|2[0-9]|3[01])\.)' and
+    callback_uri not like '%..%' and
+    kms_key_resource ~ '^projects/[a-z][a-z0-9-]{4,28}[a-z0-9]/locations/[a-z]+-[a-z]+[0-9]/keyRings/[A-Za-z0-9_-]{1,63}/cryptoKeys/[A-Za-z0-9_-]{1,63}$' and
+    split_part(kms_key_resource,'/',2)=project_id and split_part(kms_key_resource,'/',4)=region and
+    source_commit ~ '^[a-f0-9]{40}$' and
+    not enabled and not provider_calls_enabled and not customer_onboarding_enabled and
+    not webhook_intake_enabled and not evidence_enabled and
+    not economic_contributions_enabled and not ai_dispatch_enabled
+  );
 
 -- A previous repository revision installed the Square overlay inside the
 -- historical foundation migration. Its dormant table was required to remain
@@ -494,6 +493,14 @@ begin
      not exists(select 1 from pg_catalog.pg_class
        where oid='private.square_production_runtime_binding'::regclass
          and relkind='r' and relrowsecurity and relforcerowsecurity) or
+     not exists(select 1 from pg_catalog.pg_constraint
+       where conrelid='private.integration_production_platform_bindings'::regclass
+         and conname='integration_production_platform_overlay_guard'
+         and contype='c' and convalidated) or
+     not exists(select 1 from pg_catalog.pg_constraint
+       where conrelid='private.integration_production_provider_bindings'::regclass
+         and conname='integration_production_provider_overlay_guard'
+         and contype='c' and convalidated) or
      not exists(select 1 from pg_catalog.pg_constraint c
        where c.conrelid='private.square_production_runtime_binding'::regclass
          and c.contype='p' and c.convalidated

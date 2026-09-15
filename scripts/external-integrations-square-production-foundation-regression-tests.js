@@ -178,9 +178,6 @@ assert.match(overlay, /provider_binding\.provider_authority_fingerprint is disti
   "stored generated values are revalidated after any temporarily drifted helper definition");
 assert.match(overlay, /provider_binding\.enabled is distinct from false[\s\S]*provider_binding\.provider_calls_enabled is distinct from false[\s\S]*provider_binding\.ai_dispatch_enabled is distinct from false/,
   "every retained provider row remains closed before runtime authority is composed");
-assert.match(overlay, /square_production_runtime_overlay_provider_gate_constraint_drifted/);
-assert.match(overlay, /'\(NOTenabled\)'[\s\S]*'\(NOTai_dispatch_enabled\)'/,
-  "all seven provider gate constraints remain fail-closed for future rows");
 assert.match(overlay, /square_production_runtime_overlay_provider_authority_chain_drifted/);
 assert.match(overlay, /provider_platform_fk\.confrelid='private\.integration_production_platform_bindings'::regclass/);
 assert.match(overlay, /provider_platform_fk\.confmatchtype='s'/);
@@ -193,9 +190,8 @@ assert.match(overlay, /square_production_runtime_overlay_platform_authority_targ
 assert.match(overlay, /platform_binding\.binding_key is distinct from 'vaeroex-production-integrations-v1'/);
 assert.match(overlay, /platform_binding\.runtime_enabled is distinct from false[\s\S]*platform_binding\.economic_contributions_enabled is distinct from false[\s\S]*platform_binding\.ai_dispatch_enabled is distinct from false/,
   "retained platform authority remains canonical and closed");
-assert.match(overlay, /platform_gate_check\.conrelid='private\.integration_production_platform_bindings'::regclass/);
-assert.match(overlay, /'\(binding_key=''vaeroex-production-integrations-v1''::text\)'[\s\S]*'\(NOTai_dispatch_enabled\)'/,
-  "all retained and future platform rows remain on the canonical closed Production target");
+assert.match(overlay, /platform_relation\.relowner=\(select oid from pg_catalog\.pg_roles where rolname=current_user\)/,
+  "the retained platform table remains owned by the trusted migration administrator");
 assert.match(overlay, /square_production_runtime_overlay_provider_acl_drifted/);
 assert.match(overlay, /private\.integration_production_provider_bindings',privilege_name/,
   "no denied runtime role may retain effective provider-table authority");
@@ -205,6 +201,13 @@ assert.match(overlay, /private\.integration_production_platform_bindings',privil
 assert.match(overlay, /square_production_runtime_overlay_authority_role_drifted/);
 assert.match(overlay, /authority_role_record\.rolcanlogin[\s\S]*membership\.set_option[\s\S]*member_role\.rolsuper/,
   "all six retained authority roles preserve exact non-login, non-assumable attributes");
+assert.match(overlay, /add constraint integration_production_platform_overlay_guard check\([\s\S]*binding_key='vaeroex-production-integrations-v1'[\s\S]*not ai_dispatch_enabled/,
+  "one validated platform guard scans all retained rows and pins future closed-state authority");
+assert.match(overlay, /add constraint integration_production_provider_overlay_guard check\([\s\S]*callback_uri !~\* '\(sandbox\|preview\|localhost\|sslip\\\.io\)'[\s\S]*split_part\(kms_key_resource,'\/',2\)=project_id[\s\S]*not ai_dispatch_enabled/,
+  "one validated provider guard scans all retained rows and pins endpoints, KMS scope, and gates");
+assert.match(overlay, /conname='integration_production_platform_overlay_guard'[\s\S]*convalidated/);
+assert.match(overlay, /conname='integration_production_provider_overlay_guard'[\s\S]*convalidated/,
+  "postflight retains both complete shared-table authority guards");
 assert.match(overlay, /to_regclass\('private\.integration_production_provider_bindings'\)/);
 assert.match(overlay, /to_regclass\('private\.square_account_configuration'\)/);
 assert.match(overlay, /rolname='square_production_runtime_authority'/);
