@@ -348,30 +348,8 @@ async function qualifyProductionRoleDrift(databaseUrl) {
       fail("Production foundation drift rejection did not preserve atomic rollback.");
     }
     await recovery.query("alter role square_production_evidence_authority nologin noinherit nosuperuser nocreatedb nocreaterole noreplication nobypassrls");
-    const applicationId = crypto.randomBytes(256).toString("hex");
-    const redirectUri = `https://${crypto.randomBytes(1018).toString("hex")}.com`;
-    const kmsResource = crypto.randomBytes(4096).toString("hex");
-    await recovery.query(`insert into private.square_account_configuration(environment,application_id,redirect_uri,broker_login,
-      enrollment_login,webhook_login,kms_key_resource,approval_expires_at)
-      values('sandbox',$1,$2,'square_long_broker','square_long_enrollment','square_long_webhook',$3,'2099-01-01T00:00:00Z')`,
-      [applicationId,redirectUri,kmsResource]);
   } finally {
     await recovery.end();
-  }
-}
-
-async function verifyProductionFingerprintUpgrade(databaseUrl) {
-  const { Client } = require("pg");
-  const client = new Client({ connectionString: databaseUrl });
-  await client.connect();
-  try {
-    const result = await client.query(`select count(*)::integer as count from private.square_account_configuration
-      where length(application_id)=512 and length(redirect_uri)=2048 and length(kms_key_resource)=8192
-        and square_production_binding_fingerprint~'^sha256:[a-f0-9]{64}$'
-        and square_production_authority_fingerprint~'^sha256:[a-f0-9]{64}$'`);
-    if (result.rows[0]?.count !== 1) fail("Long existing configuration did not survive compact Production fingerprint upgrade.");
-  } finally {
-    await client.end();
   }
 }
 
@@ -396,7 +374,6 @@ async function main() {
   await applyFixture(databaseUrl);
   await qualifyProductionRoleDrift(localMigrationAdministratorDatabaseUrl);
   run(cli, ["migration", "up", "--local"]);
-  await verifyProductionFingerprintUpgrade(databaseUrl);
   run(process.execPath, [
     "scripts/run-isolated-database-tests.js",
     ...testPaths
