@@ -342,7 +342,7 @@ async function qualifyProductionRoleDrift(databaseUrl) {
   await recovery.connect();
   try {
     const state = (await recovery.query(
-      "select r.rolcanlogin, to_regclass('private.square_production_runtime_binding') is null as rolled_back from pg_roles r where r.rolname='square_production_evidence_authority'"
+      "select r.rolcanlogin, to_regclass('private.integration_production_platform_bindings') is null as rolled_back from pg_roles r where r.rolname='square_production_evidence_authority'"
     )).rows[0];
     if (!state?.rolcanlogin || !state?.rolled_back) {
       fail("Production foundation drift rejection did not preserve atomic rollback.");
