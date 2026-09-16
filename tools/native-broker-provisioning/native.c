@@ -1331,7 +1331,7 @@ static void production_authority_diagnostic(const char *target, bool identity_ok
     identity_ok?"true":"false",profile_ok?"true":"false",platform_closed?"true":"false",provider_closed?"true":"false",
     configuration_closed?"true":"false",capability_closed?"true":"false",closed?"true":"false",locked?"true":"false",
     phase!=PRODUCTION_PHASE_INVALID?"true":"false",contract?"true":"false",oauth?"true":"false",broker?"true":"false",
-    scheduler?"true":"false",webhook?"true":"false",runtime?"true":"false",evidence?"true":"false",broker_wrapper?"true":"false",
+    scheduler?"true":"false",webhook?"true":"false",runtime?"true":"false",evidence?"true":"false",
     broker_role_exists?"true":"false",broker_capability_exists?"true":"false",broker_wrapper_exists?"true":"false",broker_wrapper?"true":"false",
     broker_helper?"true":"false",broker_capability_role?"true":"false",broker_no_membership?"true":"false",broker_target_absent?"true":"false",
     broker_public_usage?"true":"false",broker_execute_acl?"true":"false",broker_private_closed?"true":"false");
