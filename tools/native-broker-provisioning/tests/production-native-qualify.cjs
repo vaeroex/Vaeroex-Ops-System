@@ -447,6 +447,8 @@ async function main() {
     executable: binaries.get(postflightProfile.name), target: postflightTarget,
   });
   const postflightDrift = profiles.find(profile => profile.name === "oauth");
+  const postflightLock = await fixture.connect();
+  await postflightLock.query("BEGIN; LOCK TABLE pg_catalog.pg_proc IN SHARE MODE");
   let postflightDeliveryInvoked = false, postflightMutated = false;
   let postflightMutationBlocked = false, postflightDenied = false;
   try {
@@ -483,9 +485,32 @@ async function main() {
   check(postflightMutated === false, "authority_drift_delivery_mutation_not_applied");
   check(postflightMutationBlocked === true, "authority_drift_delivery_blocked_by_authority_lock");
   check(postflightDenied === true, "authority_drift_native_rejected_after_delivery");
+  await postflightLock.query("ROLLBACK");
+  await postflightLock.end().catch(() => undefined);
   check((await postflightNative.inspect({ target: postflightTarget, intent: "postflight-authority-restored",
     approvalId: "synthetic-production", signal: new AbortController().signal })).ack,
   "failed_postflight_assignment_rolls_back_and_restored_authority_inspects");
+  let appliedDeliveryInvoked = false, appliedMutation = false, appliedDenied = false;
+  try {
+    await postflightNative.assign({ target: postflightTarget, intent: "postflight-authority-recheck-applied",
+      approvalId: "synthetic-production", signal: new AbortController().signal, async deliver() {
+        appliedDeliveryInvoked = true;
+        await fixture.control.query(`CREATE OR REPLACE FUNCTION ${overlayRpcDefinition(postflightDrift)} RETURNS void
+          LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path='' AS
+          $function$ BEGIN RAISE EXCEPTION 'synthetic_postflight_drift' USING ERRCODE='55000'; END $function$`);
+        appliedMutation = true;
+        return { ack: true };
+      } });
+  } catch { appliedDenied = true; }
+  if (appliedMutation) await fixture.control.query(`CREATE OR REPLACE FUNCTION ${overlayRpcDefinition(postflightDrift)} RETURNS void
+    LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path='' AS $function$${productionAuthoritySource(postflightDrift)}$function$`);
+  process.stdout.write(JSON.stringify({ outcome: "postflight_authority_drift_applied_observation",
+    deliveryInvoked: appliedDeliveryInvoked === true,
+    deliveryMutatedAuthority: appliedMutation === true,
+    nativeRejectedAfterDelivery: appliedDenied === true }) + "\n");
+  check(appliedDeliveryInvoked === true, "authority_drift_applied_delivery_invoked");
+  check(appliedMutation === true, "authority_drift_applied_mutation_committed");
+  check(appliedDenied === true, "authority_drift_applied_native_rejected_after_delivery");
   stage = "current_permission_recheck";
   await fixture.control.query("GRANT SELECT(secret) ON private.production_business_probe TO square_production_runtime_authority");
   const driftProfile = profiles.find(profile => profile.name === "runtime");
