@@ -40,14 +40,23 @@ terminal.
    seller, then explicitly record the merchant, business entity and location
    IDs. Compare provider discovery to that record; do not infer a mapping from
    names or the provider default. Approve only that exact tuple for the private
-   allowlist and stop if any identity is ambiguous. Seller, workspace, entity
-   and location identifiers must not enter the repository, qualification JSON,
-   CI artifacts, issues, PR comments or chat.
+   allowlist and stop if any identity is ambiguous. A separately reviewed
+   backend/agent procedure—not this personal handoff—must apply the approved
+   private tuple and verify that a foreign workspace, seller, business entity and
+   location each fail closed. Retain those exact checks only in the private
+   operating record. The procedure may export at most a sanitized count readback
+   showing one allowlist entry, one distinct workspace and one distinct seller.
+   Those counts do not prove the mapping. Seller, workspace, entity and location
+   identifiers must not enter the repository, qualification JSON, CI artifacts,
+   issues, PR comments or chat.
 
-3. Give consent only after the agent-run readback shows the exact reviewed
-   overlay, database closure, six deployed release identities, version-1
-   credential metadata, one exact allowlisted tuple, clean callback/webhook
-   boundaries, passing lifecycle/rollback evidence and every gate still false.
+3. Give consent only after the sanitized qualifier reports a passed preflight,
+   mapping still required outside the qualifier and no activation authority, and
+   after the separate private operating record verifies the exact one allowlisted
+   tuple. Together they must cover the reviewed overlay, database closure, six
+   deployed release identities, version-1 credential metadata, clean
+   callback/webhook boundaries, passing lifecycle/rollback evidence and every
+   gate still false. Neither record substitutes for the other.
    Authorize only that one internal seller with the five reviewed read scopes
    and only the minimum separately approved read-only pilot gates. Do not enable
    a second customer, economics, Vaeroex dispatch, QBO changes or additional

@@ -129,6 +129,12 @@
     "economicContributionsAllowed": false,
     "aiDispatchAllowed": false
   },
+  "qualificationBoundary": {
+    "scope": "sanitized_preflight_only",
+    "privateMappingVerification": "required_outside_qualifier",
+    "identifiersAllowedInEvidence": false,
+    "activationAuthority": "not_granted"
+  },
   "requiredOperationalChecks": [
     "callbackHealthAlert",
     "signatureFailureAlert",
@@ -143,8 +149,7 @@
     "backupReadback",
     "restoreDrill",
     "rollbackDrill",
-    "incidentContacts",
-    "productionWorkspaceReadback"
+    "incidentContacts"
   ],
   "requiredSyntheticScenarios": [
     "initialSync",

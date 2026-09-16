@@ -78,9 +78,10 @@ if (args.includes("--help")) {
     "Usage: node qualify.mjs --evidence FILE --expect-head 40_HEX_COMMIT [--expect-blocked]",
     "",
     "Reads only a sanitized, nonsecret evidence file. It never contacts Production,",
-    "reads credentials, changes a gate, calls Square, or provisions infrastructure.",
-    "Without --expect-blocked, the command exits nonzero until every pre-activation",
-    "check passes while all activation gates remain false.",
+    "reads credentials or private mapping identifiers, changes a gate, calls Square,",
+    "or provisions infrastructure. Exact private subject mapping is reviewed separately.",
+    "Without --expect-blocked, the command exits nonzero until every sanitized",
+    "preflight check passes while all activation gates remain false.",
     ""
   ].join("\n"));
   process.exit(0);
@@ -102,10 +103,10 @@ try {
   });
   process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
   const expectedBlocked = args.includes("--expect-blocked");
-  if (expectedBlocked ? result.readyForOneCustomerActivationReview : !result.readyForOneCustomerActivationReview) {
+  if (expectedBlocked ? result.sanitizedPreflightPassed : !result.sanitizedPreflightPassed) {
     process.exitCode = 1;
   }
 } catch (error) {
-  process.stderr.write(`${error instanceof Error ? error.message : "pilot qualification failed"}\n`);
+  process.stderr.write("pilot qualification input rejected\n");
   process.exitCode = 1;
 }

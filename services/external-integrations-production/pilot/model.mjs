@@ -3,17 +3,19 @@ import fs from "node:fs";
 
 const allowedEvidenceKeys = new Set([
   "contractVersion", "sourceCommit", "projectId", "region", "hostname", "callbackUrl", "webhookUrl",
-  "database", "productionReleaseDeployment", "credentialVersionsPresent", "activationGates", "pilotAllowlist",
+  "database", "productionReleaseDeployment", "credentialVersionsPresent", "activationGates", "pilotScopeCounts",
   "operationalChecks"
 ]);
+const expectedQualificationBoundary = Object.freeze({
+  scope: "sanitized_preflight_only",
+  privateMappingVerification: "required_outside_qualifier",
+  identifiersAllowedInEvidence: false,
+  activationAuthority: "not_granted"
+});
 
 function exactKeys(value, keys, label) {
   assert.equal(value && typeof value === "object" && !Array.isArray(value), true, `${label} must be an object`);
   assert.deepEqual(Object.keys(value).sort(), [...keys].sort(), `${label} keys differ from the closed contract`);
-}
-
-function isUuid(value) {
-  return typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
 function safeIdentifier(value) {
@@ -44,11 +46,25 @@ function containsCredentialMaterial(value, path = "$") {
   return null;
 }
 
+function containsPrivateMappingMaterial(value, path = "$") {
+  if (!value || typeof value !== "object") return null;
+  for (const [key, nested] of Object.entries(value)) {
+    if (/^(?:workspaceId|merchantId|businessEntityId|locationIds?|sellerId)$/i.test(key)) return `${path}.${key}`;
+    const found = containsPrivateMappingMaterial(nested, `${path}.${key}`);
+    if (found) return found;
+  }
+  return null;
+}
+
 export function loadJson(file) {
   return JSON.parse(fs.readFileSync(file, "utf8"));
 }
 
 export function qualifyPilotEvidence(contract, evidence, expectedHead, sourceControl = {}) {
+  const privateMappingPath = containsPrivateMappingMaterial(evidence);
+  if (privateMappingPath !== null) {
+    throw new Error("private mapping identifiers are forbidden in sanitized pilot evidence");
+  }
   exactKeys(evidence, allowedEvidenceKeys, "evidence");
   const credentialPath = containsCredentialMaterial(evidence);
   assert.equal(credentialPath, null, `credential material is forbidden in pilot evidence: ${credentialPath}`);
@@ -159,34 +175,47 @@ export function qualifyPilotEvidence(contract, evidence, expectedHead, sourceCon
   exactKeys(evidence.activationGates, contract.activationGates, "activation gates");
   for (const gate of contract.activationGates) requireEqual(evidence.activationGates[gate], false, `gate_must_remain_closed:${gate}`);
 
-  assert.equal(Array.isArray(evidence.pilotAllowlist), true, "pilotAllowlist must be an array");
-  if (evidence.pilotAllowlist.length !== 1) findings.push("exactly_one_workspace_required");
-  const sellerKeys = ["workspaceId", "merchantId", "businessEntityId", "locationIds", "internalSeller", "mappingConfirmed"];
-  for (const [index, seller] of evidence.pilotAllowlist.entries()) {
-    exactKeys(seller, sellerKeys, `pilotAllowlist[${index}]`);
-    if (!isUuid(seller.workspaceId)) findings.push(`invalid_workspace_id:${index}`);
-    for (const field of ["merchantId", "businessEntityId"]) if (!safeIdentifier(seller[field])) findings.push(`invalid_${field}:${index}`);
-    if (!Array.isArray(seller.locationIds) || seller.locationIds.length < 1 ||
-      new Set(seller.locationIds).size !== seller.locationIds.length || seller.locationIds.some((value) => !safeIdentifier(value))) {
-      findings.push(`invalid_location_mapping:${index}`);
+  const pilotScopeCountKeys = ["allowlistEntryCount", "distinctWorkspaceCount", "distinctSellerCount"];
+  exactKeys(evidence.pilotScopeCounts, pilotScopeCountKeys, "pilot scope count evidence");
+  for (const key of pilotScopeCountKeys) {
+    if (!Number.isSafeInteger(evidence.pilotScopeCounts[key]) || evidence.pilotScopeCounts[key] < 0) {
+      findings.push(`invalid_pilot_scope_count:${key}`);
     }
-    requireEqual(seller.internalSeller, true, `seller_not_internal:${index}`);
-    requireEqual(seller.mappingConfirmed, true, `seller_mapping_unconfirmed:${index}`);
   }
-  if (new Set(evidence.pilotAllowlist.map(({ workspaceId }) => workspaceId)).size !== evidence.pilotAllowlist.length) {
-    findings.push("duplicate_workspace_allowlist_entry");
-  }
-  if (new Set(evidence.pilotAllowlist.map(({ merchantId }) => merchantId)).size !== evidence.pilotAllowlist.length) {
-    findings.push("duplicate_merchant_allowlist_entry");
-  }
+  requireEqual(contract.pilotPolicy.maximumAllowlistedWorkspaces, 1, "pilot_workspace_limit_not_one");
+  requireEqual(contract.pilotPolicy.maximumAllowlistedSellers, 1, "pilot_seller_limit_not_one");
+  requireEqual(contract.pilotPolicy.requiresInternalSeller, true, "pilot_must_require_internal_seller");
+  requireEqual(contract.pilotPolicy.requiresExplicitBusinessEntityMapping, true,
+    "pilot_must_require_explicit_business_entity_mapping");
+  requireEqual(contract.pilotPolicy.requiresExplicitLocationMapping, true,
+    "pilot_must_require_explicit_location_mapping");
+  requireEqual(contract.pilotPolicy.automaticMapping, false, "pilot_automatic_mapping_must_remain_disabled");
+  requireEqual(evidence.pilotScopeCounts.allowlistEntryCount, 1, "exactly_one_allowlist_entry_required");
+  requireEqual(evidence.pilotScopeCounts.distinctWorkspaceCount, 1, "exactly_one_workspace_required");
+  requireEqual(evidence.pilotScopeCounts.distinctSellerCount, 1, "exactly_one_seller_required");
+
+  exactKeys(contract.qualificationBoundary, Object.keys(expectedQualificationBoundary), "qualification boundary");
+  requireEqual(contract.qualificationBoundary.scope, expectedQualificationBoundary.scope,
+    "qualification_scope_not_sanitized_only");
+  requireEqual(contract.qualificationBoundary.privateMappingVerification,
+    expectedQualificationBoundary.privateMappingVerification,
+    "private_mapping_boundary_not_explicit");
+  requireEqual(contract.qualificationBoundary.identifiersAllowedInEvidence,
+    expectedQualificationBoundary.identifiersAllowedInEvidence,
+    "private_identifiers_must_be_forbidden");
+  requireEqual(contract.qualificationBoundary.activationAuthority, expectedQualificationBoundary.activationAuthority,
+    "qualification_must_not_grant_activation_authority");
 
   exactKeys(evidence.operationalChecks, contract.requiredOperationalChecks, "operational checks");
   for (const check of contract.requiredOperationalChecks) requireEqual(evidence.operationalChecks[check], true, `operational_check_missing:${check}`);
 
   return Object.freeze({
     contractVersion: contract.contractVersion,
-    sourceCommit: evidence.sourceCommit,
-    readyForOneCustomerActivationReview: findings.length === 0,
+    sourceCommit: expectedHead,
+    qualificationScope: expectedQualificationBoundary.scope,
+    sanitizedPreflightPassed: findings.length === 0,
+    privateMappingVerification: expectedQualificationBoundary.privateMappingVerification,
+    activationAuthority: expectedQualificationBoundary.activationAuthority,
     gatesRemainClosed: contract.activationGates.every((gate) => evidence.activationGates[gate] === false),
     releasePairChanges: Object.freeze(releasePairChanges),
     findings: Object.freeze([...new Set(findings)].sort())

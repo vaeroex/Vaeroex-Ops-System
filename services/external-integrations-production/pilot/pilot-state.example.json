@@ -41,7 +41,11 @@
     "economicContributionsEnabled": false,
     "aiDispatchEnabled": false
   },
-  "pilotAllowlist": [],
+  "pilotScopeCounts": {
+    "allowlistEntryCount": 0,
+    "distinctWorkspaceCount": 0,
+    "distinctSellerCount": 0
+  },
   "operationalChecks": {
     "callbackHealthAlert": false,
     "signatureFailureAlert": false,
@@ -56,7 +60,6 @@
     "backupReadback": false,
     "restoreDrill": false,
     "rollbackDrill": false,
-    "incidentContacts": false,
-    "productionWorkspaceReadback": false
+    "incidentContacts": false
   }
 }

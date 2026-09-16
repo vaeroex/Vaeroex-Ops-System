@@ -8,7 +8,8 @@ const root = path.resolve(__dirname, "..");
 const pilot = path.join(root, "services/external-integrations-production/pilot");
 const read = (name) => fs.readFileSync(path.join(pilot, name), "utf8");
 const contract = JSON.parse(read("contract.json"));
-const baseline = JSON.parse(read("pilot-state.example.json"));
+const baselineSource = read("pilot-state.example.json");
+const baseline = JSON.parse(baselineSource);
 const model = read("model.mjs");
 const tests = read("model.test.mjs");
 const qualification = read("qualify.mjs");
@@ -53,8 +54,28 @@ for (const triggerBinding of contract.database.requiredOverlayObjects.triggers) 
 }
 assert.equal(contract.pilotPolicy.maximumAllowlistedWorkspaces, 1);
 assert.equal(contract.pilotPolicy.maximumAllowlistedSellers, 1);
+assert.equal(contract.pilotPolicy.requiresInternalSeller, true);
+assert.equal(contract.pilotPolicy.requiresExplicitBusinessEntityMapping, true);
+assert.equal(contract.pilotPolicy.requiresExplicitLocationMapping, true);
+assert.equal(contract.pilotPolicy.automaticMapping, false);
 assert.equal(contract.pilotPolicy.economicContributionsAllowed, false);
 assert.equal(contract.pilotPolicy.aiDispatchAllowed, false);
+assert.deepEqual(contract.qualificationBoundary, {
+  scope: "sanitized_preflight_only",
+  privateMappingVerification: "required_outside_qualifier",
+  identifiersAllowedInEvidence: false,
+  activationAuthority: "not_granted"
+});
+assert.deepEqual(baseline.pilotScopeCounts, {
+  allowlistEntryCount: 0,
+  distinctWorkspaceCount: 0,
+  distinctSellerCount: 0
+});
+assert.equal("pilotAllowlist" in baseline, false);
+assert.equal(contract.requiredOperationalChecks.includes("productionWorkspaceReadback"), false);
+for (const field of ["workspaceId", "merchantId", "businessEntityId", "locationIds"]) {
+  assert.doesNotMatch(baselineSource, new RegExp(`"${field}"`), `${field} is forbidden in sanitized example evidence`);
+}
 assert.equal(new Set(Object.keys(contract.database.loginBindings)).size, 6);
 assert.equal(new Set(Object.values(contract.database.loginBindings)).size, 6);
 assert.deepEqual(contract.database.authorityRpcBindings, Object.fromEntries([
@@ -122,7 +143,10 @@ for (const scenario of contract.requiredSyntheticScenarios) {
 }
 for (const action of contract.prohibitedActions) assert.ok(contract.prohibitedActions.includes(action));
 assert.match(model, /credential material is forbidden/);
+assert.match(model, /private mapping identifiers are forbidden in sanitized pilot evidence/);
+assert.match(model, /exactly_one_allowlist_entry_required/);
 assert.match(model, /exactly_one_workspace_required/);
+assert.match(model, /exactly_one_seller_required/);
 assert.match(model, /gate_must_remain_closed/);
 assert.match(qualification, /never contacts Production/);
 assert.match(qualification, /createHash\("sha256"\)/);
@@ -131,6 +155,7 @@ assert.match(qualification, /merge-base", "--is-ancestor"/);
 assert.match(qualification, /qualificationSourceHead/);
 assert.match(qualification, /qualificationSourcesExact/);
 assert.match(qualification, /status", "--porcelain=v1"/);
+assert.match(qualification, /pilot qualification input rejected/);
 assert.doesNotMatch(readme, /6b5ccc4513150312e5c3a1dbcce81fab111571e7/,
   "the handoff command must resolve the exact current qualification head instead of a stale base");
 
@@ -262,6 +287,12 @@ for (const document of [readme, handoff]) {
 }
 assert.match(handoff, /only the minimum separately approved read-only\s+pilot gates/);
 assert.match(handoff, /Do not enable\s+a second\s+customer, economics, Vaeroex dispatch, QBO changes or additional\s+infrastructure/);
+assert.match(readme, /aggregate counts[\s\S]*do not prove[\s\S]*exact business[\s\S]*entity and location mapping/);
+assert.match(readme, /qualifier rejects identifier fields and mapping\s+booleans/);
+assert.match(readme, /privateMappingVerification:[\s\S]*required_outside_qualifier/);
+assert.match(readme, /activationAuthority:[\s\S]*not_granted/);
+assert.match(handoff, /Those counts\s+do not prove the mapping/);
+assert.match(handoff, /Neither record substitutes for the other/);
 assert.match(readme, /No implementation\s+for creating and privately delivering the exact six Production LOGINs is\s+committed in this repository/);
 assert.match(readme, /explicit readiness\s+blocker/);
 assert.match(readme, /fixed six-profile Production extension of\s+`tools\/native-broker-provisioning`/);
@@ -293,7 +324,10 @@ const blockedOutput = run(process.execPath, [
   "--expect-blocked"
 ]);
 const blocked = JSON.parse(blockedOutput);
-assert.equal(blocked.readyForOneCustomerActivationReview, false);
+assert.equal(blocked.qualificationScope, "sanitized_preflight_only");
+assert.equal(blocked.sanitizedPreflightPassed, false);
+assert.equal(blocked.privateMappingVerification, "required_outside_qualifier");
+assert.equal(blocked.activationAuthority, "not_granted");
 assert.equal(blocked.gatesRemainClosed, true);
 assert.ok(blocked.findings.includes("database_ledger_not_exact_overlay"));
 assert.ok(blocked.findings.includes("qualification_source_head_mismatch"));
@@ -303,6 +337,57 @@ assert.ok(blocked.findings.includes("reviewed_overlay_source_not_in_qualificatio
 assert.ok(blocked.findings.includes("square_overlay_source_commit_mismatch"));
 assert.ok(blocked.findings.includes("reviewed_overlay_source_missing_or_mismatch"));
 assert.ok(blocked.findings.includes("production_release_deployment_mismatch:sharedBootstrapSourceCommit"));
+
+// Malformed or closed-contract evidence must fail with one fixed label. Neither
+// parser/assertion details nor private-looking canaries may reach stdout/stderr.
+const rejectionFixture = fs.mkdtempSync(path.join(os.tmpdir(), "vaeroex-pilot-rejected-evidence-"));
+try {
+  const canary = "RAW_IDENTIFIER_CANARY_MUST_NOT_APPEAR";
+  const qualifyEvidence = (name, contents) => {
+    const evidencePath = path.join(rejectionFixture, name);
+    fs.writeFileSync(evidencePath, contents);
+    return spawnSync(process.execPath, [
+      path.join(pilot, "qualify.mjs"), "--evidence", evidencePath,
+      "--expect-head", baseline.sourceCommit, "--expect-blocked"
+    ], { cwd: root, encoding: "utf8", env: { PATH: process.env.PATH } });
+  };
+  const unknown = structuredClone(baseline);
+  unknown[canary] = true;
+  const rawIdentifierCases = ["workspaceId", "merchantId", "businessEntityId", "locationIds"].map((field) => {
+    const evidence = structuredClone(baseline);
+    evidence.pilotScopeCounts[field] = field === "locationIds" ? [canary] : canary;
+    return [`raw-${field}.json`, JSON.stringify(evidence)];
+  });
+  const mappingClaimCases = ["mappingConfirmed", "internalSeller"].map((field) => {
+    const evidence = structuredClone(baseline);
+    evidence.pilotScopeCounts[field] = true;
+    return [`mapping-${field}.json`, JSON.stringify(evidence)];
+  });
+  for (const [name, contents] of [
+    ["malformed.json", `{"value":"${canary}"`],
+    ["unknown.json", JSON.stringify(unknown)],
+    ...rawIdentifierCases,
+    ...mappingClaimCases
+  ]) {
+    const rejected = qualifyEvidence(name, contents);
+    assert.notEqual(rejected.status, 0, `${name} must be rejected`);
+    assert.equal(rejected.stdout, "");
+    assert.equal(rejected.stderr, "pilot qualification input rejected\n");
+    assert.doesNotMatch(`${rejected.stdout}${rejected.stderr}`, new RegExp(canary));
+  }
+
+  const invalidSource = structuredClone(baseline);
+  invalidSource.sourceCommit = canary;
+  const sanitized = qualifyEvidence("invalid-source.json", JSON.stringify(invalidSource));
+  assert.equal(sanitized.status, 0);
+  assert.equal(sanitized.stderr, "");
+  assert.doesNotMatch(sanitized.stdout, new RegExp(canary));
+  const sanitizedResult = JSON.parse(sanitized.stdout);
+  assert.equal(sanitizedResult.sourceCommit, baseline.sourceCommit);
+  assert.ok(sanitizedResult.findings.includes("source_commit_mismatch"));
+} finally {
+  fs.rmSync(rejectionFixture, { recursive: true, force: true });
+}
 
 // Exercise the actual CLI in a synthetic repository. A stale or modified SQL
 // verifier must not be able to reuse the fixed postflight marker as evidence.

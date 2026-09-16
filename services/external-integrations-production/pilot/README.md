@@ -1,13 +1,13 @@
 # Production Square internal-seller pilot package
 
-This package is an offline, nonsecret gate for the first one-workspace internal
+This package is an offline, nonsecret preflight for the first one-workspace internal
 seller pilot. It does not activate Square. The checked-in example intentionally
 describes the current blocked state: Production database foundation
 `20260902191323` is present, the Square overlay and layered callback are pending,
 credential containers are empty, the allowlist is empty, and every gate is
 false.
 
-An activation-review candidate must have the adjacent reviewed Square overlay
+A sanitized preflight candidate must have the adjacent reviewed Square overlay
 as its exact ledger head, `20260902191324`. Its evidence must also name the
 source-controlled migration path, match the contract's reviewed SHA-256 of that
 file and merged source commit, and carry the exact object-and-authorization
@@ -33,8 +33,8 @@ node services/external-integrations-production/pilot/qualify.mjs \
   --expect-blocked
 ```
 
-For an activation-review candidate, create a private evidence JSON outside the
-repository from sanitized readbacks only and omit `--expect-blocked`. The checker
+For a preflight candidate, create a sanitized evidence JSON outside the
+repository from nonsecret readbacks only and omit `--expect-blocked`. The checker
 accepts no extra fields, credential-shaped values, URLs carrying database
 credentials, or open gate. It requires each credential container readback to be
 exactly enabled version `1` with a total version count of `1`. It also compares
@@ -42,9 +42,17 @@ the deployed shared-bootstrap, OAuth-callback and callback-edge source/image
 pairs to the separately reviewed release pins in the contract, and verifies all
 three source commits are ancestors of the qualification head. It compares the
 six pins to the prior reviewed release: the shared pair must remain unchanged,
-while only the OAuth and edge pairs may advance. A pass reports those two changed
-pairs and means only “eligible for a separate human activation review”; it
-neither grants authorization nor mutates a system.
+while only the OAuth and edge pairs may advance. Pilot scope is represented only
+by aggregate counts: exactly one allowlist entry, one distinct workspace and one
+distinct seller. Those counts enforce the one-customer ceiling; they do not prove
+which workspace or seller was selected, internal ownership, or the exact business
+entity and location mapping. The qualifier rejects identifier fields and mapping
+booleans. Exact mapping is verified only in the private operating record under
+`PRIVATE-HANDOFF.md` and remains required even after a pass. A pass reports
+`sanitizedPreflightPassed: true`,
+`privateMappingVerification: "required_outside_qualifier"` and
+`activationAuthority: "not_granted"`; it neither grants authorization nor
+mutates a system.
 
 Run the synthetic lifecycle coverage with:
 
@@ -186,21 +194,28 @@ example still describes the hosted state.
    metadata and operator audit evidence. Require enabled version `1` and total
    count `1` for each exact container; a lost acknowledgement or any extra
    version remains unresolved and must never trigger a retry.
-6. After Isaac records the private internal workspace/seller/entity/location
-   tuple, apply only that exact private allowlist entry. Verify a foreign
-   workspace, seller, entity and location each fail closed and keep all
-   identifiers out of source, logs and sanitized evidence.
+6. After Isaac privately selects and approves the exact tuple in
+   `PRIVATE-HANDOFF.md`, use only the separately reviewed backend procedure to
+   apply that tuple and verify that a foreign workspace, seller, business entity
+   and location each fail closed. Keep the exact checks in the private operating
+   record. Retain for the qualifier only a sanitized readback of aggregate scope:
+   exactly one allowlist entry, one distinct workspace and one distinct seller.
+   Do not ingest, infer or reproduce the private tuple; keep all identifiers out
+   of source, logs and sanitized evidence.
 7. Only after the separately reviewed executable Production binding/runtime is
    deployed closed, run the bounded initial and overlapping incremental lifecycle checks,
    pagination/replay/cancellation/timeout/lost-ack checks, credential-refresh
    and webhook-dedup checks, backup/restore isolation check, and rollback drill.
    Do not contact QBO, enable economics or Vaeroex dispatch, claim historical
    completeness, or use real credentials/provider payloads as test values.
-8. Assemble the private sanitized evidence, run the offline qualifier at the
-   exact reviewed head, and confirm it reports only eligibility for a separate
-   human activation review. Do not open any gate before the explicit consent in
-   `PRIVATE-HANDOFF.md`; after consent, apply only the separately reviewed
-   one-customer read-only activation and retain the expiry/rollback monitoring.
+8. Assemble the sanitized evidence, run the offline qualifier at the exact
+   reviewed head, and confirm only that the sanitized preflight passed, private
+   mapping remains required outside the qualifier and no activation authority was
+   granted. The qualifier does not validate or replace Isaac's private operating
+   record. Do not open any gate before the explicit consent in
+   `PRIVATE-HANDOFF.md`; after consent combines both separate reviews, apply only
+   the separately reviewed one-customer read-only activation and retain the
+   expiry/rollback monitoring.
 
 The sole manual handoff is [PRIVATE-HANDOFF.md](PRIVATE-HANDOFF.md). Do not put
 seller identifiers, credentials, private database endpoints, customer data or

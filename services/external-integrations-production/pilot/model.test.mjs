@@ -52,14 +52,11 @@ function reviewCandidate() {
   for (const slot of contract.credentialSlots) {
     evidence.credentialVersionsPresent[slot] = { version: 1, state: "ENABLED", totalCount: 1 };
   }
-  evidence.pilotAllowlist = [{
-    workspaceId: "11111111-1111-4111-8111-111111111111",
-    merchantId: "MERCHANT_INTERNAL_1",
-    businessEntityId: "ENTITY_INTERNAL_1",
-    locationIds: ["LOCATION_INTERNAL_1"],
-    internalSeller: true,
-    mappingConfirmed: true
-  }];
+  evidence.pilotScopeCounts = {
+    allowlistEntryCount: 1,
+    distinctWorkspaceCount: 1,
+    distinctSellerCount: 1
+  };
   for (const check of contract.requiredOperationalChecks) evidence.operationalChecks[check] = true;
   return evidence;
 }
@@ -82,7 +79,7 @@ const reviewedSource = {
 
 test("the checked-in Production baseline is closed and accurately blocked", () => {
   const result = qualifyPilotEvidence(contract, baseline, head);
-  assert.equal(result.readyForOneCustomerActivationReview, false);
+  assert.equal(result.sanitizedPreflightPassed, false);
   assert.equal(result.gatesRemainClosed, true);
   assert.ok(result.findings.includes("database_ledger_not_exact_overlay"));
   assert.ok(result.findings.includes("qualification_source_head_mismatch"));
@@ -93,7 +90,9 @@ test("the checked-in Production baseline is closed and accurately blocked", () =
   assert.ok(result.findings.includes("square_overlay_sha256_mismatch"));
   assert.ok(result.findings.includes("database_overlay_object_postflight_missing"));
   assert.ok(result.findings.includes("production_release_deployment_mismatch:sharedBootstrapSourceCommit"));
+  assert.ok(result.findings.includes("exactly_one_allowlist_entry_required"));
   assert.ok(result.findings.includes("exactly_one_workspace_required"));
+  assert.ok(result.findings.includes("exactly_one_seller_required"));
   for (const slot of contract.credentialSlots) {
     assert.ok(result.findings.includes(`credential_version_not_one:${slot}`));
     assert.ok(result.findings.includes(`credential_version_not_enabled:${slot}`));
@@ -101,17 +100,23 @@ test("the checked-in Production baseline is closed and accurately blocked", () =
   }
 });
 
-test("one mapped internal seller can reach review while every gate stays closed", () => {
+test("one-customer aggregate scope can pass sanitized preflight while every gate stays closed", () => {
   const evidence = reviewCandidate();
   const result = qualifyPilotEvidence(reviewedContract(), evidence, head, reviewedSource);
   assert.deepEqual(result.findings, []);
   assert.deepEqual(result.releasePairChanges, ["oauthCallback", "callbackEdge"]);
-  assert.equal(result.readyForOneCustomerActivationReview, true);
+  assert.equal(result.sourceCommit, head);
+  assert.equal(result.qualificationScope, "sanitized_preflight_only");
+  assert.equal(result.sanitizedPreflightPassed, true);
+  assert.equal(result.privateMappingVerification, "required_outside_qualifier");
+  assert.equal(result.activationAuthority, "not_granted");
   assert.equal(result.gatesRemainClosed, true);
+  assert.doesNotMatch(JSON.stringify(evidence), /workspaceId|merchantId|businessEntityId|locationIds/);
+  assert.doesNotMatch(JSON.stringify(result), /workspaceId|merchantId|businessEntityId|locationIds/);
 
   evidence.activationGates.economicContributionsEnabled = true;
   const economic = qualifyPilotEvidence(reviewedContract(), evidence, head, reviewedSource);
-  assert.equal(economic.readyForOneCustomerActivationReview, false);
+  assert.equal(economic.sanitizedPreflightPassed, false);
   assert.ok(economic.findings.includes("gate_must_remain_closed:economicContributionsEnabled"));
 });
 
@@ -131,26 +136,29 @@ test("review requires exact overlay, full production release and version-one cre
     [(e) => { e.productionReleaseDeployment.oauthCallbackImageDigest = oauthCallbackImageDigest.replace(/d/g, "e"); }, "production_release_deployment_mismatch:oauthCallbackImageDigest"],
     [(e) => { e.credentialVersionsPresent.application.version = 2; }, "credential_version_not_one:application"],
     [(e) => { e.credentialVersionsPresent.application.state = "DISABLED"; }, "credential_version_not_enabled:application"],
-    [(e) => { e.credentialVersionsPresent.application.totalCount = 2; }, "credential_version_count_not_one:application"]
+    [(e) => { e.credentialVersionsPresent.application.totalCount = 2; }, "credential_version_count_not_one:application"],
+    [(e) => { e.pilotScopeCounts.allowlistEntryCount = 2; }, "exactly_one_allowlist_entry_required"],
+    [(e) => { e.pilotScopeCounts.distinctWorkspaceCount = 2; }, "exactly_one_workspace_required"],
+    [(e) => { e.pilotScopeCounts.distinctSellerCount = 2; }, "exactly_one_seller_required"]
   ]) {
     const evidence = structuredClone(baselineCandidate);
     mutate(evidence);
     const result = qualifyPilotEvidence(reviewed, evidence, head, reviewedSource);
-    assert.equal(result.readyForOneCustomerActivationReview, false);
+    assert.equal(result.sanitizedPreflightPassed, false);
     assert.ok(result.findings.includes(expected), expected);
   }
 });
 
 test("the reviewed overlay must exist in the source tree with the pinned bytes", () => {
   const result = qualifyPilotEvidence(reviewedContract(), reviewCandidate(), head);
-  assert.equal(result.readyForOneCustomerActivationReview, false);
+  assert.equal(result.sanitizedPreflightPassed, false);
   assert.ok(result.findings.includes("reviewed_overlay_source_missing_or_mismatch"));
 });
 
 test("qualification logic and contract bytes must match the immutable head", () => {
   const source = { ...reviewedSource, qualificationSourcesExact: false };
   const result = qualifyPilotEvidence(reviewedContract(), reviewCandidate(), head, source);
-  assert.equal(result.readyForOneCustomerActivationReview, false);
+  assert.equal(result.sanitizedPreflightPassed, false);
   assert.ok(result.findings.includes("qualification_sources_not_exact_head"));
 });
 
@@ -161,7 +169,7 @@ test("every reviewed release source must be included in the qualification head",
       sourceCommitsIncluded: { ...reviewedSource.sourceCommitsIncluded, [field]: false }
     };
     const result = qualifyPilotEvidence(reviewedContract(), reviewCandidate(), head, source);
-    assert.equal(result.readyForOneCustomerActivationReview, false);
+    assert.equal(result.sanitizedPreflightPassed, false);
     assert.ok(result.findings.includes(`reviewed_release_source_not_in_qualification_head:${field}`));
   }
 });
@@ -170,30 +178,56 @@ test("each changed release pair advances its source and digest together", () => 
   const reviewed = reviewedContract();
   reviewed.reviewedProductionRelease.oauthCallbackSourceCommit = reviewed.priorProductionRelease.oauthCallbackSourceCommit;
   const result = qualifyPilotEvidence(reviewed, reviewCandidate(), head, reviewedSource);
-  assert.equal(result.readyForOneCustomerActivationReview, false);
+  assert.equal(result.sanitizedPreflightPassed, false);
   assert.ok(result.findings.includes("release_pair_change_mismatch:oauthCallback"));
 });
 
-test("evidence is exact, one-customer only, and cannot carry credential material", () => {
+test("qualification boundary drift cannot alter fail-safe output", () => {
+  for (const [field, value, finding] of [
+    ["scope", "activation_ready", "qualification_scope_not_sanitized_only"],
+    ["privateMappingVerification", "confirmed", "private_mapping_boundary_not_explicit"],
+    ["identifiersAllowedInEvidence", true, "private_identifiers_must_be_forbidden"],
+    ["activationAuthority", "granted", "qualification_must_not_grant_activation_authority"]
+  ]) {
+    const drifted = reviewedContract();
+    drifted.qualificationBoundary[field] = value;
+    const result = qualifyPilotEvidence(drifted, reviewCandidate(), head, reviewedSource);
+    assert.equal(result.sanitizedPreflightPassed, false);
+    assert.ok(result.findings.includes(finding));
+    assert.equal(result.qualificationScope, "sanitized_preflight_only");
+    assert.equal(result.privateMappingVerification, "required_outside_qualifier");
+    assert.equal(result.activationAuthority, "not_granted");
+  }
+});
+
+test("evidence is exact, count-limited, and cannot carry credential material", () => {
   assert.throws(() => qualifyPilotEvidence(contract, { ...baseline, password: "synthetic-canary" }, head), /closed contract/);
   const leaked = structuredClone(baseline);
   leaked.projectId = "postgresql://synthetic.example.invalid/db";
   assert.throws(() => qualifyPilotEvidence(contract, leaked, head), /credential material is forbidden/);
   assert.throws(() => qualifyPilotEvidence(contract, baseline, "main"), /immutable Git commit/);
 
-  const duplicate = structuredClone(baseline);
-  duplicate.pilotAllowlist = [0, 1].map(() => ({
-    workspaceId: "11111111-1111-4111-8111-111111111111",
-    merchantId: "MERCHANT_INTERNAL_1",
-    businessEntityId: "ENTITY_INTERNAL_1",
-    locationIds: ["LOCATION_INTERNAL_1"],
-    internalSeller: true,
-    mappingConfirmed: true
-  }));
-  const result = qualifyPilotEvidence(contract, duplicate, head);
+  const oversized = reviewCandidate();
+  oversized.pilotScopeCounts = {
+    allowlistEntryCount: 2,
+    distinctWorkspaceCount: 2,
+    distinctSellerCount: 2
+  };
+  const result = qualifyPilotEvidence(reviewedContract(), oversized, head, reviewedSource);
+  assert.ok(result.findings.includes("exactly_one_allowlist_entry_required"));
   assert.ok(result.findings.includes("exactly_one_workspace_required"));
-  assert.ok(result.findings.includes("duplicate_workspace_allowlist_entry"));
-  assert.ok(result.findings.includes("duplicate_merchant_allowlist_entry"));
+  assert.ok(result.findings.includes("exactly_one_seller_required"));
+});
+
+test("sanitized qualification rejects legacy allowlists and mapping claims", () => {
+  const legacy = reviewCandidate();
+  delete legacy.pilotScopeCounts;
+  legacy.pilotAllowlist = [];
+  assert.throws(() => qualifyPilotEvidence(reviewedContract(), legacy, head, reviewedSource), /closed contract/);
+
+  const booleanClaim = reviewCandidate();
+  booleanClaim.pilotScopeCounts.mappingConfirmed = true;
+  assert.throws(() => qualifyPilotEvidence(reviewedContract(), booleanClaim, head, reviewedSource), /closed contract/);
 });
 
 test("initial pagination, cancellation, timeout, replay and lost acknowledgement remain atomic", () => {
