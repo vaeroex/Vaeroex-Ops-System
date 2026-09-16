@@ -221,8 +221,10 @@ async function main() {
   // existing role identity. Use the actual create path so native prepare,
   // capability membership, and its acknowledged role OID establish the
   // production closed-state contract before the injected store failure.
+  const postMutationProfile = profiles[1];
+  const postMutationTarget = makeTarget(postMutationProfile);
   const postMutationNativeBase = adapterModule.createLocalSyntheticProductionNativeAdapter({
-    executable: binaries.get(failedProfile.name), target: failedTarget,
+    executable: binaries.get(postMutationProfile.name), target: postMutationTarget,
   });
   let postMutationRoleOid = "0";
   const postMutationNative = Object.freeze({
@@ -243,14 +245,14 @@ async function main() {
     },
   });
   const postMutationStore = lifecycleModule.createInMemorySyntheticSecretStore({ production: true });
-  const postMutationCoordinator = lifecycleModule.createSyntheticProductionProvisioningCoordinator({ target: failedTarget,
+  const postMutationCoordinator = lifecycleModule.createSyntheticProductionProvisioningCoordinator({ target: postMutationTarget,
     native: postMutationNative, secretStore: postMutationStore, audit: { async append() { return { ack: true }; } } });
   stage = "post_mutation_fixture_run";
   const postMutation = await postMutationCoordinator.run({ operation: "create", actor: "synthetic-owner",
     intent: "production-post-mutation-fence", approvalId: "synthetic-production", deadlineMs: 30000, cleanupTimeoutMs: 5000 });
   const postMutationRole = (await fixture.control.query(`SELECT rolcanlogin,rolinherit,
     (SELECT count(*)::integer FROM pg_stat_activity WHERE usename=$1) sessions
-    FROM pg_roles WHERE rolname=$1`, [failedProfile.role])).rows[0];
+    FROM pg_roles WHERE rolname=$1`, [postMutationProfile.role])).rows[0];
   const commitStatus = ["not_attempted", "uncertain", "acknowledged"].includes(postMutation.databaseCommit)
     ? postMutation.databaseCommit : "other";
   process.stdout.write(JSON.stringify({
@@ -275,7 +277,7 @@ async function main() {
   check(postMutationRole.rolcanlogin === false, "post_mutation_role_nologin");
   check(postMutationRole.rolinherit === false, "post_mutation_role_noinherit");
   check(postMutationRole.sessions === 0, "post_mutation_role_zero_sessions");
-  await fixture.control.query(`DROP ROLE ${failedProfile.role}`);
+  await fixture.control.query(`DROP ROLE ${postMutationProfile.role}`);
 
   for (const profile of profiles) {
     stage = `profile_${profile.name}`;
