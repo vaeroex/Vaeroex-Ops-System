@@ -1,9 +1,102 @@
 begin;
+
+-- Capture the Production-shaped authority closure before installing pgTAP.
+-- Supabase creates privileged extensions as supabase_admin; PostgreSQL REVOKE
+-- by postgres cannot remove the extension owner's original PUBLIC grants.
+-- Keeping the original predicates here tests the real 103-migration catalog
+-- without hiding any privilege behind test-only extension instrumentation.
+create temporary table square_production_pre_pgtap_authority_privileges
+on commit drop
+as
+select
+  (with authority(role_name) as (values
+    ('square_production_oauth_authority'),('square_production_broker_authority'),
+    ('square_production_scheduler_authority'),('square_production_webhook_authority'),
+    ('square_production_runtime_authority'),('square_production_evidence_authority')
+  ), application_relations as (
+    select relation.oid,relation_namespace.nspname,relation.relname,relation.relkind
+    from pg_catalog.pg_class relation
+    join pg_catalog.pg_namespace relation_namespace on relation_namespace.oid=relation.relnamespace
+    where relation_namespace.nspname<>'pg_catalog'
+      and relation_namespace.nspname<>'information_schema'
+      and relation_namespace.nspname not like 'pg\_toast%' escape '\'
+      and relation_namespace.nspname not like 'pg\_temp%' escape '\'
+      and relation.relkind in ('r','p','v','m','f')
+  ), relation_privileges(privilege_type) as (values
+    ('SELECT'),('INSERT'),('UPDATE'),('DELETE'),('TRUNCATE'),('REFERENCES'),('TRIGGER'),('MAINTAIN')
+  )
+    select count(*)::integer
+    from authority
+    cross join application_relations
+    cross join relation_privileges
+    where pg_catalog.has_table_privilege(
+      authority.role_name,application_relations.oid,relation_privileges.privilege_type
+    ) and not (
+      relation_privileges.privilege_type='SELECT'
+      and application_relations.nspname='extensions'
+      and application_relations.relname=any(array['pg_stat_statements','pg_stat_statements_info'])
+      and application_relations.relkind='v'
+      and not pg_catalog.has_schema_privilege(authority.role_name,'extensions','USAGE')
+      and not pg_catalog.pg_has_role(authority.role_name,'pg_read_all_stats','USAGE')
+      and exists (
+        select 1 from pg_catalog.pg_depend extension_dependency
+        join pg_catalog.pg_extension extension_record
+          on extension_record.oid=extension_dependency.refobjid
+        where extension_dependency.classid='pg_catalog.pg_class'::regclass
+          and extension_dependency.objid=application_relations.oid
+          and extension_dependency.objsubid=0
+          and extension_dependency.refclassid='pg_catalog.pg_extension'::regclass
+          and extension_dependency.deptype='e'
+          and extension_record.extname='pg_stat_statements'
+      )
+    )) as relation_privilege_count,
+  (with authority(role_name) as (values
+    ('square_production_oauth_authority'),('square_production_broker_authority'),
+    ('square_production_scheduler_authority'),('square_production_webhook_authority'),
+    ('square_production_runtime_authority'),('square_production_evidence_authority')
+  ), application_columns as (
+    select relation.oid,attribute.attnum,
+      relation_namespace.nspname,relation.relname,relation.relkind
+    from pg_catalog.pg_class relation
+    join pg_catalog.pg_namespace relation_namespace on relation_namespace.oid=relation.relnamespace
+    join pg_catalog.pg_attribute attribute on attribute.attrelid=relation.oid
+    where relation_namespace.nspname<>'pg_catalog'
+      and relation_namespace.nspname<>'information_schema'
+      and relation_namespace.nspname not like 'pg\_toast%' escape '\'
+      and relation_namespace.nspname not like 'pg\_temp%' escape '\'
+      and relation.relkind in ('r','p','v','m','f')
+      and attribute.attnum>0 and not attribute.attisdropped
+  ), column_privileges(privilege_type) as (values
+    ('SELECT'),('INSERT'),('UPDATE'),('REFERENCES')
+  )
+    select count(*)::integer
+    from authority
+    cross join application_columns
+    cross join column_privileges
+    where pg_catalog.has_column_privilege(
+      authority.role_name,application_columns.oid,
+      application_columns.attnum,column_privileges.privilege_type
+    ) and not (
+      column_privileges.privilege_type='SELECT'
+      and application_columns.nspname='extensions'
+      and application_columns.relname=any(array['pg_stat_statements','pg_stat_statements_info'])
+      and application_columns.relkind='v'
+      and not pg_catalog.has_schema_privilege(authority.role_name,'extensions','USAGE')
+      and not pg_catalog.pg_has_role(authority.role_name,'pg_read_all_stats','USAGE')
+      and exists (
+        select 1 from pg_catalog.pg_depend extension_dependency
+        join pg_catalog.pg_extension extension_record
+          on extension_record.oid=extension_dependency.refobjid
+        where extension_dependency.classid='pg_catalog.pg_class'::regclass
+          and extension_dependency.objid=application_columns.oid
+          and extension_dependency.objsubid=0
+          and extension_dependency.refclassid='pg_catalog.pg_extension'::regclass
+          and extension_dependency.deptype='e'
+          and extension_record.extname='pg_stat_statements'
+      )
+    )) as column_privilege_count;
+
 create extension if not exists pgtap with schema extensions;
--- pgTAP adds PUBLIC-readable diagnostic views that do not exist in the verified
--- Production baseline. Remove only those test-instrumentation grants inside
--- this rolled-back test transaction; the migration's authority guard is intact.
-revoke select on extensions.tap_funky, extensions.pg_all_foreign_keys from public;
 set local search_path=public,extensions;
 select no_plan();
 
@@ -182,92 +275,12 @@ select is((with authority(role_name) as (values
   where pg_catalog.has_schema_privilege(
     authority.role_name,application_schemas.oid,'create'
   )),0,'Square authorities cannot create objects in any non-system schema');
-select is((with authority(role_name) as (values
-  ('square_production_oauth_authority'),('square_production_broker_authority'),
-  ('square_production_scheduler_authority'),('square_production_webhook_authority'),
-  ('square_production_runtime_authority'),('square_production_evidence_authority')
-), application_relations as (
-  select relation.oid,relation_namespace.nspname,relation.relname,relation.relkind
-  from pg_catalog.pg_class relation
-  join pg_catalog.pg_namespace relation_namespace on relation_namespace.oid=relation.relnamespace
-  where relation_namespace.nspname<>'pg_catalog'
-    and relation_namespace.nspname<>'information_schema'
-    and relation_namespace.nspname not like 'pg\_toast%' escape '\'
-    and relation_namespace.nspname not like 'pg\_temp%' escape '\'
-    and relation.relkind in ('r','p','v','m','f')
-), relation_privileges(privilege_type) as (values
-  ('SELECT'),('INSERT'),('UPDATE'),('DELETE'),('TRUNCATE'),('REFERENCES'),('TRIGGER'),('MAINTAIN')
-)
-  select count(*)::integer
-  from authority
-  cross join application_relations
-  cross join relation_privileges
-  where pg_catalog.has_table_privilege(
-    authority.role_name,application_relations.oid,relation_privileges.privilege_type
-  ) and not (
-    relation_privileges.privilege_type='SELECT'
-    and application_relations.nspname='extensions'
-    and application_relations.relname=any(array['pg_stat_statements','pg_stat_statements_info'])
-    and application_relations.relkind='v'
-    and not pg_catalog.has_schema_privilege(authority.role_name,'extensions','USAGE')
-    and not pg_catalog.pg_has_role(authority.role_name,'pg_read_all_stats','USAGE')
-    and exists (
-      select 1 from pg_catalog.pg_depend extension_dependency
-      join pg_catalog.pg_extension extension_record
-        on extension_record.oid=extension_dependency.refobjid
-      where extension_dependency.classid='pg_catalog.pg_class'::regclass
-        and extension_dependency.objid=application_relations.oid
-        and extension_dependency.objsubid=0
-        and extension_dependency.refclassid='pg_catalog.pg_extension'::regclass
-        and extension_dependency.deptype='e'
-        and extension_record.extname='pg_stat_statements'
-    )
-  )),0,'Square authorities inherit no table privilege beyond the exact unusable statistics metadata views');
-select is((with authority(role_name) as (values
-  ('square_production_oauth_authority'),('square_production_broker_authority'),
-  ('square_production_scheduler_authority'),('square_production_webhook_authority'),
-  ('square_production_runtime_authority'),('square_production_evidence_authority')
-), application_columns as (
-  select relation.oid,attribute.attnum,
-    relation_namespace.nspname,relation.relname,relation.relkind
-  from pg_catalog.pg_class relation
-  join pg_catalog.pg_namespace relation_namespace on relation_namespace.oid=relation.relnamespace
-  join pg_catalog.pg_attribute attribute on attribute.attrelid=relation.oid
-  where relation_namespace.nspname<>'pg_catalog'
-    and relation_namespace.nspname<>'information_schema'
-    and relation_namespace.nspname not like 'pg\_toast%' escape '\'
-    and relation_namespace.nspname not like 'pg\_temp%' escape '\'
-    and relation.relkind in ('r','p','v','m','f')
-    and attribute.attnum>0 and not attribute.attisdropped
-), column_privileges(privilege_type) as (values
-  ('SELECT'),('INSERT'),('UPDATE'),('REFERENCES')
-)
-  select count(*)::integer
-  from authority
-  cross join application_columns
-  cross join column_privileges
-  where pg_catalog.has_column_privilege(
-    authority.role_name,application_columns.oid,
-    application_columns.attnum,column_privileges.privilege_type
-  ) and not (
-    column_privileges.privilege_type='SELECT'
-    and application_columns.nspname='extensions'
-    and application_columns.relname=any(array['pg_stat_statements','pg_stat_statements_info'])
-    and application_columns.relkind='v'
-    and not pg_catalog.has_schema_privilege(authority.role_name,'extensions','USAGE')
-    and not pg_catalog.pg_has_role(authority.role_name,'pg_read_all_stats','USAGE')
-    and exists (
-      select 1 from pg_catalog.pg_depend extension_dependency
-      join pg_catalog.pg_extension extension_record
-        on extension_record.oid=extension_dependency.refobjid
-      where extension_dependency.classid='pg_catalog.pg_class'::regclass
-        and extension_dependency.objid=application_columns.oid
-        and extension_dependency.objsubid=0
-        and extension_dependency.refclassid='pg_catalog.pg_extension'::regclass
-        and extension_dependency.deptype='e'
-        and extension_record.extname='pg_stat_statements'
-    )
-  )),0,'Square authorities inherit no column privilege beyond the exact unusable statistics metadata views');
+select is((select relation_privilege_count
+  from pg_temp.square_production_pre_pgtap_authority_privileges),0,
+  'Square authorities inherit no table privilege beyond the exact unusable statistics metadata views');
+select is((select column_privilege_count
+  from pg_temp.square_production_pre_pgtap_authority_privileges),0,
+  'Square authorities inherit no column privilege beyond the exact unusable statistics metadata views');
 select is((with authority(role_name) as (values
   ('square_production_oauth_authority'),('square_production_broker_authority'),
   ('square_production_scheduler_authority'),('square_production_webhook_authority'),

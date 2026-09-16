@@ -261,6 +261,18 @@ assert.deepEqual(
 );
 assert.doesNotMatch(pgTap, /^select\s+(?:un)?like\s*\(/gmi,
   "regex assertions use portable ok(expression [not] like pattern, description) forms");
+const prePgTapPrivilegeSnapshot = pgTap.indexOf(
+  "create temporary table square_production_pre_pgtap_authority_privileges"
+);
+const pgTapInstallation = pgTap.indexOf("create extension if not exists pgtap");
+assert.ok(prePgTapPrivilegeSnapshot >= 0 && prePgTapPrivilegeSnapshot < pgTapInstallation,
+  "authority relation and column privileges are captured before pgTAP adds test-only PUBLIC grants");
+assert.doesNotMatch(pgTap,
+  /revoke select on extensions\.(?:tap_funky|pg_all_foreign_keys)/i,
+  "qualification does not pretend a non-owner can revoke the extension owner's PUBLIC grants");
+assert.match(pgTap,
+  /select is\(\(select relation_privilege_count[\s\S]*select is\(\(select column_privilege_count/,
+  "pgTAP reports the unchanged pre-instrumentation relation and column privilege predicates");
 assert.match(pgTap,
   /application_routines\.oid<>expected\.rpc[\s\S]*has_schema_privilege\(expected\.role_name,application_routines\.namespace_oid,'usage'\)[\s\S]*has_function_privilege\(expected\.role_name,application_routines\.oid,'execute'\)\),0/,
   "PG17 qualification rejects every unrelated callable non-system routine grant"
