@@ -23,13 +23,14 @@ begin
   select pg_catalog.encode(extensions.digest(pg_catalog.convert_to(pg_catalog.string_agg(
     pg_catalog.length(version)::text||':'||version,'' order by version
   ),'UTF8'),'sha256'),'hex') into strict ledger_fingerprint
-  from supabase_migrations.schema_migrations where version<='20260902191324';
+  from supabase_migrations.schema_migrations where version<='20260902191325';
 
-  if (select count(*) from supabase_migrations.schema_migrations where version<='20260902191324')<>103
-    or ledger_fingerprint<>'224d377fe3f44a59dabd188ad897624207830940a985e408e0072fb7941db146'
+  if (select count(*) from supabase_migrations.schema_migrations where version<='20260902191325')<>104
+    or ledger_fingerprint<>'7dc51d888ee9c4a6bb595b1a4431ab5fcdb649e34c871ba91a6512d5fa2dc89f'
     or not exists(select 1 from supabase_migrations.schema_migrations where version='20260902191323')
     or not exists(select 1 from supabase_migrations.schema_migrations where version='20260902191324')
-    or exists(select 1 from supabase_migrations.schema_migrations where version>'20260902191324') then
+    or not exists(select 1 from supabase_migrations.schema_migrations where version='20260902191325')
+    or exists(select 1 from supabase_migrations.schema_migrations where version>'20260902191325') then
     raise exception using errcode='55000',message='square_production_overlay_ledger_not_exact';
   end if;
 
@@ -349,8 +350,7 @@ begin
   ), role_checks as (
     select 'login_attributes:'||expected.login_name check_name
     from expected left join pg_catalog.pg_roles login_role on login_role.rolname=expected.login_name
-    where login_role.oid is null or not login_role.rolcanlogin or not login_role.rolinherit
-      or login_role.rolsuper or login_role.rolcreatedb or login_role.rolcreaterole
+    where login_role.oid is null or login_role.rolsuper or login_role.rolcreatedb or login_role.rolcreaterole
       or login_role.rolreplication or login_role.rolbypassrls or login_role.rolconfig is not null
     union all
     select 'authority_attributes:'||expected.authority_name
@@ -358,6 +358,16 @@ begin
     where authority_role.oid is null or authority_role.rolcanlogin or authority_role.rolinherit
       or authority_role.rolsuper or authority_role.rolcreatedb or authority_role.rolcreaterole
       or authority_role.rolreplication or authority_role.rolbypassrls or authority_role.rolconfig is not null
+  ), role_phase_checks as (
+    select 'login_phase_not_uniform_or_safe'
+    from (
+      select count(login_role.oid) role_count,
+        bool_and(not login_role.rolcanlogin and not login_role.rolinherit) all_staged,
+        bool_and(login_role.rolcanlogin and login_role.rolinherit) all_active
+      from expected
+      left join pg_catalog.pg_roles login_role on login_role.rolname=expected.login_name
+    ) phase
+    where phase.role_count<>6 or not (phase.all_staged or phase.all_active)
   ), role_setting_checks as (
     select 'database_role_setting:'||target.role_name||':'||setting.setdatabase::text
     from target_roles target
@@ -742,6 +752,7 @@ begin
   ), violations as (
     select check_name from overlay_object_checks
     union all select check_name from role_checks
+    union all select * from role_phase_checks
     union all select * from role_setting_checks
     union all select * from membership_checks
     union all select * from relation_acl_checks
@@ -779,5 +790,174 @@ begin
 end
 $verification$;
 
-select 'square_production_overlay_object_and_authorization_postflight_passed' as nonsecret_result;
+select 'square_production_overlay_structural_and_authorization_postflight_passed' as nonsecret_result;
+
+select case
+  when bool_and(not rolcanlogin and not rolinherit)
+    then 'square_production_overlay_staged_role_postflight_passed'
+  when bool_and(rolcanlogin and rolinherit)
+    then 'square_production_overlay_active_role_postflight_passed'
+  else 'square_production_overlay_role_postflight_unreachable'
+end as nonsecret_result
+from pg_catalog.pg_roles
+where rolname=any(array[
+  'square_production_oauth','square_production_broker','square_production_scheduler',
+  'square_production_webhook','square_production_runtime','square_production_evidence'
+]);
+
+-- Final 104-migration runtime catalog and authority checks.  This second
+-- verifier is deliberately explicit so a future overlay cannot be mistaken
+-- for the internal runtime surface.
+do $runtime_catalog$
+declare
+  relation_name text;
+  function_signature text;
+  relation_oid oid;
+  procedure_oid oid;
+  role_oid oid;
+  authority_oid oid;
+  acl_count integer;
+  map record;
+  expected_relations text[] := array[
+    'private.integration_production_platform_bindings',
+    'private.integration_production_provider_bindings',
+    'private.integration_production_provider_secrets',
+    'private.integration_production_provider_capabilities',
+    'private.square_production_configuration_generations',
+    'private.square_production_runtime_bindings',
+    'private.square_production_generation_fences',
+    'private.square_production_lifecycle_audit_events',
+    'private.square_production_internal_permits',
+    'private.square_production_internal_oauth_states',
+    'private.square_production_internal_credentials',
+    'private.square_production_internal_scans',
+    'private.square_production_internal_page_receipts',
+    'private.square_production_internal_source_versions',
+    'private.square_production_internal_fences',
+    'private.square_production_internal_audit_events'
+  ];
+  expected_private_functions text[] := array[
+    'private.square_production_internal_reject_immutable_mutation_v1()',
+    'private.square_production_internal_guard_lifecycle_update_v1()',
+    'private.square_production_internal_require_keys_v1(text,text[])',
+    'private.square_production_internal_fingerprint_v1(text[])',
+    'private.square_production_internal_audit_v1(text,text,text,text,bigint,text,jsonb)',
+    'private.square_production_internal_require_login_v1(text)',
+    'private.square_production_internal_lock_permit_v1(uuid,text,boolean)',
+    'private.square_production_internal_install_permit_v1(jsonb)'
+  ];
+begin
+  foreach relation_name in array expected_relations loop
+    relation_oid := to_regclass(relation_name);
+    if relation_oid is null or not exists(
+      select 1 from pg_class c where c.oid=relation_oid and c.relkind='r'
+        and c.relpersistence='p' and c.relowner='postgres'::regrole
+        and c.relrowsecurity and c.relforcerowsecurity and not c.relhassubclass
+    ) then
+      raise exception using errcode='55000',message='square_production_internal_relation_not_exact',detail=relation_name;
+    end if;
+    if exists(select 1 from pg_policy p where p.polrelid=relation_oid)
+      or exists(select 1 from pg_inherits i where i.inhrelid=relation_oid or i.inhparent=relation_oid) then
+      raise exception using errcode='55000',message='square_production_internal_relation_boundary_not_exact',detail=relation_name;
+    end if;
+    if exists(select 1 from aclexplode((select c.relacl from pg_class c where c.oid=relation_oid)) a
+      where a.grantee<>('postgres'::regrole)::oid) then
+      raise exception using errcode='55000',message='square_production_internal_direct_table_acl_present',detail=relation_name;
+    end if;
+  end loop;
+  if (select count(*) from pg_trigger t where not t.tgisinternal and t.tgrelid=any(
+    array(select to_regclass(relation_name_value.name)
+      from unnest(expected_relations) as relation_name_value(name)))) <> 23 then
+    raise exception using errcode='55000',message='square_production_internal_trigger_inventory_not_exact';
+  end if;
+
+  foreach function_signature in array expected_private_functions loop
+    procedure_oid := to_regprocedure(function_signature);
+    if procedure_oid is null or not exists(select 1 from pg_proc p where p.oid=procedure_oid
+      and p.proowner='postgres'::regrole
+      and p.prosecdef=(function_signature not like 'private.square_production_internal_require_keys_v1%'
+        and function_signature not like 'private.square_production_internal_fingerprint_v1%')
+      and p.provolatile in ('i','s','v')
+      and p.proconfig @> array['search_path=""']::text[]) then
+      raise exception using errcode='55000',message='square_production_internal_private_function_not_exact',detail=function_signature;
+    end if;
+  end loop;
+
+  for map in select * from (values
+    ('public.square_production_internal_oauth_v1(text,jsonb)','square_production_oauth_authority'),
+    ('public.square_production_internal_broker_v1(text,jsonb)','square_production_broker_authority'),
+    ('public.square_production_internal_runtime_v1(text,jsonb)','square_production_runtime_authority'),
+    ('public.square_production_internal_evidence_v1(text,jsonb)','square_production_evidence_authority'),
+    ('public.check_square_production_scheduler_authority_v1(text,text,text,bigint,text)','square_production_scheduler_authority'),
+    ('public.check_square_production_webhook_authority_v1(text,text,text,bigint,text)','square_production_webhook_authority')
+  ) as authority_map(function_signature,authority_name) loop
+    procedure_oid := to_regprocedure(map.function_signature);
+    authority_oid := (map.authority_name)::regrole::oid;
+    if procedure_oid is null then
+      raise exception using errcode='55000',message='square_production_public_rpc_missing',detail=map.function_signature;
+    end if;
+    if map.function_signature like 'public.check_square%' then
+      if not exists(select 1 from pg_proc p where p.oid=procedure_oid
+        and p.proowner='postgres'::regrole and p.prosecdef and p.prorettype='void'::regtype
+        and p.proconfig @> array['search_path=""']::text[]) then
+        raise exception using errcode='55000',message='square_production_legacy_rpc_not_exact',detail=map.function_signature;
+      end if;
+    elsif not exists(select 1 from pg_proc p where p.oid=procedure_oid
+      and p.proowner='postgres'::regrole and p.prosecdef and p.provolatile='v'
+      and p.prorettype='jsonb'::regtype and p.proconfig @> array['search_path=""']::text[]) then
+      raise exception using errcode='55000',message='square_production_internal_public_rpc_not_exact',detail=map.function_signature;
+    end if;
+    select count(*) into acl_count from aclexplode((select p.proacl from pg_proc p where p.oid=procedure_oid)) a
+      where a.grantee=authority_oid and a.privilege_type='EXECUTE' and not a.is_grantable;
+    if acl_count<>1 or exists(select 1 from aclexplode((select p.proacl from pg_proc p where p.oid=procedure_oid)) a
+      where a.grantee not in (authority_oid,('postgres'::regrole)::oid)) then
+      raise exception using errcode='55000',message='square_production_public_rpc_acl_not_exact',detail=map.function_signature;
+    end if;
+  end loop;
+
+  foreach relation_name in array array[
+    'square_production_oauth_authority','square_production_broker_authority',
+    'square_production_scheduler_authority','square_production_webhook_authority',
+    'square_production_runtime_authority','square_production_evidence_authority'
+  ] loop
+    role_oid := (relation_name)::regrole::oid;
+    if exists(select 1 from pg_roles r where r.oid=role_oid and
+      (r.rolcanlogin or r.rolinherit or r.rolsuper or r.rolcreatedb or r.rolcreaterole
+       or r.rolreplication or r.rolbypassrls or r.rolconfig is not null)) then
+      raise exception using errcode='55000',message='square_production_authority_role_not_fenced',detail=relation_name;
+    end if;
+    if exists(select 1 from pg_auth_members m where m.member=role_oid
+      and (m.inherit_option or m.set_option or m.admin_option)) then
+      raise exception using errcode='55000',message='square_production_authority_membership_not_fenced',detail=relation_name;
+    end if;
+  end loop;
+end
+$runtime_catalog$;
+
+select 'square_production_internal_runtime_catalog_postflight_passed' as nonsecret_result,
+  '20260902191325' as ledger_head,
+  'sha256:7dc51d888ee9c4a6bb595b1a4431ab5fcdb649e34c871ba91a6512d5fa2dc89f' as ledger_fingerprint,
+  'db502e7671028fc9867d49c1b8c198b694d1f07674fe8312bdbc032d80570716' as migration_source_sha256,
+  array[
+    'public.check_square_production_scheduler_authority_v1(text,text,text,bigint,text)',
+    'public.check_square_production_webhook_authority_v1(text,text,text,bigint,text)',
+    'public.square_production_internal_broker_v1(text,jsonb)',
+    'public.square_production_internal_evidence_v1(text,jsonb)',
+    'public.square_production_internal_oauth_v1(text,jsonb)',
+    'public.square_production_internal_runtime_v1(text,jsonb)'
+  ]::text[] as authority_rpcs,
+  array[
+    'private.square_production_internal_reject_immutable_mutation_v1()',
+    'private.square_production_internal_guard_lifecycle_update_v1()',
+    'private.square_production_internal_require_keys_v1(text,text[])',
+    'private.square_production_internal_fingerprint_v1(text[])',
+    'private.square_production_internal_audit_v1(text,text,text,text,bigint,text,jsonb)',
+    'private.square_production_internal_require_login_v1(text)',
+    'private.square_production_internal_lock_permit_v1(uuid,bigint)',
+    'private.square_production_internal_install_permit_v1(jsonb)',
+    'public.square_production_internal_oauth_v1(text,jsonb)',
+    'public.square_production_internal_broker_v1(text,jsonb)',
+    'public.square_production_internal_runtime_v1(text,jsonb)',
+    'public.square_production_internal_evidence_v1(text,jsonb)'
+  ]::text[] as required_functions;
 rollback;

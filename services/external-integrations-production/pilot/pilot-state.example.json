@@ -1,5 +1,5 @@
 {
-  "contractVersion": "square_production_internal_seller_pilot_evidence_v1",
+  "contractVersion": "square_production_internal_seller_pilot_evidence_v2",
   "sourceCommit": "6b5ccc4513150312e5c3a1dbcce81fab111571e7",
   "projectId": "vaeroex-integrations-prod",
   "region": "us-west1",
@@ -12,7 +12,8 @@
     "overlayPath": null,
     "overlaySourceCommit": null,
     "overlaySha256": null,
-    "overlayObjectPostflight": null
+    "overlayObjectPostflight": null,
+    "rolePostflight": null
   },
   "productionReleaseDeployment": {
     "sharedBootstrapSourceCommit": null,
@@ -45,6 +46,19 @@
     "allowlistEntryCount": 0,
     "distinctWorkspaceCount": 0,
     "distinctSellerCount": 0
+  },
+  "phaseReceipts": {
+    "consent": { "marker": null, "fingerprint": null },
+    "locationMapping": { "marker": null, "fingerprint": null },
+    "initialSync": { "marker": null, "fingerprint": null },
+    "replay": { "marker": null, "fingerprint": null },
+    "workspaceEvidence": { "marker": null, "fingerprint": null },
+    "cleanupGateReadback": { "marker": null, "fingerprint": null },
+    "refresh": { "marker": null, "fingerprint": null },
+    "webhookDeduplication": { "marker": null, "fingerprint": null },
+    "revocation": { "marker": null, "fingerprint": null },
+    "disconnect": { "marker": null, "fingerprint": null },
+    "recovery": { "marker": null, "fingerprint": null }
   },
   "operationalChecks": {
     "callbackHealthAlert": false,

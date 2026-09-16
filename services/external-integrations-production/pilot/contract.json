@@ -1,5 +1,5 @@
 {
-  "contractVersion": "square_production_internal_seller_pilot_v1",
+  "contractVersion": "square_production_internal_seller_pilot_v3",
   "environment": "production",
   "projectId": "vaeroex-integrations-prod",
   "region": "us-west1",
@@ -21,7 +21,7 @@
     "requiredOverlayPath": "supabase/migrations/20260902191324_square_production_runtime_overlay.sql",
     "requiredOverlaySourceCommit": "aec44f42f216ceeb447b2b909eb2c6c78c02340e",
     "requiredOverlaySha256": "2cc43a9313d056e58b75143f032f347cb0972f45cc1edbd484f6b1fb0574661f",
-    "requiredPostflight": "square_production_overlay_object_and_authorization_postflight_passed",
+    "requiredPostflight": "square_production_overlay_structural_and_authorization_postflight_passed",
     "requiredOverlayObjects": {
       "relations": [
         "private.square_production_configuration_generations",
@@ -119,6 +119,314 @@
     "databaseRuntime",
     "databaseEvidence"
   ],
+  "qualificationPhases": {
+    "precredential_nonsecret": {
+      "enabledCredentialSlots": [],
+      "absentCredentialSlots": [
+        "application",
+        "webhookSignature",
+        "databaseOauth",
+        "databaseBroker",
+        "databaseScheduler",
+        "databaseWebhook",
+        "databaseRuntime",
+        "databaseEvidence"
+      ],
+      "requiresPilotScope": false,
+      "requiresProductionRuntime": true,
+      "requiredDatabaseRolePostflight": "square_production_internal_roles_closed_postflight_passed",
+      "requiredPhaseReceipts": [],
+      "requiredOperationalChecks": [
+        "callbackHealthAlert",
+        "primaryAndBackupAlertDelivery",
+        "backupReadback",
+        "restoreDrill",
+        "rollbackDrill",
+        "incidentContacts"
+      ]
+    },
+    "internal_consent_ready": {
+      "enabledCredentialSlots": [
+        "application",
+        "databaseOauth",
+        "databaseBroker"
+      ],
+      "absentCredentialSlots": [
+        "webhookSignature",
+        "databaseScheduler",
+        "databaseWebhook",
+        "databaseRuntime",
+        "databaseEvidence"
+      ],
+      "requiresPilotScope": true,
+      "requiresProductionRuntime": true,
+      "requiredDatabaseRolePostflight": "square_production_internal_roles_closed_postflight_passed",
+      "requiredPhaseReceipts": [],
+      "requiredOperationalChecks": [
+        "callbackHealthAlert",
+        "providerAuthAlert",
+        "backupFailureAlert",
+        "primaryAndBackupAlertDelivery",
+        "backupReadback",
+        "restoreDrill",
+        "rollbackDrill",
+        "incidentContacts"
+      ]
+    },
+    "internal_manual_sync_complete": {
+      "enabledCredentialSlots": [
+        "application",
+        "databaseOauth",
+        "databaseBroker",
+        "databaseRuntime",
+        "databaseEvidence"
+      ],
+      "absentCredentialSlots": [
+        "webhookSignature",
+        "databaseScheduler",
+        "databaseWebhook"
+      ],
+      "requiresPilotScope": true,
+      "requiresProductionRuntime": true,
+      "requiredDatabaseRolePostflight": "square_production_internal_roles_closed_postflight_passed",
+      "requiredPhaseReceipts": [
+        "consent",
+        "locationMapping",
+        "initialSync",
+        "replay",
+        "workspaceEvidence",
+        "cleanupGateReadback"
+      ],
+      "requiredOperationalChecks": [
+        "callbackHealthAlert",
+        "providerAuthAlert",
+        "rateLimitAlert",
+        "providerServerErrorAlert",
+        "taskAgeRetryDeadLetterAlert",
+        "staleIncompleteSyncAlert",
+        "backupFailureAlert",
+        "primaryAndBackupAlertDelivery",
+        "backupReadback",
+        "restoreDrill",
+        "rollbackDrill",
+        "incidentContacts"
+      ]
+    },
+    "post_initial_lifecycle": {
+      "enabledCredentialSlots": [
+        "application",
+        "webhookSignature",
+        "databaseOauth",
+        "databaseBroker",
+        "databaseScheduler",
+        "databaseWebhook",
+        "databaseRuntime",
+        "databaseEvidence"
+      ],
+      "absentCredentialSlots": [],
+      "requiresPilotScope": true,
+      "requiresProductionRuntime": true,
+      "requiredDatabaseRolePostflight": "square_production_internal_roles_closed_postflight_passed",
+      "requiredPhaseReceipts": [
+        "consent",
+        "locationMapping",
+        "initialSync",
+        "replay",
+        "workspaceEvidence",
+        "cleanupGateReadback",
+        "refresh",
+        "webhookDeduplication",
+        "revocation",
+        "disconnect",
+        "recovery"
+      ],
+      "requiredOperationalChecks": [
+        "callbackHealthAlert",
+        "signatureFailureAlert",
+        "credentialRefreshAlert",
+        "providerAuthAlert",
+        "rateLimitAlert",
+        "providerServerErrorAlert",
+        "taskAgeRetryDeadLetterAlert",
+        "staleIncompleteSyncAlert",
+        "backupFailureAlert",
+        "primaryAndBackupAlertDelivery",
+        "backupReadback",
+        "restoreDrill",
+        "rollbackDrill",
+        "incidentContacts"
+      ]
+    },
+    "external_customer_blocked": {
+      "enabledCredentialSlots": [],
+      "absentCredentialSlots": [
+        "application",
+        "webhookSignature",
+        "databaseOauth",
+        "databaseBroker",
+        "databaseScheduler",
+        "databaseWebhook",
+        "databaseRuntime",
+        "databaseEvidence"
+      ],
+      "requiresPilotScope": false,
+      "requiresProductionRuntime": false,
+      "requiredDatabaseRolePostflight": null,
+      "requiredPhaseReceipts": [],
+      "requiredOperationalChecks": []
+    }
+  },
+  "phaseReceiptMarkers": {
+    "consent": "square_production_internal_consent_postflight_passed",
+    "locationMapping": "square_production_internal_location_mapping_postflight_passed",
+    "initialSync": "square_production_internal_initial_sync_postflight_passed",
+    "replay": "square_production_internal_replay_postflight_passed",
+    "workspaceEvidence": "square_production_internal_workspace_evidence_postflight_passed",
+    "cleanupGateReadback": "square_production_internal_cleanup_gate_readback_postflight_passed",
+    "refresh": "square_production_internal_refresh_postflight_passed",
+    "webhookDeduplication": "square_production_internal_webhook_deduplication_postflight_passed",
+    "revocation": "square_production_internal_revocation_postflight_passed",
+    "disconnect": "square_production_internal_disconnect_postflight_passed",
+    "recovery": "square_production_internal_recovery_postflight_passed"
+  },
+  "productionRuntimeSurface": {
+    "baselineMigrationCount": 103,
+    "baselineHead": "20260902191324",
+    "baselineMigrationSourceSha256": "f66fee303a0b6462fb531d63a82f0868d6c04783a91db603a7572ed572f9abc5",
+    "baselineAuthorityRpcs": [
+      "square_production_broker_authority=public.check_square_production_broker_authority_v1(text,text,text,bigint,text)",
+      "square_production_evidence_authority=public.check_square_production_evidence_authority_v1(text,text,text,bigint,text)",
+      "square_production_oauth_authority=public.check_square_production_oauth_authority_v1(text,text,text,bigint,text)",
+      "square_production_runtime_authority=public.check_square_production_runtime_authority_v1(text,text,text,bigint,text)",
+      "square_production_scheduler_authority=public.check_square_production_scheduler_authority_v1(text,text,text,bigint,text)",
+      "square_production_webhook_authority=public.check_square_production_webhook_authority_v1(text,text,text,bigint,text)"
+    ],
+    "baselineBlockingPredicates": [
+      "customer_onboarding_enabled_constrained_false",
+      "oauth_requires_customer_onboarding_enabled",
+      "provider_calls_enabled_constrained_false",
+      "runtime_enabled_constrained_false"
+    ],
+    "runtimeContract": {
+      "status": "reviewed_runtime_migration",
+      "sourceCommit": "b61c5fc58156ae35c41df19e9bc1b7ba6fc4fe5a",
+      "sourcePath": "supabase/migrations/20260902191325_square_production_internal_pilot_runtime.sql",
+      "migrationCount": 104,
+      "ledgerHead": "20260902191325",
+      "ledgerFingerprint": "sha256:7dc51d888ee9c4a6bb595b1a4431ab5fcdb649e34c871ba91a6512d5fa2dc89f",
+      "migrationSourceSha256": "db502e7671028fc9867d49c1b8c198b694d1f07674fe8312bdbc032d80570716",
+      "authorityRpcs": [
+        "square_production_oauth_authority=public.square_production_internal_oauth_v1(text,jsonb)",
+        "square_production_broker_authority=public.square_production_internal_broker_v1(text,jsonb)",
+        "square_production_scheduler_authority=public.check_square_production_scheduler_authority_v1(text,text,text,bigint,text)",
+        "square_production_webhook_authority=public.check_square_production_webhook_authority_v1(text,text,text,bigint,text)",
+        "square_production_runtime_authority=public.square_production_internal_runtime_v1(text,jsonb)",
+        "square_production_evidence_authority=public.square_production_internal_evidence_v1(text,jsonb)"
+      ],
+      "requiredFunctions": [
+        "private.square_production_internal_reject_immutable_mutation_v1()",
+        "private.square_production_internal_guard_lifecycle_update_v1()",
+        "private.square_production_internal_require_keys_v1(jsonb,text[])",
+        "private.square_production_internal_fingerprint_v1(text[])",
+        "private.square_production_internal_audit_v1(uuid,bigint,text,text,text,text,timestamptz)",
+        "private.square_production_internal_require_login_v1(text)",
+        "private.square_production_internal_lock_permit_v1(uuid,text,boolean)",
+        "private.square_production_internal_install_permit_v1(jsonb)",
+        "public.square_production_internal_oauth_v1(text,jsonb)",
+        "public.square_production_internal_broker_v1(text,jsonb)",
+        "public.square_production_internal_runtime_v1(text,jsonb)",
+        "public.square_production_internal_evidence_v1(text,jsonb)"
+      ],
+      "catalogPostflight": {
+        "marker": "square_production_internal_runtime_catalog_postflight_passed",
+        "ledgerHead": "20260902191325",
+        "ledgerFingerprint": "sha256:7dc51d888ee9c4a6bb595b1a4431ab5fcdb649e34c871ba91a6512d5fa2dc89f",
+        "migrationSourceSha256": "db502e7671028fc9867d49c1b8c198b694d1f07674fe8312bdbc032d80570716",
+        "authorityRpcs": [
+          "square_production_oauth_authority=public.square_production_internal_oauth_v1(text,jsonb)",
+          "square_production_broker_authority=public.square_production_internal_broker_v1(text,jsonb)",
+          "square_production_scheduler_authority=public.check_square_production_scheduler_authority_v1(text,text,text,bigint,text)",
+          "square_production_webhook_authority=public.check_square_production_webhook_authority_v1(text,text,text,bigint,text)",
+          "square_production_runtime_authority=public.square_production_internal_runtime_v1(text,jsonb)",
+          "square_production_evidence_authority=public.square_production_internal_evidence_v1(text,jsonb)"
+        ],
+        "requiredFunctions": [
+          "private.square_production_generation_fingerprint_v1(bigint,text[])",
+          "private.square_production_configuration_fingerprint_v1(bigint,text,text,text,text,text,text,text,text,text,text,text,text,text,text,text,text,text[],text,text,text,text[],text,text,boolean,boolean,boolean,boolean,boolean,boolean,boolean)",
+          "private.reject_square_production_immutable_mutation_v1()",
+          "private.validate_square_production_runtime_binding_v1()",
+          "private.record_square_production_lifecycle_audit_v1()",
+          "private.check_square_production_operational_generation_v1(text,text,text,bigint,text,text)",
+          "public.check_square_production_oauth_authority_v1(text,text,text,bigint,text)",
+          "public.check_square_production_broker_authority_v1(text,text,text,bigint,text)",
+          "public.check_square_production_scheduler_authority_v1(text,text,text,bigint,text)",
+          "public.check_square_production_webhook_authority_v1(text,text,text,bigint,text)",
+          "public.check_square_production_runtime_authority_v1(text,text,text,bigint,text)",
+          "public.check_square_production_evidence_authority_v1(text,text,text,bigint,text)",
+          "private.square_production_internal_reject_immutable_mutation_v1()",
+          "private.square_production_internal_guard_lifecycle_update_v1()",
+          "private.square_production_internal_require_keys_v1(jsonb,text[])",
+          "private.square_production_internal_fingerprint_v1(text[])",
+          "private.square_production_internal_audit_v1(uuid,bigint,text,text,text,text,timestamptz)",
+          "private.square_production_internal_require_login_v1(text)",
+          "private.square_production_internal_lock_permit_v1(uuid,text,boolean)",
+          "private.square_production_internal_install_permit_v1(jsonb)",
+          "public.square_production_internal_oauth_v1(text,jsonb)",
+          "public.square_production_internal_broker_v1(text,jsonb)",
+          "public.square_production_internal_runtime_v1(text,jsonb)",
+          "public.square_production_internal_evidence_v1(text,jsonb)"
+        ]
+      }
+    }
+  },
+  "productionNativeProvisioning": {
+    "status": "reviewed_source_pending_execution_environment",
+    "sourceCommit": "01accbaefb283b911b7a1eb9dae50312071c450b",
+    "sourceSha256": "58a0a579f1c9b10437f46127cc5824721c65626d5b4a7dca1df924586b8a5a28",
+    "sourcePaths": [
+      ".github/workflows/ci.yml",
+      "package.json",
+      "scripts/run-square-production-overlay-qualification.js",
+      "tools/native-broker-provisioning/PRODUCTION-PROFILES.md",
+      "tools/native-broker-provisioning/adapter.mjs",
+      "tools/native-broker-provisioning/build-production.mjs",
+      "tools/native-broker-provisioning/dsn-codec.mjs",
+      "tools/native-broker-provisioning/lifecycle.mjs",
+      "tools/native-broker-provisioning/maintenance-identity.mjs",
+      "tools/native-broker-provisioning/maintenance-launcher.c",
+      "tools/native-broker-provisioning/maintenance-policy.mjs",
+      "tools/native-broker-provisioning/maintenance.mjs",
+      "tools/native-broker-provisioning/native.c",
+      "tools/native-broker-provisioning/production-profile.mjs",
+      "tools/native-broker-provisioning/production-source.mjs",
+      "tools/native-broker-provisioning/secret-manager-rest.mjs",
+      "tools/native-broker-provisioning/tests/bootstrap.cjs",
+      "tools/native-broker-provisioning/tests/dsn-codec.test.mjs",
+      "tools/native-broker-provisioning/tests/fixture.cjs",
+      "tools/native-broker-provisioning/tests/lifecycle.test.mjs",
+      "tools/native-broker-provisioning/tests/maintenance-launcher.test.mjs",
+      "tools/native-broker-provisioning/tests/maintenance.test.mjs",
+      "tools/native-broker-provisioning/tests/production-catalog-qualify.c",
+      "tools/native-broker-provisioning/tests/production-catalog-qualify.cjs",
+      "tools/native-broker-provisioning/tests/production-native-qualify.cjs",
+      "tools/native-broker-provisioning/tests/production-profiles.test.mjs"
+    ],
+    "profileNames": [
+      "square_production_broker",
+      "square_production_evidence",
+      "square_production_oauth",
+      "square_production_runtime",
+      "square_production_scheduler",
+      "square_production_webhook"
+    ],
+    "deploymentIdentityManifestSha256": null
+  },
+  "pilotCallbackRelease": {
+    "status": "pending_immutable_callback_release",
+    "sourceCommit": "52a18bbbaa9dbbd6054aa1aa4b3ab56c94883f52",
+    "imageDigest": null,
+    "scanMarker": null
+  },
   "pilotPolicy": {
     "maximumAllowlistedWorkspaces": 1,
     "maximumAllowlistedSellers": 1,
@@ -162,7 +470,10 @@
     "providerRevocation",
     "cancellation",
     "timeout",
-    "lostAcknowledgement"
+    "lostAcknowledgement",
+    "generationFencing",
+    "atomicPageValidation",
+    "canonicalSourceVersion"
   ],
   "prohibitedActions": [
     "activateGate",

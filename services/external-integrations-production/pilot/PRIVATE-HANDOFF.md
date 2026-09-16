@@ -21,14 +21,21 @@ terminal.
    verify the signed-in operator is exactly `isaac@vaeroex.com`, the project is
    exactly `vaeroex-integrations-prod`, and the already-existing
    `square-production-application` and
-   `square-production-webhook-signature` containers are empty. Proceed only if
+   `square-production-webhook-signature` containers are empty. For the first
+   consent/manual-sync phase, enter only the application credential and leave
+   the webhook-signature container empty. Proceed only if
    the current provider UI presents a verified protected entry surface that
    does not render or reveal the value. A plaintext textarea or unverified
    masking is not a no-echo path: stop and wait for a separately reviewed
    private delivery mechanism. Do not use a local CLI, helper, second
    host/window, clipboard capture or value readback. Retain only sanitized operator/audit metadata and
    a metadata-only result showing enabled version `1` with total count `1` for
-   each exact container. If creation is cancelled, times out or loses its
+   the application container and zero versions for the webhook-signature
+   container. Only after consent, explicit mapping, bounded manual initial sync,
+   replay, workspace verification and cleanup have succeeded may a separately
+   reviewed post-initial step enter the webhook signature through the same
+   protected procedure and verify enabled version `1` with total count `1`. If
+   creation is cancelled, times out or loses its
    acknowledgement, do not retry: keep all gates false, reconcile metadata and
    the operator audit event, and escalate an unresolved result for a reviewed
    recovery/rotation decision. Never inspect payload bytes, adopt `latest`,
@@ -50,12 +57,14 @@ terminal.
    identifiers must not enter the repository, qualification JSON, CI artifacts,
    issues, PR comments or chat.
 
-3. Give consent only after the sanitized qualifier reports a passed preflight,
-   mapping still required outside the qualifier and no activation authority, and
+3. Give consent only after the sanitized qualifier reports only internally
+   consistent assertions (never hosted proof), mapping still required outside the
+   qualifier and no activation authority, and
    after the separate private operating record verifies the exact one allowlisted
    tuple. Together they must cover the reviewed overlay, database closure, six
-   deployed release identities, version-1 credential metadata, clean
-   callback/webhook boundaries, passing lifecycle/rollback evidence and every
+   deployed release identities, phase-required version-1 credential metadata,
+   an empty webhook-signature slot, the clean callback boundary, required
+   pre-consent operational evidence and every
    gate still false. Neither record substitutes for the other.
    Authorize only that one internal seller with the five reviewed read scopes
    and only the minimum separately approved read-only pilot gates. Do not enable
