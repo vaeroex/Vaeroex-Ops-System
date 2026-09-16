@@ -12,6 +12,8 @@ declare
   object_record record;
   role_name text;
   role_record record;
+  expected_rpc regprocedure;
+  square_overlay_present boolean;
   schema_digest text;
 begin
   if to_regprocedure('private.integration_production_foundation_split_marker_v1()') is null then
@@ -87,11 +89,12 @@ begin
     'private.integration_production_provider_secrets',
     'private.integration_production_provider_capabilities'
   ] loop
-    select relkind,relowner,relrowsecurity,relforcerowsecurity
+    select relkind,relpersistence,relowner,relrowsecurity,relforcerowsecurity
       into strict object_record
     from pg_catalog.pg_class
     where oid=object_name::regclass;
     if object_record.relkind <> 'r'
+      or object_record.relpersistence <> 'p'
       or object_record.relowner <> marker_owner
       or not object_record.relrowsecurity
       or not object_record.relforcerowsecurity
@@ -257,6 +260,9 @@ begin
     raise exception 'integration_production_foundation_function_drift'
       using errcode = '55000';
   end if;
+  square_overlay_present :=
+    to_regclass('private.square_production_configuration_generations') is not null;
+
   foreach role_name in array array[
     'anon','authenticated','service_role',
     'square_production_oauth_authority','square_production_broker_authority',
@@ -306,6 +312,14 @@ begin
     'square_production_scheduler_authority','square_production_webhook_authority',
     'square_production_runtime_authority','square_production_evidence_authority'
   ] loop
+    expected_rpc := case role_name
+      when 'square_production_oauth_authority' then pg_catalog.to_regprocedure('public.check_square_production_oauth_authority_v1(text,text,text,bigint,text)')
+      when 'square_production_broker_authority' then pg_catalog.to_regprocedure('public.check_square_production_broker_authority_v1(text,text,text,bigint,text)')
+      when 'square_production_scheduler_authority' then pg_catalog.to_regprocedure('public.check_square_production_scheduler_authority_v1(text,text,text,bigint,text)')
+      when 'square_production_webhook_authority' then pg_catalog.to_regprocedure('public.check_square_production_webhook_authority_v1(text,text,text,bigint,text)')
+      when 'square_production_runtime_authority' then pg_catalog.to_regprocedure('public.check_square_production_runtime_authority_v1(text,text,text,bigint,text)')
+      when 'square_production_evidence_authority' then pg_catalog.to_regprocedure('public.check_square_production_evidence_authority_v1(text,text,text,bigint,text)')
+    end;
     select * into role_record from pg_catalog.pg_roles where rolname=role_name;
     if not found
       or role_record.rolcanlogin or role_record.rolinherit or role_record.rolsuper
@@ -331,12 +345,41 @@ begin
           and dependency.refobjid=role_record.oid
           and dependency.deptype in ('a','o')
           and not (
-            dependency.deptype='a'
+            dependency.deptype='a' and dependency.objsubid=0
             and dependency.dbid=(select oid from pg_catalog.pg_database where datname=current_database())
-            and dependency.classid='pg_namespace'::regclass
-            and dependency.objid='public'::regnamespace
-            and dependency.objsubid=0
+            and (
+              (
+                dependency.classid='pg_namespace'::regclass
+                and dependency.objid='public'::regnamespace
+              ) or (
+                square_overlay_present
+                and dependency.classid='pg_proc'::regclass
+                and dependency.objid=expected_rpc::oid
+              )
+            )
           )
+      )
+      or (
+        square_overlay_present and (
+          expected_rpc is null
+          or 1 <> (
+            select count(*)
+            from pg_catalog.pg_proc rpc
+            cross join lateral pg_catalog.aclexplode(rpc.proacl) rpc_acl
+            where rpc.oid=expected_rpc::oid
+              and rpc_acl.grantee<>rpc.proowner
+          )
+          or 1 <> (
+            select count(*)
+            from pg_catalog.pg_proc rpc
+            cross join lateral pg_catalog.aclexplode(rpc.proacl) rpc_acl
+            where rpc.oid=expected_rpc::oid
+              and rpc_acl.grantee=role_record.oid
+              and rpc_acl.grantor=rpc.proowner
+              and rpc_acl.privilege_type='EXECUTE'
+              and not rpc_acl.is_grantable
+          )
+        )
       )
       or 1 <> (
         select count(*)

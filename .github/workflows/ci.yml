@@ -647,6 +647,9 @@ jobs:
       - name: Qualify non-economic Square observation admission in disposable databases only
         run: node scripts/run-square-observation-database-qualification.js --supabase-local
 
+      - name: Qualify the exact Production baseline and dormant Square runtime overlay
+        run: node scripts/run-square-production-overlay-qualification.js
+
       - name: Remove isolated database state
         if: always()
         run: supabase stop --no-backup
