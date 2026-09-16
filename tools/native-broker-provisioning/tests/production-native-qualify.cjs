@@ -163,7 +163,8 @@ async function main() {
     const line = result.stdout.trim();
     let value;
     try { value = JSON.parse(line); } catch { value = null; }
-    const names = ["identity", "profile", "closedAuthority", "targetLock", "phaseValid", "productionContract",
+    const names = ["identity", "profile", "platformClosed", "providerClosed", "configurationClosed", "capabilityClosed",
+      "closedAuthority", "targetLock", "phaseValid", "productionContract",
       "oauthAuthority", "brokerAuthority", "schedulerAuthority", "webhookAuthority", "runtimeAuthority", "evidenceAuthority"];
     check(value?.outcome === "production_authority_diagnostic" && names.every(name => typeof value[name] === "boolean"),
       "post_mutation_authority_diagnostic_shape");

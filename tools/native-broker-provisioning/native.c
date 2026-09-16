@@ -1258,7 +1258,21 @@ static bool lock_target(const char *target);
  * a failed synthetic inspection can distinguish fixture setup from recovery;
  * it never includes connection data, SQL, credentials, or provider values. */
 static void production_authority_diagnostic(const char *target, bool identity_ok, bool profile_ok) {
+  const char *target_value[]={target};
   production_phase phase=production_ledger_phase();
+  bool platform_closed=true_query("SELECT NOT EXISTS (SELECT FROM private.integration_production_platform_bindings "
+    "WHERE infrastructure_provisioned OR runtime_enabled OR economic_contributions_enabled OR ai_dispatch_enabled)",0,NULL);
+  bool provider_closed=true_query("SELECT NOT EXISTS (SELECT FROM private.integration_production_provider_bindings "
+    "WHERE provider_key='square' AND environment='production' AND (enabled OR provider_calls_enabled "
+    "OR customer_onboarding_enabled OR webhook_intake_enabled OR evidence_enabled "
+    "OR economic_contributions_enabled OR ai_dispatch_enabled))",0,NULL);
+  bool configuration_closed=true_query("SELECT NOT EXISTS (SELECT FROM private.square_production_configuration_generations "
+    "WHERE runtime_enabled OR provider_calls_enabled OR customer_onboarding_enabled OR webhook_intake_enabled "
+    "OR evidence_enabled OR economic_contributions_enabled OR ai_dispatch_enabled)",0,NULL);
+  bool capability_closed=true_query("SELECT NOT EXISTS (SELECT FROM private.integration_production_provider_capabilities "
+    "WHERE database_login=$1 AND NOT (provider_key='square' AND environment='production' "
+    "AND project_id='vaeroex-integrations-prod' AND capability='" CAPABILITY_NAME "' "
+    "AND database_secret_purpose='database_" CAPABILITY_NAME "'))",1,target_value);
   bool closed=closed_authority(target);
   bool locked=closed && lock_target(target);
   bool contract=phase!=PRODUCTION_PHASE_INVALID && production_contract_valid(phase);
@@ -1280,8 +1294,9 @@ static void production_authority_diagnostic(const char *target, bool identity_ok
   bool evidence=production_named_authority_valid("square_production_evidence_authority",
     "public.check_square_production_evidence_authority_v1(text,text,text,bigint,text)",
     AUTHORITY_SOURCE_FOR("square_production_evidence_authority","evidence"),"square_production_evidence",false);
-  printf("{\"outcome\":\"production_authority_diagnostic\",\"identity\":%s,\"profile\":%s,\"closedAuthority\":%s,\"targetLock\":%s,\"phaseValid\":%s,\"productionContract\":%s,\"oauthAuthority\":%s,\"brokerAuthority\":%s,\"schedulerAuthority\":%s,\"webhookAuthority\":%s,\"runtimeAuthority\":%s,\"evidenceAuthority\":%s}\n",
-    identity_ok?"true":"false",profile_ok?"true":"false",closed?"true":"false",locked?"true":"false",
+  printf("{\"outcome\":\"production_authority_diagnostic\",\"identity\":%s,\"profile\":%s,\"platformClosed\":%s,\"providerClosed\":%s,\"configurationClosed\":%s,\"capabilityClosed\":%s,\"closedAuthority\":%s,\"targetLock\":%s,\"phaseValid\":%s,\"productionContract\":%s,\"oauthAuthority\":%s,\"brokerAuthority\":%s,\"schedulerAuthority\":%s,\"webhookAuthority\":%s,\"runtimeAuthority\":%s,\"evidenceAuthority\":%s}\n",
+    identity_ok?"true":"false",profile_ok?"true":"false",platform_closed?"true":"false",provider_closed?"true":"false",
+    configuration_closed?"true":"false",capability_closed?"true":"false",closed?"true":"false",locked?"true":"false",
     phase!=PRODUCTION_PHASE_INVALID?"true":"false",contract?"true":"false",oauth?"true":"false",broker?"true":"false",
     scheduler?"true":"false",webhook?"true":"false",runtime?"true":"false",evidence?"true":"false");
   fflush(stdout);
