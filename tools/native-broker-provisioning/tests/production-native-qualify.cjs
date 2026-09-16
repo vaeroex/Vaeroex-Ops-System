@@ -246,13 +246,28 @@ async function main() {
     native: postMutationNative, secretStore: postMutationStore, audit: { async append() { return { ack: true }; } } });
   const postMutation = await postMutationCoordinator.run({ operation: "rotate", actor: "synthetic-owner",
     intent: "production-post-mutation-fence", approvalId: "synthetic-production", deadlineMs: 30000, cleanupTimeoutMs: 5000 });
-  check(postMutation.fenceConfirmed && postMutation.requiresFreshReplacement && postMutation.databaseCommit === "uncertain",
-    "post_mutation_failure_requires_checked_recovery");
   const postMutationRole = (await fixture.control.query(`SELECT rolcanlogin,rolinherit,
     (SELECT count(*)::integer FROM pg_stat_activity WHERE usename=$1) sessions
     FROM pg_roles WHERE rolname=$1`, [failedProfile.role])).rows[0];
-  check(postMutationRole && !postMutationRole.rolcanlogin && !postMutationRole.rolinherit && postMutationRole.sessions === 0,
-    "post_mutation_failure_fences_exact_production_role");
+  const commitStatus = ["not_attempted", "uncertain", "acknowledged"].includes(postMutation.databaseCommit)
+    ? postMutation.databaseCommit : "other";
+  process.stdout.write(JSON.stringify({
+    outcome: "post_mutation_recovery_observation",
+    fenceConfirmed: postMutation.fenceConfirmed === true,
+    requiresFreshReplacement: postMutation.requiresFreshReplacement === true,
+    databaseCommit: commitStatus,
+    rolePresent: Boolean(postMutationRole),
+    noLogin: postMutationRole?.rolcanlogin === false,
+    noInherit: postMutationRole?.rolinherit === false,
+    zeroSessions: postMutationRole?.sessions === 0,
+  }) + "\n");
+  check(postMutation.fenceConfirmed === true, "post_mutation_fence_confirmed");
+  check(postMutation.requiresFreshReplacement === true, "post_mutation_recovery_required");
+  check(postMutation.databaseCommit === "uncertain", "post_mutation_commit_uncertain");
+  check(Boolean(postMutationRole), "post_mutation_role_present");
+  check(postMutationRole.rolcanlogin === false, "post_mutation_role_nologin");
+  check(postMutationRole.rolinherit === false, "post_mutation_role_noinherit");
+  check(postMutationRole.sessions === 0, "post_mutation_role_zero_sessions");
   await fixture.control.query(`DROP ROLE ${failedProfile.role}`);
 
   for (const profile of profiles) {
