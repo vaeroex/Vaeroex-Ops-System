@@ -253,6 +253,10 @@ async function main() {
     ? postMutation.databaseCommit : "other";
   process.stdout.write(JSON.stringify({
     outcome: "post_mutation_recovery_observation",
+    phase: ["fence", "assign_and_commit", "activate", "authenticate", "close", "staged_ready"].includes(postMutation.phase)
+      ? postMutation.phase : "other",
+    result: ["uncertain", "fenced_failure", "cancelled", "blocked"].includes(postMutation.outcome)
+      ? postMutation.outcome : "other",
     fenceConfirmed: postMutation.fenceConfirmed === true,
     requiresFreshReplacement: postMutation.requiresFreshReplacement === true,
     databaseCommit: commitStatus,
