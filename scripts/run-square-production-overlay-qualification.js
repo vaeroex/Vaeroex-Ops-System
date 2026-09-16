@@ -175,6 +175,40 @@ async function snapshotQboCatalog(databaseUrl) {
   }
 }
 
+async function snapshotPreservedRoutineAcls(databaseUrl) {
+  const client = new Client({ connectionString: databaseUrl });
+  await client.connect();
+  try {
+    const result = await client.query(`
+      select coalesce(pg_catalog.jsonb_agg(pg_catalog.jsonb_build_array(
+        namespace.nspname,
+        function_record.proname,
+        pg_catalog.pg_get_function_identity_arguments(function_record.oid),
+        owner_role.rolname,
+        case when function_acl.grantee=0 then 'PUBLIC' else grantee_role.rolname end,
+        function_acl.privilege_type,
+        function_acl.is_grantable
+      ) order by namespace.nspname,function_record.proname,
+        pg_catalog.pg_get_function_identity_arguments(function_record.oid),
+        function_acl.grantee,function_acl.privilege_type),'[]'::jsonb) as snapshot
+      from pg_catalog.pg_proc function_record
+      join pg_catalog.pg_namespace namespace on namespace.oid=function_record.pronamespace
+      join pg_catalog.pg_roles owner_role on owner_role.oid=function_record.proowner
+      cross join lateral pg_catalog.aclexplode(function_record.proacl) function_acl
+      left join pg_catalog.pg_roles grantee_role on grantee_role.oid=function_acl.grantee
+      where namespace.nspname not in ('pg_catalog','information_schema','extensions')
+        and function_record.proname not like '%square_production%'
+        and function_record.oid<>all(array[
+          'public.match_business_memory_chunks(uuid,extensions.vector,integer,double precision)'::regprocedure::oid,
+          'public.set_updated_at()'::regprocedure::oid
+        ])
+    `);
+    return result.rows[0].snapshot;
+  } finally {
+    await client.end();
+  }
+}
+
 async function main() {
   assertMigrationManifest();
   const databaseUrl = localDatabaseUrl();
@@ -183,10 +217,17 @@ async function main() {
   await qualifySubstitutedLedger(databaseUrl);
   run(cli, ["db", "reset", "--local", "--no-seed", "--version", baseVersion]);
   const beforeQbo = await snapshotQboCatalog(databaseUrl);
+  const beforePreservedRoutineAcls = await snapshotPreservedRoutineAcls(databaseUrl);
 
   run(cli, ["db", "reset", "--local", "--no-seed", "--version", overlayVersion]);
   const afterQbo = await snapshotQboCatalog(databaseUrl);
+  const afterPreservedRoutineAcls = await snapshotPreservedRoutineAcls(databaseUrl);
   assert.deepEqual(afterQbo, beforeQbo, "Square Production overlay leaves every QBO catalog contract unchanged");
+  assert.deepEqual(
+    afterPreservedRoutineAcls,
+    beforePreservedRoutineAcls,
+    "Square Production overlay preserves every unrelated explicit routine grant"
+  );
 
   run(process.execPath, [
     "scripts/run-isolated-database-tests.js",
