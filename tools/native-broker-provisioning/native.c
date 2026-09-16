@@ -160,6 +160,7 @@ static struct timespec started;
 static PGconn *db = NULL;
 static bool sensitive_started = false;
 static bool transaction = false;
+static bool last_query_error = false;
 
 static void wipe(void *p, size_t n) {
   volatile unsigned char *v = p;
@@ -247,9 +248,11 @@ static bool command(const char *sql) {
   return ok && !stopped();
 }
 static PGresult *query(const char *sql, int count, const char *const *values) {
+  last_query_error = false;
   if (stopped()) return NULL;
   PGresult *r = PQexecParams(db, sql, count, NULL, values, NULL, NULL, 0);
   if (!r || PQresultStatus(r) != PGRES_TUPLES_OK || stopped()) {
+    last_query_error = true;
     if (r) PQclear(r);
     return NULL;
   }
@@ -1254,6 +1257,14 @@ static bool production_authority_valid(const char *target) {
 #ifdef VAEROEX_SYNTHETIC_ONLY
 #ifdef VAEROEX_PRODUCTION_PROFILE
 static bool lock_target(const char *target);
+static bool diagnostic_named_authority(const char *capability,const char *authority_function,
+                                       const char *authority_source,const char *target,bool *query_error) {
+  if (!command("SAVEPOINT vaeroex_authority_diagnostic")) { *query_error=true; return false; }
+  bool value=production_named_authority_valid(capability,authority_function,authority_source,target,false);
+  *query_error=last_query_error;
+  if (!command("ROLLBACK TO SAVEPOINT vaeroex_authority_diagnostic")) *query_error=true;
+  return value;
+}
 /* Local qualification only. This emits fixed predicate labels and booleans so
  * a failed synthetic inspection can distinguish fixture setup from recovery;
  * it never includes connection data, SQL, credentials, or provider values. */
@@ -1276,24 +1287,25 @@ static void production_authority_diagnostic(const char *target, bool identity_ok
   bool closed=closed_authority(target);
   bool locked=closed && lock_target(target);
   bool contract=phase!=PRODUCTION_PHASE_INVALID && production_contract_valid(phase);
-  bool oauth=production_named_authority_valid("square_production_oauth_authority",
+  bool oauth_error=false,broker_error=false,scheduler_error=false,webhook_error=false,runtime_error=false,evidence_error=false;
+  bool oauth=diagnostic_named_authority("square_production_oauth_authority",
     "public.check_square_production_oauth_authority_v1(text,text,text,bigint,text)",
-    AUTHORITY_SOURCE_FOR("square_production_oauth_authority","oauth"),"square_production_oauth",false);
-  bool broker=production_named_authority_valid("square_production_broker_authority",
+    AUTHORITY_SOURCE_FOR("square_production_oauth_authority","oauth"),"square_production_oauth",&oauth_error);
+  bool broker=diagnostic_named_authority("square_production_broker_authority",
     "public.check_square_production_broker_authority_v1(text,text,text,bigint,text)",
-    AUTHORITY_SOURCE_FOR("square_production_broker_authority","broker"),"square_production_broker",false);
-  bool scheduler=production_named_authority_valid("square_production_scheduler_authority",
+    AUTHORITY_SOURCE_FOR("square_production_broker_authority","broker"),"square_production_broker",&broker_error);
+  bool scheduler=diagnostic_named_authority("square_production_scheduler_authority",
     "public.check_square_production_scheduler_authority_v1(text,text,text,bigint,text)",
-    AUTHORITY_SOURCE_FOR("square_production_scheduler_authority","scheduler"),"square_production_scheduler",false);
-  bool webhook=production_named_authority_valid("square_production_webhook_authority",
+    AUTHORITY_SOURCE_FOR("square_production_scheduler_authority","scheduler"),"square_production_scheduler",&scheduler_error);
+  bool webhook=diagnostic_named_authority("square_production_webhook_authority",
     "public.check_square_production_webhook_authority_v1(text,text,text,bigint,text)",
-    AUTHORITY_SOURCE_FOR("square_production_webhook_authority","webhook"),"square_production_webhook",false);
-  bool runtime=production_named_authority_valid("square_production_runtime_authority",
+    AUTHORITY_SOURCE_FOR("square_production_webhook_authority","webhook"),"square_production_webhook",&webhook_error);
+  bool runtime=diagnostic_named_authority("square_production_runtime_authority",
     "public.check_square_production_runtime_authority_v1(text,text,text,bigint,text)",
-    AUTHORITY_SOURCE_FOR("square_production_runtime_authority","runtime"),"square_production_runtime",false);
-  bool evidence=production_named_authority_valid("square_production_evidence_authority",
+    AUTHORITY_SOURCE_FOR("square_production_runtime_authority","runtime"),"square_production_runtime",&runtime_error);
+  bool evidence=diagnostic_named_authority("square_production_evidence_authority",
     "public.check_square_production_evidence_authority_v1(text,text,text,bigint,text)",
-    AUTHORITY_SOURCE_FOR("square_production_evidence_authority","evidence"),"square_production_evidence",false);
+    AUTHORITY_SOURCE_FOR("square_production_evidence_authority","evidence"),"square_production_evidence",&evidence_error);
   const char *broker_values[]={"square_production_broker_authority",
     "public.check_square_production_broker_authority_v1(text,text,text,bigint,text)",
     "private.check_square_production_operational_generation_v1(text,text,text,bigint,text,text)",
@@ -1327,11 +1339,12 @@ static void production_authority_diagnostic(const char *target, bool identity_ok
     "WHERE p.oid=to_regprocedure($2) AND (a.grantee<>p.proowner OR a.privilege_type<>'EXECUTE' OR a.is_grantable) "
     "AND NOT (a.grantee=$1::regrole AND a.privilege_type='EXECUTE' AND NOT a.is_grantable))",2,broker_values);
   bool broker_private_closed=true_query("SELECT NOT has_schema_privilege($1,'private','USAGE')",1,broker_values);
-  printf("{\"outcome\":\"production_authority_diagnostic\",\"identity\":%s,\"profile\":%s,\"platformClosed\":%s,\"providerClosed\":%s,\"configurationClosed\":%s,\"capabilityClosed\":%s,\"closedAuthority\":%s,\"targetLock\":%s,\"phaseValid\":%s,\"productionContract\":%s,\"oauthAuthority\":%s,\"brokerAuthority\":%s,\"schedulerAuthority\":%s,\"webhookAuthority\":%s,\"runtimeAuthority\":%s,\"evidenceAuthority\":%s,\"brokerRoleExists\":%s,\"brokerCapabilityExists\":%s,\"brokerWrapperExists\":%s,\"brokerWrapper\":%s,\"brokerHelper\":%s,\"brokerCapabilityRole\":%s,\"brokerNoMembership\":%s,\"brokerTargetAbsent\":%s,\"brokerPublicUsage\":%s,\"brokerExecuteAcl\":%s,\"brokerPrivateClosed\":%s}\n",
+  printf("{\"outcome\":\"production_authority_diagnostic\",\"identity\":%s,\"profile\":%s,\"platformClosed\":%s,\"providerClosed\":%s,\"configurationClosed\":%s,\"capabilityClosed\":%s,\"closedAuthority\":%s,\"targetLock\":%s,\"phaseValid\":%s,\"productionContract\":%s,\"oauthAuthority\":%s,\"brokerAuthority\":%s,\"schedulerAuthority\":%s,\"webhookAuthority\":%s,\"runtimeAuthority\":%s,\"evidenceAuthority\":%s,\"oauthQueryError\":%s,\"brokerQueryError\":%s,\"schedulerQueryError\":%s,\"webhookQueryError\":%s,\"runtimeQueryError\":%s,\"evidenceQueryError\":%s,\"brokerRoleExists\":%s,\"brokerCapabilityExists\":%s,\"brokerWrapperExists\":%s,\"brokerWrapper\":%s,\"brokerHelper\":%s,\"brokerCapabilityRole\":%s,\"brokerNoMembership\":%s,\"brokerTargetAbsent\":%s,\"brokerPublicUsage\":%s,\"brokerExecuteAcl\":%s,\"brokerPrivateClosed\":%s}\n",
     identity_ok?"true":"false",profile_ok?"true":"false",platform_closed?"true":"false",provider_closed?"true":"false",
     configuration_closed?"true":"false",capability_closed?"true":"false",closed?"true":"false",locked?"true":"false",
     phase!=PRODUCTION_PHASE_INVALID?"true":"false",contract?"true":"false",oauth?"true":"false",broker?"true":"false",
     scheduler?"true":"false",webhook?"true":"false",runtime?"true":"false",evidence?"true":"false",
+    oauth_error?"true":"false",broker_error?"true":"false",scheduler_error?"true":"false",webhook_error?"true":"false",runtime_error?"true":"false",evidence_error?"true":"false",
     broker_role_exists?"true":"false",broker_capability_exists?"true":"false",broker_wrapper_exists?"true":"false",broker_wrapper?"true":"false",
     broker_helper?"true":"false",broker_capability_role?"true":"false",broker_no_membership?"true":"false",broker_target_absent?"true":"false",
     broker_public_usage?"true":"false",broker_execute_acl?"true":"false",broker_private_closed?"true":"false");
