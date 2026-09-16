@@ -226,12 +226,14 @@ async function main() {
   const postMutationNativeBase = adapterModule.createLocalSyntheticProductionNativeAdapter({
     executable: binaries.get(failedProfile.name), target: failedTarget,
   });
+  stage = "post_mutation_fixture_prepare";
   const preparedPostMutation = await postMutationNativeBase.prepare({ target: failedTarget,
     operation: "create", intent: "production-post-mutation-prepare", approvalId: "synthetic-production",
     signal: new AbortController().signal });
   check(preparedPostMutation.roleOid && preparedPostMutation.roleOid !== "0" && preparedPostMutation.noLogin === true,
     "post_mutation_fixture_native_prepare");
   const postMutationRoleIdentity = { role_oid: preparedPostMutation.roleOid };
+  stage = "post_mutation_fixture_run";
   const postMutationTarget = Object.freeze({ ...failedTarget, roleOid: postMutationRoleIdentity.role_oid });
   const postMutationNativePrepared = adapterModule.createLocalSyntheticProductionNativeAdapter({
     executable: binaries.get(failedProfile.name), target: postMutationTarget,
