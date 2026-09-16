@@ -214,9 +214,8 @@ async function main() {
   // fence. Recovery is still mandatory; the post-mutation case below proves
   // that a committed role is fenced when one exists.
   check(!failed.fenceConfirmed && failed.requiresFreshReplacement, "precreate_failure_requires_recovery_without_target_fence");
-  let role = (await fixture.control.query("SELECT rolcanlogin,rolinherit FROM pg_roles WHERE rolname=$1", [failedProfile.role])).rows[0];
-  check(role && !role.rolcanlogin && !role.rolinherit, "failure_never_leaves_production_login");
-  await fixture.control.query(`DROP ROLE ${failedProfile.role}`);
+  const role = (await fixture.control.query("SELECT rolcanlogin,rolinherit FROM pg_roles WHERE rolname=$1", [failedProfile.role])).rows[0];
+  check(!role, "precreate_failure_leaves_no_production_login");
 
   // A store failure happens only after the native prepare has committed a
   // durable role identity. It must still leave that exact role fenced, with no
@@ -230,10 +229,10 @@ async function main() {
     intent: "production-post-mutation-fence", approvalId: "synthetic-production", deadlineMs: 30000, cleanupTimeoutMs: 5000 });
   check(postMutation.fenceConfirmed && postMutation.requiresFreshReplacement && postMutation.databaseCommit === "uncertain",
     "post_mutation_failure_requires_checked_recovery");
-  role = (await fixture.control.query(`SELECT rolcanlogin,rolinherit,
+  const postMutationRole = (await fixture.control.query(`SELECT rolcanlogin,rolinherit,
     (SELECT count(*)::integer FROM pg_stat_activity WHERE usename=$1) sessions
     FROM pg_roles WHERE rolname=$1`, [failedProfile.role])).rows[0];
-  check(role && !role.rolcanlogin && !role.rolinherit && role.sessions === 0,
+  check(postMutationRole && !postMutationRole.rolcanlogin && !postMutationRole.rolinherit && postMutationRole.sessions === 0,
     "post_mutation_failure_fences_exact_production_role");
   await fixture.control.query(`DROP ROLE ${failedProfile.role}`);
 
