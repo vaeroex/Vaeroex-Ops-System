@@ -175,6 +175,8 @@ test("post-mutation recovery reports each safety condition independently", () =>
   assert.match(qualifier, /databaseCommit: commitStatus/);
   assert.match(qualifier, /const digestAvailability/);
   assert.match(qualifier, /production_fixture_digest_function_available/);
+  assert.match(qualifier, /fixture\\.connect\\(fenceProfile\\.role, fenceCandidate\\.toString\\("ascii"\\), "tls"\\)/,
+    "the Node SCRAM fencing probe supplies its candidate as the required string type");
 });
 
 test("portable catalog qualification executes exact phase predicates from CI", () => {

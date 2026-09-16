@@ -408,7 +408,11 @@ async function main() {
   check(activeMembershipRejected, "active_login_with_noninheriting_capability_membership_rejected");
   await fixture.control.query(`GRANT ${fenceProfile.capabilityRole} TO ${fenceProfile.role}
     WITH ADMIN FALSE, INHERIT TRUE, SET FALSE`);
-  const live = await fixture.connect(fenceProfile.role, fenceCandidate, "tls");
+  // The native child authenticates through libpq; this independent Node pg
+  // session is only the existing-session fencing probe. Its SCRAM client
+  // requires the candidate password as an ASCII string (passing the Buffer
+  // would fail before PostgreSQL authentication and misclassify the fixture).
+  const live = await fixture.connect(fenceProfile.role, fenceCandidate.toString("ascii"), "tls");
   const activeAuthority = (await live.query("SELECT has_function_privilege(session_user,$1::regprocedure,'EXECUTE') allowed",
     [overlayRpc(fenceProfile)])).rows[0];
   check(activeAuthority?.allowed === true, "active_session_has_only_its_mapped_rpc_before_fence");
