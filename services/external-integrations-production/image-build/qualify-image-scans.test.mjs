@@ -25,13 +25,14 @@ const integrity = Object.freeze({
 
 test("fingerprints every executable bootstrap module and keeps compression unreachable", async () => {
   const base = new URL("../bootstrap-runtime/", import.meta.url);
-  const [dockerfile, server, callbackBoundary, packageText] = await Promise.all(
-    ["Dockerfile", "server.mjs", "callback-boundary.mjs", "package.json"]
+  const [dockerignore, dockerfile, server, callbackBoundary, packageText] = await Promise.all(
+    [".dockerignore", "Dockerfile", "server.mjs", "callback-boundary.mjs", "package.json"]
       .map((name) => readFile(new URL(name, base), "utf8")),
   );
-  const sources = { dockerfile, server, callbackBoundary, packageText };
+  const sources = { dockerignore, dockerfile, server, callbackBoundary, packageText };
   assert.deepEqual(verifyBootstrapSourceContent(sources), integrity);
   for (const [field, reason] of [
+    ["dockerignore", /bootstrap_dockerignore_changed/],
     ["dockerfile", /bootstrap_dockerfile_changed/],
     ["server", /bootstrap_server_changed/],
     ["callbackBoundary", /bootstrap_callback_boundary_changed/],

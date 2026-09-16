@@ -4,6 +4,8 @@ This directory is the deployable, reviewed activation layer for the shared Vaero
 
 ## Safety state
 
+The bootstrap build context is deny-by-default and admits exactly the three Dockerfile COPY inputs: `package.json`, `callback-boundary.mjs`, and `server.mjs`. The qualifier fingerprints that context policy plus every executable runtime module before accepting the documented compression-path exception.
+
 The exact first-stage null set also includes `oauth_callback_source_commit = null`. A runtime plan must supply a separate exact OAuth source revision together with all three digests and the edge source revision. That OAuth source pin is applied only to `square-production-oauth`; all peer services retain `source_commit`, so a callback-only release reports its actual source without revising peers.
 
 The first apply must leave `bootstrap_image_digest = null`, `oauth_callback_image_digest = null`, `callback_edge_image_digest = null`, and `callback_edge_source_commit = null`. It creates the shared network, static ingress and egress addresses, NAT, task queue, image repository, bounded logging, Cloud Armor policy, Square-specific identities, one KMS key, and empty Secret Manager containers. It creates no Cloud Run service, load balancer, callback edge, DNS record, secret version, database LOGIN, database grant, or migration.

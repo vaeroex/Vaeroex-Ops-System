@@ -12,6 +12,7 @@ const versions = read("services/external-integrations-production/infra/activatio
 const outputs = read("services/external-integrations-production/infra/activation/outputs.tf");
 const backend = read("services/external-integrations-production/infra/activation/backend.tf");
 const dockerfile = read("services/external-integrations-production/bootstrap-runtime/Dockerfile");
+const dockerignore = read("services/external-integrations-production/bootstrap-runtime/.dockerignore");
 const serverPath = path.join(root, "services/external-integrations-production/bootstrap-runtime/server.mjs");
 const serverSource = read("services/external-integrations-production/bootstrap-runtime/server.mjs");
 const callbackBoundarySource = read("services/external-integrations-production/bootstrap-runtime/callback-boundary.mjs");
@@ -193,6 +194,7 @@ assert.doesNotMatch(outputs, /secret_data|password|token/i, "outputs remain non-
 
 assert.match(dockerfile, /^FROM gcr\.io\/distroless\/nodejs22-debian13@sha256:[a-f0-9]{64}$/m, "the bootstrap uses an immutable minimal runtime-only base image");
 assert.match(dockerfile, /^COPY --chown=nonroot:nonroot package\.json callback-boundary\.mjs server\.mjs \.\/$/m, "the bootstrap copies only its runtime files as the unprivileged identity");
+assert.deepEqual(dockerignore.trimEnd().split("\n"), ["*", "!package.json", "!callback-boundary.mjs", "!server.mjs"], "the minimal build context admits every and only Dockerfile COPY input");
 assert.match(dockerfile, /^USER nonroot$/m, "the bootstrap does not run as root");
 assert.match(dockerfile, /^CMD \["server\.mjs"\]$/m, "the distroless Node entrypoint receives only the reviewed runtime module");
 // The remaining no-fix CVE-2026-85091 finding requires zlib's non-blocking
