@@ -379,14 +379,14 @@ async function qualifyProductionNativeProfiles(databaseUrl) {
       const login = `square_production_${name}`, authority = `${login}_authority`;
       const rpc = `public.check_square_production_${name}_authority_v1(text,text,text,bigint,text)`;
       await client.query(`create role ${login} nologin noinherit nosuperuser nocreatedb nocreaterole noreplication nobypassrls`);
-      await client.query(`grant ${authority} to ${login} with admin false, inherit true, set false`);
+      await client.query(`grant ${authority} to ${login} with admin false, inherit false, set false`);
       const proof = await client.query(`
         select not login.rolcanlogin and not login.rolinherit and not login.rolsuper
           and not login.rolcreatedb and not login.rolcreaterole and not login.rolreplication
           and not login.rolbypassrls and login.rolconfig is null
           and (select count(*)=1 from pg_catalog.pg_auth_members membership
             where membership.member=login.oid and membership.roleid=$2::regrole
-              and not membership.admin_option and membership.inherit_option and not membership.set_option)
+              and not membership.admin_option and not membership.inherit_option and not membership.set_option)
           and pg_catalog.has_function_privilege($2,$3::regprocedure,'EXECUTE')
           and not pg_catalog.has_function_privilege(login.oid,$3::regprocedure,'EXECUTE')
           and not exists (
