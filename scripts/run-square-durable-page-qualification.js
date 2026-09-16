@@ -190,6 +190,7 @@ async function migrationQualification(target, administrator) {
   const cardTail = files.filter(name => name === "20260912034447_square_workspace_card_contract.sql");
   const operationalTail = files.filter(name => name === "20260912150000_square_operational_intelligence.sql");
   const productionFoundationTail = files.filter(name => name === "20260902191323_integration_production_runtime_foundation.sql");
+  const productionOverlayTail = files.filter(name => name === "20260902191324_square_production_runtime_overlay.sql");
   const productionFoundationMarkerTail = files.filter(name => name === "20260912190000_square_production_runtime_foundation.sql");
   const productionLegacyGuardTail = files.filter(name => name === "20260915040500_integration_production_legacy_foundation_guard.sql");
   equal(added.length, 2, "both additive Square migrations present");
@@ -206,9 +207,10 @@ async function migrationQualification(target, administrator) {
   equal(cardTail.length, 1, "separately qualified restricted workspace card contract present");
   equal(operationalTail.length, 1, "separately qualified operational intelligence contract present");
   equal(productionFoundationTail.length, 1, "dormant Production runtime foundation present");
+  equal(productionOverlayTail.length, 1, "isolated Production-only Square runtime overlay present");
   equal(productionFoundationMarkerTail.length, 1, "historical Production foundation ledger marker remains present");
   equal(productionLegacyGuardTail.length, 1, "legacy all-in-one Production state has a forward rejection guard");
-  equal(baseline.length + added.length + accountTail.length + remoteTail.length + brokerTail.length + gcpTail.length + recoveryTail.length + mappedTail.length + mappedFenceTail.length + observationTail.length + interpretationTail.length + evidenceTail.length + cardTail.length + operationalTail.length + productionFoundationTail.length + productionFoundationMarkerTail.length + productionLegacyGuardTail.length, files.length, "migration manifest is explicit");
+  equal(baseline.length + added.length + accountTail.length + remoteTail.length + brokerTail.length + gcpTail.length + recoveryTail.length + mappedTail.length + mappedFenceTail.length + observationTail.length + interpretationTail.length + evidenceTail.length + cardTail.length + operationalTail.length + productionFoundationTail.length + productionOverlayTail.length + productionFoundationMarkerTail.length + productionLegacyGuardTail.length, files.length, "migration manifest is explicit");
   const clean = await createDatabase(target, administrator, "clean");
   await applyMigrations(clean.client, baseline);
   const before = await sourceSchemaFingerprint(clean.client);
