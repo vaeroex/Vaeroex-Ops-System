@@ -170,11 +170,18 @@ async function main() {
       "brokerCapabilityExists", "brokerWrapperExists"];
     check(value?.outcome === "production_authority_diagnostic" && names.every(name => typeof value[name] === "boolean"),
       "post_mutation_authority_diagnostic_shape");
+    const queryCategories = ["none", "undefined_column", "undefined_function", "undefined_table", "syntax", "datatype", "permission", "aborted_transaction", "other_sqlstate", "transport", "other"];
+    const categoryNames = ["oauth", "broker", "scheduler", "webhook", "runtime", "evidence"];
+    check(categoryNames.every(name => queryCategories.includes(value?.[`${name}QueryCategory`])),
+      "post_mutation_authority_query_category_shape");
     process.stdout.write(JSON.stringify({ outcome: "post_mutation_authority_observation", ...Object.fromEntries(
       names.map(name => [name, value?.[name] === true]),
-    ), brokerRoleExists: value?.brokerRoleExists === true, oauthQueryError: value?.oauthQueryError === true, brokerQueryError: value?.brokerQueryError === true,
+    ), brokerRoleExists: value?.brokerRoleExists === true, oauthQueryError: value?.oauthQueryError === true, oauthQueryCategory: value?.oauthQueryCategory,
+    brokerQueryError: value?.brokerQueryError === true, brokerQueryCategory: value?.brokerQueryCategory,
     schedulerQueryError: value?.schedulerQueryError === true, webhookQueryError: value?.webhookQueryError === true,
-    runtimeQueryError: value?.runtimeQueryError === true, evidenceQueryError: value?.evidenceQueryError === true }) + "\n");
+    schedulerQueryCategory: value?.schedulerQueryCategory, webhookQueryCategory: value?.webhookQueryCategory,
+    runtimeQueryError: value?.runtimeQueryError === true, runtimeQueryCategory: value?.runtimeQueryCategory,
+    evidenceQueryError: value?.evidenceQueryError === true, evidenceQueryCategory: value?.evidenceQueryCategory }) + "\n");
     for (const name of names) check(value[name] === true, `post_mutation_authority_${name}`);
   };
   stage = "precreate_capability_creator_substitution";
