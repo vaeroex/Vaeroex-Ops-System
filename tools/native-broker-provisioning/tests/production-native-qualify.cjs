@@ -445,23 +445,41 @@ async function main() {
     executable: binaries.get(postflightProfile.name), target: postflightTarget,
   });
   const postflightDrift = profiles.find(profile => profile.name === "oauth");
-  let postflightMutated = false, postflightDenied = false;
+  let postflightDeliveryInvoked = false, postflightMutated = false;
+  let postflightMutationBlocked = false, postflightDenied = false;
   try {
     await postflightNative.assign({ target: postflightTarget, intent: "postflight-authority-recheck",
       approvalId: "synthetic-production", signal: new AbortController().signal, async deliver() {
-        await fixture.control.query(`CREATE OR REPLACE FUNCTION ${overlayRpc(postflightDrift)} RETURNS void
-          LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path='' AS
-          $function$ BEGIN RAISE EXCEPTION 'synthetic_postflight_drift' USING ERRCODE='55000'; END $function$`);
-        postflightMutated = true;
-        return { ack: true };
+        postflightDeliveryInvoked = true;
+        try {
+          // The native transaction deliberately holds SHARE locks over every
+          // authority relation.  A fixture DDL mutation therefore cannot
+          // execute concurrently; bound the attempt and classify that exact
+          // sequencing outcome instead of hanging until the native timeout.
+          await fixture.control.query(`BEGIN; SET LOCAL lock_timeout = '100ms';
+            CREATE OR REPLACE FUNCTION ${overlayRpc(postflightDrift)} RETURNS void
+              LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path='' AS
+              $function$ BEGIN RAISE EXCEPTION 'synthetic_postflight_drift' USING ERRCODE='55000'; END $function$;
+            COMMIT`);
+          postflightMutated = true;
+          return { ack: true };
+        } catch {
+          postflightMutationBlocked = true;
+          await fixture.control.query("ROLLBACK").catch(() => undefined);
+          throw new Error("synthetic_postflight_drift_blocked");
+        }
       } });
   } catch { postflightDenied = true; }
   if (postflightMutated) await fixture.control.query(`CREATE OR REPLACE FUNCTION ${overlayRpc(postflightDrift)} RETURNS void
     LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path='' AS $function$${productionAuthoritySource(postflightDrift)}$function$`);
   process.stdout.write(JSON.stringify({ outcome: "postflight_authority_drift_observation",
+    deliveryInvoked: postflightDeliveryInvoked === true,
     deliveryMutatedAuthority: postflightMutated === true,
+    deliveryMutationBlockedByAuthorityLock: postflightMutationBlocked === true,
     nativeRejectedAfterDelivery: postflightDenied === true }) + "\n");
-  check(postflightMutated === true, "authority_drift_delivery_mutated_authority");
+  check(postflightDeliveryInvoked === true, "authority_drift_delivery_invoked");
+  check(postflightMutated === false, "authority_drift_delivery_mutation_not_applied");
+  check(postflightMutationBlocked === true, "authority_drift_delivery_blocked_by_authority_lock");
   check(postflightDenied === true, "authority_drift_native_rejected_after_delivery");
   check((await postflightNative.inspect({ target: postflightTarget, intent: "postflight-authority-restored",
     approvalId: "synthetic-production", signal: new AbortController().signal })).ack,

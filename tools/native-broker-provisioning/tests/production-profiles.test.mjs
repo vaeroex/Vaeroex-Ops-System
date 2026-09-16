@@ -178,7 +178,9 @@ test("post-mutation recovery reports each safety condition independently", () =>
   assert.match(qualifier, /fixture\.connect\(fenceProfile\.role, fenceCandidate\.toString\("ascii"\), "tls"\)/,
     "the Node SCRAM fencing probe supplies its candidate as the required string type");
   assert.match(qualifier, /postflight_authority_drift_observation/);
-  assert.match(qualifier, /authority_drift_delivery_mutated_authority/);
+  assert.match(qualifier, /authority_drift_delivery_invoked/);
+  assert.match(qualifier, /authority_drift_delivery_mutation_not_applied/);
+  assert.match(qualifier, /authority_drift_delivery_blocked_by_authority_lock/);
   assert.match(qualifier, /authority_drift_native_rejected_after_delivery/);
 });
 
