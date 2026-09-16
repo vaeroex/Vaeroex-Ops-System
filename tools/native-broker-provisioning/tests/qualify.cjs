@@ -303,7 +303,20 @@ async function main() {
     secretStore: { ...store, async stage(handle, bytes) { secrets.push(bytes.toString("ascii")); return store.stage(handle, bytes); } },
     audit: { async append(event) { events.push(event); return { ack: true }; } } });
   offsets = fixture.logOffsets();
-  for (const operation of ["create", "rotate"]) {
+  const integratedOperations = ["create", "rotate"];
+  for (const operation of integratedOperations) {
+    if (operation === "rotate") {
+      // The Sandbox account-broker capability leaves LOGIN enabled only for
+      // the bounded candidate-authentication check. Rotation requires the
+      // documented precondition: fence the exact role and drain its sessions
+      // before the coordinator re-verifies closed state.
+      const integratedOid = (await fixture.control.query("SELECT oid::text FROM pg_roles WHERE rolname=$1", [integratedRole])).rows[0].oid;
+      const preRotationFence = await native.fence({ target: Object.freeze({ ...nativeTarget, roleOid: integratedOid }),
+        operation: "fence", actor: "synthetic-operator", intent: "integrated-pre-rotation-fence",
+        approvalId: "synthetic-only", signal: new AbortController().signal });
+      check(preRotationFence.ack && preRotationFence.noLogin && preRotationFence.sessionsTerminated,
+        "integrated_rotation_requires_exact_pre_fence");
+    }
     const coordinated = await coordinator.run({ operation, actor: "synthetic-operator", intent: "integrated-" + operation,
       approvalId: "synthetic-only", deadlineMs: 30000 });
     check(coordinated.outcome === "staged_ready" && coordinated.credentialPublished === false &&
