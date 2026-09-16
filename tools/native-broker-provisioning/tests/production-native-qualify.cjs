@@ -172,7 +172,7 @@ async function main() {
       "post_mutation_authority_diagnostic_shape");
     const queryCategories = ["none", "undefined_column", "undefined_function", "undefined_table", "syntax", "datatype", "permission", "aborted_transaction", "other_sqlstate", "transport", "other"];
     const categoryNames = ["oauth", "broker", "scheduler", "webhook", "runtime", "evidence"];
-    const functionCategoryNames = ["schema", "function", "table", "column", "sequence", "fdw", "server", "tablespace", "parameter", "role"];
+    const functionCategoryNames = ["schema", "function", "table", "column", "sequence", "fdw", "server", "tablespace", "parameter", "role", "aclexplode", "acldefault", "regprocedure", "digest", "getExpr"];
     check(categoryNames.every(name => queryCategories.includes(value?.[`${name}QueryCategory`])),
       "post_mutation_authority_query_category_shape");
     check(functionCategoryNames.every(name => queryCategories.includes(value?.[`${name}Category`])),
@@ -188,7 +188,8 @@ async function main() {
     schemaCategory: value?.schemaCategory, functionCategory: value?.functionCategory, tableCategory: value?.tableCategory,
     columnCategory: value?.columnCategory, sequenceCategory: value?.sequenceCategory, fdwCategory: value?.fdwCategory,
     serverCategory: value?.serverCategory, tablespaceCategory: value?.tablespaceCategory, parameterCategory: value?.parameterCategory,
-    roleCategory: value?.roleCategory }) + "\n");
+    roleCategory: value?.roleCategory, aclexplodeCategory: value?.aclexplodeCategory, acldefaultCategory: value?.acldefaultCategory,
+    regprocedureCategory: value?.regprocedureCategory, digestCategory: value?.digestCategory, getExprCategory: value?.getExprCategory }) + "\n");
     for (const name of names) check(value[name] === true, `post_mutation_authority_${name}`);
   };
   stage = "precreate_capability_creator_substitution";

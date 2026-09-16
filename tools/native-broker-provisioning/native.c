@@ -1290,7 +1290,8 @@ typedef enum {
   DIAGNOSTIC_SCHEMA_FUNCTION, DIAGNOSTIC_FUNCTION_FUNCTION, DIAGNOSTIC_TABLE_FUNCTION,
   DIAGNOSTIC_COLUMN_FUNCTION, DIAGNOSTIC_SEQUENCE_FUNCTION, DIAGNOSTIC_FDW_FUNCTION,
   DIAGNOSTIC_SERVER_FUNCTION, DIAGNOSTIC_TABLESPACE_FUNCTION, DIAGNOSTIC_PARAMETER_FUNCTION,
-  DIAGNOSTIC_ROLE_FUNCTION
+  DIAGNOSTIC_ROLE_FUNCTION, DIAGNOSTIC_ACLEXPLODE_FUNCTION, DIAGNOSTIC_ACLDEFAULT_FUNCTION,
+  DIAGNOSTIC_REGPROCEDURE_FUNCTION, DIAGNOSTIC_DIGEST_FUNCTION, DIAGNOSTIC_GET_EXPR_FUNCTION
 } diagnostic_function;
 /* A closed set of probes for the fixed predicate below; callers cannot supply
  * SQL. Each probe reports only a finite SQLSTATE category. */
@@ -1307,6 +1308,11 @@ static const char *diagnostic_function_probe(diagnostic_function probe, const ch
     case DIAGNOSTIC_TABLESPACE_FUNCTION: sql="SELECT has_tablespace_privilege($1,t.oid,'CREATE') FROM pg_tablespace t LIMIT 1"; break;
     case DIAGNOSTIC_PARAMETER_FUNCTION: sql="SELECT has_parameter_privilege($1,p.parname,'SET') FROM pg_parameter_acl p LIMIT 1"; break;
     case DIAGNOSTIC_ROLE_FUNCTION: sql="SELECT pg_has_role($1,'pg_read_all_stats','USAGE')"; break;
+    case DIAGNOSTIC_ACLEXPLODE_FUNCTION: sql="SELECT aclexplode(n.nspacl) FROM pg_namespace n LIMIT 1"; break;
+    case DIAGNOSTIC_ACLDEFAULT_FUNCTION: sql="SELECT acldefault('n',n.nspowner) FROM pg_namespace n LIMIT 1"; break;
+    case DIAGNOSTIC_REGPROCEDURE_FUNCTION: sql="SELECT to_regprocedure($1)"; break;
+    case DIAGNOSTIC_DIGEST_FUNCTION: sql="SELECT extensions.digest(pg_catalog.convert_to('x','UTF8'),'sha256')"; break;
+    case DIAGNOSTIC_GET_EXPR_FUNCTION: sql="SELECT pg_catalog.pg_get_expr(NULL::pg_node_tree,0)"; break;
     default: return "other";
   }
   if (!command("SAVEPOINT vaeroex_function_diagnostic")) return "other";
@@ -1413,13 +1419,18 @@ static void production_authority_diagnostic(const char *target, bool identity_ok
   const char *tablespace_category=diagnostic_function_probe(DIAGNOSTIC_TABLESPACE_FUNCTION,function_probe_values);
   const char *parameter_category=diagnostic_function_probe(DIAGNOSTIC_PARAMETER_FUNCTION,function_probe_values);
   const char *role_category=diagnostic_function_probe(DIAGNOSTIC_ROLE_FUNCTION,function_probe_values);
-  printf("{\"outcome\":\"production_authority_diagnostic\",\"identity\":%s,\"profile\":%s,\"platformClosed\":%s,\"providerClosed\":%s,\"configurationClosed\":%s,\"capabilityClosed\":%s,\"closedAuthority\":%s,\"targetLock\":%s,\"phaseValid\":%s,\"productionContract\":%s,\"oauthAuthority\":%s,\"brokerAuthority\":%s,\"schedulerAuthority\":%s,\"webhookAuthority\":%s,\"runtimeAuthority\":%s,\"evidenceAuthority\":%s,\"oauthQueryError\":%s,\"oauthQueryCategory\":\"%s\",\"brokerQueryError\":%s,\"brokerQueryCategory\":\"%s\",\"schedulerQueryError\":%s,\"schedulerQueryCategory\":\"%s\",\"webhookQueryError\":%s,\"webhookQueryCategory\":\"%s\",\"runtimeQueryError\":%s,\"runtimeQueryCategory\":\"%s\",\"evidenceQueryError\":%s,\"evidenceQueryCategory\":\"%s\",\"schemaCategory\":\"%s\",\"functionCategory\":\"%s\",\"tableCategory\":\"%s\",\"columnCategory\":\"%s\",\"sequenceCategory\":\"%s\",\"fdwCategory\":\"%s\",\"serverCategory\":\"%s\",\"tablespaceCategory\":\"%s\",\"parameterCategory\":\"%s\",\"roleCategory\":\"%s\",\"brokerRoleExists\":%s,\"brokerCapabilityExists\":%s,\"brokerWrapperExists\":%s,\"brokerWrapper\":%s,\"brokerWrapperShape\":%s,\"brokerHelper\":%s,\"brokerCapabilityRole\":%s,\"brokerNoMembership\":%s,\"brokerTargetAbsent\":%s,\"brokerPublicUsage\":%s,\"brokerExecuteAcl\":%s,\"brokerPrivateClosed\":%s}\n",
+  const char *aclexplode_category=diagnostic_function_probe(DIAGNOSTIC_ACLEXPLODE_FUNCTION,function_probe_values);
+  const char *acldefault_category=diagnostic_function_probe(DIAGNOSTIC_ACLDEFAULT_FUNCTION,function_probe_values);
+  const char *regprocedure_category=diagnostic_function_probe(DIAGNOSTIC_REGPROCEDURE_FUNCTION,function_probe_values);
+  const char *digest_category=diagnostic_function_probe(DIAGNOSTIC_DIGEST_FUNCTION,function_probe_values);
+  const char *get_expr_category=diagnostic_function_probe(DIAGNOSTIC_GET_EXPR_FUNCTION,function_probe_values);
+  printf("{\"outcome\":\"production_authority_diagnostic\",\"identity\":%s,\"profile\":%s,\"platformClosed\":%s,\"providerClosed\":%s,\"configurationClosed\":%s,\"capabilityClosed\":%s,\"closedAuthority\":%s,\"targetLock\":%s,\"phaseValid\":%s,\"productionContract\":%s,\"oauthAuthority\":%s,\"brokerAuthority\":%s,\"schedulerAuthority\":%s,\"webhookAuthority\":%s,\"runtimeAuthority\":%s,\"evidenceAuthority\":%s,\"oauthQueryError\":%s,\"oauthQueryCategory\":\"%s\",\"brokerQueryError\":%s,\"brokerQueryCategory\":\"%s\",\"schedulerQueryError\":%s,\"schedulerQueryCategory\":\"%s\",\"webhookQueryError\":%s,\"webhookQueryCategory\":\"%s\",\"runtimeQueryError\":%s,\"runtimeQueryCategory\":\"%s\",\"evidenceQueryError\":%s,\"evidenceQueryCategory\":\"%s\",\"schemaCategory\":\"%s\",\"functionCategory\":\"%s\",\"tableCategory\":\"%s\",\"columnCategory\":\"%s\",\"sequenceCategory\":\"%s\",\"fdwCategory\":\"%s\",\"serverCategory\":\"%s\",\"tablespaceCategory\":\"%s\",\"parameterCategory\":\"%s\",\"roleCategory\":\"%s\",\"aclexplodeCategory\":\"%s\",\"acldefaultCategory\":\"%s\",\"regprocedureCategory\":\"%s\",\"digestCategory\":\"%s\",\"getExprCategory\":\"%s\",\"brokerRoleExists\":%s,\"brokerCapabilityExists\":%s,\"brokerWrapperExists\":%s,\"brokerWrapper\":%s,\"brokerWrapperShape\":%s,\"brokerHelper\":%s,\"brokerCapabilityRole\":%s,\"brokerNoMembership\":%s,\"brokerTargetAbsent\":%s,\"brokerPublicUsage\":%s,\"brokerExecuteAcl\":%s,\"brokerPrivateClosed\":%s}\n",
     identity_ok?"true":"false",profile_ok?"true":"false",platform_closed?"true":"false",provider_closed?"true":"false",
     configuration_closed?"true":"false",capability_closed?"true":"false",closed?"true":"false",locked?"true":"false",
     phase!=PRODUCTION_PHASE_INVALID?"true":"false",contract?"true":"false",oauth?"true":"false",broker?"true":"false",
     scheduler?"true":"false",webhook?"true":"false",runtime?"true":"false",evidence?"true":"false",
     oauth_error?"true":"false",oauth_category,broker_error?"true":"false",broker_category,scheduler_error?"true":"false",scheduler_category,webhook_error?"true":"false",webhook_category,runtime_error?"true":"false",runtime_category,evidence_error?"true":"false",evidence_category,
-    schema_category,function_category,table_category,column_category,sequence_category,fdw_category,server_category,tablespace_category,parameter_category,role_category,
+    schema_category,function_category,table_category,column_category,sequence_category,fdw_category,server_category,tablespace_category,parameter_category,role_category,aclexplode_category,acldefault_category,regprocedure_category,digest_category,get_expr_category,
     broker_role_exists?"true":"false",broker_capability_exists?"true":"false",broker_wrapper_exists?"true":"false",broker_wrapper?"true":"false",broker_wrapper_shape?"true":"false",
     broker_helper?"true":"false",broker_capability_role?"true":"false",broker_no_membership?"true":"false",broker_target_absent?"true":"false",
     broker_public_usage?"true":"false",broker_execute_acl?"true":"false",broker_private_closed?"true":"false");
