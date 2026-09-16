@@ -129,13 +129,13 @@ begin
     raise exception using errcode='55000',message='square_production_overlay_schema_not_exact';
   end if;
 
-  with expected(login_name,authority_name,rpc_signature) as (values
-    ('square_production_oauth','square_production_oauth_authority','public.check_square_production_oauth_authority_v1(text,text,text,bigint,text)'),
-    ('square_production_broker','square_production_broker_authority','public.check_square_production_broker_authority_v1(text,text,text,bigint,text)'),
-    ('square_production_scheduler','square_production_scheduler_authority','public.check_square_production_scheduler_authority_v1(text,text,text,bigint,text)'),
-    ('square_production_webhook','square_production_webhook_authority','public.check_square_production_webhook_authority_v1(text,text,text,bigint,text)'),
-    ('square_production_runtime','square_production_runtime_authority','public.check_square_production_runtime_authority_v1(text,text,text,bigint,text)'),
-    ('square_production_evidence','square_production_evidence_authority','public.check_square_production_evidence_authority_v1(text,text,text,bigint,text)')
+  with expected(login_name,authority_name,rpc_signature,old_rpc_grant_expected) as (values
+    ('square_production_oauth','square_production_oauth_authority','public.check_square_production_oauth_authority_v1(text,text,text,bigint,text)',false),
+    ('square_production_broker','square_production_broker_authority','public.check_square_production_broker_authority_v1(text,text,text,bigint,text)',false),
+    ('square_production_scheduler','square_production_scheduler_authority','public.check_square_production_scheduler_authority_v1(text,text,text,bigint,text)',true),
+    ('square_production_webhook','square_production_webhook_authority','public.check_square_production_webhook_authority_v1(text,text,text,bigint,text)',true),
+    ('square_production_runtime','square_production_runtime_authority','public.check_square_production_runtime_authority_v1(text,text,text,bigint,text)',false),
+    ('square_production_evidence','square_production_evidence_authority','public.check_square_production_evidence_authority_v1(text,text,text,bigint,text)',false)
   ), target_roles as (
     select expected.login_name role_name,'login' role_kind from expected
     union all
@@ -226,6 +226,7 @@ begin
       join pg_catalog.pg_namespace namespace on namespace.oid=relation.relnamespace
       where namespace.nspname='private' and relation.relkind in ('r','p','v','m','f','S')
         and relation.relname like 'square!_production!_%' escape '!'
+        and relation.relname not like 'square!_production!_internal!_%' escape '!'
     )
     union all
     select 'overlay_private_function_inventory_not_exact'
@@ -233,6 +234,7 @@ begin
       select count(*) from pg_catalog.pg_proc procedure
       join pg_catalog.pg_namespace namespace on namespace.oid=procedure.pronamespace
       where namespace.nspname='private' and procedure.proname like '%square!_production!_%' escape '!'
+        and procedure.proname not like 'square!_production!_internal!_%' escape '!'
     )
     union all
     select 'overlay_public_rpc_inventory_not_exact'
@@ -550,21 +552,21 @@ begin
             or procedure.prokind<>'f' or procedure.prorettype<>'void'::regtype
             or procedure.proconfig is distinct from array['search_path=""']::text[])
       )
-      or 1<>(
+      or (case when expected.old_rpc_grant_expected then 1 else 0 end)<>(
         select count(*)
         from pg_catalog.pg_proc procedure
         join pg_catalog.pg_namespace namespace on namespace.oid=procedure.pronamespace
         cross join lateral pg_catalog.aclexplode(procedure.proacl) acl
         where acl.grantee=authority_role.oid and acl.privilege_type='EXECUTE'
       )
-      or not exists(
+      or (expected.old_rpc_grant_expected and not exists(
         select 1
         from pg_catalog.pg_proc procedure
         cross join lateral pg_catalog.aclexplode(procedure.proacl) acl
         where procedure.oid=to_regprocedure(expected.rpc_signature)
           and acl.grantee=authority_role.oid and acl.privilege_type='EXECUTE'
           and not acl.is_grantable
-      )
+      ))
   ), expected_rpc_exposure_checks as (
     select 'unexpected_rpc_grantee:'||expected.rpc_signature||':'||coalesce(grantee.rolname,'PUBLIC')
     from expected
@@ -792,18 +794,23 @@ $verification$;
 
 select 'square_production_overlay_structural_and_authorization_postflight_passed' as nonsecret_result;
 
-select case
-  when bool_and(not rolcanlogin and not rolinherit)
-    then 'square_production_overlay_staged_role_postflight_passed'
-  when bool_and(rolcanlogin and rolinherit)
-    then 'square_production_overlay_active_role_postflight_passed'
-  else 'square_production_overlay_role_postflight_unreachable'
-end as nonsecret_result
-from pg_catalog.pg_roles
-where rolname=any(array[
-  'square_production_oauth','square_production_broker','square_production_scheduler',
-  'square_production_webhook','square_production_runtime','square_production_evidence'
-]);
+do $role_postflight$
+begin
+  if 6<>(select count(*) from pg_catalog.pg_roles where rolname=any(array[
+    'square_production_oauth','square_production_broker','square_production_scheduler',
+    'square_production_webhook','square_production_runtime','square_production_evidence'
+  ])) or exists(
+    select 1 from pg_catalog.pg_roles
+    where rolname=any(array[
+      'square_production_oauth','square_production_broker','square_production_scheduler',
+      'square_production_webhook','square_production_runtime','square_production_evidence'
+    ]) and (rolcanlogin or rolinherit)
+  ) then
+    raise exception using errcode='55000',message='square_production_internal_roles_not_closed';
+  end if;
+end
+$role_postflight$;
+select 'square_production_internal_roles_closed_postflight_passed' as nonsecret_result;
 
 -- Final 104-migration runtime catalog and authority checks.  This second
 -- verifier is deliberately explicit so a future overlay cannot be mistaken
@@ -839,9 +846,9 @@ declare
   expected_private_functions text[] := array[
     'private.square_production_internal_reject_immutable_mutation_v1()',
     'private.square_production_internal_guard_lifecycle_update_v1()',
-    'private.square_production_internal_require_keys_v1(text,text[])',
+    'private.square_production_internal_require_keys_v1(jsonb,text[])',
     'private.square_production_internal_fingerprint_v1(text[])',
-    'private.square_production_internal_audit_v1(text,text,text,text,bigint,text,jsonb)',
+    'private.square_production_internal_audit_v1(uuid,bigint,text,text,text,text,timestamptz)',
     'private.square_production_internal_require_login_v1(text)',
     'private.square_production_internal_lock_permit_v1(uuid,text,boolean)',
     'private.square_production_internal_install_permit_v1(jsonb)'
@@ -939,21 +946,33 @@ select 'square_production_internal_runtime_catalog_postflight_passed' as nonsecr
   'sha256:7dc51d888ee9c4a6bb595b1a4431ab5fcdb649e34c871ba91a6512d5fa2dc89f' as ledger_fingerprint,
   'db502e7671028fc9867d49c1b8c198b694d1f07674fe8312bdbc032d80570716' as migration_source_sha256,
   array[
-    'public.check_square_production_scheduler_authority_v1(text,text,text,bigint,text)',
-    'public.check_square_production_webhook_authority_v1(text,text,text,bigint,text)',
-    'public.square_production_internal_broker_v1(text,jsonb)',
-    'public.square_production_internal_evidence_v1(text,jsonb)',
-    'public.square_production_internal_oauth_v1(text,jsonb)',
-    'public.square_production_internal_runtime_v1(text,jsonb)'
+    'square_production_oauth_authority=public.square_production_internal_oauth_v1(text,jsonb)',
+    'square_production_broker_authority=public.square_production_internal_broker_v1(text,jsonb)',
+    'square_production_scheduler_authority=public.check_square_production_scheduler_authority_v1(text,text,text,bigint,text)',
+    'square_production_webhook_authority=public.check_square_production_webhook_authority_v1(text,text,text,bigint,text)',
+    'square_production_runtime_authority=public.square_production_internal_runtime_v1(text,jsonb)',
+    'square_production_evidence_authority=public.square_production_internal_evidence_v1(text,jsonb)'
   ]::text[] as authority_rpcs,
   array[
+    'private.square_production_generation_fingerprint_v1(bigint,text[])',
+    'private.square_production_configuration_fingerprint_v1(bigint,text,text,text,text,text,text,text,text,text,text,text,text,text,text,text,text,text[],text,text,text,text[],text,text,boolean,boolean,boolean,boolean,boolean,boolean,boolean)',
+    'private.reject_square_production_immutable_mutation_v1()',
+    'private.validate_square_production_runtime_binding_v1()',
+    'private.record_square_production_lifecycle_audit_v1()',
+    'private.check_square_production_operational_generation_v1(text,text,text,bigint,text,text)',
+    'public.check_square_production_oauth_authority_v1(text,text,text,bigint,text)',
+    'public.check_square_production_broker_authority_v1(text,text,text,bigint,text)',
+    'public.check_square_production_scheduler_authority_v1(text,text,text,bigint,text)',
+    'public.check_square_production_webhook_authority_v1(text,text,text,bigint,text)',
+    'public.check_square_production_runtime_authority_v1(text,text,text,bigint,text)',
+    'public.check_square_production_evidence_authority_v1(text,text,text,bigint,text)',
     'private.square_production_internal_reject_immutable_mutation_v1()',
     'private.square_production_internal_guard_lifecycle_update_v1()',
-    'private.square_production_internal_require_keys_v1(text,text[])',
+    'private.square_production_internal_require_keys_v1(jsonb,text[])',
     'private.square_production_internal_fingerprint_v1(text[])',
-    'private.square_production_internal_audit_v1(text,text,text,text,bigint,text,jsonb)',
+    'private.square_production_internal_audit_v1(uuid,bigint,text,text,text,text,timestamptz)',
     'private.square_production_internal_require_login_v1(text)',
-    'private.square_production_internal_lock_permit_v1(uuid,bigint)',
+    'private.square_production_internal_lock_permit_v1(uuid,text,boolean)',
     'private.square_production_internal_install_permit_v1(jsonb)',
     'public.square_production_internal_oauth_v1(text,jsonb)',
     'public.square_production_internal_broker_v1(text,jsonb)',

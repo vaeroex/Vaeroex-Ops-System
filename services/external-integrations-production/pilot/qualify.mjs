@@ -239,7 +239,7 @@ try {
   const expectedBlocked = args.includes("--expect-blocked");
   const expectedConsistent = args.includes("--expect-consistent");
   if (expectedBlocked === expectedConsistent ||
-      (expectedBlocked && result.activationReadiness) ||
+      (expectedBlocked && (result.activationReadiness || result.findings.length === 0)) ||
       (expectedConsistent && (!result.operatorAssertionsInternallyConsistent || result.activationReadiness))) {
     process.exitCode = 1;
   }

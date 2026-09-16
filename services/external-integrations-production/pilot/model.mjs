@@ -148,7 +148,10 @@ export function qualifyPilotEvidence(contract, evidence, expectedHead, sourceCon
   }
 
   exactKeys(evidence.database, ["ledgerHead", "foundationVersion", "overlayPath", "overlaySourceCommit", "overlaySha256", "overlayObjectPostflight", "rolePostflight"], "database evidence");
-  requireEqual(evidence.database.ledgerHead, contract.database.requiredOverlayVersion, "database_ledger_not_exact_overlay");
+  const expectedLedgerHead = phase.requiresProductionRuntime
+    ? contract.productionRuntimeSurface.runtimeContract.ledgerHead
+    : contract.database.requiredOverlayVersion;
+  requireEqual(evidence.database.ledgerHead, expectedLedgerHead, "database_ledger_not_exact_phase");
   requireEqual(evidence.database.foundationVersion, contract.database.requiredFoundationVersion, "production_foundation_mismatch");
   requireEqual(evidence.database.overlayPath, contract.database.requiredOverlayPath, "square_overlay_path_mismatch");
   if (!/^[a-f0-9]{40}$/.test(contract.database.requiredOverlaySourceCommit ?? "")) {
@@ -397,8 +400,8 @@ export function qualifyPilotEvidence(contract, evidence, expectedHead, sourceCon
         catalogPostflight.ledgerHead !== runtimeContract.catalogPostflight.ledgerHead ||
         catalogPostflight.ledgerFingerprint !== runtimeContract.catalogPostflight.ledgerFingerprint ||
         catalogPostflight.migrationSourceSha256 !== runtimeContract.catalogPostflight.migrationSourceSha256 ||
-        JSON.stringify(catalogPostflight.authorityRpcs) !== JSON.stringify(runtimeContract.catalogPostflight.authorityRpcs) ||
-        JSON.stringify(catalogPostflight.requiredFunctions) !== JSON.stringify(runtimeContract.catalogPostflight.requiredFunctions)) {
+        JSON.stringify([...catalogPostflight.authorityRpcs].sort()) !== JSON.stringify([...runtimeContract.catalogPostflight.authorityRpcs].sort()) ||
+        JSON.stringify([...catalogPostflight.requiredFunctions].sort()) !== JSON.stringify([...runtimeContract.catalogPostflight.requiredFunctions].sort())) {
         findings.push("production_runtime_catalog_postflight_not_exact");
       }
     }
@@ -562,6 +565,12 @@ export function createSyntheticPilot({
     versions: new Map(),
     receipts: new Map(),
     webhookReceipts: new Set(),
+    // Active-generation stores are separate from immutable historical
+    // provenance. Evidence and replay checks must never read an older
+    // generation after reauthorization.
+    archivedVersions: new Map(),
+    archivedReceipts: new Map(),
+    archivedWebhookReceipts: new Set(),
     refreshes: 0
   };
 
@@ -587,6 +596,11 @@ export function createSyntheticPilot({
     state.pendingAuthorization = null;
   };
   const activateNextGeneration = () => {
+    for (const [identity, entry] of state.versions) {
+      state.archivedVersions.set(`${state.generation}:${identity}`, entry);
+    }
+    for (const [receipt, digest] of state.receipts) state.archivedReceipts.set(receipt, digest);
+    for (const receipt of state.webhookReceipts) state.archivedWebhookReceipts.add(receipt);
     state.generation += 1;
     state.lifecycle = "authorized";
     state.mapped = false;
@@ -594,6 +608,9 @@ export function createSyntheticPilot({
     state.checkpoint = null;
     state.scan = null;
     state.mappingFingerprint = null;
+    state.versions = new Map();
+    state.receipts = new Map();
+    state.webhookReceipts = new Set();
     return state.generation;
   };
   return Object.freeze({

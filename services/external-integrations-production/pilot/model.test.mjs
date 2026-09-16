@@ -212,7 +212,7 @@ test("the checked-in Production baseline is closed and accurately blocked", () =
   const result = qualifyPilotEvidence(contract, baseline, head);
   assert.equal(result.activationReadiness, false);
   assert.equal(result.gatesRemainClosed, true);
-  assert.ok(result.findings.includes("database_ledger_not_exact_overlay"));
+  assert.ok(result.findings.includes("database_ledger_not_exact_phase"));
   assert.ok(result.findings.includes("qualification_source_head_mismatch"));
   assert.ok(result.findings.includes("square_overlay_path_mismatch"));
   assert.ok(result.findings.includes("reviewed_overlay_source_not_in_qualification_head"));
@@ -305,7 +305,7 @@ test("role postflight is phase-specific and never treats staged authority as act
   assert.equal(staged.database.rolePostflight, "square_production_internal_roles_closed_postflight_passed");
   const wrong = qualifyPilotEvidence(reviewedContract(), {
     ...staged,
-    database: { ...staged.database, rolePostflight: "square_production_overlay_active_role_postflight_passed" }
+    database: { ...staged.database, rolePostflight: "square_production_internal_roles_active_postflight_failed" }
   }, head, reviewedSource, "precredential_nonsecret");
   assert.ok(wrong.findings.includes("database_role_postflight_missing_or_wrong_phase"));
   const active = reviewCandidate("internal_consent_ready");
@@ -620,6 +620,27 @@ test("generationFencing rejects stale mapping, page, refresh, webhook, disconnec
   assert.equal(pilot.state.lifecycle, "authorized");
   mapInternalPilot(pilot, currentGeneration);
   assert.equal(pilot.state.mapped, true);
+});
+
+test("new authorization reads only its generation while preserving prior provenance separately", () => {
+  const pilot = createSyntheticPilot();
+  const firstGeneration = completeFreshAuthorization(pilot);
+  mapInternalPilot(pilot, firstGeneration);
+  pilot.startScan("initial", firstGeneration);
+  pilot.commitPage({ expectedGeneration: firstGeneration, receiptId: "GENERATION_ONE_PAGE", cursor: null,
+    nextCursor: null, observations: [observation("PAYMENT_GENERATION_ONE", "1")] });
+  pilot.finishScan(firstGeneration);
+
+  const secondGeneration = completeFreshAuthorization(pilot, 10);
+  mapInternalPilot(pilot, secondGeneration);
+  const evidence = pilot.readEvidence({ expectedGeneration: secondGeneration,
+    actorWorkspaceId: pilot.state.workspaceId, actorBusinessEntityId: pilot.state.businessEntityId,
+    actorMerchantId: pilot.state.merchantId });
+  assert.equal(evidence.observationCount, 0);
+  assert.deepEqual(evidence.observationsByFamily, {});
+  assert.equal(evidence.checkpoint, null);
+  assert.equal(pilot.state.archivedVersions.size, 1);
+  assert.equal(pilot.state.versions.size, 0);
 });
 
 test("authorization completion is current-generation-bound, expiring, one-use and fenced by newer lifecycle events", () => {

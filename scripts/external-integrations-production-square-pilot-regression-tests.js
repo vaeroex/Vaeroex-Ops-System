@@ -341,8 +341,8 @@ assert.match(databaseVerification, /not procedure\.prosecdef or procedure\.provo
 assert.match(databaseVerification, /pg_catalog\.pg_policy/);
 assert.match(databaseVerification, /pg_catalog\.pg_publication_namespace/);
 assert.match(databaseVerification, /square_production_overlay_structural_and_authorization_postflight_passed/);
-assert.match(databaseVerification, /square_production_overlay_staged_role_postflight_passed/);
-assert.match(databaseVerification, /square_production_overlay_active_role_postflight_passed/);
+assert.match(databaseVerification, /square_production_internal_roles_closed_postflight_passed/);
+assert.doesNotMatch(databaseVerification, /square_production_overlay_(?:staged|active)_role_postflight_passed/);
 assert.match(databaseVerification, /login_phase_not_uniform_or_safe/);
 assert.match(databaseVerification, /bool_and\(not login_role\.rolcanlogin and not login_role\.rolinherit\)/);
 assert.doesNotMatch(databaseVerification, /^\s*(?:create|alter|drop|grant|revoke|insert|update|delete|truncate)\s/im,
@@ -410,7 +410,7 @@ assert.equal(blocked.hostedQualificationProven, false);
 assert.equal(blocked.privateMappingVerification, "required_outside_qualifier");
 assert.equal(blocked.activationAuthority, "not_granted");
 assert.equal(blocked.gatesRemainClosed, true);
-assert.ok(blocked.findings.includes("database_ledger_not_exact_overlay"));
+assert.ok(blocked.findings.includes("database_ledger_not_exact_phase"));
 assert.ok(blocked.findings.includes("qualification_source_head_mismatch"));
 assert.ok(blocked.findings.includes("qualification_sources_not_exact_head"));
 assert.ok(blocked.findings.includes("square_overlay_sha256_mismatch"));
