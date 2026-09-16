@@ -226,5 +226,35 @@ const foundationValidCapabilityDriftStatement = /update private\.integration_pro
 assert.ok(foundationValidCapabilityDriftStatement, "foundation-valid identity drift fixture is present");
 assert.doesNotMatch(foundationValidCapabilityDriftStatement, /database_secret_purpose/,
   "overlay identity drift does not trip the provider-neutral secret-purpose constraint first");
+assert.match(pgTap, /is_generated='NEVER' and is_nullable='YES'\),0/,
+  "catalog nullability review distinguishes writable columns from generated expressions");
+for (const generatedFingerprint of [
+  "square_production_configuration_generations.configuration_fingerprint",
+  "square_production_configuration_generations.provider_authority_fingerprint",
+  "square_production_generation_fences.fence_fingerprint",
+  "square_production_lifecycle_audit_events.event_fingerprint",
+  "square_production_runtime_bindings.binding_fingerprint"
+]) {
+  assert.ok(pgTap.includes(generatedFingerprint),
+    `${generatedFingerprint} is explicit in the generated-column nullability contract`);
+}
+assert.deepEqual(
+  [...overlay.matchAll(/^create trigger ([a-z0-9_]+)$/gmi)].map((match) => match[1]),
+  [
+    "square_production_configuration_immutable",
+    "square_production_configuration_truncate_immutable",
+    "square_production_configuration_audit",
+    "square_production_binding_authority",
+    "square_production_binding_immutable",
+    "square_production_binding_truncate_immutable",
+    "square_production_binding_audit",
+    "square_production_fence_immutable",
+    "square_production_fence_truncate_immutable",
+    "square_production_fence_audit",
+    "square_production_audit_immutable",
+    "square_production_audit_truncate_immutable"
+  ],
+  "runtime trigger count is backed by the exact immutable, authority and sanitized-audit manifest"
+);
 
 console.log("Square Production runtime overlay regression tests passed");

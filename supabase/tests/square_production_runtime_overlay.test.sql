@@ -134,7 +134,21 @@ select is((select count(*)::integer from information_schema.columns
     and table_name in (
       'square_production_configuration_generations','square_production_runtime_bindings',
       'square_production_generation_fences','square_production_lifecycle_audit_events'
-    ) and is_nullable='YES'),0,'overlay authority columns are deliberately non-nullable');
+    ) and is_generated='NEVER' and is_nullable='YES'),0,
+  'all writable overlay authority columns are deliberately non-nullable');
+select is((select string_agg(table_name||'.'||column_name,',' order by table_name,column_name)
+  from information_schema.columns
+  where table_schema='private'
+    and table_name in (
+      'square_production_configuration_generations','square_production_runtime_bindings',
+      'square_production_generation_fences','square_production_lifecycle_audit_events'
+    ) and is_generated='ALWAYS' and is_nullable='YES'),
+  'square_production_configuration_generations.configuration_fingerprint,'||
+  'square_production_configuration_generations.provider_authority_fingerprint,'||
+  'square_production_generation_fences.fence_fingerprint,'||
+  'square_production_lifecycle_audit_events.event_fingerprint,'||
+  'square_production_runtime_bindings.binding_fingerprint',
+  'only the exact five derived fingerprint columns retain catalog-generated nullability');
 select is((select count(*)::integer from information_schema.columns
   where table_schema='private' and table_name='square_production_lifecycle_audit_events'
     and (data_type in ('json','jsonb') or column_name ~* '(payload|token|secret|credential|merchant|workspace|actor)')),0,
