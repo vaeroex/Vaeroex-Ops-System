@@ -166,6 +166,7 @@ async function main() {
     const names = ["identity", "profile", "platformClosed", "providerClosed", "configurationClosed", "capabilityClosed",
       "closedAuthority", "targetLock", "phaseValid", "productionContract",
       "oauthAuthority", "brokerAuthority", "schedulerAuthority", "webhookAuthority", "runtimeAuthority", "evidenceAuthority",
+      "brokerRoleExists", "brokerCapabilityExists", "brokerWrapperExists",
       "brokerWrapper", "brokerHelper", "brokerCapabilityRole", "brokerNoMembership", "brokerTargetAbsent", "brokerPublicUsage",
       "brokerExecuteAcl", "brokerPrivateClosed"];
     check(value?.outcome === "production_authority_diagnostic" && names.every(name => typeof value[name] === "boolean"),
