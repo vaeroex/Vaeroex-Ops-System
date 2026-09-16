@@ -1497,7 +1497,11 @@ static int run(int argc, char **argv) {
   }
  #if defined(VAEROEX_SYNTHETIC_ONLY) && defined(VAEROEX_PRODUCTION_PROFILE)
   if (ok && !strcmp(op,"diagnose")) {
+    if (!command("BEGIN")) return 2;
+    transaction = true;
     production_authority_diagnostic(target,true,true);
+    (void)command("ROLLBACK");
+    transaction = false;
     return 0;
   }
  #endif
