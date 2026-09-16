@@ -23,6 +23,16 @@ const approvedSquareQualificationPaths = Object.freeze([
   "services/external-integrations-production/image-build/qualify-image-scans.test.mjs",
   "services/external-integrations-production/image-build/verify-trigger-context.mjs",
   "services/external-integrations-production/image-build/verify-trigger-context.test.mjs",
+  // Offline Production pilot qualification only; exact files, no runtime or
+  // directory-wide exemption.
+  "services/external-integrations-production/pilot/PRIVATE-HANDOFF.md",
+  "services/external-integrations-production/pilot/README.md",
+  "services/external-integrations-production/pilot/contract.json",
+  "services/external-integrations-production/pilot/model.mjs",
+  "services/external-integrations-production/pilot/model.test.mjs",
+  "services/external-integrations-production/pilot/pilot-state.example.json",
+  "services/external-integrations-production/pilot/qualify.mjs",
+  "services/external-integrations-production/pilot/verify-database.sql",
   // Dedicated read-only Sandbox host; exact files, not a service-directory exemption.
   "services/square-workspace-host/.gitignore",
   "services/square-workspace-host/README.md",

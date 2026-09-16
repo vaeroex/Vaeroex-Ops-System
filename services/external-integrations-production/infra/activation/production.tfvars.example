@@ -1,8 +1,8 @@
 project_id    = "vaeroex-integrations-prod"
 region        = "us-west1"
 source_commit = "f4915edadbe2abddd7993c74c1fc3e80e1d1f821"
-oauth_callback_source_commit = "f4915edadbe2abddd7993c74c1fc3e80e1d1f821"
-callback_edge_source_commit = "bb4ad8d3653ca0eecdada88eeeea8a86fa76fc81"
+oauth_callback_source_commit = "45cc2193dd87270ef413f2e21c65cf3b05c1c255"
+callback_edge_source_commit = "45cc2193dd87270ef413f2e21c65cf3b05c1c255"
 operator_email = "isaac@vaeroex.com"
 alert_email    = "isaac@vaeroex.com"
 
@@ -13,8 +13,8 @@ alert_email    = "isaac@vaeroex.com"
 # regressions in the same review. A callback-only release changes the OAuth
 # callback and edge inputs, leaving bootstrap_image_digest unchanged.
 bootstrap_image_digest = "us-west1-docker.pkg.dev/vaeroex-integrations-prod/vaeroex-integrations-images/production-bootstrap@sha256:d56fe933eab1322bb4fe905b183964a980d641af23d69904e15989add501dc6f"
-oauth_callback_image_digest = "us-west1-docker.pkg.dev/vaeroex-integrations-prod/vaeroex-integrations-images/production-bootstrap@sha256:d56fe933eab1322bb4fe905b183964a980d641af23d69904e15989add501dc6f"
-callback_edge_image_digest = "us-west1-docker.pkg.dev/vaeroex-integrations-prod/vaeroex-integrations-images/square-callback-edge@sha256:f9ef2ebc1669e86f549cb7d24f5bb8f40b4a54e4cd14a70a2d3cfb1b6e8e8012"
+oauth_callback_image_digest = "us-west1-docker.pkg.dev/vaeroex-integrations-prod/vaeroex-integrations-images/production-bootstrap@sha256:ebd5e50ab854ca3de3f49ee51ea8fbef0dfa5510b74c19b0ec6e9c367fffeddf"
+callback_edge_image_digest = "us-west1-docker.pkg.dev/vaeroex-integrations-prod/vaeroex-integrations-images/square-callback-edge@sha256:0a841f23b5a45edbbdca61ab4a8a5c2391a377cef1f5a5c00e113db1a33c5bf9"
 
 production_hostname            = "square.vaeroex.com"
 runtime_enabled                 = false
