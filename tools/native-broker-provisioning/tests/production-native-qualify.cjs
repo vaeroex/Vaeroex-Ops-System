@@ -164,16 +164,17 @@ async function main() {
     let value;
     try { value = JSON.parse(line); } catch { value = null; }
     const names = ["identity", "profile", "platformClosed", "providerClosed", "configurationClosed", "capabilityClosed",
-      "closedAuthority", "targetLock", "phaseValid", "productionContract",
+      "closedAuthority", "targetLock", "phaseValid", "productionContract", "brokerWrapperShape", "brokerHelper",
+      "brokerCapabilityRole", "brokerNoMembership", "brokerTargetAbsent", "brokerPublicUsage", "brokerExecuteAcl", "brokerPrivateClosed",
       "oauthAuthority", "brokerAuthority", "schedulerAuthority", "webhookAuthority", "runtimeAuthority", "evidenceAuthority",
-      "brokerRoleExists", "brokerCapabilityExists", "brokerWrapperExists",
-      "brokerWrapper", "brokerHelper", "brokerCapabilityRole", "brokerNoMembership", "brokerTargetAbsent", "brokerPublicUsage",
-      "brokerExecuteAcl", "brokerPrivateClosed"];
+      "brokerCapabilityExists", "brokerWrapperExists"];
     check(value?.outcome === "production_authority_diagnostic" && names.every(name => typeof value[name] === "boolean"),
       "post_mutation_authority_diagnostic_shape");
     process.stdout.write(JSON.stringify({ outcome: "post_mutation_authority_observation", ...Object.fromEntries(
       names.map(name => [name, value?.[name] === true]),
-    ) }) + "\n");
+    ), brokerRoleExists: value?.brokerRoleExists === true, oauthQueryError: value?.oauthQueryError === true, brokerQueryError: value?.brokerQueryError === true,
+    schedulerQueryError: value?.schedulerQueryError === true, webhookQueryError: value?.webhookQueryError === true,
+    runtimeQueryError: value?.runtimeQueryError === true, evidenceQueryError: value?.evidenceQueryError === true }) + "\n");
     for (const name of names) check(value[name] === true, `post_mutation_authority_${name}`);
   };
   stage = "precreate_capability_creator_substitution";
