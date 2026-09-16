@@ -36,6 +36,19 @@ variable "callback_edge_source_commit" {
   }
 }
 
+variable "oauth_callback_source_commit" {
+  type     = string
+  default  = null
+  nullable = true
+  validation {
+    condition = (
+      var.oauth_callback_source_commit == null ||
+      can(regex("^[a-f0-9]{40}$", var.oauth_callback_source_commit))
+    )
+    error_message = "oauth_callback_source_commit must be null or an exact full Git SHA."
+  }
+}
+
 variable "operator_email" {
   type    = string
   default = "isaac@vaeroex.com"

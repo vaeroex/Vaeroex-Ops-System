@@ -8,8 +8,9 @@ const IMAGE_POLICY = Object.freeze({
   bootstrap: "us-west1-docker.pkg.dev/vaeroex-integrations-prod/vaeroex-integrations-images/production-bootstrap",
   buildBucket: "vaeroex-integrations-prod-build",
   bootstrapException: "CVE-2026-85091",
-  bootstrapDockerfileSha256: "628ac2a6fd58b0ac33ca95c1af9a5717f2c3b26f6bf353853c0d56a6ca57e35f",
-  bootstrapServerSha256: "c724529d24e8338bdfff14b51557a72cedb332abddc6d705a0cecca07e08c110",
+  bootstrapDockerfileSha256: "a94896fde4c3a4f423b5b09cb7b899809089bd5ee9f8f25ea73e70a022ac8867",
+  bootstrapServerSha256: "9df82e10ee028ccb895ec4b95452d1a0b635013135821f444f1e7a2fd2f582f0",
+  bootstrapCallbackBoundarySha256: "dcad858b2abd699ee64f0b2b566a3d70f818fad2ceb3e2fbeee252efb673a69a",
   vulnerabilityDiscoveryNote: "projects/goog-analysis/locations/us-west1/notes/PACKAGE_VULNERABILITY",
   vulnerabilityNotePrefix: "projects/goog-vulnz/notes/",
   requiredStableScanReads: 3,
@@ -154,16 +155,12 @@ async function readDigestFile(path) {
   return text.slice(0, -1);
 }
 
-async function verifyBootstrapSource() {
-  const base = "/workspace/services/external-integrations-production/bootstrap-runtime";
-  const [dockerfile, server, packageText] = await Promise.all([
-    readSmallFile(`${base}/Dockerfile`, 4096),
-    readSmallFile(`${base}/server.mjs`, 16_384),
-    readSmallFile(`${base}/package.json`, 4096),
-  ]);
+export function verifyBootstrapSourceContent({ dockerfile, server, callbackBoundary, packageText }) {
+  if ([dockerfile, server, callbackBoundary, packageText].some((value) => typeof value !== "string")) reject("bootstrap_source_invalid");
   const sha256 = (value) => createHash("sha256").update(value).digest("hex");
   if (sha256(dockerfile) !== IMAGE_POLICY.bootstrapDockerfileSha256) reject("bootstrap_dockerfile_changed");
   if (sha256(server) !== IMAGE_POLICY.bootstrapServerSha256) reject("bootstrap_server_changed");
+  if (sha256(callbackBoundary) !== IMAGE_POLICY.bootstrapCallbackBoundarySha256) reject("bootstrap_callback_boundary_changed");
   let manifest;
   try {
     manifest = JSON.parse(packageText);
@@ -173,12 +170,23 @@ async function verifyBootstrapSource() {
   if (Object.keys(manifest.dependencies ?? {}).length !== 0 || Object.keys(manifest.optionalDependencies ?? {}).length !== 0) {
     reject("bootstrap_runtime_dependencies");
   }
-  if (/\b(zlib|gzip|deflate|createGzip|createDeflate)\b/i.test(server)) reject("bootstrap_compression_reachable");
+  if (/\b(zlib|gzip|deflate|createGzip|createDeflate)\b/i.test(server + "\n" + callbackBoundary)) reject("bootstrap_compression_reachable");
   return Object.freeze({
     bootstrapFingerprintsVerified: true,
     runtimeDependenciesEmpty: true,
     compressionPathAbsent: true,
   });
+}
+
+async function verifyBootstrapSource() {
+  const base = "/workspace/services/external-integrations-production/bootstrap-runtime";
+  const [dockerfile, server, callbackBoundary, packageText] = await Promise.all([
+    readSmallFile(`${base}/Dockerfile`, 4096),
+    readSmallFile(`${base}/server.mjs`, 16_384),
+    readSmallFile(`${base}/callback-boundary.mjs`, 32_768),
+    readSmallFile(`${base}/package.json`, 4096),
+  ]);
+  return verifyBootstrapSourceContent({ dockerfile, server, callbackBoundary, packageText });
 }
 
 export async function listOccurrences(resourceUrl, accessToken, fetchImpl) {

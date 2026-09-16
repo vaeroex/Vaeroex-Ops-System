@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 import {
   buildCandidateManifest,
@@ -8,6 +9,7 @@ import {
   parseDigestReference,
   scanEvidenceFingerprint,
   waitForCompletedScan,
+  verifyBootstrapSourceContent,
 } from "./qualify-image-scans.mjs";
 import { POLICY } from "./verify-trigger-context.mjs";
 
@@ -19,6 +21,25 @@ const integrity = Object.freeze({
   bootstrapFingerprintsVerified: true,
   runtimeDependenciesEmpty: true,
   compressionPathAbsent: true,
+});
+
+test("fingerprints every executable bootstrap module and keeps compression unreachable", async () => {
+  const base = new URL("../bootstrap-runtime/", import.meta.url);
+  const [dockerfile, server, callbackBoundary, packageText] = await Promise.all(
+    ["Dockerfile", "server.mjs", "callback-boundary.mjs", "package.json"]
+      .map((name) => readFile(new URL(name, base), "utf8")),
+  );
+  const sources = { dockerfile, server, callbackBoundary, packageText };
+  assert.deepEqual(verifyBootstrapSourceContent(sources), integrity);
+  for (const [field, reason] of [
+    ["dockerfile", /bootstrap_dockerfile_changed/],
+    ["server", /bootstrap_server_changed/],
+    ["callbackBoundary", /bootstrap_callback_boundary_changed/],
+  ]) assert.throws(() => verifyBootstrapSourceContent({ ...sources, [field]: sources[field] + "\n" }), reason);
+  assert.throws(() => verifyBootstrapSourceContent({
+    ...sources,
+    packageText: JSON.stringify({ dependencies: { zlib: "1.0.0" } }),
+  }), /bootstrap_runtime_dependencies/);
 });
 let occurrenceSequence = 0;
 const occurrence = (kind, details = {}, resourceUri = callback.resourceUrl) => ({

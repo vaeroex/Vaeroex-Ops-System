@@ -53,11 +53,12 @@ locals {
   deployment_enabled = (
     var.bootstrap_image_digest != null &&
     var.oauth_callback_image_digest != null &&
-    var.callback_edge_image_digest != null
+    var.callback_edge_image_digest != null &&
+    var.oauth_callback_source_commit != null
   )
   deployment_inputs_valid = (
-    (var.bootstrap_image_digest == null && var.oauth_callback_image_digest == null && var.callback_edge_image_digest == null && var.callback_edge_source_commit == null) ||
-    (var.bootstrap_image_digest != null && var.oauth_callback_image_digest != null && var.callback_edge_image_digest != null && var.callback_edge_source_commit != null)
+    (var.bootstrap_image_digest == null && var.oauth_callback_image_digest == null && var.callback_edge_image_digest == null && var.callback_edge_source_commit == null && var.oauth_callback_source_commit == null) ||
+    (var.bootstrap_image_digest != null && var.oauth_callback_image_digest != null && var.callback_edge_image_digest != null && var.callback_edge_source_commit != null && var.oauth_callback_source_commit != null)
   )
 }
 
@@ -550,7 +551,7 @@ resource "google_cloud_run_v2_service" "square" {
       }
       env {
         name  = "VAEROEX_SOURCE_COMMIT"
-        value = var.source_commit
+        value = each.key == "oauth" ? var.oauth_callback_source_commit : var.source_commit
       }
       env {
         name  = "VAEROEX_RUNTIME_ENABLED"

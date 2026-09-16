@@ -7,13 +7,14 @@ mock_provider "google" {
 }
 
 variables {
-  project_id                  = "vaeroex-integrations-prod"
-  region                      = "us-west1"
-  source_commit               = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-  callback_edge_source_commit = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-  bootstrap_image_digest      = "us-west1-docker.pkg.dev/vaeroex-integrations-prod/vaeroex-integrations-images/production-bootstrap@sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
-  oauth_callback_image_digest = "us-west1-docker.pkg.dev/vaeroex-integrations-prod/vaeroex-integrations-images/production-bootstrap@sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
-  callback_edge_image_digest  = "us-west1-docker.pkg.dev/vaeroex-integrations-prod/vaeroex-integrations-images/square-callback-edge@sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+  project_id                   = "vaeroex-integrations-prod"
+  region                       = "us-west1"
+  source_commit                = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  oauth_callback_source_commit = "ffffffffffffffffffffffffffffffffffffffff"
+  callback_edge_source_commit  = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  bootstrap_image_digest       = "us-west1-docker.pkg.dev/vaeroex-integrations-prod/vaeroex-integrations-images/production-bootstrap@sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+  oauth_callback_image_digest  = "us-west1-docker.pkg.dev/vaeroex-integrations-prod/vaeroex-integrations-images/production-bootstrap@sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+  callback_edge_image_digest   = "us-west1-docker.pkg.dev/vaeroex-integrations-prod/vaeroex-integrations-images/square-callback-edge@sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
 }
 
 run "callback_images_are_existing_resource_updates_only" {
@@ -37,6 +38,17 @@ run "callback_images_are_existing_resource_updates_only" {
       google_cloud_run_v2_service.square[mode].template[0].containers[0].image == var.bootstrap_image_digest
     ])
     error_message = "Every non-OAuth service must remain pinned to the shared bootstrap digest."
+  }
+
+  assert {
+    condition = (
+      [for item in google_cloud_run_v2_service.square["oauth"].template[0].containers[0].env : item.value if item.name == "VAEROEX_SOURCE_COMMIT"][0] == var.oauth_callback_source_commit &&
+      alltrue([
+        for mode in ["broker", "scheduler", "webhook", "runtime", "evidence"] :
+        [for item in google_cloud_run_v2_service.square[mode].template[0].containers[0].env : item.value if item.name == "VAEROEX_SOURCE_COMMIT"][0] == var.source_commit
+      ])
+    )
+    error_message = "Callback-only release provenance must update OAuth without revising peer services."
   }
 
   assert {

@@ -53,9 +53,12 @@ assert.match(variables, /var\.region == "us-west1"/, "the activation cannot crea
 assert.match(variables, /bootstrap_image_digest == null/, "the first apply creates no runtime");
 assert.match(variables, /production-bootstrap@sha256:\[a-f0-9\]\{64\}/, "a runtime image must be an immutable digest in the isolated repository");
 assert.match(variables, /variable "oauth_callback_image_digest"[\s\S]*production-bootstrap@sha256:\[a-f0-9\]\{64\}/, "the OAuth callback runtime has its own immutable disabled-bootstrap input");
+assert.match(variables, /variable "oauth_callback_source_commit"[\s\S]*\^\[a-f0-9\]\{40\}\$/, "OAuth callback provenance requires an exact separate source revision");
 assert.match(variables, /square-callback-edge@sha256:\[a-f0-9\]\{64\}/, "the callback edge image must be an immutable digest in the isolated repository");
 assert.match(main, /deployment_inputs_valid/, "runtime and callback-edge artifacts must be deployed together");
 assert.match(main, /callback_edge_source_commit == null/, "a callback edge cannot be deployed without exact source provenance");
+assert.match(main, /oauth_callback_source_commit == null/, "first-stage infrastructure cannot claim an OAuth runtime revision");
+assert.match(main, /value\s*=\s*each\.key == "oauth" \? var\.oauth_callback_source_commit : var\.source_commit/, "OAuth source provenance is separate without revising peer services");
 assert.match(main, /image\s*=\s*each\.key == "oauth" \? var\.oauth_callback_image_digest : var\.bootstrap_image_digest/, "only the existing OAuth service selects the callback-specific image");
 assert.match(main, /for_each\s*=\s*local\.deployment_enabled \? local\.modes : toset\(\[\]\)/, "the callback-specific image introduces no Cloud Run resource");
 assert.match(main, /"containerscanning\.googleapis\.com"/, "release images require automatic vulnerability scanning");
@@ -138,6 +141,7 @@ assert.match(workflow, /External integrations Square Production callback edge te
 assert.match(activationReadme, /Direct human build submission remains closed/, "manual callback-edge publication is explicitly closed");
 assert.match(activationReadme, /only configured rebuild path is the `vaeroex-production-images` GitHub push trigger/, "future publication requires the source-bound reviewed trigger");
 assert.match(releasePins, new RegExp(`source_commit\\s*=\\s*"${reviewedSourceCommit}"`), "the second-stage release is pinned to the reviewed source revision");
+assert.match(releasePins, new RegExp(`oauth_callback_source_commit\\s*=\\s*"${reviewedSourceCommit}"`), "the currently pinned OAuth digest reports its actual shared bootstrap revision");
 assert.match(releasePins, new RegExp(`callback_edge_source_commit\\s*=\\s*"${reviewedCallbackEdgeSourceCommit}"`), "the callback edge is pinned to its distinct reviewed source revision");
 assert.match(releasePins, new RegExp(`bootstrap_image_digest\\s*=\\s*"${reviewedBootstrapDigest}"`), "the reviewed bootstrap digest is pinned exactly");
 assert.match(releasePins, new RegExp(`oauth_callback_image_digest\\s*=\\s*"${reviewedOauthCallbackDigest}"`), "the OAuth callback starts from the reviewed disabled-bootstrap digest without revising peer services");

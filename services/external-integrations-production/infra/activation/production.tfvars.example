@@ -1,6 +1,7 @@
 project_id    = "vaeroex-integrations-prod"
 region        = "us-west1"
 source_commit = "f4915edadbe2abddd7993c74c1fc3e80e1d1f821"
+oauth_callback_source_commit = "f4915edadbe2abddd7993c74c1fc3e80e1d1f821"
 callback_edge_source_commit = "bb4ad8d3653ca0eecdada88eeeea8a86fa76fc81"
 operator_email = "isaac@vaeroex.com"
 alert_email    = "isaac@vaeroex.com"
