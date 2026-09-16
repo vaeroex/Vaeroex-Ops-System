@@ -373,6 +373,7 @@ async function main() {
     "--version",
     fixtureBaseVersion
   ]);
+  await require("./prepare-production-shaped-local-database.js").normalizeLocalFixture();
   await applyFixture(databaseUrl);
   await qualifyProductionRoleDrift(localMigrationAdministratorDatabaseUrl);
   run(cli, ["migration", "up", "--local"]);

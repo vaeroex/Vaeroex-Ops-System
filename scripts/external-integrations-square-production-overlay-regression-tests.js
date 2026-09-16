@@ -218,8 +218,8 @@ assert.match(runner, /filter\(\(name\) => \/\^\\d\+_\.\+\\\.sql\$\/\.test\(name\
   "qualification includes legacy variable-width migration versions");
 assert.match(runner, /baselineVersions\.length, 102/);
 assert.match(runner, /sha256:3326a738d016df98e0fd22830b8c950dac3cc6d50bd26b61de1d9ebd282c201f/);
-assert.match(runner, /"db", "reset", "--local", "--no-seed", "--version", baseVersion/);
-assert.match(runner, /"db", "reset", "--local", "--no-seed", "--version", overlayVersion/);
+assert.match(runner, /await resetLocalFixture\(baseVersion\)/);
+assert.match(runner, /await resetLocalFixture\(overlayVersion\)/);
 assert.match(runner, /snapshotQboCatalog/);
 assert.match(runner, /deepEqual\(afterQbo, beforeQbo/);
 assert.match(runner, /snapshotPreservedRoutineAcls/);
@@ -406,5 +406,48 @@ assert.deepEqual(
   ],
   "runtime trigger count is backed by the exact immutable, authority and sanitized-audit manifest"
 );
+
+const localFixture = require("./prepare-production-shaped-local-database.js");
+const fixtureSource = fs.readFileSync(path.join(root, "scripts/prepare-production-shaped-local-database.js"), "utf8");
+const savedCi = process.env.CI, savedActions = process.env.GITHUB_ACTIONS;
+try {
+  process.env.CI = "true";
+  process.env.GITHUB_ACTIONS = "true";
+  const config = 'project_id = "square-production-fixture"';
+  const context = [{ Endpoints: { docker: { Host: "unix:///var/run/docker.sock" } } }];
+  const container = [{ Name: "/supabase_db_square-production-fixture", State: { Running: true },
+    Config: { Image: "public.ecr.aws/supabase/postgres:17.6.1.156" },
+    NetworkSettings: { Ports: { "5432/tcp": [{ HostPort: "54322" }] } } }];
+  const url = "postgresql://postgres:synthetic-only@127.0.0.1:54322/postgres";
+  assert.equal(localFixture.validateLocalTarget(config, context, container, url).host, "127.0.0.1");
+  for (const deniedUrl of [url.replace("127.0.0.1", "database.example.com"),
+    url.replace("/postgres", "/other"), `${url}?host=database.example.com`, url.replace("54322", "54323")]) {
+    assert.throws(() => localFixture.validateLocalTarget(config, context, container, deniedUrl));
+  }
+  assert.throws(() => localFixture.validateLocalTarget(config,
+    [{ Endpoints: { docker: { Host: "tcp://remote.example:2376" } } }], container, url));
+  assert.throws(() => localFixture.validateLocalTarget(config, context,
+    [{ ...container[0], Name: "/unrelated" }], url));
+  process.env.CI = "false";
+  assert.throws(() => localFixture.validateLocalTarget(config, context, container, url), /ci_fixture_only/);
+} finally {
+  if (savedCi === undefined) delete process.env.CI; else process.env.CI = savedCi;
+  if (savedActions === undefined) delete process.env.GITHUB_ACTIONS; else process.env.GITHUB_ACTIONS = savedActions;
+}
+assert.match(localFixture.normalizeSql, /exists\(select 1 from net\.http_request_queue\).*exists\(select 1 from net\._http_response\)/s);
+assert.match(localFixture.normalizeSql, /drop extension pg_net restrict/);
+assert.doesNotMatch(localFixture.normalizeSql, /cascade|grant |revoke /i);
+assert.match(fixtureSource, /localConnection\(\); \/\/ Verify the current local container before destructive reset/);
+assert.match(fixtureSource, /name\.split\("_", 1\)\[0\] <= version/);
+assert.doesNotMatch(fixtureSource, /name\.slice\(0, 14\)|\\d\{14\}_.\+/);
+const fixtureVersions = fs.readdirSync(path.join(root, "supabase/migrations"))
+  .filter(name => /^\d+_.+\.sql$/.test(name)).sort().map(name => name.split("_", 1)[0])
+  .filter(version => version <= "20260902191323");
+assert.equal(fixtureVersions.length, 102, "CI fixture retains every variable-width canonical migration");
+assert.equal(require("node:crypto").createHash("sha256").update(
+  fixtureVersions.map(version => `${version.length}:${version}`).join("")
+).digest("hex"), "3326a738d016df98e0fd22830b8c950dac3cc6d50bd26b61de1d9ebd282c201f");
+assert.match(fixtureSource, /"migration", "up", "--local", "--workdir", directory/);
+assert.match(fixtureSource, /SUPABASE_DB_MIGRATIONS_ENABLED: "true"/);
 
 console.log("Square Production runtime overlay regression tests passed");

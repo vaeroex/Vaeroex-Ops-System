@@ -4,6 +4,7 @@ const crypto = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
 const { Client } = require("pg");
+const { resetLocalFixture } = require("./prepare-production-shaped-local-database.js");
 
 const root = path.resolve(__dirname, "..");
 const cli = process.env.SUPABASE_CLI_PATH || "supabase";
@@ -372,21 +373,21 @@ async function main() {
   assertMigrationManifest();
   const databaseUrl = localDatabaseUrl();
 
-  run(cli, ["db", "reset", "--local", "--no-seed", "--version", baseVersion]);
+  await resetLocalFixture(baseVersion);
   await qualifySubstitutedLedger(databaseUrl);
-  run(cli, ["db", "reset", "--local", "--no-seed", "--version", baseVersion]);
+  await resetLocalFixture(baseVersion);
   await qualifyPerDatabaseRoleSetting(databaseUrl);
-  run(cli, ["db", "reset", "--local", "--no-seed", "--version", baseVersion]);
+  await resetLocalFixture(baseVersion);
   await qualifySequencePrivilegeDrift(databaseUrl);
-  run(cli, ["db", "reset", "--local", "--no-seed", "--version", baseVersion]);
+  await resetLocalFixture(baseVersion);
   await qualifyMaintainPrivilegeDrift(databaseUrl);
-  run(cli, ["db", "reset", "--local", "--no-seed", "--version", baseVersion]);
+  await resetLocalFixture(baseVersion);
   await qualifyCustomPgRoutineDrift(databaseUrl);
-  run(cli, ["db", "reset", "--local", "--no-seed", "--version", baseVersion]);
+  await resetLocalFixture(baseVersion);
   const beforeQbo = await snapshotQboCatalog(databaseUrl);
   const beforePreservedRoutineAcls = await snapshotPreservedRoutineAcls(databaseUrl);
 
-  run(cli, ["db", "reset", "--local", "--no-seed", "--version", overlayVersion]);
+  await resetLocalFixture(overlayVersion);
   const afterQbo = await snapshotQboCatalog(databaseUrl);
   const afterPreservedRoutineAcls = await snapshotPreservedRoutineAcls(databaseUrl);
   assert.deepEqual(afterQbo, beforeQbo, "Square Production overlay leaves every QBO catalog contract unchanged");

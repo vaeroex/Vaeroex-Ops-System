@@ -591,7 +591,10 @@ jobs:
         run: supabase init --force
 
       - name: Apply migrations to isolated local Postgres
-        run: supabase db start
+        run: |
+          SUPABASE_DB_MIGRATIONS_ENABLED=false supabase db start
+          node scripts/prepare-production-shaped-local-database.js
+          supabase migration up --local
 
       - name: Verify authorization and Customer #1 billing behavior
         run: |
