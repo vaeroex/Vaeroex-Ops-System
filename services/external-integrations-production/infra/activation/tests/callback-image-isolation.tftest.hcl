@@ -58,14 +58,6 @@ run "callback_images_are_existing_resource_updates_only" {
 
   assert {
     condition = (
-      one(google_network_services_wasm_plugin.square_callback[0].versions).version_name == "vbbbbbbbbbbbb" &&
-      one(google_network_services_wasm_plugin.square_callback[0].versions).plugin_config_data == null
-    )
-    error_message = "The ordinary callback edge must remain diagnostic-free by default."
-  }
-
-  assert {
-    condition = (
       var.runtime_enabled == false &&
       var.provider_calls_enabled == false &&
       var.customer_onboarding_enabled == false &&
@@ -75,40 +67,4 @@ run "callback_images_are_existing_resource_updates_only" {
     )
     error_message = "A callback-only image plan must keep every Production gate closed."
   }
-}
-
-run "finite_diagnostic_configuration_is_a_distinct_immutable_version" {
-  command = plan
-
-  variables {
-    callback_edge_diagnostic_window = {
-      not_before_unix = 1789542000
-      expires_unix    = 1789543200
-    }
-  }
-
-  assert {
-    condition = one(google_network_services_wasm_plugin.square_callback[0].versions).plugin_config_data == base64encode(
-      "vaeroex_public_callback_predicate_v1\n1789542000\n1789543200\n"
-    )
-    error_message = "The diagnostic version must receive only the reviewed exact 20-minute window."
-  }
-
-  assert {
-    condition     = one(google_network_services_wasm_plugin.square_callback[0].versions).version_name == "vbbbbbbbbbbbb-c${substr(sha256("vaeroex_public_callback_predicate_v1\n1789542000\n1789543200\n"), 0, 12)}"
-    error_message = "The immutable callback version ID must bind the diagnostic configuration digest."
-  }
-}
-
-run "diagnostic_window_over_twenty_minutes_is_rejected" {
-  command = plan
-
-  variables {
-    callback_edge_diagnostic_window = {
-      not_before_unix = 1789542000
-      expires_unix    = 1789543201
-    }
-  }
-
-  expect_failures = [var.callback_edge_diagnostic_window]
 }

@@ -36,27 +36,6 @@ variable "callback_edge_source_commit" {
   }
 }
 
-variable "callback_edge_diagnostic_window" {
-  type = object({
-    not_before_unix = number
-    expires_unix    = number
-  })
-  default  = null
-  nullable = true
-  validation {
-    condition = var.callback_edge_diagnostic_window == null ? true : (
-      floor(var.callback_edge_diagnostic_window.not_before_unix) == var.callback_edge_diagnostic_window.not_before_unix &&
-      floor(var.callback_edge_diagnostic_window.expires_unix) == var.callback_edge_diagnostic_window.expires_unix &&
-      var.callback_edge_diagnostic_window.not_before_unix > 0 &&
-      var.callback_edge_diagnostic_window.not_before_unix <= 9999999999 &&
-      var.callback_edge_diagnostic_window.expires_unix <= 9999999999 &&
-      var.callback_edge_diagnostic_window.expires_unix > var.callback_edge_diagnostic_window.not_before_unix &&
-      var.callback_edge_diagnostic_window.expires_unix - var.callback_edge_diagnostic_window.not_before_unix <= 1200
-    )
-    error_message = "callback_edge_diagnostic_window must be null or an exact positive Unix-second window of at most 20 minutes."
-  }
-}
-
 variable "oauth_callback_source_commit" {
   type     = string
   default  = null

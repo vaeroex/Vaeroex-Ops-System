@@ -49,14 +49,7 @@ locals {
       mode => "projects/${data.google_project.current.number}/secrets/${secret_id}/versions/1"
     }
   }
-  callback_edge_diagnostic_config = var.callback_edge_diagnostic_window == null ? null : join("\n", [
-    "vaeroex_public_callback_predicate_v1",
-    tostring(var.callback_edge_diagnostic_window.not_before_unix),
-    tostring(var.callback_edge_diagnostic_window.expires_unix),
-    "",
-  ])
-  callback_edge_config_suffix = local.callback_edge_diagnostic_config == null ? "" : "-c${substr(sha256(local.callback_edge_diagnostic_config), 0, 12)}"
-  callback_edge_version       = var.callback_edge_source_commit == null ? null : "v${substr(var.callback_edge_source_commit, 0, 12)}${local.callback_edge_config_suffix}"
+  callback_edge_version = var.callback_edge_source_commit == null ? null : "v${substr(var.callback_edge_source_commit, 0, 12)}"
   deployment_enabled = (
     var.bootstrap_image_digest != null &&
     var.oauth_callback_image_digest != null &&
@@ -670,10 +663,9 @@ resource "google_network_services_wasm_plugin" "square_callback" {
   deletion_policy = "PREVENT"
 
   versions {
-    version_name       = local.callback_edge_version
-    description        = "Immutable Square callback edge for source ${var.callback_edge_source_commit}"
-    image_uri          = var.callback_edge_image_digest
-    plugin_config_data = local.callback_edge_diagnostic_config == null ? null : base64encode(local.callback_edge_diagnostic_config)
+    version_name = local.callback_edge_version
+    description  = "Immutable Square callback edge for source ${var.callback_edge_source_commit}"
+    image_uri    = var.callback_edge_image_digest
   }
 }
 
