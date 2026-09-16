@@ -221,8 +221,12 @@ async function main() {
   // durable role identity. It must still leave that exact role fenced, with no
   // session, and force an explicit recovery rather than silently retrying.
   const postMutationNative = adapterModule.createLocalSyntheticProductionNativeAdapter({ executable: binaries.get(failedProfile.name), target: failedTarget });
-  const postMutationStore = { ...lifecycleModule.createInMemorySyntheticSecretStore({ production: true }),
-    async stage() { throw new Error("synthetic_stage_ack_denied"); } };
+  const postMutationMemory = lifecycleModule.createInMemorySyntheticSecretStore({ production: true });
+  const postMutationStore = { ...postMutationMemory,
+    async stage(handle, bytes) {
+      await postMutationMemory.stage(handle, bytes);
+      throw new Error("synthetic_stage_ack_denied");
+    } };
   const postMutationCoordinator = lifecycleModule.createSyntheticProductionProvisioningCoordinator({ target: failedTarget,
     native: postMutationNative, secretStore: postMutationStore, audit: { async append() { return { ack: true }; } } });
   const postMutation = await postMutationCoordinator.run({ operation: "create", actor: "synthetic-owner",
