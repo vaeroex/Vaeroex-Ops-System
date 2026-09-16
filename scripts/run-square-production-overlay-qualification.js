@@ -214,7 +214,7 @@ async function qualifyMaintainPrivilegeDrift(databaseUrl) {
   }
 }
 
-async function qualifyCustomPgRoutineDrift(databaseUrl) {
+async function qualifyCustomRoutineDrift(databaseUrl) {
   const migration = fs.readFileSync(path.join(
     root,
     "supabase/migrations/20260902191324_square_production_runtime_overlay.sql"
@@ -223,31 +223,29 @@ async function qualifyCustomPgRoutineDrift(databaseUrl) {
   await client.connect();
   try {
     await client.query(`
-      set allow_system_table_mods=on;
-      create schema pg_square_qualification;
-      grant usage on schema pg_square_qualification to public;
-      create function pg_square_qualification.ambient_public_probe()
+      create schema square_qualification;
+      grant usage on schema square_qualification to public;
+      create function square_qualification.ambient_public_probe()
       returns integer language sql as 'select 1'
     `);
     const effective = await client.query(`
       select pg_catalog.has_schema_privilege(
-          'square_production_oauth_authority','pg_square_qualification','USAGE'
+          'square_production_oauth_authority','square_qualification','USAGE'
         ) and pg_catalog.has_function_privilege(
           'square_production_oauth_authority',
-          'pg_square_qualification.ambient_public_probe()','EXECUTE'
+          'square_qualification.ambient_public_probe()','EXECUTE'
         ) as effective
     `);
-    assert.equal(effective.rows[0].effective, true, "negative fixture exposes a callable custom pg_* routine");
+    assert.equal(effective.rows[0].effective, true, "negative fixture exposes a callable custom-schema routine");
     await assert.rejects(
       client.query(migration),
       /square_production_overlay_authority_rpc_not_closed/,
-      "a callable routine in a custom pg_* schema must fail the final closure"
+      "a callable routine in a custom schema must fail the final closure"
     );
     await client.query("rollback");
   } finally {
     await client.query("rollback").catch(() => undefined);
-    await client.query("drop schema if exists pg_square_qualification cascade").catch(() => undefined);
-    await client.query("set allow_system_table_mods=off").catch(() => undefined);
+    await client.query("drop schema if exists square_qualification cascade").catch(() => undefined);
     await client.end();
   }
 }
@@ -382,7 +380,7 @@ async function main() {
   await resetLocalFixture(baseVersion);
   await qualifyMaintainPrivilegeDrift(databaseUrl);
   await resetLocalFixture(baseVersion);
-  await qualifyCustomPgRoutineDrift(databaseUrl);
+  await qualifyCustomRoutineDrift(databaseUrl);
   await resetLocalFixture(baseVersion);
   const beforeQbo = await snapshotQboCatalog(databaseUrl);
   const beforePreservedRoutineAcls = await snapshotPreservedRoutineAcls(databaseUrl);

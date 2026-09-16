@@ -243,8 +243,10 @@ assert.match(runner,
   /qualifyMaintainPrivilegeDrift[\s\S]*grant maintain on table[\s\S]*square_production_overlay_authority_rpc_not_closed/,
   "qualification proves effective application-table MAINTAIN authority fails the overlay closure");
 assert.match(runner,
-  /qualifyCustomPgRoutineDrift[\s\S]*allow_system_table_mods=on[\s\S]*pg_square_qualification[\s\S]*square_production_overlay_authority_rpc_not_closed/,
-  "qualification proves a callable routine in a custom pg_* schema is not treated as a system routine");
+  /qualifyCustomRoutineDrift[\s\S]*create schema square_qualification[\s\S]*square_production_overlay_authority_rpc_not_closed/,
+  "qualification proves a callable routine in an ordinary custom schema fails closure");
+assert.doesNotMatch(runner, /allow_system_table_mods|pg_square_qualification/,
+  "qualification does not require superuser-only reserved-schema fixtures outside the verified baseline");
 
 const pgTapAssertionFunctions = [...pgTap.matchAll(
   /^select\s+(?:\*\s+from\s+)?([a-z_][a-z0-9_]*)\s*\(/gmi
