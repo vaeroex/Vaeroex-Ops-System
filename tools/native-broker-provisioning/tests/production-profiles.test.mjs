@@ -177,6 +177,9 @@ test("post-mutation recovery reports each safety condition independently", () =>
   assert.match(qualifier, /production_fixture_digest_function_available/);
   assert.match(qualifier, /fixture\.connect\(fenceProfile\.role, fenceCandidate\.toString\("ascii"\), "tls"\)/,
     "the Node SCRAM fencing probe supplies its candidate as the required string type");
+  assert.match(qualifier, /postflight_authority_drift_observation/);
+  assert.match(qualifier, /authority_drift_delivery_mutated_authority/);
+  assert.match(qualifier, /authority_drift_native_rejected_after_delivery/);
 });
 
 test("portable catalog qualification executes exact phase predicates from CI", () => {

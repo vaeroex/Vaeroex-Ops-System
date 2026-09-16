@@ -458,7 +458,11 @@ async function main() {
   } catch { postflightDenied = true; }
   if (postflightMutated) await fixture.control.query(`CREATE OR REPLACE FUNCTION ${overlayRpc(postflightDrift)} RETURNS void
     LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path='' AS $function$${productionAuthoritySource(postflightDrift)}$function$`);
-  check(postflightMutated && postflightDenied, "authority_drift_after_secret_ack_rejected_before_commit");
+  process.stdout.write(JSON.stringify({ outcome: "postflight_authority_drift_observation",
+    deliveryMutatedAuthority: postflightMutated === true,
+    nativeRejectedAfterDelivery: postflightDenied === true }) + "\n");
+  check(postflightMutated === true, "authority_drift_delivery_mutated_authority");
+  check(postflightDenied === true, "authority_drift_native_rejected_after_delivery");
   check((await postflightNative.inspect({ target: postflightTarget, intent: "postflight-authority-restored",
     approvalId: "synthetic-production", signal: new AbortController().signal })).ack,
   "failed_postflight_assignment_rolls_back_and_restored_authority_inspects");
