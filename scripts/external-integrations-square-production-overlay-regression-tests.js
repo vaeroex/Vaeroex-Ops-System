@@ -436,6 +436,9 @@ try {
 }
 assert.match(localFixture.normalizeSql, /exists\(select 1 from net\.http_request_queue\).*exists\(select 1 from net\._http_response\)/s);
 assert.match(localFixture.normalizeSql, /drop extension pg_net restrict/);
+assert.match(localFixture.normalizeSql, /extname='pg_net' and extversion='0\.20\.4'/,
+  "fixture pins the control file packaged in the exact Supabase 17.6.1.156 image, not its stale README");
+assert.doesNotMatch(localFixture.normalizeSql, /extversion='0\.19\.5'/);
 assert.match(localFixture.normalizeSql, /relkind in \('r','p','v','m','f','S','i','I'\)/,
   "data relation inventory excludes pg_net's two composite-type catalog rows");
 assert.equal(localFixture.sanitizedFailure(new Error("local_pg_net_fixture_inventory_changed")), "local_pg_net_fixture_inventory_changed");

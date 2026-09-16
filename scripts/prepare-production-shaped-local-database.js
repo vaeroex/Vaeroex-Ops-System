@@ -43,7 +43,9 @@ begin
     raise exception 'production_shaped_local_identity_mismatch';
   end if;
   if exists(select 1 from pg_catalog.pg_extension where extname='pg_net') then
-    if not exists(select 1 from pg_catalog.pg_extension where extname='pg_net' and extversion='0.19.5')
+    -- The exact 17.6.1.156 image control file pins 0.20.4; its README's
+    -- older 0.19.5 extension table is not the packaged default.
+    if not exists(select 1 from pg_catalog.pg_extension where extname='pg_net' and extversion='0.20.4')
       or (select array_agg(relname::text order by relname) from pg_catalog.pg_class
         where relnamespace='net'::regnamespace and relkind in ('r','p','v','m','f','S','i','I')) is distinct from
         array['_http_response','_http_response_created_idx','http_request_queue','http_request_queue_id_seq']::text[]
