@@ -220,13 +220,15 @@ async function main() {
   // A store failure happens only after the native prepare has committed a
   // durable role identity. It must still leave that exact role fenced, with no
   // session, and force an explicit recovery rather than silently retrying.
-  const postMutationNative = adapterModule.createLocalSyntheticProductionNativeAdapter({ executable: binaries.get(failedProfile.name), target: failedTarget });
-  const postMutationMemory = lifecycleModule.createInMemorySyntheticSecretStore({ production: true });
-  const postMutationStore = { ...postMutationMemory,
-    async stage(handle, bytes) {
-      await postMutationMemory.stage(handle, bytes);
-      throw new Error("synthetic_stage_ack_denied");
-    } };
+  const postMutationNativeBase = adapterModule.createLocalSyntheticProductionNativeAdapter({ executable: binaries.get(failedProfile.name), target: failedTarget });
+  const postMutationNative = Object.freeze({
+    ...postMutationNativeBase,
+    async assign(context) {
+      await postMutationNativeBase.assign(context);
+      throw new Error("synthetic_assign_ack_denied");
+    },
+  });
+  const postMutationStore = lifecycleModule.createInMemorySyntheticSecretStore({ production: true });
   const postMutationCoordinator = lifecycleModule.createSyntheticProductionProvisioningCoordinator({ target: failedTarget,
     native: postMutationNative, secretStore: postMutationStore, audit: { async append() { return { ack: true }; } } });
   const postMutation = await postMutationCoordinator.run({ operation: "create", actor: "synthetic-owner",
