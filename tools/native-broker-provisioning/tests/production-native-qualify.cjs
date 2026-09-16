@@ -224,8 +224,8 @@ async function main() {
   const postMutationNative = Object.freeze({
     ...postMutationNativeBase,
     async assign(context) {
-      await postMutationNativeBase.assign(context);
-      throw new Error("synthetic_assign_ack_denied");
+      const assigned = await postMutationNativeBase.assign(context);
+      return Object.freeze({ ...assigned, storeAcknowledged: false });
     },
   });
   const postMutationStore = lifecycleModule.createInMemorySyntheticSecretStore({ production: true });
