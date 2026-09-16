@@ -709,5 +709,20 @@ select ok(pg_temp.statement_error($sql$
   truncate private.square_production_lifecycle_audit_events
 $sql$) like '55000:square_production_history_immutable','sanitized lifecycle audit cannot be truncated');
 
+-- pg_net's two composite types also have pg_class rows (relkind c). The
+-- disposable-CI normalizer must inventory data relations, not mistake these
+-- documented type descriptors for extra queue tables.
+create schema net;
+create unlogged table net.http_request_queue(id bigserial);
+create unlogged table net._http_response(created timestamptz);
+create index on net._http_response(created);
+create type net.http_response as (status integer);
+create type net.http_response_result as (response net.http_response);
+select is((select count(*)::integer from pg_catalog.pg_class where relnamespace='net'::regnamespace),6,
+  'pg_net-shaped fixture includes two composite-type catalog rows');
+select is((select count(*)::integer from pg_catalog.pg_class where relnamespace='net'::regnamespace
+  and relkind in ('r','p','v','m','f','S','i','I')),4,
+  'local fixture data-relation inventory excludes only non-data composite descriptors');
+
 select * from finish();
 rollback;

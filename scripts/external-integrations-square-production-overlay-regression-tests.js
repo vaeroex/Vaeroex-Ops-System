@@ -436,6 +436,12 @@ try {
 }
 assert.match(localFixture.normalizeSql, /exists\(select 1 from net\.http_request_queue\).*exists\(select 1 from net\._http_response\)/s);
 assert.match(localFixture.normalizeSql, /drop extension pg_net restrict/);
+assert.match(localFixture.normalizeSql, /relkind in \('r','p','v','m','f','S','i','I'\)/,
+  "data relation inventory excludes pg_net's two composite-type catalog rows");
+assert.equal(localFixture.sanitizedFailure(new Error("local_pg_net_fixture_inventory_changed")), "local_pg_net_fixture_inventory_changed");
+assert.equal(localFixture.sanitizedFailure({ code: "42501", message: "untrusted payload" }), "local_fixture_database_permission_denied");
+assert.equal(localFixture.sanitizedFailure({ code: "2BP01" }), "local_fixture_unexpected_extension_dependency");
+assert.equal(localFixture.sanitizedFailure(new Error("untrusted payload")), "production_shaped_local_fixture_failed");
 assert.doesNotMatch(localFixture.normalizeSql, /cascade|grant |revoke /i);
 assert.match(fixtureSource, /localConnection\(\); \/\/ Verify the current local container before destructive reset/);
 assert.match(fixtureSource, /name\.split\("_", 1\)\[0\] <= version/);

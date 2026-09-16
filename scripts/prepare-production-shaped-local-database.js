@@ -45,7 +45,7 @@ begin
   if exists(select 1 from pg_catalog.pg_extension where extname='pg_net') then
     if not exists(select 1 from pg_catalog.pg_extension where extname='pg_net' and extversion='0.19.5')
       or (select array_agg(relname::text order by relname) from pg_catalog.pg_class
-        where relnamespace='net'::regnamespace) is distinct from
+        where relnamespace='net'::regnamespace and relkind in ('r','p','v','m','f','S','i','I')) is distinct from
         array['_http_response','_http_response_created_idx','http_request_queue','http_request_queue_id_seq']::text[]
       or (select array_agg(proname::text order by proname) from pg_catalog.pg_proc
         where pronamespace='net'::regnamespace) is distinct from
@@ -130,9 +130,23 @@ async function resetLocalFixture(version) {
   } finally { fs.rmSync(directory, { recursive: true, force: true }); }
 }
 
-module.exports = { validateLocalTarget, normalizeSql, normalizeLocalFixture, resetLocalFixture };
+function sanitizedFailure(error) {
+  const labels = new Set(["ci_fixture_only", "local_container_required", "local_database_required",
+    "local_container_identity_mismatch", "linked_project_forbidden", "inherited_database_configuration_forbidden",
+    "local_project_missing", "local_database_status_missing", "production_shaped_local_command_failed",
+    "production_shaped_local_identity_mismatch", "local_pg_net_fixture_inventory_changed",
+    "local_pg_net_fixture_not_empty", "local_net_schema_not_extension_owned",
+    "exact_migration_version_required", "migration_version_missing", "local_migration_prefix_not_exact"]);
+  if (labels.has(error?.message)) return error.message;
+  if (error?.code === "42501") return "local_fixture_database_permission_denied";
+  if (error?.code === "2BP01") return "local_fixture_unexpected_extension_dependency";
+  if (["42P01", "42704", "42883"].includes(error?.code)) return "local_fixture_expected_object_missing";
+  return "production_shaped_local_fixture_failed";
+}
+
+module.exports = { validateLocalTarget, normalizeSql, normalizeLocalFixture, resetLocalFixture, sanitizedFailure };
 if (require.main === module) {
   if (process.argv.length !== 2) throw new Error("no_target_arguments_allowed");
   normalizeLocalFixture().then(() => console.log("production_shaped_local_fixture_ready"))
-    .catch(() => { console.error("production_shaped_local_fixture_failed"); process.exitCode = 1; });
+    .catch(error => { console.error(sanitizedFailure(error)); process.exitCode = 1; });
 }
