@@ -37,7 +37,7 @@ assert.equal(contract.webhookUrl, "https://square.vaeroex.com/api/integrations/s
 assert.equal(contract.database.requiredFoundationVersion, "20260902191323");
 assert.equal(contract.database.requiredOverlayVersion, "20260902191324");
 assert.equal(contract.database.requiredOverlayPath, "supabase/migrations/20260902191324_square_production_runtime_overlay.sql");
-assert.equal(contract.database.requiredOverlaySourceCommit, "5e3fb044bf492e6a1d5c323e0030a58a9a63f553");
+assert.equal(contract.database.requiredOverlaySourceCommit, "aec44f42f216ceeb447b2b909eb2c6c78c02340e");
 assert.equal(contract.database.requiredOverlaySha256, "2cc43a9313d056e58b75143f032f347cb0972f45cc1edbd484f6b1fb0574661f");
 assert.equal(contract.database.requiredPostflight, "square_production_overlay_object_and_authorization_postflight_passed");
 assert.equal(contract.database.requiredOverlayObjects.relations.length, 4);

@@ -19,7 +19,7 @@
     "requiredFoundationVersion": "20260902191323",
     "requiredOverlayVersion": "20260902191324",
     "requiredOverlayPath": "supabase/migrations/20260902191324_square_production_runtime_overlay.sql",
-    "requiredOverlaySourceCommit": "5e3fb044bf492e6a1d5c323e0030a58a9a63f553",
+    "requiredOverlaySourceCommit": "aec44f42f216ceeb447b2b909eb2c6c78c02340e",
     "requiredOverlaySha256": "2cc43a9313d056e58b75143f032f347cb0972f45cc1edbd484f6b1fb0574661f",
     "requiredPostflight": "square_production_overlay_object_and_authorization_postflight_passed",
     "requiredOverlayObjects": {
