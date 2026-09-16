@@ -522,11 +522,23 @@ async function main() {
   const authorityTarget = Object.freeze({ ...makeTarget(authorityDrift), roleOid: (await fixture.control.query(
     "SELECT oid::text value FROM pg_roles WHERE rolname=$1", [authorityDrift.role])).rows[0].value });
   const authorityNative = adapterModule.createLocalSyntheticProductionNativeAdapter({ executable: binaries.get("oauth"), target: authorityTarget });
-  await fixture.control.query(`CREATE OR REPLACE FUNCTION ${overlayRpc(authorityDrift)} RETURNS void LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path='' AS
-    $function$ BEGIN RAISE EXCEPTION 'synthetic_replaced_authority' USING ERRCODE='55000'; END $function$`);
+  let authorityMutationApplied = false, authorityMutationFailed = false;
+  try {
+    await fixture.control.query(`CREATE OR REPLACE FUNCTION ${overlayRpc(authorityDrift)} RETURNS void LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path='' AS
+      $function$ BEGIN RAISE EXCEPTION 'synthetic_replaced_authority' USING ERRCODE='55000'; END $function$`);
+    authorityMutationApplied = true;
+  } catch {
+    authorityMutationFailed = true;
+    await fixture.control.query("ROLLBACK").catch(() => undefined);
+  }
   let authorityDriftDenied = false;
   try { await authorityNative.inspect({ target: authorityTarget, intent: "authority-rpc-drift", approvalId: "synthetic-production", signal: new AbortController().signal }); }
   catch { authorityDriftDenied = true; }
+  process.stdout.write(JSON.stringify({ outcome: "authority_rpc_drift_observation",
+    mutationApplied: authorityMutationApplied === true,
+    mutationFailed: authorityMutationFailed === true,
+    nativeRejected: authorityDriftDenied === true }) + "\n");
+  check(authorityMutationApplied === true, "same_signature_authority_rpc_mutation_applied");
   check(authorityDriftDenied, "same_signature_authority_rpc_body_drift_rejected");
   await fixture.control.query(`CREATE OR REPLACE FUNCTION ${overlayRpc(authorityDrift)} RETURNS void LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path='' AS $function$${productionAuthoritySource(authorityDrift)}$function$`);
   await fixture.control.query(`REVOKE USAGE ON SCHEMA public FROM ${authorityDrift.capabilityRole}`);
