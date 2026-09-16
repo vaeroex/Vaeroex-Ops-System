@@ -68,8 +68,10 @@ assert.match(scans, /release-candidates\/\$\{manifest\.source\.commit\}\/\$\{man
 assert.match(scans, /secretAnalysisQualified: false[\s\S]*secretAnalysisRequiredBeforeEligibility: true/);
 assert.match(scans, /deploymentEligible: false[\s\S]*requiresReviewedDigestPin: true[\s\S]*automaticRuntimeRollout: false/);
 assert.match(scans, /bootstrapException: "CVE-2026-85091"/);
-assert.match(scans, /bootstrapDockerfileSha256: "628ac2a6fd58b0ac33ca95c1af9a5717f2c3b26f6bf353853c0d56a6ca57e35f"/);
-assert.match(scans, /bootstrapServerSha256: "c724529d24e8338bdfff14b51557a72cedb332abddc6d705a0cecca07e08c110"/);
+assert.match(scans, /bootstrapDockerignoreSha256: "1cff3c6b71037eee721261556878d3c6a819175a98ed4336ca8b96d3fc291b44"/);
+assert.match(scans, /bootstrapDockerfileSha256: "a94896fde4c3a4f423b5b09cb7b899809089bd5ee9f8f25ea73e70a022ac8867"/);
+assert.match(scans, /bootstrapServerSha256: "9df82e10ee028ccb895ec4b95452d1a0b635013135821f444f1e7a2fd2f582f0"/);
+assert.match(scans, /bootstrapCallbackBoundarySha256: "dcad858b2abd699ee64f0b2b566a3d70f818fad2ceb3e2fbeee252efb673a69a"/);
 assert.match(scans, /runtimeDependenciesEmpty[\s\S]*compressionPathAbsent/);
 assert.match(outputs, /image_build_approval\s*=\s*true[\s\S]*automatic_rollout\s*=\s*false/);
 

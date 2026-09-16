@@ -36,6 +36,19 @@ variable "callback_edge_source_commit" {
   }
 }
 
+variable "oauth_callback_source_commit" {
+  type     = string
+  default  = null
+  nullable = true
+  validation {
+    condition = (
+      var.oauth_callback_source_commit == null ||
+      can(regex("^[a-f0-9]{40}$", var.oauth_callback_source_commit))
+    )
+    error_message = "oauth_callback_source_commit must be null or an exact full Git SHA."
+  }
+}
+
 variable "operator_email" {
   type    = string
   default = "isaac@vaeroex.com"
@@ -65,6 +78,20 @@ variable "bootstrap_image_digest" {
       can(regex("^us-west1-docker\\.pkg\\.dev/vaeroex-integrations-prod/vaeroex-integrations-images/production-bootstrap@sha256:[a-f0-9]{64}$", var.bootstrap_image_digest))
     )
     error_message = "The bootstrap image must be an immutable digest in the reviewed Production repository."
+  }
+}
+
+variable "oauth_callback_image_digest" {
+  type      = string
+  default   = null
+  nullable  = true
+  sensitive = false
+  validation {
+    condition = (
+      var.oauth_callback_image_digest == null ||
+      can(regex("^us-west1-docker\\.pkg\\.dev/vaeroex-integrations-prod/vaeroex-integrations-images/production-bootstrap@sha256:[a-f0-9]{64}$", var.oauth_callback_image_digest))
+    )
+    error_message = "The OAuth callback image must be an immutable disabled-bootstrap digest in the reviewed Production repository."
   }
 }
 
