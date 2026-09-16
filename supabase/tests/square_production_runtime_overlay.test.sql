@@ -253,10 +253,17 @@ select 'square','production','vaeroex-integrations-prod',capability,
   case when capability='task_invoker' then null else 'database_'||capability end
 from unnest(array['broker','evidence','oauth','runtime','scheduler','task_invoker','webhook']::text[]) capability;
 
+select ok(pg_temp.statement_error($sql$
+  update private.integration_production_provider_capabilities
+  set database_secret_purpose='database_evidence'
+  where provider_key='square' and environment='production'
+    and project_id='vaeroex-integrations-prod' and capability='broker'
+$sql$) like '23514:%',
+  'provider-neutral foundation rejects a capability-to-secret-purpose mismatch before overlay evaluation');
+
 update private.integration_production_provider_capabilities
 set service_account='square-broker-drift@vaeroex-integrations-prod.iam.gserviceaccount.com',
-  database_login='square_production_broker_drift',
-  database_secret_purpose='database_evidence'
+  database_login='square_production_broker_drift'
 where provider_key='square' and environment='production'
   and project_id='vaeroex-integrations-prod' and capability='broker';
 
@@ -273,14 +280,13 @@ select ok(pg_temp.statement_error($sql$
   cross join private.integration_production_platform_bindings platform
   where configuration.generation=1
 $sql$) like '23514:square_production_binding_capabilities_incomplete',
-  'binding rejects drift in the capability service account, database login and secret purpose mapping');
+  'binding rejects foundation-valid drift in the capability service account and database login mapping');
 select is((select count(*)::integer from private.square_production_runtime_bindings),0,
   'capability mapping rejection leaves no partial runtime binding');
 
 update private.integration_production_provider_capabilities
 set service_account='square-broker@vaeroex-integrations-prod.iam.gserviceaccount.com',
-  database_login='square_production_broker',
-  database_secret_purpose='database_broker'
+  database_login='square_production_broker'
 where provider_key='square' and environment='production'
   and project_id='vaeroex-integrations-prod' and capability='broker';
 

@@ -209,5 +209,22 @@ assert.deepEqual(
 );
 assert.doesNotMatch(pgTap, /^select\s+(?:un)?like\s*\(/gmi,
   "regex assertions use portable ok(expression [not] like pattern, description) forms");
+const secretPurposeRejection = pgTap.indexOf("set database_secret_purpose='database_evidence'");
+const foundationValidCapabilityDrift = pgTap.indexOf(
+  "set service_account='square-broker-drift@vaeroex-integrations-prod.iam.gserviceaccount.com'"
+);
+const overlayCapabilityRejection = pgTap.indexOf(
+  "'23514:square_production_binding_capabilities_incomplete'"
+);
+assert.ok(
+  secretPurposeRejection >= 0 &&
+    secretPurposeRejection < foundationValidCapabilityDrift &&
+    foundationValidCapabilityDrift < overlayCapabilityRejection,
+  "secret-purpose drift is asserted at the foundation before foundation-valid identity drift reaches the overlay"
+);
+const foundationValidCapabilityDriftStatement = /update private\.integration_production_provider_capabilities\s+set service_account='square-broker-drift[^;]+;/s.exec(pgTap)?.[0];
+assert.ok(foundationValidCapabilityDriftStatement, "foundation-valid identity drift fixture is present");
+assert.doesNotMatch(foundationValidCapabilityDriftStatement, /database_secret_purpose/,
+  "overlay identity drift does not trip the provider-neutral secret-purpose constraint first");
 
 console.log("Square Production runtime overlay regression tests passed");
