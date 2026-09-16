@@ -73,10 +73,16 @@ and objects owned by either LOGIN or authority roles. The Square overlay remains
 responsible for creating and granting the six checked RPCs; this package does not
 recreate that overlay.
 
-The postflight is point-in-time closure for existing application objects plus
-future-default-ACL closure for schemas, relations, sequences and routines. It
-requires current-database CONNECT and rejects direct target database ACLs and
-database CREATE. The provider's inherited PUBLIC CONNECT/TEMP baseline on
+The postflight is point-in-time closure for existing application objects and
+the `pg_default_acl` rows that exist when it runs. It rejects unsafe existing
+default-ACL rows for schemas, relations, sequences and routines, but an absent
+row retains PostgreSQL's built-in defaults, including PUBLIC EXECUTE on newly
+created functions. It does not install or guarantee a future-object privilege
+policy. Any later migration or DDL makes this result stale; activation remains
+blocked until a separately reviewed verifier covering the new exact state is
+run again and passes. The postflight requires current-database CONNECT and
+rejects direct target database ACLs and database CREATE. The provider's
+inherited PUBLIC CONNECT/TEMP baseline on
 `postgres`/template databases cannot be denied per role without a global
 legacy revoke, so the approved endpoint, exact database name, network firewall
 and monitoring remain the SQL-login boundary. PostgreSQL system catalogs,

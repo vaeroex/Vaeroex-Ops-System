@@ -106,7 +106,7 @@ try {
   if (expectedBlocked ? result.sanitizedPreflightPassed : !result.sanitizedPreflightPassed) {
     process.exitCode = 1;
   }
-} catch (error) {
+} catch {
   process.stderr.write("pilot qualification input rejected\n");
   process.exitCode = 1;
 }

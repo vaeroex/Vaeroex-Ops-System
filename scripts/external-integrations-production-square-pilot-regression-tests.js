@@ -295,6 +295,12 @@ assert.match(handoff, /Those counts\s+do not prove the mapping/);
 assert.match(handoff, /Neither record substitutes for the other/);
 assert.match(readme, /No implementation\s+for creating and privately delivering the exact six Production LOGINs is\s+committed in this repository/);
 assert.match(readme, /explicit readiness\s+blocker/);
+assert.match(readme, /point-in-time closure for existing application objects and\s+the `pg_default_acl` rows that exist when it runs/);
+assert.match(readme, /absent\s+row retains PostgreSQL's built-in defaults, including PUBLIC EXECUTE on newly\s+created functions/);
+assert.match(readme, /does not install or guarantee a future-object privilege\s+policy/);
+assert.match(readme, /later migration or DDL makes this result stale[\s\S]*separately reviewed verifier covering the new exact state is\s+run again and passes/);
+assert.doesNotMatch(readme, /future-default-ACL closure/,
+  "the point-in-time verifier must not claim future default-privilege closure");
 assert.match(readme, /fixed six-profile Production extension of\s+`tools\/native-broker-provisioning`/);
 assert.match(readme, /dedicated private Production\s+execution environment and identity/);
 assert.match(readme, /Sandbox VM\/service account must not be repurposed/);
