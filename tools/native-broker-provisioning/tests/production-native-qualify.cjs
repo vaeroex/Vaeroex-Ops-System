@@ -158,48 +158,6 @@ async function main() {
     role: profile.role, systemIdentifier: fixture.systemId, databaseOid: fixture.databaseOid, adminRole: admin,
     capabilityRole: profile.capabilityRole, rootCertificate: fixture.cert, roleOid: "0",
   });
-  const productionAuthorityDiagnostic = profile => {
-    const target = makeTarget(profile);
-    const result = spawnSync(binaries.get(profile.name), ["diagnose", target.host, String(target.port), target.database,
-      target.adminRole, target.role, target.capabilityRole, target.systemIdentifier, target.databaseOid,
-      target.rootCertificate, "post-mutation-authority-diagnostic", target.roleOid, "synthetic-production"], {
-      env: { PATH: "/usr/bin:/bin", LANG: "C", LC_ALL: "C" }, encoding: "utf8", maxBuffer: 8192,
-      stdio: ["ignore", "pipe", "pipe", "pipe"],
-    });
-    check(result.status === 0 && !result.error, "post_mutation_authority_diagnostic_completed");
-    const line = result.stdout.trim();
-    let value;
-    try { value = JSON.parse(line); } catch { value = null; }
-    const names = ["identity", "profile", "platformClosed", "providerClosed", "configurationClosed", "capabilityClosed",
-      "closedAuthority", "targetLock", "phaseValid", "productionContract", "brokerWrapperShape", "brokerHelper",
-      "brokerCapabilityRole", "brokerNoMembership", "brokerTargetAbsent", "brokerPublicUsage", "brokerExecuteAcl", "brokerPrivateClosed",
-      "oauthAuthority", "brokerAuthority", "schedulerAuthority", "webhookAuthority", "runtimeAuthority", "evidenceAuthority",
-      "brokerCapabilityExists", "brokerWrapperExists"];
-    check(value?.outcome === "production_authority_diagnostic" && names.every(name => typeof value[name] === "boolean"),
-      "post_mutation_authority_diagnostic_shape");
-    const queryCategories = ["none", "undefined_column", "undefined_function", "undefined_table", "syntax", "datatype", "permission", "aborted_transaction", "other_sqlstate", "transport", "other"];
-    const categoryNames = ["oauth", "broker", "scheduler", "webhook", "runtime", "evidence"];
-    const functionCategoryNames = ["schema", "function", "table", "column", "sequence", "fdw", "server", "tablespace", "parameter", "role", "aclexplode", "acldefault", "regprocedure", "digest", "convertTo", "digestTyped", "getExpr"];
-    check(categoryNames.every(name => queryCategories.includes(value?.[`${name}QueryCategory`])),
-      "post_mutation_authority_query_category_shape");
-    check(functionCategoryNames.every(name => queryCategories.includes(value?.[`${name}Category`])),
-      "post_mutation_authority_function_category_shape");
-    process.stdout.write(JSON.stringify({ outcome: "post_mutation_authority_observation", ...Object.fromEntries(
-      names.map(name => [name, value?.[name] === true]),
-    ), brokerRoleExists: value?.brokerRoleExists === true, oauthQueryError: value?.oauthQueryError === true, oauthQueryCategory: value?.oauthQueryCategory,
-    brokerQueryError: value?.brokerQueryError === true, brokerQueryCategory: value?.brokerQueryCategory,
-    schedulerQueryError: value?.schedulerQueryError === true, webhookQueryError: value?.webhookQueryError === true,
-    schedulerQueryCategory: value?.schedulerQueryCategory, webhookQueryCategory: value?.webhookQueryCategory,
-    runtimeQueryError: value?.runtimeQueryError === true, runtimeQueryCategory: value?.runtimeQueryCategory,
-    evidenceQueryError: value?.evidenceQueryError === true, evidenceQueryCategory: value?.evidenceQueryCategory,
-    schemaCategory: value?.schemaCategory, functionCategory: value?.functionCategory, tableCategory: value?.tableCategory,
-    columnCategory: value?.columnCategory, sequenceCategory: value?.sequenceCategory, fdwCategory: value?.fdwCategory,
-    serverCategory: value?.serverCategory, tablespaceCategory: value?.tablespaceCategory, parameterCategory: value?.parameterCategory,
-    roleCategory: value?.roleCategory, aclexplodeCategory: value?.aclexplodeCategory, acldefaultCategory: value?.acldefaultCategory,
-    regprocedureCategory: value?.regprocedureCategory, digestCategory: value?.digestCategory, convertToCategory: value?.convertToCategory,
-    digestTypedCategory: value?.digestTypedCategory, getExprCategory: value?.getExprCategory }) + "\n");
-    for (const name of names) check(value[name] === true, `post_mutation_authority_${name}`);
-  };
   stage = "precreate_capability_creator_substitution";
   const preCreateProfile = profiles[0], preCreateTarget = makeTarget(preCreateProfile);
   await fixture.control.query("CREATE ROLE synthetic_precreate_extra_operator NOLOGIN CREATEROLE NOSUPERUSER NOCREATEDB NOREPLICATION NOBYPASSRLS");
