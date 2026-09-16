@@ -265,6 +265,11 @@ begin
       or role_record.rolconfig is not null
       or exists (
         select 1
+        from pg_catalog.pg_db_role_setting database_setting
+        where database_setting.setrole=role_record.oid
+      )
+      or exists (
+        select 1
         from pg_catalog.pg_auth_members membership
         left join pg_catalog.pg_roles member_role on member_role.oid=membership.member
         where membership.member=role_record.oid or (
@@ -655,13 +660,13 @@ begin
     select count(*)
     from private.integration_production_provider_capabilities capability
     join (values
-      ('broker','square-broker@vaeroex-integrations-prod.iam.gserviceaccount.com','square_production_broker','database_broker'),
-      ('evidence','square-evidence@vaeroex-integrations-prod.iam.gserviceaccount.com','square_production_evidence','database_evidence'),
-      ('oauth','square-oauth@vaeroex-integrations-prod.iam.gserviceaccount.com','square_production_oauth','database_oauth'),
-      ('runtime','square-runtime@vaeroex-integrations-prod.iam.gserviceaccount.com','square_production_runtime','database_runtime'),
-      ('scheduler','square-scheduler@vaeroex-integrations-prod.iam.gserviceaccount.com','square_production_scheduler','database_scheduler'),
-      ('task_invoker','square-task-invoker@vaeroex-integrations-prod.iam.gserviceaccount.com',null,null),
-      ('webhook','square-webhook@vaeroex-integrations-prod.iam.gserviceaccount.com','square_production_webhook','database_webhook')
+      ('broker','sq-prod-broker@vaeroex-integrations-prod.iam.gserviceaccount.com','square_production_broker','database_broker'),
+      ('evidence','sq-prod-evidence@vaeroex-integrations-prod.iam.gserviceaccount.com','square_production_evidence','database_evidence'),
+      ('oauth','sq-prod-oauth@vaeroex-integrations-prod.iam.gserviceaccount.com','square_production_oauth','database_oauth'),
+      ('runtime','sq-prod-runtime@vaeroex-integrations-prod.iam.gserviceaccount.com','square_production_runtime','database_runtime'),
+      ('scheduler','sq-prod-scheduler@vaeroex-integrations-prod.iam.gserviceaccount.com','square_production_scheduler','database_scheduler'),
+      ('task_invoker','sq-prod-task-invoker@vaeroex-integrations-prod.iam.gserviceaccount.com',null,null),
+      ('webhook','sq-prod-webhook@vaeroex-integrations-prod.iam.gserviceaccount.com','square_production_webhook','database_webhook')
     ) expected(capability,service_account,database_login,database_secret_purpose)
       on capability.capability=expected.capability
       and capability.service_account=expected.service_account
@@ -922,6 +927,14 @@ alter table private.square_production_generation_fences force row level security
 alter table private.square_production_lifecycle_audit_events enable row level security;
 alter table private.square_production_lifecycle_audit_events force row level security;
 
+-- The exact Production baseline leaves these two legacy routines executable by
+-- PUBLIC. Close only that inherited authority while preserving the explicit
+-- authenticated business-memory grant and trigger execution semantics.
+revoke execute on function
+  public.match_business_memory_chunks(uuid,extensions.vector,integer,double precision),
+  public.set_updated_at()
+from public;
+
 revoke all on table
   private.square_production_configuration_generations,
   private.square_production_runtime_bindings,
@@ -979,7 +992,10 @@ declare
   grantee_oid oid;
   grantee_name name;
   expected_trigger_count integer;
+  overlay_schema_digest text;
+  authority_failure_categories text;
 begin
+  perform pg_catalog.set_config('search_path','',true);
   foreach object_name in array array[
     'private.square_production_configuration_generations',
     'private.square_production_runtime_bindings',
@@ -1052,6 +1068,123 @@ begin
       raise exception 'square_production_overlay_relation_not_closed' using errcode='42501';
     end if;
   end loop;
+
+  select pg_catalog.encode(extensions.digest(pg_catalog.convert_to((pg_catalog.jsonb_build_object(
+    'columns',coalesce((
+      select pg_catalog.jsonb_agg(pg_catalog.jsonb_build_array(
+        relation.relname,attribute.attnum,attribute.attname,
+        pg_catalog.format_type(attribute.atttypid,attribute.atttypmod),
+        attribute.attnotnull,attribute.attidentity,attribute.attgenerated,
+        pg_catalog.pg_get_expr(default_value.adbin,default_value.adrelid,true),
+        case when attribute.attcollation=0 then null
+          else pg_catalog.format('%I.%I',collation_namespace.nspname,collation_record.collname) end,
+        collation_record.collprovider::text,collation_record.collisdeterministic,
+        collation_record.collversion
+      ) order by relation.relname,attribute.attnum)
+      from pg_catalog.pg_class relation
+      join pg_catalog.pg_namespace namespace on namespace.oid=relation.relnamespace
+      join pg_catalog.pg_attribute attribute on attribute.attrelid=relation.oid
+      left join pg_catalog.pg_attrdef default_value
+        on default_value.adrelid=relation.oid and default_value.adnum=attribute.attnum
+      left join pg_catalog.pg_collation collation_record
+        on collation_record.oid=attribute.attcollation
+      left join pg_catalog.pg_namespace collation_namespace
+        on collation_namespace.oid=collation_record.collnamespace
+      where namespace.nspname='private' and relation.relname=any(array[
+        'square_production_configuration_generations','square_production_runtime_bindings',
+        'square_production_generation_fences','square_production_lifecycle_audit_events'
+      ]) and attribute.attnum>0 and not attribute.attisdropped
+    ),'[]'::jsonb),
+    'constraints',coalesce((
+      select pg_catalog.jsonb_agg(pg_catalog.jsonb_build_array(
+        relation.relname,constraint_record.conname,constraint_record.contype,
+        constraint_record.condeferrable,constraint_record.condeferred,
+        constraint_record.convalidated,
+        pg_catalog.pg_get_constraintdef(constraint_record.oid,true)
+      ) order by relation.relname,constraint_record.conname)
+      from pg_catalog.pg_constraint constraint_record
+      join pg_catalog.pg_class relation on relation.oid=constraint_record.conrelid
+      join pg_catalog.pg_namespace namespace on namespace.oid=relation.relnamespace
+      where namespace.nspname='private' and relation.relname=any(array[
+        'square_production_configuration_generations','square_production_runtime_bindings',
+        'square_production_generation_fences','square_production_lifecycle_audit_events'
+      ])
+    ),'[]'::jsonb),
+    'indexes',coalesce((
+      select pg_catalog.jsonb_agg(pg_catalog.jsonb_build_array(
+        relation.relname,index_relation.relname,
+        pg_catalog.pg_get_indexdef(index_record.indexrelid,0,true)
+      ) order by relation.relname,index_relation.relname)
+      from pg_catalog.pg_index index_record
+      join pg_catalog.pg_class relation on relation.oid=index_record.indrelid
+      join pg_catalog.pg_class index_relation on index_relation.oid=index_record.indexrelid
+      join pg_catalog.pg_namespace namespace on namespace.oid=relation.relnamespace
+      where namespace.nspname='private' and relation.relname=any(array[
+        'square_production_configuration_generations','square_production_runtime_bindings',
+        'square_production_generation_fences','square_production_lifecycle_audit_events'
+      ])
+    ),'[]'::jsonb),
+    'policy_count',(select count(*) from pg_catalog.pg_policy policy_record
+      where policy_record.polrelid=any(array[
+        'private.square_production_configuration_generations'::regclass,
+        'private.square_production_runtime_bindings'::regclass,
+        'private.square_production_generation_fences'::regclass,
+        'private.square_production_lifecycle_audit_events'::regclass
+      ])),
+    'trigger_count',(select count(*) from pg_catalog.pg_trigger trigger_record
+      where not trigger_record.tgisinternal and trigger_record.tgrelid=any(array[
+        'private.square_production_configuration_generations'::regclass,
+        'private.square_production_runtime_bindings'::regclass,
+        'private.square_production_generation_fences'::regclass,
+        'private.square_production_lifecycle_audit_events'::regclass
+      ]))
+  ))::text,'UTF8'),'sha256'),'hex') into strict overlay_schema_digest;
+  if overlay_schema_digest<>'2739c85b607701a5635c636112a32122ea7d244dc569273d5c9ea3fd05300d26' then
+    raise exception 'square_production_overlay_schema_not_exact' using errcode='55000';
+  end if;
+
+  if exists (
+    with expected(function_signature,argument_names) as (values
+      ('private.square_production_generation_fingerprint_v1(bigint,text[])',
+        array['p_generation','p_parts']::text[]),
+      ('private.square_production_configuration_fingerprint_v1(bigint,text,text,text,text,text,text,text,text,text,text,text,text,text,text,text,text,text[],text,text,text,text[],text,text,boolean,boolean,boolean,boolean,boolean,boolean,boolean)',
+        array['p_generation','p_provider_key','p_environment','p_project_id','p_region','p_lifecycle_state',
+          'p_application_id','p_callback_origin','p_callback_method','p_callback_path','p_callback_uri',
+          'p_webhook_method','p_webhook_path','p_webhook_uri','p_api_version','p_authorization_endpoint',
+          'p_provider_origin','p_requested_scopes','p_kms_key_resource','p_application_secret_purpose',
+          'p_webhook_signature_secret_purpose','p_database_secret_purposes','p_provider_policy_version',
+          'p_source_commit','p_runtime_enabled','p_provider_calls_enabled','p_customer_onboarding_enabled',
+          'p_webhook_intake_enabled','p_evidence_enabled','p_economic_contributions_enabled',
+          'p_ai_dispatch_enabled']::text[]),
+      ('private.reject_square_production_immutable_mutation_v1()',null::text[]),
+      ('private.validate_square_production_runtime_binding_v1()',null::text[]),
+      ('private.record_square_production_lifecycle_audit_v1()',null::text[]),
+      ('private.check_square_production_operational_generation_v1(text,text,text,bigint,text,text)',
+        array['p_provider_key','p_environment','p_project_id','p_generation',
+          'p_configuration_fingerprint','p_capability']::text[]),
+      ('public.check_square_production_oauth_authority_v1(text,text,text,bigint,text)',
+        array['p_provider_key','p_environment','p_project_id','p_generation','p_configuration_fingerprint']::text[]),
+      ('public.check_square_production_broker_authority_v1(text,text,text,bigint,text)',
+        array['p_provider_key','p_environment','p_project_id','p_generation','p_configuration_fingerprint']::text[]),
+      ('public.check_square_production_scheduler_authority_v1(text,text,text,bigint,text)',
+        array['p_provider_key','p_environment','p_project_id','p_generation','p_configuration_fingerprint']::text[]),
+      ('public.check_square_production_webhook_authority_v1(text,text,text,bigint,text)',
+        array['p_provider_key','p_environment','p_project_id','p_generation','p_configuration_fingerprint']::text[]),
+      ('public.check_square_production_runtime_authority_v1(text,text,text,bigint,text)',
+        array['p_provider_key','p_environment','p_project_id','p_generation','p_configuration_fingerprint']::text[]),
+      ('public.check_square_production_evidence_authority_v1(text,text,text,bigint,text)',
+        array['p_provider_key','p_environment','p_project_id','p_generation','p_configuration_fingerprint']::text[])
+    )
+    select 1
+    from expected
+    left join pg_catalog.pg_proc function_record
+      on function_record.oid=pg_catalog.to_regprocedure(expected.function_signature)
+    where function_record.oid is null
+      or function_record.proargnames is distinct from expected.argument_names
+      or function_record.proargmodes is not null
+  ) then
+    raise exception 'square_production_overlay_function_abi_not_exact' using errcode='55000';
+  end if;
 
   foreach function_name in array array[
     'private.square_production_generation_fingerprint_v1(bigint,text[])',
@@ -1135,7 +1268,8 @@ begin
       else 'square_production_evidence_authority'
     end;
 
-    if exists (
+    authority_failure_categories := pg_catalog.concat_ws(',',
+      case when exists (
       select 1 from pg_catalog.pg_proc function_record
       where function_record.oid=function_name::regprocedure and (
         function_record.proowner<>current_user::regrole::oid
@@ -1143,7 +1277,8 @@ begin
         or function_record.provolatile<>'s'
         or function_record.proconfig is distinct from array['search_path=""']::text[]
       )
-    ) or 1 <> (
+      ) then 'rpc_definition' end,
+      case when 1 <> (
       select count(*)
       from pg_catalog.pg_proc function_record
       cross join lateral pg_catalog.aclexplode(function_record.proacl) function_acl
@@ -1151,17 +1286,302 @@ begin
         and function_acl.grantee=grantee_name::regrole::oid
         and function_acl.privilege_type='EXECUTE'
         and not function_acl.is_grantable
-    ) or exists (
+      ) then 'mapped_rpc_acl_cardinality' end,
+      case when exists (
       select 1
       from pg_catalog.pg_proc function_record
       cross join lateral pg_catalog.aclexplode(function_record.proacl) function_acl
       where function_record.oid=function_name::regprocedure
         and function_acl.grantee<>function_record.proowner
         and function_acl.grantee<>grantee_name::regrole::oid
-    ) then
-      raise exception 'square_production_overlay_authority_rpc_not_closed' using errcode='42501';
+      ) then 'unexpected_rpc_acl' end,
+      case when not pg_catalog.has_function_privilege(
+        grantee_name,
+        function_name::regprocedure,
+        'EXECUTE'
+      ) then 'mapped_rpc_execute_missing' end,
+      case when pg_catalog.has_schema_privilege(
+        grantee_name,
+        'private',
+        'USAGE'
+      ) then 'private_schema_usage' end,
+      case when exists (
+      select 1
+      from pg_catalog.pg_namespace application_namespace
+      where application_namespace.nspname<>'pg_catalog'
+        and application_namespace.nspname<>'information_schema'
+        and application_namespace.nspname not like 'pg\_toast%' escape '\'
+        and application_namespace.nspname not like 'pg\_temp%' escape '\'
+        and pg_catalog.has_schema_privilege(
+          grantee_name,
+          application_namespace.oid,
+          'CREATE'
+        )
+      ) then 'non_system_schema_create' end,
+      case when exists (
+      -- System-catalog routines/types/languages, including the large-object
+      -- constructors, remain PostgreSQL's inherent trusted-runtime/resource
+      -- boundary. Revoking those cluster-wide defaults here would alter the
+      -- provider-neutral legacy baseline; deployment monitoring owns them.
+      select 1
+      from pg_catalog.pg_proc application_function
+      join pg_catalog.pg_namespace application_namespace
+        on application_namespace.oid=application_function.pronamespace
+      where application_namespace.nspname<>'pg_catalog'
+        and application_namespace.nspname<>'information_schema'
+        and application_namespace.nspname not like 'pg\_toast%' escape '\'
+        and application_namespace.nspname not like 'pg\_temp%' escape '\'
+        and pg_catalog.has_schema_privilege(
+          grantee_name,
+          application_namespace.oid,
+          'USAGE'
+        )
+        and pg_catalog.has_function_privilege(
+          grantee_name,
+          application_function.oid,
+          'EXECUTE'
+        )
+        and application_function.oid<>function_name::regprocedure::oid
+      ) then 'unexpected_non_system_routine_execute' end,
+      case when exists (
+      -- PostgreSQL's pg_stat_statements extension grants PUBLIC SELECT on its
+      -- two extension-owned statistics views. The Square roles have no USAGE
+      -- on extensions, so these metadata views are not callable by them.
+      -- Exempt only those exact canonical metadata grants, never an extension
+      -- class wholesale.
+      select 1
+      from pg_catalog.pg_class application_relation
+      join pg_catalog.pg_namespace application_namespace
+        on application_namespace.oid=application_relation.relnamespace
+      cross join (values
+        ('SELECT'),('INSERT'),('UPDATE'),('DELETE'),
+        ('TRUNCATE'),('REFERENCES'),('TRIGGER'),('MAINTAIN')
+      ) relation_privilege(privilege_type)
+      where application_namespace.nspname<>'pg_catalog'
+        and application_namespace.nspname<>'information_schema'
+        and application_namespace.nspname not like 'pg\_toast%' escape '\'
+        and application_namespace.nspname not like 'pg\_temp%' escape '\'
+        and application_relation.relkind in ('r','p','v','m','f')
+        and not (
+          relation_privilege.privilege_type='SELECT'
+          and application_namespace.nspname='extensions'
+          and application_relation.relname=any(array[
+            'pg_stat_statements','pg_stat_statements_info'
+          ])
+          and application_relation.relkind='v'
+          and not pg_catalog.has_schema_privilege(grantee_name,'extensions','USAGE')
+          and not pg_catalog.pg_has_role(grantee_name,'pg_read_all_stats','USAGE')
+          and exists (
+            select 1
+            from pg_catalog.pg_depend extension_dependency
+            join pg_catalog.pg_extension extension_record
+              on extension_record.oid=extension_dependency.refobjid
+            where extension_dependency.classid='pg_catalog.pg_class'::regclass
+              and extension_dependency.objid=application_relation.oid
+              and extension_dependency.objsubid=0
+              and extension_dependency.refclassid='pg_catalog.pg_extension'::regclass
+              and extension_dependency.deptype='e'
+              and extension_record.extname='pg_stat_statements'
+          )
+        )
+        and pg_catalog.has_table_privilege(
+          grantee_name,
+          application_relation.oid,
+          relation_privilege.privilege_type
+        )
+      ) then 'unexpected_non_system_relation_privilege' end,
+      case when exists (
+      select 1
+      from pg_catalog.pg_class application_relation
+      join pg_catalog.pg_namespace application_namespace
+        on application_namespace.oid=application_relation.relnamespace
+      join pg_catalog.pg_attribute application_column
+        on application_column.attrelid=application_relation.oid
+      cross join (values
+        ('SELECT'),('INSERT'),('UPDATE'),('REFERENCES')
+      ) column_privilege(privilege_type)
+      where application_namespace.nspname<>'pg_catalog'
+        and application_namespace.nspname<>'information_schema'
+        and application_namespace.nspname not like 'pg\_toast%' escape '\'
+        and application_namespace.nspname not like 'pg\_temp%' escape '\'
+        and application_relation.relkind in ('r','p','v','m','f')
+        and not (
+          column_privilege.privilege_type='SELECT'
+          and application_namespace.nspname='extensions'
+          and application_relation.relname=any(array[
+            'pg_stat_statements','pg_stat_statements_info'
+          ])
+          and application_relation.relkind='v'
+          and not pg_catalog.has_schema_privilege(grantee_name,'extensions','USAGE')
+          and not pg_catalog.pg_has_role(grantee_name,'pg_read_all_stats','USAGE')
+          and exists (
+            select 1
+            from pg_catalog.pg_depend extension_dependency
+            join pg_catalog.pg_extension extension_record
+              on extension_record.oid=extension_dependency.refobjid
+            where extension_dependency.classid='pg_catalog.pg_class'::regclass
+              and extension_dependency.objid=application_relation.oid
+              and extension_dependency.objsubid=0
+              and extension_dependency.refclassid='pg_catalog.pg_extension'::regclass
+              and extension_dependency.deptype='e'
+              and extension_record.extname='pg_stat_statements'
+          )
+        )
+        and application_column.attnum>0
+        and not application_column.attisdropped
+        and pg_catalog.has_column_privilege(
+          grantee_name,
+          application_relation.oid,
+          application_column.attnum,
+          column_privilege.privilege_type
+        )
+      ) then 'unexpected_non_system_column_privilege' end,
+      case when exists (
+      select 1
+      from pg_catalog.pg_class application_sequence
+      join pg_catalog.pg_namespace application_namespace
+        on application_namespace.oid=application_sequence.relnamespace
+      cross join (values ('USAGE'),('SELECT'),('UPDATE'))
+        sequence_privilege(privilege_type)
+      where application_namespace.nspname<>'pg_catalog'
+        and application_namespace.nspname<>'information_schema'
+        and application_namespace.nspname not like 'pg\_toast%' escape '\'
+        and application_namespace.nspname not like 'pg\_temp%' escape '\'
+        and application_sequence.relkind='S'
+        and pg_catalog.has_sequence_privilege(
+          grantee_name,
+          application_sequence.oid,
+          sequence_privilege.privilege_type
+        )
+      ) then 'unexpected_non_system_sequence_privilege' end,
+      case when exists (
+      select 1
+      from pg_catalog.pg_db_role_setting database_setting
+      where database_setting.setrole=grantee_name::regrole::oid
+      ) then 'per_database_role_setting' end,
+      case when exists (
+      select 1
+      from pg_catalog.pg_foreign_data_wrapper foreign_wrapper
+      where pg_catalog.has_foreign_data_wrapper_privilege(
+        grantee_name,
+        foreign_wrapper.oid,
+        'USAGE'
+      )
+      ) then 'foreign_data_wrapper_usage' end,
+      case when exists (
+      select 1
+      from pg_catalog.pg_foreign_server foreign_server
+      where pg_catalog.has_server_privilege(
+        grantee_name,
+        foreign_server.oid,
+        'USAGE'
+      )
+      ) then 'foreign_server_usage' end,
+      case when exists (
+      select 1
+      from pg_catalog.pg_tablespace tablespace_record
+      where pg_catalog.has_tablespace_privilege(
+        grantee_name,
+        tablespace_record.oid,
+        'CREATE'
+      )
+      ) then 'tablespace_create' end,
+      case when not pg_catalog.has_database_privilege(
+        grantee_name,
+        current_database(),
+        'CONNECT'
+      ) then 'current_database_connect_missing' end,
+      case when not pg_catalog.has_database_privilege(
+        grantee_name,
+        current_database(),
+        'TEMP'
+      ) then 'current_database_temp_missing' end,
+      case when pg_catalog.has_database_privilege(
+        grantee_name,
+        current_database(),
+        'CREATE'
+      ) then 'current_database_create' end,
+      case when exists (
+      -- Keep the current application's standard PUBLIC CONNECT+TEMP boundary;
+      -- other databases may retain only ambient PUBLIC CONNECT. Reject any
+      -- target-specific database ACL or non-PUBLIC CONNECT source. Connection
+      -- endpoint/database pinning and monitoring prevent dormant service
+      -- principals from selecting a different database.
+      select 1
+      from pg_catalog.pg_database database_record
+      cross join lateral pg_catalog.aclexplode(database_record.datacl) database_acl
+      where database_acl.grantee=grantee_name::regrole::oid
+      ) then 'direct_database_acl' end,
+      case when exists (
+      select 1
+      from pg_catalog.pg_database database_record
+      where database_record.datallowconn
+        and database_record.datname<>current_database()
+        and pg_catalog.has_database_privilege(
+          grantee_name,
+          database_record.oid,
+          'CONNECT'
+        )
+        and not exists (
+          select 1
+          from pg_catalog.aclexplode(coalesce(
+            database_record.datacl,
+            pg_catalog.acldefault('d',database_record.datdba)
+          )) database_acl
+          where database_acl.grantee=0
+            and database_acl.privilege_type='CONNECT'
+        )
+      ) then 'non_public_other_database_connect' end,
+      case when exists (
+      select 1
+      from pg_catalog.pg_default_acl default_acl
+      cross join lateral pg_catalog.aclexplode(default_acl.defaclacl) default_privilege
+      where default_acl.defaclobjtype in ('r','S','f','n')
+        and default_privilege.grantee in (0,grantee_name::regrole::oid)
+      ) then 'public_or_direct_default_acl' end
+    );
+
+    if authority_failure_categories<>'' then
+      raise exception 'square_production_overlay_authority_rpc_not_closed'
+        using errcode='42501',detail='failed_checks='||authority_failure_categories;
     end if;
   end loop;
+
+  if exists (
+    select 1
+    from pg_catalog.pg_proc legacy_function
+    cross join lateral pg_catalog.aclexplode(
+      coalesce(
+        legacy_function.proacl,
+        pg_catalog.acldefault('f',legacy_function.proowner)
+      )
+    ) function_acl
+    where legacy_function.oid=any(array[
+      'public.match_business_memory_chunks(uuid,extensions.vector,integer,double precision)'::regprocedure::oid,
+      'public.set_updated_at()'::regprocedure::oid
+    ])
+      and function_acl.grantee=0
+      and function_acl.privilege_type='EXECUTE'
+  ) or not pg_catalog.has_function_privilege(
+    'authenticated',
+    'public.match_business_memory_chunks(uuid,extensions.vector,integer,double precision)',
+    'EXECUTE'
+  ) or not exists (
+    select 1
+    from pg_catalog.pg_trigger trigger_record
+    where not trigger_record.tgisinternal
+      and trigger_record.tgfoid='public.set_updated_at()'::regprocedure
+      and trigger_record.tgenabled='O'
+  ) or exists (
+    select 1
+    from pg_catalog.pg_trigger trigger_record
+    where not trigger_record.tgisinternal
+      and trigger_record.tgfoid='public.set_updated_at()'::regprocedure
+      and trigger_record.tgenabled<>'O'
+  ) then
+    raise exception 'square_production_overlay_legacy_public_execute_not_closed'
+      using errcode='42501';
+  end if;
 end
 $closed_square_production_overlay$;
 
