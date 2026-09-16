@@ -161,6 +161,22 @@ test("Production profile fencing pairs login state with non-inheriting capabilit
   assert.match(qualifier, /noncurrent_profile_privilege_drift_blocks_current_profile_before_mutation/);
 });
 
+test("post-mutation recovery reports each safety condition independently", () => {
+  const qualifier = readFileSync(resolve(root,
+    "tools/native-broker-provisioning/tests/production-native-qualify.cjs"), "utf8");
+  for (const label of [
+    "post_mutation_fence_confirmed",
+    "post_mutation_recovery_required",
+    "post_mutation_commit_uncertain",
+    "post_mutation_role_nologin",
+    "post_mutation_role_noinherit",
+    "post_mutation_role_zero_sessions",
+  ]) assert.match(qualifier, new RegExp(label));
+  assert.match(qualifier, /databaseCommit: commitStatus/);
+  assert.match(qualifier, /const digestAvailability/);
+  assert.match(qualifier, /production_fixture_digest_function_available/);
+});
+
 test("portable catalog qualification executes exact phase predicates from CI", () => {
   const qualifier = readFileSync(resolve(root,
     "tools/native-broker-provisioning/tests/production-catalog-qualify.cjs"), "utf8");

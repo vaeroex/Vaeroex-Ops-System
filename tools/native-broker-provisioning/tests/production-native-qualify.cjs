@@ -255,12 +255,24 @@ async function main() {
   const failingStore = { ...baseStore, async withCredential() { throw new Error("synthetic_auth_read_denied"); } };
   const failedCoordinator = lifecycleModule.createSyntheticProductionProvisioningCoordinator({ target: failedTarget, native: failedNative,
     secretStore: failingStore, audit: { async append() { return { ack: true }; } } });
-  const failed = await failedCoordinator.run({ operation: "create", actor: "synthetic-owner", intent: "production-failure-fence",
-    approvalId: "synthetic-production", deadlineMs: 30000, cleanupTimeoutMs: 5000 });
+  // Make this case fail during the closed-authority preflight. The production
+  // recovery contract must still classify the run as uncertain, but no role or
+  // commit may exist for the compensating fence to target. Restore the gate in
+  // finally so later profiles always start from the exact closed fixture.
+  await fixture.control.query("UPDATE private.integration_production_provider_bindings SET enabled=true WHERE provider_key='square' AND environment='production'");
+  let failed;
+  try {
+    failed = await failedCoordinator.run({ operation: "create", actor: "synthetic-owner", intent: "production-failure-fence",
+      approvalId: "synthetic-production", deadlineMs: 30000, cleanupTimeoutMs: 5000 });
+  } finally {
+    await fixture.control.query("UPDATE private.integration_production_provider_bindings SET enabled=false WHERE provider_key='square' AND environment='production'");
+  }
   // This failure is before target-role creation, so there is no identity to
   // fence. Recovery is still mandatory; the post-mutation case below proves
   // that a committed role is fenced when one exists.
-  check(!failed.fenceConfirmed && failed.requiresFreshReplacement, "precreate_failure_requires_recovery_without_target_fence");
+  check(failed.fenceConfirmed === false, "precreate_failure_fence_not_confirmed");
+  check(failed.requiresFreshReplacement === true, "precreate_failure_requires_fresh_replacement");
+  check(failed.databaseCommit === "not_attempted", "precreate_failure_commit_not_attempted");
   const role = (await fixture.control.query("SELECT rolcanlogin,rolinherit FROM pg_roles WHERE rolname=$1", [failedProfile.role])).rows[0];
   check(!role, "precreate_failure_leaves_no_production_login");
 
