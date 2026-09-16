@@ -922,6 +922,14 @@ alter table private.square_production_generation_fences force row level security
 alter table private.square_production_lifecycle_audit_events enable row level security;
 alter table private.square_production_lifecycle_audit_events force row level security;
 
+-- The exact Production baseline leaves these two legacy routines executable by
+-- PUBLIC. Close only that inherited authority while preserving the explicit
+-- authenticated business-memory grant and trigger execution semantics.
+revoke execute on function
+  public.match_business_memory_chunks(uuid,extensions.vector,integer,double precision),
+  public.set_updated_at()
+from public;
+
 revoke all on table
   private.square_production_configuration_generations,
   private.square_production_runtime_bindings,
@@ -1158,10 +1166,99 @@ begin
       where function_record.oid=function_name::regprocedure
         and function_acl.grantee<>function_record.proowner
         and function_acl.grantee<>grantee_name::regrole::oid
+    ) or not pg_catalog.has_function_privilege(
+      grantee_name,
+      function_name::regprocedure,
+      'EXECUTE'
+    ) or 1 <> (
+      select count(*)
+      from pg_catalog.pg_proc public_function
+      join pg_catalog.pg_namespace public_namespace
+        on public_namespace.oid=public_function.pronamespace
+      where public_namespace.nspname='public'
+        and pg_catalog.has_function_privilege(
+          grantee_name,
+          public_function.oid,
+          'EXECUTE'
+        )
+    ) or exists (
+      select 1
+      from pg_catalog.pg_class application_relation
+      join pg_catalog.pg_namespace application_namespace
+        on application_namespace.oid=application_relation.relnamespace
+      cross join (values
+        ('SELECT'),('INSERT'),('UPDATE'),('DELETE'),
+        ('TRUNCATE'),('REFERENCES'),('TRIGGER')
+      ) relation_privilege(privilege_type)
+      where application_namespace.nspname not like 'pg\_%' escape '\'
+        and application_namespace.nspname<>'information_schema'
+        and application_relation.relkind in ('r','p','v','m','f')
+        and pg_catalog.has_table_privilege(
+          grantee_name,
+          application_relation.oid,
+          relation_privilege.privilege_type
+        )
+    ) or exists (
+      select 1
+      from pg_catalog.pg_class application_relation
+      join pg_catalog.pg_namespace application_namespace
+        on application_namespace.oid=application_relation.relnamespace
+      join pg_catalog.pg_attribute application_column
+        on application_column.attrelid=application_relation.oid
+      cross join (values
+        ('SELECT'),('INSERT'),('UPDATE'),('REFERENCES')
+      ) column_privilege(privilege_type)
+      where application_namespace.nspname not like 'pg\_%' escape '\'
+        and application_namespace.nspname<>'information_schema'
+        and application_relation.relkind in ('r','p','v','m','f')
+        and application_column.attnum>0
+        and not application_column.attisdropped
+        and pg_catalog.has_column_privilege(
+          grantee_name,
+          application_relation.oid,
+          application_column.attnum,
+          column_privilege.privilege_type
+        )
     ) then
       raise exception 'square_production_overlay_authority_rpc_not_closed' using errcode='42501';
     end if;
   end loop;
+
+  if exists (
+    select 1
+    from pg_catalog.pg_proc legacy_function
+    cross join lateral pg_catalog.aclexplode(
+      coalesce(
+        legacy_function.proacl,
+        pg_catalog.acldefault('f',legacy_function.proowner)
+      )
+    ) function_acl
+    where legacy_function.oid=any(array[
+      'public.match_business_memory_chunks(uuid,extensions.vector,integer,double precision)'::regprocedure::oid,
+      'public.set_updated_at()'::regprocedure::oid
+    ])
+      and function_acl.grantee=0
+      and function_acl.privilege_type='EXECUTE'
+  ) or not pg_catalog.has_function_privilege(
+    'authenticated',
+    'public.match_business_memory_chunks(uuid,extensions.vector,integer,double precision)',
+    'EXECUTE'
+  ) or not exists (
+    select 1
+    from pg_catalog.pg_trigger trigger_record
+    where not trigger_record.tgisinternal
+      and trigger_record.tgfoid='public.set_updated_at()'::regprocedure
+      and trigger_record.tgenabled='O'
+  ) or exists (
+    select 1
+    from pg_catalog.pg_trigger trigger_record
+    where not trigger_record.tgisinternal
+      and trigger_record.tgfoid='public.set_updated_at()'::regprocedure
+      and trigger_record.tgenabled<>'O'
+  ) then
+    raise exception 'square_production_overlay_legacy_public_execute_not_closed'
+      using errcode='42501';
+  end if;
 end
 $closed_square_production_overlay$;
 

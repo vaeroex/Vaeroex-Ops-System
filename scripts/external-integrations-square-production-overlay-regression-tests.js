@@ -156,6 +156,18 @@ assert.match(overlay, /pg_catalog\.pg_rewrite/);
 assert.match(overlay, /pg_catalog\.pg_publication_namespace/);
 assert.match(overlay, /pg_catalog\.aclexplode\(attribute\.attacl\)/);
 assert.doesNotMatch(overlay, /create policy|grant (?:select|insert|update|delete|all)/i);
+assert.match(overlay,
+  /revoke execute on function\s+public\.match_business_memory_chunks\(uuid,extensions\.vector,integer,double precision\),\s+public\.set_updated_at\(\)\s+from public;/,
+  "overlay removes only the two inherited legacy PUBLIC execution paths"
+);
+assert.doesNotMatch(overlay,
+  /revoke execute on function\s+public\.match_business_memory_chunks\([^;]+from authenticated;/,
+  "authenticated business-memory matching access is preserved"
+);
+assert.match(overlay,
+  /public_namespace\.nspname='public'[\s\S]*has_function_privilege\([\s\S]*grantee_name,[\s\S]*public_function\.oid,[\s\S]*'EXECUTE'/,
+  "each Square authority is closed against every unrelated public routine"
+);
 for (const capability of ["oauth","broker","scheduler","webhook","runtime","evidence"]) {
   const functionName = `check_square_production_${capability}_authority_v1`;
   assert.match(overlay, new RegExp(`create function public\\.${functionName}\\(`));
@@ -193,6 +205,11 @@ assert.match(runner, /"db", "reset", "--local", "--no-seed", "--version", baseVe
 assert.match(runner, /"db", "reset", "--local", "--no-seed", "--version", overlayVersion/);
 assert.match(runner, /snapshotQboCatalog/);
 assert.match(runner, /deepEqual\(afterQbo, beforeQbo/);
+assert.match(runner, /snapshotPreservedRoutineAcls/);
+assert.match(runner, /function_record\.oid<>all\(array\[[\s\S]*match_business_memory_chunks[\s\S]*set_updated_at/,
+  "qualification excludes only the two intentional legacy ACL changes from its preservation snapshot");
+assert.match(runner, /preserves every unrelated explicit routine grant/,
+  "qualification preserves QBO and every other explicit routine grant");
 assert.match(runner, /qualifySubstitutedLedger/);
 assert.match(runner, /set version='20260826089999'[\s\S]*where version='20260826090000'/);
 
@@ -209,6 +226,26 @@ assert.deepEqual(
 );
 assert.doesNotMatch(pgTap, /^select\s+(?:un)?like\s*\(/gmi,
   "regex assertions use portable ok(expression [not] like pattern, description) forms");
+assert.match(pgTap,
+  /public_routines\.oid<>expected\.rpc[\s\S]*has_function_privilege\(expected\.role_name,public_routines\.oid,'execute'\)\),0/,
+  "PG17 qualification rejects every unrelated effective public routine grant"
+);
+assert.match(pgTap,
+  /match_business_memory_chunks\(uuid,extensions\.vector,integer,double precision\)'::regprocedure::oid,[\s\S]*'public\.set_updated_at\(\)'::regprocedure::oid[\s\S]*function_acl\.grantee=0/,
+  "PG17 qualification checks the two legacy PUBLIC ACLs directly"
+);
+assert.match(pgTap,
+  /create trigger square_production_updated_at_probe_trigger[\s\S]*execute function public\.set_updated_at\(\)[\s\S]*updated_at>'2026-01-01T00:00:00Z'/,
+  "PG17 qualification proves trigger execution still works"
+);
+assert.match(pgTap,
+  /has_table_privilege\([\s\S]*Square authorities inherit no table privilege on any non-system relation/,
+  "PG17 qualification checks effective table privileges across all application relations"
+);
+assert.match(pgTap,
+  /has_column_privilege\([\s\S]*Square authorities inherit no column privilege on any non-system relation/,
+  "PG17 qualification checks effective column privileges across all application relations"
+);
 const secretPurposeRejection = pgTap.indexOf("set database_secret_purpose='database_evidence'");
 const foundationValidCapabilityDrift = pgTap.indexOf(
   "set service_account='square-broker-drift@vaeroex-integrations-prod.iam.gserviceaccount.com'"

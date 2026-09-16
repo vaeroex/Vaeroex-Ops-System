@@ -120,6 +120,106 @@ select is((select count(*)::integer from (values
   ('square_production_evidence_authority','public.check_square_production_broker_authority_v1(text,text,text,bigint,text)'::regprocedure)
 ) denied(role_name,rpc) where pg_catalog.has_function_privilege(role_name,rpc,'execute')),0,
   'no authority inherits a different capability preflight RPC');
+select is((with expected(role_name,rpc) as (values
+  ('square_production_oauth_authority','public.check_square_production_oauth_authority_v1(text,text,text,bigint,text)'::regprocedure),
+  ('square_production_broker_authority','public.check_square_production_broker_authority_v1(text,text,text,bigint,text)'::regprocedure),
+  ('square_production_scheduler_authority','public.check_square_production_scheduler_authority_v1(text,text,text,bigint,text)'::regprocedure),
+  ('square_production_webhook_authority','public.check_square_production_webhook_authority_v1(text,text,text,bigint,text)'::regprocedure),
+  ('square_production_runtime_authority','public.check_square_production_runtime_authority_v1(text,text,text,bigint,text)'::regprocedure),
+  ('square_production_evidence_authority','public.check_square_production_evidence_authority_v1(text,text,text,bigint,text)'::regprocedure)
+), public_routines as (
+  select function_record.oid
+  from pg_catalog.pg_proc function_record
+  join pg_catalog.pg_namespace function_namespace
+    on function_namespace.oid=function_record.pronamespace
+  where function_namespace.nspname='public'
+)
+  select count(*)::integer
+  from expected
+  cross join public_routines
+  where public_routines.oid<>expected.rpc
+    and pg_catalog.has_function_privilege(expected.role_name,public_routines.oid,'execute')),0,
+  'each Square authority can execute no public routine beyond its one mapped preflight RPC');
+select is((with authority(role_name) as (values
+  ('square_production_oauth_authority'),('square_production_broker_authority'),
+  ('square_production_scheduler_authority'),('square_production_webhook_authority'),
+  ('square_production_runtime_authority'),('square_production_evidence_authority')
+), application_relations as (
+  select relation.oid
+  from pg_catalog.pg_class relation
+  join pg_catalog.pg_namespace relation_namespace on relation_namespace.oid=relation.relnamespace
+  where relation_namespace.nspname not like 'pg\_%' escape '\'
+    and relation_namespace.nspname<>'information_schema'
+    and relation.relkind in ('r','p','v','m','f')
+), relation_privileges(privilege_type) as (values
+  ('SELECT'),('INSERT'),('UPDATE'),('DELETE'),('TRUNCATE'),('REFERENCES'),('TRIGGER')
+)
+  select count(*)::integer
+  from authority
+  cross join application_relations
+  cross join relation_privileges
+  where pg_catalog.has_table_privilege(
+    authority.role_name,application_relations.oid,relation_privileges.privilege_type
+  )),0,'Square authorities inherit no table privilege on any non-system relation');
+select is((with authority(role_name) as (values
+  ('square_production_oauth_authority'),('square_production_broker_authority'),
+  ('square_production_scheduler_authority'),('square_production_webhook_authority'),
+  ('square_production_runtime_authority'),('square_production_evidence_authority')
+), application_columns as (
+  select relation.oid,attribute.attnum
+  from pg_catalog.pg_class relation
+  join pg_catalog.pg_namespace relation_namespace on relation_namespace.oid=relation.relnamespace
+  join pg_catalog.pg_attribute attribute on attribute.attrelid=relation.oid
+  where relation_namespace.nspname not like 'pg\_%' escape '\'
+    and relation_namespace.nspname<>'information_schema'
+    and relation.relkind in ('r','p','v','m','f')
+    and attribute.attnum>0 and not attribute.attisdropped
+), column_privileges(privilege_type) as (values
+  ('SELECT'),('INSERT'),('UPDATE'),('REFERENCES')
+)
+  select count(*)::integer
+  from authority
+  cross join application_columns
+  cross join column_privileges
+  where pg_catalog.has_column_privilege(
+    authority.role_name,application_columns.oid,
+    application_columns.attnum,column_privileges.privilege_type
+  )),0,'Square authorities inherit no column privilege on any non-system relation');
+select is((select count(*)::integer
+  from pg_catalog.pg_proc function_record
+  cross join lateral pg_catalog.aclexplode(coalesce(
+    function_record.proacl,
+    pg_catalog.acldefault('f',function_record.proowner)
+  )) function_acl
+  where function_record.oid=any(array[
+    'public.match_business_memory_chunks(uuid,extensions.vector,integer,double precision)'::regprocedure::oid,
+    'public.set_updated_at()'::regprocedure::oid
+  ]) and function_acl.grantee=0 and function_acl.privilege_type='EXECUTE'),0,
+  'the only inherited legacy public routine grants are closed for Square authorities');
+select ok(pg_catalog.has_function_privilege('authenticated',
+  'public.match_business_memory_chunks(uuid,extensions.vector,integer,double precision)','execute'),
+  'authenticated retains its explicit business-memory matching grant');
+select is((select count(*)::integer
+  from pg_catalog.pg_trigger trigger_record
+  where not trigger_record.tgisinternal
+    and trigger_record.tgfoid='public.set_updated_at()'::regprocedure
+    and trigger_record.tgenabled='O'),42,
+  'all existing updated-at triggers remain enabled after removing PUBLIC function execution');
+
+create temporary table square_production_updated_at_probe(
+  probe_id integer primary key,
+  probe_value text not null,
+  updated_at timestamptz not null
+);
+create trigger square_production_updated_at_probe_trigger
+before update on square_production_updated_at_probe
+for each row execute function public.set_updated_at();
+insert into square_production_updated_at_probe(probe_id,probe_value,updated_at)
+values (1,'before','2026-01-01T00:00:00Z');
+update square_production_updated_at_probe set probe_value='after' where probe_id=1;
+select ok((select updated_at>'2026-01-01T00:00:00Z'::timestamptz
+  from square_production_updated_at_probe where probe_id=1),
+  'set_updated_at continues executing as a trigger after PUBLIC execution is revoked');
 select ok(pg_catalog.pg_get_functiondef(
   'private.check_square_production_operational_generation_v1(text,text,text,bigint,text,text)'::regprocedure)
   not like '%economic_contributions_enabled%',
