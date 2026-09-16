@@ -172,8 +172,11 @@ async function main() {
       "post_mutation_authority_diagnostic_shape");
     const queryCategories = ["none", "undefined_column", "undefined_function", "undefined_table", "syntax", "datatype", "permission", "aborted_transaction", "other_sqlstate", "transport", "other"];
     const categoryNames = ["oauth", "broker", "scheduler", "webhook", "runtime", "evidence"];
+    const functionCategoryNames = ["schema", "function", "table", "column", "sequence", "fdw", "server", "tablespace", "parameter"];
     check(categoryNames.every(name => queryCategories.includes(value?.[`${name}QueryCategory`])),
       "post_mutation_authority_query_category_shape");
+    check(functionCategoryNames.every(name => queryCategories.includes(value?.[`${name}Category`])),
+      "post_mutation_authority_function_category_shape");
     process.stdout.write(JSON.stringify({ outcome: "post_mutation_authority_observation", ...Object.fromEntries(
       names.map(name => [name, value?.[name] === true]),
     ), brokerRoleExists: value?.brokerRoleExists === true, oauthQueryError: value?.oauthQueryError === true, oauthQueryCategory: value?.oauthQueryCategory,
@@ -181,7 +184,10 @@ async function main() {
     schedulerQueryError: value?.schedulerQueryError === true, webhookQueryError: value?.webhookQueryError === true,
     schedulerQueryCategory: value?.schedulerQueryCategory, webhookQueryCategory: value?.webhookQueryCategory,
     runtimeQueryError: value?.runtimeQueryError === true, runtimeQueryCategory: value?.runtimeQueryCategory,
-    evidenceQueryError: value?.evidenceQueryError === true, evidenceQueryCategory: value?.evidenceQueryCategory }) + "\n");
+    evidenceQueryError: value?.evidenceQueryError === true, evidenceQueryCategory: value?.evidenceQueryCategory,
+    schemaCategory: value?.schemaCategory, functionCategory: value?.functionCategory, tableCategory: value?.tableCategory,
+    columnCategory: value?.columnCategory, sequenceCategory: value?.sequenceCategory, fdwCategory: value?.fdwCategory,
+    serverCategory: value?.serverCategory, tablespaceCategory: value?.tablespaceCategory, parameterCategory: value?.parameterCategory }) + "\n");
     for (const name of names) check(value[name] === true, `post_mutation_authority_${name}`);
   };
   stage = "precreate_capability_creator_substitution";

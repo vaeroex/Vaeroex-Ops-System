@@ -1286,6 +1286,34 @@ static bool diagnostic_named_authority(const char *capability,const char *author
   if (!command("ROLLBACK TO SAVEPOINT vaeroex_authority_diagnostic")) { *query_error=true; *error_category="other"; }
   return value;
 }
+typedef enum {
+  DIAGNOSTIC_SCHEMA_FUNCTION, DIAGNOSTIC_FUNCTION_FUNCTION, DIAGNOSTIC_TABLE_FUNCTION,
+  DIAGNOSTIC_COLUMN_FUNCTION, DIAGNOSTIC_SEQUENCE_FUNCTION, DIAGNOSTIC_FDW_FUNCTION,
+  DIAGNOSTIC_SERVER_FUNCTION, DIAGNOSTIC_TABLESPACE_FUNCTION, DIAGNOSTIC_PARAMETER_FUNCTION
+} diagnostic_function;
+/* A closed set of probes for the fixed predicate below; callers cannot supply
+ * SQL. Each probe reports only a finite SQLSTATE category. */
+static const char *diagnostic_function_probe(diagnostic_function probe, const char *const *values) {
+  const char *sql;
+  switch (probe) {
+    case DIAGNOSTIC_SCHEMA_FUNCTION: sql="SELECT has_schema_privilege($1,n.oid,'USAGE') FROM pg_namespace n LIMIT 1"; break;
+    case DIAGNOSTIC_FUNCTION_FUNCTION: sql="SELECT has_function_privilege($1,p.oid,'EXECUTE') FROM pg_proc p LIMIT 1"; break;
+    case DIAGNOSTIC_TABLE_FUNCTION: sql="SELECT has_table_privilege($1,r.oid,'SELECT') FROM pg_class r LIMIT 1"; break;
+    case DIAGNOSTIC_COLUMN_FUNCTION: sql="SELECT has_column_privilege($1,r.oid,a.attnum,'SELECT') FROM pg_class r JOIN pg_attribute a ON a.attrelid=r.oid AND a.attnum>0 LIMIT 1"; break;
+    case DIAGNOSTIC_SEQUENCE_FUNCTION: sql="SELECT has_sequence_privilege($1,r.oid,'USAGE') FROM pg_class r LIMIT 1"; break;
+    case DIAGNOSTIC_FDW_FUNCTION: sql="SELECT has_foreign_data_wrapper_privilege($1,f.oid,'USAGE') FROM pg_foreign_data_wrapper f LIMIT 1"; break;
+    case DIAGNOSTIC_SERVER_FUNCTION: sql="SELECT has_server_privilege($1,s.oid,'USAGE') FROM pg_foreign_server s LIMIT 1"; break;
+    case DIAGNOSTIC_TABLESPACE_FUNCTION: sql="SELECT has_tablespace_privilege($1,t.oid,'CREATE') FROM pg_tablespace t LIMIT 1"; break;
+    case DIAGNOSTIC_PARAMETER_FUNCTION: sql="SELECT has_parameter_privilege($1,p.parname,'SET') FROM pg_parameter_acl p LIMIT 1"; break;
+    default: return "other";
+  }
+  if (!command("SAVEPOINT vaeroex_function_diagnostic")) return "other";
+  PGresult *r=query(sql,1,values);
+  const char *category=last_query_error ? last_query_error_category : "none";
+  if (r) PQclear(r);
+  if (!command("ROLLBACK TO SAVEPOINT vaeroex_function_diagnostic")) return "other";
+  return category;
+}
 /* Local qualification only. This emits fixed predicate labels and booleans so
  * a failed synthetic inspection can distinguish fixture setup from recovery;
  * it never includes connection data, SQL, credentials, or provider values. */
@@ -1372,12 +1400,23 @@ static void production_authority_diagnostic(const char *target, bool identity_ok
     "WHERE p.oid=to_regprocedure($2) AND (a.grantee<>p.proowner OR a.privilege_type<>'EXECUTE' OR a.is_grantable) "
     "AND NOT (a.grantee=$1::regrole AND a.privilege_type='EXECUTE' AND NOT a.is_grantable))",2,broker_values);
   bool broker_private_closed=true_query("SELECT NOT has_schema_privilege($1,'private','USAGE')",1,broker_values);
-  printf("{\"outcome\":\"production_authority_diagnostic\",\"identity\":%s,\"profile\":%s,\"platformClosed\":%s,\"providerClosed\":%s,\"configurationClosed\":%s,\"capabilityClosed\":%s,\"closedAuthority\":%s,\"targetLock\":%s,\"phaseValid\":%s,\"productionContract\":%s,\"oauthAuthority\":%s,\"brokerAuthority\":%s,\"schedulerAuthority\":%s,\"webhookAuthority\":%s,\"runtimeAuthority\":%s,\"evidenceAuthority\":%s,\"oauthQueryError\":%s,\"oauthQueryCategory\":\"%s\",\"brokerQueryError\":%s,\"brokerQueryCategory\":\"%s\",\"schedulerQueryError\":%s,\"schedulerQueryCategory\":\"%s\",\"webhookQueryError\":%s,\"webhookQueryCategory\":\"%s\",\"runtimeQueryError\":%s,\"runtimeQueryCategory\":\"%s\",\"evidenceQueryError\":%s,\"evidenceQueryCategory\":\"%s\",\"brokerRoleExists\":%s,\"brokerCapabilityExists\":%s,\"brokerWrapperExists\":%s,\"brokerWrapper\":%s,\"brokerWrapperShape\":%s,\"brokerHelper\":%s,\"brokerCapabilityRole\":%s,\"brokerNoMembership\":%s,\"brokerTargetAbsent\":%s,\"brokerPublicUsage\":%s,\"brokerExecuteAcl\":%s,\"brokerPrivateClosed\":%s}\n",
+  const char *function_probe_values[]={target};
+  const char *schema_category=diagnostic_function_probe(DIAGNOSTIC_SCHEMA_FUNCTION,function_probe_values);
+  const char *function_category=diagnostic_function_probe(DIAGNOSTIC_FUNCTION_FUNCTION,function_probe_values);
+  const char *table_category=diagnostic_function_probe(DIAGNOSTIC_TABLE_FUNCTION,function_probe_values);
+  const char *column_category=diagnostic_function_probe(DIAGNOSTIC_COLUMN_FUNCTION,function_probe_values);
+  const char *sequence_category=diagnostic_function_probe(DIAGNOSTIC_SEQUENCE_FUNCTION,function_probe_values);
+  const char *fdw_category=diagnostic_function_probe(DIAGNOSTIC_FDW_FUNCTION,function_probe_values);
+  const char *server_category=diagnostic_function_probe(DIAGNOSTIC_SERVER_FUNCTION,function_probe_values);
+  const char *tablespace_category=diagnostic_function_probe(DIAGNOSTIC_TABLESPACE_FUNCTION,function_probe_values);
+  const char *parameter_category=diagnostic_function_probe(DIAGNOSTIC_PARAMETER_FUNCTION,function_probe_values);
+  printf("{\"outcome\":\"production_authority_diagnostic\",\"identity\":%s,\"profile\":%s,\"platformClosed\":%s,\"providerClosed\":%s,\"configurationClosed\":%s,\"capabilityClosed\":%s,\"closedAuthority\":%s,\"targetLock\":%s,\"phaseValid\":%s,\"productionContract\":%s,\"oauthAuthority\":%s,\"brokerAuthority\":%s,\"schedulerAuthority\":%s,\"webhookAuthority\":%s,\"runtimeAuthority\":%s,\"evidenceAuthority\":%s,\"oauthQueryError\":%s,\"oauthQueryCategory\":\"%s\",\"brokerQueryError\":%s,\"brokerQueryCategory\":\"%s\",\"schedulerQueryError\":%s,\"schedulerQueryCategory\":\"%s\",\"webhookQueryError\":%s,\"webhookQueryCategory\":\"%s\",\"runtimeQueryError\":%s,\"runtimeQueryCategory\":\"%s\",\"evidenceQueryError\":%s,\"evidenceQueryCategory\":\"%s\",\"schemaCategory\":\"%s\",\"functionCategory\":\"%s\",\"tableCategory\":\"%s\",\"columnCategory\":\"%s\",\"sequenceCategory\":\"%s\",\"fdwCategory\":\"%s\",\"serverCategory\":\"%s\",\"tablespaceCategory\":\"%s\",\"parameterCategory\":\"%s\",\"brokerRoleExists\":%s,\"brokerCapabilityExists\":%s,\"brokerWrapperExists\":%s,\"brokerWrapper\":%s,\"brokerWrapperShape\":%s,\"brokerHelper\":%s,\"brokerCapabilityRole\":%s,\"brokerNoMembership\":%s,\"brokerTargetAbsent\":%s,\"brokerPublicUsage\":%s,\"brokerExecuteAcl\":%s,\"brokerPrivateClosed\":%s}\n",
     identity_ok?"true":"false",profile_ok?"true":"false",platform_closed?"true":"false",provider_closed?"true":"false",
     configuration_closed?"true":"false",capability_closed?"true":"false",closed?"true":"false",locked?"true":"false",
     phase!=PRODUCTION_PHASE_INVALID?"true":"false",contract?"true":"false",oauth?"true":"false",broker?"true":"false",
     scheduler?"true":"false",webhook?"true":"false",runtime?"true":"false",evidence?"true":"false",
     oauth_error?"true":"false",oauth_category,broker_error?"true":"false",broker_category,scheduler_error?"true":"false",scheduler_category,webhook_error?"true":"false",webhook_category,runtime_error?"true":"false",runtime_category,evidence_error?"true":"false",evidence_category,
+    schema_category,function_category,table_category,column_category,sequence_category,fdw_category,server_category,tablespace_category,parameter_category,
     broker_role_exists?"true":"false",broker_capability_exists?"true":"false",broker_wrapper_exists?"true":"false",broker_wrapper?"true":"false",broker_wrapper_shape?"true":"false",
     broker_helper?"true":"false",broker_capability_role?"true":"false",broker_no_membership?"true":"false",broker_target_absent?"true":"false",
     broker_public_usage?"true":"false",broker_execute_acl?"true":"false",broker_private_closed?"true":"false");
