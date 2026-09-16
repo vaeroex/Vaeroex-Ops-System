@@ -264,7 +264,6 @@ async function main() {
   // capability membership, and its acknowledged role OID establish the
   // production closed-state contract before the injected store failure.
   const postMutationProfile = profiles[1];
-  productionAuthorityDiagnostic(postMutationProfile);
   const postMutationTarget = makeTarget(postMutationProfile);
   const postMutationNativeBase = adapterModule.createLocalSyntheticProductionNativeAdapter({
     executable: binaries.get(postMutationProfile.name), target: postMutationTarget,
