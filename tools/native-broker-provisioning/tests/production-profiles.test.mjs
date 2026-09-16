@@ -183,6 +183,7 @@ test("post-mutation recovery reports each safety condition independently", () =>
   assert.match(qualifier, /authority_drift_delivery_blocked_by_authority_lock/);
   assert.match(qualifier, /authority_drift_native_rejected_after_delivery/);
   assert.match(qualifier, /authority_rpc_drift_observation/);
+  assert.match(qualifier, /mutationErrorCategory/);
   assert.match(qualifier, /same_signature_authority_rpc_mutation_applied/);
   assert.match(qualifier, /same_signature_authority_rpc_body_drift_rejected/);
 });

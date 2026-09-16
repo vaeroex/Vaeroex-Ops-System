@@ -523,12 +523,17 @@ async function main() {
     "SELECT oid::text value FROM pg_roles WHERE rolname=$1", [authorityDrift.role])).rows[0].value });
   const authorityNative = adapterModule.createLocalSyntheticProductionNativeAdapter({ executable: binaries.get("oauth"), target: authorityTarget });
   let authorityMutationApplied = false, authorityMutationFailed = false;
+  let authorityMutationErrorCategory = "none";
   try {
     await fixture.control.query(`CREATE OR REPLACE FUNCTION ${overlayRpc(authorityDrift)} RETURNS void LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path='' AS
       $function$ BEGIN RAISE EXCEPTION 'synthetic_replaced_authority' USING ERRCODE='55000'; END $function$`);
     authorityMutationApplied = true;
-  } catch {
+  } catch (error) {
     authorityMutationFailed = true;
+    authorityMutationErrorCategory = error?.code === "55P03" ? "lock_timeout"
+      : error?.code === "42501" ? "insufficient_privilege"
+        : error?.code === "42883" ? "undefined_function"
+          : /^[0-9A-Z]{5}$/.test(error?.code ?? "") ? "other_sqlstate" : "unknown";
     await fixture.control.query("ROLLBACK").catch(() => undefined);
   }
   let authorityDriftDenied = false;
@@ -537,6 +542,8 @@ async function main() {
   process.stdout.write(JSON.stringify({ outcome: "authority_rpc_drift_observation",
     mutationApplied: authorityMutationApplied === true,
     mutationFailed: authorityMutationFailed === true,
+    mutationErrorCategory: ["none", "lock_timeout", "insufficient_privilege", "undefined_function", "other_sqlstate", "unknown"].includes(authorityMutationErrorCategory)
+      ? authorityMutationErrorCategory : "unknown",
     nativeRejected: authorityDriftDenied === true }) + "\n");
   check(authorityMutationApplied === true, "same_signature_authority_rpc_mutation_applied");
   check(authorityDriftDenied, "same_signature_authority_rpc_body_drift_rejected");
