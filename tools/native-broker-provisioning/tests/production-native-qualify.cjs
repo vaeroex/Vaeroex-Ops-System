@@ -31,6 +31,8 @@ begin
     p_provider_key,p_environment,p_project_id,p_generation,p_configuration_fingerprint,'${profile.name}');
 end
 `;
+const overlayRpcDefinition = profile => `public.check_square_production_${profile.name}_authority_v1(
+  p_provider_key text,p_environment text,p_project_id text,p_generation bigint,p_configuration_fingerprint text)`;
 
 async function main() {
   const profilesModule = await import(pathToFileURL(path.resolve(__dirname, "../production-profile.mjs")));
@@ -457,7 +459,7 @@ async function main() {
           // execute concurrently; bound the attempt and classify that exact
           // sequencing outcome instead of hanging until the native timeout.
           await fixture.control.query(`BEGIN; SET LOCAL lock_timeout = '100ms';
-            CREATE OR REPLACE FUNCTION ${overlayRpc(postflightDrift)} RETURNS void
+            CREATE OR REPLACE FUNCTION ${overlayRpcDefinition(postflightDrift)} RETURNS void
               LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path='' AS
               $function$ BEGIN RAISE EXCEPTION 'synthetic_postflight_drift' USING ERRCODE='55000'; END $function$;
             COMMIT`);
@@ -470,7 +472,7 @@ async function main() {
         }
       } });
   } catch { postflightDenied = true; }
-  if (postflightMutated) await fixture.control.query(`CREATE OR REPLACE FUNCTION ${overlayRpc(postflightDrift)} RETURNS void
+  if (postflightMutated) await fixture.control.query(`CREATE OR REPLACE FUNCTION ${overlayRpcDefinition(postflightDrift)} RETURNS void
     LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path='' AS $function$${productionAuthoritySource(postflightDrift)}$function$`);
   process.stdout.write(JSON.stringify({ outcome: "postflight_authority_drift_observation",
     deliveryInvoked: postflightDeliveryInvoked === true,
@@ -525,7 +527,7 @@ async function main() {
   let authorityMutationApplied = false, authorityMutationFailed = false;
   let authorityMutationErrorCategory = "none";
   try {
-    await fixture.control.query(`CREATE OR REPLACE FUNCTION ${overlayRpc(authorityDrift)} RETURNS void LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path='' AS
+    await fixture.control.query(`CREATE OR REPLACE FUNCTION ${overlayRpcDefinition(authorityDrift)} RETURNS void LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path='' AS
       $function$ BEGIN RAISE EXCEPTION 'synthetic_replaced_authority' USING ERRCODE='55000'; END $function$`);
     authorityMutationApplied = true;
   } catch (error) {
@@ -547,7 +549,7 @@ async function main() {
     nativeRejected: authorityDriftDenied === true }) + "\n");
   check(authorityMutationApplied === true, "same_signature_authority_rpc_mutation_applied");
   check(authorityDriftDenied, "same_signature_authority_rpc_body_drift_rejected");
-  await fixture.control.query(`CREATE OR REPLACE FUNCTION ${overlayRpc(authorityDrift)} RETURNS void LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path='' AS $function$${productionAuthoritySource(authorityDrift)}$function$`);
+  await fixture.control.query(`CREATE OR REPLACE FUNCTION ${overlayRpcDefinition(authorityDrift)} RETURNS void LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path='' AS $function$${productionAuthoritySource(authorityDrift)}$function$`);
   await fixture.control.query(`REVOKE USAGE ON SCHEMA public FROM ${authorityDrift.capabilityRole}`);
   let publicUsageDenied = false;
   try { await authorityNative.inspect({ target: authorityTarget, intent: "authority-public-usage-drift", approvalId: "synthetic-production", signal: new AbortController().signal }); }
