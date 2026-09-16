@@ -3,7 +3,9 @@ package main
 import (
 	"encoding/base64"
 	"fmt"
+	"strings"
 	"testing"
+	"time"
 
 	callbackedge "vaeroex.local/square-oauth-callback-edge"
 
@@ -170,9 +172,124 @@ func TestManagedHeaderEventRejectsOnlyMalformedEnvelopesAndBodyIndicators(t *tes
 	}
 }
 
+func TestExactPublicCanaryReturnsOnlyFinitePredicateLabelsInsideItsWindow(t *testing.T) {
+	window := diagnosticWindow{notBeforeUnix: 100, expiresUnix: 1300}
+	reasons := []callbackedge.RejectionReason{
+		callbackedge.RejectionNone,
+		callbackedge.RejectionHeaderBounds,
+		callbackedge.RejectionHeaderSpoofing,
+		callbackedge.RejectionTransferEncoding,
+		callbackedge.RejectionExpect,
+		callbackedge.RejectionDuplicateContentLength,
+		callbackedge.RejectionNonzeroContentLength,
+		callbackedge.RejectionTargetMismatch,
+		callbackedge.RejectionMethod,
+		callbackedge.RejectionPath,
+		callbackedge.RejectionQueryEmpty,
+		callbackedge.RejectionQueryLimit,
+		callbackedge.RejectionQueryUnsafe,
+	}
+	for _, reason := range reasons {
+		status, body, ok := exactDiagnosticResponse(diagnosticCanaryTarget, reason, window.notBeforeUnix, window)
+		expectedStatus := uint32(400)
+		if reason == callbackedge.RejectionNone {
+			expectedStatus = 200
+		}
+		if !ok || status != expectedStatus || body != "callback_predicate_"+string(reason) {
+			t.Fatalf("unexpected finite response for %q: %d %q %v", reason, status, body, ok)
+		}
+	}
+}
+
+func TestPublicCanaryCannotRespondOutsideItsExactTargetAndTimeWindow(t *testing.T) {
+	window := diagnosticWindow{notBeforeUnix: 100, expiresUnix: 1300}
+	for _, test := range []struct {
+		name   string
+		target string
+		now    int64
+	}{
+		{name: "wrong target", target: callbackedge.CallbackPath + "?state=other&code=VAEROEX_PUBLIC_NEVER_ISSUED_CANARY", now: window.notBeforeUnix},
+		{name: "before window", target: diagnosticCanaryTarget, now: window.notBeforeUnix - 1},
+		{name: "at expiry", target: diagnosticCanaryTarget, now: window.expiresUnix},
+		{name: "after expiry", target: diagnosticCanaryTarget, now: window.expiresUnix + 1},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			status, body, ok := exactDiagnosticResponse(test.target, callbackedge.RejectionNonzeroContentLength, test.now, window)
+			if ok || status != 0 || body != "" {
+				t.Fatalf("diagnostic escaped its exact bound: %d %q %v", status, body, ok)
+			}
+		})
+	}
+}
+
+func TestDiagnosticConfigurationIsDefaultOffAndStrictlyBounded(t *testing.T) {
+	valid := []byte(diagnosticConfigVersion + "\n100\n1300\n")
+	if window := parseDiagnosticWindow(valid); window != (diagnosticWindow{notBeforeUnix: 100, expiresUnix: 1300}) {
+		t.Fatalf("expected exact 20-minute window, got %#v", window)
+	}
+	for _, configuration := range [][]byte{
+		nil,
+		{},
+		[]byte(diagnosticConfigVersion + "\n100\n1301\n"),
+		[]byte(diagnosticConfigVersion + "\n100\n100\n"),
+		[]byte(diagnosticConfigVersion + "\n0100\n200\n"),
+		[]byte(diagnosticConfigVersion + "\n+100\n200\n"),
+		[]byte(diagnosticConfigVersion + "\n100\n200"),
+		[]byte("unknown\n100\n200\n"),
+		[]byte(strings.Repeat("x", maxDiagnosticConfigBytes+1)),
+	} {
+		if window := parseDiagnosticWindow(configuration); window != (diagnosticWindow{}) {
+			t.Fatalf("invalid configuration enabled the diagnostic: %q %#v", configuration, window)
+		}
+	}
+}
+
+func TestConfiguredCanaryUsesTheUnchangedParserDecisionPath(t *testing.T) {
+	now := time.Now().Unix()
+	configuration := []byte(fmt.Sprintf("%s\n%d\n%d\n", diagnosticConfigVersion, now-1, now+600))
+	rawQuery := strings.TrimPrefix(diagnosticCanaryTarget, callbackedge.CallbackPath+"?")
+	host, reset := newCallbackHostWithConfiguration("GET", callbackedge.CallbackPath, rawQuery, configuration)
+	defer reset()
+	if status := host.StartPlugin(); status != types.OnPluginStartStatusOK {
+		t.Fatalf("expected valid bounded configuration to start, got %v", status)
+	}
+	contextID := host.InitializeHttpContext()
+	action := host.CallOnRequestHeaders(contextID, [][2]string{{":path", diagnosticCanaryTarget}, {"content-length", "1"}}, false)
+	response := host.GetSentLocalResponse(contextID)
+	if action != types.ActionPause || response == nil || response.StatusCode != 400 ||
+		string(response.Data) != "callback_predicate_nonzero_content_length" {
+		t.Fatalf("unexpected exact canary result: %v %#v", action, response)
+	}
+}
+
+func TestAbsentOrInvalidConfigurationCannotEnableTheCanary(t *testing.T) {
+	rawQuery := strings.TrimPrefix(diagnosticCanaryTarget, callbackedge.CallbackPath+"?")
+	for _, configuration := range [][]byte{nil, []byte("invalid")} {
+		host, reset := newCallbackHostWithConfiguration("GET", callbackedge.CallbackPath, rawQuery, configuration)
+		if status := host.StartPlugin(); status != types.OnPluginStartStatusOK {
+			reset()
+			t.Fatalf("invalid configuration must preserve normal service, got %v", status)
+		}
+		contextID := host.InitializeHttpContext()
+		action := host.CallOnRequestHeaders(contextID, [][2]string{{":path", diagnosticCanaryTarget}, {"content-length", "1"}}, false)
+		response := host.GetSentLocalResponse(contextID)
+		if action != types.ActionPause || response == nil || response.StatusCode != 400 ||
+			string(response.Data) != "invalid integration callback" {
+			reset()
+			t.Fatalf("configuration unexpectedly enabled a predicate response: %v %#v", action, response)
+		}
+		reset()
+	}
+}
+
 func newCallbackHost(method, path, query string) (proxytest.HostEmulator, func()) {
+	return newCallbackHostWithConfiguration(method, path, query, nil)
+}
+
+func newCallbackHostWithConfiguration(method, path, query string, configuration []byte) (proxytest.HostEmulator, func()) {
 	options := proxytest.NewEmulatorOption().
 		WithVMContext(&vmContext{}).
+		WithPluginConfiguration(configuration).
 		WithProperty([]string{"request", "method"}, []byte(method)).
 		WithProperty([]string{"request", "path"}, []byte(path)).
 		WithProperty([]string{"request", "query"}, []byte(query))
