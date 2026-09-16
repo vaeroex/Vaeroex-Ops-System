@@ -1251,6 +1251,43 @@ static bool production_authority_valid(const char *target) {
   return true;
 #endif
 }
+#ifdef VAEROEX_SYNTHETIC_ONLY
+#ifdef VAEROEX_PRODUCTION_PROFILE
+static bool lock_target(const char *target);
+/* Local qualification only. This emits fixed predicate labels and booleans so
+ * a failed synthetic inspection can distinguish fixture setup from recovery;
+ * it never includes connection data, SQL, credentials, or provider values. */
+static void production_authority_diagnostic(const char *target, bool identity_ok, bool profile_ok) {
+  production_phase phase=production_ledger_phase();
+  bool closed=closed_authority(target);
+  bool locked=closed && lock_target(target);
+  bool contract=phase!=PRODUCTION_PHASE_INVALID && production_contract_valid(phase);
+  bool oauth=production_named_authority_valid("square_production_oauth_authority",
+    "public.check_square_production_oauth_authority_v1(text,text,text,bigint,text)",
+    AUTHORITY_SOURCE_FOR("square_production_oauth_authority","oauth"),"square_production_oauth",false);
+  bool broker=production_named_authority_valid("square_production_broker_authority",
+    "public.check_square_production_broker_authority_v1(text,text,text,bigint,text)",
+    AUTHORITY_SOURCE_FOR("square_production_broker_authority","broker"),"square_production_broker",false);
+  bool scheduler=production_named_authority_valid("square_production_scheduler_authority",
+    "public.check_square_production_scheduler_authority_v1(text,text,text,bigint,text)",
+    AUTHORITY_SOURCE_FOR("square_production_scheduler_authority","scheduler"),"square_production_scheduler",false);
+  bool webhook=production_named_authority_valid("square_production_webhook_authority",
+    "public.check_square_production_webhook_authority_v1(text,text,text,bigint,text)",
+    AUTHORITY_SOURCE_FOR("square_production_webhook_authority","webhook"),"square_production_webhook",false);
+  bool runtime=production_named_authority_valid("square_production_runtime_authority",
+    "public.check_square_production_runtime_authority_v1(text,text,text,bigint,text)",
+    AUTHORITY_SOURCE_FOR("square_production_runtime_authority","runtime"),"square_production_runtime",false);
+  bool evidence=production_named_authority_valid("square_production_evidence_authority",
+    "public.check_square_production_evidence_authority_v1(text,text,text,bigint,text)",
+    AUTHORITY_SOURCE_FOR("square_production_evidence_authority","evidence"),"square_production_evidence",false);
+  printf("{\"outcome\":\"production_authority_diagnostic\",\"identity\":%s,\"profile\":%s,\"closedAuthority\":%s,\"targetLock\":%s,\"phaseValid\":%s,\"productionContract\":%s,\"oauthAuthority\":%s,\"brokerAuthority\":%s,\"schedulerAuthority\":%s,\"webhookAuthority\":%s,\"runtimeAuthority\":%s,\"evidenceAuthority\":%s}\n",
+    identity_ok?"true":"false",profile_ok?"true":"false",closed?"true":"false",locked?"true":"false",
+    phase!=PRODUCTION_PHASE_INVALID?"true":"false",contract?"true":"false",oauth?"true":"false",broker?"true":"false",
+    scheduler?"true":"false",webhook?"true":"false",runtime?"true":"false",evidence?"true":"false");
+  fflush(stdout);
+}
+#endif
+#endif
 static bool role_valid(const char *target, const char *oid, int state) {
   const char *values[] = {target, oid, state==2 ? "2" : state==1 ? "1" : "0", CAPABILITY};
   return true_query("SELECT EXISTS (SELECT FROM pg_roles r WHERE r.rolname=$1 AND r.oid::text=$2 "
@@ -1390,7 +1427,11 @@ static int run(int argc, char **argv) {
   const char *op = argv[1], *host = argv[2], *port = argv[3], *database = argv[4], *admin = argv[5];
   const char *target = argv[6], *capability = argv[7], *system_id = argv[8], *db_oid = argv[9];
   const char *certificate = argv[10], *intent = argv[11], *role_oid = argv[12], *approval = argv[13];
-  if (strcmp(op,"inspect") && strcmp(op,"prepare") && strcmp(op,"fence") && strcmp(op,"assign") && strcmp(op,"activate") && strcmp(op,"authenticate")) return 2;
+  if (strcmp(op,"inspect") && strcmp(op,"prepare") && strcmp(op,"fence") && strcmp(op,"assign") && strcmp(op,"activate") && strcmp(op,"authenticate")
+#ifdef VAEROEX_SYNTHETIC_ONLY
+      && strcmp(op,"diagnose")
+#endif
+      ) return 2;
   if (!digits(port,5) || strtoul(port,NULL,10) < 1 || strtoul(port,NULL,10) > 65535
     || !identifier(database) || !identifier(admin) || !identifier(target)
     || (strncmp(target,"square_",7) && strncmp(target,"vaeroex_",8))
@@ -1408,7 +1449,7 @@ static int run(int argc, char **argv) {
   if (mlock(password,sizeof(password)) != 0) return 2;
   if (mlock(admin_password,sizeof(admin_password)) != 0) { munlock(password,sizeof(password)); return 2; }
   bool commit_attempted = false;
-  bool ok = read_line(3,admin_password,sizeof(admin_password),5000);
+  bool ok = !strcmp(op,"diagnose") || read_line(3,admin_password,sizeof(admin_password),5000);
   if (ok) {
     const char *keywords[] = {"host","port","dbname","user","password","passfile","sslmode","sslrootcert",
       "connect_timeout","application_name","options","sslcertmode","gssencmode","require_auth",NULL};
@@ -1429,8 +1470,22 @@ static int run(int argc, char **argv) {
   if (ok) {
     PQsetNoticeProcessor(db,notice,NULL);
     atomic_store(&watched_socket,PQsocket(db));
-    ok = identity(host,database,admin,system_id,db_oid) && profile();
+    bool identity_ok = identity(host,database,admin,system_id,db_oid);
+    bool profile_ok = identity_ok && profile();
+    ok = identity_ok && profile_ok;
+#if defined(VAEROEX_SYNTHETIC_ONLY) && defined(VAEROEX_PRODUCTION_PROFILE)
+    if (!ok && !strcmp(op,"diagnose")) {
+      production_authority_diagnostic(target,identity_ok,profile_ok);
+      return 2;
+    }
+#endif
   }
+ #if defined(VAEROEX_SYNTHETIC_ONLY) && defined(VAEROEX_PRODUCTION_PROFILE)
+  if (ok && !strcmp(op,"diagnose")) {
+    production_authority_diagnostic(target,true,true);
+    return 0;
+  }
+ #endif
   if (ok) { ok = command("BEGIN"); transaction = ok; }
   if (ok) ok = closed_authority(target) && lock_target(target);
   if (ok) ok = production_authority_valid(target);

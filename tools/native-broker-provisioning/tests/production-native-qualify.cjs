@@ -151,6 +151,27 @@ async function main() {
     role: profile.role, systemIdentifier: fixture.systemId, databaseOid: fixture.databaseOid, adminRole: admin,
     capabilityRole: profile.capabilityRole, rootCertificate: fixture.cert, roleOid: "0",
   });
+  const productionAuthorityDiagnostic = profile => {
+    const target = makeTarget(profile);
+    const result = spawnSync(binaries.get(profile.name), ["diagnose", target.host, String(target.port), target.database,
+      target.adminRole, target.role, target.capabilityRole, target.systemIdentifier, target.databaseOid,
+      target.rootCertificate, "post-mutation-authority-diagnostic", target.roleOid, "synthetic-production"], {
+      env: { PATH: "/usr/bin:/bin", LANG: "C", LC_ALL: "C" }, encoding: "utf8", maxBuffer: 8192,
+      stdio: ["ignore", "pipe", "pipe", "pipe"],
+    });
+    check(result.status === 0 && !result.error, "post_mutation_authority_diagnostic_completed");
+    const line = result.stdout.trim();
+    let value;
+    try { value = JSON.parse(line); } catch { value = null; }
+    const names = ["identity", "profile", "closedAuthority", "targetLock", "phaseValid", "productionContract",
+      "oauthAuthority", "brokerAuthority", "schedulerAuthority", "webhookAuthority", "runtimeAuthority", "evidenceAuthority"];
+    check(value?.outcome === "production_authority_diagnostic" && names.every(name => typeof value[name] === "boolean"),
+      "post_mutation_authority_diagnostic_shape");
+    process.stdout.write(JSON.stringify({ outcome: "post_mutation_authority_observation", ...Object.fromEntries(
+      names.map(name => [name, value?.[name] === true]),
+    ) }) + "\n");
+    for (const name of names) check(value[name] === true, `post_mutation_authority_${name}`);
+  };
   stage = "precreate_capability_creator_substitution";
   const preCreateProfile = profiles[0], preCreateTarget = makeTarget(preCreateProfile);
   await fixture.control.query("CREATE ROLE synthetic_precreate_extra_operator NOLOGIN CREATEROLE NOSUPERUSER NOCREATEDB NOREPLICATION NOBYPASSRLS");
@@ -222,6 +243,7 @@ async function main() {
   // capability membership, and its acknowledged role OID establish the
   // production closed-state contract before the injected store failure.
   const postMutationProfile = profiles[1];
+  productionAuthorityDiagnostic(postMutationProfile);
   const postMutationTarget = makeTarget(postMutationProfile);
   const postMutationNativeBase = adapterModule.createLocalSyntheticProductionNativeAdapter({
     executable: binaries.get(postMutationProfile.name), target: postMutationTarget,
