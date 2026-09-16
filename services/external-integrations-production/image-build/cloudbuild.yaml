@@ -33,7 +33,7 @@ steps:
     id: verify-bootstrap-source
     dir: services/external-integrations-production/bootstrap-runtime
     entrypoint: /bin/bash
-    args: ["-ceu", "node --check server.mjs && node -e 'const p=require(\"./package.json\"); if(Object.keys(p.dependencies||{}).length||Object.keys(p.optionalDependencies||{}).length) process.exit(1)'"]
+    args: ["-ceu", "node --check callback-boundary.mjs && node --check server.mjs && node --test callback-boundary.test.mjs && node -e 'const p=require(\"./package.json\"); if(Object.keys(p.dependencies||{}).length||Object.keys(p.optionalDependencies||{}).length) process.exit(1)'"]
 
   - name: gcr.io/cloud-builders/docker@sha256:2e8d40d8e48dc14fab4213d5e532d74f63fd403d9e8d7f6463096a75820286c3
     id: build-bootstrap-runtime

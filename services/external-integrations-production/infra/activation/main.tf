@@ -50,10 +50,15 @@ locals {
     }
   }
   callback_edge_version = var.callback_edge_source_commit == null ? null : "v${substr(var.callback_edge_source_commit, 0, 12)}"
-  deployment_enabled    = var.bootstrap_image_digest != null && var.callback_edge_image_digest != null
+  deployment_enabled = (
+    var.bootstrap_image_digest != null &&
+    var.oauth_callback_image_digest != null &&
+    var.callback_edge_image_digest != null &&
+    var.oauth_callback_source_commit != null
+  )
   deployment_inputs_valid = (
-    (var.bootstrap_image_digest == null && var.callback_edge_image_digest == null && var.callback_edge_source_commit == null) ||
-    (var.bootstrap_image_digest != null && var.callback_edge_image_digest != null && var.callback_edge_source_commit != null)
+    (var.bootstrap_image_digest == null && var.oauth_callback_image_digest == null && var.callback_edge_image_digest == null && var.callback_edge_source_commit == null && var.oauth_callback_source_commit == null) ||
+    (var.bootstrap_image_digest != null && var.oauth_callback_image_digest != null && var.callback_edge_image_digest != null && var.callback_edge_source_commit != null && var.oauth_callback_source_commit != null)
   )
 }
 
@@ -73,7 +78,7 @@ resource "google_compute_network" "platform" {
     prevent_destroy = true
     precondition {
       condition     = local.deployment_inputs_valid
-      error_message = "The bootstrap runtime and callback edge must be omitted or deployed together by immutable digest."
+      error_message = "The shared bootstrap, OAuth callback runtime and callback edge must be omitted or deployed together by immutable digest."
     }
   }
   depends_on = [google_project_service.required]
@@ -538,7 +543,7 @@ resource "google_cloud_run_v2_service" "square" {
       }
     }
     containers {
-      image = var.bootstrap_image_digest
+      image = each.key == "oauth" ? var.oauth_callback_image_digest : var.bootstrap_image_digest
       resources {
         limits            = { cpu = "1", memory = "512Mi" }
         cpu_idle          = true
@@ -546,7 +551,7 @@ resource "google_cloud_run_v2_service" "square" {
       }
       env {
         name  = "VAEROEX_SOURCE_COMMIT"
-        value = var.source_commit
+        value = each.key == "oauth" ? var.oauth_callback_source_commit : var.source_commit
       }
       env {
         name  = "VAEROEX_RUNTIME_ENABLED"
@@ -689,15 +694,6 @@ resource "google_network_services_lb_edge_extension" "square_callback" {
         "request.method",
         "request.path",
         "request.query",
-      ]
-      forward_headers = [
-        "content-length",
-        "expect",
-        "transfer-encoding",
-        "x-vaeroex-oauth-code",
-        "x-vaeroex-oauth-denied",
-        "x-vaeroex-oauth-handoff-version",
-        "x-vaeroex-oauth-state",
       ]
     }
   }

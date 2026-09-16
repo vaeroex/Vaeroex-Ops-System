@@ -12,8 +12,10 @@ const versions = read("services/external-integrations-production/infra/activatio
 const outputs = read("services/external-integrations-production/infra/activation/outputs.tf");
 const backend = read("services/external-integrations-production/infra/activation/backend.tf");
 const dockerfile = read("services/external-integrations-production/bootstrap-runtime/Dockerfile");
+const dockerignore = read("services/external-integrations-production/bootstrap-runtime/.dockerignore");
 const serverPath = path.join(root, "services/external-integrations-production/bootstrap-runtime/server.mjs");
 const serverSource = read("services/external-integrations-production/bootstrap-runtime/server.mjs");
+const callbackBoundarySource = read("services/external-integrations-production/bootstrap-runtime/callback-boundary.mjs");
 const bootstrapPackage = JSON.parse(read("services/external-integrations-production/bootstrap-runtime/package.json"));
 const edgeCallback = read("services/external-integrations-production/callback-edge/callback.go");
 const edgePlugin = read("services/external-integrations-production/callback-edge/plugin/main.go");
@@ -26,6 +28,7 @@ const activationPath = path.join(root, "services/external-integrations-productio
 const reviewedSourceCommit = "f4915edadbe2abddd7993c74c1fc3e80e1d1f821";
 const reviewedCallbackEdgeSourceCommit = "bb4ad8d3653ca0eecdada88eeeea8a86fa76fc81";
 const reviewedBootstrapDigest = "us-west1-docker.pkg.dev/vaeroex-integrations-prod/vaeroex-integrations-images/production-bootstrap@sha256:d56fe933eab1322bb4fe905b183964a980d641af23d69904e15989add501dc6f";
+const reviewedOauthCallbackDigest = reviewedBootstrapDigest;
 const reviewedCallbackEdgeDigest = "us-west1-docker.pkg.dev/vaeroex-integrations-prod/vaeroex-integrations-images/square-callback-edge@sha256:f9ef2ebc1669e86f549cb7d24f5bb8f40b4a54e4cd14a70a2d3cfb1b6e8e8012";
 
 function runTerraform(args) {
@@ -43,15 +46,22 @@ function runTerraform(args) {
 runTerraform(["fmt", "-check", "-recursive"]);
 runTerraform(["init", "-backend=false", "-input=false"]);
 runTerraform(["validate"]);
+runTerraform(["test"]);
 
 assert.match(versions, /version\s*=\s*"7\.39\.0"/, "the Google provider is pinned to the first release supporting explicit edge-extension attributes");
 assert.match(variables, /var\.project_id == "vaeroex-integrations-prod"/, "the activation cannot target another project");
 assert.match(variables, /var\.region == "us-west1"/, "the activation cannot create an extra region");
 assert.match(variables, /bootstrap_image_digest == null/, "the first apply creates no runtime");
 assert.match(variables, /production-bootstrap@sha256:\[a-f0-9\]\{64\}/, "a runtime image must be an immutable digest in the isolated repository");
+assert.match(variables, /variable "oauth_callback_image_digest"[\s\S]*production-bootstrap@sha256:\[a-f0-9\]\{64\}/, "the OAuth callback runtime has its own immutable disabled-bootstrap input");
+assert.match(variables, /variable "oauth_callback_source_commit"[\s\S]*\^\[a-f0-9\]\{40\}\$/, "OAuth callback provenance requires an exact separate source revision");
 assert.match(variables, /square-callback-edge@sha256:\[a-f0-9\]\{64\}/, "the callback edge image must be an immutable digest in the isolated repository");
 assert.match(main, /deployment_inputs_valid/, "runtime and callback-edge artifacts must be deployed together");
 assert.match(main, /callback_edge_source_commit == null/, "a callback edge cannot be deployed without exact source provenance");
+assert.match(main, /oauth_callback_source_commit == null/, "first-stage infrastructure cannot claim an OAuth runtime revision");
+assert.match(main, /value\s*=\s*each\.key == "oauth" \? var\.oauth_callback_source_commit : var\.source_commit/, "OAuth source provenance is separate without revising peer services");
+assert.match(main, /image\s*=\s*each\.key == "oauth" \? var\.oauth_callback_image_digest : var\.bootstrap_image_digest/, "only the existing OAuth service selects the callback-specific image");
+assert.match(main, /for_each\s*=\s*local\.deployment_enabled \? local\.modes : toset\(\[\]\)/, "the callback-specific image introduces no Cloud Run resource");
 assert.match(main, /"containerscanning\.googleapis\.com"/, "release images require automatic vulnerability scanning");
 
 for (const gate of [
@@ -106,20 +116,25 @@ assert.match(activationReadme, /Network Services API defaults it to disabled/, "
 assert.match(activationReadme, /No `allUsers` IAM binding is created/, "the domain-restricted public ingress contract is documented");
 assert.match(main, /google_network_services_lb_edge_extension" "square_callback"[\s\S]*fail_open\s*=\s*false/, "the callback edge fails closed");
 assert.match(main, /forward_attributes = \[\s*"request.method",\s*"request.path",\s*"request.query",\s*\]/, "only the exact method, path, and query attributes are forwarded to the callback plugin");
-assert.match(main, /forward_headers = \[\s*"content-length",\s*"expect",\s*"transfer-encoding",\s*"x-vaeroex-oauth-code",\s*"x-vaeroex-oauth-denied",\s*"x-vaeroex-oauth-handoff-version",\s*"x-vaeroex-oauth-state",\s*\]/, "only the exact body-indicator and bounded internal OAuth handoff headers cross the edge");
+assert.doesNotMatch(main, /forward_headers\s*=/, "the edge plugin receives the complete client header map instead of a selected subset");
 assert.match(edgeCallback, /CallbackPath\s*=\s*"\/api\/integrations\/square\/callback"/, "the edge accepts only the Square callback path");
 assert.match(edgeCallback, /WebhookPath\s*=\s*"\/api\/integrations\/square\/webhook"/, "the edge permits only the exact queryless Square webhook pass-through");
-assert.match(edgeCallback, /error_description/, "the edge recognizes provider denial descriptions without forwarding them");
+assert.doesNotMatch(edgeCallback, /error_description|response_type|QueryUnescape|validState|validCode/, "OAuth query semantics are not interpreted at the edge");
 assert.doesNotMatch(edgeCallback, /endOfStream/, "the header-only managed extension does not mistake its platform callback flag for request-body evidence");
 assert.match(edgeCallback, /HasForbiddenCallbackBodyHeaders/, "request-body indicators are rejected by a unit-tested bounded header contract");
+assert.match(edgeCallback, /MaxInputHeaderBytes\s*=\s*16384/, "the complete edge header map retains an aggregate byte bound");
+for (const header of ["forwarded", "x-forwarded-host", "x-original-url", "x-rewrite-url"]) {
+  assert.match(edgeCallback, new RegExp(`"${header}"`), `${header} is rejected from the complete client header map`);
+}
+assert.match(edgeCallback, /for _, reserved := range ReservedHandoffHeaders/, "client-supplied internal handoff headers fail closed");
 assert.match(edgePlugin, /ReplaceHttpRequestHeader\(":path", callbackedge\.CallbackPath\)/, "the edge strips the OAuth query before Cloud Run request logging");
 assert.match(edgePlugin, /GetHttpRequestHeaders\(\)/, "the edge reads the complete bounded header map before parsing callbacks");
 assert.match(edgePlugin, /headersError != nil/, "header retrieval failure fails closed");
-assert.match(edgePlugin, /callbackedge\.(?:Parse|Diagnose)ForwardedHeaderCallback\([\s\S]*headers,/, "the plugin uses the unit-tested combined query and body-indicator contract");
-assert.match(edgePlugin, /requestTarget != diagnosticTarget[\s\S]*markerCount == 1/, "the finite diagnostic is reachable only for the exact synthetic request target and one exact marker");
-assert.match(edgePlugin, /sendFixedResponse\(status, "callback_predicate_"\+string\(reason\)\)/, "the synthetic diagnostic emits only a finite predicate label");
+assert.match(edgePlugin, /callbackedge\.ParseForwardedHeaderCallback\([\s\S]*headers,/, "the plugin uses the unit-tested combined query and body-indicator contract");
+assert.doesNotMatch(edgePlugin, /diagnostic|callback_predicate|vaeroex_public_synthetic_predicate/, "the temporary public callback diagnostic is absent");
 assert.match(edgePlugin, /if err := proxywasm\.SendHttpResponse\([\s\S]*err != nil \{[\s\S]*panic\(err\)/, "a failed local rejection response escalates to fail_open=false plugin failure");
-assert.match(edgePlugin, /clearReservedHandoffHeaders\(\)/, "client-forged handoff headers are removed before forwarding");
+assert.match(edgePlugin, /clearReservedHandoffHeaders\(\)/, "reserved handoff headers receive a defense-in-depth purge before the trusted pair is appended");
+assert.match(edgePlugin, /AddHttpRequestHeader\(callbackedge\.HandoffQueryHeader, handoff\.EncodedQuery\)/, "the edge forwards one safely encoded raw-query handoff");
 assert.doesNotMatch(edgePlugin, /AddHttpRequestHeader\([^\n]*error_description/, "provider error descriptions never enter the internal request");
 assert.match(edgeCloudBuild, /_SOURCE_COMMIT[\s\S]*\^\[a-f0-9\]\{40\}\$/, "callback-edge publication validates the reviewed source revision");
 assert.match(edgeCloudBuild, /go test -count=1 \.\/\.\.\./, "the source-bound callback-edge build runs parser and plugin orchestration tests");
@@ -127,8 +142,10 @@ assert.match(workflow, /External integrations Square Production callback edge te
 assert.match(activationReadme, /Direct human build submission remains closed/, "manual callback-edge publication is explicitly closed");
 assert.match(activationReadme, /only configured rebuild path is the `vaeroex-production-images` GitHub push trigger/, "future publication requires the source-bound reviewed trigger");
 assert.match(releasePins, new RegExp(`source_commit\\s*=\\s*"${reviewedSourceCommit}"`), "the second-stage release is pinned to the reviewed source revision");
+assert.match(releasePins, new RegExp(`oauth_callback_source_commit\\s*=\\s*"${reviewedSourceCommit}"`), "the currently pinned OAuth digest reports its actual shared bootstrap revision");
 assert.match(releasePins, new RegExp(`callback_edge_source_commit\\s*=\\s*"${reviewedCallbackEdgeSourceCommit}"`), "the callback edge is pinned to its distinct reviewed source revision");
 assert.match(releasePins, new RegExp(`bootstrap_image_digest\\s*=\\s*"${reviewedBootstrapDigest}"`), "the reviewed bootstrap digest is pinned exactly");
+assert.match(releasePins, new RegExp(`oauth_callback_image_digest\\s*=\\s*"${reviewedOauthCallbackDigest}"`), "the OAuth callback starts from the reviewed disabled-bootstrap digest without revising peer services");
 assert.match(releasePins, new RegExp(`callback_edge_image_digest\\s*=\\s*"${reviewedCallbackEdgeDigest}"`), "the independently scanned callback edge digest is pinned exactly");
 for (const gate of [
   "runtime_enabled",
@@ -176,22 +193,38 @@ assert.doesNotMatch(main, /supabase|migration|postgres/i, "cloud activation cann
 assert.doesNotMatch(outputs, /secret_data|password|token/i, "outputs remain non-secret");
 
 assert.match(dockerfile, /^FROM gcr\.io\/distroless\/nodejs22-debian13@sha256:[a-f0-9]{64}$/m, "the bootstrap uses an immutable minimal runtime-only base image");
-assert.match(dockerfile, /^COPY --chown=nonroot:nonroot package\.json server\.mjs \.\/$/m, "the bootstrap copies only its runtime files as the unprivileged identity");
+assert.match(dockerfile, /^COPY --chown=nonroot:nonroot package\.json callback-boundary\.mjs server\.mjs \.\/$/m, "the bootstrap copies only its runtime files as the unprivileged identity");
+assert.deepEqual(dockerignore.trimEnd().split("\n"), ["*", "!package.json", "!callback-boundary.mjs", "!server.mjs"], "the minimal build context admits every and only Dockerfile COPY input");
 assert.match(dockerfile, /^USER nonroot$/m, "the bootstrap does not run as root");
 assert.match(dockerfile, /^CMD \["server\.mjs"\]$/m, "the distroless Node entrypoint receives only the reviewed runtime module");
 // The remaining no-fix CVE-2026-85091 finding requires zlib's non-blocking
 // gzwrite path. This dormant HTTP responder must not make that path reachable.
 assert.equal(
   createHash("sha256").update(dockerfile).digest("hex"),
-  "628ac2a6fd58b0ac33ca95c1af9a5717f2c3b26f6bf353853c0d56a6ca57e35f",
+  "a94896fde4c3a4f423b5b09cb7b899809089bd5ee9f8f25ea73e70a022ac8867",
   "every executable bootstrap image change requires an explicit reviewed fingerprint update",
 );
 assert.equal(
   createHash("sha256").update(serverSource).digest("hex"),
-  "c724529d24e8338bdfff14b51557a72cedb332abddc6d705a0cecca07e08c110",
+  "9df82e10ee028ccb895ec4b95452d1a0b635013135821f444f1e7a2fd2f582f0",
   "every executable bootstrap server change requires an explicit reviewed fingerprint update",
 );
+assert.equal(
+  createHash("sha256").update(callbackBoundarySource).digest("hex"),
+  "dcad858b2abd699ee64f0b2b566a3d70f818fad2ceb3e2fbeee252efb673a69a",
+  "every executable callback boundary change requires an explicit reviewed fingerprint update",
+);
 assert.deepEqual(bootstrapPackage.dependencies ?? {}, {}, "the bootstrap has no runtime package dependency that could add compression");
+assert.match(callbackBoundarySource, /SQUARE_PRODUCTION_HOST = "square\.vaeroex\.com"/, "the backend accepts only the exact Production TLS host");
+assert.match(callbackBoundarySource, /SQUARE_EDGE_INPUT_MAX_HEADER_COUNT = 64/, "the edge input envelope is explicitly bounded at 64 headers");
+assert.match(callbackBoundarySource, /SQUARE_BACKEND_MAX_HEADER_COUNT = SQUARE_EDGE_INPUT_MAX_HEADER_COUNT \+ 2/, "the backend admits only the edge envelope plus its two trusted handoff headers");
+assert.match(serverSource, /http\.createServer\(\{ maxHeaderSize: 32_768 \}/, "the Node parser retains an explicit 32 KiB aggregate header byte ceiling");
+assert.match(serverSource, /server\.maxHeadersCount = 0/, "Node preserves complete raw headers so the callback boundary can apply the explicit 66-header cap without truncation");
+assert.match(callbackBoundarySource, /input\.method !== "GET" \|\| input\.url !== SQUARE_CALLBACK_PATH/, "the backend independently requires the exact queryless GET callback route");
+assert.match(callbackBoundarySource, /\["forwarded", "x-forwarded-host", "x-original-url", "x-rewrite-url"\]/, "forwarded authority cannot select the Production callback backend");
+assert.match(callbackBoundarySource, /csrfVerified !== true[\s\S]*currentGeneration !== value\.generation[\s\S]*expiresAtMs <= nowMs[\s\S]*consumedAtMs !== nowMs/, "state consumption binds CSRF, current generation, expiry, and first-use time");
+assert.match(callbackBoundarySource, /consumeState\(Object\.freeze\(\{ stateHash, nowMs \}\)\)/, "the backend delegates one hashed state consumption without forwarding raw state");
+assert.doesNotMatch(callbackBoundarySource, /fetch\(|https:\/\/connect\.square|secret|credential/i, "the disabled backend boundary has no provider or credential capability");
 
 async function exerciseBootstrap() {
   const port = 19_000 + Math.floor(Math.random() * 1_000);
@@ -225,6 +258,30 @@ async function exerciseBootstrap() {
     assert.equal(response.headers.get("x-content-type-options"), "nosniff");
     assert.equal(response.headers.get("x-vaeroex-source-commit"), sourceCommit);
     assert.deepEqual(await response.json(), { error: "production_integration_runtime_disabled" });
+
+    const state = "0123456789_abcdefghijklmnopqrstuvwxyz-ABCDE";
+    const callbackHeaders = {
+      host: "square.vaeroex.com",
+      "x-vaeroex-oauth-handoff-version": "square_oauth_callback_handoff_v1",
+      "x-vaeroex-oauth-query": Buffer.from(`state=${state}&code=synthetic-code`).toString("base64url"),
+    };
+    const validHandoff = await fetch(`http://127.0.0.1:${port}/api/integrations/square/callback`, { headers: callbackHeaders });
+    assert.equal(validHandoff.status, 404, "the exact edge output reaches only the disabled callback backend");
+    assert.deepEqual(await validHandoff.json(), { error: "production_integration_runtime_disabled" });
+
+    const malformedHandoff = await fetch(`http://127.0.0.1:${port}/api/integrations/square/callback`, { headers: {
+      ...callbackHeaders,
+      "x-vaeroex-oauth-query": Buffer.from(`state=${state}&code=x&code=y`).toString("base64url"),
+    } });
+    assert.equal(malformedHandoff.status, 404, "backend OAuth semantics fail without a public parsing oracle");
+    assert.deepEqual(await malformedHandoff.json(), { error: "production_integration_runtime_disabled" });
+
+    const forgedHandoff = await fetch(`http://127.0.0.1:${port}/api/integrations/square/callback`, { headers: {
+      ...callbackHeaders,
+      "x-vaeroex-oauth-state": state,
+    } });
+    assert.equal(forgedHandoff.status, 404, "legacy or forged internal handoffs fail without a public parsing oracle");
+    assert.deepEqual(await forgedHandoff.json(), { error: "production_integration_runtime_disabled" });
 
     const health = await fetch(`http://127.0.0.1:${port}/healthz`);
     assert.equal(health.status, 200);
