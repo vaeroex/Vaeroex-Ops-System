@@ -210,7 +210,10 @@ async function main() {
     secretStore: failingStore, audit: { async append() { return { ack: true }; } } });
   const failed = await failedCoordinator.run({ operation: "create", actor: "synthetic-owner", intent: "production-failure-fence",
     approvalId: "synthetic-production", deadlineMs: 30000, cleanupTimeoutMs: 5000 });
-  check(failed.fenceConfirmed && failed.requiresFreshReplacement, "failure_is_fenced_and_requires_recovery");
+  // This failure is before target-role creation, so there is no identity to
+  // fence. Recovery is still mandatory; the post-mutation case below proves
+  // that a committed role is fenced when one exists.
+  check(!failed.fenceConfirmed && failed.requiresFreshReplacement, "precreate_failure_requires_recovery_without_target_fence");
   let role = (await fixture.control.query("SELECT rolcanlogin,rolinherit FROM pg_roles WHERE rolname=$1", [failedProfile.role])).rows[0];
   check(role && !role.rolcanlogin && !role.rolinherit, "failure_never_leaves_production_login");
   await fixture.control.query(`DROP ROLE ${failedProfile.role}`);
