@@ -163,7 +163,9 @@ async function qualifySequencePrivilegeDrift(databaseUrl) {
     assert.equal(effective.rows[0].effective, true, "negative fixture exposes one application sequence");
     await assert.rejects(
       client.query(migration),
-      /square_production_overlay_authority_rpc_not_closed/,
+      error => error.message === "square_production_overlay_authority_rpc_not_closed"
+        && error.code === "42501"
+        && error.detail === "failed_checks=unexpected_non_system_sequence_privilege",
       "effective application-sequence authority must fail the final closure"
     );
     await client.query("rollback");
@@ -198,7 +200,9 @@ async function qualifyMaintainPrivilegeDrift(databaseUrl) {
     assert.equal(effective.rows[0].effective, true, "negative fixture exposes table maintenance");
     await assert.rejects(
       client.query(migration),
-      /square_production_overlay_authority_rpc_not_closed/,
+      error => error.message === "square_production_overlay_authority_rpc_not_closed"
+        && error.code === "42501"
+        && error.detail === "failed_checks=unexpected_non_system_relation_privilege",
       "effective application-table MAINTAIN authority must fail the final closure"
     );
     await client.query("rollback");

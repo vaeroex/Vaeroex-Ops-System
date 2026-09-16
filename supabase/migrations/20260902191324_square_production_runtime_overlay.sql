@@ -660,13 +660,13 @@ begin
     select count(*)
     from private.integration_production_provider_capabilities capability
     join (values
-      ('broker','square-broker@vaeroex-integrations-prod.iam.gserviceaccount.com','square_production_broker','database_broker'),
-      ('evidence','square-evidence@vaeroex-integrations-prod.iam.gserviceaccount.com','square_production_evidence','database_evidence'),
-      ('oauth','square-oauth@vaeroex-integrations-prod.iam.gserviceaccount.com','square_production_oauth','database_oauth'),
-      ('runtime','square-runtime@vaeroex-integrations-prod.iam.gserviceaccount.com','square_production_runtime','database_runtime'),
-      ('scheduler','square-scheduler@vaeroex-integrations-prod.iam.gserviceaccount.com','square_production_scheduler','database_scheduler'),
-      ('task_invoker','square-task-invoker@vaeroex-integrations-prod.iam.gserviceaccount.com',null,null),
-      ('webhook','square-webhook@vaeroex-integrations-prod.iam.gserviceaccount.com','square_production_webhook','database_webhook')
+      ('broker','sq-prod-broker@vaeroex-integrations-prod.iam.gserviceaccount.com','square_production_broker','database_broker'),
+      ('evidence','sq-prod-evidence@vaeroex-integrations-prod.iam.gserviceaccount.com','square_production_evidence','database_evidence'),
+      ('oauth','sq-prod-oauth@vaeroex-integrations-prod.iam.gserviceaccount.com','square_production_oauth','database_oauth'),
+      ('runtime','sq-prod-runtime@vaeroex-integrations-prod.iam.gserviceaccount.com','square_production_runtime','database_runtime'),
+      ('scheduler','sq-prod-scheduler@vaeroex-integrations-prod.iam.gserviceaccount.com','square_production_scheduler','database_scheduler'),
+      ('task_invoker','sq-prod-task-invoker@vaeroex-integrations-prod.iam.gserviceaccount.com',null,null),
+      ('webhook','sq-prod-webhook@vaeroex-integrations-prod.iam.gserviceaccount.com','square_production_webhook','database_webhook')
     ) expected(capability,service_account,database_login,database_secret_purpose)
       on capability.capability=expected.capability
       and capability.service_account=expected.service_account
@@ -993,6 +993,7 @@ declare
   grantee_name name;
   expected_trigger_count integer;
   overlay_schema_digest text;
+  authority_failure_categories text;
 begin
   perform pg_catalog.set_config('search_path','',true);
   foreach object_name in array array[
@@ -1267,7 +1268,8 @@ begin
       else 'square_production_evidence_authority'
     end;
 
-    if exists (
+    authority_failure_categories := pg_catalog.concat_ws(',',
+      case when exists (
       select 1 from pg_catalog.pg_proc function_record
       where function_record.oid=function_name::regprocedure and (
         function_record.proowner<>current_user::regrole::oid
@@ -1275,7 +1277,8 @@ begin
         or function_record.provolatile<>'s'
         or function_record.proconfig is distinct from array['search_path=""']::text[]
       )
-    ) or 1 <> (
+      ) then 'rpc_definition' end,
+      case when 1 <> (
       select count(*)
       from pg_catalog.pg_proc function_record
       cross join lateral pg_catalog.aclexplode(function_record.proacl) function_acl
@@ -1283,22 +1286,26 @@ begin
         and function_acl.grantee=grantee_name::regrole::oid
         and function_acl.privilege_type='EXECUTE'
         and not function_acl.is_grantable
-    ) or exists (
+      ) then 'mapped_rpc_acl_cardinality' end,
+      case when exists (
       select 1
       from pg_catalog.pg_proc function_record
       cross join lateral pg_catalog.aclexplode(function_record.proacl) function_acl
       where function_record.oid=function_name::regprocedure
         and function_acl.grantee<>function_record.proowner
         and function_acl.grantee<>grantee_name::regrole::oid
-    ) or not pg_catalog.has_function_privilege(
-      grantee_name,
-      function_name::regprocedure,
-      'EXECUTE'
-    ) or pg_catalog.has_schema_privilege(
-      grantee_name,
-      'private',
-      'USAGE'
-    ) or exists (
+      ) then 'unexpected_rpc_acl' end,
+      case when not pg_catalog.has_function_privilege(
+        grantee_name,
+        function_name::regprocedure,
+        'EXECUTE'
+      ) then 'mapped_rpc_execute_missing' end,
+      case when pg_catalog.has_schema_privilege(
+        grantee_name,
+        'private',
+        'USAGE'
+      ) then 'private_schema_usage' end,
+      case when exists (
       select 1
       from pg_catalog.pg_namespace application_namespace
       where application_namespace.nspname<>'pg_catalog'
@@ -1310,7 +1317,8 @@ begin
           application_namespace.oid,
           'CREATE'
         )
-    ) or exists (
+      ) then 'non_system_schema_create' end,
+      case when exists (
       -- System-catalog routines/types/languages, including the large-object
       -- constructors, remain PostgreSQL's inherent trusted-runtime/resource
       -- boundary. Revoking those cluster-wide defaults here would alter the
@@ -1334,7 +1342,8 @@ begin
           'EXECUTE'
         )
         and application_function.oid<>function_name::regprocedure::oid
-    ) or exists (
+      ) then 'unexpected_non_system_routine_execute' end,
+      case when exists (
       -- PostgreSQL's pg_stat_statements extension grants PUBLIC SELECT on its
       -- two extension-owned statistics views. The Square roles have no USAGE
       -- on extensions, so these metadata views are not callable by them.
@@ -1380,7 +1389,8 @@ begin
           application_relation.oid,
           relation_privilege.privilege_type
         )
-    ) or exists (
+      ) then 'unexpected_non_system_relation_privilege' end,
+      case when exists (
       select 1
       from pg_catalog.pg_class application_relation
       join pg_catalog.pg_namespace application_namespace
@@ -1425,7 +1435,8 @@ begin
           application_column.attnum,
           column_privilege.privilege_type
         )
-    ) or exists (
+      ) then 'unexpected_non_system_column_privilege' end,
+      case when exists (
       select 1
       from pg_catalog.pg_class application_sequence
       join pg_catalog.pg_namespace application_namespace
@@ -1442,11 +1453,13 @@ begin
           application_sequence.oid,
           sequence_privilege.privilege_type
         )
-    ) or exists (
+      ) then 'unexpected_non_system_sequence_privilege' end,
+      case when exists (
       select 1
       from pg_catalog.pg_db_role_setting database_setting
       where database_setting.setrole=grantee_name::regrole::oid
-    ) or exists (
+      ) then 'per_database_role_setting' end,
+      case when exists (
       select 1
       from pg_catalog.pg_foreign_data_wrapper foreign_wrapper
       where pg_catalog.has_foreign_data_wrapper_privilege(
@@ -1454,7 +1467,8 @@ begin
         foreign_wrapper.oid,
         'USAGE'
       )
-    ) or exists (
+      ) then 'foreign_data_wrapper_usage' end,
+      case when exists (
       select 1
       from pg_catalog.pg_foreign_server foreign_server
       where pg_catalog.has_server_privilege(
@@ -1462,7 +1476,8 @@ begin
         foreign_server.oid,
         'USAGE'
       )
-    ) or exists (
+      ) then 'foreign_server_usage' end,
+      case when exists (
       select 1
       from pg_catalog.pg_tablespace tablespace_record
       where pg_catalog.has_tablespace_privilege(
@@ -1470,19 +1485,23 @@ begin
         tablespace_record.oid,
         'CREATE'
       )
-    ) or not pg_catalog.has_database_privilege(
-      grantee_name,
-      current_database(),
-      'CONNECT'
-    ) or not pg_catalog.has_database_privilege(
-      grantee_name,
-      current_database(),
-      'TEMP'
-    ) or pg_catalog.has_database_privilege(
-      grantee_name,
-      current_database(),
-      'CREATE'
-    ) or exists (
+      ) then 'tablespace_create' end,
+      case when not pg_catalog.has_database_privilege(
+        grantee_name,
+        current_database(),
+        'CONNECT'
+      ) then 'current_database_connect_missing' end,
+      case when not pg_catalog.has_database_privilege(
+        grantee_name,
+        current_database(),
+        'TEMP'
+      ) then 'current_database_temp_missing' end,
+      case when pg_catalog.has_database_privilege(
+        grantee_name,
+        current_database(),
+        'CREATE'
+      ) then 'current_database_create' end,
+      case when exists (
       -- Keep the current application's standard PUBLIC CONNECT+TEMP boundary;
       -- other databases may retain only ambient PUBLIC CONNECT. Reject any
       -- target-specific database ACL or non-PUBLIC CONNECT source. Connection
@@ -1492,7 +1511,8 @@ begin
       from pg_catalog.pg_database database_record
       cross join lateral pg_catalog.aclexplode(database_record.datacl) database_acl
       where database_acl.grantee=grantee_name::regrole::oid
-    ) or exists (
+      ) then 'direct_database_acl' end,
+      case when exists (
       select 1
       from pg_catalog.pg_database database_record
       where database_record.datallowconn
@@ -1511,14 +1531,19 @@ begin
           where database_acl.grantee=0
             and database_acl.privilege_type='CONNECT'
         )
-    ) or exists (
+      ) then 'non_public_other_database_connect' end,
+      case when exists (
       select 1
       from pg_catalog.pg_default_acl default_acl
       cross join lateral pg_catalog.aclexplode(default_acl.defaclacl) default_privilege
       where default_acl.defaclobjtype in ('r','S','f','n')
         and default_privilege.grantee in (0,grantee_name::regrole::oid)
-    ) then
-      raise exception 'square_production_overlay_authority_rpc_not_closed' using errcode='42501';
+      ) then 'public_or_direct_default_acl' end
+    );
+
+    if authority_failure_categories<>'' then
+      raise exception 'square_production_overlay_authority_rpc_not_closed'
+        using errcode='42501',detail='failed_checks='||authority_failure_categories;
     end if;
   end loop;
 

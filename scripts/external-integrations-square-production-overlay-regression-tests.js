@@ -131,20 +131,37 @@ const generatedConfigurationFingerprint = /configuration_fingerprint text genera
 assert.ok(generatedConfigurationFingerprint, "configuration generated expression is present");
 assert.doesNotMatch(generatedConfigurationFingerprint, /array_to_string|::text/,
   "generated configuration fingerprint delegates all normalization to its immutable typed helper");
+const activationTerraform = fs.readFileSync(path.join(root,
+  "services/external-integrations-production/infra/activation/main.tf"), "utf8");
 for (const [capability, serviceAccount, databaseLogin, secretPurpose] of [
-  ["broker", "square-broker@vaeroex-integrations-prod.iam.gserviceaccount.com", "square_production_broker", "database_broker"],
-  ["evidence", "square-evidence@vaeroex-integrations-prod.iam.gserviceaccount.com", "square_production_evidence", "database_evidence"],
-  ["oauth", "square-oauth@vaeroex-integrations-prod.iam.gserviceaccount.com", "square_production_oauth", "database_oauth"],
-  ["runtime", "square-runtime@vaeroex-integrations-prod.iam.gserviceaccount.com", "square_production_runtime", "database_runtime"],
-  ["scheduler", "square-scheduler@vaeroex-integrations-prod.iam.gserviceaccount.com", "square_production_scheduler", "database_scheduler"],
-  ["task_invoker", "square-task-invoker@vaeroex-integrations-prod.iam.gserviceaccount.com", "null", "null"],
-  ["webhook", "square-webhook@vaeroex-integrations-prod.iam.gserviceaccount.com", "square_production_webhook", "database_webhook"]
+  ["broker", "sq-prod-broker@vaeroex-integrations-prod.iam.gserviceaccount.com", "square_production_broker", "database_broker"],
+  ["evidence", "sq-prod-evidence@vaeroex-integrations-prod.iam.gserviceaccount.com", "square_production_evidence", "database_evidence"],
+  ["oauth", "sq-prod-oauth@vaeroex-integrations-prod.iam.gserviceaccount.com", "square_production_oauth", "database_oauth"],
+  ["runtime", "sq-prod-runtime@vaeroex-integrations-prod.iam.gserviceaccount.com", "square_production_runtime", "database_runtime"],
+  ["scheduler", "sq-prod-scheduler@vaeroex-integrations-prod.iam.gserviceaccount.com", "square_production_scheduler", "database_scheduler"],
+  ["task_invoker", "sq-prod-task-invoker@vaeroex-integrations-prod.iam.gserviceaccount.com", "null", "null"],
+  ["webhook", "sq-prod-webhook@vaeroex-integrations-prod.iam.gserviceaccount.com", "square_production_webhook", "database_webhook"]
 ]) {
+  assert.match(activationTerraform, new RegExp(`\\b${capability}\\s*=\\s*"${serviceAccount.split("@")[0]}"`),
+    `${capability} overlay identity must match the reviewed deployed Terraform account ID`);
   assert.ok(
     overlay.includes(`('${capability}','${serviceAccount}',${databaseLogin === "null" ? "null" : `'${databaseLogin}'`},${secretPurpose === "null" ? "null" : `'${secretPurpose}'`})`),
     `${capability} capability is pinned to its exact service account, database login and secret purpose`
   );
 }
+const failureCategories = ["rpc_definition", "mapped_rpc_acl_cardinality", "unexpected_rpc_acl",
+  "mapped_rpc_execute_missing", "private_schema_usage", "non_system_schema_create",
+  "unexpected_non_system_routine_execute", "unexpected_non_system_relation_privilege",
+  "unexpected_non_system_column_privilege", "unexpected_non_system_sequence_privilege",
+  "per_database_role_setting", "foreign_data_wrapper_usage", "foreign_server_usage",
+  "tablespace_create", "current_database_connect_missing", "current_database_temp_missing",
+  "current_database_create", "direct_database_acl", "non_public_other_database_connect",
+  "public_or_direct_default_acl"];
+const finiteClosure = overlay.slice(overlay.indexOf("authority_failure_categories :="),
+  overlay.indexOf("if authority_failure_categories<>''"));
+assert.deepEqual([...finiteClosure.matchAll(/then '([a-z_]+)' end/g)].map(match => match[1]),
+  failureCategories, "closure exposes exactly twenty fixed invariant labels, never catalog values");
+assert.match(overlay, /detail='failed_checks='\|\|authority_failure_categories/);
 assert.match(overlay, /create table private\.square_production_lifecycle_audit_events/);
 const auditTable = /create table private\.square_production_lifecycle_audit_events \([\s\S]*?\n\);/.exec(overlay)?.[0];
 assert.ok(auditTable, "sanitized lifecycle audit table is present");
@@ -344,7 +361,7 @@ assert.match(pgTap, /cannot read unredacted PostgreSQL statistics/,
   "PG17 qualification proves no Square authority has pg_read_all_stats");
 const secretPurposeRejection = pgTap.indexOf("set database_secret_purpose='database_evidence'");
 const foundationValidCapabilityDrift = pgTap.indexOf(
-  "set service_account='square-broker-drift@vaeroex-integrations-prod.iam.gserviceaccount.com'"
+  "set service_account='sq-prod-broker-drift@vaeroex-integrations-prod.iam.gserviceaccount.com'"
 );
 const overlayCapabilityRejection = pgTap.indexOf(
   "'23514:square_production_binding_capabilities_incomplete'"
@@ -355,7 +372,7 @@ assert.ok(
     foundationValidCapabilityDrift < overlayCapabilityRejection,
   "secret-purpose drift is asserted at the foundation before foundation-valid identity drift reaches the overlay"
 );
-const foundationValidCapabilityDriftStatement = /update private\.integration_production_provider_capabilities\s+set service_account='square-broker-drift[^;]+;/s.exec(pgTap)?.[0];
+const foundationValidCapabilityDriftStatement = /update private\.integration_production_provider_capabilities\s+set service_account='sq-prod-broker-drift[^;]+;/s.exec(pgTap)?.[0];
 assert.ok(foundationValidCapabilityDriftStatement, "foundation-valid identity drift fixture is present");
 assert.doesNotMatch(foundationValidCapabilityDriftStatement, /database_secret_purpose/,
   "overlay identity drift does not trip the provider-neutral secret-purpose constraint first");

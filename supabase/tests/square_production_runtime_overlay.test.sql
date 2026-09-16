@@ -1,5 +1,9 @@
 begin;
 create extension if not exists pgtap with schema extensions;
+-- pgTAP adds PUBLIC-readable diagnostic views that do not exist in the verified
+-- Production baseline. Remove only those test-instrumentation grants inside
+-- this rolled-back test transaction; the migration's authority guard is intact.
+revoke select on extensions.tap_funky, extensions.pg_all_foreign_keys from public;
 set local search_path=public,extensions;
 select no_plan();
 
@@ -588,7 +592,7 @@ insert into private.integration_production_provider_capabilities(
   provider_key,environment,project_id,capability,service_account,database_login,database_secret_purpose
 )
 select 'square','production','vaeroex-integrations-prod',capability,
-  'square-'||replace(capability,'_','-')||'@vaeroex-integrations-prod.iam.gserviceaccount.com',
+  'sq-prod-'||replace(capability,'_','-')||'@vaeroex-integrations-prod.iam.gserviceaccount.com',
   case when capability='task_invoker' then null else ('square_production_'||capability)::name end,
   case when capability='task_invoker' then null else 'database_'||capability end
 from unnest(array['broker','evidence','oauth','runtime','scheduler','task_invoker','webhook']::text[]) capability;
@@ -602,7 +606,7 @@ $sql$) like '23514:%',
   'provider-neutral foundation rejects a capability-to-secret-purpose mismatch before overlay evaluation');
 
 update private.integration_production_provider_capabilities
-set service_account='square-broker-drift@vaeroex-integrations-prod.iam.gserviceaccount.com',
+set service_account='sq-prod-broker-drift@vaeroex-integrations-prod.iam.gserviceaccount.com',
   database_login='square_production_broker_drift'
 where provider_key='square' and environment='production'
   and project_id='vaeroex-integrations-prod' and capability='broker';
@@ -625,7 +629,7 @@ select is((select count(*)::integer from private.square_production_runtime_bindi
   'capability mapping rejection leaves no partial runtime binding');
 
 update private.integration_production_provider_capabilities
-set service_account='square-broker@vaeroex-integrations-prod.iam.gserviceaccount.com',
+set service_account='sq-prod-broker@vaeroex-integrations-prod.iam.gserviceaccount.com',
   database_login='square_production_broker'
 where provider_key='square' and environment='production'
   and project_id='vaeroex-integrations-prod' and capability='broker';
