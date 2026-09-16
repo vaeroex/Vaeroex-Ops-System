@@ -42,6 +42,7 @@ async function main() {
   stage = "production_shape";
   await fixture.control.query(`
     CREATE SCHEMA extensions;
+    CREATE EXTENSION pgcrypto WITH SCHEMA extensions;
     ALTER EXTENSION pg_stat_statements SET SCHEMA extensions;
     REVOKE ALL ON SCHEMA extensions FROM PUBLIC;
     CREATE TABLE private.integration_production_platform_bindings(
@@ -84,6 +85,10 @@ async function main() {
     INSERT INTO private.integration_production_platform_bindings DEFAULT VALUES;
     INSERT INTO private.integration_production_provider_bindings(provider_key,environment) VALUES('square','production');
   `);
+  const digestAvailability = (await fixture.control.query(
+    "SELECT to_regprocedure('extensions.digest(bytea,text)') IS NOT NULL available",
+  )).rows[0];
+  check(digestAvailability?.available === true, "production_fixture_digest_function_available");
   await fixture.control.query(`SET check_function_bodies=off;
     CREATE FUNCTION private.check_square_production_operational_generation_v1(
     p_provider_key text,p_environment text,p_project_id text,p_generation bigint,
