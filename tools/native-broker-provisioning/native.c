@@ -1315,6 +1315,17 @@ static void production_authority_diagnostic(const char *target, bool identity_ok
   bool broker_role_exists=true_query("SELECT EXISTS (SELECT FROM pg_roles WHERE rolname=$1)",1,&broker_values[3]);
   bool broker_capability_exists=true_query("SELECT EXISTS (SELECT FROM pg_roles WHERE rolname=$1)",1,broker_values);
   bool broker_wrapper_exists=true_query("SELECT to_regprocedure($1) IS NOT NULL",1,&broker_values[1]);
+  const char *broker_wrapper_shape_values[]={broker_values[0],broker_values[1],
+    AUTHORITY_SOURCE_FOR("square_production_broker_authority","broker")};
+  bool broker_wrapper_shape=true_query("SELECT EXISTS (SELECT FROM pg_namespace n JOIN pg_proc p ON p.pronamespace=n.oid "
+    "JOIN pg_language l ON l.oid=p.prolang WHERE p.oid=to_regprocedure($2) AND n.nspname='public' "
+    "AND has_schema_privilege($1,n.oid,'USAGE') AND l.lanname='plpgsql' "
+    "AND p.proowner=current_user::regrole::oid AND p.prosecdef AND p.proparallel='u' AND NOT p.proisstrict "
+    "AND NOT p.proretset AND p.prokind='f' AND p.proargmodes IS NULL AND p.pronargdefaults=0 "
+    "AND p.proargdefaults IS NULL AND p.proconfig IS NOT DISTINCT FROM array['search_path=\"\"']::text[] "
+    "AND p.provolatile='s' AND p.pronargs=5 AND p.prorettype='void'::regtype AND p.proargnames IS NOT DISTINCT FROM "
+    "array['p_provider_key','p_environment','p_project_id','p_generation','p_configuration_fingerprint']::text[] "
+    "AND p.prosrc=$3)",3,broker_wrapper_shape_values);
   bool broker_helper=true_query("SELECT EXISTS (SELECT FROM pg_namespace n JOIN pg_proc p ON p.pronamespace=n.oid "
     "JOIN pg_language l ON l.oid=p.prolang WHERE p.oid=to_regprocedure($1) AND n.nspname='private' "
     "AND l.lanname='plpgsql' AND p.proowner=current_user::regrole::oid AND NOT p.prosecdef AND p.provolatile='s' "
@@ -1339,13 +1350,13 @@ static void production_authority_diagnostic(const char *target, bool identity_ok
     "WHERE p.oid=to_regprocedure($2) AND (a.grantee<>p.proowner OR a.privilege_type<>'EXECUTE' OR a.is_grantable) "
     "AND NOT (a.grantee=$1::regrole AND a.privilege_type='EXECUTE' AND NOT a.is_grantable))",2,broker_values);
   bool broker_private_closed=true_query("SELECT NOT has_schema_privilege($1,'private','USAGE')",1,broker_values);
-  printf("{\"outcome\":\"production_authority_diagnostic\",\"identity\":%s,\"profile\":%s,\"platformClosed\":%s,\"providerClosed\":%s,\"configurationClosed\":%s,\"capabilityClosed\":%s,\"closedAuthority\":%s,\"targetLock\":%s,\"phaseValid\":%s,\"productionContract\":%s,\"oauthAuthority\":%s,\"brokerAuthority\":%s,\"schedulerAuthority\":%s,\"webhookAuthority\":%s,\"runtimeAuthority\":%s,\"evidenceAuthority\":%s,\"oauthQueryError\":%s,\"brokerQueryError\":%s,\"schedulerQueryError\":%s,\"webhookQueryError\":%s,\"runtimeQueryError\":%s,\"evidenceQueryError\":%s,\"brokerRoleExists\":%s,\"brokerCapabilityExists\":%s,\"brokerWrapperExists\":%s,\"brokerWrapper\":%s,\"brokerHelper\":%s,\"brokerCapabilityRole\":%s,\"brokerNoMembership\":%s,\"brokerTargetAbsent\":%s,\"brokerPublicUsage\":%s,\"brokerExecuteAcl\":%s,\"brokerPrivateClosed\":%s}\n",
+  printf("{\"outcome\":\"production_authority_diagnostic\",\"identity\":%s,\"profile\":%s,\"platformClosed\":%s,\"providerClosed\":%s,\"configurationClosed\":%s,\"capabilityClosed\":%s,\"closedAuthority\":%s,\"targetLock\":%s,\"phaseValid\":%s,\"productionContract\":%s,\"oauthAuthority\":%s,\"brokerAuthority\":%s,\"schedulerAuthority\":%s,\"webhookAuthority\":%s,\"runtimeAuthority\":%s,\"evidenceAuthority\":%s,\"oauthQueryError\":%s,\"brokerQueryError\":%s,\"schedulerQueryError\":%s,\"webhookQueryError\":%s,\"runtimeQueryError\":%s,\"evidenceQueryError\":%s,\"brokerRoleExists\":%s,\"brokerCapabilityExists\":%s,\"brokerWrapperExists\":%s,\"brokerWrapper\":%s,\"brokerWrapperShape\":%s,\"brokerHelper\":%s,\"brokerCapabilityRole\":%s,\"brokerNoMembership\":%s,\"brokerTargetAbsent\":%s,\"brokerPublicUsage\":%s,\"brokerExecuteAcl\":%s,\"brokerPrivateClosed\":%s}\n",
     identity_ok?"true":"false",profile_ok?"true":"false",platform_closed?"true":"false",provider_closed?"true":"false",
     configuration_closed?"true":"false",capability_closed?"true":"false",closed?"true":"false",locked?"true":"false",
     phase!=PRODUCTION_PHASE_INVALID?"true":"false",contract?"true":"false",oauth?"true":"false",broker?"true":"false",
     scheduler?"true":"false",webhook?"true":"false",runtime?"true":"false",evidence?"true":"false",
     oauth_error?"true":"false",broker_error?"true":"false",scheduler_error?"true":"false",webhook_error?"true":"false",runtime_error?"true":"false",evidence_error?"true":"false",
-    broker_role_exists?"true":"false",broker_capability_exists?"true":"false",broker_wrapper_exists?"true":"false",broker_wrapper?"true":"false",
+    broker_role_exists?"true":"false",broker_capability_exists?"true":"false",broker_wrapper_exists?"true":"false",broker_wrapper?"true":"false",broker_wrapper_shape?"true":"false",
     broker_helper?"true":"false",broker_capability_role?"true":"false",broker_no_membership?"true":"false",broker_target_absent?"true":"false",
     broker_public_usage?"true":"false",broker_execute_acl?"true":"false",broker_private_closed?"true":"false");
   fflush(stdout);
