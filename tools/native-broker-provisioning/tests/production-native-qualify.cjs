@@ -221,8 +221,19 @@ async function main() {
   // durable role identity. It must still leave that exact role fenced, with no
   // session, and force an explicit recovery rather than silently retrying.
   const postMutationNativeBase = adapterModule.createLocalSyntheticProductionNativeAdapter({ executable: binaries.get(failedProfile.name), target: failedTarget });
+  let postMutationRoleOid = "0";
   const postMutationNative = Object.freeze({
     ...postMutationNativeBase,
+    async prepare(context) {
+      const prepared = await postMutationNativeBase.prepare(context);
+      postMutationRoleOid = prepared.roleOid;
+      return prepared;
+    },
+    async fence(context) {
+      return postMutationNativeBase.fence(Object.freeze({ ...context,
+        target: Object.freeze({ ...context.target, roleOid: postMutationRoleOid }),
+      }));
+    },
     async assign(context) {
       const assigned = await postMutationNativeBase.assign(context);
       return Object.freeze({ ...assigned, storeAcknowledged: false });
