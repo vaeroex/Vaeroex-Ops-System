@@ -18,7 +18,40 @@
   "database": {
     "requiredFoundationVersion": "20260902191323",
     "requiredOverlayVersion": "20260902191324",
-    "squareOverlayRequired": true,
+    "requiredOverlayPath": "supabase/migrations/20260902191324_square_production_runtime_overlay.sql",
+    "requiredOverlaySourceCommit": "5e3fb044bf492e6a1d5c323e0030a58a9a63f553",
+    "requiredOverlaySha256": "2cc43a9313d056e58b75143f032f347cb0972f45cc1edbd484f6b1fb0574661f",
+    "requiredPostflight": "square_production_overlay_object_and_authorization_postflight_passed",
+    "requiredOverlayObjects": {
+      "relations": [
+        "private.square_production_configuration_generations",
+        "private.square_production_runtime_bindings",
+        "private.square_production_generation_fences",
+        "private.square_production_lifecycle_audit_events"
+      ],
+      "privateFunctions": [
+        "private.square_production_generation_fingerprint_v1(bigint,text[])",
+        "private.square_production_configuration_fingerprint_v1(bigint,text,text,text,text,text,text,text,text,text,text,text,text,text,text,text,text,text[],text,text,text,text[],text,text,boolean,boolean,boolean,boolean,boolean,boolean,boolean)",
+        "private.reject_square_production_immutable_mutation_v1()",
+        "private.validate_square_production_runtime_binding_v1()",
+        "private.record_square_production_lifecycle_audit_v1()",
+        "private.check_square_production_operational_generation_v1(text,text,text,bigint,text,text)"
+      ],
+      "triggers": [
+        "private.square_production_configuration_generations:square_production_configuration_immutable",
+        "private.square_production_configuration_generations:square_production_configuration_truncate_immutable",
+        "private.square_production_configuration_generations:square_production_configuration_audit",
+        "private.square_production_runtime_bindings:square_production_binding_authority",
+        "private.square_production_runtime_bindings:square_production_binding_immutable",
+        "private.square_production_runtime_bindings:square_production_binding_truncate_immutable",
+        "private.square_production_runtime_bindings:square_production_binding_audit",
+        "private.square_production_generation_fences:square_production_fence_immutable",
+        "private.square_production_generation_fences:square_production_fence_truncate_immutable",
+        "private.square_production_generation_fences:square_production_fence_audit",
+        "private.square_production_lifecycle_audit_events:square_production_audit_immutable",
+        "private.square_production_lifecycle_audit_events:square_production_audit_truncate_immutable"
+      ]
+    },
     "loginBindings": {
       "square_production_oauth": "square_production_oauth_authority",
       "square_production_broker": "square_production_broker_authority",
@@ -26,6 +59,14 @@
       "square_production_webhook": "square_production_webhook_authority",
       "square_production_runtime": "square_production_runtime_authority",
       "square_production_evidence": "square_production_evidence_authority"
+    },
+    "authorityRpcBindings": {
+      "square_production_oauth_authority": "public.check_square_production_oauth_authority_v1(text,text,text,bigint,text)",
+      "square_production_broker_authority": "public.check_square_production_broker_authority_v1(text,text,text,bigint,text)",
+      "square_production_scheduler_authority": "public.check_square_production_scheduler_authority_v1(text,text,text,bigint,text)",
+      "square_production_webhook_authority": "public.check_square_production_webhook_authority_v1(text,text,text,bigint,text)",
+      "square_production_runtime_authority": "public.check_square_production_runtime_authority_v1(text,text,text,bigint,text)",
+      "square_production_evidence_authority": "public.check_square_production_evidence_authority_v1(text,text,text,bigint,text)"
     },
     "loginPolicy": {
       "superuser": false,
@@ -37,6 +78,27 @@
       "directTablePrivileges": false,
       "authorityMembershipsPerLogin": 1
     }
+  },
+  "reviewedProductionRelease": {
+    "sharedBootstrapSourceCommit": "f4915edadbe2abddd7993c74c1fc3e80e1d1f821",
+    "sharedBootstrapImageDigest": "us-west1-docker.pkg.dev/vaeroex-integrations-prod/vaeroex-integrations-images/production-bootstrap@sha256:d56fe933eab1322bb4fe905b183964a980d641af23d69904e15989add501dc6f",
+    "oauthCallbackSourceCommit": "45cc2193dd87270ef413f2e21c65cf3b05c1c255",
+    "oauthCallbackImageDigest": "us-west1-docker.pkg.dev/vaeroex-integrations-prod/vaeroex-integrations-images/production-bootstrap@sha256:ebd5e50ab854ca3de3f49ee51ea8fbef0dfa5510b74c19b0ec6e9c367fffeddf",
+    "callbackEdgeSourceCommit": "45cc2193dd87270ef413f2e21c65cf3b05c1c255",
+    "callbackEdgeImageDigest": "us-west1-docker.pkg.dev/vaeroex-integrations-prod/vaeroex-integrations-images/square-callback-edge@sha256:0a841f23b5a45edbbdca61ab4a8a5c2391a377cef1f5a5c00e113db1a33c5bf9"
+  },
+  "priorProductionRelease": {
+    "sharedBootstrapSourceCommit": "f4915edadbe2abddd7993c74c1fc3e80e1d1f821",
+    "sharedBootstrapImageDigest": "us-west1-docker.pkg.dev/vaeroex-integrations-prod/vaeroex-integrations-images/production-bootstrap@sha256:d56fe933eab1322bb4fe905b183964a980d641af23d69904e15989add501dc6f",
+    "oauthCallbackSourceCommit": "f4915edadbe2abddd7993c74c1fc3e80e1d1f821",
+    "oauthCallbackImageDigest": "us-west1-docker.pkg.dev/vaeroex-integrations-prod/vaeroex-integrations-images/production-bootstrap@sha256:d56fe933eab1322bb4fe905b183964a980d641af23d69904e15989add501dc6f",
+    "callbackEdgeSourceCommit": "bb4ad8d3653ca0eecdada88eeeea8a86fa76fc81",
+    "callbackEdgeImageDigest": "us-west1-docker.pkg.dev/vaeroex-integrations-prod/vaeroex-integrations-images/square-callback-edge@sha256:f9ef2ebc1669e86f549cb7d24f5bb8f40b4a54e4cd14a70a2d3cfb1b6e8e8012"
+  },
+  "expectedReleasePairChanges": {
+    "sharedBootstrap": false,
+    "oauthCallback": true,
+    "callbackEdge": true
   },
   "activationGates": [
     "runtimeEnabled",

@@ -8,21 +8,29 @@
   "webhookUrl": "https://square.vaeroex.com/api/integrations/square/webhook",
   "database": {
     "ledgerHead": "20260902191323",
-    "foundationApplied": true,
-    "squareOverlayApplied": false,
-    "loginBindingsVerified": false,
-    "directTablePrivilegesAbsent": true
+    "foundationVersion": "20260902191323",
+    "overlayPath": null,
+    "overlaySourceCommit": null,
+    "overlaySha256": null,
+    "overlayObjectPostflight": null
   },
-  "callbackLayerQualified": false,
+  "productionReleaseDeployment": {
+    "sharedBootstrapSourceCommit": null,
+    "sharedBootstrapImageDigest": null,
+    "callbackEdgeSourceCommit": null,
+    "callbackEdgeImageDigest": null,
+    "oauthCallbackSourceCommit": null,
+    "oauthCallbackImageDigest": null
+  },
   "credentialVersionsPresent": {
-    "application": false,
-    "webhookSignature": false,
-    "databaseOauth": false,
-    "databaseBroker": false,
-    "databaseScheduler": false,
-    "databaseWebhook": false,
-    "databaseRuntime": false,
-    "databaseEvidence": false
+    "application": { "version": null, "state": "ABSENT", "totalCount": 0 },
+    "webhookSignature": { "version": null, "state": "ABSENT", "totalCount": 0 },
+    "databaseOauth": { "version": null, "state": "ABSENT", "totalCount": 0 },
+    "databaseBroker": { "version": null, "state": "ABSENT", "totalCount": 0 },
+    "databaseScheduler": { "version": null, "state": "ABSENT", "totalCount": 0 },
+    "databaseWebhook": { "version": null, "state": "ABSENT", "totalCount": 0 },
+    "databaseRuntime": { "version": null, "state": "ABSENT", "totalCount": 0 },
+    "databaseEvidence": { "version": null, "state": "ABSENT", "totalCount": 0 }
   },
   "activationGates": {
     "runtimeEnabled": false,

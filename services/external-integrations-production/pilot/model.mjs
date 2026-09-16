@@ -3,7 +3,7 @@ import fs from "node:fs";
 
 const allowedEvidenceKeys = new Set([
   "contractVersion", "sourceCommit", "projectId", "region", "hostname", "callbackUrl", "webhookUrl",
-  "database", "callbackLayerQualified", "credentialVersionsPresent", "activationGates", "pilotAllowlist",
+  "database", "productionReleaseDeployment", "credentialVersionsPresent", "activationGates", "pilotAllowlist",
   "operationalChecks"
 ]);
 
@@ -18,6 +18,15 @@ function isUuid(value) {
 
 function safeIdentifier(value) {
   return typeof value === "string" && value.length >= 1 && value.length <= 191 && /^[A-Za-z0-9_-]+$/.test(value);
+}
+
+function isSha256(value) {
+  return typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
+}
+
+function isImageDigest(value, repository) {
+  return typeof value === "string" && value.startsWith(`${repository}@sha256:`) &&
+    /^[a-f0-9]{64}$/.test(value.slice(`${repository}@sha256:`.length));
 }
 
 function containsCredentialMaterial(value, path = "$") {
@@ -39,7 +48,7 @@ export function loadJson(file) {
   return JSON.parse(fs.readFileSync(file, "utf8"));
 }
 
-export function qualifyPilotEvidence(contract, evidence, expectedHead) {
+export function qualifyPilotEvidence(contract, evidence, expectedHead, sourceControl = {}) {
   exactKeys(evidence, allowedEvidenceKeys, "evidence");
   const credentialPath = containsCredentialMaterial(evidence);
   assert.equal(credentialPath, null, `credential material is forbidden in pilot evidence: ${credentialPath}`);
@@ -52,20 +61,100 @@ export function qualifyPilotEvidence(contract, evidence, expectedHead) {
 
   requireEqual(evidence.contractVersion, "square_production_internal_seller_pilot_evidence_v1", "evidence_contract_mismatch");
   requireEqual(evidence.sourceCommit, expectedHead, "source_commit_mismatch");
+  requireEqual(sourceControl.sourceCommit, expectedHead, "qualification_source_head_mismatch");
+  requireEqual(sourceControl.qualificationSourcesExact, true, "qualification_sources_not_exact_head");
   for (const field of ["projectId", "region", "hostname", "callbackUrl", "webhookUrl"]) {
     requireEqual(evidence[field], contract[field], `${field}_mismatch`);
   }
 
-  exactKeys(evidence.database, ["ledgerHead", "foundationApplied", "squareOverlayApplied", "loginBindingsVerified", "directTablePrivilegesAbsent"], "database evidence");
+  exactKeys(evidence.database, ["ledgerHead", "foundationVersion", "overlayPath", "overlaySourceCommit", "overlaySha256", "overlayObjectPostflight"], "database evidence");
   requireEqual(evidence.database.ledgerHead, contract.database.requiredOverlayVersion, "database_ledger_not_exact_overlay");
-  requireEqual(evidence.database.foundationApplied, true, "production_foundation_missing");
-  requireEqual(evidence.database.squareOverlayApplied, true, "square_overlay_missing");
-  requireEqual(evidence.database.loginBindingsVerified, true, "login_bindings_unverified");
-  requireEqual(evidence.database.directTablePrivilegesAbsent, true, "direct_table_privilege_detected");
-  requireEqual(evidence.callbackLayerQualified, true, "callback_layer_unqualified");
+  requireEqual(evidence.database.foundationVersion, contract.database.requiredFoundationVersion, "production_foundation_mismatch");
+  requireEqual(evidence.database.overlayPath, contract.database.requiredOverlayPath, "square_overlay_path_mismatch");
+  if (!/^[a-f0-9]{40}$/.test(contract.database.requiredOverlaySourceCommit ?? "")) {
+    findings.push("reviewed_overlay_source_commit_pending");
+  } else {
+    requireEqual(sourceControl.overlaySourceIncluded, true, "reviewed_overlay_source_not_in_qualification_head");
+    requireEqual(evidence.database.overlaySourceCommit, contract.database.requiredOverlaySourceCommit,
+      "square_overlay_source_commit_mismatch");
+  }
+  if (!isSha256(contract.database.requiredOverlaySha256)) findings.push("reviewed_overlay_sha256_pending");
+  else {
+    requireEqual(sourceControl.sourceOverlaySha256, contract.database.requiredOverlaySha256,
+      "reviewed_overlay_source_missing_or_mismatch");
+    requireEqual(evidence.database.overlaySha256, contract.database.requiredOverlaySha256, "square_overlay_sha256_mismatch");
+  }
+  requireEqual(evidence.database.overlayObjectPostflight, contract.database.requiredPostflight, "database_overlay_object_postflight_missing");
+
+  const releaseKeys = [
+    "sharedBootstrapSourceCommit", "sharedBootstrapImageDigest",
+    "oauthCallbackSourceCommit", "oauthCallbackImageDigest",
+    "callbackEdgeSourceCommit", "callbackEdgeImageDigest"
+  ];
+  exactKeys(evidence.productionReleaseDeployment, releaseKeys, "production release deployment evidence");
+  exactKeys(contract.reviewedProductionRelease, releaseKeys, "reviewed production release");
+  exactKeys(contract.priorProductionRelease, releaseKeys, "prior production release");
+  exactKeys(contract.expectedReleasePairChanges, ["sharedBootstrap", "oauthCallback", "callbackEdge"],
+    "expected release pair changes");
+  requireEqual(contract.expectedReleasePairChanges.sharedBootstrap, false, "shared_bootstrap_release_must_remain_unchanged");
+  requireEqual(contract.expectedReleasePairChanges.oauthCallback, true, "oauth_callback_release_must_advance");
+  requireEqual(contract.expectedReleasePairChanges.callbackEdge, true, "callback_edge_release_must_advance");
+  const reviewedRelease = contract.reviewedProductionRelease;
+  const priorRelease = contract.priorProductionRelease;
+  const releaseShapes = {
+    sharedBootstrapSourceCommit: (value) => typeof value === "string" && /^[a-f0-9]{40}$/.test(value),
+    sharedBootstrapImageDigest: (value) => isImageDigest(value,
+      "us-west1-docker.pkg.dev/vaeroex-integrations-prod/vaeroex-integrations-images/production-bootstrap"),
+    callbackEdgeSourceCommit: (value) => typeof value === "string" && /^[a-f0-9]{40}$/.test(value),
+    callbackEdgeImageDigest: (value) => isImageDigest(value,
+      "us-west1-docker.pkg.dev/vaeroex-integrations-prod/vaeroex-integrations-images/square-callback-edge"),
+    oauthCallbackSourceCommit: (value) => typeof value === "string" && /^[a-f0-9]{40}$/.test(value),
+    oauthCallbackImageDigest: (value) => isImageDigest(value,
+      "us-west1-docker.pkg.dev/vaeroex-integrations-prod/vaeroex-integrations-images/production-bootstrap")
+  };
+  let releasePinsValid = true;
+  for (const field of releaseKeys) {
+    if (!releaseShapes[field](priorRelease[field])) {
+      releasePinsValid = false;
+      findings.push(`prior_production_release_invalid:${field}`);
+    }
+    if (!releaseShapes[field](reviewedRelease[field])) {
+      releasePinsValid = false;
+      findings.push(`reviewed_production_release_pending:${field}`);
+    } else {
+      if (field.endsWith("SourceCommit")) {
+        requireEqual(sourceControl.sourceCommitsIncluded?.[field], true,
+          `reviewed_release_source_not_in_qualification_head:${field}`);
+      }
+      requireEqual(evidence.productionReleaseDeployment[field], reviewedRelease[field],
+        `production_release_deployment_mismatch:${field}`);
+    }
+  }
+  const releasePairFields = {
+    sharedBootstrap: ["sharedBootstrapSourceCommit", "sharedBootstrapImageDigest"],
+    oauthCallback: ["oauthCallbackSourceCommit", "oauthCallbackImageDigest"],
+    callbackEdge: ["callbackEdgeSourceCommit", "callbackEdgeImageDigest"]
+  };
+  const releasePairChanges = [];
+  if (releasePinsValid) {
+    for (const [pair, fields] of Object.entries(releasePairFields)) {
+      const fieldChanges = fields.map((field) => reviewedRelease[field] !== priorRelease[field]);
+      const pairMatches = contract.expectedReleasePairChanges[pair]
+        ? fieldChanges.every(Boolean)
+        : fieldChanges.every((changed) => !changed);
+      requireEqual(pairMatches, true, `release_pair_change_mismatch:${pair}`);
+      if (fieldChanges.every(Boolean)) releasePairChanges.push(pair);
+    }
+  }
 
   exactKeys(evidence.credentialVersionsPresent, contract.credentialSlots, "credential version evidence");
-  for (const slot of contract.credentialSlots) requireEqual(evidence.credentialVersionsPresent[slot], true, `credential_version_missing:${slot}`);
+  for (const slot of contract.credentialSlots) {
+    const metadata = evidence.credentialVersionsPresent[slot];
+    exactKeys(metadata, ["version", "state", "totalCount"], `credential version evidence.${slot}`);
+    requireEqual(metadata.version, 1, `credential_version_not_one:${slot}`);
+    requireEqual(metadata.state, "ENABLED", `credential_version_not_enabled:${slot}`);
+    requireEqual(metadata.totalCount, 1, `credential_version_count_not_one:${slot}`);
+  }
 
   exactKeys(evidence.activationGates, contract.activationGates, "activation gates");
   for (const gate of contract.activationGates) requireEqual(evidence.activationGates[gate], false, `gate_must_remain_closed:${gate}`);
@@ -99,6 +188,7 @@ export function qualifyPilotEvidence(contract, evidence, expectedHead) {
     sourceCommit: evidence.sourceCommit,
     readyForOneCustomerActivationReview: findings.length === 0,
     gatesRemainClosed: contract.activationGates.every((gate) => evidence.activationGates[gate] === false),
+    releasePairChanges: Object.freeze(releasePairChanges),
     findings: Object.freeze([...new Set(findings)].sort())
   });
 }

@@ -26,10 +26,11 @@ const releasePins = read("services/external-integrations-production/infra/activa
 const activationPath = path.join(root, "services/external-integrations-production/infra/activation");
 
 const reviewedSourceCommit = "f4915edadbe2abddd7993c74c1fc3e80e1d1f821";
-const reviewedCallbackEdgeSourceCommit = "bb4ad8d3653ca0eecdada88eeeea8a86fa76fc81";
+const reviewedOauthCallbackSourceCommit = "45cc2193dd87270ef413f2e21c65cf3b05c1c255";
+const reviewedCallbackEdgeSourceCommit = reviewedOauthCallbackSourceCommit;
 const reviewedBootstrapDigest = "us-west1-docker.pkg.dev/vaeroex-integrations-prod/vaeroex-integrations-images/production-bootstrap@sha256:d56fe933eab1322bb4fe905b183964a980d641af23d69904e15989add501dc6f";
-const reviewedOauthCallbackDigest = reviewedBootstrapDigest;
-const reviewedCallbackEdgeDigest = "us-west1-docker.pkg.dev/vaeroex-integrations-prod/vaeroex-integrations-images/square-callback-edge@sha256:f9ef2ebc1669e86f549cb7d24f5bb8f40b4a54e4cd14a70a2d3cfb1b6e8e8012";
+const reviewedOauthCallbackDigest = "us-west1-docker.pkg.dev/vaeroex-integrations-prod/vaeroex-integrations-images/production-bootstrap@sha256:ebd5e50ab854ca3de3f49ee51ea8fbef0dfa5510b74c19b0ec6e9c367fffeddf";
+const reviewedCallbackEdgeDigest = "us-west1-docker.pkg.dev/vaeroex-integrations-prod/vaeroex-integrations-images/square-callback-edge@sha256:0a841f23b5a45edbbdca61ab4a8a5c2391a377cef1f5a5c00e113db1a33c5bf9";
 
 function runTerraform(args) {
   const result = spawnSync(process.env.TERRAFORM_BIN || "terraform", args, {
@@ -142,10 +143,10 @@ assert.match(workflow, /External integrations Square Production callback edge te
 assert.match(activationReadme, /Direct human build submission remains closed/, "manual callback-edge publication is explicitly closed");
 assert.match(activationReadme, /only configured rebuild path is the `vaeroex-production-images` GitHub push trigger/, "future publication requires the source-bound reviewed trigger");
 assert.match(releasePins, new RegExp(`source_commit\\s*=\\s*"${reviewedSourceCommit}"`), "the second-stage release is pinned to the reviewed source revision");
-assert.match(releasePins, new RegExp(`oauth_callback_source_commit\\s*=\\s*"${reviewedSourceCommit}"`), "the currently pinned OAuth digest reports its actual shared bootstrap revision");
+assert.match(releasePins, new RegExp(`oauth_callback_source_commit\\s*=\\s*"${reviewedOauthCallbackSourceCommit}"`), "the OAuth callback is pinned to its separately reviewed source revision");
 assert.match(releasePins, new RegExp(`callback_edge_source_commit\\s*=\\s*"${reviewedCallbackEdgeSourceCommit}"`), "the callback edge is pinned to its distinct reviewed source revision");
 assert.match(releasePins, new RegExp(`bootstrap_image_digest\\s*=\\s*"${reviewedBootstrapDigest}"`), "the reviewed bootstrap digest is pinned exactly");
-assert.match(releasePins, new RegExp(`oauth_callback_image_digest\\s*=\\s*"${reviewedOauthCallbackDigest}"`), "the OAuth callback starts from the reviewed disabled-bootstrap digest without revising peer services");
+assert.match(releasePins, new RegExp(`oauth_callback_image_digest\\s*=\\s*"${reviewedOauthCallbackDigest}"`), "the OAuth callback uses its separately scanned reviewed digest without revising peer services");
 assert.match(releasePins, new RegExp(`callback_edge_image_digest\\s*=\\s*"${reviewedCallbackEdgeDigest}"`), "the independently scanned callback edge digest is pinned exactly");
 for (const gate of [
   "runtime_enabled",
