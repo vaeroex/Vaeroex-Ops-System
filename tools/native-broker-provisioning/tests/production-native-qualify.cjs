@@ -217,32 +217,34 @@ async function main() {
   const role = (await fixture.control.query("SELECT rolcanlogin,rolinherit FROM pg_roles WHERE rolname=$1", [failedProfile.role])).rows[0];
   check(!role, "precreate_failure_leaves_no_production_login");
 
-  // A store failure happens only after the native prepare has committed a
-  // durable role identity. It must still leave that exact role fenced, with no
+  // A store failure happens only after the native assignment mutates an exact
+  // existing role identity. It must still leave that role fenced, with no
   // session, and force an explicit recovery rather than silently retrying.
-  const postMutationNativeBase = adapterModule.createLocalSyntheticProductionNativeAdapter({ executable: binaries.get(failedProfile.name), target: failedTarget });
-  let postMutationRoleOid = "0";
+  // Use an explicitly existing closed role for this scenario. That keeps the
+  // acknowledgement-loss fixture focused on the post-mutation fence contract
+  // instead of coupling it to CREATE-role reconciliation.
+  await fixture.control.query(`CREATE ROLE ${failedProfile.role} NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS`);
+  await fixture.control.query(`GRANT ${failedProfile.capabilityRole} TO ${failedProfile.role} WITH ADMIN FALSE, INHERIT FALSE, SET FALSE`);
+  const postMutationRoleIdentity = (await fixture.control.query(
+    "SELECT oid::text role_oid FROM pg_roles WHERE rolname=$1", [failedProfile.role],
+  )).rows[0];
+  check(postMutationRoleIdentity?.role_oid && postMutationRoleIdentity.role_oid !== "0",
+    "post_mutation_fixture_role_identity_ready");
+  const postMutationTarget = Object.freeze({ ...failedTarget, roleOid: postMutationRoleIdentity.role_oid });
+  const postMutationNativeBase = adapterModule.createLocalSyntheticProductionNativeAdapter({
+    executable: binaries.get(failedProfile.name), target: postMutationTarget,
+  });
   const postMutationNative = Object.freeze({
     ...postMutationNativeBase,
-    async prepare(context) {
-      const prepared = await postMutationNativeBase.prepare(context);
-      postMutationRoleOid = prepared.roleOid;
-      return prepared;
-    },
-    async fence(context) {
-      return postMutationNativeBase.fence(Object.freeze({ ...context,
-        target: Object.freeze({ ...context.target, roleOid: postMutationRoleOid }),
-      }));
-    },
     async assign(context) {
       const assigned = await postMutationNativeBase.assign(context);
       return Object.freeze({ ...assigned, storeAcknowledged: false });
     },
   });
   const postMutationStore = lifecycleModule.createInMemorySyntheticSecretStore({ production: true });
-  const postMutationCoordinator = lifecycleModule.createSyntheticProductionProvisioningCoordinator({ target: failedTarget,
+  const postMutationCoordinator = lifecycleModule.createSyntheticProductionProvisioningCoordinator({ target: postMutationTarget,
     native: postMutationNative, secretStore: postMutationStore, audit: { async append() { return { ack: true }; } } });
-  const postMutation = await postMutationCoordinator.run({ operation: "create", actor: "synthetic-owner",
+  const postMutation = await postMutationCoordinator.run({ operation: "rotate", actor: "synthetic-owner",
     intent: "production-post-mutation-fence", approvalId: "synthetic-production", deadlineMs: 30000, cleanupTimeoutMs: 5000 });
   check(postMutation.fenceConfirmed && postMutation.requiresFreshReplacement && postMutation.databaseCommit === "uncertain",
     "post_mutation_failure_requires_checked_recovery");
