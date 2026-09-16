@@ -165,8 +165,8 @@ assert.doesNotMatch(overlay,
   "authenticated business-memory matching access is preserved"
 );
 assert.match(overlay,
-  /public_namespace\.nspname='public'[\s\S]*has_function_privilege\([\s\S]*grantee_name,[\s\S]*public_function\.oid,[\s\S]*'EXECUTE'/,
-  "each Square authority is closed against every unrelated public routine"
+  /application_namespace\.nspname<>'pg_catalog'[\s\S]*has_schema_privilege\([\s\S]*grantee_name,[\s\S]*application_namespace\.oid,[\s\S]*'USAGE'[\s\S]*has_function_privilege\([\s\S]*grantee_name,[\s\S]*application_function\.oid,[\s\S]*'EXECUTE'/,
+  "each Square authority is closed against every callable unrelated non-system routine"
 );
 for (const capability of ["oauth","broker","scheduler","webhook","runtime","evidence"]) {
   const functionName = `check_square_production_${capability}_authority_v1`;
@@ -212,6 +212,22 @@ assert.match(runner, /preserves every unrelated explicit routine grant/,
   "qualification preserves QBO and every other explicit routine grant");
 assert.match(runner, /qualifySubstitutedLedger/);
 assert.match(runner, /set version='20260826089999'[\s\S]*where version='20260826090000'/);
+assert.match(runner,
+  /qualifyPerDatabaseRoleSetting[\s\S]*alter role square_production_oauth_authority in database %I set statement_timeout[\s\S]*square_production_overlay_authority_role_drift/,
+  "qualification rejects database-scoped authority settings before creating overlay objects");
+assert.match(overlay, /pg_db_role_setting[\s\S]*setrole=role_record\.oid/,
+  "migration preflight rejects database-scoped authority settings");
+assert.match(overlay, /pg_db_role_setting[\s\S]*setrole=grantee_name::regrole::oid/,
+  "migration postflight rejects database-scoped authority settings");
+assert.match(runner,
+  /qualifySequencePrivilegeDrift[\s\S]*grant usage on sequence[\s\S]*square_production_overlay_authority_rpc_not_closed/,
+  "qualification proves effective application-sequence authority fails the overlay closure");
+assert.match(runner,
+  /qualifyMaintainPrivilegeDrift[\s\S]*grant maintain on table[\s\S]*square_production_overlay_authority_rpc_not_closed/,
+  "qualification proves effective application-table MAINTAIN authority fails the overlay closure");
+assert.match(runner,
+  /qualifyCustomPgRoutineDrift[\s\S]*allow_system_table_mods=on[\s\S]*pg_square_qualification[\s\S]*square_production_overlay_authority_rpc_not_closed/,
+  "qualification proves a callable routine in a custom pg_* schema is not treated as a system routine");
 
 const pgTapAssertionFunctions = [...pgTap.matchAll(
   /^select\s+(?:\*\s+from\s+)?([a-z_][a-z0-9_]*)\s*\(/gmi
@@ -227,8 +243,16 @@ assert.deepEqual(
 assert.doesNotMatch(pgTap, /^select\s+(?:un)?like\s*\(/gmi,
   "regex assertions use portable ok(expression [not] like pattern, description) forms");
 assert.match(pgTap,
-  /public_routines\.oid<>expected\.rpc[\s\S]*has_function_privilege\(expected\.role_name,public_routines\.oid,'execute'\)\),0/,
-  "PG17 qualification rejects every unrelated effective public routine grant"
+  /application_routines\.oid<>expected\.rpc[\s\S]*has_schema_privilege\(expected\.role_name,application_routines\.namespace_oid,'usage'\)[\s\S]*has_function_privilege\(expected\.role_name,application_routines\.oid,'execute'\)\),0/,
+  "PG17 qualification rejects every unrelated callable non-system routine grant"
+);
+assert.match(pgTap,
+  /has_schema_privilege\(authority\.role_name,'private','usage'\)[\s\S]*cannot use the private schema/,
+  "PG17 qualification rejects private-schema usage"
+);
+assert.match(pgTap,
+  /application_schemas\.oid,'create'[\s\S]*cannot create objects in any non-system schema/,
+  "PG17 qualification rejects CREATE on every non-system schema"
 );
 assert.match(pgTap,
   /match_business_memory_chunks\(uuid,extensions\.vector,integer,double precision\)'::regprocedure::oid,[\s\S]*'public\.set_updated_at\(\)'::regprocedure::oid[\s\S]*function_acl\.grantee=0/,
@@ -239,13 +263,85 @@ assert.match(pgTap,
   "PG17 qualification proves trigger execution still works"
 );
 assert.match(pgTap,
-  /has_table_privilege\([\s\S]*Square authorities inherit no table privilege on any non-system relation/,
+  /has_table_privilege\([\s\S]*Square authorities inherit no table privilege beyond the exact unusable statistics metadata views/,
   "PG17 qualification checks effective table privileges across all application relations"
 );
 assert.match(pgTap,
-  /has_column_privilege\([\s\S]*Square authorities inherit no column privilege on any non-system relation/,
+  /has_column_privilege\([\s\S]*Square authorities inherit no column privilege beyond the exact unusable statistics metadata views/,
   "PG17 qualification checks effective column privileges across all application relations"
 );
+assert.match(pgTap,
+  /has_sequence_privilege\([\s\S]*Square authorities inherit no sequence privilege on any non-system application sequence/,
+  "PG17 qualification checks effective sequence privileges across all application sequences"
+);
+assert.match(pgTap,
+  /\('MAINTAIN'\)[\s\S]*has_table_privilege/,
+  "PG17 qualification includes the PostgreSQL 17 MAINTAIN table privilege"
+);
+assert.match(pgTap,
+  /has_foreign_data_wrapper_privilege\([\s\S]*no effective foreign-data-wrapper usage/,
+  "PG17 qualification checks every foreign-data wrapper"
+);
+assert.match(pgTap,
+  /has_server_privilege\([\s\S]*no effective foreign-server usage/,
+  "PG17 qualification checks every foreign server"
+);
+assert.match(pgTap,
+  /has_tablespace_privilege\([\s\S]*cannot create objects in any tablespace/,
+  "PG17 qualification checks tablespace CREATE"
+);
+assert.match(pgTap,
+  /has_database_privilege\(authority\.role_name,current_database\(\),'connect'\)[\s\S]*current-database CONNECT and TEMP/,
+  "PG17 qualification pins current-database CONNECT and TEMP without CREATE"
+);
+assert.match(pgTap,
+  /database_record\.datallowconn[\s\S]*database_acl\.grantee=0[\s\S]*standard PUBLIC default/,
+  "PG17 qualification rejects non-PUBLIC authority to other connectable databases"
+);
+assert.match(pgTap,
+  /pg_default_acl[\s\S]*defaclobjtype in \('r','S','f','n'\)[\s\S]*future relations, sequences, routines or schemas/,
+  "PG17 qualification rejects material PUBLIC or target default ACLs"
+);
+assert.doesNotMatch(overlay, /nspname not like 'pg\\_%'/,
+  "application catalog scans do not exempt arbitrary pg_* extension schemas");
+assert.match(overlay, /nspname not like 'pg\\_toast%' escape '\\'/,
+  "application catalog scans exclude only the exact pg_toast prefix");
+assert.match(overlay, /nspname not like 'pg\\_temp%' escape '\\'/,
+  "application catalog scans exclude only the exact pg_temp prefix");
+assert.match(overlay, /large-object[\s\S]*trusted-runtime\/resource[\s\S]*deployment monitoring/,
+  "migration documents the inherent catalog large-object boundary without global revocation");
+assert.match(overlay,
+  /attribute\.attcollation=0[\s\S]*collation_namespace\.nspname,collation_record\.collname[\s\S]*collprovider::text[\s\S]*collisdeterministic[\s\S]*collversion/,
+  "overlay schema attestation binds schema-qualified collation identity and runtime properties");
+assert.match(overlay, /2739c85b607701a5635c636112a32122ea7d244dc569273d5c9ea3fd05300d26/,
+  "overlay schema attestation pins the exact collation-aware PG17 digest");
+assert.match(overlay,
+  /function_record\.proargnames is distinct from expected\.argument_names[\s\S]*function_record\.proargmodes is not null/,
+  "overlay function attestation pins every argument name and the exact all-IN mode contract");
+for (const argumentName of [
+  "p_generation", "p_parts", "p_provider_key", "p_environment", "p_project_id",
+  "p_configuration_fingerprint", "p_capability", "p_ai_dispatch_enabled"
+]) {
+  assert.ok(overlay.includes(`'${argumentName}'`), `${argumentName} is pinned in the function ABI postflight`);
+}
+assert.match(pgTap, /pg_db_role_setting[\s\S]*database-scoped role settings/,
+  "PG17 qualification proves database-scoped authority settings are absent");
+for (const metadataView of ["pg_stat_statements", "pg_stat_statements_info"]) {
+  assert.ok(overlay.includes(metadataView), `migration allowlists exact ${metadataView} metadata view`);
+  assert.ok(pgTap.includes(metadataView), `PG17 qualification binds exact ${metadataView} metadata view`);
+}
+assert.match(overlay,
+  /relation_privilege\.privilege_type='SELECT'[\s\S]*not pg_catalog\.has_schema_privilege\(grantee_name,'extensions','USAGE'\)[\s\S]*not pg_catalog\.pg_has_role\(grantee_name,'pg_read_all_stats','USAGE'\)[\s\S]*extension_record\.extname='pg_stat_statements'/,
+  "relation exception is limited to SELECT on the pg_stat_statements extension-owned views");
+assert.match(overlay,
+  /column_privilege\.privilege_type='SELECT'[\s\S]*not pg_catalog\.has_schema_privilege\(grantee_name,'extensions','USAGE'\)[\s\S]*not pg_catalog\.pg_has_role\(grantee_name,'pg_read_all_stats','USAGE'\)[\s\S]*extension_record\.extname='pg_stat_statements'/,
+  "column exception is limited to SELECT inherited from the pg_stat_statements extension-owned views");
+assert.match(pgTap, /canonical pg_stat_statements metadata views carry the allowed PUBLIC SELECT ACL/,
+  "PG17 qualification proves the exact platform metadata ACL allowlist");
+assert.match(pgTap, /cannot use the extensions schema containing the canonical metadata views/,
+  "PG17 qualification proves the allowlisted metadata views remain unusable by Square authorities");
+assert.match(pgTap, /cannot read unredacted PostgreSQL statistics/,
+  "PG17 qualification proves no Square authority has pg_read_all_stats");
 const secretPurposeRejection = pgTap.indexOf("set database_secret_purpose='database_evidence'");
 const foundationValidCapabilityDrift = pgTap.indexOf(
   "set service_account='square-broker-drift@vaeroex-integrations-prod.iam.gserviceaccount.com'"

@@ -92,6 +92,161 @@ async function qualifySubstitutedLedger(databaseUrl) {
   }
 }
 
+async function qualifyPerDatabaseRoleSetting(databaseUrl) {
+  const migration = fs.readFileSync(path.join(
+    root,
+    "supabase/migrations/20260902191324_square_production_runtime_overlay.sql"
+  ), "utf8");
+  const client = new Client({ connectionString: databaseUrl });
+  await client.connect();
+  try {
+    await client.query(`
+      do $fixture$
+      begin
+        execute pg_catalog.format(
+          'alter role square_production_oauth_authority in database %I set statement_timeout=%L',
+          current_database(),
+          '1s'
+        );
+      end
+      $fixture$
+    `);
+    const present = await client.query(`
+      select count(*)::integer as count
+      from pg_catalog.pg_db_role_setting
+      where setrole='square_production_oauth_authority'::regrole::oid
+    `);
+    assert.equal(present.rows[0].count, 1, "negative fixture creates one database-scoped role setting");
+    await assert.rejects(
+      client.query(migration),
+      /square_production_overlay_authority_role_drift/,
+      "database-scoped authority settings must fail closed before overlay creation"
+    );
+    await client.query("rollback");
+    const absent = await client.query(
+      "select to_regclass('private.square_production_configuration_generations') is null as absent"
+    );
+    assert.equal(absent.rows[0].absent, true, "rejected role setting creates no overlay relation");
+  } finally {
+    await client.query("rollback").catch(() => undefined);
+    await client.query(`
+      do $cleanup$
+      begin
+        execute pg_catalog.format(
+          'alter role square_production_oauth_authority in database %I reset all',
+          current_database()
+        );
+      end
+      $cleanup$
+    `).catch(() => undefined);
+    await client.end();
+  }
+}
+
+async function qualifySequencePrivilegeDrift(databaseUrl) {
+  const migration = fs.readFileSync(path.join(
+    root,
+    "supabase/migrations/20260902191324_square_production_runtime_overlay.sql"
+  ), "utf8");
+  const sequence = "public.document_extraction_provider_outcomes_outcome_sequence_seq";
+  const client = new Client({ connectionString: databaseUrl });
+  await client.connect();
+  try {
+    await client.query(`grant usage on sequence ${sequence} to public`);
+    const effective = await client.query(`
+      select pg_catalog.has_sequence_privilege(
+        'square_production_oauth_authority',
+        $1::regclass,
+        'USAGE'
+      ) as effective
+    `, [sequence]);
+    assert.equal(effective.rows[0].effective, true, "negative fixture exposes one application sequence");
+    await assert.rejects(
+      client.query(migration),
+      /square_production_overlay_authority_rpc_not_closed/,
+      "effective application-sequence authority must fail the final closure"
+    );
+    await client.query("rollback");
+    const absent = await client.query(
+      "select to_regclass('private.square_production_configuration_generations') is null as absent"
+    );
+    assert.equal(absent.rows[0].absent, true, "rejected sequence privilege leaves no overlay relation");
+  } finally {
+    await client.query("rollback").catch(() => undefined);
+    await client.query(`revoke usage on sequence ${sequence} from public`).catch(() => undefined);
+    await client.end();
+  }
+}
+
+async function qualifyMaintainPrivilegeDrift(databaseUrl) {
+  const migration = fs.readFileSync(path.join(
+    root,
+    "supabase/migrations/20260902191324_square_production_runtime_overlay.sql"
+  ), "utf8");
+  const relation = "public.document_extraction_provider_outcomes";
+  const client = new Client({ connectionString: databaseUrl });
+  await client.connect();
+  try {
+    await client.query(`grant maintain on table ${relation} to public`);
+    const effective = await client.query(`
+      select pg_catalog.has_table_privilege(
+        'square_production_oauth_authority',
+        $1::regclass,
+        'MAINTAIN'
+      ) as effective
+    `, [relation]);
+    assert.equal(effective.rows[0].effective, true, "negative fixture exposes table maintenance");
+    await assert.rejects(
+      client.query(migration),
+      /square_production_overlay_authority_rpc_not_closed/,
+      "effective application-table MAINTAIN authority must fail the final closure"
+    );
+    await client.query("rollback");
+  } finally {
+    await client.query("rollback").catch(() => undefined);
+    await client.query(`revoke maintain on table ${relation} from public`).catch(() => undefined);
+    await client.end();
+  }
+}
+
+async function qualifyCustomPgRoutineDrift(databaseUrl) {
+  const migration = fs.readFileSync(path.join(
+    root,
+    "supabase/migrations/20260902191324_square_production_runtime_overlay.sql"
+  ), "utf8");
+  const client = new Client({ connectionString: databaseUrl });
+  await client.connect();
+  try {
+    await client.query(`
+      set allow_system_table_mods=on;
+      create schema pg_square_qualification;
+      grant usage on schema pg_square_qualification to public;
+      create function pg_square_qualification.ambient_public_probe()
+      returns integer language sql as 'select 1'
+    `);
+    const effective = await client.query(`
+      select pg_catalog.has_schema_privilege(
+          'square_production_oauth_authority','pg_square_qualification','USAGE'
+        ) and pg_catalog.has_function_privilege(
+          'square_production_oauth_authority',
+          'pg_square_qualification.ambient_public_probe()','EXECUTE'
+        ) as effective
+    `);
+    assert.equal(effective.rows[0].effective, true, "negative fixture exposes a callable custom pg_* routine");
+    await assert.rejects(
+      client.query(migration),
+      /square_production_overlay_authority_rpc_not_closed/,
+      "a callable routine in a custom pg_* schema must fail the final closure"
+    );
+    await client.query("rollback");
+  } finally {
+    await client.query("rollback").catch(() => undefined);
+    await client.query("drop schema if exists pg_square_qualification cascade").catch(() => undefined);
+    await client.query("set allow_system_table_mods=off").catch(() => undefined);
+    await client.end();
+  }
+}
+
 async function snapshotQboCatalog(databaseUrl) {
   const client = new Client({ connectionString: databaseUrl });
   await client.connect();
@@ -215,6 +370,14 @@ async function main() {
 
   run(cli, ["db", "reset", "--local", "--no-seed", "--version", baseVersion]);
   await qualifySubstitutedLedger(databaseUrl);
+  run(cli, ["db", "reset", "--local", "--no-seed", "--version", baseVersion]);
+  await qualifyPerDatabaseRoleSetting(databaseUrl);
+  run(cli, ["db", "reset", "--local", "--no-seed", "--version", baseVersion]);
+  await qualifySequencePrivilegeDrift(databaseUrl);
+  run(cli, ["db", "reset", "--local", "--no-seed", "--version", baseVersion]);
+  await qualifyMaintainPrivilegeDrift(databaseUrl);
+  run(cli, ["db", "reset", "--local", "--no-seed", "--version", baseVersion]);
+  await qualifyCustomPgRoutineDrift(databaseUrl);
   run(cli, ["db", "reset", "--local", "--no-seed", "--version", baseVersion]);
   const beforeQbo = await snapshotQboCatalog(databaseUrl);
   const beforePreservedRoutineAcls = await snapshotPreservedRoutineAcls(databaseUrl);

@@ -35,6 +35,15 @@ select is((select count(*)::integer from pg_catalog.pg_roles where rolname in (
 ) and not rolcanlogin and not rolinherit and not rolsuper and not rolcreatedb
   and not rolcreaterole and not rolreplication and not rolbypassrls and rolconfig is null),6,
   'all Square Production authority roles remain NOLOGIN, NOINHERIT and unprivileged');
+select is((select count(*)::integer from pg_catalog.pg_db_role_setting database_setting
+  where database_setting.setrole=any(array[
+    'square_production_oauth_authority'::regrole::oid,
+    'square_production_broker_authority'::regrole::oid,
+    'square_production_scheduler_authority'::regrole::oid,
+    'square_production_webhook_authority'::regrole::oid,
+    'square_production_runtime_authority'::regrole::oid,
+    'square_production_evidence_authority'::regrole::oid
+  ])),0,'Square Production authorities have no database-scoped role settings');
 
 select is((select count(*)::integer from (
   values
@@ -127,32 +136,63 @@ select is((with expected(role_name,rpc) as (values
   ('square_production_webhook_authority','public.check_square_production_webhook_authority_v1(text,text,text,bigint,text)'::regprocedure),
   ('square_production_runtime_authority','public.check_square_production_runtime_authority_v1(text,text,text,bigint,text)'::regprocedure),
   ('square_production_evidence_authority','public.check_square_production_evidence_authority_v1(text,text,text,bigint,text)'::regprocedure)
-), public_routines as (
-  select function_record.oid
+), application_routines as (
+  select function_record.oid,function_namespace.oid as namespace_oid
   from pg_catalog.pg_proc function_record
   join pg_catalog.pg_namespace function_namespace
     on function_namespace.oid=function_record.pronamespace
-  where function_namespace.nspname='public'
+  where function_namespace.nspname<>'pg_catalog'
+    and function_namespace.nspname<>'information_schema'
+    and function_namespace.nspname not like 'pg\_toast%' escape '\'
+    and function_namespace.nspname not like 'pg\_temp%' escape '\'
 )
   select count(*)::integer
   from expected
-  cross join public_routines
-  where public_routines.oid<>expected.rpc
-    and pg_catalog.has_function_privilege(expected.role_name,public_routines.oid,'execute')),0,
-  'each Square authority can execute no public routine beyond its one mapped preflight RPC');
+  cross join application_routines
+  where application_routines.oid<>expected.rpc
+    and pg_catalog.has_schema_privilege(expected.role_name,application_routines.namespace_oid,'usage')
+    and pg_catalog.has_function_privilege(expected.role_name,application_routines.oid,'execute')),0,
+  'each Square authority can call no non-system routine beyond its one mapped preflight RPC');
+select is((select count(*)::integer from (values
+  ('square_production_oauth_authority'),('square_production_broker_authority'),
+  ('square_production_scheduler_authority'),('square_production_webhook_authority'),
+  ('square_production_runtime_authority'),('square_production_evidence_authority')
+) authority(role_name)
+  where pg_catalog.has_schema_privilege(authority.role_name,'private','usage')),0,
+  'Square authorities cannot use the private schema');
+select is((with authority(role_name) as (values
+  ('square_production_oauth_authority'),('square_production_broker_authority'),
+  ('square_production_scheduler_authority'),('square_production_webhook_authority'),
+  ('square_production_runtime_authority'),('square_production_evidence_authority')
+), application_schemas as (
+  select namespace.oid
+  from pg_catalog.pg_namespace namespace
+  where namespace.nspname<>'pg_catalog'
+    and namespace.nspname<>'information_schema'
+    and namespace.nspname not like 'pg\_toast%' escape '\'
+    and namespace.nspname not like 'pg\_temp%' escape '\'
+)
+  select count(*)::integer
+  from authority
+  cross join application_schemas
+  where pg_catalog.has_schema_privilege(
+    authority.role_name,application_schemas.oid,'create'
+  )),0,'Square authorities cannot create objects in any non-system schema');
 select is((with authority(role_name) as (values
   ('square_production_oauth_authority'),('square_production_broker_authority'),
   ('square_production_scheduler_authority'),('square_production_webhook_authority'),
   ('square_production_runtime_authority'),('square_production_evidence_authority')
 ), application_relations as (
-  select relation.oid
+  select relation.oid,relation_namespace.nspname,relation.relname,relation.relkind
   from pg_catalog.pg_class relation
   join pg_catalog.pg_namespace relation_namespace on relation_namespace.oid=relation.relnamespace
-  where relation_namespace.nspname not like 'pg\_%' escape '\'
+  where relation_namespace.nspname<>'pg_catalog'
     and relation_namespace.nspname<>'information_schema'
+    and relation_namespace.nspname not like 'pg\_toast%' escape '\'
+    and relation_namespace.nspname not like 'pg\_temp%' escape '\'
     and relation.relkind in ('r','p','v','m','f')
 ), relation_privileges(privilege_type) as (values
-  ('SELECT'),('INSERT'),('UPDATE'),('DELETE'),('TRUNCATE'),('REFERENCES'),('TRIGGER')
+  ('SELECT'),('INSERT'),('UPDATE'),('DELETE'),('TRUNCATE'),('REFERENCES'),('TRIGGER'),('MAINTAIN')
 )
   select count(*)::integer
   from authority
@@ -160,18 +200,39 @@ select is((with authority(role_name) as (values
   cross join relation_privileges
   where pg_catalog.has_table_privilege(
     authority.role_name,application_relations.oid,relation_privileges.privilege_type
-  )),0,'Square authorities inherit no table privilege on any non-system relation');
+  ) and not (
+    relation_privileges.privilege_type='SELECT'
+    and application_relations.nspname='extensions'
+    and application_relations.relname=any(array['pg_stat_statements','pg_stat_statements_info'])
+    and application_relations.relkind='v'
+    and not pg_catalog.has_schema_privilege(authority.role_name,'extensions','USAGE')
+    and not pg_catalog.pg_has_role(authority.role_name,'pg_read_all_stats','USAGE')
+    and exists (
+      select 1 from pg_catalog.pg_depend extension_dependency
+      join pg_catalog.pg_extension extension_record
+        on extension_record.oid=extension_dependency.refobjid
+      where extension_dependency.classid='pg_catalog.pg_class'::regclass
+        and extension_dependency.objid=application_relations.oid
+        and extension_dependency.objsubid=0
+        and extension_dependency.refclassid='pg_catalog.pg_extension'::regclass
+        and extension_dependency.deptype='e'
+        and extension_record.extname='pg_stat_statements'
+    )
+  )),0,'Square authorities inherit no table privilege beyond the exact unusable statistics metadata views');
 select is((with authority(role_name) as (values
   ('square_production_oauth_authority'),('square_production_broker_authority'),
   ('square_production_scheduler_authority'),('square_production_webhook_authority'),
   ('square_production_runtime_authority'),('square_production_evidence_authority')
 ), application_columns as (
-  select relation.oid,attribute.attnum
+  select relation.oid,attribute.attnum,
+    relation_namespace.nspname,relation.relname,relation.relkind
   from pg_catalog.pg_class relation
   join pg_catalog.pg_namespace relation_namespace on relation_namespace.oid=relation.relnamespace
   join pg_catalog.pg_attribute attribute on attribute.attrelid=relation.oid
-  where relation_namespace.nspname not like 'pg\_%' escape '\'
+  where relation_namespace.nspname<>'pg_catalog'
     and relation_namespace.nspname<>'information_schema'
+    and relation_namespace.nspname not like 'pg\_toast%' escape '\'
+    and relation_namespace.nspname not like 'pg\_temp%' escape '\'
     and relation.relkind in ('r','p','v','m','f')
     and attribute.attnum>0 and not attribute.attisdropped
 ), column_privileges(privilege_type) as (values
@@ -184,7 +245,172 @@ select is((with authority(role_name) as (values
   where pg_catalog.has_column_privilege(
     authority.role_name,application_columns.oid,
     application_columns.attnum,column_privileges.privilege_type
-  )),0,'Square authorities inherit no column privilege on any non-system relation');
+  ) and not (
+    column_privileges.privilege_type='SELECT'
+    and application_columns.nspname='extensions'
+    and application_columns.relname=any(array['pg_stat_statements','pg_stat_statements_info'])
+    and application_columns.relkind='v'
+    and not pg_catalog.has_schema_privilege(authority.role_name,'extensions','USAGE')
+    and not pg_catalog.pg_has_role(authority.role_name,'pg_read_all_stats','USAGE')
+    and exists (
+      select 1 from pg_catalog.pg_depend extension_dependency
+      join pg_catalog.pg_extension extension_record
+        on extension_record.oid=extension_dependency.refobjid
+      where extension_dependency.classid='pg_catalog.pg_class'::regclass
+        and extension_dependency.objid=application_columns.oid
+        and extension_dependency.objsubid=0
+        and extension_dependency.refclassid='pg_catalog.pg_extension'::regclass
+        and extension_dependency.deptype='e'
+        and extension_record.extname='pg_stat_statements'
+    )
+  )),0,'Square authorities inherit no column privilege beyond the exact unusable statistics metadata views');
+select is((with authority(role_name) as (values
+  ('square_production_oauth_authority'),('square_production_broker_authority'),
+  ('square_production_scheduler_authority'),('square_production_webhook_authority'),
+  ('square_production_runtime_authority'),('square_production_evidence_authority')
+), application_sequences as (
+  select sequence_record.oid
+  from pg_catalog.pg_class sequence_record
+  join pg_catalog.pg_namespace sequence_namespace on sequence_namespace.oid=sequence_record.relnamespace
+  where sequence_namespace.nspname<>'pg_catalog'
+    and sequence_namespace.nspname<>'information_schema'
+    and sequence_namespace.nspname not like 'pg\_toast%' escape '\'
+    and sequence_namespace.nspname not like 'pg\_temp%' escape '\'
+    and sequence_record.relkind='S'
+), sequence_privileges(privilege_type) as (values ('USAGE'),('SELECT'),('UPDATE'))
+  select count(*)::integer
+  from authority
+  cross join application_sequences
+  cross join sequence_privileges
+  where pg_catalog.has_sequence_privilege(
+    authority.role_name,application_sequences.oid,sequence_privileges.privilege_type
+  )),0,'Square authorities inherit no sequence privilege on any non-system application sequence');
+select is((with authority(role_name) as (values
+  ('square_production_oauth_authority'),('square_production_broker_authority'),
+  ('square_production_scheduler_authority'),('square_production_webhook_authority'),
+  ('square_production_runtime_authority'),('square_production_evidence_authority')
+)
+  select count(*)::integer
+  from authority
+  cross join pg_catalog.pg_foreign_data_wrapper foreign_wrapper
+  where pg_catalog.has_foreign_data_wrapper_privilege(
+    authority.role_name,foreign_wrapper.oid,'usage'
+  )),0,'Square authorities have no effective foreign-data-wrapper usage');
+select is((with authority(role_name) as (values
+  ('square_production_oauth_authority'),('square_production_broker_authority'),
+  ('square_production_scheduler_authority'),('square_production_webhook_authority'),
+  ('square_production_runtime_authority'),('square_production_evidence_authority')
+)
+  select count(*)::integer
+  from authority
+  cross join pg_catalog.pg_foreign_server foreign_server
+  where pg_catalog.has_server_privilege(
+    authority.role_name,foreign_server.oid,'usage'
+  )),0,'Square authorities have no effective foreign-server usage');
+select is((with authority(role_name) as (values
+  ('square_production_oauth_authority'),('square_production_broker_authority'),
+  ('square_production_scheduler_authority'),('square_production_webhook_authority'),
+  ('square_production_runtime_authority'),('square_production_evidence_authority')
+)
+  select count(*)::integer
+  from authority
+  cross join pg_catalog.pg_tablespace tablespace_record
+  where pg_catalog.has_tablespace_privilege(
+    authority.role_name,tablespace_record.oid,'create'
+  )),0,'Square authorities cannot create objects in any tablespace');
+select is((select count(*)::integer from (values
+  ('square_production_oauth_authority'),('square_production_broker_authority'),
+  ('square_production_scheduler_authority'),('square_production_webhook_authority'),
+  ('square_production_runtime_authority'),('square_production_evidence_authority')
+) authority(role_name)
+  where pg_catalog.has_database_privilege(authority.role_name,current_database(),'connect')
+    and pg_catalog.has_database_privilege(authority.role_name,current_database(),'temp')
+    and not pg_catalog.has_database_privilege(authority.role_name,current_database(),'create')),6,
+  'Square authorities retain only current-database CONNECT and TEMP at the database layer');
+select is((with authority(role_name,role_oid) as (values
+  ('square_production_oauth_authority','square_production_oauth_authority'::regrole::oid),
+  ('square_production_broker_authority','square_production_broker_authority'::regrole::oid),
+  ('square_production_scheduler_authority','square_production_scheduler_authority'::regrole::oid),
+  ('square_production_webhook_authority','square_production_webhook_authority'::regrole::oid),
+  ('square_production_runtime_authority','square_production_runtime_authority'::regrole::oid),
+  ('square_production_evidence_authority','square_production_evidence_authority'::regrole::oid)
+)
+  select count(*)::integer
+  from authority
+  cross join pg_catalog.pg_database database_record
+  cross join lateral pg_catalog.aclexplode(database_record.datacl) database_acl
+  where database_acl.grantee=authority.role_oid),0,
+  'Square authorities have no direct database ACL on any database');
+select is((with authority(role_name) as (values
+  ('square_production_oauth_authority'),('square_production_broker_authority'),
+  ('square_production_scheduler_authority'),('square_production_webhook_authority'),
+  ('square_production_runtime_authority'),('square_production_evidence_authority')
+)
+  select count(*)::integer
+  from authority
+  cross join pg_catalog.pg_database database_record
+  where database_record.datallowconn
+    and database_record.datname<>current_database()
+    and pg_catalog.has_database_privilege(authority.role_name,database_record.oid,'connect')
+    and not exists (
+      select 1
+      from pg_catalog.aclexplode(coalesce(
+        database_record.datacl,
+        pg_catalog.acldefault('d',database_record.datdba)
+      )) database_acl
+      where database_acl.grantee=0 and database_acl.privilege_type='CONNECT'
+    )),0,
+  'any inherited CONNECT to another connectable database is only the standard PUBLIC default');
+select is((with authority(role_oid) as (values
+  ('square_production_oauth_authority'::regrole::oid),
+  ('square_production_broker_authority'::regrole::oid),
+  ('square_production_scheduler_authority'::regrole::oid),
+  ('square_production_webhook_authority'::regrole::oid),
+  ('square_production_runtime_authority'::regrole::oid),
+  ('square_production_evidence_authority'::regrole::oid)
+)
+  select count(*)::integer
+  from pg_catalog.pg_default_acl default_acl
+  cross join lateral pg_catalog.aclexplode(default_acl.defaclacl) default_privilege
+  where default_acl.defaclobjtype in ('r','S','f','n')
+    and (default_privilege.grantee=0 or default_privilege.grantee=any(
+      select authority.role_oid from authority
+    ))),0,
+  'no PUBLIC or Square-target default ACL can expose future relations, sequences, routines or schemas');
+select is((select count(*)::integer
+  from pg_catalog.pg_class relation
+  join pg_catalog.pg_namespace namespace on namespace.oid=relation.relnamespace
+  join pg_catalog.pg_depend extension_dependency
+    on extension_dependency.classid='pg_catalog.pg_class'::regclass
+    and extension_dependency.objid=relation.oid
+    and extension_dependency.objsubid=0
+    and extension_dependency.refclassid='pg_catalog.pg_extension'::regclass
+    and extension_dependency.deptype='e'
+  join pg_catalog.pg_extension extension_record
+    on extension_record.oid=extension_dependency.refobjid
+  cross join lateral pg_catalog.aclexplode(relation.relacl) relation_acl
+  where namespace.nspname='extensions'
+    and relation.relname=any(array['pg_stat_statements','pg_stat_statements_info'])
+    and relation.relkind='v'
+    and extension_record.extname='pg_stat_statements'
+    and relation_acl.grantee=0
+    and relation_acl.privilege_type='SELECT'
+    and not relation_acl.is_grantable),2,
+  'only the two canonical pg_stat_statements metadata views carry the allowed PUBLIC SELECT ACL');
+select is((select count(*)::integer from (values
+  ('square_production_oauth_authority'),('square_production_broker_authority'),
+  ('square_production_scheduler_authority'),('square_production_webhook_authority'),
+  ('square_production_runtime_authority'),('square_production_evidence_authority')
+) authority(role_name)
+  where pg_catalog.has_schema_privilege(authority.role_name,'extensions','USAGE')),0,
+  'Square authorities cannot use the extensions schema containing the canonical metadata views');
+select is((select count(*)::integer from (values
+  ('square_production_oauth_authority'),('square_production_broker_authority'),
+  ('square_production_scheduler_authority'),('square_production_webhook_authority'),
+  ('square_production_runtime_authority'),('square_production_evidence_authority')
+) authority(role_name)
+  where pg_catalog.pg_has_role(authority.role_name,'pg_read_all_stats','USAGE')),0,
+  'Square authorities cannot read unredacted PostgreSQL statistics');
 select is((select count(*)::integer
   from pg_catalog.pg_proc function_record
   cross join lateral pg_catalog.aclexplode(coalesce(
