@@ -165,7 +165,7 @@ select is((select count(*)::integer from private.square_production_generation_fe
 select is((select count(*)::integer from private.square_production_lifecycle_audit_events),0,
   'overlay fabricates no audit history');
 
-select like(pg_temp.statement_error($sql$
+select ok(pg_temp.statement_error($sql$
   insert into private.square_production_configuration_generations(
     generation,application_id,callback_origin,kms_key_resource,provider_policy_version,source_commit,prepared_at
   ) values (
@@ -173,7 +173,7 @@ select like(pg_temp.statement_error($sql$
     'projects/vaeroex-integrations-prod/locations/us-west1/keyRings/square-production/cryptoKeys/provider-credentials',
     'square_production_read_only_v1',repeat('a',40),'2026-09-15T00:00:00Z'
   )
-$sql$),'23514:%','foreign callback contract is rejected');
+$sql$) like '23514:%','foreign callback contract is rejected');
 
 insert into private.square_production_configuration_generations(
   generation,application_id,kms_key_resource,provider_policy_version,source_commit,prepared_at
@@ -197,7 +197,7 @@ select is((select count(*)::integer from private.square_production_lifecycle_aud
     and reason_code='activation_gates_closed'),1,
   'configuration lifecycle creates one sanitized closed-gate audit event');
 
-select like(pg_temp.statement_error($sql$
+select ok(pg_temp.statement_error($sql$
   insert into private.square_production_runtime_bindings(
     provider_key,environment,project_id,region,generation,configuration_fingerprint,
     platform_binding_key,platform_fingerprint,provider_authority_fingerprint,source_commit,bound_at
@@ -205,7 +205,7 @@ select like(pg_temp.statement_error($sql$
     'vaeroex-production-integrations-v1',repeat('sha256:a',1),provider_authority_fingerprint,source_commit,
     '2026-09-15T00:01:00Z'
   from private.square_production_configuration_generations where generation=1
-$sql$),'23514:%','binding fails atomically while provider authority and secret references are empty');
+$sql$) like '23514:%','binding fails atomically while provider authority and secret references are empty');
 select is((select count(*)::integer from private.square_production_runtime_bindings),0,
   'failed authority binding rolls back the binding row');
 select is((select count(*)::integer from private.square_production_lifecycle_audit_events
@@ -260,7 +260,7 @@ set service_account='square-broker-drift@vaeroex-integrations-prod.iam.gservicea
 where provider_key='square' and environment='production'
   and project_id='vaeroex-integrations-prod' and capability='broker';
 
-select like(pg_temp.statement_error($sql$
+select ok(pg_temp.statement_error($sql$
   insert into private.square_production_runtime_bindings(
     provider_key,environment,project_id,region,generation,configuration_fingerprint,
     platform_binding_key,platform_fingerprint,provider_authority_fingerprint,source_commit,bound_at
@@ -272,7 +272,7 @@ select like(pg_temp.statement_error($sql$
   from private.square_production_configuration_generations configuration
   cross join private.integration_production_platform_bindings platform
   where configuration.generation=1
-$sql$),'23514:square_production_binding_capabilities_incomplete',
+$sql$) like '23514:square_production_binding_capabilities_incomplete',
   'binding rejects drift in the capability service account, database login and secret purpose mapping');
 select is((select count(*)::integer from private.square_production_runtime_bindings),0,
   'capability mapping rejection leaves no partial runtime binding');
@@ -296,13 +296,13 @@ from private.square_production_configuration_generations configuration
 cross join private.integration_production_platform_bindings platform
 where configuration.generation=1;
 
-select like(pg_temp.statement_error($sql$
+select ok(pg_temp.statement_error($sql$
   select private.check_square_production_operational_generation_v1(
     'square','production','vaeroex-integrations-prod',1,
     (select configuration_fingerprint from private.square_production_configuration_generations where generation=1),
     'runtime'
   )
-$sql$),'42501:square_production_runtime_disabled','current generation stays unusable while gates are closed');
+$sql$) like '42501:square_production_runtime_disabled','current generation stays unusable while gates are closed');
 
 insert into private.square_production_configuration_generations(
   generation,application_id,kms_key_resource,provider_policy_version,source_commit,prepared_at
@@ -323,13 +323,13 @@ from private.square_production_configuration_generations configuration
 cross join private.integration_production_platform_bindings platform
 where configuration.generation=2;
 
-select like(pg_temp.statement_error($sql$
+select ok(pg_temp.statement_error($sql$
   select private.check_square_production_operational_generation_v1(
     'square','production','vaeroex-integrations-prod',1,
     (select configuration_fingerprint from private.square_production_configuration_generations where generation=1),
     'runtime'
   )
-$sql$),'42501:square_production_generation_stale','superseded generation is rejected before runtime use');
+$sql$) like '42501:square_production_generation_stale','superseded generation is rejected before runtime use');
 
 insert into private.square_production_generation_fences(
   provider_key,environment,project_id,generation,configuration_fingerprint,
@@ -339,25 +339,25 @@ select provider_key,environment,project_id,generation,configuration_fingerprint,
   'operator_stop','manual_emergency_stop','2026-09-15T00:04:00Z'
 from private.square_production_runtime_bindings where generation=2;
 
-select like(pg_temp.statement_error($sql$
+select ok(pg_temp.statement_error($sql$
   select private.check_square_production_operational_generation_v1(
     'square','production','vaeroex-integrations-prod',2,
     (select configuration_fingerprint from private.square_production_configuration_generations where generation=2),
     'runtime'
   )
-$sql$),'42501:square_production_generation_fenced','latest fenced generation is rejected before gate evaluation');
+$sql$) like '42501:square_production_generation_fenced','latest fenced generation is rejected before gate evaluation');
 select is((select count(*)::integer from private.square_production_lifecycle_audit_events),5,
   'two configurations, two bindings and one fence emit exact sanitized lifecycle audit history');
 
-select like(pg_temp.statement_error($sql$
+select ok(pg_temp.statement_error($sql$
   update private.square_production_configuration_generations set prepared_at='2026-09-16T00:00:00Z' where generation=1
-$sql$),'55000:square_production_history_immutable','configuration generations cannot be rewritten');
-select like(pg_temp.statement_error($sql$
+$sql$) like '55000:square_production_history_immutable','configuration generations cannot be rewritten');
+select ok(pg_temp.statement_error($sql$
   delete from private.square_production_runtime_bindings where generation=1
-$sql$),'55000:square_production_history_immutable','runtime bindings cannot be deleted');
-select like(pg_temp.statement_error($sql$
+$sql$) like '55000:square_production_history_immutable','runtime bindings cannot be deleted');
+select ok(pg_temp.statement_error($sql$
   truncate private.square_production_lifecycle_audit_events
-$sql$),'55000:square_production_history_immutable','sanitized lifecycle audit cannot be truncated');
+$sql$) like '55000:square_production_history_immutable','sanitized lifecycle audit cannot be truncated');
 
 select * from finish();
 rollback;

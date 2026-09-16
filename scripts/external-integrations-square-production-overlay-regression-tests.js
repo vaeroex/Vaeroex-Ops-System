@@ -22,6 +22,10 @@ const runner = fs.readFileSync(
   path.join(root, "scripts/run-square-production-overlay-qualification.js"),
   "utf8"
 );
+const pgTap = fs.readFileSync(
+  path.join(root, "supabase/tests/square_production_runtime_overlay.test.sql"),
+  "utf8"
+);
 
 assert.equal(migrations.indexOf(baseName), 101, "Production foundation remains migration 102");
 assert.equal(migrations[102], overlayName, "Production overlay is the adjacent migration 103");
@@ -191,5 +195,19 @@ assert.match(runner, /snapshotQboCatalog/);
 assert.match(runner, /deepEqual\(afterQbo, beforeQbo/);
 assert.match(runner, /qualifySubstitutedLedger/);
 assert.match(runner, /set version='20260826089999'[\s\S]*where version='20260826090000'/);
+
+const pgTapAssertionFunctions = [...pgTap.matchAll(
+  /^select\s+(?:\*\s+from\s+)?([a-z_][a-z0-9_]*)\s*\(/gmi
+)]
+  .map((match) => match[1].toLowerCase())
+  .filter((name, index, names) => names.indexOf(name) === index)
+  .sort();
+assert.deepEqual(
+  pgTapAssertionFunctions,
+  ["finish", "is", "no_plan", "ok"],
+  "PG17 qualification uses only pgTAP assertion signatures proven by the repository test corpus"
+);
+assert.doesNotMatch(pgTap, /^select\s+(?:un)?like\s*\(/gmi,
+  "regex assertions use portable ok(expression [not] like pattern, description) forms");
 
 console.log("Square Production runtime overlay regression tests passed");
