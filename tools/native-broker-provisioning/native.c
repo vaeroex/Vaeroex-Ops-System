@@ -33,7 +33,52 @@
 #include <sys/random.h>
 #endif
 
-#if defined(VAEROEX_MAPPED_ENROLLER) && defined(VAEROEX_MAPPED_RUNTIME)
+#if (defined(VAEROEX_PRODUCTION_OAUTH) + defined(VAEROEX_PRODUCTION_BROKER) + \
+     defined(VAEROEX_PRODUCTION_SCHEDULER) + defined(VAEROEX_PRODUCTION_WEBHOOK) + \
+     defined(VAEROEX_PRODUCTION_RUNTIME) + defined(VAEROEX_PRODUCTION_EVIDENCE)) > 0 && \
+    (defined(VAEROEX_MAPPED_ENROLLER) || defined(VAEROEX_MAPPED_RUNTIME))
+#error Production and Sandbox capability profiles are mutually exclusive
+#elif (defined(VAEROEX_PRODUCTION_OAUTH) + defined(VAEROEX_PRODUCTION_BROKER) + \
+       defined(VAEROEX_PRODUCTION_SCHEDULER) + defined(VAEROEX_PRODUCTION_WEBHOOK) + \
+       defined(VAEROEX_PRODUCTION_RUNTIME) + defined(VAEROEX_PRODUCTION_EVIDENCE)) > 1
+#error Choose one fixed Production capability
+#elif defined(VAEROEX_PRODUCTION_OAUTH)
+#define CAPABILITY "square_production_oauth_authority"
+#define CAPABILITY_NAME "oauth"
+#define MAPPED_ROLE "square_production_oauth"
+#define AUTHORITY_FUNCTION "public.check_square_production_oauth_authority_v1(text,text,text,bigint,text)"
+#define VAEROEX_PRODUCTION_PROFILE 1
+#elif defined(VAEROEX_PRODUCTION_BROKER)
+#define CAPABILITY "square_production_broker_authority"
+#define CAPABILITY_NAME "broker"
+#define MAPPED_ROLE "square_production_broker"
+#define AUTHORITY_FUNCTION "public.check_square_production_broker_authority_v1(text,text,text,bigint,text)"
+#define VAEROEX_PRODUCTION_PROFILE 1
+#elif defined(VAEROEX_PRODUCTION_SCHEDULER)
+#define CAPABILITY "square_production_scheduler_authority"
+#define CAPABILITY_NAME "scheduler"
+#define MAPPED_ROLE "square_production_scheduler"
+#define AUTHORITY_FUNCTION "public.check_square_production_scheduler_authority_v1(text,text,text,bigint,text)"
+#define VAEROEX_PRODUCTION_PROFILE 1
+#elif defined(VAEROEX_PRODUCTION_WEBHOOK)
+#define CAPABILITY "square_production_webhook_authority"
+#define CAPABILITY_NAME "webhook"
+#define MAPPED_ROLE "square_production_webhook"
+#define AUTHORITY_FUNCTION "public.check_square_production_webhook_authority_v1(text,text,text,bigint,text)"
+#define VAEROEX_PRODUCTION_PROFILE 1
+#elif defined(VAEROEX_PRODUCTION_RUNTIME)
+#define CAPABILITY "square_production_runtime_authority"
+#define CAPABILITY_NAME "runtime"
+#define MAPPED_ROLE "square_production_runtime"
+#define AUTHORITY_FUNCTION "public.check_square_production_runtime_authority_v1(text,text,text,bigint,text)"
+#define VAEROEX_PRODUCTION_PROFILE 1
+#elif defined(VAEROEX_PRODUCTION_EVIDENCE)
+#define CAPABILITY "square_production_evidence_authority"
+#define CAPABILITY_NAME "evidence"
+#define MAPPED_ROLE "square_production_evidence"
+#define AUTHORITY_FUNCTION "public.check_square_production_evidence_authority_v1(text,text,text,bigint,text)"
+#define VAEROEX_PRODUCTION_PROFILE 1
+#elif defined(VAEROEX_MAPPED_ENROLLER) && defined(VAEROEX_MAPPED_RUNTIME)
 #error Choose one fixed mapped capability
 #elif defined(VAEROEX_MAPPED_ENROLLER)
 #define CAPABILITY "square_verified_enrollment_authority"
@@ -44,6 +89,33 @@
 #else
 #define CAPABILITY "square_account_broker_authority"
 #endif
+#ifdef VAEROEX_PRODUCTION_PROFILE
+/* The authority RPC is a fixed, reviewed capability boundary.  ACL shape
+ * alone does not prove that a same-signature replacement still performs the
+ * generation check, so the native recheck pins the stored PL/pgSQL source too.
+ * `prosrc` preserves the dollar-quoted body byte-for-byte on PostgreSQL. */
+#define AUTHORITY_SOURCE_FOR(capability,capability_name) \
+  "\nbegin\n" \
+  "  if not pg_catalog.pg_has_role(session_user,'" capability "','MEMBER') then\n" \
+  "    raise exception '" capability "_denied' using errcode='42501';\n" \
+  "  end if;\n" \
+  "  perform private.check_square_production_operational_generation_v1(\n" \
+  "    p_provider_key,p_environment,p_project_id,p_generation,p_configuration_fingerprint,'" capability_name "');\n" \
+  "end\n"
+#define AUTHORITY_SOURCE AUTHORITY_SOURCE_FOR(CAPABILITY,CAPABILITY_NAME)
+#define OPERATIONAL_AUTHORITY_FUNCTION \
+  "private.check_square_production_operational_generation_v1(text,text,text,bigint,text,text)"
+/* PostgreSQL's built-in md5(text) is sufficient here because this is an
+ * equality pin, not a password hash. It avoids making the native authority
+ * recheck depend on an extension ACL while detecting any helper replacement. */
+#define OPERATIONAL_AUTHORITY_SOURCE_MD5 "0af0303c9f714bea9662be9b85c6b9c7"
+typedef enum {
+  PRODUCTION_PHASE_INVALID = 0,
+  PRODUCTION_PHASE_OVERLAY = 1,
+  PRODUCTION_PHASE_INTERNAL_RUNTIME = 2
+} production_phase;
+static production_phase production_ledger_phase(void);
+#endif
 #define PASSWORD_BYTES 64
 #define PASSWORD_CHARS (PASSWORD_BYTES * 2)
 #define DEADLINE_SECONDS 15
@@ -53,6 +125,12 @@
 #endif
 #if defined(VAEROEX_MANAGED_PROFILE_TEST) && !defined(VAEROEX_SYNTHETIC_ONLY)
 #error Managed profile tests require the local-only synthetic target gate
+#endif
+#if defined(VAEROEX_PRODUCTION_INTERNAL_RUNTIME_TEST) && !defined(VAEROEX_SYNTHETIC_ONLY)
+#error Internal runtime profile tests require the local-only synthetic target gate
+#endif
+#if defined(VAEROEX_PRODUCTION_INTERNAL_RUNTIME_SOURCE_SHA256) && !defined(VAEROEX_PRODUCTION_PROFILE)
+#error Internal runtime source pins are valid only for Production profiles
 #endif
 #ifdef VAEROEX_MANAGED_SUPABASE
 #if !defined(VAEROEX_MANAGED_HOST) || !defined(VAEROEX_MANAGED_PORT) || \
@@ -349,7 +427,51 @@ static bool candidate_identity(const char *host,const char *database,const char 
 }
 static bool closed_authority(const char *target) {
   const char *values[] = {target};
-#ifdef MAPPED_ROLE
+#ifdef VAEROEX_PRODUCTION_PROFILE
+  if(strcmp(target,MAPPED_ROLE))return false;
+  if (managed_profile() && !command("LOCK TABLE supabase_migrations.schema_migrations IN SHARE MODE")) return false;
+  production_phase phase=production_ledger_phase();
+  if (phase==PRODUCTION_PHASE_INVALID || !command("LOCK TABLE private.integration_production_platform_bindings, "
+    "private.integration_production_provider_bindings, private.integration_production_provider_secrets, "
+    "private.integration_production_provider_capabilities, private.square_production_configuration_generations, "
+    "private.square_production_runtime_bindings, private.square_production_generation_fences, "
+    "private.square_production_lifecycle_audit_events IN SHARE MODE")) return false;
+  if (phase==PRODUCTION_PHASE_INTERNAL_RUNTIME && !command(
+    "LOCK TABLE private.square_production_internal_permits, private.square_production_internal_oauth_states, "
+    "private.square_production_internal_credentials, private.square_production_internal_scans, "
+    "private.square_production_internal_page_receipts, private.square_production_internal_source_versions, "
+    "private.square_production_internal_fences, private.square_production_internal_audit_events IN SHARE MODE")) return false;
+  if (managed_profile() && !true_query("SELECT NOT row_security_active('private.integration_production_platform_bindings') "
+      "AND NOT row_security_active('private.integration_production_provider_bindings') "
+      "AND NOT row_security_active('private.integration_production_provider_secrets') "
+      "AND NOT row_security_active('private.integration_production_provider_capabilities') "
+      "AND NOT row_security_active('private.square_production_configuration_generations') "
+      "AND NOT row_security_active('private.square_production_runtime_bindings') "
+      "AND NOT row_security_active('private.square_production_generation_fences') "
+      "AND NOT row_security_active('private.square_production_lifecycle_audit_events')",0,NULL)) return false;
+  if (phase==PRODUCTION_PHASE_INTERNAL_RUNTIME && managed_profile() && !true_query(
+      "SELECT NOT row_security_active('private.square_production_internal_permits') "
+      "AND NOT row_security_active('private.square_production_internal_oauth_states') "
+      "AND NOT row_security_active('private.square_production_internal_credentials') "
+      "AND NOT row_security_active('private.square_production_internal_scans') "
+      "AND NOT row_security_active('private.square_production_internal_page_receipts') "
+      "AND NOT row_security_active('private.square_production_internal_source_versions') "
+      "AND NOT row_security_active('private.square_production_internal_fences') "
+      "AND NOT row_security_active('private.square_production_internal_audit_events')",0,NULL)) return false;
+  return true_query("SELECT NOT EXISTS (SELECT FROM private.integration_production_platform_bindings "
+      "WHERE infrastructure_provisioned OR runtime_enabled OR economic_contributions_enabled OR ai_dispatch_enabled) "
+      "AND NOT EXISTS (SELECT FROM private.integration_production_provider_bindings "
+      "WHERE provider_key='square' AND environment='production' AND "
+      "(enabled OR provider_calls_enabled OR customer_onboarding_enabled OR webhook_intake_enabled "
+      "OR evidence_enabled OR economic_contributions_enabled OR ai_dispatch_enabled)) "
+      "AND NOT EXISTS (SELECT FROM private.square_production_configuration_generations WHERE "
+      "runtime_enabled OR provider_calls_enabled OR customer_onboarding_enabled OR webhook_intake_enabled "
+      "OR evidence_enabled OR economic_contributions_enabled OR ai_dispatch_enabled) "
+      "AND NOT EXISTS (SELECT FROM private.integration_production_provider_capabilities "
+      "WHERE database_login=$1 AND NOT (provider_key='square' AND environment='production' "
+      "AND project_id='vaeroex-integrations-prod' AND capability='" CAPABILITY_NAME "' "
+      "AND database_secret_purpose='database_" CAPABILITY_NAME "'))",1,values);
+#elif defined(MAPPED_ROLE)
   /* Mapped maintenance requires the additive schema and known-disabled joined
    * gates. SHARE locks fence concurrent activation through credential commit.
    * FORCE RLS visibility must be established; hidden rows cannot prove closure. */
@@ -397,37 +519,806 @@ static bool closed_authority(const char *target) {
       "AND NOT EXISTS (SELECT FROM private.square_gcp_callback_binding WHERE broker_login=$1 AND enabled IS NOT FALSE)", 1, values);
 #endif
 }
-static bool role_valid(const char *target, const char *oid, bool allow_login) {
-  const char *values[] = {target, oid, allow_login ? "true" : "false", CAPABILITY};
+
+#ifdef VAEROEX_PRODUCTION_PROFILE
+static bool production_internal_runtime_source_pinned(void) {
+#ifdef VAEROEX_PRODUCTION_INTERNAL_RUNTIME_SOURCE_SHA256
+  /* This second pin is deliberately compiled into the broker. The offline
+   * builder also verifies the migration bytes before defining the macro, so a
+   * final-ledger database cannot be accepted by a baseline-source binary. */
+  return !strcmp(VAEROEX_PRODUCTION_INTERNAL_RUNTIME_SOURCE_SHA256,
+    "db502e7671028fc9867d49c1b8c198b694d1f07674fe8312bdbc032d80570716");
+#else
+  return false;
+#endif
+}
+
+static production_phase production_ledger_phase(void) {
+  if (!managed_profile()) {
+#ifdef VAEROEX_PRODUCTION_INTERNAL_RUNTIME_TEST
+    return production_internal_runtime_source_pinned()
+      ? PRODUCTION_PHASE_INTERNAL_RUNTIME : PRODUCTION_PHASE_INVALID;
+#else
+    return PRODUCTION_PHASE_OVERLAY;
+#endif
+  }
+  PGresult *r=query("SELECT CASE "
+    "WHEN (SELECT count(*)=103 FROM supabase_migrations.schema_migrations) "
+      "AND (SELECT count(*)=102 FROM supabase_migrations.schema_migrations WHERE version<='20260902191323') "
+      "AND (SELECT 'sha256:'||pg_catalog.encode(extensions.digest(pg_catalog.convert_to("
+        "pg_catalog.string_agg(pg_catalog.length(version)::text||':'||version,'' ORDER BY version),'UTF8'),'sha256'),'hex') "
+        "='sha256:3326a738d016df98e0fd22830b8c950dac3cc6d50bd26b61de1d9ebd282c201f' "
+        "FROM supabase_migrations.schema_migrations WHERE version<='20260902191323') "
+      "AND (SELECT 'sha256:'||pg_catalog.encode(extensions.digest(pg_catalog.convert_to("
+        "pg_catalog.string_agg(pg_catalog.length(version)::text||':'||version,'' ORDER BY version),'UTF8'),'sha256'),'hex') "
+        "='sha256:224d377fe3f44a59dabd188ad897624207830940a985e408e0072fb7941db146' "
+        "FROM supabase_migrations.schema_migrations WHERE version<='20260902191324') "
+      "AND (SELECT count(*)=1 FROM supabase_migrations.schema_migrations WHERE version='20260902191323') "
+      "AND (SELECT count(*)=1 FROM supabase_migrations.schema_migrations WHERE version='20260902191324') "
+      "AND NOT EXISTS (SELECT FROM supabase_migrations.schema_migrations WHERE version>'20260902191324') THEN 'overlay' "
+    "WHEN (SELECT count(*)=104 FROM supabase_migrations.schema_migrations) "
+      "AND (SELECT count(*)=102 FROM supabase_migrations.schema_migrations WHERE version<='20260902191323') "
+      "AND (SELECT 'sha256:'||pg_catalog.encode(extensions.digest(pg_catalog.convert_to("
+        "pg_catalog.string_agg(pg_catalog.length(version)::text||':'||version,'' ORDER BY version),'UTF8'),'sha256'),'hex') "
+        "='sha256:3326a738d016df98e0fd22830b8c950dac3cc6d50bd26b61de1d9ebd282c201f' "
+        "FROM supabase_migrations.schema_migrations WHERE version<='20260902191323') "
+      "AND (SELECT 'sha256:'||pg_catalog.encode(extensions.digest(pg_catalog.convert_to("
+        "pg_catalog.string_agg(pg_catalog.length(version)::text||':'||version,'' ORDER BY version),'UTF8'),'sha256'),'hex') "
+        "='sha256:224d377fe3f44a59dabd188ad897624207830940a985e408e0072fb7941db146' "
+        "FROM supabase_migrations.schema_migrations WHERE version<='20260902191324') "
+      "AND (SELECT 'sha256:'||pg_catalog.encode(extensions.digest(pg_catalog.convert_to("
+        "pg_catalog.string_agg(pg_catalog.length(version)::text||':'||version,'' ORDER BY version),'UTF8'),'sha256'),'hex') "
+        "='sha256:7dc51d888ee9c4a6bb595b1a4431ab5fcdb649e34c871ba91a6512d5fa2dc89f' "
+        "FROM supabase_migrations.schema_migrations WHERE version<='20260902191325') "
+      "AND (SELECT count(*)=1 FROM supabase_migrations.schema_migrations WHERE version='20260902191323') "
+      "AND (SELECT count(*)=1 FROM supabase_migrations.schema_migrations WHERE version='20260902191324') "
+      "AND (SELECT count(*)=1 FROM supabase_migrations.schema_migrations WHERE version='20260902191325') "
+      "AND NOT EXISTS (SELECT FROM supabase_migrations.schema_migrations WHERE version>'20260902191325') THEN 'internal' "
+    "ELSE 'invalid' END",0,NULL);
+  production_phase phase=PRODUCTION_PHASE_INVALID;
+  if (r && PQntuples(r)==1) {
+    if (!strcmp(PQgetvalue(r,0,0),"overlay")) phase=PRODUCTION_PHASE_OVERLAY;
+    if (!strcmp(PQgetvalue(r,0,0),"internal") && production_internal_runtime_source_pinned())
+      phase=PRODUCTION_PHASE_INTERNAL_RUNTIME;
+  }
+  if (r) PQclear(r);
+  return phase;
+}
+
+static bool production_relations_valid(void) {
+#ifdef VAEROEX_PRODUCTION_PROFILE
+  if (!managed_profile()) return true;
+  return true_query("WITH expected(name,triggers) AS (VALUES "
+      "('private.integration_production_platform_bindings',0),"
+      "('private.integration_production_provider_bindings',0),"
+      "('private.integration_production_provider_secrets',0),"
+      "('private.integration_production_provider_capabilities',0),"
+      "('private.square_production_configuration_generations',3),"
+      "('private.square_production_runtime_bindings',4),"
+      "('private.square_production_generation_fences',3),"
+      "('private.square_production_lifecycle_audit_events',2)), "
+    "resolved AS (SELECT expected.*,to_regclass(expected.name) oid FROM expected) "
+    "SELECT (SELECT count(*)=8 FROM resolved WHERE oid IS NOT NULL) "
+    "AND NOT EXISTS (SELECT FROM resolved e LEFT JOIN pg_class r ON r.oid=e.oid WHERE r.oid IS NULL "
+      "OR r.relkind<>'r' OR r.relpersistence<>'p' OR r.relowner<>current_user::regrole::oid "
+      "OR NOT r.relrowsecurity OR NOT r.relforcerowsecurity OR r.relhassubclass "
+      "OR e.triggers<>(SELECT count(*) FROM pg_trigger t WHERE t.tgrelid=r.oid AND NOT t.tgisinternal AND t.tgenabled='O') "
+      "OR e.triggers<>(SELECT count(*) FROM pg_trigger t WHERE t.tgrelid=r.oid AND NOT t.tgisinternal)) "
+    "AND NOT EXISTS (SELECT FROM resolved e JOIN pg_inherits i ON i.inhrelid=e.oid OR i.inhparent=e.oid) "
+    "AND NOT EXISTS (SELECT FROM resolved e JOIN pg_rewrite w ON w.ev_class=e.oid) "
+    "AND NOT EXISTS (SELECT FROM resolved e JOIN pg_policy p ON p.polrelid=e.oid) "
+    "AND NOT EXISTS (SELECT FROM resolved e JOIN pg_class r ON r.oid=e.oid "
+      "CROSS JOIN LATERAL aclexplode(r.relacl) a WHERE a.grantee<>r.relowner) "
+    "AND NOT EXISTS (SELECT FROM resolved e JOIN pg_attribute col ON col.attrelid=e.oid AND col.attnum>0 AND NOT col.attisdropped "
+      "CROSS JOIN LATERAL aclexplode(col.attacl) a JOIN pg_class r ON r.oid=e.oid WHERE a.grantee<>r.relowner) "
+    "AND NOT EXISTS (SELECT FROM pg_publication WHERE puballtables) "
+    "AND NOT EXISTS (SELECT FROM resolved e JOIN pg_publication_rel p ON p.prrelid=e.oid) "
+    "AND NOT EXISTS (SELECT FROM pg_publication_namespace WHERE pnnspid='private'::regnamespace)",0,NULL);
+#else
+  return true;
+#endif
+}
+
+static bool production_function_abi_valid(void) {
+#ifdef VAEROEX_PRODUCTION_PROFILE
+  if (!managed_profile()) return true;
+  return true_query("WITH expected(signature,language,volatility,security_definer,is_strict,parallel,result,names,source_hash) AS (VALUES "
+      "('private.square_production_generation_fingerprint_v1(bigint,text[])','sql','i',false,true,'s','text',"
+        "array['p_generation','p_parts']::text[],'def74b5d5cad41db546e9d892226a2cc83c76d19274e2a021f04b13d640bc71d'),"
+      "('private.square_production_configuration_fingerprint_v1(bigint,text,text,text,text,text,text,text,text,text,text,text,text,text,text,text,text,text[],text,text,text,text[],text,text,boolean,boolean,boolean,boolean,boolean,boolean,boolean)',"
+        "'sql','i',false,true,'s','text',array['p_generation','p_provider_key','p_environment','p_project_id','p_region','p_lifecycle_state','p_application_id','p_callback_origin','p_callback_method','p_callback_path','p_callback_uri','p_webhook_method','p_webhook_path','p_webhook_uri','p_api_version','p_authorization_endpoint','p_provider_origin','p_requested_scopes','p_kms_key_resource','p_application_secret_purpose','p_webhook_signature_secret_purpose','p_database_secret_purposes','p_provider_policy_version','p_source_commit','p_runtime_enabled','p_provider_calls_enabled','p_customer_onboarding_enabled','p_webhook_intake_enabled','p_evidence_enabled','p_economic_contributions_enabled','p_ai_dispatch_enabled']::text[],"
+        "'5d7db71e0b5586089ac422a2eea3b0a0e85b1439314e6dcb238f1b91b85a8bea'),"
+      "('private.reject_square_production_immutable_mutation_v1()','plpgsql','v',false,false,'u','trigger',null::text[],'9aeed7ebf8d8f94a6d1a368296e90c9db1e1eecaf5c87adcf095c1149f9612f8'),"
+      "('private.validate_square_production_runtime_binding_v1()','plpgsql','v',false,false,'u','trigger',null::text[],'58e0806b2d796690b3be6c4d1939f81c84ed9481aa4a4cdac10210f22d0dc2f7'),"
+      "('private.record_square_production_lifecycle_audit_v1()','plpgsql','v',false,false,'u','trigger',null::text[],'81460db3bc5c19b6e6b27e119be59cf5d172427790fb4deaef7194195e2c85d4'),"
+      "('private.check_square_production_operational_generation_v1(text,text,text,bigint,text,text)','plpgsql','s',false,false,'u','void',"
+        "array['p_provider_key','p_environment','p_project_id','p_generation','p_configuration_fingerprint','p_capability']::text[],'9f88e3f2787d4e7a30f66e4a42b00a8044b0c51cd69f9368b4bb9f45c0f8fdab')"
+    "), resolved AS (SELECT e.*,to_regprocedure(e.signature) oid FROM expected e) "
+    "SELECT (SELECT count(*)=6 FROM resolved WHERE oid IS NOT NULL) "
+    "AND NOT EXISTS (SELECT FROM resolved e LEFT JOIN pg_proc p ON p.oid=e.oid "
+      "LEFT JOIN pg_language l ON l.oid=p.prolang WHERE p.oid IS NULL OR l.lanname<>e.language "
+      "OR p.proowner<>current_user::regrole::oid OR p.provolatile<>e.volatility::\"char\" "
+      "OR p.prosecdef<>e.security_definer OR p.proisstrict<>e.is_strict OR p.proparallel<>e.parallel::\"char\" "
+      "OR p.proretset OR p.prokind<>'f' OR p.prorettype<>to_regtype(e.result) "
+      "OR p.proargnames IS DISTINCT FROM e.names OR p.proargmodes IS NOT NULL "
+      "OR p.pronargdefaults<>0 OR p.proargdefaults IS NOT NULL "
+      "OR p.proconfig IS DISTINCT FROM array['search_path=\"\"']::text[] "
+      "OR pg_catalog.encode(extensions.digest(pg_catalog.convert_to(p.prosrc,'UTF8'),'sha256'),'hex')<>e.source_hash) "
+    "AND NOT EXISTS (SELECT FROM resolved e JOIN pg_proc p ON p.oid=e.oid "
+      "CROSS JOIN LATERAL aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a WHERE a.grantee<>p.proowner) "
+    "AND EXISTS (SELECT FROM pg_proc p JOIN pg_language l ON l.oid=p.prolang "
+      "WHERE p.oid=to_regprocedure('private.integration_production_fingerprint_v1(text[])') "
+      "AND p.proowner=current_user::regrole::oid AND p.provolatile='i' AND p.proisstrict AND p.proparallel='s' "
+      "AND NOT p.prosecdef AND p.proconfig IS NOT DISTINCT FROM array['search_path=\"\"']::text[] "
+      "AND p.prokind='f' AND NOT p.proretset AND p.pronargs=1 AND p.prorettype='text'::regtype AND l.lanname='sql' "
+      "AND p.proargnames IS NOT DISTINCT FROM array['p_parts']::text[] AND p.proargmodes IS NULL "
+      "AND p.pronargdefaults=0 AND p.proargdefaults IS NULL "
+      "AND pg_catalog.encode(extensions.digest(pg_catalog.convert_to(p.prosrc,'UTF8'),'sha256'),'hex') "
+        "='98a86fc4d75c479b10ae63900cdf1c03a5083fb59a52d61636cc3a886acfa096' "
+      "AND NOT EXISTS (SELECT FROM aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a "
+        "WHERE a.grantee<>p.proowner))",0,NULL);
+#else
+  return true;
+#endif
+}
+
+static bool production_foundation_schema_valid(void) {
+#ifdef VAEROEX_PRODUCTION_PROFILE
+  if (!managed_profile()) return true;
+  return true_query("SELECT pg_catalog.encode(extensions.digest(pg_catalog.convert_to((pg_catalog.jsonb_build_object("
+    "'columns',coalesce((SELECT pg_catalog.jsonb_agg(pg_catalog.jsonb_build_array("
+      "r.relname,a.attnum,a.attname,pg_catalog.format_type(a.atttypid,a.atttypmod),"
+      "a.attnotnull,a.attidentity,a.attgenerated,pg_catalog.pg_get_expr(d.adbin,d.adrelid,true)) "
+      "ORDER BY r.relname,a.attnum) FROM pg_catalog.pg_class r "
+      "JOIN pg_catalog.pg_namespace n ON n.oid=r.relnamespace "
+      "JOIN pg_catalog.pg_attribute a ON a.attrelid=r.oid "
+      "LEFT JOIN pg_catalog.pg_attrdef d ON d.adrelid=r.oid AND d.adnum=a.attnum "
+      "WHERE n.nspname='private' AND r.relname=ANY(array["
+        "'integration_production_platform_bindings','integration_production_provider_bindings',"
+        "'integration_production_provider_secrets','integration_production_provider_capabilities']) "
+      "AND a.attnum>0 AND NOT a.attisdropped),'[]'::jsonb),"
+    "'constraints',coalesce((SELECT pg_catalog.jsonb_agg(pg_catalog.jsonb_build_array("
+      "r.relname,c.conname,c.contype,c.condeferrable,c.condeferred,c.convalidated,"
+      "pg_catalog.pg_get_constraintdef(c.oid,true)) ORDER BY r.relname,c.conname) "
+      "FROM pg_catalog.pg_constraint c JOIN pg_catalog.pg_class r ON r.oid=c.conrelid "
+      "JOIN pg_catalog.pg_namespace n ON n.oid=r.relnamespace WHERE n.nspname='private' "
+      "AND r.relname=ANY(array['integration_production_platform_bindings','integration_production_provider_bindings',"
+        "'integration_production_provider_secrets','integration_production_provider_capabilities'])),'[]'::jsonb),"
+    "'indexes',coalesce((SELECT pg_catalog.jsonb_agg(pg_catalog.jsonb_build_array("
+      "r.relname,ir.relname,pg_catalog.pg_get_indexdef(i.indexrelid,0,true)) ORDER BY r.relname,ir.relname) "
+      "FROM pg_catalog.pg_index i JOIN pg_catalog.pg_class r ON r.oid=i.indrelid "
+      "JOIN pg_catalog.pg_class ir ON ir.oid=i.indexrelid JOIN pg_catalog.pg_namespace n ON n.oid=r.relnamespace "
+      "WHERE n.nspname='private' AND r.relname=ANY(array["
+        "'integration_production_platform_bindings','integration_production_provider_bindings',"
+        "'integration_production_provider_secrets','integration_production_provider_capabilities'])),'[]'::jsonb),"
+    "'policy_count',(SELECT count(*) FROM pg_catalog.pg_policy p WHERE p.polrelid=ANY(array["
+      "'private.integration_production_platform_bindings'::regclass,"
+      "'private.integration_production_provider_bindings'::regclass,"
+      "'private.integration_production_provider_secrets'::regclass,"
+      "'private.integration_production_provider_capabilities'::regclass])),"
+    "'trigger_count',(SELECT count(*) FROM pg_catalog.pg_trigger t WHERE NOT t.tgisinternal AND t.tgrelid=ANY(array["
+      "'private.integration_production_platform_bindings'::regclass,"
+      "'private.integration_production_provider_bindings'::regclass,"
+      "'private.integration_production_provider_secrets'::regclass,"
+      "'private.integration_production_provider_capabilities'::regclass]))"
+    "))::text,'UTF8'),'sha256'),'hex')='0fe4e1c2080fed1725db60ddb1643f4cd2d979a1a261c3445aae54c56788897e'",0,NULL);
+#else
+  return true;
+#endif
+}
+
+static bool production_overlay_schema_valid(void) {
+#ifdef VAEROEX_PRODUCTION_PROFILE
+  if (!managed_profile()) return true;
+  return true_query("SELECT pg_catalog.encode(extensions.digest(pg_catalog.convert_to((pg_catalog.jsonb_build_object("
+    "'columns',coalesce((SELECT pg_catalog.jsonb_agg(pg_catalog.jsonb_build_array("
+      "r.relname,a.attnum,a.attname,pg_catalog.format_type(a.atttypid,a.atttypmod),"
+      "a.attnotnull,a.attidentity,a.attgenerated,pg_catalog.pg_get_expr(d.adbin,d.adrelid,true),"
+      "CASE WHEN a.attcollation=0 THEN NULL ELSE pg_catalog.format('%I.%I',cn.nspname,col.collname) END,"
+      "col.collprovider::text,col.collisdeterministic,col.collversion) ORDER BY r.relname,a.attnum) "
+      "FROM pg_catalog.pg_class r JOIN pg_catalog.pg_namespace n ON n.oid=r.relnamespace "
+      "JOIN pg_catalog.pg_attribute a ON a.attrelid=r.oid "
+      "LEFT JOIN pg_catalog.pg_attrdef d ON d.adrelid=r.oid AND d.adnum=a.attnum "
+      "LEFT JOIN pg_catalog.pg_collation col ON col.oid=a.attcollation "
+      "LEFT JOIN pg_catalog.pg_namespace cn ON cn.oid=col.collnamespace "
+      "WHERE n.nspname='private' AND r.relname=ANY(array["
+        "'square_production_configuration_generations','square_production_runtime_bindings',"
+        "'square_production_generation_fences','square_production_lifecycle_audit_events']) "
+      "AND a.attnum>0 AND NOT a.attisdropped),'[]'::jsonb),"
+    "'constraints',coalesce((SELECT pg_catalog.jsonb_agg(pg_catalog.jsonb_build_array("
+      "r.relname,c.conname,c.contype,c.condeferrable,c.condeferred,c.convalidated,"
+      "pg_catalog.pg_get_constraintdef(c.oid,true)) ORDER BY r.relname,c.conname) "
+      "FROM pg_catalog.pg_constraint c JOIN pg_catalog.pg_class r ON r.oid=c.conrelid "
+      "JOIN pg_catalog.pg_namespace n ON n.oid=r.relnamespace WHERE n.nspname='private' "
+      "AND r.relname=ANY(array['square_production_configuration_generations','square_production_runtime_bindings',"
+        "'square_production_generation_fences','square_production_lifecycle_audit_events'])),'[]'::jsonb),"
+    "'indexes',coalesce((SELECT pg_catalog.jsonb_agg(pg_catalog.jsonb_build_array("
+      "r.relname,ir.relname,pg_catalog.pg_get_indexdef(i.indexrelid,0,true)) ORDER BY r.relname,ir.relname) "
+      "FROM pg_catalog.pg_index i JOIN pg_catalog.pg_class r ON r.oid=i.indrelid "
+      "JOIN pg_catalog.pg_class ir ON ir.oid=i.indexrelid JOIN pg_catalog.pg_namespace n ON n.oid=r.relnamespace "
+      "WHERE n.nspname='private' AND r.relname=ANY(array["
+        "'square_production_configuration_generations','square_production_runtime_bindings',"
+        "'square_production_generation_fences','square_production_lifecycle_audit_events'])),'[]'::jsonb),"
+    "'policy_count',(SELECT count(*) FROM pg_catalog.pg_policy p WHERE p.polrelid=ANY(array["
+      "'private.square_production_configuration_generations'::regclass,"
+      "'private.square_production_runtime_bindings'::regclass,"
+      "'private.square_production_generation_fences'::regclass,"
+      "'private.square_production_lifecycle_audit_events'::regclass])),"
+    "'trigger_count',(SELECT count(*) FROM pg_catalog.pg_trigger t WHERE NOT t.tgisinternal AND t.tgrelid=ANY(array["
+      "'private.square_production_configuration_generations'::regclass,"
+      "'private.square_production_runtime_bindings'::regclass,"
+      "'private.square_production_generation_fences'::regclass,"
+      "'private.square_production_lifecycle_audit_events'::regclass]))"
+    "))::text,'UTF8'),'sha256'),'hex')='2739c85b607701a5635c636112a32122ea7d244dc569273d5c9ea3fd05300d26'",0,NULL);
+#else
+  return true;
+#endif
+}
+
+static bool production_baseline_triggers_valid(production_phase phase) {
+  if (!managed_profile()) return true;
+  const char *values[]={phase==PRODUCTION_PHASE_INTERNAL_RUNTIME?"internal":"overlay"};
+  return true_query("WITH expected(relation_name,trigger_name,function_signature,trigger_type,definition_hash) AS (VALUES "
+      "('square_production_configuration_generations','square_production_configuration_audit','private.record_square_production_lifecycle_audit_v1()',5,'adc6b33177ba624f1464c5b0e10ebb4db8082cfeb74bcc2ba2261356cdfaf6c7'),"
+      "('square_production_configuration_generations','square_production_configuration_immutable','private.reject_square_production_immutable_mutation_v1()',27,'11a01f225b7d5045d5514ea975220ed0338701c9eaafeef22836369460fec63d'),"
+      "('square_production_configuration_generations','square_production_configuration_truncate_immutable','private.reject_square_production_immutable_mutation_v1()',34,'8c4836750759ca542890417233a6d9b9e5dcedf3283fbd8ba3d433c99eb94daf'),"
+      "('square_production_generation_fences','square_production_fence_audit','private.record_square_production_lifecycle_audit_v1()',5,'a885169065930abdcc58be3c67a30d636c7d0b05019154e3ec382c1784b13ee1'),"
+      "('square_production_generation_fences','square_production_fence_immutable','private.reject_square_production_immutable_mutation_v1()',27,'6dbf4385acf6404cbfc6c12417527e1b70a5be4f772fe744650f1c42502ffefa'),"
+      "('square_production_generation_fences','square_production_fence_truncate_immutable','private.reject_square_production_immutable_mutation_v1()',34,'7a8c9133fde7fb723a061147ebd3525d9ab5673279da2da6ea6b472696e394a3'),"
+      "('square_production_lifecycle_audit_events','square_production_audit_immutable','private.reject_square_production_immutable_mutation_v1()',27,'acd67e020314b4b20173cca7f9deac5b32136bc20cb328def573962a37e3f26d'),"
+      "('square_production_lifecycle_audit_events','square_production_audit_truncate_immutable','private.reject_square_production_immutable_mutation_v1()',34,'d4b7717cd9b3d3cc5f5ed99cca466722da173b302232d4b25b9cf3beb0ec6991'),"
+      "('square_production_runtime_bindings','square_production_binding_audit','private.record_square_production_lifecycle_audit_v1()',5,'3a886f47af1d77955049135720723c19872aebede7a17c638f3e54e3f1803d1f'),"
+      "('square_production_runtime_bindings','square_production_binding_authority','private.validate_square_production_runtime_binding_v1()',7,'46cf9b1bef6379035248bffe82409c74c4cd328692ef31c41cb37abae194128d'),"
+      "('square_production_runtime_bindings','square_production_binding_immutable','private.reject_square_production_immutable_mutation_v1()',27,'ee597c2ef4536c8ff62069bbee0a0d528d3f20d15be255b184ea23f84651cf58'),"
+      "('square_production_runtime_bindings','square_production_binding_truncate_immutable','private.reject_square_production_immutable_mutation_v1()',34,'d7d255c8629b61c21cb032e411d93ca399b545667d117ac725e7bcc9ea8b849a')"
+    "), resolved AS (SELECT e.*,r.oid relation_oid,t.oid trigger_oid FROM expected e "
+      "LEFT JOIN pg_catalog.pg_class r ON r.oid=pg_catalog.to_regclass('private.'||e.relation_name) "
+      "LEFT JOIN pg_catalog.pg_trigger t ON t.tgrelid=r.oid AND t.tgname=e.trigger_name AND NOT t.tgisinternal) "
+    "SELECT (SELECT count(*)=12 FROM resolved WHERE trigger_oid IS NOT NULL) "
+    "AND (SELECT count(*)=12 FROM pg_catalog.pg_trigger t JOIN pg_catalog.pg_class r ON r.oid=t.tgrelid "
+      "JOIN pg_catalog.pg_namespace n ON n.oid=r.relnamespace WHERE n.nspname='private' AND NOT t.tgisinternal "
+      "AND r.relname=ANY(array['integration_production_platform_bindings','integration_production_provider_bindings',"
+        "'integration_production_provider_secrets','integration_production_provider_capabilities',"
+        "'square_production_configuration_generations','square_production_runtime_bindings',"
+        "'square_production_generation_fences','square_production_lifecycle_audit_events'])) "
+    "AND NOT EXISTS (SELECT FROM resolved e LEFT JOIN pg_catalog.pg_trigger t ON t.oid=e.trigger_oid "
+      "WHERE t.oid IS NULL OR t.tgfoid<>pg_catalog.to_regprocedure(e.function_signature) "
+      "OR t.tgtype<>e.trigger_type OR t.tgattr::text<>'' OR pg_catalog.octet_length(t.tgargs)<>0 "
+      "OR t.tgqual IS NOT NULL OR t.tgenabled<>'O' OR t.tgconstraint<>0 "
+      "OR pg_catalog.encode(extensions.digest(pg_catalog.convert_to(pg_catalog.pg_get_triggerdef(t.oid,true),'UTF8'),'sha256'),'hex')<>e.definition_hash) "
+    "AND (SELECT ($1='overlay' AND count(*)=44 AND pg_catalog.encode(extensions.digest(pg_catalog.convert_to(coalesce("
+      "pg_catalog.jsonb_agg(pg_catalog.jsonb_build_array(r.relname,c.conname,crn.nspname||'.'||cr.relname,"
+        "frn.nspname||'.'||fr.relname,c.contype::text,c.condeferrable,c.condeferred,c.convalidated,"
+        "pg_catalog.pg_get_constraintdef(c.oid,true),pn.nspname||'.'||p.proname||'('||"
+        "pg_catalog.pg_get_function_identity_arguments(p.oid)||')',t.tgtype::integer,t.tgattr::text,"
+        "pg_catalog.encode(t.tgargs,'hex'),pg_catalog.pg_get_expr(t.tgqual,t.tgrelid,true),t.tgenabled::text) "
+        "ORDER BY r.relname,c.conname,pn.nspname,p.proname,t.tgtype),'[]'::jsonb)::text,'UTF8'),'sha256'),'hex')="
+        "'e236e65bb2a97355712eda632b18dd8113608c605495561cf26a1d536d3f0152') OR "
+      "($1='internal' AND count(*)=46 AND pg_catalog.encode(extensions.digest(pg_catalog.convert_to(coalesce("
+      "pg_catalog.jsonb_agg(pg_catalog.jsonb_build_array(r.relname,c.conname,crn.nspname||'.'||cr.relname,"
+        "frn.nspname||'.'||fr.relname,c.contype::text,c.condeferrable,c.condeferred,c.convalidated,"
+        "pg_catalog.pg_get_constraintdef(c.oid,true),pn.nspname||'.'||p.proname||'('||"
+        "pg_catalog.pg_get_function_identity_arguments(p.oid)||')',t.tgtype::integer,t.tgattr::text,"
+        "pg_catalog.encode(t.tgargs,'hex'),pg_catalog.pg_get_expr(t.tgqual,t.tgrelid,true),t.tgenabled::text) "
+        "ORDER BY r.relname,c.conname,pn.nspname,p.proname,t.tgtype),'[]'::jsonb)::text,'UTF8'),'sha256'),'hex')="
+        "'7f38e1cd66b2410975a43507ba2d6f72483b896115a86560f1b1c1f93146c086') "
+      "FROM pg_catalog.pg_trigger t JOIN pg_catalog.pg_class r ON r.oid=t.tgrelid "
+      "JOIN pg_catalog.pg_namespace n ON n.oid=r.relnamespace JOIN pg_catalog.pg_proc p ON p.oid=t.tgfoid "
+      "JOIN pg_catalog.pg_namespace pn ON pn.oid=p.pronamespace "
+      "LEFT JOIN pg_catalog.pg_constraint c ON c.oid=t.tgconstraint "
+      "LEFT JOIN pg_catalog.pg_class cr ON cr.oid=c.conrelid LEFT JOIN pg_catalog.pg_namespace crn ON crn.oid=cr.relnamespace "
+      "LEFT JOIN pg_catalog.pg_class fr ON fr.oid=c.confrelid LEFT JOIN pg_catalog.pg_namespace frn ON frn.oid=fr.relnamespace "
+      "WHERE n.nspname='private' AND t.tgisinternal AND r.relname=ANY(array["
+        "'integration_production_platform_bindings','integration_production_provider_bindings',"
+        "'integration_production_provider_secrets','integration_production_provider_capabilities',"
+        "'square_production_configuration_generations','square_production_runtime_bindings',"
+        "'square_production_generation_fences','square_production_lifecycle_audit_events']))",1,values);
+}
+
+static bool production_internal_runtime_relations_valid(void) {
+  if (!managed_profile()) return true;
+  return true_query("WITH expected(name,triggers) AS (VALUES "
+      "('private.square_production_internal_permits',2),"
+      "('private.square_production_internal_oauth_states',2),"
+      "('private.square_production_internal_credentials',1),"
+      "('private.square_production_internal_scans',2),"
+      "('private.square_production_internal_page_receipts',1),"
+      "('private.square_production_internal_source_versions',1),"
+      "('private.square_production_internal_fences',1),"
+      "('private.square_production_internal_audit_events',1)), "
+    "resolved AS (SELECT expected.*,to_regclass(expected.name) oid FROM expected) "
+    "SELECT (SELECT count(*)=8 FROM resolved WHERE oid IS NOT NULL) "
+    "AND (SELECT count(*)=8 FROM pg_class r JOIN pg_namespace n ON n.oid=r.relnamespace "
+      "WHERE n.nspname='private' AND r.relkind='r' "
+      "AND r.relname LIKE 'square\\_production\\_internal\\_%' ESCAPE '\\') "
+    "AND NOT EXISTS (SELECT FROM resolved e LEFT JOIN pg_class r ON r.oid=e.oid WHERE r.oid IS NULL "
+      "OR r.relkind<>'r' OR r.relpersistence<>'p' OR r.relowner<>current_user::regrole::oid "
+      "OR NOT r.relrowsecurity OR NOT r.relforcerowsecurity OR r.relhassubclass "
+      "OR e.triggers<>(SELECT count(*) FROM pg_trigger t WHERE t.tgrelid=r.oid AND NOT t.tgisinternal AND t.tgenabled='O') "
+      "OR e.triggers<>(SELECT count(*) FROM pg_trigger t WHERE t.tgrelid=r.oid AND NOT t.tgisinternal)) "
+    "AND NOT EXISTS (SELECT FROM resolved e JOIN pg_inherits i ON i.inhrelid=e.oid OR i.inhparent=e.oid) "
+    "AND NOT EXISTS (SELECT FROM resolved e JOIN pg_rewrite w ON w.ev_class=e.oid) "
+    "AND NOT EXISTS (SELECT FROM resolved e JOIN pg_policy p ON p.polrelid=e.oid) "
+    "AND NOT EXISTS (SELECT FROM resolved e JOIN pg_class r ON r.oid=e.oid "
+      "CROSS JOIN LATERAL aclexplode(r.relacl) a WHERE a.grantee<>r.relowner) "
+    "AND NOT EXISTS (SELECT FROM resolved e JOIN pg_attribute col ON col.attrelid=e.oid AND col.attnum>0 AND NOT col.attisdropped "
+      "CROSS JOIN LATERAL aclexplode(col.attacl) a JOIN pg_class r ON r.oid=e.oid WHERE a.grantee<>r.relowner) "
+    "AND NOT EXISTS (SELECT FROM pg_publication WHERE puballtables) "
+    "AND NOT EXISTS (SELECT FROM resolved e JOIN pg_publication_rel p ON p.prrelid=e.oid) "
+    "AND NOT EXISTS (SELECT FROM pg_publication_namespace WHERE pnnspid='private'::regnamespace)",0,NULL);
+}
+
+static bool production_internal_runtime_schema_valid(void) {
+  if (!managed_profile()) return true;
+  return true_query("SELECT pg_catalog.encode(extensions.digest(pg_catalog.convert_to((pg_catalog.jsonb_build_object("
+    "'columns',coalesce((SELECT pg_catalog.jsonb_agg(pg_catalog.jsonb_build_array("
+      "r.relname,a.attnum,a.attname,pg_catalog.format_type(a.atttypid,a.atttypmod),"
+      "a.attnotnull,a.attidentity,a.attgenerated,pg_catalog.pg_get_expr(d.adbin,d.adrelid,true),"
+      "CASE WHEN a.attcollation=0 THEN NULL ELSE pg_catalog.format('%I.%I',cn.nspname,col.collname) END,"
+      "col.collprovider::text,col.collisdeterministic,col.collversion) ORDER BY r.relname,a.attnum) "
+      "FROM pg_catalog.pg_class r JOIN pg_catalog.pg_namespace n ON n.oid=r.relnamespace "
+      "JOIN pg_catalog.pg_attribute a ON a.attrelid=r.oid "
+      "LEFT JOIN pg_catalog.pg_attrdef d ON d.adrelid=r.oid AND d.adnum=a.attnum "
+      "LEFT JOIN pg_catalog.pg_collation col ON col.oid=a.attcollation "
+      "LEFT JOIN pg_catalog.pg_namespace cn ON cn.oid=col.collnamespace "
+      "WHERE n.nspname='private' AND r.relname=ANY(array["
+        "'square_production_internal_permits','square_production_internal_oauth_states',"
+        "'square_production_internal_credentials','square_production_internal_scans',"
+        "'square_production_internal_page_receipts','square_production_internal_source_versions',"
+        "'square_production_internal_fences','square_production_internal_audit_events']) "
+      "AND a.attnum>0 AND NOT a.attisdropped),'[]'::jsonb),"
+    "'constraints',coalesce((SELECT pg_catalog.jsonb_agg(pg_catalog.jsonb_build_array("
+      "r.relname,c.conname,c.contype,c.condeferrable,c.condeferred,c.convalidated,"
+      "pg_catalog.pg_get_constraintdef(c.oid,true)) ORDER BY r.relname,c.conname) "
+      "FROM pg_catalog.pg_constraint c JOIN pg_catalog.pg_class r ON r.oid=c.conrelid "
+      "JOIN pg_catalog.pg_namespace n ON n.oid=r.relnamespace WHERE n.nspname='private' "
+      "AND r.relname=ANY(array['square_production_internal_permits','square_production_internal_oauth_states',"
+        "'square_production_internal_credentials','square_production_internal_scans',"
+        "'square_production_internal_page_receipts','square_production_internal_source_versions',"
+        "'square_production_internal_fences','square_production_internal_audit_events'])),'[]'::jsonb),"
+    "'indexes',coalesce((SELECT pg_catalog.jsonb_agg(pg_catalog.jsonb_build_array("
+      "r.relname,ir.relname,pg_catalog.pg_get_indexdef(i.indexrelid,0,true)) ORDER BY r.relname,ir.relname) "
+      "FROM pg_catalog.pg_index i JOIN pg_catalog.pg_class r ON r.oid=i.indrelid "
+      "JOIN pg_catalog.pg_class ir ON ir.oid=i.indexrelid JOIN pg_catalog.pg_namespace n ON n.oid=r.relnamespace "
+      "WHERE n.nspname='private' AND r.relname=ANY(array["
+        "'square_production_internal_permits','square_production_internal_oauth_states',"
+        "'square_production_internal_credentials','square_production_internal_scans',"
+        "'square_production_internal_page_receipts','square_production_internal_source_versions',"
+        "'square_production_internal_fences','square_production_internal_audit_events'])),'[]'::jsonb),"
+    "'policy_count',(SELECT count(*) FROM pg_catalog.pg_policy p WHERE p.polrelid=ANY(array["
+      "'private.square_production_internal_permits'::regclass,"
+      "'private.square_production_internal_oauth_states'::regclass,"
+      "'private.square_production_internal_credentials'::regclass,"
+      "'private.square_production_internal_scans'::regclass,"
+      "'private.square_production_internal_page_receipts'::regclass,"
+      "'private.square_production_internal_source_versions'::regclass,"
+      "'private.square_production_internal_fences'::regclass,"
+      "'private.square_production_internal_audit_events'::regclass])),"
+    "'trigger_count',(SELECT count(*) FROM pg_catalog.pg_trigger t WHERE NOT t.tgisinternal AND t.tgrelid=ANY(array["
+      "'private.square_production_internal_permits'::regclass,"
+      "'private.square_production_internal_oauth_states'::regclass,"
+      "'private.square_production_internal_credentials'::regclass,"
+      "'private.square_production_internal_scans'::regclass,"
+      "'private.square_production_internal_page_receipts'::regclass,"
+      "'private.square_production_internal_source_versions'::regclass,"
+      "'private.square_production_internal_fences'::regclass,"
+      "'private.square_production_internal_audit_events'::regclass]))"
+    "))::text,'UTF8'),'sha256'),'hex')='fbdfdcd9489ff7cfbb618b8f437b79cd398ed41f6fb901cb6843b8b919bb6060'",0,NULL);
+}
+
+static bool production_internal_runtime_triggers_valid(void) {
+  if (!managed_profile()) return true;
+  return true_query("WITH expected(relation_name,trigger_name,function_signature,trigger_type,definition_hash) AS (VALUES "
+      "('square_production_internal_audit_events','square_production_internal_audit_events_immutable','private.square_production_internal_reject_immutable_mutation_v1()',58,'56b6c13a6951cb7d04d4b05759821cb38ebca7ff5fbd8b771201729a9179b784'),"
+      "('square_production_internal_credentials','square_production_internal_credentials_immutable','private.square_production_internal_reject_immutable_mutation_v1()',58,'75e506533897efa5a91119d758feec3a0c6a2e9ab08616b02a67c78315f3b45f'),"
+      "('square_production_internal_fences','square_production_internal_fences_immutable','private.square_production_internal_reject_immutable_mutation_v1()',58,'b1d5b3e6cde6beaba2a0f237442d5b7617ff447297ec9a9b90d28482af15d5ec'),"
+      "('square_production_internal_oauth_states','square_production_internal_oauth_state_delete_guard','private.square_production_internal_reject_immutable_mutation_v1()',42,'c75c1a6505c73b14548119b2d48ebbf65428117588d02077355071370e06f427'),"
+      "('square_production_internal_oauth_states','square_production_internal_oauth_state_update_guard','private.square_production_internal_guard_lifecycle_update_v1()',19,'dd53b845b550ecc5adf60ba730c5d1e69575f5b596597f5944d6508f318db58c'),"
+      "('square_production_internal_page_receipts','square_production_internal_page_receipts_immutable','private.square_production_internal_reject_immutable_mutation_v1()',58,'67e242c38f4b027eb4aa5de3cce96c575445222b26d020923b5461922970ad29'),"
+      "('square_production_internal_permits','square_production_internal_permit_delete_guard','private.square_production_internal_reject_immutable_mutation_v1()',42,'b3bfbab3cd47b89db396a3126673b0c0608e6eda0392d664c534c8deeb260978'),"
+      "('square_production_internal_permits','square_production_internal_permit_update_guard','private.square_production_internal_guard_lifecycle_update_v1()',19,'a0c405a92f0792095c2721ce7dd1c50f1cc9db50f8e130aff9433606f19133bf'),"
+      "('square_production_internal_scans','square_production_internal_scan_delete_guard','private.square_production_internal_reject_immutable_mutation_v1()',42,'420916208512c502d3521c1ef7da7fda854ed9281347bdba20656326c126869e'),"
+      "('square_production_internal_scans','square_production_internal_scan_update_guard','private.square_production_internal_guard_lifecycle_update_v1()',19,'7dda55baf049b978b31b0dcb314509ce13baf68b020b23b9aab6d0b958cf8a24'),"
+      "('square_production_internal_source_versions','square_production_internal_source_versions_immutable','private.square_production_internal_reject_immutable_mutation_v1()',58,'238b59f5ca4071cd6de823c6e42eac24b9b73e4459e16e4a97a7e6d9bd378390')"
+    "), resolved AS (SELECT e.*,r.oid relation_oid,t.oid trigger_oid FROM expected e "
+      "LEFT JOIN pg_catalog.pg_class r ON r.oid=pg_catalog.to_regclass('private.'||e.relation_name) "
+      "LEFT JOIN pg_catalog.pg_trigger t ON t.tgrelid=r.oid AND t.tgname=e.trigger_name AND NOT t.tgisinternal) "
+    "SELECT (SELECT count(*)=11 FROM resolved WHERE trigger_oid IS NOT NULL) "
+    "AND (SELECT count(*)=11 FROM pg_catalog.pg_trigger t JOIN pg_catalog.pg_class r ON r.oid=t.tgrelid "
+      "JOIN pg_catalog.pg_namespace n ON n.oid=r.relnamespace WHERE n.nspname='private' AND NOT t.tgisinternal "
+      "AND r.relname=ANY(array['square_production_internal_permits','square_production_internal_oauth_states',"
+        "'square_production_internal_credentials','square_production_internal_scans',"
+        "'square_production_internal_page_receipts','square_production_internal_source_versions',"
+        "'square_production_internal_fences','square_production_internal_audit_events'])) "
+    "AND NOT EXISTS (SELECT FROM resolved e LEFT JOIN pg_catalog.pg_trigger t ON t.oid=e.trigger_oid "
+      "WHERE t.oid IS NULL OR t.tgfoid<>pg_catalog.to_regprocedure(e.function_signature) "
+      "OR t.tgtype<>e.trigger_type OR t.tgattr::text<>'' OR pg_catalog.octet_length(t.tgargs)<>0 "
+      "OR t.tgqual IS NOT NULL OR t.tgenabled<>'O' OR t.tgconstraint<>0 "
+      "OR pg_catalog.encode(extensions.digest(pg_catalog.convert_to(pg_catalog.pg_get_triggerdef(t.oid,true),'UTF8'),'sha256'),'hex')<>e.definition_hash) "
+    "AND (SELECT count(*)=44 AND pg_catalog.encode(extensions.digest(pg_catalog.convert_to(coalesce("
+      "pg_catalog.jsonb_agg(pg_catalog.jsonb_build_array(r.relname,c.conname,crn.nspname||'.'||cr.relname,"
+        "frn.nspname||'.'||fr.relname,c.contype::text,c.condeferrable,c.condeferred,c.convalidated,"
+        "pg_catalog.pg_get_constraintdef(c.oid,true),pn.nspname||'.'||p.proname||'('||"
+        "pg_catalog.pg_get_function_identity_arguments(p.oid)||')',t.tgtype::integer,t.tgattr::text,"
+        "pg_catalog.encode(t.tgargs,'hex'),pg_catalog.pg_get_expr(t.tgqual,t.tgrelid,true),t.tgenabled::text) "
+        "ORDER BY r.relname,c.conname,pn.nspname,p.proname,t.tgtype),'[]'::jsonb)::text,'UTF8'),'sha256'),'hex')="
+        "'b3750e1d4f6155e7e170b8257ccaa15262ed91da122873198b2980a0c413ba6b' "
+      "FROM pg_catalog.pg_trigger t JOIN pg_catalog.pg_class r ON r.oid=t.tgrelid "
+      "JOIN pg_catalog.pg_namespace n ON n.oid=r.relnamespace JOIN pg_catalog.pg_proc p ON p.oid=t.tgfoid "
+      "JOIN pg_catalog.pg_namespace pn ON pn.oid=p.pronamespace "
+      "LEFT JOIN pg_catalog.pg_constraint c ON c.oid=t.tgconstraint "
+      "LEFT JOIN pg_catalog.pg_class cr ON cr.oid=c.conrelid LEFT JOIN pg_catalog.pg_namespace crn ON crn.oid=cr.relnamespace "
+      "LEFT JOIN pg_catalog.pg_class fr ON fr.oid=c.confrelid LEFT JOIN pg_catalog.pg_namespace frn ON frn.oid=fr.relnamespace "
+      "WHERE n.nspname='private' AND t.tgisinternal AND r.relname=ANY(array["
+        "'square_production_internal_permits','square_production_internal_oauth_states',"
+        "'square_production_internal_credentials','square_production_internal_scans',"
+        "'square_production_internal_page_receipts','square_production_internal_source_versions',"
+        "'square_production_internal_fences','square_production_internal_audit_events']))",0,NULL);
+}
+
+static bool production_internal_runtime_functions_valid(void) {
+  if (!managed_profile()) return true;
+  return true_query("WITH expected(signature,language,volatility,security_definer,is_strict,parallel,result,names,default_count,default_expression,source_hash) AS (VALUES "
+      "('private.square_production_internal_reject_immutable_mutation_v1()','plpgsql','v',true,false,'u','trigger',null::text[],0,null::text,'879e64a04de08a3fb906ce6f0a5675627ecace40386769247cf0a44c817dd82e'),"
+      "('private.square_production_internal_guard_lifecycle_update_v1()','plpgsql','v',true,false,'u','trigger',null::text[],0,null::text,'76ba2c0506b61ebbbe3e124700678021199ed89c6088dddc540050defb7053d0'),"
+      "('private.square_production_internal_require_keys_v1(jsonb,text[])','plpgsql','i',false,true,'s','void',array['p_payload','p_required_keys']::text[],0,null::text,'ec3eb20a72acab3d1c18c6d5eb9b2fb1eb4d8c6743af2c4f2e4c80bba0d91d61'),"
+      "('private.square_production_internal_fingerprint_v1(text[])','sql','i',false,true,'s','text',array['p_parts']::text[],0,null::text,'3f77909a44ff2bbc574f8b3228482aac0e9c55a1dd3356001384efe21db560b4'),"
+      "('private.square_production_internal_audit_v1(uuid,bigint,text,text,text,text,timestamptz)','plpgsql','v',true,false,'u','text',array['p_permit_id','p_generation','p_event_kind','p_outcome','p_reason_code','p_subject_fingerprint','p_recorded_at']::text[],0,null::text,'4d548e25a8988edc1fdfa8b719bf5d7195e32d9f44bde5b584f8484fc30539cb'),"
+      "('private.square_production_internal_require_login_v1(text)','plpgsql','s',true,false,'u','void',array['p_capability']::text[],0,null::text,'bef67b686c3168496fcc46e2518e1555b694faef1168f5612caf2921183107df'),"
+      "('private.square_production_internal_lock_permit_v1(uuid,text,boolean)','plpgsql','v',true,false,'u','private.square_production_internal_permits',array['p_permit_id','p_capability','p_allow_internal_fence']::text[],1,'false','2507da8db8332de74b2d16e6683a989c239e76b5405c931173abd96408c0738c'),"
+      "('private.square_production_internal_install_permit_v1(jsonb)','plpgsql','v',true,false,'u','jsonb',array['p_payload']::text[],0,null::text,'1dee75afd6b19f73656210091560267b4ce0442cd92c70da38261b841d6f2f1d'),"
+      "('public.square_production_internal_oauth_v1(text,jsonb)','plpgsql','v',true,false,'u','jsonb',array['p_operation','p_payload']::text[],0,null::text,'9d29d2d57410d185cbec029c4583b6e64394b12033f33c3e47819e9a9db93662'),"
+      "('public.square_production_internal_broker_v1(text,jsonb)','plpgsql','v',true,false,'u','jsonb',array['p_operation','p_payload']::text[],0,null::text,'dd16a4df4d6344f6297834953e423fa85dbbcf32f320d58048be43b13cc3dd9b'),"
+      "('public.square_production_internal_runtime_v1(text,jsonb)','plpgsql','v',true,false,'u','jsonb',array['p_operation','p_payload']::text[],0,null::text,'fe072192b425eee0a727ca439989d5cc848b2efd00d0f086121adafa9ae2510d'),"
+      "('public.square_production_internal_evidence_v1(text,jsonb)','plpgsql','v',true,false,'u','jsonb',array['p_operation','p_payload']::text[],0,null::text,'a851744c9f08d87d47260305bfc5751b206209e9e72c5028b42d202460c4ce74')"
+    "), resolved AS (SELECT e.*,to_regprocedure(e.signature) oid FROM expected e) "
+    "SELECT (SELECT count(*)=12 FROM resolved WHERE oid IS NOT NULL) "
+    "AND (SELECT count(*)=12 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace "
+      "WHERE n.nspname IN ('private','public') "
+      "AND p.proname LIKE 'square\\_production\\_internal\\_%' ESCAPE '\\') "
+    "AND NOT EXISTS (SELECT FROM resolved e LEFT JOIN pg_proc p ON p.oid=e.oid "
+      "LEFT JOIN pg_language l ON l.oid=p.prolang WHERE p.oid IS NULL OR l.lanname<>e.language "
+      "OR p.proowner<>current_user::regrole::oid OR p.provolatile<>e.volatility::\"char\" "
+      "OR p.prosecdef<>e.security_definer OR p.proisstrict<>e.is_strict OR p.proparallel<>e.parallel::\"char\" "
+      "OR p.proretset OR p.prokind<>'f' OR p.prorettype<>to_regtype(e.result) "
+      "OR p.proargnames IS DISTINCT FROM e.names OR p.proargmodes IS NOT NULL "
+      "OR p.pronargdefaults<>e.default_count "
+      "OR pg_catalog.pg_get_expr(p.proargdefaults,0) IS DISTINCT FROM e.default_expression "
+      "OR p.proconfig IS DISTINCT FROM array['search_path=\"\"']::text[] "
+      "OR pg_catalog.encode(extensions.digest(pg_catalog.convert_to(p.prosrc,'UTF8'),'sha256'),'hex')<>e.source_hash) "
+    "AND NOT EXISTS (SELECT FROM resolved e JOIN pg_proc p ON p.oid=e.oid "
+      "CROSS JOIN LATERAL aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a "
+      "WHERE e.signature LIKE 'private.%' AND a.grantee<>p.proowner)",0,NULL);
+}
+
+static bool production_internal_runtime_contract_valid(void) {
+  return production_internal_runtime_source_pinned() && production_internal_runtime_relations_valid() &&
+    production_internal_runtime_schema_valid() && production_internal_runtime_triggers_valid() &&
+    production_internal_runtime_functions_valid();
+}
+
+static bool production_contract_valid(production_phase phase) {
+  return phase!=PRODUCTION_PHASE_INVALID && production_relations_valid() &&
+    production_foundation_schema_valid() && production_overlay_schema_valid() && production_baseline_triggers_valid(phase) &&
+    production_function_abi_valid() &&
+    (phase==PRODUCTION_PHASE_OVERLAY || production_internal_runtime_contract_valid());
+}
+#endif
+#ifdef VAEROEX_PRODUCTION_PROFILE
+static bool production_named_authority_valid(const char *capability,const char *authority_function,
+                                             const char *authority_source,const char *target,bool internal_runtime) {
+  const char *values[]={capability,authority_function,authority_source,
+    OPERATIONAL_AUTHORITY_FUNCTION,OPERATIONAL_AUTHORITY_SOURCE_MD5,target,
+    internal_runtime?"internal":"overlay"};
+  return true_query("SELECT to_regprocedure($2) IS NOT NULL "
+    "AND EXISTS (SELECT FROM pg_namespace n JOIN pg_proc p ON p.pronamespace=n.oid "
+      "JOIN pg_language l ON l.oid=p.prolang "
+      "WHERE p.oid=to_regprocedure($2) AND n.nspname='public' "
+      "AND has_schema_privilege($1,n.oid,'USAGE') AND l.lanname='plpgsql' "
+      "AND p.proowner=current_user::regrole::oid AND p.prosecdef "
+      "AND p.proparallel='u' AND NOT p.proisstrict AND NOT p.proretset AND p.prokind='f' "
+      "AND p.proargmodes IS NULL AND p.pronargdefaults=0 AND p.proargdefaults IS NULL "
+      "AND p.proconfig IS NOT DISTINCT FROM array['search_path=\"\"']::text[] "
+      "AND (($7='overlay' AND p.provolatile='s' AND p.pronargs=5 AND p.prorettype='void'::regtype "
+        "AND p.proargnames IS NOT DISTINCT FROM "
+          "array['p_provider_key','p_environment','p_project_id','p_generation','p_configuration_fingerprint']::text[] "
+        "AND p.prosrc=$3) "
+      "OR ($7='internal' AND p.provolatile='v' AND p.pronargs=2 AND p.prorettype='jsonb'::regtype "
+        "AND p.proargnames IS NOT DISTINCT FROM array['p_operation','p_payload']::text[] "
+        "AND pg_catalog.encode(extensions.digest(pg_catalog.convert_to(p.prosrc,'UTF8'),'sha256'),'hex')=$3))) "
+    "AND ($7='internal' OR EXISTS (SELECT FROM pg_namespace n JOIN pg_proc p ON p.pronamespace=n.oid "
+      "JOIN pg_language l ON l.oid=p.prolang "
+      "WHERE p.oid=to_regprocedure($4) AND n.nspname='private' "
+      "AND l.lanname='plpgsql' "
+      "AND p.proowner=current_user::regrole::oid AND NOT p.prosecdef AND p.provolatile='s' "
+      "AND p.proparallel='u' AND NOT p.proisstrict AND NOT p.proretset AND p.prokind='f' "
+      "AND p.pronargs=6 AND p.prorettype='void'::regtype "
+      "AND p.proargnames IS NOT DISTINCT FROM "
+        "array['p_provider_key','p_environment','p_project_id','p_generation','p_configuration_fingerprint','p_capability']::text[] "
+      "AND p.proargmodes IS NULL AND p.pronargdefaults=0 AND p.proargdefaults IS NULL "
+      "AND p.proconfig is not distinct from array['search_path=\"\"']::text[] "
+      "AND md5(p.prosrc)=$5)) "
+    "AND ($7='internal' OR NOT EXISTS (SELECT FROM pg_proc p CROSS JOIN LATERAL aclexplode("
+      "coalesce(p.proacl,acldefault('f',p.proowner))) a WHERE p.oid=to_regprocedure($4) "
+      "AND a.grantee<>p.proowner)) "
+    "AND EXISTS (SELECT FROM pg_roles c WHERE c.rolname=$1 AND NOT c.rolcanlogin AND NOT c.rolinherit "
+      "AND NOT c.rolsuper AND NOT c.rolcreaterole AND NOT c.rolcreatedb AND NOT c.rolreplication "
+      "AND NOT c.rolbypassrls AND c.rolconfig IS NULL) "
+    /* PostgreSQL 16+ records the one automatic creator edge as if bootstrap
+     * superuser OID 10 granted it to the non-superuser CREATEROLE session that
+     * created the role. Count alone is not identity: bind the optional edge to
+     * this exact maintenance session and grantor. The fixed candidate edge is
+     * the only other permitted membership after prepare. */
+    "AND NOT EXISTS (SELECT FROM pg_auth_members m WHERE m.member=$1::regrole) "
+    /* Each fixed login is independently bounded too. A current-target-only
+     * check would let a peer role accumulate attributes, membership or direct
+     * object authority while a different profile is being maintained. */
+    "AND NOT EXISTS (SELECT FROM pg_roles target_role WHERE target_role.rolname=$6 AND NOT ("
+      "NOT target_role.rolsuper AND NOT target_role.rolcreaterole AND NOT target_role.rolcreatedb "
+      "AND NOT target_role.rolreplication AND NOT target_role.rolbypassrls AND target_role.rolconfig IS NULL "
+      "AND ((target_role.rolcanlogin AND target_role.rolinherit) OR "
+        "(NOT target_role.rolcanlogin AND NOT target_role.rolinherit)) "
+      "AND NOT EXISTS (SELECT FROM pg_roles other_role WHERE other_role.rolname NOT IN ($6,$1) "
+        "AND pg_has_role(target_role.oid,other_role.oid,'MEMBER')) "
+      "AND NOT EXISTS (SELECT FROM pg_auth_members m JOIN pg_roles member_role ON member_role.oid=m.member "
+        "WHERE m.roleid=target_role.oid AND NOT ("
+          "m.member=session_user::regrole::oid AND m.grantor='10'::oid "
+          "AND NOT member_role.rolsuper AND member_role.rolcreaterole "
+          "AND m.admin_option AND NOT m.inherit_option AND NOT m.set_option)) "
+      "AND NOT EXISTS (SELECT FROM pg_shdepend d WHERE d.refclassid='pg_authid'::regclass "
+        "AND d.refobjid=target_role.oid AND d.deptype IN ('o','a','i','r')) "
+      "AND NOT EXISTS (SELECT FROM pg_db_role_setting s WHERE s.setrole=target_role.oid)"
+    ")) "
+    /* A fixed login may be absent before prepare, or must otherwise be an
+     * exact active pair (LOGIN/INHERIT plus membership INHERIT) or exact
+     * closed pair (NOLOGIN/NOINHERIT plus membership INHERIT FALSE).  This
+     * checks every profile independently: fencing one role must not require
+     * unrelated legitimate service roles to lose their own authority. */
+    "AND NOT EXISTS (SELECT FROM pg_roles target_role WHERE target_role.rolname=$6 "
+      "AND NOT EXISTS (SELECT FROM pg_auth_members m WHERE m.roleid=$1::regrole AND m.member=target_role.oid)) "
+    "AND (SELECT count(*) FROM pg_auth_members m JOIN pg_roles target_role ON target_role.oid=m.member "
+      "WHERE m.roleid=$1::regrole AND target_role.rolname=$6)<=1 "
+    "AND (SELECT count(*) FROM pg_auth_members m WHERE m.roleid=$1::regrole)<=CASE WHEN EXISTS ("
+      "SELECT FROM pg_auth_members m JOIN pg_roles target_role ON target_role.oid=m.member "
+      "WHERE m.roleid=$1::regrole AND target_role.rolname=$6 "
+      "AND NOT m.admin_option AND NOT m.set_option AND ("
+        "(target_role.rolcanlogin AND target_role.rolinherit AND m.inherit_option) OR "
+        "(NOT target_role.rolcanlogin AND NOT target_role.rolinherit AND NOT m.inherit_option)"
+      ")"
+    ") THEN 2 ELSE 1 END "
+    "AND NOT EXISTS (SELECT FROM pg_auth_members m JOIN pg_roles member_role ON member_role.oid=m.member "
+    "WHERE m.roleid=$1::regrole AND NOT ("
+        "(member_role.rolname=$6 AND NOT m.admin_option AND NOT m.set_option AND ("
+          "(member_role.rolcanlogin AND member_role.rolinherit AND m.inherit_option) OR "
+          "(NOT member_role.rolcanlogin AND NOT member_role.rolinherit AND NOT m.inherit_option)"
+        ")) OR "
+        "(m.member=session_user::regrole::oid AND m.grantor='10'::oid "
+          "AND m.admin_option AND NOT m.inherit_option AND NOT m.set_option "
+          "AND NOT member_role.rolsuper AND member_role.rolcreaterole)"
+      ")) "
+    /* The required non-grantable public-schema USAGE and EXECUTE ACL on the
+     * one pinned authority RPC necessarily record two current-database ACL
+     * dependencies. Reject every other direct/initial ACL, owner, or policy
+     * dependency. */
+    "AND NOT EXISTS (SELECT FROM pg_shdepend d WHERE d.refclassid='pg_authid'::regclass "
+      "AND d.refobjid=$1::regrole AND d.deptype IN ('o','a','i','r') AND NOT ("
+        "d.deptype='a' AND d.dbid=(SELECT oid FROM pg_database WHERE datname=current_database()) "
+        "AND d.objsubid=0 AND ((d.classid='pg_proc'::regclass AND d.objid=to_regprocedure($2)) "
+          "OR (d.classid='pg_namespace'::regclass AND d.objid='public'::regnamespace)))) "
+    "AND NOT EXISTS (SELECT FROM pg_db_role_setting s WHERE s.setrole=$1::regrole) "
+    "AND (SELECT count(*)=1 FROM pg_namespace n CROSS JOIN LATERAL aclexplode("
+      "coalesce(n.nspacl,acldefault('n',n.nspowner))) a WHERE n.oid='public'::regnamespace "
+      "AND a.grantee=$1::regrole AND a.privilege_type='USAGE' AND NOT a.is_grantable) "
+    "AND NOT EXISTS (SELECT FROM pg_namespace n CROSS JOIN LATERAL aclexplode("
+      "coalesce(n.nspacl,acldefault('n',n.nspowner))) a WHERE n.oid='public'::regnamespace "
+      "AND a.grantee=$1::regrole AND (a.privilege_type<>'USAGE' OR a.is_grantable)) "
+    "AND (SELECT count(*)=1 FROM pg_proc p CROSS JOIN LATERAL aclexplode(p.proacl) a "
+      "WHERE a.grantee=$1::regrole AND a.privilege_type='EXECUTE' AND NOT a.is_grantable AND p.oid=to_regprocedure($2)) "
+    "AND NOT EXISTS (SELECT FROM pg_proc p CROSS JOIN LATERAL aclexplode("
+      "coalesce(p.proacl,acldefault('f',p.proowner))) a WHERE p.oid=to_regprocedure($2) "
+      "AND (a.grantee<>p.proowner OR a.privilege_type<>'EXECUTE' OR a.is_grantable) "
+      "AND NOT (a.grantee=$1::regrole AND a.privilege_type='EXECUTE' AND NOT a.is_grantable)) "
+    "AND NOT EXISTS (SELECT FROM pg_namespace n WHERE n.nspname NOT IN ('pg_catalog','information_schema') "
+      "AND n.nspname NOT LIKE 'pg\\_toast%' ESCAPE '\\' AND n.nspname NOT LIKE 'pg\\_temp%' ESCAPE '\\' "
+      "AND has_schema_privilege($1,n.oid,'CREATE')) "
+    "AND NOT has_schema_privilege($1,'private','USAGE') "
+    "AND NOT EXISTS (SELECT FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace "
+      "WHERE n.nspname NOT IN ('pg_catalog','information_schema') "
+      "AND n.nspname NOT LIKE 'pg\\_toast%' ESCAPE '\\' AND n.nspname NOT LIKE 'pg\\_temp%' ESCAPE '\\' "
+      "AND p.oid<>to_regprocedure($2) AND has_schema_privilege($1,n.oid,'USAGE') "
+      "AND has_function_privilege($1,p.oid,'EXECUTE')) "
+    "AND NOT EXISTS (SELECT FROM pg_class r JOIN pg_namespace n ON n.oid=r.relnamespace "
+      "CROSS JOIN (VALUES ('SELECT'),('INSERT'),('UPDATE'),('DELETE'),('TRUNCATE'),('REFERENCES'),('TRIGGER'),('MAINTAIN')) privilege(name) "
+      "WHERE n.nspname NOT IN ('pg_catalog','information_schema') "
+      "AND n.nspname NOT LIKE 'pg\\_toast%' ESCAPE '\\' AND n.nspname NOT LIKE 'pg\\_temp%' ESCAPE '\\' "
+      "AND r.relkind IN ('r','p','v','m','f') AND has_table_privilege($1,r.oid,privilege.name) AND NOT ("
+        "privilege.name='SELECT' AND n.nspname='extensions' "
+        "AND r.relname IN ('pg_stat_statements','pg_stat_statements_info') AND r.relkind='v' "
+        "AND NOT has_schema_privilege($1,n.oid,'USAGE') AND NOT pg_has_role($1,'pg_read_all_stats','USAGE') "
+        "AND EXISTS (SELECT FROM pg_depend d JOIN pg_extension e ON e.oid=d.refobjid "
+          "WHERE d.classid='pg_class'::regclass AND d.objid=r.oid AND d.objsubid=0 "
+          "AND d.refclassid='pg_extension'::regclass AND d.deptype='e' AND e.extname='pg_stat_statements'))) "
+    "AND NOT EXISTS (SELECT FROM pg_class r JOIN pg_namespace n ON n.oid=r.relnamespace "
+      "JOIN pg_attribute a ON a.attrelid=r.oid AND a.attnum>0 AND NOT a.attisdropped "
+      "CROSS JOIN (VALUES ('SELECT'),('INSERT'),('UPDATE'),('REFERENCES')) privilege(name) "
+      "WHERE n.nspname NOT IN ('pg_catalog','information_schema') "
+      "AND n.nspname NOT LIKE 'pg\\_toast%' ESCAPE '\\' AND n.nspname NOT LIKE 'pg\\_temp%' ESCAPE '\\' "
+      "AND r.relkind IN ('r','p','v','m','f') AND has_column_privilege($1,r.oid,a.attnum,privilege.name) AND NOT ("
+        "privilege.name='SELECT' AND n.nspname='extensions' "
+        "AND r.relname IN ('pg_stat_statements','pg_stat_statements_info') AND r.relkind='v' "
+        "AND NOT has_schema_privilege($1,n.oid,'USAGE') AND NOT pg_has_role($1,'pg_read_all_stats','USAGE') "
+        "AND EXISTS (SELECT FROM pg_depend d JOIN pg_extension e ON e.oid=d.refobjid "
+          "WHERE d.classid='pg_class'::regclass AND d.objid=r.oid AND d.objsubid=0 "
+          "AND d.refclassid='pg_extension'::regclass AND d.deptype='e' AND e.extname='pg_stat_statements'))) "
+    "AND NOT EXISTS (SELECT FROM pg_class r JOIN pg_namespace n ON n.oid=r.relnamespace "
+      "WHERE n.nspname NOT IN ('pg_catalog','information_schema') "
+      "AND n.nspname NOT LIKE 'pg\\_toast%' ESCAPE '\\' AND n.nspname NOT LIKE 'pg\\_temp%' ESCAPE '\\' "
+      /* PostgreSQL may reorder ordinary AND predicates. CASE is required so
+       * has_sequence_privilege never receives a non-sequence OID. */
+      "AND CASE WHEN r.relkind='S' THEN has_sequence_privilege($1,r.oid,'USAGE,SELECT,UPDATE') ELSE false END) "
+    "AND NOT EXISTS (SELECT FROM pg_foreign_data_wrapper f "
+      "WHERE has_foreign_data_wrapper_privilege($1,f.oid,'USAGE')) "
+    "AND NOT EXISTS (SELECT FROM pg_foreign_server s WHERE has_server_privilege($1,s.oid,'USAGE')) "
+    "AND NOT EXISTS (SELECT FROM pg_tablespace t WHERE has_tablespace_privilege($1,t.oid,'CREATE')) "
+    "AND NOT EXISTS (SELECT FROM pg_parameter_acl parameter WHERE "
+      "has_parameter_privilege($1,parameter.parname,'SET') "
+      "OR has_parameter_privilege($1,parameter.parname,'ALTER SYSTEM')) "
+    "AND has_database_privilege($1,current_database(),'CONNECT') "
+    "AND has_database_privilege($1,current_database(),'TEMP') "
+    "AND NOT has_database_privilege($1,current_database(),'CREATE') "
+    "AND NOT EXISTS (SELECT FROM pg_database d CROSS JOIN LATERAL aclexplode(d.datacl) a "
+      "WHERE a.grantee=$1::regrole) "
+    "AND NOT EXISTS (SELECT FROM pg_database d WHERE d.datallowconn AND d.datname<>current_database() "
+      "AND has_database_privilege($1,d.oid,'CONNECT') AND NOT EXISTS (SELECT FROM aclexplode("
+        "coalesce(d.datacl,acldefault('d',d.datdba))) a "
+        "WHERE a.grantee=0 AND a.privilege_type='CONNECT')) "
+    "AND NOT EXISTS (SELECT FROM pg_default_acl d CROSS JOIN LATERAL aclexplode(d.defaclacl) a "
+      "WHERE d.defaclobjtype IN ('r','S','f','n') AND a.grantee IN (0,$1::regrole))",7,values);
+}
+
+static bool production_overlay_wrapper_owner_only(const char *authority_function,const char *authority_source) {
+  const char *values[]={authority_function,authority_source};
+  return true_query("SELECT EXISTS (SELECT FROM pg_namespace n JOIN pg_proc p ON p.pronamespace=n.oid "
+      "JOIN pg_language l ON l.oid=p.prolang WHERE p.oid=to_regprocedure($1) AND n.nspname='public' "
+      "AND l.lanname='plpgsql' AND p.proowner=current_user::regrole::oid AND p.prosecdef "
+      "AND p.provolatile='s' AND p.proparallel='u' AND NOT p.proisstrict AND NOT p.proretset AND p.prokind='f' "
+      "AND p.pronargs=5 AND p.prorettype='void'::regtype AND p.proargmodes IS NULL "
+      "AND p.pronargdefaults=0 AND p.proargdefaults IS NULL "
+      "AND p.proargnames IS NOT DISTINCT FROM "
+        "array['p_provider_key','p_environment','p_project_id','p_generation','p_configuration_fingerprint']::text[] "
+      "AND p.proconfig IS NOT DISTINCT FROM array['search_path=\"\"']::text[] AND p.prosrc=$2) "
+    "AND NOT EXISTS (SELECT FROM pg_proc p CROSS JOIN LATERAL aclexplode("
+      "coalesce(p.proacl,acldefault('f',p.proowner))) a WHERE p.oid=to_regprocedure($1) "
+      "AND a.grantee<>p.proowner)",2,values);
+}
+#endif
+static bool production_authority_valid(const char *target) {
+#ifdef VAEROEX_PRODUCTION_PROFILE
+  production_phase phase=production_ledger_phase();
+  if (strcmp(target,MAPPED_ROLE) || !production_contract_valid(phase)) return false;
+  if (phase==PRODUCTION_PHASE_INTERNAL_RUNTIME) {
+    return production_overlay_wrapper_owner_only(
+        "public.check_square_production_oauth_authority_v1(text,text,text,bigint,text)",
+        AUTHORITY_SOURCE_FOR("square_production_oauth_authority","oauth")) &&
+      production_overlay_wrapper_owner_only(
+        "public.check_square_production_broker_authority_v1(text,text,text,bigint,text)",
+        AUTHORITY_SOURCE_FOR("square_production_broker_authority","broker")) &&
+      production_overlay_wrapper_owner_only(
+        "public.check_square_production_runtime_authority_v1(text,text,text,bigint,text)",
+        AUTHORITY_SOURCE_FOR("square_production_runtime_authority","runtime")) &&
+      production_overlay_wrapper_owner_only(
+        "public.check_square_production_evidence_authority_v1(text,text,text,bigint,text)",
+        AUTHORITY_SOURCE_FOR("square_production_evidence_authority","evidence")) &&
+      production_named_authority_valid("square_production_oauth_authority",
+        "public.square_production_internal_oauth_v1(text,jsonb)",
+        "9d29d2d57410d185cbec029c4583b6e64394b12033f33c3e47819e9a9db93662","square_production_oauth",true) &&
+      production_named_authority_valid("square_production_broker_authority",
+        "public.square_production_internal_broker_v1(text,jsonb)",
+        "dd16a4df4d6344f6297834953e423fa85dbbcf32f320d58048be43b13cc3dd9b","square_production_broker",true) &&
+      production_named_authority_valid("square_production_scheduler_authority",
+        "public.check_square_production_scheduler_authority_v1(text,text,text,bigint,text)",
+        AUTHORITY_SOURCE_FOR("square_production_scheduler_authority","scheduler"),"square_production_scheduler",false) &&
+      production_named_authority_valid("square_production_webhook_authority",
+        "public.check_square_production_webhook_authority_v1(text,text,text,bigint,text)",
+        AUTHORITY_SOURCE_FOR("square_production_webhook_authority","webhook"),"square_production_webhook",false) &&
+      production_named_authority_valid("square_production_runtime_authority",
+        "public.square_production_internal_runtime_v1(text,jsonb)",
+        "fe072192b425eee0a727ca439989d5cc848b2efd00d0f086121adafa9ae2510d","square_production_runtime",true) &&
+      production_named_authority_valid("square_production_evidence_authority",
+        "public.square_production_internal_evidence_v1(text,jsonb)",
+        "a851744c9f08d87d47260305bfc5751b206209e9e72c5028b42d202460c4ce74","square_production_evidence",true);
+  }
+  return production_named_authority_valid("square_production_oauth_authority",
+      "public.check_square_production_oauth_authority_v1(text,text,text,bigint,text)",
+      AUTHORITY_SOURCE_FOR("square_production_oauth_authority","oauth"),"square_production_oauth",false) &&
+    production_named_authority_valid("square_production_broker_authority",
+      "public.check_square_production_broker_authority_v1(text,text,text,bigint,text)",
+      AUTHORITY_SOURCE_FOR("square_production_broker_authority","broker"),"square_production_broker",false) &&
+    production_named_authority_valid("square_production_scheduler_authority",
+      "public.check_square_production_scheduler_authority_v1(text,text,text,bigint,text)",
+      AUTHORITY_SOURCE_FOR("square_production_scheduler_authority","scheduler"),"square_production_scheduler",false) &&
+    production_named_authority_valid("square_production_webhook_authority",
+      "public.check_square_production_webhook_authority_v1(text,text,text,bigint,text)",
+      AUTHORITY_SOURCE_FOR("square_production_webhook_authority","webhook"),"square_production_webhook",false) &&
+    production_named_authority_valid("square_production_runtime_authority",
+      "public.check_square_production_runtime_authority_v1(text,text,text,bigint,text)",
+      AUTHORITY_SOURCE_FOR("square_production_runtime_authority","runtime"),"square_production_runtime",false) &&
+    production_named_authority_valid("square_production_evidence_authority",
+      "public.check_square_production_evidence_authority_v1(text,text,text,bigint,text)",
+      AUTHORITY_SOURCE_FOR("square_production_evidence_authority","evidence"),"square_production_evidence",false);
+#else
+  (void)target;
+  return true;
+#endif
+}
+static bool role_valid(const char *target, const char *oid, int state) {
+  const char *values[] = {target, oid, state==2 ? "2" : state==1 ? "1" : "0", CAPABILITY};
   return true_query("SELECT EXISTS (SELECT FROM pg_roles r WHERE r.rolname=$1 AND r.oid::text=$2 "
     "AND NOT r.rolsuper AND NOT r.rolcreaterole AND NOT r.rolcreatedb AND NOT r.rolreplication "
-    "AND NOT r.rolbypassrls AND r.rolinherit AND (NOT r.rolcanlogin OR $3::boolean) "
+    "AND NOT r.rolbypassrls "
+#ifdef VAEROEX_PRODUCTION_PROFILE
+    "AND (($3::integer=2 AND r.rolcanlogin=r.rolinherit) "
+      "OR ($3::integer=1 AND r.rolcanlogin AND r.rolinherit) "
+      "OR ($3::integer=0 AND NOT r.rolcanlogin AND NOT r.rolinherit)) "
+#else
+    "AND r.rolinherit AND (NOT r.rolcanlogin OR $3::integer<>0) "
+#endif
     "AND r.rolconfig IS NULL) "
     "AND EXISTS (SELECT FROM pg_roles c WHERE c.rolname=$4 "
     "AND NOT c.rolcanlogin AND NOT c.rolsuper AND NOT c.rolcreaterole AND NOT c.rolcreatedb "
     "AND NOT c.rolreplication AND NOT c.rolbypassrls AND c.rolconfig IS NULL) "
     "AND EXISTS (SELECT FROM pg_auth_members m JOIN pg_roles r ON r.oid=m.member "
     "JOIN pg_roles c ON c.oid=m.roleid WHERE r.rolname=$1 AND c.rolname=$4 "
-    "AND NOT m.admin_option AND m.inherit_option AND m.set_option) "
+    "AND NOT m.admin_option "
+#ifdef VAEROEX_PRODUCTION_PROFILE
+    "AND NOT m.set_option AND m.inherit_option=CASE WHEN $3::integer=1 THEN true "
+      "WHEN $3::integer=0 THEN false ELSE (SELECT rolinherit FROM pg_roles WHERE rolname=$1) END) "
+#else
+    "AND m.inherit_option AND m.set_option) "
+#endif
     /* Grants are keyed by grantor too: one good row must not hide a second
      * ADMIN-capable grant of the same capability from another grantor. */
     "AND NOT EXISTS (SELECT FROM pg_auth_members m JOIN pg_roles r ON r.oid=m.member "
     "JOIN pg_roles c ON c.oid=m.roleid WHERE r.rolname=$1 AND "
-    "(c.rolname<>$4 OR m.admin_option OR NOT m.inherit_option OR NOT m.set_option)) "
+    "(c.rolname<>$4 OR m.admin_option "
+#ifdef VAEROEX_PRODUCTION_PROFILE
+    "OR m.inherit_option<>CASE WHEN $3::integer=1 THEN true "
+      "WHEN $3::integer=0 THEN false ELSE (SELECT rolinherit FROM pg_roles WHERE rolname=$1) END "
+    "OR m.set_option)) "
+#else
+    "OR NOT m.inherit_option OR NOT m.set_option)) "
+#endif
+#ifdef VAEROEX_PRODUCTION_PROFILE
+    /* The optional automatic creator membership must be the exact current
+     * non-superuser CREATEROLE session and bootstrap-superuser grant, not merely
+     * any role having a sufficiently powerful attribute. */
+    "AND (SELECT count(*) BETWEEN 1 AND 2 FROM pg_auth_members m WHERE m.roleid=$4::regrole) "
+    "AND NOT EXISTS (SELECT FROM pg_auth_members m JOIN pg_roles member_role ON member_role.oid=m.member "
+      "WHERE m.roleid=$4::regrole AND NOT ("
+        "(m.member=$1::regrole AND NOT m.admin_option AND NOT m.set_option AND m.inherit_option=CASE "
+          "WHEN $3::integer=1 THEN true WHEN $3::integer=0 THEN false "
+          "ELSE (SELECT rolinherit FROM pg_roles WHERE rolname=$1) END) OR "
+        "(m.member=session_user::regrole::oid AND m.grantor='10'::oid "
+          "AND m.admin_option AND NOT m.inherit_option AND NOT m.set_option "
+          "AND NOT member_role.rolsuper AND member_role.rolcreaterole)"
+      ")) "
+#endif
     "AND NOT EXISTS (SELECT FROM pg_roles c WHERE c.rolname NOT IN ($1,$4) "
     "AND pg_has_role($1,c.oid,'MEMBER')) "
     /* PG16+ gives a non-superuser CREATEROLE operator an inherent ADMIN-only
      * membership. That exact authenticated operator may manage this role but
      * must not inherit or SET ROLE into it. No other member is permitted. */
-    "AND NOT EXISTS (SELECT FROM pg_auth_members m WHERE m.roleid=(SELECT oid FROM pg_roles WHERE rolname=$1) "
-    "AND NOT (m.member=(SELECT oid FROM pg_roles WHERE rolname=session_user) "
-    "AND m.admin_option AND NOT m.inherit_option AND NOT m.set_option)) "
+    "AND NOT EXISTS (SELECT FROM pg_auth_members m JOIN pg_roles member_role ON member_role.oid=m.member "
+    "WHERE m.roleid=(SELECT oid FROM pg_roles WHERE rolname=$1) AND NOT ("
+    "m.member=session_user::regrole::oid AND m.grantor='10'::oid AND NOT member_role.rolsuper "
+    "AND member_role.rolcreaterole AND m.admin_option AND NOT m.inherit_option AND NOT m.set_option)) "
     /* Native shared dependencies cover direct ACLs (including column/function
      * grants), ownership, initial ACLs and policy references across databases.
      * A dedicated login may inherit the capability, not own extra authority. */
     "AND NOT EXISTS (SELECT FROM pg_shdepend d WHERE d.refclassid='pg_authid'::regclass "
     "AND d.refobjid=(SELECT oid FROM pg_roles WHERE rolname=$1) AND d.deptype IN ('o','a','i','r')) "
-    "AND NOT EXISTS (SELECT FROM pg_db_role_setting WHERE setrole=(SELECT oid FROM pg_roles WHERE rolname=$1))", 4, values);
+    "AND NOT EXISTS (SELECT FROM pg_db_role_setting WHERE setrole=(SELECT oid FROM pg_roles WHERE rolname=$1))", 4, values)
+    && production_authority_valid(target);
 }
 static bool no_sessions(const char *target) {
   const char *values[] = {target};
@@ -542,21 +1433,52 @@ static int run(int argc, char **argv) {
   }
   if (ok) { ok = command("BEGIN"); transaction = ok; }
   if (ok) ok = closed_authority(target) && lock_target(target);
+  if (ok) ok = production_authority_valid(target);
   if (ok && !strcmp(op,"prepare")) {
     const char *values[] = {target,CAPABILITY};
     ok = !strcmp(role_oid,"0") && true_query("SELECT NOT EXISTS (SELECT FROM pg_roles WHERE rolname=$1) "
       "AND EXISTS (SELECT FROM pg_roles WHERE rolname=$2 AND NOT rolcanlogin "
       "AND NOT rolsuper AND NOT rolcreaterole AND NOT rolcreatedb AND NOT rolreplication AND NOT rolbypassrls "
       "AND rolconfig IS NULL)",2,values);
-    if (ok) ok = role_command("CREATE ROLE",target,"NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE INHERIT NOREPLICATION NOBYPASSRLS");
-    if (ok) ok = role_command("GRANT " CAPABILITY " TO",target,"WITH ADMIN FALSE, INHERIT TRUE, SET TRUE");
+    if (ok) ok = role_command("CREATE ROLE",target,
+#ifdef VAEROEX_PRODUCTION_PROFILE
+      "NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS"
+#else
+      "NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE INHERIT NOREPLICATION NOBYPASSRLS"
+#endif
+    );
+    if (ok) ok = role_command("GRANT " CAPABILITY " TO",target,
+#ifdef VAEROEX_PRODUCTION_PROFILE
+      "WITH ADMIN FALSE, INHERIT FALSE, SET FALSE"
+#else
+      "WITH ADMIN FALSE, INHERIT TRUE, SET TRUE"
+#endif
+    );
   } else if (ok && !strcmp(op,"inspect") && !strcmp(role_oid,"0")) {
     const char *values[]={target};
     ok=true_query("SELECT NOT EXISTS (SELECT FROM pg_roles WHERE rolname=$1)",1,values);
   } else if (ok) {
-    bool allow_login = !strcmp(op,"fence") || !strcmp(op,"inspect") || !strcmp(op,"authenticate");
-    ok = strcmp(role_oid,"0") && role_valid(target,role_oid,allow_login);
-    if (ok && strcmp(op,"inspect") && strcmp(op,"authenticate")) ok = role_command("ALTER ROLE",target,"NOLOGIN");
+    /* An ordinary inspection is a closed-state proof. Only fence may accept
+     * either the bounded active state or the already-closed state because it
+     * is the compensating operation after an interrupted authentication. */
+    int expected_state=!strcmp(op,"authenticate")?1:!strcmp(op,"fence")?2:0;
+    ok = strcmp(role_oid,"0") && role_valid(target,role_oid,expected_state);
+    if (ok && strcmp(op,"inspect") && strcmp(op,"authenticate")) {
+#ifdef VAEROEX_PRODUCTION_PROFILE
+      /* Make inherited RPC authority disappear in the same transaction that
+       * fences LOGIN. Role-level NOINHERIT alone is not sufficient on
+       * PostgreSQL 16+ when an existing membership has INHERIT TRUE. */
+      if (!strcmp(op,"fence")) ok = role_command("GRANT " CAPABILITY " TO",target,
+        "WITH ADMIN FALSE, INHERIT FALSE, SET FALSE");
+#endif
+      if (ok) ok = role_command("ALTER ROLE",target,
+#ifdef VAEROEX_PRODUCTION_PROFILE
+        "NOLOGIN NOINHERIT"
+#else
+        "NOLOGIN"
+#endif
+      );
+    }
     if (ok && !strcmp(op,"fence")) {
       /* NOLOGIN must commit before termination so new authentication is denied.
        * Existing sessions are not revoked merely by changing their password. */
@@ -571,10 +1493,10 @@ static int run(int argc, char **argv) {
       }
       if (ok) ok = command("BEGIN");
       transaction = ok;
-      if (ok) ok = closed_authority(target) && lock_target(target) && role_valid(target,role_oid,false) && no_sessions(target);
+      if (ok) ok = closed_authority(target) && lock_target(target) && role_valid(target,role_oid,0) && no_sessions(target);
     }
     if (ok && (!strcmp(op,"assign") || !strcmp(op,"activate")))
-      ok = role_valid(target,role_oid,false) && no_sessions(target);
+      ok = role_valid(target,role_oid,0) && no_sessions(target);
     if (ok && !strcmp(op,"assign")) {
       puts("{\"phase\":\"ready\"}");
       fflush(stdout);
@@ -592,7 +1514,19 @@ static int run(int argc, char **argv) {
       }
       wipe(password,sizeof(password));
     }
-    if (ok && !strcmp(op,"activate")) ok = role_command("ALTER ROLE",target,"LOGIN");
+    if (ok && !strcmp(op,"activate")) {
+#ifdef VAEROEX_PRODUCTION_PROFILE
+      ok = role_command("GRANT " CAPABILITY " TO",target,
+        "WITH ADMIN FALSE, INHERIT TRUE, SET FALSE");
+#endif
+      if (ok) ok = role_command("ALTER ROLE",target,
+#ifdef VAEROEX_PRODUCTION_PROFILE
+        "LOGIN INHERIT"
+#else
+        "LOGIN"
+#endif
+      );
+    }
     if (ok && !strcmp(op,"authenticate")) {
       /* The supervisor holds the staged value only in a private pipe. Keep the
        * authority-table locks until actual candidate authentication completes. */
@@ -635,6 +1569,17 @@ static int run(int argc, char **argv) {
     if (ok) snprintf(resolved_oid,sizeof(resolved_oid),"%s",PQgetvalue(r,0,0));
     if (r) PQclear(r);
   }
+#ifdef VAEROEX_PRODUCTION_PROFILE
+  /* Re-run the exact managed ledger/schema/ABI/authority closure immediately
+   * before commit, after the final role transition and secret-store ack. The
+   * authority/table locks remain held; an absent-role inspection still proves
+   * the profile contract rather than silently skipping the postflight. */
+  if (ok) {
+    int final_state=(!strcmp(op,"activate") || !strcmp(op,"authenticate")) ? 1 : 0;
+    ok=strcmp(resolved_oid,"0") ? role_valid(target,resolved_oid,final_state)
+      : (!strcmp(op,"inspect") && production_authority_valid(target));
+  }
+#endif
   /* A transport loss at COMMIT is never treated as rollback or success. */
   if (ok) { commit_attempted = true; ok = command("COMMIT"); transaction = !ok; }
   if (!ok && transaction && db && PQstatus(db)==CONNECTION_OK && !stopped()) (void)command("ROLLBACK");

@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import { isAbsolute } from "node:path";
 import { nativeCapabilityAllowed } from "./sandbox-profile.mjs";
+import { productionProvisioningBuildProfile } from "./production-profile.mjs";
 
 const outcomes = Object.freeze({ inspect: "inspected", prepare: "prepared", fence: "fenced", assign: "assigned", activate: "activated", authenticate: "authenticated" });
 const targetFields = Object.freeze(["projectReference", "host", "port", "database", "role", "systemIdentifier", "databaseOid", "adminRole", "capabilityRole", "rootCertificate", "roleOid"]);
@@ -38,6 +39,14 @@ export function createLocalSyntheticNativeAdapter({ executable, target: supplied
   return createNativeAdapter({ executable, target: suppliedTarget, timeoutMs });
 }
 
+/** Explicit local-only Production profile qualification; never a hosted factory. */
+export function createLocalSyntheticProductionNativeAdapter({ executable, target: suppliedTarget, timeoutMs = 20000 }) {
+  if (!suppliedTarget || suppliedTarget.host !== "127.0.0.1" || suppliedTarget.projectReference !== "synthetic-production" ||
+      !/^square_production_(oauth|broker|scheduler|webhook|runtime|evidence)$/.test(suppliedTarget.role) ||
+      suppliedTarget.capabilityRole !== `${suppliedTarget.role}_authority`) throw safeFailure();
+  return createNativeAdapter({ executable, target: suppliedTarget, timeoutMs, productionLocal: true });
+}
+
 // Explicit maintenance lane. The separately compiled executable pins the same
 // endpoint, physical database and SQL/transport identities before reading FD3.
 // No ambient password, URL, environment credential or arbitrary SQL is accepted.
@@ -50,14 +59,22 @@ export function createManagedSupabaseNativeAdapter({ executable, target, withAdm
   return createNativeAdapter({ executable, target, timeoutMs, withAdministrator });
 }
 
-function createNativeAdapter({ executable, target: suppliedTarget, timeoutMs, withAdministrator }) {
+export function createManagedProductionNativeAdapter({ executable, target, profileName, withAdministrator, timeoutMs = 20000 }) {
+  const expected = productionProvisioningBuildProfile(profileName).target;
+  if (!target || targetFields.some(key => key !== "roleOid" && target[key] !== expected[key]) ||
+      !/^(?:0|[1-9][0-9]{0,9})$/.test(target.roleOid ?? "") || typeof withAdministrator !== "function") throw safeFailure();
+  return createNativeAdapter({ executable, target, timeoutMs, withAdministrator, productionLocal: true });
+}
+
+function createNativeAdapter({ executable, target: suppliedTarget, timeoutMs, withAdministrator, productionLocal = false }) {
   if (typeof executable !== "string" || !isAbsolute(executable) || /[\u0000-\u001f\u007f]/.test(executable) ||
       !suppliedTarget ||
       Object.keys(suppliedTarget).length !== targetFields.length || !targetFields.every(key => Object.hasOwn(suppliedTarget, key)) ||
       !Number.isInteger(suppliedTarget.port) || suppliedTarget.port < 1 || suppliedTarget.port > 65535 ||
       !["database", "role", "adminRole"].every(key => typeof suppliedTarget[key] === "string" && /^[a-z][a-z0-9_]{0,62}$/.test(suppliedTarget[key])) ||
       !/^(?:square_|vaeroex_)/.test(suppliedTarget.role) || /qbo|password/.test(suppliedTarget.role) ||
-      suppliedTarget.role === suppliedTarget.adminRole || !nativeCapabilityAllowed(suppliedTarget) ||
+      suppliedTarget.role === suppliedTarget.adminRole ||
+      (!nativeCapabilityAllowed(suppliedTarget) && !productionLocal) ||
       !["systemIdentifier", "databaseOid", "roleOid"].every(key => typeof suppliedTarget[key] === "string" && /^(?:0|[1-9][0-9]{0,19})$/.test(suppliedTarget[key])) ||
       typeof suppliedTarget.rootCertificate !== "string" || !isAbsolute(suppliedTarget.rootCertificate) ||
       /[\u0000-\u001f\u007f]/.test(suppliedTarget.rootCertificate) || suppliedTarget.rootCertificate.length > 1024 ||

@@ -1,5 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 import { nativeCapabilityAllowed } from "./sandbox-profile.mjs";
+import { productionCapabilityAllowed, productionProvisioningBuildProfile } from "./production-profile.mjs";
 
 // This file has no network, process-spawn, SQL or cloud-store implementation.
 // A reviewed synthetic adapter is not a supported provider provisioning lane.
@@ -24,13 +25,13 @@ const identifier = value => typeof value === "string" && /^[a-zA-Z0-9_.:-]{1,128
 const sameTarget = (left, right) => left && targetKeys.every(key => left[key] === right[key]) &&
   Object.keys(left).length === targetKeys.length;
 
-function snapshotTarget(value) {
+function snapshotTarget(value, production = false) {
   if (!value || Object.keys(value).length !== targetKeys.length ||
       !targetKeys.every(key => Object.hasOwn(value, key)) ||
       !identifier(value.projectReference) || !identifier(value.host) ||
       !/^[a-z_][a-z0-9_]{0,62}$/.test(value.role) ||
       !/^[a-z_][a-z0-9_]{0,62}$/.test(value.adminRole) || value.adminRole === value.role ||
-      !nativeCapabilityAllowed(value) ||
+      !(production ? productionCapabilityAllowed(value) : nativeCapabilityAllowed(value)) ||
       typeof value.rootCertificate !== "string" || !value.rootCertificate.startsWith("/") ||
       value.rootCertificate.length > 1024 || /[\u0000-\u001f\u007f]/.test(value.rootCertificate) ||
       !/^[a-zA-Z0-9_]{1,63}$/.test(value.database) ||
@@ -105,6 +106,11 @@ export function createSyntheticProvisioningCoordinator({ target: inputTarget, na
   return createProvisioningCoordinator({ target: inputTarget, native, secretStore, audit, now });
 }
 
+export function createSyntheticProductionProvisioningCoordinator({ target: inputTarget, native, secretStore, audit, now = Date.now }) {
+  if (inputTarget?.projectReference !== "synthetic-production") throw fault();
+  return createProvisioningCoordinator({ target: inputTarget, native, secretStore, audit, now, production: true });
+}
+
 // This explicit composition is for operator-mediated isolated maintenance, not
 // application startup. Hosted qualification and private operator entry remain
 // prerequisites; no application binding is enabled by this state machine.
@@ -118,8 +124,15 @@ export function createManagedSupabaseProvisioningCoordinator(options) {
   return createProvisioningCoordinator(options);
 }
 
-function createProvisioningCoordinator({ target: inputTarget, native, secretStore, audit, now = Date.now }) {
-  const target = snapshotTarget(inputTarget);
+export function createManagedProductionProvisioningCoordinator({ profileName, ...options }) {
+  const expected = productionProvisioningBuildProfile(profileName).target;
+  if (!options.target || targetKeys.some(key => key !== "roleOid" && options.target[key] !== expected[key]) ||
+      !/^(?:0|[1-9][0-9]{0,9})$/.test(options.target.roleOid ?? "")) throw fault();
+  return createProvisioningCoordinator({ ...options, production: true });
+}
+
+function createProvisioningCoordinator({ target: inputTarget, native, secretStore, audit, now = Date.now, production = false }) {
+  const target = snapshotTarget(inputTarget, production);
   requireMethods(native, nativeMethods);
   requireMethods(secretStore, storeMethods);
   requireMethods(audit, ["append"]);
@@ -157,6 +170,9 @@ function createProvisioningCoordinator({ target: inputTarget, native, secretStor
     let missingAcknowledgement = false;
     let auditFailed = false;
     let authorityVerified = false;
+    let inspectionStarted = false;
+    let inspectionConfirmed = false;
+    let authenticationFenceConfirmed = false;
     let stopped = false;
     let pendingPreparation;
     let validPrepared = () => false;
@@ -192,7 +208,12 @@ function createProvisioningCoordinator({ target: inputTarget, native, secretStor
     });
 
     try {
-      await step("verify_closed_authority", () => native.inspect(context), closed);
+      await step("verify_closed_authority", async () => {
+        inspectionStarted = true;
+        const inspected = await native.inspect(context);
+        if (closed(inspected)) inspectionConfirmed = true;
+        return inspected;
+      }, closed);
       authorityVerified = true;
       // Reservation is created before mutation or generation. It is never active.
       phase = "reserve";
@@ -292,12 +313,13 @@ function createProvisioningCoordinator({ target: inputTarget, native, secretStor
         authenticationReads === 1 && authenticationVerified);
       if (target.capabilityRole !== "square_account_broker_authority") {
         await step("fence_after_authentication", () => native.fence(context), fenced);
+        authenticationFenceConfirmed = true;
       }
       // Native auth connection is closed before a staged-ready result exists.
       await step("close", () => native.abortAndDrain(context), value => ack(value) && value.drained === true);
       await step("staged_ready", () => secretStore.markStagedReady(reservation));
       requiresRecovery = false;
-      return result("staged_ready", false, false);
+      return result("staged_ready", authenticationFenceConfirmed, false);
     } catch {
       stopped = true;
       acceptingDelivery = false;
@@ -306,9 +328,11 @@ function createProvisioningCoordinator({ target: inputTarget, native, secretStor
       // Secret deletion is not DB commit proof. A terminal reservation tombstone
       // also prevents a delayed stage completion from becoming usable.
       const discarded = reservation === undefined || ack(await boundedCleanup(() => secretStore.discard(reservation), cleanupTimeoutMs));
-      let fenceConfirmed = !mutationStarted;
-      let barrier = !mutationStarted;
-      if (mutationStarted) {
+      const existingPreflightFailure = inspectionStarted && !inspectionConfirmed && context.target.roleOid !== "0";
+      const needsFence = mutationStarted || existingPreflightFailure;
+      let fenceConfirmed = inspectionConfirmed && !mutationStarted;
+      let barrier = !needsFence;
+      if (needsFence) {
         const drain = await boundedCleanup(cleanSignal => native.abortAndDrain(Object.freeze({ ...context, signal: cleanSignal })), cleanupTimeoutMs);
         barrier = ack(drain) && drain.drained === true;
         if (barrier) {
@@ -328,9 +352,10 @@ function createProvisioningCoordinator({ target: inputTarget, native, secretStor
           fenceConfirmed = fenced(fence);
         }
       }
-      const uncertain = (commitAttempted && !commitAcknowledged) || !barrier || !fenceConfirmed || !discarded || missingAcknowledgement;
+      const uncertain = (commitAttempted && !commitAcknowledged) || !barrier || (needsFence && !fenceConfirmed) || !discarded ||
+        missingAcknowledgement || (inspectionStarted && !inspectionConfirmed && context.target.roleOid === "0");
       const outcome = uncertain ? "uncertain" : controller.signal.aborted ? "cancelled" : "fenced_failure";
-      requiresRecovery = mutationStarted || uncertain;
+      requiresRecovery = mutationStarted || (inspectionStarted && !inspectionConfirmed) || uncertain;
       try { await record("final", outcome, true); } catch { /* fixed metadata only; never infer DB outcome from audit */ }
       return Object.freeze({ ...result(outcome, fenceConfirmed, requiresRecovery), auditComplete: !auditFailed });
     } finally {
@@ -346,8 +371,8 @@ function createProvisioningCoordinator({ target: inputTarget, native, secretStor
 }
 
 /** Bounded, transient test double; never a hosted secret-store implementation. */
-export function createInMemorySyntheticSecretStore({ capacity = 16 } = {}) {
-  if (!Number.isInteger(capacity) || capacity < 1 || capacity > 256) throw fault();
+export function createInMemorySyntheticSecretStore({ capacity = 16, production = false } = {}) {
+  if (!Number.isInteger(capacity) || capacity < 1 || capacity > 256 || typeof production !== "boolean") throw fault();
   const reservations = new WeakMap();
   const intents = new Set();
   let count = 0;
@@ -355,7 +380,7 @@ export function createInMemorySyntheticSecretStore({ capacity = 16 } = {}) {
   return Object.freeze({
     reserve({ target, intent }) {
       if (count >= capacity || intents.size >= 256 || intents.has(intent)) throw fault();
-      snapshotTarget(target);
+      snapshotTarget(target, production);
       const handle = Object.freeze(Object.create(null));
       intents.add(intent); count++;
       reservations.set(handle, { state: "reserved", bytes: undefined });

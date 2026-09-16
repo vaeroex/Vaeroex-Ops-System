@@ -55,7 +55,10 @@ process.stdout.write('synthetic_fixed_entry_passed\\n');
       ...(process.platform === "linux" ? ["-static"] : []), "-DVAEROEX_LAUNCHER_SYNTHETIC_ONLY",
       `-DVAEROEX_TEST_NODE=${JSON.stringify(node)}`, `-DVAEROEX_TEST_INSTALL=${JSON.stringify(install)}`,
       source, "-o", launcher];
-    success(run("/usr/bin/cc", flags));
+    // Clang needs a writable compiler scratch directory on sandboxed macOS.
+    // This applies only to compilation; launcher invocations below still prove
+    // that execve supplies exactly PATH, LANG and LC_ALL to Node.
+    success(run("/usr/bin/cc", flags, { env: { ...environment, TMPDIR: tmpdir() } }));
     if (process.platform === "linux") {
       const headers = run("/usr/bin/readelf", ["-lW", launcher]);success(headers);
       const dynamic = run("/usr/bin/readelf", ["-dW", launcher]);success(dynamic);

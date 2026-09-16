@@ -16,11 +16,19 @@ const isCredentialByte = byte => (byte >= 48 && byte <= 57) || (byte >= 97 && by
  * The maintenance launcher separately pins the public CA file and its digest.
  */
 export function createManagedSupabaseDsnCodec({ role } = {}) {
-  if (typeof role !== "string" || !/^square_sandbox_[a-z_]{1,40}$/.test(role) ||
-      /qbo|password/.test(role)) throw denied();
+  if (typeof role !== "string" || !/^square_sandbox_[a-z_]{1,40}$/.test(role) || /qbo|password/.test(role)) throw denied();
+  return createPinnedSupabaseDsnCodec({ role, projectReference: project, host, port: 5432 });
+}
+
+export function createPinnedSupabaseDsnCodec({ role, projectReference, host: pinnedHost, port } = {}) {
+  if (typeof role !== "string" || !/^square_(?:sandbox_[a-z_]{1,40}|production_(?:oauth|broker|scheduler|webhook|runtime|evidence))$/.test(role) ||
+      /qbo|password/.test(role) || !/^[a-z]{20}$/.test(projectReference ?? "") ||
+      typeof pinnedHost !== "string" || pinnedHost.length > 253 ||
+      !/^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])$/.test(pinnedHost) || !pinnedHost.includes(".") ||
+      !Number.isInteger(port) || port < 1 || port > 65535) throw denied();
   // These strings contain configuration only, never credential material.
-  const prefix = Buffer.from(`postgresql://${role}.${project}:`, "ascii");
-  const suffix = Buffer.from(`@${host}:5432/postgres?sslmode=verify-full`, "ascii");
+  const prefix = Buffer.from(`postgresql://${role}.${projectReference}:`, "ascii");
+  const suffix = Buffer.from(`@${pinnedHost}:${port}/postgres?sslmode=verify-full`, "ascii");
   const size = prefix.length + 128 + suffix.length;
   const isBuffer = value => Buffer.isBuffer(value) && !(value.buffer instanceof SharedArrayBuffer);
   const isCredential = value => isBuffer(value) && value.length === 128 && value.every(isCredentialByte);
