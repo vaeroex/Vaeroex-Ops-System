@@ -165,7 +165,9 @@ async function main() {
     try { value = JSON.parse(line); } catch { value = null; }
     const names = ["identity", "profile", "platformClosed", "providerClosed", "configurationClosed", "capabilityClosed",
       "closedAuthority", "targetLock", "phaseValid", "productionContract",
-      "oauthAuthority", "brokerAuthority", "schedulerAuthority", "webhookAuthority", "runtimeAuthority", "evidenceAuthority"];
+      "oauthAuthority", "brokerAuthority", "schedulerAuthority", "webhookAuthority", "runtimeAuthority", "evidenceAuthority",
+      "brokerWrapper", "brokerHelper", "brokerCapabilityRole", "brokerNoMembership", "brokerTargetAbsent", "brokerPublicUsage",
+      "brokerExecuteAcl", "brokerPrivateClosed"];
     check(value?.outcome === "production_authority_diagnostic" && names.every(name => typeof value[name] === "boolean"),
       "post_mutation_authority_diagnostic_shape");
     process.stdout.write(JSON.stringify({ outcome: "post_mutation_authority_observation", ...Object.fromEntries(
