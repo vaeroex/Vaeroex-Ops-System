@@ -217,27 +217,29 @@ async function main() {
   const role = (await fixture.control.query("SELECT rolcanlogin,rolinherit FROM pg_roles WHERE rolname=$1", [failedProfile.role])).rows[0];
   check(!role, "precreate_failure_leaves_no_production_login");
 
-  // A store failure happens only after the native assignment mutates an exact
-  // existing role identity. It must still leave that role fenced, with no
-  // session, and force an explicit recovery rather than silently retrying.
-  // Use an explicitly existing closed role for this scenario. That keeps the
-  // acknowledgement-loss fixture focused on the post-mutation fence contract
-  // instead of coupling it to CREATE-role reconciliation.
-  await fixture.control.query(`CREATE ROLE ${failedProfile.role} NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS`);
-  await fixture.control.query(`GRANT ${failedProfile.capabilityRole} TO ${failedProfile.role} WITH ADMIN FALSE, INHERIT FALSE, SET FALSE`);
-  const postMutationRoleIdentity = (await fixture.control.query(
-    "SELECT oid::text role_oid FROM pg_roles WHERE rolname=$1", [failedProfile.role],
-  )).rows[0];
-  check(postMutationRoleIdentity?.role_oid && postMutationRoleIdentity.role_oid !== "0",
-    "post_mutation_fixture_role_identity_ready");
-  const postMutationTarget = Object.freeze({ ...failedTarget, roleOid: postMutationRoleIdentity.role_oid });
+  // A store failure happens only after native assignment mutates an exact
+  // existing role identity. Build that precondition through the real native
+  // prepare operation rather than hand-writing a role/membership pair: the
+  // native closed-state contract includes the exact capability edge and
+  // creator/dependency invariants. This keeps the scenario focused on the
+  // post-mutation fence contract rather than an invalid fixture identity.
   const postMutationNativeBase = adapterModule.createLocalSyntheticProductionNativeAdapter({
+    executable: binaries.get(failedProfile.name), target: failedTarget,
+  });
+  const preparedPostMutation = await postMutationNativeBase.prepare({ target: failedTarget,
+    operation: "create", intent: "production-post-mutation-prepare", approvalId: "synthetic-production",
+    signal: new AbortController().signal });
+  check(preparedPostMutation.roleOid && preparedPostMutation.roleOid !== "0" && preparedPostMutation.noLogin === true,
+    "post_mutation_fixture_native_prepare");
+  const postMutationRoleIdentity = { role_oid: preparedPostMutation.roleOid };
+  const postMutationTarget = Object.freeze({ ...failedTarget, roleOid: postMutationRoleIdentity.role_oid });
+  const postMutationNativePrepared = adapterModule.createLocalSyntheticProductionNativeAdapter({
     executable: binaries.get(failedProfile.name), target: postMutationTarget,
   });
   const postMutationNative = Object.freeze({
-    ...postMutationNativeBase,
+    ...postMutationNativePrepared,
     async assign(context) {
-      const assigned = await postMutationNativeBase.assign(context);
+      const assigned = await postMutationNativePrepared.assign(context);
       return Object.freeze({ ...assigned, storeAcknowledged: false });
     },
   });
