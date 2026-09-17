@@ -1,4 +1,5 @@
 const assert = require("node:assert/strict");
+const crypto = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
 const Module = require("node:module");
@@ -18,6 +19,10 @@ const activationReadme = fs.readFileSync(path.join(root, "services/external-inte
 const evidenceDatabaseTest = fs.readFileSync(path.join(root, "scripts/square-workspace-evidence-database-tests.js"), "utf8");
 const fixtureRichMigrationTest = fs.readFileSync(path.join(root, "scripts/run-phase8b-zero-based-delivery-migration-tests.js"), "utf8");
 const observationDatabaseTest = fs.readFileSync(path.join(root, "scripts/run-square-observation-database-qualification.js"), "utf8");
+const internalRuntimeMigration = fs.readFileSync(path.join(root,
+  "supabase/migrations/20260902191325_square_production_internal_pilot_runtime.sql"), "utf8");
+const internalRuntimeQualification = fs.readFileSync(path.join(root,
+  "scripts/run-square-production-internal-pilot-runtime-qualification.js"), "utf8");
 const separatedDatabaseQualifications = [
   "scripts/run-square-account-connection-qualification.js",
   "scripts/run-square-broker-runtime-qualification.js",
@@ -222,6 +227,25 @@ assert.match(legacyGuard, /square_internal_runtime_present :=[\s\S]*square_produ
   "forward guard recognizes only the complete internal-runtime RPC set");
 assert.match(legacyGuard, /integration_production_internal_runtime_partial/,
   "forward guard rejects a partial internal-runtime RPC set");
+assert.match(legacyGuard, /schema_migrations[\s\S]*version='20260902191325'[\s\S]*integration_production_internal_runtime_drift/,
+  "forward guard accepts the internal runtime only with its exact migration ledger entry");
+assert.match(legacyGuard, /count\(\*\)=12[\s\S]*proowner<>marker_owner[\s\S]*prosecdef<>expected\.security_definer[\s\S]*prosrc,'UTF8'[\s\S]*expected\.source_hash/,
+  "forward guard authenticates the complete internal-runtime function catalog before changing authority allowlists");
+assert.match(legacyGuard, /count\(\*\) from pg_catalog\.pg_class[\s\S]*square_production_internal_permits[\s\S]*square_production_internal_audit_events/,
+  "forward guard requires every private object used by the authenticated internal runtime");
+for (const capability of ["oauth", "broker", "runtime", "evidence"]) {
+  const body = internalRuntimeMigration.match(new RegExp(
+    `create function public\\.square_production_internal_${capability}_v1\\(p_operation text,p_payload jsonb\\)[\\s\\S]*?as \\$function\\$([\\s\\S]*?)\\$function\\$;`
+  ));
+  assert.ok(body, `frozen ${capability} runtime body is present`);
+  const sourceHash = crypto.createHash("sha256").update(body[1], "utf8").digest("hex");
+  assert.match(legacyGuard, new RegExp(
+    `public\\.square_production_internal_${capability}_v1\\(text,jsonb\\)[\\s\\S]*?${sourceHash}`
+  ), `forward guard pins the exact frozen ${capability} runtime body`);
+}
+assert.match(internalRuntimeQualification,
+  /restoreLocalSessionAuthorization = await enableLocalSessionAuthorization\(databaseUrl\);[\s\S]*const elevatedClient = new Client\(\{ connectionString: databaseUrl \}\);[\s\S]*await elevatedClient\.connect\(\);[\s\S]*await client\.end\(\);[\s\S]*client = elevatedClient;[\s\S]*await exerciseRuntime\(client\);/,
+  "Supabase-local qualification reconnects after postgres elevation before session authorization");
 assert.match(legacyGuard, /pg_catalog\.pg_shdepend[\s\S]*dependency\.classid='pg_namespace'::regclass[\s\S]*dependency\.objid='public'::regnamespace/,
   "forward guard permits the reviewed public-schema ACL dependency");
 assert.match(legacyGuard, /dependency\.classid='pg_proc'::regclass/,

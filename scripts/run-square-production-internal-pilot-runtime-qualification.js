@@ -1345,6 +1345,10 @@ async function main() {
     assert.deepEqual(ledger.rows[0], { count: 104, head: runtimeVersion, fingerprint: runtimeLedgerFingerprint });
     assert.deepEqual(await catalogSnapshot(client), beforeQbo, "runtime migration leaves QBO catalog byte-for-byte unchanged");
     restoreLocalSessionAuthorization = await enableLocalSessionAuthorization(databaseUrl);
+    const elevatedClient = new Client({ connectionString: databaseUrl });
+    await elevatedClient.connect();
+    await client.end();
+    client = elevatedClient;
     await exerciseRuntime(client);
   } finally {
     try {
