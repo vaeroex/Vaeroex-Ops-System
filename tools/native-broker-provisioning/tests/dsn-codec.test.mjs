@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { createManagedSupabaseDsnCodec } from "../dsn-codec.mjs";
+import { createManagedSupabaseDsnCodec, createPinnedSupabaseDsnCodec } from "../dsn-codec.mjs";
 
 const role = "square_sandbox_synthetic_broker";
 const codec = createManagedSupabaseDsnCodec({ role });
@@ -57,6 +57,23 @@ test("every altered envelope byte is rejected, including role, project, host and
   }
   const otherRole = createManagedSupabaseDsnCodec({ role: "square_sandbox_another_broker" });
   rejects(() => otherRole.decode(original));
+});
+
+test("pinned codec preserves the reviewed non-default endpoint port", () => {
+  const productionRole = "square_production_runtime";
+  const at6543 = createPinnedSupabaseDsnCodec({ role: productionRole, projectReference: "mdiianhfrojmxqpwrflh",
+    host: "pooler.example.com", port: 6543 });
+  const input = credential();
+  const encoded = at6543.encode(input);
+  assert.ok(encoded.subarray(-Buffer.byteLength("@pooler.example.com:6543/postgres?sslmode=verify-full"))
+    .equals(Buffer.from("@pooler.example.com:6543/postgres?sslmode=verify-full")));
+  const at5432 = createPinnedSupabaseDsnCodec({ role: productionRole, projectReference: "mdiianhfrojmxqpwrflh",
+    host: "pooler.example.com", port: 5432 });
+  rejects(() => at5432.decode(encoded));
+  for (const port of [undefined, null, "6543", 0, 65536, 5432.5]) rejects(() =>
+    createPinnedSupabaseDsnCodec({ role: productionRole, projectReference: "mdiianhfrojmxqpwrflh",
+      host: "pooler.example.com", port }));
+  encoded.fill(0); input.fill(0);
 });
 
 test("decode rejects malformed credentials without exposing input or changing it", () => {

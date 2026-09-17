@@ -7,6 +7,16 @@ const denied = () => new Error("maintenance_identity_denied");
 // runtime identity or arbitrary metadata path fallback. This SA is distinct from
 // the callback reader and must be provisioned/attached explicitly before use.
 export function createGceMaintenanceIdentity({ request = http.request } = {}) {
+  return createPinnedGceMaintenanceIdentity({ request, pin });
+}
+
+export function createPinnedGceMaintenanceIdentity({ request = http.request, pin: identityPin } = {}) {
+  if (!identityPin || !/^[a-z][a-z0-9-]{4,28}[a-z0-9]$/.test(identityPin.projectId ?? "") ||
+      !/^[1-9][0-9]{5,19}$/.test(identityPin.projectNumber ?? "") ||
+      !/^[1-9][0-9]{5,24}$/.test(identityPin.instanceId ?? "") ||
+      !/^[a-z]+-[a-z]+[0-9]-[a-z]$/.test(identityPin.zone ?? "") ||
+      typeof identityPin.serviceAccount !== "string" ||
+      !identityPin.serviceAccount.endsWith(`@${identityPin.projectId}.iam.gserviceaccount.com`)) throw denied();
   if (typeof request !== "function") throw denied();
   let verified = false, active = false;
   async function get(path, maximum = 4096) {
@@ -34,9 +44,9 @@ export function createGceMaintenanceIdentity({ request = http.request } = {}) {
     });
   }
   async function verify() {
-    const checks = [["project/project-id", pin.projectId], ["project/numeric-project-id", pin.projectNumber],
-      ["instance/id", pin.instanceId], ["instance/zone", `projects/${pin.projectNumber}/zones/${pin.zone}`],
-      ["instance/service-accounts/default/email", pin.serviceAccount]];
+    const checks = [["project/project-id", identityPin.projectId], ["project/numeric-project-id", identityPin.projectNumber],
+      ["instance/id", identityPin.instanceId], ["instance/zone", `projects/${identityPin.projectNumber}/zones/${identityPin.zone}`],
+      ["instance/service-accounts/default/email", identityPin.serviceAccount]];
     verified = false;
     for (const [path, expected] of checks) {
       const bytes = await get(path);
@@ -54,7 +64,7 @@ export function createGceMaintenanceIdentity({ request = http.request } = {}) {
       // Recheck the attached identity; a prior native host inspection is not a
       // permanent authorization for a different service account.
       await verify();
-      bytes = await get(`instance/service-accounts/${pin.serviceAccount}/token`, 16384);
+      bytes = await get(`instance/service-accounts/${identityPin.serviceAccount}/token`, 16384);
       const value = JSON.parse(bytes.toString("utf8"));
       if (value?.token_type !== "Bearer" || typeof value.access_token !== "string" ||
           value.access_token.length < 16 || value.access_token.length > 8192 ||

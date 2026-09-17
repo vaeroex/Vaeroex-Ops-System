@@ -144,18 +144,35 @@ test("missing authority proof stops before private store, mutation or generation
   const f = fixture({ nativeOverrides: { inspect: async () => ({ ack: true, authorityClosed: false }) } });
   const result = await f.coordinator.run(invocation);
   assert.equal(result.applicationAuthority, "unverified");
+  assert.equal(result.fenceConfirmed, false);
+  assert.equal(result.requiresFreshReplacement, true);
   assert.deepEqual(f.calls, ["inspect"]);
 });
 
-test("role OID reuse or replacement is rejected before generation", async () => {
+test("existing-role inspection failure drains and fences before requiring checked recovery", async () => {
   for (const operation of ["rotate", "recover"]) {
     const f = fixture({ configuredTarget: { ...target, roleOid: "43" }, nativeOverrides: {
       inspect: async () => ({ ack: false }),
     } });
     const result = await f.coordinator.run({ ...invocation, operation });
     assert.notEqual(result.outcome, "staged_ready");
+    assert.equal(result.fenceConfirmed, true);
+    assert.equal(result.requiresFreshReplacement, true);
+    assert.deepEqual(f.calls, ["inspect", "abortAndDrain", "fence"]);
     assert.equal(f.calls.includes("assign"), false);
   }
+});
+
+test("existing-role inspection and compensating-fence failure remains uncertain", async () => {
+  const f = fixture({ configuredTarget: { ...target, roleOid: "43" }, nativeOverrides: {
+    inspect: async () => { throw new Error("synthetic_inspection_failure"); },
+    fence: async () => ({ ack: false }),
+  } });
+  const result = await f.coordinator.run({ ...invocation, operation: "recover" });
+  assert.equal(result.outcome, "uncertain");
+  assert.equal(result.fenceConfirmed, false);
+  assert.equal(result.requiresFreshReplacement, true);
+  assert.deepEqual(f.calls, ["inspect", "abortAndDrain", "fence"]);
 });
 
 for (const metadata of [{ committed: false }, { storeAcknowledged: false }, { authorityClosed: false }, { ack: false }]) {
