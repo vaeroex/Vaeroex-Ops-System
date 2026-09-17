@@ -4,14 +4,15 @@ import { constants, closeSync, fsyncSync, fstatSync, lstatSync, openSync, readFi
 import { fileURLToPath } from "node:url";
 import { dirname } from "node:path";
 import { promisify } from "node:util";
-import { createManagedSupabaseNativeAdapter } from "./adapter.mjs";
-import { createManagedSupabaseProvisioningCoordinator } from "./lifecycle.mjs";
+import { createManagedProductionNativeAdapter, createManagedSupabaseNativeAdapter } from "./adapter.mjs";
+import { createManagedProductionProvisioningCoordinator, createManagedSupabaseProvisioningCoordinator } from "./lifecycle.mjs";
 import { createGoogleSecretManagerStagingStore } from "./secret-store.mjs";
-import { createSandboxSecretManagerRestClient } from "./secret-manager-rest.mjs";
-import { createManagedSupabaseDsnCodec } from "./dsn-codec.mjs";
-import { createGceMaintenanceIdentity } from "./maintenance-identity.mjs";
+import { createPinnedSecretManagerRestClient } from "./secret-manager-rest.mjs";
+import { createPinnedSupabaseDsnCodec } from "./dsn-codec.mjs";
+import { createPinnedGceMaintenanceIdentity } from "./maintenance-identity.mjs";
 import { readPrivateAdministrator, releasePrivateAdministratorInput } from "./private-entry.mjs";
 import { sandboxProvisioningInstallation } from "./sandbox-profile.mjs";
+import { productionProvisioningInstallation } from "./production-profile.mjs";
 import { maintenanceWindow, requireMutationWindow, requiresClearance, checkRecoveryClearance } from "./maintenance-policy.mjs";
 
 // Dedicated operator CLI. Never imported by an application or invoked on boot.
@@ -19,9 +20,12 @@ import { maintenanceWindow, requireMutationWindow, requiresClearance, checkRecov
 // Enter only through the reviewed static maintenance-launcher. The checks below
 // are defense in depth, not protection from hooks that ran before JavaScript.
 let profile;
-try { profile = sandboxProvisioningInstallation(dirname(fileURLToPath(import.meta.url))); }
-catch { process.stdout.write("native_maintenance_denied\n"); process.exit(2); }
-const { install, target: sandboxTarget, maintenance: pin } = profile;
+try { profile = sandboxProvisioningInstallation(dirname(fileURLToPath(import.meta.url))); profile = Object.freeze({ kind: "sandbox", ...profile }); }
+catch {
+  try { profile = productionProvisioningInstallation(dirname(fileURLToPath(import.meta.url))); }
+  catch { process.stdout.write("native_maintenance_denied\n"); process.exit(2); }
+}
+const { install, target: pinnedTarget, maintenance: pin } = profile;
 const executable = `${install}/native-managed`;
 const journal = `${profile.state}/maintenance.jsonl`;
 const denied = () => new Error("native_maintenance_denied");
@@ -64,8 +68,8 @@ async function main() {
   trustedFile(`${install}/native-managed.sha256`, 128);
   const expectedHash = readFileSync(`${install}/native-managed.sha256`, "ascii").trim();
   if (!/^[a-f0-9]{64}$/.test(expectedHash) || createHash("sha256").update(readFileSync(executable)).digest("hex") !== expectedHash) throw denied();
-  trustedFile(sandboxTarget.rootCertificate, 16384);
-  if (createHash("sha256").update(readFileSync(sandboxTarget.rootCertificate)).digest("hex") !== pin.caSha256) throw denied();
+  trustedFile(pinnedTarget.rootCertificate, 16384);
+  if (createHash("sha256").update(readFileSync(pinnedTarget.rootCertificate)).digest("hex") !== pin.caSha256) throw denied();
   trustedFile(journal, 1048576, true);
   lockFd = openSync(lockPath, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600);
   lockIdentity = fstatSync(lockFd);
@@ -80,17 +84,19 @@ async function main() {
     const clearancePath = `${profile.state}/recovery-clearance.json`;
     trustedFile(clearancePath, 4096, true);
     const clearance = JSON.parse(readFileSync(clearancePath, "utf8"));
-    clearanceExpiry = checkRecoveryClearance({ last, operation, roleOid, intent, approvalId, clearance, now: Date.now(), profile: profile.name });
+    clearanceExpiry = checkRecoveryClearance({ last, operation, roleOid, intent, approvalId, clearance,
+      now: Date.now(), profile: profile.name, profileKind: profile.kind });
   }
   journalFd = openSync(journal, constants.O_WRONLY | constants.O_APPEND | constants.O_NOFOLLOW);
-  const identity = createGceMaintenanceIdentity();
+  const identity = createPinnedGceMaintenanceIdentity({ pin });
   await identity.verify();
-  const client = createSandboxSecretManagerRestClient({ withAccessToken: identity.withAccessToken, profile: profile.name });
+  const client = createPinnedSecretManagerRestClient({ withAccessToken: identity.withAccessToken,
+    secretParent: pin.secretParent, projectId: pin.projectId, projectNumber: pin.projectNumber });
   await client.preflight();
   // Public TLS evidence only, before private administrator entry. The presented
   // chain is never itself promoted to a trust root.
-  const tls = promisify(execFile)("/usr/bin/openssl", ["s_client", "-starttls", "postgres", "-connect", `${sandboxTarget.host}:5432`,
-    "-servername", sandboxTarget.host, "-verify_hostname", sandboxTarget.host, "-CAfile", sandboxTarget.rootCertificate,
+  const tls = promisify(execFile)("/usr/bin/openssl", ["s_client", "-starttls", "postgres", "-connect", `${pinnedTarget.host}:${pinnedTarget.port}`,
+    "-servername", pinnedTarget.host, "-verify_hostname", pinnedTarget.host, "-CAfile", pinnedTarget.rootCertificate,
     "-verify_return_error", "-brief"], { env: { PATH: "/usr/bin:/bin", LANG: "C", LC_ALL: "C" },
     timeout: 10000, maxBuffer: 32768, signal: cancellation.signal });
   tls.child.stdin.end();
@@ -101,19 +107,27 @@ async function main() {
   password = await readPrivateAdministrator({ timeoutMs: entryWindow.entryTimeoutMs, signal: cancellation.signal });
   if (cancellation.signal.aborted) throw denied();
   requireMutationWindow(deadline, clearanceExpiry, Date.now());
-  const target = Object.freeze({ ...sandboxTarget, roleOid });
-  native = createManagedSupabaseNativeAdapter({ executable, target, withAdministrator: async (consume, signal) => {
+  const target = Object.freeze({ ...pinnedTarget, roleOid });
+  const adapterOptions = { executable, target, withAdministrator: async (consume, signal) => {
     if (!password || signal.aborted) throw denied();
     await consume(password);
     if (signal.aborted) throw denied();
     return { ack: true };
-  } });
+  } };
+  native = profile.kind === "production"
+    ? createManagedProductionNativeAdapter({ ...adapterOptions, profileName: profile.name })
+    : createManagedSupabaseNativeAdapter(adapterOptions);
   const underlyingStore = createGoogleSecretManagerStagingStore({ client, projectId: pin.projectId,
-    projectNumber: pin.projectNumber, secretParent: pin.secretParent, payloadCodec: createManagedSupabaseDsnCodec({ role: target.role }) });
+    projectNumber: pin.projectNumber, secretParent: pin.secretParent,
+    payloadCodec: createPinnedSupabaseDsnCodec({ role: target.role, projectReference: target.projectReference,
+      host: target.host, port: target.port }) });
   store = Object.freeze({ ...underlyingStore, reserve(context) { reservation = underlyingStore.reserve(context); return reservation; } });
-  const coordinator = createManagedSupabaseProvisioningCoordinator({ target, native, secretStore: store,
-    audit: { async append(event) { append({ kind: "lifecycle", ...event }); return { ack: true }; } } });
-  append({ kind: "maintenance_started", actor: pin.serviceAccount, targetRole: sandboxTarget.role, operation, intent, approvalId, time: Date.now() });
+  const coordinatorOptions = { target, native, secretStore: store,
+    audit: { async append(event) { append({ kind: "lifecycle", ...event }); return { ack: true }; } } };
+  const coordinator = profile.kind === "production"
+    ? createManagedProductionProvisioningCoordinator({ ...coordinatorOptions, profileName: profile.name })
+    : createManagedSupabaseProvisioningCoordinator(coordinatorOptions);
+  append({ kind: "maintenance_started", actor: pin.serviceAccount, targetRole: pinnedTarget.role, operation, intent, approvalId, time: Date.now() });
   const result = await coordinator.run({ operation, actor: "isolated_native_postgres_operator", intent, approvalId,
     deadlineMs: 30000, cleanupTimeoutMs: 10000, signal: cancellation.signal });
   const metadata = reservation ? store.metadata(reservation) : undefined;

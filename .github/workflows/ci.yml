@@ -310,6 +310,8 @@ jobs:
           VAEROEX_NATIVE_TEST_DEPENDENCIES="$native_manifest" node tools/native-broker-provisioning/tests/managed-qualify.cjs
           VAEROEX_NATIVE_TEST_DEPENDENCIES="$native_manifest" VAEROEX_MANAGED_TEST_SYSTEM_LIBPQ=16.15 node tools/native-broker-provisioning/tests/managed-qualify.cjs
           VAEROEX_NATIVE_TEST_DEPENDENCIES="$native_manifest" node tools/native-broker-provisioning/tests/mapped-qualify.cjs
+          VAEROEX_NATIVE_TEST_DEPENDENCIES="$native_manifest" node tools/native-broker-provisioning/tests/production-native-qualify.cjs
+          VAEROEX_NATIVE_TEST_DEPENDENCIES="$native_manifest" pnpm test:native-broker-production-catalog
           node tools/native-broker-provisioning/build-managed.mjs "$RUNNER_TEMP/native-managed-sandbox"
           node tools/native-broker-provisioning/build-managed.mjs "$RUNNER_TEMP/native-managed-enroller" enroller
           node tools/native-broker-provisioning/build-managed.mjs "$RUNNER_TEMP/native-managed-runtime" runtime

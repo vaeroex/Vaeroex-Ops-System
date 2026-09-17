@@ -76,7 +76,9 @@ async function createFixture({ expandedOperator = false } = {}) {
   let running = false, startupAttempted = false;
   const clients = new Set();
   async function connect(user = admin, password, transport = "socket") {
-    if (![admin, target, "synthetic_unprivileged", "synthetic_privileged", "synthetic_lane_admin", "synthetic_other_grantor"].includes(user) || !["socket", "tls"].includes(transport)) failed("local_client_target");
+    const fixedUser = [admin, target, "synthetic_unprivileged", "synthetic_privileged", "synthetic_lane_admin", "synthetic_other_grantor"].includes(user);
+    const productionProfile = /^square_production_(oauth|broker|scheduler|webhook|runtime|evidence)$/.test(user);
+    if ((!fixedUser && !productionProfile) || !["socket", "tls"].includes(transport)) failed("local_client_target");
     const client = new Client({ host: transport === "tls" ? "127.0.0.1" : socket, port: listenPort, user,
       password: password ?? "", database: "postgres", application_name: "native_broker_synthetic_control",
       connectionTimeoutMillis: 3000, statement_timeout: 6000, query_timeout: 7000,

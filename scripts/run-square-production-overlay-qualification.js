@@ -367,6 +367,81 @@ async function snapshotPreservedRoutineAcls(databaseUrl) {
   }
 }
 
+async function qualifyProductionNativeProfiles(databaseUrl) {
+  const profiles = ["oauth", "broker", "scheduler", "webhook", "runtime", "evidence"];
+  const client = new Client({ connectionString: databaseUrl });
+  await client.connect();
+  try {
+    const ledger = await client.query("select count(*)::integer count from supabase_migrations.schema_migrations");
+    assert.equal(ledger.rows[0].count, 103, "native profile proof uses exact 102-version baseline plus overlay");
+    await client.query("begin");
+    for (const name of profiles) {
+      const login = `square_production_${name}`, authority = `${login}_authority`;
+      const rpc = `public.check_square_production_${name}_authority_v1(text,text,text,bigint,text)`;
+      await client.query(`create role ${login} nologin noinherit nosuperuser nocreatedb nocreaterole noreplication nobypassrls`);
+      await client.query(`grant ${authority} to ${login} with admin false, inherit false, set false`);
+      const proof = await client.query(`
+        select not login.rolcanlogin and not login.rolinherit and not login.rolsuper
+          and not login.rolcreatedb and not login.rolcreaterole and not login.rolreplication
+          and not login.rolbypassrls and login.rolconfig is null
+          and (select count(*)=1 from pg_catalog.pg_auth_members membership
+            where membership.member=login.oid and membership.roleid=$2::regrole
+              and not membership.admin_option and not membership.inherit_option and not membership.set_option)
+          and pg_catalog.has_function_privilege($2,$3::regprocedure,'EXECUTE')
+          and not pg_catalog.has_function_privilege(login.oid,$3::regprocedure,'EXECUTE')
+          and not exists (
+            select from pg_catalog.pg_roles principal
+            join pg_catalog.pg_class relation on true
+            join pg_catalog.pg_namespace namespace on namespace.oid=relation.relnamespace
+            cross join (values ('SELECT'),('INSERT'),('UPDATE'),('DELETE'),('TRUNCATE'),('REFERENCES'),('TRIGGER'),('MAINTAIN')) privilege(name)
+            where principal.oid in (login.oid,$2::regrole)
+              and namespace.nspname not in ('pg_catalog','information_schema','extensions')
+              and namespace.nspname not like 'pg\\_toast%' escape '\\'
+              and namespace.nspname not like 'pg\\_temp%' escape '\\'
+              and relation.relkind in ('r','p','v','m','f')
+              and pg_catalog.has_table_privilege(principal.oid,relation.oid,privilege.name)
+          )
+          and not exists (
+            select from pg_catalog.pg_roles principal
+            join pg_catalog.pg_class relation on true
+            join pg_catalog.pg_namespace namespace on namespace.oid=relation.relnamespace
+            join pg_catalog.pg_attribute attribute on attribute.attrelid=relation.oid
+              and attribute.attnum>0 and not attribute.attisdropped
+            cross join (values ('SELECT'),('INSERT'),('UPDATE'),('REFERENCES')) privilege(name)
+            where principal.oid in (login.oid,$2::regrole)
+              and namespace.nspname not in ('pg_catalog','information_schema','extensions')
+              and namespace.nspname not like 'pg\\_toast%' escape '\\'
+              and namespace.nspname not like 'pg\\_temp%' escape '\\'
+              and relation.relkind in ('r','p','v','m','f')
+              and pg_catalog.has_column_privilege(principal.oid,relation.oid,attribute.attnum,privilege.name)
+          )
+          and not exists (select from pg_catalog.pg_shdepend dependency
+            where dependency.refclassid='pg_authid'::regclass and dependency.refobjid=login.oid
+              and dependency.deptype in ('o','a','i','r'))
+          and not exists (select from pg_catalog.pg_db_role_setting setting where setting.setrole=login.oid)
+          as valid
+        from pg_catalog.pg_roles login where login.rolname=$1
+      `, [login, authority, rpc]);
+      assert.equal(proof.rows[0]?.valid, true, `${login} is a closed one-authority native profile`);
+    }
+    await client.query("rollback");
+    const absent = await client.query("select count(*)::integer count from pg_catalog.pg_roles where rolname=any($1::text[])",
+      [profiles.map(name => `square_production_${name}`)]);
+    assert.equal(absent.rows[0].count, 0, "profile qualification rolls every synthetic login back");
+
+    await client.query("begin");
+    await client.query("create role square_production_oauth nologin noinherit nosuperuser nocreatedb nocreaterole noreplication nobypassrls");
+    await assert.rejects(client.query("grant square_production_missing_authority to square_production_oauth"),
+      /square_production_missing_authority/, "failed authority mapping aborts the profile transaction");
+    await client.query("rollback");
+    const failureAbsent = await client.query("select to_regrole('square_production_oauth') is null absent");
+    assert.equal(failureAbsent.rows[0].absent, true, "failed mapping leaves no Production login");
+  } finally {
+    await client.query("rollback").catch(() => undefined);
+    await client.end();
+  }
+}
+
 async function main() {
   assertMigrationManifest();
   const databaseUrl = localDatabaseUrl();
@@ -394,6 +469,8 @@ async function main() {
     beforePreservedRoutineAcls,
     "Square Production overlay preserves every unrelated explicit routine grant"
   );
+
+  await qualifyProductionNativeProfiles(databaseUrl);
 
   run(process.execPath, [
     "scripts/run-isolated-database-tests.js",

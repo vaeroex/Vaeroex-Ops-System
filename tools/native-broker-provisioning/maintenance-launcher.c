@@ -21,6 +21,19 @@
 #error Production maintenance launcher requires Linux
 #endif
 
+#if (defined(VAEROEX_PRODUCTION_OAUTH) + defined(VAEROEX_PRODUCTION_BROKER) + \
+     defined(VAEROEX_PRODUCTION_SCHEDULER) + defined(VAEROEX_PRODUCTION_WEBHOOK) + \
+     defined(VAEROEX_PRODUCTION_RUNTIME) + defined(VAEROEX_PRODUCTION_EVIDENCE)) > 1
+#error Select one fixed Production maintenance installation
+#elif (defined(VAEROEX_PRODUCTION_OAUTH) + defined(VAEROEX_PRODUCTION_BROKER) + \
+       defined(VAEROEX_PRODUCTION_SCHEDULER) + defined(VAEROEX_PRODUCTION_WEBHOOK) + \
+       defined(VAEROEX_PRODUCTION_RUNTIME) + defined(VAEROEX_PRODUCTION_EVIDENCE)) > 0 && \
+      (defined(VAEROEX_MAPPED_ENROLLER) || defined(VAEROEX_MAPPED_RUNTIME))
+#error Production and Sandbox maintenance installations are mutually exclusive
+#elif defined(VAEROEX_MAPPED_ENROLLER) && defined(VAEROEX_MAPPED_RUNTIME)
+#error Select one fixed mapped maintenance installation
+#endif
+
 #ifdef VAEROEX_LAUNCHER_SYNTHETIC_ONLY
 #if !defined(VAEROEX_TEST_NODE) || !defined(VAEROEX_TEST_INSTALL)
 #error Synthetic launcher requires immutable local fixture paths
@@ -29,8 +42,18 @@
 #define INSTALL_PATH VAEROEX_TEST_INSTALL
 #else
 #define NODE_PATH "/usr/bin/node"
-#if defined(VAEROEX_MAPPED_ENROLLER) && defined(VAEROEX_MAPPED_RUNTIME)
-#error Select one fixed mapped maintenance installation
+#if defined(VAEROEX_PRODUCTION_OAUTH)
+#define INSTALL_PATH "/opt/vaeroex-production-square-oauth"
+#elif defined(VAEROEX_PRODUCTION_BROKER)
+#define INSTALL_PATH "/opt/vaeroex-production-square-broker"
+#elif defined(VAEROEX_PRODUCTION_SCHEDULER)
+#define INSTALL_PATH "/opt/vaeroex-production-square-scheduler"
+#elif defined(VAEROEX_PRODUCTION_WEBHOOK)
+#define INSTALL_PATH "/opt/vaeroex-production-square-webhook"
+#elif defined(VAEROEX_PRODUCTION_RUNTIME)
+#define INSTALL_PATH "/opt/vaeroex-production-square-runtime"
+#elif defined(VAEROEX_PRODUCTION_EVIDENCE)
+#define INSTALL_PATH "/opt/vaeroex-production-square-evidence"
 #elif defined(VAEROEX_MAPPED_ENROLLER)
 #define INSTALL_PATH "/opt/vaeroex-native-enroller"
 #elif defined(VAEROEX_MAPPED_RUNTIME)

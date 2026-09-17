@@ -9,8 +9,17 @@ const permissions = Object.freeze(["secretmanager.versions.add", "secretmanager.
  * private Buffer; HTTPS necessarily makes transient header/JSON string copies.
  * These are not persisted or included in any returned failure. */
 export function createSandboxSecretManagerRestClient({ withAccessToken, request = https.request, profile = "callback" } = {}) {
-  const parent = sandboxProvisioningProfile(profile).maintenance.secretParent;
-  const numericParent = parent.replace("projects/vaeroex-square-sandbox/", "projects/112579468800/");
+  const maintenance = sandboxProvisioningProfile(profile).maintenance;
+  return createPinnedSecretManagerRestClient({ withAccessToken, request, secretParent: maintenance.secretParent,
+    projectId: maintenance.projectId, projectNumber: maintenance.projectNumber });
+}
+
+export function createPinnedSecretManagerRestClient({ withAccessToken, request = https.request,
+  secretParent: parent, projectId, projectNumber } = {}) {
+  if (!/^[a-z][a-z0-9-]{4,28}[a-z0-9]$/.test(projectId ?? "") ||
+      !/^[1-9][0-9]{5,19}$/.test(projectNumber ?? "") ||
+      typeof parent !== "string" || !parent.startsWith(`projects/${projectId}/secrets/`)) throw fail();
+  const numericParent = parent.replace(`projects/${projectId}/`, `projects/${projectNumber}/`);
   if (typeof withAccessToken !== "function" || typeof request !== "function") throw fail();
   const version = name => {
     const match = typeof name === "string" && /^(projects\/[^/]+\/secrets\/[^/]+)\/versions\/([1-9][0-9]{0,20})$/.exec(name);

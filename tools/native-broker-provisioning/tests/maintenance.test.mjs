@@ -4,6 +4,7 @@ import { EventEmitter, getEventListeners } from "node:events";
 import { createGceMaintenanceIdentity } from "../maintenance-identity.mjs";
 import { readPrivateAdministrator, releasePrivateAdministratorInput } from "../private-entry.mjs";
 import { sandboxMaintenance as pin, sandboxTarget } from "../sandbox-profile.mjs";
+import { productionDatabaseIdentity, productionProvisioningProfile } from "../production-profile.mjs";
 import { maintenanceWindow, requireMutationWindow, requiresClearance, checkRecoveryClearance } from "../maintenance-policy.mjs";
 
 // Only public, deterministic fixtures and in-memory streams. No metadata HTTP,
@@ -366,12 +367,15 @@ test("only clean finished or genuinely pre-mutation final records avoid fresh cl
     assert.equal(requiresClearance(undefined, operation), false);
     assert.equal(requiresClearance({ kind: "maintenance_finished", outcome: "staged_ready" }, operation), false);
     assert.equal(requiresClearance({ kind: "maintenance_finished", outcome: "fenced_failure",
-      databaseCommit: "not_attempted", requiresFreshReplacement: false }, operation), false);
+      databaseCommit: "not_attempted", requiresFreshReplacement: false, fenceConfirmed: true,
+      applicationAuthority: "verified_closed" }, operation), false);
     for (const prior of [interrupted,
       { kind: "maintenance_finished", outcome: "uncertain", databaseCommit: "uncertain", requiresFreshReplacement: true },
       { kind: "maintenance_finished", databaseCommit: "not_attempted", requiresFreshReplacement: true },
       { kind: "maintenance_finished", databaseCommit: "not_attempted" },
       { kind: "maintenance_finished", databaseCommit: "acknowledged", requiresFreshReplacement: false },
+      { kind: "maintenance_finished", outcome: "fenced_failure", databaseCommit: "not_attempted",
+        requiresFreshReplacement: false, fenceConfirmed: true, applicationAuthority: "unverified" },
     ]) assert.equal(requiresClearance(prior, operation), true);
   }
   assert.equal(requiresClearance(undefined, "recover"), true);
@@ -384,6 +388,20 @@ test("exact recovery clearance requires acknowledged fence, empty sessions and n
   assert.equal(checkRecoveryClearance(input), policyNow + 600000);
   assert.equal(checkRecoveryClearance({ ...input, last: undefined, operation: "create", roleOid: "0", clearance: undefined }), Infinity);
   assert.throws(() => checkRecoveryClearance({ ...input, last: undefined }), policyDenied);
+});
+
+test("Production recovery clearance binds the exact Production project and role, including runtime", () => {
+  for (const profile of ["oauth", "broker", "scheduler", "webhook", "runtime", "evidence"]) {
+    const targetRole = productionProvisioningProfile(profile).role;
+    const input = recovery({ profile, profileKind: "production",
+      clearance: { ...recovery().clearance, projectReference: productionDatabaseIdentity.projectReference, targetRole } });
+    assert.equal(checkRecoveryClearance(input), policyNow + 600000);
+    assert.throws(() => checkRecoveryClearance({ ...input,
+      clearance: { ...input.clearance, projectReference: sandboxTarget.projectReference } }), policyDenied);
+    assert.throws(() => checkRecoveryClearance({ ...input,
+      clearance: { ...input.clearance, targetRole: sandboxTarget.role } }), policyDenied);
+  }
+  assert.throws(() => checkRecoveryClearance({ ...recovery(), profileKind: "Production" }), policyDenied);
 });
 
 for (const [field, value] of [

@@ -34,7 +34,7 @@ try {
   run(path.join(source, "configure"), ["--prefix=" + pgRoot, "--with-ssl=openssl", "--without-icu", "--without-readline"], source);
   run("/usr/bin/make", ["-j2"], source, 1200000);
   run("/usr/bin/make", ["install"], source, 120000);
-  for (const name of ["pg_stat_statements", "auto_explain"]) {
+  for (const name of ["pg_stat_statements", "auto_explain", "pgcrypto"]) {
     run("/usr/bin/make", ["-j2"], path.join(source, "contrib", name));
     run("/usr/bin/make", ["install"], path.join(source, "contrib", name));
   }
