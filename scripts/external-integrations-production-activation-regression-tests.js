@@ -134,6 +134,8 @@ assert.match(edgePlugin, /headersError != nil/, "header retrieval failure fails 
 assert.match(edgePlugin, /callbackedge\.ParseForwardedHeaderCallback\([\s\S]*headers,/, "the plugin uses the unit-tested combined query and body-indicator contract");
 assert.match(edgePlugin, /VAEROEX_PUBLIC_NEVER_ISSUED_CANARY/, "the finite diagnostic is restricted to the public never-issued canary");
 assert.match(edgePlugin, /callback_predicate_/, "the finite diagnostic returns only fixed predicate labels");
+assert.match(edgePlugin, /callback_predicate_request_properties_unavailable/, "property-access failure receives a fixed canary-only label");
+assert.match(edgePlugin, /callback_predicate_internal_failure/, "panic containment receives a fixed canary-only label");
 assert.doesNotMatch(edgePlugin, /proxywasm\.Log|console\.|fmt\.Print|requestTarget|rawHeaders/, "the finite diagnostic cannot log or return request material");
 assert.match(edgePlugin, /if err := proxywasm\.SendHttpResponse\([\s\S]*err != nil \{[\s\S]*panic\(err\)/, "a failed local rejection response escalates to fail_open=false plugin failure");
 assert.match(edgePlugin, /clearReservedHandoffHeaders\(\)/, "reserved handoff headers receive a defense-in-depth purge before the trusted pair is appended");

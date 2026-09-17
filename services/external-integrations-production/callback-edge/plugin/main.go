@@ -28,6 +28,10 @@ func (*httpContext) OnHttpRequestHeaders(headerCount int, _ bool) (action types.
 	action = types.ActionPause
 	defer func() {
 		if recover() != nil {
+			if isExactDiagnosticTargetHeader() {
+				sendFixedResponse(500, "callback_predicate_internal_failure")
+				return
+			}
 			sendFixedResponse(500, "integration callback unavailable")
 		}
 	}()
@@ -43,6 +47,10 @@ func (*httpContext) OnHttpRequestHeaders(headerCount int, _ bool) (action types.
 	path, pathError := proxywasm.GetProperty([]string{"request", "path"})
 	rawQuery, queryError := proxywasm.GetProperty([]string{"request", "query"})
 	if methodError != nil || pathError != nil || queryError != nil {
+		if isExactDiagnosticTargetHeader() {
+			sendFixedResponse(500, "callback_predicate_request_properties_unavailable")
+			return action
+		}
 		sendFixedResponse(500, "integration callback unavailable")
 		return action
 	}
