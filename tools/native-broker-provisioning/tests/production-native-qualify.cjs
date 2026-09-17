@@ -478,6 +478,10 @@ async function main() {
   check(appliedDeliveryInvoked === true, "authority_drift_applied_delivery_invoked");
   check(appliedMutation === true, "authority_drift_applied_mutation_committed");
   check(appliedDenied === true, "authority_drift_applied_native_rejected_after_delivery");
+  stage = "bounded_production_concurrency";
+  await require("./production-concurrency.cjs")({ fixture, native: postflightNative,
+    target: postflightTarget, check, definition: overlayRpcDefinition(postflightDrift),
+    source: productionAuthoritySource(postflightDrift) });
   stage = "current_permission_recheck";
   await fixture.control.query("GRANT SELECT(secret) ON private.production_business_probe TO square_production_runtime_authority");
   const driftProfile = profiles.find(profile => profile.name === "runtime");
