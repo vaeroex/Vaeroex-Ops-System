@@ -19,15 +19,16 @@ async function qualify(runtime) {
   ];
   const productionFoundation=["20260902191323_integration_production_runtime_foundation.sql"];
   const productionOverlay=["20260902191324_square_production_runtime_overlay.sql"];
+  const productionInternalRuntime=["20260902191325_square_production_internal_pilot_runtime.sql"];
   const productionCompatibility=[
     "20260912190000_square_production_runtime_foundation.sql",
     "20260915040500_integration_production_legacy_foundation_guard.sql"
   ];
-  eq(files.length,119,"full canonical chain, including the isolated Production overlay and compatibility guards");
-  for (const name of [...additiveSquareTail,...productionFoundation,...productionOverlay,...productionCompatibility])
+  eq(files.length,120,"full canonical chain, including the separately qualified Production runtime and compatibility guards");
+  for (const name of [...additiveSquareTail,...productionFoundation,...productionOverlay,...productionInternalRuntime,...productionCompatibility])
     eq(files.filter(file=>file===name).length,1,`canonical manifest contains ${name} exactly once`);
   stage="migrations";
-  const staged=new Set([...additiveSquareTail,...productionFoundation,...productionOverlay,...productionCompatibility]);
+  const staged=new Set([...additiveSquareTail,...productionFoundation,...productionOverlay,...productionInternalRuntime,...productionCompatibility]);
   await runtime.applyMigrations(c,files.filter(file=>!staged.has(file)));
   // Production authority roles are cluster-wide. A Supabase-local `db start`
   // has already installed this separately tested foundation in its canonical
