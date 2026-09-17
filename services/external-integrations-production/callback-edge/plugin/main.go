@@ -1,6 +1,8 @@
 package main
 
 import (
+	"strings"
+
 	callbackedge "vaeroex.local/square-oauth-callback-edge"
 
 	"github.com/proxy-wasm/proxy-wasm-go-sdk/proxywasm"
@@ -17,6 +19,8 @@ type vmContext struct{ types.DefaultVMContext }
 type pluginContext struct{ types.DefaultPluginContext }
 type httpContext struct{ types.DefaultHttpContext }
 
+const diagnosticCanaryTarget = callbackedge.CallbackPath + "?state=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA&code=VAEROEX_PUBLIC_NEVER_ISSUED_CANARY"
+
 func (*vmContext) NewPluginContext(uint32) types.PluginContext { return &pluginContext{} }
 func (*pluginContext) NewHttpContext(uint32) types.HttpContext { return &httpContext{} }
 
@@ -24,10 +28,18 @@ func (*httpContext) OnHttpRequestHeaders(headerCount int, _ bool) (action types.
 	action = types.ActionPause
 	defer func() {
 		if recover() != nil {
+			if isExactDiagnosticTargetHeader() {
+				sendFixedResponse(500, "callback_predicate_internal_failure")
+				return
+			}
 			sendFixedResponse(500, "integration callback unavailable")
 		}
 	}()
 	if headerCount > callbackedge.MaxInputHeaderCount {
+		if isExactDiagnosticTargetHeader() {
+			sendFixedResponse(400, "callback_predicate_header_count")
+			return action
+		}
 		sendFixedResponse(400, "invalid integration request")
 		return action
 	}
@@ -35,6 +47,10 @@ func (*httpContext) OnHttpRequestHeaders(headerCount int, _ bool) (action types.
 	path, pathError := proxywasm.GetProperty([]string{"request", "path"})
 	rawQuery, queryError := proxywasm.GetProperty([]string{"request", "query"})
 	if methodError != nil || pathError != nil || queryError != nil {
+		if isExactDiagnosticTargetHeader() {
+			sendFixedResponse(500, "callback_predicate_request_properties_unavailable")
+			return action
+		}
 		sendFixedResponse(500, "integration callback unavailable")
 		return action
 	}
@@ -43,7 +59,20 @@ func (*httpContext) OnHttpRequestHeaders(headerCount int, _ bool) (action types.
 	defer zeroBytes(rawQuery)
 
 	headers, headersError := proxywasm.GetHttpRequestHeaders()
-	if headersError != nil || !callbackedge.IsBoundedClientHeaderMap(headers) || callbackedge.HasForbiddenClientHeaders(headers) {
+	if headersError != nil {
+		if isExactDiagnosticRequest(string(method), string(path), string(rawQuery)) {
+			sendFixedResponse(400, "callback_predicate_header_map_unavailable")
+			return action
+		}
+		sendFixedResponse(400, "invalid integration request")
+		return action
+	}
+	if !callbackedge.IsBoundedClientHeaderMap(headers) || callbackedge.HasForbiddenClientHeaders(headers) {
+		_, reason := callbackedge.DiagnoseForwardedHeaderCallback(string(method), string(path), string(rawQuery), headers)
+		if isExactDiagnosticRequest(string(method), string(path), string(rawQuery)) {
+			sendFixedResponse(400, "callback_predicate_"+string(reason))
+			return action
+		}
 		sendFixedResponse(400, "invalid integration request")
 		return action
 	}
@@ -59,6 +88,17 @@ func (*httpContext) OnHttpRequestHeaders(headerCount int, _ bool) (action types.
 	// LbEdgeExtension invokes only REQUEST_HEADERS and does not expose request
 	// bodies to the plugin. Its callback flag is therefore not body evidence.
 	// Reject every forwarded HTTP body indicator instead.
+	if isExactDiagnosticRequest(string(method), string(path), string(rawQuery)) {
+		_, rejectionReason := callbackedge.DiagnoseForwardedHeaderCallback(
+			string(method), string(path), string(rawQuery), headers,
+		)
+		status := uint32(200)
+		if rejectionReason != callbackedge.RejectionNone {
+			status = 400
+		}
+		sendFixedResponse(status, "callback_predicate_"+string(rejectionReason))
+		return action
+	}
 	handoff, parseError := callbackedge.ParseForwardedHeaderCallback(
 		string(method), string(path), string(rawQuery), headers,
 	)
@@ -77,6 +117,24 @@ func (*httpContext) OnHttpRequestHeaders(headerCount int, _ bool) (action types.
 		return action
 	}
 	return types.ActionContinue
+}
+
+func isExactDiagnosticRequest(method, pathAttribute, queryAttribute string) bool {
+	if method != "GET" {
+		return false
+	}
+	query := strings.TrimPrefix(queryAttribute, "?")
+	return query != "" && (pathAttribute == callbackedge.CallbackPath || pathAttribute == callbackedge.CallbackPath+"?"+query) &&
+		callbackedge.CallbackPath+"?"+query == diagnosticCanaryTarget
+}
+
+func isExactDiagnosticTargetHeader() bool {
+	target, err := proxywasm.GetHttpRequestHeader(":path")
+	if err != nil || target != diagnosticCanaryTarget {
+		return false
+	}
+	method, err := proxywasm.GetHttpRequestHeader(":method")
+	return err == nil && method == "GET"
 }
 
 func clearReservedHandoffHeaders() bool {

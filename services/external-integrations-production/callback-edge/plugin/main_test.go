@@ -13,6 +13,70 @@ import (
 
 const validStateFixture = "0123456789_abcdefghijklmnopqrstuvwxyz-ABCDE"
 
+func TestFiniteDiagnosticIsExactPublicCanaryOnly(t *testing.T) {
+	query := "state=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA&code=VAEROEX_PUBLIC_NEVER_ISSUED_CANARY"
+	host, reset := newCallbackHost("GET", callbackedge.CallbackPath, query)
+	contextID := host.InitializeHttpContext()
+	action := host.CallOnRequestHeaders(contextID, [][2]string{{":path", callbackedge.CallbackPath + "?" + query}, {"content-length", "0"}}, false)
+	response := host.GetSentLocalResponse(contextID)
+	if action != types.ActionPause || response == nil || response.StatusCode != 200 || string(response.Data) != "callback_predicate_accepted" {
+		reset()
+		t.Fatalf("exact canary must return only its fixed accepted label: %v %#v", action, response)
+	}
+	reset()
+
+	for _, altered := range []string{
+		"state=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA&code=VAEROEX_PUBLIC_NEVER_ISSUED_CANARX",
+		"code=VAEROEX_PUBLIC_NEVER_ISSUED_CANARY&state=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+		query + "&scope=unknown",
+	} {
+		host, reset = newCallbackHost("GET", callbackedge.CallbackPath, altered)
+		contextID = host.InitializeHttpContext()
+		action = host.CallOnRequestHeaders(contextID, [][2]string{{":path", callbackedge.CallbackPath + "?" + altered}, {"content-length", "0"}}, false)
+		if action != types.ActionContinue || host.GetSentLocalResponse(contextID) != nil {
+			reset()
+			t.Fatalf("non-canary request behavior changed: %q %v %#v", altered, action, host.GetSentLocalResponse(contextID))
+		}
+		reset()
+	}
+}
+
+func TestFiniteDiagnosticReportsExistingRejectionWithoutRelaxingIt(t *testing.T) {
+	query := "state=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA&code=VAEROEX_PUBLIC_NEVER_ISSUED_CANARY"
+	host, reset := newCallbackHost("GET", callbackedge.CallbackPath, query)
+	defer reset()
+	contextID := host.InitializeHttpContext()
+	action := host.CallOnRequestHeaders(contextID, [][2]string{{":path", callbackedge.CallbackPath + "?" + query}, {"x-forwarded-host", "synthetic.invalid"}}, false)
+	response := host.GetSentLocalResponse(contextID)
+	if action != types.ActionPause || response == nil || response.StatusCode != 400 || string(response.Data) != "callback_predicate_header_spoofing" {
+		t.Fatalf("exact canary must expose only the existing failed predicate: %v %#v", action, response)
+	}
+}
+
+func TestFiniteDiagnosticEarlyFailureRequiresExactGETCanary(t *testing.T) {
+	query := "state=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA&code=VAEROEX_PUBLIC_NEVER_ISSUED_CANARY"
+	for _, test := range []struct {
+		method, expected string
+	}{
+		{method: "GET", expected: "callback_predicate_header_count"},
+		{method: "POST", expected: "invalid integration request"},
+	} {
+		headers := [][2]string{{":method", test.method}, {":path", callbackedge.CallbackPath + "?" + query}}
+		for len(headers) <= callbackedge.MaxInputHeaderCount {
+			headers = append(headers, [2]string{fmt.Sprintf("x-padding-%d", len(headers)), "x"})
+		}
+		host, reset := newCallbackHost(test.method, callbackedge.CallbackPath, query)
+		contextID := host.InitializeHttpContext()
+		action := host.CallOnRequestHeaders(contextID, headers, false)
+		response := host.GetSentLocalResponse(contextID)
+		if action != types.ActionPause || response == nil || response.StatusCode != 400 || string(response.Data) != test.expected {
+			reset()
+			t.Fatalf("unexpected early %s response: %v %#v", test.method, action, response)
+		}
+		reset()
+	}
+}
+
 func TestManagedHeaderEventForwardsExactEncodedQuery(t *testing.T) {
 	rawQuery := "state=" + validStateFixture + "&code=synthetic-code"
 	host, reset := newCallbackHost("GET", callbackedge.CallbackPath, rawQuery)
