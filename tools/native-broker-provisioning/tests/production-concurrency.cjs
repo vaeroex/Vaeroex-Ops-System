@@ -4,7 +4,7 @@ const { setTimeout: delay } = require("node:timers/promises");
 
 // Called only after createFixture has verified the pinned local engine and
 // extensions. No remote inputs, credentials, SQL text or driver errors escape.
-module.exports = async function qualifyConcurrency({ fixture, native, target, check, definition, source }) {
+module.exports = async function qualifyConcurrency({ fixture, native, createPeer, target, check, definition, source }) {
   const control = fixture.control;
   const catalogs = ["pg_proc", "pg_authid", "pg_auth_members", "pg_db_role_setting"];
   const context = intent => ({ target, intent, approvalId: "synthetic-production", signal: new AbortController().signal });
@@ -99,7 +99,9 @@ module.exports = async function qualifyConcurrency({ fixture, native, target, ch
   let queued = [], assignPid;
   const assigned = await native.assign({ ...context("concurrency-native-peers"), async deliver() {
     assignPid = await nativePid();
-    queued = ["fence", "inspect"].map(op => native[op](context(`concurrency-peer-${op}`)).then(
+    // Each adapter deliberately refuses overlap within its own process.
+    // Independent adapters model the separate native workers under test.
+    queued = ["fence", "inspect"].map(op => createPeer()[op](context(`concurrency-peer-${op}`)).then(
       result => result.ack === true, () => false));
     await until(async () => (await control.query(`SELECT count(*)::int n FROM pg_locks
       WHERE relation='pg_proc'::regclass AND NOT granted AND $1=ANY(pg_blocking_pids(pid))`, [assignPid])).rows[0].n === 2,

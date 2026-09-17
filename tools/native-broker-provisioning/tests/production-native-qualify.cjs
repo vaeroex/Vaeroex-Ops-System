@@ -480,6 +480,9 @@ async function main() {
   check(appliedDenied === true, "authority_drift_applied_native_rejected_after_delivery");
   stage = "bounded_production_concurrency";
   await require("./production-concurrency.cjs")({ fixture, native: postflightNative,
+    createPeer: () => adapterModule.createLocalSyntheticProductionNativeAdapter({
+      executable: binaries.get(postflightProfile.name), target: postflightTarget,
+    }),
     target: postflightTarget, check, definition: overlayRpcDefinition(postflightDrift),
     source: productionAuthoritySource(postflightDrift) });
   stage = "current_permission_recheck";
