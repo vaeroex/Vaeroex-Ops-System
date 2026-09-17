@@ -1,4 +1,5 @@
 const assert = require("node:assert/strict");
+const crypto = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
 const Module = require("node:module");
@@ -18,6 +19,10 @@ const activationReadme = fs.readFileSync(path.join(root, "services/external-inte
 const evidenceDatabaseTest = fs.readFileSync(path.join(root, "scripts/square-workspace-evidence-database-tests.js"), "utf8");
 const fixtureRichMigrationTest = fs.readFileSync(path.join(root, "scripts/run-phase8b-zero-based-delivery-migration-tests.js"), "utf8");
 const observationDatabaseTest = fs.readFileSync(path.join(root, "scripts/run-square-observation-database-qualification.js"), "utf8");
+const internalRuntimeMigration = fs.readFileSync(path.join(root,
+  "supabase/migrations/20260902191325_square_production_internal_pilot_runtime.sql"), "utf8");
+const internalRuntimeQualification = fs.readFileSync(path.join(root,
+  "scripts/run-square-production-internal-pilot-runtime-qualification.js"), "utf8");
 const separatedDatabaseQualifications = [
   "scripts/run-square-account-connection-qualification.js",
   "scripts/run-square-broker-runtime-qualification.js",
@@ -218,17 +223,46 @@ assert.match(legacyGuard, /convert_to\(object_record\.prosrc,'UTF8'\)[\s\S]*98a8
   "forward guard binds the retained fingerprint helper to its reviewed implementation bytes");
 assert.match(legacyGuard, /integration_production_foundation_role_drift/,
   "forward guard revalidates dormant authority role attributes and memberships");
+assert.match(legacyGuard, /square_internal_runtime_present :=[\s\S]*square_production_internal_oauth_v1\(text,jsonb\)[\s\S]*square_production_internal_broker_v1\(text,jsonb\)[\s\S]*square_production_internal_runtime_v1\(text,jsonb\)[\s\S]*square_production_internal_evidence_v1\(text,jsonb\)/,
+  "forward guard recognizes only the complete internal-runtime RPC set");
+assert.match(legacyGuard, /integration_production_internal_runtime_partial/,
+  "forward guard rejects a partial internal-runtime RPC set");
+assert.match(legacyGuard, /schema_migrations[\s\S]*version='20260902191325'[\s\S]*integration_production_internal_runtime_drift/,
+  "forward guard accepts the internal runtime only with its exact migration ledger entry");
+assert.match(legacyGuard, /count\(\*\)=12[\s\S]*proowner<>marker_owner[\s\S]*prosecdef<>expected\.security_definer[\s\S]*prosrc,'UTF8'[\s\S]*expected\.source_hash/,
+  "forward guard authenticates the complete internal-runtime function catalog before changing authority allowlists");
+assert.match(legacyGuard, /count\(\*\) from pg_catalog\.pg_class[\s\S]*square_production_internal_permits[\s\S]*square_production_internal_audit_events/,
+  "forward guard requires every private object used by the authenticated internal runtime");
+for (const capability of ["oauth", "broker", "runtime", "evidence"]) {
+  const body = internalRuntimeMigration.match(new RegExp(
+    `create function public\\.square_production_internal_${capability}_v1\\(p_operation text,p_payload jsonb\\)[\\s\\S]*?as \\$function\\$([\\s\\S]*?)\\$function\\$;`
+  ));
+  assert.ok(body, `frozen ${capability} runtime body is present`);
+  const sourceHash = crypto.createHash("sha256").update(body[1], "utf8").digest("hex");
+  assert.match(legacyGuard, new RegExp(
+    `public\\.square_production_internal_${capability}_v1\\(text,jsonb\\)[\\s\\S]*?${sourceHash}`
+  ), `forward guard pins the exact frozen ${capability} runtime body`);
+}
+assert.match(internalRuntimeQualification,
+  /restoreLocalSessionAuthorization = await enableLocalSessionAuthorization\(databaseUrl\);[\s\S]*const elevatedClient = new Client\(\{ connectionString: databaseUrl \}\);[\s\S]*await elevatedClient\.connect\(\);[\s\S]*await client\.end\(\);[\s\S]*client = elevatedClient;[\s\S]*await exerciseRuntime\(client\);/,
+  "Supabase-local qualification reconnects after postgres elevation before session authorization");
 assert.match(legacyGuard, /pg_catalog\.pg_shdepend[\s\S]*dependency\.classid='pg_namespace'::regclass[\s\S]*dependency\.objid='public'::regnamespace/,
   "forward guard permits the reviewed public-schema ACL dependency");
 assert.match(legacyGuard, /dependency\.classid='pg_proc'::regclass/,
   "forward guard can preserve only exact reviewed preflight-function ACL dependencies");
+assert.match(legacyGuard, /square_overlay_present[\s\S]*not square_internal_runtime_present or expected_internal_rpc is null[\s\S]*dependency\.objid=expected_rpc::oid[\s\S]*square_internal_runtime_present[\s\S]*expected_internal_rpc is not null[\s\S]*dependency\.objid=expected_internal_rpc::oid/,
+  "forward guard permits only the staged dependency before replacement and each role's exact internal-runtime dependency afterward");
 for (const capability of ["oauth", "broker", "scheduler", "webhook", "runtime", "evidence"]) {
   assert.match(legacyGuard, new RegExp(
     `when 'square_production_${capability}_authority' then pg_catalog\\.to_regprocedure\\('public\\.check_square_production_${capability}_authority_v1\\(text,text,text,bigint,text\\)'\\)`
   ), `forward guard binds ${capability} authority only to its exact preflight RPC dependency`);
 }
-assert.match(legacyGuard, /square_overlay_present[\s\S]*expected_rpc is null[\s\S]*aclexplode\(rpc\.proacl\)[\s\S]*rpc_acl\.grantee<>rpc\.proowner[\s\S]*rpc_acl\.grantee=role_record\.oid[\s\S]*rpc_acl\.grantor=rpc\.proowner[\s\S]*privilege_type='EXECUTE'[\s\S]*not rpc_acl\.is_grantable/,
-  "forward guard requires one exact non-grantable authority RPC ACL and no other non-owner grantee");
+assert.match(legacyGuard, /square_overlay_present[\s\S]*not square_internal_runtime_present or expected_internal_rpc is null[\s\S]*expected_rpc is null[\s\S]*aclexplode\(rpc\.proacl\)[\s\S]*rpc_acl\.grantee<>rpc\.proowner[\s\S]*rpc_acl\.grantee=role_record\.oid[\s\S]*rpc_acl\.grantor=rpc\.proowner[\s\S]*privilege_type='EXECUTE'[\s\S]*not rpc_acl\.is_grantable/,
+  "forward guard requires the staged RPC only until an exact internal replacement exists, while scheduler and webhook remain staged");
+assert.match(legacyGuard, /square_internal_runtime_present and expected_internal_rpc is not null and \([\s\S]*rpc_acl\.grantee=role_record\.oid[\s\S]*rpc_acl\.privilege_type='EXECUTE'[\s\S]*not rpc_acl\.is_grantable/,
+  "forward guard independently checks each internal-runtime RPC grant is exact and non-grantable");
+assert.match(legacyGuard, /square_internal_runtime_present and expected_internal_rpc is not null and \([\s\S]*rpc\.oid=expected_rpc::oid[\s\S]*rpc_acl\.grantee<>rpc\.proowner[\s\S]*rpc\.oid=expected_internal_rpc::oid/,
+  "forward guard rejects every non-owner ACL on each replaced staged RPC, including PUBLIC");
 assert.match(legacyGuard, /aclexplode\(public_schema\.nspacl\)[\s\S]*privilege_type='USAGE'[\s\S]*has_schema_privilege\(role_name,'public','CREATE'\)/,
   "forward guard requires exact non-grantable public USAGE without CREATE");
 assert.match(legacyGuard, /jsonb_build_object\([\s\S]*'columns'[\s\S]*'constraints'[\s\S]*'indexes'[\s\S]*'policy_count'[\s\S]*'trigger_count'[\s\S]*0fe4e1c2080fed1725db60ddb1643f4cd2d979a1a261c3445aae54c56788897e/,
@@ -252,8 +286,8 @@ assert.match(fixtureRichMigrationTest, /qualifyProductionRoleDrift\(localMigrati
   "only the role-drift witness uses the local migration-administrator connection");
 for (const qualification of separatedDatabaseQualifications) {
   assert.match(qualification,
-    /baseline = (?:names|files)\.filter\(name => name < (?:migrationName|migration) && !\[productionFoundation,productionOverlay\]\.includes\(name\)\)/,
-    "legacy Square database qualifications exclude both Production-only authority migrations");
+    /baseline = (?:names|files)\.filter\(name => name < (?:migrationName|migration) && !\[productionFoundation,productionOverlay,productionInternalRuntime\]\.includes\(name\)\)/,
+    "legacy Square database qualifications exclude all three separately qualified Production-only authority migrations");
 }
 assert.match(observationDatabaseTest, /if\(runtime\.targetKind==="native-postgres"\)[\s\S]*foundation rejects authority-role ownership in another database/,
   "foundation mutation tests run only in their isolated per-process native cluster");

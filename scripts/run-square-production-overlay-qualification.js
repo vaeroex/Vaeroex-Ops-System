@@ -61,7 +61,8 @@ function assertMigrationManifest() {
   );
   assert.equal(names[101], `${baseVersion}_integration_production_runtime_foundation.sql`);
   assert.equal(names[102], `${overlayVersion}_square_production_runtime_overlay.sql`);
-  assert.equal(names[103], "20260907042202_square_dormant_trusted_authority.sql");
+  assert.equal(names[103], "20260902191325_square_production_internal_pilot_runtime.sql");
+  assert.equal(names[104], "20260907042202_square_dormant_trusted_authority.sql");
 }
 
 async function qualifySubstitutedLedger(databaseUrl) {

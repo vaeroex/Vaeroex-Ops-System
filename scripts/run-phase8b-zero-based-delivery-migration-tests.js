@@ -262,6 +262,7 @@ function assertTargetIsSinglePendingMigration() {
   const dormantSquareTail = [
     "20260902191323_integration_production_runtime_foundation.sql",
     "20260902191324_square_production_runtime_overlay.sql",
+    "20260902191325_square_production_internal_pilot_runtime.sql",
     "20260907042202_square_dormant_trusted_authority.sql",
     "20260907042352_square_dormant_atomic_pages.sql",
     "20260907174326_square_dormant_account_connection.sql",

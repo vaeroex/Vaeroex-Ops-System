@@ -58,11 +58,14 @@ async function qualify(runtime) {
   const files = runtime.migrationFiles();
   const productionFoundation = "20260902191323_integration_production_runtime_foundation.sql";
   const productionOverlay = "20260902191324_square_production_runtime_overlay.sql";
-  const baseline = files.filter(name => name < migrationName && ![productionFoundation,productionOverlay].includes(name));
+  const productionInternalRuntime = "20260902191325_square_production_internal_pilot_runtime.sql";
+  const baseline = files.filter(name => name < migrationName && ![productionFoundation,productionOverlay,productionInternalRuntime].includes(name));
   equal(files.filter(name => name === productionFoundation).length, 1,
     "provider-neutral Production foundation remains separately qualified from the mapped runtime");
   equal(files.filter(name => name === productionOverlay).length, 1,
     "Production-only Square overlay remains excluded from the Sandbox mapped runtime");
+  equal(files.filter(name => name === productionInternalRuntime).length, 1,
+    "Production internal-pilot runtime remains separately qualified from the Sandbox mapped runtime");
   equal(baseline.length, 108, "complete canonical callback baseline");
   equal(files.filter(name => name >= migrationName), [migrationName,fencingMigration,"20260911151334_square_verified_provider_observations.sql", "20260911205108_square_canonical_interpretation.sql", "20260911222230_square_workspace_evidence.sql", "20260912034447_square_workspace_card_contract.sql", "20260912150000_square_operational_intelligence.sql", "20260912190000_square_production_runtime_foundation.sql", "20260915040500_integration_production_legacy_foundation_guard.sql"], "exact mapped extension, inherited-entry fencing and separately qualified observation admission");
   const database = await runtime.createDatabase("broker_runtime");

@@ -13,7 +13,10 @@ declare
   role_name text;
   role_record record;
   expected_rpc regprocedure;
+  expected_internal_rpc regprocedure;
   square_overlay_present boolean;
+  square_internal_runtime_present boolean;
+  square_internal_runtime_catalog_valid boolean;
   schema_digest text;
 begin
   if to_regprocedure('private.integration_production_foundation_split_marker_v1()') is null then
@@ -262,6 +265,89 @@ begin
   end if;
   square_overlay_present :=
     to_regclass('private.square_production_configuration_generations') is not null;
+  square_internal_runtime_present :=
+    to_regprocedure('public.square_production_internal_oauth_v1(text,jsonb)') is not null
+    and to_regprocedure('public.square_production_internal_broker_v1(text,jsonb)') is not null
+    and to_regprocedure('public.square_production_internal_runtime_v1(text,jsonb)') is not null
+    and to_regprocedure('public.square_production_internal_evidence_v1(text,jsonb)') is not null;
+
+  if not square_internal_runtime_present and (
+    to_regprocedure('public.square_production_internal_oauth_v1(text,jsonb)') is not null
+    or to_regprocedure('public.square_production_internal_broker_v1(text,jsonb)') is not null
+    or to_regprocedure('public.square_production_internal_runtime_v1(text,jsonb)') is not null
+    or to_regprocedure('public.square_production_internal_evidence_v1(text,jsonb)') is not null
+  ) then
+    raise exception 'integration_production_internal_runtime_partial'
+      using errcode = '55000';
+  end if;
+
+  with expected(signature,language,volatility,security_definer,is_strict,parallel,result,names,default_count,default_expression,source_hash) as (values
+    ('private.square_production_internal_reject_immutable_mutation_v1()','plpgsql','v',true,false,'u','trigger',null::text[],0,null::text,'879e64a04de08a3fb906ce6f0a5675627ecace40386769247cf0a44c817dd82e'),
+    ('private.square_production_internal_guard_lifecycle_update_v1()','plpgsql','v',true,false,'u','trigger',null::text[],0,null::text,'76ba2c0506b61ebbbe3e124700678021199ed89c6088dddc540050defb7053d0'),
+    ('private.square_production_internal_require_keys_v1(jsonb,text[])','plpgsql','i',false,true,'s','void',array['p_payload','p_required_keys']::text[],0,null::text,'ec3eb20a72acab3d1c18c6d5eb9b2fb1eb4d8c6743af2c4f2e4c80bba0d91d61'),
+    ('private.square_production_internal_fingerprint_v1(text[])','sql','i',false,true,'s','text',array['p_parts']::text[],0,null::text,'3f77909a44ff2bbc574f8b3228482aac0e9c55a1dd3356001384efe21db560b4'),
+    ('private.square_production_internal_audit_v1(uuid,bigint,text,text,text,text,timestamptz)','plpgsql','v',true,false,'u','text',array['p_permit_id','p_generation','p_event_kind','p_outcome','p_reason_code','p_subject_fingerprint','p_recorded_at']::text[],0,null::text,'4d548e25a8988edc1fdfa8b719bf5d7195e32d9f44bde5b584f8484fc30539cb'),
+    ('private.square_production_internal_require_login_v1(text)','plpgsql','s',true,false,'u','void',array['p_capability']::text[],0,null::text,'bef67b686c3168496fcc46e2518e1555b694faef1168f5612caf2921183107df'),
+    ('private.square_production_internal_lock_permit_v1(uuid,text,boolean)','plpgsql','v',true,false,'u','private.square_production_internal_permits',array['p_permit_id','p_capability','p_allow_internal_fence']::text[],1,'false','70e8f973ca1942bf69d6e0c0228a145eb44edfc1bc26ed153fae3321de08b920'),
+    ('private.square_production_internal_install_permit_v1(jsonb)','plpgsql','v',true,false,'u','jsonb',array['p_payload']::text[],0,null::text,'efa4aa61687f5580ceb24897fb1ad6a83527c765a37804bcc03cbbfa375b1905'),
+    ('public.square_production_internal_oauth_v1(text,jsonb)','plpgsql','v',true,false,'u','jsonb',array['p_operation','p_payload']::text[],0,null::text,'6ff215c19aa5c66b607c307d26bcf8f53cc8b3308bd929a50a5f97c5e049d860'),
+    ('public.square_production_internal_broker_v1(text,jsonb)','plpgsql','v',true,false,'u','jsonb',array['p_operation','p_payload']::text[],0,null::text,'41f97c64568a973faa25cfdf99bca8301cbb2103ff8d95491d010e90d3e0d6bb'),
+    ('public.square_production_internal_runtime_v1(text,jsonb)','plpgsql','v',true,false,'u','jsonb',array['p_operation','p_payload']::text[],0,null::text,'ceddeb0f3f55ad1210d4434ab249313473e7e30365197767ab48606fd08dc210'),
+    ('public.square_production_internal_evidence_v1(text,jsonb)','plpgsql','v',true,false,'u','jsonb',array['p_operation','p_payload']::text[],0,null::text,'98e2d0363897ad1020fb4296dd643ccd4798cac10030b8a4883379844d954877')
+  ), resolved as (
+    select expected.*,pg_catalog.to_regprocedure(expected.signature) oid from expected
+  )
+  select (select count(*)=12 from resolved where oid is not null)
+    and (select count(*)=12 from pg_catalog.pg_proc function_record
+      join pg_catalog.pg_namespace namespace on namespace.oid=function_record.pronamespace
+      where namespace.nspname in ('private','public')
+        and function_record.proname like 'square\_production\_internal\_%' escape '\')
+    and not exists (
+      select 1 from resolved expected
+      left join pg_catalog.pg_proc function_record on function_record.oid=expected.oid
+      left join pg_catalog.pg_language function_language on function_language.oid=function_record.prolang
+      where function_record.oid is null
+        or function_language.lanname<>expected.language
+        or function_record.proowner<>marker_owner
+        or function_record.provolatile<>expected.volatility::"char"
+        or function_record.prosecdef<>expected.security_definer
+        or function_record.proisstrict<>expected.is_strict
+        or function_record.proparallel<>expected.parallel::"char"
+        or function_record.proretset or function_record.prokind<>'f'
+        or function_record.prorettype<>pg_catalog.to_regtype(expected.result)
+        or function_record.proargnames is distinct from expected.names
+        or function_record.proargmodes is not null
+        or function_record.pronargdefaults<>expected.default_count
+        or pg_catalog.pg_get_expr(function_record.proargdefaults,0) is distinct from expected.default_expression
+        or function_record.proconfig is distinct from array['search_path=""']::text[]
+        or pg_catalog.encode(extensions.digest(
+          pg_catalog.convert_to(function_record.prosrc,'UTF8'),'sha256'
+        ),'hex')<>expected.source_hash
+    )
+    into strict square_internal_runtime_catalog_valid;
+
+  if square_internal_runtime_present and (
+    not square_internal_runtime_catalog_valid
+    or not exists (
+      select 1 from supabase_migrations.schema_migrations
+      where version='20260902191325'
+    )
+    or 8 <> (
+      select count(*) from pg_catalog.pg_class relation
+      join pg_catalog.pg_namespace namespace on namespace.oid=relation.relnamespace
+      where namespace.nspname='private' and relation.relkind='r'
+        and relation.relname like 'square\_production\_internal\_%' escape '\'
+        and relation.relname=any(array[
+          'square_production_internal_permits','square_production_internal_oauth_states',
+          'square_production_internal_credentials','square_production_internal_scans',
+          'square_production_internal_page_receipts','square_production_internal_source_versions',
+          'square_production_internal_fences','square_production_internal_audit_events'
+        ])
+    )
+  ) then
+    raise exception 'integration_production_internal_runtime_drift'
+      using errcode = '55000';
+  end if;
 
   foreach role_name in array array[
     'anon','authenticated','service_role',
@@ -320,6 +406,13 @@ begin
       when 'square_production_runtime_authority' then pg_catalog.to_regprocedure('public.check_square_production_runtime_authority_v1(text,text,text,bigint,text)')
       when 'square_production_evidence_authority' then pg_catalog.to_regprocedure('public.check_square_production_evidence_authority_v1(text,text,text,bigint,text)')
     end;
+    expected_internal_rpc := case role_name
+      when 'square_production_oauth_authority' then pg_catalog.to_regprocedure('public.square_production_internal_oauth_v1(text,jsonb)')
+      when 'square_production_broker_authority' then pg_catalog.to_regprocedure('public.square_production_internal_broker_v1(text,jsonb)')
+      when 'square_production_runtime_authority' then pg_catalog.to_regprocedure('public.square_production_internal_runtime_v1(text,jsonb)')
+      when 'square_production_evidence_authority' then pg_catalog.to_regprocedure('public.square_production_internal_evidence_v1(text,jsonb)')
+      else null
+    end;
     select * into role_record from pg_catalog.pg_roles where rolname=role_name;
     if not found
       or role_record.rolcanlogin or role_record.rolinherit or role_record.rolsuper
@@ -353,14 +446,22 @@ begin
                 and dependency.objid='public'::regnamespace
               ) or (
                 square_overlay_present
+                and (not square_internal_runtime_present or expected_internal_rpc is null)
                 and dependency.classid='pg_proc'::regclass
                 and dependency.objid=expected_rpc::oid
+              ) or (
+                square_internal_runtime_present
+                and expected_internal_rpc is not null
+                and dependency.classid='pg_proc'::regclass
+                and dependency.objid=expected_internal_rpc::oid
               )
             )
           )
       )
       or (
-        square_overlay_present and (
+        square_overlay_present
+        and (not square_internal_runtime_present or expected_internal_rpc is null)
+        and (
           expected_rpc is null
           or 1 <> (
             select count(*)
@@ -374,6 +475,35 @@ begin
             from pg_catalog.pg_proc rpc
             cross join lateral pg_catalog.aclexplode(rpc.proacl) rpc_acl
             where rpc.oid=expected_rpc::oid
+              and rpc_acl.grantee=role_record.oid
+              and rpc_acl.grantor=rpc.proowner
+              and rpc_acl.privilege_type='EXECUTE'
+              and not rpc_acl.is_grantable
+          )
+        )
+      )
+      or (
+        square_internal_runtime_present and expected_internal_rpc is not null and (
+          exists (
+            select 1
+            from pg_catalog.pg_proc rpc
+            cross join lateral pg_catalog.aclexplode(rpc.proacl) rpc_acl
+            where rpc.oid=expected_rpc::oid
+              and rpc_acl.grantee<>rpc.proowner
+          )
+          or
+          1 <> (
+            select count(*)
+            from pg_catalog.pg_proc rpc
+            cross join lateral pg_catalog.aclexplode(rpc.proacl) rpc_acl
+            where rpc.oid=expected_internal_rpc::oid
+              and rpc_acl.grantee<>rpc.proowner
+          )
+          or 1 <> (
+            select count(*)
+            from pg_catalog.pg_proc rpc
+            cross join lateral pg_catalog.aclexplode(rpc.proacl) rpc_acl
+            where rpc.oid=expected_internal_rpc::oid
               and rpc_acl.grantee=role_record.oid
               and rpc_acl.grantor=rpc.proowner
               and rpc_acl.privilege_type='EXECUTE'

@@ -223,6 +223,9 @@ jobs:
       - name: Test provider-neutral and Square Production contracts
         run: pnpm test:external-integrations-square-production-foundation
 
+      - name: Test closed Square Production internal-pilot runtime contract
+        run: pnpm test:external-integrations-square-production-internal-runtime
+
       - name: Test Production Square one-customer pilot package
         run: pnpm test:external-integrations-production-square-pilot
 
@@ -654,6 +657,9 @@ jobs:
 
       - name: Qualify the exact Production baseline and dormant Square runtime overlay
         run: node scripts/run-square-production-overlay-qualification.js
+
+      - name: Qualify the closed Square Production internal-pilot runtime
+        run: node scripts/run-square-production-internal-pilot-runtime-qualification.js
 
       - name: Remove isolated database state
         if: always()

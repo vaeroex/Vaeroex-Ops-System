@@ -21,12 +21,17 @@ const internalName = "20260902191325_square_production_internal_pilot_runtime.sq
 const pins = Object.freeze({
   foundation: "f8598ca685c795ad56bfdb7a29a1ded3da1c096d42ffb62ea4e123271db54c6d",
   overlay: "2cc43a9313d056e58b75143f032f347cb0972f45cc1edbd484f6b1fb0574661f",
-  internal: "db502e7671028fc9867d49c1b8c198b694d1f07674fe8312bdbc032d80570716",
+  internal: "f7e6f8f72357dafc1a5b6ad0566c2aa90293175420b84b593b98065370e45928",
   preFoundationLedger: "sha256:db7c39a62dce07ac3d21a78653a6d4a905f399d00ea1a4dce452ed4018958060",
 });
 const hash = source => crypto.createHash("sha256").update(source).digest("hex");
 let stage = "source_manifest", root, socketRoot, running = false, terminating = false, assertions = 0;
 const check = (value, name) => { assertions++; if (!value) { stage = name; throw new Error("catalog_qualification_failed"); } };
+const contractStages = new Set([
+  "begin", "closed_authority", "ledger_phase", "relations", "foundation_schema", "overlay_schema",
+  "baseline_triggers", "baseline_function_abi", "internal_relations", "internal_schema",
+  "internal_triggers", "internal_functions", "authority"
+]);
 
 const baseEnv = Object.freeze({ PATH: "/usr/bin:/bin", LANG: "C", LC_ALL: "C", PSQL_HISTORY: "/dev/null",
   PGPASSFILE: "/dev/null", PGSERVICEFILE: "/dev/null", PGSYSCONFDIR: "/nonexistent" });
@@ -96,8 +101,12 @@ function qualify(binary, expectedStage = null) {
     env: { ...baseEnv, TMPDIR: root }, encoding: "utf8", timeout: 30000, maxBuffer: 4096,
   });
   if (expectedStage === null) {
+    if (!result.error && result.status === 3 && result.stdout === "") {
+      const match = /^production_catalog_contract_invalid:([a-z_]+)\n?$/.exec(result.stderr);
+      if (match && contractStages.has(match[1])) stage = `catalog_contract_positive_${match[1]}`;
+    }
     check(!result.error && result.status === 0 && result.stdout.trim() === "production_catalog_contract_valid" &&
-      result.stderr === "", "catalog_contract_positive");
+      result.stderr === "", stage.startsWith("catalog_contract_positive_") ? stage : "catalog_contract_positive");
   } else {
     check(!result.error && result.status === 3 && result.stdout === "" &&
       result.stderr.trim() === `production_catalog_contract_invalid:${expectedStage}`, `${expectedStage}_substitution_rejected`);

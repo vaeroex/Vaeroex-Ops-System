@@ -6,9 +6,9 @@ reviewed Production state. Do not repeat
 the overlay, Terraform, database, routing, alert or qualification work here.
 If the README's six-LOGIN native-SCRAM blocker or executable Production
 binding/runtime blocker is unresolved, this handoff must not begin.
-The planned `20260902191325` runtime migration is absent from the current merged
-qualification tree and is therefore one such unresolved blocker; planning pins
-do not authorize applying it.
+Migration `20260902191325` is source-controlled but remains unapplied until a
+fresh exact-ledger readback and separate bounded apply authorization. Source
+delivery and planning pins do not authorize applying it or creating LOGINs.
 Keep every Square gate false until the separately reviewed one-customer consent
 step. Never put a credential, MFA response, seller identifier, private database
 endpoint or provider payload in Git, CI, an issue, a PR, chat or a recorded

@@ -53,6 +53,8 @@
     "test:external-integrations-square-observations-db": "node scripts/run-square-observation-database-qualification.js",
     "test:external-integrations-square-production-foundation": "node --test services/external-integrations-production/bootstrap-runtime/callback-boundary.test.mjs && node scripts/external-integrations-production-platform-regression-tests.js && node scripts/external-integrations-square-production-foundation-regression-tests.js",
     "test:external-integrations-square-production-overlay": "node scripts/external-integrations-square-production-overlay-regression-tests.js",
+    "test:external-integrations-square-production-internal-runtime": "node scripts/external-integrations-square-production-internal-runtime-regression-tests.js",
+    "test:external-integrations-square-production-internal-runtime-db": "node scripts/run-square-production-internal-pilot-runtime-qualification.js",
     "test:external-integrations-production-square-pilot": "node scripts/external-integrations-production-square-pilot-regression-tests.js",
     "test:external-integrations-production-image-trigger": "node --test services/external-integrations-production/image-build/verify-trigger-context.test.mjs services/external-integrations-production/image-build/qualify-image-scans.test.mjs && node scripts/external-integrations-production-image-trigger-regression-tests.js",
     "test:external-integrations-square-gcp-ops": "node services/square-sandbox-callback/ops/run-ops-qualification.mjs",
