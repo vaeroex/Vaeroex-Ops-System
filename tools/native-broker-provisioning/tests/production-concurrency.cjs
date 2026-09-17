@@ -6,7 +6,8 @@ const { setTimeout: delay } = require("node:timers/promises");
 // extensions. No remote inputs, credentials, SQL text or driver errors escape.
 module.exports = async function qualifyConcurrency({ fixture, native, createPeer, target, check, definition, source }) {
   const control = fixture.control;
-  const catalogs = ["pg_proc", "pg_authid", "pg_auth_members", "pg_db_role_setting"];
+  const catalogs = ["pg_proc", "pg_authid", "pg_auth_members", "pg_db_role_setting",
+    "pg_namespace", "pg_class", "pg_database", "pg_parameter_acl", "pg_default_acl"];
   const context = intent => ({ target, intent, approvalId: "synthetic-production", signal: new AbortController().signal });
   const cases = [
     ["function", "pg_proc", `CREATE OR REPLACE FUNCTION ${definition} RETURNS void
@@ -14,6 +15,12 @@ module.exports = async function qualifyConcurrency({ fixture, native, createPeer
     ["role_attribute", "pg_authid", "ALTER ROLE square_production_evidence_authority LOGIN"],
     ["membership", "pg_auth_members", "GRANT square_production_scheduler_authority TO synthetic_unprivileged WITH ADMIN FALSE, INHERIT TRUE, SET FALSE"],
     ["database_role_setting", "pg_db_role_setting", "ALTER ROLE square_production_oauth_authority IN DATABASE postgres SET statement_timeout='1s'"],
+    ["schema", "pg_namespace", "GRANT CREATE ON SCHEMA public TO square_production_runtime_authority"],
+    ["relation", "pg_class", "GRANT SELECT ON private.square_production_generation_fences TO square_production_runtime_authority"],
+    ["column", "pg_class", "GRANT SELECT (marker) ON private.square_production_generation_fences TO square_production_runtime_authority"],
+    ["database", "pg_database", "GRANT CREATE ON DATABASE postgres TO square_production_runtime_authority"],
+    ["parameter", "pg_parameter_acl", "GRANT SET ON PARAMETER session_replication_role TO PUBLIC"],
+    ["default", "pg_default_acl", "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO square_production_runtime_authority"],
   ];
   const observe = (name, expected, actual) => {
     process.stdout.write(JSON.stringify({ outcome: "production_concurrency", case: name, expected, actual }) + "\n");
@@ -34,7 +41,7 @@ module.exports = async function qualifyConcurrency({ fixture, native, createPeer
     const row = (await control.query(`SELECT count(DISTINCT relation)::int n FROM pg_locks
       WHERE pid=$1 AND granted AND mode='ShareRowExclusiveLock'
       AND relation=ANY($2::regclass[])`, [pid, catalogs.map(name => `pg_catalog.${name}`)])).rows[0];
-    return row.n === 4;
+    return row.n === catalogs.length;
   }
   async function waiting(pid, relation, blocker) {
     return (await control.query(`SELECT EXISTS(SELECT FROM pg_locks WHERE pid=$1
@@ -53,13 +60,7 @@ module.exports = async function qualifyConcurrency({ fixture, native, createPeer
 
   // Bounded reproduction of the final-review ACL race. Roll back each
   // competing grant before acknowledging private delivery; report no SQL.
-  const aclCases = [
-    ["schema", "GRANT CREATE ON SCHEMA public TO square_production_runtime_authority"],
-    ["relation", "GRANT SELECT ON private.square_production_generation_fences TO square_production_runtime_authority"],
-    ["database", "GRANT CREATE ON DATABASE postgres TO square_production_runtime_authority"],
-    ["parameter", "GRANT SET ON PARAMETER session_replication_role TO PUBLIC"],
-    ["default", "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO square_production_runtime_authority"],
-  ];
+  const aclCases = cases.slice(4).map(([name, , sql]) => [name, sql]);
   let aclBlocked = true, aclObserved = 0;
   const aclAssignment = await native.assign({ ...context("concurrency-acl-review"), async deliver() {
     for (const [name, sql] of aclCases) {
@@ -78,7 +79,7 @@ module.exports = async function qualifyConcurrency({ fixture, native, createPeer
   observe("all_checked_acl_mutations_blocked", true,
     aclBlocked && aclObserved === aclCases.length && aclAssignment.committed === true);
 
-  // All four actual DDL paths wait on native-held locks. No fixture lock masks
+  // All actual DDL paths wait on native-held locks. No fixture lock masks
   // protection. Completion is coordinated by pg_locks, not a lucky sleep.
   for (const exit of ["commit", "rollback", "timeout"]) {
     let pid, delivery = false, releaseDelivery;
@@ -108,7 +109,7 @@ module.exports = async function qualifyConcurrency({ fixture, native, createPeer
     } catch { acknowledged = false; }
     finally { releaseDelivery(); }
     observe(`${exit}_delivery_reached`, true, delivery);
-    observe(`${exit}_all_four_waits_observed`, true, observedAllWaits);
+    observe(`${exit}_all_mutation_waits_observed`, true, observedAllWaits);
     if (exit === "timeout") observe("native_ack_deadline_exercised", true,
       Date.now() - deliveryAt >= 4500 && Date.now() - deliveryAt < 10000);
     observe(`${exit}_acknowledged`, exit === "commit", acknowledged);

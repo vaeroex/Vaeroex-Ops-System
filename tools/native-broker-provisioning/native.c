@@ -475,6 +475,14 @@ static bool closed_authority(const char *target) {
   if (!command("LOCK TABLE pg_catalog.pg_authid IN SHARE ROW EXCLUSIVE MODE")) return false;
   if (!command("LOCK TABLE pg_catalog.pg_auth_members IN SHARE ROW EXCLUSIVE MODE")) return false;
   if (!command("LOCK TABLE pg_catalog.pg_db_role_setting IN SHARE ROW EXCLUSIVE MODE")) return false;
+  /* Existing authority checks also reject schema, relation/column, database,
+   * parameter and default ACL drift. Application-table SHARE locks do not
+   * conflict with GRANT, so retain the ACL catalogs through the same commit. */
+  if (!command("LOCK TABLE pg_catalog.pg_namespace IN SHARE ROW EXCLUSIVE MODE")) return false;
+  if (!command("LOCK TABLE pg_catalog.pg_class IN SHARE ROW EXCLUSIVE MODE")) return false;
+  if (!command("LOCK TABLE pg_catalog.pg_database IN SHARE ROW EXCLUSIVE MODE")) return false;
+  if (!command("LOCK TABLE pg_catalog.pg_parameter_acl IN SHARE ROW EXCLUSIVE MODE")) return false;
+  if (!command("LOCK TABLE pg_catalog.pg_default_acl IN SHARE ROW EXCLUSIVE MODE")) return false;
   if (managed_profile() && !command("LOCK TABLE supabase_migrations.schema_migrations IN SHARE MODE")) return false;
   production_phase phase=production_ledger_phase();
   if (phase==PRODUCTION_PHASE_INVALID || !command("LOCK TABLE private.integration_production_platform_bindings, "
