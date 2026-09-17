@@ -275,8 +275,9 @@ assert.match(readme, /callback-only Terraform plan[\s\S]*no create, destroy or r
 assert.doesNotMatch(readme, /only the three reviewed in-place updates/,
   "the operator sequence cannot reuse a prior callback plan's update count");
 assert.match(readme, /authoritative database source and catalog checks are the merged[\s\S]*`productionSourcePins`[\s\S]*`production-native-qualify\.cjs`[\s\S]*`production-catalog-qualify\.cjs`/);
-assert.match(readme, /`20260902191325`[\s\S]*absent from the merged qualification[\s\S]*future pins are not a reviewed runtime dependency/);
-assert.match(readme, /Do not apply `20260902191325` under the current package/);
+assert.match(readme, /`20260902191325` is now delivered[\s\S]*remains unapplied[\s\S]*not activation evidence/);
+assert.match(readme, /Do not apply `20260902191325` merely because its source is merged[\s\S]*exactly 103 entries[\s\S]*separate bounded authorization/);
+assert.match(handoff, /`20260902191325` is source-controlled[\s\S]*remains unapplied[\s\S]*do not authorize applying it or creating LOGINs/);
 assert.match(readme, /all six profiles must be fenced `NOLOGIN NOINHERIT`/);
 assert.match(readme, /CI\/source qualification remains nonauthorizing/);
 assert.match(readme, /fixed six-profile Production extension of\s+`tools\/native-broker-provisioning`/);
