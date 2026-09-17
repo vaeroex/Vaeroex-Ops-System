@@ -260,8 +260,8 @@ assert.match(fixtureRichMigrationTest, /qualifyProductionRoleDrift\(localMigrati
   "only the role-drift witness uses the local migration-administrator connection");
 for (const qualification of separatedDatabaseQualifications) {
   assert.match(qualification,
-    /baseline = (?:names|files)\.filter\(name => name < (?:migrationName|migration) && !\[productionFoundation,productionOverlay\]\.includes\(name\)\)/,
-    "legacy Square database qualifications exclude both Production-only authority migrations");
+    /baseline = (?:names|files)\.filter\(name => name < (?:migrationName|migration) && !\[productionFoundation,productionOverlay,productionInternalRuntime\]\.includes\(name\)\)/,
+    "legacy Square database qualifications exclude all three separately qualified Production-only authority migrations");
 }
 assert.match(observationDatabaseTest, /if\(runtime\.targetKind==="native-postgres"\)[\s\S]*foundation rejects authority-role ownership in another database/,
   "foundation mutation tests run only in their isolated per-process native cluster");
