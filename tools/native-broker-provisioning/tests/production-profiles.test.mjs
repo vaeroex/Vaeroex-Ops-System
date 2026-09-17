@@ -179,8 +179,12 @@ test("post-mutation recovery reports each safety condition independently", () =>
   assert.match(qualifier, /fixture\.connect\(fenceProfile\.role, fenceCandidate\.toString\("ascii"\), "tls"\)/,
     "the Node SCRAM fencing probe supplies its candidate as the required string type");
   assert.match(qualifier, /postflight_authority_drift_observation/);
-  assert.match(nativeSource, /LOCK TABLE pg_catalog\.pg_proc, pg_catalog\.pg_auth_members IN SHARE MODE/,
-    "the native transaction locks function and membership catalogs before authority reads");
+  assert.match(nativeSource, /LOCK TABLE pg_catalog\.pg_proc IN SHARE ROW EXCLUSIVE MODE/,
+    "the native transaction locks the function catalog before authority reads");
+  assert.match(nativeSource, /LOCK TABLE pg_catalog\.pg_authid IN SHARE ROW EXCLUSIVE MODE/,
+    "the native transaction fences role-attribute mutations before authority reads");
+  assert.match(nativeSource, /LOCK TABLE pg_catalog\.pg_auth_members IN SHARE ROW EXCLUSIVE MODE/,
+    "the native transaction serializes membership mutations before authority reads");
   assert.match(qualifier, /const postflightMutation = await fixture\.connect\(\)/,
     "postflight mutations run without an external fixture lock masking the native lock");
   assert.doesNotMatch(qualifier, /postflightLock/, "the regression must exercise native-held catalog locks");
