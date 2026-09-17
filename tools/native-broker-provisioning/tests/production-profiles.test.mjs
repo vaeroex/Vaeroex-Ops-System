@@ -217,6 +217,14 @@ test("portable catalog qualification executes exact phase predicates from CI", (
   const migration = readFileSync(resolve(root,
     "supabase/migrations/20260902191325_square_production_internal_pilot_runtime.sql"), "utf8");
   const nativeSource = readFileSync(resolve(root, "tools/native-broker-provisioning/native.c"), "utf8");
+  const catalogVerifier = nativeSource.slice(
+    nativeSource.indexOf("static bool production_internal_runtime_functions_valid"),
+    nativeSource.indexOf("static bool production_internal_runtime_contract_valid"),
+  );
+  const authorityVerifier = nativeSource.slice(
+    nativeSource.indexOf("static bool production_authority_valid"),
+    nativeSource.indexOf("#ifdef VAEROEX_SYNTHETIC_ONLY", nativeSource.indexOf("static bool production_authority_valid")),
+  );
   assert.match(qualifier, /20260902191323_integration_production_runtime_foundation\.sql/);
   assert.match(qualifier, /20260902191324_square_production_runtime_overlay\.sql/);
   assert.match(qualifier, /VAEROEX_PRODUCTION_INTERNAL_RUNTIME_MIGRATION/);
@@ -268,6 +276,16 @@ test("portable catalog qualification executes exact phase predicates from CI", (
     const bodyHash = createHash("sha256").update(migration.slice(bodyStart, bodyEnd)).digest("hex");
     assert.match(nativeSource, new RegExp(bodyHash),
       `${functionName} catalog predicate pins its exact PostgreSQL function body`);
+    const operationalMatch = /^public\.square_production_internal_(oauth|broker|runtime|evidence)_v1$/.exec(functionName);
+    if (operationalMatch) {
+      assert.match(catalogVerifier, new RegExp(
+        `${functionName.replaceAll(".", "\\.")}\\(text,jsonb\\)'[\\s\\S]{0,300}'${bodyHash}'`,
+      ), `${functionName} canonical catalog entry pins its exact migration body hash`);
+      assert.match(authorityVerifier, new RegExp(
+        `production_named_authority_valid\\("square_production_${operationalMatch[1]}_authority",[\\s\\S]{0,180}`
+        + `${functionName.replaceAll(".", "\\.")}\\(text,jsonb\\)\",[\\s\\S]{0,100}\"${bodyHash}\"`,
+      ), `${functionName} authority mapping reuses its canonical catalog body hash`);
+    }
   }
 });
 

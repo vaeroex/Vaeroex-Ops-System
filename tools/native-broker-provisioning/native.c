@@ -1265,10 +1265,10 @@ static bool production_authority_valid(const char *target) {
         AUTHORITY_SOURCE_FOR("square_production_evidence_authority","evidence")) &&
       production_named_authority_valid("square_production_oauth_authority",
         "public.square_production_internal_oauth_v1(text,jsonb)",
-        "9d29d2d57410d185cbec029c4583b6e64394b12033f33c3e47819e9a9db93662","square_production_oauth",true) &&
+        "6ff215c19aa5c66b607c307d26bcf8f53cc8b3308bd929a50a5f97c5e049d860","square_production_oauth",true) &&
       production_named_authority_valid("square_production_broker_authority",
         "public.square_production_internal_broker_v1(text,jsonb)",
-        "dd16a4df4d6344f6297834953e423fa85dbbcf32f320d58048be43b13cc3dd9b","square_production_broker",true) &&
+        "41f97c64568a973faa25cfdf99bca8301cbb2103ff8d95491d010e90d3e0d6bb","square_production_broker",true) &&
       production_named_authority_valid("square_production_scheduler_authority",
         "public.check_square_production_scheduler_authority_v1(text,text,text,bigint,text)",
         AUTHORITY_SOURCE_FOR("square_production_scheduler_authority","scheduler"),"square_production_scheduler",false) &&
@@ -1277,10 +1277,10 @@ static bool production_authority_valid(const char *target) {
         AUTHORITY_SOURCE_FOR("square_production_webhook_authority","webhook"),"square_production_webhook",false) &&
       production_named_authority_valid("square_production_runtime_authority",
         "public.square_production_internal_runtime_v1(text,jsonb)",
-        "fe072192b425eee0a727ca439989d5cc848b2efd00d0f086121adafa9ae2510d","square_production_runtime",true) &&
+        "ceddeb0f3f55ad1210d4434ab249313473e7e30365197767ab48606fd08dc210","square_production_runtime",true) &&
       production_named_authority_valid("square_production_evidence_authority",
         "public.square_production_internal_evidence_v1(text,jsonb)",
-        "a851744c9f08d87d47260305bfc5751b206209e9e72c5028b42d202460c4ce74","square_production_evidence",true);
+        "98e2d0363897ad1020fb4296dd643ccd4798cac10030b8a4883379844d954877","square_production_evidence",true);
   }
   return production_named_authority_valid("square_production_oauth_authority",
       "public.check_square_production_oauth_authority_v1(text,text,text,bigint,text)",
