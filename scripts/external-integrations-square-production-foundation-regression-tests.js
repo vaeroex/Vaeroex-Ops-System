@@ -233,8 +233,8 @@ for (const capability of ["oauth", "broker", "scheduler", "webhook", "runtime", 
     `when 'square_production_${capability}_authority' then pg_catalog\\.to_regprocedure\\('public\\.check_square_production_${capability}_authority_v1\\(text,text,text,bigint,text\\)'\\)`
   ), `forward guard binds ${capability} authority only to its exact preflight RPC dependency`);
 }
-assert.match(legacyGuard, /square_overlay_present[\s\S]*expected_rpc is null[\s\S]*aclexplode\(rpc\.proacl\)[\s\S]*rpc_acl\.grantee<>rpc\.proowner[\s\S]*rpc_acl\.grantee=role_record\.oid[\s\S]*rpc_acl\.grantor=rpc\.proowner[\s\S]*privilege_type='EXECUTE'[\s\S]*not rpc_acl\.is_grantable/,
-  "forward guard requires one exact non-grantable authority RPC ACL and no other non-owner grantee");
+assert.match(legacyGuard, /square_overlay_present[\s\S]*not square_internal_runtime_present or expected_internal_rpc is null[\s\S]*expected_rpc is null[\s\S]*aclexplode\(rpc\.proacl\)[\s\S]*rpc_acl\.grantee<>rpc\.proowner[\s\S]*rpc_acl\.grantee=role_record\.oid[\s\S]*rpc_acl\.grantor=rpc\.proowner[\s\S]*privilege_type='EXECUTE'[\s\S]*not rpc_acl\.is_grantable/,
+  "forward guard requires the staged RPC only until an exact internal replacement exists, while scheduler and webhook remain staged");
 assert.match(legacyGuard, /square_internal_runtime_present and expected_internal_rpc is not null and \([\s\S]*rpc_acl\.grantee=role_record\.oid[\s\S]*rpc_acl\.privilege_type='EXECUTE'[\s\S]*not rpc_acl\.is_grantable/,
   "forward guard independently checks each internal-runtime RPC grant is exact and non-grantable");
 assert.match(legacyGuard, /aclexplode\(public_schema\.nspacl\)[\s\S]*privilege_type='USAGE'[\s\S]*has_schema_privilege\(role_name,'public','CREATE'\)/,

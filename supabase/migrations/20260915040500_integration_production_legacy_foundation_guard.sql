@@ -389,7 +389,9 @@ begin
           )
       )
       or (
-        square_overlay_present and (
+        square_overlay_present
+        and (not square_internal_runtime_present or expected_internal_rpc is null)
+        and (
           expected_rpc is null
           or 1 <> (
             select count(*)
