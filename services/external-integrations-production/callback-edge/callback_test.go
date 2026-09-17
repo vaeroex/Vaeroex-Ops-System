@@ -32,6 +32,47 @@ func TestForwardedHeaderEventAcceptsStructurallyValidBodylessCallback(t *testing
 	}
 }
 
+func TestDiagnosticReasonsAreFiniteAndParserEquivalent(t *testing.T) {
+	query := "state=" + validStateFixture + "&code=synthetic-code"
+	tests := []struct {
+		name          string
+		method, path  string
+		query         string
+		headers       [][2]string
+		expected      RejectionReason
+	}{
+		{name: "accepted", method: "GET", path: CallbackPath, query: query, headers: [][2]string{{"content-length", "0"}}, expected: RejectionNone},
+		{name: "bounds", method: "GET", path: CallbackPath, query: query, headers: [][2]string{{"x", strings.Repeat("y", MaxInputHeaderBytes)}}, expected: RejectionHeaderBounds},
+		{name: "spoof", method: "GET", path: CallbackPath, query: query, headers: [][2]string{{"x-forwarded-host", "synthetic.invalid"}}, expected: RejectionHeaderSpoofing},
+		{name: "transfer", method: "GET", path: CallbackPath, query: query, headers: [][2]string{{"transfer-encoding", "chunked"}}, expected: RejectionTransferEncoding},
+		{name: "expect", method: "GET", path: CallbackPath, query: query, headers: [][2]string{{"expect", "100-continue"}}, expected: RejectionExpect},
+		{name: "duplicate length", method: "GET", path: CallbackPath, query: query, headers: [][2]string{{"content-length", "0"}, {"content-length", "0"}}, expected: RejectionDuplicateContentLength},
+		{name: "nonzero length", method: "GET", path: CallbackPath, query: query, headers: [][2]string{{"content-length", "1"}}, expected: RejectionNonzeroContentLength},
+		{name: "target", method: "GET", path: CallbackPath + "?" + query, query: query + "x", expected: RejectionTargetMismatch},
+		{name: "method", method: "POST", path: CallbackPath, query: query, expected: RejectionMethod},
+		{name: "path", method: "GET", path: "/", query: query, expected: RejectionPath},
+		{name: "empty", method: "GET", path: CallbackPath, expected: RejectionQueryEmpty},
+		{name: "limit", method: "GET", path: CallbackPath, query: strings.Repeat("x", MaxRawQueryBytes+1), expected: RejectionQueryLimit},
+		{name: "unsafe", method: "GET", path: CallbackPath, query: "state=x&code=raw space", expected: RejectionQueryUnsafe},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			handoff, reason := DiagnoseForwardedHeaderCallback(test.method, test.path, test.query, test.headers)
+			parsed, err := ParseForwardedHeaderCallback(test.method, test.path, test.query, test.headers)
+			if reason != test.expected {
+				t.Fatalf("expected %s, got %s", test.expected, reason)
+			}
+			if reason == RejectionNone {
+				if err != nil || handoff != parsed {
+					t.Fatalf("accepted diagnostic diverged from parser: %#v %#v %v", handoff, parsed, err)
+				}
+			} else if err == nil || handoff != (Handoff{}) {
+				t.Fatalf("rejected diagnostic diverged from parser: %#v %v", handoff, err)
+			}
+		})
+	}
+}
+
 func TestEquivalentForwardedTargetRepresentationsAreAccepted(t *testing.T) {
 	rawQuery := "state=" + validStateFixture + "&code=" + strings.Repeat("x", 191)
 	for _, target := range []struct{ path, query string }{

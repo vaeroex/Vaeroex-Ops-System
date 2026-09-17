@@ -132,7 +132,9 @@ assert.match(edgePlugin, /ReplaceHttpRequestHeader\(":path", callbackedge\.Callb
 assert.match(edgePlugin, /GetHttpRequestHeaders\(\)/, "the edge reads the complete bounded header map before parsing callbacks");
 assert.match(edgePlugin, /headersError != nil/, "header retrieval failure fails closed");
 assert.match(edgePlugin, /callbackedge\.ParseForwardedHeaderCallback\([\s\S]*headers,/, "the plugin uses the unit-tested combined query and body-indicator contract");
-assert.doesNotMatch(edgePlugin, /diagnostic|callback_predicate|vaeroex_public_synthetic_predicate/, "the temporary public callback diagnostic is absent");
+assert.match(edgePlugin, /VAEROEX_PUBLIC_NEVER_ISSUED_CANARY/, "the finite diagnostic is restricted to the public never-issued canary");
+assert.match(edgePlugin, /callback_predicate_/, "the finite diagnostic returns only fixed predicate labels");
+assert.doesNotMatch(edgePlugin, /proxywasm\.Log|console\.|fmt\.Print|requestTarget|rawHeaders/, "the finite diagnostic cannot log or return request material");
 assert.match(edgePlugin, /if err := proxywasm\.SendHttpResponse\([\s\S]*err != nil \{[\s\S]*panic\(err\)/, "a failed local rejection response escalates to fail_open=false plugin failure");
 assert.match(edgePlugin, /clearReservedHandoffHeaders\(\)/, "reserved handoff headers receive a defense-in-depth purge before the trusted pair is appended");
 assert.match(edgePlugin, /AddHttpRequestHeader\(callbackedge\.HandoffQueryHeader, handoff\.EncodedQuery\)/, "the edge forwards one safely encoded raw-query handoff");

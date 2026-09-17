@@ -24,6 +24,24 @@ const (
 
 var ErrInvalidRequest = errors.New("invalid integration request")
 
+type RejectionReason string
+
+const (
+	RejectionNone                   RejectionReason = "accepted"
+	RejectionHeaderBounds           RejectionReason = "header_bounds"
+	RejectionHeaderSpoofing         RejectionReason = "header_spoofing"
+	RejectionTransferEncoding       RejectionReason = "transfer_encoding"
+	RejectionExpect                 RejectionReason = "expect"
+	RejectionDuplicateContentLength RejectionReason = "duplicate_content_length"
+	RejectionNonzeroContentLength   RejectionReason = "nonzero_content_length"
+	RejectionTargetMismatch         RejectionReason = "target_mismatch"
+	RejectionMethod                 RejectionReason = "method"
+	RejectionPath                   RejectionReason = "path"
+	RejectionQueryEmpty             RejectionReason = "query_empty"
+	RejectionQueryLimit             RejectionReason = "query_limit"
+	RejectionQueryUnsafe            RejectionReason = "query_unsafe"
+)
+
 var ReservedHandoffHeaders = [...]string{
 	HandoffVersionHeader,
 	HandoffQueryHeader,
@@ -41,10 +59,27 @@ type Handoff struct {
 // are rejected before any callback material can be converted into an internal
 // handoff.
 func ParseForwardedHeaderCallback(method, pathAttribute, queryAttribute string, headers [][2]string) (Handoff, error) {
-	if !IsBoundedClientHeaderMap(headers) || HasForbiddenClientHeaders(headers) || HasForbiddenCallbackBodyHeaders(headers) {
+	handoff, reason := DiagnoseForwardedHeaderCallback(method, pathAttribute, queryAttribute, headers)
+	if reason != RejectionNone {
 		return Handoff{}, ErrInvalidRequest
 	}
-	return ParseForwardedCallback(method, pathAttribute, queryAttribute)
+	return handoff, nil
+}
+
+// DiagnoseForwardedHeaderCallback runs the exact Production parser and returns
+// only one finite predicate label. It never returns request values or headers.
+// The plugin exposes this label solely for the public never-issued canary.
+func DiagnoseForwardedHeaderCallback(method, pathAttribute, queryAttribute string, headers [][2]string) (Handoff, RejectionReason) {
+	if !IsBoundedClientHeaderMap(headers) {
+		return Handoff{}, RejectionHeaderBounds
+	}
+	if HasForbiddenClientHeaders(headers) {
+		return Handoff{}, RejectionHeaderSpoofing
+	}
+	if reason := callbackBodyRejectionReason(headers); reason != RejectionNone {
+		return Handoff{}, reason
+	}
+	return diagnoseForwardedCallback(method, pathAttribute, queryAttribute)
 }
 
 // IsBoundedClientHeaderMap applies the input count and byte limits before the
@@ -87,43 +122,60 @@ func HasForbiddenClientHeaders(headers [][2]string) bool {
 }
 
 func ParseForwardedCallback(method, pathAttribute, queryAttribute string) (Handoff, error) {
+	handoff, reason := diagnoseForwardedCallback(method, pathAttribute, queryAttribute)
+	if reason != RejectionNone {
+		return Handoff{}, ErrInvalidRequest
+	}
+	return handoff, nil
+}
+
+func diagnoseForwardedCallback(method, pathAttribute, queryAttribute string) (Handoff, RejectionReason) {
 	path, rawQuery, valid := normalizeForwardedTarget(pathAttribute, queryAttribute)
 	if !valid {
-		return Handoff{}, ErrInvalidRequest
+		return Handoff{}, RejectionTargetMismatch
 	}
 	if method != "GET" {
-		return Handoff{}, ErrInvalidRequest
+		return Handoff{}, RejectionMethod
 	}
 	if path != CallbackPath {
-		return Handoff{}, ErrInvalidRequest
+		return Handoff{}, RejectionPath
 	}
 	if len(rawQuery) == 0 {
-		return Handoff{}, ErrInvalidRequest
+		return Handoff{}, RejectionQueryEmpty
 	}
 	if len(rawQuery) > MaxRawQueryBytes {
-		return Handoff{}, ErrInvalidRequest
+		return Handoff{}, RejectionQueryLimit
 	}
 	if hasUnsafeRawQuery(rawQuery) {
-		return Handoff{}, ErrInvalidRequest
+		return Handoff{}, RejectionQueryUnsafe
 	}
-	return Handoff{EncodedQuery: base64.RawURLEncoding.EncodeToString([]byte(rawQuery))}, nil
+	return Handoff{EncodedQuery: base64.RawURLEncoding.EncodeToString([]byte(rawQuery))}, RejectionNone
 }
 
 func HasForbiddenCallbackBodyHeaders(headers [][2]string) bool {
+	return callbackBodyRejectionReason(headers) != RejectionNone
+}
+
+func callbackBodyRejectionReason(headers [][2]string) RejectionReason {
 	contentLengthCount := 0
 	for _, header := range headers {
 		name := strings.ToLower(header[0])
 		switch name {
-		case "transfer-encoding", "expect":
-			return true
+		case "transfer-encoding":
+			return RejectionTransferEncoding
+		case "expect":
+			return RejectionExpect
 		case "content-length":
 			contentLengthCount++
-			if contentLengthCount > 1 || strings.TrimSpace(header[1]) != "0" {
-				return true
+			if contentLengthCount > 1 {
+				return RejectionDuplicateContentLength
+			}
+			if strings.TrimSpace(header[1]) != "0" {
+				return RejectionNonzeroContentLength
 			}
 		}
 	}
-	return false
+	return RejectionNone
 }
 
 func IsWebhookRequest(method, pathAttribute, queryAttribute string) bool {
