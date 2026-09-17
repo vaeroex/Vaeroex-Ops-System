@@ -51,6 +51,33 @@ module.exports = async function qualifyConcurrency({ fixture, native, createPeer
     observe(`${label}_checked_fence`, true, result.ack === true && result.committed === true && row?.ok === true);
   }
 
+  // Bounded reproduction of the final-review ACL race. Roll back each
+  // competing grant before acknowledging private delivery; report no SQL.
+  const aclCases = [
+    ["schema", "GRANT CREATE ON SCHEMA public TO square_production_runtime_authority"],
+    ["relation", "GRANT SELECT ON private.square_production_generation_fences TO square_production_runtime_authority"],
+    ["database", "GRANT CREATE ON DATABASE postgres TO square_production_runtime_authority"],
+    ["parameter", "GRANT SET ON PARAMETER session_replication_role TO PUBLIC"],
+    ["default", "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO square_production_runtime_authority"],
+  ];
+  let aclBlocked = true, aclObserved = 0;
+  const aclAssignment = await native.assign({ ...context("concurrency-acl-review"), async deliver() {
+    for (const [name, sql] of aclCases) {
+      const client = await fixture.connect();
+      await client.query("BEGIN; SET LOCAL lock_timeout='100ms'");
+      let outcome = "applied";
+      try { await client.query(sql); }
+      catch (error) { outcome = error?.code === "55P03" ? "lock_timeout" : error?.code === "40P01" ? "deadlock" : "failed"; }
+      await client.query("ROLLBACK"); await client.end();
+      process.stdout.write(JSON.stringify({ outcome: "production_concurrency", case: `acl_${name}`,
+        expected: "lock_timeout", actual: outcome }) + "\n");
+      aclBlocked &&= outcome === "lock_timeout"; aclObserved++;
+    }
+    return { ack: true };
+  } });
+  observe("all_checked_acl_mutations_blocked", true,
+    aclBlocked && aclObserved === aclCases.length && aclAssignment.committed === true);
+
   // All four actual DDL paths wait on native-held locks. No fixture lock masks
   // protection. Completion is coordinated by pg_locks, not a lucky sleep.
   for (const exit of ["commit", "rollback", "timeout"]) {
