@@ -130,7 +130,11 @@ func isExactDiagnosticRequest(method, pathAttribute, queryAttribute string) bool
 
 func isExactDiagnosticTargetHeader() bool {
 	target, err := proxywasm.GetHttpRequestHeader(":path")
-	return err == nil && target == diagnosticCanaryTarget
+	if err != nil || target != diagnosticCanaryTarget {
+		return false
+	}
+	method, err := proxywasm.GetHttpRequestHeader(":method")
+	return err == nil && method == "GET"
 }
 
 func clearReservedHandoffHeaders() bool {
