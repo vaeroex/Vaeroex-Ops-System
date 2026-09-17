@@ -218,10 +218,16 @@ assert.match(legacyGuard, /convert_to\(object_record\.prosrc,'UTF8'\)[\s\S]*98a8
   "forward guard binds the retained fingerprint helper to its reviewed implementation bytes");
 assert.match(legacyGuard, /integration_production_foundation_role_drift/,
   "forward guard revalidates dormant authority role attributes and memberships");
+assert.match(legacyGuard, /square_internal_runtime_present :=[\s\S]*square_production_internal_oauth_v1\(text,jsonb\)[\s\S]*square_production_internal_broker_v1\(text,jsonb\)[\s\S]*square_production_internal_runtime_v1\(text,jsonb\)[\s\S]*square_production_internal_evidence_v1\(text,jsonb\)/,
+  "forward guard recognizes only the complete internal-runtime RPC set");
+assert.match(legacyGuard, /integration_production_internal_runtime_partial/,
+  "forward guard rejects a partial internal-runtime RPC set");
 assert.match(legacyGuard, /pg_catalog\.pg_shdepend[\s\S]*dependency\.classid='pg_namespace'::regclass[\s\S]*dependency\.objid='public'::regnamespace/,
   "forward guard permits the reviewed public-schema ACL dependency");
 assert.match(legacyGuard, /dependency\.classid='pg_proc'::regclass/,
   "forward guard can preserve only exact reviewed preflight-function ACL dependencies");
+assert.match(legacyGuard, /square_internal_runtime_present[\s\S]*expected_internal_rpc is not null[\s\S]*dependency\.classid='pg_proc'::regclass[\s\S]*dependency\.objid=expected_internal_rpc::oid/,
+  "forward guard permits only each authority role's exact internal-runtime RPC dependency");
 for (const capability of ["oauth", "broker", "scheduler", "webhook", "runtime", "evidence"]) {
   assert.match(legacyGuard, new RegExp(
     `when 'square_production_${capability}_authority' then pg_catalog\\.to_regprocedure\\('public\\.check_square_production_${capability}_authority_v1\\(text,text,text,bigint,text\\)'\\)`
@@ -229,6 +235,8 @@ for (const capability of ["oauth", "broker", "scheduler", "webhook", "runtime", 
 }
 assert.match(legacyGuard, /square_overlay_present[\s\S]*expected_rpc is null[\s\S]*aclexplode\(rpc\.proacl\)[\s\S]*rpc_acl\.grantee<>rpc\.proowner[\s\S]*rpc_acl\.grantee=role_record\.oid[\s\S]*rpc_acl\.grantor=rpc\.proowner[\s\S]*privilege_type='EXECUTE'[\s\S]*not rpc_acl\.is_grantable/,
   "forward guard requires one exact non-grantable authority RPC ACL and no other non-owner grantee");
+assert.match(legacyGuard, /square_internal_runtime_present and expected_internal_rpc is not null and \([\s\S]*rpc_acl\.grantee=role_record\.oid[\s\S]*rpc_acl\.privilege_type='EXECUTE'[\s\S]*not rpc_acl\.is_grantable/,
+  "forward guard independently checks each internal-runtime RPC grant is exact and non-grantable");
 assert.match(legacyGuard, /aclexplode\(public_schema\.nspacl\)[\s\S]*privilege_type='USAGE'[\s\S]*has_schema_privilege\(role_name,'public','CREATE'\)/,
   "forward guard requires exact non-grantable public USAGE without CREATE");
 assert.match(legacyGuard, /jsonb_build_object\([\s\S]*'columns'[\s\S]*'constraints'[\s\S]*'indexes'[\s\S]*'policy_count'[\s\S]*'trigger_count'[\s\S]*0fe4e1c2080fed1725db60ddb1643f4cd2d979a1a261c3445aae54c56788897e/,
