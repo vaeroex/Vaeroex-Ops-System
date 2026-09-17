@@ -1,4 +1,7 @@
 begin;
+-- Supabase installs pgTAP in `extensions`; the standalone native qualifier
+-- installs it in `public`. Keep the same test valid in both isolated targets.
+set local search_path=public,extensions;
 select plan(34);
 
 select is(
