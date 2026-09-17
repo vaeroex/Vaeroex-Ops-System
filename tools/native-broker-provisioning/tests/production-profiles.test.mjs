@@ -35,7 +35,7 @@ test("Production profiles pin the exact reviewed 102+overlay sources", () => {
     internalRuntimeVersion: "20260902191325",
     internalRuntimeMigrationCount: 104,
     internalRuntimeLedgerFingerprint: "sha256:7dc51d888ee9c4a6bb595b1a4431ab5fcdb649e34c871ba91a6512d5fa2dc89f",
-    internalRuntimeSha256: "d9fcff27beb666c009a045ad3232d6b5ac90d214df4595bc8d0b8943b2e81601",
+    internalRuntimeSha256: "f7e6f8f72357dafc1a5b6ad0566c2aa90293175420b84b593b98065370e45928",
   });
   assert.equal(hash("supabase/migrations/20260902191323_integration_production_runtime_foundation.sql"), productionSourcePins.foundationSha256);
   assert.equal(hash("supabase/migrations/20260902191324_square_production_runtime_overlay.sql"), productionSourcePins.overlaySha256);
@@ -214,6 +214,9 @@ test("portable catalog qualification executes exact phase predicates from CI", (
   const bootstrap = readFileSync(resolve(root,
     "tools/native-broker-provisioning/tests/bootstrap.cjs"), "utf8");
   const workflow = readFileSync(resolve(root, ".github/workflows/ci.yml"), "utf8");
+  const migration = readFileSync(resolve(root,
+    "supabase/migrations/20260902191325_square_production_internal_pilot_runtime.sql"), "utf8");
+  const nativeSource = readFileSync(resolve(root, "tools/native-broker-provisioning/native.c"), "utf8");
   assert.match(qualifier, /20260902191323_integration_production_runtime_foundation\.sql/);
   assert.match(qualifier, /20260902191324_square_production_runtime_overlay\.sql/);
   assert.match(qualifier, /VAEROEX_PRODUCTION_INTERNAL_RUNTIME_MIGRATION/);
@@ -226,6 +229,8 @@ test("portable catalog qualification executes exact phase predicates from CI", (
   assert.doesNotMatch(qualifier, /psql\(\["-f", (?:foundation|overlay|internal)\]/);
   assert.match(qualifier, /baseline_triggers/);
   assert.match(qualifier, /internal_triggers/);
+  assert.match(qualifier, /catalog_contract_positive_\$\{match\[1\]\}/);
+  assert.match(qualifier, /"internal_functions"/);
   assert.match(qualifier, /internalSourceAtOverlay = "exact_103_qualified"/);
   assert.match(qualifier, /qualify\(overlayBinary, "closed_authority"\)/);
   assert.match(qualifier, /baselineSourceAtInternal = "exact_104_rejected"/);
@@ -242,6 +247,28 @@ test("portable catalog qualification executes exact phase predicates from CI", (
   assert.doesNotMatch(harness, /strncmp\(argv\[1\],"\/private\/"/);
   assert.match(bootstrap, /"pg_stat_statements", "auto_explain", "pgcrypto"/);
   assert.match(workflow, /pnpm test:native-broker-production-catalog/);
+  for (const functionName of [
+    "private.square_production_internal_reject_immutable_mutation_v1",
+    "private.square_production_internal_guard_lifecycle_update_v1",
+    "private.square_production_internal_require_keys_v1",
+    "private.square_production_internal_fingerprint_v1",
+    "private.square_production_internal_audit_v1",
+    "private.square_production_internal_require_login_v1",
+    "private.square_production_internal_lock_permit_v1",
+    "private.square_production_internal_install_permit_v1",
+    "public.square_production_internal_oauth_v1",
+    "public.square_production_internal_broker_v1",
+    "public.square_production_internal_runtime_v1",
+    "public.square_production_internal_evidence_v1",
+  ]) {
+    const start = migration.indexOf(`create function ${functionName}`);
+    assert.ok(start >= 0, `${functionName} exists in the pinned migration`);
+    const bodyStart = migration.indexOf("as $function$", start) + "as $function$".length;
+    const bodyEnd = migration.indexOf("$function$", bodyStart);
+    const bodyHash = createHash("sha256").update(migration.slice(bodyStart, bodyEnd)).digest("hex");
+    assert.match(nativeSource, new RegExp(bodyHash),
+      `${functionName} catalog predicate pins its exact PostgreSQL function body`);
+  }
 });
 
 test("unverified hosted identity pins remain non-executable and Sandbox factory is unchanged", () => {

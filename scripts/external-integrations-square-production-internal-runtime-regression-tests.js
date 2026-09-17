@@ -132,6 +132,16 @@ assert.ok(permitLockHelper.indexOf("business_entities entity")
 "operator authority locks precede wall-time evaluation");
 assert.doesNotMatch(permitLockHelper, /statement_timestamp\(\)/,
 "the shared permit boundary never uses a statement-start timestamp after a lock wait");
+assert.match(permitLockHelper,
+  /session_not_after is null or session_not_after<=authorization_now/,
+  "runtime authorization rejects sessions without a finite expiration");
+const permitInstaller = migration.slice(
+  migration.indexOf("create function private.square_production_internal_install_permit_v1"),
+  migration.indexOf("create function public.square_production_internal_oauth_v1")
+);
+assert.match(permitInstaller,
+  /session_not_after is null or session_not_after<=installed_at/,
+  "permit installation rejects sessions without a finite expiration");
 for (const category of [
   "mapped_rpc_acl_cardinality", "unexpected_rpc_acl", "private_schema_usage",
   "non_system_schema_create", "unexpected_non_system_routine_execute",
@@ -142,6 +152,15 @@ for (const category of [
 assert.match(qualificationRunner,
   /verifyPermitAuthoritySerialization[\s\S]*generation_fence[\s\S]*55P03[\s\S]*authority revoked during its lock wait[\s\S]*wall time after the lock wait/,
   "the disposable PostgreSQL qualification exercises generation, authority-row, and post-wait expiry fencing");
+assert.match(qualificationRunner,
+  /verifyNullSessionInstallation[\s\S]*not_after=null[\s\S]*null-expiration installation creates no permit/,
+  "the disposable PostgreSQL qualification proves null-expiration installation fails closed");
+assert.match(qualificationRunner,
+  /verifyNullSessionRuntime[\s\S]*not_after=null[\s\S]*square_production_internal_operator_denied/,
+  "the disposable PostgreSQL qualification proves null-expiration runtime access fails closed");
+assert.match(qualificationRunner,
+  /workspace_members set status='disabled'[\s\S]*authority revoked during its lock wait/,
+  "the authority serialization fixture uses the schema-valid disabled membership state");
 
 for (const token of [
   "state_hash", "state_already_consumed", "exchange_effect_latched", "exchange_outcome_uncertain",

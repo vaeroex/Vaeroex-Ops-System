@@ -473,7 +473,7 @@ async function verifyPermitAuthoritySerialization(client, ids, configuration) {
     await new Promise(resolve => setTimeout(resolve, 150));
     assert.equal(membershipSettled, false, "runtime must wait for the authority mutation");
     await peer.query(
-      "update public.workspace_members set status='inactive' where workspace_id=$1 and user_id=$2",
+      "update public.workspace_members set status='disabled' where workspace_id=$1 and user_id=$2",
       [ids.workspaceId, ids.operatorId]
     );
     await peer.query("commit");
@@ -513,6 +513,56 @@ async function verifyPermitAuthoritySerialization(client, ids, configuration) {
     await client.query("rollback").catch(() => undefined);
     await peer.query("rollback").catch(() => undefined);
     await peer.end();
+  }
+}
+
+async function verifyNullSessionInstallation(client, ids, installPayload) {
+  let installationError;
+  await client.query("begin");
+  try {
+    await client.query("update auth.sessions set not_after=null where id=$1", [ids.sessionId]);
+    await client.query("savepoint null_expiration_installation");
+    try {
+      await client.query(
+        "select private.square_production_internal_install_permit_v1($1::jsonb)",
+        [JSON.stringify(installPayload)]
+      );
+    } catch (error) {
+      installationError = error;
+    }
+    await client.query("rollback to savepoint null_expiration_installation");
+    assert.match(String(installationError?.message), /square_production_internal_operator_denied/,
+      "permit installation rejects a session with no finite expiration");
+    assert.equal((await client.query(
+      "select count(*)::integer count from private.square_production_internal_permits where permit_id=$1",
+      [ids.permitId]
+    )).rows[0].count, 0, "null-expiration installation creates no permit");
+    await client.query(
+      "update auth.sessions set not_after=clock_timestamp()+interval '2 days' where id=$1",
+      [ids.sessionId]
+    );
+    await client.query("commit");
+  } catch (error) {
+    await client.query("rollback").catch(() => undefined);
+    throw error;
+  }
+
+}
+
+async function verifyNullSessionRuntime(client, ids, evidencePayload) {
+  await client.query("begin");
+  try {
+    await client.query("update auth.sessions set not_after=null where id=$1", [ids.sessionId]);
+    await assertRuntimeRoleRejects(client, "evidence", "read", evidencePayload,
+      /square_production_internal_operator_denied/);
+    await client.query(
+      "update auth.sessions set not_after=clock_timestamp()+interval '2 days' where id=$1",
+      [ids.sessionId]
+    );
+    await client.query("commit");
+  } catch (error) {
+    await client.query("rollback").catch(() => undefined);
+    throw error;
   }
 }
 
@@ -612,16 +662,27 @@ async function exerciseRuntime(client) {
     "install-permit-v1", ids.permitId, "1", configuration, ids.workspaceId, ids.entityId,
     ids.operatorId, ids.sessionId, expectedMerchantId, expectedLocationId, approvalExpiresAt
   ]);
+  const installPayload = {
+    approvalExpiresAt, businessEntityId: ids.entityId, configurationFingerprint: configuration,
+    expectedLocationId, expectedMerchantId, generation: 1, operatorId: ids.operatorId,
+    operatorSessionId: ids.sessionId, permitId: ids.permitId,
+    requestFingerprint: installFingerprint, workspaceId: ids.workspaceId
+  };
+  const evidencePayload = {
+    actorId: ids.operatorId, businessEntityId: ids.entityId, permitId: ids.permitId,
+    requestFingerprint: runtimeFingerprint([
+      "read-evidence-v1", ids.permitId, "1", configuration, "1",
+      ids.workspaceId, ids.entityId, ids.operatorId, ids.sessionId
+    ]),
+    sessionId: ids.sessionId, workspaceId: ids.workspaceId
+  };
+  await verifyNullSessionInstallation(client, ids, installPayload);
   const installed = (await client.query(
     "select private.square_production_internal_install_permit_v1($1::jsonb) value",
-    [JSON.stringify({
-      approvalExpiresAt, businessEntityId: ids.entityId, configurationFingerprint: configuration,
-      expectedLocationId, expectedMerchantId, generation: 1, operatorId: ids.operatorId,
-      operatorSessionId: ids.sessionId, permitId: ids.permitId,
-      requestFingerprint: installFingerprint, workspaceId: ids.workspaceId
-    })]
+    [JSON.stringify(installPayload)]
   )).rows[0].value;
   assert.equal(installed.state, "prepared");
+  await verifyNullSessionRuntime(client, ids, evidencePayload);
   await verifyPermitAuthoritySerialization(client, ids, configuration);
 
   await client.query("begin");

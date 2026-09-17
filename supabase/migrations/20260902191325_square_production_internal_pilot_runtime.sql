@@ -1257,7 +1257,7 @@ begin
     raise exception 'square_production_internal_permit_fenced' using errcode='42501';
   end if;
 
-  if session_not_after<=authorization_now or member_status<>'active'
+  if session_not_after is null or session_not_after<=authorization_now or member_status<>'active'
     or member_role not in ('owner','admin','manager') or entity_status<>'active' then
     raise exception 'square_production_internal_operator_denied' using errcode='42501';
   end if;
@@ -1400,7 +1400,7 @@ begin
     ) then
     raise exception 'square_production_internal_native_profiles_incomplete' using errcode='42501';
   end if;
-  if session_not_after<=installed_at or member_status<>'active'
+  if session_not_after is null or session_not_after<=installed_at or member_status<>'active'
     or member_role not in ('owner','admin','manager') or entity_status<>'active' then
     raise exception 'square_production_internal_operator_denied' using errcode='42501';
   end if;
