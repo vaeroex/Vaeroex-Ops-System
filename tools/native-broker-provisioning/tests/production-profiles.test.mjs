@@ -185,6 +185,8 @@ test("post-mutation recovery reports each safety condition independently", () =>
     "the native transaction fences role-attribute mutations before authority reads");
   assert.match(nativeSource, /LOCK TABLE pg_catalog\.pg_auth_members IN SHARE ROW EXCLUSIVE MODE/,
     "the native transaction serializes membership mutations before authority reads");
+  assert.match(nativeSource, /LOCK TABLE pg_catalog\.pg_db_role_setting IN SHARE ROW EXCLUSIVE MODE/,
+    "the native transaction fences per-database role settings before authority reads");
   assert.match(qualifier, /const postflightMutation = await fixture\.connect\(\)/,
     "postflight mutations run without an external fixture lock masking the native lock");
   assert.doesNotMatch(qualifier, /postflightLock/, "the regression must exercise native-held catalog locks");

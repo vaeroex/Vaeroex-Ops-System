@@ -474,6 +474,7 @@ static bool closed_authority(const char *target) {
   if (!command("LOCK TABLE pg_catalog.pg_proc IN SHARE ROW EXCLUSIVE MODE")) return false;
   if (!command("LOCK TABLE pg_catalog.pg_authid IN SHARE ROW EXCLUSIVE MODE")) return false;
   if (!command("LOCK TABLE pg_catalog.pg_auth_members IN SHARE ROW EXCLUSIVE MODE")) return false;
+  if (!command("LOCK TABLE pg_catalog.pg_db_role_setting IN SHARE ROW EXCLUSIVE MODE")) return false;
   if (managed_profile() && !command("LOCK TABLE supabase_migrations.schema_migrations IN SHARE MODE")) return false;
   production_phase phase=production_ledger_phase();
   if (phase==PRODUCTION_PHASE_INVALID || !command("LOCK TABLE private.integration_production_platform_bindings, "
