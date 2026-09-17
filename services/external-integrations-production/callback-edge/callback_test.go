@@ -35,11 +35,11 @@ func TestForwardedHeaderEventAcceptsStructurallyValidBodylessCallback(t *testing
 func TestDiagnosticReasonsAreFiniteAndParserEquivalent(t *testing.T) {
 	query := "state=" + validStateFixture + "&code=synthetic-code"
 	tests := []struct {
-		name          string
-		method, path  string
-		query         string
-		headers       [][2]string
-		expected      RejectionReason
+		name         string
+		method, path string
+		query        string
+		headers      [][2]string
+		expected     RejectionReason
 	}{
 		{name: "accepted", method: "GET", path: CallbackPath, query: query, headers: [][2]string{{"content-length", "0"}}, expected: RejectionNone},
 		{name: "bounds", method: "GET", path: CallbackPath, query: query, headers: [][2]string{{"x", strings.Repeat("y", MaxInputHeaderBytes)}}, expected: RejectionHeaderBounds},
