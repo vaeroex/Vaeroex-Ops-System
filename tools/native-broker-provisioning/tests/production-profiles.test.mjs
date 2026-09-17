@@ -164,6 +164,7 @@ test("Production profile fencing pairs login state with non-inheriting capabilit
 test("post-mutation recovery reports each safety condition independently", () => {
   const qualifier = readFileSync(resolve(root,
     "tools/native-broker-provisioning/tests/production-native-qualify.cjs"), "utf8");
+  const nativeSource = readFileSync(resolve(root, "tools/native-broker-provisioning/native.c"), "utf8");
   for (const label of [
     "post_mutation_fence_confirmed",
     "post_mutation_recovery_required",
@@ -178,9 +179,16 @@ test("post-mutation recovery reports each safety condition independently", () =>
   assert.match(qualifier, /fixture\.connect\(fenceProfile\.role, fenceCandidate\.toString\("ascii"\), "tls"\)/,
     "the Node SCRAM fencing probe supplies its candidate as the required string type");
   assert.match(qualifier, /postflight_authority_drift_observation/);
+  assert.match(nativeSource, /LOCK TABLE pg_catalog\.pg_proc, pg_catalog\.pg_auth_members IN SHARE MODE/,
+    "the native transaction locks function and membership catalogs before authority reads");
+  assert.match(qualifier, /const postflightMutation = await fixture\.connect\(\)/,
+    "postflight mutations run without an external fixture lock masking the native lock");
+  assert.doesNotMatch(qualifier, /postflightLock/, "the regression must exercise native-held catalog locks");
   assert.match(qualifier, /authority_drift_delivery_invoked/);
   assert.match(qualifier, /authority_drift_delivery_mutation_not_applied/);
   assert.match(qualifier, /authority_drift_delivery_blocked_by_authority_lock/);
+  assert.match(qualifier, /authority_drift_membership_delivery_mutation_not_applied/);
+  assert.match(qualifier, /authority_drift_membership_delivery_blocked_by_authority_lock/);
   assert.match(qualifier, /authority_drift_native_rejected_after_delivery/);
   assert.match(qualifier, /postflight_authority_drift_applied_observation/);
   assert.match(qualifier, /authority_drift_applied_delivery_invoked/);

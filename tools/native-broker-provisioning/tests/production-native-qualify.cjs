@@ -405,46 +405,55 @@ async function main() {
     executable: binaries.get(postflightProfile.name), target: postflightTarget,
   });
   const postflightDrift = profiles.find(profile => profile.name === "oauth");
-  const postflightLock = await fixture.connect();
-  await postflightLock.query("BEGIN; LOCK TABLE pg_catalog.pg_proc IN SHARE MODE");
-  let postflightDeliveryInvoked = false, postflightMutated = false;
-  let postflightMutationBlocked = false, postflightDenied = false;
+  const postflightMutation = await fixture.connect();
+  let postflightDeliveryInvoked = false, postflightMutated = false, postflightMembershipMutated = false;
+  let postflightMutationBlocked = false, postflightMembershipMutationBlocked = false, postflightDenied = false;
+  const attemptPostflightMutation = async sql => {
+    try {
+      await postflightMutation.query(`BEGIN; SET LOCAL lock_timeout = '100ms'; ${sql}; COMMIT`);
+      return { mutated: true, lockBlocked: false };
+    } catch (error) {
+      await postflightMutation.query("ROLLBACK").catch(() => undefined);
+      return { mutated: false, lockBlocked: error?.code === "55P03" };
+    }
+  };
   try {
     await postflightNative.assign({ target: postflightTarget, intent: "postflight-authority-recheck",
       approvalId: "synthetic-production", signal: new AbortController().signal, async deliver() {
         postflightDeliveryInvoked = true;
-        try {
-          // The native transaction deliberately holds SHARE locks over every
-          // authority relation.  A fixture DDL mutation therefore cannot
-          // execute concurrently; bound the attempt and classify that exact
-          // sequencing outcome instead of hanging until the native timeout.
-          await fixture.control.query(`BEGIN; SET LOCAL lock_timeout = '100ms';
-            CREATE OR REPLACE FUNCTION ${overlayRpcDefinition(postflightDrift)} RETURNS void
-              LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path='' AS
-              $function$ BEGIN RAISE EXCEPTION 'synthetic_postflight_drift' USING ERRCODE='55000'; END $function$;
-            COMMIT`);
-          postflightMutated = true;
-          return { ack: true };
-        } catch {
-          postflightMutationBlocked = true;
-          await fixture.control.query("ROLLBACK").catch(() => undefined);
-          throw new Error("synthetic_postflight_drift_blocked");
-        }
+        /* The native transaction itself must fence both authority mutations;
+         * no external fixture lock is held here.  Each bounded attempt emits
+         * only booleans, with 55P03 classified as the expected lock conflict. */
+        const functionMutation = await attemptPostflightMutation(`CREATE OR REPLACE FUNCTION ${overlayRpcDefinition(postflightDrift)} RETURNS void
+          LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path='' AS
+          $function$ BEGIN RAISE EXCEPTION 'synthetic_postflight_drift' USING ERRCODE='55000'; END $function$`);
+        postflightMutated = functionMutation.mutated;
+        postflightMutationBlocked = functionMutation.lockBlocked;
+        const membershipMutation = await attemptPostflightMutation(`GRANT ${postflightDrift.capabilityRole} TO synthetic_unprivileged
+          WITH ADMIN FALSE, INHERIT TRUE, SET FALSE`);
+        postflightMembershipMutated = membershipMutation.mutated;
+        postflightMembershipMutationBlocked = membershipMutation.lockBlocked;
+        if (!postflightMutationBlocked || !postflightMembershipMutationBlocked) return { ack: true };
+        throw new Error("synthetic_postflight_authority_mutations_blocked");
       } });
   } catch { postflightDenied = true; }
   if (postflightMutated) await fixture.control.query(`CREATE OR REPLACE FUNCTION ${overlayRpcDefinition(postflightDrift)} RETURNS void
     LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path='' AS $function$${productionAuthoritySource(postflightDrift)}$function$`);
+  if (postflightMembershipMutated) await fixture.control.query(`REVOKE ${postflightDrift.capabilityRole} FROM synthetic_unprivileged`);
   process.stdout.write(JSON.stringify({ outcome: "postflight_authority_drift_observation",
     deliveryInvoked: postflightDeliveryInvoked === true,
     deliveryMutatedAuthority: postflightMutated === true,
     deliveryMutationBlockedByAuthorityLock: postflightMutationBlocked === true,
+    deliveryMembershipMutatedAuthority: postflightMembershipMutated === true,
+    deliveryMembershipMutationBlockedByAuthorityLock: postflightMembershipMutationBlocked === true,
     nativeRejectedAfterDelivery: postflightDenied === true }) + "\n");
   check(postflightDeliveryInvoked === true, "authority_drift_delivery_invoked");
   check(postflightMutated === false, "authority_drift_delivery_mutation_not_applied");
   check(postflightMutationBlocked === true, "authority_drift_delivery_blocked_by_authority_lock");
+  check(postflightMembershipMutated === false, "authority_drift_membership_delivery_mutation_not_applied");
+  check(postflightMembershipMutationBlocked === true, "authority_drift_membership_delivery_blocked_by_authority_lock");
   check(postflightDenied === true, "authority_drift_native_rejected_after_delivery");
-  await postflightLock.query("ROLLBACK");
-  await postflightLock.end().catch(() => undefined);
+  await postflightMutation.end().catch(() => undefined);
   check((await postflightNative.inspect({ target: postflightTarget, intent: "postflight-authority-restored",
     approvalId: "synthetic-production", signal: new AbortController().signal })).ack,
   "failed_postflight_assignment_rolls_back_and_restored_authority_inspects");

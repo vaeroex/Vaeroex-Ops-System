@@ -463,6 +463,13 @@ static bool closed_authority(const char *target) {
   const char *values[] = {target};
 #ifdef VAEROEX_PRODUCTION_PROFILE
   if(strcmp(target,MAPPED_ROLE))return false;
+  /* Authority predicates read the function and membership catalogs.  Hold
+   * relation-level SHARE locks for the complete maintenance transaction so
+   * CREATE OR REPLACE FUNCTION and GRANT/REVOKE membership changes cannot
+   * commit between the final authority read and our COMMIT.  The native
+   * operator is the reviewed catalog owner; failure to acquire either lock is
+   * a fail-closed authority result. */
+  if (!command("LOCK TABLE pg_catalog.pg_proc, pg_catalog.pg_auth_members IN SHARE MODE")) return false;
   if (managed_profile() && !command("LOCK TABLE supabase_migrations.schema_migrations IN SHARE MODE")) return false;
   production_phase phase=production_ledger_phase();
   if (phase==PRODUCTION_PHASE_INVALID || !command("LOCK TABLE private.integration_production_platform_bindings, "
