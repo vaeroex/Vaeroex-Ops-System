@@ -377,6 +377,7 @@ begin
                 and dependency.objid='public'::regnamespace
               ) or (
                 square_overlay_present
+                and (not square_internal_runtime_present or expected_internal_rpc is null)
                 and dependency.classid='pg_proc'::regclass
                 and dependency.objid=expected_rpc::oid
               ) or (
@@ -414,6 +415,14 @@ begin
       )
       or (
         square_internal_runtime_present and expected_internal_rpc is not null and (
+          exists (
+            select 1
+            from pg_catalog.pg_proc rpc
+            cross join lateral pg_catalog.aclexplode(rpc.proacl) rpc_acl
+            where rpc.oid=expected_rpc::oid
+              and rpc_acl.grantee<>rpc.proowner
+          )
+          or
           1 <> (
             select count(*)
             from pg_catalog.pg_proc rpc
