@@ -409,6 +409,113 @@ async function verifyCredentialReadLockOrder(client, credentialPayload) {
   }
 }
 
+async function verifyPermitAuthoritySerialization(client, ids, configuration) {
+  const parameters = client.connectionParameters;
+  const host = parameters.host;
+  assert.ok(host === "127.0.0.1" || host === "localhost" || host.startsWith("/private/tmp/"),
+    "authority peer must remain on the qualified local PostgreSQL target");
+  const peer = new Client({
+    application_name: "square_production_runtime_authority_peer",
+    database: parameters.database,
+    host,
+    password: parameters.password,
+    port: parameters.port,
+    ssl: false,
+    user: parameters.user
+  });
+  const evidencePayload = {
+    actorId: ids.operatorId,
+    businessEntityId: ids.entityId,
+    permitId: ids.permitId,
+    requestFingerprint: runtimeFingerprint([
+      "read-evidence-v1", ids.permitId, "1", configuration, "1",
+      ids.workspaceId, ids.entityId, ids.operatorId, ids.sessionId
+    ]),
+    sessionId: ids.sessionId,
+    workspaceId: ids.workspaceId
+  };
+  await peer.connect();
+  try {
+    await client.query("begin");
+    await asRuntimeRole(client, "evidence", "read", evidencePayload);
+    await peer.query("begin");
+    await peer.query("set local lock_timeout='300ms'");
+    const blockedMutations = [
+      ["session", "update auth.sessions set not_after=not_after where id=$1", [ids.sessionId]],
+      ["membership", "update public.workspace_members set status=status where workspace_id=$1 and user_id=$2", [ids.workspaceId, ids.operatorId]],
+      ["entity", "update public.business_entities set status=status where workspace_id=$1 and id=$2", [ids.workspaceId, ids.entityId]],
+      ["generation_fence", `insert into private.square_production_generation_fences(
+        provider_key,environment,project_id,generation,configuration_fingerprint,
+        fence_kind,reason_code,fenced_at
+      ) values('square','production','vaeroex-integrations-prod',1,$1,
+        'operator_stop','manual_emergency_stop',clock_timestamp())`, [configuration]]
+    ];
+    for (const [label, sql, values] of blockedMutations) {
+      await peer.query(`savepoint ${label}_lock_probe`);
+      let error;
+      try { await peer.query(sql, values); } catch (caught) { error = caught; }
+      assert.equal(error?.code, "55P03", `${label} mutation must wait for the runtime transaction`);
+      await peer.query(`rollback to savepoint ${label}_lock_probe`);
+    }
+    await peer.query("rollback");
+    await client.query("rollback");
+
+    await peer.query("begin");
+    await peer.query(
+      "select 1 from public.workspace_members where workspace_id=$1 and user_id=$2 for update",
+      [ids.workspaceId, ids.operatorId]
+    );
+    let membershipSettled = false;
+    const membershipOutcome = asRuntimeRole(client, "evidence", "read", evidencePayload).then(
+      value => { membershipSettled = true; return { value }; },
+      error => { membershipSettled = true; return { error }; }
+    );
+    await new Promise(resolve => setTimeout(resolve, 150));
+    assert.equal(membershipSettled, false, "runtime must wait for the authority mutation");
+    await peer.query(
+      "update public.workspace_members set status='inactive' where workspace_id=$1 and user_id=$2",
+      [ids.workspaceId, ids.operatorId]
+    );
+    await peer.query("commit");
+    const membershipResult = await membershipOutcome;
+    assert.match(String(membershipResult.error?.message), /square_production_internal_operator_denied/,
+      "runtime must reject authority revoked during its lock wait");
+    await peer.query(
+      "update public.workspace_members set status='active' where workspace_id=$1 and user_id=$2",
+      [ids.workspaceId, ids.operatorId]
+    );
+
+    await peer.query(
+      "update auth.sessions set not_after=clock_timestamp()+interval '500 milliseconds' where id=$1",
+      [ids.sessionId]
+    );
+    await peer.query("begin");
+    await peer.query(
+      "select 1 from private.square_production_internal_permits where permit_id=$1 for update",
+      [ids.permitId]
+    );
+    let expirySettled = false;
+    const expiryOutcome = asRuntimeRole(client, "evidence", "read", evidencePayload).then(
+      value => { expirySettled = true; return { value }; },
+      error => { expirySettled = true; return { error }; }
+    );
+    await new Promise(resolve => setTimeout(resolve, 700));
+    assert.equal(expirySettled, false, "runtime must remain blocked until the permit lock is released");
+    await peer.query("commit");
+    const expiryResult = await expiryOutcome;
+    assert.match(String(expiryResult.error?.message), /square_production_internal_operator_denied/,
+      "runtime must evaluate session expiry using wall time after the lock wait");
+    await peer.query(
+      "update auth.sessions set not_after=clock_timestamp()+interval '2 days' where id=$1",
+      [ids.sessionId]
+    );
+  } finally {
+    await client.query("rollback").catch(() => undefined);
+    await peer.query("rollback").catch(() => undefined);
+    await peer.end();
+  }
+}
+
 async function seedClosedFoundation(client) {
   await client.query(`
     insert into private.integration_production_platform_bindings(
@@ -515,6 +622,7 @@ async function exerciseRuntime(client) {
     })]
   )).rows[0].value;
   assert.equal(installed.state, "prepared");
+  await verifyPermitAuthoritySerialization(client, ids, configuration);
 
   await client.query("begin");
   try {

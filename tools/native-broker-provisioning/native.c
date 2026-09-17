@@ -581,7 +581,7 @@ static bool production_internal_runtime_source_pinned(void) {
    * builder also verifies the migration bytes before defining the macro, so a
    * final-ledger database cannot be accepted by a baseline-source binary. */
   return !strcmp(VAEROEX_PRODUCTION_INTERNAL_RUNTIME_SOURCE_SHA256,
-    "db502e7671028fc9867d49c1b8c198b694d1f07674fe8312bdbc032d80570716");
+    "d9fcff27beb666c009a045ad3232d6b5ac90d214df4595bc8d0b8943b2e81601");
 #else
   return false;
 #endif

@@ -111,6 +111,37 @@ assert.match(migration, /pg_catalog\.pg_has_role\(session_user,authority_name,'M
 assert.match(migration, /capability\.database_login::text=login_name/);
 assert.match(migration, /capability\.database_secret_purpose='database_'\|\|p_capability/);
 assert.match(migration, /'sq-prod-'\|\|p_capability\|\|'@vaeroex-integrations-prod\.iam\.gserviceaccount\.com'/);
+assert.match(migration,
+  /integration_production_provider_bindings provider_binding[\s\S]{0,500}for update;[\s\S]{0,900}square_production_runtime_bindings binding[\s\S]{0,300}for update;[\s\S]{0,700}square_production_configuration_generations configuration[\s\S]{0,350}for update;/,
+  "runtime authorization locks the shared provider parent, exact binding, and configuration generation");
+const permitLockHelper = migration.slice(
+  migration.indexOf("create function private.square_production_internal_lock_permit_v1"),
+  migration.indexOf("create function private.square_production_internal_install_permit_v1")
+);
+for (const lockedAuthority of ["auth.sessions session_record", "workspace_members member", "business_entities entity"]) {
+  const lockStart = permitLockHelper.indexOf(lockedAuthority);
+  assert.ok(lockStart >= 0 && permitLockHelper.indexOf("for update;", lockStart) > lockStart,
+    `${lockedAuthority} is locked by the permit helper`);
+}
+assert.ok(permitLockHelper.indexOf("auth.sessions session_record")
+  < permitLockHelper.indexOf("workspace_members member"));
+assert.ok(permitLockHelper.indexOf("workspace_members member")
+  < permitLockHelper.indexOf("business_entities entity"));
+assert.ok(permitLockHelper.indexOf("business_entities entity")
+  < permitLockHelper.indexOf("authorization_now:=clock_timestamp()"),
+"operator authority locks precede wall-time evaluation");
+assert.doesNotMatch(permitLockHelper, /statement_timestamp\(\)/,
+"the shared permit boundary never uses a statement-start timestamp after a lock wait");
+for (const category of [
+  "mapped_rpc_acl_cardinality", "unexpected_rpc_acl", "private_schema_usage",
+  "non_system_schema_create", "unexpected_non_system_routine_execute",
+  "unexpected_non_system_relation_privilege", "unexpected_non_system_column_privilege",
+  "unexpected_non_system_sequence_privilege", "direct_database_acl",
+  "public_or_direct_default_acl"
+]) assert.ok(migration.includes(category), `authority preflight repeats overlay closure check ${category}`);
+assert.match(qualificationRunner,
+  /verifyPermitAuthoritySerialization[\s\S]*generation_fence[\s\S]*55P03[\s\S]*authority revoked during its lock wait[\s\S]*wall time after the lock wait/,
+  "the disposable PostgreSQL qualification exercises generation, authority-row, and post-wait expiry fencing");
 
 for (const token of [
   "state_hash", "state_already_consumed", "exchange_effect_latched", "exchange_outcome_uncertain",

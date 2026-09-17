@@ -11,6 +11,8 @@ declare
   version_fingerprint text;
   role_name text;
   role_record pg_catalog.pg_roles;
+  function_name text;
+  authority_failure_categories text;
 begin
   if current_user::text <> 'postgres' or session_user::text <> 'postgres'
     or current_setting('server_version_num')::integer < 170000
@@ -98,6 +100,14 @@ begin
     'square_production_scheduler_authority','square_production_webhook_authority',
     'square_production_runtime_authority','square_production_evidence_authority'
   ] loop
+    function_name := case role_name
+      when 'square_production_oauth_authority' then 'public.check_square_production_oauth_authority_v1(text,text,text,bigint,text)'
+      when 'square_production_broker_authority' then 'public.check_square_production_broker_authority_v1(text,text,text,bigint,text)'
+      when 'square_production_scheduler_authority' then 'public.check_square_production_scheduler_authority_v1(text,text,text,bigint,text)'
+      when 'square_production_webhook_authority' then 'public.check_square_production_webhook_authority_v1(text,text,text,bigint,text)'
+      when 'square_production_runtime_authority' then 'public.check_square_production_runtime_authority_v1(text,text,text,bigint,text)'
+      else 'public.check_square_production_evidence_authority_v1(text,text,text,bigint,text)'
+    end;
     select * into role_record from pg_catalog.pg_roles where rolname=role_name;
     if not found or role_record.rolcanlogin or role_record.rolinherit
       or role_record.rolsuper or role_record.rolcreatedb or role_record.rolcreaterole
@@ -106,9 +116,174 @@ begin
       or exists(
         select 1 from pg_catalog.pg_db_role_setting database_setting
         where database_setting.setrole=role_record.oid
-      ) then
+      )
+      or exists(
+        select 1 from pg_catalog.pg_auth_members membership
+        left join pg_catalog.pg_roles member_role on member_role.oid=membership.member
+        where membership.member=role_record.oid or (
+          membership.roleid=role_record.oid and (
+            membership.inherit_option or membership.set_option
+            or not membership.admin_option
+            or not (member_role.rolsuper or member_role.rolcreaterole)
+          )
+        )
+      )
+      or exists(
+        select 1 from pg_catalog.pg_shdepend dependency
+        where dependency.refclassid='pg_authid'::regclass
+          and dependency.refobjid=role_record.oid
+          and dependency.deptype in ('a','o')
+          and not (
+            dependency.deptype='a'
+            and dependency.dbid=(select oid from pg_catalog.pg_database where datname=current_database())
+            and dependency.objsubid=0
+            and ((dependency.classid='pg_namespace'::regclass
+                and dependency.objid='public'::regnamespace)
+              or (dependency.classid='pg_proc'::regclass
+                and dependency.objid=function_name::regprocedure))
+          )
+      )
+      or 1<>(
+        select count(*) from pg_catalog.pg_namespace public_schema
+        cross join lateral pg_catalog.aclexplode(public_schema.nspacl) schema_acl
+        where public_schema.oid='public'::regnamespace
+          and schema_acl.grantee=role_record.oid
+          and schema_acl.privilege_type='USAGE' and not schema_acl.is_grantable
+      )
+      or 1<(select count(*) from pg_catalog.pg_auth_members where roleid=role_record.oid) then
       raise exception 'square_production_internal_runtime_authority_role_drift'
         using errcode='42501';
+    end if;
+
+    authority_failure_categories:=pg_catalog.concat_ws(',',
+      case when exists(
+        select 1 from pg_catalog.pg_proc function_record
+        where function_record.oid=function_name::regprocedure and (
+          function_record.proowner<>'postgres'::regrole::oid
+          or not function_record.prosecdef or function_record.provolatile<>'s'
+          or function_record.proconfig is distinct from array['search_path=""']::text[]
+        )
+      ) then 'rpc_definition' end,
+      case when 1<>(
+        select count(*) from pg_catalog.pg_proc function_record
+        cross join lateral pg_catalog.aclexplode(function_record.proacl) function_acl
+        where function_record.oid=function_name::regprocedure
+          and function_acl.grantee=role_record.oid
+          and function_acl.privilege_type='EXECUTE' and not function_acl.is_grantable
+      ) then 'mapped_rpc_acl_cardinality' end,
+      case when exists(
+        select 1 from pg_catalog.pg_proc function_record
+        cross join lateral pg_catalog.aclexplode(function_record.proacl) function_acl
+        where function_record.oid=function_name::regprocedure
+          and function_acl.grantee not in (function_record.proowner,role_record.oid)
+      ) then 'unexpected_rpc_acl' end,
+      case when not pg_catalog.has_function_privilege(role_name,function_name::regprocedure,'EXECUTE')
+        then 'mapped_rpc_execute_missing' end,
+      case when pg_catalog.has_schema_privilege(role_name,'private','USAGE') then 'private_schema_usage' end,
+      case when exists(
+        select 1 from pg_catalog.pg_namespace namespace
+        where namespace.nspname<>'pg_catalog' and namespace.nspname<>'information_schema'
+          and namespace.nspname not like 'pg\_toast%' escape '\'
+          and namespace.nspname not like 'pg\_temp%' escape '\'
+          and pg_catalog.has_schema_privilege(role_name,namespace.oid,'CREATE')
+      ) then 'non_system_schema_create' end,
+      case when exists(
+        select 1 from pg_catalog.pg_proc routine
+        join pg_catalog.pg_namespace namespace on namespace.oid=routine.pronamespace
+        where namespace.nspname<>'pg_catalog' and namespace.nspname<>'information_schema'
+          and namespace.nspname not like 'pg\_toast%' escape '\'
+          and namespace.nspname not like 'pg\_temp%' escape '\'
+          and pg_catalog.has_schema_privilege(role_name,namespace.oid,'USAGE')
+          and pg_catalog.has_function_privilege(role_name,routine.oid,'EXECUTE')
+          and routine.oid<>function_name::regprocedure::oid
+      ) then 'unexpected_non_system_routine_execute' end,
+      case when exists(
+        select 1 from pg_catalog.pg_class relation
+        join pg_catalog.pg_namespace namespace on namespace.oid=relation.relnamespace
+        cross join (values ('SELECT'),('INSERT'),('UPDATE'),('DELETE'),
+          ('TRUNCATE'),('REFERENCES'),('TRIGGER'),('MAINTAIN')) privilege(privilege_type)
+        where namespace.nspname<>'pg_catalog' and namespace.nspname<>'information_schema'
+          and namespace.nspname not like 'pg\_toast%' escape '\'
+          and namespace.nspname not like 'pg\_temp%' escape '\'
+          and relation.relkind in ('r','p','v','m','f')
+          and not (privilege.privilege_type='SELECT' and namespace.nspname='extensions'
+            and relation.relname=any(array['pg_stat_statements','pg_stat_statements_info'])
+            and relation.relkind='v'
+            and not pg_catalog.has_schema_privilege(role_name,'extensions','USAGE')
+            and not pg_catalog.pg_has_role(role_name,'pg_read_all_stats','USAGE')
+            and exists(
+              select 1 from pg_catalog.pg_depend extension_dependency
+              join pg_catalog.pg_extension extension_record on extension_record.oid=extension_dependency.refobjid
+              where extension_dependency.classid='pg_catalog.pg_class'::regclass
+                and extension_dependency.objid=relation.oid and extension_dependency.objsubid=0
+                and extension_dependency.refclassid='pg_catalog.pg_extension'::regclass
+                and extension_dependency.deptype='e' and extension_record.extname='pg_stat_statements'
+            ))
+          and pg_catalog.has_table_privilege(role_name,relation.oid,privilege.privilege_type)
+      ) then 'unexpected_non_system_relation_privilege' end,
+      case when exists(
+        select 1 from pg_catalog.pg_class relation
+        join pg_catalog.pg_namespace namespace on namespace.oid=relation.relnamespace
+        join pg_catalog.pg_attribute attribute on attribute.attrelid=relation.oid
+        cross join (values ('SELECT'),('INSERT'),('UPDATE'),('REFERENCES')) privilege(privilege_type)
+        where namespace.nspname<>'pg_catalog' and namespace.nspname<>'information_schema'
+          and namespace.nspname not like 'pg\_toast%' escape '\'
+          and namespace.nspname not like 'pg\_temp%' escape '\'
+          and relation.relkind in ('r','p','v','m','f')
+          and attribute.attnum>0 and not attribute.attisdropped
+          and not (privilege.privilege_type='SELECT' and namespace.nspname='extensions'
+            and relation.relname=any(array['pg_stat_statements','pg_stat_statements_info'])
+            and relation.relkind='v'
+            and not pg_catalog.has_schema_privilege(role_name,'extensions','USAGE')
+            and not pg_catalog.pg_has_role(role_name,'pg_read_all_stats','USAGE')
+            and exists(
+              select 1 from pg_catalog.pg_depend extension_dependency
+              join pg_catalog.pg_extension extension_record on extension_record.oid=extension_dependency.refobjid
+              where extension_dependency.classid='pg_catalog.pg_class'::regclass
+                and extension_dependency.objid=relation.oid and extension_dependency.objsubid=0
+                and extension_dependency.refclassid='pg_catalog.pg_extension'::regclass
+                and extension_dependency.deptype='e' and extension_record.extname='pg_stat_statements'
+            ))
+          and pg_catalog.has_column_privilege(role_name,relation.oid,attribute.attnum,privilege.privilege_type)
+      ) then 'unexpected_non_system_column_privilege' end,
+      case when exists(
+        select 1 from pg_catalog.pg_class sequence_record
+        join pg_catalog.pg_namespace namespace on namespace.oid=sequence_record.relnamespace
+        cross join (values ('USAGE'),('SELECT'),('UPDATE')) privilege(privilege_type)
+        where namespace.nspname<>'pg_catalog' and namespace.nspname<>'information_schema'
+          and namespace.nspname not like 'pg\_toast%' escape '\'
+          and namespace.nspname not like 'pg\_temp%' escape '\'
+          and sequence_record.relkind='S'
+          and pg_catalog.has_sequence_privilege(role_name,sequence_record.oid,privilege.privilege_type)
+      ) then 'unexpected_non_system_sequence_privilege' end,
+      case when exists(select 1 from pg_catalog.pg_foreign_data_wrapper wrapper
+        where pg_catalog.has_foreign_data_wrapper_privilege(role_name,wrapper.oid,'USAGE')) then 'foreign_data_wrapper_usage' end,
+      case when exists(select 1 from pg_catalog.pg_foreign_server server_record
+        where pg_catalog.has_server_privilege(role_name,server_record.oid,'USAGE')) then 'foreign_server_usage' end,
+      case when exists(select 1 from pg_catalog.pg_tablespace tablespace_record
+        where pg_catalog.has_tablespace_privilege(role_name,tablespace_record.oid,'CREATE')) then 'tablespace_create' end,
+      case when not pg_catalog.has_database_privilege(role_name,current_database(),'CONNECT') then 'current_database_connect_missing' end,
+      case when not pg_catalog.has_database_privilege(role_name,current_database(),'TEMP') then 'current_database_temp_missing' end,
+      case when pg_catalog.has_database_privilege(role_name,current_database(),'CREATE') then 'current_database_create' end,
+      case when exists(select 1 from pg_catalog.pg_database database_record
+        cross join lateral pg_catalog.aclexplode(database_record.datacl) database_acl
+        where database_acl.grantee=role_record.oid) then 'direct_database_acl' end,
+      case when exists(
+        select 1 from pg_catalog.pg_database database_record
+        where database_record.datallowconn and database_record.datname<>current_database()
+          and pg_catalog.has_database_privilege(role_name,database_record.oid,'CONNECT')
+          and not exists(select 1 from pg_catalog.aclexplode(coalesce(database_record.datacl,
+            pg_catalog.acldefault('d',database_record.datdba))) database_acl
+            where database_acl.grantee=0 and database_acl.privilege_type='CONNECT')
+      ) then 'non_public_other_database_connect' end,
+      case when exists(select 1 from pg_catalog.pg_default_acl default_acl
+        cross join lateral pg_catalog.aclexplode(default_acl.defaclacl) default_privilege
+        where default_acl.defaclobjtype in ('r','S','f','n')
+          and default_privilege.grantee in (0,role_record.oid)) then 'public_or_direct_default_acl' end
+    );
+    if authority_failure_categories<>'' then
+      raise exception 'square_production_internal_runtime_authority_not_closed'
+        using errcode='42501',detail='failed_checks='||authority_failure_categories;
     end if;
   end loop;
 
@@ -430,6 +605,7 @@ begin
       where state_record.state_id=state_uuid for update;
     if not found then raise exception 'square_production_internal_exchange_denied' using errcode='42501'; end if;
     permit_row:=private.square_production_internal_lock_permit_v1(state_row.permit_id,'broker');
+    now_at:=clock_timestamp();
     expected_hash:=private.square_production_internal_fingerprint_v1(array[
       'acquire-exchange-v1',state_uuid::text,state_row.consume_receipt_fingerprint
     ]);
@@ -517,6 +693,7 @@ begin
       raise exception 'square_production_internal_exchange_acquire_receipt_denied' using errcode='42501';
     end if;
     permit_row:=private.square_production_internal_lock_permit_v1(state_row.permit_id,'broker');
+    now_at:=clock_timestamp();
     expected_hash:=private.square_production_internal_fingerprint_v1(array[
       'acquire-exchange-v1',state_uuid::text,state_row.consume_receipt_fingerprint
     ]);
@@ -579,6 +756,7 @@ begin
       where state_record.state_id=state_uuid for update;
     if not found then raise exception 'square_production_internal_credential_commit_denied' using errcode='42501'; end if;
     permit_row:=private.square_production_internal_lock_permit_v1(state_row.permit_id,'broker');
+    now_at:=clock_timestamp();
     if state_row.exchange_id is distinct from exchange_uuid
       or state_row.exchange_receipt_fingerprint is distinct from exchange_receipt_hash then
       raise exception 'square_production_internal_credential_commit_denied' using errcode='42501';
@@ -708,6 +886,7 @@ begin
       raise exception 'square_production_internal_exchange_receipt_denied' using errcode='42501';
     end if;
     permit_row:=private.square_production_internal_lock_permit_v1(state_row.permit_id,'broker');
+    now_at:=clock_timestamp();
     if state_row.status<>'stored' then
       if state_row.status<>'uncertain' then
         update private.square_production_internal_oauth_states set status='uncertain' where state_id=state_uuid;
@@ -750,6 +929,7 @@ begin
       raise exception 'square_production_internal_credential_read_denied' using errcode='42501';
     end if;
     permit_row:=private.square_production_internal_lock_permit_v1(scan_row.permit_id,'broker');
+    now_at:=clock_timestamp();
     expected_hash:=private.square_production_internal_fingerprint_v1(array[
       'read-credential-v1',scan_row.scan_id::text,lease_uuid::text,p_payload->>'leaseOwnerFingerprint',
       permit_row.credential_id::text,permit_row.credential_version::text
@@ -990,6 +1170,11 @@ as $function$
 declare permit_row private.square_production_internal_permits;
 declare binding_row private.square_production_runtime_bindings;
 declare configuration_row private.square_production_configuration_generations;
+declare session_not_after timestamptz;
+declare member_role text;
+declare member_status text;
+declare entity_status text;
+declare authorization_now timestamptz;
 begin
   perform private.square_production_internal_require_login_v1(p_capability);
   select permit.* into permit_row
@@ -1000,12 +1185,23 @@ begin
     raise exception 'square_production_internal_permit_denied' using errcode='42501';
   end if;
 
+  perform 1
+  from private.integration_production_provider_bindings provider_binding
+  where provider_binding.provider_key='square'
+    and provider_binding.environment='production'
+    and provider_binding.project_id='vaeroex-integrations-prod'
+  for update;
+  if not found then
+    raise exception 'square_production_internal_generation_stale' using errcode='42501';
+  end if;
+
   select binding.* into binding_row
   from private.square_production_runtime_bindings binding
   where binding.provider_key='square' and binding.environment='production'
     and binding.project_id='vaeroex-integrations-prod'
   order by binding.generation desc
-  limit 1;
+  limit 1
+  for update;
   if not found or binding_row.generation<>permit_row.generation
     or binding_row.configuration_fingerprint<>permit_row.configuration_fingerprint then
     raise exception 'square_production_internal_generation_stale' using errcode='42501';
@@ -1015,7 +1211,34 @@ begin
   where configuration.provider_key='square' and configuration.environment='production'
     and configuration.project_id='vaeroex-integrations-prod'
     and configuration.generation=permit_row.generation
-    and configuration.configuration_fingerprint=permit_row.configuration_fingerprint;
+    and configuration.configuration_fingerprint=permit_row.configuration_fingerprint
+  for update;
+
+  select session_record.not_after into session_not_after
+  from auth.sessions session_record
+  where session_record.id=permit_row.operator_session_id
+    and session_record.user_id=permit_row.operator_id
+  for update;
+  if not found then
+    raise exception 'square_production_internal_operator_denied' using errcode='42501';
+  end if;
+  select member.role,member.status into member_role,member_status
+  from public.workspace_members member
+  where member.user_id=permit_row.operator_id
+    and member.workspace_id=permit_row.workspace_id
+  for update;
+  if not found then
+    raise exception 'square_production_internal_operator_denied' using errcode='42501';
+  end if;
+  select entity.status into entity_status
+  from public.business_entities entity
+  where entity.id=permit_row.business_entity_id
+    and entity.workspace_id=permit_row.workspace_id
+  for update;
+  if not found then
+    raise exception 'square_production_internal_operator_denied' using errcode='42501';
+  end if;
+  authorization_now:=clock_timestamp();
 
   if configuration_row.runtime_enabled or configuration_row.provider_calls_enabled
     or configuration_row.customer_onboarding_enabled or configuration_row.webhook_intake_enabled
@@ -1029,23 +1252,13 @@ begin
       exists(
         select 1 from private.square_production_internal_fences fence
         where fence.permit_id=permit_row.permit_id
-      ) or permit_row.approval_expires_at<=statement_timestamp()
+      ) or permit_row.approval_expires_at<=authorization_now
     )) then
     raise exception 'square_production_internal_permit_fenced' using errcode='42501';
   end if;
 
-  if not exists(
-    select 1 from auth.sessions session_record
-    join public.workspace_members member
-      on member.user_id=session_record.user_id and member.workspace_id=permit_row.workspace_id
-    join public.business_entities entity
-      on entity.id=permit_row.business_entity_id and entity.workspace_id=permit_row.workspace_id
-    where session_record.id=permit_row.operator_session_id
-      and session_record.user_id=permit_row.operator_id
-      and session_record.not_after>statement_timestamp()
-      and member.status='active' and member.role in ('owner','admin','manager')
-      and entity.status='active'
-  ) then
+  if session_not_after<=authorization_now or member_status<>'active'
+    or member_role not in ('owner','admin','manager') or entity_status<>'active' then
     raise exception 'square_production_internal_operator_denied' using errcode='42501';
   end if;
   perform private.square_production_internal_require_login_v1(p_capability);
@@ -1071,9 +1284,13 @@ declare expected_merchant text;
 declare expected_location text;
 declare expires_at timestamptz;
 declare request_hash text;
-declare installed_at timestamptz:=statement_timestamp();
+declare installed_at timestamptz;
 declare binding_row private.square_production_runtime_bindings;
 declare configuration_row private.square_production_configuration_generations;
+declare session_not_after timestamptz;
+declare member_role text;
+declare member_status text;
+declare entity_status text;
 declare expected_request_hash text;
 declare permit_hash text;
 begin
@@ -1101,16 +1318,24 @@ begin
     workspace_uuid::text,entity_uuid::text,operator_uuid::text,session_uuid::text,
     expected_merchant,expected_location,p_payload->>'approvalExpiresAt'
   ]);
-  if request_hash is distinct from expected_request_hash
-    or expires_at<=installed_at or expires_at>installed_at+interval '24 hours' then
+  if request_hash is distinct from expected_request_hash then
     raise exception 'square_production_internal_permit_install_invalid' using errcode='22023';
   end if;
 
+  perform 1
+  from private.integration_production_provider_bindings provider_binding
+  where provider_binding.provider_key='square'
+    and provider_binding.environment='production'
+    and provider_binding.project_id='vaeroex-integrations-prod'
+  for update;
+  if not found then
+    raise exception 'square_production_internal_generation_stale' using errcode='42501';
+  end if;
   select binding.* into binding_row
   from private.square_production_runtime_bindings binding
   where binding.provider_key='square' and binding.environment='production'
     and binding.project_id='vaeroex-integrations-prod'
-  order by binding.generation desc limit 1;
+  order by binding.generation desc limit 1 for update;
   if not found or binding_row.generation<>generation_number
     or binding_row.configuration_fingerprint<>configuration_hash
     or exists(
@@ -1125,7 +1350,28 @@ begin
   where configuration.provider_key='square' and configuration.environment='production'
     and configuration.project_id='vaeroex-integrations-prod'
     and configuration.generation=generation_number
-    and configuration.configuration_fingerprint=configuration_hash;
+    and configuration.configuration_fingerprint=configuration_hash
+  for update;
+
+  select session_record.not_after into session_not_after
+  from auth.sessions session_record
+  where session_record.id=session_uuid and session_record.user_id=operator_uuid
+  for update;
+  if not found then raise exception 'square_production_internal_operator_denied' using errcode='42501'; end if;
+  select member.role,member.status into member_role,member_status
+  from public.workspace_members member
+  where member.user_id=operator_uuid and member.workspace_id=workspace_uuid
+  for update;
+  if not found then raise exception 'square_production_internal_operator_denied' using errcode='42501'; end if;
+  select entity.status into entity_status
+  from public.business_entities entity
+  where entity.id=entity_uuid and entity.workspace_id=workspace_uuid
+  for update;
+  if not found then raise exception 'square_production_internal_operator_denied' using errcode='42501'; end if;
+  installed_at:=clock_timestamp();
+  if expires_at<=installed_at or expires_at>installed_at+interval '24 hours' then
+    raise exception 'square_production_internal_permit_install_invalid' using errcode='22023';
+  end if;
   if configuration_row.runtime_enabled or configuration_row.provider_calls_enabled
     or configuration_row.customer_onboarding_enabled or configuration_row.webhook_intake_enabled
     or configuration_row.evidence_enabled or configuration_row.economic_contributions_enabled
@@ -1154,17 +1400,8 @@ begin
     ) then
     raise exception 'square_production_internal_native_profiles_incomplete' using errcode='42501';
   end if;
-  if not exists(
-    select 1 from auth.sessions session_record
-    join public.workspace_members member
-      on member.user_id=session_record.user_id and member.workspace_id=workspace_uuid
-    join public.business_entities entity
-      on entity.id=entity_uuid and entity.workspace_id=workspace_uuid
-    where session_record.id=session_uuid and session_record.user_id=operator_uuid
-      and session_record.not_after>installed_at
-      and member.status='active' and member.role in ('owner','admin','manager')
-      and entity.status='active'
-  ) then
+  if session_not_after<=installed_at or member_status<>'active'
+    or member_role not in ('owner','admin','manager') or entity_status<>'active' then
     raise exception 'square_production_internal_operator_denied' using errcode='42501';
   end if;
 
@@ -1224,6 +1461,7 @@ begin
     expires_at:=(p_payload->>'expiresAt')::timestamptz;
     request_hash:=p_payload->>'requestFingerprint';
     permit_row:=private.square_production_internal_lock_permit_v1(permit_uuid,'oauth');
+    now_at:=clock_timestamp();
     expected_hash:=private.square_production_internal_fingerprint_v1(array[
       'create-state-v1',permit_uuid::text,state_uuid::text,state_digest,
       actor_uuid::text,session_uuid::text,p_payload->>'expiresAt',permit_row.row_version::text
@@ -1264,6 +1502,7 @@ begin
       raise exception 'square_production_internal_state_denied' using errcode='42501';
     end if;
     permit_row:=private.square_production_internal_lock_permit_v1(state_row.permit_id,'oauth');
+    now_at:=clock_timestamp();
     expected_hash:=private.square_production_internal_fingerprint_v1(array[
       'consume-state-v2',state_digest
     ]);
@@ -1310,6 +1549,7 @@ begin
     if not found then raise exception 'square_production_internal_state_denied' using errcode='42501'; end if;
     state_uuid:=state_row.state_id;
     permit_row:=private.square_production_internal_lock_permit_v1(state_row.permit_id,'oauth');
+    now_at:=clock_timestamp();
     expected_hash:=private.square_production_internal_fingerprint_v1(array[
       'deny-state-v1',state_digest
     ]);
@@ -1359,6 +1599,7 @@ begin
     state_uuid:=state_row.state_id;
     receipt_hash:=state_row.consume_receipt_fingerprint;
     permit_row:=private.square_production_internal_lock_permit_v1(state_row.permit_id,'oauth');
+    now_at:=clock_timestamp();
     return pg_catalog.jsonb_build_object(
       'permitId',permit_row.permit_id,'stateId',state_uuid,
       'generation',permit_row.generation,'configurationFingerprint',permit_row.configuration_fingerprint,
@@ -1375,6 +1616,7 @@ begin
     session_uuid:=(p_payload->>'sessionId')::uuid;
     request_hash:=p_payload->>'mappingFingerprint';
     permit_row:=private.square_production_internal_lock_permit_v1(permit_uuid,'oauth');
+    now_at:=clock_timestamp();
     expected_hash:=private.square_production_internal_fingerprint_v1(array[
       'confirm-mapping-v1',permit_uuid::text,actor_uuid::text,session_uuid::text,
       p_payload->>'merchantId',p_payload->>'locationId',permit_row.row_version::text
@@ -1404,6 +1646,7 @@ begin
     cleanup_hash:=p_payload->>'cleanupFingerprint';
     cleanup_reason:=p_payload->>'reasonCode';
     permit_row:=private.square_production_internal_lock_permit_v1(permit_uuid,'oauth',true);
+    now_at:=clock_timestamp();
     if cleanup_reason not in ('internal_pilot_complete','manual_operator_stop') then
       raise exception 'square_production_internal_cleanup_denied' using errcode='42501';
     end if;
@@ -1498,6 +1741,7 @@ begin
     owner_hash:=p_payload->>'leaseOwnerFingerprint';
     request_hash:=p_payload->>'requestFingerprint';
     permit_row:=private.square_production_internal_lock_permit_v1(permit_uuid,'runtime');
+    now_at:=clock_timestamp();
     expected_hash:=private.square_production_internal_fingerprint_v1(array[
       'create-scan-v1',permit_uuid::text,scan_uuid::text,task_uuid::text,
       p_payload->>'paymentWindowStart',p_payload->>'paymentWindowEnd',owner_hash,permit_row.row_version::text
@@ -1537,6 +1781,7 @@ begin
       where scan.scan_id=scan_uuid for update;
     if not found then raise exception 'square_production_internal_page_acquire_denied' using errcode='42501'; end if;
     permit_row:=private.square_production_internal_lock_permit_v1(scan_row.permit_id,'runtime');
+    now_at:=clock_timestamp();
     if scan_row.status='committed' then
       return pg_catalog.jsonb_build_object(
         'permitId',permit_row.permit_id,'scanId',scan_uuid,'status','committed','replayed',true
@@ -1593,6 +1838,7 @@ begin
       where scan.scan_id=scan_uuid for update;
     if not found then raise exception 'square_production_internal_page_commit_denied' using errcode='42501'; end if;
     permit_row:=private.square_production_internal_lock_permit_v1(scan_row.permit_id,'runtime');
+    now_at:=clock_timestamp();
     expected_location_hash:=private.square_production_internal_fingerprint_v1(array[
       'location-v1',permit_row.expected_location_id
     ]);
@@ -1721,6 +1967,7 @@ begin
       where scan.scan_id=scan_uuid for update;
     if not found then raise exception 'square_production_internal_page_release_denied' using errcode='42501'; end if;
     permit_row:=private.square_production_internal_lock_permit_v1(scan_row.permit_id,'runtime');
+    now_at:=clock_timestamp();
     expected_hash:=private.square_production_internal_fingerprint_v1(array[
       'release-page-v1',scan_uuid::text,lease_uuid::text,owner_hash,reason,scan_row.row_version::text
     ]);
@@ -1785,6 +2032,7 @@ begin
   permit_uuid:=(p_payload->>'permitId')::uuid;
   request_hash:=p_payload->>'requestFingerprint';
   permit_row:=private.square_production_internal_lock_permit_v1(permit_uuid,'evidence',true);
+  now_at:=clock_timestamp();
   expected_hash:=private.square_production_internal_fingerprint_v1(array[
     'read-evidence-v1',permit_uuid::text,permit_row.generation::text,
     permit_row.configuration_fingerprint,permit_row.row_version::text,
