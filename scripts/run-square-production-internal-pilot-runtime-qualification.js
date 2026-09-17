@@ -53,6 +53,51 @@ function localDatabaseUrl() {
   return value;
 }
 
+async function enableLocalSessionAuthorization(databaseUrl) {
+  const parsed = new URL(databaseUrl);
+  if (!["127.0.0.1", "localhost"].includes(parsed.hostname)
+    || parsed.pathname !== "/postgres" || parsed.search || parsed.hash) {
+    throw new Error("square_production_internal_runtime_local_admin_target_forbidden");
+  }
+  parsed.username = "supabase_admin";
+  const administrator = new Client({
+    connectionString: parsed.toString(),
+    application_name: "square_production_runtime_local_session_authorization"
+  });
+  await administrator.connect();
+  let elevated = false;
+  try {
+    const identity = (await administrator.query(`
+      select current_user actor,current_database() database,
+        (select rolsuper from pg_catalog.pg_roles where rolname=current_user) administrator_superuser,
+        (select rolsuper from pg_catalog.pg_roles where rolname='postgres') postgres_superuser
+    `)).rows[0];
+    assert.deepEqual(identity, {
+      actor: "supabase_admin", database: "postgres",
+      administrator_superuser: true, postgres_superuser: false
+    }, "temporary session-authorization elevation is restricted to the expected disposable local roles");
+    await administrator.query("alter role postgres superuser");
+    elevated = true;
+    assert.equal((await administrator.query(
+      "select rolsuper from pg_catalog.pg_roles where rolname='postgres'"
+    )).rows[0].rolsuper, true, "local postgres elevation became effective");
+  } catch (error) {
+    if (elevated) await administrator.query("alter role postgres nosuperuser").catch(() => undefined);
+    await administrator.end().catch(() => undefined);
+    throw error;
+  }
+  return async () => {
+    try {
+      await administrator.query("alter role postgres nosuperuser");
+      assert.equal((await administrator.query(
+        "select rolsuper from pg_catalog.pg_roles where rolname='postgres'"
+      )).rows[0].rolsuper, false, "local postgres elevation was restored");
+    } finally {
+      await administrator.end();
+    }
+  };
+}
+
 function runtimeFingerprint(parts) {
   const normalized = ["square-production-internal-runtime-v1", ...parts].map(value => String(value));
   for (const part of normalized) assert.match(part, /^[\x20-\x7e]*$/, "fingerprint parts are transport-stable ASCII");
@@ -1119,6 +1164,7 @@ async function main() {
     "scripts/run-isolated-database-tests.js",
     "supabase/tests/square_production_internal_pilot_runtime.test.sql"
   ]);
+  let restoreLocalSessionAuthorization;
   client = new Client({ connectionString: databaseUrl });
   await client.connect();
   try {
@@ -1129,10 +1175,18 @@ async function main() {
     `, [runtimeVersion]);
     assert.deepEqual(ledger.rows[0], { count: 104, head: runtimeVersion, fingerprint: runtimeLedgerFingerprint });
     assert.deepEqual(await catalogSnapshot(client), beforeQbo, "runtime migration leaves QBO catalog byte-for-byte unchanged");
+    restoreLocalSessionAuthorization = await enableLocalSessionAuthorization(databaseUrl);
     await exerciseRuntime(client);
   } finally {
-    await dropRuntimeLogins(client);
-    await client.end();
+    try {
+      await dropRuntimeLogins(client);
+    } finally {
+      try {
+        if (restoreLocalSessionAuthorization) await restoreLocalSessionAuthorization();
+      } finally {
+        await client.end();
+      }
+    }
   }
   process.stdout.write("square_production_internal_runtime_qualification_ok\n");
 }

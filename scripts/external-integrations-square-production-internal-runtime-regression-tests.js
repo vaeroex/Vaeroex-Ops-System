@@ -14,6 +14,9 @@ const overlayPath = path.join(
 );
 const migration = fs.readFileSync(migrationPath, "utf8");
 const overlay = fs.readFileSync(overlayPath, "utf8");
+const qualificationRunner = fs.readFileSync(path.join(
+  root, "scripts/run-square-production-internal-pilot-runtime-qualification.js"
+), "utf8");
 const sha256 = value => crypto.createHash("sha256").update(value).digest("hex");
 
 assert.equal(
@@ -21,6 +24,15 @@ assert.equal(
   "2cc43a9313d056e58b75143f032f347cb0972f45cc1edbd484f6b1fb0574661f",
   "the reviewed Production overlay stays byte-identical"
 );
+assert.match(qualificationRunner,
+  /\["127\.0\.0\.1", "localhost"\]\.includes\(parsed\.hostname\)[\s\S]*parsed\.username = "supabase_admin"/,
+  "session-authorization fixture elevation is restricted to the disposable local Supabase administrator");
+assert.match(qualificationRunner,
+  /administrator_superuser: true, postgres_superuser: false[\s\S]*alter role postgres superuser[\s\S]*alter role postgres nosuperuser/,
+  "the fixture proves the expected initial roles and restores postgres NOSUPERUSER");
+assert.match(qualificationRunner,
+  /try \{[\s\S]*dropRuntimeLogins\(client\)[\s\S]*restoreLocalSessionAuthorization\(\)[\s\S]*client\.end\(\)/,
+  "runtime LOGIN cleanup, privilege restoration, and client closure remain nested fail-safe cleanup steps");
 assert.match(migration, /requires_exact_103_version_baseline/);
 assert.match(migration, /sha256:224d377fe3f44a59dabd188ad897624207830940a985e408e0072fb7941db146/);
 assert.doesNotMatch(migration, /(?:create table|insert into) private\.square_account_(?:configuration|connections|oauth_states|credentials|sync_tasks)/i,
