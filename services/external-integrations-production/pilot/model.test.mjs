@@ -511,7 +511,7 @@ test("sanitized qualification rejects legacy allowlists and mapping claims", () 
   assert.throws(() => qualifyPilotEvidence(reviewedContract(), booleanClaim, head, reviewedSource), /closed contract/);
 });
 
-test("initialSync pagination cancellation timeout replay and lostAcknowledgement remain atomic", () => {
+test("initialSync one-page cancellation timeout replay and lostAcknowledgement remain atomic", () => {
   const pilot = createSyntheticPilot();
   const generation = completeFreshAuthorization(pilot);
   mapInternalPilot(pilot, generation);
@@ -771,7 +771,7 @@ test("evidence authority returns only sanitized mapped-generation counts", () =>
   assert.doesNotMatch(JSON.stringify(evidence), /PAYMENT_1|ORDER_1|workspaceId|merchantId|cursor/);
 });
 
-test("evidence marks an active partial scan incomplete and retains only the last complete checkpoint", () => {
+test("incremental pagination evidence remains incomplete and retains only the last complete checkpoint", () => {
   const pilot = createSyntheticPilot();
   const generation = completeFreshAuthorization(pilot);
   mapInternalPilot(pilot, generation);

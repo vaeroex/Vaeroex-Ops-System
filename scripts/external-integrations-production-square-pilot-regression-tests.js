@@ -35,6 +35,20 @@ function run(command, args) {
   return result.stdout;
 }
 
+function sourceCollectionSha256(repository, commit, sourcePaths) {
+  const digest = crypto.createHash("sha256");
+  for (const relative of [...sourcePaths].sort()) {
+    const result = spawnSync("git", ["-C", repository, "show", `${commit}:${relative}`], {
+      encoding: null, env: { PATH: process.env.PATH }
+    });
+    assert.equal(result.status, 0, `synthetic source fixture is missing ${relative}`);
+    const blob = result.stdout;
+    digest.update(Buffer.from(`${Buffer.byteLength(relative)}:${relative}:${blob.length}:`, "utf8"));
+    digest.update(blob);
+  }
+  return digest.digest("hex");
+}
+
 const productionSourcePins = JSON.parse(run(process.execPath, ["--input-type=module", "--eval",
   `import { productionSourcePins } from ${JSON.stringify(pathToFileURL(path.join(root,
     "tools/native-broker-provisioning/production-profile.mjs")).href)}; process.stdout.write(JSON.stringify(productionSourcePins));`
@@ -414,27 +428,53 @@ try {
   for (const name of ["contract.json", "model.mjs", "qualify.mjs", "pilot-state.example.json"]) {
     fs.copyFileSync(path.join(pilot, name), path.join(fixturePilot, name));
   }
-  const fixtureNative = path.join(sourceFixture, "tools/native-broker-provisioning");
-  fs.mkdirSync(fixtureNative, { recursive: true });
-  for (const name of ["production-profile.mjs", "production-source.mjs"]) {
-    fs.copyFileSync(path.join(root, "tools/native-broker-provisioning", name), path.join(fixtureNative, name));
+  for (const relative of contract.productionNativeProvisioning.sourcePaths) {
+    const destination = path.join(sourceFixture, relative);
+    fs.mkdirSync(path.dirname(destination), { recursive: true });
+    fs.copyFileSync(path.join(root, relative), destination);
   }
   const fixtureGit = (...args) => run("git", ["-C", sourceFixture,
     "-c", "core.hooksPath=/dev/null", "-c", "commit.gpgsign=false",
     "-c", "user.name=Local synthetic fixture", "-c", "user.email=fixture@example.invalid", ...args]);
   fixtureGit("init", "--quiet");
   fixtureGit("add", ".");
-  fixtureGit("commit", "--quiet", "-m", "Synthetic source-pin fixture");
-  const fixtureHead = fixtureGit("rev-parse", "HEAD").trim();
+  fixtureGit("commit", "--quiet", "-m", "Synthetic reviewed native source");
+  const reviewedNativeHead = fixtureGit("rev-parse", "HEAD").trim();
+  const fixtureContractPath = path.join(fixturePilot, "contract.json");
+  const fixtureContract = JSON.parse(fs.readFileSync(fixtureContractPath, "utf8"));
+  fixtureContract.productionNativeProvisioning.sourceCommit = reviewedNativeHead;
+  fixtureContract.productionNativeProvisioning.sourceSha256 = sourceCollectionSha256(sourceFixture,
+    reviewedNativeHead, fixtureContract.productionNativeProvisioning.sourcePaths);
+  fs.writeFileSync(fixtureContractPath, `${JSON.stringify(fixtureContract, null, 2)}\n`);
+  fixtureGit("add", `${relativePilot}/contract.json`);
+  fixtureGit("commit", "--quiet", "-m", "Pin synthetic reviewed native source");
+  let fixtureHead = fixtureGit("rev-parse", "HEAD").trim();
   const qualifyFixture = () => JSON.parse(run(process.execPath, [
     path.join(fixturePilot, "qualify.mjs"), "--expect-head", fixtureHead,
     "--evidence", path.join(fixturePilot, "pilot-state.example.json"),
     "--phase", "precredential_nonsecret", "--expect-blocked"
   ]));
-  assert.equal(qualifyFixture().findings.includes("qualification_sources_not_exact_head"), false);
+  const pinnedNative = qualifyFixture();
+  assert.equal(pinnedNative.findings.includes("qualification_sources_not_exact_head"), false);
+  assert.equal(pinnedNative.findings.includes("production_native_provisioning_source_not_exact"), false);
+  assert.equal(pinnedNative.findings.includes("production_native_provisioning_source_sha256_mismatch"), false);
   fs.appendFileSync(path.join(fixturePilot, "qualify.mjs"), "\n// synthetic unreviewed qualifier change\n");
   assert.ok(qualifyFixture().findings.includes("qualification_sources_not_exact_head"),
     "a dirty offline qualifier is rejected without minting hosted proof");
+  fs.copyFileSync(path.join(pilot, "qualify.mjs"), path.join(fixturePilot, "qualify.mjs"));
+
+  const driftedNativePath = path.join(sourceFixture, "tools/native-broker-provisioning/native.c");
+  fs.appendFileSync(driftedNativePath, "\n/* synthetic descendant drift */\n");
+  fixtureGit("add", "tools/native-broker-provisioning/native.c");
+  fixtureGit("commit", "--quiet", "-m", "Drift one reviewed native source path");
+  fixtureHead = fixtureGit("rev-parse", "HEAD").trim();
+  const driftedNative = qualifyFixture();
+  assert.equal(driftedNative.findings.includes("qualification_sources_not_exact_head"), false,
+    "the descendant still contains the exact qualifier source");
+  assert.ok(driftedNative.findings.includes("production_native_provisioning_source_not_exact"),
+    "an ancestor pin cannot authorize changed native bytes at the qualification head");
+  assert.ok(driftedNative.findings.includes("production_native_provisioning_source_sha256_mismatch"),
+    "the measured native source digest must describe the qualification head");
 } finally {
   fs.rmSync(sourceFixture, { recursive: true, force: true });
 }

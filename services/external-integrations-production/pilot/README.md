@@ -255,10 +255,11 @@ example still describes the hosted state.
    Do not ingest, infer or reproduce the private tuple; keep all identifiers out
    of source, logs and sanitized evidence.
 7. Only after the separately reviewed executable Production binding/runtime is
-   deployed closed, run one bounded manually initiated initial sync, its
-   pagination/replay/cancellation/timeout/lost-ack checks, workspace evidence
-   readback and cleanup/gate readback. Keep webhook intake and its credential
-   absent. `post_initial_lifecycle` stays blocked; provisioning the webhook
+   deployed closed, run one bounded, one-page manually initiated initial
+   payments sync with replay/cancellation/timeout/lost-ack checks. Exercise
+   cursor pagination separately through the bounded incremental-sync path, then
+   perform workspace evidence and cleanup/gate readbacks. Keep webhook intake
+   and its credential absent. `post_initial_lifecycle` stays blocked; provisioning the webhook
    signature or qualifying scheduler/webhook behavior requires a separate
    reviewed executable runtime milestone.
    Do not contact QBO, enable economics or Vaeroex dispatch, claim historical

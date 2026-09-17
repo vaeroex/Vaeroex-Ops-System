@@ -91,9 +91,11 @@ function productionNativeProvisioningSource(expectedHead) {
     sourceExact: false, sourceCommit: null, sourceSha256: null, deploymentIdentityManifestSha256: null
   });
   const sourceCommit = pin.sourceCommit;
-  const sourceSha256 = sourceCollectionSha256(sourceCommit, pin.sourcePaths);
+  const reviewedSourceSha256 = sourceCollectionSha256(sourceCommit, pin.sourcePaths);
+  const sourceSha256 = sourceCollectionSha256(expectedHead, pin.sourcePaths);
   return Object.freeze({
-    sourceExact: sourceIncluded(sourceCommit, expectedHead) && sourceSha256 === pin.sourceSha256,
+    sourceExact: sourceIncluded(sourceCommit, expectedHead) &&
+      reviewedSourceSha256 === pin.sourceSha256 && sourceSha256 === pin.sourceSha256,
     sourceCommit, sourceSha256,
     deploymentIdentityManifestSha256: pin.deploymentIdentityManifestSha256
   });
