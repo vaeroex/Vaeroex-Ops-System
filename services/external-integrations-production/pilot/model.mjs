@@ -104,7 +104,7 @@ export function qualifyPilotEvidence(contract, evidence, expectedHead, sourceCon
   ];
   exactKeys(contract.qualificationPhases, phaseNames, "qualification phases");
   const phaseKeys = [
-    "enabledCredentialSlots", "absentCredentialSlots", "requiresPilotScope", "requiresProductionRuntime", "requiredDatabaseRolePostflight",
+    "enabledCredentialSlots", "absentCredentialSlots", "requiresPilotScope", "requiresProductionRuntime", "fixedBlocker", "requiredDatabaseRolePostflight",
     "requiredPhaseReceipts", "requiredOperationalChecks"
   ];
   for (const phaseName of phaseNames) {
@@ -122,6 +122,8 @@ export function qualifyPilotEvidence(contract, evidence, expectedHead, sourceCon
       `qualification phase.${phaseName}.requiresPilotScope must be a boolean`);
     assert.equal(typeof candidatePhase.requiresProductionRuntime, "boolean",
       `qualification phase.${phaseName}.requiresProductionRuntime must be a boolean`);
+    assert.equal(candidatePhase.fixedBlocker === null || safeIdentifier(candidatePhase.fixedBlocker), true,
+      `qualification phase.${phaseName}.fixedBlocker must be a fixed label or null`);
     assert.equal(candidatePhase.requiredDatabaseRolePostflight === null || safeIdentifier(candidatePhase.requiredDatabaseRolePostflight), true,
       `qualification phase.${phaseName}.requiredDatabaseRolePostflight must be a fixed marker or null`);
     const credentialPartition = [...candidatePhase.enabledCredentialSlots, ...candidatePhase.absentCredentialSlots];
@@ -140,6 +142,7 @@ export function qualifyPilotEvidence(contract, evidence, expectedHead, sourceCon
   }
   assert.equal(phaseNames.includes(targetPhase), true, "target phase is not in the closed contract");
   const phase = contract.qualificationPhases[targetPhase];
+  if (phase.fixedBlocker !== null) findings.push(phase.fixedBlocker);
   requireEqual(evidence.sourceCommit, expectedHead, "source_commit_mismatch");
   requireEqual(sourceControl.sourceCommit, expectedHead, "qualification_source_head_mismatch");
   requireEqual(sourceControl.qualificationSourcesExact, true, "qualification_sources_not_exact_head");
@@ -148,9 +151,10 @@ export function qualifyPilotEvidence(contract, evidence, expectedHead, sourceCon
   }
 
   exactKeys(evidence.database, ["ledgerHead", "foundationVersion", "overlayPath", "overlaySourceCommit", "overlaySha256", "overlayObjectPostflight", "rolePostflight"], "database evidence");
-  const expectedLedgerHead = phase.requiresProductionRuntime
+  const expectedLedgerHead = phase.requiresProductionRuntime &&
+    contract.productionRuntimeSurface.runtimeContract.status === "reviewed_runtime_migration"
     ? contract.productionRuntimeSurface.runtimeContract.ledgerHead
-    : contract.database.requiredOverlayVersion;
+    : contract.productionRuntimeSurface.baselineHead;
   requireEqual(evidence.database.ledgerHead, expectedLedgerHead, "database_ledger_not_exact_phase");
   requireEqual(evidence.database.foundationVersion, contract.database.requiredFoundationVersion, "production_foundation_mismatch");
   requireEqual(evidence.database.overlayPath, contract.database.requiredOverlayPath, "square_overlay_path_mismatch");
@@ -296,7 +300,7 @@ export function qualifyPilotEvidence(contract, evidence, expectedHead, sourceCon
       "runtimeContract"], "production runtime surface");
   const runtimeContract = contract.productionRuntimeSurface.runtimeContract;
   exactKeys(runtimeContract,
-    ["status", "sourceCommit", "sourcePath", "migrationCount", "ledgerHead", "ledgerFingerprint", "migrationSourceSha256", "authorityRpcs", "requiredFunctions", "catalogPostflight"],
+    ["status", "sourceCommit", "sourcePath", "migrationCount", "ledgerHead", "ledgerFingerprint", "migrationSourceSha256", "authorityRpcs", "requiredFunctions"],
     "production runtime contract");
   assert.equal(["pending_reviewed_runtime_migration", "reviewed_runtime_migration"].includes(runtimeContract.status), true,
     "production runtime contract status is not closed");
@@ -307,14 +311,12 @@ export function qualifyPilotEvidence(contract, evidence, expectedHead, sourceCon
   const baselineAuthorityRpcs = contract.productionRuntimeSurface.baselineAuthorityRpcs;
   assert.equal(Array.isArray(baselineAuthorityRpcs) && new Set(baselineAuthorityRpcs).size === baselineAuthorityRpcs.length,
     true, "baseline authority bindings must be unique");
-  const baselineRequiredFunctions = runtimeContract.catalogPostflight?.requiredFunctions
-    ?.filter((signature) => !runtimeRequiredFunctions.includes(signature)) ?? baselineAuthorityRpcs.map((binding) => {
-      assert.equal(typeof binding, "string", "baseline authority binding must be a string");
-      const separator = binding.indexOf("=");
-      assert.ok(separator > 0 && separator < binding.length - 1,
-        "baseline authority binding must include one function signature");
-      return binding.slice(separator + 1);
-    });
+  for (const binding of baselineAuthorityRpcs) {
+    assert.equal(typeof binding, "string", "baseline authority binding must be a string");
+    const separator = binding.indexOf("=");
+    assert.ok(separator > 0 && separator < binding.length - 1,
+      "baseline authority binding must include one function signature");
+  }
   if (runtimeContract.status === "pending_reviewed_runtime_migration") {
     assert.equal(runtimeContract.sourceCommit, null, "pending production runtime must not name an unreviewed source");
     assert.equal(runtimeContract.sourcePath, null, "pending production runtime must not name an unreviewed source path");
@@ -323,10 +325,10 @@ export function qualifyPilotEvidence(contract, evidence, expectedHead, sourceCon
     assert.equal(runtimeContract.ledgerFingerprint, null, "pending production runtime must not name an unreviewed ledger fingerprint");
     assert.equal(runtimeContract.migrationSourceSha256, null, "pending production runtime must not pin an unreviewed source");
     assert.deepEqual(runtimeContract.authorityRpcs, [], "pending production runtime must not invent authority grants");
-    assert.equal(runtimeContract.catalogPostflight, null,
-      "pending production runtime must not invent a catalog postflight");
+    assert.deepEqual(runtimeContract.requiredFunctions, [], "pending production runtime must not invent a function surface");
   } else {
     assert.match(runtimeContract.sourceCommit, /^[a-f0-9]{40}$/, "reviewed runtime must pin its source commit");
+    requireEqual(sourceControl.runtimeSourceIncluded, true, "reviewed_runtime_source_not_in_qualification_head");
     assert.equal(typeof runtimeContract.sourcePath === "string" && runtimeContract.sourcePath.startsWith("supabase/migrations/") &&
       !runtimeContract.sourcePath.includes(".."), true,
       "reviewed runtime must pin one safe source path");
@@ -346,27 +348,22 @@ export function qualifyPilotEvidence(contract, evidence, expectedHead, sourceCon
       "reviewed production runtime must pin exactly one final RPC per authority");
     assert.deepEqual([...runtimeContract.requiredFunctions].sort(), runtimeRequiredFunctions,
       "reviewed production runtime must pin the exact internal function surface");
-    const fullFinalAuthorityRpcs = [...runtimeContract.authorityRpcs].sort();
-    const fullFinalRequiredFunctions = [...baselineRequiredFunctions, ...runtimeContract.requiredFunctions].sort();
-    assert.equal(new Set(fullFinalAuthorityRpcs).size, fullFinalAuthorityRpcs.length,
-      "final authority surface must not contain duplicate bindings");
-    assert.equal(new Set(fullFinalRequiredFunctions).size, fullFinalRequiredFunctions.length,
-      "final function surface must not contain duplicate signatures");
-    exactKeys(runtimeContract.catalogPostflight,
-      ["marker", "ledgerHead", "ledgerFingerprint", "migrationSourceSha256", "authorityRpcs", "requiredFunctions"],
-      "reviewed production runtime catalog postflight");
-    assert.equal(safeIdentifier(runtimeContract.catalogPostflight.marker), true,
-      "reviewed production runtime catalog postflight must use a fixed marker");
-    requireEqual(runtimeContract.catalogPostflight.ledgerHead, runtimeContract.ledgerHead,
-      "production_runtime_catalog_postflight_ledger_mismatch");
-    requireEqual(runtimeContract.catalogPostflight.ledgerFingerprint, runtimeContract.ledgerFingerprint,
-      "production_runtime_catalog_postflight_ledger_fingerprint_mismatch");
-    requireEqual(runtimeContract.catalogPostflight.migrationSourceSha256, runtimeContract.migrationSourceSha256,
-      "production_runtime_catalog_postflight_source_mismatch");
-    assert.deepEqual([...runtimeContract.catalogPostflight.authorityRpcs].sort(), fullFinalAuthorityRpcs,
-      "reviewed production runtime catalog postflight must cover the full final authority surface");
-    assert.deepEqual([...runtimeContract.catalogPostflight.requiredFunctions].sort(), fullFinalRequiredFunctions,
-      "reviewed production runtime catalog postflight must cover the full final function surface");
+  }
+  const sourcePins = sourceControl.productionSourcePins;
+  const baseSourcePinsExact = sourcePins && sourcePins.baselineVersion === contract.database.requiredFoundationVersion &&
+      sourcePins.overlayVersion === contract.database.requiredOverlayVersion &&
+      sourcePins.overlayMigrationCount === contract.productionRuntimeSurface.baselineMigrationCount &&
+      sourcePins.overlaySha256 === contract.database.requiredOverlaySha256 &&
+      sourcePins.baselineMigrationCount === 102 &&
+      /^sha256:[a-f0-9]{64}$/.test(sourcePins.baselineLedgerFingerprint ?? "") &&
+      isSha256(sourcePins.foundationSha256);
+  const reviewedRuntimePinsExact = runtimeContract.status !== "reviewed_runtime_migration" ||
+    Boolean(sourcePins && sourcePins.internalRuntimeVersion === runtimeContract.ledgerHead &&
+      sourcePins.internalRuntimeMigrationCount === runtimeContract.migrationCount &&
+      sourcePins.internalRuntimeLedgerFingerprint === runtimeContract.ledgerFingerprint &&
+      sourcePins.internalRuntimeSha256 === runtimeContract.migrationSourceSha256);
+  if (!baseSourcePinsExact || !reviewedRuntimePinsExact) {
+    findings.push("production_source_pins_not_exact");
   }
   const baselineMeasuredSurface = sourceControl.productionRuntimeBaselineSurface;
   if (!baselineMeasuredSurface || baselineMeasuredSurface.migrationCount !== contract.productionRuntimeSurface.baselineMigrationCount ||
@@ -381,10 +378,9 @@ export function qualifyPilotEvidence(contract, evidence, expectedHead, sourceCon
       findings.push("production_runtime_authority_contract_not_reviewed");
       findings.push("production_runtime_internal_pilot_permit_missing");
     } else {
-      // Migration text is an integrity hint only: later DROP/REVOKE statements
-      // can invalidate an earlier CREATE/GRANT. Promotion requires a separately
-      // captured exact-ledger catalog postflight; this offline checker never
-      // generates that marker from source text.
+      // Source identity is an offline integrity assertion only. The merged
+      // native/catalog qualification owns the exact-104 catalog contract; this
+      // pilot checker neither recreates it nor turns CI into hosted proof.
       const measuredSurface = sourceControl.productionRuntimeSurface;
       const measuredRuntimeAuthorityRpcs = Array.isArray(measuredSurface?.runtimeAuthorityRpcs)
         ? [...measuredSurface.runtimeAuthorityRpcs].sort() : [];
@@ -394,15 +390,6 @@ export function qualifyPilotEvidence(contract, evidence, expectedHead, sourceCon
         measuredSurface?.ledgerFingerprint !== runtimeContract.ledgerFingerprint ||
         JSON.stringify(measuredRuntimeAuthorityRpcs) !== JSON.stringify([...runtimeContract.authorityRpcs].sort())) {
         findings.push("production_runtime_source_integrity_not_exact");
-      }
-      const catalogPostflight = sourceControl.productionRuntimeCatalogPostflight;
-      if (!catalogPostflight || catalogPostflight.marker !== runtimeContract.catalogPostflight.marker ||
-        catalogPostflight.ledgerHead !== runtimeContract.catalogPostflight.ledgerHead ||
-        catalogPostflight.ledgerFingerprint !== runtimeContract.catalogPostflight.ledgerFingerprint ||
-        catalogPostflight.migrationSourceSha256 !== runtimeContract.catalogPostflight.migrationSourceSha256 ||
-        JSON.stringify([...catalogPostflight.authorityRpcs].sort()) !== JSON.stringify([...runtimeContract.catalogPostflight.authorityRpcs].sort()) ||
-        JSON.stringify([...catalogPostflight.requiredFunctions].sort()) !== JSON.stringify([...runtimeContract.catalogPostflight.requiredFunctions].sort())) {
-        findings.push("production_runtime_catalog_postflight_not_exact");
       }
     }
   }
@@ -668,6 +655,10 @@ export function createSyntheticPilot({
       assert.ok(kind === "initial" || kind === "incremental", "unsupported scan kind");
       if (kind === "incremental") assert.notEqual(state.checkpoint, null, "incremental sync requires a durable checkpoint");
       const source = options.source ?? "payments/list_payments";
+      assert.ok(typeof source === "string" && source.length >= 3 && source.length <= 191 &&
+        /^[A-Za-z0-9_]+\/[A-Za-z0-9_/-]+$/.test(source), "scan source must be bounded");
+      const resourceFamily = source.split("/", 1)[0];
+      assert.ok(safeIdentifier(resourceFamily), "scan resource family must be bounded");
       const now = options.now ?? 0;
       const deadlineAt = options.deadlineAt ?? now + 86_400_000;
       const attempt = options.attempt ?? 1;
@@ -677,10 +668,12 @@ export function createSyntheticPilot({
           deadlineAt - now <= 86_400_000, "initial pilot deadline exceeds 24 hours");
         assert.ok(Number.isSafeInteger(attempt) && attempt >= 1 && attempt <= 3, "initial pilot attempts are bounded");
       }
-      state.scan = { kind, source, deadlineAt, attempt, expectedCursor: null, pages: 0, complete: false, incomplete: false };
+      state.scan = { kind, source, resourceFamily, deadlineAt, attempt, expectedCursor: null, pages: 0, complete: false, incomplete: false };
     },
     commitPage({ expectedGeneration, receiptId, cursor, nextCursor, observations, cancelled = false, timedOut = false }) {
       requireActive(expectedGeneration);
+      assert.ok(state.scan, "no active scan");
+      assert.equal(state.scan.incomplete, false, "incomplete scan requires explicit recovery");
       assert.ok(safeIdentifier(receiptId), "receiptId must be bounded");
       assert.ok(Array.isArray(observations), "observations must be an array");
       assert.ok(observations.length <= (state.scan?.kind === "initial" ? 100 : 256),
@@ -688,6 +681,10 @@ export function createSyntheticPilot({
       const staged = observations.map(canonicalObservation);
       const stagedByIdentity = new Map();
       for (const entry of staged) {
+        assert.equal(entry.observation.resourceFamily, state.scan.resourceFamily,
+          "observation resource family does not match scan source");
+        assert.equal(entry.observation.operation, state.scan.source,
+          "observation operation does not match scan source");
         const priorEntry = stagedByIdentity.get(entry.identity);
         assert.ok(!priorEntry || priorEntry.canonical === entry.canonical, "duplicate source version payload changed within page");
         stagedByIdentity.set(entry.identity, entry);
@@ -699,7 +696,7 @@ export function createSyntheticPilot({
         assert.equal(prior, digest, "receipt replay payload changed");
         return Object.freeze({ outcome: "replay", committed: true, inserted: 0 });
       }
-      assert.ok(state.scan && !state.scan.complete, "no active scan");
+      assert.equal(state.scan.complete, false, "no active scan");
       if (state.scan.kind === "initial") {
         assert.equal(cursor, null, "initial payments page must start at the empty cursor");
         assert.equal(nextCursor, null, "initial payments page must not continue pagination");
@@ -775,7 +772,7 @@ export function createSyntheticPilot({
         observationCount: state.versions.size,
         observationsByFamily: Object.freeze(byFamily),
         checkpoint: state.checkpoint,
-        incomplete: state.scan?.incomplete ?? false,
+        incomplete: state.scan !== null && (!state.scan.complete || state.scan.incomplete),
         history: state.checkpoint === null ? "unknown" : "partial"
       });
     },

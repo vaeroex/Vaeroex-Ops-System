@@ -74,7 +74,7 @@
       "createRole": false,
       "replication": false,
       "bypassRls": false,
-      "inherit": true,
+      "inherit": false,
       "directTablePrivileges": false,
       "authorityMembershipsPerLogin": 1
     }
@@ -134,7 +134,8 @@
       ],
       "requiresPilotScope": false,
       "requiresProductionRuntime": true,
-      "requiredDatabaseRolePostflight": "square_production_internal_roles_closed_postflight_passed",
+      "fixedBlocker": null,
+      "requiredDatabaseRolePostflight": "square_production_native_all_profiles_fenced_assertion",
       "requiredPhaseReceipts": [],
       "requiredOperationalChecks": [
         "callbackHealthAlert",
@@ -160,7 +161,8 @@
       ],
       "requiresPilotScope": true,
       "requiresProductionRuntime": true,
-      "requiredDatabaseRolePostflight": "square_production_internal_roles_closed_postflight_passed",
+      "fixedBlocker": null,
+      "requiredDatabaseRolePostflight": "square_production_native_all_profiles_fenced_assertion",
       "requiredPhaseReceipts": [],
       "requiredOperationalChecks": [
         "callbackHealthAlert",
@@ -188,7 +190,8 @@
       ],
       "requiresPilotScope": true,
       "requiresProductionRuntime": true,
-      "requiredDatabaseRolePostflight": "square_production_internal_roles_closed_postflight_passed",
+      "fixedBlocker": null,
+      "requiredDatabaseRolePostflight": "square_production_native_all_profiles_fenced_assertion",
       "requiredPhaseReceipts": [
         "consent",
         "locationMapping",
@@ -226,7 +229,8 @@
       "absentCredentialSlots": [],
       "requiresPilotScope": true,
       "requiresProductionRuntime": true,
-      "requiredDatabaseRolePostflight": "square_production_internal_roles_closed_postflight_passed",
+      "fixedBlocker": "post_initial_lifecycle_runtime_not_implemented",
+      "requiredDatabaseRolePostflight": "square_production_native_all_profiles_fenced_assertion",
       "requiredPhaseReceipts": [
         "consent",
         "locationMapping",
@@ -271,6 +275,7 @@
       ],
       "requiresPilotScope": false,
       "requiresProductionRuntime": false,
+      "fixedBlocker": "external_customer_activation_forbidden",
       "requiredDatabaseRolePostflight": null,
       "requiredPhaseReceipts": [],
       "requiredOperationalChecks": []
@@ -308,81 +313,21 @@
       "runtime_enabled_constrained_false"
     ],
     "runtimeContract": {
-      "status": "reviewed_runtime_migration",
-      "sourceCommit": "b61c5fc58156ae35c41df19e9bc1b7ba6fc4fe5a",
-      "sourcePath": "supabase/migrations/20260902191325_square_production_internal_pilot_runtime.sql",
-      "migrationCount": 104,
-      "ledgerHead": "20260902191325",
-      "ledgerFingerprint": "sha256:7dc51d888ee9c4a6bb595b1a4431ab5fcdb649e34c871ba91a6512d5fa2dc89f",
-      "migrationSourceSha256": "db502e7671028fc9867d49c1b8c198b694d1f07674fe8312bdbc032d80570716",
-      "authorityRpcs": [
-        "square_production_oauth_authority=public.square_production_internal_oauth_v1(text,jsonb)",
-        "square_production_broker_authority=public.square_production_internal_broker_v1(text,jsonb)",
-        "square_production_scheduler_authority=public.check_square_production_scheduler_authority_v1(text,text,text,bigint,text)",
-        "square_production_webhook_authority=public.check_square_production_webhook_authority_v1(text,text,text,bigint,text)",
-        "square_production_runtime_authority=public.square_production_internal_runtime_v1(text,jsonb)",
-        "square_production_evidence_authority=public.square_production_internal_evidence_v1(text,jsonb)"
-      ],
-      "requiredFunctions": [
-        "private.square_production_internal_reject_immutable_mutation_v1()",
-        "private.square_production_internal_guard_lifecycle_update_v1()",
-        "private.square_production_internal_require_keys_v1(jsonb,text[])",
-        "private.square_production_internal_fingerprint_v1(text[])",
-        "private.square_production_internal_audit_v1(uuid,bigint,text,text,text,text,timestamptz)",
-        "private.square_production_internal_require_login_v1(text)",
-        "private.square_production_internal_lock_permit_v1(uuid,text,boolean)",
-        "private.square_production_internal_install_permit_v1(jsonb)",
-        "public.square_production_internal_oauth_v1(text,jsonb)",
-        "public.square_production_internal_broker_v1(text,jsonb)",
-        "public.square_production_internal_runtime_v1(text,jsonb)",
-        "public.square_production_internal_evidence_v1(text,jsonb)"
-      ],
-      "catalogPostflight": {
-        "marker": "square_production_internal_runtime_catalog_postflight_passed",
-        "ledgerHead": "20260902191325",
-        "ledgerFingerprint": "sha256:7dc51d888ee9c4a6bb595b1a4431ab5fcdb649e34c871ba91a6512d5fa2dc89f",
-        "migrationSourceSha256": "db502e7671028fc9867d49c1b8c198b694d1f07674fe8312bdbc032d80570716",
-        "authorityRpcs": [
-          "square_production_oauth_authority=public.square_production_internal_oauth_v1(text,jsonb)",
-          "square_production_broker_authority=public.square_production_internal_broker_v1(text,jsonb)",
-          "square_production_scheduler_authority=public.check_square_production_scheduler_authority_v1(text,text,text,bigint,text)",
-          "square_production_webhook_authority=public.check_square_production_webhook_authority_v1(text,text,text,bigint,text)",
-          "square_production_runtime_authority=public.square_production_internal_runtime_v1(text,jsonb)",
-          "square_production_evidence_authority=public.square_production_internal_evidence_v1(text,jsonb)"
-        ],
-        "requiredFunctions": [
-          "private.square_production_generation_fingerprint_v1(bigint,text[])",
-          "private.square_production_configuration_fingerprint_v1(bigint,text,text,text,text,text,text,text,text,text,text,text,text,text,text,text,text,text[],text,text,text,text[],text,text,boolean,boolean,boolean,boolean,boolean,boolean,boolean)",
-          "private.reject_square_production_immutable_mutation_v1()",
-          "private.validate_square_production_runtime_binding_v1()",
-          "private.record_square_production_lifecycle_audit_v1()",
-          "private.check_square_production_operational_generation_v1(text,text,text,bigint,text,text)",
-          "public.check_square_production_oauth_authority_v1(text,text,text,bigint,text)",
-          "public.check_square_production_broker_authority_v1(text,text,text,bigint,text)",
-          "public.check_square_production_scheduler_authority_v1(text,text,text,bigint,text)",
-          "public.check_square_production_webhook_authority_v1(text,text,text,bigint,text)",
-          "public.check_square_production_runtime_authority_v1(text,text,text,bigint,text)",
-          "public.check_square_production_evidence_authority_v1(text,text,text,bigint,text)",
-          "private.square_production_internal_reject_immutable_mutation_v1()",
-          "private.square_production_internal_guard_lifecycle_update_v1()",
-          "private.square_production_internal_require_keys_v1(jsonb,text[])",
-          "private.square_production_internal_fingerprint_v1(text[])",
-          "private.square_production_internal_audit_v1(uuid,bigint,text,text,text,text,timestamptz)",
-          "private.square_production_internal_require_login_v1(text)",
-          "private.square_production_internal_lock_permit_v1(uuid,text,boolean)",
-          "private.square_production_internal_install_permit_v1(jsonb)",
-          "public.square_production_internal_oauth_v1(text,jsonb)",
-          "public.square_production_internal_broker_v1(text,jsonb)",
-          "public.square_production_internal_runtime_v1(text,jsonb)",
-          "public.square_production_internal_evidence_v1(text,jsonb)"
-        ]
-      }
+      "status": "pending_reviewed_runtime_migration",
+      "sourceCommit": null,
+      "sourcePath": null,
+      "migrationCount": null,
+      "ledgerHead": null,
+      "ledgerFingerprint": null,
+      "migrationSourceSha256": null,
+      "authorityRpcs": [],
+      "requiredFunctions": []
     }
   },
   "productionNativeProvisioning": {
     "status": "reviewed_source_pending_execution_environment",
-    "sourceCommit": "34fb0d90c93499c2f01bf95ebe1f38df393b71f0",
-    "sourceSha256": "4c13f0307271b87ec1b09dd5fafe3c69b6f954fe62ce83f2acb151f021b74423",
+    "sourceCommit": "0efed0c395335b74af480fcc367ecdf5e0694f23",
+    "sourceSha256": "09fcf252cf11eb733505664a6ea55ab2d1df1bc4e1eafc9de7d618d280f6801b",
     "sourcePaths": [
       ".github/workflows/ci.yml",
       "package.json",
@@ -408,6 +353,7 @@
       "tools/native-broker-provisioning/tests/maintenance.test.mjs",
       "tools/native-broker-provisioning/tests/production-catalog-qualify.c",
       "tools/native-broker-provisioning/tests/production-catalog-qualify.cjs",
+      "tools/native-broker-provisioning/tests/production-concurrency.cjs",
       "tools/native-broker-provisioning/tests/production-native-qualify.cjs",
       "tools/native-broker-provisioning/tests/production-profiles.test.mjs"
     ],

@@ -8,18 +8,21 @@ describes the current blocked state: Production database foundation
 credential containers are empty, the allowlist is empty, and every gate is
 false.
 
-A sanitized preflight candidate must have the adjacent reviewed Square overlay
-as its exact final runtime ledger head, `20260902191325`. Its evidence must also name the
-source-controlled migration path, match the contract's reviewed SHA-256 of that
-file and merged source commit, and carry the exact object-and-authorization
-database postflight marker.
-A version-only or boolean claim is rejected. The contract pins the corrected
-overlay's final reviewed hash; activation evidence must prove that exact source
-object was merged and applied. The qualifier independently hashes that path in
-the exact Git object named by `--expect-head` and requires the qualifier itself
-to run from that head. It pins the reviewed native provisioning source and final
-runtime migration; readiness remains blocked until the separate execution
-identity and deployment manifest are reviewed and read back.
+A sanitized preflight candidate can currently attest only the reviewed 103-file
+source baseline ending at Square overlay `20260902191324`. The executable
+internal runtime dependency is still pending: this contract deliberately names
+no runtime source commit, path, ledger head, fingerprint, digest, function or
+authority surface. The merged native source retains 104-ledger planning pins for
+`20260902191325`, but that migration is absent from the merged qualification
+tree and those future pins are not a reviewed runtime dependency. A version-only
+or boolean claim is rejected. The contract pins the corrected overlay's final
+reviewed hash; activation evidence must prove that exact source object was
+merged and applied. The qualifier independently hashes that path in the exact
+Git object named by `--expect-head` and requires the qualifier itself to run
+from that head. A future reviewed runtime must separately pin its own source and
+prove that source commit is an ancestor of the qualification head. Readiness
+remains blocked until that runtime is separately delivered and the native
+execution identity and deployment manifest are reviewed and read back.
 
 The immutable network contract is:
 
@@ -38,9 +41,14 @@ node services/external-integrations-production/pilot/qualify.mjs \
 ```
 
 Use `--expect-consistent` only for a candidate whose sanitized assertions have
-no findings; when the 104-ledger catalog has been read back, provide its fixed
-nonsecret marker with `--runtime-catalog-postflight PATH`. A blocked result is
-not equivalent to a consistent result, and neither result grants activation.
+no findings. Exact catalog, ownership, ACL, role and concurrency qualification
+belongs to the merged native/catalog test contract; this package does not
+maintain a second SQL verifier or accept a catalog marker as proof. The current
+merged tree qualifies the exact 103-file overlay baseline; its optional 104
+planning pins become applicable only if that migration is separately reviewed
+and merged. A
+blocked result is not equivalent to a consistent result, and neither result
+proves hosted execution or grants activation.
 
 For a consistency candidate, create a sanitized evidence JSON outside the
 repository from nonsecret readbacks only and select one exact `--phase`. The
@@ -52,9 +60,10 @@ ready now, so private credential entry cannot start merely because infrastructur
 checks pass.
 `internal_consent_ready` requires the application credential and the OAuth and
 broker database profiles at enabled version `1`, while runtime/evidence and
-webhook/scheduler profiles remain absent. The webhook credential, refresh checks
-and webhook checks first become prerequisites at `post_initial_lifecycle`, after
-`internal_manual_sync_complete`. `external_customer_blocked` always fails. The
+webhook/scheduler profiles remain absent. `post_initial_lifecycle` is explicitly
+blocked until a separately reviewed scheduler/webhook runtime exists; the
+checked-in contract cannot authorize webhook credential entry or that phase.
+`external_customer_blocked` always fails. The
 checker also compares
 the deployed shared-bootstrap, OAuth-callback and callback-edge source/image
 pairs to the separately reviewed release pins in the contract, and verifies all
@@ -84,40 +93,20 @@ Run the synthetic lifecycle coverage with:
 node --test services/external-integrations-production/pilot/model.test.mjs
 ```
 
-`verify-database.sql` is a read-only, fail-closed post-provisioning check. It
-requires the exact fingerprinted 104-entry ledger ending at `20260902191325`,
-the reviewed PostgreSQL 17 digest of all overlay columns, defaults, generated
-expressions, constraints and indexes, and the exact reviewed function bodies,
-owners and trigger bindings. It accepts only one uniform, phase-labeled role
-state: all six profiles are either staged `NOLOGIN NOINHERIT` before private
-credential provisioning, or all six are active `LOGIN INHERIT` after the bounded
-activation. Both states retain one exact inherited but non-settable capability membership
-each, and one distinct checked RPC grant per NOLOGIN authority. It rejects
-swapped or additional RPC grants, direct LOGIN function grants, relation or
-column ACLs, unexpected schema/database ACLs, schema/database creation authority,
-and objects owned by either LOGIN or authority roles. The Square overlay remains
-responsible for creating and granting the six checked RPCs; this package does not
-recreate that overlay.
-
-The postflight is point-in-time closure for existing application objects and
-the `pg_default_acl` rows that exist when it runs. It rejects unsafe existing
-default-ACL rows for schemas, relations, sequences and routines, but an absent
-row retains PostgreSQL's built-in defaults, including PUBLIC EXECUTE on newly
-created functions. It does not install or guarantee a future-object privilege
-policy. Any later migration or DDL makes this result stale; activation remains
-blocked until a separately reviewed verifier covering the new exact state is
-run again and passes. The postflight requires current-database CONNECT and
-rejects direct target database ACLs and database CREATE. The provider's
-inherited PUBLIC CONNECT/TEMP baseline on
-`postgres`/template databases cannot be denied per role without a global
-legacy revoke, so the approved endpoint, exact database name, network firewall
-and monitoring remain the SQL-login boundary. PostgreSQL system catalogs,
-built-in types/languages and built-in large-object constructors likewise remain
-part of the trusted database-runtime resource boundary and are not pilot
-authority.
-The only application-relation exception is PUBLIC SELECT on the two literal
-`pg_stat_statements` extension views in `extensions`, which is accepted only
-while every pilot role lacks USAGE on that schema.
+The authoritative database source and catalog checks are the merged
+`productionSourcePins`, `production-native-qualify.cjs` and
+`production-catalog-qualify.cjs` contracts. They validate the exact 102/103
+source chain now and the planned 104 source only when that optional migration is
+present. Their PostgreSQL catalog checks include ownership, FORCE RLS,
+relation/column/routine ACLs, role membership, lifecycle constraints and the
+concurrent ACL-race regression. This package consumes their immutable source
+pins; it does not recreate or weaken those checks. At every pilot-package
+checkpoint all six profiles must be fenced `NOLOGIN NOINHERIT`, with the exact
+non-settable membership recorded by the native contract. A bounded operation
+may activate only its exact profile under that contract and must return every
+profile to the all-fenced checkpoint before producing sanitized pilot evidence.
+CI/source qualification remains nonauthorizing: hosted catalog and role
+readback is still required before a private action.
 
 Provider credentials have no local shell helper or CLI path. In one approved,
 private, non-recorded GCP Secret Manager console session, the exact operator
@@ -129,19 +118,19 @@ surface is verified, use it first only for the already-existing empty
 `square-production-application` container in `vaeroex-integrations-prod`. Keep
 `square-production-webhook-signature` empty until internal consent, exact mapping,
 bounded manual initial sync, replay, workspace readback and cleanup have all
-succeeded with webhook intake closed. At `post_initial_lifecycle`, use the same
-protected procedure for the webhook signature. Each phase-required metadata-only
+succeeded with webhook intake closed. The webhook-signature container remains
+empty because `post_initial_lifecycle` is blocked. Each phase-required metadata-only
 readback must show exactly enabled version `1` and total count `1`. Any
 cancellation, timeout or
 lost acknowledgement is unresolved: stop, reconcile metadata/audit evidence
 and do not retry. Secret values never belong in Git, a command, local
 environment, chat, logs, screenshots or evidence.
-Database credentials must use a separately reviewed Production native-SCRAM
-profile; the Sandbox-pinned profile must not be repurposed. This package keeps a
-machine-readable pin for the exact six-profile source and source hash, while the
-deployment-identity manifest remains pending. It must remain blocked until that
-source is integrated by a normal merge, its exact paths and hashes are pinned
-here, and it passes the combined exact-head checks. Do not improvise
+Database credentials must use the merged Production native-SCRAM profiles; the
+Sandbox-pinned profile must not be repurposed. This package pins the exact
+six-profile source at `0efed0c395335b74af480fcc367ecdf5e0694f23`, including
+the final concurrency/ACL-race regression, while the deployment-identity
+manifest remains pending. It must remain blocked until the reviewed private
+Production execution path is bound and passes hosted checks. Do not improvise
 the operation from SQL, a shell, the Sandbox tooling or prose, and do not begin
 provider-credential entry or pilot consent merely because the B source exists.
 That fixed six-profile Production extension of `tools/native-broker-provisioning`
@@ -175,15 +164,19 @@ lifecycle. An independently reviewed executable Production binding/runtime and
 the fixed native provisioner above must exist, be deployed with every gate
 closed, and pass hosted readbacks before credential entry or consent can begin.
 
-The final adjacent Production-only runtime migration is
-`20260902191325_square_production_internal_pilot_runtime.sql`; the reviewed
-overlay itself stays byte-identical. It adds only durable state-create,
+The planned adjacent Production-only runtime migration is
+`20260902191325_square_production_internal_pilot_runtime.sql`, but it is not in
+the current merged qualification tree and has no reviewed source identity in
+this contract. It must be delivered and reviewed separately before this package
+can pin or apply it; the reviewed overlay itself stays byte-identical. The
+planned dependency adds only durable state-create,
 one-use consume/receipt,
 broker credential commit, exact mapping, bounded manual page/replay, workspace
 evidence and cleanup/fence surfaces. Each new entry point must be granted only to
-its exact Square Production authority, and the 104-ledger verifier proves the
-complete final authority/function surface: all six baseline checked RPCs as well
-as every new runtime entry point, with their final owners and ACLs. Migration
+its exact Square Production authority. The planned ledger-104 contract assigns
+the OAuth, broker, runtime and evidence authorities to internal RPCs while
+scheduler and webhook retain their baseline checked RPCs. No current readiness
+claim relies on those planned objects or ACLs. Migration
 text is only a source-integrity hint; an earlier `CREATE` or `GRANT` does not
 survive a later `DROP` or `REVOKE` by implication. Do not grant generic `integration_*`
 roles to Square logins, import later Sandbox/dormant migrations, enable a
@@ -226,15 +219,16 @@ example still describes the hosted state.
    that its image/source values remain current. Apply only the exact reviewed
    plan, then read back its exact plan/state addresses, deployed digests, source
    variables, ingress and disabled runtime state.
-3. In the approved database window, apply only adjacent migration
-   `20260902191325` with the normal exact-version bound. Verify its merged source
-   commit, source-controlled path and SHA-256, the exact ledger head, and the
-   reviewed object/function/trigger manifest. Leave LOGIN provisioning blocked
-   until the reviewed B implementation is integrated, its combined exact-head
-   checks pass, and a reviewed private Production execution path is available
+3. Do not apply `20260902191325` under the current package. The merged
+   qualification tree ends at the reviewed 103-file overlay source and the
+   runtime dependency is explicitly pending. Only after a separate runtime PR
+   is reviewed and merged may a refreshed contract pin that migration's own
+   source commit, source-controlled path, SHA-256, exact ledger head and reviewed
+   object/function/trigger manifest. Leave LOGIN provisioning blocked
+   until a reviewed private Production execution path is available
    for all six LOGINs; continue the independent nonsecret checks below. Keep the
-   one-to-one non-settable authority memberships and retain only sanitized
-   postflight markers and role/RPC inventory. A prose instruction is not an
+   one-to-one non-settable authority memberships and retain only a sanitized
+   all-profiles-fenced assertion and role/RPC inventory. A prose instruction is not an
    executable credential-delivery path.
 4. Verify public health, exact callback/webhook host-method-path behavior,
    direct Cloud Run denial, query stripping before ordinary request logs, and
@@ -264,9 +258,9 @@ example still describes the hosted state.
    deployed closed, run one bounded manually initiated initial sync, its
    pagination/replay/cancellation/timeout/lost-ack checks, workspace evidence
    readback and cleanup/gate readback. Keep webhook intake and its credential
-   absent. Only after that path succeeds may the later phase provision the
-   webhook signature and qualify overlapping incremental sync, refresh, webhook
-   dedup, revocation, disconnect and recovery.
+   absent. `post_initial_lifecycle` stays blocked; provisioning the webhook
+   signature or qualifying scheduler/webhook behavior requires a separate
+   reviewed executable runtime milestone.
    Do not contact QBO, enable economics or Vaeroex dispatch, claim historical
    completeness, or use real credentials/provider payloads as test values.
 8. Assemble the sanitized evidence, run the offline qualifier at the exact

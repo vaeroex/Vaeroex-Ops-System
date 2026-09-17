@@ -4,6 +4,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { createSyntheticPilot, loadJson, qualifyPilotEvidence } from "./model.mjs";
+import { productionSourcePins } from "../../../tools/native-broker-provisioning/production-profile.mjs";
 
 const directory = path.dirname(fileURLToPath(import.meta.url));
 const contract = loadJson(path.join(directory, "contract.json"));
@@ -11,12 +12,35 @@ const baseline = loadJson(path.join(directory, "pilot-state.example.json"));
 const head = baseline.sourceCommit;
 const overlaySourceCommit = "3".repeat(40);
 const overlaySha256 = "a".repeat(64);
+const reviewedProductionSourcePins = Object.freeze({ ...productionSourcePins, overlaySha256 });
 const sharedBootstrapSourceCommit = "9".repeat(40);
 const sharedBootstrapImageDigest = `us-west1-docker.pkg.dev/vaeroex-integrations-prod/vaeroex-integrations-images/production-bootstrap@sha256:${"8".repeat(64)}`;
 const callbackEdgeSourceCommit = "b".repeat(40);
 const callbackEdgeImageDigest = `us-west1-docker.pkg.dev/vaeroex-integrations-prod/vaeroex-integrations-images/square-callback-edge@sha256:${"c".repeat(64)}`;
 const oauthCallbackSourceCommit = "e".repeat(40);
 const oauthCallbackImageDigest = `us-west1-docker.pkg.dev/vaeroex-integrations-prod/vaeroex-integrations-images/production-bootstrap@sha256:${"d".repeat(64)}`;
+const syntheticRuntimeAuthorityRpcs = [
+  "square_production_oauth_authority=public.square_production_internal_oauth_v1(text,jsonb)",
+  "square_production_broker_authority=public.square_production_internal_broker_v1(text,jsonb)",
+  "square_production_scheduler_authority=public.check_square_production_scheduler_authority_v1(text,text,text,bigint,text)",
+  "square_production_webhook_authority=public.check_square_production_webhook_authority_v1(text,text,text,bigint,text)",
+  "square_production_runtime_authority=public.square_production_internal_runtime_v1(text,jsonb)",
+  "square_production_evidence_authority=public.square_production_internal_evidence_v1(text,jsonb)"
+];
+const syntheticRuntimeFunctions = [
+  "private.square_production_internal_reject_immutable_mutation_v1()",
+  "private.square_production_internal_guard_lifecycle_update_v1()",
+  "private.square_production_internal_require_keys_v1(jsonb,text[])",
+  "private.square_production_internal_fingerprint_v1(text[])",
+  "private.square_production_internal_audit_v1(uuid,bigint,text,text,text,text,timestamptz)",
+  "private.square_production_internal_require_login_v1(text)",
+  "private.square_production_internal_lock_permit_v1(uuid,text,boolean)",
+  "private.square_production_internal_install_permit_v1(jsonb)",
+  "public.square_production_internal_oauth_v1(text,jsonb)",
+  "public.square_production_internal_broker_v1(text,jsonb)",
+  "public.square_production_internal_runtime_v1(text,jsonb)",
+  "public.square_production_internal_evidence_v1(text,jsonb)"
+];
 
 function mapInternalPilot(pilot, expectedGeneration) {
   pilot.confirmMapping({
@@ -43,18 +67,6 @@ function completeFreshAuthorization(pilot, now = 0) {
   const opaqueState = `AUTHORIZATION_STATE_${++authorizationStateSequence}`;
   pilot.beginAuthorization({ expectedGeneration, opaqueState, now, expiresAt: now + 60_000 });
   return pilot.completeAuthorization({ expectedGeneration, opaqueState, now: now + 1 });
-}
-
-function fullFinalAuthoritySurface(runtimeAuthorityRpcs) {
-  return [...runtimeAuthorityRpcs].sort();
-}
-
-function fullFinalFunctionSurface(runtimeRequiredFunctions) {
-  return [
-    ...contract.productionRuntimeSurface.runtimeContract.catalogPostflight.requiredFunctions
-      .filter((signature) => !contract.productionRuntimeSurface.runtimeContract.requiredFunctions.includes(signature)),
-    ...runtimeRequiredFunctions
-  ].sort();
 }
 
 function reviewedContract() {
@@ -113,6 +125,7 @@ const reviewedSource = {
     oauthCallbackSourceCommit: true
   },
   overlaySourceIncluded: true,
+  runtimeSourceIncluded: false,
   sourceCommit: head,
   sourceOverlaySha256: overlaySha256,
   productionRuntimeBaselineSurface: {
@@ -136,7 +149,7 @@ const reviewedSource = {
   productionNativeProvisioning: {
     sourceExact: false, sourceCommit: null, sourceSha256: null, deploymentIdentityManifestSha256: null
   },
-  productionRuntimeCatalogPostflight: null
+  productionSourcePins: reviewedProductionSourcePins
 };
 
 const currentRuntimeSource = {
@@ -146,26 +159,18 @@ const currentRuntimeSource = {
 
 function internallyConsistentButUnattestedContract() {
   const reviewed = reviewedContract();
-  const authorityRpcs = [...contract.productionRuntimeSurface.runtimeContract.authorityRpcs];
-  const requiredFunctions = [...contract.productionRuntimeSurface.runtimeContract.requiredFunctions];
+  const authorityRpcs = [...syntheticRuntimeAuthorityRpcs];
+  const requiredFunctions = [...syntheticRuntimeFunctions];
   reviewed.productionRuntimeSurface.runtimeContract = {
     status: "reviewed_runtime_migration",
-    sourceCommit: "2".repeat(40),
+    sourceCommit: "5".repeat(40),
     sourcePath: "supabase/migrations/synthetic-runtime.sql",
     migrationCount: 104,
     ledgerHead: "20260902191325",
     ledgerFingerprint: `sha256:${"3".repeat(64)}`,
     migrationSourceSha256: "4".repeat(64),
     authorityRpcs,
-    requiredFunctions,
-    catalogPostflight: {
-      marker: "square_production_internal_pilot_catalog_postflight_passed",
-      ledgerHead: "20260902191325",
-      ledgerFingerprint: `sha256:${"3".repeat(64)}`,
-      migrationSourceSha256: "4".repeat(64),
-      authorityRpcs: fullFinalAuthoritySurface(authorityRpcs),
-      requiredFunctions: fullFinalFunctionSurface(requiredFunctions)
-    }
+    requiredFunctions
   };
   reviewed.productionNativeProvisioning = {
     status: "reviewed_production_native_profiles",
@@ -193,20 +198,22 @@ function internallyConsistentButUnattestedSource() {
       definedFunctions: reviewed.productionRuntimeSurface.runtimeContract.requiredFunctions,
       runtimeAuthorityRpcs: authorityRpcs
     },
+    runtimeSourceIncluded: true,
+    productionSourcePins: {
+      ...reviewedProductionSourcePins,
+      internalRuntimeVersion: reviewed.productionRuntimeSurface.runtimeContract.ledgerHead,
+      internalRuntimeMigrationCount: reviewed.productionRuntimeSurface.runtimeContract.migrationCount,
+      internalRuntimeLedgerFingerprint: reviewed.productionRuntimeSurface.runtimeContract.ledgerFingerprint,
+      internalRuntimeSha256: reviewed.productionRuntimeSurface.runtimeContract.migrationSourceSha256
+    },
     productionNativeProvisioning: {
       sourceExact: true,
       sourceCommit: reviewed.productionNativeProvisioning.sourceCommit,
       sourceSha256: reviewed.productionNativeProvisioning.sourceSha256,
       deploymentIdentityManifestSha256: reviewed.productionNativeProvisioning.deploymentIdentityManifestSha256
-    },
-    productionRuntimeCatalogPostflight: reviewed.productionRuntimeSurface.runtimeContract.catalogPostflight
+    }
   };
 }
-
-// Focused scenarios: initialSync, incrementalSync, pagination, replay, refresh,
-// webhookDeduplication, disconnect, providerRevocation, cancellation, timeout,
-// lostAcknowledgement, generationFencing, atomicPageValidation,
-// canonicalSourceVersion.
 
 test("the checked-in Production baseline is closed and accurately blocked", () => {
   const result = qualifyPilotEvidence(contract, baseline, head);
@@ -268,48 +275,45 @@ test("sanitized receipts and operational booleans are assertions, never hosted q
   assert.equal("sanitizedPreflightPassed" in result, false);
 });
 
-test("runtime source scanning cannot substitute for the exact-ledger catalog postflight", () => {
+test("pilot qualification reuses the merged native production source pins without claiming hosted proof", () => {
   const reviewed = internallyConsistentButUnattestedContract();
   const source = internallyConsistentButUnattestedSource();
-  source.productionRuntimeCatalogPostflight = null;
+  source.productionSourcePins = { ...source.productionSourcePins, internalRuntimeMigrationCount: 103 };
   const result = qualifyPilotEvidence(reviewed, reviewCandidate("internal_manual_sync_complete"), head, source,
     "internal_manual_sync_complete");
-  assert.ok(result.findings.includes("production_runtime_catalog_postflight_not_exact"));
+  assert.ok(result.findings.includes("production_source_pins_not_exact"));
   assert.equal(result.hostedQualificationProven, false);
   assert.equal(result.activationReadiness, false);
 });
 
-test("runtime catalog postflight covers the full final baseline and runtime authority surface", () => {
+test("a reviewed runtime source must be an ancestor of the qualification head", () => {
   const reviewed = internallyConsistentButUnattestedContract();
-  const missingBaselineBinding = internallyConsistentButUnattestedSource();
-  missingBaselineBinding.productionRuntimeCatalogPostflight = {
-    ...missingBaselineBinding.productionRuntimeCatalogPostflight,
-    authorityRpcs: missingBaselineBinding.productionRuntimeCatalogPostflight.authorityRpcs.slice(1)
-  };
-  const missingBindingResult = qualifyPilotEvidence(reviewed, reviewCandidate("internal_manual_sync_complete"), head,
-    missingBaselineBinding, "internal_manual_sync_complete");
-  assert.ok(missingBindingResult.findings.includes("production_runtime_catalog_postflight_not_exact"));
+  const source = internallyConsistentButUnattestedSource();
+  source.runtimeSourceIncluded = false;
+  const evidence = reviewCandidate("internal_manual_sync_complete");
+  evidence.database.ledgerHead = reviewed.productionRuntimeSurface.runtimeContract.ledgerHead;
+  const result = qualifyPilotEvidence(reviewed, evidence, head, source, "internal_manual_sync_complete");
+  assert.ok(result.findings.includes("reviewed_runtime_source_not_in_qualification_head"));
+  assert.equal(result.hostedQualificationProven, false);
 
-  const missingBaselineFunction = internallyConsistentButUnattestedSource();
-  missingBaselineFunction.productionRuntimeCatalogPostflight = {
-    ...missingBaselineFunction.productionRuntimeCatalogPostflight,
-    requiredFunctions: missingBaselineFunction.productionRuntimeCatalogPostflight.requiredFunctions.slice(1)
-  };
-  const missingFunctionResult = qualifyPilotEvidence(reviewed, reviewCandidate("internal_manual_sync_complete"), head,
-    missingBaselineFunction, "internal_manual_sync_complete");
-  assert.ok(missingFunctionResult.findings.includes("production_runtime_catalog_postflight_not_exact"));
+  const missingPins = internallyConsistentButUnattestedSource();
+  delete missingPins.productionSourcePins;
+  const missingPinsResult = qualifyPilotEvidence(reviewed, evidence, head, missingPins,
+    "internal_manual_sync_complete");
+  assert.ok(missingPinsResult.findings.includes("production_source_pins_not_exact"));
+  assert.equal(missingPinsResult.hostedQualificationProven, false);
 });
 
-test("role postflight is phase-specific and never treats staged authority as active", () => {
+test("every supported phase records only the all-profiles-fenced checkpoint", () => {
   const staged = reviewCandidate("precredential_nonsecret");
-  assert.equal(staged.database.rolePostflight, "square_production_internal_roles_closed_postflight_passed");
+  assert.equal(staged.database.rolePostflight, "square_production_native_all_profiles_fenced_assertion");
   const wrong = qualifyPilotEvidence(reviewedContract(), {
     ...staged,
     database: { ...staged.database, rolePostflight: "square_production_internal_roles_active_postflight_failed" }
   }, head, reviewedSource, "precredential_nonsecret");
   assert.ok(wrong.findings.includes("database_role_postflight_missing_or_wrong_phase"));
   const active = reviewCandidate("internal_consent_ready");
-  assert.equal(active.database.rolePostflight, "square_production_internal_roles_closed_postflight_passed");
+  assert.equal(active.database.rolePostflight, "square_production_native_all_profiles_fenced_assertion");
 });
 
 test("internal consent readiness requires exact release and only its phase credential metadata", () => {
@@ -348,13 +352,18 @@ test("phase gates separate readiness, completed manual sync, later lifecycle, an
     reviewedSource, "precredential_nonsecret");
   assert.equal(precredential.activationReadiness, false,
     "credential entry stays blocked until every nonsecret runtime prerequisite exists");
-  assert.ok(precredential.findings.includes("production_runtime_catalog_postflight_not_exact"));
+  assert.ok(precredential.findings.includes("production_runtime_authority_contract_not_reviewed"));
+  assert.ok(precredential.findings.includes("production_runtime_internal_pilot_permit_missing"));
+  assert.equal(precredential.findings.includes("database_ledger_not_exact_phase"), false);
+  assert.equal(precredential.findings.includes("production_runtime_source_integrity_not_exact"), false);
+  assert.equal(precredential.findings.includes("production_source_pins_not_exact"), false);
 
   const blockedRuntime = qualifyPilotEvidence(reviewed, reviewCandidate(), head, currentRuntimeSource,
     "internal_consent_ready");
   assert.equal(blockedRuntime.activationReadiness, false);
   assert.ok(blockedRuntime.findings.includes("production_runtime_baseline_surface_not_exact"));
-  assert.ok(blockedRuntime.findings.includes("production_runtime_catalog_postflight_not_exact"));
+  assert.ok(blockedRuntime.findings.includes("production_runtime_authority_contract_not_reviewed"));
+  assert.equal(blockedRuntime.findings.includes("production_runtime_source_integrity_not_exact"), false);
 
   const changedPrefix = {
     ...reviewedSource,
@@ -383,6 +392,7 @@ test("phase gates separate readiness, completed manual sync, later lifecycle, an
   const lifecycle = qualifyPilotEvidence(reviewed, reviewCandidate("post_initial_lifecycle"), head,
     reviewedSource, "post_initial_lifecycle");
   assert.equal(lifecycle.activationReadiness, false);
+  assert.ok(lifecycle.findings.includes("post_initial_lifecycle_runtime_not_implemented"));
   assert.ok(lifecycle.findings.includes("production_native_provisioning_profile_not_reviewed"));
   assert.deepEqual(reviewCandidate("post_initial_lifecycle").credentialVersionsPresent.webhookSignature,
     { version: 1, state: "ENABLED", totalCount: 1 });
@@ -501,7 +511,7 @@ test("sanitized qualification rejects legacy allowlists and mapping claims", () 
   assert.throws(() => qualifyPilotEvidence(reviewedContract(), booleanClaim, head, reviewedSource), /closed contract/);
 });
 
-test("initial pagination, cancellation, timeout, replay and lost acknowledgement remain atomic", () => {
+test("initialSync pagination cancellation timeout replay and lostAcknowledgement remain atomic", () => {
   const pilot = createSyntheticPilot();
   const generation = completeFreshAuthorization(pilot);
   mapInternalPilot(pilot, generation);
@@ -520,22 +530,32 @@ test("initial pagination, cancellation, timeout, replay and lost acknowledgement
   assert.throws(() => pilot.commitPage({ ...finalRequest, observations: [observation("PAYMENT_CHANGED", "1")] }), /replay payload changed/);
   assert.match(pilot.finishScan(generation), /^1:initial:1$/);
 
-  const cancelled = createSyntheticPilot();
-  const cancelledGeneration = completeFreshAuthorization(cancelled);
-  mapInternalPilot(cancelled, cancelledGeneration);
-  cancelled.startScan("initial", cancelledGeneration);
-  const beforeInterrupted = { versions: cancelled.state.versions.size, receipts: cancelled.state.receipts.size };
-  assert.equal(cancelled.commitPage({ expectedGeneration: cancelledGeneration, receiptId: "INITIAL_CANCELLED", cursor: null,
-    nextCursor: null, observations: [observation("PAYMENT_2", "1")], cancelled: true }).outcome, "cancelled");
-  assert.deepEqual({ versions: cancelled.state.versions.size, receipts: cancelled.state.receipts.size }, beforeInterrupted);
+  for (const interruption of ["cancelled", "timedOut"]) {
+    const interrupted = createSyntheticPilot();
+    const interruptedGeneration = completeFreshAuthorization(interrupted);
+    mapInternalPilot(interrupted, interruptedGeneration);
+    interrupted.startScan("initial", interruptedGeneration);
+    const beforeInterrupted = {
+      versions: interrupted.state.versions.size,
+      receipts: interrupted.state.receipts.size,
+      checkpoint: interrupted.state.checkpoint
+    };
+    const request = { expectedGeneration: interruptedGeneration, receiptId: `INITIAL_${interruption.toUpperCase()}`,
+      cursor: null, nextCursor: null, observations: [observation("PAYMENT_2", "1")], [interruption]: true };
+    assert.equal(interrupted.commitPage(request).outcome, interruption === "cancelled" ? "cancelled" : "timeout");
+    assert.throws(() => interrupted.commitPage({ ...request, [interruption]: false }),
+      /incomplete scan requires explicit recovery/);
+    assert.deepEqual({ versions: interrupted.state.versions.size, receipts: interrupted.state.receipts.size,
+      checkpoint: interrupted.state.checkpoint }, beforeInterrupted);
+  }
 });
 
-test("incremental sync, refresh and webhook dedup preserve the active generation", () => {
+test("incrementalSync refresh and webhookDeduplication preserve the active generation", () => {
   const pilot = createSyntheticPilot();
   const generation = completeFreshAuthorization(pilot);
   mapInternalPilot(pilot, generation);
   pilot.startScan("initial", generation);
-  pilot.commitPage({ expectedGeneration: generation, receiptId: "BASELINE", cursor: null, nextCursor: null, observations: [observation("ORDER_1", "1")] });
+  pilot.commitPage({ expectedGeneration: generation, receiptId: "BASELINE", cursor: null, nextCursor: null, observations: [observation("PAYMENT_1", "1")] });
   pilot.finishScan(generation);
 
   assert.equal(pilot.refresh({ expectedGeneration: generation, outcome: "success" }), true);
@@ -543,14 +563,14 @@ test("incremental sync, refresh and webhook dedup preserve the active generation
   pilot.startScan("incremental", generation);
   assert.equal(pilot.commitPage({
     expectedGeneration: generation, receiptId: "INCREMENTAL_1", cursor: null, nextCursor: null,
-    observations: [observation("ORDER_1", "1"), observation("ORDER_2", "1")]
+    observations: [observation("PAYMENT_1", "1"), observation("PAYMENT_2", "1")]
   }).inserted, 1, "overlap replay does not duplicate an immutable source version");
   pilot.finishScan(generation);
   assert.equal(pilot.receiveWebhook({ expectedGeneration: generation, eventId: "WEBHOOK_1" }), "accepted");
   assert.equal(pilot.receiveWebhook({ expectedGeneration: generation, eventId: "WEBHOOK_1" }), "duplicate");
 });
 
-test("refresh failure, disconnect and provider revocation fence later work", () => {
+test("refresh failure, disconnect and providerRevocation fence later work", () => {
   for (const close of ["refresh", "disconnect", "revoke"]) {
     const pilot = createSyntheticPilot();
     const generation = completeFreshAuthorization(pilot);
@@ -682,8 +702,26 @@ test("atomicPageValidation rejects a malformed later observation without source,
     observations: [observation("PAYMENT_1", "1"), { resourceFamily: "payments", operation: "payments/list_payments", authorityScope: "internal", providerId: "PAYMENT_2" }] }), /source version must be bounded/);
   assert.equal(pilot.state.versions.size, 0);
   assert.equal(pilot.state.receipts.size, 0);
-  assert.deepEqual(pilot.state.scan, { kind: "initial", source: "payments/list_payments", deadlineAt: 86_400_000,
+  assert.deepEqual(pilot.state.scan, { kind: "initial", source: "payments/list_payments", resourceFamily: "payments", deadlineAt: 86_400_000,
     attempt: 1, expectedCursor: null, pages: 0, complete: false, incomplete: false });
+});
+
+test("a scan admits only observations from its exact resource family and operation", () => {
+  const pilot = createSyntheticPilot();
+  const generation = completeFreshAuthorization(pilot);
+  mapInternalPilot(pilot, generation);
+  pilot.startScan("initial", generation);
+  assert.throws(() => pilot.commitPage({ expectedGeneration: generation, receiptId: "WRONG_FAMILY", cursor: null,
+    nextCursor: null, observations: [observation("ORDER_1", "1", {
+      resourceFamily: "orders", operation: "orders/list_orders"
+    })] }), /observation resource family does not match scan source/);
+  assert.throws(() => pilot.commitPage({ expectedGeneration: generation, receiptId: "WRONG_OPERATION", cursor: null,
+    nextCursor: null, observations: [observation("PAYMENT_1", "1", {
+      operation: "payments/get_payment"
+    })] }), /observation operation does not match scan source/);
+  assert.equal(pilot.state.versions.size, 0);
+  assert.equal(pilot.state.receipts.size, 0);
+  assert.equal(pilot.state.checkpoint, null);
 });
 
 test("canonicalSourceVersion deduplicates reordered payload keys and rejects immutable conflicts", () => {
@@ -708,9 +746,11 @@ test("evidence authority returns only sanitized mapped-generation counts", () =>
   mapInternalPilot(pilot, generation);
   pilot.startScan("initial", generation);
   pilot.commitPage({ expectedGeneration: generation, receiptId: "EVIDENCE_PAGE", cursor: null, nextCursor: null,
-    observations: [observation("PAYMENT_1", "1"), observation("ORDER_1", "1", {
-      resourceFamily: "orders", operation: "orders/list_orders"
-    })] });
+    observations: [observation("PAYMENT_1", "1")] });
+  pilot.finishScan(generation);
+  pilot.startScan("incremental", generation, { source: "orders/list_orders" });
+  pilot.commitPage({ expectedGeneration: generation, receiptId: "EVIDENCE_ORDER_PAGE", cursor: null, nextCursor: null,
+    observations: [observation("ORDER_1", "1", { resourceFamily: "orders", operation: "orders/list_orders" })] });
   pilot.finishScan(generation);
   const evidence = pilot.readEvidence({ expectedGeneration: generation,
     actorWorkspaceId: pilot.state.workspaceId, actorBusinessEntityId: pilot.state.businessEntityId,
@@ -720,7 +760,7 @@ test("evidence authority returns only sanitized mapped-generation counts", () =>
     status: "verified_non_economic_observations",
     observationCount: 2,
     observationsByFamily: { payments: 1, orders: 1 },
-    checkpoint: "1:initial:1",
+    checkpoint: "1:incremental:1",
     incomplete: false,
     history: "partial"
   });
@@ -729,4 +769,54 @@ test("evidence authority returns only sanitized mapped-generation counts", () =>
     actorBusinessEntityId: pilot.state.businessEntityId, actorMerchantId: pilot.state.merchantId
   }), /evidence authority denied/);
   assert.doesNotMatch(JSON.stringify(evidence), /PAYMENT_1|ORDER_1|workspaceId|merchantId|cursor/);
+});
+
+test("evidence marks an active partial scan incomplete and retains only the last complete checkpoint", () => {
+  const pilot = createSyntheticPilot();
+  const generation = completeFreshAuthorization(pilot);
+  mapInternalPilot(pilot, generation);
+  pilot.startScan("initial", generation);
+  pilot.commitPage({ expectedGeneration: generation, receiptId: "COMPLETE_BASELINE", cursor: null,
+    nextCursor: null, observations: [observation("PAYMENT_1", "1")] });
+  const lastCompleteCheckpoint = pilot.finishScan(generation);
+
+  pilot.startScan("incremental", generation, { source: "orders/list_orders" });
+  pilot.commitPage({ expectedGeneration: generation, receiptId: "PARTIAL_INCREMENTAL", cursor: null,
+    nextCursor: "NEXT_PAGE", observations: [observation("ORDER_1", "1", {
+      resourceFamily: "orders", operation: "orders/list_orders"
+    })] });
+  const evidence = pilot.readEvidence({ expectedGeneration: generation,
+    actorWorkspaceId: pilot.state.workspaceId, actorBusinessEntityId: pilot.state.businessEntityId,
+    actorMerchantId: pilot.state.merchantId });
+  assert.equal(evidence.incomplete, true);
+  assert.equal(evidence.checkpoint, lastCompleteCheckpoint);
+  assert.equal(evidence.observationCount, 2);
+  assert.deepEqual(evidence.observationsByFamily, { payments: 1, orders: 1 });
+
+  const beforeWrongCursor = {
+    versions: pilot.state.versions.size,
+    receipts: pilot.state.receipts.size,
+    checkpoint: pilot.state.checkpoint,
+    expectedCursor: pilot.state.scan.expectedCursor
+  };
+  assert.throws(() => pilot.commitPage({ expectedGeneration: generation, receiptId: "OUT_OF_ORDER_INCREMENTAL",
+    cursor: "WRONG_PAGE", nextCursor: null, observations: [observation("ORDER_2", "1", {
+      resourceFamily: "orders", operation: "orders/list_orders"
+    })] }), /cursor does not match durable scan state/);
+  assert.deepEqual({ versions: pilot.state.versions.size, receipts: pilot.state.receipts.size,
+    checkpoint: pilot.state.checkpoint, expectedCursor: pilot.state.scan.expectedCursor }, beforeWrongCursor);
+
+  const finalPage = { expectedGeneration: generation, receiptId: "FINAL_INCREMENTAL", cursor: "NEXT_PAGE",
+    nextCursor: null, observations: [observation("ORDER_2", "1", {
+      resourceFamily: "orders", operation: "orders/list_orders"
+    })] };
+  assert.deepEqual(pilot.commitPage(finalPage), { outcome: "committed", committed: true, inserted: 1 });
+  assert.equal(pilot.commitPage(finalPage).outcome, "replay");
+  assert.equal(pilot.finishScan(generation), "1:incremental:2");
+  const completeEvidence = pilot.readEvidence({ expectedGeneration: generation,
+    actorWorkspaceId: pilot.state.workspaceId, actorBusinessEntityId: pilot.state.businessEntityId,
+    actorMerchantId: pilot.state.merchantId });
+  assert.equal(completeEvidence.incomplete, false);
+  assert.equal(completeEvidence.checkpoint, "1:incremental:2");
+  assert.equal(completeEvidence.observationCount, 3);
 });
