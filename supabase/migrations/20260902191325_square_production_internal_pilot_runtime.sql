@@ -2370,14 +2370,16 @@ begin
         and relation.relname like 'square\_production\_internal\_%' escape '\'
         and not trigger_record.tgisinternal),'[]'::jsonb),
     'internalTriggers',coalesce((select pg_catalog.jsonb_agg(pg_catalog.jsonb_build_array(
-      relation.relname,constraint_record.conname,referenced_namespace.nspname,
-      referenced_relation.relname,trigger_function_namespace.nspname,
+      namespace.nspname,relation.relname,declared_namespace.nspname,declared_relation.relname,
+      constraint_record.conname,referenced_namespace.nspname,referenced_relation.relname,
+      trigger_function_namespace.nspname,
       trigger_function.proname,pg_catalog.pg_get_function_identity_arguments(trigger_function.oid),
       trigger_record.tgtype::integer,trigger_record.tgattr::text,
       pg_catalog.encode(trigger_record.tgargs,'hex'),
       pg_catalog.pg_get_expr(trigger_record.tgqual,trigger_record.tgrelid,true),
       trigger_record.tgenabled::text
-    ) order by relation.relname,constraint_record.conname,trigger_function_namespace.nspname,
+    ) order by namespace.nspname,relation.relname,declared_relation.relname,
+      constraint_record.conname,trigger_function_namespace.nspname,
       trigger_function.proname,trigger_record.tgtype,trigger_record.tgattr::text)
       from pg_catalog.pg_trigger trigger_record
       join pg_catalog.pg_class relation on relation.oid=trigger_record.tgrelid
@@ -2385,13 +2387,19 @@ begin
       join pg_catalog.pg_proc trigger_function on trigger_function.oid=trigger_record.tgfoid
       join pg_catalog.pg_namespace trigger_function_namespace on trigger_function_namespace.oid=trigger_function.pronamespace
       left join pg_catalog.pg_constraint constraint_record on constraint_record.oid=trigger_record.tgconstraint
+      left join pg_catalog.pg_class declared_relation on declared_relation.oid=constraint_record.conrelid
+      left join pg_catalog.pg_namespace declared_namespace on declared_namespace.oid=declared_relation.relnamespace
       left join pg_catalog.pg_class referenced_relation on referenced_relation.oid=constraint_record.confrelid
       left join pg_catalog.pg_namespace referenced_namespace on referenced_namespace.oid=referenced_relation.relnamespace
-      where namespace.nspname='private' and relation.relkind='r'
-        and relation.relname like 'square\_production\_internal\_%' escape '\'
-        and trigger_record.tgisinternal),'[]'::jsonb)
+      where trigger_record.tgisinternal and (
+        (namespace.nspname='private' and relation.relkind='r'
+          and relation.relname like 'square\_production\_internal\_%' escape '\')
+        or (declared_namespace.nspname='private' and declared_relation.relkind='r'
+          and declared_relation.relname like 'square\_production\_internal\_%' escape '\'
+          and constraint_record.contype='f')
+      )),'[]'::jsonb)
   ))::text,'UTF8'),'sha256'),'hex') into strict schema_digest;
-  if schema_digest is distinct from '4258cd7206afd93115f8fdc8a7bf1244b684229c82f71d6e448bb19449e547bb' then
+  if schema_digest is distinct from '9f8f5bc1b89d2093e58ca6fda32806266b9da2115cd454e84b8ab761cdd19fd6' then
     raise exception 'square_production_internal_relation_contract_invalid' using errcode='55000';
   end if;
 end

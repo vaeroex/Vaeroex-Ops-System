@@ -77,7 +77,7 @@ const retainedDigest = [...legacyGuard.matchAll(relationDigest)].at(-1)?.[0];
 assert.ok(installedDigest && retainedDigest, "installation and later guard both hash the full relation catalog");
 assert.equal(installedDigest.replace(/\s+/g, " "), retainedDigest.replace(/\s+/g, " "),
   "the later guard recomputes the exact installation-time relation contract");
-const sourcePinnedDigest = "4258cd7206afd93115f8fdc8a7bf1244b684229c82f71d6e448bb19449e547bb";
+const sourcePinnedDigest = "9f8f5bc1b89d2093e58ca6fda32806266b9da2115cd454e84b8ab761cdd19fd6";
 assert.match(migration, new RegExp(`schema_digest is distinct from '${sourcePinnedDigest}'`));
 assert.match(legacyGuard, new RegExp(`schema_digest is distinct from '${sourcePinnedDigest}'`));
 assert.doesNotMatch(legacyGuard, /obj_description\('private\.square_production_internal_permits'/);
@@ -94,6 +94,8 @@ assert.match(qualificationRunner, /verifyInternalRelationGuard[\s\S]*no force ro
 assert.match(qualificationRunner, /forged mutable comment cannot replace the source-pinned relation contract/);
 assert.match(qualificationRunner, /protected text-column collation/);
 assert.match(qualificationRunner, /internal foreign-key trigger state/);
+assert.match(qualificationRunner, /workspace-entity parent-side internal foreign-key trigger state/);
+assert.match(legacyGuard, /declared_relation\.relname like 'square\\_production\\_internal\\_%'/);
 
 const publicFunctions = [...migration.matchAll(
   /create function public\.(square_production_internal_[a-z]+_v1)\(p_operation text,p_payload jsonb\)/g

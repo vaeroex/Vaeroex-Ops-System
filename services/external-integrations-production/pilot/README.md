@@ -166,7 +166,7 @@ closed, and pass hosted readbacks before credential entry or consent can begin.
 The adjacent Production-only runtime migration is
 `20260902191325_square_production_internal_pilot_runtime.sql`. Its dedicated
 source contract pins SHA-256
-`3b283fd9662cecbdfa9e5f2a7a4f0ba0d82833f447f1b7c4018fc5277caf38b5`, but
+`1da1eaf92a2879ac4309978a242d4a6e357c91615b1da2935f3e1a95b616d716`, but
 delivery in Git does not authorize or prove remote application. The reviewed
 overlay itself stays byte-identical. The dependency adds only durable state-create,
 one-use consume/receipt,

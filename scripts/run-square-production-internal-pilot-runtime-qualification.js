@@ -349,6 +349,19 @@ async function verifyInternalRelationGuard(client) {
       `${name} internal foreign-key trigger state`);
   }
   assert.ok(internalTriggerCount>0, "the protected relations include internal foreign-key triggers");
+  const parentTrigger = (await client.query(`
+    select trigger_record.tgname
+    from pg_catalog.pg_trigger trigger_record
+    join pg_catalog.pg_constraint constraint_record on constraint_record.oid=trigger_record.tgconstraint
+    where trigger_record.tgisinternal and constraint_record.contype='f'
+      and constraint_record.conrelid='private.square_production_internal_permits'::regclass
+      and trigger_record.tgrelid='public.business_entities'::regclass
+    order by trigger_record.tgname limit 1
+  `)).rows[0]?.tgname;
+  assert.match(parentTrigger, /^[A-Za-z0-9_]+$/,
+    "workspace-entity foreign key has a parent-side referential-integrity trigger");
+  await rejected(`alter table public.business_entities disable trigger "${parentTrigger}"`,
+    "workspace-entity parent-side internal foreign-key trigger state");
 }
 
 async function catalogSnapshot(client) {

@@ -26,7 +26,7 @@ ledger fingerprints are immutable test inputs. A B source tree with no
 Optional future support is fail-closed. If a combined source tree later contains
 version `20260902191325`, it must contain exactly the single reviewed
 `20260902191325_square_production_internal_pilot_runtime.sql` file with SHA-256
-`3b283fd9662cecbdfa9e5f2a7a4f0ba0d82833f447f1b7c4018fc5277caf38b5`.
+`1da1eaf92a2879ac4309978a242d4a6e357c91615b1da2935f3e1a95b616d716`.
 Only then does the offline builder compile that source identity into the broker,
 which may accept either the exact 103-row overlay ledger or exact 104-row runtime
 ledger. A baseline-source binary always rejects ledger 104.
