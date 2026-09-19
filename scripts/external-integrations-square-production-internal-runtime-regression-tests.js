@@ -14,6 +14,9 @@ const overlayPath = path.join(
 );
 const migration = fs.readFileSync(migrationPath, "utf8");
 const overlay = fs.readFileSync(overlayPath, "utf8");
+const legacyGuard = fs.readFileSync(path.join(root,
+  "supabase/migrations/20260915040500_integration_production_legacy_foundation_guard.sql"
+), "utf8");
 const qualificationRunner = fs.readFileSync(path.join(
   root, "scripts/run-square-production-internal-pilot-runtime-qualification.js"
 ), "utf8");
@@ -68,6 +71,22 @@ assert.match(migration, /relation\.relforcerowsecurity/);
 assert.match(migration, /pg_catalog\.pg_policy/);
 assert.match(migration, /pg_catalog\.pg_inherits/);
 assert.match(migration, /pg_catalog\.pg_publication_rel/);
+const relationDigest = /select pg_catalog\.encode\(extensions\.digest\(pg_catalog\.convert_to\(\(pg_catalog\.jsonb_build_object\([\s\S]*?\)\)::text,'UTF8'\),'sha256'\),'hex'\) into strict schema_digest;/g;
+const installedDigest = [...migration.matchAll(relationDigest)].at(-1)?.[0];
+const retainedDigest = [...legacyGuard.matchAll(relationDigest)].at(-1)?.[0];
+assert.ok(installedDigest && retainedDigest, "installation and later guard both hash the full relation catalog");
+assert.equal(installedDigest.replace(/\s+/g, " "), retainedDigest.replace(/\s+/g, " "),
+  "the later guard recomputes the exact installation-time relation contract");
+for (const protection of [
+  "relowner=marker_owner", "relrowsecurity", "relforcerowsecurity", "pg_catalog.pg_policy",
+  "pg_catalog.pg_inherits", "pg_catalog.pg_rewrite", "aclexplode(relation.relacl)", "aclexplode(attribute.attacl)",
+  "pg_catalog.pg_publication_rel", "pg_catalog.pg_get_constraintdef",
+  "pg_catalog.pg_get_indexdef", "pg_catalog.pg_get_triggerdef", "trigger_record.tgenabled"
+]) assert.ok(legacyGuard.includes(protection), `retained relations reject ${protection} drift`);
+assert.match(migration, /comment on table private\.square_production_internal_permits is %L/);
+assert.match(legacyGuard, /obj_description\('private\.square_production_internal_permits'::regclass,'pg_class'\)[\s\S]*square-production-internal-relations-v1:/);
+assert.match(qualificationRunner, /verifyInternalRelationGuard[\s\S]*no force row level security[\s\S]*grant select[\s\S]*create policy[\s\S]*disable trigger[\s\S]*drop constraint/,
+  "disposable PostgreSQL exercises every protected relation against the guard");
 
 const publicFunctions = [...migration.matchAll(
   /create function public\.(square_production_internal_[a-z]+_v1)\(p_operation text,p_payload jsonb\)/g
@@ -250,6 +269,19 @@ assert.match(migration, /operation text not null default 'list_payments' check\(
 assert.match(migration, /payment_window_end-payment_window_start<=interval '24 hours'/);
 assert.match(migration, /pg_catalog\.jsonb_array_length\(p_payload->'observations'\)>100/);
 assert.match(migration, /'continuationAllowed',false/);
+const acquireBranch = migration.slice(migration.indexOf("elsif p_operation='acquire_page' then"),
+  migration.indexOf("elsif p_operation='commit_page' then"));
+for (const field of ["workspaceId", "businessEntityId", "actorId", "sessionId",
+  "permitId", "generation", "scanRequestFingerprint", "requestFingerprint", "leaseId"]) {
+  assert.ok(acquireBranch.includes(field), `page acquisition binds ${field}`);
+}
+assert.ok(acquireBranch.indexOf("square_production_internal_page_acquire_denied")
+  < acquireBranch.indexOf("if scan_row.status='committed'"),
+"tenant/request authority is checked before committed replay returns data");
+assert.match(acquireBranch, /request_hash is distinct from scan_row\.acquire_request_fingerprint/);
+assert.match(acquireBranch, /request_hash=scan_row\.acquire_request_fingerprint/);
+assert.match(qualificationRunner, /leased replay rejects a changed request or tenant authority binding/);
+assert.match(qualificationRunner, /committed replay cannot reveal another workspace scan or permit/);
 assert.match(migration, /p_payload->>'continuation'\)::boolean/);
 assert.doesNotMatch(migration, /\b(?:amount|currency|card|customer|email|phone)\b/i,
   "minimized payment evidence stores no economic, card, or customer attributes");

@@ -581,7 +581,7 @@ static bool production_internal_runtime_source_pinned(void) {
    * builder also verifies the migration bytes before defining the macro, so a
    * final-ledger database cannot be accepted by a baseline-source binary. */
   return !strcmp(VAEROEX_PRODUCTION_INTERNAL_RUNTIME_SOURCE_SHA256,
-    "f7e6f8f72357dafc1a5b6ad0566c2aa90293175420b84b593b98065370e45928");
+    "5776669c1d75997f34c0ac19ef58a9ad43749b7c8eec25d8f7f63fa807064927");
 #else
   return false;
 #endif
@@ -957,7 +957,7 @@ static bool production_internal_runtime_schema_valid(void) {
       "'private.square_production_internal_source_versions'::regclass,"
       "'private.square_production_internal_fences'::regclass,"
       "'private.square_production_internal_audit_events'::regclass]))"
-    "))::text,'UTF8'),'sha256'),'hex')='fbdfdcd9489ff7cfbb618b8f437b79cd398ed41f6fb901cb6843b8b919bb6060'",0,NULL);
+    "))::text,'UTF8'),'sha256'),'hex')='3b1cfe4165a510c73e9192c94937695204899f2bd58b69d5d5d034bb6d4a8d92'",0,NULL);
 }
 
 static bool production_internal_runtime_triggers_valid(void) {
@@ -1014,7 +1014,7 @@ static bool production_internal_runtime_functions_valid(void) {
   if (!managed_profile()) return true;
   return true_query("WITH expected(signature,language,volatility,security_definer,is_strict,parallel,result,names,default_count,default_expression,source_hash) AS (VALUES "
       "('private.square_production_internal_reject_immutable_mutation_v1()','plpgsql','v',true,false,'u','trigger',null::text[],0,null::text,'879e64a04de08a3fb906ce6f0a5675627ecace40386769247cf0a44c817dd82e'),"
-      "('private.square_production_internal_guard_lifecycle_update_v1()','plpgsql','v',true,false,'u','trigger',null::text[],0,null::text,'76ba2c0506b61ebbbe3e124700678021199ed89c6088dddc540050defb7053d0'),"
+      "('private.square_production_internal_guard_lifecycle_update_v1()','plpgsql','v',true,false,'u','trigger',null::text[],0,null::text,'61cbb7ce05f9bf6c574f44f7642c6bb239815b639fc1fc00fe65fa753f1cd818'),"
       "('private.square_production_internal_require_keys_v1(jsonb,text[])','plpgsql','i',false,true,'s','void',array['p_payload','p_required_keys']::text[],0,null::text,'ec3eb20a72acab3d1c18c6d5eb9b2fb1eb4d8c6743af2c4f2e4c80bba0d91d61'),"
       "('private.square_production_internal_fingerprint_v1(text[])','sql','i',false,true,'s','text',array['p_parts']::text[],0,null::text,'3f77909a44ff2bbc574f8b3228482aac0e9c55a1dd3356001384efe21db560b4'),"
       "('private.square_production_internal_audit_v1(uuid,bigint,text,text,text,text,timestamptz)','plpgsql','v',true,false,'u','text',array['p_permit_id','p_generation','p_event_kind','p_outcome','p_reason_code','p_subject_fingerprint','p_recorded_at']::text[],0,null::text,'4d548e25a8988edc1fdfa8b719bf5d7195e32d9f44bde5b584f8484fc30539cb'),"
@@ -1023,7 +1023,7 @@ static bool production_internal_runtime_functions_valid(void) {
       "('private.square_production_internal_install_permit_v1(jsonb)','plpgsql','v',true,false,'u','jsonb',array['p_payload']::text[],0,null::text,'efa4aa61687f5580ceb24897fb1ad6a83527c765a37804bcc03cbbfa375b1905'),"
       "('public.square_production_internal_oauth_v1(text,jsonb)','plpgsql','v',true,false,'u','jsonb',array['p_operation','p_payload']::text[],0,null::text,'6ff215c19aa5c66b607c307d26bcf8f53cc8b3308bd929a50a5f97c5e049d860'),"
       "('public.square_production_internal_broker_v1(text,jsonb)','plpgsql','v',true,false,'u','jsonb',array['p_operation','p_payload']::text[],0,null::text,'41f97c64568a973faa25cfdf99bca8301cbb2103ff8d95491d010e90d3e0d6bb'),"
-      "('public.square_production_internal_runtime_v1(text,jsonb)','plpgsql','v',true,false,'u','jsonb',array['p_operation','p_payload']::text[],0,null::text,'ceddeb0f3f55ad1210d4434ab249313473e7e30365197767ab48606fd08dc210'),"
+      "('public.square_production_internal_runtime_v1(text,jsonb)','plpgsql','v',true,false,'u','jsonb',array['p_operation','p_payload']::text[],0,null::text,'63024be692c785827b982945c220b0268d8e57ee2db4f3d46a8033a5f5fe3301'),"
       "('public.square_production_internal_evidence_v1(text,jsonb)','plpgsql','v',true,false,'u','jsonb',array['p_operation','p_payload']::text[],0,null::text,'98e2d0363897ad1020fb4296dd643ccd4798cac10030b8a4883379844d954877')"
     "), resolved AS (SELECT e.*,to_regprocedure(e.signature) oid FROM expected e) "
     "SELECT (SELECT count(*)=12 FROM resolved WHERE oid IS NOT NULL) "
@@ -1277,7 +1277,7 @@ static bool production_authority_valid(const char *target) {
         AUTHORITY_SOURCE_FOR("square_production_webhook_authority","webhook"),"square_production_webhook",false) &&
       production_named_authority_valid("square_production_runtime_authority",
         "public.square_production_internal_runtime_v1(text,jsonb)",
-        "ceddeb0f3f55ad1210d4434ab249313473e7e30365197767ab48606fd08dc210","square_production_runtime",true) &&
+        "63024be692c785827b982945c220b0268d8e57ee2db4f3d46a8033a5f5fe3301","square_production_runtime",true) &&
       production_named_authority_valid("square_production_evidence_authority",
         "public.square_production_internal_evidence_v1(text,jsonb)",
         "98e2d0363897ad1020fb4296dd643ccd4798cac10030b8a4883379844d954877","square_production_evidence",true);

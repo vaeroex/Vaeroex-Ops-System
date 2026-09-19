@@ -203,7 +203,7 @@ assert.equal(productionSourcePins.internalRuntimeMigrationCount, 104);
 assert.equal(productionSourcePins.internalRuntimeLedgerFingerprint,
   "sha256:7dc51d888ee9c4a6bb595b1a4431ab5fcdb649e34c871ba91a6512d5fa2dc89f");
 assert.equal(productionSourcePins.internalRuntimeSha256,
-  "f7e6f8f72357dafc1a5b6ad0566c2aa90293175420b84b593b98065370e45928");
+  "5776669c1d75997f34c0ac19ef58a9ad43749b7c8eec25d8f7f63fa807064927");
 assert.match(ciWorkflow,
   /VAEROEX_NATIVE_TEST_DEPENDENCIES="\$native_manifest" node tools\/native-broker-provisioning\/tests\/production-native-qualify\.cjs/);
 assert.match(ciWorkflow,

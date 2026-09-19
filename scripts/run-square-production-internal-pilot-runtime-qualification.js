@@ -263,6 +263,66 @@ async function runPgTapNative(client) {
   assert.deepEqual(failures, [], `pgTAP failures: ${failures.join(" | ")}`);
 }
 
+async function verifyInternalRelationGuard(client) {
+  await client.query(fs.readFileSync(path.join(root,
+    "supabase/migrations/20260912190000_square_production_runtime_foundation.sql"
+  ), "utf8"));
+  const guard = fs.readFileSync(path.join(root,
+    "supabase/migrations/20260915040500_integration_production_legacy_foundation_guard.sql"
+  ), "utf8").match(/do \$legacy_overlay_guard\$[\s\S]*?\$legacy_overlay_guard\$;/)?.[0];
+  assert.ok(guard, "reviewed forward guard is available for disposable catalog qualification");
+  await client.query(guard);
+  const relations = [
+    "square_production_internal_permits", "square_production_internal_oauth_states",
+    "square_production_internal_credentials", "square_production_internal_scans",
+    "square_production_internal_page_receipts", "square_production_internal_source_versions",
+    "square_production_internal_fences", "square_production_internal_audit_events"
+  ];
+  async function rejected(mutation, label) {
+    await client.query("begin");
+    try {
+      await client.query(mutation);
+      await assert.rejects(client.query(guard), error => error.code === "55000"
+        && /integration_production_internal_relation_(?:contract_)?drift/.test(error.message),
+      `${label} must fail closed`);
+    } finally {
+      await client.query("rollback");
+    }
+    await client.query(guard);
+  }
+  for (const name of relations) {
+    const table = `private.${name}`;
+    const manifest = (await client.query(`
+      select
+        (select tgname from pg_catalog.pg_trigger where tgrelid=$1::regclass
+          and not tgisinternal order by tgname limit 1) trigger_name,
+        (select conname from pg_catalog.pg_constraint where conrelid=$1::regclass
+          and contype='c' order by conname limit 1) check_name,
+        (select attname from pg_catalog.pg_attribute where attrelid=$1::regclass
+          and attnum>0 and not attisdropped order by attnum limit 1) column_name,
+        (select index_relation.relname from pg_catalog.pg_index index_record
+          join pg_catalog.pg_class index_relation on index_relation.oid=index_record.indexrelid
+          where index_record.indrelid=$1::regclass order by index_relation.relname limit 1) index_name
+    `, [table])).rows[0];
+    assert.ok(manifest.trigger_name && manifest.check_name && manifest.column_name && manifest.index_name,
+      `${name} has a reviewed column, constraint, index, and trigger`);
+    await rejected(`alter table ${table} no force row level security`, `${name} FORCE RLS`);
+    await rejected(`alter table ${table} disable row level security`, `${name} enabled RLS`);
+    await rejected(`alter table ${table} owner to service_role`, `${name} ownership`);
+    await rejected(`grant select on ${table} to authenticated`, `${name} table ACL`);
+    await rejected(`grant select (${manifest.column_name}) on ${table} to authenticated`, `${name} column ACL`);
+    await rejected(`create policy contract_drift on ${table} using (true)`, `${name} policy`);
+    await rejected(`create rule contract_drift as on insert to ${table} do instead nothing`, `${name} rewrite rule`);
+    await rejected(`alter table ${table} disable trigger ${manifest.trigger_name}`, `${name} trigger`);
+    await rejected(`alter table ${table} drop constraint ${manifest.check_name}`, `${name} constraint`);
+    await rejected(`alter index private.${manifest.index_name} set (fillfactor=70)`, `${name} index`);
+  }
+  await rejected("alter table private.square_production_internal_permits add column unexpected text",
+    "reviewed column manifest");
+  await rejected("comment on table private.square_production_internal_permits is null",
+    "installation-bound catalog fingerprint");
+}
+
 async function catalogSnapshot(client) {
   const result = await client.query(`
     select pg_catalog.jsonb_build_object(
@@ -635,10 +695,18 @@ async function seedOperator(client, values) {
     [values.workspaceId, values.operatorId]);
   await client.query("insert into public.workspace_members(workspace_id,user_id,role,status) values($1,$2,'owner','active')",
     [values.workspaceId, values.operatorId]);
+  await client.query("insert into public.workspaces(id,name,created_by) values($1,'Unrelated Pilot Workspace',$2)",
+    [values.foreignWorkspaceId, values.operatorId]);
+  await client.query("insert into public.workspace_members(workspace_id,user_id,role,status) values($1,$2,'owner','active')",
+    [values.foreignWorkspaceId, values.operatorId]);
   await client.query(`insert into public.business_entities(
       id,workspace_id,entity_key,display_name,base_currency,timezone,created_by,updated_by
     ) values($1,$2,'internal-pilot','Internal Pilot Entity','USD','America/Los_Angeles',$3,$3)`,
   [values.entityId, values.workspaceId, values.operatorId]);
+  await client.query(`insert into public.business_entities(
+      id,workspace_id,entity_key,display_name,base_currency,timezone,created_by,updated_by
+    ) values($1,$2,'unrelated-pilot','Unrelated Pilot Entity','USD','America/Los_Angeles',$3,$3)`,
+  [values.foreignEntityId, values.foreignWorkspaceId, values.operatorId]);
   await client.query("insert into auth.sessions(id,user_id,not_after) values($1,$2,statement_timestamp()+interval '2 days')",
     [values.sessionId, values.operatorId]);
 }
@@ -646,7 +714,8 @@ async function seedOperator(client, values) {
 async function exerciseRuntime(client) {
   const ids = {
     operatorId: id(), workspaceId: id(), entityId: id(), sessionId: id(), permitId: id(), stateId: id(),
-    credentialId: id(), scanId: id(), taskId: id(), leaseId: id(), sourceVersionId: id()
+    credentialId: id(), scanId: id(), taskId: id(), leaseId: id(), sourceVersionId: id(),
+    foreignWorkspaceId: id(), foreignEntityId: id()
   };
   const expectedMerchantId = "merchant-internal-001";
   const expectedLocationId = "location-internal-001";
@@ -1096,15 +1165,31 @@ async function exerciseRuntime(client) {
   assert.equal(scan.status, "ready");
 
   const leaseRequestFingerprint = runtimeFingerprint([
-    "acquire-page-v1", ids.scanId, ids.leaseId, leaseOwnerFingerprint, "1"
+    "acquire-page-v2", ids.scanId, ids.leaseId, leaseOwnerFingerprint,
+    scanRequestFingerprint, ids.permitId, ids.workspaceId, ids.entityId,
+    ids.operatorId, ids.sessionId, "1", "1"
   ]);
-  const lease = await asRuntimeRole(client, "runtime", "acquire_page", {
-    leaseId: ids.leaseId, leaseOwnerFingerprint, requestFingerprint: leaseRequestFingerprint,
-    scanId: ids.scanId
-  });
+  const acquirePayload = {
+    actorId: ids.operatorId, businessEntityId: ids.entityId, generation: 1,
+    leaseId: ids.leaseId, leaseOwnerFingerprint, permitId: ids.permitId,
+    requestFingerprint: leaseRequestFingerprint, scanId: ids.scanId,
+    scanRequestFingerprint, sessionId: ids.sessionId, workspaceId: ids.workspaceId
+  };
+  const lease = await asRuntimeRole(client, "runtime", "acquire_page", acquirePayload);
   assert.equal(lease.status, "leased");
   assert.equal(lease.path, "/v2/payments");
   assert.equal(lease.continuationAllowed, false);
+  assert.equal((await asRuntimeRole(client, "runtime", "acquire_page", acquirePayload)).replayed, true);
+  for (const changed of [
+    { workspaceId: ids.foreignWorkspaceId, businessEntityId: ids.foreignEntityId },
+    { actorId: id() }, { sessionId: id() }, { permitId: id() },
+    { generation: 2 }, { scanRequestFingerprint: runtimeFingerprint(["foreign-scan"]) },
+    { requestFingerprint: runtimeFingerprint(["foreign-request"]) }, { leaseId: id() }
+  ]) await assert.rejects(
+    asRuntimeRole(client, "runtime", "acquire_page", { ...acquirePayload, ...changed }),
+    /square_production_internal_page_acquire_denied/,
+    "leased replay rejects a changed request or tenant authority binding"
+  );
   await client.query("begin");
   try {
     const releaseFingerprint = runtimeFingerprint([
@@ -1187,6 +1272,17 @@ async function exerciseRuntime(client) {
   const replayedPage = await asRuntimeRole(client, "runtime", "commit_page", pagePayload);
   assert.equal(replayedPage.status, "committed");
   assert.equal(replayedPage.replayed, true);
+  assert.equal((await asRuntimeRole(client, "runtime", "acquire_page", acquirePayload)).replayed, true);
+  for (const changed of [
+    { workspaceId: ids.foreignWorkspaceId, businessEntityId: ids.foreignEntityId },
+    { actorId: id() }, { sessionId: id() }, { permitId: id() },
+    { scanRequestFingerprint: runtimeFingerprint(["foreign-scan"]) },
+    { requestFingerprint: runtimeFingerprint(["foreign-request"]) }, { leaseId: id() }
+  ]) await assert.rejects(
+    asRuntimeRole(client, "runtime", "acquire_page", { ...acquirePayload, ...changed }),
+    /square_production_internal_page_acquire_denied/,
+    "committed replay cannot reveal another workspace scan or permit"
+  );
   for (const changedObservation of [
     { ...observations[0], paymentStatus: "pending" },
     { ...observations[0], sourceVersionId: id() }
@@ -1211,16 +1307,15 @@ async function exerciseRuntime(client) {
   assert.equal(evidence.observationCount, 1);
   assert.equal(evidence.providerCallsEnabled, false);
   assert.equal(Object.hasOwn(evidence, "merchantId"), false);
-  const foreignWorkspaceId = id();
   const foreignEvidenceFingerprint = runtimeFingerprint([
     "read-evidence-v1", ids.permitId, "1", configuration, "7",
-    foreignWorkspaceId, ids.entityId, ids.operatorId, ids.sessionId
+    ids.foreignWorkspaceId, ids.entityId, ids.operatorId, ids.sessionId
   ]);
   await assert.rejects(
     asRuntimeRole(client, "evidence", "read", {
       actorId: ids.operatorId, businessEntityId: ids.entityId, permitId: ids.permitId,
       requestFingerprint: foreignEvidenceFingerprint, sessionId: ids.sessionId,
-      workspaceId: foreignWorkspaceId
+      workspaceId: ids.foreignWorkspaceId
     }),
     /square_production_internal_evidence_denied/
   );
@@ -1291,8 +1386,8 @@ async function exerciseRuntime(client) {
 
   await assert.rejects(
     asRuntimeRole(client, "runtime", "acquire_page", {
-      leaseId: id(), leaseOwnerFingerprint,
-      requestFingerprint: runtimeFingerprint(["blocked-after-cleanup"]), scanId: ids.scanId
+      ...acquirePayload, leaseId: id(),
+      requestFingerprint: runtimeFingerprint(["blocked-after-cleanup"])
     }),
     /square_production_internal_permit_fenced/
   );
@@ -1384,6 +1479,7 @@ async function nativeMain() {
     assert.deepEqual(ledger.rows[0], { count: 104, head: runtimeVersion, fingerprint: runtimeLedgerFingerprint });
     assert.deepEqual(await catalogSnapshot(target.client), beforeQbo,
       "runtime migration leaves QBO catalog byte-for-byte unchanged");
+    await verifyInternalRelationGuard(target.client);
     await runPgTapNative(target.client);
     await exerciseRuntime(target.client);
     process.stdout.write(`square_production_internal_runtime_native_qualification_ok ${target.directory}\n`);

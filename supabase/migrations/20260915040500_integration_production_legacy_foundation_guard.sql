@@ -283,7 +283,7 @@ begin
 
   with expected(signature,language,volatility,security_definer,is_strict,parallel,result,names,default_count,default_expression,source_hash) as (values
     ('private.square_production_internal_reject_immutable_mutation_v1()','plpgsql','v',true,false,'u','trigger',null::text[],0,null::text,'879e64a04de08a3fb906ce6f0a5675627ecace40386769247cf0a44c817dd82e'),
-    ('private.square_production_internal_guard_lifecycle_update_v1()','plpgsql','v',true,false,'u','trigger',null::text[],0,null::text,'76ba2c0506b61ebbbe3e124700678021199ed89c6088dddc540050defb7053d0'),
+    ('private.square_production_internal_guard_lifecycle_update_v1()','plpgsql','v',true,false,'u','trigger',null::text[],0,null::text,'61cbb7ce05f9bf6c574f44f7642c6bb239815b639fc1fc00fe65fa753f1cd818'),
     ('private.square_production_internal_require_keys_v1(jsonb,text[])','plpgsql','i',false,true,'s','void',array['p_payload','p_required_keys']::text[],0,null::text,'ec3eb20a72acab3d1c18c6d5eb9b2fb1eb4d8c6743af2c4f2e4c80bba0d91d61'),
     ('private.square_production_internal_fingerprint_v1(text[])','sql','i',false,true,'s','text',array['p_parts']::text[],0,null::text,'3f77909a44ff2bbc574f8b3228482aac0e9c55a1dd3356001384efe21db560b4'),
     ('private.square_production_internal_audit_v1(uuid,bigint,text,text,text,text,timestamptz)','plpgsql','v',true,false,'u','text',array['p_permit_id','p_generation','p_event_kind','p_outcome','p_reason_code','p_subject_fingerprint','p_recorded_at']::text[],0,null::text,'4d548e25a8988edc1fdfa8b719bf5d7195e32d9f44bde5b584f8484fc30539cb'),
@@ -292,7 +292,7 @@ begin
     ('private.square_production_internal_install_permit_v1(jsonb)','plpgsql','v',true,false,'u','jsonb',array['p_payload']::text[],0,null::text,'efa4aa61687f5580ceb24897fb1ad6a83527c765a37804bcc03cbbfa375b1905'),
     ('public.square_production_internal_oauth_v1(text,jsonb)','plpgsql','v',true,false,'u','jsonb',array['p_operation','p_payload']::text[],0,null::text,'6ff215c19aa5c66b607c307d26bcf8f53cc8b3308bd929a50a5f97c5e049d860'),
     ('public.square_production_internal_broker_v1(text,jsonb)','plpgsql','v',true,false,'u','jsonb',array['p_operation','p_payload']::text[],0,null::text,'41f97c64568a973faa25cfdf99bca8301cbb2103ff8d95491d010e90d3e0d6bb'),
-    ('public.square_production_internal_runtime_v1(text,jsonb)','plpgsql','v',true,false,'u','jsonb',array['p_operation','p_payload']::text[],0,null::text,'ceddeb0f3f55ad1210d4434ab249313473e7e30365197767ab48606fd08dc210'),
+    ('public.square_production_internal_runtime_v1(text,jsonb)','plpgsql','v',true,false,'u','jsonb',array['p_operation','p_payload']::text[],0,null::text,'63024be692c785827b982945c220b0268d8e57ee2db4f3d46a8033a5f5fe3301'),
     ('public.square_production_internal_evidence_v1(text,jsonb)','plpgsql','v',true,false,'u','jsonb',array['p_operation','p_payload']::text[],0,null::text,'98e2d0363897ad1020fb4296dd643ccd4798cac10030b8a4883379844d954877')
   ), resolved as (
     select expected.*,pg_catalog.to_regprocedure(expected.signature) oid from expected
@@ -347,6 +347,107 @@ begin
   ) then
     raise exception 'integration_production_internal_runtime_drift'
       using errcode = '55000';
+  end if;
+
+  if square_internal_runtime_present then
+    foreach object_name in array array[
+      'private.square_production_internal_permits','private.square_production_internal_oauth_states',
+      'private.square_production_internal_credentials','private.square_production_internal_scans',
+      'private.square_production_internal_page_receipts','private.square_production_internal_source_versions',
+      'private.square_production_internal_fences','private.square_production_internal_audit_events'
+    ] loop
+      if not exists (
+        select 1 from pg_catalog.pg_class relation
+        where relation.oid=object_name::regclass and relation.relkind='r'
+          and relation.relpersistence='p' and relation.relowner=marker_owner
+          and relation.relrowsecurity and relation.relforcerowsecurity
+          and not relation.relhassubclass
+      ) or exists (
+        select 1 from pg_catalog.pg_policy policy where policy.polrelid=object_name::regclass
+      ) or exists (
+        select 1 from pg_catalog.pg_inherits inheritance
+        where inheritance.inhrelid=object_name::regclass or inheritance.inhparent=object_name::regclass
+      ) or exists (
+        select 1 from pg_catalog.pg_rewrite rule where rule.ev_class=object_name::regclass
+      ) or exists (
+        select 1 from pg_catalog.pg_class relation
+        cross join lateral pg_catalog.aclexplode(relation.relacl) acl
+        where relation.oid=object_name::regclass and acl.grantee<>marker_owner
+      ) or exists (
+        select 1 from pg_catalog.pg_attribute attribute
+        cross join lateral pg_catalog.aclexplode(attribute.attacl) acl
+        where attribute.attrelid=object_name::regclass and not attribute.attisdropped
+          and acl.grantee<>marker_owner
+      ) or exists (
+        select 1 from pg_catalog.pg_publication publication where publication.puballtables
+      ) or exists (
+        select 1 from pg_catalog.pg_publication_rel publication_relation
+        where publication_relation.prrelid=object_name::regclass
+      ) or exists (
+        select 1 from pg_catalog.pg_publication_namespace publication_namespace
+        where publication_namespace.pnnspid='private'::regnamespace
+      ) then
+        raise exception 'integration_production_internal_relation_drift' using errcode='55000';
+      end if;
+    end loop;
+
+    select pg_catalog.encode(extensions.digest(pg_catalog.convert_to((pg_catalog.jsonb_build_object(
+      'relations',coalesce((select pg_catalog.jsonb_agg(pg_catalog.jsonb_build_array(
+        relation.relname,relation.relreplident,relation.reloptions,relation.reltablespace
+      ) order by relation.relname)
+        from pg_catalog.pg_class relation join pg_catalog.pg_namespace namespace on namespace.oid=relation.relnamespace
+        where namespace.nspname='private' and relation.relkind='r'
+          and relation.relname like 'square\_production\_internal\_%' escape '\'),'[]'::jsonb),
+      'columns',coalesce((select pg_catalog.jsonb_agg(pg_catalog.jsonb_build_array(
+        relation.relname,attribute.attnum,attribute.attname,
+        pg_catalog.format_type(attribute.atttypid,attribute.atttypmod),attribute.attnotnull,
+        attribute.attidentity,attribute.attgenerated,
+        pg_catalog.pg_get_expr(default_value.adbin,default_value.adrelid,true)
+      ) order by relation.relname,attribute.attnum)
+        from pg_catalog.pg_class relation join pg_catalog.pg_namespace namespace on namespace.oid=relation.relnamespace
+        join pg_catalog.pg_attribute attribute on attribute.attrelid=relation.oid
+        left join pg_catalog.pg_attrdef default_value on default_value.adrelid=relation.oid and default_value.adnum=attribute.attnum
+        where namespace.nspname='private' and relation.relkind='r'
+          and relation.relname like 'square\_production\_internal\_%' escape '\'
+          and attribute.attnum>0 and not attribute.attisdropped),'[]'::jsonb),
+      'constraints',coalesce((select pg_catalog.jsonb_agg(pg_catalog.jsonb_build_array(
+        relation.relname,constraint_record.conname,constraint_record.contype,
+        constraint_record.condeferrable,constraint_record.condeferred,constraint_record.convalidated,
+        pg_catalog.pg_get_constraintdef(constraint_record.oid,true)
+      ) order by relation.relname,constraint_record.conname)
+        from pg_catalog.pg_constraint constraint_record
+        join pg_catalog.pg_class relation on relation.oid=constraint_record.conrelid
+        join pg_catalog.pg_namespace namespace on namespace.oid=relation.relnamespace
+        where namespace.nspname='private' and relation.relkind='r'
+          and relation.relname like 'square\_production\_internal\_%' escape '\'),'[]'::jsonb),
+      'indexes',coalesce((select pg_catalog.jsonb_agg(pg_catalog.jsonb_build_array(
+        relation.relname,index_relation.relname,index_relation.reloptions,index_relation.reltablespace,
+        index_record.indisunique,index_record.indisprimary,index_record.indisexclusion,
+        index_record.indisvalid,index_record.indisready,index_record.indislive,
+        index_record.indisreplident,index_record.indnullsnotdistinct,
+        pg_catalog.pg_get_indexdef(index_record.indexrelid,0,true)
+      ) order by relation.relname,index_relation.relname)
+        from pg_catalog.pg_index index_record
+        join pg_catalog.pg_class relation on relation.oid=index_record.indrelid
+        join pg_catalog.pg_class index_relation on index_relation.oid=index_record.indexrelid
+        join pg_catalog.pg_namespace namespace on namespace.oid=relation.relnamespace
+        where namespace.nspname='private' and relation.relkind='r'
+          and relation.relname like 'square\_production\_internal\_%' escape '\'),'[]'::jsonb),
+      'triggers',coalesce((select pg_catalog.jsonb_agg(pg_catalog.jsonb_build_array(
+        relation.relname,trigger_record.tgname,trigger_record.tgenabled,
+        pg_catalog.pg_get_triggerdef(trigger_record.oid,true)
+      ) order by relation.relname,trigger_record.tgname)
+        from pg_catalog.pg_trigger trigger_record
+        join pg_catalog.pg_class relation on relation.oid=trigger_record.tgrelid
+        join pg_catalog.pg_namespace namespace on namespace.oid=relation.relnamespace
+        where namespace.nspname='private' and relation.relkind='r'
+          and relation.relname like 'square\_production\_internal\_%' escape '\'
+          and not trigger_record.tgisinternal),'[]'::jsonb)
+    ))::text,'UTF8'),'sha256'),'hex') into strict schema_digest;
+    if pg_catalog.obj_description('private.square_production_internal_permits'::regclass,'pg_class')
+      is distinct from 'square-production-internal-relations-v1:'||schema_digest then
+      raise exception 'integration_production_internal_relation_contract_drift' using errcode='55000';
+    end if;
   end if;
 
   foreach role_name in array array[

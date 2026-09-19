@@ -35,7 +35,7 @@ test("Production profiles pin the exact reviewed 102+overlay sources", () => {
     internalRuntimeVersion: "20260902191325",
     internalRuntimeMigrationCount: 104,
     internalRuntimeLedgerFingerprint: "sha256:7dc51d888ee9c4a6bb595b1a4431ab5fcdb649e34c871ba91a6512d5fa2dc89f",
-    internalRuntimeSha256: "f7e6f8f72357dafc1a5b6ad0566c2aa90293175420b84b593b98065370e45928",
+    internalRuntimeSha256: "5776669c1d75997f34c0ac19ef58a9ad43749b7c8eec25d8f7f63fa807064927",
   });
   assert.equal(hash("supabase/migrations/20260902191323_integration_production_runtime_foundation.sql"), productionSourcePins.foundationSha256);
   assert.equal(hash("supabase/migrations/20260902191324_square_production_runtime_overlay.sql"), productionSourcePins.overlaySha256);

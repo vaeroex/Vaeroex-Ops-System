@@ -21,7 +21,7 @@ const internalName = "20260902191325_square_production_internal_pilot_runtime.sq
 const pins = Object.freeze({
   foundation: "f8598ca685c795ad56bfdb7a29a1ded3da1c096d42ffb62ea4e123271db54c6d",
   overlay: "2cc43a9313d056e58b75143f032f347cb0972f45cc1edbd484f6b1fb0574661f",
-  internal: "f7e6f8f72357dafc1a5b6ad0566c2aa90293175420b84b593b98065370e45928",
+  internal: "5776669c1d75997f34c0ac19ef58a9ad43749b7c8eec25d8f7f63fa807064927",
   preFoundationLedger: "sha256:db7c39a62dce07ac3d21a78653a6d4a905f399d00ea1a4dce452ed4018958060",
 });
 const hash = source => crypto.createHash("sha256").update(source).digest("hex");

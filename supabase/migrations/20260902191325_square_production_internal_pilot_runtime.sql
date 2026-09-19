@@ -438,6 +438,8 @@ create table private.square_production_internal_scans (
   payment_window_end timestamptz not null check(isfinite(payment_window_end)),
   request_fingerprint text not null check(request_fingerprint ~ '^sha256:[a-f0-9]{64}$'),
   lease_owner_fingerprint text not null check(lease_owner_fingerprint ~ '^sha256:[a-f0-9]{64}$'),
+  acquire_request_fingerprint text check(acquire_request_fingerprint is null or acquire_request_fingerprint ~ '^sha256:[a-f0-9]{64}$'),
+  acquire_lease_id uuid,
   status text not null default 'ready' check(status in ('ready','leased','committed','blocked','cleaned')),
   attempt integer not null default 0 check(attempt between 0 and 3),
   lease_id uuid,
@@ -448,6 +450,8 @@ create table private.square_production_internal_scans (
   check(payment_window_end>payment_window_start and payment_window_end<=created_at
     and payment_window_end-payment_window_start<=interval '24 hours'),
   check((status='leased')=(lease_id is not null and lease_expires_at is not null)),
+  check((acquire_request_fingerprint is null)=(acquire_lease_id is null)),
+  check(status='ready' or acquire_request_fingerprint is not null),
   check((status='committed')=(committed_at is not null))
 );
 
@@ -1001,9 +1005,11 @@ begin
     end if;
   elsif tg_table_name='square_production_internal_scans' then
     if (pg_catalog.to_jsonb(new)-array[
-      'status','attempt','lease_id','lease_expires_at','committed_at','row_version'
+      'status','attempt','lease_id','lease_expires_at','committed_at','row_version',
+      'acquire_request_fingerprint','acquire_lease_id'
     ]) is distinct from (pg_catalog.to_jsonb(old)-array[
-      'status','attempt','lease_id','lease_expires_at','committed_at','row_version'
+      'status','attempt','lease_id','lease_expires_at','committed_at','row_version',
+      'acquire_request_fingerprint','acquire_lease_id'
     ]) or new.row_version<>old.row_version+1 then
       raise exception 'square_production_internal_scan_identity_immutable' using errcode='55000';
     end if;
@@ -1771,7 +1777,8 @@ begin
     );
   elsif p_operation='acquire_page' then
     perform private.square_production_internal_require_keys_v1(p_payload,array[
-      'leaseId','leaseOwnerFingerprint','requestFingerprint','scanId'
+      'actorId','businessEntityId','generation','leaseId','leaseOwnerFingerprint',
+      'permitId','requestFingerprint','scanId','scanRequestFingerprint','sessionId','workspaceId'
     ]);
     scan_uuid:=(p_payload->>'scanId')::uuid;
     lease_uuid:=(p_payload->>'leaseId')::uuid;
@@ -1782,12 +1789,28 @@ begin
     if not found then raise exception 'square_production_internal_page_acquire_denied' using errcode='42501'; end if;
     permit_row:=private.square_production_internal_lock_permit_v1(scan_row.permit_id,'runtime');
     now_at:=clock_timestamp();
+    if (p_payload->>'permitId')::uuid is distinct from permit_row.permit_id
+      or (p_payload->>'workspaceId')::uuid is distinct from permit_row.workspace_id
+      or (p_payload->>'businessEntityId')::uuid is distinct from permit_row.business_entity_id
+      or (p_payload->>'actorId')::uuid is distinct from permit_row.operator_id
+      or (p_payload->>'sessionId')::uuid is distinct from permit_row.operator_session_id
+      or (p_payload->>'generation')::bigint is distinct from permit_row.generation
+      or p_payload->>'scanRequestFingerprint' is distinct from scan_row.request_fingerprint
+      or scan_row.generation is distinct from permit_row.generation
+      or owner_hash is distinct from scan_row.lease_owner_fingerprint then
+      raise exception 'square_production_internal_page_acquire_denied' using errcode='42501';
+    end if;
     if scan_row.status='committed' then
+      if lease_uuid is distinct from scan_row.acquire_lease_id
+        or request_hash is distinct from scan_row.acquire_request_fingerprint then
+        raise exception 'square_production_internal_page_acquire_denied' using errcode='42501';
+      end if;
       return pg_catalog.jsonb_build_object(
         'permitId',permit_row.permit_id,'scanId',scan_uuid,'status','committed','replayed',true
       );
     elsif scan_row.status='leased' and scan_row.lease_id=lease_uuid
-      and scan_row.lease_owner_fingerprint=owner_hash and scan_row.lease_expires_at>now_at then
+      and request_hash=scan_row.acquire_request_fingerprint
+      and scan_row.acquire_lease_id=lease_uuid and scan_row.lease_expires_at>now_at then
       return pg_catalog.jsonb_build_object(
         'permitId',permit_row.permit_id,'scanId',scan_uuid,'status','leased',
         'leaseId',lease_uuid,'leaseExpiresAt',scan_row.lease_expires_at,'replayed',true,
@@ -1796,7 +1819,10 @@ begin
       );
     end if;
     expected_hash:=private.square_production_internal_fingerprint_v1(array[
-      'acquire-page-v1',scan_uuid::text,lease_uuid::text,owner_hash,scan_row.row_version::text
+      'acquire-page-v2',scan_uuid::text,lease_uuid::text,owner_hash,
+      scan_row.request_fingerprint,permit_row.permit_id::text,permit_row.workspace_id::text,
+      permit_row.business_entity_id::text,permit_row.operator_id::text,
+      permit_row.operator_session_id::text,permit_row.generation::text,scan_row.row_version::text
     ]);
     if permit_row.state<>'syncing' or owner_hash<>scan_row.lease_owner_fingerprint
       or request_hash<>expected_hash or scan_row.attempt>=3
@@ -1805,7 +1831,8 @@ begin
     end if;
     update private.square_production_internal_scans
       set status='leased',attempt=attempt+1,lease_id=lease_uuid,
-        lease_expires_at=now_at+interval '2 minutes',row_version=row_version+1
+        lease_expires_at=now_at+interval '2 minutes',row_version=row_version+1,
+        acquire_request_fingerprint=request_hash,acquire_lease_id=lease_uuid
       where scan_id=scan_uuid returning * into scan_row;
     audit_hash:=private.square_production_internal_audit_v1(
       permit_row.permit_id,permit_row.generation,'page_leased','accepted','single_page_lease',
@@ -2142,6 +2169,7 @@ declare function_identity text;
 declare relation_owner oid;
 declare function_owner oid;
 declare relation_count bigint;
+declare schema_digest text;
 begin
   foreach relation_name in array array[
     'private.square_production_internal_permits','private.square_production_internal_oauth_states',
@@ -2162,6 +2190,8 @@ begin
     ) or exists(
       select 1 from pg_catalog.pg_inherits inheritance where inheritance.inhrelid=relation_name::regclass
         or inheritance.inhparent=relation_name::regclass
+    ) or exists(
+      select 1 from pg_catalog.pg_rewrite rule where rule.ev_class=relation_name::regclass
     ) or exists(
       select 1 from pg_catalog.pg_class relation
       cross join lateral pg_catalog.aclexplode(relation.relacl) acl
@@ -2282,6 +2312,63 @@ begin
   ) then
     raise exception 'square_production_internal_trigger_manifest_invalid' using errcode='55000';
   end if;
+  select pg_catalog.encode(extensions.digest(pg_catalog.convert_to((pg_catalog.jsonb_build_object(
+    'relations',coalesce((select pg_catalog.jsonb_agg(pg_catalog.jsonb_build_array(
+      relation.relname,relation.relreplident,relation.reloptions,relation.reltablespace
+    ) order by relation.relname)
+      from pg_catalog.pg_class relation join pg_catalog.pg_namespace namespace on namespace.oid=relation.relnamespace
+      where namespace.nspname='private' and relation.relkind='r'
+        and relation.relname like 'square\_production\_internal\_%' escape '\'),'[]'::jsonb),
+    'columns',coalesce((select pg_catalog.jsonb_agg(pg_catalog.jsonb_build_array(
+      relation.relname,attribute.attnum,attribute.attname,
+      pg_catalog.format_type(attribute.atttypid,attribute.atttypmod),attribute.attnotnull,
+      attribute.attidentity,attribute.attgenerated,
+      pg_catalog.pg_get_expr(default_value.adbin,default_value.adrelid,true)
+    ) order by relation.relname,attribute.attnum)
+      from pg_catalog.pg_class relation join pg_catalog.pg_namespace namespace on namespace.oid=relation.relnamespace
+      join pg_catalog.pg_attribute attribute on attribute.attrelid=relation.oid
+      left join pg_catalog.pg_attrdef default_value on default_value.adrelid=relation.oid and default_value.adnum=attribute.attnum
+      where namespace.nspname='private' and relation.relkind='r'
+        and relation.relname like 'square\_production\_internal\_%' escape '\'
+        and attribute.attnum>0 and not attribute.attisdropped),'[]'::jsonb),
+    'constraints',coalesce((select pg_catalog.jsonb_agg(pg_catalog.jsonb_build_array(
+      relation.relname,constraint_record.conname,constraint_record.contype,
+      constraint_record.condeferrable,constraint_record.condeferred,constraint_record.convalidated,
+      pg_catalog.pg_get_constraintdef(constraint_record.oid,true)
+    ) order by relation.relname,constraint_record.conname)
+      from pg_catalog.pg_constraint constraint_record
+      join pg_catalog.pg_class relation on relation.oid=constraint_record.conrelid
+      join pg_catalog.pg_namespace namespace on namespace.oid=relation.relnamespace
+      where namespace.nspname='private' and relation.relkind='r'
+        and relation.relname like 'square\_production\_internal\_%' escape '\'),'[]'::jsonb),
+    'indexes',coalesce((select pg_catalog.jsonb_agg(pg_catalog.jsonb_build_array(
+      relation.relname,index_relation.relname,index_relation.reloptions,index_relation.reltablespace,
+      index_record.indisunique,index_record.indisprimary,index_record.indisexclusion,
+      index_record.indisvalid,index_record.indisready,index_record.indislive,
+      index_record.indisreplident,index_record.indnullsnotdistinct,
+      pg_catalog.pg_get_indexdef(index_record.indexrelid,0,true)
+    ) order by relation.relname,index_relation.relname)
+      from pg_catalog.pg_index index_record
+      join pg_catalog.pg_class relation on relation.oid=index_record.indrelid
+      join pg_catalog.pg_class index_relation on index_relation.oid=index_record.indexrelid
+      join pg_catalog.pg_namespace namespace on namespace.oid=relation.relnamespace
+      where namespace.nspname='private' and relation.relkind='r'
+        and relation.relname like 'square\_production\_internal\_%' escape '\'),'[]'::jsonb),
+    'triggers',coalesce((select pg_catalog.jsonb_agg(pg_catalog.jsonb_build_array(
+      relation.relname,trigger_record.tgname,trigger_record.tgenabled,
+      pg_catalog.pg_get_triggerdef(trigger_record.oid,true)
+    ) order by relation.relname,trigger_record.tgname)
+      from pg_catalog.pg_trigger trigger_record
+      join pg_catalog.pg_class relation on relation.oid=trigger_record.tgrelid
+      join pg_catalog.pg_namespace namespace on namespace.oid=relation.relnamespace
+      where namespace.nspname='private' and relation.relkind='r'
+        and relation.relname like 'square\_production\_internal\_%' escape '\'
+        and not trigger_record.tgisinternal),'[]'::jsonb)
+  ))::text,'UTF8'),'sha256'),'hex') into strict schema_digest;
+  execute pg_catalog.format(
+    'comment on table private.square_production_internal_permits is %L',
+    'square-production-internal-relations-v1:'||schema_digest
+  );
 end
 $square_production_internal_postflight$;
 
