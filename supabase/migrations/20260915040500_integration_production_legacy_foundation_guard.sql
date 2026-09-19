@@ -402,11 +402,16 @@ begin
         relation.relname,attribute.attnum,attribute.attname,
         pg_catalog.format_type(attribute.atttypid,attribute.atttypmod),attribute.attnotnull,
         attribute.attidentity,attribute.attgenerated,
-        pg_catalog.pg_get_expr(default_value.adbin,default_value.adrelid,true)
+        pg_catalog.pg_get_expr(default_value.adbin,default_value.adrelid,true),
+        case when attribute.attcollation=0 then null else
+          pg_catalog.format('%I.%I',collation_namespace.nspname,collation_record.collname) end,
+        collation_record.collprovider::text,collation_record.collisdeterministic,collation_record.collversion
       ) order by relation.relname,attribute.attnum)
         from pg_catalog.pg_class relation join pg_catalog.pg_namespace namespace on namespace.oid=relation.relnamespace
         join pg_catalog.pg_attribute attribute on attribute.attrelid=relation.oid
         left join pg_catalog.pg_attrdef default_value on default_value.adrelid=relation.oid and default_value.adnum=attribute.attnum
+        left join pg_catalog.pg_collation collation_record on collation_record.oid=attribute.attcollation
+        left join pg_catalog.pg_namespace collation_namespace on collation_namespace.oid=collation_record.collnamespace
         where namespace.nspname='private' and relation.relkind='r'
           and relation.relname like 'square\_production\_internal\_%' escape '\'
           and attribute.attnum>0 and not attribute.attisdropped),'[]'::jsonb),
@@ -442,10 +447,30 @@ begin
         join pg_catalog.pg_namespace namespace on namespace.oid=relation.relnamespace
         where namespace.nspname='private' and relation.relkind='r'
           and relation.relname like 'square\_production\_internal\_%' escape '\'
-          and not trigger_record.tgisinternal),'[]'::jsonb)
+          and not trigger_record.tgisinternal),'[]'::jsonb),
+      'internalTriggers',coalesce((select pg_catalog.jsonb_agg(pg_catalog.jsonb_build_array(
+        relation.relname,constraint_record.conname,referenced_namespace.nspname,
+        referenced_relation.relname,trigger_function_namespace.nspname,
+        trigger_function.proname,pg_catalog.pg_get_function_identity_arguments(trigger_function.oid),
+        trigger_record.tgtype::integer,trigger_record.tgattr::text,
+        pg_catalog.encode(trigger_record.tgargs,'hex'),
+        pg_catalog.pg_get_expr(trigger_record.tgqual,trigger_record.tgrelid,true),
+        trigger_record.tgenabled::text
+      ) order by relation.relname,constraint_record.conname,trigger_function_namespace.nspname,
+        trigger_function.proname,trigger_record.tgtype,trigger_record.tgattr::text)
+        from pg_catalog.pg_trigger trigger_record
+        join pg_catalog.pg_class relation on relation.oid=trigger_record.tgrelid
+        join pg_catalog.pg_namespace namespace on namespace.oid=relation.relnamespace
+        join pg_catalog.pg_proc trigger_function on trigger_function.oid=trigger_record.tgfoid
+        join pg_catalog.pg_namespace trigger_function_namespace on trigger_function_namespace.oid=trigger_function.pronamespace
+        left join pg_catalog.pg_constraint constraint_record on constraint_record.oid=trigger_record.tgconstraint
+        left join pg_catalog.pg_class referenced_relation on referenced_relation.oid=constraint_record.confrelid
+        left join pg_catalog.pg_namespace referenced_namespace on referenced_namespace.oid=referenced_relation.relnamespace
+        where namespace.nspname='private' and relation.relkind='r'
+          and relation.relname like 'square\_production\_internal\_%' escape '\'
+          and trigger_record.tgisinternal),'[]'::jsonb)
     ))::text,'UTF8'),'sha256'),'hex') into strict schema_digest;
-    if pg_catalog.obj_description('private.square_production_internal_permits'::regclass,'pg_class')
-      is distinct from 'square-production-internal-relations-v1:'||schema_digest then
+    if schema_digest is distinct from '4258cd7206afd93115f8fdc8a7bf1244b684229c82f71d6e448bb19449e547bb' then
       raise exception 'integration_production_internal_relation_contract_drift' using errcode='55000';
     end if;
   end if;

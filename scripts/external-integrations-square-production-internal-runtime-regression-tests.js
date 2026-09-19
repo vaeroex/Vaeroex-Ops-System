@@ -77,16 +77,23 @@ const retainedDigest = [...legacyGuard.matchAll(relationDigest)].at(-1)?.[0];
 assert.ok(installedDigest && retainedDigest, "installation and later guard both hash the full relation catalog");
 assert.equal(installedDigest.replace(/\s+/g, " "), retainedDigest.replace(/\s+/g, " "),
   "the later guard recomputes the exact installation-time relation contract");
+const sourcePinnedDigest = "4258cd7206afd93115f8fdc8a7bf1244b684229c82f71d6e448bb19449e547bb";
+assert.match(migration, new RegExp(`schema_digest is distinct from '${sourcePinnedDigest}'`));
+assert.match(legacyGuard, new RegExp(`schema_digest is distinct from '${sourcePinnedDigest}'`));
+assert.doesNotMatch(legacyGuard, /obj_description\('private\.square_production_internal_permits'/);
 for (const protection of [
   "relowner=marker_owner", "relrowsecurity", "relforcerowsecurity", "pg_catalog.pg_policy",
   "pg_catalog.pg_inherits", "pg_catalog.pg_rewrite", "aclexplode(relation.relacl)", "aclexplode(attribute.attacl)",
   "pg_catalog.pg_publication_rel", "pg_catalog.pg_get_constraintdef",
-  "pg_catalog.pg_get_indexdef", "pg_catalog.pg_get_triggerdef", "trigger_record.tgenabled"
+  "pg_catalog.pg_get_indexdef", "pg_catalog.pg_get_triggerdef", "trigger_record.tgenabled",
+  "attribute.attcollation", "collation_record.collprovider", "collation_record.collisdeterministic",
+  "collation_record.collversion", "'internalTriggers'", "trigger_record.tgisinternal"
 ]) assert.ok(legacyGuard.includes(protection), `retained relations reject ${protection} drift`);
-assert.match(migration, /comment on table private\.square_production_internal_permits is %L/);
-assert.match(legacyGuard, /obj_description\('private\.square_production_internal_permits'::regclass,'pg_class'\)[\s\S]*square-production-internal-relations-v1:/);
 assert.match(qualificationRunner, /verifyInternalRelationGuard[\s\S]*no force row level security[\s\S]*grant select[\s\S]*create policy[\s\S]*disable trigger[\s\S]*drop constraint/,
   "disposable PostgreSQL exercises every protected relation against the guard");
+assert.match(qualificationRunner, /forged mutable comment cannot replace the source-pinned relation contract/);
+assert.match(qualificationRunner, /protected text-column collation/);
+assert.match(qualificationRunner, /internal foreign-key trigger state/);
 
 const publicFunctions = [...migration.matchAll(
   /create function public\.(square_production_internal_[a-z]+_v1)\(p_operation text,p_payload jsonb\)/g

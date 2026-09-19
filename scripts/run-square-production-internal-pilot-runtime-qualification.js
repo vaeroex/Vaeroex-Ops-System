@@ -281,7 +281,9 @@ async function verifyInternalRelationGuard(client) {
   async function rejected(mutation, label) {
     await client.query("begin");
     try {
-      await client.query(mutation);
+      for (const statement of Array.isArray(mutation) ? mutation : [mutation]) {
+        await client.query(statement);
+      }
       await assert.rejects(client.query(guard), error => error.code === "55000"
         && /integration_production_internal_relation_(?:contract_)?drift/.test(error.message),
       `${label} must fail closed`);
@@ -319,8 +321,34 @@ async function verifyInternalRelationGuard(client) {
   }
   await rejected("alter table private.square_production_internal_permits add column unexpected text",
     "reviewed column manifest");
-  await rejected("comment on table private.square_production_internal_permits is null",
-    "installation-bound catalog fingerprint");
+  const permit = "private.square_production_internal_permits";
+  await client.query("begin");
+  try {
+    await client.query(`comment on table ${permit} is 'square-production-internal-relations-v1:${"0".repeat(64)}'`);
+    await client.query(guard);
+  } finally {
+    await client.query("rollback");
+  }
+  await rejected([
+    `comment on table ${permit} is 'square-production-internal-relations-v1:${"0".repeat(64)}'`,
+    `alter table ${permit} disable trigger square_production_internal_permit_update_guard`
+  ], "forged mutable comment cannot replace the source-pinned relation contract");
+  await rejected('alter table private.square_production_internal_audit_events alter column event_kind type text collate "C"',
+    "protected text-column collation");
+  let internalTriggerCount = 0;
+  for (const name of relations) {
+    const table = `private.${name}`;
+    const internalTrigger = (await client.query(`
+      select tgname from pg_catalog.pg_trigger
+      where tgrelid=$1::regclass and tgisinternal order by tgname limit 1
+    `, [table])).rows[0]?.tgname;
+    if (!internalTrigger) continue;
+    internalTriggerCount++;
+    assert.match(internalTrigger, /^[A-Za-z0-9_]+$/);
+    await rejected(`alter table ${table} disable trigger "${internalTrigger}"`,
+      `${name} internal foreign-key trigger state`);
+  }
+  assert.ok(internalTriggerCount>0, "the protected relations include internal foreign-key triggers");
 }
 
 async function catalogSnapshot(client) {
