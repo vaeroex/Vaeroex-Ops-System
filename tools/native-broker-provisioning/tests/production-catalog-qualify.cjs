@@ -239,15 +239,6 @@ password_encryption='scram-sha-256'
     qualify(overlayBinary, "closed_authority");
     baselineSourceAtInternal = "exact_104_rejected";
     qualify(internalBinary);
-    stage = "internal_trigger_substitution";
-    psql(["-c", `DROP TRIGGER square_production_internal_permit_delete_guard ON private.square_production_internal_permits;
-      CREATE TRIGGER square_production_internal_permit_delete_guard BEFORE DELETE ON private.square_production_internal_permits
-      FOR EACH ROW WHEN (false) EXECUTE FUNCTION private.square_production_internal_reject_immutable_mutation_v1();`]);
-    qualify(internalBinary, "internal_triggers");
-    psql(["-c", `DROP TRIGGER square_production_internal_permit_delete_guard ON private.square_production_internal_permits;
-      CREATE TRIGGER square_production_internal_permit_delete_guard BEFORE DELETE ON private.square_production_internal_permits
-      FOR EACH ROW EXECUTE FUNCTION private.square_production_internal_reject_immutable_mutation_v1();`]);
-    qualify(internalBinary);
     const parentTriggers = psql(["-At", "-c", `SELECT trigger_record.tgname
       FROM pg_catalog.pg_trigger trigger_record
       JOIN pg_catalog.pg_constraint constraint_record ON constraint_record.oid=trigger_record.tgconstraint
@@ -263,6 +254,11 @@ password_encryption='scram-sha-256'
       finally { psql(["-c", `ALTER TABLE public.business_entities ENABLE TRIGGER "${name}"`]); }
       qualify(internalBinary);
     }
+    stage = "internal_trigger_substitution";
+    psql(["-c", `DROP TRIGGER square_production_internal_permit_delete_guard ON private.square_production_internal_permits;
+      CREATE TRIGGER square_production_internal_permit_delete_guard BEFORE DELETE ON private.square_production_internal_permits
+      FOR EACH ROW WHEN (false) EXECUTE FUNCTION private.square_production_internal_reject_immutable_mutation_v1();`]);
+    qualify(internalBinary, "internal_triggers");
     internalRuntime = "exact_104_qualified";
   }
   cleanup();
