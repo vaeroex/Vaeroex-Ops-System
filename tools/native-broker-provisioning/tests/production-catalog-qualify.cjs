@@ -21,7 +21,7 @@ const internalName = "20260902191325_square_production_internal_pilot_runtime.sq
 const pins = Object.freeze({
   foundation: "f8598ca685c795ad56bfdb7a29a1ded3da1c096d42ffb62ea4e123271db54c6d",
   overlay: "2cc43a9313d056e58b75143f032f347cb0972f45cc1edbd484f6b1fb0574661f",
-  internal: "1da1eaf92a2879ac4309978a242d4a6e357c91615b1da2935f3e1a95b616d716",
+  internal: "ff2182044f28d6901f1582db3d31ef20d027a1e4590f0b295a7a64a1ad4c1325",
   preFoundationLedger: "sha256:db7c39a62dce07ac3d21a78653a6d4a905f399d00ea1a4dce452ed4018958060",
 });
 const hash = source => crypto.createHash("sha256").update(source).digest("hex");
@@ -244,6 +244,25 @@ password_encryption='scram-sha-256'
       CREATE TRIGGER square_production_internal_permit_delete_guard BEFORE DELETE ON private.square_production_internal_permits
       FOR EACH ROW WHEN (false) EXECUTE FUNCTION private.square_production_internal_reject_immutable_mutation_v1();`]);
     qualify(internalBinary, "internal_triggers");
+    psql(["-c", `DROP TRIGGER square_production_internal_permit_delete_guard ON private.square_production_internal_permits;
+      CREATE TRIGGER square_production_internal_permit_delete_guard BEFORE DELETE ON private.square_production_internal_permits
+      FOR EACH ROW EXECUTE FUNCTION private.square_production_internal_reject_immutable_mutation_v1();`]);
+    qualify(internalBinary);
+    const parentTriggers = psql(["-At", "-c", `SELECT trigger_record.tgname
+      FROM pg_catalog.pg_trigger trigger_record
+      JOIN pg_catalog.pg_constraint constraint_record ON constraint_record.oid=trigger_record.tgconstraint
+      WHERE trigger_record.tgisinternal AND constraint_record.contype='f'
+        AND constraint_record.conrelid='private.square_production_internal_permits'::regclass
+        AND trigger_record.tgrelid='public.business_entities'::regclass
+      ORDER BY trigger_record.tgname`]).stdout.trim().split("\n");
+    check(parentTriggers.length === 2 && parentTriggers.every(name => /^RI_ConstraintTrigger_[A-Za-z0-9_]+$/.test(name)),
+      "both_referenced_side_triggers_present");
+    for (const name of parentTriggers) {
+      psql(["-c", `ALTER TABLE public.business_entities DISABLE TRIGGER "${name}"`]);
+      try { qualify(internalBinary, "internal_triggers"); }
+      finally { psql(["-c", `ALTER TABLE public.business_entities ENABLE TRIGGER "${name}"`]); }
+      qualify(internalBinary);
+    }
     internalRuntime = "exact_104_qualified";
   }
   cleanup();

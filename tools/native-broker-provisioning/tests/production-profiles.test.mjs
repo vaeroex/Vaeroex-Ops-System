@@ -35,7 +35,7 @@ test("Production profiles pin the exact reviewed 102+overlay sources", () => {
     internalRuntimeVersion: "20260902191325",
     internalRuntimeMigrationCount: 104,
     internalRuntimeLedgerFingerprint: "sha256:7dc51d888ee9c4a6bb595b1a4431ab5fcdb649e34c871ba91a6512d5fa2dc89f",
-    internalRuntimeSha256: "1da1eaf92a2879ac4309978a242d4a6e357c91615b1da2935f3e1a95b616d716",
+    internalRuntimeSha256: "ff2182044f28d6901f1582db3d31ef20d027a1e4590f0b295a7a64a1ad4c1325",
   });
   assert.equal(hash("supabase/migrations/20260902191323_integration_production_runtime_foundation.sql"), productionSourcePins.foundationSha256);
   assert.equal(hash("supabase/migrations/20260902191324_square_production_runtime_overlay.sql"), productionSourcePins.overlaySha256);
@@ -237,6 +237,15 @@ test("portable catalog qualification executes exact phase predicates from CI", (
   assert.doesNotMatch(qualifier, /psql\(\["-f", (?:foundation|overlay|internal)\]/);
   assert.match(qualifier, /baseline_triggers/);
   assert.match(qualifier, /internal_triggers/);
+  assert.match(qualifier, /parentTriggers\.length === 2/);
+  assert.match(qualifier, /trigger_record\.tgrelid='public\.business_entities'::regclass/);
+  assert.match(qualifier, /DISABLE TRIGGER "\$\{name\}"[\s\S]*qualify\(internalBinary, "internal_triggers"\)/);
+  const internalTriggerVerifier = nativeSource.slice(
+    nativeSource.indexOf("static bool production_internal_runtime_triggers_valid"),
+    nativeSource.indexOf("static bool production_internal_runtime_functions_valid"),
+  );
+  assert.match(internalTriggerVerifier, /crn\.nspname='private'[\s\S]*c\.contype='f'/,
+    "native validation includes parent-side triggers declared by protected foreign keys");
   assert.match(qualifier, /catalog_contract_positive_\$\{match\[1\]\}/);
   assert.match(qualifier, /"internal_functions"/);
   assert.match(qualifier, /internalSourceAtOverlay = "exact_103_qualified"/);

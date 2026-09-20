@@ -272,6 +272,21 @@ async function verifyInternalRelationGuard(client) {
   ), "utf8").match(/do \$legacy_overlay_guard\$[\s\S]*?\$legacy_overlay_guard\$;/)?.[0];
   assert.ok(guard, "reviewed forward guard is available for disposable catalog qualification");
   await client.query(guard);
+  const runtimeRpcs = ["oauth", "broker", "runtime", "evidence"];
+  for (const removed of [...runtimeRpcs.map(name => [name]), runtimeRpcs]) {
+    await client.query("begin");
+    try {
+      for (const name of removed) {
+        await client.query(`drop function public.square_production_internal_${name}_v1(text,jsonb)`);
+      }
+      await assert.rejects(client.query(guard), error => error.code === "55000"
+        && /integration_production_internal_runtime_partial/.test(error.message),
+      `recorded runtime ledger rejects removal of ${removed.join("+")} RPCs`);
+    } finally {
+      await client.query("rollback");
+    }
+    await client.query(guard);
+  }
   const relations = [
     "square_production_internal_permits", "square_production_internal_oauth_states",
     "square_production_internal_credentials", "square_production_internal_scans",
@@ -1270,6 +1285,18 @@ async function exerciseRuntime(client) {
   });
   assert.equal(encryptedCredential.ciphertextBase64, ciphertextBase64);
   assert.equal(Object.hasOwn(encryptedCredential, "accessToken"), false);
+  for (const field of ["leaseId", "leaseOwnerFingerprint", "requestFingerprint"]) {
+    const foreignWorkspaceRead = {
+      leaseId: ids.leaseId, leaseOwnerFingerprint, permitId: ids.permitId,
+      requestFingerprint: credentialReadFingerprint, scanId: ids.scanId,
+      [field]: null
+    };
+    await assert.rejects(
+      asRuntimeRole(client, "broker", "read_credential", foreignWorkspaceRead),
+      error => error.code === "42501" && /square_production_internal_credential_read_denied/.test(error.message),
+      `shared broker cannot read another workspace credential with JSON-null ${field}`
+    );
+  }
 
   const responseFingerprint = runtimeFingerprint(["payments-response-v1", "one-bounded-page"]);
   const pageId = runtimeFingerprint(["payments-page-v1", ids.scanId, responseFingerprint]);
@@ -1502,6 +1529,20 @@ async function main() {
 
 async function nativeMain() {
   assertMigrationManifest();
+  const preRuntimeTarget = await createNativeTarget();
+  try {
+    await applyNativePrefix(preRuntimeTarget.client, overlayVersion);
+    await preRuntimeTarget.client.query(fs.readFileSync(path.join(root,
+      "supabase/migrations/20260912190000_square_production_runtime_foundation.sql"
+    ), "utf8"));
+    const guard = fs.readFileSync(path.join(root,
+      "supabase/migrations/20260915040500_integration_production_legacy_foundation_guard.sql"
+    ), "utf8").match(/do \$legacy_overlay_guard\$[\s\S]*?\$legacy_overlay_guard\$;/)?.[0];
+    assert.ok(guard);
+    await preRuntimeTarget.client.query(guard);
+  } finally {
+    await preRuntimeTarget.stop();
+  }
   const target = await createNativeTarget();
   try {
     await applyNativePrefix(target.client, overlayVersion);

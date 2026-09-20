@@ -16,6 +16,7 @@ declare
   expected_internal_rpc regprocedure;
   square_overlay_present boolean;
   square_internal_runtime_present boolean;
+  square_internal_runtime_recorded boolean;
   square_internal_runtime_catalog_valid boolean;
   schema_digest text;
 begin
@@ -265,11 +266,20 @@ begin
   end if;
   square_overlay_present :=
     to_regclass('private.square_production_configuration_generations') is not null;
+  square_internal_runtime_recorded := exists (
+    select 1 from supabase_migrations.schema_migrations
+    where version='20260902191325'
+  );
   square_internal_runtime_present :=
     to_regprocedure('public.square_production_internal_oauth_v1(text,jsonb)') is not null
     and to_regprocedure('public.square_production_internal_broker_v1(text,jsonb)') is not null
     and to_regprocedure('public.square_production_internal_runtime_v1(text,jsonb)') is not null
     and to_regprocedure('public.square_production_internal_evidence_v1(text,jsonb)') is not null;
+
+  if square_internal_runtime_recorded and not square_internal_runtime_present then
+    raise exception 'integration_production_internal_runtime_partial'
+      using errcode = '55000';
+  end if;
 
   if not square_internal_runtime_present and (
     to_regprocedure('public.square_production_internal_oauth_v1(text,jsonb)') is not null
@@ -291,7 +301,7 @@ begin
     ('private.square_production_internal_lock_permit_v1(uuid,text,boolean)','plpgsql','v',true,false,'u','private.square_production_internal_permits',array['p_permit_id','p_capability','p_allow_internal_fence']::text[],1,'false','70e8f973ca1942bf69d6e0c0228a145eb44edfc1bc26ed153fae3321de08b920'),
     ('private.square_production_internal_install_permit_v1(jsonb)','plpgsql','v',true,false,'u','jsonb',array['p_payload']::text[],0,null::text,'efa4aa61687f5580ceb24897fb1ad6a83527c765a37804bcc03cbbfa375b1905'),
     ('public.square_production_internal_oauth_v1(text,jsonb)','plpgsql','v',true,false,'u','jsonb',array['p_operation','p_payload']::text[],0,null::text,'6ff215c19aa5c66b607c307d26bcf8f53cc8b3308bd929a50a5f97c5e049d860'),
-    ('public.square_production_internal_broker_v1(text,jsonb)','plpgsql','v',true,false,'u','jsonb',array['p_operation','p_payload']::text[],0,null::text,'41f97c64568a973faa25cfdf99bca8301cbb2103ff8d95491d010e90d3e0d6bb'),
+    ('public.square_production_internal_broker_v1(text,jsonb)','plpgsql','v',true,false,'u','jsonb',array['p_operation','p_payload']::text[],0,null::text,'386b2afeeb21c1884b1d1e4869ceccde87218f2201c4e5c802c74b3ff7ec5b61'),
     ('public.square_production_internal_runtime_v1(text,jsonb)','plpgsql','v',true,false,'u','jsonb',array['p_operation','p_payload']::text[],0,null::text,'63024be692c785827b982945c220b0268d8e57ee2db4f3d46a8033a5f5fe3301'),
     ('public.square_production_internal_evidence_v1(text,jsonb)','plpgsql','v',true,false,'u','jsonb',array['p_operation','p_payload']::text[],0,null::text,'98e2d0363897ad1020fb4296dd643ccd4798cac10030b8a4883379844d954877')
   ), resolved as (
@@ -328,10 +338,7 @@ begin
 
   if square_internal_runtime_present and (
     not square_internal_runtime_catalog_valid
-    or not exists (
-      select 1 from supabase_migrations.schema_migrations
-      where version='20260902191325'
-    )
+    or not square_internal_runtime_recorded
     or 8 <> (
       select count(*) from pg_catalog.pg_class relation
       join pg_catalog.pg_namespace namespace on namespace.oid=relation.relnamespace

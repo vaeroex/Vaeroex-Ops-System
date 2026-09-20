@@ -581,7 +581,7 @@ static bool production_internal_runtime_source_pinned(void) {
    * builder also verifies the migration bytes before defining the macro, so a
    * final-ledger database cannot be accepted by a baseline-source binary. */
   return !strcmp(VAEROEX_PRODUCTION_INTERNAL_RUNTIME_SOURCE_SHA256,
-    "1da1eaf92a2879ac4309978a242d4a6e357c91615b1da2935f3e1a95b616d716");
+    "ff2182044f28d6901f1582db3d31ef20d027a1e4590f0b295a7a64a1ad4c1325");
 #else
   return false;
 #endif
@@ -989,25 +989,31 @@ static bool production_internal_runtime_triggers_valid(void) {
       "OR t.tgtype<>e.trigger_type OR t.tgattr::text<>'' OR pg_catalog.octet_length(t.tgargs)<>0 "
       "OR t.tgqual IS NOT NULL OR t.tgenabled<>'O' OR t.tgconstraint<>0 "
       "OR pg_catalog.encode(extensions.digest(pg_catalog.convert_to(pg_catalog.pg_get_triggerdef(t.oid,true),'UTF8'),'sha256'),'hex')<>e.definition_hash) "
-    "AND (SELECT count(*)=44 AND pg_catalog.encode(extensions.digest(pg_catalog.convert_to(coalesce("
-      "pg_catalog.jsonb_agg(pg_catalog.jsonb_build_array(r.relname,c.conname,crn.nspname||'.'||cr.relname,"
+    "AND (SELECT count(*)=48 AND pg_catalog.encode(extensions.digest(pg_catalog.convert_to(coalesce("
+      "pg_catalog.jsonb_agg(pg_catalog.jsonb_build_array(n.nspname,r.relname,c.conname,crn.nspname||'.'||cr.relname,"
         "frn.nspname||'.'||fr.relname,c.contype::text,c.condeferrable,c.condeferred,c.convalidated,"
         "pg_catalog.pg_get_constraintdef(c.oid,true),pn.nspname||'.'||p.proname||'('||"
         "pg_catalog.pg_get_function_identity_arguments(p.oid)||')',t.tgtype::integer,t.tgattr::text,"
         "pg_catalog.encode(t.tgargs,'hex'),pg_catalog.pg_get_expr(t.tgqual,t.tgrelid,true),t.tgenabled::text) "
-        "ORDER BY r.relname,c.conname,pn.nspname,p.proname,t.tgtype),'[]'::jsonb)::text,'UTF8'),'sha256'),'hex')="
-        "'b3750e1d4f6155e7e170b8257ccaa15262ed91da122873198b2980a0c413ba6b' "
+        "ORDER BY n.nspname,r.relname,c.conname,pn.nspname,p.proname,t.tgtype),'[]'::jsonb)::text,'UTF8'),'sha256'),'hex')="
+        "'d5b54b7b0dc5f17fbc057488ce87b2a7dbb21321a67754a509f4660ef0de4190' "
       "FROM pg_catalog.pg_trigger t JOIN pg_catalog.pg_class r ON r.oid=t.tgrelid "
       "JOIN pg_catalog.pg_namespace n ON n.oid=r.relnamespace JOIN pg_catalog.pg_proc p ON p.oid=t.tgfoid "
       "JOIN pg_catalog.pg_namespace pn ON pn.oid=p.pronamespace "
       "LEFT JOIN pg_catalog.pg_constraint c ON c.oid=t.tgconstraint "
       "LEFT JOIN pg_catalog.pg_class cr ON cr.oid=c.conrelid LEFT JOIN pg_catalog.pg_namespace crn ON crn.oid=cr.relnamespace "
       "LEFT JOIN pg_catalog.pg_class fr ON fr.oid=c.confrelid LEFT JOIN pg_catalog.pg_namespace frn ON frn.oid=fr.relnamespace "
-      "WHERE n.nspname='private' AND t.tgisinternal AND r.relname=ANY(array["
+      "WHERE t.tgisinternal AND ((n.nspname='private' AND r.relname=ANY(array["
         "'square_production_internal_permits','square_production_internal_oauth_states',"
         "'square_production_internal_credentials','square_production_internal_scans',"
         "'square_production_internal_page_receipts','square_production_internal_source_versions',"
-        "'square_production_internal_fences','square_production_internal_audit_events']))",0,NULL);
+        "'square_production_internal_fences','square_production_internal_audit_events'])) "
+      "OR (crn.nspname='private' AND cr.relname=ANY(array["
+        "'square_production_internal_permits','square_production_internal_oauth_states',"
+        "'square_production_internal_credentials','square_production_internal_scans',"
+        "'square_production_internal_page_receipts','square_production_internal_source_versions',"
+        "'square_production_internal_fences','square_production_internal_audit_events']) "
+      "AND c.contype='f')))",0,NULL);
 }
 
 static bool production_internal_runtime_functions_valid(void) {
@@ -1022,7 +1028,7 @@ static bool production_internal_runtime_functions_valid(void) {
       "('private.square_production_internal_lock_permit_v1(uuid,text,boolean)','plpgsql','v',true,false,'u','private.square_production_internal_permits',array['p_permit_id','p_capability','p_allow_internal_fence']::text[],1,'false','70e8f973ca1942bf69d6e0c0228a145eb44edfc1bc26ed153fae3321de08b920'),"
       "('private.square_production_internal_install_permit_v1(jsonb)','plpgsql','v',true,false,'u','jsonb',array['p_payload']::text[],0,null::text,'efa4aa61687f5580ceb24897fb1ad6a83527c765a37804bcc03cbbfa375b1905'),"
       "('public.square_production_internal_oauth_v1(text,jsonb)','plpgsql','v',true,false,'u','jsonb',array['p_operation','p_payload']::text[],0,null::text,'6ff215c19aa5c66b607c307d26bcf8f53cc8b3308bd929a50a5f97c5e049d860'),"
-      "('public.square_production_internal_broker_v1(text,jsonb)','plpgsql','v',true,false,'u','jsonb',array['p_operation','p_payload']::text[],0,null::text,'41f97c64568a973faa25cfdf99bca8301cbb2103ff8d95491d010e90d3e0d6bb'),"
+      "('public.square_production_internal_broker_v1(text,jsonb)','plpgsql','v',true,false,'u','jsonb',array['p_operation','p_payload']::text[],0,null::text,'386b2afeeb21c1884b1d1e4869ceccde87218f2201c4e5c802c74b3ff7ec5b61'),"
       "('public.square_production_internal_runtime_v1(text,jsonb)','plpgsql','v',true,false,'u','jsonb',array['p_operation','p_payload']::text[],0,null::text,'63024be692c785827b982945c220b0268d8e57ee2db4f3d46a8033a5f5fe3301'),"
       "('public.square_production_internal_evidence_v1(text,jsonb)','plpgsql','v',true,false,'u','jsonb',array['p_operation','p_payload']::text[],0,null::text,'98e2d0363897ad1020fb4296dd643ccd4798cac10030b8a4883379844d954877')"
     "), resolved AS (SELECT e.*,to_regprocedure(e.signature) oid FROM expected e) "
@@ -1268,7 +1274,7 @@ static bool production_authority_valid(const char *target) {
         "6ff215c19aa5c66b607c307d26bcf8f53cc8b3308bd929a50a5f97c5e049d860","square_production_oauth",true) &&
       production_named_authority_valid("square_production_broker_authority",
         "public.square_production_internal_broker_v1(text,jsonb)",
-        "41f97c64568a973faa25cfdf99bca8301cbb2103ff8d95491d010e90d3e0d6bb","square_production_broker",true) &&
+        "386b2afeeb21c1884b1d1e4869ceccde87218f2201c4e5c802c74b3ff7ec5b61","square_production_broker",true) &&
       production_named_authority_valid("square_production_scheduler_authority",
         "public.check_square_production_scheduler_authority_v1(text,text,text,bigint,text)",
         AUTHORITY_SOURCE_FOR("square_production_scheduler_authority","scheduler"),"square_production_scheduler",false) &&

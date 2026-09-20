@@ -238,6 +238,18 @@ const credentialReadBranch = migration.slice(
   migration.indexOf("elsif p_operation='read_credential' then"),
   migration.indexOf("create function private.square_production_internal_guard_lifecycle_update_v1")
 );
+for (const field of ["leaseId", "leaseOwnerFingerprint", "requestFingerprint"]) {
+  assert.ok(credentialReadBranch.includes(`pg_catalog.jsonb_typeof(p_payload->'${field}') is distinct from 'string'`),
+    `credential read rejects JSON-null ${field} before credential lookup`);
+  assert.ok(qualificationRunner.includes(`"leaseId", "leaseOwnerFingerprint", "requestFingerprint"`),
+    "native qualification exercises all three nullable credential-read bindings");
+}
+assert.match(legacyGuard, /square_internal_runtime_recorded := exists \([\s\S]*?version='20260902191325'/,
+  "later foundation guard binds runtime contract to the applied ledger");
+assert.match(legacyGuard, /square_internal_runtime_recorded and not square_internal_runtime_present[\s\S]*?integration_production_internal_runtime_partial/,
+  "recorded runtime cannot pass with all four RPCs removed");
+assert.match(qualificationRunner, /for \(const removed of \[\.\.\.runtimeRpcs\.map\(name => \[name\]\), runtimeRpcs\]\)/,
+  "disposable database tests each required RPC and complete removal");
 assert.ok(credentialReadBranch.indexOf("select scan.* into scan_row")
   < credentialReadBranch.indexOf("square_production_internal_lock_permit_v1(scan_row.permit_id,'broker')"),
 "credential reads use the shared scan-then-permit lock order");

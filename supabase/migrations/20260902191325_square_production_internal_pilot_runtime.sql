@@ -923,6 +923,11 @@ begin
     perform private.square_production_internal_require_keys_v1(p_payload,array[
       'leaseId','leaseOwnerFingerprint','permitId','requestFingerprint','scanId'
     ]);
+    if pg_catalog.jsonb_typeof(p_payload->'leaseId') is distinct from 'string'
+      or pg_catalog.jsonb_typeof(p_payload->'leaseOwnerFingerprint') is distinct from 'string'
+      or pg_catalog.jsonb_typeof(p_payload->'requestFingerprint') is distinct from 'string' then
+      raise exception 'square_production_internal_credential_read_denied' using errcode='42501';
+    end if;
     permit_uuid:=(p_payload->>'permitId')::uuid;
     scan_uuid:=(p_payload->>'scanId')::uuid;
     lease_uuid:=(p_payload->>'leaseId')::uuid;
