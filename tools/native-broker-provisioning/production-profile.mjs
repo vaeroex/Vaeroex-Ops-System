@@ -24,7 +24,7 @@ export const productionSourcePins = Object.freeze({
   internalRuntimeVersion: "20260902191325",
   internalRuntimeMigrationCount: 104,
   internalRuntimeLedgerFingerprint: "sha256:7dc51d888ee9c4a6bb595b1a4431ab5fcdb649e34c871ba91a6512d5fa2dc89f",
-  internalRuntimeSha256: "db502e7671028fc9867d49c1b8c198b694d1f07674fe8312bdbc032d80570716",
+  internalRuntimeSha256: "ff2182044f28d6901f1582db3d31ef20d027a1e4590f0b295a7a64a1ad4c1325",
 });
 
 const names = Object.freeze(["oauth", "broker", "scheduler", "webhook", "runtime", "evidence"]);

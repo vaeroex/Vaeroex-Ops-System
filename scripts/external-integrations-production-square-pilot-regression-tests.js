@@ -203,7 +203,7 @@ assert.equal(productionSourcePins.internalRuntimeMigrationCount, 104);
 assert.equal(productionSourcePins.internalRuntimeLedgerFingerprint,
   "sha256:7dc51d888ee9c4a6bb595b1a4431ab5fcdb649e34c871ba91a6512d5fa2dc89f");
 assert.equal(productionSourcePins.internalRuntimeSha256,
-  "db502e7671028fc9867d49c1b8c198b694d1f07674fe8312bdbc032d80570716");
+  "ff2182044f28d6901f1582db3d31ef20d027a1e4590f0b295a7a64a1ad4c1325");
 assert.match(ciWorkflow,
   /VAEROEX_NATIVE_TEST_DEPENDENCIES="\$native_manifest" node tools\/native-broker-provisioning\/tests\/production-native-qualify\.cjs/);
 assert.match(ciWorkflow,
@@ -275,8 +275,9 @@ assert.match(readme, /callback-only Terraform plan[\s\S]*no create, destroy or r
 assert.doesNotMatch(readme, /only the three reviewed in-place updates/,
   "the operator sequence cannot reuse a prior callback plan's update count");
 assert.match(readme, /authoritative database source and catalog checks are the merged[\s\S]*`productionSourcePins`[\s\S]*`production-native-qualify\.cjs`[\s\S]*`production-catalog-qualify\.cjs`/);
-assert.match(readme, /`20260902191325`[\s\S]*absent from the merged qualification[\s\S]*future pins are not a reviewed runtime dependency/);
-assert.match(readme, /Do not apply `20260902191325` under the current package/);
+assert.match(readme, /`20260902191325` is now delivered[\s\S]*remains unapplied[\s\S]*not activation evidence/);
+assert.match(readme, /Do not apply `20260902191325` merely because its source is merged[\s\S]*exactly 103 entries[\s\S]*separate bounded authorization/);
+assert.match(handoff, /`20260902191325` is source-controlled[\s\S]*remains unapplied[\s\S]*do not authorize applying it or creating LOGINs/);
 assert.match(readme, /all six profiles must be fenced `NOLOGIN NOINHERIT`/);
 assert.match(readme, /CI\/source qualification remains nonauthorizing/);
 assert.match(readme, /fixed six-profile Production extension of\s+`tools\/native-broker-provisioning`/);

@@ -9,13 +9,12 @@ credential containers are empty, the allowlist is empty, and every gate is
 false.
 
 A sanitized preflight candidate can currently attest only the reviewed 103-file
-source baseline ending at Square overlay `20260902191324`. The executable
-internal runtime dependency is still pending: this contract deliberately names
-no runtime source commit, path, ledger head, fingerprint, digest, function or
-authority surface. The merged native source retains 104-ledger planning pins for
-`20260902191325`, but that migration is absent from the merged qualification
-tree and those future pins are not a reviewed runtime dependency. A version-only
-or boolean claim is rejected. The contract pins the corrected overlay's final
+source baseline ending at Square overlay `20260902191324`. Migration
+`20260902191325` is now delivered by its own reviewed source contract, but it
+remains unapplied and is not activation evidence. This pilot contract still
+deliberately names no applied runtime source commit, ledger receipt or hosted
+authority readback. A version-only or boolean claim is rejected. The contract
+pins the corrected overlay's final
 reviewed hash; activation evidence must prove that exact source object was
 merged and applied. The qualifier independently hashes that path in the exact
 Git object named by `--expect-head` and requires the qualifier itself to run
@@ -164,12 +163,12 @@ lifecycle. An independently reviewed executable Production binding/runtime and
 the fixed native provisioner above must exist, be deployed with every gate
 closed, and pass hosted readbacks before credential entry or consent can begin.
 
-The planned adjacent Production-only runtime migration is
-`20260902191325_square_production_internal_pilot_runtime.sql`, but it is not in
-the current merged qualification tree and has no reviewed source identity in
-this contract. It must be delivered and reviewed separately before this package
-can pin or apply it; the reviewed overlay itself stays byte-identical. The
-planned dependency adds only durable state-create,
+The adjacent Production-only runtime migration is
+`20260902191325_square_production_internal_pilot_runtime.sql`. Its dedicated
+source contract pins SHA-256
+`ff2182044f28d6901f1582db3d31ef20d027a1e4590f0b295a7a64a1ad4c1325`, but
+delivery in Git does not authorize or prove remote application. The reviewed
+overlay itself stays byte-identical. The dependency adds only durable state-create,
 one-use consume/receipt,
 broker credential commit, exact mapping, bounded manual page/replay, workspace
 evidence and cleanup/fence surfaces. Each new entry point must be granted only to
@@ -219,12 +218,11 @@ example still describes the hosted state.
    that its image/source values remain current. Apply only the exact reviewed
    plan, then read back its exact plan/state addresses, deployed digests, source
    variables, ingress and disabled runtime state.
-3. Do not apply `20260902191325` under the current package. The merged
-   qualification tree ends at the reviewed 103-file overlay source and the
-   runtime dependency is explicitly pending. Only after a separate runtime PR
-   is reviewed and merged may a refreshed contract pin that migration's own
-   source commit, source-controlled path, SHA-256, exact ledger head and reviewed
-   object/function/trigger manifest. Leave LOGIN provisioning blocked
+3. Do not apply `20260902191325` merely because its source is merged. First
+   verify the Production ledger contains exactly 103 entries, ends at
+   `20260902191324`, and matches the pinned baseline fingerprint; then obtain a
+   separate bounded authorization for the exact reviewed migration bytes.
+   Leave LOGIN provisioning blocked
    until a reviewed private Production execution path is available
    for all six LOGINs; continue the independent nonsecret checks below. Keep the
    one-to-one non-settable authority memberships and retain only a sanitized

@@ -6,6 +6,7 @@ const path = require("node:path");
 const root = path.resolve(__dirname, "..");
 const baseName = "20260902191323_integration_production_runtime_foundation.sql";
 const overlayName = "20260902191324_square_production_runtime_overlay.sql";
+const internalRuntimeName = "20260902191325_square_production_internal_pilot_runtime.sql";
 const firstExcludedName = "20260907042202_square_dormant_trusted_authority.sql";
 const migrationDirectory = path.join(root, "supabase/migrations");
 const migrations = fs.readdirSync(migrationDirectory)
@@ -29,7 +30,8 @@ const pgTap = fs.readFileSync(
 
 assert.equal(migrations.indexOf(baseName), 101, "Production foundation remains migration 102");
 assert.equal(migrations[102], overlayName, "Production overlay is the adjacent migration 103");
-assert.equal(migrations[103], firstExcludedName, "Sandbox migrations remain later and excluded");
+assert.equal(migrations[103], internalRuntimeName, "Production internal runtime is the adjacent separately qualified migration 104");
+assert.equal(migrations[104], firstExcludedName, "Sandbox migrations remain later and excluded");
 assert.equal(
   migrations.filter((name) => name <= baseName).length,
   102,
