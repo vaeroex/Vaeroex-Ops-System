@@ -5,7 +5,7 @@ locals {
   network         = "projects/vaeroex-integrations-prod/global/networks/vaeroex-integrations-production"
   subnetwork      = "projects/vaeroex-integrations-prod/regions/us-west1/subnetworks/vaeroex-integrations-us-west1"
   profiles        = toset(["oauth", "broker", "scheduler", "webhook", "runtime", "evidence"])
-  active_profiles = var.temporary_access_enabled ? local.profiles : toset([])
+  active_profiles = var.temporary_access_enabled ? var.temporary_access_profiles : toset([])
   window_condition = join(" && ", [
     "request.time >= timestamp('${var.window_starts_at}')",
     "request.time < timestamp('${var.window_expires_at}')",

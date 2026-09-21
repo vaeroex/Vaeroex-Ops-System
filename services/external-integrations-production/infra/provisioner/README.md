@@ -30,8 +30,11 @@ prompt or invokes the native tool.
 API network paths. During setup only, `setup_https_enabled` permits package
 downloads over TCP/443. It provides no secret authority. After installation,
 close that broad setup rule and verify its removal before setting
-`temporary_access_enabled` to grant the six separate four-permission secret
-bindings. Terraform rejects simultaneous setup HTTPS and credential staging.
+`temporary_access_enabled` and explicitly selecting only the reviewed
+`temporary_access_profiles` needed for that window. A six-role sequence selects
+all six profiles; a bounded OAuth-only recovery selects only `oauth`. Terraform
+rejects an open window with no selected profile, a selection while access is
+closed, unknown profiles, and simultaneous setup HTTPS and credential staging.
 The explicit grant dependency also enforces transition ordering: setup-rule
 deletion completes before any secret grant is created, and every secret-grant
 deletion completes before setup HTTPS can be recreated. These apply-graph edges

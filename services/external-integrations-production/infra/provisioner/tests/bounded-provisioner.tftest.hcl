@@ -65,6 +65,7 @@ run "open_window_has_only_exact_expiring_permissions" {
   variables {
     administrative_access_enabled = true
     temporary_access_enabled      = true
+    temporary_access_profiles     = ["oauth", "broker", "scheduler", "webhook", "runtime", "evidence"]
   }
 
   assert {
@@ -113,6 +114,24 @@ run "open_window_has_only_exact_expiring_permissions" {
   }
 }
 
+run "oauth_only_window_has_only_oauth_secret_authority" {
+  command = plan
+  variables {
+    administrative_access_enabled = true
+    temporary_access_enabled      = true
+    temporary_access_profiles     = ["oauth"]
+  }
+
+  assert {
+    condition = (
+      toset(keys(google_secret_manager_secret_iam_member.private_versions)) == toset(["oauth"]) &&
+      google_secret_manager_secret_iam_member.private_versions["oauth"].secret_id == "square-production-oauth-db" &&
+      google_secret_manager_secret_iam_member.private_versions["oauth"].condition[0].expression == "request.time >= timestamp('2099-01-01T00:00:00Z') && request.time < timestamp('2099-01-01T01:00:00Z')"
+    )
+    error_message = "An OAuth-only window must grant the provisioner authority on only the OAuth database-secret container."
+  }
+}
+
 run "setup_downloads_have_no_secret_authority" {
   command = plan
   variables {
@@ -138,14 +157,43 @@ run "reject_secret_staging_with_setup_egress" {
     administrative_access_enabled = true
     setup_https_enabled           = true
     temporary_access_enabled      = true
+    temporary_access_profiles     = ["oauth"]
   }
   expect_failures = [var.temporary_access_enabled]
 }
 
 run "reject_secret_staging_without_private_administration" {
   command = plan
-  variables { temporary_access_enabled = true }
+  variables {
+    temporary_access_enabled  = true
+    temporary_access_profiles = ["oauth"]
+  }
   expect_failures = [var.temporary_access_enabled]
+}
+
+run "reject_open_temporary_access_without_a_profile" {
+  command = plan
+  variables {
+    administrative_access_enabled = true
+    temporary_access_enabled      = true
+  }
+  expect_failures = [var.temporary_access_profiles]
+}
+
+run "reject_profile_selection_while_temporary_access_is_closed" {
+  command = plan
+  variables { temporary_access_profiles = ["oauth"] }
+  expect_failures = [var.temporary_access_profiles]
+}
+
+run "reject_unknown_temporary_access_profile" {
+  command = plan
+  variables {
+    administrative_access_enabled = true
+    temporary_access_enabled      = true
+    temporary_access_profiles     = ["unknown"]
+  }
+  expect_failures = [var.temporary_access_profiles]
 }
 
 run "reject_setup_without_private_administration" {

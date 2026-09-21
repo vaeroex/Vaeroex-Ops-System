@@ -38,7 +38,8 @@ run "setup_removed_credentials_created" {
     target = [google_compute_firewall.setup_https, google_secret_manager_secret_iam_member.private_versions]
   }
   variables {
-    temporary_access_enabled = true
+    temporary_access_enabled  = true
+    temporary_access_profiles = ["oauth", "broker", "scheduler", "webhook", "runtime", "evidence"]
   }
   assert {
     condition = (
