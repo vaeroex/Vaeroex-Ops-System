@@ -87,8 +87,22 @@ test("guest setup is bounded public Debian setup and preserves administrative se
   assert.doesNotMatch(source,/mount .*remount| -o "\$scratch\/libpq-version"|^"\$scratch\/libpq-version"/m);
   assert.match(source,/199\.36\.153\.8 secretmanager\.googleapis\.com/);
   assert.match(source,/Storage=none\\nProcessSizeMax=0/);
+  assert.match(source,/^export PATH=\/usr\/bin:\/bin LANG=C LC_ALL=C DEBIAN_FRONTEND=noninteractive$/m);
+  assert.match(source,/^\/usr\/sbin\/sysctl -p "\$sysctl_file" >\/dev\/null$/m);
   assert.match(source,/public_setup_complete_no_credential_entry/);
   assert.doesNotMatch(source,/apt-key|curl.*\|.*sh|trusted=yes|--allow-unauthenticated|swapoff|gcloud|supabase|psql|read -s|systemctl (?:stop|disable).*ssh|systemctl (?:stop|disable).*google|secretmanager.*:access/);
+});
+
+test("guest sysctl executable resolves under the restricted setup PATH without kernel mutation",{skip:process.platform!=="linux"},()=>{
+  const source=readFileSync(resolve(here,"setup-production-guest.sh"),"utf8");
+  const command=source.match(/^(\S+) -p "\$sysctl_file" >\/dev\/null$/m)?.[1];
+  assert.equal(command,"/usr/sbin/sysctl");
+  // Extract the actual setup executable, but replace the mutation arguments
+  // with its read-only version request. Do not load a sysctl configuration.
+  const result=spawnSync(command,["--version"],{env:{PATH:"/usr/bin:/bin",LANG:"C",LC_ALL:"C"},encoding:"utf8",timeout:5000});
+  assert.equal(result.status,0);
+  assert.match(result.stdout,/^sysctl from procps-ng /);
+  assert.equal(result.stderr,"");
 });
 
 test("guest libpq probe executes from private state while Linux scratch remains noexec",{skip:process.platform!=="linux"},()=>{

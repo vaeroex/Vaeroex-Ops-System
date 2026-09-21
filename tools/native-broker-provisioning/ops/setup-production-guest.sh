@@ -83,7 +83,7 @@ chmod 0644 "$sysctl_file"
 install -d -m 0755 /etc/systemd/coredump.conf.d
 printf '[Coredump]\nStorage=none\nProcessSizeMax=0\n' > "$coredump_file"
 chmod 0644 "$coredump_file"
-sysctl -p "$sysctl_file" >/dev/null
+/usr/sbin/sysctl -p "$sysctl_file" >/dev/null
 systemctl mask sleep.target suspend.target hibernate.target hybrid-sleep.target suspend-then-hibernate.target >/dev/null 2>&1
 [[ $(< /proc/sys/kernel/core_pattern) = '|/bin/false' && $(< /proc/sys/fs/suid_dumpable) = 0 && $(wc -l < /proc/swaps) = 1 ]] || fail production_guest_memory_controls_failed
 printf '%s\n' public_setup_complete_no_credential_entry > "$state/status"
