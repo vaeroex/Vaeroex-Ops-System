@@ -456,9 +456,11 @@ password_encryption='scram-sha-256'
         WITH ADMIN FALSE, INHERIT TRUE, SET FALSE`]);
     stage = "managed_password_locker_fence";
     const pausedScram = await pauseScramAuthentication("square_production_oauth", "paused_scram_probe");
-    const pausedRows = psql(["-At", "-F", "|", "-c", `SELECT coalesce(usename,'<null>'),
+    const pausedActivity = psql(["-At", "-F", "|", "-c", `SELECT coalesce(usename,'<null>'),
       coalesce(application_name,'<null>'),backend_type,coalesce(state,'<null>'),coalesce(datname,'<null>')
-      FROM pg_stat_activity WHERE application_name='paused_scram_probe'`]).stdout.trim().split("|");
+      FROM pg_stat_activity WHERE application_name='paused_scram_probe'`]).stdout.trim();
+    check(pausedActivity === "", "paused_scram_absent_from_activity_before_fence");
+    const pausedRows = pausedActivity === "" ? [] : pausedActivity.split("|");
     process.stdout.write(JSON.stringify({ outcome: "paused_scram_catalog_observation",
       rowVisible: pausedRows.length === 5, userVisible: pausedRows[0] === "square_production_oauth",
       userNull: pausedRows[0] === "<null>", applicationVisible: pausedRows[1] === "paused_scram_probe",
