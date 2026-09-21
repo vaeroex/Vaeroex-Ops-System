@@ -6,6 +6,7 @@ const crypto = require("node:crypto");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
+const net = require("node:net");
 const { spawn, spawnSync } = require("node:child_process");
 const { Client } = require("pg");
 
@@ -79,6 +80,105 @@ const port = "55432";
 const database = "production_catalog_runtime";
 const psql = (args, timeout) => run(path.join(pgRoot, "bin/psql"), ["-X", "-v", "ON_ERROR_STOP=1",
   "-h", socket(), "-p", port, "-U", "postgres", "-d", database, ...args], timeout);
+function startupPacket(user, applicationName) {
+  const fields = ["user", user, "database", database, "application_name", applicationName];
+  const body = Buffer.concat([Buffer.from([0, 3, 0, 0]),
+    ...fields.map(value => Buffer.concat([Buffer.from(value), Buffer.from([0])])), Buffer.from([0])]);
+  const packet = Buffer.alloc(4 + body.length);
+  packet.writeInt32BE(packet.length, 0);
+  body.copy(packet, 4);
+  return packet;
+}
+function passwordPacket(payload) {
+  const packet = Buffer.alloc(5 + payload.length);
+  packet[0] = "p".charCodeAt(0);
+  packet.writeInt32BE(4 + payload.length, 1);
+  payload.copy(packet, 5);
+  return packet;
+}
+async function nextProtocolMessage(connection, state) {
+  for (;;) {
+    if (state.buffer.length >= 5) {
+      const length = state.buffer.readInt32BE(1);
+      if (length >= 4 && state.buffer.length >= 1 + length) {
+        const message = { type: String.fromCharCode(state.buffer[0]),
+          payload: state.buffer.subarray(5, 1 + length) };
+        state.buffer = state.buffer.subarray(1 + length);
+        return message;
+      }
+    }
+    const chunk = await new Promise((resolve, reject) => {
+      const cleanup = () => { connection.off("data", onData); connection.off("error", onError); connection.off("close", onClose); };
+      const onData = value => { cleanup(); resolve(value); };
+      const onError = error => { cleanup(); reject(error); };
+      const onClose = () => { cleanup(); reject(new Error("protocol_closed")); };
+      connection.once("data", onData); connection.once("error", onError); connection.once("close", onClose);
+    });
+    state.buffer = Buffer.concat([state.buffer, chunk]);
+  }
+}
+async function pauseScramAuthentication(user, applicationName) {
+  const connection = net.createConnection({ path: path.join(socket(), `.s.PGSQL.${port}`) });
+  connection.setTimeout(5000, () => connection.destroy(new Error("protocol_timeout")));
+  await new Promise((resolve, reject) => { connection.once("connect", resolve); connection.once("error", reject); });
+  const state = { buffer: Buffer.alloc(0) };
+  connection.write(startupPacket(user, applicationName));
+  let message;
+  do { message = await nextProtocolMessage(connection, state); } while (message.type !== "R");
+  check(message.payload.readInt32BE(0) === 10, "paused_scram_server_requests_sasl");
+  const clientFirstBare = "n=*,r=0123456789abcdef0123456789abcdef";
+  const initial = Buffer.from(`n,,${clientFirstBare}`);
+  const mechanism = Buffer.from("SCRAM-SHA-256\0");
+  const initialLength = Buffer.alloc(4); initialLength.writeInt32BE(initial.length, 0);
+  connection.write(passwordPacket(Buffer.concat([mechanism, initialLength, initial])));
+  do { message = await nextProtocolMessage(connection, state); } while (message.type !== "R");
+  check(message.payload.readInt32BE(0) === 11, "paused_scram_server_challenge_observed");
+  return { connection, state, clientFirstBare, serverFirst: message.payload.subarray(4).toString("utf8") };
+}
+function scramAttributes(value) {
+  const attributes = new Map();
+  for (const component of value.split(",")) {
+    if (component.length < 3 || component[1] !== "=" || attributes.has(component[0]))
+      throw new Error("catalog_qualification_failed");
+    attributes.set(component[0], component.slice(2));
+  }
+  return attributes;
+}
+function errorSqlstate(payload) {
+  for (let offset = 0; offset < payload.length && payload[offset] !== 0;) {
+    const field = String.fromCharCode(payload[offset++]);
+    const end = payload.indexOf(0, offset);
+    if (end < 0) break;
+    const value = payload.subarray(offset, end).toString("utf8");
+    if (field === "C") return value;
+    offset = end + 1;
+  }
+  return "unknown";
+}
+async function finishPausedScram(session, password) {
+  const attributes = scramAttributes(session.serverFirst);
+  const nonce = attributes.get("r"), salt = attributes.get("s"), rounds = Number(attributes.get("i"));
+  check(typeof nonce === "string" && nonce.startsWith("0123456789abcdef0123456789abcdef") &&
+    typeof salt === "string" && Number.isInteger(rounds) && rounds >= 4096, "paused_scram_challenge_shape");
+  const finalWithoutProof = `c=biws,r=${nonce}`;
+  const saltedPassword = crypto.pbkdf2Sync(password, Buffer.from(salt, "base64"), rounds, 32, "sha256");
+  const clientKey = crypto.createHmac("sha256", saltedPassword).update("Client Key").digest();
+  const storedKey = crypto.createHash("sha256").update(clientKey).digest();
+  const authentication = `${session.clientFirstBare},${session.serverFirst},${finalWithoutProof}`;
+  const signature = crypto.createHmac("sha256", storedKey).update(authentication).digest();
+  const proof = Buffer.alloc(clientKey.length);
+  for (let index = 0; index < proof.length; index++) proof[index] = clientKey[index] ^ signature[index];
+  session.connection.write(passwordPacket(Buffer.from(`${finalWithoutProof},p=${proof.toString("base64")}`)));
+  let ready = false, sqlstate = "none", saslFinal = false;
+  for (let count = 0; count < 16 && !ready && sqlstate === "none"; count++) {
+    const message = await nextProtocolMessage(session.connection, session.state);
+    if (message.type === "R") saslFinal ||= message.payload.readInt32BE(0) === 12;
+    else if (message.type === "E") sqlstate = errorSqlstate(message.payload);
+    else if (message.type === "Z") ready = true;
+  }
+  saltedPassword.fill(0); clientKey.fill(0); storedKey.fill(0); signature.fill(0); proof.fill(0);
+  return { ready, sqlstate, saslFinal };
+}
 const psqlSource = (source, timeout) => {
   const result = spawnSync(path.join(pgRoot, "bin/psql"), ["-X", "-v", "ON_ERROR_STOP=1",
     "-h", socket(), "-p", port, "-U", "postgres", "-d", database, "-f", "-"], {
@@ -119,6 +219,16 @@ function qualifyManagedFence(binary) {
   });
   check(!result.error && result.status === 0 && result.stdout.trim() === "production_managed_catalog_fence_valid" &&
     result.stderr === "", "managed_nonowner_catalog_fence_positive");
+}
+function qualifyManagedApplicationLockFence(binary) {
+  const result = spawnSync(binary, [socket(), port, database, "postgres", "managed-application-lock-fence"], {
+    env: { ...baseEnv, TMPDIR: root }, encoding: "utf8", timeout: 30000, maxBuffer: 4096,
+  });
+  check(!result.error, "managed_application_lock_fence_process");
+  check(result.status === 0, "managed_application_lock_fence_status");
+  check(result.stdout.trim() === "production_managed_application_lock_fence_valid",
+    "managed_application_lock_fence_label");
+  check(result.stderr === "", "managed_application_lock_fence_stderr");
 }
 function qualifyManagedPasswordFence(binary) {
   return new Promise((resolve, reject) => {
@@ -312,6 +422,48 @@ password_encryption='scram-sha-256'
         PASSWORD '${originalPassword}';
       GRANT square_production_oauth_authority TO square_production_oauth
         WITH ADMIN FALSE, INHERIT TRUE, SET FALSE`]);
+    stage = "managed_application_lock_grant";
+    psql(["-c", `GRANT USAGE ON SCHEMA private TO square_production_oauth;
+      GRANT UPDATE ON private.square_production_internal_permits TO square_production_oauth`]);
+    const applicationLocker = new Client({ host: socket(), port: Number(port), database,
+      user: "square_production_oauth", password: originalPassword, ssl: false,
+      application_name: "synthetic_managed_application_locker", connectionTimeoutMillis: 3000,
+      statement_timeout: 6000, query_timeout: 7000 });
+    applicationLocker.on("error", () => undefined);
+    stage = "managed_application_lock_connect";
+    await applicationLocker.connect();
+    stage = "managed_application_lock_begin";
+    const applicationPid = (await applicationLocker.query("SELECT pg_backend_pid() pid")).rows[0].pid;
+    await applicationLocker.query("BEGIN");
+    stage = "managed_application_lock_acquire";
+    await applicationLocker.query("LOCK TABLE private.square_production_internal_permits IN ROW EXCLUSIVE MODE");
+    stage = "managed_application_lock_observe";
+    check(Number.isInteger(applicationPid) && applicationPid > 0, "managed_application_pid_shape");
+    const applicationLockHeld = psql(["-At", "-c", `SELECT EXISTS(
+      SELECT FROM pg_locks WHERE pid=${applicationPid} AND granted AND
+      relation='private.square_production_internal_permits'::regclass AND mode='RowExclusiveLock')`]).stdout.trim();
+    check(applicationLockHeld === "t", "managed_application_row_exclusive_lock_observed");
+    stage = "managed_application_lock_native_fence";
+    qualifyManagedApplicationLockFence(internalBinary);
+    let applicationSessionClosed = false;
+    try { await applicationLocker.query("SELECT 1"); }
+    catch { applicationSessionClosed = true; }
+    await applicationLocker.end().catch(() => undefined);
+    check(applicationSessionClosed, "managed_application_locker_drained_before_share_lock");
+    psql(["-c", `REVOKE UPDATE ON private.square_production_internal_permits FROM square_production_oauth;
+      REVOKE USAGE ON SCHEMA private FROM square_production_oauth;
+      GRANT square_production_oauth_authority TO square_production_oauth
+        WITH ADMIN FALSE, INHERIT TRUE, SET FALSE`]);
+    stage = "managed_password_locker_fence";
+    const pausedScram = await pauseScramAuthentication("square_production_oauth", "paused_scram_probe");
+    const pausedRows = psql(["-At", "-F", "|", "-c", `SELECT coalesce(usename,'<null>'),
+      coalesce(application_name,'<null>'),backend_type,coalesce(state,'<null>'),coalesce(datname,'<null>')
+      FROM pg_stat_activity WHERE application_name='paused_scram_probe'`]).stdout.trim().split("|");
+    process.stdout.write(JSON.stringify({ outcome: "paused_scram_catalog_observation",
+      rowVisible: pausedRows.length === 5, userVisible: pausedRows[0] === "square_production_oauth",
+      userNull: pausedRows[0] === "<null>", applicationVisible: pausedRows[1] === "paused_scram_probe",
+      backendType: pausedRows[2] ?? null, stateNull: pausedRows[3] === "<null>",
+      databaseVisible: pausedRows[4] === database }) + "\n");
     const verifierBefore = psql(["-At", "-c",
       "SELECT rolpassword FROM pg_authid WHERE rolname='square_production_oauth'"]).stdout.trim();
     const locker = new Client({ host: socket(), port: Number(port), database,
@@ -343,6 +495,8 @@ password_encryption='scram-sha-256'
     const fenceResult = await fencePromise;
     await reconnectPromise;
     await locker.end().catch(() => undefined);
+    const pausedOutcome = await finishPausedScram(pausedScram, originalPassword);
+    pausedScram.connection.destroy();
     const readback = psql(["-At", "-F", "|", "-c", `SELECT NOT r.rolcanlogin,NOT r.rolinherit,
       coalesce((SELECT bool_and(NOT m.inherit_option) FROM pg_auth_members m
         WHERE m.member=r.oid AND m.roleid='square_production_oauth_authority'::regrole),false),
@@ -354,12 +508,16 @@ password_encryption='scram-sha-256'
       readback[2] === "t" && readback[3] === "0" && readback[4] === verifierBefore;
     process.stdout.write(JSON.stringify({ outcome: "target_password_locker_observation",
       nativeFenceRejected: !fenceSucceeded, reconnectConnected, reconnectClosed,
+      pausedScramCompleted: pausedOutcome.saslFinal, pausedScramReady: pausedOutcome.ready,
+      pausedScramSqlstate: pausedOutcome.sqlstate,
       noLogin: readback[0] === "t", noInherit: readback[1] === "t",
       membershipFenced: readback[2] === "t", zeroSessions: readback[3] === "0",
       verifierUnchanged: readback[4] === verifierBefore }) + "\n");
     check(fenceSucceeded, "target_password_locker_native_fence_succeeds");
     check(readback[3] === "0", "target_password_locker_drained_before_nologin_transition");
     check(!reconnectConnected || reconnectClosed, "target_reconnect_cannot_hold_password_lock_through_fence");
+    check(pausedOutcome.saslFinal && !pausedOutcome.ready && pausedOutcome.sqlstate === "28000",
+      "paused_scram_rechecks_nologin_after_authentication");
     check(exactClosedState, "password_locker_rollback_and_exact_closed_state_confirmed");
     psql(["-c", `REVOKE square_production_oauth_authority FROM square_production_oauth;
       DROP ROLE square_production_oauth`]);

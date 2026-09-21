@@ -9,11 +9,14 @@ failure path fences it back to `NOLOGIN NOINHERIT` and drains sessions.
 
 The membership edge is part of that state machine. A staged or fenced login has
 `INHERIT FALSE` on its one capability membership; activation changes that exact
-edge to `INHERIT TRUE` in the same transaction as `LOGIN INHERIT`. Fencing
-changes it back to `INHERIT FALSE` in the same transaction as `NOLOGIN
-NOINHERIT`, before the commit that precedes session termination. This prevents
-an already-authenticated PostgreSQL 16+ session from retaining inherited RPC
-authority while it is waiting to be drained. Each of the six profiles is
+edge to `INHERIT TRUE` in the same transaction as `LOGIN INHERIT`. Managed
+fencing first serializes native maintenance on the private platform-binding
+relation, revalidates the complete current active-or-closed contract, and
+commits only the exact membership change to `INHERIT FALSE`. It then drains the target before taking
+the application-table locks and committing `NOLOGIN NOINHERIT`. Closing
+inherited authority first prevents new RPCs while draining already-authorized
+requests avoids a competing application-lock order. Any failure after the
+first commit is checked-recovery territory. Each of the six profiles is
 verified independently as absent, exactly closed, or exactly active, so fencing
 one profile does not disable another legitimately active least-privilege role.
 Because a PostgreSQL LOGIN may set its own global and per-database defaults,
@@ -28,7 +31,10 @@ administrator control session to drain the exact target while the primary
 session waits for `NOLOGIN NOINHERIT`. This clears a target-owned uncommitted
 password change and continues across the reconnect window; the existing
 post-commit drain removes any session authenticated before NOLOGIN became
-visible. No other role is terminated.
+visible. A PostgreSQL 17 protocol regression pauses SCRAM before session
+establishment, proves that such a connection is absent from
+`pg_stat_activity`, and then proves completion after the fence is rejected with
+SQLSTATE `28000` before `ReadyForQuery`. No other role is terminated.
 
 The required B source contract is the exact 102-migration foundation ending at
 `20260902191323` plus overlay `20260902191324`. Both file hashes and the 102/103

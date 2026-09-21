@@ -154,7 +154,9 @@ test("Production profile fencing pairs login state with non-inheriting capabilit
     "tools/native-broker-provisioning/tests/production-catalog-qualify.cjs"), "utf8");
   assert.match(nativeSource, /CREATE ROLE",target,[\s\S]*?NOLOGIN[\s\S]*?NOINHERIT/);
   assert.match(nativeSource, /WITH ADMIN FALSE, INHERIT FALSE, SET FALSE/);
-  assert.match(nativeSource, /managed_fence_role\(target\)[\s\S]*?role_command\("GRANT " CAPABILITY " TO",target,[\s\S]*?INHERIT FALSE, SET FALSE/,
+  assert.match(nativeSource, /production_authority_catalog_fence\(\)[\s\S]*?managed_close_capability\(target\)[\s\S]*?terminate_target_sessions\(control_db,target\)[\s\S]*?closed_authority\(target\)/,
+    "managed Production closes inherited authority and drains the exact login before taking application locks");
+  assert.match(nativeSource, /role_command\("GRANT " CAPABILITY " TO",target,[\s\S]*?INHERIT FALSE, SET FALSE/,
     "managed and self-owned Production fences both remove inherited capability authority");
   assert.match(nativeSource, /if \(ok && !strcmp\(op,"activate"\)\) \{[\s\S]*?INHERIT TRUE, SET FALSE/);
   assert.match(nativeSource, /target_role\.rolcanlogin AND target_role\.rolinherit AND m\.inherit_option/);
@@ -162,9 +164,9 @@ test("Production profile fencing pairs login state with non-inheriting capabilit
   assert.match(qualifier, /existing_session_loses_effective_rpc_before_session_termination/);
   assert.match(qualifier, /active_login_with_noninheriting_capability_membership_rejected/);
   assert.match(qualifier, /noncurrent_profile_privilege_drift_blocks_current_profile_before_mutation/);
-  assert.match(nativeSource, /production_authority_valid\(target,!strcmp\(op,"fence"\)\)/,
+  assert.match(nativeSource, /production_authority_valid\(target,!strcmp\(op,"fence"\),managed_capability_closed\)/,
     "only the pre-revocation fence path permits target-owned settings");
-  assert.match(nativeSource, /production_authority_valid\(target,state==2\)/,
+  assert.match(nativeSource, /production_authority_valid\(target,state==2 \|\| state==3,state==3\)/,
     "the fence role check applies the same narrow pre-revocation exception");
   assert.match(nativeSource, /\$8=\$6 OR target_role\.rolconfig IS NULL/,
     "the exception is bound to the exact operation target");
