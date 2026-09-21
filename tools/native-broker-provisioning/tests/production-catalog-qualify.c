@@ -37,13 +37,49 @@ int main(int argc,char **argv) {
   bool contract=argc==5 && !strcmp(argv[4],"postgres");
   bool fence_only=argc==6 && !strcmp(argv[4],"synthetic_hosted_operator") &&
     !strcmp(argv[5],"managed-fence");
-  if ((!contract && !fence_only) || strcmp(argv[1],VAEROEX_CATALOG_SOCKET_PATH) || !digits(argv[2],5) ||
+  bool password_fence=argc==6 && !strcmp(argv[4],"postgres") &&
+    !strcmp(argv[5],"managed-password-fence");
+  if ((!contract && !fence_only && !password_fence) || strcmp(argv[1],VAEROEX_CATALOG_SOCKET_PATH) || !digits(argv[2],5) ||
       strcmp(argv[3],"production_catalog_runtime")) return 2;
   const char *keys[]={"host","port","dbname","user","passfile","sslmode","connect_timeout","application_name",NULL};
   const char *values[]={argv[1],argv[2],argv[3],argv[4],"/dev/null/vaeroex-no-passfile","disable","5",
     "vaeroex-production-catalog-qualification",NULL};
   db=PQconnectdbParams(keys,values,0);
   bool ok=db && PQstatus(db)==CONNECTION_OK;
+  if (ok && password_fence) {
+    control_db=PQconnectdbParams(keys,values,0);
+    ok=control_db && PQstatus(control_db)==CONNECTION_OK;
+    if (ok) {
+      PQsetNoticeProcessor(db,notice,NULL);
+      PQsetNoticeProcessor(control_db,notice,NULL);
+      transaction=command("BEGIN");
+      ok=transaction && closed_authority(MAPPED_ROLE) && lock_target(MAPPED_ROLE) &&
+        production_authority_valid(MAPPED_ROLE,true);
+      const char *target_values[]={MAPPED_ROLE};
+      PGresult *identity=ok ? query("SELECT oid::text FROM pg_roles WHERE rolname=$1",1,target_values) : NULL;
+      char target_oid[24]={0};
+      ok=ok && identity && PQntuples(identity)==1 && digits(PQgetvalue(identity,0,0),10);
+      if (ok) snprintf(target_oid,sizeof(target_oid),"%s",PQgetvalue(identity,0,0));
+      if (identity) PQclear(identity);
+      ok=ok && role_valid(MAPPED_ROLE,target_oid,2) && managed_fence_role(MAPPED_ROLE) &&
+        role_valid(MAPPED_ROLE,target_oid,0);
+      if (ok) { ok=command("COMMIT"); transaction=!ok; }
+      if (ok) ok=terminate_target_sessions(control_db,MAPPED_ROLE) && no_sessions(MAPPED_ROLE);
+      if (ok) {
+        transaction=command("BEGIN");
+        ok=transaction && closed_authority(MAPPED_ROLE) && lock_target(MAPPED_ROLE) &&
+          role_valid(MAPPED_ROLE,target_oid,0) && no_sessions(MAPPED_ROLE);
+      }
+      if (transaction) { (void)command("ROLLBACK"); transaction=false; }
+    }
+    if (control_db) PQfinish(control_db);
+    control_db=NULL;
+    if (db) PQfinish(db);
+    db=NULL;
+    if (!ok) return 3;
+    puts("production_managed_password_fence_valid");
+    return 0;
+  }
   if (ok && fence_only) {
     PQsetNoticeProcessor(db,notice,NULL);
     ok=command("BEGIN") && !lock_target(MAPPED_ROLE) && production_authority_catalog_fence() &&

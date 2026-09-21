@@ -170,14 +170,6 @@ static bool sensitive_started = false;
 static bool transaction = false;
 static bool last_query_error = false;
 static const char *last_query_error_category = "none";
-#if defined(VAEROEX_SYNTHETIC_ONLY) && defined(VAEROEX_PRODUCTION_PROFILE)
-static int synthetic_managed_fence_failure = 0;
-static int synthetic_managed_fence_base = 0;
-#define SYNTHETIC_FENCE_FAILURE(offset) do { if (!synthetic_managed_fence_failure) \
-  synthetic_managed_fence_failure=synthetic_managed_fence_base+(offset); } while (0)
-#else
-#define SYNTHETIC_FENCE_FAILURE(offset) do { (void)(offset); } while (0)
-#endif
 
 static void wipe(void *p, size_t n) {
   volatile unsigned char *v = p;
@@ -323,7 +315,7 @@ static bool terminate_target_sessions(PGconn *connection,const char *target) {
 }
 static bool managed_fence_command(const char *sql,const char *target) {
   if (!managed_profile() || !control_db || PQstatus(control_db)!=CONNECTION_OK ||
-      strcmp(target,MAPPED_ROLE)) { SYNTHETIC_FENCE_FAILURE(1); return false; }
+      strcmp(target,MAPPED_ROLE)) return false;
   /* A target LOGIN may hold its own pg_authid tuple with an uncommitted
    * ALTER ROLE CURRENT_USER PASSWORD.  The hosted operator cannot lock that
    * provider-owned catalog first.  Drain the exact target, then keep draining
@@ -332,50 +324,38 @@ static bool managed_fence_command(const char *sql,const char *target) {
    * post-commit drain removes any session authenticated in the preceding
    * race window.  No query contains a credential or accepts a caller-selected
    * role. */
-  if (!terminate_target_sessions(control_db,target)) { SYNTHETIC_FENCE_FAILURE(2); return false; }
+  if (!terminate_target_sessions(control_db,target)) return false;
   if (PQsetnonblocking(db,1)!=0 || !PQsendQuery(db,sql)) {
-    SYNTHETIC_FENCE_FAILURE(3);
     (void)PQsetnonblocking(db,0);
     return false;
   }
   bool ok=true;
   while (ok && !stopped() && PQisBusy(db)) {
     ok=terminate_target_sessions(control_db,target);
-    if (!ok) { SYNTHETIC_FENCE_FAILURE(4); break; }
     struct pollfd descriptor={PQsocket(db),POLLIN,0};
     int ready=poll(&descriptor,1,20);
     if (ready<0 && errno==EINTR) continue;
-    if (ready<0 || (ready>0 && !PQconsumeInput(db))) {
-      SYNTHETIC_FENCE_FAILURE(5);ok=false;
-    }
+    if (ready<0 || (ready>0 && !PQconsumeInput(db))) ok=false;
   }
   int results=0;
   if (ok && !PQisBusy(db)) {
     for (PGresult *r=PQgetResult(db);r;r=PQgetResult(db)) {
       results++;
-      if (PQresultStatus(r)!=PGRES_COMMAND_OK) { SYNTHETIC_FENCE_FAILURE(6);ok=false; }
+      if (PQresultStatus(r)!=PGRES_COMMAND_OK) ok=false;
       PQclear(r);
     }
-  } else { SYNTHETIC_FENCE_FAILURE(stopped()?8:7);ok=false; }
-  if (PQsetnonblocking(db,0)!=0) { SYNTHETIC_FENCE_FAILURE(9);ok=false; }
-  if (results!=1 && ok) { SYNTHETIC_FENCE_FAILURE(7);ok=false; }
-  return ok && !stopped();
+  } else ok=false;
+  if (PQsetnonblocking(db,0)!=0) ok=false;
+  return ok && results==1 && !stopped();
 }
 static bool managed_fence_role(const char *target) {
   char grant[256],alter[128];
   int grant_length=snprintf(grant,sizeof(grant),
     "GRANT " CAPABILITY " TO \"%s\" WITH ADMIN FALSE, INHERIT FALSE, SET FALSE",target);
   int alter_length=snprintf(alter,sizeof(alter),"ALTER ROLE \"%s\" NOLOGIN NOINHERIT",target);
-  if (!(grant_length>0 && (size_t)grant_length<sizeof(grant) &&
-      alter_length>0 && (size_t)alter_length<sizeof(alter))) return false;
-#if defined(VAEROEX_SYNTHETIC_ONLY) && defined(VAEROEX_PRODUCTION_PROFILE)
-  synthetic_managed_fence_base=10;
-#endif
-  if (!managed_fence_command(grant,target)) return false;
-#if defined(VAEROEX_SYNTHETIC_ONLY) && defined(VAEROEX_PRODUCTION_PROFILE)
-  synthetic_managed_fence_base=20;
-#endif
-  return managed_fence_command(alter,target);
+  return grant_length>0 && (size_t)grant_length<sizeof(grant) &&
+    alter_length>0 && (size_t)alter_length<sizeof(alter) &&
+    managed_fence_command(grant,target) && managed_fence_command(alter,target);
 }
 #endif
 static bool profile(void) {
@@ -551,21 +531,7 @@ static bool production_authority_catalog_fence(void) {
      * immediately before COMMIT under READ COMMITTED.  The bounded operator
      * window prohibits out-of-band administrative DDL while this fence is held;
      * a later boundary still rejects any committed drift. */
-#if defined(VAEROEX_SYNTHETIC_ONLY) && defined(VAEROEX_PRODUCTION_PROFILE)
-    PGresult *result=PQexec(db,
-      "LOCK TABLE private.integration_production_platform_bindings IN SHARE ROW EXCLUSIVE MODE");
-    bool locked=result && PQresultStatus(result)==PGRES_COMMAND_OK;
-    if (!locked) {
-      const char *state=result ? PQresultErrorField(result,PG_DIAG_SQLSTATE) : NULL;
-      SYNTHETIC_FENCE_FAILURE(!state?51:!strcmp(state,"55P03")?52:
-        !strcmp(state,"57014")?53:!strcmp(state,"42501")?54:55);
-    }
-    if (result) PQclear(result);
-    if (locked && stopped()) SYNTHETIC_FENCE_FAILURE(56);
-    return locked && !stopped();
-#else
     return command("LOCK TABLE private.integration_production_platform_bindings IN SHARE ROW EXCLUSIVE MODE");
-#endif
   }
   return command("LOCK TABLE pg_catalog.pg_proc IN SHARE ROW EXCLUSIVE MODE") &&
     command("LOCK TABLE pg_catalog.pg_authid IN SHARE ROW EXCLUSIVE MODE") &&
@@ -582,26 +548,19 @@ static bool closed_authority(const char *target) {
   const char *values[] = {target};
 #ifdef VAEROEX_PRODUCTION_PROFILE
   if(strcmp(target,MAPPED_ROLE))return false;
-  if (!production_authority_catalog_fence()) { SYNTHETIC_FENCE_FAILURE(41); return false; }
-  if (managed_profile() && !command("LOCK TABLE supabase_migrations.schema_migrations IN SHARE MODE")) {
-    SYNTHETIC_FENCE_FAILURE(42); return false;
-  }
+  if (!production_authority_catalog_fence()) return false;
+  if (managed_profile() && !command("LOCK TABLE supabase_migrations.schema_migrations IN SHARE MODE")) return false;
   production_phase phase=production_ledger_phase();
-  if (phase==PRODUCTION_PHASE_INVALID) { SYNTHETIC_FENCE_FAILURE(43); return false; }
-  if (!command("LOCK TABLE private.integration_production_platform_bindings, "
+  if (phase==PRODUCTION_PHASE_INVALID || !command("LOCK TABLE private.integration_production_platform_bindings, "
     "private.integration_production_provider_bindings, private.integration_production_provider_secrets, "
     "private.integration_production_provider_capabilities, private.square_production_configuration_generations, "
     "private.square_production_runtime_bindings, private.square_production_generation_fences, "
-    "private.square_production_lifecycle_audit_events IN SHARE MODE")) {
-    SYNTHETIC_FENCE_FAILURE(44); return false;
-  }
+    "private.square_production_lifecycle_audit_events IN SHARE MODE")) return false;
   if (phase==PRODUCTION_PHASE_INTERNAL_RUNTIME && !command(
     "LOCK TABLE private.square_production_internal_permits, private.square_production_internal_oauth_states, "
     "private.square_production_internal_credentials, private.square_production_internal_scans, "
     "private.square_production_internal_page_receipts, private.square_production_internal_source_versions, "
-    "private.square_production_internal_fences, private.square_production_internal_audit_events IN SHARE MODE")) {
-    SYNTHETIC_FENCE_FAILURE(45); return false;
-  }
+    "private.square_production_internal_fences, private.square_production_internal_audit_events IN SHARE MODE")) return false;
   if (managed_profile() && !true_query("SELECT NOT row_security_active('private.integration_production_platform_bindings') "
       "AND NOT row_security_active('private.integration_production_provider_bindings') "
       "AND NOT row_security_active('private.integration_production_provider_secrets') "
@@ -609,9 +568,7 @@ static bool closed_authority(const char *target) {
       "AND NOT row_security_active('private.square_production_configuration_generations') "
       "AND NOT row_security_active('private.square_production_runtime_bindings') "
       "AND NOT row_security_active('private.square_production_generation_fences') "
-      "AND NOT row_security_active('private.square_production_lifecycle_audit_events')",0,NULL)) {
-    SYNTHETIC_FENCE_FAILURE(46); return false;
-  }
+      "AND NOT row_security_active('private.square_production_lifecycle_audit_events')",0,NULL)) return false;
   if (phase==PRODUCTION_PHASE_INTERNAL_RUNTIME && managed_profile() && !true_query(
       "SELECT NOT row_security_active('private.square_production_internal_permits') "
       "AND NOT row_security_active('private.square_production_internal_oauth_states') "
@@ -620,10 +577,8 @@ static bool closed_authority(const char *target) {
       "AND NOT row_security_active('private.square_production_internal_page_receipts') "
       "AND NOT row_security_active('private.square_production_internal_source_versions') "
       "AND NOT row_security_active('private.square_production_internal_fences') "
-      "AND NOT row_security_active('private.square_production_internal_audit_events')",0,NULL)) {
-    SYNTHETIC_FENCE_FAILURE(47); return false;
-  }
-  bool gates_closed=true_query("SELECT NOT EXISTS (SELECT FROM private.integration_production_platform_bindings "
+      "AND NOT row_security_active('private.square_production_internal_audit_events')",0,NULL)) return false;
+  return true_query("SELECT NOT EXISTS (SELECT FROM private.integration_production_platform_bindings "
       "WHERE infrastructure_provisioned OR runtime_enabled OR economic_contributions_enabled OR ai_dispatch_enabled) "
       "AND NOT EXISTS (SELECT FROM private.integration_production_provider_bindings "
       "WHERE provider_key='square' AND environment='production' AND "
@@ -636,8 +591,6 @@ static bool closed_authority(const char *target) {
       "WHERE database_login=$1 AND NOT (provider_key='square' AND environment='production' "
       "AND project_id='vaeroex-integrations-prod' AND capability='" CAPABILITY_NAME "' "
       "AND database_secret_purpose='database_" CAPABILITY_NAME "'))",1,values);
-  if (!gates_closed) SYNTHETIC_FENCE_FAILURE(48);
-  return gates_closed;
 #elif defined(MAPPED_ROLE)
   /* Mapped maintenance requires the additive schema and known-disabled joined
    * gates. SHARE locks fence concurrent activation through credential commit.
@@ -1823,9 +1776,6 @@ static int run(int argc, char **argv) {
     }
 #endif
   }
-#if defined(VAEROEX_SYNTHETIC_ONLY) && defined(VAEROEX_PRODUCTION_PROFILE)
-  if (!ok && !strcmp(op,"fence")) SYNTHETIC_FENCE_FAILURE(31);
-#endif
  #if defined(VAEROEX_SYNTHETIC_ONLY) && defined(VAEROEX_PRODUCTION_PROFILE)
   if (ok && !strcmp(op,"diagnose")) {
     if (!command("BEGIN")) return 2;
@@ -1836,35 +1786,14 @@ static int run(int argc, char **argv) {
     return 0;
   }
  #endif
-  if (ok) {
-    ok = command("BEGIN"); transaction = ok;
-#if defined(VAEROEX_SYNTHETIC_ONLY) && defined(VAEROEX_PRODUCTION_PROFILE)
-    if (!ok && !strcmp(op,"fence")) SYNTHETIC_FENCE_FAILURE(32);
-#endif
-  }
-  if (ok) {
-    ok = closed_authority(target);
-#if defined(VAEROEX_SYNTHETIC_ONLY) && defined(VAEROEX_PRODUCTION_PROFILE)
-    if (!ok && !strcmp(op,"fence")) SYNTHETIC_FENCE_FAILURE(33);
-#endif
-  }
-  if (ok) {
-    ok = lock_target(target);
-#if defined(VAEROEX_SYNTHETIC_ONLY) && defined(VAEROEX_PRODUCTION_PROFILE)
-    if (!ok && !strcmp(op,"fence")) SYNTHETIC_FENCE_FAILURE(34);
-#endif
-  }
+  if (ok) { ok = command("BEGIN"); transaction = ok; }
+  if (ok) ok = closed_authority(target) && lock_target(target);
   /* Fence must not depend on settings that the target LOGIN can assign to
    * itself.  Only this pre-revocation path permits those two catalog fields;
    * every other role, privilege, membership, object and gate predicate remains
    * exact, and the normal post-commit validation below rejects residual
    * settings after NOLOGIN/NOINHERIT commits and sessions are terminated. */
-  if (ok) {
-    ok = production_authority_valid(target,!strcmp(op,"fence"));
-#if defined(VAEROEX_SYNTHETIC_ONLY) && defined(VAEROEX_PRODUCTION_PROFILE)
-    if (!ok && !strcmp(op,"fence")) SYNTHETIC_FENCE_FAILURE(35);
-#endif
-  }
+  if (ok) ok = production_authority_valid(target,!strcmp(op,"fence"));
   if (ok && !strcmp(op,"prepare")) {
     const char *values[] = {target,CAPABILITY};
     ok = !strcmp(role_oid,"0") && true_query("SELECT NOT EXISTS (SELECT FROM pg_roles WHERE rolname=$1) "
@@ -1894,9 +1823,6 @@ static int run(int argc, char **argv) {
      * is the compensating operation after an interrupted authentication. */
     int expected_state=!strcmp(op,"authenticate")?1:!strcmp(op,"fence")?2:0;
     ok = strcmp(role_oid,"0") && role_valid(target,role_oid,expected_state);
-#if defined(VAEROEX_SYNTHETIC_ONLY) && defined(VAEROEX_PRODUCTION_PROFILE)
-    if (!ok && !strcmp(op,"fence")) SYNTHETIC_FENCE_FAILURE(36);
-#endif
     if (ok && strcmp(op,"inspect") && strcmp(op,"authenticate")) {
       if (!strcmp(op,"fence")) {
 #ifdef VAEROEX_PRODUCTION_PROFILE
@@ -2027,12 +1953,7 @@ static int run(int argc, char **argv) {
   wipe(password,sizeof(password));
   munlock(password,sizeof(password));
   munlock(admin_password,sizeof(admin_password));
-  if (!ok) {
-#if defined(VAEROEX_SYNTHETIC_ONLY) && defined(VAEROEX_PRODUCTION_PROFILE)
-    if (synthetic_managed_fence_failure) return synthetic_managed_fence_failure;
-#endif
-    return (sensitive_started || commit_attempted) ? 3 : 2;
-  }
+  if (!ok) return (sensitive_started || commit_attempted) ? 3 : 2;
   const char *outcome=!strcmp(op,"assign")?"assigned":!strcmp(op,"prepare")?"prepared":!strcmp(op,"fence")?"fenced":
     !strcmp(op,"activate")?"activated":!strcmp(op,"authenticate")?"authenticated":"inspected";
   printf("{\"outcome\":\"%s\",\"committed\":true,\"role_oid\":\"%s\"}\n",outcome,resolved_oid);

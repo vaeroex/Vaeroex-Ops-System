@@ -150,6 +150,8 @@ test("Production profile fencing pairs login state with non-inheriting capabilit
   const nativeSource = readFileSync(resolve(root, "tools/native-broker-provisioning/native.c"), "utf8");
   const qualifier = readFileSync(resolve(root,
     "tools/native-broker-provisioning/tests/production-native-qualify.cjs"), "utf8");
+  const catalogQualifier = readFileSync(resolve(root,
+    "tools/native-broker-provisioning/tests/production-catalog-qualify.cjs"), "utf8");
   assert.match(nativeSource, /CREATE ROLE",target,[\s\S]*?NOLOGIN[\s\S]*?NOINHERIT/);
   assert.match(nativeSource, /WITH ADMIN FALSE, INHERIT FALSE, SET FALSE/);
   assert.match(nativeSource, /managed_fence_role\(target\)[\s\S]*?role_command\("GRANT " CAPABILITY " TO",target,[\s\S]*?INHERIT FALSE, SET FALSE/,
@@ -179,12 +181,16 @@ test("Production profile fencing pairs login state with non-inheriting capabilit
     "target_settings_membership_fenced",
     "target_settings_sessions_drained",
     "reconciled_target_settings_restore_exact_fence_contract",
+  ]) assert.match(qualifier, new RegExp(label));
+  for (const label of [
     "target_password_locker_observation",
     "target_password_locker_native_fence_succeeds",
     "target_password_locker_drained_before_nologin_transition",
     "target_reconnect_cannot_hold_password_lock_through_fence",
     "password_locker_rollback_and_exact_closed_state_confirmed",
-  ]) assert.match(qualifier, new RegExp(label));
+  ]) assert.match(catalogQualifier, new RegExp(label));
+  assert.match(catalogQualifier, /"-DVAEROEX_SYNTHETIC_ONLY", "-DVAEROEX_MANAGED_PROFILE_TEST"/,
+    "the password-lock regression compiles the managed path on the exact Production-shaped catalog");
   assert.match(nativeSource, /while \(ok && !stopped\(\) && PQisBusy\(db\)\)[\s\S]*?terminate_target_sessions\(control_db,target\)/,
     "the exact-target drainer remains active while NOLOGIN waits");
   assert.match(nativeSource, /managed_fence_role\(target\)[\s\S]*?command\("COMMIT"\)[\s\S]*?pg_terminate_backend/,

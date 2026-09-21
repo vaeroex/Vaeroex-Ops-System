@@ -6,7 +6,7 @@ const crypto = require("node:crypto");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { spawnSync } = require("node:child_process");
+const { spawn, spawnSync } = require("node:child_process");
 const { Client } = require("pg");
 
 if (process.argv.length !== 2 || process.getuid?.() === 0) {
@@ -120,6 +120,22 @@ function qualifyManagedFence(binary) {
   check(!result.error && result.status === 0 && result.stdout.trim() === "production_managed_catalog_fence_valid" &&
     result.stderr === "", "managed_nonowner_catalog_fence_positive");
 }
+function qualifyManagedPasswordFence(binary) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(binary, [socket(), port, database, "postgres", "managed-password-fence"], {
+      env: { ...baseEnv, TMPDIR: root }, stdio: ["ignore", "pipe", "pipe"],
+    });
+    let stdout = "", stderr = "", finished = false;
+    const timer = setTimeout(() => { if (!finished) child.kill("SIGKILL"); }, 20000);
+    child.stdout.on("data", bytes => { if (stdout.length + bytes.length <= 4096) stdout += bytes.toString("utf8"); });
+    child.stderr.on("data", bytes => { if (stderr.length + bytes.length <= 4096) stderr += bytes.toString("utf8"); });
+    child.once("error", error => { clearTimeout(timer); reject(error); });
+    child.once("close", (code, signal) => {
+      finished = true; clearTimeout(timer);
+      resolve({ code, signal, stdout, stderr });
+    });
+  });
+}
 function cleanup() {
   if (root && (running || fs.existsSync(path.join(data(), "postmaster.pid")))) {
     const result = spawnSync(path.join(pgRoot, "bin/pg_ctl"), ["-D", data(), "-m", "fast", "-w", "stop"],
@@ -174,7 +190,8 @@ unix_socket_permissions=0700
 password_encryption='scram-sha-256'
 `, { mode: 0o600 });
   fs.writeFileSync(path.join(data(), "pg_hba.conf"),
-    "local all postgres,synthetic_hosted_operator,synthetic_application_login trust\nlocal all all reject\n", { mode: 0o600 });
+    "local all postgres,synthetic_hosted_operator,synthetic_application_login trust\n" +
+    "local all square_production_oauth scram-sha-256\nlocal all all reject\n", { mode: 0o600 });
   run(path.join(pgRoot, "bin/pg_ctl"), ["-D", data(), "-l", path.join(root, "postgres.log"), "-w", "start"]);
   running = true;
   run(path.join(pgRoot, "bin/createdb"), ["-h", socket(), "-p", port, "-U", "postgres", database]);
@@ -289,6 +306,63 @@ password_encryption='scram-sha-256'
     qualify(overlayBinary, "closed_authority");
     baselineSourceAtInternal = "exact_104_rejected";
     qualify(internalBinary);
+    stage = "managed_password_locker_fence";
+    const originalPassword = "synthetic-managed-password-locker-original";
+    psql(["-c", `CREATE ROLE square_production_oauth LOGIN INHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS
+        PASSWORD '${originalPassword}';
+      GRANT square_production_oauth_authority TO square_production_oauth
+        WITH ADMIN FALSE, INHERIT TRUE, SET FALSE`]);
+    const verifierBefore = psql(["-At", "-c",
+      "SELECT rolpassword FROM pg_authid WHERE rolname='square_production_oauth'"]).stdout.trim();
+    const locker = new Client({ host: socket(), port: Number(port), database,
+      user: "square_production_oauth", password: originalPassword, ssl: false,
+      application_name: "synthetic_managed_password_locker", connectionTimeoutMillis: 3000,
+      statement_timeout: 6000, query_timeout: 7000 });
+    locker.on("error", () => undefined);
+    await locker.connect();
+    await locker.query("BEGIN");
+    await locker.query("ALTER ROLE CURRENT_USER PASSWORD 'synthetic-uncommitted-password-locker'");
+    let reconnectConnected = false, reconnectClosed = false;
+    const fencePromise = qualifyManagedPasswordFence(internalBinary);
+    const reconnectPromise = (async () => {
+      await new Promise(resolve => setTimeout(resolve, 30));
+      let reconnect;
+      try {
+        reconnect = new Client({ host: socket(), port: Number(port), database,
+          user: "square_production_oauth", password: originalPassword, ssl: false,
+          application_name: "synthetic_managed_password_reconnect", connectionTimeoutMillis: 3000,
+          statement_timeout: 6000, query_timeout: 7000 });
+        reconnect.on("error", () => undefined);
+        await reconnect.connect(); reconnectConnected = true;
+        await reconnect.query("BEGIN");
+        await reconnect.query("ALTER ROLE CURRENT_USER PASSWORD 'synthetic-reconnect-password-locker'");
+        await reconnect.query("SELECT pg_sleep(2)");
+      } catch { reconnectClosed = true; }
+      finally { await reconnect?.end().catch(() => undefined); }
+    })();
+    const fenceResult = await fencePromise;
+    await reconnectPromise;
+    await locker.end().catch(() => undefined);
+    const readback = psql(["-At", "-F", "|", "-c", `SELECT NOT r.rolcanlogin,NOT r.rolinherit,
+      coalesce((SELECT bool_and(NOT m.inherit_option) FROM pg_auth_members m
+        WHERE m.member=r.oid AND m.roleid='square_production_oauth_authority'::regrole),false),
+      (SELECT count(*) FROM pg_stat_activity WHERE usename='square_production_oauth'),r.rolpassword
+      FROM pg_authid r WHERE r.rolname='square_production_oauth'`]).stdout.trim().split("|");
+    const fenceSucceeded = fenceResult.code === 0 && fenceResult.signal === null &&
+      fenceResult.stdout === "production_managed_password_fence_valid\n" && fenceResult.stderr === "";
+    const exactClosedState = readback.length === 5 && readback[0] === "t" && readback[1] === "t" &&
+      readback[2] === "t" && readback[3] === "0" && readback[4] === verifierBefore;
+    process.stdout.write(JSON.stringify({ outcome: "target_password_locker_observation",
+      nativeFenceRejected: !fenceSucceeded, reconnectConnected, reconnectClosed,
+      noLogin: readback[0] === "t", noInherit: readback[1] === "t",
+      membershipFenced: readback[2] === "t", zeroSessions: readback[3] === "0",
+      verifierUnchanged: readback[4] === verifierBefore }) + "\n");
+    check(fenceSucceeded, "target_password_locker_native_fence_succeeds");
+    check(readback[3] === "0", "target_password_locker_drained_before_nologin_transition");
+    check(!reconnectConnected || reconnectClosed, "target_reconnect_cannot_hold_password_lock_through_fence");
+    check(exactClosedState, "password_locker_rollback_and_exact_closed_state_confirmed");
+    psql(["-c", `REVOKE square_production_oauth_authority FROM square_production_oauth;
+      DROP ROLE square_production_oauth`]);
     const parentTriggers = psql(["-At", "-c", `SELECT trigger_record.tgname
       FROM pg_catalog.pg_trigger trigger_record
       JOIN pg_catalog.pg_constraint constraint_record ON constraint_record.oid=trigger_record.tgconstraint
