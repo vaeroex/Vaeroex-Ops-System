@@ -454,7 +454,12 @@ async function main() {
     FROM pg_authid r WHERE r.rolname=$1`, [lockerProfile.role, lockerProfile.capabilityRole])).rows[0];
   console.log(JSON.stringify({ outcome: "target_password_locker_observation",
     nativeFenceRejected: lockerFenceRejected,
-    reconnectConnected, reconnectClosed }));
+    reconnectConnected, reconnectClosed,
+    noLogin: lockerReadback?.no_login === true,
+    noInherit: lockerReadback?.no_inherit === true,
+    membershipFenced: lockerReadback?.membership_fenced === true,
+    zeroSessions: lockerReadback?.sessions === 0,
+    verifierUnchanged: lockerReadback?.verifier === verifierBefore }));
   check(!lockerFenceRejected, "target_password_locker_native_fence_succeeds");
   check(lockerFence.ack && lockerFence.sessionsTerminated,
     "target_password_locker_drained_before_nologin_transition");
