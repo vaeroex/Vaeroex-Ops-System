@@ -422,7 +422,14 @@ matches(
   "the fixture must preserve the exact production-labelled 2-leased/1-pending shape"
 );
 
-equal(approvedSquareQualificationPaths.length, 146, "dormant scope permits only exact reviewed migrations, UI, native service/templates, provider-neutral Production composition and activation, restricted evidence host, query-stripping callback edge, repository-bound image trigger, internal-pilot runtime and offline pilot files");
+equal(approvedSquareQualificationPaths.length, 157, "dormant scope permits only exact reviewed migrations, UI, native service/templates, provider-neutral Production composition and activation, restricted evidence host, query-stripping callback edge, repository-bound image trigger, internal-pilot runtime, offline pilot and bounded provisioner files");
+assertionCount++;
+assert.deepEqual(approvedSquareQualificationPaths.filter(file => file.startsWith("services/external-integrations-production/infra/provisioner/")), [
+  ".gitignore", ".terraform.lock.hcl", "README.md", "backend.tf", "main.tf", "outputs.tf",
+  "tests/bounded-provisioner.tftest.hcl", "tests/transition-order.tftest.hcl",
+  "tests/verify-transition-order.mjs", "variables.tf", "versions.tf"
+].map(file => `services/external-integrations-production/infra/provisioner/${file}`),
+"only the eleven reviewed bounded provisioner files are exempt");
 assertionCount++;
 assert.deepEqual(JSON.parse(read("vercel.json")), {
   git: { deploymentEnabled: { "codex/square-remote-sandbox-binding": false, "codex/square-sandbox-qualification": false, "codex/square-gcp-sandbox-callback": false } }
@@ -435,6 +442,10 @@ for (const protectedPath of [
   "app/api/integrations/square/activate/route.ts",
   "components/integrations/SquarePanel.tsx",
   "services/external-integrations-square/server.ts",
+  "services/external-integrations-production/infra/provisioner/activate.tf",
+  "services/external-integrations-production/infra/provisioner/production.tfvars",
+  "services/external-integrations-production/infra/provisioner/terraform.tfstate",
+  "services/external-integrations-production/infra/provisioner/unreviewed/main.tf",
   "lib/supabase/server.ts",
   "vercel.ts"
 ]) {
