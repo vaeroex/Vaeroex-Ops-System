@@ -170,7 +170,13 @@ test("Production profile fencing pairs login state with non-inheriting capabilit
     "only the exact target's per-database settings are deferred to postflight");
   for (const label of [
     "target_settings_require_checked_post_commit_recovery",
-    "target_settings_cannot_block_nologin_membership_fence_or_session_drain",
+    "target_settings_fence_observation",
+    "target_settings_fence_nologin_committed",
+    "target_settings_fence_noinherit_committed",
+    "target_settings_global_setting_preserved_for_checked_recovery",
+    "target_settings_database_setting_preserved_for_checked_recovery",
+    "target_settings_membership_fenced",
+    "target_settings_sessions_drained",
     "reconciled_target_settings_restore_exact_fence_contract",
     "target_password_locker_drained_before_nologin_transition",
     "target_reconnect_cannot_hold_password_lock_through_fence",

@@ -366,10 +366,27 @@ async function main() {
     (SELECT count(*)::integer FROM pg_stat_activity WHERE usename=$1) sessions
     FROM pg_roles r WHERE r.rolname=$1`, [settingProfile.role, settingProfile.capabilityRole])).rows[0];
   check(settingFenceRejectedAfterCommit, "target_settings_require_checked_post_commit_recovery");
-  check(settingFenceReadback?.no_login === true && settingFenceReadback.no_inherit === true &&
-    settingFenceReadback.global_setting === true && settingFenceReadback.database_settings === 1 &&
-    settingFenceReadback.membership_fenced === true && settingFenceReadback.sessions === 0,
-  "target_settings_cannot_block_nologin_membership_fence_or_session_drain");
+  console.log(JSON.stringify({
+    outcome: "target_settings_fence_observation",
+    noLogin: settingFenceReadback?.no_login === true,
+    noInherit: settingFenceReadback?.no_inherit === true,
+    globalSettingPreserved: settingFenceReadback?.global_setting === true,
+    databaseSettings: settingFenceReadback?.database_settings === 1 ? "expected_one" : "unexpected",
+    membershipFenced: settingFenceReadback?.membership_fenced === true,
+    zeroSessions: settingFenceReadback?.sessions === 0,
+  }));
+  check(settingFenceReadback?.no_login === true,
+    "target_settings_fence_nologin_committed");
+  check(settingFenceReadback?.no_inherit === true,
+    "target_settings_fence_noinherit_committed");
+  check(settingFenceReadback?.global_setting === true,
+    "target_settings_global_setting_preserved_for_checked_recovery");
+  check(settingFenceReadback?.database_settings === 1,
+    "target_settings_database_setting_preserved_for_checked_recovery");
+  check(settingFenceReadback?.membership_fenced === true,
+    "target_settings_membership_fenced");
+  check(settingFenceReadback?.sessions === 0,
+    "target_settings_sessions_drained");
   await fixture.control.query(`ALTER ROLE ${settingProfile.role} RESET ALL;
     ALTER ROLE ${settingProfile.role} IN DATABASE postgres RESET ALL`);
   const settingFenceRecovered = await settingNative.fence({ target: settingTarget,
