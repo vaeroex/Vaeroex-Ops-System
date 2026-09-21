@@ -1409,9 +1409,11 @@ static bool production_authority_valid(const char *target,bool allow_target_sett
   return true;
 #endif
 }
-#ifdef VAEROEX_SYNTHETIC_ONLY
 #ifdef VAEROEX_PRODUCTION_PROFILE
 static bool lock_target(const char *target);
+#endif
+#ifdef VAEROEX_SYNTHETIC_ONLY
+#ifdef VAEROEX_PRODUCTION_PROFILE
 static bool diagnostic_named_authority(const char *capability,const char *authority_function,
                                        const char *authority_source,const char *target,bool *query_error,
                                        const char **error_category) {
