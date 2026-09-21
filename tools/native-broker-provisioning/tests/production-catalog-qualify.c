@@ -73,7 +73,7 @@ int main(int argc,char **argv) {
         catalog_step("internal_triggers",production_internal_runtime_triggers_valid()) &&
         catalog_step("internal_functions",production_internal_runtime_functions_valid());
     }
-    ok=ok && catalog_step("authority",production_authority_valid(MAPPED_ROLE));
+    ok=ok && catalog_step("authority",production_authority_valid(MAPPED_ROLE,false));
     (void)command("ROLLBACK");
   }
   if (db) PQfinish(db);

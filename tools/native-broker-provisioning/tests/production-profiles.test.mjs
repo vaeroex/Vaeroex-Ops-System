@@ -159,6 +159,19 @@ test("Production profile fencing pairs login state with non-inheriting capabilit
   assert.match(qualifier, /existing_session_loses_effective_rpc_before_session_termination/);
   assert.match(qualifier, /active_login_with_noninheriting_capability_membership_rejected/);
   assert.match(qualifier, /noncurrent_profile_privilege_drift_blocks_current_profile_before_mutation/);
+  assert.match(nativeSource, /production_authority_valid\(target,!strcmp\(op,"fence"\)\)/,
+    "only the pre-revocation fence path permits target-owned settings");
+  assert.match(nativeSource, /production_authority_valid\(target,state==2\)/,
+    "the fence role check applies the same narrow pre-revocation exception");
+  assert.match(nativeSource, /\$8=\$6 OR target_role\.rolconfig IS NULL/,
+    "the exception is bound to the exact operation target");
+  assert.match(nativeSource, /\$8=\$6 OR NOT EXISTS \(SELECT FROM pg_db_role_setting s WHERE s\.setrole=target_role\.oid\)/,
+    "only the exact target's per-database settings are deferred to postflight");
+  for (const label of [
+    "target_settings_require_checked_post_commit_recovery",
+    "target_settings_cannot_block_nologin_membership_fence_or_session_drain",
+    "reconciled_target_settings_restore_exact_fence_contract",
+  ]) assert.match(qualifier, new RegExp(label));
 });
 
 test("post-mutation recovery reports each safety condition independently", () => {

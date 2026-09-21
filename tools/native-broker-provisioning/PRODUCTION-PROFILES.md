@@ -16,6 +16,13 @@ an already-authenticated PostgreSQL 16+ session from retaining inherited RPC
 authority while it is waiting to be drained. Each of the six profiles is
 verified independently as absent, exactly closed, or exactly active, so fencing
 one profile does not disable another legitimately active least-privilege role.
+Because a PostgreSQL LOGIN may set its own global and per-database defaults,
+the compensating fence does not let those target-owned settings block the
+NOLOGIN/NOINHERIT transition, membership fence, or session drain. Every other
+authority predicate remains exact before mutation. The full post-commit check
+still rejects any residual setting and reports checked recovery; an operator
+must reconcile only the observed settings before the exact closed-state proof
+can succeed.
 
 The required B source contract is the exact 102-migration foundation ending at
 `20260902191323` plus overlay `20260902191324`. Both file hashes and the 102/103

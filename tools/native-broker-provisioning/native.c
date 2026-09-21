@@ -1075,10 +1075,11 @@ static bool production_contract_valid(production_phase phase) {
 #endif
 #ifdef VAEROEX_PRODUCTION_PROFILE
 static bool production_named_authority_valid(const char *capability,const char *authority_function,
-                                             const char *authority_source,const char *target,bool internal_runtime) {
+                                             const char *authority_source,const char *target,bool internal_runtime,
+                                             const char *settings_exception) {
   const char *values[]={capability,authority_function,authority_source,
     OPERATIONAL_AUTHORITY_FUNCTION,OPERATIONAL_AUTHORITY_SOURCE_MD5,target,
-    internal_runtime?"internal":"overlay"};
+    internal_runtime?"internal":"overlay",settings_exception};
   return true_query("SELECT to_regprocedure($2) IS NOT NULL "
     "AND EXISTS (SELECT FROM pg_namespace n JOIN pg_proc p ON p.pronamespace=n.oid "
       "JOIN pg_language l ON l.oid=p.prolang "
@@ -1124,7 +1125,8 @@ static bool production_named_authority_valid(const char *capability,const char *
      * object authority while a different profile is being maintained. */
     "AND NOT EXISTS (SELECT FROM pg_roles target_role WHERE target_role.rolname=$6 AND NOT ("
       "NOT target_role.rolsuper AND NOT target_role.rolcreaterole AND NOT target_role.rolcreatedb "
-      "AND NOT target_role.rolreplication AND NOT target_role.rolbypassrls AND target_role.rolconfig IS NULL "
+      "AND NOT target_role.rolreplication AND NOT target_role.rolbypassrls "
+      "AND ($8=$6 OR target_role.rolconfig IS NULL) "
       "AND ((target_role.rolcanlogin AND target_role.rolinherit) OR "
         "(NOT target_role.rolcanlogin AND NOT target_role.rolinherit)) "
       "AND NOT EXISTS (SELECT FROM pg_roles other_role WHERE other_role.rolname NOT IN ($6,$1) "
@@ -1136,7 +1138,7 @@ static bool production_named_authority_valid(const char *capability,const char *
           "AND m.admin_option AND NOT m.inherit_option AND NOT m.set_option)) "
       "AND NOT EXISTS (SELECT FROM pg_shdepend d WHERE d.refclassid='pg_authid'::regclass "
         "AND d.refobjid=target_role.oid AND d.deptype IN ('o','a','i','r')) "
-      "AND NOT EXISTS (SELECT FROM pg_db_role_setting s WHERE s.setrole=target_role.oid)"
+      "AND ($8=$6 OR NOT EXISTS (SELECT FROM pg_db_role_setting s WHERE s.setrole=target_role.oid))"
     ")) "
     /* A fixed login may be absent before prepare, or must otherwise be an
      * exact active pair (LOGIN/INHERIT plus membership INHERIT) or exact
@@ -1242,7 +1244,7 @@ static bool production_named_authority_valid(const char *capability,const char *
         "coalesce(d.datacl,acldefault('d',d.datdba))) a "
         "WHERE a.grantee=0 AND a.privilege_type='CONNECT')) "
     "AND NOT EXISTS (SELECT FROM pg_default_acl d CROSS JOIN LATERAL aclexplode(d.defaclacl) a "
-      "WHERE d.defaclobjtype IN ('r','S','f','n') AND a.grantee IN (0,$1::regrole))",7,values);
+      "WHERE d.defaclobjtype IN ('r','S','f','n') AND a.grantee IN (0,$1::regrole))",8,values);
 }
 
 static bool production_overlay_wrapper_owner_only(const char *authority_function,const char *authority_source) {
@@ -1261,10 +1263,11 @@ static bool production_overlay_wrapper_owner_only(const char *authority_function
       "AND a.grantee<>p.proowner)",2,values);
 }
 #endif
-static bool production_authority_valid(const char *target) {
+static bool production_authority_valid(const char *target,bool allow_target_settings) {
 #ifdef VAEROEX_PRODUCTION_PROFILE
   production_phase phase=production_ledger_phase();
   if (strcmp(target,MAPPED_ROLE) || !production_contract_valid(phase)) return false;
+  const char *settings_exception=allow_target_settings?target:"";
   if (phase==PRODUCTION_PHASE_INTERNAL_RUNTIME) {
     return production_overlay_wrapper_owner_only(
         "public.check_square_production_oauth_authority_v1(text,text,text,bigint,text)",
@@ -1280,43 +1283,44 @@ static bool production_authority_valid(const char *target) {
         AUTHORITY_SOURCE_FOR("square_production_evidence_authority","evidence")) &&
       production_named_authority_valid("square_production_oauth_authority",
         "public.square_production_internal_oauth_v1(text,jsonb)",
-        "6ff215c19aa5c66b607c307d26bcf8f53cc8b3308bd929a50a5f97c5e049d860","square_production_oauth",true) &&
+        "6ff215c19aa5c66b607c307d26bcf8f53cc8b3308bd929a50a5f97c5e049d860","square_production_oauth",true,settings_exception) &&
       production_named_authority_valid("square_production_broker_authority",
         "public.square_production_internal_broker_v1(text,jsonb)",
-        "386b2afeeb21c1884b1d1e4869ceccde87218f2201c4e5c802c74b3ff7ec5b61","square_production_broker",true) &&
+        "386b2afeeb21c1884b1d1e4869ceccde87218f2201c4e5c802c74b3ff7ec5b61","square_production_broker",true,settings_exception) &&
       production_named_authority_valid("square_production_scheduler_authority",
         "public.check_square_production_scheduler_authority_v1(text,text,text,bigint,text)",
-        AUTHORITY_SOURCE_FOR("square_production_scheduler_authority","scheduler"),"square_production_scheduler",false) &&
+        AUTHORITY_SOURCE_FOR("square_production_scheduler_authority","scheduler"),"square_production_scheduler",false,settings_exception) &&
       production_named_authority_valid("square_production_webhook_authority",
         "public.check_square_production_webhook_authority_v1(text,text,text,bigint,text)",
-        AUTHORITY_SOURCE_FOR("square_production_webhook_authority","webhook"),"square_production_webhook",false) &&
+        AUTHORITY_SOURCE_FOR("square_production_webhook_authority","webhook"),"square_production_webhook",false,settings_exception) &&
       production_named_authority_valid("square_production_runtime_authority",
         "public.square_production_internal_runtime_v1(text,jsonb)",
-        "63024be692c785827b982945c220b0268d8e57ee2db4f3d46a8033a5f5fe3301","square_production_runtime",true) &&
+        "63024be692c785827b982945c220b0268d8e57ee2db4f3d46a8033a5f5fe3301","square_production_runtime",true,settings_exception) &&
       production_named_authority_valid("square_production_evidence_authority",
         "public.square_production_internal_evidence_v1(text,jsonb)",
-        "98e2d0363897ad1020fb4296dd643ccd4798cac10030b8a4883379844d954877","square_production_evidence",true);
+        "98e2d0363897ad1020fb4296dd643ccd4798cac10030b8a4883379844d954877","square_production_evidence",true,settings_exception);
   }
   return production_named_authority_valid("square_production_oauth_authority",
       "public.check_square_production_oauth_authority_v1(text,text,text,bigint,text)",
-      AUTHORITY_SOURCE_FOR("square_production_oauth_authority","oauth"),"square_production_oauth",false) &&
+      AUTHORITY_SOURCE_FOR("square_production_oauth_authority","oauth"),"square_production_oauth",false,settings_exception) &&
     production_named_authority_valid("square_production_broker_authority",
       "public.check_square_production_broker_authority_v1(text,text,text,bigint,text)",
-      AUTHORITY_SOURCE_FOR("square_production_broker_authority","broker"),"square_production_broker",false) &&
+      AUTHORITY_SOURCE_FOR("square_production_broker_authority","broker"),"square_production_broker",false,settings_exception) &&
     production_named_authority_valid("square_production_scheduler_authority",
       "public.check_square_production_scheduler_authority_v1(text,text,text,bigint,text)",
-      AUTHORITY_SOURCE_FOR("square_production_scheduler_authority","scheduler"),"square_production_scheduler",false) &&
+      AUTHORITY_SOURCE_FOR("square_production_scheduler_authority","scheduler"),"square_production_scheduler",false,settings_exception) &&
     production_named_authority_valid("square_production_webhook_authority",
       "public.check_square_production_webhook_authority_v1(text,text,text,bigint,text)",
-      AUTHORITY_SOURCE_FOR("square_production_webhook_authority","webhook"),"square_production_webhook",false) &&
+      AUTHORITY_SOURCE_FOR("square_production_webhook_authority","webhook"),"square_production_webhook",false,settings_exception) &&
     production_named_authority_valid("square_production_runtime_authority",
       "public.check_square_production_runtime_authority_v1(text,text,text,bigint,text)",
-      AUTHORITY_SOURCE_FOR("square_production_runtime_authority","runtime"),"square_production_runtime",false) &&
+      AUTHORITY_SOURCE_FOR("square_production_runtime_authority","runtime"),"square_production_runtime",false,settings_exception) &&
     production_named_authority_valid("square_production_evidence_authority",
       "public.check_square_production_evidence_authority_v1(text,text,text,bigint,text)",
-      AUTHORITY_SOURCE_FOR("square_production_evidence_authority","evidence"),"square_production_evidence",false);
+      AUTHORITY_SOURCE_FOR("square_production_evidence_authority","evidence"),"square_production_evidence",false,settings_exception);
 #else
   (void)target;
+  (void)allow_target_settings;
   return true;
 #endif
 }
@@ -1327,7 +1331,7 @@ static bool diagnostic_named_authority(const char *capability,const char *author
                                        const char *authority_source,const char *target,bool *query_error,
                                        const char **error_category) {
   if (!command("SAVEPOINT vaeroex_authority_diagnostic")) { *query_error=true; *error_category="other"; return false; }
-  bool value=production_named_authority_valid(capability,authority_function,authority_source,target,false);
+  bool value=production_named_authority_valid(capability,authority_function,authority_source,target,false,"");
   *query_error=last_query_error;
   *error_category=last_query_error_category;
   if (!command("ROLLBACK TO SAVEPOINT vaeroex_authority_diagnostic")) { *query_error=true; *error_category="other"; }
@@ -1502,7 +1506,7 @@ static bool role_valid(const char *target, const char *oid, int state) {
 #else
     "AND r.rolinherit AND (NOT r.rolcanlogin OR $3::integer<>0) "
 #endif
-    "AND r.rolconfig IS NULL) "
+    "AND ($3::integer=2 OR r.rolconfig IS NULL)) "
     "AND EXISTS (SELECT FROM pg_roles c WHERE c.rolname=$4 "
     "AND NOT c.rolcanlogin AND NOT c.rolsuper AND NOT c.rolcreaterole AND NOT c.rolcreatedb "
     "AND NOT c.rolreplication AND NOT c.rolbypassrls AND c.rolconfig IS NULL) "
@@ -1556,8 +1560,9 @@ static bool role_valid(const char *target, const char *oid, int state) {
      * A dedicated login may inherit the capability, not own extra authority. */
     "AND NOT EXISTS (SELECT FROM pg_shdepend d WHERE d.refclassid='pg_authid'::regclass "
     "AND d.refobjid=(SELECT oid FROM pg_roles WHERE rolname=$1) AND d.deptype IN ('o','a','i','r')) "
-    "AND NOT EXISTS (SELECT FROM pg_db_role_setting WHERE setrole=(SELECT oid FROM pg_roles WHERE rolname=$1))", 4, values)
-    && production_authority_valid(target);
+    "AND ($3::integer=2 OR NOT EXISTS (SELECT FROM pg_db_role_setting "
+      "WHERE setrole=(SELECT oid FROM pg_roles WHERE rolname=$1)))", 4, values)
+    && production_authority_valid(target,state==2);
 }
 static bool no_sessions(const char *target) {
   const char *values[] = {target};
@@ -1709,7 +1714,12 @@ static int run(int argc, char **argv) {
  #endif
   if (ok) { ok = command("BEGIN"); transaction = ok; }
   if (ok) ok = closed_authority(target) && lock_target(target);
-  if (ok) ok = production_authority_valid(target);
+  /* Fence must not depend on settings that the target LOGIN can assign to
+   * itself.  Only this pre-revocation path permits those two catalog fields;
+   * every other role, privilege, membership, object and gate predicate remains
+   * exact, and the normal post-commit validation below rejects residual
+   * settings after NOLOGIN/NOINHERIT commits and sessions are terminated. */
+  if (ok) ok = production_authority_valid(target,!strcmp(op,"fence"));
   if (ok && !strcmp(op,"prepare")) {
     const char *values[] = {target,CAPABILITY};
     ok = !strcmp(role_oid,"0") && true_query("SELECT NOT EXISTS (SELECT FROM pg_roles WHERE rolname=$1) "
@@ -1853,7 +1863,7 @@ static int run(int argc, char **argv) {
   if (ok) {
     int final_state=(!strcmp(op,"activate") || !strcmp(op,"authenticate")) ? 1 : 0;
     ok=strcmp(resolved_oid,"0") ? role_valid(target,resolved_oid,final_state)
-      : (!strcmp(op,"inspect") && production_authority_valid(target));
+      : (!strcmp(op,"inspect") && production_authority_valid(target,false));
   }
 #endif
   /* A transport loss at COMMIT is never treated as rollback or success. */
