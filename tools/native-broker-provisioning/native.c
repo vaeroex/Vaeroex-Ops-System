@@ -165,6 +165,7 @@ static atomic_bool watcher_done = false;
 static atomic_bool expired = false;
 static struct timespec started;
 static PGconn *db = NULL;
+static PGconn *control_db = NULL;
 static bool sensitive_started = false;
 static bool transaction = false;
 static bool last_query_error = false;
@@ -301,6 +302,62 @@ static bool role_command(const char *prefix, const char *role, const char *suffi
   int n = snprintf(sql, sizeof(sql), "%s \"%s\" %s", prefix, role, suffix);
   return n > 0 && (size_t)n < sizeof(sql) && command(sql);
 }
+#ifdef VAEROEX_PRODUCTION_PROFILE
+static bool terminate_target_sessions(PGconn *connection,const char *target) {
+  const char *values[]={target};
+  PGresult *r=PQexecParams(connection,
+    "SELECT coalesce(bool_and(pg_terminate_backend(pid,1000)),true) "
+    "FROM pg_stat_activity WHERE usename=$1",1,NULL,values,NULL,NULL,0);
+  bool ok=r && PQresultStatus(r)==PGRES_TUPLES_OK && PQntuples(r)==1 &&
+    PQnfields(r)==1 && !strcmp(PQgetvalue(r,0,0),"t");
+  if (r) PQclear(r);
+  return ok && !stopped();
+}
+static bool managed_fence_command(const char *sql,const char *target) {
+  if (!managed_profile() || !control_db || PQstatus(control_db)!=CONNECTION_OK ||
+      strcmp(target,MAPPED_ROLE)) return false;
+  /* A target LOGIN may hold its own pg_authid tuple with an uncommitted
+   * ALTER ROLE CURRENT_USER PASSWORD.  The hosted operator cannot lock that
+   * provider-owned catalog first.  Drain the exact target, then keep draining
+   * through the bounded asynchronous NOLOGIN transition.  Once ALTER ROLE
+   * owns the tuple, reconnecting sessions cannot change it; the normal
+   * post-commit drain removes any session authenticated in the preceding
+   * race window.  No query contains a credential or accepts a caller-selected
+   * role. */
+  if (!terminate_target_sessions(control_db,target)) return false;
+  if (PQsetnonblocking(db,1)!=0 || !PQsendQuery(db,sql)) {
+    (void)PQsetnonblocking(db,0);
+    return false;
+  }
+  bool ok=true;
+  while (ok && !stopped() && PQisBusy(db)) {
+    ok=terminate_target_sessions(control_db,target);
+    struct pollfd descriptor={PQsocket(db),POLLIN,0};
+    int ready=poll(&descriptor,1,20);
+    if (ready<0 && errno==EINTR) continue;
+    if (ready<0 || (ready>0 && !PQconsumeInput(db))) ok=false;
+  }
+  int results=0;
+  if (ok && !PQisBusy(db)) {
+    for (PGresult *r=PQgetResult(db);r;r=PQgetResult(db)) {
+      results++;
+      if (PQresultStatus(r)!=PGRES_COMMAND_OK) ok=false;
+      PQclear(r);
+    }
+  } else ok=false;
+  if (PQsetnonblocking(db,0)!=0) ok=false;
+  return ok && results==1 && !stopped();
+}
+static bool managed_fence_role(const char *target) {
+  char grant[256],alter[128];
+  int grant_length=snprintf(grant,sizeof(grant),
+    "GRANT " CAPABILITY " TO \"%s\" WITH ADMIN FALSE, INHERIT FALSE, SET FALSE",target);
+  int alter_length=snprintf(alter,sizeof(alter),"ALTER ROLE \"%s\" NOLOGIN NOINHERIT",target);
+  return grant_length>0 && (size_t)grant_length<sizeof(grant) &&
+    alter_length>0 && (size_t)alter_length<sizeof(alter) &&
+    managed_fence_command(grant,target) && managed_fence_command(alter,target);
+}
+#endif
 static bool profile(void) {
   /* SET, not set_config: Supautils handles the supported VariableSetStmt path.
    * Native parameter ACL false is not a substitute for effective readback. */
@@ -1684,17 +1741,34 @@ static int run(int argc, char **argv) {
 #endif
       NULL};
     db = PQconnectdbParams(keywords,values,0);
+#ifdef VAEROEX_PRODUCTION_PROFILE
+    /* Fence alone receives a second independently authenticated administrator
+     * session.  It is used only to terminate exact-target sessions while the
+     * primary connection waits for the NOLOGIN tuple transition. */
+    if (!strcmp(op,"fence") && managed_profile())
+      control_db=PQconnectdbParams(keywords,values,0);
+#endif
   }
   wipe(admin_password,sizeof(admin_password));
   /* mlock is page-granular and locks do not stack. These arrays may share a
    * page, so keep BOTH locks until all owned credential material is wiped. */
-  ok = ok && db && PQstatus(db)==CONNECTION_OK && !stopped();
+  ok = ok && db && PQstatus(db)==CONNECTION_OK &&
+    (!control_db || PQstatus(control_db)==CONNECTION_OK) && !stopped();
   if (ok) {
     PQsetNoticeProcessor(db,notice,NULL);
     atomic_store(&watched_socket,PQsocket(db));
     bool identity_ok = identity(host,database,admin,system_id,db_oid);
     bool profile_ok = identity_ok && profile();
     ok = identity_ok && profile_ok;
+#ifdef VAEROEX_PRODUCTION_PROFILE
+    if (ok && control_db) {
+      PGconn *primary=db;
+      PQsetNoticeProcessor(control_db,notice,NULL);
+      db=control_db;
+      ok=identity(host,database,admin,system_id,db_oid) && profile();
+      db=primary;
+    }
+#endif
 #if defined(VAEROEX_SYNTHETIC_ONLY) && defined(VAEROEX_PRODUCTION_PROFILE)
     if (!ok && !strcmp(op,"diagnose")) {
       production_authority_diagnostic(target,identity_ok,profile_ok);
@@ -1750,14 +1824,21 @@ static int run(int argc, char **argv) {
     int expected_state=!strcmp(op,"authenticate")?1:!strcmp(op,"fence")?2:0;
     ok = strcmp(role_oid,"0") && role_valid(target,role_oid,expected_state);
     if (ok && strcmp(op,"inspect") && strcmp(op,"authenticate")) {
+      if (!strcmp(op,"fence")) {
 #ifdef VAEROEX_PRODUCTION_PROFILE
-      /* Make inherited RPC authority disappear in the same transaction that
-       * fences LOGIN. Role-level NOINHERIT alone is not sufficient on
-       * PostgreSQL 16+ when an existing membership has INHERIT TRUE. */
-      if (!strcmp(op,"fence")) ok = role_command("GRANT " CAPABILITY " TO",target,
-        "WITH ADMIN FALSE, INHERIT FALSE, SET FALSE");
+        /* Make inherited RPC authority disappear in the same transaction that
+         * fences LOGIN. The managed helper keeps draining target-owned catalog
+         * lockers while both fixed transitions wait. */
+        if (managed_profile()) ok=managed_fence_role(target);
+        else {
+          ok=role_command("GRANT " CAPABILITY " TO",target,
+            "WITH ADMIN FALSE, INHERIT FALSE, SET FALSE");
+          if (ok) ok=role_command("ALTER ROLE",target,"NOLOGIN NOINHERIT");
+        }
+#else
+        ok=role_command("ALTER ROLE",target,"NOLOGIN");
 #endif
-      if (ok) ok = role_command("ALTER ROLE",target,
+      } else if (ok) ok = role_command("ALTER ROLE",target,
 #ifdef VAEROEX_PRODUCTION_PROFILE
         "NOLOGIN NOINHERIT"
 #else
@@ -1898,6 +1979,7 @@ int main(int argc, char **argv) {
   atomic_store(&watcher_done,true);
   pthread_join(thread,NULL);
   atomic_store(&watched_socket,-1);
+  if (control_db) PQfinish(control_db);
   if (db) PQfinish(db);
   if (result==2) puts("{\"outcome\":\"failed\"}");
   if (result==3) puts("{\"outcome\":\"uncertain\"}");

@@ -23,6 +23,12 @@ authority predicate remains exact before mutation. The full post-commit check
 still rejects any residual setting and reports checked recovery; an operator
 must reconcile only the observed settings before the exact closed-state proof
 can succeed.
+The managed fence also uses a separately authenticated, identity-checked
+administrator control session to drain the exact target while the primary
+session waits for `NOLOGIN NOINHERIT`. This clears a target-owned uncommitted
+password change and continues across the reconnect window; the existing
+post-commit drain removes any session authenticated before NOLOGIN became
+visible. No other role is terminated.
 
 The required B source contract is the exact 102-migration foundation ending at
 `20260902191323` plus overlay `20260902191324`. Both file hashes and the 102/103

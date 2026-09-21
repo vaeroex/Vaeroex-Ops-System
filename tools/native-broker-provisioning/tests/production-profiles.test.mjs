@@ -152,7 +152,8 @@ test("Production profile fencing pairs login state with non-inheriting capabilit
     "tools/native-broker-provisioning/tests/production-native-qualify.cjs"), "utf8");
   assert.match(nativeSource, /CREATE ROLE",target,[\s\S]*?NOLOGIN[\s\S]*?NOINHERIT/);
   assert.match(nativeSource, /WITH ADMIN FALSE, INHERIT FALSE, SET FALSE/);
-  assert.match(nativeSource, /if \(!strcmp\(op,"fence"\)\) ok = role_command\("GRANT " CAPABILITY " TO",target,[\s\S]*?INHERIT FALSE, SET FALSE/);
+  assert.match(nativeSource, /managed_fence_role\(target\)[\s\S]*?role_command\("GRANT " CAPABILITY " TO",target,[\s\S]*?INHERIT FALSE, SET FALSE/,
+    "managed and self-owned Production fences both remove inherited capability authority");
   assert.match(nativeSource, /if \(ok && !strcmp\(op,"activate"\)\) \{[\s\S]*?INHERIT TRUE, SET FALSE/);
   assert.match(nativeSource, /target_role\.rolcanlogin AND target_role\.rolinherit AND m\.inherit_option/);
   assert.match(nativeSource, /NOT target_role\.rolcanlogin AND NOT target_role\.rolinherit AND NOT m\.inherit_option/);
@@ -171,7 +172,14 @@ test("Production profile fencing pairs login state with non-inheriting capabilit
     "target_settings_require_checked_post_commit_recovery",
     "target_settings_cannot_block_nologin_membership_fence_or_session_drain",
     "reconciled_target_settings_restore_exact_fence_contract",
+    "target_password_locker_drained_before_nologin_transition",
+    "target_reconnect_cannot_hold_password_lock_through_fence",
+    "password_locker_rollback_and_exact_closed_state_confirmed",
   ]) assert.match(qualifier, new RegExp(label));
+  assert.match(nativeSource, /while \(ok && !stopped\(\) && PQisBusy\(db\)\)[\s\S]*?terminate_target_sessions\(control_db,target\)/,
+    "the exact-target drainer remains active while NOLOGIN waits");
+  assert.match(nativeSource, /managed_fence_role\(target\)[\s\S]*?command\("COMMIT"\)[\s\S]*?pg_terminate_backend/,
+    "the reconnect window is followed by the existing post-commit session drain");
 });
 
 test("post-mutation recovery reports each safety condition independently", () => {
