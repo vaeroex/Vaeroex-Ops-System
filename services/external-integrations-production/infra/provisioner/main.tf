@@ -111,6 +111,9 @@ resource "google_secret_manager_secret_iam_member" "private_versions" {
   secret_id = "square-production-${each.key}-db"
   role      = google_project_iam_custom_role.private_versions.name
   member    = google_service_account.provisioner.member
+  # Count-removal transitions must finish destroying setup HTTPS before any
+  # grant is created; reverse transitions destroy all grants before setup.
+  depends_on = [google_compute_firewall.setup_https]
   condition {
     title       = "bounded-native-provisioning"
     description = "One exact database secret during the admitted maintenance window."

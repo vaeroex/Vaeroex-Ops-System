@@ -458,26 +458,44 @@ async function main() {
     approvalId: "synthetic-production", signal: new AbortController().signal })).ack,
   "failed_postflight_assignment_rolls_back_and_restored_authority_inspects");
   let appliedDeliveryInvoked = false, appliedMutation = false, appliedDenied = false;
+  // Delivery acknowledgement must let the actual native transaction commit
+  // before this separate administrator can replace the locked authority RPC.
+  // In-transaction drift is excluded by the preceding lock-conflict test;
+  // this case proves committed drift is rejected at the next native boundary.
+  const appliedAssignment = await postflightNative.assign({ target: postflightTarget,
+    intent: "authority-drift-after-commit", approvalId: "synthetic-production",
+    signal: new AbortController().signal, async deliver() {
+      appliedDeliveryInvoked = true;
+      return { ack: true };
+    } });
+  check(appliedDeliveryInvoked === true, "authority_drift_postcommit_delivery_invoked");
+  const appliedCommitConfirmed = appliedAssignment.ack === true && appliedAssignment.committed === true &&
+    appliedAssignment.storeAcknowledged === true;
+  check(appliedCommitConfirmed, "authority_drift_postcommit_assignment_committed");
   try {
-    await postflightNative.assign({ target: postflightTarget, intent: "postflight-authority-recheck-applied",
-      approvalId: "synthetic-production", signal: new AbortController().signal, async deliver() {
-        appliedDeliveryInvoked = true;
-        await fixture.control.query(`CREATE OR REPLACE FUNCTION ${overlayRpcDefinition(postflightDrift)} RETURNS void
-          LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path='' AS
-          $function$ BEGIN RAISE EXCEPTION 'synthetic_postflight_drift' USING ERRCODE='55000'; END $function$`);
-        appliedMutation = true;
-        return { ack: true };
-      } });
-  } catch { appliedDenied = true; }
-  if (appliedMutation) await fixture.control.query(`CREATE OR REPLACE FUNCTION ${overlayRpcDefinition(postflightDrift)} RETURNS void
-    LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path='' AS $function$${productionAuthoritySource(postflightDrift)}$function$`);
-  process.stdout.write(JSON.stringify({ outcome: "postflight_authority_drift_applied_observation",
+    // This standalone query resolves only after PostgreSQL's implicit commit.
+    await fixture.control.query(`CREATE OR REPLACE FUNCTION ${overlayRpcDefinition(postflightDrift)} RETURNS void
+      LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path='' AS
+      $function$ BEGIN RAISE EXCEPTION 'synthetic_postflight_drift' USING ERRCODE='55000'; END $function$`);
+    appliedMutation = true;
+    try {
+      await postflightNative.inspect({ target: postflightTarget, intent: "authority-drift-next-boundary",
+        approvalId: "synthetic-production", signal: new AbortController().signal });
+    } catch { appliedDenied = true; }
+  } finally {
+    if (appliedMutation) await fixture.control.query(`CREATE OR REPLACE FUNCTION ${overlayRpcDefinition(postflightDrift)} RETURNS void
+      LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path='' AS $function$${productionAuthoritySource(postflightDrift)}$function$`);
+  }
+  process.stdout.write(JSON.stringify({ outcome: "postcommit_authority_drift_observation",
     deliveryInvoked: appliedDeliveryInvoked === true,
-    deliveryMutatedAuthority: appliedMutation === true,
-    nativeRejectedAfterDelivery: appliedDenied === true }) + "\n");
-  check(appliedDeliveryInvoked === true, "authority_drift_applied_delivery_invoked");
-  check(appliedMutation === true, "authority_drift_applied_mutation_committed");
-  check(appliedDenied === true, "authority_drift_applied_native_rejected_after_delivery");
+    nativeCommitConfirmed: appliedCommitConfirmed === true,
+    mutationCommittedAfterNativeCommit: appliedMutation === true,
+    nextNativeBoundaryRejected: appliedDenied === true }) + "\n");
+  check(appliedMutation === true, "authority_drift_postcommit_mutation_committed");
+  check(appliedDenied === true, "authority_drift_postcommit_next_native_boundary_rejected");
+  check((await postflightNative.inspect({ target: postflightTarget, intent: "authority-drift-postcommit-restored",
+    approvalId: "synthetic-production", signal: new AbortController().signal })).ack,
+  "authority_drift_postcommit_restored_authority_inspects");
   stage = "bounded_production_concurrency";
   await require("./production-concurrency.cjs")({ fixture, native: postflightNative,
     createPeer: () => adapterModule.createLocalSyntheticProductionNativeAdapter({

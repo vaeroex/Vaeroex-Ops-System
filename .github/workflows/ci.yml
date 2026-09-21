@@ -134,6 +134,7 @@ jobs:
           terraform -chdir=services/external-integrations-production/infra/provisioner init -backend=false -input=false -lockfile=readonly
           terraform -chdir=services/external-integrations-production/infra/provisioner validate
           terraform -chdir=services/external-integrations-production/infra/provisioner test
+          node services/external-integrations-production/infra/provisioner/tests/verify-transition-order.mjs
 
       - name: Verify isolated Square remote Sandbox binding and closed Production gates
         run: |

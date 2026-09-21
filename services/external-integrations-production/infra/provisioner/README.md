@@ -32,6 +32,10 @@ downloads over TCP/443. It provides no secret authority. After installation,
 close that broad setup rule and verify its removal before setting
 `temporary_access_enabled` to grant the six separate four-permission secret
 bindings. Terraform rejects simultaneous setup HTTPS and credential staging.
+The explicit grant dependency also enforces transition ordering: setup-rule
+deletion completes before any secret grant is created, and every secret-grant
+deletion completes before setup HTTPS can be recreated. These apply-graph edges
+are tested in both directions; a single flag-switch apply cannot overlap them.
 
 During private entry, HTTPS reaches only `199.36.153.8/30` (the
 `private.googleapis.com` VIP). The reviewed guest setup must resolve exactly
@@ -81,7 +85,14 @@ terraform init -backend=false
 terraform fmt -check -recursive
 terraform validate
 terraform test
+node tests/verify-transition-order.mjs
 ```
+
+The transition verifier runs the real firewall/IAM resource dependency closure
+through three isolated mocked Terraform applies, checking graph edges and
+completion/start ordering. It excludes the backend, credentials and real state;
+provider schemas come only from the pinned local cache. Its in-memory trace is
+not printed or persisted, and its disposable files are removed afterward.
 
 The test fixtures use documentation IPs and an artificial future window. They
 prove template boundaries only; no hosted identity, capacity, IAM inheritance,

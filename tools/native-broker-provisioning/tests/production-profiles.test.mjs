@@ -196,10 +196,20 @@ test("post-mutation recovery reports each safety condition independently", () =>
   assert.match(qualifier, /authority_drift_membership_delivery_mutation_not_applied/);
   assert.match(qualifier, /authority_drift_membership_delivery_blocked_by_authority_lock/);
   assert.match(qualifier, /authority_drift_native_rejected_after_delivery/);
-  assert.match(qualifier, /postflight_authority_drift_applied_observation/);
-  assert.match(qualifier, /authority_drift_applied_delivery_invoked/);
-  assert.match(qualifier, /authority_drift_applied_mutation_committed/);
-  assert.match(qualifier, /authority_drift_applied_native_rejected_after_delivery/);
+  assert.match(qualifier, /postcommit_authority_drift_observation/);
+  assert.match(qualifier, /authority_drift_postcommit_delivery_invoked/);
+  assert.match(qualifier, /authority_drift_postcommit_assignment_committed/);
+  assert.match(qualifier, /authority_drift_postcommit_mutation_committed/);
+  assert.match(qualifier, /authority_drift_postcommit_next_native_boundary_rejected/);
+  assert.match(qualifier, /authority_drift_postcommit_restored_authority_inspects/);
+  const postcommit = qualifier.slice(qualifier.indexOf("const appliedAssignment ="),
+    qualifier.indexOf('stage = "bounded_production_concurrency"'));
+  assert.match(postcommit, /appliedAssignment\.ack === true && appliedAssignment\.committed === true &&\s*appliedAssignment\.storeAcknowledged === true/);
+  assert.doesNotMatch(postcommit.slice(0, postcommit.indexOf("authority_drift_postcommit_assignment_committed")),
+    /fixture\.control\.query|CREATE OR REPLACE FUNCTION/,
+    "administrator mutation must not wait on native-held locks inside delivery");
+  assert.match(postcommit, /authority_drift_postcommit_assignment_committed[\s\S]*?CREATE OR REPLACE FUNCTION[\s\S]*?appliedMutation = true[\s\S]*?postflightNative\.inspect/);
+  assert.match(postcommit, /finally \{\s*if \(appliedMutation\) await fixture\.control\.query/);
   assert.match(qualifier, /authority_rpc_drift_observation/);
   assert.match(qualifier, /mutationErrorCategory/);
   assert.match(qualifier, /same_signature_authority_rpc_mutation_applied/);

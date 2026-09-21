@@ -118,7 +118,7 @@ export async function installProfiles(source, expectedManifestHash) {
   for (const name of profileNames) {
     const install=`/opt/vaeroex-production-square-${name}`,state=`/var/lib/vaeroex-production-square-${name}`;
     mkdirSync(install,{mode:0o755});mkdirSync(state,{mode:0o700});
-    for (const module of runtimeModules) {const target=resolve(install,module);copyFileSync(resolve(source,moduleRoot,module),target,constants.COPYFILE_EXCL);chmodSync(target,0o444);}
+    for (const moduleName of runtimeModules) {const target=resolve(install,moduleName);copyFileSync(resolve(source,moduleRoot,moduleName),target,constants.COPYFILE_EXCL);chmodSync(target,0o444);}
     for (const [from,to] of [[`native-${name}`,"native-managed"],[`native-${name}.launcher`,"maintenance-launcher"]]) {
       copyFileSync(resolve(build,from),resolve(install,to),constants.COPYFILE_EXCL);chmodSync(resolve(install,to),0o555);
     }
