@@ -17,6 +17,9 @@ const syntheticManagedFenceFailures = new Map([
   [24, "nologin_continuous_session_drain"], [25, "nologin_async_input"],
   [26, "nologin_command_result"], [27, "nologin_async_incomplete"],
   [28, "nologin_deadline"], [29, "nologin_restore_blocking"],
+  [31, "fence_connection_profile"], [32, "fence_transaction_begin"],
+  [33, "fence_closed_authority"], [34, "fence_target_lock"],
+  [35, "fence_authority_preflight"], [36, "fence_role_precondition"],
 ]);
 const label = value => typeof value === "string" && /^[a-zA-Z0-9_-]{1,80}$/.test(value);
 const credentialByte = value => (value >= 48 && value <= 57) || (value >= 97 && value <= 102);

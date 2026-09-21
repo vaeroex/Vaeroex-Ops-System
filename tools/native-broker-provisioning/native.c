@@ -1795,6 +1795,9 @@ static int run(int argc, char **argv) {
     }
 #endif
   }
+#if defined(VAEROEX_SYNTHETIC_ONLY) && defined(VAEROEX_PRODUCTION_PROFILE)
+  if (!ok && !strcmp(op,"fence")) SYNTHETIC_FENCE_FAILURE(31);
+#endif
  #if defined(VAEROEX_SYNTHETIC_ONLY) && defined(VAEROEX_PRODUCTION_PROFILE)
   if (ok && !strcmp(op,"diagnose")) {
     if (!command("BEGIN")) return 2;
@@ -1805,14 +1808,35 @@ static int run(int argc, char **argv) {
     return 0;
   }
  #endif
-  if (ok) { ok = command("BEGIN"); transaction = ok; }
-  if (ok) ok = closed_authority(target) && lock_target(target);
+  if (ok) {
+    ok = command("BEGIN"); transaction = ok;
+#if defined(VAEROEX_SYNTHETIC_ONLY) && defined(VAEROEX_PRODUCTION_PROFILE)
+    if (!ok && !strcmp(op,"fence")) SYNTHETIC_FENCE_FAILURE(32);
+#endif
+  }
+  if (ok) {
+    ok = closed_authority(target);
+#if defined(VAEROEX_SYNTHETIC_ONLY) && defined(VAEROEX_PRODUCTION_PROFILE)
+    if (!ok && !strcmp(op,"fence")) SYNTHETIC_FENCE_FAILURE(33);
+#endif
+  }
+  if (ok) {
+    ok = lock_target(target);
+#if defined(VAEROEX_SYNTHETIC_ONLY) && defined(VAEROEX_PRODUCTION_PROFILE)
+    if (!ok && !strcmp(op,"fence")) SYNTHETIC_FENCE_FAILURE(34);
+#endif
+  }
   /* Fence must not depend on settings that the target LOGIN can assign to
    * itself.  Only this pre-revocation path permits those two catalog fields;
    * every other role, privilege, membership, object and gate predicate remains
    * exact, and the normal post-commit validation below rejects residual
    * settings after NOLOGIN/NOINHERIT commits and sessions are terminated. */
-  if (ok) ok = production_authority_valid(target,!strcmp(op,"fence"));
+  if (ok) {
+    ok = production_authority_valid(target,!strcmp(op,"fence"));
+#if defined(VAEROEX_SYNTHETIC_ONLY) && defined(VAEROEX_PRODUCTION_PROFILE)
+    if (!ok && !strcmp(op,"fence")) SYNTHETIC_FENCE_FAILURE(35);
+#endif
+  }
   if (ok && !strcmp(op,"prepare")) {
     const char *values[] = {target,CAPABILITY};
     ok = !strcmp(role_oid,"0") && true_query("SELECT NOT EXISTS (SELECT FROM pg_roles WHERE rolname=$1) "
@@ -1842,6 +1866,9 @@ static int run(int argc, char **argv) {
      * is the compensating operation after an interrupted authentication. */
     int expected_state=!strcmp(op,"authenticate")?1:!strcmp(op,"fence")?2:0;
     ok = strcmp(role_oid,"0") && role_valid(target,role_oid,expected_state);
+#if defined(VAEROEX_SYNTHETIC_ONLY) && defined(VAEROEX_PRODUCTION_PROFILE)
+    if (!ok && !strcmp(op,"fence")) SYNTHETIC_FENCE_FAILURE(36);
+#endif
     if (ok && strcmp(op,"inspect") && strcmp(op,"authenticate")) {
       if (!strcmp(op,"fence")) {
 #ifdef VAEROEX_PRODUCTION_PROFILE
