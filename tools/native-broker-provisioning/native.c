@@ -170,6 +170,13 @@ static bool sensitive_started = false;
 static bool transaction = false;
 static bool last_query_error = false;
 static const char *last_query_error_category = "none";
+#if defined(VAEROEX_SYNTHETIC_ONLY) && defined(VAEROEX_PRODUCTION_PROFILE)
+static int synthetic_managed_fence_failure = 0;
+static int synthetic_managed_fence_base = 0;
+#define SYNTHETIC_FENCE_FAILURE(offset) (synthetic_managed_fence_failure=synthetic_managed_fence_base+(offset))
+#else
+#define SYNTHETIC_FENCE_FAILURE(offset) ((void)(offset))
+#endif
 
 static void wipe(void *p, size_t n) {
   volatile unsigned char *v = p;
@@ -315,7 +322,7 @@ static bool terminate_target_sessions(PGconn *connection,const char *target) {
 }
 static bool managed_fence_command(const char *sql,const char *target) {
   if (!managed_profile() || !control_db || PQstatus(control_db)!=CONNECTION_OK ||
-      strcmp(target,MAPPED_ROLE)) return false;
+      strcmp(target,MAPPED_ROLE)) { SYNTHETIC_FENCE_FAILURE(1); return false; }
   /* A target LOGIN may hold its own pg_authid tuple with an uncommitted
    * ALTER ROLE CURRENT_USER PASSWORD.  The hosted operator cannot lock that
    * provider-owned catalog first.  Drain the exact target, then keep draining
@@ -324,38 +331,50 @@ static bool managed_fence_command(const char *sql,const char *target) {
    * post-commit drain removes any session authenticated in the preceding
    * race window.  No query contains a credential or accepts a caller-selected
    * role. */
-  if (!terminate_target_sessions(control_db,target)) return false;
+  if (!terminate_target_sessions(control_db,target)) { SYNTHETIC_FENCE_FAILURE(2); return false; }
   if (PQsetnonblocking(db,1)!=0 || !PQsendQuery(db,sql)) {
+    SYNTHETIC_FENCE_FAILURE(3);
     (void)PQsetnonblocking(db,0);
     return false;
   }
   bool ok=true;
   while (ok && !stopped() && PQisBusy(db)) {
     ok=terminate_target_sessions(control_db,target);
+    if (!ok) { SYNTHETIC_FENCE_FAILURE(4); break; }
     struct pollfd descriptor={PQsocket(db),POLLIN,0};
     int ready=poll(&descriptor,1,20);
     if (ready<0 && errno==EINTR) continue;
-    if (ready<0 || (ready>0 && !PQconsumeInput(db))) ok=false;
+    if (ready<0 || (ready>0 && !PQconsumeInput(db))) {
+      SYNTHETIC_FENCE_FAILURE(5);ok=false;
+    }
   }
   int results=0;
   if (ok && !PQisBusy(db)) {
     for (PGresult *r=PQgetResult(db);r;r=PQgetResult(db)) {
       results++;
-      if (PQresultStatus(r)!=PGRES_COMMAND_OK) ok=false;
+      if (PQresultStatus(r)!=PGRES_COMMAND_OK) { SYNTHETIC_FENCE_FAILURE(6);ok=false; }
       PQclear(r);
     }
-  } else ok=false;
-  if (PQsetnonblocking(db,0)!=0) ok=false;
-  return ok && results==1 && !stopped();
+  } else { SYNTHETIC_FENCE_FAILURE(stopped()?8:7);ok=false; }
+  if (PQsetnonblocking(db,0)!=0) { SYNTHETIC_FENCE_FAILURE(9);ok=false; }
+  if (results!=1 && ok) { SYNTHETIC_FENCE_FAILURE(7);ok=false; }
+  return ok && !stopped();
 }
 static bool managed_fence_role(const char *target) {
   char grant[256],alter[128];
   int grant_length=snprintf(grant,sizeof(grant),
     "GRANT " CAPABILITY " TO \"%s\" WITH ADMIN FALSE, INHERIT FALSE, SET FALSE",target);
   int alter_length=snprintf(alter,sizeof(alter),"ALTER ROLE \"%s\" NOLOGIN NOINHERIT",target);
-  return grant_length>0 && (size_t)grant_length<sizeof(grant) &&
-    alter_length>0 && (size_t)alter_length<sizeof(alter) &&
-    managed_fence_command(grant,target) && managed_fence_command(alter,target);
+  if (!(grant_length>0 && (size_t)grant_length<sizeof(grant) &&
+      alter_length>0 && (size_t)alter_length<sizeof(alter))) return false;
+#if defined(VAEROEX_SYNTHETIC_ONLY) && defined(VAEROEX_PRODUCTION_PROFILE)
+  synthetic_managed_fence_base=10;
+#endif
+  if (!managed_fence_command(grant,target)) return false;
+#if defined(VAEROEX_SYNTHETIC_ONLY) && defined(VAEROEX_PRODUCTION_PROFILE)
+  synthetic_managed_fence_base=20;
+#endif
+  return managed_fence_command(alter,target);
 }
 #endif
 static bool profile(void) {
@@ -1953,7 +1972,12 @@ static int run(int argc, char **argv) {
   wipe(password,sizeof(password));
   munlock(password,sizeof(password));
   munlock(admin_password,sizeof(admin_password));
-  if (!ok) return (sensitive_started || commit_attempted) ? 3 : 2;
+  if (!ok) {
+#if defined(VAEROEX_SYNTHETIC_ONLY) && defined(VAEROEX_PRODUCTION_PROFILE)
+    if (synthetic_managed_fence_failure) return synthetic_managed_fence_failure;
+#endif
+    return (sensitive_started || commit_attempted) ? 3 : 2;
+  }
   const char *outcome=!strcmp(op,"assign")?"assigned":!strcmp(op,"prepare")?"prepared":!strcmp(op,"fence")?"fenced":
     !strcmp(op,"activate")?"activated":!strcmp(op,"authenticate")?"authenticated":"inspected";
   printf("{\"outcome\":\"%s\",\"committed\":true,\"role_oid\":\"%s\"}\n",outcome,resolved_oid);

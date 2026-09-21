@@ -5,7 +5,19 @@ import { productionProvisioningBuildProfile } from "./production-profile.mjs";
 
 const outcomes = Object.freeze({ inspect: "inspected", prepare: "prepared", fence: "fenced", assign: "assigned", activate: "activated", authenticate: "authenticated" });
 const targetFields = Object.freeze(["projectReference", "host", "port", "database", "role", "systemIdentifier", "databaseOid", "adminRole", "capabilityRole", "rootCertificate", "roleOid"]);
-const safeFailure = () => new Error("local_synthetic_native_operation_failed");
+const safeFailure = safeStage => Object.assign(new Error("local_synthetic_native_operation_failed"),
+  safeStage ? { safeStage } : {});
+const syntheticManagedFenceFailures = new Map([
+  [11, "membership_precondition"], [12, "membership_initial_session_drain"],
+  [13, "membership_async_send"], [14, "membership_continuous_session_drain"],
+  [15, "membership_async_input"], [16, "membership_command_result"],
+  [17, "membership_async_incomplete"], [18, "membership_deadline"],
+  [19, "membership_restore_blocking"], [21, "nologin_precondition"],
+  [22, "nologin_initial_session_drain"], [23, "nologin_async_send"],
+  [24, "nologin_continuous_session_drain"], [25, "nologin_async_input"],
+  [26, "nologin_command_result"], [27, "nologin_async_incomplete"],
+  [28, "nologin_deadline"], [29, "nologin_restore_blocking"],
+]);
 const label = value => typeof value === "string" && /^[a-zA-Z0-9_-]{1,80}$/.test(value);
 const credentialByte = value => (value >= 48 && value <= 57) || (value >= 97 && value <= 102);
 const staticLine = value => Buffer.from(value, "ascii");
@@ -211,7 +223,7 @@ function createNativeAdapter({ executable, target: suppliedTarget, timeoutMs, wi
         const expectedOid = operation === "prepare" ? terminalOid !== "0" : terminalOid === roleOid;
         if (invalid || !administratorAcknowledged || code !== 0 || signal || outputUsed || terminalOid === undefined || !expectedOid ||
             (operation === "assign" && (!delivered || !stored)) || (operation === "authenticate" && !authenticatedInput)) {
-          reject(safeFailure()); return;
+          reject(safeFailure(productionLocal ? syntheticManagedFenceFailures.get(code) : undefined)); return;
         }
         if (operation === "prepare") roleOid = terminalOid;
         resolve(Object.freeze({ ack: true, authorityClosed: true, committed: true, roleOid: terminalOid,

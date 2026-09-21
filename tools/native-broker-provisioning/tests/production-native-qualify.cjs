@@ -440,9 +440,12 @@ async function main() {
     finally { await reconnect?.end().catch(() => undefined); }
   })();
   stage = "target_password_locker_native_fence";
-  let lockerFence, lockerFenceRejected = false;
+  let lockerFence, lockerFenceRejected = false, lockerFenceFailureStage = "none";
   try { lockerFence = await fencePromise; }
-  catch { lockerFenceRejected = true; }
+  catch (error) {
+    lockerFenceRejected = true;
+    lockerFenceFailureStage = typeof error?.safeStage === "string" ? error.safeStage : "unknown";
+  }
   await reconnectPromise;
   await lockerSession.end().catch(() => undefined);
   stage = "target_password_locker_readback";
@@ -454,6 +457,7 @@ async function main() {
     FROM pg_authid r WHERE r.rolname=$1`, [lockerProfile.role, lockerProfile.capabilityRole])).rows[0];
   console.log(JSON.stringify({ outcome: "target_password_locker_observation",
     nativeFenceRejected: lockerFenceRejected,
+    nativeFenceFailureStage: lockerFenceFailureStage,
     reconnectConnected, reconnectClosed,
     noLogin: lockerReadback?.no_login === true,
     noInherit: lockerReadback?.no_inherit === true,
