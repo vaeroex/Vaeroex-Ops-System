@@ -1869,9 +1869,9 @@ static int run(int argc, char **argv) {
     return 0;
   }
  #endif
-  bool managed_capability_closed=false;
   bool managed_capability_transition=false;
 #ifdef VAEROEX_PRODUCTION_PROFILE
+  bool managed_capability_closed=false;
   int managed_fence_entry_state=-1;
   if (ok && !strcmp(op,"fence") && managed_profile()) {
     /* Close inherited RPC authority before taking application-table locks.
