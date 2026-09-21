@@ -41,9 +41,11 @@ int main(int argc,char **argv) {
     !strcmp(argv[5],"managed-password-fence");
   bool interrupted_recovery=argc==6 && !strcmp(argv[4],"postgres") &&
     !strcmp(argv[5],"managed-interrupted-recovery");
+  bool closed_fence=argc==6 && !strcmp(argv[4],"postgres") &&
+    !strcmp(argv[5],"managed-closed-fence");
   bool application_lock_fence=argc==6 && !strcmp(argv[4],"postgres") &&
     !strcmp(argv[5],"managed-application-lock-fence");
-  if ((!contract && !fence_only && !password_fence && !interrupted_recovery && !application_lock_fence) || strcmp(argv[1],VAEROEX_CATALOG_SOCKET_PATH) || !digits(argv[2],5) ||
+  if ((!contract && !fence_only && !password_fence && !interrupted_recovery && !closed_fence && !application_lock_fence) || strcmp(argv[1],VAEROEX_CATALOG_SOCKET_PATH) || !digits(argv[2],5) ||
       strcmp(argv[3],"production_catalog_runtime")) return 2;
   const char *keys[]={"host","port","dbname","user","passfile","sslmode","connect_timeout","application_name",NULL};
   const char *values[]={argv[1],argv[2],argv[3],argv[4],"/dev/null/vaeroex-no-passfile","disable","5",
@@ -75,7 +77,7 @@ int main(int argc,char **argv) {
     puts("production_managed_application_lock_fence_valid");
     return 0;
   }
-  if (ok && (password_fence || interrupted_recovery)) {
+  if (ok && (password_fence || interrupted_recovery || closed_fence)) {
     control_db=PQconnectdbParams(keys,values,0);
     ok=control_db && PQstatus(control_db)==CONNECTION_OK;
     if (ok) {
@@ -85,7 +87,9 @@ int main(int argc,char **argv) {
       ok=transaction && catalog_step("managed_recovery_catalog_fence",production_authority_catalog_fence());
       if (ok) ok=password_fence
         ? catalog_step("managed_recovery_active_contract",production_authority_valid(MAPPED_ROLE,true,false))
-        : catalog_step("managed_recovery_transition_contract",production_authority_valid(MAPPED_ROLE,true,true));
+        : interrupted_recovery
+          ? catalog_step("managed_recovery_transition_contract",production_authority_valid(MAPPED_ROLE,true,true))
+          : catalog_step("managed_recovery_closed_contract",production_authority_valid(MAPPED_ROLE,false,false));
       const char *target_values[]={MAPPED_ROLE};
       PGresult *identity=ok ? query("SELECT oid::text FROM pg_roles WHERE rolname=$1",1,target_values) : NULL;
       char target_oid[24]={0};
@@ -94,7 +98,11 @@ int main(int argc,char **argv) {
       if (identity) PQclear(identity);
       if (ok) ok=password_fence
         ? catalog_step("managed_recovery_active_entry_role",role_valid(MAPPED_ROLE,target_oid,2))
-        : catalog_step("managed_recovery_transition_entry_role",role_valid(MAPPED_ROLE,target_oid,3));
+        : interrupted_recovery
+          ? catalog_step("managed_recovery_transition_entry_role",role_valid(MAPPED_ROLE,target_oid,3))
+          : catalog_step("managed_recovery_closed_entry_role",role_valid(MAPPED_ROLE,target_oid,0));
+      if (ok) ok=catalog_step("managed_recovery_entry_state",
+        managed_fence_entry_role_state(MAPPED_ROLE,target_oid)==(closed_fence?0:interrupted_recovery?3:2));
       ok=ok &&
         catalog_step("managed_recovery_close_capability",managed_close_capability(MAPPED_ROLE));
       if (ok) { ok=catalog_step("managed_recovery_first_commit",command("COMMIT")); transaction=!ok; }
@@ -104,7 +112,8 @@ int main(int argc,char **argv) {
         transaction=catalog_step("managed_recovery_second_begin",command("BEGIN"));
         ok=transaction && catalog_step("managed_recovery_closed_authority",closed_authority(MAPPED_ROLE)) &&
           catalog_step("managed_recovery_target_lock",lock_target(MAPPED_ROLE)) &&
-          catalog_step("managed_recovery_transition_role",role_valid(MAPPED_ROLE,target_oid,3)) &&
+          catalog_step(closed_fence?"managed_recovery_preserved_closed_role":"managed_recovery_transition_role",
+            role_valid(MAPPED_ROLE,target_oid,closed_fence?0:3)) &&
           catalog_step("managed_recovery_fence_role",managed_fence_role(MAPPED_ROLE)) &&
           catalog_step("managed_recovery_closed_role",role_valid(MAPPED_ROLE,target_oid,0));
       }
@@ -126,7 +135,8 @@ int main(int argc,char **argv) {
     db=NULL;
     if (!ok) return 3;
     puts(password_fence ? "production_managed_password_fence_valid" :
-      "production_managed_interrupted_recovery_valid");
+      interrupted_recovery ? "production_managed_interrupted_recovery_valid" :
+      "production_managed_closed_fence_valid");
     return 0;
   }
   if (ok && fence_only) {

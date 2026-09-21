@@ -1641,11 +1641,15 @@ static bool role_valid(const char *target, const char *oid, int state) {
     && production_authority_valid(target,state==2 || state==3,state==3);
 }
 #ifdef VAEROEX_PRODUCTION_PROFILE
-static bool managed_fence_entry_role_valid(const char *target,const char *oid) {
-  /* A fresh fence starts from either the exact active/closed contract or the
-   * single safe recovery state left after the capability-only commit:
-   * LOGIN INHERIT with the target membership already non-inheriting. */
-  return role_valid(target,oid,2) || role_valid(target,oid,3);
+static int managed_fence_entry_role_state(const char *target,const char *oid) {
+  /* Preserve which exact contract admitted the role.  State 2 intentionally
+   * remains the existing active-path assertion, while state 3 is the single
+   * safe capability-only recovery transition.  Test exact closure first so a
+   * no-op fence of an already-closed role remains closed through phase two. */
+  if (role_valid(target,oid,0)) return 0;
+  if (role_valid(target,oid,3)) return 3;
+  if (role_valid(target,oid,2)) return 2;
+  return -1;
 }
 #endif
 static bool no_sessions(const char *target) {
@@ -1814,7 +1818,9 @@ static int run(int argc, char **argv) {
   }
  #endif
   bool managed_capability_closed=false;
+  bool managed_capability_transition=false;
 #ifdef VAEROEX_PRODUCTION_PROFILE
+  int managed_fence_entry_state=-1;
   if (ok && !strcmp(op,"fence") && managed_profile()) {
     /* Close inherited RPC authority before taking application-table locks.
      * A previously authorized request may already hold a RowExclusiveLock on
@@ -1827,7 +1833,10 @@ static int run(int argc, char **argv) {
     ok=command("BEGIN");
     transaction=ok;
     if (ok) ok=production_authority_catalog_fence();
-    if (ok) ok=strcmp(role_oid,"0") && managed_fence_entry_role_valid(target,role_oid);
+    if (ok && strcmp(role_oid,"0")) {
+      managed_fence_entry_state=managed_fence_entry_role_state(target,role_oid);
+      ok=managed_fence_entry_state>=0;
+    } else if (ok) ok=false;
     if (ok) ok=managed_close_capability(target);
     if (ok) {
       commit_attempted=true;
@@ -1836,6 +1845,7 @@ static int run(int argc, char **argv) {
     }
     if (ok) ok=terminate_target_sessions(control_db,target);
     managed_capability_closed=ok;
+    managed_capability_transition=ok && managed_fence_entry_state!=0;
   }
 #endif
   if (ok) { ok = command("BEGIN"); transaction = ok; }
@@ -1845,7 +1855,7 @@ static int run(int argc, char **argv) {
    * every other role, privilege, membership, object and gate predicate remains
    * exact, and the normal post-commit validation below rejects residual
    * settings after NOLOGIN/NOINHERIT commits and sessions are terminated. */
-  if (ok) ok = production_authority_valid(target,!strcmp(op,"fence"),managed_capability_closed);
+  if (ok) ok = production_authority_valid(target,!strcmp(op,"fence"),managed_capability_transition);
   if (ok && !strcmp(op,"prepare")) {
     const char *values[] = {target,CAPABILITY};
     ok = !strcmp(role_oid,"0") && true_query("SELECT NOT EXISTS (SELECT FROM pg_roles WHERE rolname=$1) "
@@ -1874,7 +1884,10 @@ static int run(int argc, char **argv) {
      * either the bounded active state or the already-closed state because it
      * is the compensating operation after an interrupted authentication. */
     int expected_state=!strcmp(op,"authenticate")?1:
-      !strcmp(op,"fence") && managed_capability_closed?3:
+#ifdef VAEROEX_PRODUCTION_PROFILE
+      !strcmp(op,"fence") && managed_capability_closed?
+        (managed_fence_entry_state==0?0:3):
+#endif
       !strcmp(op,"fence")?2:0;
     ok = strcmp(role_oid,"0") && role_valid(target,role_oid,expected_state);
     if (ok && strcmp(op,"inspect") && strcmp(op,"authenticate")) {

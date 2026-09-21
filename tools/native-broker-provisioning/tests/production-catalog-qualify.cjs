@@ -257,6 +257,14 @@ function qualifyManagedInterruptedRecovery(binary) {
     result.stdout === "production_managed_interrupted_recovery_valid\n" && result.stderr === "",
   "managed_capability_only_commit_recovery_succeeds");
 }
+function qualifyManagedClosedFence(binary) {
+  const result = spawnSync(binary, [socket(), port, database, "postgres", "managed-closed-fence"], {
+    env: { ...baseEnv, TMPDIR: root }, encoding: "utf8", timeout: 30000, maxBuffer: 4096,
+  });
+  check(!result.error && result.status === 0 && result.signal === null &&
+    result.stdout === "production_managed_closed_fence_valid\n" && result.stderr === "",
+  "managed_already_closed_fence_succeeds");
+}
 function rejectManagedInterruptedRecovery(binary, label) {
   const result = managedInterruptedRecoveryResult(binary);
   const rejectedStage = /^production_catalog_contract_invalid:(managed_recovery_(?:transition_contract|transition_entry_role))\n?$/.exec(
@@ -506,6 +514,15 @@ password_encryption='scram-sha-256'
       WHERE r.rolname='square_production_oauth'
         AND m.roleid='square_production_oauth_authority'::regrole`]).stdout.trim();
     check(recoveredFence === "t|t|t|t|t|0", "managed_capability_only_commit_recovers_exact_closed_state");
+    stage = "managed_already_closed_fence";
+    qualifyManagedClosedFence(internalBinary);
+    const preservedClosedFence = psql(["-At", "-F", "|", "-c", `SELECT NOT r.rolcanlogin,NOT r.rolinherit,
+      NOT m.inherit_option,NOT m.admin_option,NOT m.set_option,
+      (SELECT count(*) FROM pg_stat_activity WHERE usename='square_production_oauth')
+      FROM pg_roles r JOIN pg_auth_members m ON m.member=r.oid
+      WHERE r.rolname='square_production_oauth'
+        AND m.roleid='square_production_oauth_authority'::regrole`]).stdout.trim();
+    check(preservedClosedFence === "t|t|t|t|t|0", "managed_already_closed_fence_preserves_exact_state");
     psql(["-c", `ALTER ROLE square_production_oauth LOGIN INHERIT;
       GRANT square_production_oauth_authority TO square_production_oauth
         WITH ADMIN FALSE, INHERIT TRUE, SET FALSE`]);

@@ -166,18 +166,22 @@ test("Production profile fencing pairs login state with non-inheriting capabilit
   assert.match(qualifier, /existing_session_loses_effective_rpc_before_session_termination/);
   assert.match(qualifier, /active_login_with_noninheriting_capability_membership_rejected/);
   assert.match(qualifier, /noncurrent_profile_privilege_drift_blocks_current_profile_before_mutation/);
-  assert.match(nativeSource, /production_authority_valid\(target,!strcmp\(op,"fence"\),managed_capability_closed\)/,
+  assert.match(nativeSource, /production_authority_valid\(target,!strcmp\(op,"fence"\),managed_capability_transition\)/,
     "only the pre-revocation fence path permits target-owned settings");
   assert.match(nativeSource, /production_authority_valid\(target,state==2 \|\| state==3,state==3\)/,
     "the fence role check applies the same narrow pre-revocation exception");
   assert.match(nativeSource, /\$3::integer=3 AND r\.rolcanlogin AND r\.rolinherit/,
     "checked recovery accepts only the exact login-open, inherit-enabled role transition");
-  assert.match(nativeSource, /managed_fence_entry_role_valid\(target,role_oid\)/,
-    "a fresh managed fence accepts the exact capability-only checked-recovery state");
+  assert.match(nativeSource, /managed_fence_entry_role_state\(target,role_oid\)/,
+    "a fresh managed fence records the exact active, transition, or already-closed entry contract");
+  assert.match(nativeSource, /managed_fence_entry_state==0\?0:3/,
+    "an already-closed entry remains closed while active and transition entries use the checked-recovery predicate");
   assert.match(catalogHarness, /managed-password-fence[\s\S]*managed_recovery_active_contract[\s\S]*role_valid\(MAPPED_ROLE,target_oid,2\)/,
     "the existing active-path assertion remains an exact active-role contract");
   assert.match(catalogHarness, /managed-interrupted-recovery[\s\S]*managed_recovery_transition_contract[\s\S]*role_valid\(MAPPED_ROLE,target_oid,3\)/,
     "the separate checked-recovery assertion accepts only the exact transition contract");
+  assert.match(catalogHarness, /managed-closed-fence[\s\S]*managed_recovery_closed_contract[\s\S]*role_valid\(MAPPED_ROLE,target_oid,0\)/,
+    "an already-closed fence uses the exact closed assertion rather than the transition contract");
   assert.match(nativeSource, /\$8=\$6 OR target_role\.rolconfig IS NULL/,
     "the exception is bound to the exact operation target");
   assert.match(nativeSource, /\$8=\$6 OR NOT EXISTS \(SELECT FROM pg_db_role_setting s WHERE s\.setrole=target_role\.oid\)/,
@@ -203,6 +207,8 @@ test("Production profile fencing pairs login state with non-inheriting capabilit
     "managed_capability_only_commit_state_observed",
     "managed_capability_only_commit_recovery_succeeds",
     "managed_capability_only_commit_recovers_exact_closed_state",
+    "managed_already_closed_fence_succeeds",
+    "managed_already_closed_fence_preserves_exact_state",
     "managed_recovery_transition_matrix",
     "missing_capability_membership",
   ]) assert.match(catalogQualifier, new RegExp(label));
