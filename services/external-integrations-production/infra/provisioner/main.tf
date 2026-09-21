@@ -78,9 +78,11 @@ resource "google_compute_instance" "provisioner" {
     enable_integrity_monitoring = true
   }
   scheduling {
-    provisioning_model          = "STANDARD"
-    automatic_restart           = false
-    on_host_maintenance         = "TERMINATE"
+    provisioning_model = "STANDARD"
+    automatic_restart  = false
+    # Standard E2 requires live migration; termination is Spot-only for E2.
+    # The separate maximum-run STOP and no-restart controls remain enforced.
+    on_host_maintenance         = "MIGRATE"
     instance_termination_action = "STOP"
     max_run_duration {
       seconds = 3600

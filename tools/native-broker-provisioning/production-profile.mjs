@@ -1,7 +1,6 @@
 // These are public database/source identities, never connection credentials.
-// The direct host proves project identity only. It is deliberately not an
-// executable maintenance endpoint: the reviewed pooler host, CA file and
-// provisioner VM/service-account identity have not yet been bound.
+// The direct host proves project identity only. Native maintenance retains the
+// reviewed session-pooler transport, pinned below to the actual private VM.
 export const productionDatabaseIdentity = Object.freeze({
   projectReference: "mdiianhfrojmxqpwrflh",
   region: "us-west-2",
@@ -48,17 +47,17 @@ const profiles = Object.freeze(Object.fromEntries(names.map(name => [name, Objec
 })])));
 
 export const productionDeploymentBinding = Object.freeze({
-  status: "blocked_pending_reviewed_identity_manifest",
-  connectionHost: null,
-  connectionPort: null,
-  rootCertificate: null,
-  provisionerProjectId: null,
-  provisionerInstanceId: null,
-  provisionerZone: null,
-  provisionerServiceAccount: null,
-  provisionerProjectNumber: null,
-  adminRole: null,
-  rootCaSha256: null,
+  status: "reviewed_ready",
+  connectionHost: "aws-1-us-west-2.pooler.supabase.com",
+  connectionPort: 5432,
+  rootCertificate: "/etc/vaeroex-production-native/supabase-root-2021.crt",
+  provisionerProjectId: "vaeroex-integrations-prod",
+  provisionerInstanceId: "6328469880854922663",
+  provisionerZone: "us-west1-b",
+  provisionerServiceAccount: "sq-prod-provisioner@vaeroex-integrations-prod.iam.gserviceaccount.com",
+  provisionerProjectNumber: "711446392261",
+  adminRole: "postgres",
+  rootCaSha256: "700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7",
 });
 
 export function productionProvisioningProfile(name) {

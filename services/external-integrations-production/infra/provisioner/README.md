@@ -46,7 +46,9 @@ before applying; these additions do not replace platform security policy.
 
 Start the VM explicitly only in the admitted window. Its standard, non-Spot
 scheduling uses `max_run_duration = 3600`, `instance_termination_action = STOP`,
-no automatic restart and termination on host maintenance. This maximum applies
+no automatic restart and E2-required live migration on host maintenance. GCP
+rejected `TERMINATE` for non-Spot E2; live migration does not change the separate
+one-hour STOP limit or permit an automatic restart. This maximum applies
 to each start; it is not a cumulative budget cap or authority for repeated starts.
 Count creation, setup and any recovery runtime together under the approved
 $0.25 execution admission. The retained 10-GiB disk is approximately $0.40/month

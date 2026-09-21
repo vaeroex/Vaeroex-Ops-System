@@ -298,16 +298,40 @@ test("portable catalog qualification executes exact phase predicates from CI", (
   }
 });
 
-test("unverified hosted identity pins remain non-executable and Sandbox factory is unchanged", () => {
+test("verified private Production identity is exact and Sandbox factory is unchanged", () => {
   assert.deepEqual(productionDatabaseIdentity, {
     projectReference: "mdiianhfrojmxqpwrflh", region: "us-west-2",
     directIdentityHost: "db.mdiianhfrojmxqpwrflh.supabase.co", database: "postgres",
     databaseOid: "5", systemIdentifier: "7642734024280108049", postgresBuild: "17.6.1.127",
   });
-  assert.equal(productionDeploymentBinding.status, "blocked_pending_reviewed_identity_manifest");
-  assert.ok(Object.entries(productionDeploymentBinding).filter(([key]) => key !== "status").every(([, value]) => value === null));
-  for (const name of names) assert.throws(() => productionProvisioningBuildProfile(name),
-    /production_native_deployment_manifest_required/);
+  assert.deepEqual(productionDeploymentBinding, {
+    status: "reviewed_ready",
+    connectionHost: "aws-1-us-west-2.pooler.supabase.com", connectionPort: 5432,
+    rootCertificate: "/etc/vaeroex-production-native/supabase-root-2021.crt",
+    provisionerProjectId: "vaeroex-integrations-prod", provisionerInstanceId: "6328469880854922663",
+    provisionerZone: "us-west1-b",
+    provisionerServiceAccount: "sq-prod-provisioner@vaeroex-integrations-prod.iam.gserviceaccount.com",
+    provisionerProjectNumber: "711446392261", adminRole: "postgres",
+    rootCaSha256: "700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7",
+  });
+  assert.equal(hash("tools/jit-access-feasibility/supabase-root-2021.crt"), productionDeploymentBinding.rootCaSha256);
+  for (const name of names) {
+    const built = productionProvisioningBuildProfile(name);
+    assert.deepEqual(built, {
+      kind: "production", name,
+      install: `/opt/vaeroex-production-square-${name}`, state: `/var/lib/vaeroex-production-square-${name}`,
+      target: { projectReference: "mdiianhfrojmxqpwrflh", host: productionDeploymentBinding.connectionHost,
+        port: 5432, database: "postgres", role: `square_production_${name}`,
+        systemIdentifier: "7642734024280108049", databaseOid: "5", adminRole: "postgres",
+        capabilityRole: `square_production_${name}_authority`, rootCertificate: productionDeploymentBinding.rootCertificate,
+        roleOid: "0" },
+      maintenance: { projectId: "vaeroex-integrations-prod", projectNumber: "711446392261",
+        instanceId: "6328469880854922663", zone: "us-west1-b",
+        serviceAccount: productionDeploymentBinding.provisionerServiceAccount,
+        secretParent: `projects/vaeroex-integrations-prod/secrets/square-production-${name}-db`,
+        caSha256: productionDeploymentBinding.rootCaSha256 },
+    });
+  }
   const profile = productionProvisioningProfile("oauth");
   const target = Object.freeze({ projectReference: "synthetic-production", host: "127.0.0.1", port: 5432,
     database: "postgres", role: profile.role, systemIdentifier: "1", databaseOid: "5", adminRole: "synthetic_owner",
@@ -320,6 +344,21 @@ test("unverified hosted identity pins remain non-executable and Sandbox factory 
     Object.fromEntries(Object.entries(target).filter(([key]) => key !== "roleOid"))]) {
     assert.throws(() => createLocalSyntheticProductionNativeAdapter({ executable: "/tmp/native", target: malformed }),
       /local_synthetic_native_operation_failed/);
+  }
+});
+
+test("every missing deployment identity field still denies all six native builds", async () => {
+  const source = readFileSync(resolve(root, "tools/native-broker-provisioning/production-profile.mjs"), "utf8");
+  const start = source.indexOf("export const productionDeploymentBinding = Object.freeze({");
+  const end = source.indexOf("\n});", start) + "\n});".length;
+  assert.ok(start >= 0 && end > start);
+  for (const field of Object.keys(productionDeploymentBinding)) {
+    const binding = { ...productionDeploymentBinding, [field]: null };
+    const changed = source.slice(0, start) +
+      `export const productionDeploymentBinding = Object.freeze(${JSON.stringify(binding)});` + source.slice(end);
+    const fixture = await import(`data:text/javascript;base64,${Buffer.from(changed).toString("base64")}`);
+    for (const name of names) assert.throws(() => fixture.productionProvisioningBuildProfile(name),
+      /production_native_deployment_manifest_required/, field);
   }
 });
 

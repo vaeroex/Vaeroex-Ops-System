@@ -70,12 +70,19 @@ qualification is the separate, required proof.
 
 The Production build, six fixed install paths, launcher, private maintenance
 composition, Secret Manager staging and lifecycle/fence path are implemented.
-They deliberately refuse to build or start today. The verified direct database
-host is identity evidence, not the reviewed IPv4/session-pooler endpoint. The
-Production pooler host, root CA file, provisioner instance and service account
-remain null in `productionDeploymentBinding`; all must be reviewed and pinned
-before `build-production.mjs` emits an executable. Sandbox VM, identity,
-endpoint, CA and install profiles are never reused.
+The direct database host is identity evidence, not the native maintenance
+endpoint. The authenticated Production dashboard confirmed session pooler
+`aws-1-us-west-2.pooler.supabase.com:5432`. `productionDeploymentBinding` pins
+private instance `6328469880854922663` in `us-west1-b`, GCP project
+`vaeroex-integrations-prod` / `711446392261`, and its keyless
+`sq-prod-provisioner@vaeroex-integrations-prod.iam.gserviceaccount.com` identity.
+The public Supabase CA is installed under `/etc/vaeroex-production-native/` and
+checked by its exact source hash. These are build-time public identity pins,
+not hosted credential/provisioning evidence or permission to open activation
+gates. Missing pins still deny every build. All six existing secret containers
+and role-to-authority mappings remain separate. Sandbox VM, identities,
+endpoints and install profiles are not reused; only the same public provider CA
+bytes are reused. The JIT experiment remains parked.
 
 Rollback is fencing, not password rollback: on cancellation, timeout, failed
 secret staging, failed authentication or lost acknowledgement, the supervisor

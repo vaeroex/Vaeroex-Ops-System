@@ -18,6 +18,7 @@ run "initial_installation_is_stopped_and_inaccessible" {
       google_compute_instance.provisioner.machine_type == "e2-small" &&
       google_compute_instance.provisioner.scheduling[0].provisioning_model == "STANDARD" &&
       google_compute_instance.provisioner.scheduling[0].automatic_restart == false &&
+      google_compute_instance.provisioner.scheduling[0].on_host_maintenance == "MIGRATE" &&
       google_compute_instance.provisioner.scheduling[0].instance_termination_action == "STOP" &&
       google_compute_instance.provisioner.scheduling[0].max_run_duration[0].seconds == 3600
     )

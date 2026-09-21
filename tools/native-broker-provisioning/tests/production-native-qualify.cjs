@@ -562,7 +562,7 @@ async function main() {
   check(!evidence.includes(Buffer.from("SCRAM-SHA-256$")), "verifier_absent_from_logs_and_statistics");
   fixture = undefined;
   process.stdout.write(JSON.stringify({ outcome: "passed", assertions, hostedQualification: false,
-    profiles: profiles.map(profile => profile.name), deploymentBinding: "blocked_pending_reviewed_identity_manifest" }) + "\n");
+    profiles: profiles.map(profile => profile.name), deploymentBinding: profilesModule.productionDeploymentBinding.status }) + "\n");
 }
 
 main().catch(error => {
