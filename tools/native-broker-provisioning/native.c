@@ -173,9 +173,10 @@ static const char *last_query_error_category = "none";
 #if defined(VAEROEX_SYNTHETIC_ONLY) && defined(VAEROEX_PRODUCTION_PROFILE)
 static int synthetic_managed_fence_failure = 0;
 static int synthetic_managed_fence_base = 0;
-#define SYNTHETIC_FENCE_FAILURE(offset) (synthetic_managed_fence_failure=synthetic_managed_fence_base+(offset))
+#define SYNTHETIC_FENCE_FAILURE(offset) do { if (!synthetic_managed_fence_failure) \
+  synthetic_managed_fence_failure=synthetic_managed_fence_base+(offset); } while (0)
 #else
-#define SYNTHETIC_FENCE_FAILURE(offset) ((void)(offset))
+#define SYNTHETIC_FENCE_FAILURE(offset) do { (void)(offset); } while (0)
 #endif
 
 static void wipe(void *p, size_t n) {
@@ -567,19 +568,26 @@ static bool closed_authority(const char *target) {
   const char *values[] = {target};
 #ifdef VAEROEX_PRODUCTION_PROFILE
   if(strcmp(target,MAPPED_ROLE))return false;
-  if (!production_authority_catalog_fence()) return false;
-  if (managed_profile() && !command("LOCK TABLE supabase_migrations.schema_migrations IN SHARE MODE")) return false;
+  if (!production_authority_catalog_fence()) { SYNTHETIC_FENCE_FAILURE(41); return false; }
+  if (managed_profile() && !command("LOCK TABLE supabase_migrations.schema_migrations IN SHARE MODE")) {
+    SYNTHETIC_FENCE_FAILURE(42); return false;
+  }
   production_phase phase=production_ledger_phase();
-  if (phase==PRODUCTION_PHASE_INVALID || !command("LOCK TABLE private.integration_production_platform_bindings, "
+  if (phase==PRODUCTION_PHASE_INVALID) { SYNTHETIC_FENCE_FAILURE(43); return false; }
+  if (!command("LOCK TABLE private.integration_production_platform_bindings, "
     "private.integration_production_provider_bindings, private.integration_production_provider_secrets, "
     "private.integration_production_provider_capabilities, private.square_production_configuration_generations, "
     "private.square_production_runtime_bindings, private.square_production_generation_fences, "
-    "private.square_production_lifecycle_audit_events IN SHARE MODE")) return false;
+    "private.square_production_lifecycle_audit_events IN SHARE MODE")) {
+    SYNTHETIC_FENCE_FAILURE(44); return false;
+  }
   if (phase==PRODUCTION_PHASE_INTERNAL_RUNTIME && !command(
     "LOCK TABLE private.square_production_internal_permits, private.square_production_internal_oauth_states, "
     "private.square_production_internal_credentials, private.square_production_internal_scans, "
     "private.square_production_internal_page_receipts, private.square_production_internal_source_versions, "
-    "private.square_production_internal_fences, private.square_production_internal_audit_events IN SHARE MODE")) return false;
+    "private.square_production_internal_fences, private.square_production_internal_audit_events IN SHARE MODE")) {
+    SYNTHETIC_FENCE_FAILURE(45); return false;
+  }
   if (managed_profile() && !true_query("SELECT NOT row_security_active('private.integration_production_platform_bindings') "
       "AND NOT row_security_active('private.integration_production_provider_bindings') "
       "AND NOT row_security_active('private.integration_production_provider_secrets') "
@@ -587,7 +595,9 @@ static bool closed_authority(const char *target) {
       "AND NOT row_security_active('private.square_production_configuration_generations') "
       "AND NOT row_security_active('private.square_production_runtime_bindings') "
       "AND NOT row_security_active('private.square_production_generation_fences') "
-      "AND NOT row_security_active('private.square_production_lifecycle_audit_events')",0,NULL)) return false;
+      "AND NOT row_security_active('private.square_production_lifecycle_audit_events')",0,NULL)) {
+    SYNTHETIC_FENCE_FAILURE(46); return false;
+  }
   if (phase==PRODUCTION_PHASE_INTERNAL_RUNTIME && managed_profile() && !true_query(
       "SELECT NOT row_security_active('private.square_production_internal_permits') "
       "AND NOT row_security_active('private.square_production_internal_oauth_states') "
@@ -596,8 +606,10 @@ static bool closed_authority(const char *target) {
       "AND NOT row_security_active('private.square_production_internal_page_receipts') "
       "AND NOT row_security_active('private.square_production_internal_source_versions') "
       "AND NOT row_security_active('private.square_production_internal_fences') "
-      "AND NOT row_security_active('private.square_production_internal_audit_events')",0,NULL)) return false;
-  return true_query("SELECT NOT EXISTS (SELECT FROM private.integration_production_platform_bindings "
+      "AND NOT row_security_active('private.square_production_internal_audit_events')",0,NULL)) {
+    SYNTHETIC_FENCE_FAILURE(47); return false;
+  }
+  bool gates_closed=true_query("SELECT NOT EXISTS (SELECT FROM private.integration_production_platform_bindings "
       "WHERE infrastructure_provisioned OR runtime_enabled OR economic_contributions_enabled OR ai_dispatch_enabled) "
       "AND NOT EXISTS (SELECT FROM private.integration_production_provider_bindings "
       "WHERE provider_key='square' AND environment='production' AND "
@@ -610,6 +622,8 @@ static bool closed_authority(const char *target) {
       "WHERE database_login=$1 AND NOT (provider_key='square' AND environment='production' "
       "AND project_id='vaeroex-integrations-prod' AND capability='" CAPABILITY_NAME "' "
       "AND database_secret_purpose='database_" CAPABILITY_NAME "'))",1,values);
+  if (!gates_closed) SYNTHETIC_FENCE_FAILURE(48);
+  return gates_closed;
 #elif defined(MAPPED_ROLE)
   /* Mapped maintenance requires the additive schema and known-disabled joined
    * gates. SHARE locks fence concurrent activation through credential commit.

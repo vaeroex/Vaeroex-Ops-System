@@ -20,6 +20,10 @@ const syntheticManagedFenceFailures = new Map([
   [31, "fence_connection_profile"], [32, "fence_transaction_begin"],
   [33, "fence_closed_authority"], [34, "fence_target_lock"],
   [35, "fence_authority_preflight"], [36, "fence_role_precondition"],
+  [41, "closed_authority_catalog_fence"], [42, "closed_authority_ledger_lock"],
+  [43, "closed_authority_ledger_phase"], [44, "closed_authority_overlay_locks"],
+  [45, "closed_authority_internal_locks"], [46, "closed_authority_overlay_visibility"],
+  [47, "closed_authority_internal_visibility"], [48, "closed_authority_gate_query"],
 ]);
 const label = value => typeof value === "string" && /^[a-zA-Z0-9_-]{1,80}$/.test(value);
 const credentialByte = value => (value >= 48 && value <= 57) || (value >= 97 && value <= 102);
