@@ -207,6 +207,9 @@ test("Production profile fencing pairs login state with non-inheriting capabilit
     "managed_capability_only_commit_state_observed",
     "managed_capability_only_commit_recovery_succeeds",
     "managed_capability_only_commit_recovers_exact_closed_state",
+    "managed_transition_wait_and_closed_reconciliation_succeed",
+    "managed_transition_wait_finishes_exact_closed_state",
+    "managed_control_socket_deadline_interrupts_blocking_drain",
     "managed_already_closed_fence_succeeds",
     "managed_already_closed_fence_preserves_exact_state",
     "managed_recovery_transition_matrix",
@@ -216,6 +219,12 @@ test("Production profile fencing pairs login state with non-inheriting capabilit
     "the password-lock regression compiles the managed path on the exact Production-shaped catalog");
   assert.match(nativeSource, /while \(ok && !stopped\(\) && PQisBusy\(db\)\)[\s\S]*?terminate_target_sessions\(control_db,target\)/,
     "the exact-target drainer remains active while NOLOGIN waits");
+  assert.match(nativeSource, /watched_control_socket[\s\S]*?shutdown\(control_fd, SHUT_RDWR\)/,
+    "the native deadline interrupts a blocking control-session drain as well as the primary connection");
+  assert.match(nativeSource, /strcmp\(operation,"fence"\)[\s\S]*?role_valid\(target,role_oid,3\)[\s\S]*?command\("ROLLBACK"\)[\s\S]*?continue/,
+    "queued non-fence operations retry only the exact capability-only transition");
+  assert.match(nativeSource, /\*fence_entry_state==3 && \(observed==3 \|\| observed==0\)/,
+    "a queued recovery fence accepts only the still-transitional or exact-closed result");
   assert.match(nativeSource, /managed_fence_role\(target\)[\s\S]*?command\("COMMIT"\)[\s\S]*?pg_terminate_backend/,
     "the reconnect window is followed by the existing post-commit session drain");
 });

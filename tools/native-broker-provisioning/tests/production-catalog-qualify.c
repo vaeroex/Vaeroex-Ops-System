@@ -33,6 +33,29 @@ static bool managed_catalog_fence_shape(void) {
         "'pg_catalog.pg_default_acl'::regclass]))",0,NULL);
 }
 
+struct managed_transition_closer {
+  const char *const *keys;
+  const char *const *values;
+  bool ok;
+};
+
+static void *close_managed_transition(void *argument) {
+  struct managed_transition_closer *closer=argument;
+  struct timespec pause={0,100000000};
+  nanosleep(&pause,NULL);
+  PGconn *connection=PQconnectdbParams(closer->keys,closer->values,0);
+  PGresult *result=NULL;
+  closer->ok=connection && PQstatus(connection)==CONNECTION_OK;
+  if (closer->ok) {
+    result=PQexec(connection,"BEGIN; LOCK TABLE private.integration_production_platform_bindings "
+      "IN SHARE ROW EXCLUSIVE MODE; ALTER ROLE square_production_oauth NOLOGIN NOINHERIT; COMMIT");
+    closer->ok=result && PQresultStatus(result)==PGRES_COMMAND_OK;
+  }
+  if (result) PQclear(result);
+  if (connection) PQfinish(connection);
+  return NULL;
+}
+
 int main(int argc,char **argv) {
   bool contract=argc==5 && !strcmp(argv[4],"postgres");
   bool fence_only=argc==6 && !strcmp(argv[4],"synthetic_hosted_operator") &&
@@ -45,13 +68,85 @@ int main(int argc,char **argv) {
     !strcmp(argv[5],"managed-closed-fence");
   bool application_lock_fence=argc==6 && !strcmp(argv[4],"postgres") &&
     !strcmp(argv[5],"managed-application-lock-fence");
-  if ((!contract && !fence_only && !password_fence && !interrupted_recovery && !closed_fence && !application_lock_fence) || strcmp(argv[1],VAEROEX_CATALOG_SOCKET_PATH) || !digits(argv[2],5) ||
+  bool transition_wait=argc==6 && !strcmp(argv[4],"postgres") &&
+    !strcmp(argv[5],"managed-transition-wait");
+  bool control_timeout=argc==6 && !strcmp(argv[4],"postgres") &&
+    !strcmp(argv[5],"managed-control-timeout");
+  if ((!contract && !fence_only && !password_fence && !interrupted_recovery && !closed_fence &&
+      !application_lock_fence && !transition_wait && !control_timeout) || strcmp(argv[1],VAEROEX_CATALOG_SOCKET_PATH) || !digits(argv[2],5) ||
       strcmp(argv[3],"production_catalog_runtime")) return 2;
   const char *keys[]={"host","port","dbname","user","passfile","sslmode","connect_timeout","application_name",NULL};
   const char *values[]={argv[1],argv[2],argv[3],argv[4],"/dev/null/vaeroex-no-passfile","disable","5",
     "vaeroex-production-catalog-qualification",NULL};
   db=PQconnectdbParams(keys,values,0);
   bool ok=db && PQstatus(db)==CONNECTION_OK;
+  if (ok && control_timeout) {
+    control_db=PQconnectdbParams(keys,values,0);
+    ok=control_db && PQstatus(control_db)==CONNECTION_OK;
+    if (ok) {
+      PQsetNoticeProcessor(db,notice,NULL);
+      PQsetNoticeProcessor(control_db,notice,NULL);
+      atomic_store(&cancelled,0);
+      atomic_store(&expired,false);
+      atomic_store(&watcher_done,false);
+      atomic_store(&watched_socket,PQsocket(db));
+      atomic_store(&watched_control_socket,PQsocket(control_db));
+      clock_gettime(CLOCK_MONOTONIC,&started);
+      started.tv_sec-=DEADLINE_SECONDS;
+      managed_test_block_control=true;
+      pthread_t watcher;
+      ok=pthread_create(&watcher,NULL,watch,NULL)==0;
+      long before=elapsed_ms();
+      if (ok) ok=!terminate_target_sessions(control_db,MAPPED_ROLE);
+      long duration=elapsed_ms()-before;
+      atomic_store(&watcher_done,true);
+      if (ok) ok=pthread_join(watcher,NULL)==0;
+      managed_test_block_control=false;
+      ok=ok && atomic_load(&expired) && duration<2000;
+      atomic_store(&watched_socket,-1);
+      atomic_store(&watched_control_socket,-1);
+    }
+    if (control_db) PQfinish(control_db);
+    control_db=NULL;
+    if (db) PQfinish(db);
+    db=NULL;
+    if (!ok) return 3;
+    puts("production_managed_control_timeout_valid");
+    return 0;
+  }
+  if (ok && transition_wait) {
+    PQsetNoticeProcessor(db,notice,NULL);
+    const char *target_values[]={MAPPED_ROLE};
+    PGresult *identity=query("SELECT oid::text FROM pg_roles WHERE rolname=$1",1,target_values);
+    char target_oid[24]={0};
+    ok=identity && PQntuples(identity)==1 && digits(PQgetvalue(identity,0,0),10);
+    if (ok) snprintf(target_oid,sizeof(target_oid),"%s",PQgetvalue(identity,0,0));
+    if (identity) PQclear(identity);
+    clock_gettime(CLOCK_MONOTONIC,&started);
+    atomic_store(&cancelled,0);
+    atomic_store(&expired,false);
+    managed_test_transition_waits=0;
+    struct managed_transition_closer closer={keys,values,false};
+    pthread_t closer_thread;
+    ok=ok && pthread_create(&closer_thread,NULL,close_managed_transition,&closer)==0;
+    int entry=-1;
+    bool transition=false;
+    if (ok) ok=begin_locked_authority_after_transition("inspect",MAPPED_ROLE,target_oid,&entry,&transition);
+    if (transaction) { (void)command("ROLLBACK"); transaction=false; }
+    if (ok) ok=pthread_join(closer_thread,NULL)==0 && closer.ok && managed_test_transition_waits>0;
+    if (ok) {
+      entry=3;
+      transition=true;
+      ok=begin_locked_authority_after_transition("fence",MAPPED_ROLE,target_oid,&entry,&transition) &&
+        entry==0 && !transition && role_valid(MAPPED_ROLE,target_oid,0);
+      if (transaction) { (void)command("ROLLBACK"); transaction=false; }
+    }
+    if (db) PQfinish(db);
+    db=NULL;
+    if (!ok) return 3;
+    puts("production_managed_transition_wait_valid");
+    return 0;
+  }
   if (ok && application_lock_fence) {
     control_db=PQconnectdbParams(keys,values,0);
     ok=control_db && PQstatus(control_db)==CONNECTION_OK;

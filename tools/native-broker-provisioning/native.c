@@ -161,6 +161,7 @@ extern char **environ;
 _Static_assert(ATOMIC_INT_LOCK_FREE == 2, "cancellation requires signal-safe lock-free atomics");
 static atomic_int cancelled = 0;
 static atomic_int watched_socket = -1;
+static atomic_int watched_control_socket = -1;
 static atomic_bool watcher_done = false;
 static atomic_bool expired = false;
 static struct timespec started;
@@ -189,7 +190,9 @@ static void *watch(void *unused) {
     if (elapsed_ms() >= DEADLINE_SECONDS * 1000L) atomic_store(&expired, true);
     if (stopped()) {
       int fd = atomic_load(&watched_socket);
+      int control_fd = atomic_load(&watched_control_socket);
       if (fd >= 0) shutdown(fd, SHUT_RDWR);
+      if (control_fd >= 0 && control_fd != fd) shutdown(control_fd, SHUT_RDWR);
     }
     struct timespec pause = {0, 20000000};
     nanosleep(&pause, NULL);
@@ -303,9 +306,16 @@ static bool role_command(const char *prefix, const char *role, const char *suffi
   return n > 0 && (size_t)n < sizeof(sql) && command(sql);
 }
 #ifdef VAEROEX_PRODUCTION_PROFILE
+#ifdef VAEROEX_MANAGED_PROFILE_TEST
+static bool managed_test_block_control = false;
+static int managed_test_transition_waits = 0;
+#endif
 static bool terminate_target_sessions(PGconn *connection,const char *target) {
   const char *values[]={target};
   PGresult *r=PQexecParams(connection,
+#ifdef VAEROEX_MANAGED_PROFILE_TEST
+    managed_test_block_control ? "SELECT true FROM (SELECT pg_sleep(30)) blocked" :
+#endif
     "SELECT coalesce(bool_and(pg_terminate_backend(pid,1000)),true) "
     "FROM pg_stat_activity WHERE usename=$1",1,NULL,values,NULL,NULL,0);
   bool ok=r && PQresultStatus(r)==PGRES_TUPLES_OK && PQntuples(r)==1 &&
@@ -1651,6 +1661,46 @@ static int managed_fence_entry_role_state(const char *target,const char *oid) {
   if (role_valid(target,oid,2)) return 2;
   return -1;
 }
+static bool begin_locked_authority_after_transition(const char *operation,const char *target,
+                                                    const char *role_oid,int *fence_entry_state,
+                                                    bool *capability_transition) {
+  for (;;) {
+    if (!command("BEGIN")) return false;
+    transaction=true;
+    if (!closed_authority(target) || !lock_target(target)) return false;
+    if (managed_profile() && strcmp(operation,"fence") && strcmp(role_oid,"0") &&
+        role_valid(target,role_oid,3)) {
+      /* A concurrently running fence has committed the capability-only
+       * transition but has not yet committed NOLOGIN/NOINHERIT.  Do not
+       * reject an otherwise valid queued operation or act on the transitional
+       * role. Release the transaction locks and retry only this exact state;
+       * every other invalid authority shape still fails closed below. */
+      if (!command("ROLLBACK")) return false;
+      transaction=false;
+#ifdef VAEROEX_MANAGED_PROFILE_TEST
+      managed_test_transition_waits++;
+#endif
+      struct timespec pause={0,20000000};
+      while (nanosleep(&pause,&pause)!=0 && errno==EINTR) {}
+      if (stopped()) return false;
+      continue;
+    }
+    if (managed_profile() && !strcmp(operation,"fence") && *fence_entry_state>=0) {
+      int observed=managed_fence_entry_role_state(target,role_oid);
+      bool valid=(*fence_entry_state==0 && observed==0) ||
+        (*fence_entry_state==2 && observed==3) ||
+        (*fence_entry_state==3 && (observed==3 || observed==0));
+      if (!valid) return false;
+      /* A second fence queued during the first fence's transaction gap may
+       * observe exact closure after taking the relation lock. Reconcile that
+       * completed transition as a no-op fence rather than reporting an
+       * uncertain operation. */
+      *fence_entry_state=observed;
+      *capability_transition=observed!=0;
+    }
+    return true;
+  }
+}
 #endif
 static bool no_sessions(const char *target) {
   const char *values[] = {target};
@@ -1785,6 +1835,8 @@ static int run(int argc, char **argv) {
    * page, so keep BOTH locks until all owned credential material is wiped. */
   ok = ok && db && PQstatus(db)==CONNECTION_OK &&
     (!control_db || PQstatus(control_db)==CONNECTION_OK) && !stopped();
+  if (control_db && PQstatus(control_db)==CONNECTION_OK)
+    atomic_store(&watched_control_socket,PQsocket(control_db));
   if (ok) {
     PQsetNoticeProcessor(db,notice,NULL);
     atomic_store(&watched_socket,PQsocket(db));
@@ -1848,8 +1900,13 @@ static int run(int argc, char **argv) {
     managed_capability_transition=ok && managed_fence_entry_state!=0;
   }
 #endif
+#ifdef VAEROEX_PRODUCTION_PROFILE
+  if (ok) ok=begin_locked_authority_after_transition(op,target,role_oid,
+    &managed_fence_entry_state,&managed_capability_transition);
+#else
   if (ok) { ok = command("BEGIN"); transaction = ok; }
   if (ok) ok = closed_authority(target) && lock_target(target);
+#endif
   /* Fence must not depend on settings that the target LOGIN can assign to
    * itself.  Only this pre-revocation path permits those two catalog fields;
    * every other role, privilege, membership, object and gate predicate remains
@@ -2047,6 +2104,7 @@ int main(int argc, char **argv) {
   atomic_store(&watcher_done,true);
   pthread_join(thread,NULL);
   atomic_store(&watched_socket,-1);
+  atomic_store(&watched_control_socket,-1);
   if (control_db) PQfinish(control_db);
   if (db) PQfinish(db);
   if (result==2) puts("{\"outcome\":\"failed\"}");
