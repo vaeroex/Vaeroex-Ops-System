@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from "node:fs";
+import { chmodSync, copyFileSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -79,8 +79,54 @@ test("guest setup is bounded public Debian setup and preserves administrative se
   assert.match(source,/Acquire::Retries=0/);
   assert.match(source,/package_bytes" -le 201326592/);
   assert.match(source,/v>=170006&&v<180000/);
+  assert.match(source,/^umask 077$/m);
+  assert.match(source,/^state=\/var\/lib\/vaeroex-production-native-setup$/m);
+  assert.match(source,/^mkdir -m 0700 "\$state"$/m);
+  assert.match(source,/ -o "\$state\/libpq-version"$/m);
+  assert.match(source,/^"\$state\/libpq-version" \|\| fail production_guest_runtime_libpq17_required$/m);
+  assert.doesNotMatch(source,/mount .*remount| -o "\$scratch\/libpq-version"|^"\$scratch\/libpq-version"/m);
   assert.match(source,/199\.36\.153\.8 secretmanager\.googleapis\.com/);
   assert.match(source,/Storage=none\\nProcessSizeMax=0/);
   assert.match(source,/public_setup_complete_no_credential_entry/);
   assert.doesNotMatch(source,/apt-key|curl.*\|.*sh|trusted=yes|--allow-unauthenticated|swapoff|gcloud|supabase|psql|read -s|systemctl (?:stop|disable).*ssh|systemctl (?:stop|disable).*google|secretmanager.*:access/);
+});
+
+test("guest libpq probe executes from private state while Linux scratch remains noexec",{skip:process.platform!=="linux"},()=>{
+  const source=readFileSync(resolve(here,"setup-production-guest.sh"),"utf8");
+  const main=source.match(/'(int main\(void\)\{[^\n']+\})'/)?.[1];
+  const invocation=source.match(/^"\$(?:state|scratch)\/libpq-version" \|\| fail production_guest_runtime_libpq17_required$/m)?.[0];
+  const outputDirectory=source.match(/ -o "\$(state|scratch)\/libpq-version"$/m)?.[1];
+  assert.ok(main);
+  assert.ok(invocation);
+  assert.equal(outputDirectory,"state");
+  const mount=readFileSync("/proc/self/mountinfo","utf8").split("\n").map(line=>line.split(" ")).find(fields=>fields[4]==="/dev/shm");
+  assert.ok(mount?.[5].split(",").includes("noexec"),"the regression requires actual noexec scratch, without changing any mount");
+  const state=mkdtempSync(resolve(tmpdir(),"production-libpq-state-"));
+  const scratch=mkdtempSync("/dev/shm/production-libpq-scratch-");
+  try {
+    assert.equal(statSync(state).mode&0o777,0o700);
+    const cSource=resolve(scratch,"libpq-version.c");
+    const executable=resolve(outputDirectory==="state"?state:scratch,"libpq-version");
+    for(const [version,expected] of [[170006,0],[170005,2],[180000,2]]) {
+      // Stub only the public version value, retaining the setup's exact C
+      // predicate and shell invocation; no database or libpq install is needed.
+      writeFileSync(cSource,`int PQlibVersion(void){return ${version};}\n${main}\n`,{mode:0o600});
+      const compile=spawnSync("/usr/bin/cc",[cSource,"-o",executable],{encoding:"utf8",timeout:10000});
+      assert.equal(compile.status,0,"public probe compiles into executable private state");
+      const result=spawnSync("/bin/bash",["-c",`set -euo pipefail\nfail(){ printf '%s\\n' "$1"; exit 2; }\n${invocation}`],{env:{PATH:"/usr/bin:/bin",state,scratch},encoding:"utf8",timeout:5000});
+      assert.equal(result.status,expected);
+      assert.equal(result.stdout,expected===0?"":"production_guest_runtime_libpq17_required\n");
+      assert.equal(result.stderr,"");
+      if(version===170006) {
+        const scratchExecutable=resolve(scratch,"libpq-version");
+        copyFileSync(executable,scratchExecutable);
+        chmodSync(scratchExecutable,0o700);
+        const rejected=spawnSync(scratchExecutable,[],{encoding:"utf8",timeout:5000});
+        assert.equal(rejected.error?.code,"EACCES","the prior scratch execution fails because the actual mount is noexec");
+      }
+    }
+  } finally {
+    rmSync(scratch,{recursive:true,force:true});
+    rmSync(state,{recursive:true,force:true});
+  }
 });

@@ -56,8 +56,10 @@ libpq_major=$(/usr/bin/pg_config --version | awk '{split($2,v,".");print v[1]}')
 libpq_minor=$(/usr/bin/pg_config --version | awk '{split($2,v,".");print v[2]+0}')
 [[ "$libpq_major" = 17 && "$libpq_minor" -ge 6 ]] || fail production_guest_libpq17_required
 printf '%s\n' '#include <libpq-fe.h>' 'int main(void){int v=PQlibVersion();return v>=170006&&v<180000?0:2;}' > "$scratch/libpq-version.c"
-/usr/bin/cc -I"$(/usr/bin/pg_config --includedir)" -L"$(/usr/bin/pg_config --libdir)" "$scratch/libpq-version.c" -lpq -o "$scratch/libpq-version"
-"$scratch/libpq-version" || fail production_guest_runtime_libpq17_required
+# /run remains noexec. Execute this public probe only from the root-owned 0700
+# setup state directory; package downloads and source stay in scratch.
+/usr/bin/cc -I"$(/usr/bin/pg_config --includedir)" -L"$(/usr/bin/pg_config --libdir)" "$scratch/libpq-version.c" -lpq -o "$state/libpq-version"
+"$state/libpq-version" || fail production_guest_runtime_libpq17_required
 dpkg-query -W -f='${Package}\t${Version}\t${Architecture}\n' "${packages[@]}" > "$state/package-versions.tsv"
 sha256sum /usr/bin/node /usr/bin/openssl /usr/bin/cc /usr/share/keyrings/debian-archive-keyring.gpg > "$state/public-dependency-sha256.txt"
 printf 'package_download_bytes=%s\n' "$package_bytes" > "$state/package-transfer.txt"
