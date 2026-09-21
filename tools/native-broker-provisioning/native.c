@@ -465,17 +465,16 @@ static bool production_authority_catalog_fence(void) {
     /* Hosted Supabase owns system catalogs as supabase_admin.  The supported
      * password-backed postgres operator can read them and manage the fixed
      * roles, but cannot take write-strength LOCK TABLE modes on those catalogs.
-     * Serialize every reviewed native Production worker with one fixed
-     * transaction-scoped advisory mutex instead.  The application-owned
-     * authority tables remain locked below, and the complete ledger, schema,
+     * Serialize every reviewed native Production worker with a write-strength
+     * lock on the fixed private platform-binding relation instead.  Only its
+     * owner or a role with a qualifying write/MAINTAIN privilege can acquire
+     * this mode; application LOGINs receive neither.  The remaining authority
+     * tables are locked below, and the complete ledger, schema,
      * ABI, ACL and role contract is re-read both before mutation and
      * immediately before COMMIT under READ COMMITTED.  The bounded operator
-     * window prohibits out-of-band administrative DDL while this mutex is held;
+     * window prohibits out-of-band administrative DDL while this fence is held;
      * a later boundary still rejects any committed drift. */
-    PGresult *result=query("SELECT pg_advisory_xact_lock(1936744819,0)",0,NULL);
-    bool ok=result && PQntuples(result)==1 && PQnfields(result)==1;
-    if (result) PQclear(result);
-    return ok;
+    return command("LOCK TABLE private.integration_production_platform_bindings IN SHARE ROW EXCLUSIVE MODE");
   }
   return command("LOCK TABLE pg_catalog.pg_proc IN SHARE ROW EXCLUSIVE MODE") &&
     command("LOCK TABLE pg_catalog.pg_authid IN SHARE ROW EXCLUSIVE MODE") &&

@@ -118,10 +118,13 @@ credential**. Nonsecret NOLOGIN setup is separate from password assignment.
 On hosted Supabase, the supported `postgres` operator does not own the
 `supabase_admin` system catalogs and cannot take write-strength locks on them.
 The managed profile therefore serializes all reviewed native workers with one
-fixed transaction-scoped advisory mutex, retains locks on the application-owned
-authority tables, and revalidates the complete ledger/schema/function/ACL/role
-contract immediately before commit. The bounded window prohibits unrelated
-administrative DDL; any committed drift is rejected at the next native boundary.
+write-strength lock on the fixed private platform-binding relation. Only the
+relation owner or a role with a qualifying write/MAINTAIN privilege can acquire
+that lock; application LOGINs receive neither. It retains locks on the other
+application-owned authority tables and revalidates the complete
+ledger/schema/function/ACL/role contract immediately before commit. The bounded
+window prohibits unrelated administrative DDL; any committed drift is rejected
+at the next native boundary.
 Self-owned/local profiles retain the stronger explicit catalog locks.
 Assignment holds those applicable authority fences, sends the candidate
 privately to Secret Manager, verifies CRC/readback and only then commits. Secret storage uses an

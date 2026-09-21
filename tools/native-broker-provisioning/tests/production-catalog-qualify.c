@@ -20,8 +20,10 @@ static bool catalog_step(const char *name,bool value) {
 
 static bool managed_catalog_fence_shape(void) {
   return true_query("SELECT EXISTS (SELECT FROM pg_locks WHERE pid=pg_backend_pid() "
-      "AND locktype='advisory' AND classid='1936744819'::oid AND objid='0'::oid "
-      "AND objsubid=2 AND mode='ExclusiveLock' AND granted) "
+      "AND relation='private.integration_production_platform_bindings'::regclass "
+      "AND mode='ShareRowExclusiveLock' AND granted) "
+    "AND NOT EXISTS (SELECT FROM pg_locks WHERE pid=pg_backend_pid() AND granted "
+      "AND locktype='advisory') "
     "AND NOT EXISTS (SELECT FROM pg_locks WHERE pid=pg_backend_pid() AND granted "
       "AND mode='ShareRowExclusiveLock' AND relation=ANY(array["
         "'pg_catalog.pg_proc'::regclass,'pg_catalog.pg_authid'::regclass,"

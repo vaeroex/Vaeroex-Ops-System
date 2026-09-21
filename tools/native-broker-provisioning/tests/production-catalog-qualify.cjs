@@ -173,14 +173,16 @@ unix_socket_permissions=0700
 password_encryption='scram-sha-256'
 `, { mode: 0o600 });
   fs.writeFileSync(path.join(data(), "pg_hba.conf"),
-    "local all postgres,synthetic_hosted_operator trust\nlocal all all reject\n", { mode: 0o600 });
+    "local all postgres,synthetic_hosted_operator,synthetic_application_login trust\nlocal all all reject\n", { mode: 0o600 });
   run(path.join(pgRoot, "bin/pg_ctl"), ["-D", data(), "-l", path.join(root, "postgres.log"), "-w", "start"]);
   running = true;
   run(path.join(pgRoot, "bin/createdb"), ["-h", socket(), "-p", port, "-U", "postgres", database]);
   const seed = versions.map(version => `('${version}')`).join(",");
   psql(["-c", `CREATE ROLE anon NOLOGIN; CREATE ROLE authenticated NOLOGIN; CREATE ROLE service_role NOLOGIN;
     CREATE ROLE synthetic_hosted_operator LOGIN CREATEROLE NOSUPERUSER NOCREATEDB NOREPLICATION NOBYPASSRLS;
+    CREATE ROLE synthetic_application_login LOGIN NOCREATEROLE NOSUPERUSER NOCREATEDB NOREPLICATION NOBYPASSRLS;
     CREATE SCHEMA private; REVOKE ALL ON SCHEMA private FROM PUBLIC;
+    GRANT USAGE ON SCHEMA private TO synthetic_application_login;
     CREATE SCHEMA extensions; CREATE EXTENSION pgcrypto WITH SCHEMA extensions; REVOKE ALL ON SCHEMA extensions FROM PUBLIC;
     CREATE DOMAIN extensions.vector AS text;
     CREATE FUNCTION public.set_updated_at() RETURNS trigger LANGUAGE plpgsql AS $function$
@@ -220,14 +222,30 @@ password_encryption='scram-sha-256'
   psql(["-c", "INSERT INTO supabase_migrations.schema_migrations(version) VALUES ('20260902191324')"]);
   const overlayBinary = path.join(root, "catalog-overlay");
   compile(overlayBinary, null);
+  psql(["-c", `ALTER TABLE private.integration_production_platform_bindings OWNER TO synthetic_hosted_operator;
+    GRANT USAGE ON SCHEMA private TO synthetic_hosted_operator`]);
   const managedPrivilegeShape = psql(["-At", "-c", `SELECT
     (SELECT relowner<> 'synthetic_hosted_operator'::regrole FROM pg_class WHERE oid='pg_catalog.pg_proc'::regclass)
+    AND (SELECT relowner='synthetic_hosted_operator'::regrole FROM pg_class
+      WHERE oid='private.integration_production_platform_bindings'::regclass)
     AND NOT has_table_privilege('synthetic_hosted_operator','pg_catalog.pg_proc','MAINTAIN')
     AND NOT has_table_privilege('synthetic_hosted_operator','pg_catalog.pg_proc','UPDATE')
     AND NOT has_table_privilege('synthetic_hosted_operator','pg_catalog.pg_proc','DELETE')
     AND NOT has_table_privilege('synthetic_hosted_operator','pg_catalog.pg_proc','TRUNCATE')`]).stdout.trim();
   check(managedPrivilegeShape === "t", "managed_operator_has_production_shaped_catalog_permissions");
+  const applicationFence = spawnSync(path.join(pgRoot, "bin/psql"), ["-X", "-qAt", "-v", "ON_ERROR_STOP=0",
+    "-h", socket(), "-p", port, "-U", "synthetic_application_login", "-d", database,
+    "-c", "BEGIN", "-c", "LOCK TABLE private.integration_production_platform_bindings IN SHARE ROW EXCLUSIVE MODE",
+    "-c", "\\echo :SQLSTATE", "-c", "ROLLBACK"], {
+    env: { ...baseEnv, TMPDIR: root }, encoding: "utf8", timeout: 30000, maxBuffer: 4096,
+    stdio: ["ignore", "pipe", "ignore"],
+  });
+  check(!applicationFence.error, "application_fence_process_completed");
+  check(applicationFence.status === 0 && applicationFence.stdout === "42501\n" && applicationFence.stderr === null,
+    "application_fence_denied_for_relation_privilege");
   qualifyManagedFence(overlayBinary);
+  psql(["-c", `ALTER TABLE private.integration_production_platform_bindings OWNER TO postgres;
+    REVOKE USAGE ON SCHEMA private FROM synthetic_hosted_operator`]);
   qualify(overlayBinary);
 
   stage = "overlay_trigger_substitution";
