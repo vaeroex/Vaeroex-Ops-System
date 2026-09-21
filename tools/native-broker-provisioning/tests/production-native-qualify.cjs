@@ -360,7 +360,9 @@ async function main() {
   await settingSession.end().catch(() => undefined);
   const settingFenceReadback = (await fixture.control.query(`SELECT NOT r.rolcanlogin no_login,
     NOT r.rolinherit no_inherit,r.rolconfig IS NOT NULL global_setting,
-    (SELECT count(*)::integer FROM pg_db_role_setting s WHERE s.setrole=r.oid) database_settings,
+    (SELECT count(*)::integer FROM pg_db_role_setting s WHERE s.setrole=r.oid) setting_rows,
+    (SELECT count(*)::integer FROM pg_db_role_setting s WHERE s.setrole=r.oid
+      AND s.setdatabase=(SELECT oid FROM pg_database WHERE datname=current_database())) database_settings,
     (SELECT bool_and(NOT m.inherit_option) FROM pg_auth_members m
       WHERE m.member=r.oid AND m.roleid=$2::regrole) membership_fenced,
     (SELECT count(*)::integer FROM pg_stat_activity WHERE usename=$1) sessions
@@ -371,6 +373,7 @@ async function main() {
     noLogin: settingFenceReadback?.no_login === true,
     noInherit: settingFenceReadback?.no_inherit === true,
     globalSettingPreserved: settingFenceReadback?.global_setting === true,
+    settingRows: settingFenceReadback?.setting_rows === 2 ? "expected_two" : "unexpected",
     databaseSettings: settingFenceReadback?.database_settings === 1 ? "expected_one" : "unexpected",
     membershipFenced: settingFenceReadback?.membership_fenced === true,
     zeroSessions: settingFenceReadback?.sessions === 0,
@@ -381,6 +384,8 @@ async function main() {
     "target_settings_fence_noinherit_committed");
   check(settingFenceReadback?.global_setting === true,
     "target_settings_global_setting_preserved_for_checked_recovery");
+  check(settingFenceReadback?.setting_rows === 2,
+    "target_settings_exact_global_and_database_rows_preserved_for_checked_recovery");
   check(settingFenceReadback?.database_settings === 1,
     "target_settings_database_setting_preserved_for_checked_recovery");
   check(settingFenceReadback?.membership_fenced === true,

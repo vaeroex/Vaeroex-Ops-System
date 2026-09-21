@@ -174,6 +174,7 @@ test("Production profile fencing pairs login state with non-inheriting capabilit
     "target_settings_fence_nologin_committed",
     "target_settings_fence_noinherit_committed",
     "target_settings_global_setting_preserved_for_checked_recovery",
+    "target_settings_exact_global_and_database_rows_preserved_for_checked_recovery",
     "target_settings_database_setting_preserved_for_checked_recovery",
     "target_settings_membership_fenced",
     "target_settings_sessions_drained",
