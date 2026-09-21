@@ -1688,7 +1688,7 @@ static bool begin_locked_authority_after_transition(const char *operation,const 
     if (managed_profile() && !strcmp(operation,"fence") && *fence_entry_state>=0) {
       int observed=managed_fence_entry_role_state(target,role_oid);
       bool valid=(*fence_entry_state==0 && observed==0) ||
-        (*fence_entry_state==2 && observed==3) ||
+        (*fence_entry_state==2 && (observed==3 || observed==0)) ||
         (*fence_entry_state==3 && (observed==3 || observed==0));
       if (!valid) return false;
       /* A second fence queued during the first fence's transaction gap may

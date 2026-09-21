@@ -141,10 +141,27 @@ int main(int argc,char **argv) {
         entry==0 && !transition && role_valid(MAPPED_ROLE,target_oid,0);
       if (transaction) { (void)command("ROLLBACK"); transaction=false; }
     }
+    if (ok) {
+      /* Reproduce the reverse overlap: fence A records exact active state 2,
+       * commits its capability-only transition, then fence B completes exact
+       * closure before A acquires the second relation lock. */
+      ok=role_command("ALTER ROLE ",MAPPED_ROLE," LOGIN INHERIT") &&
+        role_command("GRANT " CAPABILITY " TO",MAPPED_ROLE,
+          " WITH ADMIN FALSE, INHERIT TRUE, SET FALSE");
+      entry=ok?managed_fence_entry_role_state(MAPPED_ROLE,target_oid):-1;
+      transition=true;
+      if (ok) ok=entry==2 && managed_close_capability(MAPPED_ROLE) &&
+        role_command("ALTER ROLE ",MAPPED_ROLE," NOLOGIN NOINHERIT") &&
+        role_valid(MAPPED_ROLE,target_oid,0);
+      if (ok) ok=begin_locked_authority_after_transition("fence",MAPPED_ROLE,target_oid,&entry,&transition) &&
+        entry==0 && !transition && role_valid(MAPPED_ROLE,target_oid,0);
+      if (transaction) { (void)command("ROLLBACK"); transaction=false; }
+    }
     if (db) PQfinish(db);
     db=NULL;
     if (!ok) return 3;
     puts("production_managed_transition_wait_valid");
+    puts("production_managed_active_entry_overtaken_valid");
     return 0;
   }
   if (ok && application_lock_fence) {

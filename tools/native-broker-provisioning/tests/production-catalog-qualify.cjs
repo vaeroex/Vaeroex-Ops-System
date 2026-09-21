@@ -270,8 +270,10 @@ function qualifyManagedTransitionWait(binary) {
     env: { ...baseEnv, TMPDIR: root }, encoding: "utf8", timeout: 30000, maxBuffer: 4096,
   });
   check(!result.error && result.status === 0 && result.signal === null &&
-    result.stdout === "production_managed_transition_wait_valid\n" && result.stderr === "",
+    result.stdout === "production_managed_transition_wait_valid\nproduction_managed_active_entry_overtaken_valid\n" && result.stderr === "",
   "managed_transition_wait_and_closed_reconciliation_succeed");
+  check(result.stdout.includes("production_managed_active_entry_overtaken_valid\n"),
+    "managed_active_entry_overtaken_by_recovery_fence_reconciles_exact_closure");
 }
 function qualifyManagedControlTimeout(binary) {
   const result = spawnSync(binary, [socket(), port, database, "postgres", "managed-control-timeout"], {
