@@ -130,7 +130,12 @@ jobs:
       - name: Native broker provisioning lifecycle and closed release boundary
         run: |
           pnpm test:native-broker-provisioning
-          node --test tools/native-broker-provisioning/ops/install-production-profiles.test.mjs
+          # The runner's /dev/shm may be executable. Give this test an actual
+          # noexec scratch mount only inside a disposable private namespace.
+          timeout 120 sudo -n unshare --mount --propagation private /bin/bash -euo pipefail -c '
+            mount -t tmpfs -o noexec,nosuid,nodev,size=32m,mode=1777 tmpfs /dev/shm
+            exec runuser -u "$1" -- "$2" --test "$3"
+          ' -- "$(id -un)" "$(node -p process.execPath)" "$PWD/tools/native-broker-provisioning/ops/install-production-profiles.test.mjs"
           terraform -chdir=services/external-integrations-production/infra/provisioner init -backend=false -input=false -lockfile=readonly
           terraform -chdir=services/external-integrations-production/infra/provisioner validate
           terraform -chdir=services/external-integrations-production/infra/provisioner test

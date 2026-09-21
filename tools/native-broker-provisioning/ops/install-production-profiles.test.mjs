@@ -99,8 +99,9 @@ test("guest libpq probe executes from private state while Linux scratch remains 
   assert.ok(main);
   assert.ok(invocation);
   assert.equal(outputDirectory,"state");
-  const mount=readFileSync("/proc/self/mountinfo","utf8").split("\n").map(line=>line.split(" ")).find(fields=>fields[4]==="/dev/shm");
-  assert.ok(mount?.[5].split(",").includes("noexec"),"the regression requires actual noexec scratch, without changing any mount");
+  // Resolve the visible mount, including a private CI overmount of /dev/shm.
+  const mountOptions=execFileSync("/usr/bin/findmnt",["--target","/dev/shm","--noheadings","--output","OPTIONS"],{encoding:"utf8",timeout:5000,maxBuffer:4096}).trim().split(",");
+  assert.ok(mountOptions.includes("noexec"),"the regression requires actual noexec scratch in the disposable CI namespace");
   const state=mkdtempSync(resolve(tmpdir(),"production-libpq-state-"));
   const scratch=mkdtempSync("/dev/shm/production-libpq-scratch-");
   try {
