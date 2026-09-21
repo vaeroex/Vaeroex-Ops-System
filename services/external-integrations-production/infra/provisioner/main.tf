@@ -105,6 +105,26 @@ resource "google_project_iam_custom_role" "private_versions" {
   ]
 }
 
+# A selector or time-window change is a new access generation. The default
+# destroy-before-create replacement, combined with the IAM dependency and
+# replace trigger below, orders every old grant's destruction before the new
+# generation exists and any replacement grant can be created. This prevents a
+# direct profile-to-profile apply from briefly authorizing both profiles.
+resource "terraform_data" "private_access_generation" {
+  input = {
+    enabled    = var.temporary_access_enabled
+    profiles   = sort(tolist(var.temporary_access_profiles))
+    starts_at  = var.window_starts_at
+    expires_at = var.window_expires_at
+  }
+  triggers_replace = sha256(jsonencode({
+    enabled    = var.temporary_access_enabled
+    profiles   = sort(tolist(var.temporary_access_profiles))
+    starts_at  = var.window_starts_at
+    expires_at = var.window_expires_at
+  }))
+}
+
 resource "google_secret_manager_secret_iam_member" "private_versions" {
   for_each  = local.active_profiles
   project   = local.project_id
@@ -113,7 +133,10 @@ resource "google_secret_manager_secret_iam_member" "private_versions" {
   member    = google_service_account.provisioner.member
   # Count-removal transitions must finish destroying setup HTTPS before any
   # grant is created; reverse transitions destroy all grants before setup.
-  depends_on = [google_compute_firewall.setup_https]
+  depends_on = [google_compute_firewall.setup_https, terraform_data.private_access_generation]
+  lifecycle {
+    replace_triggered_by = [terraform_data.private_access_generation]
+  }
   condition {
     title       = "bounded-native-provisioning"
     description = "One exact database secret during the admitted maintenance window."

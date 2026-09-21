@@ -35,10 +35,22 @@ close that broad setup rule and verify its removal before setting
 all six profiles; a bounded OAuth-only recovery selects only `oauth`. Terraform
 rejects an open window with no selected profile, a selection while access is
 closed, unknown profiles, and simultaneous setup HTTPS and credential staging.
-The explicit grant dependency also enforces transition ordering: setup-rule
-deletion completes before any secret grant is created, and every secret-grant
-deletion completes before setup HTTPS can be recreated. These apply-graph edges
-are tested in both directions; a single flag-switch apply cannot overlap them.
+One state-local `terraform_data` generation barrier carries no cloud authority.
+Changing the selection or time window replaces that barrier
+destroy-before-create and replaces retained grants, so every old grant is
+destroyed before the new generation and its grants can be created. The explicit
+grant dependencies also ensure setup-rule deletion completes before any secret
+grant is created, and every secret-grant deletion completes before setup HTTPS
+can be recreated. The apply-graph tests cover setup in both directions and a
+direct OAuth-to-broker and same-profile time-window change.
+
+The first apply after adopting this generation barrier must use all three access
+flags false and an empty profile selection, with the prior state independently
+confirmed to contain no temporary secret grants. That closed bootstrap creates
+only the state-local barrier. Do not combine barrier adoption with opening or
+changing access: grants created by an older configuration do not carry the new
+dependency. After the closed bootstrap, the tested replacement graph prevents a
+single selection or time-window apply from overlapping old and new authority.
 
 During private entry, HTTPS reaches only `199.36.153.8/30` (the
 `private.googleapis.com` VIP). The reviewed guest setup must resolve exactly
