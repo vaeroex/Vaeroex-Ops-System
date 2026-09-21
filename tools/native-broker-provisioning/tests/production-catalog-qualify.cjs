@@ -7,6 +7,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
+const { Client } = require("pg");
 
 if (process.argv.length !== 2 || process.getuid?.() === 0) {
   process.stdout.write('{"outcome":"local_inputs_rejected"}\n');
@@ -243,7 +244,21 @@ password_encryption='scram-sha-256'
   check(!applicationFence.error, "application_fence_process_completed");
   check(applicationFence.status === 0 && applicationFence.stdout === "42501\n" && applicationFence.stderr === null,
     "application_fence_denied_for_relation_privilege");
-  qualifyManagedFence(overlayBinary);
+  stage = "managed_target_lock_not_publicly_blockable";
+  const advisoryBlocker = new Client({ host: socket(), port: Number(port), database,
+    user: "synthetic_application_login", password: "", ssl: false,
+    application_name: "synthetic_public_target_lock_holder", connectionTimeoutMillis: 3000,
+    statement_timeout: 5000, query_timeout: 6000 });
+  try {
+    await advisoryBlocker.connect();
+    await advisoryBlocker.query("BEGIN");
+    await advisoryBlocker.query(
+      "SELECT pg_advisory_xact_lock(1936744818, hashtext('square_production_oauth'))");
+    qualifyManagedFence(overlayBinary);
+  } finally {
+    await advisoryBlocker.query("ROLLBACK").catch(() => undefined);
+    await advisoryBlocker.end().catch(() => undefined);
+  }
   psql(["-c", `ALTER TABLE private.integration_production_platform_bindings OWNER TO postgres;
     REVOKE USAGE ON SCHEMA private FROM synthetic_hosted_operator`]);
   qualify(overlayBinary);

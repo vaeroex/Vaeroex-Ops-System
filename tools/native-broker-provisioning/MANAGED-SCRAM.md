@@ -120,8 +120,13 @@ On hosted Supabase, the supported `postgres` operator does not own the
 The managed profile therefore serializes all reviewed native workers with one
 write-strength lock on the fixed private platform-binding relation. Only the
 relation owner or a role with a qualifying write/MAINTAIN privilege can acquire
-that lock; application LOGINs receive neither. It retains locks on the other
-application-owned authority tables and revalidates the complete
+that lock; application LOGINs receive neither. The same restricted relation
+fence provides the managed per-target serialization; managed Production takes
+no predictable public advisory lock that an application LOGIN could hold to
+delay NOLOGIN or revocation. The target-lock boundary fails closed unless the
+relation fence is already held and the target is the compiled capability role.
+The managed transaction retains locks on the other application-owned authority
+tables and revalidates the complete
 ledger/schema/function/ACL/role contract immediately before commit. The bounded
 window prohibits unrelated administrative DDL; any committed drift is rejected
 at the next native boundary.

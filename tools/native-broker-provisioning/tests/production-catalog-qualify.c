@@ -46,7 +46,8 @@ int main(int argc,char **argv) {
   bool ok=db && PQstatus(db)==CONNECTION_OK;
   if (ok && fence_only) {
     PQsetNoticeProcessor(db,notice,NULL);
-    ok=command("BEGIN") && production_authority_catalog_fence() && managed_catalog_fence_shape();
+    ok=command("BEGIN") && !lock_target(MAPPED_ROLE) && production_authority_catalog_fence() &&
+      lock_target(MAPPED_ROLE) && !lock_target("square_production_unmapped") && managed_catalog_fence_shape();
     (void)command("ROLLBACK");
     if (db) PQfinish(db);
     db=NULL;

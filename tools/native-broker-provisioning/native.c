@@ -1564,6 +1564,21 @@ static bool no_sessions(const char *target) {
   return true_query("SELECT NOT EXISTS (SELECT FROM pg_stat_activity WHERE usename=$1)", 1, values);
 }
 static bool lock_target(const char *target) {
+#ifdef VAEROEX_PRODUCTION_PROFILE
+  if (managed_profile()) {
+    /* The managed Production authority boundary already holds the fixed,
+     * restricted ShareRowExclusiveLock acquired by closed_authority().  Use
+     * that application-owned fence for target serialization too: an ordinary
+     * LOGIN must not be able to pre-acquire a predictable public advisory key
+     * and delay NOLOGIN/revocation.  Fail closed if this helper is called out
+     * of order or for any target other than the compile-time capability role. */
+    if (strcmp(target,MAPPED_ROLE)) return false;
+    return true_query("SELECT EXISTS (SELECT FROM pg_locks WHERE pid=pg_backend_pid() "
+      "AND locktype='relation' "
+      "AND relation='private.integration_production_platform_bindings'::regclass "
+      "AND mode='ShareRowExclusiveLock' AND granted)",0,NULL);
+  }
+#endif
   const char *values[] = {target};
   PGresult *r = query("SELECT pg_advisory_xact_lock(1936744818, hashtext($1))", 1, values);
   bool ok = r != NULL;
