@@ -24,6 +24,9 @@ const syntheticManagedFenceFailures = new Map([
   [43, "closed_authority_ledger_phase"], [44, "closed_authority_overlay_locks"],
   [45, "closed_authority_internal_locks"], [46, "closed_authority_overlay_visibility"],
   [47, "closed_authority_internal_visibility"], [48, "closed_authority_gate_query"],
+  [51, "catalog_fence_transport"], [52, "catalog_fence_lock_timeout"],
+  [53, "catalog_fence_statement_cancelled"], [54, "catalog_fence_permission"],
+  [55, "catalog_fence_other_sqlstate"], [56, "catalog_fence_stopped"],
 ]);
 const label = value => typeof value === "string" && /^[a-zA-Z0-9_-]{1,80}$/.test(value);
 const credentialByte = value => (value >= 48 && value <= 57) || (value >= 97 && value <= 102);

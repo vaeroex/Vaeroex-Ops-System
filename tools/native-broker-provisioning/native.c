@@ -551,7 +551,21 @@ static bool production_authority_catalog_fence(void) {
      * immediately before COMMIT under READ COMMITTED.  The bounded operator
      * window prohibits out-of-band administrative DDL while this fence is held;
      * a later boundary still rejects any committed drift. */
+#if defined(VAEROEX_SYNTHETIC_ONLY) && defined(VAEROEX_PRODUCTION_PROFILE)
+    PGresult *result=PQexec(db,
+      "LOCK TABLE private.integration_production_platform_bindings IN SHARE ROW EXCLUSIVE MODE");
+    bool locked=result && PQresultStatus(result)==PGRES_COMMAND_OK;
+    if (!locked) {
+      const char *state=result ? PQresultErrorField(result,PG_DIAG_SQLSTATE) : NULL;
+      SYNTHETIC_FENCE_FAILURE(!state?51:!strcmp(state,"55P03")?52:
+        !strcmp(state,"57014")?53:!strcmp(state,"42501")?54:55);
+    }
+    if (result) PQclear(result);
+    if (locked && stopped()) SYNTHETIC_FENCE_FAILURE(56);
+    return locked && !stopped();
+#else
     return command("LOCK TABLE private.integration_production_platform_bindings IN SHARE ROW EXCLUSIVE MODE");
+#endif
   }
   return command("LOCK TABLE pg_catalog.pg_proc IN SHARE ROW EXCLUSIVE MODE") &&
     command("LOCK TABLE pg_catalog.pg_authid IN SHARE ROW EXCLUSIVE MODE") &&
