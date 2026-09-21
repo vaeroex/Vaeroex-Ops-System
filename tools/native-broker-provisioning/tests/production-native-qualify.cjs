@@ -411,13 +411,18 @@ async function main() {
     executable: binaries.get(lockerProfile.name), target: lockerTarget,
   });
   const lockerCandidate = candidates.get(lockerProfile.name);
+  stage = "target_password_locker_read_initial_verifier";
   const verifierBefore = (await fixture.control.query(
     "SELECT rolpassword value FROM pg_authid WHERE rolname=$1", [lockerProfile.role])).rows[0].value;
+  stage = "target_password_locker_activate_fixture_role";
   await fixture.control.query(`ALTER ROLE ${lockerProfile.role} LOGIN INHERIT;
     GRANT ${lockerProfile.capabilityRole} TO ${lockerProfile.role}
       WITH ADMIN FALSE, INHERIT TRUE, SET FALSE`);
+  stage = "target_password_locker_connect_fixture_role";
   const lockerSession = await fixture.connect(lockerProfile.role, lockerCandidate.toString("ascii"), "tls");
+  stage = "target_password_locker_begin_fixture_transaction";
   await lockerSession.query("BEGIN");
+  stage = "target_password_locker_acquire_authid_tuple";
   await lockerSession.query("ALTER ROLE CURRENT_USER PASSWORD 'synthetic-uncommitted-locker'");
   let reconnectConnected = false, reconnectClosed = false;
   const fencePromise = lockerNative.fence({ target: lockerTarget, intent: "target-password-locker-fence",
@@ -434,15 +439,23 @@ async function main() {
     } catch { reconnectClosed = true; }
     finally { await reconnect?.end().catch(() => undefined); }
   })();
-  const lockerFence = await fencePromise;
+  stage = "target_password_locker_native_fence";
+  let lockerFence, lockerFenceRejected = false;
+  try { lockerFence = await fencePromise; }
+  catch { lockerFenceRejected = true; }
   await reconnectPromise;
   await lockerSession.end().catch(() => undefined);
+  stage = "target_password_locker_readback";
   const lockerReadback = (await fixture.control.query(`SELECT NOT r.rolcanlogin no_login,
     NOT r.rolinherit no_inherit,r.rolpassword verifier,
     (SELECT bool_and(NOT m.inherit_option) FROM pg_auth_members m
       WHERE m.member=r.oid AND m.roleid=$2::regrole) membership_fenced,
     (SELECT count(*)::integer FROM pg_stat_activity WHERE usename=$1) sessions
     FROM pg_authid r WHERE r.rolname=$1`, [lockerProfile.role, lockerProfile.capabilityRole])).rows[0];
+  console.log(JSON.stringify({ outcome: "target_password_locker_observation",
+    nativeFenceRejected: lockerFenceRejected,
+    reconnectConnected, reconnectClosed }));
+  check(!lockerFenceRejected, "target_password_locker_native_fence_succeeds");
   check(lockerFence.ack && lockerFence.sessionsTerminated,
     "target_password_locker_drained_before_nologin_transition");
   check(!reconnectConnected || reconnectClosed,

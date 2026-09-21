@@ -179,6 +179,8 @@ test("Production profile fencing pairs login state with non-inheriting capabilit
     "target_settings_membership_fenced",
     "target_settings_sessions_drained",
     "reconciled_target_settings_restore_exact_fence_contract",
+    "target_password_locker_observation",
+    "target_password_locker_native_fence_succeeds",
     "target_password_locker_drained_before_nologin_transition",
     "target_reconnect_cannot_hold_password_lock_through_fence",
     "password_locker_rollback_and_exact_closed_state_confirmed",
