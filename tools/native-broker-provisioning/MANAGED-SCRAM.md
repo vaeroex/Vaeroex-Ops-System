@@ -115,8 +115,16 @@ paste secrets into chat, commands, the database SQL editor or ordinary shells.
 Native inspection then attests SQL identity, physical database, complete
 authority visibility and safe effective controls **before generating any broker
 credential**. Nonsecret NOLOGIN setup is separate from password assignment.
-Assignment holds authority locks, sends the candidate privately to Secret
-Manager, verifies CRC/readback and only then commits. Secret storage uses an
+On hosted Supabase, the supported `postgres` operator does not own the
+`supabase_admin` system catalogs and cannot take write-strength locks on them.
+The managed profile therefore serializes all reviewed native workers with one
+fixed transaction-scoped advisory mutex, retains locks on the application-owned
+authority tables, and revalidates the complete ledger/schema/function/ACL/role
+contract immediately before commit. The bounded window prohibits unrelated
+administrative DDL; any committed drift is rejected at the next native boundary.
+Self-owned/local profiles retain the stronger explicit catalog locks.
+Assignment holds those applicable authority fences, sends the candidate
+privately to Secret Manager, verifies CRC/readback and only then commits. Secret storage uses an
 immutable version and a strict DSN codec compatible with the existing callback;
 the CA remains separately configured. LOGIN activation and candidate native
 authentication happen under closed application authority. Successful result is

@@ -28,7 +28,7 @@ const hash = source => crypto.createHash("sha256").update(source).digest("hex");
 let stage = "source_manifest", root, socketRoot, running = false, terminating = false, assertions = 0;
 const check = (value, name) => { assertions++; if (!value) { stage = name; throw new Error("catalog_qualification_failed"); } };
 const contractStages = new Set([
-  "begin", "closed_authority", "ledger_phase", "relations", "foundation_schema", "overlay_schema",
+  "begin", "closed_authority", "managed_catalog_fence", "ledger_phase", "relations", "foundation_schema", "overlay_schema",
   "baseline_triggers", "baseline_function_abi", "internal_relations", "internal_schema",
   "internal_triggers", "internal_functions", "authority"
 ]);
@@ -112,6 +112,13 @@ function qualify(binary, expectedStage = null) {
       result.stderr.trim() === `production_catalog_contract_invalid:${expectedStage}`, `${expectedStage}_substitution_rejected`);
   }
 }
+function qualifyManagedFence(binary) {
+  const result = spawnSync(binary, [socket(), port, database, "synthetic_hosted_operator", "managed-fence"], {
+    env: { ...baseEnv, TMPDIR: root }, encoding: "utf8", timeout: 30000, maxBuffer: 4096,
+  });
+  check(!result.error && result.status === 0 && result.stdout.trim() === "production_managed_catalog_fence_valid" &&
+    result.stderr === "", "managed_nonowner_catalog_fence_positive");
+}
 function cleanup() {
   if (root && (running || fs.existsSync(path.join(data(), "postmaster.pid")))) {
     const result = spawnSync(path.join(pgRoot, "bin/pg_ctl"), ["-D", data(), "-m", "fast", "-w", "stop"],
@@ -165,12 +172,14 @@ unix_socket_directories='${socket()}'
 unix_socket_permissions=0700
 password_encryption='scram-sha-256'
 `, { mode: 0o600 });
-  fs.writeFileSync(path.join(data(), "pg_hba.conf"), "local all postgres trust\nlocal all all reject\n", { mode: 0o600 });
+  fs.writeFileSync(path.join(data(), "pg_hba.conf"),
+    "local all postgres,synthetic_hosted_operator trust\nlocal all all reject\n", { mode: 0o600 });
   run(path.join(pgRoot, "bin/pg_ctl"), ["-D", data(), "-l", path.join(root, "postgres.log"), "-w", "start"]);
   running = true;
   run(path.join(pgRoot, "bin/createdb"), ["-h", socket(), "-p", port, "-U", "postgres", database]);
   const seed = versions.map(version => `('${version}')`).join(",");
   psql(["-c", `CREATE ROLE anon NOLOGIN; CREATE ROLE authenticated NOLOGIN; CREATE ROLE service_role NOLOGIN;
+    CREATE ROLE synthetic_hosted_operator LOGIN CREATEROLE NOSUPERUSER NOCREATEDB NOREPLICATION NOBYPASSRLS;
     CREATE SCHEMA private; REVOKE ALL ON SCHEMA private FROM PUBLIC;
     CREATE SCHEMA extensions; CREATE EXTENSION pgcrypto WITH SCHEMA extensions; REVOKE ALL ON SCHEMA extensions FROM PUBLIC;
     CREATE DOMAIN extensions.vector AS text;
@@ -211,6 +220,14 @@ password_encryption='scram-sha-256'
   psql(["-c", "INSERT INTO supabase_migrations.schema_migrations(version) VALUES ('20260902191324')"]);
   const overlayBinary = path.join(root, "catalog-overlay");
   compile(overlayBinary, null);
+  const managedPrivilegeShape = psql(["-At", "-c", `SELECT
+    (SELECT relowner<> 'synthetic_hosted_operator'::regrole FROM pg_class WHERE oid='pg_catalog.pg_proc'::regclass)
+    AND NOT has_table_privilege('synthetic_hosted_operator','pg_catalog.pg_proc','MAINTAIN')
+    AND NOT has_table_privilege('synthetic_hosted_operator','pg_catalog.pg_proc','UPDATE')
+    AND NOT has_table_privilege('synthetic_hosted_operator','pg_catalog.pg_proc','DELETE')
+    AND NOT has_table_privilege('synthetic_hosted_operator','pg_catalog.pg_proc','TRUNCATE')`]).stdout.trim();
+  check(managedPrivilegeShape === "t", "managed_operator_has_production_shaped_catalog_permissions");
+  qualifyManagedFence(overlayBinary);
   qualify(overlayBinary);
 
   stage = "overlay_trigger_substitution";

@@ -459,30 +459,40 @@ static bool candidate_identity(const char *host,const char *database,const char 
     "AND (SELECT oid::text FROM pg_database WHERE datname=current_database())=$3 "
     "AND (SELECT oid::text FROM pg_roles WHERE rolname=session_user)=$4 AND NOT pg_is_in_recovery()",4,values);
 }
+#ifdef VAEROEX_PRODUCTION_PROFILE
+static bool production_authority_catalog_fence(void) {
+  if (managed_profile()) {
+    /* Hosted Supabase owns system catalogs as supabase_admin.  The supported
+     * password-backed postgres operator can read them and manage the fixed
+     * roles, but cannot take write-strength LOCK TABLE modes on those catalogs.
+     * Serialize every reviewed native Production worker with one fixed
+     * transaction-scoped advisory mutex instead.  The application-owned
+     * authority tables remain locked below, and the complete ledger, schema,
+     * ABI, ACL and role contract is re-read both before mutation and
+     * immediately before COMMIT under READ COMMITTED.  The bounded operator
+     * window prohibits out-of-band administrative DDL while this mutex is held;
+     * a later boundary still rejects any committed drift. */
+    PGresult *result=query("SELECT pg_advisory_xact_lock(1936744819,0)",0,NULL);
+    bool ok=result && PQntuples(result)==1 && PQnfields(result)==1;
+    if (result) PQclear(result);
+    return ok;
+  }
+  return command("LOCK TABLE pg_catalog.pg_proc IN SHARE ROW EXCLUSIVE MODE") &&
+    command("LOCK TABLE pg_catalog.pg_authid IN SHARE ROW EXCLUSIVE MODE") &&
+    command("LOCK TABLE pg_catalog.pg_auth_members IN SHARE ROW EXCLUSIVE MODE") &&
+    command("LOCK TABLE pg_catalog.pg_db_role_setting IN SHARE ROW EXCLUSIVE MODE") &&
+    command("LOCK TABLE pg_catalog.pg_namespace IN SHARE ROW EXCLUSIVE MODE") &&
+    command("LOCK TABLE pg_catalog.pg_class IN SHARE ROW EXCLUSIVE MODE") &&
+    command("LOCK TABLE pg_catalog.pg_database IN SHARE ROW EXCLUSIVE MODE") &&
+    command("LOCK TABLE pg_catalog.pg_parameter_acl IN SHARE ROW EXCLUSIVE MODE") &&
+    command("LOCK TABLE pg_catalog.pg_default_acl IN SHARE ROW EXCLUSIVE MODE");
+}
+#endif
 static bool closed_authority(const char *target) {
   const char *values[] = {target};
 #ifdef VAEROEX_PRODUCTION_PROFILE
   if(strcmp(target,MAPPED_ROLE))return false;
-  /* Authority predicates read the function, membership and role catalogs.
-   * Acquire one self-conflicting lock mode in a fixed order before the
-   * advisory target lock.  This keeps concurrent native workers from both
-   * holding compatible membership locks while waiting on one another, and
-   * conflicts with CREATE OR REPLACE FUNCTION, GRANT/REVOKE membership and
-   * ALTER ROLE changes for the complete maintenance transaction.  The native
-   * operator is the reviewed catalog owner; failure to acquire any lock is a
-   * fail-closed authority result. */
-  if (!command("LOCK TABLE pg_catalog.pg_proc IN SHARE ROW EXCLUSIVE MODE")) return false;
-  if (!command("LOCK TABLE pg_catalog.pg_authid IN SHARE ROW EXCLUSIVE MODE")) return false;
-  if (!command("LOCK TABLE pg_catalog.pg_auth_members IN SHARE ROW EXCLUSIVE MODE")) return false;
-  if (!command("LOCK TABLE pg_catalog.pg_db_role_setting IN SHARE ROW EXCLUSIVE MODE")) return false;
-  /* Existing authority checks also reject schema, relation/column, database,
-   * parameter and default ACL drift. Application-table SHARE locks do not
-   * conflict with GRANT, so retain the ACL catalogs through the same commit. */
-  if (!command("LOCK TABLE pg_catalog.pg_namespace IN SHARE ROW EXCLUSIVE MODE")) return false;
-  if (!command("LOCK TABLE pg_catalog.pg_class IN SHARE ROW EXCLUSIVE MODE")) return false;
-  if (!command("LOCK TABLE pg_catalog.pg_database IN SHARE ROW EXCLUSIVE MODE")) return false;
-  if (!command("LOCK TABLE pg_catalog.pg_parameter_acl IN SHARE ROW EXCLUSIVE MODE")) return false;
-  if (!command("LOCK TABLE pg_catalog.pg_default_acl IN SHARE ROW EXCLUSIVE MODE")) return false;
+  if (!production_authority_catalog_fence()) return false;
   if (managed_profile() && !command("LOCK TABLE supabase_migrations.schema_migrations IN SHARE MODE")) return false;
   production_phase phase=production_ledger_phase();
   if (phase==PRODUCTION_PHASE_INVALID || !command("LOCK TABLE private.integration_production_platform_bindings, "
