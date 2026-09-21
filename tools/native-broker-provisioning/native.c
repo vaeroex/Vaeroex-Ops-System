@@ -1575,7 +1575,8 @@ static bool role_valid(const char *target, const char *oid, int state) {
     "AND NOT r.rolsuper AND NOT r.rolcreaterole AND NOT r.rolcreatedb AND NOT r.rolreplication "
     "AND NOT r.rolbypassrls "
 #ifdef VAEROEX_PRODUCTION_PROFILE
-    "AND (($3::integer IN (2,3) AND r.rolcanlogin=r.rolinherit) "
+    "AND (($3::integer=2 AND r.rolcanlogin=r.rolinherit) "
+      "OR ($3::integer=3 AND r.rolcanlogin AND r.rolinherit) "
       "OR ($3::integer=1 AND r.rolcanlogin AND r.rolinherit) "
       "OR ($3::integer=0 AND NOT r.rolcanlogin AND NOT r.rolinherit)) "
 #else
@@ -1639,6 +1640,14 @@ static bool role_valid(const char *target, const char *oid, int state) {
       "WHERE setrole=(SELECT oid FROM pg_roles WHERE rolname=$1)))", 4, values)
     && production_authority_valid(target,state==2 || state==3,state==3);
 }
+#ifdef VAEROEX_PRODUCTION_PROFILE
+static bool managed_fence_entry_role_valid(const char *target,const char *oid) {
+  /* A fresh fence starts from either the exact active/closed contract or the
+   * single safe recovery state left after the capability-only commit:
+   * LOGIN INHERIT with the target membership already non-inheriting. */
+  return role_valid(target,oid,2) || role_valid(target,oid,3);
+}
+#endif
 static bool no_sessions(const char *target) {
   const char *values[] = {target};
   return true_query("SELECT NOT EXISTS (SELECT FROM pg_stat_activity WHERE usename=$1)", 1, values);
@@ -1818,7 +1827,7 @@ static int run(int argc, char **argv) {
     ok=command("BEGIN");
     transaction=ok;
     if (ok) ok=production_authority_catalog_fence();
-    if (ok) ok=strcmp(role_oid,"0") && role_valid(target,role_oid,2);
+    if (ok) ok=strcmp(role_oid,"0") && managed_fence_entry_role_valid(target,role_oid);
     if (ok) ok=managed_close_capability(target);
     if (ok) {
       commit_attempted=true;

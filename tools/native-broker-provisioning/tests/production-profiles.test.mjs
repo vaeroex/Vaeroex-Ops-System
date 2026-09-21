@@ -152,6 +152,8 @@ test("Production profile fencing pairs login state with non-inheriting capabilit
     "tools/native-broker-provisioning/tests/production-native-qualify.cjs"), "utf8");
   const catalogQualifier = readFileSync(resolve(root,
     "tools/native-broker-provisioning/tests/production-catalog-qualify.cjs"), "utf8");
+  const catalogHarness = readFileSync(resolve(root,
+    "tools/native-broker-provisioning/tests/production-catalog-qualify.c"), "utf8");
   assert.match(nativeSource, /CREATE ROLE",target,[\s\S]*?NOLOGIN[\s\S]*?NOINHERIT/);
   assert.match(nativeSource, /WITH ADMIN FALSE, INHERIT FALSE, SET FALSE/);
   assert.match(nativeSource, /production_authority_catalog_fence\(\)[\s\S]*?managed_close_capability\(target\)[\s\S]*?terminate_target_sessions\(control_db,target\)[\s\S]*?closed_authority\(target\)/,
@@ -168,6 +170,14 @@ test("Production profile fencing pairs login state with non-inheriting capabilit
     "only the pre-revocation fence path permits target-owned settings");
   assert.match(nativeSource, /production_authority_valid\(target,state==2 \|\| state==3,state==3\)/,
     "the fence role check applies the same narrow pre-revocation exception");
+  assert.match(nativeSource, /\$3::integer=3 AND r\.rolcanlogin AND r\.rolinherit/,
+    "checked recovery accepts only the exact login-open, inherit-enabled role transition");
+  assert.match(nativeSource, /managed_fence_entry_role_valid\(target,role_oid\)/,
+    "a fresh managed fence accepts the exact capability-only checked-recovery state");
+  assert.match(catalogHarness, /managed-password-fence[\s\S]*managed_recovery_active_contract[\s\S]*role_valid\(MAPPED_ROLE,target_oid,2\)/,
+    "the existing active-path assertion remains an exact active-role contract");
+  assert.match(catalogHarness, /managed-interrupted-recovery[\s\S]*managed_recovery_transition_contract[\s\S]*role_valid\(MAPPED_ROLE,target_oid,3\)/,
+    "the separate checked-recovery assertion accepts only the exact transition contract");
   assert.match(nativeSource, /\$8=\$6 OR target_role\.rolconfig IS NULL/,
     "the exception is bound to the exact operation target");
   assert.match(nativeSource, /\$8=\$6 OR NOT EXISTS \(SELECT FROM pg_db_role_setting s WHERE s\.setrole=target_role\.oid\)/,
@@ -190,6 +200,11 @@ test("Production profile fencing pairs login state with non-inheriting capabilit
     "target_password_locker_drained_before_nologin_transition",
     "target_reconnect_cannot_hold_password_lock_through_fence",
     "password_locker_rollback_and_exact_closed_state_confirmed",
+    "managed_capability_only_commit_state_observed",
+    "managed_capability_only_commit_recovery_succeeds",
+    "managed_capability_only_commit_recovers_exact_closed_state",
+    "managed_recovery_transition_matrix",
+    "missing_capability_membership",
   ]) assert.match(catalogQualifier, new RegExp(label));
   assert.match(catalogQualifier, /"-DVAEROEX_SYNTHETIC_ONLY", "-DVAEROEX_MANAGED_PROFILE_TEST"/,
     "the password-lock regression compiles the managed path on the exact Production-shaped catalog");

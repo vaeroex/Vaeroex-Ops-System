@@ -246,6 +246,24 @@ function qualifyManagedPasswordFence(binary) {
     });
   });
 }
+function managedInterruptedRecoveryResult(binary) {
+  return spawnSync(binary, [socket(), port, database, "postgres", "managed-interrupted-recovery"], {
+    env: { ...baseEnv, TMPDIR: root }, encoding: "utf8", timeout: 30000, maxBuffer: 4096,
+  });
+}
+function qualifyManagedInterruptedRecovery(binary) {
+  const result = managedInterruptedRecoveryResult(binary);
+  check(!result.error && result.status === 0 && result.signal === null &&
+    result.stdout === "production_managed_interrupted_recovery_valid\n" && result.stderr === "",
+  "managed_capability_only_commit_recovery_succeeds");
+}
+function rejectManagedInterruptedRecovery(binary, label) {
+  const result = managedInterruptedRecoveryResult(binary);
+  const rejectedStage = /^production_catalog_contract_invalid:(managed_recovery_(?:transition_contract|transition_entry_role))\n?$/.exec(
+    result.stderr ?? "");
+  check(!result.error && result.status === 3 && result.signal === null && result.stdout === "" && rejectedStage,
+    `managed_recovery_rejects_${label}`);
+}
 function cleanup() {
   if (root && (running || fs.existsSync(path.join(data(), "postmaster.pid")))) {
     const result = spawnSync(path.join(pgRoot, "bin/pg_ctl"), ["-D", data(), "-m", "fast", "-w", "stop"],
@@ -422,6 +440,27 @@ password_encryption='scram-sha-256'
         PASSWORD '${originalPassword}';
       GRANT square_production_oauth_authority TO square_production_oauth
         WITH ADMIN FALSE, INHERIT TRUE, SET FALSE`]);
+    stage = "managed_recovery_transition_matrix";
+    const rejectedTransitions = Object.freeze([
+      [true, true, true, "active"],
+      [true, false, true, "login_noinherit_inheriting_membership"],
+      [true, false, false, "login_noinherit_noninheriting_membership"],
+      [false, true, true, "nologin_inherit_inheriting_membership"],
+      [false, true, false, "nologin_inherit_noninheriting_membership"],
+      [false, false, true, "nologin_noinherit_inheriting_membership"],
+      [false, false, false, "closed"],
+    ]);
+    for (const [login, inherit, membershipInherits, label] of rejectedTransitions) {
+      psql(["-c", `ALTER ROLE square_production_oauth ${login ? "LOGIN" : "NOLOGIN"} ${inherit ? "INHERIT" : "NOINHERIT"};
+        GRANT square_production_oauth_authority TO square_production_oauth
+          WITH ADMIN FALSE, INHERIT ${membershipInherits ? "TRUE" : "FALSE"}, SET FALSE`]);
+      rejectManagedInterruptedRecovery(internalBinary, label);
+    }
+    psql(["-c", `ALTER ROLE square_production_oauth LOGIN INHERIT;
+      REVOKE square_production_oauth_authority FROM square_production_oauth`]);
+    rejectManagedInterruptedRecovery(internalBinary, "missing_capability_membership");
+    psql(["-c", `GRANT square_production_oauth_authority TO square_production_oauth
+      WITH ADMIN FALSE, INHERIT TRUE, SET FALSE`]);
     stage = "managed_application_lock_grant";
     psql(["-c", `GRANT USAGE ON SCHEMA private TO square_production_oauth;
       GRANT UPDATE ON private.square_production_internal_permits TO square_production_oauth`]);
@@ -451,7 +490,23 @@ password_encryption='scram-sha-256'
     await applicationLocker.end().catch(() => undefined);
     check(applicationSessionClosed, "managed_application_locker_drained_before_share_lock");
     psql(["-c", `REVOKE UPDATE ON private.square_production_internal_permits FROM square_production_oauth;
-      REVOKE USAGE ON SCHEMA private FROM square_production_oauth;
+      REVOKE USAGE ON SCHEMA private FROM square_production_oauth`]);
+    const interruptedFence = psql(["-At", "-F", "|", "-c", `SELECT r.rolcanlogin,r.rolinherit,
+      NOT m.inherit_option,NOT m.admin_option,NOT m.set_option
+      FROM pg_roles r JOIN pg_auth_members m ON m.member=r.oid
+      WHERE r.rolname='square_production_oauth'
+        AND m.roleid='square_production_oauth_authority'::regrole`]).stdout.trim();
+    check(interruptedFence === "t|t|t|t|t", "managed_capability_only_commit_state_observed");
+    stage = "managed_capability_only_recovery";
+    qualifyManagedInterruptedRecovery(internalBinary);
+    const recoveredFence = psql(["-At", "-F", "|", "-c", `SELECT NOT r.rolcanlogin,NOT r.rolinherit,
+      NOT m.inherit_option,NOT m.admin_option,NOT m.set_option,
+      (SELECT count(*) FROM pg_stat_activity WHERE usename='square_production_oauth')
+      FROM pg_roles r JOIN pg_auth_members m ON m.member=r.oid
+      WHERE r.rolname='square_production_oauth'
+        AND m.roleid='square_production_oauth_authority'::regrole`]).stdout.trim();
+    check(recoveredFence === "t|t|t|t|t|0", "managed_capability_only_commit_recovers_exact_closed_state");
+    psql(["-c", `ALTER ROLE square_production_oauth LOGIN INHERIT;
       GRANT square_production_oauth_authority TO square_production_oauth
         WITH ADMIN FALSE, INHERIT TRUE, SET FALSE`]);
     stage = "managed_password_locker_fence";

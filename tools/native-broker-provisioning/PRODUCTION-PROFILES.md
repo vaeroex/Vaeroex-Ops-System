@@ -16,7 +16,9 @@ commits only the exact membership change to `INHERIT FALSE`. It then drains the 
 the application-table locks and committing `NOLOGIN NOINHERIT`. Closing
 inherited authority first prevents new RPCs while draining already-authorized
 requests avoids a competing application-lock order. Any failure after the
-first commit is checked-recovery territory. Each of the six profiles is
+first commit is checked-recovery territory; a fresh fence accepts only that
+exact capability-closed/login-open transition and completes the remaining
+`NOLOGIN NOINHERIT` phase. Each of the six profiles is
 verified independently as absent, exactly closed, or exactly active, so fencing
 one profile does not disable another legitimately active least-privilege role.
 Because a PostgreSQL LOGIN may set its own global and per-database defaults,
