@@ -115,8 +115,36 @@ paste secrets into chat, commands, the database SQL editor or ordinary shells.
 Native inspection then attests SQL identity, physical database, complete
 authority visibility and safe effective controls **before generating any broker
 credential**. Nonsecret NOLOGIN setup is separate from password assignment.
-Assignment holds authority locks, sends the candidate privately to Secret
-Manager, verifies CRC/readback and only then commits. Secret storage uses an
+On hosted Supabase, the supported `postgres` operator does not own the
+`supabase_admin` system catalogs and cannot take write-strength locks on them.
+The managed profile therefore serializes all reviewed native workers with one
+write-strength lock on the fixed private platform-binding relation. Only the
+relation owner or a role with a qualifying write/MAINTAIN privilege can acquire
+that lock; application LOGINs receive neither. The same restricted relation
+fence provides the managed per-target serialization; managed Production takes
+no predictable public advisory lock that an application LOGIN could hold to
+delay NOLOGIN or revocation. The target-lock boundary fails closed unless the
+relation fence is already held and the target is the compiled capability role.
+Managed fencing is deliberately two-phase. A short transaction serializes
+native maintenance on the private platform-binding relation, validates the
+complete current active-or-closed contract, and commits only the exact
+capability membership to non-inheriting. The control session then drains the
+target so an already authorized RPC releases its application locks. The normal
+transaction can then take the complete application-owned authority locks and commit
+`NOLOGIN NOINHERIT` without reversing lock order. Any failure after the first
+commit requires checked recovery. A paused PostgreSQL 17 SCRAM exchange that is
+not yet visible in `pg_stat_activity` is still denied before session
+establishment because PostgreSQL rechecks `NOLOGIN`; the qualification requires
+SQLSTATE `28000` and no `ReadyForQuery`.
+
+The managed transaction retains locks on the other application-owned authority
+tables and revalidates the complete ledger/schema/function/ACL/role contract
+immediately before commit. The bounded window prohibits unrelated
+administrative DDL; any committed drift is rejected at the next native
+boundary.
+Self-owned/local profiles retain the stronger explicit catalog locks.
+Assignment holds those applicable authority fences, sends the candidate
+privately to Secret Manager, verifies CRC/readback and only then commits. Secret storage uses an
 immutable version and a strict DSN codec compatible with the existing callback;
 the CA remains separately configured. LOGIN activation and candidate native
 authentication happen under closed application authority. Successful result is

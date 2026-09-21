@@ -331,6 +331,74 @@ async function main() {
       readback.capability_members === 1 && !readback.business_read && readback.sessions === 0,
       `${profile.name}_exact_closed_authority_with_target_membership`);
   }
+  // An ordinary LOGIN may set its own global and per-database defaults. Those
+  // target-controlled rows must not prevent the native compensating fence from
+  // committing NOLOGIN/NOINHERIT and draining sessions. Residual settings are
+  // still rejected by the post-commit exact contract and require checked
+  // reconciliation; the test removes only its own synthetic drift afterward.
+  stage = "target_owned_role_settings_fence";
+  const settingProfile = profiles.find(profile => profile.name === "evidence");
+  const settingTarget = Object.freeze({ ...makeTarget(settingProfile), roleOid: (await fixture.control.query(
+    "SELECT oid::text value FROM pg_roles WHERE rolname=$1", [settingProfile.role])).rows[0].value });
+  const settingNative = adapterModule.createLocalSyntheticProductionNativeAdapter({
+    executable: binaries.get(settingProfile.name), target: settingTarget,
+  });
+  const settingCandidate = candidates.get(settingProfile.name);
+  check(Buffer.isBuffer(settingCandidate) && settingCandidate.length === 128,
+    "setting_target_private_candidate_available");
+  await fixture.control.query(`ALTER ROLE ${settingProfile.role} LOGIN INHERIT;
+    GRANT ${settingProfile.capabilityRole} TO ${settingProfile.role}
+      WITH ADMIN FALSE, INHERIT TRUE, SET FALSE`);
+  const settingSession = await fixture.connect(settingProfile.role, settingCandidate.toString("ascii"), "tls");
+  await settingSession.query("ALTER ROLE CURRENT_USER SET work_mem='1MB'");
+  await settingSession.query("ALTER ROLE CURRENT_USER IN DATABASE postgres SET statement_timeout='1s'");
+  let settingFenceRejectedAfterCommit = false;
+  try {
+    await settingNative.fence({ target: settingTarget, intent: "target-owned-settings-fence",
+      approvalId: "synthetic-production", signal: new AbortController().signal });
+  } catch { settingFenceRejectedAfterCommit = true; }
+  await settingSession.end().catch(() => undefined);
+  const settingFenceReadback = (await fixture.control.query(`SELECT NOT r.rolcanlogin no_login,
+    NOT r.rolinherit no_inherit,r.rolconfig IS NOT NULL global_setting,
+    (SELECT count(*)::integer FROM pg_db_role_setting s WHERE s.setrole=r.oid) setting_rows,
+    (SELECT count(*)::integer FROM pg_db_role_setting s WHERE s.setrole=r.oid
+      AND s.setdatabase=(SELECT oid FROM pg_database WHERE datname=current_database())) database_settings,
+    (SELECT bool_and(NOT m.inherit_option) FROM pg_auth_members m
+      WHERE m.member=r.oid AND m.roleid=$2::regrole) membership_fenced,
+    (SELECT count(*)::integer FROM pg_stat_activity WHERE usename=$1) sessions
+    FROM pg_roles r WHERE r.rolname=$1`, [settingProfile.role, settingProfile.capabilityRole])).rows[0];
+  check(settingFenceRejectedAfterCommit, "target_settings_require_checked_post_commit_recovery");
+  console.log(JSON.stringify({
+    outcome: "target_settings_fence_observation",
+    noLogin: settingFenceReadback?.no_login === true,
+    noInherit: settingFenceReadback?.no_inherit === true,
+    globalSettingPreserved: settingFenceReadback?.global_setting === true,
+    settingRows: settingFenceReadback?.setting_rows === 2 ? "expected_two" : "unexpected",
+    databaseSettings: settingFenceReadback?.database_settings === 1 ? "expected_one" : "unexpected",
+    membershipFenced: settingFenceReadback?.membership_fenced === true,
+    zeroSessions: settingFenceReadback?.sessions === 0,
+  }));
+  check(settingFenceReadback?.no_login === true,
+    "target_settings_fence_nologin_committed");
+  check(settingFenceReadback?.no_inherit === true,
+    "target_settings_fence_noinherit_committed");
+  check(settingFenceReadback?.global_setting === true,
+    "target_settings_global_setting_preserved_for_checked_recovery");
+  check(settingFenceReadback?.setting_rows === 2,
+    "target_settings_exact_global_and_database_rows_preserved_for_checked_recovery");
+  check(settingFenceReadback?.database_settings === 1,
+    "target_settings_database_setting_preserved_for_checked_recovery");
+  check(settingFenceReadback?.membership_fenced === true,
+    "target_settings_membership_fenced");
+  check(settingFenceReadback?.sessions === 0,
+    "target_settings_sessions_drained");
+  await fixture.control.query(`ALTER ROLE ${settingProfile.role} RESET ALL;
+    ALTER ROLE ${settingProfile.role} IN DATABASE postgres RESET ALL`);
+  const settingFenceRecovered = await settingNative.fence({ target: settingTarget,
+    intent: "target-owned-settings-reconciled", approvalId: "synthetic-production",
+    signal: new AbortController().signal });
+  check(settingFenceRecovered.ack && settingFenceRecovered.sessionsTerminated,
+    "reconciled_target_settings_restore_exact_fence_contract");
   // PostgreSQL 16+ evaluates inherited membership in an already-authenticated
   // session. Fencing must therefore change the fixed capability edge before
   // the session drain; NOLOGIN/NOINHERIT on the role alone is not sufficient.

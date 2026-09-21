@@ -150,15 +150,84 @@ test("Production profile fencing pairs login state with non-inheriting capabilit
   const nativeSource = readFileSync(resolve(root, "tools/native-broker-provisioning/native.c"), "utf8");
   const qualifier = readFileSync(resolve(root,
     "tools/native-broker-provisioning/tests/production-native-qualify.cjs"), "utf8");
+  const catalogQualifier = readFileSync(resolve(root,
+    "tools/native-broker-provisioning/tests/production-catalog-qualify.cjs"), "utf8");
+  const catalogHarness = readFileSync(resolve(root,
+    "tools/native-broker-provisioning/tests/production-catalog-qualify.c"), "utf8");
   assert.match(nativeSource, /CREATE ROLE",target,[\s\S]*?NOLOGIN[\s\S]*?NOINHERIT/);
   assert.match(nativeSource, /WITH ADMIN FALSE, INHERIT FALSE, SET FALSE/);
-  assert.match(nativeSource, /if \(!strcmp\(op,"fence"\)\) ok = role_command\("GRANT " CAPABILITY " TO",target,[\s\S]*?INHERIT FALSE, SET FALSE/);
+  assert.match(nativeSource, /production_authority_catalog_fence\(\)[\s\S]*?managed_close_capability\(target\)[\s\S]*?terminate_target_sessions\(control_db,target\)[\s\S]*?closed_authority\(target\)/,
+    "managed Production closes inherited authority and drains the exact login before taking application locks");
+  assert.match(nativeSource, /role_command\("GRANT " CAPABILITY " TO",target,[\s\S]*?INHERIT FALSE, SET FALSE/,
+    "managed and self-owned Production fences both remove inherited capability authority");
   assert.match(nativeSource, /if \(ok && !strcmp\(op,"activate"\)\) \{[\s\S]*?INHERIT TRUE, SET FALSE/);
   assert.match(nativeSource, /target_role\.rolcanlogin AND target_role\.rolinherit AND m\.inherit_option/);
   assert.match(nativeSource, /NOT target_role\.rolcanlogin AND NOT target_role\.rolinherit AND NOT m\.inherit_option/);
   assert.match(qualifier, /existing_session_loses_effective_rpc_before_session_termination/);
   assert.match(qualifier, /active_login_with_noninheriting_capability_membership_rejected/);
   assert.match(qualifier, /noncurrent_profile_privilege_drift_blocks_current_profile_before_mutation/);
+  assert.match(nativeSource, /production_authority_valid\(target,!strcmp\(op,"fence"\),managed_capability_transition\)/,
+    "only the pre-revocation fence path permits target-owned settings");
+  assert.match(nativeSource, /production_authority_valid\(target,state==2 \|\| state==3,state==3\)/,
+    "the fence role check applies the same narrow pre-revocation exception");
+  assert.match(nativeSource, /\$3::integer=3 AND r\.rolcanlogin AND r\.rolinherit/,
+    "checked recovery accepts only the exact login-open, inherit-enabled role transition");
+  assert.match(nativeSource, /managed_fence_entry_role_state\(target,role_oid\)/,
+    "a fresh managed fence records the exact active, transition, or already-closed entry contract");
+  assert.match(nativeSource, /managed_fence_entry_state==0\?0:3/,
+    "an already-closed entry remains closed while active and transition entries use the checked-recovery predicate");
+  assert.match(catalogHarness, /managed-password-fence[\s\S]*managed_recovery_active_contract[\s\S]*role_valid\(MAPPED_ROLE,target_oid,2\)/,
+    "the existing active-path assertion remains an exact active-role contract");
+  assert.match(catalogHarness, /managed-interrupted-recovery[\s\S]*managed_recovery_transition_contract[\s\S]*role_valid\(MAPPED_ROLE,target_oid,3\)/,
+    "the separate checked-recovery assertion accepts only the exact transition contract");
+  assert.match(catalogHarness, /managed-closed-fence[\s\S]*managed_recovery_closed_contract[\s\S]*role_valid\(MAPPED_ROLE,target_oid,0\)/,
+    "an already-closed fence uses the exact closed assertion rather than the transition contract");
+  assert.match(nativeSource, /\$8=\$6 OR target_role\.rolconfig IS NULL/,
+    "the exception is bound to the exact operation target");
+  assert.match(nativeSource, /\$8=\$6 OR NOT EXISTS \(SELECT FROM pg_db_role_setting s WHERE s\.setrole=target_role\.oid\)/,
+    "only the exact target's per-database settings are deferred to postflight");
+  for (const label of [
+    "target_settings_require_checked_post_commit_recovery",
+    "target_settings_fence_observation",
+    "target_settings_fence_nologin_committed",
+    "target_settings_fence_noinherit_committed",
+    "target_settings_global_setting_preserved_for_checked_recovery",
+    "target_settings_exact_global_and_database_rows_preserved_for_checked_recovery",
+    "target_settings_database_setting_preserved_for_checked_recovery",
+    "target_settings_membership_fenced",
+    "target_settings_sessions_drained",
+    "reconciled_target_settings_restore_exact_fence_contract",
+  ]) assert.match(qualifier, new RegExp(label));
+  for (const label of [
+    "target_password_locker_observation",
+    "target_password_locker_native_fence_succeeds",
+    "target_password_locker_drained_before_nologin_transition",
+    "target_reconnect_cannot_hold_password_lock_through_fence",
+    "password_locker_rollback_and_exact_closed_state_confirmed",
+    "managed_capability_only_commit_state_observed",
+    "managed_capability_only_commit_recovery_succeeds",
+    "managed_capability_only_commit_recovers_exact_closed_state",
+    "managed_transition_wait_and_closed_reconciliation_succeed",
+    "managed_active_entry_overtaken_by_recovery_fence_reconciles_exact_closure",
+    "managed_transition_wait_finishes_exact_closed_state",
+    "managed_control_socket_deadline_interrupts_blocking_drain",
+    "managed_already_closed_fence_succeeds",
+    "managed_already_closed_fence_preserves_exact_state",
+    "managed_recovery_transition_matrix",
+    "missing_capability_membership",
+  ]) assert.match(catalogQualifier, new RegExp(label));
+  assert.match(catalogQualifier, /"-DVAEROEX_SYNTHETIC_ONLY", "-DVAEROEX_MANAGED_PROFILE_TEST"/,
+    "the password-lock regression compiles the managed path on the exact Production-shaped catalog");
+  assert.match(nativeSource, /while \(ok && !stopped\(\) && PQisBusy\(db\)\)[\s\S]*?terminate_target_sessions\(control_db,target\)/,
+    "the exact-target drainer remains active while NOLOGIN waits");
+  assert.match(nativeSource, /watched_control_socket[\s\S]*?shutdown\(control_fd, SHUT_RDWR\)/,
+    "the native deadline interrupts a blocking control-session drain as well as the primary connection");
+  assert.match(nativeSource, /strcmp\(operation,"fence"\)[\s\S]*?role_valid\(target,role_oid,3\)[\s\S]*?command\("ROLLBACK"\)[\s\S]*?continue/,
+    "queued non-fence operations retry only the exact capability-only transition");
+  assert.match(nativeSource, /\*fence_entry_state==2 && \(observed==3 \|\| observed==0\)[\s\S]*?\*fence_entry_state==3 && \(observed==3 \|\| observed==0\)/,
+    "queued active and recovery fences accept only the still-transitional or exact-closed result");
+  assert.match(nativeSource, /managed_fence_role\(target\)[\s\S]*?command\("COMMIT"\)[\s\S]*?pg_terminate_backend/,
+    "the reconnect window is followed by the existing post-commit session drain");
 });
 
 test("post-mutation recovery reports each safety condition independently", () => {

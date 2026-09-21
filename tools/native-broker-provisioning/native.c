@@ -161,10 +161,12 @@ extern char **environ;
 _Static_assert(ATOMIC_INT_LOCK_FREE == 2, "cancellation requires signal-safe lock-free atomics");
 static atomic_int cancelled = 0;
 static atomic_int watched_socket = -1;
+static atomic_int watched_control_socket = -1;
 static atomic_bool watcher_done = false;
 static atomic_bool expired = false;
 static struct timespec started;
 static PGconn *db = NULL;
+static PGconn *control_db = NULL;
 static bool sensitive_started = false;
 static bool transaction = false;
 static bool last_query_error = false;
@@ -188,7 +190,9 @@ static void *watch(void *unused) {
     if (elapsed_ms() >= DEADLINE_SECONDS * 1000L) atomic_store(&expired, true);
     if (stopped()) {
       int fd = atomic_load(&watched_socket);
+      int control_fd = atomic_load(&watched_control_socket);
       if (fd >= 0) shutdown(fd, SHUT_RDWR);
+      if (control_fd >= 0 && control_fd != fd) shutdown(control_fd, SHUT_RDWR);
     }
     struct timespec pause = {0, 20000000};
     nanosleep(&pause, NULL);
@@ -301,6 +305,71 @@ static bool role_command(const char *prefix, const char *role, const char *suffi
   int n = snprintf(sql, sizeof(sql), "%s \"%s\" %s", prefix, role, suffix);
   return n > 0 && (size_t)n < sizeof(sql) && command(sql);
 }
+#ifdef VAEROEX_PRODUCTION_PROFILE
+#ifdef VAEROEX_MANAGED_PROFILE_TEST
+static bool managed_test_block_control = false;
+static int managed_test_transition_waits = 0;
+#endif
+static bool terminate_target_sessions(PGconn *connection,const char *target) {
+  const char *values[]={target};
+  PGresult *r=PQexecParams(connection,
+#ifdef VAEROEX_MANAGED_PROFILE_TEST
+    managed_test_block_control ? "SELECT true FROM (SELECT pg_sleep(30)) blocked" :
+#endif
+    "SELECT coalesce(bool_and(pg_terminate_backend(pid,1000)),true) "
+    "FROM pg_stat_activity WHERE usename=$1",1,NULL,values,NULL,NULL,0);
+  bool ok=r && PQresultStatus(r)==PGRES_TUPLES_OK && PQntuples(r)==1 &&
+    PQnfields(r)==1 && !strcmp(PQgetvalue(r,0,0),"t");
+  if (r) PQclear(r);
+  return ok && !stopped();
+}
+static bool managed_fence_command(const char *sql,const char *target) {
+  if (!managed_profile() || !control_db || PQstatus(control_db)!=CONNECTION_OK ||
+      strcmp(target,MAPPED_ROLE)) return false;
+  /* A target LOGIN may hold its own pg_authid tuple with an uncommitted
+   * ALTER ROLE CURRENT_USER PASSWORD.  The hosted operator cannot lock that
+   * provider-owned catalog first.  Drain the exact target, then keep draining
+   * through the bounded asynchronous NOLOGIN transition.  Once ALTER ROLE
+   * owns the tuple, reconnecting sessions cannot change it; the normal
+   * post-commit drain removes any session authenticated in the preceding
+   * race window.  No query contains a credential or accepts a caller-selected
+   * role. */
+  if (!terminate_target_sessions(control_db,target)) return false;
+  if (PQsetnonblocking(db,1)!=0 || !PQsendQuery(db,sql)) {
+    (void)PQsetnonblocking(db,0);
+    return false;
+  }
+  bool ok=true;
+  while (ok && !stopped() && PQisBusy(db)) {
+    ok=terminate_target_sessions(control_db,target);
+    struct pollfd descriptor={PQsocket(db),POLLIN,0};
+    int ready=poll(&descriptor,1,20);
+    if (ready<0 && errno==EINTR) continue;
+    if (ready<0 || (ready>0 && !PQconsumeInput(db))) ok=false;
+  }
+  int results=0;
+  if (ok && !PQisBusy(db)) {
+    for (PGresult *r=PQgetResult(db);r;r=PQgetResult(db)) {
+      results++;
+      if (PQresultStatus(r)!=PGRES_COMMAND_OK) ok=false;
+      PQclear(r);
+    }
+  } else ok=false;
+  if (PQsetnonblocking(db,0)!=0) ok=false;
+  return ok && results==1 && !stopped();
+}
+static bool managed_close_capability(const char *target) {
+  return managed_profile() && !strcmp(target,MAPPED_ROLE) &&
+    role_command("GRANT " CAPABILITY " TO",target,
+      "WITH ADMIN FALSE, INHERIT FALSE, SET FALSE");
+}
+static bool managed_fence_role(const char *target) {
+  char alter[128];
+  int alter_length=snprintf(alter,sizeof(alter),"ALTER ROLE \"%s\" NOLOGIN NOINHERIT",target);
+  return alter_length>0 && (size_t)alter_length<sizeof(alter) &&
+    managed_fence_command(alter,target);
+}
+#endif
 static bool profile(void) {
   /* SET, not set_config: Supautils handles the supported VariableSetStmt path.
    * Native parameter ACL false is not a substitute for effective readback. */
@@ -459,30 +528,39 @@ static bool candidate_identity(const char *host,const char *database,const char 
     "AND (SELECT oid::text FROM pg_database WHERE datname=current_database())=$3 "
     "AND (SELECT oid::text FROM pg_roles WHERE rolname=session_user)=$4 AND NOT pg_is_in_recovery()",4,values);
 }
+#ifdef VAEROEX_PRODUCTION_PROFILE
+static bool production_authority_catalog_fence(void) {
+  if (managed_profile()) {
+    /* Hosted Supabase owns system catalogs as supabase_admin.  The supported
+     * password-backed postgres operator can read them and manage the fixed
+     * roles, but cannot take write-strength LOCK TABLE modes on those catalogs.
+     * Serialize every reviewed native Production worker with a write-strength
+     * lock on the fixed private platform-binding relation instead.  Only its
+     * owner or a role with a qualifying write/MAINTAIN privilege can acquire
+     * this mode; application LOGINs receive neither.  The remaining authority
+     * tables are locked below, and the complete ledger, schema,
+     * ABI, ACL and role contract is re-read both before mutation and
+     * immediately before COMMIT under READ COMMITTED.  The bounded operator
+     * window prohibits out-of-band administrative DDL while this fence is held;
+     * a later boundary still rejects any committed drift. */
+    return command("LOCK TABLE private.integration_production_platform_bindings IN SHARE ROW EXCLUSIVE MODE");
+  }
+  return command("LOCK TABLE pg_catalog.pg_proc IN SHARE ROW EXCLUSIVE MODE") &&
+    command("LOCK TABLE pg_catalog.pg_authid IN SHARE ROW EXCLUSIVE MODE") &&
+    command("LOCK TABLE pg_catalog.pg_auth_members IN SHARE ROW EXCLUSIVE MODE") &&
+    command("LOCK TABLE pg_catalog.pg_db_role_setting IN SHARE ROW EXCLUSIVE MODE") &&
+    command("LOCK TABLE pg_catalog.pg_namespace IN SHARE ROW EXCLUSIVE MODE") &&
+    command("LOCK TABLE pg_catalog.pg_class IN SHARE ROW EXCLUSIVE MODE") &&
+    command("LOCK TABLE pg_catalog.pg_database IN SHARE ROW EXCLUSIVE MODE") &&
+    command("LOCK TABLE pg_catalog.pg_parameter_acl IN SHARE ROW EXCLUSIVE MODE") &&
+    command("LOCK TABLE pg_catalog.pg_default_acl IN SHARE ROW EXCLUSIVE MODE");
+}
+#endif
 static bool closed_authority(const char *target) {
   const char *values[] = {target};
 #ifdef VAEROEX_PRODUCTION_PROFILE
   if(strcmp(target,MAPPED_ROLE))return false;
-  /* Authority predicates read the function, membership and role catalogs.
-   * Acquire one self-conflicting lock mode in a fixed order before the
-   * advisory target lock.  This keeps concurrent native workers from both
-   * holding compatible membership locks while waiting on one another, and
-   * conflicts with CREATE OR REPLACE FUNCTION, GRANT/REVOKE membership and
-   * ALTER ROLE changes for the complete maintenance transaction.  The native
-   * operator is the reviewed catalog owner; failure to acquire any lock is a
-   * fail-closed authority result. */
-  if (!command("LOCK TABLE pg_catalog.pg_proc IN SHARE ROW EXCLUSIVE MODE")) return false;
-  if (!command("LOCK TABLE pg_catalog.pg_authid IN SHARE ROW EXCLUSIVE MODE")) return false;
-  if (!command("LOCK TABLE pg_catalog.pg_auth_members IN SHARE ROW EXCLUSIVE MODE")) return false;
-  if (!command("LOCK TABLE pg_catalog.pg_db_role_setting IN SHARE ROW EXCLUSIVE MODE")) return false;
-  /* Existing authority checks also reject schema, relation/column, database,
-   * parameter and default ACL drift. Application-table SHARE locks do not
-   * conflict with GRANT, so retain the ACL catalogs through the same commit. */
-  if (!command("LOCK TABLE pg_catalog.pg_namespace IN SHARE ROW EXCLUSIVE MODE")) return false;
-  if (!command("LOCK TABLE pg_catalog.pg_class IN SHARE ROW EXCLUSIVE MODE")) return false;
-  if (!command("LOCK TABLE pg_catalog.pg_database IN SHARE ROW EXCLUSIVE MODE")) return false;
-  if (!command("LOCK TABLE pg_catalog.pg_parameter_acl IN SHARE ROW EXCLUSIVE MODE")) return false;
-  if (!command("LOCK TABLE pg_catalog.pg_default_acl IN SHARE ROW EXCLUSIVE MODE")) return false;
+  if (!production_authority_catalog_fence()) return false;
   if (managed_profile() && !command("LOCK TABLE supabase_migrations.schema_migrations IN SHARE MODE")) return false;
   production_phase phase=production_ledger_phase();
   if (phase==PRODUCTION_PHASE_INVALID || !command("LOCK TABLE private.integration_production_platform_bindings, "
@@ -1066,10 +1144,11 @@ static bool production_contract_valid(production_phase phase) {
 #endif
 #ifdef VAEROEX_PRODUCTION_PROFILE
 static bool production_named_authority_valid(const char *capability,const char *authority_function,
-                                             const char *authority_source,const char *target,bool internal_runtime) {
+                                             const char *authority_source,const char *target,bool internal_runtime,
+                                             const char *settings_exception,bool membership_transition) {
   const char *values[]={capability,authority_function,authority_source,
     OPERATIONAL_AUTHORITY_FUNCTION,OPERATIONAL_AUTHORITY_SOURCE_MD5,target,
-    internal_runtime?"internal":"overlay"};
+    internal_runtime?"internal":"overlay",settings_exception,membership_transition?"transition":""};
   return true_query("SELECT to_regprocedure($2) IS NOT NULL "
     "AND EXISTS (SELECT FROM pg_namespace n JOIN pg_proc p ON p.pronamespace=n.oid "
       "JOIN pg_language l ON l.oid=p.prolang "
@@ -1115,7 +1194,8 @@ static bool production_named_authority_valid(const char *capability,const char *
      * object authority while a different profile is being maintained. */
     "AND NOT EXISTS (SELECT FROM pg_roles target_role WHERE target_role.rolname=$6 AND NOT ("
       "NOT target_role.rolsuper AND NOT target_role.rolcreaterole AND NOT target_role.rolcreatedb "
-      "AND NOT target_role.rolreplication AND NOT target_role.rolbypassrls AND target_role.rolconfig IS NULL "
+      "AND NOT target_role.rolreplication AND NOT target_role.rolbypassrls "
+      "AND ($8=$6 OR target_role.rolconfig IS NULL) "
       "AND ((target_role.rolcanlogin AND target_role.rolinherit) OR "
         "(NOT target_role.rolcanlogin AND NOT target_role.rolinherit)) "
       "AND NOT EXISTS (SELECT FROM pg_roles other_role WHERE other_role.rolname NOT IN ($6,$1) "
@@ -1127,7 +1207,7 @@ static bool production_named_authority_valid(const char *capability,const char *
           "AND m.admin_option AND NOT m.inherit_option AND NOT m.set_option)) "
       "AND NOT EXISTS (SELECT FROM pg_shdepend d WHERE d.refclassid='pg_authid'::regclass "
         "AND d.refobjid=target_role.oid AND d.deptype IN ('o','a','i','r')) "
-      "AND NOT EXISTS (SELECT FROM pg_db_role_setting s WHERE s.setrole=target_role.oid)"
+      "AND ($8=$6 OR NOT EXISTS (SELECT FROM pg_db_role_setting s WHERE s.setrole=target_role.oid))"
     ")) "
     /* A fixed login may be absent before prepare, or must otherwise be an
      * exact active pair (LOGIN/INHERIT plus membership INHERIT) or exact
@@ -1143,14 +1223,16 @@ static bool production_named_authority_valid(const char *capability,const char *
       "WHERE m.roleid=$1::regrole AND target_role.rolname=$6 "
       "AND NOT m.admin_option AND NOT m.set_option AND ("
         "(target_role.rolcanlogin AND target_role.rolinherit AND m.inherit_option) OR "
-        "(NOT target_role.rolcanlogin AND NOT target_role.rolinherit AND NOT m.inherit_option)"
+        "(NOT target_role.rolcanlogin AND NOT target_role.rolinherit AND NOT m.inherit_option) OR "
+        "($9='transition' AND target_role.rolcanlogin AND target_role.rolinherit AND NOT m.inherit_option)"
       ")"
     ") THEN 2 ELSE 1 END "
     "AND NOT EXISTS (SELECT FROM pg_auth_members m JOIN pg_roles member_role ON member_role.oid=m.member "
     "WHERE m.roleid=$1::regrole AND NOT ("
         "(member_role.rolname=$6 AND NOT m.admin_option AND NOT m.set_option AND ("
           "(member_role.rolcanlogin AND member_role.rolinherit AND m.inherit_option) OR "
-          "(NOT member_role.rolcanlogin AND NOT member_role.rolinherit AND NOT m.inherit_option)"
+          "(NOT member_role.rolcanlogin AND NOT member_role.rolinherit AND NOT m.inherit_option) OR "
+          "($9='transition' AND member_role.rolcanlogin AND member_role.rolinherit AND NOT m.inherit_option)"
         ")) OR "
         "(m.member=session_user::regrole::oid AND m.grantor='10'::oid "
           "AND m.admin_option AND NOT m.inherit_option AND NOT m.set_option "
@@ -1233,7 +1315,7 @@ static bool production_named_authority_valid(const char *capability,const char *
         "coalesce(d.datacl,acldefault('d',d.datdba))) a "
         "WHERE a.grantee=0 AND a.privilege_type='CONNECT')) "
     "AND NOT EXISTS (SELECT FROM pg_default_acl d CROSS JOIN LATERAL aclexplode(d.defaclacl) a "
-      "WHERE d.defaclobjtype IN ('r','S','f','n') AND a.grantee IN (0,$1::regrole))",7,values);
+      "WHERE d.defaclobjtype IN ('r','S','f','n') AND a.grantee IN (0,$1::regrole))",9,values);
 }
 
 static bool production_overlay_wrapper_owner_only(const char *authority_function,const char *authority_source) {
@@ -1252,10 +1334,12 @@ static bool production_overlay_wrapper_owner_only(const char *authority_function
       "AND a.grantee<>p.proowner)",2,values);
 }
 #endif
-static bool production_authority_valid(const char *target) {
+static bool production_authority_valid(const char *target,bool allow_target_settings,
+                                       bool membership_transition) {
 #ifdef VAEROEX_PRODUCTION_PROFILE
   production_phase phase=production_ledger_phase();
   if (strcmp(target,MAPPED_ROLE) || !production_contract_valid(phase)) return false;
+  const char *settings_exception=allow_target_settings?target:"";
   if (phase==PRODUCTION_PHASE_INTERNAL_RUNTIME) {
     return production_overlay_wrapper_owner_only(
         "public.check_square_production_oauth_authority_v1(text,text,text,bigint,text)",
@@ -1271,54 +1355,70 @@ static bool production_authority_valid(const char *target) {
         AUTHORITY_SOURCE_FOR("square_production_evidence_authority","evidence")) &&
       production_named_authority_valid("square_production_oauth_authority",
         "public.square_production_internal_oauth_v1(text,jsonb)",
-        "6ff215c19aa5c66b607c307d26bcf8f53cc8b3308bd929a50a5f97c5e049d860","square_production_oauth",true) &&
+        "6ff215c19aa5c66b607c307d26bcf8f53cc8b3308bd929a50a5f97c5e049d860","square_production_oauth",true,settings_exception,
+        membership_transition && !strcmp(target,"square_production_oauth")) &&
       production_named_authority_valid("square_production_broker_authority",
         "public.square_production_internal_broker_v1(text,jsonb)",
-        "386b2afeeb21c1884b1d1e4869ceccde87218f2201c4e5c802c74b3ff7ec5b61","square_production_broker",true) &&
+        "386b2afeeb21c1884b1d1e4869ceccde87218f2201c4e5c802c74b3ff7ec5b61","square_production_broker",true,settings_exception,
+        membership_transition && !strcmp(target,"square_production_broker")) &&
       production_named_authority_valid("square_production_scheduler_authority",
         "public.check_square_production_scheduler_authority_v1(text,text,text,bigint,text)",
-        AUTHORITY_SOURCE_FOR("square_production_scheduler_authority","scheduler"),"square_production_scheduler",false) &&
+        AUTHORITY_SOURCE_FOR("square_production_scheduler_authority","scheduler"),"square_production_scheduler",false,settings_exception,
+        membership_transition && !strcmp(target,"square_production_scheduler")) &&
       production_named_authority_valid("square_production_webhook_authority",
         "public.check_square_production_webhook_authority_v1(text,text,text,bigint,text)",
-        AUTHORITY_SOURCE_FOR("square_production_webhook_authority","webhook"),"square_production_webhook",false) &&
+        AUTHORITY_SOURCE_FOR("square_production_webhook_authority","webhook"),"square_production_webhook",false,settings_exception,
+        membership_transition && !strcmp(target,"square_production_webhook")) &&
       production_named_authority_valid("square_production_runtime_authority",
         "public.square_production_internal_runtime_v1(text,jsonb)",
-        "63024be692c785827b982945c220b0268d8e57ee2db4f3d46a8033a5f5fe3301","square_production_runtime",true) &&
+        "63024be692c785827b982945c220b0268d8e57ee2db4f3d46a8033a5f5fe3301","square_production_runtime",true,settings_exception,
+        membership_transition && !strcmp(target,"square_production_runtime")) &&
       production_named_authority_valid("square_production_evidence_authority",
         "public.square_production_internal_evidence_v1(text,jsonb)",
-        "98e2d0363897ad1020fb4296dd643ccd4798cac10030b8a4883379844d954877","square_production_evidence",true);
+        "98e2d0363897ad1020fb4296dd643ccd4798cac10030b8a4883379844d954877","square_production_evidence",true,settings_exception,
+        membership_transition && !strcmp(target,"square_production_evidence"));
   }
   return production_named_authority_valid("square_production_oauth_authority",
       "public.check_square_production_oauth_authority_v1(text,text,text,bigint,text)",
-      AUTHORITY_SOURCE_FOR("square_production_oauth_authority","oauth"),"square_production_oauth",false) &&
+      AUTHORITY_SOURCE_FOR("square_production_oauth_authority","oauth"),"square_production_oauth",false,settings_exception,
+      membership_transition && !strcmp(target,"square_production_oauth")) &&
     production_named_authority_valid("square_production_broker_authority",
       "public.check_square_production_broker_authority_v1(text,text,text,bigint,text)",
-      AUTHORITY_SOURCE_FOR("square_production_broker_authority","broker"),"square_production_broker",false) &&
+      AUTHORITY_SOURCE_FOR("square_production_broker_authority","broker"),"square_production_broker",false,settings_exception,
+      membership_transition && !strcmp(target,"square_production_broker")) &&
     production_named_authority_valid("square_production_scheduler_authority",
       "public.check_square_production_scheduler_authority_v1(text,text,text,bigint,text)",
-      AUTHORITY_SOURCE_FOR("square_production_scheduler_authority","scheduler"),"square_production_scheduler",false) &&
+      AUTHORITY_SOURCE_FOR("square_production_scheduler_authority","scheduler"),"square_production_scheduler",false,settings_exception,
+      membership_transition && !strcmp(target,"square_production_scheduler")) &&
     production_named_authority_valid("square_production_webhook_authority",
       "public.check_square_production_webhook_authority_v1(text,text,text,bigint,text)",
-      AUTHORITY_SOURCE_FOR("square_production_webhook_authority","webhook"),"square_production_webhook",false) &&
+      AUTHORITY_SOURCE_FOR("square_production_webhook_authority","webhook"),"square_production_webhook",false,settings_exception,
+      membership_transition && !strcmp(target,"square_production_webhook")) &&
     production_named_authority_valid("square_production_runtime_authority",
       "public.check_square_production_runtime_authority_v1(text,text,text,bigint,text)",
-      AUTHORITY_SOURCE_FOR("square_production_runtime_authority","runtime"),"square_production_runtime",false) &&
+      AUTHORITY_SOURCE_FOR("square_production_runtime_authority","runtime"),"square_production_runtime",false,settings_exception,
+      membership_transition && !strcmp(target,"square_production_runtime")) &&
     production_named_authority_valid("square_production_evidence_authority",
       "public.check_square_production_evidence_authority_v1(text,text,text,bigint,text)",
-      AUTHORITY_SOURCE_FOR("square_production_evidence_authority","evidence"),"square_production_evidence",false);
+      AUTHORITY_SOURCE_FOR("square_production_evidence_authority","evidence"),"square_production_evidence",false,settings_exception,
+      membership_transition && !strcmp(target,"square_production_evidence"));
 #else
   (void)target;
+  (void)allow_target_settings;
+  (void)membership_transition;
   return true;
 #endif
 }
-#ifdef VAEROEX_SYNTHETIC_ONLY
 #ifdef VAEROEX_PRODUCTION_PROFILE
 static bool lock_target(const char *target);
+#endif
+#ifdef VAEROEX_SYNTHETIC_ONLY
+#ifdef VAEROEX_PRODUCTION_PROFILE
 static bool diagnostic_named_authority(const char *capability,const char *authority_function,
                                        const char *authority_source,const char *target,bool *query_error,
                                        const char **error_category) {
   if (!command("SAVEPOINT vaeroex_authority_diagnostic")) { *query_error=true; *error_category="other"; return false; }
-  bool value=production_named_authority_valid(capability,authority_function,authority_source,target,false);
+  bool value=production_named_authority_valid(capability,authority_function,authority_source,target,false,"",false);
   *query_error=last_query_error;
   *error_category=last_query_error_category;
   if (!command("ROLLBACK TO SAVEPOINT vaeroex_authority_diagnostic")) { *query_error=true; *error_category="other"; }
@@ -1482,18 +1582,19 @@ static void production_authority_diagnostic(const char *target, bool identity_ok
 #endif
 #endif
 static bool role_valid(const char *target, const char *oid, int state) {
-  const char *values[] = {target, oid, state==2 ? "2" : state==1 ? "1" : "0", CAPABILITY};
+  const char *values[] = {target, oid, state==3 ? "3" : state==2 ? "2" : state==1 ? "1" : "0", CAPABILITY};
   return true_query("SELECT EXISTS (SELECT FROM pg_roles r WHERE r.rolname=$1 AND r.oid::text=$2 "
     "AND NOT r.rolsuper AND NOT r.rolcreaterole AND NOT r.rolcreatedb AND NOT r.rolreplication "
     "AND NOT r.rolbypassrls "
 #ifdef VAEROEX_PRODUCTION_PROFILE
     "AND (($3::integer=2 AND r.rolcanlogin=r.rolinherit) "
+      "OR ($3::integer=3 AND r.rolcanlogin AND r.rolinherit) "
       "OR ($3::integer=1 AND r.rolcanlogin AND r.rolinherit) "
       "OR ($3::integer=0 AND NOT r.rolcanlogin AND NOT r.rolinherit)) "
 #else
     "AND r.rolinherit AND (NOT r.rolcanlogin OR $3::integer<>0) "
 #endif
-    "AND r.rolconfig IS NULL) "
+    "AND ($3::integer IN (2,3) OR r.rolconfig IS NULL)) "
     "AND EXISTS (SELECT FROM pg_roles c WHERE c.rolname=$4 "
     "AND NOT c.rolcanlogin AND NOT c.rolsuper AND NOT c.rolcreaterole AND NOT c.rolcreatedb "
     "AND NOT c.rolreplication AND NOT c.rolbypassrls AND c.rolconfig IS NULL) "
@@ -1502,7 +1603,7 @@ static bool role_valid(const char *target, const char *oid, int state) {
     "AND NOT m.admin_option "
 #ifdef VAEROEX_PRODUCTION_PROFILE
     "AND NOT m.set_option AND m.inherit_option=CASE WHEN $3::integer=1 THEN true "
-      "WHEN $3::integer=0 THEN false ELSE (SELECT rolinherit FROM pg_roles WHERE rolname=$1) END) "
+      "WHEN $3::integer IN (0,3) THEN false ELSE (SELECT rolinherit FROM pg_roles WHERE rolname=$1) END) "
 #else
     "AND m.inherit_option AND m.set_option) "
 #endif
@@ -1513,7 +1614,7 @@ static bool role_valid(const char *target, const char *oid, int state) {
     "(c.rolname<>$4 OR m.admin_option "
 #ifdef VAEROEX_PRODUCTION_PROFILE
     "OR m.inherit_option<>CASE WHEN $3::integer=1 THEN true "
-      "WHEN $3::integer=0 THEN false ELSE (SELECT rolinherit FROM pg_roles WHERE rolname=$1) END "
+      "WHEN $3::integer IN (0,3) THEN false ELSE (SELECT rolinherit FROM pg_roles WHERE rolname=$1) END "
     "OR m.set_option)) "
 #else
     "OR NOT m.inherit_option OR NOT m.set_option)) "
@@ -1526,7 +1627,7 @@ static bool role_valid(const char *target, const char *oid, int state) {
     "AND NOT EXISTS (SELECT FROM pg_auth_members m JOIN pg_roles member_role ON member_role.oid=m.member "
       "WHERE m.roleid=$4::regrole AND NOT ("
         "(m.member=$1::regrole AND NOT m.admin_option AND NOT m.set_option AND m.inherit_option=CASE "
-          "WHEN $3::integer=1 THEN true WHEN $3::integer=0 THEN false "
+          "WHEN $3::integer=1 THEN true WHEN $3::integer IN (0,3) THEN false "
           "ELSE (SELECT rolinherit FROM pg_roles WHERE rolname=$1) END) OR "
         "(m.member=session_user::regrole::oid AND m.grantor='10'::oid "
           "AND m.admin_option AND NOT m.inherit_option AND NOT m.set_option "
@@ -1547,14 +1648,82 @@ static bool role_valid(const char *target, const char *oid, int state) {
      * A dedicated login may inherit the capability, not own extra authority. */
     "AND NOT EXISTS (SELECT FROM pg_shdepend d WHERE d.refclassid='pg_authid'::regclass "
     "AND d.refobjid=(SELECT oid FROM pg_roles WHERE rolname=$1) AND d.deptype IN ('o','a','i','r')) "
-    "AND NOT EXISTS (SELECT FROM pg_db_role_setting WHERE setrole=(SELECT oid FROM pg_roles WHERE rolname=$1))", 4, values)
-    && production_authority_valid(target);
+    "AND ($3::integer IN (2,3) OR NOT EXISTS (SELECT FROM pg_db_role_setting "
+      "WHERE setrole=(SELECT oid FROM pg_roles WHERE rolname=$1)))", 4, values)
+    && production_authority_valid(target,state==2 || state==3,state==3);
 }
+#ifdef VAEROEX_PRODUCTION_PROFILE
+static int managed_fence_entry_role_state(const char *target,const char *oid) {
+  /* Preserve which exact contract admitted the role.  State 2 intentionally
+   * remains the existing active-path assertion, while state 3 is the single
+   * safe capability-only recovery transition.  Test exact closure first so a
+   * no-op fence of an already-closed role remains closed through phase two. */
+  if (role_valid(target,oid,0)) return 0;
+  if (role_valid(target,oid,3)) return 3;
+  if (role_valid(target,oid,2)) return 2;
+  return -1;
+}
+static bool begin_locked_authority_after_transition(const char *operation,const char *target,
+                                                    const char *role_oid,int *fence_entry_state,
+                                                    bool *capability_transition) {
+  for (;;) {
+    if (!command("BEGIN")) return false;
+    transaction=true;
+    if (!closed_authority(target) || !lock_target(target)) return false;
+    if (managed_profile() && strcmp(operation,"fence") && strcmp(role_oid,"0") &&
+        role_valid(target,role_oid,3)) {
+      /* A concurrently running fence has committed the capability-only
+       * transition but has not yet committed NOLOGIN/NOINHERIT.  Do not
+       * reject an otherwise valid queued operation or act on the transitional
+       * role. Release the transaction locks and retry only this exact state;
+       * every other invalid authority shape still fails closed below. */
+      if (!command("ROLLBACK")) return false;
+      transaction=false;
+#ifdef VAEROEX_MANAGED_PROFILE_TEST
+      managed_test_transition_waits++;
+#endif
+      struct timespec pause={0,20000000};
+      while (nanosleep(&pause,&pause)!=0 && errno==EINTR) {}
+      if (stopped()) return false;
+      continue;
+    }
+    if (managed_profile() && !strcmp(operation,"fence") && *fence_entry_state>=0) {
+      int observed=managed_fence_entry_role_state(target,role_oid);
+      bool valid=(*fence_entry_state==0 && observed==0) ||
+        (*fence_entry_state==2 && (observed==3 || observed==0)) ||
+        (*fence_entry_state==3 && (observed==3 || observed==0));
+      if (!valid) return false;
+      /* A second fence queued during the first fence's transaction gap may
+       * observe exact closure after taking the relation lock. Reconcile that
+       * completed transition as a no-op fence rather than reporting an
+       * uncertain operation. */
+      *fence_entry_state=observed;
+      *capability_transition=observed!=0;
+    }
+    return true;
+  }
+}
+#endif
 static bool no_sessions(const char *target) {
   const char *values[] = {target};
   return true_query("SELECT NOT EXISTS (SELECT FROM pg_stat_activity WHERE usename=$1)", 1, values);
 }
 static bool lock_target(const char *target) {
+#ifdef VAEROEX_PRODUCTION_PROFILE
+  if (managed_profile()) {
+    /* The managed Production authority boundary already holds the fixed,
+     * restricted ShareRowExclusiveLock acquired by closed_authority().  Use
+     * that application-owned fence for target serialization too: an ordinary
+     * LOGIN must not be able to pre-acquire a predictable public advisory key
+     * and delay NOLOGIN/revocation.  Fail closed if this helper is called out
+     * of order or for any target other than the compile-time capability role. */
+    if (strcmp(target,MAPPED_ROLE)) return false;
+    return true_query("SELECT EXISTS (SELECT FROM pg_locks WHERE pid=pg_backend_pid() "
+      "AND locktype='relation' "
+      "AND relation='private.integration_production_platform_bindings'::regclass "
+      "AND mode='ShareRowExclusiveLock' AND granted)",0,NULL);
+  }
+#endif
   const char *values[] = {target};
   PGresult *r = query("SELECT pg_advisory_xact_lock(1936744818, hashtext($1))", 1, values);
   bool ok = r != NULL;
@@ -1655,17 +1824,36 @@ static int run(int argc, char **argv) {
 #endif
       NULL};
     db = PQconnectdbParams(keywords,values,0);
+#ifdef VAEROEX_PRODUCTION_PROFILE
+    /* Fence alone receives a second independently authenticated administrator
+     * session.  It is used only to terminate exact-target sessions while the
+     * primary connection waits for the NOLOGIN tuple transition. */
+    if (!strcmp(op,"fence") && managed_profile())
+      control_db=PQconnectdbParams(keywords,values,0);
+#endif
   }
   wipe(admin_password,sizeof(admin_password));
   /* mlock is page-granular and locks do not stack. These arrays may share a
    * page, so keep BOTH locks until all owned credential material is wiped. */
-  ok = ok && db && PQstatus(db)==CONNECTION_OK && !stopped();
+  ok = ok && db && PQstatus(db)==CONNECTION_OK &&
+    (!control_db || PQstatus(control_db)==CONNECTION_OK) && !stopped();
+  if (control_db && PQstatus(control_db)==CONNECTION_OK)
+    atomic_store(&watched_control_socket,PQsocket(control_db));
   if (ok) {
     PQsetNoticeProcessor(db,notice,NULL);
     atomic_store(&watched_socket,PQsocket(db));
     bool identity_ok = identity(host,database,admin,system_id,db_oid);
     bool profile_ok = identity_ok && profile();
     ok = identity_ok && profile_ok;
+#ifdef VAEROEX_PRODUCTION_PROFILE
+    if (ok && control_db) {
+      PGconn *primary=db;
+      PQsetNoticeProcessor(control_db,notice,NULL);
+      db=control_db;
+      ok=identity(host,database,admin,system_id,db_oid) && profile();
+      db=primary;
+    }
+#endif
 #if defined(VAEROEX_SYNTHETIC_ONLY) && defined(VAEROEX_PRODUCTION_PROFILE)
     if (!ok && !strcmp(op,"diagnose")) {
       production_authority_diagnostic(target,identity_ok,profile_ok);
@@ -1683,9 +1871,50 @@ static int run(int argc, char **argv) {
     return 0;
   }
  #endif
+  bool managed_capability_transition=false;
+#ifdef VAEROEX_PRODUCTION_PROFILE
+  bool managed_capability_closed=false;
+  int managed_fence_entry_state=-1;
+  if (ok && !strcmp(op,"fence") && managed_profile()) {
+    /* Close inherited RPC authority before taking application-table locks.
+     * A previously authorized request may already hold a RowExclusiveLock on
+     * those tables. This first, deliberately small transaction prevents any
+     * new request from inheriting the capability; the exact-login drain then
+     * rolls back existing requests and releases their locks. Any later failure
+     * is checked-recovery territory because this safe closure has committed.
+     * The full contract is validated once before this transition and again
+     * under the normal locks below. */
+    ok=command("BEGIN");
+    transaction=ok;
+    if (ok) ok=production_authority_catalog_fence();
+    if (ok && strcmp(role_oid,"0")) {
+      managed_fence_entry_state=managed_fence_entry_role_state(target,role_oid);
+      ok=managed_fence_entry_state>=0;
+    } else if (ok) ok=false;
+    if (ok) ok=managed_close_capability(target);
+    if (ok) {
+      commit_attempted=true;
+      ok=command("COMMIT");
+      transaction=!ok;
+    }
+    if (ok) ok=terminate_target_sessions(control_db,target);
+    managed_capability_closed=ok;
+    managed_capability_transition=ok && managed_fence_entry_state!=0;
+  }
+#endif
+#ifdef VAEROEX_PRODUCTION_PROFILE
+  if (ok) ok=begin_locked_authority_after_transition(op,target,role_oid,
+    &managed_fence_entry_state,&managed_capability_transition);
+#else
   if (ok) { ok = command("BEGIN"); transaction = ok; }
   if (ok) ok = closed_authority(target) && lock_target(target);
-  if (ok) ok = production_authority_valid(target);
+#endif
+  /* Fence must not depend on settings that the target LOGIN can assign to
+   * itself.  Only this pre-revocation path permits those two catalog fields;
+   * every other role, privilege, membership, object and gate predicate remains
+   * exact, and the normal post-commit validation below rejects residual
+   * settings after NOLOGIN/NOINHERIT commits and sessions are terminated. */
+  if (ok) ok = production_authority_valid(target,!strcmp(op,"fence"),managed_capability_transition);
   if (ok && !strcmp(op,"prepare")) {
     const char *values[] = {target,CAPABILITY};
     ok = !strcmp(role_oid,"0") && true_query("SELECT NOT EXISTS (SELECT FROM pg_roles WHERE rolname=$1) "
@@ -1713,17 +1942,30 @@ static int run(int argc, char **argv) {
     /* An ordinary inspection is a closed-state proof. Only fence may accept
      * either the bounded active state or the already-closed state because it
      * is the compensating operation after an interrupted authentication. */
-    int expected_state=!strcmp(op,"authenticate")?1:!strcmp(op,"fence")?2:0;
+    int expected_state=!strcmp(op,"authenticate")?1:
+#ifdef VAEROEX_PRODUCTION_PROFILE
+      !strcmp(op,"fence") && managed_capability_closed?
+        (managed_fence_entry_state==0?0:3):
+#endif
+      !strcmp(op,"fence")?2:0;
     ok = strcmp(role_oid,"0") && role_valid(target,role_oid,expected_state);
     if (ok && strcmp(op,"inspect") && strcmp(op,"authenticate")) {
+      if (!strcmp(op,"fence")) {
 #ifdef VAEROEX_PRODUCTION_PROFILE
-      /* Make inherited RPC authority disappear in the same transaction that
-       * fences LOGIN. Role-level NOINHERIT alone is not sufficient on
-       * PostgreSQL 16+ when an existing membership has INHERIT TRUE. */
-      if (!strcmp(op,"fence")) ok = role_command("GRANT " CAPABILITY " TO",target,
-        "WITH ADMIN FALSE, INHERIT FALSE, SET FALSE");
+        /* Managed Production already committed the capability-inheritance
+         * fence and drained existing RPCs before these application locks were
+         * acquired. Keep draining exact-target catalog lockers while the
+         * remaining NOLOGIN tuple transition waits. */
+        if (managed_profile()) ok=managed_fence_role(target);
+        else {
+          ok=role_command("GRANT " CAPABILITY " TO",target,
+            "WITH ADMIN FALSE, INHERIT FALSE, SET FALSE");
+          if (ok) ok=role_command("ALTER ROLE",target,"NOLOGIN NOINHERIT");
+        }
+#else
+        ok=role_command("ALTER ROLE",target,"NOLOGIN");
 #endif
-      if (ok) ok = role_command("ALTER ROLE",target,
+      } else if (ok) ok = role_command("ALTER ROLE",target,
 #ifdef VAEROEX_PRODUCTION_PROFILE
         "NOLOGIN NOINHERIT"
 #else
@@ -1829,7 +2071,7 @@ static int run(int argc, char **argv) {
   if (ok) {
     int final_state=(!strcmp(op,"activate") || !strcmp(op,"authenticate")) ? 1 : 0;
     ok=strcmp(resolved_oid,"0") ? role_valid(target,resolved_oid,final_state)
-      : (!strcmp(op,"inspect") && production_authority_valid(target));
+      : (!strcmp(op,"inspect") && production_authority_valid(target,false,false));
   }
 #endif
   /* A transport loss at COMMIT is never treated as rollback or success. */
@@ -1864,6 +2106,8 @@ int main(int argc, char **argv) {
   atomic_store(&watcher_done,true);
   pthread_join(thread,NULL);
   atomic_store(&watched_socket,-1);
+  atomic_store(&watched_control_socket,-1);
+  if (control_db) PQfinish(control_db);
   if (db) PQfinish(db);
   if (result==2) puts("{\"outcome\":\"failed\"}");
   if (result==3) puts("{\"outcome\":\"uncertain\"}");
