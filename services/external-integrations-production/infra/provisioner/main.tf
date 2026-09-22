@@ -27,6 +27,11 @@ data "google_secret_manager_secret_iam_policy" "private_versions" {
   for_each  = var.temporary_access_enabled ? local.profiles : toset([])
   project   = local.project_id
   secret_id = "square-production-${each.key}-db"
+  # A saved plan must not cache the all-closed readback before its bounded
+  # propagation interval. Defer every opening read to apply, after the current
+  # generation's wait and immediately before the grant precondition. Closed
+  # cleanup still has zero instances because for_each is empty.
+  depends_on = [time_sleep.private_access_propagation]
 }
 
 locals {
@@ -180,14 +185,12 @@ resource "google_secret_manager_secret_iam_member" "private_versions" {
   lifecycle {
     replace_triggered_by = [time_sleep.private_access_propagation]
     precondition {
-      condition = length(local.existing_provisioner_private_bindings) == 0 || (
-        length(local.existing_provisioner_private_bindings) == 1 &&
-        one(local.existing_provisioner_private_bindings).profile == each.key &&
-        one(local.existing_provisioner_private_bindings).role == local.private_versions_role_name &&
-        one(local.existing_provisioner_private_bindings).title == "bounded-native-provisioning" &&
-        one(local.existing_provisioner_private_bindings).description == "One exact database secret during the admitted maintenance window." &&
-        one(local.existing_provisioner_private_bindings).expression == local.window_condition
-      )
+      # An opening plan is admitted only from a live all-closed checkpoint.
+      # Even an exact-looking grant is residual authority when Terraform state
+      # is closed; accepting it would bypass revocation propagation and the
+      # bounded generation transition. Open-state no-op plans are therefore
+      # intentionally unsupported. Cleanup skips these policy reads entirely.
+      condition     = length(local.existing_provisioner_private_bindings) == 0
       error_message = "Private access must be fully closed and read back before opening a different profile or time window."
     }
   }

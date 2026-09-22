@@ -108,12 +108,10 @@ export function verifyPrivateAccessPlan(plan) {
       }
       return "private_access_plan_closed_no_transition_confirmed";
     }
-    if (beforeEnabled !== true || afterEnabled !== true || !isNoOp(generation) || !isDeepStrictEqual(beforeInput, afterInput)) {
-      reject("private_access_plan_state_inconsistent");
-    }
-    verifyGrantContract(beforeGrants[0], "before", beforeInput);
-    verifyGrantContract(afterGrants[0], "after", afterInput);
-    return "private_access_plan_open_no_transition_confirmed";
+    // A live open-state plan cannot prove that its grant was created by the
+    // reviewed closed-to-open transition rather than left behind out of band.
+    // Only close plans are supported once temporary authority exists.
+    reject("private_access_open_no_transition_rejected");
   }
 
   // A plan may either close an existing grant or open one from a previously

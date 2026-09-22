@@ -58,12 +58,18 @@ only the state-local barrier and its zero-duration propagation marker. Do not
 combine barrier adoption with opening or changing access: grants created by an
 older configuration do not carry the new dependency. Direct open-to-open
 profile or time-window changes are unsupported. Every saved plan must be
-rendered as JSON and pass `scripts/verify-private-access-plan.mjs` before
-apply. That verifier requires an opening plan's prior Terraform state to be an
-applied closed checkpoint and rejects any mutation carrying a managed grant on
-both sides of the plan. The live IAM-policy readback independently rejects
-residual or alternate-role provisioner bindings before opening, while remaining
-absent during cleanup so an unrelated read failure cannot block revocation.
+applied only through `scripts/apply-reviewed-private-access-plan.mjs`. That
+entry point privately copies the exact plan, renders it in memory, requires
+`scripts/verify-private-access-plan.mjs` to pass, rechecks the copied bytes,
+requires the previously reviewed SHA-256, and applies that same copy. Direct
+`terraform apply` is unsupported. The verifier requires an opening plan's
+prior Terraform state to be an applied
+closed checkpoint and rejects any mutation carrying a managed grant on both
+sides of the plan. Open-state no-op plans are also rejected. After the bounded
+propagation interval, an apply-time live IAM-policy readback independently
+rejects every residual or alternate-role provisioner binding before opening.
+Cleanup instantiates no policy read, so an unrelated read failure cannot block
+revocation.
 Normal operation also waits for the predecessor's time condition to expire,
 supplies that exact expiry as the next plan's
 `previous_access_expires_at`, and verifies the exact zero-grant set before
@@ -122,19 +128,25 @@ terraform validate
 terraform test
 node tests/verify-transition-order.mjs
 node tests/verify-private-access-plan.test.mjs
+node tests/apply-reviewed-private-access-plan.test.mjs
 ```
 
-For every hosted mutation, create a full saved plan, inspect its complete
-action set, then enforce the state transition before apply without persisting
+For every hosted mutation, set `umask 077`, create a full saved plan, inspect
+its complete action set, record its SHA-256 and confirm the source plan has no
+group or other permission bits. Then use the single reviewed apply entry point;
+it verifies and applies the same private copy without persisting or printing
 the JSON rendering:
 
 ```sh
-terraform show -json reviewed.tfplan | node scripts/verify-private-access-plan.mjs
-terraform apply reviewed.tfplan
+node scripts/apply-reviewed-private-access-plan.mjs reviewed.tfplan <reviewed-sha256>
 ```
 
-Only a fixed transition label is printed. The verifier never prints or stores
-the plan, provider values or state. A failed label blocks apply.
+Only fixed transition/completion labels are added by the entry point. The
+verifier never prints or stores the rendered plan, provider values or state.
+A failed label blocks apply and the private copy is removed. Both Terraform
+children run without inherited `TF_LOG*` settings; their ordinary output and
+errors are captured and discarded. Reapplying or refreshing an open window is
+intentionally unsupported; close it first.
 
 The transition verifier runs the real firewall/IAM resource dependency closure
 through eight isolated mocked Terraform apply steps, checking graph edges and

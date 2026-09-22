@@ -10,11 +10,13 @@ const terraform = process.env.TERRAFORM_BIN || "terraform";
 const providers = path.join(root, ".terraform/providers");
 const scratch = mkdtempSync(path.join(os.tmpdir(), "vaeroex-provisioner-order-"));
 const setupTransitionProfiles = ["oauth"];
+const policyReadProfiles = ["oauth", "broker", "scheduler", "webhook", "runtime", "evidence"];
 const testFile = "tests/transition-order.tftest.hcl";
 const firewall = "google_compute_firewall.setup_https[0]";
 const generation = "terraform_data.private_access_generation";
 const propagation = "time_sleep.private_access_propagation";
 const grant = profile => `google_secret_manager_secret_iam_member.private_versions["${profile}"]`;
+const policyRead = profile => `data.google_secret_manager_secret_iam_policy.private_versions["${profile}"]`;
 
 // No backend, credential environment, external CLI configuration or provider
 // download is admitted. The signed cached provider supplies schemas only;
@@ -111,12 +113,16 @@ try {
     "successor_generation_replacement_order_unsafe");
   completedBeforeStarted(successorWindowEvents, generation, propagation,
     "successor_propagation_start_order_unsafe");
-  completedBeforeStarted(successorWindowEvents, propagation, grant("broker"),
-    "successor_grant_order_unsafe");
+  for (const profile of policyReadProfiles) {
+    completedBeforeStarted(successorWindowEvents, propagation, policyRead(profile),
+      "successor_policy_read_before_propagation_unsafe");
+    completedBeforeStarted(successorWindowEvents, policyRead(profile), grant("broker"),
+      "successor_grant_before_policy_read_unsafe");
+  }
   process.stdout.write("provisioner_setup_destroy_before_oauth_grant_confirmed\n");
   process.stdout.write("provisioner_oauth_grant_destroy_before_setup_confirmed\n");
   process.stdout.write("provisioner_oauth_destroy_before_closed_checkpoint_confirmed\n");
-  process.stdout.write("provisioner_closed_checkpoint_expiry_propagation_before_successor_confirmed\n");
+  process.stdout.write("provisioner_closed_checkpoint_propagation_policy_read_before_successor_confirmed\n");
 } catch (error) {
   // Terraform trace and assertion internals remain private to the disposable
   // mocked run; the caller receives only this fixed failure category.
@@ -125,15 +131,16 @@ try {
     "mock_transition_run_trace_missing", "mock_transition_apply_graph_missing",
     "setup_removal_operation_order_unsafe", "grant_removal_operation_order_unsafe",
     "old_profile_revocation_order_unsafe", "closed_generation_replacement_order_unsafe",
-    "successor_generation_replacement_order_unsafe", "successor_grant_order_unsafe",
-    "successor_propagation_start_order_unsafe",
+    "successor_generation_replacement_order_unsafe", "successor_propagation_start_order_unsafe",
+    "successor_policy_read_before_propagation_unsafe", "successor_grant_before_policy_read_unsafe",
     "setup_removal_operation_order_unsafe_predecessor_missing", "setup_removal_operation_order_unsafe_successor_missing",
     "grant_removal_operation_order_unsafe_predecessor_missing", "grant_removal_operation_order_unsafe_successor_missing",
     "old_profile_revocation_order_unsafe_predecessor_missing", "old_profile_revocation_order_unsafe_successor_missing",
     "closed_generation_replacement_order_unsafe_predecessor_missing", "closed_generation_replacement_order_unsafe_successor_missing",
     "successor_generation_replacement_order_unsafe_predecessor_missing", "successor_generation_replacement_order_unsafe_successor_missing",
     "successor_propagation_start_order_unsafe_predecessor_missing", "successor_propagation_start_order_unsafe_successor_missing",
-    "successor_grant_order_unsafe_predecessor_missing", "successor_grant_order_unsafe_successor_missing",
+    "successor_policy_read_before_propagation_unsafe_predecessor_missing", "successor_policy_read_before_propagation_unsafe_successor_missing",
+    "successor_grant_before_policy_read_unsafe_predecessor_missing", "successor_grant_before_policy_read_unsafe_successor_missing",
     "run_terraform_init_with_the_pinned_provider_first",
     "mock_provider_required", "mock_transition_tests_incomplete",
     "setup_removal_dependency_missing", "grant_removal_dependency_missing",

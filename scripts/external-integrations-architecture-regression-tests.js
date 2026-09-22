@@ -422,15 +422,16 @@ matches(
   "the fixture must preserve the exact production-labelled 2-leased/1-pending shape"
 );
 
-equal(approvedSquareQualificationPaths.length, 159, "dormant scope permits only exact reviewed migrations, UI, native service/templates, provider-neutral Production composition and activation, restricted evidence host, query-stripping callback edge, repository-bound image trigger, internal-pilot runtime, offline pilot and bounded provisioner files");
+equal(approvedSquareQualificationPaths.length, 161, "dormant scope permits only exact reviewed migrations, UI, native service/templates, provider-neutral Production composition and activation, restricted evidence host, query-stripping callback edge, repository-bound image trigger, internal-pilot runtime, offline pilot and bounded provisioner files");
 assertionCount++;
 assert.deepEqual(approvedSquareQualificationPaths.filter(file => file.startsWith("services/external-integrations-production/infra/provisioner/")), [
   ".gitignore", ".terraform.lock.hcl", "README.md", "backend.tf", "main.tf", "outputs.tf",
-  "scripts/verify-private-access-plan.mjs",
+  "scripts/apply-reviewed-private-access-plan.mjs", "scripts/verify-private-access-plan.mjs",
+  "tests/apply-reviewed-private-access-plan.test.mjs",
   "tests/bounded-provisioner.tftest.hcl", "tests/transition-order.tftest.hcl",
   "tests/verify-private-access-plan.test.mjs", "tests/verify-transition-order.mjs", "variables.tf", "versions.tf"
 ].map(file => `services/external-integrations-production/infra/provisioner/${file}`),
-"only the thirteen reviewed bounded provisioner files are exempt");
+"only the fifteen reviewed bounded provisioner files are exempt");
 assertionCount++;
 assert.deepEqual(JSON.parse(read("vercel.json")), {
   git: { deploymentEnabled: { "codex/square-remote-sandbox-binding": false, "codex/square-sandbox-qualification": false, "codex/square-gcp-sandbox-callback": false } }

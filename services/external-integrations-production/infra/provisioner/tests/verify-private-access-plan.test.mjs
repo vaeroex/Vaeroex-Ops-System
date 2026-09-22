@@ -81,9 +81,9 @@ assert.equal(
   verifyPrivateAccessPlan(plan(generation(false, false, ["no-op"]))),
   "private_access_plan_closed_no_transition_confirmed",
 );
-assert.equal(
-  verifyPrivateAccessPlan(plan(generation(true, true, ["no-op"]), grant("oauth", true, true, ["no-op"]))),
-  "private_access_plan_open_no_transition_confirmed",
+rejects(
+  plan(generation(true, true, ["no-op"]), grant("oauth", true, true, ["no-op"])),
+  "private_access_open_no_transition_rejected",
 );
 
 rejects(
@@ -127,7 +127,7 @@ rejects(
 );
 rejects(
   plan(generation(true, true, ["update"]), grant("oauth", true, true, ["no-op"])),
-  "private_access_plan_state_inconsistent",
+  "private_access_open_no_transition_rejected",
 );
 rejects(
   plan(

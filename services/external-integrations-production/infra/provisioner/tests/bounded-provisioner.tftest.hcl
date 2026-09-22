@@ -1,4 +1,11 @@
 mock_provider "google" {
+  mock_resource "google_service_account" {
+    defaults = {
+      name   = "projects/vaeroex-integrations-prod/serviceAccounts/sq-prod-provisioner@vaeroex-integrations-prod.iam.gserviceaccount.com"
+      email  = "sq-prod-provisioner@vaeroex-integrations-prod.iam.gserviceaccount.com"
+      member = "serviceAccount:sq-prod-provisioner@vaeroex-integrations-prod.iam.gserviceaccount.com"
+    }
+  }
   mock_data "google_secret_manager_secret_iam_policy" {
     defaults = {
       policy_data = "{\"version\":3,\"bindings\":[]}"
@@ -273,7 +280,13 @@ run "reject_window_start_before_previous_expiry" {
 }
 
 run "reject_changed_window_while_old_binding_is_still_present" {
-  command = plan
+  # The secret-policy read is deliberately deferred until apply, after the
+  # propagation barrier. A plan-only assertion would reintroduce the stale
+  # plan/apply observation this regression protects against.
+  command = apply
+  plan_options {
+    target = [google_secret_manager_secret_iam_member.private_versions]
+  }
   variables {
     administrative_access_enabled = true
     temporary_access_enabled      = true
@@ -291,7 +304,10 @@ run "reject_changed_window_while_old_binding_is_still_present" {
 }
 
 run "reject_profile_switch_while_old_binding_is_still_present" {
-  command = plan
+  command = apply
+  plan_options {
+    target = [google_secret_manager_secret_iam_member.private_versions]
+  }
   variables {
     administrative_access_enabled = true
     temporary_access_enabled      = true
@@ -307,7 +323,10 @@ run "reject_profile_switch_while_old_binding_is_still_present" {
 }
 
 run "reject_residual_provisioner_binding_under_another_role" {
-  command = plan
+  command = apply
+  plan_options {
+    target = [google_secret_manager_secret_iam_member.private_versions]
+  }
   variables {
     administrative_access_enabled = true
     temporary_access_enabled      = true
@@ -322,21 +341,23 @@ run "reject_residual_provisioner_binding_under_another_role" {
   expect_failures = [google_secret_manager_secret_iam_member.private_versions["oauth"]]
 }
 
-run "accept_unchanged_window_with_exact_binding_readback" {
-  command = plan
+run "reject_exact_residual_binding_when_state_is_closed" {
+  command = apply
+  plan_options {
+    target = [google_secret_manager_secret_iam_member.private_versions]
+  }
   variables {
     administrative_access_enabled = true
     temporary_access_enabled      = true
     temporary_access_profiles     = ["oauth"]
+    window_starts_at              = "2099-01-04T00:00:00Z"
+    window_expires_at             = "2099-01-04T01:00:00Z"
   }
   override_data {
     target = data.google_secret_manager_secret_iam_policy.private_versions["oauth"]
     values = {
-      policy_data = "{\"version\":3,\"bindings\":[{\"role\":\"projects/vaeroex-integrations-prod/roles/squareProductionPrivateVersions\",\"members\":[\"serviceAccount:sq-prod-provisioner@vaeroex-integrations-prod.iam.gserviceaccount.com\"],\"condition\":{\"title\":\"bounded-native-provisioning\",\"description\":\"One exact database secret during the admitted maintenance window.\",\"expression\":\"request.time >= timestamp('2099-01-01T00:00:00Z') && request.time < timestamp('2099-01-01T01:00:00Z')\"}}]}"
+      policy_data = "{\"version\":3,\"bindings\":[{\"role\":\"projects/vaeroex-integrations-prod/roles/squareProductionPrivateVersions\",\"members\":[\"serviceAccount:sq-prod-provisioner@vaeroex-integrations-prod.iam.gserviceaccount.com\"],\"condition\":{\"title\":\"bounded-native-provisioning\",\"description\":\"One exact database secret during the admitted maintenance window.\",\"expression\":\"request.time >= timestamp('2099-01-04T00:00:00Z') && request.time < timestamp('2099-01-04T01:00:00Z')\"}}]}"
     }
   }
-  assert {
-    condition     = toset(keys(google_secret_manager_secret_iam_member.private_versions)) == toset(["oauth"])
-    error_message = "An unchanged exact binding must remain plannable without broadening authority."
-  }
+  expect_failures = [google_secret_manager_secret_iam_member.private_versions["oauth"]]
 }
