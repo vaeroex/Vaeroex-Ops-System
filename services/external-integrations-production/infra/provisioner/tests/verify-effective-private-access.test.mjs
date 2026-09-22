@@ -130,6 +130,21 @@ assert.deepEqual(verifyEffectivePrivateAccess({ ...query, phase: "open", active_
 });
 assert.equal(openRunner.calls.filter(call => call.args[0] === "beta" && call.args[4].includes("square-production-oauth-db")).length, 1);
 
+const populatedOpenRunner = runnerFor("oauth", { oauth: ["1"], broker: ["2"] });
+assert.deepEqual(verifyEffectivePrivateAccess({ ...query, phase: "open", active_profile: "oauth" }, {
+  run: populatedOpenRunner.run,
+  now: new Date(requestTime),
+}), {
+  status: "policy_troubleshooter_oauth_only_confirmed",
+  checked_secrets: "6",
+  checked_versions: "2",
+  checked_tuples: "12",
+});
+assert.equal(populatedOpenRunner.calls.filter(call => call.args[0] === "beta" &&
+  call.args[4].includes("square-production-oauth-db/versions/1")).length, 3);
+assert.equal(populatedOpenRunner.calls.filter(call => call.args[0] === "beta" &&
+  call.args[4].includes("square-production-broker-db/versions/2")).length, 3);
+
 const populatedRunner = runnerFor("", { oauth: ["7", "1"], broker: ["2"] });
 assert.deepEqual(verifyEffectivePrivateAccess(query, {
   run: populatedRunner.run,
@@ -163,34 +178,86 @@ function rejected(mutator, label, queryOverride = query) {
   }), error => error.fixedLabel === label);
 }
 
+function verified(mutator, queryOverride = query, inventory = {}) {
+  const runner = runnerFor(queryOverride.phase === "open" ? queryOverride.active_profile : "", inventory);
+  let index = 0;
+  return verifyEffectivePrivateAccess(queryOverride, {
+    now: new Date(requestTime),
+    run(command, args, options) {
+      const base = runner.run(command, args, options);
+      if (args[0] === "secrets") return base;
+      const response = JSON.parse(base.stdout);
+      mutator(response, args, index++);
+      return { ...base, stdout: JSON.stringify(response) };
+    },
+  });
+}
+
 rejected((response, _args, index) => { if (index === 0) response.overallAccessState = "CAN_ACCESS"; },
   "policy_troubleshooter_access_mismatch");
 rejected((response, _args, index) => { if (index === 4) response.overallAccessState = "UNKNOWN_INFO"; },
   "policy_troubleshooter_analysis_incomplete");
-rejected((response, _args, index) => {
-  if (index === 3) response.allowPolicyExplanation.allowAccessState = "ALLOW_ACCESS_STATE_UNKNOWN_INFO";
-}, "policy_troubleshooter_analysis_incomplete");
-rejected((response, _args, index) => {
-  if (index === 2) response.allowPolicyExplanation.errors = [{ code: 7 }];
-}, "policy_troubleshooter_analysis_incomplete");
-rejected((response, _args, index) => { if (index === 0) delete response.pabPolicyExplanation; },
+rejected((response, _args, index) => { if (index === 4) response.overallAccessState = "UNKNOWN_CONDITIONAL"; },
   "policy_troubleshooter_analysis_incomplete");
+for (const invalidState of [undefined, null, "UNKNOWN", "OVERALL_ACCESS_STATE_UNSPECIFIED", "NOT_GRANTED"]) {
+  rejected((response, _args, index) => {
+    if (index !== 0) return;
+    if (invalidState === undefined) delete response.overallAccessState;
+    else response.overallAccessState = invalidState;
+  }, "policy_troubleshooter_response_invalid");
+}
 rejected((response, _args, index) => { if (index === 0) response.accessTuple.permission = "secretmanager.secrets.get"; },
+  "policy_troubleshooter_tuple_mismatch");
+rejected((response, _args, index) => { if (index === 0) delete response.accessTuple; },
   "policy_troubleshooter_tuple_mismatch");
 rejected((response, _args, index) => { if (index === 0) response.accessTuple.permissionFqdn = "secretmanager.googleapis.com/secrets.get"; },
   "policy_troubleshooter_tuple_mismatch");
 rejected((response, _args, index) => {
-  if (index === 0) response.accessTuple.conditionContext.request.receiveTime = "2099-01-01T00:10:01Z";
+  if (index === 0) response.accessTuple.principal = "other@vaeroex-integrations-prod.iam.gserviceaccount.com";
 }, "policy_troubleshooter_tuple_mismatch");
 rejected((response, _args, index) => {
-  if (index === 0) response.allowPolicyExplanation.explainedPolicies.push({
+  if (index === 0) response.accessTuple.fullResourceName += "-other";
+}, "policy_troubleshooter_tuple_mismatch");
+rejected((response, _args, index) => {
+  if (index === 0) response.accessTuple.conditionContext.request.receiveTime = "2099-01-01T00:10:01Z";
+}, "policy_troubleshooter_tuple_mismatch");
+for (const field of ["name", "service", "type"]) {
+  rejected((response, _args, index) => {
+    if (index === 0) response.accessTuple.conditionContext.resource[field] += "-other";
+  }, "policy_troubleshooter_tuple_mismatch");
+}
+assert.equal(verified((response, _args, index) => {
+  if (index === 0) {
+    delete response.allowPolicyExplanation;
+    delete response.denyPolicyExplanation;
+    delete response.pabPolicyExplanation;
+  }
+  if (index === 1) response.allowPolicyExplanation.allowAccessState = "ALLOW_ACCESS_STATE_UNKNOWN_INFO";
+  if (index === 2) response.allowPolicyExplanation.errors = [{ code: 7 }];
+  if (index === 3) response.allowPolicyExplanation.explainedPolicies.push({
     relevance: "HEURISTIC_RELEVANCE_HIGH",
     condition: { expression: "request.time < timestamp('2100-01-01T00:00:00Z')" },
     conditionExplanation: { value: null },
   });
-}, "policy_troubleshooter_analysis_incomplete");
+}).status, "policy_troubleshooter_closed_all_denied");
+assert.equal(verified((response, args) => {
+  if (args[4].endsWith("/versions/7")) {
+    delete response.allowPolicyExplanation;
+    response.denyPolicyExplanation = { denyAccessState: "DENY_ACCESS_STATE_UNKNOWN_INFO" };
+    response.pabPolicyExplanation = null;
+  }
+}, query, { oauth: ["7"] }).status, "policy_troubleshooter_closed_all_denied");
 
 const openQuery = { ...query, phase: "open", active_profile: "oauth" };
+assert.equal(verified((response, args) => {
+  if (args[4].includes("square-production-oauth-db")) return;
+  response.allowPolicyExplanation = null;
+  response.denyPolicyExplanation = { denyAccessState: "DENY_ACCESS_STATE_UNKNOWN_INFO", errors: [{ code: 7 }] };
+  response.pabPolicyExplanation = { principalAccessBoundaryAccessState: "PAB_ACCESS_STATE_UNKNOWN_INFO" };
+}, openQuery).status, "policy_troubleshooter_oauth_only_confirmed");
+rejected((response, args) => {
+  if (args[4].includes("square-production-oauth-db")) delete response.pabPolicyExplanation;
+}, "policy_troubleshooter_analysis_incomplete", openQuery);
 rejected((response, args, index) => {
   if (index === 0 && args[4].includes("square-production-oauth-db")) response.overallAccessState = "CANNOT_ACCESS";
 }, "policy_troubleshooter_access_mismatch", openQuery);
