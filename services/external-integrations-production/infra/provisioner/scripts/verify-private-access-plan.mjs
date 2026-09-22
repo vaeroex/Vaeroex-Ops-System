@@ -54,6 +54,8 @@ function verifyOpenGenerationInput(value) {
 function verifyPreservedCloseCheckpoint(beforeInput, afterInput) {
   verifyOpenGenerationInput(beforeInput);
   if (!Array.isArray(afterInput?.profiles) || afterInput.profiles.length !== 0 ||
+      afterInput?.starts_at !== beforeInput.starts_at ||
+      afterInput?.expires_at !== beforeInput.expires_at ||
       exactTimestamp(afterInput?.checkpoint_expires_at) !== exactTimestamp(beforeInput.expires_at)) {
     reject("private_access_close_must_preserve_expiry");
   }

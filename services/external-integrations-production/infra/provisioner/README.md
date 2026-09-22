@@ -134,6 +134,9 @@ open-generation recovery close plan; a loss after commit uses the unchanged
 closed/no-transition proof above. Never retry the opening or infer closure
 from direct policy absence. The independent
 condition expiry remains the hard bound.
+The closing plan must preserve the admitted window's original start and expiry
+and record that same expiry as its closed checkpoint, so an interrupted
+post-close proof can be resumed without rewriting the generation.
 Normal operation also waits for the predecessor's time condition to expire,
 supplies that exact expiry as the next plan's
 `previous_access_expires_at`, and verifies the exact zero-grant set before

@@ -29,6 +29,12 @@ const generation = (before, after, actions = ["update"], overrides = {}) => ({
   },
 });
 
+const preservedCloseWindow = Object.freeze({
+  starts_at: NEXT_START,
+  expires_at: NEXT_EXPIRY,
+  checkpoint_expires_at: NEXT_EXPIRY,
+});
+
 const grantValue = (profile, overrides = {}) => {
   const startsAt = overrides.starts_at ?? NEXT_START;
   const expiresAt = overrides.expires_at ?? NEXT_EXPIRY;
@@ -72,7 +78,7 @@ assert.equal(
 );
 assert.equal(
   verifyPrivateAccessPlan(plan(generation(true, false, ["delete", "create"], {
-    after: { checkpoint_expires_at: NEXT_EXPIRY },
+    after: preservedCloseWindow,
   }), grant("oauth", true, false, ["delete"]))),
   "private_access_one_grant_to_closed_confirmed",
 );
@@ -90,7 +96,7 @@ assert.deepEqual(privateAccessClosedCheckpointTuple(plan(generation(false, false
 });
 assert.equal(
   verifyPrivateAccessPlan(plan(generation(true, false, ["delete", "create"], {
-    after: { checkpoint_expires_at: NEXT_EXPIRY },
+    after: preservedCloseWindow,
   }))),
   "private_access_open_generation_without_grant_to_closed_recovery_confirmed",
 );
@@ -121,7 +127,19 @@ rejects(
 );
 rejects(
   plan(generation(true, false, ["delete", "create"], {
-    after: { checkpoint_expires_at: "2098-12-31T23:00:00Z" },
+    after: { ...preservedCloseWindow, checkpoint_expires_at: "2098-12-31T23:00:00Z" },
+  })),
+  "private_access_close_must_preserve_expiry",
+);
+rejects(
+  plan(generation(true, false, ["delete", "create"], {
+    after: { ...preservedCloseWindow, starts_at: PRIOR_START },
+  })),
+  "private_access_close_must_preserve_expiry",
+);
+rejects(
+  plan(generation(true, false, ["delete", "create"], {
+    after: { ...preservedCloseWindow, expires_at: PRIOR_EXPIRY },
   })),
   "private_access_close_must_preserve_expiry",
 );
@@ -130,7 +148,9 @@ rejects(
   "private_access_closed_plan_omits_managed_grant",
 );
 rejects(
-  plan(generation(true, false, ["delete", "create"], { after: { checkpoint_expires_at: "2098-12-31T23:00:00Z" } }), grant("oauth", true, false, ["delete"])),
+  plan(generation(true, false, ["delete", "create"], {
+    after: { ...preservedCloseWindow, checkpoint_expires_at: "2098-12-31T23:00:00Z" },
+  }), grant("oauth", true, false, ["delete"])),
   "private_access_close_must_preserve_expiry",
 );
 rejects(
@@ -157,7 +177,7 @@ rejects(
 );
 rejects(
   plan(
-    generation(true, false, ["delete", "create"], { after: { checkpoint_expires_at: NEXT_EXPIRY } }),
+    generation(true, false, ["delete", "create"], { after: preservedCloseWindow }),
     grant("oauth", true, false, ["delete"], {
       before: {
         condition: [{
