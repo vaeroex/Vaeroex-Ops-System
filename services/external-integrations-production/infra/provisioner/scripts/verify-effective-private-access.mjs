@@ -150,20 +150,23 @@ function verifyResponse(response, tuple, expectedState, requestTime) {
   ) {
     reject("policy_troubleshooter_tuple_mismatch");
   }
-  if (
+  if (["UNKNOWN_INFO", "UNKNOWN_CONDITIONAL"].includes(response.overallAccessState)) {
+    reject("policy_troubleshooter_analysis_incomplete");
+  }
+  if (!["CAN_ACCESS", "CANNOT_ACCESS"].includes(response.overallAccessState)) {
+    reject("policy_troubleshooter_response_invalid");
+  }
+  if (response.overallAccessState !== expectedState) {
+    reject("policy_troubleshooter_access_mismatch");
+  }
+  if (expectedState === "CAN_ACCESS" && (
     typeof response.allowPolicyExplanation !== "object" || response.allowPolicyExplanation === null ||
     typeof response.denyPolicyExplanation !== "object" || response.denyPolicyExplanation === null ||
     typeof response.pabPolicyExplanation !== "object" || response.pabPolicyExplanation === null ||
     hasUnknownOrUnspecifiedState(response) ||
     hasOutcomeRelevantConditionAmbiguity(response)
-  ) {
+  )) {
     reject("policy_troubleshooter_analysis_incomplete");
-  }
-  if (response.overallAccessState !== expectedState) {
-    if (["UNKNOWN_INFO", "UNKNOWN_CONDITIONAL"].includes(response.overallAccessState)) {
-      reject("policy_troubleshooter_analysis_incomplete");
-    }
-    reject("policy_troubleshooter_access_mismatch");
   }
 }
 

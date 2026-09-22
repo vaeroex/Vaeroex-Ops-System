@@ -74,9 +74,14 @@ those containers. The matrix therefore contains `6 + 3N` tuples, where `N` is
 the exact number of existing numeric versions; it never substitutes the
 semantically different `latest` alias. It uses the current beta command so the
 top-level decision includes allow, deny and Principal Access Boundary policy
-evaluation. Any unknown or unspecified state, failed/malformed enumeration,
-missing policy explanation, outcome-relevant conditional ambiguity,
-API/process failure, mismatched tuple or unexpected access blocks the grant.
+evaluation. For a denied tuple, the exact echoed tuple plus a top-level
+`CANNOT_ACCESS` is the pilot closure decision; auxiliary allow, deny and
+Principal Access Boundary explanations are diagnostic metadata and may be
+missing or incomplete without overriding that conclusive denial. The selected
+profile's intentional `CAN_ACCESS` result retains the stricter explanation and
+condition checks. A top-level unknown or unspecified state,
+failed/malformed enumeration, missing or malformed decision, API/process
+failure, mismatched tuple or unexpected access still blocks the grant.
 The six direct Secret Manager policy reads remain only supplemental residue
 evidence; they are not an effective-authority claim and do not replace
 Troubleshooter's inherited policy evaluation. Cleanup instantiates neither
@@ -104,6 +109,10 @@ Secret/SecretVersion condition context, captures and discards raw CLI output,
 and emits only fixed labels. Secret Manager version-list consistency is a
 documented pilot limitation; the controlled window admits no concurrent
 provisioning, and no generalized concurrent-administrator claim is made.
+Auxiliary Policy Troubleshooter explanation completeness for conclusive denials
+is also a documented pilot limitation. Every expected exact tuple must still be
+present with the required top-level result; `UNKNOWN`, missing tuples,
+malformed responses and API failures remain blocking.
 An operator-process loss in the narrow interval after Google accepts a grant
 but before Terraform checkpoints it is recovered only through the verified
 open-generation-without-managed-grant to closed plan. Before applying that
@@ -154,6 +163,18 @@ supplies that exact expiry as the next plan's
 opening a replacement window. The bounded propagation interval is additional
 defense against stale policy enforcement, not a claim of instantaneous IAM
 consistency.
+
+Before opening and after closing every supervised pilot window, independent
+live readbacks remain mandatory. Closed state requires zero secret versions
+before first provisioning, no direct or project-level provisioner bindings,
+no temporary OS Login, IAP, firewall or setup-HTTPS access, the provisioner VM
+stopped, every activation gate false and a zero-drift Terraform plan. After a
+successful role provisioning, the exact acknowledged numeric secret version
+is retained, so later closure does not incorrectly require zero versions; it
+requires that every enumerated version tuple is `CANNOT_ACCESS`. An OAuth-only
+opening must show only the reviewed OAuth tuples as `CAN_ACCESS` and every peer
+tuple as `CANNOT_ACCESS`. Any actual unexpected grant or contradictory live
+readback stops the window and cleanup must restore the complete closed state.
 
 During private entry, HTTPS reaches only `199.36.153.8/30` (the
 `private.googleapis.com` VIP). The reviewed guest setup must resolve exactly
