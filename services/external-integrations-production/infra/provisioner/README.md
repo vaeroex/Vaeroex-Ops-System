@@ -30,12 +30,130 @@ prompt or invokes the native tool.
 API network paths. During setup only, `setup_https_enabled` permits package
 downloads over TCP/443. It provides no secret authority. After installation,
 close that broad setup rule and verify its removal before setting
-`temporary_access_enabled` to grant the six separate four-permission secret
-bindings. Terraform rejects simultaneous setup HTTPS and credential staging.
-The explicit grant dependency also enforces transition ordering: setup-rule
-deletion completes before any secret grant is created, and every secret-grant
-deletion completes before setup HTTPS can be recreated. These apply-graph edges
-are tested in both directions; a single flag-switch apply cannot overlap them.
+`temporary_access_enabled` and explicitly selecting one reviewed
+`temporary_access_profiles` value for that window. The bounded recovery selects
+only `oauth`; later role windows remain separate. Terraform rejects an open
+window with zero or multiple profiles, a selection while access is closed,
+unknown profiles, a successor starting before the read-back expiry of its
+predecessor, and simultaneous setup HTTPS and credential staging.
+One state-local `terraform_data` generation barrier carries no cloud authority.
+Changing the selection or time window replaces that barrier
+destroy-before-create and replaces retained grants, so every old grant is
+destroyed before the new generation can be created. A pinned `time_sleep`
+provider then enforces a ten-minute IAM propagation interval before any new
+grant is created. This exceeds Google's documented typical two-minute interval
+and its noted seven-minute case. IAM can take longer, so normal operations also
+close and verify access between role windows; the independent IAM time
+condition remains the hard boundary. The explicit grant dependencies
+also ensure setup-rule deletion completes before any secret grant is created,
+and every secret-grant deletion completes before setup HTTPS can be recreated.
+The apply-graph tests cover setup in both directions and prove the full
+old-grant -> closed generation checkpoint, followed by successor generation ->
+propagation interval -> new-grant sequence.
+
+The first apply after adopting this generation barrier must use all three access
+flags false and an empty profile selection, with the prior state independently
+confirmed to contain no temporary secret grants. That closed bootstrap creates
+only the state-local barrier and its zero-duration propagation marker. Do not
+combine barrier adoption with opening or changing access: grants created by an
+older configuration do not carry the new dependency. Direct open-to-open
+profile or time-window changes are unsupported. Every saved plan must be
+applied only through `scripts/apply-reviewed-private-access-plan.mjs`. That
+entry point privately copies the exact plan, renders it in memory, requires
+`scripts/verify-private-access-plan.mjs` to pass, rechecks the copied bytes,
+requires the previously reviewed SHA-256, and applies that same copy. Direct
+`terraform apply` is unsupported. The verifier requires an opening plan's
+prior Terraform state to be an applied
+closed checkpoint and rejects any mutation carrying a managed grant on both
+sides of the plan. Open-state no-op plans are also rejected. After the bounded
+propagation interval, an apply-time Google IAM Policy Troubleshooter sweep must
+return definitive denial for `versions.add` on each of the six fixed Secret
+resources and for `versions.access`, `versions.get` and `versions.disable` on
+every numeric SecretVersion returned by a fresh metadata-only enumeration of
+those containers. The matrix therefore contains `6 + 3N` tuples, where `N` is
+the exact number of existing numeric versions; it never substitutes the
+semantically different `latest` alias. It uses the current beta command so the
+top-level decision includes allow, deny and Principal Access Boundary policy
+evaluation. Any unknown or unspecified state, failed/malformed enumeration,
+missing policy explanation, outcome-relevant conditional ambiguity,
+API/process failure, mismatched tuple or unexpected access blocks the grant.
+The six direct Secret Manager policy reads remain only supplemental residue
+evidence; they are not an effective-authority claim and do not replace
+Troubleshooter's inherited policy evaluation. Cleanup instantiates neither
+read, so an unrelated read or analyzer failure cannot block revocation.
+
+Every successful opening then waits through a second ten-minute propagation
+interval and freshly enumerates the same six containers. The resulting
+`6 + 3N` matrix must report the selected profile's Secret and existing numeric
+versions available and every peer Secret/version tuple denied before Terraform
+records the opening as qualified. With an empty selected container, the opening
+proves only `versions.add`; the native store then canonicalizes the exact
+numeric version returned by `addVersion`, accesses and verifies that exact
+version's payload/checksum, and gets the same exact version again before the
+staged-ready acknowledgement. The earlier `STORED` frame is a private database
+transaction handshake sent only after exact-version access verification; it is
+not the operator success acknowledgement. The coordinator accepts only the
+later exact-version `staged_ready` result. It never guesses or acknowledges
+`latest`.
+The OAuth recovery window therefore permits only OAuth and denies the five peer
+containers. A post-grant analysis failure is an applied-but-unverified state:
+close and reconcile it without retrying or treating the apply as successful.
+The verifier invokes no ancestry command and never uses `testIamPermissions` as
+its authorization gate. It supplies exact request-time and
+Secret/SecretVersion condition context, captures and discards raw CLI output,
+and emits only fixed labels. Secret Manager version-list consistency is a
+documented pilot limitation; the controlled window admits no concurrent
+provisioning, and no generalized concurrent-administrator claim is made.
+An operator-process loss in the narrow interval after Google accepts a grant
+but before Terraform checkpoints it is recovered only through the verified
+open-generation-without-managed-grant to closed plan. Before applying that
+cleanup, the entry point reads and validates all six fixed Secret policies,
+allows only absence or the one exact provisioner member/role/profile/time
+condition derived from the plan, removes only that exact tuple, and rereads all
+six policies. Any other provisioner binding, condition mismatch, malformed
+policy, failed enumeration or residual tuple blocks Terraform apply. A failed
+or lost removal acknowledgement is accepted only when the complete readback
+proves exact absence. The resulting
+direct-policy-absence label is narrow reconciliation evidence, not proof of
+effective closure. After it passes, the reviewed close apply removes the
+temporary OS Login, IAP, firewall and state resources. The entry point then
+waits ten minutes and requires the full `6 + 3N` Policy Troubleshooter matrix
+to return definitive denial before reporting success. Analyzer uncertainty
+does not undo the already-closed resources, but it reports revocation as
+uncertain. A normal tracked close receives the same post-apply direct readback
+and effective-denial proof. If the operator process is lost after a tracked
+close commits but before those checks finish, the unchanged reviewed
+closed/no-transition plan must be applied through the same wrapper. It requires
+zero direct provisioner bindings, waits the full propagation interval and
+reruns the complete denial matrix before acknowledging closure. Failed opening
+and tracked-closing applies perform
+exact reconciliation and the denial check, so a remotely accepted grant is
+revoked even when Terraform does not checkpoint it. An uncatchable process
+loss before a close commits, including `SIGKILL`, must be followed by the
+open-generation recovery close plan; a loss after commit uses the unchanged
+closed/no-transition proof above. Never retry the opening or infer closure
+from direct policy absence. The independent
+condition expiry remains the hard bound.
+The saved-plan verifier rejects targeted/incomplete plans in every phase so an
+opening cannot omit its dependent effective-authority receipt. It distinguishes
+setup and administration as explicitly non-closed phases. It may report a
+closed bootstrap, recovery, tracked close or closed checkpoint only when the
+administrative, setup-HTTPS and temporary-secret flags are all false, the
+profile set is empty, and post-apply state contains none of the exact temporary
+OS Login, IAP or firewall resources. A contradictory closed-state tuple or any
+retained temporary access fails before apply; setup and pre-secret
+administration remain supported but never produce a closure acknowledgement.
+The first closed bootstrap also receives the same post-apply direct-binding
+absence and complete effective-denial proof as a resumed closed checkpoint.
+The closing plan must preserve the admitted window's original start and expiry
+and record that same expiry as its closed checkpoint, so an interrupted
+post-close proof can be resumed without rewriting the generation.
+Normal operation also waits for the predecessor's time condition to expire,
+supplies that exact expiry as the next plan's
+`previous_access_expires_at`, and verifies the exact zero-grant set before
+opening a replacement window. The bounded propagation interval is additional
+defense against stale policy enforcement, not a claim of instantaneous IAM
+consistency.
 
 During private entry, HTTPS reaches only `199.36.153.8/30` (the
 `private.googleapis.com` VIP). The reviewed guest setup must resolve exactly
@@ -64,8 +182,9 @@ commitment is needed.
 Use the existing root-owned static native launcher, exact GCE identity check,
 immutable code/CA hashes, private TTY, per-role journal and checked recovery
 procedure. This template creates no database password or cloud key. Runtime
-reader permissions remain separate. Six sequential profile operations must
-finish fenced with zero sessions before the all-closed checkpoint. Stop
+reader permissions remain separate. Each role operation must finish fenced
+with zero sessions and return to an all-closed checkpoint before the next role
+window. Stop
 credential admission at least two minutes before the scheduled stop. A failed
 or uncertain acknowledgement requires read-only role/version/journal
 reconciliation; never recreate credentials or assume an audit event proves a
@@ -78,7 +197,8 @@ must not silently reopen a previous session. Backend configuration and concrete
 variables belong to the separately inspected operating plan, not committed
 credentials or inferred defaults.
 
-Local checks use the signed pinned Google provider and no cloud state:
+Local checks use the signed pinned External, Google and time providers and no
+cloud state:
 
 ```sh
 terraform init -backend=false
@@ -86,10 +206,31 @@ terraform fmt -check -recursive
 terraform validate
 terraform test
 node tests/verify-transition-order.mjs
+node tests/verify-effective-private-access.test.mjs
+node tests/verify-private-access-plan.test.mjs
+node tests/reconcile-private-access.test.mjs
+node tests/apply-reviewed-private-access-plan.test.mjs
 ```
 
+For every hosted mutation, set `umask 077`, create a full saved plan, inspect
+its complete action set, record its SHA-256 and confirm the source plan has no
+group or other permission bits. Then use the single reviewed apply entry point;
+it verifies and applies the same private copy without persisting or printing
+the JSON rendering:
+
+```sh
+node scripts/apply-reviewed-private-access-plan.mjs reviewed.tfplan <reviewed-sha256>
+```
+
+Only fixed transition/completion labels are added by the entry point. The
+verifier never prints or stores the rendered plan, provider values or state.
+A failed label blocks apply and the private copy is removed. Both Terraform
+children run without inherited `TF_LOG*` settings; their ordinary output and
+errors are captured and discarded. Reapplying or refreshing an open window is
+intentionally unsupported; close it first.
+
 The transition verifier runs the real firewall/IAM resource dependency closure
-through three isolated mocked Terraform applies, checking graph edges and
+through eight isolated mocked Terraform apply steps, checking graph edges and
 completion/start ordering. It excludes the backend, credentials and real state;
 provider schemas come only from the pinned local cache. Its in-memory trace is
 not printed or persisted, and its disposable files are removed afterward.

@@ -1,4 +1,35 @@
-mock_provider "google" {}
+mock_provider "google" {
+  mock_data "google_project" {
+    defaults = {
+      number = "123456789012"
+    }
+  }
+  mock_resource "google_service_account" {
+    defaults = {
+      name   = "projects/vaeroex-integrations-prod/serviceAccounts/sq-prod-provisioner@vaeroex-integrations-prod.iam.gserviceaccount.com"
+      email  = "sq-prod-provisioner@vaeroex-integrations-prod.iam.gserviceaccount.com"
+      member = "serviceAccount:sq-prod-provisioner@vaeroex-integrations-prod.iam.gserviceaccount.com"
+    }
+  }
+  mock_data "google_secret_manager_secret_iam_policy" {
+    defaults = {
+      policy_data = "{\"version\":3,\"bindings\":[]}"
+    }
+  }
+}
+mock_provider "external" {
+  mock_data "external" {
+    defaults = {
+      result = {
+        status           = "policy_troubleshooter_closed_all_denied"
+        checked_secrets  = "6"
+        checked_versions = "0"
+        checked_tuples   = "6"
+      }
+    }
+  }
+}
+mock_provider "time" {}
 
 # Documentation-only addresses and a synthetic image pin; never a hosted plan.
 variables {
@@ -6,6 +37,7 @@ variables {
   boot_image                 = "projects/debian-cloud/global/images/debian-13-trixie-v20260901"
   window_starts_at           = "2099-01-01T00:00:00Z"
   window_expires_at          = "2099-01-01T01:00:00Z"
+  previous_access_expires_at = "2098-12-31T23:00:00Z"
   verified_pooler_ipv4_cidrs = ["192.0.2.1/32", "192.0.2.2/32"]
 }
 
@@ -48,39 +80,48 @@ run "initial_installation_is_stopped_and_inaccessible" {
   }
   assert {
     condition = (
+      length(data.google_secret_manager_secret_iam_policy.private_versions) == 0 &&
       length(google_secret_manager_secret_iam_member.private_versions) == 0 &&
       length(google_compute_instance_iam_member.operator_oslogin) == 0 &&
       length(google_iap_tunnel_instance_iam_member.operator_tunnel) == 0 &&
       length(google_service_account_iam_member.operator_oslogin_service_account) == 0 &&
       length(google_compute_firewall.iap_ssh) == 0 &&
       length(google_compute_firewall.pooler) == 0 && length(google_compute_firewall.google_api_https) == 0 &&
-      length(google_compute_firewall.setup_https) == 0
+      length(google_compute_firewall.setup_https) == 0 &&
+      length(data.google_project.current) == 0 &&
+      length(data.external.private_access_closed) == 0 &&
+      length(data.external.private_access_effective) == 0 &&
+      length(terraform_data.private_access_effective_authority) == 0
     )
-    error_message = "No temporary administration, secret authority or allowed network access exists by default."
+    error_message = "Closed access must require no secret-policy readback and create no temporary administration, secret authority or allowed network access."
   }
 }
 
-run "open_window_has_only_exact_expiring_permissions" {
+run "open_window_has_only_exact_expiring_permission" {
   command = plan
   variables {
     administrative_access_enabled = true
     temporary_access_enabled      = true
+    temporary_access_profiles     = ["oauth"]
   }
 
   assert {
     condition = (
-      toset(keys(google_secret_manager_secret_iam_member.private_versions)) == toset(["oauth", "broker", "scheduler", "webhook", "runtime", "evidence"]) &&
+      toset(keys(google_secret_manager_secret_iam_member.private_versions)) == toset(["oauth"]) &&
       toset(google_project_iam_custom_role.private_versions.permissions) == toset([
         "secretmanager.versions.add", "secretmanager.versions.access",
         "secretmanager.versions.get", "secretmanager.versions.disable"
       ]) &&
+      length(data.external.private_access_closed) == 1 &&
+      length(data.external.private_access_effective) == 1 &&
+      time_sleep.private_access_effective_propagation[0].create_duration == "10m" &&
       alltrue([for profile, binding in google_secret_manager_secret_iam_member.private_versions :
         binding.secret_id == "square-production-${profile}-db" &&
         binding.project == "vaeroex-integrations-prod" &&
         binding.condition[0].expression == "request.time >= timestamp('2099-01-01T00:00:00Z') && request.time < timestamp('2099-01-01T01:00:00Z')"
       ])
     )
-    error_message = "Grant only four version-staging permissions to the six exact database secrets during one window."
+    error_message = "Grant only four version-staging permissions to one exact database secret during one window."
   }
   assert {
     condition = (
@@ -113,6 +154,28 @@ run "open_window_has_only_exact_expiring_permissions" {
   }
 }
 
+run "oauth_only_window_has_only_oauth_secret_authority" {
+  command = plan
+  variables {
+    administrative_access_enabled = true
+    temporary_access_enabled      = true
+    temporary_access_profiles     = ["oauth"]
+  }
+
+  assert {
+    condition = (
+      toset(keys(google_secret_manager_secret_iam_member.private_versions)) == toset(["oauth"]) &&
+      google_secret_manager_secret_iam_member.private_versions["oauth"].secret_id == "square-production-oauth-db" &&
+      google_secret_manager_secret_iam_member.private_versions["oauth"].condition[0].expression == "request.time >= timestamp('2099-01-01T00:00:00Z') && request.time < timestamp('2099-01-01T01:00:00Z')"
+    )
+    error_message = "An OAuth-only window must grant the provisioner authority on only the OAuth database-secret container."
+  }
+  assert {
+    condition     = time_sleep.private_access_propagation.create_duration == "10m"
+    error_message = "Opening private version authority must wait for the bounded IAM propagation interval."
+  }
+}
+
 run "setup_downloads_have_no_secret_authority" {
   command = plan
   variables {
@@ -138,14 +201,53 @@ run "reject_secret_staging_with_setup_egress" {
     administrative_access_enabled = true
     setup_https_enabled           = true
     temporary_access_enabled      = true
+    temporary_access_profiles     = ["oauth"]
   }
   expect_failures = [var.temporary_access_enabled]
 }
 
 run "reject_secret_staging_without_private_administration" {
   command = plan
-  variables { temporary_access_enabled = true }
+  variables {
+    temporary_access_enabled  = true
+    temporary_access_profiles = ["oauth"]
+  }
   expect_failures = [var.temporary_access_enabled]
+}
+
+run "reject_open_temporary_access_without_a_profile" {
+  command = plan
+  variables {
+    administrative_access_enabled = true
+    temporary_access_enabled      = true
+  }
+  expect_failures = [var.temporary_access_profiles]
+}
+
+run "reject_multiple_profiles_in_one_window" {
+  command = plan
+  variables {
+    administrative_access_enabled = true
+    temporary_access_enabled      = true
+    temporary_access_profiles     = ["oauth", "broker"]
+  }
+  expect_failures = [var.temporary_access_profiles]
+}
+
+run "reject_profile_selection_while_temporary_access_is_closed" {
+  command = plan
+  variables { temporary_access_profiles = ["oauth"] }
+  expect_failures = [var.temporary_access_profiles]
+}
+
+run "reject_unknown_temporary_access_profile" {
+  command = plan
+  variables {
+    administrative_access_enabled = true
+    temporary_access_enabled      = true
+    temporary_access_profiles     = ["unknown"]
+  }
+  expect_failures = [var.temporary_access_profiles]
 }
 
 run "reject_setup_without_private_administration" {
@@ -188,4 +290,179 @@ run "reject_reversed_window" {
   command = plan
   variables { window_expires_at = "2098-12-31T23:59:59Z" }
   expect_failures = [var.window_expires_at]
+}
+
+run "reject_window_start_before_previous_expiry" {
+  command = plan
+  variables {
+    administrative_access_enabled = true
+    temporary_access_enabled      = true
+    temporary_access_profiles     = ["oauth"]
+    previous_access_expires_at    = "2099-01-01T00:00:01Z"
+  }
+  expect_failures = [var.previous_access_expires_at]
+}
+
+run "reject_changed_window_while_old_binding_is_still_present" {
+  # The secret-policy read is deliberately deferred until apply, after the
+  # propagation barrier. A plan-only assertion would reintroduce the stale
+  # plan/apply observation this regression protects against.
+  command = apply
+  plan_options {
+    target = [google_secret_manager_secret_iam_member.private_versions]
+  }
+  variables {
+    administrative_access_enabled = true
+    temporary_access_enabled      = true
+    temporary_access_profiles     = ["oauth"]
+    window_starts_at              = "2099-01-02T00:00:00Z"
+    window_expires_at             = "2099-01-02T01:00:00Z"
+  }
+  override_data {
+    target = data.google_secret_manager_secret_iam_policy.private_versions["oauth"]
+    values = {
+      policy_data = "{\"version\":3,\"bindings\":[{\"role\":\"projects/vaeroex-integrations-prod/roles/squareProductionPrivateVersions\",\"members\":[\"serviceAccount:sq-prod-provisioner@vaeroex-integrations-prod.iam.gserviceaccount.com\"],\"condition\":{\"title\":\"bounded-native-provisioning\",\"description\":\"One exact database secret during the admitted maintenance window.\",\"expression\":\"request.time >= timestamp('2099-01-01T00:00:00Z') && request.time < timestamp('2099-01-01T01:00:00Z')\"}}]}"
+    }
+  }
+  expect_failures = [google_secret_manager_secret_iam_member.private_versions["oauth"]]
+}
+
+run "reject_profile_switch_while_old_binding_is_still_present" {
+  command = apply
+  plan_options {
+    target = [google_secret_manager_secret_iam_member.private_versions]
+  }
+  variables {
+    administrative_access_enabled = true
+    temporary_access_enabled      = true
+    temporary_access_profiles     = ["broker"]
+  }
+  override_data {
+    target = data.google_secret_manager_secret_iam_policy.private_versions["oauth"]
+    values = {
+      policy_data = "{\"version\":3,\"bindings\":[{\"role\":\"projects/vaeroex-integrations-prod/roles/squareProductionPrivateVersions\",\"members\":[\"serviceAccount:sq-prod-provisioner@vaeroex-integrations-prod.iam.gserviceaccount.com\"],\"condition\":{\"title\":\"bounded-native-provisioning\",\"description\":\"One exact database secret during the admitted maintenance window.\",\"expression\":\"request.time >= timestamp('2099-01-01T00:00:00Z') && request.time < timestamp('2099-01-01T01:00:00Z')\"}}]}"
+    }
+  }
+  expect_failures = [google_secret_manager_secret_iam_member.private_versions["broker"]]
+}
+
+run "reject_residual_provisioner_binding_under_another_role" {
+  command = apply
+  plan_options {
+    target = [google_secret_manager_secret_iam_member.private_versions]
+  }
+  variables {
+    administrative_access_enabled = true
+    temporary_access_enabled      = true
+    temporary_access_profiles     = ["oauth"]
+  }
+  override_data {
+    target = data.google_secret_manager_secret_iam_policy.private_versions["broker"]
+    values = {
+      policy_data = "{\"version\":3,\"bindings\":[{\"role\":\"roles/secretmanager.secretAccessor\",\"members\":[\"serviceAccount:sq-prod-provisioner@vaeroex-integrations-prod.iam.gserviceaccount.com\"]}]}"
+    }
+  }
+  expect_failures = [google_secret_manager_secret_iam_member.private_versions["oauth"]]
+}
+
+run "reject_exact_residual_binding_when_state_is_closed" {
+  command = apply
+  plan_options {
+    target = [google_secret_manager_secret_iam_member.private_versions]
+  }
+  variables {
+    administrative_access_enabled = true
+    temporary_access_enabled      = true
+    temporary_access_profiles     = ["oauth"]
+    window_starts_at              = "2099-01-04T00:00:00Z"
+    window_expires_at             = "2099-01-04T01:00:00Z"
+  }
+  override_data {
+    target = data.google_secret_manager_secret_iam_policy.private_versions["oauth"]
+    values = {
+      policy_data = "{\"version\":3,\"bindings\":[{\"role\":\"projects/vaeroex-integrations-prod/roles/squareProductionPrivateVersions\",\"members\":[\"serviceAccount:sq-prod-provisioner@vaeroex-integrations-prod.iam.gserviceaccount.com\"],\"condition\":{\"title\":\"bounded-native-provisioning\",\"description\":\"One exact database secret during the admitted maintenance window.\",\"expression\":\"request.time >= timestamp('2099-01-04T00:00:00Z') && request.time < timestamp('2099-01-04T01:00:00Z')\"}}]}"
+    }
+  }
+  expect_failures = [google_secret_manager_secret_iam_member.private_versions["oauth"]]
+}
+
+run "reject_effective_authority_at_closed_checkpoint" {
+  command = apply
+  plan_options {
+    target = [google_secret_manager_secret_iam_member.private_versions]
+  }
+  variables {
+    administrative_access_enabled = true
+    temporary_access_enabled      = true
+    temporary_access_profiles     = ["oauth"]
+  }
+  override_data {
+    target = data.external.private_access_closed[0]
+    values = {
+      result = {
+        status           = "policy_troubleshooter_oauth_only_confirmed"
+        checked_secrets  = "6"
+        checked_versions = "0"
+        checked_tuples   = "6"
+      }
+    }
+  }
+  expect_failures = [google_secret_manager_secret_iam_member.private_versions["oauth"]]
+}
+
+run "reject_peer_authority_after_oauth_open" {
+  command = apply
+  plan_options {
+    target = [terraform_data.private_access_effective_authority]
+  }
+  variables {
+    administrative_access_enabled = true
+    temporary_access_enabled      = true
+    temporary_access_profiles     = ["oauth"]
+  }
+  override_data {
+    target = data.external.private_access_effective[0]
+    values = {
+      result = {
+        status           = "policy_troubleshooter_broker_only_confirmed"
+        checked_secrets  = "6"
+        checked_versions = "0"
+        checked_tuples   = "6"
+      }
+    }
+  }
+  expect_failures = [terraform_data.private_access_effective_authority[0]]
+}
+
+run "oauth_effective_authority_exact_matrix_confirmed" {
+  command = apply
+  plan_options {
+    target = [terraform_data.private_access_effective_authority]
+  }
+  variables {
+    administrative_access_enabled = true
+    temporary_access_enabled      = true
+    temporary_access_profiles     = ["oauth"]
+  }
+  override_data {
+    target = data.external.private_access_effective[0]
+    values = {
+      result = {
+        status           = "policy_troubleshooter_oauth_only_confirmed"
+        checked_secrets  = "6"
+        checked_versions = "0"
+        checked_tuples   = "6"
+      }
+    }
+  }
+  assert {
+    condition = (
+      terraform_data.private_access_effective_authority[0].input.profile == "oauth" &&
+      terraform_data.private_access_effective_authority[0].input.status == "policy_troubleshooter_oauth_only_confirmed" &&
+      terraform_data.private_access_effective_authority[0].input.checked_secrets == "6" &&
+      terraform_data.private_access_effective_authority[0].input.checked_versions == "0" &&
+      terraform_data.private_access_effective_authority[0].input.checked_tuples == "6"
+    )
+    error_message = "The OAuth opening may complete only after the exact live numeric-version effective-access matrix is confirmed."
+  }
 }

@@ -37,13 +37,49 @@ variable "setup_https_enabled" {
 }
 
 variable "temporary_access_enabled" {
-  description = "Grant the six exact private version permissions only after installation and restricted egress are verified."
+  description = "Grant private version permissions only to the explicitly selected reviewed profiles after installation and restricted egress are verified."
   type        = bool
   default     = false
   nullable    = false
   validation {
     condition     = !var.temporary_access_enabled || (var.administrative_access_enabled && !var.setup_https_enabled)
     error_message = "Credential staging requires private administration and closed setup HTTPS."
+  }
+}
+
+variable "temporary_access_profiles" {
+  description = "Exact reviewed database-secret profiles admitted for this window; empty whenever temporary access is closed."
+  type        = set(string)
+  default     = []
+  nullable    = false
+  validation {
+    condition = alltrue([
+      for profile in var.temporary_access_profiles :
+      contains(["oauth", "broker", "scheduler", "webhook", "runtime", "evidence"], profile)
+    ])
+    error_message = "Temporary access may target only the six reviewed database-secret profiles."
+  }
+  validation {
+    condition = (
+      var.temporary_access_enabled
+      ? length(var.temporary_access_profiles) == 1
+      : length(var.temporary_access_profiles) == 0
+    )
+    error_message = "Select exactly one reviewed profile when temporary access is open, and none while it is closed."
+  }
+}
+
+variable "previous_access_expires_at" {
+  description = "Read-back expiry of the preceding temporary-access window; a successor may not start before it."
+  type        = string
+  nullable    = false
+  validation {
+    condition = (
+      can(regex("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$", var.previous_access_expires_at)) &&
+      can(timeadd(var.previous_access_expires_at, "0s")) &&
+      (!var.temporary_access_enabled || try(timecmp(var.window_starts_at, var.previous_access_expires_at) >= 0, false))
+    )
+    error_message = "Supply the exact predecessor expiry; every newly opened window must start at or after that boundary."
   }
 }
 

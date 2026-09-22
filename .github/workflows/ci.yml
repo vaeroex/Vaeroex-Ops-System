@@ -140,6 +140,10 @@ jobs:
           terraform -chdir=services/external-integrations-production/infra/provisioner validate
           terraform -chdir=services/external-integrations-production/infra/provisioner test
           node services/external-integrations-production/infra/provisioner/tests/verify-transition-order.mjs
+          node services/external-integrations-production/infra/provisioner/tests/verify-effective-private-access.test.mjs
+          node services/external-integrations-production/infra/provisioner/tests/verify-private-access-plan.test.mjs
+          node services/external-integrations-production/infra/provisioner/tests/reconcile-private-access.test.mjs
+          node services/external-integrations-production/infra/provisioner/tests/apply-reviewed-private-access-plan.test.mjs
 
       - name: Verify isolated Square remote Sandbox binding and closed Production gates
         run: |
