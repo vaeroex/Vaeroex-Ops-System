@@ -66,10 +66,44 @@ requires the previously reviewed SHA-256, and applies that same copy. Direct
 prior Terraform state to be an applied
 closed checkpoint and rejects any mutation carrying a managed grant on both
 sides of the plan. Open-state no-op plans are also rejected. After the bounded
-propagation interval, an apply-time live IAM-policy readback independently
-rejects every residual or alternate-role provisioner binding before opening.
-Cleanup instantiates no policy read, so an unrelated read failure cannot block
-revocation.
+propagation interval, an apply-time Google IAM Policy Troubleshooter sweep must
+return definitive denial for `versions.add` on each of the six fixed Secret
+resources and for `versions.access`, `versions.get` and `versions.disable` on
+every numeric SecretVersion returned by a fresh metadata-only enumeration of
+those containers. The matrix therefore contains `6 + 3N` tuples, where `N` is
+the exact number of existing numeric versions; it never substitutes the
+semantically different `latest` alias. It uses the current beta command so the
+top-level decision includes allow, deny and Principal Access Boundary policy
+evaluation. Any unknown or unspecified state, failed/malformed enumeration,
+missing policy explanation, outcome-relevant conditional ambiguity,
+API/process failure, mismatched tuple or unexpected access blocks the grant.
+The six direct Secret Manager policy reads remain only supplemental residue
+evidence; they are not an effective-authority claim and do not replace
+Troubleshooter's inherited policy evaluation. Cleanup instantiates neither
+read, so an unrelated read or analyzer failure cannot block revocation.
+
+Every successful opening then waits through a second ten-minute propagation
+interval and freshly enumerates the same six containers. The resulting
+`6 + 3N` matrix must report the selected profile's Secret and existing numeric
+versions available and every peer Secret/version tuple denied before Terraform
+records the opening as qualified. With an empty selected container, the opening
+proves only `versions.add`; the native store then canonicalizes the exact
+numeric version returned by `addVersion`, accesses and verifies that exact
+version's payload/checksum, and gets the same exact version again before the
+staged-ready acknowledgement. The earlier `STORED` frame is a private database
+transaction handshake sent only after exact-version access verification; it is
+not the operator success acknowledgement. The coordinator accepts only the
+later exact-version `staged_ready` result. It never guesses or acknowledges
+`latest`.
+The OAuth recovery window therefore permits only OAuth and denies the five peer
+containers. A post-grant analysis failure is an applied-but-unverified state:
+close and reconcile it without retrying or treating the apply as successful.
+The verifier invokes no ancestry command and never uses `testIamPermissions` as
+its authorization gate. It supplies exact request-time and
+Secret/SecretVersion condition context, captures and discards raw CLI output,
+and emits only fixed labels. Secret Manager version-list consistency is a
+documented pilot limitation; the controlled window admits no concurrent
+provisioning, and no generalized concurrent-administrator claim is made.
 Normal operation also waits for the predecessor's time condition to expire,
 supplies that exact expiry as the next plan's
 `previous_access_expires_at`, and verifies the exact zero-grant set before
@@ -119,7 +153,8 @@ must not silently reopen a previous session. Backend configuration and concrete
 variables belong to the separately inspected operating plan, not committed
 credentials or inferred defaults.
 
-Local checks use the signed pinned Google and time providers and no cloud state:
+Local checks use the signed pinned External, Google and time providers and no
+cloud state:
 
 ```sh
 terraform init -backend=false
@@ -127,6 +162,7 @@ terraform fmt -check -recursive
 terraform validate
 terraform test
 node tests/verify-transition-order.mjs
+node tests/verify-effective-private-access.test.mjs
 node tests/verify-private-access-plan.test.mjs
 node tests/apply-reviewed-private-access-plan.test.mjs
 ```

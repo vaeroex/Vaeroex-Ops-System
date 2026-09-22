@@ -15,6 +15,10 @@ const testFile = "tests/transition-order.tftest.hcl";
 const firewall = "google_compute_firewall.setup_https[0]";
 const generation = "terraform_data.private_access_generation";
 const propagation = "time_sleep.private_access_propagation";
+const closedAnalysis = "data.external.private_access_closed[0]";
+const effectivePropagation = "time_sleep.private_access_effective_propagation[0]";
+const effectiveAnalysis = "data.external.private_access_effective[0]";
+const effectiveReceipt = "terraform_data.private_access_effective_authority[0]";
 const grant = profile => `google_secret_manager_secret_iam_member.private_versions["${profile}"]`;
 const policyRead = profile => `data.google_secret_manager_secret_iam_policy.private_versions["${profile}"]`;
 
@@ -79,7 +83,7 @@ try {
   const fixture = readFileSync(path.join(root, testFile), "utf8");
   assert.ok(fixture.startsWith('mock_provider "google" {'), "mock_provider_required");
   writeFileSync(path.join(scratch, testFile), fixture);
-  writeFileSync(env.TF_CLI_CONFIG_FILE, `provider_installation {\n  filesystem_mirror {\n    path = ${JSON.stringify(providers)}\n    include = ["registry.terraform.io/hashicorp/google", "registry.terraform.io/hashicorp/time"]\n  }\n}\n`);
+  writeFileSync(env.TF_CLI_CONFIG_FILE, `provider_installation {\n  filesystem_mirror {\n    path = ${JSON.stringify(providers)}\n    include = ["registry.terraform.io/hashicorp/external", "registry.terraform.io/hashicorp/google", "registry.terraform.io/hashicorp/time"]\n  }\n}\n`);
   run(["init", "-backend=false", "-input=false", "-lockfile=readonly", "-no-color"]);
   const trace = run(["test", `-filter=${testFile}`, "-no-color"], true);
   assert.ok(trace.includes("Success! 8 passed, 0 failed."), "mock_transition_tests_incomplete");
@@ -119,10 +123,21 @@ try {
     completedBeforeStarted(successorWindowEvents, policyRead(profile), grant("broker"),
       "successor_grant_before_policy_read_unsafe");
   }
+  completedBeforeStarted(successorWindowEvents, propagation, closedAnalysis,
+    "successor_effective_denial_before_propagation_unsafe");
+  completedBeforeStarted(successorWindowEvents, closedAnalysis, grant("broker"),
+    "successor_grant_before_effective_denial_unsafe");
+  completedBeforeStarted(successorWindowEvents, grant("broker"), effectivePropagation,
+    "successor_effective_propagation_before_grant_unsafe");
+  completedBeforeStarted(successorWindowEvents, effectivePropagation, effectiveAnalysis,
+    "successor_effective_analysis_before_post_grant_propagation_unsafe");
+  completedBeforeStarted(successorWindowEvents, effectiveAnalysis, effectiveReceipt,
+    "successor_completion_before_effective_analysis_unsafe");
   process.stdout.write("provisioner_setup_destroy_before_oauth_grant_confirmed\n");
   process.stdout.write("provisioner_oauth_grant_destroy_before_setup_confirmed\n");
   process.stdout.write("provisioner_oauth_destroy_before_closed_checkpoint_confirmed\n");
   process.stdout.write("provisioner_closed_checkpoint_propagation_policy_read_before_successor_confirmed\n");
+  process.stdout.write("provisioner_effective_access_matrix_order_confirmed\n");
 } catch (error) {
   // Terraform trace and assertion internals remain private to the disposable
   // mocked run; the caller receives only this fixed failure category.
@@ -133,6 +148,10 @@ try {
     "old_profile_revocation_order_unsafe", "closed_generation_replacement_order_unsafe",
     "successor_generation_replacement_order_unsafe", "successor_propagation_start_order_unsafe",
     "successor_policy_read_before_propagation_unsafe", "successor_grant_before_policy_read_unsafe",
+    "successor_effective_denial_before_propagation_unsafe", "successor_grant_before_effective_denial_unsafe",
+    "successor_effective_propagation_before_grant_unsafe",
+    "successor_effective_analysis_before_post_grant_propagation_unsafe",
+    "successor_completion_before_effective_analysis_unsafe",
     "setup_removal_operation_order_unsafe_predecessor_missing", "setup_removal_operation_order_unsafe_successor_missing",
     "grant_removal_operation_order_unsafe_predecessor_missing", "grant_removal_operation_order_unsafe_successor_missing",
     "old_profile_revocation_order_unsafe_predecessor_missing", "old_profile_revocation_order_unsafe_successor_missing",
@@ -141,6 +160,11 @@ try {
     "successor_propagation_start_order_unsafe_predecessor_missing", "successor_propagation_start_order_unsafe_successor_missing",
     "successor_policy_read_before_propagation_unsafe_predecessor_missing", "successor_policy_read_before_propagation_unsafe_successor_missing",
     "successor_grant_before_policy_read_unsafe_predecessor_missing", "successor_grant_before_policy_read_unsafe_successor_missing",
+    "successor_effective_denial_before_propagation_unsafe_predecessor_missing", "successor_effective_denial_before_propagation_unsafe_successor_missing",
+    "successor_grant_before_effective_denial_unsafe_predecessor_missing", "successor_grant_before_effective_denial_unsafe_successor_missing",
+    "successor_effective_propagation_before_grant_unsafe_predecessor_missing", "successor_effective_propagation_before_grant_unsafe_successor_missing",
+    "successor_effective_analysis_before_post_grant_propagation_unsafe_predecessor_missing", "successor_effective_analysis_before_post_grant_propagation_unsafe_successor_missing",
+    "successor_completion_before_effective_analysis_unsafe_predecessor_missing", "successor_completion_before_effective_analysis_unsafe_successor_missing",
     "run_terraform_init_with_the_pinned_provider_first",
     "mock_provider_required", "mock_transition_tests_incomplete",
     "setup_removal_dependency_missing", "grant_removal_dependency_missing",

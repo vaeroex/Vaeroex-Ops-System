@@ -1,4 +1,9 @@
 mock_provider "google" {
+  mock_data "google_project" {
+    defaults = {
+      number = "123456789012"
+    }
+  }
   mock_resource "google_service_account" {
     defaults = {
       name   = "projects/vaeroex-integrations-prod/serviceAccounts/sq-prod-provisioner@vaeroex-integrations-prod.iam.gserviceaccount.com"
@@ -9,6 +14,18 @@ mock_provider "google" {
   mock_data "google_secret_manager_secret_iam_policy" {
     defaults = {
       policy_data = "{\"version\":3,\"bindings\":[]}"
+    }
+  }
+}
+mock_provider "external" {
+  mock_data "external" {
+    defaults = {
+      result = {
+        status           = "policy_troubleshooter_closed_all_denied"
+        checked_secrets  = "6"
+        checked_versions = "0"
+        checked_tuples   = "6"
+      }
     }
   }
 }
@@ -70,7 +87,11 @@ run "initial_installation_is_stopped_and_inaccessible" {
       length(google_service_account_iam_member.operator_oslogin_service_account) == 0 &&
       length(google_compute_firewall.iap_ssh) == 0 &&
       length(google_compute_firewall.pooler) == 0 && length(google_compute_firewall.google_api_https) == 0 &&
-      length(google_compute_firewall.setup_https) == 0
+      length(google_compute_firewall.setup_https) == 0 &&
+      length(data.google_project.current) == 0 &&
+      length(data.external.private_access_closed) == 0 &&
+      length(data.external.private_access_effective) == 0 &&
+      length(terraform_data.private_access_effective_authority) == 0
     )
     error_message = "Closed access must require no secret-policy readback and create no temporary administration, secret authority or allowed network access."
   }
@@ -91,6 +112,9 @@ run "open_window_has_only_exact_expiring_permission" {
         "secretmanager.versions.add", "secretmanager.versions.access",
         "secretmanager.versions.get", "secretmanager.versions.disable"
       ]) &&
+      length(data.external.private_access_closed) == 1 &&
+      length(data.external.private_access_effective) == 1 &&
+      time_sleep.private_access_effective_propagation[0].create_duration == "10m" &&
       alltrue([for profile, binding in google_secret_manager_secret_iam_member.private_versions :
         binding.secret_id == "square-production-${profile}-db" &&
         binding.project == "vaeroex-integrations-prod" &&
@@ -360,4 +384,85 @@ run "reject_exact_residual_binding_when_state_is_closed" {
     }
   }
   expect_failures = [google_secret_manager_secret_iam_member.private_versions["oauth"]]
+}
+
+run "reject_effective_authority_at_closed_checkpoint" {
+  command = apply
+  plan_options {
+    target = [google_secret_manager_secret_iam_member.private_versions]
+  }
+  variables {
+    administrative_access_enabled = true
+    temporary_access_enabled      = true
+    temporary_access_profiles     = ["oauth"]
+  }
+  override_data {
+    target = data.external.private_access_closed[0]
+    values = {
+      result = {
+        status           = "policy_troubleshooter_oauth_only_confirmed"
+        checked_secrets  = "6"
+        checked_versions = "0"
+        checked_tuples   = "6"
+      }
+    }
+  }
+  expect_failures = [google_secret_manager_secret_iam_member.private_versions["oauth"]]
+}
+
+run "reject_peer_authority_after_oauth_open" {
+  command = apply
+  plan_options {
+    target = [terraform_data.private_access_effective_authority]
+  }
+  variables {
+    administrative_access_enabled = true
+    temporary_access_enabled      = true
+    temporary_access_profiles     = ["oauth"]
+  }
+  override_data {
+    target = data.external.private_access_effective[0]
+    values = {
+      result = {
+        status           = "policy_troubleshooter_broker_only_confirmed"
+        checked_secrets  = "6"
+        checked_versions = "0"
+        checked_tuples   = "6"
+      }
+    }
+  }
+  expect_failures = [terraform_data.private_access_effective_authority[0]]
+}
+
+run "oauth_effective_authority_exact_matrix_confirmed" {
+  command = apply
+  plan_options {
+    target = [terraform_data.private_access_effective_authority]
+  }
+  variables {
+    administrative_access_enabled = true
+    temporary_access_enabled      = true
+    temporary_access_profiles     = ["oauth"]
+  }
+  override_data {
+    target = data.external.private_access_effective[0]
+    values = {
+      result = {
+        status           = "policy_troubleshooter_oauth_only_confirmed"
+        checked_secrets  = "6"
+        checked_versions = "0"
+        checked_tuples   = "6"
+      }
+    }
+  }
+  assert {
+    condition = (
+      terraform_data.private_access_effective_authority[0].input.profile == "oauth" &&
+      terraform_data.private_access_effective_authority[0].input.status == "policy_troubleshooter_oauth_only_confirmed" &&
+      terraform_data.private_access_effective_authority[0].input.checked_secrets == "6" &&
+      terraform_data.private_access_effective_authority[0].input.checked_versions == "0" &&
+      terraform_data.private_access_effective_authority[0].input.checked_tuples == "6"
+    )
+    error_message = "The OAuth opening may complete only after the exact live numeric-version effective-access matrix is confirmed."
+  }
 }

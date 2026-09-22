@@ -5,6 +5,10 @@ terraform {
       source  = "hashicorp/google"
       version = "7.39.0"
     }
+    external = {
+      source  = "hashicorp/external"
+      version = "2.3.5"
+    }
     time = {
       source  = "hashicorp/time"
       version = "0.13.1"

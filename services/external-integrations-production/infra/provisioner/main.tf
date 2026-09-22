@@ -20,6 +20,11 @@ locals {
   }
 }
 
+data "google_project" "current" {
+  count      = var.temporary_access_enabled ? 1 : 0
+  project_id = local.project_id
+}
+
 data "google_secret_manager_secret_iam_policy" "private_versions" {
   # Cleanup must remain able to revoke the active grant even if an unrelated
   # secret's policy cannot be read. Inspect every peer container only while a
@@ -27,10 +32,10 @@ data "google_secret_manager_secret_iam_policy" "private_versions" {
   for_each  = var.temporary_access_enabled ? local.profiles : toset([])
   project   = local.project_id
   secret_id = "square-production-${each.key}-db"
-  # A saved plan must not cache the all-closed readback before its bounded
-  # propagation interval. Defer every opening read to apply, after the current
-  # generation's wait and immediately before the grant precondition. Closed
-  # cleanup still has zero instances because for_each is empty.
+  # This direct-policy read is supplemental residue evidence only. Effective
+  # authority is decided by the apply-time Policy Troubleshooter matrix below.
+  # Defer this read until after the same bounded propagation interval and never
+  # instantiate it during cleanup.
   depends_on = [time_sleep.private_access_propagation]
 }
 
@@ -52,7 +57,7 @@ locals {
 # These are additive APIs only. Existing platform APIs, network, subnet, NAT,
 # egress address and all secret containers remain owned by the foundation root.
 resource "google_project_service" "administration" {
-  for_each           = toset(["iap.googleapis.com"])
+  for_each           = toset(["iap.googleapis.com", "policytroubleshooter.googleapis.com"])
   project            = local.project_id
   service            = each.key
   disable_on_destroy = false
@@ -173,6 +178,25 @@ resource "time_sleep" "private_access_propagation" {
   }
 }
 
+data "external" "private_access_closed" {
+  count   = var.temporary_access_enabled ? 1 : 0
+  program = ["node", "${path.module}/scripts/verify-effective-private-access.mjs"]
+  query = {
+    project_id        = local.project_id
+    project_number    = one(data.google_project.current).number
+    phase             = "closed"
+    active_profile    = ""
+    window_starts_at  = var.window_starts_at
+    window_expires_at = var.window_expires_at
+  }
+  # Unknown until apply because the generation-specific propagation wait is
+  # replaced by every supported closed-to-open transition.
+  depends_on = [
+    google_project_service.administration["policytroubleshooter.googleapis.com"],
+    time_sleep.private_access_propagation,
+  ]
+}
+
 resource "google_secret_manager_secret_iam_member" "private_versions" {
   for_each  = local.active_profiles
   project   = local.project_id
@@ -191,13 +215,83 @@ resource "google_secret_manager_secret_iam_member" "private_versions" {
       # bounded generation transition. Open-state no-op plans are therefore
       # intentionally unsupported. Cleanup skips these policy reads entirely.
       condition     = length(local.existing_provisioner_private_bindings) == 0
-      error_message = "Private access must be fully closed and read back before opening a different profile or time window."
+      error_message = "Supplemental direct-policy residue must be absent before opening a different profile or time window."
+    }
+    precondition {
+      condition = (
+        one(data.external.private_access_closed).result.status == "policy_troubleshooter_closed_all_denied" &&
+        one(data.external.private_access_closed).result.checked_secrets == "6" &&
+        try(
+          tonumber(one(data.external.private_access_closed).result.checked_versions) >= 0 &&
+          tonumber(one(data.external.private_access_closed).result.checked_tuples) ==
+          6 + 3 * tonumber(one(data.external.private_access_closed).result.checked_versions),
+          false,
+        )
+      )
+      error_message = "Policy Troubleshooter must definitively deny add authority and every enumerated numeric-version permission before private authority opens."
     }
   }
   condition {
     title       = "bounded-native-provisioning"
     description = "One exact database secret during the admitted maintenance window."
     expression  = local.window_condition
+  }
+}
+
+# The grant can be visible to IAM after its mutation acknowledges. Wait through
+# the same bounded propagation interval before claiming that the exact opened
+# profile is usable and every peer profile remains denied.
+resource "time_sleep" "private_access_effective_propagation" {
+  count           = var.temporary_access_enabled ? 1 : 0
+  create_duration = "10m"
+  depends_on      = [google_secret_manager_secret_iam_member.private_versions]
+
+  triggers = {
+    generation = terraform_data.private_access_generation.triggers_replace
+  }
+}
+
+data "external" "private_access_effective" {
+  count   = var.temporary_access_enabled ? 1 : 0
+  program = ["node", "${path.module}/scripts/verify-effective-private-access.mjs"]
+  query = {
+    project_id        = local.project_id
+    project_number    = one(data.google_project.current).number
+    phase             = "open"
+    active_profile    = join("", sort(tolist(local.active_profiles)))
+    window_starts_at  = var.window_starts_at
+    window_expires_at = var.window_expires_at
+  }
+  depends_on = [time_sleep.private_access_effective_propagation]
+}
+
+# This state-local receipt is created only after Google reports the exact
+# effective-access matrix. A failed post-open analysis leaves the bounded IAM
+# grant applied but unverified; operators must close it and reconcile rather
+# than retrying or treating the apply as successful.
+resource "terraform_data" "private_access_effective_authority" {
+  count = var.temporary_access_enabled ? 1 : 0
+  input = {
+    profile          = join("", sort(tolist(local.active_profiles)))
+    status           = one(data.external.private_access_effective).result.status
+    checked_secrets  = one(data.external.private_access_effective).result.checked_secrets
+    checked_versions = one(data.external.private_access_effective).result.checked_versions
+    checked_tuples   = one(data.external.private_access_effective).result.checked_tuples
+  }
+  lifecycle {
+    precondition {
+      condition = (
+        one(data.external.private_access_effective).result.status == "policy_troubleshooter_${join("", sort(tolist(local.active_profiles)))}_only_confirmed" &&
+        one(data.external.private_access_effective).result.checked_secrets == "6" &&
+        try(
+          tonumber(one(data.external.private_access_effective).result.checked_versions) >= 0 &&
+          tonumber(one(data.external.private_access_effective).result.checked_tuples) ==
+          6 + 3 * tonumber(one(data.external.private_access_effective).result.checked_versions),
+          false,
+        )
+      )
+      error_message = "Policy Troubleshooter must confirm add authority and every enumerated numeric-version permission only for the opened profile."
+    }
   }
 }
 

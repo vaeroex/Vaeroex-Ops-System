@@ -11,6 +11,23 @@ mock_provider "google" {
       policy_data = "{\"version\":3,\"bindings\":[]}"
     }
   }
+  mock_data "google_project" {
+    defaults = {
+      number = "123456789012"
+    }
+  }
+}
+mock_provider "external" {
+  mock_data "external" {
+    defaults = {
+      result = {
+        status           = "policy_troubleshooter_closed_all_denied"
+        checked_secrets  = "6"
+        checked_versions = "0"
+        checked_tuples   = "6"
+      }
+    }
+  }
 }
 mock_provider "time" {}
 
@@ -63,11 +80,22 @@ run "setup_present" {
 run "setup_removed_credentials_created" {
   command = apply
   plan_options {
-    target = [google_compute_firewall.setup_https, google_secret_manager_secret_iam_member.private_versions, time_sleep.private_access_propagation]
+    target = [google_compute_firewall.setup_https, terraform_data.private_access_effective_authority]
   }
   variables {
     temporary_access_enabled  = true
     temporary_access_profiles = ["oauth"]
+  }
+  override_data {
+    target = data.external.private_access_effective[0]
+    values = {
+      result = {
+        status           = "policy_troubleshooter_oauth_only_confirmed"
+        checked_secrets  = "6"
+        checked_versions = "0"
+        checked_tuples   = "6"
+      }
+    }
   }
   assert {
     condition = (
@@ -100,7 +128,18 @@ run "credentials_removed_setup_created" {
 run "setup_removed_oauth_created" {
   command = apply
   plan_options {
-    target = [google_compute_firewall.setup_https, google_secret_manager_secret_iam_member.private_versions, terraform_data.private_access_generation, time_sleep.private_access_propagation]
+    target = [google_compute_firewall.setup_https, terraform_data.private_access_effective_authority]
+  }
+  override_data {
+    target = data.external.private_access_effective[0]
+    values = {
+      result = {
+        status           = "policy_troubleshooter_oauth_only_confirmed"
+        checked_secrets  = "6"
+        checked_versions = "0"
+        checked_tuples   = "6"
+      }
+    }
   }
   variables {
     temporary_access_enabled   = true
@@ -142,7 +181,18 @@ run "oauth_removed_to_fully_closed_checkpoint" {
 run "closed_checkpoint_to_broker_new_window" {
   command = apply
   plan_options {
-    target = [google_secret_manager_secret_iam_member.private_versions, terraform_data.private_access_generation, time_sleep.private_access_propagation]
+    target = [terraform_data.private_access_effective_authority]
+  }
+  override_data {
+    target = data.external.private_access_effective[0]
+    values = {
+      result = {
+        status           = "policy_troubleshooter_broker_only_confirmed"
+        checked_secrets  = "6"
+        checked_versions = "0"
+        checked_tuples   = "6"
+      }
+    }
   }
   variables {
     temporary_access_enabled   = true
