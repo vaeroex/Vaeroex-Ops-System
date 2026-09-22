@@ -68,7 +68,7 @@ assert.equal(
   "private_access_closed_to_one_grant_confirmed",
 );
 assert.equal(
-  verifyPrivateAccessPlan(plan(generation(true, false, ["update"], {
+  verifyPrivateAccessPlan(plan(generation(true, false, ["delete", "create"], {
     after: { checkpoint_expires_at: NEXT_EXPIRY },
   }), grant("oauth", true, false, ["delete"]))),
   "private_access_one_grant_to_closed_confirmed",
@@ -80,6 +80,12 @@ assert.equal(
 assert.equal(
   verifyPrivateAccessPlan(plan(generation(false, false, ["no-op"]))),
   "private_access_plan_closed_no_transition_confirmed",
+);
+assert.equal(
+  verifyPrivateAccessPlan(plan(generation(true, false, ["delete", "create"], {
+    after: { checkpoint_expires_at: NEXT_EXPIRY },
+  }))),
+  "private_access_open_generation_without_grant_to_closed_recovery_confirmed",
 );
 rejects(
   plan(generation(true, true, ["no-op"]), grant("oauth", true, true, ["no-op"])),
@@ -104,14 +110,20 @@ rejects(
 );
 rejects(
   plan(generation(true, false)),
-  "private_access_closed_plan_omits_managed_grant",
+  "private_access_closed_recovery_transition_invalid",
+);
+rejects(
+  plan(generation(true, false, ["delete", "create"], {
+    after: { checkpoint_expires_at: "2098-12-31T23:00:00Z" },
+  })),
+  "private_access_close_must_preserve_expiry",
 );
 rejects(
   plan(generation(true, true, ["no-op"])),
   "private_access_closed_plan_omits_managed_grant",
 );
 rejects(
-  plan(generation(true, false, ["update"], { after: { checkpoint_expires_at: "2098-12-31T23:00:00Z" } }), grant("oauth", true, false, ["delete"])),
+  plan(generation(true, false, ["delete", "create"], { after: { checkpoint_expires_at: "2098-12-31T23:00:00Z" } }), grant("oauth", true, false, ["delete"])),
   "private_access_close_must_preserve_expiry",
 );
 rejects(
@@ -131,7 +143,7 @@ rejects(
 );
 rejects(
   plan(
-    generation(true, false, ["update"], { after: { checkpoint_expires_at: NEXT_EXPIRY } }),
+    generation(true, false, ["delete", "create"], { after: { checkpoint_expires_at: NEXT_EXPIRY } }),
     grant("oauth", true, false, ["delete"], {
       before: {
         condition: [{

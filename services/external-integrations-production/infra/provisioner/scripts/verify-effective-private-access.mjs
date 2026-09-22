@@ -184,7 +184,7 @@ function parseQuery(query, now) {
     reject("policy_troubleshooter_input_invalid");
   }
   const nowMs = now.getTime();
-  if (!Number.isFinite(nowMs) || nowMs < start || nowMs >= expiry) {
+  if (!Number.isFinite(nowMs) || nowMs < start || (phase === "open" && nowMs >= expiry)) {
     reject("policy_troubleshooter_window_inactive");
   }
   const requestTime = new Date(Math.floor(nowMs / 1000) * 1000).toISOString().replace(".000Z", "Z");

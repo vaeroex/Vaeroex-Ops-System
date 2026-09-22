@@ -9,6 +9,7 @@ const PROVISIONER_MEMBER = "serviceAccount:sq-prod-provisioner@vaeroex-integrati
 const PRIVATE_VERSIONS_ROLE = "projects/vaeroex-integrations-prod/roles/squareProductionPrivateVersions";
 const CONDITION_TITLE = "bounded-native-provisioning";
 const CONDITION_DESCRIPTION = "One exact database secret during the admitted maintenance window.";
+const PROFILES = Object.freeze(["oauth", "broker", "scheduler", "webhook", "runtime", "evidence"]);
 
 function reject(label) {
   const error = new Error(label);
@@ -35,6 +36,72 @@ function input(resource, side) {
 function isNoOp(resource) {
   const actions = resource?.change?.actions;
   return Array.isArray(actions) && actions.length === 1 && actions[0] === "no-op";
+}
+
+function verifyOpenGenerationInput(value) {
+  const start = exactTimestamp(value?.starts_at);
+  const expiry = exactTimestamp(value?.expires_at);
+  const checkpointExpiry = exactTimestamp(value?.checkpoint_expires_at);
+  if (
+    value?.enabled !== true || !Array.isArray(value?.profiles) || value.profiles.length !== 1 ||
+    !PROFILES.includes(value.profiles[0]) || start === null || expiry === null || checkpointExpiry === null ||
+    expiry <= start || expiry > start + 60 * 60 * 1000 || checkpointExpiry !== expiry
+  ) {
+    reject("private_access_open_generation_invalid");
+  }
+}
+
+function verifyPreservedCloseCheckpoint(beforeInput, afterInput) {
+  verifyOpenGenerationInput(beforeInput);
+  if (!Array.isArray(afterInput?.profiles) || afterInput.profiles.length !== 0 ||
+      exactTimestamp(afterInput?.checkpoint_expires_at) !== exactTimestamp(beforeInput.expires_at)) {
+    reject("private_access_close_must_preserve_expiry");
+  }
+}
+
+export function privateAccessRecoveryTuple(plan) {
+  if (!plan || !Array.isArray(plan.resource_changes)) {
+    reject("private_access_plan_invalid");
+  }
+  const generations = plan.resource_changes.filter(change => change.address === GENERATION_ADDRESS);
+  if (generations.length !== 1) {
+    reject("private_access_generation_missing_or_ambiguous");
+  }
+  const generation = generations[0];
+  const beforeInput = input(generation, "before");
+  const afterInput = input(generation, "after");
+  if (enabled(generation, "before") !== true || enabled(generation, "after") !== false ||
+      !isDeepStrictEqual(generation.change?.actions, ["delete", "create"])) {
+    reject("private_access_closed_recovery_transition_invalid");
+  }
+  verifyPreservedCloseCheckpoint(beforeInput, afterInput);
+  return Object.freeze({
+    profile: beforeInput.profiles[0],
+    windowStartsAt: beforeInput.starts_at,
+    windowExpiresAt: beforeInput.expires_at,
+  });
+}
+
+export function privateAccessOpeningTuple(plan) {
+  if (!plan || !Array.isArray(plan.resource_changes)) {
+    reject("private_access_plan_invalid");
+  }
+  const generations = plan.resource_changes.filter(change => change.address === GENERATION_ADDRESS);
+  if (generations.length !== 1) {
+    reject("private_access_generation_missing_or_ambiguous");
+  }
+  const generation = generations[0];
+  const afterInput = input(generation, "after");
+  if (enabled(generation, "before") !== false || enabled(generation, "after") !== true ||
+      !isDeepStrictEqual(generation.change?.actions, ["delete", "create"])) {
+    reject("private_access_open_generation_invalid");
+  }
+  verifyOpenGenerationInput(afterInput);
+  return Object.freeze({
+    profile: afterInput.profiles[0],
+    windowStartsAt: afterInput.starts_at,
+    windowExpiresAt: afterInput.expires_at,
+  });
 }
 
 function verifyGrantContract(grant, side, generationInput) {
@@ -93,15 +160,16 @@ export function verifyPrivateAccessPlan(plan) {
       if (afterEnabled !== false || exactTimestamp(afterInput?.checkpoint_expires_at) === null) {
         reject("private_access_closed_plan_omits_managed_grant");
       }
-      if (beforeEnabled === true) {
-        reject("private_access_closed_plan_omits_managed_grant");
-      }
       if (beforeEnabled === null) {
         const actions = generation.change?.actions;
         if (!Array.isArray(actions) || actions.length !== 1 || actions[0] !== "create") {
           reject("private_access_closed_bootstrap_invalid");
         }
         return "private_access_plan_closed_bootstrap_confirmed";
+      }
+      if (beforeEnabled === true) {
+        privateAccessRecoveryTuple(plan);
+        return "private_access_open_generation_without_grant_to_closed_recovery_confirmed";
       }
       if (beforeEnabled !== false || !isNoOp(generation) || !isDeepStrictEqual(beforeInput, afterInput)) {
         reject("private_access_closed_checkpoint_rewrite_rejected");
@@ -146,13 +214,7 @@ export function verifyPrivateAccessPlan(plan) {
     if (afterGrants.length !== 0 || afterEnabled !== false) {
       reject("private_access_close_plan_inconsistent");
     }
-    const predecessorExpiry = exactTimestamp(beforeInput?.checkpoint_expires_at);
-    const predecessorConditionExpiry = exactTimestamp(beforeInput?.expires_at);
-    const closedCheckpointExpiry = exactTimestamp(afterInput?.checkpoint_expires_at);
-    if (predecessorExpiry === null || predecessorConditionExpiry === null || closedCheckpointExpiry === null ||
-        predecessorExpiry !== predecessorConditionExpiry || predecessorExpiry !== closedCheckpointExpiry) {
-      reject("private_access_close_must_preserve_expiry");
-    }
+    privateAccessRecoveryTuple(plan);
     verifyGrantContract(beforeGrants[0], "before", beforeInput);
     return "private_access_one_grant_to_closed_confirmed";
   }

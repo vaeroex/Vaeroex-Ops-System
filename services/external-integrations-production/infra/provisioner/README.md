@@ -104,6 +104,29 @@ Secret/SecretVersion condition context, captures and discards raw CLI output,
 and emits only fixed labels. Secret Manager version-list consistency is a
 documented pilot limitation; the controlled window admits no concurrent
 provisioning, and no generalized concurrent-administrator claim is made.
+An operator-process loss in the narrow interval after Google accepts a grant
+but before Terraform checkpoints it is recovered only through the verified
+open-generation-without-managed-grant to closed plan. Before applying that
+cleanup, the entry point reads and validates all six fixed Secret policies,
+allows only absence or the one exact provisioner member/role/profile/time
+condition derived from the plan, removes only that exact tuple, and rereads all
+six policies. Any other provisioner binding, condition mismatch, malformed
+policy, failed enumeration or residual tuple blocks Terraform apply. A failed
+or lost removal acknowledgement is accepted only when the complete readback
+proves exact absence. The resulting
+direct-policy-absence label is narrow reconciliation evidence, not proof of
+effective closure. After it passes, the reviewed close apply removes the
+temporary OS Login, IAP, firewall and state resources. The entry point then
+waits ten minutes and requires the full `6 + 3N` Policy Troubleshooter matrix
+to return definitive denial before reporting success. Analyzer uncertainty
+does not undo the already-closed resources, but it reports revocation as
+uncertain. A normal tracked close receives the same post-apply direct readback
+and effective-denial proof. Failed opening and tracked-closing applies perform
+exact reconciliation and the denial check, so a remotely accepted grant is
+revoked even when Terraform does not checkpoint it. An uncatchable process
+loss, including `SIGKILL`, must be followed by this recovery close plan; never
+retry the opening or infer closure from direct policy absence. The independent
+condition expiry remains the hard bound.
 Normal operation also waits for the predecessor's time condition to expire,
 supplies that exact expiry as the next plan's
 `previous_access_expires_at`, and verifies the exact zero-grant set before
@@ -164,6 +187,7 @@ terraform test
 node tests/verify-transition-order.mjs
 node tests/verify-effective-private-access.test.mjs
 node tests/verify-private-access-plan.test.mjs
+node tests/reconcile-private-access.test.mjs
 node tests/apply-reviewed-private-access-plan.test.mjs
 ```
 

@@ -247,8 +247,19 @@ for (const [analysis, label] of [
     },
   }), error => error.fixedLabel === label && !error.message.includes("provider detail"));
 }
-assert.throws(() => verifyEffectivePrivateAccess(query, {
+const expiredClosedRunner = runnerFor();
+assert.equal(verifyEffectivePrivateAccess(query, {
+  now: new Date("2099-01-01T02:00:00Z"),
+  run: expiredClosedRunner.run,
+}).status, "policy_troubleshooter_closed_all_denied");
+assert.equal(expiredClosedRunner.calls.filter(call => call.args[0] === "beta")
+  .every(call => call.args.includes("--request-time=2099-01-01T02:00:00Z")), true);
+assert.throws(() => verifyEffectivePrivateAccess(openQuery, {
   now: new Date("2099-01-01T01:00:00Z"),
+  run() { throw new Error("must_not_run"); },
+}), error => error.fixedLabel === "policy_troubleshooter_window_inactive");
+assert.throws(() => verifyEffectivePrivateAccess(query, {
+  now: new Date("2098-12-31T23:59:59Z"),
   run() { throw new Error("must_not_run"); },
 }), error => error.fixedLabel === "policy_troubleshooter_window_inactive");
 assert.throws(() => verifyEffectivePrivateAccess({ ...query, project_id: "other" }, {
