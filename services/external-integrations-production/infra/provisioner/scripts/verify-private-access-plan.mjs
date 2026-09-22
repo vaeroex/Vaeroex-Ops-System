@@ -10,6 +10,15 @@ const PRIVATE_VERSIONS_ROLE = "projects/vaeroex-integrations-prod/roles/squarePr
 const CONDITION_TITLE = "bounded-native-provisioning";
 const CONDITION_DESCRIPTION = "One exact database secret during the admitted maintenance window.";
 const PROFILES = Object.freeze(["oauth", "broker", "scheduler", "webhook", "runtime", "evidence"]);
+const TEMPORARY_ACCESS_ADDRESSES = Object.freeze([
+  "google_compute_instance_iam_member.operator_oslogin[0]",
+  "google_iap_tunnel_instance_iam_member.operator_tunnel[0]",
+  "google_service_account_iam_member.operator_oslogin_service_account[0]",
+  "google_compute_firewall.iap_ssh[0]",
+  "google_compute_firewall.pooler[0]",
+  "google_compute_firewall.google_api_https[0]",
+  "google_compute_firewall.setup_https[0]",
+]);
 
 function reject(label) {
   const error = new Error(label);
@@ -36,6 +45,59 @@ function input(resource, side) {
 function isNoOp(resource) {
   const actions = resource?.change?.actions;
   return Array.isArray(actions) && actions.length === 1 && actions[0] === "no-op";
+}
+
+function accessPhase(plan) {
+  const administrative = plan?.variables?.administrative_access_enabled?.value;
+  const setupHttps = plan?.variables?.setup_https_enabled?.value;
+  const temporary = plan?.variables?.temporary_access_enabled?.value;
+  const profiles = plan?.variables?.temporary_access_profiles?.value;
+  if (typeof administrative !== "boolean" || typeof setupHttps !== "boolean" ||
+      typeof temporary !== "boolean" || !Array.isArray(profiles) ||
+      profiles.some(profile => typeof profile !== "string" || !PROFILES.includes(profile))) {
+    reject("private_access_plan_phase_variables_invalid");
+  }
+  if (!administrative && !setupHttps && !temporary && profiles.length === 0) return "closed";
+  if (administrative && setupHttps && !temporary && profiles.length === 0) return "setup";
+  if (administrative && !setupHttps && !temporary && profiles.length === 0) return "administrative";
+  if (administrative && !setupHttps && temporary && profiles.length === 1) return `open:${profiles[0]}`;
+  reject("private_access_plan_phase_variables_invalid");
+}
+
+function verifyFullyClosedBoundary(plan, phase) {
+  if (phase !== "closed") reject("private_access_closed_controls_not_disabled");
+  for (const address of TEMPORARY_ACCESS_ADDRESSES) {
+    const matches = plan.resource_changes.filter(change => change.address === address);
+    if (matches.length > 1 || matches.some(change => change?.change?.after !== null)) {
+      reject("private_access_closed_temporary_resource_present");
+    }
+  }
+}
+
+export function privateAccessClosedBootstrapTuple(plan) {
+  if (!plan || !Array.isArray(plan.resource_changes)) reject("private_access_plan_invalid");
+  const generations = plan.resource_changes.filter(change => change.address === GENERATION_ADDRESS);
+  if (generations.length !== 1) reject("private_access_generation_missing_or_ambiguous");
+  const generation = generations[0];
+  const afterInput = input(generation, "after");
+  const start = exactTimestamp(afterInput?.starts_at);
+  const expiry = exactTimestamp(afterInput?.expires_at);
+  const checkpointExpiry = exactTimestamp(afterInput?.checkpoint_expires_at);
+  const previousExpiry = exactTimestamp(plan?.variables?.previous_access_expires_at?.value);
+  if (
+    generation.change?.before !== null || enabled(generation, "after") !== false ||
+    !isDeepStrictEqual(generation.change?.actions, ["create"]) ||
+    !Array.isArray(afterInput?.profiles) || afterInput.profiles.length !== 0 ||
+    start === null || expiry === null || expiry <= start || expiry > start + 60 * 60 * 1000 ||
+    checkpointExpiry === null || previousExpiry === null || checkpointExpiry !== previousExpiry ||
+    checkpointExpiry > start
+  ) {
+    reject("private_access_closed_bootstrap_invalid");
+  }
+  return Object.freeze({
+    windowStartsAt: afterInput.starts_at,
+    windowExpiresAt: afterInput.expires_at,
+  });
 }
 
 function verifyOpenGenerationInput(value) {
@@ -106,7 +168,7 @@ export function privateAccessOpeningTuple(plan) {
   });
 }
 
-export function privateAccessClosedCheckpointTuple(plan) {
+export function privateAccessClosedNoTransitionTuple(plan) {
   if (!plan || !Array.isArray(plan.resource_changes)) {
     reject("private_access_plan_invalid");
   }
@@ -119,12 +181,17 @@ export function privateAccessClosedCheckpointTuple(plan) {
   const afterInput = input(generation, "after");
   const start = exactTimestamp(afterInput?.starts_at);
   const expiry = exactTimestamp(afterInput?.expires_at);
+  const checkpointExpiry = exactTimestamp(afterInput?.checkpoint_expires_at);
+  const previousExpiry = exactTimestamp(plan?.variables?.previous_access_expires_at?.value);
+  const strictPostClose = checkpointExpiry !== null && checkpointExpiry === expiry;
+  const canonicalBootstrap = checkpointExpiry !== null && previousExpiry !== null &&
+    checkpointExpiry === previousExpiry && checkpointExpiry <= start;
   if (
     enabled(generation, "before") !== false || enabled(generation, "after") !== false ||
     !isNoOp(generation) || !isDeepStrictEqual(beforeInput, afterInput) ||
     !Array.isArray(afterInput?.profiles) || afterInput.profiles.length !== 0 ||
     start === null || expiry === null || expiry <= start || expiry > start + 60 * 60 * 1000 ||
-    exactTimestamp(afterInput?.checkpoint_expires_at) !== expiry
+    (!strictPostClose && !canonicalBootstrap)
   ) {
     reject("private_access_closed_checkpoint_invalid");
   }
@@ -132,6 +199,16 @@ export function privateAccessClosedCheckpointTuple(plan) {
     windowStartsAt: afterInput.starts_at,
     windowExpiresAt: afterInput.expires_at,
   });
+}
+
+export function privateAccessClosedCheckpointTuple(plan) {
+  const tuple = privateAccessClosedNoTransitionTuple(plan);
+  const generation = plan.resource_changes.find(change => change.address === GENERATION_ADDRESS);
+  const afterInput = input(generation, "after");
+  if (exactTimestamp(afterInput?.checkpoint_expires_at) !== exactTimestamp(afterInput?.expires_at)) {
+    reject("private_access_closed_checkpoint_invalid");
+  }
+  return tuple;
 }
 
 function verifyGrantContract(grant, side, generationInput) {
@@ -158,6 +235,9 @@ export function verifyPrivateAccessPlan(plan) {
   if (!plan || !Array.isArray(plan.resource_changes)) {
     reject("private_access_plan_invalid");
   }
+  // Any targeted or otherwise incomplete plan can omit resources or dependent
+  // qualification receipts. The wrapper never applies one for any phase.
+  if (plan.complete !== true) reject("private_access_plan_incomplete");
 
   const generations = plan.resource_changes.filter(change => change.address === GENERATION_ADDRESS);
   if (generations.length !== 1) {
@@ -181,6 +261,7 @@ export function verifyPrivateAccessPlan(plan) {
   const afterEnabled = enabled(generation, "after");
   const beforeInput = input(generation, "before");
   const afterInput = input(generation, "after");
+  const phase = accessPhase(plan);
 
   if (mutatingGrants.length === 0) {
     if (beforeGrants.length !== afterGrants.length) {
@@ -191,20 +272,22 @@ export function verifyPrivateAccessPlan(plan) {
         reject("private_access_closed_plan_omits_managed_grant");
       }
       if (beforeEnabled === null) {
-        const actions = generation.change?.actions;
-        if (!Array.isArray(actions) || actions.length !== 1 || actions[0] !== "create") {
-          reject("private_access_closed_bootstrap_invalid");
-        }
+        privateAccessClosedBootstrapTuple(plan);
+        verifyFullyClosedBoundary(plan, phase);
         return "private_access_plan_closed_bootstrap_confirmed";
       }
       if (beforeEnabled === true) {
         privateAccessRecoveryTuple(plan);
+        verifyFullyClosedBoundary(plan, phase);
         return "private_access_open_generation_without_grant_to_closed_recovery_confirmed";
       }
       if (beforeEnabled !== false || !isNoOp(generation) || !isDeepStrictEqual(beforeInput, afterInput)) {
         reject("private_access_closed_checkpoint_rewrite_rejected");
       }
-      privateAccessClosedCheckpointTuple(plan);
+      privateAccessClosedNoTransitionTuple(plan);
+      if (phase === "setup") return "private_access_setup_phase_confirmed";
+      if (phase === "administrative") return "private_access_administrative_phase_confirmed";
+      verifyFullyClosedBoundary(plan, phase);
       return "private_access_plan_closed_no_transition_confirmed";
     }
     // A live open-state plan cannot prove that its grant was created by the
@@ -237,6 +320,7 @@ export function verifyPrivateAccessPlan(plan) {
     if (successorStart < checkpointExpiry) {
       reject("private_access_successor_starts_before_checkpoint_expiry");
     }
+    if (phase !== `open:${afterGrants[0].index}`) reject("private_access_open_controls_invalid");
     verifyGrantContract(afterGrants[0], "after", afterInput);
     return "private_access_closed_to_one_grant_confirmed";
   }
@@ -246,6 +330,7 @@ export function verifyPrivateAccessPlan(plan) {
       reject("private_access_close_plan_inconsistent");
     }
     privateAccessRecoveryTuple(plan);
+    verifyFullyClosedBoundary(plan, phase);
     verifyGrantContract(beforeGrants[0], "before", beforeInput);
     return "private_access_one_grant_to_closed_confirmed";
   }

@@ -134,6 +134,17 @@ open-generation recovery close plan; a loss after commit uses the unchanged
 closed/no-transition proof above. Never retry the opening or infer closure
 from direct policy absence. The independent
 condition expiry remains the hard bound.
+The saved-plan verifier rejects targeted/incomplete plans in every phase so an
+opening cannot omit its dependent effective-authority receipt. It distinguishes
+setup and administration as explicitly non-closed phases. It may report a
+closed bootstrap, recovery, tracked close or closed checkpoint only when the
+administrative, setup-HTTPS and temporary-secret flags are all false, the
+profile set is empty, and post-apply state contains none of the exact temporary
+OS Login, IAP or firewall resources. A contradictory closed-state tuple or any
+retained temporary access fails before apply; setup and pre-secret
+administration remain supported but never produce a closure acknowledgement.
+The first closed bootstrap also receives the same post-apply direct-binding
+absence and complete effective-denial proof as a resumed closed checkpoint.
 The closing plan must preserve the admitted window's original start and expiry
 and record that same expiry as its closed checkpoint, so an interrupted
 post-close proof can be resumed without rewriting the generation.

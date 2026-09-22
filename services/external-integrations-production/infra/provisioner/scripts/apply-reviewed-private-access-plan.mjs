@@ -18,7 +18,8 @@ import {
 } from "./reconcile-private-access.mjs";
 import { verifyEffectivePrivateAccess } from "./verify-effective-private-access.mjs";
 import {
-  privateAccessClosedCheckpointTuple,
+  privateAccessClosedBootstrapTuple,
+  privateAccessClosedNoTransitionTuple,
   privateAccessOpeningTuple,
   privateAccessRecoveryTuple,
   verifyPrivateAccessPlan,
@@ -30,6 +31,7 @@ const RECOVERY_LABEL = "private_access_open_generation_without_grant_to_closed_r
 const OPENING_LABEL = "private_access_closed_to_one_grant_confirmed";
 const CLOSING_LABEL = "private_access_one_grant_to_closed_confirmed";
 const CLOSED_NO_TRANSITION_LABEL = "private_access_plan_closed_no_transition_confirmed";
+const CLOSED_BOOTSTRAP_LABEL = "private_access_plan_closed_bootstrap_confirmed";
 const PROJECT_ID = "vaeroex-integrations-prod";
 const PROJECT_NUMBER = "711446392261";
 const REVOCATION_PROPAGATION_MS = 10 * 60 * 1000;
@@ -162,6 +164,7 @@ export function applyReviewedPrivateAccessPlan(planPath, reviewedSha256, options
     let recovery;
     let closing;
     let opening;
+    let closedBootstrap;
     let closedNoTransition;
     if (verificationLabel === RECOVERY_LABEL) {
       recovery = privateAccessRecoveryTuple(rendered);
@@ -174,8 +177,10 @@ export function applyReviewedPrivateAccessPlan(planPath, reviewedSha256, options
       closing = privateAccessRecoveryTuple(rendered);
     } else if (verificationLabel === OPENING_LABEL) {
       opening = privateAccessOpeningTuple(rendered);
+    } else if (verificationLabel === CLOSED_BOOTSTRAP_LABEL) {
+      closedBootstrap = privateAccessClosedBootstrapTuple(rendered);
     } else if (verificationLabel === CLOSED_NO_TRANSITION_LABEL) {
-      closedNoTransition = privateAccessClosedCheckpointTuple(rendered);
+      closedNoTransition = privateAccessClosedNoTransitionTuple(rendered);
     }
 
     if (sha256(readFileSync(immutableCopy)) !== expectedHash) {
@@ -212,7 +217,7 @@ export function applyReviewedPrivateAccessPlan(planPath, reviewedSha256, options
       }
       reject("private_access_verified_plan_apply_failed");
     }
-    const closedTransition = recovery ?? closing ?? closedNoTransition;
+    const closedTransition = recovery ?? closing ?? closedBootstrap ?? closedNoTransition;
     if (closing) {
       try {
         reconciliationLabel = reconcilePrivateAccess(closing, options);
@@ -220,7 +225,7 @@ export function applyReviewedPrivateAccessPlan(planPath, reviewedSha256, options
         reject("private_access_exact_reconciliation_uncertain_after_cleanup_apply");
       }
     }
-    if (closedNoTransition) {
+    if (closedBootstrap || closedNoTransition) {
       try {
         reconciliationLabel = confirmPrivateAccessClosed(options);
       } catch {

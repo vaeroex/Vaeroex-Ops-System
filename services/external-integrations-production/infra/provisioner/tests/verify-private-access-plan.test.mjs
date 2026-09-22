@@ -8,6 +8,13 @@ const PRIOR_START = "2099-01-01T00:00:00Z";
 const PRIOR_EXPIRY = "2099-01-01T01:00:00Z";
 const NEXT_START = "2099-01-02T00:00:00Z";
 const NEXT_EXPIRY = "2099-01-02T01:00:00Z";
+const phaseVariables = (phase = "closed", profile = "oauth") => ({
+  administrative_access_enabled: { value: phase !== "closed" },
+  setup_https_enabled: { value: phase === "setup" },
+  temporary_access_enabled: { value: phase === "open" },
+  temporary_access_profiles: { value: phase === "open" ? [profile] : [] },
+  previous_access_expires_at: { value: "2098-12-31T23:00:00Z" },
+});
 
 const generationInput = (enabled, overrides = {}) => ({
   enabled,
@@ -65,7 +72,18 @@ const grant = (profile, before, after, actions, overrides = {}) => ({
 });
 
 function plan(...resourceChanges) {
-  return { format_version: "1.2", resource_changes: resourceChanges };
+  const afterEnabled = resourceChanges.find(change => change.address === "terraform_data.private_access_generation")
+    ?.change?.after?.input?.enabled;
+  return {
+    format_version: "1.2",
+    complete: true,
+    variables: phaseVariables(afterEnabled === true ? "open" : "closed"),
+    resource_changes: resourceChanges,
+  };
+}
+
+function planInPhase(phase, ...resourceChanges) {
+  return { ...plan(...resourceChanges), variables: phaseVariables(phase) };
 }
 
 function rejects(candidate, label) {
@@ -83,12 +101,88 @@ assert.equal(
   "private_access_one_grant_to_closed_confirmed",
 );
 assert.equal(
-  verifyPrivateAccessPlan(plan(generation(null, false, ["create"]))),
+  verifyPrivateAccessPlan(plan(generation(null, false, ["create"], {
+    after: { checkpoint_expires_at: "2098-12-31T23:00:00Z" },
+  }))),
   "private_access_plan_closed_bootstrap_confirmed",
+);
+assert.equal(
+  verifyPrivateAccessPlan({
+    ...plan(generation(null, false, ["create"], {
+      after: { checkpoint_expires_at: PRIOR_START },
+    })),
+    variables: {
+      ...phaseVariables("closed"),
+      previous_access_expires_at: { value: PRIOR_START },
+    },
+  }),
+  "private_access_plan_closed_bootstrap_confirmed",
+);
+rejects(
+  {
+    ...plan(generation(null, false, ["create"], {
+      after: { checkpoint_expires_at: "2098-12-31T23:00:00Z" },
+    })),
+    variables: {
+      ...phaseVariables("closed"),
+      previous_access_expires_at: { value: "2098-12-31T22:59:59Z" },
+    },
+  },
+  "private_access_closed_bootstrap_invalid",
+);
+rejects(
+  {
+    ...plan(generation(null, false, ["create"], {
+      after: { checkpoint_expires_at: "2099-01-01T00:00:01Z" },
+    })),
+    variables: {
+      ...phaseVariables("closed"),
+      previous_access_expires_at: { value: "2099-01-01T00:00:01Z" },
+    },
+  },
+  "private_access_closed_bootstrap_invalid",
 );
 assert.equal(
   verifyPrivateAccessPlan(plan(generation(false, false, ["no-op"]))),
   "private_access_plan_closed_no_transition_confirmed",
+);
+assert.equal(
+  verifyPrivateAccessPlan(planInPhase("setup", generation(false, false, ["no-op"]))),
+  "private_access_setup_phase_confirmed",
+);
+assert.equal(
+  verifyPrivateAccessPlan(planInPhase("administrative", generation(false, false, ["no-op"]))),
+  "private_access_administrative_phase_confirmed",
+);
+const bootstrapNoTransition = generation(false, false, ["no-op"], {
+  before: { checkpoint_expires_at: "2098-12-31T23:00:00Z" },
+  after: { checkpoint_expires_at: "2098-12-31T23:00:00Z" },
+});
+assert.equal(
+  verifyPrivateAccessPlan(plan(bootstrapNoTransition)),
+  "private_access_plan_closed_no_transition_confirmed",
+);
+assert.equal(
+  verifyPrivateAccessPlan(planInPhase("setup", bootstrapNoTransition)),
+  "private_access_setup_phase_confirmed",
+);
+assert.equal(
+  verifyPrivateAccessPlan(planInPhase("administrative", bootstrapNoTransition)),
+  "private_access_administrative_phase_confirmed",
+);
+rejects(
+  {
+    ...plan(bootstrapNoTransition),
+    variables: {
+      ...phaseVariables("closed"),
+      previous_access_expires_at: { value: "2098-12-31T22:59:59Z" },
+    },
+  },
+  "private_access_closed_checkpoint_invalid",
+);
+assert.throws(
+  () => privateAccessClosedCheckpointTuple(plan(bootstrapNoTransition)),
+  error => error.fixedLabel === "private_access_closed_checkpoint_invalid",
 );
 assert.deepEqual(privateAccessClosedCheckpointTuple(plan(generation(false, false, ["no-op"]))), {
   windowStartsAt: PRIOR_START,
@@ -189,6 +283,38 @@ rejects(
     }),
   ),
   "private_access_managed_grant_contract_mismatch",
+);
+
+const temporaryAccessResources = [
+  ["google_compute_instance_iam_member.operator_oslogin[0]", "google_compute_instance_iam_member", "operator_oslogin"],
+  ["google_iap_tunnel_instance_iam_member.operator_tunnel[0]", "google_iap_tunnel_instance_iam_member", "operator_tunnel"],
+  ["google_service_account_iam_member.operator_oslogin_service_account[0]", "google_service_account_iam_member", "operator_oslogin_service_account"],
+  ["google_compute_firewall.iap_ssh[0]", "google_compute_firewall", "iap_ssh"],
+  ["google_compute_firewall.pooler[0]", "google_compute_firewall", "pooler"],
+  ["google_compute_firewall.google_api_https[0]", "google_compute_firewall", "google_api_https"],
+  ["google_compute_firewall.setup_https[0]", "google_compute_firewall", "setup_https"],
+];
+const retainedTemporaryResource = ([address, type, name]) => ({
+  address,
+  type,
+  name,
+  change: { actions: ["no-op"], before: {}, after: {} },
+});
+const closingGeneration = generation(true, false, ["delete", "create"], { after: preservedCloseWindow });
+const closingGrant = grant("oauth", true, false, ["delete"]);
+rejects(
+  planInPhase("administrative", closingGeneration, closingGrant, ...temporaryAccessResources.map(retainedTemporaryResource)),
+  "private_access_closed_controls_not_disabled",
+);
+for (const resource of temporaryAccessResources) {
+  rejects(
+    plan(closingGeneration, closingGrant, retainedTemporaryResource(resource)),
+    "private_access_closed_temporary_resource_present",
+  );
+}
+rejects(
+  { ...plan(generation(false, true), grant("oauth", false, true, ["create"])), complete: false },
+  "private_access_plan_incomplete",
 );
 
 process.stdout.write("private_access_saved_plan_transition_guard_confirmed\n");

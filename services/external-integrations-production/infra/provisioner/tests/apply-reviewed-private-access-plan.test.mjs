@@ -21,6 +21,27 @@ const root = mkdtempSync(join(tmpdir(), "vaeroex-reviewed-apply-test-"));
 const planPath = join(root, "candidate.tfplan");
 writeFileSync(planPath, Buffer.from("opaque-saved-plan"), { mode: 0o600 });
 const reviewedSha256 = createHash("sha256").update("opaque-saved-plan").digest("hex");
+const closedPlanVariables = Object.freeze({
+  administrative_access_enabled: { value: false },
+  setup_https_enabled: { value: false },
+  temporary_access_enabled: { value: false },
+  temporary_access_profiles: { value: [] },
+  previous_access_expires_at: { value: "2098-12-31T23:00:00Z" },
+});
+const openPlanVariables = Object.freeze({
+  administrative_access_enabled: { value: true },
+  setup_https_enabled: { value: false },
+  temporary_access_enabled: { value: true },
+  temporary_access_profiles: { value: ["oauth"] },
+  previous_access_expires_at: { value: "2099-01-01T01:00:00Z" },
+});
+const administrativePlanVariables = Object.freeze({
+  administrative_access_enabled: { value: true },
+  setup_https_enabled: { value: false },
+  temporary_access_enabled: { value: false },
+  temporary_access_profiles: { value: [] },
+  previous_access_expires_at: { value: "2099-01-01T01:00:00Z" },
+});
 
 const generation = {
   address: "terraform_data.private_access_generation",
@@ -35,12 +56,17 @@ const generation = {
         profiles: [],
         starts_at: "2099-01-01T00:00:00Z",
         expires_at: "2099-01-01T01:00:00Z",
-        checkpoint_expires_at: "2099-01-01T01:00:00Z",
+        checkpoint_expires_at: "2098-12-31T23:00:00Z",
       },
     },
   },
 };
-const validJson = Buffer.from(JSON.stringify({ format_version: "1.2", resource_changes: [generation] }));
+const validJson = Buffer.from(JSON.stringify({
+  format_version: "1.2",
+  complete: true,
+  variables: closedPlanVariables,
+  resource_changes: [generation],
+}));
 const confirmedReconciliation = Object.freeze({
   status: "private_access_exact_direct_binding_reconciliation_confirmed",
   checked_secrets: "6",
@@ -61,7 +87,13 @@ const success = applyReviewedPrivateAccessPlan(planPath, reviewedSha256, {
     TF_LOG_SDK_PROTO_DATA_DIR: join(root, "terraform-protocol-logs"),
   },
   temporaryRoot: root,
-  reconcilePrivateAccess() { return confirmedReconciliation; },
+  confirmClosedPrivateAccess() {
+    return { status: "private_access_exact_direct_binding_absence_confirmed", checked_secrets: "6" };
+  },
+  waitForRevocationPropagation(milliseconds) { assert.equal(milliseconds, 600_000); },
+  verifyEffectivePrivateAccess() {
+    return { status: "policy_troubleshooter_closed_all_denied", checked_secrets: "6", checked_versions: "0", checked_tuples: "6" };
+  },
   runTerraform(args, options) {
     calls.push({ args, options, bytes: readFileSync(args.at(-1)) });
     return args[0] === "show"
@@ -74,7 +106,8 @@ const success = applyReviewedPrivateAccessPlan(planPath, reviewedSha256, {
   },
 });
 assert.equal(success.verificationLabel, "private_access_plan_closed_bootstrap_confirmed");
-assert.equal(success.reconciliationLabel, undefined);
+assert.equal(success.reconciliationLabel, "private_access_exact_direct_binding_absence_confirmed");
+assert.equal(success.effectiveRevocationLabel, "policy_troubleshooter_closed_all_denied");
 assert.equal(success.resultLabel, "private_access_verified_plan_apply_completed");
 assert.match(success.planSha256, /^[a-f0-9]{64}$/);
 assert.deepEqual(calls.map(call => call.args.slice(0, 2)), [["show", "-json"], ["apply", "-input=false"]]);
@@ -116,6 +149,8 @@ const closedNoTransitionGeneration = {
 };
 const closedNoTransitionJson = Buffer.from(JSON.stringify({
   format_version: "1.2",
+  complete: true,
+  variables: closedPlanVariables,
   resource_changes: [closedNoTransitionGeneration],
 }));
 const closedRecoveryOrder = [];
@@ -228,7 +263,11 @@ assert.throws(
     reconcilePrivateAccess() { return confirmedReconciliation; },
     runTerraform(args) {
       if (args[0] === "apply") applyCalled = true;
-      return { status: 0, stdout: Buffer.from('{"resource_changes":[]}'), stderr: Buffer.alloc(0) };
+      return {
+        status: 0,
+        stdout: Buffer.from(JSON.stringify({ complete: true, variables: closedPlanVariables, resource_changes: [] })),
+        stderr: Buffer.alloc(0),
+      };
     },
   }),
   error => error.fixedLabel === "private_access_generation_missing_or_ambiguous",
@@ -283,6 +322,8 @@ const cleanupChanges = cleanupAddresses.map(([address, type, name]) => ({
 }));
 const recoveryJson = Buffer.from(JSON.stringify({
   format_version: "1.2",
+  complete: true,
+  variables: closedPlanVariables,
   resource_changes: [recoveryGeneration, ...cleanupChanges],
 }));
 const recoveryOrder = [];
@@ -357,6 +398,8 @@ const trackedCloseGrant = {
 };
 const trackedCloseJson = Buffer.from(JSON.stringify({
   format_version: "1.2",
+  complete: true,
+  variables: closedPlanVariables,
   resource_changes: [recoveryGeneration, trackedCloseGrant, ...cleanupChanges],
 }));
 const trackedCloseOrder = [];
@@ -442,7 +485,12 @@ const openingGrant = {
     },
   },
 };
-const openingJson = Buffer.from(JSON.stringify({ format_version: "1.2", resource_changes: [openingGeneration, openingGrant] }));
+const openingJson = Buffer.from(JSON.stringify({
+  format_version: "1.2",
+  complete: true,
+  variables: openPlanVariables,
+  resource_changes: [openingGeneration, openingGrant],
+}));
 const failedOpenOrder = [];
 assert.throws(() => applyReviewedPrivateAccessPlan(planPath, reviewedSha256, {
   cwd: root,
@@ -470,7 +518,13 @@ const fakeTerraformDirectory = join(root, "fake-terraform-bin");
 mkdirSync(fakeTerraformDirectory, { mode: 0o700 });
 const fakeTerraformPath = join(fakeTerraformDirectory, "terraform");
 const fakeGcloudPath = join(fakeTerraformDirectory, "gcloud");
-const encodedPlanJson = validJson.toString("base64");
+const administrativeJson = Buffer.from(JSON.stringify({
+  format_version: "1.2",
+  complete: true,
+  variables: administrativePlanVariables,
+  resource_changes: [closedNoTransitionGeneration],
+}));
+const encodedPlanJson = administrativeJson.toString("base64");
 writeFileSync(
   fakeTerraformPath,
   `#!${process.execPath}
@@ -520,7 +574,7 @@ const cliResult = spawnSync(process.execPath, [wrapperPath, planPath, reviewedSh
 assert.equal(cliResult.status, 0);
 assert.equal(
   cliResult.stdout,
-  "private_access_plan_closed_bootstrap_confirmed\nprivate_access_verified_plan_apply_completed\n",
+  "private_access_administrative_phase_confirmed\nprivate_access_verified_plan_apply_completed\n",
 );
 assert.equal(cliResult.stderr, "");
 assert.equal(cliResult.stdout.includes("raw-"), false);
