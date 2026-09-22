@@ -1,11 +1,13 @@
 locals {
-  project_id      = "vaeroex-integrations-prod"
-  name            = "square-production-provisioner"
-  operator        = "user:isaac@vaeroex.com"
-  network         = "projects/vaeroex-integrations-prod/global/networks/vaeroex-integrations-production"
-  subnetwork      = "projects/vaeroex-integrations-prod/regions/us-west1/subnetworks/vaeroex-integrations-us-west1"
-  profiles        = toset(["oauth", "broker", "scheduler", "webhook", "runtime", "evidence"])
-  active_profiles = var.temporary_access_enabled ? var.temporary_access_profiles : toset([])
+  project_id                 = "vaeroex-integrations-prod"
+  name                       = "square-production-provisioner"
+  operator                   = "user:isaac@vaeroex.com"
+  network                    = "projects/vaeroex-integrations-prod/global/networks/vaeroex-integrations-production"
+  subnetwork                 = "projects/vaeroex-integrations-prod/regions/us-west1/subnetworks/vaeroex-integrations-us-west1"
+  profiles                   = toset(["oauth", "broker", "scheduler", "webhook", "runtime", "evidence"])
+  active_profiles            = var.temporary_access_enabled ? var.temporary_access_profiles : toset([])
+  provisioner_member         = "serviceAccount:sq-prod-provisioner@vaeroex-integrations-prod.iam.gserviceaccount.com"
+  private_versions_role_name = "projects/vaeroex-integrations-prod/roles/squareProductionPrivateVersions"
   window_condition = join(" && ", [
     "request.time >= timestamp('${var.window_starts_at}')",
     "request.time < timestamp('${var.window_expires_at}')",
@@ -16,6 +18,30 @@ locals {
     purpose     = "bounded-native-provisioning"
     managed_by  = "terraform"
   }
+}
+
+data "google_secret_manager_secret_iam_policy" "private_versions" {
+  # Cleanup must remain able to revoke the active grant even if an unrelated
+  # secret's policy cannot be read. Inspect every peer container only while a
+  # successor grant is being opened, never while access is being closed.
+  for_each  = var.temporary_access_enabled ? local.profiles : toset([])
+  project   = local.project_id
+  secret_id = "square-production-${each.key}-db"
+}
+
+locals {
+  existing_provisioner_private_bindings = flatten([
+    for profile, policy in data.google_secret_manager_secret_iam_policy.private_versions : [
+      for binding in try(jsondecode(policy.policy_data).bindings, []) : {
+        profile     = profile
+        role        = binding.role
+        title       = try(binding.condition.title, "")
+        description = try(binding.condition.description, "")
+        expression  = try(binding.condition.expression, "")
+      }
+      if contains(try(binding.members, []), local.provisioner_member)
+    ]
+  ])
 }
 
 # These are additive APIs only. Existing platform APIs, network, subnet, NAT,
@@ -112,17 +138,34 @@ resource "google_project_iam_custom_role" "private_versions" {
 # direct profile-to-profile apply from briefly authorizing both profiles.
 resource "terraform_data" "private_access_generation" {
   input = {
-    enabled    = var.temporary_access_enabled
-    profiles   = sort(tolist(var.temporary_access_profiles))
-    starts_at  = var.window_starts_at
-    expires_at = var.window_expires_at
+    enabled               = var.temporary_access_enabled
+    profiles              = sort(tolist(var.temporary_access_profiles))
+    starts_at             = var.window_starts_at
+    expires_at            = var.window_expires_at
+    checkpoint_expires_at = var.temporary_access_enabled ? var.window_expires_at : var.previous_access_expires_at
   }
   triggers_replace = sha256(jsonencode({
-    enabled    = var.temporary_access_enabled
-    profiles   = sort(tolist(var.temporary_access_profiles))
-    starts_at  = var.window_starts_at
-    expires_at = var.window_expires_at
+    enabled               = var.temporary_access_enabled
+    profiles              = sort(tolist(var.temporary_access_profiles))
+    starts_at             = var.window_starts_at
+    expires_at            = var.window_expires_at
+    checkpoint_expires_at = var.temporary_access_enabled ? var.window_expires_at : var.previous_access_expires_at
   }))
+}
+
+# IAM policy updates are eventually consistent. A replacement access
+# generation therefore waits after every old grant has been destroyed before
+# any new grant may be created. Ten minutes exceeds Google's documented
+# typical two-minute interval and its noted seven-minute case. Because IAM can
+# take longer, normal operations also close and verify between role windows;
+# the binding's independent time condition remains the hard access boundary.
+resource "time_sleep" "private_access_propagation" {
+  create_duration = var.temporary_access_enabled ? "10m" : "0s"
+  depends_on      = [terraform_data.private_access_generation]
+
+  triggers = {
+    generation = terraform_data.private_access_generation.triggers_replace
+  }
 }
 
 resource "google_secret_manager_secret_iam_member" "private_versions" {
@@ -133,9 +176,20 @@ resource "google_secret_manager_secret_iam_member" "private_versions" {
   member    = google_service_account.provisioner.member
   # Count-removal transitions must finish destroying setup HTTPS before any
   # grant is created; reverse transitions destroy all grants before setup.
-  depends_on = [google_compute_firewall.setup_https, terraform_data.private_access_generation]
+  depends_on = [google_compute_firewall.setup_https, time_sleep.private_access_propagation]
   lifecycle {
-    replace_triggered_by = [terraform_data.private_access_generation]
+    replace_triggered_by = [time_sleep.private_access_propagation]
+    precondition {
+      condition = length(local.existing_provisioner_private_bindings) == 0 || (
+        length(local.existing_provisioner_private_bindings) == 1 &&
+        one(local.existing_provisioner_private_bindings).profile == each.key &&
+        one(local.existing_provisioner_private_bindings).role == local.private_versions_role_name &&
+        one(local.existing_provisioner_private_bindings).title == "bounded-native-provisioning" &&
+        one(local.existing_provisioner_private_bindings).description == "One exact database secret during the admitted maintenance window." &&
+        one(local.existing_provisioner_private_bindings).expression == local.window_condition
+      )
+      error_message = "Private access must be fully closed and read back before opening a different profile or time window."
+    }
   }
   condition {
     title       = "bounded-native-provisioning"

@@ -1,4 +1,11 @@
-mock_provider "google" {}
+mock_provider "google" {
+  mock_data "google_secret_manager_secret_iam_policy" {
+    defaults = {
+      policy_data = "{\"version\":3,\"bindings\":[]}"
+    }
+  }
+}
+mock_provider "time" {}
 
 # Documentation-only addresses and a synthetic image pin; never a hosted plan.
 variables {
@@ -6,6 +13,7 @@ variables {
   boot_image                 = "projects/debian-cloud/global/images/debian-13-trixie-v20260901"
   window_starts_at           = "2099-01-01T00:00:00Z"
   window_expires_at          = "2099-01-01T01:00:00Z"
+  previous_access_expires_at = "2098-12-31T23:00:00Z"
   verified_pooler_ipv4_cidrs = ["192.0.2.1/32", "192.0.2.2/32"]
 }
 
@@ -48,6 +56,7 @@ run "initial_installation_is_stopped_and_inaccessible" {
   }
   assert {
     condition = (
+      length(data.google_secret_manager_secret_iam_policy.private_versions) == 0 &&
       length(google_secret_manager_secret_iam_member.private_versions) == 0 &&
       length(google_compute_instance_iam_member.operator_oslogin) == 0 &&
       length(google_iap_tunnel_instance_iam_member.operator_tunnel) == 0 &&
@@ -56,21 +65,21 @@ run "initial_installation_is_stopped_and_inaccessible" {
       length(google_compute_firewall.pooler) == 0 && length(google_compute_firewall.google_api_https) == 0 &&
       length(google_compute_firewall.setup_https) == 0
     )
-    error_message = "No temporary administration, secret authority or allowed network access exists by default."
+    error_message = "Closed access must require no secret-policy readback and create no temporary administration, secret authority or allowed network access."
   }
 }
 
-run "open_window_has_only_exact_expiring_permissions" {
+run "open_window_has_only_exact_expiring_permission" {
   command = plan
   variables {
     administrative_access_enabled = true
     temporary_access_enabled      = true
-    temporary_access_profiles     = ["oauth", "broker", "scheduler", "webhook", "runtime", "evidence"]
+    temporary_access_profiles     = ["oauth"]
   }
 
   assert {
     condition = (
-      toset(keys(google_secret_manager_secret_iam_member.private_versions)) == toset(["oauth", "broker", "scheduler", "webhook", "runtime", "evidence"]) &&
+      toset(keys(google_secret_manager_secret_iam_member.private_versions)) == toset(["oauth"]) &&
       toset(google_project_iam_custom_role.private_versions.permissions) == toset([
         "secretmanager.versions.add", "secretmanager.versions.access",
         "secretmanager.versions.get", "secretmanager.versions.disable"
@@ -81,7 +90,7 @@ run "open_window_has_only_exact_expiring_permissions" {
         binding.condition[0].expression == "request.time >= timestamp('2099-01-01T00:00:00Z') && request.time < timestamp('2099-01-01T01:00:00Z')"
       ])
     )
-    error_message = "Grant only four version-staging permissions to the six exact database secrets during one window."
+    error_message = "Grant only four version-staging permissions to one exact database secret during one window."
   }
   assert {
     condition = (
@@ -130,6 +139,10 @@ run "oauth_only_window_has_only_oauth_secret_authority" {
     )
     error_message = "An OAuth-only window must grant the provisioner authority on only the OAuth database-secret container."
   }
+  assert {
+    condition     = time_sleep.private_access_propagation.create_duration == "10m"
+    error_message = "Opening private version authority must wait for the bounded IAM propagation interval."
+  }
 }
 
 run "setup_downloads_have_no_secret_authority" {
@@ -176,6 +189,16 @@ run "reject_open_temporary_access_without_a_profile" {
   variables {
     administrative_access_enabled = true
     temporary_access_enabled      = true
+  }
+  expect_failures = [var.temporary_access_profiles]
+}
+
+run "reject_multiple_profiles_in_one_window" {
+  command = plan
+  variables {
+    administrative_access_enabled = true
+    temporary_access_enabled      = true
+    temporary_access_profiles     = ["oauth", "broker"]
   }
   expect_failures = [var.temporary_access_profiles]
 }
@@ -236,4 +259,84 @@ run "reject_reversed_window" {
   command = plan
   variables { window_expires_at = "2098-12-31T23:59:59Z" }
   expect_failures = [var.window_expires_at]
+}
+
+run "reject_window_start_before_previous_expiry" {
+  command = plan
+  variables {
+    administrative_access_enabled = true
+    temporary_access_enabled      = true
+    temporary_access_profiles     = ["oauth"]
+    previous_access_expires_at    = "2099-01-01T00:00:01Z"
+  }
+  expect_failures = [var.previous_access_expires_at]
+}
+
+run "reject_changed_window_while_old_binding_is_still_present" {
+  command = plan
+  variables {
+    administrative_access_enabled = true
+    temporary_access_enabled      = true
+    temporary_access_profiles     = ["oauth"]
+    window_starts_at              = "2099-01-02T00:00:00Z"
+    window_expires_at             = "2099-01-02T01:00:00Z"
+  }
+  override_data {
+    target = data.google_secret_manager_secret_iam_policy.private_versions["oauth"]
+    values = {
+      policy_data = "{\"version\":3,\"bindings\":[{\"role\":\"projects/vaeroex-integrations-prod/roles/squareProductionPrivateVersions\",\"members\":[\"serviceAccount:sq-prod-provisioner@vaeroex-integrations-prod.iam.gserviceaccount.com\"],\"condition\":{\"title\":\"bounded-native-provisioning\",\"description\":\"One exact database secret during the admitted maintenance window.\",\"expression\":\"request.time >= timestamp('2099-01-01T00:00:00Z') && request.time < timestamp('2099-01-01T01:00:00Z')\"}}]}"
+    }
+  }
+  expect_failures = [google_secret_manager_secret_iam_member.private_versions["oauth"]]
+}
+
+run "reject_profile_switch_while_old_binding_is_still_present" {
+  command = plan
+  variables {
+    administrative_access_enabled = true
+    temporary_access_enabled      = true
+    temporary_access_profiles     = ["broker"]
+  }
+  override_data {
+    target = data.google_secret_manager_secret_iam_policy.private_versions["oauth"]
+    values = {
+      policy_data = "{\"version\":3,\"bindings\":[{\"role\":\"projects/vaeroex-integrations-prod/roles/squareProductionPrivateVersions\",\"members\":[\"serviceAccount:sq-prod-provisioner@vaeroex-integrations-prod.iam.gserviceaccount.com\"],\"condition\":{\"title\":\"bounded-native-provisioning\",\"description\":\"One exact database secret during the admitted maintenance window.\",\"expression\":\"request.time >= timestamp('2099-01-01T00:00:00Z') && request.time < timestamp('2099-01-01T01:00:00Z')\"}}]}"
+    }
+  }
+  expect_failures = [google_secret_manager_secret_iam_member.private_versions["broker"]]
+}
+
+run "reject_residual_provisioner_binding_under_another_role" {
+  command = plan
+  variables {
+    administrative_access_enabled = true
+    temporary_access_enabled      = true
+    temporary_access_profiles     = ["oauth"]
+  }
+  override_data {
+    target = data.google_secret_manager_secret_iam_policy.private_versions["broker"]
+    values = {
+      policy_data = "{\"version\":3,\"bindings\":[{\"role\":\"roles/secretmanager.secretAccessor\",\"members\":[\"serviceAccount:sq-prod-provisioner@vaeroex-integrations-prod.iam.gserviceaccount.com\"]}]}"
+    }
+  }
+  expect_failures = [google_secret_manager_secret_iam_member.private_versions["oauth"]]
+}
+
+run "accept_unchanged_window_with_exact_binding_readback" {
+  command = plan
+  variables {
+    administrative_access_enabled = true
+    temporary_access_enabled      = true
+    temporary_access_profiles     = ["oauth"]
+  }
+  override_data {
+    target = data.google_secret_manager_secret_iam_policy.private_versions["oauth"]
+    values = {
+      policy_data = "{\"version\":3,\"bindings\":[{\"role\":\"projects/vaeroex-integrations-prod/roles/squareProductionPrivateVersions\",\"members\":[\"serviceAccount:sq-prod-provisioner@vaeroex-integrations-prod.iam.gserviceaccount.com\"],\"condition\":{\"title\":\"bounded-native-provisioning\",\"description\":\"One exact database secret during the admitted maintenance window.\",\"expression\":\"request.time >= timestamp('2099-01-01T00:00:00Z') && request.time < timestamp('2099-01-01T01:00:00Z')\"}}]}"
+    }
+  }
+  assert {
+    condition     = toset(keys(google_secret_manager_secret_iam_member.private_versions)) == toset(["oauth"])
+    error_message = "An unchanged exact binding must remain plannable without broadening authority."
+  }
 }

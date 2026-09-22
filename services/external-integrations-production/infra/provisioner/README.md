@@ -30,27 +30,46 @@ prompt or invokes the native tool.
 API network paths. During setup only, `setup_https_enabled` permits package
 downloads over TCP/443. It provides no secret authority. After installation,
 close that broad setup rule and verify its removal before setting
-`temporary_access_enabled` and explicitly selecting only the reviewed
-`temporary_access_profiles` needed for that window. A six-role sequence selects
-all six profiles; a bounded OAuth-only recovery selects only `oauth`. Terraform
-rejects an open window with no selected profile, a selection while access is
-closed, unknown profiles, and simultaneous setup HTTPS and credential staging.
+`temporary_access_enabled` and explicitly selecting one reviewed
+`temporary_access_profiles` value for that window. The bounded recovery selects
+only `oauth`; later role windows remain separate. Terraform rejects an open
+window with zero or multiple profiles, a selection while access is closed,
+unknown profiles, a successor starting before the read-back expiry of its
+predecessor, and simultaneous setup HTTPS and credential staging.
 One state-local `terraform_data` generation barrier carries no cloud authority.
 Changing the selection or time window replaces that barrier
 destroy-before-create and replaces retained grants, so every old grant is
-destroyed before the new generation and its grants can be created. The explicit
-grant dependencies also ensure setup-rule deletion completes before any secret
-grant is created, and every secret-grant deletion completes before setup HTTPS
-can be recreated. The apply-graph tests cover setup in both directions and a
-direct OAuth-to-broker and same-profile time-window change.
+destroyed before the new generation can be created. A pinned `time_sleep`
+provider then enforces a ten-minute IAM propagation interval before any new
+grant is created. This exceeds Google's documented typical two-minute interval
+and its noted seven-minute case. IAM can take longer, so normal operations also
+close and verify access between role windows; the independent IAM time
+condition remains the hard boundary. The explicit grant dependencies
+also ensure setup-rule deletion completes before any secret grant is created,
+and every secret-grant deletion completes before setup HTTPS can be recreated.
+The apply-graph tests cover setup in both directions and prove the full
+old-grant -> closed generation checkpoint, followed by successor generation ->
+propagation interval -> new-grant sequence.
 
 The first apply after adopting this generation barrier must use all three access
 flags false and an empty profile selection, with the prior state independently
 confirmed to contain no temporary secret grants. That closed bootstrap creates
-only the state-local barrier. Do not combine barrier adoption with opening or
-changing access: grants created by an older configuration do not carry the new
-dependency. After the closed bootstrap, the tested replacement graph prevents a
-single selection or time-window apply from overlapping old and new authority.
+only the state-local barrier and its zero-duration propagation marker. Do not
+combine barrier adoption with opening or changing access: grants created by an
+older configuration do not carry the new dependency. Direct open-to-open
+profile or time-window changes are unsupported. Every saved plan must be
+rendered as JSON and pass `scripts/verify-private-access-plan.mjs` before
+apply. That verifier requires an opening plan's prior Terraform state to be an
+applied closed checkpoint and rejects any mutation carrying a managed grant on
+both sides of the plan. The live IAM-policy readback independently rejects
+residual or alternate-role provisioner bindings before opening, while remaining
+absent during cleanup so an unrelated read failure cannot block revocation.
+Normal operation also waits for the predecessor's time condition to expire,
+supplies that exact expiry as the next plan's
+`previous_access_expires_at`, and verifies the exact zero-grant set before
+opening a replacement window. The bounded propagation interval is additional
+defense against stale policy enforcement, not a claim of instantaneous IAM
+consistency.
 
 During private entry, HTTPS reaches only `199.36.153.8/30` (the
 `private.googleapis.com` VIP). The reviewed guest setup must resolve exactly
@@ -79,8 +98,9 @@ commitment is needed.
 Use the existing root-owned static native launcher, exact GCE identity check,
 immutable code/CA hashes, private TTY, per-role journal and checked recovery
 procedure. This template creates no database password or cloud key. Runtime
-reader permissions remain separate. Six sequential profile operations must
-finish fenced with zero sessions before the all-closed checkpoint. Stop
+reader permissions remain separate. Each role operation must finish fenced
+with zero sessions and return to an all-closed checkpoint before the next role
+window. Stop
 credential admission at least two minutes before the scheduled stop. A failed
 or uncertain acknowledgement requires read-only role/version/journal
 reconciliation; never recreate credentials or assume an audit event proves a
@@ -93,7 +113,7 @@ must not silently reopen a previous session. Backend configuration and concrete
 variables belong to the separately inspected operating plan, not committed
 credentials or inferred defaults.
 
-Local checks use the signed pinned Google provider and no cloud state:
+Local checks use the signed pinned Google and time providers and no cloud state:
 
 ```sh
 terraform init -backend=false
@@ -101,10 +121,23 @@ terraform fmt -check -recursive
 terraform validate
 terraform test
 node tests/verify-transition-order.mjs
+node tests/verify-private-access-plan.test.mjs
 ```
 
+For every hosted mutation, create a full saved plan, inspect its complete
+action set, then enforce the state transition before apply without persisting
+the JSON rendering:
+
+```sh
+terraform show -json reviewed.tfplan | node scripts/verify-private-access-plan.mjs
+terraform apply reviewed.tfplan
+```
+
+Only a fixed transition label is printed. The verifier never prints or stores
+the plan, provider values or state. A failed label blocks apply.
+
 The transition verifier runs the real firewall/IAM resource dependency closure
-through three isolated mocked Terraform applies, checking graph edges and
+through eight isolated mocked Terraform apply steps, checking graph edges and
 completion/start ordering. It excludes the backend, credentials and real state;
 provider schemas come only from the pinned local cache. Its in-memory trace is
 not printed or persisted, and its disposable files are removed afterward.

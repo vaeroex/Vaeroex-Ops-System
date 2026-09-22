@@ -62,10 +62,24 @@ variable "temporary_access_profiles" {
   validation {
     condition = (
       var.temporary_access_enabled
-      ? length(var.temporary_access_profiles) > 0
+      ? length(var.temporary_access_profiles) == 1
       : length(var.temporary_access_profiles) == 0
     )
-    error_message = "Select at least one exact profile when temporary access is open, and none while it is closed."
+    error_message = "Select exactly one reviewed profile when temporary access is open, and none while it is closed."
+  }
+}
+
+variable "previous_access_expires_at" {
+  description = "Read-back expiry of the preceding temporary-access window; a successor may not start before it."
+  type        = string
+  nullable    = false
+  validation {
+    condition = (
+      can(regex("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$", var.previous_access_expires_at)) &&
+      can(timeadd(var.previous_access_expires_at, "0s")) &&
+      (!var.temporary_access_enabled || try(timecmp(var.window_starts_at, var.previous_access_expires_at) >= 0, false))
+    )
+    error_message = "Supply the exact predecessor expiry; every newly opened window must start at or after that boundary."
   }
 }
 
