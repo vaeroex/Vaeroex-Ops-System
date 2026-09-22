@@ -168,3 +168,15 @@ export function reconcileExactPrivateAccess(recoveryInput, options = {}) {
     removed_bindings: String(matched),
   });
 }
+
+export function confirmExactPrivateAccessClosed(options = {}) {
+  const run = options.run ?? defaultRun;
+  const environment = sanitizedGcloudEnvironment(options.environment ?? process.env);
+  const policies = readAllPolicies(run, environment);
+  verifyFinalPolicies(policies);
+
+  return Object.freeze({
+    status: "private_access_exact_direct_binding_absence_confirmed",
+    checked_secrets: String(PROFILES.length),
+  });
+}

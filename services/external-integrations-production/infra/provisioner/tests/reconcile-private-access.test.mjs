@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 
-import { reconcileExactPrivateAccess } from "../scripts/reconcile-private-access.mjs";
+import {
+  confirmExactPrivateAccessClosed,
+  reconcileExactPrivateAccess,
+} from "../scripts/reconcile-private-access.mjs";
 
 const profiles = ["oauth", "broker", "scheduler", "webhook", "runtime", "evidence"];
 const member = "serviceAccount:sq-prod-provisioner@vaeroex-integrations-prod.iam.gserviceaccount.com";
@@ -29,7 +32,7 @@ function fixture({ removalStatus = 0, removalDisappears = true, binding = exactB
   bindingProfile = "oauth", malformedProfile } = {}) {
   const calls = [];
   const policies = Object.fromEntries(profiles.map(profile => [profile, { bindings: [] }]));
-  policies[bindingProfile].bindings.push(binding);
+  if (binding) policies[bindingProfile].bindings.push(binding);
   policies.oauth.bindings.push({ role: "roles/viewer", members: ["user:other@example.com"] });
   return {
     calls,
@@ -132,5 +135,19 @@ const lateMalformed = fixture({ malformedProfile: "evidence" });
 assert.throws(() => reconcileExactPrivateAccess(recovery, { run: lateMalformed.run }),
   error => error.fixedLabel === "private_access_exact_reconciliation_failed");
 assert.equal(lateMalformed.calls.some(call => call.args[1] === "remove-iam-policy-binding"), false);
+
+const alreadyClosed = fixture({ binding: null });
+assert.deepEqual(confirmExactPrivateAccessClosed({ run: alreadyClosed.run }), {
+  status: "private_access_exact_direct_binding_absence_confirmed",
+  checked_secrets: "6",
+});
+assert.equal(alreadyClosed.calls.filter(call => call.args[1] === "get-iam-policy").length, 6);
+assert.equal(alreadyClosed.calls.some(call => call.args[1] === "remove-iam-policy-binding"), false);
+
+const residualWhileClosed = fixture();
+assert.throws(() => confirmExactPrivateAccessClosed({ run: residualWhileClosed.run }),
+  error => error.fixedLabel === "private_access_exact_reconciliation_failed");
+assert.equal(residualWhileClosed.calls.filter(call => call.args[1] === "get-iam-policy").length, 6);
+assert.equal(residualWhileClosed.calls.some(call => call.args[1] === "remove-iam-policy-binding"), false);
 
 process.stdout.write("private_access_post_accept_orphan_exact_reconciliation_confirmed\n");

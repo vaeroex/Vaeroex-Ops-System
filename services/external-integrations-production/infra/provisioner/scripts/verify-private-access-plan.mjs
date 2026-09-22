@@ -104,6 +104,34 @@ export function privateAccessOpeningTuple(plan) {
   });
 }
 
+export function privateAccessClosedCheckpointTuple(plan) {
+  if (!plan || !Array.isArray(plan.resource_changes)) {
+    reject("private_access_plan_invalid");
+  }
+  const generations = plan.resource_changes.filter(change => change.address === GENERATION_ADDRESS);
+  if (generations.length !== 1) {
+    reject("private_access_generation_missing_or_ambiguous");
+  }
+  const generation = generations[0];
+  const beforeInput = input(generation, "before");
+  const afterInput = input(generation, "after");
+  const start = exactTimestamp(afterInput?.starts_at);
+  const expiry = exactTimestamp(afterInput?.expires_at);
+  if (
+    enabled(generation, "before") !== false || enabled(generation, "after") !== false ||
+    !isNoOp(generation) || !isDeepStrictEqual(beforeInput, afterInput) ||
+    !Array.isArray(afterInput?.profiles) || afterInput.profiles.length !== 0 ||
+    start === null || expiry === null || expiry <= start || expiry > start + 60 * 60 * 1000 ||
+    exactTimestamp(afterInput?.checkpoint_expires_at) !== expiry
+  ) {
+    reject("private_access_closed_checkpoint_invalid");
+  }
+  return Object.freeze({
+    windowStartsAt: afterInput.starts_at,
+    windowExpiresAt: afterInput.expires_at,
+  });
+}
+
 function verifyGrantContract(grant, side, generationInput) {
   const value = grant?.change?.[side];
   const profile = grant?.index;
@@ -174,6 +202,7 @@ export function verifyPrivateAccessPlan(plan) {
       if (beforeEnabled !== false || !isNoOp(generation) || !isDeepStrictEqual(beforeInput, afterInput)) {
         reject("private_access_closed_checkpoint_rewrite_rejected");
       }
+      privateAccessClosedCheckpointTuple(plan);
       return "private_access_plan_closed_no_transition_confirmed";
     }
     // A live open-state plan cannot prove that its grant was created by the

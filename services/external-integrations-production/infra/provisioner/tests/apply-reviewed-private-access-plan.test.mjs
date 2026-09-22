@@ -92,6 +92,102 @@ assert.equal(existsSync(join(root, "terraform.log")), false);
 assert.equal(existsSync(join(root, "terraform-protocol-logs")), false);
 assert.deepEqual(readdirSync(root), ["candidate.tfplan"]);
 
+const closedNoTransitionGeneration = {
+  address: "terraform_data.private_access_generation",
+  type: "terraform_data",
+  name: "private_access_generation",
+  change: {
+    actions: ["no-op"],
+    before: { input: {
+      enabled: false,
+      profiles: [],
+      starts_at: "2099-01-01T00:00:00Z",
+      expires_at: "2099-01-01T01:00:00Z",
+      checkpoint_expires_at: "2099-01-01T01:00:00Z",
+    } },
+    after: { input: {
+      enabled: false,
+      profiles: [],
+      starts_at: "2099-01-01T00:00:00Z",
+      expires_at: "2099-01-01T01:00:00Z",
+      checkpoint_expires_at: "2099-01-01T01:00:00Z",
+    } },
+  },
+};
+const closedNoTransitionJson = Buffer.from(JSON.stringify({
+  format_version: "1.2",
+  resource_changes: [closedNoTransitionGeneration],
+}));
+const closedRecoveryOrder = [];
+const closedRecovery = applyReviewedPrivateAccessPlan(planPath, reviewedSha256, {
+  cwd: root,
+  temporaryRoot: root,
+  confirmClosedPrivateAccess() {
+    closedRecoveryOrder.push("confirm-closed");
+    return { status: "private_access_exact_direct_binding_absence_confirmed", checked_secrets: "6" };
+  },
+  waitForRevocationPropagation(milliseconds) {
+    closedRecoveryOrder.push("wait");
+    assert.equal(milliseconds, 600_000);
+  },
+  verifyEffectivePrivateAccess(query) {
+    closedRecoveryOrder.push("effective");
+    assert.equal(query.phase, "closed");
+    assert.equal(query.window_starts_at, "2099-01-01T00:00:00Z");
+    assert.equal(query.window_expires_at, "2099-01-01T01:00:00Z");
+    return {
+      status: "policy_troubleshooter_closed_all_denied",
+      checked_secrets: "6",
+      checked_versions: "2",
+      checked_tuples: "12",
+    };
+  },
+  runTerraform(args) {
+    closedRecoveryOrder.push(args[0]);
+    return args[0] === "show"
+      ? { status: 0, stdout: closedNoTransitionJson, stderr: Buffer.alloc(0) }
+      : { status: 0, stdout: Buffer.alloc(0), stderr: Buffer.alloc(0) };
+  },
+});
+assert.equal(closedRecovery.verificationLabel, "private_access_plan_closed_no_transition_confirmed");
+assert.equal(closedRecovery.reconciliationLabel, "private_access_exact_direct_binding_absence_confirmed");
+assert.equal(closedRecovery.effectiveRevocationLabel, "policy_troubleshooter_closed_all_denied");
+assert.deepEqual(closedRecoveryOrder, ["show", "apply", "confirm-closed", "wait", "effective"]);
+
+assert.throws(() => applyReviewedPrivateAccessPlan(planPath, reviewedSha256, {
+  cwd: root,
+  temporaryRoot: root,
+  confirmClosedPrivateAccess() { throw new Error("raw-residual-binding"); },
+  runTerraform(args) {
+    return args[0] === "show"
+      ? { status: 0, stdout: closedNoTransitionJson, stderr: Buffer.alloc(0) }
+      : { status: 0, stdout: Buffer.alloc(0), stderr: Buffer.alloc(0) };
+  },
+}), error => error.fixedLabel === "private_access_exact_reconciliation_uncertain_after_cleanup_apply" &&
+  !error.message.includes("raw-"));
+
+assert.throws(() => applyReviewedPrivateAccessPlan(planPath, reviewedSha256, {
+  cwd: root,
+  temporaryRoot: root,
+  confirmClosedPrivateAccess() {
+    return { status: "private_access_exact_direct_binding_absence_confirmed", checked_secrets: "6" };
+  },
+  waitForRevocationPropagation() {},
+  verifyEffectivePrivateAccess() {
+    return {
+      status: "policy_troubleshooter_closed_all_denied",
+      checked_secrets: "6",
+      checked_versions: "2",
+      checked_tuples: "11",
+    };
+  },
+  runTerraform(args) {
+    return args[0] === "show"
+      ? { status: 0, stdout: closedNoTransitionJson, stderr: Buffer.alloc(0) }
+      : { status: 0, stdout: Buffer.alloc(0), stderr: Buffer.alloc(0) };
+  },
+}), error => error.fixedLabel === "private_access_effective_revocation_uncertain_after_cleanup_apply");
+
 let wrongHashRunnerCalled = false;
 assert.throws(
   () => applyReviewedPrivateAccessPlan(planPath, "0".repeat(64), {

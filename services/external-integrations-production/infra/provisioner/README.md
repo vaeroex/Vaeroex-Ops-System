@@ -121,11 +121,18 @@ waits ten minutes and requires the full `6 + 3N` Policy Troubleshooter matrix
 to return definitive denial before reporting success. Analyzer uncertainty
 does not undo the already-closed resources, but it reports revocation as
 uncertain. A normal tracked close receives the same post-apply direct readback
-and effective-denial proof. Failed opening and tracked-closing applies perform
+and effective-denial proof. If the operator process is lost after a tracked
+close commits but before those checks finish, the unchanged reviewed
+closed/no-transition plan must be applied through the same wrapper. It requires
+zero direct provisioner bindings, waits the full propagation interval and
+reruns the complete denial matrix before acknowledging closure. Failed opening
+and tracked-closing applies perform
 exact reconciliation and the denial check, so a remotely accepted grant is
 revoked even when Terraform does not checkpoint it. An uncatchable process
-loss, including `SIGKILL`, must be followed by this recovery close plan; never
-retry the opening or infer closure from direct policy absence. The independent
+loss before a close commits, including `SIGKILL`, must be followed by the
+open-generation recovery close plan; a loss after commit uses the unchanged
+closed/no-transition proof above. Never retry the opening or infer closure
+from direct policy absence. The independent
 condition expiry remains the hard bound.
 Normal operation also waits for the predecessor's time condition to expire,
 supplies that exact expiry as the next plan's

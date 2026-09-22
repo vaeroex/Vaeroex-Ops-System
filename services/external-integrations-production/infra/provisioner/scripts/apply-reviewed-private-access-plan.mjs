@@ -12,9 +12,13 @@ import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { reconcileExactPrivateAccess } from "./reconcile-private-access.mjs";
+import {
+  confirmExactPrivateAccessClosed,
+  reconcileExactPrivateAccess,
+} from "./reconcile-private-access.mjs";
 import { verifyEffectivePrivateAccess } from "./verify-effective-private-access.mjs";
 import {
+  privateAccessClosedCheckpointTuple,
   privateAccessOpeningTuple,
   privateAccessRecoveryTuple,
   verifyPrivateAccessPlan,
@@ -25,6 +29,7 @@ const TERRAFORM_DIAGNOSTIC_ENVIRONMENT = /^TF_LOG(?:_|$)/;
 const RECOVERY_LABEL = "private_access_open_generation_without_grant_to_closed_recovery_confirmed";
 const OPENING_LABEL = "private_access_closed_to_one_grant_confirmed";
 const CLOSING_LABEL = "private_access_one_grant_to_closed_confirmed";
+const CLOSED_NO_TRANSITION_LABEL = "private_access_plan_closed_no_transition_confirmed";
 const PROJECT_ID = "vaeroex-integrations-prod";
 const PROJECT_NUMBER = "711446392261";
 const REVOCATION_PROPAGATION_MS = 10 * 60 * 1000;
@@ -73,6 +78,17 @@ function reconcilePrivateAccess(recovery, options) {
   });
   if (result?.status !== "private_access_exact_direct_binding_reconciliation_confirmed" ||
       result?.checked_secrets !== "6") throw new Error("invalid reconciliation result");
+  return result.status;
+}
+
+function confirmPrivateAccessClosed(options) {
+  const confirmClosed = options.confirmClosedPrivateAccess ?? confirmExactPrivateAccessClosed;
+  const result = confirmClosed({
+    environment: options.environment ?? process.env,
+    ...(options.runGcloud ? { run: options.runGcloud } : {}),
+  });
+  if (result?.status !== "private_access_exact_direct_binding_absence_confirmed" ||
+      result?.checked_secrets !== "6") throw new Error("invalid closed-access result");
   return result.status;
 }
 
@@ -146,6 +162,7 @@ export function applyReviewedPrivateAccessPlan(planPath, reviewedSha256, options
     let recovery;
     let closing;
     let opening;
+    let closedNoTransition;
     if (verificationLabel === RECOVERY_LABEL) {
       recovery = privateAccessRecoveryTuple(rendered);
       try {
@@ -157,6 +174,8 @@ export function applyReviewedPrivateAccessPlan(planPath, reviewedSha256, options
       closing = privateAccessRecoveryTuple(rendered);
     } else if (verificationLabel === OPENING_LABEL) {
       opening = privateAccessOpeningTuple(rendered);
+    } else if (verificationLabel === CLOSED_NO_TRANSITION_LABEL) {
+      closedNoTransition = privateAccessClosedCheckpointTuple(rendered);
     }
 
     if (sha256(readFileSync(immutableCopy)) !== expectedHash) {
@@ -193,10 +212,17 @@ export function applyReviewedPrivateAccessPlan(planPath, reviewedSha256, options
       }
       reject("private_access_verified_plan_apply_failed");
     }
-    const closedTransition = recovery ?? closing;
+    const closedTransition = recovery ?? closing ?? closedNoTransition;
     if (closing) {
       try {
         reconciliationLabel = reconcilePrivateAccess(closing, options);
+      } catch {
+        reject("private_access_exact_reconciliation_uncertain_after_cleanup_apply");
+      }
+    }
+    if (closedNoTransition) {
+      try {
+        reconciliationLabel = confirmPrivateAccessClosed(options);
       } catch {
         reject("private_access_exact_reconciliation_uncertain_after_cleanup_apply");
       }

@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
-import { verifyPrivateAccessPlan } from "../scripts/verify-private-access-plan.mjs";
+import {
+  privateAccessClosedCheckpointTuple,
+  verifyPrivateAccessPlan,
+} from "../scripts/verify-private-access-plan.mjs";
 
 const PRIOR_START = "2099-01-01T00:00:00Z";
 const PRIOR_EXPIRY = "2099-01-01T01:00:00Z";
@@ -81,6 +84,10 @@ assert.equal(
   verifyPrivateAccessPlan(plan(generation(false, false, ["no-op"]))),
   "private_access_plan_closed_no_transition_confirmed",
 );
+assert.deepEqual(privateAccessClosedCheckpointTuple(plan(generation(false, false, ["no-op"]))), {
+  windowStartsAt: PRIOR_START,
+  windowExpiresAt: PRIOR_EXPIRY,
+});
 assert.equal(
   verifyPrivateAccessPlan(plan(generation(true, false, ["delete", "create"], {
     after: { checkpoint_expires_at: NEXT_EXPIRY },
@@ -136,6 +143,13 @@ rejects(
 rejects(
   plan(generation(false, false, ["update"], { after: { checkpoint_expires_at: "2098-12-31T23:00:00Z" } })),
   "private_access_closed_checkpoint_rewrite_rejected",
+);
+rejects(
+  plan(generation(false, false, ["no-op"], {
+    before: { expires_at: "2099-01-01T02:00:01Z", checkpoint_expires_at: "2099-01-01T02:00:01Z" },
+    after: { expires_at: "2099-01-01T02:00:01Z", checkpoint_expires_at: "2099-01-01T02:00:01Z" },
+  })),
+  "private_access_closed_checkpoint_invalid",
 );
 rejects(
   plan(generation(true, true, ["update"]), grant("oauth", true, true, ["no-op"])),
