@@ -12,7 +12,8 @@ const VERSION_PERMISSIONS = Object.freeze([
 ]);
 const MAX_INPUT_BYTES = 16 * 1024;
 const MAX_RESPONSE_BYTES = 4 * 1024 * 1024;
-const QUERY_TIMEOUT_MS = 20_000;
+const QUERY_TIMEOUT_MS = 120_000;
+const READ_ATTEMPTS = 2;
 const GCLOUD_DIAGNOSTIC_ENVIRONMENT = /^(?:CLOUDSDK_CORE_LOG_HTTP|CLOUDSDK_LOG_HTTP|CLOUDSDK_CORE_VERBOSITY|CLOUDSDK_CORE_TRACE_TOKEN|CLOUDSDK_CORE_LOG_FILE)$/;
 
 function reject(label) {
@@ -66,17 +67,24 @@ function versionTuple(projectNumber, profile, version, permission) {
 }
 
 function runBounded(run, args, environment, failureLabel) {
-  const result = run("gcloud", args, {
-    env: environment,
-    encoding: "utf8",
-    input: undefined,
-    maxBuffer: MAX_RESPONSE_BYTES,
-    stdio: ["ignore", "pipe", "pipe"],
-    timeout: QUERY_TIMEOUT_MS,
-  });
-  if (result?.error || result?.status !== 0 || typeof result?.stdout !== "string" ||
-      Buffer.byteLength(result.stdout) > MAX_RESPONSE_BYTES) reject(failureLabel);
-  return result.stdout;
+  for (let attempt = 0; attempt < READ_ATTEMPTS; attempt += 1) {
+    let result;
+    try {
+      result = run("gcloud", args, {
+        env: environment,
+        encoding: "utf8",
+        input: undefined,
+        maxBuffer: MAX_RESPONSE_BYTES,
+        stdio: ["ignore", "pipe", "pipe"],
+        timeout: QUERY_TIMEOUT_MS,
+      });
+    } catch {
+      result = null;
+    }
+    if (!result?.error && result?.status === 0 && typeof result?.stdout === "string" &&
+        Buffer.byteLength(result.stdout) <= MAX_RESPONSE_BYTES) return result.stdout;
+  }
+  reject(failureLabel);
 }
 
 function enumerateVersions(run, environment, projectNumber, profile) {

@@ -18,6 +18,10 @@ const recovery = Object.freeze({
   windowStartsAt: "2099-01-01T00:00:00Z",
   windowExpiresAt: "2099-01-01T01:00:00Z",
 });
+const twoHourRecovery = Object.freeze({
+  ...recovery,
+  windowExpiresAt: "2099-01-01T02:00:00Z",
+});
 
 function exactBinding(overrides = {}) {
   return {
@@ -94,7 +98,37 @@ for (const call of orphan.calls) {
   assert.equal("CLOUDSDK_CORE_LOG_HTTP" in call.options.env, false);
   assert.equal("CLOUDSDK_LOG_HTTP" in call.options.env, false);
   assert.deepEqual(call.options.stdio, ["ignore", "pipe", "pipe"]);
+  assert.equal(call.options.timeout, 120_000);
 }
+
+const retryReadBase = fixture({ binding: null });
+let failedReadOnce = false;
+assert.deepEqual(confirmExactPrivateAccessClosed({
+  run(command, args, options) {
+    if (!failedReadOnce && args[1] === "get-iam-policy") {
+      failedReadOnce = true;
+      retryReadBase.calls.push({ command, args, options });
+      return { status: 1, stdout: "", stderr: "raw-transient-read-error" };
+    }
+    return retryReadBase.run(command, args, options);
+  },
+}), {
+  status: "private_access_exact_direct_binding_absence_confirmed",
+  checked_secrets: "6",
+});
+assert.equal(retryReadBase.calls.filter(call => call.args[1] === "get-iam-policy").length, 7);
+
+const twoHourClosed = fixture({ binding: null });
+assert.deepEqual(reconcileExactPrivateAccess(twoHourRecovery, { run: twoHourClosed.run }), {
+  status: "private_access_exact_direct_binding_reconciliation_confirmed",
+  checked_secrets: "6",
+  removed_bindings: "0",
+});
+assert.throws(() => reconcileExactPrivateAccess({
+  ...twoHourRecovery,
+  windowExpiresAt: "2099-01-01T02:00:01Z",
+}, { run() { throw new Error("must_not_run"); } }),
+error => error.fixedLabel === "private_access_exact_reconciliation_failed");
 
 const beforeSecondPass = orphan.calls.length;
 assert.deepEqual(reconcileExactPrivateAccess(recovery, { run: orphan.run }), {
@@ -130,6 +164,7 @@ const retained = fixture({ removalStatus: 1, removalDisappears: false });
 assert.throws(() => reconcileExactPrivateAccess(recovery, { run: retained.run }),
   error => error.fixedLabel === "private_access_exact_reconciliation_failed" &&
     !error.message.includes("raw-"));
+assert.equal(retained.calls.filter(call => call.args[1] === "remove-iam-policy-binding").length, 1);
 
 const lateMalformed = fixture({ malformedProfile: "evidence" });
 assert.throws(() => reconcileExactPrivateAccess(recovery, { run: lateMalformed.run }),

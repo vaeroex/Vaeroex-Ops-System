@@ -94,14 +94,14 @@ variable "window_starts_at" {
 }
 
 variable "window_expires_at" {
-  description = "Exact IAM expiry, more than zero and no more than 60 minutes after start."
+  description = "Exact IAM expiry, more than zero and no more than 120 minutes after start."
   type        = string
   nullable    = false
   validation {
     condition = can(regex("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$", var.window_expires_at)) && try(
       timecmp(var.window_expires_at, var.window_starts_at) > 0 &&
-    timecmp(var.window_expires_at, timeadd(var.window_starts_at, "60m")) <= 0, false)
-    error_message = "The exact UTC expiry must follow start by at most 60 minutes."
+    timecmp(var.window_expires_at, timeadd(var.window_starts_at, "120m")) <= 0, false)
+    error_message = "The exact UTC expiry must follow start by at most 120 minutes."
   }
 }
 

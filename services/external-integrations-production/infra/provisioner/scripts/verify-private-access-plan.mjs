@@ -88,7 +88,7 @@ export function privateAccessClosedBootstrapTuple(plan) {
     generation.change?.before !== null || enabled(generation, "after") !== false ||
     !isDeepStrictEqual(generation.change?.actions, ["create"]) ||
     !Array.isArray(afterInput?.profiles) || afterInput.profiles.length !== 0 ||
-    start === null || expiry === null || expiry <= start || expiry > start + 60 * 60 * 1000 ||
+    start === null || expiry === null || expiry <= start || expiry > start + 120 * 60 * 1000 ||
     checkpointExpiry === null || previousExpiry === null || checkpointExpiry !== previousExpiry ||
     checkpointExpiry > start
   ) {
@@ -107,7 +107,7 @@ function verifyOpenGenerationInput(value) {
   if (
     value?.enabled !== true || !Array.isArray(value?.profiles) || value.profiles.length !== 1 ||
     !PROFILES.includes(value.profiles[0]) || start === null || expiry === null || checkpointExpiry === null ||
-    expiry <= start || expiry > start + 60 * 60 * 1000 || checkpointExpiry !== expiry
+    expiry <= start || expiry > start + 120 * 60 * 1000 || checkpointExpiry !== expiry
   ) {
     reject("private_access_open_generation_invalid");
   }
@@ -190,7 +190,7 @@ export function privateAccessClosedNoTransitionTuple(plan) {
     enabled(generation, "before") !== false || enabled(generation, "after") !== false ||
     !isNoOp(generation) || !isDeepStrictEqual(beforeInput, afterInput) ||
     !Array.isArray(afterInput?.profiles) || afterInput.profiles.length !== 0 ||
-    start === null || expiry === null || expiry <= start || expiry > start + 60 * 60 * 1000 ||
+    start === null || expiry === null || expiry <= start || expiry > start + 120 * 60 * 1000 ||
     (!strictPostClose && !canonicalBootstrap)
   ) {
     reject("private_access_closed_checkpoint_invalid");
@@ -321,6 +321,7 @@ export function verifyPrivateAccessPlan(plan) {
       reject("private_access_successor_starts_before_checkpoint_expiry");
     }
     if (phase !== `open:${afterGrants[0].index}`) reject("private_access_open_controls_invalid");
+    verifyOpenGenerationInput(afterInput);
     verifyGrantContract(afterGrants[0], "after", afterInput);
     return "private_access_closed_to_one_grant_confirmed";
   }

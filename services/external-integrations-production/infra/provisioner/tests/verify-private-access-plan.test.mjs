@@ -94,6 +94,26 @@ assert.equal(
   verifyPrivateAccessPlan(plan(generation(false, true), grant("oauth", false, true, ["create"]))),
   "private_access_closed_to_one_grant_confirmed",
 );
+const twoHourExpiry = "2099-01-02T02:00:00Z";
+assert.equal(
+  verifyPrivateAccessPlan(plan(
+    generation(false, true, ["update"], {
+      after: { expires_at: twoHourExpiry, checkpoint_expires_at: twoHourExpiry },
+    }),
+    grant("oauth", false, true, ["create"], { after: { expires_at: twoHourExpiry } }),
+  )),
+  "private_access_closed_to_one_grant_confirmed",
+);
+const overlongExpiry = "2099-01-02T02:00:01Z";
+rejects(
+  plan(
+    generation(false, true, ["update"], {
+      after: { expires_at: overlongExpiry, checkpoint_expires_at: overlongExpiry },
+    }),
+    grant("oauth", false, true, ["create"], { after: { expires_at: overlongExpiry } }),
+  ),
+  "private_access_open_generation_invalid",
+);
 assert.equal(
   verifyPrivateAccessPlan(plan(generation(true, false, ["delete", "create"], {
     after: preservedCloseWindow,

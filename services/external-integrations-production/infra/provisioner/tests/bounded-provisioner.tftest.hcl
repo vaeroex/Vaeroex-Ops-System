@@ -54,7 +54,7 @@ run "initial_installation_is_stopped_and_inaccessible" {
       google_compute_instance.provisioner.scheduling[0].instance_termination_action == "STOP" &&
       google_compute_instance.provisioner.scheduling[0].max_run_duration[0].seconds == 3600
     )
-    error_message = "Creation must converge to stopped, non-Spot e2-small with one-hour STOP and no restart."
+    error_message = "Closed state must converge to stopped, non-Spot e2-small with one-hour STOP and no restart."
   }
   assert {
     condition = (
@@ -280,9 +280,14 @@ run "reject_empty_pooler_input" {
   expect_failures = [var.verified_pooler_ipv4_cidrs]
 }
 
-run "reject_window_longer_than_one_hour" {
+run "accept_two_hour_window" {
   command = plan
-  variables { window_expires_at = "2099-01-01T01:00:01Z" }
+  variables { window_expires_at = "2099-01-01T02:00:00Z" }
+}
+
+run "reject_window_longer_than_two_hours" {
+  command = plan
+  variables { window_expires_at = "2099-01-01T02:00:01Z" }
   expect_failures = [var.window_expires_at]
 }
 

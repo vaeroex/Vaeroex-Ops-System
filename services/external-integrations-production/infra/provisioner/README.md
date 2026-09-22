@@ -163,6 +163,9 @@ supplies that exact expiry as the next plan's
 opening a replacement window. The bounded propagation interval is additional
 defense against stale policy enforcement, not a claim of instantaneous IAM
 consistency.
+Each mandatory Google readback is bounded to 120 seconds and may retry once;
+Terraform applies, IAM mutations, credential operations and database mutations
+remain single-attempt and must reconcile read-only after any uncertainty.
 
 Before opening and after closing every supervised pilot window, independent
 live readbacks remain mandatory. Closed state requires zero secret versions
