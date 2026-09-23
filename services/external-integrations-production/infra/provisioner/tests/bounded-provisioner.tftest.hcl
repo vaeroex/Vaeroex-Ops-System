@@ -285,6 +285,23 @@ run "accept_two_hour_window" {
   variables { window_expires_at = "2099-01-01T02:00:00Z" }
 }
 
+run "short_oauth_preserves_short_administrative_expiry" {
+  command = plan
+  variables {
+    administrative_access_enabled = true
+    temporary_access_enabled      = true
+    temporary_access_profiles     = ["oauth"]
+  }
+  assert {
+    condition = (
+      google_compute_instance_iam_member.operator_oslogin[0].condition[0].expression == "request.time >= timestamp('2099-01-01T00:00:00Z') && request.time < timestamp('2099-01-01T01:00:00Z')" &&
+      google_iap_tunnel_instance_iam_member.operator_tunnel[0].condition[0].expression == "request.time >= timestamp('2099-01-01T00:00:00Z') && request.time < timestamp('2099-01-01T01:00:00Z') && destination.port == 22" &&
+      google_service_account_iam_member.operator_oslogin_service_account[0].condition[0].expression == "request.time >= timestamp('2099-01-01T00:00:00Z') && request.time < timestamp('2099-01-01T01:00:00Z')"
+    )
+    error_message = "Administrative grants must not outlast a shorter OAuth window."
+  }
+}
+
 run "accept_three_hour_closed_checkpoint" {
   command = plan
   variables { window_expires_at = "2099-01-01T03:00:00Z" }
@@ -304,6 +321,14 @@ run "accept_three_hour_oauth_only_window" {
       google_secret_manager_secret_iam_member.private_versions["oauth"].condition[0].expression == "request.time >= timestamp('2099-01-01T00:00:00Z') && request.time < timestamp('2099-01-01T03:00:00Z')"
     )
     error_message = "The extended window must remain OAuth-only with its exact hard expiry."
+  }
+  assert {
+    condition = (
+      google_compute_instance_iam_member.operator_oslogin[0].condition[0].expression == "request.time >= timestamp('2099-01-01T00:00:00Z') && request.time < timestamp('2099-01-01T02:00:00Z')" &&
+      google_iap_tunnel_instance_iam_member.operator_tunnel[0].condition[0].expression == "request.time >= timestamp('2099-01-01T00:00:00Z') && request.time < timestamp('2099-01-01T02:00:00Z') && destination.port == 22" &&
+      google_service_account_iam_member.operator_oslogin_service_account[0].condition[0].expression == "request.time >= timestamp('2099-01-01T00:00:00Z') && request.time < timestamp('2099-01-01T02:00:00Z')"
+    )
+    error_message = "All three administrative grants must expire at 120 minutes even when OAuth lasts 180."
   }
 }
 

@@ -12,6 +12,11 @@ locals {
     "request.time >= timestamp('${var.window_starts_at}')",
     "request.time < timestamp('${var.window_expires_at}')",
   ])
+  administrative_expires_at = timecmp(var.window_expires_at, timeadd(var.window_starts_at, "120m")) <= 0 ? var.window_expires_at : timeadd(var.window_starts_at, "120m")
+  administrative_window_condition = join(" && ", [
+    "request.time >= timestamp('${var.window_starts_at}')",
+    "request.time < timestamp('${local.administrative_expires_at}')",
+  ])
   labels = {
     application = "vaeroex-integrations"
     environment = "production"
@@ -304,7 +309,7 @@ resource "google_compute_instance_iam_member" "operator_oslogin" {
   member        = local.operator
   condition {
     title      = "bounded-native-provisioning"
-    expression = local.window_condition
+    expression = local.administrative_window_condition
   }
 }
 
@@ -317,7 +322,7 @@ resource "google_iap_tunnel_instance_iam_member" "operator_tunnel" {
   member   = local.operator
   condition {
     title      = "bounded-native-ssh-only"
-    expression = "${local.window_condition} && destination.port == 22"
+    expression = "${local.administrative_window_condition} && destination.port == 22"
   }
 }
 
@@ -328,7 +333,7 @@ resource "google_service_account_iam_member" "operator_oslogin_service_account" 
   member             = local.operator
   condition {
     title      = "bounded-native-oslogin"
-    expression = local.window_condition
+    expression = local.administrative_window_condition
   }
 }
 
