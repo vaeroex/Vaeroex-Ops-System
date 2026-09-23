@@ -72,8 +72,20 @@ const grant = (profile, before, after, actions, overrides = {}) => ({
 });
 
 function plan(...resourceChanges) {
-  const afterEnabled = resourceChanges.find(change => change.address === "terraform_data.private_access_generation")
-    ?.change?.after?.input?.enabled;
+  const afterInput = resourceChanges.find(change => change.address === "terraform_data.private_access_generation")
+    ?.change?.after?.input;
+  const afterEnabled = afterInput?.enabled;
+  const expiry = Math.min(Date.parse(afterInput?.expires_at), Date.parse(afterInput?.starts_at) + 120 * 60 * 1000);
+  if (afterEnabled === true && Number.isFinite(expiry)) {
+    const expression = `request.time >= timestamp('${afterInput.starts_at}') && request.time < timestamp('${new Date(expiry).toISOString().replace(".000Z", "Z")}')`;
+    for (const [address, suffix] of [
+      ["google_compute_instance_iam_member.operator_oslogin[0]", ""],
+      ["google_iap_tunnel_instance_iam_member.operator_tunnel[0]", " && destination.port == 22"],
+      ["google_service_account_iam_member.operator_oslogin_service_account[0]", ""],
+    ]) {
+      resourceChanges.push({ address, change: { actions: ["create"], before: null, after: { condition: [{ expression: expression + suffix }] } } });
+    }
+  }
   return {
     format_version: "1.2",
     complete: true,
@@ -105,6 +117,24 @@ assert.equal(
   "private_access_closed_to_one_grant_confirmed",
 );
 const threeHourExpiry = "2099-01-02T03:00:00Z";
+for (const address of [
+  "google_compute_instance_iam_member.operator_oslogin[0]",
+  "google_iap_tunnel_instance_iam_member.operator_tunnel[0]",
+  "google_service_account_iam_member.operator_oslogin_service_account[0]",
+]) {
+  for (const mutation of ["longer", "missing", "duplicate", "unknown"]) {
+    const candidate = plan(
+      generation(false, true, ["update"], { after: { expires_at: threeHourExpiry, checkpoint_expires_at: threeHourExpiry } }),
+      grant("oauth", false, true, ["create"], { after: { expires_at: threeHourExpiry } }),
+    );
+    const resource = candidate.resource_changes.find(change => change.address === address);
+    if (mutation === "longer") resource.change.after.condition[0].expression = resource.change.after.condition[0].expression.replace("02:00:00Z", "03:00:00Z");
+    if (mutation === "missing") candidate.resource_changes = candidate.resource_changes.filter(change => change !== resource);
+    if (mutation === "duplicate") candidate.resource_changes.push(structuredClone(resource));
+    if (mutation === "unknown") resource.change.after.condition[0].expression = null;
+    rejects(candidate, "private_access_administrative_expiry_mismatch");
+  }
+}
 assert.equal(
   verifyPrivateAccessPlan(plan(
     generation(false, true, ["update"], {

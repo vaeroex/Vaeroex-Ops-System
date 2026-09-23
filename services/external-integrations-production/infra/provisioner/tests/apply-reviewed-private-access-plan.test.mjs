@@ -489,7 +489,16 @@ const openingJson = Buffer.from(JSON.stringify({
   format_version: "1.2",
   complete: true,
   variables: openPlanVariables,
-  resource_changes: [openingGeneration, openingGrant],
+  resource_changes: [openingGeneration, openingGrant, ...[
+    ["google_compute_instance_iam_member.operator_oslogin[0]", ""],
+    ["google_iap_tunnel_instance_iam_member.operator_tunnel[0]", " && destination.port == 22"],
+    ["google_service_account_iam_member.operator_oslogin_service_account[0]", ""],
+  ].map(([address, suffix]) => ({
+    address,
+    change: { actions: ["create"], before: null, after: { condition: [{
+      expression: "request.time >= timestamp('2099-01-02T00:00:00Z') && request.time < timestamp('2099-01-02T01:00:00Z')" + suffix,
+    }] } },
+  }))],
 }));
 const failedOpenOrder = [];
 assert.throws(() => applyReviewedPrivateAccessPlan(planPath, reviewedSha256, {

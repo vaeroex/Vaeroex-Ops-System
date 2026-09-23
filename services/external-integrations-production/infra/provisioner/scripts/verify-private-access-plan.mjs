@@ -231,6 +231,26 @@ function verifyGrantContract(grant, side, generationInput) {
   }
 }
 
+function verifyAdministrativeExpiry(plan, generationInput) {
+  const expiry = new Date(Math.min(
+    exactTimestamp(generationInput.expires_at),
+    exactTimestamp(generationInput.starts_at) + 120 * 60 * 1000,
+  )).toISOString().replace(".000Z", "Z");
+  const condition = `request.time >= timestamp('${generationInput.starts_at}') && request.time < timestamp('${expiry}')`;
+  for (const [address, suffix] of [
+    ["google_compute_instance_iam_member.operator_oslogin[0]", ""],
+    ["google_iap_tunnel_instance_iam_member.operator_tunnel[0]", " && destination.port == 22"],
+    ["google_service_account_iam_member.operator_oslogin_service_account[0]", ""],
+  ]) {
+    const matches = plan.resource_changes.filter(change => change.address === address);
+    const conditions = matches[0]?.change?.after?.condition;
+    if (matches.length !== 1 || !Array.isArray(conditions) || conditions.length !== 1 ||
+        conditions[0]?.expression !== condition + suffix) {
+      reject("private_access_administrative_expiry_mismatch");
+    }
+  }
+}
+
 export function verifyPrivateAccessPlan(plan) {
   if (!plan || !Array.isArray(plan.resource_changes)) {
     reject("private_access_plan_invalid");
@@ -327,6 +347,7 @@ export function verifyPrivateAccessPlan(plan) {
     if (phase !== `open:${afterGrants[0].index}`) reject("private_access_open_controls_invalid");
     verifyOpenGenerationInput(afterInput);
     verifyGrantContract(afterGrants[0], "after", afterInput);
+    verifyAdministrativeExpiry(plan, afterInput);
     return "private_access_closed_to_one_grant_confirmed";
   }
 
