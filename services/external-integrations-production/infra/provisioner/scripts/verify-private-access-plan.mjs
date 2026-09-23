@@ -284,7 +284,11 @@ export function verifyPrivateAccessPlan(plan) {
       if (beforeEnabled !== false || !isNoOp(generation) || !isDeepStrictEqual(beforeInput, afterInput)) {
         reject("private_access_closed_checkpoint_rewrite_rejected");
       }
-      privateAccessClosedNoTransitionTuple(plan);
+      const tuple = privateAccessClosedNoTransitionTuple(plan);
+      if ((phase === "setup" || phase === "administrative") &&
+          exactTimestamp(tuple.windowExpiresAt) > exactTimestamp(tuple.windowStartsAt) + 120 * 60 * 1000) {
+        reject("private_access_non_oauth_window_too_long");
+      }
       if (phase === "setup") return "private_access_setup_phase_confirmed";
       if (phase === "administrative") return "private_access_administrative_phase_confirmed";
       verifyFullyClosedBoundary(plan, phase);

@@ -324,6 +324,25 @@ run "reject_window_longer_than_three_hours" {
   expect_failures = [var.window_expires_at]
 }
 
+run "reject_extended_administrative_window" {
+  command = plan
+  variables {
+    administrative_access_enabled = true
+    window_expires_at             = "2099-01-01T02:00:01Z"
+  }
+  expect_failures = [var.window_expires_at]
+}
+
+run "reject_extended_setup_window" {
+  command = plan
+  variables {
+    administrative_access_enabled = true
+    setup_https_enabled           = true
+    window_expires_at             = "2099-01-01T02:00:01Z"
+  }
+  expect_failures = [var.window_expires_at]
+}
+
 run "reject_reversed_window" {
   command = plan
   variables { window_expires_at = "2098-12-31T23:59:59Z" }

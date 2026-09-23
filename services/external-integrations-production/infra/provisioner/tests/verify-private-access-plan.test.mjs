@@ -135,6 +135,12 @@ assert.equal(
   "private_access_one_grant_to_closed_confirmed",
 );
 const overlongExpiry = "2099-01-02T03:00:01Z";
+for (const phase of ["setup", "administrative"]) {
+  rejects(planInPhase(phase, generation(false, false, ["no-op"], {
+    before: { starts_at: NEXT_START, expires_at: threeHourExpiry, checkpoint_expires_at: threeHourExpiry },
+    after: { starts_at: NEXT_START, expires_at: threeHourExpiry, checkpoint_expires_at: threeHourExpiry },
+  })), "private_access_non_oauth_window_too_long");
+}
 rejects(
   plan(
     generation(false, true, ["update"], {
