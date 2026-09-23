@@ -615,7 +615,7 @@ jobs:
 
       - name: Apply migrations to isolated local Postgres
         run: |
-          SUPABASE_DB_MIGRATIONS_ENABLED=false supabase db start
+          env -u SUPABASE_INTERNAL_IMAGE_REGISTRY SUPABASE_DB_MIGRATIONS_ENABLED=false supabase db start
           node scripts/prepare-production-shaped-local-database.js
           supabase migration up --local
 
