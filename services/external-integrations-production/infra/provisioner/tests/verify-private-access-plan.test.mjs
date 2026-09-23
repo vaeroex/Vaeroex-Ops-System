@@ -104,7 +104,37 @@ assert.equal(
   )),
   "private_access_closed_to_one_grant_confirmed",
 );
-const overlongExpiry = "2099-01-02T02:00:01Z";
+const threeHourExpiry = "2099-01-02T03:00:00Z";
+assert.equal(
+  verifyPrivateAccessPlan(plan(
+    generation(false, true, ["update"], {
+      after: { expires_at: threeHourExpiry, checkpoint_expires_at: threeHourExpiry },
+    }),
+    grant("oauth", false, true, ["create"], { after: { expires_at: threeHourExpiry } }),
+  )),
+  "private_access_closed_to_one_grant_confirmed",
+);
+for (const profile of ["broker", "runtime", "evidence", "scheduler", "webhook"]) {
+  const candidate = plan(
+    generation(false, true, ["update"], {
+      after: { profiles: [profile], expires_at: threeHourExpiry, checkpoint_expires_at: threeHourExpiry },
+    }),
+    grant(profile, false, true, ["create"], { after: { expires_at: threeHourExpiry } }),
+  );
+  candidate.variables = phaseVariables("open", profile);
+  rejects(candidate, "private_access_open_generation_invalid");
+}
+assert.equal(
+  verifyPrivateAccessPlan(plan(
+    generation(true, false, ["delete", "create"], {
+      before: { expires_at: threeHourExpiry, checkpoint_expires_at: threeHourExpiry },
+      after: { starts_at: NEXT_START, expires_at: threeHourExpiry, checkpoint_expires_at: threeHourExpiry },
+    }),
+    grant("oauth", true, false, ["delete"], { before: { expires_at: threeHourExpiry } }),
+  )),
+  "private_access_one_grant_to_closed_confirmed",
+);
+const overlongExpiry = "2099-01-02T03:00:01Z";
 rejects(
   plan(
     generation(false, true, ["update"], {
@@ -280,8 +310,8 @@ rejects(
 );
 rejects(
   plan(generation(false, false, ["no-op"], {
-    before: { expires_at: "2099-01-01T02:00:01Z", checkpoint_expires_at: "2099-01-01T02:00:01Z" },
-    after: { expires_at: "2099-01-01T02:00:01Z", checkpoint_expires_at: "2099-01-01T02:00:01Z" },
+    before: { expires_at: "2099-01-01T03:00:01Z", checkpoint_expires_at: "2099-01-01T03:00:01Z" },
+    after: { expires_at: "2099-01-01T03:00:01Z", checkpoint_expires_at: "2099-01-01T03:00:01Z" },
   })),
   "private_access_closed_checkpoint_invalid",
 );

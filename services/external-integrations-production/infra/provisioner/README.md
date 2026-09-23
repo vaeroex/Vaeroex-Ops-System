@@ -190,6 +190,18 @@ three flags to false after the task, interruption or deadline. Their sole target
 is the dedicated provisioner SA. Review existing higher-priority network rules
 before applying; these additions do not replace platform security policy.
 
+The OAuth-only pilot IAM window may last at most 180 minutes; other profiles
+retain the 120-minute maximum. Closed checkpoints can retain the OAuth expiry
+without granting access. A separately authorized temporary organization
+`roles/iam.denyReviewer` binding must expire within 180 minutes of creation and
+be removed immediately on failure, abandonment, or cleanup. This is read-only
+review authority, not additional provisioner authority. Finish validation and
+reviews before creating that binding or starting any temporary-access clock.
+Saved plans contain fixed timestamps: prepare the plan when the operator is
+ready to authorize, and never shift timestamps after approval. Keep the $0.25
+execution ceiling and mandatory cleanup; a longer IAM bound does not authorize
+longer VM execution or repeated starts.
+
 Start the VM explicitly only in the admitted window. Its standard, non-Spot
 scheduling uses `max_run_duration = 3600`, `instance_termination_action = STOP`,
 no automatic restart and E2-required live migration on host maintenance. GCP

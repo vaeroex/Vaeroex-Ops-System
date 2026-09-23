@@ -285,9 +285,42 @@ run "accept_two_hour_window" {
   variables { window_expires_at = "2099-01-01T02:00:00Z" }
 }
 
-run "reject_window_longer_than_two_hours" {
+run "accept_three_hour_closed_checkpoint" {
   command = plan
-  variables { window_expires_at = "2099-01-01T02:00:01Z" }
+  variables { window_expires_at = "2099-01-01T03:00:00Z" }
+}
+
+run "accept_three_hour_oauth_only_window" {
+  command = plan
+  variables {
+    administrative_access_enabled = true
+    temporary_access_enabled      = true
+    temporary_access_profiles     = ["oauth"]
+    window_expires_at             = "2099-01-01T03:00:00Z"
+  }
+  assert {
+    condition = (
+      toset(keys(google_secret_manager_secret_iam_member.private_versions)) == toset(["oauth"]) &&
+      google_secret_manager_secret_iam_member.private_versions["oauth"].condition[0].expression == "request.time >= timestamp('2099-01-01T00:00:00Z') && request.time < timestamp('2099-01-01T03:00:00Z')"
+    )
+    error_message = "The extended window must remain OAuth-only with its exact hard expiry."
+  }
+}
+
+run "reject_extended_peer_window" {
+  command = plan
+  variables {
+    administrative_access_enabled = true
+    temporary_access_enabled      = true
+    temporary_access_profiles     = ["broker"]
+    window_expires_at             = "2099-01-01T02:00:01Z"
+  }
+  expect_failures = [var.window_expires_at]
+}
+
+run "reject_window_longer_than_three_hours" {
+  command = plan
+  variables { window_expires_at = "2099-01-01T03:00:01Z" }
   expect_failures = [var.window_expires_at]
 }
 
