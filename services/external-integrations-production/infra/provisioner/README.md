@@ -163,6 +163,9 @@ supplies that exact expiry as the next plan's
 opening a replacement window. The bounded propagation interval is additional
 defense against stale policy enforcement, not a claim of instantaneous IAM
 consistency.
+Each mandatory Google readback is bounded to 120 seconds and may retry once;
+Terraform applies, IAM mutations, credential operations and database mutations
+remain single-attempt and must reconcile read-only after any uncertainty.
 
 Before opening and after closing every supervised pilot window, independent
 live readbacks remain mandatory. Closed state requires zero secret versions
@@ -186,6 +189,18 @@ Network rules do not expire automatically: coordinating cleanup must return all
 three flags to false after the task, interruption or deadline. Their sole target
 is the dedicated provisioner SA. Review existing higher-priority network rules
 before applying; these additions do not replace platform security policy.
+
+The OAuth-only pilot IAM window may last at most 180 minutes; other profiles
+retain the 120-minute maximum. Closed checkpoints can retain the OAuth expiry
+without granting access. A separately authorized temporary organization
+`roles/iam.denyReviewer` binding must expire within 180 minutes of creation and
+be removed immediately on failure, abandonment, or cleanup. This is read-only
+review authority, not additional provisioner authority. Finish validation and
+reviews before creating that binding or starting any temporary-access clock.
+Saved plans contain fixed timestamps: prepare the plan when the operator is
+ready to authorize, and never shift timestamps after approval. Keep the $0.25
+execution ceiling and mandatory cleanup; a longer IAM bound does not authorize
+longer VM execution or repeated starts.
 
 Start the VM explicitly only in the admitted window. Its standard, non-Spot
 scheduling uses `max_run_duration = 3600`, `instance_termination_action = STOP`,

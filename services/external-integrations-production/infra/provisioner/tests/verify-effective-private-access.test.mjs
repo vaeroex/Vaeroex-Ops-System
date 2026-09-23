@@ -104,6 +104,7 @@ for (const call of closedRunner.calls.filter(call => call.args[0] === "secrets")
   assert.equal("CLOUDSDK_CORE_LOG_HTTP" in call.options.env, false);
   assert.equal("CLOUDSDK_LOG_HTTP" in call.options.env, false);
   assert.deepEqual(call.options.stdio, ["ignore", "pipe", "pipe"]);
+  assert.equal(call.options.timeout, 120_000);
 }
 for (const call of closedAnalyses) {
   assert.equal(call.command, "gcloud");
@@ -115,8 +116,24 @@ for (const call of closedAnalyses) {
   assert.equal("CLOUDSDK_CORE_LOG_HTTP" in call.options.env, false);
   assert.equal("CLOUDSDK_LOG_HTTP" in call.options.env, false);
   assert.deepEqual(call.options.stdio, ["ignore", "pipe", "pipe"]);
+  assert.equal(call.options.timeout, 120_000);
   assert.equal(call.args.some(value => value.includes("testIamPermissions")), false);
 }
+
+const retriedReadRunner = runnerFor();
+let failedReadOnce = false;
+assert.equal(verifyEffectivePrivateAccess(query, {
+  now: new Date(requestTime),
+  run(command, args, options) {
+    if (!failedReadOnce) {
+      failedReadOnce = true;
+      retriedReadRunner.calls.push({ command, args, options });
+      return { status: 1, stdout: "", stderr: "raw-transient-read-error" };
+    }
+    return retriedReadRunner.run(command, args, options);
+  },
+}).status, "policy_troubleshooter_closed_all_denied");
+assert.equal(retriedReadRunner.calls.length, 13);
 
 const openRunner = runnerFor("oauth");
 assert.deepEqual(verifyEffectivePrivateAccess({ ...query, phase: "open", active_profile: "oauth" }, {

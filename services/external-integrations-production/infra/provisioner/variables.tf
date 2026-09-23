@@ -94,14 +94,17 @@ variable "window_starts_at" {
 }
 
 variable "window_expires_at" {
-  description = "Exact IAM expiry, more than zero and no more than 60 minutes after start."
+  description = "Exact IAM expiry: at most 180 minutes for OAuth or closed checkpoints; other profiles remain bounded to 120 minutes."
   type        = string
   nullable    = false
   validation {
     condition = can(regex("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$", var.window_expires_at)) && try(
       timecmp(var.window_expires_at, var.window_starts_at) > 0 &&
-    timecmp(var.window_expires_at, timeadd(var.window_starts_at, "60m")) <= 0, false)
-    error_message = "The exact UTC expiry must follow start by at most 60 minutes."
+      timecmp(var.window_expires_at, timeadd(var.window_starts_at, (
+        (var.temporary_access_enabled && var.administrative_access_enabled && !var.setup_https_enabled && var.temporary_access_profiles == toset(["oauth"])) ||
+        (!var.temporary_access_enabled && !var.administrative_access_enabled && !var.setup_https_enabled && length(var.temporary_access_profiles) == 0)
+    ) ? "180m" : "120m")) <= 0, false)
+    error_message = "The exact UTC expiry must follow start by at most 180 minutes for OAuth/closed checkpoints, or 120 minutes for other profiles."
   }
 }
 

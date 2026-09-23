@@ -54,7 +54,7 @@ run "initial_installation_is_stopped_and_inaccessible" {
       google_compute_instance.provisioner.scheduling[0].instance_termination_action == "STOP" &&
       google_compute_instance.provisioner.scheduling[0].max_run_duration[0].seconds == 3600
     )
-    error_message = "Creation must converge to stopped, non-Spot e2-small with one-hour STOP and no restart."
+    error_message = "Closed state must converge to stopped, non-Spot e2-small with one-hour STOP and no restart."
   }
   assert {
     condition = (
@@ -280,9 +280,91 @@ run "reject_empty_pooler_input" {
   expect_failures = [var.verified_pooler_ipv4_cidrs]
 }
 
-run "reject_window_longer_than_one_hour" {
+run "accept_two_hour_window" {
   command = plan
-  variables { window_expires_at = "2099-01-01T01:00:01Z" }
+  variables { window_expires_at = "2099-01-01T02:00:00Z" }
+}
+
+run "short_oauth_preserves_short_administrative_expiry" {
+  command = plan
+  variables {
+    administrative_access_enabled = true
+    temporary_access_enabled      = true
+    temporary_access_profiles     = ["oauth"]
+  }
+  assert {
+    condition = (
+      google_compute_instance_iam_member.operator_oslogin[0].condition[0].expression == "request.time >= timestamp('2099-01-01T00:00:00Z') && request.time < timestamp('2099-01-01T01:00:00Z')" &&
+      google_iap_tunnel_instance_iam_member.operator_tunnel[0].condition[0].expression == "request.time >= timestamp('2099-01-01T00:00:00Z') && request.time < timestamp('2099-01-01T01:00:00Z') && destination.port == 22" &&
+      google_service_account_iam_member.operator_oslogin_service_account[0].condition[0].expression == "request.time >= timestamp('2099-01-01T00:00:00Z') && request.time < timestamp('2099-01-01T01:00:00Z')"
+    )
+    error_message = "Administrative grants must not outlast a shorter OAuth window."
+  }
+}
+
+run "accept_three_hour_closed_checkpoint" {
+  command = plan
+  variables { window_expires_at = "2099-01-01T03:00:00Z" }
+}
+
+run "accept_three_hour_oauth_only_window" {
+  command = plan
+  variables {
+    administrative_access_enabled = true
+    temporary_access_enabled      = true
+    temporary_access_profiles     = ["oauth"]
+    window_expires_at             = "2099-01-01T03:00:00Z"
+  }
+  assert {
+    condition = (
+      toset(keys(google_secret_manager_secret_iam_member.private_versions)) == toset(["oauth"]) &&
+      google_secret_manager_secret_iam_member.private_versions["oauth"].condition[0].expression == "request.time >= timestamp('2099-01-01T00:00:00Z') && request.time < timestamp('2099-01-01T03:00:00Z')"
+    )
+    error_message = "The extended window must remain OAuth-only with its exact hard expiry."
+  }
+  assert {
+    condition = (
+      google_compute_instance_iam_member.operator_oslogin[0].condition[0].expression == "request.time >= timestamp('2099-01-01T00:00:00Z') && request.time < timestamp('2099-01-01T02:00:00Z')" &&
+      google_iap_tunnel_instance_iam_member.operator_tunnel[0].condition[0].expression == "request.time >= timestamp('2099-01-01T00:00:00Z') && request.time < timestamp('2099-01-01T02:00:00Z') && destination.port == 22" &&
+      google_service_account_iam_member.operator_oslogin_service_account[0].condition[0].expression == "request.time >= timestamp('2099-01-01T00:00:00Z') && request.time < timestamp('2099-01-01T02:00:00Z')"
+    )
+    error_message = "All three administrative grants must expire at 120 minutes even when OAuth lasts 180."
+  }
+}
+
+run "reject_extended_peer_window" {
+  command = plan
+  variables {
+    administrative_access_enabled = true
+    temporary_access_enabled      = true
+    temporary_access_profiles     = ["broker"]
+    window_expires_at             = "2099-01-01T02:00:01Z"
+  }
+  expect_failures = [var.window_expires_at]
+}
+
+run "reject_window_longer_than_three_hours" {
+  command = plan
+  variables { window_expires_at = "2099-01-01T03:00:01Z" }
+  expect_failures = [var.window_expires_at]
+}
+
+run "reject_extended_administrative_window" {
+  command = plan
+  variables {
+    administrative_access_enabled = true
+    window_expires_at             = "2099-01-01T02:00:01Z"
+  }
+  expect_failures = [var.window_expires_at]
+}
+
+run "reject_extended_setup_window" {
+  command = plan
+  variables {
+    administrative_access_enabled = true
+    setup_https_enabled           = true
+    window_expires_at             = "2099-01-01T02:00:01Z"
+  }
   expect_failures = [var.window_expires_at]
 }
 

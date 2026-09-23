@@ -7,7 +7,8 @@ const CONDITION_TITLE = "bounded-native-provisioning";
 const CONDITION_DESCRIPTION = "One exact database secret during the admitted maintenance window.";
 const PROFILES = Object.freeze(["oauth", "broker", "scheduler", "webhook", "runtime", "evidence"]);
 const MAX_RESPONSE_BYTES = 4 * 1024 * 1024;
-const QUERY_TIMEOUT_MS = 20_000;
+const QUERY_TIMEOUT_MS = 120_000;
+const READ_ATTEMPTS = 2;
 const GCLOUD_DIAGNOSTIC_ENVIRONMENT = /^(?:CLOUDSDK_CORE_LOG_HTTP|CLOUDSDK_LOG_HTTP|CLOUDSDK_CORE_VERBOSITY|CLOUDSDK_CORE_TRACE_TOKEN|CLOUDSDK_CORE_LOG_FILE)$/;
 
 function reject(label = "private_access_exact_reconciliation_failed") {
@@ -35,7 +36,7 @@ function defaultRun(command, args, options) {
   return spawnSync(command, args, options);
 }
 
-function runBounded(run, args, environment) {
+function tryBounded(run, args, environment) {
   let result;
   try {
     result = run("gcloud", args, {
@@ -47,11 +48,25 @@ function runBounded(run, args, environment) {
       timeout: QUERY_TIMEOUT_MS,
     });
   } catch {
-    reject();
+    return null;
   }
   if (result?.error || result?.status !== 0 || typeof result?.stdout !== "string" ||
-      Buffer.byteLength(result.stdout) > MAX_RESPONSE_BYTES) reject();
+      Buffer.byteLength(result.stdout) > MAX_RESPONSE_BYTES) return null;
   return result.stdout;
+}
+
+function runBoundedRead(run, args, environment) {
+  for (let attempt = 0; attempt < READ_ATTEMPTS; attempt += 1) {
+    const stdout = tryBounded(run, args, environment);
+    if (stdout !== null) return stdout;
+  }
+  reject();
+}
+
+function runBoundedMutation(run, args, environment) {
+  const stdout = tryBounded(run, args, environment);
+  if (stdout === null) reject();
+  return stdout;
 }
 
 function policyBindings(stdout) {
@@ -78,7 +93,7 @@ function policyBindings(stdout) {
 }
 
 function readPolicy(run, environment, secretId) {
-  return policyBindings(runBounded(run, [
+  return policyBindings(runBoundedRead(run, [
     "secrets", "get-iam-policy", secretId,
     `--project=${PROJECT_ID}`,
     "--format=json",
@@ -91,7 +106,7 @@ function checkedRecoveryTuple(recovery) {
   const start = exactTimestamp(recovery?.windowStartsAt);
   const expiry = exactTimestamp(recovery?.windowExpiresAt);
   if (!PROFILES.includes(recovery?.profile) || start === null || expiry === null ||
-      expiry <= start || expiry > start + 60 * 60 * 1000) reject();
+      expiry <= start || expiry > start + (recovery.profile === "oauth" ? 180 : 120) * 60 * 1000) reject();
   return Object.freeze({
     profile: recovery.profile,
     condition: Object.freeze({
@@ -133,7 +148,7 @@ function verifyFinalPolicies(policies) {
 }
 
 function removeCondition(run, environment, secretId, condition) {
-  return runBounded(run, [
+  return runBoundedMutation(run, [
     "secrets", "remove-iam-policy-binding", secretId,
     `--project=${PROJECT_ID}`,
     `--member=${PROVISIONER_MEMBER}`,
