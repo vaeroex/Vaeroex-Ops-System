@@ -106,7 +106,7 @@ function checkedRecoveryTuple(recovery) {
   const start = exactTimestamp(recovery?.windowStartsAt);
   const expiry = exactTimestamp(recovery?.windowExpiresAt);
   if (!PROFILES.includes(recovery?.profile) || start === null || expiry === null ||
-      expiry <= start || expiry > start + 120 * 60 * 1000) reject();
+      expiry <= start || expiry > start + (recovery.profile === "oauth" ? 180 : 120) * 60 * 1000) reject();
   return Object.freeze({
     profile: recovery.profile,
     condition: Object.freeze({

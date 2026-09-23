@@ -33,7 +33,7 @@ function exactBinding(overrides = {}) {
 }
 
 function fixture({ removalStatus = 0, removalDisappears = true, binding = exactBinding(),
-  bindingProfile = "oauth", malformedProfile } = {}) {
+  bindingProfile = "oauth", malformedProfile, expectedCondition = condition } = {}) {
   const calls = [];
   const policies = Object.fromEntries(profiles.map(profile => [profile, { bindings: [] }]));
   if (binding) policies[bindingProfile].bindings.push(binding);
@@ -54,10 +54,10 @@ function fixture({ removalStatus = 0, removalDisappears = true, binding = exactB
       assert.equal(args.includes("--project=vaeroex-integrations-prod"), true);
       assert.equal(args.includes(`--member=${member}`), true);
       assert.equal(args.includes(`--role=${role}`), true);
-      assert.equal(args.includes(`--condition=expression=${condition.expression},title=${condition.title},description=${condition.description}`), true);
+      assert.equal(args.includes(`--condition=expression=${expectedCondition.expression},title=${expectedCondition.title},description=${expectedCondition.description}`), true);
       if (removalDisappears) {
         policies[profile].bindings = policies[profile].bindings.flatMap(candidate => {
-          if (candidate.role !== role || candidate.condition?.expression !== condition.expression) return [candidate];
+          if (candidate.role !== role || candidate.condition?.expression !== expectedCondition.expression) return [candidate];
           const members = candidate.members.filter(candidateMember => candidateMember !== member);
           return members.length ? [{ ...candidate, members }] : [];
         });
@@ -126,9 +126,27 @@ assert.deepEqual(reconcileExactPrivateAccess(twoHourRecovery, { run: twoHourClos
 });
 assert.throws(() => reconcileExactPrivateAccess({
   ...twoHourRecovery,
-  windowExpiresAt: "2099-01-01T02:00:01Z",
+  windowExpiresAt: "2099-01-01T03:00:01Z",
 }, { run() { throw new Error("must_not_run"); } }),
 error => error.fixedLabel === "private_access_exact_reconciliation_failed");
+
+const threeHourRecovery = { ...recovery, windowExpiresAt: "2099-01-01T03:00:00Z" };
+const threeHourClosed = fixture({ binding: null });
+assert.equal(reconcileExactPrivateAccess(threeHourRecovery, { run: threeHourClosed.run }).removed_bindings, "0");
+const threeHourCondition = {
+  ...condition,
+  expression: "request.time >= timestamp('2099-01-01T00:00:00Z') && request.time < timestamp('2099-01-01T03:00:00Z')",
+};
+const threeHourOrphan = fixture({
+  binding: exactBinding({ condition: threeHourCondition }), expectedCondition: threeHourCondition,
+});
+assert.equal(reconcileExactPrivateAccess(threeHourRecovery, { run: threeHourOrphan.run }).removed_bindings, "1");
+assert.equal(threeHourOrphan.calls.filter(call => call.args[1] === "remove-iam-policy-binding").length, 1);
+for (const profile of profiles.filter(profile => profile !== "oauth")) {
+  assert.throws(() => reconcileExactPrivateAccess({ ...threeHourRecovery, profile }, {
+    run() { assert.fail("extended peer recovery must fail before cloud access"); },
+  }), error => error.fixedLabel === "private_access_exact_reconciliation_failed");
+}
 
 const beforeSecondPass = orphan.calls.length;
 assert.deepEqual(reconcileExactPrivateAccess(recovery, { run: orphan.run }), {
