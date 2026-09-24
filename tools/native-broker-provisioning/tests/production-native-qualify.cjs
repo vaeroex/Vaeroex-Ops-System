@@ -444,6 +444,10 @@ async function main() {
   const activeAuthority = (await live.query("SELECT has_function_privilege(session_user,$1::regprocedure,'EXECUTE') allowed",
     [overlayRpc(fenceProfile)])).rows[0];
   check(activeAuthority?.allowed === true, "active_session_has_only_its_mapped_rpc_before_fence");
+  let setRoleDenied = false;
+  try { await live.query(`SET ROLE ${fenceProfile.capabilityRole}`); }
+  catch (error) { setRoleDenied = error.code === "42501"; }
+  check(setRoleDenied, "native_set_false_denies_role_switch_while_rpc_is_inherited");
   await fixture.control.query(`BEGIN;
     GRANT ${fenceProfile.capabilityRole} TO ${fenceProfile.role} WITH ADMIN FALSE, INHERIT FALSE, SET FALSE;
     ALTER ROLE ${fenceProfile.role} NOLOGIN NOINHERIT;
@@ -465,6 +469,23 @@ async function main() {
   check(fencedReadback && !fencedReadback.rolcanlogin && !fencedReadback.rolinherit &&
     !fencedReadback.inherit_option && fencedReadback.sessions === 0,
   "native_fence_commits_closed_membership_before_drain_completion");
+  stage = "supervised_native_service_admission";
+  const { superviseServiceAdmission } = await import(pathToFileURL(path.resolve(__dirname, "../service-admission.mjs")));
+  const admissionCancellation = new AbortController();
+  const admissionResult = await superviseServiceAdmission({ native: fenceNative, target: fenceTarget,
+    intent: "synthetic-service-admit", approvalId: "synthetic-production", signal: admissionCancellation.signal,
+    async record() {}, async notify() {
+      const service = await fixture.connect(fenceProfile.role, fenceCandidate.toString("ascii"), "tls");
+      try {
+        const permission = (await service.query("SELECT has_function_privilege(session_user,$1::regprocedure,'EXECUTE') allowed",
+          [overlayRpc(fenceProfile)])).rows[0];
+        check(permission.allowed === true, "supervised_native_admission_inherits_exact_rpc");
+      } finally { await service.end(); admissionCancellation.abort(); }
+    } });
+  check(admissionResult.outcome === "service_closed" && admissionResult.fenceConfirmed,
+    "supervised_native_admission_fences_on_cancellation");
+  check((await fenceNative.inspect({ target: fenceTarget, intent: "post-service-closed", approvalId: "synthetic-production",
+    signal: new AbortController().signal })).ack, "supervised_native_admission_closed_catalog_confirmed");
   stage = "native_postflight_authority_recheck";
   const postflightProfile = profiles.find(profile => profile.name === "runtime");
   const postflightTarget = Object.freeze({ ...makeTarget(postflightProfile), roleOid: (await fixture.control.query(

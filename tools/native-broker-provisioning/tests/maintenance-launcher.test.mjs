@@ -115,6 +115,18 @@ process.stdout.write('synthetic_fixed_entry_passed\\n');
     assert.equal(invoke().stdout === denied, true, "writable install directory rejected");
     chmodSync(install, 0o700);
     accepted(invoke());
+    const admissionArgs = ["admit", "123", ...publicArgs.slice(2)];
+    assert.equal(invoke(admissionArgs).stdout, denied, "Sandbox launcher cannot admit a service");
+    writeFileSync(join(install, "maintenance.mjs"), fixture.replace(JSON.stringify(publicArgs), JSON.stringify(admissionArgs)), { mode: 0o600 });
+    for (const profile of ["OAUTH", "BROKER", "RUNTIME", "EVIDENCE", "SCHEDULER", "WEBHOOK"]) {
+      success(run("/usr/bin/cc", [...flags.slice(0, -3), `-DVAEROEX_PRODUCTION_${profile}`, ...flags.slice(-3)],
+        { env: { ...environment, TMPDIR: tmpdir() } }));
+      if (["SCHEDULER", "WEBHOOK"].includes(profile)) assert.equal(invoke(admissionArgs).stdout, denied);
+      else {
+        accepted(invoke(admissionArgs));
+        assert.equal(invoke(["admit", "0", ...publicArgs.slice(2)]).stdout, denied);
+      }
+    }
   } finally {
     if (inherited !== undefined) closeSync(inherited);
     rmSync(root, { recursive: true, force: true }); // This invocation's public-synthetic mkdtemp only.

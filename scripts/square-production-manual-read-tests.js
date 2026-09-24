@@ -168,9 +168,9 @@ module.exports = async function ({ permit: p, actor, now, fp }) {
       seen.push(sql); return sql.startsWith("select session_user") ? { rows: [{ login: `square_production_${profile}`, current_login: `square_production_${profile}` }] } : { rows: [{ value: {} }] };
     }, end: async () => seen.push("closed") }));
     await rpc(profile === "runtime" ? "acquire_page" : "read", {});
-    assert.equal(seen[1], `set role square_production_${profile}_authority`);
-    assert.equal(seen[2], `select public.square_production_internal_${profile}_v1($1::text,$2::jsonb) as value`);
-    assert.equal(seen[3], "closed"); await assert.rejects(() => rpc("read_credential", {}), /operation_denied/);
+    assert.equal(seen.length, 3);
+    assert.equal(seen[1], `select public.square_production_internal_${profile}_v1($1::text,$2::jsonb) as value`);
+    assert.equal(seen[2], "closed"); await assert.rejects(() => rpc("read_credential", {}), /operation_denied/);
   }
   let invoked = 0;
   const server = createInternalConsentServer({ profile: "runtime", runtime: async raw => { invoked++; return { status: raw.action }; },

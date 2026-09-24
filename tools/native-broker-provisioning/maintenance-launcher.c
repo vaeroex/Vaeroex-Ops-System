@@ -145,7 +145,11 @@ static bool digits(const char *value,size_t minimum,size_t maximum) {
   return true;
 }
 static bool arguments(int argc,char **argv) {
-  if(argc!=6 || (strcmp(argv[1],"create") && strcmp(argv[1],"rotate") && strcmp(argv[1],"recover")) ||
+  bool admission=false;
+#if defined(VAEROEX_PRODUCTION_OAUTH) || defined(VAEROEX_PRODUCTION_BROKER) || defined(VAEROEX_PRODUCTION_RUNTIME) || defined(VAEROEX_PRODUCTION_EVIDENCE)
+  admission=argc==6 && !strcmp(argv[1],"admit");
+#endif
+  if(argc!=6 || (!admission && strcmp(argv[1],"create") && strcmp(argv[1],"rotate") && strcmp(argv[1],"recover")) ||
     !digits(argv[2],1,10) || !token(argv[3]) || !token(argv[4]) || !digits(argv[5],13,13))return false;
   return !strcmp(argv[1],"create") ? !strcmp(argv[2],"0") : strcmp(argv[2],"0")!=0;
 }

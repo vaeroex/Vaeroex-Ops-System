@@ -413,7 +413,12 @@ async function createRuntimeLogins(client, capabilities = loginRoles) {
   for (const capability of capabilities) {
     const login = `square_production_${capability}`;
     await client.query(`create role ${login} login inherit nosuperuser nocreatedb nocreaterole noreplication nobypassrls`);
-    await client.query(`grant square_production_${capability}_authority to ${login}`);
+    await client.query(`grant square_production_${capability}_authority to ${login} with admin false, inherit true, set false`);
+    await client.query(`set session authorization ${login}`);
+    await client.query("savepoint native_membership");
+    await assert.rejects(() => client.query(`set role square_production_${capability}_authority`), { code: "42501" });
+    await client.query("rollback to savepoint native_membership");
+    await client.query("reset session authorization");
   }
 }
 
@@ -919,7 +924,9 @@ async function exerciseRuntime(client) {
   const expectedLocationId = "location-internal-001";
   await seedClosedFoundation(client);
   await seedOperator(client, ids);
+  await client.query("begin");
   await createRuntimeLogins(client);
+  await client.query("commit");
 
   const configuration = (await client.query(`
     select configuration_fingerprint from private.square_production_configuration_generations where generation=1
