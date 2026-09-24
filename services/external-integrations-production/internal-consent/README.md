@@ -34,6 +34,8 @@ Synthetic tests prove these new handlers, not a completed real consent.
    only OAuth-SA invocation on the existing broker, and allows the single
    bodyless `POST /api/integrations/square/connect` through Cloud Armor.
    Its default is null, so current deployment/network/permissions stay dormant.
+   Both database versions must be `1`, matching the existing OAuth/broker IAM
+   grants; other versions are rejected by deployment and runtime configuration.
    The corresponding reviewed edge image adds that exact initiation envelope;
    callback envelope/query semantics are unchanged. No new service, network,
    role definition, scheduler or paid resource is created.

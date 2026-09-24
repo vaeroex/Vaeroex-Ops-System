@@ -171,6 +171,8 @@ assert.match(main, /database-version-1-only/);
 assert.match(main, /resource\.name == '\$\{local\.secret_version_names\.application\}'/);
 assert.match(main, /resource\.name == '\$\{local\.secret_version_names\.webhook\}'/);
 assert.match(main, /resource\.name == '\$\{local\.secret_version_names\.database\[each\.key\]\}'/);
+assert.match(main, /mode => "projects\/\$\{data\.google_project\.current\.number\}\/secrets\/\$\{secret_id\}\/versions\/1"/, "existing database IAM remains pinned to version 1");
+assert.match(variables, /var\.internal_consent\.database_versions\.oauth == 1 &&\s*var\.internal_consent\.database_versions\.broker == 1 &&/, "both internal consent database versions must match the existing IAM grant");
 assert.doesNotMatch(main, /resource\s+"google_secret_manager_secret_version"/, "Terraform never handles credential values");
 assert.doesNotMatch(main, /secret_data|password|access_token|refresh_token/i, "Terraform has no credential inputs");
 

@@ -17,7 +17,7 @@ const databaseCaHash = "700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d1
 const googleKeys = createRemoteJWKSet(new URL("https://www.googleapis.com/oauth2/v3/certs"), { timeoutDuration: 5_000 });
 const ConfigSchema = z.object({
   profile: z.enum(["oauth", "broker"]), permit: InternalPermitSchema,
-  databaseVersion: z.number().int().positive().safe(), databaseCa: z.string().max(16_384),
+  databaseVersion: z.literal(1), databaseCa: z.string().max(16_384),
   brokerOrigin: z.literal("https://square-production-broker-u5c6zahmpq-uw.a.run.app"),
   supabasePublishableKey: z.string().min(16).max(2048)
 }).strict();

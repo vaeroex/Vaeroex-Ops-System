@@ -99,11 +99,11 @@ variable "internal_consent" {
       can(regex("^us-west1-docker\\.pkg\\.dev/vaeroex-integrations-prod/vaeroex-integrations-images/square-internal-consent@sha256:[a-f0-9]{64}$", var.internal_consent.image_digest)) &&
       can(regex("^[a-f0-9]{40}$", var.internal_consent.source_commit)) &&
       var.internal_consent.broker_origin == "https://square-production-broker-u5c6zahmpq-uw.a.run.app" &&
-      var.internal_consent.database_versions.oauth >= 1 && floor(var.internal_consent.database_versions.oauth) == var.internal_consent.database_versions.oauth &&
-      var.internal_consent.database_versions.broker >= 1 && floor(var.internal_consent.database_versions.broker) == var.internal_consent.database_versions.broker &&
+      var.internal_consent.database_versions.oauth == 1 &&
+      var.internal_consent.database_versions.broker == 1 &&
       sha256(var.internal_consent.database_ca) == "700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7"
     )
-    error_message = "Internal consent requires the reviewed immutable image/source, exact existing broker, numeric OAuth/broker versions and pinned public database CA."
+    error_message = "Internal consent requires the reviewed immutable image/source, exact existing broker, IAM-granted OAuth/broker database version 1 and pinned public database CA."
   }
 }
 

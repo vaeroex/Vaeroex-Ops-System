@@ -17,6 +17,7 @@ Module._resolveFilename = function(request, parent, isMain, options) {
 const { createInternalOAuth, createInternalBroker, createInternalOAuthHandler, InternalPermitSchema, internalFingerprint: fp } = require("../services/external-integrations-production/internal-consent/handlers.ts");
 const { createInternalRpc } = require("../services/external-integrations-production/internal-consent/database.ts");
 const { createInternalConsentTransport } = require("../services/external-integrations-production/internal-consent/transport.ts");
+const { createProductionInternalConsentRuntime } = require("../services/external-integrations-production/internal-consent/runtime.ts");
 const { ProviderApplicationSecret } = require("../lib/integrations/credentials/secret-manager.ts");
 const squareOAuth = require("../lib/integrations/providers/square/account-connection-oauth.ts");
 const { SQUARE_OAUTH_SCOPES } = squareOAuth;
@@ -223,6 +224,29 @@ async function main() {
   }
   const wrong = createInternalRpc("oauth", async () => ({ async query() { return { rows: [{ login: "postgres", current_login: "postgres" }] }; }, async end() {} }));
   await assert.rejects(() => wrong("create_state", {}), /result_unavailable/);
+  const runtimeFetch = global.fetch;
+  try {
+    for (const profile of ["oauth", "broker"]) {
+      const metadataCalls = [];
+      global.fetch = async url => {
+        metadataCalls.push(String(url));
+        if (url === "http://metadata.google.internal/computeMetadata/v1/project/project-id") return new Response("vaeroex-integrations-prod");
+        if (url === "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/email")
+          return new Response(`sq-prod-${profile}@vaeroex-integrations-prod.iam.gserviceaccount.com`);
+        throw new Error("unexpected_runtime_qualification_network");
+      };
+      const configuration = { profile, permit, databaseVersion: 1,
+        databaseCa: fs.readFileSync(path.join(root, "tools/jit-access-feasibility/supabase-root-2021.crt"), "utf8"),
+        brokerOrigin: "https://square-production-broker-u5c6zahmpq-uw.a.run.app",
+        supabasePublishableKey: "sb_publishable_synthetic_configuration_only" };
+      const server = await createProductionInternalConsentRuntime(configuration);
+      assert.equal(server.listening, false);
+      assert.equal(metadataCalls.length, 2, "version 1 assembly uses only the expected identity readback");
+      for (const databaseVersion of [0, 2, 1.5, null, undefined, "1"])
+        await assert.rejects(() => createProductionInternalConsentRuntime({ ...configuration, databaseVersion }), /Invalid literal value/);
+      assert.equal(metadataCalls.length, 2, "non-version-1 configuration stops before metadata, database, secret or provider access");
+    }
+  } finally { global.fetch = runtimeFetch; }
   let networkCalls = 0, authorizations = 0;
   const transport = createInternalConsentTransport({ applicationId: permit.applicationId, authorize: async () => { authorizations++; },
     network: async () => { networkCalls++; return new Response("{}", { status: 200 }); } });
