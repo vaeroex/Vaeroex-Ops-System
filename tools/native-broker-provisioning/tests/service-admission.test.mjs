@@ -38,11 +38,15 @@ function fixture(options = {}) {
     intent: "admit_once", approvalId: "approved_once", signal: controller.signal,
     async record(stage) { calls.push(stage); if (options.receiptFailure === stage) throw Error("synthetic"); },
     async notify() { calls.push("notify");
+      if (options.outputStalls) {
+        const output = new Writable({ write() { setImmediate(() => controller.abort()); /* SSH remains open without draining. */ } });
+        return admissionOutput(output, () => controller.abort())();
+      }
       if (options.outputFails) {
         const output = new Writable({ write(_bytes, _encoding, callback) { callback(Object.assign(Error("synthetic"), { code: "EPIPE" })); } });
         return admissionOutput(output, () => controller.abort())();
       }
-      if (options.notifyFails) throw Error("synthetic"); controller.abort(); } }) };
+      if (options.notifyFails) throw Error("synthetic"); setImmediate(() => controller.abort()); } }) };
 }
 test("graceful cancellation fences after native admission and reports closure only after ACK", async () => {
   const f = fixture(); const result = await f.run();
@@ -62,6 +66,13 @@ test("failed start receipt cannot activate; uncertain fence cannot claim closed 
   const after = fixture({ fenceFails: true }), result = await after.run();
   assert.equal(result.outcome, "requires_checked_recovery"); assert.equal(result.fenceConfirmed, false);
   assert.equal(after.calls.filter(x => x === "fence").length, 1);
+});
+
+test("an open stalled output stream cannot block cancellation from reaching the fence", { timeout: 1000 }, async () => {
+  const f = fixture({ outputStalls: true }); const result = await f.run();
+  assert.equal(result.outcome, "requires_checked_recovery"); assert.equal(result.fenceConfirmed, true);
+  assert.equal(f.calls.filter(x => x === "activate").length, 1);
+  assert.deepEqual(f.calls.slice(-3), ["drain", "fence", "admission_closed"]);
 });
 
 test("a real SSH-style SIGHUP cancels supervised admission and awaits fencing", () => {

@@ -16,6 +16,23 @@ export function admissionOutput(output, cancel) {
     error => error ? reject(deny()) : resolve()));
 }
 
+async function notifyUntilCancellation(notify, signal) {
+  await new Promise((resolve, reject) => {
+    let settled = false;
+    const finish = (done, value) => {
+      if (settled) return;
+      settled = true; signal.removeEventListener("abort", abort); done(value);
+    };
+    const abort = () => finish(reject, deny());
+    signal.addEventListener("abort", abort, { once: true });
+    if (signal.aborted) abort();
+    else Promise.resolve().then(() => {
+      if (signal.aborted) throw deny();
+      return notify();
+    }).then(value => finish(resolve, value), error => finish(reject, error));
+  });
+}
+
 export function serviceAdmissionReceipt({ profile, last, roleOid, secretParent }) {
   if (profile?.kind !== "production" || !profiles.has(profile.name) || !/^[1-9][0-9]{0,9}$/.test(roleOid ?? "") ||
       last?.kind !== "maintenance_finished" || last.outcome !== "staged_ready" || last.roleOid !== roleOid ||
@@ -46,7 +63,7 @@ export async function superviseServiceAdmission({ native, target, intent, approv
     if (!receipt(active) || active.noLogin !== false) throw deny();
     admitted = true;
     await record("admission_opened");
-    await notify();
+    await notifyUntilCancellation(notify, signal);
     await new Promise(resolve => {
       if (signal.aborted) resolve();
       else signal.addEventListener("abort", resolve, { once: true });

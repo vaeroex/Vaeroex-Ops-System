@@ -480,7 +480,7 @@ async function main() {
         const permission = (await service.query("SELECT has_function_privilege(session_user,$1::regprocedure,'EXECUTE') allowed",
           [overlayRpc(fenceProfile)])).rows[0];
         check(permission.allowed === true, "supervised_native_admission_inherits_exact_rpc");
-      } finally { await service.end(); admissionCancellation.abort(); }
+      } finally { await service.end(); setImmediate(() => admissionCancellation.abort()); }
     } });
   check(admissionResult.outcome === "service_closed" && admissionResult.fenceConfirmed,
     "supervised_native_admission_fences_on_cancellation");
