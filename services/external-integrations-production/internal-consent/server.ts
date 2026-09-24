@@ -10,8 +10,13 @@ const privateHeaders = { "cache-control": "no-store", "referrer-policy": "no-ref
  * Google ingress/invoker checks remain external and unchanged. */
 export function createInternalConsentServer(input:
   | { profile: "oauth"; runtime: ReturnType<typeof createInternalOAuth> | null;
-      authenticate(request: Request): Promise<InternalActor | null> }
+      authenticate(request: Request): Promise<InternalActor | null>;
+      manual?(action: string, actor: InternalActor): Promise<unknown> }
   | { profile: "broker"; runtime: ReturnType<typeof createInternalBroker> | null;
+      authenticateOAuthService(request: Request): Promise<boolean>;
+      readPage?(body: unknown): Promise<unknown>;
+      authenticateRuntimeService?(request: Request): Promise<boolean> }
+  | { profile: "runtime" | "evidence"; runtime: ((body: unknown) => Promise<unknown>) | null;
       authenticateOAuthService(request: Request): Promise<boolean> }) {
   const oauth = input.profile === "oauth" ? createInternalOAuthHandler(input) : null;
   const server = http.createServer({ maxHeaderSize: 32_768 }, async (incoming, outgoing) => {
@@ -29,10 +34,12 @@ export function createInternalConsentServer(input:
           if (incoming.headers["transfer-encoding"] || incoming.headers["content-length"] && incoming.headers["content-length"] !== "0")
             throw new Error("body");
           response = await oauth(request, incoming.rawHeaders);
-        } else if (input.profile === "broker" && input.runtime && incoming.method === "POST" &&
-          incoming.url === "/internal/square/broker/exchange" &&
+        } else if (input.profile !== "oauth" && input.runtime && incoming.method === "POST" &&
           incoming.headers["content-type"] === "application/json" &&
-          await input.authenticateOAuthService(request)) {
+          (input.profile === "broker" ?
+            incoming.url === "/internal/square/broker/exchange" && await input.authenticateOAuthService(request) ||
+            incoming.url === "/internal/square/broker/payments" && !!input.readPage && !!input.authenticateRuntimeService && await input.authenticateRuntimeService(request)
+            : incoming.url === `/internal/square/${input.profile}/manual` && await input.authenticateOAuthService(request))) {
           const chunks: Buffer[] = [];
           let bytes = 0;
           for await (const part of incoming) {
@@ -42,7 +49,12 @@ export function createInternalConsentServer(input:
             chunks.push(chunk);
           }
           const body = Buffer.concat(chunks);
-          try { response = Response.json(await input.runtime.exchange(JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(body)) as ExchangeInput), { headers: privateHeaders }); }
+          try {
+            const parsed = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(body));
+            const result = input.profile !== "broker" ? await input.runtime(parsed) :
+              incoming.url === "/internal/square/broker/payments" ? await input.readPage!(parsed) : await input.runtime.exchange(parsed as ExchangeInput);
+            response = Response.json(result, { headers: privateHeaders });
+          }
           finally { body.fill(0); for (const chunk of chunks) chunk.fill(0); }
         } else response = Response.json({ error: "production_integration_runtime_disabled" }, { status: 404, headers: privateHeaders });
       }

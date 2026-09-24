@@ -106,3 +106,78 @@ isolated dormant release with its `react-server` condition; it does not invent
 a replacement stub. Type checking is the existing required exact-head job,
 separate from transpilation. This Dockerfile is a candidate,
 not authorization to build, push, deploy, access credentials or enable consent.
+# Manual mapping and first Payments page
+
+The optional `manualRead` configuration extends the same image to the existing
+OAuth, broker, runtime and evidence services. Omit it to retain consent-only
+behavior; omit the entire configuration to retain the disabled bootstrap.
+Scheduler, webhook, economics and AI are not part of this path. No migration or
+database grant changes are required. This change is code/configuration only,
+not deployment or activation approval.
+
+The authenticated workspace endpoint is a bodyless POST to
+`/api/integrations/square/internal/manual/{map|prepare|read|evidence}`. It uses the
+existing exact operator/session/workspace configuration and same-origin guard.
+It forwards only that fixed action and the validated account token to the
+existing `/connect` route. The OAuth service reauthenticates the token; private
+service calls use audience-bound Google identity tokens. Every SQL operation
+still performs migration 25's live session, workspace/entity, generation,
+configuration, native-role and closed-general-gate checks.
+
+`manualRead` contains only operator-approved private references: credential ID
+and version 1, the reconciled `mapping_required` permit row version, one scan,
+task and lease UUID, owner fingerprint, and a historical window no longer than
+24 hours. These are not browser parameters. Read them from the reconciled
+consent catalog/receipt using the existing bounded operator procedure, never a
+new service table grant. The expected permit versions are mapping version,
+mapping+1 (scan creation), mapping+2 (syncing), mapping+3 (synced evidence).
+If the actual catalog differs, stop and reconcile; do not search versions.
+The two private service origins must match the existing reviewed Cloud Run
+services before a deployment plan is approved.
+
+Execution is sequential and operator-controlled:
+
+1. `map` confirms only the permit's exact verified merchant/location.
+2. `prepare` creates one scan. Neither mapping nor scan creation retries a
+   failed or lost acknowledgment. Reconcile before selecting the next action.
+3. `read` acquires the existing SQL lease, asks only the broker for one bounded
+   `GET /v2/payments` (limit 100, exact location/window), and commits minimized
+   hash/status/time observations. The broker validates encrypted credential
+   AAD, seller, expiry and `PAYMENTS_READ`. It never returns tokens, raw payloads,
+   customer/card data, money objects, provider IDs or the private cursor.
+4. A committed `read` replay returns the existing outcome without fetching
+   again. A live leased replay returns `pending`; it is not permission to repeat
+   provider I/O. The public 25-second budget fits the existing 30-second edge.
+   A public timeout returns HTTP 202 `pending` (acknowledgment unresolved), not
+   success or a claim of failure. Poll the same `read` action; do not repeat
+   mapping or scan creation. An expired/failed lease returns reconciliation
+   required and never automatically reacquires or retries the provider.
+   Lost commit acknowledgment permits one identical receipt check using the
+   existing idempotent `commit_page` RPC. A second failure stops. A provider or
+   parsing failure leaves the lease for bounded expiry/operator reconciliation;
+   it does not automatically retry or create another scan.
+5. `evidence` returns only the authorized Payments count, one-page status and
+   explicit unknown historical completeness. Other workspaces receive the same
+   unavailable response, not counts or existence information.
+
+All results are non-economic. No revenue, profit, netting, accounting truth,
+stock, valuation or completeness claim is made. A cursor is never followed.
+
+## Shortest separately authorized live sequence
+
+- Review/merge this PR; build and scan the exact image through the existing
+  repository-bound trigger, and review the dormant image/configuration plan.
+- Provision OAuth and broker with the existing private database-password flow;
+  privately install the Square application credential and exact one-seller
+  permit. Deploy the reviewed consent handlers and perform that seller's consent.
+- Reconcile consent; provision runtime and evidence only. Pin the exact stored
+  credential reference and current mapping row version in `manualRead`, verify
+  the existing private service origins, and approve the four-service manual
+  configuration plus only the three described service-invoker bindings.
+- From the same authenticated approved workspace session, run map → prepare →
+  read → read replay → evidence, then the existing bounded cleanup/fencing flow.
+
+No VM, credential prompt, IAM opening, image deployment, consent, provider call
+or activation is performed by these tests. The existing general activation
+flags remain false; the separately approved one-internal-seller permit is the
+only authority for this manual exception.

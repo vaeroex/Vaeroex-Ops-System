@@ -81,3 +81,45 @@ export async function initiateSquareInternalPilot(request: Request) {
     });
   } catch { return denied(); }
 }
+
+/** Deliberately bodyless manual pilot actions. The service owns all mapping,
+ * scan and credential references; the browser cannot choose another seller. */
+export async function executeSquareInternalPilotAction(request: Request, action: string) {
+  if (!["map", "prepare", "read", "evidence"].includes(action) || !squareInternalPilotConfigured() ||
+    request.method !== "POST" || request.body !== null || request.headers.get("origin") !== PUBLIC_SITE_URL ||
+    request.headers.get("host") !== new URL(PUBLIC_SITE_URL).host || new URL(request.url).origin !== PUBLIC_SITE_URL ||
+    new URL(request.url).search || request.headers.has("sec-fetch-site") && request.headers.get("sec-fetch-site") !== "same-origin") return denied();
+  const approved = await squareInternalPilotAccess();
+  if (!approved) return denied();
+  let dispatched = false;
+  try {
+    const { data, error } = await approved.access.supabase.auth.getSession();
+    if (error || !data.session || data.session.user.id !== approved.config.operatorId) return denied();
+    dispatched = true;
+    const result = await boundedResult(await fetch("https://square.vaeroex.com/api/integrations/square/connect", {
+      method: "POST", headers: { Authorization: `Bearer ${data.session.access_token}`, "x-vaeroex-square-action": action },
+      redirect: "error", cache: "no-store", signal: AbortSignal.timeout(25_000)
+    }));
+    const count = z.number().int().min(0).max(100);
+    const schema = action === "evidence" ? z.object({ source: z.literal("Square Production"),
+      status: z.literal("verified_non_economic_provider_observations"), resource: z.literal("Payments"), observationCount: count,
+      pageCount: z.literal(1), historicalCompleteness: z.literal("unknown"), economicContributions: z.literal(false),
+      limitations: z.tuple([z.literal("One bounded page only"), z.literal("No revenue, profit, netting, accounting truth or complete-history claim")]) }).strict()
+      : action === "read" ? z.union([
+        z.object({ status: z.literal("committed"), replayed: z.boolean(), observationCount: count.optional(),
+          nonEconomic: z.literal(true), historicalCompleteness: z.literal("unknown") }).strict(),
+        z.object({ status: z.literal("pending"), nonEconomic: z.literal(true), historicalCompleteness: z.literal("unknown") }).strict()
+      ])
+      : z.object({ status: z.literal(action === "map" ? "mapped" : "ready"), nonEconomic: z.literal(true) }).strict();
+    const checked = schema.parse(result);
+    return Response.json(checked, { status: checked.status === "pending" ? 202 : 200, headers });
+  } catch (error) {
+    // The 25s public budget fits the 30s edge. The private service may still
+    // commit after a lost HTTP acknowledgment: poll this SAME read action.
+    // Its existing lease replay cannot issue a second provider request.
+    if (dispatched && action === "read" && error instanceof Error && ["TimeoutError", "AbortError"].includes(error.name))
+      return Response.json({ status: "pending", nonEconomic: true, historicalCompleteness: "unknown" }, { status: 202, headers });
+    if (action === "read") return Response.json({ error: "Square read requires reconciliation." }, { status: 409, headers });
+    return denied();
+  }
+}

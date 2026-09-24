@@ -6,6 +6,46 @@ mock_provider "google" {
   }
 }
 
+run "manual_read_uses_existing_services_and_exact_invokers" {
+  command = plan
+  variables {
+    internal_consent = {
+      image_digest             = "us-west1-docker.pkg.dev/vaeroex-integrations-prod/vaeroex-integrations-images/square-internal-consent@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      source_commit            = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      broker_origin            = "https://square-production-broker-u5c6zahmpq-uw.a.run.app"
+      permit                   = {}
+      database_versions        = { oauth = 1, broker = 1 }
+      read_database_versions   = { runtime = 1, evidence = 1 }
+      database_ca              = file("../../../../tools/jit-access-feasibility/supabase-root-2021.crt")
+      supabase_publishable_key = "synthetic_publishable_key_only"
+      manual_read              = { credentialVersion = 1 }
+    }
+  }
+  assert {
+    condition = alltrue([for mode in ["oauth", "broker", "runtime", "evidence"] :
+    google_cloud_run_v2_service.square[mode].template[0].containers[0].image == var.internal_consent.image_digest])
+    error_message = "Manual read must reuse only the four existing service identities."
+  }
+  assert {
+    condition = alltrue([for mode in ["scheduler", "webhook"] :
+    google_cloud_run_v2_service.square[mode].template[0].containers[0].image == var.bootstrap_image_digest])
+    error_message = "Scheduler and webhook must retain the dormant image."
+  }
+  assert {
+    condition     = toset(keys(google_cloud_run_v2_service_iam_member.manual_read_invoker)) == toset(["oauth_runtime", "oauth_evidence", "runtime_broker"])
+    error_message = "Only the three manual service call edges may be added."
+  }
+  assert {
+    condition = alltrue([for mode in ["runtime", "evidence"] :
+    jsondecode([for env in google_cloud_run_v2_service.square[mode].template[0].containers[0].env : env.value if env.name == "SQUARE_INTERNAL_CONSENT_CONFIGURATION"][0]).databaseVersion == 1])
+    error_message = "Read services must use exactly database version one."
+  }
+  assert {
+    condition     = !var.runtime_enabled && !var.provider_calls_enabled && !var.customer_onboarding_enabled && !var.webhook_intake_enabled && !var.economic_contributions_enabled && !var.ai_dispatch_enabled
+    error_message = "Manual configuration never opens general activation gates."
+  }
+}
+
 variables {
   project_id                   = "vaeroex-integrations-prod"
   region                       = "us-west1"

@@ -49,6 +49,7 @@ const approvedSquareQualificationPaths = Object.freeze([
   // Exact one-internal-seller OAuth/broker executable; defaults stay disabled.
   "app/(square-connection)/app/settings/integrations/square/internal/page.tsx",
   "app/api/integrations/square/internal/connect/route.ts",
+  "app/api/integrations/square/internal/manual/[action]/route.ts",
   "lib/integrations/control-plane/square-internal-pilot.ts",
   "scripts/square-production-internal-consent-tests.js",
   "services/external-integrations-production/internal-consent/.dockerignore",
@@ -58,6 +59,8 @@ const approvedSquareQualificationPaths = Object.freeze([
   "services/external-integrations-production/internal-consent/database.ts",
   "services/external-integrations-production/internal-consent/entry.ts",
   "services/external-integrations-production/internal-consent/handlers.ts",
+  "services/external-integrations-production/internal-consent/manual-read.ts",
+  "scripts/square-production-manual-read-tests.js",
   "services/external-integrations-production/internal-consent/package-release.cjs",
   "services/external-integrations-production/internal-consent/runtime.ts",
   "services/external-integrations-production/internal-consent/server.ts",

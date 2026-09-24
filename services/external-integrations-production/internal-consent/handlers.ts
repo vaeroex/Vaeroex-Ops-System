@@ -259,6 +259,7 @@ export function createInternalBroker(input: BrokerDependencies) {
 export function createInternalOAuthHandler(input: {
   runtime: ReturnType<typeof createInternalOAuth> | null;
   authenticate(request: Request): Promise<InternalActor | null>;
+  manual?(action: string, actor: InternalActor): Promise<unknown>;
 }) {
   return async (request: Request, rawHeaders: string[] = []): Promise<Response> => {
     const headers = { "cache-control": "no-store", "referrer-policy": "no-referrer", "x-content-type-options": "nosniff" };
@@ -269,6 +270,11 @@ export function createInternalOAuthHandler(input: {
         url.pathname === "/api/integrations/square/connect" && !url.search) {
         const actor = await input.authenticate(request);
         if (!actor || request.body !== null) throw new InternalConsentError("authority");
+        const action = request.headers.get("x-vaeroex-square-action");
+        if (action !== null) {
+          if (!input.manual) throw new InternalConsentError("authority");
+          return Response.json(await input.manual(action, actor), { headers });
+        }
         return Response.json(await input.runtime.initiate(actor), { headers });
       }
       if (request.method === "GET" && url.pathname === SQUARE_CALLBACK_PATH && !url.search) {

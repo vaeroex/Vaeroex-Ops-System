@@ -91,6 +91,8 @@ variable "internal_consent" {
     database_versions        = object({ oauth = number, broker = number })
     database_ca              = string
     supabase_publishable_key = string
+    manual_read              = optional(any)
+    read_database_versions   = optional(object({ runtime = number, evidence = number }))
   })
   default  = null
   nullable = true
@@ -101,6 +103,8 @@ variable "internal_consent" {
       var.internal_consent.broker_origin == "https://square-production-broker-u5c6zahmpq-uw.a.run.app" &&
       var.internal_consent.database_versions.oauth == 1 &&
       var.internal_consent.database_versions.broker == 1 &&
+      (var.internal_consent.manual_read == null ? var.internal_consent.read_database_versions == null : try(
+      var.internal_consent.read_database_versions.runtime == 1 && var.internal_consent.read_database_versions.evidence == 1, false)) &&
       sha256(var.internal_consent.database_ca) == "700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7"
     )
     error_message = "Internal consent requires the reviewed immutable image/source, exact existing broker, IAM-granted OAuth/broker database version 1 and pinned public database CA."
