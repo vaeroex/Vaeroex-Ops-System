@@ -224,7 +224,7 @@ func TestInternalConnectIsBodylessPostOnly(t *testing.T) {
 	}
 	for _, input := range []struct {
 		method, path, query string
-		extra              [2]string
+		extra               [2]string
 	}{
 		{method: "GET", path: InternalConnectPath},
 		{method: "POST", path: InternalConnectPath, query: "token=synthetic"},

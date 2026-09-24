@@ -14,7 +14,11 @@ import (
 const validStateFixture = "0123456789_abcdefghijklmnopqrstuvwxyz-ABCDE"
 
 func TestInternalConnectPassesWithoutCallbackHandoff(t *testing.T) {
-	host, reset := newCallbackHost("POST", callbackedge.InternalConnectPath, "")
+	// The pinned proxytest emulator's ProxyGetProperty dereferences data[0]
+	// even for a present empty property. Use the supported '?' empty-query
+	// representation here; callback_test.go covers an actual empty string.
+	// The real SDK GetProperty accepts a zero-length host buffer via unsafe.Slice.
+	host, reset := newCallbackHost("POST", callbackedge.InternalConnectPath, "?")
 	defer reset()
 	contextID := host.InitializeHttpContext()
 	action := host.CallOnRequestHeaders(contextID, [][2]string{
