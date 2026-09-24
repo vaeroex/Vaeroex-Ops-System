@@ -214,6 +214,9 @@ export function privateAccessClosedCheckpointTuple(plan) {
 function verifyGrantContract(grant, side, generationInput) {
   const value = grant?.change?.[side];
   const profile = grant?.index;
+  const secretId = `square-production-${profile}-db`;
+  const expectedSecret = value?.secret_id === secretId ||
+    value?.secret_id === `projects/${PROJECT_ID}/secrets/${secretId}`;
   const start = generationInput?.starts_at;
   const expiry = generationInput?.expires_at;
   const checkpointExpiry = generationInput?.checkpoint_expires_at;
@@ -222,7 +225,7 @@ function verifyGrantContract(grant, side, generationInput) {
     generationInput?.enabled !== true ||
     !Array.isArray(generationInput?.profiles) || generationInput.profiles.length !== 1 || generationInput.profiles[0] !== profile ||
     exactTimestamp(start) === null || exactTimestamp(expiry) === null || checkpointExpiry !== expiry ||
-    value?.project !== PROJECT_ID || value?.secret_id !== `square-production-${profile}-db` ||
+    value?.project !== PROJECT_ID || !expectedSecret ||
     value?.role !== PRIVATE_VERSIONS_ROLE || value?.member !== PROVISIONER_MEMBER ||
     condition?.title !== CONDITION_TITLE || condition?.description !== CONDITION_DESCRIPTION ||
     condition?.expression !== `request.time >= timestamp('${start}') && request.time < timestamp('${expiry}')`
