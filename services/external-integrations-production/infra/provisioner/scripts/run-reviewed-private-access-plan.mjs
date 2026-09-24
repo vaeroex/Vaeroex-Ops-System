@@ -135,9 +135,12 @@ export async function superviseExecution(directory, options = {}) {
   const timer = setTimeout(() => {
     if (existsSync(join(directory, "result.json"))) return;
     timedOut = true;
-    recordProgress(directory, "private_access_execution_deadline_reached");
-    killGroup("SIGTERM");
-    drain = new Promise(done => setTimeout(() => { killGroup("SIGKILL"); done(); }, GRACE_MS));
+    try { recordProgress(directory, "private_access_execution_deadline_reached"); }
+    catch { /* Receipt storage cannot prevent the deadline's process stop. */ }
+    finally {
+      killGroup("SIGTERM");
+      drain = new Promise(done => setTimeout(() => { killGroup("SIGKILL"); done(); }, GRACE_MS));
+    }
   }, Math.max(1, request.deadlineMs - Date.now()));
   await new Promise(resolveDone => {
     child.once("error", () => {

@@ -539,6 +539,43 @@ assert.deepEqual(failedOpenProgress.map(row => row.label), [
 ]);
 assert.doesNotMatch(JSON.stringify(failedOpenProgress), /raw-apply|raw-provider/);
 
+// A broken outcome/recovery receipt must never bypass the existing safety work.
+for (const brokenStage of failedOpenProgress.slice(2).map(row => row.label)) {
+  const order = [];
+  assert.throws(() => applyReviewedPrivateAccessPlan(planPath, reviewedSha256, {
+    cwd: root, temporaryRoot: root,
+    onProgress(label) { if (label === brokenStage) throw Error("synthetic_receipt_io_failure"); },
+    reconcilePrivateAccess() { order.push("reconcile"); return confirmedReconciliation; },
+    waitForRevocationPropagation(ms) { assert.equal(ms, 600_000); order.push("wait"); },
+    verifyEffectivePrivateAccess() {
+      order.push("effective");
+      return { status: "policy_troubleshooter_closed_all_denied", checked_secrets: "6", checked_versions: "0", checked_tuples: "6" };
+    },
+    runTerraform(args) {
+      order.push(args[0]);
+      return { status: args[0] === "show" ? 0 : 1, stdout: args[0] === "show" ? openingJson : Buffer.alloc(0) };
+    },
+  }), error => error.fixedLabel === "private_access_open_apply_failed_after_effective_revocation", brokenStage);
+  assert.deepEqual(order, ["show", "apply", "reconcile", "wait", "effective"], brokenStage);
+}
+
+let receiptFailureApplies = 0;
+assert.throws(() => applyReviewedPrivateAccessPlan(planPath, reviewedSha256, {
+  cwd: root, temporaryRoot: root,
+  onProgress() { throw Error("synthetic_receipt_io_failure"); },
+  runTerraform(args) {
+    if (args[0] === "apply") receiptFailureApplies++;
+    return { status: 0, stdout: openingJson };
+  },
+}), error => error.fixedLabel === "private_access_receipt_failed_before_apply");
+assert.equal(receiptFailureApplies, 0);
+
+assert.throws(() => applyReviewedPrivateAccessPlan(planPath, reviewedSha256, {
+  cwd: root, temporaryRoot: root,
+  onProgress(label) { if (label === "private_access_terraform_apply_returned") throw Error("synthetic_receipt_io_failure"); },
+  runTerraform(args) { return { status: 0, stdout: args[0] === "show" ? openingJson : Buffer.alloc(0) }; },
+}), error => error.fixedLabel === "private_access_receipt_failed_requires_reconciliation");
+
 const fakeTerraformDirectory = join(root, "fake-terraform-bin");
 mkdirSync(fakeTerraformDirectory, { mode: 0o700 });
 const fakeTerraformPath = join(fakeTerraformDirectory, "terraform");

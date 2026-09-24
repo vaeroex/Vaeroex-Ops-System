@@ -23,7 +23,7 @@ const mode=JSON.parse(readFileSync(directory+'/request.json')).cwd.split('/').at
 await superviseExecution(directory,{childArgs:[${JSON.stringify(worker)},directory,mode]});
 `);
 writeFileSync(worker, `
-import { openSync,closeSync,writeFileSync } from 'node:fs';
+import { openSync,closeSync,writeFileSync,chmodSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { recordProgress,recordResult } from ${JSON.stringify(moduleUrl)};
 const [directory,mode]=process.argv.slice(2);
@@ -31,7 +31,8 @@ closeSync(openSync(directory+'/fixture-once','wx',0o600));
 console.log(${JSON.stringify(sentinel)});console.error(${JSON.stringify(sentinel)});
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
 recordProgress(directory,'private_access_terraform_apply_started');
-if(mode==='hang'){
+if(mode.startsWith('hang')){
+ if(mode==='hang_receipt_failure')chmodSync(directory+'/progress.jsonl',0o400);
  const child=spawn(process.execPath,['-e','process.on("SIGTERM",()=>{});setInterval(()=>{},1000)'],{stdio:'ignore'});
  writeFileSync(directory+'/fixture-child.pid',String(child.pid));
  await wait(10000);
@@ -103,7 +104,10 @@ setInterval(()=>{},1000);`);
   assert.equal((await terminal(lost.directory)).state, "uncertain");
   assert.equal(readExecution(lost.directory).label, "private_access_acknowledgement_missing_requires_reconciliation");
 
-  const hang = input("hang", 800);
+  const hangs = [];
+  for (const mode of ["hang", "hang_receipt_failure"]) {
+  const hang = input(mode, 800);
+  hangs.push(hang);
   await startExecution(hang, { supervisorPath: supervisor });
   const hungResult = await terminal(hang.directory);
   assert.equal(hungResult.state, "uncertain");
@@ -114,12 +118,13 @@ setInterval(()=>{},1000);`);
     try { process.kill(childPid, 0); await wait(20); } catch (e) { assert.equal(e.code, "ESRCH"); alive = false; }
   }
   assert.equal(alive, false, "deadline must stop the descendant, not just its parent");
+  }
 
   await assert.rejects(startExecution({ ...input("bad-hash"), reviewedSha256: "0".repeat(64) }), /reviewed_hash_mismatch/);
   const publicPlan = join(root, "public.plan"); writeFileSync(publicPlan, "fixture"); chmodSync(publicPlan, 0o644);
   await assert.rejects(startExecution({ ...input("public-plan"), planPath: publicPlan }), /file_not_private/);
   await assert.rejects(startExecution({ ...input("expired"), deadlineMs: Date.now() - 1 }), /deadline_invalid/);
-  for (const directory of [failed.directory, success.directory, lost.directory, hang.directory]) {
+  for (const directory of [failed.directory, success.directory, lost.directory, ...hangs.map(x => x.directory)]) {
     for (const name of ["request.json", "progress.jsonl", "result.json"]) {
       assert.equal(statSync(join(directory, name)).mode & 0o077, 0);
       assert.ok(!readFileSync(join(directory, name), "utf8").includes(sentinel));

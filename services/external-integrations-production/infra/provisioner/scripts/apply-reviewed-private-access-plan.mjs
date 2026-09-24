@@ -119,6 +119,12 @@ function verifyEffectiveRevocation(recovery, options) {
 }
 
 export function applyReviewedPrivateAccessPlan(planPath, reviewedSha256, options = {}) {
+  const observer = options.onProgress;
+  let receiptFailed = false;
+  options = { ...options, onProgress(label, detail) {
+    try { observer?.(label, detail); }
+    catch { receiptFailed = true; }
+  } };
   const cwd = resolve(options.cwd ?? process.cwd());
   const runTerraform = options.runTerraform ?? defaultTerraformRun;
   const temporaryRoot = options.temporaryRoot ?? tmpdir();
@@ -193,6 +199,7 @@ export function applyReviewedPrivateAccessPlan(planPath, reviewedSha256, options
     }
 
     options.onProgress?.("private_access_terraform_apply_started");
+    if (receiptFailed) reject("private_access_receipt_failed_before_apply");
     const applied = runTerraform(["apply", "-input=false", immutableCopy], {
       cwd,
       env: terraformEnvironment,
@@ -258,6 +265,9 @@ export function applyReviewedPrivateAccessPlan(planPath, reviewedSha256, options
       }
     }
 
+    // Once apply has run, receipt I/O must not interrupt checked recovery or
+    // closure verification. It also must not turn an unrecorded run into success.
+    if (receiptFailed) reject("private_access_receipt_failed_requires_reconciliation");
     return {
       verificationLabel,
       ...(reconciliationLabel ? { reconciliationLabel } : {}),
