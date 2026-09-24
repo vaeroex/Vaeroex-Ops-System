@@ -1,5 +1,6 @@
 // Package the exact existing server-only dependency; no replacement shim,
 // downloaded guest package, or ancestor node_modules is used at runtime.
+/* eslint-disable @typescript-eslint/no-require-imports -- Standalone Node CommonJS release packaging. */
 const fs = require("node:fs");
 const path = require("node:path");
 const os = require("node:os");

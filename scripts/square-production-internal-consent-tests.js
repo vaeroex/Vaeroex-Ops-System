@@ -254,7 +254,8 @@ async function main() {
     headers: { "Square-Version": "2026-08-19", "Content-Type": "application/json" }, signal: new AbortController().signal,
     body: JSON.stringify({ client_id: permit.applicationId, grant_type: "authorization_code", short_lived: true,
       redirect_uri: "https://square.vaeroex.com/api/integrations/square/callback" }) };
-  const accepted = await transport(request); for await (const _chunk of accepted.body) { /* consume only local synthetic response */ }
+  const accepted = await transport(request);
+  for await (const chunk of accepted.body) assert.ok(chunk instanceof Uint8Array);
   assert.equal(networkCalls, 1); assert.equal(authorizations, 1);
   for (const url of ["https://connect.squareupsandbox.com/oauth2/token", "https://connect.squareup.com/oauth2/revoke", "https://connect.squareup.com/v2/payments"])
     await assert.rejects(() => transport({ ...request, url }), /transport_denied/);
