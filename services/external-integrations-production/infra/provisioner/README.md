@@ -246,6 +246,7 @@ node tests/verify-effective-private-access.test.mjs
 node tests/verify-private-access-plan.test.mjs
 node tests/reconcile-private-access.test.mjs
 node tests/apply-reviewed-private-access-plan.test.mjs
+node tests/run-reviewed-private-access-plan.test.mjs
 ```
 
 For every hosted mutation, set `umask 077`, create a full saved plan, inspect
@@ -257,6 +258,44 @@ the JSON rendering:
 ```sh
 node scripts/apply-reviewed-private-access-plan.mjs reviewed.tfplan <reviewed-sha256>
 ```
+
+### Durable execution and acknowledgement
+
+For the supervised Cloud Shell path, use `scripts/run-reviewed-private-access-plan.mjs`
+to invoke that same reviewed apply function. Do not wrap it in the retired
+30-minute `spawnSync` launcher. Opening has two required ten-minute waits; a
+failed apply then has a further ten-minute checked-recovery wait plus API reads.
+The outer 30-minute timer could terminate recovery before it returned a result.
+
+After the existing exact-plan authorization, identity, clock, closed-state and
+scope checks, start once with a new private receipt directory and an explicit
+approved execution deadline (epoch milliseconds). Reserve enough time for those
+checks and mandatory cleanup; use a practical 60-minute execution allowance only
+when it fits the authorized window. The runner caps execution at 90 minutes and
+does not extend any IAM expiry, VM timer, operator deadline or cleanup deadline.
+No new window is authorized by these instructions.
+
+```sh
+node scripts/run-reviewed-private-access-plan.mjs start /private/reviewed.tfplan <reviewed-sha256> /private/new-receipt-directory <approved-execution-deadline-ms>
+node scripts/run-reviewed-private-access-plan.mjs status /private/new-receipt-directory
+```
+
+`start` acknowledges launch, **not apply success**. A detached supervisor keeps
+the reviewed worker independent of the SSH connection. On reconnect, use only
+`status`; never resubmit `start` or call internal `execute`/`supervise` modes.
+Exclusive admission and apply guards prevent duplicate mutation; receipts are
+never truncated by a duplicate start. Fixed progress labels are fsynced as each
+stage finishes, including Terraform's exit code **before** recovery begins.
+Raw Terraform/provider output and credentials are not stored or printed.
+
+Only a durable `succeeded` result followed by the existing independent OAuth-only
+opening checks permits advancement. `failed` or `uncertain` requires the existing
+read-only reconciliation and mandatory cleanup, never another apply. The hard
+execution deadline stops the child process group and records uncertainty; it
+does not authorize a retry. A Cloud Shell machine restart can still interrupt a
+worker: missing/unreadable acknowledgement remains uncertain, not success.
+The same mechanism supports the already-reviewed closed cleanup plan without
+weakening its result, IAM-denial or resource-closure checks.
 
 Only fixed transition/completion labels are added by the entry point. The
 verifier never prints or stores the rendered plan, provider values or state.

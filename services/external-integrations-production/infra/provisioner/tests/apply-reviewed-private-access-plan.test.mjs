@@ -16,6 +16,7 @@ import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 
 import { applyReviewedPrivateAccessPlan } from "../scripts/apply-reviewed-private-access-plan.mjs";
+import { startExecution, readExecution } from "../scripts/run-reviewed-private-access-plan.mjs";
 
 const root = mkdtempSync(join(tmpdir(), "vaeroex-reviewed-apply-test-"));
 const planPath = join(root, "candidate.tfplan");
@@ -501,15 +502,23 @@ const openingJson = Buffer.from(JSON.stringify({
   }))],
 }));
 const failedOpenOrder = [];
+const failedOpenProgress = [];
 assert.throws(() => applyReviewedPrivateAccessPlan(planPath, reviewedSha256, {
   cwd: root,
   temporaryRoot: root,
+  onProgress(label, detail) { failedOpenProgress.push({ label, detail }); },
   reconcilePrivateAccess(tuple) {
     failedOpenOrder.push("reconcile");
     assert.equal(tuple.profile, "oauth");
     return confirmedReconciliation;
   },
-  waitForRevocationPropagation() { failedOpenOrder.push("wait"); },
+  waitForRevocationPropagation(milliseconds) {
+    failedOpenOrder.push("wait");
+    assert.equal(milliseconds, 600_000);
+    assert.deepEqual(failedOpenProgress.find(row => row.label === "private_access_terraform_apply_returned")?.detail,
+      { exitCode: 1, processError: null, successful: false });
+    assert.equal(failedOpenProgress.at(-1).label, "private_access_revocation_wait_started");
+  },
   verifyEffectivePrivateAccess() {
     failedOpenOrder.push("effective");
     return { status: "policy_troubleshooter_closed_all_denied", checked_secrets: "6", checked_versions: "2", checked_tuples: "12" };
@@ -522,6 +531,13 @@ assert.throws(() => applyReviewedPrivateAccessPlan(planPath, reviewedSha256, {
   },
 }), error => error.fixedLabel === "private_access_open_apply_failed_after_effective_revocation");
 assert.deepEqual(failedOpenOrder, ["show", "apply", "reconcile", "wait", "effective"]);
+assert.deepEqual(failedOpenProgress.map(row => row.label), [
+  "private_access_plan_verified", "private_access_terraform_apply_started", "private_access_terraform_apply_returned",
+  "private_access_failed_apply_reconciliation_started", "private_access_failed_apply_reconciliation_confirmed",
+  "private_access_revocation_wait_started", "private_access_revocation_wait_completed",
+  "private_access_effective_revocation_check_started", "private_access_effective_revocation_confirmed",
+]);
+assert.doesNotMatch(JSON.stringify(failedOpenProgress), /raw-apply|raw-provider/);
 
 const fakeTerraformDirectory = join(root, "fake-terraform-bin");
 mkdirSync(fakeTerraformDirectory, { mode: 0o700 });
@@ -590,6 +606,25 @@ assert.equal(cliResult.stdout.includes("raw-"), false);
 assert.equal(cliResult.stderr.includes("raw-"), false);
 assert.equal(existsSync(join(root, "terraform-cli.log")), false);
 assert.equal(existsSync(join(root, "terraform-cli-protocol-logs")), false);
+
+// Exercise the actual detached supervisor -> reviewed wrapper -> result reader,
+// using only the existing harmless local Terraform executable above.
+const executionDirectory = join(root, "durable-execution");
+const originalPath = process.env.PATH;
+process.env.PATH = `${fakeTerraformDirectory}:${originalPath ?? ""}`;
+try {
+  await startExecution({ planPath, reviewedSha256, directory: executionDirectory,
+    deadlineMs: Date.now() + 5000, cwd: root });
+} finally { process.env.PATH = originalPath; }
+const end = Date.now() + 7000;
+while (!existsSync(join(executionDirectory, "result.json")) && Date.now() < end) {
+  await new Promise(done => setTimeout(done, 20));
+}
+assert.equal(readExecution(executionDirectory).state, "succeeded");
+const durableProgress = readFileSync(join(executionDirectory, "progress.jsonl"), "utf8");
+assert.match(durableProgress, /private_access_terraform_apply_returned/);
+assert.match(durableProgress, /"exitCode":0/);
+assert.doesNotMatch(durableProgress, /raw-|hostile/);
 
 rmSync(root, { recursive: true, force: true });
 process.stdout.write("private_access_single_verified_apply_entrypoint_confirmed\n");
