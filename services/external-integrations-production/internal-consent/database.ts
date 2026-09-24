@@ -34,8 +34,8 @@ export function createInternalRpc(profile: "oauth" | "broker" | "runtime" | "evi
       const identity = await database.query("select session_user::text as login, current_user::text as current_login");
       if (identity.rows.length !== 1 || identity.rows[0].login !== `square_production_${profile}` ||
         identity.rows[0].current_login !== `square_production_${profile}`) throw new Error("identity");
-      // The profile is the fixed service constructor parameter, never HTTP data.
-      await database.query(`set role square_production_${profile}_authority`);
+      // Native admission grants INHERIT TRUE, SET FALSE. Execute only the fixed
+      // RPC through inherited permission, retaining the exact LOGIN identity.
       const result = await database.query(sql[profile], [operation, JSON.stringify(payload)]);
       if (result.rows.length !== 1 || result.rows[0].value === null || result.rows[0].value === undefined) throw new Error("result");
       return result.rows[0].value;

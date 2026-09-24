@@ -29,7 +29,7 @@ const { install, target: pinnedTarget, maintenance: pin } = profile;
 const executable = `${install}/native-managed`;
 const journal = `${profile.state}/maintenance.jsonl`;
 const denied = () => new Error("native_maintenance_denied");
-let password, journalFd, lockFd, lockIdentity, native, reservation, store, softTimer, hardTimer, clearanceExpiry = Infinity, finished = false;
+let password, journalFd, lockFd, lockIdentity, native, reservation, store, softTimer, hardTimer, releaseHangup, clearanceExpiry = Infinity, finished = false;
 const lockPath = `${profile.state}/maintenance.lock`;
 const cancellation = new AbortController();
 const cancel = () => cancellation.abort();
@@ -53,7 +53,7 @@ async function main() {
   const [operation, roleOid, intent, approvalId, deadlineText] = process.argv.slice(2);
   if (process.argv.length !== 7 || process.execArgv.length || process.platform !== "linux" || process.getuid() !== 0 ||
       fileURLToPath(import.meta.url) !== `${install}/maintenance.mjs` ||
-      !["create", "rotate", "recover"].includes(operation) || !/^(0|[1-9][0-9]{0,9})$/.test(roleOid ?? "") ||
+      !["create", "rotate", "recover", "admit"].includes(operation) || !/^(0|[1-9][0-9]{0,9})$/.test(roleOid ?? "") ||
       operation === "create" && roleOid !== "0" || operation !== "create" && roleOid === "0" ||
       ![intent, approvalId].every(x => /^[a-zA-Z0-9_-]{1,80}$/.test(x ?? "")) || !/^[1-9][0-9]{12}$/.test(deadlineText ?? "") ||
       Object.keys(process.env).some(k => /^(NODE_|PG|LD_|DYLD_|MALLOC|LIBPQ)/.test(k))) throw denied();
@@ -77,10 +77,16 @@ async function main() {
   const prior = readFileSync(journal, "utf8").trim().split("\n").filter(Boolean).map(line => JSON.parse(line));
   if (prior.some(e => e.intent === intent)) throw denied();
   const last = prior.at(-1);
+  // Existing Sandbox installations never load or expose this Production lane.
+  const admission = operation === "admit" && profile.kind === "production"
+    ? await import("./service-admission.mjs") : undefined;
+  if (operation === "admit" && !admission) throw denied();
+  const admissionVersion = admission ? admission.serviceAdmissionReceipt({ profile, last, roleOid,
+    secretParent: pin.secretParent.replace(`projects/${pin.projectId}/`, `projects/${pin.projectNumber}/`) }) : undefined;
   // No process restart silently forgets an interrupted/uncertain invocation.
   // Recovery requires independent exact-role/version reconciliation recorded by
   // the operator in the runbook, not a successful-looking audit event.
-  if (requiresClearance(last, operation)) {
+  if (operation !== "admit" && requiresClearance(last, operation)) {
     const clearancePath = `${profile.state}/recovery-clearance.json`;
     trustedFile(clearancePath, 4096, true);
     const clearance = JSON.parse(readFileSync(clearancePath, "utf8"));
@@ -92,7 +98,13 @@ async function main() {
   await identity.verify();
   const client = createPinnedSecretManagerRestClient({ withAccessToken: identity.withAccessToken,
     secretParent: pin.secretParent, projectId: pin.projectId, projectNumber: pin.projectNumber });
-  await client.preflight();
+  let notify;
+  if (operation === "admit") {
+    releaseHangup = admission.admissionHangup(cancel);
+    notify = admission.admissionOutput(process.stdout, cancel);
+    const version = await client.getSecretVersion({ name: admissionVersion });
+    if (version.name !== admissionVersion || version.state !== "ENABLED") throw denied();
+  } else await client.preflight();
   // Public TLS evidence only, before private administrator entry. The presented
   // chain is never itself promoted to a trust root.
   const tls = promisify(execFile)("/usr/bin/openssl", ["s_client", "-starttls", "postgres", "-connect", `${pinnedTarget.host}:${pinnedTarget.port}`,
@@ -117,6 +129,18 @@ async function main() {
   native = profile.kind === "production"
     ? createManagedProductionNativeAdapter({ ...adapterOptions, profileName: profile.name })
     : createManagedSupabaseNativeAdapter(adapterOptions);
+  if (operation === "admit") {
+    // Existing soft cancellation starts a minute before the unchanged hard stop.
+    // Admission fencing has its own 30-second bound; no ACK means reconciliation.
+    const result = await admission.superviseServiceAdmission({ native, target, intent, approvalId, signal: cancellation.signal,
+      record: async stage => append({ kind: "service_admission", stage, intent, approvalId, roleOid,
+        targetRole: target.role, provisioningIntent: last.intent, versionName: admissionVersion, time: Date.now() }),
+      notify });
+    finished = true;
+    process.stdout.write(`native_maintenance_${result.outcome}\n`);
+    if (result.outcome !== "service_closed") process.exitCode = 2;
+    return;
+  }
   const underlyingStore = createGoogleSecretManagerStagingStore({ client, projectId: pin.projectId,
     projectNumber: pin.projectNumber, secretParent: pin.secretParent,
     payloadCodec: createPinnedSupabaseDsnCodec({ role: target.role, projectReference: target.projectReference,
@@ -156,4 +180,5 @@ catch {
     } catch { /* A stale/changed lock requires explicit operator recovery. */ }
   }
   process.removeListener("SIGINT", cancel); process.removeListener("SIGTERM", cancel);
+  releaseHangup?.();
 }

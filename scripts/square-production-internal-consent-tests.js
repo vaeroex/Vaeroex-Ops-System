@@ -216,8 +216,8 @@ async function main() {
       return { rows: [{ value: { status: "synthetic" } }] };
     }, async end() { ended.push(true); } }));
     await rpc(profile === "oauth" ? "create_state" : "acquire_exchange", { stateId: id() });
-    assert.equal(queries[1][0], `set role square_production_${profile}_authority`);
-    assert.equal(queries[2][0], `select public.square_production_internal_${profile}_v1($1::text,$2::jsonb) as value`);
+    assert.equal(queries.length, 2);
+    assert.equal(queries[1][0], `select public.square_production_internal_${profile}_v1($1::text,$2::jsonb) as value`);
     assert.equal(ended.length, 1);
     await assert.rejects(() => rpc("create_scan", {}), /operation_denied/);
     assert.equal(ended.length, 1);

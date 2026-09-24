@@ -52,7 +52,8 @@ test("stage copies only committed public native files and exact 104-migration hi
 
 test("installer has only six fixed flat destinations and never invokes maintenance",()=>{
   assert.deepEqual(profileNames,["oauth","broker","scheduler","webhook","runtime","evidence"]);
-  assert.equal(runtimeModules.length,11);
+  assert.equal(runtimeModules.length,12);
+  assert.ok(runtimeModules.includes("service-admission.mjs"));
   const source=readFileSync(resolve(here,"install-production-profiles.mjs"),"utf8");
   assert.match(source,/constants\.COPYFILE_EXCL/);
   assert.match(source,/absent\(`\/var\/lib\/vaeroex-production-square-\$\{name\}`\)/);
