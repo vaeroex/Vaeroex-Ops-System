@@ -339,6 +339,16 @@ async function main() {
     assert.equal(manualCalls, 1, "manual_foreign_workspace_origin_and_unknown_action_stop_before_forwarding");
     global.fetch = async () => Response.json({ status: "mapped", nonEconomic: true, credential: "synthetic_private_value" });
     assert.equal((await pilot.executeSquareInternalPilotAction(request(), "map")).status, 404, "manual_proxy_rejects_unexpected_private_fields");
+    global.fetch = async () => { const error = new Error("synthetic public deadline"); error.name = "TimeoutError"; throw error; };
+    const pendingRead = await pilot.executeSquareInternalPilotAction(request(), "read");
+    assert.equal(pendingRead.status, 202);
+    assert.deepEqual(await pendingRead.json(), { status: "pending", nonEconomic: true, historicalCompleteness: "unknown" });
+    global.fetch = async () => Response.json({ status: "pending", nonEconomic: true, historicalCompleteness: "unknown" });
+    assert.equal((await pilot.executeSquareInternalPilotAction(request(), "read")).status, 202);
+    global.fetch = async () => Response.json({ status: "committed", replayed: true, nonEconomic: true, historicalCompleteness: "unknown" });
+    assert.equal((await pilot.executeSquareInternalPilotAction(request(), "read")).status, 200);
+    global.fetch = async () => new Response(null, { status: 409 });
+    assert.equal((await pilot.executeSquareInternalPilotAction(request(), "read")).status, 409, "expired_or_failed_read_requires_reconciliation");
   } finally {
     Module._load = load; global.fetch = savedFetch; Date.now = savedNow;
     for (const [name, value] of Object.entries(savedEnvironment)) {

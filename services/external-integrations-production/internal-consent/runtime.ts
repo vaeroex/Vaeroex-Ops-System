@@ -144,7 +144,7 @@ export async function createProductionInternalConsentRuntime(raw: unknown) {
         if (action === "evidence") return z.object({ source: z.literal("Square Production"), status: z.literal("verified_non_economic_provider_observations"),
           resource: z.literal("Payments"), observationCount: z.number().int().min(0).max(100), pageCount: z.literal(1),
           historicalCompleteness: z.literal("unknown"), economicContributions: z.literal(false), limitations: z.array(z.string().max(100)).length(2) }).strict().parse(result);
-        return z.object({ status: z.enum(["ready", "committed"]), replayed: z.boolean().optional(), observationCount: z.number().int().min(0).max(100).optional(),
+        return z.object({ status: z.enum(["ready", "pending", "committed"]), replayed: z.boolean().optional(), observationCount: z.number().int().min(0).max(100).optional(),
           nonEconomic: z.literal(true), historicalCompleteness: z.literal("unknown").optional() }).strict().parse(result);
       } } : {}), async authenticate(request): Promise<InternalActor | null> {
       const authorization = request.headers.get("authorization");

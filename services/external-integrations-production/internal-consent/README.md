@@ -146,7 +146,12 @@ Execution is sequential and operator-controlled:
    AAD, seller, expiry and `PAYMENTS_READ`. It never returns tokens, raw payloads,
    customer/card data, money objects, provider IDs or the private cursor.
 4. A committed `read` replay returns the existing outcome without fetching
-   again. A leased replay stops; it is not permission to repeat provider I/O.
+   again. A live leased replay returns `pending`; it is not permission to repeat
+   provider I/O. The public 25-second budget fits the existing 30-second edge.
+   A public timeout returns HTTP 202 `pending` (acknowledgment unresolved), not
+   success or a claim of failure. Poll the same `read` action; do not repeat
+   mapping or scan creation. An expired/failed lease returns reconciliation
+   required and never automatically reacquires or retries the provider.
    Lost commit acknowledgment permits one identical receipt check using the
    existing idempotent `commit_page` RPC. A second failure stops. A provider or
    parsing failure leaves the lease for bounded expiry/operator reconciliation;

@@ -111,13 +111,15 @@ export function createInternalPaymentsRuntime(input: Base & {
       scanRequestFingerprint, requestFingerprint }), { permitId: p.permitId, scanId: c.scanId });
     if (lease.status === "committed" && lease.replayed === true)
       return { status: "committed", replayed: true, nonEconomic: true, historicalCompleteness: "unknown" };
-    requireFields(lease, { status: "leased", replayed: false, leaseId: c.leaseId, method: "GET", path: "/v2/payments",
-      continuationAllowed: false, requestFingerprint });
+    requireFields(lease, { status: "leased", leaseId: c.leaseId, method: "GET", path: "/v2/payments", continuationAllowed: false });
+    z.boolean().parse(lease.replayed);
     if (Date.parse(databaseTimestamp.parse(lease.beginTime)) !== Date.parse(c.paymentWindowStart) ||
       Date.parse(databaseTimestamp.parse(lease.endTime)) !== Date.parse(c.paymentWindowEnd) ||
       Date.parse(databaseTimestamp.parse(lease.leaseExpiresAt)) <= now().getTime()) throw denied();
-    // A leased replay deliberately does NOT fetch again. Only a committed
-    // replay is automatic; uncertain provider requests require reconciliation.
+    // A live leased replay is a status poll, not permission to fetch again.
+    // Expired leases still fail the unchanged SQL request/version binding.
+    if (lease.replayed) return { status: "pending", nonEconomic: true, historicalCompleteness: "unknown" };
+    requireFields(lease, { requestFingerprint });
     const page = PageSchema.parse(await input.readPage({ actor, permitId: p.permitId, scanId: c.scanId,
       leaseId: c.leaseId, leaseOwnerFingerprint: c.leaseOwnerFingerprint }));
     requireFields(page, { permitId: p.permitId, scanId: c.scanId });

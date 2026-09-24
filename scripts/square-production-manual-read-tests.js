@@ -43,6 +43,7 @@ module.exports = async function ({ permit: p, actor, now, fp }) {
       assert.deepEqual(Object.fromEntries(parsed.searchParams), { begin_time: c.paymentWindowStart, end_time: c.paymentWindowEnd,
         location_id: p.expectedLocationId, limit: "100", sort_order: "ASC" });
       assert.equal(init.headers.Authorization, `Bearer ${credential.accessToken}`);
+      if (options.providerBarrier) await options.providerBarrier();
       return Response.json({ payments: options.empty ? [] : [{ id: "SYNTHETIC_PAYMENT", location_id: p.expectedLocationId,
         created_at: "2026-09-24T10:30:00+00:00", status: "COMPLETED", amount_money: { amount: 100, currency: "USD" },
         customer_id: "synthetic_private_customer", ...options.paymentChange }], cursor: "synthetic_next_page_never_followed" });
@@ -122,14 +123,35 @@ module.exports = async function ({ permit: p, actor, now, fp }) {
     await assert.rejects(() => f.mapping(foreign)); await assert.rejects(() => f.runtime({ action: "read", actor: foreign }));
     await assert.rejects(() => f.evidence(foreign)); assert.deepEqual(f.calls, []);
   }
-  for (const options of [{ leasedReplay: true }, { paymentChange: { location_id: "OTHER_LOCATION" } },
+  const pending = fixture({ leasedReplay: true });
+  await pending.mapping(actor); await pending.runtime({ action: "prepare", actor });
+  assert.equal((await pending.runtime({ action: "read", actor })).status, "pending");
+  assert.equal(pending.count(), 0, "live_lease_status_poll_never_repeats_provider_read");
+  let release, entered;
+  const blocked = new Promise(resolve => { release = resolve; });
+  const started = new Promise(resolve => { entered = resolve; });
+  const concurrent = fixture({ providerBarrier: async () => { entered(); await blocked; } });
+  await concurrent.mapping(actor); await concurrent.runtime({ action: "prepare", actor });
+  const inFlight = concurrent.runtime({ action: "read", actor });
+  await started;
+  assert.equal((await concurrent.runtime({ action: "read", actor })).status, "pending");
+  assert.equal(concurrent.count(), 1, "in_flight_poll_does_not_fetch_again");
+  release();
+  assert.equal((await inFlight).status, "committed");
+  assert.equal((await concurrent.runtime({ action: "read", actor })).replayed, true);
+  assert.equal(concurrent.count(), 1, "pending_to_committed_has_exactly_one_provider_call");
+  const expired = fixture({ leasedReplay: true, leaseChange: { leaseExpiresAt: "2026-09-24T11:00:00+00:00" } });
+  await expired.mapping(actor); await expired.runtime({ action: "prepare", actor });
+  await assert.rejects(() => expired.runtime({ action: "read", actor }));
+  assert.equal(expired.count(), 0, "expired_lease_requires_reconciliation_without_refetch");
+  for (const options of [{ paymentChange: { location_id: "OTHER_LOCATION" } },
     { paymentChange: { id: null } }, { paymentChange: { created_at: null } },
     { credentialChange: { externalAuthorizedEntityReference: "OTHER_SELLER" } }, { storedChange: { credentialVersion: 2 } },
     { leaseChange: { beginTime: "2026-09-24T10:01:00+00:00" } }, { storedChange: { accessExpiresAt: "2026-09-24T11:00:00+00:00" } }]) {
     const f = fixture(options); await f.mapping(actor); await f.runtime({ action: "prepare", actor });
     await assert.rejects(() => f.runtime({ action: "read", actor }));
     assert.equal(f.calls.includes("commit_page"), false);
-    if (options.leasedReplay || options.credentialChange || options.storedChange) assert.equal(f.count(), 0);
+    if (options.credentialChange || options.storedChange) assert.equal(f.count(), 0);
   }
   for (const [option, action] of [["lostMapping", "map"], ["lostPrepare", "prepare"]]) {
     const f = fixture({ [option]: true });
