@@ -57,6 +57,8 @@ for (const image of ["square-callback-edge", "production-bootstrap", "square-int
 }
 assert.match(cloudbuild, /id: verify-trigger-context[\s\S]*id: require-completed-scans/);
 assert.match(cloudbuild, /id: test-callback-edge[\s\S]*go test -count=1 \.\/\.\.\./, "the approved repository-bound build runs parser and plugin orchestration tests");
+assert.match(cloudbuild, /corepack prepare pnpm@9\.15\.4 --activate[\s\S]*corepack pnpm install --frozen-lockfile --ignore-scripts[\s\S]*corepack pnpm exec ncc build/, "the pinned Node image invokes pnpm through Corepack for install and bundling");
+assert.doesNotMatch(cloudbuild, /^\s+pnpm (?:install|exec) /m, "the build must not depend on an absent pnpm shell shim");
 assert.match(cloudbuild, /sourceProvenanceHash: \[SHA256\]/);
 assert.match(scans, /FINISHED_SUCCESS/);
 assert.match(scans, /vulnerabilityDiscoveryNote: "projects\/goog-analysis\/locations\/us-west1\/notes\/PACKAGE_VULNERABILITY"/);
