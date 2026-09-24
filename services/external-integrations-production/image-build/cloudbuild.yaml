@@ -52,9 +52,9 @@ steps:
       - |
         node -e 'if(require("./package.json").packageManager!=="pnpm@9.15.4") process.exit(1)'
         corepack prepare pnpm@9.15.4 --activate
-        pnpm install --frozen-lockfile --ignore-scripts
+        corepack pnpm install --frozen-lockfile --ignore-scripts
         node scripts/square-production-internal-consent-tests.js
-        pnpm exec ncc build services/external-integrations-production/internal-consent/entry.ts -o services/external-integrations-production/internal-consent/dist --no-cache --transpile-only --external server-only
+        corepack pnpm exec ncc build services/external-integrations-production/internal-consent/entry.ts -o services/external-integrations-production/internal-consent/dist --no-cache --transpile-only --external server-only
         node services/external-integrations-production/internal-consent/package-release.cjs
 
   - name: gcr.io/cloud-builders/docker@sha256:2e8d40d8e48dc14fab4213d5e532d74f63fd403d9e8d7f6463096a75820286c3
