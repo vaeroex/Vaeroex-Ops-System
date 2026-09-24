@@ -194,7 +194,12 @@ assert.match(main, /max_dispatches_per_second\s*=\s*5/);
 assert.match(main, /max_attempts\s*=\s*8/);
 assert.match(main, /prevent_destroy\s*=\s*true/g);
 assert.doesNotMatch(main, /quickbooks|qbo/i, "activation cannot mutate QBO resources");
-assert.doesNotMatch(main, /supabase|migration|postgres/i, "cloud activation cannot apply database changes");
+const publicAuthKeyMapping = /^[ \t]*supabasePublishableKey = env\.value\.supabase_publishable_key[ \t]*$/gm;
+assert.equal([...main.matchAll(publicAuthKeyMapping)].length, 1, "the reviewed public Auth key mapping occurs exactly once");
+const withoutPublicAuthKey = main.replace(publicAuthKeyMapping, "");
+assert.doesNotMatch(withoutPublicAuthKey, /supabase|migration|postgres/i, "cloud activation cannot apply database changes");
+for (const forbidden of ["supabase_password = value", "resource \"supabase_project\" \"other\" {}", "migration", "postgres"])
+  assert.match(`${withoutPublicAuthKey}\n${forbidden}`, /supabase|migration|postgres/i, "only the exact public Auth key mapping is exempt");
 assert.doesNotMatch(outputs, /secret_data|password|token/i, "outputs remain non-secret");
 
 assert.match(dockerfile, /^FROM gcr\.io\/distroless\/nodejs22-debian13@sha256:[a-f0-9]{64}$/m, "the bootstrap uses an immutable minimal runtime-only base image");
