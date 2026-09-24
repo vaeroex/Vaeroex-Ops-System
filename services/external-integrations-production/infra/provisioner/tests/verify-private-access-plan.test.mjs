@@ -388,6 +388,33 @@ const retainedTemporaryResource = ([address, type, name]) => ({
 });
 const closingGeneration = generation(true, false, ["delete", "create"], { after: preservedCloseWindow });
 const closingGrant = grant("oauth", true, false, ["delete"]);
+// Google 7.39 refresh uses the canonical resource path in the before value,
+// although the opening configuration supplies the short secret name.
+const refreshedCleanup = plan(
+  closingGeneration,
+  grant("oauth", true, false, ["delete"], {
+    before: { secret_id: "projects/vaeroex-integrations-prod/secrets/square-production-oauth-db" },
+  }),
+  ...temporaryAccessResources.filter(([, , name]) => name !== "setup_https")
+    .map(([address, type, name]) => ({
+      address, type, name,
+      change: { actions: ["delete"], before: { project: "vaeroex-integrations-prod" }, after: null },
+    })),
+);
+assert.equal(refreshedCleanup.complete, true);
+assert.equal(refreshedCleanup.resource_changes.filter(resource =>
+  resource.type.startsWith("google_") && resource.change.actions[0] === "delete").length, 7);
+assert.equal(verifyPrivateAccessPlan(refreshedCleanup), "private_access_one_grant_to_closed_confirmed");
+for (const secretId of [
+  "projects/vaeroex-square-sandbox/secrets/square-production-oauth-db",
+  "projects/vaeroex-integrations-prod/secrets/square-production-broker-db",
+  "square-production-broker-db",
+]) {
+  const candidate = structuredClone(refreshedCleanup);
+  candidate.resource_changes.find(resource => resource.type === "google_secret_manager_secret_iam_member")
+    .change.before.secret_id = secretId;
+  rejects(candidate, "private_access_managed_grant_contract_mismatch");
+}
 rejects(
   planInPhase("administrative", closingGeneration, closingGrant, ...temporaryAccessResources.map(retainedTemporaryResource)),
   "private_access_closed_controls_not_disabled",
