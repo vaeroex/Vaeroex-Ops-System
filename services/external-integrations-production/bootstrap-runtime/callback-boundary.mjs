@@ -113,6 +113,12 @@ function checkedHandoff(input) {
   return parseRawQuery(one(headers, HANDOFF_HEADERS.query));
 }
 
+// The enabled internal-pilot handler shares these exact, already-qualified
+// envelope/query decisions. Parsing alone grants no state or broker authority.
+export function parseSquareProductionCallbackHandoff(input) {
+  return checkedHandoff(input);
+}
+
 function sameHash(left, right) {
   if (typeof left !== "string" || typeof right !== "string" || !/^[a-f0-9]{64}$/.test(left) || !/^[a-f0-9]{64}$/.test(right)) return false;
   return timingSafeEqual(Buffer.from(left, "hex"), Buffer.from(right, "hex"));

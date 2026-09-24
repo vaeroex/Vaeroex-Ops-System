@@ -44,6 +44,23 @@ steps:
       - us-west1-docker.pkg.dev/vaeroex-integrations-prod/vaeroex-integrations-images/production-bootstrap:$COMMIT_SHA
       - services/external-integrations-production/bootstrap-runtime
 
+  - name: node:22.23.1-bookworm-slim@sha256:6c74791e557ce11fc957704f6d4fe134a7bc8d6f5ca4403205b2966bd488f6b3
+    id: bundle-internal-consent
+    entrypoint: /bin/bash
+    args:
+      - -ceu
+      - |
+        node -e 'if(require("./package.json").packageManager!=="pnpm@9.15.4") process.exit(1)'
+        corepack prepare pnpm@9.15.4 --activate
+        pnpm install --frozen-lockfile --ignore-scripts
+        node scripts/square-production-internal-consent-tests.js
+        pnpm exec ncc build services/external-integrations-production/internal-consent/entry.ts -o services/external-integrations-production/internal-consent/dist --no-cache --transpile-only --external server-only
+        node services/external-integrations-production/internal-consent/package-release.cjs
+
+  - name: gcr.io/cloud-builders/docker@sha256:2e8d40d8e48dc14fab4213d5e532d74f63fd403d9e8d7f6463096a75820286c3
+    id: build-internal-consent
+    args: ["build", "--no-cache", "--tag", "us-west1-docker.pkg.dev/vaeroex-integrations-prod/vaeroex-integrations-images/square-internal-consent:$COMMIT_SHA", "services/external-integrations-production/internal-consent"]
+
   - name: gcr.io/cloud-builders/docker@sha256:2e8d40d8e48dc14fab4213d5e532d74f63fd403d9e8d7f6463096a75820286c3
     id: publish-callback-edge
     args: ["push", "us-west1-docker.pkg.dev/vaeroex-integrations-prod/vaeroex-integrations-images/square-callback-edge:$COMMIT_SHA"]
@@ -53,6 +70,10 @@ steps:
     args: ["push", "us-west1-docker.pkg.dev/vaeroex-integrations-prod/vaeroex-integrations-images/production-bootstrap:$COMMIT_SHA"]
 
   - name: gcr.io/cloud-builders/docker@sha256:2e8d40d8e48dc14fab4213d5e532d74f63fd403d9e8d7f6463096a75820286c3
+    id: publish-internal-consent
+    args: ["push", "us-west1-docker.pkg.dev/vaeroex-integrations-prod/vaeroex-integrations-images/square-internal-consent:$COMMIT_SHA"]
+
+  - name: gcr.io/cloud-builders/docker@sha256:2e8d40d8e48dc14fab4213d5e532d74f63fd403d9e8d7f6463096a75820286c3
     id: resolve-immutable-digests
     entrypoint: /bin/bash
     args:
@@ -60,10 +81,13 @@ steps:
       - |
         callback="$$(docker inspect --format='{{index .RepoDigests 0}}' us-west1-docker.pkg.dev/vaeroex-integrations-prod/vaeroex-integrations-images/square-callback-edge:$COMMIT_SHA)"
         bootstrap="$$(docker inspect --format='{{index .RepoDigests 0}}' us-west1-docker.pkg.dev/vaeroex-integrations-prod/vaeroex-integrations-images/production-bootstrap:$COMMIT_SHA)"
+        consent="$$(docker inspect --format='{{index .RepoDigests 0}}' us-west1-docker.pkg.dev/vaeroex-integrations-prod/vaeroex-integrations-images/square-internal-consent:$COMMIT_SHA)"
         [[ "$$callback" =~ ^us-west1-docker\.pkg\.dev/vaeroex-integrations-prod/vaeroex-integrations-images/square-callback-edge@sha256:[a-f0-9]{64}$$ ]]
         [[ "$$bootstrap" =~ ^us-west1-docker\.pkg\.dev/vaeroex-integrations-prod/vaeroex-integrations-images/production-bootstrap@sha256:[a-f0-9]{64}$$ ]]
+        [[ "$$consent" =~ ^us-west1-docker\.pkg\.dev/vaeroex-integrations-prod/vaeroex-integrations-images/square-internal-consent@sha256:[a-f0-9]{64}$$ ]]
         printf '%s\n' "$$callback" > /workspace/callback-edge.digest
         printf '%s\n' "$$bootstrap" > /workspace/bootstrap-runtime.digest
+        printf '%s\n' "$$consent" > /workspace/internal-consent.digest
 
   - name: node:22.23.1-bookworm-slim@sha256:6c74791e557ce11fc957704f6d4fe134a7bc8d6f5ca4403205b2966bd488f6b3
     id: require-completed-scans
@@ -74,6 +98,7 @@ steps:
 images:
   - us-west1-docker.pkg.dev/vaeroex-integrations-prod/vaeroex-integrations-images/square-callback-edge:$COMMIT_SHA
   - us-west1-docker.pkg.dev/vaeroex-integrations-prod/vaeroex-integrations-images/production-bootstrap:$COMMIT_SHA
+  - us-west1-docker.pkg.dev/vaeroex-integrations-prod/vaeroex-integrations-images/square-internal-consent:$COMMIT_SHA
 options:
   logging: CLOUD_LOGGING_ONLY
   sourceProvenanceHash: [SHA256]

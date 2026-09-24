@@ -6,12 +6,13 @@ import { fetchBoundedJson, getMetadataAccessToken, POLICY } from "./verify-trigg
 const IMAGE_POLICY = Object.freeze({
   callback: "us-west1-docker.pkg.dev/vaeroex-integrations-prod/vaeroex-integrations-images/square-callback-edge",
   bootstrap: "us-west1-docker.pkg.dev/vaeroex-integrations-prod/vaeroex-integrations-images/production-bootstrap",
+  consent: "us-west1-docker.pkg.dev/vaeroex-integrations-prod/vaeroex-integrations-images/square-internal-consent",
   buildBucket: "vaeroex-integrations-prod-build",
   bootstrapException: "CVE-2026-85091",
   bootstrapDockerignoreSha256: "1cff3c6b71037eee721261556878d3c6a819175a98ed4336ca8b96d3fc291b44",
   bootstrapDockerfileSha256: "a94896fde4c3a4f423b5b09cb7b899809089bd5ee9f8f25ea73e70a022ac8867",
   bootstrapServerSha256: "9df82e10ee028ccb895ec4b95452d1a0b635013135821f444f1e7a2fd2f582f0",
-  bootstrapCallbackBoundarySha256: "dcad858b2abd699ee64f0b2b566a3d70f818fad2ceb3e2fbeee252efb673a69a",
+  bootstrapCallbackBoundarySha256: "b3005de72ff5f1d2fa46851462ce458bda5752624c77d5e496a6b244dbbac5bf",
   vulnerabilityDiscoveryNote: "projects/goog-analysis/locations/us-west1/notes/PACKAGE_VULNERABILITY",
   vulnerabilityNotePrefix: "projects/goog-vulnz/notes/",
   requiredStableScanReads: 3,
@@ -48,7 +49,7 @@ function vulnerabilityIdentifier(occurrence) {
 }
 
 export function evaluateScanOccurrences(kind, occurrences, sourceIntegrity) {
-  if (kind !== "callback" && kind !== "bootstrap") reject("image_kind");
+  if (!["callback", "bootstrap", "consent"].includes(kind)) reject("image_kind");
   if (!Array.isArray(occurrences)) reject("scan_shape");
   if (occurrences.some((entry) => !entry || typeof entry !== "object")) reject("scan_shape");
   if (occurrences.some(
@@ -125,15 +126,17 @@ export function scanEvidenceFingerprint(occurrences) {
   return createHash("sha256").update(JSON.stringify(evidence)).digest("hex");
 }
 
-export function buildCandidateManifest({ buildId, sourceCommit, callback, bootstrap, callbackScan, bootstrapScan }) {
+export function buildCandidateManifest({ buildId, sourceCommit, callback, bootstrap, consent, callbackScan, bootstrapScan, consentScan }) {
   if (!/^[a-f0-9-]{16,64}$/.test(buildId ?? "")) reject("build_id");
   if (!/^[a-f0-9]{40}$/.test(sourceCommit ?? "")) reject("source_commit");
+  if (!consent || !consentScan) reject("consent_scan_required");
+  parseDigestReference(consent.reference, IMAGE_POLICY.consent);
   return Object.freeze({
     schemaVersion: 1,
     source: Object.freeze({ repository: POLICY.repositoryFullName, branch: POLICY.branchName, commit: sourceCommit }),
     build: Object.freeze({ id: buildId, trigger: POLICY.triggerName, approved: true }),
-    images: Object.freeze({ callback: callback.reference, bootstrap: bootstrap.reference }),
-    scans: Object.freeze({ callback: callbackScan, bootstrap: bootstrapScan }),
+    images: Object.freeze({ callback: callback.reference, bootstrap: bootstrap.reference, consent: consent.reference }),
+    scans: Object.freeze({ callback: callbackScan, bootstrap: bootstrapScan, consent: consentScan }),
     secretAnalysisQualified: false,
     secretAnalysisRequiredBeforeEligibility: true,
     deploymentEligible: false,
@@ -278,27 +281,30 @@ async function uploadCandidate(manifest, accessToken, fetchImpl = fetch) {
 }
 
 export async function qualifyPublishedImages({ buildId, sourceCommit, fetchImpl = fetch }) {
-  const [callbackText, bootstrapText, sourceIntegrity, accessToken] = await Promise.all([
+  const [callbackText, bootstrapText, consentText, sourceIntegrity, accessToken] = await Promise.all([
     readDigestFile("/workspace/callback-edge.digest"),
     readDigestFile("/workspace/bootstrap-runtime.digest"),
+    readDigestFile("/workspace/internal-consent.digest"),
     verifyBootstrapSource(),
     getMetadataAccessToken(fetchImpl),
   ]);
   const callback = parseDigestReference(callbackText, IMAGE_POLICY.callback);
   const bootstrap = parseDigestReference(bootstrapText, IMAGE_POLICY.bootstrap);
-  const [callbackScan, bootstrapScan] = await Promise.all([
+  const consent = parseDigestReference(consentText, IMAGE_POLICY.consent);
+  const [callbackScan, bootstrapScan, consentScan] = await Promise.all([
     waitForCompletedScan("callback", callback, null, accessToken, fetchImpl),
     waitForCompletedScan("bootstrap", bootstrap, sourceIntegrity, accessToken, fetchImpl),
+    waitForCompletedScan("consent", consent, null, accessToken, fetchImpl),
   ]);
-  const manifest = buildCandidateManifest({ buildId, sourceCommit, callback, bootstrap, callbackScan, bootstrapScan });
+  const manifest = buildCandidateManifest({ buildId, sourceCommit, callback, bootstrap, consent, callbackScan, bootstrapScan, consentScan });
   const candidate = await uploadCandidate(manifest, accessToken, fetchImpl);
-  return Object.freeze({ callback: callback.reference, bootstrap: bootstrap.reference, candidate });
+  return Object.freeze({ callback: callback.reference, bootstrap: bootstrap.reference, consent: consent.reference, candidate });
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   qualifyPublishedImages({ buildId: process.env.BUILD_ID, sourceCommit: process.env.COMMIT_SHA }).then(
     (result) => {
-      process.stdout.write(`production_image_scans_qualified\ncallback_digest=${result.callback}\nbootstrap_digest=${result.bootstrap}\ncandidate=${result.candidate}\n`);
+      process.stdout.write(`production_image_scans_qualified\ncallback_digest=${result.callback}\nbootstrap_digest=${result.bootstrap}\nconsent_digest=${result.consent}\ncandidate=${result.candidate}\n`);
     },
     () => {
       process.stderr.write("production_image_scans_rejected\n");

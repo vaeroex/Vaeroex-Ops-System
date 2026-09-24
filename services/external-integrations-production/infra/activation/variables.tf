@@ -81,6 +81,32 @@ variable "bootstrap_image_digest" {
   }
 }
 
+variable "internal_consent" {
+  description = "Separately reviewed one-seller consent deployment; null preserves the dormant services. Public configuration/references only, never secret values."
+  type = object({
+    image_digest             = string
+    source_commit            = string
+    broker_origin            = string
+    permit                   = any
+    database_versions        = object({ oauth = number, broker = number })
+    database_ca              = string
+    supabase_publishable_key = string
+  })
+  default  = null
+  nullable = true
+  validation {
+    condition = var.internal_consent == null ? true : (
+      can(regex("^us-west1-docker\\.pkg\\.dev/vaeroex-integrations-prod/vaeroex-integrations-images/square-internal-consent@sha256:[a-f0-9]{64}$", var.internal_consent.image_digest)) &&
+      can(regex("^[a-f0-9]{40}$", var.internal_consent.source_commit)) &&
+      var.internal_consent.broker_origin == "https://square-production-broker-u5c6zahmpq-uw.a.run.app" &&
+      var.internal_consent.database_versions.oauth >= 1 && floor(var.internal_consent.database_versions.oauth) == var.internal_consent.database_versions.oauth &&
+      var.internal_consent.database_versions.broker >= 1 && floor(var.internal_consent.database_versions.broker) == var.internal_consent.database_versions.broker &&
+      sha256(var.internal_consent.database_ca) == "700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7"
+    )
+    error_message = "Internal consent requires the reviewed immutable image/source, exact existing broker, numeric OAuth/broker versions and pinned public database CA."
+  }
+}
+
 variable "oauth_callback_image_digest" {
   type      = string
   default   = null

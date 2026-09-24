@@ -242,6 +242,12 @@ jobs:
       - name: Test closed Square Production internal-pilot runtime contract
         run: pnpm test:external-integrations-square-production-internal-runtime
 
+      - name: Test Square internal seller consent handlers
+        run: |
+          node scripts/square-production-internal-consent-tests.js
+          pnpm exec ncc build services/external-integrations-production/internal-consent/entry.ts -o services/external-integrations-production/internal-consent/dist --no-cache --transpile-only --external server-only
+          node services/external-integrations-production/internal-consent/package-release.cjs
+
       - name: Test Production Square one-customer pilot package
         run: pnpm test:external-integrations-production-square-pilot
 

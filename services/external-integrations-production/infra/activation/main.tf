@@ -29,7 +29,7 @@ locals {
   ])
   modes        = toset(["oauth", "broker", "scheduler", "webhook", "runtime", "evidence"])
   public_modes = toset(["oauth", "webhook"])
-  egress_modes = toset(["broker", "runtime"])
+  egress_modes = toset(concat(["broker", "runtime"], var.internal_consent == null ? [] : ["oauth"]))
   warm_modes   = toset(["oauth", "broker", "webhook", "runtime"])
   service_account_ids = {
     oauth        = "sq-prod-oauth"
@@ -236,6 +236,14 @@ resource "google_cloudbuild_trigger" "production_images" {
     "services/external-integrations-production/bootstrap-runtime/**",
     "services/external-integrations-production/callback-edge/**",
     "services/external-integrations-production/image-build/**",
+    "services/external-integrations-production/internal-consent/**",
+    "lib/integrations/contracts/**",
+    "lib/integrations/credentials/**",
+    "lib/integrations/providers/square/**",
+    "scripts/square-production-internal-consent-tests.js",
+    "package.json",
+    "pnpm-lock.yaml",
+    "tsconfig.json",
   ]
   tags = ["production-image-build"]
 
@@ -450,7 +458,7 @@ resource "google_compute_security_policy" "ingress" {
     priority = 1100
     match {
       expr {
-        expression = "request.path != '/healthz' && request.path != '/api/integrations/square/callback' && request.path != '/api/integrations/square/webhook'"
+        expression = "request.path != '/healthz' && request.path != '/api/integrations/square/callback' && request.path != '/api/integrations/square/webhook'${var.internal_consent == null ? "" : " && request.path != '/api/integrations/square/connect'"}"
       }
     }
     description = "Reject every unapproved route before runtime"
@@ -460,7 +468,7 @@ resource "google_compute_security_policy" "ingress" {
     priority = 1150
     match {
       expr {
-        expression = "(request.path == '/healthz' && request.method != 'GET' && request.method != 'HEAD') || (request.path == '/api/integrations/square/callback' && request.method != 'GET') || (request.path == '/api/integrations/square/webhook' && request.method != 'POST')"
+        expression = "(request.path == '/healthz' && request.method != 'GET' && request.method != 'HEAD') || (request.path == '/api/integrations/square/callback' && request.method != 'GET') || (request.path == '/api/integrations/square/webhook' && request.method != 'POST') || (request.path == '/api/integrations/square/connect' && request.method != 'POST')"
       }
     }
     description = "Reject unsupported methods"
@@ -543,7 +551,7 @@ resource "google_cloud_run_v2_service" "square" {
       }
     }
     containers {
-      image = each.key == "oauth" ? var.oauth_callback_image_digest : var.bootstrap_image_digest
+      image = var.internal_consent != null && contains(["oauth", "broker"], each.key) ? var.internal_consent.image_digest : (each.key == "oauth" ? var.oauth_callback_image_digest : var.bootstrap_image_digest)
       resources {
         limits            = { cpu = "1", memory = "512Mi" }
         cpu_idle          = true
@@ -551,7 +559,21 @@ resource "google_cloud_run_v2_service" "square" {
       }
       env {
         name  = "VAEROEX_SOURCE_COMMIT"
-        value = each.key == "oauth" ? var.oauth_callback_source_commit : var.source_commit
+        value = var.internal_consent != null && contains(["oauth", "broker"], each.key) ? var.internal_consent.source_commit : (each.key == "oauth" ? var.oauth_callback_source_commit : var.source_commit)
+      }
+      dynamic "env" {
+        for_each = var.internal_consent != null && contains(["oauth", "broker"], each.key) ? [var.internal_consent] : []
+        content {
+          name = "SQUARE_INTERNAL_CONSENT_CONFIGURATION"
+          value = jsonencode({
+            profile                = each.key
+            permit                 = env.value.permit
+            databaseVersion        = env.value.database_versions[each.key]
+            databaseCa             = env.value.database_ca
+            brokerOrigin           = env.value.broker_origin
+            supabasePublishableKey = env.value.supabase_publishable_key
+          })
+        }
       }
       env {
         name  = "VAEROEX_RUNTIME_ENABLED"
@@ -580,6 +602,15 @@ resource "google_cloud_run_v2_service" "square" {
     }
   }
   lifecycle { prevent_destroy = true }
+}
+
+resource "google_cloud_run_v2_service_iam_member" "oauth_calls_broker" {
+  count    = local.deployment_enabled && var.internal_consent != null ? 1 : 0
+  project  = var.project_id
+  location = var.region
+  name     = google_cloud_run_v2_service.square["broker"].name
+  role     = "roles/run.invoker"
+  member   = google_service_account.square["oauth"].member
 }
 
 resource "google_compute_region_network_endpoint_group" "public" {

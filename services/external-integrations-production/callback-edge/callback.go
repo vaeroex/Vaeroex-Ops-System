@@ -8,6 +8,7 @@ import (
 
 const (
 	CallbackPath          = "/api/integrations/square/callback"
+	InternalConnectPath   = "/api/integrations/square/connect"
 	WebhookPath           = "/api/integrations/square/webhook"
 	HealthPath            = "/healthz"
 	HandoffVersion        = "square_oauth_callback_handoff_v1"
@@ -186,6 +187,16 @@ func IsWebhookRequest(method, pathAttribute, queryAttribute string) bool {
 func IsHealthRequest(method, pathAttribute, queryAttribute string) bool {
 	path, rawQuery, valid := normalizeForwardedTarget(pathAttribute, queryAttribute)
 	return valid && (method == "GET" || method == "HEAD") && path == HealthPath && rawQuery == ""
+}
+
+// The internal-seller initiation uses a validated Vaeroex session in the
+// Authorization header, never a query/body credential. The backend independently
+// binds that session to the one installed permit. No callback parser changes.
+func IsInternalConnectRequest(method, pathAttribute, queryAttribute string, headers [][2]string) bool {
+	path, rawQuery, valid := normalizeForwardedTarget(pathAttribute, queryAttribute)
+	return valid && method == "POST" && path == InternalConnectPath && rawQuery == "" &&
+		IsBoundedClientHeaderMap(headers) && !HasForbiddenClientHeaders(headers) &&
+		callbackBodyRejectionReason(headers) == RejectionNone
 }
 
 func normalizeForwardedTarget(pathAttribute, queryAttribute string) (string, string, bool) {

@@ -408,8 +408,9 @@ async function catalogSnapshot(client) {
   return result.rows[0].snapshot;
 }
 
-async function createRuntimeLogins(client) {
-  for (const capability of loginRoles) {
+async function createRuntimeLogins(client, capabilities = loginRoles) {
+  assert.ok(capabilities.every(capability => loginRoles.includes(capability)));
+  for (const capability of capabilities) {
     const login = `square_production_${capability}`;
     await client.query(`create role ${login} login inherit nosuperuser nocreatedb nocreaterole noreplication nobypassrls`);
     await client.query(`grant square_production_${capability}_authority to ${login}`);
@@ -765,6 +766,147 @@ async function seedOperator(client, values) {
   [values.foreignEntityId, values.foreignWorkspaceId, values.operatorId]);
   await client.query("insert into auth.sessions(id,user_id,not_after) values($1,$2,statement_timestamp()+interval '2 days')",
     [values.sessionId, values.operatorId]);
+}
+
+async function exerciseConsentOnly(client) {
+  const peerProfiles = ["runtime", "evidence", "scheduler", "webhook"];
+  const peerLogins = peerProfiles.map(profile => `square_production_${profile}`);
+  const ids = {
+    operatorId: id(), workspaceId: id(), entityId: id(), sessionId: id(), permitId: id(),
+    stateId: id(), credentialId: id(), foreignWorkspaceId: id(), foreignEntityId: id()
+  };
+  const expectedMerchantId = "merchant-consent-only-001";
+  const expectedLocationId = "location-consent-only-001";
+  async function assertPeersAbsent(stage) {
+    const closed = (await client.query(`
+      select
+        (select count(*)::integer from pg_catalog.pg_roles where rolname=any($1::text[])) roles,
+        (select count(*)::integer from pg_catalog.pg_auth_members membership
+          join pg_catalog.pg_roles role_record on role_record.oid=membership.member
+          where role_record.rolname=any($1::text[])) memberships,
+        (select count(*)::integer from pg_catalog.pg_db_role_setting setting
+          join pg_catalog.pg_roles role_record on role_record.oid=setting.setrole
+          where role_record.rolname=any($1::text[])) settings,
+        (select count(*)::integer from pg_catalog.pg_stat_activity
+          where usename=any($1::text[])) sessions
+    `, [peerLogins])).rows[0];
+    assert.deepEqual(closed, { roles: 0, memberships: 0, settings: 0, sessions: 0 },
+      `consent_only_${stage}_peer_profiles_absent`);
+  }
+  // A separate rollback-scoped consent fixture leaves the later runtime/evidence
+  // qualification unchanged. Capability and secret rows below are references only;
+  // this test has no Secret Manager adapter, secret values, or provider transport.
+  await client.query("begin");
+  try {
+    await assertPeersAbsent("before_install");
+    await seedClosedFoundation(client);
+    await seedOperator(client, ids);
+    await createRuntimeLogins(client, ["oauth", "broker"]);
+    const activeProfiles = (await client.query(`
+      select rolname::text name from pg_catalog.pg_roles
+      where rolcanlogin and rolname=any($1::text[]) order by rolname
+    `, [["square_production_oauth", "square_production_broker", ...peerLogins]])).rows;
+    assert.deepEqual(activeProfiles, [
+      { name: "square_production_broker" }, { name: "square_production_oauth" }
+    ], "consent_only_exactly_oauth_and_broker_logins");
+    const referenceContract = (await client.query(`
+      select
+        (select count(*)::integer from private.integration_production_provider_capabilities
+          where provider_key='square' and environment='production'
+            and capability in ('oauth','broker','runtime','evidence','scheduler','webhook')) capabilities,
+        (select count(*)::integer from private.integration_production_provider_secrets
+          where provider_key='square' and environment='production'
+            and secret_purpose=any($1::text[])
+            and secret_version_resource=
+              'projects/vaeroex-integrations-prod/secrets/square-production-'||
+                replace(secret_purpose,'_','-')||'/versions/1') peer_reference_rows
+    `, [peerProfiles.map(profile => `database_${profile}`)])).rows[0];
+    assert.deepEqual(referenceContract, { capabilities: 6, peer_reference_rows: 4 },
+      "consent_only_six_capabilities_with_reference_only_peer_metadata");
+    const configuration = (await client.query(`
+      select configuration_fingerprint from private.square_production_configuration_generations where generation=1
+    `)).rows[0].configuration_fingerprint;
+    const approvalExpiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+    const installed = (await client.query(
+      "select private.square_production_internal_install_permit_v1($1::jsonb) value",
+      [JSON.stringify({
+        approvalExpiresAt, businessEntityId: ids.entityId, configurationFingerprint: configuration,
+        expectedLocationId, expectedMerchantId, generation: 1, operatorId: ids.operatorId,
+        operatorSessionId: ids.sessionId, permitId: ids.permitId, workspaceId: ids.workspaceId,
+        requestFingerprint: runtimeFingerprint([
+          "install-permit-v1", ids.permitId, "1", configuration, ids.workspaceId, ids.entityId,
+          ids.operatorId, ids.sessionId, expectedMerchantId, expectedLocationId, approvalExpiresAt
+        ])
+      })]
+    )).rows[0].value;
+    assert.equal(installed.state, "prepared", "consent_only_permit_installs_without_peer_logins");
+    const stateHash = crypto.createHash("sha256").update("synthetic-consent-only-state").digest("hex");
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+    const created = await asRuntimeRole(client, "oauth", "create_state", {
+      actorId: ids.operatorId, expiresAt, permitId: ids.permitId, sessionId: ids.sessionId,
+      stateHash, stateId: ids.stateId,
+      requestFingerprint: runtimeFingerprint([
+        "create-state-v1", ids.permitId, ids.stateId, stateHash, ids.operatorId, ids.sessionId, expiresAt, "1"
+      ])
+    });
+    assert.equal(created.state, "consent_pending", "consent_only_oauth_state_created");
+    const consumed = await asRuntimeRole(client, "oauth", "consume_state", {
+      stateHash, consumeRequestFingerprint: runtimeFingerprint(["consume-state-v2", stateHash])
+    });
+    assert.equal(consumed.status, "consumed", "consent_only_oauth_state_consumed");
+    const exchange = await asRuntimeRole(client, "broker", "acquire_exchange", {
+      stateId: ids.stateId,
+      exchangeRequestFingerprint: runtimeFingerprint([
+        "acquire-exchange-v1", ids.stateId, consumed.consumeReceiptFingerprint
+      ])
+    });
+    assert.equal(exchange.status, "acquired", "consent_only_broker_exchange_acquired");
+    assert.deepEqual(Object.keys(exchange).filter(key => /secret/i.test(key)),
+      ["applicationSecretVersionResource"], "consent_only_exchange_exposes_no_peer_secret_reference");
+    await assertPeersAbsent("before_credential_commit");
+    const ciphertextBase64 = Buffer.from("synthetic-consent-only-encrypted-envelope").toString("base64");
+    const providerIssuedAt = new Date(Date.now() - 1000).toISOString();
+    const accessExpiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+    const grantedScopes = ["INVENTORY_READ", "ITEMS_READ", "MERCHANT_PROFILE_READ", "ORDERS_READ", "PAYMENTS_READ"];
+    const aadContext = {
+      credentialId: ids.credentialId, credentialVersion: "1", environment: "production", generation: "1",
+      permitId: ids.permitId, projectId: "vaeroex-integrations-prod", providerKey: "square"
+    };
+    const aadDigest = runtimeFingerprint([
+      "aad-v1", "square", "production", "vaeroex-integrations-prod", "1", ids.permitId, ids.credentialId, "1"
+    ]);
+    const externalEntityFingerprint = runtimeFingerprint(["external-entity-v1", expectedMerchantId, expectedLocationId]);
+    const committed = await asRuntimeRole(client, "broker", "commit_credential", {
+      aadContext, aadDigest, accessExpiresAt, ciphertextBase64, credentialId: ids.credentialId,
+      credentialVersion: 1, exchangeId: exchange.exchangeId,
+      exchangeReceiptFingerprint: exchange.exchangeReceiptFingerprint, externalEntityFingerprint,
+      grantedScopes, locationId: expectedLocationId, merchantId: expectedMerchantId,
+      providerIssuedAt, stateId: ids.stateId,
+      commandFingerprint: runtimeFingerprint([
+        "credential-command-v1", ids.stateId, exchange.exchangeId, exchange.exchangeReceiptFingerprint,
+        ids.credentialId, "1", runtimeFingerprint(["ciphertext-v1", ciphertextBase64]), aadDigest,
+        externalEntityFingerprint, providerIssuedAt, accessExpiresAt, grantedScopes.join(",")
+      ])
+    });
+    assert.equal(committed.status, "stored", "consent_only_encrypted_credential_committed");
+    await assertPeersAbsent("after_credential_commit");
+    const result = (await client.query(`
+      select
+        (select count(*)::integer from private.square_production_internal_credentials) credentials,
+        (select state from private.square_production_internal_permits where permit_id=$1) permit_state,
+        (select count(*)::integer from private.square_production_internal_scans) scans,
+        (select count(*)::integer from private.square_production_internal_source_versions) observations,
+        (select bool_and(not runtime_enabled and not provider_calls_enabled and not customer_onboarding_enabled
+          and not webhook_intake_enabled and not evidence_enabled and not economic_contributions_enabled
+          and not ai_dispatch_enabled) from private.square_production_configuration_generations) gates_closed
+    `, [ids.permitId])).rows[0];
+    assert.deepEqual(result, {
+      credentials: 1, permit_state: "mapping_required", scans: 0, observations: 0, gates_closed: true
+    }, "consent_only_two_profiles_reach_stored_without_runtime_or_evidence");
+  } finally {
+    await client.query("rollback");
+  }
+  process.stdout.write("square_production_consent_only_two_login_profiles_qualification_ok\n");
 }
 
 async function exerciseRuntime(client) {
@@ -1512,6 +1654,7 @@ async function main() {
     await elevatedClient.connect();
     await client.end();
     client = elevatedClient;
+    await exerciseConsentOnly(client);
     await exerciseRuntime(client);
   } finally {
     try {
@@ -1563,6 +1706,7 @@ async function nativeMain() {
       "runtime migration leaves QBO catalog byte-for-byte unchanged");
     await verifyInternalRelationGuard(target.client);
     await runPgTapNative(target.client);
+    await exerciseConsentOnly(target.client);
     await exerciseRuntime(target.client);
     process.stdout.write(`square_production_internal_runtime_native_qualification_ok ${target.directory}\n`);
   } finally {

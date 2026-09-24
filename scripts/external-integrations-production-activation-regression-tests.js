@@ -60,8 +60,8 @@ assert.match(variables, /square-callback-edge@sha256:\[a-f0-9\]\{64\}/, "the cal
 assert.match(main, /deployment_inputs_valid/, "runtime and callback-edge artifacts must be deployed together");
 assert.match(main, /callback_edge_source_commit == null/, "a callback edge cannot be deployed without exact source provenance");
 assert.match(main, /oauth_callback_source_commit == null/, "first-stage infrastructure cannot claim an OAuth runtime revision");
-assert.match(main, /value\s*=\s*each\.key == "oauth" \? var\.oauth_callback_source_commit : var\.source_commit/, "OAuth source provenance is separate without revising peer services");
-assert.match(main, /image\s*=\s*each\.key == "oauth" \? var\.oauth_callback_image_digest : var\.bootstrap_image_digest/, "only the existing OAuth service selects the callback-specific image");
+assert.match(main, /value\s*=\s*var\.internal_consent != null && contains\(\["oauth", "broker"\], each\.key\) \? var\.internal_consent\.source_commit : \(each\.key == "oauth" \? var\.oauth_callback_source_commit : var\.source_commit\)/, "internal consent provenance affects only OAuth/broker and preserves the dormant fallback");
+assert.match(main, /image\s*=\s*var\.internal_consent != null && contains\(\["oauth", "broker"\], each\.key\) \? var\.internal_consent\.image_digest : \(each\.key == "oauth" \? var\.oauth_callback_image_digest : var\.bootstrap_image_digest\)/, "internal consent cannot select images for the four deferred profiles");
 assert.match(main, /for_each\s*=\s*local\.deployment_enabled \? local\.modes : toset\(\[\]\)/, "the callback-specific image introduces no Cloud Run resource");
 assert.match(main, /"containerscanning\.googleapis\.com"/, "release images require automatic vulnerability scanning");
 
@@ -216,7 +216,7 @@ assert.equal(
 );
 assert.equal(
   createHash("sha256").update(callbackBoundarySource).digest("hex"),
-  "dcad858b2abd699ee64f0b2b566a3d70f818fad2ceb3e2fbeee252efb673a69a",
+  "b3005de72ff5f1d2fa46851462ce458bda5752624c77d5e496a6b244dbbac5bf",
   "every executable callback boundary change requires an explicit reviewed fingerprint update",
 );
 assert.deepEqual(bootstrapPackage.dependencies ?? {}, {}, "the bootstrap has no runtime package dependency that could add compression");

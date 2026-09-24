@@ -422,7 +422,7 @@ matches(
   "the fixture must preserve the exact production-labelled 2-leased/1-pending shape"
 );
 
-equal(approvedSquareQualificationPaths.length, 167, "dormant scope permits only exact reviewed migrations, UI, native service/templates, provider-neutral Production composition and activation, restricted evidence host, query-stripping callback edge, repository-bound image trigger, internal-pilot runtime, offline pilot and bounded provisioner files");
+equal(approvedSquareQualificationPaths.length, 183, "dormant scope permits only exact reviewed migrations, UI, native service/templates, provider-neutral Production composition and activation, restricted evidence host, query-stripping callback edge, repository-bound image trigger, internal-seller consent, internal-pilot runtime, offline pilot and bounded provisioner files");
 assertionCount++;
 assert.deepEqual(approvedSquareQualificationPaths.filter(file => file.startsWith("services/external-integrations-production/infra/provisioner/")), [
   ".gitignore", ".terraform.lock.hcl", "README.md", "backend.tf", "main.tf", "outputs.tf",

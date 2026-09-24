@@ -89,6 +89,10 @@ test("requires a completed scan and rejects secrets, criticals and callback high
   assert.throws(() => evaluateScanOccurrences("callback", [discovery(), occurrence("SECRET")], null), /secret_finding/);
   assert.throws(() => evaluateScanOccurrences("callback", [discovery(), vulnerability("CRITICAL", "CVE-2099-1")], null), /critical_vulnerability/);
   assert.throws(() => evaluateScanOccurrences("callback", [discovery(), vulnerability("HIGH", IMAGE_POLICY.bootstrapException)], null), /high_vulnerability/);
+  assert.throws(() => evaluateScanOccurrences("consent", [discovery(), vulnerability("HIGH", IMAGE_POLICY.bootstrapException)], {
+    bootstrapFingerprintsVerified: true, runtimeDependenciesEmpty: true, compressionPathAbsent: true
+  }), /high_vulnerability/, "internal consent can never borrow the bootstrap compression exception");
+  assert.throws(() => evaluateScanOccurrences("consent", [discovery(), occurrence("SECRET")], null), /secret_finding/);
 });
 
 test("ignores foreign discovery completion and rejects ambiguous or foreign vulnerability evidence", () => {
@@ -238,8 +242,10 @@ test("candidate records remain immutable-review inputs and never deployment auth
     sourceCommit: "c".repeat(40),
     callback,
     bootstrap,
+    consent: parseDigestReference(`${IMAGE_POLICY.consent}@sha256:${"d".repeat(64)}`, IMAGE_POLICY.consent),
     callbackScan: clean,
     bootstrapScan: clean,
+    consentScan: clean,
   });
   assert.equal(manifest.source.repository, POLICY.repositoryFullName);
   assert.equal(manifest.source.branch, "main");
@@ -250,4 +256,7 @@ test("candidate records remain immutable-review inputs and never deployment auth
   assert.equal(manifest.automaticRuntimeRollout, false);
   assert.match(manifest.images.callback, /@sha256:[a-f0-9]{64}$/);
   assert.match(manifest.images.bootstrap, /@sha256:[a-f0-9]{64}$/);
+  assert.match(manifest.images.consent, /square-internal-consent@sha256:[a-f0-9]{64}$/);
+  assert.throws(() => buildCandidateManifest({ buildId: manifest.build.id, sourceCommit: manifest.source.commit,
+    callback, bootstrap, callbackScan: clean, bootstrapScan: clean }), /consent_scan_required/);
 });
