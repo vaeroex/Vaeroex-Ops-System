@@ -4,6 +4,7 @@ import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { z } from "zod";
 import { canonicalContractJson } from "@/lib/integrations/contracts/canonical";
 import { ProviderAccessCredential } from "@/lib/integrations/credentials/broker";
+import { CredentialEnvelopeSchema } from "@/lib/integrations/credentials/contracts";
 import type { CredentialKms } from "@/lib/integrations/credentials/kms";
 import type { ProviderApplicationSecret } from "@/lib/integrations/credentials/secret-manager";
 import { createSquareAccountDiscovery } from "@/lib/integrations/providers/square/account-discovery";
@@ -202,11 +203,11 @@ export function createInternalBroker(input: BrokerDependencies) {
       try {
         const policy = createSquareOAuthPolicy({ environment: "production", applicationId: permit.applicationId, redirectUri: callbackUri, returnPath });
         const provider = createSquareOAuthCredentialProvider({ policy, applicationId: permit.applicationId, transport: input.transport });
-        const credential = await provider.exchangeAuthorizationCode({
+        const credential = CredentialEnvelopeSchema.parse(await provider.exchangeAuthorizationCode({
           applicationSecret: await input.applicationSecret(acquired.applicationSecretVersionResource!),
           authorizationCode: command.authorizationCode, requestedScopes: acquired.requestedScopes,
           externalAuthorizedEntityReference: permit.expectedMerchantId, now: now()
-        });
+        }));
         const discovery = createSquareAccountDiscovery({ environment: "production", applicationId: permit.applicationId,
           readAuthenticated: request => readSquareAuthenticatedDiscovery({ ...request, transport: input.transport }), clock: now });
         await discovery.verify({ externalAuthorizedEntityReference: permit.expectedMerchantId,

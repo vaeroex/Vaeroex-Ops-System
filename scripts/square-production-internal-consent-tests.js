@@ -18,7 +18,8 @@ const { createInternalOAuth, createInternalBroker, createInternalOAuthHandler, I
 const { createInternalRpc } = require("../services/external-integrations-production/internal-consent/database.ts");
 const { createInternalConsentTransport } = require("../services/external-integrations-production/internal-consent/transport.ts");
 const { ProviderApplicationSecret } = require("../lib/integrations/credentials/secret-manager.ts");
-const { SQUARE_OAUTH_SCOPES } = require("../lib/integrations/providers/square/account-connection-oauth.ts");
+const squareOAuth = require("../lib/integrations/providers/square/account-connection-oauth.ts");
+const { SQUARE_OAUTH_SCOPES } = squareOAuth;
 const id = () => crypto.randomUUID();
 const now = new Date("2026-09-24T12:00:00.000Z");
 const permit = {
@@ -158,6 +159,23 @@ async function main() {
     assert.equal(f.calls.filter(value => value === "commit_credential").length, 0);
     assert.equal(f.network.filter(value => value === "/oauth2/token").length, 1);
   }
+  // The provider interface deliberately returns unknown. Revalidate its result
+  // at the broker boundary before discovery, encryption or a credential commit.
+  const createProvider = squareOAuth.createSquareOAuthCredentialProvider;
+  try {
+    squareOAuth.createSquareOAuthCredentialProvider = options => {
+      const provider = createProvider(options);
+      return { ...provider, async exchangeAuthorizationCode(request) {
+        return { ...await provider.exchangeAuthorizationCode(request), accessToken: null };
+      } };
+    };
+    const malformed = fixture(), state = await authorized(malformed);
+    await assert.rejects(() => malformed.oauth.callback(callback(state)), /provider_exchange_requires_reconciliation/);
+    assert.deepEqual(malformed.network, ["/oauth2/token", "/oauth2/token/status"]);
+    assert.equal(malformed.encrypted.length, 0);
+    assert.equal(malformed.calls.filter(value => value === "commit_credential").length, 0);
+    assert.equal(malformed.calls.filter(value => value === "reconcile_exchange").length, 1);
+  } finally { squareOAuth.createSquareOAuthCredentialProvider = createProvider; }
   const denial = fixture(), deniedState = await authorized(denial);
   assert.deepEqual(await denial.oauth.callback(callback(deniedState, "error=access_denied&error_description=discarded")), { status: "denied" });
   assert.equal(denial.network.length + denial.secrets.length, 0);
