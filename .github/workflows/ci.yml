@@ -144,6 +144,7 @@ jobs:
           node services/external-integrations-production/infra/provisioner/tests/verify-private-access-plan.test.mjs
           node services/external-integrations-production/infra/provisioner/tests/reconcile-private-access.test.mjs
           node services/external-integrations-production/infra/provisioner/tests/apply-reviewed-private-access-plan.test.mjs
+          node services/external-integrations-production/infra/provisioner/tests/run-reviewed-private-access-plan.test.mjs
 
       - name: Verify isolated Square remote Sandbox binding and closed Production gates
         run: |
@@ -614,6 +615,7 @@ jobs:
         run: supabase init --force
 
       - name: Apply migrations to isolated local Postgres
+        id: isolated_database_setup
         run: |
           env -u SUPABASE_INTERNAL_IMAGE_REGISTRY SUPABASE_DB_MIGRATIONS_ENABLED=false supabase db start
           node scripts/prepare-production-shaped-local-database.js
@@ -640,13 +642,20 @@ jobs:
             supabase/tests/external_integrations_phase_8b_credential_lineage_recovery.test.sql \
             supabase/tests/external_integrations_phase_8b_precontract_retirement.test.sql \
             supabase/tests/external_integrations_phase_8b_provider_result_evidence.test.sql \
-            supabase/tests/external_integrations_qbo_production_convergence.test.sql \
-            supabase/tests/square_production_runtime_foundation.test.sql
+            supabase/tests/external_integrations_qbo_production_convergence.test.sql
+
+      # Preserve earlier failures while still collecting independent Square
+      # evidence. Never run these checks without successful disposable setup.
+      - name: Verify Square Production runtime foundation in the isolated database
+        if: ${{ !cancelled() && steps.isolated_database_setup.outcome == 'success' }}
+        run: node scripts/run-isolated-database-tests.js supabase/tests/square_production_runtime_foundation.test.sql
 
       - name: Qualify dormant Square authority and atomic pages in disposable local databases
+        if: ${{ !cancelled() && steps.isolated_database_setup.outcome == 'success' }}
         run: node scripts/run-square-durable-page-qualification.js --supabase-local
 
       - name: Qualify dormant Square account lifecycle in disposable local databases
+        if: ${{ !cancelled() && steps.isolated_database_setup.outcome == 'success' }}
         # Install only in this explicit disposable test job, never application build/Preview.
         run: |
           pnpm exec playwright install --with-deps chromium
@@ -656,24 +665,31 @@ jobs:
         run: node scripts/run-phase8b-zero-based-delivery-migration-tests.js
 
       - name: Qualify remote Sandbox binding in disposable local databases only
+        if: ${{ !cancelled() && steps.isolated_database_setup.outcome == 'success' }}
         run: node scripts/run-square-remote-sandbox-qualification.js --supabase-local
 
       - name: Qualify separate Square broker and runtime authority in disposable databases only
+        if: ${{ !cancelled() && steps.isolated_database_setup.outcome == 'success' }}
         run: node scripts/run-square-broker-runtime-qualification.js --supabase-local
 
       - name: Qualify native GCP callback first-consent authority in disposable databases only
+        if: ${{ !cancelled() && steps.isolated_database_setup.outcome == 'success' }}
         run: node scripts/run-square-gcp-callback-database-qualification.js --supabase-local
 
       - name: Qualify mapped Square native role and recovery boundaries in disposable databases only
+        if: ${{ !cancelled() && steps.isolated_database_setup.outcome == 'success' }}
         run: node scripts/run-square-gcp-mapped-database-qualification.js --supabase-local
 
       - name: Qualify non-economic Square observation admission in disposable databases only
+        if: ${{ !cancelled() && steps.isolated_database_setup.outcome == 'success' }}
         run: node scripts/run-square-observation-database-qualification.js --supabase-local
 
       - name: Qualify the exact Production baseline and dormant Square runtime overlay
+        if: ${{ !cancelled() && steps.isolated_database_setup.outcome == 'success' }}
         run: node scripts/run-square-production-overlay-qualification.js
 
       - name: Qualify the closed Square Production internal-pilot runtime
+        if: ${{ !cancelled() && steps.isolated_database_setup.outcome == 'success' }}
         run: node scripts/run-square-production-internal-pilot-runtime-qualification.js
 
       - name: Remove isolated database state

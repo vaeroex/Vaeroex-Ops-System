@@ -96,8 +96,11 @@ function confirmPrivateAccessClosed(options) {
 
 function verifyEffectiveRevocation(recovery, options) {
   const waitForRevocationPropagation = options.waitForRevocationPropagation ?? defaultWaitForRevocationPropagation;
+  options.onProgress?.("private_access_revocation_wait_started");
   waitForRevocationPropagation(REVOCATION_PROPAGATION_MS);
+  options.onProgress?.("private_access_revocation_wait_completed");
   const verifyEffective = options.verifyEffectivePrivateAccess ?? verifyEffectivePrivateAccess;
+  options.onProgress?.("private_access_effective_revocation_check_started");
   const result = verifyEffective({
     project_id: PROJECT_ID,
     project_number: PROJECT_NUMBER,
@@ -111,10 +114,17 @@ function verifyEffectiveRevocation(recovery, options) {
     ...(options.now ? { now: options.now } : {}),
   });
   if (!effectiveClosedResult(result)) throw new Error("invalid effective revocation result");
+  options.onProgress?.("private_access_effective_revocation_confirmed");
   return result.status;
 }
 
 export function applyReviewedPrivateAccessPlan(planPath, reviewedSha256, options = {}) {
+  const observer = options.onProgress;
+  let receiptFailed = false;
+  options = { ...options, onProgress(label, detail) {
+    try { observer?.(label, detail); }
+    catch { receiptFailed = true; }
+  } };
   const cwd = resolve(options.cwd ?? process.cwd());
   const runTerraform = options.runTerraform ?? defaultTerraformRun;
   const temporaryRoot = options.temporaryRoot ?? tmpdir();
@@ -159,6 +169,7 @@ export function applyReviewedPrivateAccessPlan(planPath, reviewedSha256, options
       reject("private_access_plan_json_invalid");
     }
     const verificationLabel = verifyPrivateAccessPlan(rendered);
+    options.onProgress?.("private_access_plan_verified");
     let reconciliationLabel;
     let effectiveRevocationLabel;
     let recovery;
@@ -187,6 +198,8 @@ export function applyReviewedPrivateAccessPlan(planPath, reviewedSha256, options
       reject("private_access_plan_copy_changed_before_apply");
     }
 
+    options.onProgress?.("private_access_terraform_apply_started");
+    if (receiptFailed) reject("private_access_receipt_failed_before_apply");
     const applied = runTerraform(["apply", "-input=false", immutableCopy], {
       cwd,
       env: terraformEnvironment,
@@ -194,11 +207,20 @@ export function applyReviewedPrivateAccessPlan(planPath, reviewedSha256, options
       maxBuffer: MAX_PLAN_BYTES,
       stdio: ["ignore", "pipe", "pipe"],
     });
+    // Persist the child outcome before checked recovery's ten-minute wait.
+    // Never forward Terraform output or provider error messages to the observer.
+    options.onProgress?.("private_access_terraform_apply_returned", {
+      exitCode: Number.isInteger(applied?.status) ? applied.status : null,
+      processError: applied?.error ? "child_process_error" : null,
+      successful: !applied?.error && applied?.status === 0,
+    });
     if (applied?.error || applied?.status !== 0) {
       const failedTransition = opening ?? closing;
       if (failedTransition) {
         try {
+          options.onProgress?.("private_access_failed_apply_reconciliation_started");
           reconcilePrivateAccess(failedTransition, options);
+          options.onProgress?.("private_access_failed_apply_reconciliation_confirmed");
         } catch {
           reject(opening
             ? "private_access_open_apply_failed_reconciliation_incomplete"
@@ -243,6 +265,9 @@ export function applyReviewedPrivateAccessPlan(planPath, reviewedSha256, options
       }
     }
 
+    // Once apply has run, receipt I/O must not interrupt checked recovery or
+    // closure verification. It also must not turn an unrecorded run into success.
+    if (receiptFailed) reject("private_access_receipt_failed_requires_reconciliation");
     return {
       verificationLabel,
       ...(reconciliationLabel ? { reconciliationLabel } : {}),

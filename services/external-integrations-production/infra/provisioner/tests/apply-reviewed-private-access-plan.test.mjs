@@ -16,6 +16,7 @@ import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 
 import { applyReviewedPrivateAccessPlan } from "../scripts/apply-reviewed-private-access-plan.mjs";
+import { startExecution, readExecution } from "../scripts/run-reviewed-private-access-plan.mjs";
 
 const root = mkdtempSync(join(tmpdir(), "vaeroex-reviewed-apply-test-"));
 const planPath = join(root, "candidate.tfplan");
@@ -501,15 +502,23 @@ const openingJson = Buffer.from(JSON.stringify({
   }))],
 }));
 const failedOpenOrder = [];
+const failedOpenProgress = [];
 assert.throws(() => applyReviewedPrivateAccessPlan(planPath, reviewedSha256, {
   cwd: root,
   temporaryRoot: root,
+  onProgress(label, detail) { failedOpenProgress.push({ label, detail }); },
   reconcilePrivateAccess(tuple) {
     failedOpenOrder.push("reconcile");
     assert.equal(tuple.profile, "oauth");
     return confirmedReconciliation;
   },
-  waitForRevocationPropagation() { failedOpenOrder.push("wait"); },
+  waitForRevocationPropagation(milliseconds) {
+    failedOpenOrder.push("wait");
+    assert.equal(milliseconds, 600_000);
+    assert.deepEqual(failedOpenProgress.find(row => row.label === "private_access_terraform_apply_returned")?.detail,
+      { exitCode: 1, processError: null, successful: false });
+    assert.equal(failedOpenProgress.at(-1).label, "private_access_revocation_wait_started");
+  },
   verifyEffectivePrivateAccess() {
     failedOpenOrder.push("effective");
     return { status: "policy_troubleshooter_closed_all_denied", checked_secrets: "6", checked_versions: "2", checked_tuples: "12" };
@@ -522,6 +531,50 @@ assert.throws(() => applyReviewedPrivateAccessPlan(planPath, reviewedSha256, {
   },
 }), error => error.fixedLabel === "private_access_open_apply_failed_after_effective_revocation");
 assert.deepEqual(failedOpenOrder, ["show", "apply", "reconcile", "wait", "effective"]);
+assert.deepEqual(failedOpenProgress.map(row => row.label), [
+  "private_access_plan_verified", "private_access_terraform_apply_started", "private_access_terraform_apply_returned",
+  "private_access_failed_apply_reconciliation_started", "private_access_failed_apply_reconciliation_confirmed",
+  "private_access_revocation_wait_started", "private_access_revocation_wait_completed",
+  "private_access_effective_revocation_check_started", "private_access_effective_revocation_confirmed",
+]);
+assert.doesNotMatch(JSON.stringify(failedOpenProgress), /raw-apply|raw-provider/);
+
+// A broken outcome/recovery receipt must never bypass the existing safety work.
+for (const brokenStage of failedOpenProgress.slice(2).map(row => row.label)) {
+  const order = [];
+  assert.throws(() => applyReviewedPrivateAccessPlan(planPath, reviewedSha256, {
+    cwd: root, temporaryRoot: root,
+    onProgress(label) { if (label === brokenStage) throw Error("synthetic_receipt_io_failure"); },
+    reconcilePrivateAccess() { order.push("reconcile"); return confirmedReconciliation; },
+    waitForRevocationPropagation(ms) { assert.equal(ms, 600_000); order.push("wait"); },
+    verifyEffectivePrivateAccess() {
+      order.push("effective");
+      return { status: "policy_troubleshooter_closed_all_denied", checked_secrets: "6", checked_versions: "0", checked_tuples: "6" };
+    },
+    runTerraform(args) {
+      order.push(args[0]);
+      return { status: args[0] === "show" ? 0 : 1, stdout: args[0] === "show" ? openingJson : Buffer.alloc(0) };
+    },
+  }), error => error.fixedLabel === "private_access_open_apply_failed_after_effective_revocation", brokenStage);
+  assert.deepEqual(order, ["show", "apply", "reconcile", "wait", "effective"], brokenStage);
+}
+
+let receiptFailureApplies = 0;
+assert.throws(() => applyReviewedPrivateAccessPlan(planPath, reviewedSha256, {
+  cwd: root, temporaryRoot: root,
+  onProgress() { throw Error("synthetic_receipt_io_failure"); },
+  runTerraform(args) {
+    if (args[0] === "apply") receiptFailureApplies++;
+    return { status: 0, stdout: openingJson };
+  },
+}), error => error.fixedLabel === "private_access_receipt_failed_before_apply");
+assert.equal(receiptFailureApplies, 0);
+
+assert.throws(() => applyReviewedPrivateAccessPlan(planPath, reviewedSha256, {
+  cwd: root, temporaryRoot: root,
+  onProgress(label) { if (label === "private_access_terraform_apply_returned") throw Error("synthetic_receipt_io_failure"); },
+  runTerraform(args) { return { status: 0, stdout: args[0] === "show" ? openingJson : Buffer.alloc(0) }; },
+}), error => error.fixedLabel === "private_access_receipt_failed_requires_reconciliation");
 
 const fakeTerraformDirectory = join(root, "fake-terraform-bin");
 mkdirSync(fakeTerraformDirectory, { mode: 0o700 });
@@ -590,6 +643,25 @@ assert.equal(cliResult.stdout.includes("raw-"), false);
 assert.equal(cliResult.stderr.includes("raw-"), false);
 assert.equal(existsSync(join(root, "terraform-cli.log")), false);
 assert.equal(existsSync(join(root, "terraform-cli-protocol-logs")), false);
+
+// Exercise the actual detached supervisor -> reviewed wrapper -> result reader,
+// using only the existing harmless local Terraform executable above.
+const executionDirectory = join(root, "durable-execution");
+const originalPath = process.env.PATH;
+process.env.PATH = `${fakeTerraformDirectory}:${originalPath ?? ""}`;
+try {
+  await startExecution({ planPath, reviewedSha256, directory: executionDirectory,
+    deadlineMs: Date.now() + 5000, cwd: root });
+} finally { process.env.PATH = originalPath; }
+const end = Date.now() + 7000;
+while (!existsSync(join(executionDirectory, "result.json")) && Date.now() < end) {
+  await new Promise(done => setTimeout(done, 20));
+}
+assert.equal(readExecution(executionDirectory).state, "succeeded");
+const durableProgress = readFileSync(join(executionDirectory, "progress.jsonl"), "utf8");
+assert.match(durableProgress, /private_access_terraform_apply_returned/);
+assert.match(durableProgress, /"exitCode":0/);
+assert.doesNotMatch(durableProgress, /raw-|hostile/);
 
 rmSync(root, { recursive: true, force: true });
 process.stdout.write("private_access_single_verified_apply_entrypoint_confirmed\n");
