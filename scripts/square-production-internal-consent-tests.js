@@ -219,7 +219,7 @@ async function main() {
     assert.equal(queries[1][0], `set role square_production_${profile}_authority`);
     assert.equal(queries[2][0], `select public.square_production_internal_${profile}_v1($1::text,$2::jsonb) as value`);
     assert.equal(ended.length, 1);
-    await assert.rejects(() => rpc("read_credential", {}), /operation_denied/);
+    await assert.rejects(() => rpc("create_scan", {}), /operation_denied/);
     assert.equal(ended.length, 1);
   }
   const wrong = createInternalRpc("oauth", async () => ({ async query() { return { rows: [{ login: "postgres", current_login: "postgres" }] }; }, async end() {} }));
@@ -321,12 +321,31 @@ async function main() {
     process.env.VERCEL_ENV = "production";
     global.fetch = async () => new Response(" ".repeat(8193), { status: 200 });
     assert.equal((await pilot.initiateSquareInternalPilot(request())).status, 404, "response_budget_does_not_trust_content_length");
+    let manualCalls = 0;
+    global.fetch = async (url, options) => {
+      manualCalls++;
+      assert.equal(url, "https://square.vaeroex.com/api/integrations/square/connect");
+      assert.equal(options.headers["x-vaeroex-square-action"], "map");
+      assert.equal(options.body, undefined);
+      assert.equal(options.headers.Authorization, `Bearer ${jwtSentinel}`);
+      return Response.json({ status: "mapped", nonEconomic: true });
+    };
+    assert.deepEqual(await (await pilot.executeSquareInternalPilotAction(request(), "map")).json(), { status: "mapped", nonEconomic: true });
+    workspace = id();
+    assert.equal((await pilot.executeSquareInternalPilotAction(request(), "map")).status, 404);
+    workspace = permit.workspaceId;
+    assert.equal((await pilot.executeSquareInternalPilotAction(request(), "scheduler")).status, 404);
+    assert.equal((await pilot.executeSquareInternalPilotAction(request("https://other.example"), "map")).status, 404);
+    assert.equal(manualCalls, 1, "manual_foreign_workspace_origin_and_unknown_action_stop_before_forwarding");
+    global.fetch = async () => Response.json({ status: "mapped", nonEconomic: true, credential: "synthetic_private_value" });
+    assert.equal((await pilot.executeSquareInternalPilotAction(request(), "map")).status, 404, "manual_proxy_rejects_unexpected_private_fields");
   } finally {
     Module._load = load; global.fetch = savedFetch; Date.now = savedNow;
     for (const [name, value] of Object.entries(savedEnvironment)) {
       if (value === undefined) delete process.env[name]; else process.env[name] = value;
     }
   }
+  await require("./square-production-manual-read-tests.js")({ permit, actor, now, fp });
   console.log("Square internal Production consent: real handlers, five exact provider endpoints, encrypted commit, replay/lost-ack, denial/isolation, zero AI: passed");
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

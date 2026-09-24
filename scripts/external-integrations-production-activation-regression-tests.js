@@ -60,8 +60,13 @@ assert.match(variables, /square-callback-edge@sha256:\[a-f0-9\]\{64\}/, "the cal
 assert.match(main, /deployment_inputs_valid/, "runtime and callback-edge artifacts must be deployed together");
 assert.match(main, /callback_edge_source_commit == null/, "a callback edge cannot be deployed without exact source provenance");
 assert.match(main, /oauth_callback_source_commit == null/, "first-stage infrastructure cannot claim an OAuth runtime revision");
-assert.match(main, /value\s*=\s*var\.internal_consent != null && contains\(\["oauth", "broker"\], each\.key\) \? var\.internal_consent\.source_commit : \(each\.key == "oauth" \? var\.oauth_callback_source_commit : var\.source_commit\)/, "internal consent provenance affects only OAuth/broker and preserves the dormant fallback");
-assert.match(main, /image\s*=\s*var\.internal_consent != null && contains\(\["oauth", "broker"\], each\.key\) \? var\.internal_consent\.image_digest : \(each\.key == "oauth" \? var\.oauth_callback_image_digest : var\.bootstrap_image_digest\)/, "internal consent cannot select images for the four deferred profiles");
+assert.match(main, /value\s*=\s*contains\(local\.internal_handler_modes, each\.key\) \? var\.internal_consent\.source_commit : \(each\.key == "oauth" \? var\.oauth_callback_source_commit : var\.source_commit\)/, "manual handlers preserve dormant image provenance");
+assert.match(main, /image\s*=\s*contains\(local\.internal_handler_modes, each\.key\) \? var\.internal_consent\.image_digest : \(each\.key == "oauth" \? var\.oauth_callback_image_digest : var\.bootstrap_image_digest\)/, "manual handlers preserve the dormant fallback");
+assert.match(main, /internal_handler_modes = var\.internal_consent == null \? toset\(\[\]\) : toset\(concat\(\s*\["oauth", "broker"\], var\.internal_consent\.manual_read == null \? \[\] : \["runtime", "evidence"\]\)\)/, "scheduler and webhook remain deferred; runtime/evidence require explicit manual-read configuration");
+assert.match(main, /oauth_runtime\s*= \{ caller = "oauth", target = "runtime" \}/);
+assert.match(main, /oauth_evidence\s*= \{ caller = "oauth", target = "evidence" \}/);
+assert.match(main, /runtime_broker\s*= \{ caller = "runtime", target = "broker" \}/);
+assert.match(variables, /read_database_versions\.runtime == 1 && var\.internal_consent\.read_database_versions\.evidence == 1/, "read profiles use only the existing version-1 grant");
 assert.match(main, /for_each\s*=\s*local\.deployment_enabled \? local\.modes : toset\(\[\]\)/, "the callback-specific image introduces no Cloud Run resource");
 assert.match(main, /"containerscanning\.googleapis\.com"/, "release images require automatic vulnerability scanning");
 
