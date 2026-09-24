@@ -216,3 +216,30 @@ func TestOnlyExactQuerylessHealthAndWebhookPassThrough(t *testing.T) {
 		}
 	}
 }
+
+func TestInternalConnectIsBodylessPostOnly(t *testing.T) {
+	headers := [][2]string{{"authorization", "Bearer SYNTHETIC_SESSION"}, {"content-length", "0"}}
+	if !IsInternalConnectRequest("POST", InternalConnectPath, "", headers) {
+		t.Fatal("exact authenticated initiation envelope must reach backend authority")
+	}
+	for _, input := range []struct {
+		method, path, query string
+		extra               [2]string
+	}{
+		{method: "GET", path: InternalConnectPath},
+		{method: "POST", path: InternalConnectPath, query: "token=synthetic"},
+		{method: "POST", path: InternalConnectPath + "/"},
+		{method: "POST", path: InternalConnectPath, extra: [2]string{"content-length", "1"}},
+		{method: "POST", path: InternalConnectPath, extra: [2]string{"transfer-encoding", "chunked"}},
+		{method: "POST", path: InternalConnectPath, extra: [2]string{"x-forwarded-host", "square.vaeroex.com"}},
+		{method: "POST", path: InternalConnectPath, extra: [2]string{HandoffQueryHeader, "synthetic"}},
+	} {
+		candidate := append([][2]string{}, headers...)
+		if input.extra[0] != "" {
+			candidate = append(candidate, input.extra)
+		}
+		if IsInternalConnectRequest(input.method, input.path, input.query, candidate) {
+			t.Fatal("unapproved initiation envelope accepted")
+		}
+	}
+}

@@ -13,6 +13,22 @@ import (
 
 const validStateFixture = "0123456789_abcdefghijklmnopqrstuvwxyz-ABCDE"
 
+func TestInternalConnectPassesWithoutCallbackHandoff(t *testing.T) {
+	// The pinned proxytest emulator's ProxyGetProperty dereferences data[0]
+	// even for a present empty property. Use the supported '?' empty-query
+	// representation here; callback_test.go covers an actual empty string.
+	// The real SDK GetProperty accepts a zero-length host buffer via unsafe.Slice.
+	host, reset := newCallbackHost("POST", callbackedge.InternalConnectPath, "?")
+	defer reset()
+	contextID := host.InitializeHttpContext()
+	action := host.CallOnRequestHeaders(contextID, [][2]string{
+		{":path", callbackedge.InternalConnectPath}, {"authorization", "Bearer SYNTHETIC_SESSION"}, {"content-length", "0"},
+	}, false)
+	if action != types.ActionContinue || host.GetSentLocalResponse(contextID) != nil {
+		t.Fatal("exact initiation envelope must reach independent backend authentication")
+	}
+}
+
 func TestFiniteDiagnosticIsExactPublicCanaryOnly(t *testing.T) {
 	query := "state=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA&code=VAEROEX_PUBLIC_NEVER_ISSUED_CANARY"
 	host, reset := newCallbackHost("GET", callbackedge.CallbackPath, query)

@@ -60,8 +60,8 @@ assert.match(variables, /square-callback-edge@sha256:\[a-f0-9\]\{64\}/, "the cal
 assert.match(main, /deployment_inputs_valid/, "runtime and callback-edge artifacts must be deployed together");
 assert.match(main, /callback_edge_source_commit == null/, "a callback edge cannot be deployed without exact source provenance");
 assert.match(main, /oauth_callback_source_commit == null/, "first-stage infrastructure cannot claim an OAuth runtime revision");
-assert.match(main, /value\s*=\s*each\.key == "oauth" \? var\.oauth_callback_source_commit : var\.source_commit/, "OAuth source provenance is separate without revising peer services");
-assert.match(main, /image\s*=\s*each\.key == "oauth" \? var\.oauth_callback_image_digest : var\.bootstrap_image_digest/, "only the existing OAuth service selects the callback-specific image");
+assert.match(main, /value\s*=\s*var\.internal_consent != null && contains\(\["oauth", "broker"\], each\.key\) \? var\.internal_consent\.source_commit : \(each\.key == "oauth" \? var\.oauth_callback_source_commit : var\.source_commit\)/, "internal consent provenance affects only OAuth/broker and preserves the dormant fallback");
+assert.match(main, /image\s*=\s*var\.internal_consent != null && contains\(\["oauth", "broker"\], each\.key\) \? var\.internal_consent\.image_digest : \(each\.key == "oauth" \? var\.oauth_callback_image_digest : var\.bootstrap_image_digest\)/, "internal consent cannot select images for the four deferred profiles");
 assert.match(main, /for_each\s*=\s*local\.deployment_enabled \? local\.modes : toset\(\[\]\)/, "the callback-specific image introduces no Cloud Run resource");
 assert.match(main, /"containerscanning\.googleapis\.com"/, "release images require automatic vulnerability scanning");
 
@@ -171,6 +171,8 @@ assert.match(main, /database-version-1-only/);
 assert.match(main, /resource\.name == '\$\{local\.secret_version_names\.application\}'/);
 assert.match(main, /resource\.name == '\$\{local\.secret_version_names\.webhook\}'/);
 assert.match(main, /resource\.name == '\$\{local\.secret_version_names\.database\[each\.key\]\}'/);
+assert.match(main, /mode => "projects\/\$\{data\.google_project\.current\.number\}\/secrets\/\$\{secret_id\}\/versions\/1"/, "existing database IAM remains pinned to version 1");
+assert.match(variables, /var\.internal_consent\.database_versions\.oauth == 1 &&\s*var\.internal_consent\.database_versions\.broker == 1 &&/, "both internal consent database versions must match the existing IAM grant");
 assert.doesNotMatch(main, /resource\s+"google_secret_manager_secret_version"/, "Terraform never handles credential values");
 assert.doesNotMatch(main, /secret_data|password|access_token|refresh_token/i, "Terraform has no credential inputs");
 
@@ -194,7 +196,12 @@ assert.match(main, /max_dispatches_per_second\s*=\s*5/);
 assert.match(main, /max_attempts\s*=\s*8/);
 assert.match(main, /prevent_destroy\s*=\s*true/g);
 assert.doesNotMatch(main, /quickbooks|qbo/i, "activation cannot mutate QBO resources");
-assert.doesNotMatch(main, /supabase|migration|postgres/i, "cloud activation cannot apply database changes");
+const publicAuthKeyMapping = /^[ \t]*supabasePublishableKey = env\.value\.supabase_publishable_key[ \t]*$/gm;
+assert.equal([...main.matchAll(publicAuthKeyMapping)].length, 1, "the reviewed public Auth key mapping occurs exactly once");
+const withoutPublicAuthKey = main.replace(publicAuthKeyMapping, "");
+assert.doesNotMatch(withoutPublicAuthKey, /supabase|migration|postgres/i, "cloud activation cannot apply database changes");
+for (const forbidden of ["supabase_password = value", "resource \"supabase_project\" \"other\" {}", "migration", "postgres"])
+  assert.match(`${withoutPublicAuthKey}\n${forbidden}`, /supabase|migration|postgres/i, "only the exact public Auth key mapping is exempt");
 assert.doesNotMatch(outputs, /secret_data|password|token/i, "outputs remain non-secret");
 
 assert.match(dockerfile, /^FROM gcr\.io\/distroless\/nodejs22-debian13@sha256:[a-f0-9]{64}$/m, "the bootstrap uses an immutable minimal runtime-only base image");
@@ -216,7 +223,7 @@ assert.equal(
 );
 assert.equal(
   createHash("sha256").update(callbackBoundarySource).digest("hex"),
-  "dcad858b2abd699ee64f0b2b566a3d70f818fad2ceb3e2fbeee252efb673a69a",
+  "b3005de72ff5f1d2fa46851462ce458bda5752624c77d5e496a6b244dbbac5bf",
   "every executable callback boundary change requires an explicit reviewed fingerprint update",
 );
 assert.deepEqual(bootstrapPackage.dependencies ?? {}, {}, "the bootstrap has no runtime package dependency that could add compression");

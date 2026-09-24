@@ -20,7 +20,7 @@ assert.match(trigger, /service_account\s*=\s*google_service_account\.build\.id/)
 assert.match(trigger, /filename\s*=\s*"services\/external-integrations-production\/image-build\/cloudbuild\.yaml"/);
 assert.match(trigger, /owner\s*=\s*"vaeroex"[\s\S]*name\s*=\s*"Vaeroex-Ops-System"/);
 assert.match(trigger, /branch\s*=\s*"\^main\$"/);
-for (const scope of ["bootstrap-runtime/\\*\\*", "callback-edge/\\*\\*", "image-build/\\*\\*"]) {
+for (const scope of ["bootstrap-runtime/\\*\\*", "callback-edge/\\*\\*", "image-build/\\*\\*", "internal-consent/\\*\\*"]) {
   assert.match(trigger, new RegExp(`services/external-integrations-production/${scope}`));
 }
 assert.match(trigger, /approval_required\s*=\s*true/);
@@ -51,7 +51,7 @@ assert.match(context, /Object\.keys\(trigger\.substitutions \?\? \{\}\)/);
 assert.match(context, /trigger\.triggerTemplate[\s\S]*trigger\.repositoryEventConfig[\s\S]*trigger\.developerConnectEventConfig[\s\S]*trigger\.sourceToBuild/);
 assert.match(context, /projects\/\$\{POLICY\.projectId\}\/locations\/\$\{POLICY\.location\}\/builds/);
 
-for (const image of ["square-callback-edge", "production-bootstrap"]) {
+for (const image of ["square-callback-edge", "production-bootstrap", "square-internal-consent"]) {
   assert.match(cloudbuild, new RegExp(`${image}:\\$COMMIT_SHA`));
   assert.match(cloudbuild, new RegExp(`${image}@sha256:\\[a-f0-9\\]\\{64\\}`));
 }
@@ -71,7 +71,7 @@ assert.match(scans, /bootstrapException: "CVE-2026-85091"/);
 assert.match(scans, /bootstrapDockerignoreSha256: "1cff3c6b71037eee721261556878d3c6a819175a98ed4336ca8b96d3fc291b44"/);
 assert.match(scans, /bootstrapDockerfileSha256: "a94896fde4c3a4f423b5b09cb7b899809089bd5ee9f8f25ea73e70a022ac8867"/);
 assert.match(scans, /bootstrapServerSha256: "9df82e10ee028ccb895ec4b95452d1a0b635013135821f444f1e7a2fd2f582f0"/);
-assert.match(scans, /bootstrapCallbackBoundarySha256: "dcad858b2abd699ee64f0b2b566a3d70f818fad2ceb3e2fbeee252efb673a69a"/);
+assert.match(scans, /bootstrapCallbackBoundarySha256: "b3005de72ff5f1d2fa46851462ce458bda5752624c77d5e496a6b244dbbac5bf"/);
 assert.match(scans, /runtimeDependenciesEmpty[\s\S]*compressionPathAbsent/);
 assert.match(outputs, /image_build_approval\s*=\s*true[\s\S]*automatic_rollout\s*=\s*false/);
 

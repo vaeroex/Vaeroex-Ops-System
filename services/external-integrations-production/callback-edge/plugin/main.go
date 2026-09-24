@@ -78,7 +78,8 @@ func (*httpContext) OnHttpRequestHeaders(headerCount int, _ bool) (action types.
 	}
 
 	if callbackedge.IsHealthRequest(string(method), string(path), string(rawQuery)) ||
-		callbackedge.IsWebhookRequest(string(method), string(path), string(rawQuery)) {
+		callbackedge.IsWebhookRequest(string(method), string(path), string(rawQuery)) ||
+		callbackedge.IsInternalConnectRequest(string(method), string(path), string(rawQuery), headers) {
 		if !clearReservedHandoffHeaders() {
 			sendFixedResponse(500, "integration callback unavailable")
 			return action

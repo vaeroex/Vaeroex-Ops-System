@@ -14,6 +14,14 @@ const POLICY = Object.freeze({
     "services/external-integrations-production/bootstrap-runtime/**",
     "services/external-integrations-production/callback-edge/**",
     "services/external-integrations-production/image-build/**",
+    "services/external-integrations-production/internal-consent/**",
+    "lib/integrations/contracts/**",
+    "lib/integrations/credentials/**",
+    "lib/integrations/providers/square/**",
+    "scripts/square-production-internal-consent-tests.js",
+    "package.json",
+    "pnpm-lock.yaml",
+    "tsconfig.json",
   ]),
 });
 
