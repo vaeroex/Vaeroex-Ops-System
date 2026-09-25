@@ -12,6 +12,14 @@ const labels = {
   recovery_required: "Connection recovery required"
 } as const;
 
+const syncLabels = {
+  not_started: "No read has started",
+  running: "Read in progress",
+  checkpointed: "Read checkpoint recorded",
+  interrupted: "Read interrupted",
+  recovery_required: "Read recovery required"
+} as const;
+
 /** Only the allowlisted safe view crosses into customer rendering. No freshness inference. */
 export function SquareConnectionPanel({ view }: { view: SquareConnectionView }) {
   const entitiesById = new Map(view.businessEntities.map((entity) => [entity.id, entity]));
@@ -20,7 +28,7 @@ export function SquareConnectionPanel({ view }: { view: SquareConnectionView }) 
       <div>
         <h1 id="square-connection-heading" className="text-2xl font-semibold text-ink">Square connection</h1>
         <p className="mt-2 text-sm text-muted">Authorize an account, confirm its Business Entity and locations, and manage access.</p>
-        <p className="mt-2 text-sm text-muted">Synchronization is not yet qualified. Authorization does not establish complete or current data. Records remain pending and cannot affect accounting.</p>
+        <p className="mt-2 text-sm text-muted">Connection status does not establish current or complete Square data. No revenue, profit, netting, stock, valuation, or accounting claim is made here.</p>
       </div>
       {!view.canManage ? <p role="status">Your workspace role can view connection status but cannot manage access.</p> : null}
       {view.connections.length === 0 ? <p>No Square connection is configured.</p> : null}
@@ -33,6 +41,11 @@ export function SquareConnectionPanel({ view }: { view: SquareConnectionView }) 
           <article key={connection.connectionId} className="space-y-4 rounded-md border border-line p-4">
             <h2 className="text-lg font-semibold text-ink">{connection.sellerLabel ?? "Square account awaiting verification"}</h2>
             <p role="status">{labels[connection.state]}</p>
+            <div aria-label="Square read status" className="space-y-1 text-sm">
+              <p>Read status: {connection.sync ? syncLabels[connection.sync.state] : "Unavailable"}</p>
+              <p>Last verified observation: {connection.sync?.lastVerifiedObservationAt ?? "Unknown"}</p>
+              <p>Historical completeness: Unknown</p>
+            </div>
             <p>Business Entity: {entity?.label ?? "Unavailable"}</p>
             {!connection.retentionApproved ? <p>Approved retention and access policy is required before mapping can be enrolled.</p> : null}
             {connection.revocationPending ? <p role="status">Vaeroex access is disabled. Provider revocation is not confirmed; workspace disconnect does not retry it.</p> : null}
