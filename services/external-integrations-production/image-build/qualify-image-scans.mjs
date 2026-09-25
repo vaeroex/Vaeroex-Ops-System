@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { readFile, stat } from "node:fs/promises";
+import { lstat, readFile, readdir, stat } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 import { fetchBoundedJson, getMetadataAccessToken, POLICY } from "./verify-trigger-context.mjs";
 
@@ -9,6 +9,15 @@ const IMAGE_POLICY = Object.freeze({
   consent: "us-west1-docker.pkg.dev/vaeroex-integrations-prod/vaeroex-integrations-images/square-internal-consent",
   buildBucket: "vaeroex-integrations-prod-build",
   bootstrapException: "CVE-2026-85091",
+  consentException: "CVE-2026-85091",
+  consentZlibPackageVersion: "1:1.3.dfsg+really1.3.1-1",
+  consentDockerfileSha256: "ea2009a1babf8d22eb60bebb73901a0fa44cdcff8ff9d876208173cea45c4c8b",
+  consentReleaseFiles: Object.freeze({
+    "index.js": "af6d149b9fa445de4569fdc468791dafe93e7d43bfd05a6f3285b48e7dc84725",
+    "node_modules/server-only/empty.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "node_modules/server-only/index.js": "2c4720b71eb03e5f75a83d43e6fd83c0446aa172a58a4d6ffbd74ecad72ba7b5",
+    "node_modules/server-only/package.json": "e4b0cc01e2e0349c51c694fa97d8a642eb8322521ca1444b20bd1842594b4339",
+  }),
   bootstrapDockerignoreSha256: "1cff3c6b71037eee721261556878d3c6a819175a98ed4336ca8b96d3fc291b44",
   bootstrapDockerfileSha256: "a94896fde4c3a4f423b5b09cb7b899809089bd5ee9f8f25ea73e70a022ac8867",
   bootstrapServerSha256: "9df82e10ee028ccb895ec4b95452d1a0b635013135821f444f1e7a2fd2f582f0",
@@ -79,12 +88,21 @@ export function evaluateScanOccurrences(kind, occurrences, sourceIntegrity) {
     if (severity === "CRITICAL") reject("critical_vulnerability");
     if (severity === "HIGH") {
       const identifier = vulnerabilityIdentifier(occurrence);
-      const exceptionAllowed = kind === "bootstrap" &&
+      const bootstrapExceptionAllowed = kind === "bootstrap" &&
         identifier === IMAGE_POLICY.bootstrapException &&
         sourceIntegrity?.bootstrapFingerprintsVerified === true &&
         sourceIntegrity?.runtimeDependenciesEmpty === true &&
         sourceIntegrity?.compressionPathAbsent === true;
-      if (!exceptionAllowed) reject("high_vulnerability");
+      const packageIssues = occurrence.vulnerability?.packageIssue;
+      const consentExceptionAllowed = kind === "consent" &&
+        identifier === IMAGE_POLICY.consentException &&
+        sourceIntegrity?.consentDockerfilePinned === true &&
+        sourceIntegrity?.consentReleasePinned === true &&
+        sourceIntegrity?.debianLibzCallPathAbsent === true &&
+        Array.isArray(packageIssues) && packageIssues.length === 1 &&
+        packageIssues[0]?.affectedPackage === "zlib" &&
+        packageIssues[0]?.affectedVersion?.fullName === IMAGE_POLICY.consentZlibPackageVersion;
+      if (!bootstrapExceptionAllowed && !consentExceptionAllowed) reject("high_vulnerability");
       acceptedExceptions.push(identifier);
     }
   }
@@ -181,6 +199,43 @@ export function verifyBootstrapSourceContent({ dockerignore, dockerfile, server,
     runtimeDependenciesEmpty: true,
     compressionPathAbsent: true,
   });
+}
+
+export function verifyConsentReleaseContent({ dockerfile, files }) {
+  if (typeof dockerfile !== "string" || !files || typeof files !== "object" || Array.isArray(files)) reject("consent_release_invalid");
+  const sha256 = (value) => createHash("sha256").update(value).digest("hex");
+  if (sha256(dockerfile) !== IMAGE_POLICY.consentDockerfileSha256) reject("consent_base_changed");
+  const expectedNames = Object.keys(IMAGE_POLICY.consentReleaseFiles).sort();
+  if (JSON.stringify(Object.keys(files).sort()) !== JSON.stringify(expectedNames)) reject("consent_release_files_changed");
+  for (const name of expectedNames) {
+    if (!Buffer.isBuffer(files[name]) || sha256(files[name]) !== IMAGE_POLICY.consentReleaseFiles[name]) {
+      reject("consent_release_bytes_changed");
+    }
+  }
+  const bundle = files["index.js"].toString("utf8");
+  if (/\b(gzwrite|gzprintf|gzvprintf|gz_vacate|dlopen|ffi-napi|node-ffi|libz\.so|node:zlib|createGzip|createDeflate)\b|\.node\b/i.test(bundle)) {
+    reject("consent_native_compression_path");
+  }
+  return Object.freeze({ consentDockerfilePinned: true, consentReleasePinned: true, debianLibzCallPathAbsent: true });
+}
+
+async function verifyConsentRelease() {
+  const base = "/workspace/services/external-integrations-production/internal-consent";
+  const files = Object.create(null);
+  async function walk(directory, prefix = "") {
+    for (const entry of await readdir(directory)) {
+      const relative = prefix ? `${prefix}/${entry}` : entry;
+      const location = `${directory}/${entry}`;
+      const metadata = await lstat(location);
+      if (metadata.isDirectory()) await walk(location, relative);
+      else if (metadata.isFile() && metadata.size <= 1024 * 1024 && Object.keys(files).length < 5) {
+        files[relative] = await readFile(location);
+      } else reject("consent_release_files_changed");
+    }
+  }
+  if (!(await lstat(`${base}/dist`)).isDirectory()) reject("consent_release_files_changed");
+  await walk(`${base}/dist`);
+  return verifyConsentReleaseContent({ dockerfile: await readSmallFile(`${base}/Dockerfile`, 4096), files });
 }
 
 async function verifyBootstrapSource() {
@@ -281,11 +336,12 @@ async function uploadCandidate(manifest, accessToken, fetchImpl = fetch) {
 }
 
 export async function qualifyPublishedImages({ buildId, sourceCommit, fetchImpl = fetch }) {
-  const [callbackText, bootstrapText, consentText, sourceIntegrity, accessToken] = await Promise.all([
+  const [callbackText, bootstrapText, consentText, sourceIntegrity, consentIntegrity, accessToken] = await Promise.all([
     readDigestFile("/workspace/callback-edge.digest"),
     readDigestFile("/workspace/bootstrap-runtime.digest"),
     readDigestFile("/workspace/internal-consent.digest"),
     verifyBootstrapSource(),
+    verifyConsentRelease(),
     getMetadataAccessToken(fetchImpl),
   ]);
   const callback = parseDigestReference(callbackText, IMAGE_POLICY.callback);
@@ -294,7 +350,7 @@ export async function qualifyPublishedImages({ buildId, sourceCommit, fetchImpl 
   const [callbackScan, bootstrapScan, consentScan] = await Promise.all([
     waitForCompletedScan("callback", callback, null, accessToken, fetchImpl),
     waitForCompletedScan("bootstrap", bootstrap, sourceIntegrity, accessToken, fetchImpl),
-    waitForCompletedScan("consent", consent, null, accessToken, fetchImpl),
+    waitForCompletedScan("consent", consent, consentIntegrity, accessToken, fetchImpl),
   ]);
   const manifest = buildCandidateManifest({ buildId, sourceCommit, callback, bootstrap, consent, callbackScan, bootstrapScan, consentScan });
   const candidate = await uploadCandidate(manifest, accessToken, fetchImpl);

@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { execFile } from "node:child_process";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import { createRequire } from "node:module";
 import test from "node:test";
+import { promisify } from "node:util";
 import {
   buildCandidateManifest,
   evaluateScanOccurrences,
@@ -10,6 +15,7 @@ import {
   scanEvidenceFingerprint,
   waitForCompletedScan,
   verifyBootstrapSourceContent,
+  verifyConsentReleaseContent,
 } from "./qualify-image-scans.mjs";
 import { POLICY } from "./verify-trigger-context.mjs";
 
@@ -21,6 +27,11 @@ const integrity = Object.freeze({
   bootstrapFingerprintsVerified: true,
   runtimeDependenciesEmpty: true,
   compressionPathAbsent: true,
+});
+const consentIntegrity = Object.freeze({
+  consentDockerfilePinned: true,
+  consentReleasePinned: true,
+  debianLibzCallPathAbsent: true,
 });
 
 test("fingerprints every executable bootstrap module and keeps compression unreachable", async () => {
@@ -60,6 +71,35 @@ const vulnerability = (severity, identifier, resourceUri = callback.resourceUrl)
   noteName: `projects/goog-vulnz/notes/${identifier}`,
   vulnerability: { effectiveSeverity: severity },
 }, resourceUri);
+const consentZlibHigh = (resourceUri) => occurrence("VULNERABILITY", {
+  noteName: `projects/goog-vulnz/notes/${IMAGE_POLICY.consentException}`,
+  vulnerability: {
+    effectiveSeverity: "HIGH",
+    packageIssue: [{ affectedPackage: "zlib", affectedVersion: { fullName: IMAGE_POLICY.consentZlibPackageVersion } }],
+  },
+}, resourceUri);
+
+test("consent exception binds the exact pinned base and four-file release, with no native path", async () => {
+  const base = new URL("../internal-consent/", import.meta.url);
+  const dockerfile = await readFile(new URL("Dockerfile", base), "utf8");
+  const release = await mkdtemp(join(tmpdir(), "square-consent-scan-test-"));
+  try {
+    await promisify(execFile)("pnpm", ["exec", "ncc", "build", new URL("entry.ts", base).pathname,
+      "-o", release, "--no-cache", "--transpile-only", "--external", "server-only"]);
+    const serverOnly = dirname(createRequire(import.meta.url).resolve("server-only"));
+    const files = {};
+    for (const name of Object.keys(IMAGE_POLICY.consentReleaseFiles)) {
+      files[name] = await readFile(name === "index.js" ? join(release, name) : join(serverOnly, name.split("/").at(-1)));
+    }
+    assert.deepEqual(verifyConsentReleaseContent({ dockerfile, files }), consentIntegrity);
+    assert.throws(() => verifyConsentReleaseContent({ dockerfile: dockerfile + "\n", files }), /consent_base_changed/);
+    assert.throws(() => verifyConsentReleaseContent({ dockerfile, files: { ...files, "extra.node": Buffer.alloc(0) } }), /consent_release_files_changed/);
+    assert.throws(() => verifyConsentReleaseContent({ dockerfile, files: Object.fromEntries([...Object.entries(files), ["__proto__", Buffer.alloc(0)]]) }), /consent_release_files_changed/);
+    assert.throws(() => verifyConsentReleaseContent({ dockerfile, files: { ...files, "index.js": Buffer.concat([files["index.js"], Buffer.from(" ")]) } }), /consent_release_bytes_changed/);
+  } finally {
+    await rm(release, { recursive: true, force: true });
+  }
+});
 
 test("accepts only exact immutable image references", () => {
   assert.deepEqual(callback, {
@@ -93,6 +133,25 @@ test("requires a completed scan and rejects secrets, criticals and callback high
     bootstrapFingerprintsVerified: true, runtimeDependenciesEmpty: true, compressionPathAbsent: true
   }), /high_vulnerability/, "internal consent can never borrow the bootstrap compression exception");
   assert.throws(() => evaluateScanOccurrences("consent", [discovery(), occurrence("SECRET")], null), /secret_finding/);
+});
+
+test("consent permits only its independently pinned Debian zlib finding", () => {
+  const consent = parseDigestReference(`${IMAGE_POLICY.consent}@sha256:${"d".repeat(64)}`, IMAGE_POLICY.consent);
+  const completed = discovery(consent.resourceUrl);
+  const high = consentZlibHigh(consent.resourceUrl);
+  assert.deepEqual(evaluateScanOccurrences("consent", [completed, high], consentIntegrity).acceptedExceptions, [IMAGE_POLICY.consentException]);
+  for (const badIntegrity of [null, integrity, {}, { ...consentIntegrity, debianLibzCallPathAbsent: false }]) {
+    assert.throws(() => evaluateScanOccurrences("consent", [completed, high], badIntegrity), /high_vulnerability/);
+  }
+  for (const bad of [
+    vulnerability("HIGH", "CVE-2099-2", consent.resourceUrl),
+    { ...high, vulnerability: { ...high.vulnerability, packageIssue: [{ affectedPackage: "not-zlib", affectedVersion: { fullName: IMAGE_POLICY.consentZlibPackageVersion } }] } },
+    { ...high, vulnerability: { ...high.vulnerability, packageIssue: [{ affectedPackage: "zlib", affectedVersion: { fullName: "changed" } }] } },
+  ]) assert.throws(() => evaluateScanOccurrences("consent", [completed, bad], consentIntegrity), /high_vulnerability/);
+  assert.throws(() => evaluateScanOccurrences("consent", [completed, high, high], consentIntegrity), /duplicate_vulnerability_exception/);
+  assert.throws(() => evaluateScanOccurrences("consent", [completed, high, vulnerability("HIGH", "CVE-2099-4", consent.resourceUrl)], consentIntegrity), /high_vulnerability/);
+  assert.throws(() => evaluateScanOccurrences("consent", [completed, high, occurrence("SECRET", {}, consent.resourceUrl)], consentIntegrity), /secret_finding/);
+  assert.throws(() => evaluateScanOccurrences("consent", [completed, high, vulnerability("CRITICAL", "CVE-2099-3", consent.resourceUrl)], consentIntegrity), /critical_vulnerability/);
 });
 
 test("ignores foreign discovery completion and rejects ambiguous or foreign vulnerability evidence", () => {
