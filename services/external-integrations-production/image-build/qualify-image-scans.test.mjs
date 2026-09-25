@@ -78,6 +78,13 @@ const consentZlibHigh = (resourceUri) => occurrence("VULNERABILITY", {
     packageIssue: [{ affectedPackage: "zlib", affectedVersion: { fullName: IMAGE_POLICY.consentZlibPackageVersion } }],
   },
 }, resourceUri);
+const originLoaderFinding = (identifier, resourceUri) => occurrence("VULNERABILITY", {
+  noteName: `projects/goog-vulnz/notes/${identifier}`,
+  vulnerability: {
+    shortDescription: identifier,
+    packageIssue: [{ affectedPackage: "glibc", affectedVersion: { fullName: IMAGE_POLICY.originLoaderGlibcVersion } }],
+  },
+}, resourceUri);
 
 test("consent exception binds the exact pinned base and four-file release, with no native path", async () => {
   const base = new URL("../internal-consent/", import.meta.url);
@@ -152,6 +159,55 @@ test("consent permits only its independently pinned Debian zlib finding", () => 
   assert.throws(() => evaluateScanOccurrences("consent", [completed, high, vulnerability("HIGH", "CVE-2099-4", consent.resourceUrl)], consentIntegrity), /high_vulnerability/);
   assert.throws(() => evaluateScanOccurrences("consent", [completed, high, occurrence("SECRET", {}, consent.resourceUrl)], consentIntegrity), /secret_finding/);
   assert.throws(() => evaluateScanOccurrences("consent", [completed, high, vulnerability("CRITICAL", "CVE-2099-3", consent.resourceUrl)], consentIntegrity), /critical_vulnerability/);
+});
+
+test("only the two observed unscored loader CVEs on exact Node image digests have a narrow exception", () => {
+  const images = [
+    ["bootstrap", parseDigestReference(IMAGE_POLICY.originLoaderImages.bootstrap, IMAGE_POLICY.bootstrap), integrity],
+    ["consent", parseDigestReference(IMAGE_POLICY.originLoaderImages.consent, IMAGE_POLICY.consent), consentIntegrity],
+  ];
+  for (const [kind, image, sourceIntegrity] of images) {
+    const completed = discovery(image.resourceUrl);
+    const findings = IMAGE_POLICY.originLoaderCves.map((id) => originLoaderFinding(id, image.resourceUrl));
+    const result = evaluateScanOccurrences(kind, [completed, ...findings], sourceIntegrity, image);
+    assert.deepEqual(result.acceptedExceptions, IMAGE_POLICY.originLoaderCves);
+    assert.equal(result.severityCounts.SEVERITY_UNSPECIFIED, 2);
+    assert.throws(() => evaluateScanOccurrences(kind, [completed, ...findings], sourceIntegrity), /scan_severity_unknown/);
+    assert.throws(() => evaluateScanOccurrences(kind, [completed, ...findings], sourceIntegrity,
+      { ...image, reference: image.reference.replace(/.$/, "0") }), /scan_severity_unknown/);
+    assert.throws(() => evaluateScanOccurrences(kind, [completed, ...findings], sourceIntegrity,
+      { ...image, resourceUrl: "https://different.invalid/image" }), /scan_severity_unknown/);
+    assert.throws(() => evaluateScanOccurrences(kind, [completed, ...findings], null, image), /scan_severity_unknown/);
+    assert.throws(() => evaluateScanOccurrences(kind, [completed,
+      originLoaderFinding("CVE-2099-99999", image.resourceUrl)], sourceIntegrity, image), /scan_severity_unknown/);
+    assert.throws(() => evaluateScanOccurrences(kind, [completed,
+      { ...findings[0], noteName: "projects/goog-vulnz/notes/other" }], sourceIntegrity, image),
+    /scan_severity_unknown/);
+    assert.throws(() => evaluateScanOccurrences(kind, [completed,
+      { ...findings[0], vulnerability: { ...findings[0].vulnerability,
+        packageIssue: [{ affectedPackage: "not-glibc", affectedVersion: { fullName: IMAGE_POLICY.originLoaderGlibcVersion } }] } }],
+    sourceIntegrity, image), /scan_severity_unknown/);
+    assert.throws(() => evaluateScanOccurrences(kind, [completed,
+      { ...findings[0], vulnerability: { ...findings[0].vulnerability,
+        packageIssue: [{ affectedPackage: "glibc", affectedVersion: { fullName: "changed" } }] } }],
+    sourceIntegrity, image), /scan_severity_unknown/);
+    for (const explicit of ["SEVERITY_UNSPECIFIED", "UNSPECIFIED"]) {
+      assert.throws(() => evaluateScanOccurrences(kind, [completed,
+        { ...findings[0], vulnerability: { ...findings[0].vulnerability, severity: explicit } }],
+      sourceIntegrity, image), /scan_severity_unknown/);
+    }
+    assert.throws(() => evaluateScanOccurrences(kind, [completed,
+      { ...findings[0], vulnerability: { ...findings[0].vulnerability, severity: "toString" } }],
+    sourceIntegrity, image), /scan_severity_unknown/);
+    assert.throws(() => evaluateScanOccurrences(kind, [completed, findings[0], findings[0]], sourceIntegrity, image),
+      /duplicate_vulnerability_exception/);
+    assert.throws(() => evaluateScanOccurrences(kind, [completed,
+      { ...findings[0], vulnerability: { ...findings[0].vulnerability, effectiveSeverity: "CRITICAL" } }],
+    sourceIntegrity, image), /critical_vulnerability/);
+  }
+  const callbackFinding = originLoaderFinding(IMAGE_POLICY.originLoaderCves[0], callback.resourceUrl);
+  assert.throws(() => evaluateScanOccurrences("callback", [discovery(), callbackFinding], null, callback),
+    /scan_severity_unknown/);
 });
 
 test("ignores foreign discovery completion and rejects ambiguous or foreign vulnerability evidence", () => {
