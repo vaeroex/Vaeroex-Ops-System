@@ -11,6 +11,10 @@ const IMAGE_POLICY = Object.freeze({
   bootstrapException: "CVE-2026-85091",
   consentException: "CVE-2026-85091",
   consentZlibPackageVersion: "1:1.3.dfsg+really1.3.1-1",
+  // Exact merged image filesystems: 1,303 bootstrap and 1,304 consent regular
+  // files, zero setuid/setgid bits in either. Both run fixed Node entrypoints
+  // as nonroot with no declared volumes; the two $ORIGIN loader CVEs have no
+  // privileged executable to reach. See PR #430 for the bounded evidence.
   originLoaderCves: Object.freeze(["CVE-2026-86805", "CVE-2026-95818"]),
   originLoaderGlibcVersion: "2.41-12+deb13u4",
   originLoaderImages: Object.freeze({
