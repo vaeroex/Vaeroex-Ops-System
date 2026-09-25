@@ -25,8 +25,14 @@ Synthetic tests prove these new handlers, not a completed real consent.
    The existing repository-bound trigger builds this exact third image from
    approved main with the unchanged builder identity, frozen dependency lock
    and existing candidate staging path. It requires completed scans; this
-   image rejects every HIGH/CRITICAL finding including the bootstrap's zlib
-   exception. Independent secret scanning and a reviewed digest pin remain
+   image still rejects every CRITICAL and every unrelated HIGH finding. A
+   separate consent-only exception for `CVE-2026-85091` is gated on the exact
+   Debian zlib package/version, pinned distroless base Dockerfile and four
+   reviewed release-file hashes. The reviewed bundle has no native addon,
+   dynamic-library loader or zlib call path; its Node process does not load
+   Debian `libz.so`. This does not reuse the bootstrap exception. Any release
+   byte or base change fails the exception and needs renewed review.
+   Independent exact-digest secret scanning and a reviewed digest pin remain
    mandatory before eligibility. No automatic rollout or alternate submission
    path is introduced.
 4. The optional `internal_consent` Terraform input switches only existing
