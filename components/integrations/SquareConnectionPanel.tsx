@@ -1,4 +1,4 @@
-import type { SquareConnectionView } from "@/lib/integrations/providers/square/account-connection-contracts";
+import type { SquareConnectionStatusView } from "@/lib/integrations/control-plane/square-connection-status-view";
 import { SQUARE_CUSTOMER_API_PATH } from "@/lib/integrations/control-plane/square-customer-routes";
 
 const labels = {
@@ -21,7 +21,7 @@ const syncLabels = {
 } as const;
 
 /** Only the allowlisted safe view crosses into customer rendering. No freshness inference. */
-export function SquareConnectionPanel({ view }: { view: SquareConnectionView }) {
+export function SquareConnectionPanel({ view }: { view: SquareConnectionStatusView }) {
   const entitiesById = new Map(view.businessEntities.map((entity) => [entity.id, entity]));
   return (
     <section className="space-y-6" aria-labelledby="square-connection-heading">

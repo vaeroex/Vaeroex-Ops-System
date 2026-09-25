@@ -56,14 +56,7 @@ export const SquareConnectionViewSchema = z.object({
     locations: z.array(z.object({ id: ProviderIdSchema, label: DisplayLabelSchema }).strict()).max(500),
     mappedLocationIds: z.array(ProviderIdSchema).max(500),
     retentionApproved: z.boolean(),
-    revocationPending: z.boolean(),
-    // Optional until a workspace-authorized checkpoint reader is installed.
-    // Absence is unknown, never evidence that a scan completed or is current.
-    sync: z.object({
-      state: z.enum(["not_started", "running", "checkpointed", "interrupted", "recovery_required"]),
-      lastVerifiedObservationAt: IsoTimestampSchema.nullable(),
-      historicalCompleteness: z.literal("unknown")
-    }).strict().optional()
+    revocationPending: z.boolean()
   }).strict()).max(32)
 }).strict();
 export type SquareConnectionView = Readonly<z.infer<typeof SquareConnectionViewSchema>>;

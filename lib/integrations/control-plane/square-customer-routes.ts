@@ -2,11 +2,13 @@ import { z } from "zod";
 import squareHandoffPolicy from "@/lib/integrations/control-plane/square-customer-handoff-policy.json";
 import {
   SquareConnectionActorSchema,
-  SquareConnectionViewSchema,
   type SquareConnectionActor,
-  type SquareConnectionService,
-  type SquareConnectionView
+  type SquareConnectionService
 } from "@/lib/integrations/providers/square/account-connection-contracts";
+import {
+  SquareConnectionStatusViewSchema,
+  type SquareConnectionStatusView
+} from "@/lib/integrations/control-plane/square-connection-status-view";
 import { parseSquareOAuthCallback } from "@/lib/integrations/providers/square/account-connection-oauth";
 import { SQUARE_REMOTE_SANDBOX } from "@/lib/integrations/control-plane/square-remote-sandbox-contracts";
 import { SQUARE_OAUTH_SCOPES } from "@/lib/integrations/providers/square/account-connection-oauth";
@@ -224,8 +226,8 @@ function customerHandlers(dependencies: Readonly<{
     const actor = SquareConnectionActorSchema.parse(await authenticate(request));
     return Object.freeze(actor);
   };
-  const viewFor = async (actor: SquareConnectionActor): Promise<SquareConnectionView> => {
-    const view = SquareConnectionViewSchema.parse(await service.snapshot(actor));
+  const viewFor = async (actor: SquareConnectionActor): Promise<SquareConnectionStatusView> => {
+    const view = SquareConnectionStatusViewSchema.parse(await service.snapshot(actor));
     return { ...view, canManage: view.canManage && managementRoles.has(actor.role) };
   };
   return Object.freeze({

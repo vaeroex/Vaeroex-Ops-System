@@ -27,12 +27,12 @@ import {
 } from "@/lib/integrations/providers/square/account-connection-broker";
 import {
   SquareAccountContextSchema,
-  SquareConnectionViewSchema,
   type SquareAccountContext,
   type SquareConnectionActor,
   type SquareConnectionService,
   type SquareConnectionView
 } from "@/lib/integrations/providers/square/account-connection-contracts";
+import { SquareConnectionStatusViewSchema } from "@/lib/integrations/control-plane/square-connection-status-view";
 import {
   createSquareOAuthCredentialProvider,
   createSquareOAuthPolicy,
@@ -245,7 +245,7 @@ export function createSquareAccountConnectionService(input: Readonly<{
       try {
         // The shared RPC applies the derived full view bound before this schema.
         const value = await squareAccountRpc(client, contextFor(actor), "status", {});
-        SquareConnectionViewSchema.parse(value);
+        SquareConnectionStatusViewSchema.parse(value);
         return value as SquareConnectionView;
       } catch { return denied(); }
     },
