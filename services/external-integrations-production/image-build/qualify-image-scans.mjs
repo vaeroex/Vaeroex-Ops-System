@@ -11,6 +11,12 @@ const IMAGE_POLICY = Object.freeze({
   bootstrapException: "CVE-2026-85091",
   consentException: "CVE-2026-85091",
   consentZlibPackageVersion: "1:1.3.dfsg+really1.3.1-1",
+  originLoaderCves: Object.freeze(["CVE-2026-86805", "CVE-2026-95818"]),
+  originLoaderGlibcVersion: "2.41-12+deb13u4",
+  originLoaderImages: Object.freeze({
+    bootstrap: "us-west1-docker.pkg.dev/vaeroex-integrations-prod/vaeroex-integrations-images/production-bootstrap@sha256:d8fa941a4371c08f2d73d9832846dbde32925ffbece1013f3ce7f872e634d205",
+    consent: "us-west1-docker.pkg.dev/vaeroex-integrations-prod/vaeroex-integrations-images/square-internal-consent@sha256:966b3f0fbe4ac98b11549987df9c57d8f2f0acf98b4e9f10420399dd8991fb44",
+  }),
   consentDockerfileSha256: "ea2009a1babf8d22eb60bebb73901a0fa44cdcff8ff9d876208173cea45c4c8b",
   consentReleaseFiles: Object.freeze({
     "index.js": "af6d149b9fa445de4569fdc468791dafe93e7d43bfd05a6f3285b48e7dc84725",
@@ -57,7 +63,7 @@ function vulnerabilityIdentifier(occurrence) {
   return null;
 }
 
-export function evaluateScanOccurrences(kind, occurrences, sourceIntegrity) {
+export function evaluateScanOccurrences(kind, occurrences, sourceIntegrity, image = null) {
   if (!["callback", "bootstrap", "consent"].includes(kind)) reject("image_kind");
   if (!Array.isArray(occurrences)) reject("scan_shape");
   if (occurrences.some((entry) => !entry || typeof entry !== "object")) reject("scan_shape");
@@ -82,8 +88,33 @@ export function evaluateScanOccurrences(kind, occurrences, sourceIntegrity) {
     if (typeof occurrence.noteName !== "string" || !occurrence.noteName.startsWith(IMAGE_POLICY.vulnerabilityNotePrefix)) {
       reject("vulnerability_source_invalid");
     }
-    const severity = occurrence.vulnerability?.effectiveSeverity ?? occurrence.vulnerability?.severity ?? "UNSPECIFIED";
-    if (!(severity in severityCounts)) reject("scan_severity_unknown");
+    const severity = occurrence.vulnerability?.effectiveSeverity ?? occurrence.vulnerability?.severity ?? null;
+    if (severity === null || severity === "SEVERITY_UNSPECIFIED" || severity === "UNSPECIFIED") {
+      const identifier = vulnerabilityIdentifier(occurrence);
+      const packageIssues = occurrence.vulnerability?.packageIssue;
+      const sourcePinned = kind === "bootstrap"
+        ? sourceIntegrity?.bootstrapFingerprintsVerified === true &&
+          sourceIntegrity?.runtimeDependenciesEmpty === true &&
+          sourceIntegrity?.compressionPathAbsent === true
+        : kind === "consent" &&
+          sourceIntegrity?.consentDockerfilePinned === true &&
+          sourceIntegrity?.consentReleasePinned === true &&
+          sourceIntegrity?.debianLibzCallPathAbsent === true;
+      const exactOriginLoaderFinding = severity === null &&
+        image?.reference === IMAGE_POLICY.originLoaderImages[kind] &&
+        image?.resourceUrl === `https://${image.reference}` &&
+        IMAGE_POLICY.originLoaderCves.includes(identifier) && sourcePinned &&
+        occurrence.noteName === `projects/goog-vulnz/notes/${identifier}` &&
+        Array.isArray(packageIssues) && packageIssues.length === 1 &&
+        packageIssues[0]?.affectedPackage === "glibc" &&
+        packageIssues[0]?.affectedVersion?.fullName === IMAGE_POLICY.originLoaderGlibcVersion &&
+        packageIssues[0]?.effectiveSeverity == null;
+      if (!exactOriginLoaderFinding) reject("scan_severity_unknown");
+      severityCounts.SEVERITY_UNSPECIFIED += 1;
+      acceptedExceptions.push(identifier);
+      continue;
+    }
+    if (!Object.hasOwn(severityCounts, severity)) reject("scan_severity_unknown");
     severityCounts[severity] += 1;
     if (severity === "CRITICAL") reject("critical_vulnerability");
     if (severity === "HIGH") {
@@ -106,7 +137,7 @@ export function evaluateScanOccurrences(kind, occurrences, sourceIntegrity) {
       acceptedExceptions.push(identifier);
     }
   }
-  if (acceptedExceptions.length > 1) reject("duplicate_vulnerability_exception");
+  if (acceptedExceptions.length !== new Set(acceptedExceptions).size) reject("duplicate_vulnerability_exception");
 
   return Object.freeze({
     discoveryCount: discovery.length,
@@ -291,7 +322,7 @@ export async function waitForCompletedScan(
   while (now() < deadline) {
     const occurrences = await listOccurrences(image.resourceUrl, accessToken, fetchImpl);
     try {
-      const result = evaluateScanOccurrences(kind, occurrences, sourceIntegrity);
+      const result = evaluateScanOccurrences(kind, occurrences, sourceIntegrity, image);
       const fingerprint = scanEvidenceFingerprint(occurrences);
       if (fingerprint === previousFingerprint) {
         stableReadCount += 1;
