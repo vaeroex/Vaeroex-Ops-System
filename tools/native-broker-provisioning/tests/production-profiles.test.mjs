@@ -24,8 +24,8 @@ test("customer native contract pins exactly the candidate and its eight function
   assert.equal((contract.sql.match(/\('[^']+','[a-f0-9]{64}'\)/g)||[]).length,8);
   assert.match(contract.sql,/count\(\*\)=4 FROM pg_class/);
   assert.match(contract.sql,/r\.relpersistence='p'/);
-  assert.match(contract.sql,/NOT r\.relhasrules/);
   assert.match(contract.sql,/pg_rewrite WHERE ev_class=r\.oid/);
+  assert.doesNotMatch(contract.sql,/NOT r\.relhasrules/);
   for (const field of ["p.provolatile", "p.proisstrict", "p.proparallel", "p.proargnames", "p.pronargdefaults", "l.lanname"]) {
     assert.ok(contract.sql.includes(field), `customer executable ABI includes ${field}`);
   }
