@@ -105,9 +105,21 @@ main().catch(error => {
     'customer_ci_fixture_only']);
   // Only literal, source-reviewed exception labels from this disposable test
   // may be reported. Never print query/context, PostgreSQL detail or raw errors.
-  const labels = new Set([...fs.readFileSync(path.join(customerDirectory,customerFile),'utf8')
-    .matchAll(/raise exception '([a-z_]+)'/g)].map(match => match[1]));
-  const label = labels.has(error?.message) ? error.message : 'unclassified';
+  const labels = new Set([
+    path.join(customerDirectory,customerFile),
+    path.join(root,'supabase/migrations/20260902191325_square_production_internal_pilot_runtime.sql'),
+    path.join(root,'supabase/tests/square_production_customer_connection.test.sql')
+  ].flatMap(file => [...fs.readFileSync(file,'utf8').matchAll(/raise exception '([a-z_]+)'/g)]
+    .map(match => match[1])));
+  const permissionLabels = [
+    [/^permission denied to set session authorization(?:\s|$)/,'fixture_session_authorization_denied'],
+    [/^permission denied for schema private$/,'private_schema_permission_denied'],
+    [/^permission denied for schema public$/,'public_schema_permission_denied'],
+    [/^permission denied for table /,'table_permission_denied'],
+    [/^must be superuser to /,'fixture_superuser_operation_denied']
+  ];
+  const label = labels.has(error?.message) ? error.message :
+    permissionLabels.find(([pattern]) => pattern.test(error?.message || ''))?.[1] || 'unclassified';
   const code = /^[0-9A-Z]{5}$/.test(error?.code || '') ? error.code : 'unknown';
   console.error(fixed.has(error?.message) ? error.message : `customer_qualification_failed:${code}:${label}`);
   process.exitCode = 1;

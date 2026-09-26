@@ -22,18 +22,18 @@ run "customer_consent_selects_exact_customer_runtime_configuration" {
   assert {
     condition = alltrue([for mode in ["oauth", "broker"] :
       toset(keys(jsondecode([for env in google_cloud_run_v2_service.square[mode].template[0].containers[0].env :
-        env.value if env.name == "SQUARE_INTERNAL_CONSENT_CONFIGURATION"][0]))) ==
+      env.value if env.name == "SQUARE_INTERNAL_CONSENT_CONFIGURATION"][0]))) ==
       toset(["mode", "profile", "applicationId", "databaseVersion", "databaseCa", "brokerOrigin"]) &&
       jsondecode([for env in google_cloud_run_v2_service.square[mode].template[0].containers[0].env :
-        env.value if env.name == "SQUARE_INTERNAL_CONSENT_CONFIGURATION"][0]).mode == "customer_owner_v1"])
+    env.value if env.name == "SQUARE_INTERNAL_CONSENT_CONFIGURATION"][0]).mode == "customer_owner_v1"])
     error_message = "Customer mode must serialize exactly the strict customer runtime schema, without an internal permit or publishable key."
   }
   assert {
-    condition = alltrue([for mode in ["runtime", "evidence", "scheduler", "webhook"] :
+    condition = (alltrue([for mode in ["runtime", "evidence", "scheduler", "webhook"] :
       google_cloud_run_v2_service.square[mode].template[0].containers[0].image == var.bootstrap_image_digest]) &&
       length(google_cloud_run_v2_service_iam_member.manual_read_invoker) == 0 &&
       !var.runtime_enabled && !var.provider_calls_enabled && !var.customer_onboarding_enabled &&
-      !var.webhook_intake_enabled && !var.economic_contributions_enabled && !var.ai_dispatch_enabled
+    !var.webhook_intake_enabled && !var.economic_contributions_enabled && !var.ai_dispatch_enabled)
     error_message = "Customer consent configuration must retain peer dormancy and all closed general gates."
   }
 }

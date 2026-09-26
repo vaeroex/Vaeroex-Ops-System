@@ -669,6 +669,10 @@ password_encryption='scram-sha-256'
     check(/^[a-f0-9]{64}$/.test(catalogHash), "customer_catalog_digest_shape");
     process.stdout.write(JSON.stringify({ outcome: "customer_catalog_source_fingerprint", sha256: catalogHash }) + "\n");
     check(catalogHash === customerModule.customerCatalogSha256, "customer_catalog_source_pin");
+    const nativeSearchPathHash = psql(["-At", "-c", `SET search_path=pg_catalog; ${customerModule.customerCatalogSql}`])
+      .stdout.trim().split("\n").at(-1);
+    process.stdout.write(JSON.stringify({ outcome: "customer_catalog_native_search_path_fingerprint", sha256: nativeSearchPathHash }) + "\n");
+    check(nativeSearchPathHash === catalogHash, "customer_catalog_native_search_path_pin");
     qualify(internalBinary);
     psql(["-c", "GRANT EXECUTE ON FUNCTION public.square_production_customer_v1(text,jsonb) TO square_production_runtime_authority"]);
     qualify(internalBinary, "authority");

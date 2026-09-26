@@ -577,13 +577,13 @@ resource "google_cloud_run_v2_service" "square" {
             databaseVersion = env.value.database_versions[each.key]
             databaseCa      = env.value.database_ca
             brokerOrigin    = env.value.broker_origin
-          }) : jsonencode(merge({
-            profile                = each.key
-            permit                 = env.value.permit
-            databaseVersion        = contains(["oauth", "broker"], each.key) ? env.value.database_versions[each.key] : env.value.read_database_versions[each.key]
-            databaseCa             = env.value.database_ca
-            brokerOrigin           = env.value.broker_origin
-            supabasePublishableKey = env.value.supabase_publishable_key
+            }) : jsonencode(merge({
+              profile                = each.key
+              permit                 = env.value.permit
+              databaseVersion        = contains(["oauth", "broker"], each.key) ? env.value.database_versions[each.key] : env.value.read_database_versions[each.key]
+              databaseCa             = env.value.database_ca
+              brokerOrigin           = env.value.broker_origin
+              supabasePublishableKey = env.value.supabase_publishable_key
           }, env.value.manual_read == null ? {} : { manualRead = env.value.manual_read }))
         }
       }

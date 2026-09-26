@@ -9,7 +9,7 @@ export const customerMigrationFile = fileURLToPath(new URL(
 
 // OID-independent PostgreSQL 17 catalog contract for exactly these four
 // migration-defined tables, including both sides of their foreign keys.
-export const customerCatalogSha256 = "0000000000000000000000000000000000000000000000000000000000000000";
+export const customerCatalogSha256 = "41c98c9e07dc1672f4e655050c13edde292df35a75e56bf499b212916c3d79bf";
 export const customerCatalogSql = `WITH protected AS (
   SELECT r.* FROM pg_class r JOIN pg_namespace n ON n.oid=r.relnamespace
   WHERE n.nspname='private' AND r.relname IN ('square_production_customer_bindings',
