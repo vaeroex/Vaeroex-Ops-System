@@ -388,6 +388,13 @@ password_encryption='scram-sha-256'
       id uuid NOT NULL, workspace_id uuid NOT NULL, status text NOT NULL DEFAULT 'active',
       PRIMARY KEY(id), UNIQUE(workspace_id,id)
     );
+    -- Row types used by the customer entitlement function at installation.
+    -- This catalog-only fixture never invokes or substitutes customer authority.
+    CREATE TABLE public.workspaces(id uuid PRIMARY KEY, manually_unlocked boolean NOT NULL DEFAULT false);
+    CREATE TABLE public.customer_subscriptions(id uuid PRIMARY KEY, workspace_id uuid NOT NULL,
+      billing_provider text NOT NULL, created_at timestamptz NOT NULL,
+      manually_activated boolean NOT NULL DEFAULT false, status text NOT NULL,
+      current_period_end timestamptz, stripe_customer_id text, stripe_subscription_id text);
     CREATE SCHEMA supabase_migrations; CREATE TABLE supabase_migrations.schema_migrations(version text PRIMARY KEY);
     INSERT INTO supabase_migrations.schema_migrations(version) VALUES ${seed};`]);
 
@@ -658,6 +665,10 @@ password_encryption='scram-sha-256'
     stage = "customer_source_and_native_admission";
     psqlSource(fs.readFileSync(customerModule.customerMigrationFile, "utf8"), 120000);
     psql(["-c", "INSERT INTO supabase_migrations.schema_migrations(version) VALUES ('20260925032300')"]);
+    const catalogHash = psql(["-At", "-c", customerModule.customerCatalogSql]).stdout.trim();
+    check(/^[a-f0-9]{64}$/.test(catalogHash), "customer_catalog_digest_shape");
+    process.stdout.write(JSON.stringify({ outcome: "customer_catalog_source_fingerprint", sha256: catalogHash }) + "\n");
+    check(catalogHash === customerModule.customerCatalogSha256, "customer_catalog_source_pin");
     qualify(internalBinary);
     psql(["-c", "GRANT EXECUTE ON FUNCTION public.square_production_customer_v1(text,jsonb) TO square_production_runtime_authority"]);
     qualify(internalBinary, "authority");
@@ -667,6 +678,27 @@ password_encryption='scram-sha-256'
     qualify(internalBinary, "authority");
     psql(["-c", "ALTER TABLE private.square_production_customer_credentials FORCE ROW LEVEL SECURITY"]);
     qualify(internalBinary);
+    const relation = "private.square_production_customer_credentials";
+    const triggerName = "square_production_customer_credential_immutable";
+    const triggerDefinition = psql(["-At", "-c", `SELECT pg_get_triggerdef(oid)
+      FROM pg_trigger WHERE tgrelid='${relation}'::regclass AND tgname='${triggerName}'`]).stdout.trim();
+    const indexDefinition = psql(["-At", "-c", "SELECT pg_get_indexdef('private.square_production_customer_one_live_workspace'::regclass)"]).stdout.trim();
+    const constraintName = "square_production_customer_credentials_aad_context_check";
+    const constraintDefinition = psql(["-At", "-c", `SELECT pg_get_constraintdef(oid)
+      FROM pg_constraint WHERE conrelid='${relation}'::regclass AND conname='${constraintName}'`]).stdout.trim();
+    check(triggerDefinition !== "" && indexDefinition !== "" && constraintDefinition !== "", "customer_drift_fixture_definitions_present");
+    for (const [mutation,restore] of [
+      [`ALTER TABLE ${relation} DISABLE TRIGGER ${triggerName}`, `ALTER TABLE ${relation} ENABLE TRIGGER ${triggerName}`],
+      [`DROP TRIGGER ${triggerName} ON ${relation}`, triggerDefinition],
+      ["DROP INDEX private.square_production_customer_one_live_workspace", indexDefinition],
+      [`ALTER TABLE ${relation} DROP CONSTRAINT ${constraintName}; ALTER TABLE ${relation} ADD CONSTRAINT ${constraintName} CHECK (true)`,
+        `ALTER TABLE ${relation} DROP CONSTRAINT ${constraintName}; ALTER TABLE ${relation} ADD CONSTRAINT ${constraintName} ${constraintDefinition}`]
+    ]) {
+      psql(["-c", mutation]);
+      try { qualify(internalBinary, "authority"); }
+      finally { psql(["-c", restore]); }
+      qualify(internalBinary);
+    }
     internalRuntime = "exact_104_qualified";
   }
   cleanup();

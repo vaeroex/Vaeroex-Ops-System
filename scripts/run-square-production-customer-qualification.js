@@ -103,6 +103,12 @@ async function main() {
 main().catch(error => {
   const fixed = new Set(['customer_local_database_unavailable','customer_nonlocal_database_forbidden',
     'customer_ci_fixture_only']);
-  console.error(fixed.has(error?.message) ? error.message : `customer_qualification_failed:${error?.code || 'unknown'}`);
+  // Only literal, source-reviewed exception labels from this disposable test
+  // may be reported. Never print query/context, PostgreSQL detail or raw errors.
+  const labels = new Set([...fs.readFileSync(path.join(customerDirectory,customerFile),'utf8')
+    .matchAll(/raise exception '([a-z_]+)'/g)].map(match => match[1]));
+  const label = labels.has(error?.message) ? error.message : 'unclassified';
+  const code = /^[0-9A-Z]{5}$/.test(error?.code || '') ? error.code : 'unknown';
+  console.error(fixed.has(error?.message) ? error.message : `customer_qualification_failed:${code}:${label}`);
   process.exitCode = 1;
 });

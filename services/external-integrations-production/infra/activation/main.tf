@@ -570,7 +570,14 @@ resource "google_cloud_run_v2_service" "square" {
         for_each = contains(local.internal_handler_modes, each.key) ? [var.internal_consent] : []
         content {
           name = "SQUARE_INTERNAL_CONSENT_CONFIGURATION"
-          value = jsonencode(merge({
+          value = env.value.mode == "customer_owner_v1" ? jsonencode({
+            mode            = env.value.mode
+            profile         = each.key
+            applicationId   = env.value.application_id
+            databaseVersion = env.value.database_versions[each.key]
+            databaseCa      = env.value.database_ca
+            brokerOrigin    = env.value.broker_origin
+          }) : jsonencode(merge({
             profile                = each.key
             permit                 = env.value.permit
             databaseVersion        = contains(["oauth", "broker"], each.key) ? env.value.database_versions[each.key] : env.value.read_database_versions[each.key]

@@ -50,7 +50,12 @@ The native provisioner recognizes exactly the 104-entry internal baseline or the
 customer migration bytes and all eight customer function bodies. Only OAuth and
 broker may reach the extra customer RPC; peer grants remain rejected. Native
 qualification retains the foundation/internal checks and checks the customer
-ownership, FORCE RLS and closed ACL contract. Provisioning requires customer
+ownership, FORCE RLS and closed ACL contract, plus the customer
+tables' exact column, constraint, index and trigger fingerprint, including both
+sides of protected foreign keys. The disposable catalog regression substitutes
+the immutable trigger, live-workspace index and credential constraint and
+requires native admission to fail closed.
+Provisioning requires customer
 consent disabled and holds the customer relations through commit. Disposable
 tests exercise native `ADMIN FALSE, INHERIT TRUE, SET FALSE` admission without
 role switching, owner preparation, OAuth consumption, broker replay/authorization,
@@ -64,6 +69,12 @@ The historical consent-image CVE exception also remains byte-bound to its old
 bundle. This candidate does not update that exception: its regression requires
 the changed bundle to be rejected by the old exception. Any necessary exception
 for a new image requires new reachability evidence and separate approval.
+
+The existing activation input supports an explicit `customer_owner_v1` mode
+which serializes only the six fields accepted by that runtime. Internal permits,
+manual reads and publishable keys cannot be mixed into customer mode; the legacy
+internal-seller configuration remains unchanged. This is configuration support,
+not permission to deploy or enable the private customer consent binding.
 
 Only then prepare separately authorized private provisioning for OAuth and broker.
 The native no-echo PostgreSQL flow generates each role's credential and binds its

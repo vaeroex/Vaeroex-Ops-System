@@ -25,6 +25,9 @@ test("customer native contract pins exactly the candidate and its eight function
   assert.match(contract.sql,/count\(\*\)=4 FROM pg_class/);
   assert.match(contract.sql,/r\.relrowsecurity AND r\.relforcerowsecurity/);
   assert.match(contract.sql,/count\(\*\)=3 FROM pg_proc/);
+  for (const check of ["pg_get_constraintdef", "pg_get_indexdef", "t.tgenabled", "t.tgqual", "c.conrelid IN"]) {
+    assert.ok(contract.sql.includes(check), `customer catalog contract includes ${check}`);
+  }
 });
 import { createLocalSyntheticNativeAdapter, createLocalSyntheticProductionNativeAdapter } from "../adapter.mjs";
 import { createInMemorySyntheticSecretStore } from "../lifecycle.mjs";

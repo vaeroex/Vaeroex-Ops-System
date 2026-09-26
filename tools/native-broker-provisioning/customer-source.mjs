@@ -7,6 +7,39 @@ export const customerMigrationSha256 = "4e35c1cb33fd0a793611c2bf3ee43539ba95d00a
 export const customerMigrationFile = fileURLToPath(new URL(
   "../../supabase/production-migrations/20260925032300_square_production_customer_connection.sql", import.meta.url));
 
+// OID-independent PostgreSQL 17 catalog contract for exactly these four
+// migration-defined tables, including both sides of their foreign keys.
+export const customerCatalogSha256 = "0000000000000000000000000000000000000000000000000000000000000000";
+export const customerCatalogSql = `WITH protected AS (
+  SELECT r.* FROM pg_class r JOIN pg_namespace n ON n.oid=r.relnamespace
+  WHERE n.nspname='private' AND r.relname IN ('square_production_customer_bindings',
+    'square_production_customer_connections','square_production_customer_oauth_states','square_production_customer_credentials')
+) SELECT encode(extensions.digest(convert_to(jsonb_build_object(
+  'columns',coalesce((SELECT jsonb_agg(jsonb_build_array(r.relname,a.attnum,a.attname,
+    format_type(a.atttypid,a.atttypmod),a.attnotnull,a.attidentity,a.attgenerated,
+    pg_get_expr(d.adbin,d.adrelid,true),CASE WHEN a.attcollation=0 THEN NULL
+      ELSE format('%I.%I',cn.nspname,col.collname) END,col.collprovider::text,col.collisdeterministic,col.collversion)
+    ORDER BY r.relname,a.attnum) FROM protected r JOIN pg_attribute a ON a.attrelid=r.oid
+    LEFT JOIN pg_attrdef d ON d.adrelid=r.oid AND d.adnum=a.attnum
+    LEFT JOIN pg_collation col ON col.oid=a.attcollation LEFT JOIN pg_namespace cn ON cn.oid=col.collnamespace
+    WHERE a.attnum>0 AND NOT a.attisdropped),'[]'::jsonb),
+  'constraints',coalesce((SELECT jsonb_agg(jsonb_build_array(r.relname,c.conname,c.contype,
+    c.condeferrable,c.condeferred,c.convalidated,pg_get_constraintdef(c.oid,true)) ORDER BY r.relname,c.conname)
+    FROM protected r JOIN pg_constraint c ON c.conrelid=r.oid),'[]'::jsonb),
+  'indexes',coalesce((SELECT jsonb_agg(jsonb_build_array(r.relname,ir.relname,i.indisvalid,i.indisready,
+    i.indislive,pg_get_indexdef(i.indexrelid,0,true)) ORDER BY r.relname,ir.relname)
+    FROM protected r JOIN pg_index i ON i.indrelid=r.oid JOIN pg_class ir ON ir.oid=i.indexrelid),'[]'::jsonb),
+  'triggers',coalesce((SELECT jsonb_agg(jsonb_build_array(n.nspname,r.relname,
+    CASE WHEN t.tgisinternal THEN c.conname ELSE t.tgname END,t.tgisinternal,t.tgenabled,t.tgtype,
+    t.tgdeferrable,t.tginitdeferred,pn.nspname,p.proname,pg_get_function_identity_arguments(p.oid),
+    pg_get_expr(t.tgqual,t.tgrelid,true),encode(t.tgargs,'hex'),t.tgattr::text,
+    pg_get_constraintdef(c.oid,true)) ORDER BY n.nspname,r.relname,c.conname,t.tgisinternal,
+      p.proname,t.tgtype,t.tgname) FROM pg_trigger t JOIN pg_class r ON r.oid=t.tgrelid
+    JOIN pg_namespace n ON n.oid=r.relnamespace JOIN pg_proc p ON p.oid=t.tgfoid
+    JOIN pg_namespace pn ON pn.oid=p.pronamespace LEFT JOIN pg_constraint c ON c.oid=t.tgconstraint
+    WHERE t.tgrelid IN (SELECT oid FROM protected) OR c.conrelid IN (SELECT oid FROM protected)),'[]'::jsonb)
+)::text,'UTF8'),'sha256'),'hex')`;
+
 // Exact extra contract for the customer phase; never accepts arbitrary later
 // ledgers or extra reachable RPCs. Builder and disposable native tests share it.
 export function customerNativeContract() {
@@ -51,6 +84,7 @@ export function customerNativeContract() {
         AND NOT EXISTS (SELECT FROM aclexplode(r.relacl) a WHERE a.grantee<>r.relowner)
         AND NOT EXISTS (SELECT FROM pg_attribute col CROSS JOIN LATERAL aclexplode(col.attacl) a
           WHERE col.attrelid=r.oid AND a.grantee<>r.relowner)
-        AND NOT EXISTS (SELECT FROM pg_policy WHERE polrelid=r.oid))`;
+        AND NOT EXISTS (SELECT FROM pg_policy WHERE polrelid=r.oid))
+    AND (${customerCatalogSql})='${customerCatalogSha256}'`;
   return { sql, sha256: customerMigrationSha256 };
 }
