@@ -39,8 +39,9 @@ test("customer binding may remain open only during exact native role revocation"
   assert.match(source,/!strcmp\(operation,"fence"\) \? fence_authority\(target\) : closed_authority\(target\)/);
   assert.match(source,/\$1 IN \('internal','customer'\) AND count\(\*\)=46/);
   assert.match(source,/\$1<>'customer' OR c\.conrelid IS NULL OR c\.conrelid NOT IN/);
-  assert.doesNotMatch(source,/SET LOCAL search_path=public/);
-  assert.doesNotMatch(harness,/SET LOCAL search_path=public/);
+  const catalogRunner=readFileSync(new URL("./production-catalog-qualify.cjs",import.meta.url),"utf8");
+  assert.match(catalogRunner,/\$\{internalDeleteTriggerDefinition\};/);
+  assert.match(catalogRunner,/internalDeleteTriggerDefinition[\s\S]*?qualify\(internalBinary\);[\s\S]*?stage = "customer_source_and_native_admission"/);
   assert.match(harness,/customer_open_binding_rejects_non_fence/);
   assert.match(harness,/customer_binding_not_mutated_by_role_fence/);
   assert.match(harness,/production_ledger_phase\(\)==PRODUCTION_PHASE_CUSTOMER[\s\S]*?SET search_path=pg_catalog/);

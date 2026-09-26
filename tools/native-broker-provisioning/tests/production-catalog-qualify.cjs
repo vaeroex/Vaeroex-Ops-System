@@ -654,14 +654,19 @@ password_encryption='scram-sha-256'
       qualify(internalBinary);
     }
     stage = "internal_trigger_substitution";
+    const internalDeleteTriggerDefinition=psql(["-At","-c",`SELECT pg_get_triggerdef(oid)
+      FROM pg_trigger WHERE tgrelid='private.square_production_internal_permits'::regclass
+        AND tgname='square_production_internal_permit_delete_guard'`]).stdout.trim();
+    check(internalDeleteTriggerDefinition.startsWith("CREATE TRIGGER square_production_internal_permit_delete_guard "),
+      "internal_trigger_restore_source_exact");
     psql(["-c", `DROP TRIGGER square_production_internal_permit_delete_guard ON private.square_production_internal_permits;
       CREATE TRIGGER square_production_internal_permit_delete_guard BEFORE DELETE ON private.square_production_internal_permits
       FOR EACH ROW WHEN (false) EXECUTE FUNCTION private.square_production_internal_reject_immutable_mutation_v1();`]);
     qualify(internalBinary, "internal_triggers");
     // Restore the deliberate substitution before qualifying the customer delta.
     psql(["-c", `DROP TRIGGER square_production_internal_permit_delete_guard ON private.square_production_internal_permits;
-      CREATE TRIGGER square_production_internal_permit_delete_guard BEFORE DELETE ON private.square_production_internal_permits
-      FOR EACH ROW EXECUTE FUNCTION private.square_production_internal_reject_immutable_mutation_v1();`]);
+      ${internalDeleteTriggerDefinition};`]);
+    qualify(internalBinary);
     stage = "customer_source_and_native_admission";
     psqlSource(fs.readFileSync(customerModule.customerMigrationFile, "utf8"), 120000);
     psql(["-c", "INSERT INTO supabase_migrations.schema_migrations(version) VALUES ('20260925032300')"]);
