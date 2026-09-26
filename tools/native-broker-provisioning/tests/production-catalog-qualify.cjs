@@ -678,6 +678,10 @@ password_encryption='scram-sha-256'
     process.stdout.write(JSON.stringify({ outcome: "customer_catalog_native_search_path_fingerprint", sha256: nativeSearchPathHash }) + "\n");
     check(nativeSearchPathHash === customerModule.customerCatalogSha256, "customer_catalog_native_search_path_pin");
     qualify(internalBinary);
+    psql(["-c", "CREATE RULE customer_credential_suppress_fixture AS ON INSERT TO private.square_production_customer_credentials DO INSTEAD NOTHING"]);
+    try { qualify(internalBinary, "authority"); }
+    finally { psql(["-c", "DROP RULE customer_credential_suppress_fixture ON private.square_production_customer_credentials"]); }
+    qualify(internalBinary);
     psql(["-c", "ALTER FUNCTION public.square_production_customer_v1(text,jsonb) IMMUTABLE"]);
     try { qualify(internalBinary, "authority"); }
     finally { psql(["-c", "ALTER FUNCTION public.square_production_customer_v1(text,jsonb) VOLATILE"]); }

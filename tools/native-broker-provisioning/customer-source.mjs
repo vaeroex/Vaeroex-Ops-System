@@ -102,7 +102,9 @@ export function customerNativeContract() {
     AND (SELECT count(*)=4 FROM pg_class r JOIN pg_namespace n ON n.oid=r.relnamespace
       WHERE n.nspname='private' AND r.relname IN ('square_production_customer_bindings',
         'square_production_customer_connections','square_production_customer_oauth_states','square_production_customer_credentials')
-        AND r.relkind='r' AND r.relpersistence='p' AND r.relowner='postgres'::regrole AND r.relrowsecurity AND r.relforcerowsecurity
+        AND r.relkind='r' AND r.relpersistence='p' AND NOT r.relhasrules
+        AND r.relowner='postgres'::regrole AND r.relrowsecurity AND r.relforcerowsecurity
+        AND NOT EXISTS (SELECT FROM pg_rewrite WHERE ev_class=r.oid)
         AND NOT EXISTS (SELECT FROM aclexplode(r.relacl) a WHERE a.grantee<>r.relowner)
         AND NOT EXISTS (SELECT FROM pg_attribute col CROSS JOIN LATERAL aclexplode(col.attacl) a
           WHERE col.attrelid=r.oid AND a.grantee<>r.relowner)
