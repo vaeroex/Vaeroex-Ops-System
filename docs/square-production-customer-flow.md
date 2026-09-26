@@ -30,6 +30,10 @@ CI runs the customer database test even after the known QBO lease failure, only
 when disposable database setup succeeded. Its runner stages exactly the 104
 canonical Production migrations through `20260902191325`, then this customer
 migration; it rejects remote database targets and does not edit ledger history.
+The candidate resides in `supabase/production-migrations`, outside the mixed
+Sandbox history; an explicitly authorized Production staging operation must copy
+that exact reviewed file beside the 104 canonical files. Ordinary local migration
+commands cannot accidentally apply it after the Sandbox chain.
 Current false-only activation constraints remain intact, so successful customer
 consent SQL branches require a later coordinated activation contract.
 

@@ -1,6 +1,7 @@
 -- Dormant Production customer connection authority. This is not an activation.
 -- The reviewed foundation's false-only gates remain unchanged. A later, separately
 -- approved activation must evolve them before prepare/callback/commit can succeed.
+-- Opt-in Production-only candidate; never part of the mixed Sandbox fixture chain.
 begin;
 
 do $baseline$

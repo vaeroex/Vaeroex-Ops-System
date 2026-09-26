@@ -198,7 +198,7 @@ const approvedSquareQualificationPaths = Object.freeze([
   "services/external-integrations-production/internal-consent/customer-flow.ts",
   "services/external-integrations-production/internal-consent/customer-runtime.ts",
   "services/external-integrations-production/internal-consent/customer-server.ts",
-  "supabase/migrations/20260925032300_square_production_customer_connection.sql",
+  "supabase/production-migrations/20260925032300_square_production_customer_connection.sql",
   "supabase/tests/square_production_customer_connection.test.sql"
 ]);
 const approved = new Set(approvedSquareQualificationPaths);

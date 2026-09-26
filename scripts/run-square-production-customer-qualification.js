@@ -14,6 +14,7 @@ const cli = process.env.SUPABASE_CLI_PATH || 'supabase';
 const baseline = '20260902191325';
 const customer = '20260925032300';
 const customerFile = `${customer}_square_production_customer_connection.sql`;
+const customerDirectory = path.join(root, 'supabase/production-migrations');
 
 function manifest() {
   const names = fs.readdirSync(path.join(root,'supabase/migrations'))
@@ -21,7 +22,8 @@ function manifest() {
   const prior = names.filter(name => name.split('_',1)[0] <= baseline);
   assert.equal(prior.length,104,'canonical Production baseline contains 104 files');
   assert.equal(prior.at(-1),`${baseline}_square_production_internal_pilot_runtime.sql`);
-  assert.equal(names.filter(name => name === customerFile).length,1);
+  assert.equal(fs.readdirSync(customerDirectory).filter(name => name === customerFile).length,1);
+  assert.equal(names.includes(customerFile),false,'Production-only customer candidate cannot enter mixed history');
   const staged = [...prior,customerFile];
   assert.equal(staged.length,105);
   assert.equal(new Set(staged.map(name => name.split('_',1)[0])).size,105);
@@ -79,13 +81,6 @@ async function main() {
   if (process.env.CI !== 'true' || process.env.GITHUB_ACTIONS !== 'true') {
     throw new Error('customer_ci_fixture_only');
   }
-  if (process.argv[2] === '--prepare-legacy-fixture' && process.argv.length === 3) {
-    // The general fixture includes Sandbox history. Keep the Production-only
-    // customer migration out of that chain; it is qualified separately below.
-    await resetLocalFixture('20260915040500');
-    console.log('square_customer_legacy_fixture_ready');
-    return;
-  }
   if (process.argv.length !== 2) throw new Error('customer_ci_fixture_only');
   await resetLocalFixture(baseline);
   const client = new Client({connectionString:localDatabaseUrl(),application_name:'square_customer_disposable_qualification'});
@@ -94,7 +89,7 @@ async function main() {
     const before = await client.query('select version from supabase_migrations.schema_migrations order by version');
     assert.equal(before.rows.length,104);
     assert.equal(before.rows.at(-1).version,baseline);
-    await client.query(fs.readFileSync(path.join(root,'supabase/migrations',customerFile),'utf8'));
+    await client.query(fs.readFileSync(path.join(customerDirectory,customerFile),'utf8'));
     await assertFingerprintVectors(client);
     await client.query(fs.readFileSync(path.join(root,'supabase/tests/square_production_customer_connection.test.sql'),'utf8'));
     const after = await client.query('select version from supabase_migrations.schema_migrations order by version');

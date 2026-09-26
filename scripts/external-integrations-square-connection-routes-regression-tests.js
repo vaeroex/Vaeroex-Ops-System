@@ -184,7 +184,11 @@ async function main() {
   const escaped = modules.renderToStaticMarkup(modules.React.createElement(modules.SquareConnectionPanel, { view: { ...view, connections: [{ ...view.connections[0], sellerLabel: "<script>PRIVATE_DISPLAY_CANARY</script>" }] } }));
   ok(!escaped.includes("<script>PRIVATE_DISPLAY_CANARY</script>"));
   const gatedPage = fs.readFileSync(path.join(root, "app/(square-connection)/app/settings/integrations/square/page.tsx"), "utf8");
-  ok(gatedPage.indexOf("if (!squareCustomerConnectionsEnabled()) notFound()") < gatedPage.indexOf("await headers()"));
+  const legacyGate = gatedPage.indexOf("if (!squareCustomerConnectionsEnabled()) notFound()");
+  ok(legacyGate >= 0 && legacyGate < gatedPage.indexOf("await headers()", legacyGate),
+    'legacy page gate remains before legacy header/authentication access');
+  ok(gatedPage.indexOf('if (productionSquareCustomerEnabled())') < gatedPage.indexOf('await headers()'),
+    'Production owner branch is separately gated before header/authentication access');
   ok(!fs.existsSync(path.join(root, "app/app/settings/integrations/square/page.tsx")), "disabled page bypasses protected parent authentication");
   console.log(`Square connection route regression tests passed: ${assertions} assertions.`);
 }
