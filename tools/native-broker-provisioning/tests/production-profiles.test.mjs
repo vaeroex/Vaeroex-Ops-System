@@ -14,6 +14,44 @@ import {
   productionSourcePins,
 } from "../production-profile.mjs";
 import { productionSourceManifest } from "../production-source.mjs";
+import { customerNativeContract, customerMigrationFile, customerMigrationSha256 } from "../customer-source.mjs";
+
+test("customer native contract pins exactly the candidate and its eight function bodies", () => {
+  const contract=customerNativeContract();
+  assert.equal(createHash("sha256").update(readFileSync(customerMigrationFile)).digest("hex"),customerMigrationSha256);
+  const prefix="square_production_customer_";
+  assert.ok(contract.sql.includes(`left(p.proname,${prefix.length})='${prefix}'`));
+  assert.equal((contract.sql.match(/\('[^']+','[a-f0-9]{64}'\)/g)||[]).length,8);
+  assert.match(contract.sql,/count\(\*\)=4 FROM pg_class/);
+  assert.match(contract.sql,/r\.relpersistence='p'/);
+  assert.match(contract.sql,/pg_rewrite WHERE ev_class=r\.oid/);
+  assert.doesNotMatch(contract.sql,/NOT r\.relhasrules/);
+  for (const field of ["p.provolatile", "p.proisstrict", "p.proparallel", "p.proargnames", "p.pronargdefaults", "l.lanname"]) {
+    assert.ok(contract.sql.includes(field), `customer executable ABI includes ${field}`);
+  }
+  assert.match(contract.sql,/r\.relrowsecurity AND r\.relforcerowsecurity/);
+  assert.match(contract.sql,/count\(\*\)=3 FROM pg_proc/);
+  for (const check of ["pg_get_constraintdef", "pg_get_indexdef", "t.tgenabled", "t.tgqual", "c.conrelid IN"]) {
+    assert.ok(contract.sql.includes(check), `customer catalog contract includes ${check}`);
+  }
+});
+
+test("customer binding may remain open only during exact native role revocation", () => {
+  const source=readFileSync(new URL("../native.c",import.meta.url),"utf8");
+  const harness=readFileSync(new URL("./production-catalog-qualify.c",import.meta.url),"utf8");
+  assert.match(source,/customer_fence \? !production_contract_valid\(phase\)/);
+  assert.match(source,/checked_authority\(target,false\)/);
+  assert.match(source,/!strcmp\(operation,"fence"\) \? fence_authority\(target\) : closed_authority\(target\)/);
+  assert.match(source,/\$1 IN \('internal','customer'\) AND count\(\*\)=46/);
+  assert.match(source,/\$1<>'customer' OR c\.conrelid IS NULL OR c\.conrelid NOT IN/);
+  const catalogRunner=readFileSync(new URL("./production-catalog-qualify.cjs",import.meta.url),"utf8");
+  assert.match(catalogRunner,/\$\{internalDeleteTriggerDefinition\};/);
+  assert.match(catalogRunner,/internalDeleteTriggerDefinition[\s\S]*?qualify\(internalBinary\);[\s\S]*?stage = "customer_source_and_native_admission"/);
+  assert.match(catalogRunner,/customer_fence_role_starts_absent[\s\S]*?CREATE ROLE square_production_oauth LOGIN INHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS/);
+  assert.match(harness,/customer_open_binding_rejects_non_fence/);
+  assert.match(harness,/customer_binding_not_mutated_by_role_fence/);
+  assert.match(harness,/production_ledger_phase\(\)==PRODUCTION_PHASE_CUSTOMER[\s\S]*?SET search_path=pg_catalog/);
+});
 import { createLocalSyntheticNativeAdapter, createLocalSyntheticProductionNativeAdapter } from "../adapter.mjs";
 import { createInMemorySyntheticSecretStore } from "../lifecycle.mjs";
 import { sandboxTarget } from "../sandbox-profile.mjs";

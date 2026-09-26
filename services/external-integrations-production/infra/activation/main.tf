@@ -242,7 +242,10 @@ resource "google_cloudbuild_trigger" "production_images" {
     "lib/integrations/contracts/**",
     "lib/integrations/credentials/**",
     "lib/integrations/providers/square/**",
+    "lib/integrations/control-plane/square-production-customer-view.ts",
     "scripts/square-production-internal-consent-tests.js",
+    "scripts/square-production-customer-flow-tests.js",
+    "scripts/square-production-customer-workspace-tests.js",
     "package.json",
     "pnpm-lock.yaml",
     "tsconfig.json",
@@ -567,13 +570,20 @@ resource "google_cloud_run_v2_service" "square" {
         for_each = contains(local.internal_handler_modes, each.key) ? [var.internal_consent] : []
         content {
           name = "SQUARE_INTERNAL_CONSENT_CONFIGURATION"
-          value = jsonencode(merge({
-            profile                = each.key
-            permit                 = env.value.permit
-            databaseVersion        = contains(["oauth", "broker"], each.key) ? env.value.database_versions[each.key] : env.value.read_database_versions[each.key]
-            databaseCa             = env.value.database_ca
-            brokerOrigin           = env.value.broker_origin
-            supabasePublishableKey = env.value.supabase_publishable_key
+          value = env.value.mode == "customer_owner_v1" ? jsonencode({
+            mode            = env.value.mode
+            profile         = each.key
+            applicationId   = env.value.application_id
+            databaseVersion = env.value.database_versions[each.key]
+            databaseCa      = env.value.database_ca
+            brokerOrigin    = env.value.broker_origin
+            }) : jsonencode(merge({
+              profile                = each.key
+              permit                 = env.value.permit
+              databaseVersion        = contains(["oauth", "broker"], each.key) ? env.value.database_versions[each.key] : env.value.read_database_versions[each.key]
+              databaseCa             = env.value.database_ca
+              brokerOrigin           = env.value.broker_origin
+              supabasePublishableKey = env.value.supabase_publishable_key
           }, env.value.manual_read == null ? {} : { manualRead = env.value.manual_read }))
         }
       }

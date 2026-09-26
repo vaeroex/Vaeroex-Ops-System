@@ -8,7 +8,8 @@ export const profileNames = Object.freeze(["oauth", "broker", "scheduler", "webh
 export const runtimeModules = Object.freeze(["maintenance.mjs", "adapter.mjs", "lifecycle.mjs", "secret-store.mjs",
   "secret-manager-rest.mjs", "dsn-codec.mjs", "maintenance-identity.mjs", "private-entry.mjs",
   "maintenance-policy.mjs", "service-admission.mjs", "production-profile.mjs", "sandbox-profile.mjs"]);
-const buildModules = ["build-production.mjs", "production-source.mjs", "native.c", "maintenance-launcher.c"];
+const buildModules = ["build-production.mjs", "production-source.mjs", "customer-source.mjs", "native.c", "maintenance-launcher.c"];
+const customerMigration = "supabase/production-migrations/20260925032300_square_production_customer_connection.sql";
 const moduleRoot = "tools/native-broker-provisioning/";
 const caSource = "tools/jit-access-feasibility/supabase-root-2021.crt";
 const caPath = "/etc/vaeroex-production-native/supabase-root-2021.crt";
@@ -41,7 +42,7 @@ export function validateManifest(value) {
   });
   const migrations=paths.filter(path => path.startsWith("supabase/migrations/"));
   const versions=migrations.map(migrationVersion);
-  const exact=[...runtimeModules,...buildModules].map(name=>moduleRoot+name).concat(caSource);
+  const exact=[...runtimeModules,...buildModules].map(name=>moduleRoot+name).concat(caSource,customerMigration);
   if (new Set(paths).size !== paths.length || migrations.length !== 104 ||
       versions.some(version=>!version || version>"20260902191325") || new Set(versions).size !== 104 ||
       [...versions].sort().at(-1) !== "20260902191325" ||
@@ -59,7 +60,7 @@ export function stageSource(repository, commit, output) {
   if (git("rev-parse",`${commit}^{commit}`).toString().trim()!==commit) throw denied();
   const migrations=git("ls-tree","-r","--name-only",commit,"supabase/migrations").toString().trim().split("\n")
     .filter(path=>migrationVersion(path)&&migrationVersion(path)<="20260902191325");
-  const paths=[...runtimeModules,...buildModules].map(name=>moduleRoot+name).concat(caSource,migrations).sort();
+  const paths=[...runtimeModules,...buildModules].map(name=>moduleRoot+name).concat(caSource,customerMigration,migrations).sort();
   const files=paths.map(path=>({path,bytes:git("show",`${commit}:${path}`)}));
   const manifest=validateManifest({schemaVersion:"production_native_install_source_v1",sourceCommit:commit,
     files:files.map(({path,bytes})=>({path,sha256:hash(bytes)}))});

@@ -28,6 +28,7 @@ const pins = Object.freeze({
 });
 const hash = source => crypto.createHash("sha256").update(source).digest("hex");
 let stage = "source_manifest", root, socketRoot, running = false, terminating = false, assertions = 0;
+let customerContract;
 const check = (value, name) => { assertions++; if (!value) { stage = name; throw new Error("catalog_qualification_failed"); } };
 const contractStages = new Set([
   "begin", "closed_authority", "managed_catalog_fence", "ledger_phase", "relations", "foundation_schema", "overlay_schema",
@@ -194,6 +195,7 @@ function compile(output, sourcePin) {
     `-Wl,-rpath,${library}`, "-DVAEROEX_SYNTHETIC_ONLY", "-DVAEROEX_MANAGED_PROFILE_TEST",
     "-DVAEROEX_PRODUCTION_OAUTH", `-DVAEROEX_CATALOG_SOCKET_PATH=${JSON.stringify(socket())}`,
     ...(sourcePin ? [`-DVAEROEX_PRODUCTION_INTERNAL_RUNTIME_SOURCE_SHA256=${JSON.stringify(sourcePin)}`] : []),
+    ...(sourcePin && customerContract ? [`-DVAEROEX_PRODUCTION_CUSTOMER_CONTRACT=${JSON.stringify(customerContract.sql)}`] : []),
     source, "-lpq", "-o", output];
   run("/usr/bin/cc", flags);
 }
@@ -327,6 +329,8 @@ process.once("SIGINT", () => terminate("SIGINT"));
 process.once("SIGTERM", () => terminate("SIGTERM"));
 
 async function main() {
+  const customerModule = await import("../customer-source.mjs");
+  customerContract = customerModule.customerNativeContract();
   stage = "cluster_bootstrap";
   // Keep the separately owned socket directory below Darwin's sockaddr_un
   // bound while compiling that exact path into the local-only C harness.
@@ -384,6 +388,13 @@ password_encryption='scram-sha-256'
       id uuid NOT NULL, workspace_id uuid NOT NULL, status text NOT NULL DEFAULT 'active',
       PRIMARY KEY(id), UNIQUE(workspace_id,id)
     );
+    -- Row types used by the customer entitlement function at installation.
+    -- This catalog-only fixture never invokes or substitutes customer authority.
+    CREATE TABLE public.workspaces(id uuid PRIMARY KEY, manually_unlocked boolean NOT NULL DEFAULT false);
+    CREATE TABLE public.customer_subscriptions(id uuid PRIMARY KEY, workspace_id uuid NOT NULL,
+      billing_provider text NOT NULL, created_at timestamptz NOT NULL,
+      manually_activated boolean NOT NULL DEFAULT false, status text NOT NULL,
+      current_period_end timestamptz, stripe_customer_id text, stripe_subscription_id text);
     CREATE SCHEMA supabase_migrations; CREATE TABLE supabase_migrations.schema_migrations(version text PRIMARY KEY);
     INSERT INTO supabase_migrations.schema_migrations(version) VALUES ${seed};`]);
 
@@ -643,10 +654,107 @@ password_encryption='scram-sha-256'
       qualify(internalBinary);
     }
     stage = "internal_trigger_substitution";
+    const internalDeleteTriggerDefinition=psql(["-At","-c",`SELECT pg_get_triggerdef(oid)
+      FROM pg_trigger WHERE tgrelid='private.square_production_internal_permits'::regclass
+        AND tgname='square_production_internal_permit_delete_guard'`]).stdout.trim();
+    check(internalDeleteTriggerDefinition.startsWith("CREATE TRIGGER square_production_internal_permit_delete_guard "),
+      "internal_trigger_restore_source_exact");
     psql(["-c", `DROP TRIGGER square_production_internal_permit_delete_guard ON private.square_production_internal_permits;
       CREATE TRIGGER square_production_internal_permit_delete_guard BEFORE DELETE ON private.square_production_internal_permits
       FOR EACH ROW WHEN (false) EXECUTE FUNCTION private.square_production_internal_reject_immutable_mutation_v1();`]);
     qualify(internalBinary, "internal_triggers");
+    // Restore the deliberate substitution before qualifying the customer delta.
+    psql(["-c", `DROP TRIGGER square_production_internal_permit_delete_guard ON private.square_production_internal_permits;
+      ${internalDeleteTriggerDefinition};`]);
+    qualify(internalBinary);
+    stage = "customer_source_and_native_admission";
+    psqlSource(fs.readFileSync(customerModule.customerMigrationFile, "utf8"), 120000);
+    psql(["-c", "INSERT INTO supabase_migrations.schema_migrations(version) VALUES ('20260925032300')"]);
+    const catalogHash = psql(["-At", "-c", customerModule.customerCatalogSql]).stdout.trim();
+    check(/^[a-f0-9]{64}$/.test(catalogHash), "customer_catalog_digest_shape");
+    process.stdout.write(JSON.stringify({ outcome: "customer_catalog_source_fingerprint", sha256: catalogHash }) + "\n");
+    const nativeSearchPathHash = psql(["-At", "-c", `SET search_path=pg_catalog; ${customerModule.customerCatalogSql}`])
+      .stdout.trim().split("\n").at(-1);
+    process.stdout.write(JSON.stringify({ outcome: "customer_catalog_native_search_path_fingerprint", sha256: nativeSearchPathHash }) + "\n");
+    check(nativeSearchPathHash === customerModule.customerCatalogSha256, "customer_catalog_native_search_path_pin");
+    qualify(internalBinary);
+    psql(["-c", "CREATE RULE customer_credential_suppress_fixture AS ON INSERT TO private.square_production_customer_credentials DO INSTEAD NOTHING"]);
+    try { qualify(internalBinary, "authority"); }
+    finally { psql(["-c", "DROP RULE customer_credential_suppress_fixture ON private.square_production_customer_credentials"]); }
+    qualify(internalBinary);
+    psql(["-c", "ALTER FUNCTION public.square_production_customer_v1(text,jsonb) IMMUTABLE"]);
+    try { qualify(internalBinary, "authority"); }
+    finally { psql(["-c", "ALTER FUNCTION public.square_production_customer_v1(text,jsonb) VOLATILE"]); }
+    qualify(internalBinary);
+    psql(["-c", "GRANT EXECUTE ON FUNCTION public.square_production_customer_v1(text,jsonb) TO square_production_runtime_authority"]);
+    qualify(internalBinary, "authority");
+    psql(["-c", "REVOKE EXECUTE ON FUNCTION public.square_production_customer_v1(text,jsonb) FROM square_production_runtime_authority"]);
+    qualify(internalBinary);
+    psql(["-c", "ALTER TABLE private.square_production_customer_credentials NO FORCE ROW LEVEL SECURITY"]);
+    qualify(internalBinary, "authority");
+    psql(["-c", "ALTER TABLE private.square_production_customer_credentials FORCE ROW LEVEL SECURITY"]);
+    qualify(internalBinary);
+    psql(["-c", "ALTER TABLE private.square_production_customer_credentials SET UNLOGGED"]);
+    try { qualify(internalBinary, "authority"); }
+    finally { psql(["-c", "ALTER TABLE private.square_production_customer_credentials SET LOGGED"]); }
+    qualify(internalBinary);
+    const customerParentTriggers=psql(["-At","-c",`SELECT t.tgname FROM pg_trigger t
+      JOIN pg_constraint c ON c.oid=t.tgconstraint
+      WHERE t.tgrelid='private.integration_production_platform_bindings'::regclass
+        AND c.conrelid='private.square_production_customer_bindings'::regclass ORDER BY t.tgname`])
+      .stdout.trim().split("\n");
+    check(customerParentTriggers.length===2 && customerParentTriggers.every(name=>/^[A-Za-z0-9_]+$/.test(name)),
+      "customer_fk_parent_fixture_exact");
+    for (const name of customerParentTriggers) {
+      psql(["-c",`ALTER TABLE private.integration_production_platform_bindings DISABLE TRIGGER "${name}"`]);
+      try { qualify(internalBinary,"authority"); }
+      finally { psql(["-c",`ALTER TABLE private.integration_production_platform_bindings ENABLE TRIGGER "${name}"`]); }
+      qualify(internalBinary);
+    }
+    const relation = "private.square_production_customer_credentials";
+    const triggerName = "square_production_customer_credential_immutable";
+    const triggerDefinition = psql(["-At", "-c", `SELECT pg_get_triggerdef(oid)
+      FROM pg_trigger WHERE tgrelid='${relation}'::regclass AND tgname='${triggerName}'`]).stdout.trim();
+    const indexDefinition = psql(["-At", "-c", "SELECT pg_get_indexdef('private.square_production_customer_one_live_workspace'::regclass)"]).stdout.trim();
+    const constraintName = "square_production_customer_credentials_aad_context_check";
+    const constraintDefinition = psql(["-At", "-c", `SELECT pg_get_constraintdef(oid)
+      FROM pg_constraint WHERE conrelid='${relation}'::regclass AND conname='${constraintName}'`]).stdout.trim();
+    check(triggerDefinition !== "" && indexDefinition !== "" && constraintDefinition !== "", "customer_drift_fixture_definitions_present");
+    for (const [mutation,restore] of [
+      [`ALTER TABLE ${relation} DISABLE TRIGGER ${triggerName}`, `ALTER TABLE ${relation} ENABLE TRIGGER ${triggerName}`],
+      [`DROP TRIGGER ${triggerName} ON ${relation}`, triggerDefinition],
+      ["DROP INDEX private.square_production_customer_one_live_workspace", indexDefinition],
+      [`ALTER TABLE ${relation} DROP CONSTRAINT ${constraintName}; ALTER TABLE ${relation} ADD CONSTRAINT ${constraintName} CHECK (true)`,
+        `ALTER TABLE ${relation} DROP CONSTRAINT ${constraintName}; ALTER TABLE ${relation} ADD CONSTRAINT ${constraintName} ${constraintDefinition}`]
+    ]) {
+      psql(["-c", mutation]);
+      try { qualify(internalBinary, "authority"); }
+      finally { psql(["-c", restore]); }
+      qualify(internalBinary);
+    }
+    stage = "customer_open_binding_role_fence";
+    const customerFixture = fs.readFileSync(path.join(repository,
+      "supabase/tests/square_production_customer_connection.test.sql"), "utf8");
+    const fixtureStart=customerFixture.indexOf("insert into private.integration_production_platform_bindings(");
+    const fixtureEnd=customerFixture.indexOf("insert into auth.users(");
+    check(fixtureStart>0 && fixtureEnd>fixtureStart, "customer_binding_fixture_boundaries");
+    psqlSource(customerFixture.slice(fixtureStart,fixtureEnd));
+    check(psql(["-At","-c","SELECT count(*) FROM pg_roles WHERE rolname='square_production_oauth'"])
+      .stdout.trim()==="0", "customer_fence_role_starts_absent");
+    psql(["-c", `UPDATE private.square_production_customer_bindings SET consent_enabled=true;
+      CREATE ROLE square_production_oauth LOGIN INHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
+      GRANT square_production_oauth_authority TO square_production_oauth
+        WITH ADMIN FALSE, INHERIT TRUE, SET FALSE`]);
+    qualify(internalBinary, "closed_authority");
+    const customerFence = spawnSync(internalBinary,[socket(),port,database,"postgres","managed-customer-fence"],{
+      env:{...baseEnv,TMPDIR:root},encoding:"utf8",timeout:30000,maxBuffer:4096,
+    });
+    stage="customer_open_binding_native_fence_closes_role_and_sessions";
+    check(!customerFence.error && customerFence.status===0 &&
+      customerFence.stdout==="production_managed_customer_fence_valid\n" && customerFence.stderr==="",
+    "customer_open_binding_native_fence_closes_role_and_sessions");
+    psql(["-c", "UPDATE private.square_production_customer_bindings SET consent_enabled=false"]);
+    qualify(internalBinary);
     internalRuntime = "exact_104_qualified";
   }
   cleanup();

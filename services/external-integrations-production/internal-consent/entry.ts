@@ -1,6 +1,7 @@
 import "server-only";
 import { createInternalConsentServer } from "./server";
 import { createProductionInternalConsentRuntime } from "./runtime";
+import { createProductionCustomerRuntime } from "./customer-runtime";
 
 process.on("uncaughtException", () => process.exit(78));
 process.on("unhandledRejection", () => process.exit(78));
@@ -10,9 +11,11 @@ async function main() {
   const raw = process.env.SQUARE_INTERNAL_CONSENT_CONFIGURATION;
   // No configuration is the ordinary dormant deployment: no metadata, secret,
   // database, authentication or provider access occurs.
-  const server = raw
-    ? await createProductionInternalConsentRuntime(JSON.parse(raw))
-    : createInternalConsentServer({ profile: "oauth", runtime: null, authenticate: async () => null });
+  const config = raw ? JSON.parse(raw) : null;
+  const server = !config
+    ? createInternalConsentServer({ profile: "oauth", runtime: null, authenticate: async () => null })
+    : config.mode === "customer_owner_v1" ? await createProductionCustomerRuntime(config)
+    : await createProductionInternalConsentRuntime(config);
   server.listen(port, "0.0.0.0");
   for (const signal of ["SIGTERM", "SIGINT"]) process.on(signal, () => server.close(() => process.exit(0)));
 }

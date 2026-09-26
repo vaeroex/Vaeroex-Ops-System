@@ -43,3 +43,29 @@ export function createInternalRpc(profile: "oauth" | "broker" | "runtime" | "evi
     finally { if (database) try { await database.end(); } catch { /* Never expose connection diagnostics. */ } }
   };
 }
+
+const customerOperations = {
+  oauth: new Set(["lookup_state", "consume_state", "deny_state", "authorization_failed"]),
+  broker: new Set(["acquire_exchange", "authorize_exchange", "commit_credential"])
+};
+
+/** The customer callback and broker share only this fixed customer RPC.
+ * Browser owner operations use the signed authenticated Supabase session and
+ * never obtain either native LOGIN or a generic table capability. */
+export function createCustomerRpc(profile: "oauth" | "broker", open: () => Promise<Database>): InternalRpc {
+  return async (operation, payload) => {
+    if (!customerOperations[profile].has(operation)) throw new Error("square_customer_database_operation_denied");
+    let database: Database | undefined;
+    try {
+      database = await open();
+      const identity = await database.query("select session_user::text as login, current_user::text as current_login");
+      if (identity.rows.length !== 1 || identity.rows[0].login !== `square_production_${profile}` ||
+        identity.rows[0].current_login !== `square_production_${profile}`) throw new Error("identity");
+      const result = await database.query("select public.square_production_customer_v1($1::text,$2::jsonb) as value",
+        [operation, JSON.stringify(payload)]);
+      if (result.rows.length !== 1 || result.rows[0].value === null || result.rows[0].value === undefined) throw new Error("result");
+      return result.rows[0].value;
+    } catch { throw new Error("square_customer_database_result_unavailable"); }
+    finally { if (database) try { await database.end(); } catch { /* Keep diagnostics private. */ } }
+  };
+}

@@ -1,6 +1,7 @@
 // Exact additive dormant qualification/connection scope. Legacy parser suites still reject
 // every other database/runtime path; no directory-wide exemption is permitted.
 const approvedSquareQualificationPaths = Object.freeze([
+  "tools/native-broker-provisioning/customer-source.mjs",
   // Closed Production activation; exact infrastructure/runtime files only.
   "scripts/external-integrations-production-activation-regression-tests.js",
   "services/external-integrations-production/bootstrap-runtime/.dockerignore",
@@ -193,7 +194,13 @@ const approvedSquareQualificationPaths = Object.freeze([
   "app/api/integrations/square/disconnect/route.ts",
   "app/api/integrations/square/webhook/route.ts",
   "components/integrations/SquareConnectionPanel.tsx",
-  "vercel.json"
+  "vercel.json",
+  "components/integrations/SquareProductionCustomerPanel.tsx",
+  "services/external-integrations-production/internal-consent/customer-flow.ts",
+  "services/external-integrations-production/internal-consent/customer-runtime.ts",
+  "services/external-integrations-production/internal-consent/customer-server.ts",
+  "supabase/production-migrations/20260925032300_square_production_customer_connection.sql",
+  "supabase/tests/square_production_customer_connection.test.sql"
 ]);
 const approved = new Set(approvedSquareQualificationPaths);
 function withoutSquareQualificationPaths(changedFiles) {

@@ -245,6 +245,8 @@ jobs:
       - name: Test Square internal seller consent handlers
         run: |
           node scripts/square-production-internal-consent-tests.js
+          node scripts/square-production-customer-flow-tests.js
+          node scripts/square-production-customer-workspace-tests.js
           pnpm exec ncc build services/external-integrations-production/internal-consent/entry.ts -o services/external-integrations-production/internal-consent/dist --no-cache --transpile-only --external server-only
           node services/external-integrations-production/internal-consent/package-release.cjs
 
@@ -697,6 +699,10 @@ jobs:
       - name: Qualify the closed Square Production internal-pilot runtime
         if: ${{ !cancelled() && steps.isolated_database_setup.outcome == 'success' }}
         run: node scripts/run-square-production-internal-pilot-runtime-qualification.js
+
+      - name: Qualify closed Square Production customer authority in disposable PostgreSQL
+        if: ${{ !cancelled() && steps.isolated_database_setup.outcome == 'success' }}
+        run: node scripts/run-square-production-customer-qualification.js
 
       - name: Remove isolated database state
         if: always()
