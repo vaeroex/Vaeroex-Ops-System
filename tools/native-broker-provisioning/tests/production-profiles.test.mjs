@@ -14,6 +14,18 @@ import {
   productionSourcePins,
 } from "../production-profile.mjs";
 import { productionSourceManifest } from "../production-source.mjs";
+import { customerNativeContract, customerMigrationFile, customerMigrationSha256 } from "../customer-source.mjs";
+
+test("customer native contract pins exactly the candidate and its eight function bodies", () => {
+  const contract=customerNativeContract();
+  assert.equal(createHash("sha256").update(readFileSync(customerMigrationFile)).digest("hex"),customerMigrationSha256);
+  const prefix="square_production_customer_";
+  assert.ok(contract.sql.includes(`left(p.proname,${prefix.length})='${prefix}'`));
+  assert.equal((contract.sql.match(/\('[^']+','[a-f0-9]{64}'\)/g)||[]).length,8);
+  assert.match(contract.sql,/count\(\*\)=4 FROM pg_class/);
+  assert.match(contract.sql,/r\.relrowsecurity AND r\.relforcerowsecurity/);
+  assert.match(contract.sql,/count\(\*\)=3 FROM pg_proc/);
+});
 import { createLocalSyntheticNativeAdapter, createLocalSyntheticProductionNativeAdapter } from "../adapter.mjs";
 import { createInMemorySyntheticSecretStore } from "../lifecycle.mjs";
 import { sandboxTarget } from "../sandbox-profile.mjs";

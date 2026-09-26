@@ -1,6 +1,7 @@
 // Exact additive dormant qualification/connection scope. Legacy parser suites still reject
 // every other database/runtime path; no directory-wide exemption is permitted.
 const approvedSquareQualificationPaths = Object.freeze([
+  "tools/native-broker-provisioning/customer-source.mjs",
   // Closed Production activation; exact infrastructure/runtime files only.
   "scripts/external-integrations-production-activation-regression-tests.js",
   "services/external-integrations-production/bootstrap-runtime/.dockerignore",

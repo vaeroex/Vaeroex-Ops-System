@@ -1,6 +1,6 @@
--- Dormant Production customer connection authority. This is not an activation.
--- The reviewed foundation's false-only gates remain unchanged. A later, separately
--- approved activation must evolve them before prepare/callback/commit can succeed.
+-- Closed-by-default Production customer consent authority. This is not activation.
+-- A separately approved consent binding enables only this customer RPC path;
+-- the existing foundation/internal-pilot gates and contracts stay unchanged.
 -- Opt-in Production-only candidate; never part of the mixed Sandbox fixture chain.
 begin;
 
@@ -27,6 +27,30 @@ begin
 end
 $baseline$;
 
+create table private.square_production_customer_bindings (
+  provider_key text not null default 'square' check(provider_key='square'),
+  environment text not null default 'production' check(environment='production'),
+  project_id text not null default 'vaeroex-integrations-prod' check(project_id='vaeroex-integrations-prod'),
+  generation bigint not null check(generation between 1 and 9007199254740991),
+  configuration_fingerprint text not null check(configuration_fingerprint ~ '^sha256:[a-f0-9]{64}$'),
+  platform_binding_key text not null check(platform_binding_key='vaeroex-production-integrations-v1'),
+  platform_fingerprint text not null check(platform_fingerprint ~ '^sha256:[a-f0-9]{64}$'),
+  provider_authority_fingerprint text not null check(provider_authority_fingerprint ~ '^sha256:[a-f0-9]{64}$'),
+  source_commit text not null check(source_commit ~ '^[a-f0-9]{40}$'),
+  consent_enabled boolean not null default false,
+  primary key(provider_key,environment,project_id,generation),
+  unique(provider_key,environment,project_id,generation,configuration_fingerprint),
+  foreign key(provider_key,environment,project_id,generation,configuration_fingerprint)
+    references private.square_production_configuration_generations(provider_key,environment,project_id,generation,configuration_fingerprint)
+    on update restrict on delete restrict,
+  foreign key(platform_binding_key,platform_fingerprint)
+    references private.integration_production_platform_bindings(binding_key,platform_fingerprint)
+    on update restrict on delete restrict,
+  foreign key(provider_key,environment,provider_authority_fingerprint)
+    references private.integration_production_provider_bindings(provider_key,environment,provider_authority_fingerprint)
+    on update restrict on delete restrict
+);
+
 create table private.square_production_customer_connections (
   connection_id uuid primary key,
   provider_key text not null default 'square' check(provider_key='square'),
@@ -52,7 +76,7 @@ create table private.square_production_customer_connections (
   foreign key(workspace_id,business_entity_id)
     references public.business_entities(workspace_id,id) on update restrict on delete restrict,
   foreign key(provider_key,environment,project_id,generation,configuration_fingerprint)
-    references private.square_production_runtime_bindings(provider_key,environment,project_id,generation,configuration_fingerprint)
+    references private.square_production_customer_bindings(provider_key,environment,project_id,generation,configuration_fingerprint)
     on update restrict on delete restrict,
   check((credential_id is null)=(credential_version is null)),
   check((merchant_id is null)=(seller_label is null)),
@@ -117,6 +141,7 @@ do $rls$
 declare relation_name text;
 begin
   foreach relation_name in array array[
+    'square_production_customer_bindings',
     'square_production_customer_connections','square_production_customer_oauth_states',
     'square_production_customer_credentials'
   ] loop
@@ -231,7 +256,7 @@ returns private.square_production_configuration_generations
 language plpgsql volatile security definer set search_path=''
 as $function$
 declare configuration private.square_production_configuration_generations;
-declare binding private.square_production_runtime_bindings;
+declare binding private.square_production_customer_bindings;
 declare provider_binding private.integration_production_provider_bindings;
 declare platform_binding private.integration_production_platform_bindings;
 begin
@@ -240,7 +265,7 @@ begin
   elsif p_capability<>'owner' then
     raise exception 'square_production_customer_gate_closed' using errcode='42501';
   end if;
-  select b.* into binding from private.square_production_runtime_bindings b
+  select b.* into binding from private.square_production_customer_bindings b
     where b.provider_key='square' and b.environment='production'
       and b.project_id='vaeroex-integrations-prod'
     order by b.generation desc limit 1 for share;
@@ -263,15 +288,42 @@ begin
   select platform.* into platform_binding from private.integration_production_platform_bindings platform
     where platform.binding_key=provider_binding.platform_binding_key
       and platform.project_id='vaeroex-integrations-prod' for share;
-  if not found or not platform_binding.infrastructure_provisioned
-    or not platform_binding.runtime_enabled or not provider_binding.enabled
-    or not provider_binding.provider_calls_enabled or not provider_binding.customer_onboarding_enabled
-    or not configuration.runtime_enabled or not configuration.provider_calls_enabled
-    or not configuration.customer_onboarding_enabled
+  if not found or not binding.consent_enabled
+    or platform_binding.platform_fingerprint<>binding.platform_fingerprint
+    or platform_binding.source_commit<>binding.source_commit
+    or platform_binding.environment<>'production'
+    or provider_binding.provider_authority_fingerprint<>binding.provider_authority_fingerprint
+    or configuration.provider_authority_fingerprint<>binding.provider_authority_fingerprint
+    or provider_binding.source_commit<>binding.source_commit
+    or configuration.source_commit<>binding.source_commit
+    or configuration.region<>provider_binding.region or provider_binding.region<>platform_binding.region
+    or configuration.application_id<>provider_binding.application_id
+    or configuration.callback_uri<>provider_binding.callback_uri
+    or configuration.kms_key_resource<>provider_binding.kms_key_resource
+    or platform_binding.infrastructure_provisioned or platform_binding.runtime_enabled
+    or platform_binding.economic_contributions_enabled or platform_binding.ai_dispatch_enabled
+    or provider_binding.enabled or provider_binding.provider_calls_enabled
+    or provider_binding.customer_onboarding_enabled or provider_binding.evidence_enabled
+    or configuration.runtime_enabled or configuration.provider_calls_enabled
+    or configuration.customer_onboarding_enabled or configuration.evidence_enabled
     or configuration.webhook_intake_enabled or configuration.economic_contributions_enabled
     or configuration.ai_dispatch_enabled or provider_binding.webhook_intake_enabled
     or provider_binding.economic_contributions_enabled or provider_binding.ai_dispatch_enabled
     then raise exception 'square_production_customer_gate_closed' using errcode='42501'; end if;
+  -- Only acknowledged version 1 and the two native service identities are
+  -- prerequisites for consent. No scheduler/webhook/runtime references invented.
+  if (select count(*) from private.integration_production_provider_secrets s
+    where s.provider_key='square' and s.environment='production' and s.project_id=binding.project_id
+      and ((s.secret_purpose='application' and s.secret_version_resource='projects/vaeroex-integrations-prod/secrets/square-production-application/versions/1')
+        or (s.secret_purpose='database_oauth' and s.secret_version_resource='projects/vaeroex-integrations-prod/secrets/square-production-oauth-db/versions/1')
+        or (s.secret_purpose='database_broker' and s.secret_version_resource='projects/vaeroex-integrations-prod/secrets/square-production-broker-db/versions/1')))<>3
+    or (select count(*) from private.integration_production_provider_capabilities c
+      where c.provider_key='square' and c.environment='production' and c.project_id=binding.project_id
+        and c.capability in ('oauth','broker') and c.database_login::text='square_production_'||c.capability
+        and c.database_secret_purpose='database_'||c.capability
+        and c.service_account='sq-prod-'||c.capability||'@vaeroex-integrations-prod.iam.gserviceaccount.com')<>2 then
+    raise exception 'square_production_customer_gate_closed' using errcode='42501';
+  end if;
   return configuration;
 end
 $function$;
@@ -349,7 +401,7 @@ begin
     perform private.square_production_customer_require_owner_v1(actor_uuid,session_uuid,workspace_uuid,entity_uuid);
     perform private.square_production_customer_require_eligible_v1(workspace_uuid);
     select b.generation,b.configuration_fingerprint into generation_number,configuration_hash
-      from private.square_production_runtime_bindings b
+      from private.square_production_customer_bindings b
       where b.provider_key='square' and b.environment='production'
         and b.project_id='vaeroex-integrations-prod'
       order by b.generation desc limit 1;

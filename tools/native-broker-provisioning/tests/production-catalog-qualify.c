@@ -274,7 +274,7 @@ int main(int argc,char **argv) {
     ok=ok && catalog_step("overlay_schema",production_overlay_schema_valid());
     ok=ok && catalog_step("baseline_triggers",production_baseline_triggers_valid(phase));
     ok=ok && catalog_step("baseline_function_abi",production_function_abi_valid());
-    if (ok && phase==PRODUCTION_PHASE_INTERNAL_RUNTIME) {
+    if (ok && phase>=PRODUCTION_PHASE_INTERNAL_RUNTIME) {
       ok=catalog_step("internal_relations",production_internal_runtime_relations_valid()) &&
         catalog_step("internal_schema",production_internal_runtime_schema_valid()) &&
         catalog_step("internal_triggers",production_internal_runtime_triggers_valid()) &&

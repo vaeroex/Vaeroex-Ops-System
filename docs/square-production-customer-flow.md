@@ -34,16 +34,27 @@ The candidate resides in `supabase/production-migrations`, outside the mixed
 Sandbox history; an explicitly authorized Production staging operation must copy
 that exact reviewed file beside the 104 canonical files. Ordinary local migration
 commands cannot accidentally apply it after the Sandbox chain.
-Current false-only activation constraints remain intact, so successful customer
-consent SQL branches require a later coordinated activation contract.
+Existing false-only foundation/internal-pilot constraints remain intact. One
+private FORCE-RLS customer consent binding, empty on installation and disabled
+by default, authorizes only this customer flow. It binds the exact immutable
+configuration generation, platform/provider fingerprints and source identity.
+Opening it requires separate authorization and verified application/OAuth/broker
+version-1 metadata and service identities; no scheduler/webhook/runtime/evidence
+secret references are invented or required for consent. No service or workspace
+owner receives table access or permission to change the binding.
 
 ## Required before a live deployment
 
-The current native provisioner rejects versions after `20260902191325` and rejects
-the extra customer RPC grant to the OAuth/broker authority roles. Its exact source,
-ledger, catalog, and admission contract must be updated and qualified before this
-migration can be applied or the customer service admitted. This is a current
-compatibility blocker, not an approved bypass of native checks.
+The native provisioner recognizes exactly the 104-entry internal baseline or the
+105-entry customer ledger ending `20260925032300`. The offline builder pins the
+customer migration bytes and all eight customer function bodies. Only OAuth and
+broker may reach the extra customer RPC; peer grants remain rejected. Native
+qualification retains the foundation/internal checks and checks the customer
+ownership, FORCE RLS and closed ACL contract. Provisioning requires customer
+consent disabled and holds the customer relations through commit. Disposable
+tests exercise native `ADMIN FALSE, INHERIT TRUE, SET FALSE` admission without
+role switching, owner preparation, OAuth consumption, broker replay/authorization,
+and closing the consent binding. Remote installation/admission remain unapproved.
 
 After code/database qualification and native compatibility, build the changed
 consent image through the repository-bound trigger and run vulnerability and

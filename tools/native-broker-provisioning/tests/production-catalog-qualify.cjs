@@ -28,6 +28,7 @@ const pins = Object.freeze({
 });
 const hash = source => crypto.createHash("sha256").update(source).digest("hex");
 let stage = "source_manifest", root, socketRoot, running = false, terminating = false, assertions = 0;
+let customerContract;
 const check = (value, name) => { assertions++; if (!value) { stage = name; throw new Error("catalog_qualification_failed"); } };
 const contractStages = new Set([
   "begin", "closed_authority", "managed_catalog_fence", "ledger_phase", "relations", "foundation_schema", "overlay_schema",
@@ -194,6 +195,7 @@ function compile(output, sourcePin) {
     `-Wl,-rpath,${library}`, "-DVAEROEX_SYNTHETIC_ONLY", "-DVAEROEX_MANAGED_PROFILE_TEST",
     "-DVAEROEX_PRODUCTION_OAUTH", `-DVAEROEX_CATALOG_SOCKET_PATH=${JSON.stringify(socket())}`,
     ...(sourcePin ? [`-DVAEROEX_PRODUCTION_INTERNAL_RUNTIME_SOURCE_SHA256=${JSON.stringify(sourcePin)}`] : []),
+    ...(sourcePin && customerContract ? [`-DVAEROEX_PRODUCTION_CUSTOMER_CONTRACT=${JSON.stringify(customerContract.sql)}`] : []),
     source, "-lpq", "-o", output];
   run("/usr/bin/cc", flags);
 }
@@ -327,6 +329,8 @@ process.once("SIGINT", () => terminate("SIGINT"));
 process.once("SIGTERM", () => terminate("SIGTERM"));
 
 async function main() {
+  const customerModule = await import("../customer-source.mjs");
+  customerContract = customerModule.customerNativeContract();
   stage = "cluster_bootstrap";
   // Keep the separately owned socket directory below Darwin's sockaddr_un
   // bound while compiling that exact path into the local-only C harness.
@@ -647,6 +651,22 @@ password_encryption='scram-sha-256'
       CREATE TRIGGER square_production_internal_permit_delete_guard BEFORE DELETE ON private.square_production_internal_permits
       FOR EACH ROW WHEN (false) EXECUTE FUNCTION private.square_production_internal_reject_immutable_mutation_v1();`]);
     qualify(internalBinary, "internal_triggers");
+    // Restore the deliberate substitution before qualifying the customer delta.
+    psql(["-c", `DROP TRIGGER square_production_internal_permit_delete_guard ON private.square_production_internal_permits;
+      CREATE TRIGGER square_production_internal_permit_delete_guard BEFORE DELETE ON private.square_production_internal_permits
+      FOR EACH ROW EXECUTE FUNCTION private.square_production_internal_reject_immutable_mutation_v1();`]);
+    stage = "customer_source_and_native_admission";
+    psqlSource(fs.readFileSync(customerModule.customerMigrationFile, "utf8"), 120000);
+    psql(["-c", "INSERT INTO supabase_migrations.schema_migrations(version) VALUES ('20260925032300')"]);
+    qualify(internalBinary);
+    psql(["-c", "GRANT EXECUTE ON FUNCTION public.square_production_customer_v1(text,jsonb) TO square_production_runtime_authority"]);
+    qualify(internalBinary, "authority");
+    psql(["-c", "REVOKE EXECUTE ON FUNCTION public.square_production_customer_v1(text,jsonb) FROM square_production_runtime_authority"]);
+    qualify(internalBinary);
+    psql(["-c", "ALTER TABLE private.square_production_customer_credentials NO FORCE ROW LEVEL SECURITY"]);
+    qualify(internalBinary, "authority");
+    psql(["-c", "ALTER TABLE private.square_production_customer_credentials FORCE ROW LEVEL SECURITY"]);
+    qualify(internalBinary);
     internalRuntime = "exact_104_qualified";
   }
   cleanup();

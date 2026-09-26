@@ -115,7 +115,10 @@ async function main() {
     assert.equal(calls.length, count);
     process.stdout.write("square_production_customer_workspace_owner_csrf_host_session_zero_ai_passed\n");
   } finally {
-    for (const [key, value] of Object.entries(prior)) value === undefined ? delete process.env[key] : process.env[key] = value;
+    for (const [key, value] of Object.entries(prior)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
   }
 }
 const fixtureRunner = fs.readFileSync(path.join(root, "scripts/run-square-production-customer-qualification.js"), "utf8");
