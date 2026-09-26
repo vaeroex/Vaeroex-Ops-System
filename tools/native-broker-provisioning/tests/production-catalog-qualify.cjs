@@ -731,14 +731,17 @@ password_encryption='scram-sha-256'
     const fixtureEnd=customerFixture.indexOf("insert into auth.users(");
     check(fixtureStart>0 && fixtureEnd>fixtureStart, "customer_binding_fixture_boundaries");
     psqlSource(customerFixture.slice(fixtureStart,fixtureEnd));
+    check(psql(["-At","-c","SELECT count(*) FROM pg_roles WHERE rolname='square_production_oauth'"])
+      .stdout.trim()==="0", "customer_fence_role_starts_absent");
     psql(["-c", `UPDATE private.square_production_customer_bindings SET consent_enabled=true;
-      ALTER ROLE square_production_oauth LOGIN INHERIT;
+      CREATE ROLE square_production_oauth LOGIN INHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
       GRANT square_production_oauth_authority TO square_production_oauth
         WITH ADMIN FALSE, INHERIT TRUE, SET FALSE`]);
     qualify(internalBinary, "closed_authority");
     const customerFence = spawnSync(internalBinary,[socket(),port,database,"postgres","managed-customer-fence"],{
       env:{...baseEnv,TMPDIR:root},encoding:"utf8",timeout:30000,maxBuffer:4096,
     });
+    stage="customer_open_binding_native_fence_closes_role_and_sessions";
     check(!customerFence.error && customerFence.status===0 &&
       customerFence.stdout==="production_managed_customer_fence_valid\n" && customerFence.stderr==="",
     "customer_open_binding_native_fence_closes_role_and_sessions");

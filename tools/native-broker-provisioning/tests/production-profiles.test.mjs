@@ -42,6 +42,7 @@ test("customer binding may remain open only during exact native role revocation"
   const catalogRunner=readFileSync(new URL("./production-catalog-qualify.cjs",import.meta.url),"utf8");
   assert.match(catalogRunner,/\$\{internalDeleteTriggerDefinition\};/);
   assert.match(catalogRunner,/internalDeleteTriggerDefinition[\s\S]*?qualify\(internalBinary\);[\s\S]*?stage = "customer_source_and_native_admission"/);
+  assert.match(catalogRunner,/customer_fence_role_starts_absent[\s\S]*?CREATE ROLE square_production_oauth LOGIN INHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS/);
   assert.match(harness,/customer_open_binding_rejects_non_fence/);
   assert.match(harness,/customer_binding_not_mutated_by_role_fence/);
   assert.match(harness,/production_ledger_phase\(\)==PRODUCTION_PHASE_CUSTOMER[\s\S]*?SET search_path=pg_catalog/);
