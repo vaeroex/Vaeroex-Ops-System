@@ -6,6 +6,56 @@ mock_provider "google" {
   }
 }
 
+run "customer_first_read_uses_only_existing_runtime_and_broker" {
+  command = plan
+  variables {
+    internal_consent = {
+      image_digest             = "us-west1-docker.pkg.dev/vaeroex-integrations-prod/vaeroex-integrations-images/square-internal-consent@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      source_commit            = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      mode                     = "customer_owner_v1"
+      application_id           = "sq0idp-synthetic-application"
+      broker_origin            = "https://square-production-broker-u5c6zahmpq-uw.a.run.app"
+      database_versions        = { oauth = 1, broker = 1 }
+      database_ca              = file("../../../../tools/jit-access-feasibility/supabase-root-2021.crt")
+      customer_reads           = true
+      customer_runtime_version = 1
+    }
+  }
+  assert {
+    condition = alltrue([for mode in ["broker", "runtime"] :
+      jsondecode([for env in google_cloud_run_v2_service.square[mode].template[0].containers[0].env :
+    env.value if env.name == "SQUARE_INTERNAL_CONSENT_CONFIGURATION"][0]).customerReads == true])
+    error_message = "Only checked customer runtime/broker paths may execute the first read."
+  }
+  assert {
+    condition = (length(google_cloud_run_v2_service_iam_member.manual_read_invoker) == 1 &&
+      google_cloud_run_v2_service.square["runtime"].template[0].containers[0].resources[0].cpu_idle == false &&
+      alltrue([for mode in ["evidence", "scheduler", "webhook"] :
+      google_cloud_run_v2_service.square[mode].template[0].containers[0].image == var.bootstrap_image_digest]) &&
+      !var.runtime_enabled && !var.provider_calls_enabled && !var.customer_onboarding_enabled &&
+    !var.webhook_intake_enabled && !var.economic_contributions_enabled && !var.ai_dispatch_enabled)
+    error_message = "The optional customer read configuration must not activate peers, internal permits or general gates."
+  }
+}
+
+run "customer_first_read_rejects_unprovisioned_runtime_version" {
+  command = plan
+  variables {
+    internal_consent = {
+      image_digest             = "us-west1-docker.pkg.dev/vaeroex-integrations-prod/vaeroex-integrations-images/square-internal-consent@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      source_commit            = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      mode                     = "customer_owner_v1"
+      application_id           = "sq0idp-synthetic-application"
+      broker_origin            = "https://square-production-broker-u5c6zahmpq-uw.a.run.app"
+      database_versions        = { oauth = 1, broker = 1 }
+      database_ca              = file("../../../../tools/jit-access-feasibility/supabase-root-2021.crt")
+      customer_reads           = true
+      customer_runtime_version = 2
+    }
+  }
+  expect_failures = [var.internal_consent]
+}
+
 run "customer_consent_selects_exact_customer_runtime_configuration" {
   command = plan
   variables {

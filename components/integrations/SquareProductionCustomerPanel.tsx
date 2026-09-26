@@ -1,4 +1,4 @@
-import type { ProductionSquareCustomerView } from "@/lib/integrations/control-plane/square-production-customer-view";
+import type { ProductionSquareCustomerView,ProductionSquareReadView } from "@/lib/integrations/control-plane/square-production-customer-view";
 
 const label = {
   authorization_required: "Authorization required",
@@ -10,7 +10,7 @@ const label = {
 
 /** No provider IDs, tokens, raw observations or inferred economic values enter
  * this view. Status is always fetched from current workspace authority. */
-export function SquareProductionCustomerPanel({ view }: { view: ProductionSquareCustomerView }) {
+export function SquareProductionCustomerPanel({ view,reads={} }: { view: ProductionSquareCustomerView;reads?:Record<string,ProductionSquareReadView> }) {
   const entities = new Map(view.businessEntities.map(entity => [entity.id, entity.label]));
   return <main className="mx-auto max-w-3xl space-y-6 p-6">
     <h1 className="text-2xl font-semibold text-ink">Square Production connection</h1>
@@ -20,7 +20,25 @@ export function SquareProductionCustomerPanel({ view }: { view: ProductionSquare
       <h2 className="font-semibold">{connection.sellerLabel ?? "Square seller awaiting verification"}</h2>
       <p role="status">{label[connection.state]}</p>
       <p>Business Entity: {entities.get(connection.businessEntityId) ?? "Unavailable"}</p>
-      {connection.state === "mapping_required" ? <p>Location mapping and read access have not been approved. No records are being counted as complete history.</p> : null}
+      {connection.state === "mapping_required" && !reads[connection.connectionId] ? <p>Location mapping and read access have not been approved. No records are being counted as complete history.</p> : null}
+      {reads[connection.connectionId] ? <div className="space-y-3">
+        {!reads[connection.connectionId].mappedLocation ? <form action="/api/integrations/square/mapping" method="post">
+          <input type="hidden" name="connectionId" value={connection.connectionId}/>
+          <label>Verified Square location <select name="locationFingerprint" required defaultValue="">
+            <option value="" disabled>Select a location</option>
+            {reads[connection.connectionId].locations.map(location=><option key={location.fingerprint} value={location.fingerprint}>{location.label}</option>)}
+          </select></label><button type="submit">Confirm this workspace’s location</button>
+        </form>:<p>Location mapped: {reads[connection.connectionId].locations.find(location=>location.fingerprint===reads[connection.connectionId].mappedLocation)?.label??"Verified location"}</p>}
+        {reads[connection.connectionId].mappedLocation&&reads[connection.connectionId].readStatus==="not_requested"?<form action="/api/integrations/square/read" method="post">
+          <input type="hidden" name="connectionId" value={connection.connectionId}/>
+          <p>Read the first Payments page for the last 24 hours (up to 100 observations). No continuing synchronization is enabled.</p>
+          <button type="submit">Request one read-only Payments page</button>
+        </form>:null}
+        <p role="status">Payments read: {reads[connection.connectionId].readStatus}. Refresh this page to check the result.</p>
+        {reads[connection.connectionId].readStatus==="committed"?<p>{reads[connection.connectionId].observationCount} verified non-economic Payment observations · Square Production · verified {reads[connection.connectionId].verifiedAt}.
+          {reads[connection.connectionId].hasMore?" More provider pages exist; they have not been read.":" No continuation was returned for this bounded request."}</p>:null}
+        <p>Historical completeness unknown. No revenue, profit, netting, accounting truth, inventory value or complete-history claim.</p>
+      </div>:null}
       {connection.state !== "disconnected" ?
         <form action="/api/integrations/square/disconnect" method="post">
           <input type="hidden" name="connectionId" value={connection.connectionId} />

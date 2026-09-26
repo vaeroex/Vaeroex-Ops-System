@@ -2,7 +2,7 @@ import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { SquareConnectionPanel } from "@/components/integrations/SquareConnectionPanel";
 import { SquareProductionCustomerPanel } from "@/components/integrations/SquareProductionCustomerPanel";
-import { productionSquareCustomerEnabled, productionSquareCustomerView } from "@/lib/integrations/control-plane/square-production-customer";
+import { productionSquareCustomerEnabled, productionSquareCustomerView,productionSquareReadViews } from "@/lib/integrations/control-plane/square-production-customer";
 import { PUBLIC_SITE_URL } from "@/lib/seo/public-seo";
 import { squareCustomerConnectionsEnabled, squareCustomerPageView } from "@/lib/integrations/control-plane/square-customer-availability";
 import { SQUARE_CUSTOMER_SETTINGS_PATH } from "@/lib/integrations/control-plane/square-customer-routes";
@@ -17,7 +17,7 @@ export default async function SquareConnectionPage() {
       incoming.get("x-forwarded-proto") !== "https") notFound();
     const view = await productionSquareCustomerView();
     if (!view) notFound();
-    return <SquareProductionCustomerPanel view={view} />;
+    return <SquareProductionCustomerPanel view={view} reads={await productionSquareReadViews(view)} />;
   }
   if (!squareCustomerConnectionsEnabled()) notFound();
   const incoming = await headers();

@@ -126,6 +126,39 @@ async function main() {
     const after = await client.query('select version from supabase_migrations.schema_migrations order by version');
     assert.deepEqual(after.rows,before.rows,'qualification never edits migration history');
     console.log('square_production_customer_disposable_qualification_ok');
+    // This explicit disposable-only ledger step emulates the normal migrator
+    // before the dependent read candidate. It cannot run against a hosted URL.
+    await client.query("insert into supabase_migrations.schema_migrations(version) values ('20260925032300')");
+    const readModule=await import('../tools/native-broker-provisioning/customer-read-source.mjs');
+    await client.query(fs.readFileSync(readModule.customerReadMigrationFile,'utf8'));
+    const catalog=await client.query(`set search_path=pg_catalog; ${readModule.customerReadCatalogSql}`);
+    const catalogHash=catalog.at(-1).rows[0].encode;
+    assert.match(catalogHash,/^[a-f0-9]{64}$/);
+    console.log(JSON.stringify({label:'customer_read_native_catalog_fingerprint',sha256:catalogHash}));
+    const parts=fs.readFileSync(path.join(root,'supabase/tests/square_production_customer_first_read.test.sql'),'utf8')
+      .split(/^-- customer-read-native-session:(broker|runtime|admin)\s*$/m);
+    assert.deepEqual(parts.filter((_,index)=>index%2===1),['broker','admin','runtime','broker','admin','runtime','admin']);
+    await client.query(parts[0]);
+    const password=crypto.randomBytes(32).toString('hex');
+    for(const profile of ['broker','runtime'])await client.query(`alter role square_production_${profile} password '${password}'`);
+    for(let index=1;index<parts.length;index+=2){
+      const profile=parts[index];if(profile==='admin'){await client.query(parts[index+1]);continue;}
+      const url=new URL(databaseUrl);url.username=`square_production_${profile}`;url.password=password;
+      const native=new Client({connectionString:url.toString(),application_name:`square_customer_read_disposable_${profile}`});
+      try{
+        await native.connect();
+        const identity=await native.query('select session_user=$1 and current_user=$1 and current_role=$1 as exact',[`square_production_${profile}`]);
+        assert.equal(identity.rows[0].exact,true,'read uses actual native authenticated identity');
+        if(profile==='runtime'){
+          const fixture=await client.query("select to_regclass('public.square_read_fixture_page') is not null as present");
+          if(fixture.rows[0].present){const page=await client.query('select payload from public.square_read_fixture_page');
+            await native.query("select set_config('vaeroex.test.page',$1,false)",[JSON.stringify(page.rows[0].payload)]);}
+        }
+        await native.query(parts[index+1]);
+      }finally{await native.end();}
+    }
+    console.log('square_customer_mapping_first_page_native_privacy_replay_revocation_passed');
+    assert.equal(catalogHash,readModule.customerReadCatalogSha256,'exact dependent native catalog pin');
   } finally {
     await client.end();
   }
@@ -140,6 +173,8 @@ main().catch(error => {
     path.join(customerDirectory,customerFile),
     path.join(root,'supabase/migrations/20260902191325_square_production_internal_pilot_runtime.sql'),
     path.join(root,'supabase/tests/square_production_customer_connection.test.sql')
+    ,path.join(root,'supabase/production-migrations/20260926232356_square_production_customer_first_read.sql')
+    ,path.join(root,'supabase/tests/square_production_customer_first_read.test.sql')
   ].flatMap(file => [...fs.readFileSync(file,'utf8').matchAll(/raise exception '([a-z_]+)'/g)]
     .map(match => match[1])));
   const permissionLabels = [

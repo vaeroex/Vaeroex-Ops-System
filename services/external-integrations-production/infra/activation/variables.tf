@@ -95,6 +95,8 @@ variable "internal_consent" {
     supabase_publishable_key = optional(string)
     manual_read              = optional(any)
     read_database_versions   = optional(object({ runtime = number, evidence = number }))
+    customer_reads           = optional(bool, false)
+    customer_runtime_version = optional(number)
   })
   default  = null
   nullable = true
@@ -108,10 +110,11 @@ variable "internal_consent" {
       (var.internal_consent.mode == "customer_owner_v1" ? (
         can(regex("^sq0idp-[A-Za-z0-9_-]{1,184}$", var.internal_consent.application_id)) &&
         var.internal_consent.permit == null && var.internal_consent.supabase_publishable_key == null &&
-        var.internal_consent.manual_read == null && var.internal_consent.read_database_versions == null
+        var.internal_consent.manual_read == null && var.internal_consent.read_database_versions == null &&
+        (var.internal_consent.customer_reads ? var.internal_consent.customer_runtime_version == 1 : var.internal_consent.customer_runtime_version == null)
         ) : (var.internal_consent.mode == "internal_seller_v1" &&
         var.internal_consent.application_id == null && var.internal_consent.permit != null &&
-      var.internal_consent.supabase_publishable_key != null)) &&
+      var.internal_consent.supabase_publishable_key != null && !var.internal_consent.customer_reads && var.internal_consent.customer_runtime_version == null)) &&
       (var.internal_consent.manual_read == null ? var.internal_consent.read_database_versions == null : try(
       var.internal_consent.read_database_versions.runtime == 1 && var.internal_consent.read_database_versions.evidence == 1, false)) &&
       sha256(var.internal_consent.database_ca) == "700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7"

@@ -1,6 +1,12 @@
 // Exact additive dormant qualification/connection scope. Legacy parser suites still reject
 // every other database/runtime path; no directory-wide exemption is permitted.
 const approvedSquareQualificationPaths = Object.freeze([
+  "app/api/integrations/square/read/route.ts",
+  "services/external-integrations-production/internal-consent/customer-read.ts",
+  "services/external-integrations-production/internal-consent/customer-read.test.cjs",
+  "tools/native-broker-provisioning/customer-read-source.mjs",
+  "supabase/production-migrations/20260926232356_square_production_customer_first_read.sql",
+  "supabase/tests/square_production_customer_first_read.test.sql",
   "tools/native-broker-provisioning/customer-source.mjs",
   // Closed Production activation; exact infrastructure/runtime files only.
   "scripts/external-integrations-production-activation-regression-tests.js",

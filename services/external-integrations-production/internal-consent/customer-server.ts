@@ -3,6 +3,8 @@ import "server-only";
 import http from "node:http";
 import { z } from "zod";
 import type { CustomerExchange } from "./customer-flow";
+import { CustomerReadCommandSchema } from "./customer-read";
+import type { CustomerPaymentsPage } from "./customer-read";
 
 const exchangeSchema = z.object({
   stateId: z.string().uuid(), connectionId: z.string().uuid(), generation: z.number().int().positive().safe(),
@@ -53,6 +55,22 @@ export function createCustomerBrokerHandler(input: Readonly<{
   };
 }
 
+export function createCustomerPaymentsHandler(input: {
+  readPage: ((command: ReturnType<typeof CustomerReadCommandSchema.parse>)=>Promise<CustomerPaymentsPage>) | null;
+  authenticateRuntimeService(request:Request):Promise<boolean>;
+}) {
+  return async(request:Request,body:unknown):Promise<Response>=>{
+    if(!input.readPage)return closed();
+    try{
+      const url=new URL(request.url);
+      if(request.method!=="POST"||url.origin!=="https://square-production-broker-u5c6zahmpq-uw.a.run.app"||
+        url.pathname!=="/internal/square/broker/customer-payments"||url.search||url.hash||
+        request.headers.get("content-type")!=="application/json"||!await input.authenticateRuntimeService(request))return closed();
+      return Response.json(await input.readPage(CustomerReadCommandSchema.parse(body)),{headers});
+    }catch{return denied();}
+  };
+}
+
 /** The ordinary dormant entrypoint does not construct this listener. A future
  * reviewed customer-mode deployment must select the matching OAuth/broker
  * profile and exact native role; no generic runtime or webhook endpoint exists. */
@@ -61,9 +79,13 @@ export function createCustomerConsentServer(input: Readonly<{
 }> | Readonly<{
   profile: "broker"; runtime: Parameters<typeof createCustomerBrokerHandler>[0]["runtime"];
   authenticateOAuthService: Parameters<typeof createCustomerBrokerHandler>[0]["authenticateOAuthService"];
+  payments?: Parameters<typeof createCustomerPaymentsHandler>[0];
+}> | Readonly<{
+  profile:"runtime";runtime:null;runOne():Promise<unknown>;
 }>) {
   const oauth = input.profile === "oauth" ? createCustomerOAuthHandler(input.runtime) : null;
   const broker = input.profile === "broker" ? createCustomerBrokerHandler(input) : null;
+  const payments=input.profile==="broker"&&input.payments?createCustomerPaymentsHandler(input.payments):null;
   const server = http.createServer({ maxHeaderSize: 32_768 }, async (incoming, outgoing) => {
     let response: Response;
     try {
@@ -78,7 +100,8 @@ export function createCustomerConsentServer(input: Readonly<{
           if (incoming.headers["transfer-encoding"] || incoming.headers["content-length"] && incoming.headers["content-length"] !== "0")
             throw new Error("body");
           response = await oauth(request, incoming.rawHeaders);
-        } else if (broker && incoming.method === "POST" && incoming.url === "/internal/square/broker/customer-exchange") {
+        } else if (broker && incoming.method === "POST" && (incoming.url === "/internal/square/broker/customer-exchange"||
+          payments&&incoming.url === "/internal/square/broker/customer-payments")) {
           const chunks: Buffer[] = []; let bytes = 0;
           try {
             for await (const part of incoming) {
@@ -88,7 +111,7 @@ export function createCustomerConsentServer(input: Readonly<{
               chunks.push(chunk);
             }
             const raw = Buffer.concat(chunks);
-            try { response = await broker(request, JSON.parse(new TextDecoder("utf8", { fatal: true }).decode(raw))); }
+            try { response = await (incoming.url === "/internal/square/broker/customer-payments" ? payments! : broker)(request, JSON.parse(new TextDecoder("utf8", { fatal: true }).decode(raw))); }
             finally { raw.fill(0); }
           } finally { for (const chunk of chunks) chunk.fill(0); }
         } else response = closed();
@@ -102,5 +125,12 @@ export function createCustomerConsentServer(input: Readonly<{
   server.requestTimeout = 15_000;
   server.headersTimeout = 10_000;
   server.keepAliveTimeout = 5_000;
+  // Poll only the checked database queue, never the provider. A worker failure
+  // stops processing; a leased/uncertain request is not automatically retried.
+  if(input.profile==="runtime"){
+    let stopped=false;let timer:ReturnType<typeof setTimeout>|undefined;
+    const next=async()=>{if(stopped)return;try{await input.runOne();if(!stopped)timer=setTimeout(()=>{void next();},15000);}catch{stopped=true;}};
+    server.once("listening",()=>{void next();});server.once("close",()=>{stopped=true;if(timer)clearTimeout(timer);});
+  }
   return server;
 }
