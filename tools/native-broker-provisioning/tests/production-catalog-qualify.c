@@ -296,7 +296,6 @@ int main(int argc,char **argv) {
     ok=ok && catalog_step("closed_authority",closed_authority(MAPPED_ROLE));
     ok=ok && catalog_step("managed_catalog_fence",managed_catalog_fence_shape());
     ok=ok && catalog_step("ledger_phase",phase!=PRODUCTION_PHASE_INVALID);
-    if (ok && phase==PRODUCTION_PHASE_CUSTOMER) ok=command("SET LOCAL search_path=public");
     ok=ok && catalog_step("relations",production_relations_valid());
     ok=ok && catalog_step("foundation_schema",production_foundation_schema_valid());
     ok=ok && catalog_step("overlay_schema",production_overlay_schema_valid());
@@ -308,7 +307,6 @@ int main(int argc,char **argv) {
         catalog_step("internal_triggers",production_internal_runtime_triggers_valid()) &&
         catalog_step("internal_functions",production_internal_runtime_functions_valid());
     }
-    if (phase==PRODUCTION_PHASE_CUSTOMER) ok=command("SET LOCAL search_path=pg_catalog") && ok;
     ok=ok && catalog_step("authority",production_authority_valid(MAPPED_ROLE,false,false));
     (void)command("ROLLBACK");
   }

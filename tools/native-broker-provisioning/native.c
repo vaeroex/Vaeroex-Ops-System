@@ -1184,19 +1184,11 @@ static bool production_contract_valid(production_phase phase) {
 #else
   if (phase==PRODUCTION_PHASE_CUSTOMER) return false;
 #endif
-  /* Evaluate the unchanged legacy fingerprint in its qualified canonical
-   * context; pg_catalog is implicitly first. The customer fingerprint and
-   * subsequent native work retain the native pg_catalog context. */
-  if (phase==PRODUCTION_PHASE_CUSTOMER && !command("SET LOCAL search_path=public")) return false;
-  bool valid=phase!=PRODUCTION_PHASE_INVALID && production_relations_valid() &&
+  /* Retain the qualified pg_catalog context for every phase's fingerprints. */
+  return phase!=PRODUCTION_PHASE_INVALID && production_relations_valid() &&
     production_foundation_schema_valid() && production_overlay_schema_valid() && production_baseline_triggers_valid(phase) &&
     production_function_abi_valid() &&
     (phase==PRODUCTION_PHASE_OVERLAY || production_internal_runtime_contract_valid());
-  if (phase==PRODUCTION_PHASE_CUSTOMER) {
-    bool restored=command("SET LOCAL search_path=pg_catalog");
-    return valid && restored;
-  }
-  return valid;
 }
 #endif
 #ifdef VAEROEX_PRODUCTION_PROFILE
