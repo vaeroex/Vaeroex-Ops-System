@@ -923,7 +923,8 @@ static bool production_overlay_schema_valid(void) {
 
 static bool production_baseline_triggers_valid(production_phase phase) {
   if (!managed_profile()) return true;
-  const char *values[]={phase>=PRODUCTION_PHASE_INTERNAL_RUNTIME?"internal":"overlay"};
+  const char *values[]={phase==PRODUCTION_PHASE_CUSTOMER?"customer":
+    phase>=PRODUCTION_PHASE_INTERNAL_RUNTIME?"internal":"overlay"};
   return true_query("WITH expected(relation_name,trigger_name,function_signature,trigger_type,definition_hash) AS (VALUES "
       "('square_production_configuration_generations','square_production_configuration_audit','private.record_square_production_lifecycle_audit_v1()',5,'adc6b33177ba624f1464c5b0e10ebb4db8082cfeb74bcc2ba2261356cdfaf6c7'),"
       "('square_production_configuration_generations','square_production_configuration_immutable','private.reject_square_production_immutable_mutation_v1()',27,'11a01f225b7d5045d5514ea975220ed0338701c9eaafeef22836369460fec63d'),"
@@ -960,7 +961,7 @@ static bool production_baseline_triggers_valid(production_phase phase) {
         "pg_catalog.encode(t.tgargs,'hex'),pg_catalog.pg_get_expr(t.tgqual,t.tgrelid,true),t.tgenabled::text) "
         "ORDER BY r.relname,c.conname,pn.nspname,p.proname,t.tgtype),'[]'::jsonb)::text,'UTF8'),'sha256'),'hex')="
         "'e236e65bb2a97355712eda632b18dd8113608c605495561cf26a1d536d3f0152') OR "
-      "($1='internal' AND count(*)=46 AND pg_catalog.encode(extensions.digest(pg_catalog.convert_to(coalesce("
+      "($1 IN ('internal','customer') AND count(*)=46 AND pg_catalog.encode(extensions.digest(pg_catalog.convert_to(coalesce("
       "pg_catalog.jsonb_agg(pg_catalog.jsonb_build_array(r.relname,c.conname,crn.nspname||'.'||cr.relname,"
         "frn.nspname||'.'||fr.relname,c.contype::text,c.condeferrable,c.condeferred,c.convalidated,"
         "pg_catalog.pg_get_constraintdef(c.oid,true),pn.nspname||'.'||p.proname||'('||"
@@ -978,7 +979,15 @@ static bool production_baseline_triggers_valid(production_phase phase) {
         "'integration_production_platform_bindings','integration_production_provider_bindings',"
         "'integration_production_provider_secrets','integration_production_provider_capabilities',"
         "'square_production_configuration_generations','square_production_runtime_bindings',"
-        "'square_production_generation_fences','square_production_lifecycle_audit_events']))",1,values);
+        "'square_production_generation_fences','square_production_lifecycle_audit_events']) "
+      /* The exact customer contract separately pins both sides of these new
+       * FKs. Preserve the frozen legacy trigger inventory without omitting any
+       * unknown or non-customer dependency. */
+      "AND ($1<>'customer' OR c.conrelid IS NULL OR c.conrelid NOT IN ("
+        "pg_catalog.to_regclass('private.square_production_customer_bindings'),"
+        "pg_catalog.to_regclass('private.square_production_customer_connections'),"
+        "pg_catalog.to_regclass('private.square_production_customer_oauth_states'),"
+        "pg_catalog.to_regclass('private.square_production_customer_credentials'))))",1,values);
 }
 
 static bool production_internal_runtime_relations_valid(void) {
@@ -1175,10 +1184,9 @@ static bool production_contract_valid(production_phase phase) {
 #else
   if (phase==PRODUCTION_PHASE_CUSTOMER) return false;
 #endif
-  /* Frozen legacy serialization was qualified with public visible (implicit
-   * pg_catalog remains first). Keep those exact predicates/hashes unchanged;
-   * the customer delta and all subsequent native work use pg_catalog. This is
-   * transaction-local and restoration is attempted even after a failed check. */
+  /* Evaluate the unchanged legacy fingerprint in its qualified canonical
+   * context; pg_catalog is implicitly first. The customer fingerprint and
+   * subsequent native work retain the native pg_catalog context. */
   if (phase==PRODUCTION_PHASE_CUSTOMER && !command("SET LOCAL search_path=public")) return false;
   bool valid=phase!=PRODUCTION_PHASE_INVALID && production_relations_valid() &&
     production_foundation_schema_valid() && production_overlay_schema_valid() && production_baseline_triggers_valid(phase) &&

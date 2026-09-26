@@ -28,6 +28,7 @@ export function createCustomerOAuthHandler(runtime: Readonly<{
         url.pathname !== "/api/integrations/square/callback" || url.search || url.hash || request.body !== null) return closed();
       const result = await runtime.callback({ method: request.method, url: url.pathname, rawHeaders });
       z.union([z.object({ status: z.literal("denied") }).strict(),
+        z.object({ status: z.literal("reconciliation_required") }).strict(),
         z.object({ status: z.literal("stored"), nonEconomic: z.literal(true) }).strict()]).parse(result);
       return new Response(null, { status: 303, headers: { ...headers,
         location: "https://www.vaeroex.com/app/settings/integrations/square" } });

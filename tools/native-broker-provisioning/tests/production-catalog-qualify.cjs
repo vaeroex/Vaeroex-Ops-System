@@ -681,6 +681,19 @@ password_encryption='scram-sha-256'
     qualify(internalBinary, "authority");
     psql(["-c", "ALTER TABLE private.square_production_customer_credentials FORCE ROW LEVEL SECURITY"]);
     qualify(internalBinary);
+    const customerParentTriggers=psql(["-At","-c",`SELECT t.tgname FROM pg_trigger t
+      JOIN pg_constraint c ON c.oid=t.tgconstraint
+      WHERE t.tgrelid='private.integration_production_platform_bindings'::regclass
+        AND c.conrelid='private.square_production_customer_bindings'::regclass ORDER BY t.tgname`])
+      .stdout.trim().split("\n");
+    check(customerParentTriggers.length===2 && customerParentTriggers.every(name=>/^[A-Za-z0-9_]+$/.test(name)),
+      "customer_fk_parent_fixture_exact");
+    for (const name of customerParentTriggers) {
+      psql(["-c",`ALTER TABLE private.integration_production_platform_bindings DISABLE TRIGGER "${name}"`]);
+      try { qualify(internalBinary,"authority"); }
+      finally { psql(["-c",`ALTER TABLE private.integration_production_platform_bindings ENABLE TRIGGER "${name}"`]); }
+      qualify(internalBinary);
+    }
     const relation = "private.square_production_customer_credentials";
     const triggerName = "square_production_customer_credential_immutable";
     const triggerDefinition = psql(["-At", "-c", `SELECT pg_get_triggerdef(oid)

@@ -66,7 +66,7 @@ async function main() {
   await assert.rejects(() => revoked.oauth.callback({ ...callback(revoked.state), rawHeaders: ["Host", "other.vaeroex.com"] }));
   assert.equal(revoked.exchange.length, 0, "host fails before exchange");
   const unreachable = fixture(true);
-  await assert.rejects(() => unreachable.oauth.callback(callback(unreachable.state)), /requires_reconciliation/);
+  assert.equal((await unreachable.oauth.callback(callback(unreachable.state))).status,'reconciliation_required');
   assert.deepEqual(unreachable.calls, ['lookup_state', 'consume_state', 'authorization_failed']);
   await assert.rejects(() => unreachable.oauth.callback(callback(unreachable.state)), /requires_reconciliation/);
   assert.equal(unreachable.exchange.length, 1, 'lost broker connection does not retry provider exchange');
@@ -172,6 +172,16 @@ async function main() {
   const deniedHandler = createCustomerOAuthHandler({ async callback() { return { status: 'denied' }; } });
   assert.equal((await deniedHandler(new Request('https://square.vaeroex.com/api/integrations/square/callback'),
     callback(managed.state).rawHeaders)).headers.get('location'), redirect.headers.get('location'));
+  const lostBroker=fixture(true);
+  const recoveryRedirect=await createCustomerOAuthHandler(lostBroker.oauth)(
+    new Request('https://square.vaeroex.com/api/integrations/square/callback'),callback(lostBroker.state).rawHeaders);
+  assert.equal(recoveryRedirect.status,303,'recognized consumed-callback failure returns to recovery UI');
+  assert.equal(recoveryRedirect.headers.get('location'),redirect.headers.get('location'));
+  assert.equal(await recoveryRedirect.text(),'','recovery redirect exposes no callback values');
+  assert.deepEqual(lostBroker.calls,['lookup_state','consume_state','authorization_failed']);
+  const malformed=await oauthHandler(new Request('https://square.vaeroex.com/api/integrations/square/callback'),['Host','unapproved.invalid']);
+  assert.equal(malformed.status,409);
+  assert.equal(malformed.headers.get('location'),null,'malformed callbacks are not recognized recovery redirects');
   assert.equal((await oauthHandler(new Request("https://square.vaeroex.com/api/integrations/square/callback?state=leak"),
     callback(managed.state).rawHeaders)).status, 404, "raw public query is never accepted by backend handoff");
   assert.equal((await oauthHandler(new Request("https://other.vaeroex.com/api/integrations/square/callback"),

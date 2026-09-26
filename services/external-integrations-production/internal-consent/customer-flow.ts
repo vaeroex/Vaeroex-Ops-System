@@ -94,7 +94,10 @@ export function createProductionCustomerOAuth(input: Readonly<{
           // state fence runs. A committed credential is not undone; an
           // exchanging state becomes recovery_required. Never exchange again.
           try { await input.rpc("authorization_failed", { stateId: state.stateId }); } catch { /* Keep fixed outward error. */ }
-          denied();
+          // Only this already-validated, atomically consumed callback may send
+          // the browser to its workspace reconciliation UI. This status does
+          // not claim the failure fence or lost broker result was acknowledged.
+          return Object.freeze({ status: "reconciliation_required" as const });
         }
         return Object.freeze(result);
       } catch { return denied(); }
