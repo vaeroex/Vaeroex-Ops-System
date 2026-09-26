@@ -28,7 +28,7 @@ function callback(state) {
     "x-vaeroex-oauth-handoff-version", "square_oauth_callback_handoff_v1",
     "x-vaeroex-oauth-query", Buffer.from(`state=${state}&code=synthetic-code`).toString("base64url")] };
 }
-function fixture() {
+function fixture(failBeforeAcquire = false) {
   const calls = [], exchange = [];
   const state = crypto.randomBytes(32).toString("base64url");
   const created = { stateId: id(), connectionId: id(), stateHash: oauthStateHash(state) };
@@ -51,7 +51,8 @@ function fixture() {
     throw new Error("unexpected operation");
   };
   const oauth = createProductionCustomerOAuth({ applicationId, rpc, now: () => now,
-    async exchange(command) { exchange.push(command); return { status: "stored", nonEconomic: true }; } });
+    async exchange(command) { exchange.push(command); if (failBeforeAcquire) throw new Error('synthetic_broker_unreachable');
+      return { status: "stored", nonEconomic: true }; } });
   return { oauth, calls, exchange, state, created };
 }
 
@@ -64,6 +65,11 @@ async function main() {
   const revoked = fixture();
   await assert.rejects(() => revoked.oauth.callback({ ...callback(revoked.state), rawHeaders: ["Host", "other.vaeroex.com"] }));
   assert.equal(revoked.exchange.length, 0, "host fails before exchange");
+  const unreachable = fixture(true);
+  await assert.rejects(() => unreachable.oauth.callback(callback(unreachable.state)), /requires_reconciliation/);
+  assert.deepEqual(unreachable.calls, ['lookup_state', 'consume_state', 'authorization_failed']);
+  await assert.rejects(() => unreachable.oauth.callback(callback(unreachable.state)), /requires_reconciliation/);
+  assert.equal(unreachable.exchange.length, 1, 'lost broker connection does not retry provider exchange');
 
   for (const profile of ["oauth", "broker"]) {
     const queries = [];
@@ -158,8 +164,14 @@ async function main() {
 
   const managed = fixture();
   const oauthHandler = createCustomerOAuthHandler(managed.oauth);
-  assert.equal((await oauthHandler(new Request("https://square.vaeroex.com/api/integrations/square/callback"),
-    callback(managed.state).rawHeaders)).status, 200, "path-only managed handoff reaches disabled-independent OAuth backend");
+  const redirect = await oauthHandler(new Request("https://square.vaeroex.com/api/integrations/square/callback"),
+    callback(managed.state).rawHeaders);
+  assert.equal(redirect.status, 303, "validated callback returns browser to workspace");
+  assert.equal(redirect.headers.get('location'), 'https://www.vaeroex.com/app/settings/integrations/square');
+  assert.equal(await redirect.text(), '', 'callback redirect carries no OAuth data');
+  const deniedHandler = createCustomerOAuthHandler({ async callback() { return { status: 'denied' }; } });
+  assert.equal((await deniedHandler(new Request('https://square.vaeroex.com/api/integrations/square/callback'),
+    callback(managed.state).rawHeaders)).headers.get('location'), redirect.headers.get('location'));
   assert.equal((await oauthHandler(new Request("https://square.vaeroex.com/api/integrations/square/callback?state=leak"),
     callback(managed.state).rawHeaders)).status, 404, "raw public query is never accepted by backend handoff");
   assert.equal((await oauthHandler(new Request("https://other.vaeroex.com/api/integrations/square/callback"),

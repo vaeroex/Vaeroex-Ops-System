@@ -83,7 +83,7 @@ create table private.square_production_customer_oauth_states (
   stored_at timestamptz check(stored_at is null or isfinite(stored_at)),
   check((status in ('pending','denied','cancelled'))=(consumed_at is null)),
   check((status in ('consumed','exchanging','stored','uncertain'))=(consume_fingerprint is not null)),
-  check((status in ('exchanging','stored','uncertain'))=(exchange_fingerprint is not null)),
+  check(status='uncertain' or (status in ('exchanging','stored'))=(exchange_fingerprint is not null)),
   check((status='stored')=(stored_at is not null and commit_fingerprint is not null))
 );
 create unique index square_production_customer_one_open_state
@@ -334,9 +334,9 @@ begin
       'connections',(select coalesce(jsonb_agg(jsonb_build_object(
         'connectionId',connection_id,'businessEntityId',business_entity_id,'state',state,
         'sellerLabel',seller_label,'locations','[]'::jsonb,'mappedLocationIds','[]'::jsonb,
-        'retentionApproved',false,'revocationPending',false) order by connection_id),'[]'::jsonb)
+        'retentionApproved',false,'revocationPending',false) order by (state='disconnected'),updated_at desc,connection_id),'[]'::jsonb)
         from (select * from private.square_production_customer_connections
-          where workspace_id=workspace_uuid order by connection_id limit 32) scoped)
+          where workspace_id=workspace_uuid order by (state='disconnected'),updated_at desc,connection_id limit 32) scoped)
     );
   end if;
 
@@ -563,7 +563,7 @@ begin
 
   if p_operation='authorization_failed' then
     perform private.square_production_customer_require_keys_v1(p_payload,array['stateId']);
-    if state_row.status<>'exchanging' then
+    if state_row.status not in ('consumed','exchanging') then
       raise exception 'square_production_customer_state_denied' using errcode='42501'; end if;
     update private.square_production_customer_oauth_states set status='uncertain'
       where state_id=state_row.state_id;

@@ -16,6 +16,7 @@ const precontractRetirementVersion = "20260826190801";
 const providerResultEvidenceVersion = "20260826222000";
 const productionConvergenceVersion = "20260827033058";
 const targetVersion = "20260902191322";
+const separatelyQualifiedCustomerMigration = "20260925032300_square_production_customer_connection.sql";
 const fixturePath = path.join(
   root,
   "supabase/tests/fixtures/external_integrations_phase_8b_zero_based_legacy.sql"
@@ -39,7 +40,7 @@ function fail(message, status = 1) {
 }
 
 function run(command, args, options = {}) {
-  const result = spawnSync(command, args, {
+  const result = legacyMigrationSpawn(command, args, {
     cwd: root,
     env: process.env,
     encoding: "utf8",
@@ -53,6 +54,24 @@ function run(command, args, options = {}) {
     fail(`${command} ${args.join(" ")} failed.`, result.status || 1);
   }
   return result;
+}
+
+// Preserve the historical fixture and its QBO assertions. The customer
+// migration requires the canonical Production-only baseline and has its own
+// disposable runner; it must not execute after this mixed Sandbox tail.
+function legacyMigrationSpawn(command, args, options) {
+  if (command !== cli || args.join(' ') !== 'migration up --local') return spawnSync(command, args, options);
+  const directory = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'vaeroex-legacy-fixture-migrations-'));
+  try {
+    fs.mkdirSync(path.join(directory, 'supabase/migrations'), { recursive: true });
+    fs.copyFileSync(path.join(root, 'supabase/config.toml'), path.join(directory, 'supabase/config.toml'));
+    for (const name of fs.readdirSync(path.join(root, 'supabase/migrations'))) {
+      if (/^\d+_.+\.sql$/.test(name) && name !== separatelyQualifiedCustomerMigration) {
+        fs.copyFileSync(path.join(root, 'supabase/migrations', name), path.join(directory, 'supabase/migrations', name));
+      }
+    }
+    return spawnSync(command, [...args, '--workdir', directory], options);
+  } finally { fs.rmSync(directory, { recursive: true, force: true }); }
 }
 
 function parseEnvValue(output, name) {
@@ -279,7 +298,7 @@ function assertTargetIsSinglePendingMigration() {
   "20260912190000_square_production_runtime_foundation.sql",
   "20260915040500_integration_production_legacy_foundation_guard.sql"
   ];
-  const laterMigrations = migrations.slice(targetIndex + 1);
+  const laterMigrations = migrations.slice(targetIndex + 1).filter(name => name !== separatelyQualifiedCustomerMigration);
   if (laterMigrations.length !== dormantSquareTail.length ||
       laterMigrations.some((migration, index) => migration !== dormantSquareTail[index])) {
     fail(
@@ -330,7 +349,7 @@ async function qualifyProductionRoleDrift(databaseUrl) {
     await client.end();
   }
 
-  const rejected = spawnSync(cli, ["migration", "up", "--local"], {
+  const rejected = legacyMigrationSpawn(cli, ["migration", "up", "--local"], {
     cwd: root,
     env: process.env,
     encoding: "utf8",

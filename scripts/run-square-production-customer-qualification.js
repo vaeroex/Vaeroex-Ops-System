@@ -79,6 +79,14 @@ async function main() {
   if (process.env.CI !== 'true' || process.env.GITHUB_ACTIONS !== 'true') {
     throw new Error('customer_ci_fixture_only');
   }
+  if (process.argv[2] === '--prepare-legacy-fixture' && process.argv.length === 3) {
+    // The general fixture includes Sandbox history. Keep the Production-only
+    // customer migration out of that chain; it is qualified separately below.
+    await resetLocalFixture('20260915040500');
+    console.log('square_customer_legacy_fixture_ready');
+    return;
+  }
+  if (process.argv.length !== 2) throw new Error('customer_ci_fixture_only');
   await resetLocalFixture(baseline);
   const client = new Client({connectionString:localDatabaseUrl(),application_name:'square_customer_disposable_qualification'});
   await client.connect();

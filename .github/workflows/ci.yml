@@ -626,8 +626,7 @@ jobs:
         id: isolated_database_setup
         run: |
           env -u SUPABASE_INTERNAL_IMAGE_REGISTRY SUPABASE_DB_MIGRATIONS_ENABLED=false supabase db start
-          node scripts/prepare-production-shaped-local-database.js
-          supabase migration up --local
+          node scripts/run-square-production-customer-qualification.js --prepare-legacy-fixture
 
       - name: Verify authorization and Customer #1 billing behavior
         run: |

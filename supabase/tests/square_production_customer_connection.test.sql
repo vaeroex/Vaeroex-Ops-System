@@ -145,6 +145,41 @@ insert into private.square_production_customer_connections(
   'authorization_required',now(),now()
   from private.square_production_runtime_bindings b where b.generation=1;
 
+-- More history than the bounded projection must never hide the live row.
+insert into private.square_production_customer_connections(
+  connection_id,workspace_id,business_entity_id,actor_id,session_id,generation,configuration_fingerprint,
+  state,created_at,updated_at,disconnected_at
+) select ('00000000-0000-4000-8000-'||lpad(n::text,12,'0'))::uuid,
+  c.workspace_id,c.business_entity_id,c.actor_id,c.session_id,c.generation,c.configuration_fingerprint,
+  'disconnected',now(),now(),now()
+  from private.square_production_customer_connections c cross join generate_series(1,40) n
+  where c.connection_id='aaaaaaaa-5555-4555-8555-aaaaaaaaaaaa';
+
+-- A consumed attempt can be fenced without inventing a broker acquisition.
+insert into private.square_production_customer_oauth_states(
+  state_id,connection_id,state_hash,generation,connection_row_version,actor_id,session_id,
+  request_fingerprint,consume_fingerprint,status,created_at,expires_at,consumed_at
+) select 'aaaaaaaa-9999-4999-8999-aaaaaaaaaaaa',connection_id,'sha256:'||repeat('a',64),
+  generation,row_version,actor_id,session_id,'sha256:'||repeat('b',64),'sha256:'||repeat('c',64),
+  'consumed',now(),now()+interval '10 minutes',now()
+  from private.square_production_customer_connections where connection_id='aaaaaaaa-5555-4555-8555-aaaaaaaaaaaa';
+update private.square_production_customer_oauth_states set status='uncertain'
+  where state_id='aaaaaaaa-9999-4999-8999-aaaaaaaaaaaa';
+do $pre_acquire_recovery$
+declare rejected boolean:=false;
+begin
+  if not exists(select 1 from private.square_production_customer_oauth_states
+    where state_id='aaaaaaaa-9999-4999-8999-aaaaaaaaaaaa' and status='uncertain'
+      and exchange_fingerprint is null and consume_fingerprint is not null) then
+    raise exception 'customer_pre_acquire_recovery_contract_failed';
+  end if;
+  begin
+    update private.square_production_customer_oauth_states set status='exchanging'
+      where state_id='aaaaaaaa-9999-4999-8999-aaaaaaaaaaaa';
+  exception when check_violation then rejected:=true; end;
+  if not rejected then raise exception 'customer_exchange_without_acquisition_allowed'; end if;
+end $pre_acquire_recovery$;
+
 set local role authenticated;
 do $owner$
 declare view jsonb; blocked boolean:=false; closed boolean:=false;
@@ -154,7 +189,7 @@ begin
     'session_id','aaaaaaaa-3333-4333-8333-aaaaaaaaaaaa')::text,true);
   view:=public.square_production_customer_v1('status',jsonb_build_object(
     'workspaceId','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'));
-  if jsonb_array_length(view->'connections')<>1
+  if jsonb_array_length(view->'connections')<>32
     or view#>>'{connections,0,connectionId}'<>'aaaaaaaa-5555-4555-8555-aaaaaaaaaaaa'
     or view#>>'{businessEntities,0,id}'<>'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa' then
     raise exception 'customer_owner_status_isolation_failed';

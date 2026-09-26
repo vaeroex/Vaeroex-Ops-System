@@ -86,7 +86,7 @@ const originLoaderFinding = (identifier, resourceUri) => occurrence("VULNERABILI
   },
 }, resourceUri);
 
-test("consent exception binds the exact pinned base and four-file release, with no native path", async () => {
+test("changed customer consent bundle cannot inherit the historical image exception", async () => {
   const base = new URL("../internal-consent/", import.meta.url);
   const dockerfile = await readFile(new URL("Dockerfile", base), "utf8");
   const release = await mkdtemp(join(tmpdir(), "square-consent-scan-test-"));
@@ -98,7 +98,8 @@ test("consent exception binds the exact pinned base and four-file release, with 
     for (const name of Object.keys(IMAGE_POLICY.consentReleaseFiles)) {
       files[name] = await readFile(name === "index.js" ? join(release, name) : join(serverOnly, name.split("/").at(-1)));
     }
-    assert.deepEqual(verifyConsentReleaseContent({ dockerfile, files }), consentIntegrity);
+    assert.throws(() => verifyConsentReleaseContent({ dockerfile, files }), /consent_release_bytes_changed/,
+      'customer source changes require independent new-image vulnerability and secret qualification');
     assert.throws(() => verifyConsentReleaseContent({ dockerfile: dockerfile + "\n", files }), /consent_base_changed/);
     assert.throws(() => verifyConsentReleaseContent({ dockerfile, files: { ...files, "extra.node": Buffer.alloc(0) } }), /consent_release_files_changed/);
     assert.throws(() => verifyConsentReleaseContent({ dockerfile, files: Object.fromEntries([...Object.entries(files), ["__proto__", Buffer.alloc(0)]]) }), /consent_release_files_changed/);

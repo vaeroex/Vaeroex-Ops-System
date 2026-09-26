@@ -118,4 +118,17 @@ async function main() {
     for (const [key, value] of Object.entries(prior)) value === undefined ? delete process.env[key] : process.env[key] = value;
   }
 }
+const fixtureRunner = fs.readFileSync(path.join(root, "scripts/run-square-production-customer-qualification.js"), "utf8");
+const workflow = fs.readFileSync(path.join(root, ".github/workflows/ci.yml"), "utf8");
+assert.match(workflow, /node scripts\/run-square-production-customer-qualification\.js --prepare-legacy-fixture/);
+assert.match(fixtureRunner, /resetLocalFixture\('20260915040500'\)/);
+assert.match(fixtureRunner, /await resetLocalFixture\(baseline\)/);
+assert.match(fixtureRunner, /assert\.equal\(before\.rows\.length,104\)/);
+const customerSql = fs.readFileSync(path.join(root, 'supabase/migrations/20260925032300_square_production_customer_connection.sql'), 'utf8');
+assert.match(customerSql, /if state_row\.status not in \('consumed','exchanging'\) then/);
+assert.match(customerSql, /check\(status='uncertain' or \(status in \('exchanging','stored'\)\)=\(exchange_fingerprint is not null\)\)/);
+const { withoutSquareQualificationPaths } = require('./square-dormant-scope-test-support.js');
+assert.equal(withoutSquareQualificationPaths('supabase/migrations/20260925032300_square_production_customer_connection.sql'), '');
+assert.equal(withoutSquareQualificationPaths('supabase/migrations/20260925032301_unapproved.sql'),
+  'supabase/migrations/20260925032301_unapproved.sql');
 main().catch(error => { process.stderr.write(`square_production_customer_workspace_failed:${error instanceof Error ? error.message : "unknown"}\n`); process.exitCode = 1; });

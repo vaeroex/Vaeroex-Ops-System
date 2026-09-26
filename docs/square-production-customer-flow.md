@@ -45,6 +45,10 @@ After code/database qualification and native compatibility, build the changed
 consent image through the repository-bound trigger and run vulnerability and
 secret analysis on its immutable digest. The previously qualified consent digest
 does not contain this customer implementation.
+The historical consent-image CVE exception also remains byte-bound to its old
+bundle. This candidate does not update that exception: its regression requires
+the changed bundle to be rejected by the old exception. Any necessary exception
+for a new image requires new reachability evidence and separate approval.
 
 Only then prepare separately authorized private provisioning for OAuth and broker.
 The native no-echo PostgreSQL flow generates each role's credential and binds its
