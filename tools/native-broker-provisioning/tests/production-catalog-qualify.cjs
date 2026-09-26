@@ -668,11 +668,10 @@ password_encryption='scram-sha-256'
     const catalogHash = psql(["-At", "-c", customerModule.customerCatalogSql]).stdout.trim();
     check(/^[a-f0-9]{64}$/.test(catalogHash), "customer_catalog_digest_shape");
     process.stdout.write(JSON.stringify({ outcome: "customer_catalog_source_fingerprint", sha256: catalogHash }) + "\n");
-    check(catalogHash === customerModule.customerCatalogSha256, "customer_catalog_source_pin");
     const nativeSearchPathHash = psql(["-At", "-c", `SET search_path=pg_catalog; ${customerModule.customerCatalogSql}`])
       .stdout.trim().split("\n").at(-1);
     process.stdout.write(JSON.stringify({ outcome: "customer_catalog_native_search_path_fingerprint", sha256: nativeSearchPathHash }) + "\n");
-    check(nativeSearchPathHash === catalogHash, "customer_catalog_native_search_path_pin");
+    check(nativeSearchPathHash === customerModule.customerCatalogSha256, "customer_catalog_native_search_path_pin");
     qualify(internalBinary);
     psql(["-c", "GRANT EXECUTE ON FUNCTION public.square_production_customer_v1(text,jsonb) TO square_production_runtime_authority"]);
     qualify(internalBinary, "authority");
@@ -703,6 +702,26 @@ password_encryption='scram-sha-256'
       finally { psql(["-c", restore]); }
       qualify(internalBinary);
     }
+    stage = "customer_open_binding_role_fence";
+    const customerFixture = fs.readFileSync(path.join(repository,
+      "supabase/tests/square_production_customer_connection.test.sql"), "utf8");
+    const fixtureStart=customerFixture.indexOf("insert into private.integration_production_platform_bindings(");
+    const fixtureEnd=customerFixture.indexOf("insert into auth.users(");
+    check(fixtureStart>0 && fixtureEnd>fixtureStart, "customer_binding_fixture_boundaries");
+    psqlSource(customerFixture.slice(fixtureStart,fixtureEnd));
+    psql(["-c", `UPDATE private.square_production_customer_bindings SET consent_enabled=true;
+      ALTER ROLE square_production_oauth LOGIN INHERIT;
+      GRANT square_production_oauth_authority TO square_production_oauth
+        WITH ADMIN FALSE, INHERIT TRUE, SET FALSE`]);
+    qualify(internalBinary, "closed_authority");
+    const customerFence = spawnSync(internalBinary,[socket(),port,database,"postgres","managed-customer-fence"],{
+      env:{...baseEnv,TMPDIR:root},encoding:"utf8",timeout:30000,maxBuffer:4096,
+    });
+    check(!customerFence.error && customerFence.status===0 &&
+      customerFence.stdout==="production_managed_customer_fence_valid\n" && customerFence.stderr==="",
+    "customer_open_binding_native_fence_closes_role_and_sessions");
+    psql(["-c", "UPDATE private.square_production_customer_bindings SET consent_enabled=false"]);
+    qualify(internalBinary);
     internalRuntime = "exact_104_qualified";
   }
   cleanup();

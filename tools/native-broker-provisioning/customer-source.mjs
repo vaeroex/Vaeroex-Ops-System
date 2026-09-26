@@ -8,8 +8,10 @@ export const customerMigrationFile = fileURLToPath(new URL(
   "../../supabase/production-migrations/20260925032300_square_production_customer_connection.sql", import.meta.url));
 
 // OID-independent PostgreSQL 17 catalog contract for exactly these four
-// migration-defined tables, including both sides of their foreign keys.
-export const customerCatalogSha256 = "41c98c9e07dc1672f4e655050c13edde292df35a75e56bf499b212916c3d79bf";
+// migration-defined tables, including both sides of their foreign keys. The
+// fingerprint is qualified under the native profile's exact pg_catalog path;
+// public/private relation identities remain fully represented.
+export const customerCatalogSha256 = "eb6bb3581d7b3b04c91adabbea4ec764302b53de02f24c001b16681080c576e0";
 export const customerCatalogSql = `WITH protected AS (
   SELECT r.* FROM pg_class r JOIN pg_namespace n ON n.oid=r.relnamespace
   WHERE n.nspname='private' AND r.relname IN ('square_production_customer_bindings',

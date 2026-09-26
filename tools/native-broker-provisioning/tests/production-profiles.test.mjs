@@ -29,6 +29,17 @@ test("customer native contract pins exactly the candidate and its eight function
     assert.ok(contract.sql.includes(check), `customer catalog contract includes ${check}`);
   }
 });
+
+test("customer binding may remain open only during exact native role revocation", () => {
+  const source=readFileSync(new URL("../native.c",import.meta.url),"utf8");
+  const harness=readFileSync(new URL("./production-catalog-qualify.c",import.meta.url),"utf8");
+  assert.match(source,/customer_fence \? !production_contract_valid\(phase\)/);
+  assert.match(source,/checked_authority\(target,false\)/);
+  assert.match(source,/!strcmp\(operation,"fence"\) \? fence_authority\(target\) : closed_authority\(target\)/);
+  assert.match(harness,/customer_open_binding_rejects_non_fence/);
+  assert.match(harness,/customer_binding_not_mutated_by_role_fence/);
+  assert.match(harness,/production_ledger_phase\(\)==PRODUCTION_PHASE_CUSTOMER[\s\S]*?SET search_path=pg_catalog/);
+});
 import { createLocalSyntheticNativeAdapter, createLocalSyntheticProductionNativeAdapter } from "../adapter.mjs";
 import { createInMemorySyntheticSecretStore } from "../lifecycle.mjs";
 import { sandboxTarget } from "../sandbox-profile.mjs";

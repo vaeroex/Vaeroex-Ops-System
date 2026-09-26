@@ -244,7 +244,7 @@ end
 $revocation$;
 
 reset role;
--- Synthetic, transactional admission using the exact native grant attributes.
+-- Synthetic admission using the exact native grant attributes.
 -- No actual Production identity or secret is created by this disposable test.
 update public.workspace_members set status='active'
   where workspace_id='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
@@ -292,7 +292,10 @@ begin
   if created->>'stateId'<>state_id::text then raise exception 'customer_active_create_state_failed'; end if;
 end $customer_prepare$;
 reset role;
-set session authorization square_production_oauth;
+-- The runner commits the disposable fixture, then connects as each actual
+-- native LOGIN. Supabase postgres cannot SET SESSION AUTHORIZATION to it.
+commit;
+-- customer-native-session:oauth
 do $oauth_native$
 declare looked jsonb; consumed jsonb; hash text:='sha256:'||repeat('d',64); denied boolean:=false;
 begin
@@ -310,8 +313,7 @@ begin
   exception when insufficient_privilege then denied:=true; end;
   if not denied then raise exception 'customer_oauth_broker_boundary_failed'; end if;
 end $oauth_native$;
-reset session authorization;
-set session authorization square_production_broker;
+-- customer-native-session:broker
 do $broker_native$
 declare acquired jsonb; replayed jsonb; hash text;
 begin
@@ -327,9 +329,9 @@ begin
     'generation',1,'requestFingerprint',hash))->>'authorized'<>'true' then
     raise exception 'customer_native_provider_authorization_failed'; end if;
 end $broker_native$;
-reset session authorization;
+-- customer-native-session:admin
 update private.square_production_customer_bindings set consent_enabled=false where generation=1;
-set session authorization square_production_broker;
+-- customer-native-session:broker
 do $closed_again$
 declare denied boolean:=false;
 begin
@@ -339,5 +341,6 @@ begin
   exception when insufficient_privilege then denied:=true; end;
   if not denied then raise exception 'customer_consent_binding_revocation_failed'; end if;
 end $closed_again$;
-reset session authorization;
-rollback;
+-- customer-native-session:admin
+drop role square_production_oauth;
+drop role square_production_broker;

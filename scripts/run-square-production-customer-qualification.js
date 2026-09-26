@@ -76,6 +76,35 @@ async function assertFingerprintVectors(client) {
   }
 }
 
+async function qualifyNativeSessions(admin, databaseUrl, source) {
+  const parts=source.split(/^-- customer-native-session:(oauth|broker|admin)\s*$/m);
+  assert.equal(parts.length,11,'exact five native-session phase switches');
+  assert.deepEqual(parts.filter((_,index)=>index%2===1),['oauth','broker','admin','broker','admin']);
+  assert.equal(/set session authorization/i.test(source.replace(/--[^\n]*/g,'')),false,
+    'qualification uses real native LOGIN sessions, never impersonation');
+  await admin.query(parts[0]); // Explicit disposable fixture COMMIT before native connections.
+  const password=crypto.randomBytes(32).toString('hex'); // Loopback-only synthetic fixture, never a Production input.
+  for (const profile of ['oauth','broker']) {
+    await admin.query(`alter role square_production_${profile} password '${password}'`);
+  }
+  for (let index=1;index<parts.length;index+=2) {
+    const profile=parts[index];
+    if (profile==='admin') { await admin.query(parts[index+1]); continue; }
+    const connection=new URL(databaseUrl);
+    const role=`square_production_${profile}`;
+    connection.username=role;
+    connection.password=password;
+    const native=new Client({connectionString:connection.toString(),
+      application_name:`square_customer_disposable_${profile}`});
+    try {
+      await native.connect();
+      const identity=await native.query('select session_user=$1 and current_user=$1 and current_role=$1 as exact',[role]);
+      assert.equal(identity.rows[0].exact,true,'actual native authenticated identity');
+      await native.query(parts[index+1]);
+    } finally { await native.end(); }
+  }
+}
+
 async function main() {
   manifest();
   if (process.env.CI !== 'true' || process.env.GITHUB_ACTIONS !== 'true') {
@@ -83,7 +112,8 @@ async function main() {
   }
   if (process.argv.length !== 2) throw new Error('customer_ci_fixture_only');
   await resetLocalFixture(baseline);
-  const client = new Client({connectionString:localDatabaseUrl(),application_name:'square_customer_disposable_qualification'});
+  const databaseUrl=localDatabaseUrl();
+  const client = new Client({connectionString:databaseUrl,application_name:'square_customer_disposable_qualification'});
   await client.connect();
   try {
     const before = await client.query('select version from supabase_migrations.schema_migrations order by version');
@@ -91,7 +121,8 @@ async function main() {
     assert.equal(before.rows.at(-1).version,baseline);
     await client.query(fs.readFileSync(path.join(customerDirectory,customerFile),'utf8'));
     await assertFingerprintVectors(client);
-    await client.query(fs.readFileSync(path.join(root,'supabase/tests/square_production_customer_connection.test.sql'),'utf8'));
+    await qualifyNativeSessions(client,databaseUrl,
+      fs.readFileSync(path.join(root,'supabase/tests/square_production_customer_connection.test.sql'),'utf8'));
     const after = await client.query('select version from supabase_migrations.schema_migrations order by version');
     assert.deepEqual(after.rows,before.rows,'qualification never edits migration history');
     console.log('square_production_customer_disposable_qualification_ok');

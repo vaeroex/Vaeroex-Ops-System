@@ -557,7 +557,10 @@ static bool production_authority_catalog_fence(void) {
     command("LOCK TABLE pg_catalog.pg_default_acl IN SHARE ROW EXCLUSIVE MODE");
 }
 #endif
-static bool closed_authority(const char *target) {
+#ifdef VAEROEX_PRODUCTION_PROFILE
+static bool production_contract_valid(production_phase phase);
+#endif
+static bool checked_authority(const char *target,bool customer_fence) {
   const char *values[] = {target};
 #ifdef VAEROEX_PRODUCTION_PROFILE
   if(strcmp(target,MAPPED_ROLE))return false;
@@ -594,8 +597,10 @@ static bool closed_authority(const char *target) {
   if (phase==PRODUCTION_PHASE_CUSTOMER && (!command(
       "LOCK TABLE private.square_production_customer_bindings, private.square_production_customer_connections, "
       "private.square_production_customer_oauth_states, private.square_production_customer_credentials IN SHARE MODE") ||
-      !true_query("SELECT NOT row_security_active('private.square_production_customer_bindings') "
-        "AND NOT EXISTS (SELECT FROM private.square_production_customer_bindings WHERE consent_enabled)",0,NULL))) return false;
+      !true_query("SELECT NOT row_security_active('private.square_production_customer_bindings')",0,NULL) ||
+      (customer_fence ? !production_contract_valid(phase) :
+        !true_query("SELECT NOT EXISTS (SELECT FROM private.square_production_customer_bindings "
+          "WHERE consent_enabled)",0,NULL)))) return false;
   return true_query("SELECT NOT EXISTS (SELECT FROM private.integration_production_platform_bindings "
       "WHERE infrastructure_provisioned OR runtime_enabled OR economic_contributions_enabled OR ai_dispatch_enabled) "
       "AND NOT EXISTS (SELECT FROM private.integration_production_provider_bindings "
@@ -610,6 +615,7 @@ static bool closed_authority(const char *target) {
       "AND project_id='vaeroex-integrations-prod' AND capability='" CAPABILITY_NAME "' "
       "AND database_secret_purpose='database_" CAPABILITY_NAME "'))",1,values);
 #elif defined(MAPPED_ROLE)
+  (void)customer_fence;
   /* Mapped maintenance requires the additive schema and known-disabled joined
    * gates. SHARE locks fence concurrent activation through credential commit.
    * FORCE RLS visibility must be established; hidden rows cannot prove closure. */
@@ -642,6 +648,7 @@ static bool closed_authority(const char *target) {
       "(m.enabled IS NOT FALSE OR m.provider_calls_enabled IS NOT FALSE "
       "OR b.enabled IS NOT FALSE OR b.provider_calls_enabled IS NOT FALSE))",1,values);
 #else
+  (void)customer_fence;
   /* These predicates select DENIAL rows inside NOT EXISTS. Including a NULL
    * flag as a denial therefore rejects unknown authority; it never enables it.
    * Acceptance requires known surface=false or blocked=true, and enabled=false. */
@@ -657,6 +664,18 @@ static bool closed_authority(const char *target) {
       "AND NOT EXISTS (SELECT FROM private.square_gcp_callback_binding WHERE broker_login=$1 AND enabled IS NOT FALSE)", 1, values);
 #endif
 }
+static bool closed_authority(const char *target) {
+  return checked_authority(target,false);
+}
+#ifdef VAEROEX_PRODUCTION_PROFILE
+/* Revocation must remain possible while the customer consent binding is open.
+ * This exception is fence-only, checks the exact customer protection contract,
+ * and does not grant authority or change any activation binding. Provisioning,
+ * admission and ordinary inspection still require the binding closed. */
+static bool fence_authority(const char *target) {
+  return checked_authority(target,true);
+}
+#endif
 
 #ifdef VAEROEX_PRODUCTION_PROFILE
 static bool production_internal_runtime_source_pinned(void) {
@@ -1692,7 +1711,8 @@ static bool begin_locked_authority_after_transition(const char *operation,const 
   for (;;) {
     if (!command("BEGIN")) return false;
     transaction=true;
-    if (!closed_authority(target) || !lock_target(target)) return false;
+    if (!(!strcmp(operation,"fence") ? fence_authority(target) : closed_authority(target)) ||
+        !lock_target(target)) return false;
     if (managed_profile() && strcmp(operation,"fence") && strcmp(role_oid,"0") &&
         role_valid(target,role_oid,3)) {
       /* A concurrently running fence has committed the capability-only
@@ -2010,7 +2030,13 @@ static int run(int argc, char **argv) {
       }
       if (ok) ok = command("BEGIN");
       transaction = ok;
-      if (ok) ok = closed_authority(target) && lock_target(target) && role_valid(target,role_oid,0) && no_sessions(target);
+      if (ok) ok =
+#ifdef VAEROEX_PRODUCTION_PROFILE
+        fence_authority(target) &&
+#else
+        closed_authority(target) &&
+#endif
+        lock_target(target) && role_valid(target,role_oid,0) && no_sessions(target);
     }
     if (ok && (!strcmp(op,"assign") || !strcmp(op,"activate")))
       ok = role_valid(target,role_oid,0) && no_sessions(target);

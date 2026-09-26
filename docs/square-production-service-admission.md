@@ -44,6 +44,14 @@ no automatic retry or general recurring service-admission scheduler.
 
 ## Explicit limit
 
+In the customer-consent phase, native fencing may complete while the separately
+authorized customer binding is enabled. It still validates the exact protection
+contract and closes the target LOGIN, inherited capability and sessions. All
+other maintenance/admission operations require the customer binding closed.
+The fence receipt proves role/session closure, not customer-binding closure;
+operator cleanup must close that binding separately. Native fencing never
+changes it or grants any additional authority.
+
 The supervisor holds the existing private administrator buffer only until
 fencing/termination and then clears it. A VM stop, SIGKILL or power loss is **not**
 a PostgreSQL LOGIN expiry guarantee. The hard-stop path reports recovery required;

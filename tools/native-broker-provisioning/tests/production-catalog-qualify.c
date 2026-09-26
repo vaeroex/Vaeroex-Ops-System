@@ -62,6 +62,8 @@ int main(int argc,char **argv) {
     !strcmp(argv[5],"managed-fence");
   bool password_fence=argc==6 && !strcmp(argv[4],"postgres") &&
     !strcmp(argv[5],"managed-password-fence");
+  bool customer_fence=argc==6 && !strcmp(argv[4],"postgres") &&
+    !strcmp(argv[5],"managed-customer-fence");
   bool interrupted_recovery=argc==6 && !strcmp(argv[4],"postgres") &&
     !strcmp(argv[5],"managed-interrupted-recovery");
   bool closed_fence=argc==6 && !strcmp(argv[4],"postgres") &&
@@ -72,7 +74,7 @@ int main(int argc,char **argv) {
     !strcmp(argv[5],"managed-transition-wait");
   bool control_timeout=argc==6 && !strcmp(argv[4],"postgres") &&
     !strcmp(argv[5],"managed-control-timeout");
-  if ((!contract && !fence_only && !password_fence && !interrupted_recovery && !closed_fence &&
+  if ((!contract && !fence_only && !password_fence && !customer_fence && !interrupted_recovery && !closed_fence &&
       !application_lock_fence && !transition_wait && !control_timeout) || strcmp(argv[1],VAEROEX_CATALOG_SOCKET_PATH) || !digits(argv[2],5) ||
       strcmp(argv[3],"production_catalog_runtime")) return 2;
   const char *keys[]={"host","port","dbname","user","passfile","sslmode","connect_timeout","application_name",NULL};
@@ -80,6 +82,10 @@ int main(int argc,char **argv) {
     "vaeroex-production-catalog-qualification",NULL};
   db=PQconnectdbParams(keys,values,0);
   bool ok=db && PQstatus(db)==CONNECTION_OK;
+  /* Match the native profile's parser/catalog context for the customer phase,
+   * including the complete inherited foundation contract, not only its delta. */
+  if (ok && production_ledger_phase()==PRODUCTION_PHASE_CUSTOMER)
+    ok=command("SET search_path=pg_catalog");
   if (ok && control_timeout) {
     control_db=PQconnectdbParams(keys,values,0);
     ok=control_db && PQstatus(control_db)==CONNECTION_OK;
@@ -189,7 +195,7 @@ int main(int argc,char **argv) {
     puts("production_managed_application_lock_fence_valid");
     return 0;
   }
-  if (ok && (password_fence || interrupted_recovery || closed_fence)) {
+  if (ok && (password_fence || customer_fence || interrupted_recovery || closed_fence)) {
     control_db=PQconnectdbParams(keys,values,0);
     ok=control_db && PQstatus(control_db)==CONNECTION_OK;
     if (ok) {
@@ -197,7 +203,9 @@ int main(int argc,char **argv) {
       PQsetNoticeProcessor(control_db,notice,NULL);
       transaction=catalog_step("managed_recovery_begin",command("BEGIN"));
       ok=transaction && catalog_step("managed_recovery_catalog_fence",production_authority_catalog_fence());
-      if (ok) ok=password_fence
+      if (ok && customer_fence) ok=catalog_step("customer_open_binding_rejects_closed_authority",!closed_authority(MAPPED_ROLE)) &&
+        catalog_step("customer_open_binding_accepts_only_fence",fence_authority(MAPPED_ROLE));
+      if (ok) ok=(password_fence || customer_fence)
         ? catalog_step("managed_recovery_active_contract",production_authority_valid(MAPPED_ROLE,true,false))
         : interrupted_recovery
           ? catalog_step("managed_recovery_transition_contract",production_authority_valid(MAPPED_ROLE,true,true))
@@ -208,7 +216,7 @@ int main(int argc,char **argv) {
       ok=ok && identity && PQntuples(identity)==1 && digits(PQgetvalue(identity,0,0),10);
       if (ok) snprintf(target_oid,sizeof(target_oid),"%s",PQgetvalue(identity,0,0));
       if (identity) PQclear(identity);
-      if (ok) ok=password_fence
+      if (ok) ok=(password_fence || customer_fence)
         ? catalog_step("managed_recovery_active_entry_role",role_valid(MAPPED_ROLE,target_oid,2))
         : interrupted_recovery
           ? catalog_step("managed_recovery_transition_entry_role",role_valid(MAPPED_ROLE,target_oid,3))
@@ -220,9 +228,25 @@ int main(int argc,char **argv) {
       if (ok) { ok=catalog_step("managed_recovery_first_commit",command("COMMIT")); transaction=!ok; }
       if (ok) ok=catalog_step("managed_recovery_first_drain",
         terminate_target_sessions(control_db,MAPPED_ROLE) && no_sessions(MAPPED_ROLE));
+      if (ok && customer_fence) {
+        int entry=2;
+        bool transition=true;
+        for (const char **operation=(const char *[]) {"prepare","assign","activate","authenticate","inspect",NULL};
+             *operation && ok; operation++) {
+          ok=catalog_step("customer_open_binding_rejects_non_fence",
+            !begin_locked_authority_after_transition(*operation,MAPPED_ROLE,target_oid,&entry,&transition));
+          if (transaction) { (void)command("ROLLBACK"); transaction=false; }
+        }
+      }
       if (ok) {
-        transaction=catalog_step("managed_recovery_second_begin",command("BEGIN"));
-        ok=transaction && catalog_step("managed_recovery_closed_authority",closed_authority(MAPPED_ROLE)) &&
+        int entry=2;
+        bool transition=true;
+        transaction=customer_fence
+          ? catalog_step("customer_fence_native_second_entry",begin_locked_authority_after_transition(
+              "fence",MAPPED_ROLE,target_oid,&entry,&transition))
+          : catalog_step("managed_recovery_second_begin",command("BEGIN"));
+        ok=transaction && catalog_step("managed_recovery_closed_authority",
+          customer_fence ? fence_authority(MAPPED_ROLE) : closed_authority(MAPPED_ROLE)) &&
           catalog_step("managed_recovery_target_lock",lock_target(MAPPED_ROLE)) &&
           catalog_step(closed_fence?"managed_recovery_preserved_closed_role":"managed_recovery_transition_role",
             role_valid(MAPPED_ROLE,target_oid,closed_fence?0:3)) &&
@@ -234,10 +258,13 @@ int main(int argc,char **argv) {
         terminate_target_sessions(control_db,MAPPED_ROLE) && no_sessions(MAPPED_ROLE));
       if (ok) {
         transaction=catalog_step("managed_recovery_verify_begin",command("BEGIN"));
-        ok=transaction && catalog_step("managed_recovery_verify_authority",closed_authority(MAPPED_ROLE)) &&
+        ok=transaction && catalog_step("managed_recovery_verify_authority",
+          customer_fence ? fence_authority(MAPPED_ROLE) : closed_authority(MAPPED_ROLE)) &&
           catalog_step("managed_recovery_verify_target",lock_target(MAPPED_ROLE)) &&
           catalog_step("managed_recovery_verify_role",role_valid(MAPPED_ROLE,target_oid,0)) &&
           catalog_step("managed_recovery_verify_sessions",no_sessions(MAPPED_ROLE));
+        if (ok && customer_fence) ok=catalog_step("customer_binding_not_mutated_by_role_fence",
+          true_query("SELECT EXISTS (SELECT FROM private.square_production_customer_bindings WHERE consent_enabled)",0,NULL));
       }
       if (transaction) { (void)command("ROLLBACK"); transaction=false; }
     }
@@ -246,7 +273,7 @@ int main(int argc,char **argv) {
     if (db) PQfinish(db);
     db=NULL;
     if (!ok) return 3;
-    puts(password_fence ? "production_managed_password_fence_valid" :
+    puts(customer_fence ? "production_managed_customer_fence_valid" : password_fence ? "production_managed_password_fence_valid" :
       interrupted_recovery ? "production_managed_interrupted_recovery_valid" :
       "production_managed_closed_fence_valid");
     return 0;
