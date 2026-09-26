@@ -174,6 +174,27 @@ async function main() {
   const unsafe = await handlers.handle("status", request("status")); equal(unsafe.status, 400); ok(!(await unsafe.text()).includes("PRIVATE_PROVIDER_CANARY")); currentView = view;
   const rendered = modules.renderToStaticMarkup(modules.React.createElement(modules.SquareConnectionPanel, { view }));
   ok(rendered.includes("Mapping required")); ok(rendered.includes("Confirm location mapping"));
+  ok(rendered.includes("Read status: Unavailable") && rendered.includes("Last verified observation: Unknown") &&
+    rendered.includes("Historical completeness: Unknown"), "missing checkpoint evidence remains explicitly unknown");
+  const checkpointed = modules.renderToStaticMarkup(modules.React.createElement(modules.SquareConnectionPanel, { view: {
+    ...view, connections: [{ ...view.connections[0], sync: {
+      state: "checkpointed", lastVerifiedObservationAt: "2026-09-24T00:00:00.000Z", historicalCompleteness: "unknown"
+    } }]
+  } }));
+  ok(checkpointed.includes("Read checkpoint recorded") && checkpointed.includes("2026-09-24T00:00:00.000Z") &&
+    checkpointed.includes("Historical completeness: Unknown") && !checkpointed.includes("Last successful sync"),
+  "a bounded checkpoint is not presented as a complete or current history");
+  const { SquareConnectionStatusViewSchema } = require("../lib/integrations/control-plane/square-connection-status-view.ts");
+  const checkpointView = { ...view, connections: [{ ...view.connections[0], sync: {
+    state: "checkpointed", lastVerifiedObservationAt: "2026-09-24T00:00:00.000Z", historicalCompleteness: "unknown"
+  } }] };
+  ok(SquareConnectionStatusViewSchema.safeParse(checkpointView).success, "bounded checkpoint metadata is accepted");
+  ok(!SquareConnectionStatusViewSchema.safeParse({ ...checkpointView, connections: [{ ...checkpointView.connections[0],
+    sync: { ...checkpointView.connections[0].sync, privateCursor: "PRIVATE_CURSOR_CANARY" } }] }).success,
+  "private cursor cannot enter the customer status view");
+  ok(!SquareConnectionStatusViewSchema.safeParse({ ...checkpointView, connections: [{ ...checkpointView.connections[0],
+    sync: { ...checkpointView.connections[0].sync, historicalCompleteness: "complete" } }] }).success,
+  "incomplete history cannot be upgraded by presentation data");
   ok(rendered.includes("Other authorized connections and the Square provider authorization are preserved"), "confirmed disconnect explains its workspace-only scope");
   ok(!rendered.includes("provider revocation pending") && !rendered.includes("including its other connections"), "customer disconnect does not claim remote or shared authorization revocation");
   const pending = modules.renderToStaticMarkup(modules.React.createElement(modules.SquareConnectionPanel, { view: {
