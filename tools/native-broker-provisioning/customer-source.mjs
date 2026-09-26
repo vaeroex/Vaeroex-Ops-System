@@ -65,7 +65,19 @@ export function customerNativeContract() {
     if (!definition) throw new Error("production_customer_source_pin_denied");
     return `('${signature}','${createHash("sha256").update(definition[1]).digest("hex")}')`;
   });
-  const sql = `WITH expected(signature,hash) AS (VALUES ${tuples.join(",")})
+  const abi = [
+    "('private.square_production_customer_fingerprint_v1(text[])','sql','i',true,'s',false,'text',array['p_parts'],0,null::text)",
+    "('private.square_production_customer_require_keys_v1(jsonb,text[])','plpgsql','i',false,'u',false,'void',array['p_payload','p_keys'],0,null::text)",
+    "('private.square_production_customer_require_login_v1(text)','plpgsql','s',false,'u',true,'void',array['p_capability'],0,null::text)",
+    "('private.square_production_customer_require_owner_v1(uuid,uuid,uuid,uuid)','plpgsql','v',false,'u',true,'void',array['p_actor_id','p_session_id','p_workspace_id','p_business_entity_id'],1,'NULL::uuid')",
+    "('private.square_production_customer_require_eligible_v1(uuid)','plpgsql','v',false,'u',true,'void',array['p_workspace_id'],0,null::text)",
+    "('private.square_production_customer_require_gate_v1(bigint,text,text)','plpgsql','v',false,'u',true,'private.square_production_configuration_generations',array['p_generation','p_configuration_fingerprint','p_capability'],0,null::text)",
+    "('private.square_production_customer_immutable_v1()','plpgsql','v',false,'u',true,'trigger',null::text[],0,null::text)",
+    "('public.square_production_customer_v1(text,jsonb)','plpgsql','v',false,'u',true,'jsonb',array['p_operation','p_payload'],0,null::text)",
+  ];
+  const sql = `WITH expected(signature,hash) AS (VALUES ${tuples.join(",")}),
+    abi(signature,language,volatility,is_strict,parallel,security_definer,result,names,default_count,default_expression)
+      AS (VALUES ${abi.join(",")})
     SELECT (SELECT count(*)=8 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
       WHERE n.nspname IN ('private','public') AND left(p.proname,27)='square_production_customer_')
     AND NOT EXISTS (SELECT FROM expected e LEFT JOIN pg_proc p ON p.oid=to_regprocedure(e.signature)
@@ -79,6 +91,14 @@ export function customerNativeContract() {
     AND (SELECT count(*)=3 FROM pg_proc p CROSS JOIN LATERAL aclexplode(p.proacl) a
       WHERE p.oid=to_regprocedure('public.square_production_customer_v1(text,jsonb)')
         AND a.grantee<>p.proowner AND NOT a.is_grantable AND a.privilege_type='EXECUTE')
+    AND NOT EXISTS (SELECT FROM abi e LEFT JOIN pg_proc p ON p.oid=to_regprocedure(e.signature)
+      LEFT JOIN pg_language l ON l.oid=p.prolang WHERE p.oid IS NULL OR l.lanname<>e.language
+        OR p.provolatile<>e.volatility::"char" OR p.proisstrict<>e.is_strict
+        OR p.proparallel<>e.parallel::"char" OR p.prosecdef<>e.security_definer
+        OR p.proretset OR p.prokind<>'f' OR p.prorettype<>to_regtype(e.result)
+        OR p.proargnames IS DISTINCT FROM e.names OR p.proargmodes IS NOT NULL
+        OR p.pronargdefaults<>e.default_count
+        OR pg_get_expr(p.proargdefaults,0) IS DISTINCT FROM e.default_expression)
     AND (SELECT count(*)=4 FROM pg_class r JOIN pg_namespace n ON n.oid=r.relnamespace
       WHERE n.nspname='private' AND r.relname IN ('square_production_customer_bindings',
         'square_production_customer_connections','square_production_customer_oauth_states','square_production_customer_credentials')

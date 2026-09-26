@@ -678,6 +678,10 @@ password_encryption='scram-sha-256'
     process.stdout.write(JSON.stringify({ outcome: "customer_catalog_native_search_path_fingerprint", sha256: nativeSearchPathHash }) + "\n");
     check(nativeSearchPathHash === customerModule.customerCatalogSha256, "customer_catalog_native_search_path_pin");
     qualify(internalBinary);
+    psql(["-c", "ALTER FUNCTION public.square_production_customer_v1(text,jsonb) IMMUTABLE"]);
+    try { qualify(internalBinary, "authority"); }
+    finally { psql(["-c", "ALTER FUNCTION public.square_production_customer_v1(text,jsonb) VOLATILE"]); }
+    qualify(internalBinary);
     psql(["-c", "GRANT EXECUTE ON FUNCTION public.square_production_customer_v1(text,jsonb) TO square_production_runtime_authority"]);
     qualify(internalBinary, "authority");
     psql(["-c", "REVOKE EXECUTE ON FUNCTION public.square_production_customer_v1(text,jsonb) FROM square_production_runtime_authority"]);
