@@ -36,6 +36,7 @@ test("customer binding may remain open only during exact native role revocation"
   assert.match(source,/customer_fence \? !production_contract_valid\(phase\)/);
   assert.match(source,/checked_authority\(target,false\)/);
   assert.match(source,/!strcmp\(operation,"fence"\) \? fence_authority\(target\) : closed_authority\(target\)/);
+  assert.match(source,/bool restored=command\("SET LOCAL search_path=pg_catalog"\);\s+return valid && restored;/);
   assert.match(harness,/customer_open_binding_rejects_non_fence/);
   assert.match(harness,/customer_binding_not_mutated_by_role_fence/);
   assert.match(harness,/production_ledger_phase\(\)==PRODUCTION_PHASE_CUSTOMER[\s\S]*?SET search_path=pg_catalog/);

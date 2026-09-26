@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 export const customerMigrationVersion = "20260925032300";
-export const customerMigrationSha256 = "4e35c1cb33fd0a793611c2bf3ee43539ba95d00a47ca79fdd2e492b28bdad146";
+export const customerMigrationSha256 = "59261c8a3cc8c09cd83ea3817f5ad3adba89ef89aa735a1a611b3f3858ad3c92";
 export const customerMigrationFile = fileURLToPath(new URL(
   "../../supabase/production-migrations/20260925032300_square_production_customer_connection.sql", import.meta.url));
 

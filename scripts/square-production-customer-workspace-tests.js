@@ -131,6 +131,8 @@ assert.match(fixtureRunner,/actual native authenticated identity/);
 assert.match(fixtureRunner,/await native\.connect\(\)/);
 assert.match(fixtureRunner,/qualification uses real native LOGIN sessions, never impersonation/);
 const customerSql = fs.readFileSync(path.join(root, 'supabase/production-migrations/20260925032300_square_production_customer_connection.sql'), 'utf8');
+assert.match(customerSql,/if \(expires_at is not null and expires_at<=now_at\) or member_role<>'owner'/);
+assert.match(customerSql,/if not found then raise exception 'square_production_customer_owner_denied'/);
 assert.match(customerSql, /if state_row\.status not in \('consumed','exchanging'\) then/);
 assert.match(customerSql, /check\(status='uncertain' or \(status in \('exchanging','stored'\)\)=\(exchange_fingerprint is not null\)\)/);
 const { withoutSquareQualificationPaths } = require('./square-dormant-scope-test-support.js');

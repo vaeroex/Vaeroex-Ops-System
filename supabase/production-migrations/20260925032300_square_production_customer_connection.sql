@@ -213,7 +213,10 @@ begin
     if not found then raise exception 'square_production_customer_owner_denied' using errcode='42501'; end if;
   end if;
   now_at:=clock_timestamp();
-  if expires_at is null or expires_at<=now_at or member_role<>'owner'
+  -- Supabase leaves not_after NULL when absolute session time-boxing is off.
+  -- The exact live session/user binding above remains mandatory; finite
+  -- expirations are enforced, and request JWT validity is checked by the host.
+  if (expires_at is not null and expires_at<=now_at) or member_role<>'owner'
     or member_status<>'active' or (p_business_entity_id is not null and entity_status<>'active') then
     raise exception 'square_production_customer_owner_denied' using errcode='42501';
   end if;

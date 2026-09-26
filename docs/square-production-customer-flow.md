@@ -42,6 +42,10 @@ Opening it requires separate authorization and verified application/OAuth/broker
 version-1 metadata and service identities; no scheduler/webhook/runtime/evidence
 secret references are invented or required for consent. No service or workspace
 owner receives table access or permission to change the binding.
+Customer authorization requires an existing session bound to the exact user;
+NULL `not_after` means Supabase absolute time-boxing is disabled, not that the
+session is missing. Finite expiry, revocation and verified request identity are
+still enforced. The historical internal-pilot session contract is unchanged.
 
 ## Required before a live deployment
 

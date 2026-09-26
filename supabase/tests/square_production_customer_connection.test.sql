@@ -183,6 +183,40 @@ begin
   if not rejected then raise exception 'customer_exchange_without_acquisition_allowed'; end if;
 end $pre_acquire_recovery$;
 
+do $customer_session_contract$
+declare denied boolean:=false;
+begin
+  update auth.sessions set not_after=null where id='aaaaaaaa-3333-4333-8333-aaaaaaaaaaaa';
+  perform private.square_production_customer_require_owner_v1(
+    '11111111-1111-4111-8111-111111111111','aaaaaaaa-3333-4333-8333-aaaaaaaaaaaa',
+    'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa');
+  begin
+    perform private.square_production_customer_require_owner_v1(
+      '22222222-2222-4222-8222-222222222222','aaaaaaaa-3333-4333-8333-aaaaaaaaaaaa',
+      'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+  exception when insufficient_privilege then denied:=true; end;
+  if not denied then raise exception 'customer_unbounded_session_wrong_actor_allowed'; end if;
+  denied:=false;
+  begin
+    perform private.square_production_customer_require_owner_v1(
+      '11111111-1111-4111-8111-111111111111','ffffffff-ffff-4fff-8fff-ffffffffffff',
+      'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+  exception when insufficient_privilege then denied:=true; end;
+  if not denied then raise exception 'customer_missing_session_allowed'; end if;
+  update auth.sessions set not_after=clock_timestamp()-interval '1 second'
+    where id='aaaaaaaa-3333-4333-8333-aaaaaaaaaaaa';
+  denied:=false;
+  begin
+    perform private.square_production_customer_require_owner_v1(
+      '11111111-1111-4111-8111-111111111111','aaaaaaaa-3333-4333-8333-aaaaaaaaaaaa',
+      'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+  exception when insufficient_privilege then denied:=true; end;
+  if not denied then raise exception 'customer_expired_session_allowed'; end if;
+  -- The remaining owner/OAuth/broker flow uses a normal unbounded active session.
+  update auth.sessions set not_after=null
+    where id='aaaaaaaa-3333-4333-8333-aaaaaaaaaaaa';
+end $customer_session_contract$;
+
 set local role authenticated;
 do $owner$
 declare view jsonb; blocked boolean:=false; closed boolean:=false;
