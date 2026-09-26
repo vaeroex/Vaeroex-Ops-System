@@ -34,7 +34,9 @@ test("stage copies only committed public native files and exact 104-migration hi
       assert.equal(statSync(resolve(stage,file.path)).mode&0o777,0o400);
       assert.doesNotMatch(file.path,/\.env|\.temp|(?:^|\/)seed(?:\.|\/)|\.pem$/);
     }
-    assert.deepEqual(readdirSync(resolve(stage,"supabase")),["migrations"]);
+    assert.deepEqual(readdirSync(resolve(stage,"supabase")),["migrations","production-migrations"]);
+    assert.deepEqual(readdirSync(resolve(stage,"supabase/production-migrations")),
+      ["20260925032300_square_production_customer_connection.sql"]);
     assert.throws(()=>stageSource(repository,commit,stage),/production_profile_install_denied/,
       "an existing stage is never overwritten");
     const mutations=[

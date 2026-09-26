@@ -6,6 +6,55 @@ mock_provider "google" {
   }
 }
 
+run "customer_consent_selects_exact_customer_runtime_configuration" {
+  command = plan
+  variables {
+    internal_consent = {
+      image_digest      = "us-west1-docker.pkg.dev/vaeroex-integrations-prod/vaeroex-integrations-images/square-internal-consent@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      source_commit     = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      mode              = "customer_owner_v1"
+      application_id    = "sq0idp-synthetic-application"
+      broker_origin     = "https://square-production-broker-u5c6zahmpq-uw.a.run.app"
+      database_versions = { oauth = 1, broker = 1 }
+      database_ca       = file("../../../../tools/jit-access-feasibility/supabase-root-2021.crt")
+    }
+  }
+  assert {
+    condition = alltrue([for mode in ["oauth", "broker"] :
+      toset(keys(jsondecode([for env in google_cloud_run_v2_service.square[mode].template[0].containers[0].env :
+      env.value if env.name == "SQUARE_INTERNAL_CONSENT_CONFIGURATION"][0]))) ==
+      toset(["mode", "profile", "applicationId", "databaseVersion", "databaseCa", "brokerOrigin"]) &&
+      jsondecode([for env in google_cloud_run_v2_service.square[mode].template[0].containers[0].env :
+    env.value if env.name == "SQUARE_INTERNAL_CONSENT_CONFIGURATION"][0]).mode == "customer_owner_v1"])
+    error_message = "Customer mode must serialize exactly the strict customer runtime schema, without an internal permit or publishable key."
+  }
+  assert {
+    condition = (alltrue([for mode in ["runtime", "evidence", "scheduler", "webhook"] :
+      google_cloud_run_v2_service.square[mode].template[0].containers[0].image == var.bootstrap_image_digest]) &&
+      length(google_cloud_run_v2_service_iam_member.manual_read_invoker) == 0 &&
+      !var.runtime_enabled && !var.provider_calls_enabled && !var.customer_onboarding_enabled &&
+    !var.webhook_intake_enabled && !var.economic_contributions_enabled && !var.ai_dispatch_enabled)
+    error_message = "Customer consent configuration must retain peer dormancy and all closed general gates."
+  }
+}
+
+run "customer_configuration_rejects_mixed_internal_permit" {
+  command = plan
+  variables {
+    internal_consent = {
+      image_digest      = "us-west1-docker.pkg.dev/vaeroex-integrations-prod/vaeroex-integrations-images/square-internal-consent@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      source_commit     = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      mode              = "customer_owner_v1"
+      application_id    = "sq0idp-synthetic-application"
+      permit            = {}
+      broker_origin     = "https://square-production-broker-u5c6zahmpq-uw.a.run.app"
+      database_versions = { oauth = 1, broker = 1 }
+      database_ca       = file("../../../../tools/jit-access-feasibility/supabase-root-2021.crt")
+    }
+  }
+  expect_failures = [var.internal_consent]
+}
+
 run "manual_read_uses_existing_services_and_exact_invokers" {
   command = plan
   variables {

@@ -54,6 +54,8 @@ steps:
         corepack prepare pnpm@9.15.4 --activate
         corepack pnpm install --frozen-lockfile --ignore-scripts
         node scripts/square-production-internal-consent-tests.js
+        node scripts/square-production-customer-flow-tests.js
+        node scripts/square-production-customer-workspace-tests.js
         corepack pnpm exec ncc build services/external-integrations-production/internal-consent/entry.ts -o services/external-integrations-production/internal-consent/dist --no-cache --transpile-only --external server-only
         node services/external-integrations-production/internal-consent/package-release.cjs
 
