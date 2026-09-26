@@ -23,6 +23,7 @@ test("customer native contract pins exactly the candidate and its eight function
   assert.ok(contract.sql.includes(`left(p.proname,${prefix.length})='${prefix}'`));
   assert.equal((contract.sql.match(/\('[^']+','[a-f0-9]{64}'\)/g)||[]).length,8);
   assert.match(contract.sql,/count\(\*\)=4 FROM pg_class/);
+  assert.match(contract.sql,/r\.relpersistence='p'/);
   assert.match(contract.sql,/r\.relrowsecurity AND r\.relforcerowsecurity/);
   assert.match(contract.sql,/count\(\*\)=3 FROM pg_proc/);
   for (const check of ["pg_get_constraintdef", "pg_get_indexdef", "t.tgenabled", "t.tgqual", "c.conrelid IN"]) {

@@ -681,6 +681,10 @@ password_encryption='scram-sha-256'
     qualify(internalBinary, "authority");
     psql(["-c", "ALTER TABLE private.square_production_customer_credentials FORCE ROW LEVEL SECURITY"]);
     qualify(internalBinary);
+    psql(["-c", "ALTER TABLE private.square_production_customer_credentials SET UNLOGGED"]);
+    try { qualify(internalBinary, "authority"); }
+    finally { psql(["-c", "ALTER TABLE private.square_production_customer_credentials SET LOGGED"]); }
+    qualify(internalBinary);
     const customerParentTriggers=psql(["-At","-c",`SELECT t.tgname FROM pg_trigger t
       JOIN pg_constraint c ON c.oid=t.tgconstraint
       WHERE t.tgrelid='private.integration_production_platform_bindings'::regclass
