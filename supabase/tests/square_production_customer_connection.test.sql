@@ -59,6 +59,7 @@ insert into private.integration_production_provider_secrets(
   'projects/vaeroex-integrations-prod/secrets/'||case purpose
     when 'database_oauth' then 'square-production-oauth-db'
     when 'database_broker' then 'square-production-broker-db'
+    when 'database_runtime' then 'square-production-runtime-db'
     else 'square-production-'||replace(purpose,'_','-') end||'/versions/1'
   from unnest(array[
     'application','database_broker','database_evidence','database_oauth','database_runtime',

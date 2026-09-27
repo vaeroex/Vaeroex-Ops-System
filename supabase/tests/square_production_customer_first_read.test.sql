@@ -1,5 +1,13 @@
 -- Only after the customer qualification's disposable, committed fixture.
 begin;
+do $runtime_fixture$
+begin
+ if not exists(select from private.integration_production_provider_secrets where provider_key='square'
+  and environment='production' and project_id='vaeroex-integrations-prod' and secret_purpose='database_runtime'
+  and secret_version_resource='projects/vaeroex-integrations-prod/secrets/square-production-runtime-db/versions/1') then
+  raise exception 'customer_read_fixture_runtime_secret_contract_mismatch';
+ end if;
+end $runtime_fixture$;
 create role square_production_broker login inherit nosuperuser nocreatedb nocreaterole noreplication nobypassrls;
 create role square_production_runtime login inherit nosuperuser nocreatedb nocreaterole noreplication nobypassrls;
 grant square_production_broker_authority to square_production_broker with admin false,inherit true,set false;
