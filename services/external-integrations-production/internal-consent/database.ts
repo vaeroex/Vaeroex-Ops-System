@@ -71,7 +71,7 @@ export function createCustomerRpc(profile: "oauth" | "broker", open: () => Promi
 }
 
 const workspaceReadOperations = {
-  broker: new Set(["store_locations", "credential", "authorize_page"]),
+  broker: new Set(["store_locations", "credential", "authorize_refresh", "commit_refresh", "reconcile_refresh", "authorize_page"]),
   runtime: new Set(["claim", "commit", "reconcile", "fail"])
 };
 export function createWorkspaceReadRpc(profile: "broker" | "runtime", open: () => Promise<Database>): InternalRpc {

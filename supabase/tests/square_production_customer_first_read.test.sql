@@ -54,7 +54,7 @@ insert into private.square_production_customer_credentials(
 values('aaaaaaaa-9999-4999-8999-aaaaaaaaaaaa',1,'aaaaaaaa-8888-4888-8888-aaaaaaaaaaaa','aaaaaaaa-7777-4777-8777-aaaaaaaaaaaa',1,
  'c3ludGhldGljIGVuY3J5cHRlZA==','{}','sha256:'||repeat('a',64),
  'projects/vaeroex-integrations-prod/locations/us-west1/keyRings/square-production/cryptoKeys/provider-credentials','seller_customer_a',
- array['INVENTORY_READ','ITEMS_READ','MERCHANT_PROFILE_READ','ORDERS_READ','PAYMENTS_READ'],'sha256:'||repeat('b',64),now()-interval '1 hour',now()+interval '1 hour',now());
+ array['INVENTORY_READ','ITEMS_READ','MERCHANT_PROFILE_READ','ORDERS_READ','PAYMENTS_READ'],'sha256:'||repeat('b',64),now()-interval '2 days',now()-interval '1 day',now());
 update private.square_production_customer_connections set state='mapping_required',credential_id='aaaaaaaa-9999-4999-8999-aaaaaaaaaaaa',credential_version=1,
  merchant_id='seller_customer_a',seller_label='Customer seller',row_version=row_version+1,updated_at=now()
 where connection_id='aaaaaaaa-8888-4888-8888-aaaaaaaaaaaa';
@@ -91,22 +91,83 @@ begin
  if public.square_production_workspace_read_v1('claim','{"leaseId":"bbbbbbbb-eeee-4eee-8eee-bbbbbbbbbbbb","leaseFingerprint":"sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"}')->>'status'<>'idle' then raise exception 'customer_read_claim_replayed'; end if;
  begin perform public.square_production_workspace_read_v1('credential','{}');exception when insufficient_privilege then denied:=true; end;
  if not denied then raise exception 'customer_read_runtime_credential_allowed'; end if;
+ denied:=false;
+ begin perform public.square_production_workspace_read_v1('authorize_refresh','{}');exception when insufficient_privilege then denied:=true; end;
+ if not denied then raise exception 'customer_read_runtime_refresh_allowed'; end if;
 end $claim$;
 -- customer-read-native-session:broker
 do $page_authority$
 declare command jsonb:='{"scanId":"aaaaaaaa-abcd-4bcd-8bcd-aaaaaaaaaaaa","leaseId":"aaaaaaaa-eeee-4eee-8eee-aaaaaaaaaaaa","leaseFingerprint":"sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"}';
-declare result jsonb; denied boolean:=false;
+declare result jsonb; denied boolean:=false; renewal jsonb; issued text; expires text; aad_hash text; renewal_hash text;
 begin
  result:=public.square_production_workspace_read_v1('credential',command);
- if result->>'providerLocationId'<>'location_customer_a' then raise exception 'customer_read_broker_location_failed'; end if;
+ if result->>'providerLocationId'<>'location_customer_a' or result->>'refreshRequired'<>'true' then raise exception 'customer_read_broker_location_failed'; end if;
  begin perform public.square_production_workspace_read_v1('credential',command);exception when insufficient_privilege then denied:=true;end;
  if not denied then raise exception 'customer_read_provider_replay_allowed';end if;
+ denied:=false;
+ begin perform public.square_production_workspace_read_v1('authorize_page',command);exception when insufficient_privilege then denied:=true;end;
+ if not denied then raise exception 'customer_read_expired_page_authorized';end if;
+ denied:=false;
+ begin perform public.square_production_workspace_read_v1('authorize_refresh',command||jsonb_build_object('phase','token','leaseId','bbbbbbbb-eeee-4eee-8eee-bbbbbbbbbbbb'));
+ exception when insufficient_privilege then denied:=true;end;
+ if not denied then raise exception 'customer_read_foreign_refresh_lease_allowed';end if;
+ if public.square_production_workspace_read_v1('authorize_refresh',command||'{"phase":"token"}'::jsonb)->>'authorized'<>'true' then raise exception 'customer_read_refresh_token_failed';end if;
+ denied:=false;
+ begin perform public.square_production_workspace_read_v1('authorize_refresh',command||'{"phase":"token"}'::jsonb);exception when insufficient_privilege then denied:=true;end;
+ if not denied then raise exception 'customer_read_refresh_token_replayed';end if;
+ if public.square_production_workspace_read_v1('authorize_refresh',command||'{"phase":"status"}'::jsonb)->>'authorized'<>'true' then raise exception 'customer_read_refresh_status_failed';end if;
+ denied:=false;
+ begin perform public.square_production_workspace_read_v1('authorize_refresh',command||'{"phase":"status"}'::jsonb);exception when insufficient_privilege then denied:=true;end;
+ if not denied then raise exception 'customer_read_refresh_status_replayed';end if;
+ issued:=to_char(clock_timestamp() at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"');
+ expires:=to_char(issued::timestamptz+interval '24 hours' at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"');
+ select 'sha256:'||encode(sha256(convert_to(string_agg(length(v)::text||':'||v,'' order by ordinal),'UTF8')),'hex') into aad_hash
+ from unnest(array['square-production-customer-aad-v1','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+ 'aaaaaaaa-8888-4888-8888-aaaaaaaaaaaa','1','aaaaaaaa-9999-4999-8999-aaaaaaaaaaaa','2']) with ordinality as parts(v,ordinal);
+ select 'sha256:'||encode(sha256(convert_to(string_agg(length(v)::text||':'||v,'' order by ordinal),'UTF8')),'hex') into renewal_hash
+ from unnest(array['square-customer-refresh-v1','aaaaaaaa-abcd-4bcd-8bcd-aaaaaaaaaaaa','aaaaaaaa-eeee-4eee-8eee-aaaaaaaaaaaa',
+ 'aaaaaaaa-9999-4999-8999-aaaaaaaaaaaa','2',aad_hash,expires]) with ordinality as parts(v,ordinal);
+ renewal:=command||jsonb_build_object('credentialId','aaaaaaaa-9999-4999-8999-aaaaaaaaaaaa','credentialVersion',2,
+ 'ciphertextBase64','c3ludGhldGljIHJlbmV3ZWQ=','aadDigest',aad_hash,'aadContext',jsonb_build_object('providerKey','square','environment','production',
+ 'projectId','vaeroex-integrations-prod','workspaceId','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','connectionId','aaaaaaaa-8888-4888-8888-aaaaaaaaaaaa',
+ 'generation',1,'credentialId','aaaaaaaa-9999-4999-8999-aaaaaaaaaaaa','credentialVersion',2),'merchantId','seller_customer_a',
+ 'grantedScopes',to_jsonb(array['INVENTORY_READ','ITEMS_READ','MERCHANT_PROFILE_READ','ORDERS_READ','PAYMENTS_READ']),
+ 'providerIssuedAt',issued,'accessExpiresAt',expires,'commandFingerprint',renewal_hash);
+ denied:=false;
+ begin perform public.square_production_workspace_read_v1('commit_refresh',jsonb_set(renewal,'{aadContext,workspaceId}','"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"'));
+ exception when insufficient_privilege then denied:=true;end;
+ if not denied then raise exception 'customer_read_cross_workspace_refresh_allowed';end if;
+ denied:=false;
+ begin perform public.square_production_workspace_read_v1('commit_refresh',renewal||'{"merchantId":"seller_customer_b"}'::jsonb);
+ exception when insufficient_privilege then denied:=true;end;
+ if not denied then raise exception 'customer_read_changed_seller_refresh_allowed';end if;
+ result:=public.square_production_workspace_read_v1('commit_refresh',renewal);
+ if result->>'stored'<>'true' or result->>'credentialVersion'<>'2' then raise exception 'customer_read_refresh_commit_failed';end if;
+ if public.square_production_workspace_read_v1('reconcile_refresh',command) is distinct from result then raise exception 'customer_read_refresh_lost_ack_failed';end if;
+ denied:=false;
+ begin perform public.square_production_workspace_read_v1('commit_refresh',renewal);exception when insufficient_privilege then denied:=true;end;
+ if not denied then raise exception 'customer_read_refresh_commit_replayed';end if;
+ denied:=false;
+ begin perform 1 from private.square_production_workspace_read_refreshes;exception when insufficient_privilege then denied:=true;end;
+ if not denied then raise exception 'customer_read_refresh_direct_table_allowed';end if;
  if public.square_production_workspace_read_v1('authorize_page',command)->>'authorized'<>'true' then raise exception 'customer_read_page_authority_failed';end if;
  denied:=false;
  begin perform public.square_production_workspace_read_v1('authorize_page',command);exception when insufficient_privilege then denied:=true;end;
  if not denied then raise exception 'customer_read_authorize_replay_allowed';end if;
 end $page_authority$;
 -- customer-read-native-session:admin
+update public.workspace_members set status='disabled' where workspace_id='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+-- customer-read-native-session:broker
+do $revoked_refresh$
+declare denied boolean:=false;
+begin
+ begin perform public.square_production_workspace_read_v1('reconcile_refresh',
+ '{"scanId":"aaaaaaaa-abcd-4bcd-8bcd-aaaaaaaaaaaa","leaseId":"aaaaaaaa-eeee-4eee-8eee-aaaaaaaaaaaa","leaseFingerprint":"sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"}');
+ exception when insufficient_privilege then denied:=true;end;
+ if not denied then raise exception 'customer_read_revoked_refresh_reconcile_allowed';end if;
+end $revoked_refresh$;
+-- customer-read-native-session:admin
+update public.workspace_members set status='active' where workspace_id='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 -- Supply canonical six-field observations after the native broker boundary.
 do $prepare_page$
 declare scan_uuid uuid:='aaaaaaaa-abcd-4bcd-8bcd-aaaaaaaaaaaa'; observation jsonb; source_hash text; command_hash text; now_text text;

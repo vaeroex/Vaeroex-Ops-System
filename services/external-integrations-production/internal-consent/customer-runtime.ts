@@ -11,6 +11,7 @@ import { createCustomerPaymentsBroker,createCustomerPaymentsRuntime } from "./cu
 import { createProductionCustomerOAuth, createProductionCustomerBroker, type CustomerExchange } from "./customer-flow";
 import { createCustomerConsentServer } from "./customer-server";
 import { createInternalConsentTransport } from "./transport";
+import { createSquareOAuthCredentialProvider,createSquareOAuthPolicy } from "@/lib/integrations/providers/square/account-connection-oauth";
 
 const project = "vaeroex-integrations-prod", projectNumber = "711446392261";
 const databaseProject = "mdiianhfrojmxqpwrflh";
@@ -104,7 +105,7 @@ export async function createProductionCustomerRuntime(raw: unknown) {
     const runOne=createCustomerPaymentsRuntime({rpc:createWorkspaceReadRpc(profile,open),async readPage(command){
       const token=await metadata(`instance/service-accounts/default/identity?audience=${encodeURIComponent(brokerOrigin)}&format=full`);
       return JSON.parse(await readBounded(await fetch(`${brokerOrigin}/internal/square/broker/customer-payments`,{
-        method:"POST",redirect:"error",cache:"no-store",signal:AbortSignal.timeout(25000),
+        method:"POST",redirect:"error",cache:"no-store",signal:AbortSignal.timeout(55000),
         headers:{Authorization:`Bearer ${token}`,"X-Serverless-Authorization":`Bearer ${token}`,"Content-Type":"application/json"},body:JSON.stringify(command)}),100000));
     }});
     return createCustomerConsentServer({profile,runtime:null,runOne});
@@ -149,6 +150,10 @@ export async function createProductionCustomerRuntime(raw: unknown) {
       z.object({stored:z.literal(true)}).strict().parse(await createWorkspaceReadRpc("broker",open)("store_locations",command));
     }}:{}) });
   return createCustomerConsentServer({ profile, runtime: broker, authenticateOAuthService:authenticateService("oauth"),
-    ...(config.customerReads?{payments:{readPage:createCustomerPaymentsBroker({rpc:createWorkspaceReadRpc("broker",open),kms}),
+    ...(config.customerReads?{payments:{readPage:createCustomerPaymentsBroker({rpc:createWorkspaceReadRpc("broker",open),kms,
+      refresh:{applicationSecret:()=>secrets.access("square","production"),provider:authorize=>createSquareOAuthCredentialProvider({
+        applicationId:config.applicationId,policy:createSquareOAuthPolicy({environment:"production",applicationId:config.applicationId,
+          redirectUri:"https://square.vaeroex.com/api/integrations/square/callback",returnPath:"/app/settings/integrations/square"}),
+        transport:createInternalConsentTransport({applicationId:config.applicationId,authorize,refreshOnly:true}),timeoutMs:10000})}}),
       authenticateRuntimeService:authenticateService("runtime")}}:{}) });
 }

@@ -4,6 +4,8 @@ import { z } from "zod";
 import { canonicalContractJson } from "@/lib/integrations/contracts/canonical";
 import { CredentialEnvelopeSchema } from "@/lib/integrations/credentials/contracts";
 import type { CredentialKms } from "@/lib/integrations/credentials/kms";
+import type { OAuthCredentialProvider } from "@/lib/integrations/credentials/broker";
+import type { ProviderApplicationSecret } from "@/lib/integrations/credentials/secret-manager";
 import { SQUARE_API_VERSION } from "@/lib/integrations/providers/square/contracts";
 import { parseSquarePaymentResponse, squarePaymentFingerprint, squarePaymentResponseFingerprint } from "@/lib/integrations/providers/square/payment-responses";
 import { customerFingerprint as fp } from "./customer-flow";
@@ -27,12 +29,13 @@ const denied=()=>new Error("square_customer_read_requires_reconciliation");
 /** Called only by the authenticated runtime after an atomic customer claim.
  * Credentials and provider IDs stay in this broker. This deliberately imports
  * only the shared provider parser, not the internal-seller permit handlers. */
-export function createCustomerPaymentsBroker(input:{rpc:InternalRpc;kms:CredentialKms;network?:typeof fetch;now?:()=>Date}) {
+export function createCustomerPaymentsBroker(input:{rpc:InternalRpc;kms:CredentialKms;network?:typeof fetch;now?:()=>Date;
+  refresh?:{provider(authorize:()=>Promise<void>):OAuthCredentialProvider;applicationSecret():Promise<ProviderApplicationSecret>}}) {
   return async (raw:Command):Promise<CustomerPaymentsPage>=>{
     const command=CustomerReadCommandSchema.parse(raw),now=input.now??(()=>new Date());
     const stored=z.object({credentialId:uuid,credentialVersion:z.literal(1),ciphertextBase64:z.string().min(16).max(131072),
       aadContext:z.record(z.string(),z.unknown()),aadDigest:hash,kmsKeyResource:z.literal(kmsKey),
-      merchantId:z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,99}$/),accessExpiresAt:time,
+      merchantId:z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,99}$/),accessExpiresAt:time,refreshRequired:z.boolean(),
       providerLocationId:z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,49}$/),locationFingerprint:hash,
       windowStart:time,windowEnd:time,workspaceId:uuid,connectionId:uuid,generation:z.number().int().positive().safe()
     }).strict().parse(await input.rpc("credential",command));
@@ -41,16 +44,51 @@ export function createCustomerPaymentsBroker(input:{rpc:InternalRpc;kms:Credenti
     if(canonicalContractJson(aad)!==canonicalContractJson(stored.aadContext)||stored.aadDigest!==fp(["square-production-customer-aad-v1",
       stored.workspaceId,stored.connectionId,stored.generation,stored.credentialId,stored.credentialVersion])||
       stored.locationFingerprint!==fp(["square-customer-location-v1",stored.connectionId,stored.generation,stored.providerLocationId])||
-      Date.parse(stored.accessExpiresAt)<=now().getTime()||Date.parse(stored.windowEnd)>now().getTime()||
+      Date.parse(stored.windowEnd)>now().getTime()||
       Date.parse(stored.windowEnd)-Date.parse(stored.windowStart)<=0||Date.parse(stored.windowEnd)-Date.parse(stored.windowStart)>86400000)throw denied();
     const ciphertext=Buffer.from(stored.ciphertextBase64,"base64"),additionalAuthenticatedData=Buffer.from(canonicalContractJson(aad));
     let plaintext:Uint8Array|undefined;
     try {
       plaintext=await input.kms.decrypt({keyResource:kmsKey,ciphertext,additionalAuthenticatedData});
-      const credential=CredentialEnvelopeSchema.parse(JSON.parse(new TextDecoder("utf8",{fatal:true}).decode(plaintext)));
+      let credential=CredentialEnvelopeSchema.parse(JSON.parse(new TextDecoder("utf8",{fatal:true}).decode(plaintext)));
       if(credential.providerKey!=="square"||credential.environment!=="production"||
         credential.externalAuthorizedEntityReference!==stored.merchantId||!credential.grantedScopes.includes("PAYMENTS_READ")||
         Date.parse(credential.accessExpiresAt)!==Date.parse(stored.accessExpiresAt))throw denied();
+      if(stored.refreshRequired){
+        if(!input.refresh)throw denied();
+        let phase:"token"|"status"="token",calls=0;
+        const provider=input.refresh.provider(async()=>{
+          if(calls>=2)throw denied();
+          z.object({authorized:z.literal(true)}).strict().parse(await input.rpc("authorize_refresh",{...command,phase}));
+          phase="status";calls++;
+        });
+        const refreshed=CredentialEnvelopeSchema.parse(await provider.refreshCredential({credential,
+          applicationSecret:await input.refresh.applicationSecret(),now:now()}));
+        if(calls!==2||refreshed.externalAuthorizedEntityReference!==stored.merchantId||
+          refreshed.providerKey!=="square"||refreshed.environment!=="production"||
+          canonicalContractJson(refreshed.grantedScopes)!==canonicalContractJson(credential.grantedScopes)||
+          refreshed.refreshToken!==credential.refreshToken||Date.parse(refreshed.accessExpiresAt)<=now().getTime()+60000)throw denied();
+        const credentialVersion=stored.credentialVersion+1,refreshAad={...aad,credentialVersion};
+        const aadDigest=fp(["square-production-customer-aad-v1",stored.workspaceId,stored.connectionId,stored.generation,
+          stored.credentialId,credentialVersion]);
+        const clear=Buffer.from(canonicalContractJson(refreshed)),aadBytes=Buffer.from(canonicalContractJson(refreshAad));
+        let encrypted:Uint8Array|undefined;
+        try{
+          encrypted=await input.kms.encrypt({keyResource:kmsKey,plaintext:clear,additionalAuthenticatedData:aadBytes});
+          const commit={...command,credentialId:stored.credentialId,credentialVersion,aadContext:refreshAad,aadDigest,
+            ciphertextBase64:Buffer.from(encrypted).toString("base64"),merchantId:stored.merchantId,grantedScopes:refreshed.grantedScopes,
+            providerIssuedAt:refreshed.updatedAt,accessExpiresAt:refreshed.accessExpiresAt,
+            commandFingerprint:fp(["square-customer-refresh-v1",command.scanId,command.leaseId,stored.credentialId,
+              credentialVersion,aadDigest,refreshed.accessExpiresAt])};
+          let receipt:unknown;
+          try{receipt=await input.rpc("commit_refresh",commit);}
+          catch{receipt=await input.rpc("reconcile_refresh",command);}
+          const checked=z.object({stored:z.literal(true),credentialVersion:z.literal(2),commandFingerprint:hash}).strict().parse(receipt);
+          if(checked.commandFingerprint!==commit.commandFingerprint)throw denied();
+          credential=refreshed;
+        }finally{clear.fill(0);aadBytes.fill(0);encrypted?.fill(0);}
+      }
+      if(Date.parse(credential.accessExpiresAt)<=now().getTime())throw denied();
       z.object({authorized:z.literal(true)}).strict().parse(await input.rpc("authorize_page",command));
       const query={begin_time:new Date(stored.windowStart).toISOString(),end_time:new Date(stored.windowEnd).toISOString(),
         location_id:stored.providerLocationId,limit:"100",sort_order:"ASC"};

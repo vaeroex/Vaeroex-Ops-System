@@ -57,6 +57,7 @@ function fixture(failBeforeAcquire = false) {
 }
 
 async function main() {
+  await require('./square-production-customer-refresh-tests.js')();
   const first = fixture();
   assert.equal((await first.oauth.callback(callback(first.state))).status, "stored");
   assert.equal(first.exchange.length, 1);

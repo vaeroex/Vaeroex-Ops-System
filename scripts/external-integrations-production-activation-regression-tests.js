@@ -201,7 +201,7 @@ assert.match(main, /max_dispatches_per_second\s*=\s*5/);
 assert.match(main, /max_attempts\s*=\s*8/);
 assert.match(main, /prevent_destroy\s*=\s*true/g);
 assert.doesNotMatch(main, /quickbooks|qbo/i, "activation cannot mutate QBO resources");
-const publicAuthKeyMapping = /^[ \t]*supabasePublishableKey = env\.value\.supabase_publishable_key[ \t]*$/gm;
+const publicAuthKeyMapping = /^[ \t]*supabasePublishableKey[ \t]+=[ \t]+env\.value\.supabase_publishable_key[ \t]*$/gm;
 assert.equal([...main.matchAll(publicAuthKeyMapping)].length, 1, "the reviewed public Auth key mapping occurs exactly once");
 const withoutPublicAuthKey = main.replace(publicAuthKeyMapping, "");
 assert.doesNotMatch(withoutPublicAuthKey, /supabase|migration|postgres/i, "cloud activation cannot apply database changes");

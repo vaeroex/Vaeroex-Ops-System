@@ -3,14 +3,16 @@ import { SQUARE_OAUTH_API_VERSION, type SquareOAuthTransport } from "@/lib/integ
 
 /** The existing provider parser owns token/schema/size semantics. This concrete
  * transport restricts the network to the five consent/discovery endpoints;
- * redirects, refresh grants, revocation and business-data writes are absent. */
+ * redirects, revocation and business-data writes are absent. A separately
+ * checked customer-read lease may select only the refresh-token transport. */
 export function createInternalConsentTransport(input: {
-  applicationId: string; authorize(): Promise<void>; network?: typeof fetch;
+  applicationId: string; authorize(): Promise<void>; network?: typeof fetch; refreshOnly?: true;
 }): SquareOAuthTransport {
   return async request => {
     try {
       const url = new URL(request.url);
       const discovery = ["/v2/merchants/me", "/v2/locations", "/v2/locations/main"].includes(url.pathname);
+      if (input.refreshOnly && discovery) throw new Error("request");
       if (url.origin !== "https://connect.squareup.com" || url.username || url.password || url.search || url.hash ||
         (!discovery && !["/oauth2/token", "/oauth2/token/status"].includes(url.pathname)) ||
         request.method !== (discovery ? "GET" : "POST") ||
@@ -21,7 +23,11 @@ export function createInternalConsentTransport(input: {
       if (url.pathname === "/oauth2/token") {
         if (typeof request.body !== "string" || request.body.length > 65_536) throw new Error("body");
         const body = JSON.parse(request.body);
-        if (body.client_id !== input.applicationId || body.grant_type !== "authorization_code" || body.short_lived !== true ||
+        if (body.client_id !== input.applicationId || body.short_lived !== true) throw new Error("body");
+        if (input.refreshOnly) {
+          if (body.grant_type !== "refresh_token" || typeof body.refresh_token !== "string" ||
+            Object.keys(body).sort().join(",") !== "client_id,client_secret,grant_type,refresh_token,scopes,short_lived") throw new Error("body");
+        } else if (body.grant_type !== "authorization_code" ||
           body.redirect_uri !== "https://square.vaeroex.com/api/integrations/square/callback") throw new Error("body");
       } else if (request.body !== null) throw new Error("body");
       if (request.signal.aborted) throw new Error("abort");

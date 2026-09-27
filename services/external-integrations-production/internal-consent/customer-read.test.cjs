@@ -25,7 +25,7 @@ function fixture(options={}){
     assert.equal(op,'credential');return {credentialId,credentialVersion:1,ciphertextBase64:Buffer.from('synthetic_encrypted_credential').toString('base64'),aadContext:aad,
       aadDigest:fp(['square-production-customer-aad-v1',workspaceId,connectionId,1,credentialId,1]),
       kmsKeyResource:'projects/vaeroex-integrations-prod/locations/us-west1/keyRings/square-production/cryptoKeys/provider-credentials',merchantId:'seller_a',
-      accessExpiresAt:credential.accessExpiresAt,providerLocationId:'location_a',locationFingerprint:fp(['square-customer-location-v1',connectionId,1,'location_a']),
+      accessExpiresAt:credential.accessExpiresAt,refreshRequired:false,providerLocationId:'location_a',locationFingerprint:fp(['square-customer-location-v1',connectionId,1,'location_a']),
       windowStart:'2026-09-26T10:00:00.000Z',windowEnd:'2026-09-26T11:00:00.000Z',workspaceId,connectionId,generation:1,...options.storedChange};
   },kms:{async encrypt(){throw Error('unused');},async decrypt(){decrypted=Buffer.from(JSON.stringify({...credential,...options.credentialChange}));return decrypted;}},
   network:async(url,init)=>{count++;assert.equal(init.method,'GET');assert.equal(init.redirect,'error');assert.equal(init.credentials,'omit');

@@ -7,7 +7,7 @@ export const customerReadMigrationFile=fileURLToPath(new URL("../../supabase/pro
 // Filled only from the exact disposable PostgreSQL qualification receipt.
 export const customerReadCatalogSha256="aee6932d1ab3bd7fdbd42f2b5065355d0bc47fc9ba073e68cd4702e74a25b653";
 export const customerReadRelations=["square_production_workspace_read_bindings","square_production_workspace_locations",
-  "square_production_workspace_mappings","square_production_workspace_scans","square_production_workspace_payment_observations"];
+  "square_production_workspace_mappings","square_production_workspace_scans","square_production_workspace_read_refreshes","square_production_workspace_payment_observations"];
 export const customerReadCatalogSql=customerCatalogSql.replace(
   /r\.relname IN \('square_production_customer_bindings',[\s\S]*?'square_production_customer_credentials'\)/,
   `r.relname IN (${customerReadRelations.map(name=>`'${name}'`).join(",")})`);
@@ -29,7 +29,7 @@ export function customerReadNativeContract(){
           AND a.grantee IN('authenticated'::regrole,'square_production_broker_authority'::regrole,'square_production_runtime_authority'::regrole))))
     AND (SELECT count(*)=3 FROM pg_proc p CROSS JOIN LATERAL aclexplode(p.proacl) a
       WHERE p.oid=to_regprocedure('public.square_production_workspace_read_v1(text,jsonb)') AND a.grantee<>p.proowner)
-    AND (SELECT count(*)=5 FROM pg_class r JOIN pg_namespace n ON n.oid=r.relnamespace
+    AND (SELECT count(*)=6 FROM pg_class r JOIN pg_namespace n ON n.oid=r.relnamespace
       WHERE n.nspname='private' AND r.relname IN(${customerReadRelations.map(name=>`'${name}'`).join(",")})
       AND r.relkind='r' AND r.relpersistence='p' AND r.relowner='postgres'::regrole AND r.relrowsecurity AND r.relforcerowsecurity
       AND NOT EXISTS(SELECT FROM pg_rewrite WHERE ev_class=r.oid)
