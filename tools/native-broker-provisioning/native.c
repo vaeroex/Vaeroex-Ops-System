@@ -603,7 +603,7 @@ static bool checked_authority(const char *target,bool customer_fence) {
           "WHERE consent_enabled)",0,NULL)))) return false;
   if (phase==PRODUCTION_PHASE_CUSTOMER && true_query("SELECT count(*)=106 FROM supabase_migrations.schema_migrations",0,NULL) &&
       (!command("LOCK TABLE private.square_production_workspace_read_bindings,private.square_production_workspace_locations,"
-        "private.square_production_workspace_mappings,private.square_production_workspace_scans,private.square_production_workspace_payment_observations IN SHARE MODE") ||
+        "private.square_production_workspace_mappings,private.square_production_workspace_scans,private.square_production_workspace_read_refreshes,private.square_production_workspace_payment_observations IN SHARE MODE") ||
        (!customer_fence && !true_query("SELECT NOT EXISTS(SELECT FROM private.square_production_workspace_read_bindings WHERE read_enabled)",0,NULL)))) return false;
   return true_query("SELECT NOT EXISTS (SELECT FROM private.integration_production_platform_bindings "
       "WHERE infrastructure_provisioned OR runtime_enabled OR economic_contributions_enabled OR ai_dispatch_enabled) "

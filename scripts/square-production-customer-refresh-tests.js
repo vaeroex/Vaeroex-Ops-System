@@ -23,7 +23,7 @@ module.exports=async function(){
     aadDigest:fp(['square-production-customer-aad-v1',workspaceId,connectionId,1,credentialId,1]),kmsKeyResource,merchantId:'merchant_A',accessExpiresAt:credential.accessExpiresAt,
     refreshRequired:!options.current,providerLocationId:'location_A',locationFingerprint:fp(['square-customer-location-v1',connectionId,1,'location_A']),
     windowStart:'2026-09-26T12:00:00.000Z',windowEnd:now.toISOString(),workspaceId:options.foreign?randomUUID():workspaceId,connectionId,generation:1};
-   if(op==='authorize_refresh'){if(options.revoked)throw Error('synthetic revoked');assert.equal(payload.phase,calls.filter(x=>x==='authorize_refresh').length===1?'token':'status');return {authorized:true};}
+   if(op==='authorize_refresh'){if(options.revoked||options.revokedStatus&&payload.phase==='status')throw Error('synthetic revoked');assert.equal(payload.phase,calls.filter(x=>x==='authorize_refresh').length===1?'token':'status');return {authorized:true};}
    if(op==='commit_refresh'){
     assert.equal(payload.credentialVersion,2);assert.equal(payload.credentialId,credentialId);assert.equal(payload.aadContext.workspaceId,workspaceId);
     assert.equal(payload.merchantId,'merchant_A');assert.equal(payload.accessExpiresAt,expires);
@@ -60,9 +60,9 @@ module.exports=async function(){
   assert(!canonicalContractJson(page).includes('accessToken'));assert(!canonicalContractJson(page).includes('merchant_A'));
   for(const b of f.buffers)assert(b.every(x=>x===0),'plaintext and AAD buffers cleared');
  }
- for(const options of [{foreign:true},{revoked:true},{merchantMismatch:true},{revokedPage:true},{lostCommit:true,uncommitted:true}]){
+ for(const options of [{foreign:true},{revoked:true},{revokedStatus:true},{merchantMismatch:true},{revokedPage:true},{lostCommit:true,uncommitted:true}]){
   const f=fixture(options);await assert.rejects(()=>f.broker(f.command));assert(!f.calls.includes('commit_refresh')||options.revokedPage||options.lostCommit);
-  assert.equal(f.networkCalls,options.merchantMismatch||options.revokedPage||options.lostCommit?2:0);
+  assert.equal(f.networkCalls,options.merchantMismatch||options.revokedPage||options.lostCommit?2:options.revokedStatus?1:0);
  }
  const f=fixture({merchantMismatch:true});let failed=0;
  const runtime=createCustomerPaymentsRuntime({rpc:async(op,payload)=>{

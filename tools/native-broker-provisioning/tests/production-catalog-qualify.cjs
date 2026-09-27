@@ -767,6 +767,8 @@ password_encryption='scram-sha-256'
     check(readCatalogHash===customerReadModule.customerReadCatalogSha256,"customer_read_catalog_pin");
     qualify(internalBinary);
     for(const [mutation,restore] of [
+      ["GRANT SELECT ON private.square_production_workspace_read_refreshes TO square_production_broker_authority",
+       "REVOKE SELECT ON private.square_production_workspace_read_refreshes FROM square_production_broker_authority"],
       ["ALTER TABLE private.square_production_workspace_scans NO FORCE ROW LEVEL SECURITY",
        "ALTER TABLE private.square_production_workspace_scans FORCE ROW LEVEL SECURITY"],
       ["GRANT SELECT ON private.square_production_workspace_payment_observations TO square_production_runtime_authority",
