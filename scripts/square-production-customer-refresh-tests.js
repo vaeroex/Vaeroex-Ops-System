@@ -1,10 +1,9 @@
 // Loaded by the customer suite's existing TS/alias/zero-AI test boundary.
 const assert=require('node:assert/strict');
 const {randomUUID}=require('node:crypto');
-const {createCustomerPaymentsBroker,createCustomerPaymentsRuntime}=require('../services/external-integrations-production/internal-consent/customer-read.ts');
+const {createCustomerPaymentsBroker,createCustomerPaymentsRuntime,createCustomerReadRefreshProvider}=require('../services/external-integrations-production/internal-consent/customer-read.ts');
 const {customerFingerprint:fp}=require('../services/external-integrations-production/internal-consent/customer-flow.ts');
-const {createSquareOAuthCredentialProvider,createSquareOAuthPolicy,SQUARE_OAUTH_SCOPES}=require('../lib/integrations/providers/square/account-connection-oauth.ts');
-const {createInternalConsentTransport}=require('../services/external-integrations-production/internal-consent/transport.ts');
+const {SQUARE_OAUTH_SCOPES}=require('../lib/integrations/providers/square/account-connection-oauth.ts');
 const {ProviderApplicationSecret}=require('../lib/integrations/credentials/secret-manager.ts');
 const {canonicalContractJson}=require('../lib/integrations/contracts/canonical.ts');
 module.exports=async function(){
@@ -38,16 +37,14 @@ module.exports=async function(){
    assert.equal(JSON.parse(Buffer.from(request.additionalAuthenticatedData).toString()).credentialVersion,2);
    buffers.push(request.plaintext,request.additionalAuthenticatedData);return Buffer.from('synthetic renewed ciphertext');
   }},refresh:{applicationSecret:async()=>new ProviderApplicationSecret({schemaVersion:'provider_application_secret_v1',providerKey:'square',environment:'production',clientId:applicationId,clientSecret:'synthetic_private_application_secret'}),
-   provider:authorize=>createSquareOAuthCredentialProvider({applicationId,policy:createSquareOAuthPolicy({environment:'production',applicationId,
-    redirectUri:'https://square.vaeroex.com/api/integrations/square/callback',returnPath:'/app/settings/integrations/square'}),
-    transport:createInternalConsentTransport({applicationId,authorize,refreshOnly:true,network:async(url,init)=>{
+   provider:authorize=>createCustomerReadRefreshProvider({applicationId,authorize,network:async(url,init)=>{
      networkCalls++;if(url.endsWith('/oauth2/token')){
       const body=JSON.parse(init.body);assert.equal(body.grant_type,'refresh_token');assert.equal(body.refresh_token,credential.refreshToken);
       return Response.json({access_token:'synthetic_renewed_access_token',token_type:'bearer',expires_at:expires,merchant_id:options.merchantMismatch?'merchant_B':'merchant_A',refresh_token:credential.refreshToken,short_lived:true});
      }
      assert(url.endsWith('/oauth2/token/status'));assert.equal(init.headers.Authorization,'Bearer synthetic_renewed_access_token');
      return Response.json({client_id:applicationId,merchant_id:options.merchantMismatch?'merchant_B':'merchant_A',expires_at:expires,scopes:[...SQUARE_OAUTH_SCOPES]});
-    }})})},network:async(url,init)=>{
+    }})},network:async(url,init)=>{
     networkCalls++;assert.equal(new URL(url).pathname,'/v2/payments');assert.equal(init.headers.Authorization,`Bearer ${options.current?credential.accessToken:'synthetic_renewed_access_token'}`);
     return Response.json({payments:[{id:'synthetic_payment',location_id:'location_A',created_at:'2026-09-27T11:00:00Z',status:'COMPLETED',amount_money:{amount:123,currency:'USD'}}]});
    }});

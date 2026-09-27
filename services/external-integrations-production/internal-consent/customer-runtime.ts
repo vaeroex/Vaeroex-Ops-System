@@ -7,11 +7,10 @@ import { z } from "zod";
 import { GoogleCloudKmsCredentialAdapter } from "@/lib/integrations/credentials/kms";
 import { GoogleSecretManagerProviderSecrets } from "@/lib/integrations/credentials/secret-manager";
 import { createCustomerRpc,createWorkspaceReadRpc } from "./database";
-import { createCustomerPaymentsBroker,createCustomerPaymentsRuntime } from "./customer-read";
+import { createCustomerPaymentsBroker,createCustomerPaymentsRuntime,createCustomerReadRefreshProvider } from "./customer-read";
 import { createProductionCustomerOAuth, createProductionCustomerBroker, type CustomerExchange } from "./customer-flow";
 import { createCustomerConsentServer } from "./customer-server";
 import { createInternalConsentTransport } from "./transport";
-import { createSquareOAuthCredentialProvider,createSquareOAuthPolicy } from "@/lib/integrations/providers/square/account-connection-oauth";
 
 const project = "vaeroex-integrations-prod", projectNumber = "711446392261";
 const databaseProject = "mdiianhfrojmxqpwrflh";
@@ -151,9 +150,7 @@ export async function createProductionCustomerRuntime(raw: unknown) {
     }}:{}) });
   return createCustomerConsentServer({ profile, runtime: broker, authenticateOAuthService:authenticateService("oauth"),
     ...(config.customerReads?{payments:{readPage:createCustomerPaymentsBroker({rpc:createWorkspaceReadRpc("broker",open),kms,
-      refresh:{applicationSecret:()=>secrets.access("square","production"),provider:authorize=>createSquareOAuthCredentialProvider({
-        applicationId:config.applicationId,policy:createSquareOAuthPolicy({environment:"production",applicationId:config.applicationId,
-          redirectUri:"https://square.vaeroex.com/api/integrations/square/callback",returnPath:"/app/settings/integrations/square"}),
-        transport:createInternalConsentTransport({applicationId:config.applicationId,authorize,refreshOnly:true}),timeoutMs:10000})}}),
+      refresh:{applicationSecret:()=>secrets.access("square","production"),provider:authorize=>createCustomerReadRefreshProvider({
+        applicationId:config.applicationId,authorize})}}),
       authenticateRuntimeService:authenticateService("runtime")}}:{}) });
 }

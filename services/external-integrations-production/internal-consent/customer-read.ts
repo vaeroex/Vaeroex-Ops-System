@@ -6,6 +6,8 @@ import { CredentialEnvelopeSchema } from "@/lib/integrations/credentials/contrac
 import type { CredentialKms } from "@/lib/integrations/credentials/kms";
 import type { OAuthCredentialProvider } from "@/lib/integrations/credentials/broker";
 import type { ProviderApplicationSecret } from "@/lib/integrations/credentials/secret-manager";
+import { createSquareOAuthCredentialProvider,createSquareOAuthPolicy,SQUARE_OAUTH_TIMEOUT_MS } from "@/lib/integrations/providers/square/account-connection-oauth";
+import { createInternalConsentTransport } from "./transport";
 import { SQUARE_API_VERSION } from "@/lib/integrations/providers/square/contracts";
 import { parseSquarePaymentResponse, squarePaymentFingerprint, squarePaymentResponseFingerprint } from "@/lib/integrations/providers/square/payment-responses";
 import { customerFingerprint as fp } from "./customer-flow";
@@ -25,6 +27,16 @@ const pageSchema=z.object({scanId:uuid,leaseId:uuid,leaseFingerprint:hash,respon
   observations:z.array(observationSchema).max(100),hasMore:z.boolean()}).strict();
 export type CustomerPaymentsPage=z.infer<typeof pageSchema>;
 const denied=()=>new Error("square_customer_read_requires_reconciliation");
+
+/** The production assembly and offline regression use this exact factory so
+ * the provider's maximum timeout cannot diverge from a synthetic fixture. */
+export function createCustomerReadRefreshProvider(input:{applicationId:string;authorize:()=>Promise<void>;network?:typeof fetch}){
+  return createSquareOAuthCredentialProvider({applicationId:input.applicationId,
+    policy:createSquareOAuthPolicy({environment:"production",applicationId:input.applicationId,
+      redirectUri:"https://square.vaeroex.com/api/integrations/square/callback",returnPath:"/app/settings/integrations/square"}),
+    transport:createInternalConsentTransport({applicationId:input.applicationId,authorize:input.authorize,refreshOnly:true,network:input.network}),
+    timeoutMs:SQUARE_OAUTH_TIMEOUT_MS});
+}
 
 /** Called only by the authenticated runtime after an atomic customer claim.
  * Credentials and provider IDs stay in this broker. This deliberately imports
