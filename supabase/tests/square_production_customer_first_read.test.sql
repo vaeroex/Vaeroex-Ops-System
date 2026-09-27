@@ -82,10 +82,27 @@ begin
  'connectionId','aaaaaaaa-8888-4888-8888-aaaaaaaaaaaa','scanId','bbbbbbbb-abcd-4bcd-8bcd-bbbbbbbbbbbb','windowStart',now()-interval '1 hour','windowEnd',now()));
 end $owner$;
 reset role;commit;
+-- A different workspace's older queued request loses session authority.
+-- Only this disposable admin fixture seeds its formerly admitted state.
+update private.square_production_customer_connections set state='mapping_required',
+ credential_id='bbbbbbbb-9999-4999-8999-bbbbbbbbbbbb',credential_version=1,merchant_id='seller_customer_b',seller_label='Customer B'
+ where connection_id='bbbbbbbb-6666-4666-8666-bbbbbbbbbbbb';
+insert into private.square_production_workspace_locations values('bbbbbbbb-6666-4666-8666-bbbbbbbbbbbb',1,
+ 'sha256:'||repeat('b',64),'location_customer_b','Customer B location',now());
+insert into private.square_production_workspace_mappings values('bbbbbbbb-6666-4666-8666-bbbbbbbbbbbb',1,
+ 'sha256:'||repeat('b',64),'sha256:'||repeat('b',64),now());
+insert into private.square_production_workspace_scans(scan_id,connection_id,generation,workspace_id,business_entity_id,actor_id,session_id,
+ connection_row_version,mapping_fingerprint,window_start,window_end,status,created_at)
+ select 'bbbbbbbb-abcd-4bcd-8bcd-bbbbbbbbbbbb',connection_id,generation,workspace_id,business_entity_id,actor_id,session_id,
+ row_version,'sha256:'||repeat('b',64),now()-interval '1 hour',now(),'ready',now()-interval '1 day'
+ from private.square_production_customer_connections where connection_id='bbbbbbbb-6666-4666-8666-bbbbbbbbbbbb';
+update auth.sessions set not_after=now()-interval '1 second' where id='bbbbbbbb-4444-4444-8444-bbbbbbbbbbbb';
 -- customer-read-native-session:runtime
 do $claim$
 declare result jsonb; denied boolean:=false;
 begin
+ result:=public.square_production_workspace_read_v1('claim','{"leaseId":"cccccccc-eeee-4eee-8eee-cccccccccccc","leaseFingerprint":"sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"}');
+ if result is distinct from '{"status":"quarantined"}'::jsonb then raise exception 'customer_read_expired_claim_not_quarantined';end if;
  result:=public.square_production_workspace_read_v1('claim','{"leaseId":"aaaaaaaa-eeee-4eee-8eee-aaaaaaaaaaaa","leaseFingerprint":"sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"}');
  if result->>'status'<>'leased' or result->>'scanId'<>'aaaaaaaa-abcd-4bcd-8bcd-aaaaaaaaaaaa' then raise exception 'customer_read_claim_failed'; end if;
  if public.square_production_workspace_read_v1('claim','{"leaseId":"bbbbbbbb-eeee-4eee-8eee-bbbbbbbbbbbb","leaseFingerprint":"sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"}')->>'status'<>'idle' then raise exception 'customer_read_claim_replayed'; end if;
@@ -156,6 +173,13 @@ begin
  if not denied then raise exception 'customer_read_authorize_replay_allowed';end if;
 end $page_authority$;
 -- customer-read-native-session:admin
+do $quarantine_receipt$
+begin
+ if not exists(select from private.square_production_workspace_scans
+   where scan_id='bbbbbbbb-abcd-4bcd-8bcd-bbbbbbbbbbbb' and status='uncertain'
+   and provider_started_at is null and not provider_authorized and observation_count is null)
+   then raise exception 'customer_read_quarantine_not_terminal_or_provider_started';end if;
+end $quarantine_receipt$;
 update public.workspace_members set status='disabled' where workspace_id='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 -- customer-read-native-session:broker
 do $revoked_refresh$

@@ -143,6 +143,7 @@ export function createCustomerPaymentsRuntime(input:{rpc:InternalRpc;readPage(co
     const leaseId=randomUUID(),leaseFingerprint=fp(["square-customer-lease-v1",leaseId]);
     const raw=await input.rpc("claim",{leaseId,leaseFingerprint});
     if(z.object({status:z.literal("idle")}).strict().safeParse(raw).success)return {status:"idle"};
+    if(z.object({status:z.literal("quarantined")}).strict().safeParse(raw).success)return {status:"quarantined"};
     const lease=leaseSchema.parse(raw);
     if(lease.leaseId!==leaseId||lease.leaseFingerprint!==leaseFingerprint)throw denied();
     const command={scanId:lease.scanId,leaseId,leaseFingerprint};

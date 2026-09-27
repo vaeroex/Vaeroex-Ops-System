@@ -125,11 +125,12 @@ export function createCustomerConsentServer(input: Readonly<{
   server.requestTimeout = 15_000;
   server.headersTimeout = 10_000;
   server.keepAliveTimeout = 5_000;
-  // Poll only the checked database queue, never the provider. A worker failure
-  // stops processing; a leased/uncertain request is not automatically retried.
+  // Poll only the checked database queue, never retry a leased/uncertain row.
+  // One failed workspace request must not stop unrelated ready requests.
   if(input.profile==="runtime"){
     let stopped=false;let timer:ReturnType<typeof setTimeout>|undefined;
-    const next=async()=>{if(stopped)return;try{await input.runOne();if(!stopped)timer=setTimeout(()=>{void next();},15000);}catch{stopped=true;}};
+    const next=async()=>{if(stopped)return;try{await input.runOne();}catch{/* No provider or mutation retry. */}
+      if(!stopped)timer=setTimeout(()=>{void next();},15000);};
     server.once("listening",()=>{void next();});server.once("close",()=>{stopped=true;if(timer)clearTimeout(timer);});
   }
   return server;

@@ -6,6 +6,7 @@ const {customerFingerprint:fp}=require('../services/external-integrations-produc
 const {SQUARE_OAUTH_SCOPES}=require('../lib/integrations/providers/square/account-connection-oauth.ts');
 const {ProviderApplicationSecret}=require('../lib/integrations/credentials/secret-manager.ts');
 const {canonicalContractJson}=require('../lib/integrations/contracts/canonical.ts');
+const {createCustomerConsentServer}=require('../services/external-integrations-production/internal-consent/customer-server.ts');
 module.exports=async function(){
  const now=new Date('2026-09-27T12:00:00.000Z'),applicationId='sq0idp-SYNTHETIC_REFRESH';
  const expires='2026-09-28T12:00:00.000Z',kmsKeyResource='projects/vaeroex-integrations-prod/locations/us-west1/keyRings/square-production/cryptoKeys/provider-credentials';
@@ -67,5 +68,21 @@ module.exports=async function(){
   if(op==='fail'){failed++;return {status:'uncertain'};}throw Error('unexpected');
  },readPage:async()=>{throw Error('synthetic refresh failed');}});
  await assert.rejects(runtime);assert.equal(failed,1,'failed refresh fenced once without retry');
+ let reads=0;
+ const quarantine=createCustomerPaymentsRuntime({rpc:async op=>{assert.equal(op,'claim');return {status:'quarantined'};},
+  readPage:async()=>{reads++;throw Error('unexpected provider call');}});
+ assert.deepEqual(await quarantine(),{status:'quarantined'});assert.equal(reads,0,'invalid claim cannot reach provider');
+ // Exercise the actual listener's polling path without opening a socket.
+ const originalSet=global.setTimeout,originalClear=global.clearTimeout,scheduled=[];let runs=0,cleared=0,server;
+ try{
+  global.setTimeout=(callback,delay)=>{assert.equal(delay,15000);scheduled.push(callback);return {synthetic:true};};
+  global.clearTimeout=()=>{cleared++;};
+  server=createCustomerConsentServer({profile:'runtime',runtime:null,runOne:async()=>{runs++;if(runs===1)throw Error('synthetic fenced workspace');return {status:'idle'};}});
+  server.emit('listening');await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(runs,1);assert.equal(scheduled.length,1,'one workspace failure keeps bounded polling');
+  scheduled.shift()();await new Promise(resolve=>setImmediate(resolve));assert.equal(runs,2,'next ready workspace can progress');
+  server.emit('close');assert.equal(cleared,1);scheduled.shift()();await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(runs,2,'shutdown prevents further claims');
+ }finally{global.setTimeout=originalSet;global.clearTimeout=originalClear;server?.removeAllListeners();}
  console.log('square_customer_expired_refresh_persist_lost_ack_isolation_zero_ai_passed');
 };

@@ -224,7 +224,15 @@ begin
     perform private.square_production_customer_require_keys_v1(p_payload,array['leaseFingerprint','leaseId']);
     select * into s from private.square_production_workspace_scans where status='ready' order by created_at,scan_id for update skip locked limit 1;
     if not found then return jsonb_build_object('status','idle'); end if;
-    c:=private.square_production_workspace_read_context_v1(s.connection_id,s.generation,s.actor_id,s.session_id,s.connection_row_version);
+    begin
+      c:=private.square_production_workspace_read_context_v1(s.connection_id,s.generation,s.actor_id,s.session_id,s.connection_row_version);
+    exception when insufficient_privilege then
+      -- Authority may expire after enqueue. Terminally fence this locked row
+      -- without returning its workspace or authorizing any provider request.
+      update private.square_production_workspace_scans set status='uncertain',lease_id=(p_payload->>'leaseId')::uuid,
+        lease_fingerprint=p_payload->>'leaseFingerprint',lease_expires_at=clock_timestamp()+interval '60 seconds' where scan_id=s.scan_id;
+      return jsonb_build_object('status','quarantined');
+    end;
     update private.square_production_workspace_scans set status='leased',lease_id=(p_payload->>'leaseId')::uuid,
       lease_fingerprint=p_payload->>'leaseFingerprint',lease_expires_at=clock_timestamp()+interval '60 seconds' where scan_id=s.scan_id returning * into s;
     return jsonb_build_object('status','leased','scanId',s.scan_id,'connectionId',s.connection_id,'generation',s.generation,
