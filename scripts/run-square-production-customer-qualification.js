@@ -138,11 +138,14 @@ async function main() {
     const parts=fs.readFileSync(path.join(root,'supabase/tests/square_production_customer_first_read.test.sql'),'utf8')
       .split(/^-- customer-read-native-session:(broker|runtime|admin)\s*$/m);
     assert.deepEqual(parts.filter((_,index)=>index%2===1),['broker','admin','broker','admin','runtime','admin','runtime','broker','admin','broker','admin','runtime','admin']);
+    console.log('customer_read_phase_initial_fixture');
     await client.query(parts[0]);
     const password=crypto.randomBytes(32).toString('hex');
     for(const profile of ['broker','runtime'])await client.query(`alter role square_production_${profile} password '${password}'`);
     for(let index=1;index<parts.length;index+=2){
-      const profile=parts[index];if(profile==='admin'){await client.query(parts[index+1]);continue;}
+      const profile=parts[index];
+      console.log(`customer_read_phase_${(index+1)/2}_${profile}`);
+      if(profile==='admin'){await client.query(parts[index+1]);continue;}
       const url=new URL(databaseUrl);url.username=`square_production_${profile}`;url.password=password;
       const native=new Client({connectionString:url.toString(),application_name:`square_customer_read_disposable_${profile}`});
       try{
@@ -184,8 +187,16 @@ main().catch(error => {
     [/^permission denied for table /,'table_permission_denied'],
     [/^must be superuser to /,'fixture_superuser_operation_denied']
   ];
+  const knownFunctions=new Set([
+    path.join(customerDirectory,customerFile),
+    path.join(root,'supabase/migrations/20260902191325_square_production_internal_pilot_runtime.sql'),
+    path.join(root,'supabase/production-migrations/20260926232356_square_production_customer_first_read.sql')
+  ].flatMap(file=>[...fs.readFileSync(file,'utf8').matchAll(/create function ([a-z_]+\.[a-z_0-9]+)/g)].map(match=>match[1])));
+  for(const name of ['pg_catalog.sha256','extensions.digest','pg_catalog.pg_has_role'])knownFunctions.add(name);
+  const missing=error?.code==='42883'?/^function ([a-z_]+\.[a-z_0-9]+)\(/.exec(error?.message||'')?.[1]:null;
   const label = labels.has(error?.message) ? error.message :
-    permissionLabels.find(([pattern]) => pattern.test(error?.message || ''))?.[1] || 'unclassified';
+    permissionLabels.find(([pattern]) => pattern.test(error?.message || ''))?.[1] ||
+    (knownFunctions.has(missing)?`undefined_function_${missing.replaceAll('.','_')}`:'unclassified');
   const code = /^[0-9A-Z]{5}$/.test(error?.code || '') ? error.code : 'unknown';
   console.error(fixed.has(error?.message) ? error.message : `customer_qualification_failed:${code}:${label}`);
   process.exitCode = 1;
