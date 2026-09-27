@@ -162,10 +162,15 @@ export function createCustomerPaymentsRuntime(input:{rpc:InternalRpc;readPage(co
       return z.object({status:z.literal("committed"),observationCount:z.number().int().min(0).max(100),nonEconomic:z.literal(true),
         historicalCompleteness:z.literal("unknown")}).strict().parse(await input.rpc("commit",commit));
     }catch{
-      const receipt=z.object({status:z.enum(["leased","committed","uncertain"]),nonEconomic:z.literal(true),historicalCompleteness:z.literal("unknown")})
-        .strict().parse(await input.rpc("reconcile",command));
-      if(receipt.status!=="committed")throw denied();
-      return receipt;
+      try{
+        const receipt=z.object({status:z.enum(["leased","committed","uncertain"]),nonEconomic:z.literal(true),historicalCompleteness:z.literal("unknown")})
+          .strict().parse(await input.rpc("reconcile",command));
+        if(receipt.status!=="committed")throw denied();
+        return receipt;
+      }catch{
+        try{await input.rpc("fail",command);}catch{/* Never retry an uncertain failure acknowledgement. */}
+        throw denied();
+      }
     }
   };
 }

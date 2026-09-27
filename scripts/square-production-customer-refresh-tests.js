@@ -68,6 +68,16 @@ module.exports=async function(){
   if(op==='fail'){failed++;return {status:'uncertain'};}throw Error('unexpected');
  },readPage:async()=>{throw Error('synthetic refresh failed');}});
  await assert.rejects(runtime);assert.equal(failed,1,'failed refresh fenced once without retry');
+ const current=fixture({current:true}),basePage=await current.broker(current.command),postClaimCalls=[];
+ const postClaim=createCustomerPaymentsRuntime({rpc:async(op,payload)=>{
+  postClaimCalls.push(op);
+  if(op==='claim')return {status:'leased',...payload,scanId:current.command.scanId,connectionId:randomUUID(),generation:1,
+   workspaceId:randomUUID(),businessEntityId:randomUUID(),actorId:randomUUID(),sessionId:randomUUID(),windowStart:'2026-09-26T12:00:00.000Z',windowEnd:now.toISOString()};
+  if(op==='fail')return {status:'uncertain'};
+  throw Error('synthetic post-claim revocation');
+ },readPage:async command=>({...basePage,...command})});
+ await assert.rejects(postClaim);assert.deepEqual(postClaimCalls,['claim','commit','reconcile','fail'],
+  'failed commit reconciliation fences once without another page or mutation retry');
  let reads=0;
  const quarantine=createCustomerPaymentsRuntime({rpc:async op=>{assert.equal(op,'claim');return {status:'quarantined'};},
   readPage:async()=>{reads++;throw Error('unexpected provider call');}});

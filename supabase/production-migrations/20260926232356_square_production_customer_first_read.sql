@@ -250,6 +250,13 @@ begin
   if not found or s.lease_id is distinct from (p_payload->>'leaseId')::uuid
     or s.lease_fingerprint is distinct from p_payload->>'leaseFingerprint' then
     raise exception 'square_customer_lease_denied' using errcode='42501'; end if;
+  -- Failure fencing grants no provider/data authority. The exact native runtime
+  -- lease can close only its still-leased scan after expiry or owner revocation.
+  if p_operation='fail' then
+    if s.status<>'leased' then raise exception 'square_customer_lease_denied' using errcode='42501';end if;
+    update private.square_production_workspace_scans set status='uncertain' where scan_id=s.scan_id;
+    return jsonb_build_object('status','uncertain');
+  end if;
   c:=private.square_production_workspace_read_context_v1(s.connection_id,s.generation,s.actor_id,s.session_id,s.connection_row_version);
   select * into m from private.square_production_workspace_mappings where connection_id=s.connection_id and generation=s.generation for share;
   if not found or m.mapping_fingerprint<>s.mapping_fingerprint then raise exception 'square_customer_mapping_denied' using errcode='42501'; end if;
@@ -260,10 +267,7 @@ begin
   select * into credential from private.square_production_customer_credentials where connection_id=c.connection_id
     and generation=c.generation and credential_id=c.credential_id and credential_version=c.credential_version for share;
   if not found then raise exception 'square_customer_credential_denied' using errcode='42501'; end if;
-  if p_operation='fail' then
-    update private.square_production_workspace_scans set status='uncertain' where scan_id=s.scan_id;
-    return jsonb_build_object('status','uncertain');
-  elsif p_operation='authorize_page' then
+  if p_operation='authorize_page' then
     if s.provider_started_at is null or s.provider_authorized then raise exception 'square_customer_provider_replay_denied' using errcode='42501'; end if;
     select * into renewal from private.square_production_workspace_read_refreshes where scan_id=s.scan_id for share;
     if (found and (renewal.status<>'stored' or renewal.access_expires_at<=clock_timestamp()))

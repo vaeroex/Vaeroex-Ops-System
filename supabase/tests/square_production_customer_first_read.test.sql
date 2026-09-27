@@ -112,6 +112,24 @@ begin
  begin perform public.square_production_workspace_read_v1('authorize_refresh','{}');exception when insufficient_privilege then denied:=true; end;
  if not denied then raise exception 'customer_read_runtime_refresh_allowed'; end if;
 end $claim$;
+-- customer-read-native-session:admin
+-- Simulate a claimed request whose session and lease both expired. It must
+-- remain fenceable by only its matching runtime lease, not any owner/broker.
+update private.square_production_workspace_scans set status='leased',lease_expires_at=now()-interval '1 second'
+ where scan_id='bbbbbbbb-abcd-4bcd-8bcd-bbbbbbbbbbbb' and status='uncertain';
+-- customer-read-native-session:runtime
+do $expired_failure_fence$
+declare command jsonb:='{"scanId":"bbbbbbbb-abcd-4bcd-8bcd-bbbbbbbbbbbb","leaseId":"cccccccc-eeee-4eee-8eee-cccccccccccc","leaseFingerprint":"sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"}'; denied boolean:=false;
+begin
+ begin perform public.square_production_workspace_read_v1('fail',command||'{"leaseFingerprint":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}'::jsonb);
+ exception when insufficient_privilege then denied:=true;end;
+ if not denied then raise exception 'customer_read_failure_wrong_lease_allowed';end if;
+ if public.square_production_workspace_read_v1('fail',command) is distinct from '{"status":"uncertain"}'::jsonb
+ then raise exception 'customer_read_expired_revoked_failure_not_fenced';end if;
+ denied:=false;
+ begin perform public.square_production_workspace_read_v1('fail',command);exception when insufficient_privilege then denied:=true;end;
+ if not denied then raise exception 'customer_read_failure_replayed';end if;
+end $expired_failure_fence$;
 -- customer-read-native-session:broker
 do $page_authority$
 declare command jsonb:='{"scanId":"aaaaaaaa-abcd-4bcd-8bcd-aaaaaaaaaaaa","leaseId":"aaaaaaaa-eeee-4eee-8eee-aaaaaaaaaaaa","leaseFingerprint":"sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"}';
@@ -221,6 +239,10 @@ begin
  result:=public.square_production_workspace_read_v1('commit',current_setting('vaeroex.test.page')::jsonb);
  if result->>'observationCount'<>'1' or result->>'status'<>'committed' then raise exception 'customer_read_commit_failed'; end if;
  if public.square_production_workspace_read_v1('reconcile','{"scanId":"aaaaaaaa-abcd-4bcd-8bcd-aaaaaaaaaaaa","leaseId":"aaaaaaaa-eeee-4eee-8eee-aaaaaaaaaaaa","leaseFingerprint":"sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"}')->>'status'<>'committed' then raise exception 'customer_read_reconcile_failed';end if;
+ begin perform public.square_production_workspace_read_v1('fail','{"scanId":"aaaaaaaa-abcd-4bcd-8bcd-aaaaaaaaaaaa","leaseId":"aaaaaaaa-eeee-4eee-8eee-aaaaaaaaaaaa","leaseFingerprint":"sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"}');
+ exception when insufficient_privilege then denied:=true;end;
+ if not denied then raise exception 'customer_read_committed_failure_allowed';end if;
+ denied:=false;
  begin perform public.square_production_workspace_read_v1('commit',current_setting('vaeroex.test.page')::jsonb);exception when insufficient_privilege then denied:=true;end;
  if not denied then raise exception 'customer_read_duplicate_commit_allowed';end if;
  denied:=false;
