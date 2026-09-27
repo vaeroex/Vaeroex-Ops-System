@@ -137,7 +137,7 @@ async function main() {
     console.log(JSON.stringify({label:'customer_read_native_catalog_fingerprint',sha256:catalogHash}));
     const parts=fs.readFileSync(path.join(root,'supabase/tests/square_production_customer_first_read.test.sql'),'utf8')
       .split(/^-- customer-read-native-session:(broker|runtime|admin)\s*$/m);
-    assert.deepEqual(parts.filter((_,index)=>index%2===1),['broker','admin','runtime','broker','admin','runtime','admin']);
+    assert.deepEqual(parts.filter((_,index)=>index%2===1),['broker','admin','broker','admin','runtime','broker','admin','runtime','admin']);
     await client.query(parts[0]);
     const password=crypto.randomBytes(32).toString('hex');
     for(const profile of ['broker','runtime'])await client.query(`alter role square_production_${profile} password '${password}'`);

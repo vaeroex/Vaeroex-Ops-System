@@ -7,7 +7,25 @@ grant square_production_runtime_authority to square_production_runtime with admi
 update private.square_production_customer_bindings set consent_enabled=true where generation=1;
 insert into private.square_production_workspace_read_bindings select generation,configuration_fingerprint,true
  from private.square_production_customer_bindings where generation=1;
+-- A later connection transition must fail before any discovered location is
+-- written. Restore only this disposable fixture after the native denial.
+update private.square_production_customer_connections set row_version=row_version+1
+ where connection_id='aaaaaaaa-8888-4888-8888-aaaaaaaaaaaa';
 commit;
+-- customer-read-native-session:broker
+do $stale_locations$
+declare denied boolean:=false;
+begin
+ begin perform public.square_production_workspace_read_v1('store_locations',jsonb_build_object(
+  'stateId','aaaaaaaa-7777-4777-8777-aaaaaaaaaaaa',
+  'requestFingerprint','sha256:e37e414510d5af07acffbbc96abc3e7e9cb9240514b9cf456a4ba6bc5b80ec1b',
+  'locations',jsonb_build_array(jsonb_build_object('id','location_customer_a','label','Verified customer location'))));
+ exception when insufficient_privilege then denied:=true;end;
+ if not denied then raise exception 'customer_read_stale_location_transition_allowed';end if;
+end $stale_locations$;
+-- customer-read-native-session:admin
+update private.square_production_customer_connections set row_version=row_version-1
+ where connection_id='aaaaaaaa-8888-4888-8888-aaaaaaaaaaaa';
 -- customer-read-native-session:broker
 do $locations$
 declare state_uuid uuid:='aaaaaaaa-7777-4777-8777-aaaaaaaaaaaa'; credential_uuid uuid:='aaaaaaaa-9999-4999-8999-aaaaaaaaaaaa';

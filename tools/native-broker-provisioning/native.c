@@ -995,8 +995,8 @@ static bool production_baseline_triggers_valid(production_phase phase) {
         "pg_catalog.to_regclass('private.square_production_customer_bindings'),"
         "pg_catalog.to_regclass('private.square_production_customer_connections'),"
         "pg_catalog.to_regclass('private.square_production_customer_oauth_states'),"
-        "pg_catalog.to_regclass('private.square_production_customer_credentials'),"
-        "pg_catalog.to_regclass('private.square_production_workspace_scans'))))",1,values);
+        "pg_catalog.to_regclass('private.square_production_customer_credentials')) "
+        "AND c.conrelid IS DISTINCT FROM pg_catalog.to_regclass('private.square_production_workspace_scans')))",1,values);
 }
 
 static bool production_internal_runtime_relations_valid(void) {

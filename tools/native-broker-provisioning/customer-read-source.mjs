@@ -5,7 +5,7 @@ import {customerCatalogSql} from "./customer-source.mjs";
 export const customerReadMigrationVersion="20260926232356";
 export const customerReadMigrationFile=fileURLToPath(new URL("../../supabase/production-migrations/20260926232356_square_production_customer_first_read.sql",import.meta.url));
 // Filled only from the exact disposable PostgreSQL qualification receipt.
-export const customerReadCatalogSha256="0000000000000000000000000000000000000000000000000000000000000000";
+export const customerReadCatalogSha256="aee6932d1ab3bd7fdbd42f2b5065355d0bc47fc9ba073e68cd4702e74a25b653";
 export const customerReadRelations=["square_production_workspace_read_bindings","square_production_workspace_locations",
   "square_production_workspace_mappings","square_production_workspace_scans","square_production_workspace_payment_observations"];
 export const customerReadCatalogSql=customerCatalogSql.replace(

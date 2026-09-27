@@ -145,7 +145,10 @@ begin
     if not found or st.status<>'exchanging' or st.expires_at<=clock_timestamp() or st.exchange_fingerprint is distinct from p_payload->>'requestFingerprint' then
       raise exception 'square_customer_locations_denied' using errcode='42501'; end if;
     select * into c from private.square_production_customer_connections where connection_id=st.connection_id for share;
-    if not found or c.state<>'consent_pending' or c.generation<>st.generation or c.row_version<>st.connection_row_version then
+    -- create_state records the pre-transition row version, then increments
+    -- the connection once when entering consent_pending. No later transition
+    -- may be admitted here.
+    if not found or c.state<>'consent_pending' or c.generation<>st.generation or c.row_version<>st.connection_row_version+1 then
       raise exception 'square_customer_locations_denied' using errcode='42501'; end if;
     perform private.square_production_customer_require_owner_v1(st.actor_id,st.session_id,c.workspace_id,c.business_entity_id);
     perform private.square_production_customer_require_eligible_v1(c.workspace_id);
