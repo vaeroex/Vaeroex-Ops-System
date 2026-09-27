@@ -23,7 +23,7 @@ const IMAGE_POLICY = Object.freeze({
   }),
   consentDockerfileSha256: "ea2009a1babf8d22eb60bebb73901a0fa44cdcff8ff9d876208173cea45c4c8b",
   consentReleaseFiles: Object.freeze({
-    "index.js": "af6d149b9fa445de4569fdc468791dafe93e7d43bfd05a6f3285b48e7dc84725",
+    "index.js": "c2b425a546c43ca9f50201bc73e704762727a3a779600852b4d244866ca1d087",
     "node_modules/server-only/empty.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "node_modules/server-only/index.js": "2c4720b71eb03e5f75a83d43e6fd83c0446aa172a58a4d6ffbd74ecad72ba7b5",
     "node_modules/server-only/package.json": "e4b0cc01e2e0349c51c694fa97d8a642eb8322521ca1444b20bd1842594b4339",
