@@ -6,7 +6,8 @@ import { createRemoteJWKSet, jwtVerify } from "jose";
 import { z } from "zod";
 import { GoogleCloudKmsCredentialAdapter } from "@/lib/integrations/credentials/kms";
 import { GoogleSecretManagerProviderSecrets } from "@/lib/integrations/credentials/secret-manager";
-import { createCustomerRpc } from "./database";
+import { createCustomerRpc,createWorkspaceReadRpc } from "./database";
+import { createCustomerPaymentsBroker,createCustomerPaymentsRuntime,createCustomerReadRefreshProvider } from "./customer-read";
 import { createProductionCustomerOAuth, createProductionCustomerBroker, type CustomerExchange } from "./customer-flow";
 import { createCustomerConsentServer } from "./customer-server";
 import { createInternalConsentTransport } from "./transport";
@@ -20,11 +21,11 @@ const applicationResource = `projects/${project}/secrets/square-production-appli
 const kmsResource = `projects/${project}/locations/us-west1/keyRings/square-production/cryptoKeys/provider-credentials`;
 const googleKeys = createRemoteJWKSet(new URL("https://www.googleapis.com/oauth2/v3/certs"), { timeoutDuration: 5_000 });
 const ConfigSchema = z.object({
-  mode: z.literal("customer_owner_v1"), profile: z.enum(["oauth", "broker"]),
+  mode: z.literal("customer_owner_v1"), profile: z.enum(["oauth", "broker","runtime"]),
   applicationId: z.string().regex(/^sq0idp-[A-Za-z0-9_-]{1,184}$/),
   databaseVersion: z.literal(1), databaseCa: z.string().max(16_384),
-  brokerOrigin: z.literal(brokerOrigin)
-}).strict();
+  brokerOrigin: z.literal(brokerOrigin),customerReads:z.literal(true).optional()
+}).strict().refine(value=>value.profile!=="runtime"||value.customerReads===true);
 
 async function readBounded(response: Response, maximum = 8192) {
   if (!response.ok || !response.body) throw new Error("square_customer_transport_denied");
@@ -93,6 +94,21 @@ export async function createProductionCustomerRuntime(raw: unknown) {
       catch { await client.end().catch(() => undefined); throw new Error("square_customer_database_connect_denied"); }
     } finally { bytes.fill(0); }
   };
+  const authenticateService=(service:"oauth"|"runtime")=>async(request:Request)=>{
+    const authorization=request.headers.get("authorization");
+    if(!authorization?.startsWith("Bearer ")||authorization.length>16384)return false;
+    try{const {payload}=await jwtVerify(authorization.slice(7),googleKeys,{issuer:["https://accounts.google.com","accounts.google.com"],audience:brokerOrigin,algorithms:["RS256"]});
+      return payload.email===`sq-prod-${service}@${project}.iam.gserviceaccount.com`&&payload.email_verified===true;}catch{return false;}
+  };
+  if(profile==="runtime"){
+    const runOne=createCustomerPaymentsRuntime({rpc:createWorkspaceReadRpc(profile,open),async readPage(command){
+      const token=await metadata(`instance/service-accounts/default/identity?audience=${encodeURIComponent(brokerOrigin)}&format=full`);
+      return JSON.parse(await readBounded(await fetch(`${brokerOrigin}/internal/square/broker/customer-payments`,{
+        method:"POST",redirect:"error",cache:"no-store",signal:AbortSignal.timeout(55000),
+        headers:{Authorization:`Bearer ${token}`,"X-Serverless-Authorization":`Bearer ${token}`,"Content-Type":"application/json"},body:JSON.stringify(command)}),100000));
+    }});
+    return createCustomerConsentServer({profile,runtime:null,runOne});
+  }
   const rpc = createCustomerRpc(profile, open);
   if (profile === "oauth") {
     const oauth = createProductionCustomerOAuth({ applicationId: config.applicationId, rpc,
@@ -120,20 +136,21 @@ export async function createProductionCustomerRuntime(raw: unknown) {
         method: "POST", body: JSON.stringify({ plaintext, additionalAuthenticatedData })
       });
       return { ciphertext: result.ciphertext };
-    }, async decrypt() { throw new Error("square_customer_decrypt_unavailable"); }
+    }, async decrypt({name,ciphertext,additionalAuthenticatedData}) {
+      if(!config.customerReads||name!==kmsResource)throw new Error("square_customer_decrypt_unavailable");
+      const result=await google(`https://cloudkms.googleapis.com/v1/${name}:decrypt`,{method:"POST",body:JSON.stringify({ciphertext,additionalAuthenticatedData})});
+      return {plaintext:result.plaintext};
+    }
   } });
   const broker = createProductionCustomerBroker({ applicationId: config.applicationId, rpc,
     transport: authorize => createInternalConsentTransport({ applicationId: config.applicationId, authorize }),
-    applicationSecret: () => secrets.access("square", "production"), kms });
-  const authenticateOAuthService = async (request: Request) => {
-    const authorization = request.headers.get("authorization");
-    if (!authorization?.startsWith("Bearer ") || authorization.length > 16_384) return false;
-    try {
-      const { payload } = await jwtVerify(authorization.slice(7), googleKeys, {
-        issuer: ["https://accounts.google.com", "accounts.google.com"], audience: brokerOrigin, algorithms: ["RS256"]
-      });
-      return payload.email === `sq-prod-oauth@${project}.iam.gserviceaccount.com` && payload.email_verified === true;
-    } catch { return false; }
-  };
-  return createCustomerConsentServer({ profile, runtime: broker, authenticateOAuthService });
+    applicationSecret: () => secrets.access("square", "production"), kms,
+    ...(config.customerReads?{async storeLocations(command:{stateId:string;requestFingerprint:string;locations:{id:string;label:string}[]}){
+      z.object({stored:z.literal(true)}).strict().parse(await createWorkspaceReadRpc("broker",open)("store_locations",command));
+    }}:{}) });
+  return createCustomerConsentServer({ profile, runtime: broker, authenticateOAuthService:authenticateService("oauth"),
+    ...(config.customerReads?{payments:{readPage:createCustomerPaymentsBroker({rpc:createWorkspaceReadRpc("broker",open),kms,
+      refresh:{applicationSecret:()=>secrets.access("square","production"),provider:authorize=>createCustomerReadRefreshProvider({
+        applicationId:config.applicationId,authorize})}}),
+      authenticateRuntimeService:authenticateService("runtime")}}:{}) });
 }

@@ -28,7 +28,7 @@ const pins = Object.freeze({
 });
 const hash = source => crypto.createHash("sha256").update(source).digest("hex");
 let stage = "source_manifest", root, socketRoot, running = false, terminating = false, assertions = 0;
-let customerContract;
+let customerContract, customerReadContract;
 const check = (value, name) => { assertions++; if (!value) { stage = name; throw new Error("catalog_qualification_failed"); } };
 const contractStages = new Set([
   "begin", "closed_authority", "managed_catalog_fence", "ledger_phase", "relations", "foundation_schema", "overlay_schema",
@@ -196,6 +196,7 @@ function compile(output, sourcePin) {
     "-DVAEROEX_PRODUCTION_OAUTH", `-DVAEROEX_CATALOG_SOCKET_PATH=${JSON.stringify(socket())}`,
     ...(sourcePin ? [`-DVAEROEX_PRODUCTION_INTERNAL_RUNTIME_SOURCE_SHA256=${JSON.stringify(sourcePin)}`] : []),
     ...(sourcePin && customerContract ? [`-DVAEROEX_PRODUCTION_CUSTOMER_CONTRACT=${JSON.stringify(customerContract.sql)}`] : []),
+    ...(sourcePin && customerReadContract ? [`-DVAEROEX_PRODUCTION_CUSTOMER_READ_CONTRACT=${JSON.stringify(customerReadContract.sql)}`] : []),
     source, "-lpq", "-o", output];
   run("/usr/bin/cc", flags);
 }
@@ -331,6 +332,8 @@ process.once("SIGTERM", () => terminate("SIGTERM"));
 async function main() {
   const customerModule = await import("../customer-source.mjs");
   customerContract = customerModule.customerNativeContract();
+  const customerReadModule = await import("../customer-read-source.mjs");
+  customerReadContract = customerReadModule.customerReadNativeContract();
   stage = "cluster_bootstrap";
   // Keep the separately owned socket directory below Darwin's sockaddr_un
   // bound while compiling that exact path into the local-only C harness.
@@ -755,7 +758,38 @@ password_encryption='scram-sha-256'
     "customer_open_binding_native_fence_closes_role_and_sessions");
     psql(["-c", "UPDATE private.square_production_customer_bindings SET consent_enabled=false"]);
     qualify(internalBinary);
-    internalRuntime = "exact_104_qualified";
+    stage = "customer_read_source_and_native_admission";
+    psqlSource(fs.readFileSync(customerReadModule.customerReadMigrationFile,"utf8"),120000);
+    psql(["-c",`INSERT INTO supabase_migrations.schema_migrations(version) VALUES ('${customerReadModule.customerReadMigrationVersion}')`]);
+    const readCatalogHash=psql(["-At","-c",`SET search_path=pg_catalog; ${customerReadModule.customerReadCatalogSql}`])
+      .stdout.trim().split("\n").at(-1);
+    process.stdout.write(JSON.stringify({outcome:"customer_read_catalog_native_fingerprint",sha256:readCatalogHash})+"\n");
+    check(readCatalogHash===customerReadModule.customerReadCatalogSha256,"customer_read_catalog_pin");
+    qualify(internalBinary);
+    for(const [mutation,restore] of [
+      ["GRANT SELECT ON private.square_production_workspace_read_refreshes TO square_production_broker_authority",
+       "REVOKE SELECT ON private.square_production_workspace_read_refreshes FROM square_production_broker_authority"],
+      ["ALTER TABLE private.square_production_workspace_scans NO FORCE ROW LEVEL SECURITY",
+       "ALTER TABLE private.square_production_workspace_scans FORCE ROW LEVEL SECURITY"],
+      ["GRANT SELECT ON private.square_production_workspace_payment_observations TO square_production_runtime_authority",
+       "REVOKE SELECT ON private.square_production_workspace_payment_observations FROM square_production_runtime_authority"],
+      ["GRANT EXECUTE ON FUNCTION public.square_production_workspace_read_v1(text,jsonb) TO square_production_oauth_authority",
+       "REVOKE EXECUTE ON FUNCTION public.square_production_workspace_read_v1(text,jsonb) FROM square_production_oauth_authority"]
+    ]){
+      psql(["-c",mutation]);
+      try{qualify(internalBinary,"authority");}finally{psql(["-c",restore]);}
+      qualify(internalBinary);
+    }
+    const readParentTriggers=psql(["-At","-c",`SELECT t.tgname FROM pg_trigger t JOIN pg_constraint c ON c.oid=t.tgconstraint
+      WHERE t.tgrelid='public.business_entities'::regclass AND c.conrelid='private.square_production_workspace_scans'::regclass ORDER BY t.tgname`])
+      .stdout.trim().split("\n");
+    check(readParentTriggers.length===2&&readParentTriggers.every(name=>/^[A-Za-z0-9_]+$/.test(name)),"customer_read_parent_trigger_fixture");
+    for(const name of readParentTriggers){
+      psql(["-c",`ALTER TABLE public.business_entities DISABLE TRIGGER "${name}"`]);
+      try{qualify(internalBinary,"authority");}finally{psql(["-c",`ALTER TABLE public.business_entities ENABLE TRIGGER "${name}"`]);}
+      qualify(internalBinary);
+    }
+    internalRuntime = "exact_106_customer_read_qualified";
   }
   cleanup();
   process.stdout.write(JSON.stringify({ outcome: "passed", localOnly: true, hostedQualification: false,

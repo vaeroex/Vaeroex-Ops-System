@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { productionProvisioningBuildProfile } from "./production-profile.mjs";
 import { productionSourceManifest } from "./production-source.mjs";
 import { customerNativeContract } from "./customer-source.mjs";
+import { customerReadNativeContract } from "./customer-read-source.mjs";
 
 // Offline build only. The committed deployment binding must first contain every
 // reviewed public endpoint/CA/VM identity pin; null pins fail before compiler I/O.
@@ -28,6 +29,7 @@ try {
   const digest = name => createHash("sha256").update(readFileSync(resolve(migrations, name))).digest("hex");
   const sourceManifest = productionSourceManifest({ migrationNames: names, digest });
   const customer = customerNativeContract();
+  const customerRead=customerReadNativeContract();
   const sourcePhaseMacro = sourceManifest.phase === "internalRuntime"
     ? [`-DVAEROEX_PRODUCTION_INTERNAL_RUNTIME_SOURCE_SHA256=${JSON.stringify(sourceManifest.internalRuntimeSha256)}`]
     : [];
@@ -39,6 +41,7 @@ try {
     "-fstack-protector-strong", "-fPIE", "-pie", "-Wl,-z,relro,-z,now", `-I${include}`, `-L${library}`,
     "-DVAEROEX_MANAGED_SUPABASE", macro, ...sourcePhaseMacro,
     `-DVAEROEX_PRODUCTION_CUSTOMER_CONTRACT=${JSON.stringify(customer.sql)}`,
+    `-DVAEROEX_PRODUCTION_CUSTOMER_READ_CONTRACT=${JSON.stringify(customerRead.sql)}`,
     ...Object.entries(pins).map(([key, value]) => `-DVAEROEX_MANAGED_${key}=${JSON.stringify(value)}`),
     resolve(source, "native.c"), "-lpq", "-o", process.argv[2]], { env: environment, stdio: "pipe", timeout: 30000 });
   const launcher = process.argv[2] + ".launcher";

@@ -16,7 +16,16 @@ Disconnect fences this workspace locally, including failed consent, and permits
 a new connection after disconnected history. It does not claim that provider
 revocation has happened. A provider request already authorized and in flight at
 disconnect may finish; later requests and credential commit must recheck authority.
-Mapping and data reads remain unavailable in this customer slice.
+The dependent first-read candidate adds owner-confirmed location mapping and
+one bounded Payments page, without an internal-seller permit. An expired or
+near-expiry access token is renewed once by the broker under the claimed scan's
+live workspace/session/generation authority. Separate token and token-status
+latches precede the existing provider adapter's calls. The renewed envelope is
+KMS-encrypted with credential-version-2 AAD and persisted in a private FORCE-RLS
+read-renewal table before the Payments call is authorized. The original consent
+credential remains immutable. A lost persistence acknowledgement permits only
+checked reconciliation, not another refresh. These repository changes do not
+enable reads, deploy services, or authorize a live migration apply.
 
 ## Validation
 

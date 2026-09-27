@@ -21,7 +21,7 @@ Module._load = function(request, parent, isMain) {
   if (request === "@/lib/security/require-workspace-access") return { requireWorkspaceAccess: async () => access };
   return load.call(this, request, parent, isMain);
 };
-const { productionSquareCustomerAction, productionSquareCustomerView } = require("../lib/integrations/control-plane/square-production-customer.ts");
+const { productionSquareCustomerAction, productionSquareCustomerView,productionSquareReadAction,productionSquareReadViews } = require("../lib/integrations/control-plane/square-production-customer.ts");
 const { SquareProductionCustomerPanel } = require("../components/integrations/SquareProductionCustomerPanel.tsx");
 const { renderToStaticMarkup } = require("react-dom/server");
 const React = require("react");
@@ -32,6 +32,13 @@ function setup(role = "owner", claim = sessionId) {
   access = { user: { id: userId }, membership: { role }, workspaceId,
     supabase: { auth: { async getClaims() { return { data: { claims: { sub: userId, session_id: claim } }, error: null }; } },
       async rpc(name, args) {
+        if(name==="square_production_workspace_read_v1"){
+          calls.push(args);assert.equal(args.p_payload.workspaceId,workspaceId);
+          if(args.p_operation==="map")return {error:null,data:{mapped:true}};
+          if(args.p_operation==="start")return {error:null,data:{status:"ready",nonEconomic:true,historicalCompleteness:"unknown"}};
+          return {error:null,data:{locations:[{fingerprint:`sha256:${"c".repeat(64)}`,label:"Verified location"}],mappedLocation:null,
+            readStatus:"not_requested",observationCount:null,verifiedAt:null,hasMore:null,source:"Square Production",historicalCompleteness:"unknown",nonEconomic:true}};
+        }
         assert.equal(name, "square_production_customer_v1");
         calls.push(args);
         const operation = args.p_operation, command = args.p_payload;
@@ -113,6 +120,23 @@ async function main() {
     assert.equal((await productionSquareCustomerAction("status", request("status", "GET"))).status, 403,
       "stale or missing session fails before RPC");
     assert.equal(calls.length, count);
+    setup();delete process.env.SQUARE_PRODUCTION_CUSTOMER_READS;
+    assert.equal((await productionSquareReadAction("read",request("read","POST",`connectionId=${connectionId}`))).status,404);
+    assert.equal(calls.length,count);
+    process.env.SQUARE_PRODUCTION_CUSTOMER_READS="enabled";
+    assert.equal((await productionSquareReadAction("mapping",request("mapping","POST",`connectionId=${connectionId}&locationFingerprint=sha256:${"c".repeat(64)}`))).status,303);
+    assert.equal((await productionSquareReadAction("read",request("read","POST",`connectionId=${connectionId}`))).status,303);
+    const readCount=calls.length;
+    for(const body of [`connectionId=${connectionId}&workspaceId=${id()}`,`connectionId=${connectionId}&connectionId=${id()}`])
+      assert.equal((await productionSquareReadAction("read",request("read","POST",body))).status,403);
+    assert.equal((await productionSquareReadAction("read",request("read","POST",`connectionId=${connectionId}`,{origin:"https://other.invalid"}))).status,403);
+    setup("admin");assert.equal((await productionSquareReadAction("read",request("read","POST",`connectionId=${connectionId}`))).status,403);
+    assert.equal(calls.length,readCount);
+    setup();const views=await productionSquareReadViews({...baseView,connections:[{...baseView.connections[0],state:"mapping_required"}]});
+    assert.equal(views[connectionId].locations[0].label,"Verified location");
+    const html=renderToStaticMarkup(React.createElement(SquareProductionCustomerPanel,{view:{...baseView,connections:[{...baseView.connections[0],state:"mapping_required"}]},reads:views}));
+    assert.match(html,/Confirm this workspace/);assert.match(html,/Historical completeness unknown/);assert.doesNotMatch(html,/providerLocationId|merchantId|ciphertext/);
+    delete process.env.SQUARE_PRODUCTION_CUSTOMER_READS;
     process.stdout.write("square_production_customer_workspace_owner_csrf_host_session_zero_ai_passed\n");
   } finally {
     for (const [key, value] of Object.entries(prior)) {

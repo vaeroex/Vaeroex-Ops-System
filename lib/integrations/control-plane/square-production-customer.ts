@@ -5,7 +5,7 @@ import { z } from "zod";
 import { requireWorkspaceAccess } from "@/lib/security/require-workspace-access";
 import { oauthStateHash } from "@/lib/integrations/credentials/oauth-state";
 import { createSquareOAuthPolicy, squareAuthorizationUrl } from "@/lib/integrations/providers/square/account-connection-oauth";
-import { ProductionSquareCustomerViewSchema } from "@/lib/integrations/control-plane/square-production-customer-view";
+import { ProductionSquareCustomerViewSchema,ProductionSquareReadViewSchema } from "@/lib/integrations/control-plane/square-production-customer-view";
 import handoffPolicy from "@/lib/integrations/control-plane/square-customer-handoff-policy.json";
 import { PUBLIC_SITE_URL } from "@/lib/seo/public-seo";
 
@@ -158,4 +158,52 @@ export async function productionSquareCustomerAction(action: "status" | "connect
       headers: { ...privateHeaders, "content-type": "text/html; charset=utf-8", "content-security-policy": handoffPolicy.csp }
     });
   } catch { return denied(); }
+}
+
+export function productionSquareCustomerReadsEnabled(){
+  return productionSquareCustomerEnabled()&&process.env.SQUARE_PRODUCTION_CUSTOMER_READS==="enabled";
+}
+async function readRpc(access:Awaited<ReturnType<typeof owner>>,operation:string,payload:Record<string,unknown>){
+  const call=access.supabase.rpc.bind(access.supabase) as unknown as (name:string,args:Record<string,unknown>)=>Promise<{data:unknown;error:unknown}>;
+  const result=await call("square_production_workspace_read_v1",{p_operation:operation,p_payload:payload});
+  if(result.error||result.data==null)throw new Error("square_customer_read_denied");return result.data;
+}
+export async function productionSquareReadViews(view:z.infer<typeof ProductionSquareCustomerViewSchema>){
+  if(!productionSquareCustomerReadsEnabled())return {};
+  const result:Record<string,z.infer<typeof ProductionSquareReadViewSchema>>={};
+  const access=await owner();
+  // The RPC revalidates each connection against this signed workspace; no raw
+  // connection, membership or fact table is selected by the web host.
+  for(const connection of view.connections.filter(row=>row.state==="mapping_required")){
+    try{result[connection.connectionId]=ProductionSquareReadViewSchema.parse(await readRpc(access,"status",{
+      workspaceId:access.workspaceId,connectionId:connection.connectionId}));}catch{/* No existence leakage on denied authority. */}
+  }return result;
+}
+export async function productionSquareReadAction(action:"mapping"|"read",request:Request){
+  if(!productionSquareCustomerReadsEnabled())return unavailable();
+  const url=new URL(request.url);
+  if(request.method!=="POST"||url.origin!==PUBLIC_SITE_URL||url.pathname!==`/api/integrations/square/${action}`||url.search||url.hash||
+    request.headers.get("host")!==new URL(PUBLIC_SITE_URL).host||request.headers.get("origin")!==PUBLIC_SITE_URL||
+    request.headers.has("sec-fetch-site")&&request.headers.get("sec-fetch-site")!=="same-origin")return denied();
+  try{
+    if(request.headers.get("content-type")?.split(";",1)[0]!=="application/x-www-form-urlencoded"||!request.body) return denied();
+    const reader=request.body.getReader();const chunks:Uint8Array[]=[];let size=0;let form:URLSearchParams;
+    try{for(;;){const part=await reader.read();if(part.done)break;size+=part.value.length;if(size>256||chunks.length>=8){part.value.fill(0);throw new Error("body");}chunks.push(part.value);}
+      form=new URLSearchParams(new TextDecoder("utf8",{fatal:true}).decode(Buffer.concat(chunks)));
+    }finally{for(const chunk of chunks)chunk.fill(0);await reader.cancel().catch(()=>undefined);reader.releaseLock();}
+    const keys=[...form.keys()].sort();
+    if(keys.join(",")!==(action==="mapping"?"connectionId,locationFingerprint":"connectionId")||form.getAll("connectionId").length!==1)return denied();
+    const connectionId=uuid.parse(form.get("connectionId")),access=await owner();
+    if(action==="mapping"){
+      if(form.getAll("locationFingerprint").length!==1)return denied();
+      z.object({mapped:z.literal(true)}).strict().parse(await readRpc(access,"map",{workspaceId:access.workspaceId,connectionId,
+        locationFingerprint:fingerprint.parse(form.get("locationFingerprint"))}));
+    }else{
+      const end=new Date();
+      z.object({status:z.enum(["ready","leased","committed","uncertain"]),nonEconomic:z.literal(true),historicalCompleteness:z.literal("unknown")}).strict()
+        .parse(await readRpc(access,"start",{workspaceId:access.workspaceId,connectionId,scanId:randomUUID(),
+          windowStart:new Date(end.getTime()-86400000).toISOString(),windowEnd:end.toISOString()}));
+    }
+    return new Response(null,{status:303,headers:{...privateHeaders,location:settingsPath}});
+  }catch{return denied();}
 }

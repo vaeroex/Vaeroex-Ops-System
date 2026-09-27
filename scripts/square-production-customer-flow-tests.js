@@ -57,6 +57,7 @@ function fixture(failBeforeAcquire = false) {
 }
 
 async function main() {
+  await require('./square-production-customer-refresh-tests.js')();
   const first = fixture();
   assert.equal((await first.oauth.callback(callback(first.state))).status, "stored");
   assert.equal(first.exchange.length, 1);
@@ -198,6 +199,7 @@ async function main() {
   assert.equal(serviceBroker.network.length, 5, "broker service replay is non-economic and does not repeat provider exchange");
   const noServiceIdentity = new Request(brokerRequest.url, { method: "POST", headers: { "content-type": "application/json" } });
   assert.equal((await brokerHandler(noServiceIdentity, serviceBroker.command)).status, 404);
+  await require('../services/external-integrations-production/internal-consent/customer-read.test.cjs')();
   process.stdout.write("square_production_customer_flow_positive_replay_isolation_zero_ai_passed\n");
 }
 main().catch(() => { process.stderr.write("square_production_customer_flow_failed\n"); process.exitCode = 1; });

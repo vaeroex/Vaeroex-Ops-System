@@ -187,3 +187,30 @@ No VM, credential prompt, IAM opening, image deployment, consent, provider call
 or activation is performed by these tests. The existing general activation
 flags remain false; the separately approved one-internal-seller permit is the
 only authority for this manual exception.
+
+## Customer-owned mapping and first page (separate, closed candidate)
+
+Customer connections do **not** use the internal-seller permit above. The
+dependent Production-only migration `20260926232356` requires exactly the
+105-entry baseline through customer migration `20260925032300`. It adds a
+closed read binding, private verified location choices, one immutable mapping,
+one first-page request per connection/generation, and sanitized observations.
+No runtime role receives direct table access.
+
+The current workspace owner maps an opaque location fingerprint and requests
+the last 24 hours, at most 100 Payments. Existing runtime/broker identities
+claim that request once and perform one GET. Only the broker decrypts provider
+credentials. The workspace sees counts, source, freshness, page status and
+explicit unknown completeness—not provider identifiers, Money or a cursor.
+Lost commit acknowledgement permits only a checked status read, never another
+fetch. Owner/session, subscription, entity, generation and mapping authority
+are rechecked before provider authorization and commit.
+
+Deployment is not authorized by this candidate. After database/native
+qualification and review, separate decisions must cover both customer
+migrations, exact credential version 1, the changed consent image and the
+existing runtime/broker configuration. The optional background queue needs
+CPU allocation on the existing runtime; its actual cost must be included in
+that deployment decision. Default configuration and every general activation
+gate stay closed. Scheduler, webhook, continuing reads, renewal, economics
+and AI are not part of this first-page slice.

@@ -601,6 +601,10 @@ static bool checked_authority(const char *target,bool customer_fence) {
       (customer_fence ? !production_contract_valid(phase) :
         !true_query("SELECT NOT EXISTS (SELECT FROM private.square_production_customer_bindings "
           "WHERE consent_enabled)",0,NULL)))) return false;
+  if (phase==PRODUCTION_PHASE_CUSTOMER && true_query("SELECT count(*)=106 FROM supabase_migrations.schema_migrations",0,NULL) &&
+      (!command("LOCK TABLE private.square_production_workspace_read_bindings,private.square_production_workspace_locations,"
+        "private.square_production_workspace_mappings,private.square_production_workspace_scans,private.square_production_workspace_read_refreshes,private.square_production_workspace_payment_observations IN SHARE MODE") ||
+       (!customer_fence && !true_query("SELECT NOT EXISTS(SELECT FROM private.square_production_workspace_read_bindings WHERE read_enabled)",0,NULL)))) return false;
   return true_query("SELECT NOT EXISTS (SELECT FROM private.integration_production_platform_bindings "
       "WHERE infrastructure_provisioned OR runtime_enabled OR economic_contributions_enabled OR ai_dispatch_enabled) "
       "AND NOT EXISTS (SELECT FROM private.integration_production_provider_bindings "
@@ -713,7 +717,7 @@ static production_phase production_ledger_phase(void) {
       "AND (SELECT count(*)=1 FROM supabase_migrations.schema_migrations WHERE version='20260902191323') "
       "AND (SELECT count(*)=1 FROM supabase_migrations.schema_migrations WHERE version='20260902191324') "
       "AND NOT EXISTS (SELECT FROM supabase_migrations.schema_migrations WHERE version>'20260902191324') THEN 'overlay' "
-    "WHEN (SELECT count(*) IN (104,105) FROM supabase_migrations.schema_migrations) "
+    "WHEN (SELECT count(*) IN (104,105,106) FROM supabase_migrations.schema_migrations) "
       "AND (SELECT count(*)=102 FROM supabase_migrations.schema_migrations WHERE version<='20260902191323') "
       "AND (SELECT 'sha256:'||pg_catalog.encode(extensions.digest(pg_catalog.convert_to("
         "pg_catalog.string_agg(pg_catalog.length(version)::text||':'||version,'' ORDER BY version),'UTF8'),'sha256'),'hex') "
@@ -732,10 +736,14 @@ static production_phase production_ledger_phase(void) {
       "AND (SELECT count(*)=1 FROM supabase_migrations.schema_migrations WHERE version='20260902191325') "
       "AND ((SELECT count(*)=104 FROM supabase_migrations.schema_migrations) "
         "AND NOT EXISTS (SELECT FROM supabase_migrations.schema_migrations WHERE version>'20260902191325') "
-        "OR (SELECT count(*)=105 FROM supabase_migrations.schema_migrations) "
+        "OR (SELECT count(*) IN (105,106) FROM supabase_migrations.schema_migrations) "
         "AND (SELECT count(*)=1 FROM supabase_migrations.schema_migrations WHERE version='20260925032300') "
-        "AND NOT EXISTS (SELECT FROM supabase_migrations.schema_migrations WHERE version>'20260902191325' AND version<>'20260925032300')) "
-      "THEN CASE WHEN (SELECT count(*)=105 FROM supabase_migrations.schema_migrations) THEN 'customer' ELSE 'internal' END "
+        "AND ((SELECT count(*)=105 FROM supabase_migrations.schema_migrations) "
+          "AND NOT EXISTS (SELECT FROM supabase_migrations.schema_migrations WHERE version>'20260902191325' AND version<>'20260925032300') "
+          "OR (SELECT count(*)=106 FROM supabase_migrations.schema_migrations) "
+          "AND (SELECT count(*)=1 FROM supabase_migrations.schema_migrations WHERE version='20260926232356') "
+          "AND NOT EXISTS (SELECT FROM supabase_migrations.schema_migrations WHERE version>'20260902191325' AND version NOT IN ('20260925032300','20260926232356')))) "
+      "THEN CASE WHEN (SELECT count(*) IN (105,106) FROM supabase_migrations.schema_migrations) THEN 'customer' ELSE 'internal' END "
     "ELSE 'invalid' END",0,NULL);
   production_phase phase=PRODUCTION_PHASE_INVALID;
   if (r && PQntuples(r)==1) {
@@ -987,7 +995,8 @@ static bool production_baseline_triggers_valid(production_phase phase) {
         "pg_catalog.to_regclass('private.square_production_customer_bindings'),"
         "pg_catalog.to_regclass('private.square_production_customer_connections'),"
         "pg_catalog.to_regclass('private.square_production_customer_oauth_states'),"
-        "pg_catalog.to_regclass('private.square_production_customer_credentials'))))",1,values);
+        "pg_catalog.to_regclass('private.square_production_customer_credentials')) "
+        "AND c.conrelid IS DISTINCT FROM pg_catalog.to_regclass('private.square_production_workspace_scans')))",1,values);
 }
 
 static bool production_internal_runtime_relations_valid(void) {
@@ -1184,6 +1193,13 @@ static bool production_contract_valid(production_phase phase) {
 #else
   if (phase==PRODUCTION_PHASE_CUSTOMER) return false;
 #endif
+  if (phase==PRODUCTION_PHASE_CUSTOMER && true_query("SELECT count(*)=106 FROM supabase_migrations.schema_migrations",0,NULL)) {
+#ifdef VAEROEX_PRODUCTION_CUSTOMER_READ_CONTRACT
+    if (!true_query(VAEROEX_PRODUCTION_CUSTOMER_READ_CONTRACT,0,NULL)) return false;
+#else
+    return false;
+#endif
+  }
   /* Legacy fingerprints retain their qualified public-visible serialization;
    * customer fingerprints and subsequent native work use pg_catalog. */
   if (phase==PRODUCTION_PHASE_CUSTOMER && !command("SET LOCAL search_path=public")) return false;
@@ -1204,10 +1220,14 @@ static bool production_named_authority_valid(const char *capability,const char *
                                              const char *settings_exception,bool membership_transition) {
   bool customer=production_ledger_phase()==PRODUCTION_PHASE_CUSTOMER &&
     (!strcmp(capability,"square_production_oauth_authority") || !strcmp(capability,"square_production_broker_authority"));
+  bool customer_read=production_ledger_phase()==PRODUCTION_PHASE_CUSTOMER &&
+    true_query("SELECT count(*)=106 FROM supabase_migrations.schema_migrations",0,NULL) &&
+    (!strcmp(capability,"square_production_broker_authority") || !strcmp(capability,"square_production_runtime_authority"));
   const char *values[]={capability,authority_function,authority_source,
     OPERATIONAL_AUTHORITY_FUNCTION,OPERATIONAL_AUTHORITY_SOURCE_MD5,target,
     internal_runtime?"internal":"overlay",settings_exception,membership_transition?"transition":"",
-    customer?"public.square_production_customer_v1(text,jsonb)":""};
+    customer?"public.square_production_customer_v1(text,jsonb)":"",
+    customer_read?"public.square_production_workspace_read_v1(text,jsonb)":""};
   return true_query("SELECT to_regprocedure($2) IS NOT NULL "
     "AND EXISTS (SELECT FROM pg_namespace n JOIN pg_proc p ON p.pronamespace=n.oid "
       "JOIN pg_language l ON l.oid=p.prolang "
@@ -1304,7 +1324,7 @@ static bool production_named_authority_valid(const char *capability,const char *
     "AND NOT EXISTS (SELECT FROM pg_shdepend d WHERE d.refclassid='pg_authid'::regclass "
       "AND d.refobjid=$1::regrole AND d.deptype IN ('o','a','i','r') AND NOT ("
         "d.deptype='a' AND d.dbid=(SELECT oid FROM pg_database WHERE datname=current_database()) "
-        "AND d.objsubid=0 AND ((d.classid='pg_proc'::regclass AND (d.objid=to_regprocedure($2) OR ($10<>'' AND d.objid=to_regprocedure($10)))) "
+        "AND d.objsubid=0 AND ((d.classid='pg_proc'::regclass AND (d.objid=to_regprocedure($2) OR ($10<>'' AND d.objid=to_regprocedure($10)) OR ($11<>'' AND d.objid=to_regprocedure($11)))) "
           "OR (d.classid='pg_namespace'::regclass AND d.objid='public'::regnamespace)))) "
     "AND NOT EXISTS (SELECT FROM pg_db_role_setting s WHERE s.setrole=$1::regrole) "
     "AND (SELECT count(*)=1 FROM pg_namespace n CROSS JOIN LATERAL aclexplode("
@@ -1326,7 +1346,7 @@ static bool production_named_authority_valid(const char *capability,const char *
     "AND NOT EXISTS (SELECT FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace "
       "WHERE n.nspname NOT IN ('pg_catalog','information_schema') "
       "AND n.nspname NOT LIKE 'pg\\_toast%' ESCAPE '\\' AND n.nspname NOT LIKE 'pg\\_temp%' ESCAPE '\\' "
-      "AND p.oid<>to_regprocedure($2) AND ($10='' OR p.oid<>to_regprocedure($10)) AND has_schema_privilege($1,n.oid,'USAGE') "
+      "AND p.oid<>to_regprocedure($2) AND ($10='' OR p.oid<>to_regprocedure($10)) AND ($11='' OR p.oid<>to_regprocedure($11)) AND has_schema_privilege($1,n.oid,'USAGE') "
       "AND has_function_privilege($1,p.oid,'EXECUTE')) "
     "AND NOT EXISTS (SELECT FROM pg_class r JOIN pg_namespace n ON n.oid=r.relnamespace "
       "CROSS JOIN (VALUES ('SELECT'),('INSERT'),('UPDATE'),('DELETE'),('TRUNCATE'),('REFERENCES'),('TRIGGER'),('MAINTAIN')) privilege(name) "
@@ -1374,7 +1394,7 @@ static bool production_named_authority_valid(const char *capability,const char *
         "coalesce(d.datacl,acldefault('d',d.datdba))) a "
         "WHERE a.grantee=0 AND a.privilege_type='CONNECT')) "
     "AND NOT EXISTS (SELECT FROM pg_default_acl d CROSS JOIN LATERAL aclexplode(d.defaclacl) a "
-        "WHERE d.defaclobjtype IN ('r','S','f','n') AND a.grantee IN (0,$1::regrole))",10,values);
+        "WHERE d.defaclobjtype IN ('r','S','f','n') AND a.grantee IN (0,$1::regrole))",11,values);
 }
 
 static bool production_overlay_wrapper_owner_only(const char *authority_function,const char *authority_source) {

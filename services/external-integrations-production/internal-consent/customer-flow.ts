@@ -115,6 +115,7 @@ export function createProductionCustomerBroker(input: Readonly<{
   applicationId: string; rpc: CustomerBrokerRpc; transport(authorize: () => Promise<void>): SquareOAuthTransport;
   applicationSecret(): Promise<ProviderApplicationSecret>;
   kms: Pick<CredentialKms, "encrypt">; now?: () => Date;
+  storeLocations?(command: { stateId: string; requestFingerprint: string; locations: { id: string; label: string }[] }): Promise<void>;
 }>) {
   const policy = createSquareOAuthPolicy({ environment: "production", applicationId: input.applicationId,
     redirectUri: callbackUri, returnPath });
@@ -176,6 +177,12 @@ export function createProductionCustomerBroker(input: Readonly<{
         plaintext, additionalAuthenticatedData })).toString("base64"); }
       finally { plaintext.fill(0); additionalAuthenticatedData.fill(0); }
       stage = "commit";
+      // Persist only authenticated active locations, under the consumed
+      // customer state. Never fabricate an internal-seller permit or mapping.
+      if (input.storeLocations) await input.storeLocations({ stateId: acquired.stateId,
+        requestFingerprint: customerFingerprint(["square-production-customer-acquire-v1",acquired.stateId,acquired.connectionId,acquired.generation]),
+        locations: seller.locations.filter(location => location.status === "ACTIVE")
+          .map(location => ({ id: location.id, label: location.label })) });
       const committed = CommittedSchema.parse(await input.rpc("commit_credential", {
         stateId: acquired.stateId, requestFingerprint: customerFingerprint(["square-production-customer-commit-v1",
           acquired.stateId, credentialId, credentialVersion, aadDigest, seller.merchantId]),

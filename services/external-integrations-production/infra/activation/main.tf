@@ -32,7 +32,7 @@ locals {
   egress_modes = toset(concat(["broker", "runtime"], var.internal_consent == null ? [] : ["oauth"]))
   warm_modes   = toset(["oauth", "broker", "webhook", "runtime"])
   internal_handler_modes = var.internal_consent == null ? toset([]) : toset(concat(
-  ["oauth", "broker"], var.internal_consent.manual_read == null ? [] : ["runtime", "evidence"]))
+  ["oauth", "broker"], var.internal_consent.customer_reads ? ["runtime"] : (var.internal_consent.manual_read == null ? [] : ["runtime", "evidence"])))
   service_account_ids = {
     oauth        = "sq-prod-oauth"
     broker       = "sq-prod-broker"
@@ -559,7 +559,7 @@ resource "google_cloud_run_v2_service" "square" {
       image = contains(local.internal_handler_modes, each.key) ? var.internal_consent.image_digest : (each.key == "oauth" ? var.oauth_callback_image_digest : var.bootstrap_image_digest)
       resources {
         limits            = { cpu = "1", memory = "512Mi" }
-        cpu_idle          = true
+        cpu_idle          = !try(each.key == "runtime" && var.internal_consent.customer_reads, false)
         startup_cpu_boost = true
       }
       env {
@@ -570,20 +570,20 @@ resource "google_cloud_run_v2_service" "square" {
         for_each = contains(local.internal_handler_modes, each.key) ? [var.internal_consent] : []
         content {
           name = "SQUARE_INTERNAL_CONSENT_CONFIGURATION"
-          value = env.value.mode == "customer_owner_v1" ? jsonencode({
-            mode            = env.value.mode
-            profile         = each.key
-            applicationId   = env.value.application_id
-            databaseVersion = env.value.database_versions[each.key]
-            databaseCa      = env.value.database_ca
-            brokerOrigin    = env.value.broker_origin
-            }) : jsonencode(merge({
-              profile                = each.key
-              permit                 = env.value.permit
-              databaseVersion        = contains(["oauth", "broker"], each.key) ? env.value.database_versions[each.key] : env.value.read_database_versions[each.key]
-              databaseCa             = env.value.database_ca
-              brokerOrigin           = env.value.broker_origin
-              supabasePublishableKey = env.value.supabase_publishable_key
+          value = env.value.mode == "customer_owner_v1" ? jsonencode(merge({
+            mode                                                                 = env.value.mode
+            profile                                                              = each.key
+            applicationId                                                        = env.value.application_id
+            databaseVersion                                                      = each.key == "runtime" ? env.value.customer_runtime_version : env.value.database_versions[each.key]
+            databaseCa                                                           = env.value.database_ca
+            brokerOrigin                                                         = env.value.broker_origin
+            }, env.value.customer_reads && each.key != "oauth" ? { customerReads = true } : {})) : jsonencode(merge({
+            profile                                                              = each.key
+            permit                                                               = env.value.permit
+            databaseVersion                                                      = contains(["oauth", "broker"], each.key) ? env.value.database_versions[each.key] : env.value.read_database_versions[each.key]
+            databaseCa                                                           = env.value.database_ca
+            brokerOrigin                                                         = env.value.broker_origin
+            supabasePublishableKey                                               = env.value.supabase_publishable_key
           }, env.value.manual_read == null ? {} : { manualRead = env.value.manual_read }))
         }
       }
@@ -628,11 +628,13 @@ resource "google_cloud_run_v2_service_iam_member" "oauth_calls_broker" {
 # Dormant unless the separately approved one-page read configuration is set.
 # No scheduler/webhook invocation or database permissions are added here.
 resource "google_cloud_run_v2_service_iam_member" "manual_read_invoker" {
-  for_each = local.deployment_enabled && contains(local.internal_handler_modes, "runtime") ? {
+  for_each = local.deployment_enabled && contains(local.internal_handler_modes, "runtime") ? (var.internal_consent.customer_reads ? {
+    runtime_broker = { caller = "runtime", target = "broker" }
+    } : {
     oauth_runtime  = { caller = "oauth", target = "runtime" }
     oauth_evidence = { caller = "oauth", target = "evidence" }
     runtime_broker = { caller = "runtime", target = "broker" }
-  } : {}
+  }) : {}
   project  = var.project_id
   location = var.region
   name     = google_cloud_run_v2_service.square[each.value.target].name

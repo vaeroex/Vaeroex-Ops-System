@@ -62,7 +62,7 @@ assert.match(main, /callback_edge_source_commit == null/, "a callback edge canno
 assert.match(main, /oauth_callback_source_commit == null/, "first-stage infrastructure cannot claim an OAuth runtime revision");
 assert.match(main, /value\s*=\s*contains\(local\.internal_handler_modes, each\.key\) \? var\.internal_consent\.source_commit : \(each\.key == "oauth" \? var\.oauth_callback_source_commit : var\.source_commit\)/, "manual handlers preserve dormant image provenance");
 assert.match(main, /image\s*=\s*contains\(local\.internal_handler_modes, each\.key\) \? var\.internal_consent\.image_digest : \(each\.key == "oauth" \? var\.oauth_callback_image_digest : var\.bootstrap_image_digest\)/, "manual handlers preserve the dormant fallback");
-assert.match(main, /internal_handler_modes = var\.internal_consent == null \? toset\(\[\]\) : toset\(concat\(\s*\["oauth", "broker"\], var\.internal_consent\.manual_read == null \? \[\] : \["runtime", "evidence"\]\)\)/, "scheduler and webhook remain deferred; runtime/evidence require explicit manual-read configuration");
+assert.match(main, /internal_handler_modes = var\.internal_consent == null \? toset\(\[\]\) : toset\(concat\(\s*\["oauth", "broker"\], var\.internal_consent\.customer_reads \? \["runtime"\] : \(var\.internal_consent\.manual_read == null \? \[\] : \["runtime", "evidence"\]\)\)\)/, "customer reads admit runtime only; internal runtime/evidence still require manual-read configuration; scheduler and webhook remain deferred");
 assert.match(main, /oauth_runtime\s*= \{ caller = "oauth", target = "runtime" \}/);
 assert.match(main, /oauth_evidence\s*= \{ caller = "oauth", target = "evidence" \}/);
 assert.match(main, /runtime_broker\s*= \{ caller = "runtime", target = "broker" \}/);
@@ -201,7 +201,7 @@ assert.match(main, /max_dispatches_per_second\s*=\s*5/);
 assert.match(main, /max_attempts\s*=\s*8/);
 assert.match(main, /prevent_destroy\s*=\s*true/g);
 assert.doesNotMatch(main, /quickbooks|qbo/i, "activation cannot mutate QBO resources");
-const publicAuthKeyMapping = /^[ \t]*supabasePublishableKey = env\.value\.supabase_publishable_key[ \t]*$/gm;
+const publicAuthKeyMapping = /^[ \t]*supabasePublishableKey[ \t]+=[ \t]+env\.value\.supabase_publishable_key[ \t]*$/gm;
 assert.equal([...main.matchAll(publicAuthKeyMapping)].length, 1, "the reviewed public Auth key mapping occurs exactly once");
 const withoutPublicAuthKey = main.replace(publicAuthKeyMapping, "");
 assert.doesNotMatch(withoutPublicAuthKey, /supabase|migration|postgres/i, "cloud activation cannot apply database changes");
