@@ -155,7 +155,14 @@ begin
  begin perform public.square_production_workspace_read_v1('authorize_refresh',command||'{"phase":"status"}'::jsonb);exception when insufficient_privilege then denied:=true;end;
  if not denied then raise exception 'customer_read_refresh_status_replayed';end if;
  issued:=to_char(clock_timestamp() at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"');
- expires:=to_char(issued::timestamptz+interval '24 hours' at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"');
+ -- Reproduce the original fixture's precedence defect before checking the fix:
+ -- AT TIME ZONE binds above + and otherwise targets the interval, not the sum.
+ denied:=false;
+ begin perform to_char(issued::timestamptz+interval '24 hours' at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"');
+ exception when undefined_function then denied:=true;end;
+ if not denied then raise exception 'customer_read_fixture_original_timezone_failure_not_reproduced';end if;
+ expires:=to_char((issued::timestamptz+interval '24 hours') at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"');
+ if expires::timestamptz<>issued::timestamptz+interval '24 hours' then raise exception 'customer_read_fixture_exact_refresh_expiry_failed';end if;
  select 'sha256:'||encode(sha256(convert_to(string_agg(length(v)::text||':'||v,'' order by ordinal),'UTF8')),'hex') into aad_hash
  from unnest(array['square-production-customer-aad-v1','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
  'aaaaaaaa-8888-4888-8888-aaaaaaaaaaaa','1','aaaaaaaa-9999-4999-8999-aaaaaaaaaaaa','2']) with ordinality as parts(v,ordinal);
