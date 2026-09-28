@@ -458,7 +458,7 @@ for (const ordinary of [
 ]) rejects(ordinary, "private_access_proof_role_contract_mismatch");
 assert.equal(verifyPrivateAccessPlan(plan(generation(false, true),
   grant("oauth", false, true, ["create"]), proofRole(true))), "private_access_closed_to_one_grant_confirmed");
-for (const permission of ["secretmanager.versions.add", "secretmanager.versions.disable", "secretmanager.versions.destroy"]) {
+for (const permission of ["secretmanager.versions.add", "secretmanager.versions.disable", "secretmanager.versions.destroy", "secretmanager.versions.enable"]) {
   const value = proofOpening();
   value.resource_changes.find(x => x.type === "google_project_iam_custom_role").change.after.permissions.push(permission);
   rejects(value, "private_access_proof_role_contract_mismatch");

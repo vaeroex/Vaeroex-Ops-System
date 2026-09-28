@@ -11,7 +11,7 @@ const VERSION_PERMISSIONS = Object.freeze([
   "secretmanager.versions.get",
   "secretmanager.versions.disable",
 ]);
-const PROOF_VERSION_PERMISSIONS = Object.freeze([...VERSION_PERMISSIONS, "secretmanager.versions.destroy"]);
+const PROOF_VERSION_PERMISSIONS = Object.freeze([...VERSION_PERMISSIONS, "secretmanager.versions.destroy", "secretmanager.versions.enable"]);
 const MAX_INPUT_BYTES = 16 * 1024;
 const MAX_RESPONSE_BYTES = 4 * 1024 * 1024;
 const QUERY_TIMEOUT_MS = 120_000;

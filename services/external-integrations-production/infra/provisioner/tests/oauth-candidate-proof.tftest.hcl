@@ -20,7 +20,7 @@ mock_provider "external" {
         status           = "policy_troubleshooter_closed_all_denied"
         checked_secrets  = "7"
         checked_versions = "2"
-        checked_tuples   = "15"
+        checked_tuples   = "17"
       }
     }
   }
@@ -54,7 +54,7 @@ run "proof_get_access_only_exact_version_one" {
         status           = "policy_troubleshooter_oauth_candidate_proof_confirmed"
         checked_secrets  = "7"
         checked_versions = "2"
-        checked_tuples   = "15"
+        checked_tuples   = "17"
       }
     }
   }
@@ -67,7 +67,7 @@ run "proof_get_access_only_exact_version_one" {
       terraform_data.private_access_generation.input.access_mode == "oauth_candidate_proof" &&
       data.external.private_access_closed[0].query.access_mode == "oauth_candidate_proof" &&
       data.external.private_access_effective[0].query.access_mode == "oauth_candidate_proof" &&
-      terraform_data.private_access_effective_authority[0].input.checked_tuples == "15"
+      terraform_data.private_access_effective_authority[0].input.checked_tuples == "17"
     )
     error_message = "Proof permits only retained OAuth version 1 get/access and requires the seven-secret proof matrix."
   }
@@ -95,7 +95,7 @@ run "proof_closed_checkpoint_retains_mode_not_access" {
 run "proof_rejects_peer_profile" {
   command = plan
   variables {
-    window_expires_at              = "2099-01-01T01:00:00Z"
+    window_expires_at             = "2099-01-01T01:00:00Z"
     administrative_access_enabled = true
     temporary_access_enabled      = true
     temporary_access_profiles     = ["broker"]
@@ -106,7 +106,7 @@ run "proof_rejects_peer_profile" {
 run "proof_rejects_administrative_only" {
   command = plan
   variables {
-    window_expires_at              = "2099-01-01T01:00:00Z"
+    window_expires_at             = "2099-01-01T01:00:00Z"
     administrative_access_enabled = true
   }
   expect_failures = [var.oauth_candidate_proof_enabled]

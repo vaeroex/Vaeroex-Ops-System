@@ -70,7 +70,7 @@ function effectiveClosedResult(result, proof) {
   if (result?.status !== "policy_troubleshooter_closed_all_denied" || result?.checked_secrets !== (proof ? "7" : "6") ||
       typeof result?.checked_versions !== "string" || !/^(?:0|[1-9][0-9]*)$/.test(result.checked_versions) ||
       typeof result?.checked_tuples !== "string" || !/^(?:0|[1-9][0-9]*)$/.test(result.checked_tuples)) return false;
-  return BigInt(result.checked_tuples) === (proof ? 7n : 6n) + (proof ? 4n : 3n) * BigInt(result.checked_versions);
+  return BigInt(result.checked_tuples) === (proof ? 7n : 6n) + (proof ? 5n : 3n) * BigInt(result.checked_versions);
 }
 
 function reconcilePrivateAccess(recovery, options) {

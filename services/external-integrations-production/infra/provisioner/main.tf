@@ -12,7 +12,7 @@ locals {
   access_mode                 = var.oauth_candidate_proof_enabled ? "oauth_candidate_proof" : "provision"
   proof_generation            = var.oauth_candidate_proof_enabled ? { access_mode = local.access_mode } : {}
   checked_secret_count        = var.oauth_candidate_proof_enabled ? 7 : 6
-  checked_version_permissions = var.oauth_candidate_proof_enabled ? 4 : 3
+  checked_version_permissions = var.oauth_candidate_proof_enabled ? 5 : 3
   window_condition = join(" && ", [
     "request.time >= timestamp('${var.window_starts_at}')",
     "request.time < timestamp('${var.window_expires_at}')",

@@ -18,8 +18,8 @@ approved saved plan. This repository change does not open a proof window.
 
 Before opening, the proof inventory must contain only OAuth version 1. The
 proof-only live matrix checks all six DB containers plus the application
-container: deny `versions.add` on each Secret and check access/get/disable/destroy
-on every existing numeric SecretVersion (`7 + 4N` tuples). Closed means all denied;
+container: deny `versions.add` on each Secret and check access/get/disable/destroy/enable
+on every existing numeric SecretVersion (`7 + 5N` tuples). Closed means all denied;
 open means only OAuth version-1 get/access allowed. All other permissions,
 peer/application access, unknown results, wrong inventories and API failures
 block the proof. The application payload is never read by these checks.

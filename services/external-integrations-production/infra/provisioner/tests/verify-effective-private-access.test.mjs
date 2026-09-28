@@ -399,10 +399,23 @@ for (const phase of ["open", "closed"]) {
   assert.equal(result.status, phase === "open" ? "policy_troubleshooter_oauth_candidate_proof_confirmed" : "policy_troubleshooter_closed_all_denied");
   assert.equal(result.checked_secrets, "7");
   assert.equal(result.checked_versions, "2");
-  assert.equal(result.checked_tuples, "15");
-  assert.equal(runner.calls.filter(args => args[0] === "beta").length, 15);
+  assert.equal(result.checked_tuples, "17");
+  assert.equal(runner.calls.filter(args => args[0] === "beta").length, 17);
   assert.equal(runner.calls.filter(args => args[0] === "secrets").length, 7);
   assert.equal(runner.calls.some(args => args.includes("access") || args.includes("add")), false, "metadata/analysis only, never secret access");
+}
+// Inherited enable authority must not be hidden by empty direct secret policies.
+for (const phase of ["open", "closed"]) {
+  for (const secret of ["square-production-oauth-db", "square-production-application"]) {
+    const runner = proofRunner({ phase, alter(response, resource, permission) {
+      if (resource.includes(`/${secret}/`) && permission === "secretmanager.versions.enable") {
+        response.overallAccessState = "CAN_ACCESS";
+      }
+    } });
+    assert.throws(() => verifyEffectivePrivateAccess({ ...proofQuery, phase, active_profile: phase === "open" ? "oauth" : "" }, {
+      run: runner.run, now: new Date(requestTime),
+    }), error => error.fixedLabel === "policy_troubleshooter_access_mismatch");
+  }
 }
 for (const mutate of [
   (r, resource, permission) => { if (permission === "secretmanager.versions.add") r.overallAccessState = "CAN_ACCESS"; },

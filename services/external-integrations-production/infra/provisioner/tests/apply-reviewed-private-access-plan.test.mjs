@@ -705,7 +705,7 @@ for (const [sourceJson, applyStatus, expectedOrder, expectedFailure] of [
     waitForRevocationPropagation(ms) { order.push("wait"); assert.equal(ms, 600_000); },
     verifyEffectivePrivateAccess(query) {
       order.push("effective"); assert.equal(query.access_mode, OAUTH_PROOF_MODE); assert.equal(query.phase, "closed");
-      return { status: "policy_troubleshooter_closed_all_denied", checked_secrets: "7", checked_versions: "2", checked_tuples: "15" };
+      return { status: "policy_troubleshooter_closed_all_denied", checked_secrets: "7", checked_versions: "2", checked_tuples: "17" };
     },
     runTerraform(args) {
       order.push(args[0]);
