@@ -1,4 +1,6 @@
 import { spawnSync } from "node:child_process";
+import { OAUTH_PROOF_MODE, OAUTH_PROOF_ROLE, OAUTH_PROOF_TITLE, OAUTH_PROOF_DESCRIPTION,
+  oauthProofCondition, privateAccessMode } from "./oauth-candidate-proof-contract.mjs";
 
 const PROJECT_ID = "vaeroex-integrations-prod";
 const PROVISIONER_MEMBER = "serviceAccount:sq-prod-provisioner@vaeroex-integrations-prod.iam.gserviceaccount.com";
@@ -105,22 +107,26 @@ function readPolicy(run, environment, secretId) {
 function checkedRecoveryTuple(recovery) {
   const start = exactTimestamp(recovery?.windowStartsAt);
   const expiry = exactTimestamp(recovery?.windowExpiresAt);
-  if (!PROFILES.includes(recovery?.profile) || start === null || expiry === null ||
+  const proof = privateAccessMode(recovery?.accessMode) === OAUTH_PROOF_MODE;
+  if (!PROFILES.includes(recovery?.profile) || (proof && recovery.profile !== "oauth") || start === null || expiry === null ||
       expiry <= start || expiry > start + (recovery.profile === "oauth" ? 180 : 120) * 60 * 1000) reject();
   return Object.freeze({
     profile: recovery.profile,
+    proof,
+    role: proof ? OAUTH_PROOF_ROLE : PRIVATE_VERSIONS_ROLE,
     condition: Object.freeze({
-      title: CONDITION_TITLE,
-      description: CONDITION_DESCRIPTION,
-      expression: `request.time >= timestamp('${recovery.windowStartsAt}') && request.time < timestamp('${recovery.windowExpiresAt}')`,
+      title: proof ? OAUTH_PROOF_TITLE : CONDITION_TITLE,
+      description: proof ? OAUTH_PROOF_DESCRIPTION : CONDITION_DESCRIPTION,
+      expression: proof ? oauthProofCondition(recovery.windowStartsAt, recovery.windowExpiresAt)
+        : `request.time >= timestamp('${recovery.windowStartsAt}') && request.time < timestamp('${recovery.windowExpiresAt}')`,
     }),
   });
 }
 
-function readAllPolicies(run, environment) {
-  return new Map(PROFILES.map(profile => [
+function readAllPolicies(run, environment, proof = false) {
+  return new Map((proof ? [...PROFILES, "application"] : PROFILES).map(profile => [
     profile,
-    readPolicy(run, environment, `square-production-${profile}-db`),
+    readPolicy(run, environment, profile === "application" ? "square-production-application" : `square-production-${profile}-db`),
   ]));
 }
 
@@ -135,7 +141,7 @@ function verifyInitialPolicies(policies, recovery) {
   if (matches.length > 1) reject();
   if (matches.length === 1) {
     const [{ profile, binding }] = matches;
-    if (profile !== recovery.profile || binding.role !== PRIVATE_VERSIONS_ROLE ||
+    if (profile !== recovery.profile || binding.role !== recovery.role ||
         binding.condition?.title !== recovery.condition.title ||
         binding.condition?.description !== recovery.condition.description ||
         binding.condition?.expression !== recovery.condition.expression) reject();
@@ -147,12 +153,12 @@ function verifyFinalPolicies(policies) {
   if (provisionerBindings(policies).length !== 0) reject();
 }
 
-function removeCondition(run, environment, secretId, condition) {
+function removeCondition(run, environment, secretId, condition, role) {
   return runBoundedMutation(run, [
     "secrets", "remove-iam-policy-binding", secretId,
     `--project=${PROJECT_ID}`,
     `--member=${PROVISIONER_MEMBER}`,
-    `--role=${PRIVATE_VERSIONS_ROLE}`,
+    `--role=${role}`,
     `--condition=expression=${condition.expression},title=${condition.title},description=${condition.description}`,
     "--format=none",
     "--quiet",
@@ -164,22 +170,22 @@ export function reconcileExactPrivateAccess(recoveryInput, options = {}) {
   const recovery = checkedRecoveryTuple(recoveryInput);
   const run = options.run ?? defaultRun;
   const environment = sanitizedGcloudEnvironment(options.environment ?? process.env);
-  const initial = readAllPolicies(run, environment);
+  const initial = readAllPolicies(run, environment, recovery.proof);
   const matched = verifyInitialPolicies(initial, recovery);
   if (matched === 1) {
     try {
-      removeCondition(run, environment, `square-production-${recovery.profile}-db`, recovery.condition);
+      removeCondition(run, environment, `square-production-${recovery.profile}-db`, recovery.condition, recovery.role);
     } catch {
       // A lost or failed mutation acknowledgment is resolved exclusively by
-      // the mandatory exact six-policy readback below.
+      // the mandatory exact policy readback below (including application in proof mode).
     }
   }
-  const final = readAllPolicies(run, environment);
+  const final = readAllPolicies(run, environment, recovery.proof);
   verifyFinalPolicies(final);
 
   return Object.freeze({
     status: "private_access_exact_direct_binding_reconciliation_confirmed",
-    checked_secrets: String(PROFILES.length),
+    checked_secrets: String(initial.size),
     removed_bindings: String(matched),
   });
 }
@@ -187,11 +193,11 @@ export function reconcileExactPrivateAccess(recoveryInput, options = {}) {
 export function confirmExactPrivateAccessClosed(options = {}) {
   const run = options.run ?? defaultRun;
   const environment = sanitizedGcloudEnvironment(options.environment ?? process.env);
-  const policies = readAllPolicies(run, environment);
+  const policies = readAllPolicies(run, environment, privateAccessMode(options.accessMode) === OAUTH_PROOF_MODE);
   verifyFinalPolicies(policies);
 
   return Object.freeze({
     status: "private_access_exact_direct_binding_absence_confirmed",
-    checked_secrets: String(PROFILES.length),
+    checked_secrets: String(policies.size),
   });
 }

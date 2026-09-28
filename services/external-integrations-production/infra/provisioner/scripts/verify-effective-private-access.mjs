@@ -1,5 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
+import { OAUTH_PROOF_MODE, OAUTH_PROOF_VERSION, OAUTH_PROOF_PERMISSIONS, privateAccessMode } from "./oauth-candidate-proof-contract.mjs";
 
 const PROJECT_ID = "vaeroex-integrations-prod";
 const PRINCIPAL = "sq-prod-provisioner@vaeroex-integrations-prod.iam.gserviceaccount.com";
@@ -10,6 +11,7 @@ const VERSION_PERMISSIONS = Object.freeze([
   "secretmanager.versions.get",
   "secretmanager.versions.disable",
 ]);
+const PROOF_VERSION_PERMISSIONS = Object.freeze([...VERSION_PERMISSIONS, "secretmanager.versions.destroy", "secretmanager.versions.enable"]);
 const MAX_INPUT_BYTES = 16 * 1024;
 const MAX_RESPONSE_BYTES = 4 * 1024 * 1024;
 const QUERY_TIMEOUT_MS = 120_000;
@@ -41,8 +43,12 @@ function defaultRun(command, args, options) {
   return spawnSync(command, args, options);
 }
 
+function secretIdFor(profile) {
+  return profile === "application" ? "square-production-application" : `square-production-${profile}-db`;
+}
+
 function secretTuple(projectNumber, profile) {
-  const secretId = `square-production-${profile}-db`;
+  const secretId = secretIdFor(profile);
   const secretName = `projects/${projectNumber}/secrets/${secretId}`;
   return {
     profile,
@@ -55,7 +61,7 @@ function secretTuple(projectNumber, profile) {
 }
 
 function versionTuple(projectNumber, profile, version, permission) {
-  const resourceName = `projects/${projectNumber}/secrets/square-production-${profile}-db/versions/${version}`;
+  const resourceName = `projects/${projectNumber}/secrets/${secretIdFor(profile)}/versions/${version}`;
   return {
     profile,
     permission,
@@ -88,7 +94,7 @@ function runBounded(run, args, environment, failureLabel) {
 }
 
 function enumerateVersions(run, environment, projectNumber, profile) {
-  const secretId = `square-production-${profile}-db`;
+  const secretId = secretIdFor(profile);
   const stdout = runBounded(run, [
     "secrets", "versions", "list", secretId,
     `--project=${PROJECT_ID}`,
@@ -184,6 +190,7 @@ function parseQuery(query, now) {
   const projectNumber = query?.project_number;
   const phase = query?.phase;
   const activeProfile = query?.active_profile ?? "";
+  const accessMode = privateAccessMode(query?.access_mode);
   if (
     query?.project_id !== PROJECT_ID ||
     typeof projectNumber !== "string" || !/^[1-9][0-9]{5,19}$/.test(projectNumber) ||
@@ -194,29 +201,37 @@ function parseQuery(query, now) {
   ) {
     reject("policy_troubleshooter_input_invalid");
   }
+  if (accessMode === OAUTH_PROOF_MODE && (projectNumber !== "711446392261" ||
+      (phase === "open" && activeProfile !== "oauth"))) reject("policy_troubleshooter_input_invalid");
   const nowMs = now.getTime();
   if (!Number.isFinite(nowMs) || nowMs < start || (phase === "open" && nowMs >= expiry)) {
     reject("policy_troubleshooter_window_inactive");
   }
   const requestTime = new Date(Math.floor(nowMs / 1000) * 1000).toISOString().replace(".000Z", "Z");
   if (exactTimestamp(requestTime) === null) reject("policy_troubleshooter_clock_invalid");
-  return { projectNumber, phase, activeProfile, requestTime };
+  return { projectNumber, phase, activeProfile, requestTime, accessMode };
 }
 
 export function verifyEffectivePrivateAccess(query, options = {}) {
   const run = options.run ?? defaultRun;
   const now = options.now ?? new Date();
   const environment = sanitizedGcloudEnvironment(options.environment ?? process.env);
-  const { projectNumber, phase, activeProfile, requestTime } = parseQuery(query, now);
+  const { projectNumber, phase, activeProfile, requestTime, accessMode } = parseQuery(query, now);
+  const proof = accessMode === OAUTH_PROOF_MODE;
+  const profiles = proof ? [...PROFILES, "application"] : PROFILES;
+  const versionPermissions = proof ? PROOF_VERSION_PERMISSIONS : VERSION_PERMISSIONS;
   const seen = new Set();
   let checkedVersions = 0;
 
-  for (const profile of PROFILES) {
+  for (const profile of profiles) {
     const versions = enumerateVersions(run, environment, projectNumber, profile);
+    if (proof && profile === "oauth" && (versions.length !== 1 || versions[0] !== "1")) {
+      reject("policy_troubleshooter_oauth_candidate_inventory_mismatch");
+    }
     checkedVersions += versions.length;
     const tuples = [
       secretTuple(projectNumber, profile),
-      ...versions.flatMap(version => VERSION_PERMISSIONS.map(permission =>
+      ...versions.flatMap(version => versionPermissions.map(permission =>
         versionTuple(projectNumber, profile, version, permission))),
     ];
     for (const tuple of tuples) {
@@ -224,7 +239,10 @@ export function verifyEffectivePrivateAccess(query, options = {}) {
       const key = `${tuple.fullResourceName}\u0000${permission}`;
       if (seen.has(key)) reject("policy_troubleshooter_matrix_invalid");
       seen.add(key);
-      const expectedState = phase === "open" && profile === activeProfile ? "CAN_ACCESS" : "CANNOT_ACCESS";
+      const allowed = proof
+        ? tuple.resourceName === OAUTH_PROOF_VERSION && OAUTH_PROOF_PERMISSIONS.includes(permission)
+        : profile === activeProfile;
+      const expectedState = phase === "open" && allowed ? "CAN_ACCESS" : "CANNOT_ACCESS";
       const args = [
         "beta", "policy-intelligence", "troubleshoot-policy", "iam", tuple.fullResourceName,
         `--principal-email=${PRINCIPAL}`,
@@ -248,15 +266,15 @@ export function verifyEffectivePrivateAccess(query, options = {}) {
       verifyResponse(response, tuple, expectedState, requestTime);
     }
   }
-  if (seen.size !== PROFILES.length + checkedVersions * VERSION_PERMISSIONS.length) {
+  if (seen.size !== profiles.length + checkedVersions * versionPermissions.length) {
     reject("policy_troubleshooter_matrix_invalid");
   }
 
   return {
     status: phase === "closed"
       ? "policy_troubleshooter_closed_all_denied"
-      : `policy_troubleshooter_${activeProfile}_only_confirmed`,
-    checked_secrets: String(PROFILES.length),
+      : proof ? "policy_troubleshooter_oauth_candidate_proof_confirmed" : `policy_troubleshooter_${activeProfile}_only_confirmed`,
+    checked_secrets: String(profiles.length),
     checked_versions: String(checkedVersions),
     checked_tuples: String(seen.size),
   };

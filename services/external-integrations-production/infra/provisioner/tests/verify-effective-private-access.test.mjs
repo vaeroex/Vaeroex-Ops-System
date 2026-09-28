@@ -371,4 +371,71 @@ try {
   rmSync(cliRoot, { recursive: true, force: true });
 }
 
+const proofQuery = { ...query, project_number: "711446392261", phase: "open", active_profile: "oauth", access_mode: "oauth_candidate_proof" };
+function proofRunner({ phase = "open", oauthVersions = ["1"], alter } = {}) {
+  const calls = [];
+  return { calls, run(command, args) {
+    calls.push(args);
+    if (args[0] === "secrets") {
+      const versions = args[3] === "square-production-oauth-db" ? oauthVersions
+        : args[3] === "square-production-application" ? ["1"] : [];
+      return { status: 0, stdout: JSON.stringify(versions.map(version => ({
+        name: `projects/711446392261/secrets/${args[3]}/versions/${version}`,
+      }))) };
+    }
+    const resource = parsedArgument(args, "--resource-name="), permission = parsedArgument(args, "--permission=");
+    const allowed = phase === "open" && resource === "projects/711446392261/secrets/square-production-oauth-db/versions/1" &&
+      ["secretmanager.versions.get", "secretmanager.versions.access"].includes(permission);
+    const response = responseFor(args, allowed ? "CAN_ACCESS" : "CANNOT_ACCESS");
+    alter?.(response, resource, permission);
+    return { status: 0, stdout: JSON.stringify(response) };
+  } };
+}
+for (const phase of ["open", "closed"]) {
+  const runner = proofRunner({ phase });
+  const result = verifyEffectivePrivateAccess({ ...proofQuery, phase, active_profile: phase === "open" ? "oauth" : "" }, {
+    run: runner.run, now: new Date(requestTime),
+  });
+  assert.equal(result.status, phase === "open" ? "policy_troubleshooter_oauth_candidate_proof_confirmed" : "policy_troubleshooter_closed_all_denied");
+  assert.equal(result.checked_secrets, "7");
+  assert.equal(result.checked_versions, "2");
+  assert.equal(result.checked_tuples, "17");
+  assert.equal(runner.calls.filter(args => args[0] === "beta").length, 17);
+  assert.equal(runner.calls.filter(args => args[0] === "secrets").length, 7);
+  assert.equal(runner.calls.some(args => args.includes("access") || args.includes("add")), false, "metadata/analysis only, never secret access");
+}
+// Inherited enable authority must not be hidden by empty direct secret policies.
+for (const phase of ["open", "closed"]) {
+  for (const secret of ["square-production-oauth-db", "square-production-application"]) {
+    const runner = proofRunner({ phase, alter(response, resource, permission) {
+      if (resource.includes(`/${secret}/`) && permission === "secretmanager.versions.enable") {
+        response.overallAccessState = "CAN_ACCESS";
+      }
+    } });
+    assert.throws(() => verifyEffectivePrivateAccess({ ...proofQuery, phase, active_profile: phase === "open" ? "oauth" : "" }, {
+      run: runner.run, now: new Date(requestTime),
+    }), error => error.fixedLabel === "policy_troubleshooter_access_mismatch");
+  }
+}
+for (const mutate of [
+  (r, resource, permission) => { if (permission === "secretmanager.versions.add") r.overallAccessState = "CAN_ACCESS"; },
+  (r, resource, permission) => { if (permission === "secretmanager.versions.disable") r.overallAccessState = "CAN_ACCESS"; },
+  (r, resource, permission) => { if (permission === "secretmanager.versions.destroy") r.overallAccessState = "CAN_ACCESS"; },
+  (r, resource) => { if (resource.includes("square-production-broker-db")) r.overallAccessState = "CAN_ACCESS"; },
+  (r, resource) => { if (resource.includes("square-production-application")) r.overallAccessState = "CAN_ACCESS"; },
+  r => { r.overallAccessState = "UNKNOWN_INFO"; },
+  r => { delete r.accessTuple; },
+]) {
+  assert.throws(() => verifyEffectivePrivateAccess(proofQuery, { run: proofRunner({ alter: mutate }).run, now: new Date(requestTime) }));
+}
+for (const oauthVersions of [[], ["2"], ["1", "2"]]) {
+  assert.throws(() => verifyEffectivePrivateAccess(proofQuery, { run: proofRunner({ oauthVersions }).run, now: new Date(requestTime) }),
+    error => error.fixedLabel === "policy_troubleshooter_oauth_candidate_inventory_mismatch");
+}
+for (const overrides of [{ project_number: "123456789012" }, { active_profile: "broker" }, { access_mode: "unknown" }]) {
+  const runner = proofRunner();
+  assert.throws(() => verifyEffectivePrivateAccess({ ...proofQuery, ...overrides }, { run: runner.run, now: new Date(requestTime) }));
+  assert.equal(runner.calls.length, 0);
+}
+
 process.stdout.write("policy_troubleshooter_exact_live_version_matrix_confirmed\n");

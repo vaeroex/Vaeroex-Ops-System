@@ -69,6 +69,20 @@ variable "temporary_access_profiles" {
   }
 }
 
+variable "oauth_candidate_proof_enabled" {
+  description = "Fixed retained OAuth version-1 get/access proof, never credential staging. Preserve true in its closed cleanup/checkpoint."
+  type        = bool
+  default     = false
+  nullable    = false
+  validation {
+    condition = !var.oauth_candidate_proof_enabled || (
+      !var.setup_https_enabled &&
+      (var.temporary_access_enabled ? var.temporary_access_profiles == toset(["oauth"]) : !var.administrative_access_enabled)
+    )
+    error_message = "Candidate proof permits only OAuth, or its fully closed cleanup; no setup or administrative-only phase."
+  }
+}
+
 variable "previous_access_expires_at" {
   description = "Read-back expiry of the preceding temporary-access window; a successor may not start before it."
   type        = string

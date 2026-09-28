@@ -17,6 +17,7 @@ import {
   reconcileExactPrivateAccess,
 } from "./reconcile-private-access.mjs";
 import { verifyEffectivePrivateAccess } from "./verify-effective-private-access.mjs";
+import { OAUTH_PROOF_MODE } from "./oauth-candidate-proof-contract.mjs";
 import {
   privateAccessClosedBootstrapTuple,
   privateAccessClosedNoTransitionTuple,
@@ -65,11 +66,11 @@ function defaultWaitForRevocationPropagation(milliseconds) {
   }
 }
 
-function effectiveClosedResult(result) {
-  if (result?.status !== "policy_troubleshooter_closed_all_denied" || result?.checked_secrets !== "6" ||
+function effectiveClosedResult(result, proof) {
+  if (result?.status !== "policy_troubleshooter_closed_all_denied" || result?.checked_secrets !== (proof ? "7" : "6") ||
       typeof result?.checked_versions !== "string" || !/^(?:0|[1-9][0-9]*)$/.test(result.checked_versions) ||
       typeof result?.checked_tuples !== "string" || !/^(?:0|[1-9][0-9]*)$/.test(result.checked_tuples)) return false;
-  return BigInt(result.checked_tuples) === 6n + 3n * BigInt(result.checked_versions);
+  return BigInt(result.checked_tuples) === (proof ? 7n : 6n) + (proof ? 5n : 3n) * BigInt(result.checked_versions);
 }
 
 function reconcilePrivateAccess(recovery, options) {
@@ -79,18 +80,19 @@ function reconcilePrivateAccess(recovery, options) {
     ...(options.runGcloud ? { run: options.runGcloud } : {}),
   });
   if (result?.status !== "private_access_exact_direct_binding_reconciliation_confirmed" ||
-      result?.checked_secrets !== "6") throw new Error("invalid reconciliation result");
+      result?.checked_secrets !== (recovery.accessMode === OAUTH_PROOF_MODE ? "7" : "6")) throw new Error("invalid reconciliation result");
   return result.status;
 }
 
-function confirmPrivateAccessClosed(options) {
+function confirmPrivateAccessClosed(options, tuple) {
   const confirmClosed = options.confirmClosedPrivateAccess ?? confirmExactPrivateAccessClosed;
   const result = confirmClosed({
     environment: options.environment ?? process.env,
     ...(options.runGcloud ? { run: options.runGcloud } : {}),
+    ...(tuple.accessMode === OAUTH_PROOF_MODE ? { accessMode: OAUTH_PROOF_MODE } : {}),
   });
   if (result?.status !== "private_access_exact_direct_binding_absence_confirmed" ||
-      result?.checked_secrets !== "6") throw new Error("invalid closed-access result");
+      result?.checked_secrets !== (tuple.accessMode === OAUTH_PROOF_MODE ? "7" : "6")) throw new Error("invalid closed-access result");
   return result.status;
 }
 
@@ -106,6 +108,7 @@ function verifyEffectiveRevocation(recovery, options) {
     project_number: PROJECT_NUMBER,
     phase: "closed",
     active_profile: "",
+    ...(recovery.accessMode === OAUTH_PROOF_MODE ? { access_mode: OAUTH_PROOF_MODE } : {}),
     window_starts_at: recovery.windowStartsAt,
     window_expires_at: recovery.windowExpiresAt,
   }, {
@@ -113,7 +116,7 @@ function verifyEffectiveRevocation(recovery, options) {
     ...(options.runGcloud ? { run: options.runGcloud } : {}),
     ...(options.now ? { now: options.now } : {}),
   });
-  if (!effectiveClosedResult(result)) throw new Error("invalid effective revocation result");
+  if (!effectiveClosedResult(result, recovery.accessMode === OAUTH_PROOF_MODE)) throw new Error("invalid effective revocation result");
   options.onProgress?.("private_access_effective_revocation_confirmed");
   return result.status;
 }
@@ -249,7 +252,7 @@ export function applyReviewedPrivateAccessPlan(planPath, reviewedSha256, options
     }
     if (closedBootstrap || closedNoTransition) {
       try {
-        reconciliationLabel = confirmPrivateAccessClosed(options);
+        reconciliationLabel = confirmPrivateAccessClosed(options, closedBootstrap ?? closedNoTransition);
       } catch {
         reject("private_access_exact_reconciliation_uncertain_after_cleanup_apply");
       }
