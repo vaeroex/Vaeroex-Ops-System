@@ -87,7 +87,7 @@ async function main() {
   const admission = operation === "admit" && profile.kind === "production"
     ? await import("./service-admission.mjs") : undefined;
   if (operation === "admit" && !admission) throw denied();
-  const admissionVersion = admission ? admission.serviceAdmissionReceipt({ profile, last, roleOid,
+  const admissionVersion = admission ? admission.serviceAdmissionReceipt({ profile, last, roleOid, prior, intent, approvalId,
     secretParent: pin.secretParent.replace(`projects/${pin.projectId}/`, `projects/${pin.projectNumber}/`) }) : undefined;
   const reconciliation = operation === "reconcile" ? await import("./existing-candidate-reconciliation.mjs") : undefined;
   // No process restart silently forgets an interrupted/uncertain invocation.
@@ -154,7 +154,8 @@ async function main() {
         priorIntent: reconciliation.existingOAuthCandidate.priorIntent, roleOid,
         versionName: reconciliation.existingOAuthCandidate.versionName, time: Date.now() }) });
     // New evidence is appended, never substituted for the old uncertain record.
-    // This proof-only receipt is not a provision/admission receipt.
+    // This is proof, not historical COMMIT confirmation or service admission.
+    // Only its conclusive authenticated/fenced result can qualify a later admit.
     append({ kind: "existing_candidate_reconciliation_finished", intent, approvalId, time: Date.now(), ...result });
     finished = true;
     if (result.failureCategory !== null) process.stdout.write(`native_existing_candidate_failure_${result.failureStage}_${result.failureCategory}\n`);

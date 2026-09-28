@@ -11,13 +11,21 @@ const intent = "synthetic_candidate_proof", approvalId = "synthetic_proof_approv
 function proof() {
   const now = 1800000000000;
   return { profile: { kind: "production", name: "oauth", target }, roleOid: pin.roleOid, intent, approvalId,
-    journalSha256: "a".repeat(64), now,
-    prior: [{ kind: "maintenance_started", intent: pin.priorIntent },
+    journalSha256: pin.retainedJournalSha256, now,
+    prior: [...Array.from({ length: 12 }, (_, i) => ({ kind: "retained_failed_history", intent: `retained_${i}`, approvalId: `retained_approval_${i}` })),
+      { kind: "maintenance_started", intent: pin.priorIntent },
       { kind: "maintenance_finished", intent: pin.priorIntent, roleOid: pin.roleOid, phase: "assign_and_commit",
-        outcome: "uncertain", databaseCommit: "uncertain", requiresFreshReplacement: true, applicationAuthority: "verified_closed" }],
+        outcome: "uncertain", databaseCommit: "uncertain", requiresFreshReplacement: true, applicationAuthority: "verified_closed" },
+      ...["started", "authentication_started", "fenced"].map(stage => ({ kind: "existing_candidate_reconciliation", stage,
+        intent: pin.retainedProofIntent, approvalId: pin.retainedProofApprovalId, priorIntent: pin.priorIntent,
+        roleOid: pin.roleOid, versionName: pin.versionName })),
+      { kind: "existing_candidate_reconciliation_finished", intent: pin.retainedProofIntent, approvalId: pin.retainedProofApprovalId,
+        priorIntent: pin.priorIntent, roleOid: pin.roleOid, versionName: pin.versionName,
+        outcome: "existing_candidate_reconciliation_uncertain", candidateAuthenticated: false, fenceConfirmed: true,
+        originalDatabaseCommit: "uncertain", credentialPublished: false }],
     clearance: { schema: "oauth_existing_candidate_reconciliation_v1", priorIntent: pin.priorIntent, nextIntent: intent,
       approvalId, projectReference: target.projectReference, targetRole: target.role, roleOid: pin.roleOid,
-      versionName: pin.versionName, createTime: pin.createTime, journalSha256: "a".repeat(64), roleFenced: true,
+      versionName: pin.versionName, createTime: pin.createTime, journalSha256: pin.retainedJournalSha256, roleFenced: true,
       sessions: 0, candidateState: "ENABLED", expiresAt: now + 600000 } };
 }
 test("unresolved candidate clearance binds exact retired journal, OID, version, intent and ten-minute expiry", () => {
@@ -30,13 +38,35 @@ test("unresolved candidate clearance binds exact retired journal, OID, version, 
     p => p.profile.target = { ...target, host: "other.invalid" },
     p => p.intent = pin.priorIntent, p => p.prior.push({ kind: "existing_candidate_reconciliation_finished" }),
     p => p.prior.unshift({ kind: "maintenance_started", intent: pin.priorIntent }),
-    p => p.prior[1].phase = "verify_closed_authority", p => p.prior[1].roleOid = "2",
-    p => p.prior[1].databaseCommit = "acknowledged", p => p.journalSha256 = "b".repeat(64),
+    p => p.intent = pin.retainedProofIntent, p => p.approvalId = pin.retainedProofApprovalId,
+    p => p.approvalId = "retained_approval_0", p => p.prior.splice(14),
+    p => p.prior[13].phase = "verify_closed_authority", p => p.prior[13].roleOid = "2",
+    p => p.prior[13].databaseCommit = "acknowledged", p => p.journalSha256 = "b".repeat(64),
+    p => p.clearance.journalSha256 = p.journalSha256 = "b".repeat(64),
+    p => p.prior[15].stage = "candidate_authenticated", p => p.prior[16].stage = "fence_uncertain",
+    p => p.prior[17].candidateAuthenticated = true, p => p.prior[17].fenceConfirmed = false,
+    p => p.prior[17].originalDatabaseCommit = "acknowledged", p => p.prior[17].credentialPublished = true,
     p => p.clearance.priorIntent = "other", p => p.clearance.nextIntent = "other", p => p.clearance.approvalId = "other",
     p => p.clearance.versionName = pin.versionName.replace(/1$/, "2"), p => p.clearance.roleFenced = false,
     p => p.clearance.sessions = 1, p => p.clearance.candidateState = "DISABLED", p => p.clearance.createTime = "other",
     p => p.clearance.expiresAt = p.now, p => p.clearance.expiresAt = p.now + 600001,
   ]) { const p = proof(); mutate(p); assert.throws(() => checkExistingCandidateClearance(p), /existing_oauth_candidate_denied/); }
+});
+
+test("the fresh proof consumes eligibility without removing the uncertain commit or any failed record", () => {
+  const p = proof(), preserved = structuredClone(p.prior);
+  checkExistingCandidateClearance(p);
+  p.prior.push({ kind: "existing_candidate_reconciliation", stage: "started", intent, approvalId });
+  p.intent = "another_proof"; p.approvalId = "another_approval";
+  p.clearance.nextIntent = p.intent; p.clearance.approvalId = p.approvalId;
+  assert.throws(() => checkExistingCandidateClearance(p), /existing_oauth_candidate_denied/);
+  assert.deepEqual(p.prior.slice(0, 18), preserved);
+  assert.equal(p.prior[13].databaseCommit, "uncertain");
+  assert.equal(p.prior[17].outcome, "existing_candidate_reconciliation_uncertain");
+  // The launcher computes this input from the real bytes under its journal lock.
+  const source = readFileSync(new URL("../maintenance.mjs", import.meta.url), "utf8");
+  assert.match(source, /journalSha256: createHash\("sha256"\)\.update\(journalBytes\)\.digest\("hex"\)/);
+  assert.match(source, /serviceAdmissionReceipt\(\{ profile, last, roleOid, prior, intent, approvalId,/);
 });
 
 function checksum(bytes) {

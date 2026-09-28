@@ -44,6 +44,30 @@ no automatic retry or general recurring service-admission scheduler.
 
 ## Explicit limit
 
+### Retained OAuth candidate: one fresh proof, then separate admission
+
+OAuth role OID `34220` already has candidate secret version **1**. Do not run the
+provisioning sequence above again for it. Its original operation
+`prod_oauth_20260927_224909_v1` remains `databaseCommit=uncertain`; the failed proof
+`prod_oauth_proof_20260928_065338_v1` and all earlier failed records remain intact.
+
+One fresh, separately authorized proof may use a maximum-ten-minute clearance
+bound to the new intent/approval and exact retained 18-record journal SHA-256
+`8548c13634d5039cbce0355cfafc0f3d0c0f283f1c3a1f72d7a29377c980823f`.
+The launcher hashes the actual journal under its exclusive lock. Appending any
+new proof attempt consumes this eligibility; another failed or interrupted
+attempt cannot use it again. No record is removed, rewritten, or relabeled.
+
+Only a new `existing_candidate_verified_closed` result with
+`candidateAuthenticated=true`, `fenceConfirmed=true`, null failure fields, exact
+OID/version binding, `originalDatabaseCommit=uncertain` and
+`credentialPublished=false` can qualify subsequent supervised admission.
+That admission needs its own fresh intent/approval and normal live native
+catalog/fencing checks. A successful present authentication does not recover the
+lost historical COMMIT acknowledgement. A failed/uncertain proof never admits
+the role, creates a credential, or creates version 2. Preparing or merging this
+path does not authorize proof, admission, secret access, or activation.
+
 In the customer-consent phase, native fencing may complete while the separately
 authorized customer binding is enabled. It still validates the exact protection
 contract and closes the target LOGIN, inherited capability and sessions. All

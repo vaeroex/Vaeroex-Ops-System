@@ -7,6 +7,9 @@ export const existingOAuthCandidate = Object.freeze({
   roleOid: "34220",
   versionName: "projects/711446392261/secrets/square-production-oauth-db/versions/1",
   createTime: "2026-09-27T23:21:17.971560Z",
+  retainedProofIntent: "prod_oauth_proof_20260928_065338_v1",
+  retainedProofApprovalId: "square_prod_oauth_proof_approval_20260928_065338_v1",
+  retainedJournalSha256: "8548c13634d5039cbce0355cfafc0f3d0c0f283f1c3a1f72d7a29377c980823f",
 });
 const pin = existingOAuthCandidate;
 const deny = () => new Error("existing_oauth_candidate_denied");
@@ -24,14 +27,25 @@ function exactTarget(target) {
 
 export function checkExistingCandidateClearance({ profile, prior, journalSha256, roleOid, intent, approvalId, clearance, now }) {
   const last = prior?.at(-1);
+  const original = prior?.at(-5);
+  // One new attempt against the exact retained 18-record journal. Maintenance
+  // hashes the actual locked journal bytes; any appended attempt consumes this
+  // eligibility, and deleting/reordering even an older failed record rejects it.
   if (profile?.kind !== "production" || profile.name !== "oauth" || !exactTarget({ ...profile.target, roleOid }) ||
-      !Array.isArray(prior) || last?.kind !== "maintenance_finished" || last.intent !== pin.priorIntent ||
-      last.phase !== "assign_and_commit" || last.outcome !== "uncertain" || last.databaseCommit !== "uncertain" ||
-      last.roleOid !== pin.roleOid || last.requiresFreshReplacement !== true || last.applicationAuthority !== "verified_closed" ||
+      !Array.isArray(prior) || prior.length !== 18 || journalSha256 !== pin.retainedJournalSha256 ||
+      original?.kind !== "maintenance_finished" || original.intent !== pin.priorIntent ||
+      original.phase !== "assign_and_commit" || original.outcome !== "uncertain" || original.databaseCommit !== "uncertain" ||
+      original.roleOid !== pin.roleOid || original.requiresFreshReplacement !== true || original.applicationAuthority !== "verified_closed" ||
       prior.filter(x => x.kind === "maintenance_started" && x.intent === pin.priorIntent).length !== 1 ||
       prior.filter(x => x.kind === "maintenance_finished" && x.intent === pin.priorIntent).length !== 1 ||
-      !token(intent) || !token(approvalId) || prior.some(x => x.intent === intent) ||
-      !/^[a-f0-9]{64}$/.test(journalSha256 ?? "") ||
+      !["started", "authentication_started", "fenced"].every((stage, index) =>
+        prior[index + 14].kind === "existing_candidate_reconciliation" && prior[index + 14].stage === stage) ||
+      !prior.slice(14).every(x => x.intent === pin.retainedProofIntent && x.approvalId === pin.retainedProofApprovalId &&
+        x.priorIntent === pin.priorIntent && x.roleOid === pin.roleOid && x.versionName === pin.versionName) ||
+      last.kind !== "existing_candidate_reconciliation_finished" || last.outcome !== "existing_candidate_reconciliation_uncertain" ||
+      last.candidateAuthenticated !== false || last.fenceConfirmed !== true ||
+      last.originalDatabaseCommit !== "uncertain" || last.credentialPublished !== false ||
+      !token(intent) || !token(approvalId) || prior.some(x => x.intent === intent || x.approvalId === approvalId) ||
       clearance?.schema !== "oauth_existing_candidate_reconciliation_v1" ||
       clearance.priorIntent !== pin.priorIntent || clearance.nextIntent !== intent || clearance.approvalId !== approvalId ||
       clearance.projectReference !== expected.projectReference || clearance.targetRole !== expected.role ||
@@ -40,8 +54,8 @@ export function checkExistingCandidateClearance({ profile, prior, journalSha256,
       clearance.roleFenced !== true || clearance.sessions !== 0 || clearance.candidateState !== "ENABLED" ||
       !Number.isSafeInteger(now) || !Number.isSafeInteger(clearance.expiresAt) ||
       clearance.expiresAt <= now || clearance.expiresAt > now + 600000) throw deny();
-  // This authorizes inspection of an unresolved candidate, NOT an assertion
-  // that the old transaction succeeded or that no unresolved version exists.
+  // Neither this clearance nor a later successful authentication rewrites the
+  // original uncertain COMMIT or any failed proof as historical success.
   return clearance.expiresAt;
 }
 

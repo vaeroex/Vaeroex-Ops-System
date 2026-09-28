@@ -3,6 +3,9 @@ import assert from "node:assert/strict";
 import { Writable } from "node:stream";
 import { spawnSync } from "node:child_process";
 import { serviceAdmissionReceipt, superviseServiceAdmission, admissionOutput } from "../service-admission.mjs";
+import { existingOAuthCandidate as pin, reconcileExistingOAuthCandidate } from "../existing-candidate-reconciliation.mjs";
+import { productionProvisioningBuildProfile } from "../production-profile.mjs";
+import { createPinnedSupabaseDsnCodec } from "../dsn-codec.mjs";
 
 const parent = "projects/711446392261/secrets/square-production-oauth-db";
 function proof() {
@@ -24,6 +27,110 @@ test("admission requires the exact conclusive fenced provision/version-1 receipt
     const x = proof(); change(x); assert.throws(() => serviceAdmissionReceipt(x), /admission_denied/);
   }
 });
+
+function existingProof(result) {
+  const profile = productionProvisioningBuildProfile("oauth");
+  const last = { kind: "existing_candidate_reconciliation_finished", intent: "synthetic_new_oauth_proof",
+    approvalId: "synthetic_new_oauth_proof_approval", time: 1800000000000,
+    ...(result ?? { outcome: "existing_candidate_verified_closed", failureStage: null, failureCategory: null,
+      priorIntent: pin.priorIntent, roleOid: pin.roleOid, versionName: pin.versionName,
+      candidateAuthenticated: true, fenceConfirmed: true, originalDatabaseCommit: "uncertain", credentialPublished: false }) };
+  return { profile: { ...profile, target: { ...profile.target } }, last, roleOid: pin.roleOid, secretParent: parent,
+    intent: "synthetic_new_oauth_admission", approvalId: "synthetic_new_oauth_admission_approval",
+    prior: [{ kind: "maintenance_finished", intent: pin.priorIntent, approvalId: "synthetic_original_approval" },
+      { kind: "existing_candidate_reconciliation_finished", intent: pin.retainedProofIntent,
+        approvalId: pin.retainedProofApprovalId, outcome: "existing_candidate_reconciliation_uncertain" }, last] };
+}
+
+test("only the exact conclusive OAuth proof admits its existing version without rewriting historical uncertainty", () => {
+  const proof = existingProof(), before = JSON.stringify(proof.prior);
+  assert.equal(serviceAdmissionReceipt(proof), pin.versionName);
+  assert.equal(JSON.stringify(proof.prior), before);
+  assert.equal(proof.last.originalDatabaseCommit, "uncertain");
+  assert.equal(proof.last.credentialPublished, false);
+  assert.equal(Object.hasOwn(proof.last, "databaseCommit"), false);
+  assert.equal(Object.hasOwn(proof.last, "secret"), false);
+  for (const change of [
+    x => x.profile.kind = "sandbox", x => x.profile.name = "broker", x => x.roleOid = "34221",
+    x => x.secretParent = parent.replace("oauth", "broker"), x => x.last.roleOid = "34221",
+    x => x.last.versionName = pin.versionName.replace(/1$/, "2"), x => x.last.priorIntent = "other",
+    x => x.last.kind = "maintenance_finished", x => x.last.outcome = "existing_candidate_reconciliation_uncertain",
+    x => x.last.candidateAuthenticated = false, x => x.last.fenceConfirmed = false,
+    x => x.last.originalDatabaseCommit = "acknowledged", x => x.last.databaseCommit = "acknowledged",
+    x => x.last.credentialPublished = true, x => x.last.secret = {},
+    x => x.last.failureStage = "authentication", x => x.last.failureCategory = "database_connection",
+    x => { delete x.last.failureStage; }, x => { delete x.last.failureCategory; },
+    x => x.last.time = "1800000000000", x => x.last.intent = pin.priorIntent,
+    x => x.last.intent = pin.retainedProofIntent, x => x.last.approvalId = pin.retainedProofApprovalId,
+    x => x.last.intent = "bad intent", x => x.last.approvalId = "bad approval",
+    x => x.intent = x.last.intent, x => x.intent = pin.priorIntent, x => x.intent = pin.retainedProofIntent,
+    x => x.approvalId = x.last.approvalId, x => x.approvalId = pin.retainedProofApprovalId,
+    x => x.approvalId = "synthetic_original_approval", x => x.intent = "bad intent", x => x.approvalId = "bad approval",
+    x => { delete x.prior; }, x => x.prior.push({ kind: "service_admission" }),
+    x => x.prior.unshift({ ...x.last, intent: "older_successful_proof" }),
+  ]) {
+    const value = existingProof(); change(value);
+    assert.throws(() => serviceAdmissionReceipt(value), /native_service_admission_denied/);
+  }
+  for (const field of Object.keys(productionProvisioningBuildProfile("oauth").target).filter(key => key !== "roleOid")) {
+    const value = existingProof(); value.profile.target[field] = "different";
+    assert.throws(() => serviceAdmissionReceipt(value), /native_service_admission_denied/);
+  }
+  const extraTarget = existingProof(); extraTarget.profile.target.extra = true;
+  assert.throws(() => serviceAdmissionReceipt(extraTarget), /native_service_admission_denied/);
+});
+
+test("actual proof result feeds supervised admission using only the retained candidate and existing native operations", async () => {
+  const input = existingProof(), target = { ...input.profile.target, roleOid: pin.roleOid };
+  const calls = [], buffers = [];
+  const ack = { ack: true, committed: true, authorityClosed: true, roleOid: pin.roleOid };
+  const native = {
+    async inspect() { calls.push("inspect"); return ack; },
+    async fence() { calls.push("fence"); return { ...ack, noLogin: true, sessionsTerminated: true }; },
+    async activate() { calls.push("activate"); return { ...ack, noLogin: false }; },
+    async authenticate(context) {
+      calls.push("authenticate");
+      await context.withCredential(async bytes => { assert.equal(bytes.length, 128); buffers.push(bytes); });
+      return { ...ack, sessionUser: target.role, target };
+    },
+    async abortAndDrain() { calls.push("drain"); return { ack: true, drained: true }; },
+    async prepare() { assert.fail("role creation forbidden"); }, async assign() { assert.fail("credential assignment forbidden"); },
+  };
+  const client = {
+    async getSecretVersion({ name }) {
+      calls.push("metadata"); assert.equal(name, pin.versionName);
+      return { name, state: "ENABLED", createTime: pin.createTime };
+    },
+    async accessSecretVersion({ name }) {
+      calls.push("access"); assert.equal(name, pin.versionName);
+      const raw = Buffer.alloc(128, 97), data = createPinnedSupabaseDsnCodec(target).encode(raw); raw.fill(0); buffers.push(data);
+      let crc = 0xffffffff;
+      for (const byte of data) {
+        crc ^= byte;
+        for (let bit = 0; bit < 8; bit++) crc = (crc >>> 1) ^ ((crc & 1) ? 0x82f63b78 : 0);
+      }
+      return { name, payload: { data, dataCrc32c: String((crc ^ 0xffffffff) >>> 0) } };
+    },
+    async addSecretVersion() { assert.fail("version creation forbidden"); },
+    async disableSecretVersion() { assert.fail("version changes forbidden"); },
+  };
+  const result = await reconcileExistingOAuthCandidate({ native, client, target, intent: input.last.intent,
+    approvalId: input.last.approvalId, signal: new AbortController().signal, async record() {} });
+  assert.equal(result.outcome, "existing_candidate_verified_closed");
+  const admission = existingProof(result);
+  assert.equal(serviceAdmissionReceipt(admission), pin.versionName);
+  assert.deepEqual(calls, ["inspect", "fence", "metadata", "activate", "authenticate", "access", "drain", "fence"]);
+  assert.ok(buffers.every(bytes => bytes.every(byte => byte === 0)));
+  const cancellation = new AbortController();
+  const admitted = await superviseServiceAdmission({ native, target, intent: admission.intent, approvalId: admission.approvalId,
+    signal: cancellation.signal, async record() {}, async notify() { setImmediate(() => cancellation.abort()); } });
+  assert.equal(admitted.outcome, "service_closed");
+  assert.equal(admitted.fenceConfirmed, true);
+  assert.deepEqual(calls.slice(8), ["inspect", "activate", "drain", "fence"]);
+  assert.equal(admission.last.originalDatabaseCommit, "uncertain");
+  assert.equal(admission.last.credentialPublished, false);
+});
+
 function fixture(options = {}) {
   const controller = new AbortController(), calls = [];
   const ack = { ack: true, committed: true, roleOid: "123" };
