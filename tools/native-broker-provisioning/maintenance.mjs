@@ -61,7 +61,10 @@ async function main() {
   if (operation === "reconcile" && (profile.kind !== "production" || profile.name !== "oauth" || roleOid !== "34220")) throw denied();
   const window = maintenanceWindow(deadline, Date.now());
   softTimer = setTimeout(cancel, window.softCancelAfterMs);
-  hardTimer = setTimeout(() => {
+  // Reconciliation owns bounded drain/fence cleanup. Its hard deadline cancels
+  // work but cannot exit or wipe the administrator input before fencing ends.
+  // Other maintenance modes retain their existing deadline behavior.
+  hardTimer = setTimeout(operation === "reconcile" ? cancel : () => {
     cancel(); void native?.abortAndDrain().catch(() => undefined); password?.fill(0);
     process.stdout.write("native_deadline_interrupted_recovery_required\n"); process.exit(2);
   }, window.hardStopAfterMs);

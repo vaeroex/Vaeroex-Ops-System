@@ -134,10 +134,16 @@ export async function reconcileExistingOAuthCandidate({ native, client, target, 
   finally {
     controller.abort(); candidate?.fill(0); if (payload instanceof Uint8Array) payload.fill(0);
     if (attempted) {
+      // A missing drain acknowledgement must not skip the independent fence.
+      // The adapter itself refuses fencing while a worker is still active.
+      const drain = new AbortController(), drainTimer = setTimeout(() => drain.abort(), 10000);
+      try {
+        const drained = await untilAbort(() => native.abortAndDrain(), drain.signal);
+        if (drained?.ack !== true || drained.drained !== true) throw deny();
+      } catch { failed = true; }
+      finally { clearTimeout(drainTimer); }
       const cleanup = new AbortController(), timer = setTimeout(() => cleanup.abort(), 30000);
       try {
-        const drained = await untilAbort(() => native.abortAndDrain(), cleanup.signal);
-        if (drained?.ack !== true || drained.drained !== true) throw deny();
         fenced = fenceReceipt(await untilAbort(() => native.fence({ ...context, signal: cleanup.signal }), cleanup.signal));
       } catch { fenced = false; }
       finally { clearTimeout(timer); }

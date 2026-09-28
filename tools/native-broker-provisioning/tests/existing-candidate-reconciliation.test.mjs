@@ -134,6 +134,55 @@ test("uncertain final fence is never successful and is not retried", async () =>
   assert.equal(result.outcome, "existing_candidate_reconciliation_uncertain");
   assert.equal(f.calls.filter(x => x === "fence").length, 2);
 });
+test("missing, negative or rejected drain acknowledgement still attempts an independent fence", async () => {
+  for (const result of [undefined, { ack: false, drained: false }, "reject"]) {
+    const f = fixture({ lostActivateAck: true });
+    f.native.abortAndDrain = async () => {
+      f.calls.push("drain");
+      if (result === "reject") throw Error("synthetic reaped-worker acknowledgement loss");
+      return result;
+    };
+    const proof = await f.run();
+    assert.deepEqual(f.calls.slice(-2), ["drain", "fence"]);
+    assert.equal(proof.fenceConfirmed, true);
+    assert.equal(proof.outcome, "existing_candidate_reconciliation_uncertain");
+    assert.equal(f.calls.filter(x => x === "activate").length, 1);
+  }
+});
+test("drain timeout cannot consume the independent fencing deadline", async t => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const f = fixture({ lostActivateAck: true });
+  let drainStarted;
+  const started = new Promise(resolve => { drainStarted = resolve; });
+  f.native.abortAndDrain = () => { f.calls.push("drain"); drainStarted(); return new Promise(() => {}); };
+  const pending = f.run();
+  await started;
+  t.mock.timers.tick(10000);
+  const result = await pending;
+  assert.deepEqual(f.calls.slice(-2), ["drain", "fence"]);
+  assert.equal(result.fenceConfirmed, true);
+  assert.equal(result.outcome, "existing_candidate_reconciliation_uncertain");
+});
+test("deadline cancellation during final fencing cannot interrupt its independent signal", async () => {
+  const f = fixture();
+  const fence = f.native.fence;
+  let calls = 0;
+  f.native.fence = async context => {
+    if (++calls === 2) {
+      // Same cancel-only handler installed for both reconciliation deadlines.
+      setTimeout(() => f.controller.abort(), 0);
+      await new Promise(resolve => setTimeout(resolve, 20));
+      assert.equal(f.controller.signal.aborted, true);
+      assert.equal(context.signal.aborted, false);
+    }
+    return fence(context);
+  };
+  const result = await f.run();
+  assert.equal(result.fenceConfirmed, true);
+  assert.deepEqual(f.calls.slice(-2), ["drain", "fence"]);
+  const code = readFileSync(new URL("../maintenance.mjs", import.meta.url), "utf8");
+  assert.match(code, /hardTimer = setTimeout\(operation === "reconcile" \? cancel : \(\) => \{/);
+});
 test("late secret response is wiped and cannot authenticate after cancellation/fence", async () => {
   const f = fixture({ lateRead: true }), result = await f.run();
   await new Promise(resolve => setTimeout(resolve, 40));

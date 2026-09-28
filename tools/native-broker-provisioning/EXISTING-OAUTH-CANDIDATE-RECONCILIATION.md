@@ -94,7 +94,11 @@ needed. No live command, operation ID or clearance has been generated here.
    authentication. Verify session user, role OID and full database target. Never
    read `pg_authid.rolpassword`, print a secret/hash, or compare password verifiers.
 4. On success, failure, cancellation, SSH loss or receipt failure: drain native
-   work, use the independent bounded fence to restore NOLOGIN/NOINHERIT and
+   work (ten-second bound), then attempt the independent thirty-second fence
+   even if the drain acknowledgement is missing. The native adapter rejects a
+   fence while a worker remains active; no acknowledgement means uncertainty.
+   Both reconciliation deadline timers cancel work without terminating cleanup
+   or wiping its administrator input early. Restore NOLOGIN/NOINHERIT and
    terminate sessions. No authentication, assignment or provisioning retry.
 5. Append distinct stage/final evidence, leaving the old journal intact. A final
    receipt write failure cannot suppress fencing or produce a success label.
