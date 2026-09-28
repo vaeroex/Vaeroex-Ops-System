@@ -127,6 +127,17 @@ process.stdout.write('synthetic_fixed_entry_passed\\n');
         assert.equal(invoke(["admit", "0", ...publicArgs.slice(2)]).stdout, denied);
       }
     }
+    const reconcileArgs = ["reconcile", "34220", ...publicArgs.slice(2)];
+    writeFileSync(join(install, "maintenance.mjs"), fixture.replace(JSON.stringify(publicArgs), JSON.stringify(reconcileArgs)), { mode: 0o600 });
+    for (const profile of ["OAUTH", "BROKER", "RUNTIME", "EVIDENCE", "SCHEDULER", "WEBHOOK", null]) {
+      success(run("/usr/bin/cc", [...flags.slice(0, -3), ...(profile ? [`-DVAEROEX_PRODUCTION_${profile}`] : []), ...flags.slice(-3)],
+        { env: { ...environment, TMPDIR: tmpdir() } }));
+      if (profile === "OAUTH") {
+        accepted(invoke(reconcileArgs));
+        assert.equal(invoke(["reconcile", "34221", ...publicArgs.slice(2)]).stdout, denied);
+        assert.equal(invoke(["reconcile", "0", ...publicArgs.slice(2)]).stdout, denied);
+      } else assert.equal(invoke(reconcileArgs).stdout, denied);
+    }
   } finally {
     if (inherited !== undefined) closeSync(inherited);
     rmSync(root, { recursive: true, force: true }); // This invocation's public-synthetic mkdtemp only.

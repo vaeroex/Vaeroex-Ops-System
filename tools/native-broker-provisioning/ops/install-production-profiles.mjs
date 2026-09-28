@@ -7,7 +7,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 export const profileNames = Object.freeze(["oauth", "broker", "scheduler", "webhook", "runtime", "evidence"]);
 export const runtimeModules = Object.freeze(["maintenance.mjs", "adapter.mjs", "lifecycle.mjs", "secret-store.mjs",
   "secret-manager-rest.mjs", "dsn-codec.mjs", "maintenance-identity.mjs", "private-entry.mjs",
-  "maintenance-policy.mjs", "service-admission.mjs", "production-profile.mjs", "sandbox-profile.mjs"]);
+  "maintenance-policy.mjs", "service-admission.mjs", "existing-candidate-reconciliation.mjs", "production-profile.mjs", "sandbox-profile.mjs"]);
 const buildModules = ["build-production.mjs", "production-source.mjs", "customer-source.mjs", "native.c", "maintenance-launcher.c"];
 const customerMigration = "supabase/production-migrations/20260925032300_square_production_customer_connection.sql";
 const moduleRoot = "tools/native-broker-provisioning/";
