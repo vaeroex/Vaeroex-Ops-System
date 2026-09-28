@@ -5,11 +5,17 @@ import { productionProvisioningBuildProfile } from "./production-profile.mjs";
 
 const outcomes = Object.freeze({ inspect: "inspected", prepare: "prepared", fence: "fenced", assign: "assigned", activate: "activated", authenticate: "authenticated" });
 const targetFields = Object.freeze(["projectReference", "host", "port", "database", "role", "systemIdentifier", "databaseOid", "adminRole", "capabilityRole", "rootCertificate", "roleOid"]);
-const safeFailure = () => new Error("local_synthetic_native_operation_failed");
+const failureCategories = new Set(["database_connection", "database_authentication_unconfirmed", "database_identity", "secret_access", "timeout", "cancelled"]);
+const safeFailure = category => Object.assign(new Error("local_synthetic_native_operation_failed"), {
+  failureCategory: failureCategories.has(category) ? category : "unclassified",
+});
 const label = value => typeof value === "string" && /^[a-zA-Z0-9_-]{1,80}$/.test(value);
 const credentialByte = value => (value >= 48 && value <= 57) || (value >= 97 && value <= 102);
 const staticLine = value => Buffer.from(value, "ascii");
 const readyLine = staticLine('{"phase":"ready"}');
+const nativeFailures = ["database_connection", "database_authentication_unconfirmed", "database_identity", "timeout"]
+  .flatMap(category => ["failed", "uncertain"].map(outcome => ({ category,
+    bytes: staticLine(`{"outcome":"${outcome}","failure_category":"${category}"}`) })));
 
 // No arbitrary JSON/error decoding: only the finite C protocol can become JS
 // strings. Unknown stdout/stderr bytes are wiped, never forwarded or logged.
@@ -100,6 +106,7 @@ function createNativeAdapter({ executable, target: suppliedTarget, timeoutMs, wi
       const output = Buffer.alloc(1024), frame = Buffer.alloc(129);
       let outputUsed = 0, frameUsed = 0, totalOutput = 0, invalid = false, finished = false;
       let terminalOid, progressSeen = false, delivered = false, stored = false, authenticatedInput = false;
+      let failureCategory;
       const administratorSignal = new AbortController();
       let administratorAcknowledged = !withAdministrator;
       let privateBorrow;
@@ -108,8 +115,9 @@ function createNativeAdapter({ executable, target: suppliedTarget, timeoutMs, wi
       let reapResolve;
       const reaped = new Promise(done => { reapResolve = done; });
       const record = { child, reaped, stop: undefined };
-      const stop = () => {
+      const stop = category => {
         if (finished) return;
+        failureCategory ??= failureCategories.has(category) ? category : "unclassified";
         invalid = true;
         administratorSignal.abort();
         privateBorrow?.fill(0); frame.fill(0);
@@ -119,9 +127,10 @@ function createNativeAdapter({ executable, target: suppliedTarget, timeoutMs, wi
       };
       record.stop = stop;
       active.add(record);
-      const timer = setTimeout(stop, timeoutMs);
-      context.signal.addEventListener("abort", stop, { once: true });
-      if (context.signal.aborted) stop();
+      const timer = setTimeout(() => stop("timeout"), timeoutMs);
+      const cancelled = () => stop(context.signal.reason === "timeout" ? "timeout" : "cancelled");
+      context.signal.addEventListener("abort", cancelled, { once: true });
+      if (context.signal.aborted) cancelled();
       for (const pipe of child.stdio.slice(1)) pipe?.on("error", stop);
       child.on("error", stop);
       child.stderr.on("data", bytes => { bytes.fill(0); stop(); });
@@ -132,6 +141,8 @@ function createNativeAdapter({ executable, target: suppliedTarget, timeoutMs, wi
           for (const value of bytes) {
             if (value === 10) {
               const line = output.subarray(0, outputUsed);
+              const failure = ["activate", "authenticate"].includes(operation) && nativeFailures.find(value => line.equals(value.bytes));
+              if (failure && !terminalOid) { stop(failure.category); output.fill(0); outputUsed = 0; return; }
               if (operation === "assign" && !progressSeen && !terminalOid && line.equals(readyLine)) progressSeen = true;
               else if (!terminalOid) {
                 const parsed = terminal(line, operation);
@@ -196,13 +207,13 @@ function createNativeAdapter({ executable, target: suppliedTarget, timeoutMs, wi
             } finally { candidateFrame.fill(0); outgoingFrames.delete(candidateFrame); bytes.fill(0); privateBorrow = undefined; }
           });
           if (!read?.ack) throw safeFailure();
-        }).catch(stop);
+        }).catch(error => stop(error?.failureCategory));
       }
       child.once("close", (code, signal) => {
         finished = true;
         administratorSignal.abort();
         clearTimeout(timer); clearTimeout(killTimer);
-        context.signal.removeEventListener("abort", stop);
+        context.signal.removeEventListener("abort", cancelled);
         output.fill(0); frame.fill(0); privateBorrow?.fill(0); privateBorrow = undefined;
         for (const bytes of outgoingFrames) bytes.fill(0);
         outgoingFrames.clear();
@@ -211,7 +222,7 @@ function createNativeAdapter({ executable, target: suppliedTarget, timeoutMs, wi
         const expectedOid = operation === "prepare" ? terminalOid !== "0" : terminalOid === roleOid;
         if (invalid || !administratorAcknowledged || code !== 0 || signal || outputUsed || terminalOid === undefined || !expectedOid ||
             (operation === "assign" && (!delivered || !stored)) || (operation === "authenticate" && !authenticatedInput)) {
-          reject(safeFailure()); return;
+          reject(safeFailure(failureCategory)); return;
         }
         if (operation === "prepare") roleOid = terminalOid;
         resolve(Object.freeze({ ack: true, authorityClosed: true, committed: true, roleOid: terminalOid,

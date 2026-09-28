@@ -48,7 +48,9 @@ else {
       fs.writeSync(4,Buffer.from('a'.repeat(128)+'\\n'));
       const ack=await read(5);const valid=ack.equals(Buffer.from('STORED\\n'));ack.fill(0);if(!valid)stop();
     }
-    terminal();
+    if(mode.startsWith('failure-')) {
+      process.stdout.write(JSON.stringify({outcome:'failed',failure_category:mode.slice(8)})+'\\n',()=>process.exit(2));
+    } else terminal();
   })().catch(stop);
 }
 `;
@@ -82,6 +84,30 @@ test("managed authentication supplies administrator FD3 and separate candidate F
   assert.ok(candidate.every(byte => byte === 0));
   assert.ok(supplier.borrowed[0].every(byte => byte === 0));
   assert.ok(supplier.signals[0].aborted); // Scope closes even on success.
+  assert.deepEqual(await adapter.abortAndDrain(), { ack: true, drained: true });
+});
+
+test("only finite native failure frames can become nonsecret categories", async t => {
+  for (const category of ["database_connection", "database_authentication_unconfirmed", "database_identity", "timeout", "PRIVATE_UNTRUSTED_VALUE"]) {
+    const supplier = administrator();
+    const adapter = createManagedSupabaseNativeAdapter({ executable: await executable(t, "failure-" + category), target, ...supplier });
+    const bytes = publicCandidate();
+    await assert.rejects(adapter.authenticate(context({ withCredential: async consume => { await consume(bytes); return { ack: true }; } })), error => {
+      assert.equal(error.failureCategory, category === "PRIVATE_UNTRUSTED_VALUE" ? "unclassified" : category);
+      assert.equal(error.cause, undefined);
+      assert.equal(JSON.stringify(error).includes("PRIVATE_UNTRUSTED_VALUE"), false);
+      return denied(error);
+    });
+    assert.ok(bytes.every(byte => byte === 0));
+    assert.deepEqual(await adapter.abortAndDrain(), { ack: true, drained: true });
+  }
+});
+
+test("credential supplier category survives private-pipe termination without error text", async t => {
+  const adapter = createManagedSupabaseNativeAdapter({ executable: await executable(t, "waiting"), target, ...administrator() });
+  await assert.rejects(adapter.authenticate(context({ withCredential: async () => {
+    throw Object.assign(Error("PRIVATE PROVIDER ERROR"), { failureCategory: "secret_access" });
+  } })), error => denied(error) && error.failureCategory === "secret_access" && !JSON.stringify(error).includes("PRIVATE"));
   assert.deepEqual(await adapter.abortAndDrain(), { ack: true, drained: true });
 });
 
@@ -138,7 +164,7 @@ test("external cancellation and adapter timeout each close private-entry scope",
         if (cause === "external") queueMicrotask(() => controller.abort());
         return new Promise(resolve => signal.addEventListener("abort", () => resolve({ ack: false }), { once: true }));
       } });
-    await assert.rejects(adapter.inspect(context({ signal: controller.signal })), denied);
+    await assert.rejects(adapter.inspect(context({ signal: controller.signal })), error => denied(error) && error.failureCategory === (cause === "timeout" ? "timeout" : "cancelled"));
     assert.ok(entrySignal.aborted);
     const bytes = Buffer.from(publicAdmin);
     await assert.rejects(lateConsume(bytes), denied); bytes.fill(0);

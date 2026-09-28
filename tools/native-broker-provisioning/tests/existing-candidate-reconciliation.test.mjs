@@ -195,7 +195,8 @@ test("deadline cancellation during final fencing cannot interrupt its independen
   assert.equal(result.fenceConfirmed, true);
   assert.deepEqual(f.calls.slice(-2), ["drain", "fence"]);
   const code = readFileSync(new URL("../maintenance.mjs", import.meta.url), "utf8");
-  assert.match(code, /hardTimer = setTimeout\(operation === "reconcile" \? cancel : \(\) => \{/);
+  assert.match(code, /hardTimer = setTimeout\(operation === "reconcile" \? timedOut : \(\) => \{/);
+  assert.match(code, /const timedOut = \(\) => cancellation\.abort\("timeout"\)/);
 });
 test("late secret response is wiped and cannot authenticate after cancellation/fence", async () => {
   const f = fixture({ lateRead: true }), result = await f.run();
@@ -218,4 +219,95 @@ test("managed wiring returns before provisioning store creation and only appends
   const branch = code.slice(start, end);
   assert.ok(start > 0 && end > start); assert.match(branch, /existing_candidate_reconciliation_finished/);
   assert.match(branch, /return;/); assert.doesNotMatch(branch, /coordinator\.run|\.assign\(|addSecretVersion/);
+});
+
+test("fixed proof receipts distinguish source-owned failure stages without exposing errors", async () => {
+  const cases = [
+    ["secret_metadata", "secret_access", f => { f.client.getSecretVersion = async () => { throw Error("PRIVATE PROVIDER RESPONSE"); }; }],
+    ["secret_access", "secret_access", f => { f.client.accessSecretVersion = async () => { throw Error("PRIVATE PAYLOAD"); }; }],
+    ["secret_access", "timeout", f => { f.client.accessSecretVersion = async () => { throw Object.assign(Error("PRIVATE URL"), { failureCategory: "timeout" }); }; }],
+    ["activation", "database_connection", f => { f.native.activate = async () => { throw Object.assign(Error("PRIVATE DSN"), { failureCategory: "database_connection" }); }; }],
+    ["authentication", "database_authentication_unconfirmed", f => { f.native.authenticate = async () => { throw Object.assign(Error("PRIVATE PASSWORD"), { failureCategory: "database_authentication_unconfirmed" }); }; }],
+    ["authentication", "timeout", f => { f.native.authenticate = async () => { throw Object.assign(Error("PRIVATE TIMEOUT"), { failureCategory: "timeout" }); }; }],
+    ["activation", "unclassified", f => { f.native.activate = async () => { throw Object.assign(Error("PRIVATE ERROR"), { failureCategory: "PRIVATE CATEGORY" }); }; }],
+  ];
+  for (const [stage, category, mutate] of cases) {
+    const f = fixture(); mutate(f);
+    const result = await f.run();
+    assert.equal(result.failureStage, stage); assert.equal(result.failureCategory, category);
+    assert.equal(result.outcome, "existing_candidate_reconciliation_uncertain");
+    assert.equal(result.fenceConfirmed, true);
+    assert.equal(JSON.stringify(result).includes("PRIVATE"), false);
+    assert.deepEqual(f.calls.slice(-2), ["drain", "fence"]);
+  }
+});
+
+test("known deadline is timeout, ordinary cancellation is not guessed to be timeout", async () => {
+  for (const reason of [undefined, "timeout"]) {
+    const f = fixture();
+    f.native.activate = async () => { f.controller.abort(reason); return new Promise(() => {}); };
+    const result = await f.run();
+    assert.equal(result.failureStage, "activation");
+    assert.equal(result.failureCategory, reason === "timeout" ? "timeout" : "cancelled");
+    assert.equal(result.fenceConfirmed, true);
+  }
+});
+
+test("only observed candidate identity mismatches receive database_identity", async () => {
+  for (const change of [{ ack: false }, { committed: false }, { authorityClosed: false }, { roleOid: "999" },
+    { sessionUser: "other" }, { target: { ...target, roleOid: "999" } }]) {
+    const f = fixture(), authenticate = f.native.authenticate;
+    f.native.authenticate = async context => ({ ...await authenticate(context), ...change });
+    const result = await f.run();
+    assert.equal(result.failureCategory, "sessionUser" in change || "target" in change ? "database_identity" : "unclassified");
+    assert.equal(result.fenceConfirmed, true);
+    assert.equal(result.candidateAuthenticated, false);
+  }
+});
+
+for (const phase of ["drain", "final_fence"]) {
+  test(`owned ${phase} deadline retains timeout label and never retries cleanup`, async t => {
+    t.mock.timers.enable({ apis: ["setTimeout"] });
+    const f = fixture(); let begin, release;
+    const started = new Promise(resolve => { begin = resolve; });
+    if (phase === "drain") {
+      f.native.abortAndDrain = () => {
+        f.calls.push("drain"); begin();
+        return new Promise(resolve => { release = () => resolve({ ack: true, drained: true }); });
+      };
+    } else {
+      const fence = f.native.fence;
+      f.native.fence = context => {
+        if (!f.calls.includes("drain")) return fence(context);
+        f.calls.push("fence"); begin(); return new Promise(() => {});
+      };
+    }
+    const pending = f.run(); await started;
+    t.mock.timers.tick(phase === "drain" ? 10000 : 30000);
+    await new Promise(resolve => setImmediate(resolve));
+    if (release) release();
+    const result = await pending;
+    assert.equal(result.failureStage, phase); assert.equal(result.failureCategory, "timeout");
+    assert.equal(result.candidateAuthenticated, true);
+    assert.equal(result.fenceConfirmed, phase === "drain");
+    assert.equal(result.outcome, "existing_candidate_reconciliation_uncertain");
+    assert.equal(f.calls.filter(call => call === "drain").length, 1);
+    assert.equal(f.calls.filter(call => call === "fence").length, 2);
+  });
+}
+
+test("a late secret error cannot overwrite the first native failure receipt", async () => {
+  const f = fixture(); let rejectAccess;
+  f.client.accessSecretVersion = () => new Promise((_, reject) => { rejectAccess = reject; });
+  f.native.authenticate = async context => {
+    const pending = context.withCredential(async () => {});
+    pending.catch(() => undefined);
+    throw Object.assign(Error("PRIVATE NATIVE ERROR"), { failureCategory: "database_connection" });
+  };
+  const result = await f.run();
+  rejectAccess(Error("PRIVATE LATE PROVIDER ERROR"));
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(result.failureStage, "authentication");
+  assert.equal(result.failureCategory, "database_connection");
+  assert.equal(result.fenceConfirmed, true);
 });

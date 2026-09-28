@@ -1,7 +1,9 @@
 import https from "node:https";
 import { sandboxProvisioningProfile } from "./sandbox-profile.mjs";
 
-const fail = () => new Error("secret_manager_transport_denied");
+const fail = category => Object.assign(new Error("secret_manager_transport_denied"), {
+  failureCategory: category === "timeout" ? "timeout" : "secret_access",
+});
 const permissions = Object.freeze(["secretmanager.versions.add", "secretmanager.versions.access", "secretmanager.versions.get", "secretmanager.versions.disable"]);
 
 /** Fixed isolated maintenance transport. No redirects, retries, arbitrary URLs,
@@ -40,9 +42,9 @@ export function createPinnedSecretManagerRestClient({ withAccessToken, request =
             const chunks = [];
             const wipe = () => { for (const chunk of chunks) chunk.fill(0); chunks.length = 0; };
             let req, timer;
-            const deny = () => {
+            const deny = category => {
               if (settled) return;
-              settled = true; clearTimeout(timer); wipe(); response?.destroy(); req?.destroy(); reject(fail());
+              settled = true; clearTimeout(timer); wipe(); response?.destroy(); req?.destroy(); reject(fail(category));
             };
             try {
               req = request({ protocol: "https:", hostname: "secretmanager.googleapis.com", port: 443,
@@ -71,7 +73,7 @@ export function createPinnedSecretManagerRestClient({ withAccessToken, request =
                 });
               });
               req.on("error", deny);
-              timer = setTimeout(deny, timeout);
+              timer = setTimeout(() => deny("timeout"), timeout);
               req.end(payload);
             } catch { deny(); }
           });
@@ -79,7 +81,7 @@ export function createPinnedSecretManagerRestClient({ withAccessToken, request =
       });
       if (uses !== 1 || result?.ack !== true || !reply) throw fail();
       return reply;
-    } catch { throw fail(); }
+    } catch (error) { throw fail(error?.failureCategory); }
   }
   return Object.freeze({
     async preflight() {

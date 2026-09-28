@@ -33,6 +33,7 @@ let password, journalFd, lockFd, lockIdentity, native, reservation, store, softT
 const lockPath = `${profile.state}/maintenance.lock`;
 const cancellation = new AbortController();
 const cancel = () => cancellation.abort();
+const timedOut = () => cancellation.abort("timeout");
 process.on("SIGINT", cancel); process.on("SIGTERM", cancel);
 
 function trustedFile(path, maximum, privateFile = false) {
@@ -60,11 +61,11 @@ async function main() {
   const deadline = Number(deadlineText);
   if (operation === "reconcile" && (profile.kind !== "production" || profile.name !== "oauth" || roleOid !== "34220")) throw denied();
   const window = maintenanceWindow(deadline, Date.now());
-  softTimer = setTimeout(cancel, window.softCancelAfterMs);
+  softTimer = setTimeout(operation === "reconcile" ? timedOut : cancel, window.softCancelAfterMs);
   // Reconciliation owns bounded drain/fence cleanup. Its hard deadline cancels
   // work but cannot exit or wipe the administrator input before fencing ends.
   // Other maintenance modes retain their existing deadline behavior.
-  hardTimer = setTimeout(operation === "reconcile" ? cancel : () => {
+  hardTimer = setTimeout(operation === "reconcile" ? timedOut : () => {
     cancel(); void native?.abortAndDrain().catch(() => undefined); password?.fill(0);
     process.stdout.write("native_deadline_interrupted_recovery_required\n"); process.exit(2);
   }, window.hardStopAfterMs);
@@ -156,6 +157,7 @@ async function main() {
     // This proof-only receipt is not a provision/admission receipt.
     append({ kind: "existing_candidate_reconciliation_finished", intent, approvalId, time: Date.now(), ...result });
     finished = true;
+    if (result.failureCategory !== null) process.stdout.write(`native_existing_candidate_failure_${result.failureStage}_${result.failureCategory}\n`);
     process.stdout.write(`native_${result.outcome}\n`);
     if (result.outcome !== "existing_candidate_verified_closed") process.exitCode = 2;
     return;

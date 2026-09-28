@@ -10,6 +10,10 @@ export const existingOAuthCandidate = Object.freeze({
 });
 const pin = existingOAuthCandidate;
 const deny = () => new Error("existing_oauth_candidate_denied");
+const failureCategories = new Set(["secret_access", "database_connection", "database_authentication_unconfirmed", "database_identity", "timeout", "cancelled"]);
+const fixedFailure = (error, fallback = "unclassified") => Object.assign(deny(), {
+  failureCategory: failureCategories.has(error?.failureCategory) ? error.failureCategory : fallback,
+});
 const token = value => typeof value === "string" && /^[a-zA-Z0-9_-]{1,80}$/.test(value);
 const expected = productionProvisioningBuildProfile("oauth").target;
 
@@ -61,13 +65,13 @@ function untilAbort(action, signal) {
       if (done) return;
       done = true; signal.removeEventListener("abort", abort); fn(value);
     };
-    const abort = () => finish(reject, deny());
+    const abort = () => finish(reject, fixedFailure(undefined, signal.reason === "timeout" ? "timeout" : "cancelled"));
     signal.addEventListener("abort", abort, { once: true });
     if (signal.aborted) abort();
     else Promise.resolve().then(() => {
       if (signal.aborted) throw deny();
       return action();
-    }).then(value => finish(resolve, value), () => finish(reject, deny()));
+    }).then(value => finish(resolve, value), error => finish(reject, fixedFailure(error)));
   });
 }
 
@@ -81,7 +85,7 @@ export async function reconcileExistingOAuthCandidate({ native, client, target, 
       !(signal instanceof AbortSignal) || typeof record !== "function" ||
       ["inspect", "fence", "activate", "authenticate", "abortAndDrain"].some(k => typeof native?.[k] !== "function") ||
       typeof client?.getSecretVersion !== "function" || typeof client?.accessSecretVersion !== "function") throw deny();
-  const controller = new AbortController(), cancel = () => controller.abort();
+  const controller = new AbortController(), cancel = () => controller.abort(signal.reason);
   signal.addEventListener("abort", cancel, { once: true });
   if (signal.aborted) cancel();
   const context = Object.freeze({ target, intent, approvalId, signal: controller.signal });
@@ -91,33 +95,50 @@ export async function reconcileExistingOAuthCandidate({ native, client, target, 
   const step = action => untilAbort(action, controller.signal);
   const codec = createPinnedSupabaseDsnCodec(target);
   let attempted = false, matched = false, fenced = false, failed = false, reads = 0, consumed = false;
+  let failureStage = null, failureCategory = null;
+  const failure = (stage, error, fallback = "unclassified") => {
+    // Latch the first source-owned category. Never persist an error, provider
+    // response or shared mutable 'current phase' from concurrent native/HTTP I/O.
+    if (failureStage === null) {
+      failureStage = stage;
+      failureCategory = fixedFailure(error, fallback).failureCategory;
+    }
+  };
+  const at = async (stage, action, fallback) => {
+    try { return await step(action); }
+    catch (error) { failure(stage, error, fallback); throw error; }
+  };
   let payload, candidate;
   try {
-    await step(() => record("started")); check();
+    await at("receipt", () => record("started")); check();
     attempted = true;
-    if (!receipt(await step(() => native.inspect(context)))) throw deny();
-    if (!fenceReceipt(await step(() => native.fence(context)))) throw deny();
-    checkExistingCandidateMetadata(await step(() => client.getSecretVersion({ name: pin.versionName }, { timeout: 4000, retry: null })));
-    await step(() => record("authentication_started")); check();
-    if (!receipt(await step(async () => {
+    await at("inspection", async () => { if (!receipt(await native.inspect(context))) throw deny(); });
+    await at("initial_fence", async () => { if (!fenceReceipt(await native.fence(context))) throw deny(); });
+    await at("secret_metadata", async () => checkExistingCandidateMetadata(await client.getSecretVersion({ name: pin.versionName }, { timeout: 4000, retry: null })), "secret_access");
+    await at("receipt", () => record("authentication_started")); check();
+    await at("activation", async () => {
       const r = await native.activate(context);
-      if (r?.noLogin !== false) throw deny();
-      return r;
-    }))) throw deny();
-    const auth = await step(() => native.authenticate({ ...context, withCredential: async consume => {
+      if (!receipt(r) || r.noLogin !== false) throw deny();
+    });
+    const auth = await at("authentication", () => native.authenticate({ ...context, withCredential: async consume => {
       check();
       if (++reads !== 1 || typeof consume !== "function") throw deny();
       let reply;
       try {
         // Read once, by immutable numeric version. Late responses are wiped and
         // checked for cancellation before any native private pipe receives data.
-        reply = await client.accessSecretVersion({ name: pin.versionName }, { timeout: 4000, retry: null });
-        payload = reply?.payload?.data;
-        check();
-        const checksum = reply?.payload?.dataCrc32c;
-        if (reply?.name !== pin.versionName || !Buffer.isBuffer(payload) || payload.buffer instanceof SharedArrayBuffer ||
-            payload.length > 8192 || !/^(0|[1-9][0-9]{0,9})$/.test(String(checksum)) || Number(checksum) !== crc32c(payload)) throw deny();
-        candidate = codec.decode(payload); check();
+        try {
+          reply = await client.accessSecretVersion({ name: pin.versionName }, { timeout: 4000, retry: null });
+          payload = reply?.payload?.data;
+          check();
+          const checksum = reply?.payload?.dataCrc32c;
+          if (reply?.name !== pin.versionName || !Buffer.isBuffer(payload) || payload.buffer instanceof SharedArrayBuffer ||
+              payload.length > 8192 || !/^(0|[1-9][0-9]{0,9})$/.test(String(checksum)) || Number(checksum) !== crc32c(payload)) throw deny();
+          candidate = codec.decode(payload); check();
+        } catch (error) {
+          const sanitized = fixedFailure(error, controller.signal.aborted ? (controller.signal.reason === "timeout" ? "timeout" : "cancelled") : "secret_access");
+          failure("secret_access", sanitized); throw sanitized;
+        }
         await consume(candidate); check(); consumed = true;
         return { ack: true };
       } finally {
@@ -127,10 +148,13 @@ export async function reconcileExistingOAuthCandidate({ native, client, target, 
       }
     } }));
     check();
-    if (!receipt(auth) || auth.sessionUser !== expected.role || !exactTarget(auth.target) || reads !== 1 || !consumed) throw deny();
+    if (!receipt(auth) || reads !== 1 || !consumed) throw deny();
+    if (auth.sessionUser !== expected.role || !exactTarget(auth.target)) {
+      failure("authentication", undefined, "database_identity"); throw deny();
+    }
     matched = true;
-    await step(() => record("candidate_authenticated"));
-  } catch { failed = true; }
+    await at("receipt", () => record("candidate_authenticated"));
+  } catch (error) { failed = true; failure("proof", error); }
   finally {
     controller.abort(); candidate?.fill(0); if (payload instanceof Uint8Array) payload.fill(0);
     if (attempted) {
@@ -138,26 +162,28 @@ export async function reconcileExistingOAuthCandidate({ native, client, target, 
       // Keep the original reaping barrier even if its acknowledgement is late:
       // the adapter refuses fencing while a worker is still active. Maintenance
       // already waits for reaping before releasing its password and lock.
-      const drain = new AbortController(), drainTimer = setTimeout(() => drain.abort(), 10000);
+      const drain = new AbortController(), drainTimer = setTimeout(() => drain.abort("timeout"), 10000);
       const draining = Promise.resolve().then(() => native.abortAndDrain());
       try {
         const drained = await untilAbort(() => draining, drain.signal);
         if (drained?.ack !== true || drained.drained !== true) throw deny();
-      } catch { failed = true; }
+      } catch (error) { failed = true; failure("drain", error); }
       finally { clearTimeout(drainTimer); }
       // No second drain or fence retry. Do not spend the only fence on an active
       // worker, then merely reap it in maintenance's outer finally without one.
-      try { await draining; } catch { failed = true; }
-      const cleanup = new AbortController(), timer = setTimeout(() => cleanup.abort(), 30000);
+      try { await draining; } catch (error) { failed = true; failure("drain", error); }
+      const cleanup = new AbortController(), timer = setTimeout(() => cleanup.abort("timeout"), 30000);
       try {
         fenced = fenceReceipt(await untilAbort(() => native.fence({ ...context, signal: cleanup.signal }), cleanup.signal));
-      } catch { fenced = false; }
+      } catch (error) { fenced = false; failure("final_fence", error); }
       finally { clearTimeout(timer); }
-      try { await record(fenced ? "fenced" : "fence_uncertain"); } catch { failed = true; }
+      if (!fenced) failure("final_fence");
+      try { await record(fenced ? "fenced" : "fence_uncertain"); } catch (error) { failed = true; failure("receipt", error); }
     }
     signal.removeEventListener("abort", cancel);
   }
   return Object.freeze({ outcome: !failed && matched && fenced ? "existing_candidate_verified_closed" : "existing_candidate_reconciliation_uncertain",
+    failureStage, failureCategory,
     priorIntent: pin.priorIntent, roleOid: pin.roleOid, versionName: pin.versionName,
     candidateAuthenticated: matched, fenceConfirmed: fenced, originalDatabaseCommit: "uncertain", credentialPublished: false });
 }

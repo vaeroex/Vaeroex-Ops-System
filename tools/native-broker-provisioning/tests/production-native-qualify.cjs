@@ -2,6 +2,7 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- Offline native qualification CLI. */
 const fs = require("node:fs");
 const path = require("node:path");
+const net = require("node:net");
 const { pathToFileURL } = require("node:url");
 const { spawnSync } = require("node:child_process");
 if (process.argv.length !== 2) { process.stdout.write('{"outcome":"remote_inputs_rejected"}\n'); process.exit(2); }
@@ -330,6 +331,65 @@ async function main() {
       !readback.rolcreaterole && readback.memberships === 1 && readback.mapped && readback.membership_fenced && readback.authority_rpc && !readback.fenced_rpc &&
       readback.capability_members === 1 && !readback.business_read && readback.sessions === 0,
       `${profile.name}_exact_closed_authority_with_target_membership`);
+  }
+  stage = "oauth_fixed_failure_receipts";
+  const receiptProfile = profiles.find(profile => profile.name === "oauth");
+  const receiptTarget = Object.freeze({ ...makeTarget(receiptProfile), roleOid: (await fixture.control.query(
+    "SELECT oid::text value FROM pg_roles WHERE rolname=$1", [receiptProfile.role])).rows[0].value });
+  const receiptNative = adapterModule.createLocalSyntheticProductionNativeAdapter({
+    executable: binaries.get(receiptProfile.name), target: receiptTarget,
+  });
+  const receiptContext = { target: receiptTarget, intent: "oauth-fixed-receipt",
+    approvalId: "synthetic-production", signal: new AbortController().signal };
+  const withCandidate = candidate => async consume => {
+    await consume(candidate); return { ack: true };
+  };
+  await receiptNative.activate(receiptContext);
+  try {
+    const correct = Buffer.from(candidates.get(receiptProfile.name));
+    const authenticated = await receiptNative.authenticate({ ...receiptContext, withCredential: withCandidate(correct) });
+    check(authenticated.ack && correct.every(byte => byte === 0), "oauth_fixed_receipt_correct_candidate_authenticates_and_wipes");
+    const incorrect = Buffer.from(candidates.get(receiptProfile.name));
+    incorrect[0] = incorrect[0] === 97 ? 98 : 97;
+    let rejected;
+    try { await receiptNative.authenticate({ ...receiptContext, withCredential: withCandidate(incorrect) }); }
+    catch (error) { rejected = error; }
+    check(rejected?.message === "local_synthetic_native_operation_failed" &&
+      rejected.failureCategory === "database_authentication_unconfirmed" && rejected.cause === undefined,
+    "oauth_fixed_receipt_wrong_candidate_reports_password_exchange_unconfirmed");
+    check(incorrect.every(byte => byte === 0), "oauth_fixed_receipt_wrong_candidate_wiped");
+  } finally {
+    await receiptNative.abortAndDrain();
+    const fenced = await receiptNative.fence(receiptContext);
+    check(fenced.ack && fenced.noLogin && fenced.sessionsTerminated, "oauth_fixed_receipt_failures_finish_fenced");
+  }
+  // Only loopback sockets created by this test receive these connection probes.
+  // Immediate close proves connection failure; a silent socket lets the adapter's
+  // own deadline prove timeout without interpreting libpq diagnostic text.
+  for (const mode of ["closed", "timeout"]) {
+    const sockets = new Set();
+    const server = net.createServer(socket => {
+      sockets.add(socket); socket.on("error", () => undefined);
+      socket.on("close", () => sockets.delete(socket));
+      if (mode === "closed") socket.destroy();
+    });
+    await new Promise((resolve, reject) => { server.once("error", reject); server.listen(0, "127.0.0.1", resolve); });
+    const unavailableTarget = Object.freeze({ ...receiptTarget, port: server.address().port });
+    const unavailableNative = adapterModule.createLocalSyntheticProductionNativeAdapter({
+      executable: binaries.get(receiptProfile.name), target: unavailableTarget, timeoutMs: mode === "timeout" ? 100 : 10000,
+    });
+    try {
+      let rejected;
+      try { await unavailableNative.activate({ ...receiptContext, target: unavailableTarget }); }
+      catch (error) { rejected = error; }
+      check(rejected?.message === "local_synthetic_native_operation_failed" && rejected.cause === undefined &&
+        rejected.failureCategory === (mode === "timeout" ? "timeout" : "database_connection"),
+      `oauth_fixed_receipt_${mode}_connection_category`);
+    } finally {
+      await unavailableNative.abortAndDrain();
+      for (const socket of sockets) socket.destroy();
+      await new Promise(resolve => server.close(resolve));
+    }
   }
   // An ordinary LOGIN may set its own global and per-database defaults. Those
   // target-controlled rows must not prevent the native compensating fence from
