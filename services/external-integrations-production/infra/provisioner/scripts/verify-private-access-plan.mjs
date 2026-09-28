@@ -48,7 +48,7 @@ function proofTuple(value) {
   return privateAccessMode(value?.access_mode) === OAUTH_PROOF_MODE ? { accessMode: OAUTH_PROOF_MODE } : {};
 }
 
-function verifyProofRole(plan, required) {
+function verifyProofRole(plan, required, allowCreate) {
   const roles = plan.resource_changes.filter(change => change.address === "google_project_iam_custom_role.oauth_candidate_proof");
   if (roles.length === 0 && !required) return;
   if (roles.length !== 1) reject("private_access_proof_role_contract_mismatch");
@@ -57,7 +57,7 @@ function verifyProofRole(plan, required) {
       value?.role_id !== "squareProductionOAuthCandidateProof" || value?.deleted === true ||
       !Array.isArray(value?.permissions) || !isDeepStrictEqual([...value.permissions].sort(), [...OAUTH_PROOF_PERMISSIONS].sort()) ||
       !(isNoOp(role) && isDeepStrictEqual(role.change.before, value) ||
-        role.change.before === null && isDeepStrictEqual(role.change.actions, ["create"]))) {
+        allowCreate && role.change.before === null && isDeepStrictEqual(role.change.actions, ["create"]))) {
     reject("private_access_proof_role_contract_mismatch");
   }
 }
@@ -319,7 +319,7 @@ export function verifyPrivateAccessPlan(plan) {
   const selectedProof = plan.variables?.oauth_candidate_proof_enabled?.value ?? false;
   if (typeof selectedProof !== "boolean" || selectedProof !== proof ||
       proof && !["closed", "open:oauth"].includes(phase)) reject("private_access_proof_mode_mismatch");
-  verifyProofRole(plan, proof || priorProof);
+  verifyProofRole(plan, proof || priorProof, proof);
 
   if (mutatingGrants.length === 0) {
     if (beforeGrants.length !== afterGrants.length) {
