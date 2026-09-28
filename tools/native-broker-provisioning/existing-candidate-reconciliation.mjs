@@ -135,13 +135,19 @@ export async function reconcileExistingOAuthCandidate({ native, client, target, 
     controller.abort(); candidate?.fill(0); if (payload instanceof Uint8Array) payload.fill(0);
     if (attempted) {
       // A missing drain acknowledgement must not skip the independent fence.
-      // The adapter itself refuses fencing while a worker is still active.
+      // Keep the original reaping barrier even if its acknowledgement is late:
+      // the adapter refuses fencing while a worker is still active. Maintenance
+      // already waits for reaping before releasing its password and lock.
       const drain = new AbortController(), drainTimer = setTimeout(() => drain.abort(), 10000);
+      const draining = Promise.resolve().then(() => native.abortAndDrain());
       try {
-        const drained = await untilAbort(() => native.abortAndDrain(), drain.signal);
+        const drained = await untilAbort(() => draining, drain.signal);
         if (drained?.ack !== true || drained.drained !== true) throw deny();
       } catch { failed = true; }
       finally { clearTimeout(drainTimer); }
+      // No second drain or fence retry. Do not spend the only fence on an active
+      // worker, then merely reap it in maintenance's outer finally without one.
+      try { await draining; } catch { failed = true; }
       const cleanup = new AbortController(), timer = setTimeout(() => cleanup.abort(), 30000);
       try {
         fenced = fenceReceipt(await untilAbort(() => native.fence({ ...context, signal: cleanup.signal }), cleanup.signal));

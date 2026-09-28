@@ -149,19 +149,33 @@ test("missing, negative or rejected drain acknowledgement still attempts an inde
     assert.equal(f.calls.filter(x => x === "activate").length, 1);
   }
 });
-test("drain timeout cannot consume the independent fencing deadline", async t => {
+test("late reaping retains the sole fence until the real adapter active-worker guard permits it", async t => {
   t.mock.timers.enable({ apis: ["setTimeout"] });
   const f = fixture({ lostActivateAck: true });
-  let drainStarted;
+  let drainStarted, reap, active = true;
   const started = new Promise(resolve => { drainStarted = resolve; });
-  f.native.abortAndDrain = () => { f.calls.push("drain"); drainStarted(); return new Promise(() => {}); };
+  const fence = f.native.fence;
+  f.native.fence = async context => {
+    if (f.calls.includes("drain")) assert.equal(active, false, "real adapter rejects fence while worker active");
+    return fence(context);
+  };
+  f.native.abortAndDrain = () => {
+    f.calls.push("drain"); drainStarted();
+    return new Promise(resolve => { reap = () => { active = false; resolve({ ack: true, drained: true }); }; });
+  };
   const pending = f.run();
   await started;
   t.mock.timers.tick(10000);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(f.calls.at(-1), "drain");
+  assert.equal(f.calls.filter(x => x === "fence").length, 1, "no premature final fence");
+  reap();
   const result = await pending;
   assert.deepEqual(f.calls.slice(-2), ["drain", "fence"]);
   assert.equal(result.fenceConfirmed, true);
   assert.equal(result.outcome, "existing_candidate_reconciliation_uncertain");
+  assert.equal(f.calls.filter(x => x === "drain").length, 1);
+  assert.equal(f.calls.filter(x => x === "fence").length, 2, "initial fence and sole final fence");
 });
 test("deadline cancellation during final fencing cannot interrupt its independent signal", async () => {
   const f = fixture();
