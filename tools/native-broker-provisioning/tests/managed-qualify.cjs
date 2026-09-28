@@ -24,7 +24,7 @@ function worker(binary, op, oid, options = {}) {
     "synthetic_managed_intent", String(oid), "synthetic_managed_approval"];
   return new Promise((resolve, reject) => {
     const child = spawn(binary, args, { env: nativeEnv, stdio: ["ignore", "pipe", "pipe", "pipe", "pipe", "pipe", "pipe"] });
-    let output = "", candidate = "", outcome, roleOid, failed = false, ready = false, delivered = false;
+    let output = "", candidate = "", outcome, roleOid, failureCategory, failed = false, ready = false, delivered = false;
     const fail = () => { failed = true; child.kill("SIGKILL"); };
     const timer = setTimeout(fail, 20000);
     child.once("error", fail);
@@ -38,8 +38,10 @@ function worker(binary, op, oid, options = {}) {
         if (line === '{"phase":"ready"}') { if (ready) return fail(); ready = true; continue; }
         const match = /^\{"outcome":"(prepared|assigned|activated|authenticated|fenced|inspected)","committed":true,"role_oid":"([0-9]{1,10})"\}$/.exec(line);
         const denied = /^\{"outcome":"(failed|uncertain|policy_blocked)"\}$/.exec(line);
-        if (outcome || (!match && !denied)) return fail();
-        outcome = match?.[1] ?? denied[1]; roleOid = match?.[2];
+        const classified = (op === "activate" || op === "authenticate") &&
+          /^\{"outcome":"(failed|uncertain)","failure_category":"(database_connection|database_authentication_unconfirmed|database_identity|timeout)"\}$/.exec(line);
+        if (outcome || (!match && !denied && !classified)) return fail();
+        outcome = match?.[1] ?? denied?.[1] ?? classified[1]; roleOid = match?.[2]; failureCategory = classified?.[2];
       }
     });
     child.stdio[4].on("data", bytes => {
@@ -58,7 +60,7 @@ function worker(binary, op, oid, options = {}) {
     child.once("close", (code, signal) => {
       clearTimeout(timer);
       if (failed || signal || output || !outcome) return reject(new Error("fixed_worker_protocol"));
-      resolve({ outcome, roleOid, ready, code, password: candidate.endsWith("\n") ? candidate.slice(0, -1) : null });
+      resolve({ outcome, roleOid, failureCategory, ready, code, password: candidate.endsWith("\n") ? candidate.slice(0, -1) : null });
     });
   });
 }
@@ -191,7 +193,9 @@ GRANT SELECT,UPDATE,DELETE,TRUNCATE ON ALL TABLES IN SCHEMA private TO synthetic
   check(replacement.outcome === "assigned" && replacement.password !== first.password && replacement.password !== uncertain.password, "recovery_generates_unique_replacement_not_replay");
   check((await worker(managed, "activate", oid)).outcome === "activated", "replacement_activation");
   check((await worker(managed, "authenticate", oid, { password: replacement.password })).outcome === "authenticated", "replacement_native_authentication");
-  check((await worker(managed, "authenticate", oid, { password: first.password })).outcome !== "authenticated", "retired_password_rejected");
+  const retired = await worker(managed, "authenticate", oid, { password: first.password });
+  check(retired.outcome !== "authenticated", "retired_password_rejected");
+  check(retired.failureCategory === "database_authentication_unconfirmed", "retired_password_fixed_failure_receipt");
   check((await worker(managed, "fence", oid)).outcome === "fenced", "final_local_role_fenced");
   await lane.end();
   await fixture.stop(); fixture = null;

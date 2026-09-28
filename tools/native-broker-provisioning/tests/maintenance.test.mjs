@@ -2,6 +2,7 @@ import test, { afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { EventEmitter, getEventListeners } from "node:events";
 import { createGceMaintenanceIdentity } from "../maintenance-identity.mjs";
+import { createPinnedSecretManagerRestClient } from "../secret-manager-rest.mjs";
 import { readPrivateAdministrator, releasePrivateAdministratorInput } from "../private-entry.mjs";
 import { sandboxMaintenance as pin, sandboxTarget } from "../sandbox-profile.mjs";
 import { productionDatabaseIdentity, productionProvisioningProfile } from "../production-profile.mjs";
@@ -71,6 +72,29 @@ test("identity construction is inert; verification is fixed native host metadata
   }
   f.chunks.forEach(zero);
   assert.throws(() => createGceMaintenanceIdentity({ request: null }), identityDenied);
+});
+
+test("owned Secret Manager timeout survives the real identity wrapper's error sanitization", async () => {
+  for (const operation of ["getSecretVersion", "accessSecretVersion"]) {
+    const f = identityFixture(); await f.identity.verify();
+    let calls = 0, destroyed = 0;
+    const client = createPinnedSecretManagerRestClient({
+      projectId: pin.projectId, projectNumber: pin.projectNumber, secretParent: pin.secretParent,
+      withAccessToken: f.identity.withAccessToken,
+      request() {
+        calls++; const req = new EventEmitter();
+        req.end = () => {}; req.destroy = () => { destroyed++; };
+        return req;
+      },
+    });
+    await assert.rejects(client[operation]({ name: `${pin.secretParent}/versions/1` }, { timeout: 5 }), error => {
+      assert.equal(error.message, "secret_manager_transport_denied");
+      assert.equal(error.failureCategory, "timeout"); assert.equal(error.cause, undefined);
+      assert.equal(JSON.stringify(error).includes(tokenText), false);
+      return true;
+    });
+    assert.equal(calls, 1); assert.equal(destroyed, 1); f.chunks.forEach(zero);
+  }
 });
 
 for (const path of checks.keys()) {

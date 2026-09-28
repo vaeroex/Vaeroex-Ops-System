@@ -30,7 +30,7 @@ export function createPinnedSecretManagerRestClient({ withAccessToken, request =
   };
   async function call(path, body, timeout = 4000) {
     if (!Number.isInteger(timeout) || timeout < 1 || timeout > 10000) throw fail();
-    let uses = 0, reply;
+    let uses = 0, reply, transportFailureCategory;
     try {
       const result = await withAccessToken(async token => {
         if (++uses !== 1 || !Buffer.isBuffer(token) || token.length < 16 || token.length > 8192 ||
@@ -44,6 +44,9 @@ export function createPinnedSecretManagerRestClient({ withAccessToken, request =
             let req, timer;
             const deny = category => {
               if (settled) return;
+              // The identity wrapper deliberately strips callback errors. Keep
+              // only our own finite label outside that wrapper, never its error.
+              transportFailureCategory = category === "timeout" ? "timeout" : "secret_access";
               settled = true; clearTimeout(timer); wipe(); response?.destroy(); req?.destroy(); reject(fail(category));
             };
             try {
@@ -81,7 +84,7 @@ export function createPinnedSecretManagerRestClient({ withAccessToken, request =
       });
       if (uses !== 1 || result?.ack !== true || !reply) throw fail();
       return reply;
-    } catch (error) { throw fail(error?.failureCategory); }
+    } catch { throw fail(transportFailureCategory); }
   }
   return Object.freeze({
     async preflight() {
