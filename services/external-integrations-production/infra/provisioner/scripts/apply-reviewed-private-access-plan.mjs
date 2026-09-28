@@ -36,6 +36,115 @@ const CLOSED_BOOTSTRAP_LABEL = "private_access_plan_closed_bootstrap_confirmed";
 const PROJECT_ID = "vaeroex-integrations-prod";
 const PROJECT_NUMBER = "711446392261";
 const REVOCATION_PROPAGATION_MS = 10 * 60 * 1000;
+// Only addresses in this root can become receipt labels. Never derive a label
+// from a provider message, path, identifier, expression value or progress hook.
+const FAILURE_RESOURCES = new Map([
+  ["terraform_data.private_access_generation", "generation"],
+  ["time_sleep.private_access_propagation", "pre_open_propagation"],
+  ["data.external.private_access_closed[0]", "pre_open_effective_access"],
+  ["time_sleep.private_access_effective_propagation[0]", "post_open_propagation"],
+  ["data.external.private_access_effective[0]", "post_open_effective_access"],
+  ["terraform_data.private_access_effective_authority[0]", "effective_authority_receipt"],
+  ["data.google_project.current[0]", "project_metadata"],
+  ["google_project_iam_custom_role.private_versions", "role_definition"],
+  ["google_project_iam_custom_role.oauth_candidate_proof", "role_definition"],
+  ...["oauth", "broker", "scheduler", "webhook", "runtime", "evidence"].flatMap(profile => [
+    [`google_secret_manager_secret_iam_member.private_versions["${profile}"]`, "private_grant"],
+    [`data.google_secret_manager_secret_iam_policy.private_versions["${profile}"]`, "direct_policy_check"],
+  ]),
+  ...["google_compute_instance_iam_member.operator_oslogin", "google_iap_tunnel_instance_iam_member.operator_tunnel",
+    "google_service_account_iam_member.operator_oslogin_service_account"].map(address => [`${address}[0]`, "administrative_access"]),
+  ...["iap_ssh", "pooler", "google_api_https", "setup_https"].map(name => [`google_compute_firewall.${name}[0]`, "network_access"]),
+  ...["iap.googleapis.com", "policytroubleshooter.googleapis.com"].map(api => [`google_project_service.administration["${api}"]`, "api_enablement"]),
+].map(([address, stage]) => [address, { stage, resource: address.replace(/[^a-z0-9]+/g, "_").replace(/_$/, "") }]));
+const FAILURE_SUMMARIES = new Map([
+  ["Error acquiring the state lock", "state_lock_acquisition_failed"],
+  ["Error releasing the state lock", "state_lock_release_failed"],
+  ["Failed to load state", "state_read_failed"],
+  ["Failed to save state", "state_write_failed"],
+  ["Failed to persist state to backend", "state_write_failed"],
+  ["Error saving state", "state_write_failed"],
+  ["Saved plan is stale", "saved_plan_stale"],
+  ["Saved plan does not match the given state", "saved_plan_state_mismatch"],
+  ["External Program Execution Failed", "external_program_failed"],
+  ["Unexpected External Program Results", "external_program_result_invalid"],
+  ["Resource precondition failed", "resource_precondition_failed"],
+  ["Plugin did not respond", "provider_unresponsive"],
+  ["Plugin error", "provider_error"],
+  ["Failed to load plugin schemas", "provider_schema_failed"],
+  ["Failed to instantiate provider", "provider_start_failed"],
+  ["Invalid provider configuration", "provider_configuration_invalid"],
+  ["Provider produced inconsistent result after apply", "provider_result_inconsistent"],
+]);
+const VERIFIER_FAILURES = new Set([
+  "policy_troubleshooter_version_enumeration_failed", "policy_troubleshooter_response_invalid",
+  "policy_troubleshooter_tuple_mismatch", "policy_troubleshooter_analysis_incomplete",
+  "policy_troubleshooter_access_mismatch", "policy_troubleshooter_input_invalid",
+  "policy_troubleshooter_window_inactive", "policy_troubleshooter_clock_invalid",
+  "policy_troubleshooter_oauth_candidate_inventory_mismatch", "policy_troubleshooter_matrix_invalid",
+  "policy_troubleshooter_process_failed",
+]);
+const API_FAILURES = new Map([
+  ["400", "api_bad_request"], ["401", "api_unauthenticated"], ["403", "api_permission_denied"],
+  ["404", "api_not_found"], ["409", "api_conflict"], ["412", "api_precondition_failed"],
+  ["429", "api_rate_limited"], ["500", "api_server_error"], ["502", "api_server_error"],
+  ["503", "api_unavailable"], ["504", "api_timeout"],
+]);
+
+function terraformFailureLabels(applied) {
+  const labels = [], seen = new Set();
+  let supported = false, invalid = false, found = false;
+  const add = (resource, diagnostic) => {
+    const group = [
+      `private_access_terraform_failure_stage_${resource?.stage ?? "unknown"}`,
+      `private_access_terraform_failure_resource_${resource?.resource ?? "unknown"}`,
+      `private_access_terraform_failure_diagnostic_${diagnostic}`,
+    ];
+    // Keep each diagnostic paired with its resource, even when stages repeat.
+    const key = group.join("\n");
+    if (!seen.has(key)) { seen.add(key); labels.push(...group); }
+  };
+  try {
+    for (const output of [applied?.stdout, applied?.stderr]) {
+      if (!Buffer.isBuffer(output) && typeof output !== "string") continue;
+      for (const line of output.toString("utf8").split("\n")) {
+        if (!line.trim()) continue;
+        // Output is already bounded by the child buffer. Do not parse large
+        // values/snippets, and never copy any portion of them into a receipt.
+        if (line.length > 256 * 1024) { invalid = true; continue; }
+        let event;
+        try { event = JSON.parse(line); } catch { invalid = true; continue; }
+        if (event?.["@module"] !== "terraform.ui") continue;
+        if (event.type === "version") {
+          supported = typeof event.ui === "string" && /^1\.[0-9]+$/.test(event.ui);
+          if (!supported) invalid = true;
+          continue;
+        }
+        if (event.type !== "diagnostic" || event.diagnostic?.severity !== "error") continue;
+        if (!supported) { invalid = true; continue; }
+        const diagnostic = event.diagnostic;
+        const resource = FAILURE_RESOURCES.get(diagnostic.address);
+        let category = FAILURE_SUMMARIES.get(diagnostic.summary) ?? "unknown";
+        const detail = typeof diagnostic.detail === "string" ? diagnostic.detail : "";
+        if (category === "external_program_failed" &&
+            ["pre_open_effective_access", "post_open_effective_access"].includes(resource?.stage)) {
+          const fixed = detail.match(/(?:^|\n)(?:Error Message: *)?(policy_troubleshooter_[a-z_]+)(?:\r?\n|$)/)?.[1];
+          if (VERIFIER_FAILURES.has(fixed)) category = fixed;
+        }
+        const code = `${typeof diagnostic.summary === "string" ? diagnostic.summary : ""}\n${detail}`
+          .match(/\bgoogleapi: Error (400|401|403|404|409|412|429|500|502|503|504)(?:[,\s:]|$)/)?.[1];
+        const apiCategory = API_FAILURES.get(code);
+        add(resource, category === "unknown" ? apiCategory ?? "unknown" : category);
+        // A known Terraform summary must not hide a recognized API cause.
+        if (apiCategory && category !== "unknown") add(resource, apiCategory);
+        found = true;
+      }
+    }
+  } catch { invalid = true; }
+  if (!found) add(null, applied?.error ? "child_process_error" : invalid ? "machine_output_invalid" : "unknown");
+  else if (invalid) labels.push("private_access_terraform_failure_diagnostic_machine_output_invalid");
+  return labels;
+}
 
 function reject(label) {
   const error = new Error(label);
@@ -203,7 +312,7 @@ export function applyReviewedPrivateAccessPlan(planPath, reviewedSha256, options
 
     options.onProgress?.("private_access_terraform_apply_started");
     if (receiptFailed) reject("private_access_receipt_failed_before_apply");
-    const applied = runTerraform(["apply", "-input=false", immutableCopy], {
+    const applied = runTerraform(["apply", "-input=false", "-json", immutableCopy], {
       cwd,
       env: terraformEnvironment,
       input: undefined,
@@ -218,6 +327,9 @@ export function applyReviewedPrivateAccessPlan(planPath, reviewedSha256, options
       successful: !applied?.error && applied?.status === 0,
     });
     if (applied?.error || applied?.status !== 0) {
+      // Persist only finite fixed labels before recovery. Receipt I/O failure
+      // is guarded by onProgress and cannot skip reconciliation or its wait.
+      for (const label of terraformFailureLabels(applied)) options.onProgress?.(label);
       const failedTransition = opening ?? closing;
       if (failedTransition) {
         try {
