@@ -33,6 +33,7 @@
  * used by the provisioner. Keep this fixed diagnostic lookup available there
  * too; it returns only a SQLSTATE category, never the provider error text. */
 extern char *PQresultErrorField(const PGresult *, int);
+extern int PQconnectionUsedPassword(const PGconn *);
 #ifdef __linux__
 #include <sys/prctl.h>
 #include <sys/random.h>
@@ -172,6 +173,15 @@ static bool sensitive_started = false;
 static bool transaction = false;
 static bool last_query_error = false;
 static const char *last_query_error_category = "none";
+static const char *proof_failure_category = NULL;
+
+static const char *connection_failure_category(const PGconn *connection) {
+  /* This public libpq predicate proves only that the server demanded password
+   * authentication. Transport loss after that exchange is still possible; this
+   * receipt never asserts an incorrect password or an authentication rejection. */
+  return connection && PQconnectionUsedPassword(connection)
+    ? "database_authentication_unconfirmed" : "database_connection";
+}
 
 static void wipe(void *p, size_t n) {
   volatile unsigned char *v = p;
@@ -1869,6 +1879,7 @@ static int run(int argc, char **argv) {
   const char *op = argv[1], *host = argv[2], *port = argv[3], *database = argv[4], *admin = argv[5];
   const char *target = argv[6], *capability = argv[7], *system_id = argv[8], *db_oid = argv[9];
   const char *certificate = argv[10], *intent = argv[11], *role_oid = argv[12], *approval = argv[13];
+  const bool proof_operation = !strcmp(op,"activate") || !strcmp(op,"authenticate");
   if (strcmp(op,"inspect") && strcmp(op,"prepare") && strcmp(op,"fence") && strcmp(op,"assign") && strcmp(op,"activate") && strcmp(op,"authenticate")
 #ifdef VAEROEX_SYNTHETIC_ONLY
       && strcmp(op,"diagnose")
@@ -1904,6 +1915,8 @@ static int run(int argc, char **argv) {
 #endif
       NULL};
     db = PQconnectdbParams(keywords,values,0);
+    if (proof_operation && (!db || PQstatus(db)!=CONNECTION_OK))
+      proof_failure_category=connection_failure_category(db);
 #ifdef VAEROEX_PRODUCTION_PROFILE
     /* Fence alone receives a second independently authenticated administrator
      * session.  It is used only to terminate exact-target sessions while the
@@ -2120,6 +2133,8 @@ static int run(int argc, char **argv) {
         const char *vals[]={host,port,database,transport_user(target,true),password,"/dev/null/vaeroex-no-passfile",host[0]=='/'?"disable":"verify-full",
           host[0]=='/'?NULL:certificate,"5","vaeroex-native-authentication","","disable","disable","scram-sha-256",NULL};
         candidate=PQconnectdbParams(keys,vals,0);
+        if (!candidate || PQstatus(candidate)!=CONNECTION_OK)
+          proof_failure_category=connection_failure_category(candidate);
         ok=candidate && PQstatus(candidate)==CONNECTION_OK && !stopped();
       }
       wipe(password,sizeof(password));
@@ -2131,6 +2146,7 @@ static int run(int argc, char **argv) {
         const char *values[]={target,role_oid};
         ok=candidate_identity(host,database,target,system_id,db_oid,role_oid) && true_query(
           "SELECT session_user::text=$1 AND (SELECT oid::text FROM pg_roles WHERE rolname=session_user)=$2",2,values);
+        if (!ok && !stopped()) proof_failure_category="database_identity";
         db=admin_connection;
         atomic_store(&watched_socket,PQsocket(db));
       }
@@ -2166,7 +2182,10 @@ static int run(int argc, char **argv) {
   wipe(password,sizeof(password));
   munlock(password,sizeof(password));
   munlock(admin_password,sizeof(admin_password));
-  if (!ok) return (sensitive_started || commit_attempted) ? 3 : 2;
+  if (!ok) {
+    if (proof_operation && atomic_load(&expired)) proof_failure_category="timeout";
+    return (sensitive_started || commit_attempted) ? 3 : 2;
+  }
   const char *outcome=!strcmp(op,"assign")?"assigned":!strcmp(op,"prepare")?"prepared":!strcmp(op,"fence")?"fenced":
     !strcmp(op,"activate")?"activated":!strcmp(op,"authenticate")?"authenticated":"inspected";
   printf("{\"outcome\":\"%s\",\"committed\":true,\"role_oid\":\"%s\"}\n",outcome,resolved_oid);
@@ -2195,8 +2214,10 @@ int main(int argc, char **argv) {
   atomic_store(&watched_control_socket,-1);
   if (control_db) PQfinish(control_db);
   if (db) PQfinish(db);
-  if (result==2) puts("{\"outcome\":\"failed\"}");
-  if (result==3) puts("{\"outcome\":\"uncertain\"}");
+  if ((result==2 || result==3) && proof_failure_category)
+    printf("{\"outcome\":\"%s\",\"failure_category\":\"%s\"}\n",result==2?"failed":"uncertain",proof_failure_category);
+  else if (result==2) puts("{\"outcome\":\"failed\"}");
+  else if (result==3) puts("{\"outcome\":\"uncertain\"}");
   return result;
 #endif
 }

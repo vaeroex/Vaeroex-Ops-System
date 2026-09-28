@@ -19,7 +19,9 @@ Do not run the existing `create`, `recover`, `rotate`, or `admit` command for it
 
 The existing `recover` path is deliberately unchanged: it makes a fresh
 credential. The new `reconcile` path returns before constructing that coordinator
-or its mutating secret store. The native C database worker is unchanged.
+or its mutating secret store. The native C database worker's proof operations add
+only finite failure receipts; database authorization, mutation and fencing are
+unchanged.
 
 ## Before a live verification decision
 
@@ -70,6 +72,11 @@ it does not set `unresolvedSecretVersions=false` or declare the old commit known
 The last journal record must remain the exact uncertain `assign_and_commit`
 result, with one start and one finish for the retired intent. Any new journal
 record or reused intent blocks replay. Existing exclusive locking is preserved.
+
+The retained September 28 proof appended reconciliation records. Its journal
+therefore no longer meets this original last-record admission rule. Fixed-label
+diagnostics do **not** authorize or enable another proof: preserve those records
+and obtain a separately reviewed admission decision before any new live plan.
 
 The reviewed command shape (not a current runnable handoff) is:
 
@@ -123,6 +130,24 @@ or create version 2. A failed authentication is not proof of password mismatch
 without its own conclusive classification. Completing a demonstrated mismatch
 with that same credential would require separately reviewed native functionality
 and explicit authorization; it is not implemented here.
+
+### Fixed failure evidence
+
+On failure, the journal and Terminal may additionally report one finite
+`failureStage`/`failureCategory` pair. Stages distinguish activation, secret
+metadata/payload access, authentication and final recovery. Categories are
+`secret_access`, `database_connection`, `database_authentication_unconfirmed`,
+`database_identity`, `timeout`, `cancelled`, or `unclassified`. Only the first
+observed failure is retained; late parallel errors cannot replace it. No raw
+provider/native error, URL, connection string, credential or query is recorded.
+
+`database_authentication_unconfirmed` means libpq observed a password exchange
+but did not establish the connection. It does **not** establish a bad password;
+transport failure during that exchange is also possible. `database_identity`
+covers the candidate-session identity check, not every administrator/catalog
+preflight. `timeout` requires an owned deadline; unknown failures remain
+`unclassified`. The old `authentication_started` record preceded activation and
+cannot retrospectively distinguish any of these failure categories.
 
 ## Mandatory final readback
 

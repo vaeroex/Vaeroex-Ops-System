@@ -1,7 +1,9 @@
 import https from "node:https";
 import { sandboxProvisioningProfile } from "./sandbox-profile.mjs";
 
-const fail = () => new Error("secret_manager_transport_denied");
+const fail = category => Object.assign(new Error("secret_manager_transport_denied"), {
+  failureCategory: category === "timeout" ? "timeout" : "secret_access",
+});
 const permissions = Object.freeze(["secretmanager.versions.add", "secretmanager.versions.access", "secretmanager.versions.get", "secretmanager.versions.disable"]);
 
 /** Fixed isolated maintenance transport. No redirects, retries, arbitrary URLs,
@@ -28,7 +30,7 @@ export function createPinnedSecretManagerRestClient({ withAccessToken, request =
   };
   async function call(path, body, timeout = 4000) {
     if (!Number.isInteger(timeout) || timeout < 1 || timeout > 10000) throw fail();
-    let uses = 0, reply;
+    let uses = 0, reply, transportFailureCategory;
     try {
       const result = await withAccessToken(async token => {
         if (++uses !== 1 || !Buffer.isBuffer(token) || token.length < 16 || token.length > 8192 ||
@@ -40,9 +42,12 @@ export function createPinnedSecretManagerRestClient({ withAccessToken, request =
             const chunks = [];
             const wipe = () => { for (const chunk of chunks) chunk.fill(0); chunks.length = 0; };
             let req, timer;
-            const deny = () => {
+            const deny = category => {
               if (settled) return;
-              settled = true; clearTimeout(timer); wipe(); response?.destroy(); req?.destroy(); reject(fail());
+              // The identity wrapper deliberately strips callback errors. Keep
+              // only our own finite label outside that wrapper, never its error.
+              transportFailureCategory = category === "timeout" ? "timeout" : "secret_access";
+              settled = true; clearTimeout(timer); wipe(); response?.destroy(); req?.destroy(); reject(fail(category));
             };
             try {
               req = request({ protocol: "https:", hostname: "secretmanager.googleapis.com", port: 443,
@@ -71,7 +76,7 @@ export function createPinnedSecretManagerRestClient({ withAccessToken, request =
                 });
               });
               req.on("error", deny);
-              timer = setTimeout(deny, timeout);
+              timer = setTimeout(() => deny("timeout"), timeout);
               req.end(payload);
             } catch { deny(); }
           });
@@ -79,7 +84,7 @@ export function createPinnedSecretManagerRestClient({ withAccessToken, request =
       });
       if (uses !== 1 || result?.ack !== true || !reply) throw fail();
       return reply;
-    } catch { throw fail(); }
+    } catch { throw fail(transportFailureCategory); }
   }
   return Object.freeze({
     async preflight() {

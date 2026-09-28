@@ -164,13 +164,26 @@ test("no retry, redirect following or raw provider error propagation", async () 
 
 test("timeout is bounded, closes request and never retries", async () => {
   const f = fixture({ mode: "timeout" });
-  await assert.rejects(f.client.getSecretVersion({ name }, { timeout: 5 }), failure);
+  await assert.rejects(f.client.getSecretVersion({ name }, { timeout: 5 }), error => failure(error) && error.failureCategory === "timeout");
   assert.equal(f.calls.length, 1); assert.equal(f.calls[0].req.destroyed, true);
   const fresh = fixture();
   for (const timeout of [0, -1, 10001, NaN, "5"]) {
     await assert.rejects(fresh.client.getSecretVersion({ name }, { timeout }), failure);
   }
   assert.equal(fresh.calls.length, 0);
+});
+
+test("non-timeout provider errors carry only the fixed secret-access category", async () => {
+  for (const setup of [{ status: 403 }, { mode: "request_error" }, { mode: "response_error" }]) {
+    const f = fixture(setup);
+    await assert.rejects(f.client.accessSecretVersion({ name }), error => {
+      assert.equal(error.failureCategory, "secret_access");
+      assert.equal(error.cause, undefined);
+      assert.equal(JSON.stringify(error).includes(publicSecret), false);
+      return failure(error);
+    });
+    assert.equal(f.calls.length, 1);
+  }
 });
 
 test("malformed JSON, oversized bodies and excessive fragments fail sanitized and wipe chunks", async () => {
