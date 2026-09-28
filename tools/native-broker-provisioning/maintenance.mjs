@@ -53,11 +53,12 @@ async function main() {
   const [operation, roleOid, intent, approvalId, deadlineText] = process.argv.slice(2);
   if (process.argv.length !== 7 || process.execArgv.length || process.platform !== "linux" || process.getuid() !== 0 ||
       fileURLToPath(import.meta.url) !== `${install}/maintenance.mjs` ||
-      !["create", "rotate", "recover", "admit"].includes(operation) || !/^(0|[1-9][0-9]{0,9})$/.test(roleOid ?? "") ||
+      !["create", "rotate", "recover", "admit", "reconcile"].includes(operation) || !/^(0|[1-9][0-9]{0,9})$/.test(roleOid ?? "") ||
       operation === "create" && roleOid !== "0" || operation !== "create" && roleOid === "0" ||
       ![intent, approvalId].every(x => /^[a-zA-Z0-9_-]{1,80}$/.test(x ?? "")) || !/^[1-9][0-9]{12}$/.test(deadlineText ?? "") ||
       Object.keys(process.env).some(k => /^(NODE_|PG|LD_|DYLD_|MALLOC|LIBPQ)/.test(k))) throw denied();
   const deadline = Number(deadlineText);
+  if (operation === "reconcile" && (profile.kind !== "production" || profile.name !== "oauth" || roleOid !== "34220")) throw denied();
   const window = maintenanceWindow(deadline, Date.now());
   softTimer = setTimeout(cancel, window.softCancelAfterMs);
   hardTimer = setTimeout(() => {
@@ -74,7 +75,8 @@ async function main() {
   lockFd = openSync(lockPath, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600);
   lockIdentity = fstatSync(lockFd);
   writeSync(lockFd, JSON.stringify({ pid: process.pid, intent, time: Date.now() }) + "\n"); fsyncSync(lockFd);
-  const prior = readFileSync(journal, "utf8").trim().split("\n").filter(Boolean).map(line => JSON.parse(line));
+  const journalBytes = readFileSync(journal);
+  const prior = journalBytes.toString("utf8").trim().split("\n").filter(Boolean).map(line => JSON.parse(line));
   if (prior.some(e => e.intent === intent)) throw denied();
   const last = prior.at(-1);
   // Existing Sandbox installations never load or expose this Production lane.
@@ -83,10 +85,17 @@ async function main() {
   if (operation === "admit" && !admission) throw denied();
   const admissionVersion = admission ? admission.serviceAdmissionReceipt({ profile, last, roleOid,
     secretParent: pin.secretParent.replace(`projects/${pin.projectId}/`, `projects/${pin.projectNumber}/`) }) : undefined;
+  const reconciliation = operation === "reconcile" ? await import("./existing-candidate-reconciliation.mjs") : undefined;
   // No process restart silently forgets an interrupted/uncertain invocation.
   // Recovery requires independent exact-role/version reconciliation recorded by
   // the operator in the runbook, not a successful-looking audit event.
-  if (operation !== "admit" && requiresClearance(last, operation)) {
+  if (reconciliation) {
+    const clearancePath = `${profile.state}/recovery-clearance.json`;
+    trustedFile(clearancePath, 4096, true);
+    clearanceExpiry = reconciliation.checkExistingCandidateClearance({ profile, prior, roleOid, intent, approvalId,
+      journalSha256: createHash("sha256").update(journalBytes).digest("hex"),
+      clearance: JSON.parse(readFileSync(clearancePath, "utf8")), now: Date.now() });
+  } else if (operation !== "admit" && requiresClearance(last, operation)) {
     const clearancePath = `${profile.state}/recovery-clearance.json`;
     trustedFile(clearancePath, 4096, true);
     const clearance = JSON.parse(readFileSync(clearancePath, "utf8"));
@@ -99,7 +108,12 @@ async function main() {
   const client = createPinnedSecretManagerRestClient({ withAccessToken: identity.withAccessToken,
     secretParent: pin.secretParent, projectId: pin.projectId, projectNumber: pin.projectNumber });
   let notify;
-  if (operation === "admit") {
+  if (reconciliation) {
+    const hangup = (await import("./service-admission.mjs")).admissionHangup(cancel);
+    process.stdout.on("error", cancel);
+    releaseHangup = () => { hangup(); process.stdout.removeListener("error", cancel); };
+    reconciliation.checkExistingCandidateMetadata(await client.getSecretVersion({ name: reconciliation.existingOAuthCandidate.versionName }));
+  } else if (operation === "admit") {
     releaseHangup = admission.admissionHangup(cancel);
     notify = admission.admissionOutput(process.stdout, cancel);
     const version = await client.getSecretVersion({ name: admissionVersion });
@@ -129,6 +143,20 @@ async function main() {
   native = profile.kind === "production"
     ? createManagedProductionNativeAdapter({ ...adapterOptions, profileName: profile.name })
     : createManagedSupabaseNativeAdapter(adapterOptions);
+  if (reconciliation) {
+    const result = await reconciliation.reconcileExistingOAuthCandidate({ native, client, target, intent, approvalId,
+      signal: cancellation.signal,
+      record: async stage => append({ kind: "existing_candidate_reconciliation", stage, intent, approvalId,
+        priorIntent: reconciliation.existingOAuthCandidate.priorIntent, roleOid,
+        versionName: reconciliation.existingOAuthCandidate.versionName, time: Date.now() }) });
+    // New evidence is appended, never substituted for the old uncertain record.
+    // This proof-only receipt is not a provision/admission receipt.
+    append({ kind: "existing_candidate_reconciliation_finished", intent, approvalId, time: Date.now(), ...result });
+    finished = true;
+    process.stdout.write(`native_${result.outcome}\n`);
+    if (result.outcome !== "existing_candidate_verified_closed") process.exitCode = 2;
+    return;
+  }
   if (operation === "admit") {
     // Existing soft cancellation starts a minute before the unchanged hard stop.
     // Admission fencing has its own 30-second bound; no ACK means reconciliation.
