@@ -9,6 +9,7 @@ import {
   readFileSync,
   readdirSync,
   rmSync,
+  statSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -16,7 +17,7 @@ import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 
 import { applyReviewedPrivateAccessPlan } from "../scripts/apply-reviewed-private-access-plan.mjs";
-import { startExecution, readExecution } from "../scripts/run-reviewed-private-access-plan.mjs";
+import { startExecution, readExecution, recordProgress } from "../scripts/run-reviewed-private-access-plan.mjs";
 import { OAUTH_PROOF_MODE, OAUTH_PROOF_ROLE, OAUTH_PROOF_PERMISSIONS, OAUTH_PROOF_TITLE,
   OAUTH_PROOF_DESCRIPTION, oauthProofCondition } from "../scripts/oauth-candidate-proof-contract.mjs";
 
@@ -114,6 +115,7 @@ assert.equal(success.effectiveRevocationLabel, "policy_troubleshooter_closed_all
 assert.equal(success.resultLabel, "private_access_verified_plan_apply_completed");
 assert.match(success.planSha256, /^[a-f0-9]{64}$/);
 assert.deepEqual(calls.map(call => call.args.slice(0, 2)), [["show", "-json"], ["apply", "-input=false"]]);
+assert.deepEqual(calls[1].args.slice(0, -1), ["apply", "-input=false", "-json"]);
 assert.equal(calls[0].args.at(-1), calls[1].args.at(-1));
 assert.notEqual(calls[0].args.at(-1), planPath);
 assert.deepEqual(calls[0].bytes, Buffer.from("opaque-saved-plan"));
@@ -503,6 +505,25 @@ const openingJson = Buffer.from(JSON.stringify({
     }] } },
   }))],
 }));
+const machineOutput = (...events) => Buffer.from([
+  { type: "version", ui: "1.2" }, ...events,
+].map(event => JSON.stringify({ "@module": "terraform.ui", ...event })).join("\n") + "\n");
+const diagnosticEvent = (address, summary, detail = "") => ({
+  type: "diagnostic", diagnostic: { severity: "error", address, summary, detail },
+});
+const sensitiveSentinel = "SYNTHETIC_RAW_CREDENTIAL_VALUE_MUST_NOT_PERSIST";
+const postOpenFailureOutput = machineOutput(
+  { type: "apply_progress", hook: { resource: { addr: "time_sleep.private_access_propagation" } },
+    "@message": sensitiveSentinel },
+  { type: "outputs", outputs: { secret: { sensitive: true, value: sensitiveSentinel } } },
+  diagnosticEvent("data.external.private_access_effective[0]", "External Program Execution Failed",
+    `Program: /sensitive/${sensitiveSentinel}\nError Message: policy_troubleshooter_access_mismatch\n\nState: exit status 1`),
+);
+const postOpenFailureLabels = [
+  "private_access_terraform_failure_stage_post_open_effective_access",
+  "private_access_terraform_failure_resource_data_external_private_access_effective_0",
+  "private_access_terraform_failure_diagnostic_policy_troubleshooter_access_mismatch",
+];
 const failedOpenOrder = [];
 const failedOpenProgress = [];
 assert.throws(() => applyReviewedPrivateAccessPlan(planPath, reviewedSha256, {
@@ -529,17 +550,18 @@ assert.throws(() => applyReviewedPrivateAccessPlan(planPath, reviewedSha256, {
     failedOpenOrder.push(args[0]);
     return args[0] === "show"
       ? { status: 0, stdout: openingJson, stderr: Buffer.alloc(0) }
-      : { status: 1, stdout: Buffer.from("raw-apply"), stderr: Buffer.from("raw-provider") };
+      : { status: 1, stdout: postOpenFailureOutput, stderr: Buffer.alloc(0) };
   },
 }), error => error.fixedLabel === "private_access_open_apply_failed_after_effective_revocation");
 assert.deepEqual(failedOpenOrder, ["show", "apply", "reconcile", "wait", "effective"]);
 assert.deepEqual(failedOpenProgress.map(row => row.label), [
   "private_access_plan_verified", "private_access_terraform_apply_started", "private_access_terraform_apply_returned",
+  ...postOpenFailureLabels,
   "private_access_failed_apply_reconciliation_started", "private_access_failed_apply_reconciliation_confirmed",
   "private_access_revocation_wait_started", "private_access_revocation_wait_completed",
   "private_access_effective_revocation_check_started", "private_access_effective_revocation_confirmed",
 ]);
-assert.doesNotMatch(JSON.stringify(failedOpenProgress), /raw-apply|raw-provider/);
+assert.doesNotMatch(JSON.stringify(failedOpenProgress), /raw-apply|raw-provider|SYNTHETIC_RAW_CREDENTIAL/);
 
 // A broken outcome/recovery receipt must never bypass the existing safety work.
 for (const brokenStage of failedOpenProgress.slice(2).map(row => row.label)) {
@@ -555,10 +577,110 @@ for (const brokenStage of failedOpenProgress.slice(2).map(row => row.label)) {
     },
     runTerraform(args) {
       order.push(args[0]);
-      return { status: args[0] === "show" ? 0 : 1, stdout: args[0] === "show" ? openingJson : Buffer.alloc(0) };
+      return { status: args[0] === "show" ? 0 : 1, stdout: args[0] === "show" ? openingJson : postOpenFailureOutput };
     },
   }), error => error.fixedLabel === "private_access_open_apply_failed_after_effective_revocation", brokenStage);
   assert.deepEqual(order, ["show", "apply", "reconcile", "wait", "effective"], brokenStage);
+}
+
+// Only error diagnostics in the supported JSON UI can identify a failure.
+// These local fixtures never invoke Terraform, gcloud, credentials or a wait.
+const unknownFailure = diagnostic => [
+  "private_access_terraform_failure_stage_unknown",
+  "private_access_terraform_failure_resource_unknown",
+  `private_access_terraform_failure_diagnostic_${diagnostic}`,
+];
+const failureCases = [
+  ["post-open verifier", postOpenFailureOutput, postOpenFailureLabels],
+  ["pre-open verifier", machineOutput(diagnosticEvent("data.external.private_access_closed[0]",
+    "External Program Execution Failed", "Error Message: policy_troubleshooter_version_enumeration_failed\n\nState: exit status 1")), [
+    "private_access_terraform_failure_stage_pre_open_effective_access",
+    "private_access_terraform_failure_resource_data_external_private_access_closed_0",
+    "private_access_terraform_failure_diagnostic_policy_troubleshooter_version_enumeration_failed",
+  ]],
+  ["state lock", machineOutput(diagnosticEvent(undefined, "Error acquiring the state lock", sensitiveSentinel)),
+    unknownFailure("state_lock_acquisition_failed")],
+  ["lock release", machineOutput(diagnosticEvent(undefined, "Error releasing the state lock", sensitiveSentinel)),
+    unknownFailure("state_lock_release_failed")],
+  ...["Failed to save state", "Failed to persist state to backend", "Error saving state"].map(summary => [
+    summary, machineOutput(diagnosticEvent(undefined, summary, sensitiveSentinel)), unknownFailure("state_write_failed"),
+  ]),
+  ["state write and lock release", machineOutput(
+    diagnosticEvent(undefined, "Failed to persist state to backend", sensitiveSentinel),
+    diagnosticEvent(undefined, "Error releasing the state lock", sensitiveSentinel)),
+    [...unknownFailure("state_write_failed"), ...unknownFailure("state_lock_release_failed")]],
+  ["state write with API cause", machineOutput(diagnosticEvent(undefined, "Failed to persist state to backend",
+    `googleapi: Error 403: ${sensitiveSentinel}`)),
+    [...unknownFailure("state_write_failed"), ...unknownFailure("api_permission_denied")]],
+  ["provider failure", machineOutput(diagnosticEvent(undefined, "Plugin did not respond", sensitiveSentinel)),
+    unknownFailure("provider_unresponsive")],
+  ["API denied", machineOutput(diagnosticEvent('google_secret_manager_secret_iam_member.private_versions["oauth"]',
+    `Error applying IAM policy: googleapi: Error 403: ${sensitiveSentinel}`)), [
+    "private_access_terraform_failure_stage_private_grant",
+    "private_access_terraform_failure_resource_google_secret_manager_secret_iam_member_private_versions_oauth",
+    "private_access_terraform_failure_diagnostic_api_permission_denied",
+  ]],
+  ["unknown resource", machineOutput(diagnosticEvent(`module.${sensitiveSentinel}.resource`, sensitiveSentinel)), unknownFailure("unknown")],
+  ["unknown verifier label", machineOutput(diagnosticEvent("data.external.private_access_effective[0]", "External Program Execution Failed",
+    "Error Message: policy_troubleshooter_access_mismatch_unrecognized\n")),
+    [...postOpenFailureLabels.slice(0, 2), "private_access_terraform_failure_diagnostic_external_program_failed"]],
+  ["unrelated progress", machineOutput({ type: "apply_progress", hook: { resource: { addr: "data.external.private_access_closed[0]" } },
+    "@message": "policy_troubleshooter_access_mismatch" },
+    { ...diagnosticEvent("data.external.private_access_effective[0]", "External Program Execution Failed", "policy_troubleshooter_access_mismatch"),
+      diagnostic: { severity: "warning", address: "data.external.private_access_effective[0]", summary: "Plugin error" } },
+    { type: "log", "@message": `Error acquiring the state lock ${sensitiveSentinel}` }), unknownFailure("unknown")],
+  ["unrelated message field", machineOutput({ ...diagnosticEvent(undefined, sensitiveSentinel),
+    "@message": "data.external.private_access_effective[0]: policy_troubleshooter_access_mismatch" }), unknownFailure("unknown")],
+  ["malformed", Buffer.from(`{${sensitiveSentinel}`), unknownFailure("machine_output_invalid")],
+  ["missing output", undefined, unknownFailure("unknown")],
+  ["missing schema", Buffer.from(JSON.stringify({ "@module": "terraform.ui",
+    ...diagnosticEvent("data.external.private_access_closed[0]", "Plugin error") })), unknownFailure("machine_output_invalid")],
+  ["unsupported schema", machineOutput({ type: "version", ui: "2.0" },
+    diagnosticEvent("data.external.private_access_closed[0]", "Plugin error")), unknownFailure("machine_output_invalid")],
+  ["oversized record", machineOutput(diagnosticEvent("data.external.private_access_closed[0]", "Plugin error", "x".repeat(256 * 1024))),
+    unknownFailure("machine_output_invalid")],
+  ["valid diagnostic before truncated record", Buffer.concat([postOpenFailureOutput, Buffer.from(`{${sensitiveSentinel}`)]),
+    [...postOpenFailureLabels, "private_access_terraform_failure_diagnostic_machine_output_invalid"]],
+];
+const failureReceiptDirectory = join(root, "sanitized-failure-receipt");
+mkdirSync(failureReceiptDirectory, { mode: 0o700 });
+for (const [name, output, expectedLabels] of failureCases) {
+  const progress = [], order = [];
+  assert.throws(() => applyReviewedPrivateAccessPlan(planPath, reviewedSha256, {
+    cwd: root, temporaryRoot: root,
+    onProgress(label, detail) {
+      progress.push({ label, detail });
+      if (name === "post-open verifier") recordProgress(failureReceiptDirectory, label, detail);
+    },
+    reconcilePrivateAccess() { order.push("reconcile"); return confirmedReconciliation; },
+    waitForRevocationPropagation(ms) {
+      assert.equal(ms, 600_000); order.push("wait");
+      assert.deepEqual(progress.map(row => row.label).filter(label => label.startsWith("private_access_terraform_failure_")), expectedLabels, name);
+      if (name === "post-open verifier") {
+        const persisted = readFileSync(join(failureReceiptDirectory, "progress.jsonl"), "utf8");
+        for (const label of expectedLabels) assert.ok(persisted.includes(label));
+      }
+    },
+    verifyEffectivePrivateAccess() {
+      order.push("effective");
+      return { status: "policy_troubleshooter_closed_all_denied", checked_secrets: "6", checked_versions: "0", checked_tuples: "6" };
+    },
+    runTerraform(args) {
+      order.push(args[0]);
+      if (args[0] === "apply") assert.deepEqual(args.slice(0, -1), ["apply", "-input=false", "-json"]);
+      return args[0] === "show" ? { status: 0, stdout: openingJson } : { status: 1, stdout: output };
+    },
+  }), error => error.fixedLabel === "private_access_open_apply_failed_after_effective_revocation", name);
+  assert.deepEqual(order, ["show", "apply", "reconcile", "wait", "effective"], name);
+  assert.doesNotMatch(JSON.stringify(progress), /SYNTHETIC_RAW_CREDENTIAL|\/sensitive\//, name);
+  assert.equal(readdirSync(root).some(name => name.startsWith("vaeroex-private-access-plan-")), false, name);
+}
+const persistedFailurePath = join(failureReceiptDirectory, "progress.jsonl");
+assert.equal(statSync(persistedFailurePath).mode & 0o777, 0o600);
+const persistedFailure = readFileSync(persistedFailurePath, "utf8");
+assert.doesNotMatch(persistedFailure, /SYNTHETIC_RAW_CREDENTIAL|\/sensitive\//);
+for (const row of persistedFailure.trim().split("\n").map(JSON.parse).filter(row => row.label.startsWith("private_access_terraform_failure_"))) {
+  assert.deepEqual(Object.keys(row).sort(), ["label", "utc"]);
 }
 
 let receiptFailureApplies = 0;
