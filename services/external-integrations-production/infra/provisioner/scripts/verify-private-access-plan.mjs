@@ -1,5 +1,7 @@
 import { pathToFileURL } from "node:url";
 import { isDeepStrictEqual } from "node:util";
+import { OAUTH_PROOF_MODE, OAUTH_PROOF_ROLE, OAUTH_PROOF_PERMISSIONS, OAUTH_PROOF_TITLE,
+  OAUTH_PROOF_DESCRIPTION, oauthProofCondition, privateAccessMode } from "./oauth-candidate-proof-contract.mjs";
 
 const GENERATION_ADDRESS = "terraform_data.private_access_generation";
 const GRANT_TYPE = "google_secret_manager_secret_iam_member";
@@ -40,6 +42,24 @@ function exactTimestamp(value) {
 
 function input(resource, side) {
   return resource?.change?.[side]?.input ?? null;
+}
+
+function proofTuple(value) {
+  return privateAccessMode(value?.access_mode) === OAUTH_PROOF_MODE ? { accessMode: OAUTH_PROOF_MODE } : {};
+}
+
+function verifyProofRole(plan, required) {
+  const roles = plan.resource_changes.filter(change => change.address === "google_project_iam_custom_role.oauth_candidate_proof");
+  if (roles.length === 0 && !required) return;
+  if (roles.length !== 1) reject("private_access_proof_role_contract_mismatch");
+  const role = roles[0], value = role.change?.after;
+  if (role.type !== "google_project_iam_custom_role" || value?.project !== PROJECT_ID ||
+      value?.role_id !== "squareProductionOAuthCandidateProof" || value?.deleted === true ||
+      !Array.isArray(value?.permissions) || !isDeepStrictEqual([...value.permissions].sort(), [...OAUTH_PROOF_PERMISSIONS].sort()) ||
+      !(isNoOp(role) && isDeepStrictEqual(role.change.before, value) ||
+        role.change.before === null && isDeepStrictEqual(role.change.actions, ["create"]))) {
+    reject("private_access_proof_role_contract_mismatch");
+  }
 }
 
 function isNoOp(resource) {
@@ -97,16 +117,18 @@ export function privateAccessClosedBootstrapTuple(plan) {
   return Object.freeze({
     windowStartsAt: afterInput.starts_at,
     windowExpiresAt: afterInput.expires_at,
+    ...proofTuple(afterInput),
   });
 }
 
 function verifyOpenGenerationInput(value) {
+  const proof = privateAccessMode(value?.access_mode) === OAUTH_PROOF_MODE;
   const start = exactTimestamp(value?.starts_at);
   const expiry = exactTimestamp(value?.expires_at);
   const checkpointExpiry = exactTimestamp(value?.checkpoint_expires_at);
   if (
     value?.enabled !== true || !Array.isArray(value?.profiles) || value.profiles.length !== 1 ||
-    !PROFILES.includes(value.profiles[0]) || start === null || expiry === null || checkpointExpiry === null ||
+    !PROFILES.includes(value.profiles[0]) || (proof && value.profiles[0] !== "oauth") || start === null || expiry === null || checkpointExpiry === null ||
     expiry <= start || expiry > start + (value.profiles[0] === "oauth" ? 180 : 120) * 60 * 1000 || checkpointExpiry !== expiry
   ) {
     reject("private_access_open_generation_invalid");
@@ -118,6 +140,7 @@ function verifyPreservedCloseCheckpoint(beforeInput, afterInput) {
   if (!Array.isArray(afterInput?.profiles) || afterInput.profiles.length !== 0 ||
       afterInput?.starts_at !== beforeInput.starts_at ||
       afterInput?.expires_at !== beforeInput.expires_at ||
+      privateAccessMode(afterInput?.access_mode) !== privateAccessMode(beforeInput?.access_mode) ||
       exactTimestamp(afterInput?.checkpoint_expires_at) !== exactTimestamp(beforeInput.expires_at)) {
     reject("private_access_close_must_preserve_expiry");
   }
@@ -143,6 +166,7 @@ export function privateAccessRecoveryTuple(plan) {
     profile: beforeInput.profiles[0],
     windowStartsAt: beforeInput.starts_at,
     windowExpiresAt: beforeInput.expires_at,
+    ...proofTuple(beforeInput),
   });
 }
 
@@ -165,6 +189,7 @@ export function privateAccessOpeningTuple(plan) {
     profile: afterInput.profiles[0],
     windowStartsAt: afterInput.starts_at,
     windowExpiresAt: afterInput.expires_at,
+    ...proofTuple(afterInput),
   });
 }
 
@@ -198,6 +223,7 @@ export function privateAccessClosedNoTransitionTuple(plan) {
   return Object.freeze({
     windowStartsAt: afterInput.starts_at,
     windowExpiresAt: afterInput.expires_at,
+    ...proofTuple(afterInput),
   });
 }
 
@@ -221,14 +247,17 @@ function verifyGrantContract(grant, side, generationInput) {
   const expiry = generationInput?.expires_at;
   const checkpointExpiry = generationInput?.checkpoint_expires_at;
   const condition = Array.isArray(value?.condition) && value.condition.length === 1 ? value.condition[0] : null;
+  const proof = privateAccessMode(generationInput?.access_mode) === OAUTH_PROOF_MODE;
   if (
     generationInput?.enabled !== true ||
     !Array.isArray(generationInput?.profiles) || generationInput.profiles.length !== 1 || generationInput.profiles[0] !== profile ||
     exactTimestamp(start) === null || exactTimestamp(expiry) === null || checkpointExpiry !== expiry ||
     value?.project !== PROJECT_ID || !expectedSecret ||
-    value?.role !== PRIVATE_VERSIONS_ROLE || value?.member !== PROVISIONER_MEMBER ||
-    condition?.title !== CONDITION_TITLE || condition?.description !== CONDITION_DESCRIPTION ||
-    condition?.expression !== `request.time >= timestamp('${start}') && request.time < timestamp('${expiry}')`
+    (proof && profile !== "oauth") ||
+    value?.role !== (proof ? OAUTH_PROOF_ROLE : PRIVATE_VERSIONS_ROLE) || value?.member !== PROVISIONER_MEMBER ||
+    condition?.title !== (proof ? OAUTH_PROOF_TITLE : CONDITION_TITLE) ||
+    condition?.description !== (proof ? OAUTH_PROOF_DESCRIPTION : CONDITION_DESCRIPTION) ||
+    condition?.expression !== (proof ? oauthProofCondition(start, expiry) : `request.time >= timestamp('${start}') && request.time < timestamp('${expiry}')`)
   ) {
     reject("private_access_managed_grant_contract_mismatch");
   }
@@ -285,6 +314,12 @@ export function verifyPrivateAccessPlan(plan) {
   const beforeInput = input(generation, "before");
   const afterInput = input(generation, "after");
   const phase = accessPhase(plan);
+  const proof = privateAccessMode(afterInput?.access_mode) === OAUTH_PROOF_MODE;
+  const priorProof = privateAccessMode(beforeInput?.access_mode) === OAUTH_PROOF_MODE;
+  const selectedProof = plan.variables?.oauth_candidate_proof_enabled?.value ?? false;
+  if (typeof selectedProof !== "boolean" || selectedProof !== proof ||
+      proof && !["closed", "open:oauth"].includes(phase)) reject("private_access_proof_mode_mismatch");
+  verifyProofRole(plan, proof || priorProof);
 
   if (mutatingGrants.length === 0) {
     if (beforeGrants.length !== afterGrants.length) {

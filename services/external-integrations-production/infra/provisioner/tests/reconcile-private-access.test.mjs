@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { OAUTH_PROOF_MODE, OAUTH_PROOF_ROLE, OAUTH_PROOF_TITLE, OAUTH_PROOF_DESCRIPTION,
+  oauthProofCondition } from "../scripts/oauth-candidate-proof-contract.mjs";
 
 import {
   confirmExactPrivateAccessClosed,
@@ -33,9 +35,9 @@ function exactBinding(overrides = {}) {
 }
 
 function fixture({ removalStatus = 0, removalDisappears = true, binding = exactBinding(),
-  bindingProfile = "oauth", malformedProfile, expectedCondition = condition } = {}) {
+  bindingProfile = "oauth", malformedProfile, expectedCondition = condition, expectedRole = role } = {}) {
   const calls = [];
-  const policies = Object.fromEntries(profiles.map(profile => [profile, { bindings: [] }]));
+  const policies = Object.fromEntries([...profiles, "application"].map(profile => [profile, { bindings: [] }]));
   if (binding) policies[bindingProfile].bindings.push(binding);
   policies.oauth.bindings.push({ role: "roles/viewer", members: ["user:other@example.com"] });
   return {
@@ -44,7 +46,8 @@ function fixture({ removalStatus = 0, removalDisappears = true, binding = exactB
     run(command, args, options) {
       calls.push({ command, args, options });
       assert.equal(command, "gcloud");
-      const profile = args[2]?.match(/^square-production-(oauth|broker|scheduler|webhook|runtime|evidence)-db$/)?.[1];
+      const profile = args[2] === "square-production-application" ? "application"
+        : args[2]?.match(/^square-production-(oauth|broker|scheduler|webhook|runtime|evidence)-db$/)?.[1];
       assert.ok(profile);
       if (args[1] === "get-iam-policy") {
         if (profile === malformedProfile) return { status: 0, stdout: "not-json", stderr: "raw-malformed" };
@@ -53,11 +56,11 @@ function fixture({ removalStatus = 0, removalDisappears = true, binding = exactB
       assert.equal(args[1], "remove-iam-policy-binding");
       assert.equal(args.includes("--project=vaeroex-integrations-prod"), true);
       assert.equal(args.includes(`--member=${member}`), true);
-      assert.equal(args.includes(`--role=${role}`), true);
+      assert.equal(args.includes(`--role=${expectedRole}`), true);
       assert.equal(args.includes(`--condition=expression=${expectedCondition.expression},title=${expectedCondition.title},description=${expectedCondition.description}`), true);
       if (removalDisappears) {
         policies[profile].bindings = policies[profile].bindings.flatMap(candidate => {
-          if (candidate.role !== role || candidate.condition?.expression !== expectedCondition.expression) return [candidate];
+          if (candidate.role !== expectedRole || candidate.condition?.expression !== expectedCondition.expression) return [candidate];
           const members = candidate.members.filter(candidateMember => candidateMember !== member);
           return members.length ? [{ ...candidate, members }] : [];
         });
@@ -202,5 +205,37 @@ assert.throws(() => confirmExactPrivateAccessClosed({ run: residualWhileClosed.r
   error => error.fixedLabel === "private_access_exact_reconciliation_failed");
 assert.equal(residualWhileClosed.calls.filter(call => call.args[1] === "get-iam-policy").length, 6);
 assert.equal(residualWhileClosed.calls.some(call => call.args[1] === "remove-iam-policy-binding"), false);
+
+const proofRecovery = { ...recovery, accessMode: OAUTH_PROOF_MODE };
+const proofCondition = { title: OAUTH_PROOF_TITLE, description: OAUTH_PROOF_DESCRIPTION,
+  expression: oauthProofCondition(recovery.windowStartsAt, recovery.windowExpiresAt) };
+function proofFixture(overrides = {}) {
+  return fixture({ expectedRole: OAUTH_PROOF_ROLE, expectedCondition: proofCondition,
+    binding: exactBinding({ role: OAUTH_PROOF_ROLE, condition: proofCondition }), ...overrides });
+}
+for (const removalStatus of [0, 1]) {
+  const proof = proofFixture({ removalStatus });
+  assert.deepEqual(reconcileExactPrivateAccess(proofRecovery, { run: proof.run }), {
+    status: "private_access_exact_direct_binding_reconciliation_confirmed", checked_secrets: "7", removed_bindings: "1",
+  });
+  assert.equal(proof.calls.filter(call => call.args[1] === "remove-iam-policy-binding").length, 1);
+  assert.equal(proof.calls.filter(call => call.args[1] === "get-iam-policy").length, 14);
+  assert.equal(confirmExactPrivateAccessClosed({ run: proof.run, accessMode: OAUTH_PROOF_MODE }).checked_secrets, "7");
+}
+for (const unsafe of [
+  { bindingProfile: "application" }, { bindingProfile: "broker" },
+  { binding: exactBinding() },
+  { binding: exactBinding({ role: OAUTH_PROOF_ROLE, condition: { ...proofCondition,
+    expression: proofCondition.expression.replace("/versions/1'", "/versions/2'") } }) },
+]) {
+  const proof = proofFixture(unsafe);
+  assert.throws(() => reconcileExactPrivateAccess(proofRecovery, { run: proof.run }),
+    error => error.fixedLabel === "private_access_exact_reconciliation_failed");
+  assert.equal(proof.calls.some(call => call.args[1] === "remove-iam-policy-binding"), false);
+}
+const proofUncertain = proofFixture({ removalStatus: 1, removalDisappears: false });
+assert.throws(() => reconcileExactPrivateAccess(proofRecovery, { run: proofUncertain.run }),
+  error => error.fixedLabel === "private_access_exact_reconciliation_failed");
+assert.equal(proofUncertain.calls.filter(call => call.args[1] === "remove-iam-policy-binding").length, 1);
 
 process.stdout.write("private_access_post_accept_orphan_exact_reconciliation_confirmed\n");

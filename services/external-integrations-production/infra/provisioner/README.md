@@ -1,5 +1,46 @@
 # Bounded Production native provisioner
 
+## Retained OAuth candidate proof (separately authorized)
+
+`oauth_candidate_proof_enabled = true` selects only the retained candidate from
+PR #435: OAuth role OID `34220` and existing numeric secret version
+`projects/711446392261/secrets/square-production-oauth-db/versions/1`.
+This is not another provisioning attempt or service admission. It does not
+create, rotate, disable or destroy a version, and never uses `latest`.
+
+The separate `squareProductionOAuthCandidateProof` custom-role definition has
+only `secretmanager.versions.get` and `secretmanager.versions.access`. Its OAuth
+binding additionally requires the exact numeric version resource and approved
+time interval. The existing four-permission provisioning role is unchanged.
+The new definition remains unbound after cleanup; it confers no access without
+a binding. Its first creation must be explicitly included in the separately
+approved saved plan. This repository change does not open a proof window.
+
+Before opening, the proof inventory must contain only OAuth version 1. The
+proof-only live matrix checks all six DB containers plus the application
+container: deny `versions.add` on each Secret and check access/get/disable/destroy
+on every existing numeric SecretVersion (`7 + 4N` tuples). Closed means all denied;
+open means only OAuth version-1 get/access allowed. All other permissions,
+peer/application access, unknown results, wrong inventories and API failures
+block the proof. The application payload is never read by these checks.
+
+The saved-plan tuple carries `access_mode = "oauth_candidate_proof"` through
+opening, failed-apply reconciliation and cleanup. Keep the proof flag true in
+the fully closed cleanup/checkpoint so the seven-secret denial matrix is not
+silently replaced by ordinary provisioning checks. Disable administrative and
+temporary access, empty the profile set, preserve the opened timestamps, stop
+the VM and verify closure as usual. Both propagation waits are unchanged.
+
+Only after separate exact-plan authorization and verified opening may the
+installed reconciliation launcher run once with private administrator entry.
+Preserve the uncertain journal, use only the existing candidate, restore
+`NOLOGIN NOINHERIT`, drain sessions and close access regardless of proof outcome.
+Success proves the current version-1 credential match and final fencing; it
+does not retrospectively relabel the uncertain commit or admit the role for
+runtime use. Any uncertain result requires read-only reconciliation, not retry.
+
+## Existing provisioning path
+
 This separate Terraform root prepares exactly one private `e2-small` and one
 10-GiB standard boot/recovery disk for the six reviewed native Square database
 profiles. It reuses the Production VPC, subnet, private Google access, regional

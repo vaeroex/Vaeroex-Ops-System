@@ -1,8 +1,12 @@
 import assert from "node:assert/strict";
 import {
   privateAccessClosedCheckpointTuple,
+  privateAccessOpeningTuple,
+  privateAccessRecoveryTuple,
   verifyPrivateAccessPlan,
 } from "../scripts/verify-private-access-plan.mjs";
+import { OAUTH_PROOF_MODE, OAUTH_PROOF_ROLE, OAUTH_PROOF_PERMISSIONS, OAUTH_PROOF_TITLE,
+  OAUTH_PROOF_DESCRIPTION, oauthProofCondition } from "../scripts/oauth-candidate-proof-contract.mjs";
 
 const PRIOR_START = "2099-01-01T00:00:00Z";
 const PRIOR_EXPIRY = "2099-01-01T01:00:00Z";
@@ -429,5 +433,66 @@ rejects(
   { ...plan(generation(false, true), grant("oauth", false, true, ["create"])), complete: false },
   "private_access_plan_incomplete",
 );
+
+const proofRoleValue = { project: "vaeroex-integrations-prod", role_id: "squareProductionOAuthCandidateProof",
+  permissions: [...OAUTH_PROOF_PERMISSIONS], deleted: false };
+function proofRole(existing = false) {
+  return { address: "google_project_iam_custom_role.oauth_candidate_proof", type: "google_project_iam_custom_role",
+    change: { actions: [existing ? "no-op" : "create"], before: existing ? structuredClone(proofRoleValue) : null,
+      after: structuredClone(proofRoleValue) } };
+}
+const proofGrantValue = { role: OAUTH_PROOF_ROLE, condition: [{ title: OAUTH_PROOF_TITLE,
+  description: OAUTH_PROOF_DESCRIPTION, expression: oauthProofCondition(NEXT_START, NEXT_EXPIRY) }] };
+function proofOpening() {
+  const value = plan(generation(false, true, ["delete", "create"], { after: { access_mode: OAUTH_PROOF_MODE } }),
+    grant("oauth", false, true, ["create"], { after: structuredClone(proofGrantValue) }), proofRole());
+  value.variables.oauth_candidate_proof_enabled = { value: true };
+  return value;
+}
+assert.equal(verifyPrivateAccessPlan(proofOpening()), "private_access_closed_to_one_grant_confirmed");
+assert.equal(privateAccessOpeningTuple(proofOpening()).accessMode, OAUTH_PROOF_MODE);
+for (const permission of ["secretmanager.versions.add", "secretmanager.versions.disable", "secretmanager.versions.destroy"]) {
+  const value = proofOpening();
+  value.resource_changes.find(x => x.type === "google_project_iam_custom_role").change.after.permissions.push(permission);
+  rejects(value, "private_access_proof_role_contract_mismatch");
+}
+for (const mutate of [
+  value => value.role = "projects/vaeroex-integrations-prod/roles/squareProductionPrivateVersions",
+  value => value.secret_id = "square-production-broker-db",
+  value => value.condition[0].expression = value.condition[0].expression.replace("/versions/1'", "/versions/latest'"),
+  value => value.condition[0].expression = value.condition[0].expression.replace("/versions/1'", "/versions/2'"),
+  value => value.condition[0].expression = value.condition[0].expression.replace("711446392261", "123456789012"),
+  value => value.condition[0].expression = `request.time >= timestamp('${NEXT_START}') && request.time < timestamp('${NEXT_EXPIRY}')`,
+]) {
+  const value = proofOpening();
+  mutate(value.resource_changes.find(x => x.type === "google_secret_manager_secret_iam_member").change.after);
+  rejects(value, "private_access_managed_grant_contract_mismatch");
+}
+const missingProofRole = proofOpening();
+missingProofRole.resource_changes = missingProofRole.resource_changes.filter(x => x.type !== "google_project_iam_custom_role");
+rejects(missingProofRole, "private_access_proof_role_contract_mismatch");
+const wrongProofFlag = proofOpening();
+wrongProofFlag.variables.oauth_candidate_proof_enabled.value = false;
+rejects(wrongProofFlag, "private_access_proof_mode_mismatch");
+const proofClose = plan(generation(true, false, ["delete", "create"], {
+  before: { access_mode: OAUTH_PROOF_MODE }, after: { ...preservedCloseWindow, access_mode: OAUTH_PROOF_MODE },
+}), grant("oauth", true, false, ["delete"], { before: proofGrantValue }), proofRole(true));
+proofClose.variables.oauth_candidate_proof_enabled = { value: true };
+assert.equal(verifyPrivateAccessPlan(proofClose), "private_access_one_grant_to_closed_confirmed");
+assert.equal(privateAccessRecoveryTuple(proofClose).accessMode, OAUTH_PROOF_MODE);
+const proofRecovery = structuredClone(proofClose);
+proofRecovery.resource_changes = proofRecovery.resource_changes.filter(x => x.type !== "google_secret_manager_secret_iam_member");
+assert.equal(verifyPrivateAccessPlan(proofRecovery), "private_access_open_generation_without_grant_to_closed_recovery_confirmed");
+const droppedCloseMode = structuredClone(proofClose);
+delete droppedCloseMode.resource_changes[0].change.after.input.access_mode;
+droppedCloseMode.variables.oauth_candidate_proof_enabled.value = false;
+rejects(droppedCloseMode, "private_access_close_must_preserve_expiry");
+const proofCheckpoint = plan(generation(false, false, ["no-op"], {
+  before: { ...preservedCloseWindow, access_mode: OAUTH_PROOF_MODE },
+  after: { ...preservedCloseWindow, access_mode: OAUTH_PROOF_MODE },
+}), proofRole(true));
+proofCheckpoint.variables.oauth_candidate_proof_enabled = { value: true };
+assert.equal(verifyPrivateAccessPlan(proofCheckpoint), "private_access_plan_closed_no_transition_confirmed");
+assert.equal(privateAccessClosedCheckpointTuple(proofCheckpoint).accessMode, OAUTH_PROOF_MODE);
 
 process.stdout.write("private_access_saved_plan_transition_guard_confirmed\n");

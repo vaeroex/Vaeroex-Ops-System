@@ -1,16 +1,27 @@
 locals {
-  project_id                 = "vaeroex-integrations-prod"
-  name                       = "square-production-provisioner"
-  operator                   = "user:isaac@vaeroex.com"
-  network                    = "projects/vaeroex-integrations-prod/global/networks/vaeroex-integrations-production"
-  subnetwork                 = "projects/vaeroex-integrations-prod/regions/us-west1/subnetworks/vaeroex-integrations-us-west1"
-  profiles                   = toset(["oauth", "broker", "scheduler", "webhook", "runtime", "evidence"])
-  active_profiles            = var.temporary_access_enabled ? var.temporary_access_profiles : toset([])
-  provisioner_member         = "serviceAccount:sq-prod-provisioner@vaeroex-integrations-prod.iam.gserviceaccount.com"
-  private_versions_role_name = "projects/vaeroex-integrations-prod/roles/squareProductionPrivateVersions"
+  project_id                  = "vaeroex-integrations-prod"
+  name                        = "square-production-provisioner"
+  operator                    = "user:isaac@vaeroex.com"
+  network                     = "projects/vaeroex-integrations-prod/global/networks/vaeroex-integrations-production"
+  subnetwork                  = "projects/vaeroex-integrations-prod/regions/us-west1/subnetworks/vaeroex-integrations-us-west1"
+  profiles                    = toset(["oauth", "broker", "scheduler", "webhook", "runtime", "evidence"])
+  active_profiles             = var.temporary_access_enabled ? var.temporary_access_profiles : toset([])
+  provisioner_member          = "serviceAccount:sq-prod-provisioner@vaeroex-integrations-prod.iam.gserviceaccount.com"
+  private_versions_role_name  = "projects/vaeroex-integrations-prod/roles/squareProductionPrivateVersions"
+  oauth_proof_role_name       = "projects/vaeroex-integrations-prod/roles/squareProductionOAuthCandidateProof"
+  access_mode                 = var.oauth_candidate_proof_enabled ? "oauth_candidate_proof" : "provision"
+  proof_generation            = var.oauth_candidate_proof_enabled ? { access_mode = local.access_mode } : {}
+  checked_secret_count        = var.oauth_candidate_proof_enabled ? 7 : 6
+  checked_version_permissions = var.oauth_candidate_proof_enabled ? 4 : 3
   window_condition = join(" && ", [
     "request.time >= timestamp('${var.window_starts_at}')",
     "request.time < timestamp('${var.window_expires_at}')",
+  ])
+  oauth_proof_condition = join(" && ", [
+    "resource.service == 'secretmanager.googleapis.com'",
+    "resource.type == 'secretmanager.googleapis.com/SecretVersion'",
+    "resource.name == 'projects/711446392261/secrets/square-production-oauth-db/versions/1'",
+    local.window_condition,
   ])
   administrative_expires_at = timecmp(var.window_expires_at, timeadd(var.window_starts_at, "120m")) <= 0 ? var.window_expires_at : timeadd(var.window_starts_at, "120m")
   administrative_window_condition = join(" && ", [
@@ -146,26 +157,37 @@ resource "google_project_iam_custom_role" "private_versions" {
   ]
 }
 
+# Separate read-only definition; the normal four-permission role is unchanged.
+# Retain this unbound role and the mode in the closed proof checkpoint so a
+# lost cleanup acknowledgement can rerun the same proof-specific denial matrix.
+resource "google_project_iam_custom_role" "oauth_candidate_proof" {
+  project     = local.project_id
+  role_id     = "squareProductionOAuthCandidateProof"
+  title       = "Square OAuth retained candidate proof"
+  description = "Metadata and payload read of retained OAuth version 1; no version mutation."
+  permissions = ["secretmanager.versions.access", "secretmanager.versions.get"]
+}
+
 # A selector or time-window change is a new access generation. The default
 # destroy-before-create replacement, combined with the IAM dependency and
 # replace trigger below, orders every old grant's destruction before the new
 # generation exists and any replacement grant can be created. This prevents a
 # direct profile-to-profile apply from briefly authorizing both profiles.
 resource "terraform_data" "private_access_generation" {
-  input = {
+  input = merge({
     enabled               = var.temporary_access_enabled
     profiles              = sort(tolist(var.temporary_access_profiles))
     starts_at             = var.window_starts_at
     expires_at            = var.window_expires_at
     checkpoint_expires_at = var.temporary_access_enabled ? var.window_expires_at : var.previous_access_expires_at
-  }
-  triggers_replace = sha256(jsonencode({
+  }, local.proof_generation)
+  triggers_replace = sha256(jsonencode(merge({
     enabled               = var.temporary_access_enabled
     profiles              = sort(tolist(var.temporary_access_profiles))
     starts_at             = var.window_starts_at
     expires_at            = var.window_expires_at
     checkpoint_expires_at = var.temporary_access_enabled ? var.window_expires_at : var.previous_access_expires_at
-  }))
+  }, local.proof_generation)))
 }
 
 # IAM policy updates are eventually consistent. A replacement access
@@ -190,6 +212,7 @@ data "external" "private_access_closed" {
     project_id        = local.project_id
     project_number    = one(data.google_project.current).number
     phase             = "closed"
+    access_mode       = local.access_mode
     active_profile    = ""
     window_starts_at  = var.window_starts_at
     window_expires_at = var.window_expires_at
@@ -206,11 +229,11 @@ resource "google_secret_manager_secret_iam_member" "private_versions" {
   for_each  = local.active_profiles
   project   = local.project_id
   secret_id = "square-production-${each.key}-db"
-  role      = google_project_iam_custom_role.private_versions.name
+  role      = var.oauth_candidate_proof_enabled ? local.oauth_proof_role_name : google_project_iam_custom_role.private_versions.name
   member    = google_service_account.provisioner.member
   # Count-removal transitions must finish destroying setup HTTPS before any
   # grant is created; reverse transitions destroy all grants before setup.
-  depends_on = [google_compute_firewall.setup_https, time_sleep.private_access_propagation]
+  depends_on = [google_compute_firewall.setup_https, time_sleep.private_access_propagation, google_project_iam_custom_role.oauth_candidate_proof]
   lifecycle {
     replace_triggered_by = [time_sleep.private_access_propagation]
     precondition {
@@ -225,11 +248,11 @@ resource "google_secret_manager_secret_iam_member" "private_versions" {
     precondition {
       condition = (
         one(data.external.private_access_closed).result.status == "policy_troubleshooter_closed_all_denied" &&
-        one(data.external.private_access_closed).result.checked_secrets == "6" &&
+        one(data.external.private_access_closed).result.checked_secrets == tostring(local.checked_secret_count) &&
         try(
           tonumber(one(data.external.private_access_closed).result.checked_versions) >= 0 &&
           tonumber(one(data.external.private_access_closed).result.checked_tuples) ==
-          6 + 3 * tonumber(one(data.external.private_access_closed).result.checked_versions),
+          local.checked_secret_count + local.checked_version_permissions * tonumber(one(data.external.private_access_closed).result.checked_versions),
           false,
         )
       )
@@ -237,9 +260,9 @@ resource "google_secret_manager_secret_iam_member" "private_versions" {
     }
   }
   condition {
-    title       = "bounded-native-provisioning"
-    description = "One exact database secret during the admitted maintenance window."
-    expression  = local.window_condition
+    title       = var.oauth_candidate_proof_enabled ? "bounded-oauth-existing-candidate-proof" : "bounded-native-provisioning"
+    description = var.oauth_candidate_proof_enabled ? "Only retained OAuth version 1 during the separately authorized proof window." : "One exact database secret during the admitted maintenance window."
+    expression  = var.oauth_candidate_proof_enabled ? local.oauth_proof_condition : local.window_condition
   }
 }
 
@@ -263,6 +286,7 @@ data "external" "private_access_effective" {
     project_id        = local.project_id
     project_number    = one(data.google_project.current).number
     phase             = "open"
+    access_mode       = local.access_mode
     active_profile    = join("", sort(tolist(local.active_profiles)))
     window_starts_at  = var.window_starts_at
     window_expires_at = var.window_expires_at
@@ -286,12 +310,12 @@ resource "terraform_data" "private_access_effective_authority" {
   lifecycle {
     precondition {
       condition = (
-        one(data.external.private_access_effective).result.status == "policy_troubleshooter_${join("", sort(tolist(local.active_profiles)))}_only_confirmed" &&
-        one(data.external.private_access_effective).result.checked_secrets == "6" &&
+        one(data.external.private_access_effective).result.status == (var.oauth_candidate_proof_enabled ? "policy_troubleshooter_oauth_candidate_proof_confirmed" : "policy_troubleshooter_${join("", sort(tolist(local.active_profiles)))}_only_confirmed") &&
+        one(data.external.private_access_effective).result.checked_secrets == tostring(local.checked_secret_count) &&
         try(
           tonumber(one(data.external.private_access_effective).result.checked_versions) >= 0 &&
           tonumber(one(data.external.private_access_effective).result.checked_tuples) ==
-          6 + 3 * tonumber(one(data.external.private_access_effective).result.checked_versions),
+          local.checked_secret_count + local.checked_version_permissions * tonumber(one(data.external.private_access_effective).result.checked_versions),
           false,
         )
       )

@@ -17,6 +17,8 @@ import { join } from "node:path";
 
 import { applyReviewedPrivateAccessPlan } from "../scripts/apply-reviewed-private-access-plan.mjs";
 import { startExecution, readExecution } from "../scripts/run-reviewed-private-access-plan.mjs";
+import { OAUTH_PROOF_MODE, OAUTH_PROOF_ROLE, OAUTH_PROOF_PERMISSIONS, OAUTH_PROOF_TITLE,
+  OAUTH_PROOF_DESCRIPTION, oauthProofCondition } from "../scripts/oauth-candidate-proof-contract.mjs";
 
 const root = mkdtempSync(join(tmpdir(), "vaeroex-reviewed-apply-test-"));
 const planPath = join(root, "candidate.tfplan");
@@ -662,6 +664,59 @@ const durableProgress = readFileSync(join(executionDirectory, "progress.jsonl"),
 assert.match(durableProgress, /private_access_terraform_apply_returned/);
 assert.match(durableProgress, /"exitCode":0/);
 assert.doesNotMatch(durableProgress, /raw-|hostile/);
+
+// The same one-shot recovery must retain proof mode and deny the application
+// secret as well as every DB profile. These are local subprocess/API fixtures.
+for (const [sourceJson, applyStatus, expectedOrder, expectedFailure] of [
+  [openingJson, 1, ["show", "apply", "reconcile", "wait", "effective"], "private_access_open_apply_failed_after_effective_revocation"],
+  [trackedCloseJson, 0, ["show", "apply", "reconcile", "wait", "effective"], null],
+  [trackedCloseJson, 1, ["show", "apply", "reconcile", "wait", "effective"], "private_access_close_apply_failed_after_effective_revocation"],
+  [recoveryJson, 0, ["show", "reconcile", "apply", "wait", "effective"], null],
+  [closedNoTransitionJson, 0, ["show", "apply", "confirm", "wait", "effective"], null],
+]) {
+  const value = JSON.parse(sourceJson);
+  value.variables.oauth_candidate_proof_enabled = { value: true };
+  for (const resource of value.resource_changes) {
+    for (const side of ["before", "after"]) {
+      const item = resource.change[side];
+      if (item?.input) item.input.access_mode = OAUTH_PROOF_MODE;
+      if (item?.secret_id) {
+        item.role = OAUTH_PROOF_ROLE;
+        item.condition = [{ title: OAUTH_PROOF_TITLE, description: OAUTH_PROOF_DESCRIPTION,
+          expression: oauthProofCondition(openInput.starts_at, openInput.expires_at) }];
+      }
+    }
+  }
+  const roleValue = { project: "vaeroex-integrations-prod", role_id: "squareProductionOAuthCandidateProof",
+    permissions: [...OAUTH_PROOF_PERMISSIONS], deleted: false };
+  value.resource_changes.push({ address: "google_project_iam_custom_role.oauth_candidate_proof", type: "google_project_iam_custom_role",
+    change: { actions: ["no-op"], before: roleValue, after: roleValue } });
+  const order = [];
+  const execute = () => applyReviewedPrivateAccessPlan(planPath, reviewedSha256, {
+    cwd: root, temporaryRoot: root,
+    reconcilePrivateAccess(tuple) {
+      order.push("reconcile"); assert.equal(tuple.accessMode, OAUTH_PROOF_MODE);
+      return { ...confirmedReconciliation, checked_secrets: "7" };
+    },
+    confirmClosedPrivateAccess(options) {
+      order.push("confirm"); assert.equal(options.accessMode, OAUTH_PROOF_MODE);
+      return { status: "private_access_exact_direct_binding_absence_confirmed", checked_secrets: "7" };
+    },
+    waitForRevocationPropagation(ms) { order.push("wait"); assert.equal(ms, 600_000); },
+    verifyEffectivePrivateAccess(query) {
+      order.push("effective"); assert.equal(query.access_mode, OAUTH_PROOF_MODE); assert.equal(query.phase, "closed");
+      return { status: "policy_troubleshooter_closed_all_denied", checked_secrets: "7", checked_versions: "2", checked_tuples: "15" };
+    },
+    runTerraform(args) {
+      order.push(args[0]);
+      return { status: args[0] === "show" ? 0 : applyStatus,
+        stdout: args[0] === "show" ? Buffer.from(JSON.stringify(value)) : Buffer.alloc(0) };
+    },
+  });
+  if (expectedFailure) assert.throws(execute, error => error.fixedLabel === expectedFailure);
+  else assert.equal(execute().effectiveRevocationLabel, "policy_troubleshooter_closed_all_denied");
+  assert.deepEqual(order, expectedOrder);
+}
 
 rmSync(root, { recursive: true, force: true });
 process.stdout.write("private_access_single_verified_apply_entrypoint_confirmed\n");
