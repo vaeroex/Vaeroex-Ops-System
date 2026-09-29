@@ -12,6 +12,8 @@ const approvedSquareQualificationPaths = Object.freeze([
   "components/admin/AdminSubscriptionEditor.tsx",
   "components/admin/AdminWorkspaceAccessForm.tsx",
   "components/admin/AdminWorkspaceLifecycleActions.tsx",
+  // Exact user-authorized success-notice correction only; write/authority rules remain unchanged.
+  "app/app/admin/subscriptions/actions.ts",
   // Exact user-authorized upload/preparation and shared feedback paths only.
   // This is a path allowance, not permission to change Square or approval rules.
   "app/app/files/actions.ts",

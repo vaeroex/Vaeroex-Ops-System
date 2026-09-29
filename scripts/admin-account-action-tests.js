@@ -570,7 +570,8 @@ test("manual subscription copy requires an access check because a record save ca
     assert.equal(savedRecord.status, "active");
     assert.equal(savedRecord.billing_provider, "manual");
     assert.deepEqual(workspace, originalWorkspace, "failed workspace write must not be mistaken for confirmed access");
-    assert.equal(url.searchParams.get("message"), "Manual activation saved.", "the unchanged action reports the record save despite the second-write error");
+    assert.equal(url.searchParams.get("message"), "Manual subscription record saved. Check workspace access separately.", "the notice confirms only the saved record, not the rejected workspace update");
+    assert.doesNotMatch(url.searchParams.get("message"), /Manual activation saved|access (?:saved|granted|updated)/i);
     assert.equal(url.searchParams.has("error"), false);
 
     const jsx = (type, props) => ({ type, props });

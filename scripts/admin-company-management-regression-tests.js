@@ -40,12 +40,13 @@ const accountClarityPaths = [
   "components/admin/AdminAccountOverview.tsx", "components/admin/AdminCompanyTabs.tsx",
   "components/admin/AdminActivationRequestReview.tsx", "components/admin/AdminManualActivationForm.tsx",
   "components/admin/AdminSubscriptionEditor.tsx", "components/admin/AdminWorkspaceAccessForm.tsx",
-  "components/admin/AdminWorkspaceLifecycleActions.tsx"
+  "components/admin/AdminWorkspaceLifecycleActions.tsx", "app/app/admin/subscriptions/actions.ts"
 ];
-assert.equal(withoutSquareQualificationPaths(accountClarityPaths.join("\n")), "", "only the nine explicitly authorized account-clarity paths are exempt");
+assert.equal(withoutSquareQualificationPaths(accountClarityPaths.join("\n")), "", "only the nine approved UI paths and exact approved subscription-notice path are exempt");
 for (const protectedPath of [
   "app/app/admin/customers/actions.ts", "app/app/admin/workspaces/actions.ts",
-  "app/app/admin/subscriptions/actions.ts", "lib/admin/vaeroex-admin.ts",
+  "app/app/admin/subscriptions/actions.ts.unexpected", "app/app/admin/subscriptions/other-actions.ts",
+  "app/app/admin/subscriptions/nested/actions.ts", "lib/admin/vaeroex-admin.ts",
   "components/admin/AdminDeleteAccount.tsx", "components/admin/AdminWorkspaceAccessFormOther.tsx",
   "supabase/migrations/20990101000000_admin_access.sql"
 ]) {
