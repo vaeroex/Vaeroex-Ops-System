@@ -162,7 +162,9 @@ export function createDirectSquareProvider(input: {
             const updatedAt = item.updatedAt ?? item.createdAt;
             const filteredAt = request.readKind === "created" ? item.createdAt : updatedAt;
             if (!item.id || item.locationId !== request.locationId || !item.createdAt || !updatedAt ||
-                !filteredAt || Date.parse(filteredAt) < start || Date.parse(filteredAt) > end || Date.parse(item.createdAt) > end) throw failure();
+                !filteredAt || Date.parse(filteredAt) < start ||
+                (request.readKind === "created" ? Date.parse(filteredAt) >= end : Date.parse(filteredAt) > end) ||
+                Date.parse(item.createdAt) > end) throw failure();
             const money = item.totalMoney ?? item.amountMoney;
             return { id: item.id, locationId: item.locationId, status: item.status ?? "UNKNOWN", createdAt: item.createdAt,
               updatedAt, amountMinor: money?.amountMinor ?? null, currency: money?.currency ?? null };

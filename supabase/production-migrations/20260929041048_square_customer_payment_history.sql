@@ -314,7 +314,7 @@ begin
       if not isfinite(created_time) or not isfinite(updated_time) or updated_time<created_time
         or c.window_start is null or c.window_end is null
         or (c.read_kind='updated' and (updated_time<c.window_start or updated_time>c.window_end+interval '1 minute'))
-        or (c.read_kind='created' and (created_time<c.window_start or created_time>c.window_end)) then
+        or (c.read_kind='created' and (created_time<c.window_start or created_time>=c.window_end)) then
         raise exception 'square_customer_backend_payload_denied' using errcode='22023'; end if;
       insert into square_customer_private.payments(workspace_id,connection_id,payment_id,location_id,status,created_at,updated_at,amount_minor,currency)
         values(p_workspace_id,cid,item->>'id',c.location_id,item->>'status',created_time,updated_time,(item->>'amountMinor')::bigint,item->>'currency')

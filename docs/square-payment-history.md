@@ -8,6 +8,9 @@ from a first September read without a connection or location failure.
 The historical form requests an explicit inclusive UTC date range of 1–31 days,
 one page of at most 100 Payments per click. It searches Payment **creation** time
 so later updates do not exclude a payment created in the selected period.
+The inclusive end date is sent and stored as the exclusive next UTC midnight,
+so even a Payment in the final fractional second is included. Coverage states
+that exact exclusive boundary; a Payment at the following midnight is outside.
 The seller and selected location remain bound to the existing connection.
 Invoice records themselves are not imported or interpreted as Payments.
 

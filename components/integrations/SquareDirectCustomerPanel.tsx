@@ -37,7 +37,7 @@ function timestamp(value: string | null): string {
 }
 
 function paymentWindow(read: { start: string; end: string; kind: "created" | "updated" }): string {
-  return `Payments ${read.kind} from ${timestamp(read.start)} through ${timestamp(read.end)}`;
+  return `Payments ${read.kind} from ${timestamp(read.start)} ${read.kind === "created" ? "up to (not including)" : "through"} ${timestamp(read.end)}`;
 }
 
 function emptyPaymentsExplanation(connection: DirectView["connections"][number]): string {

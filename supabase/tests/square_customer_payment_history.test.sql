@@ -150,6 +150,7 @@ returns jsonb language sql as $$ select jsonb_build_object('connectionId','aaaaa
  'cursor',page_cursor,'cursorBindingFingerprint',case when page_cursor is not null then 'sha256:'||repeat('c',64) end,
  'cursorFingerprint',case when page_cursor is not null then 'sha256:'||repeat('d',64) end) $$;
 select pg_temp.denied('history_created_before_start_denied','commit_page',pg_temp.history_page('33333333-8888-4888-8888-aaaaaaaaaaaa','before_range',now()-interval '120 days 1 microsecond',now()-interval '1 hour'),'a','a','a','22023');
+select pg_temp.denied('history_created_at_end_denied','commit_page',pg_temp.history_page('33333333-8888-4888-8888-aaaaaaaaaaaa','at_range_end',now()-interval '89 days',now()-interval '1 hour'),'a','a','a','22023');
 select pg_temp.denied('history_created_after_end_denied','commit_page',pg_temp.history_page('33333333-8888-4888-8888-aaaaaaaaaaaa','after_range',now()-interval '89 days'+interval '1 microsecond',now()-interval '1 hour'),'a','a','a','22023');
 select pg_temp.call_backend('commit_page',pg_temp.history_page('33333333-8888-4888-8888-aaaaaaaaaaaa','historical_payment',now()-interval '120 days',now()-interval '1 hour','12345','history_page_2'));
 select pg_temp.check_true(pg_temp.call_backend('status')->'connections'->0->'lastCompletedRead'->>'kind'='updated','history_partial_page_not_complete_coverage');
@@ -162,13 +163,17 @@ select pg_temp.call_backend('authorize','{"connectionId":"aaaaaaaa-5555-4555-855
 select pg_temp.call_backend('commit_page',pg_temp.history_page('55555555-8888-4888-8888-aaaaaaaaaaaa','historical_payment',now()-interval '120 days',now()-interval '2 hours','11111','history_page_3'));
 select pg_temp.call_backend('claim','{"connectionId":"aaaaaaaa-5555-4555-8555-aaaaaaaaaaaa","leaseId":"66666666-8888-4888-8888-aaaaaaaaaaaa"}');
 select pg_temp.call_backend('authorize','{"connectionId":"aaaaaaaa-5555-4555-8555-aaaaaaaaaaaa","leaseId":"66666666-8888-4888-8888-aaaaaaaaaaaa"}');
-select pg_temp.call_backend('commit_page',pg_temp.history_page('66666666-8888-4888-8888-aaaaaaaaaaaa','history_end_boundary',now()-interval '89 days',now()-interval '1 hour'));
+select pg_temp.call_backend('commit_page',pg_temp.history_page('66666666-8888-4888-8888-aaaaaaaaaaaa','history_end_boundary',now()-interval '89 days 1 microsecond',now()-interval '1 hour'));
 select pg_temp.check_true(pg_temp.call_backend('status')->'connections'->0->'lastCompletedRead'->>'kind'='created'
  and (pg_temp.call_backend('status')->'connections'->0->'lastCompletedRead'->>'start')::timestamptz=now()-interval '120 days'
  and (pg_temp.call_backend('status')->'connections'->0->'lastCompletedRead'->>'end')::timestamptz=now()-interval '89 days'
  and pg_temp.call_backend('status')->'connections'->0->'activeRead'='null'::jsonb,'history_final_page_records_exact_coverage');
 select pg_temp.check_true(jsonb_array_length(pg_temp.call_backend('status','{}','b','b','b')->'connections')=0,'history_saved_payment_not_visible_in_other_workspace');
 reset role;
+select pg_temp.check_true((select created_at=now()-interval '120 days' from square_customer_private.payments
+ where connection_id='aaaaaaaa-5555-4555-8555-aaaaaaaaaaaa' and payment_id='historical_payment')
+ and (select created_at=now()-interval '89 days 1 microsecond' from square_customer_private.payments
+ where connection_id='aaaaaaaa-5555-4555-8555-aaaaaaaaaaaa' and payment_id='history_end_boundary'),'history_start_and_last_microsecond_included');
 select pg_temp.check_true((select a.checkpoint_at=b.checkpoint_at and a.last_synced_at=b.last_synced_at
  and a.connection_id=b.connection_id and a.generation=b.generation and a.credential_version=b.credential_version
  and a.ciphertext=b.ciphertext and a.merchant_id=b.merchant_id and a.location_id=b.location_id
@@ -194,4 +199,21 @@ select pg_temp.call_backend('commit_page','{"connectionId":"aaaaaaaa-5555-4555-8
 reset role;
 select pg_temp.check_true((select checkpoint_at is null and last_synced_at is null and last_read_kind='created' and last_read_completed_at is not null
  from square_customer_private.connections where connection_id='aaaaaaaa-5555-4555-8555-aaaaaaaaaaaa'),'history_empty_import_cannot_initialize_update_checkpoint');
+
+-- A requested UTC calendar day includes every instant before the next midnight.
+set local role service_role;
+select pg_temp.call_backend('claim_history',pg_temp.history_payload('99999999-8888-4888-8888-aaaaaaaaaaaa','2026-05-04T00:00:00Z','2026-05-05T00:00:00Z'));
+select pg_temp.call_backend('authorize','{"connectionId":"aaaaaaaa-5555-4555-8555-aaaaaaaaaaaa","leaseId":"99999999-8888-4888-8888-aaaaaaaaaaaa"}');
+select pg_temp.denied('history_next_midnight_excluded','commit_page',pg_temp.history_page('99999999-8888-4888-8888-aaaaaaaaaaaa','next_day_payment','2026-05-05T00:00:00Z','2026-05-05T12:00:00Z'),'a','a','a','22023');
+select pg_temp.call_backend('commit_page',pg_temp.history_page('99999999-8888-4888-8888-aaaaaaaaaaaa','day_start_payment','2026-05-04T00:00:00Z','2026-05-05T12:00:00Z','12345','day_page_2'));
+select pg_temp.call_backend('claim','{"connectionId":"aaaaaaaa-5555-4555-8555-aaaaaaaaaaaa","leaseId":"bbbbbbbb-8888-4888-8888-aaaaaaaaaaaa"}');
+select pg_temp.call_backend('authorize','{"connectionId":"aaaaaaaa-5555-4555-8555-aaaaaaaaaaaa","leaseId":"bbbbbbbb-8888-4888-8888-aaaaaaaaaaaa"}');
+select pg_temp.call_backend('commit_page',pg_temp.history_page('bbbbbbbb-8888-4888-8888-aaaaaaaaaaaa','day_final_payment','2026-05-04T23:59:59.999999Z','2026-05-05T12:00:00Z'));
+select pg_temp.check_true((pg_temp.call_backend('status')->'connections'->0->'lastCompletedRead'->>'start')::timestamptz='2026-05-04T00:00:00Z'::timestamptz
+ and (pg_temp.call_backend('status')->'connections'->0->'lastCompletedRead'->>'end')::timestamptz='2026-05-05T00:00:00Z'::timestamptz,'history_full_utc_day_coverage_recorded');
+reset role;
+select pg_temp.check_true((select count(*)=2 from square_customer_private.payments where connection_id='aaaaaaaa-5555-4555-8555-aaaaaaaaaaaa'
+ and payment_id in ('day_start_payment','day_final_payment'))
+ and not exists(select from square_customer_private.payments where connection_id='aaaaaaaa-5555-4555-8555-aaaaaaaaaaaa'
+ and payment_id='next_day_payment'),'history_full_utc_day_boundary_payments_saved');
 rollback;

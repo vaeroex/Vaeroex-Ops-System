@@ -117,7 +117,7 @@ export async function directForm(action: string, request: Request) {
       if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime()) ||
           start.toISOString().slice(0, 10) !== startDate || end.toISOString().slice(0, 10) !== endDate) throw new Error("square_customer_form_denied");
       const historical = DirectHistoricalWindowSchema.parse({ windowStart: start.toISOString(),
-        windowEnd: new Date(end.getTime() + 86_400_000 - 1).toISOString() });
+        windowEnd: new Date(end.getTime() + 86_400_000).toISOString() });
       if (Date.parse(historical.windowEnd) > Date.now()) throw new Error("square_customer_form_denied");
       return { connectionId: uuid.parse(form.get("connectionId")), historical };
     }

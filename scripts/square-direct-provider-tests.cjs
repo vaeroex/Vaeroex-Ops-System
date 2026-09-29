@@ -124,7 +124,7 @@ async function main() {
   const history = fixture({ network: async (url) => {
     assert.equal(url.searchParams.get('sort_field'), 'CREATED_AT');
     assert.equal(url.searchParams.get('begin_time'), '2026-05-04T00:00:00.000Z');
-    assert.equal(url.searchParams.get('end_time'), '2026-05-05T23:59:59.999Z');
+    assert.equal(url.searchParams.get('end_time'), '2026-05-06T00:00:00.000Z');
     assert.equal(url.searchParams.get('location_id'), 'LOCATION_1');
     assert.equal(url.searchParams.get('limit'), '100');
     assert.equal(url.searchParams.has('updated_at_begin_time'), false);
@@ -133,7 +133,7 @@ async function main() {
       created_at: '2026-05-05T04:43:00Z', updated_at: '2026-06-01T00:00:00Z', total_money: { amount: 400000, currency: 'USD' } }],
       ...(url.searchParams.has('cursor') ? {} : { cursor: 'history_cursor_1' }) });
   } });
-  const historicalRequest = { ...request, readKind: 'created', windowStart: '2026-05-04T00:00:00.000Z', windowEnd: '2026-05-05T23:59:59.999Z' };
+  const historicalRequest = { ...request, readKind: 'created', windowStart: '2026-05-04T00:00:00.000Z', windowEnd: '2026-05-06T00:00:00.000Z' };
   const historicalPage = await history.provider.payments(historicalRequest);
   assert.equal(historicalPage.payments[0].amountMinor, '400000', 'historical payment updated later is still imported');
   const historyNext = { ...historicalRequest, cursor: historicalPage.cursor,
@@ -154,6 +154,14 @@ async function main() {
   const outsideHistory = fixture({ network: async () => Response.json({ payments: [{ id: 'OUTSIDE', location_id: 'LOCATION_1',
     created_at: '2026-05-03T23:59:59Z', updated_at: '2026-05-04T12:00:00Z', status: 'COMPLETED' }] }) });
   await assert.rejects(() => outsideHistory.provider.payments(historicalRequest));
+  for (const createdAt of ['2026-05-04T00:00:00.000Z', '2026-05-05T23:59:59.999Z', '2026-05-05T23:59:59.999999Z']) {
+    const boundary = fixture({ network: async () => Response.json({ payments: [{ id: 'BOUNDARY', location_id: 'LOCATION_1',
+      created_at: createdAt, updated_at: '2026-06-01T00:00:00Z', status: 'COMPLETED' }] }) });
+    assert.equal((await boundary.provider.payments(historicalRequest)).payments.length, 1, 'the whole inclusive end date is covered');
+  }
+  const nextMidnight = fixture({ network: async () => Response.json({ payments: [{ id: 'NEXT_DAY', location_id: 'LOCATION_1',
+    created_at: '2026-05-06T00:00:00.000Z', updated_at: '2026-06-01T00:00:00Z', status: 'COMPLETED' }] }) });
+  await assert.rejects(() => nextMidnight.provider.payments(historicalRequest), 'exclusive next-midnight endpoint is not part of the selected dates');
   for (const changed of [{ workspaceId: randomUUID() }, { connectionId: randomUUID() }, { locationId: 'FOREIGN' },
     { merchantId: 'FOREIGN' }, { windowStart: '2026-09-28T00:00:00.000Z' }, { cursor: 'foreign_cursor' }]) {
     const count = payment.calls.length;

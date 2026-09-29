@@ -200,7 +200,7 @@ async function main() {
   function request(action, body, headers = {}) { return new Request(`${origin}/api/integrations/square/${action}`, {
     method: 'POST', headers: { host: 'www.vaeroex.com', origin, 'content-type': 'application/x-www-form-urlencoded', ...headers }, body }); }
   const connectionId = randomUUID(), businessEntityId = randomUUID();
-  const history = fixture(), historyRange = { windowStart: '2026-05-04T00:00:00.000Z', windowEnd: '2026-05-05T23:59:59.999Z' };
+  const history = fixture(), historyRange = { windowStart: '2026-05-04T00:00:00.000Z', windowEnd: '2026-05-06T00:00:00.000Z' };
   await history.service.read(history.row().connectionId, historyRange);
   assert.equal(history.calls[0].operation, 'claim_history');
   assert.equal(history.calls[0].payload.windowStart, historyRange.windowStart);
@@ -216,8 +216,12 @@ async function main() {
   assert.equal(invalidHistory.calls.length, 0, 'invalid history fails before database or provider access');
   assert.deepEqual(await directForm('read', request('read', `connectionId=${connectionId}&startDate=2026-05-04&endDate=2026-05-05`)),
     { connectionId, historical: historyRange });
+  assert.deepEqual(await directForm('read', request('read', `connectionId=${connectionId}&startDate=2026-05-04&endDate=2026-05-04`)),
+    { connectionId, historical: { windowStart: '2026-05-04T00:00:00.000Z', windowEnd: '2026-05-05T00:00:00.000Z' } });
+  assert.deepEqual(await directForm('read', request('read', `connectionId=${connectionId}&startDate=2026-05-01&endDate=2026-05-31`)),
+    { connectionId, historical: { windowStart: '2026-05-01T00:00:00.000Z', windowEnd: '2026-06-01T00:00:00.000Z' } });
   for (const dates of ['startDate=2026-02-30&endDate=2026-03-01', 'startDate=2026-05-05&endDate=2026-05-04',
-    'startDate=2026-01-01&endDate=2026-05-04', 'startDate=2099-01-01&endDate=2099-01-02',
+    'startDate=2026-01-01&endDate=2026-05-04', 'startDate=2026-05-01&endDate=2026-06-01', 'startDate=2099-01-01&endDate=2099-01-02',
     'startDate=2026-05-04', 'startDate=2026-05-04&endDate=2026-05-05&startDate=2026-05-04'])
     await assert.rejects(() => directForm('read', request('read', `connectionId=${connectionId}&${dates}`)));
   for (const [action, body] of [['connect', `businessEntityId=${businessEntityId}`], ['read', `connectionId=${connectionId}`],

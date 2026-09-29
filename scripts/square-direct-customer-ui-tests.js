@@ -143,9 +143,9 @@ test("active coverage distinguishes creation and update dates and continues the 
   for (const kind of ["created", "updated"]) {
     for (const hasMore of [true, false]) {
       const html = render({ ...view, connections: [{ ...connection, state: "retry_required", hasMore,
-        activeRead: { kind, start: "2026-05-04T00:00:00.000Z", end: "2026-05-04T23:59:59.999Z" }, payments: [],
+        activeRead: { kind, start: "2026-05-04T00:00:00.000Z", end: "2026-05-05T00:00:00.000Z" }, payments: [],
       }] });
-      assert.match(html, new RegExp(`Current search: Payments ${kind} from 2026-05-04 00:00:00 UTC through 2026-05-04 23:59:59\\.999 UTC`));
+      assert.ok(html.includes(`Current search: Payments ${kind} from 2026-05-04 00:00:00 UTC ${kind === "created" ? "up to (not including)" : "through"} 2026-05-05 00:00:00 UTC`));
       assert.match(html, /search is incomplete until every page has been read/);
       assert.match(html, /This search is still incomplete/);
       assert.match(html, hasMore ? /Read next Payments page/ : /Continue Payments read/);
@@ -160,9 +160,9 @@ test("active coverage distinguishes creation and update dates and continues the 
 test("empty completed searches show actual date coverage without claiming all history", () => {
   for (const kind of ["created", "updated"]) {
     const html = render({ ...view, connections: [{ ...connection, payments: [], lastCompletedRead: {
-      kind, start: "2026-05-04T00:00:00.000Z", end: "2026-05-04T23:59:59.999Z", completedAt: "2026-09-29T01:02:03.000Z",
+      kind, start: "2026-05-04T00:00:00.000Z", end: "2026-05-05T00:00:00.000Z", completedAt: "2026-09-29T01:02:03.000Z",
     } }] });
-    assert.match(html, new RegExp(`Last completed search: Payments ${kind} from 2026-05-04 00:00:00 UTC through 2026-05-04 23:59:59\\.999 UTC`));
+    assert.ok(html.includes(`Last completed search: Payments ${kind} from 2026-05-04 00:00:00 UTC ${kind === "created" ? "up to (not including)" : "through"} 2026-05-05 00:00:00 UTC`));
     assert.match(html, /Completed: 2026-09-29 01:02:03 UTC/);
     assert.match(html, /This covers only that date window and the selected location/);
     assert.match(html, new RegExp(`The last completed search checked Payments ${kind} from`));
