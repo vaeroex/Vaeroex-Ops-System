@@ -45,6 +45,11 @@ assert.match(adminNav, /min-h-11/);
 assert.match(adminNav, /overflow-x-auto/);
 assert.match(lifecycleActions, /disabled aria-describedby/);
 assert.match(companyDetail, /Activation needs a decision/);
+const pilotSql = read("supabase/tests/manual_activation_entitlement.test.sql");
+assert.match(pilotSql, /^begin;/);
+assert.match(pilotSql, /rollback;\s*$/);
+assert.match(pilotSql, /grant select, update on table public\.manual_activation_requests to service_role;/);
+assert.doesNotMatch(pilotSql, /grant[^;]+to\s+(?:anon|authenticated)/i, "the isolated pilot fixture must not grant customer-side review authority");
 const accountClarityPaths = [
   "app/app/admin/customers/page.tsx", "app/app/admin/customers/[workspaceId]/page.tsx",
   "components/admin/AdminAccountOverview.tsx", "components/admin/AdminCompanyTabs.tsx",

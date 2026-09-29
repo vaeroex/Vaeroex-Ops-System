@@ -4,6 +4,15 @@ create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 select no_plan();
 
+-- The disposable SQL-created tables do not carry the hosted server client's
+-- table grants. Model only the invoker RPC's required service-role authority
+-- inside this rolled-back fixture, as the billing entitlement suite does.
+-- This qualifies RPC behavior, not the current Production catalog grants.
+grant select, update on table public.manual_activation_requests to service_role;
+grant select on table public.profiles, public.subscription_plans, public.workspace_members to service_role;
+grant select, insert, update on table public.customer_subscriptions to service_role;
+grant select, update on table public.workspaces to service_role;
+
 create or replace function pg_temp.raises_sqlstate(p_sql text, p_expected text)
 returns boolean
 language plpgsql
