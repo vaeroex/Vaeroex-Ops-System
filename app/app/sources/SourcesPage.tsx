@@ -7,8 +7,7 @@ import {
   bulkManageLearnedKnowledgeAction,
   discardFileAnalysisAction,
   manageLearnedKnowledgeAction,
-  manageSourceFileAction,
-  uploadFileAction
+  manageSourceFileAction
 } from "@/app/app/files/actions";
 import { WorkspaceAgreementList } from "@/components/legal/WorkspaceAgreementList";
 import { AnalysisProgressSubmit } from "@/components/operations/AnalysisProgressSubmit";
@@ -16,7 +15,7 @@ import { ConfirmSubmitButton } from "@/components/operations/ConfirmSubmitButton
 import { CreateDrawer } from "@/components/operations/CreateDrawer";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { filterEligibleMemoryRowsByLifecycle } from "@/lib/ai/evidence-index";
-import { TextInput } from "@/components/operations/FormControls";
+import { UploadSourceForm } from "@/components/evidence/UploadSourceForm";
 import { LoadingLink } from "@/components/operations/LoadingLink";
 import { PendingSubmitButton } from "@/components/operations/PendingSubmitButton";
 import { StatusBadge } from "@/components/operations/StatusBadge";
@@ -67,7 +66,6 @@ type SourcesTab = "files" | "knowledge" | "archived" | "legal";
 type SourceDetailSection = "summary" | "findings" | "imported" | "history";
 
 const ANALYSIS_PROGRESS_STEPS = ["Reading file", "Extracting key information", "Identifying business signals", "Checking KPI/import opportunities", "Saving analysis", "Done"];
-const UPLOAD_PROGRESS_STEPS = ["Uploading file", "Saving securely", "Preparing source record", "Refreshing Sources", "Complete"];
 const sourceTabs: Array<{ key: SourcesTab; label: string; href: Route }> = [
   { key: "files", label: "Active Sources", href: "/app/sources" },
   { key: "knowledge", label: "Learned Knowledge", href: "/app/sources?tab=knowledge" },
@@ -359,54 +357,6 @@ function filteredFiles({
     });
 }
 
-function FolderSelect({ folders }: { folders: Pick<FolderRow, "id" | "name">[] }) {
-  return (
-    <label className="block text-sm font-medium text-slate-200">
-      Folder
-      <select name="folder_id" className="mt-2 min-h-11 w-full rounded-lg border border-white/10 bg-slate-950/70 px-3 py-2 text-sm text-slate-100 outline-none focus:border-vaeroex-accent">
-        <option value="">No folder</option>
-        {folders.map((folder) => (
-          <option key={folder.id} value={folder.id}>
-            {folder.name}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
-
-function UploadSourceForm({ folders }: { folders: Pick<FolderRow, "id" | "name">[] }) {
-  return (
-    <form action={uploadFileAction} className="grid gap-4 text-slate-100">
-      <input type="hidden" name="return_path" value="/app/sources" />
-      <label className="block text-sm font-medium text-slate-200">
-        File
-        <input
-          name="file"
-          type="file"
-          accept=".csv,.xlsx,.pdf,.png,.jpg,.jpeg,.docx"
-          required
-          className="mt-2 w-full rounded-lg border border-white/10 bg-slate-950/70 px-3 py-2 text-sm outline-none file:mr-3 file:rounded-md file:border-0 file:bg-vaeroex-blue file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-white focus:border-vaeroex-accent"
-        />
-      </label>
-      <TextInput label="Display name" name="display_name" placeholder="Optional name shown in Vaeroex" />
-      <FolderSelect folders={folders} />
-      <label className="flex items-start gap-3 rounded-lg border border-white/10 bg-slate-950/45 p-3 text-xs leading-5 text-slate-300">
-        <input name="allow_duplicate" type="checkbox" className="mt-0.5 h-4 w-4 rounded border-white/20 bg-slate-950 text-vaeroex-blue focus:ring-vaeroex-accent" />
-        <span>
-          Upload anyway if this is a duplicate source. Vaeroex warns when the file name, type, and size match an existing active source.
-        </span>
-      </label>
-      <p className="rounded-lg border border-white/10 bg-slate-950/45 p-3 text-xs leading-5 text-slate-400">
-        Do not upload patient data, Social Security numbers, insurance IDs, or regulated healthcare data.
-      </p>
-      <AnalysisProgressSubmit className="rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50" pendingLabel="Uploading file..." steps={UPLOAD_PROGRESS_STEPS}>
-        Upload file
-      </AnalysisProgressSubmit>
-    </form>
-  );
-}
-
 function UploadSourceDrawer({ folders, compact = false }: { folders: Pick<FolderRow, "id" | "name">[]; compact?: boolean }) {
   if (compact) {
     return (
@@ -488,7 +438,7 @@ function SourceFileActions({
       {access?.viewUrl ? <a href={access.viewUrl} target="_blank" rel="noreferrer" className="rounded-md border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-100 hover:border-cyan-300/40 hover:bg-cyan-950/30">Preview original</a> : null}
       {access?.downloadUrl ? <a href={access.downloadUrl} download={file.original_name} className="rounded-md border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-100 hover:border-cyan-300/40 hover:bg-cyan-950/30">Download original</a> : null}
       {status !== "Archived" && isSpreadsheet(file) ? (
-        <LoadingLink href={sourceDetailHref(file.id, "imported")} className="rounded-md border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-100 hover:border-cyan-300/40 hover:bg-cyan-950/30" loadingLabel="Opening imported data...">Review imported data</LoadingLink>
+        <LoadingLink href={sourceDetailHref(file.id, "imported")} className="rounded-md border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-100 hover:border-cyan-300/40 hover:bg-cyan-950/30" loadingLabel="Opening import review...">{file.import_status === "imported" ? "View imported data" : "Review spreadsheet"}</LoadingLink>
       ) : null}
       {status !== "Archived" && status !== "Analyzing" && !isSpreadsheet(file) ? (
         <form action={analyzeFileAction}>
@@ -812,24 +762,27 @@ function SourceFileRow({
             <StatusBadge value={status} />
           </div>
           <p className="mt-1 text-xs leading-5 text-slate-400">
-            {file.original_name} · {fileSizeLabel(file.file_size_bytes)} · Uploaded {formatDate(file.created_at)}
+            {file.original_name !== file.display_name ? `${file.original_name} · ` : ""}{fileSizeLabel(file.file_size_bytes)} · Uploaded {formatDate(file.created_at)}
           </p>
           <p className="mt-2 line-clamp-1 text-xs leading-5 text-slate-400">
             {status === "Needs Review"
               ? "Analysis needs a human check before Vaeroex uses it."
               : status === "Learned"
                 ? "This source is available to Vaeroex intelligence."
-                : file.analysis_summary || fileCategory(file, folders)}
+                : status === "Analyzing"
+                  ? "Processing is in progress. Open the source to check its current result."
+                  : status === "Import Review"
+                    ? "Review detected rows and mapping before approving an import."
+                    : status === "Uploaded"
+                      ? "File saved. Open it to choose its next review or analysis step."
+                      : ["Analysis failed", "Import failed", "No usable data found", "Needs clearer file"].includes(status)
+                        ? latestAnalysisFailureMessage(file) || "Processing needs attention. Open the source for the specific issue."
+                        : file.analysis_summary || fileCategory(file, folders)}
           </p>
         </div>
         <SourceFilePrimaryActions file={file} />
       </div>
 
-      {isSpreadsheet(file) && file.import_status === "ready" && status === "Import Review" ? (
-        <div className="mt-3 rounded-lg border border-cyan-400/30 bg-cyan-950/30 p-3 text-xs leading-5 text-cyan-50">
-          Vaeroex found structured data in this file. You can import it as KPI data after review.
-        </div>
-      ) : null}
     </article>
   );
 }
