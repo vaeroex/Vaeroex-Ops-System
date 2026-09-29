@@ -188,7 +188,7 @@ export default async function AdminCompanyDetailPage({
       {tab === "subscription" ? (
         <div className="space-y-6">
           <div className="flex justify-end">
-            <CreateDrawer title="Manual activation" description="Record manually approved access. This can update an existing subscription record; it does not charge the customer." triggerLabel="Manage manual access">
+            <CreateDrawer title="Manual subscription record" description="Record a manually approved subscription. Existing records may be updated. Check workspace access after saving; this does not charge the customer." triggerLabel="Manage manual subscription">
               <AdminManualActivationForm
                 returnTo={returnTo}
                 workspaceId={workspace.id}

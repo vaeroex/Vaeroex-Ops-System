@@ -48,13 +48,13 @@ export function AdminManualActivationForm({
       </label>
       <div className="space-y-3 lg:col-span-2">
         <p className="text-sm leading-6 text-slate-300">
-          Saves manual access for this email and the linked workspace. If the email already has a subscription, its latest record may be updated and marked as manual. This does not start or cancel Stripe billing. Existing user accounts, workspace data, and connection records are retained.
+          Saves a manual subscription record for this email. If the email already has a subscription, its latest record may be updated and marked as manual. Check workspace access after saving; a saved record does not confirm that workspace access was updated. This does not start or cancel Stripe billing. Existing user accounts, workspace data, and connection records are retained.
         </p>
         <PendingSubmitButton
-          pendingLabel="Saving manual activation..."
+          pendingLabel="Saving manual subscription record..."
           className="min-h-11 rounded-md bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white hover:bg-blue-950/70"
         >
-          Save manual activation
+          Save manual subscription record
         </PendingSubmitButton>
       </div>
     </form>

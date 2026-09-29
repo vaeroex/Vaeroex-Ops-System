@@ -449,7 +449,7 @@ async function overviewFixture(options = {}) {
   }
   mocks["@/components/legal/WorkspaceAgreementActions"] = { WorkspaceAgreementActions: "WorkspaceAgreementActions" };
   const { default: Page } = load("app/app/admin/customers/[workspaceId]/page.tsx", mocks);
-  const tree = await Page({ params: Promise.resolve({ workspaceId }), searchParams: Promise.resolve({ tab: "overview" }) });
+  const tree = await Page({ params: Promise.resolve({ workspaceId }), searchParams: Promise.resolve({ tab: options.tab || "overview" }) });
   const props = nodes(tree, (node) => node.type === "AdminAccountOverview")[0]?.props;
   let overview;
   if (props) {
@@ -505,4 +505,93 @@ test("overview read errors and unknown counts stay unavailable instead of being 
   const workspaceError = await overviewFixture({ errors: ["workspaces"] });
   assert.equal(workspaceError.props, undefined, "unverified workspace must not expose account controls");
   assert.match(nodes(workspaceError.tree, (node) => node.type === "ErrorNotice")[0].props.message, /No access settings/);
+});
+
+test("manual subscription copy requires an access check because a record save can outlive a failed workspace update", async () => {
+  // Demonstrate the existing second-write limitation using the real action.
+  // This UI change does not repair or qualify the backend's two-write workflow.
+  for (const existing of [false, true]) {
+    const workspace = { id: workspaceId, subscription_status: "expired", manually_unlocked: false };
+    const originalWorkspace = structuredClone(workspace);
+    let savedRecord = null;
+    let workspaceAttempts = 0;
+    const writes = [];
+    const admin = {
+      from(table) {
+        assert.ok(["profiles", "customer_subscriptions", "workspaces"].includes(table));
+        let payload;
+        const filters = [];
+        const query = {
+          select() { return query; },
+          eq(key, value) { filters.push([key, value]); return query; },
+          order() { return query; },
+          limit() { return query; },
+          async maybeSingle() {
+            if (table === "profiles") return { data: { id: "fixture-member" }, error: null };
+            assert.equal(table, "customer_subscriptions");
+            return { data: existing ? { id: subscriptionId, workspace_id: workspaceId } : null, error: null };
+          },
+          async insert(value) {
+            assert.equal(table, "customer_subscriptions");
+            savedRecord = structuredClone(value);
+            writes.push("subscription saved");
+            return { data: null, error: null };
+          },
+          update(value) { payload = value; return query; },
+          then(resolve, reject) {
+            return Promise.resolve().then(() => {
+              if (table === "customer_subscriptions") {
+                assert.deepEqual(filters, [["id", subscriptionId]]);
+                savedRecord = structuredClone(payload);
+                writes.push("subscription saved");
+                return { data: null, error: null };
+              }
+              assert.equal(table, "workspaces");
+              assert.deepEqual(filters, [["id", workspaceId]]);
+              assert.equal(payload.manually_unlocked, true);
+              workspaceAttempts++;
+              writes.push("workspace rejected");
+              return { data: null, error: { message: "Synthetic workspace update rejected." } };
+            }).then(resolve, reject);
+          }
+        };
+        return query;
+      }
+    };
+    const { createManualSubscriptionAction } = load("app/app/admin/subscriptions/actions.ts", {
+      "next/navigation": { redirect },
+      "next/cache": { revalidatePath() {} },
+      "@/lib/admin/vaeroex-admin": { requireVaeroexAdmin: async () => ({ admin, user: { id: actorId } }) },
+      "@/lib/security/tool-execution-gateway": { logSecurityAuditEvent: async () => {} }
+    });
+    const url = await redirected(createManualSubscriptionAction(form({ customer_email: "member@example.invalid", workspace_id: workspaceId, plan_slug: "vaeroex", status: "active" })));
+    assert.deepEqual(writes, ["subscription saved", "workspace rejected"]);
+    assert.equal(workspaceAttempts, 1);
+    assert.equal(savedRecord.status, "active");
+    assert.equal(savedRecord.billing_provider, "manual");
+    assert.deepEqual(workspace, originalWorkspace, "failed workspace write must not be mistaken for confirmed access");
+    assert.equal(url.searchParams.get("message"), "Manual activation saved.", "the unchanged action reports the record save despite the second-write error");
+    assert.equal(url.searchParams.has("error"), false);
+
+    const jsx = (type, props) => ({ type, props });
+    const { AdminManualActivationForm } = load("components/admin/AdminManualActivationForm.tsx", {
+      "react/jsx-runtime": { jsx, jsxs: jsx },
+      "@/components/operations/PendingSubmitButton": { PendingSubmitButton: "PendingSubmitButton" },
+      "@/app/app/admin/subscriptions/actions": { createManualSubscriptionAction }
+    });
+    const rendered = AdminManualActivationForm({ returnTo: detailPath, workspaceId, customerEmail: "member@example.invalid" });
+    assert.match(content(rendered), /Saves a manual subscription record/);
+    assert.match(content(rendered), /Check workspace access after saving/);
+    assert.match(content(rendered), /a saved record does not confirm that workspace access was updated/);
+    assert.doesNotMatch(content(rendered), /Saves manual access|access (?:is|was) granted/i);
+    const submit = nodes(rendered, (node) => node.type === "PendingSubmitButton")[0];
+    assert.equal(content(submit), "Save manual subscription record");
+    assert.equal(submit.props.pendingLabel, "Saving manual subscription record...");
+  }
+  const page = await overviewFixture({ tab: "subscription", emptyMembers: true });
+  const drawer = nodes(page.tree, (node) => node.type === "CreateDrawer")[0];
+  assert.equal(drawer.props.title, "Manual subscription record");
+  assert.equal(drawer.props.triggerLabel, "Manage manual subscription");
+  assert.match(drawer.props.description, /Check workspace access after saving/);
+  assert.doesNotMatch(drawer.props.description, /Record manually approved access/);
 });
