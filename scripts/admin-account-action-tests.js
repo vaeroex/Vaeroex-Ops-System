@@ -390,7 +390,8 @@ async function overviewFixture(options = {}) {
   const company = {
     workspace_id: workspaceId, company_name: "Disposable fixture account", lifecycle_status: "inactive",
     subscription_status: "expired", subscription_plan_slug: "vaeroex", billing_provider: "stripe",
-    primary_contact_name: "Fixture contact", primary_contact_email: options.activationRequests ? "contact@example.invalid" : null
+    primary_contact_name: "Fixture contact", primary_contact_email: options.activationRequests ? "contact@example.invalid" : null,
+    ...options.company
   };
   const admin = {
     auth: new Proxy({}, { get: () => forbidden }),
@@ -434,7 +435,7 @@ async function overviewFixture(options = {}) {
             if (table === "admin_company_directory_v1") return { data: company, error: null };
             if (table === "workspaces") return { data: { id: workspaceId, created_at: "2026-09-29", updated_at: "2026-09-29" }, error: null };
             if (table === "workspace_members") return { data: members.slice(0, query.maximum), count: members.length, error: null };
-            if (table === "customer_subscriptions") return { data: [], error: null };
+            if (table === "customer_subscriptions") return { data: options.subscriptions || [], error: null };
             if (table === "workspace_agreements") return { data: null, error: null };
             assert.ok(["kpis", "file_uploads", "reports", "ai_agent_runs"].includes(table), `Unexpected read: ${table}`);
             return { data: null, count: options.nullCounts ? null : 0, error: null };
@@ -514,6 +515,20 @@ test("account overview reads at most 100 workspace memberships and only those me
   assert.equal(empty.queries.some((query) => query.table === "profiles"), false, "empty membership sets must not scan profiles");
   assert.match(content(empty.overview), /No membership records/);
   assert.equal(empty.props.memberCount, 0);
+});
+
+test("billing overview distinguishes no linked subscription from workspace fallback status and a failed read", async () => {
+  const missing = await overviewFixture({ company: { subscription_status: "manual_review", billing_provider: null } });
+  assert.equal(missing.props.subscriptionLabel, "No linked subscription");
+  assert.equal(missing.props.company.subscription_status, "manual_review", "workspace/directory state must stay unchanged");
+  assert.match(content(missing.overview), /No linked subscription/);
+
+  const failed = await overviewFixture({ errors: ["customer_subscriptions"] });
+  assert.equal(failed.props.subscriptionLabel, "Unavailable");
+  assert.doesNotMatch(content(failed.overview), /No linked subscription/);
+
+  const linked = await overviewFixture({ subscriptions: [{ id: subscriptionId, workspace_id: workspaceId, status: "expired", plan_slug: "vaeroex", billing_provider: "stripe" }] });
+  assert.equal(linked.props.subscriptionLabel, "expired · Vaeroex · stripe", "verified linked records retain their existing summary");
 });
 
 test("overview read errors and unknown counts stay unavailable instead of being reported as zero or absent", async () => {

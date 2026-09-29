@@ -161,7 +161,7 @@ export default async function AdminCompanyDetailPage({
 
       {tab === "overview" ? (
         <AdminAccountOverview company={company} attention={attention}
-          subscriptionLabel={subscriptionsResult.error ? "Unavailable" : `${company.subscription_status} · ${displayPlanName(company.subscription_plan_slug)}${company.billing_provider ? ` · ${company.billing_provider}` : ""}`}
+          subscriptionLabel={subscriptionsResult.error ? "Unavailable" : !subscriptions.length ? "No linked subscription" : `${company.subscription_status} · ${displayPlanName(company.subscription_plan_slug)}${company.billing_provider ? ` · ${company.billing_provider}` : ""}`}
           agreementLabel={agreementResult.error ? "Unavailable" : agreement ? `Signed ${formatAdminDate(agreement.signed_at)}` : "No agreement"}
           members={members.map((member) => ({ id: member.id, userId: member.user_id, name: profiles.get(member.user_id || "")?.full_name || null, email: profiles.get(member.user_id || "")?.email || member.invited_email, role: member.role, status: member.status }))}
           memberCount={membersResult.error ? null : membersResult.count}
