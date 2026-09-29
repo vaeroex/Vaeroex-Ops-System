@@ -43,7 +43,10 @@ export function AdminWorkspaceLifecycleActions({
   }
 
   if (lifecycle !== "inactive") {
-    return <p className="text-sm leading-6 text-muted">Archive is available when workspace access and linked subscriptions are inactive. Pending activation must be resolved first. Archiving hides the workspace from normal Admin lists and preserves its data.</p>;
+    return <div className="space-y-2">
+      <button type="button" disabled aria-describedby={`archive-blocked-${workspaceId}`} className="min-h-11 rounded-md border border-line px-4 py-2 text-sm font-semibold text-muted opacity-60">Archive workspace</button>
+      <p id={`archive-blocked-${workspaceId}`} className="text-sm leading-6 text-muted">{lifecycle === "pending_activation" ? "Unavailable while the workspace or a linked subscription is in manual review. Review workspace access and subscription records and resolve their pending status first." : "Unavailable while workspace access or a linked subscription is active. Review access and subscription records first."} Archive only hides an inactive workspace from normal Admin lists; it does not delete data or disable a login.</p>
+    </div>;
   }
 
   return (

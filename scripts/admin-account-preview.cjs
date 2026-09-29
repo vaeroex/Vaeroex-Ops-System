@@ -12,10 +12,14 @@ const webpackPackage = require("next/dist/compiled/webpack/webpack");
 webpackPackage.init();
 const webpack = webpackPackage.webpack;
 const root = path.resolve(__dirname, "..");
+// Before/after comparisons share this fixture's data and actions. Only rendered
+// application components may come from a separately verified baseline checkout.
+const componentRoot = process.env.ADMIN_PREVIEW_COMPONENT_ROOT ? fs.realpathSync(process.env.ADMIN_PREVIEW_COMPONENT_ROOT) : root;
 const fixture = path.join(__dirname, "admin-account-fixture");
 const output = fs.mkdtempSync(path.join(os.tmpdir(), "vaeroex-admin-account-preview-"));
 fs.chmodSync(output, 0o700);
-const port = 3158;
+const port = Number(process.env.ADMIN_PREVIEW_PORT || 3158);
+if (![3158, 3159].includes(port)) throw new Error("Only the two local comparison ports are supported.");
 const origin = `http://127.0.0.1:${port}`;
 
 function loadConfig() {
@@ -31,7 +35,7 @@ async function build() {
   const actions = path.join(fixture, "actions.ts");
   // AdminLifecycleBadge uses a pure label helper from the server-marked directory
   // module. Its database imports are type-only; all mutation modules stay mocked.
-  const aliases = { "@/app/app/admin/workspaces/actions$": actions, "@/app/app/admin/subscriptions/actions$": actions, "server-only$": false, "next/link$": navigation, "next/navigation$": navigation, "@": root };
+  const aliases = { "@/app/app/admin/workspaces/actions$": actions, "@/app/app/admin/subscriptions/actions$": actions, "server-only$": false, "next/link$": navigation, "next/navigation$": navigation, "@": componentRoot };
   await new Promise((resolve, reject) => webpack({ mode: "development", target: "web", devtool: false, entry: path.join(fixture, "entry.tsx"), output: { path: output, filename: "preview.js" }, resolve: { extensions: [".tsx", ".ts", ".js"], alias: aliases }, module: { rules: [{ test: /\.tsx?$/, exclude: /node_modules/, use: path.join(__dirname, "workspace-clarity-fixture/ts-loader.cjs") }] }, plugins: [new webpack.DefinePlugin({ "process.env.NODE_ENV": JSON.stringify("development") })] }, (error, stats) => {
     if (error || stats.hasErrors()) reject(error || new Error(stats.toString({ all: false, errors: true })));
     else resolve();

@@ -130,7 +130,7 @@ function harness(options = {}) {
               assert.ok(Object.keys(values).every((key) => allowed.includes(key)), "unexpected account-field mutation");
               if (options.writeError) return { data: null, error: { message: "Fixture write rejected." } };
               Object.assign(row, values);
-              return { data: null, error: null };
+              return { data: { id: row.id }, error: null };
             }
             return { data: structuredClone(row), error: null };
           }).then(resolve, reject);
@@ -368,6 +368,11 @@ test("real lifecycle controls require confirmation, cancel without submission an
     for (const disallowed of ["active", "pending_activation"]) {
       const unavailable = AdminWorkspaceLifecycleActions({ workspaceId, companyName: "Disposable fixture account", lifecycle: disallowed, returnTo: detailPath });
       assert.equal(nodes(unavailable, (node) => node.type === "form").length, 0, `${disallowed} must not expose an archive form`);
+      assert.equal(nodes(unavailable, (node) => node.type === "button")[0].props.disabled, true);
+      if (disallowed === "pending_activation") {
+        assert.match(content(unavailable), /workspace or a linked subscription is in manual review/);
+        assert.doesNotMatch(content(unavailable), /Resolve the activation request/, "manual review does not imply an activation request exists");
+      }
     }
   }
 });
@@ -385,7 +390,8 @@ async function overviewFixture(options = {}) {
   const company = {
     workspace_id: workspaceId, company_name: "Disposable fixture account", lifecycle_status: "inactive",
     subscription_status: "expired", subscription_plan_slug: "vaeroex", billing_provider: "stripe",
-    primary_contact_name: "Fixture contact", primary_contact_email: null
+    primary_contact_name: "Fixture contact", primary_contact_email: options.activationRequests ? "contact@example.invalid" : null,
+    ...options.company
   };
   const admin = {
     auth: new Proxy({}, { get: () => forbidden }),
@@ -395,6 +401,7 @@ async function overviewFixture(options = {}) {
       const builder = {
         select(columns, settings) { query.columns = columns; query.settings = settings; return builder; },
         eq(key, value) { query.filters.push(["eq", key, value]); return builder; },
+        ilike(key, value) { query.filters.push(["ilike", key, value]); return builder; },
         in(key, value) { query.filters.push(["in", key, value]); return builder; },
         is(key, value) { query.filters.push(["is", key, value]); return builder; },
         contains(key, value) { query.filters.push(["contains", key, value]); return builder; },
@@ -405,6 +412,13 @@ async function overviewFixture(options = {}) {
           return Promise.resolve().then(() => {
             queries.push(structuredClone(query));
             const error = options.errors?.includes(table) ? { message: "Fixture read unavailable." } : null;
+            if (["manual_activation_requests", "subscription_events"].includes(table)) {
+              assert.ok(query.filters.some(([kind, key, value]) => kind === "ilike" && key === (table === "manual_activation_requests" ? "email" : "customer_email") && value === company.primary_contact_email));
+              if (error) return { data: null, error };
+              const statuses = query.filters.find(([kind, key]) => kind === "in" && key === "status")?.[2];
+              const rows = table === "manual_activation_requests" ? options.activationRequests : [];
+              return { data: rows.filter((row) => !statuses || statuses.includes(row.status)).sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, query.maximum), error: null };
+            }
             if (table === "profiles") {
               assert.equal(query.columns, "id,full_name,email", "profile reads must use only the needed identity fields");
               assert.equal(query.filters.length, 1);
@@ -421,7 +435,7 @@ async function overviewFixture(options = {}) {
             if (table === "admin_company_directory_v1") return { data: company, error: null };
             if (table === "workspaces") return { data: { id: workspaceId, created_at: "2026-09-29", updated_at: "2026-09-29" }, error: null };
             if (table === "workspace_members") return { data: members.slice(0, query.maximum), count: members.length, error: null };
-            if (table === "customer_subscriptions") return { data: [], error: null };
+            if (table === "customer_subscriptions") return { data: options.subscriptions || [], error: null };
             if (table === "workspace_agreements") return { data: null, error: null };
             assert.ok(["kpis", "file_uploads", "reports", "ai_agent_runs"].includes(table), `Unexpected read: ${table}`);
             return { data: null, count: options.nullCounts ? null : 0, error: null };
@@ -465,6 +479,23 @@ function content(tree) {
   return tree == null || typeof tree === "boolean" ? "" : String(tree);
 }
 
+test("older pending requests remain actionable after twelve newer resolved requests", async () => {
+  const activationRequests = [
+    { id: "older-pending", status: "pending", email: "contact@example.invalid", created_at: "2026-09-01" },
+    { id: "older-needs-info", status: "needs_more_info", email: "contact@example.invalid", created_at: "2026-09-02" },
+    ...Array.from({ length: 12 }, (_, index) => ({ id: `resolved-${index}`, status: index % 2 ? "approved" : "denied", email: "contact@example.invalid", created_at: "2026-09-29" }))
+  ];
+  const fixture = await overviewFixture({ activationRequests });
+  const requests = fixture.queries.filter((query) => query.table === "manual_activation_requests");
+  assert.equal(requests.length, 2);
+  assert.ok(requests.every((query) => query.maximum === 12));
+  assert.deepEqual(requests.map((query) => query.filters.find(([kind, key]) => kind === "in" && key === "status")[2]), [["pending", "needs_more_info"], ["approved", "denied"]]);
+  assert.deepEqual(nodes(fixture.tree, (node) => node.type === "AdminActivationRequestReview").map((node) => node.props.request.id), ["older-needs-info", "older-pending"]);
+  const failed = await overviewFixture({ activationRequests, errors: ["manual_activation_requests"] });
+  assert.match(nodes(failed.tree, (node) => node.type === "ErrorNotice")[0].props.message, /pending activation requests/);
+  assert.equal(nodes(failed.tree, (node) => node.type === "AdminActivationRequestReview").length, 0);
+});
+
 test("account overview reads at most 100 workspace memberships and only those members' profile identities", async () => {
   const fixture = await overviewFixture();
   const membershipQuery = fixture.queries.find((query) => query.table === "workspace_members");
@@ -484,6 +515,20 @@ test("account overview reads at most 100 workspace memberships and only those me
   assert.equal(empty.queries.some((query) => query.table === "profiles"), false, "empty membership sets must not scan profiles");
   assert.match(content(empty.overview), /No membership records/);
   assert.equal(empty.props.memberCount, 0);
+});
+
+test("billing overview distinguishes no linked subscription from workspace fallback status and a failed read", async () => {
+  const missing = await overviewFixture({ company: { subscription_status: "manual_review", billing_provider: null } });
+  assert.equal(missing.props.subscriptionLabel, "No linked subscription");
+  assert.equal(missing.props.company.subscription_status, "manual_review", "workspace/directory state must stay unchanged");
+  assert.match(content(missing.overview), /No linked subscription/);
+
+  const failed = await overviewFixture({ errors: ["customer_subscriptions"] });
+  assert.equal(failed.props.subscriptionLabel, "Unavailable");
+  assert.doesNotMatch(content(failed.overview), /No linked subscription/);
+
+  const linked = await overviewFixture({ subscriptions: [{ id: subscriptionId, workspace_id: workspaceId, status: "expired", plan_slug: "vaeroex", billing_provider: "stripe" }] });
+  assert.equal(linked.props.subscriptionLabel, "expired · Vaeroex · stripe", "verified linked records retain their existing summary");
 });
 
 test("overview read errors and unknown counts stay unavailable instead of being reported as zero or absent", async () => {
@@ -507,9 +552,7 @@ test("overview read errors and unknown counts stay unavailable instead of being 
   assert.match(nodes(workspaceError.tree, (node) => node.type === "ErrorNotice")[0].props.message, /No access settings/);
 });
 
-test("manual subscription copy requires an access check because a record save can outlive a failed workspace update", async () => {
-  // Demonstrate the existing second-write limitation using the real action.
-  // This UI change does not repair or qualify the backend's two-write workflow.
+test("manual subscription partial failure is a persistent error, never confirmed access or a blind retry", async () => {
   for (const existing of [false, true]) {
     const workspace = { id: workspaceId, subscription_status: "expired", manually_unlocked: false };
     const originalWorkspace = structuredClone(workspace);
@@ -527,8 +570,11 @@ test("manual subscription copy requires an access check because a record save ca
           order() { return query; },
           limit() { return query; },
           async maybeSingle() {
+            if (payload) return await query;
             if (table === "profiles") return { data: { id: "fixture-member" }, error: null };
+            if (table === "workspaces") return { data: { id: workspaceId }, error: null };
             assert.equal(table, "customer_subscriptions");
+            assert.deepEqual(filters, [["customer_email", "member@example.invalid"], ["billing_provider", "manual"], ["manually_activated", true], ["workspace_id", workspaceId]]);
             return { data: existing ? { id: subscriptionId, workspace_id: workspaceId } : null, error: null };
           },
           async insert(value) {
@@ -570,9 +616,9 @@ test("manual subscription copy requires an access check because a record save ca
     assert.equal(savedRecord.status, "active");
     assert.equal(savedRecord.billing_provider, "manual");
     assert.deepEqual(workspace, originalWorkspace, "failed workspace write must not be mistaken for confirmed access");
-    assert.equal(url.searchParams.get("message"), "Manual subscription record saved. Check workspace access separately.", "the notice confirms only the saved record, not the rejected workspace update");
-    assert.doesNotMatch(url.searchParams.get("message"), /Manual activation saved|access (?:saved|granted|updated)/i);
-    assert.equal(url.searchParams.has("error"), false);
+    assert.equal(url.searchParams.has("message"), false);
+    assert.match(url.searchParams.get("error"), /record saved, but the workspace update failed/);
+    assert.match(url.searchParams.get("error"), /Access is not confirmed/);
 
     const jsx = (type, props) => ({ type, props });
     const { AdminManualActivationForm } = load("components/admin/AdminManualActivationForm.tsx", {
@@ -582,8 +628,8 @@ test("manual subscription copy requires an access check because a record save ca
     });
     const rendered = AdminManualActivationForm({ returnTo: detailPath, workspaceId, customerEmail: "member@example.invalid" });
     assert.match(content(rendered), /Saves a manual subscription record/);
-    assert.match(content(rendered), /Check workspace access after saving/);
-    assert.match(content(rendered), /a saved record does not confirm that workspace access was updated/);
+    assert.match(content(rendered), /Stripe records and other workspaces are not converted or moved/);
+    assert.match(content(rendered), /no automatic end date/);
     assert.doesNotMatch(content(rendered), /Saves manual access|access (?:is|was) granted/i);
     const submit = nodes(rendered, (node) => node.type === "PendingSubmitButton")[0];
     assert.equal(content(submit), "Save manual subscription record");
@@ -593,6 +639,105 @@ test("manual subscription copy requires an access check because a record save ca
   const drawer = nodes(page.tree, (node) => node.type === "CreateDrawer")[0];
   assert.equal(drawer.props.title, "Manual subscription record");
   assert.equal(drawer.props.triggerLabel, "Manage manual subscription");
-  assert.match(drawer.props.description, /Check workspace access after saving/);
+  assert.match(drawer.props.description, /without a purchase or charge/);
   assert.doesNotMatch(drawer.props.description, /Record manually approved access/);
+});
+
+// Execute the real actions and entitlement evaluator over disposable in-memory
+// rows. This is not a claim of Auth signup, PostgREST or RLS qualification.
+function pilotFixture(options = {}) {
+  const email = "ordinary-owner@example.invalid";
+  const state = {
+    profiles: [{ id: "ordinary-owner", email }],
+    workspaces: [{ id: workspaceId, subscription_required: true, manually_unlocked: false, subscription_status: "manual_review", plan_slug: "vaeroex" }],
+    customer_subscriptions: [
+      { id: "other-manual", customer_email: email, user_id: "ordinary-owner", workspace_id: otherWorkspaceId, billing_provider: "manual", manually_activated: true, status: "expired" },
+      { id: "other-stripe", customer_email: email, user_id: "ordinary-owner", workspace_id: otherWorkspaceId, billing_provider: "stripe", manually_activated: false, status: "active" }
+    ]
+  };
+  const preserved = structuredClone(state.customer_subscriptions);
+  const writes = [];
+  const admin = { from(table) {
+    assert.ok(Object.hasOwn(state, table));
+    let filters = [], payload, operation = "read", maximum;
+    const q = {
+      select() { return q; }, eq(key, value) { filters.push([key, value]); return q; },
+      is(key, value) { filters.push([key, value]); return q; },
+      or() { return q; }, order() { return q; }, limit(value) { maximum = value; return q; },
+      maybeSingle() { return execute(true); },
+      insert(value) { payload = value; operation = "insert"; return q; },
+      update(value) { payload = value; operation = "update"; return q; },
+      then(resolve, reject) { return execute(false).then(resolve, reject); }
+    };
+    async function execute(single) {
+      if (options.readError === table && operation === "read") return { data: null, error: { message: "Synthetic read rejected" } };
+      let rows = state[table].filter((row) => filters.every(([key, value]) => row[key] === value));
+      if (maximum) rows = rows.slice(0, maximum);
+      if (operation !== "read") {
+        writes.push({ table, operation, filters: structuredClone(filters) });
+        if (options.workspaceWriteFailure && table === "workspaces") return { data: null, error: { message: "Synthetic workspace failure" } };
+        if (operation === "insert") {
+          const row = { id: `manual-${state[table].length}`, ...payload };
+          state[table].push(row); rows = [row];
+        } else rows.forEach((row) => Object.assign(row, payload));
+      }
+      return { data: structuredClone(single ? rows[0] || null : rows), error: null };
+    }
+    return q;
+  } };
+  const actions = load("app/app/admin/subscriptions/actions.ts", {
+    "next/navigation": { redirect }, "next/cache": { revalidatePath() {} },
+    "@/lib/admin/vaeroex-admin": { requireVaeroexAdmin: async () => ({ admin, user: { id: actorId } }) },
+    "@/lib/security/tool-execution-gateway": { logSecurityAuditEvent: async () => {} }
+  });
+  const { getSubscriptionStatus } = load("lib/billing/get-subscription-status.ts", {});
+  const eligibility = (selectedWorkspace) => getSubscriptionStatus({ supabase: admin, userId: "ordinary-owner", email, workspaceId: selectedWorkspace });
+  const fields = { customer_email: email, workspace_id: workspaceId, plan_slug: "vaeroex", status: "active" };
+  return { state, writes, preserved, fields, actions, eligibility };
+}
+
+test("ordinary non-admin pilot: manual grant targets one workspace, preserves Stripe/other workspace, and can end without disabling login", async () => {
+  const f = pilotFixture();
+  assert.equal((await f.eligibility(workspaceId)).allowed, false);
+  let result = await redirected(f.actions.createManualSubscriptionAction(form(f.fields)));
+  assert.match(result.searchParams.get("message"), /record and workspace settings saved/);
+  assert.equal((await f.eligibility(workspaceId)).allowed, true);
+  assert.equal((await f.eligibility(workspaceId)).source, "manual", "must not use admin bypass");
+  assert.deepEqual(f.state.customer_subscriptions.slice(0, 2), f.preserved);
+  result = await redirected(f.actions.createManualSubscriptionAction(form({ ...f.fields, status: "expired" })));
+  assert.equal(result.searchParams.has("error"), false);
+  assert.equal(f.state.customer_subscriptions.length, 3, "repeat save updates the exact manual record, not another record");
+  assert.equal((await f.eligibility(workspaceId)).allowed, false);
+  assert.equal(f.state.workspaces[0].manually_unlocked, false);
+  assert.equal(f.state.workspaces[0].subscription_required, true);
+  assert.equal(f.state.profiles[0].email, f.fields.customer_email, "login identity retained");
+  assert.deepEqual(f.state.customer_subscriptions.slice(0, 2), f.preserved);
+});
+
+test("first-time manual pilot record is unlinked for setup, never moves an existing workspace record", async () => {
+  const f = pilotFixture();
+  const result = await redirected(f.actions.createManualSubscriptionAction(form({ ...f.fields, workspace_id: "" })));
+  assert.match(result.searchParams.get("message"), /continue to workspace setup/);
+  assert.equal(f.state.customer_subscriptions.at(-1).workspace_id, null);
+  assert.equal((await f.eligibility()).allowed, true);
+  assert.equal((await f.eligibility(workspaceId)).allowed, false, "unlinked setup access does not unlock an existing workspace");
+  assert.deepEqual(f.state.customer_subscriptions.slice(0, 2), f.preserved);
+  assert.equal(f.writes.some((write) => write.table === "workspaces"), false);
+});
+
+test("manual lookup failures or unknown workspace cause no writes; a rejected second write stops with exact partial-result feedback", async () => {
+  for (const readError of ["profiles", "workspaces", "customer_subscriptions"]) {
+    const f = pilotFixture({ readError });
+    const result = await redirected(f.actions.createManualSubscriptionAction(form(f.fields)));
+    assert.match(result.searchParams.get("error"), /Nothing was saved/);
+    assert.equal(f.writes.length, 0);
+  }
+  const absent = pilotFixture();
+  assert.match((await redirected(absent.actions.createManualSubscriptionAction(form({ ...absent.fields, workspace_id: "missing" })))).searchParams.get("error"), /Workspace could not be verified/);
+  assert.equal(absent.writes.length, 0);
+  const failed = pilotFixture({ workspaceWriteFailure: true });
+  const result = await redirected(failed.actions.createManualSubscriptionAction(form(failed.fields)));
+  assert.match(result.searchParams.get("error"), /record saved, but the workspace update failed/);
+  assert.equal(failed.writes.length, 2, "no retry or compensating mutation");
+  assert.equal((await failed.eligibility(workspaceId)).allowed, false);
 });

@@ -12,6 +12,7 @@ import { ActivityProvider } from "@/components/app/ActivityProvider";
 import { SectionCard } from "@/components/operations/SectionCard";
 import { CreateDrawer } from "@/components/operations/CreateDrawer";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
+import { AdminNav } from "@/components/admin/AdminNav";
 import { complete, detailPath, setLifecycle, setMode, snapshot, subscribe, workspaceId, type Lifecycle, type Mode } from "./actions";
 import Link, { usePathname, useSearchParams } from "../customer-evidence-workflow-fixture/navigation";
 
@@ -25,10 +26,11 @@ function Preview() {
   const requestedTab = params.get("tab") || "overview";
   const tab = (["overview", "workspace", "subscription", "agreement"].includes(requestedTab) ? requestedTab : "overview") as AdminCompanyTab;
   const returnTo = `${detailPath}?tab=${tab}`;
-  const company = { workspace_id: workspaceId, company_name: "Acme Sample", primary_contact_name: "Sample Owner", primary_contact_email: "owner@example.test", lifecycle_status: fixture.lifecycle, industry: "Sample services", size: "1–10", subscription_status: fixture.subscription.status } as ComponentProps<typeof AdminAccountOverview>["company"];
+  const company = { workspace_id: workspaceId, company_name: "Acme Sample", primary_contact_name: "Sample Contact", primary_contact_email: "contact@example.test", lifecycle_status: fixture.lifecycle, industry: "Sample services", size: "1–10", subscription_status: fixture.subscription.status, workspace_subscription_status: fixture.workspace.subscription_status, subscription_required: fixture.workspace.subscription_required, manually_unlocked: fixture.workspace.manually_unlocked } as ComponentProps<typeof AdminAccountOverview>["company"];
   return <ActivityProvider><div className="vaeroex-app-shell min-h-dvh overflow-x-hidden bg-[#f8fafc] text-ink">
     <div className="border-b border-white/10 bg-[#08111f] p-3 text-xs leading-5 text-amber-100">LOCAL SYNTHETIC PREVIEW — actual Admin components. Server actions, lifecycle guards, redirects, and persistence are mocked in memory. This does not qualify database authorization, RLS, or Production behavior. No provider or network connections.</div>
     <main className="mx-auto max-w-6xl space-y-6 p-4 sm:p-6">
+      <AdminNav />
       <details className="rounded-lg border border-white/10 bg-[#08111f] p-4" open>
         <summary className="cursor-pointer text-sm font-semibold">Fixture controls · synthetic actions only</summary>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">

@@ -1,6 +1,11 @@
 // Exact additive dormant qualification/connection scope. Legacy parser suites still reject
 // every other database/runtime path; no directory-wide exemption is permitted.
 const approvedSquareQualificationPaths = Object.freeze([
+  // Exact follow-up paths authorized for pilot wording, mobile navigation and
+  // isolated activation tests. No neighboring handler or migration is exempt.
+  "components/admin/AdminNav.tsx",
+  "app/billing-required/page.tsx",
+  "supabase/tests/manual_activation_entitlement.test.sql",
   // Exact user-authorized Admin account clarity paths; no neighboring actions,
   // authorization helpers, migrations, or provider behavior are exempted.
   "app/app/admin/customers/page.tsx",

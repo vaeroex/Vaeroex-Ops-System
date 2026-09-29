@@ -12,8 +12,8 @@ export default async function BillingRequiredPage({ searchParams }: BillingRequi
   return (
     <main className="min-h-screen bg-slate-50 px-6 py-10 text-ink">
       <section className="mx-auto max-w-3xl rounded-lg border border-line bg-white p-7 shadow-panel">
-        <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-blue">Subscription required</p>
-        <h1 className="mt-2 text-3xl font-semibold">Your Vaeroex subscription is required to access this workspace.</h1>
+        <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-blue">Workspace access</p>
+        <h1 className="mt-2 text-3xl font-semibold">Activate your Vaeroex access</h1>
         <p className="mt-3 text-sm leading-6 text-muted">
           {params?.reason || "Use the same email you used for your Vaeroex subscription, or request manual activation if access does not unlock automatically."}
         </p>
@@ -23,10 +23,7 @@ export default async function BillingRequiredPage({ searchParams }: BillingRequi
             View Vaeroex subscription
           </Link>
           <a href="#already-purchased" className="rounded-lg border border-line bg-white px-4 py-2 text-sm font-semibold">
-            I already purchased
-          </a>
-          <a href="#already-purchased" className="rounded-lg border border-line bg-white px-4 py-2 text-sm font-semibold">
-            Request Manual Activation
+            Request manual or pilot access
           </a>
           <a href={VAEROEX_MAILTO_LINKS.billing} className="rounded-lg border border-line bg-white px-4 py-2 text-sm font-semibold">
             Email Billing
@@ -44,7 +41,7 @@ export default async function BillingRequiredPage({ searchParams }: BillingRequi
       <section id="already-purchased" className="mx-auto mt-6 max-w-3xl rounded-lg border border-line bg-white p-7 shadow-panel">
         <h2 className="text-xl font-semibold">Request manual activation</h2>
         <p className="mt-2 text-sm leading-6 text-muted">
-          Submit the email and purchase details from your Vaeroex subscription. Vaeroex will verify access and unlock the workspace when confirmed.
+          Use your Vaeroex sign-in email. For an invited pilot, explain that invitation in the message; no purchase or order number is required. Sending a request does not grant access or create a paid subscription. After approval, return to Vaeroex to continue workspace setup and its required agreement, or open your existing workspace.
         </p>
         {params?.message ? <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">{params.message}</div> : null}
         <div className="mt-4">
@@ -56,7 +53,7 @@ export default async function BillingRequiredPage({ searchParams }: BillingRequi
             <input required name="name" className="mt-2 w-full rounded-lg border border-line px-3 py-2 outline-none focus:border-vaeroex-blue" />
           </label>
           <label className="block text-sm font-medium">
-            Email used for Vaeroex subscription
+            Vaeroex sign-in email
             <input required name="email" type="email" className="mt-2 w-full rounded-lg border border-line px-3 py-2 outline-none focus:border-vaeroex-blue" />
           </label>
           <label className="block text-sm font-medium">
@@ -64,7 +61,7 @@ export default async function BillingRequiredPage({ searchParams }: BillingRequi
             <input name="company" className="mt-2 w-full rounded-lg border border-line px-3 py-2 outline-none focus:border-vaeroex-blue" />
           </label>
           <label className="block text-sm font-medium">
-            Subscription purchased
+            Requested plan
             <input name="plan_purchased" defaultValue="Vaeroex" className="mt-2 w-full rounded-lg border border-line px-3 py-2 outline-none focus:border-vaeroex-blue" />
           </label>
           <label className="block text-sm font-medium md:col-span-2">

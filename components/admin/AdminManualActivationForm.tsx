@@ -39,8 +39,8 @@ export function AdminManualActivationForm({
         </select>
       </label>
       <label className="block text-sm font-medium text-slate-100">
-        Workspace ID
-        <input name="workspace_id" defaultValue={workspaceId} className="mt-2 min-h-11 w-full rounded-md border border-line bg-white px-3 py-2 text-ink" />
+        Workspace ID {workspaceId ? "(this business)" : "(optional before first workspace setup)"}
+        <input name="workspace_id" defaultValue={workspaceId} readOnly={Boolean(workspaceId)} className="mt-2 min-h-11 w-full rounded-md border border-line bg-white px-3 py-2 text-ink" />
       </label>
       <label className="block text-sm font-medium text-slate-100 lg:col-span-2">
         Notes
@@ -48,8 +48,9 @@ export function AdminManualActivationForm({
       </label>
       <div className="space-y-3 lg:col-span-2">
         <p className="text-sm leading-6 text-slate-300">
-          Saves a manual subscription record for this email. If the email already has a subscription, its latest record may be updated and marked as manual. Check workspace access after saving; a saved record does not confirm that workspace access was updated. This does not start or cancel Stripe billing. Existing user accounts, workspace data, and connection records are retained.
+          Saves a manual subscription record only for this email and workspace. An existing manual record for that exact target may be updated; Stripe records and other workspaces are not converted or moved. This does not charge the customer. An active record without a workspace allows first-time workspace setup after the required agreement.
         </p>
+        <p className="text-sm leading-6 text-slate-300">Manual pilot access has no automatic end date. To end it, expire the manual record and review workspace access: require a subscription and turn off manual unlock. Other eligible subscriptions or trials may still permit access. Login accounts, saved data, and connection records are retained; this is not a provider disconnect or a Stripe cancellation.</p>
         <PendingSubmitButton
           pendingLabel="Saving manual subscription record..."
           className="min-h-11 rounded-md bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white hover:bg-blue-950/70"
