@@ -422,7 +422,7 @@ matches(
   "the fixture must preserve the exact production-labelled 2-leased/1-pending shape"
 );
 
-equal(approvedSquareQualificationPaths.length, 223, "dormant scope permits only exact reviewed migrations, UI, native service/templates, provider-neutral Production composition and activation, restricted evidence host, query-stripping callback edge, repository-bound image trigger, internal-seller consent and manual read, internal-pilot runtime, offline pilot, bounded provisioner and customer candidate files");
+equal(approvedSquareQualificationPaths.length, 229, "dormant scope permits only exact reviewed migrations, UI/upload feedback, native service/templates, provider-neutral Production composition and activation, restricted evidence host, query-stripping callback edge, repository-bound image trigger, internal-seller consent and manual read, internal-pilot runtime, offline pilot, bounded provisioner and customer candidate files");
 const workspaceClarityPaths = [
   "app/app/intelligence/page.tsx",
   "app/app/kpis/page.tsx",
@@ -441,12 +441,22 @@ const workspaceClarityPaths = [
   "components/reports/SavedAnalysisList.tsx"
 ];
 equal(withoutSquareQualificationPaths(workspaceClarityPaths.join("\n")), "", "only the fifteen reviewed workspace-clarity and note-feedback paths are exempt");
+const uploadFeedbackPaths = [
+  "app/app/files/actions.ts",
+  "components/evidence/UploadSourceForm.tsx",
+  "components/app/ToastRegion.tsx",
+  "components/operations/AnalysisProgressSubmit.tsx",
+  "components/operations/FormControls.tsx",
+  "components/operations/PendingSubmitButton.tsx"
+];
+equal(withoutSquareQualificationPaths(uploadFeedbackPaths.join("\n")), "", "only the six explicitly authorized upload/feedback paths are exempt");
 for (const unapprovedWorkspacePath of [
   ...workspaceClarityPaths.map(file => `${file}.unexpected`),
+  ...uploadFeedbackPaths.map(file => `${file}.unexpected`),
   "app/app/intelligence/actions.ts",
   "app/app/kpis/unreviewed/page.tsx",
   "app/app/sources/business-notes/approval-actions.ts",
-  "app/app/files/actions.ts",
+  "app/app/files/unreviewed-actions.ts",
   "components/app/AppNavigationExtra.tsx",
   "components/evidence/UnreviewedList.tsx",
   "components/evidence/EvidenceLifecycleSelectionExtra.tsx",
@@ -456,6 +466,7 @@ for (const unapprovedWorkspacePath of [
 ]) {
   equal(withoutSquareQualificationPaths(unapprovedWorkspacePath), unapprovedWorkspacePath, "workspace UI allowance must reject neighboring, action, and backend paths");
   equal(withoutSquareQualificationPaths([...workspaceClarityPaths, unapprovedWorkspacePath].join("\n")), unapprovedWorkspacePath, "approved UI paths cannot hide unrelated changes in a mixed diff");
+  equal(withoutSquareQualificationPaths([...uploadFeedbackPaths, unapprovedWorkspacePath].join("\n")), unapprovedWorkspacePath, "approved upload/feedback paths cannot hide unrelated changes in a mixed diff");
 }
 const directCustomerProtectedPaths = [
   "components/integrations/SquareDirectCustomerPanel.tsx",
