@@ -82,7 +82,7 @@ if (process.env.WORKSPACE_REDESIGN_BASE) {
   const baseline = process.env.WORKSPACE_REDESIGN_BASE;
   assert.match(baseline, /^[a-f0-9]{40}$/);
   const files = [
-    "components/app/AppShell.tsx", "components/intelligence/ExecutiveHomepage.tsx",
+    "components/app/AppShell.tsx", "app/app/forms/page.tsx", "components/intelligence/ExecutiveHomepage.tsx",
     "components/intelligence/IntelligenceSignalInbox.tsx", "components/intelligence/IntelligenceBriefingCards.tsx",
     "app/app/intelligence/page.tsx", "app/app/sources/SourcesPage.tsx",
     "components/evidence/BusinessNotesPanel.tsx", "app/app/settings/page.tsx",

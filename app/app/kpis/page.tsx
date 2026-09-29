@@ -92,7 +92,7 @@ type KpisPageProps = {
     q?: string;
     limit?: string;
     metricSearch?: string | string[];
-    category?: string;
+    category?: string | string[];
   }>;
 };
 
@@ -1639,7 +1639,8 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
   // List-only filters never alter the records, comparison or detail datasets.
   const metricSearchValue = params?.metricSearch;
   const metricSearch = (Array.isArray(metricSearchValue) ? metricSearchValue[0] || "" : metricSearchValue || "").trim();
-  const categoryFilter = params?.category || "";
+  const categoryValue = params?.category;
+  const categoryFilter = Array.isArray(categoryValue) ? categoryValue[0] || "" : categoryValue || "";
   const metricCategories = [...new Set(latestKpiRows.map((kpi) => kpi.category).filter((category): category is string => Boolean(category)))].sort();
   const matchingMetricRows = filteredLatestKpiRows.filter((kpi) =>
     (!metricSearch || `${kpi.name} ${kpi.category || ""}`.toLowerCase().includes(metricSearch.toLowerCase()))

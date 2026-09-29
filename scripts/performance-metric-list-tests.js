@@ -147,6 +147,66 @@ test("metric search normalizes normal, empty and repeated parameters to the firs
   }
 });
 
+test("category normalizes single, empty and repeated parameters without trimming or reclassifying categories", async () => {
+  const snapshot = (html) => ({
+    counts: counts(html),
+    rows: rows(html).map(({ name, text, href }) => ({ name, text, href })),
+    select: html.match(/<select\b[^>]*name="category"[^>]*>[\s\S]*?<\/select>/)?.[0],
+  });
+  for (const [first, later] of [["Financial", "Operations"], ["Operations", "Financial"], ["", "Financial"], ["", ""], [" Financial ", "Financial"], ["financial", "Financial"], ["Retired category", "Operations"]]) {
+    const single = snapshot(await render({ category: first }));
+    const repeated = snapshot(await render(new URLSearchParams([["category", first], ["category", later]])));
+    assert.deepEqual(repeated, single, "the first category alone controls results, selection, batching and detail links");
+    if (!first) assert.deepEqual(repeated, snapshot(await render()));
+    if ([" Financial ", "financial", "Retired category"].includes(first)) assert.equal(repeated.counts.matching, 0, "category matching remains exact, not trimmed or case-folded");
+    for (const row of repeated.rows) {
+      assert.deepEqual(new URL(row.href, "https://fixture.invalid").searchParams.getAll("category"), first ? [first] : []);
+    }
+  }
+});
+
+test("new single-value filters normalize together and preserve existing dates, status, batching and detail return context", async () => {
+  const context = { status: "behind-target", show: "12", timeline: "Custom Range", start: "2026-09-01", end: "2026-09-29" };
+  for (const search of ["Net sales", "", "   ", "No matching metric"]) {
+    for (const category of ["Financial", "", "Operations", "Retired category"]) {
+      const single = new URLSearchParams({ ...context, metricSearch: search, category });
+      const repeated = new URLSearchParams(single);
+      repeated.append("metricSearch", "Service capacity");
+      repeated.append("category", "Financial");
+      const html = await render(repeated);
+      const expected = await render(single);
+      assert.deepEqual(counts(html), counts(expected));
+      assert.deepEqual(rows(html), rows(expected));
+      assert.deepEqual(hrefs(html), hrefs(expected), "all navigation uses the same supported filter context");
+      const selected = rows(html)[0];
+      if (!selected) continue;
+      const detail = await render(new URL(selected.href, "https://fixture.invalid").searchParams);
+      const back = hrefs(detail).find((link) => link.label === "← Back to Performance");
+      assert.ok(back);
+      const restored = new URL(back.href, "https://fixture.invalid").searchParams;
+      for (const [key, value] of Object.entries(context)) assert.equal(restored.get(key), value);
+      assert.deepEqual(restored.getAll("metricSearch"), search.trim() ? [search.trim()] : []);
+      assert.deepEqual(restored.getAll("category"), category ? [category] : []);
+      assert.deepEqual(counts(await render(restored)), counts(expected));
+    }
+  }
+});
+
+test("normalizing list filters preserves intentionally multi-value metric comparison selection", async () => {
+  const metrics = ["Net sales — Flagship store", "Net sales — North district"];
+  const params = new URLSearchParams({ section: "compare", metricSearch: "Net sales", category: "Financial" });
+  for (const metric of metrics) params.append("metric", metric);
+  const expected = await render(params);
+  params.append("metricSearch", "No matching metric");
+  params.append("category", "Operations");
+  const html = await render(params);
+  assert.equal(html, expected, "single-value normalization must not flatten the existing metric array");
+  const selected = [...html.matchAll(/<input\b[^>]*name="metric"[^>]*>/g)]
+    .filter((match) => /\bchecked(?:=|\s|$)/.test(match[0]))
+    .map((match) => decode(match[0].match(/\bvalue="([^"]*)"/)?.[1] ?? ""));
+  for (const metric of metrics) assert.ok(selected.includes(metric), `${metric} remains selected for comparison`);
+});
+
 test("zero remains a value, null remains unavailable, and long metric identities remain intact", async () => {
   const zero = rows(await render({ metricSearch: "Net sales — West district" }));
   const missing = rows(await render({ metricSearch: "Net sales — Online store" }));
