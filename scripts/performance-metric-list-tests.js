@@ -126,6 +126,27 @@ test("search, category and existing status combine across the complete loaded se
   assert.deepEqual(counts(await render({ metricSearch: "Net sales", category: "Financial", status: "behind-target", show: "999999" })), { total: 112, matching: behind.length, shown: behind.length });
 });
 
+test("metric search normalizes normal, empty and repeated parameters to the first supported string", async () => {
+  const snapshot = (html) => ({
+    counts: counts(html),
+    rows: rows(html).map(({ name, text, href }) => ({ name, text, href })),
+    value: decode(html.match(/<input\b[^>]*name="metricSearch"[^>]*value="([^"]*)"/)?.[1] ?? ""),
+  });
+  const unfiltered = snapshot(await render());
+  for (const values of [[""], ["   "], ["", "Net sales"], ["  ", "Net sales"], ["", ""]]) {
+    assert.deepEqual(snapshot(await render(new URLSearchParams(values.map((value) => ["metricSearch", value])))), unfiltered);
+  }
+  for (const [first, later] of [["  NET SALES  ", "No matching metric"], ["No matching metric", "Net sales"]]) {
+    const single = snapshot(await render({ metricSearch: first }));
+    const repeated = snapshot(await render(new URLSearchParams([["metricSearch", first], ["metricSearch", later]])));
+    assert.deepEqual(repeated, single, "only the first value participates in filtering, batching and detail navigation");
+    assert.equal(repeated.value, first.trim());
+    for (const row of repeated.rows) {
+      assert.deepEqual(new URL(row.href, "https://fixture.invalid").searchParams.getAll("metricSearch"), [first.trim()]);
+    }
+  }
+});
+
 test("zero remains a value, null remains unavailable, and long metric identities remain intact", async () => {
   const zero = rows(await render({ metricSearch: "Net sales — West district" }));
   const missing = rows(await render({ metricSearch: "Net sales — Online store" }));
