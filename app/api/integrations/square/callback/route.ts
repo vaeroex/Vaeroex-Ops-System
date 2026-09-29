@@ -1,5 +1,6 @@
 import { squareCustomerRoute } from "@/lib/integrations/control-plane/square-customer-availability";
 export const runtime = "nodejs";
+export const maxDuration = 60;
 export async function GET(request: Request) { return squareCustomerRoute("callback", request); }
 export const POST = GET;
 export const PUT = GET;

@@ -1,6 +1,10 @@
 // Exact additive dormant qualification/connection scope. Legacy parser suites still reject
 // every other database/runtime path; no directory-wide exemption is permitted.
 const approvedSquareQualificationPaths = Object.freeze([
+  // Direct customer backend remains gated off; only these additive protected paths.
+  "components/integrations/SquareDirectCustomerPanel.tsx",
+  "supabase/production-migrations/20260929004917_square_customer_service_backend.sql",
+  "supabase/tests/square_customer_backend.test.sql",
   "app/api/integrations/square/read/route.ts",
   "services/external-integrations-production/internal-consent/customer-read.ts",
   "services/external-integrations-production/internal-consent/customer-read.test.cjs",
