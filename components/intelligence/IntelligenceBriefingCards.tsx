@@ -128,11 +128,28 @@ function BriefingCard({
 
 export function IntelligenceBriefingCards({
   states,
-  generationEnabled
+  generationEnabled,
+  compactUnavailable = false
 }: {
   states: Readonly<Record<IntelligenceBriefingType, IntelligenceBriefingState>>;
   generationEnabled: boolean;
+  compactUnavailable?: boolean;
 }) {
+  const types = ["weekly", "monthly"] as const;
+  const unavailableOnly = types.every((type) => !states[type].artifact && states[type].status !== "generating"
+    && !(generationEnabled && intelligenceBriefingStateAllowsGeneration(states[type])));
+  if (compactUnavailable && unavailableOnly) {
+    return (
+      <details className="rounded-lg border border-white/10 bg-[#08111f] p-4" data-briefings-collapsed>
+        <summary className="cursor-pointer text-sm font-semibold text-white">
+          Briefings not ready <span className="ml-2 font-normal text-slate-400">Weekly and monthly · View status and requirements</span>
+        </summary>
+        <div className="mt-4 grid gap-4 lg:grid-cols-2">
+          {types.map((type) => <BriefingCard key={type} initialState={states[type]} generationEnabled={generationEnabled} />)}
+        </div>
+      </details>
+    );
+  }
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       <BriefingCard initialState={states.weekly} generationEnabled={generationEnabled} />

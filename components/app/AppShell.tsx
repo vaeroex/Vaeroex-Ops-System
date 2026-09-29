@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { signOutAction } from "@/lib/auth/actions";
 import { selectWorkspaceAction } from "@/lib/workspaces/actions";
 import { AppNavigation } from "@/components/app/AppNavigation";
+import { WorkspacePageTitle } from "@/components/app/WorkspacePageTitle";
 import { GlobalSearch } from "@/components/app/GlobalSearch";
 import { ToastRegion } from "@/components/app/ToastRegion";
 import { VaeroexLogo } from "@/components/brand/VaeroexLogo";
@@ -132,7 +133,7 @@ export function AppShell({ children, profile, workspaces, activeWorkspace, isVae
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-vaeroex-silver">
                   {activeWorkspace?.name || "Setup required"} · {accessLabel}
                 </p>
-                <h1 className="mt-1 truncate text-lg font-semibold tracking-wide">Executive Intelligence</h1>
+                <WorkspacePageTitle items={navSections.flatMap((section) => section.items)} />
               </div>
             </div>
             <div className="flex shrink-0 items-center justify-end gap-2 sm:gap-3">

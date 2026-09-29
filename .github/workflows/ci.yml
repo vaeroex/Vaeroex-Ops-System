@@ -52,6 +52,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Workspace navigation and bounded-list regressions
+        run: pnpm test:workspace-clarity
+
       - name: Restricted Square workspace host Linux qualification
         run: |
           node services/square-workspace-host/window-plan.test.mjs

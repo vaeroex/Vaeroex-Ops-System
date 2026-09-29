@@ -63,7 +63,10 @@ assert.match(sourcesPage, /\.eq\("workspace_id", workspaceId\)/, "Evidence data 
 assert.match(legacyFilesPage, /permanentRedirect/, "legacy Files URLs must redirect permanently");
 assert.match(legacyFilesPage, /DETAIL_SECTION_BY_LEGACY_PANEL/, "legacy source panels must map to the closest Evidence view");
 assert.doesNotMatch(legacyFilesPage, /requireWorkspacePage|\.from\(/, "the compatibility route must not recreate a parallel data workspace");
-assert.match(navigation, /pathname\.startsWith\(`\$\{href\}\//, "nested Evidence routes must keep Evidence active");
+const { isWorkspacePathActive } = loadTypeScriptModule("lib/presentation/app-navigation.ts");
+assert.match(navigation, /isWorkspacePathActive\(pathname, item\.href\)/, "navigation must use the tested route matcher");
+assert.equal(isWorkspacePathActive("/app/sources/source-1", "/app/sources"), true, "nested Evidence routes must keep Evidence active");
+assert.equal(isWorkspacePathActive("/app/sources-other", "/app/sources"), false, "unrelated prefixes must not activate Evidence");
 
 const appFiles = [
   "app/app/page.tsx",

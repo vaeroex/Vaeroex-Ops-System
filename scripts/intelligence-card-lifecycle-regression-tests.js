@@ -138,7 +138,8 @@ const dismissedWithNoteOverlay = buildIntelligenceCardLifecycleOverlayV1({
   insights: [baseInsight],
   identities: { [baseInsight.id]: identityA },
   lifecycleRecords: [{ ...dismissed, reason_text: "Review after the seasonal period." }],
-  actorDisplayNames: { "manager-a": "Morgan Rivera" }
+  actorDisplayNames: { "manager-a": "Morgan Rivera" },
+  nowMs: Date.parse("2026-07-31T00:00:00Z")
 });
 assert.equal(dismissedWithNoteOverlay.history[0].reasonText, "Review after the seasonal period.", "bounded optional dismissal notes remain available to History");
 
