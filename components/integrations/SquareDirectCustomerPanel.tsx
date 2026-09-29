@@ -33,7 +33,21 @@ export function squarePaymentAmount(amountMinor: string | null, currency: string
 function timestamp(value: string | null): string {
   if (!value) return "Not yet synced";
   const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? "Time unavailable" : parsed.toISOString().replace("T", " ").replace(".000Z", " UTC");
+  return Number.isNaN(parsed.getTime()) ? "Time unavailable" : parsed.toISOString().replace("T", " ").replace(/(?:\.000)?Z$/, " UTC");
+}
+
+function paymentWindow(read: { start: string; end: string; kind: "created" | "updated" }): string {
+  return `Payments ${read.kind} from ${timestamp(read.start)} ${read.kind === "created" ? "up to (not including)" : "through"} ${timestamp(read.end)}`;
+}
+
+function emptyPaymentsExplanation(connection: DirectView["connections"][number]): string {
+  if (connection.activeRead) {
+    return `No Payments have been saved for this connection yet. The current search checks ${paymentWindow(connection.activeRead)}. This search is still incomplete.`;
+  }
+  if (connection.lastCompletedRead) {
+    return `No Payments have been saved for this connection. The last completed search checked ${paymentWindow(connection.lastCompletedRead)} for the selected location. Older Payments may be outside these dates.`;
+  }
+  return "No Payments have been saved for this connection. No completed search dates are available, so this does not establish whether older Payments exist in Square.";
 }
 
 const buttonClass = "rounded-md border border-line px-4 py-2 text-sm font-semibold";
@@ -56,6 +70,7 @@ export function SquareDirectCustomerPanel({ view }: { view: DirectView }) {
           <p>Business Entity: {entities.get(connection.businessEntityId) ?? "Unavailable"}</p>
           <p role="status">{connection.recoveryRequired ? "Authorization recovery required" : connectionLabels[connection.state]}</p>
           <p className="text-sm text-muted">Source: Square Production · Last successful sync: {timestamp(connection.lastSyncedAt)}</p>
+          {connection.checkpointAt ? <p className="text-sm text-muted">Ongoing Payments updates resume from: {timestamp(connection.checkpointAt)}</p> : null}
           {connection.lastError ? <p role="status">The last attempt did not finish. Your last successfully saved Payments remain below.</p> : null}
         </div>
         {connection.recoveryRequired ? <p role="status">Square authorization outcome and this workspace’s account connection are unconfirmed. Contact support for checked recovery before taking any further connection action.</p> : null}
@@ -74,10 +89,27 @@ export function SquareDirectCustomerPanel({ view }: { view: DirectView }) {
         </form> : null}
 
         {connection.locationId ? <p>Location: {connection.locations.find(location => location.id === connection.locationId)?.label ?? "Selected Square location"}</p> : null}
+        {connection.activeRead ? <p role="status" className="text-sm">Current search: {paymentWindow(connection.activeRead)}. The search is incomplete until every page has been read.</p> : null}
+        {connection.lastCompletedRead ? <p className="text-sm text-muted">Last completed search: {paymentWindow(connection.lastCompletedRead)}. Completed: {timestamp(connection.lastCompletedRead.completedAt)}. This covers only that date window and the selected location.</p> : null}
         {view.available && !connection.recoveryRequired && (connection.state === "connected" || connection.state === "retry_required") && connection.locationId && !connection.revocationPending ? <form action="/api/integrations/square/read" method="post" className="space-y-2">
           <input type="hidden" name="connectionId" value={connection.connectionId} />
-          <button type="submit" className={buttonClass}>{connection.hasMore ? "Read next Payments page" : connection.lastSyncedAt ? "Update Payments" : "Read Payments"}</button>
-          <p className="text-sm text-muted">Each request reads one page. {connection.hasMore ? "More pages remain in the current read." : "Updates resume from the saved checkpoint; this is not a complete-history claim."}</p>
+          <button type="submit" className={buttonClass}>{connection.hasMore ? "Read next Payments page" : connection.activeRead ? "Continue Payments read" : connection.lastSyncedAt ? "Update Payments" : "Read Payments"}</button>
+          <p className="text-sm text-muted">Each request reads one page of up to 100 Payments. {connection.hasMore || connection.activeRead ? "Continue the current search to finish its date window." : "Updates search by the date a Payment was updated, resuming from the saved checkpoint. Older Payments may need a historical import."}</p>
+        </form> : null}
+        {view.available && view.historyAvailable && !connection.recoveryRequired && (connection.state === "connected" || connection.state === "retry_required") && connection.locationId && !connection.revocationPending && !connection.activeRead && !connection.hasMore ? <form action="/api/integrations/square/read" method="post" className="space-y-3 rounded-md border border-line p-4">
+          <input type="hidden" name="connectionId" value={connection.connectionId} />
+          <h3 className="font-semibold">Import historical Payments</h3>
+          <p id={`history-dates-${connection.connectionId}`} className="text-sm text-muted">Choose 1–31 calendar days, including both dates, in UTC. This searches when Payments were created at the selected location and keeps the saved checkpoint for ongoing updates.</p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="block text-sm font-semibold">Start date (UTC)
+              <input type="date" name="startDate" required aria-describedby={`history-dates-${connection.connectionId}`} className="mt-2 block w-full rounded-md border border-line px-3 py-2" />
+            </label>
+            <label className="block text-sm font-semibold">End date (UTC)
+              <input type="date" name="endDate" required aria-describedby={`history-dates-${connection.connectionId}`} className="mt-2 block w-full rounded-md border border-line px-3 py-2" />
+            </label>
+          </div>
+          <p className="text-sm text-muted">Each request imports one page of up to 100 Payments. Continue with “Read next Payments page” if more results remain.</p>
+          <button type="submit" className={buttonClass}>Import historical Payments</button>
         </form> : null}
         {connection.state === "syncing" || connection.state === "exchanging" ? <form action="/app/settings/integrations/square" method="get">
           <button type="submit" className="text-sm underline">Refresh connection status</button>
@@ -95,7 +127,7 @@ export function SquareDirectCustomerPanel({ view }: { view: DirectView }) {
               <td className="whitespace-nowrap px-2 py-2">{squarePaymentAmount(payment.amountMinor, payment.currency)}</td>
             </tr>)}</tbody>
           </table>
-          {connection.payments.length === 0 ? <p className="py-3 text-sm">No Payments have been saved for this connection.</p> : null}
+          {connection.payments.length === 0 ? <p className="py-3 text-sm">{emptyPaymentsExplanation(connection)}</p> : null}
         </div>
         <p className="text-xs text-muted">These are Square Payment records, not revenue, profit, settlement totals, or accounting statements. Older saved records may not reflect later provider changes until the next successful update.</p>
 

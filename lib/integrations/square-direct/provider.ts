@@ -18,6 +18,7 @@ const id = z.string().min(1).max(191).regex(/^[A-Za-z0-9._:-]+$/);
 const fingerprint = z.string().regex(/^sha256:[a-f0-9]{64}$/).nullable();
 const paymentInput = z.object({ workspaceId: z.string().uuid(), connectionId: z.string().uuid(), merchantId: id,
   locationId: id.max(50), windowStart: z.string().datetime({ offset: true }), windowEnd: z.string().datetime({ offset: true }),
+  readKind: z.enum(["updated", "created"]).default("updated"),
   cursor: z.string().regex(/^[A-Za-z0-9._~:+-]{1,4096}={0,2}$/).nullable(),
   cursorBindingFingerprint: fingerprint, cursorFingerprint: fingerprint }).strict();
 function outward(error: unknown): never {
@@ -135,7 +136,10 @@ export function createDirectSquareProvider(input: {
               (request.cursor === null ? request.cursorFingerprint !== null || request.cursorBindingFingerprint !== null :
                 request.cursorFingerprint === null || request.cursorBindingFingerprint === null)) throw failure();
           // Avoid Square's implicit created-at one-year filter when reading later updates.
-          const query: Record<string, string> = { begin_time: "1970-01-01T00:00:00.000Z", end_time: request.windowEnd,
+          const query: Record<string, string> = request.readKind === "created"
+            ? { begin_time: request.windowStart, end_time: request.windowEnd,
+              location_id: request.locationId, limit: "100", sort_order: "ASC", sort_field: "CREATED_AT" }
+            : { begin_time: "1970-01-01T00:00:00.000Z", end_time: request.windowEnd,
             updated_at_begin_time: request.windowStart, updated_at_end_time: request.windowEnd,
             location_id: request.locationId, limit: "100", sort_order: "ASC", sort_field: "UPDATED_AT" };
           if (request.cursor !== null) query.cursor = request.cursor;
@@ -156,8 +160,11 @@ export function createDirectSquareProvider(input: {
           if (parsed.outcome !== "accepted") throw failure();
           const payments = parsed.value.items.map(item => {
             const updatedAt = item.updatedAt ?? item.createdAt;
+            const filteredAt = request.readKind === "created" ? item.createdAt : updatedAt;
             if (!item.id || item.locationId !== request.locationId || !item.createdAt || !updatedAt ||
-                Date.parse(updatedAt) < start || Date.parse(updatedAt) > end || Date.parse(item.createdAt) > end) throw failure();
+                !filteredAt || Date.parse(filteredAt) < start ||
+                (request.readKind === "created" ? Date.parse(filteredAt) >= end : Date.parse(filteredAt) > end) ||
+                Date.parse(item.createdAt) > end) throw failure();
             const money = item.totalMoney ?? item.amountMoney;
             return { id: item.id, locationId: item.locationId, status: item.status ?? "UNKNOWN", createdAt: item.createdAt,
               updatedAt, amountMinor: money?.amountMinor ?? null, currency: money?.currency ?? null };

@@ -5,7 +5,7 @@ import { requireAuth } from "@/lib/security/require-auth";
 import { getCurrentWorkspace } from "@/lib/security/get-current-workspace";
 import { PUBLIC_SITE_URL } from "@/lib/seo/public-seo";
 import handoff from "@/lib/integrations/control-plane/square-customer-handoff-policy.json";
-import { DirectActorSchema } from "./contracts";
+import { DirectActorSchema, DirectHistoricalWindowSchema } from "./contracts";
 import { createDirectSquareService } from "./service";
 import { createDirectSquareProvider } from "./provider";
 
@@ -110,6 +110,17 @@ export async function directForm(action: string, request: Request) {
     if (action === "mapping" && keys === "connectionId,locationId") return { connectionId: uuid.parse(form.get("connectionId")),
       locationId: z.string().regex(/^[A-Za-z0-9._:-]{1,50}$/).parse(form.get("locationId")) };
     if (action === "read" && keys === "connectionId") return { connectionId: uuid.parse(form.get("connectionId")) };
+    if (action === "read" && keys === "connectionId,endDate,startDate") {
+      const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+      const startDate = date.parse(form.get("startDate")), endDate = date.parse(form.get("endDate"));
+      const start = new Date(`${startDate}T00:00:00.000Z`), end = new Date(`${endDate}T00:00:00.000Z`);
+      if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime()) ||
+          start.toISOString().slice(0, 10) !== startDate || end.toISOString().slice(0, 10) !== endDate) throw new Error("square_customer_form_denied");
+      const historical = DirectHistoricalWindowSchema.parse({ windowStart: start.toISOString(),
+        windowEnd: new Date(end.getTime() + 86_400_000).toISOString() });
+      if (Date.parse(historical.windowEnd) > Date.now()) throw new Error("square_customer_form_denied");
+      return { connectionId: uuid.parse(form.get("connectionId")), historical };
+    }
     if (action === "disconnect" && keys === "confirmation,connectionId" && form.get("confirmation") === "disconnect")
       return { connectionId: uuid.parse(form.get("connectionId")) };
     throw new Error("square_customer_form_denied");
@@ -132,7 +143,7 @@ export async function squareDirectRoute(action: string, request: Request) {
     if (action === "connect" && "businessEntityId" in form) return navigate(await backend.connect(form.businessEntityId!));
     if (!("connectionId" in form)) throw new Error("form");
     if (action === "mapping" && "locationId" in form) await backend.map(form.connectionId!, form.locationId!);
-    else if (action === "read") await backend.read(form.connectionId!);
+    else if (action === "read") await backend.read(form.connectionId!, "historical" in form ? form.historical : undefined);
     else if (action === "disconnect") await backend.disconnect(form.connectionId!);
     else throw new Error("form");
     return new Response(null, { status: 303, headers: { ...headers, location: squareSettingsPath } });

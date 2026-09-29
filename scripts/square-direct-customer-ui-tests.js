@@ -25,10 +25,11 @@ const render = view => renderToStaticMarkup(React.createElement(SquareDirectCust
 const connection = {
   connectionId: "connection-owner-a", businessEntityId: "entity-owner-a", state: "connected", sellerLabel: "Owner A seller",
   locations: [{ id: "location-a", label: "Owner A location" }], locationId: "location-a", lastSyncedAt: "2026-09-29T01:02:03.000Z",
+  checkpointAt: "2026-09-29T01:00:00.000Z", activeRead: null, lastCompletedRead: null,
   lastError: null, hasMore: false, revocationPending: false, recoveryRequired: false,
   payments: [{ id: "payment-a", locationId: "location-a", status: "COMPLETED", createdAt: "2026-09-29T01:01:00.000Z", updatedAt: "2026-09-29T01:01:00.000Z", amountMinor: "12345", currency: "USD" }],
 };
-const view = { available: true, businessEntities: [{ id: "entity-owner-a", label: "Owner A business" }], connections: [connection] };
+const view = { available: true, historyAvailable: true, businessEntities: [{ id: "entity-owner-a", label: "Owner A business" }], connections: [connection] };
 
 test("unavailable workspace without a connection renders no actions", () => {
   const html = render({ ...view, available: false, connections: [] });
@@ -87,6 +88,110 @@ test("pagination, retry and reauthorization have distinct actionable states", ()
   const renew = render({ ...view, connections: [{ ...connection, state: "reauthorization_required" }] });
   assert.match(renew, /Disconnect this connection, then connect again/);
   assert.doesNotMatch(renew, /action="\/api\/integrations\/square\/(read|connect)"/);
+});
+
+test("historical import submits inclusive UTC dates with the existing owned connection", () => {
+  for (const state of ["connected", "retry_required"]) {
+    const html = render({ ...view, connections: [{ ...connection, state }] });
+    const forms = [...html.matchAll(/<form\b[^>]*action="\/api\/integrations\/square\/read"[^>]*>[\s\S]*?<\/form>/g)].map(match => match[0]);
+    assert.equal(forms.length, 2);
+    assert.doesNotMatch(forms[0], /name="(?:startDate|endDate)"/);
+    const history = forms.find(form => /name="startDate"/.test(form));
+    assert.ok(history);
+    assert.match(history, /method="post"/);
+    assert.match(history, /name="connectionId" value="connection-owner-a"/);
+    for (const name of ["startDate", "endDate"]) {
+      const input = history.match(new RegExp(`<input[^>]*name="${name}"[^>]*>`))?.[0];
+      assert.ok(input);
+      assert.match(input, /type="date"/);
+      assert.match(input, /required=""/);
+      assert.match(input, /aria-describedby="history-dates-connection-owner-a"/);
+    }
+    assert.match(history, /Start date \(UTC\)/);
+    assert.match(history, /End date \(UTC\)/);
+    assert.match(history, /1–31 calendar days, including both dates, in UTC/);
+    assert.match(history, /when Payments were created at the selected location/);
+    assert.match(history, /keeps the saved checkpoint for ongoing updates/);
+    assert.match(history, /one page of up to 100 Payments/);
+    assert.doesNotMatch(history, /name="(?:workspaceId|locationId|checkpointAt|readKind|cursor)"/);
+  }
+});
+
+test("historical import respects every existing read eligibility boundary", () => {
+  for (const partial of [
+    { state: "mapping_required" }, { state: "syncing" }, { state: "exchanging" },
+    { state: "reauthorization_required" }, { state: "disconnected" },
+    { recoveryRequired: true }, { revocationPending: true }, { locationId: null },
+    { hasMore: true },
+  ]) {
+    const html = render({ ...view, connections: [{ ...connection, ...partial }] });
+    assert.doesNotMatch(html, /name="startDate"|name="endDate"|Import historical Payments/);
+  }
+  assert.doesNotMatch(render({ ...view, available: false }), /name="startDate"|name="endDate"/);
+});
+
+test("older backend capability keeps normal updates available and hides historical imports", () => {
+  for (const historyAvailable of [false, undefined]) {
+    const html = render({ ...view, historyAvailable });
+    assert.doesNotMatch(html, /name="startDate"|name="endDate"|Import historical Payments/);
+    assert.match(html, /Update Payments/);
+    assert.match(html, /action="\/api\/integrations\/square\/read" method="post"/);
+  }
+});
+
+test("active coverage distinguishes creation and update dates and continues the same search", () => {
+  for (const kind of ["created", "updated"]) {
+    for (const hasMore of [true, false]) {
+      const html = render({ ...view, connections: [{ ...connection, state: "retry_required", hasMore,
+        activeRead: { kind, start: "2026-05-04T00:00:00.000Z", end: "2026-05-05T00:00:00.000Z" }, payments: [],
+      }] });
+      assert.ok(html.includes(`Current search: Payments ${kind} from 2026-05-04 00:00:00 UTC ${kind === "created" ? "up to (not including)" : "through"} 2026-05-05 00:00:00 UTC`));
+      assert.match(html, /search is incomplete until every page has been read/);
+      assert.match(html, /This search is still incomplete/);
+      assert.match(html, hasMore ? /Read next Payments page/ : /Continue Payments read/);
+      assert.doesNotMatch(html, /name="startDate"|name="endDate"|Import historical Payments/);
+      const form = html.match(/<form\b[^>]*action="\/api\/integrations\/square\/read"[^>]*>[\s\S]*?<\/form>/)?.[0];
+      assert.ok(form);
+      assert.deepEqual([...form.matchAll(/<input[^>]*name="([^"]+)"/g)].map(match => match[1]), ["connectionId"]);
+    }
+  }
+});
+
+test("empty completed searches show actual date coverage without claiming all history", () => {
+  for (const kind of ["created", "updated"]) {
+    const html = render({ ...view, connections: [{ ...connection, payments: [], lastCompletedRead: {
+      kind, start: "2026-05-04T00:00:00.000Z", end: "2026-05-05T00:00:00.000Z", completedAt: "2026-09-29T01:02:03.000Z",
+    } }] });
+    assert.ok(html.includes(`Last completed search: Payments ${kind} from 2026-05-04 00:00:00 UTC ${kind === "created" ? "up to (not including)" : "through"} 2026-05-05 00:00:00 UTC`));
+    assert.match(html, /Completed: 2026-09-29 01:02:03 UTC/);
+    assert.match(html, /This covers only that date window and the selected location/);
+    assert.match(html, new RegExp(`The last completed search checked Payments ${kind} from`));
+    assert.match(html, /Older Payments may be outside these dates/);
+    assert.match(html, /Ongoing Payments updates resume from: 2026-09-29 01:00:00 UTC/);
+    assert.doesNotMatch(html, /all Payments have been imported|complete payment history|no Payments exist/i);
+  }
+});
+
+test("missing legacy coverage stays unknown and never infers dates from a sync time", () => {
+  const legacy = { ...connection, payments: [] };
+  delete legacy.activeRead;
+  delete legacy.lastCompletedRead;
+  delete legacy.checkpointAt;
+  const html = render({ ...view, connections: [legacy] });
+  assert.match(html, /No completed search dates are available/);
+  assert.match(html, /does not establish whether older Payments exist in Square/);
+  assert.doesNotMatch(html, /Last completed search:|Current search:|updates resume from:/);
+  assert.match(html, /Import historical Payments/);
+});
+
+test("historical saved payments retain their actual creation date and exact amount", () => {
+  const html = render({ ...view, connections: [{ ...connection, payments: [{ ...connection.payments[0],
+    id: "historical-payment-a", createdAt: "2026-05-04T16:15:00.000Z", amountMinor: "400000", currency: "USD",
+  }] }] });
+  assert.match(html, /historical-payment-a/);
+  assert.match(html, /2026-05-04 16:15:00 UTC/);
+  assert.match(html, /USD 4,000\.00/);
+  assert.doesNotMatch(html, /No Payments have been saved/);
 });
 
 test("disconnect requires explicit confirmation and pending revocation blocks reconnect", () => {

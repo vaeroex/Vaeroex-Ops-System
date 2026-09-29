@@ -5,6 +5,9 @@ const approvedSquareQualificationPaths = Object.freeze([
   "components/integrations/SquareDirectCustomerPanel.tsx",
   "supabase/production-migrations/20260929004917_square_customer_service_backend.sql",
   "supabase/tests/square_customer_backend.test.sql",
+  // Bounded customer history; exact migration and disposable qualification only.
+  "supabase/production-migrations/20260929041048_square_customer_payment_history.sql",
+  "supabase/tests/square_customer_payment_history.test.sql",
   "app/api/integrations/square/read/route.ts",
   "services/external-integrations-production/internal-consent/customer-read.ts",
   "services/external-integrations-production/internal-consent/customer-read.test.cjs",
