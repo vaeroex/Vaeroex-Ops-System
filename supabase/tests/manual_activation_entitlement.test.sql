@@ -243,5 +243,28 @@ select ok(
 );
 
 reset role;
+-- A new, ordinary pilot account has no workspace before the required setup
+-- agreement. Approval must retain an unlinked manual entitlement, not attach
+-- it to another customer's workspace or create a fabricated paid subscription.
+insert into public.profiles (id, email, full_name) values
+  ('a6100000-0000-4000-8000-000000000003', 'new-pilot@example.test', 'New Pilot');
+insert into public.manual_activation_requests (id, name, email, company, status) values
+  ('c6100000-0000-4000-8000-000000000003', 'New Pilot', 'new-pilot@example.test', 'New Pilot Business', 'pending');
+set local role service_role;
+select is(public.review_manual_activation_request(
+  'c6100000-0000-4000-8000-000000000003', 'approved',
+  'a6100000-0000-4000-8000-000000000001', 'vaeroex'
+) ->> 'access_granted', 'true', 'new pilot approval grants eligibility for first workspace setup');
+select results_eq(
+  $$select user_id, workspace_id, billing_provider, manually_activated, status, stripe_subscription_id
+    from public.customer_subscriptions where customer_email = 'new-pilot@example.test'$$,
+  $$values ('a6100000-0000-4000-8000-000000000003'::uuid, null::uuid, 'manual'::text, true, 'active'::text, null::text)$$,
+  'new pilot retains its own unlinked manual entitlement with no fabricated Stripe subscription'
+);
+select is((select count(*)::integer from public.workspace_members where user_id = 'a6100000-0000-4000-8000-000000000003'), 0,
+  'approval does not add the new pilot to somebody else’s workspace');
+select is((select workspace_id from public.customer_subscriptions where customer_email = 'manual-customer@example.test'),
+  'b6100000-0000-4000-8000-000000000001'::uuid, 'existing customer workspace mapping remains intact');
+reset role;
 select * from finish();
 rollback;

@@ -715,6 +715,10 @@ jobs:
         if: ${{ !cancelled() && steps.isolated_database_setup.outcome == 'success' }}
         run: node scripts/run-square-customer-backend-qualification.js
 
+      - name: Verify manual pilot activation in the isolated database
+        if: ${{ !cancelled() && steps.isolated_database_setup.outcome == 'success' }}
+        run: node scripts/run-isolated-database-tests.js supabase/tests/manual_activation_entitlement.test.sql
+
       - name: Remove isolated database state
         if: always()
         run: supabase stop --no-backup

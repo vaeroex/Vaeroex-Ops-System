@@ -128,6 +128,8 @@ export default async function AdminCompanyDetailPage({
   ]);
 
   const activationRequests = (activationRequestsResult.data || []) as ActivationRequest[];
+  const pendingRequests = activationRequests.filter((request) => ["pending", "needs_more_info"].includes(request.status));
+  const previousRequests = activationRequests.filter((request) => !["pending", "needs_more_info"].includes(request.status));
   const events = (eventsResult.data || []) as SubscriptionEvent[];
   const delivery = deliveryResult.data as DeliveryRow | null;
   const queryResults = [
@@ -185,10 +187,19 @@ export default async function AdminCompanyDetailPage({
         </div>
       ) : null}
 
+      {(tab === "overview" || tab === "subscription") && pendingRequests.length ? <SectionCard title="Activation needs a decision" description="Requests match the contact email, not a workspace ID. Approval uses the existing account entitlement and workspace-setup rules; review the customer identity before approving.">
+        <div className="space-y-4">{pendingRequests.map((request) => <article key={request.id} className="rounded-lg border border-line p-4">
+          <p className="break-all font-semibold text-ink">{request.email}</p>
+          <p className="mt-1 text-xs text-muted">{request.company || "Company not provided"} · {formatAdminDate(request.created_at)} UTC</p>
+          {request.message ? <p className="mt-2 text-sm text-muted">{request.message}</p> : null}
+          <AdminActivationRequestReview request={request} returnTo={returnTo} />
+        </article>)}</div>
+      </SectionCard> : null}
+
       {tab === "subscription" ? (
         <div className="space-y-6">
           <div className="flex justify-end">
-            <CreateDrawer title="Manual subscription record" description="Record a manually approved subscription. Existing records may be updated. Check workspace access after saving; this does not charge the customer." triggerLabel="Manage manual subscription">
+            <CreateDrawer title="Manual subscription record" description="Record pilot access for this business without a purchase or charge. Only its matching manual record may be updated." triggerLabel="Manage manual subscription">
               <AdminManualActivationForm
                 returnTo={returnTo}
                 workspaceId={workspace.id}
@@ -227,14 +238,14 @@ export default async function AdminCompanyDetailPage({
             <section className="mt-4 grid gap-6 xl:grid-cols-2">
             <SectionCard title="Activation requests">
               <div className="space-y-3">
-                {activationRequests.length ? activationRequests.map((request) => (
+                {previousRequests.length ? previousRequests.map((request) => (
                   <article key={request.id} className="rounded-lg border border-line p-3">
                     <div className="flex items-start justify-between gap-3">
                       <div><p className="font-semibold text-ink">{request.email}</p><p className="mt-1 text-xs text-muted">{request.company || "No company"} · {formatAdminDate(request.created_at)}</p></div>
                       <StatusBadge value={request.status} />
                     </div>
                     {request.message ? <p className="mt-2 text-sm leading-6 text-muted">{request.message}</p> : null}
-                    <AdminActivationRequestReview request={request} returnTo={returnTo} />
+                    <p className="mt-2 text-xs text-muted">Decision retained. Manage current access separately; do not replay approval to end a pilot.</p>
                   </article>
                 )) : activationRequestsResult.error ? <p className="text-sm text-muted">Activation requests unavailable.</p> : <EmptyState title="No activation requests" description="No request matches this company contact." />}
               </div>

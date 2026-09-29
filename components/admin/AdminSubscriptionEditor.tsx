@@ -31,6 +31,7 @@ export function AdminSubscriptionEditor({ subscription, returnTo }: { subscripti
         <p className="text-sm leading-6 text-muted">
           Saves this Vaeroex subscription record and updates the linked workspace’s access settings. Choosing Canceled here does not cancel billing in Stripe. User accounts, workspace data, and connection records are retained.
         </p>
+        {subscription.billing_provider === "manual" ? <p className="text-sm text-muted">Manual pilot access does not expire automatically. Choose Expired to end this record, then confirm that workspace access requires a subscription and manual unlock is off. Other eligible subscriptions or trials may still allow access.</p> : null}
         <PendingSubmitButton
           pendingLabel="Saving subscription record..."
           className="min-h-11 rounded-md bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white hover:bg-blue-950/70"

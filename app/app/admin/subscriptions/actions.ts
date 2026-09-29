@@ -52,15 +52,25 @@ export async function createManualSubscriptionAction(formData: FormData) {
     redirect(withAdminActionNotice(returnTo, "error", "Subscription status cannot be assigned."));
   }
 
-  const { data: profile } = await admin.from("profiles").select("id").eq("email", email).maybeSingle();
-  const { data: existing } = await admin
+  const { data: profile, error: profileError } = await admin.from("profiles").select("id").eq("email", email).maybeSingle();
+  if (profileError) redirect(withAdminActionNotice(returnTo, "error", "Customer identity could not be verified. Nothing was saved."));
+  if (workspaceId) {
+    const workspace = await admin.from("workspaces").select("id").eq("id", workspaceId).maybeSingle();
+    if (workspace.error || !workspace.data) redirect(withAdminActionNotice(returnTo, "error", "Workspace could not be verified. Nothing was saved."));
+  }
+  let existingQuery = admin
     .from("customer_subscriptions")
     .select("id,workspace_id")
     .eq("customer_email", email)
+    .eq("billing_provider", "manual")
+    .eq("manually_activated", true);
+  existingQuery = workspaceId ? existingQuery.eq("workspace_id", workspaceId) : existingQuery.is("workspace_id", null);
+  const { data: existing, error: existingError } = await existingQuery
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
-  const effectiveWorkspaceId = workspaceId ?? existing?.workspace_id ?? null;
+  if (existingError) redirect(withAdminActionNotice(returnTo, "error", "Existing manual record could not be verified. Nothing was saved."));
+  const effectiveWorkspaceId = workspaceId;
 
   const payload = {
     user_id: profile?.id ?? null,
@@ -85,15 +95,19 @@ export async function createManualSubscriptionAction(formData: FormData) {
     redirect(withAdminActionNotice(returnTo, "error", result.error.message));
   }
 
+  let workspaceUpdateFailed = false;
   if (effectiveWorkspaceId) {
-    await admin
+    const workspaceUpdate = await admin
       .from("workspaces")
       .update({
         subscription_status: status,
         plan_slug: planSlug,
+        subscription_required: true,
         manually_unlocked: ["active", "trialing"].includes(status)
       })
-      .eq("id", effectiveWorkspaceId);
+      .eq("id", effectiveWorkspaceId)
+      .select("id").maybeSingle();
+    workspaceUpdateFailed = Boolean(workspaceUpdate.error || !workspaceUpdate.data);
   }
 
   await logSecurityAuditEvent({
@@ -112,14 +126,18 @@ export async function createManualSubscriptionAction(formData: FormData) {
       source: "admin_subscription_action",
       customer_email: email,
       status,
-      plan_slug: planSlug
+      plan_slug: planSlug,
+      workspace_update_confirmed: effectiveWorkspaceId ? !workspaceUpdateFailed : null
     } satisfies Json
   });
 
   revalidatePath("/app/admin/subscriptions");
   revalidatePath("/app/admin/customers");
   if (effectiveWorkspaceId) revalidatePath(`/app/admin/customers/${effectiveWorkspaceId}`);
-  redirect(withAdminActionNotice(returnTo, "message", "Manual subscription record saved. Check workspace access separately."));
+  if (workspaceUpdateFailed) redirect(withAdminActionNotice(returnTo, "error", "Manual subscription record saved, but the workspace update failed. Access is not confirmed. Review workspace access before another save; do not create a duplicate record."));
+  redirect(withAdminActionNotice(returnTo, "message", effectiveWorkspaceId
+    ? "Manual subscription record and workspace settings saved. Other linked subscriptions still determine eligibility."
+    : "Manual subscription record saved. The customer can continue to workspace setup if this record is active. No workspace was changed."));
 }
 
 export async function updateSubscriptionAction(formData: FormData) {
@@ -137,11 +155,12 @@ export async function updateSubscriptionAction(formData: FormData) {
     redirect(withAdminActionNotice(returnTo, "error", "Subscription status cannot be assigned."));
   }
 
-  const { data: existing } = await admin
+  const { data: existing, error: existingError } = await admin
     .from("customer_subscriptions")
     .select("workspace_id")
     .eq("id", id)
     .maybeSingle();
+  if (existingError || !existing) redirect(withAdminActionNotice(returnTo, "error", "Subscription could not be verified. Nothing was saved."));
 
   const { error } = await admin
     .from("customer_subscriptions")
@@ -156,15 +175,18 @@ export async function updateSubscriptionAction(formData: FormData) {
     redirect(withAdminActionNotice(returnTo, "error", error.message));
   }
 
-  if (existing?.workspace_id) {
-    await admin
+  let workspaceUpdateFailed = false;
+  if (existing.workspace_id) {
+    const workspaceUpdate = await admin
       .from("workspaces")
       .update({
         subscription_status: status,
         plan_slug: planSlug,
         manually_unlocked: ["active", "trialing"].includes(status)
       })
-      .eq("id", existing.workspace_id);
+      .eq("id", existing.workspace_id)
+      .select("id").maybeSingle();
+    workspaceUpdateFailed = Boolean(workspaceUpdate.error || !workspaceUpdate.data);
   }
 
   await logSecurityAuditEvent({
@@ -182,13 +204,15 @@ export async function updateSubscriptionAction(formData: FormData) {
     metadata: {
       source: "admin_subscription_action",
       status,
-      plan_slug: planSlug
+      plan_slug: planSlug,
+      workspace_update_confirmed: existing.workspace_id ? !workspaceUpdateFailed : null
     } satisfies Json
   });
 
   revalidatePath("/app/admin/subscriptions");
   revalidatePath("/app/admin/customers");
   if (existing?.workspace_id) revalidatePath(`/app/admin/customers/${existing.workspace_id}`);
+  if (workspaceUpdateFailed) redirect(withAdminActionNotice(returnTo, "error", "Subscription record saved, but the workspace update failed. Access is not confirmed. Review workspace access before another save."));
   redirect(withAdminActionNotice(returnTo, "message", "Subscription updated."));
 }
 
