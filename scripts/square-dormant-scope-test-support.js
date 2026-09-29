@@ -1,6 +1,24 @@
 // Exact additive dormant qualification/connection scope. Legacy parser suites still reject
 // every other database/runtime path; no directory-wide exemption is permitted.
 const approvedSquareQualificationPaths = Object.freeze([
+  // Reviewed workspace clarity only: presentation and note-feedback routing,
+  // not Square activation or changes to server-side business/authority rules.
+  // Exact paths keep unrelated UI and all neighboring backend paths protected.
+  "app/app/intelligence/page.tsx",
+  "app/app/kpis/page.tsx",
+  "app/app/reports/page.tsx",
+  "app/app/sources/SourcesPage.tsx",
+  "app/app/sources/business-notes/actions.ts",
+  "components/app/AppNavigation.tsx",
+  "components/app/AppShell.tsx",
+  "components/app/ThemeControls.tsx",
+  "components/app/WorkspacePageTitle.tsx",
+  "components/evidence/BusinessNotesPanel.tsx",
+  "components/evidence/EvidenceBatchList.tsx",
+  "components/evidence/EvidenceLifecycleSelection.tsx",
+  "components/intelligence/IntelligenceBriefingCards.tsx",
+  "components/intelligence/IntelligenceSignalInbox.tsx",
+  "components/reports/SavedAnalysisList.tsx",
   // Direct customer backend remains gated off; only these additive protected paths.
   "components/integrations/SquareDirectCustomerPanel.tsx",
   "supabase/production-migrations/20260929004917_square_customer_service_backend.sql",

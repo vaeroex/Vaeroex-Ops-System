@@ -10,7 +10,6 @@ import {
   manageSourceFileAction,
   uploadFileAction
 } from "@/app/app/files/actions";
-import { LegalSafetyNotice } from "@/components/legal/LegalSafetyNotice";
 import { WorkspaceAgreementList } from "@/components/legal/WorkspaceAgreementList";
 import { AnalysisProgressSubmit } from "@/components/operations/AnalysisProgressSubmit";
 import { ConfirmSubmitButton } from "@/components/operations/ConfirmSubmitButton";
@@ -22,8 +21,9 @@ import { LoadingLink } from "@/components/operations/LoadingLink";
 import { PendingSubmitButton } from "@/components/operations/PendingSubmitButton";
 import { StatusBadge } from "@/components/operations/StatusBadge";
 import { SourceImportReview } from "@/components/evidence/SourceImportReview";
-import { BusinessNotesPanel, type BusinessNotesObservability } from "@/components/evidence/BusinessNotesPanel";
-import { EvidenceLifecycleCheckbox, EvidenceLifecycleSelection } from "@/components/evidence/EvidenceLifecycleSelection";
+import { BusinessNoteEntry, BusinessNotesPanel, type BusinessNotesObservability } from "@/components/evidence/BusinessNotesPanel";
+import { EvidenceLifecycleCheckbox } from "@/components/evidence/EvidenceLifecycleSelection";
+import { EvidenceBatchList } from "@/components/evidence/EvidenceBatchList";
 import { collapseBusinessNoteKnowledgeRows } from "@/lib/ai/business-notes/knowledge-projection";
 import { businessNoteReleaseChannel } from "@/lib/ai/business-notes/release-channel";
 import { isBusinessNoteExtractionEnabled } from "@/lib/ai/providers/workflow-provider-policy";
@@ -36,6 +36,7 @@ import { requireWorkspacePage } from "@/lib/workspaces/page-context";
 type SourceSearchParams = {
   error?: string;
   message?: string;
+  feedback?: string;
   status?: string;
   q?: string;
   file?: string;
@@ -1020,10 +1021,9 @@ function LearnedKnowledgeView({
           <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-400">
             {archived
               ? "Learned knowledge that is no longer active in Vaeroex answers."
-              : "Everything Vaeroex has learned from your business information."}
+              : "Browse and filter the learned knowledge loaded for this workspace."}
           </p>
         </div>
-        <StatusBadge value={`${visibleItems.length} showing`} />
       </div>
 
       <form method="get" className="grid gap-2 lg:grid-cols-[minmax(14rem,1fr)_170px_170px_150px_auto]">
@@ -1057,18 +1057,15 @@ function LearnedKnowledgeView({
       </form>
 
       {visibleItems.length ? (
-        <EvidenceLifecycleSelection
-          items={visibleItems.map((item) => ({ id: item.id, label: knowledgeStatement(item) }))}
-          singularLabel="Learned Knowledge item"
-          archived={archived}
-          action={bulkManageLearnedKnowledgeAction}
-        >
-          <div className="space-y-3">
-            {visibleItems.map((item) => {
+        <EvidenceBatchList
+          key={`${archived}:${params?.q || ""}:${params?.trust || ""}:${params?.source_type || ""}:${params?.sort || ""}`}
+          pluralLabel="knowledge items"
+          selection={{ singularLabel: "Learned Knowledge item", archived, action: bulkManageLearnedKnowledgeAction }}
+          items={visibleItems.map((item) => {
             const sourceFile = sourceFileForKnowledge(item, files);
             const trust = knowledgeTrustStatus(item);
 
-            return (
+            return { id: item.id, label: knowledgeStatement(item), content: (
               <article key={item.id} className="rounded-lg border border-white/10 bg-slate-950/35 p-4">
                 <div className="flex items-start gap-3">
                   <EvidenceLifecycleCheckbox id={item.id} label={knowledgeStatement(item)} />
@@ -1088,10 +1085,9 @@ function LearnedKnowledgeView({
                   </div>
                 </div>
               </article>
-            );
-            })}
-          </div>
-        </EvidenceLifecycleSelection>
+            ) };
+          })}
+        />
       ) : (
         <div className="rounded-lg border border-dashed border-white/15 bg-slate-950/45 p-8 text-center">
           <h3 className="text-lg font-semibold text-white">{archived ? "No archived knowledge." : "No learned knowledge yet."}</h3>
@@ -1289,6 +1285,24 @@ export async function renderSourcesPage(params: SourceSearchParams = {}, options
     );
   }
 
+  // Note actions return to #business-notes. Keep their feedback inside that
+  // target; a long file list must not separate the result from the review.
+  const showNoteFeedback = activeTab === "files" && params.feedback === "business-notes" && Boolean(errorMessage || successMessage);
+  const actionFeedback = <>
+    <ErrorNotice message={errorMessage} />
+    {successMessage ? (
+      <div role="status" className="rounded-lg border border-emerald-400/35 bg-emerald-950/30 p-3 text-sm text-emerald-100">{successMessage}</div>
+    ) : null}
+  </>;
+  const notesPanel = activeTab === "files" || activeTab === "archived" ? (
+    <BusinessNotesPanel
+      notes={businessNotes}
+      observability={activeTab === "files" ? businessNoteObservability : null}
+      archived={activeTab === "archived"}
+      feedback={showNoteFeedback ? actionFeedback : undefined}
+    />
+  ) : null;
+
   return (
     <div className="evidence-workspace space-y-6">
       <section className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-panel">
@@ -1302,33 +1316,10 @@ export async function renderSourcesPage(params: SourceSearchParams = {}, options
             {activeTab === "legal" ? null : <UploadSourceDrawer folders={folders} compact />}
           </div>
         </div>
-        <div className="mt-3">
-          <details className="rounded-lg border border-amber-300/25 bg-amber-950/15 px-3 py-2">
-            <summary className="cursor-pointer list-none text-xs font-semibold text-amber-100">
-              Sensitive information reminder
-            </summary>
-            <div className="mt-2">
-              <LegalSafetyNotice tone="sensitive" compact />
-            </div>
-          </details>
-        </div>
+        {activeTab === "files" ? <div className="mt-3"><BusinessNoteEntry enabled={isBusinessNoteExtractionEnabled()} /></div> : null}
       </section>
 
-      <ErrorNotice message={errorMessage} />
-      {successMessage ? (
-        <div className="rounded-lg border border-emerald-400/35 bg-emerald-950/30 p-3 text-sm text-emerald-100">
-          {successMessage}
-        </div>
-      ) : null}
-
-      {activeTab === "files" || activeTab === "archived" ? (
-        <BusinessNotesPanel
-          notes={businessNotes}
-          enabled={isBusinessNoteExtractionEnabled()}
-          observability={activeTab === "files" ? businessNoteObservability : null}
-          archived={activeTab === "archived"}
-        />
-      ) : null}
+      {showNoteFeedback ? notesPanel : actionFeedback}
 
       <section className="space-y-4">
         <nav className="vaeroex-mobile-safe-scroll flex gap-2 overflow-x-auto rounded-lg border border-white/10 bg-[#08111f] p-2 shadow-sm" aria-label="Sources views">
@@ -1396,18 +1387,14 @@ export async function renderSourcesPage(params: SourceSearchParams = {}, options
                   <h2 className="text-base font-semibold text-white">Archived Files</h2>
                   <p className="mt-1 text-sm text-slate-400">Source files removed from current views.</p>
                 </div>
-                <StatusBadge value={`${visibleFiles.length} showing`} />
               </div>
               <div className="mt-4 space-y-3">
                 {visibleFiles.length ? (
-                  visibleFiles.map((file) => (
-                    <SourceFileRow
-                      key={file.id}
-                      file={file}
-                      folders={folders}
-                      runs={runs}
-                    />
-                  ))
+                  <EvidenceBatchList
+                    key={`archived:${params.q || ""}:${params.status || ""}`}
+                    pluralLabel="files"
+                    items={visibleFiles.map((file) => ({ id: file.id, label: file.display_name, content: <SourceFileRow file={file} folders={folders} runs={runs} /> }))}
+                  />
                 ) : (
                   <div className="rounded-lg border border-dashed border-white/15 bg-slate-950/45 p-8 text-center">
                     <h3 className="text-lg font-semibold text-white">No archived files.</h3>
@@ -1425,18 +1412,14 @@ export async function renderSourcesPage(params: SourceSearchParams = {}, options
                   <h2 className="text-base font-semibold text-white">Source Files</h2>
                   <p className="mt-1 text-sm text-slate-400">Open a source to review its analysis, imported data, history, and lifecycle.</p>
                 </div>
-                <StatusBadge value={`${visibleFiles.length} showing`} />
               </div>
               <div className="mt-4 space-y-3">
                 {visibleFiles.length ? (
-                  visibleFiles.map((file) => (
-                    <SourceFileRow
-                      key={file.id}
-                      file={file}
-                      folders={folders}
-                      runs={runs}
-                    />
-                  ))
+                  <EvidenceBatchList
+                    key={`active:${params.q || ""}:${params.status || ""}`}
+                    pluralLabel="files"
+                    items={visibleFiles.map((file) => ({ id: file.id, label: file.display_name, content: <SourceFileRow file={file} folders={folders} runs={runs} /> }))}
+                  />
                 ) : (
                   <div className="rounded-lg border border-dashed border-white/15 bg-slate-950/45 p-8 text-center">
                     <h3 className="text-lg font-semibold text-white">{files.length ? "No files match this search" : "No source files yet"}</h3>
@@ -1459,6 +1442,8 @@ export async function renderSourcesPage(params: SourceSearchParams = {}, options
           </div>
         )}
       </section>
+
+      {!showNoteFeedback ? notesPanel : null}
 
     </div>
   );

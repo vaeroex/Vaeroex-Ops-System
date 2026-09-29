@@ -71,6 +71,7 @@ import {
 } from "@/lib/kpis/semantics";
 import { getRecordFolders, managedValues, shortPreview } from "@/lib/records/management";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
+import { listBatchCount, performanceSection } from "@/lib/presentation/list-batch";
 import type { Database } from "@/lib/supabase/types";
 
 type KpisPageProps = {
@@ -414,16 +415,14 @@ function StatusFilterCard({
   active: boolean;
   href: Route;
 }) {
-  const status = statusForTone(tone);
   return (
     <Link
       href={href}
       aria-current={active ? "true" : undefined}
       className={`${spatialSurfaceClassName({ depth: active ? "raised" : "subtle", interactive: true, selected: active })} vaeroex-semantic-interactive ${toneClasses(tone)} block rounded-lg border p-3 transition ${active ? "shadow-panel ring-2 ring-current/30" : "hover:brightness-[1.03]"}`}
     >
-      <span className="text-xs font-semibold uppercase tracking-[0.14em] opacity-80">{label}</span>
-      <span className="mt-2 block text-2xl font-semibold">{value}</span>
-      <span className="mt-1 block text-xs leading-5 opacity-80">{detail}</span>
+      <span className="flex items-center justify-between gap-2"><span className="text-xs font-semibold">{label}</span><span className="text-xl font-semibold">{value}</span></span>
+      <span className="mt-1 hidden text-xs leading-5 opacity-80 sm:block">{detail}</span>
     </Link>
   );
 }
@@ -433,13 +432,15 @@ function KpiTile({
   deterministic,
   settings,
   color,
-  index
+  index,
+  href
 }: {
   kpi: KpiRow;
   deterministic: KpiPageConsumerStateV1;
   settings: KpiSettingRow[];
   color: string;
   index: number;
+  href: Route;
 }) {
   const direction = deterministic.semantics.desiredDirection;
   const targetReference = deterministic.targetReference;
@@ -450,7 +451,6 @@ function KpiTile({
     hasTarget: targetReference.kind !== "none",
     hasDirection: direction !== "unknown"
   });
-  const href = `/app/kpis?metric=${encodeURIComponent(kpi.name)}&section=detail#kpi-detail` as Route;
   const difference = kpi.actual_value !== null && targetReference.kind === "scalar"
     ? formatNumericValue(kpi.actual_value - targetReference.value, kpi.name)
     : "Not available";
@@ -461,13 +461,13 @@ function KpiTile({
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: color }} />
-            <h2 className="truncate text-sm font-semibold text-white">{kpi.name}</h2>
+            <h2 className="break-words text-sm font-semibold text-white">{kpi.name}</h2>
           </div>
         </div>
         <KpiStatusBadge label={deterministic.statusText} status={semanticStatus} />
       </div>
       <p className="mt-3 text-2xl font-semibold text-white">{formatSettingValue(kpi.actual_value, kpi.name, settings)}</p>
-      <div className="mt-3 grid gap-2 text-xs leading-5 text-slate-300 sm:grid-cols-3">
+      <div className="mt-3 grid grid-cols-2 gap-2 text-xs leading-5 text-slate-300 sm:grid-cols-3">
         <p>
           <span className="block text-slate-500">Target</span>
           {formatTargetReference(targetReference, kpi.name, settings)}
@@ -1599,7 +1599,6 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
   const timeline = isKpiTimeline(params?.timeline) ? params.timeline : "90D";
   const selectedTimelineRange = timelineRange(timeline, adjustedKpis.length ? adjustedKpis : rawKpis, params?.start, params?.end);
   const activeStatusFilter = isKpiStatusFilter(params?.status) ? params.status : "all";
-  const showAllTiles = params?.show === "all";
   const kpis = filterKpisByTimeline(adjustedKpis, selectedTimelineRange);
   const allVisibleKpis = adjustedKpis;
   const people = (peopleResult.data || []) as TeamPersonOption[];
@@ -1674,8 +1673,9 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
   const filteredLatestKpiRows = latestKpiRows.filter((kpi) => matchesStatusFilter(kpi, activeStatusFilter, kpiTone(kpi)));
   const filteredMetricNames = new Set(filteredLatestKpiRows.map((kpi) => kpi.name));
   const filteredKpis = activeStatusFilter === "all" ? kpis : kpis.filter((kpi) => filteredMetricNames.has(kpi.name));
-  const visibleTileRows = showAllTiles ? filteredLatestKpiRows : filteredLatestKpiRows.slice(0, INITIAL_KPI_CARD_COUNT);
-  const canToggleTileExpansion = filteredLatestKpiRows.length > INITIAL_KPI_CARD_COUNT;
+  const tileCount = listBatchCount(params?.show, filteredLatestKpiRows.length, INITIAL_KPI_CARD_COUNT);
+  const visibleTileRows = filteredLatestKpiRows.slice(0, tileCount);
+  const canLoadMoreTiles = tileCount < filteredLatestKpiRows.length;
   const filterCount = activeStatusFilter === "all" ? metricNames.length : filteredLatestKpiRows.length;
   const selectedMetrics = resolveSelectedKpiNames(params?.metric, metricNames);
   const primaryMetric = selectedMetrics[0] || "";
@@ -1683,14 +1683,7 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
   const hasComparison = selectedMetrics.length > 1;
   const comparisonMode = isComparisonMode(params?.mode) ? params.mode : defaultComparisonMode(selectedTrends);
   const selectedComparisonContext = comparisonContext(selectedTimelineRange);
-  const activeSection =
-    params?.section === "compare" || params?.metric === "compare"
-      ? "compare"
-      : params?.section === "records" || params?.sort
-        ? "records"
-        : params?.section === "detail"
-          ? "detail"
-          : "overview";
+  const activeSection = performanceSection(params, primaryMetric);
   const selectedMetricRows = primaryMetric ? getMetricHistoryRows(allVisibleKpis, primaryMetric) : [];
   const selectedMetricActualValues = selectedMetricRows.map((row) => row.actual_value).filter((value): value is number => value !== null);
   const selectedLatestKpi = selectedMetricRows.at(-1);
@@ -1811,7 +1804,7 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
     <div className="vaeroex-priority-surface space-y-6">
       <PageHeader
         eyebrow="Measurement Layer"
-        title="KPIs"
+        title="Performance"
         description="Track the numbers that shape Vaeroex intelligence."
         actions={
           <div className="flex flex-wrap gap-2">
@@ -1853,6 +1846,7 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
 
       {activeSection === "overview" || activeSection === "detail" ? (
         <>
+          {activeSection === "overview" ? <>
           <TimelineControls timeline={timeline} range={selectedTimelineRange} status={activeStatusFilter} />
 
           <section className="grid gap-3 sm:grid-cols-3">
@@ -1884,7 +1878,7 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
 
           <div className="flex flex-col gap-2 rounded-lg border border-white/10 bg-[#08111f] px-4 py-3 text-sm text-slate-300 sm:flex-row sm:items-center sm:justify-between">
             <p>
-              Showing <span className="font-semibold text-white">{filterCount}</span> {statusFilterLabel(activeStatusFilter)} KPI{filterCount === 1 ? "" : "s"}.
+              Showing <span className="font-semibold text-white">{visibleTileRows.length} of {filterCount}</span> {statusFilterLabel(activeStatusFilter)} KPI{filterCount === 1 ? "" : "s"}.
             </p>
             {activeStatusFilter !== "all" ? (
               <Link href={kpiHref({ ...timelineQueryParams(timeline, selectedTimelineRange), status: "all" })} className="w-fit text-xs font-semibold text-vaeroex-accent underline underline-offset-4">
@@ -1903,6 +1897,7 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
                   settings={kpiSettings}
                   color={kpiColor(kpi.name, kpiSettings, index)}
                   index={index}
+                  href={`${kpiHref({ ...timelineQueryParams(timeline, selectedTimelineRange), status: activeStatusFilter, show: params?.show, metric: kpi.name, section: "detail" })}#kpi-detail` as Route}
                 />
               ))}
             </section>
@@ -1910,19 +1905,21 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
             <EmptyState title="No KPIs match this filter" description="Clear the filter, create a KPI manually, or import reviewed CSV/XLSX data to continue building the measurement layer." />
           )}
 
-          {canToggleTileExpansion ? (
+          {canLoadMoreTiles ? (
             <div className="flex justify-center">
               <Link
-                href={kpiHref({ ...timelineQueryParams(timeline, selectedTimelineRange), status: activeStatusFilter, show: showAllTiles ? null : "all" })}
+                href={kpiHref({ ...timelineQueryParams(timeline, selectedTimelineRange), status: activeStatusFilter, show: tileCount + INITIAL_KPI_CARD_COUNT })}
                 className="rounded-lg border border-white/10 px-4 py-2 text-sm font-semibold text-cyan-100 hover:border-vaeroex-accent/50 hover:bg-cyan-950/40 hover:text-vaeroex-accent"
               >
-                {showAllTiles ? "Show fewer KPIs" : `Show all ${filteredLatestKpiRows.length} KPIs`}
+                Show next {Math.min(INITIAL_KPI_CARD_COUNT, filteredLatestKpiRows.length - tileCount)} KPIs
               </Link>
             </div>
           ) : null}
+          </> : null}
 
           {activeSection === "detail" && primaryMetric ? (
             <section id="kpi-detail" className="grid gap-4 xl:grid-cols-[1.15fr_.85fr]">
+              <Link href={kpiHref({ ...timelineQueryParams(timeline, selectedTimelineRange), status: activeStatusFilter, show: params?.show })} className="inline-flex min-h-11 w-fit items-center text-sm font-semibold text-vaeroex-accent hover:underline xl:col-span-2">← Back to Performance</Link>
               <div className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-panel">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div>

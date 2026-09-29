@@ -257,22 +257,6 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
         </div>
       </div>
       <ErrorNotice message={displayErrors[0]?.message || null} />
-      <section aria-labelledby="intelligence-briefings-heading" className="space-y-4 border-b border-white/10 pb-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan-200">Leadership cadence</p>
-            <h2 id="intelligence-briefings-heading" className="mt-1 text-xl font-semibold text-white">Intelligence Briefings</h2>
-            <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-400">Generate rolling weekly and monthly syntheses from eligible business evidence, or return to the latest current briefing.</p>
-          </div>
-          <Link href="/app/intelligence/briefings" className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-cyan-200 hover:underline">
-            <CalendarRange aria-hidden="true" className="h-4 w-4" /> Open Briefings
-          </Link>
-        </div>
-        <IntelligenceBriefingCards
-          states={briefingStates}
-          generationEnabled={isIntelligenceBriefingEnabled()}
-        />
-      </section>
       <IntelligenceSignalInbox
         currentCards={lifecycleCards.current}
         historyCards={lifecycleCards.history}
@@ -281,6 +265,22 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
         canManageLifecycle={canManageLifecycle}
         blockedState={blockedState}
       />
+      <section aria-labelledby="intelligence-briefings-heading" className="space-y-4 border-t border-white/10 pt-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h2 id="intelligence-briefings-heading" className="mt-1 text-xl font-semibold text-white">Intelligence Briefings</h2>
+            <p className="mt-1 text-sm text-slate-400">Weekly and monthly summaries of eligible evidence.</p>
+          </div>
+          <Link href="/app/intelligence/briefings" className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-cyan-200 hover:underline">
+            <CalendarRange aria-hidden="true" className="h-4 w-4" /> Open Briefings
+          </Link>
+        </div>
+        <IntelligenceBriefingCards
+          states={briefingStates}
+          generationEnabled={isIntelligenceBriefingEnabled()}
+          compactUnavailable
+        />
+      </section>
     </div>
   );
 }

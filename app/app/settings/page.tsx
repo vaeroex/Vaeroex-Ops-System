@@ -59,91 +59,100 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="User Settings"
-        title="Vaeroex Settings"
-        description="Manage your personal workspace experience, including the official Pulsar visual identity and display preferences."
+        eyebrow="Workspace"
+        title="Settings"
+        description="Manage optional connections, your account, and this browser’s appearance."
       />
 
-      <ThemeControls />
+      {squareConnectionsEnabled || qboConnectionsEnabled || squareEvidence ? (
+        <section aria-labelledby="settings-connections" className="space-y-3">
+          <div>
+            <h2 id="settings-connections" className="text-lg font-semibold text-ink">Connections</h2>
+            <p className="mt-1 text-sm text-muted">Optional sources for this workspace. Connecting a service is not required to use Vaeroex.</p>
+          </div>
 
-      {squareEvidence ? <SquareEvidenceCard evidence={squareEvidence} /> : null}
+          {squareConnectionsEnabled ? <SectionCard
+            title="Square connection"
+            description="Connect your Square account, view this workspace’s saved Payments, and manage its connection."
+          >
+            <Link href="/app/settings/integrations/square" className="inline-block rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white">
+              Manage Square
+            </Link>
+          </SectionCard> : null}
 
-      {squareConnectionsEnabled ? <SectionCard
-        title="Square connection"
-        description="Connect your Square account, view this workspace’s saved Payments, and manage its connection."
-      >
-        <Link href="/app/settings/integrations/square" className="inline-block rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white">
-          Manage Square
-        </Link>
-      </SectionCard> : null}
+          {qboConnectionsEnabled ? (
+            <SectionCard
+              title="Accounting connection"
+              description="Connection health and data freshness for this workspace."
+            >
+              <ConnectionStatusPanel
+                connections={connections ?? []}
+                freshness={freshness ?? []}
+                businessEntities={businessEntities ?? []}
+                canManage={canManage}
+              />
+            </SectionCard>
+          ) : null}
 
-      {qboConnectionsEnabled ? (
-        <SectionCard
-          title="Accounting connection"
-          description="Connection health and data freshness for this workspace."
-        >
-          <ConnectionStatusPanel
-            connections={connections ?? []}
-            freshness={freshness ?? []}
-            businessEntities={businessEntities ?? []}
-            canManage={canManage}
-          />
-        </SectionCard>
+          {squareEvidence ? <SquareEvidenceCard evidence={squareEvidence} /> : null}
+        </section>
       ) : null}
 
       <SectionCard
-        title="Account Security"
-        description="Change the password for your signed-in Vaeroex account. Use a strong password and update it only from a trusted device."
+        title="Account"
+        description={context.profile?.email || "Signed in to Vaeroex"}
       >
-        <form action={changePasswordAction} className="max-w-xl space-y-4">
-          <AuthMessage error={params?.error} message={params?.message} />
-          <label className="block text-sm font-medium text-ink">
-            New password
-            <input
-              required
-              name="password"
-              type="password"
-              autoComplete="new-password"
-              minLength={8}
-              className="mt-2 w-full rounded-lg border border-line px-3 py-2 outline-none focus:border-vaeroex-blue"
-            />
-          </label>
-          <label className="block text-sm font-medium text-ink">
-            Confirm password
-            <input
-              required
-              name="confirm_password"
-              type="password"
-              autoComplete="new-password"
-              minLength={8}
-              className="mt-2 w-full rounded-lg border border-line px-3 py-2 outline-none focus:border-vaeroex-blue"
-            />
-          </label>
-          <p className="text-xs leading-5 text-muted">
-            Passwords must be at least 8 characters. Vaeroex will keep you signed in after a successful update.
-          </p>
-          <button className="rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white">
-            Change password
-          </button>
-        </form>
+        <details open={Boolean(params?.error || params?.message)}>
+          <summary className="w-fit cursor-pointer rounded-md py-1 text-sm font-semibold text-vaeroex-blue outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-blue focus-visible:ring-offset-2">Change password</summary>
+          <form action={changePasswordAction} className="mt-4 max-w-xl space-y-4">
+            <AuthMessage error={params?.error} message={params?.message} />
+            <p className="text-sm text-muted">Use a strong password and update it only from a trusted device.</p>
+            <label className="block text-sm font-medium text-ink">
+              New password
+              <input
+                required
+                name="password"
+                type="password"
+                autoComplete="new-password"
+                minLength={8}
+                className="mt-2 w-full rounded-lg border border-line px-3 py-2 outline-none focus:border-vaeroex-blue"
+              />
+            </label>
+            <label className="block text-sm font-medium text-ink">
+              Confirm password
+              <input
+                required
+                name="confirm_password"
+                type="password"
+                autoComplete="new-password"
+                minLength={8}
+                className="mt-2 w-full rounded-lg border border-line px-3 py-2 outline-none focus:border-vaeroex-blue"
+              />
+            </label>
+            <p className="text-xs leading-5 text-muted">
+              Passwords must be at least 8 characters. Vaeroex will keep you signed in after a successful update.
+            </p>
+            <button className="rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white">
+              Update password
+            </button>
+          </form>
+        </details>
       </SectionCard>
 
-      <SectionCard title="Current workspace" description="Theme settings are personal to this browser. Workspace access and account permissions remain unchanged.">
-        <div className="grid gap-3 md:grid-cols-3">
-          <div className="rounded-lg border border-line bg-slate-50 p-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted">Workspace</p>
-            <p className="mt-2 text-sm font-semibold text-ink">{context.activeWorkspace?.name || "Setup required"}</p>
+      <SectionCard title="Workspace">
+        <dl className="flex flex-wrap gap-x-10 gap-y-3 text-sm">
+          <div>
+            <dt className="text-xs font-semibold uppercase tracking-wide text-muted">Current workspace</dt>
+            <dd className="mt-1 font-semibold text-ink">{context.activeWorkspace?.name || "Setup required"}</dd>
           </div>
-          <div className="rounded-lg border border-line bg-slate-50 p-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted">Role</p>
-            <p className="mt-2 text-sm font-semibold text-ink">{context.membership?.role || "Setup pending"}</p>
+          <div>
+            <dt className="text-xs font-semibold uppercase tracking-wide text-muted">Your role</dt>
+            <dd className="mt-1 font-semibold text-ink">{context.membership?.role || "Setup pending"}</dd>
           </div>
-          <div className="rounded-lg border border-line bg-slate-50 p-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted">Account</p>
-            <p className="mt-2 text-sm font-semibold text-ink">{context.profile?.email || "Signed in"}</p>
-          </div>
-        </div>
+        </dl>
       </SectionCard>
+
+      <ThemeControls />
     </div>
   );
 }

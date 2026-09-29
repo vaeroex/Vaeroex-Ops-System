@@ -28,18 +28,20 @@ function readableDate(value: string) {
     : new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(date);
 }
 
-export function SavedAnalysisList({ analyses }: { analyses: readonly SavedAnalysisListItem[] }) {
+export function SavedAnalysisList({ analyses, loadLimitReached = false }: { analyses: readonly SavedAnalysisListItem[]; loadLimitReached?: boolean }) {
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
+  const [visibleCount, setVisibleCount] = useState(25);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-  const visible = useMemo(() => analyses.filter((analysis) => {
+  const matching = useMemo(() => analyses.filter((analysis) => {
     if (filter !== "all" && analysis.analysisType !== filter) return false;
     const search = query.trim().toLowerCase();
     return !search || `${analysis.title} ${savedAnalysisTypeLabel(analysis.analysisType)} ${analysis.evidenceStatus}`.toLowerCase().includes(search);
   }), [analyses, filter, query]);
+  const visible = matching.slice(0, visibleCount);
   const allVisibleSelected = visible.length > 0 && visible.every((analysis) => selected.has(analysis.id));
 
   function toggle(id: string) {
@@ -75,8 +77,9 @@ export function SavedAnalysisList({ analyses }: { analyses: readonly SavedAnalys
     <section className="space-y-4" aria-labelledby="saved-analyses-heading">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h2 id="saved-analyses-heading" className="text-lg font-semibold text-white">Saved Analyses</h2>
-          <p className="mt-1 text-sm text-slate-400">Analyses leadership explicitly chose to preserve.</p>
+          <h2 id="saved-analyses-heading" className="sr-only">Browse saved analyses</h2>
+          <p className="text-sm text-slate-400" role="status">Showing {visible.length} of {matching.length} matching loaded analyses.</p>
+          {loadLimitReached ? <p className="mt-1 text-xs text-slate-500">Search covers this loaded set (up to 300 recent analyses), not older history.</p> : null}
         </div>
         <label className="relative block min-w-0 lg:w-80">
           <span className="sr-only">Search saved analyses</span>
@@ -85,6 +88,7 @@ export function SavedAnalysisList({ analyses }: { analyses: readonly SavedAnalys
             value={query}
             onChange={(event) => {
               setQuery(event.currentTarget.value);
+              setVisibleCount(25);
               setSelected(new Set());
             }}
             placeholder="Search saved analyses"
@@ -93,13 +97,14 @@ export function SavedAnalysisList({ analyses }: { analyses: readonly SavedAnalys
         </label>
       </div>
 
-      <div className="vaeroex-mobile-safe-scroll flex gap-2 overflow-x-auto pb-1" aria-label="Saved analysis filters">
+      <div className="flex flex-wrap gap-2" aria-label="Saved analysis filters">
         {filters.map((item) => (
           <button
             key={item.value}
             type="button"
             onClick={() => {
               setFilter(item.value);
+              setVisibleCount(25);
               setSelected(new Set());
             }}
             className={`inline-flex min-h-11 shrink-0 items-center rounded-lg border px-3 py-2 text-sm font-semibold ${filter === item.value ? "border-cyan-300/40 bg-cyan-950/35 text-cyan-100" : "border-white/10 bg-white/[0.04] text-slate-300 hover:bg-cyan-950/25"}`}
@@ -158,10 +163,11 @@ export function SavedAnalysisList({ analyses }: { analyses: readonly SavedAnalys
               </article>
             ))}
           </div>
+          {visible.length < matching.length ? <button type="button" onClick={() => setVisibleCount((count) => count + 25)} className="min-h-11 rounded-lg border border-white/10 px-4 py-2 text-sm font-semibold text-cyan-100">Load more analyses</button> : null}
         </>
       ) : (
         <div className="rounded-lg border border-dashed border-white/15 bg-[#08111f] p-6 text-center">
-          <h3 className="text-base font-semibold text-white">No saved analyses match this view</h3>
+          <h3 className="text-base font-semibold text-white">{analyses.length ? "No saved analyses match this view" : "No saved analyses yet"}</h3>
           <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-400">Open a completed analysis or Intelligence Briefing and choose Save.</p>
         </div>
       )}

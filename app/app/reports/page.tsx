@@ -49,7 +49,7 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
       <ErrorNotice message={params?.error || error?.message} />
       {params?.message ? <div className="rounded-lg border border-emerald-300/30 bg-emerald-950/25 p-3 text-sm text-emerald-100">{params.message}</div> : null}
 
-      <SavedAnalysisList analyses={saved} />
+      <SavedAnalysisList analyses={saved} loadLimitReached={(data?.length ?? 0) >= 300} />
     </div>
   );
 }
