@@ -177,7 +177,7 @@ test("confidence and history changes reset the batch while deep links still open
   assert.doesNotMatch(nodes(deep, (node) => node.type === "aside")[0].props.className, /^hidden/);
 });
 
-test("hiding a selected low-confidence finding previews the first remaining result without reopening mobile Back", () => {
+test("confidence-filter fallback becomes the selection and survives clearing the filter without reopening mobile Back", () => {
   const previousWindow = global.window;
   global.window = { scrollY: 0, requestAnimationFrame: (fn) => fn(), scrollTo: () => {} };
   try {
@@ -192,6 +192,12 @@ test("hiding a selected low-confidence finding previews the first remaining resu
     assert.equal(rows(tree)[0].props["aria-current"], "true");
     assert.match(content(nodes(tree, (node) => node.type === "aside")[0]), /Synthetic finding 0/);
     assert.doesNotMatch(content(nodes(tree, (node) => node.type === "aside")[0]), /Select a finding/);
+    nodes(tree, (node) => node.type === "input")[0].props.onChange({ currentTarget: { checked: false } });
+    tree = render();
+    assert.equal(rows(tree).length, 3);
+    assert.equal(rows(tree)[0].props["aria-current"], "true");
+    assert.match(content(nodes(tree, (node) => node.type === "aside")[0]), /Synthetic finding 0/);
+    assert.doesNotMatch(content(nodes(tree, (node) => node.type === "aside")[0]), /Synthetic finding 1/, "clearing the filter must not resurrect the excluded prior selection");
     rows(tree)[0].props.onClick({ currentTarget: { focus: () => {} } });
     tree = render();
     button(tree, "← Back to list").props.onClick();
@@ -199,6 +205,12 @@ test("hiding a selected low-confidence finding previews the first remaining resu
     assert.equal(rows(tree).some((node) => node.props["aria-current"] === "true"), false);
     assert.match(nodes(tree, (node) => node.type === "aside")[0].props.className, /^hidden xl:block/);
     assert.match(content(nodes(tree, (node) => node.type === "aside")[0]), /Select a finding/);
+    for (const checked of [true, false]) {
+      nodes(tree, (node) => node.type === "input")[0].props.onChange({ currentTarget: { checked } });
+      tree = render();
+      assert.equal(rows(tree).some((node) => node.props["aria-current"] === "true"), false, "an intentional Back-to-list empty selection remains empty across confidence changes");
+      assert.match(nodes(tree, (node) => node.type === "aside")[0].props.className, /^hidden xl:block/);
+    }
   } finally { global.window = previousWindow; }
 });
 

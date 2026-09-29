@@ -532,6 +532,20 @@ export function IntelligenceSignalInbox({
     setDismissOpen(false);
   }
 
+  function changeConfidenceFilter(hide: boolean) {
+    const nextCards = sortIntelligenceLifecycleCardsV1(viewCards
+      .filter((card) => activeType === "All" || card.snapshot.type === activeType)
+      .filter((card) => !hide || card.snapshot.confidence !== "Low"));
+    if (selectedKey && !nextCards.some((card) => card.findingKeyHash === selectedKey) && nextCards[0]) {
+      setSelectedKey(nextCards[0].findingKeyHash);
+      setPanelMode("summary");
+      setDismissOpen(false);
+    }
+    setHideLowConfidence(hide);
+    setVisibleCount(pageSize);
+    setMobileDetailOpen(false);
+  }
+
   function selectCard(card: IntelligenceLifecycleCardV1, trigger: HTMLButtonElement) {
     listReturnRef.current = { top: window.scrollY, trigger };
     setSelectedKey(card.findingKeyHash);
@@ -644,7 +658,7 @@ export function IntelligenceSignalInbox({
           <h2 className="mt-1 text-xl font-semibold text-white">Current findings and history</h2>
         </div>
         <label className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-xs text-slate-200">
-          <input type="checkbox" checked={hideLowConfidence} onChange={(event) => { setHideLowConfidence(event.currentTarget.checked); setVisibleCount(pageSize); setMobileDetailOpen(false); }} className="h-4 w-4 rounded border-white/20 bg-slate-950 text-vaeroex-blue focus:ring-vaeroex-accent" />
+          <input type="checkbox" checked={hideLowConfidence} onChange={(event) => changeConfidenceFilter(event.currentTarget.checked)} className="h-4 w-4 rounded border-white/20 bg-slate-950 text-vaeroex-blue focus:ring-vaeroex-accent" />
           Hide low confidence
         </label>
       </div>
