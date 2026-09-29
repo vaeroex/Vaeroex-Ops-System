@@ -20,8 +20,10 @@ function loadTsx(relative, mocks = {}) {
   return loaded.exports;
 }
 
-const { SquareDirectCustomerPanel, squarePaymentAmount } = loadTsx("components/integrations/SquareDirectCustomerPanel.tsx");
-const render = view => renderToStaticMarkup(React.createElement(SquareDirectCustomerPanel, { view }));
+const { SquareDirectCustomerPanel, squarePaymentAmount, squareBusinessTime, squarePaymentsHref } = loadTsx("components/integrations/SquareDirectCustomerPanel.tsx", {
+  "next/link": { __esModule: true, default: ({ children, prefetch, ...props }) => { assert.equal(prefetch, false); return React.createElement("a", props, children); } },
+});
+const render = (view, props = {}) => renderToStaticMarkup(React.createElement(SquareDirectCustomerPanel, { view, ...props }));
 const connection = {
   connectionId: "connection-owner-a", businessEntityId: "entity-owner-a", state: "connected", sellerLabel: "Owner A seller",
   locations: [{ id: "location-a", label: "Owner A location" }], locationId: "location-a", lastSyncedAt: "2026-09-29T01:02:03.000Z",
@@ -30,6 +32,203 @@ const connection = {
   payments: [{ id: "payment-a", locationId: "location-a", status: "COMPLETED", createdAt: "2026-09-29T01:01:00.000Z", updatedAt: "2026-09-29T01:01:00.000Z", amountMinor: "12345", currency: "USD" }],
 };
 const view = { available: true, historyAvailable: true, businessEntities: [{ id: "entity-owner-a", label: "Owner A business" }], connections: [connection] };
+const connectionMetadata = item => ({
+  connectionId: item.connectionId, businessEntityId: item.businessEntityId, businessEntityLabel: "Owner A business",
+  sellerLabel: item.sellerLabel, locationLabel: "Owner A location", state: item.state, timeZone: "America/Los_Angeles", timeZoneFallback: false,
+  createdAt: "2026-09-29T00:00:00.000Z", paymentCount: item.payments.length,
+});
+const browserFor = (overrides = {}) => ({
+  connectionId: connection.connectionId, currentConnection: connection, timeZone: "America/Los_Angeles", timeZoneFallback: false, page: 1, pageSize: 25,
+  totalCount: 1, totalPages: 1, payments: connection.payments, connections: [connectionMetadata(connection)],
+  filters: { startDate: null, endDate: null, status: "all" }, ...overrides,
+});
+
+test("direct Settings navigation is present for every connection state without browser Back or workspace switching", () => {
+  for (const state of ["consent_pending", "exchanging", "mapping_required", "connected", "syncing", "retry_required", "reauthorization_required", "disconnected"]) {
+    for (const available of [true, false]) {
+      const html = render({ ...view, available, connections: [{ ...connection, state }] });
+      assert.match(html, /<a href="\/app\/settings"[^>]*>← Back to Settings<\/a>/);
+      assert.doesNotMatch(html, /history\.back|router\.back|javascript:|name="workspaceId"|workspaceId=/);
+    }
+  }
+  assert.match(render({ ...view, connections: [] }), /← Back to Settings/);
+});
+
+test("one compact current connection and collapsed historical rows replace repeated cards and tables", () => {
+  const old = { ...connection, connectionId: "old-connection", state: "disconnected", sellerLabel: "Old seller" };
+  const unused = { ...old, connectionId: "unused-attempt", sellerLabel: null, payments: [] };
+  const browser = browserFor({ connections: [connectionMetadata(connection), connectionMetadata(old), connectionMetadata(unused)] });
+  const html = render({ ...view, connections: [connection, old, unused] }, { browser });
+  assert.equal((html.match(/id="current-square-connection"/g) ?? []).length, 1);
+  assert.equal((html.match(/<table /g) ?? []).length, 1);
+  const history = html.slice(html.indexOf("Connection history"));
+  assert.match(history, /Old seller/);
+  assert.match(history, /Unused Square attempt/);
+  assert.match(history, /connectionId=old-connection/);
+  assert.match(history, /connectionId=unused-attempt/);
+  assert.doesNotMatch(history, /<table|<form/);
+  assert.doesNotMatch(html, /<details[^>]*\bopen(?:=|>)/);
+  assert.doesNotMatch(html, /name="locationId"/);
+});
+
+test("history includes all browser connections and current context is not limited by the old status preview", () => {
+  const old = Array.from({ length: 42 }, (_, index) => ({ ...connection, connectionId: `old-${index}`, state: "disconnected", sellerLabel: `Archived ${index}`, payments: [] }));
+  const browser = browserFor({ connections: [connectionMetadata(connection), ...old.map(connectionMetadata)] });
+  const html = render({ ...view, connections: old.slice(0, 32) }, { browser });
+  assert.match(html, /id="current-square-connection"/);
+  assert.match(html, /Owner A seller/);
+  assert.match(html, /Archived 41/);
+  assert.equal((html.match(/>View saved Payments<\/a>/g) ?? []).length, 42);
+  assert.doesNotMatch(html, /action="\/api\/integrations\/square\/connect"/);
+});
+
+test("archive browsing changes only the stored-payment panel, not the current connection or action target", () => {
+  const old = { ...connection, connectionId: "old-connection", state: "disconnected", sellerLabel: "Old seller", payments: [{ ...connection.payments[0], id: "old-payment" }] };
+  const html = render({ ...view, connections: [connection, old] }, { browser: browserFor({
+    connectionId: old.connectionId, payments: old.payments, connections: [connectionMetadata(connection), connectionMetadata(old)],
+  }) });
+  assert.match(html, /Previous connection/);
+  assert.match(html, /old-payment/);
+  for (const form of html.matchAll(/<form\b[^>]*method="post"[^>]*>[\s\S]*?<\/form>/g)) {
+    assert.match(form[0], /name="connectionId" value="connection-owner-a"/);
+    assert.doesNotMatch(form[0], /value="old-connection"/);
+  }
+});
+
+test("legacy unavailable browsing preserves selected archived records with an honest limited-preview label", () => {
+  const old = { ...connection, connectionId: "old-connection", state: "disconnected", sellerLabel: "Old seller", payments: [{ ...connection.payments[0], id: "old-payment" }] };
+  const html = render({ ...view, connections: [connection, old] }, { browseConnectionId: old.connectionId });
+  assert.match(html, /old-payment/);
+  assert.match(html, /saved-record preview only/);
+  assert.match(html, /not all matching stored Payments/);
+  assert.doesNotMatch(html, /Filter saved Payments|aria-label="Saved Payments pagination"/);
+  assert.match(render({ ...view, connections: [old] }), /old-payment/);
+  const unknown = render({ ...view, connections: [old] }, { browseConnectionId: "foreign-connection" });
+  assert.doesNotMatch(unknown, /old-payment/);
+});
+
+test("Manage connection and Disconnect are nested closed disclosures before required confirmation", () => {
+  const html = render(view, { browser: browserFor() });
+  const manage = html.slice(html.indexOf(">Manage connection</summary>"), html.indexOf("<section id=\"saved-payments\""));
+  assert.match(manage, /<details[^>]*>[\s\S]*>Disconnect Square<\/summary>[\s\S]*<form/);
+  assert.match(manage, /type="checkbox" required=""[^>]*name="confirmation" value="disconnect"/);
+  assert.match(manage, /Confirm disconnect/);
+  assert.doesNotMatch(manage, /\bopen=/);
+});
+
+test("configured business timezone renders readable dates while full IDs and exact UTC remain in payment details", () => {
+  const payment = { ...connection.payments[0], id: "full-provider-payment-identifier", createdAt: "2026-05-05T04:43:11.000Z", updatedAt: "2026-05-05T04:43:12.000Z", amountMinor: "400000" };
+  const html = render(view, { browser: browserFor({ payments: [payment] }) });
+  assert.match(html, /Dates in America\/Los_Angeles · Business timezone/);
+  assert.match(html, /May 4, 2026, 9:43 PM/);
+  assert.match(html, /USD 4,000\.00/);
+  const row = html.match(/<tr[^>]*data-payment-row="true"[\s\S]*?<\/tr>/)?.[0];
+  assert.ok(row);
+  const beforeDetails = row.slice(0, row.indexOf("<details"));
+  assert.doesNotMatch(beforeDetails, /full-provider-payment-identifier|2026-05-05 04:43:11 UTC/);
+  assert.match(row, /<details[\s\S]*full-provider-payment-identifier[\s\S]*2026-05-05 04:43:11 UTC[\s\S]*2026-05-05 04:43:12 UTC/);
+  assert.equal(squareBusinessTime("2026-05-05T04:43:11Z", "America/Los_Angeles"), "May 4, 2026, 9:43 PM");
+  assert.equal(squareBusinessTime("2026-05-05T04:43:11Z", "Invalid/Timezone"), "Time unavailable");
+});
+
+test("an unrecognized stored business timezone is labeled as UTC fallback without hiding saved browsing or controls", () => {
+  const html = render(view, { browser: browserFor({ timeZone: "UTC", timeZoneFallback: true,
+    connections: [{ ...connectionMetadata(connection), timeZone: "UTC", timeZoneFallback: true }] }) });
+  assert.match(html, /Dates in UTC · Fallback; business timezone unavailable/);
+  assert.match(html, /Last successful update[\s\S]*UTC · Fallback; business timezone unavailable/);
+  assert.match(html, /Filter saved Payments/);
+  assert.match(html, /payment-a/);
+  assert.match(html, /Update Payments/);
+  assert.doesNotMatch(html, /Dates in UTC · Business timezone|saved-record preview only/);
+});
+
+test("an archived fallback timezone does not relabel the valid current connection", () => {
+  const old = { ...connection, connectionId: "old-connection", state: "disconnected" };
+  const html = render(view, { browser: browserFor({ connectionId: old.connectionId, timeZone: "UTC", timeZoneFallback: true,
+    connections: [connectionMetadata(connection), { ...connectionMetadata(old), timeZone: "UTC", timeZoneFallback: true }] }) });
+  const currentPanel = html.slice(0, html.indexOf('id="saved-payments"'));
+  assert.match(currentPanel, /America\/Los_Angeles/);
+  assert.doesNotMatch(currentPanel, /Fallback/);
+  assert.match(html, /Dates in UTC · Fallback; business timezone unavailable/);
+});
+
+test("failed and canceled attempts cannot be mistaken for completed-payment badges or totals", () => {
+  const payments = ["COMPLETED", "FAILED", "CANCELED", "PENDING", "APPROVED"].map((status, index) => ({ ...connection.payments[0], id: `status-${index}`, status }));
+  const html = render(view, { browser: browserFor({ payments, totalCount: payments.length }) });
+  assert.match(html, /bg-emerald-50 text-emerald-800">Completed<\/span>/);
+  assert.match(html, /bg-red-50 text-red-800">Failed attempt<\/span>/);
+  assert.match(html, /bg-red-50 text-red-800">Canceled attempt<\/span>/);
+  assert.match(html, /Failed and canceled attempts are not additional successful payments/);
+  assert.match(html, /approved and pending records are not yet completed/);
+  assert.doesNotMatch(html, /Total revenue|Total Payments amount/);
+});
+
+test("mobile rows keep date amount status and Details visible in two columns without a fixed table width", () => {
+  const html = render(view, { browser: browserFor() });
+  assert.doesNotMatch(html, /min-w-\[420px\]/);
+  assert.match(html, /<table class="block w-full text-left text-sm sm:table"/);
+  assert.match(html, /<thead class="sr-only[^\"]*sm:not-sr-only"/);
+  const row = html.match(/<tr[^>]*data-payment-row="true"[\s\S]*?<\/tr>/)?.[0];
+  assert.match(row, /grid grid-cols-2[^\"]*sm:table-row/);
+  for (const order of [1, 2, 3, 4]) assert.match(row, new RegExp(`order-${order} min-w-0`));
+  assert.equal((row.match(/sm:order-none/g) ?? []).length, 4);
+  assert.match(row, /<details class="text-xs">/);
+  assert.match(row, /<summary[^>]*>Details/);
+  assert.match(html, /<th scope="col"[^>]*>Date/);
+  assert.match(html, /<th scope="col"[^>]*>Status/);
+  assert.match(html, /<th scope="col"[^>]*>Amount/);
+});
+
+test("25-row browsing renders every page of 413 server-selected records without importing or losing filters", () => {
+  const all = Array.from({ length: 413 }, (_, index) => ({ ...connection.payments[0], id: `stored-payment-${index}` }));
+  const ids = [];
+  const filters = { startDate: "2026-05-01", endDate: "2026-09-30", status: "COMPLETED" };
+  for (let page = 1; page <= 17; page++) {
+    const payments = all.slice((page - 1) * 25, page * 25);
+    const html = render(view, { browser: browserFor({ payments, page, totalPages: 17, totalCount: all.length, filters }) });
+    assert.equal((html.match(/data-payment-row="true"/g) ?? []).length, page === 17 ? 13 : 25);
+    assert.match(html, new RegExp(`Page ${page} of 17`));
+    ids.push(...[...html.matchAll(/<dd class="break-all">(stored-payment-\d+)<\/dd>/g)].map(match => match[1]));
+    const browse = html.match(/<form\b[^>]*method="get"[^>]*>[\s\S]*?<\/form>/)?.[0];
+    assert.ok(browse);
+    assert.match(browse, /action="\/app\/settings\/integrations\/square#saved-payments"/);
+    assert.doesNotMatch(browse, /\/api\/integrations|name="page"|name="workspaceId"/);
+    const nav = html.slice(html.indexOf('<nav aria-label="Saved Payments pagination"'));
+    for (const href of nav.matchAll(/href="([^"]+)"/g)) {
+      const url = new URL(href[1].replaceAll("&amp;", "&"), "https://example.invalid");
+      assert.equal(url.pathname, "/app/settings/integrations/square");
+      assert.equal(url.searchParams.get("connectionId"), connection.connectionId);
+      assert.equal(url.searchParams.get("startDate"), filters.startDate);
+      assert.equal(url.searchParams.get("endDate"), filters.endDate);
+      assert.equal(url.searchParams.get("status"), filters.status);
+      assert.equal(url.hash, "#saved-payments");
+    }
+  }
+  assert.deepEqual(ids, all.map(payment => payment.id));
+  assert.equal(new Set(ids).size, 413);
+});
+
+test("filter date coverage and zero-match text distinguish stored browsing from provider imports", () => {
+  const html = render(view, { browser: browserFor({ payments: [], totalCount: 0, totalPages: 1,
+    filters: { startDate: "2026-05-04", endDate: "2026-05-05", status: "FAILED" },
+  }) });
+  assert.match(html, /0 matching saved Payments/);
+  assert.match(html, /No saved Payments match these filters/);
+  assert.match(html, /Searched stored creation dates: 2026-05-04 through 2026-05-05, inclusive \(America\/Los_Angeles\)/);
+  assert.match(html, /They do not search Square for new records/);
+  assert.doesNotMatch(html, /aria-label="Saved Payments pagination"/);
+  assert.equal(squarePaymentsHref(connection.connectionId), "/app/settings/integrations/square?connectionId=connection-owner-a#saved-payments");
+});
+
+test("invalid saved-payment filters offer a safe reset using only the known selected connection", () => {
+  const html = render(view, { browseError: "Choose valid saved-payment filters.", browseConnectionId: connection.connectionId });
+  assert.match(html, /Choose valid saved-payment filters/);
+  assert.match(html, /href="\/app\/settings\/integrations\/square\?connectionId=connection-owner-a#saved-payments"[^>]*>Reset saved-payment filters/);
+  assert.match(html, /saved-record preview only/);
+  const unknown = render({ ...view, connections: [] }, { browseError: "Choose valid saved-payment filters.", browseConnectionId: "foreign-connection" });
+  assert.match(unknown, /href="\/app\/settings\/integrations\/square"[^>]*>Reset saved-payment filters/);
+  assert.doesNotMatch(unknown, /foreign-connection/);
+});
 
 test("unavailable workspace without a connection renders no actions", () => {
   const html = render({ ...view, available: false, connections: [] });
@@ -54,7 +253,7 @@ test("owner view renders exact Square amounts, source and sync time without anot
   assert.match(html, /Owner A seller/);
   assert.match(html, /USD 123\.45/);
   assert.match(html, /Source: Square Production/);
-  assert.match(html, /2026-09-29 01:02:03 UTC/);
+  assert.match(html, /Sep 29, 2026, 1:02 AM/);
   assert.match(html, /value="connection-owner-a"/);
   assert.doesNotMatch(html, /name="workspaceId"|internal.permit|Owner B|revenue:|profit:/i);
   assert.match(html, /not revenue, profit/);
@@ -246,16 +445,18 @@ test("direct page rejects host/protocol mismatch before workspace authority and 
   const { default: page } = loadTsx("app/(square-connection)/app/settings/integrations/square/page.tsx", {
     "next/headers": { headers: async () => incoming },
     "next/navigation": { notFound: () => { throw new Error("NOT_FOUND"); } },
+    "@/lib/integrations/square-direct/payment-browse": { parseDirectPaymentBrowseQuery: () => ({ connectionId: null, page: 1, startDate: null, endDate: null, status: "all" }) },
     "@/components/integrations/SquareDirectCustomerPanel": { SquareDirectCustomerPanel },
     "@/components/integrations/SquareConnectionPanel": { SquareConnectionPanel: () => { throw new Error("LEGACY_RENDER"); } },
     "@/components/integrations/SquareProductionCustomerPanel": { SquareProductionCustomerPanel: () => { throw new Error("LEGACY_RENDER"); } },
-    "@/lib/integrations/square-direct/server": { squareDirectEnabled: () => true, squareDirectView: async () => { directReads++; return returned; } },
+    "@/lib/integrations/square-direct/server": { squareDirectEnabled: () => true, squareDirectView: async () => { directReads++; return returned; }, squareDirectPayments: async () => ({ browser: null, error: null }) },
     "@/lib/integrations/control-plane/square-production-customer": { productionSquareCustomerEnabled: () => { throw new Error("LEGACY_GATE"); } },
     "@/lib/integrations/control-plane/square-customer-availability": {},
     "@/lib/integrations/control-plane/square-customer-routes": { SQUARE_CUSTOMER_SETTINGS_PATH: "/app/settings/integrations/square" },
     "@/lib/seo/public-seo": { PUBLIC_SITE_URL: "https://www.vaeroex.com" },
   });
-  assert.equal((await page()).type, SquareDirectCustomerPanel);
+  const readPage = () => page({ searchParams: Promise.resolve({}) });
+  assert.equal((await readPage()).type, SquareDirectCustomerPanel);
   assert.equal(directReads, 1);
   for (const headers of [
     { host: "evil.invalid", "x-forwarded-proto": "https" },
@@ -264,12 +465,12 @@ test("direct page rejects host/protocol mismatch before workspace authority and 
     { host: "www.vaeroex.com" },
   ]) {
     incoming = new Headers(headers);
-    await assert.rejects(page(), /NOT_FOUND/);
+    await assert.rejects(readPage(), /NOT_FOUND/);
   }
   assert.equal(directReads, 1);
   incoming = new Headers({ host: "www.vaeroex.com", "x-forwarded-proto": "https" });
   returned = null;
-  await assert.rejects(page(), /NOT_FOUND/);
+  await assert.rejects(readPage(), /NOT_FOUND/);
   assert.equal(directReads, 2);
 });
 

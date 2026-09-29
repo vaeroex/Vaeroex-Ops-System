@@ -8,6 +8,7 @@ import handoff from "@/lib/integrations/control-plane/square-customer-handoff-po
 import { DirectActorSchema, DirectHistoricalWindowSchema } from "./contracts";
 import { createDirectSquareService } from "./service";
 import { createDirectSquareProvider } from "./provider";
+import { DirectPaymentBrowserSchema, parseDirectPaymentBrowseQuery } from "./payment-browse";
 
 export const squareSettingsPath = "/app/settings/integrations/square";
 const headers = { "cache-control": "no-store, max-age=0", "referrer-policy": "no-referrer",
@@ -33,8 +34,7 @@ function config() {
   if (!directEncryptionKeyValid(encryptionKey)) throw new Error("square_customer_configuration_unavailable");
   return { applicationId, applicationSecret, encryptionKey };
 }
-async function service() {
-  const settings = config();
+async function ownerDatabase() {
   const { supabase, user } = await requireAuth(); // getUser validates the signed session with Supabase.
   const access = await getCurrentWorkspace();
   if (access.membership.role !== "owner" || access.membership.user_id !== user.id) throw new Error("square_customer_denied");
@@ -45,6 +45,11 @@ async function service() {
   if (!admin) throw new Error("square_customer_configuration_unavailable");
   const call = admin.rpc.bind(admin) as unknown as (name: string, payload: Record<string, unknown>) =>
     Promise<{ data: unknown; error: unknown }>;
+  return { actor, call };
+}
+async function service() {
+  const settings = config();
+  const { actor, call } = await ownerDatabase();
   return createDirectSquareService({ actor, encryptionKey: settings.encryptionKey,
     provider: authorize => createDirectSquareProvider({ ...settings, authorize }),
     rpc: async (operation, payload) => {
@@ -61,6 +66,20 @@ async function service() {
 export async function squareDirectView() {
   if (!squareDirectEnabled()) return null;
   try { return await (await service()).view(); } catch { return null; }
+}
+/** Saved-data browsing is read-only. It does not decrypt a seller credential,
+ * contact Square, claim an import lease, or advance an ongoing checkpoint. */
+export async function squareDirectPayments(searchParams: Record<string, string | string[] | undefined>) {
+  if (!squareDirectEnabled()) return null;
+  const query = parseDirectPaymentBrowseQuery(searchParams);
+  const { actor, call } = await ownerDatabase();
+  const result = await call("square_customer_payments_v1", {
+    p_actor_id: actor.actorId, p_session_id: actor.sessionId, p_workspace_id: actor.workspaceId,
+    p_connection_id: query.connectionId, p_page: query.page,
+    p_start_date: query.startDate, p_end_date: query.endDate, p_status: query.status
+  });
+  if (result.error || result.data == null) throw new Error("square_customer_payment_browse_unavailable");
+  return DirectPaymentBrowserSchema.parse(result.data);
 }
 function escape(value: string) {
   return value.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/'/g, "&#39;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
