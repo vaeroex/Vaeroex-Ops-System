@@ -5,7 +5,8 @@ import { oauthStateHash } from "@/lib/integrations/credentials/oauth-state";
 import { parseSquareOAuthCallback } from "@/lib/integrations/providers/square/account-connection-oauth";
 import { sealCredential, openCredential } from "./crypto";
 import { createDirectSquareProvider, directCallbackUri } from "./provider";
-import { DirectContextSchema, DirectViewSchema, type DirectActor, type DirectContext, type DirectRpc } from "./contracts";
+import { DirectContextSchema, DirectViewSchema, DirectHistoricalWindowSchema, type DirectHistoricalWindow,
+  type DirectActor, type DirectContext, type DirectRpc } from "./contracts";
 
 const stored = z.object({ stored: z.literal(true) }).strict();
 const denied = () => new Error("square_customer_action_failed");
@@ -79,10 +80,13 @@ export function createDirectSquareService(input: {
     async map(connectionId: string, locationId: string) {
       z.object({ mapped: z.literal(true) }).strict().parse(await input.rpc("map", { connectionId, locationId }));
     },
-    async read(connectionId: string) {
+    async read(connectionId: string, historical?: DirectHistoricalWindow) {
       const leaseId = randomUUID();
-      let row = context(await input.rpc("claim", { connectionId, leaseId }), connectionId, leaseId);
+      const range = historical === undefined ? undefined : DirectHistoricalWindowSchema.parse(historical);
+      if (range && Date.parse(range.windowEnd) > now().getTime()) throw denied();
+      let row = context(await input.rpc(range ? "claim_history" : "claim", { connectionId, leaseId, ...range }), connectionId, leaseId);
       try {
+        if (range && (row.readKind !== "created" || row.windowStart !== range.windowStart || row.windowEnd !== range.windowEnd)) throw denied();
         if (!row.ciphertext || !row.merchantId || !row.locationId || !row.accessExpiresAt || !row.windowStart || !row.windowEnd) throw denied();
         let credential = openCredential(row.ciphertext, input.encryptionKey, aad(row));
         if (credential.externalAuthorizedEntityReference !== row.merchantId || credential.accessExpiresAt !== row.accessExpiresAt) throw denied();
@@ -102,6 +106,7 @@ export function createDirectSquareService(input: {
         if (Date.parse(credential.accessExpiresAt) <= now().getTime()) throw denied();
         const page = await square.payments({ credential, workspaceId: row.workspaceId, connectionId,
           merchantId: row.merchantId!, locationId: row.locationId!, windowStart: row.windowStart!, windowEnd: row.windowEnd!,
+          readKind: row.readKind,
           cursor: row.cursor, cursorBindingFingerprint: row.cursorBindingFingerprint, cursorFingerprint: row.cursorFingerprint });
         z.object({ stored: z.literal(true), hasMore: z.boolean() }).strict().parse(await input.rpc("commit_page", {
           connectionId, leaseId, ...page,

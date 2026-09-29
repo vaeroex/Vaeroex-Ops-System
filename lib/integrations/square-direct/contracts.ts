@@ -5,6 +5,14 @@ const id = z.string().uuid();
 // not its transport spelling (also stabilizes persisted cursor fingerprints).
 const instant = z.string().datetime({ offset: true }).transform(value => new Date(value).toISOString());
 const fingerprint = z.string().regex(/^sha256:[a-f0-9]{64}$/);
+const readKind = z.enum(["updated", "created"]);
+const readWindow = z.object({ start: instant, end: instant, kind: readKind }).strict();
+export const DirectHistoricalWindowSchema = z.object({ windowStart: instant, windowEnd: instant }).strict()
+  .refine(value => {
+    const duration = Date.parse(value.windowEnd) - Date.parse(value.windowStart);
+    return duration > 0 && duration <= 31 * 86_400_000;
+  });
+export type DirectHistoricalWindow = z.infer<typeof DirectHistoricalWindowSchema>;
 export const DirectActorSchema = z.object({ workspaceId: id, actorId: id, sessionId: id }).strict();
 export type DirectActor = z.infer<typeof DirectActorSchema>;
 export const DirectPaymentSchema = z.object({
@@ -19,10 +27,13 @@ const location = z.object({ id: z.string().min(1).max(50), label: z.string().min
 export const DirectStateSchema = z.enum(["consent_pending", "exchanging", "mapping_required", "connected",
   "syncing", "retry_required", "reauthorization_required", "disconnected"]);
 export const DirectViewSchema = z.object({
+  historyAvailable: z.boolean().default(false),
   available: z.boolean(), businessEntities: z.array(z.object({ id, label: z.string().min(1).max(255) }).strict()).max(1000),
   connections: z.array(z.object({ connectionId: id, businessEntityId: id, state: DirectStateSchema,
     sellerLabel: z.string().max(255).nullable(), locations: z.array(location).max(500), locationId: z.string().max(50).nullable(),
     lastSyncedAt: instant.nullable(), lastError: z.enum(["retry_required", "reauthorization_required"]).nullable(),
+    checkpointAt: instant.nullable().default(null), activeRead: readWindow.nullable().default(null),
+    lastCompletedRead: readWindow.extend({ completedAt: instant }).nullable().default(null),
     hasMore: z.boolean(), revocationPending: z.boolean(), recoveryRequired: z.boolean(), payments: z.array(DirectPaymentSchema).max(100)
   }).strict()).max(100)
 }).strict();
@@ -33,6 +44,7 @@ export const DirectContextSchema = z.object({
   ciphertext: z.string().max(131072).nullable(), merchantId: z.string().max(191).nullable(),
   accessExpiresAt: instant.nullable(), locationId: z.string().max(50).nullable(),
   windowStart: instant.nullable(), windowEnd: instant.nullable(), cursor: z.string().max(4098).nullable(),
+  readKind: readKind.default("updated"),
   cursorBindingFingerprint: fingerprint.nullable(), cursorFingerprint: fingerprint.nullable(),
   leaseId: id.nullable(), state: DirectStateSchema
 }).strict();

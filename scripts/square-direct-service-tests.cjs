@@ -56,7 +56,10 @@ function fixture(options = {}) {
       consumed = true; uncertain = true; row.leaseId = payload.leaseId; row.state = 'exchanging'; return snapshot();
     }
     if (operation === 'decline') { uncertain = false; row.state = 'disconnected'; row.leaseId = null; return { recorded: true }; }
-    if (operation === 'claim') { row.leaseId = payload.leaseId; row.state = 'syncing'; return options.foreignContext ? { ...snapshot(), workspaceId: randomUUID() } : snapshot(); }
+    if (operation === 'claim' || operation === 'claim_history') {
+      if (operation === 'claim_history') row = { ...row, readKind: 'created', windowStart: payload.windowStart, windowEnd: payload.windowEnd };
+      row.leaseId = payload.leaseId; row.state = 'syncing';
+      return options.foreignContext ? { ...snapshot(), workspaceId: randomUUID() } : snapshot(); }
     if (operation === 'authorize' || operation === 'authorize_disconnect') {
       assert.equal(payload.leaseId, row.leaseId); assert.equal(payload.connectionId, row.connectionId);
       if (options.denyDispatch) throw Error('fenced');
@@ -115,7 +118,7 @@ function fixture(options = {}) {
       return { ...old, accessToken: 'synthetic-renewed', updatedAt: clock.toISOString(), accessExpiresAt: '2026-09-30T12:00:00.000Z' }; },
     payments: async request => {
       await authorize(); pages++; calls.push({ operation: 'provider_payments', request });
-      assert.equal(request.windowStart, '2026-09-29T00:00:00.000Z');
+      assert.equal(request.windowStart, request.readKind === 'created' ? '2026-05-04T00:00:00.000Z' : '2026-09-29T00:00:00.000Z');
       assert.equal(request.credential.accessToken, 'synthetic-renewed');
       if (options.provider401) throw Error('square_direct_reauthorization_required');
       return { payments: [{ id: 'P1', locationId: 'LOCATION_1', status: 'COMPLETED', createdAt: clock.toISOString(), updatedAt: clock.toISOString(), amountMinor: '12345', currency: 'USD' }],
@@ -197,6 +200,26 @@ async function main() {
   function request(action, body, headers = {}) { return new Request(`${origin}/api/integrations/square/${action}`, {
     method: 'POST', headers: { host: 'www.vaeroex.com', origin, 'content-type': 'application/x-www-form-urlencoded', ...headers }, body }); }
   const connectionId = randomUUID(), businessEntityId = randomUUID();
+  const history = fixture(), historyRange = { windowStart: '2026-05-04T00:00:00.000Z', windowEnd: '2026-05-05T23:59:59.999Z' };
+  await history.service.read(history.row().connectionId, historyRange);
+  assert.equal(history.calls[0].operation, 'claim_history');
+  assert.equal(history.calls[0].payload.windowStart, historyRange.windowStart);
+  assert.equal(history.row().readKind, 'created');
+  assert.equal(history.counts().pages, 1);
+  const foreignHistory = fixture({ foreignContext: true });
+  await assert.rejects(() => foreignHistory.service.read(foreignHistory.row().connectionId, historyRange));
+  assert.equal(foreignHistory.counts().pages, 0);
+  const invalidHistory = fixture();
+  for (const range of [{ ...historyRange, windowStart: '2026-01-01T00:00:00Z' },
+    { windowStart: '2026-09-29T00:00:00Z', windowEnd: '2026-09-30T00:00:00Z' }])
+    await assert.rejects(() => invalidHistory.service.read(invalidHistory.row().connectionId, range));
+  assert.equal(invalidHistory.calls.length, 0, 'invalid history fails before database or provider access');
+  assert.deepEqual(await directForm('read', request('read', `connectionId=${connectionId}&startDate=2026-05-04&endDate=2026-05-05`)),
+    { connectionId, historical: historyRange });
+  for (const dates of ['startDate=2026-02-30&endDate=2026-03-01', 'startDate=2026-05-05&endDate=2026-05-04',
+    'startDate=2026-01-01&endDate=2026-05-04', 'startDate=2099-01-01&endDate=2099-01-02',
+    'startDate=2026-05-04', 'startDate=2026-05-04&endDate=2026-05-05&startDate=2026-05-04'])
+    await assert.rejects(() => directForm('read', request('read', `connectionId=${connectionId}&${dates}`)));
   for (const [action, body] of [['connect', `businessEntityId=${businessEntityId}`], ['read', `connectionId=${connectionId}`],
     ['mapping', `connectionId=${connectionId}&locationId=LOCATION_1`], ['disconnect', `connectionId=${connectionId}&confirmation=disconnect`]]) {
     const valid = request(action, body); assert(directRequestAllowed(action, valid)); await directForm(action, valid);
