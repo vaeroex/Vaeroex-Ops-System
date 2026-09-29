@@ -33,9 +33,9 @@ export function AdminManualActivationForm({
         </select>
       </label>
       <label className="block text-sm font-medium text-slate-100">
-        Status
+        Manual subscription status
         <select name="status" defaultValue="active" className="mt-2 min-h-11 w-full rounded-md border border-line bg-white px-3 py-2 text-ink">
-          {subscriptionStatusOptions.map((status) => <option key={status} value={status}>{status}</option>)}
+          {subscriptionStatusOptions.map((status) => <option key={status} value={status}>{status.charAt(0).toUpperCase() + status.slice(1).replace(/_/g, " ")}</option>)}
         </select>
       </label>
       <label className="block text-sm font-medium text-slate-100">
@@ -46,12 +46,15 @@ export function AdminManualActivationForm({
         Notes
         <textarea name="notes" rows={4} className="mt-2 w-full rounded-md border border-line bg-white px-3 py-2 text-ink" />
       </label>
-      <div className="lg:col-span-2">
+      <div className="space-y-3 lg:col-span-2">
+        <p className="text-sm leading-6 text-slate-300">
+          Saves manual access for this email and the linked workspace. If the email already has a subscription, its latest record may be updated and marked as manual. This does not start or cancel Stripe billing. Existing user accounts, workspace data, and connection records are retained.
+        </p>
         <PendingSubmitButton
-          pendingLabel="Saving..."
+          pendingLabel="Saving manual activation..."
           className="min-h-11 rounded-md bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white hover:bg-blue-950/70"
         >
-          Save activation
+          Save manual activation
         </PendingSubmitButton>
       </div>
     </form>

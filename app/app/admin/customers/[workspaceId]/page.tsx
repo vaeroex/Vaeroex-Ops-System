@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import { notFound } from "next/navigation";
 import { AdminActivationRequestReview } from "@/components/admin/AdminActivationRequestReview";
+import { AdminAccountOverview } from "@/components/admin/AdminAccountOverview";
 import { AdminCompanyTabs, type AdminCompanyTab } from "@/components/admin/AdminCompanyTabs";
 import { AdminLifecycleBadge } from "@/components/admin/AdminLifecycleBadge";
 import { AdminManualActivationForm } from "@/components/admin/AdminManualActivationForm";
@@ -65,6 +66,7 @@ export default async function AdminCompanyDetailPage({
   if (companyResult.error) {
     return (
       <div className="space-y-6">
+        <Link href="/app/admin/customers" className="text-sm font-semibold text-vaeroex-blue hover:underline">Back to Customers</Link>
         <PageHeader eyebrow="Internal admin" title="Company unavailable" description="The selected company record could not be loaded." />
         <ErrorNotice message="Company management data could not be loaded." />
       </div>
@@ -78,7 +80,7 @@ export default async function AdminCompanyDetailPage({
     admin.from("workspaces").select("*").eq("id", workspaceId).maybeSingle(),
     admin.from("customer_subscriptions").select("*").eq("workspace_id", workspaceId).order("updated_at", { ascending: false }).limit(20),
     admin.from("workspace_agreements").select("*").eq("workspace_id", workspaceId).maybeSingle(),
-    admin.from("workspace_members").select("id,user_id,role,status,invited_email,created_at").eq("workspace_id", workspaceId).order("created_at", { ascending: true }).limit(100),
+    admin.from("workspace_members").select("id,user_id,role,status,invited_email,created_at", { count: "exact" }).eq("workspace_id", workspaceId).order("created_at", { ascending: true }).limit(100),
     admin.from("kpis").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId),
     admin.from("file_uploads").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId),
     admin
@@ -102,7 +104,14 @@ export default async function AdminCompanyDetailPage({
   ]);
 
   const workspace = workspaceResult.data as WorkspaceRow | null;
+  if (workspaceResult.error) return <div className="space-y-6"><Link href="/app/admin/customers" className="text-sm font-semibold text-vaeroex-blue hover:underline">Back to Customers</Link><ErrorNotice message="Workspace details could not be loaded. No access settings are available until the workspace can be verified." /></div>;
   if (!workspace) notFound();
+  const members = membersResult.data || [];
+  const memberUserIds = [...new Set(members.flatMap((member) => member.user_id ? [member.user_id] : []))];
+  const profilesResult = memberUserIds.length
+    ? await admin.from("profiles").select("id,full_name,email").in("id", memberUserIds)
+    : { data: [], error: null };
+  const profiles = new Map((profilesResult.data || []).map((profile) => [profile.id, profile]));
   const subscriptions = (subscriptionsResult.data || []) as SubscriptionRow[];
   const agreement = agreementResult.data as AgreementRow | null;
   const contactEmail = company.primary_contact_email || subscriptions[0]?.customer_email || "";
@@ -121,98 +130,48 @@ export default async function AdminCompanyDetailPage({
   const activationRequests = (activationRequestsResult.data || []) as ActivationRequest[];
   const events = (eventsResult.data || []) as SubscriptionEvent[];
   const delivery = deliveryResult.data as DeliveryRow | null;
-  const savedAnalysisCount = savedAnalysisResult.count || 0;
   const queryResults = [
-    workspaceResult,
-    subscriptionsResult,
-    agreementResult,
-    membersResult,
-    kpiCount,
-    fileCount,
-    savedAnalysisResult,
-    intelligenceCount,
-    activationRequestsResult,
-    eventsResult,
-    deliveryResult
-  ];
-  const relatedQueryError = queryResults.find((result) => result.error)?.error;
+    ["subscriptions", subscriptionsResult], ["agreement", agreementResult],
+    ["members", membersResult], ["member profiles", profilesResult],
+    ["KPI count", kpiCount], ["evidence-file count", fileCount],
+    ["saved-analysis count", savedAnalysisResult], ["analysis-artifact count", intelligenceCount],
+    ["activation requests", activationRequestsResult], ["subscription events", eventsResult], ["agreement delivery", deliveryResult]
+  ] as const;
+  const unavailable = queryResults.filter(([, result]) => result.error).map(([label]) => label);
+  const countLabel = (result: { error: unknown; count: number | null }) => result.error || result.count === null ? "Unavailable" : String(result.count);
   const attention = companyAttentionReasons(company);
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-3">
         <Link href="/app/admin/customers" className="text-sm font-semibold text-vaeroex-blue hover:underline">Back to Customers</Link>
-        <span className="break-all text-xs text-muted">Workspace {workspaceId}</span>
       </div>
       <PageHeader
-        eyebrow="Company management"
+        eyebrow="Workspace account"
         title={company.company_name}
-        description={`${company.primary_contact_email || "No primary contact email"} · ${company.industry || "Industry not set"}`}
-        actions={<AdminLifecycleBadge value={company.lifecycle_status} />}
+        description="Manage this workspace’s access, subscription records, and agreement. User logins are separate."
       />
-      {notices.message ? <p className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">{notices.message}</p> : null}
-      <ErrorNotice message={notices.error || (relatedQueryError ? "Some company details could not be loaded." : null)} />
+      {notices.message ? <p role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">{notices.message}</p> : null}
+      <ErrorNotice message={notices.error || (unavailable.length ? `Could not load: ${unavailable.join(", ")}. Unavailable information is not a zero or an absent record.` : null)} />
       <AdminCompanyTabs workspaceId={workspaceId} activeTab={tab} />
 
       {tab === "overview" ? (
-        <div className="space-y-6">
-          <SectionCard title="Company summary" description="A concise view of the company record and its current operational state.">
-            <dl className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <DetailValue label="Primary contact" value={company.primary_contact_name || "Name not set"} />
-              <DetailValue label="Lifecycle" value={company.lifecycle_status === "pending_activation" ? "Pending activation" : company.lifecycle_status} />
-              <DetailValue label="Subscription" value={`${company.subscription_status} · ${displayPlanName(company.subscription_plan_slug)}`} />
-              <DetailValue label="Agreement" value={agreement ? `Signed ${formatAdminDate(agreement.signed_at)}` : "No agreement"} />
-              <DetailValue label="Workspace updated" value={formatAdminDate(company.workspace_updated_at)} />
-              <DetailValue label="Workspace members" value={String(membersResult.data?.length || 0)} />
-              <DetailValue label="Industry" value={company.industry || "Not set"} />
-              <DetailValue label="Company size" value={company.size || "Not set"} />
-            </dl>
-          </SectionCard>
-
-          <section className="grid gap-6 lg:grid-cols-2">
-            <SectionCard title="Attention">
-              {attention.length ? (
-                <ul className="space-y-2 text-sm text-amber-900">
-                  {attention.map((reason) => <li key={reason} className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2">{reason}</li>)}
-                </ul>
-              ) : <EmptyState title="No current exceptions" description="This company has no access, activation, or agreement exceptions." />}
-            </SectionCard>
-            <SectionCard title="Operational footprint">
-              <dl className="grid gap-3 sm:grid-cols-2">
-                <DetailValue label="KPIs" value={String(kpiCount.count || 0)} />
-                <DetailValue label="Evidence files" value={String(fileCount.count || 0)} />
-                <DetailValue label="Saved analyses" value={String(savedAnalysisCount)} />
-                <DetailValue label="Analysis artifacts" value={String(intelligenceCount.count || 0)} />
-              </dl>
-            </SectionCard>
-          </section>
-        </div>
+        <AdminAccountOverview company={company} attention={attention}
+          subscriptionLabel={subscriptionsResult.error ? "Unavailable" : `${company.subscription_status} · ${displayPlanName(company.subscription_plan_slug)}${company.billing_provider ? ` · ${company.billing_provider}` : ""}`}
+          agreementLabel={agreementResult.error ? "Unavailable" : agreement ? `Signed ${formatAdminDate(agreement.signed_at)}` : "No agreement"}
+          members={members.map((member) => ({ id: member.id, userId: member.user_id, name: profiles.get(member.user_id || "")?.full_name || null, email: profiles.get(member.user_id || "")?.email || member.invited_email, role: member.role, status: member.status }))}
+          memberCount={membersResult.error ? null : membersResult.count}
+          memberError={membersResult.error ? "Membership records could not be loaded." : profilesResult.error ? "Member identities could not be loaded. Membership totals are still available." : null}
+          footprint={[{ label: "Last workspace update", value: formatAdminDate(workspace.updated_at) }, { label: "Created", value: formatAdminDate(workspace.created_at) }, { label: "KPIs", value: countLabel(kpiCount) }, { label: "Evidence files", value: countLabel(fileCount) }, { label: "Saved analyses", value: countLabel(savedAnalysisResult) }, { label: "Analysis artifacts", value: countLabel(intelligenceCount) }]}
+        />
       ) : null}
 
       {tab === "workspace" ? (
         <div className="space-y-6">
-          <SectionCard title="Workspace access" description="These are the existing access controls, scoped to this workspace.">
+          <SectionCard title="Workspace access settings" description="Changes affect this workspace’s eligibility, not a user’s login or membership. Linked subscriptions also determine access.">
             <AdminWorkspaceAccessForm workspace={workspace} returnTo={returnTo} />
           </SectionCard>
-
-          <section className="grid gap-6 xl:grid-cols-2">
-            <SectionCard title="Workspace details">
-              <dl className="grid gap-3 sm:grid-cols-2">
-                <DetailValue label="Workspace ID" value={workspace.id} />
-                <DetailValue label="Created" value={formatAdminDate(workspace.created_at)} />
-                <DetailValue label="Last updated" value={formatAdminDate(workspace.updated_at)} />
-                <DetailValue label="Access required" value={workspace.subscription_required ? "Yes" : "No"} />
-                <DetailValue label="Manual unlock" value={workspace.manually_unlocked ? "Enabled" : "Disabled"} />
-                <DetailValue label="Plan" value={displayPlanName(workspace.plan_slug)} />
-              </dl>
-              <div className="mt-4">
-                {agreement ? (
-                  <Link href={`/app/admin/workspace-agreements/${agreement.id}` as Route} className="text-sm font-semibold text-vaeroex-blue hover:underline">View agreement</Link>
-                ) : <span className="text-sm font-medium text-slate-500">No agreement</span>}
-              </div>
-            </SectionCard>
-
-            <SectionCard title="Workspace lifecycle" description="Archive removes an inactive workspace from normal Admin lists without altering access, data, billing, or legal history.">
+            <SectionCard title="Admin list visibility" description="Archive hides an inactive workspace from normal Admin lists. It does not deactivate a login, delete data, cancel billing, or disconnect services.">
               <div className="flex flex-col items-start gap-4">
                 <AdminLifecycleBadge value={company.lifecycle_status} />
                 <AdminWorkspaceLifecycleActions
@@ -223,14 +182,13 @@ export default async function AdminCompanyDetailPage({
                 />
               </div>
             </SectionCard>
-          </section>
         </div>
       ) : null}
 
       {tab === "subscription" ? (
         <div className="space-y-6">
           <div className="flex justify-end">
-            <CreateDrawer title="Create manual activation" description="Use the existing trusted activation path for a verified account." triggerLabel="New Activation">
+            <CreateDrawer title="Manual activation" description="Record manually approved access. This can update an existing subscription record; it does not charge the customer." triggerLabel="Manage manual access">
               <AdminManualActivationForm
                 returnTo={returnTo}
                 workspaceId={workspace.id}
@@ -240,7 +198,7 @@ export default async function AdminCompanyDetailPage({
             </CreateDrawer>
           </div>
 
-          <SectionCard title="Subscriptions" description="Provider attribution and update controls are preserved for each linked subscription.">
+          <SectionCard title="Subscription records" description="These are Vaeroex records, not controls for canceling or charging a Stripe subscription.">
             <div className="space-y-4">
               {subscriptions.length ? subscriptions.map((subscription) => (
                 <article key={subscription.id} className="rounded-lg border border-line p-4">
@@ -248,20 +206,25 @@ export default async function AdminCompanyDetailPage({
                     <div className="min-w-0">
                       <p className="font-semibold text-ink">{subscription.customer_email}</p>
                       <p className="mt-1 text-xs text-muted">{subscription.billing_provider || subscription.source} · Updated {formatAdminDate(subscription.updated_at)}</p>
-                      <p className="mt-2 break-all text-xs text-muted">Stripe customer: {subscription.stripe_customer_id || "Not available"}</p>
-                      <p className="mt-1 break-all text-xs text-muted">Stripe subscription: {subscription.stripe_subscription_id || "Not available"}</p>
                     </div>
                     <StatusBadge value={subscription.status} />
                   </div>
-                  <div className="mt-4 border-t border-line pt-4">
+                  <details className="mt-4 border-t border-line pt-4" open={Boolean(notices.error)}>
+                    <summary className="cursor-pointer text-sm font-semibold text-ink">Edit subscription record</summary>
+                    <div className="mt-4 space-y-3">
+                    <p className="break-all text-xs text-muted">Stripe customer: {subscription.stripe_customer_id || "Not available"}</p>
+                    <p className="break-all text-xs text-muted">Stripe subscription: {subscription.stripe_subscription_id || "Not available"}</p>
                     <AdminSubscriptionEditor subscription={subscription} returnTo={returnTo} />
-                  </div>
+                    </div>
+                  </details>
                 </article>
-              )) : <EmptyState title="No linked subscription" description="Create a manual activation or review an existing activation request." />}
+              )) : subscriptionsResult.error ? <p className="text-sm text-muted">Subscription records unavailable.</p> : <EmptyState title="No linked subscription" description="Review manual access or an existing activation request; this does not establish Stripe billing." />}
             </div>
           </SectionCard>
 
-          <section className="grid gap-6 xl:grid-cols-2">
+          <details className="rounded-lg border border-line p-4">
+            <summary className="cursor-pointer font-semibold text-ink">Activation and subscription history</summary>
+            <section className="mt-4 grid gap-6 xl:grid-cols-2">
             <SectionCard title="Activation requests">
               <div className="space-y-3">
                 {activationRequests.length ? activationRequests.map((request) => (
@@ -273,7 +236,7 @@ export default async function AdminCompanyDetailPage({
                     {request.message ? <p className="mt-2 text-sm leading-6 text-muted">{request.message}</p> : null}
                     <AdminActivationRequestReview request={request} returnTo={returnTo} />
                   </article>
-                )) : <EmptyState title="No activation requests" description="No request matches this company contact." />}
+                )) : activationRequestsResult.error ? <p className="text-sm text-muted">Activation requests unavailable.</p> : <EmptyState title="No activation requests" description="No request matches this company contact." />}
               </div>
             </SectionCard>
 
@@ -287,10 +250,11 @@ export default async function AdminCompanyDetailPage({
                     </div>
                     <AdminSubscriptionEventDetails event={event} />
                   </article>
-                )) : <EmptyState title="No subscription events" description="No provider events match this company contact." />}
+                )) : eventsResult.error ? <p className="text-sm text-muted">Subscription events unavailable.</p> : <EmptyState title="No subscription events" description="No provider events match this company contact." />}
               </div>
             </SectionCard>
           </section>
+          </details>
         </div>
       ) : null}
 
@@ -302,7 +266,7 @@ export default async function AdminCompanyDetailPage({
                 <DetailValue label="Agreement ID" value={agreement.id} />
                 <DetailValue label="Signed" value={formatAdminDate(agreement.signed_at)} />
                 <DetailValue label="Version" value={agreement.agreement_version} />
-                <DetailValue label="Delivery" value={delivery ? `${delivery.status} · ${delivery.attempt_count} attempt${delivery.attempt_count === 1 ? "" : "s"}` : "Not recorded"} />
+                <DetailValue label="Delivery" value={deliveryResult.error ? "Unavailable" : delivery ? `${delivery.status} · ${delivery.attempt_count} attempt${delivery.attempt_count === 1 ? "" : "s"}` : "Not recorded"} />
               </dl>
               <div className="flex flex-wrap items-center gap-3">
                 <Link href={`/app/admin/workspace-agreements/${agreement.id}` as Route} className="inline-flex min-h-11 items-center rounded-md bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white">View agreement</Link>
@@ -310,7 +274,7 @@ export default async function AdminCompanyDetailPage({
               </div>
               <p className="text-xs leading-5 text-muted">Administrative resend and full delivery-ledger status remain available on the agreement detail page.</p>
             </div>
-          ) : <EmptyState title="No agreement" description="This workspace does not have a retained Workspace Agreement." />}
+          ) : agreementResult.error ? <p className="text-sm text-muted">Agreement unavailable.</p> : <EmptyState title="No agreement" description="This workspace does not have a retained Workspace Agreement." />}
         </SectionCard>
       ) : null}
     </div>

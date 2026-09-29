@@ -8,7 +8,7 @@ type SubscriptionRow = Database["public"]["Tables"]["customer_subscriptions"]["R
 
 export function AdminSubscriptionEditor({ subscription, returnTo }: { subscription: SubscriptionRow; returnTo: string }) {
   return (
-    <form action={updateSubscriptionAction} className="grid gap-3 md:grid-cols-2 xl:grid-cols-[180px_180px_minmax(240px,1fr)_auto] xl:items-end">
+    <form action={updateSubscriptionAction} className="grid gap-4 md:grid-cols-2">
       <input type="hidden" name="subscription_id" value={subscription.id} />
       <input type="hidden" name="return_to" value={returnTo} />
       <label className="text-sm font-medium text-ink">
@@ -18,21 +18,26 @@ export function AdminSubscriptionEditor({ subscription, returnTo }: { subscripti
         </select>
       </label>
       <label className="text-sm font-medium text-ink">
-        Status
+        Vaeroex subscription status
         <select name="status" defaultValue={subscription.status} className="mt-2 min-h-11 w-full rounded-md border border-line bg-white px-3 py-2">
-          {subscriptionStatusOptions.map((status) => <option key={status} value={status}>{status}</option>)}
+          {subscriptionStatusOptions.map((status) => <option key={status} value={status}>{status.charAt(0).toUpperCase() + status.slice(1).replace(/_/g, " ")}</option>)}
         </select>
       </label>
-      <label className="text-sm font-medium text-ink">
+      <label className="text-sm font-medium text-ink md:col-span-2">
         Notes
         <input name="notes" defaultValue={subscription.notes || ""} className="mt-2 min-h-11 w-full rounded-md border border-line px-3 py-2" />
       </label>
-      <PendingSubmitButton
-        pendingLabel="Updating..."
-        className="min-h-11 rounded-md bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white hover:bg-blue-950/70"
-      >
-        Update subscription
-      </PendingSubmitButton>
+      <div className="space-y-3 md:col-span-2">
+        <p className="text-sm leading-6 text-muted">
+          Saves this Vaeroex subscription record and updates the linked workspace’s access settings. Choosing Canceled here does not cancel billing in Stripe. User accounts, workspace data, and connection records are retained.
+        </p>
+        <PendingSubmitButton
+          pendingLabel="Saving subscription record..."
+          className="min-h-11 rounded-md bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white hover:bg-blue-950/70"
+        >
+          Save subscription record
+        </PendingSubmitButton>
+      </div>
     </form>
   );
 }
