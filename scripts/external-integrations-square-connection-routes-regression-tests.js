@@ -209,8 +209,13 @@ async function main() {
   ok(legacyGate >= 0 && legacyGate < gatedPage.indexOf("await headers()", legacyGate),
     'legacy page gate remains before legacy header/authentication access');
   const productionGate = gatedPage.indexOf('if (productionSquareCustomerEnabled())');
-  ok(productionGate >= 0 && productionGate < gatedPage.indexOf('await headers()'),
+  ok(productionGate >= 0 && productionGate < gatedPage.indexOf('await headers()', productionGate),
     'Production owner branch is separately gated before header/authentication access');
+  const directGate = gatedPage.indexOf('if (squareDirectEnabled())');
+  ok(directGate >= 0 && directGate < productionGate && directGate < gatedPage.indexOf('await headers()'),
+    'direct customer branch is separately gated before the first header access');
+  ok(directGate < gatedPage.indexOf('await squareDirectView()') && gatedPage.indexOf('await squareDirectView()') < productionGate,
+    'direct customer authentication/view access stays inside the separately gated branch');
   ok(!fs.existsSync(path.join(root, "app/app/settings/integrations/square/page.tsx")), "disabled page bypasses protected parent authentication");
   console.log(`Square connection route regression tests passed: ${assertions} assertions.`);
 }
