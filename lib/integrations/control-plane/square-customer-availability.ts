@@ -11,6 +11,7 @@ import {
 import { SquareConnectionActorSchema } from "@/lib/integrations/providers/square/account-connection-contracts";
 import { requireWorkspaceAccess } from "@/lib/security/require-workspace-access";
 import { productionSquareCustomerAction, productionSquareCustomerEnabled } from "@/lib/integrations/control-plane/square-production-customer";
+import { squareDirectEnabled, squareDirectRoute } from "@/lib/integrations/square-direct/server";
 
 // No environment variable, production binding or import installs these capabilities.
 let localHandlers: SquareCustomerHandlers | null = null;
@@ -27,6 +28,7 @@ export function installSquareLocalQualification(dependencies: SquareLocalCustome
 }
 
 export async function squareCustomerRoute(action: SquareCustomerAction, request: Request) {
+  if (squareDirectEnabled()) return squareDirectRoute(action, request);
   if (productionSquareCustomerEnabled()) {
     if (action === "status" || action === "connect" || action === "disconnect")
       return productionSquareCustomerAction(action, request);

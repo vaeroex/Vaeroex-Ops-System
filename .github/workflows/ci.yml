@@ -247,6 +247,9 @@ jobs:
           node scripts/square-production-internal-consent-tests.js
           node scripts/square-production-customer-flow-tests.js
           node scripts/square-production-customer-workspace-tests.js
+          node scripts/square-direct-provider-tests.cjs
+          node scripts/square-direct-service-tests.cjs
+          node scripts/square-direct-customer-ui-tests.js
           pnpm exec ncc build services/external-integrations-production/internal-consent/entry.ts -o services/external-integrations-production/internal-consent/dist --no-cache --transpile-only --external server-only
           node services/external-integrations-production/internal-consent/package-release.cjs
 
@@ -703,6 +706,10 @@ jobs:
       - name: Qualify closed Square Production customer authority in disposable PostgreSQL
         if: ${{ !cancelled() && steps.isolated_database_setup.outcome == 'success' }}
         run: node scripts/run-square-production-customer-qualification.js
+
+      - name: Qualify dormant customer Square backend on the exact 105-migration baseline
+        if: ${{ !cancelled() && steps.isolated_database_setup.outcome == 'success' }}
+        run: node scripts/run-square-customer-backend-qualification.js
 
       - name: Remove isolated database state
         if: always()
