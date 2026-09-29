@@ -198,7 +198,7 @@ for (const label of ["Business Note extraction failed", "Business Note ready for
   assert.equal(text(tree.props.children[0]), label, "the result must render inside the hash landing target, before note content");
   assert.equal(nodes(tree).filter((node) => node === feedback).length, 1);
 }
-assert.doesNotMatch(page, /Sensitive information reminder|LegalSafetyNotice/, "AppShell already provides the sensitive-information reminder");
+assert.doesNotMatch(page, /Sensitive information reminder|LegalSafetyNotice/, "file upload owns the single inline sensitive-information reminder; browsing must not duplicate it");
 for (const name of ["approveBusinessNoteAction", "cancelBusinessNoteReviewAction", "bulkManageBusinessNotesAction"]) assert.match(notes, new RegExp(name));
 assert.match(page, /key=\{`\$\{archived\}:\$\{params\?\.q/, "knowledge filters reset their displayed batch");
 assert.match(page, /selection=\{\{ singularLabel: "Learned Knowledge item", archived, action: bulkManageLearnedKnowledgeAction \}\}/);

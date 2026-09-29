@@ -94,7 +94,7 @@ function ReviewForm({ note, extraction }: { note: BusinessNoteRow; extraction: B
   const warnings = businessNoteReviewWarnings(extraction);
   const additionalContextPrompts = businessNoteAdditionalContextPrompts(extraction);
   return (
-    <article className="rounded-lg border border-cyan-300/30 bg-cyan-950/15 p-4">
+    <article className="workspace-note-review rounded-lg border border-cyan-300/30 bg-cyan-950/15 p-4">
       <div className="flex items-start gap-3">
         <EvidenceLifecycleCheckbox id={note.id} label={extraction.title} />
         <div className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-2">
@@ -223,7 +223,7 @@ function BusinessNoteSummaryCard({ note, archived = false }: { note: BusinessNot
   });
   if (!extraction) return null;
   return (
-    <article className="rounded-md border border-white/10 bg-slate-950/45 p-3">
+    <article className="workspace-list-row border-b border-white/10 py-4 last:border-b-0">
       <div className="flex items-start gap-3">
         <EvidenceLifecycleCheckbox id={note.id} label={extraction.title} />
         <div className="min-w-0 flex-1">
@@ -245,7 +245,7 @@ function BusinessNoteSummaryCard({ note, archived = false }: { note: BusinessNot
 
 export function BusinessNoteEntry({ enabled }: { enabled: boolean }) {
   return (
-    <details className="rounded-lg border border-cyan-300/20 bg-cyan-950/10 p-3">
+    <details className="workspace-note-entry workspace-secondary-details rounded-lg border border-white/10 p-3">
       <summary className="cursor-pointer text-sm font-semibold text-cyan-100">Add business note</summary>
       <form action={submitBusinessNoteForReviewAction} className="mt-4 space-y-3">
         <BusinessNoteComposer disabled={!enabled} />
@@ -282,7 +282,7 @@ export function BusinessNotesPanel({
   const archivedNotes = archived ? notes.filter((note) => note.status === "archived" && note.archived_at && !note.deleted_at) : [];
   const selectableNotes = archived ? archivedNotes : [...reviewNotes, ...approvedNotes];
   return (
-    <section id="business-notes" className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-panel sm:p-5">
+    <section id="business-notes" className="workspace-panel workspace-business-notes rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100 sm:p-5">
       {feedback ? <div className="mb-4 space-y-3">{feedback}</div> : null}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="max-w-3xl">

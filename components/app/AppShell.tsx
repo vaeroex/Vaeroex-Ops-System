@@ -4,10 +4,10 @@ import { signOutAction } from "@/lib/auth/actions";
 import { selectWorkspaceAction } from "@/lib/workspaces/actions";
 import { AppNavigation } from "@/components/app/AppNavigation";
 import { WorkspacePageTitle } from "@/components/app/WorkspacePageTitle";
+import { WorkspacePresentation, WorkspaceSwitcherDisclosure } from "@/components/app/WorkspacePresentation";
 import { GlobalSearch } from "@/components/app/GlobalSearch";
 import { ToastRegion } from "@/components/app/ToastRegion";
 import { VaeroexLogo } from "@/components/brand/VaeroexLogo";
-import { ComplianceNotice } from "@/components/operations/ComplianceNotice";
 import { legalLinks } from "@/lib/legal/content";
 import { isPremiumConversationalVaeroexEnabled } from "@/lib/product/conversational-vaeroex";
 import type { Profile, Workspace, WorkspaceMember } from "@/lib/supabase/types";
@@ -23,7 +23,7 @@ const baseNavSections = [
         : []),
       { href: "/app/intelligence", label: "Intelligence" },
       { href: "/app/kpis", label: "Performance" },
-      { href: "/app/sources", label: "Evidence" },
+      { href: "/app/sources", label: "Files & Notes" },
       { href: "/app/reports", label: "Saved Analyses" },
       { href: "/app/settings", label: "Settings" }
     ]
@@ -74,22 +74,22 @@ export function AppShell({ children, profile, workspaces, activeWorkspace, isVae
   const workspaceDisplayName = isDemoWorkspace ? "Demo Workspace" : activeWorkspace?.name || "Setup required";
 
   return (
-    <div className="vaeroex-app-shell min-h-dvh overflow-x-hidden bg-[#f8fafc] text-ink">
-      <aside className="fixed inset-y-0 left-0 hidden w-64 border-r border-slate-800 bg-vaeroex-navy p-3 text-white shadow-command lg:flex lg:flex-col">
+    <WorkspacePresentation className="vaeroex-app-shell min-h-dvh overflow-x-hidden bg-[#f8fafc] text-ink">
+      <aside className="workspace-sidebar fixed inset-y-0 left-0 hidden w-64 border-r border-slate-800 bg-vaeroex-navy p-3 text-white shadow-command lg:flex lg:flex-col">
         <Link href="/app" aria-label="Vaeroex Overview" className="group flex h-12 items-center rounded-lg border border-white/10 bg-white/[0.04] px-3 shadow-sm shadow-black/10">
           <VaeroexLogo variant="symbol" size="sm" priority className="transition group-hover:scale-[1.01]" />
           <span className="ml-3 text-sm font-semibold tracking-wide text-white">Vaeroex</span>
         </Link>
 
-        <form action={selectWorkspaceAction} className="mt-3 rounded-lg border border-white/10 bg-white/[0.055] p-2.5 shadow-sm shadow-black/10">
-          <div className="flex items-start justify-between gap-3">
+        <form action={selectWorkspaceAction} className="workspace-switcher mt-3 rounded-lg border border-white/10 bg-white/[0.055] p-2.5 shadow-sm shadow-black/10">
+          <WorkspaceSwitcherDisclosure summary={<div className="flex flex-1 items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-white">{workspaceDisplayName}</p>
             </div>
             <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${workspaceStatusTone(accessLabel)}`}>
               {isDemoWorkspace ? "Sample Business Environment" : accessLabel}
             </span>
-          </div>
+          </div>}>
           <select
             name="workspace_id"
             aria-label="Workspace switcher"
@@ -111,6 +111,7 @@ export function AppShell({ children, profile, workspaces, activeWorkspace, isVae
               Switch Workspace
             </button>
           ) : null}
+          </WorkspaceSwitcherDisclosure>
         </form>
 
         <AppNavigation sections={navSections} />
@@ -122,8 +123,8 @@ export function AppShell({ children, profile, workspaces, activeWorkspace, isVae
         </form>
       </aside>
 
-      <div className="lg:pl-64">
-        <header className="sticky top-0 z-10 border-b border-slate-800 bg-vaeroex-navy px-3 py-3 text-white shadow-command sm:px-4 lg:px-8">
+      <div className="workspace-body lg:pl-64">
+        <header className="workspace-topbar sticky top-0 z-10 border-b border-slate-800 bg-vaeroex-navy px-3 py-3 text-white shadow-command sm:px-4 lg:px-8">
           <div className="flex min-w-0 items-center justify-between gap-3">
             <div className="flex min-w-0 flex-1 items-center gap-3 pr-2">
               <span className="grid h-11 w-11 place-items-center rounded-lg border border-white/15 bg-white/10 shadow-sm shadow-black/10">
@@ -146,12 +147,11 @@ export function AppShell({ children, profile, workspaces, activeWorkspace, isVae
           </div>
         </header>
 
-        <nav className="border-b border-line bg-white px-3 py-2 sm:px-4 lg:hidden">
+        <nav className="workspace-mobile-navigation border-b border-line bg-white px-3 py-2 sm:px-4 lg:hidden">
           <AppNavigation sections={navSections} mobile />
         </nav>
 
-        <main className="mx-auto w-full max-w-[1480px] space-y-5 overflow-x-hidden p-3 sm:p-4 lg:p-6">
-          <ComplianceNotice compact />
+        <main id="workspace-content" className="workspace-main mx-auto w-full max-w-[1480px] space-y-5 overflow-x-hidden p-3 sm:p-4 lg:p-6">
           {children}
           <footer className="flex flex-col gap-2 border-t border-line pt-5 text-xs text-muted sm:flex-row sm:items-center sm:justify-between">
             <p>Vaeroex turns business evidence into leadership clarity.</p>
@@ -169,6 +169,6 @@ export function AppShell({ children, profile, workspaces, activeWorkspace, isVae
         </main>
       </div>
       <ToastRegion />
-    </div>
+    </WorkspacePresentation>
   );
 }

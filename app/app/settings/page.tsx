@@ -57,7 +57,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
     : { data: [] };
 
   return (
-    <div className="space-y-6">
+    <div className="workspace-page workspace-settings mx-auto max-w-5xl space-y-5">
       <PageHeader
         eyebrow="Workspace"
         title="Settings"
@@ -65,20 +65,21 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
       />
 
       {squareConnectionsEnabled || qboConnectionsEnabled || squareEvidence ? (
-        <section aria-labelledby="settings-connections" className="space-y-3">
+        <section aria-labelledby="settings-connections" className="workspace-panel space-y-4">
           <div>
             <h2 id="settings-connections" className="text-lg font-semibold text-ink">Connections</h2>
             <p className="mt-1 text-sm text-muted">Optional sources for this workspace. Connecting a service is not required to use Vaeroex.</p>
           </div>
 
-          {squareConnectionsEnabled ? <SectionCard
-            title="Square connection"
-            description="Connect your Square account, view this workspace’s saved Payments, and manage its connection."
-          >
-            <Link href="/app/settings/integrations/square" className="inline-block rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white">
+          {squareConnectionsEnabled ? <div className="workspace-settings-connection flex flex-col gap-3 rounded-lg border border-line p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <h3 className="text-sm font-semibold text-ink">Square connection</h3>
+              <p className="mt-1 text-sm text-muted">Manage this workspace’s connection and saved Payments.</p>
+            </div>
+            <Link href="/app/settings/integrations/square" className="workspace-row-link inline-flex min-h-10 shrink-0 items-center justify-center rounded-md border border-line px-4 py-2 text-sm font-semibold text-vaeroex-blue">
               Manage Square
             </Link>
-          </SectionCard> : null}
+          </div> : null}
 
           {qboConnectionsEnabled ? (
             <SectionCard
@@ -98,6 +99,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
         </section>
       ) : null}
 
+      <div className="workspace-settings-account-grid grid items-start gap-5 lg:grid-cols-2">
       <SectionCard
         title="Account"
         description={context.profile?.email || "Signed in to Vaeroex"}
@@ -151,6 +153,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
           </div>
         </dl>
       </SectionCard>
+      </div>
 
       <ThemeControls />
     </div>

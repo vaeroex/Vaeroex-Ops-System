@@ -357,7 +357,7 @@ assert.match(homepageSource, /model\.health\.available[\s\S]*<BusinessHealthTren
 assert.doesNotMatch(healthTrendSource, /buildDemoTrendPoints|Sample demo trend/, "Business Health must not fabricate a demo trend when history is insufficient");
 assert.doesNotMatch(homepageSource, /View full intelligence|Executive Brief/, "Overview must not expose redundant page actions or report generation");
 assert.doesNotMatch(intelligencePageSource, /Business Health|Business Intelligence Coverage|What leadership should know/, "Intelligence must start with findings instead of repeating Overview");
-for (const label of ["Overview", "Intelligence", "Performance", "Evidence", "Saved Analyses", "Settings"]) {
+for (const label of ["Overview", "Intelligence", "Performance", "Files & Notes", "Saved Analyses", "Settings"]) {
   assert.match(appShellSource, new RegExp(`label: "${label}"`), `authenticated navigation must expose ${label} as a primary concept`);
 }
 assert.match(appShellSource, /label: "Primary",\s*collapsible: false/, "primary navigation must not be hidden in a workspace accordion");
@@ -366,7 +366,7 @@ assert.match(navigationSource, /isWorkspacePathActive\(pathname, item\.href\)/, 
 assert.equal(isWorkspacePathActive("/app/reports/saved-analysis-1", "/app/reports"), true, "nested Saved Analysis routes must keep their navigation item active");
 assert.equal(isWorkspacePathActive("/app/reports-other", "/app/reports"), false, "a shared text prefix is not a nested Saved Analysis route");
 assert.doesNotMatch(appShellSource, /href: "\/app", label: "Home"/, "authenticated navigation must use Overview instead of Home");
-assert.match(sourcesPageSource, />Evidence<\//, "the Sources workspace must present the broader Evidence purpose");
+assert.match(sourcesPageSource, />Files &amp; Notes<\//, "the Sources workspace must name its files and business notes clearly");
 assert.match(sourcesPageSource, /update_source_file_lifecycle|manageSourceFileAction/, "evidence presentation changes must retain lifecycle controls");
 assert.match(sourcesPageSource, /\["queued", "pending", "running", "processing"\]\.includes\(latestRun\.status\)/, "Analyzing must require a current active run");
 assert.doesNotMatch(sourcesPageSource, /processing_status \|\| ""\) === "processing"\) return "Analyzing"/, "a stale file processing field must not display Analyzing without an active run");
@@ -378,10 +378,10 @@ assert.match(kpiPageSource, /resolveKpiTargetReference\(semantics, row\.target\)
 assert.match(kpiPageSource, /if \(semantics\.desiredDirection === "unknown"\) return "Direction not set"/, "KPIs without a confirmed direction must remain neutral");
 assert.match(kpiPageSource, /!\(key === "status" && value === "all"\)/, "the KPI URL builder must preserve show=all while omitting the default status");
 assert.match(kpiPageSource, /const INITIAL_KPI_CARD_COUNT = 6/, "KPI browsing starts with six cards");
-assert.match(kpiPageSource, /listBatchCount\(params\?\.show, filteredLatestKpiRows\.length, INITIAL_KPI_CARD_COUNT\)/, "KPI expansion uses the bounded shared count over the filtered result set");
-assert.match(kpiPageSource, /filteredLatestKpiRows\.slice\(0, tileCount\)/, "each requested KPI batch renders from the full matching result set");
+assert.match(kpiPageSource, /listBatchCount\(params\?\.show, matchingMetricRows\.length, INITIAL_KPI_CARD_COUNT\)/, "KPI expansion uses the bounded shared count over the filtered result set");
+assert.match(kpiPageSource, /matchingMetricRows\.slice\(0, tileCount\)/, "each requested KPI batch renders from the full matching result set");
 assert.match(kpiPageSource, /show: tileCount \+ INITIAL_KPI_CARD_COUNT/, "the KPI expansion control requests the next six cards");
-assert.match(kpiPageSource, /Show next \{Math\.min\(INITIAL_KPI_CARD_COUNT, filteredLatestKpiRows\.length - tileCount\)\} KPIs/, "the expansion label states the actual bounded next count");
+assert.match(kpiPageSource, /Show next \{Math\.min\(INITIAL_KPI_CARD_COUNT, matchingMetricRows\.length - tileCount\)\} metrics/, "the expansion label states the actual bounded next count");
 assert.doesNotMatch(kpiPageSource, /Loading Compare/, "Compare must not retain a stale loading label");
 assert.doesNotMatch(kpiPageSource, /Biggest positive movement|Biggest risk signal/, "comparison summaries must not assign business meaning without directionality");
 

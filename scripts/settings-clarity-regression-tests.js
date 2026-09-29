@@ -65,6 +65,8 @@ test("Settings puts optional connection management before account, workspace, an
   assert.match(html, /href="\/app\/settings\/integrations\/square"/);
   assert.match(html, /Workspace A/);
   assert.equal((html.match(/owner@example\.invalid/g) ?? []).length, 1);
+  assert.match(html, /workspace-settings-account-grid/);
+  assert.match(html, /workspace-settings-connection[\s\S]*href="\/app\/settings\/integrations\/square"/);
   assert.doesNotMatch(html, /name="workspaceId"|workspaceId=|<details[^>]*\bopen(?:=|>)/);
 });
 

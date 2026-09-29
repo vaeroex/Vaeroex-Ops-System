@@ -76,7 +76,7 @@ function BriefingCard({
 
   return (
     <article
-      className="rounded-lg border border-white/10 bg-[#08111f] p-5 shadow-panel"
+      className="workspace-briefing-card flex h-full flex-col rounded-lg border border-white/10 bg-[#08111f] p-5 shadow-panel"
       data-intelligence-briefing-card={type}
       data-generation-enabled={generationEnabled ? "true" : "false"}
     >
@@ -102,26 +102,28 @@ function BriefingCard({
       </div>
       {providerMessage ? <p className="mt-4 text-sm leading-6 text-slate-300" role="status">{providerMessage}</p> : null}
       {evidenceMessage ? <p className="mt-2 text-sm leading-6 text-slate-300" role="status">{evidenceMessage}</p> : null}
-      <div className="mt-5 flex flex-wrap gap-3 border-t border-white/10 pt-4">
-        {state.artifact ? (
-          <Link href={`/app/intelligence/briefings/${type}`} className="inline-flex min-h-11 items-center rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white hover:bg-cyan-400 hover:text-vaeroex-navy">
-            View Current Briefing
-          </Link>
-        ) : null}
-        <button
-          type="button"
-          onClick={generate}
-          disabled={!canGenerate || pending}
-          className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-white/15 px-4 py-2 text-sm font-semibold text-white hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {pending ? <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" /> : <RefreshCw aria-hidden="true" className="h-4 w-4" />}
-          {pending ? "Generating..." : generationLabel}
-        </button>
-        {state.eligibility === "no_eligible_evidence" && !state.artifact ? (
-          <Link href="/app/sources" className="inline-flex min-h-11 items-center rounded-lg border border-white/15 px-4 py-2 text-sm font-semibold text-white hover:bg-white/[0.06]">
-            Add business information
-          </Link>
-        ) : null}
+      <div className="workspace-briefing-actions mt-auto pt-5">
+        <div className="flex flex-wrap gap-3 border-t border-white/10 pt-4">
+          {state.artifact ? (
+            <Link href={`/app/intelligence/briefings/${type}`} className="inline-flex min-h-11 items-center rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white hover:bg-cyan-400 hover:text-vaeroex-navy">
+              View Current Briefing
+            </Link>
+          ) : null}
+          <button
+            type="button"
+            onClick={generate}
+            disabled={!canGenerate || pending}
+            className={`inline-flex min-h-11 items-center gap-2 rounded-lg border px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60 ${state.artifact ? "border-white/15 hover:bg-white/[0.06]" : "border-vaeroex-blue bg-vaeroex-blue hover:bg-blue-500"}`}
+          >
+            {pending ? <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" /> : <RefreshCw aria-hidden="true" className="h-4 w-4" />}
+            {pending ? "Generating..." : generationLabel}
+          </button>
+          {state.eligibility === "no_eligible_evidence" && !state.artifact ? (
+            <Link href="/app/sources" className="inline-flex min-h-11 items-center rounded-lg border border-white/15 px-4 py-2 text-sm font-semibold text-white hover:bg-white/[0.06]">
+              Add business information
+            </Link>
+          ) : null}
+        </div>
       </div>
     </article>
   );
@@ -141,7 +143,7 @@ export function IntelligenceBriefingCards({
     && !(generationEnabled && intelligenceBriefingStateAllowsGeneration(states[type])));
   if (compactUnavailable && unavailableOnly) {
     return (
-      <details className="rounded-lg border border-white/10 bg-[#08111f] p-4" data-briefings-collapsed>
+      <details className="workspace-briefings-unavailable rounded-lg border border-white/10 bg-[#08111f] p-4" data-briefings-collapsed>
         <summary className="cursor-pointer text-sm font-semibold text-white">
           Briefings not ready <span className="ml-2 font-normal text-slate-400">Weekly and monthly · View status and requirements</span>
         </summary>

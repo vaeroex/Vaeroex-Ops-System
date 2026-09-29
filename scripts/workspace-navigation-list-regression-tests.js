@@ -194,6 +194,10 @@ test("300 saved analyses render in 25-row batches without changing or skipping a
   const render = savedAnalysesHarness();
   let tree = render();
   assert.equal(analysisRows(tree).length, 25);
+  const typeFilter = nodes(tree, node => node.type === "select" && node.props["aria-label"] === "Analysis type")[0];
+  assert.ok(typeFilter, "the compact native filter retains an accessible label");
+  assert.deepEqual(nodes(typeFilter, node => node.type === "option").map(node => node.props.value), ["all", "business_health", "finding_explanation", "weekly_briefing", "monthly_briefing"]);
+  assert.ok(analysisRows(tree).every(row => row.props.className.includes("workspace-list-row")), "saved content renders as compact rows without dropping records");
   assert.match(content(tree), /Showing 25 of 300 matching loaded analyses/);
   assert.match(content(tree), /Search covers this loaded set \(up to 300 recent analyses\), not older history/);
   for (let expected = 50; expected <= 300; expected += 25) {
@@ -223,7 +227,7 @@ test("Saved Analyses Select all visible never selects unloaded cards and filteri
   button(tree, "Select all visible").props.onClick();
   tree = render();
   assert.match(content(tree), /50 selected/);
-  button(tree, "Weekly").props.onClick();
+  nodes(tree, node => node.type === "select" && node.props["aria-label"] === "Analysis type")[0].props.onChange({ currentTarget: { value: "weekly_briefing" } });
   tree = render();
   assert.match(content(tree), /Showing 25 of 75 matching loaded analyses/);
   assert.match(content(tree), /0 selected/);
@@ -232,7 +236,7 @@ test("Saved Analyses Select all visible never selects unloaded cards and filteri
   button(tree, "Load more analyses").props.onClick();
   tree = render();
   assert.equal(analysisRows(tree).length, 50);
-  button(tree, "All").props.onClick();
+  nodes(tree, node => node.type === "select" && node.props["aria-label"] === "Analysis type")[0].props.onChange({ currentTarget: { value: "all" } });
   tree = render();
   assert.equal(analysisRows(tree).length, 25);
 });

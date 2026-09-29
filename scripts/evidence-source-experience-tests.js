@@ -30,7 +30,10 @@ assert.match(sourcesPage, /min-w-32[\s\S]{0,180}whitespace-nowrap|whitespace-now
 assert.match(sourcesPage, /w-full[\s\S]{0,180}sm:w-auto/, "the source action must stack safely on mobile");
 assert.doesNotMatch(sourcesPage, /xl:grid-cols-\[minmax\(0,1\.25fr\)_minmax\(24rem,0\.85fr\)\]/, "the list must not be compressed by the old selected-source panel");
 assert.match(sourceDetailRoute, /renderSourcesPage[\s\S]*sourceDetail: true/, "nested source routes must use the unified Evidence renderer");
-assert.match(sourcesPage, /aria-label="Breadcrumb"[\s\S]*>Evidence<\//, "source detail must include an Evidence breadcrumb");
+assert.match(sourcesPage, /aria-label="Breadcrumb"[\s\S]*>Files &amp; Notes<\//, "source detail must include the canonical Files & Notes breadcrumb");
+assert.match(sourcesPage, /workspace-page-header[\s\S]*<h1[^>]*>Files &amp; Notes<\/h1>/, "customer input workspace retains a single purposeful Files & Notes heading");
+assert.match(sourcesPage, /workspace-primary-action[\s\S]{0,500}>\s*Upload file\s*<\/summary>/, "upload remains the explicit primary action, never an automatic import");
+assert.match(sourcesPage, /workspace-list-row workspace-source-row/, "source rows use the compact shared presentation without changing source destinations");
 for (const label of ["Summary", "Findings", "Imported Data", "History"]) assert.match(sourcesPage, new RegExp(`label: "${label}"`));
 assert.match(sourcesPage, /Original file preview is unavailable\./, "unavailable secure preview must use honest copy");
 assert.match(sourcesPage, /Preview original/, "source detail must label preview accurately");

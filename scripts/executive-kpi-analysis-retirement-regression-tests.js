@@ -34,7 +34,8 @@ assert.match(page, /value === "actual" \|\| value === "percent" \|\| value === "
 assert.match(page, /params\?\.timeline/);
 assert.match(page, /params\?\.metric/);
 assert.match(page, /params\?\.mode/);
-assert.match(page, /params\?\.section === "compare"/);
+assert.match(page, /const activeSection = performanceSection\(params, primaryMetric\)/);
+assert.match(read("lib/presentation/list-batch.ts"), /params\?\.section === "compare" \|\| params\?\.metric === "compare"/, "existing compare selection remains in the shared presentation helper");
 assert.match(kpiSettings, /const selectedByIdentity = new Map<string, string>\(\)/, "selected KPI query values must resolve by canonical identity");
 assert.match(kpiSettings, /return \[\.\.\.selectedByIdentity\.values\(\)\]/, "all unique selected KPI query values must remain supported");
 assert.match(page, /Select at least two KPIs with two or more dated values to compare trend lines/);

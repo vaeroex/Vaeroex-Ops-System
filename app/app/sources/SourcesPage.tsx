@@ -12,10 +12,9 @@ import {
 import { WorkspaceAgreementList } from "@/components/legal/WorkspaceAgreementList";
 import { AnalysisProgressSubmit } from "@/components/operations/AnalysisProgressSubmit";
 import { ConfirmSubmitButton } from "@/components/operations/ConfirmSubmitButton";
-import { CreateDrawer } from "@/components/operations/CreateDrawer";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { filterEligibleMemoryRowsByLifecycle } from "@/lib/ai/evidence-index";
-import { UploadSourceForm } from "@/components/evidence/UploadSourceForm";
+import { UploadSourceForm, UploadSourceTrigger } from "@/components/evidence/UploadSourceForm";
 import { LoadingLink } from "@/components/operations/LoadingLink";
 import { PendingSubmitButton } from "@/components/operations/PendingSubmitButton";
 import { StatusBadge } from "@/components/operations/StatusBadge";
@@ -357,32 +356,20 @@ function filteredFiles({
     });
 }
 
-function UploadSourceDrawer({ folders, compact = false }: { folders: Pick<FolderRow, "id" | "name">[]; compact?: boolean }) {
-  if (compact) {
-    return (
-      <details className="group relative">
-        <summary className="inline-flex min-h-11 cursor-pointer list-none items-center justify-center rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white transition hover:bg-cyan-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/60">
-          Upload Source
-        </summary>
-        <div className="absolute right-0 z-30 mt-2 w-[min(34rem,calc(100vw-2rem))] rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-2xl shadow-black/40">
-          <div className="mb-4">
-            <p className="text-sm font-semibold text-white">Upload Source</p>
-            <p className="mt-1 text-xs leading-5 text-slate-400">Reports, spreadsheets, SOPs, notes, and operational files.</p>
-          </div>
-          <UploadSourceForm folders={folders} />
-        </div>
-      </details>
-    );
-  }
-
+function UploadSourceDrawer({ folders }: { folders: Pick<FolderRow, "id" | "name">[] }) {
   return (
-    <CreateDrawer
-      title="Upload source file"
-      description="Upload reports, KPI spreadsheets, SOPs, meeting notes, financial exports, or operational documents. CSV/XLSX imports always go through review before saving."
-      triggerLabel="Upload Source"
-    >
-      <UploadSourceForm folders={folders} />
-    </CreateDrawer>
+    <details id="workspace-file-upload" className="group relative">
+      <summary className="workspace-primary-action inline-flex min-h-11 cursor-pointer list-none items-center justify-center rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white transition hover:bg-cyan-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/60">
+        Upload file
+      </summary>
+      <div className="absolute right-0 z-30 mt-2 w-[min(34rem,calc(100vw-2rem))] rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-2xl shadow-black/40">
+        <div className="mb-4">
+          <p className="text-sm font-semibold text-white">Upload file</p>
+          <p className="mt-1 text-xs leading-5 text-slate-400">Reports, spreadsheets, SOPs, notes, and operational files.</p>
+        </div>
+        <UploadSourceForm folders={folders} />
+      </div>
+    </details>
   );
 }
 
@@ -407,7 +394,7 @@ function SourceFilePrimaryActions({ file }: { file: FileUploadRow }) {
     <div className="flex w-full shrink-0 sm:w-auto sm:justify-end">
       <LoadingLink
         href={sourceDetailHref(file.id)}
-        className="inline-flex min-h-11 w-full min-w-32 items-center justify-center whitespace-nowrap rounded-md bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 sm:w-auto"
+        className="workspace-row-link inline-flex min-h-10 w-full min-w-32 items-center justify-center whitespace-nowrap rounded-md border border-white/15 px-3 py-2 text-sm font-semibold text-cyan-100 hover:bg-white/[0.05] sm:w-auto"
         loadingLabel="Opening source..."
       >
         Open source
@@ -743,8 +730,8 @@ function SourceFileRow({
   const status = fileStatus(file, linkedRuns);
 
   return (
-    <article id={`file-${file.id}`} className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-panel transition hover:border-cyan-300/25">
-      <div className={`grid gap-4 sm:items-center ${selectable ? "sm:grid-cols-[auto_minmax(0,1fr)_auto]" : "sm:grid-cols-[minmax(0,1fr)_auto]"}`}>
+    <article id={`file-${file.id}`} className="workspace-list-row workspace-source-row border-b border-white/10 px-1 py-4 text-slate-100 last:border-b-0">
+      <div className={`grid gap-3 sm:items-center ${selectable ? "sm:grid-cols-[auto_minmax(0,1fr)_auto]" : "sm:grid-cols-[minmax(0,1fr)_auto]"}`}>
         {selectable ? (
           <label className="inline-flex min-h-10 items-center gap-2 rounded-md border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-100">
             <input
@@ -764,7 +751,7 @@ function SourceFileRow({
           <p className="mt-1 text-xs leading-5 text-slate-400">
             {file.original_name !== file.display_name ? `${file.original_name} · ` : ""}{fileSizeLabel(file.file_size_bytes)} · Uploaded {formatDate(file.created_at)}
           </p>
-          <p className="mt-2 line-clamp-1 text-xs leading-5 text-slate-400">
+          <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-400">
             {status === "Needs Review"
               ? "Analysis needs a human check before Vaeroex uses it."
               : status === "Learned"
@@ -1019,7 +1006,7 @@ function LearnedKnowledgeView({
             const trust = knowledgeTrustStatus(item);
 
             return { id: item.id, label: knowledgeStatement(item), content: (
-              <article key={item.id} className="rounded-lg border border-white/10 bg-slate-950/35 p-4">
+              <article key={item.id} className="workspace-list-row border-b border-white/10 py-4 last:border-b-0">
                 <div className="flex items-start gap-3">
                   <EvidenceLifecycleCheckbox id={item.id} label={knowledgeStatement(item)} />
                   <div className="flex min-w-0 flex-1 flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
@@ -1208,9 +1195,9 @@ export async function renderSourcesPage(params: SourceSearchParams = {}, options
     const fileImportRows = linkedFile ? importRows.filter((item) => item.file_upload_id === linkedFile.id) : [];
 
     return (
-      <div className="evidence-workspace space-y-4">
+      <div className="evidence-workspace workspace-page workspace-source-detail space-y-4">
         <nav className="flex min-w-0 items-center gap-2 overflow-hidden text-sm text-slate-400" aria-label="Breadcrumb">
-          <LoadingLink href="/app/sources" className="shrink-0 font-semibold text-cyan-100 hover:text-white" loadingLabel="Opening Evidence...">Evidence</LoadingLink>
+          <LoadingLink href="/app/sources" className="shrink-0 font-semibold text-cyan-100 hover:text-white" loadingLabel="Opening Files & Notes...">Files &amp; Notes</LoadingLink>
           <span aria-hidden="true">/</span>
           <span className="truncate text-slate-300">{linkedFile?.display_name || "Source unavailable"}</span>
         </nav>
@@ -1219,7 +1206,7 @@ export async function renderSourcesPage(params: SourceSearchParams = {}, options
           <div className="rounded-lg border border-white/10 bg-[#08111f] p-6 text-slate-100 shadow-panel">
             <h1 className="text-xl font-semibold text-white">Source unavailable</h1>
             <p className="mt-2 text-sm leading-6 text-slate-400">This source does not exist in the current workspace or has been deleted from active lifecycle views.</p>
-            <LoadingLink href="/app/sources" className="mt-4 inline-flex min-h-11 items-center rounded-md bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white" loadingLabel="Opening Evidence...">Back to Evidence</LoadingLink>
+            <LoadingLink href="/app/sources" className="mt-4 inline-flex min-h-11 items-center rounded-md bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white" loadingLabel="Opening Files & Notes...">Back to Files &amp; Notes</LoadingLink>
           </div>
         ) : (
           <SourceFileDetailPanel
@@ -1257,16 +1244,16 @@ export async function renderSourcesPage(params: SourceSearchParams = {}, options
   ) : null;
 
   return (
-    <div className="evidence-workspace space-y-6">
-      <section className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-panel">
+    <div className="evidence-workspace workspace-page workspace-files-notes space-y-5">
+      <section className="workspace-page-header text-slate-100">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="min-w-0">
-            <h1 className="text-2xl font-semibold tracking-normal text-white">Evidence</h1>
-            <p className="mt-1 text-sm leading-6 text-slate-300">{activeTab === "legal" ? "View immutable legal records retained for this workspace." : "Upload, analyze, and organize the information Vaeroex can use."}</p>
+            <p className="workspace-eyebrow text-xs font-semibold uppercase tracking-wide text-slate-400">Workspace inputs</p>
+            <h1 className="mt-1 text-2xl font-semibold tracking-normal text-white">Files &amp; Notes</h1>
+            <p className="mt-1 text-sm leading-6 text-slate-300">{activeTab === "legal" ? "View immutable legal records retained for this workspace." : "Add business information. Review it before it becomes evidence."}</p>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            {activeTab === "legal" ? null : <p className="max-w-sm text-xs leading-5 text-slate-400">Reports, spreadsheets, SOPs, notes, and operational files.</p>}
-            {activeTab === "legal" ? null : <UploadSourceDrawer folders={folders} compact />}
+            {activeTab === "legal" ? null : <UploadSourceDrawer folders={folders} />}
           </div>
         </div>
         {activeTab === "files" ? <div className="mt-3"><BusinessNoteEntry enabled={isBusinessNoteExtractionEnabled()} /></div> : null}
@@ -1275,7 +1262,7 @@ export async function renderSourcesPage(params: SourceSearchParams = {}, options
       {showNoteFeedback ? notesPanel : actionFeedback}
 
       <section className="space-y-4">
-        <nav className="vaeroex-mobile-safe-scroll flex gap-2 overflow-x-auto rounded-lg border border-white/10 bg-[#08111f] p-2 shadow-sm" aria-label="Sources views">
+        <nav className="workspace-tabs vaeroex-mobile-safe-scroll flex gap-2 overflow-x-auto border-b border-white/10 pb-2" aria-label="Sources views">
           {sourceTabs.filter((tab) => tab.key !== "knowledge" || activeTab === "knowledge" || activeKnowledgeRows.length > 0).map((tab) => {
             const active = activeTab === tab.key;
             const count =
@@ -1304,9 +1291,10 @@ export async function renderSourcesPage(params: SourceSearchParams = {}, options
         </nav>
 
         {activeTab === "files" ? (
-          <form method="get" className="grid gap-3 rounded-lg border border-white/10 bg-[#08111f] p-3 sm:grid-cols-[1fr_auto]">
+          <form method="get" className="workspace-toolbar grid gap-3 sm:grid-cols-[minmax(0,28rem)_auto] sm:justify-start">
             <input
               name="q"
+              aria-label="Search files"
               defaultValue={params?.q || ""}
               placeholder="Search files..."
               className="min-h-11 rounded-lg border border-white/10 bg-slate-950/70 px-3 py-2 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-vaeroex-accent"
@@ -1359,11 +1347,11 @@ export async function renderSourcesPage(params: SourceSearchParams = {}, options
             <LearnedKnowledgeView items={memoryChunks} files={files} params={params} archived />
           </div>
         ) : (
-          <div className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-panel">
+          <div className="workspace-panel rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <h2 className="text-base font-semibold text-white">Source Files</h2>
-                  <p className="mt-1 text-sm text-slate-400">Open a source to review its analysis, imported data, history, and lifecycle.</p>
+                  <p className="mt-1 text-xs text-slate-400">Open a file for review, imports, and history.</p>
                 </div>
               </div>
               <div className="mt-4 space-y-3">
@@ -1387,7 +1375,7 @@ export async function renderSourcesPage(params: SourceSearchParams = {}, options
                           Clear search
                         </Link>
                       ) : null}
-                      <UploadSourceDrawer folders={folders} />
+                      <UploadSourceTrigger />
                     </div>
                   </div>
                 )}

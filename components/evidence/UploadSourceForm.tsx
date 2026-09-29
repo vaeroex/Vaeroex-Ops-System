@@ -7,6 +7,16 @@ import type { UploadSourceState } from "@/lib/files/upload-types";
 
 const fieldClass = "mt-2 min-h-11 w-full rounded-lg border border-white/10 bg-slate-950/70 px-3 py-2 text-sm text-slate-100 outline-none focus:border-vaeroex-accent";
 
+export function UploadSourceTrigger() {
+  return <button type="button" aria-controls="workspace-file-upload" className="min-h-11 rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white" onClick={() => {
+    const upload = document.getElementById("workspace-file-upload");
+    if (!(upload instanceof HTMLDetailsElement)) return;
+    upload.open = true;
+    upload.scrollIntoView({ block: "center" });
+    upload.querySelector<HTMLInputElement>('input[type="file"]')?.focus({ preventScroll: true });
+  }}>Upload file</button>;
+}
+
 export function UploadSourceForm({ folders }: { folders: { id: string; name: string }[] }) {
   const [state, submit, pending] = useActionState<UploadSourceState, FormData>(async (previous, data) => {
     try {
@@ -83,7 +93,8 @@ export function UploadSourceForm({ folders }: { folders: { id: string; name: str
             <span>Upload anyway if this is a duplicate source. Vaeroex checks the file name, type, and size against active sources.</span>
           </label>
         </details>
-        <p className="text-xs leading-5 text-slate-400">Documents and images are saved for a separate analysis decision. Do not upload patient data, Social Security numbers, insurance IDs, or regulated healthcare data.</p>
+        <p className="text-xs leading-5 text-slate-400">Documents and images are saved for a separate analysis decision.</p>
+        <p data-upload-sensitive-reminder className="text-xs leading-5 text-slate-400">Do not upload patient data, PHI/ePHI, Social Security numbers, insurance IDs, or other regulated sensitive information.</p>
         <button type="submit" disabled={busy || state.blocked} aria-busy={busy} data-vaeroex-local-activity="true" className="min-h-11 rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">
           {busy ? "Uploading and preparing review…" : "Upload and prepare review"}
         </button>

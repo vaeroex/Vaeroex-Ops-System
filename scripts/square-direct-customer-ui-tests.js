@@ -52,6 +52,7 @@ test("direct Settings navigation is present for every connection state without b
     }
   }
   assert.match(render({ ...view, connections: [] }), /← Back to Settings/);
+  assert.match(render(view), /<div class="vaeroex-app-shell vaeroex-customer-workspace min-h-dvh"><main class="workspace-page workspace-square/);
 });
 
 test("one compact current connection and collapsed historical rows replace repeated cards and tables", () => {

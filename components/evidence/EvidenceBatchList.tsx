@@ -16,7 +16,7 @@ const BATCH_SIZE = 25;
 export function EvidenceBatchList({
   items,
   pluralLabel,
-  className = "space-y-3",
+  className = "workspace-list",
   selection
 }: {
   items: readonly EvidenceBatchItem[];

@@ -249,13 +249,14 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
     actorDisplayNames
   });
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-3 border-b border-white/10 pb-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="workspace-intelligence space-y-6">
+      <header className="workspace-page-header workspace-intelligence-header flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan-200">Executive Intelligence</p>
-          <p className="mt-1 text-sm text-slate-400">Review current signals and rolling leadership briefings.</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan-200">Leadership review</p>
+          <h1 className="mt-2 text-2xl font-semibold text-white sm:text-3xl">Intelligence</h1>
+          <p className="mt-2 text-sm text-slate-400">Review current signals and rolling leadership briefings.</p>
         </div>
-      </div>
+      </header>
       <ErrorNotice message={displayErrors[0]?.message || null} />
       <IntelligenceSignalInbox
         currentCards={lifecycleCards.current}
@@ -265,7 +266,7 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
         canManageLifecycle={canManageLifecycle}
         blockedState={blockedState}
       />
-      <section aria-labelledby="intelligence-briefings-heading" className="space-y-4 border-t border-white/10 pt-6">
+      <section aria-labelledby="intelligence-briefings-heading" className="workspace-briefings-section space-y-4 border-t border-white/10 pt-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h2 id="intelligence-briefings-heading" className="mt-1 text-xl font-semibold text-white">Intelligence Briefings</h2>

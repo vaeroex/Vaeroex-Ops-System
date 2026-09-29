@@ -1,6 +1,17 @@
 // Exact additive dormant qualification/connection scope. Legacy parser suites still reject
 // every other database/runtime path; no directory-wide exemption is permitted.
 const approvedSquareQualificationPaths = Object.freeze([
+  // Exact user-authorized customer presentation release; no directory-wide
+  // allowance and no neighboring handlers, queries or migrations are exempt.
+  "app/app/forms/page.tsx",
+  "app/app/intelligence/briefings/page.tsx",
+  "app/globals.css",
+  "components/app/WorkspacePresentation.tsx",
+  "components/intelligence/BusinessHealthInstrument.tsx",
+  "components/intelligence/ExecutiveHomepage.tsx",
+  "components/intelligence/IntelligenceBriefingViewer.tsx",
+  "components/operations/DecisionPageHeader.tsx",
+  "components/operations/SectionCard.tsx",
   // Exact follow-up paths authorized for pilot wording, mobile navigation and
   // isolated activation tests. No neighboring handler or migration is exempt.
   "components/admin/AdminNav.tsx",

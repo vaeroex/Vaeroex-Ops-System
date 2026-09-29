@@ -132,7 +132,7 @@ function PanelTabs({
   ];
 
   return (
-    <div className={`grid ${analysisAvailable ? "grid-cols-3" : "grid-cols-2"} rounded-lg border border-white/10 bg-slate-950/50 p-1`} role="tablist" aria-label="Selected finding view">
+    <div className={`workspace-finding-tabs grid ${analysisAvailable ? "grid-cols-3" : "grid-cols-2"} rounded-lg border border-white/10 bg-slate-950/50 p-1`} role="tablist" aria-label="Selected finding view">
       {tabs.map((tab) => (
         <button
           key={tab.id}
@@ -632,7 +632,7 @@ export function IntelligenceSignalInbox({
     const selected = selectedCard?.findingKeyHash === card.findingKeyHash;
     const historyAffordance = card.view === "history";
     return (
-      <button key={card.findingKeyHash} type="button" data-finding-key={card.findingKeyHash} aria-current={selected ? "true" : undefined} onClick={(event) => selectCard(card, event.currentTarget)} className={`${spatialSurfaceClassName({ depth: selected ? "raised" : "subtle", interactive: true, selected })} vaeroex-semantic-card vaeroex-semantic-interactive ${semanticStatusClass(categoryStatus)} block w-full rounded-lg border p-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/80 ${historyAffordance ? "cursor-pointer" : ""} ${selected ? historyAffordance ? "border-cyan-300/55 bg-cyan-950/25 ring-2 ring-cyan-300/55 shadow-[0_0_0_1px_rgba(103,232,249,0.08)]" : "ring-1 ring-current/30" : historyAffordance ? "hover:border-cyan-300/50 hover:bg-cyan-950/20 hover:shadow-md" : "hover:brightness-[1.03]"}`}>
+      <button key={card.findingKeyHash} type="button" data-finding-key={card.findingKeyHash} aria-current={selected ? "true" : undefined} onClick={(event) => selectCard(card, event.currentTarget)} className={`workspace-finding-card ${spatialSurfaceClassName({ depth: selected ? "raised" : "subtle", interactive: true, selected })} vaeroex-semantic-card vaeroex-semantic-interactive ${semanticStatusClass(categoryStatus)} block w-full rounded-lg border p-4 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/80 ${historyAffordance ? "cursor-pointer" : ""} ${selected ? historyAffordance ? "border-cyan-300/55 bg-cyan-950/25 ring-2 ring-cyan-300/55 shadow-[0_0_0_1px_rgba(103,232,249,0.08)]" : "ring-1 ring-current/30" : historyAffordance ? "hover:border-cyan-300/50 hover:bg-cyan-950/20 hover:shadow-md" : "hover:brightness-[1.03]"}`}>
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0">
             <div className="mb-2 flex flex-wrap gap-2">
@@ -655,29 +655,31 @@ export function IntelligenceSignalInbox({
   }
 
   return (
-    <section className="vaeroex-intelligence-inbox vaeroex-priority-surface rounded-xl border border-white/10 bg-[#07101f] p-4 text-slate-100 shadow-command">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+    <section className="workspace-findings vaeroex-intelligence-inbox vaeroex-priority-surface rounded-xl border border-white/10 bg-[#07101f] p-4 text-slate-100 shadow-command">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-vaeroex-accent">Intelligence</p>
-          <h2 className="mt-1 text-xl font-semibold text-white">Current findings and history</h2>
+          <h2 className="text-base font-semibold text-white">Current findings and history</h2>
         </div>
-        <label className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-xs text-slate-200">
+        <p className="text-xs text-slate-400">Showing {filteredCards.length ? `1-${pagedCards.length}` : "0"} of {filteredCards.length}.</p>
+      </div>
+
+      <div className="workspace-inbox-toolbar mt-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="inline-grid grid-cols-2 rounded-lg border border-white/10 bg-slate-950/50 p-1" role="tablist" aria-label="Intelligence lifecycle view">
+          {(["current", "history"] as LifecycleView[]).map((view) => (
+            <button key={view} type="button" role="tab" aria-selected={lifecycleView === view} onClick={() => selectView(view)} className={`inline-flex min-h-10 items-center justify-center gap-2 rounded-md px-4 py-2 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/60 ${lifecycleView === view ? "bg-vaeroex-blue text-white" : "text-slate-300 hover:bg-cyan-950/30 hover:text-white"}`}>
+              {view === "current" ? <Check aria-hidden="true" className="h-4 w-4" /> : <History aria-hidden="true" className="h-4 w-4" />}
+              {view === "current" ? "Current" : "History"}
+              <span className="rounded-full bg-white/10 px-2 py-0.5 text-[0.7rem]">{view === "current" ? currentCards.length : historyCards.length}</span>
+            </button>
+          ))}
+        </div>
+        <label className="inline-flex min-h-10 items-center gap-2 text-xs text-slate-300">
           <input type="checkbox" checked={hideLowConfidence} onChange={(event) => changeConfidenceFilter(event.currentTarget.checked)} className="h-4 w-4 rounded border-white/20 bg-slate-950 text-vaeroex-blue focus:ring-vaeroex-accent" />
           Hide low confidence
         </label>
       </div>
 
-      <div className="mt-4 inline-grid grid-cols-2 rounded-lg border border-white/10 bg-slate-950/50 p-1" role="tablist" aria-label="Intelligence lifecycle view">
-        {(["current", "history"] as LifecycleView[]).map((view) => (
-          <button key={view} type="button" role="tab" aria-selected={lifecycleView === view} onClick={() => selectView(view)} className={`inline-flex min-h-10 items-center justify-center gap-2 rounded-md px-4 py-2 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/60 ${lifecycleView === view ? "bg-vaeroex-blue text-white" : "text-slate-300 hover:bg-cyan-950/30 hover:text-white"}`}>
-            {view === "current" ? <Check aria-hidden="true" className="h-4 w-4" /> : <History aria-hidden="true" className="h-4 w-4" />}
-            {view === "current" ? "Current" : "History"}
-            <span className="rounded-full bg-white/10 px-2 py-0.5 text-[0.7rem]">{view === "current" ? currentCards.length : historyCards.length}</span>
-          </button>
-        ))}
-      </div>
-
-      <div className="mt-4 flex gap-2 overflow-x-auto border-b border-white/10 pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="workspace-finding-categories mt-4 flex gap-2 overflow-x-auto border-b border-white/10 pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {visibleTypes.map((type) => (
           <button key={type} type="button" onClick={() => selectType(type)} className={`inline-flex min-h-10 shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/60 ${activeType === type ? "bg-vaeroex-blue text-white" : "text-slate-300 hover:bg-cyan-950/30 hover:text-white"}`}>
             {typeTabLabel(type)} <span className="rounded-full bg-white/10 px-2 py-0.5 text-[0.7rem]">{counts[type]}</span>
@@ -686,8 +688,7 @@ export function IntelligenceSignalInbox({
       </div>
 
       <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(23rem,.82fr)]">
-        <div data-finding-list className={`${mobileDetailOpen && selectedCard ? "hidden xl:block" : "block"} space-y-5 xl:max-h-[calc(100dvh-10rem)] xl:overflow-y-auto xl:pr-1`}>
-          <p className="text-xs text-slate-400">Showing {filteredCards.length ? `1-${pagedCards.length}` : "0"} of {filteredCards.length}.</p>
+        <div data-finding-list className={`${mobileDetailOpen && selectedCard ? "hidden xl:block" : "block"} workspace-finding-list space-y-5 xl:max-h-[calc(100dvh-10rem)] xl:overflow-y-auto xl:pr-1`}>
           {lifecycleView === "current" && activeType === "All" ? (
             <>
               <section className="space-y-3" aria-labelledby="attention-findings-heading">
@@ -723,7 +724,7 @@ export function IntelligenceSignalInbox({
           {filteredCards.length > pagedCards.length ? <button type="button" onClick={() => setVisibleCount((count) => count + pageSize)} className="min-h-10 rounded-lg border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-semibold text-slate-100 hover:border-cyan-300/40 hover:bg-cyan-950/30">Load more</button> : null}
         </div>
 
-        <aside ref={detailRef} tabIndex={-1} aria-label="Selected finding" className={`${mobileDetailOpen && selectedCard ? "block" : "hidden xl:block"} scroll-mt-24 ${spatialSurfaceClassName({ depth: "raised", selected: Boolean(selectedCard) })} vaeroex-semantic-card ${selectedCard ? semanticStatusClass(findingCategoryStatus(selectedCard.snapshot.type)) : semanticStatusClass("neutral")} rounded-lg border p-4 shadow-panel xl:sticky xl:top-24 xl:max-h-[calc(100dvh-8rem)] xl:self-start xl:overflow-y-auto`}>
+        <aside ref={detailRef} tabIndex={-1} aria-label="Selected finding" className={`${mobileDetailOpen && selectedCard ? "block" : "hidden xl:block"} workspace-finding-detail scroll-mt-24 ${spatialSurfaceClassName({ depth: "raised", selected: Boolean(selectedCard) })} vaeroex-semantic-card ${selectedCard ? semanticStatusClass(findingCategoryStatus(selectedCard.snapshot.type)) : semanticStatusClass("neutral")} rounded-lg border p-4 shadow-panel xl:sticky xl:top-24 xl:max-h-[calc(100dvh-8rem)] xl:self-start xl:overflow-y-auto`}>
           {selectedCard ? (
             <div className="space-y-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
