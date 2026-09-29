@@ -41,25 +41,26 @@ const buttonClass = "rounded-md border border-line px-4 py-2 text-sm font-semibo
 export function SquareDirectCustomerPanel({ view }: { view: DirectView }) {
   const entities = new Map(view.businessEntities.map(entity => [entity.id, entity.label]));
   const connectableEntities = view.connections.every(connection =>
-    connection.state === "disconnected" && !connection.revocationPending) ? view.businessEntities : [];
+    connection.state === "disconnected" && !connection.revocationPending && !connection.recoveryRequired) ? view.businessEntities : [];
 
   return <main className="mx-auto max-w-5xl space-y-6 p-6">
     <header className="space-y-2">
       <h1 className="text-2xl font-semibold text-ink">Square connection and Payments</h1>
       <p className="text-sm text-muted">Connect your Square account, choose its location, and view that location’s Payments in this workspace.</p>
     </header>
-    {!view.available ? <p role="status">New Square connections and Payments updates are unavailable for this workspace. You can still review saved Payments and disconnect an existing connection.</p> : null}
+    {!view.available ? <p role="status">New Square connections and Payments updates are unavailable for this workspace. Saved Payments and existing connection status remain available.</p> : null}
       {view.connections.length === 0 ? <p role="status">No Square account is connected to this workspace.</p> : null}
       {view.connections.map(connection => <section key={connection.connectionId} className="space-y-4 rounded-lg border border-line p-4">
         <div className="space-y-1">
           <h2 className="text-lg font-semibold">{connection.sellerLabel ?? "Square account"}</h2>
           <p>Business Entity: {entities.get(connection.businessEntityId) ?? "Unavailable"}</p>
-          <p role="status">{connectionLabels[connection.state]}</p>
+          <p role="status">{connection.recoveryRequired ? "Authorization recovery required" : connectionLabels[connection.state]}</p>
           <p className="text-sm text-muted">Source: Square Production · Last successful sync: {timestamp(connection.lastSyncedAt)}</p>
           {connection.lastError ? <p role="status">The last attempt did not finish. Your last successfully saved Payments remain below.</p> : null}
         </div>
+        {connection.recoveryRequired ? <p role="status">Square authorization outcome and this workspace’s account connection are unconfirmed. Contact support for checked recovery before taking any further connection action.</p> : null}
 
-        {view.available && connection.state === "mapping_required" ? <form action="/api/integrations/square/mapping" method="post" className="space-y-3">
+        {view.available && !connection.recoveryRequired && connection.state === "mapping_required" ? <form action="/api/integrations/square/mapping" method="post" className="space-y-3">
           <input type="hidden" name="connectionId" value={connection.connectionId} />
           <label className="block font-semibold">Square location
             <select name="locationId" required defaultValue="" className="mt-2 block w-full rounded-md border border-line px-3 py-2">
@@ -73,7 +74,7 @@ export function SquareDirectCustomerPanel({ view }: { view: DirectView }) {
         </form> : null}
 
         {connection.locationId ? <p>Location: {connection.locations.find(location => location.id === connection.locationId)?.label ?? "Selected Square location"}</p> : null}
-        {view.available && (connection.state === "connected" || connection.state === "retry_required") && connection.locationId && !connection.revocationPending ? <form action="/api/integrations/square/read" method="post" className="space-y-2">
+        {view.available && !connection.recoveryRequired && (connection.state === "connected" || connection.state === "retry_required") && connection.locationId && !connection.revocationPending ? <form action="/api/integrations/square/read" method="post" className="space-y-2">
           <input type="hidden" name="connectionId" value={connection.connectionId} />
           <button type="submit" className={buttonClass}>{connection.hasMore ? "Read next Payments page" : connection.lastSyncedAt ? "Update Payments" : "Read Payments"}</button>
           <p className="text-sm text-muted">Each request reads one page. {connection.hasMore ? "More pages remain in the current read." : "Updates resume from the saved checkpoint; this is not a complete-history claim."}</p>
@@ -81,7 +82,7 @@ export function SquareDirectCustomerPanel({ view }: { view: DirectView }) {
         {connection.state === "syncing" || connection.state === "exchanging" ? <form action="/app/settings/integrations/square" method="get">
           <button type="submit" className="text-sm underline">Refresh connection status</button>
         </form> : null}
-        {connection.state === "reauthorization_required" ? <p>Disconnect this connection, then connect again to renew Square authorization.</p> : null}
+        {!connection.recoveryRequired && connection.state === "reauthorization_required" ? <p>Disconnect this connection, then connect again to renew Square authorization.</p> : null}
 
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
@@ -98,8 +99,8 @@ export function SquareDirectCustomerPanel({ view }: { view: DirectView }) {
         </div>
         <p className="text-xs text-muted">These are Square Payment records, not revenue, profit, settlement totals, or accounting statements. Older saved records may not reflect later provider changes until the next successful update.</p>
 
-        {connection.revocationPending ? <p role="status">Disconnected locally. Square authorization revocation is still pending; reconnect is blocked until it completes.</p> : null}
-        {connection.state !== "disconnected" || connection.revocationPending ? <form action="/api/integrations/square/disconnect" method="post" className="space-y-3 border-t border-line pt-4">
+        {!connection.recoveryRequired && connection.revocationPending ? <p role="status">Disconnected locally. Square authorization revocation is still pending; reconnect is blocked until it completes.</p> : null}
+        {!connection.recoveryRequired && (connection.state !== "disconnected" || connection.revocationPending) ? <form action="/api/integrations/square/disconnect" method="post" className="space-y-3 border-t border-line pt-4">
           <input type="hidden" name="connectionId" value={connection.connectionId} />
           <label className="flex gap-2"><input type="checkbox" name="confirmation" value="disconnect" required />
             <span>I confirm disconnecting this Square connection. Saved Payments are retained; further reads stop.</span>

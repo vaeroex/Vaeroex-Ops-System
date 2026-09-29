@@ -422,7 +422,22 @@ matches(
   "the fixture must preserve the exact production-labelled 2-leased/1-pending shape"
 );
 
-equal(approvedSquareQualificationPaths.length, 201, "dormant scope permits only exact reviewed migrations, UI, native service/templates, provider-neutral Production composition and activation, restricted evidence host, query-stripping callback edge, repository-bound image trigger, internal-seller consent and manual read, internal-pilot runtime, offline pilot, bounded provisioner and customer candidate files");
+equal(approvedSquareQualificationPaths.length, 204, "dormant scope permits only exact reviewed migrations, UI, native service/templates, provider-neutral Production composition and activation, restricted evidence host, query-stripping callback edge, repository-bound image trigger, internal-seller consent and manual read, internal-pilot runtime, offline pilot, bounded provisioner and customer candidate files");
+const directCustomerProtectedPaths = [
+  "components/integrations/SquareDirectCustomerPanel.tsx",
+  "supabase/production-migrations/20260929004917_square_customer_service_backend.sql",
+  "supabase/tests/square_customer_backend.test.sql"
+];
+equal(withoutSquareQualificationPaths(directCustomerProtectedPaths.join("\n")), "", "exact closed direct customer component, migration and qualification are in scope");
+for (const unapprovedDirectPath of [
+  "components/integrations/SquareDirectAdminPanel.tsx",
+  "supabase/production-migrations/20260929004918_square_customer_service_backend.sql",
+  "supabase/migrations/20260929004917_square_customer_service_backend.sql",
+  "supabase/tests/square_customer_backend_unreviewed.test.sql",
+  "app/api/integrations/square/direct-activation/route.ts"
+]) {
+  equal(withoutSquareQualificationPaths(unapprovedDirectPath), unapprovedDirectPath, "direct customer exception cannot authorize neighboring paths or activation");
+}
 assertionCount++;
 assert.deepEqual(approvedSquareQualificationPaths.filter(file => file.startsWith("services/external-integrations-production/infra/provisioner/")), [
   ".gitignore", ".terraform.lock.hcl", "README.md", "backend.tf", "main.tf", "outputs.tf",

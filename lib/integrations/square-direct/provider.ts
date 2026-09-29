@@ -99,12 +99,16 @@ export function createDirectSquareProvider(input: {
       authorizationUrl(state: string) {
         try { return squareAuthorizationUrl({ policy, applicationId, state }); } catch (error) { return outward(error); }
       },
-      async exchange(code: string) {
+      async exchange(code: string, onCredential?: (credential: CredentialEnvelope) => Promise<void>) {
         try {
           const credential = credentialForProduction(CredentialEnvelopeSchema.parse(await oauth.exchangeAuthorizationCode({
             authorizationCode: code, applicationSecret, requestedScopes: SQUARE_OAUTH_SCOPES, now: now()
           })), now());
           if (!credential.externalAuthorizedEntityReference) throw failure();
+          // Persist encrypted recovery authority before discovery can fail.
+          // A rejected/uncertain stage stops here; it is never permission to
+          // repeat the authorization-code exchange or continue discovery.
+          await onCredential?.(credential);
           const discovery = createSquareAccountDiscovery({ environment: "production", applicationId, clock: now,
             readAuthenticated: request => readSquareAuthenticatedDiscovery({ ...request, transport }) });
           await discovery.verify({ externalAuthorizedEntityReference: credential.externalAuthorizedEntityReference,

@@ -51,12 +51,26 @@ export function createDirectSquareService(input: {
       const callback = parseSquareOAuthCallback(url, directCallbackUri), leaseId = randomUUID();
       const row = context(await input.rpc("consume", { stateHash: oauthStateHash(callback.state), leaseId }), undefined, leaseId);
       if (callback.kind === "denied") {
-        await fail(row.connectionId, leaseId, new Error("square_direct_reauthorization_required"));
+        await input.rpc("decline", { connectionId: row.connectionId, leaseId });
         return;
       }
       try {
-        const result = await provider(row.connectionId, leaseId).exchange(callback.authorizationCode);
-        const ciphertext = sealCredential(result.credential, input.encryptionKey, aad(row, 1));
+        let ciphertext: string | null = null;
+        const result = await provider(row.connectionId, leaseId).exchange(callback.authorizationCode, async credential => {
+          // Keep the verified credential before discovery or finalization can
+          // fail. A lost staging acknowledgement is read back, never retried.
+          const candidate = sealCredential(credential, input.encryptionKey, aad(row, 1));
+          let receipt: unknown;
+          try { receipt = await input.rpc("stage_credential", { connectionId: row.connectionId, leaseId,
+            ciphertext: candidate, merchantId: credential.externalAuthorizedEntityReference,
+            accessExpiresAt: credential.accessExpiresAt }); }
+          catch { receipt = await input.rpc("reconcile", { connectionId: row.connectionId, leaseId }); }
+          const committed = context(receipt, row.connectionId, leaseId);
+          if (committed.ciphertext !== candidate || committed.credentialVersion !== 1 || committed.generation !== row.generation ||
+            committed.merchantId !== credential.externalAuthorizedEntityReference || committed.accessExpiresAt !== credential.accessExpiresAt) throw denied();
+          ciphertext = candidate;
+        });
+        if (ciphertext === null) throw denied();
         stored.parse(await input.rpc("complete_connect", { connectionId: row.connectionId, leaseId,
           ciphertext, merchantId: result.merchantId, sellerLabel: result.sellerLabel,
           locations: result.locations, accessExpiresAt: result.credential.accessExpiresAt }));

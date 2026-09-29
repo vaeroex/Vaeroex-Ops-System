@@ -87,6 +87,18 @@ async function main() {
   const connected = await exchange.provider.exchange('synthetic-code');
   assert.equal(connected.merchantId, 'MERCHANT_1'); assert.deepEqual(connected.locations, [{ id: 'LOCATION_1', label: 'Shop' }]);
   assert.equal(exchange.calls.length, 5);
+  const stagedExchange = fixture(); let stagedCredential;
+  await stagedExchange.provider.exchange('synthetic-code', async value => {
+    assert.deepEqual(stagedExchange.calls.map(call => call.url.pathname), ['/oauth2/token', '/oauth2/token/status']);
+    stagedCredential = value;
+  });
+  assert.equal(stagedCredential.externalAuthorizedEntityReference, 'MERCHANT_1');
+  assert.equal(stagedExchange.calls[2].url.pathname, '/v2/merchants/me', 'credential staging precedes discovery');
+  const unstagedExchange = fixture();
+  await assert.rejects(() => unstagedExchange.provider.exchange('synthetic-code', async () => { throw Error('synthetic staging lost acknowledgement'); }),
+    /^Error: square_direct_provider_failed$/);
+  assert.deepEqual(unstagedExchange.calls.map(call => call.url.pathname), ['/oauth2/token', '/oauth2/token/status'],
+    'failed credential staging never starts discovery or repeats exchange');
   let authorizations = 0;
   const guarded = fixture({ authorize: async () => { authorizations++; } });
   await guarded.provider.exchange('synthetic-code'); assert.equal(authorizations, 5, 'each OAuth/discovery dispatch rechecks authority');

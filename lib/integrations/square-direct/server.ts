@@ -20,11 +20,17 @@ export function squareDirectEnabled() {
   return process.env.NODE_ENV === "production" && process.env.VERCEL_ENV === "production" &&
     process.env.SQUARE_CUSTOMER_BACKEND_ENABLED === "true";
 }
+export function directEncryptionKeyValid(value: unknown): value is string {
+  if (typeof value !== "string" || !/^[A-Za-z0-9+/]{43}=$/.test(value)) return false;
+  const bytes = Buffer.from(value, "base64");
+  try { return bytes.length === 32 && bytes.toString("base64") === value; }
+  finally { bytes.fill(0); }
+}
 function config() {
   const applicationId = z.string().regex(/^sq0idp-[A-Za-z0-9_-]{1,184}$/).parse(process.env.SQUARE_CUSTOMER_APPLICATION_ID);
   const applicationSecret = z.string().min(16).max(16384).parse(process.env.SQUARE_CUSTOMER_APPLICATION_SECRET);
-  const encryptionKey = z.string().regex(/^[A-Za-z0-9+/]{43}=$/).parse(process.env.SQUARE_CUSTOMER_ENCRYPTION_KEY);
-  if (Buffer.from(encryptionKey, "base64").length !== 32) throw new Error("square_customer_configuration_unavailable");
+  const encryptionKey = process.env.SQUARE_CUSTOMER_ENCRYPTION_KEY;
+  if (!directEncryptionKeyValid(encryptionKey)) throw new Error("square_customer_configuration_unavailable");
   return { applicationId, applicationSecret, encryptionKey };
 }
 async function service() {

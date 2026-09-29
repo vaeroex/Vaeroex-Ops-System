@@ -23,7 +23,7 @@ export const DirectViewSchema = z.object({
   connections: z.array(z.object({ connectionId: id, businessEntityId: id, state: DirectStateSchema,
     sellerLabel: z.string().max(255).nullable(), locations: z.array(location).max(500), locationId: z.string().max(50).nullable(),
     lastSyncedAt: instant.nullable(), lastError: z.enum(["retry_required", "reauthorization_required"]).nullable(),
-    hasMore: z.boolean(), revocationPending: z.boolean(), payments: z.array(DirectPaymentSchema).max(100)
+    hasMore: z.boolean(), revocationPending: z.boolean(), recoveryRequired: z.boolean(), payments: z.array(DirectPaymentSchema).max(100)
   }).strict()).max(100)
 }).strict();
 export type DirectView = z.infer<typeof DirectViewSchema>;

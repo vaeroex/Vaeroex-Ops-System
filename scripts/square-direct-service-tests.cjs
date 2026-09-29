@@ -22,7 +22,7 @@ const { createDirectSquareService } = require('../lib/integrations/square-direct
 const { sealCredential, openCredential } = require('../lib/integrations/square-direct/crypto.ts');
 const { directCallbackUri } = require('../lib/integrations/square-direct/provider.ts');
 const { DirectViewSchema } = require('../lib/integrations/square-direct/contracts.ts');
-const { directRequestAllowed, directForm, squareDirectRoute } = require('../lib/integrations/square-direct/server.ts');
+const { directRequestAllowed, directForm, squareDirectRoute, directEncryptionKeyValid } = require('../lib/integrations/square-direct/server.ts');
 const { SQUARE_OAUTH_SCOPES } = require('../lib/integrations/providers/square/account-connection-oauth.ts');
 const clock = new Date('2026-09-29T12:00:00.000Z');
 const origin = 'https://www.vaeroex.com';
@@ -40,7 +40,7 @@ function fixture(options = {}) {
     cursor: null, cursorBindingFingerprint: null, cursorFingerprint: null, leaseId: null, state: 'connected' };
   const aad = () => ({ workspaceId: row.workspaceId, connectionId: row.connectionId, generation: row.generation, credentialVersion: row.credentialVersion });
   row.ciphertext = sealCredential(credential, key, aad());
-  let consumed = false, stateHash, pages = 0, refreshed = 0;
+  let consumed = false, stateHash, pages = 0, refreshed = 0, uncertain = false;
   const pgTime = value => value ? value.replace('.000Z', '+00:00') : value;
   const snapshot = () => ({ ...row, accessExpiresAt: pgTime(row.accessExpiresAt) });
   const rpc = async (operation, payload) => {
@@ -53,18 +53,31 @@ function fixture(options = {}) {
     }
     if (operation === 'consume') {
       assert(!consumed && payload.stateHash === stateHash, 'one actor-bound single-use callback state');
-      consumed = true; row.leaseId = payload.leaseId; row.state = 'exchanging'; return snapshot();
+      consumed = true; uncertain = true; row.leaseId = payload.leaseId; row.state = 'exchanging'; return snapshot();
     }
+    if (operation === 'decline') { uncertain = false; row.state = 'disconnected'; row.leaseId = null; return { recorded: true }; }
     if (operation === 'claim') { row.leaseId = payload.leaseId; row.state = 'syncing'; return options.foreignContext ? { ...snapshot(), workspaceId: randomUUID() } : snapshot(); }
     if (operation === 'authorize' || operation === 'authorize_disconnect') {
       assert.equal(payload.leaseId, row.leaseId); assert.equal(payload.connectionId, row.connectionId);
       if (options.denyDispatch) throw Error('fenced');
       return { authorized: true };
     }
+    if (operation === 'stage_credential') {
+      if (!options.stageNotCommitted) {
+        row = { ...row, ciphertext: payload.ciphertext, merchantId: payload.merchantId,
+          accessExpiresAt: payload.accessExpiresAt, credentialVersion: 1 }; uncertain = false;
+      }
+      if (options.stageLostAck || options.stageNotCommitted) throw Error('synthetic_stage_uncertain');
+      return snapshot();
+    }
     if (operation === 'complete_connect') {
       assert.equal(payload.leaseId, row.leaseId);
+      assert.equal(row.ciphertext, payload.ciphertext); assert.equal(row.credentialVersion, 1);
+      if (options.completeFailure) throw Error('synthetic_finalization_failure');
       row = { ...row, ciphertext: payload.ciphertext, merchantId: payload.merchantId, accessExpiresAt: payload.accessExpiresAt,
-        credentialVersion: 1, state: 'mapping_required', leaseId: null }; return { stored: true };
+        credentialVersion: 1, state: 'mapping_required', leaseId: null };
+      if (options.completeLostAck) throw Error('synthetic_ack_lost');
+      return { stored: true };
     }
     if (operation === 'map') { assert.equal(payload.locationId, 'LOCATION_1'); row.locationId = payload.locationId; row.state = 'connected'; return { mapped: true }; }
     if (operation === 'commit_refresh') {
@@ -87,13 +100,16 @@ function fixture(options = {}) {
       assert.equal(payload.leaseId, row.leaseId, 'failed/stale completion cannot overwrite committed page');
       row.state = payload.reason; row.leaseId = null; return { failed: true };
     }
-    if (operation === 'disconnect') { row.state = 'disconnected'; row.leaseId = payload.leaseId; return snapshot(); }
+    if (operation === 'disconnect') { if (uncertain && !row.ciphertext) throw Error('provider_outcome_unconfirmed');
+      row.state = 'disconnected'; row.leaseId = payload.leaseId; return snapshot(); }
     if (operation === 'complete_disconnect') { row.ciphertext = null; row.leaseId = null; return { disconnected: true }; }
     throw Error('unexpected_operation');
   };
   const service = createDirectSquareService({ actor, encryptionKey: key, rpc, now: () => clock, provider: authorize => ({
     authorizationUrl: state => `${directCallbackUri}?state=${state}`,
-    exchange: async () => { await authorize(); calls.push({ operation: 'provider_exchange' });
+    exchange: async (_code, onCredential) => { await authorize(); calls.push({ operation: 'provider_exchange' });
+      await onCredential(credential);
+      if (options.discoveryFailure) throw Error('synthetic_discovery_failure');
       return { credential, merchantId: 'MERCHANT_1', sellerLabel: 'Shop', locations: [{ id: 'LOCATION_1', label: 'Main' }] }; },
     refresh: async old => { await authorize(); refreshed++; calls.push({ operation: 'provider_refresh' });
       return { ...old, accessToken: 'synthetic-renewed', updatedAt: clock.toISOString(), accessExpiresAt: '2026-09-30T12:00:00.000Z' }; },
@@ -131,8 +147,29 @@ async function main() {
   assert.equal(callback.calls.filter(x => x.operation === 'provider_exchange').length, 1);
   const denied = fixture(), deniedUrl = new URL(await denied.service.connect(denied.entity));
   deniedUrl.searchParams.set('error', 'access_denied'); await denied.service.callback(deniedUrl.href);
-  assert.equal(denied.row().state, 'reauthorization_required');
+  assert.equal(denied.row().state, 'disconnected');
   assert.equal(denied.calls.filter(x => x.operation.startsWith('provider_')).length, 0);
+  for (const options of [{ completeFailure: true }, { discoveryFailure: true }]) {
+    const interrupted = fixture(options), url = new URL(await interrupted.service.connect(interrupted.entity));
+    url.searchParams.set('code', 'never-issued'); await assert.rejects(() => interrupted.service.callback(url.href));
+    assert(interrupted.row().ciphertext, 'verified credential survives discovery/finalization failure');
+    await interrupted.service.disconnect(interrupted.row().connectionId);
+    assert.equal(interrupted.calls.filter(x => x.operation === 'provider_revoke').length, 1);
+  }
+  const staged = fixture({ stageLostAck: true }), stagedUrl = new URL(await staged.service.connect(staged.entity));
+  stagedUrl.searchParams.set('code', 'never-issued'); await staged.service.callback(stagedUrl.href);
+  assert.equal(staged.row().state, 'mapping_required');
+  assert.equal(staged.calls.filter(x => x.operation === 'stage_credential').length, 1);
+  assert.equal(staged.calls.filter(x => x.operation === 'provider_exchange').length, 1);
+  const unstaged = fixture({ stageNotCommitted: true }), unstagedUrl = new URL(await unstaged.service.connect(unstaged.entity));
+  unstagedUrl.searchParams.set('code', 'never-issued'); await assert.rejects(() => unstaged.service.callback(unstagedUrl.href));
+  await assert.rejects(() => unstaged.service.disconnect(unstaged.row().connectionId));
+  assert.equal(unstaged.calls.some(x => ['provider_revoke', 'complete_disconnect'].includes(x.operation)), false,
+    'unknown grant or another workspace reservation cannot be falsely cleared or revoked');
+  const connectedAck = fixture({ completeLostAck: true }), connectedUrl = new URL(await connectedAck.service.connect(connectedAck.entity));
+  connectedUrl.searchParams.set('code', 'never-issued'); await assert.rejects(() => connectedAck.service.callback(connectedUrl.href));
+  assert.equal(connectedAck.row().state, 'mapping_required'); assert(connectedAck.row().ciphertext);
+  assert.equal(connectedAck.calls.filter(x => x.operation === 'provider_exchange').length, 1);
   for (const query of ['state=s&code=c&code=d', 'state=s&code=c&error=denied', 'state=s&code=c&unexpected=x', 'state=%zz&code=c']) {
     const malformed = fixture(); await assert.rejects(() => malformed.service.callback(`${directCallbackUri}?${query}`));
     assert.equal(malformed.calls.length, 0);
@@ -153,6 +190,10 @@ async function main() {
   assert.equal(revoke.row().state, 'disconnected'); assert(revoke.row().ciphertext);
   assert.equal(revoke.calls.some(x => x.operation === 'complete_disconnect'), false);
   assert.throws(() => DirectViewSchema.parse({ available: true, businessEntities: [], connections: [], ciphertext: 'private' }));
+  const canonicalKey = Buffer.alloc(32).toString('base64'), noncanonicalKey = `${canonicalKey.slice(0, 42)}B=`;
+  assert.equal(Buffer.from(noncanonicalKey, 'base64').length, 32);
+  assert.equal(directEncryptionKeyValid(canonicalKey), true);
+  assert.equal(directEncryptionKeyValid(noncanonicalKey), false, 'bad pad bits rejected before any OAuth dispatch');
   function request(action, body, headers = {}) { return new Request(`${origin}/api/integrations/square/${action}`, {
     method: 'POST', headers: { host: 'www.vaeroex.com', origin, 'content-type': 'application/x-www-form-urlencoded', ...headers }, body }); }
   const connectionId = randomUUID(), businessEntityId = randomUUID();

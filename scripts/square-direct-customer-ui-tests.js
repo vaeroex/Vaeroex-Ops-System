@@ -25,7 +25,7 @@ const render = view => renderToStaticMarkup(React.createElement(SquareDirectCust
 const connection = {
   connectionId: "connection-owner-a", businessEntityId: "entity-owner-a", state: "connected", sellerLabel: "Owner A seller",
   locations: [{ id: "location-a", label: "Owner A location" }], locationId: "location-a", lastSyncedAt: "2026-09-29T01:02:03.000Z",
-  lastError: null, hasMore: false, revocationPending: false,
+  lastError: null, hasMore: false, revocationPending: false, recoveryRequired: false,
   payments: [{ id: "payment-a", locationId: "location-a", status: "COMPLETED", createdAt: "2026-09-29T01:01:00.000Z", updatedAt: "2026-09-29T01:01:00.000Z", amountMinor: "12345", currency: "USD" }],
 };
 const view = { available: true, businessEntities: [{ id: "entity-owner-a", label: "Owner A business" }], connections: [connection] };
@@ -122,6 +122,18 @@ test("a live connection or pending revocation blocks connecting a second Busines
   assert.match(closed, /value="entity-owner-b"/);
 });
 
+test("unconfirmed authorization requires checked recovery without provider actions or closed claims", () => {
+  for (const state of ["exchanging", "reauthorization_required", "connected", "mapping_required", "disconnected"]) {
+    const html = render({ ...view, connections: [{ ...connection, state, recoveryRequired: true }] });
+    assert.match(html, /Authorization recovery required/);
+    assert.match(html, /Square authorization outcome and this workspace’s account connection are unconfirmed\. Contact support for checked recovery before taking any further connection action\./);
+    assert.doesNotMatch(html, /action="\/api\/integrations\/square\/(connect|disconnect|mapping|read)"/);
+    assert.doesNotMatch(html, /Disconnected locally|>Disconnected<|Disconnect this connection, then connect again|revoke Vaeroex|Square[’']s app permissions/i);
+  }
+  const known = render({ ...view, connections: [{ ...connection, state: "reauthorization_required", recoveryRequired: false }] });
+  assert.match(known, /action="\/api\/integrations\/square\/disconnect"/);
+});
+
 test("direct page rejects host/protocol mismatch before workspace authority and has no legacy fallback", async () => {
   let incoming = new Headers({ host: "www.vaeroex.com", "x-forwarded-proto": "https" });
   let directReads = 0;
@@ -154,4 +166,41 @@ test("direct page rejects host/protocol mismatch before workspace authority and 
   returned = null;
   await assert.rejects(page(), /NOT_FOUND/);
   assert.equal(directReads, 2);
+});
+
+test("workspace settings exposes canonical Square navigation only to enabled owners", async () => {
+  let enabled = false, role = "owner", evidenceReads = 0;
+  const supabase = { from() { throw new Error("UNEXPECTED_DATABASE_READ"); } };
+  const { SectionCard } = loadTsx("components/operations/SectionCard.tsx");
+  const empty = () => null;
+  const { default: settingsPage } = loadTsx("app/app/settings/page.tsx", {
+    "next/headers": { headers: async () => new Headers() },
+    "next/link": { __esModule: true, default: ({ children, ...props }) => React.createElement("a", props, children) },
+    "@/components/auth/AuthMessage": { AuthMessage: empty },
+    "@/components/app/ThemeControls": { ThemeControls: empty },
+    "@/components/integrations/ConnectionStatusPanel": { ConnectionStatusPanel: empty },
+    "@/components/integrations/SquareEvidenceCard": { SquareEvidenceCard: empty },
+    "@/components/operations/PageHeader": { PageHeader: empty },
+    "@/components/operations/SectionCard": { SectionCard },
+    "@/lib/auth/actions": { changePasswordAction: "/synthetic-account-security" },
+    "@/lib/integrations/control-plane/qbo-customer-availability": { qboProductionCustomerConnectionsEnabled: () => false },
+    "@/lib/integrations/square-direct/server": { squareDirectEnabled: () => enabled },
+    "@/lib/integrations/control-plane/square-workspace-evidence": { readSquareWorkspaceEvidence: async (client, workspaceId) => {
+      assert.equal(client, supabase); assert.equal(workspaceId, "workspace-a"); evidenceReads++; return null;
+    } },
+    "@/lib/workspaces/page-context": { requireWorkspacePage: async () => ({
+      supabase, workspaceId: "workspace-a", context: { membership: { role }, activeWorkspace: { name: "Workspace A" } },
+    }) },
+  });
+  const renderSettings = async () => renderToStaticMarkup(await settingsPage({ searchParams: Promise.resolve({}) }));
+  assert.doesNotMatch(await renderSettings(), /Manage Square|href="\/app\/settings\/integrations\/square"/);
+  enabled = true;
+  const owner = await renderSettings();
+  assert.match(owner, /Square connection/);
+  assert.match(owner, /href="\/app\/settings\/integrations\/square"/);
+  assert.match(owner, /Manage Square/);
+  for (role of ["admin", "manager", "member"]) {
+    assert.doesNotMatch(await renderSettings(), /Manage Square|href="\/app\/settings\/integrations\/square"/);
+  }
+  assert.equal(evidenceReads, 5, "existing evidence reader remains intact");
 });

@@ -9,6 +9,8 @@ import { requireWorkspacePage } from "@/lib/workspaces/page-context";
 import { SquareEvidenceCard } from "@/components/integrations/SquareEvidenceCard";
 import { readSquareWorkspaceEvidence } from "@/lib/integrations/control-plane/square-workspace-evidence";
 import { headers } from "next/headers";
+import Link from "next/link";
+import { squareDirectEnabled } from "@/lib/integrations/square-direct/server";
 
 type SettingsPageProps = {
   searchParams?: Promise<{
@@ -23,6 +25,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
   const params = await searchParams;
   const { context, supabase, workspaceId } = await requireWorkspacePage();
   const squareEvidence = await readSquareWorkspaceEvidence(supabase, workspaceId, await headers());
+  const squareConnectionsEnabled = squareDirectEnabled() && context.membership?.role === "owner";
   const qboConnectionsEnabled = qboProductionCustomerConnectionsEnabled();
   const { data: connections } = qboConnectionsEnabled
     ? await supabase
@@ -64,6 +67,15 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
       <ThemeControls />
 
       {squareEvidence ? <SquareEvidenceCard evidence={squareEvidence} /> : null}
+
+      {squareConnectionsEnabled ? <SectionCard
+        title="Square connection"
+        description="Connect your Square account, view this workspace’s saved Payments, and manage its connection."
+      >
+        <Link href="/app/settings/integrations/square" className="inline-block rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white">
+          Manage Square
+        </Link>
+      </SectionCard> : null}
 
       {qboConnectionsEnabled ? (
         <SectionCard

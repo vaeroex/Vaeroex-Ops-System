@@ -91,9 +91,13 @@ select pg_temp.check_true(pg_temp.call_backend('consume',jsonb_build_object('sta
 select pg_temp.denied('callback_replay_denied','consume',jsonb_build_object('stateHash','sha256:'||repeat('a',64),'leaseId','aaaaaaaa-8888-4888-8888-aaaaaaaaaaaa'));
 select pg_temp.denied('unauthorized_commit_denied','complete_connect',jsonb_build_object('connectionId','aaaaaaaa-5555-4555-8555-aaaaaaaaaaaa','leaseId','aaaaaaaa-7777-4777-8777-aaaaaaaaaaaa','ciphertext',repeat('x',48),'merchantId','merchant_a','sellerLabel','Seller A','locations',jsonb_build_array(jsonb_build_object('id','location_a','label','A')),'accessExpiresAt',now()+interval '1 day'));
 select pg_temp.call_backend('authorize','{"connectionId":"aaaaaaaa-5555-4555-8555-aaaaaaaaaaaa","leaseId":"aaaaaaaa-7777-4777-8777-aaaaaaaaaaaa"}');
+select pg_temp.check_true(pg_temp.call_backend('stage_credential',jsonb_build_object('connectionId','aaaaaaaa-5555-4555-8555-aaaaaaaaaaaa','leaseId','aaaaaaaa-7777-4777-8777-aaaaaaaaaaaa','ciphertext',repeat('x',48),'merchantId','merchant_a','accessExpiresAt',now()+interval '1 day'))->>'credentialVersion'='1','credential_staged_before_discovery');
+select pg_temp.check_true(pg_temp.call_backend('reconcile','{"connectionId":"aaaaaaaa-5555-4555-8555-aaaaaaaaaaaa","leaseId":"aaaaaaaa-7777-4777-8777-aaaaaaaaaaaa"}')->>'ciphertext'=repeat('x',48),'stage_lost_ack_readback');
+select pg_temp.denied('complete_must_match_staged_credential','complete_connect',jsonb_build_object('connectionId','aaaaaaaa-5555-4555-8555-aaaaaaaaaaaa','leaseId','aaaaaaaa-7777-4777-8777-aaaaaaaaaaaa','ciphertext',repeat('q',48),'merchantId','merchant_a','sellerLabel','Seller A','locations',jsonb_build_array(jsonb_build_object('id','location_a','label','A')),'accessExpiresAt',now()+interval '1 day'),'a','a','a','22023');
 select pg_temp.call_backend('complete_connect',jsonb_build_object('connectionId','aaaaaaaa-5555-4555-8555-aaaaaaaaaaaa','leaseId','aaaaaaaa-7777-4777-8777-aaaaaaaaaaaa','ciphertext',repeat('x',48),'merchantId','merchant_a','sellerLabel','Seller A','locations',jsonb_build_array(jsonb_build_object('id','location_a','label','A')),'accessExpiresAt',now()+interval '1 day'));
 select pg_temp.check_true((pg_temp.call_backend('status')->'connections'->0->>'state')='mapping_required'
  and not ((pg_temp.call_backend('status')->'connections'->0) ? 'ciphertext'),'status_no_credentials');
+select pg_temp.check_true((pg_temp.call_backend('status')->>'available')::boolean,'paid_status_available');
 select pg_temp.denied('mapping_unverified_location','map','{"connectionId":"aaaaaaaa-5555-4555-8555-aaaaaaaaaaaa","locationId":"location_other"}');
 select pg_temp.call_backend('map','{"connectionId":"aaaaaaaa-5555-4555-8555-aaaaaaaaaaaa","locationId":"location_a"}');
 select pg_temp.denied('cross_workspace_connection_read','claim','{"connectionId":"aaaaaaaa-5555-4555-8555-aaaaaaaaaaaa","leaseId":"bbbbbbbb-7777-4777-8777-bbbbbbbbbbbb"}','b','b','b');
@@ -101,7 +105,8 @@ select pg_temp.denied('cross_workspace_connection_read','claim','{"connectionId"
 select pg_temp.call_backend('begin',jsonb_build_object('connectionId','bbbbbbbb-5555-4555-8555-bbbbbbbbbbbb','businessEntityId','bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb','stateHash','sha256:'||repeat('b',64)),'b','b','b');
 select pg_temp.call_backend('consume',jsonb_build_object('stateHash','sha256:'||repeat('b',64),'leaseId','bbbbbbbb-7777-4777-8777-bbbbbbbbbbbb'),'b','b','b');
 select pg_temp.call_backend('authorize','{"connectionId":"bbbbbbbb-5555-4555-8555-bbbbbbbbbbbb","leaseId":"bbbbbbbb-7777-4777-8777-bbbbbbbbbbbb"}','b','b','b');
-select pg_temp.denied('seller_exclusive_across_workspaces','complete_connect',jsonb_build_object('connectionId','bbbbbbbb-5555-4555-8555-bbbbbbbbbbbb','leaseId','bbbbbbbb-7777-4777-8777-bbbbbbbbbbbb','ciphertext',repeat('b',48),'merchantId','merchant_a','sellerLabel','Seller A','locations',jsonb_build_array(jsonb_build_object('id','location_a','label','A')),'accessExpiresAt',now()+interval '1 day'),'b','b','b','23505');
+select pg_temp.denied('seller_exclusive_across_workspaces','stage_credential',jsonb_build_object('connectionId','bbbbbbbb-5555-4555-8555-bbbbbbbbbbbb','leaseId','bbbbbbbb-7777-4777-8777-bbbbbbbbbbbb','ciphertext',repeat('b',48),'merchantId','merchant_a','accessExpiresAt',now()+interval '1 day'),'b','b','b','23505');
+select pg_temp.denied('merchant_conflict_never_revokes_other_workspace','disconnect','{"connectionId":"bbbbbbbb-5555-4555-8555-bbbbbbbbbbbb","leaseId":"bbbbbbbb-8888-4888-8888-bbbbbbbbbbbb"}','b','b','b','55000');
 
 select pg_temp.call_backend('claim','{"connectionId":"aaaaaaaa-5555-4555-8555-aaaaaaaaaaaa","leaseId":"aaaaaaaa-8888-4888-8888-aaaaaaaaaaaa"}');
 select pg_temp.denied('concurrent_claim_blocked','claim','{"connectionId":"aaaaaaaa-5555-4555-8555-aaaaaaaaaaaa","leaseId":"aaaaaaaa-9999-4999-8999-aaaaaaaaaaaa"}','a','a','a','55000');
@@ -148,15 +153,40 @@ select pg_temp.call_backend('authorize','{"connectionId":"aaaaaaaa-5555-4555-855
 reset role;
 update public.customer_subscriptions set current_period_end=now()-interval '1 day' where workspace_id='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 set local role service_role;
+select pg_temp.check_true(pg_temp.call_backend('status')->>'available'='false'
+ and jsonb_array_length(pg_temp.call_backend('status')->'connections')=1,'expired_status_unavailable_but_connection_readable');
 select pg_temp.denied('expiry_blocks_provider_dispatch','authorize','{"connectionId":"aaaaaaaa-5555-4555-8555-aaaaaaaaaaaa","leaseId":"dddddddd-9999-4999-8999-dddddddddddd"}');
 select pg_temp.check_true(pg_temp.call_backend('disconnect','{"connectionId":"aaaaaaaa-5555-4555-8555-aaaaaaaaaaaa","leaseId":"eeeeeeee-9999-4999-8999-eeeeeeeeeeee"}')->>'state'='disconnected','expired_subscription_disconnect_fences_live_work');
 select pg_temp.denied('old_commit_after_disconnect_denied','commit_refresh',jsonb_build_object('connectionId','aaaaaaaa-5555-4555-8555-aaaaaaaaaaaa','leaseId','dddddddd-9999-4999-8999-dddddddddddd','credentialVersion',4,'ciphertext',repeat('q',48),'accessExpiresAt',now()+interval '1 day'));
 select pg_temp.call_backend('authorize_disconnect','{"connectionId":"aaaaaaaa-5555-4555-8555-aaaaaaaaaaaa","leaseId":"eeeeeeee-9999-4999-8999-eeeeeeeeeeee"}');
-select pg_temp.denied('pending_revoke_keeps_merchant_reserved','complete_connect',jsonb_build_object('connectionId','bbbbbbbb-5555-4555-8555-bbbbbbbbbbbb','leaseId','bbbbbbbb-7777-4777-8777-bbbbbbbbbbbb','ciphertext',repeat('b',48),'merchantId','merchant_a','sellerLabel','Seller A','locations',jsonb_build_array(jsonb_build_object('id','location_a','label','A')),'accessExpiresAt',now()+interval '1 day'),'b','b','b','23505');
+select pg_temp.denied('pending_revoke_keeps_merchant_reserved','stage_credential',jsonb_build_object('connectionId','bbbbbbbb-5555-4555-8555-bbbbbbbbbbbb','leaseId','bbbbbbbb-7777-4777-8777-bbbbbbbbbbbb','ciphertext',repeat('b',48),'merchantId','merchant_a','accessExpiresAt',now()+interval '1 day'),'b','b','b','23505');
 select pg_temp.denied('duplicate_disconnect_lease_busy','disconnect','{"connectionId":"aaaaaaaa-5555-4555-8555-aaaaaaaaaaaa","leaseId":"ffffffff-9999-4999-8999-ffffffffffff"}','a','a','a','55000');
 select pg_temp.call_backend('complete_disconnect','{"connectionId":"aaaaaaaa-5555-4555-8555-aaaaaaaaaaaa","leaseId":"eeeeeeee-9999-4999-8999-eeeeeeeeeeee"}');
 reset role;
 select pg_temp.check_true((select ciphertext is null and not revocation_pending and lease_id is null from square_customer_private.connections where workspace_id='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'),'revoke_ack_clears_ciphertext_and_lease');
+set local role service_role;
+-- Once A's acknowledged revoke releases the seller, B can retain its own
+-- candidate before discovery. A failed finalization must leave it revocable.
+select pg_temp.call_backend('stage_credential',jsonb_build_object('connectionId','bbbbbbbb-5555-4555-8555-bbbbbbbbbbbb','leaseId','bbbbbbbb-7777-4777-8777-bbbbbbbbbbbb','ciphertext',repeat('b',48),'merchantId','merchant_a','accessExpiresAt',now()+interval '1 day'),'b','b','b');
+select pg_temp.denied('failed_complete_retains_staged_credential','complete_connect',jsonb_build_object('connectionId','bbbbbbbb-5555-4555-8555-bbbbbbbbbbbb','leaseId','bbbbbbbb-7777-4777-8777-bbbbbbbbbbbb','ciphertext',repeat('b',48),'merchantId','merchant_a','sellerLabel','Seller B','locations','[]'::jsonb,'accessExpiresAt',now()+interval '1 day'),'b','b','b','22023');
+select pg_temp.call_backend('fail','{"connectionId":"bbbbbbbb-5555-4555-8555-bbbbbbbbbbbb","leaseId":"bbbbbbbb-7777-4777-8777-bbbbbbbbbbbb","reason":"retry_required"}','b','b','b');
+select pg_temp.check_true(pg_temp.call_backend('disconnect','{"connectionId":"bbbbbbbb-5555-4555-8555-bbbbbbbbbbbb","leaseId":"bbbbbbbb-9999-4999-8999-bbbbbbbbbbbb"}','b','b','b')->>'ciphertext'=repeat('b',48),'failed_connect_staged_credential_available_for_revoke');
+select pg_temp.call_backend('authorize_disconnect','{"connectionId":"bbbbbbbb-5555-4555-8555-bbbbbbbbbbbb","leaseId":"bbbbbbbb-9999-4999-8999-bbbbbbbbbbbb"}','b','b','b');
+select pg_temp.call_backend('complete_disconnect','{"connectionId":"bbbbbbbb-5555-4555-8555-bbbbbbbbbbbb","leaseId":"bbbbbbbb-9999-4999-8999-bbbbbbbbbbbb"}','b','b','b');
+select pg_temp.call_backend('begin',jsonb_build_object('connectionId','bbbbbbbb-6666-4666-8666-bbbbbbbbbbbb','businessEntityId','bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb','stateHash','sha256:'||repeat('f',64)),'b','b','b');
+select pg_temp.call_backend('consume',jsonb_build_object('stateHash','sha256:'||repeat('f',64),'leaseId','ffffffff-7777-4777-8777-ffffffffffff'),'b','b','b');
+select pg_temp.call_backend('authorize','{"connectionId":"bbbbbbbb-6666-4666-8666-bbbbbbbbbbbb","leaseId":"ffffffff-7777-4777-8777-ffffffffffff"}','b','b','b');
+select pg_temp.denied('cannot_decline_dispatched_exchange','decline','{"connectionId":"bbbbbbbb-6666-4666-8666-bbbbbbbbbbbb","leaseId":"ffffffff-7777-4777-8777-ffffffffffff"}','b','b','b');
+select pg_temp.call_backend('fail','{"connectionId":"bbbbbbbb-6666-4666-8666-bbbbbbbbbbbb","leaseId":"ffffffff-7777-4777-8777-ffffffffffff","reason":"retry_required"}','b','b','b');
+select pg_temp.denied('unknown_exchange_cannot_fake_disconnect','disconnect','{"connectionId":"bbbbbbbb-6666-4666-8666-bbbbbbbbbbbb","leaseId":"ffffffff-8888-4888-8888-ffffffffffff"}','b','b','b','55000');
+select pg_temp.check_true((pg_temp.call_backend('status','{}','b','b','b')->'connections'->0->>'recoveryRequired')::boolean,'unknown_exchange_recovery_visible');
+reset role;
+update public.customer_subscriptions set current_period_end=now()+interval '1 day' where workspace_id='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+set local role service_role;
+select pg_temp.call_backend('begin',jsonb_build_object('connectionId','aaaaaaaa-6666-4666-8666-aaaaaaaaaaaa','businessEntityId','aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa','stateHash','sha256:'||repeat('c',64)));
+select pg_temp.call_backend('consume',jsonb_build_object('stateHash','sha256:'||repeat('c',64),'leaseId','cccccccc-7777-4777-8777-cccccccccccc'));
+select pg_temp.check_true((pg_temp.call_backend('decline','{"connectionId":"aaaaaaaa-6666-4666-8666-aaaaaaaaaaaa","leaseId":"cccccccc-7777-4777-8777-cccccccccccc"}')->>'disconnected')::boolean,'provider_denial_before_exchange_closes_safely');
+reset role;
 select pg_temp.check_true(not exists(select from private.square_production_customer_connections)
  and not exists(select from private.square_production_customer_bindings),'native_customer_contract_unchanged');
 rollback;

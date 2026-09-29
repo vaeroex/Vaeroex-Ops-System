@@ -55,6 +55,7 @@ create table square_customer_private.connections (
   last_synced_at timestamptz check(isfinite(last_synced_at)),
   last_error text check(last_error in ('retry_required','reauthorization_required')),
   revocation_pending boolean not null default false,
+  authorization_uncertain boolean not null default false,
   created_at timestamptz not null default clock_timestamp() check(isfinite(created_at)),
   updated_at timestamptz not null default clock_timestamp() check(isfinite(updated_at)),
   unique(connection_id,workspace_id),
@@ -133,21 +134,22 @@ declare c square_customer_private.connections; s square_customer_private.oauth_s
 declare cfg square_customer_private.configuration; cid uuid; lid uuid; t timestamptz;
 declare keys text[]; item jsonb; incoming jsonb; observed_count integer;
 declare access_expiry timestamptz; created_time timestamptz; updated_time timestamptz; incoming_cursor text;
+declare entitled boolean:=false;
 begin
   if auth.role() is distinct from 'service_role' or p_actor_id is null or p_session_id is null or p_workspace_id is null
-    or p_operation is null or p_operation not in ('status','begin','consume','authorize','authorize_disconnect','reconcile','complete_connect','map','claim','commit_refresh','commit_page','fail','disconnect','complete_disconnect')
+    or p_operation is null or p_operation not in ('status','begin','consume','decline','authorize','authorize_disconnect','reconcile','stage_credential','complete_connect','map','claim','commit_refresh','commit_page','fail','disconnect','complete_disconnect')
     or p_payload is null or jsonb_typeof(p_payload)<>'object' or pg_column_size(p_payload)>524288 then
     raise exception 'square_customer_backend_denied' using errcode='42501';
   end if;
   -- Same lock order throughout: owner/session/workspace, entitlement, config,
   -- connection, OAuth state/payment rows. No lock spans a provider request.
   perform private.square_production_customer_require_owner_v1(p_actor_id,p_session_id,p_workspace_id);
-  if p_operation not in ('status','disconnect','authorize_disconnect','complete_disconnect','fail') then
+  if p_operation not in ('status','decline','disconnect','authorize_disconnect','complete_disconnect','fail') then
     perform private.square_production_customer_require_eligible_v1(p_workspace_id);
   end if;
   select * into cfg from square_customer_private.configuration where singleton for share;
   if not found then raise exception 'square_customer_backend_closed' using errcode='42501'; end if;
-  if p_operation not in ('status','disconnect','authorize_disconnect','complete_disconnect','fail') and
+  if p_operation not in ('status','decline','disconnect','authorize_disconnect','complete_disconnect','fail') and
     (not cfg.enabled or cfg.application_id is distinct from p_application_id) then
     raise exception 'square_customer_backend_closed' using errcode='42501';
   end if;
@@ -155,6 +157,7 @@ begin
     when 'status' then array[]::text[]
     when 'begin' then array['connectionId','businessEntityId','stateHash']
     when 'consume' then array['stateHash','leaseId']
+    when 'stage_credential' then array['connectionId','leaseId','ciphertext','merchantId','accessExpiresAt']
     when 'complete_connect' then array['connectionId','leaseId','ciphertext','merchantId','sellerLabel','locations','accessExpiresAt']
     when 'map' then array['connectionId','locationId']
     when 'commit_refresh' then array['connectionId','leaseId','credentialVersion','ciphertext','accessExpiresAt']
@@ -163,7 +166,14 @@ begin
     else array['connectionId','leaseId'] end;
   perform private.square_production_customer_require_keys_v1(p_payload,keys);
   if p_operation='status' then
-    return jsonb_build_object('available',cfg.enabled and cfg.application_id is not distinct from p_application_id,
+    -- Status and disconnect remain readable for an expired customer, but the
+    -- displayed ability to connect/read must use the same paid-workspace rule.
+    begin
+      perform private.square_production_customer_require_eligible_v1(p_workspace_id);
+      entitled:=true;
+    exception when insufficient_privilege then entitled:=false;
+    end;
+    return jsonb_build_object('available',entitled and cfg.enabled and cfg.application_id is not distinct from p_application_id,
       'businessEntities',(select coalesce(jsonb_agg(jsonb_build_object('id',e.id,'label',e.display_name) order by e.id),'[]'::jsonb)
         from (select id,display_name from public.business_entities where workspace_id=p_workspace_id and status='active' order by id limit 1000) e),
       'connections',(select coalesce(jsonb_agg(jsonb_build_object(
@@ -172,6 +182,7 @@ begin
           when r.state='exchanging' and r.lease_expires_at<=clock_timestamp() then 'reauthorization_required' else r.state end,'sellerLabel',r.seller_label,
         'locations',r.locations,'locationId',r.location_id,'lastSyncedAt',r.last_synced_at,'lastError',r.last_error,
         'hasMore',r.cursor is not null,'revocationPending',r.revocation_pending,
+        'recoveryRequired',r.authorization_uncertain and r.ciphertext is null,
         'payments',(select coalesce(jsonb_agg(jsonb_build_object('id',p.payment_id,'locationId',p.location_id,
           'status',p.status,'createdAt',p.created_at,'updatedAt',p.updated_at,'amountMinor',p.amount_minor::text,'currency',p.currency)
           order by p.updated_at desc,p.payment_id),'[]'::jsonb) from
@@ -207,7 +218,7 @@ begin
   select * into c from square_customer_private.connections where connection_id=cid and workspace_id=p_workspace_id for update;
   if not found or c.application_id is distinct from p_application_id then
     raise exception 'square_customer_backend_connection_denied' using errcode='42501'; end if;
-  if p_operation not in ('disconnect','authorize_disconnect','complete_disconnect') then
+  if p_operation not in ('decline','disconnect','authorize_disconnect','complete_disconnect') then
     perform private.square_production_customer_require_owner_v1(p_actor_id,p_session_id,p_workspace_id,c.business_entity_id);
   end if;
   if p_operation<>'map' then
@@ -221,7 +232,7 @@ begin
     if s.consumed_at is not null or s.expires_at<=t or c.state<>'consent_pending' then
       raise exception 'square_customer_backend_state_denied' using errcode='42501'; end if;
     update square_customer_private.oauth_states set consumed_at=t where state_hash=s.state_hash;
-    update square_customer_private.connections set state='exchanging',lease_id=lid,lease_expires_at=t+interval '120 seconds',
+    update square_customer_private.connections set state='exchanging',authorization_uncertain=true,lease_id=lid,lease_expires_at=t+interval '120 seconds',
       lease_actor_id=p_actor_id,lease_session_id=p_session_id,lease_authorized=false,updated_at=t where connection_id=cid returning * into c;
     return square_customer_private.context_v1(c);
   elsif p_operation='map' then
@@ -232,6 +243,8 @@ begin
     update square_customer_private.connections set state='connected',location_id=p_payload->>'locationId',updated_at=t where connection_id=cid;
     return jsonb_build_object('mapped',true);
   elsif p_operation='disconnect' then
+    if c.authorization_uncertain and c.ciphertext is null then
+      raise exception 'square_customer_backend_exchange_recovery_required' using errcode='55000'; end if;
     if c.state='disconnected' and c.revocation_pending and c.lease_id is not null and c.lease_expires_at>t then
       raise exception 'square_customer_backend_lease_busy' using errcode='55000'; end if;
     update square_customer_private.oauth_states set consumed_at=coalesce(consumed_at,t) where connection_id=cid;
@@ -255,7 +268,14 @@ begin
   if c.lease_id is distinct from lid or c.lease_expires_at<=t or c.lease_expires_at is null
     or c.lease_actor_id is distinct from p_actor_id or c.lease_session_id is distinct from p_session_id then
     raise exception 'square_customer_backend_stale_lease' using errcode='42501'; end if;
-  if p_operation='reconcile' then
+  if p_operation='decline' then
+    if c.state<>'exchanging' or c.ciphertext is not null or c.credential_version<>0 or c.lease_authorized then
+      raise exception 'square_customer_backend_stale_lease' using errcode='42501'; end if;
+    update square_customer_private.connections set state='disconnected',authorization_uncertain=false,
+      lease_id=null,lease_expires_at=null,lease_actor_id=null,lease_session_id=null,lease_authorized=false,updated_at=t
+      where connection_id=cid;
+    return jsonb_build_object('disconnected',true);
+  elsif p_operation='reconcile' then
     if c.state not in ('exchanging','syncing') then raise exception 'square_customer_backend_stale_lease' using errcode='42501'; end if;
     return square_customer_private.context_v1(c);
   elsif p_operation='authorize_disconnect' then
@@ -263,6 +283,8 @@ begin
       raise exception 'square_customer_backend_stale_lease' using errcode='42501'; end if;
     return jsonb_build_object('authorized',true);
   elsif p_operation='complete_disconnect' then
+    if c.authorization_uncertain and c.ciphertext is null then
+      raise exception 'square_customer_backend_exchange_recovery_required' using errcode='55000'; end if;
     if c.state<>'disconnected' then raise exception 'square_customer_backend_stale_lease' using errcode='42501'; end if;
     update square_customer_private.connections set ciphertext=null,access_expires_at=null,revocation_pending=false,
       lease_id=null,lease_expires_at=null,lease_actor_id=null,lease_session_id=null,lease_authorized=false,
@@ -281,7 +303,7 @@ begin
     return jsonb_build_object('authorized',true);
   end if;
   if not c.lease_authorized then raise exception 'square_customer_backend_dispatch_denied' using errcode='42501'; end if;
-  if p_operation in ('complete_connect','commit_refresh') then
+  if p_operation in ('stage_credential','complete_connect','commit_refresh') then
     if jsonb_typeof(p_payload->'ciphertext') is distinct from 'string'
       or length(p_payload->>'ciphertext') not between 32 and 131072
       or jsonb_typeof(p_payload->'accessExpiresAt') is distinct from 'string' then
@@ -290,8 +312,17 @@ begin
     if not isfinite(access_expiry) or access_expiry<=t or access_expiry>t+interval '2 days' then
       raise exception 'square_customer_backend_payload_denied' using errcode='22023'; end if;
   end if;
-  if p_operation='complete_connect' then
+  if p_operation='stage_credential' then
     if c.state<>'exchanging' or c.credential_version<>0 or c.ciphertext is not null
+      or coalesce(p_payload->>'merchantId','') !~ '^[A-Za-z0-9][A-Za-z0-9._:-]{0,190}$' then
+      raise exception 'square_customer_backend_payload_denied' using errcode='22023'; end if;
+    update square_customer_private.connections set credential_version=1,ciphertext=p_payload->>'ciphertext',
+      merchant_id=p_payload->>'merchantId',access_expires_at=access_expiry,authorization_uncertain=false,updated_at=t
+      where connection_id=cid returning * into c;
+    return square_customer_private.context_v1(c);
+  elsif p_operation='complete_connect' then
+    if c.state<>'exchanging' or c.credential_version<>1 or c.ciphertext is distinct from p_payload->>'ciphertext'
+      or c.merchant_id is distinct from p_payload->>'merchantId' or c.access_expires_at is distinct from access_expiry
       or coalesce(p_payload->>'merchantId','') !~ '^[A-Za-z0-9][A-Za-z0-9._:-]{0,190}$'
       or jsonb_typeof(p_payload->'sellerLabel') is distinct from 'string'
       or length(p_payload->>'sellerLabel') not between 1 and 255
@@ -307,8 +338,7 @@ begin
     end loop;
     if (select count(distinct value->>'id') from jsonb_array_elements(p_payload->'locations'))<>jsonb_array_length(p_payload->'locations') then
       raise exception 'square_customer_backend_payload_denied' using errcode='22023'; end if;
-    update square_customer_private.connections set state='mapping_required',credential_version=1,ciphertext=p_payload->>'ciphertext',
-      merchant_id=p_payload->>'merchantId',seller_label=p_payload->>'sellerLabel',locations=p_payload->'locations',access_expires_at=access_expiry,
+    update square_customer_private.connections set state='mapping_required',seller_label=p_payload->>'sellerLabel',locations=p_payload->'locations',
       lease_id=null,lease_expires_at=null,lease_actor_id=null,lease_session_id=null,lease_authorized=false,last_error=null,updated_at=t
       where connection_id=cid;
     return jsonb_build_object('stored',true);
