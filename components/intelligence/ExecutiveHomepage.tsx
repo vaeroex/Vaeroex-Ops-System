@@ -26,6 +26,7 @@ type ExecutiveHomepageProps = {
   healthHistory: BusinessHealthTrendPoint[];
   healthHistoryAsOfDate: string;
   healthHistoryError?: string | null;
+  healthVisual?: "scorecard" | "arc";
   businessHealthAnalysis: {
     state: BusinessHealthAnalysisState;
     requestToken: string | null;
@@ -52,7 +53,7 @@ function PriorityCard({ card }: { card: ExecutivePriorityCard }) {
   const PriorityIcon = priority.Icon;
 
   return (
-    <SpatialSurface as="article" depth="raised" interactive className={`vaeroex-semantic-card ${semanticStatusClass(status)} flex flex-col rounded-lg border p-4 shadow-panel`}>
+    <SpatialSurface as="article" depth="raised" interactive className={`workspace-priority-card vaeroex-semantic-card ${semanticStatusClass(status)} flex flex-col rounded-lg border p-4 shadow-panel`}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
           <span className={`vaeroex-semantic-badge inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[0.68rem] font-semibold ${semanticStatusClass(status)}`}><Icon aria-hidden="true" className="h-3.5 w-3.5" />{card.label}</span>
@@ -63,7 +64,7 @@ function PriorityCard({ card }: { card: ExecutivePriorityCard }) {
       <h2 className="mt-3 text-lg font-semibold leading-6">{card.title}</h2>
       <p className="mt-2 text-sm leading-6 opacity-80">{card.summary}</p>
       <p className="mt-3 text-xs font-semibold opacity-70">{card.metadata}</p>
-      <div className="mt-4">
+      <div className="mt-auto pt-4">
         <Link
           href={card.href}
           className="vaeroex-semantic-interactive inline-flex min-h-11 items-center gap-2 rounded-lg border border-current/20 px-3 py-2 text-sm font-semibold hover:bg-blue-950/10"
@@ -82,6 +83,7 @@ export function ExecutiveHomepage({
   healthHistory,
   healthHistoryAsOfDate,
   healthHistoryError,
+  healthVisual = "scorecard",
   businessHealthAnalysis
 }: ExecutiveHomepageProps) {
   const trendDelta = model.health.trendDelta;
@@ -106,29 +108,29 @@ export function ExecutiveHomepage({
   const ReadinessIcon = readinessPresentation.Icon;
 
   return (
-    <div className="vaeroex-priority-surface space-y-5">
-      <header className="flex flex-col gap-2 border-b border-line/80 pb-4 sm:flex-row sm:items-end sm:justify-between">
+    <div className="workspace-executive-overview vaeroex-priority-surface space-y-6">
+      <header className="workspace-page-header flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-ink sm:text-3xl">Executive Overview</h1>
           <p className="mt-1 text-sm text-muted">What leadership should know now.</p>
         </div>
-        <p className="text-xs text-muted">Last updated {lastUpdatedLabel}</p>
+        <p className="shrink-0 text-xs text-muted">Last updated {lastUpdatedLabel}</p>
       </header>
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,3fr)_minmax(360px,2fr)]" data-executive-opening>
-        <SpatialSurface as="section" depth="focus" className={`vaeroex-business-health-surface vaeroex-semantic-frame ${semanticStatusClass(healthStatus)} overflow-hidden border-x-0 bg-vaeroex-navy p-5 text-white shadow-command xl:col-span-2`} ariaLabelledBy="business-health-heading">
+        <SpatialSurface as="section" depth="focus" className={`workspace-business-health vaeroex-business-health-surface vaeroex-semantic-frame ${semanticStatusClass(healthStatus)} overflow-hidden border-x-0 bg-vaeroex-navy p-5 text-white shadow-command xl:col-span-2`} ariaLabelledBy="business-health-heading">
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-4">
+            <p id="business-health-heading" className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-200">Business Health</p>
+            <span className={`vaeroex-semantic-badge inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold ${semanticStatusClass(healthStatus)}`}><HealthIcon aria-hidden="true" className="h-3.5 w-3.5" />{model.health.status}</span>
+          </div>
           <div className="grid gap-5 lg:grid-cols-[minmax(220px,.62fr)_minmax(0,1.38fr)] lg:items-start">
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <p id="business-health-heading" className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-200">Business Health</p>
-                <span className={`vaeroex-semantic-badge inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold ${semanticStatusClass(healthStatus)}`}><HealthIcon aria-hidden="true" className="h-3.5 w-3.5" />{model.health.status}</span>
-              </div>
-              <div className="mt-4">
-                <BusinessHealthInstrument score={model.health.available ? model.health.score : null} status={model.health.status} />
+            <div className="workspace-health-score">
+              <div className="flex justify-center lg:justify-start">
+                <BusinessHealthInstrument score={model.health.available ? model.health.score : null} status={model.health.status} variant={healthVisual} />
               </div>
               {!model.health.available ? <p className="mt-4 text-xl font-semibold">Business Health is not yet evaluable.</p> : null}
               {model.health.available ? (
-                <dl className="mt-5 grid gap-3 border-t border-white/10 pt-4 text-sm sm:grid-cols-3 lg:grid-cols-1">
+                <dl className="workspace-health-facts mt-5 grid grid-cols-3 gap-3 border-t border-white/10 pt-4 text-sm">
                   <div>
                     <dt className="text-xs font-semibold text-cyan-200">Current state</dt>
                     <dd className="mt-1 font-semibold text-white">
@@ -147,11 +149,11 @@ export function ExecutiveHomepage({
               ) : null}
             </div>
 
-            <div>
+            <div className="workspace-health-assessment min-w-0">
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan-200">
                 {businessHealthAnalysis.state.status === "current" ? "Validated executive interpretation" : "Current assessment"}
               </p>
-              <h2 className="text-xl font-semibold leading-7 sm:text-2xl">{model.health.displayTitle}</h2>
+              <h2 className="mt-2 text-xl font-semibold leading-7 sm:text-2xl">{model.health.displayTitle}</h2>
               {businessHealthAnalysis.state.status === "current" && businessHealthAnalysis.state.artifact ? (
                 <p className="mt-3 text-sm leading-6 text-slate-200">{businessHealthAnalysis.state.artifact.analysis.executive_interpretation}</p>
               ) : null}
@@ -166,18 +168,18 @@ export function ExecutiveHomepage({
                   </dd>
                 </div>
               </dl>
-              <div className="mt-3">
+              <div className="workspace-health-actions mt-5 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-white/10 pt-1">
+                <BusinessHealthAnalysisPanel
+                  initialState={businessHealthAnalysis.state}
+                  requestToken={businessHealthAnalysis.requestToken}
+                  currentFacts={businessHealthAnalysis.facts}
+                  currentCitations={businessHealthAnalysis.citations}
+                />
                 <EligibleBusinessSignals
                   total={model.health.memorySignals}
                   categories={model.health.eligibleSignalCategories}
                 />
               </div>
-              <BusinessHealthAnalysisPanel
-                initialState={businessHealthAnalysis.state}
-                requestToken={businessHealthAnalysis.requestToken}
-                currentFacts={businessHealthAnalysis.facts}
-                currentCitations={businessHealthAnalysis.citations}
-              />
             </div>
           </div>
 
@@ -191,8 +193,8 @@ export function ExecutiveHomepage({
         </SpatialSurface>
       </div>
 
-      <section aria-label="Executive priorities" className="grid items-start gap-4 lg:grid-cols-[1fr_1fr_.78fr]">
-        <SpatialSurface as="article" depth="raised" interactive className={`vaeroex-semantic-card ${semanticStatusClass(riskStatus)} rounded-lg border p-4 shadow-panel`}>
+      <section aria-label="Executive priorities" className="workspace-executive-priorities grid items-stretch gap-4 lg:grid-cols-[1fr_1fr_.78fr]">
+        <SpatialSurface as="article" depth="raised" interactive className={`workspace-priority-card vaeroex-semantic-card ${semanticStatusClass(riskStatus)} flex flex-col rounded-lg border p-4 shadow-panel`}>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex flex-wrap items-center gap-2">
               <span className={`vaeroex-semantic-badge inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[0.68rem] font-semibold ${semanticStatusClass(riskStatus)}`}><RiskIcon aria-hidden="true" className="h-3.5 w-3.5" />Needs Attention</span>
@@ -203,10 +205,10 @@ export function ExecutiveHomepage({
           <h2 className="mt-3 text-lg font-semibold leading-6">{risk.title}</h2>
           <p className="mt-2 text-sm leading-6 opacity-80">{risk.summary}</p>
           {!decision.empty ? <p className="mt-3 border-t border-current/10 pt-3 text-sm leading-6"><span className="font-semibold">Decision:</span> {decision.summary}</p> : null}
-          <Link href={risk.href} className="mt-4 inline-flex min-h-10 items-center gap-2 text-sm font-semibold hover:underline">{risk.actionLabel} <ArrowRight aria-hidden="true" className="h-4 w-4" /></Link>
+          <Link href={risk.href} className="mt-auto inline-flex min-h-10 items-center gap-2 pt-4 text-sm font-semibold hover:underline">{risk.actionLabel} <ArrowRight aria-hidden="true" className="h-4 w-4" /></Link>
         </SpatialSurface>
         <PriorityCard card={{ ...opportunity, label: "Top Opportunity" }} />
-        <SpatialSurface as="article" depth="subtle" className={`vaeroex-semantic-card ${semanticStatusClass(readinessStatus)} rounded-lg border p-4 shadow-panel`}>
+        <SpatialSurface as="article" depth="subtle" className={`workspace-readiness-card workspace-priority-card vaeroex-semantic-card ${semanticStatusClass(readinessStatus)} rounded-lg border p-4 shadow-panel`}>
           <div className="flex items-center gap-2">
             <ReadinessIcon aria-hidden="true" className="h-5 w-5" />
             <h2 className="text-base font-semibold text-ink">Intelligence readiness</h2>
@@ -242,7 +244,7 @@ export function ExecutiveHomepage({
         </SpatialSurface>
       </section>
 
-      <SpatialSurface as="section" depth="subtle" className="rounded-lg border border-line/80 bg-white px-4 py-3 shadow-panel" ariaLabel="What changed">
+      <SpatialSurface as="section" depth="subtle" className="workspace-change-summary rounded-lg border border-line/80 bg-white px-4 py-3 shadow-panel" ariaLabel="What changed">
         <div className="flex items-start gap-2">
           <TrendingUp aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-vaeroex-blue" />
           {model.changes.items.length ? (

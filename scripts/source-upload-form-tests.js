@@ -25,7 +25,7 @@ function content(tree) {
   if (Array.isArray(tree)) return tree.map(content).join("");
   return tree && typeof tree === "object" ? content(tree.props?.children) : tree == null || typeof tree === "boolean" ? "" : String(tree);
 }
-function fixture(server) {
+function fixture(server, props = {}) {
   const slots = [];
   const effects = [];
   const timers = [];
@@ -54,7 +54,8 @@ function fixture(server) {
     return require(name);
   }, loaded, loaded.exports);
   return {
-    render() { index = 0; const tree = loaded.exports.UploadSourceForm({ folders: [{ id: "folder-one", name: "Monthly review" }] }); effects.splice(0).forEach((callback) => callback()); return tree; },
+    render() { index = 0; const tree = loaded.exports.UploadSourceForm({ folders: [{ id: "folder-one", name: "Monthly review" }], ...props }); effects.splice(0).forEach((callback) => callback()); return tree; },
+    trigger: () => loaded.exports.UploadSourceTrigger(),
     finish: () => running,
     timers,
     get state() { return actionState; }
@@ -73,6 +74,64 @@ async function withEnvironment(run) {
   finally { global.window = oldWindow; global.FormData = oldFormData; }
 }
 const submit = (tree, form) => tree.props.onSubmit({ preventDefault() {}, currentTarget: form });
+
+test("one discreet generic reminder stays inside file upload without repeated workspace notices", () => {
+  const view = fixture(async () => ({ error: null }));
+  const tree = view.render();
+  const reminders = nodes(tree).filter((node) => Object.hasOwn(node.props || {}, "data-upload-sensitive-reminder"));
+  assert.equal(reminders.length, 1);
+  assert.equal(reminders[0].type, "p");
+  assert.match(content(reminders[0]), /Do not upload patient data, PHI\/ePHI, Social Security numbers, insurance IDs, or other regulated sensitive information\./);
+  assert.equal(reminders[0].props.role, undefined, "this is quiet guidance, not an alert");
+  assert.doesNotMatch(reminders[0].props.className, /border|bg-|rounded/);
+  assert.match(content(tree), /Nothing is added to active KPI or metric history until you approve it/);
+  for (const file of ["components/app/AppShell.tsx", "app/app/forms/page.tsx", "components/evidence/BusinessNotesPanel.tsx", "components/evidence/BusinessNoteComposer.tsx"]) {
+    const contents = fs.readFileSync(path.join(__dirname, "..", file), "utf8");
+    assert.doesNotMatch(contents, /ComplianceNotice|Sensitive information reminder|<LegalSafetyNotice\b[^>]*tone="sensitive"/, file);
+  }
+  assert.match(fs.readFileSync(path.join(__dirname, "../components/legal/LegalAcceptanceGate.tsx"), "utf8"), /accept_sensitive/);
+  assert.match(fs.readFileSync(path.join(__dirname, "../app/app/support/page.tsx"), "utf8"), /Do not include patient data/);
+});
+
+test("both upload entry points reuse one persistent form with its reminder and entered work", () => {
+  const page = fs.readFileSync(path.join(__dirname, "../app/app/sources/SourcesPage.tsx"), "utf8");
+  const ast = ts.createSourceFile("SourcesPage.tsx", page, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const drawer = ast.statements.find((node) => ts.isFunctionDeclaration(node) && node.name?.text === "UploadSourceDrawer");
+  assert.ok(drawer);
+  const declaration = ts.createPrinter().printNode(ts.EmitHint.Unspecified, drawer, ast);
+  const drawerCode = ts.transpileModule(declaration, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText;
+  const Form = () => null;
+  const renderDrawer = Function("require", "exports", "UploadSourceForm", `${drawerCode}\nreturn UploadSourceDrawer;`)(require, {}, Form);
+  const folders = [{ id: "folder-one", name: "Monthly review" }];
+  const drawerTree = renderDrawer({ folders });
+  assert.equal(drawerTree.type, "details");
+  assert.equal(drawerTree.props.id, "workspace-file-upload");
+  assert.equal(drawerTree.props.open, undefined);
+  assert.equal(nodes(drawerTree).filter((node) => node.type === Form).length, 1);
+  assert.equal((page.match(/<UploadSourceDrawer\b/g) || []).length, 1);
+  assert.equal((page.match(/<UploadSourceTrigger\b/g) || []).length, 1);
+  assert.doesNotMatch(page, /showSensitiveReminder/);
+  const view = fixture(async () => ({ error: null }), { folders });
+  assert.equal(nodes(view.render()).filter((node) => Object.hasOwn(node.props || {}, "data-upload-sensitive-reminder")).length, 1);
+  const oldDocument = global.document, oldDetails = global.HTMLDetailsElement;
+  let focused = 0, scrolled = 0;
+  const selectedFile = { name: "synthetic.csv" }, input = { files: [selectedFile], focus(options) { assert.deepEqual(options, { preventScroll: true }); focused++; } };
+  class Details { open = false; scrollIntoView(options) { assert.deepEqual(options, { block: "center" }); scrolled++; } querySelector(selector) { assert.equal(selector, 'input[type="file"]'); return input; } }
+  const drawerElement = new Details();
+  global.HTMLDetailsElement = Details;
+  global.document = { getElementById(id) { assert.equal(id, drawerTree.props.id); return drawerElement; } };
+  try {
+    const trigger = view.trigger();
+    assert.equal(trigger.props.type, "button", "secondary entry is not another upload submission");
+    assert.equal(trigger.props["aria-controls"], drawerTree.props.id);
+    trigger.props.onClick();
+    assert.equal(drawerElement.open, true, "empty-state entry opens the previously closed primary form");
+    assert.equal(focused, 1); assert.equal(scrolled, 1);
+    trigger.props.onClick();
+    assert.equal(drawerElement.open, true);
+    assert.equal(input.files[0], selectedFile, "reopening retains the same input and selected file");
+  } finally { global.document = oldDocument; global.HTMLDetailsElement = oldDetails; }
+});
 
 test("first submit acknowledges immediately and blocks a repeated submission", () => withEnvironment(async ({ form, file }) => {
   let calls = 0;

@@ -109,7 +109,7 @@ export function ThemeControls({ variant = "panel" }: ThemeControlsProps) {
   const preferenceLabel = preferences.find((item) => item.value === preference)?.label ?? "Pulsar";
 
   return (
-    <details className="rounded-lg border border-vaeroex-silver bg-white p-4 shadow-panel dark:border-vaeroex-dark-border dark:bg-vaeroex-dark-card sm:p-5">
+    <details className="workspace-secondary-details workspace-settings-appearance rounded-lg border border-vaeroex-silver bg-white p-4 dark:border-vaeroex-dark-border dark:bg-vaeroex-dark-card sm:p-5">
       <summary className="cursor-pointer rounded-md text-ink outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-blue focus-visible:ring-offset-2">
         <span className="ml-1 inline-flex max-w-full flex-wrap items-center gap-x-4 gap-y-1 align-middle">
           <span className="text-base font-semibold">Appearance</span>

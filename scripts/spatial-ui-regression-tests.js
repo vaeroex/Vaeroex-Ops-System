@@ -71,7 +71,8 @@ for (const retiredPath of retiredWorkspacePaths) {
   assert.equal(exists(retiredPath), false, retiredPath + " must not remain in the authenticated workspace runtime");
 }
 
-assert.match(shell, /<ComplianceNotice compact \/>[\s\S]*\{children\}[\s\S]*<footer/, "the authenticated shell must render routed DOM content directly");
+assert.match(shell, /<main\b[^>]*>[\s\S]*\{children\}[\s\S]*<footer/, "the authenticated shell must render routed DOM content directly");
+assert.doesNotMatch(shell, /ComplianceNotice|Sensitive information reminder/, "the generic sensitive-data reminder belongs only in file upload, not every workspace screen");
 assert.doesNotMatch(shell, /ExperienceControls|WorkspaceExperienceProvider|SpatialWorkspaceShell|vaeroex-spatial-shell|vaeroex-spatial-scene/, "the authenticated shell must not mount an experience selector or spatial runtime");
 assert.match(navigation, /<Link[\s\S]*href=\{item\.href as Route\}/, "authenticated navigation must use normal Next links");
 assert.doesNotMatch(navigation, /preventDefault|setTimeout|useRouter|SPATIAL_NAVIGATION_INTENT_EVENT|data-spatial-destination|spatialTravelPlan/, "authenticated navigation must not delay routing for a camera handoff");

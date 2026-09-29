@@ -74,8 +74,8 @@ export function SavedAnalysisList({ analyses, loadLimitReached = false }: { anal
   }
 
   return (
-    <section className="space-y-4" aria-labelledby="saved-analyses-heading">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+    <section className="workspace-saved-analyses space-y-4" aria-labelledby="saved-analyses-heading">
+      <div className="workspace-toolbar flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h2 id="saved-analyses-heading" className="sr-only">Browse saved analyses</h2>
           <p className="text-sm text-slate-400" role="status">Showing {visible.length} of {matching.length} matching loaded analyses.</p>
@@ -97,26 +97,25 @@ export function SavedAnalysisList({ analyses, loadLimitReached = false }: { anal
         </label>
       </div>
 
-      <div className="flex flex-wrap gap-2" aria-label="Saved analysis filters">
-        {filters.map((item) => (
-          <button
-            key={item.value}
-            type="button"
-            onClick={() => {
-              setFilter(item.value);
-              setVisibleCount(25);
-              setSelected(new Set());
-            }}
-            className={`inline-flex min-h-11 shrink-0 items-center rounded-lg border px-3 py-2 text-sm font-semibold ${filter === item.value ? "border-cyan-300/40 bg-cyan-950/35 text-cyan-100" : "border-white/10 bg-white/[0.04] text-slate-300 hover:bg-cyan-950/25"}`}
-          >
-            {item.label}
-          </button>
-        ))}
-      </div>
+      <label className="flex flex-wrap items-center gap-3 text-sm text-slate-300">
+        <span className="font-medium">Analysis type</span>
+        <select
+          aria-label="Analysis type"
+          value={filter}
+          onChange={(event) => {
+            setFilter(event.currentTarget.value as Filter);
+            setVisibleCount(25);
+            setSelected(new Set());
+          }}
+          className="min-h-11 w-full rounded-lg border border-white/10 bg-slate-950/75 px-3 py-2 text-sm text-white sm:w-auto sm:min-w-48"
+        >
+          {filters.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+        </select>
+      </label>
 
       {visible.length ? (
         <>
-          <div className="flex min-h-11 flex-wrap items-center gap-3 rounded-lg border border-white/10 bg-white/[0.025] px-3 py-2">
+          <div className="workspace-selection-bar flex min-h-11 flex-wrap items-center gap-3 border-y border-white/10 px-1 py-2">
             <button type="button" onClick={selectAllVisible} disabled={allVisibleSelected} className="text-sm font-semibold text-cyan-200 disabled:text-slate-500">Select all visible</button>
             {selected.size ? <button type="button" onClick={() => setSelected(new Set())} className="text-sm font-semibold text-slate-300">Clear selection</button> : null}
             <span className="text-sm text-slate-400">{selected.size} selected</span>
@@ -127,9 +126,9 @@ export function SavedAnalysisList({ analyses, loadLimitReached = false }: { anal
             ) : null}
           </div>
 
-          <div className="grid gap-3 xl:grid-cols-2">
+          <div className="workspace-list divide-y divide-white/10">
             {visible.map((analysis) => (
-              <article key={analysis.id} className="rounded-lg border border-white/10 bg-[#08111f] p-4 shadow-panel">
+              <article key={analysis.id} className="workspace-list-row workspace-analysis-row py-4">
                 <div className="flex items-start gap-3">
                   <input
                     type="checkbox"
@@ -148,8 +147,8 @@ export function SavedAnalysisList({ analyses, loadLimitReached = false }: { anal
                         </div>
                       </details>
                     </div>
-                    <h3 className="mt-3 break-words text-lg font-semibold leading-6 text-white">{analysis.title}</h3>
-                    <dl className="mt-3 grid gap-2 text-xs text-slate-400 sm:grid-cols-2">
+                    <h3 className="mt-2 break-words text-base font-semibold leading-6 text-white">{analysis.title}</h3>
+                    <dl className="mt-2 flex flex-wrap gap-x-6 gap-y-2 text-xs text-slate-400">
                       <div><dt className="font-semibold text-slate-300">Generated</dt><dd className="mt-0.5">{readableDate(analysis.generatedAt)}</dd></div>
                       <div><dt className="font-semibold text-slate-300">Saved</dt><dd className="mt-0.5">{readableDate(analysis.savedAt)}</dd></div>
                       <div><dt className="font-semibold text-slate-300">Confidence</dt><dd className="mt-0.5">{analysis.confidence}</dd></div>
@@ -157,7 +156,7 @@ export function SavedAnalysisList({ analyses, loadLimitReached = false }: { anal
                     </dl>
                     {analysis.dateRange ? <p className="mt-2 text-xs text-slate-500">{analysis.dateRange}</p> : null}
                     {analysis.businessHealthState ? <p className="mt-1 text-xs text-slate-500">Business Health: {analysis.businessHealthState}</p> : null}
-                    <Link href={`/app/reports/${analysis.id}`} className="mt-4 inline-flex min-h-11 items-center rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white hover:bg-cyan-400 hover:text-vaeroex-navy">{analysis.analysisType.endsWith("_briefing") ? "View Briefing" : "View Analysis"}</Link>
+                    <Link href={`/app/reports/${analysis.id}`} className="workspace-row-link mt-3 inline-flex min-h-10 items-center rounded-md border border-white/15 px-3 py-2 text-sm font-semibold text-cyan-100 hover:bg-white/[0.05]">{analysis.analysisType.endsWith("_briefing") ? "View Briefing" : "View Analysis"}</Link>
                   </div>
                 </div>
               </article>

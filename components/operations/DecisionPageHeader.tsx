@@ -10,7 +10,7 @@ type DecisionPageHeaderProps = {
 
 export function DecisionPageHeader({ eyebrow, title, description, actions, help }: DecisionPageHeaderProps) {
   return (
-    <section className="rounded-lg border border-white/10 bg-[#071526] p-4 text-slate-100 shadow-panel sm:p-5">
+    <section className="workspace-page-header rounded-lg border border-white/10 bg-[#071526] p-4 text-slate-100 shadow-panel sm:p-5">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-vaeroex-accent">{eyebrow}</p>

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { Route } from "next";
+import { ChartNoAxesCombined, ChevronRight, FileText, FolderOpen, House, Settings2, Sparkles, type LucideIcon } from "lucide-react";
 import { currentWorkspaceDestination, isWorkspacePathActive } from "@/lib/presentation/app-navigation";
 
 type NavItem = {
@@ -22,6 +23,20 @@ type AppNavigationProps = {
   mobile?: boolean;
 };
 
+const destinationIcons: Record<string, LucideIcon> = {
+  "/app": House,
+  "/app/intelligence": Sparkles,
+  "/app/kpis": ChartNoAxesCombined,
+  "/app/sources": FolderOpen,
+  "/app/reports": FileText,
+  "/app/settings": Settings2
+};
+
+function DestinationIcon({ href }: { href: string }) {
+  const Icon = destinationIcons[href];
+  return Icon ? <Icon aria-hidden="true" className="workspace-nav-icon" size={18} strokeWidth={1.6} /> : null;
+}
+
 function DesktopSection({
   section,
   pathname
@@ -37,11 +52,12 @@ function DesktopSection({
         key={`${item.href}-${item.label}`}
         href={item.href as Route}
         aria-current={active ? "page" : undefined}
-        className={`flex min-h-10 items-center justify-between gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+        className={`workspace-nav-link flex min-h-10 items-center justify-between gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
           active ? "bg-vaeroex-blue text-white shadow-sm shadow-blue-950/20" : "text-slate-100 hover:bg-cyan-950/40 hover:text-vaeroex-accent"
         }`}
       >
-        <span>{item.label}</span>
+        <span className="flex min-w-0 items-center gap-3"><DestinationIcon href={item.href} /><span>{item.label}</span></span>
+        {active ? <ChevronRight aria-hidden="true" className="workspace-nav-active" size={14} /> : null}
       </Link>
     );
   });
@@ -72,11 +88,11 @@ function MobileSection({ section, pathname }: { section: NavSection; pathname: s
               key={`${section.label}-${item.label}`}
               href={item.href as Route}
               aria-current={active ? "page" : undefined}
-              className={`flex min-h-11 items-center gap-3 rounded-md px-3 py-2 text-sm font-semibold ${
+              className={`workspace-nav-link flex min-h-11 items-center gap-3 rounded-md px-3 py-2 text-sm font-semibold ${
                 active ? "bg-vaeroex-blue text-white" : "border border-line bg-white text-slate-700 hover:bg-cyan-50 hover:text-vaeroex-blue"
               }`}
             >
-              <span>{item.label}</span>
+              <DestinationIcon href={item.href} /><span>{item.label}</span>
             </Link>
           );
         })}

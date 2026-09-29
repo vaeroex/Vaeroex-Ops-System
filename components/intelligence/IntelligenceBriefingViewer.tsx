@@ -53,11 +53,11 @@ export function IntelligenceBriefingViewer({ artifact }: { artifact: Intelligenc
   const executiveSummary = composeIntelligenceBriefingExecutiveSummary(artifact);
   const analysisType = artifact.briefingType === "weekly" ? "weekly_briefing" : "monthly_briefing";
   return (
-    <div className="space-y-6" data-intelligence-briefing-viewer={artifact.briefingType}>
+    <div className="workspace-briefing-viewer mx-auto max-w-5xl space-y-6" data-intelligence-briefing-viewer={artifact.briefingType}>
       <Link href="/app/intelligence/briefings" className="inline-flex min-h-10 items-center gap-2 text-sm font-semibold text-cyan-200 hover:underline">
         <ArrowLeft aria-hidden="true" className="h-4 w-4" /> Intelligence Briefings
       </Link>
-      <header className="border-b border-white/10 pb-5">
+      <header className="workspace-page-header border-b border-white/10 pb-5">
         <p className="text-xs font-semibold uppercase tracking-[0.15em] text-cyan-200">Executive Intelligence</p>
         <h1 className="mt-2 text-2xl font-semibold text-white sm:text-3xl">{briefingTypeLabel(artifact.briefingType)}</h1>
         <p className="mt-2 text-sm font-semibold text-cyan-100">
@@ -72,7 +72,7 @@ export function IntelligenceBriefingViewer({ artifact }: { artifact: Intelligenc
         </div>
       </header>
 
-      <section className="border-l-2 border-cyan-300/45 pl-5">
+      <section className="workspace-briefing-summary rounded-lg border border-cyan-300/15 bg-cyan-950/15 p-5">
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan-200">Summary</p>
         <p className="mt-3 text-lg font-semibold leading-8 text-white">
           {executiveSummary.text}

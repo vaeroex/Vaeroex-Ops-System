@@ -422,7 +422,7 @@ matches(
   "the fixture must preserve the exact production-labelled 2-leased/1-pending shape"
 );
 
-equal(approvedSquareQualificationPaths.length, 242, "dormant scope permits only exact reviewed migrations, UI/upload feedback, nine Admin clarity paths, one approved subscription action path and three approved Admin pilot follow-up paths, native service/templates, provider-neutral Production composition and activation, restricted evidence host, query-stripping callback edge, repository-bound image trigger, internal-seller consent and manual read, internal-pilot runtime, offline pilot, bounded provisioner and customer candidate files");
+equal(approvedSquareQualificationPaths.length, 251, "dormant scope permits only exact reviewed migrations, UI/upload feedback, nine customer presentation paths, nine Admin clarity paths, one approved subscription action path and three approved Admin pilot follow-up paths, native service/templates, provider-neutral Production composition and activation, restricted evidence host, query-stripping callback edge, repository-bound image trigger, internal-seller consent and manual read, internal-pilot runtime, offline pilot, bounded provisioner and customer candidate files");
 const workspaceClarityPaths = [
   "app/app/intelligence/page.tsx",
   "app/app/kpis/page.tsx",

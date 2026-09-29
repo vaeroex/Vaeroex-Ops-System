@@ -16,7 +16,7 @@ const statusLabels = {
 } as const;
 const buttonClass = "inline-flex min-h-10 items-center justify-center rounded-md border border-line px-4 py-2 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vaeroex-blue";
 const inputClass = "mt-1 block min-h-10 w-full rounded-md border border-line bg-white px-3 py-2 text-sm text-ink";
-const cardClass = "rounded-lg border border-line bg-white p-4 shadow-panel sm:p-5";
+const cardClass = "workspace-panel rounded-lg border border-line bg-white p-4 sm:p-5";
 
 /** Preserve Square's integer minor units without a floating-point conversion. */
 export function squarePaymentAmount(amountMinor: string | null, currency: string | null): string {
@@ -67,7 +67,7 @@ function canRead(view: DirectView, connection: Connection): boolean {
 
 function CoverageDetails({ connection, timeZone }: { connection: Connection; timeZone: string }) {
   const read = connection.activeRead ?? connection.lastCompletedRead;
-  return <details className="text-sm">
+  return <details className="workspace-secondary-details text-sm">
     <summary className="cursor-pointer py-2 font-medium text-vaeroex-blue">Search coverage and update details</summary>
     <div className="mt-2 space-y-2 text-muted">
       {connection.activeRead ? <p role="status">Current search: {paymentWindow(connection.activeRead)}. The search is incomplete until every page has been read.</p> : null}
@@ -82,7 +82,7 @@ function CoverageDetails({ connection, timeZone }: { connection: Connection; tim
 
 function DisconnectControl({ connection }: { connection: Connection }) {
   if (connection.recoveryRequired || (connection.state === "disconnected" && !connection.revocationPending)) return null;
-  return <details className="border-t border-line pt-2 text-sm">
+  return <details className="workspace-secondary-details border-t border-line pt-2 text-sm">
     <summary className="cursor-pointer py-2 font-medium">Manage connection</summary>
     <details className="mt-2 rounded-md border border-line p-3">
       <summary className="cursor-pointer font-medium text-red-700">{connection.revocationPending ? "Retry Square revocation" : "Disconnect Square"}</summary>
@@ -165,7 +165,7 @@ function PaymentStatus({ status }: { status: DirectPayment["status"] }) {
 }
 
 function PaymentsTable({ payments, timeZone }: { payments: DirectPayment[]; timeZone: string }) {
-  return <div className="overflow-x-auto rounded-md border border-line">
+  return <div className="workspace-table overflow-x-auto rounded-md border border-line">
     <table className="block w-full text-left text-sm sm:table">
       <caption className="sr-only">Stored Square Payments. Dates use {timeZone}. Completed payments are distinct from failed attempts.</caption>
       <thead className="sr-only bg-slate-50 text-muted sm:not-sr-only"><tr><th scope="col" className="px-3 py-3 font-medium">Date</th><th scope="col" className="px-3 py-3 font-medium">Status</th><th scope="col" className="px-3 py-3 text-right font-medium">Amount</th><th scope="col" className="px-3 py-3 font-medium">Details</th></tr></thead>
@@ -200,7 +200,7 @@ function SavedPayments({ browser, connection, browseError }: { browser: DirectPa
       <p className="mt-1 text-xs text-muted">Dates in {timeZone}{browser && !browser.timeZoneFallback ? " · Business timezone" : " · Fallback; business timezone unavailable"}. Browsing only—no import or update is triggered.</p>
     </div>
     {browseError ? <div className="space-y-2 text-sm"><p role="status" className="text-amber-800">{browseError}</p><a href={connection ? squarePaymentsHref(connection.connectionId) : settingsPath} className="font-medium text-vaeroex-blue underline">Reset saved-payment filters</a></div> : null}
-    {browser?.connectionId && filters ? <form action={`${settingsPath}#saved-payments`} method="get" className="grid items-end gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_auto]">
+    {browser?.connectionId && filters ? <form action={`${settingsPath}#saved-payments`} method="get" className="workspace-toolbar grid items-end gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_auto]">
       <input type="hidden" name="connectionId" value={browser.connectionId} />
       <label className="block text-xs font-semibold">From date<input type="date" name="startDate" defaultValue={filters.startDate ?? ""} className={inputClass} /></label>
       <label className="block text-xs font-semibold">Through date<input type="date" name="endDate" defaultValue={filters.endDate ?? ""} className={inputClass} /></label>
@@ -237,9 +237,9 @@ export function SquareDirectCustomerPanel({ view, browser = null, browseError = 
   const currentMetadata = browser?.connections.find(connection => connection.connectionId === current?.connectionId);
   const timeZone = currentMetadata?.timeZone ?? "UTC";
   const connectableEntities = view.connections.every(connection => connection.state === "disconnected" && !connection.revocationPending && !connection.recoveryRequired) ? view.businessEntities : [];
-  return <main className="mx-auto max-w-5xl space-y-5 px-4 py-5 text-ink sm:p-6">
+  return <div className="vaeroex-app-shell vaeroex-customer-workspace min-h-dvh"><main className="workspace-page workspace-square mx-auto max-w-5xl space-y-5 px-4 py-5 text-ink sm:p-6">
     <Link href="/app/settings" prefetch={false} className="inline-flex min-h-11 items-center gap-2 rounded-md border border-line bg-white px-4 py-2 text-sm font-semibold text-vaeroex-blue shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">← Back to Settings</Link>
-    <header className="space-y-1"><h1 className="text-2xl font-semibold">Square</h1><p className="text-sm text-muted">Manage this workspace’s optional Square connection and saved Payments.</p></header>
+    <header className="workspace-page-header space-y-1"><h1 className="text-2xl font-semibold">Square</h1><p className="text-sm text-muted">Manage this workspace’s optional Square connection and saved Payments.</p></header>
     {!view.available ? <p role="status" className="rounded-md bg-slate-100 p-3 text-sm">New Square connections and Payments updates are unavailable for this workspace. Saved Payments and existing connection status remain available.</p> : null}
     {current ? <ConnectionPanel view={view} connection={current} entity={entities.get(current.businessEntityId) ?? currentMetadata?.businessEntityLabel ?? "Unavailable"} timeZone={timeZone} timeZoneFallback={currentMetadata?.timeZoneFallback ?? true} /> : <section className={`${cardClass} space-y-3`}>
       <h2 className="text-lg font-semibold">Connect Square</h2><p role="status" className="text-sm text-muted">No Square account is connected to this workspace. Previous saved Payments are retained in Connection history.</p>
@@ -261,5 +261,5 @@ export function SquareDirectCustomerPanel({ view, browser = null, browseError = 
       })}</ul>
     </details> : null}
     <p className="text-xs text-muted">Source: Square Production. Square is optional; other workspace inputs remain available.</p>
-  </main>;
+  </main></div>;
 }

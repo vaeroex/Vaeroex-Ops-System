@@ -39,11 +39,11 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
   }
 
   return (
-    <div className="space-y-8 text-slate-100">
-      <header className="border-b border-white/10 pb-5">
+    <div className="workspace-page workspace-reports space-y-5 text-slate-100">
+      <header className="workspace-page-header border-b border-white/10 pb-5">
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200">Leadership reference</p>
         <h1 className="mt-2 text-2xl font-semibold tracking-normal text-white sm:text-3xl">Saved Analyses</h1>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">Save completed analyses you want leadership to revisit. Saved analyses never regenerate or rewrite their copied content.</p>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">Revisit saved analyses and briefings. Their copied content stays unchanged.</p>
       </header>
 
       <ErrorNotice message={params?.error || error?.message} />

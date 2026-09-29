@@ -1,5 +1,4 @@
 import type { Route } from "next";
-import { LegalSafetyNotice } from "@/components/legal/LegalSafetyNotice";
 import { CreateDrawer } from "@/components/operations/CreateDrawer";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { TextArea, TextInput, PrimaryButton } from "@/components/operations/FormControls";
@@ -69,8 +68,6 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
         title="Visibility forms"
         description="Create intake, completion, issue, shift handoff, and business-evidence forms for structured operational review."
       />
-      <LegalSafetyNotice tone="sensitive" compact />
-
       <ErrorNotice message={(params?.error as string | undefined) || error?.message || folderResult.error?.message} />
 
       <section className="space-y-6">
