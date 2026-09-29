@@ -20,6 +20,10 @@ const historyFiles = fs.readdirSync(migrationDirectory).filter(name => /^\d{14}_
 assert.equal(historyFiles.length, 1, 'one additive payment history candidate');
 const historyFile = path.join(migrationDirectory, historyFiles[0]);
 const historyTestFile = path.join(root, 'supabase/tests/square_customer_payment_history.test.sql');
+const browseFiles = fs.readdirSync(migrationDirectory).filter(name => /^\d{14}_square_customer_payment_browse\.sql$/.test(name));
+assert.equal(browseFiles.length, 1, 'one additive stored-payment browse candidate');
+const browseFile = path.join(migrationDirectory, browseFiles[0]);
+const browseTestFile = path.join(root, 'supabase/tests/square_customer_payment_browse.test.sql');
 const cli = process.env.SUPABASE_CLI_PATH || 'supabase';
 
 function baselineManifest() {
@@ -76,9 +80,15 @@ async function main() {
     await client.query(fs.readFileSync(historyFile, 'utf8'));
     await client.query(fs.readFileSync(testFile, 'utf8'));
     await client.query(fs.readFileSync(historyTestFile, 'utf8'));
+    await client.query("insert into supabase_migrations.schema_migrations(version) values ('20260929041048')");
+    const backendBeforeBrowse = await client.query("select pg_get_functiondef('public.square_customer_backend_v1(text,uuid,uuid,uuid,text,jsonb)'::regprocedure) as body");
+    await client.query(fs.readFileSync(browseFile, 'utf8'));
+    await client.query(fs.readFileSync(browseTestFile, 'utf8'));
+    const backendAfterBrowse = await client.query("select pg_get_functiondef('public.square_customer_backend_v1(text,uuid,uuid,uuid,text,jsonb)'::regprocedure) as body");
+    assert.equal(backendAfterBrowse.rows[0].body, backendBeforeBrowse.rows[0].body, 'browse migration preserves existing mutation/credential backend');
     const after = await client.query('select version from supabase_migrations.schema_migrations order by version');
-    assert.deepEqual(after.rows.map(row => row.version), [...versions, '20260929004917'], 'only explicit disposable baseline bookkeeping');
-    assert(labels.size >= 70, 'every original and historical SQL assertion executed');
+    assert.deepEqual(after.rows.map(row => row.version), [...versions, '20260929004917', '20260929041048'], 'only explicit disposable baseline bookkeeping');
+    assert(labels.size >= 145, 'every original, historical and stored-browse SQL assertion executed');
     const closed = await client.query(`select
       (select not enabled and application_id is null from square_customer_private.configuration) as closed,
       (select count(*) from square_customer_private.connections) as connections,
@@ -87,7 +97,7 @@ async function main() {
     assert.equal(Number(closed.rows[0].connections), 0);
     assert.equal(Number(closed.rows[0].payments), 0);
     console.log(JSON.stringify({ label: 'square_customer_backend_postgres_qualification_passed',
-      baselineMigrations: 106, assertions: labels.size, closed: true, providerCalls: false }));
+      baselineMigrations: 107, assertions: labels.size, closed: true, providerCalls: false }));
   } finally { await client.end(); }
 }
 

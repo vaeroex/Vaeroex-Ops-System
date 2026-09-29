@@ -249,6 +249,7 @@ jobs:
           node scripts/square-production-customer-workspace-tests.js
           node scripts/square-direct-provider-tests.cjs
           node scripts/square-direct-service-tests.cjs
+          node scripts/square-payment-browse-server-tests.cjs
           node scripts/square-direct-customer-ui-tests.js
           pnpm exec ncc build services/external-integrations-production/internal-consent/entry.ts -o services/external-integrations-production/internal-consent/dist --no-cache --transpile-only --external server-only
           node services/external-integrations-production/internal-consent/package-release.cjs
