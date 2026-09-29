@@ -17,7 +17,7 @@ let membershipRole = 'owner', membershipUser = ids.actor, claimsSub = ids.actor,
 let databaseError = null, databaseData = null, calls = [];
 let pageBrowseError = false, pageHost = 'www.vaeroex.com', pageQuery;
 const view = { available: true, historyAvailable: true, businessEntities: [], connections: [] };
-const result = { connectionId: null, currentConnection: null, timeZone: 'UTC', page: 1, pageSize: 25, totalCount: 0, totalPages: 1,
+const result = { connectionId: null, currentConnection: null, timeZone: 'UTC', timeZoneFallback: false, page: 1, pageSize: 25, totalCount: 0, totalPages: 1,
   filters: { startDate: null, endDate: null, status: 'all' }, payments: [], connections: [] };
 const mocks = {
   '@/lib/security/require-auth': { requireAuth: async () => ({ user: { id: ids.actor }, supabase: { auth: {
@@ -50,6 +50,19 @@ test('saved browsing sends only the verified current owner/session/workspace and
     p_actor_id: ids.actor, p_session_id: ids.session, p_workspace_id: ids.workspace,
     p_connection_id: ids.connection, p_page: 7, p_start_date: '2026-05-04', p_end_date: '2026-05-06', p_status: 'COMPLETED'
   } }]);
+});
+test('normalized fallback metadata for an unselected historical connection does not reject valid current browsing', async () => {
+  databaseData = { ...result, connectionId: ids.connection, timeZone: 'America/Los_Angeles',
+    connections: [{ connectionId: ids.connection, businessEntityId: ids.workspace, businessEntityLabel: 'Current entity', sellerLabel: null,
+      locationLabel: null, state: 'connected', timeZone: 'America/Los_Angeles', timeZoneFallback: false, createdAt: '2026-05-05T00:00:00Z', paymentCount: 0 },
+    { connectionId: ids.actor, businessEntityId: ids.session, businessEntityLabel: 'Historical entity', sellerLabel: null,
+      locationLabel: null, state: 'disconnected', timeZone: 'UTC', timeZoneFallback: true, createdAt: '2026-05-04T00:00:00Z', paymentCount: 0 }] };
+  const parsed = await squareDirectPayments({});
+  assert.equal(parsed.timeZone, 'America/Los_Angeles'); assert.equal(parsed.timeZoneFallback, false);
+  assert.equal(parsed.connections[1].timeZone, 'UTC'); assert.equal(parsed.connections[1].timeZoneFallback, true);
+  databaseData = { ...databaseData, timeZone: 'UTC', timeZoneFallback: true };
+  assert.equal((await squareDirectPayments({})).timeZoneFallback, true);
+  databaseData = null;
 });
 test('invalid filters and unverified owner context make no database or provider call', async () => {
   for (const query of [{ page: '0' }, { page: ['1', '2'] }, { startDate: '2026-02-30' }, { status: 'anything' }, { connectionId: 'invalid' }]) {

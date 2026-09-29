@@ -31,7 +31,7 @@ const timeZone = z.string().min(1).max(255).refine(value => {
   try { new Intl.DateTimeFormat("en-US", { timeZone: value }); return true; } catch { return false; }
 });
 export const DirectPaymentBrowserSchema = z.object({
-  connectionId: z.string().uuid().nullable(), timeZone,
+  connectionId: z.string().uuid().nullable(), timeZone, timeZoneFallback: z.boolean(),
   currentConnection: DirectViewSchema.shape.connections.element.nullable(),
   page: z.number().int().positive().safe(), pageSize: z.literal(25),
   totalCount: z.number().int().nonnegative().safe(), totalPages: z.number().int().positive().safe(),
@@ -39,7 +39,7 @@ export const DirectPaymentBrowserSchema = z.object({
   payments: z.array(DirectPaymentSchema).max(25),
   connections: z.array(z.object({ connectionId: z.string().uuid(), businessEntityId: z.string().uuid(),
     businessEntityLabel: z.string().min(1).max(255), sellerLabel: z.string().max(255).nullable(),
-    locationLabel: z.string().max(255).nullable(), state: DirectStateSchema, timeZone,
+    locationLabel: z.string().max(255).nullable(), state: DirectStateSchema, timeZone, timeZoneFallback: z.boolean(),
     createdAt: instant, paymentCount: z.number().int().nonnegative().safe()
   }).strict())
 }).strict().refine(value => value.page <= value.totalPages && value.totalPages === Math.max(1, Math.ceil(value.totalCount / 25)));

@@ -97,7 +97,7 @@ function DisconnectControl({ connection }: { connection: Connection }) {
   </details>;
 }
 
-function ConnectionPanel({ view, connection, entity, timeZone }: { view: DirectView; connection: Connection; entity: string; timeZone: string }) {
+function ConnectionPanel({ view, connection, entity, timeZone, timeZoneFallback }: { view: DirectView; connection: Connection; entity: string; timeZone: string; timeZoneFallback: boolean }) {
   const readable = canRead(view, connection);
   const updateTimes = [connection.lastSyncedAt, connection.lastCompletedRead?.completedAt].filter((value): value is string => Boolean(value));
   const lastUpdate = updateTimes.sort((a, b) => Date.parse(b) - Date.parse(a))[0] ?? null;
@@ -114,7 +114,7 @@ function ConnectionPanel({ view, connection, entity, timeZone }: { view: DirectV
     </div>
     <dl className="grid gap-3 text-sm sm:grid-cols-2">
       <div><dt className="text-muted">Location</dt><dd className="mt-1 font-medium">{connection.locationId ? connection.locations.find(location => location.id === connection.locationId)?.label ?? "Selected Square location" : "Not selected yet"}</dd></div>
-      <div><dt className="text-muted">Last successful update</dt><dd className="mt-1 font-medium">{squareBusinessTime(lastUpdate, timeZone)}<span className="mt-0.5 block text-xs font-normal text-muted">{timeZone}</span></dd></div>
+      <div><dt className="text-muted">Last successful update</dt><dd className="mt-1 font-medium">{squareBusinessTime(lastUpdate, timeZone)}<span className="mt-0.5 block text-xs font-normal text-muted">{timeZone}{timeZoneFallback ? " · Fallback; business timezone unavailable" : ""}</span></dd></div>
     </dl>
     {connection.lastError ? <p role="status" className="text-sm text-amber-800">The last attempt did not finish. Your last successfully saved Payments remain below.</p> : null}
     {connection.recoveryRequired ? <p role="status" className="text-sm">Square authorization outcome and this workspace’s account connection are unconfirmed. Contact support for checked recovery before taking any further connection action.</p> : null}
@@ -197,7 +197,7 @@ function SavedPayments({ browser, connection, browseError }: { browser: DirectPa
     <div>
       <h2 id="saved-payments-heading" className="text-lg font-semibold text-ink">Saved Payments</h2>
       <p className="mt-1 text-sm text-muted">{selected?.sellerLabel ?? connection?.sellerLabel ?? "Square"}{selected?.locationLabel ? ` · ${selected.locationLabel}` : ""}{selected?.state === "disconnected" ? " · Previous connection" : ""}</p>
-      <p className="mt-1 text-xs text-muted">Dates in {timeZone}{browser ? " · Business timezone" : " · Business timezone unavailable"}. Browsing only—no import or update is triggered.</p>
+      <p className="mt-1 text-xs text-muted">Dates in {timeZone}{browser && !browser.timeZoneFallback ? " · Business timezone" : " · Fallback; business timezone unavailable"}. Browsing only—no import or update is triggered.</p>
     </div>
     {browseError ? <div className="space-y-2 text-sm"><p role="status" className="text-amber-800">{browseError}</p><a href={connection ? squarePaymentsHref(connection.connectionId) : settingsPath} className="font-medium text-vaeroex-blue underline">Reset saved-payment filters</a></div> : null}
     {browser?.connectionId && filters ? <form action={`${settingsPath}#saved-payments`} method="get" className="grid items-end gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_auto]">
@@ -234,13 +234,14 @@ export function SquareDirectCustomerPanel({ view, browser = null, browseError = 
   }));
   const selectedId = browser?.connectionId ?? browseConnectionId;
   const selected = selectedId ? (current?.connectionId === selectedId ? current : view.connections.find(connection => connection.connectionId === selectedId) ?? null) : current ?? view.connections.find(connection => connection.payments.length > 0) ?? null;
-  const timeZone = browser?.connections.find(connection => connection.connectionId === current?.connectionId)?.timeZone ?? "UTC";
+  const currentMetadata = browser?.connections.find(connection => connection.connectionId === current?.connectionId);
+  const timeZone = currentMetadata?.timeZone ?? "UTC";
   const connectableEntities = view.connections.every(connection => connection.state === "disconnected" && !connection.revocationPending && !connection.recoveryRequired) ? view.businessEntities : [];
   return <main className="mx-auto max-w-5xl space-y-5 px-4 py-5 text-ink sm:p-6">
     <Link href="/app/settings" prefetch={false} className="inline-flex min-h-11 items-center gap-2 rounded-md border border-line bg-white px-4 py-2 text-sm font-semibold text-vaeroex-blue shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">← Back to Settings</Link>
     <header className="space-y-1"><h1 className="text-2xl font-semibold">Square</h1><p className="text-sm text-muted">Manage this workspace’s optional Square connection and saved Payments.</p></header>
     {!view.available ? <p role="status" className="rounded-md bg-slate-100 p-3 text-sm">New Square connections and Payments updates are unavailable for this workspace. Saved Payments and existing connection status remain available.</p> : null}
-    {current ? <ConnectionPanel view={view} connection={current} entity={entities.get(current.businessEntityId) ?? browser?.connections.find(connection => connection.connectionId === current.connectionId)?.businessEntityLabel ?? "Unavailable"} timeZone={timeZone} /> : <section className={`${cardClass} space-y-3`}>
+    {current ? <ConnectionPanel view={view} connection={current} entity={entities.get(current.businessEntityId) ?? currentMetadata?.businessEntityLabel ?? "Unavailable"} timeZone={timeZone} timeZoneFallback={currentMetadata?.timeZoneFallback ?? true} /> : <section className={`${cardClass} space-y-3`}>
       <h2 className="text-lg font-semibold">Connect Square</h2><p role="status" className="text-sm text-muted">No Square account is connected to this workspace. Previous saved Payments are retained in Connection history.</p>
       {view.available && connectableEntities.length > 0 ? <form action="/api/integrations/square/connect" method="post" className="space-y-3">
         <label className="block text-sm font-semibold">Business Entity<select name="businessEntityId" required defaultValue="" className={inputClass}><option value="" disabled>Select a Business Entity</option>{connectableEntities.map(entity => <option key={entity.id} value={entity.id}>{entity.label}</option>)}</select></label>

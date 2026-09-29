@@ -148,6 +148,34 @@ select pg_temp.browse_check((select connections=(select jsonb_agg(to_jsonb(c) or
  and oauth is not distinct from (select jsonb_agg(to_jsonb(s) order by state_hash) from square_customer_private.oauth_states s)
  and configuration=(select to_jsonb(c) from square_customer_private.configuration c) from browse_before),'browse_no_connection_checkpoint_credential_or_data_mutation');
 
+-- The canonical entity constraint accepts Foo/Bar. Browsing falls back explicitly
+-- without changing that stored setting or filtering a UTC day as a local day.
+update public.business_entities set timezone='Foo/Bar' where id='aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa';
+set local role service_role;
+select pg_temp.browse_check(pg_temp.browse()->>'timeZone'='UTC'
+ and pg_temp.browse()->>'timeZoneFallback'='true' and pg_temp.browse()->>'totalCount'='375','browse_invalid_selected_zone_explicit_utc_fallback');
+select pg_temp.browse_check(pg_temp.browse(null,1,'2026-05-04','2026-05-04')->>'totalCount'='0'
+ and pg_temp.browse(null,1,'2026-05-05','2026-05-05')->>'totalCount'='49','browse_invalid_zone_filters_use_utc_day_boundaries');
+select pg_temp.browse_check(not exists(select from jsonb_array_elements(pg_temp.browse()->'connections') c
+ where c->>'timeZone'<>'UTC' or c->>'timeZoneFallback'<>'true'),'browse_invalid_all_option_zones_normalized');
+reset role;
+select pg_temp.browse_check((select timezone='Foo/Bar' from public.business_entities where id='aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa'),'browse_fallback_does_not_rewrite_entity_zone');
+update public.business_entities set timezone='America/Los_Angeles' where id='aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa';
+insert into public.business_entities(id,workspace_id,entity_key,display_name,base_currency,timezone,created_by,updated_by) values
+ ('aaaaaaaa-2222-4222-8222-aaaaaaaaaaaa','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','browse-previous','Previous entity','USD','Foo/Bar',
+  '11111111-1111-4111-8111-111111111111','11111111-1111-4111-8111-111111111111');
+update square_customer_private.connections set business_entity_id='aaaaaaaa-2222-4222-8222-aaaaaaaaaaaa'
+ where connection_id='aaaaaaaa-6666-4666-8666-aaaaaaaaaaaa';
+set local role service_role;
+select pg_temp.browse_check(pg_temp.browse()->>'timeZone'='America/Los_Angeles' and pg_temp.browse()->>'timeZoneFallback'='false'
+ and pg_temp.browse(null,1,'2026-05-04','2026-05-04')->>'totalCount'='49','browse_invalid_unselected_history_keeps_valid_current_zone_and_count');
+select pg_temp.browse_check(exists(select from jsonb_array_elements(pg_temp.browse()->'connections') c
+ where c->>'connectionId'='aaaaaaaa-6666-4666-8666-aaaaaaaaaaaa' and c->>'timeZone'='UTC' and c->>'timeZoneFallback'='true'),
+ 'browse_invalid_unselected_history_option_explicit_utc_fallback');
+select pg_temp.browse_check(pg_temp.browse('aaaaaaaa-6666-4666-8666-aaaaaaaaaaaa')->>'timeZoneFallback'='true'
+ and pg_temp.browse('aaaaaaaa-6666-4666-8666-aaaaaaaaaaaa')->>'totalCount'='1','browse_invalid_history_remains_selectable');
+reset role;
+
 -- Spring and fall day bounds use configured local midnights, including their
 -- unequal UTC lengths. Adjacent-day boundary rows must not leak into results.
 insert into square_customer_private.payments(workspace_id,connection_id,payment_id,location_id,status,created_at,updated_at,amount_minor,currency)
@@ -195,7 +223,8 @@ set local role service_role;
 select pg_temp.browse_check(pg_temp.browse()->>'connectionId'='aaaaaaaa-6666-4666-8666-aaaaaaaaaaaa','browse_default_latest_when_all_disconnected');
 select pg_temp.browse_check(pg_temp.browse()->'currentConnection'='null'::jsonb,'browse_no_actionable_context_when_fully_disconnected');
 reset role;
-update public.workspace_members set role='member' where user_id='11111111-1111-4111-8111-111111111111';
+-- Use a real canonical non-owner role; "member" is not a valid role value.
+update public.workspace_members set role='viewer' where user_id='11111111-1111-4111-8111-111111111111';
 set local role service_role;
 select pg_temp.browse_denied('browse_nonowner_denied');
 reset role;

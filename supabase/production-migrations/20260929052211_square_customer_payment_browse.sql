@@ -20,7 +20,7 @@ create function public.square_customer_payments_v1(
   p_page integer default 1,p_start_date text default null,p_end_date text default null,p_status text default 'all'
 ) returns jsonb language plpgsql volatile security definer set search_path=''
 as $function$
-declare cid uuid; current_id uuid; zone text; starts date; ends date; starts_at timestamptz; ends_at timestamptz;
+declare cid uuid; current_id uuid; zone text; zone_fallback boolean; starts date; ends date; starts_at timestamptz; ends_at timestamptz;
 declare records bigint; pages bigint; selected_page integer; result_payments jsonb; options jsonb; current_connection jsonb;
 begin
   if auth.role() is distinct from 'service_role' or p_actor_id is null or p_session_id is null or p_workspace_id is null then
@@ -67,9 +67,11 @@ begin
   select e.timezone into zone from square_customer_private.connections c
     join public.business_entities e on e.workspace_id=c.workspace_id and e.id=c.business_entity_id
     where c.workspace_id=p_workspace_id and c.connection_id=cid;
-  zone:=coalesce(zone,'UTC');
-  if not exists(select from pg_catalog.pg_timezone_names where name=zone) then
-    raise exception 'square_customer_browse_timezone_invalid' using errcode='22023'; end if;
+  -- Existing business-entity validation accepts zone-shaped names that may not
+  -- exist in PostgreSQL. Keep saved records browsable without editing the entity,
+  -- and explicitly tell the UI when dates/filters use UTC instead.
+  zone_fallback:=cid is not null and not exists(select from pg_catalog.pg_timezone_names where name=zone);
+  zone:=case when zone_fallback then 'UTC' else coalesce(zone,'UTC') end;
   starts_at:=starts::timestamp at time zone zone;
   -- End is the next local midnight, not +24h; preserves 23/25-hour DST days.
   ends_at:=(ends+1)::timestamp at time zone zone;
@@ -112,13 +114,14 @@ begin
       (select l->>'label' from jsonb_array_elements(c.locations) l where l->>'id'=c.location_id limit 1),
     'state',case when c.state='syncing' and c.lease_expires_at<=clock_timestamp() then 'retry_required'
       when c.state='exchanging' and c.lease_expires_at<=clock_timestamp() then 'reauthorization_required' else c.state end,
-    'timeZone',e.timezone,'createdAt',c.created_at,
+    'timeZone',coalesce(z.name,'UTC'),'timeZoneFallback',z.name is null,'createdAt',c.created_at,
     'paymentCount',(select count(*) from square_customer_private.payments p where p.workspace_id=p_workspace_id and p.connection_id=c.connection_id))
     order by (c.state<>'disconnected') desc,c.created_at desc,c.connection_id),'[]'::jsonb) into options
     from square_customer_private.connections c
     join public.business_entities e on e.workspace_id=c.workspace_id and e.id=c.business_entity_id
+    left join pg_catalog.pg_timezone_names z on z.name=e.timezone
     where c.workspace_id=p_workspace_id;
-  return jsonb_build_object('connectionId',cid,'timeZone',zone,'currentConnection',current_connection,'page',selected_page,'pageSize',25,
+  return jsonb_build_object('connectionId',cid,'timeZone',zone,'timeZoneFallback',zone_fallback,'currentConnection',current_connection,'page',selected_page,'pageSize',25,
     'totalCount',records,'totalPages',pages,'filters',jsonb_build_object('startDate',p_start_date,'endDate',p_end_date,'status',p_status),
     'payments',result_payments,'connections',options);
 end

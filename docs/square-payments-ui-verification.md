@@ -12,6 +12,8 @@ The existing mutation forms and their eligibility conditions are retained.
 - Disconnect confirmation is inside Manage connection, then Disconnect Square.
 - Payment IDs and exact UTC timestamps are in native expandable details.
 - Display dates and saved-record filters use the Business Entity's timezone.
+  Unrecognized stored zones use an explicitly labeled UTC fallback without
+  rewriting the entity; historical options are normalized independently.
 - Saved browsing has 25-row server pages, exact matching counts, and date/status
   filters applied before pagination. It never starts an import.
 - Mobile rows keep date, amount, status and Details visible without horizontal
@@ -23,7 +25,7 @@ The existing mutation forms and their eligibility conditions are retained.
 
 `supabase/production-migrations/20260929052211_square_customer_payment_browse.sql`
 
-SHA-256: `0684a93aad10aeca9f55b415dc5c9b505f608a8a2ed42c42161b81be4d069ef2`
+SHA-256: `3b7d1e3766b69b20da94358c181498b7a4852e0fb4aa97d17691114a5298f000`
 
 The migration requires the exact 107-entry baseline ending at
 `20260929041048`. It adds one stored-payment index and one service-role-only
@@ -39,7 +41,7 @@ deployment was performed during this implementation.
 
 ## Verification
 
-- 57 actual PostgreSQL 17.5 assertions through disposable PGlite, using the exact
+- 64 actual PostgreSQL 17.5 assertions through disposable PGlite, using the exact
   existing authority helpers and new migration. This is a minimal dependency
   fixture, not a claim that the full canonical CI baseline was run locally.
 - 375 current-connection payments across 15 database pages: stable ordering,
@@ -49,10 +51,12 @@ deployment was performed during this implementation.
   32-connection status limit; safe current-context parity and preserved history.
 - Tenant/owner/session rejection, closed table/function ACLs, unchanged backend
   function definition and saved-state/checkpoint snapshots.
-- 31 UI tests, including 413 synthetic records across 17 rendered pages,
+- Unknown selected and archived timezone fallback, explicit UTC date boundaries,
+  and preservation of valid current business-timezone results.
+- 33 UI tests, including 413 synthetic records across 17 rendered pages,
   responsive row layout, all connection states, unavailable-browse fallback,
   exact existing mutation-form fields and recovery/eligibility boundaries.
-- 5 server/page tests: server-derived identity, read-only RPC binding, invalid
+- 6 server/page tests: server-derived identity, read-only RPC binding, invalid
   filters, safe failure rendering, and selected-workspace cookie preservation.
 - Existing Square provider/crypto and service/HTTP boundary suites passed.
 - Full TypeScript no-emit and focused ESLint passed.
@@ -60,6 +64,26 @@ deployment was performed during this implementation.
 The existing CI workflow runs the new server tests. The canonical disposable
 PostgreSQL qualification runner now applies the additive browse migration and
 runs its SQL suite. Hosted exact-head CI was not run as part of these local results.
+
+## Initial hosted findings and narrow corrections
+
+Run `36527966034` did not qualify: `verify` rejected the two new protected paths,
+and the new SQL fixture failed `workspace_members_role_check` with SQLSTATE
+`23514`. These are separate from the unchanged QBO assertions 47–48; none is
+waived as QBO. Step 13 was skipped.
+
+- Added only the exact browse migration and SQL-test paths to the existing
+  dormant-scope allowance. 418 architecture assertions and all five affected
+  parser suites pass; neighboring paths and mixed unrelated diffs stay rejected.
+- Reproduced `23514` locally using the unchanged canonical role constraint;
+  corrected the synthetic non-owner fixture from unsupported `member` to `viewer`.
+  The full 64-assertion browse suite then passed with that constraint present.
+- Addressed review `discussion_r4130090729` with the labeled UTC fallback above.
+  Independent focused review found no remaining issue in these corrections.
+
+Corrected-head hosted results must be recorded separately. The initial red run
+is not represented as passing, and this document does not authorize a merge or
+the additive Production migration.
 
 ## Browser verification
 

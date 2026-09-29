@@ -34,11 +34,11 @@ const connection = {
 const view = { available: true, historyAvailable: true, businessEntities: [{ id: "entity-owner-a", label: "Owner A business" }], connections: [connection] };
 const connectionMetadata = item => ({
   connectionId: item.connectionId, businessEntityId: item.businessEntityId, businessEntityLabel: "Owner A business",
-  sellerLabel: item.sellerLabel, locationLabel: "Owner A location", state: item.state, timeZone: "America/Los_Angeles",
+  sellerLabel: item.sellerLabel, locationLabel: "Owner A location", state: item.state, timeZone: "America/Los_Angeles", timeZoneFallback: false,
   createdAt: "2026-09-29T00:00:00.000Z", paymentCount: item.payments.length,
 });
 const browserFor = (overrides = {}) => ({
-  connectionId: connection.connectionId, currentConnection: connection, timeZone: "America/Los_Angeles", page: 1, pageSize: 25,
+  connectionId: connection.connectionId, currentConnection: connection, timeZone: "America/Los_Angeles", timeZoneFallback: false, page: 1, pageSize: 25,
   totalCount: 1, totalPages: 1, payments: connection.payments, connections: [connectionMetadata(connection)],
   filters: { startDate: null, endDate: null, status: "all" }, ...overrides,
 });
@@ -129,6 +129,27 @@ test("configured business timezone renders readable dates while full IDs and exa
   assert.match(row, /<details[\s\S]*full-provider-payment-identifier[\s\S]*2026-05-05 04:43:11 UTC[\s\S]*2026-05-05 04:43:12 UTC/);
   assert.equal(squareBusinessTime("2026-05-05T04:43:11Z", "America/Los_Angeles"), "May 4, 2026, 9:43 PM");
   assert.equal(squareBusinessTime("2026-05-05T04:43:11Z", "Invalid/Timezone"), "Time unavailable");
+});
+
+test("an unrecognized stored business timezone is labeled as UTC fallback without hiding saved browsing or controls", () => {
+  const html = render(view, { browser: browserFor({ timeZone: "UTC", timeZoneFallback: true,
+    connections: [{ ...connectionMetadata(connection), timeZone: "UTC", timeZoneFallback: true }] }) });
+  assert.match(html, /Dates in UTC · Fallback; business timezone unavailable/);
+  assert.match(html, /Last successful update[\s\S]*UTC · Fallback; business timezone unavailable/);
+  assert.match(html, /Filter saved Payments/);
+  assert.match(html, /payment-a/);
+  assert.match(html, /Update Payments/);
+  assert.doesNotMatch(html, /Dates in UTC · Business timezone|saved-record preview only/);
+});
+
+test("an archived fallback timezone does not relabel the valid current connection", () => {
+  const old = { ...connection, connectionId: "old-connection", state: "disconnected" };
+  const html = render(view, { browser: browserFor({ connectionId: old.connectionId, timeZone: "UTC", timeZoneFallback: true,
+    connections: [connectionMetadata(connection), { ...connectionMetadata(old), timeZone: "UTC", timeZoneFallback: true }] }) });
+  const currentPanel = html.slice(0, html.indexOf('id="saved-payments"'));
+  assert.match(currentPanel, /America\/Los_Angeles/);
+  assert.doesNotMatch(currentPanel, /Fallback/);
+  assert.match(html, /Dates in UTC · Fallback; business timezone unavailable/);
 });
 
 test("failed and canceled attempts cannot be mistaken for completed-payment badges or totals", () => {
