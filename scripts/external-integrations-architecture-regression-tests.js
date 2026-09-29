@@ -422,7 +422,41 @@ matches(
   "the fixture must preserve the exact production-labelled 2-leased/1-pending shape"
 );
 
-equal(approvedSquareQualificationPaths.length, 208, "dormant scope permits only exact reviewed migrations, UI, native service/templates, provider-neutral Production composition and activation, restricted evidence host, query-stripping callback edge, repository-bound image trigger, internal-seller consent and manual read, internal-pilot runtime, offline pilot, bounded provisioner and customer candidate files");
+equal(approvedSquareQualificationPaths.length, 223, "dormant scope permits only exact reviewed migrations, UI, native service/templates, provider-neutral Production composition and activation, restricted evidence host, query-stripping callback edge, repository-bound image trigger, internal-seller consent and manual read, internal-pilot runtime, offline pilot, bounded provisioner and customer candidate files");
+const workspaceClarityPaths = [
+  "app/app/intelligence/page.tsx",
+  "app/app/kpis/page.tsx",
+  "app/app/reports/page.tsx",
+  "app/app/sources/SourcesPage.tsx",
+  "app/app/sources/business-notes/actions.ts",
+  "components/app/AppNavigation.tsx",
+  "components/app/AppShell.tsx",
+  "components/app/ThemeControls.tsx",
+  "components/app/WorkspacePageTitle.tsx",
+  "components/evidence/BusinessNotesPanel.tsx",
+  "components/evidence/EvidenceBatchList.tsx",
+  "components/evidence/EvidenceLifecycleSelection.tsx",
+  "components/intelligence/IntelligenceBriefingCards.tsx",
+  "components/intelligence/IntelligenceSignalInbox.tsx",
+  "components/reports/SavedAnalysisList.tsx"
+];
+equal(withoutSquareQualificationPaths(workspaceClarityPaths.join("\n")), "", "only the fifteen reviewed workspace-clarity and note-feedback paths are exempt");
+for (const unapprovedWorkspacePath of [
+  ...workspaceClarityPaths.map(file => `${file}.unexpected`),
+  "app/app/intelligence/actions.ts",
+  "app/app/kpis/unreviewed/page.tsx",
+  "app/app/sources/business-notes/approval-actions.ts",
+  "app/app/files/actions.ts",
+  "components/app/AppNavigationExtra.tsx",
+  "components/evidence/UnreviewedList.tsx",
+  "components/evidence/EvidenceLifecycleSelectionExtra.tsx",
+  "components/reports/UnreviewedAnalysis.tsx",
+  "app/api/integrations/square/activate/route.ts",
+  "lib/supabase/server.ts"
+]) {
+  equal(withoutSquareQualificationPaths(unapprovedWorkspacePath), unapprovedWorkspacePath, "workspace UI allowance must reject neighboring, action, and backend paths");
+  equal(withoutSquareQualificationPaths([...workspaceClarityPaths, unapprovedWorkspacePath].join("\n")), unapprovedWorkspacePath, "approved UI paths cannot hide unrelated changes in a mixed diff");
+}
 const directCustomerProtectedPaths = [
   "components/integrations/SquareDirectCustomerPanel.tsx",
   "supabase/production-migrations/20260929004917_square_customer_service_backend.sql",

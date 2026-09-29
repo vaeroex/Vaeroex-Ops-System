@@ -20,9 +20,12 @@ type SelectionItem = Readonly<{
 type SelectionContextValue = Readonly<{
   selected: ReadonlySet<string>;
   toggle: (id: string) => void;
+  limitReached: boolean;
+  pending: boolean;
 }>;
 
 const SelectionContext = createContext<SelectionContextValue | null>(null);
+const SELECTION_LIMIT = 100;
 
 function itemLabel(count: number, singular: string) {
   return `${count} ${count === 1 ? singular : `${singular}s`}`;
@@ -58,24 +61,33 @@ export function EvidenceLifecycleSelection({
   const [message, setMessage] = useState("");
   const [pending, startTransition] = useTransition();
   const selectedItems = useMemo(() => items.filter((item) => selected.has(item.id)), [items, selected]);
-  const allSelected = items.length > 0 && selectedItems.length === items.length;
+  const selectedIds = new Set(selectedItems.map((item) => item.id));
+  const selectAllItems = items.slice(0, SELECTION_LIMIT);
+  const allSelected = selectAllItems.length > 0 && selectAllItems.every((item) => selectedIds.has(item.id));
+  const limitReached = selectedIds.size >= SELECTION_LIMIT;
   const canApprove = selectedItems.length > 0 && selectedItems.every((item) => item.approvable);
 
   function toggle(id: string) {
+    if (pending || !items.some((item) => item.id === id)) return;
     setSelected((current) => {
-      const next = new Set(current);
+      const next = new Set(items.filter((item) => current.has(item.id)).map((item) => item.id));
       if (next.has(id)) next.delete(id);
-      else next.add(id);
+      else if (next.size < SELECTION_LIMIT) next.add(id);
       return next;
     });
   }
 
   function selectAll() {
-    setSelected(new Set(items.map((item) => item.id)));
+    if (pending) return;
+    setSelected(new Set(selectAllItems.map((item) => item.id)));
   }
 
   function run(nextAction: EvidenceLifecycleAction) {
     if (!selectedItems.length || pending) return;
+    if (selectedItems.length > SELECTION_LIMIT) {
+      setMessage("Select at most 100 records per action.");
+      return;
+    }
     if (!window.confirm(confirmationCopy(nextAction, selectedItems.length, singularLabel))) return;
 
     let typedConfirmation: string | undefined;
@@ -99,18 +111,18 @@ export function EvidenceLifecycleSelection({
   }
 
   return (
-    <SelectionContext.Provider value={{ selected, toggle }}>
+    <SelectionContext.Provider value={{ selected: selectedIds, toggle, limitReached, pending }}>
       <div className="mb-3 flex min-h-11 flex-wrap items-center gap-3 rounded-lg border border-white/10 bg-white/[0.025] px-3 py-2">
         <button type="button" onClick={selectAll} disabled={allSelected || pending} className="text-sm font-semibold text-cyan-200 disabled:text-slate-500">
-          Select All
+          {items.length > SELECTION_LIMIT ? "Select first 100 shown" : "Select All"}
         </button>
-        {selected.size ? (
+        {selectedIds.size ? (
           <button type="button" onClick={() => setSelected(new Set())} disabled={pending} className="text-sm font-semibold text-slate-300 disabled:text-slate-500">
             Clear Selection
           </button>
         ) : null}
-        <span className="text-sm text-slate-400">{selected.size} selected</span>
-        {selected.size ? (
+        <span className="text-sm text-slate-400">{selectedIds.size} selected · Maximum 100 per action</span>
+        {selectedIds.size ? (
           <div className="ml-auto flex flex-wrap gap-2">
             {canApprove && !archived ? (
               <button type="button" disabled={pending} onClick={() => run("approve")} className="inline-flex min-h-10 items-center gap-2 rounded-md border border-emerald-300/30 bg-emerald-950/25 px-3 py-2 text-xs font-semibold text-emerald-100 disabled:opacity-50">
@@ -145,9 +157,10 @@ export function EvidenceLifecycleCheckbox({ id, label }: { id: string; label: st
     <input
       type="checkbox"
       checked={context.selected.has(id)}
+      disabled={context.pending || (context.limitReached && !context.selected.has(id))}
       onChange={() => context.toggle(id)}
       aria-label={`Select ${label}`}
-      className="mt-1 h-4 w-4 shrink-0 rounded border-white/20 bg-slate-950 text-vaeroex-blue focus:ring-cyan-400"
+      className="mt-1 h-4 w-4 shrink-0 rounded border-white/20 bg-slate-950 text-vaeroex-blue focus:ring-cyan-400 disabled:opacity-50"
     />
   );
 }

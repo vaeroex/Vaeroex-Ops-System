@@ -60,7 +60,7 @@ function hashSource(value: string) {
 }
 
 function noticeUrl(kind: "message" | "error", message: string) {
-  return `/app/sources?${kind}=${encodeURIComponent(message)}#business-notes` as Route;
+  return `/app/sources?${kind}=${encodeURIComponent(message)}&feedback=business-notes#business-notes` as Route;
 }
 
 function listValue(value: string, maxItems: number) {

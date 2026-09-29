@@ -177,6 +177,31 @@ test("confidence and history changes reset the batch while deep links still open
   assert.doesNotMatch(nodes(deep, (node) => node.type === "aside")[0].props.className, /^hidden/);
 });
 
+test("hiding a selected low-confidence finding previews the first remaining result without reopening mobile Back", () => {
+  const previousWindow = global.window;
+  global.window = { scrollY: 0, requestAnimationFrame: (fn) => fn(), scrollTo: () => {} };
+  try {
+    const render = inboxHarness({ currentCards: [card(0), card(1), card(2)], historyCards: [], canManageLifecycle: false });
+    let tree = render();
+    rows(tree).find((node) => node.props["data-finding-key"] === "finding-001").props.onClick({ currentTarget: { focus: () => {} } });
+    tree = render();
+    assert.match(content(nodes(tree, (node) => node.type === "aside")[0]), /Synthetic finding 1/);
+    nodes(tree, (node) => node.type === "input")[0].props.onChange({ currentTarget: { checked: true } });
+    tree = render();
+    assert.equal(rows(tree).length, 2);
+    assert.equal(rows(tree)[0].props["aria-current"], "true");
+    assert.match(content(nodes(tree, (node) => node.type === "aside")[0]), /Synthetic finding 0/);
+    assert.doesNotMatch(content(nodes(tree, (node) => node.type === "aside")[0]), /Select a finding/);
+    rows(tree)[0].props.onClick({ currentTarget: { focus: () => {} } });
+    tree = render();
+    button(tree, "← Back to list").props.onClick();
+    tree = render();
+    assert.equal(rows(tree).some((node) => node.props["aria-current"] === "true"), false);
+    assert.match(nodes(tree, (node) => node.type === "aside")[0].props.className, /^hidden xl:block/);
+    assert.match(content(nodes(tree, (node) => node.type === "aside")[0]), /Select a finding/);
+  } finally { global.window = previousWindow; }
+});
+
 test("unavailable briefings collapse only on request, retaining completed and generatable briefings", () => {
   const { IntelligenceBriefingCards } = loadSource("components/intelligence/IntelligenceBriefingCards.tsx", sharedMocks);
   const unavailable = (type) => ({ briefingType: type, status: "unavailable", eligibility: "no_eligible_evidence", confidence: "Low",

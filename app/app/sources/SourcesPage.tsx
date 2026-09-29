@@ -36,6 +36,7 @@ import { requireWorkspacePage } from "@/lib/workspaces/page-context";
 type SourceSearchParams = {
   error?: string;
   message?: string;
+  feedback?: string;
   status?: string;
   q?: string;
   file?: string;
@@ -1286,7 +1287,7 @@ export async function renderSourcesPage(params: SourceSearchParams = {}, options
 
   // Note actions return to #business-notes. Keep their feedback inside that
   // target; a long file list must not separate the result from the review.
-  const showNoteFeedback = activeTab === "files" && Boolean(errorMessage || successMessage);
+  const showNoteFeedback = activeTab === "files" && params.feedback === "business-notes" && Boolean(errorMessage || successMessage);
   const actionFeedback = <>
     <ErrorNotice message={errorMessage} />
     {successMessage ? (

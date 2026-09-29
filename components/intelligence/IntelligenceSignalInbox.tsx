@@ -498,7 +498,7 @@ export function IntelligenceSignalInbox({
     [activeType, hideLowConfidence, viewCards]
   );
   const pagedCards = filteredCards.slice(0, visibleCount);
-  const selectedCard = selectedKey ? filteredCards.find((card) => card.findingKeyHash === selectedKey) || null : null;
+  const selectedCard = selectedKey ? filteredCards.find((card) => card.findingKeyHash === selectedKey) || pagedCards[0] || null : null;
   const selectedInsight = selectedCard?.insight || null;
   const currentAttention = pagedCards.filter((card) => attentionTypes.has(card.snapshot.type));
   const currentImprovements = pagedCards.filter((card) => improvementTypes.has(card.snapshot.type));
