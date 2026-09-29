@@ -1,6 +1,14 @@
 // Exact additive dormant qualification/connection scope. Legacy parser suites still reject
 // every other database/runtime path; no directory-wide exemption is permitted.
 const approvedSquareQualificationPaths = Object.freeze([
+  // Exact user-authorized upload/preparation and shared feedback paths only.
+  // This is a path allowance, not permission to change Square or approval rules.
+  "app/app/files/actions.ts",
+  "components/evidence/UploadSourceForm.tsx",
+  "components/app/ToastRegion.tsx",
+  "components/operations/AnalysisProgressSubmit.tsx",
+  "components/operations/FormControls.tsx",
+  "components/operations/PendingSubmitButton.tsx",
   // Reviewed workspace clarity only: presentation and note-feedback routing,
   // not Square activation or changes to server-side business/authority rules.
   // Exact paths keep unrelated UI and all neighboring backend paths protected.

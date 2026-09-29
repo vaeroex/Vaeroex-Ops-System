@@ -11,13 +11,17 @@ export function PendingSubmitButton({
   pendingLabel = "Working...",
   className,
   disabled = false,
-  activityDisabled = false
+  activityDisabled = false,
+  pendingContent,
+  timeoutMs = LOCAL_PENDING_TIMEOUT_MS
 }: {
   children: ReactNode;
   pendingLabel?: string;
   className: string;
   disabled?: boolean;
   activityDisabled?: boolean;
+  pendingContent?: ReactNode;
+  timeoutMs?: number;
 }) {
   const { pending } = useFormStatus();
   const [localPending, setLocalPending] = useState(false);
@@ -37,9 +41,18 @@ export function PendingSubmitButton({
     }
 
     function handleSubmit(event: SubmitEvent) {
+      if (event.defaultPrevented) {
+        return;
+      }
+
       const submitter = event.submitter instanceof HTMLElement ? event.submitter : null;
 
       if (submitter && submitter !== button) {
+        return;
+      }
+
+      if (clickLockedRef.current) {
+        event.preventDefault();
         return;
       }
 
@@ -64,6 +77,7 @@ export function PendingSubmitButton({
       observedFormPendingRef.current = false;
       clickLockedRef.current = false;
       setLocalPending(false);
+      setLocalError("");
     }
   }, [pending]);
 
@@ -73,20 +87,18 @@ export function PendingSubmitButton({
     }
 
     const timer = window.setTimeout(() => {
-      observedFormPendingRef.current = false;
-      clickLockedRef.current = false;
-      setLocalPending(false);
-      setLocalError("Vaeroex did not receive a response. Please try again.");
-    }, LOCAL_PENDING_TIMEOUT_MS);
+      setLocalError("This is taking longer than expected. Keep this page open while Vaeroex finishes. Check the result before submitting again.");
+    }, timeoutMs);
 
     return () => window.clearTimeout(timer);
-  }, [localPending]);
+  }, [localPending, timeoutMs]);
 
   const resolvedClassName = showingPending ? `${className} pointer-events-none opacity-70` : className;
 
   return (
-    <span className="inline-flex flex-col items-start gap-2">
+    <div className="inline-flex flex-col items-start gap-2">
       <button
+        type="submit"
         ref={buttonRef}
         disabled={disabled || showingPending}
         className={resolvedClassName}
@@ -96,11 +108,12 @@ export function PendingSubmitButton({
       >
         {showingPending ? pendingLabel : children}
       </button>
+      {showingPending ? pendingContent : null}
       {localError ? (
         <span role="status" aria-live="polite" className="text-xs font-medium text-amber-200">
           {localError}
         </span>
       ) : null}
-    </span>
+    </div>
   );
 }
