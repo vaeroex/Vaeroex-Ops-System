@@ -62,7 +62,10 @@ function formatSignalDate(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "Date unavailable";
 
-  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(date);
+  // Reporting dates are calendar days, not browser-local midnight instants.
+  // Actual timestamps use an explicit, labeled zone on both server and client.
+  const label = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }).format(date);
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) ? label : `${label} UTC`;
 }
 
 function formatLifecycleTimestamp(value: string) {
@@ -71,8 +74,9 @@ function formatLifecycleTimestamp(value: string) {
 
   return new Intl.DateTimeFormat("en-US", {
     dateStyle: "medium",
-    timeStyle: "short"
-  }).format(date);
+    timeStyle: "short",
+    timeZone: "UTC"
+  }).format(date) + " UTC";
 }
 
 function dismissalReasonLabel(reason: IntelligenceCardLifecycleReason | null) {

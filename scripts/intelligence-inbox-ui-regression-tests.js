@@ -3,6 +3,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const Module = require("node:module");
 const test = require("node:test");
+const { execFileSync } = require("node:child_process");
 const ts = require("typescript");
 const React = require("react");
 const { renderToStaticMarkup } = require("react-dom/server");
@@ -89,6 +90,60 @@ function content(tree) {
 }
 const button = (tree, label) => nodes(tree, (node) => node.type === "button" && content(node.props.children).startsWith(label))[0];
 const rows = (tree) => nodes(tree, (node) => node.props?.["data-finding-key"]);
+
+test("Intelligence SSR dates match browser rendering across timezones and preserve reporting days", () => {
+  // Exercise the actual component formatters in separate runtime environments,
+  // rather than comparing a duplicate implementation of the formatting rules.
+  const sources = [
+    ["components/intelligence/IntelligenceSignalInbox.tsx", ["formatSignalDate", "formatLifecycleTimestamp"]],
+    ["components/intelligence/IntelligenceBriefingCards.tsx", ["generatedLabel"]],
+  ];
+  const functions = sources.map(([relative, names]) => {
+    const filename = path.join(root, relative);
+    const source = ts.createSourceFile(filename, fs.readFileSync(filename, "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+    return source.statements.filter(statement => ts.isFunctionDeclaration(statement) && names.includes(statement.name?.text)).map(statement => statement.getText(source)).join("\n");
+  }).join("\n");
+  const program = ts.transpileModule(functions + `
+    console.log(JSON.stringify({
+      reproduced: formatSignalDate("2026-07-18T00:00:00Z"),
+      reportingDay: formatSignalDate("2026-05-04"),
+      leapDay: formatSignalDate("2024-02-29"),
+      offsetInstant: formatSignalDate("2026-05-04T23:30:00-07:00"),
+      lifecycle: formatLifecycleTimestamp("2026-07-18T00:00:00Z"),
+      generated: generatedLabel("2026-07-18T00:00:00Z"),
+      invalid: [formatSignalDate("invalid"), formatLifecycleTimestamp("invalid"), generatedLabel("invalid")]
+    }));`, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText;
+  const render = (zone) => JSON.parse(execFileSync(process.execPath, ["-e", program], { encoding: "utf8", env: { ...process.env, TZ: zone, LANG: "de_DE.UTF-8" } }));
+  const server = render("UTC");
+  assert.deepEqual(server, {
+    reproduced: "Jul 18, 2026 UTC", reportingDay: "May 4, 2026", leapDay: "Feb 29, 2024",
+    offsetInstant: "May 5, 2026 UTC", lifecycle: "Jul 18, 2026, 12:00 AM UTC", generated: "Jul 18, 2026, 12:00 AM UTC",
+    invalid: ["Date unavailable", "Date unavailable", "Generation time unavailable"],
+  });
+  for (const zone of ["America/Los_Angeles", "Pacific/Honolulu", "Asia/Tokyo", "Pacific/Kiritimati"]) {
+    assert.deepEqual(render(zone), server, `server/browser text must agree in ${zone}`);
+  }
+  const previousZone = process.env.TZ;
+  try {
+    const { IntelligenceSignalInbox } = loadSource("components/intelligence/IntelligenceSignalInbox.tsx", sharedMocks);
+    const { IntelligenceBriefingCards } = loadSource("components/intelligence/IntelligenceBriefingCards.tsx", sharedMocks);
+    const dated = card(0, { snapshot: { ...card(0).snapshot, lastUpdated: "2026-07-18T00:00:00Z" } });
+    const props = { currentCards: [dated], historyCards: [], canManageLifecycle: false };
+    const state = (briefingType) => ({ briefingType, status: "current", eligibility: "limited", confidence: "Low", artifact: { generatedAt: "2026-07-18T00:00:00Z" }, period: { start: "2026-07-11", end: "2026-07-18", dayCount: 7, cutoff: "2026-07-18T00:00:00Z", timeZone: "UTC" } });
+    const renderMarkup = () => renderToStaticMarkup(React.createElement(React.Fragment, null,
+      React.createElement(IntelligenceSignalInbox, props),
+      React.createElement(IntelligenceBriefingCards, { states: { weekly: state("weekly"), monthly: state("monthly") }, generationEnabled: false })));
+    process.env.TZ = "UTC";
+    const html = renderMarkup();
+    assert.match(html, /<p class="mt-2 text-xs text-slate-500">Jul 18, 2026 UTC<\/p>/);
+    assert.match(html, /Last generated Jul 18, 2026, 12:00 AM UTC/);
+    process.env.TZ = "America/Los_Angeles";
+    assert.equal(renderMarkup(), html, "the reproduced finding paragraph and briefing markup hydrate without text replacement");
+  } finally {
+    if (previousZone === undefined) delete process.env.TZ;
+    else process.env.TZ = previousZone;
+  }
+});
 
 test("320 current findings are batched by ten in All, with truthful remaining-category text", () => {
   const render = inboxHarness({ currentCards: Array.from({ length: 320 }, (_, i) => card(i)), historyCards: [], canManageLifecycle: false });

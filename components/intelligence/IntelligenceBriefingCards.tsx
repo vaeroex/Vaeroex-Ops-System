@@ -40,7 +40,8 @@ function generatedLabel(value: string) {
     year: "numeric",
     hour: "numeric",
     minute: "2-digit",
-    timeZoneName: "short"
+    timeZoneName: "short",
+    timeZone: "UTC"
   }).format(date);
 }
 
