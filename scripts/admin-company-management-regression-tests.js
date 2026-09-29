@@ -32,7 +32,27 @@ const eventDetails = read("components/admin/AdminSubscriptionEventDetails.tsx");
 const appShell = read("components/app/AppShell.tsx");
 const adminNav = read("components/admin/AdminNav.tsx");
 const appNavigation = read("components/app/AppNavigation.tsx");
+const appNavigationState = read("lib/presentation/app-navigation.ts");
 const globals = read("app/globals.css");
+const { withoutSquareQualificationPaths } = require("./square-dormant-scope-test-support.js");
+const accountClarityPaths = [
+  "app/app/admin/customers/page.tsx", "app/app/admin/customers/[workspaceId]/page.tsx",
+  "components/admin/AdminAccountOverview.tsx", "components/admin/AdminCompanyTabs.tsx",
+  "components/admin/AdminActivationRequestReview.tsx", "components/admin/AdminManualActivationForm.tsx",
+  "components/admin/AdminSubscriptionEditor.tsx", "components/admin/AdminWorkspaceAccessForm.tsx",
+  "components/admin/AdminWorkspaceLifecycleActions.tsx", "app/app/admin/subscriptions/actions.ts"
+];
+assert.equal(withoutSquareQualificationPaths(accountClarityPaths.join("\n")), "", "only the nine approved UI paths and exact approved subscription-notice path are exempt");
+for (const protectedPath of [
+  "app/app/admin/customers/actions.ts", "app/app/admin/workspaces/actions.ts",
+  "app/app/admin/subscriptions/actions.ts.unexpected", "app/app/admin/subscriptions/other-actions.ts",
+  "app/app/admin/subscriptions/nested/actions.ts", "lib/admin/vaeroex-admin.ts",
+  "components/admin/AdminDeleteAccount.tsx", "components/admin/AdminWorkspaceAccessFormOther.tsx",
+  "supabase/migrations/20990101000000_admin_access.sql"
+]) {
+  assert.equal(withoutSquareQualificationPaths(protectedPath), protectedPath, "neighboring action, backend, and component paths remain protected");
+  assert.equal(withoutSquareQualificationPaths([...accountClarityPaths, protectedPath].join("\n")), protectedPath, "an allowed account path cannot hide an unrelated change");
+}
 
 for (const [name, source] of [
   ["Overview", overview],
@@ -100,6 +120,8 @@ for (const tab of ["overview", "workspace", "subscription", "agreement"]) {
   assert.match(tabs, new RegExp(`value: "${tab}"`), `company detail must include the ${tab} tab`);
   assert.match(companyDetail, new RegExp(`tab === "${tab}"`), `company detail must render the ${tab} content`);
 }
+assert.match(tabs, /flex-wrap/, "account sections must wrap on narrow screens");
+assert.match(tabs, /shrink-0/, "section labels must not shrink into overlapping mobile text");
 for (const [href, label] of [
   ["/app/admin", "Admin Dashboard"],
   ["/app/admin/customers", "Customers"],
@@ -124,7 +146,8 @@ for (const route of [
 ]) {
   assert.equal(exists(route), true, `${route} must remain available as a standalone deep route`);
 }
-assert.match(appNavigation, /href === "\/app" \|\| href === "\/app\/admin"/, "Admin Dashboard must use exact active-path matching");
+assert.match(appNavigation, /isWorkspacePathActive/, "Admin navigation must use the shared active-path helper");
+assert.match(appNavigationState, /href === "\/app" \|\| href === "\/app\/admin"/, "Admin Dashboard must use exact active-path matching");
 assert.match(companyDetail, /WorkspaceAgreementActions[\s\S]+agreementId=\{agreement\.id\} admin/, "company detail must reuse secure agreement PDF actions");
 assert.match(companyDetail, /\/app\/admin\/workspace-agreements\/\$\{agreement\.id\}/, "company detail must preserve the existing agreement route");
 assert.match(companyDetail, /No agreement/, "company detail must expose the no-agreement state");
@@ -140,7 +163,7 @@ for (const [source, action] of [
   assert.match(source, new RegExp(action), `${action} must remain wired to its server form`);
   assert.match(source, /PendingSubmitButton|ConfirmSubmitButton/, `${action} must suppress repeated submissions while pending`);
 }
-for (const label of ["Access status", "Plan", "Required access", "Manual unlock", "Update access"]) {
+for (const label of ["Workspace subscription status", "Plan", "Require a subscription", "Manual access unlock", "Save access settings"]) {
   assert.match(workspaceForm, new RegExp(label), `workspace detail must preserve ${label}`);
 }
 assert.match(subscriptions + companyDetail, /New Activation/, "manual activation must remain discoverable");

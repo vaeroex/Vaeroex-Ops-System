@@ -119,7 +119,7 @@ export async function createManualSubscriptionAction(formData: FormData) {
   revalidatePath("/app/admin/subscriptions");
   revalidatePath("/app/admin/customers");
   if (effectiveWorkspaceId) revalidatePath(`/app/admin/customers/${effectiveWorkspaceId}`);
-  redirect(withAdminActionNotice(returnTo, "message", "Manual activation saved."));
+  redirect(withAdminActionNotice(returnTo, "message", "Manual subscription record saved. Check workspace access separately."));
 }
 
 export async function updateSubscriptionAction(formData: FormData) {

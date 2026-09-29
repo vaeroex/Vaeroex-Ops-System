@@ -1,6 +1,19 @@
 // Exact additive dormant qualification/connection scope. Legacy parser suites still reject
 // every other database/runtime path; no directory-wide exemption is permitted.
 const approvedSquareQualificationPaths = Object.freeze([
+  // Exact user-authorized Admin account clarity paths; no neighboring actions,
+  // authorization helpers, migrations, or provider behavior are exempted.
+  "app/app/admin/customers/page.tsx",
+  "app/app/admin/customers/[workspaceId]/page.tsx",
+  "components/admin/AdminAccountOverview.tsx",
+  "components/admin/AdminCompanyTabs.tsx",
+  "components/admin/AdminActivationRequestReview.tsx",
+  "components/admin/AdminManualActivationForm.tsx",
+  "components/admin/AdminSubscriptionEditor.tsx",
+  "components/admin/AdminWorkspaceAccessForm.tsx",
+  "components/admin/AdminWorkspaceLifecycleActions.tsx",
+  // Exact user-authorized success-notice correction only; write/authority rules remain unchanged.
+  "app/app/admin/subscriptions/actions.ts",
   // Exact user-authorized upload/preparation and shared feedback paths only.
   // This is a path allowance, not permission to change Square or approval rules.
   "app/app/files/actions.ts",
