@@ -115,9 +115,12 @@ export default async function AdminCompanyDetailPage({
   const subscriptions = (subscriptionsResult.data || []) as SubscriptionRow[];
   const agreement = agreementResult.data as AgreementRow | null;
   const contactEmail = company.primary_contact_email || subscriptions[0]?.customer_email || "";
-  const [activationRequestsResult, eventsResult, deliveryResult] = await Promise.all([
+  const [pendingRequestsResult, previousRequestsResult, eventsResult, deliveryResult] = await Promise.all([
     contactEmail
-      ? admin.from("manual_activation_requests").select("*").ilike("email", contactEmail).order("created_at", { ascending: false }).limit(12)
+      ? admin.from("manual_activation_requests").select("*").ilike("email", contactEmail).in("status", ["pending", "needs_more_info"]).order("created_at", { ascending: false }).limit(12)
+      : Promise.resolve({ data: [] as ActivationRequest[], error: null }),
+    contactEmail
+      ? admin.from("manual_activation_requests").select("*").ilike("email", contactEmail).in("status", ["approved", "denied"]).order("created_at", { ascending: false }).limit(12)
       : Promise.resolve({ data: [] as ActivationRequest[], error: null }),
     contactEmail
       ? admin.from("subscription_events").select("*").ilike("customer_email", contactEmail).order("created_at", { ascending: false }).limit(12)
@@ -127,9 +130,8 @@ export default async function AdminCompanyDetailPage({
       : Promise.resolve({ data: null as DeliveryRow | null, error: null })
   ]);
 
-  const activationRequests = (activationRequestsResult.data || []) as ActivationRequest[];
-  const pendingRequests = activationRequests.filter((request) => ["pending", "needs_more_info"].includes(request.status));
-  const previousRequests = activationRequests.filter((request) => !["pending", "needs_more_info"].includes(request.status));
+  const pendingRequests = (pendingRequestsResult.data || []) as ActivationRequest[];
+  const previousRequests = (previousRequestsResult.data || []) as ActivationRequest[];
   const events = (eventsResult.data || []) as SubscriptionEvent[];
   const delivery = deliveryResult.data as DeliveryRow | null;
   const queryResults = [
@@ -137,7 +139,7 @@ export default async function AdminCompanyDetailPage({
     ["members", membersResult], ["member profiles", profilesResult],
     ["KPI count", kpiCount], ["evidence-file count", fileCount],
     ["saved-analysis count", savedAnalysisResult], ["analysis-artifact count", intelligenceCount],
-    ["activation requests", activationRequestsResult], ["subscription events", eventsResult], ["agreement delivery", deliveryResult]
+    ["pending activation requests", pendingRequestsResult], ["previous activation requests", previousRequestsResult], ["subscription events", eventsResult], ["agreement delivery", deliveryResult]
   ] as const;
   const unavailable = queryResults.filter(([, result]) => result.error).map(([label]) => label);
   const countLabel = (result: { error: unknown; count: number | null }) => result.error || result.count === null ? "Unavailable" : String(result.count);
@@ -247,7 +249,7 @@ export default async function AdminCompanyDetailPage({
                     {request.message ? <p className="mt-2 text-sm leading-6 text-muted">{request.message}</p> : null}
                     <p className="mt-2 text-xs text-muted">Decision retained. Manage current access separately; do not replay approval to end a pilot.</p>
                   </article>
-                )) : activationRequestsResult.error ? <p className="text-sm text-muted">Activation requests unavailable.</p> : <EmptyState title="No activation requests" description="No request matches this company contact." />}
+                )) : previousRequestsResult.error ? <p className="text-sm text-muted">Previous activation requests unavailable.</p> : <EmptyState title="No previous activation requests" description="No resolved request matches this company contact." />}
               </div>
             </SectionCard>
 

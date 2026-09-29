@@ -18,6 +18,8 @@ This follow-up is not deployed. Same-data comparisons use the same synthetic own
 - Business overview separates the actual loaded owner membership, workspace access settings, and billing record. Primary contact is retained in details rather than presented as the owner.
 - Archive is present on Overview; active/pending accounts show a disabled action and reason. Existing confirmation and server-side lifecycle guards are unchanged.
 - Pending activation decisions are no longer buried with previous requests. Resolved requests remain history, not a second access-revocation control.
+- Review correction: pending/needs-information requests are queried separately before the 12-row limit, so newer resolved requests cannot hide an older decision. A regression executes the page with twelve newer resolved requests and two older unresolved requests.
+- Review correction: blocked Archive explains the actual workspace/subscription `manual_review` state; it does not assume an activation request exists.
 - Manual saving previously selected the newest subscription by email alone. Selection now also requires the exact workspace (or an explicitly unlinked record), manual provider, and manual activation. It cannot retarget another workspace's record or convert a Stripe record.
 - Both subscription actions check the workspace write result, including missing returned rows. Partial success is an error with explicit retained-record information, not a claim that access was granted. There is no automatic retry or compensating mutation. The two writes are still not atomic.
 - Manual creation explicitly requires a subscription for its selected workspace. An inactive manual record and disabled unlock do not silently leave subscription-free access enabled.
@@ -26,6 +28,7 @@ This follow-up is not deployed. Same-data comparisons use the same synthetic own
 ## Verification boundaries
 
 - Local typecheck, changed-file lint, security checks, manual-activation and Admin regressions are required.
+- The exact three user-approved pilot paths remain the only new scope allowances; the architecture count is 242 and neighboring files remain rejected. Sixteen action/page regressions and 547 architecture assertions pass locally after the review corrections.
 - Real exported Server Actions and entitlement evaluation run with disposable in-memory rows, ordinary non-admin customer identity, and a separate administrator. Covers workspace targeting, active/expired manual entitlement, Stripe/other-workspace preservation, read failures, rejected second write, and no blind retry.
 - Existing PostgreSQL activation qualification now includes first-time unlinked manual eligibility and preservation of the other workspace. It runs as its own CI step after successful isolated setup even if an earlier unrelated suite fails. It does not waive that suite's failure.
 - Browser synthetic checks cover layout, navigation, pending submission, readable failure, blocked Archive, and retained history. They do not create real logins or change real customer records.

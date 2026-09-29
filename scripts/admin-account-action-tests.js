@@ -368,6 +368,11 @@ test("real lifecycle controls require confirmation, cancel without submission an
     for (const disallowed of ["active", "pending_activation"]) {
       const unavailable = AdminWorkspaceLifecycleActions({ workspaceId, companyName: "Disposable fixture account", lifecycle: disallowed, returnTo: detailPath });
       assert.equal(nodes(unavailable, (node) => node.type === "form").length, 0, `${disallowed} must not expose an archive form`);
+      assert.equal(nodes(unavailable, (node) => node.type === "button")[0].props.disabled, true);
+      if (disallowed === "pending_activation") {
+        assert.match(content(unavailable), /workspace or a linked subscription is in manual review/);
+        assert.doesNotMatch(content(unavailable), /Resolve the activation request/, "manual review does not imply an activation request exists");
+      }
     }
   }
 });
@@ -385,7 +390,7 @@ async function overviewFixture(options = {}) {
   const company = {
     workspace_id: workspaceId, company_name: "Disposable fixture account", lifecycle_status: "inactive",
     subscription_status: "expired", subscription_plan_slug: "vaeroex", billing_provider: "stripe",
-    primary_contact_name: "Fixture contact", primary_contact_email: null
+    primary_contact_name: "Fixture contact", primary_contact_email: options.activationRequests ? "contact@example.invalid" : null
   };
   const admin = {
     auth: new Proxy({}, { get: () => forbidden }),
@@ -395,6 +400,7 @@ async function overviewFixture(options = {}) {
       const builder = {
         select(columns, settings) { query.columns = columns; query.settings = settings; return builder; },
         eq(key, value) { query.filters.push(["eq", key, value]); return builder; },
+        ilike(key, value) { query.filters.push(["ilike", key, value]); return builder; },
         in(key, value) { query.filters.push(["in", key, value]); return builder; },
         is(key, value) { query.filters.push(["is", key, value]); return builder; },
         contains(key, value) { query.filters.push(["contains", key, value]); return builder; },
@@ -405,6 +411,13 @@ async function overviewFixture(options = {}) {
           return Promise.resolve().then(() => {
             queries.push(structuredClone(query));
             const error = options.errors?.includes(table) ? { message: "Fixture read unavailable." } : null;
+            if (["manual_activation_requests", "subscription_events"].includes(table)) {
+              assert.ok(query.filters.some(([kind, key, value]) => kind === "ilike" && key === (table === "manual_activation_requests" ? "email" : "customer_email") && value === company.primary_contact_email));
+              if (error) return { data: null, error };
+              const statuses = query.filters.find(([kind, key]) => kind === "in" && key === "status")?.[2];
+              const rows = table === "manual_activation_requests" ? options.activationRequests : [];
+              return { data: rows.filter((row) => !statuses || statuses.includes(row.status)).sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, query.maximum), error: null };
+            }
             if (table === "profiles") {
               assert.equal(query.columns, "id,full_name,email", "profile reads must use only the needed identity fields");
               assert.equal(query.filters.length, 1);
@@ -464,6 +477,23 @@ function content(tree) {
   if (tree && typeof tree === "object") return content(tree.props?.children);
   return tree == null || typeof tree === "boolean" ? "" : String(tree);
 }
+
+test("older pending requests remain actionable after twelve newer resolved requests", async () => {
+  const activationRequests = [
+    { id: "older-pending", status: "pending", email: "contact@example.invalid", created_at: "2026-09-01" },
+    { id: "older-needs-info", status: "needs_more_info", email: "contact@example.invalid", created_at: "2026-09-02" },
+    ...Array.from({ length: 12 }, (_, index) => ({ id: `resolved-${index}`, status: index % 2 ? "approved" : "denied", email: "contact@example.invalid", created_at: "2026-09-29" }))
+  ];
+  const fixture = await overviewFixture({ activationRequests });
+  const requests = fixture.queries.filter((query) => query.table === "manual_activation_requests");
+  assert.equal(requests.length, 2);
+  assert.ok(requests.every((query) => query.maximum === 12));
+  assert.deepEqual(requests.map((query) => query.filters.find(([kind, key]) => kind === "in" && key === "status")[2]), [["pending", "needs_more_info"], ["approved", "denied"]]);
+  assert.deepEqual(nodes(fixture.tree, (node) => node.type === "AdminActivationRequestReview").map((node) => node.props.request.id), ["older-needs-info", "older-pending"]);
+  const failed = await overviewFixture({ activationRequests, errors: ["manual_activation_requests"] });
+  assert.match(nodes(failed.tree, (node) => node.type === "ErrorNotice")[0].props.message, /pending activation requests/);
+  assert.equal(nodes(failed.tree, (node) => node.type === "AdminActivationRequestReview").length, 0);
+});
 
 test("account overview reads at most 100 workspace memberships and only those members' profile identities", async () => {
   const fixture = await overviewFixture();
