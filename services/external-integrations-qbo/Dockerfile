@@ -14,7 +14,7 @@ COPY services/external-integrations-qbo/src ./services/external-integrations-qbo
 COPY tsconfig.json ./tsconfig.json
 
 RUN /app/node_modules/.bin/ncc build \
-      services/external-integrations-qbo/src/server.ts \
+      services/external-integrations-qbo/src/entry.ts \
       -o services/external-integrations-qbo/dist \
       --minify \
       --no-cache \

@@ -52,7 +52,8 @@ const webhookSignature = read("lib/integrations/providers/qbo/webhook-signature.
 const edgeCallback = read("services/external-integrations-qbo/edge/callback.go");
 const edgePlugin = read("services/external-integrations-qbo/edge/plugin/main.go");
 const edgeTests = read("services/external-integrations-qbo/edge/callback_test.go");
-const terraform = read("services/external-integrations-qbo/infra/main.tf");
+const terraform = read("services/external-integrations-qbo/infra/main.tf") + "\n" +
+  read("services/external-integrations-qbo/infra/modules/callback/main.tf");
 const variables = read("services/external-integrations-qbo/infra/variables.tf");
 const terraformOutputs = read("services/external-integrations-qbo/infra/outputs.tf");
 const terraformVersions = read("services/external-integrations-qbo/infra/versions.tf");
@@ -66,9 +67,6 @@ const descriptor = read("lib/integrations/providers/qbo/descriptor.ts");
 const status = read("lib/integrations/control-plane/customer-status.ts");
 const schedulerRepositoryCall = repository.match(
   /"schedule_qbo_initialization_v2",\s*\{([\s\S]*?)\},\s*client/
-)?.[1] ?? "";
-const publicCallbackGrant = terraform.match(
-  /resource "google_cloud_run_v2_service_iam_member" "public_callback" \{([\s\S]*?)\n\}/
 )?.[1] ?? "";
 const providerEgressModes = terraform.match(
   /provider_egress_modes = toset\(\[([\s\S]*?)\]\)/
@@ -203,8 +201,8 @@ matches(server, /parseQboProductionCloudTaskDelivery/, "runtime validates Cloud 
 matches(server, /qbo_production_oauth_state_namespace_invalid/, "broker rejects OAuth state namespaces it did not issue");
 matches(server, /\^\(\?:i1_\|r1_\)\[A-Za-z0-9_-\]\{43\}\$/, "broker accepts only exact initial and reauthorization state namespaces");
 matches(terraform, /google_cloud_run_v2_service_iam_member" "task_to_runtime"[\s\S]*roles\/run\.invoker[\s\S]*task_invoker/, "Cloud Run admits task delivery only from the dedicated OIDC identity");
-matches(publicCallbackGrant, /service\["oauth_ingress"\]/, "the only public invoker grant targets OAuth ingress");
-excludes(publicCallbackGrant, /provider_runtime/, "the public callback grant cannot reach the provider runtime");
+matches(terraform, /invoker_iam_disabled\s*= each\.key == "oauth_ingress"/, "only load-balancer-bound public ingress disables the Invoker IAM check");
+excludes(terraform, /member\s*=\s*"allUsers"/, "domain-restricted sharing is preserved without public IAM grants");
 matches(server, /BoundedIdentifierSchema\.parse\(credential\.externalAuthorizedEntityReference\)/, "QBO runtime requires the broker-authorized realm");
 matches(server, /externalReferenceFingerprint\(realmId\) !== authority\.providerTenantReferenceFingerprint/, "decrypted realm is compared by fingerprint");
 matches(companyVerifier, /qbo_sandbox_company_verification_v1/, "generic verifier preserves the historical sandbox fingerprint contract");

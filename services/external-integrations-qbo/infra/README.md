@@ -8,6 +8,14 @@ Every database pool verifies the session-pooler certificate and hostname against
 
 This Terraform module defines the permanent multi-tenant QBO execution surface. It is intentionally separate from qualification resources and does not contain project IDs, connection IDs, provider credentials, secret values, or disposable queue bindings.
 
+For HTTPS setup before Intuit exposes a Production webhook verifier, use the
+separately reviewed [disabled ingress bootstrap](bootstrap/README.md), not this
+full execution root and not placeholder secret versions. Both roots reuse the
+same callback module. Public ingress uses the supported load-balancer-only
+Invoker-IAM-disabled pattern without an `allUsers` grant; all private modes
+retain their Invoker IAM checks. Do not apply either root without a reviewed
+plan and explicit deployment approval.
+
 The same immutable image digest runs in five modes: public OAuth/webhook ingress, private credential broker, database-derived initialization scheduler, fair task dispatcher, and provider runtime. The public Cloud Run service accepts traffic only through the managed HTTPS load balancer. A separately digest-pinned, fail-closed Wasm edge removes OAuth query parameters before Cloud Run request logging, rejects forged handoff headers, and allows only the exact signed webhook path through unchanged. Load-balancer and plugin request logging are disabled. All other services require the exact scheduler, task-invoker, ingress, or runtime identity declared by the module.
 
 The edge applies to every request on the forwarding rule, including unexpected Host headers, and rejects hosts other than its explicit configuration. The public ingress service's default Cloud Run URL is disabled so internal/default-URL traffic cannot bypass sanitization. Service creation waits for the database-secret accessor grants; effective secret access is verified again before releasing traffic.
