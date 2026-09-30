@@ -171,7 +171,7 @@ async function main() {
       raw => { raw.Line[0].Amount = '10'; }, raw => { raw.Line[0].SalesItemLineDetail.Qty = 2; },
       raw => { raw.Line[0].SalesItemLineDetail.UnitPrice = '10'; }, raw => { raw.TxnTaxDetail = { TotalTax: '10' }; },
       raw => { raw.TxnTaxDetail = { TotalTax: 0, TaxLine: [{ Amount: 10 }] }; },
-      raw => { raw.Line = [{ Amount: 0, GroupLineDetail: { Quantity: 0, Line: [{ Amount: 10 }] } }]; }];
+      raw => { raw.Line = [{ Amount: 0, DetailType: 'GroupLineDetail', GroupLineDetail: { Quantity: 0, Line: [{ Amount: 10 }] } }]; }];
     for (const mutate of mutations) {
       const raw = invoice(); mutate(raw);
       assert.equal(minimizeQboSourceRecord({ recordType: 'Invoice', provider, raw }).status, 'active');

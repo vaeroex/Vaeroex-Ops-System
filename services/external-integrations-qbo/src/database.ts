@@ -26,6 +26,13 @@ const productionRoles = new Set([
   "integration_provider_source_authority"
 ]);
 
+// pg encodes JavaScript arrays as PostgreSQL arrays. These two arguments are
+// explicitly JSONB; reason-code text[] arguments retain normal pg encoding.
+const jsonArrayArguments: Readonly<Record<string, readonly string[]>> = {
+  commit_qbo_accounting_source_v1: ["p_facts"],
+  commit_qbo_accounting_calculation_v1: ["p_nodes"]
+};
+
 function identifier(value: string, allowed?: ReadonlySet<string>) {
   if (!/^[a-z][a-z0-9_]*$/.test(value) || (allowed && !allowed.has(value))) {
     throw new Error("qbo_production_database_identifier_denied");
@@ -63,7 +70,7 @@ export class QboProductionDatabase {
           await client.query(`set local role ${checkedRole}`);
           const result = await client.query(
             `select public.${functionName}(${parameters.join(", ")}) as data`,
-            entries.map(([, value]) => value)
+            entries.map(([key, value]) => jsonArrayArguments[functionName]?.includes(key) ? JSON.stringify(value) : value)
           );
           await client.query("commit");
           return { data: result.rows[0]?.data ?? null, error: null };

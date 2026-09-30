@@ -94,11 +94,14 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
                 canManage={context.membership?.role === "owner"}
               />
               {context.membership?.role === "owner" ? (
-                <Link href="/app/settings/integrations/quickbooks/data"
+                <div className="flex flex-wrap items-center gap-4"><Link href="/app/settings/integrations/quickbooks/data"
                   className="inline-flex min-h-10 items-center gap-2 text-sm font-semibold text-vaeroex-blue">
                   <FileText aria-hidden="true" className="h-4 w-4" />
                   View stored QuickBooks data
-                </Link>
+                </Link><Link href="/app/settings/integrations/quickbooks/accounting"
+                  className="inline-flex min-h-10 items-center gap-2 text-sm font-semibold text-vaeroex-blue">
+                  Accounting authority
+                </Link></div>
               ) : null}
             </SectionCard>
           ) : null}

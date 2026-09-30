@@ -110,20 +110,103 @@ unchanged Square catalog. The four candidate migrations remain unapplied to
 Production. Hosted `verify` and `security-database` must pass the committed head;
 local evidence is not a waiver for those gates.
 
-The product surface currently provides validated accounting-record inspection,
-non-additive report observations, lifecycle and import-quality diagnostics, and
-provenance. It does **not** complete canonical accounting intelligence or connect
-those observations to snapshot intake. That next stage requires immutable source
-selection, explicit customer/operator source-authority policy, qualified single
-fact admission, lifecycle reversal and deterministic snapshot receipts. In
-particular, `Income` plus `Other Income` transactions are not automatically a
-comparable population for a report's `Total Income`. No combined Square/QBO
-revenue, financial contribution, KPI, or evidence eligibility is inferred here.
-See [the stored-data contract](qbo-customer-stored-data.md) for the exact boundary.
+Those totals describe the earlier source-browse candidate, not the final release.
+The 2026-09-30 accounting candidate adds the forward-only
+`20260930193412_qbo_production_accounting_intake.sql` migration. It creates no
+customer consent, runtime configuration, connection, credential or schedule on
+application. All five candidate migrations still require the exact-head release
+and Production-ledger checks before deployment.
 
-Production credentials, callback/DNS and hosted ingress verification, real
-customer consent/company binding, actual ongoing delivery, and representative
-Production record reconciliation remain deployment/activation gates. The
+The current candidate connects validated Production sources to the existing
+canonical facts, reconciliation contribution events, Phase 3 deterministic
+registry, and Executive Intelligence producer. An authenticated, current
+workspace owner must separately approve the fixed posted-accrual policy and
+effective date at `/app/settings/integrations/quickbooks/accounting`. This binds
+the exact connection generation, mapping row version, realm fingerprint and
+currency. Mapping reinstatement requires fresh owner approval. No developer's
+approval substitutes for an actual business entity's consent.
+
+Only supported, explicit posting-account detail is admitted: ordinary sales
+lines and balanced journals with validated Income/Other Income classification.
+Current Item classifications cannot invent historical posting accounts. Tax,
+discount, group, foreign-currency or otherwise ambiguous economics remain under
+review instead of being silently simplified. Legacy projections lacking the
+required evidence are not promoted. Payments, deposits, transfers and report
+totals do not become revenue. Reports remain non-additive controls, and Square,
+manual and upload contributions are excluded by this explicit policy.
+
+Admission and withdrawal use immutable source applications, canonical fact/source
+edges, versioned native reconciliation cases and exactly-once financial events.
+Source correction, void, mapping withdrawal and durable disconnect invalidate
+effects; owner withdrawal preserves truthful fact history. Same-generation
+connectivity failures block new admission/current display without orphaning
+already-admitted effects. Reconsent can reuse an unchanged fact once, never add
+the prior contribution twice. SQL independently checks posting amounts, dates,
+dimensions and evidence even when a worker submits a valid hash.
+
+The bounded validation-maintenance cycle also runs accounting admission and
+deterministic processing. Independent visit timestamps prevent one blocked
+tenant from starving another. Only the existing monthly revenue aggregate/KPI
+formulas run, and only changed dependency scopes are dirtied. Database-owned
+monotonic completion times, prior-watermark fencing and coherent summary reads
+prevent stale values from appearing current.
+
+Executive Intelligence receives entity/currency-scoped **partial admitted posted
+revenue subtotals**, with native fact/source provenance and derived-only evidence.
+It does not assign performance targets, claim complete posted revenue, treat
+reports as a comparable population, merge Square cash activity, or manufacture
+Business Health conclusions. Canonical money stays decimal; presentation numbers
+require lossless decimal round-trip conversion. Amounts that cannot safely cross
+that interface remain exact strings in the view. See
+[the stored-data contract](qbo-customer-stored-data.md) for the inspection boundary.
+
+Focused native qualification applies both canonical `120+5` and Production
+`108+5` migration shapes. The latest run passed **520 assertions per shape**,
+including 215 accounting end-to-end/adversarial assertions and real concurrent
+admission sessions. It covers forged values, cross-source/stale authority,
+service-role denial, correction, void/restoration, consent withdrawal/regrant,
+mapping reapproval, exact deterministic totals, summary fencing and disconnect.
+The Square catalog was unchanged. This is isolated synthetic evidence, not a
+claim of live-company or deployed end-to-end verification.
+
+The focused browser gate now includes owner consent/revocation and the accounting
+summary, in addition to stored-data browsing. Synthetic desktop, tablet and
+mobile checks preserve explicit unchecked consent, an unfilled effective date,
+keyboard-accessible provenance links, bounded responsive layout, and no amount
+for disabled/pending/unavailable calculations. The accounting producer passed 78
+focused checks including that browser path. Phase 7 (606), Phase 8B (710),
+architecture (555), TypeScript, scoped ESLint and whitespace checks also passed
+locally. Required hosted gates must still qualify the exact committed head.
+
+The isolated legacy validator harness loads the exact new projection-version
+allowlist block, rather than testing the current v2 serializer against an old
+v1-only function. The browse-only diagnostic regression still prohibits raw
+QuickBooks observations from entering Intelligence; it now permits only the
+separately qualified accounting KPI/provenance producer. The posting-date test
+requires both the task window and owner-policy cutoff. These updates preserve
+the security predicates instead of waiving failed checks.
+
+## Supported Production webhook subscriptions
+
+Production CloudEvents use Intuit's `void` event spelling; it is normalized to
+the internal `voided` operation only after raw-body HMAC verification. Subscribe
+only to the following supported entity/event combinations:
+
+| Entities | Events |
+| --- | --- |
+| Account, Customer, Item, Vendor | Create, Update, Delete, Merge |
+| Invoice, Payment, CreditMemo, SalesReceipt, RefundReceipt, BillPayment, Purchase, Transfer | Create, Update, Delete, Void |
+| Bill, VendorCredit, Deposit, JournalEntry | Create, Update, Delete |
+
+Do not select Emailed or additional unsupported events. These 60 combinations
+are covered by focused signed-envelope tests. Invalid signatures fail before
+parsing or persistence; stored verifier version metadata is not signature proof.
+See [Intuit's webhook configuration reference](https://static.developer.intuit.com/output_html/qbo/docs/develop/webhooks/configure-webhooks.html).
+
+Production client/verifier version 1 and disabled HTTPS ingress were separately
+verified before this accounting work. Operational secret bindings, runtime
+deployment, real customer consent/company binding, actual ongoing delivery, and
+representative Production record reconciliation remain release/activation gates. The
 developer application's approval and mocked browser/database checks are not
 evidence that these gates passed. Keep the connection feature gate closed and
 execution paused until the applicable release scope and all required gates are

@@ -32,6 +32,8 @@ import { isSecurityResponseMessage } from "@/lib/security/security-response";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
 import { qboProductionCustomerConnectionsEnabled } from "@/lib/integrations/control-plane/qbo-customer-availability";
 import { QboIntelligenceDiagnostic } from "@/lib/integrations/qbo-customer/intelligence-diagnostic";
+import { loadQboAccountingIntelligence } from "@/lib/integrations/qbo-customer/accounting-intelligence-server";
+import { QboAccountingIntelligenceView } from "@/lib/integrations/qbo-customer/accounting-intelligence-view";
 
 export const dynamic = "force-dynamic";
 
@@ -172,6 +174,7 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
       reason: businessNoteContext.error.message
     }));
   }
+  const qboAccounting = await loadQboAccountingIntelligence(workspaceId, snapshotAsOf);
   let intelligenceSnapshot: IntelligenceSnapshotV1 | null = null;
   let displayedInsights = intelligence.insights;
   try {
@@ -179,6 +182,10 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
       workspaceId,
       asOf: snapshotAsOf,
       intelligence,
+      ...(qboAccounting.state === "available" && qboAccounting.data.kpis.length ? {
+        kpis: qboAccounting.data.kpis,
+        evidenceManifests: qboAccounting.data.evidenceManifests
+      } : {}),
       ...(businessNoteContext.records.length ? {
         contextualEvidence: {
           releaseChannel: businessNoteContextReleaseChannel,
@@ -260,6 +267,7 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
         </div>
       </header>
       <ErrorNotice message={displayErrors[0]?.message || null} />
+      <QboAccountingIntelligenceView result={qboAccounting} />
       {qboProductionCustomerConnectionsEnabled() && context.membership?.role === "owner"
         ? <QboIntelligenceDiagnostic workspaceId={workspaceId} /> : null}
       <IntelligenceSignalInbox

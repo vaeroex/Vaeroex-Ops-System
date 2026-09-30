@@ -1,4 +1,5 @@
 import {
+  QBO_ACCOUNTING_MINIMIZATION_VERSION,
   QBO_MASTER_RECORD_TYPES,
   QBO_PROVIDER_KEY,
   QBO_SOURCE_RECORD_CONTRACT_VERSION,
@@ -11,6 +12,7 @@ import {
   type QboSupportedObjectType
 } from "@/lib/integrations/providers/qbo/contracts";
 import {
+  IsoTimestampSchema,
   PersistedExchangeRateSchema,
   PersistedFactDecimalSchema
 } from "@/lib/integrations/contracts/primitives";
@@ -56,8 +58,11 @@ function optionalBoolean(record: JsonRecord, key: string) {
 }
 
 function requiredTimestamp(value: unknown, field: string) {
-  if (typeof value !== "string") fail(field);
-  return value;
+  const parsed = IsoTimestampSchema.safeParse(value);
+  if (!parsed.success) fail(field);
+  // PostgreSQL stores instants, not their original offset/fraction spelling.
+  // Fingerprint the same millisecond UTC representation returned by the RPCs.
+  return new Date(parsed.data).toISOString();
 }
 
 function optionalTimestamp(value: unknown, field: string) {
@@ -174,10 +179,44 @@ function lineAmount(rawLine: JsonRecord, currency: string | null) {
   return { amount, currency };
 }
 
+function hasField(record: JsonRecord | null, keys: readonly string[]) {
+  return record !== null && keys.some((key) => record[key] !== undefined && record[key] !== null);
+}
+
+function optionalMoney(record: JsonRecord, key: string, currency: string | null) {
+  const amount = optionalDecimal(record, key, { allowNegative: true });
+  if (amount === null) return null;
+  if (currency === null) fail(`${key}.CurrencyRef`);
+  return { amount, currency };
+}
+
+function hasDiscountDetail(record: JsonRecord | null) {
+  return hasField(record, ["DiscountAmt", "DiscountRate", "DiscountPercent", "PercentBased",
+    "DiscountAccountRef", "DiscountLineDetail"]);
+}
+
+function transactionAccountingEvidence(raw: JsonRecord, currency: string | null) {
+  const tax = optionalObject(raw.TxnTaxDetail, "TxnTaxDetail");
+  if (tax?.TaxLine !== undefined && tax.TaxLine !== null && !Array.isArray(tax.TaxLine)) fail("TxnTaxDetail.TaxLine");
+  return {
+    sparse: optionalBoolean(raw, "sparse") ?? false,
+    globalTaxCalculation: optionalString(raw, "GlobalTaxCalculation"),
+    totalTax: tax ? optionalMoney(tax, "TotalTax", currency) : null,
+    hasTaxDetail: tax !== null,
+    hasTaxLines: Array.isArray(tax?.TaxLine) && tax.TaxLine.length > 0,
+    hasDiscountDetail: hasDiscountDetail(raw)
+  };
+}
+
 function lineDetail(rawLine: JsonRecord, detailType: string | null, currency: string | null) {
+  if (Object.keys(rawLine).some((key) => key.endsWith("LineDetail") && rawLine[key] !== null &&
+    rawLine[key] !== undefined && key !== detailType)) fail("Line.DetailType");
   const detail = detailType ? optionalObject(rawLine[detailType], detailType) : null;
   const journalDetail = optionalObject(rawLine.JournalEntryLineDetail, "JournalEntryLineDetail");
   const journalEntity = optionalObject(journalDetail?.Entity, "JournalEntryLineDetail.Entity");
+  const itemAccount = ref(detail?.ItemAccountRef, "Line.ItemAccountRef");
+  const account = ref(detail?.AccountRef ?? journalDetail?.AccountRef, "Line.AccountRef");
+  if (itemAccount && account && itemAccount.value !== account.value) fail("Line.AccountRef");
   const postingType = journalDetail?.PostingType === "Debit"
     ? "debit"
     : journalDetail?.PostingType === "Credit"
@@ -189,8 +228,18 @@ function lineDetail(rawLine: JsonRecord, detailType: string | null, currency: st
     amount: lineAmount(rawLine, currency),
     postingType: journalDetail ? postingType : null,
     itemRef: ref(detail?.ItemRef, `${detailType}.ItemRef`),
-    accountRef: ref(detail?.AccountRef ?? journalDetail?.AccountRef, "Line.AccountRef"),
-    entityRef: ref(detail?.CustomerRef ?? detail?.VendorRef ?? journalEntity?.EntityRef, "Line.EntityRef")
+    // Intuit's transaction-line account overrides the item's default account.
+    accountRef: itemAccount ?? account,
+    entityRef: ref(detail?.CustomerRef ?? detail?.VendorRef ?? journalEntity?.EntityRef, "Line.EntityRef"),
+    accountingEvidence: {
+      accountReferenceKind: itemAccount ? "item_account_ref" as const : account ? "account_ref" as const : null,
+      taxCodeRef: ref(detail?.TaxCodeRef, "Line.TaxCodeRef"),
+      taxInclusiveAmount: detail ? optionalMoney(detail, "TaxInclusiveAmt", currency) : null,
+      hasTaxDetail: hasField(rawLine, ["TaxLineDetail", "TxnTaxDetail"]) ||
+        hasField(detail, ["TaxAmount", "TaxApplicableOn", "TaxRateRef", "TaxInclusiveAmt"]),
+      hasDiscountDetail: detailType === "DiscountLineDetail" || hasDiscountDetail(rawLine) || hasDiscountDetail(detail),
+      hasGroupDetail: detailType === "GroupLineDetail" || hasField(rawLine, ["GroupLineDetail"]) || hasField(detail, ["Line"])
+    }
   };
 }
 
@@ -319,6 +368,7 @@ function buildProjection(
     ? transactionAccounting(raw)
     : masterRecordAccounting(recordType, raw);
   const sourceCurrency = accounting.sourceCurrency;
+  const accountingEvidenceEnabled = providerMetadata.sourceEnvironment === "production";
   const status = isTransaction ? transactionStatus(recordType, raw) : optionalBoolean(raw, "Active") === false ? "inactive" : "active";
 
   const commonRelationships = relationshipEntries(raw, [
@@ -361,9 +411,11 @@ function buildProjection(
     accounting,
     relationships: commonRelationships,
     amounts: baseAmounts(raw, sourceCurrency),
-    lines: minimizedLines(raw, sourceCurrency),
+    lines: minimizedLines(raw, sourceCurrency).map(({ accountingEvidence, ...line }) =>
+      accountingEvidenceEnabled ? { ...line, accountingEvidence } : line),
     providerVersionReference: recordMetadata.syncToken ?? recordMetadata.providerUpdatedAt,
-    minimizationVersion: "qbo_minimizer_v1" as const
+    minimizationVersion: accountingEvidenceEnabled ? QBO_ACCOUNTING_MINIMIZATION_VERSION : "qbo_minimizer_v1",
+    ...(accountingEvidenceEnabled ? { accountingEvidence: transactionAccountingEvidence(raw, sourceCurrency) } : {})
   };
 
   return QboMinimizedSourceRecordSchema.parse(minimized);

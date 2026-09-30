@@ -14,7 +14,7 @@ const phase3 = read('20260821172015_external_integrations_phase_3_deterministic_
 const convergence = read('20260822035335_external_integrations_phase_8a0_provider_contract_convergence.sql');
 const validation = read('20260823042718_external_integrations_phase_8b_qbo_sandbox_validation.sql');
 function fn(text, name) {
-  const start = text.indexOf(`create or replace function ${name}(`);
+  const start = text.search(new RegExp(`create (?:or replace )?function ${name.replaceAll('.', '\\.')}\\(`));
   assert(start >= 0, name); const end = text.indexOf('$function$;', start);
   assert(end > start); return text.slice(start, end + '$function$;'.length);
 }
@@ -69,6 +69,16 @@ async function qualify(db) {
   await db.exec(fn(convergence, 'private.assert_integration_provider_source_authority_v1'));
   await db.exec(fn(convergence, 'public.commit_provider_external_source_record_version_v1'));
   await db.exec(fs.readFileSync(path.join(root, migration), 'utf8'));
+  // Exercise the candidate projection contract, including its exact forward-only
+  // version allowlist change. The full native runner separately applies all SQL.
+  await db.exec(fn(fs.readFileSync(path.join(root,
+    'supabase/production-migrations/20260930003000_qbo_customer_source_browse.sql'), 'utf8'),
+  'private.qbo_customer_preview_v1'));
+  const accounting = fs.readFileSync(path.join(root,
+    'supabase/production-migrations/20260930193412_qbo_production_accounting_intake.sql'), 'utf8');
+  const projectionAdvance = accounting.match(/do \$projection_version\$[\s\S]*?\$projection_version\$;/g);
+  assert.equal(projectionAdvance?.length, 1);
+  await db.exec(projectionAdvance[0]);
   const owner = contractSha256('synthetic-owner'), worker = contractSha256('synthetic-worker');
   const hash = value => Buffer.from(value.slice(7), 'hex');
   const call = async (name, args, role = 'qbo_source_test') => {

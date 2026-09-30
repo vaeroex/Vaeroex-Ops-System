@@ -122,7 +122,13 @@ test("Intelligence page integrates the isolated gated diagnostic without supplyi
   const occurrences = [];
   const visit = node => {
     if (ts.isCallExpression(node) && /build|loadWorkspaceIntelligenceBriefing|trySeal/.test(node.expression.getText(file))) {
-      assert.doesNotMatch(node.arguments.map(argument => argument.getText(file)).join(" "), /qbo|Qbo|QuickBooks/);
+      const args = node.arguments.map(argument => argument.getText(file)).join(" ");
+      // Only the independently qualified accounting producer may reach the
+      // snapshot. Browse diagnostics and raw stored-source data remain excluded.
+      const checked = node.expression.getText(file) === "buildIntelligenceSnapshotFromProducersV1"
+        ? args.replace(/\bqboAccounting\.(?:state|data\.(?:kpis|evidenceManifests))\b/g, "qualifiedAccounting")
+        : args;
+      assert.doesNotMatch(checked, /qbo|Qbo|QuickBooks/);
       occurrences.push(node.expression.getText(file));
     }
     ts.forEachChild(node, visit);

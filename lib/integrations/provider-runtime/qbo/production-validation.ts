@@ -91,7 +91,7 @@ export function validateProductionQboSourceClaim(input: unknown) {
   let realm = "";
   const projection = pending.normalizedProjection;
   const boundDeletion = pending.changeKind === "deleted" && projection === null
-    && (pending.normalizedSchemaVersion === "qbo_minimizer_v1"
+    && (["qbo_minimizer_v1", "qbo_minimizer_v2"].includes(pending.normalizedSchemaVersion)
       || (pending.normalizedSchemaVersion === "qbo_cdc_tombstone_v1" && claim.streamKey === "qbo_cdc"))
     && (inactiveReferenceTypes.has(pending.source.providerRecordType)
       || (QBO_TRANSACTION_RECORD_TYPES as readonly string[]).includes(pending.source.providerRecordType))

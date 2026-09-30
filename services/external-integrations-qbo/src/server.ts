@@ -67,6 +67,7 @@ import { resolveProviderAccessCredential } from "@/lib/integrations/provider-run
 import { scheduleQboProductionWork, runQboSchedulerMaintenance } from "./scheduler";
 import { QboCdcCoverageError } from "./cdc";
 import { recoverQboProductionValidation, QboValidationRecoveryResultSchema } from "./validation-recovery";
+import { recoverQboProductionAccounting, QboAccountingRecoveryResultSchema } from "./accounting-recovery";
 import {
   assertAuthorizedProviderEntityEvidence,
   assertCredentialEnvelopeMatchesProviderOAuthPolicy,
@@ -1042,15 +1043,19 @@ async function callValidationRecovery(maximumTasks: number) {
     body: JSON.stringify({ maximumTasks })
   });
   if (!response.ok) throw new Error("qbo_validation_recovery_failed");
-  return QboValidationRecoveryResultSchema.parse(await response.json());
+  return QboValidationRecoveryResultSchema.extend({ accounting: QboAccountingRecoveryResultSchema }).parse(await response.json());
 }
 
 async function handleValidationRecovery(request: IncomingMessage, response: ServerResponse) {
   const body = z.object({ maximumTasks: z.number().int().min(1).max(25) }).strict().parse(await readBody(request));
   const db = database();
   try {
-    const result = await recoverQboProductionValidation(db.role("integration_provider_source_authority"), body.maximumTasks);
-    safeEvent("qbo_validation_recovered", result);
+    const source = db.role("integration_provider_source_authority");
+    const validated = await recoverQboProductionValidation(source, body.maximumTasks);
+    const accounting = await recoverQboProductionAccounting(source, Math.min(body.maximumTasks, 5));
+    const result = { ...validated, accounting };
+    safeEvent("qbo_validation_recovered", validated);
+    safeEvent("qbo_accounting_processed", accounting);
     return json(response, 200, result);
   } finally {
     await db.close();

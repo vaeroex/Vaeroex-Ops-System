@@ -5,6 +5,11 @@ import { BoundedIdentifierSchema, UuidSchema } from "@/lib/integrations/contract
 import type { ExternalIntegrationsRpcClient } from "@/lib/integrations/persistence/repository";
 import { scheduleQboProductionInitialization } from "@/lib/integrations/persistence/qbo-production-repository";
 import { QboValidationRecoveryResultSchema } from "./validation-recovery";
+import { QboAccountingRecoveryResultSchema } from "./accounting-recovery";
+
+const maintenanceValidationResult = QboValidationRecoveryResultSchema.extend({
+  accounting: QboAccountingRecoveryResultSchema.optional()
+});
 
 const disconnectResult = z.object({
   disconnectedCount: z.number().int().min(0).max(25),
@@ -18,9 +23,9 @@ const disconnectResult = z.object({
 export async function runQboSchedulerMaintenance(input: {
   validate: () => Promise<unknown>; disconnect: () => Promise<unknown>;
 }) {
-  let validation: z.infer<typeof QboValidationRecoveryResultSchema> | null = null;
+  let validation: z.infer<typeof maintenanceValidationResult> | null = null;
   let disconnect: z.infer<typeof disconnectResult> | null = null;
-  try { validation = QboValidationRecoveryResultSchema.parse(await input.validate()); } catch { /* Report bounded failure below. */ }
+  try { validation = maintenanceValidationResult.parse(await input.validate()); } catch { /* Report bounded failure below. */ }
   try { disconnect = disconnectResult.parse(await input.disconnect()); } catch { /* Both drains are independently attempted. */ }
   return { validation, disconnect, validationFailed: validation === null, disconnectFailed: disconnect === null };
 }

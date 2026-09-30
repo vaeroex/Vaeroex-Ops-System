@@ -20,12 +20,15 @@ const candidates = [
   '20260930002000_qbo_production_ongoing_sync.sql',
   '20260930003000_qbo_customer_source_browse.sql',
   '20260930004000_qbo_production_source_validation.sql',
+  '20260930193412_qbo_production_accounting_intake.sql',
 ];
 const suiteNames = [
   'qbo_customer_oauth_completion.test.sql',
   'external_integrations_qbo_ongoing_sync.test.sql',
   'qbo_customer_source_browse.test.sql',
   'qbo_production_source_validation.test.sql',
+  'qbo_production_accounting_intake.test.sql',
+  'external_integrations_phase_3_deterministic_dependencies.test.sql',
 ];
 const quote = value => '"' + value.replaceAll('"', '""') + '"';
 const digest = value => crypto.createHash('sha256').update(value).digest('hex');
@@ -238,9 +241,12 @@ async function main() {
         await manager.connect();
         result.databaseIsolation = 'fresh-template-clone-per-suite';
         try {
-        for (const suite of [...suites, { file: 'native_scheduler_concurrency', concurrency: true }]) {
+        for (const suite of [...suites, { file: 'native_scheduler_concurrency', concurrency: true },
+          { file: 'native_accounting_qualification', accounting: true }]) {
           stage = suite.file;
-          const outcome = { file: suite.file, sha256: suite.sha256, passed: false, assertions: 0 };
+          const outcome = { file: suite.file, sha256: suite.accounting
+            ? digest(fs.readFileSync(path.join(root, 'scripts/qbo-accounting-native-qualification.cjs'))) : suite.sha256,
+            passed: false, assertions: 0 };
           result.suites.push(outcome);
           let runner, clone;
           const lines = [];
@@ -252,7 +258,11 @@ async function main() {
             await manager.query(`alter database ${quote(clone)} set search_path=public,extensions`);
             const config = { ...db.connection, database: clone };
             const connectionSetting = candidateDblinkSetting(runtime.targetKind, db.connection, clone);
-            if (suite.concurrency) {
+            if (suite.accounting) {
+              outcome.assertions = await require('./qbo-accounting-native-qualification.cjs').accountingNativeQualification(config, fixture?.sql);
+              outcome.passed = true;
+              lines.push('Native provider validation, owner policy and canonical accounting qualification passed.');
+            } else if (suite.concurrency) {
               outcome.assertions = await schedulerConcurrency(config, fixture?.sql);
               outcome.passed = true;
               lines.push('Five native scheduler assertions passed using two real database connections.');
@@ -286,11 +296,13 @@ async function main() {
       });
       result.stopped = true;
     } catch (error) {
-      result.failures.push({ stage, code: error.code, message: error.message, detail: error.detail, where: error.where });
-      console.error(JSON.stringify({ shape: shape.name, stage, code: error.code, message: error.message, detail: error.detail, where: error.where }));
+      result.failures.push({ stage, code: error.code, message: error.message, detail: error.detail, where: error.where,
+        position: error.position, internalPosition: error.internalPosition });
+      console.error(JSON.stringify({ shape: shape.name, stage, code: error.code, message: error.message, detail: error.detail, where: error.where,
+        position: error.position, internalPosition: error.internalPosition }));
     }
     if (result.nativeDirectory) result.stopped = !fs.existsSync(path.join(result.nativeDirectory, 'data/postmaster.pid'));
-    result.passed = result.stopped && result.failures.length === 0 && result.suites.length === suites.length + 1 && result.suites.every(suite => suite.passed);
+    result.passed = result.stopped && result.failures.length === 0 && result.suites.length === suites.length + 2 && result.suites.every(suite => suite.passed);
     save();
   }
   report.passed = report.runs.every(run => run.passed);
