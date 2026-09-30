@@ -100,7 +100,7 @@ excludes(terraform, /QBO_PRODUCTION_CUSTOMER_CONNECTIONS_ENABLED/, "Production r
 matches(connect, /requireWorkspaceAccess\(\)/, "connect derives workspace authority from the server session");
 matches(connect, /\.eq\("workspace_id", access\.workspaceId\)/, "connect binds the entity to the authorized workspace");
 matches(connect, /\.eq\("status", "active"\)/, "connect requires an active business entity");
-matches(connect, /\['owner', 'admin', 'manager'\]/, "connect requires a management role");
+matches(connect, /access\.membership\.role !== "owner"/, "connect requires the authenticated workspace owner");
 matches(connect, /assertQboCustomerRequestOrigin\(request\)/, "connect enforces same-origin request provenance");
 excludes(connect, /input\.workspaceId/, "connect never trusts a caller workspace ID");
 excludes(connect, /input\.providerEnvironment/, "connect never trusts a caller provider environment");
@@ -111,6 +111,7 @@ matches(connect, /NextResponse\.redirect/, "the browser receives only the provid
 excludes(connect, /accessToken|refreshToken|clientSecret/, "connect does not expose credential material");
 
 matches(reauthorize, /requireWorkspaceAccess\(\)/, "reauthorization derives workspace authority from the server session");
+matches(reauthorize, /access\.membership\.role !== "owner"/, "reauthorization requires the authenticated workspace owner");
 matches(reauthorize, /createQboCustomerReauthorizationState/, "reauthorization uses the Production V2 state contract");
 matches(reauthorize, /expectedConnectionRowVersion/, "reauthorization carries an exact connection CAS snapshot");
 excludes(reauthorize, /input\.workspaceId/, "reauthorization cannot substitute caller workspace authority");
@@ -118,7 +119,7 @@ excludes(reauthorize, /input\.mappingId/, "reauthorization cannot substitute a c
 excludes(reauthorize, /input\.credentialId/, "reauthorization cannot substitute a caller credential");
 
 matches(disconnect, /requireWorkspaceAccess\(\)/, "disconnect derives workspace authority from the server session");
-matches(disconnect, /\["owner", "admin", "manager"\]/, "disconnect requires a management role");
+matches(disconnect, /new Set\(\["owner"\]\)/, "disconnect requires the authenticated workspace owner");
 matches(disconnect, /assertQboCustomerRequestOrigin\(request\)/, "disconnect enforces same-origin request provenance");
 matches(disconnect, /\.eq\("workspace_id", access\.workspaceId\)/, "disconnect scopes the connection to the authenticated workspace");
 matches(disconnect, /\.eq\("provider_key", "quickbooks_online"\)/, "disconnect is QBO-only");
@@ -252,6 +253,13 @@ matches(terraform, /dispatch_scheduler\s+= "qbo-dispatch-scheduler"/, "dispatche
 matches(terraform, /initialization_scheduler\s+= "qbo-initialization-scheduler"/, "initialization invocation has a distinct identity");
 matches(terraform, /google_cloud_scheduler_job" "initializer"/, "initialization scheduling is permanent IaC");
 matches(terraform, /google_cloud_scheduler_job" "dispatcher"/, "dispatch scheduling is permanent IaC");
+matches(variables, /variable "execution_enabled"[\s\S]*type\s+= bool[\s\S]*default\s+= false/, "Production execution is disabled by default during provisioning");
+matches(terraform, /desired_state\s+= var\.execution_enabled \? "RUNNING" : "PAUSED"/, "queue dispatch requires explicit verified activation");
+ok((terraform.match(/paused\s+= !var\.execution_enabled/g) ?? []).length === 2, "both scheduler resource blocks remain paused until verified activation");
+matches(terraform, /bulk\s*= \{ name = var\.scheduler_name, queue_class = "provider_bulk" \}/, "the bulk dispatcher schedule is explicit");
+matches(terraform, /interactive\s*= \{ name = "\$\{var\.scheduler_name\}-interactive", queue_class = "provider_interactive" \}/, "ongoing CDC has a distinct interactive dispatcher schedule");
+matches(terraform, /queueClass\s*= each\.value\.queue_class/, "each dispatcher schedule invokes its exact queue class");
+matches(terraform, /name\s+= "QBO_DATABASE_CA_PEM"[\s\S]*supabase-root-2021\.crt/, "all service modes receive the pinned public database CA");
 matches(terraform, /roles\/cloudtasks\.enqueuer[\s\S]*task_dispatcher/, "only the dispatcher is a Cloud Tasks enqueuer");
 matches(terraform, /roles\/cloudkms\.cryptoKeyEncrypterDecrypter[\s\S]*credential_broker/, "only the broker receives KMS authority");
 matches(terraform, /provider_secret_version/, "provider secret access is version pinned");
@@ -275,15 +283,20 @@ excludes(providerEgressModes, /oauth_ingress|task_scheduler|task_dispatcher/, "i
 matches(terraformOutputs, /output "provider_egress_ip"[\s\S]*google_compute_address\.provider_egress\.address/, "Terraform exposes only the reserved public provider egress IP");
 excludes(terraform, /nat_ips\s+= \[google_compute_global_address\.callback/, "callback ingress can never become provider egress authority");
 matches(terraform, /oauth_ingress" \? "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER"/, "direct callback service ingress is closed outside the load balancer");
+matches(terraform, /default_uri_disabled\s*= each\.key == "oauth_ingress"/, "the public callback default Cloud Run URL cannot bypass the edge");
+matches(terraform, /depends_on\s*= \[google_secret_manager_secret_iam_member\.database\]/, "service creation waits for database secret accessor grants");
+matches(terraform, /cel_expression\s*= "true"/, "callback sanitization covers every forwarding-rule request, not only expected hosts");
+matches(terraform, /plugin_config_data\s*= base64encode\(jsonencode\(\{ allowedHost = var\.oauth_callback_hostname \}\)\)/, "the edge receives its explicit allowed host through reviewed configuration");
+matches(terraform, /forward_attributes\s*= \[\s*"request.host",\s*"request.method",\s*"request.path",\s*"request.query",\s*\]/, "the edge receives exactly the documented attributes needed for host and query validation");
 matches(terraform, /google_network_services_wasm_plugin" "callback"/, "Production callback uses a managed immutable edge plugin");
 matches(terraform, /google_network_services_lb_edge_extension" "callback"[\s\S]*fail_open\s+= false/, "callback edge extension fails closed");
 matches(terraform, /forward_headers = \[[\s\S]*content-length[\s\S]*x-vaeroex-oauth-state[\s\S]*\]/, "callback edge receives only the headers required for body and handoff fencing");
 matches(terraform, /google_compute_backend_service" "callback"[\s\S]*log_config \{[\s\S]*enable = false/, "callback load-balancer request logging is disabled");
 matches(terraform, /google_network_services_wasm_plugin" "callback"[\s\S]*log_config \{[\s\S]*enable = false/, "callback plugin logging is disabled");
 matches(terraform, /deletion_policy\s+= "PREVENT"/, "callback edge artifacts cannot be deleted accidentally");
-matches(terraformVersions, /version = "7\.34\.0"/, "Google provider version is pinned for the reviewed edge resources");
+matches(terraformVersions, /version = "7\.39\.0"/, "Google provider version supports explicit edge attribute forwarding");
 matches(terraformLock, /provider "registry\.terraform\.io\/hashicorp\/google"/, "the Terraform dependency lock pins the exact Google provider source");
-matches(terraformLock, /version\s+= "7\.34\.0"[\s\S]*constraints = "7\.34\.0"/, "the Terraform dependency lock pins the reviewed Google provider version");
+matches(terraformLock, /version\s+= "7\.39\.0"[\s\S]*constraints = "7\.39\.0"/, "the Terraform dependency lock pins the reviewed Google provider version");
 matches(terraformLock, /hashes = \[[\s\S]*"zh:[a-f0-9]{64}"/, "the Terraform dependency lock records provider package checksums");
 matches(variables, /image_digest must be an immutable sha256 image reference/, "IaC requires an immutable image digest");
 matches(variables, /source_commit must be a full Git commit SHA/, "IaC records the exact source commit");
@@ -293,7 +306,10 @@ matches(dockerfile, /FROM gcr\.io\/distroless\/nodejs22-debian12@sha256:/, "runt
 matches(dockerfile, /LABEL org\.opencontainers\.image\.revision=\$QBO_SOURCE_COMMIT/, "runtime image records its exact source revision");
 matches(cloudbuild, /QBO_SOURCE_COMMIT=\$\{_SOURCE_COMMIT\}/, "runtime publication supplies the reviewed source revision");
 matches(edgeCloudbuild, /_SOURCE_COMMIT[\s\S]*\^\[a-f0-9\]\{40\}\$/, "callback edge publication validates and records the reviewed source revision");
-excludes(edgeDockerfile, /\b(?:ARG|LABEL)\b/, "Wasm callback packaging remains a canonical config-free scratch image");
+matches(edgeDockerfile, /^FROM scratch\nARG QBO_SOURCE_COMMIT\nLABEL org\.opencontainers\.image\.revision=\$QBO_SOURCE_COMMIT\nCOPY plugin\.wasm \/plugin\.wasm\n$/, "Wasm callback packaging contains only the plugin and nonsecret source provenance");
+matches(edgeCloudbuild, /QBO_SOURCE_COMMIT=\$\{_SOURCE_COMMIT\}/, "callback publication passes the reviewed commit into immutable artifact provenance");
+matches(terraform, /"initializer_to_validation_runtime"[\s\S]*service\["provider_runtime"\][\s\S]*roles\/run\.invoker[\s\S]*service\["task_scheduler"\]/, "only the existing initializer identity gains bounded validation-drain invocation");
+matches(terraform, /"initializer_to_revocation_broker"[\s\S]*service\["credential_broker"\][\s\S]*roles\/run\.invoker[\s\S]*service\["task_scheduler"\]/, "the initializer can invoke the broker for canonical pending revocations");
 matches(recordManagement, /export type ManagedRecordCollection =/, "shared record types remain available to reduced runtime builds");
 excludes(recordManagement, /@\/components\//, "shared runtime libraries do not type-depend on React components");
 

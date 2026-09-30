@@ -205,11 +205,46 @@ function minimizedLines(raw: JsonRecord, currency: string | null) {
   });
 }
 
-function transactionStatus(raw: JsonRecord) {
+function documentedVoidedTransaction(recordType: QboSupportedObjectType, raw: JsonRecord) {
+  if (recordType !== "Invoice" && recordType !== "Payment") return false;
+  // Intuit's void operation prefixes PrivateNote and zeros amounts/quantities.
+  // Inspect only that bounded marker; the note never enters the projection.
+  // https://developer.intuit.com/app/developer/qbo/docs/api/accounting/most-commonly-used/invoice#void-an-invoice
+  // https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/payment#void-a-payment
+  if (typeof raw.PrivateNote !== "string" || raw.PrivateNote.length > 4000 ||
+      !/^Voided(?:$|[\s:])/.test(raw.PrivateNote)) return false;
+  const zero = (record: JsonRecord, key: string) => optionalDecimal(record, key, { allowNegative: true }) === "0";
+  if (!zero(raw, "TotalAmt") || !Array.isArray(raw.Line)) return false;
+  for (const key of ["HomeTotalAmt", "HomeBalance", "Deposit"]) {
+    if (raw[key] !== undefined && raw[key] !== null && !zero(raw, key)) return false;
+  }
+  if (recordType === "Payment") return zero(raw, "UnappliedAmt") && raw.Line.length === 0;
+  if (!zero(raw, "Balance")) return false;
+  const tax = optionalObject(raw.TxnTaxDetail, "TxnTaxDetail");
+  if (tax?.TotalTax !== undefined && !zero(tax, "TotalTax")) return false;
+  let inspected = 0;
+  const zeroedLines = (lines: unknown[], depth: number): boolean => depth <= 4 && lines.every((value, index) => {
+    if (++inspected > 2000) return false;
+    const line = object(value, `Line.${index}`);
+    if (line.Amount !== undefined && !zero(line, "Amount")) return false;
+    const detail = optionalObject(line.SalesItemLineDetail, "SalesItemLineDetail");
+    if (detail && !["Qty", "UnitPrice"].every(key => detail[key] === undefined || zero(detail, key))) return false;
+    const group = optionalObject(line.GroupLineDetail, "GroupLineDetail");
+    if (!group) return true;
+    if (group.Quantity !== undefined && !zero(group, "Quantity")) return false;
+    return Array.isArray(group.Line) && zeroedLines(group.Line, depth + 1);
+  });
+  if (tax?.TaxLine !== undefined && (!Array.isArray(tax.TaxLine) || !zeroedLines(tax.TaxLine, 0))) return false;
+  return zeroedLines(raw.Line, 0);
+}
+
+function transactionStatus(recordType: QboSupportedObjectType, raw: JsonRecord) {
   if (raw.Deleted === true) return "deleted";
   if (raw.Voided === true) return "voided";
+  if (raw.status === "Voided") return "voided";
   const status = optionalString(raw, "TxnStatus");
   if (status?.toLowerCase() === "voided") return "voided";
+  if (documentedVoidedTransaction(recordType, raw)) return "voided";
   const active = optionalBoolean(raw, "Active");
   if (active === false) return "inactive";
   return "active";
@@ -284,7 +319,7 @@ function buildProjection(
     ? transactionAccounting(raw)
     : masterRecordAccounting(recordType, raw);
   const sourceCurrency = accounting.sourceCurrency;
-  const status = isTransaction ? transactionStatus(raw) : optionalBoolean(raw, "Active") === false ? "inactive" : "active";
+  const status = isTransaction ? transactionStatus(recordType, raw) : optionalBoolean(raw, "Active") === false ? "inactive" : "active";
 
   const commonRelationships = relationshipEntries(raw, [
     "CustomerRef",
@@ -341,6 +376,7 @@ export function minimizeQboSourceRecord(input: {
 }) {
   const providerMetadata = provider(input.provider);
   const raw = object(input.raw, input.recordType);
+  if (raw.status === "Deleted") fail("Deleted.requires_cdc_tombstone");
   return buildProjection(input.recordType, raw, providerMetadata);
 }
 

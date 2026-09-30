@@ -10,6 +10,7 @@ const (
 	CallbackPath          = "/oauth/callback"
 	WebhookPath           = "/webhooks/qbo"
 	HandoffVersion        = "qbo_oauth_callback_handoff_v1"
+	DeniedHandoffVersion  = "qbo_oauth_denied_handoff_v1"
 	MaxHeaderCount        = 64
 	MaxRawQueryBytes      = 27000
 	MaxRequestTargetBytes = len(CallbackPath) + 1 + MaxRawQueryBytes
@@ -32,6 +33,7 @@ type Handoff struct {
 	Code    string
 	State   string
 	RealmID string
+	Denied  bool
 }
 
 func ParseCallbackAttributes(method, path, rawQuery string, endOfStream bool) (Handoff, error) {
@@ -41,6 +43,9 @@ func ParseCallbackAttributes(method, path, rawQuery string, endOfStream bool) (H
 		return Handoff{}, ErrInvalidCallback
 	}
 	parts := strings.Split(rawQuery, "&")
+	if len(parts) == 2 {
+		return parseDeniedCallback(parts)
+	}
 	if len(parts) != 3 {
 		return Handoff{}, ErrInvalidCallback
 	}
@@ -64,6 +69,32 @@ func ParseCallbackAttributes(method, path, rawQuery string, endOfStream bool) (H
 		return Handoff{}, ErrInvalidCallback
 	}
 	return handoff, nil
+}
+
+// Denial has exactly two fields and one bounded outcome. It never carries a
+// code, realm, error description or arbitrary provider error into the handoff.
+func parseDeniedCallback(parts []string) (Handoff, error) {
+	values := make(map[string]string, 2)
+	for _, part := range parts {
+		key, rawValue, ok := strings.Cut(part, "=")
+		if !ok || rawValue == "" || (key != "state" && key != "error") {
+			return Handoff{}, ErrInvalidCallback
+		}
+		if _, duplicate := values[key]; duplicate {
+			return Handoff{}, ErrInvalidCallback
+		}
+		value, err := url.QueryUnescape(rawValue)
+		if err != nil {
+			return Handoff{}, ErrInvalidCallback
+		}
+		values[key] = value
+	}
+	state := values["state"]
+	if values["error"] != "access_denied" || len(state) != 46 ||
+		(!strings.HasPrefix(state, "i1_") && !strings.HasPrefix(state, "r1_")) || !validState(state) {
+		return Handoff{}, ErrInvalidCallback
+	}
+	return Handoff{State: state, Denied: true}, nil
 }
 
 func ParseForwardedCallback(method, pathAttribute, queryAttribute string, endOfStream bool) (Handoff, error) {

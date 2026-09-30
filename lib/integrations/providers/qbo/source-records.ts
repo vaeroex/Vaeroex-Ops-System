@@ -1,5 +1,6 @@
 import {
   canonicalContractJson,
+  contractSha256,
   externalSourceFingerprint
 } from "@/lib/integrations/contracts/canonical";
 import { ContractJsonObjectSchema } from "@/lib/integrations/contracts/primitives";
@@ -15,6 +16,7 @@ import {
 } from "@/lib/integrations/providers/qbo/contracts";
 import { classifyQboSourceChange } from "@/lib/integrations/providers/qbo/minimizers";
 import type { ProviderAdapterContext } from "@/lib/integrations/contracts/provider-adapter";
+import { QboCdcTombstoneSchema, type QboCdcTombstone } from "./tombstones";
 
 function recordKind(recordType: string) {
   return `qbo_${recordType
@@ -132,6 +134,54 @@ export function qboMinimizedRecordToExternalSourceVersion(input: {
     ...parsed,
     sourceFingerprint: externalSourceFingerprint(parsed)
   });
+}
+
+export function assertQboCdcTombstoneBinding(input: {
+  context: ProviderAdapterContext;
+  taskId: string;
+  connectionGeneration: number;
+  tombstone: QboCdcTombstone;
+  observedAt: string;
+}) {
+  const record = QboCdcTombstoneSchema.parse(input.tombstone);
+  const realmFingerprint = contractSha256({ fingerprintPurpose: "provider_authorized_entity_reference",
+    fingerprintVersion: "provider_authorized_entity_reference_fingerprint_v1", value: record.provider.realmId });
+  if (input.context.providerKey !== QBO_PROVIDER_KEY || record.provider.sourceEnvironment === "unknown" ||
+      record.provider.sourceEnvironment !== input.context.providerEnvironment ||
+      realmFingerprint !== input.context.providerTenantReferenceFingerprint ||
+      record.evidence.taskId !== input.taskId || record.evidence.connectionId !== input.context.connectionId ||
+      record.evidence.connectionGeneration !== input.connectionGeneration) {
+    throw new Error("qbo_cdc_tombstone_binding_mismatch");
+  }
+  if (Date.parse(record.providerUpdatedAt) > Date.parse(input.observedAt)) {
+    throw new Error("qbo_cdc_tombstone_time_invalid");
+  }
+  return record;
+}
+
+export function qboCdcTombstoneToExternalSourceVersion(input: Parameters<typeof assertQboCdcTombstoneBinding>[0] & {
+  id: string;
+  immutableVersion: number;
+  priorVersionId: string | null;
+}) {
+  const record = assertQboCdcTombstoneBinding(input);
+  const version = ExternalSourceRecordVersionSchema.parse({
+    contractVersion: EXTERNAL_INTEGRATION_CONTRACT_VERSIONS.sourceRecord,
+    id: input.id, workspaceId: input.context.workspaceId, businessEntityId: input.context.businessEntityId,
+    connectionId: input.context.connectionId, immutableVersion: input.immutableVersion, priorVersionId: input.priorVersionId,
+    recordKind: recordKind(record.recordType),
+    source: { kind: "provider", providerKey: QBO_PROVIDER_KEY, providerRecordType: record.recordType,
+      providerRecordId: record.id, providerVersionReference: record.providerVersionReference },
+    temporal: { basis: "event", providerCreatedAt: record.providerCreatedAt, providerUpdatedAt: record.providerUpdatedAt,
+      observedAt: input.observedAt, synchronizedAt: input.observedAt, ingestedAt: input.observedAt,
+      effectiveAt: null, postingDate: null, periodStart: null, periodEnd: null, sourceTimeZone: null },
+    accounting: { basis: "unknown", currency: null },
+    normalizedSchemaVersion: "qbo_cdc_tombstone_v1", changeKind: "deleted", normalizedProjection: null,
+    trust: "untrusted_external_input",
+    validation: { state: "pending", validatorVersion: "qbo_phase_7_contract_validator_v1", issues: [] },
+    receivedAt: input.observedAt
+  });
+  return ExternalSourceRecordVersionSchema.parse({ ...version, sourceFingerprint: externalSourceFingerprint(version) });
 }
 
 export function qboReportToExternalSourceVersion(input: {

@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { ExternalIntegrationsRpcClient } from "@/lib/integrations/persistence/repository";
+import { qboDatabaseConfiguration } from "./database-config";
 
 type PgClient = Readonly<{
   query(sql: string, values?: readonly unknown[]): Promise<{ rows: Array<{ data?: unknown }> }>;
@@ -36,18 +37,12 @@ export class QboProductionDatabase {
   readonly #pool: PgPool;
   readonly #roles: ReadonlySet<string>;
 
-  constructor(connectionString: string, roles: readonly string[]) {
+  constructor(connectionString: string, roles: readonly string[], ca = process.env.QBO_DATABASE_CA_PEM ?? "") {
     if (roles.length === 0 || roles.length > productionRoles.size) {
       throw new Error("qbo_production_database_roles_invalid");
     }
     this.#roles = new Set(roles.map((role) => identifier(role, productionRoles)));
-    this.#pool = new Pool({
-      connectionString,
-      max: 4,
-      idleTimeoutMillis: 10_000,
-      connectionTimeoutMillis: 10_000,
-      allowExitOnIdle: true
-    });
+    this.#pool = new Pool(qboDatabaseConfiguration(connectionString, ca));
   }
 
   role(role: string): ExternalIntegrationsRpcClient {

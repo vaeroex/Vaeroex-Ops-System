@@ -52,9 +52,7 @@ export default async function QuickBooksDisconnectPage({
 
   const params = await searchParams;
   const { context, supabase, workspaceId } = await requireWorkspacePage();
-  const canManage = ["owner", "admin", "manager"].includes(
-    context.membership?.role ?? ""
-  );
+  const canManage = context.membership?.role === "owner";
   const { data: connections } = await supabase
     .from("integration_connection_summaries")
     .select("id,safe_display_name,status,status_changed_at")

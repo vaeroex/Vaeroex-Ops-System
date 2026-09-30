@@ -63,6 +63,18 @@ async function qualify(runtime) {
   await runtime.applyMigrations(c,additiveSquareTail);
   eq(await runtime.sourceSchemaFingerprint(c),schemaBefore,"Square interpretation preserves canonical/QBO schema");
   if(runtime.targetKind==="native-postgres") {
+    // Native databases do not have the CLI migration ledger. Record only the
+    // migrations actually applied above, not the deliberately withheld runtime.
+    await c.query(`create schema supabase_migrations;
+      create table supabase_migrations.schema_migrations(version text primary key)`);
+    const appliedVersions=[...files.filter(file=>!staged.has(file)),...productionFoundation,...additiveSquareTail]
+      .map(file=>file.split("_")[0]).sort();
+    await c.query("insert into supabase_migrations.schema_migrations(version) select unnest($1::text[])",[appliedVersions]);
+    eq((await c.query("select version from supabase_migrations.schema_migrations order by version")).rows.map(row=>row.version),
+      appliedVersions,"native migration ledger records exactly the completed fixture migrations");
+    eq((await c.query("select count(*)::integer as value from supabase_migrations.schema_migrations where version=any($1::text[])",
+      [[...productionOverlay,...productionInternalRuntime].map(file=>file.split("_")[0])])).rows[0].value,
+      0,"native migration ledger does not claim the withheld Production overlay or internal runtime");
     await runtime.applyMigrations(c,productionCompatibility);
   const productionPreflightCapabilities=["oauth","broker","scheduler","webhook","runtime","evidence"];
   const productionAuthorityRoles=productionPreflightCapabilities.map(

@@ -124,8 +124,9 @@ resource "google_compute_router_nat" "provider_egress" {
 }
 
 resource "google_cloud_tasks_queue" "main" {
-  name     = var.queue_name
-  location = var.region
+  name          = var.queue_name
+  location      = var.region
+  desired_state = var.execution_enabled ? "RUNNING" : "PAUSED"
 
   rate_limits {
     max_concurrent_dispatches = 10
@@ -144,10 +145,13 @@ resource "google_cloud_tasks_queue" "main" {
 resource "google_cloud_run_v2_service" "service" {
   for_each = local.modes
 
-  name                = var.service_names[each.key]
-  location            = var.region
-  ingress             = each.key == "oauth_ingress" ? "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER" : "INGRESS_TRAFFIC_ALL"
-  deletion_protection = true
+  name                 = var.service_names[each.key]
+  location             = var.region
+  ingress              = each.key == "oauth_ingress" ? "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER" : "INGRESS_TRAFFIC_ALL"
+  default_uri_disabled = each.key == "oauth_ingress"
+  deletion_protection  = true
+
+  depends_on = [google_secret_manager_secret_iam_member.database]
 
   template {
     service_account                  = google_service_account.service[each.key].email
@@ -179,6 +183,27 @@ resource "google_cloud_run_v2_service" "service" {
       env {
         name  = "QBO_SERVICE_MODE"
         value = each.value
+      }
+      env {
+        name  = "QBO_SERVICE_AUDIENCE"
+        value = local.service_origins[each.key]
+      }
+      dynamic "env" {
+        for_each = {
+          QBO_OAUTH_INGRESS_SERVICE_ACCOUNT            = "oauth_ingress"
+          QBO_PROVIDER_RUNTIME_SERVICE_ACCOUNT         = "provider_runtime"
+          QBO_TASK_SCHEDULER_SERVICE_ACCOUNT           = "task_scheduler"
+          QBO_INITIALIZATION_SCHEDULER_SERVICE_ACCOUNT = "initialization_scheduler"
+          QBO_DISPATCH_SCHEDULER_SERVICE_ACCOUNT       = "dispatch_scheduler"
+        }
+        content {
+          name  = env.key
+          value = google_service_account.service[env.value].email
+        }
+      }
+      env {
+        name  = "QBO_DATABASE_CA_PEM"
+        value = file("${path.module}/../../../tools/jit-access-feasibility/supabase-root-2021.crt")
       }
       env {
         name  = "QBO_SOURCE_COMMIT"
@@ -259,11 +284,25 @@ resource "google_cloud_run_v2_service_iam_member" "runtime_to_broker" {
   member   = google_service_account.service["provider_runtime"].member
 }
 
+resource "google_cloud_run_v2_service_iam_member" "initializer_to_revocation_broker" {
+  name     = google_cloud_run_v2_service.service["credential_broker"].name
+  location = var.region
+  role     = "roles/run.invoker"
+  member   = google_service_account.service["task_scheduler"].member
+}
+
 resource "google_cloud_run_v2_service_iam_member" "task_to_runtime" {
   name     = google_cloud_run_v2_service.service["provider_runtime"].name
   location = var.region
   role     = "roles/run.invoker"
   member   = google_service_account.service["task_invoker"].member
+}
+
+resource "google_cloud_run_v2_service_iam_member" "initializer_to_validation_runtime" {
+  name     = google_cloud_run_v2_service.service["provider_runtime"].name
+  location = var.region
+  role     = "roles/run.invoker"
+  member   = google_service_account.service["task_scheduler"].member
 }
 
 resource "google_cloud_run_v2_service_iam_member" "scheduler_to_dispatcher" {
@@ -412,9 +451,10 @@ resource "google_network_services_wasm_plugin" "callback" {
   }
 
   versions {
-    version_name = local.callback_edge_version
-    description  = "Immutable callback edge for source ${var.source_commit}"
-    image_uri    = var.callback_edge_image_digest
+    version_name       = local.callback_edge_version
+    description        = "Immutable callback edge for source ${var.source_commit}"
+    image_uri          = var.callback_edge_image_digest
+    plugin_config_data = base64encode(jsonencode({ allowedHost = var.oauth_callback_hostname }))
   }
 }
 
@@ -430,7 +470,7 @@ resource "google_network_services_lb_edge_extension" "callback" {
     name = "qbo-public-edge"
 
     match_condition {
-      cel_expression = "request.host == '${var.oauth_callback_hostname}'"
+      cel_expression = "true"
     }
 
     extensions {
@@ -438,6 +478,12 @@ resource "google_network_services_lb_edge_extension" "callback" {
       service          = google_network_services_wasm_plugin.callback.id
       fail_open        = false
       supported_events = ["REQUEST_HEADERS"]
+      forward_attributes = [
+        "request.host",
+        "request.method",
+        "request.path",
+        "request.query",
+      ]
       forward_headers = [
         "content-length",
         "expect",
@@ -452,10 +498,16 @@ resource "google_network_services_lb_edge_extension" "callback" {
 }
 
 resource "google_cloud_scheduler_job" "dispatcher" {
-  name      = var.scheduler_name
+  for_each = {
+    bulk        = { name = var.scheduler_name, queue_class = "provider_bulk" }
+    interactive = { name = "${var.scheduler_name}-interactive", queue_class = "provider_interactive" }
+  }
+
+  name      = each.value.name
   region    = var.region
   schedule  = var.dispatcher_schedule
   time_zone = "Etc/UTC"
+  paused    = !var.execution_enabled
 
   retry_config {
     retry_count          = 3
@@ -469,7 +521,7 @@ resource "google_cloud_scheduler_job" "dispatcher" {
     http_method = "POST"
     body = base64encode(jsonencode({
       maximumTasks = var.maximum_dispatch_tasks
-      queueClass   = "provider_bulk"
+      queueClass   = each.value.queue_class
     }))
     headers = { "Content-Type" = "application/json" }
 
@@ -485,6 +537,7 @@ resource "google_cloud_scheduler_job" "initializer" {
   region    = var.region
   schedule  = var.initialization_scheduler_schedule
   time_zone = "Etc/UTC"
+  paused    = !var.execution_enabled
 
   retry_config {
     retry_count          = 3
