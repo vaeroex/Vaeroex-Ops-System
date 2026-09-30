@@ -304,7 +304,7 @@ matches(dockerfile, /FROM gcr\.io\/distroless\/nodejs22-debian12@sha256:/, "runt
 matches(dockerfile, /LABEL org\.opencontainers\.image\.revision=\$QBO_SOURCE_COMMIT/, "runtime image records its exact source revision");
 matches(cloudbuild, /QBO_SOURCE_COMMIT=\$\{_SOURCE_COMMIT\}/, "runtime publication supplies the reviewed source revision");
 matches(edgeCloudbuild, /_SOURCE_COMMIT[\s\S]*\^\[a-f0-9\]\{40\}\$/, "callback edge publication validates and records the reviewed source revision");
-matches(edgeDockerfile, /^FROM scratch\nARG QBO_SOURCE_COMMIT\nLABEL org\.opencontainers\.image\.revision=\$QBO_SOURCE_COMMIT\nCOPY plugin\.wasm \/plugin\.wasm\n$/, "Wasm callback packaging contains only the plugin and nonsecret source provenance");
+matches(edgeDockerfile, /^FROM scratch\nCOPY plugin\.wasm \/plugin\.wasm\nARG QBO_SOURCE_COMMIT\nLABEL org\.opencontainers\.image\.revision=\$QBO_SOURCE_COMMIT\n$/, "Wasm callback packaging establishes its platform before metadata and contains only the plugin and nonsecret source provenance");
 matches(edgeCloudbuild, /QBO_SOURCE_COMMIT=\$\{_SOURCE_COMMIT\}/, "callback publication passes the reviewed commit into immutable artifact provenance");
 matches(terraform, /"initializer_to_validation_runtime"[\s\S]*service\["provider_runtime"\][\s\S]*roles\/run\.invoker[\s\S]*service\["task_scheduler"\]/, "only the existing initializer identity gains bounded validation-drain invocation");
 matches(terraform, /"initializer_to_revocation_broker"[\s\S]*service\["credential_broker"\][\s\S]*roles\/run\.invoker[\s\S]*service\["task_scheduler"\]/, "the initializer can invoke the broker for canonical pending revocations");
