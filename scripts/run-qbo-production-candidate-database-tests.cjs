@@ -55,6 +55,25 @@ function suiteRequests(sql, file) {
   return [sql.slice(0, split), sql.slice(split)];
 }
 
+function candidateDblinkSetting(targetKind, connection, database) {
+  assert.match(database, /^qbo_candidate_case_[a-f0-9]{20}$/, 'dblink requires the exact disposable suite clone');
+  assert.equal(connection.user, 'postgres');
+  assert.equal(connection.ssl, false);
+  let socket;
+  if (targetKind === 'owned-supabase-image') {
+    assert.equal(connection.host, '127.0.0.1', 'owned container outer connection is loopback only');
+    assert.ok(Number.isInteger(connection.port) && connection.port > 0 && connection.port <= 65535);
+    socket = '/tmp';
+  } else {
+    assert.equal(targetKind, 'native-postgres', 'only owned candidate runtimes may supply a dblink socket');
+    assert.match(connection.host, /^\/(?:private\/)?tmp\/square-qualification-[A-Za-z0-9]+\/socket$/,
+      'native dblink requires the initdb-owned private socket');
+    assert.equal(connection.port, 5432);
+    socket = connection.host;
+  }
+  return Buffer.from(`host=${socket} port=5432 dbname=${database} user=postgres`).toString('base64');
+}
+
 function snapshot(file) {
   const sql = fs.readFileSync(path.join(root, file), 'utf8');
   return { file, sql, sha256: digest(sql), version: path.basename(file).split('_')[0] };
@@ -232,8 +251,7 @@ async function main() {
             clone = name;
             await manager.query(`alter database ${quote(clone)} set search_path=public,extensions`);
             const config = { ...db.connection, database: clone };
-            const dblinkHost = db.connection.host.startsWith('/') ? db.connection.host : '/tmp';
-            const connectionSetting = Buffer.from(`host=${dblinkHost} port=5432 dbname=${clone} user=postgres`).toString('base64');
+            const connectionSetting = candidateDblinkSetting(runtime.targetKind, db.connection, clone);
             if (suite.concurrency) {
               outcome.assertions = await schedulerConcurrency(config, fixture?.sql);
               outcome.passed = true;
@@ -283,4 +301,4 @@ async function main() {
 }
 
 if (require.main === module) main().catch(error => { console.error(error); process.exitCode = 1; });
-module.exports = { checkTap, expandFixture, suiteRequests };
+module.exports = { checkTap, expandFixture, suiteRequests, candidateDblinkSetting };

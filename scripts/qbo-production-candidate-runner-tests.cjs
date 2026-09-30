@@ -5,7 +5,7 @@ const path = require('node:path');
 const os = require('node:os');
 const { spawnSync } = require('node:child_process');
 const vm = require('node:vm');
-const { checkTap, expandFixture, suiteRequests } = require('./run-qbo-production-candidate-database-tests.cjs');
+const { checkTap, expandFixture, suiteRequests, candidateDblinkSetting } = require('./run-qbo-production-candidate-database-tests.cjs');
 const { verifyLocalContext, verifyOwnedContainer, verifyBridgeGateway } = require('./qbo-candidate-local-container.cjs');
 let assertions = 0;
 assert.equal(checkTap(['1..2', 'ok 1 - first', 'ok 2 - second']), 2); assertions++;
@@ -72,6 +72,29 @@ assert.ok(requests[0].endsWith('commit;') && requests[1].startsWith('\nbegin;'))
 assert.throws(() => suiteRequests('select 1;', oauthFile)); assertions++;
 assert.throws(() => suiteRequests(sql + sql, oauthFile)); assertions++;
 assert.deepEqual(suiteRequests(sql, 'another-suite.sql'), [sql]); assertions++;
+
+const clone = `qbo_candidate_case_${'a'.repeat(20)}`;
+const outerConnection = { host: '127.0.0.1', port: 54321, user: 'postgres', ssl: false, password: 'synthetic-not-in-dblink' };
+assert.equal(Buffer.from(candidateDblinkSetting('owned-supabase-image', outerConnection, clone), 'base64').toString(),
+  `host=/tmp port=5432 dbname=${clone} user=postgres`, 'owned container dblink uses its inner socket, not outer TCP/port/password'); assertions++;
+for (const host of ['/tmp/square-qualification-Abc123/socket', '/private/tmp/square-qualification-Abc123/socket']) {
+  assert.equal(Buffer.from(candidateDblinkSetting('native-postgres', { ...outerConnection, host, port: 5432 }, clone), 'base64').toString(),
+    `host=${host} port=5432 dbname=${clone} user=postgres`, 'native runtime retains its exact private socket'); assertions++;
+}
+for (const [kind, overrides, database] of [
+  ['supabase-local', {}, clone], ['unowned', {}, clone],
+  ['owned-supabase-image', { host: 'database.example' }, clone],
+  ['owned-supabase-image', { host: '/tmp' }, clone],
+  ['owned-supabase-image', { port: 0 }, clone], ['owned-supabase-image', { port: 65536 }, clone],
+  ['owned-supabase-image', { port: '54321' }, clone], ['owned-supabase-image', { user: 'another_role' }, clone],
+  ['owned-supabase-image', { ssl: true }, clone], ['owned-supabase-image', {}, 'postgres'],
+  ['owned-supabase-image', {}, clone + ' host=remote'],
+  ['native-postgres', {}, clone], ['native-postgres', { host: '/tmp', port: 5432 }, clone],
+  ['native-postgres', { host: '/tmp/shared/socket', port: 5432 }, clone],
+  ['native-postgres', { host: '/tmp/square-qualification-Abc123/socket', port: 5433 }, clone],
+]) {
+  assert.throws(() => candidateDblinkSetting(kind, { ...outerConnection, ...overrides }, database)); assertions++;
+}
 
 // Exercise the real helper's orchestration with fake process/database boundaries.
 // No Docker daemon, PostgreSQL process, credentials, or network are used here.

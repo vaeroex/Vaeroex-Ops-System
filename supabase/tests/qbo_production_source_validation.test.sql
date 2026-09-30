@@ -263,14 +263,71 @@ select ok(pg_temp.validation_denied(format('select public.commit_canonical_busin
   'valid void ingestion cannot become a financial fact') from validation_void_claim;
 select lives_ok('select pg_temp.validation_freshness()','valid void with no effects permits ingestion freshness');
 
--- Real two-session claim ownership. Only the candidate runner's private Unix
--- socket database is allowed; its entire database is destroyed after this suite.
-do $$ begin
-  if inet_server_addr() is not null or coalesce(current_setting('vaeroex.test_database_url_b64',true),'')='' then
+-- The owned-container runner arrives over loopback-published TCP, but dblink
+-- must still use that cluster's Unix socket, never a supplied remote endpoint.
+create function pg_temp.validation_concurrency_connection(p_connection text default
+  convert_from(decode(current_setting('vaeroex.test_database_url_b64',true),'base64'),'UTF8'))
+returns text language plpgsql as $$
+declare socket_path text:=current_setting('unix_socket_directories');
+  data_path text:=current_setting('data_directory');
+  cluster_name text:=current_setting('cluster_name');
+begin
+  if current_database() !~ '^qbo_candidate_case_[a-f0-9]{20}$'
+    or current_setting('port')<>'5432' or current_user<>'postgres'
+    or p_connection is distinct from format('host=%s port=%s dbname=%s user=postgres',
+      socket_path,current_setting('port'),current_database()) then
     raise exception 'owned_disposable_socket_required_for_validation_concurrency';
   end if;
-end $$;
+  if inet_server_addr() is null then
+    if socket_path !~ '^(/private)?/tmp/square-qualification-[A-Za-z0-9]+/socket$'
+      or data_path is distinct from regexp_replace(socket_path,'/socket$','/data')
+      or cluster_name !~ '^square_qualification_[a-f0-9]{24}$'
+      or current_setting('listen_addresses')<>'' then
+      raise exception 'owned_disposable_socket_required_for_validation_concurrency';
+    end if;
+  elsif socket_path<>'/tmp' or data_path<>'/tmp/qbo-candidate-data'
+    or cluster_name !~ '^qbo_candidate_[a-f0-9]{24}$' then
+    raise exception 'owned_disposable_socket_required_for_validation_concurrency';
+  end if;
+  return p_connection;
+end;
+$$;
+select pg_temp.validation_concurrency_connection();
+select throws_ok(format('select pg_temp.validation_concurrency_connection(%L)',
+  format('host=127.0.0.1 port=5432 dbname=%s user=postgres',current_database())),
+  'P0001','owned_disposable_socket_required_for_validation_concurrency','TCP dblink endpoints are rejected');
+select throws_ok(format('select pg_temp.validation_concurrency_connection(%L)',
+  format('host=%s port=5432 dbname=postgres user=postgres',current_setting('unix_socket_directories'))),
+  'P0001','owned_disposable_socket_required_for_validation_concurrency','a different database is rejected');
+select throws_ok(format('select pg_temp.validation_concurrency_connection(%L)',
+  replace(pg_temp.validation_concurrency_connection(),'port=5432','port=5433')),
+  'P0001','owned_disposable_socket_required_for_validation_concurrency','a different socket port is rejected');
+select throws_ok(format('select pg_temp.validation_concurrency_connection(%L)',
+  replace(pg_temp.validation_concurrency_connection(),'user=postgres','user=service_role')),
+  'P0001','owned_disposable_socket_required_for_validation_concurrency','a different database principal is rejected');
+select throws_ok(format('select pg_temp.validation_concurrency_connection(%L)',
+  pg_temp.validation_concurrency_connection()||' hostaddr=127.0.0.1'),
+  'P0001','owned_disposable_socket_required_for_validation_concurrency','extra libpq endpoint overrides are rejected');
 create extension if not exists dblink with schema extensions;
+create function pg_temp.validation_connect(p_name text) returns text language plpgsql as $$
+declare remote record;
+begin
+  perform dblink_connect(p_name,pg_temp.validation_concurrency_connection());
+  select * into strict remote from dblink(p_name,$proof$
+    select inet_server_addr() is null, current_database(), current_user::text,
+      current_setting('data_directory'), current_setting('cluster_name'),
+      system_identifier::text from pg_control_system()
+  $proof$) as r(unix_socket boolean,database_name text,principal text,data_path text,cluster_name text,system_id text);
+  if remote.unix_socket is distinct from true or remote.database_name is distinct from current_database()
+    or remote.principal is distinct from 'postgres' or remote.data_path is distinct from current_setting('data_directory')
+    or remote.cluster_name is distinct from current_setting('cluster_name')
+    or remote.system_id is distinct from (select system_identifier::text from pg_control_system()) then
+    perform dblink_disconnect(p_name);
+    raise exception 'owned_disposable_socket_identity_mismatch';
+  end if;
+  return 'OK';
+end;
+$$;
 create temporary table validation_concurrent_commands as
 select t.id task_id,c.connection_generation,c.command||jsonb_build_object('version',v.value,
   'sourceIdentityFingerprint','sha256:'||encode(private.phase_3_contract_fingerprint_v1(jsonb_build_object(
@@ -282,8 +339,8 @@ select public.commit_provider_external_source_record_version_v1(command,'concurr
 commit;
 begin;
 set local search_path=public,extensions;
-select dblink_connect('validation_owner',convert_from(decode(current_setting('vaeroex.test_database_url_b64'),'base64'),'UTF8'));
-select dblink_connect('validation_contender',convert_from(decode(current_setting('vaeroex.test_database_url_b64'),'base64'),'UTF8'));
+select is(pg_temp.validation_connect('validation_owner'),'OK','owner socket proves the same disposable database and cluster');
+select is(pg_temp.validation_connect('validation_contender'),'OK','contender socket proves the same disposable database and cluster');
 select dblink_exec('validation_owner','begin; set local role integration_provider_source_authority');
 select dblink_exec('validation_contender','begin; set local role integration_provider_source_authority');
 create temporary table validation_concurrent_results(label text,value jsonb);
@@ -495,8 +552,8 @@ select is((select count(*)::int from validation_authority_inputs),2,'authority r
 commit;
 begin;
 set local search_path=public,extensions;
-select dblink_connect('validation_owner',convert_from(decode(current_setting('vaeroex.test_database_url_b64'),'base64'),'UTF8'));
-select dblink_connect('validation_contender',convert_from(decode(current_setting('vaeroex.test_database_url_b64'),'base64'),'UTF8'));
+select is(pg_temp.validation_connect('validation_owner'),'OK','reconnected owner retains owned socket identity');
+select is(pg_temp.validation_connect('validation_contender'),'OK','reconnected contender retains owned socket identity');
 select dblink_exec('validation_contender','set application_name=''qbo_validation_promotion_contender''');
 
 -- Mapping updates and promotion cannot pass one another, even before source locking.

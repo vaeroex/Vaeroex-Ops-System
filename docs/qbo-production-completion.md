@@ -99,13 +99,13 @@ browser, and dependency-audit verification before release.
 ## Qualification and remaining release boundaries
 
 The local candidate qualification executed the existing Phase 0 through 8B
-static suites (2,594 assertions), architecture (556), Production static contracts
-(236), and 569 focused TLS, OAuth, service identity, runtime, source validation,
+static suites (2,594 assertions), architecture (555), Production static contracts
+(236), and 587 focused TLS, OAuth, service identity, runtime, source validation,
 database harness, and customer-reader checks. The embedded database checks are
 registered in the normal completion script; they do not replace native SQL tests.
 Native qualification applied both the clean canonical 120-migration baseline and
 the exact 108-migration Production baseline, each followed by the four candidates.
-Each layout passed 223 assertions, including real concurrent sessions, with an
+Each layout passed 232 assertions, including real concurrent sessions, with an
 unchanged Square catalog. The four candidate migrations remain unapplied to
 Production. Hosted `verify` and `security-database` must pass the committed head;
 local evidence is not a waiver for those gates.
