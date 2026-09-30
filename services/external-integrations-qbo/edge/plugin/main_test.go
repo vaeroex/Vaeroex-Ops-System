@@ -148,6 +148,43 @@ func TestSuccessStillForwardsOnlyCanonicalHandoff(t *testing.T) {
 	}
 }
 
+func TestHeadersOnlyGoogleEdgeDoesNotTreatStreamFlagAsBody(t *testing.T) {
+	state := "i1_" + strings.Repeat("a", 43)
+	for _, query := range []string{
+		"state=" + state + "&error=access_denied",
+		"state=" + state + "&code=synthetic-code&realmId=1",
+	} {
+		for _, end := range []bool{false, true} {
+			for _, framing := range [][][2]string{nil, {{"content-length", "0"}}} {
+				host, reset := callbackHost(t, "GET", query)
+				id := host.InitializeHttpContext()
+				headers := append([][2]string{{":path", callbackedge.CallbackPath + "?" + query}}, framing...)
+				if host.CallOnRequestHeaders(id, headers, end) != types.ActionContinue || host.GetSentLocalResponse(id) != nil {
+					reset()
+					t.Fatal("headers-only ABI flag cannot reject an otherwise canonical callback")
+				}
+				if headersByName(host.GetCurrentRequestHeaders(id))[":path"][0] != callbackedge.CallbackPath {
+					reset()
+					t.Fatal("callback query must still be stripped")
+				}
+				reset()
+			}
+			for _, framing := range [][][2]string{
+				{{"content-length", "1"}}, {{"content-length", "-1"}}, {{"content-length", "invalid"}},
+				{{"content-length", "0"}, {"content-length", "0"}},
+				{{"transfer-encoding", "chunked"}}, {{"expect", "100-continue"}},
+			} {
+				host, reset := callbackHost(t, "GET", query)
+				id := host.InitializeHttpContext()
+				headers := append([][2]string{{":path", callbackedge.CallbackPath + "?" + query}}, framing...)
+				host.CallOnRequestHeaders(id, headers, end)
+				assertSanitizedRejection(t, host, id, 400, "invalid integration callback")
+				reset()
+			}
+		}
+	}
+}
+
 func TestPluginStartStrictHostConfiguration(t *testing.T) {
 	maximumHost := strings.Repeat("a", 63) + "." + strings.Repeat("b", 63) + "." + strings.Repeat("c", 63) + "." + strings.Repeat("d", 61)
 	for _, hostName := range []string{allowedTestHost, "QBO.Example.TEST", "qbo-1.example.test", maximumHost} {

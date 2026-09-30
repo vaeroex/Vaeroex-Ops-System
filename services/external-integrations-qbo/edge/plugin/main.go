@@ -123,7 +123,7 @@ func matchesAllowedHost(requestHost, allowedHost string) bool {
 	return validDNSHost(host) && strings.EqualFold(host, allowedHost)
 }
 
-func (h *httpContext) OnHttpRequestHeaders(headerCount int, endOfStream bool) (action types.Action) {
+func (h *httpContext) OnHttpRequestHeaders(headerCount int, _ bool) (action types.Action) {
 	action = types.ActionPause
 	defer func() {
 		if recover() != nil {
@@ -169,8 +169,11 @@ func (h *httpContext) OnHttpRequestHeaders(headerCount int, endOfStream bool) (a
 		sendFixedResponse(400, "invalid integration callback")
 		return action
 	}
+	// Google's headers-only edge hook does not prove end-of-stream (its tester
+	// supplies false even for GET). Framing is checked above; ingress must observe
+	// an actually empty completed body before using either callback handoff.
 	handoff, err := callbackedge.ParseForwardedCallback(
-		string(method), string(path), string(rawQuery), endOfStream,
+		string(method), string(path), string(rawQuery), true,
 	)
 	if err != nil {
 		sendFixedResponse(400, "invalid integration callback")

@@ -47,10 +47,10 @@ func TestWebhookPassThroughIsExact(t *testing.T) {
 	}
 }
 
-func TestCallbackRequiresBodylessRequest(t *testing.T) {
+func TestCallbackRequiresValidBodyFraming(t *testing.T) {
 	query := "code=synthetic-code&state=" + validStateFixture + "&realmId=1"
 	if _, err := ParseForwardedCallback("GET", CallbackPath, query, false); err == nil {
-		t.Fatal("expected callback body to fail closed")
+		t.Fatal("expected invalid callback body framing to fail closed")
 	}
 }
 

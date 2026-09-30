@@ -99,6 +99,7 @@ import { beginCustomerAuthorization, completeCustomerAuthorization, persistBefor
 import { completePendingCustomerDisconnects } from "./customer-disconnect";
 import { createQboInternalOperationAuthorizer } from "./service-identity";
 import { parseQboProductionDeniedHandoff, completeQboProductionDeniedHandoff } from "./oauth-denied-handoff";
+import { requireEmptyQboCallbackBody } from "./callback-body";
 import { executeQboProductionRead, type QboProductionLeasedTask } from "./executor";
 import {
   googleCloudKmsTransport,
@@ -1313,6 +1314,7 @@ async function handleIngress(request: IncomingMessage, response: ServerResponse,
   if (request.method !== "GET" || url.pathname !== "/oauth/callback") {
     return json(response, 404, { error: "not_found" });
   }
+  await requireEmptyQboCallbackBody(request);
   const denied = parseQboProductionDeniedHandoff({
     method: request.method,
     requestUrl: request.url ?? "",

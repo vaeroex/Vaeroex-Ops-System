@@ -36,8 +36,8 @@ type Handoff struct {
 	Denied  bool
 }
 
-func ParseCallbackAttributes(method, path, rawQuery string, endOfStream bool) (Handoff, error) {
-	if method != "GET" || !endOfStream || path != CallbackPath ||
+func ParseCallbackAttributes(method, path, rawQuery string, bodyFramingValid bool) (Handoff, error) {
+	if method != "GET" || !bodyFramingValid || path != CallbackPath ||
 		len(rawQuery) == 0 || len(rawQuery) > MaxRawQueryBytes ||
 		strings.ContainsAny(rawQuery, "?#") {
 		return Handoff{}, ErrInvalidCallback
@@ -97,12 +97,12 @@ func parseDeniedCallback(parts []string) (Handoff, error) {
 	return Handoff{State: state, Denied: true}, nil
 }
 
-func ParseForwardedCallback(method, pathAttribute, queryAttribute string, endOfStream bool) (Handoff, error) {
+func ParseForwardedCallback(method, pathAttribute, queryAttribute string, bodyFramingValid bool) (Handoff, error) {
 	path, rawQuery, valid := normalizeForwardedTarget(pathAttribute, queryAttribute)
 	if !valid {
 		return Handoff{}, ErrInvalidCallback
 	}
-	return ParseCallbackAttributes(method, path, rawQuery, endOfStream)
+	return ParseCallbackAttributes(method, path, rawQuery, bodyFramingValid)
 }
 
 func IsWebhookRequest(method, pathAttribute, queryAttribute string) bool {

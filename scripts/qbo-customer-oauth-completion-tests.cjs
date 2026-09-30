@@ -2,6 +2,8 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs'), path = require('node:path'), Module = require('node:module'), ts = require('typescript');
 const { randomUUID } = require('node:crypto');
+const { PassThrough } = require('node:stream');
+const http = require('node:http');
 const root = path.resolve(__dirname, '..');
 require.extensions['.ts'] = (module, filename) => module._compile(ts.transpileModule(fs.readFileSync(filename, 'utf8'), {
   compilerOptions: { esModuleInterop: true, module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }, fileName: filename
@@ -24,6 +26,7 @@ const { normalizeProviderOAuthReturnPath } = require('../lib/integrations/creden
 const { QBO_PRODUCTION_OAUTH_POLICY } = require('../lib/integrations/provider-runtime/qbo/oauth-policy.ts');
 const { BoundedIdentifierSchema } = require('../lib/integrations/contracts/primitives.ts');
 const { z } = require('zod');
+const { requireEmptyQboCallbackBody } = require('../services/external-integrations-qbo/src/callback-body.ts');
 const { credentialAadDigest } = require('../lib/integrations/credentials/kms.ts');
 const { contractSha256 } = require('../lib/integrations/contracts/canonical.ts');
 let passed = 0;
@@ -34,6 +37,71 @@ const stored = { credentialId, stored:true, credentialVersion:1, credentialStatu
 function client(data) { return { rpc: async () => ({ data,error:null }) }; }
 
 async function main() {
+  for (const rawHeaders of [[], ['Content-Length','0']]) {
+    await test('callback waits for actual body completion before broker authority', async () => {
+      const request=Object.assign(new PassThrough(),{rawHeaders,complete:false,aborted:false});
+      let brokerCalls=0;
+      const checked=requireEmptyQboCallbackBody(request).then(()=>brokerCalls++);
+      await Promise.resolve();assert.equal(brokerCalls,0);
+      request.complete=true;request.end();await checked;assert.equal(brokerCalls,1);
+    });
+  }
+  for (const rawHeaders of [['Content-Length','1'],['Content-Length','-1'],['Content-Length','00'],
+    ['Content-Length','0','content-length','0'],['Transfer-Encoding','chunked'],['Expect','100-continue']]) {
+    await test('callback invalid body framing denies all broker work',async()=>{
+      const request=Object.assign(new PassThrough(),{rawHeaders,complete:false,aborted:false});
+      let brokerCalls=0;
+      await assert.rejects(requireEmptyQboCallbackBody(request).then(()=>brokerCalls++),{message:'qbo_oauth_callback_body_invalid'});
+      assert.equal(brokerCalls,0);request.destroy();
+    });
+  }
+  for (const rawHeaders of [[],['content-length','0']]) {
+    await test('actual body bytes fail closed even with absent or zero declared length',async()=>{
+      const request=Object.assign(new PassThrough(),{rawHeaders,complete:false,aborted:false});
+      let brokerCalls=0;const bytes=Buffer.from('synthetic-private-body');
+      const checked=requireEmptyQboCallbackBody(request).then(()=>brokerCalls++);
+      request.end(bytes);await assert.rejects(checked,{message:'qbo_oauth_callback_body_invalid'});
+      assert.equal(brokerCalls,0);assert.ok(bytes.every(byte=>byte===0));
+    });
+  }
+  for (const event of ['error','aborted','close','incomplete-end']) {
+    await test(`callback ${event} cannot authorize broker work`,async()=>{
+      const request=Object.assign(new PassThrough(),{rawHeaders:[],complete:false,aborted:false});
+      let brokerCalls=0;const checked=requireEmptyQboCallbackBody(request).then(()=>brokerCalls++);
+      if(event==='incomplete-end')request.end();else request.emit(event,new Error('synthetic-private-error'));
+      await assert.rejects(checked,{message:'qbo_oauth_callback_body_invalid'});assert.equal(brokerCalls,0);
+    });
+  }
+  await test('real Node HTTP bodyless GET completes without consuming callback authority early',async()=>{
+    let brokerCalls=0;
+    const listener=http.createServer(async(request,response)=>{
+      try { await requireEmptyQboCallbackBody(request);brokerCalls++;response.writeHead(204).end(); }
+      catch { response.writeHead(400).end(); }
+    });
+    await new Promise(resolve=>listener.listen(0,'127.0.0.1',resolve));
+    try {
+      for(const headers of [{},{'Content-Length':'0'}]) {
+        const status=await new Promise((resolve,reject)=>{
+          const request=http.request({host:'127.0.0.1',port:listener.address().port,path:'/oauth/callback',method:'GET',headers},response=>{
+            response.resume();response.on('end',()=>resolve(response.statusCode));
+          });request.on('error',reject);request.end();
+        });assert.equal(status,204);
+      }
+      assert.equal(brokerCalls,2);
+    } finally {await new Promise(resolve=>listener.close(resolve));}
+  });
+  await test('unfinished callback stream times out closed without broker access',async()=>{
+    const request=Object.assign(new PassThrough(),{rawHeaders:[],complete:false,aborted:false});
+    let brokerCalls=0;
+    await assert.rejects(requireEmptyQboCallbackBody(request).then(()=>brokerCalls++),{message:'qbo_oauth_callback_body_invalid'});
+    assert.equal(brokerCalls,0);assert.equal(request.destroyed,true);
+  });
+  await test('empty callback body enforcement precedes both denial and success handoff consumers',async()=>{
+    const server=fs.readFileSync(path.join(root,'services/external-integrations-qbo/src/server.ts'),'utf8');
+    const gate=server.indexOf('await requireEmptyQboCallbackBody(request)');
+    assert.ok(gate>0 && gate<server.indexOf('const denied = parseQboProductionDeniedHandoff'));
+    assert.ok(gate<server.indexOf('const callback = CallbackSchema.parse(parseQboOAuthCallbackHandoff'));
+  });
   await test('stored acknowledgement precedes discovery', async () => {
     const events=[];
     const value=await persistBeforeDiscovery({ client:client(stored),stateId,credentialId,
@@ -288,7 +356,7 @@ async function main() {
     }
   });
   const context={exports:{},URL,z,BoundedIdentifierSchema,QBO_PRODUCTION_OAUTH_POLICY,normalizeProviderOAuthReturnPath,
-    parseQboProductionDeniedHandoff,completeQboProductionDeniedHandoff,parseQboOAuthCallbackHandoff,sanitizedQboOAuthConfirmationUrl,
+    parseQboProductionDeniedHandoff,completeQboProductionDeniedHandoff,parseQboOAuthCallbackHandoff,sanitizedQboOAuthConfirmationUrl,requireEmptyQboCallbackBody,
     env:name=>{assert.equal(name,'QBO_APPLICATION_ORIGIN');return 'https://www.vaeroex.com';},
     safeEvent:(...args)=>events.push(args),callBroker:async(...args)=>{requests.push(args);return brokerResult;},
     redirect:(_response,target)=>({status:303,target}),json:(_response,status,body)=>({status,body})};
@@ -302,8 +370,17 @@ async function main() {
   }
   async function runIngress(request) {
     requests.length=0;events.length=0;
-    return context.exports.ingress(request,{},new URL(request.url,'https://ingress.invalid'));
+    const stream=Object.assign(new PassThrough(),request,{complete:true,aborted:false});
+    stream.end(request.body);
+    return context.exports.ingress(stream,{},new URL(request.url,'https://ingress.invalid'));
   }
+  await test('actual ingress denies body bytes before either callback broker path',async()=>{
+    for(const version of [QBO_PRODUCTION_DENIED_HANDOFF_VERSION,'qbo_oauth_callback_handoff_v1']) {
+      await assert.rejects(runIngress({...denialRequest({headers:{'x-vaeroex-oauth-handoff-version':version}}),
+        body:Buffer.from('synthetic-private-body')}),{message:'qbo_oauth_callback_body_invalid'});
+      assert.equal(requests.length,0);assert.equal(events.length,0);
+    }
+  });
   await test('actual ingress consumes only bounded denial at private broker and returns clean customer URL',async()=>{
     for(const prefix of ['i1_','r1_']) {
       const state=prefix+'a'.repeat(43);
