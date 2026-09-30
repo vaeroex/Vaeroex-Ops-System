@@ -300,9 +300,11 @@ matches(variables, /image_digest must be an immutable sha256 image reference/, "
 matches(variables, /source_commit must be a full Git commit SHA/, "IaC records the exact source commit");
 excludes(terraform, /p8b-qbo|canary|sslip\.io|sandbox-quickbooks|intuit.*development/i, "deployable IaC contains no qualification resource binding");
 matches(dockerfile, /FROM node:22\.23\.1-bookworm-slim@sha256:/, "build image is digest pinned");
-matches(dockerfile, /FROM gcr\.io\/distroless\/nodejs22-debian12@sha256:/, "runtime image is digest pinned");
+matches(dockerfile, /FROM gcr\.io\/distroless\/nodejs22-debian13:nonroot@sha256:5ef534d3db0ac0c43bee379af4ae49cfbfc0ef38a46c94c52d87c68f32f34d8a/, "supported nonroot Node 22 runtime image is digest pinned");
 matches(dockerfile, /LABEL org\.opencontainers\.image\.revision=\$QBO_SOURCE_COMMIT/, "runtime image records its exact source revision");
 matches(cloudbuild, /QBO_SOURCE_COMMIT=\$\{_SOURCE_COMMIT\}/, "runtime publication supplies the reviewed source revision");
+matches(cloudbuild, /--network=none[\s\S]*--read-only[\s\S]*--cap-drop=ALL[\s\S]*--security-opt=no-new-privileges/, "finished image smoke has no external network or elevated capabilities");
+matches(cloudbuild, /image-smoke\.mjs:ro[\s\S]*\$\{_IMAGE\}[\s\S]*\/image-smoke\.mjs[\s\S]*\$\{_SOURCE_COMMIT\}/, "publication qualifies the actual image and source before pushing");
 matches(edgeCloudbuild, /_SOURCE_COMMIT[\s\S]*\^\[a-f0-9\]\{40\}\$/, "callback edge publication validates and records the reviewed source revision");
 matches(edgeDockerfile, /^FROM scratch\nCOPY plugin\.wasm \/plugin\.wasm\nARG QBO_SOURCE_COMMIT\nLABEL org\.opencontainers\.image\.revision=\$QBO_SOURCE_COMMIT\n$/, "Wasm callback packaging establishes its platform before metadata and contains only the plugin and nonsecret source provenance");
 matches(edgeCloudbuild, /QBO_SOURCE_COMMIT=\$\{_SOURCE_COMMIT\}/, "callback publication passes the reviewed commit into immutable artifact provenance");

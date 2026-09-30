@@ -275,6 +275,7 @@ test("synthetic desktop/mobile forms enforce consent and date, then enable and r
   const browser = await chromium.launch({ headless: true, ...(executablePath ? { executablePath } : {}) });
   const page = await browser.newPage(); const failures = [], pageErrors = [];
   page.on("pageerror", error => pageErrors.push(error.message));
+  page.on("requestfailed", request => failures.push(Error(request.failure()?.errorText)));
   await page.route("**/*", async interception => {
     try {
       const req = interception.request(), url = new URL(req.url());
@@ -310,8 +311,18 @@ test("synthetic desktop/mobile forms enforce consent and date, then enable and r
       assert.deepEqual(overflow, []);
       await page.screenshot({ path: `/tmp/qbo-accounting-authority-${width}.png`, fullPage: true });
       await page.locator('input[name="policyConsent"]').check();
+      const enableResponse = page.waitForResponse(response => response.request().method() === "POST");
       await page.getByRole("button", { name: "Enable accounting authority", exact: true }).click();
-      await page.getByRole("heading", { name: "Revoke accounting authority", exact: true }).waitFor();
+      const submitted = await enableResponse;
+      assert.equal(submitted.status(), 303, JSON.stringify({
+        status: submitted.status(), failures: failures.map(error => error.message)
+      }));
+      assert.equal(submitted.headers().location, `${origin}${helper.QBO_ACCOUNTING_PATH}?connectionId=${ids.connection}`);
+      assert.equal(state.authority.enabled, true);
+      await page.getByRole("heading", { name: "Revoke accounting authority", exact: true }).waitFor({ timeout: 5000 }).catch(async () => {
+        throw Error(JSON.stringify({ url: page.url(), body: await page.locator("body").innerText(),
+          failures: failures.map(error => error.message), pageErrors }));
+      });
       assert.equal(state.authority.enabled, true);
       assert.equal(await page.locator('input[name="confirmation"]').isChecked(), false);
       await page.getByRole("button", { name: "Revoke accounting authority", exact: true }).click();
