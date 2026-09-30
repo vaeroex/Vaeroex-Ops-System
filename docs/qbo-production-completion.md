@@ -100,7 +100,7 @@ browser, and dependency-audit verification before release.
 
 The local candidate qualification executed the existing Phase 0 through 8B
 static suites (2,594 assertions), architecture (556), Production static contracts
-(236), and 403 focused TLS, OAuth, service identity, runtime, source validation,
+(236), and 569 focused TLS, OAuth, service identity, runtime, source validation,
 database harness, and customer-reader checks. The embedded database checks are
 registered in the normal completion script; they do not replace native SQL tests.
 Native qualification applied both the clean canonical 120-migration baseline and

@@ -220,13 +220,6 @@ jobs:
           go test -count=1 ./...
           GOOS=wasip1 GOARCH=wasm go build -buildvcs=false -buildmode=c-shared -trimpath -o /tmp/qbo-production-callback-edge.wasm ./plugin
 
-      - name: Validate QBO Production Terraform without cloud access
-        working-directory: services/external-integrations-qbo/infra
-        run: |
-          terraform fmt -check
-          terraform init -backend=false -input=false -lockfile=readonly
-          terraform validate
-
       - name: External integrations Square Production callback edge tests
         working-directory: services/external-integrations-production/callback-edge
         run: |
@@ -238,7 +231,7 @@ jobs:
         working-directory: services/external-integrations-qbo/infra
         run: |
           terraform fmt -check -recursive
-          terraform init -backend=false -input=false
+          terraform init -backend=false -input=false -lockfile=readonly
           terraform validate
 
       - name: Validate dormant provider-neutral Production integration composition

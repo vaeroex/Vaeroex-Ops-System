@@ -68,6 +68,33 @@ function nonPresentationLogic(tree) {
   }
 }
 
+const intelligenceFile = "app/app/intelligence/page.tsx";
+const qboDiagnosticAdditions = [
+  'import { qboProductionCustomerConnectionsEnabled } from "@/lib/integrations/control-plane/qbo-customer-availability";\n',
+  'import { QboIntelligenceDiagnostic } from "@/lib/integrations/qbo-customer/intelligence-diagnostic";\n',
+  '      {qboProductionCustomerConnectionsEnabled() && context.membership?.role === "owner"\n'
+    + '        ? <QboIntelligenceDiagnostic workspaceId={workspaceId} /> : null}\n',
+];
+
+function withoutQboDiagnostic(source) {
+  // 2b7650dd adds only these four lines to its parent Intelligence page.
+  // Require the exact gate, owner check and workspace prop before excluding
+  // this isolated diagnostic; retain the original 75c3d61 logic/action hashes.
+  const tree = ts.createSourceFile(intelligenceFile, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const uses = { qboProductionCustomerConnectionsEnabled: 0, QboIntelligenceDiagnostic: 0 };
+  const visit = (node) => {
+    if (ts.isIdentifier(node) && Object.hasOwn(uses, node.text)) uses[node.text]++;
+    ts.forEachChild(node, visit);
+  };
+  visit(tree);
+  assert.deepEqual(Object.values(uses), [2, 2], "Each QBO binding is used only by its import and the single gated diagnostic");
+  for (const addition of qboDiagnosticAdditions) {
+    assert.equal(source.split(addition).length, 2, "Require exactly the approved QBO import/component addition");
+    source = source.replace(addition, "");
+  }
+  return source;
+}
+
 for (const [file, count, actionsDigest, logicDigest] of contracts) {
   test(`${file} preserves the inventoried workflow beneath its presentation`, () => {
     let source = fs.readFileSync(path.join(__dirname, "..", file), "utf8");
@@ -80,6 +107,7 @@ for (const [file, count, actionsDigest, logicDigest] of contracts) {
         source = source.replace(declaration, "");
       }
     }
+    if (file === intelligenceFile) source = withoutQboDiagnostic(source);
     const tree = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
     const actions = actionInventory(tree);
     assert.equal(actions.length, count, "No existing action or protected form binding may be lost or added by this presentation change");
@@ -87,3 +115,36 @@ for (const [file, count, actionsDigest, logicDigest] of contracts) {
     assert.equal(digest(nonPresentationLogic(tree)), logicDigest, "Presentation must preserve imports, queries, calculations, state and handler implementations");
   });
 }
+
+test("the additive QBO diagnostic exception rejects changed imports, authorization, scope and extra usages", () => {
+  const source = fs.readFileSync(path.join(__dirname, "..", intelligenceFile), "utf8");
+  const mutations = [
+    ["qbo-customer/intelligence-diagnostic", "qbo-customer/other-diagnostic"],
+    ["qboProductionCustomerConnectionsEnabled() && ", ""],
+    ['context.membership?.role === "owner"', 'context.membership?.role === "admin"'],
+    ["workspaceId={workspaceId}", 'workspaceId={"other-workspace"}'],
+    ["<QboIntelligenceDiagnostic workspaceId={workspaceId} />", "<QboIntelligenceDiagnostic workspaceId={workspaceId} extra={true} />"],
+    [qboDiagnosticAdditions[2], qboDiagnosticAdditions[2] + "      <QboIntelligenceDiagnostic workspaceId={workspaceId} />\n"],
+    [qboDiagnosticAdditions[0], qboDiagnosticAdditions[0] + "const extraQboRead = qboProductionCustomerConnectionsEnabled();\n"],
+  ];
+  for (const [before, after] of mutations) {
+    assert(source.includes(before));
+    assert.throws(() => withoutQboDiagnostic(source.replace(before, after)), assert.AssertionError);
+  }
+});
+
+test("the QBO exception still detects changes to existing Intelligence imports, queries and state", () => {
+  const source = fs.readFileSync(path.join(__dirname, "..", intelligenceFile), "utf8");
+  const originalDigest = contracts.find(([file]) => file === intelligenceFile)[3];
+  for (const [before, after] of [
+    ['import Link from "next/link";', 'import Link from "other-link";'],
+    ['.eq("workspace_id", workspaceId)', '.eq("workspace_id", "other-workspace")'],
+    [".limit(2000)", ".limit(2001)"],
+    ["const snapshotAsOf = new Date().toISOString();", 'const snapshotAsOf = "fixed-time";'],
+  ]) {
+    assert(source.includes(before));
+    const changed = withoutQboDiagnostic(source.replace(before, after));
+    const tree = ts.createSourceFile(intelligenceFile, changed, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+    assert.notEqual(digest(nonPresentationLogic(tree)), originalDigest, "Original non-presentation logic remains protected");
+  }
+});

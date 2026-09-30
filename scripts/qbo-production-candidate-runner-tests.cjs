@@ -2,9 +2,11 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const os = require('node:os');
+const { spawnSync } = require('node:child_process');
 const vm = require('node:vm');
 const { checkTap, expandFixture, suiteRequests } = require('./run-qbo-production-candidate-database-tests.cjs');
-const { verifyLocalContext, verifyOwnedContainer } = require('./qbo-candidate-local-container.cjs');
+const { verifyLocalContext, verifyOwnedContainer, verifyBridgeGateway } = require('./qbo-candidate-local-container.cjs');
 let assertions = 0;
 assert.equal(checkTap(['1..2', 'ok 1 - first', 'ok 2 - second']), 2); assertions++;
 assert.equal(checkTap(['ok 1 - first', '# diagnostic', '1..1']), 1); assertions++;
@@ -31,6 +33,21 @@ verifyLocalContext(context, undefined); assertions++;
 assert.throws(() => verifyLocalContext(context, 'tcp://remote:2376')); assertions++;
 assert.throws(() => verifyLocalContext([{ Endpoints: { docker: { Host: 'ssh://remote' } } }])); assertions++;
 assert.throws(() => verifyLocalContext([])); assertions++;
+const bridge = { Name: 'bridge', Driver: 'bridge', Scope: 'local', IPAM: { Config: [{ Gateway: '172.17.0.1' }] } };
+assert.equal(verifyBridgeGateway([bridge]), '172.17.0.1'); assertions++;
+for (const mutate of [
+  item => { item.Name = 'another-network'; }, item => { item.Driver = 'host'; },
+  item => { item.Scope = 'swarm'; }, item => { item.IPAM.Config = []; },
+  item => { item.IPAM.Config[0].Gateway = '172.17.0.1/16'; },
+  item => { item.IPAM.Config[0].Gateway = '172.17.0.1; echo untrusted'; },
+  item => { item.IPAM.Config[0].Gateway = '::1'; },
+  item => { item.IPAM.Config.push({ Gateway: '172.18.0.1' }); },
+]) {
+  const changed = structuredClone(bridge); mutate(changed);
+  assert.throws(() => verifyBridgeGateway([changed])); assertions++;
+}
+assert.throws(() => verifyBridgeGateway([])); assertions++;
+assert.throws(() => verifyBridgeGateway([bridge, bridge])); assertions++;
 const proof = { id: 'container-id', name: 'unique-name', image: 'sha256:exact-image', nonce: 'unique-nonce' };
 const container = { Id: proof.id, Name: `/${proof.name}`, Image: proof.image,
   Config: { Labels: { 'com.vaeroex.qbo-test': proof.nonce } },
@@ -59,8 +76,9 @@ assert.deepEqual(suiteRequests(sql, 'another-suite.sql'), [sql]); assertions++;
 // Exercise the real helper's orchestration with fake process/database boundaries.
 // No Docker daemon, PostgreSQL process, credentials, or network are used here.
 async function containerLifecycleTests() {
-  for (const failure of [null, 'launch', 'version', 'callback', 'cleanup-identity']) {
-    const calls = [], clients = [], guards = [];
+  for (const failure of [null, 'launch', 'version', 'callback', 'cleanup-identity',
+    'hba', 'password', 'refused', 'unknown', 'transient', 'exited', 'gateway']) {
+    const calls = [], clients = [], guards = [], delays = [];
     const childEnvironment = { PATH: '/synthetic/bin', QBO_CANDIDATE_PASSWORD: 'inherited-synthetic-value' };
     const ownId = 'b'.repeat(64), sourceId = 'a'.repeat(64), image = `sha256:${'c'.repeat(64)}`;
     let launch, closing = false;
@@ -69,6 +87,10 @@ async function containerLifecycleTests() {
       assert.equal(command, 'docker');
       calls.push({ args: Array.from(args), options });
       if (args[0] === 'context') return output(context);
+      if (args[0] === 'network') {
+        assert.deepEqual(Array.from(args), ['network', 'inspect', 'bridge']);
+        return output([bridge]);
+      }
       if (args[0] === 'inspect' && args[1] === 'supabase_db_candidate-test') return output([{ Id: sourceId,
         Name: '/supabase_db_candidate-test', State: { Running: true }, Image: image, Config: { Image: 'supabase/postgres:17' } }]);
       if (args[0] === 'exec') {
@@ -81,9 +103,10 @@ async function containerLifecycleTests() {
       }
       if (args[0] === 'inspect' && args[1] === ownId) return output([{
         Id: closing && failure === 'cleanup-identity' ? sourceId : ownId,
-        Name: `/${launch.args[launch.args.indexOf('--name') + 1]}`, Image: image, State: { Running: true },
+        Name: `/${launch.args[launch.args.indexOf('--name') + 1]}`, Image: image, State: { Running: failure !== 'exited' },
         Config: { Labels: { 'com.vaeroex.qbo-test': launch.args[launch.args.indexOf('--label') + 1].split('=')[1] } },
-        NetworkSettings: { Ports: { '5432/tcp': [{ HostIp: '127.0.0.1', HostPort: '54321' }] } },
+        NetworkSettings: { Ports: { '5432/tcp': [{ HostIp: '127.0.0.1', HostPort: '54321' }] },
+          Networks: { bridge: { Gateway: failure === 'gateway' ? '172.18.0.1' : '172.17.0.1' } } },
       }]);
       if (args[0] === 'rm') {
         assert.deepEqual(Array.from(args), ['rm', '--force', ownId]);
@@ -94,7 +117,12 @@ async function containerLifecycleTests() {
     class FakeClient {
       constructor(config) { this.config = config; clients.push(this); }
       on() {}
-      async connect() {}
+      async connect() {
+        const codes = { hba: '28000', password: '28P01', refused: 'ECONNREFUSED',
+          unknown: launch.options.env.QBO_CANDIDATE_PASSWORD };
+        const code = failure === 'transient' && clients.length <= 2 ? ['ECONNREFUSED', '57P03'][clients.length - 1] : codes[failure];
+        if (code) throw Object.assign(new Error(launch.options.env.QBO_CANDIDATE_PASSWORD), { code });
+      }
       async end() { this.ended = true; closing = true; }
       async query(sql) {
         if (sql.includes("current_setting('server_version_num')")) return { rows: [{
@@ -110,6 +138,7 @@ async function containerLifecycleTests() {
       module: testModule, __dirname, process: { env: childEnvironment },
       require(name) {
         if (name === 'node:child_process') return { spawnSync: fakeSpawn };
+        if (name === 'node:timers/promises') return { async setTimeout(ms) { delays.push(ms); } };
         if (name === 'pg') return { Client: FakeClient };
         if (name === './run-square-durable-page-qualification.js') return {
           assertNoRemoteConfiguration() { guards.push('remote'); }, assertNoLinkedProject() { guards.push('linked'); },
@@ -134,8 +163,8 @@ async function containerLifecycleTests() {
         if (failure === 'callback') throw new Error('synthetic qualification failure');
       });
     } catch (caught) { error = caught; }
-    assert.equal(Boolean(error), failure !== null); assertions++;
-    assert.equal(callbackReached, !['launch', 'version'].includes(failure)); assertions++;
+    assert.equal(Boolean(error), ![null, 'transient'].includes(failure)); assertions++;
+    assert.equal(callbackReached, [null, 'transient', 'callback', 'cleanup-identity'].includes(failure)); assertions++;
     assert.deepEqual(guards, ['remote', 'linked']); assertions++;
     const password = launch.options.env.QBO_CANDIDATE_PASSWORD;
     assert.match(password, /^[a-f0-9]{48}$/); assertions++;
@@ -146,14 +175,59 @@ async function containerLifecycleTests() {
     assert.ok(calls.filter(call => call.args[0] !== 'run')
       .every(call => call.options.env.QBO_CANDIDATE_PASSWORD !== password), 'generated password scoped to launch child only'); assertions++;
     assert.ok(!String(error).includes(password), 'launch failure cannot expose a password from stderr'); assertions++;
+    if (['hba', 'password', 'refused', 'unknown'].includes(failure)) {
+      const expectedCode = { hba: '28000', password: '28P01', refused: 'ECONNREFUSED', unknown: 'unknown' }[failure];
+      assert.equal(error.message, `owned disposable PostgreSQL startup timed out (last connection code: ${expectedCode})`); assertions++;
+      assert.equal(clients.length, 60, 'retain the existing startup attempt bound'); assertions++;
+      assert.deepEqual(delays, Array(60).fill(500), 'retain the existing startup retry delay'); assertions++;
+    } else if (failure === 'transient') {
+      assert.deepEqual(delays, [500, 500], 'connection refusal and PostgreSQL startup are retried'); assertions++;
+    } else if (failure === 'exited') {
+      assert.match(error.message, /^owned PostgreSQL container exited during startup/); assertions++;
+      assert.equal(clients.length, 0, 'an exited owned container cannot reach database qualification'); assertions++;
+    } else if (failure === 'gateway') {
+      assert.match(error.message, /^owned container uses the inspected Docker bridge gateway/); assertions++;
+      assert.equal(clients.length, 0, 'a mismatched bridge cannot reach database qualification'); assertions++;
+    }
     assert.ok(launch.args.includes('--pull=never') && launch.args.includes(image)); assertions++;
     assert.equal(launch.args[launch.args.indexOf('--publish') + 1], '127.0.0.1::5432'); assertions++;
     assert.equal(launch.args[launch.args.indexOf('--user') + 1], 'postgres'); assertions++;
+    assert.equal(launch.args[launch.args.indexOf('--network') + 1], 'bridge'); assertions++;
     assert.ok(!launch.args.some(arg => ['--volume', '-v', '--mount'].includes(arg)), 'no host mounts'); assertions++;
     assert.equal(calls.filter(call => call.args[0] === 'rm').length,
       ['launch', 'cleanup-identity'].includes(failure) ? 0 : 1, 'cleanup requires proven ownership even after failure'); assertions++;
     assert.ok(clients.every(client => client.ended), 'all opened clients are closed'); assertions++;
+    if (failure === null) startupShellTests(launch.args.at(-1));
   }
+}
+
+function startupShellTests(script) {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'qbo-candidate-shell-test-'));
+  try {
+    const passwordLine = script.split('\n').find(line => line.startsWith('printf ') && line.endsWith(' > /tmp/qbo-candidate-password'));
+    assert.ok(passwordLine, 'exercise the actual rendered password-file command'); assertions++;
+    const passwordFile = path.join(directory, 'password');
+    const result = spawnSync('/bin/sh', ['-c', 'umask 077\n' + passwordLine.replace('/tmp/qbo-candidate-password', '"$QBO_TEST_PASSWORD_FILE"')], {
+      env: { QBO_CANDIDATE_PASSWORD: 'synthetic-fixture', QBO_TEST_PASSWORD_FILE: passwordFile }, encoding: 'utf8', timeout: 5000,
+    });
+    assert.equal(result.status, 0); assertions++;
+    assert.deepEqual(fs.readFileSync(passwordFile), Buffer.from('synthetic-fixture\n'), 'pwfile contains exactly the password and one newline, no literal backslash suffix'); assertions++;
+    assert.equal(fs.statSync(passwordFile).mode & 0o777, 0o600); assertions++;
+    assert.equal(result.stdout + result.stderr, '', 'password-file setup prints nothing'); assertions++;
+    const hbaLine = script.split('\n').find(line => line.endsWith(' >> /tmp/qbo-candidate-data/pg_hba.conf'));
+    assert.ok(hbaLine, 'custom entrypoint must add access for Docker bridge-forwarded clients'); assertions++;
+    const hbaFile = path.join(directory, 'pg_hba.conf');
+    fs.writeFileSync(hbaFile, 'local all all trust\n', { mode: 0o600 });
+    const hba = spawnSync('/bin/sh', ['-c', hbaLine.replace('/tmp/qbo-candidate-data/pg_hba.conf', '"$QBO_TEST_HBA_FILE"')], {
+      env: { QBO_TEST_HBA_FILE: hbaFile }, encoding: 'utf8', timeout: 5000,
+    });
+    assert.equal(hba.status, 0); assertions++;
+    assert.equal(fs.readFileSync(hbaFile, 'utf8'), 'local all all trust\nhost all postgres 172.17.0.1/32 scram-sha-256\n',
+      'preserve local rules and append only gateway /32 postgres-role SCRAM, never host trust or a broad CIDR'); assertions++;
+    assert.ok(script.indexOf(hbaLine) > script.indexOf('initdb ') && script.indexOf(hbaLine) < script.indexOf('exec postgres '),
+      'configure bridge access after initdb and before PostgreSQL starts'); assertions++;
+    assert.ok(script.indexOf('rm /tmp/qbo-candidate-password') < script.indexOf('exec postgres '), 'remove password file before startup'); assertions++;
+  } finally { fs.rmSync(directory, { recursive: true, force: true }); }
 }
 containerLifecycleTests().then(() => {
   console.log(`QBO candidate runner: ${assertions} assertions passed; no database or network used.`);

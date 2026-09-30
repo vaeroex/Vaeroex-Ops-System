@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
+const { isIP } = require('node:net');
 const { spawnSync } = require('node:child_process');
 const { setTimeout: delay } = require('node:timers/promises');
 const { Client } = require('pg');
@@ -35,10 +36,22 @@ function verifyOwnedContainer(container, { id, name, image, nonce }) {
   return port;
 }
 
+function verifyBridgeGateway(networks) {
+  assert.equal(networks.length, 1, 'exactly one local Docker bridge is required');
+  const network = networks[0];
+  assert.equal(network.Name, 'bridge');
+  assert.equal(network.Driver, 'bridge');
+  assert.equal(network.Scope, 'local');
+  const gateways = (network.IPAM?.Config || []).map(config => config.Gateway).filter(value => isIP(value || '') === 4);
+  assert.equal(gateways.length, 1, 'exactly one IPv4 Docker bridge gateway is required');
+  return gateways[0];
+}
+
 async function runContainerQualification(callback) {
   assertNoRemoteConfiguration();
   assertNoLinkedProject();
   verifyLocalContext(JSON.parse(docker(['context', 'inspect'])));
+  const gateway = verifyBridgeGateway(JSON.parse(docker(['network', 'inspect', 'bridge'])));
   const project = /^project_id\s*=\s*"([A-Za-z0-9_-]+)"/m.exec(fs.readFileSync(path.join(root, 'supabase/config.toml'), 'utf8'))?.[1];
   assert.ok(project, 'repository local Supabase project identity');
   const source = JSON.parse(docker(['inspect', `supabase_db_${project}`]));
@@ -65,20 +78,25 @@ export PATH="${bin}:$PATH"
 printf '%s\\n' "$QBO_CANDIDATE_PASSWORD" > /tmp/qbo-candidate-password
 initdb -D /tmp/qbo-candidate-data --username=postgres --auth-local=trust --auth-host=scram-sha-256 --pwfile=/tmp/qbo-candidate-password --encoding=UTF8 --no-locale > /tmp/qbo-candidate-init.log
 rm /tmp/qbo-candidate-password
+# Docker forwards the loopback-published port from its bridge, not container localhost.
+# Bypassing the image entrypoint also bypasses its post-initdb host access rule.
+printf '%s\\n' 'host all postgres ${gateway}/32 scram-sha-256' >> /tmp/qbo-candidate-data/pg_hba.conf
 exec postgres -D /tmp/qbo-candidate-data -c listen_addresses='*' -c unix_socket_directories=/tmp -c cluster_name=${cluster} -c shared_buffers=64MB -c max_connections=30 -c log_statement=none -c log_min_error_statement=panic`;
     id = docker(['run', '--detach', '--pull=never', '--name', name, '--label', `com.vaeroex.qbo-test=${nonce}`,
-      '--user', 'postgres', '--publish', '127.0.0.1::5432', '--env', 'QBO_CANDIDATE_PASSWORD',
+      '--user', 'postgres', '--network', 'bridge', '--publish', '127.0.0.1::5432', '--env', 'QBO_CANDIDATE_PASSWORD',
       '--entrypoint', '/bin/sh', image, '-c', script], { env: { ...process.env, QBO_CANDIDATE_PASSWORD: password } });
     assert.match(id, /^[a-f0-9]{64}$/);
     const proof = { id, name, image, nonce };
     const inspect = () => {
       const containers = JSON.parse(docker(['inspect', id]));
       assert.equal(containers.length, 1);
+      assert.equal(containers[0].NetworkSettings?.Networks?.bridge?.Gateway, gateway, 'owned container uses the inspected Docker bridge gateway');
       return verifyOwnedContainer(containers[0], proof);
     };
     const port = inspect();
     const connection = { host: '127.0.0.1', port, database: 'postgres', user: 'postgres', password, ssl: false,
       connectionTimeoutMillis: 1000, statement_timeout: 60000 };
+    let lastStartupCode = 'none';
     for (let attempt = 0; attempt < 60; attempt++) {
       if (attempt % 5 === 0) {
         const running = JSON.parse(docker(['inspect', id]))[0];
@@ -87,9 +105,15 @@ exec postgres -D /tmp/qbo-candidate-data -c listen_addresses='*' -c unix_socket_
       const client = new Client(connection);
       client.on('error', () => {});
       try { await client.connect(); administrator = client; break; }
-      catch { await client.end().catch(() => {}); await delay(500); }
+      catch (error) {
+        // Report only known codes, never driver messages, credentials or container env/logs.
+        lastStartupCode = ['28000', '28P01', '3D000', '57P03', 'ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT']
+          .includes(error?.code) ? error.code : 'unknown';
+        await client.end().catch(() => {});
+        await delay(500);
+      }
     }
-    assert.ok(administrator, 'owned disposable PostgreSQL startup timed out');
+    assert.ok(administrator, `owned disposable PostgreSQL startup timed out (last connection code: ${lastStartupCode})`);
     const observed = (await administrator.query(`select current_setting('server_version_num')::integer as version,
       current_setting('data_directory') as data,current_setting('cluster_name') as cluster,
       current_database() as db,inet_server_port() as port`)).rows[0];
@@ -130,4 +154,4 @@ exec postgres -D /tmp/qbo-candidate-data -c listen_addresses='*' -c unix_socket_
   }
 }
 
-module.exports = { runContainerQualification, verifyLocalContext, verifyOwnedContainer };
+module.exports = { runContainerQualification, verifyLocalContext, verifyOwnedContainer, verifyBridgeGateway };

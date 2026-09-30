@@ -13,7 +13,7 @@ module.exports = function(source) {
       import { IntelligenceBriefingCards } from "@/components/intelligence/IntelligenceBriefingCards";
       import { IntelligenceSignalInbox } from "@/components/intelligence/IntelligenceSignalInbox";
       import { ErrorNotice } from "@/components/operations/ErrorNotice";
-      import { intelligenceFixture } from ${JSON.stringify(options.readRuntime)};
+      import { intelligenceFixture, qboProductionCustomerConnectionsEnabled } from ${JSON.stringify(options.readRuntime)};
       export default async function IntelligencePage({searchParams}) {
         const params = await searchParams;
         const {displayErrors,lifecycleCards,explanationTokens,canManageLifecycle,blockedState,briefingStates,isIntelligenceBriefingEnabled} = intelligenceFixture();
