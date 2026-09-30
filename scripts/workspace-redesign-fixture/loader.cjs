@@ -13,9 +13,11 @@ module.exports = function(source) {
       import { IntelligenceBriefingCards } from "@/components/intelligence/IntelligenceBriefingCards";
       import { IntelligenceSignalInbox } from "@/components/intelligence/IntelligenceSignalInbox";
       import { ErrorNotice } from "@/components/operations/ErrorNotice";
+      import { QboAccountingIntelligenceView } from "@/lib/integrations/qbo-customer/accounting-intelligence-view";
       import { intelligenceFixture, qboProductionCustomerConnectionsEnabled } from ${JSON.stringify(options.readRuntime)};
       export default async function IntelligencePage({searchParams}) {
         const params = await searchParams;
+        const qboAccounting = Object.freeze({state: "hidden"});
         const {displayErrors,lifecycleCards,explanationTokens,canManageLifecycle,blockedState,briefingStates,isIntelligenceBriefingEnabled} = intelligenceFixture();
         return ${finalReturn.expression.getText(ast)};
       }`;
