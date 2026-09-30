@@ -75,6 +75,28 @@ const qboDiagnosticAdditions = [
   '      {qboProductionCustomerConnectionsEnabled() && context.membership?.role === "owner"\n'
     + '        ? <QboIntelligenceDiagnostic workspaceId={workspaceId} /> : null}\n',
 ];
+const qboAccountingAdditions = [
+  'import { loadQboAccountingIntelligence } from "@/lib/integrations/qbo-customer/accounting-intelligence-server";\n',
+  'import { QboAccountingIntelligenceView } from "@/lib/integrations/qbo-customer/accounting-intelligence-view";\n',
+  '  const qboAccounting = await loadQboAccountingIntelligence(workspaceId, snapshotAsOf);\n',
+  '      ...(qboAccounting.state === "available" && qboAccounting.data.kpis.length ? {\n'
+    + '        kpis: qboAccounting.data.kpis,\n'
+    + '        evidenceManifests: qboAccounting.data.evidenceManifests\n'
+    + '      } : {}),\n',
+  '      <QboAccountingIntelligenceView result={qboAccounting} />\n',
+];
+
+function withoutQboAccounting(source) {
+  // The separately qualified owner-authorized producer is an additive product
+  // change, not a presentation refactor. Preserve all preexisting workflow hashes.
+  for (const addition of qboAccountingAdditions) {
+    assert.equal(source.split(addition).length, 2, "Require exactly the approved accounting producer binding");
+    source = source.replace(addition, "");
+  }
+  assert.doesNotMatch(source, /\b(?:qboAccounting|loadQboAccountingIntelligence|QboAccountingIntelligenceView)\b/,
+    "No extra accounting producer uses may escape the exact addition contract");
+  return source;
+}
 
 function withoutQboDiagnostic(source) {
   // 2b7650dd adds only these four lines to its parent Intelligence page.
@@ -92,7 +114,7 @@ function withoutQboDiagnostic(source) {
     assert.equal(source.split(addition).length, 2, "Require exactly the approved QBO import/component addition");
     source = source.replace(addition, "");
   }
-  return source;
+  return withoutQboAccounting(source);
 }
 
 for (const [file, count, actionsDigest, logicDigest] of contracts) {
@@ -146,5 +168,22 @@ test("the QBO exception still detects changes to existing Intelligence imports, 
     const changed = withoutQboDiagnostic(source.replace(before, after));
     const tree = ts.createSourceFile(intelligenceFile, changed, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
     assert.notEqual(digest(nonPresentationLogic(tree)), originalDigest, "Original non-presentation logic remains protected");
+  }
+});
+
+test("accounting exception rejects changed scope, timing, data and extra producer usages", () => {
+  const source = fs.readFileSync(path.join(__dirname, "..", intelligenceFile), "utf8");
+  for (const [before, after] of [
+    ["qbo-customer/accounting-intelligence-server", "qbo-customer/unreviewed-server"],
+    ["loadQboAccountingIntelligence(workspaceId, snapshotAsOf)", "loadQboAccountingIntelligence(otherWorkspace, snapshotAsOf)"],
+    ["loadQboAccountingIntelligence(workspaceId, snapshotAsOf)", "loadQboAccountingIntelligence(workspaceId, anotherTime)"],
+    ['qboAccounting.state === "available"', 'qboAccounting.state !== "hidden"'],
+    ["kpis: qboAccounting.data.kpis", "kpis: qboAccounting.data.rawSources"],
+    ["evidenceManifests: qboAccounting.data.evidenceManifests", "evidenceManifests: qboAccounting.data.summaries"],
+    ["result={qboAccounting}", "result={unscopedAccounting}"],
+    [qboAccountingAdditions[2], qboAccountingAdditions[2] + "  publish(qboAccounting);\n"],
+  ]) {
+    assert(source.includes(before));
+    assert.throws(() => withoutQboDiagnostic(source.replace(before, after)), assert.AssertionError);
   }
 });
