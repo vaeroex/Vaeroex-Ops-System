@@ -2,14 +2,14 @@
 
 ## Approved boundary
 
-On 2026-09-30 the operator approved only the previously reviewed disabled-ingress plan: **11 creates, 0 updates, 0 deletes**, with an estimated incremental low-traffic cost of USD 20-25/month, not a spending cap. Deployment is pending verification and hosted checks when this record is committed.
+On 2026-09-30 the operator approved and deployed the reviewed disabled-ingress plan: **11 creates, 0 updates, 0 deletes**, with an estimated incremental low-traffic cost of USD 20-25/month, not a spending cap. Hosted CI1514 passed for the deployment-record head `6c5ae5ed27eb64d293c8679fb1f261da3aa703d0` before apply.
 
-PR #448 remains draft and unmerged. This approval does not authorize DNS or Intuit settings, migrations, secret population, customer connections, provider processing, brokers, queues, schedulers or synchronization activation. `promotionAuthorized=false`; application model calls remain zero.
+PR #448 remains draft and unmerged. A subsequent narrow approval authorized only logging-normalization correction and one DNS record after a no-change plan. Neither approval authorizes Intuit settings, migrations, additional secrets, customer connections, provider processing, brokers, queues, schedulers or synchronization activation. `promotionAuthorized=false`; application model calls remain zero.
 
 ## Immutable candidate
 
 Reviewed implementation commit: `3f90f387eca173258c44ae87ff98e477ee225fa5`.
-This documentation-only descendant does not change the reviewed source or artifact pins.
+The later logging configuration correction does not change the deployed source or artifact pins.
 
 | Artifact | Immutable reference |
 | --- | --- |
@@ -53,9 +53,21 @@ Cloud Run uses internal/load-balancer-only ingress, disables its default URL, an
 
 Prior targeted checks: bootstrap 79 assertions; built-bundle smoke 12; QBO Production 236; two Terraform mock tests; both Terraform validations; real-plan allowlist; scoped lint/compilation; Go edge/plugin tests; artifact builds; whitespace checks. Required hosted CI runs on the pushed descendant; no additional broad local runs or subagents are authorized.
 
-After authorized apply, retain the complete state outside temporary storage and publish a sanitized receipt identifying actual resource counts, ingress IP, revision/digests, readiness and disabled-response observations. A certificate pending DNS is not working HTTPS. Do not weaken ingress or replace the certificate merely to obtain a health result.
+The deployed ingress IP is `136.81.90.78`; Cloud Run revision `qbo-production-oauth-ingress-00001-6lx` is Ready with 100% intended traffic. Complete plans, provenance and operational state are retained in the restricted operator deployment-record directory outside temporary storage. The default Cloud Run hostname returns 404.
 
-Next DNS proposal, not permission to execute: create a DNS-only A record for `integrations.vaeroex.com` pointing to the newly allocated global ingress IPv4, then wait for the managed certificate to become ACTIVE. Confirm existing A/AAAA/CNAME/CAA and DNS-provider behavior before changing records. Do not use the outbound NAT address.
+After the no-change plan, the separately authorized Cloudflare record was created: A `integrations.vaeroex.com` -> `136.81.90.78`, DNS only, TTL 300. The complete zone list had no conflicting record; no existing record was changed. Authoritative Cloudflare DNS and public resolver 1.1.1.1 both returned that address and TTL. Certificate issuance and public HTTPS disabled-response verification are still pending at this record's commit; the final PR deployment receipt records their actual outcome. Do not bypass TLS or treat pending issuance as working HTTPS.
+
+Production client credential metadata confirms `qbo-intuit-production-client/versions/1` is ENABLED; no value was read. `qbo-intuit-webhook-verifier` has no versions. Neither secret is mounted or accessible through bootstrap runtime configuration.
+
+## Logging normalization
+
+The live Wasm API omits `logConfig` when logging is disabled. The [API default is false](https://docs.cloud.google.com/service-extensions/docs/reference/rest/v1/projects.locations.wasmPlugins#LogConfig); [google 7.39.0](https://github.com/hashicorp/terraform-provider-google/blob/v7.39.0/google/services/networkservices/resource_network_services_wasm_plugin.go) flattens absent/empty objects to no block. An explicit false block therefore caused a perpetual proposed update, not enabled logging.
+
+Only the redundant plugin block was removed. A resource postcondition requires every returned logging entry to be disabled. The attribute remains managed and non-computed: actual remote enablement produces a visible plan change. Backend request logging remains explicitly false. No `ignore_changes`, provider upgrade, live logging mutation, Terraform apply, or state edit was used.
+
+Focused regression `scripts/qbo-callback-logging-provider-tests.cjs` exercises the actual locked provider with a localhost GET-only API and ephemeral import plans, never a deployed state. Omitted and empty logging are no-ops; explicit false remains visible normalization drift; enabled logging is detected as an update from true to no block. All four cases pass. Run with the Terraform binary and installed provider-directory paths as arguments.
+
+The fresh live plan at `2026-09-30T17:32:46Z` exited 0: **0 creates, 0 updates, 0 deletes**. Plan SHA-256: `52d43fe451a05b7625b02483bd6ca609db6e46b540f6aa2e4aed3e495230f4d3`. The deployed state hash before and after remained `d2c31c57fe1a7b609a40c56ac3c1df3c593d80baaafd9c98b16cf4c963dbeb7c`. Both Terraform roots validate; recursive formatting, two bootstrap mock tests, bootstrap 79 assertions, QBO Production 236 assertions, scoped ESLint and whitespace checks pass. No broad local run or subagent was launched.
 
 Intended callback: `https://integrations.vaeroex.com/oauth/callback`.
 Intended webhook: `https://integrations.vaeroex.com/webhooks/qbo`.

@@ -48,7 +48,8 @@ assert.deepEqual(Object.fromEntries(container.env.map(item => [item.name, item.v
 assert.ok(container.env.every(item => item.value_source.length === 0));
 const plugin = after("module.callback.google_network_services_wasm_plugin.callback");
 assert.equal(plugin.versions[0].image_uri, plan.variables.callback_edge_image_digest.value);
-assert.equal(plugin.log_config[0].enable, false);
+assert.ok(Array.isArray(plugin.log_config));
+assert.ok(plugin.log_config.every(logging => logging.enable === false));
 assert.deepEqual(JSON.parse(Buffer.from(plugin.versions[0].plugin_config_data, "base64").toString()), { allowedHost: "integrations.vaeroex.com" });
 assert.equal(after("module.callback.google_compute_backend_service.callback").log_config[0].enable, false);
 assert.equal(after("module.callback.google_network_services_lb_edge_extension.callback").extension_chains[0].extensions[0].fail_open, false);

@@ -81,8 +81,13 @@ resource "google_network_services_wasm_plugin" "callback" {
   main_version_id = "v${substr(var.source_commit, 0, 12)}"
   deletion_policy = "PREVENT"
 
-  log_config {
-    enable = false
+  # The API omits disabled logging; google 7.39.0 flattens it to no block.
+  # log_config is optional, not computed: remote enablement still produces drift.
+  lifecycle {
+    postcondition {
+      condition     = alltrue([for logging in self.log_config : logging.enable == false])
+      error_message = "QBO callback plugin logging must remain disabled."
+    }
   }
 
   versions {

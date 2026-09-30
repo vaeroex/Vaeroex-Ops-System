@@ -290,7 +290,7 @@ matches(terraform, /google_network_services_wasm_plugin" "callback"/, "Productio
 matches(terraform, /google_network_services_lb_edge_extension" "callback"[\s\S]*fail_open\s+= false/, "callback edge extension fails closed");
 matches(terraform, /forward_headers = \[[\s\S]*content-length[\s\S]*x-vaeroex-oauth-state[\s\S]*\]/, "callback edge receives only the headers required for body and handoff fencing");
 matches(terraform, /google_compute_backend_service" "callback"[\s\S]*log_config \{[\s\S]*enable = false/, "callback load-balancer request logging is disabled");
-matches(terraform, /google_network_services_wasm_plugin" "callback"[\s\S]*log_config \{[\s\S]*enable = false/, "callback plugin logging is disabled");
+matches(terraform, /google_network_services_wasm_plugin" "callback"[\s\S]*postcondition \{\s*condition\s*= alltrue\(\[for logging in self\.log_config : logging\.enable == false\]\)/, "callback plugin logging uses the API disabled default with an enforced postcondition");
 matches(terraform, /deletion_policy\s+= "PREVENT"/, "callback edge artifacts cannot be deleted accidentally");
 matches(terraformVersions, /version = "7\.39\.0"/, "Google provider version supports explicit edge attribute forwarding");
 matches(terraformLock, /provider "registry\.terraform\.io\/hashicorp\/google"/, "the Terraform dependency lock pins the exact Google provider source");
