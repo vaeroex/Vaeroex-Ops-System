@@ -91,6 +91,11 @@ export class QboProductionDatabase {
     };
   }
 
+  async checkConnectivity() {
+    const client = await this.#pool.connect();
+    client.release();
+  }
+
   async close() {
     await this.#pool.end();
   }

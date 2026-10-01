@@ -99,6 +99,7 @@ import { QboProductionDatabase } from "./database";
 import { beginCustomerAuthorization, completeCustomerAuthorization, persistBeforeDiscovery } from "./oauth-completion";
 import { completePendingCustomerDisconnects } from "./customer-disconnect";
 import { createQboInternalOperationAuthorizer } from "./service-identity";
+import { createQboStartupReadiness } from "./startup-readiness";
 import { parseQboProductionDeniedHandoff, completeQboProductionDeniedHandoff } from "./oauth-denied-handoff";
 import { requireEmptyQboCallbackBody } from "./callback-body";
 import { executeQboProductionRead, type QboProductionLeasedTask } from "./executor";
@@ -174,6 +175,15 @@ for (const value of Object.values(config)) {
 function database() {
   return new QboProductionDatabase(config.databaseUrl, rolesByMode[config.mode]);
 }
+
+const startupReady = createQboStartupReadiness(async () => {
+  const db = database();
+  try {
+    await db.checkConnectivity();
+  } finally {
+    await db.close();
+  }
+});
 
 function json(response: ServerResponse, status: number, value: unknown) {
   const body = Buffer.from(JSON.stringify(value), "utf8");
@@ -1354,6 +1364,14 @@ async function handleIngress(request: IncomingMessage, response: ServerResponse,
 
 async function route(request: IncomingMessage, response: ServerResponse) {
   const url = new URL(request.url ?? "/", "http://qbo-production.invalid");
+  if (url.pathname === "/health/ready") {
+    if (request.method !== "GET" || request.url !== "/health/ready" ||
+        (config.mode !== "credential_broker" && config.mode !== "provider_runtime")) {
+      return json(response, 404, { error: "not_found" });
+    }
+    const ready = await startupReady();
+    return json(response, ready ? 200 : 503, { ready });
+  }
   if (url.pathname === "/health") {
     return json(response, 200, {
       ok: true,

@@ -180,6 +180,21 @@ resource "google_cloud_run_v2_service" "service" {
     containers {
       image = var.image_digest
 
+      dynamic "startup_probe" {
+        for_each = contains(local.provider_egress_modes, each.key) ? [each.key] : []
+
+        content {
+          timeout_seconds   = 15
+          period_seconds    = 15
+          failure_threshold = 16
+
+          http_get {
+            path = "/health/ready"
+            port = 8080
+          }
+        }
+      }
+
       env {
         name  = "QBO_SERVICE_MODE"
         value = each.value

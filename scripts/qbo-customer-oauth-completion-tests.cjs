@@ -18,6 +18,7 @@ const { beginCustomerAuthorization, persistBeforeDiscovery, completeCustomerAuth
   require('../services/external-integrations-qbo/src/oauth-completion.ts');
 const { completePendingCustomerDisconnects } = require('../services/external-integrations-qbo/src/customer-disconnect.ts');
 const { createQboInternalOperationAuthorizer } = require('../services/external-integrations-qbo/src/service-identity.ts');
+const { createQboStartupReadiness } = require('../services/external-integrations-qbo/src/startup-readiness.ts');
 const { googleIdentityToken } = require('../services/external-integrations-qbo/src/google.ts');
 const { parseQboProductionDeniedHandoff, completeQboProductionDeniedHandoff, QBO_PRODUCTION_DENIED_HANDOFF_VERSION } =
   require('../services/external-integrations-qbo/src/oauth-denied-handoff.ts');
@@ -37,6 +38,35 @@ const stored = { credentialId, stored:true, credentialVersion:1, credentialStatu
 function client(data) { return { rpc: async () => ({ data,error:null }) }; }
 
 async function main() {
+  await test('startup readiness shares one pending check and caches its successful result',async()=>{
+    let checks=0,finish;
+    const ready=createQboStartupReadiness(()=>{checks++;return new Promise(resolve=>{finish=resolve;});});
+    const pending=[ready(),ready(),ready()];
+    await Promise.resolve();assert.equal(checks,1);
+    finish();assert.deepEqual(await Promise.all(pending),[true,true,true]);
+    assert.equal(await ready(),true);assert.equal(await ready(),true);assert.equal(checks,1);
+  });
+  await test('startup readiness returns false to concurrent callers and retries after failure',async()=>{
+    let checks=0,fail;
+    const ready=createQboStartupReadiness(()=>{
+      checks++;
+      return checks===1?new Promise((_resolve,reject)=>{fail=reject;}):Promise.resolve();
+    });
+    const pending=[ready(),ready(),ready()];
+    await Promise.resolve();assert.equal(checks,1);
+    fail(new Error('synthetic-private-database-error'));
+    assert.deepEqual(await Promise.all(pending),[false,false,false]);
+    assert.equal(checks,1);assert.equal(await ready(),true);assert.equal(checks,2);
+    assert.equal(await ready(),true);assert.equal(checks,2);
+  });
+  await test('startup readiness contains synchronous check failures and can recover',async()=>{
+    let checks=0;
+    const ready=createQboStartupReadiness(()=>{
+      if(++checks===1)throw Error('synthetic-private-configuration-error');
+      return Promise.resolve();
+    });
+    assert.equal(await ready(),false);assert.equal(await ready(),true);assert.equal(checks,2);
+  });
   for (const rawHeaders of [[], ['Content-Length','0']]) {
     await test('callback waits for actual body completion before broker authority', async () => {
       const request=Object.assign(new PassThrough(),{rawHeaders,complete:false,aborted:false});
@@ -321,6 +351,118 @@ async function main() {
   const callbackSchema=source.statements.find(n=>ts.isVariableStatement(n)&&n.declarationList.declarations.some(d=>d.name.getText(source)==='CallbackSchema'));
   assert(ingress&&callbackSchema);
   const vm=require('node:vm'); const events=[],requests=[];let brokerResult={outcome:'denied',returnIntent:'/app/settings'};
+  await test('actual database connectivity checks only connect and release and propagate connection failures',async()=>{
+    const databaseFile=path.join(root,'services/external-integrations-qbo/src/database.ts');
+    const {qboDatabaseConfiguration}=require('../services/external-integrations-qbo/src/database-config.ts');
+    const ca=fs.readFileSync(path.join(root,'tools/jit-access-feasibility/supabase-root-2021.crt'),'utf8');
+    const operations=[],forbidden=[];let connectionFailure=null,poolOptions;
+    const deny=capability=>()=>{forbidden.push(capability);throw Error(`forbidden_${capability}`);};
+    class MockPool {
+      constructor(options) {poolOptions=options;}
+      async connect() {
+        operations.push('connect');
+        if(connectionFailure)throw connectionFailure;
+        return {query:deny('sql'),release:()=>operations.push('release')};
+      }
+      async end() {operations.push('end');}
+    }
+    const context={exports:{},fetch:deny('network'),require:request=>{
+      if(request==='server-only')return {};
+      if(request==='pg')return {Pool:MockPool};
+      if(request==='./database-config')return {qboDatabaseConfiguration};
+      return deny(`import_${request}`)();
+    }};
+    vm.runInNewContext(ts.transpileModule(fs.readFileSync(databaseFile,'utf8'),{
+      fileName:databaseFile,compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}
+    }).outputText,context,{filename:databaseFile});
+    const db=new context.exports.QboProductionDatabase(
+      'postgresql://synthetic:synthetic@aws-0-us-central1.pooler.supabase.com:5432/postgres?sslmode=require',
+      ['integration_credential_broker_authority'],ca);
+    db.role=deny('role');
+    try {
+      assert.equal(poolOptions.ssl.rejectUnauthorized,true);assert.equal(poolOptions.ssl.ca,ca);
+      assert.equal(poolOptions.connectionTimeoutMillis,10000);
+      assert.equal(new URL(poolOptions.connectionString).searchParams.has('sslmode'),false);
+      assert.equal(await db.checkConnectivity(),undefined);
+      assert.deepEqual(operations,['connect','release']);operations.length=0;
+      connectionFailure=Object.assign(new Error('synthetic-private-connect-failure'),{code:'ETIMEDOUT'});
+      await assert.rejects(()=>db.checkConnectivity(),error=>error===connectionFailure);
+      assert.deepEqual(operations,['connect']);assert.deepEqual(forbidden,[]);
+    } finally {await db.close();}
+    assert.deepEqual(operations,['connect','end']);assert.deepEqual(forbidden,[]);
+  });
+  function readinessRoute(check,mode='credential_broker') {
+    const route=source.statements.find(n=>ts.isFunctionDeclaration(n)&&n.name?.text==='route');
+    const readiness=source.statements.find(n=>ts.isVariableStatement(n)&&n.declarationList.declarations.some(d=>
+      d.name.getText(source)==='startupReady'&&d.initializer&&ts.isCallExpression(d.initializer)&&
+      d.initializer.expression.getText(source)==='createQboStartupReadiness'));
+    assert(route&&readiness,'actual router must compose startup readiness');
+    const state={checks:0,databases:0,closes:0,authorizations:0,forbidden:[],logs:[]};
+    const deny=capability=>()=>{state.forbidden.push(capability);throw Error(`forbidden_${capability}`);};
+    const context={exports:{},URL,config:{mode,sourceCommit:'synthetic'},createQboStartupReadiness,
+      database:()=>{state.databases++;return {
+        checkConnectivity:async()=>{state.checks++;await check();},close:async()=>{state.closes++;},
+        role:deny('database_role'),rpc:deny('database_rpc')
+      };},
+      authorizeInternalOperation:async()=>{state.authorizations++;return false;},
+      json:(_response,status,body)=>({status,body}),safeEvent:(...args)=>state.logs.push(args),
+      console:Object.fromEntries(['log','info','warn','error','debug','trace'].map(name=>[name,(...args)=>state.logs.push(args)])),
+      process:{stdout:{write:value=>state.logs.push(value)},stderr:{write:value=>state.logs.push(value)}},
+      brokerDependencies:deny('broker_dependencies'),callBroker:deny('broker_call'),
+      googleIdentityToken:deny('identity_token'),fetch:deny('network'),
+      googleCloudKmsTransport:{encrypt:deny('kms_encrypt'),decrypt:deny('kms_decrypt')},
+      googleSecretManagerTransport:{accessSecretVersion:deny('secret_access')},
+      handleIngress:deny('ingress'),handleBroker:deny('broker'),handleScheduler:deny('scheduler'),
+      handleDispatcher:deny('dispatcher'),handleValidationRecovery:deny('validation'),executeTask:deny('provider')};
+    vm.runInNewContext(ts.transpileModule(readiness.getText(source)+'\n'+route.getText(source)+'\nexports.route=route;',{
+      compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText,context);
+    return {state,request:(url='/health/ready',method='GET')=>
+      context.exports.route({url,method,headers:{},rawHeaders:[]},{})};
+  }
+  await test('actual readiness route returns 503 on connectivity failure then retries and caches success',async()=>{
+    for(const mode of ['credential_broker','provider_runtime']) {
+      let checks=0;
+      const harness=readinessRoute(async()=>{if(++checks===1)throw Error('synthetic-private-db-url-and-password');},mode);
+      const failed=await harness.request();assert.equal(failed.status,503);assert.equal(failed.body.ready,false);
+      assert.equal(harness.state.checks,1);assert.equal(harness.state.closes,1);
+      assert.doesNotMatch(JSON.stringify([failed.body,harness.state.logs]),/synthetic-private|password/);
+      const recovered=await harness.request();assert.equal(recovered.status,200);assert.equal(recovered.body.ready,true);
+      const cached=await harness.request();assert.equal(cached.status,200);assert.equal(cached.body.ready,true);
+      assert.equal(harness.state.checks,2);assert.equal(harness.state.databases,2);assert.equal(harness.state.closes,2);
+      assert.equal(harness.state.authorizations,0);assert.deepEqual(harness.state.forbidden,[]);
+    }
+  });
+  await test('actual readiness route shares concurrent probes without operational capabilities',async()=>{
+    let finish;
+    const harness=readinessRoute(()=>new Promise(resolve=>{finish=resolve;}));
+    const pending=[harness.request(),harness.request(),harness.request()];
+    await Promise.resolve();assert.equal(harness.state.checks,1);assert.equal(harness.state.databases,1);
+    finish();assert.deepEqual((await Promise.all(pending)).map(result=>result.status),[200,200,200]);
+    assert.equal(harness.state.closes,1);assert.equal(harness.state.authorizations,0);
+    assert.deepEqual(harness.state.forbidden,[]);
+  });
+  await test('actual readiness route rejects non-GET methods and query or hash suffixes without checking connectivity',async()=>{
+    for(const mode of ['credential_broker','provider_runtime']) {
+      const harness=readinessRoute(async()=>{throw Error('must_not_check');},mode);
+      for(const method of ['POST','HEAD','PUT','PATCH','DELETE','OPTIONS']) {
+        assert.ok((await harness.request('/health/ready',method)).status>=400);
+      }
+      assert.ok((await harness.request('/health/ready?check=1')).status>=400);
+      assert.ok((await harness.request('/health/ready#check')).status>=400);
+      assert.ok((await harness.request('/health/ready?')).status>=400);
+      assert.ok((await harness.request('/health/ready#')).status>=400);
+      assert.equal(harness.state.checks,0);assert.equal(harness.state.databases,0);
+      assert.deepEqual(harness.state.forbidden,[]);
+    }
+  });
+  await test('actual readiness route denies other service modes without connectivity or operational work',async()=>{
+    for(const mode of ['oauth_ingress','task_scheduler','task_dispatcher']) {
+      const harness=readinessRoute(async()=>{throw Error('must_not_check');},mode);
+      assert.ok((await harness.request()).status>=400);
+      assert.equal(harness.state.checks,0);assert.equal(harness.state.databases,0);
+      assert.deepEqual(harness.state.forbidden,[]);
+    }
+  });
   await test('actual central router denies scheduler task execution before any handler or body access',async()=>{
     const route=source.statements.find(n=>ts.isFunctionDeclaration(n)&&n.name?.text==='route');assert(route);
     const reached=[];
