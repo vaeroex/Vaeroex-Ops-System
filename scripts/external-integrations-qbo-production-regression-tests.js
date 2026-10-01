@@ -277,6 +277,8 @@ matches(terraform, /google_compute_router_nat" "provider_egress"[\s\S]*nat_ip_al
 matches(terraform, /google_compute_router_nat" "provider_egress"[\s\S]*source_subnetwork_ip_ranges_to_nat = "LIST_OF_SUBNETWORKS"[\s\S]*endpoint_types\s+= \["ENDPOINT_TYPE_VM"\][\s\S]*min_ports_per_vm\s+= 128/, "Cloud NAT is scoped to Direct VPC egress with bounded port capacity");
 matches(providerEgressModes, /provider_egress_modes = toset\(\[\s*"credential_broker",\s*"provider_runtime",\s*\]\)/, "only Intuit-facing service modes are eligible for static egress");
 matches(terraform, /dynamic "vpc_access"[\s\S]*contains\(local\.provider_egress_modes, each\.key\)[\s\S]*egress = "ALL_TRAFFIC"[\s\S]*google_compute_subnetwork\.provider_egress\.id/, "eligible Cloud Run revisions route all traffic through Direct VPC egress");
+matches(terraform, /dynamic "startup_probe"\s*\{\s*for_each = contains\(local\.provider_egress_modes, each\.key\) \? \[each\.key\] : \[\]/, "only Direct VPC modes require startup egress readiness");
+matches(terraform, /startup_probe[\s\S]*timeout_seconds\s*= 15[\s\S]*period_seconds\s*= 15[\s\S]*failure_threshold\s*= 16[\s\S]*http_get\s*\{\s*path = "\/health\/ready"\s*port = 8080/, "startup retries are bounded to 240 seconds before accepting operational traffic");
 excludes(providerEgressModes, /oauth_ingress|task_scheduler|task_dispatcher/, "ingress and control-plane services cannot acquire provider static egress");
 matches(terraformOutputs, /output "provider_egress_ip"[\s\S]*google_compute_address\.provider_egress\.address/, "Terraform exposes only the reserved public provider egress IP");
 excludes(terraform, /nat_ips\s+= \[google_compute_global_address\.callback/, "callback ingress can never become provider egress authority");
