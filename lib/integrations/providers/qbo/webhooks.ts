@@ -27,6 +27,28 @@ const webhookEntityToRecordType: Readonly<Record<string, QboSupportedObjectType>
   journalentry: "JournalEntry"
 };
 
+// Intuit's permitted operations, restricted to this adapter's webhook entities:
+// https://static.developer.intuit.com/output_html/qbo/docs/develop/webhooks/configure-webhooks.html
+// Reviewed 2026-09-30. Emailed has no canonical change kind and stays unsubscribed.
+const webhookOperationsByRecordType: Readonly<Partial<Record<QboSupportedObjectType, readonly string[]>>> = {
+  Account: ["created", "updated", "deleted", "merged"],
+  Customer: ["created", "updated", "deleted", "merged"],
+  Vendor: ["created", "updated", "deleted", "merged"],
+  Item: ["created", "updated", "deleted", "merged"],
+  Invoice: ["created", "updated", "deleted", "void"],
+  Payment: ["created", "updated", "deleted", "void"],
+  CreditMemo: ["created", "updated", "deleted", "void"],
+  SalesReceipt: ["created", "updated", "deleted", "void"],
+  RefundReceipt: ["created", "updated", "deleted", "void"],
+  Bill: ["created", "updated", "deleted"],
+  BillPayment: ["created", "updated", "deleted", "void"],
+  VendorCredit: ["created", "updated", "deleted"],
+  Purchase: ["created", "updated", "deleted", "void"],
+  Deposit: ["created", "updated", "deleted"],
+  Transfer: ["created", "updated", "deleted", "void"],
+  JournalEntry: ["created", "updated", "deleted"]
+};
+
 function fail(field: string): never {
   throw new Error(`qbo_webhook_contract_validation_failed:${field}`);
 }
@@ -51,7 +73,7 @@ function changeKind(operation: string) {
   if (operation === "created") return "created" as const;
   if (operation === "updated" || operation === "merged") return "updated" as const;
   if (operation === "deleted") return "deleted" as const;
-  if (operation === "voided") return "voided" as const;
+  if (operation === "void") return "voided" as const;
   return null;
 }
 
@@ -73,7 +95,9 @@ export function parseQboCloudEventsWebhook(input: {
       throw new Error(`qbo_webhook_unsupported_entity:${entity}`);
     }
     const mappedChangeKind = changeKind(operation);
-    if (!mappedChangeKind) throw new Error(`qbo_webhook_unsupported_operation:${operation}`);
+    if (!mappedChangeKind || !webhookOperationsByRecordType[recordType]?.includes(operation)) {
+      throw new Error(`qbo_webhook_unsupported_operation:${operation}`);
+    }
     const realmId = stringValue(event, "intuitaccountid");
     if (input.expectedProvider && input.expectedProvider.realmId !== realmId) {
       throw new Error("qbo_webhook_realm_mismatch");

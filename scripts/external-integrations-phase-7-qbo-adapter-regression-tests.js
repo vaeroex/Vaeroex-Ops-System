@@ -539,8 +539,8 @@ equal(
 );
 equal(
   qbo.classifyQboProviderError({ httpStatus: 429, headers: { "Retry-After": "10" } }).retryAfterMs,
-  10_000,
-  "429 carries Retry-After"
+  60_000,
+  "429 preserves the documented minimum wait even for a shorter Retry-After"
 );
 equal(
   qbo.classifyQboProviderError({ httpStatus: 503 }).kind,

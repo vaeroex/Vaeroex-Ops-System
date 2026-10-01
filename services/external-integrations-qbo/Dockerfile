@@ -14,7 +14,7 @@ COPY services/external-integrations-qbo/src ./services/external-integrations-qbo
 COPY tsconfig.json ./tsconfig.json
 
 RUN /app/node_modules/.bin/ncc build \
-      services/external-integrations-qbo/src/server.ts \
+      services/external-integrations-qbo/src/entry.ts \
       -o services/external-integrations-qbo/dist \
       --minify \
       --no-cache \
@@ -22,7 +22,7 @@ RUN /app/node_modules/.bin/ncc build \
       --external server-only && \
     ! grep -Fq '@/lib/' services/external-integrations-qbo/dist/index.js
 
-FROM gcr.io/distroless/nodejs22-debian12@sha256:13593b7570658e8477de39e2f4a1dd25db2f836d68a0ba771251572d23bb4f8e AS runtime
+FROM gcr.io/distroless/nodejs22-debian13:nonroot@sha256:5ef534d3db0ac0c43bee379af4ae49cfbfc0ef38a46c94c52d87c68f32f34d8a AS runtime
 
 ARG QBO_SOURCE_COMMIT
 LABEL org.opencontainers.image.revision=$QBO_SOURCE_COMMIT

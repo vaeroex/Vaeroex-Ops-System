@@ -65,6 +65,9 @@ const queryableTypes = new Set<string>([
   ...QBO_MASTER_RECORD_TYPES,
   ...QBO_TRANSACTION_RECORD_TYPES
 ]);
+// List queries otherwise omit inactive records. Intuit's explicit all-state filter:
+// https://static.developer.intuit.com/output_html/qbo/docs/learn/explore-the-quickbooks-online-api/data-queries.html
+const activeListTypes = new Set<string>(["Account", "Customer", "Vendor", "Item"]);
 const permittedReportIdentifiers = new Set<string>(
   Object.values(QBO_PROVIDER_REPORT_IDENTIFIER_BY_TYPE)
 );
@@ -274,7 +277,7 @@ function queryText(input: {
   }
   const where = postingWindow
     ? ` WHERE TxnDate >= '${postingWindow.startDate}' AND TxnDate <= '${postingWindow.endDate}'`
-    : "";
+    : activeListTypes.has(input.recordType) ? " WHERE Active IN (true, false)" : "";
   return `SELECT * FROM ${input.recordType}${where} STARTPOSITION ${input.startPosition} MAXRESULTS ${maximumResults}`;
 }
 
@@ -401,7 +404,7 @@ export class QboReadOnlyClient {
       providerRequestFingerprint,
       providerOutcome: "provider_success"
     });
-    return parsed;
+    return { payload: parsed, providerRequestFingerprint };
   }
 
   async fetchEntityPage(input: {
@@ -431,10 +434,11 @@ export class QboReadOnlyClient {
         maximumResults: normalizeQboQueryPageSize(
           input.maximumResults ?? QBO_MAX_QUERY_PAGE_SIZE
         ),
-        postingWindow: input.postingWindow ?? null
+        postingWindow: input.postingWindow ?? null,
+        includeInactive: activeListTypes.has(recordType)
       }
     });
-    const records = queryRecords(root, recordType);
+    const records = queryRecords(root.payload, recordType);
     const startPosition = input.startPosition ?? 1;
     const maximumResults = normalizeQboQueryPageSize(
       input.maximumResults ?? QBO_MAX_QUERY_PAGE_SIZE
@@ -458,7 +462,7 @@ export class QboReadOnlyClient {
       endpointClass: "qbo_company_info",
       requestFingerprintInput: { operation: "company_info" }
     });
-    return object(root.CompanyInfo, "qbo_company_info_response_invalid");
+    return object(root.payload.CompanyInfo, "qbo_company_info_response_invalid");
   }
 
   async fetchReport(input: {
@@ -483,7 +487,7 @@ export class QboReadOnlyClient {
             end_date: window.endDate,
             accounting_method: input.accountingMethod
           });
-    return this.#get({
+    const result = await this.#get({
       path: `/v3/company/${this.#realmId}/reports/${providerReportIdentifier}`,
       parameters,
       accessToken: input.accessToken,
@@ -497,6 +501,7 @@ export class QboReadOnlyClient {
         accountingMethod: input.accountingMethod
       }
     });
+    return result.payload;
   }
 
   async fetchCdc(input: {
@@ -522,19 +527,23 @@ export class QboReadOnlyClient {
       endpointClass: "qbo_cdc",
       requestFingerprintInput: { recordTypes, changedSince }
     });
-    const responses = root.CDCResponse;
+    const responses = root.payload.CDCResponse;
     if (!Array.isArray(responses)) throw new Error("qbo_cdc_response_invalid");
-    const records: Array<{ recordType: QboSupportedObjectType; raw: unknown }> = [];
+    const records: Array<{ recordType: QboSupportedObjectType; raw: unknown; providerRequestFingerprint: string }> = [];
     for (const response of responses) {
-      const queryResponse = object(
-        object(response, "qbo_cdc_response_invalid").QueryResponse,
-        "qbo_cdc_query_response_invalid"
-      );
-      for (const recordType of recordTypes) {
-        const values = queryResponse[recordType];
-        if (values === undefined) continue;
-        if (!Array.isArray(values)) throw new Error("qbo_cdc_records_invalid");
-        for (const raw of values) records.push({ recordType, raw });
+      const envelope = object(response, "qbo_cdc_response_invalid");
+      if (envelope.Fault !== undefined) throw new Error("qbo_cdc_response_fault");
+      // CDC returns a QueryResponse list; retain compatibility with singleton envelopes.
+      const queries = Array.isArray(envelope.QueryResponse) ? envelope.QueryResponse : [envelope.QueryResponse];
+      for (const query of queries) {
+        const queryResponse = object(query, "qbo_cdc_query_response_invalid");
+        if (queryResponse.Fault !== undefined) throw new Error("qbo_cdc_response_fault");
+        for (const recordType of recordTypes) {
+          const values = queryResponse[recordType];
+          if (values === undefined) continue;
+          if (!Array.isArray(values)) throw new Error("qbo_cdc_records_invalid");
+          for (const raw of values) records.push({ recordType, raw, providerRequestFingerprint: root.providerRequestFingerprint });
+        }
       }
     }
     if (records.length > QBO_CDC_RESPONSE_OBJECT_CAP) {

@@ -31,7 +31,7 @@ export async function POST(request: Request) {
     assertQboCustomerRequestOrigin(request);
     const input = await readQboReauthorizationRequest(request);
     const access = await requireWorkspaceAccess();
-    if (!["owner", "admin", "manager"].includes(access.membership.role)) {
+    if (access.membership.role !== "owner") {
       return NextResponse.json({ ok: false, error: "Connection management is not permitted." }, { status: 403 });
     }
     const { data: connection } = await access.supabase

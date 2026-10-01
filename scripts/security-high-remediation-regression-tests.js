@@ -166,11 +166,14 @@ assert.throws(() => validatePublicFormFields({ summary: "Valid", workspace_id: "
 assert.throws(() => validatePublicFormFields({ priority: "High" }, formSchema));
 assert.throws(() => publicFormSubmissionSchema.parse({ fields: {}, status: "approved" }));
 
-assert.equal(packageJson.dependencies.next, "15.5.21");
-assert.equal(packageJson.devDependencies["eslint-config-next"], "15.5.21");
-assert.match(lockfile, /next@15\.5\.21/);
-assert.match(lockfile, /eslint-config-next@15\.5\.21/);
-assert.doesNotMatch(lockfile, /next@15\.5\.19/);
+assert.equal(packageJson.dependencies.next, "15.5.24");
+assert.equal(packageJson.devDependencies["eslint-config-next"], "15.5.24");
+assert.equal(packageJson.pnpm.overrides["next>sharp"], "0.35.4");
+assert.match(lockfile, /next@15\.5\.24/);
+assert.match(lockfile, /eslint-config-next@15\.5\.24/);
+assert.match(lockfile, /sharp@0\.35\.4/);
+assert.doesNotMatch(lockfile, /next@15\.5\.(?:19|21)(?:\D|$)/);
+assert.doesNotMatch(lockfile, /sharp@0\.34\./);
 
 async function verifyBoundedReaders() {
   const jsonRequest = new Request("https://example.test/api/public/forms/example/submit", {

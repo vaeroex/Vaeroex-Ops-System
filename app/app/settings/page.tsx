@@ -10,6 +10,7 @@ import { SquareEvidenceCard } from "@/components/integrations/SquareEvidenceCard
 import { readSquareWorkspaceEvidence } from "@/lib/integrations/control-plane/square-workspace-evidence";
 import { headers } from "next/headers";
 import Link from "next/link";
+import { FileText } from "lucide-react";
 import { squareDirectEnabled } from "@/lib/integrations/square-direct/server";
 
 type SettingsPageProps = {
@@ -90,8 +91,18 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
                 connections={connections ?? []}
                 freshness={freshness ?? []}
                 businessEntities={businessEntities ?? []}
-                canManage={canManage}
+                canManage={context.membership?.role === "owner"}
               />
+              {context.membership?.role === "owner" ? (
+                <div className="flex flex-wrap items-center gap-4"><Link href="/app/settings/integrations/quickbooks/data"
+                  className="inline-flex min-h-10 items-center gap-2 text-sm font-semibold text-vaeroex-blue">
+                  <FileText aria-hidden="true" className="h-4 w-4" />
+                  View stored QuickBooks data
+                </Link><Link href="/app/settings/integrations/quickbooks/accounting"
+                  className="inline-flex min-h-10 items-center gap-2 text-sm font-semibold text-vaeroex-blue">
+                  Accounting authority
+                </Link></div>
+              ) : null}
             </SectionCard>
           ) : null}
 

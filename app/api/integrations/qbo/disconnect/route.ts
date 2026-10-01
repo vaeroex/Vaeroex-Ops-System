@@ -15,7 +15,7 @@ import { requestIntegrationDisconnect } from "@/lib/integrations/persistence/con
 import type { ExternalIntegrationsRpcClient } from "@/lib/integrations/persistence/repository";
 import { requireWorkspaceAccess } from "@/lib/security/require-workspace-access";
 
-const managementRoles = new Set(["owner", "admin", "manager"]);
+const managementRoles = new Set(["owner"]);
 const disconnectableStatuses = new Set([
   "authorized_unmapped",
   "initializing",

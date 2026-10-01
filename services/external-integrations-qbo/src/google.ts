@@ -145,11 +145,11 @@ export const googleSecretManagerTransport = {
 
 export async function googleIdentityToken(audience: string) {
   const checked = new URL(audience);
-  if (checked.protocol !== "https:" || checked.username || checked.password) {
+  if (checked.protocol !== "https:" || checked.username || checked.password || checked.origin !== audience) {
     throw new Error("qbo_production_google_identity_audience_invalid");
   }
   const token = await metadata(
-    `/computeMetadata/v1/instance/service-accounts/default/identity?audience=${encodeURIComponent(checked.toString())}&format=full`
+    `/computeMetadata/v1/instance/service-accounts/default/identity?audience=${encodeURIComponent(audience)}&format=full`
   );
   if (token.split(".").length !== 3) {
     throw new Error("qbo_production_google_identity_token_failed");

@@ -1854,7 +1854,7 @@ async function testReadOnlyClient() {
     () => limitedClient.fetchEntityPage({ recordType: "Account", accessToken: accessCanary }),
     (error) => {
       equal(error.classification.kind, "rate_limit", "429 is classified without raw response material");
-      equal(error.classification.retryAfterMs, 7_000, "Retry-After is preserved for durable scheduling");
+      equal(error.classification.retryAfterMs, 60_000, "429 keeps the documented minimum wait for durable scheduling");
       equal(error.message.includes(accessCanary), false, "provider error excludes token canary");
       return true;
     },

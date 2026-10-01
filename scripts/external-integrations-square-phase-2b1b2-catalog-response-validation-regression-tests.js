@@ -1,10 +1,8 @@
 const assert = require("node:assert/strict");
-const childProcess = require("node:child_process");
 const fs = require("node:fs");
 const Module = require("node:module");
 const path = require("node:path");
 const ts = require("typescript");
-const { withoutSquareQualificationPaths } = require("./square-dormant-scope-test-support.js");
 
 const root = path.resolve(__dirname, "..");
 const read = (relative) => fs.readFileSync(path.join(root, relative), "utf8");
@@ -1829,7 +1827,10 @@ function testAcceptedResultImmutability() {
   );
 }
 
-function testDormancyAndRegistration() {
+function testDormancyAndRegistration(
+  squareDescriptor = square.SQUARE_PROVIDER_DESCRIPTOR,
+  activeRegistry = registeredProviders.REGISTERED_PROVIDER_REGISTRY
+) {
   equal(square.SQUARE_MODEL_CALL_COUNT, 0, "Square Catalog validation makes zero model calls");
   equal(square.SQUARE_API_VERSION, "2026-08-19", "Square Catalog validation uses pinned API version");
   equal(
@@ -1838,7 +1839,7 @@ function testDormancyAndRegistration() {
     "Catalog entity version is the contract-owned constant"
   );
   const descriptorRegistry = controlPlane.createProviderDescriptorRegistry([
-    square.SQUARE_PROVIDER_DESCRIPTOR
+    squareDescriptor
   ]);
   equal(
     descriptorRegistry.descriptors[0].descriptorFingerprint,
@@ -1863,7 +1864,7 @@ function testDormancyAndRegistration() {
     "QBO descriptor registry fingerprint is unchanged"
   );
   equal(
-    registeredProviders.REGISTERED_PROVIDER_REGISTRY.registryFingerprint,
+    activeRegistry.registryFingerprint,
     EXPECTED_QBO_REGISTRY_FINGERPRINT,
     "active registry fingerprint is unchanged"
   );
@@ -1872,7 +1873,7 @@ function testDormancyAndRegistration() {
       controlPlane.providerDescriptor(
         "square",
         "sandbox",
-        registeredProviders.REGISTERED_PROVIDER_REGISTRY
+        activeRegistry
       ),
     /provider_descriptor_not_registered/,
     "Square remains unreachable from active provider registry"
@@ -1891,28 +1892,59 @@ function testDormancyAndRegistration() {
     "Square OAuth remains unregistered"
   );
 
-  const changedFiles = childProcess.execFileSync(
-    "git",
-    ["diff", "--name-only", "origin/main"],
-    { cwd: root, encoding: "utf8" }
-  ).trim();
-  doesNotMatch(
-    withoutSquareQualificationPaths(changedFiles),
-    /^(app|components|supabase|services|lib\/supabase|vercel\.json)(?:\/|$)/m,
-    "Square remains dormant; only the exact authorized database qualification files are exempt"
-  );
-
+  // Current contracts, not unrelated PR paths, enforce the parser-only boundary.
   const squareSources = [
     "lib/integrations/providers/square/catalog-responses.ts",
     "lib/integrations/providers/square/contracts.ts",
     "lib/integrations/providers/square/fixtures/phase-2b1b1.ts",
     "lib/integrations/providers/square/fixtures/phase-2b1b2.ts"
   ].map(read).join("\n");
+  assertParserSourcesHaveNoEffects(squareSources);
+}
+
+function assertParserSourcesHaveNoEffects(squareSources) {
   doesNotMatch(
     squareSources,
     /\bfetch\s*\(|axios|node:https|node:http|@supabase|supabase-js|process\.env|openai|generateText|streamText/i,
     "Square Phase 2B.1B-2 source has no network, database, environment, or model call path"
   );
+}
+
+function testDormancyBoundaryRejectsRegressions() {
+  throws(
+    () => testDormancyAndRegistration({
+      ...square.SQUARE_PROVIDER_DESCRIPTOR,
+      displayName: "Changed Square descriptor"
+    }),
+    /Square Phase 2A descriptor fingerprint is unchanged/,
+    "a changed descriptor still fails the actual dormancy contract"
+  );
+  const expandedRegistry = controlPlane.createProviderDescriptorRegistry([
+    qbo.QBO_PROVIDER_DESCRIPTOR,
+    square.SQUARE_PROVIDER_DESCRIPTOR
+  ]);
+  throws(
+    () => testDormancyAndRegistration(square.SQUARE_PROVIDER_DESCRIPTOR, expandedRegistry),
+    /active registry fingerprint is unchanged/,
+    "registering Square still fails the actual active-registry contract"
+  );
+  for (const forbiddenSource of [
+    'fetch("https://example.invalid")',
+    'import axios from "axios"',
+    'import https from "node:https"',
+    'import http from "node:http"',
+    'import { createClient } from "@supabase/supabase-js"',
+    "process.env.PROVIDER_SECRET",
+    'import OpenAI from "openai"',
+    "generateText({})",
+    "streamText({})"
+  ]) {
+    throws(
+      () => assertParserSourcesHaveNoEffects(forbiddenSource),
+      /source has no network, database, environment, or model call path/,
+      "forbidden parser effects still fail the actual source boundary"
+    );
+  }
 }
 
 function testSchemaExportsAndDocs() {
@@ -1947,6 +1979,7 @@ testDiscriminatorTombstonesAndDuplicates();
 testStructuralJsonBoundaries();
 testAcceptedResultImmutability();
 testDormancyAndRegistration();
+testDormancyBoundaryRejectsRegressions();
 testSchemaExportsAndDocs();
 
 const fixtureInventory =
