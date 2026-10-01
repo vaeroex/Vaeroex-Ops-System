@@ -186,6 +186,32 @@ separately qualified accounting KPI/provenance producer. The posting-date test
 requires both the task window and owner-policy cutoff. These updates preserve
 the security predicates instead of waiving failed checks.
 
+## Resumed release qualification: 2026-10-01
+
+The temporary pause was lifted. CI 1522's database/security, native-broker and
+Linux qualification jobs passed; its verify job reproduced the accounting
+browser fixture's synthetic redirect DNS failure. The actual form mutation
+returned the expected 303, but Playwright interception did not serve the later
+redirected URL. The focused fixture now serves every hop on loopback HTTPS with
+an ephemeral, certificate-specific browser trust pin and blocked outside DNS.
+It tests real POST/303/GET/200 navigation, consent, date and owner controls at
+1440/390/320 pixels without changing application authorization. All 12 focused
+checks pass. Full exact-head hosted qualification remains required.
+
+The proposed maintained Node 22 Debian 13 nonroot image replaces the deprecated
+Debian 12 runtime. The build now qualifies the actual container in network-none,
+read-only mode before publication, covering all five operational modes and
+disabled ingress. It records the bundle hash, ELF dependencies, nonroot UID,
+embedded OpenSSL and absent native addons/pg-native. This is a compatibility and
+reachability check, not a vulnerability waiver. Retain scanner findings and
+require an exact-image security disposition before deployment; the previous
+f705 runtime image is not release-qualified. No global ignore is introduced.
+
+The resumed read-only Production check still found 108 applied migrations,
+none of the five candidates applied, zero QBO connections/runtime registrations,
+disabled ingress, zero queues/schedulers, and enabled numeric version 1 of each
+existing secret. No company is authorized for live verification.
+
 ## Supported Production webhook subscriptions
 
 Production CloudEvents use Intuit's `void` event spelling; it is normalized to

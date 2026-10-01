@@ -266,73 +266,152 @@ test("synthetic desktop/mobile forms enforce consent and date, then enable and r
   skip: !process.argv.includes("--browser"), timeout: 45000
 }, async () => {
   const { chromium } = require("playwright");
+  const https = require("node:https");
+  const { createHash, generateKeyPairSync } = require("node:crypto");
+  const { execFileSync } = require("node:child_process");
   const postcss = require("postcss"), tailwind = require("tailwindcss");
   const config = require("../tailwind.config.ts").default;
   const pagePath = "app/app/settings/integrations/quickbooks/accounting/page.tsx";
   const css = (await postcss([tailwind({ ...config, content: [path.join(root, pagePath)] })])
     .process(fs.readFileSync(path.join(root, "app/globals.css"), "utf8"), { from: path.join(root, "app/globals.css") })).css;
-  const executablePath = process.env.QBO_TEST_CHROME_EXECUTABLE;
-  const browser = await chromium.launch({ headless: true, ...(executablePath ? { executablePath } : {}) });
-  const page = await browser.newPage(); const failures = [], pageErrors = [];
-  page.on("pageerror", error => pageErrors.push(error.message));
-  page.on("requestfailed", request => failures.push(Error(request.failure()?.errorText)));
-  await page.route("**/*", async interception => {
+  // Playwright routes only the first URL in a redirect chain; serve every hop over loopback TLS.
+  // The one-run key stays in memory and Chromium trusts only its SPKI, not arbitrary certificates.
+  const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
+  const key = privateKey.export({ type: "pkcs8", format: "pem" });
+  const cert = execFileSync("openssl", ["req", "-new", "-x509", "-key", "/dev/stdin", "-sha256",
+    "-subj", "/CN=qbo-accounting.test", "-addext", "subjectAltName=DNS:qbo-accounting.test", "-days", "1"],
+  { input: key, timeout: 10000, stdio: ["pipe", "pipe", "pipe"] });
+  const spki = createHash("sha256").update(publicKey.export({ type: "spki", format: "der" })).digest("base64");
+  const failures = [], pageErrors = [], traffic = [];
+  const server = https.createServer({ key, cert }, async (req, res) => {
     try {
-      const req = interception.request(), url = new URL(req.url());
+      assert.equal(req.headers.host, new URL(origin).host);
+      const url = new URL(req.url, origin);
       assert.equal(url.origin, origin, "All requests stay in the synthetic fixture");
-      if (req.method() === "POST") {
+      traffic.push({ method: req.method, url: url.href, enabled: state.authority.enabled });
+      if (req.method === "POST") {
         assert.equal(url.pathname, helper.QBO_ACCOUNTING_API_PATH);
-        const response = await route.POST(new Request(req.url(), {
-          method: "POST", headers: await req.allHeaders(), body: req.postData()
+        assert.equal(req.headers.origin, origin);
+        assert.equal(req.headers["sec-fetch-site"], "same-origin");
+        const chunks = [];
+        for await (const chunk of req) chunks.push(chunk);
+        const response = await route.POST(new Request(url, {
+          method: "POST", headers: req.headers, body: Buffer.concat(chunks)
         }));
-        await interception.fulfill({ status: response.status, headers: Object.fromEntries(response.headers), body: await response.text() });
+        const location = response.headers.get("location");
+        if (location) assert.equal(location, `${origin}${helper.QBO_ACCOUNTING_PATH}?connectionId=${ids.connection}`);
+        const body = await response.text();
+        res.writeHead(response.status, Object.fromEntries(response.headers)); res.end(body);
       } else {
+        assert.equal(req.method, "GET");
         assert.equal(url.pathname, helper.QBO_ACCOUNTING_PATH);
         const html = await render(Object.fromEntries(url.searchParams));
-        await interception.fulfill({ status: 200, contentType: "text/html", body:
-          `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style></head><body><main class="p-4">${html}</main></body></html>` });
+        res.writeHead(200, { "content-type": "text/html", "cache-control": "no-store" });
+        res.end(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="data:,"><style>${css}</style></head><body><main class="p-4">${html}</main></body></html>`);
       }
-    } catch (error) { failures.push(error); await interception.fulfill({ status: 500, body: "Fixture failed" }); }
+    } catch (error) { failures.push(error); res.writeHead(500); res.end("Fixture failed"); }
   });
+  let browser;
   try {
+    await new Promise((resolve, reject) => { server.once("error", reject); server.listen(0, "127.0.0.1", resolve); });
+    const executablePath = process.env.QBO_TEST_CHROME_EXECUTABLE;
+    browser = await chromium.launch({ headless: true, args: [
+      `--host-resolver-rules=MAP qbo-accounting.test 127.0.0.1:${server.address().port}, MAP * ~NOTFOUND`,
+      "--no-proxy-server", `--ignore-certificate-errors-spki-list=${spki}`
+    ], ...(executablePath ? { executablePath } : {}) });
+    const context = await browser.newContext({ serviceWorkers: "block", acceptDownloads: false });
+    await context.route("**/*", async interception => {
+      const url = new URL(interception.request().url());
+      if (url.origin === origin && [helper.QBO_ACCOUNTING_API_PATH, helper.QBO_ACCOUNTING_PATH].includes(url.pathname)) {
+        await interception.continue();
+      } else {
+        failures.push(Error("Request outside the synthetic fixture")); await interception.abort();
+      }
+    });
+    const page = await context.newPage();
+    page.on("pageerror", error => pageErrors.push(error.message));
+    page.on("requestfailed", request => failures.push(Error(request.failure()?.errorText)));
+    const pageUrl = `${origin}${helper.QBO_ACCOUNTING_PATH}?connectionId=${ids.connection}`;
+    const apiUrl = `${origin}${helper.QBO_ACCOUNTING_API_PATH}`;
+    const mutations = () => state.calls.filter(call => call.name.startsWith("set_"));
+    const submit = async name => {
+      const [submitted, redirected] = await Promise.all([
+        page.waitForResponse(response => response.url() === apiUrl && response.request().method() === "POST"),
+        page.waitForResponse(response => response.request().redirectedFrom()?.url() === apiUrl),
+        page.getByRole("button", { name, exact: true }).click()
+      ]);
+      assert.equal(submitted.status(), 303);
+      assert.equal(submitted.headers().location, pageUrl);
+      const headers = await submitted.request().allHeaders();
+      assert.equal(headers.origin, origin);
+      assert.equal(redirected.request().redirectedFrom(), submitted.request());
+      assert.equal(submitted.request().redirectedTo(), redirected.request());
+      assert.equal(redirected.request().method(), "GET");
+      assert.equal(redirected.request().postData(), null);
+      assert.equal(redirected.url(), pageUrl); assert.equal(redirected.status(), 200);
+      assert.equal(await redirected.finished(), null);
+      await page.waitForLoadState("load"); assert.equal(page.url(), pageUrl);
+    };
     for (const width of [1440, 390, 320]) {
+      traffic.length = 0;
       reset(); await page.setViewportSize({ width, height: 1000 });
-      await page.goto(`${origin}${helper.QBO_ACCOUNTING_PATH}?connectionId=${ids.connection}`);
+      const initialAuthority = { ...state.authority };
+      await page.goto(pageUrl);
       assert.equal(await page.locator('input[name="effectiveDate"]').inputValue(), "");
       assert.equal(await page.locator('input[name="policyConsent"]').isChecked(), false);
       await page.getByRole("button", { name: "Enable accounting authority", exact: true }).click();
-      assert.equal(state.calls.filter(call => call.name.startsWith("set_")).length, 0);
+      assert.equal(mutations().length, 0);
+      await page.locator('input[name="policyConsent"]').check();
+      await page.getByRole("button", { name: "Enable accounting authority", exact: true }).click();
+      assert.equal(mutations().length, 0);
+      await page.locator('input[name="policyConsent"]').uncheck();
       await page.locator('input[name="effectiveDate"]').fill("2026-01-15");
       await page.getByRole("button", { name: "Enable accounting authority", exact: true }).click();
-      assert.equal(state.calls.filter(call => call.name.startsWith("set_")).length, 0);
+      assert.equal(mutations().length, 0);
+      assert.deepEqual(state.authority, initialAuthority);
+      assert.deepEqual(traffic, [{ method: "GET", url: pageUrl, enabled: false }]);
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
       const overflow = await page.locator("h1,h2,p,li,dt,dd,button,label").evaluateAll(elements =>
         elements.filter(element => element.scrollWidth > element.clientWidth + 2).map(element => element.textContent));
       assert.deepEqual(overflow, []);
       await page.screenshot({ path: `/tmp/qbo-accounting-authority-${width}.png`, fullPage: true });
       await page.locator('input[name="policyConsent"]').check();
-      const enableResponse = page.waitForResponse(response => response.request().method() === "POST");
-      await page.getByRole("button", { name: "Enable accounting authority", exact: true }).click();
-      const submitted = await enableResponse;
-      assert.equal(submitted.status(), 303, JSON.stringify({
-        status: submitted.status(), failures: failures.map(error => error.message)
-      }));
-      assert.equal(submitted.headers().location, `${origin}${helper.QBO_ACCOUNTING_PATH}?connectionId=${ids.connection}`);
-      assert.equal(state.authority.enabled, true);
-      await page.getByRole("heading", { name: "Revoke accounting authority", exact: true }).waitFor({ timeout: 5000 }).catch(async () => {
-        throw Error(JSON.stringify({ url: page.url(), body: await page.locator("body").innerText(),
-          failures: failures.map(error => error.message), pageErrors }));
-      });
-      assert.equal(state.authority.enabled, true);
+      await submit("Enable accounting authority");
+      await page.getByRole("heading", { name: "Revoke accounting authority", exact: true }).waitFor();
+      const enabledAuthority = { ...initialAuthority, authorityId: id(40), enabled: true, effectiveFrom: "2026-01-15T00:00:00.000Z" };
+      assert.deepEqual(state.authority, enabledAuthority);
+      assert.deepEqual(mutations(), [{ name: "set_qbo_customer_accounting_authority_v1", args: {
+        p_connection_id: ids.connection, p_expected_authority_id: null, p_enabled: true, p_effective_from: enabledAuthority.effectiveFrom
+      } }]);
+      assert.deepEqual(traffic, [
+        { method: "GET", url: pageUrl, enabled: false }, { method: "POST", url: apiUrl, enabled: false },
+        { method: "GET", url: pageUrl, enabled: true }
+      ]);
       assert.equal(await page.locator('input[name="confirmation"]').isChecked(), false);
       await page.getByRole("button", { name: "Revoke accounting authority", exact: true }).click();
-      assert.equal(state.authority.enabled, true);
+      assert.deepEqual(state.authority, enabledAuthority); assert.equal(mutations().length, 1);
+      assert.equal(traffic.length, 3);
       await page.screenshot({ path: `/tmp/qbo-accounting-authority-enabled-${width}.png`, fullPage: true });
       await page.locator('input[name="confirmation"]').check();
-      await page.getByRole("button", { name: "Revoke accounting authority", exact: true }).click();
+      await submit("Revoke accounting authority");
       await page.getByRole("button", { name: "Enable accounting authority", exact: true }).waitFor();
-      assert.equal(state.authority.enabled, false);
+      assert.deepEqual(state.authority, { ...enabledAuthority, enabled: false });
+      assert.equal(mutations().length, 2);
+      assert.deepEqual(mutations()[1], { name: "set_qbo_customer_accounting_authority_v1", args: {
+        p_connection_id: ids.connection, p_expected_authority_id: id(40), p_enabled: false, p_effective_from: enabledAuthority.effectiveFrom
+      } });
+      assert.deepEqual(traffic, [
+        { method: "GET", url: pageUrl, enabled: false }, { method: "POST", url: apiUrl, enabled: false },
+        { method: "GET", url: pageUrl, enabled: true }, { method: "POST", url: apiUrl, enabled: true },
+        { method: "GET", url: pageUrl, enabled: false }
+      ]);
     }
     assert.deepEqual(failures, []); assert.deepEqual(pageErrors, []);
-  } finally { await browser.close(); }
+  } finally {
+    try { if (browser) await browser.close(); }
+    finally {
+      server.closeAllConnections();
+      await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+    }
+  }
 });
