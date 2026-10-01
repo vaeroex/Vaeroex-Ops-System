@@ -198,6 +198,12 @@ It tests real POST/303/GET/200 navigation, consent, date and owner controls at
 1440/390/320 pixels without changing application authorization. All 12 focused
 checks pass. Full exact-head hosted qualification remains required.
 
+CI 1523 passed database/security and native qualifications but exposed Linux's
+inability to reopen Node's socket-backed stdin during fixture certificate creation.
+The fixture now uses a one-run synthetic key in a private 0700 directory/0600 file,
+removed in `finally` before browser use; exact SPKI trust and all redirect/security
+assertions remain. This does not write or access any customer/provider credential.
+
 The proposed maintained Node 22 Debian 13 nonroot image replaces the deprecated
 Debian 12 runtime. The build now qualifies the actual container in network-none,
 read-only mode before publication, covering all five operational modes and
@@ -206,6 +212,10 @@ embedded OpenSSL and absent native addons/pg-native. This is a compatibility and
 reachability check, not a vulnerability waiver. Retain scanner findings and
 require an exact-image security disposition before deployment; the previous
 f705 runtime image is not release-qualified. No global ignore is introduced.
+The Linux kernel's `linux-vdso.so.1` is verified against `/proc/self/maps` and
+handled as a virtual kernel object; every file-backed ELF dependency is still
+inspected. The bounded base probe confirmed embedded OpenSSL 3.5.8 and no system
+OpenSSL linkage. Actual final-image qualification and scan remain mandatory.
 
 The resumed read-only Production check still found 108 applied migrations,
 none of the five candidates applied, zero QBO connections/runtime registrations,

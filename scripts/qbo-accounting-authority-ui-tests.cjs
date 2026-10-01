@@ -275,12 +275,20 @@ test("synthetic desktop/mobile forms enforce consent and date, then enable and r
   const css = (await postcss([tailwind({ ...config, content: [path.join(root, pagePath)] })])
     .process(fs.readFileSync(path.join(root, "app/globals.css"), "utf8"), { from: path.join(root, "app/globals.css") })).css;
   // Playwright routes only the first URL in a redirect chain; serve every hop over loopback TLS.
-  // The one-run key stays in memory and Chromium trusts only its SPKI, not arbitrary certificates.
+  // Chromium trusts only the one-run key's SPKI, not arbitrary certificates.
   const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
   const key = privateKey.export({ type: "pkcs8", format: "pem" });
-  const cert = execFileSync("openssl", ["req", "-new", "-x509", "-key", "/dev/stdin", "-sha256",
-    "-subj", "/CN=qbo-accounting.test", "-addext", "subjectAltName=DNS:qbo-accounting.test", "-days", "1"],
-  { input: key, timeout: 10000, stdio: ["pipe", "pipe", "pipe"] });
+  // OpenSSL cannot reopen Node's socket-backed stdin on Linux; -key - is not portable either.
+  const keyDirectory = fs.mkdtempSync(path.join(require("node:os").tmpdir(), "qbo-accounting-tls-"));
+  let cert;
+  try {
+    fs.chmodSync(keyDirectory, 0o700);
+    const keyPath = path.join(keyDirectory, "key.pem");
+    fs.writeFileSync(keyPath, key, { mode: 0o600, flag: "wx" });
+    cert = execFileSync("openssl", ["req", "-new", "-x509", "-key", keyPath, "-sha256",
+      "-subj", "/CN=qbo-accounting.test", "-addext", "subjectAltName=DNS:qbo-accounting.test", "-days", "1"],
+    { timeout: 10000, stdio: ["ignore", "pipe", "pipe"] });
+  } finally { fs.rmSync(keyDirectory, { recursive: true, force: true }); }
   const spki = createHash("sha256").update(publicKey.export({ type: "spki", format: "der" })).digest("base64");
   const failures = [], pageErrors = [], traffic = [];
   const server = https.createServer({ key, cert }, async (req, res) => {

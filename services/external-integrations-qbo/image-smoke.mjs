@@ -50,7 +50,13 @@ async function main() {
   await assert.rejects(import("node:quic"), { code: "ERR_UNKNOWN_BUILTIN_MODULE" });
   const sharedObjects = process.report.getReport().sharedObjects;
   assert.ok(!sharedObjects.some((path) => /lib(?:ssl|crypto)\.so/.test(path)));
-  const elfNeeded = [...new Set([process.execPath, ...sharedObjects]
+  stage = "elf_dependencies";
+  // Linux's vDSO is kernel-supplied, not a filesystem ELF dependency.
+  assert.equal(sharedObjects.filter(path => path === "linux-vdso.so.1").length, 1);
+  assert.match(readFileSync("/proc/self/maps", "utf8"), /\[vdso\]/);
+  const fileBackedObjects = sharedObjects.filter(path => path !== "linux-vdso.so.1");
+  assert.ok(fileBackedObjects.every(path => path.startsWith("/")));
+  const elfNeeded = [...new Set([process.execPath, ...fileBackedObjects]
     .flatMap(elfDependencies))].sort();
   assert.ok(!elfNeeded.some(name => /lib(?:ssl|crypto)\.so/.test(name)));
   stage = "packaged_modules";
@@ -113,6 +119,6 @@ async function main() {
   console.log(JSON.stringify({ imageSmoke: "passed", modes: cases.length, network: "none", databaseConnections: 0,
     providerCalls: 0, node: process.versions.node, openssl: process.versions.openssl,
     systemOpenSslLinked: false, nativeAddons: 0, pgNativeAvailable: false,
-    quicBuiltinAvailable: false, elfNeeded, bundleSha256, uid: process.getuid() }));
+    quicBuiltinAvailable: false, kernelVdsoVerified: true, elfNeeded, bundleSha256, uid: process.getuid() }));
 }
 main().catch(() => { console.error(JSON.stringify({ error: "qbo_image_smoke_failed", stage })); process.exitCode = 1; });
