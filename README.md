@@ -46,3 +46,6 @@ The platform focuses on structured inputs, evidence-based analysis, dashboard vi
 ## Status
 
 This repository represents the active development foundation for Vaeroex Ops System and Executive Intelligence.
+## Google Sheets
+
+Read-only spreadsheet connections, reviewed metric mapping, and automatic refresh every 15 minutes: see [setup guide](docs/google-sheets-connector-setup.md). The connector stays disabled until server configuration is complete.

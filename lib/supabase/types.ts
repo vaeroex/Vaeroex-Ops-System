@@ -2,9 +2,66 @@ export type Json = string | number | boolean | null | { [key: string]: Json | un
 
 export type WorkspaceRole = "owner" | "admin" | "manager" | "staff" | "viewer";
 
+export type GoogleSheetsConnectionRow = {
+  id: string; workspace_id: string; business_entity_id: string; created_by: string;
+  status: "pending_authorization" | "connected" | "reauthorization_required" | "disconnected";
+  display_name: string; spreadsheet_id: string | null; spreadsheet_title: string | null;
+  tabs: Json; sheet_id: number | null; sheet_title: string | null; header_row: number;
+  headers: Json; field_mapping: Json; active_approval_id: string | null;
+  automatic_refresh_enabled: boolean; next_sync_at: string | null; last_error_code: string | null;
+  last_sync_fact_count: number; last_sync_rejected_count: number; last_sync_conflict_count: number;
+  last_sync_at: string | null; last_sync_row_count: number | null;
+  sync_lease_run_id: string | null; sync_lease_expires_at: string | null;
+  generation: number; credential_version: number; authorization_uncertain: boolean; revocation_pending: boolean;
+  oauth_lease_id: string | null; oauth_lease_expires_at: string | null;
+  refresh_lease_id: string | null; refresh_lease_expires_at: string | null;
+  created_at: string; updated_at: string; disconnected_at: string | null;
+};
+type GoogleSheetsOAuthStateRow = {
+  id: string; workspace_id: string; connection_id: string; initiated_by: string;
+  session_id: string; generation: number; state_hash: string; redirect_uri: string;
+  expires_at: string; consumed_at: string | null; created_at: string;
+  recovery_confirmed_by: string | null; recovery_confirmed_at: string | null;
+};
+type GoogleSheetsCredentialRow = {
+  connection_id: string; workspace_id: string; token_ciphertext: string; access_expires_at: string;
+  granted_scope: string; generation: number; credential_version: number; updated_at: string;
+};
+export type GoogleSheetsSyncRunRow = {
+  id: string; workspace_id: string; connection_id: string; initiated_by: string | null;
+  trigger_kind: "manual" | "scheduled"; approval_id: string;
+  status: "running" | "succeeded" | "failed"; row_count: number; fact_count: number;
+  rejected_count: number; conflict_count: number; review_issues: Json; error_code: string | null;
+  started_at: string; completed_at: string | null;
+};
+type GoogleSheetsSourceRow = {
+  id: string; workspace_id: string; business_entity_id: string; connection_id: string;
+  source_identity_fingerprint: string; current_version_id: string | null; current: boolean; last_sync_run_id: string;
+};
+type GoogleSheetsMappingApprovalRow = {
+  id: string; workspace_id: string; connection_id: string; approved_by: string; approved_at: string;
+  policy_version: string; spreadsheet_id: string; sheet_id: number; header_row: number;
+  headers: Json; field_mapping: Json;
+};
+type GoogleSheetsSourceVersionRow = {
+  id: string; workspace_id: string; connection_id: string; source_row_id: string; immutable_version: number;
+  prior_version_id: string | null; source_fingerprint: string; normalized_projection: Json;
+  trust: "untrusted_external_input"; validation_state: "valid" | "invalid"; observed_row_number: number;
+  sync_run_id: string; created_at: string;
+};
+type GoogleSheetsFactLinkRow = {
+  workspace_id: string; connection_id: string; source_row_id: string; metric_column: number;
+  source_version_id: string; approval_id: string; kpi_id: string;
+  admission_state: "accepted" | "review_required" | "retired";
+};
+
 export type Database = {
   public: {
     Functions: {
+      read_google_sheets_operational_conflicts_v1: {
+        Args: { p_workspace_id: string };
+        Returns: Json;
+      };
       read_qbo_customer_pending_cancellations_v1: {
         Args: { p_workspace_id: string };
         Returns: { connection_id: string; can_cancel: boolean }[];
@@ -950,6 +1007,54 @@ export type Database = {
       };
     };
     Tables: {
+      google_sheets_connections: {
+        Row: GoogleSheetsConnectionRow;
+        Insert: Pick<GoogleSheetsConnectionRow, "workspace_id" | "business_entity_id" | "created_by" | "display_name"> & Partial<Omit<GoogleSheetsConnectionRow, "workspace_id" | "business_entity_id" | "created_by" | "display_name">>;
+        Update: Partial<GoogleSheetsConnectionRow>;
+        Relationships: [];
+      };
+      google_sheets_oauth_states: {
+        Row: GoogleSheetsOAuthStateRow;
+        Insert: Pick<GoogleSheetsOAuthStateRow, "workspace_id" | "connection_id" | "initiated_by" | "state_hash" | "redirect_uri" | "expires_at"> & Partial<Omit<GoogleSheetsOAuthStateRow, "workspace_id" | "connection_id" | "initiated_by" | "state_hash" | "redirect_uri" | "expires_at">>;
+        Update: Partial<GoogleSheetsOAuthStateRow>;
+        Relationships: [];
+      };
+      google_sheets_credentials: {
+        Row: GoogleSheetsCredentialRow;
+        Insert: Pick<GoogleSheetsCredentialRow, "workspace_id" | "connection_id" | "token_ciphertext" | "access_expires_at" | "granted_scope"> & Partial<Omit<GoogleSheetsCredentialRow, "workspace_id" | "connection_id" | "token_ciphertext" | "access_expires_at" | "granted_scope">>;
+        Update: Partial<GoogleSheetsCredentialRow>;
+        Relationships: [];
+      };
+      google_sheets_sync_runs: {
+        Row: GoogleSheetsSyncRunRow;
+        Insert: Pick<GoogleSheetsSyncRunRow, "workspace_id" | "connection_id" | "initiated_by"> & Partial<Omit<GoogleSheetsSyncRunRow, "workspace_id" | "connection_id" | "initiated_by">>;
+        Update: Partial<GoogleSheetsSyncRunRow>;
+        Relationships: [];
+      };
+      google_sheets_source_rows: {
+        Row: GoogleSheetsSourceRow;
+        Insert: Omit<GoogleSheetsSourceRow, "id"> & { id?: string };
+        Update: Partial<GoogleSheetsSourceRow>;
+        Relationships: [];
+      };
+      google_sheets_mapping_approvals: {
+        Row: GoogleSheetsMappingApprovalRow;
+        Insert: GoogleSheetsMappingApprovalRow;
+        Update: Partial<GoogleSheetsMappingApprovalRow>;
+        Relationships: [];
+      };
+      google_sheets_source_versions: {
+        Row: GoogleSheetsSourceVersionRow;
+        Insert: GoogleSheetsSourceVersionRow;
+        Update: Partial<GoogleSheetsSourceVersionRow>;
+        Relationships: [];
+      };
+      google_sheets_fact_links: {
+        Row: GoogleSheetsFactLinkRow;
+        Insert: GoogleSheetsFactLinkRow;
+        Update: Partial<GoogleSheetsFactLinkRow>;
+        Relationships: [];
+      };
       business_entities: {
         Row: {
           base_currency: string;

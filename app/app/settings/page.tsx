@@ -31,7 +31,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
       <section aria-labelledby="settings-integrations" className="flex flex-col gap-3 border-y border-line py-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
           <h2 id="settings-integrations" className="flex items-center gap-2 text-lg font-semibold text-ink"><Plug aria-hidden="true" className="h-5 w-5" />Integrations</h2>
-          <p className="mt-1 text-sm text-muted">Square and QuickBooks connections for this workspace.</p>
+          <p className="mt-1 text-sm text-muted">Square, QuickBooks, and Google Sheets connections for this workspace.</p>
         </div>
         <Link href="/app/integrations" className="workspace-row-link inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-line px-4 py-2 text-sm font-semibold text-vaeroex-blue">
           Manage integrations<ArrowRight aria-hidden="true" className="h-4 w-4 shrink-0" />

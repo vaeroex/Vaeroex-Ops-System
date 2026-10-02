@@ -64,6 +64,9 @@ jobs:
           NEXT_TELEMETRY_DISABLED=1 pnpm exec next build services/square-workspace-host
           NEXT_TELEMETRY_DISABLED=1 node services/square-workspace-host/next.test.mjs
 
+      - name: Google Sheets runtime and database admission regressions
+        run: pnpm test:google-sheets
+
       - name: External integrations contract regressions
         run: pnpm test:external-integrations-contracts
 
@@ -153,6 +156,11 @@ jobs:
         run: |
           pnpm test:external-integrations-square-remote-sandbox
           pnpm test:external-integrations-square-remote-credentials
+
+      - name: Google Sheets desktop and mobile customer flow
+        run: |
+          pnpm exec playwright install --with-deps chromium
+          pnpm test:google-sheets-ui
 
       - name: Verify optimized Square handoff headers and isolated synthetic browser navigation
         run: |
