@@ -24,6 +24,11 @@ const preferences = loadTsx("lib/theme/preferences.ts");
 const { ThemeControls } = loadTsx("components/app/ThemeControls.tsx", { "@/lib/theme/preferences": preferences });
 const { SectionCard } = loadTsx("components/operations/SectionCard.tsx");
 const { AuthMessage } = loadTsx("components/auth/AuthMessage.tsx");
+const { ReportingTimezoneForm } = loadTsx("components/settings/ReportingTimezoneForm.tsx", {
+  "@/app/app/settings/reporting-timezone-action": { saveReportingTimezoneAction: async () => {
+    throw new Error("UNEXPECTED_TIMEZONE_MUTATION");
+  } },
+});
 const PageHeader = ({ title, description }) => React.createElement("header", null,
   React.createElement("h1", null, title), React.createElement("p", null, description));
 const render = component => renderToStaticMarkup(component);
@@ -35,6 +40,7 @@ function settingsFixture({ enabled = true, role = "owner" } = {}) {
     "next/link": { __esModule: true, default: ({ children, ...props }) => React.createElement("a", props, children) },
     "@/components/auth/AuthMessage": { AuthMessage },
     "@/components/app/ThemeControls": { ThemeControls },
+    "@/components/settings/ReportingTimezoneForm": { ReportingTimezoneForm },
     "@/components/integrations/ConnectionStatusPanel": { ConnectionStatusPanel: () => { throw new Error("UNEXPECTED_QBO_PANEL"); } },
     "@/components/integrations/SquareEvidenceCard": { SquareEvidenceCard: () => null },
     "@/components/operations/PageHeader": { PageHeader },
@@ -66,6 +72,8 @@ test("Settings puts the Integrations entry before account, workspace, and collap
   assert.match(html, /Workspace A/);
   assert.equal((html.match(/owner@example\.invalid/g) ?? []).length, 1);
   assert.match(html, /workspace-settings-account-grid/);
+  assert.match(html, /Reporting timezone/);
+  assert.match(html, /Not configured \(UTC\)/);
   assert.doesNotMatch(html, /href="\/app\/settings\/integrations\/square"|businessEntityId/);
   assert.doesNotMatch(html, /name="workspaceId"|workspaceId=|<details[^>]*\bopen(?:=|>)/);
 });
