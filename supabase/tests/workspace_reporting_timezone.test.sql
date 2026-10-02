@@ -27,6 +27,9 @@ exception when check_violation then return true;
 end;
 $$;
 
+-- Reproduce the restricted helper ACL used by billing, even on legacy-grant fixtures.
+revoke execute on function public.has_workspace_role(uuid, text[]) from public, service_role;
+
 insert into auth.users(id) values ('a9920000-0000-4000-8000-000000000001');
 insert into public.profiles(id) values ('a9920000-0000-4000-8000-000000000001') on conflict do nothing;
 insert into public.workspaces(id, name, created_by) values
@@ -112,7 +115,10 @@ select pg_temp.preference_assert(not has_function_privilege('authenticated', 'pr
   and not has_schema_privilege('authenticated', 'private', 'USAGE'), 'timezone constraint does not widen private helper access');
 
 -- Workspace creation remains privileged; exercise its existing insert authority.
+select pg_temp.preference_assert(not has_function_privilege('service_role', 'public.has_workspace_role(uuid,text[])', 'EXECUTE'),
+  'service role has no workspace role helper execution privilege');
 set local role service_role;
+discard plans;
 insert into public.workspaces(id, name, created_by, reporting_timezone) values
   ('b9920000-0000-4000-8000-000000000010', 'UTC insert', 'a9920000-0000-4000-8000-000000000001', 'UTC'),
   ('b9920000-0000-4000-8000-000000000011', 'IANA insert', 'a9920000-0000-4000-8000-000000000001', 'America/Los_Angeles'),
@@ -126,6 +132,18 @@ select pg_temp.preference_assert((select reporting_timezone = 'US/Pacific' from 
   where id = 'b9920000-0000-4000-8000-000000000012'), 'workspace insert accepts a recognized IANA alias');
 select pg_temp.preference_assert((select reporting_timezone is null from public.workspaces
   where id = 'b9920000-0000-4000-8000-000000000013'), 'workspace insert accepts unconfigured null timezone');
+update public.workspaces set name = 'Service safe update' where id = 'b9920000-0000-4000-8000-000000000013';
+select pg_temp.preference_assert((select name = 'Service safe update' and reporting_timezone is null from public.workspaces
+  where id = 'b9920000-0000-4000-8000-000000000013'), 'service role ordinary workspace update succeeds without owner helper');
+update public.workspaces set reporting_timezone = 'UTC' where id = 'b9920000-0000-4000-8000-000000000012';
+select pg_temp.preference_assert((select reporting_timezone = 'UTC' from public.workspaces
+  where id = 'b9920000-0000-4000-8000-000000000012'), 'service role timezone update succeeds without owner helper');
+select pg_temp.preference_assert(pg_temp.timezone_invalid($sql$
+  update public.workspaces set reporting_timezone = 'Not/ARealZone', name = 'Invalid service change'
+    where id = 'b9920000-0000-4000-8000-000000000012'
+$sql$), 'service role update rejects unknown timezone without owner helper');
+select pg_temp.preference_assert((select reporting_timezone = 'UTC' and name = 'Alias insert' from public.workspaces
+  where id = 'b9920000-0000-4000-8000-000000000012'), 'invalid service role update preserves saved fields');
 select pg_temp.preference_assert(pg_temp.timezone_invalid($sql$
   insert into public.workspaces(id, name, created_by, reporting_timezone) values
     ('b9920000-0000-4000-8000-000000000014', 'Invalid insert', 'a9920000-0000-4000-8000-000000000001', 'Not/ARealZone')
@@ -138,6 +156,8 @@ $sql$), 'multi-row workspace insert rejects an unknown timezone');
 select pg_temp.preference_assert((select count(*) = 0 from public.workspaces where id in
   ('b9920000-0000-4000-8000-000000000014', 'b9920000-0000-4000-8000-000000000015', 'b9920000-0000-4000-8000-000000000016')),
   'invalid workspace inserts atomically leave no rows');
+select pg_temp.preference_assert(not has_function_privilege('service_role', 'public.has_workspace_role(uuid,text[])', 'EXECUTE'),
+  'service role still has no workspace role helper execution privilege');
 reset role;
 
 rollback;

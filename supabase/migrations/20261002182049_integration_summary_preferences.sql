@@ -16,9 +16,11 @@ comment on column public.workspaces.reporting_timezone is
 create function public.guard_workspace_reporting_timezone_owner()
 returns trigger language plpgsql security invoker set search_path = '' as $$
 begin
-  if tg_op = 'UPDATE' and current_user = 'authenticated'
-    and not public.has_workspace_role(old.id, array['owner']) then
-    raise exception 'Only an active workspace owner can change the reporting timezone.' using errcode = '42501';
+  -- Separate statements keep restricted helpers out of service-role expression plans.
+  if tg_op = 'UPDATE' and current_user = 'authenticated' then
+    if not public.has_workspace_role(old.id, array['owner']) then
+      raise exception 'Only an active workspace owner can change the reporting timezone.' using errcode = '42501';
+    end if;
   end if;
   if new.reporting_timezone is not null and not exists (
     select 1 from pg_catalog.pg_timezone_names where name = new.reporting_timezone

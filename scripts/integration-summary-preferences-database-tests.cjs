@@ -33,6 +33,8 @@ test("preference migration and SQL isolation assertions run only in fresh in-mem
       assert(match, `reuse the actual ${name} dependency`);
       await db.exec(match[0]);
     }
+    await db.exec(`revoke execute on function public.has_workspace_role(uuid, text[]) from public, anon, service_role;
+      grant execute on function public.has_workspace_role(uuid, text[]) to authenticated`);
     for (const label of ["members can read workspaces", "owners and admins can update workspaces"]) {
       const start = foundation.indexOf(`create policy "${label}"`);
       assert(start >= 0);
@@ -54,6 +56,15 @@ test("preference migration and SQL isolation assertions run only in fresh in-mem
     assert.deepEqual((await db.query(policyQuery)).rows, policiesBefore, "existing workspace RLS is unchanged");
     assert.equal((await db.query("select reporting_timezone from public.workspaces where id = 'b9900000-0000-4000-8000-000000000001'")).rows[0].reporting_timezone,
       null, "existing workspaces remain unconfigured without a backfill");
+    // The first trigger invocation must be restricted service-role work, not a
+    // superuser invocation that can warm the PL/pgSQL expression plan cache.
+    await db.exec(`set role service_role;
+      insert into public.workspaces(id, name) values ('b9900000-0000-4000-8000-000000000002', 'Cold service insert');
+      update public.workspaces set name = 'Cold service update', reporting_timezone = 'UTC'
+        where id = 'b9900000-0000-4000-8000-000000000002';
+      reset role`);
+    assert.deepEqual((await db.query("select name, reporting_timezone from public.workspaces where id = 'b9900000-0000-4000-8000-000000000002'")).rows,
+      [{ name: "Cold service update", reporting_timezone: "UTC" }]);
     const result = await db.exec(read("supabase/tests/integration_summary_preferences.test.sql"));
     const assertions = result.flatMap(result => result.rows).filter(row => Object.hasOwn(row, "preference_assert"));
     assert.deepEqual(assertions.map(row => row.preference_assert), JSON.parse(read("supabase/tests/integration_summary_preferences.assertions.json")),
@@ -62,7 +73,7 @@ test("preference migration and SQL isolation assertions run only in fresh in-mem
     const timezoneResult = await db.exec(read("supabase/tests/workspace_reporting_timezone.test.sql"));
     const timezoneAssertions = timezoneResult.flatMap(result => result.rows).filter(row => Object.hasOwn(row, "preference_assert"));
     assert.deepEqual(timezoneAssertions.map(row => row.preference_assert), JSON.parse(read("supabase/tests/workspace_reporting_timezone.assertions.json")),
-      "all 27 timezone assertions execute exactly once in order");
+      "all 33 timezone assertions execute exactly once in order");
     console.log(`Passed ${timezoneAssertions.length} SQL owner-only reporting timezone assertions.`);
     for (const table of ["profiles", "workspace_members", "workspaces"]) {
       const { rows } = await db.query("select has_table_privilege('authenticated', $1, 'UPDATE') as writable", [`public.${table}`]);

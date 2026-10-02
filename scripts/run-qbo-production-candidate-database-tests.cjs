@@ -42,7 +42,7 @@ const dashboardMigrations = {
 const dashboardSuites = [
   { file: 'supabase/tests/qbo_customer_dashboard_metadata.test.sql', dashboard: 'qbo', expectedAssertions: 55 },
   { file: 'supabase/tests/integration_summary_preferences.test.sql', dashboard: 'preferences', expectedAssertions: 45 },
-  { file: 'supabase/tests/workspace_reporting_timezone.test.sql', dashboard: 'reporting-timezone', expectedAssertions: 27 },
+  { file: 'supabase/tests/workspace_reporting_timezone.test.sql', dashboard: 'reporting-timezone', expectedAssertions: 33 },
   { file: 'supabase/tests/square_customer_browse_identity.test.sql', dashboard: 'square', expectedAssertions: 33 },
 ];
 const squareDependencySuite = {
@@ -90,13 +90,19 @@ const reportingTimezoneAssertionNames = [
   'missing authenticated subject cannot update reporting timezone',
   'anonymous RLS cannot update reporting timezone',
   'timezone constraint does not widen private helper access',
+  'service role has no workspace role helper execution privilege',
   'workspace insert accepts UTC',
   'workspace insert accepts a recognized IANA timezone',
   'workspace insert accepts a recognized IANA alias',
   'workspace insert accepts unconfigured null timezone',
+  'service role ordinary workspace update succeeds without owner helper',
+  'service role timezone update succeeds without owner helper',
+  'service role update rejects unknown timezone without owner helper',
+  'invalid service role update preserves saved fields',
   'workspace insert rejects syntactically valid unknown timezone',
   'multi-row workspace insert rejects an unknown timezone',
   'invalid workspace inserts atomically leave no rows',
+  'service role still has no workspace role helper execution privilege',
 ];
 const squareIdentityAssertionNames = [
   'identity_sha256_shape', 'identity_reconnect_and_renames_keep_lineage', 'identity_ignores_attempt_age_and_generation',
