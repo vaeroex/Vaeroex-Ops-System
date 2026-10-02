@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports -- CommonJS harness uses the existing TypeScript test loader. */
 /* Actual repository and cancel route, with only session/database I/O replaced. */
 const assert = require('node:assert/strict');
 const test = require('node:test');

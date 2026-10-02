@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports -- CommonJS native fixture uses the existing TypeScript test loader. */
 /* Focused native PostgreSQL tests. Only a newly owned local cluster is accepted. */
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
