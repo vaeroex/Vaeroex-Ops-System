@@ -47,7 +47,7 @@ assert.deepEqual(productionDashboard.suites, dashboardSuites); assertions++;
 assert.deepEqual(dashboardSuites.map(suite => [suite.file, suite.expectedAssertions]), [
   ['supabase/tests/qbo_customer_dashboard_metadata.test.sql', 55],
   ['supabase/tests/integration_summary_preferences.test.sql', 45],
-  ['supabase/tests/workspace_reporting_timezone.test.sql', 15],
+  ['supabase/tests/workspace_reporting_timezone.test.sql', 27],
   ['supabase/tests/square_customer_browse_identity.test.sql', 33],
 ]); assertions++;
 assert.deepEqual(canonicalDashboard.suites.slice(0, 3), dashboardSuites.slice(0, 3)); assertions++;
@@ -60,7 +60,7 @@ for (const shape of [canonicalDashboard, productionDashboard]) {
   assert.ok(shape.migrations.every(name => !candidates.includes(name)), 'dashboard migrations are never replayed as QBO candidates'); assertions++;
 }
 for (const [kind, names, total] of [['preferences', preferenceAssertionNames, 45],
-  ['reporting-timezone', reportingTimezoneAssertionNames, 15], ['square', squareIdentityAssertionNames, 33]]) {
+  ['reporting-timezone', reportingTimezoneAssertionNames, 27], ['square', squareIdentityAssertionNames, 33]]) {
   assert.equal(checkDashboardAssertionNames(kind, names), total); assertions++;
   assert.equal(new Set(names).size, total, 'named assertions are individually identified'); assertions++;
   for (const altered of [[], names.slice(1), [...names, names[0]], [...names].reverse(), ['unregistered', ...names.slice(1)]]) {

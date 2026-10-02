@@ -62,7 +62,7 @@ test("preference migration and SQL isolation assertions run only in fresh in-mem
     const timezoneResult = await db.exec(read("supabase/tests/workspace_reporting_timezone.test.sql"));
     const timezoneAssertions = timezoneResult.flatMap(result => result.rows).filter(row => Object.hasOwn(row, "preference_assert"));
     assert.deepEqual(timezoneAssertions.map(row => row.preference_assert), JSON.parse(read("supabase/tests/workspace_reporting_timezone.assertions.json")),
-      "all 15 owner-only timezone assertions execute exactly once in order");
+      "all 27 timezone assertions execute exactly once in order");
     console.log(`Passed ${timezoneAssertions.length} SQL owner-only reporting timezone assertions.`);
     for (const table of ["profiles", "workspace_members", "workspaces"]) {
       const { rows } = await db.query("select has_table_privilege('authenticated', $1, 'UPDATE') as writable", [`public.${table}`]);

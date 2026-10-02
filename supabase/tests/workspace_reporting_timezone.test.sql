@@ -18,6 +18,15 @@ exception when insufficient_privilege then return true;
 end;
 $$;
 
+create function pg_temp.timezone_invalid(statement text)
+returns boolean language plpgsql as $$
+begin
+  execute statement;
+  return false;
+exception when check_violation then return true;
+end;
+$$;
+
 insert into auth.users(id) values ('a9920000-0000-4000-8000-000000000001');
 insert into public.profiles(id) values ('a9920000-0000-4000-8000-000000000001') on conflict do nothing;
 insert into public.workspaces(id, name, created_by) values
@@ -31,6 +40,20 @@ select set_config('request.jwt.claim.sub', 'a9920000-0000-4000-8000-000000000001
 update public.workspaces set reporting_timezone = 'America/Los_Angeles' where id = 'b9920000-0000-4000-8000-000000000001';
 select pg_temp.preference_assert((select reporting_timezone = 'America/Los_Angeles' from public.workspaces
   where id = 'b9920000-0000-4000-8000-000000000001'), 'active owner saves reporting timezone through authenticated update');
+update public.workspaces set reporting_timezone = 'UTC' where id = 'b9920000-0000-4000-8000-000000000001';
+select pg_temp.preference_assert((select reporting_timezone = 'UTC' from public.workspaces
+  where id = 'b9920000-0000-4000-8000-000000000001'), 'active owner can save UTC directly');
+update public.workspaces set reporting_timezone = 'US/Pacific' where id = 'b9920000-0000-4000-8000-000000000001';
+select pg_temp.preference_assert((select reporting_timezone = 'US/Pacific' from public.workspaces
+  where id = 'b9920000-0000-4000-8000-000000000001'), 'active owner can save a recognized IANA alias directly');
+select pg_temp.preference_assert(pg_temp.timezone_invalid($sql$
+  update public.workspaces set reporting_timezone = 'Not/ARealZone' where id = 'b9920000-0000-4000-8000-000000000001'
+$sql$), 'direct owner update rejects syntactically valid unknown timezone');
+select pg_temp.preference_assert(pg_temp.timezone_invalid($sql$
+  update public.workspaces set reporting_timezone = 'Not/ARealZone', name = 'Invalid owner change' where id = 'b9920000-0000-4000-8000-000000000001'
+$sql$), 'owner combined invalid timezone and safe-column update is denied');
+select pg_temp.preference_assert((select reporting_timezone = 'US/Pacific' and name = 'Timezone fixture' from public.workspaces
+  where id = 'b9920000-0000-4000-8000-000000000001'), 'invalid owner update atomically preserves timezone and workspace name');
 update public.workspaces set reporting_timezone = null where id = 'b9920000-0000-4000-8000-000000000001';
 select pg_temp.preference_assert((select reporting_timezone is null from public.workspaces
   where id = 'b9920000-0000-4000-8000-000000000001'), 'active owner can restore unconfigured timezone');
@@ -87,5 +110,34 @@ reset role;
 select pg_temp.preference_assert(not has_function_privilege('authenticated', 'private.is_time_zone_v1(text)', 'EXECUTE')
   and not has_function_privilege('service_role', 'private.is_time_zone_v1(text)', 'EXECUTE')
   and not has_schema_privilege('authenticated', 'private', 'USAGE'), 'timezone constraint does not widen private helper access');
+
+-- Workspace creation remains privileged; exercise its existing insert authority.
+set local role service_role;
+insert into public.workspaces(id, name, created_by, reporting_timezone) values
+  ('b9920000-0000-4000-8000-000000000010', 'UTC insert', 'a9920000-0000-4000-8000-000000000001', 'UTC'),
+  ('b9920000-0000-4000-8000-000000000011', 'IANA insert', 'a9920000-0000-4000-8000-000000000001', 'America/Los_Angeles'),
+  ('b9920000-0000-4000-8000-000000000012', 'Alias insert', 'a9920000-0000-4000-8000-000000000001', 'US/Pacific'),
+  ('b9920000-0000-4000-8000-000000000013', 'Null insert', 'a9920000-0000-4000-8000-000000000001', null);
+select pg_temp.preference_assert((select reporting_timezone = 'UTC' from public.workspaces
+  where id = 'b9920000-0000-4000-8000-000000000010'), 'workspace insert accepts UTC');
+select pg_temp.preference_assert((select reporting_timezone = 'America/Los_Angeles' from public.workspaces
+  where id = 'b9920000-0000-4000-8000-000000000011'), 'workspace insert accepts a recognized IANA timezone');
+select pg_temp.preference_assert((select reporting_timezone = 'US/Pacific' from public.workspaces
+  where id = 'b9920000-0000-4000-8000-000000000012'), 'workspace insert accepts a recognized IANA alias');
+select pg_temp.preference_assert((select reporting_timezone is null from public.workspaces
+  where id = 'b9920000-0000-4000-8000-000000000013'), 'workspace insert accepts unconfigured null timezone');
+select pg_temp.preference_assert(pg_temp.timezone_invalid($sql$
+  insert into public.workspaces(id, name, created_by, reporting_timezone) values
+    ('b9920000-0000-4000-8000-000000000014', 'Invalid insert', 'a9920000-0000-4000-8000-000000000001', 'Not/ARealZone')
+$sql$), 'workspace insert rejects syntactically valid unknown timezone');
+select pg_temp.preference_assert(pg_temp.timezone_invalid($sql$
+  insert into public.workspaces(id, name, created_by, reporting_timezone) values
+    ('b9920000-0000-4000-8000-000000000015', 'Valid batch row', 'a9920000-0000-4000-8000-000000000001', 'UTC'),
+    ('b9920000-0000-4000-8000-000000000016', 'Invalid batch row', 'a9920000-0000-4000-8000-000000000001', 'Not/ARealZone')
+$sql$), 'multi-row workspace insert rejects an unknown timezone');
+select pg_temp.preference_assert((select count(*) = 0 from public.workspaces where id in
+  ('b9920000-0000-4000-8000-000000000014', 'b9920000-0000-4000-8000-000000000015', 'b9920000-0000-4000-8000-000000000016')),
+  'invalid workspace inserts atomically leave no rows');
+reset role;
 
 rollback;

@@ -76,8 +76,9 @@ async function readIntegrationDashboard(input: DashboardInput) {
       connectionState: evidence.connectionState, lastSuccessfulRefreshAt: evidence.lastSuccessfulSyncAt, hasImportedData: evidence.hasImportedData }];
   });
   const squareGroups = selectLogicalConnections(squareRows);
+  if (squareGroups.length > 100) unavailable.push("Additional Square connections");
   let squareResultReads = 0;
-  for (const connection of squareGroups) {
+  for (const connection of squareGroups.slice(0, 100)) {
     const href = `${squareSettingsPath}?connectionId=${encodeURIComponent(connection.connectionId)}`;
     const results: DashboardEntry["results"] = [];
     if (connection.connectionState !== "disconnected" && connection.hasImportedData && squareResultReads < 5) {

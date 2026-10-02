@@ -140,6 +140,26 @@ test("QBO current producer excludes stale/disconnected attempts, groups exact li
   assert(future.dashboard.unavailable.includes("QuickBooks calculation status"));
 });
 
+test("large Square history is explicitly bounded without hiding other provider results", async () => {
+  const squares = Array.from({ length: 350 }, (_, index) => ({
+    connectionId: `10000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
+    businessEntityLabel: "Company", sellerLabel: `Company ${index}`, locationLabel: "Location",
+    state: "disconnected", paymentCount: 1, createdAt: now, lastSyncedAt: now,
+    logicalIdentityKey: index.toString(16).padStart(64, "0")
+  }));
+  const sheets = [{ id: "10000000-0000-4000-8000-000000000999", business_entity_id: "entity",
+    display_name: "Retained Sheets company", status: "connected", credential_version: 1,
+    spreadsheet_id: "sheet", sheet_id: 0, active_approval_id: "approval", last_sync_at: now,
+    last_sync_fact_count: 0, last_error_code: null, revocation_pending: false,
+    authorization_uncertain: false, automatic_refresh_enabled: true, created_at: now }];
+  const result = await loaderFixture({ squares, sheets }).run();
+  assert.equal(result.loadFailed, false);
+  assert.equal(result.dashboard.entries.filter(row => row.provider === "Square").length, 100);
+  assert.equal(result.dashboard.entries.filter(row => row.provider === "Google Sheets").length, 1);
+  assert(result.dashboard.unavailable.includes("Additional Square connections"));
+  assert.equal(new Set(result.dashboard.entries.map(row => row.key)).size, 101);
+});
+
 test("saved-status GET is workspace-bound, no-store and never performs mutations", async () => {
   let reads = 0, access = { workspaceId };
   const route = loadSource("app/api/integrations/dashboard/route.ts", {

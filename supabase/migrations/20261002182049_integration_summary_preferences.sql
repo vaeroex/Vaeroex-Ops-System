@@ -9,16 +9,22 @@ alter table public.workspaces
     ));
 
 comment on column public.workspaces.reporting_timezone is
-  'Workspace reporting display timezone. Null means unconfigured; entity and financial source timezones are unchanged. The constraint validates syntax; setters must validate the timezone name.';
+  'Workspace reporting display timezone. Null means unconfigured; entity and financial source timezones are unchanged. The constraint validates syntax and the trigger requires a recognized database timezone name.';
 
 -- Existing workspace UPDATE RLS also permits admins. Restrict this new column
 -- without changing the policies or access to any existing workspace columns.
 create function public.guard_workspace_reporting_timezone_owner()
 returns trigger language plpgsql security invoker set search_path = '' as $$
 begin
-  if current_user = 'authenticated'
+  if tg_op = 'UPDATE' and current_user = 'authenticated'
     and not public.has_workspace_role(old.id, array['owner']) then
     raise exception 'Only an active workspace owner can change the reporting timezone.' using errcode = '42501';
+  end if;
+  if new.reporting_timezone is not null and not exists (
+    select 1 from pg_catalog.pg_timezone_names where name = new.reporting_timezone
+  ) then
+    raise exception 'Reporting timezone must be a recognized database timezone name.'
+      using errcode = '23514', constraint = 'workspaces_reporting_timezone_check';
   end if;
   return new;
 end;
@@ -26,7 +32,7 @@ $$;
 
 revoke all on function public.guard_workspace_reporting_timezone_owner() from public, anon, authenticated, service_role;
 create trigger guard_workspace_reporting_timezone_owner
-  before update of reporting_timezone on public.workspaces
+  before insert or update of reporting_timezone on public.workspaces
   for each row execute function public.guard_workspace_reporting_timezone_owner();
 grant update (reporting_timezone) on public.workspaces to authenticated;
 

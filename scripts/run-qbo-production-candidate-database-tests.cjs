@@ -42,7 +42,7 @@ const dashboardMigrations = {
 const dashboardSuites = [
   { file: 'supabase/tests/qbo_customer_dashboard_metadata.test.sql', dashboard: 'qbo', expectedAssertions: 55 },
   { file: 'supabase/tests/integration_summary_preferences.test.sql', dashboard: 'preferences', expectedAssertions: 45 },
-  { file: 'supabase/tests/workspace_reporting_timezone.test.sql', dashboard: 'reporting-timezone', expectedAssertions: 15 },
+  { file: 'supabase/tests/workspace_reporting_timezone.test.sql', dashboard: 'reporting-timezone', expectedAssertions: 27 },
   { file: 'supabase/tests/square_customer_browse_identity.test.sql', dashboard: 'square', expectedAssertions: 33 },
 ];
 const squareDependencySuite = {
@@ -71,6 +71,11 @@ const preferenceAssertionNames = [
 ];
 const reportingTimezoneAssertionNames = [
   'active owner saves reporting timezone through authenticated update',
+  'active owner can save UTC directly',
+  'active owner can save a recognized IANA alias directly',
+  'direct owner update rejects syntactically valid unknown timezone',
+  'owner combined invalid timezone and safe-column update is denied',
+  'invalid owner update atomically preserves timezone and workspace name',
   'active owner can restore unconfigured timezone',
   'owner cannot update an unrelated workspace timezone',
   'timezone grant does not grant auth-bearing column updates',
@@ -85,6 +90,13 @@ const reportingTimezoneAssertionNames = [
   'missing authenticated subject cannot update reporting timezone',
   'anonymous RLS cannot update reporting timezone',
   'timezone constraint does not widen private helper access',
+  'workspace insert accepts UTC',
+  'workspace insert accepts a recognized IANA timezone',
+  'workspace insert accepts a recognized IANA alias',
+  'workspace insert accepts unconfigured null timezone',
+  'workspace insert rejects syntactically valid unknown timezone',
+  'multi-row workspace insert rejects an unknown timezone',
+  'invalid workspace inserts atomically leave no rows',
 ];
 const squareIdentityAssertionNames = [
   'identity_sha256_shape', 'identity_reconnect_and_renames_keep_lineage', 'identity_ignores_attempt_age_and_generation',
