@@ -18,7 +18,7 @@ create function pg_temp.fp(p_value text) returns text language sql immutable as 
 create function pg_temp.intent(p_id uuid,p_entity uuid default '0b930000-0000-4000-8000-000000000001') returns jsonb language sql as $$
   select jsonb_build_object('contractVersion','integration_connection_control_v1','id',p_id,
     'workspaceId','0a930000-0000-4000-8000-000000000001','businessEntityId',p_entity,
-    'providerKey','quickbooks_online','providerEnvironment','production','safeDisplayName','Synthetic company',
+    'providerKey','quickbooks_online','providerEnvironment','production','safeDisplayName','Synthetic company '||p_id::text,
     'requestedScopes',jsonb_build_array('com.intuit.quickbooks.accounting'),
     'providerDescriptorRegistryVersion','vaeroex_provider_descriptors_v1',
     'providerDescriptorRegistryFingerprint','sha256:2099f06e90a53e632acbe55ee4d95cfd2f7fac7c2c994bb733ec332f7d09dfad',

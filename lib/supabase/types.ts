@@ -5,6 +5,10 @@ export type WorkspaceRole = "owner" | "admin" | "manager" | "staff" | "viewer";
 export type Database = {
   public: {
     Functions: {
+      read_qbo_customer_pending_cancellations_v1: {
+        Args: { p_workspace_id: string };
+        Returns: { connection_id: string; can_cancel: boolean }[];
+      };
       read_square_workspace_operational_v1: {
         Args: { p_workspace_name: string; p_kind: string | null; p_status: string | null; p_location: string | null; p_from: string | null; p_to: string | null; p_sort: string; p_page: number };
         Returns: Json;

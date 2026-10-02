@@ -1,9 +1,12 @@
 import { StatusBadge } from "@/components/operations/StatusBadge";
 import Link from "next/link";
 import type { Route } from "next";
-import { Link2, RefreshCw, Unplug } from "lucide-react";
+import { Unplug } from "lucide-react";
+import { QboAuthorizationForm } from "@/components/integrations/QboAuthorizationForm";
+import { QboCancelPendingForm } from "@/components/integrations/QboCancelPendingForm";
 import {
   customerConnectionStatus,
+  canOfferPendingCancellation,
   type IntegrationConnectionSummaryRow,
   type IntegrationFreshnessSummaryRow
 } from "@/lib/integrations/control-plane/customer-status";
@@ -59,20 +62,15 @@ export function ConnectionStatusPanel({
                     </div>
                   </dl>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <StatusBadge value={summary.status} />
+                  {canManage && canOfferPendingCancellation(connection) ? (
+                    <QboCancelPendingForm connectionId={connection.id} />
+                  ) : null}
                   {canManage && summary.status === "Reauthorization required" ? (
-                    <form action="/api/integrations/qbo/reauthorize" method="post">
+                    <QboAuthorizationForm mode="reauthorize">
                       <input type="hidden" name="connectionId" value={connection.id} />
-                      <button
-                        type="submit"
-                        title="Reconnect QuickBooks"
-                        aria-label="Reconnect QuickBooks"
-                        className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-line text-ink hover:bg-slate-50"
-                      >
-                        <RefreshCw aria-hidden="true" className="h-4 w-4" />
-                      </button>
-                    </form>
+                    </QboAuthorizationForm>
                   ) : null}
                   {canManage ? (
                     <Link
@@ -91,9 +89,7 @@ export function ConnectionStatusPanel({
         </div>
       )}
       {canManage && businessEntities.length > 0 ? (
-        <form
-          action="/api/integrations/qbo/connect"
-          method="post"
+        <QboAuthorizationForm
           className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
         >
           <label className="text-sm font-medium text-ink">
@@ -118,14 +114,7 @@ export function ConnectionStatusPanel({
               className="mt-2 w-full rounded-md border border-line px-3 py-2 text-sm"
             />
           </label>
-          <button
-            type="submit"
-            className="inline-flex min-h-10 items-center justify-center gap-2 self-end rounded-md bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white"
-          >
-            <Link2 aria-hidden="true" className="h-4 w-4" />
-            Connect QuickBooks
-          </button>
-        </form>
+        </QboAuthorizationForm>
       ) : null}
     </div>
   );

@@ -25,6 +25,10 @@ export async function POST(request: Request) {
   if (!qboProductionCustomerConnectionsEnabled()) {
     return qboCustomerConnectionsUnavailableResponse();
   }
+  if (request.headers.get("accept") !== "application/json") {
+    return NextResponse.json({ ok: false, error: "Open QuickBooks from its connection page." },
+      { status: 406, headers: { "cache-control": "no-store" } });
+  }
 
   try {
     const configuration = qboProductionOAuthConfiguration();
@@ -72,13 +76,13 @@ export async function POST(request: Request) {
     if (result.connectionId !== connection.id) {
       throw new Error("qbo_reauthorization_state_binding_mismatch");
     }
-    return NextResponse.redirect(
-      createQboAuthorizationUrl({
+    return NextResponse.json(
+      { ok: true, authorizationUrl: createQboAuthorizationUrl({
         clientId: configuration.clientId,
         redirectUri: configuration.redirectUri,
         state
-      }),
-      303
+      }) },
+      { headers: { "cache-control": "no-store", "referrer-policy": "no-referrer" } }
     );
   } catch {
     return NextResponse.json(
