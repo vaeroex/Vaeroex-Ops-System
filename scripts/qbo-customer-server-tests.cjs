@@ -114,10 +114,10 @@ test("Intelligence diagnostic keeps unavailable distinct from zero, strips sourc
   redirect = false;
 });
 
-test("Intelligence page integrates the isolated gated diagnostic without supplying it to economic, evidence, snapshot or model producers", () => {
+test("Intelligence excludes record diagnostics and preserves the isolated accounting producer", () => {
   const ts = require("typescript");
   const text = fs.readFileSync(path.join(root, "app/app/intelligence/page.tsx"), "utf8");
-  assert.match(text, /qboProductionCustomerConnectionsEnabled\(\) && context.membership\?\.role === "owner"\s*\? <QboIntelligenceDiagnostic workspaceId=\{workspaceId\}/);
+  assert.doesNotMatch(text, /QboIntelligenceDiagnostic|QuickBooks record status/);
   const file = ts.createSourceFile("intelligence.tsx", text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
   const occurrences = [];
   const visit = node => {

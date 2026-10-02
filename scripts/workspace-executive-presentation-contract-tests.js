@@ -69,11 +69,9 @@ function nonPresentationLogic(tree) {
 }
 
 const intelligenceFile = "app/app/intelligence/page.tsx";
-const qboDiagnosticAdditions = [
-  'import { qboProductionCustomerConnectionsEnabled } from "@/lib/integrations/control-plane/qbo-customer-availability";\n',
-  'import { QboIntelligenceDiagnostic } from "@/lib/integrations/qbo-customer/intelligence-diagnostic";\n',
-  '      {qboProductionCustomerConnectionsEnabled() && context.membership?.role === "owner"\n'
-    + '        ? <QboIntelligenceDiagnostic workspaceId={workspaceId} /> : null}\n',
+const integrationResultAdditions = [
+  'import { SquareSheetsResults } from "@/components/integrations/SquareSheetsResults";\n',
+  '      <SquareSheetsResults supabase={supabase} workspaceId={workspaceId} isOwner={context.membership?.role === "owner"} />\n',
 ];
 const qboAccountingAdditions = [
   'import { loadQboAccountingIntelligence } from "@/lib/integrations/qbo-customer/accounting-intelligence-server";\n',
@@ -98,20 +96,22 @@ function withoutQboAccounting(source) {
   return source;
 }
 
-function withoutQboDiagnostic(source) {
-  // 2b7650dd adds only these four lines to its parent Intelligence page.
-  // Require the exact gate, owner check and workspace prop before excluding
-  // this isolated diagnostic; retain the original 75c3d61 logic/action hashes.
+function withoutIntegrationResults(source) {
+  // User-requested eligibility-qualified results replace the old unconditional
+  // diagnostic. Preserve exact session/workspace/owner wiring and all original
+  // 75c3d61 workflow hashes, rather than replacing the protected baseline.
+  assert.doesNotMatch(source, /QboIntelligenceDiagnostic|qboProductionCustomerConnectionsEnabled|qbo-customer\/intelligence-diagnostic/,
+    "Never restore the attempt-driven diagnostic on the business-results page");
   const tree = ts.createSourceFile(intelligenceFile, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
-  const uses = { qboProductionCustomerConnectionsEnabled: 0, QboIntelligenceDiagnostic: 0 };
+  const uses = { SquareSheetsResults: 0 };
   const visit = (node) => {
     if (ts.isIdentifier(node) && Object.hasOwn(uses, node.text)) uses[node.text]++;
     ts.forEachChild(node, visit);
   };
   visit(tree);
-  assert.deepEqual(Object.values(uses), [2, 2], "Each QBO binding is used only by its import and the single gated diagnostic");
-  for (const addition of qboDiagnosticAdditions) {
-    assert.equal(source.split(addition).length, 2, "Require exactly the approved QBO import/component addition");
+  assert.deepEqual(Object.values(uses), [2], "Result binding is used only by its import and one scoped component");
+  for (const addition of integrationResultAdditions) {
+    assert.equal(source.split(addition).length, 2, "Require exactly the approved result import/component addition");
     source = source.replace(addition, "");
   }
   return withoutQboAccounting(source);
@@ -129,7 +129,7 @@ for (const [file, count, actionsDigest, logicDigest] of contracts) {
         source = source.replace(declaration, "");
       }
     }
-    if (file === intelligenceFile) source = withoutQboDiagnostic(source);
+    if (file === intelligenceFile) source = withoutIntegrationResults(source);
     const tree = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
     const actions = actionInventory(tree);
     assert.equal(actions.length, count, "No existing action or protected form binding may be lost or added by this presentation change");
@@ -138,24 +138,25 @@ for (const [file, count, actionsDigest, logicDigest] of contracts) {
   });
 }
 
-test("the additive QBO diagnostic exception rejects changed imports, authorization, scope and extra usages", () => {
+test("qualified integration results reject changed imports, authorization, scope, extra usages and restored diagnostics", () => {
   const source = fs.readFileSync(path.join(__dirname, "..", intelligenceFile), "utf8");
   const mutations = [
-    ["qbo-customer/intelligence-diagnostic", "qbo-customer/other-diagnostic"],
-    ["qboProductionCustomerConnectionsEnabled() && ", ""],
+    ["@/components/integrations/SquareSheetsResults", "@/components/integrations/UnreviewedResults"],
+    ["supabase={supabase}", "supabase={adminClient}"],
     ['context.membership?.role === "owner"', 'context.membership?.role === "admin"'],
     ["workspaceId={workspaceId}", 'workspaceId={"other-workspace"}'],
-    ["<QboIntelligenceDiagnostic workspaceId={workspaceId} />", "<QboIntelligenceDiagnostic workspaceId={workspaceId} extra={true} />"],
-    [qboDiagnosticAdditions[2], qboDiagnosticAdditions[2] + "      <QboIntelligenceDiagnostic workspaceId={workspaceId} />\n"],
-    [qboDiagnosticAdditions[0], qboDiagnosticAdditions[0] + "const extraQboRead = qboProductionCustomerConnectionsEnabled();\n"],
+    ["<SquareSheetsResults supabase={supabase}", "<SquareSheetsResults extra={true} supabase={supabase}"],
+    [integrationResultAdditions[1], integrationResultAdditions[1] + integrationResultAdditions[1]],
+    [integrationResultAdditions[0], integrationResultAdditions[0] + "const extraResult = SquareSheetsResults;\n"],
+    [integrationResultAdditions[1], integrationResultAdditions[1] + "      <QboIntelligenceDiagnostic workspaceId={workspaceId} />\n"],
   ];
   for (const [before, after] of mutations) {
     assert(source.includes(before));
-    assert.throws(() => withoutQboDiagnostic(source.replace(before, after)), assert.AssertionError);
+    assert.throws(() => withoutIntegrationResults(source.replace(before, after)), assert.AssertionError);
   }
 });
 
-test("the QBO exception still detects changes to existing Intelligence imports, queries and state", () => {
+test("the integration exception still detects changes to existing Intelligence imports, queries and state", () => {
   const source = fs.readFileSync(path.join(__dirname, "..", intelligenceFile), "utf8");
   const originalDigest = contracts.find(([file]) => file === intelligenceFile)[3];
   for (const [before, after] of [
@@ -165,7 +166,7 @@ test("the QBO exception still detects changes to existing Intelligence imports, 
     ["const snapshotAsOf = new Date().toISOString();", 'const snapshotAsOf = "fixed-time";'],
   ]) {
     assert(source.includes(before));
-    const changed = withoutQboDiagnostic(source.replace(before, after));
+    const changed = withoutIntegrationResults(source.replace(before, after));
     const tree = ts.createSourceFile(intelligenceFile, changed, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
     assert.notEqual(digest(nonPresentationLogic(tree)), originalDigest, "Original non-presentation logic remains protected");
   }
@@ -184,6 +185,6 @@ test("accounting exception rejects changed scope, timing, data and extra produce
     [qboAccountingAdditions[2], qboAccountingAdditions[2] + "  publish(qboAccounting);\n"],
   ]) {
     assert(source.includes(before));
-    assert.throws(() => withoutQboDiagnostic(source.replace(before, after)), assert.AssertionError);
+    assert.throws(() => withoutIntegrationResults(source.replace(before, after)), assert.AssertionError);
   }
 });

@@ -10,6 +10,7 @@ import { SectionCard } from "@/components/operations/SectionCard";
 import { StatusBadge } from "@/components/operations/StatusBadge";
 import { FieldMappingSchema, sheetColumn } from "@/lib/integrations/google-sheets/contracts";
 import { sheetsEnabled, type SheetsTab } from "@/lib/integrations/google-sheets/server";
+import { googleSheetsResultVisibility } from "@/lib/integrations/google-sheets/result-visibility";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
 
 export const dynamic = "force-dynamic";
@@ -95,15 +96,16 @@ export default async function GoogleSheetsSettingsPage({ searchParams }: PagePro
       const recentRuns = (runResult.data ?? []).filter((run) => run.connection_id === connection.id).slice(0, 5);
       const issues = reviewIssues(recentRuns[0]?.review_issues);
       const entityName = entities.find((entity) => entity.id === connection.business_entity_id)?.display_name;
-      const status = connection.revocation_pending ? "Disconnect needs another attempt" : connection.authorization_uncertain ? "Authorization needs recovery" : running ? "Syncing" : connection.status === "connected" ? "Connected" : connection.status === "reauthorization_required" ? "Reauthorization required" : connection.status === "pending_authorization" ? "Waiting for Google authorization" : "Disconnected";
+      const visibility = googleSheetsResultVisibility(connection);
+      const status = connection.revocation_pending ? "Disconnect needs another attempt" : connection.authorization_uncertain ? "Authorization needs recovery" : running ? "Syncing" : connection.status === "connected" ? "Connected" : connection.status === "reauthorization_required" ? visibility.requiresReconnect ? "Reauthorization required" : "Authorization not completed" : connection.status === "pending_authorization" ? "Waiting for Google authorization" : "Disconnected";
       const lastError = googleSheetsErrorMessage(connection.last_error_code);
       return <SectionCard key={connection.id} title={connection.display_name} description={entityName ? `Business entity: ${entityName}` : "Connection in this workspace"}>
         <div className="min-w-0 space-y-5">
           <div className="flex flex-wrap gap-2"><StatusBadge value={status} />{mapping && connection.active_approval_id ? <StatusBadge value="Mapping approved" /> : connection.status === "connected" ? <StatusBadge value="Mapping needs approval" /> : null}</div>
-          <dl className="grid gap-4 text-sm sm:grid-cols-2">
+          {visibility.visible ? <dl className="grid gap-4 text-sm sm:grid-cols-2">
             <div><dt className="text-slate-600">Last successful sync</dt><dd className="mt-1 font-medium text-ink">{connection.last_sync_at ? <time dateTime={connection.last_sync_at}>{time(connection.last_sync_at)}</time> : "Never synced"}</dd></div>
             <div><dt className="text-slate-600">Automatic refresh</dt><dd className="mt-1 font-medium text-ink">{connection.status !== "connected" ? "Paused" : connection.automatic_refresh_enabled ? "Every 15 minutes" : "Off"}{connection.status === "connected" && connection.automatic_refresh_enabled && connection.next_sync_at ? <span className="mt-1 block text-xs font-normal text-slate-600">Next eligible run: {time(connection.next_sync_at)}</span> : null}</dd></div>
-          </dl>
+          </dl> : <p className="text-sm text-slate-600">Authorization has not completed. No spreadsheet data has been imported for this connection.</p>}
           {connection.last_sync_at ? <div className="grid grid-cols-2 gap-3 rounded-md bg-slate-50 p-3 text-sm sm:grid-cols-4">
             <p><strong className="block text-xl text-ink">{connection.last_sync_row_count ?? 0}</strong><span className="text-slate-600">Rows read</span></p>
             <p><strong className="block text-xl text-ink">{connection.last_sync_fact_count ?? 0}</strong><span className="text-slate-600">Validated metrics</span></p>

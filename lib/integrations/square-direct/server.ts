@@ -69,10 +69,12 @@ export async function squareDirectView() {
 }
 /** Saved-data browsing is read-only. It does not decrypt a seller credential,
  * contact Square, claim an import lease, or advance an ongoing checkpoint. */
-export async function squareDirectPayments(searchParams: Record<string, string | string[] | undefined>) {
+export async function squareDirectPayments(searchParams: Record<string, string | string[] | undefined>, expectedWorkspaceId?: string) {
   if (!squareDirectEnabled()) return null;
   const query = parseDirectPaymentBrowseQuery(searchParams);
   const { actor, call } = await ownerDatabase();
+  if (expectedWorkspaceId !== undefined && actor.workspaceId !== expectedWorkspaceId)
+    throw new Error("square_customer_denied");
   const result = await call("square_customer_payments_v1", {
     p_actor_id: actor.actorId, p_session_id: actor.sessionId, p_workspace_id: actor.workspaceId,
     p_connection_id: query.connectionId, p_page: query.page,

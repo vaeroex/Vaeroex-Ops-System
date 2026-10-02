@@ -86,8 +86,8 @@ async function main() {
         assert.ok(html.includes("vaeroex-app-shell"), `${route.label}: actual shell`);
       }
       assert.ok(!html.includes("Fixture boundary needs an adapter"));
-      if (route.href === "/app/intelligence") assert.doesNotMatch(html, /QuickBooks admitted posted revenue subtotal|QuickBooks accounting summary unavailable/,
-        "the real accounting view stays hidden in this closed-QBO workspace fixture");
+      if (route.href === "/app/intelligence") assert.doesNotMatch(html, /QuickBooks admitted posted revenue subtotal|QuickBooks accounting summary unavailable|aria-label="Connected data"/,
+        "real integration views stay hidden without established connections in this closed workspace fixture");
       if (state === "loading") assert.match(html, /aria-busy|animate-pulse/);
       if (state === "error") assert.match(html, /Synthetic unavailable state/);
       rendered++;
@@ -99,6 +99,8 @@ async function main() {
   assert.ok(boundary.moduleFiles.some(file => file.endsWith("/app/app/sources/SourcesPage.tsx")));
   assert.ok(boundary.moduleFiles.some(file => file.endsWith("/lib/integrations/qbo-customer/accounting-intelligence-view.tsx")), "render the real accounting view, not a component stub");
   assert.ok(!boundary.moduleFiles.some(file => file.endsWith("/lib/integrations/qbo-customer/accounting-intelligence-server.ts")), "no operational accounting loader enters the synthetic preview");
+  assert.ok(boundary.moduleFiles.some(file => file.endsWith("/components/integrations/SquareSheetsResultsView.tsx")), "render the real integration result view with empty synthetic results");
+  assert.ok(!boundary.moduleFiles.some(file => file.endsWith("/components/integrations/SquareSheetsResults.tsx")), "no operational result loader enters the synthetic preview");
   assert.ok(!boundary.moduleFiles.some(file => /\/lib\/supabase\/(server|client|admin)\./.test(file)));
   assert.throws(() => createServer({ ...result, port: 3000 }), /comparison ports/);
   console.log(`Workspace preview: note form classification, readable unavailable result and reset preservation passed; ${rendered} route/state/role server renders passed (six AppShell routes + standalone Square); live-client import boundary verified. No browser/backend authorization testing claimed.`);
