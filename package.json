@@ -165,7 +165,9 @@
     "test:nvidia-qualification-stage-three-b": "node scripts/nvidia-stage-three-b-qualification-regression-tests.js",
     "benchmark:evidence-engine-reranker": "node scripts/evidence-engine-reranker-benchmark.js",
     "benchmark:evidence-engine-reranker:baseline": "node scripts/evidence-engine-reranker-benchmark.js --baseline-only",
-    "benchmark:answers": "node scripts/answer-quality-benchmark.js"
+    "benchmark:answers": "node scripts/answer-quality-benchmark.js",
+    "test:google-sheets": "node scripts/google-sheets-runtime-tests.cjs && node scripts/google-sheets-data-tests.cjs && node scripts/google-sheets-sync-tests.cjs && node scripts/google-sheets-entity-tests.cjs",
+    "test:google-sheets-ui": "node scripts/google-sheets-ui-browser-tests.cjs"
   },
   "dependencies": {
     "@pdf-lib/fontkit": "1.1.1",

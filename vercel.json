@@ -5,5 +5,11 @@
       "codex/square-sandbox-qualification": false,
       "codex/square-gcp-sandbox-callback": false
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/integrations/google-sheets/scheduled-sync",
+      "schedule": "*/15 * * * *"
+    }
+  ]
 }

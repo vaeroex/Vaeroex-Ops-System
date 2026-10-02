@@ -194,6 +194,8 @@ async function migrationQualification(target, administrator) {
   const productionInternalRuntimeTail = files.filter(name => name === "20260902191325_square_production_internal_pilot_runtime.sql");
   const productionFoundationMarkerTail = files.filter(name => name === "20260912190000_square_production_runtime_foundation.sql");
   const productionLegacyGuardTail = files.filter(name => name === "20260915040500_integration_production_legacy_foundation_guard.sql");
+  const sheetsCompleteTail = files.filter(name => name === "20261002040024_google_sheets_complete.sql");
+  const sheetsLifecycleTail = files.filter(name => name === "20261002040031_google_sheets_lifecycle.sql");
   equal(added.length, 2, "both additive Square migrations present");
   equal(accountTail.length, 1, "account-connection migration present");
   equal(remoteTail.length, 1, "remote Sandbox binding migration present");
@@ -212,7 +214,9 @@ async function migrationQualification(target, administrator) {
   equal(productionInternalRuntimeTail.length, 1, "separately qualified Production internal-pilot runtime present");
   equal(productionFoundationMarkerTail.length, 1, "historical Production foundation ledger marker remains present");
   equal(productionLegacyGuardTail.length, 1, "legacy all-in-one Production state has a forward rejection guard");
-  equal(baseline.length + added.length + accountTail.length + remoteTail.length + brokerTail.length + gcpTail.length + recoveryTail.length + mappedTail.length + mappedFenceTail.length + observationTail.length + interpretationTail.length + evidenceTail.length + cardTail.length + operationalTail.length + productionFoundationTail.length + productionOverlayTail.length + productionInternalRuntimeTail.length + productionFoundationMarkerTail.length + productionLegacyGuardTail.length, files.length, "migration manifest is explicit");
+  equal(sheetsCompleteTail.length, 1, "separately qualified Google Sheets connector migration present");
+  equal(sheetsLifecycleTail.length, 1, "separately qualified Google Sheets lifecycle migration present");
+  equal(baseline.length + added.length + accountTail.length + remoteTail.length + brokerTail.length + gcpTail.length + recoveryTail.length + mappedTail.length + mappedFenceTail.length + observationTail.length + interpretationTail.length + evidenceTail.length + cardTail.length + operationalTail.length + productionFoundationTail.length + productionOverlayTail.length + productionInternalRuntimeTail.length + productionFoundationMarkerTail.length + productionLegacyGuardTail.length + sheetsCompleteTail.length + sheetsLifecycleTail.length, files.length, "migration manifest is explicit");
   const clean = await createDatabase(target, administrator, "clean");
   await applyMigrations(clean.client, baseline);
   const before = await sourceSchemaFingerprint(clean.client);

@@ -34,7 +34,7 @@ function loadSource(relative, mocks = {}) {
 }
 
 function harness(options = {}) {
-  const state = { role: "owner", qboEnabled: true, squareEnabled: true, workspaceId: "workspace-a",
+  const state = { role: "owner", qboEnabled: true, squareEnabled: true, sheetsEnabled: false, sheetsConnections: [], workspaceId: "workspace-a",
     connections: [], freshness: [], cancellations: [], cancellationError: false, errorTable: null, square: { available: true, connections: [] }, squareEvidence: null, ...options };
   const calls = [], queries = [];
   const access = { workspaceId: state.workspaceId,
@@ -58,7 +58,7 @@ function harness(options = {}) {
           assert.deepEqual(queryCalls.find(([method]) => method === "in"), ["in", "connection_id", state.connections.map(row => row.id)]);
         }
         return resolve({ data: state.errorTable === table ? null : table === "integration_connection_summaries" ? state.connections
-          : table === "integration_freshness_summaries" ? state.freshness : [{ id: "entity-a", display_name: "Synthetic entity" }],
+          : table === "integration_freshness_summaries" ? state.freshness : table === "google_sheets_connections" ? state.sheetsConnections : [{ id: "entity-a", display_name: "Synthetic entity" }],
         error: state.errorTable === table ? { message: "private database error" } : null });
       } };
       for (const method of ["select", "eq", "neq", "not", "order", "in"]) query[method] = (...args) => { queryCalls.push([method, ...args]); return query; };
@@ -71,6 +71,7 @@ function harness(options = {}) {
     "next/headers": { headers: async () => new Headers() },
     "@/lib/workspaces/page-context": { requireWorkspacePage: async () => { calls.push("workspace"); return access; } },
     "@/lib/integrations/control-plane/qbo-customer-availability": { qboProductionCustomerConnectionsEnabled: () => state.qboEnabled },
+    "@/lib/integrations/google-sheets/server": { sheetsEnabled: () => state.sheetsEnabled },
     "@/lib/integrations/square-direct/server": { squareDirectEnabled: () => state.squareEnabled,
       squareDirectView: async () => { calls.push("square"); return state.square; }, squareSettingsPath: "/app/settings/integrations/square" },
     "@/lib/integrations/control-plane/square-workspace-evidence": { readSquareWorkspaceEvidence: async (client, workspaceId) => {

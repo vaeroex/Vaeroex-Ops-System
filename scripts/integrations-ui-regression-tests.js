@@ -33,15 +33,26 @@ test("only database-confirmed unconsented attempts offer cancellation on either 
 });
 
 test("disabled integration gates skip provider queries; QBO management fails before workspace access", async () => {
-  const h = harness({ qboEnabled: false, squareEnabled: false });
-  const html = await h.render(landing);
-  assert.match(html, /No integrations are available/);
-  assert.doesNotMatch(html, /Connect QuickBooks|Manage QuickBooks|Connect Square|Manage Square/);
-  assert.deepEqual(h.queries, []);
-  assert.deepEqual(h.calls, ["workspace"]);
-  await assert.rejects(h.render(management), /NOT_FOUND/);
-  assert.deepEqual(h.calls, ["workspace"]);
-  assert.equal(await h.load("app/app/integrations/_qbo.ts").readQuickBooksStatus({}), null);
+  for (const role of ["owner", "viewer"]) {
+    const h = harness({ role, qboEnabled: false, squareEnabled: false, sheetsEnabled: false });
+    const html = await h.render(landing);
+    if (role === "owner") {
+      assert.deepEqual([...html.matchAll(/<article aria-label="([^"]+)"/g)].map(match => match[1]), ["Google Sheets"]);
+      assert.match(html, /Configuration required/);
+      assert.match(html, /href="\/app\/settings\/integrations\/google-sheets"/);
+      assert.match(html, /View Google Sheets setup/);
+      assert.doesNotMatch(html, /No integrations are available/);
+    } else {
+      assert.match(html, /No integrations are available/);
+      assert.doesNotMatch(html, /Google Sheets|<article/);
+    }
+    assert.doesNotMatch(html, /Connect QuickBooks|Manage QuickBooks|Connect Square|Manage Square|<form/);
+    assert.deepEqual(h.queries, []);
+    assert.deepEqual(h.calls, ["workspace"]);
+    await assert.rejects(h.render(management), /NOT_FOUND/);
+    assert.deepEqual(h.calls, ["workspace"]);
+    assert.equal(await h.load("app/app/integrations/_qbo.ts").readQuickBooksStatus({}), null);
+  }
 });
 
 test("Settings provides one Integrations entry without fetching provider data or rendering connection details", async () => {
@@ -54,17 +65,23 @@ test("Settings provides one Integrations entry without fetching provider data or
 });
 
 test("provider cards are consistent links to management, never Connect forms", async () => {
-  const h = harness();
-  const html = await h.render(landing);
-  assert.equal((html.match(/<article /g) || []).length, 2);
-  assert.equal((html.match(/Not connected/g) || []).length, 2);
-  assert.match(html, /href="\/app\/settings\/integrations\/square"/);
-  assert.match(html, /href="\/app\/settings\/integrations\/quickbooks"/);
-  assert.match(html, /Connect Square/);
-  assert.match(html, /Connect QuickBooks/);
-  assert.doesNotMatch(html, /<form|\/api\/integrations\/|businessEntityId/);
-  assert.equal(h.calls.filter(call => call === "square").length, 1);
-  assert.deepEqual(h.queries.map(query => query.table), ["integration_connection_summaries"]);
+  for (const sheetsEnabled of [false, true]) {
+    const h = harness({ sheetsEnabled });
+    const html = await h.render(landing);
+    assert.deepEqual([...html.matchAll(/<article aria-label="([^"]+)"/g)].map(match => match[1]), ["Square", "QuickBooks Online", "Google Sheets"]);
+    assert.equal((html.match(/Not connected/g) || []).length, sheetsEnabled ? 3 : 2);
+    assert.match(html, /href="\/app\/settings\/integrations\/square"/);
+    assert.match(html, /href="\/app\/settings\/integrations\/quickbooks"/);
+    assert.match(html, /href="\/app\/settings\/integrations\/google-sheets"/);
+    assert.match(html, sheetsEnabled ? /Manage Google Sheets/ : /View Google Sheets setup/);
+    assert.equal(html.includes("Configuration required"), !sheetsEnabled);
+    assert.match(html, /Connect Square/);
+    assert.match(html, /Connect QuickBooks/);
+    assert.doesNotMatch(html, /<form|\/api\/integrations\/|businessEntityId/);
+    assert.equal(h.calls.filter(call => call === "square").length, 1);
+    assert.deepEqual(h.queries.map(query => query.table), sheetsEnabled
+      ? ["integration_connection_summaries", "google_sheets_connections"] : ["integration_connection_summaries"]);
+  }
 });
 
 test("QBO reads use the authenticated tenant, production provider, and only that tenant's connection IDs", async () => {
@@ -176,7 +193,7 @@ test("desktop/mobile navigation marks Integrations active for both providers and
   assert.match(shell, /<AppNavigation sections=\{navSections\} mobile \/>/);
   const nav = loadSource("lib/presentation/app-navigation.ts");
   const items = [{ href: "/app/integrations", label: "Integrations" }, { href: "/app/settings", label: "Settings" }];
-  for (const pathname of ["/app/integrations", "/app/settings/integrations/quickbooks", "/app/settings/integrations/quickbooks/data", "/app/settings/integrations/square"]) {
+  for (const pathname of ["/app/integrations", "/app/settings/integrations/quickbooks", "/app/settings/integrations/quickbooks/data", "/app/settings/integrations/square", "/app/settings/integrations/google-sheets"]) {
     const h = harness({ pathname });
     const { AppNavigation } = h.load("components/app/AppNavigation.tsx");
     for (const mobile of [false, true]) {

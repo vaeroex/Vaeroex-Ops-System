@@ -24,11 +24,15 @@ async function qualify(runtime) {
     "20260912190000_square_production_runtime_foundation.sql",
     "20260915040500_integration_production_legacy_foundation_guard.sql"
   ];
-  eq(files.length,120,"full canonical chain, including the separately qualified Production runtime and compatibility guards");
-  for (const name of [...additiveSquareTail,...productionFoundation,...productionOverlay,...productionInternalRuntime,...productionCompatibility])
+  const separatelyQualifiedSheetsTail=[
+    "20261002040024_google_sheets_complete.sql",
+    "20261002040031_google_sheets_lifecycle.sql"
+  ];
+  eq(files.length,122,"full canonical chain, including the separately qualified Production runtime, compatibility guards and Google Sheets connector");
+  for (const name of [...additiveSquareTail,...productionFoundation,...productionOverlay,...productionInternalRuntime,...productionCompatibility,...separatelyQualifiedSheetsTail])
     eq(files.filter(file=>file===name).length,1,`canonical manifest contains ${name} exactly once`);
   stage="migrations";
-  const staged=new Set([...additiveSquareTail,...productionFoundation,...productionOverlay,...productionInternalRuntime,...productionCompatibility]);
+  const staged=new Set([...additiveSquareTail,...productionFoundation,...productionOverlay,...productionInternalRuntime,...productionCompatibility,...separatelyQualifiedSheetsTail]);
   await runtime.applyMigrations(c,files.filter(file=>!staged.has(file)));
   // Production authority roles are cluster-wide. A Supabase-local `db start`
   // has already installed this separately tested foundation in its canonical
