@@ -95,7 +95,7 @@ test("intentional disconnect retains historical presentation without resurrectin
     result("Square", { ...connectedSquare, state: "disconnected", paymentCount: 4, lastSyncedAt: oldSync }, "square-old"),
     result("Google Sheets", { ...connectedSheet, status: "disconnected", last_sync_at: oldSync, last_sync_fact_count: 5 }, "sheet-old")
   ]);
-  assert.equal((html.match(/Disconnected\. Saved data is retained; new imports are stopped/g) ?? []).length, 2);
+  assert.equal((html.match(/Disconnected\. New imports are stopped\. Saved data is retained\./g) ?? []).length, 2);
   assert.doesNotMatch(html, /Reconnect|>[45]\s+(?:saved )?(?:Payments|metrics)/);
   assert.match(html, /View saved Payments/);
   assert.match(html, /these are not accounting totals/);

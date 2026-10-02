@@ -3,12 +3,12 @@ const test = require("node:test"), assert = require("node:assert/strict");
 const fs = require("node:fs"), path = require("node:path");
 const { installLoader, id, ids, root } = require("./qbo-customer-test-support.cjs");
 const now = "2026-09-30T12:00:00.000Z", fingerprint = digit => `sha256:${digit.repeat(64)}`;
-let enabled, authCalls, workspaceCalls, claimCalls, browseCalls, rpcCalls, member, claims, summaries, connections, rpcFailure, browseFailure, freshnessRows, importedIds;
+let enabled, authCalls, workspaceCalls, claimCalls, browseCalls, queryCalls, rpcCalls, member, claims, summaries, connections, rpcFailure, projectionFailure, freshnessRows;
 function emptyBrowser(connectionId) {
   return { contractVersion: "qbo_customer_source_browse_v1", provider: "quickbooks_online", environment: "production", additive: false,
     coverage: "unknown", readAt: now, connectionId, kind: "all", pageSize: 25, nextAfter: null, sources: [], detail: null,
     connections: connections.map(c => ({ connectionId: c.connectionId, label: c.label ?? "QuickBooks company", entityLabel: "Example entity", state: c.status ?? "active" })),
-    metrics: { scope: "selected_connection_and_category_current_sources", currentSources: importedIds?.has(connectionId) ? "1" : "0", reportObservations: "0", transactionRecords: "0",
+    metrics: { scope: "selected_connection_and_category_current_sources", currentSources: "0", reportObservations: "0", transactionRecords: "0",
       validation: { pending: "0", valid: "0", invalid: "0", quarantined: "0" }, lifecycle: { active: "0", voided: "0", deleted: "0", unavailable: "0" },
       validationWork: { absent: "0", pending: "0", claimed: "0", valid: "0", quarantined: "0", superseded: "0", conflict: "0" },
       missingCurrency: "0", unknownAccountingBasis: "0", missingSourceTimeZone: "0", missingTransactionPostingDate: "0",
@@ -27,36 +27,51 @@ function summary(overrides = {}) {
     calculatedAt: "2026-09-30T11:00:00.000Z", watermark: fingerprint("c"), ...overrides };
 }
 function reset() {
-  enabled = true; authCalls = workspaceCalls = claimCalls = browseCalls = 0; rpcCalls = [];
+  enabled = true; authCalls = workspaceCalls = claimCalls = browseCalls = queryCalls = 0; rpcCalls = [];
   member = { workspaceId: ids.workspace, membership: { role: "owner", user_id: ids.actor, status: "active", workspace_id: ids.workspace } };
   claims = { data: { claims: { sub: ids.actor, session_id: ids.session } }, error: null };
-  summaries = new Map([[ids.connection, summary()]]); connections = [{ connectionId: ids.connection }]; rpcFailure = browseFailure = false;
-  freshnessRows = []; importedIds = new Set();
+  summaries = new Map([[ids.connection, summary()]]); connections = [{ connectionId: ids.connection }]; rpcFailure = projectionFailure = false;
+  freshnessRows = [];
 }
+const eligibleConnections = () => connections.filter(c => (c.scopes ?? ["com.intuit.quickbooks.accounting"]).includes("com.intuit.quickbooks.accounting")
+  && !["deleted", "deleting"].includes(c.status));
 installLoader({
   "@/lib/integrations/control-plane/qbo-customer-availability": { qboProductionCustomerConnectionsEnabled: () => enabled },
   "@/lib/security/require-auth": { requireAuth: async () => {
     authCalls++; return { user: { id: ids.actor }, supabase: { auth: { getClaims: async () => { claimCalls++; return claims; } },
       from: table => {
+        queryCalls++;
         assert.ok(["integration_connection_summaries", "integration_freshness_summaries"].includes(table));
-        const filters = [];
+        const filters = [], excluded = [], orders = []; let maximum, scopes, selectedIds;
         const query = { select: () => query, eq: (column, value) => { filters.push([column, value]); return query; },
-          in: async (column, values) => {
+          contains: (column, values) => { assert.equal(column, "granted_scopes"); scopes = values; return query; },
+          neq: (column, value) => { assert.equal(column, "status"); excluded.push(value); return query; },
+          order: (column, options) => { orders.push([column, options.ascending]); return query; },
+          limit: value => { maximum = value; return query; },
+          in: (column, values) => { assert.equal(column, "connection_id"); selectedIds = values; return query; },
+          then: resolve => {
             assert.ok(filters.some(([k,v]) => k === "workspace_id" && v === ids.workspace));
             assert.ok(filters.some(([k,v]) => k === "provider_key" && v === "quickbooks_online"));
-            assert.deepEqual(values, connections.map(c => c.connectionId));
-            return { error: null, data: table === "integration_freshness_summaries" ? freshnessRows : connections.map(c => ({
-              id: c.connectionId, status: c.status ?? "active", granted_scopes: c.scopes ?? ["com.intuit.quickbooks.accounting"] })) };
+            if (table === "integration_freshness_summaries") {
+              assert.deepEqual(selectedIds, eligibleConnections().slice(0, 6).map(c => c.connectionId));
+              return resolve({ error: null, data: freshnessRows });
+            }
+            assert.ok(filters.some(([k,v]) => k === "provider_environment" && v === "production"));
+            assert.deepEqual(scopes, ["com.intuit.quickbooks.accounting"]);
+            assert.deepEqual(excluded, ["deleted", "deleting"]);
+            assert.deepEqual(orders, [["updated_at", false], ["id", true]]); assert.equal(maximum, 6);
+            return resolve(projectionFailure ? { error: new Error("private-never-display"), data: null }
+              : { error: null, data: eligibleConnections().slice(0, maximum).map(c => ({
+                id: c.connectionId, safe_display_name: c.label ?? "QuickBooks company", status: c.status ?? "active",
+                granted_scopes: c.scopes ?? ["com.intuit.quickbooks.accounting"] })) });
           } }; return query;
       },
       rpc: async (name, args) => { rpcCalls.push({ name, args }); return rpcFailure ? { data: null, error: new Error("private-never-display") }
         : { data: name === "qbo_customer_source_browse_v1" ? emptyBrowser(args.p_connection_id) : summaries.get(args.p_connection_id), error: null }; } } };
   } },
   "@/lib/security/get-current-workspace": { getCurrentWorkspace: async () => { workspaceCalls++; return member; } },
-  "@/lib/integrations/qbo-customer/server": { qboCustomerStoredData: async (params, workspace) => {
-    browseCalls++; assert.deepEqual(params, {}); assert.equal(workspace, ids.workspace);
-    if (browseFailure) throw new Error("private-never-display");
-    return { browser: emptyBrowser(connections[0]?.connectionId ?? null) };
+  "@/lib/integrations/qbo-customer/server": { qboCustomerStoredData: async () => {
+    browseCalls++; throw new Error("The capped stored-data browser must not discover business-result eligibility");
   } }
 });
 const { parseQboAccountingSummary, buildQboAccountingIntelligence, exactQboAccountingNumber } = require("../lib/integrations/qbo-customer/accounting-intelligence.ts");
@@ -264,7 +279,7 @@ test("24 native months remain browseable; latest six observations and <=24 refer
 
 test("dormant gate denies before auth, workspace, claims, browse or RPC", async () => {
   reset(); enabled = false; assert.deepEqual(await loadQboAccountingIntelligence(ids.workspace, now), { state: "hidden" });
-  assert.equal(authCalls + workspaceCalls + claimCalls + browseCalls + rpcCalls.length, 0);
+  assert.equal(authCalls + workspaceCalls + claimCalls + browseCalls + queryCalls + rpcCalls.length, 0);
 });
 for (const field of ["role", "user_id", "status", "workspace_id", "workspaceId", "sub", "session_id", "claims_error"]) {
   test(`owner live-session fence rejects ${field} without reading financial data`, async () => {
@@ -274,7 +289,7 @@ for (const field of ["role", "user_id", "status", "workspace_id", "workspaceId",
     else if (field === "claims_error") claims.error = new Error("denied");
     else member.membership[field] = "invalid";
     assert.deepEqual(await loadQboAccountingIntelligence(ids.workspace, now), { state: "hidden" });
-    assert.equal(browseCalls, 0); assert.equal(rpcCalls.length, 0);
+    assert.equal(browseCalls, 0); assert.equal(queryCalls, 0); assert.equal(rpcCalls.length, 0);
   });
 }
 test("authenticated loader uses only own-connection summary RPC and returns real producers", async () => {
@@ -287,18 +302,18 @@ test("connection cap bounds work and reports partial coverage", async () => {
   summaries = new Map(connections.map((c, i) => [c.connectionId, summary({ connectionId: c.connectionId, businessEntityId: id(60 + i), months: [month(i + 1)] })]));
   const result = await loadQboAccountingIntelligence(ids.workspace, now);
   assert.equal(result.state, "available"); assert.equal(result.connectionsTruncated, true);
-  assert.equal(rpcCalls.length, 5); assert.equal(browseCalls, 1);
+  assert.equal(rpcCalls.length, 5); assert.equal(browseCalls, 0); assert.equal(queryCalls, 2);
   assert.equal(snapshot(result.data).kpis.length, 5);
 });
-for (const failure of ["rpc", "browse", "workspace", "connection", "duplicate", "partial"]) test(`loader ${failure} failure never falls back to zero or exposes internal errors`, async () => {
+for (const failure of ["rpc", "projection", "workspace", "connection", "duplicate", "partial"]) test(`loader ${failure} failure never falls back to zero or exposes internal errors`, async () => {
   reset();
   if (failure === "rpc") rpcFailure = true;
-  if (failure === "browse") browseFailure = true;
+  if (failure === "projection") projectionFailure = true;
   if (failure === "workspace") summaries.set(ids.connection, summary({ workspaceId: id(999) }));
   if (failure === "connection") summaries.set(ids.connection, summary({ connectionId: id(999) }));
   if (failure === "duplicate") connections.push(connections[0]);
   if (failure === "partial") connections.push({ connectionId: id(99) });
-  assert.deepEqual(await loadQboAccountingIntelligence(ids.workspace, now), { state: ["browse", "duplicate"].includes(failure) ? "hidden" : "unavailable" });
+  assert.deepEqual(await loadQboAccountingIntelligence(ids.workspace, now), { state: ["projection", "duplicate"].includes(failure) ? "hidden" : "unavailable" });
 });
 test("view escapes labels and provides internal native provenance links, not provider payloads or aggregate business-health claims", () => {
   const data = produce([summary({ businessEntityName: '<script>alert("x")</script>' })]);
@@ -344,6 +359,19 @@ test("shared presentation distinguishes first import, stale data, revoked access
   assert.match(disconnected.status, /Disconnected/); assert.equal(disconnected.lastSuccessfulSyncAt, old.lastSuccessfulSyncAt);
   assert.equal(integrationResultVisibility({ ...old, connectionState: "reauthorization_required" }).requiresReconnect, true);
 });
+test("disconnect and revoked access before importing never claim saved data exists", () => {
+  for (const connectionState of ["disconnected", "reauthorization_required"]) {
+    const evidence = { successfulAuthorization: true, hasImportedData: false, connectionState, lastSuccessfulSyncAt: null, freshness: "unknown" };
+    assert.doesNotMatch(integrationResultVisibility(evidence).status, /Saved data is retained/);
+    assert.doesNotMatch(integrationResultVisibility({ ...evidence, lastSuccessfulSyncAt: now }).status, /Saved data is retained/);
+    assert.match(integrationResultVisibility({ ...evidence, hasImportedData: true }).status, /Saved data is retained/);
+  }
+});
+test("deleted companies remain excluded even with historical scopes", async () => {
+  reset(); connections = [{ connectionId: ids.connection, status: "deleted" }, { connectionId: id(89), status: "deleting" }];
+  assert.deepEqual(await loadQboAccountingIntelligence(ids.workspace, now), { state: "hidden" });
+  assert.equal(queryCalls, 1); assert.equal(rpcCalls.length, 0);
+});
 for (const status of ["pending_authorization", "error", "disconnected", "reauthorization_required"]) {
   test(`unconsented ${status} attempts never request accounting summaries or produce empty panels`, async () => {
     reset(); connections = Array.from({ length: 7 }, (_, i) => ({ connectionId: id(50 + i), status, scopes: [] }));
@@ -352,13 +380,13 @@ for (const status of ["pending_authorization", "error", "disconnected", "reautho
     assert.equal(rpcCalls.filter(c => c.name === "read_qbo_customer_accounting_summary_v1").length, 0);
   });
 }
-test("unsuccessful attempts cannot consume the business-result connection limit", async () => {
-  reset(); connections = [...Array.from({ length: 99 }, (_, i) => ({ connectionId: id(500 + i), status: "disconnected", scopes: [] })),
+test("more than 100 unsuccessful attempts cannot consume either the browser or business-result connection limit", async () => {
+  reset(); connections = [...Array.from({ length: 150 }, (_, i) => ({ connectionId: id(500 + i), status: "disconnected", scopes: [] })),
     { connectionId: ids.connection, label: "Real company" }];
   const result = await loadQboAccountingIntelligence(ids.workspace, now);
   assert.equal(result.state, "available"); assert.equal(result.connectionsTruncated, false); assert.equal(result.data.summaries.length, 1);
   assert.deepEqual(rpcCalls.filter(c => c.name === "read_qbo_customer_accounting_summary_v1").map(c => c.args.p_connection_id), [ids.connection]);
-  assert.equal(rpcCalls.length, 1); assert.equal(browseCalls, 1);
+  assert.equal(rpcCalls.length, 1); assert.equal(browseCalls, 0); assert.equal(queryCalls, 2);
 });
 test("successful connection awaiting import shows a concise status, never zero financial activity", async () => {
   reset(); summaries.set(ids.connection, summary({ authorityEnabled: false, authorityId: null, calculationState: "disabled", months: [], calculatedAt: null, watermark: null }));
@@ -368,9 +396,8 @@ test("successful connection awaiting import shows a concise status, never zero f
   assert.equal(result.data.kpis.length, 0);
 });
 test("stored source history remains browseable without inventing current accounting authority", async () => {
-  reset(); connections = [{ connectionId: ids.connection, status: "disconnected", scopes: [] }];
+  reset(); connections = [{ connectionId: ids.connection, status: "disconnected" }];
   summaries.set(ids.connection, summary({ authorityEnabled: false, authorityId: null, calculationState: "disabled", months: [], calculatedAt: null, watermark: null }));
-  importedIds.add(ids.connection);
   const result = await loadQboAccountingIntelligence(ids.workspace, now);
   assert.equal(result.state, "available"); assert.equal(result.connections.length, 1);
   assert.match(result.connections[0].visibility.status, /Disconnected/);
