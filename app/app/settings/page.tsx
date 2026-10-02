@@ -96,7 +96,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
         {context.membership?.role === "owner" && context.activeWorkspace ? (
           <ReportingTimezoneForm key={context.activeWorkspace.id}
             workspaceId={context.activeWorkspace.id} reportingTimezone={reportingTimezone}
-            timeZones={Array.from(new Set(["UTC", ...Intl.supportedValuesOf("timeZone"), ...(reportingTimezone ? [reportingTimezone] : [])])).sort()} />
+            timeZones={[...new Set(["UTC", ...Intl.supportedValuesOf("timeZone"), ...(reportingTimezone ? [reportingTimezone] : [])])].sort()} />
         ) : (
           <dl className="mt-4 border-t border-line pt-4 text-sm">
             <dt className="font-medium text-ink">Reporting timezone</dt>
