@@ -61,7 +61,7 @@ test("Settings puts the Integrations entry before account, workspace, and collap
   const positions = ["id=\"settings-integrations\"", ">Account<", ">Workspace</h3>", ">Appearance</span>"].map(value => html.indexOf(value));
   assert.ok(positions.every(position => position >= 0));
   assert.deepEqual([...positions].sort((a, b) => a - b), positions);
-  assert.match(html, /Square and QuickBooks connections for this workspace/);
+  assert.match(html, /Square, QuickBooks, and Google Sheets connections for this workspace/);
   assert.match(html, /href="\/app\/integrations"/);
   assert.match(html, /Workspace A/);
   assert.equal((html.match(/owner@example\.invalid/g) ?? []).length, 1);
