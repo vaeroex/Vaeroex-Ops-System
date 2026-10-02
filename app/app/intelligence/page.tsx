@@ -29,10 +29,10 @@ import { buildIntelligenceInboxFromSnapshotV1 } from "@/lib/intelligence/snapsho
 import { projectIntelligenceInboxV1 } from "@/lib/intelligence/snapshot/v1/projections";
 import type { IntelligenceSnapshotV1 } from "@/lib/intelligence/snapshot/v1/types";
 import { isSecurityResponseMessage } from "@/lib/security/security-response";
-import { requireWorkspacePage } from "@/lib/workspaces/page-context";
+import { requireWorkspaceAccess } from "@/lib/security/require-workspace-access";
 import { loadQboAccountingIntelligence } from "@/lib/integrations/qbo-customer/accounting-intelligence-server";
-import { QboAccountingIntelligenceView } from "@/lib/integrations/qbo-customer/accounting-intelligence-view";
-import { SquareSheetsResults } from "@/components/integrations/SquareSheetsResults";
+import { CurrentIntegrations } from "@/components/integrations/CurrentIntegrations";
+import { loadIntegrationDashboard } from "@/lib/integrations/dashboard/server";
 
 export const dynamic = "force-dynamic";
 
@@ -42,7 +42,8 @@ type IntelligencePageProps = {
 
 export default async function IntelligencePage({ searchParams }: IntelligencePageProps) {
   const params = await searchParams;
-  const { supabase, workspaceId, context } = await requireWorkspacePage();
+  const access = await requireWorkspaceAccess();
+  const { supabase, workspaceId, context } = access;
   const [issuesResult, kpisResult, kpiSettingsResult, filesResult, crmResult, importsResult, sopsResult, formsResult, submissionsResult, peopleResult, decisionsResult, metricsResult, memoryResult, lifecycleResult, briefingStates] = await Promise.all([
     supabase.from("issues").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
     loadActiveWorkspaceKpis({ supabase, workspaceId }),
@@ -174,6 +175,7 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
     }));
   }
   const qboAccounting = await loadQboAccountingIntelligence(workspaceId, snapshotAsOf);
+  const { dashboard, currentQboAccounting } = await loadIntegrationDashboard({ access, qbo: qboAccounting, eligibleKpis });
   let intelligenceSnapshot: IntelligenceSnapshotV1 | null = null;
   let displayedInsights = intelligence.insights;
   try {
@@ -181,9 +183,9 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
       workspaceId,
       asOf: snapshotAsOf,
       intelligence,
-      ...(qboAccounting.state === "available" && qboAccounting.data.kpis.length ? {
-        kpis: qboAccounting.data.kpis,
-        evidenceManifests: qboAccounting.data.evidenceManifests
+      ...(currentQboAccounting.kpis.length ? {
+        kpis: currentQboAccounting.kpis,
+        evidenceManifests: currentQboAccounting.evidenceManifests
       } : {}),
       ...(businessNoteContext.records.length ? {
         contextualEvidence: {
@@ -266,8 +268,7 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
         </div>
       </header>
       <ErrorNotice message={displayErrors[0]?.message || null} />
-      <QboAccountingIntelligenceView result={qboAccounting} />
-      <SquareSheetsResults supabase={supabase} workspaceId={workspaceId} isOwner={context.membership?.role === "owner"} />
+      <CurrentIntegrations key={workspaceId} initial={dashboard} />
       <IntelligenceSignalInbox
         currentCards={lifecycleCards.current}
         historyCards={lifecycleCards.history}

@@ -378,6 +378,8 @@ matches(zeroBasedUpgradeRunner, /const dormantSquareTail = \[\s*"20260902191323_
   "fixture-rich QBO upgrade allows exactly the reviewed dormant Square migrations");
 matches(zeroBasedUpgradeRunner, /const separatelyQualifiedSheetsTail = \[\s*"20261002040024_google_sheets_complete\.sql",\s*"20261002040031_google_sheets_lifecycle\.sql"\s*\]/,
   "fixture-rich QBO upgrade allows exactly the two reviewed Google Sheets migrations");
+ok(zeroBasedUpgradeRunner.includes('const separatelyQualifiedPreferencesTail = [\n    "20261002182049_integration_summary_preferences.sql"\n  ];'),
+  "fixture-rich QBO upgrade allows exactly the reviewed personal summary preferences migration");
 // Execute only the pure manifest guard, with no database/CLI capability. This
 // catches an omitted additive tail before the real database gate runs in CI.
 const fixtureGuardSource = zeroBasedUpgradeRunner.slice(0, zeroBasedUpgradeRunner.indexOf("async function applyFixture"));
@@ -407,6 +409,9 @@ for (const manifest of [currentMigrations.filter(name => name !== "2026090717432
   currentMigrations.filter(name => name !== "20260911205108_square_canonical_interpretation.sql"),
   currentMigrations.filter(name => name !== "20261002040024_google_sheets_complete.sql"),
   currentMigrations.filter(name => name !== "20261002040031_google_sheets_lifecycle.sql"),
+  currentMigrations.filter(name => name !== "20261002182049_integration_summary_preferences.sql"),
+  currentMigrations.map(name => name === "20261002182049_integration_summary_preferences.sql" ? "20261002182050_integration_summary_preferences.sql" : name),
+  [...currentMigrations, "20261002182049_integration_summary_preferences.sql"],
   [...currentMigrations, "20990101000000_square_activation.sql"]]) {
   assertionCount++; assert.throws(() => acceptsFixtureManifest(manifest), /fixture_manifest_denied/, "missing or unreviewed tail still rejects");
 }
@@ -583,6 +588,7 @@ const approvedProtectedPaths = new Set([
   "supabase/migrations/20260912034447_square_workspace_card_contract.sql",
   "supabase/migrations/20260912150000_square_operational_intelligence.sql",
   "supabase/migrations/20260902191323_integration_production_runtime_foundation.sql",
+  "supabase/migrations/20261002182049_integration_summary_preferences.sql",
   "supabase/tests/external_integrations_phase_8b_qbo_sandbox_validation.test.sql",
   "supabase/tests/external_integrations_phase_8b_credential_refresh_recovery.test.sql",
   "supabase/tests/external_integrations_phase_8b_same_generation_reauthorization.test.sql",

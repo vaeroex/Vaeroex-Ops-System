@@ -3,7 +3,7 @@ import { z } from "zod";
 import { requireAuth } from "@/lib/security/require-auth";
 import { getCurrentWorkspace } from "@/lib/security/get-current-workspace";
 import { qboProductionCustomerConnectionsEnabled } from "@/lib/integrations/control-plane/qbo-customer-availability";
-import { integrationResultVisibility, type IntegrationResultVisibility } from "@/lib/integrations/control-plane/result-visibility";
+import { integrationResultVisibility, type IntegrationResultVisibility, type IntegrationResultEvidence } from "@/lib/integrations/control-plane/result-visibility";
 import { buildQboAccountingIntelligence, parseQboAccountingSummary, QBO_ACCOUNTING_INTELLIGENCE_CONNECTION_LIMIT,
   type QboAccountingIntelligence, type QboAccountingSummary } from "./accounting-intelligence";
 
@@ -11,7 +11,7 @@ export type QboAccountingIntelligenceLoad =
   | { state: "hidden" }
   | { state: "unavailable" }
   | { state: "available"; data: QboAccountingIntelligence; connectionsTruncated: boolean;
-      connections: { connectionId: string; label: string; visibility: IntegrationResultVisibility }[] };
+      connections: { connectionId: string; label: string; updatedAt: string; evidence: IntegrationResultEvidence; visibility: IntegrationResultVisibility }[] };
 
 export async function loadQboAccountingIntelligence(workspaceId: string, asOf: string): Promise<QboAccountingIntelligenceLoad> {
   if (!qboProductionCustomerConnectionsEnabled()) return { state: "hidden" };
@@ -28,7 +28,7 @@ export async function loadQboAccountingIntelligence(workspaceId: string, asOf: s
     // reauthorization, revocation and disconnect retain it. Filter in SQL
     // before bounding results, so retained attempts cannot hide real companies.
     const authority = await supabase.from("integration_connection_summaries")
-      .select("id, safe_display_name, status, granted_scopes")
+      .select("id, safe_display_name, status, granted_scopes, updated_at")
       .eq("workspace_id", workspaceId).eq("provider_key", "quickbooks_online")
       .eq("provider_environment", "production")
       .contains("granted_scopes", ["com.intuit.quickbooks.accounting"])
@@ -52,15 +52,16 @@ export async function loadQboAccountingIntelligence(workspaceId: string, asOf: s
       const lastSuccessfulSyncAt = streams.map((stream) => stream.last_successful_sync_at)
         .filter((time): time is string => time !== null).sort().at(-1) ?? null;
       const successfulAuthorization = row.granted_scopes.includes("com.intuit.quickbooks.accounting");
-      const visibility = integrationResultVisibility({ successfulAuthorization, hasImportedData: false, lastSuccessfulSyncAt,
+      const evidence: IntegrationResultEvidence = { successfulAuthorization, hasImportedData: false, lastSuccessfulSyncAt,
         connectionState: row.status === "disconnected" || row.status === "disconnecting" ? "disconnected"
           : row.status === "reauthorization_required" ? "reauthorization_required"
             : row.status === "pending_authorization" || row.status === "authorized_unmapped" ? "setup"
               : row.status === "error" || streams.some((stream) => stream.status === "sync_error") ? "sync_error" : "connected",
         freshness: streams.length && streams.every((stream) => stream.status === "current") ? "current"
-          : streams.some((stream) => ["stale", "aging"].includes(stream.status)) ? "stale" : "unknown" });
+          : streams.some((stream) => ["stale", "aging"].includes(stream.status)) ? "stale" : "unknown" };
+      const visibility = integrationResultVisibility(evidence);
       if (visibility.visible) hasEstablishedConnection = true;
-      if (visibility.visible) connections.push({ connectionId: row.id, label: row.safe_display_name, visibility });
+      if (visibility.visible) connections.push({ connectionId: row.id, label: row.safe_display_name, updatedAt: row.updated_at, evidence, visibility });
     }
     if (!connections.length) return { state: "hidden" };
     hasEstablishedConnection = true;
@@ -72,7 +73,9 @@ export async function loadQboAccountingIntelligence(workspaceId: string, asOf: s
     }
     return { state: "available", connectionsTruncated: connections.length > QBO_ACCOUNTING_INTELLIGENCE_CONNECTION_LIMIT,
       connections: connections.slice(0, QBO_ACCOUNTING_INTELLIGENCE_CONNECTION_LIMIT),
-      data: buildQboAccountingIntelligence({ workspaceId: access.workspaceId, summaries, asOf }) };
+      // Current contributions are composed only after the dashboard verifies
+      // logical connection identity and canonical sync freshness.
+      data: { ...buildQboAccountingIntelligence({ workspaceId: access.workspaceId, summaries: [], asOf }), summaries } };
   } catch {
     // No raw RPC errors, source data, or permission fallback totals reach the page.
     return { state: hasEstablishedConnection ? "unavailable" : "hidden" };

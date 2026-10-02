@@ -214,6 +214,9 @@ jobs:
           pnpm test:qbo-production-completion
           pnpm test:qbo-production-browser
 
+      - name: Current integrations dashboard, preferences and browser regressions
+        run: pnpm test:current-integrations
+
       - name: External integrations Phase 8B OAuth callback edge tests
         working-directory: services/external-integrations-qbo-sandbox/edge
         run: |

@@ -34,6 +34,153 @@ const suiteNames = [
   'qbo_production_accounting_intake.test.sql',
   'external_integrations_phase_3_deterministic_dependencies.test.sql',
 ];
+const dashboardMigrations = {
+  preferences: '20261002182049_integration_summary_preferences.sql',
+  square: '20261002182147_square_customer_browse_identity.sql',
+  qbo: '20261002182746_qbo_customer_dashboard_metadata.sql',
+};
+const dashboardSuites = [
+  { file: 'supabase/tests/qbo_customer_dashboard_metadata.test.sql', dashboard: 'qbo', expectedAssertions: 55 },
+  { file: 'supabase/tests/integration_summary_preferences.test.sql', dashboard: 'preferences', expectedAssertions: 45 },
+  { file: 'supabase/tests/workspace_reporting_timezone.test.sql', dashboard: 'reporting-timezone', expectedAssertions: 15 },
+  { file: 'supabase/tests/square_customer_browse_identity.test.sql', dashboard: 'square', expectedAssertions: 33 },
+];
+const squareDependencySuite = {
+  file: 'canonical_square_identity_dependency_denial', dashboard: 'square-dependency', expectedAssertions: 3,
+};
+const preferenceAssertionNames = [
+  'new workspace timezone defaults null', 'IANA-form timezone accepted', 'UTC accepted',
+  'explicit null restores unconfigured state', 'empty timezone rejected', 'malformed timezone path rejected',
+  'timezone whitespace rejected', 'oversized timezone rejected', 'invalid timezone updates leave stored value unchanged',
+  'existing service workspace update works with null timezone', 'existing service workspace update works with configured timezone',
+  'RLS enabled', 'anonymous read not granted', 'restore does not require delete privilege',
+  'missing preference leaves entry visible',
+  'viewer can save own preferences; workspace and logical entries are independent',
+  'repeated hide is idempotent', 'restore saved', 'restoring company A does not restore company B',
+  'other workspace untouched', 'cannot insert for another account', 'cannot insert in an inaccessible workspace',
+  'WITH CHECK prevents account reassignment', 'WITH CHECK prevents unauthorized workspace reassignment',
+  'existing owner safe-column update remains usable', 'owner can update reporting timezone',
+  'workspace owner cannot read peer preferences', 'workspace owner cannot change peer preferences',
+  'upsert cannot overwrite a peer preference', 'same entry has separate account preferences', 'new row defaults visible',
+  'raw provider IDs cannot be stored', 'uppercase hashes cannot be stored', 'trailing newline cannot bypass key constraint',
+  'oversized key cannot be stored', 'authenticated deletion is not granted',
+  'disabled membership cannot read existing preferences', 'disabled membership cannot update existing preferences',
+  'disabled membership cannot insert preferences', 'invited membership cannot read preferences',
+  'anonymous read denied', 'anonymous insert denied', 'anonymous update denied',
+  'account deletion removes preferences', 'workspace deletion removes preferences',
+];
+const reportingTimezoneAssertionNames = [
+  'active owner saves reporting timezone through authenticated update',
+  'active owner can restore unconfigured timezone',
+  'owner cannot update an unrelated workspace timezone',
+  'timezone grant does not grant auth-bearing column updates',
+  'admin cannot bypass owner-only timezone setter through direct update',
+  'admin no-op timezone update is also denied',
+  'admin combined timezone and safe-column update is atomic and denied',
+  'denied timezone update leaves all workspace fields unchanged',
+  'existing admin safe-column update remains allowed',
+  'viewer cannot update reporting timezone',
+  'staff cannot update reporting timezone',
+  'disabled owner cannot update reporting timezone',
+  'missing authenticated subject cannot update reporting timezone',
+  'anonymous RLS cannot update reporting timezone',
+  'timezone constraint does not widen private helper access',
+];
+const squareIdentityAssertionNames = [
+  'identity_sha256_shape', 'identity_reconnect_and_renames_keep_lineage', 'identity_ignores_attempt_age_and_generation',
+  ...[2, 3, 4, 5].map(n => `identity_distinct_authority_${n}`),
+  ...[6, 7, 8, 9].map(n => `identity_incomplete_discovery_${n}`),
+  'identity_never_combines_saved_results', 'identity_history_own_success_without_update_checkpoint',
+  'identity_completed_empty_distinct_from_never_checked', 'identity_historical_recovery_projected',
+  'identity_no_raw_authority_credentials_or_invented_changes', 'identity_raw_merchant_and_application_not_disclosed',
+  'identity_other_workspace_has_distinct_key', 'identity_browse_does_not_mutate',
+  ...['lastsyncedat', 'checkpointat', 'lastcompletedread', 'activeread', 'hasmore', 'lasterror', 'revocationpending', 'recoveryrequired']
+    .map(field => `identity_current_parity_${field}`),
+  'identity_partial_failed_read_not_success', 'identity_pending_revocation_remains_actionable',
+  'identity_fully_disconnected_keeps_per_attempt_success', 'identity_other_workspace_connection_denied',
+  'identity_wrong_session_denied', 'identity_nonowner_denied',
+];
+
+function dashboardPlan(shape) {
+  assert.ok(['canonical', 'production'].includes(shape), 'only the two reviewed migration shapes are supported');
+  // Canonical has preferences but no direct Square backend. Its exact-ledger
+  // production prerequisites cannot be replayed or substituted on that shape.
+  return shape === 'canonical'
+    ? { migrations: [dashboardMigrations.qbo], suites: [...dashboardSuites.slice(0, 3), squareDependencySuite] }
+    : { migrations: Object.values(dashboardMigrations), suites: dashboardSuites };
+}
+
+function checkDashboardAssertionNames(kind, names) {
+  assert.ok(['preferences', 'reporting-timezone', 'square'].includes(kind), 'only the registered named SQL assertion formats are accepted');
+  const expected = kind === 'preferences' ? preferenceAssertionNames
+    : kind === 'reporting-timezone' ? reportingTimezoneAssertionNames : squareIdentityAssertionNames;
+  assert.deepEqual(names, expected, 'every named SQL assertion must execute exactly once, in order');
+  return expected.length;
+}
+
+function composeSquareIdentitySuite(sql, browseFixture) {
+  const boundary = '\ncreate temp table browse_before as select\n';
+  assert.equal(browseFixture.split(boundary).length, 2, 'review the fixed Square seed boundary if it changes');
+  assert.ok(!/^\s*\\/m.test(browseFixture + sql), 'Square fixture composition accepts plain SQL only');
+  // The embedded fixture omits authors because its platform tables are minimal.
+  // Supply the exact synthetic owner required by real NOT NULL/FK constraints.
+  const entitySeed = "insert into public.business_entities(id,workspace_id,entity_key,display_name,base_currency,timezone) values\n  ('aaaaaaaa-9999-4999-8999-aaaaaaaaaaaa','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','another-entity','Another entity','USD','UTC');";
+  assert.equal(sql.split(entitySeed).length, 2, 'review the exact identity entity seed if it changes');
+  const nativeSeed = "insert into public.business_entities(id,workspace_id,entity_key,display_name,base_currency,timezone,created_by,updated_by) values\n  ('aaaaaaaa-9999-4999-8999-aaaaaaaaaaaa','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','another-entity','Another entity','USD','UTC','11111111-1111-4111-8111-111111111111','11111111-1111-4111-8111-111111111111');";
+  return browseFixture.slice(0, browseFixture.indexOf(boundary)) + '\n' + sql.replace(entitySeed, nativeSeed);
+}
+
+async function executeDashboardSuite(client, suite, inputs, lines) {
+  if (suite.dashboard === 'square-dependency') {
+    assert.equal(suite.file, squareDependencySuite.file);
+    const catalog = `select to_regnamespace('square_customer_private')::text as schema,
+      to_regprocedure('public.square_customer_payments_v1(uuid,uuid,uuid,uuid,integer,text,text,text)')::text as browse,
+      (select array_agg(version order by version) from supabase_migrations.schema_migrations) as ledger`;
+    const before = (await client.query(catalog)).rows;
+    assert.equal(before[0].schema, null);
+    assert.equal(before[0].browse, null);
+    lines.push('ok 1 - canonical Square direct browse dependency is absent');
+    try {
+      await assert.rejects(client.query(inputs.squareMigration), {
+        code: '55000', message: 'square_customer_identity_requires_browse',
+      });
+    } finally { await client.query('rollback'); }
+    lines.push('ok 2 - Square identity rejects canonical with its exact prerequisite error');
+    assert.deepEqual((await client.query(catalog)).rows, before, 'failed projection changes neither catalog nor ledger');
+    lines.push('ok 3 - canonical Square prerequisite denial preserves catalog and ledger');
+    return { assertions: 3, executedSqlSha256: digest(inputs.squareMigration), protocolRequests: 1 };
+  }
+  const registered = dashboardSuites.find(item => item.file === suite.file);
+  assert.ok(registered && registered.dashboard === suite.dashboard, 'dashboard SQL suite must be explicitly registered');
+  const sql = suite.dashboard === 'square' ? composeSquareIdentitySuite(suite.sql, inputs.squareFixture)
+    : expandFixture(suite.sql, inputs.qboFixture);
+  const metadata = { executedSqlSha256: digest(sql), protocolRequests: 1 };
+  if (suite.dashboard === 'qbo') {
+    await executeSuite(client, sql, lines);
+    const assertions = checkTap(lines);
+    assert.equal(assertions, registered.expectedAssertions, 'all 55 QBO metadata assertions must complete');
+    return { ...metadata, assertions };
+  }
+  const names = [];
+  const add = name => { names.push(name); lines.push(`ok ${names.length} - ${name}`); };
+  const notice = event => {
+    if (suite.dashboard === 'square' && event.message.startsWith('square_backend_test_passed:')) {
+      add(event.message.slice('square_backend_test_passed:'.length));
+    }
+  };
+  client.on('notice', notice);
+  try {
+    const results = await client.query(sql);
+    if (suite.dashboard === 'preferences' || suite.dashboard === 'reporting-timezone') {
+      for (const result of results) for (const row of result.rows) {
+        if (Object.hasOwn(row, 'preference_assert')) add(row.preference_assert);
+      }
+    }
+    const assertions = checkDashboardAssertionNames(suite.dashboard, names);
+    assert.equal(assertions, registered.expectedAssertions);
+    return { ...metadata, assertions };
+  } finally { client.removeListener('notice', notice); }
+}
 const quote = value => '"' + value.replaceAll('"', '""') + '"';
 const digest = value => crypto.createHash('sha256').update(value).digest('hex');
 const fixtureInclude = '\\ir fixtures/qbo-production-native.sql';
@@ -178,14 +325,19 @@ async function main() {
   const canonical = fs.readdirSync(path.join(root, 'supabase/migrations'))
     .filter(name => /^\d+_.+\.sql$/.test(name)).sort().map(name => snapshot(`supabase/migrations/${name}`));
   const prefix = canonical.filter(item => item.version <= '20260902191325');
-  assert.equal(canonical.length, 122, 'review the canonical migration manifest if it changes');
+  assert.equal(canonical.length, 123, 'review the canonical migration manifest if it changes');
   assert.deepEqual(canonical.filter(item => item.version > '20260915040500').map(item => path.basename(item.file)), [
     '20261002040024_google_sheets_complete.sql',
     '20261002040031_google_sheets_lifecycle.sql',
-  ], 'the canonical extension contains only the two separately qualified Google Sheets migrations');
+    '20261002182049_integration_summary_preferences.sql',
+  ], 'the canonical extension contains exactly two Google Sheets migrations and dashboard preferences');
   assert.equal(prefix.length, 104, 'exact reviewed Production prefix');
   const square = productionSquare.map(name => snapshot(`supabase/production-migrations/${name}`));
   const qbo = candidates.map(name => snapshot(`supabase/production-migrations/${name}`));
+  const dashboard = Object.values(dashboardMigrations).map(name => snapshot(`supabase/production-migrations/${name}`));
+  assert.equal(dashboard[0].sha256, canonical.find(item => path.basename(item.file) === dashboardMigrations.preferences)?.sha256,
+    'canonical and Production preference SQL must match exactly');
+  const squareFixture = snapshot('supabase/tests/square_customer_payment_browse.test.sql');
   const fixturePath = 'supabase/tests/fixtures/qbo-production-native.sql';
   const fixture = fs.existsSync(path.join(root, fixturePath)) ? snapshot(fixturePath) : undefined;
   // Read once before starting PostgreSQL: concurrent edits cannot change a run's inputs.
@@ -193,6 +345,7 @@ async function main() {
     try { return snapshot(`supabase/tests/${name}`); }
     catch (error) { if (error.code !== 'ENOENT') throw error; return { file: `supabase/tests/${name}`, missing: true }; }
   });
+  const dashboardSnapshots = dashboardSuites.map(suite => ({ ...snapshot(suite.file), ...suite }));
   const evidence = fs.mkdtempSync(path.join(fs.realpathSync('/tmp'), 'qbo-candidate-evidence-'));
   const report = { startedAt: new Date().toISOString(), productionAccess: false,
     retiredMigrationExcluded: '20260926232356_square_production_customer_first_read.sql',
@@ -200,9 +353,20 @@ async function main() {
       'scripts/run-square-durable-page-qualification.js', 'supabase/tests/fixtures/square-durable-platform.sql']
       .map(file => { const value = snapshot(file); return { file, sha256: value.sha256 }; }),
     candidateHashes: qbo.map(({ file, sha256 }) => ({ file, sha256 })),
+    dashboardCandidateHashes: dashboard.map(({ file, sha256 }) => ({ file, sha256 })),
+    squareDashboardFixture: { file: squareFixture.file, sha256: squareFixture.sha256 },
     sharedFixture: fixture && { file: fixture.file, sha256: fixture.sha256 }, runs: [] };
   const save = () => fs.writeFileSync(path.join(evidence, 'results.json'), JSON.stringify(report, null, 2));
   for (const shape of [{ name: 'canonical', migrations: canonical }, { name: 'production', migrations: [...prefix, ...square] }]) {
+    const plan = dashboardPlan(shape.name);
+    const shapeSuites = [...suites, ...plan.suites.map(suite => {
+      if (suite.file === squareDependencySuite.file) return {
+        ...squareDependencySuite, sha256: dashboard.find(item => path.basename(item.file) === dashboardMigrations.square).sha256,
+      };
+      const saved = dashboardSnapshots.find(item => item.file === suite.file);
+      assert.ok(saved, 'every planned dashboard suite must have a captured SQL snapshot');
+      return saved;
+    })];
     const result = { shape: shape.name, migrations: [], suites: [], failures: [], stopped: false };
     report.runs.push(result);
     let stage = 'owned_cluster';
@@ -238,8 +402,11 @@ async function main() {
         for (const item of qbo) await apply(item);
         assert.equal(await squareCatalog(client), before, 'QBO candidates preserve the Square catalog');
         result.squareCatalogSha256 = before;
+        // Square's new read projection is intentionally outside the QBO-only
+        // catalog comparison; all original lifecycle/ledger guards remain on.
+        for (const name of plan.migrations) await apply(dashboard.find(item => path.basename(item.file) === name));
         result.finalLedger = [...ledger].sort();
-        console.log(`${shape.name}: ${shape.migrations.length}+${qbo.length} unchanged migrations applied; exact ledger and Square catalog verified.`);
+        console.log(`${shape.name}: ${shape.migrations.length}+${qbo.length}+${plan.migrations.length} migrations applied; exact ledger and QBO-only Square catalog guard verified.`);
         // pgTAP's test metadata ACLs are not part of the pristine migration catalog.
         await client.query('create extension if not exists pgtap with schema extensions');
         // OAuth spans commits. A clean template clone per suite prevents fixture
@@ -249,7 +416,7 @@ async function main() {
         await manager.connect();
         result.databaseIsolation = 'fresh-template-clone-per-suite';
         try {
-        for (const suite of [...suites, { file: 'native_scheduler_concurrency', concurrency: true },
+        for (const suite of [...shapeSuites, { file: 'native_scheduler_concurrency', concurrency: true },
           { file: 'native_accounting_qualification', accounting: true }, pendingSuite, eligibilitySuite]) {
           stage = suite.file;
           const outcome = { file: suite.file, sha256: suite.accounting
@@ -267,7 +434,16 @@ async function main() {
             await manager.query(`alter database ${quote(clone)} set search_path=public,extensions`);
             const config = { ...db.connection, database: clone };
             const connectionSetting = candidateDblinkSetting(runtime.targetKind, db.connection, clone);
-            if (suite.eligibility) {
+            if (suite.dashboard) {
+              runner = new Client({ ...config, connectionTimeoutMillis: 5000, statement_timeout: 60000 });
+              await runner.connect();
+              Object.assign(outcome, await executeDashboardSuite(runner, suite, {
+                qboFixture: fixture?.sql, squareFixture: squareFixture.sql,
+                squareMigration: dashboard.find(item => path.basename(item.file) === dashboardMigrations.square).sql,
+              }, lines));
+              assert.equal(outcome.assertions, suite.expectedAssertions, 'all registered dashboard assertions must complete');
+              outcome.passed = true;
+            } else if (suite.eligibility) {
               runner = new Client({ ...config, connectionTimeoutMillis: 5000, statement_timeout: 60000 });
               await runner.connect();
               outcome.assertions = await require('./qbo-pending-cancellation-eligibility-database-tests.cjs').qualify({ client: runner, connection: config });
@@ -325,7 +501,7 @@ async function main() {
         position: error.position, internalPosition: error.internalPosition }));
     }
     if (result.nativeDirectory) result.stopped = !fs.existsSync(path.join(result.nativeDirectory, 'data/postmaster.pid'));
-    result.passed = result.stopped && result.failures.length === 0 && result.suites.length === suites.length + 4 && result.suites.every(suite => suite.passed);
+    result.passed = result.stopped && result.failures.length === 0 && result.suites.length === shapeSuites.length + 4 && result.suites.every(suite => suite.passed);
     save();
   }
   report.passed = report.runs.every(run => run.passed);
@@ -336,4 +512,6 @@ async function main() {
 }
 
 if (require.main === module) main().catch(error => { console.error(error); process.exitCode = 1; });
-module.exports = { checkTap, expandFixture, suiteRequests, candidateDblinkSetting, candidates, pendingSuite, eligibilitySuite };
+module.exports = { checkTap, expandFixture, suiteRequests, candidateDblinkSetting, candidates, pendingSuite, eligibilitySuite,
+  dashboardMigrations, dashboardSuites, dashboardPlan, checkDashboardAssertionNames, composeSquareIdentitySuite, executeDashboardSuite,
+  preferenceAssertionNames, reportingTimezoneAssertionNames, squareIdentityAssertionNames, squareCatalog };

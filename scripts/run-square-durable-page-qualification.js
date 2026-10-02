@@ -196,6 +196,7 @@ async function migrationQualification(target, administrator) {
   const productionLegacyGuardTail = files.filter(name => name === "20260915040500_integration_production_legacy_foundation_guard.sql");
   const sheetsCompleteTail = files.filter(name => name === "20261002040024_google_sheets_complete.sql");
   const sheetsLifecycleTail = files.filter(name => name === "20261002040031_google_sheets_lifecycle.sql");
+  const preferencesTail = files.filter(name => name === "20261002182049_integration_summary_preferences.sql");
   equal(added.length, 2, "both additive Square migrations present");
   equal(accountTail.length, 1, "account-connection migration present");
   equal(remoteTail.length, 1, "remote Sandbox binding migration present");
@@ -216,7 +217,8 @@ async function migrationQualification(target, administrator) {
   equal(productionLegacyGuardTail.length, 1, "legacy all-in-one Production state has a forward rejection guard");
   equal(sheetsCompleteTail.length, 1, "separately qualified Google Sheets connector migration present");
   equal(sheetsLifecycleTail.length, 1, "separately qualified Google Sheets lifecycle migration present");
-  equal(baseline.length + added.length + accountTail.length + remoteTail.length + brokerTail.length + gcpTail.length + recoveryTail.length + mappedTail.length + mappedFenceTail.length + observationTail.length + interpretationTail.length + evidenceTail.length + cardTail.length + operationalTail.length + productionFoundationTail.length + productionOverlayTail.length + productionInternalRuntimeTail.length + productionFoundationMarkerTail.length + productionLegacyGuardTail.length + sheetsCompleteTail.length + sheetsLifecycleTail.length, files.length, "migration manifest is explicit");
+  equal(preferencesTail.length, 1, "separately qualified personal summary preferences migration present");
+  equal(baseline.length + added.length + accountTail.length + remoteTail.length + brokerTail.length + gcpTail.length + recoveryTail.length + mappedTail.length + mappedFenceTail.length + observationTail.length + interpretationTail.length + evidenceTail.length + cardTail.length + operationalTail.length + productionFoundationTail.length + productionOverlayTail.length + productionInternalRuntimeTail.length + productionFoundationMarkerTail.length + productionLegacyGuardTail.length + sheetsCompleteTail.length + sheetsLifecycleTail.length + preferencesTail.length, files.length, "migration manifest is explicit");
   const clean = await createDatabase(target, administrator, "clean");
   await applyMigrations(clean.client, baseline);
   const before = await sourceSchemaFingerprint(clean.client);

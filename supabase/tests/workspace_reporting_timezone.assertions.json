@@ -1,0 +1,17 @@
+[
+  "active owner saves reporting timezone through authenticated update",
+  "active owner can restore unconfigured timezone",
+  "owner cannot update an unrelated workspace timezone",
+  "timezone grant does not grant auth-bearing column updates",
+  "admin cannot bypass owner-only timezone setter through direct update",
+  "admin no-op timezone update is also denied",
+  "admin combined timezone and safe-column update is atomic and denied",
+  "denied timezone update leaves all workspace fields unchanged",
+  "existing admin safe-column update remains allowed",
+  "viewer cannot update reporting timezone",
+  "staff cannot update reporting timezone",
+  "disabled owner cannot update reporting timezone",
+  "missing authenticated subject cannot update reporting timezone",
+  "anonymous RLS cannot update reporting timezone",
+  "timezone constraint does not widen private helper access"
+]

@@ -5,7 +5,9 @@ const path = require('node:path');
 const os = require('node:os');
 const { spawnSync } = require('node:child_process');
 const vm = require('node:vm');
-const { checkTap, expandFixture, suiteRequests, candidateDblinkSetting, candidates, pendingSuite, eligibilitySuite } = require('./run-qbo-production-candidate-database-tests.cjs');
+const { checkTap, expandFixture, suiteRequests, candidateDblinkSetting, candidates, pendingSuite, eligibilitySuite,
+  dashboardMigrations, dashboardSuites, dashboardPlan, checkDashboardAssertionNames, composeSquareIdentitySuite, executeDashboardSuite,
+  preferenceAssertionNames, reportingTimezoneAssertionNames, squareIdentityAssertionNames } = require('./run-qbo-production-candidate-database-tests.cjs');
 const { verifyLocalContext, verifyOwnedContainer, verifyBridgeGateway } = require('./qbo-candidate-local-container.cjs');
 let assertions = 0;
 assert.equal(candidates.at(-2), '20261002012700_qbo_customer_pending_attempt_control.sql'); assertions++;
@@ -22,7 +24,80 @@ assert.match(candidateRunner, /outcome\.assertions = await require\('\.\/qbo-pen
 assert.match(candidateRunner, /outcome\.assertions = await require\('\.\/qbo-pending-cancellation-eligibility-database-tests\.cjs'\)\.qualify\(\{ client: runner, connection: config \}\)/,
   'eligibility tests use the owned per-suite database clone'); assertions++;
 assert.match(candidateRunner, /assert\.equal\(outcome\.assertions, suite\.expectedScenarios/, 'incomplete native coverage fails the candidate run'); assertions++;
-assert.match(candidateRunner, /result\.suites\.length === suites\.length \+ 4/, 'candidate success requires all four native suites'); assertions++;
+assert.match(candidateRunner, /result\.suites\.length === shapeSuites\.length \+ 4/, 'candidate success requires the registered dashboard suites and all four existing native suites'); assertions++;
+assert.match(candidateRunner, /assert\.equal\(canonical\.length, 123,/, 'canonical count remains exact'); assertions++;
+assert.match(candidateRunner, /'20261002040024_google_sheets_complete\.sql',\s*'20261002040031_google_sheets_lifecycle\.sql',\s*'20261002182049_integration_summary_preferences\.sql',/,
+  'canonical tail remains the two Sheets migrations plus preferences'); assertions++;
+assert.match(candidateRunner, /assert\.equal\(prefix\.length, 104,/, 'production baseline remains exactly 104'); assertions++;
+assert.ok(candidateRunner.indexOf('for (const item of qbo) await apply(item);')
+  < candidateRunner.indexOf("assert.equal(await squareCatalog(client), before")); assertions++;
+assert.ok(candidateRunner.indexOf("assert.equal(await squareCatalog(client), before")
+  < candidateRunner.indexOf('for (const name of plan.migrations) await apply('),
+  'new Square projection follows, never weakens, the QBO-versus-Square catalog check'); assertions++;
+assert.deepEqual(dashboardMigrations, {
+  preferences: '20261002182049_integration_summary_preferences.sql',
+  square: '20261002182147_square_customer_browse_identity.sql',
+  qbo: '20261002182746_qbo_customer_dashboard_metadata.sql',
+}); assertions++;
+const canonicalDashboard = dashboardPlan('canonical'), productionDashboard = dashboardPlan('production');
+assert.deepEqual(canonicalDashboard.migrations, [dashboardMigrations.qbo],
+  'canonical preferences are already installed and Square direct browse is unavailable'); assertions++;
+assert.deepEqual(productionDashboard.migrations, [dashboardMigrations.preferences, dashboardMigrations.square, dashboardMigrations.qbo]); assertions++;
+assert.deepEqual(productionDashboard.suites, dashboardSuites); assertions++;
+assert.deepEqual(dashboardSuites.map(suite => [suite.file, suite.expectedAssertions]), [
+  ['supabase/tests/qbo_customer_dashboard_metadata.test.sql', 55],
+  ['supabase/tests/integration_summary_preferences.test.sql', 45],
+  ['supabase/tests/workspace_reporting_timezone.test.sql', 15],
+  ['supabase/tests/square_customer_browse_identity.test.sql', 33],
+]); assertions++;
+assert.deepEqual(canonicalDashboard.suites.slice(0, 3), dashboardSuites.slice(0, 3)); assertions++;
+assert.deepEqual(canonicalDashboard.suites[3], {
+  file: 'canonical_square_identity_dependency_denial', dashboard: 'square-dependency', expectedAssertions: 3,
+}); assertions++;
+for (const unknown of ['', 'sandbox', 'other', null]) { assert.throws(() => dashboardPlan(unknown)); assertions++; }
+for (const shape of [canonicalDashboard, productionDashboard]) {
+  assert.equal(new Set(shape.migrations).size, shape.migrations.length); assertions++;
+  assert.ok(shape.migrations.every(name => !candidates.includes(name)), 'dashboard migrations are never replayed as QBO candidates'); assertions++;
+}
+for (const [kind, names, total] of [['preferences', preferenceAssertionNames, 45],
+  ['reporting-timezone', reportingTimezoneAssertionNames, 15], ['square', squareIdentityAssertionNames, 33]]) {
+  assert.equal(checkDashboardAssertionNames(kind, names), total); assertions++;
+  assert.equal(new Set(names).size, total, 'named assertions are individually identified'); assertions++;
+  for (const altered of [[], names.slice(1), [...names, names[0]], [...names].reverse(), ['unregistered', ...names.slice(1)]]) {
+    assert.throws(() => checkDashboardAssertionNames(kind, altered)); assertions++;
+  }
+}
+assert.throws(() => checkDashboardAssertionNames('unknown', preferenceAssertionNames)); assertions++;
+assert.throws(() => checkDashboardAssertionNames('reporting-timezone', preferenceAssertionNames)); assertions++;
+assert.throws(() => checkDashboardAssertionNames('preferences', reportingTimezoneAssertionNames)); assertions++;
+for (const [file, names] of [['integration_summary_preferences', preferenceAssertionNames], ['workspace_reporting_timezone', reportingTimezoneAssertionNames]]) {
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(__dirname, `../supabase/tests/${file}.assertions.json`), 'utf8')), names,
+    'reviewed handoff manifest matches the fixed native runner labels'); assertions++;
+}
+const squareBrowseFixture = fs.readFileSync(path.join(__dirname, '../supabase/tests/square_customer_payment_browse.test.sql'), 'utf8');
+const squareIdentitySql = fs.readFileSync(path.join(__dirname, '../supabase/tests/square_customer_browse_identity.test.sql'), 'utf8');
+const composedIdentity = composeSquareIdentitySuite(squareIdentitySql, squareBrowseFixture);
+const squareSeed = squareBrowseFixture.slice(0, squareBrowseFixture.indexOf('\ncreate temp table browse_before as select\n'));
+assert.ok(composedIdentity.startsWith(squareSeed + '\n'), 'real Square helpers and seed are preserved verbatim'); assertions++;
+assert.ok(!composedIdentity.includes('create temp table browse_before'), 'only the existing seed is composed, without running the unrelated browse suite'); assertions++;
+assert.ok(composedIdentity.endsWith(squareIdentitySql.slice(squareIdentitySql.indexOf('-- Same labels'))),
+  'all Square identity assertions and rollback remain byte-for-byte intact'); assertions++;
+assert.match(composedIdentity, /timezone,created_by,updated_by\) values\n  \('aaaaaaaa-9999/,
+  'native fixture supplies required authors without changing schema constraints'); assertions++;
+assert.throws(() => composeSquareIdentitySuite(squareIdentitySql, 'begin;')); assertions++;
+assert.throws(() => composeSquareIdentitySuite(squareIdentitySql, squareBrowseFixture + squareBrowseFixture)); assertions++;
+assert.throws(() => composeSquareIdentitySuite('select 1;', squareBrowseFixture)); assertions++;
+assert.throws(() => composeSquareIdentitySuite(squareIdentitySql + '\n\\connect external', squareBrowseFixture)); assertions++;
+for (const suite of dashboardSuites) {
+  assert.ok(fs.existsSync(path.join(__dirname, '..', suite.file)), 'registered dashboard SQL suite exists'); assertions++;
+}
+const prefCanonical = fs.readFileSync(path.join(__dirname, '../supabase/migrations', dashboardMigrations.preferences));
+assert.deepEqual(fs.readFileSync(path.join(__dirname, '../supabase/production-migrations', dashboardMigrations.preferences)), prefCanonical,
+  'both layouts use exactly the same preference SQL'); assertions++;
+for (const name of [dashboardMigrations.square, dashboardMigrations.qbo]) {
+  assert.ok(!fs.existsSync(path.join(__dirname, '../supabase/migrations', name)), 'dependent projections are not in canonical bootstrap'); assertions++;
+  assert.ok(fs.lstatSync(path.join(__dirname, '../supabase/production-migrations', name)).isFile()); assertions++;
+}
 const workflow = fs.readFileSync(path.join(__dirname, '../.github/workflows/ci.yml'), 'utf8');
 assert.match(workflow.slice(workflow.indexOf('  security-database:')), /Qualify QBO completion on canonical and exact Production migration shapes[\s\S]*run: pnpm test:qbo-production-database --supabase-local/,
   'hosted security-database CI runs the candidate chain and pending scenarios'); assertions++;
@@ -270,6 +345,51 @@ function startupShellTests(script) {
     assert.ok(script.indexOf('rm /tmp/qbo-candidate-password') < script.indexOf('exec postgres '), 'remove password file before startup'); assertions++;
   } finally { fs.rmSync(directory, { recursive: true, force: true }); }
 }
-containerLifecycleTests().then(() => {
+async function dashboardExecutionTests() {
+  for (const failure of [null, 'wrong-code', 'wrong-message', 'accepted', 'changed-ledger', 'existing-browse']) {
+    let calls = 0, rolledBack = false;
+    const client = { async query(sql) {
+      if (sql === 'square-migration') {
+        if (failure === 'accepted') return { rows: [] };
+        throw Object.assign(new Error(failure === 'wrong-message' ? 'unrelated_error' : 'square_customer_identity_requires_browse'),
+          { code: failure === 'wrong-code' ? '42501' : '55000' });
+      }
+      if (sql === 'rollback') { rolledBack = true; return { rows: [] }; }
+      calls++;
+      return { rows: [{ schema: null, browse: failure === 'existing-browse' ? 'unexpected' : null,
+        ledger: failure === 'changed-ledger' && calls > 1 ? ['changed'] : ['unchanged'] }] };
+    } };
+    const work = () => executeDashboardSuite(client, canonicalDashboard.suites[3], { squareMigration: 'square-migration' }, []);
+    if (failure) { await assert.rejects(work); assertions++; }
+    else { assert.equal((await work()).assertions, 3); assertions++; }
+    assert.equal(rolledBack, failure !== 'existing-browse', 'expected prerequisite denial always rolls back before catalog inspection'); assertions++;
+  }
+  for (const kind of ['preferences', 'reporting-timezone', 'square']) {
+    const suite = { ...dashboardSuites.find(item => item.dashboard === kind),
+      sql: kind === 'square' ? squareIdentitySql : 'select preference-fixture;' };
+    const names = kind === 'square' ? squareIdentityAssertionNames
+      : kind === 'reporting-timezone' ? reportingTimezoneAssertionNames : preferenceAssertionNames;
+    let listener, removed = false;
+    const lines = [];
+    const client = {
+      on(event, callback) { assert.equal(event, 'notice'); listener = callback; },
+      removeListener(event, callback) { assert.equal(callback, listener); removed = true; },
+      async query() {
+        if (kind === 'square') for (const name of names) listener({ message: 'square_backend_test_passed:' + name });
+        return [{ rows: kind === 'square' ? [] : names.map(preference_assert => ({ preference_assert })) }];
+      },
+    };
+    const result = await executeDashboardSuite(client, suite, { squareFixture: squareBrowseFixture }, lines);
+    assert.equal(result.assertions, names.length); assertions++;
+    assert.equal(lines.length, names.length); assertions++;
+    assert.ok(removed, 'notice listener never leaks across suites'); assertions++;
+    client.query = async () => { throw new Error('synthetic SQL assertion failed'); };
+    removed = false;
+    await assert.rejects(() => executeDashboardSuite(client, suite, { squareFixture: squareBrowseFixture }, [])); assertions++;
+    assert.ok(removed, 'SQL assertion failure still removes the listener'); assertions++;
+  }
+  await assert.rejects(() => executeDashboardSuite({}, { file: 'unregistered', dashboard: 'preferences' }, {}, [])); assertions++;
+}
+dashboardExecutionTests().then(containerLifecycleTests).then(() => {
   console.log(`QBO candidate runner: ${assertions} assertions passed; no database or network used.`);
 }).catch(error => { console.error(error); process.exitCode = 1; });

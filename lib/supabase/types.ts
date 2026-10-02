@@ -2334,6 +2334,7 @@ export type Database = {
           industry: string | null;
           size: string | null;
           logo_url: string | null;
+          reporting_timezone?: string | null;
           primary_contact_name: string | null;
           primary_contact_email: string | null;
           created_by: string | null;
@@ -2351,6 +2352,7 @@ export type Database = {
           industry?: string | null;
           size?: string | null;
           logo_url?: string | null;
+          reporting_timezone?: string | null;
           primary_contact_name?: string | null;
           primary_contact_email?: string | null;
           created_by?: string | null;
