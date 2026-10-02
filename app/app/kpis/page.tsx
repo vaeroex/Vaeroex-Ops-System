@@ -1124,7 +1124,7 @@ function KpiSettingHiddenFields({
       <input type="hidden" name="display_unit" value={setting?.display_unit ?? ""} />
       <input type="hidden" name="value_format" value={setting?.value_format ?? ""} />
       <input type="hidden" name="x_axis_label" value={setting?.x_axis_label ?? "Date"} />
-      <input type="hidden" name="y_axis_label" value={setting?.y_axis_label ?? metricName} />
+      <input type="hidden" name="y_axis_label" value={setting?.y_axis_label ?? metricName.slice(0, 80)} />
       <input type="hidden" name="preferred_chart_type" value={setting?.preferred_chart_type ?? "line"} />
       <input type="hidden" name="is_visible" value={(setting?.is_visible ?? true) ? "true" : "false"} />
     </>
@@ -1464,7 +1464,7 @@ function KpiChartSettingsForm({
         Y-axis label
         <input
           name="y_axis_label"
-          defaultValue={setting?.y_axis_label ?? metricName}
+          defaultValue={setting?.y_axis_label ?? metricName.slice(0, 80)}
           className="mt-2 min-h-11 w-full rounded-lg border border-white/10 bg-slate-950/70 px-3 py-2 text-sm normal-case tracking-normal text-slate-100 outline-none focus:border-vaeroex-accent"
         />
       </label>

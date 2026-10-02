@@ -3,6 +3,7 @@ const fs = require("fs");
 const Module = require("module");
 const path = require("path");
 const ts = require("typescript");
+const { renderToStaticMarkup } = require("react-dom/server");
 
 const root = path.resolve(__dirname, "..");
 const workspaceId = "preview-workspace";
@@ -113,9 +114,9 @@ const supabase = {
   }
 };
 
-function loadTypescriptModule(relativePath, mocks = {}) {
+function loadTypescriptModule(relativePath, mocks = {}, sourceOverride) {
   const file = path.join(root, relativePath);
-  const output = ts.transpileModule(fs.readFileSync(file, "utf8"), {
+  const output = ts.transpileModule(sourceOverride ?? fs.readFileSync(file, "utf8"), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true, jsx: ts.JsxEmit.ReactJSX },
     fileName: file
   }).outputText;
@@ -133,6 +134,41 @@ function loadTypescriptModule(relativePath, mocks = {}) {
     Module._load = originalLoad;
   }
   return loaded.exports;
+}
+
+// Render the actual form inputs, including the dedicated settings page's local
+// default initializer, so this check cannot pass with a test-only fallback.
+function yAxisInputRenderers(relativePath, expectedCount) {
+  const source = fs.readFileSync(path.join(root, relativePath), "utf8");
+  const ast = ts.createSourceFile(relativePath, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const inputs = [];
+  let yAxisInitializer;
+  function visit(node) {
+    if (ts.isVariableDeclaration(node) && node.name.getText(ast) === "yAxisLabel") {
+      yAxisInitializer = node.initializer.getText(ast);
+    }
+    if (ts.isJsxSelfClosingElement(node) && node.tagName.getText(ast) === "input" && node.attributes.properties.some((attribute) => (
+      ts.isJsxAttribute(attribute) && attribute.name.text === "name" && attribute.initializer && ts.isStringLiteral(attribute.initializer) && attribute.initializer.text === "y_axis_label"
+    ))) inputs.push(node.getText(ast));
+    ts.forEachChild(node, visit);
+  }
+  visit(ast);
+  assert.equal(inputs.length, expectedCount, `${relativePath} must exercise every Y-axis input.`);
+  return inputs.map((input) => {
+    const component = loadTypescriptModule(relativePath, {}, `
+      export function renderInput(metricName, setting) {
+        const metric = metricName;
+        ${yAxisInitializer ? `const yAxisLabel = ${yAxisInitializer};` : ""}
+        return (${input});
+      }
+    `).renderInput;
+    return (metricName, setting) => {
+      const html = renderToStaticMarkup(component(metricName, setting));
+      const value = html.match(/\bvalue="([^"]*)"/);
+      assert.ok(value, "The actual input must serialize a form value.");
+      return value[1];
+    };
+  });
 }
 
 const redirect = (location) => {
@@ -345,7 +381,49 @@ function assertSingleCanonicalRow() {
   assert.equal(persistedRows.find((row) => row.id === "manual-color").color, "#EF4444", "caller selection must not promote a user color back to automatic");
   assert.equal(persistedRows.find((row) => row.id === "manual-color").color_source, "user");
 
-  console.log("KPI target, direction, recommendation, and legacy color persistence integration passed.");
+  const longMetricName = "Google Sheets Test Orders Shipped - Google Sheets Test Business Entity - North Location - test0001";
+  assert.ok(longMetricName.length > 80 && longMetricName.length <= 160);
+  const renderers = [
+    ...yAxisInputRenderers("app/app/kpis/page.tsx", 2),
+    ...yAxisInputRenderers("app/app/kpis/settings/page.tsx", 1)
+  ];
+  for (const renderInput of renderers) {
+    for (const unset of [undefined, { y_axis_label: null }]) {
+      assert.equal(renderInput(longMetricName, unset), longMetricName.slice(0, 80), "Generated labels must satisfy the unchanged server limit.");
+      assert.equal(renderInput("Orders shipped", unset), "Orders shipped", "Short generated labels stay unchanged.");
+    }
+    for (const savedLabel of ["Orders shipped", "", "A".repeat(81)]) {
+      assert.equal(renderInput(longMetricName, { y_axis_label: savedLabel }), savedLabel, "Explicit stored labels are not rewritten.");
+    }
+    const directionForm = formDataFor({
+      kpi_name: longMetricName,
+      canonical_name: "google_sheets_test_orders_shipped",
+      display_name: longMetricName,
+      unit_type: "count",
+      display_unit: "orders",
+      semantic_unit: "count",
+      target: "150",
+      desired_direction: "maximize",
+      target_behavior: "minimum_goal",
+      y_axis_label: renderInput(longMetricName, undefined)
+    });
+    const longNameRedirect = await submit(directionForm);
+    assert.match(longNameRedirect, /message=KPI\+settings\+updated\./, "Each actual form default must allow direction confirmation for a long imported metric.");
+    const saved = persistedRows.find((row) => row.workspace_id === workspaceId && row.kpi_name === longMetricName);
+    assert.equal(saved.display_name, longMetricName, "Bounding the chart label must preserve full metric identity.");
+    assert.equal(saved.y_axis_label, longMetricName.slice(0, 80).trim());
+    assert.equal(saved.target, 150);
+    assert.equal(saved.desired_direction, "maximize");
+    assert.equal(saved.classification_confirmed, true);
+    assert.equal(saved.classification_source, "user");
+  }
+  assert.equal(persistedRows.filter((row) => row.workspace_id === workspaceId && row.kpi_name === longMetricName).length, 1);
+  const countBeforeInvalidLabel = submittedPayloads.length;
+  const invalidLabelRedirect = await submit(formDataFor({ y_axis_label: "A".repeat(81) }));
+  assert.match(invalidLabelRedirect, /error=Y-axis\+label\+must\+be\+80\+characters\+or\+fewer/);
+  assert.equal(submittedPayloads.length, countBeforeInvalidLabel, "An explicit overlong label must still be rejected before persistence.");
+
+  console.log("KPI target, direction, recommendation, legacy color, and long-name chart label persistence integration passed.");
 })().catch((error) => {
   console.error(error);
   process.exitCode = 1;
