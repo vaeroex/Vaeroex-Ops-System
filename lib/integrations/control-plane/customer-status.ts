@@ -4,13 +4,13 @@ export type IntegrationConnectionSummaryRow = Readonly<{
   safe_display_name: string;
   status: string;
   status_changed_at: string;
-  granted_scopes?: readonly string[];
+  can_cancel_pending?: boolean;
 }>;
 
-// This only selects a UI action. The cancellation RPC proves no consent/effects.
+// Read-only database eligibility selects the action; cancellation rechecks it under lock.
 export function canOfferPendingCancellation(connection: IntegrationConnectionSummaryRow) {
-  return connection.status === "pending_authorization" ||
-    (connection.status === "error" && connection.granted_scopes?.length === 0);
+  return connection.can_cancel_pending === true &&
+    ["pending_authorization", "error"].includes(connection.status);
 }
 
 export type IntegrationFreshnessSummaryRow = Readonly<{

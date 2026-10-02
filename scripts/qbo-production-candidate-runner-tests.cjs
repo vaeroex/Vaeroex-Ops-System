@@ -5,19 +5,24 @@ const path = require('node:path');
 const os = require('node:os');
 const { spawnSync } = require('node:child_process');
 const vm = require('node:vm');
-const { checkTap, expandFixture, suiteRequests, candidateDblinkSetting, candidates, pendingSuite } = require('./run-qbo-production-candidate-database-tests.cjs');
+const { checkTap, expandFixture, suiteRequests, candidateDblinkSetting, candidates, pendingSuite, eligibilitySuite } = require('./run-qbo-production-candidate-database-tests.cjs');
 const { verifyLocalContext, verifyOwnedContainer, verifyBridgeGateway } = require('./qbo-candidate-local-container.cjs');
 let assertions = 0;
-assert.equal(candidates.at(-1), '20261002012700_qbo_customer_pending_attempt_control.sql'); assertions++;
+assert.equal(candidates.at(-2), '20261002012700_qbo_customer_pending_attempt_control.sql'); assertions++;
+assert.equal(candidates.at(-1), '20261002025212_qbo_customer_pending_cancellation_eligibility.sql'); assertions++;
 assert.equal(new Set(candidates).size, candidates.length, 'each candidate is applied once per migration shape'); assertions++;
 assert.deepEqual(pendingSuite, { file: 'scripts/qbo-pending-connection-database-tests.cjs', pending: true, expectedScenarios: 14 }); assertions++;
 assert.ok(fs.existsSync(path.join(__dirname, '..', pendingSuite.file)), 'registered native suite exists'); assertions++;
+assert.deepEqual(eligibilitySuite, { file: 'scripts/qbo-pending-cancellation-eligibility-database-tests.cjs', eligibility: true, expectedScenarios: 19 }); assertions++;
+assert.ok(fs.existsSync(path.join(__dirname, '..', eligibilitySuite.file)), 'registered eligibility suite exists'); assertions++;
 const candidateRunner = fs.readFileSync(path.join(__dirname, 'run-qbo-production-candidate-database-tests.cjs'), 'utf8');
-assert.match(candidateRunner, /accounting: true \}, pendingSuite\]/, 'pending tests run with the required candidate suites'); assertions++;
+assert.match(candidateRunner, /accounting: true \}, pendingSuite, eligibilitySuite\]/, 'pending and eligibility tests run with the required candidate suites'); assertions++;
 assert.match(candidateRunner, /outcome\.assertions = await require\('\.\/qbo-pending-connection-database-tests\.cjs'\)\.qualify\(\{ client: runner, connection: config \}\)/,
   'pending tests use the owned per-suite database clone'); assertions++;
+assert.match(candidateRunner, /outcome\.assertions = await require\('\.\/qbo-pending-cancellation-eligibility-database-tests\.cjs'\)\.qualify\(\{ client: runner, connection: config \}\)/,
+  'eligibility tests use the owned per-suite database clone'); assertions++;
 assert.match(candidateRunner, /assert\.equal\(outcome\.assertions, suite\.expectedScenarios/, 'incomplete native coverage fails the candidate run'); assertions++;
-assert.match(candidateRunner, /result\.suites\.length === suites\.length \+ 3/, 'candidate success requires all three native suites'); assertions++;
+assert.match(candidateRunner, /result\.suites\.length === suites\.length \+ 4/, 'candidate success requires all four native suites'); assertions++;
 const workflow = fs.readFileSync(path.join(__dirname, '../.github/workflows/ci.yml'), 'utf8');
 assert.match(workflow.slice(workflow.indexOf('  security-database:')), /Qualify QBO completion on canonical and exact Production migration shapes[\s\S]*run: pnpm test:qbo-production-database --supabase-local/,
   'hosted security-database CI runs the candidate chain and pending scenarios'); assertions++;

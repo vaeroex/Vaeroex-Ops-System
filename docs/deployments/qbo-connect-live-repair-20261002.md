@@ -57,14 +57,28 @@ on desktop/mobile and the Integrations layout at 1440/390/320px. These are synth
 checks, not evidence of a repaired deployed browser flow. Native cancellation and
 duplicate-start concurrency are also registered in hosted `security-database`.
 
-Independent review identified an unfinished error-attempt cancellation gap. The
-UI now offers cancellation for pending attempts and error attempts without granted
-scopes; the database independently proves lack of consent/effects before mutation.
+Independent review identified that empty granted scopes do not prove an attempt
+is unconsented: a consumed callback or uncertain exchange can still have empty
+scopes. The UI now requires an owner/session-authorized, read-only database
+eligibility result using the same existing unconsented predicate as cancellation.
+Missing or denied eligibility hides the action without changing the status label.
+The cancellation operation still rechecks consent/effects under lock at mutation.
 React review retained server-side tenant reads, minimal client forms, cleaned-up
 event listeners, synchronous submission locks, accessible status/error messages,
 and hydration-safe disabled OAuth submission.
 
-This record describes a candidate, not a completed deployment. Before release:
+Production applied `20261002012700_qbo_customer_pending_attempt_control.sql`
+from reviewed head `f329fe76ea2110d9ed2fc36e9e9c2e44e4948966` after exact-head
+CI 1544 passed. The private receipt verifies 114 applied migrations, an empty dry
+run, one ledger entry and unchanged protected records. The read-only eligibility
+projection is a separate forward migration; the applied migration is unchanged.
+The projection passed 38 focused native PostgreSQL scenarios (19 per migration
+layout), including consumed/recovery error denial, active-entity checks, owner and
+session isolation, read-only execution and unchanged protected rows. All 330
+candidate-runner assertions passed. UI regressions cover both management surfaces,
+non-owner reads, missing/failed/mismatched eligibility, and narrow result types.
+
+This record describes a candidate, not a completed application deployment. Before release:
 require focused regressions, real PostgreSQL concurrency/cancellation qualification,
 normal exact-head hosted checks, migration dry-run/application and protected merge.
 Then verify the actual signed-in desktop/mobile flow reaches legitimate Intuit

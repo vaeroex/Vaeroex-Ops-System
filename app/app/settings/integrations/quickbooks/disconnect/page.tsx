@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 
 import { AuthMessage } from "@/components/auth/AuthMessage";
 import { QboCancelPendingForm } from "@/components/integrations/QboCancelPendingForm";
+import { withQuickBooksPendingCancellation } from "@/app/app/integrations/_qbo";
 import { canOfferPendingCancellation } from "@/lib/integrations/control-plane/customer-status";
 import { StatusBadge } from "@/components/operations/StatusBadge";
 import { PageHeader } from "@/components/operations/PageHeader";
@@ -55,16 +56,18 @@ export default async function QuickBooksDisconnectPage({
   if (!qboProductionCustomerConnectionsEnabled()) notFound();
 
   const params = await searchParams;
-  const { context, supabase, workspaceId } = await requireWorkspacePage();
+  const access = await requireWorkspacePage();
+  const { context, supabase, workspaceId } = access;
   const canManage = context.membership?.role === "owner";
-  const { data: connections } = await supabase
+  const { data: summaries } = await supabase
     .from("integration_connection_summaries")
-    .select("id,provider_key,safe_display_name,status,status_changed_at,granted_scopes")
+    .select("id,provider_key,safe_display_name,status,status_changed_at")
     .eq("workspace_id", workspaceId)
     .eq("provider_key", "quickbooks_online")
     .eq("provider_environment", "production")
     .neq("status", "deleted")
     .order("status_changed_at", { ascending: false });
+  const connections = await withQuickBooksPendingCancellation(access, summaries ?? []);
   const message = params?.result ? resultMessages[params.result] : undefined;
   const error = params?.error ? errorMessages[params.error] : undefined;
 

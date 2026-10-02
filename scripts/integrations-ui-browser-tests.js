@@ -26,7 +26,8 @@ async function main() {
       assert.equal(request.method, "GET", "preview forbids mutations");
       const url = new URL(request.url, "http://127.0.0.1");
       assert(Object.hasOwn(routes, url.pathname));
-      const h = harness({ pathname: url.pathname, connections: url.searchParams.has("empty") ? [] : [connection("pending_authorization")] });
+      const h = harness({ pathname: url.pathname, connections: url.searchParams.has("empty") ? [] : [connection("pending_authorization")],
+        cancellations: [{ connection_id: "connection-a", can_cancel: true }] });
       const { AppNavigation } = h.load("components/app/AppNavigation.tsx");
       const sections = [{ label: "Primary", collapsible: false, items: [
         { href: "/app/integrations", label: "Integrations" }, { href: "/app/settings", label: "Settings" }
@@ -64,6 +65,7 @@ async function main() {
       await page.getByRole("link", { name: "Manage QuickBooks", exact: true }).click();
       await page.getByRole("heading", { name: "QuickBooks Online", exact: true }).waitFor();
       assert.equal(await page.getByText("Synthetic company", { exact: true }).count(), 1);
+      assert.equal(await page.getByRole("button", { name: "Cancel attempt", exact: true }).count(), 1);
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
       assert.deepEqual(await page.locator("main h1, main h2, main p, main button, main a").evaluateAll(elements => elements
         .filter(element => element.scrollWidth > element.clientWidth + 2).map(element => element.textContent)), []);

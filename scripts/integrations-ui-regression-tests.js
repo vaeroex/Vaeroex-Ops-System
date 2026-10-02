@@ -7,15 +7,29 @@ const { root, harness, connection, loadSource, React, renderToStaticMarkup } = r
 const landing = "app/app/integrations/page.tsx";
 const management = "app/app/settings/integrations/quickbooks/page.tsx";
 
-test("unfinished error attempts retain cancellation while granted/unknown authority does not", async () => {
+test("only database-confirmed unconsented attempts offer cancellation on either management page", async () => {
   const { canOfferPendingCancellation } = loadSource("lib/integrations/control-plane/customer-status.ts");
-  assert.equal(canOfferPendingCancellation(connection("pending_authorization")), true);
-  assert.equal(canOfferPendingCancellation({ ...connection("error"), granted_scopes: [] }), true);
-  assert.equal(canOfferPendingCancellation(connection("error")), false);
-  assert.equal(canOfferPendingCancellation({ ...connection("error"), granted_scopes: ["com.intuit.quickbooks.accounting"] }), false);
-  assert.equal(canOfferPendingCancellation({ ...connection("active"), granted_scopes: [] }), false);
-  const h = harness({ connections: [{ ...connection("error"), granted_scopes: [] }] });
-  assert.match(await h.render(management), /Cancel attempt/);
+  for (const status of ["pending_authorization", "error"]) {
+    assert.equal(canOfferPendingCancellation({ ...connection(status), granted_scopes: [] }), false);
+    assert.equal(canOfferPendingCancellation({ ...connection(status), can_cancel_pending: false }), false);
+    assert.equal(canOfferPendingCancellation({ ...connection(status), can_cancel_pending: true }), true);
+    for (const page of [management, "app/app/settings/integrations/quickbooks/disconnect/page.tsx"]) {
+      const h = harness({ connections: [connection(status)], cancellations: [{ connection_id: "connection-a", can_cancel: true }] });
+      assert.match(await h.render(page), /Cancel attempt/);
+      assert.deepEqual(h.calls.filter(call => call === "cancellation-eligibility"), ["cancellation-eligibility"]);
+      for (const options of [
+        { cancellations: [{ connection_id: "connection-a", can_cancel: false }] },
+        { cancellations: [] },
+        { cancellations: [{ connection_id: "other-connection", can_cancel: true }] },
+        { cancellations: [{ connection_id: "connection-a", can_cancel: "true" }] },
+        { cancellations: [{ connection_id: "connection-a", can_cancel: true }], cancellationError: true }
+      ]) {
+        const denied = await harness({ connections: [connection(status)], ...options }).render(page);
+        assert.doesNotMatch(denied, /Cancel attempt|private eligibility error/);
+      }
+    }
+  }
+  assert.equal(canOfferPendingCancellation({ ...connection("active"), can_cancel_pending: true }), false);
 });
 
 test("disabled integration gates skip provider queries; QBO management fails before workspace access", async () => {
@@ -97,7 +111,18 @@ test("non-owner roles never read Square or business entities or receive connecti
     assert.match(details, /Synthetic company/);
     assert.doesNotMatch(details, /<form|businessEntityId|Accounting authority/);
     assert(!h.calls.includes("square"));
+    assert(!h.calls.includes("cancellation-eligibility"));
     assert(!h.queries.some(query => query.table === "business_entities"));
+    for (const status of ["pending_authorization", "error"]) {
+      const pending = harness({ role, connections: [connection(status)],
+        cancellations: [{ connection_id: "connection-a", can_cancel: true }] });
+      for (const page of [management, "app/app/settings/integrations/quickbooks/disconnect/page.tsx"]) {
+        const html = await pending.render(page);
+        assert.match(html, /Synthetic company/);
+        assert.doesNotMatch(html, /Cancel attempt|<form/);
+      }
+      assert(!pending.calls.includes("cancellation-eligibility"));
+    }
   }
 });
 

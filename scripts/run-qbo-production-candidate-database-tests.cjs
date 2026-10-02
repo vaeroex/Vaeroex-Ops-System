@@ -22,8 +22,10 @@ const candidates = [
   '20260930004000_qbo_production_source_validation.sql',
   '20260930193412_qbo_production_accounting_intake.sql',
   '20261002012700_qbo_customer_pending_attempt_control.sql',
+  '20261002025212_qbo_customer_pending_cancellation_eligibility.sql',
 ];
 const pendingSuite = { file: 'scripts/qbo-pending-connection-database-tests.cjs', pending: true, expectedScenarios: 14 };
+const eligibilitySuite = { file: 'scripts/qbo-pending-cancellation-eligibility-database-tests.cjs', eligibility: true, expectedScenarios: 19 };
 const suiteNames = [
   'qbo_customer_oauth_completion.test.sql',
   'external_integrations_qbo_ongoing_sync.test.sql',
@@ -244,11 +246,11 @@ async function main() {
         result.databaseIsolation = 'fresh-template-clone-per-suite';
         try {
         for (const suite of [...suites, { file: 'native_scheduler_concurrency', concurrency: true },
-          { file: 'native_accounting_qualification', accounting: true }, pendingSuite]) {
+          { file: 'native_accounting_qualification', accounting: true }, pendingSuite, eligibilitySuite]) {
           stage = suite.file;
           const outcome = { file: suite.file, sha256: suite.accounting
             ? digest(fs.readFileSync(path.join(root, 'scripts/qbo-accounting-native-qualification.cjs')))
-            : suite.pending ? digest(fs.readFileSync(path.join(root, suite.file))) : suite.sha256,
+            : suite.pending || suite.eligibility ? digest(fs.readFileSync(path.join(root, suite.file))) : suite.sha256,
             passed: false, assertions: 0 };
           result.suites.push(outcome);
           let runner, clone;
@@ -261,7 +263,14 @@ async function main() {
             await manager.query(`alter database ${quote(clone)} set search_path=public,extensions`);
             const config = { ...db.connection, database: clone };
             const connectionSetting = candidateDblinkSetting(runtime.targetKind, db.connection, clone);
-            if (suite.pending) {
+            if (suite.eligibility) {
+              runner = new Client({ ...config, connectionTimeoutMillis: 5000, statement_timeout: 60000 });
+              await runner.connect();
+              outcome.assertions = await require('./qbo-pending-cancellation-eligibility-database-tests.cjs').qualify({ client: runner, connection: config });
+              assert.equal(outcome.assertions, suite.expectedScenarios, 'all pending-cancellation eligibility scenarios must complete');
+              outcome.passed = true;
+              lines.push('Native read-only cancellation eligibility, owner/session boundaries and unchanged protected rows passed.');
+            } else if (suite.pending) {
               runner = new Client({ ...config, connectionTimeoutMillis: 5000, statement_timeout: 60000 });
               await runner.connect();
               outcome.assertions = await require('./qbo-pending-connection-database-tests.cjs').qualify({ client: runner, connection: config });
@@ -312,7 +321,7 @@ async function main() {
         position: error.position, internalPosition: error.internalPosition }));
     }
     if (result.nativeDirectory) result.stopped = !fs.existsSync(path.join(result.nativeDirectory, 'data/postmaster.pid'));
-    result.passed = result.stopped && result.failures.length === 0 && result.suites.length === suites.length + 3 && result.suites.every(suite => suite.passed);
+    result.passed = result.stopped && result.failures.length === 0 && result.suites.length === suites.length + 4 && result.suites.every(suite => suite.passed);
     save();
   }
   report.passed = report.runs.every(run => run.passed);
@@ -323,4 +332,4 @@ async function main() {
 }
 
 if (require.main === module) main().catch(error => { console.error(error); process.exitCode = 1; });
-module.exports = { checkTap, expandFixture, suiteRequests, candidateDblinkSetting, candidates, pendingSuite };
+module.exports = { checkTap, expandFixture, suiteRequests, candidateDblinkSetting, candidates, pendingSuite, eligibilitySuite };

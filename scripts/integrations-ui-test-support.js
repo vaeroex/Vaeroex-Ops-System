@@ -35,11 +35,17 @@ function loadSource(relative, mocks = {}) {
 
 function harness(options = {}) {
   const state = { role: "owner", qboEnabled: true, squareEnabled: true, workspaceId: "workspace-a",
-    connections: [], freshness: [], errorTable: null, square: { available: true, connections: [] }, squareEvidence: null, ...options };
+    connections: [], freshness: [], cancellations: [], cancellationError: false, errorTable: null, square: { available: true, connections: [] }, squareEvidence: null, ...options };
   const calls = [], queries = [];
   const access = { workspaceId: state.workspaceId,
     context: { membership: { role: state.role }, profile: { email: "synthetic@example.invalid" }, activeWorkspace: { name: "Synthetic workspace" } },
-    supabase: { from(table) {
+    supabase: { async rpc(name, args) {
+      assert.equal(name, "read_qbo_customer_pending_cancellations_v1");
+      assert.deepEqual(args, { p_workspace_id: state.workspaceId });
+      assert.equal(state.role, "owner");
+      calls.push("cancellation-eligibility");
+      return { data: state.cancellations, error: state.cancellationError ? { message: "private eligibility error" } : null };
+    }, from(table) {
       const queryCalls = [];
       queries.push({ table, calls: queryCalls });
       const query = { then(resolve) {
@@ -55,7 +61,7 @@ function harness(options = {}) {
           : table === "integration_freshness_summaries" ? state.freshness : [{ id: "entity-a", display_name: "Synthetic entity" }],
         error: state.errorTable === table ? { message: "private database error" } : null });
       } };
-      for (const method of ["select", "eq", "not", "order", "in"]) query[method] = (...args) => { queryCalls.push([method, ...args]); return query; };
+      for (const method of ["select", "eq", "neq", "not", "order", "in"]) query[method] = (...args) => { queryCalls.push([method, ...args]); return query; };
       return query;
     } }
   };

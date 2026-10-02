@@ -18,7 +18,7 @@ export default async function QuickBooksManagementPage({ searchParams }: {
   const access = await requireWorkspacePage();
   const canManage = access.context.membership?.role === "owner";
   const [status, entities] = await Promise.all([
-    readQuickBooksStatus(access),
+    readQuickBooksStatus(access, true),
     canManage ? access.supabase.from("business_entities")
       .select("id, display_name").eq("workspace_id", access.workspaceId)
       .eq("status", "active").order("display_name", { ascending: true })
