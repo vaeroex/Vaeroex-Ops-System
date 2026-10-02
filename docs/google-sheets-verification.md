@@ -59,3 +59,28 @@ The current implementation was audited from merged `main` at `f564108517cc165b85
 - Actual review state: **Testing; no verification review submitted or approved**. Verification Center reports that verification is not required while Testing. This message is not approval for general external use. Publishing status was not changed.
 
 The [verification submission packet](google-sheets-google-verification-packet.md) contains the scope justification, implementation/data-flow evidence, owner-review-only disclosure draft, synthetic recording procedure, and remaining submission gates. Do not attest to compliance or publish the app merely to clear a Console warning before those gates are resolved.
+
+## Technical disclosure follow-up: October 2, 2026
+
+This supersedes the earlier suggestion that owner review alone can close retention
+readiness. The [retention technical review](google-sheets-retention-technical-review.md)
+records an actual implementation blocker: immutable approvals/source versions
+cannot be erased through supported operations, saved-analysis deletion retains
+content, and complete derived-copy/backup-restoration erasure is not implemented.
+
+- Read-only Production catalog inspection confirmed installed immutable triggers,
+  foreign-key constraints and the exact soft-delete function. No live DELETE ran.
+- `node scripts/google-sheets-retention-audit.cjs`: 82 existing connector checks and
+  10 added retention checks passed in synthetic embedded PostgreSQL. Successful
+  tests prove the present limitations; they do not certify a working erasure path.
+  This is not a full canonical bootstrap or a repeat of the earlier 121-check run.
+- Production Supabase UI: Pro, daily physical backups with September 25 through
+  October 2 entries, PITR not enabled. No restore/download/configuration mutation.
+- Production Vercel metadata: READY at the reviewed source, OpenAI key Sensitive
+  and not readable through the supported API. Its organization binding remains
+  unverified. The accessible OpenAI organization has all three sharing options
+  Disabled and its Default project has Standard Retention, not proven ZDR.
+- The complete proposed policy/pre-consent wording now explicitly separates
+  verified behavior from unimplemented retention/erasure commitments. Public
+  legal/app source files, credentials, scopes, callback and enabled state were not
+  changed. No policy was published or compliance attestation submitted.
