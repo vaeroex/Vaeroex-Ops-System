@@ -31,7 +31,7 @@ export function ConnectionStatusPanel({
   return (
     <div className="space-y-4">
       {connections.length === 0 ? (
-        <p className="text-sm text-muted">No accounting connection is configured.</p>
+        <p role="status" className="text-sm text-muted">No QuickBooks company is connected to this workspace.</p>
       ) : (
         <div className="divide-y divide-line border-y border-line">
           {connections.map((connection) => {
@@ -123,7 +123,7 @@ export function ConnectionStatusPanel({
             className="inline-flex min-h-10 items-center justify-center gap-2 self-end rounded-md bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white"
           >
             <Link2 aria-hidden="true" className="h-4 w-4" />
-            Connect
+            Connect QuickBooks
           </button>
         </form>
       ) : null}

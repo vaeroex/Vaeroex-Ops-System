@@ -84,7 +84,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
 
           {qboConnectionsEnabled ? (
             <SectionCard
-              title="Accounting connection"
+              title="QuickBooks connection"
               description="Connection health and data freshness for this workspace."
             >
               <ConnectionStatusPanel

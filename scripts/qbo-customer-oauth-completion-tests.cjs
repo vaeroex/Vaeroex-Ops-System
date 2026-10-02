@@ -584,6 +584,7 @@ async function main() {
   // persistence are synthetic; no route, provider or mutation capability is present.
   const { installLoader, ids, timestamp }=require('./qbo-customer-test-support.cjs');
   let role='owner',connectionStatus='reauthorization_required',workspaceReads=0;
+  let hasConnection=true,squareEnabled=false;
   const tables=[];
   const connection={id:ids.connection,provider_key:'quickbooks_online',safe_display_name:'Synthetic company',
     status_changed_at:timestamp};
@@ -591,7 +592,7 @@ async function main() {
     tables.push(table);
     assert(['integration_connection_summaries','integration_freshness_summaries','business_entities'].includes(table));
     const query={then:resolve=>resolve({data:table==='integration_connection_summaries'
-      ? [{...connection,status:connectionStatus}]
+      ? hasConnection ? [{...connection,status:connectionStatus}] : []
       : table==='business_entities' ? [{id:ids.entity,display_name:'Synthetic entity'}] : []})};
     for(const method of ['select','eq','not','neq','order','in']) query[method]=(...args)=>{
       if(method==='eq'&&args[0]==='workspace_id')assert.equal(args[1],ids.workspace);
@@ -608,7 +609,7 @@ async function main() {
     '@/components/app/ThemeControls':{ThemeControls:()=>null},
     '@/lib/auth/actions':{changePasswordAction:async()=>{throw Error('mutation_forbidden');}},
     '@/lib/integrations/control-plane/square-workspace-evidence':{readSquareWorkspaceEvidence:async()=>null},
-    '@/lib/integrations/square-direct/server':{squareDirectEnabled:()=>false},
+    '@/lib/integrations/square-direct/server':{squareDirectEnabled:()=>squareEnabled},
     'next/headers':{headers:async()=>new Headers()},
     'next/navigation':{notFound:()=>{throw Error('NOT_FOUND');}}
   });
@@ -618,6 +619,24 @@ async function main() {
   const previousGate=process.env.QBO_PRODUCTION_CUSTOMER_CONNECTIONS_ENABLED;
   try {
     process.env.QBO_PRODUCTION_CUSTOMER_CONNECTIONS_ENABLED='true';
+    await test('disconnected QuickBooks is named beside Square with an owner-only connect action',async()=>{
+      hasConnection=false;squareEnabled=true;
+      try {
+        const settings=renderToStaticMarkup(await SettingsPage({}));
+        assert.match(settings,/Square connection/);
+        assert.match(settings,/href="\/app\/settings\/integrations\/square"/);
+        assert.match(settings,/QuickBooks connection/);
+        assert.match(settings,/<p role="status"[^>]*>No QuickBooks company is connected to this workspace\.<\/p>/);
+        assert.match(settings,/action="\/api\/integrations\/qbo\/connect" method="post"/);
+        assert.match(settings,/Connect QuickBooks<\/button>/);
+        assert.match(settings,/name="businessEntityId"/);
+        for(role of ['admin','manager','member','viewer',null]) {
+          const readOnly=renderToStaticMarkup(await SettingsPage({}));
+          assert.match(readOnly,/No QuickBooks company is connected/);
+          assert.doesNotMatch(readOnly,/Connect QuickBooks<\/button>|action="\/api\/integrations\/qbo\/connect"/);
+        }
+      } finally {hasConnection=true;squareEnabled=false;role='owner';}
+    });
     await test('owner sees actual QBO connect reconnect and confirmed disconnect controls',async()=>{
       const settings=renderToStaticMarkup(await SettingsPage({}));
       assert.match(settings,/action="\/api\/integrations\/qbo\/connect"/);
