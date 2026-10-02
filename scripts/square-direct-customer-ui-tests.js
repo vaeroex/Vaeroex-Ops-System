@@ -475,14 +475,14 @@ test("direct page rejects host/protocol mismatch before workspace authority and 
   assert.equal(directReads, 2);
 });
 
-test("workspace settings exposes canonical Square navigation only to enabled owners", async () => {
+test("workspace Integrations exposes canonical Square navigation only to enabled owners", async () => {
   let enabled = false, role = "owner", evidenceReads = 0;
   const supabase = { from() { throw new Error("UNEXPECTED_DATABASE_READ"); } };
   const { SectionCard } = loadTsx("components/operations/SectionCard.tsx");
   const empty = () => null;
-  const { default: settingsPage } = loadTsx("app/app/settings/page.tsx", {
+  const { default: settingsPage } = require("./integrations-ui-test-support").loadSource("app/app/integrations/page.tsx", {
     "next/headers": { headers: async () => new Headers() },
-    "next/link": { __esModule: true, default: ({ children, ...props }) => React.createElement("a", props, children) },
+    "next/link": { __esModule: true, default: ({ children, prefetch, ...props }) => { assert.equal(prefetch, false); return React.createElement("a", props, children); } },
     "@/components/auth/AuthMessage": { AuthMessage: empty },
     "@/components/app/ThemeControls": { ThemeControls: empty },
     "@/components/integrations/ConnectionStatusPanel": { ConnectionStatusPanel: empty },
@@ -491,7 +491,9 @@ test("workspace settings exposes canonical Square navigation only to enabled own
     "@/components/operations/SectionCard": { SectionCard },
     "@/lib/auth/actions": { changePasswordAction: "/synthetic-account-security" },
     "@/lib/integrations/control-plane/qbo-customer-availability": { qboProductionCustomerConnectionsEnabled: () => false },
-    "@/lib/integrations/square-direct/server": { squareDirectEnabled: () => enabled },
+    "@/lib/integrations/square-direct/server": { squareDirectEnabled: () => enabled,
+      squareDirectView: async () => { assert.equal(enabled, true); assert.equal(role, "owner"); return view; },
+      squareSettingsPath: "/app/settings/integrations/square" },
     "@/lib/integrations/control-plane/square-workspace-evidence": { readSquareWorkspaceEvidence: async (client, workspaceId) => {
       assert.equal(client, supabase); assert.equal(workspaceId, "workspace-a"); evidenceReads++; return null;
     } },
@@ -503,7 +505,7 @@ test("workspace settings exposes canonical Square navigation only to enabled own
   assert.doesNotMatch(await renderSettings(), /Manage Square|href="\/app\/settings\/integrations\/square"/);
   enabled = true;
   const owner = await renderSettings();
-  assert.match(owner, /Square connection/);
+  assert.match(owner, /aria-label="Square"/);
   assert.match(owner, /href="\/app\/settings\/integrations\/square"/);
   assert.match(owner, /Manage Square/);
   for (role of ["admin", "manager", "member"]) {

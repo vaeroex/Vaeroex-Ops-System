@@ -136,9 +136,10 @@ test("Intelligence page integrates the isolated gated diagnostic without supplyi
   visit(file); assert(occurrences.includes("buildIntelligenceSnapshotFromProducersV1"));
   const diagnostic = fs.readFileSync(path.join(root, "lib/integrations/qbo-customer/intelligence-diagnostic.tsx"), "utf8");
   assert.doesNotMatch(diagnostic, /EvidenceCandidate|generateText|generateObject|fetch\(|\.from\(|createSupabaseAdminClient/);
-  const settings = fs.readFileSync(path.join(root, "app/app/settings/page.tsx"), "utf8");
-  assert.match(settings, /context.membership\?\.role === "owner"[\s\S]*?href="\/app\/settings\/integrations\/quickbooks\/data"/);
-  const settingsFile = ts.createSourceFile("settings.tsx", settings, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const settings = fs.readFileSync(path.join(root, "app/app/settings/integrations/quickbooks/page.tsx"), "utf8");
+  assert.match(settings, /const canManage = access.context.membership\?\.role === "owner"/);
+  assert.match(settings, /\{canManage \? <nav[\s\S]*?href="\/app\/settings\/integrations\/quickbooks\/data"/);
+  const settingsFile = ts.createSourceFile("management.tsx", settings, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
   const panels = [];
   const inspect = node => {
     if (ts.isJsxSelfClosingElement(node) && node.tagName.getText(settingsFile) === "ConnectionStatusPanel") {
@@ -146,6 +147,8 @@ test("Intelligence page integrates the isolated gated diagnostic without supplyi
     }
     ts.forEachChild(node, inspect);
   };
-  inspect(settingsFile); assert.deepEqual(panels, ['{context.membership?.role === "owner"}']);
-  assert.match(settings, /const canManage = \["owner", "admin", "manager"\]\.includes/);
+  inspect(settingsFile); assert.deepEqual(panels, ['{canManage}']);
+  assert.match(settings, /canManage \? access.supabase.from\("business_entities"\)/);
+  assert.match(settings, /\.eq\("workspace_id", access.workspaceId\)/);
+  assert(settings.indexOf("if (!qboProductionCustomerConnectionsEnabled()) notFound()") < settings.indexOf("await requireWorkspacePage()"));
 });

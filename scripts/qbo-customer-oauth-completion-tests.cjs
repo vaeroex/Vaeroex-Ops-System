@@ -580,7 +580,7 @@ async function main() {
     assert(!JSON.stringify(events).includes('private-provider-error'));
   });
 
-  // Render the actual Settings panel and disconnect page. Identity and read-only
+  // Render Settings, the integration landing/management pages and disconnect. Identity and read-only
   // persistence are synthetic; no route, provider or mutation capability is present.
   const { installLoader, ids, timestamp }=require('./qbo-customer-test-support.cjs');
   let role='owner',connectionStatus='reauthorization_required',workspaceReads=0;
@@ -609,39 +609,46 @@ async function main() {
     '@/components/app/ThemeControls':{ThemeControls:()=>null},
     '@/lib/auth/actions':{changePasswordAction:async()=>{throw Error('mutation_forbidden');}},
     '@/lib/integrations/control-plane/square-workspace-evidence':{readSquareWorkspaceEvidence:async()=>null},
-    '@/lib/integrations/square-direct/server':{squareDirectEnabled:()=>squareEnabled},
+    '@/lib/integrations/square-direct/server':{squareDirectEnabled:()=>squareEnabled,
+      squareDirectView:async()=>({available:true,connections:[]}),squareSettingsPath:'/app/settings/integrations/square'},
     'next/headers':{headers:async()=>new Headers()},
     'next/navigation':{notFound:()=>{throw Error('NOT_FOUND');}}
   });
   const SettingsPage=require('../app/app/settings/page.tsx').default;
+  const IntegrationsPage=require('../app/app/integrations/page.tsx').default;
+  const ManagementPage=require('../app/app/settings/integrations/quickbooks/page.tsx').default;
   const DisconnectPage=require('../app/app/settings/integrations/quickbooks/disconnect/page.tsx').default;
   const {renderToStaticMarkup}=require('react-dom/server');
   const previousGate=process.env.QBO_PRODUCTION_CUSTOMER_CONNECTIONS_ENABLED;
   try {
     process.env.QBO_PRODUCTION_CUSTOMER_CONNECTIONS_ENABLED='true';
-    await test('disconnected QuickBooks is named beside Square with an owner-only connect action',async()=>{
+    await test('Settings links to Integrations and provider cards lead to management with owner-only connect',async()=>{
       hasConnection=false;squareEnabled=true;
       try {
         const settings=renderToStaticMarkup(await SettingsPage({}));
-        assert.match(settings,/Square connection/);
-        assert.match(settings,/href="\/app\/settings\/integrations\/square"/);
-        assert.match(settings,/QuickBooks connection/);
-        assert.match(settings,/<p role="status"[^>]*>No QuickBooks company is connected to this workspace\.<\/p>/);
-        assert.match(settings,/action="\/api\/integrations\/qbo\/connect" method="post"/);
-        assert.match(settings,/Connect QuickBooks<\/button>/);
-        assert.match(settings,/name="businessEntityId"/);
+        assert.match(settings,/href="\/app\/integrations"/);
+        assert.doesNotMatch(settings,/action="\/api\/integrations\/qbo\/|name="businessEntityId"/);
+        const landing=renderToStaticMarkup(await IntegrationsPage());
+        assert.match(landing,/href="\/app\/settings\/integrations\/square"/);
+        assert.match(landing,/href="\/app\/settings\/integrations\/quickbooks"/);
+        assert.match(landing,/Connect QuickBooks/);
+        assert.doesNotMatch(landing,/action="\/api\/integrations\/qbo\//);
+        const management=renderToStaticMarkup(await ManagementPage());
+        assert.match(management,/<p role="status"[^>]*>No QuickBooks company is connected to this workspace\.<\/p>/);
+        assert.match(management,/Connect QuickBooks<\/button>/);
+        assert.match(management,/name="businessEntityId"/);
         for(role of ['admin','manager','member','viewer',null]) {
-          const readOnly=renderToStaticMarkup(await SettingsPage({}));
+          const readOnly=renderToStaticMarkup(await ManagementPage());
           assert.match(readOnly,/No QuickBooks company is connected/);
           assert.doesNotMatch(readOnly,/Connect QuickBooks<\/button>|action="\/api\/integrations\/qbo\/connect"/);
         }
       } finally {hasConnection=true;squareEnabled=false;role='owner';}
     });
     await test('owner sees actual QBO connect reconnect and confirmed disconnect controls',async()=>{
-      const settings=renderToStaticMarkup(await SettingsPage({}));
+      const settings=renderToStaticMarkup(await ManagementPage());
       assert.match(settings,/action="\/api\/integrations\/qbo\/connect"/);
       assert.match(settings,/action="\/api\/integrations\/qbo\/reauthorize"/);
-      assert.match(settings,/aria-label="Reconnect QuickBooks"/);
+      assert.match(settings,/Reconnect QuickBooks<\/button>/);
       assert.match(settings,/href="\/app\/settings\/integrations\/quickbooks\/disconnect"/);
       const disconnect=renderToStaticMarkup(await DisconnectPage({}));
       assert.match(disconnect,/action="\/api\/integrations\/qbo\/disconnect" method="post"/);
@@ -649,7 +656,7 @@ async function main() {
     });
     await test('admin manager member viewer and missing roles see status but no QBO mutation controls',async()=>{
       for(role of ['admin','manager','member','viewer',null]) {
-        const settings=renderToStaticMarkup(await SettingsPage({}));
+        const settings=renderToStaticMarkup(await ManagementPage());
         assert.match(settings,/Synthetic company/);
         assert.doesNotMatch(settings,/action="\/api\/integrations\/qbo\//);
         assert.doesNotMatch(settings,/href="\/app\/settings\/integrations\/quickbooks\/disconnect"/);
@@ -672,9 +679,10 @@ async function main() {
         if(gate===undefined)delete process.env.QBO_PRODUCTION_CUSTOMER_CONNECTIONS_ENABLED;
         else process.env.QBO_PRODUCTION_CUSTOMER_CONNECTIONS_ENABLED=gate;
         tables.length=0;
-        assert.doesNotMatch(renderToStaticMarkup(await SettingsPage({})),/QuickBooks|Accounting connection|\/api\/integrations\/qbo\//);
+        assert.doesNotMatch(renderToStaticMarkup(await IntegrationsPage()),/QuickBooks|Accounting connection|\/api\/integrations\/qbo\//);
         assert.deepEqual(tables,[]);
         const before=workspaceReads;
+        await assert.rejects(ManagementPage(),{message:'NOT_FOUND'});
         await assert.rejects(DisconnectPage({}),{message:'NOT_FOUND'});
         assert.equal(workspaceReads,before);assert.deepEqual(tables,[]);
       }
@@ -692,7 +700,7 @@ async function main() {
   const savedLoader={load:Module._load,resolve:Module._resolveFilename,ts:require.extensions['.ts'],tsx:require.extensions['.tsx']};
   const https=require('node:https'),savedFetch=global.fetch;
   const savedTransports=[http,https].map(transport=>({transport,request:transport.request,get:transport.get}));
-  let connectRole='owner',identityReads=0,networkAttempts=0,mismatchedState=false;
+  let connectRole='owner',identityReads=0,networkAttempts=0,mismatchedState=false,existingPending=false;
   const rpcCalls=[],entityQueries=[],foreignEntityId=randomUUID();
   const entities=[{id:ids.entity,workspace_id:ids.workspace,status:'active'},
     {id:foreignEntityId,workspace_id:randomUUID(),status:'active'}];
@@ -706,24 +714,26 @@ async function main() {
     },
     rpc:async(name,args)=>{
       rpcCalls.push({name,args:structuredClone(args)});
-      const command=args.p_command;
-      if(name==='create_integration_connection_intent_v1')return {error:null,data:{idempotent:false,connection:{
+      const command=args.p_connection;
+      if(name==='begin_qbo_customer_connection_v1')return {error:null,data:{idempotent:existingPending,
+        disposition:existingPending?'pending':'started',connection:{
         contractVersion:'integration_connection_summary_v1',id:command.id,workspaceId:command.workspaceId,
         businessEntityId:command.businessEntityId,providerKey:command.providerKey,providerEnvironment:command.providerEnvironment,
         safeDisplayName:command.safeDisplayName,status:'pending_authorization',stateReasonCode:'authorization_pending',
         requestedScopes:command.requestedScopes,grantedScopes:[],capabilitySnapshot:command.capabilitySnapshot,
         adapterVersion:command.adapterVersion,configurationVersion:command.configurationVersion,
-        connectionGeneration:1,rowVersion:7,statusChangedAt:command.requestedAt,disconnectedAt:null}}};
-      if(name==='create_qbo_customer_oauth_state_v2')return {error:null,data:{stateId:command.stateId,
-        connectionId:mismatchedState?randomUUID():command.connectionId,connectionGeneration:1,expiresAt:command.expiresAt,idempotent:false}};
+        connectionGeneration:1,rowVersion:1,statusChangedAt:command.requestedAt,disconnectedAt:null},
+        oauthState:existingPending?null:{stateId:args.p_oauth_state.stateId,
+          connectionId:mismatchedState?randomUUID():command.id,connectionGeneration:1,
+          expiresAt:args.p_oauth_state.expiresAt,idempotent:false}}};
       throw Error('unexpected_connect_rpc');
     }
   };
   const denyNetwork=()=>{networkAttempts++;throw Error('connect_network_forbidden');};
   const connectRequest=(entityId=ids.entity)=>new Request(`${connectEnvironment.QBO_APPLICATION_ORIGIN}/api/integrations/qbo/connect`,{
-    method:'POST',headers:{origin:connectEnvironment.QBO_APPLICATION_ORIGIN,'content-type':'application/x-www-form-urlencoded'},
+    method:'POST',headers:{origin:connectEnvironment.QBO_APPLICATION_ORIGIN,'content-type':'application/x-www-form-urlencoded',accept:'application/json'},
     body:new URLSearchParams({businessEntityId:entityId,displayName:'Synthetic customer'})});
-  function resetConnect() {rpcCalls.length=0;entityQueries.length=0;identityReads=0;connectRole='owner';mismatchedState=false;}
+  function resetConnect() {rpcCalls.length=0;entityQueries.length=0;identityReads=0;connectRole='owner';mismatchedState=false;existingPending=false;}
   try {
     Object.assign(process.env,connectEnvironment);
     global.fetch=denyNetwork;
@@ -732,19 +742,20 @@ async function main() {
       identityReads++;return {workspaceId:ids.workspace,membership:{role:connectRole},supabase:connectClient};
     }}});
     const {POST:connectPost}=require('../app/api/integrations/qbo/connect/route.ts');
-    await test('actual connect POST persists bound intent and state before canonical 303 without network',async()=>{
+    await test('actual connect POST atomically persists bound intent/state before canonical JSON navigation without network',async()=>{
       resetConnect();
       const response=await connectPost(connectRequest());
-      assert.equal(response.status,303);assert.equal(identityReads,1);assert.equal(networkAttempts,0);
+      assert.equal(response.status,200);assert.equal(identityReads,1);assert.equal(networkAttempts,0);
+      assert.equal(response.headers.get('cache-control'),'no-store');assert.equal(response.headers.has('location'),false);
       assert.deepEqual(entityQueries,[{table:'business_entities',columns:'id,status',
         filters:[['workspace_id',ids.workspace],['id',ids.entity],['status','active']]}]);
-      assert.deepEqual(rpcCalls.map(call=>call.name),['create_integration_connection_intent_v1','create_qbo_customer_oauth_state_v2']);
-      const intent=rpcCalls[0].args.p_command,stateCommand=rpcCalls[1].args.p_command;
+      assert.deepEqual(rpcCalls.map(call=>call.name),['begin_qbo_customer_connection_v1']);
+      const intent=rpcCalls[0].args.p_connection,stateCommand=rpcCalls[0].args.p_oauth_state;
       assert.equal(intent.workspaceId,ids.workspace);assert.equal(intent.businessEntityId,ids.entity);
       assert.equal(intent.providerKey,'quickbooks_online');assert.equal(intent.providerEnvironment,'production');
       assert.equal(intent.safeDisplayName,'Synthetic customer');
       assert.deepEqual(intent.requestedScopes,['com.intuit.quickbooks.accounting']);
-      const location=response.headers.get('location');
+      const location=(await response.json()).authorizationUrl;
       // Boolean assertions keep the raw state and redirect out of failure diagnostics.
       assert(typeof location==='string'&&URL.canParse(location),'connect redirect must be a valid URL');
       const target=new URL(location),state=target.searchParams.get('state');
@@ -760,13 +771,24 @@ async function main() {
       assert(stateCommand.stateHash===`sha256:${createHash('sha256').update(state,'utf8').digest('hex')}`,'persisted state hash must bind the redirect state');
       assert(!JSON.stringify(rpcCalls).includes(state),'raw state must not reach persistence');
       assert(stateCommand.contractVersion==='qbo_customer_oauth_state_v2'&&stateCommand.connectionId===intent.id&&
-        stateCommand.expectedConnectionGeneration===1&&stateCommand.expectedConnectionRowVersion===7,'state must bind the returned connection snapshot');
+        stateCommand.expectedConnectionGeneration===1&&stateCommand.expectedConnectionRowVersion===1,'state must bind the atomically created connection snapshot');
       assert(JSON.stringify(stateCommand.requestedScopes)===JSON.stringify(intent.requestedScopes)&&
         stateCommand.redirectUri===connectEnvironment.QBO_PRODUCTION_CALLBACK_URI&&stateCommand.returnIntent==='/app/settings',
         'state must bind the approved scopes, callback and return intent');
       assert(stateCommand.requestedAt===intent.requestedAt&&Date.parse(stateCommand.expiresAt)-Date.parse(stateCommand.requestedAt)===600000,
         'state must expire ten minutes after the intent');
-      assert(rpcCalls[1].args.p_request_id===`qbo_connect_${stateCommand.stateId.replaceAll('-','')}`,'state request ID must bind the persisted state ID');
+      assert(rpcCalls[0].args.p_request_id===`qbo_connect_${stateCommand.stateId.replaceAll('-','')}`,'state request ID must bind the persisted state ID');
+    });
+    await test('actual connect POST rejects a native form before identity or mutation',async()=>{
+      resetConnect();const request=connectRequest();request.headers.delete('accept');
+      const response=await connectPost(request);
+      assert.equal(response.status,406);assert.equal(identityReads,0);assert.equal(rpcCalls.length,0);
+    });
+    await test('actual connect POST reports an existing pending intent without another authorization URL',async()=>{
+      resetConnect();existingPending=true;
+      const response=await connectPost(connectRequest());
+      assert.equal(response.status,409);assert.equal(rpcCalls.length,1);
+      assert.equal(Object.hasOwn(await response.json(),'authorizationUrl'),false);
     });
     await test('actual connect POST rejects missing configuration before identity or mutation',async()=>{
       for(const key of ['QBO_PRODUCTION_CLIENT_ID','QBO_PRODUCTION_CALLBACK_URI','QBO_PRODUCTION_RETURN_INTENT']) {
@@ -793,7 +815,7 @@ async function main() {
     await test('actual connect POST rejects a mismatched persisted state connection without redirect',async()=>{
       resetConnect();mismatchedState=true;
       const response=await connectPost(connectRequest());
-      assert.equal(response.status,400);assert.equal(response.headers.has('location'),false);assert.equal(rpcCalls.length,2);
+      assert.equal(response.status,400);assert.equal(response.headers.has('location'),false);assert.equal(rpcCalls.length,1);
     });
     assert.equal(networkAttempts,0);
   } finally {

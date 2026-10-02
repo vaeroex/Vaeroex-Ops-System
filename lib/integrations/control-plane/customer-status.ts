@@ -4,7 +4,14 @@ export type IntegrationConnectionSummaryRow = Readonly<{
   safe_display_name: string;
   status: string;
   status_changed_at: string;
+  granted_scopes?: readonly string[];
 }>;
+
+// This only selects a UI action. The cancellation RPC proves no consent/effects.
+export function canOfferPendingCancellation(connection: IntegrationConnectionSummaryRow) {
+  return connection.status === "pending_authorization" ||
+    (connection.status === "error" && connection.granted_scopes?.length === 0);
+}
 
 export type IntegrationFreshnessSummaryRow = Readonly<{
   connection_id: string;
@@ -15,6 +22,8 @@ export type IntegrationFreshnessSummaryRow = Readonly<{
 }>;
 
 export type CustomerConnectionStatus =
+  | "Pending authorization"
+  | "Setup required"
   | "Connected"
   | "Syncing"
   | "Current"
@@ -35,7 +44,11 @@ export function customerConnectionStatus(
   freshness: readonly IntegrationFreshnessSummaryRow[]
 ) {
   let status: CustomerConnectionStatus;
-  if (connection.status === "disconnecting") {
+  if (connection.status === "pending_authorization") {
+    status = "Pending authorization";
+  } else if (connection.status === "authorized_unmapped") {
+    status = "Setup required";
+  } else if (connection.status === "disconnecting") {
     status = "Disconnecting";
   } else if (connection.status === "disconnected") {
     status = "Disconnected";
@@ -44,9 +57,7 @@ export function customerConnectionStatus(
   } else if (connection.status === "error" || freshness.some((row) => row.status === "sync_error")) {
     status = "Failed";
   } else if (
-    ["pending_authorization", "authorized_unmapped", "initializing"].includes(
-      connection.status
-    )
+    connection.status === "initializing"
   ) {
     status = "Syncing";
   } else if (

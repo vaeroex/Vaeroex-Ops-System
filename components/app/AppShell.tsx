@@ -25,6 +25,7 @@ const baseNavSections = [
       { href: "/app/kpis", label: "Performance" },
       { href: "/app/sources", label: "Files & Notes" },
       { href: "/app/reports", label: "Saved Analyses" },
+      { href: "/app/integrations", label: "Integrations" },
       { href: "/app/settings", label: "Settings" }
     ]
   }

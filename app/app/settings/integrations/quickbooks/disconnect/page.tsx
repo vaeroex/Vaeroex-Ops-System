@@ -3,6 +3,8 @@ import { ArrowLeft, Unplug } from "lucide-react";
 import { notFound } from "next/navigation";
 
 import { AuthMessage } from "@/components/auth/AuthMessage";
+import { QboCancelPendingForm } from "@/components/integrations/QboCancelPendingForm";
+import { canOfferPendingCancellation } from "@/lib/integrations/control-plane/customer-status";
 import { StatusBadge } from "@/components/operations/StatusBadge";
 import { PageHeader } from "@/components/operations/PageHeader";
 import { SectionCard } from "@/components/operations/SectionCard";
@@ -18,6 +20,7 @@ type DisconnectPageProps = {
 };
 
 const resultMessages: Readonly<Record<string, string>> = {
+  cancelled: "The unfinished QuickBooks attempt was cancelled. No company was connected; its audit history is preserved.",
   requested:
     "QuickBooks disconnect requested. Vaeroex access is disabled while credential revocation completes.",
   in_progress: "QuickBooks disconnect is already in progress.",
@@ -25,6 +28,7 @@ const resultMessages: Readonly<Record<string, string>> = {
 };
 
 const errorMessages: Readonly<Record<string, string>> = {
+  cancel_failed: "That attempt could not be cancelled. Refresh to check its current status.",
   not_permitted: "Your workspace role cannot disconnect QuickBooks.",
   unavailable: "That QuickBooks connection is unavailable for disconnect.",
   failed: "QuickBooks could not be disconnected. Review its status and try again."
@@ -55,7 +59,7 @@ export default async function QuickBooksDisconnectPage({
   const canManage = context.membership?.role === "owner";
   const { data: connections } = await supabase
     .from("integration_connection_summaries")
-    .select("id,safe_display_name,status,status_changed_at")
+    .select("id,provider_key,safe_display_name,status,status_changed_at,granted_scopes")
     .eq("workspace_id", workspaceId)
     .eq("provider_key", "quickbooks_online")
     .eq("provider_environment", "production")
@@ -106,6 +110,9 @@ export default async function QuickBooksDisconnectPage({
                       <StatusBadge value={statusLabel(connection.status)} />
                     </div>
                   </div>
+                  {canManage && canOfferPendingCancellation(connection) ? (
+                    <QboCancelPendingForm connectionId={connection.id} />
+                  ) : null}
                   {canDisconnect ? (
                     <form
                       action="/api/integrations/qbo/disconnect"

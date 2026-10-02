@@ -56,26 +56,31 @@ function settingsFixture({ enabled = true, role = "owner" } = {}) {
   return async params => render(await SettingsPage({ searchParams: Promise.resolve(params ?? {}) }));
 }
 
-test("Settings puts optional connection management before account, workspace, and collapsed appearance", async () => {
+test("Settings puts the Integrations entry before account, workspace, and collapsed appearance", async () => {
   const html = await settingsFixture()();
-  const positions = ["id=\"settings-connections\"", ">Account<", ">Workspace</h3>", ">Appearance</span>"].map(value => html.indexOf(value));
+  const positions = ["id=\"settings-integrations\"", ">Account<", ">Workspace</h3>", ">Appearance</span>"].map(value => html.indexOf(value));
   assert.ok(positions.every(position => position >= 0));
   assert.deepEqual([...positions].sort((a, b) => a - b), positions);
-  assert.match(html, /Connecting a service is not required to use Vaeroex/);
-  assert.match(html, /href="\/app\/settings\/integrations\/square"/);
+  assert.match(html, /Square and QuickBooks connections for this workspace/);
+  assert.match(html, /href="\/app\/integrations"/);
   assert.match(html, /Workspace A/);
   assert.equal((html.match(/owner@example\.invalid/g) ?? []).length, 1);
   assert.match(html, /workspace-settings-account-grid/);
-  assert.match(html, /workspace-settings-connection[\s\S]*href="\/app\/settings\/integrations\/square"/);
+  assert.doesNotMatch(html, /href="\/app\/settings\/integrations\/square"|businessEntityId/);
   assert.doesNotMatch(html, /name="workspaceId"|workspaceId=|<details[^>]*\bopen(?:=|>)/);
 });
 
-test("optional Square navigation retains its enabled-owner restriction", async () => {
+test("optional Square navigation retains its enabled-owner restriction on Integrations", async () => {
   for (const config of [{ enabled: false }, { role: "admin" }, { role: "manager" }, { role: "member" }]) {
     const html = await settingsFixture(config)();
     assert.doesNotMatch(html, /Manage Square|settings-connections/);
     assert.match(html, /Current workspace/);
     assert.match(html, /Appearance/);
+    assert.match(html, /href="\/app\/integrations"/);
+    const { harness } = require("./integrations-ui-test-support");
+    const h = harness({ squareEnabled: config.enabled ?? true, role: config.role ?? "owner", qboEnabled: false });
+    assert.doesNotMatch(await h.render("app/app/integrations/page.tsx"), /Manage Square|Connect Square|href="\/app\/settings\/integrations\/square"/);
+    assert(!h.calls.includes("square"));
   }
 });
 
