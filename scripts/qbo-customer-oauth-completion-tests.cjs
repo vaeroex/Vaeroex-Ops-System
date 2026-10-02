@@ -633,19 +633,19 @@ async function main() {
         assert.match(landing,/href="\/app\/settings\/integrations\/quickbooks"/);
         assert.match(landing,/Connect QuickBooks/);
         assert.doesNotMatch(landing,/action="\/api\/integrations\/qbo\//);
-        const management=renderToStaticMarkup(await ManagementPage());
+        const management=renderToStaticMarkup(await ManagementPage({}));
         assert.match(management,/<p role="status"[^>]*>No QuickBooks company is connected to this workspace\.<\/p>/);
         assert.match(management,/Connect QuickBooks<\/button>/);
         assert.match(management,/name="businessEntityId"/);
         for(role of ['admin','manager','member','viewer',null]) {
-          const readOnly=renderToStaticMarkup(await ManagementPage());
+          const readOnly=renderToStaticMarkup(await ManagementPage({}));
           assert.match(readOnly,/No QuickBooks company is connected/);
           assert.doesNotMatch(readOnly,/Connect QuickBooks<\/button>|action="\/api\/integrations\/qbo\/connect"/);
         }
       } finally {hasConnection=true;squareEnabled=false;role='owner';}
     });
     await test('owner sees actual QBO connect reconnect and confirmed disconnect controls',async()=>{
-      const settings=renderToStaticMarkup(await ManagementPage());
+      const settings=renderToStaticMarkup(await ManagementPage({}));
       assert.match(settings,/action="\/api\/integrations\/qbo\/connect"/);
       assert.match(settings,/action="\/api\/integrations\/qbo\/reauthorize"/);
       assert.match(settings,/Reconnect QuickBooks<\/button>/);
@@ -656,7 +656,7 @@ async function main() {
     });
     await test('admin manager member viewer and missing roles see status but no QBO mutation controls',async()=>{
       for(role of ['admin','manager','member','viewer',null]) {
-        const settings=renderToStaticMarkup(await ManagementPage());
+        const settings=renderToStaticMarkup(await ManagementPage({}));
         assert.match(settings,/Synthetic company/);
         assert.doesNotMatch(settings,/action="\/api\/integrations\/qbo\//);
         assert.doesNotMatch(settings,/href="\/app\/settings\/integrations\/quickbooks\/disconnect"/);
@@ -682,7 +682,7 @@ async function main() {
         assert.doesNotMatch(renderToStaticMarkup(await IntegrationsPage()),/QuickBooks|Accounting connection|\/api\/integrations\/qbo\//);
         assert.deepEqual(tables,[]);
         const before=workspaceReads;
-        await assert.rejects(ManagementPage(),{message:'NOT_FOUND'});
+        await assert.rejects(ManagementPage({}),{message:'NOT_FOUND'});
         await assert.rejects(DisconnectPage({}),{message:'NOT_FOUND'});
         assert.equal(workspaceReads,before);assert.deepEqual(tables,[]);
       }
