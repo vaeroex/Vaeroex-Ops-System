@@ -168,7 +168,10 @@
     "benchmark:evidence-engine-reranker:baseline": "node scripts/evidence-engine-reranker-benchmark.js --baseline-only",
     "benchmark:answers": "node scripts/answer-quality-benchmark.js",
     "test:google-sheets": "node scripts/google-sheets-runtime-tests.cjs && node scripts/google-sheets-data-tests.cjs && node scripts/google-sheets-sync-tests.cjs && node scripts/google-sheets-entity-tests.cjs",
-    "test:google-sheets-ui": "node scripts/google-sheets-ui-browser-tests.cjs"
+    "test:google-sheets-ui": "node scripts/google-sheets-ui-browser-tests.cjs",
+    "test:google-sheets-erasure": "node scripts/google-sheets-erasure-data-tests.cjs && node scripts/google-sheets-erasure-capability-tests.cjs && node --test scripts/google-sheets-erasure-approval-tests.cjs scripts/google-sheets-erasure-journal-tests.cjs",
+    "test:google-sheets-erasure-browser": "GOOGLE_SHEETS_ERASURE_BROWSER=1 node --test scripts/google-sheets-erasure-approval-tests.cjs",
+    "test:google-sheets-erasure-concurrency": "node scripts/google-sheets-erasure-concurrency-tests.cjs"
   },
   "dependencies": {
     "@pdf-lib/fontkit": "1.1.1",
