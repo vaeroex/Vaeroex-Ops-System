@@ -51,6 +51,17 @@ test('saved browsing sends only the verified current owner/session/workspace and
     p_connection_id: ids.connection, p_page: 7, p_start_date: '2026-05-04', p_end_date: '2026-05-06', p_status: 'COMPLETED'
   } }]);
 });
+test('saved browsing denies a different expected workspace before the RPC and accepts the verified workspace', async () => {
+  for (const expectedWorkspaceId of ['eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', '']) {
+    calls = [];
+    await assert.rejects(() => squareDirectPayments({ workspaceId: expectedWorkspaceId }, expectedWorkspaceId), /square_customer_denied/);
+    assert.equal(calls.length, 0, 'parent workspace mismatch must never reach the saved-payment RPC');
+  }
+  calls = [];
+  assert.deepEqual(await squareDirectPayments({}, ids.workspace), result);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].payload.p_workspace_id, ids.workspace);
+});
 test('normalized fallback metadata for an unselected historical connection does not reject valid current browsing', async () => {
   databaseData = { ...result, connectionId: ids.connection, timeZone: 'America/Los_Angeles',
     connections: [{ connectionId: ids.connection, businessEntityId: ids.workspace, businessEntityLabel: 'Current entity', sellerLabel: null,

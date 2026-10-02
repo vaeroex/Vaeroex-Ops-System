@@ -80,6 +80,20 @@ export function QboStoredDataView({ browser, query }: { browser: QboBrowser; que
   const scoped = { ...query, connectionId: browser.connectionId };
   const detail = browser.detail;
   const metrics = browser.metrics;
+  if (metrics.currentSources === "0" && !browser.sources.length && !detail) return <section aria-label="No imported QuickBooks data" className="space-y-3">
+    <h2 className="text-lg font-semibold">No imported QuickBooks data{browser.kind !== "all" ? " in this category" : " for this connection"}</h2>
+    <p className="text-sm text-slate-600">No stored sources in this selection. This does not mean zero activity or a complete import.</p>
+    <Link href="/app/settings/integrations/quickbooks" className="inline-flex min-h-11 items-center text-sm underline">Manage QuickBooks connections and setup</Link>
+    {browser.connections.length > 1 || browser.kind !== "all" ? <form action={QBO_CUSTOMER_DATA_PATH} method="get" className="flex flex-wrap items-end gap-3">
+      <label className="grid min-w-0 gap-1 text-sm sm:max-w-md">Connection / business entity
+        <select name="connectionId" defaultValue={browser.connectionId ?? ""} className="h-10 w-full min-w-0 rounded-md border border-line bg-white px-2">
+          {browser.connections.map(connection => <option key={connection.connectionId} value={connection.connectionId}>{connection.label} / {connection.entityLabel} ({words(connection.state)})</option>)}
+        </select>
+      </label>
+      <input type="hidden" name="kind" value="all" />
+      <button type="submit" className="inline-flex min-h-11 items-center text-sm underline">View stored data</button>
+    </form> : null}
+  </section>;
   return <div className="min-w-0 space-y-6">
     <div className="border-l-4 border-amber-500 bg-amber-50 p-4 text-sm text-amber-950" role="note">
       Coverage and reconciliation: unknown. Reports and transactions are not additive.

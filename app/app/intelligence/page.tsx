@@ -30,10 +30,9 @@ import { projectIntelligenceInboxV1 } from "@/lib/intelligence/snapshot/v1/proje
 import type { IntelligenceSnapshotV1 } from "@/lib/intelligence/snapshot/v1/types";
 import { isSecurityResponseMessage } from "@/lib/security/security-response";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
-import { qboProductionCustomerConnectionsEnabled } from "@/lib/integrations/control-plane/qbo-customer-availability";
-import { QboIntelligenceDiagnostic } from "@/lib/integrations/qbo-customer/intelligence-diagnostic";
 import { loadQboAccountingIntelligence } from "@/lib/integrations/qbo-customer/accounting-intelligence-server";
 import { QboAccountingIntelligenceView } from "@/lib/integrations/qbo-customer/accounting-intelligence-view";
+import { SquareSheetsResults } from "@/components/integrations/SquareSheetsResults";
 
 export const dynamic = "force-dynamic";
 
@@ -268,8 +267,7 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
       </header>
       <ErrorNotice message={displayErrors[0]?.message || null} />
       <QboAccountingIntelligenceView result={qboAccounting} />
-      {qboProductionCustomerConnectionsEnabled() && context.membership?.role === "owner"
-        ? <QboIntelligenceDiagnostic workspaceId={workspaceId} /> : null}
+      <SquareSheetsResults supabase={supabase} workspaceId={workspaceId} isOwner={context.membership?.role === "owner"} />
       <IntelligenceSignalInbox
         currentCards={lifecycleCards.current}
         historyCards={lifecycleCards.history}

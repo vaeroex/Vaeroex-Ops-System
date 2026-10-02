@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { DirectPayment, DirectView } from "@/lib/integrations/square-direct/contracts";
 import type { DirectPaymentBrowser } from "@/lib/integrations/square-direct/payment-browse";
+import { squareResultVisibility } from "@/lib/integrations/square-direct/result-visibility";
 
 type Connection = DirectView["connections"][number];
 const settingsPath = "/app/settings/integrations/square";
@@ -99,6 +100,7 @@ function DisconnectControl({ connection }: { connection: Connection }) {
 
 function ConnectionPanel({ view, connection, entity, timeZone, timeZoneFallback }: { view: DirectView; connection: Connection; entity: string; timeZone: string; timeZoneFallback: boolean }) {
   const readable = canRead(view, connection);
+  const visibility = squareResultVisibility(connection);
   const updateTimes = [connection.lastSyncedAt, connection.lastCompletedRead?.completedAt].filter((value): value is string => Boolean(value));
   const lastUpdate = updateTimes.sort((a, b) => Date.parse(b) - Date.parse(a))[0] ?? null;
   return <section className={`${cardClass} space-y-4`} aria-labelledby="current-square-connection">
@@ -112,11 +114,11 @@ function ConnectionPanel({ view, connection, entity, timeZone, timeZoneFallback 
         {connection.recoveryRequired ? "Authorization recovery required" : connection.revocationPending ? "Revocation pending" : connectionLabels[connection.state]}
       </span>
     </div>
-    <dl className="grid gap-3 text-sm sm:grid-cols-2">
+    {visibility.visible ? <dl className="grid gap-3 text-sm sm:grid-cols-2">
       <div><dt className="text-muted">Location</dt><dd className="mt-1 font-medium">{connection.locationId ? connection.locations.find(location => location.id === connection.locationId)?.label ?? "Selected Square location" : "Not selected yet"}</dd></div>
       <div><dt className="text-muted">Last successful update</dt><dd className="mt-1 font-medium">{squareBusinessTime(lastUpdate, timeZone)}<span className="mt-0.5 block text-xs font-normal text-muted">{timeZone}{timeZoneFallback ? " · Fallback; business timezone unavailable" : ""}</span></dd></div>
-    </dl>
-    {connection.lastError ? <p role="status" className="text-sm text-amber-800">The last attempt did not finish. Your last successfully saved Payments remain below.</p> : null}
+    </dl> : <p className="text-sm text-muted">Square setup has not completed. No Payments have been imported for this connection.</p>}
+    {connection.lastError ? <p role="status" className="text-sm text-amber-800">The last attempt did not finish.{connection.payments.length ? " Your last successfully saved Payments remain below." : " Check the connection details before trying again."}</p> : null}
     {connection.recoveryRequired ? <p role="status" className="text-sm">Square authorization outcome and this workspace’s account connection are unconfirmed. Contact support for checked recovery before taking any further connection action.</p> : null}
     {view.available && !connection.recoveryRequired && connection.state === "mapping_required" ? <form action="/api/integrations/square/mapping" method="post" className="space-y-3 border-t border-line pt-4">
       <input type="hidden" name="connectionId" value={connection.connectionId} />
@@ -154,7 +156,7 @@ function ConnectionPanel({ view, connection, entity, timeZone, timeZoneFallback 
     {connection.state === "syncing" || connection.state === "exchanging" ? <a href={settingsPath} className={`${buttonClass} text-vaeroex-blue`}>Refresh connection status</a> : null}
     {!connection.recoveryRequired && connection.state === "reauthorization_required" ? <p className="text-sm">Disconnect this connection, then connect again to renew Square authorization.</p> : null}
     {!connection.recoveryRequired && connection.revocationPending ? <p role="status" className="text-sm">Disconnected locally. Square authorization revocation is still pending; reconnect is blocked until it completes.</p> : null}
-    <CoverageDetails connection={connection} timeZone={timeZone} />
+    {visibility.visible && (connection.payments.length > 0 || lastUpdate || connection.activeRead || connection.hasMore) ? <CoverageDetails connection={connection} timeZone={timeZone} /> : null}
     <DisconnectControl connection={connection} />
   </section>;
 }
@@ -193,6 +195,13 @@ function SavedPayments({ browser, connection, browseError }: { browser: DirectPa
   const timeZone = browser?.timeZone ?? "UTC";
   const payments = browser?.payments ?? connection?.payments ?? [];
   const filters = browser?.filters;
+  const evidence = selected ? { ...selected, ...connection } : connection;
+  if (!browseError && evidence && !payments.length && !squareResultVisibility(evidence).visible) {
+    return <section id="saved-payments" className={`${cardClass} space-y-2`} aria-labelledby="saved-payments-heading">
+      <h2 id="saved-payments-heading" className="text-lg font-semibold text-ink">Saved Payments</h2>
+      <p className="text-sm text-muted">No Payments have been imported for this connection.</p>
+    </section>;
+  }
   return <section id="saved-payments" className={`${cardClass} scroll-mt-6 space-y-4`} aria-labelledby="saved-payments-heading">
     <div>
       <h2 id="saved-payments-heading" className="text-lg font-semibold text-ink">Saved Payments</h2>
