@@ -411,4 +411,3 @@ export function validSheetsSchedulerSecret(authorization: string | null, secret:
   const actual = Buffer.from(authorization), expected = Buffer.from(`Bearer ${secret}`);
   return actual.length === expected.length && timingSafeEqual(actual, expected);
 }
-
