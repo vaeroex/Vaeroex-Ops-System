@@ -105,7 +105,7 @@ function KpiSettingCard({
   const displayUnit = setting?.display_unit ?? "";
   const valueFormat = setting?.value_format ?? "";
   const xAxisLabel = setting?.x_axis_label ?? "Date";
-  const yAxisLabel = setting?.y_axis_label ?? metric.slice(0, 80);
+  const yAxisLabel = setting?.y_axis_label ?? metric.slice(0, 80).replace(/[\uD800-\uDBFF]$/, "");
   const preferredChartType = setting?.preferred_chart_type ?? "line";
   const semantics = resolveKpiSemantics(metric, setting);
   const targetReference = resolveKpiTargetReference(semantics, target);

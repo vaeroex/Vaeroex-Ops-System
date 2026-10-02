@@ -383,41 +383,55 @@ function assertSingleCanonicalRow() {
 
   const longMetricName = "Google Sheets Test Orders Shipped - Google Sheets Test Business Entity - North Location - test0001";
   assert.ok(longMetricName.length > 80 && longMetricName.length <= 160);
+  const generatedLabels = [
+    [longMetricName, longMetricName.slice(0, 80)],
+    ["A".repeat(79) + "😀", "A".repeat(79)],
+    ["A".repeat(78) + "😀", "A".repeat(78) + "😀"]
+  ];
   const renderers = [
     ...yAxisInputRenderers("app/app/kpis/page.tsx", 2),
     ...yAxisInputRenderers("app/app/kpis/settings/page.tsx", 1)
   ];
   for (const renderInput of renderers) {
     for (const unset of [undefined, { y_axis_label: null }]) {
-      assert.equal(renderInput(longMetricName, unset), longMetricName.slice(0, 80), "Generated labels must satisfy the unchanged server limit.");
+      for (const [metricName, expectedLabel] of generatedLabels) {
+        const label = renderInput(metricName, unset);
+        assert.equal(label, expectedLabel, "Generated labels must retain complete Unicode characters within the unchanged server limit.");
+        assert.ok(label.length <= 80);
+        assert.equal(label.isWellFormed(), true, "The generated default must never contain a lone surrogate.");
+      }
       assert.equal(renderInput("Orders shipped", unset), "Orders shipped", "Short generated labels stay unchanged.");
     }
-    for (const savedLabel of ["Orders shipped", "", "A".repeat(81)]) {
+    for (const savedLabel of ["Orders shipped", "", "A".repeat(81), "A".repeat(79) + "😀"]) {
       assert.equal(renderInput(longMetricName, { y_axis_label: savedLabel }), savedLabel, "Explicit stored labels are not rewritten.");
     }
-    const directionForm = formDataFor({
-      kpi_name: longMetricName,
-      canonical_name: "google_sheets_test_orders_shipped",
-      display_name: longMetricName,
-      unit_type: "count",
-      display_unit: "orders",
-      semantic_unit: "count",
-      target: "150",
-      desired_direction: "maximize",
-      target_behavior: "minimum_goal",
-      y_axis_label: renderInput(longMetricName, undefined)
-    });
-    const longNameRedirect = await submit(directionForm);
-    assert.match(longNameRedirect, /message=KPI\+settings\+updated\./, "Each actual form default must allow direction confirmation for a long imported metric.");
-    const saved = persistedRows.find((row) => row.workspace_id === workspaceId && row.kpi_name === longMetricName);
-    assert.equal(saved.display_name, longMetricName, "Bounding the chart label must preserve full metric identity.");
-    assert.equal(saved.y_axis_label, longMetricName.slice(0, 80).trim());
-    assert.equal(saved.target, 150);
-    assert.equal(saved.desired_direction, "maximize");
-    assert.equal(saved.classification_confirmed, true);
-    assert.equal(saved.classification_source, "user");
+    for (const [metricName, expectedLabel] of generatedLabels) {
+      const directionForm = formDataFor({
+        kpi_name: metricName,
+        canonical_name: "google_sheets_test_orders_shipped",
+        display_name: metricName,
+        unit_type: "count",
+        display_unit: "orders",
+        semantic_unit: "count",
+        target: "150",
+        desired_direction: "maximize",
+        target_behavior: "minimum_goal",
+        y_axis_label: renderInput(metricName, undefined)
+      });
+      const longNameRedirect = await submit(directionForm);
+      assert.match(longNameRedirect, /message=KPI\+settings\+updated\./, "Each actual form default must allow direction confirmation for long or Unicode metric names.");
+      const saved = persistedRows.find((row) => row.workspace_id === workspaceId && row.kpi_name === metricName);
+      assert.equal(saved.display_name, metricName, "Bounding the chart label must preserve full metric identity.");
+      assert.equal(saved.y_axis_label, expectedLabel.trim(), "Form submission must persist the intact label without replacement characters.");
+      assert.equal(saved.target, 150);
+      assert.equal(saved.desired_direction, "maximize");
+      assert.equal(saved.classification_confirmed, true);
+      assert.equal(saved.classification_source, "user");
+    }
   }
-  assert.equal(persistedRows.filter((row) => row.workspace_id === workspaceId && row.kpi_name === longMetricName).length, 1);
+  for (const [metricName] of generatedLabels) {
+    assert.equal(persistedRows.filter((row) => row.workspace_id === workspaceId && row.kpi_name === metricName).length, 1);
+  }
   const countBeforeInvalidLabel = submittedPayloads.length;
   const invalidLabelRedirect = await submit(formDataFor({ y_axis_label: "A".repeat(81) }));
   assert.match(invalidLabelRedirect, /error=Y-axis\+label\+must\+be\+80\+characters\+or\+fewer/);

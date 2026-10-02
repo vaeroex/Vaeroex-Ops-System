@@ -14,7 +14,8 @@ const printer = ts.createPrinter({ removeComments: true });
 const print = (node) => printer.printNode(ts.EmitHint.Unspecified, node, ast);
 // The reviewed long-name fix only bounds an unset Y-axis form default. Keep
 // every other historical helper/form byte protected by the original hashes.
-const printOriginalFormDefaults = (node) => print(node).replaceAll("setting?.y_axis_label ?? metricName.slice(0, 80)", "setting?.y_axis_label ?? metricName");
+const reviewedYAxisDefault = String.raw`setting?.y_axis_label ?? metricName.slice(0, 80).replace(/[\uD800-\uDBFF]$/, "")`;
+const printOriginalFormDefaults = (node) => print(node).replaceAll(reviewedYAxisDefault, "setting?.y_axis_label ?? metricName");
 const digest = (value) => crypto.createHash("sha256").update(value).digest("hex");
 
 // Frozen from main 75c3d61. Only the read-only list/timeline presentation
@@ -25,7 +26,7 @@ const protectedFunctions = ["lower", "explicitKpiDirection", "metricTone", "stat
 const protectedStatements = ["params", "{ supabase, workspaceId }", "[\n    kpiResult,\n    folderResult,\n    peopleResult,\n    shareResult,\n    fileResult,\n    kpiSettingsResult\n  ]", "today", "rawKpis", "sourceParentResult", "sourceParentEligibility", "eligibleKpis", "sourceFiles", "kpiSettings", "adjustedKpis", "timeline", "selectedTimelineRange", "activeStatusFilter", "kpis", "allVisibleKpis", "people", "shares", "metricNames", "kpiSnapshotAsOf", "kpiSnapshot", "kpiPageStates", "if:metricNames.length > INTELLIGENCE_SNAPSHOT_LIMITS.kpis", "kpiPageStatesByName", "kpiStateForName", "latestKpiRows", "kpiTone", "filteredLatestKpiRows", "filteredMetricNames", "filteredKpis", "selectedMetrics", "primaryMetric", "selectedTrends", "hasComparison", "comparisonMode", "selectedComparisonContext", "activeSection", "selectedMetricRows", "selectedMetricActualValues", "selectedLatestKpi", "selectedSourceFile", "selectedKpiSetting", "selectedKpiState", "if:kpiSnapshot && selectedKpiState", "selectedKpiDirection", "selectedKpiSemantics", "selectedManualTarget", "selectedTargetReference", "selectedKpiEvaluation", "selectedRecommendation", "comparisonSnapshotRows", "selectedComparisonStatesByName", "if:comparisonSnapshotRows.length", "undoMetricName", "undoSetting", "undoLatestKpi", "managedKpis"];
 
 test("existing KPI business, value, history, comparison and edit helpers remain byte-equivalent after TypeScript printing", () => {
-  assert.equal((source.match(/setting\?\.y_axis_label \?\? metricName\.slice\(0, 80\)/g) || []).length, 2, "only the two reviewed generated Y-axis defaults use the approved bound");
+  assert.equal(source.split(reviewedYAxisDefault).length - 1, 2, "only the two reviewed generated Y-axis defaults use the approved Unicode-safe bound");
   const functions = ast.statements.filter(ts.isFunctionDeclaration).filter((node) => protectedFunctions.includes(node.name?.text));
   assert.deepEqual(functions.map((node) => node.name.text), protectedFunctions);
   assert.equal(digest(functions.map(printOriginalFormDefaults).join("\n")), "ac0c6ee2d573d73f1c1f0c59bf851762e6c00eb53b4b2e715bb17af0783df2db");
