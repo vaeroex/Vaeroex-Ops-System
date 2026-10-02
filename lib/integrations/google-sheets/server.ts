@@ -17,6 +17,8 @@ import {
   sheetRange
 } from "@/lib/integrations/google-sheets/contracts";
 
+import { withSheetsRequest, type SheetsAbortableResult, type SheetsExecutionBudget } from "./execution";
+
 const tokenSchema = z.object({
   accessToken: z.string().min(10).max(8192),
   refreshToken: z.string().min(10).max(8192),
@@ -184,12 +186,12 @@ export function decryptSheetsTokens(workspaceId: string, connectionId: string, v
 }
 
 export async function sheetsLifecycle(operation: string, workspaceId: string, connectionId: string | null,
-  payload: Record<string, unknown> = {}, actorId: string | null = null, sessionId: string | null = null) {
+  payload: Record<string, unknown> = {}, actorId: string | null = null, sessionId: string | null = null, deadlineAt?: number) {
   const admin = sheetsAdmin();
   const rpc = admin.rpc.bind(admin) as unknown as (name: string, args: Record<string, unknown>) =>
-    Promise<{ data: unknown; error: unknown }>;
-  const result = await rpc("google_sheets_lifecycle_v1", { p_operation: operation, p_workspace_id: workspaceId,
-    p_connection_id: connectionId, p_actor_id: actorId, p_session_id: sessionId, p_payload: payload });
+    SheetsAbortableResult<{ data: unknown; error: unknown }>;
+  const result = await withSheetsRequest(deadlineAt, 10_000, signal => rpc("google_sheets_lifecycle_v1", { p_operation: operation, p_workspace_id: workspaceId,
+    p_connection_id: connectionId, p_actor_id: actorId, p_session_id: sessionId, p_payload: payload }).abortSignal(signal));
   if (result.error || result.data == null) throw new Error("google_sheets_lifecycle_failed");
   return result.data;
 }
@@ -205,20 +207,29 @@ export function parseSheetsCredential(value: unknown, workspaceId: string, conne
   return result;
 }
 
-async function limitedJson(response: Response, limit: number) {
+async function limitedJson(response: Response, limit: number, signal?: AbortSignal) {
   const reader = response.body?.getReader();
   if (!reader) throw new Error("google_sheets_empty_response");
   const chunks: Uint8Array[] = [];
   let size = 0;
-  while (true) {
-    const next = await reader.read();
-    if (next.done) break;
-    size += next.value.byteLength;
-    if (size > limit) {
-      await reader.cancel();
-      throw new Error("google_sheets_response_too_large");
+  const cancel = () => { void reader.cancel().catch(() => undefined); };
+  signal?.addEventListener("abort", cancel, { once: true });
+  try {
+    signal?.throwIfAborted();
+    while (true) {
+      const next = await reader.read();
+      signal?.throwIfAborted();
+      if (next.done) break;
+      size += next.value.byteLength;
+      if (size > limit) {
+        await reader.cancel();
+        throw new Error("google_sheets_response_too_large");
+      }
+      chunks.push(next.value);
     }
-    chunks.push(next.value);
+  } finally {
+    signal?.removeEventListener("abort", cancel);
+    reader.releaseLock();
   }
   const body = Buffer.concat(chunks).toString("utf8");
   if (!response.ok) {
@@ -239,17 +250,14 @@ async function limitedJson(response: Response, limit: number) {
   return JSON.parse(body) as unknown;
 }
 
-async function tokenRequest(body: URLSearchParams) {
-  const response = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: { "content-type": "application/x-www-form-urlencoded" },
-    body,
-    cache: "no-store",
-    credentials: "omit",
-    redirect: "error",
-    signal: AbortSignal.timeout(10_000)
+async function tokenRequest(body: URLSearchParams, deadlineAt?: number) {
+  return withSheetsRequest(deadlineAt, 10_000, async signal => {
+    const response = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body,
+      cache: "no-store", credentials: "omit", redirect: "error", signal
+    });
+    return tokenResponseSchema.parse(await limitedJson(response, 64_000, signal));
   });
-  return tokenResponseSchema.parse(await limitedJson(response, 64_000));
 }
 
 function assertScope(scope: string | undefined) {
@@ -279,26 +287,26 @@ export async function exchangeSheetsCode(code: string) {
   });
 }
 
-export async function sheetsAccessToken(workspaceId: string, connectionId: string) {
-  let row = parseSheetsCredential(await sheetsLifecycle("credential", workspaceId, connectionId), workspaceId, connectionId);
+export async function sheetsAccessToken(workspaceId: string, connectionId: string, execution?: SheetsExecutionBudget) {
+  let row = parseSheetsCredential(await sheetsLifecycle("credential", workspaceId, connectionId, {}, null, null, execution?.deadlineAt), workspaceId, connectionId);
   if (!row.ciphertext || row.state !== "connected") throw new Error("google_sheets_credential_unavailable");
   const tokens = decryptSheetsTokens(workspaceId, connectionId, row.ciphertext, row.generation, row.credentialVersion);
   if (Date.parse(tokens.expiresAt) !== Date.parse(row.accessExpiresAt ?? "")) throw new Error("google_sheets_credential_context_invalid");
   if (Date.parse(tokens.expiresAt) > Date.now() + 60_000) return tokens.accessToken;
   const leaseId = randomUUID();
   row = parseSheetsCredential(await sheetsLifecycle("claim_refresh", workspaceId, connectionId,
-    { leaseId, credentialVersion: row.credentialVersion, generation: row.generation }), workspaceId, connectionId);
+    { leaseId, credentialVersion: row.credentialVersion, generation: row.generation }, null, null, execution?.deadlineAt), workspaceId, connectionId);
   if (row.refreshLeaseId !== leaseId) throw new Error("google_sheets_refresh_busy");
   const config = sheetsConfiguration();
   let refreshed: z.infer<typeof tokenResponseSchema>;
   try {
     refreshed = await tokenRequest(new URLSearchParams({ refresh_token: tokens.refreshToken,
-      client_id: config.clientId, client_secret: config.clientSecret, grant_type: "refresh_token" }));
+      client_id: config.clientId, client_secret: config.clientSecret, grant_type: "refresh_token" }), execution?.deadlineAt);
     assertScope(refreshed.scope);
     if (refreshed.token_type && refreshed.token_type.toLowerCase() !== "bearer") throw new Error("google_sheets_token_type_invalid");
   } catch (error) {
     await sheetsLifecycle("fail_refresh", workspaceId, connectionId, { leaseId,
-      reauthorize: error instanceof Error && error.message === "google_sheets_authorization_required" }).catch(() => undefined);
+      reauthorize: error instanceof Error && error.message === "google_sheets_authorization_required" }, null, null, execution?.cleanupDeadlineAt).catch(() => undefined);
     throw error;
   }
   const next = tokenSchema.parse({ accessToken: refreshed.access_token, refreshToken: refreshed.refresh_token ?? tokens.refreshToken,
@@ -307,40 +315,40 @@ export async function sheetsAccessToken(workspaceId: string, connectionId: strin
   const ciphertext = encryptSheetsTokens(workspaceId, connectionId, next, row.generation, version);
   let receipt: unknown;
   try { receipt = await sheetsLifecycle("commit_refresh", workspaceId, connectionId,
-    { leaseId, credentialVersion: version, ciphertext, accessExpiresAt: next.expiresAt }); }
-  catch { receipt = await sheetsLifecycle("credential", workspaceId, connectionId); }
+    { leaseId, credentialVersion: version, ciphertext, accessExpiresAt: next.expiresAt }, null, null, execution?.cleanupDeadlineAt); }
+  catch { receipt = await sheetsLifecycle("credential", workspaceId, connectionId, {}, null, null, execution?.cleanupDeadlineAt); }
   const committed = parseSheetsCredential(receipt, workspaceId, connectionId);
   if (committed.credentialVersion !== version || committed.ciphertext !== ciphertext || committed.generation !== row.generation)
     throw new Error("google_sheets_refresh_storage_failed");
   return next.accessToken;
 }
 
-async function sheetsGet(workspaceId: string, connectionId: string, path: string, params: URLSearchParams, limit: number) {
-  const token = await sheetsAccessToken(workspaceId, connectionId);
+async function sheetsGet(workspaceId: string, connectionId: string, path: string, params: URLSearchParams, limit: number, execution?: SheetsExecutionBudget) {
+  const token = await sheetsAccessToken(workspaceId, connectionId, execution);
   const url = new URL(`https://sheets.googleapis.com/v4/spreadsheets/${path}`);
   url.search = params.toString();
   try {
-    return await limitedJson(await fetch(url, {
+    return await withSheetsRequest(execution?.deadlineAt, 15_000, async signal => limitedJson(await fetch(url, {
       method: "GET", headers: { authorization: `Bearer ${token}` },
-      cache: "no-store", credentials: "omit", redirect: "error", signal: AbortSignal.timeout(15_000)
-    }), limit);
+      cache: "no-store", credentials: "omit", redirect: "error", signal
+    }), limit, signal));
   } catch (error) {
     if (error instanceof Error && error.message === "google_sheets_authorization_required") {
       try {
-        const current = parseSheetsCredential(await sheetsLifecycle("credential", workspaceId, connectionId), workspaceId, connectionId);
+        const current = parseSheetsCredential(await sheetsLifecycle("credential", workspaceId, connectionId, {}, null, null, execution?.cleanupDeadlineAt), workspaceId, connectionId);
         if (current.ciphertext && decryptSheetsTokens(workspaceId, connectionId, current.ciphertext, current.generation, current.credentialVersion).accessToken === token)
-          await sheetsLifecycle("mark_reauthorization", workspaceId, connectionId, { credentialVersion: current.credentialVersion, generation: current.generation });
+          await sheetsLifecycle("mark_reauthorization", workspaceId, connectionId, { credentialVersion: current.credentialVersion, generation: current.generation }, null, null, execution?.cleanupDeadlineAt);
       } catch { /* A concurrent refresh/disconnect remains authoritative. */ }
     }
     throw error;
   }
 }
 
-export async function sheetsMetadata(workspaceId: string, connectionId: string, spreadsheetId: string) {
+export async function sheetsMetadata(workspaceId: string, connectionId: string, spreadsheetId: string, execution?: SheetsExecutionBudget) {
   const id = SpreadsheetIdSchema.parse(spreadsheetId);
   const raw = await sheetsGet(workspaceId, connectionId, id, new URLSearchParams({
     fields: "spreadsheetId,properties(title),sheets(properties(sheetId,title,sheetType,gridProperties(rowCount)))"
-  }), 256_000);
+  }), 256_000, execution);
   const metadata = metadataSchema.parse(raw);
   if (metadata.spreadsheetId !== id) throw new Error("google_sheets_spreadsheet_identity_mismatch");
   return {
@@ -356,26 +364,26 @@ export async function sheetsMetadata(workspaceId: string, connectionId: string, 
 
 export async function sheetsHeaders(
   workspaceId: string, connectionId: string, spreadsheetId: string,
-  tabTitle: string, headerRow: number
+  tabTitle: string, headerRow: number, execution?: SheetsExecutionBudget
 ) {
   const row = HeaderRowSchema.parse(headerRow);
   const range = sheetRange(tabTitle, "A", row, row).replace(/A\d+:A\d+$/, `A${row}:CV${row}`);
   const raw = await sheetsGet(workspaceId, connectionId,
     `${SpreadsheetIdSchema.parse(spreadsheetId)}/values/${encodeURIComponent(range)}`,
-    new URLSearchParams({ valueRenderOption: "FORMATTED_VALUE" }), 64_000);
+    new URLSearchParams({ valueRenderOption: "FORMATTED_VALUE" }), 64_000, execution);
   const values = z.object({ values: z.array(z.array(z.unknown())).optional() }).parse(raw).values;
   return safeHeaders(values?.[0] ?? []);
 }
 
 export async function sheetsMappedColumns(
   workspaceId: string, connectionId: string, spreadsheetId: string,
-  ranges: string[], render: "FORMATTED_VALUE" | "UNFORMATTED_VALUE" = "FORMATTED_VALUE"
+  ranges: string[], render: "FORMATTED_VALUE" | "UNFORMATTED_VALUE" = "FORMATTED_VALUE", execution?: SheetsExecutionBudget
 ) {
   z.array(z.string().min(1).max(512)).min(1).max(16).parse(ranges);
   const params = new URLSearchParams({ valueRenderOption: render, dateTimeRenderOption: "SERIAL_NUMBER", majorDimension: "ROWS" });
   for (const range of ranges) params.append("ranges", range);
   const raw = await sheetsGet(workspaceId, connectionId,
-    `${SpreadsheetIdSchema.parse(spreadsheetId)}/values:batchGet`, params, 4_000_000);
+    `${SpreadsheetIdSchema.parse(spreadsheetId)}/values:batchGet`, params, 4_000_000, execution);
   const response = z.object({
     valueRanges: z.array(z.object({ values: z.array(z.array(z.unknown())).optional() })).length(ranges.length)
   }).parse(raw);

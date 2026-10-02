@@ -11,8 +11,17 @@ export const SpreadsheetIdSchema = z.string().regex(/^[A-Za-z0-9_-]{20,200}$/);
 export const SheetIdSchema = z.number().int().min(0).safe();
 export const HeaderRowSchema = z.number().int().min(1).max(25);
 const column = z.number().int().min(0).max(99);
-const prohibited = /\b(patient|medical|health|diagnos(?:is|es)|treatment|prescription|insurance\s*(?:id|number)|social\s*security|ssn|mrn|ephi|phi|date\s*of\s*birth|dob)\b/i;
-const label = z.string().trim().min(1).max(80).refine(value => !prohibited.test(value), "Restricted business field");
+const prohibited = /\b(patients?|medical|health|diagnos(?:is|es)|treatments?|prescriptions?|insurance\s*(?:ids?|numbers?)|social\s*security|ssns?|mrns?|ephis?|phis?|dates?\s*of\s*birth|dobs?)\b/i;
+function isProhibitedField(value: string) {
+  // Sheet labels commonly use snake_case, punctuation, and camelCase/acronyms.
+  // Preserve acronym plurals (IDs, SSNs) and whole words such as "patiently".
+  const words = value.normalize("NFKC")
+    .replace(/([A-Z]+)([A-Z](?!s(?:[^a-z]|$))[a-z])/g, "$1 $2")
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/[^a-z0-9]+/gi, " ");
+  return prohibited.test(words);
+}
+const label = z.string().trim().min(1).max(80).refine(value => !isProhibitedField(value), "Restricted business field");
 export const FieldMappingSchema = z.object({
   dateColumn: column,
   dateFormat: z.enum(["iso", "serial"]),
@@ -34,7 +43,7 @@ export type FieldMapping = z.infer<typeof FieldMappingSchema>;
 
 export function assertBusinessLabel(value: string) {
   const result = z.string().trim().min(1).max(120).parse(value);
-  if (prohibited.test(result)) throw new Error("google_sheets_sensitive_label_denied");
+  if (isProhibitedField(result)) throw new Error("google_sheets_sensitive_label_denied");
   return result;
 }
 export function spreadsheetIdFromUrl(value: string) {
@@ -46,8 +55,8 @@ export function spreadsheetIdFromUrl(value: string) {
 }
 export function safeHeaders(raw: unknown) {
   return z.array(z.unknown()).max(100).parse(raw).map(value => {
-    const text = String(value ?? "").trim().slice(0, 120);
-    return prohibited.test(text) ? "[restricted column]" : text;
+    const text = String(value ?? "").trim();
+    return isProhibitedField(text) ? "[restricted column]" : text.slice(0, 120);
   });
 }
 export function mappedColumnIndexes(mapping: FieldMapping) {
@@ -55,7 +64,7 @@ export function mappedColumnIndexes(mapping: FieldMapping) {
 }
 export function assertMapping(headers: string[], input: unknown) {
   const mapping = FieldMappingSchema.parse(input);
-  if (mappedColumnIndexes(mapping).some(index => !headers[index] || headers[index] === "[restricted column]")) throw new Error("google_sheets_mapping_invalid");
+  if (mappedColumnIndexes(mapping).some(index => !headers[index] || headers[index] === "[restricted column]" || isProhibitedField(headers[index]))) throw new Error("google_sheets_mapping_invalid");
   return mapping;
 }
 export function sheetColumn(index: number) {

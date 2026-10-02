@@ -15,7 +15,7 @@ Module._resolveFilename = function(request, parent, isMain, options) {
   return resolve.call(this, request.startsWith('@/') ? path.join(root, request.slice(2)) : request, parent, isMain, options);
 };
 let rpcHandler = async () => { throw Error('Unexpected RPC'); };
-const admin = { rpc: (...args) => rpcHandler(...args) };
+const admin = { rpc: (...args) => ({ abortSignal: signal => rpcHandler(...args, signal) }) };
 Module._load = function(request, parent, isMain) {
   if (request === '@/lib/supabase/admin') return { createSupabaseAdminClient: () => admin };
   return load.call(this, request, parent, isMain);
@@ -27,6 +27,7 @@ Object.assign(process.env, { GOOGLE_SHEETS_ENABLED: 'true', VERCEL_ENV: 'product
 const api = require('../lib/integrations/google-sheets/server.ts');
 const { validSheetsSchedulerSecret } = api;
 const { runDueSheetsRefreshes } = require('../lib/integrations/google-sheets/scheduler.ts');
+const { withSheetsRequest } = require('../lib/integrations/google-sheets/execution.ts');
 const scope = 'https://www.googleapis.com/auth/spreadsheets.readonly';
 const ws = randomUUID(), conn = randomUUID();
 const credential = (expired = false) => ({ accessToken: 'synthetic_access_token', refreshToken: 'synthetic_refresh_token',
@@ -165,6 +166,41 @@ async function main() {
   networkHandler = async () => Response.json({ error: { message: 'private provider message' } }, { status: 401 });
   await assert.rejects(api.sheetsMetadata(ws, conn, spreadsheetId), /^Error: google_sheets_authorization_required$/);
   assert.equal(markedReauthorization, true); checks+=2;
+  // The shared deadline aborts a slow response body, not merely fetch headers.
+  row = context();
+  rpcHandler = async (_name, args) => {
+    assert.equal(args.p_operation, 'credential'); return { data: row, error: null };
+  };
+  let bodyCancelled = false, readSignal;
+  networkHandler = async (_url, init) => {
+    readSignal = init.signal;
+    return new Response(new ReadableStream({
+      start(controller) { controller.enqueue(new TextEncoder().encode('{')); },
+      cancel() { bodyCancelled = true; }
+    }));
+  };
+  await assert.rejects(api.sheetsMetadata(ws, conn, spreadsheetId,
+    { deadlineAt: Date.now() + 150, cleanupDeadlineAt: Date.now() + 5000 }), /google_sheets_deadline_exceeded/);
+  assert.equal(readSignal.aborted, true); assert.equal(bodyCancelled, true); checks+=3;
+  // A token refresh receives the remaining deadline and cleans up with a fresh budget.
+  row = context(credential(true)); let refreshCancelled = false, refreshCleanup = false;
+  rpcHandler = async (_name, args, signal) => {
+    if (args.p_operation === 'claim_refresh') return { data: { ...row, refreshLeaseId: args.p_payload.leaseId }, error: null };
+    if (args.p_operation === 'fail_refresh') { assert.equal(signal.aborted, false); refreshCleanup = true; return { data: {}, error: null }; }
+    assert.equal(args.p_operation, 'credential'); return { data: row, error: null };
+  };
+  networkHandler = async (_url, init) => new Promise((_resolve, reject) => {
+    init.signal.addEventListener('abort', () => { refreshCancelled = true; reject(init.signal.reason); }, { once: true });
+  });
+  await assert.rejects(api.sheetsMetadata(ws, conn, spreadsheetId,
+    { deadlineAt: Date.now() + 150, cleanupDeadlineAt: Date.now() + 5000 }), /google_sheets_deadline_exceeded/);
+  assert.equal(refreshCancelled, true); assert.equal(refreshCleanup, true); checks+=3;
+  // Per-request timeouts also abort the actual transport, even with a larger run budget.
+  let requestAborted = false;
+  await assert.rejects(withSheetsRequest(Date.now() + 1000, 10, signal => new Promise((_resolve, reject) => {
+    signal.addEventListener('abort', () => { requestAborted = true; reject(signal.reason); }, { once: true });
+  })), /google_sheets_request_timeout/);
+  assert.equal(requestAborted, true); checks+=2;
   const schedulerSecret = randomBytes(32).toString('base64url');
   assert.equal(validSheetsSchedulerSecret(`Bearer ${schedulerSecret}`, schedulerSecret), true);
   assert.equal(validSheetsSchedulerSecret('Bearer wrong', schedulerSecret), false);
@@ -176,7 +212,10 @@ async function main() {
   const original = [...remaining], attempted = [];
   const batchResult = await runDueSheetsRefreshes({ now: () => clock,
     due: async (tickAt, limit) => { dueCalls++; assert.equal(limit, 10); assert.equal(tickAt, '2026-10-02T12:00:00.000Z'); return remaining.slice(0, limit); },
-    sync: async connection => { attempted.push(connection.id); remaining.splice(remaining.findIndex(item => item.id === connection.id), 1); clock += 1000; },
+    sync: async (connection, execution) => {
+      assert.equal(execution.deadlineAt, Date.parse('2026-10-02T12:04:00.000Z'));
+      assert.equal(execution.cleanupDeadlineAt, Date.parse('2026-10-02T12:04:45.000Z'));
+      attempted.push(connection.id); remaining.splice(remaining.findIndex(item => item.id === connection.id), 1); clock += 1000; },
     backoff: async () => { throw Error('Unexpected backoff'); }
   });
   assert.deepEqual(batchResult, { attempted: 50, succeeded: 50, failed: 0 });
@@ -201,6 +240,15 @@ async function main() {
     due: async () => { clock = 240_000; return original.slice(0, 10); },
     sync: async () => { throw Error('Unexpected provider work'); }, backoff: async () => {} });
   assert.equal(slowLookup.attempted, 0); checks++;
+  clock = 0; let receivedBudget, cleanupAt;
+  const nearlyExpired = await runDueSheetsRefreshes({ now: () => clock,
+    due: async () => { clock = 239_999; return original.slice(0, 10); },
+    sync: async (_connection, execution) => { receivedBudget = execution; clock = 240_000; throw Error('google_sheets_deadline_exceeded'); },
+    backoff: async (_connection, _tickAt, deadlineAt) => { cleanupAt = deadlineAt; }
+  });
+  assert.deepEqual(nearlyExpired, { attempted: 1, succeeded: 0, failed: 1 });
+  assert.deepEqual(receivedBudget, { deadlineAt: 240_000, cleanupDeadlineAt: 285_000 });
+  assert.equal(cleanupAt, 285_000); checks+=3;
   console.log(`Google Sheets runtime: ${checks} focused checks passed.`);
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

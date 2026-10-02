@@ -13,10 +13,11 @@ const resolve = Module._resolveFilename;
 Module._resolveFilename = function(request, parent, isMain, options) {
   return resolve.call(this, request.startsWith('@/') ? path.join(root, request.slice(2)) : request, parent, isMain, options);
 };
-const { assertMapping, parseDateCell, spreadsheetIdFromUrl } = require('../lib/integrations/google-sheets/contracts.ts');
+const { assertBusinessLabel, assertMapping, parseDateCell, safeHeaders, spreadsheetIdFromUrl } = require('../lib/integrations/google-sheets/contracts.ts');
 const { normalizeSheetsRows } = require('../lib/integrations/google-sheets/ingestion.ts');
 const { buildIntelligenceLayer } = require('../lib/intelligence/layer.ts');
 const { loadActiveWorkspaceKpis } = require('../lib/kpis/load-workspace-kpis.ts');
+const { getSubscriptionStatus } = require('../lib/billing/get-subscription-status.ts');
 const phase3 = fs.readFileSync(path.join(root,'supabase/migrations/20260821172015_external_integrations_phase_3_deterministic_dependencies.sql'),'utf8');
 const source = name => fs.readFileSync(path.join(root,'supabase/migrations',name),'utf8');
 function fn(text,name) { const start=text.search(new RegExp(`create (?:or replace )?function ${name.replaceAll('.','\\.')}\\(`)); const end=text.indexOf('$function$;',start); assert(start>=0&&end>start); return text.slice(start,end+12); }
@@ -26,13 +27,77 @@ const mapping={rowKeyColumn:0,dateColumn:1,dateFormat:'iso',locationColumn:null,
 const headers=['Record ID','Date','Orders','On time'];
 const normalize=rows=>normalizeSheetsRows({workspaceId:ws,businessEntityId:entity,connectionId:connection,spreadsheetId:spreadsheet,sheetId:0,headerRow:1,mapping,rows});
 let stage='setup'; let checks=0;
+async function verifyWorkspaceEntitlements(db,call,deny) {
+  const entitlementWs=randomUUID(),entitlementEntity=randomUUID();
+  await db.query('insert into public.workspaces(id,manually_unlocked) values($1,false)',[entitlementWs]);
+  await db.query("insert into public.workspace_members values($1,$2,'owner','active')",[entitlementWs,actor]);
+  await db.query("insert into public.business_entities values($1,$2,'active','Entitlement fixture')",[entitlementEntity,entitlementWs]);
+  const billingReader={from(table){return{select(){return this;},eq(){return this;},or(){return this;},async maybeSingle(){assert.equal(table,'workspaces');return{data:(await db.query('select * from public.workspaces where id=$1',[entitlementWs])).rows[0],error:null};},async order(){assert.equal(table,'customer_subscriptions');return{data:(await db.query('select * from public.customer_subscriptions where workspace_id=$1 order by created_at desc,id desc',[entitlementWs])).rows,error:null};}};}};
+  const begin=()=>call('google_sheets_lifecycle_v1',['begin',entitlementWs,randomUUID(),actor,session,{businessEntityId:entitlementEntity,displayName:'Entitlement fixture',stateHash:'sha256:'+randomUUID().replaceAll('-','').repeat(2),redirectUri:'https://www.vaeroex.com/api/integrations/google-sheets/callback'}]);
+  const parity=async(allowed,label)=>{
+    const appAccess=await getSubscriptionStatus({supabase:billingReader,workspaceId:entitlementWs});
+    assert.equal(appAccess.allowed,allowed,label+' app access');
+    if(allowed) await begin(); else await assert.rejects(begin,/entitlement_denied/,label+' SQL access');
+    checks++;
+  };
+  await parity(false,'no entitlement');
+  await db.query('update public.workspaces set subscription_required=false where id=$1',[entitlementWs]);
+  await parity(true,'subscription bypass');
+  await db.query("update public.workspaces set subscription_required=true,subscription_status='demo' where id=$1",[entitlementWs]);
+  await parity(true,'demo workspace');
+  await db.query("update public.workspaces set subscription_status='trialing',trial_ends_at=now()+interval '1 day' where id=$1",[entitlementWs]);
+  await parity(true,'active workspace trial');
+  await db.query("update public.workspaces set trial_ends_at=now()-interval '1 second' where id=$1",[entitlementWs]);
+  await parity(false,'expired workspace trial');
+  await db.query("update public.workspaces set trial_ends_at=null where id=$1",[entitlementWs]);
+  await parity(false,'missing trial expiry');
+  await db.query("update public.workspaces set subscription_status='active',manually_unlocked=true where id=$1",[entitlementWs]);
+  await parity(false,'manual unlock without qualifying subscription');
+  await db.query("insert into public.customer_subscriptions(workspace_id,billing_provider,manually_activated,status) values($1,'manual',true,'active')",[entitlementWs]);
+  await parity(true,'manual linked entitlement');
+  await db.query('update public.workspaces set manually_unlocked=false where id=$1',[entitlementWs]);
+  await parity(false,'manual subscription without workspace unlock');
+  await db.query("update public.workspaces set subscription_required=false,manually_unlocked=true,subscription_status='trialing',trial_ends_at=now()+interval '1 day' where id=$1",[entitlementWs]);
+  const stripeId=randomUUID();
+  await db.query("insert into public.customer_subscriptions(id,workspace_id,billing_provider,manually_activated,status,current_period_end,stripe_customer_id,stripe_subscription_id) values($1,$2,'stripe',false,'past_due',now()+interval '1 day','cus_fixture','sub_fixture')",[stripeId,entitlementWs]);
+  await parity(false,'Stripe denial overrides bypass manual and trial');
+  await db.query("update public.workspaces set subscription_status='demo' where id=$1",[entitlementWs]);
+  await parity(false,'Stripe denial overrides demo');
+  await db.query("update public.customer_subscriptions set status='active',current_period_end=now()-interval '1 second' where id=$1",[stripeId]);
+  await parity(false,'expired Stripe entitlement');
+  await db.query("update public.customer_subscriptions set current_period_end=now()+interval '1 day',stripe_subscription_id=null where id=$1",[stripeId]);
+  await parity(false,'incomplete Stripe identity');
+  await db.query("update public.customer_subscriptions set stripe_subscription_id='sub_fixture' where id=$1",[stripeId]);
+  await parity(true,'active Stripe entitlement');
+  await db.query("update public.customer_subscriptions set manually_activated=true where id=$1",[stripeId]);
+  await parity(false,'manual flag cannot activate Stripe');
+  await db.query("update public.customer_subscriptions set manually_activated=false where id=$1",[stripeId]);
+  await db.query("insert into public.customer_subscriptions(workspace_id,billing_provider,manually_activated,status,created_at) values($1,'stripe',false,'canceled',now()+interval '1 second')",[entitlementWs]);
+  await parity(false,'latest linked Stripe controls access');
+  await db.query("delete from public.customer_subscriptions where workspace_id=$1 and billing_provider='stripe'",[entitlementWs]);
+  await db.query("update public.workspace_members set status='suspended' where workspace_id=$1",[entitlementWs]);
+  await deny(begin,'owner_denied');
+  await db.query("update public.workspace_members set status='active' where workspace_id=$1",[entitlementWs]);
+  await db.query("update auth.users set banned_until=now()+interval '1 day' where id=$1",[actor]);
+  await deny(begin,'owner_denied');
+  await db.query('update auth.users set banned_until=null where id=$1',[actor]);
+  // The same fallback must cover approved manual and scheduled refresh claims.
+  const fallbackConnection=randomUUID();
+  await db.query("insert into public.google_sheets_connections(id,workspace_id,business_entity_id,created_by,status,display_name,spreadsheet_id,sheet_id,sheet_title,headers) values($1,$2,$3,$4,'connected','Fallback fixture',$5,0,'Metrics',$6)",[fallbackConnection,entitlementWs,entitlementEntity,actor,spreadsheet,headers]);
+  await call('approve_google_sheets_mapping_v1',[entitlementWs,fallbackConnection,actor,session,mapping,true]);
+  const manual=await call('claim_google_sheets_sync_v1',[entitlementWs,fallbackConnection,actor,session,'manual']);
+  await call('fail_google_sheets_sync_v1',[entitlementWs,fallbackConnection,manual.runId,'fixture_failure']);
+  await db.query('update public.google_sheets_connections set next_sync_at=now() where id=$1',[fallbackConnection]);
+  const automatic=await call('claim_google_sheets_sync_v1',[entitlementWs,fallbackConnection,null,null,'scheduled']);
+  await call('fail_google_sheets_sync_v1',[entitlementWs,fallbackConnection,automatic.runId,'fixture_failure']);checks++;
+}
 async function qualify(db) {
   await db.exec(`create schema private; create schema auth; create schema extensions;
     create role anon; create role authenticated; create role service_role bypassrls;
     create function auth.role() returns text language sql stable as $$select current_setting('request.jwt.claim.role',true)$$;
     create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
     create function extensions.digest(bytea,text) returns bytea language sql immutable as $$select sha256($1)$$;
-    create table public.workspaces(id uuid primary key,manually_unlocked boolean default true);
+    create table public.workspaces(id uuid primary key,manually_unlocked boolean default true,subscription_required boolean default true,subscription_status text default 'manual_review',trial_ends_at timestamptz,plan_slug text);
     create table public.customer_subscriptions(id uuid primary key default gen_random_uuid(),workspace_id uuid,billing_provider text,created_at timestamptz default now(),manually_activated boolean,status text,current_period_end timestamptz,stripe_customer_id text,stripe_subscription_id text);
     create table public.profiles(id uuid primary key);
     create table public.workspace_members(workspace_id uuid,user_id uuid,role text,status text);
@@ -65,6 +130,7 @@ async function qualify(db) {
   await db.query("insert into auth.sessions values($1,$2,now()+interval '1 day')",[session,actor]);
   const call=async(name,args,role='service_role')=>{ stage=name; await db.exec(`set role ${role}; select set_config('request.jwt.claim.role','${role}',false)`); try { return (await db.query(`select public.${name}(${args.map((_,i)=>`$${i+1}`).join(',')}) result`,args)).rows[0].result; } finally { await db.exec("reset role; select set_config('request.jwt.claim.role','service_role',false)"); } };
   const deny=async(action,pattern)=>{await assert.rejects(action,error=>pattern?new RegExp(pattern).test(error.message):true);checks++;};
+  await verifyWorkspaceEntitlements(db,call,deny);
   await db.query("insert into public.google_sheets_connections(id,workspace_id,business_entity_id,created_by,status,display_name,spreadsheet_id,sheet_id,sheet_title,headers) values($1,$2,$3,$4,'connected','Operations sheet',$5,0,'Daily',$6)",[connection,ws,entity,actor,spreadsheet,headers]);
   const approve=()=>call('approve_google_sheets_mapping_v1',[ws,connection,actor,session,mapping,true]);
   const claim=()=>call('claim_google_sheets_sync_v1',[ws,connection,actor,session,'manual']);
@@ -81,6 +147,12 @@ async function qualify(db) {
   await deny(()=>commit(first,[['row-1','2026-10-01',20,0.9]],false),'incomplete_read');
   const initial=await commit(first,[['row-1','2026-10-01',20,0.9],['row-2','2026-10-02',30,0.95]]);
   assert.equal(initial.factCount,4); checks++;
+  // Cleanup after a lost commit acknowledgement must preserve authoritative success.
+  const successSnapshot=async()=>(await db.query("select jsonb_build_object('run',to_jsonb(r),'connection',to_jsonb(c),'facts',(select jsonb_agg(to_jsonb(k) order by k.id) from public.kpis k where k.workspace_id=c.workspace_id)) snapshot from public.google_sheets_sync_runs r join public.google_sheets_connections c on c.id=r.connection_id and c.workspace_id=r.workspace_id where r.id=$1",[first.runId])).rows[0].snapshot;
+  const committedSnapshot=await successSnapshot();
+  await call('fail_google_sheets_sync_v1',[ws,connection,first.runId,'request_timeout']);
+  assert.deepEqual(await successSnapshot(),committedSnapshot);checks++;
+
   assert((await db.query("select next_sync_at>now() and next_sync_at<=now()+interval '15 minutes' and mod(extract(epoch from next_sync_at),900)=0 due from public.google_sheets_connections where id=$1",[connection])).rows[0].due);checks++;
   assert.equal((await db.query("select actual_value from public.kpis where name like 'On-time rate%' and metric_date='2026-10-01' and archived_at is null")).rows[0].actual_value,'90');checks++;
   const savedApproval=(await db.query('select active_approval_id from public.google_sheets_connections where id=$1',[connection])).rows[0].active_approval_id;
@@ -200,7 +272,46 @@ async function qualify(db) {
   await db.exec('reset role');
   return {checks,largeRows:750,largeFacts:1500,liveProviderCalls:0,fullCanonicalBootstrap:false};
 }
+function verifySensitiveFieldBoundaries() {
+  const restricted = [
+    'patient_id', 'patients', 'Patient IDs', 'patientCount', 'PatientID',
+    'medical_record_number', 'medicalRecordNumber', 'medical-record-numbers',
+    'insurance_id', 'insuranceIDs', 'INSURANCE.NUMBERS', 'ephi_value', 'ePHIValue',
+    'PHIRecords', 'SSNs', 'MRNValue', 'dateOfBirth', 'dates_of_birth',
+    'socialSecurityNumber', 'diagnoses', 'treatments', 'prescriptions',
+  ];
+  for (const value of restricted) {
+    const raw = [...headers]; raw[2] = value;
+    assert.equal(safeHeaders(raw)[2], '[restricted column]', value);
+    assert.throws(() => assertMapping(raw, mapping), /google_sheets_mapping_invalid/, 'raw or previously saved header: ' + value);
+    assert.throws(() => assertMapping(safeHeaders(raw), mapping), /google_sheets_mapping_invalid/, 'discovered header: ' + value);
+    assert.throws(() => assertBusinessLabel(value), /google_sheets_sensitive_label_denied/, value);
+    for (const field of ['name', 'category']) {
+      const named = { ...mapping, metrics: mapping.metrics.map((metric, index) => index === 0 ? { ...metric, [field]: value } : metric) };
+      assert.throws(() => assertMapping(headers, named), /Restricted business field/, field + ': ' + value);
+    }
+    checks++;
+  }
+  for (const value of ['patientlyProcessedOrders', 'impatientCustomers', 'medicality', 'healthiness', 'philosophy', 'shipping', 'insurancePremiums', 'dobermanCount']) {
+    const raw = [...headers]; raw[2] = value;
+    assert.deepEqual(safeHeaders(raw), raw, value);
+    assertMapping(raw, mapping);
+    assert.equal(assertBusinessLabel(value), value);
+    assertMapping(headers, { ...mapping, metrics: mapping.metrics.map((metric, index) => index === 0 ? { ...metric, name: value, category: value } : metric) });
+    checks++;
+  }
+  const withLocation = { ...mapping, locationColumn: 4 };
+  for (const index of [0, 1, 2, 4]) {
+    const raw = [...headers, 'Location']; raw[index] = 'patient_id';
+    assert.throws(() => assertMapping(raw, withLocation), /google_sheets_mapping_invalid/, 'every mapped role rejects restricted columns');
+    checks++;
+  }
+  assertMapping(safeHeaders([...headers, 'patient_id']), mapping); checks++;
+  assert.equal(safeHeaders(['Orders '.repeat(20) + 'patient_id'])[0], '[restricted column]', 'inspect before header display truncation'); checks++;
+}
+
 async function main(){
+  verifySensitiveFieldBoundaries();
   const {PGlite}=require(process.env.GOOGLE_SHEETS_PGLITE_PATH||'@electric-sql/pglite');const db=new PGlite();
   try {
     assertMapping(headers,mapping);assert.equal(parseDateCell(46296,'serial'),'2026-10-01');checks++;

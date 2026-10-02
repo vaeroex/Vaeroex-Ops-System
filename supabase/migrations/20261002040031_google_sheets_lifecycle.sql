@@ -39,11 +39,15 @@ begin
     end if;
     return;
   end if;
+  -- Match getSubscriptionStatus's workspace fallbacks only after excluding a
+  -- linked Stripe row. A Stripe denial cannot be bypassed by these flags.
+  if workspace_row.subscription_required is false then return; end if;
   select exists(select 1 from public.customer_subscriptions sub where sub.workspace_id=p_workspace_id
     and sub.billing_provider='manual' and sub.manually_activated and sub.status in ('active','trialing')) into manual_allowed;
-  if not (workspace_row.manually_unlocked and manual_allowed) then
-    raise exception 'google_sheets_entitlement_denied' using errcode='42501';
-  end if;
+  if workspace_row.manually_unlocked and manual_allowed then return; end if;
+  if workspace_row.subscription_status='demo' then return; end if;
+  if workspace_row.subscription_status='trialing' and workspace_row.trial_ends_at>checked_at then return; end if;
+  raise exception 'google_sheets_entitlement_denied' using errcode='42501';
 end;
 $function$;
 revoke all on function private.require_google_sheets_eligible_v1(uuid) from public,anon,authenticated,service_role;

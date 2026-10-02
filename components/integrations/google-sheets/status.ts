@@ -27,6 +27,8 @@ export const googleSheetsErrors: Record<string, string> = {
   workspace_capacity: "This import would exceed the workspace’s 20,000 active metric limit. Reduce the report or archive older metrics before syncing again.",
   snapshot_changed: "The spreadsheet changed while it was being read. Let edits finish, then sync again. The previous successful import remains unchanged.",
   lease_expired: "The previous sync did not finish in time. Try Sync now again.",
+  deadline_exceeded: "This sync reached its time limit. Check the latest run, then try Sync now. If it repeats, reduce the selected tab size.",
+  request_timeout: "Google or the sync service did not respond in time. Check the latest run, then try Sync now.",
   recovery_required: "Remove Vaeroex access from the Google account used for this attempt, then complete connection recovery here.",
   request_failed: "That step could not be completed. Check the connection and selected spreadsheet, then try again.",
   row_limit: "This report exceeds the import limit. Use a tab with at most 10,000 data rows below the header and 15,000 numeric observations. No partial report was published.",
