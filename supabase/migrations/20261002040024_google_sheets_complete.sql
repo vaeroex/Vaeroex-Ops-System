@@ -203,9 +203,10 @@ create trigger google_sheets_connection_retirement before update on public.googl
   for each row execute function private.google_sheets_connection_retirement_v1();
 
 create function public.approve_google_sheets_mapping_v1(p_workspace_id uuid,p_connection_id uuid,p_actor_id uuid,p_session_id uuid,p_mapping jsonb,p_automatic_enabled boolean)
-returns uuid language plpgsql security invoker set search_path='' as $function$
+returns uuid language plpgsql security definer set search_path='' as $function$
 declare c public.google_sheets_connections; a uuid; m jsonb; cols integer[]; col integer;
 begin
+  if auth.role() is distinct from 'service_role' then raise exception 'google_sheets_service_denied' using errcode='42501'; end if;
   perform pg_advisory_xact_lock(hashtextextended('google_sheets:'||p_workspace_id::text,0));
   perform private.require_google_sheets_eligible_v1(p_workspace_id);
   select * into c from public.google_sheets_connections where workspace_id=p_workspace_id and id=p_connection_id for update;
@@ -428,10 +429,8 @@ create policy "workspace members read Sheets connections" on public.google_sheet
 create policy "workspace members read Sheets outcomes" on public.google_sheets_sync_runs for select to authenticated using(public.is_workspace_member(workspace_id));
 grant select on public.google_sheets_connections,public.google_sheets_sync_runs to authenticated;
 revoke all on function private.require_google_sheets_owner_v1(uuid,uuid,uuid,uuid),private.google_sheets_immutable_v1(),
-  private.retire_google_sheets_facts_v1(uuid,uuid),private.google_sheets_connection_retirement_v1() from public,anon,authenticated;
--- Invoker routines require only the server role; they do not become public mutation APIs.
-grant usage on schema private to service_role;
-grant execute on function private.require_google_sheets_owner_v1(uuid,uuid,uuid,uuid),private.retire_google_sheets_facts_v1(uuid,uuid) to service_role;
+  private.retire_google_sheets_facts_v1(uuid,uuid),private.google_sheets_connection_retirement_v1() from public,anon,authenticated,service_role;
+-- Only the guarded public SECURITY DEFINER RPCs can invoke these private helpers.
 revoke all on function public.approve_google_sheets_mapping_v1(uuid,uuid,uuid,uuid,jsonb,boolean),
   public.claim_google_sheets_sync_v1(uuid,uuid,uuid,uuid,text),public.commit_google_sheets_sync_v1(uuid,uuid,uuid,jsonb,boolean),
   public.fail_google_sheets_sync_v1(uuid,uuid,uuid,text) from public,anon,authenticated;

@@ -54,6 +54,8 @@ async function qualify(db) {
   await db.exec(fn(phase3,'private.phase_3_contract_fingerprint_v1'));
   await db.exec(source('20261002040024_google_sheets_complete.sql'));
   await db.exec(source('20261002040031_google_sheets_lifecycle.sql'));
+  assert((await db.query("select not has_schema_privilege('anon','private','USAGE') and not has_schema_privilege('authenticated','private','USAGE') and not has_schema_privilege('service_role','private','USAGE') as private_boundary")).rows[0].private_boundary);checks++;
+  assert((await db.query("select not has_function_privilege('service_role','private.require_google_sheets_owner_v1(uuid,uuid,uuid,uuid)','EXECUTE') and not has_function_privilege('service_role','private.retire_google_sheets_facts_v1(uuid,uuid)','EXECUTE') and not has_function_privilege('service_role','private.require_google_sheets_eligible_v1(uuid)','EXECUTE') as helper_boundary")).rows[0].helper_boundary);checks++;
   await db.query('insert into public.workspaces(id) values($1),($2)',[ws,otherWs]);
   await db.query("insert into public.customer_subscriptions(workspace_id,billing_provider,manually_activated,status) values($1,'manual',true,'active')",[ws]);
   await db.query('insert into public.profiles values($1)',[actor]);
@@ -70,7 +72,11 @@ async function qualify(db) {
   await deny(()=>call('approve_google_sheets_mapping_v1',[otherWs,connection,actor,session,mapping,true]),'unavailable|entitlement_denied');
   await deny(()=>call('approve_google_sheets_mapping_v1',[ws,connection,actor,randomUUID(),mapping,true]),'owner_denied');
   await deny(()=>call('approve_google_sheets_mapping_v1',[ws,connection,actor,session,mapping,true],'authenticated'));
-  await approve();
+  await deny(()=>call('approve_google_sheets_mapping_v1',[ws,connection,actor,session,mapping,true],'anon'));
+  await db.exec("select set_config('request.jwt.claim.role','authenticated',false)");
+  await deny(()=>db.query('select public.approve_google_sheets_mapping_v1($1,$2,$3,$4,$5,$6)',[ws,connection,actor,session,mapping,true]),'service_denied');
+  await db.exec("select set_config('request.jwt.claim.role','service_role',false)");
+  assert.match(await approve(),/^[a-f0-9-]{36}$/);checks++;
   const first=await claim(); await deny(claim,'sync_busy');
   await deny(()=>commit(first,[['row-1','2026-10-01',20,0.9]],false),'incomplete_read');
   const initial=await commit(first,[['row-1','2026-10-01',20,0.9],['row-2','2026-10-02',30,0.95]]);

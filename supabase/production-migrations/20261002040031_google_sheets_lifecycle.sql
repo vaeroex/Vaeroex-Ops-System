@@ -46,8 +46,7 @@ begin
   end if;
 end;
 $function$;
-revoke all on function private.require_google_sheets_eligible_v1(uuid) from public,anon,authenticated;
-grant execute on function private.require_google_sheets_eligible_v1(uuid) to service_role;
+revoke all on function private.require_google_sheets_eligible_v1(uuid) from public,anon,authenticated,service_role;
 
 create function public.google_sheets_lifecycle_v1(
   p_operation text, p_workspace_id uuid, p_connection_id uuid,

@@ -279,11 +279,16 @@ function assertTargetIsSinglePendingMigration() {
   "20260912190000_square_production_runtime_foundation.sql",
   "20260915040500_integration_production_legacy_foundation_guard.sql"
   ];
+  const separatelyQualifiedSheetsTail = [
+    "20261002040024_google_sheets_complete.sql",
+    "20261002040031_google_sheets_lifecycle.sql"
+  ];
+  const reviewedTail = [...dormantSquareTail, ...separatelyQualifiedSheetsTail];
   const laterMigrations = migrations.slice(targetIndex + 1);
-  if (laterMigrations.length !== dormantSquareTail.length ||
-      laterMigrations.some((migration, index) => migration !== dormantSquareTail[index])) {
+  if (laterMigrations.length !== reviewedTail.length ||
+      laterMigrations.some((migration, index) => migration !== reviewedTail[index])) {
     fail(
-      `Fixture-rich harness requires the reviewed dormant Square tail after ${targetVersion}.`
+      `Fixture-rich harness requires the reviewed dormant Square and Google Sheets tail after ${targetVersion}.`
     );
   }
 }

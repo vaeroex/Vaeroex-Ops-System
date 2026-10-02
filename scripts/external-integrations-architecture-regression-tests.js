@@ -376,6 +376,8 @@ matches(
 );
 matches(zeroBasedUpgradeRunner, /const dormantSquareTail = \[\s*"20260902191323_integration_production_runtime_foundation\.sql",\s*"20260902191324_square_production_runtime_overlay\.sql",\s*"20260902191325_square_production_internal_pilot_runtime\.sql",\s*"20260907042202_square_dormant_trusted_authority\.sql",\s*"20260907042352_square_dormant_atomic_pages\.sql",\s*"20260907174326_square_dormant_account_connection\.sql",\s*"20260907225626_square_remote_sandbox_binding\.sql",\s*"20260908014713_square_broker_runtime_credential_authority\.sql",\s*"20260908042529_square_gcp_callback_authority\.sql",\s*"20260910193429_square_gcp_callback_oregon_recovery\.sql",\s*"20260910231437_square_gcp_mapped_runtime\.sql",\s*"20260911000915_square_gcp_mapped_legacy_fencing\.sql",\s*"20260911151334_square_verified_provider_observations\.sql",\s*"20260911205108_square_canonical_interpretation\.sql",\s*"20260911222230_square_workspace_evidence\.sql",\s*"20260912034447_square_workspace_card_contract\.sql",\s*"20260912150000_square_operational_intelligence\.sql",\s*"20260912190000_square_production_runtime_foundation\.sql",\s*"20260915040500_integration_production_legacy_foundation_guard\.sql"\s*\]/,
   "fixture-rich QBO upgrade allows exactly the reviewed dormant Square migrations");
+matches(zeroBasedUpgradeRunner, /const separatelyQualifiedSheetsTail = \[\s*"20261002040024_google_sheets_complete\.sql",\s*"20261002040031_google_sheets_lifecycle\.sql"\s*\]/,
+  "fixture-rich QBO upgrade allows exactly the two reviewed Google Sheets migrations");
 // Execute only the pure manifest guard, with no database/CLI capability. This
 // catches an omitted additive tail before the real database gate runs in CI.
 const fixtureGuardSource = zeroBasedUpgradeRunner.slice(0, zeroBasedUpgradeRunner.indexOf("async function applyFixture"));
@@ -403,6 +405,8 @@ for (const manifest of [currentMigrations.filter(name => name !== "2026090717432
   currentMigrations.filter(name => name !== "20260911000915_square_gcp_mapped_legacy_fencing.sql"),
   currentMigrations.filter(name => name !== "20260911151334_square_verified_provider_observations.sql"),
   currentMigrations.filter(name => name !== "20260911205108_square_canonical_interpretation.sql"),
+  currentMigrations.filter(name => name !== "20261002040024_google_sheets_complete.sql"),
+  currentMigrations.filter(name => name !== "20261002040031_google_sheets_lifecycle.sql"),
   [...currentMigrations, "20990101000000_square_activation.sql"]]) {
   assertionCount++; assert.throws(() => acceptsFixtureManifest(manifest), /fixture_manifest_denied/, "missing or unreviewed tail still rejects");
 }
@@ -505,8 +509,9 @@ assert.deepEqual(approvedSquareQualificationPaths.filter(file => file.startsWith
 "only the twenty-three bounded provisioner files are exempt");
 assertionCount++;
 assert.deepEqual(JSON.parse(read("vercel.json")), {
-  git: { deploymentEnabled: { "codex/square-remote-sandbox-binding": false, "codex/square-sandbox-qualification": false, "codex/square-gcp-sandbox-callback": false } }
-}, "Square review branches cannot auto-deploy; main and every other branch keep Vercel's default behavior");
+  git: { deploymentEnabled: { "codex/square-remote-sandbox-binding": false, "codex/square-sandbox-qualification": false, "codex/square-gcp-sandbox-callback": false } },
+  crons: [{ path: "/api/integrations/google-sheets/scheduled-sync", schedule: "*/15 * * * *" }]
+}, "Square review branches cannot auto-deploy; other branches keep default behavior and only the reviewed Sheets cron is configured");
 equal(withoutSquareQualificationPaths(approvedSquareQualificationPaths.join("\n")), "", "exact qualification paths are exempt from legacy phase-only scope assertions");
 for (const protectedPath of [
   ...approvedSquareQualificationPaths.map(file => `${file}.unexpected`),
