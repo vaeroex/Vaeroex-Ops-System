@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- Execute actual TypeScript with synthetic capabilities only. */
 const assert = require('node:assert/strict');
 const fs = require('node:fs'), path = require('node:path'), Module = require('node:module'), ts = require('typescript');
-const { randomUUID } = require('node:crypto');
+const { createHash, randomUUID } = require('node:crypto');
 const { PassThrough } = require('node:stream');
 const http = require('node:http');
 const root = path.resolve(__dirname, '..');
@@ -682,6 +682,128 @@ async function main() {
   } finally {
     if(previousGate===undefined)delete process.env.QBO_PRODUCTION_CUSTOMER_CONNECTIONS_ENABLED;
     else process.env.QBO_PRODUCTION_CUSTOMER_CONNECTIONS_ENABLED=previousGate;
+  }
+
+  // Execute the real connect route and repository adapters with in-memory identity/RPCs.
+  const connectEnvironment={QBO_PRODUCTION_CUSTOMER_CONNECTIONS_ENABLED:'true',
+    QBO_APPLICATION_ORIGIN:'https://qbo-customer.example.invalid',QBO_PRODUCTION_CLIENT_ID:'synthetic-connect-client',
+    QBO_PRODUCTION_CALLBACK_URI:'https://integrations.vaeroex.com/oauth/callback',QBO_PRODUCTION_RETURN_INTENT:'/app/settings'};
+  const savedEnvironment=Object.fromEntries(Object.keys(connectEnvironment).map(key=>[key,process.env[key]]));
+  const savedLoader={load:Module._load,resolve:Module._resolveFilename,ts:require.extensions['.ts'],tsx:require.extensions['.tsx']};
+  const https=require('node:https'),savedFetch=global.fetch;
+  const savedTransports=[http,https].map(transport=>({transport,request:transport.request,get:transport.get}));
+  let connectRole='owner',identityReads=0,networkAttempts=0,mismatchedState=false;
+  const rpcCalls=[],entityQueries=[],foreignEntityId=randomUUID();
+  const entities=[{id:ids.entity,workspace_id:ids.workspace,status:'active'},
+    {id:foreignEntityId,workspace_id:randomUUID(),status:'active'}];
+  const connectClient={
+    from:table=>{
+      const read={table,columns:null,filters:[]};entityQueries.push(read);
+      const query={select:columns=>{read.columns=columns;return query;},
+        eq:(key,value)=>{read.filters.push([key,value]);return query;},
+        maybeSingle:async()=>({data:entities.find(entity=>read.filters.every(([key,value])=>entity[key]===value))??null,error:null})};
+      return query;
+    },
+    rpc:async(name,args)=>{
+      rpcCalls.push({name,args:structuredClone(args)});
+      const command=args.p_command;
+      if(name==='create_integration_connection_intent_v1')return {error:null,data:{idempotent:false,connection:{
+        contractVersion:'integration_connection_summary_v1',id:command.id,workspaceId:command.workspaceId,
+        businessEntityId:command.businessEntityId,providerKey:command.providerKey,providerEnvironment:command.providerEnvironment,
+        safeDisplayName:command.safeDisplayName,status:'pending_authorization',stateReasonCode:'authorization_pending',
+        requestedScopes:command.requestedScopes,grantedScopes:[],capabilitySnapshot:command.capabilitySnapshot,
+        adapterVersion:command.adapterVersion,configurationVersion:command.configurationVersion,
+        connectionGeneration:1,rowVersion:7,statusChangedAt:command.requestedAt,disconnectedAt:null}}};
+      if(name==='create_qbo_customer_oauth_state_v2')return {error:null,data:{stateId:command.stateId,
+        connectionId:mismatchedState?randomUUID():command.connectionId,connectionGeneration:1,expiresAt:command.expiresAt,idempotent:false}};
+      throw Error('unexpected_connect_rpc');
+    }
+  };
+  const denyNetwork=()=>{networkAttempts++;throw Error('connect_network_forbidden');};
+  const connectRequest=(entityId=ids.entity)=>new Request(`${connectEnvironment.QBO_APPLICATION_ORIGIN}/api/integrations/qbo/connect`,{
+    method:'POST',headers:{origin:connectEnvironment.QBO_APPLICATION_ORIGIN,'content-type':'application/x-www-form-urlencoded'},
+    body:new URLSearchParams({businessEntityId:entityId,displayName:'Synthetic customer'})});
+  function resetConnect() {rpcCalls.length=0;entityQueries.length=0;identityReads=0;connectRole='owner';mismatchedState=false;}
+  try {
+    Object.assign(process.env,connectEnvironment);
+    global.fetch=denyNetwork;
+    for(const {transport} of savedTransports) {transport.request=denyNetwork;transport.get=denyNetwork;}
+    installLoader({'@/lib/security/require-workspace-access':{requireWorkspaceAccess:async()=>{
+      identityReads++;return {workspaceId:ids.workspace,membership:{role:connectRole},supabase:connectClient};
+    }}});
+    const {POST:connectPost}=require('../app/api/integrations/qbo/connect/route.ts');
+    await test('actual connect POST persists bound intent and state before canonical 303 without network',async()=>{
+      resetConnect();
+      const response=await connectPost(connectRequest());
+      assert.equal(response.status,303);assert.equal(identityReads,1);assert.equal(networkAttempts,0);
+      assert.deepEqual(entityQueries,[{table:'business_entities',columns:'id,status',
+        filters:[['workspace_id',ids.workspace],['id',ids.entity],['status','active']]}]);
+      assert.deepEqual(rpcCalls.map(call=>call.name),['create_integration_connection_intent_v1','create_qbo_customer_oauth_state_v2']);
+      const intent=rpcCalls[0].args.p_command,stateCommand=rpcCalls[1].args.p_command;
+      assert.equal(intent.workspaceId,ids.workspace);assert.equal(intent.businessEntityId,ids.entity);
+      assert.equal(intent.providerKey,'quickbooks_online');assert.equal(intent.providerEnvironment,'production');
+      assert.equal(intent.safeDisplayName,'Synthetic customer');
+      assert.deepEqual(intent.requestedScopes,['com.intuit.quickbooks.accounting']);
+      const location=response.headers.get('location');
+      // Boolean assertions keep the raw state and redirect out of failure diagnostics.
+      assert(typeof location==='string'&&URL.canParse(location),'connect redirect must be a valid URL');
+      const target=new URL(location),state=target.searchParams.get('state');
+      assert(target.origin==='https://appcenter.intuit.com'&&target.pathname==='/connect/oauth2'&&
+        !target.username&&!target.password&&!target.hash,'connect redirect must use the canonical authorization endpoint');
+      assert(JSON.stringify([...target.searchParams.keys()].sort())===JSON.stringify(['client_id','redirect_uri','response_type','scope','state']),
+        'connect redirect must contain only the expected parameters');
+      assert(target.searchParams.get('client_id')===connectEnvironment.QBO_PRODUCTION_CLIENT_ID,'connect client ID must match server configuration');
+      assert(target.searchParams.get('response_type')==='code','connect must request an authorization code');
+      assert(target.searchParams.get('scope')==='com.intuit.quickbooks.accounting','connect must request only the accounting scope');
+      assert(target.searchParams.get('redirect_uri')===connectEnvironment.QBO_PRODUCTION_CALLBACK_URI,'connect callback must match server configuration');
+      assert(typeof state==='string'&&/^i1_[A-Za-z0-9_-]{43}$/.test(state),'connect must generate a namespaced 32-byte state');
+      assert(stateCommand.stateHash===`sha256:${createHash('sha256').update(state,'utf8').digest('hex')}`,'persisted state hash must bind the redirect state');
+      assert(!JSON.stringify(rpcCalls).includes(state),'raw state must not reach persistence');
+      assert(stateCommand.contractVersion==='qbo_customer_oauth_state_v2'&&stateCommand.connectionId===intent.id&&
+        stateCommand.expectedConnectionGeneration===1&&stateCommand.expectedConnectionRowVersion===7,'state must bind the returned connection snapshot');
+      assert(JSON.stringify(stateCommand.requestedScopes)===JSON.stringify(intent.requestedScopes)&&
+        stateCommand.redirectUri===connectEnvironment.QBO_PRODUCTION_CALLBACK_URI&&stateCommand.returnIntent==='/app/settings',
+        'state must bind the approved scopes, callback and return intent');
+      assert(stateCommand.requestedAt===intent.requestedAt&&Date.parse(stateCommand.expiresAt)-Date.parse(stateCommand.requestedAt)===600000,
+        'state must expire ten minutes after the intent');
+      assert(rpcCalls[1].args.p_request_id===`qbo_connect_${stateCommand.stateId.replaceAll('-','')}`,'state request ID must bind the persisted state ID');
+    });
+    await test('actual connect POST rejects missing configuration before identity or mutation',async()=>{
+      for(const key of ['QBO_PRODUCTION_CLIENT_ID','QBO_PRODUCTION_CALLBACK_URI','QBO_PRODUCTION_RETURN_INTENT']) {
+        resetConnect();delete process.env[key];
+        try {
+          const response=await connectPost(connectRequest());
+          assert.equal(response.status,400);assert.equal(response.headers.has('location'),false);
+          assert.equal(identityReads,0);assert.equal(entityQueries.length,0);assert.equal(rpcCalls.length,0);
+        } finally {process.env[key]=connectEnvironment[key];}
+      }
+    });
+    await test('actual connect POST denies non-owners and foreign entities before mutation',async()=>{
+      for(const deniedRole of ['admin','manager','member','viewer']) {
+        resetConnect();connectRole=deniedRole;
+        const response=await connectPost(connectRequest());
+        assert.equal(response.status,403);assert.equal(response.headers.has('location'),false);
+        assert.equal(entityQueries.length,0);assert.equal(rpcCalls.length,0);
+      }
+      resetConnect();
+      const response=await connectPost(connectRequest(foreignEntityId));
+      assert.equal(response.status,403);assert.equal(response.headers.has('location'),false);
+      assert.equal(identityReads,1);assert.equal(entityQueries.length,1);assert.equal(rpcCalls.length,0);
+    });
+    await test('actual connect POST rejects a mismatched persisted state connection without redirect',async()=>{
+      resetConnect();mismatchedState=true;
+      const response=await connectPost(connectRequest());
+      assert.equal(response.status,400);assert.equal(response.headers.has('location'),false);assert.equal(rpcCalls.length,2);
+    });
+    assert.equal(networkAttempts,0);
+  } finally {
+    global.fetch=savedFetch;
+    for(const {transport,request,get} of savedTransports) {transport.request=request;transport.get=get;}
+    Module._load=savedLoader.load;Module._resolveFilename=savedLoader.resolve;
+    require.extensions['.ts']=savedLoader.ts;require.extensions['.tsx']=savedLoader.tsx;
+    for(const [key,value] of Object.entries(savedEnvironment)) {
+      if(value===undefined)delete process.env[key];else process.env[key]=value;
+    }
   }
   console.log(`1..${passed}`);
 }
