@@ -118,15 +118,17 @@ test("Intelligence excludes record diagnostics and preserves the isolated accoun
   const ts = require("typescript");
   const text = fs.readFileSync(path.join(root, "app/app/intelligence/page.tsx"), "utf8");
   assert.doesNotMatch(text, /QboIntelligenceDiagnostic|QuickBooks record status/);
+  assert.match(text, /const \{ dashboard, currentQboAccounting \} = await loadIntegrationDashboard\(\{ access, qbo: qboAccounting, eligibleKpis \}\)/);
+  assert.doesNotMatch(text, /qboAccounting\.data\.(?:kpis|evidenceManifests)/);
   const file = ts.createSourceFile("intelligence.tsx", text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
   const occurrences = [];
   const visit = node => {
     if (ts.isCallExpression(node) && /build|loadWorkspaceIntelligenceBriefing|trySeal/.test(node.expression.getText(file))) {
       const args = node.arguments.map(argument => argument.getText(file)).join(" ");
-      // Only the independently qualified accounting producer may reach the
-      // snapshot. Browse diagnostics and raw stored-source data remain excluded.
+      // Only the qualified, current-only accounting producer may reach the
+      // snapshot. Raw accounting, browse diagnostics and stored sources stay out.
       const checked = node.expression.getText(file) === "buildIntelligenceSnapshotFromProducersV1"
-        ? args.replace(/\bqboAccounting\.(?:state|data\.(?:kpis|evidenceManifests))\b/g, "qualifiedAccounting")
+        ? args.replace(/\bcurrentQboAccounting\.(?:kpis|evidenceManifests)\b/g, "qualifiedAccounting")
         : args;
       assert.doesNotMatch(checked, /qbo|Qbo|QuickBooks/);
       occurrences.push(node.expression.getText(file));

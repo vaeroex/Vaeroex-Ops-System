@@ -2,6 +2,7 @@ import { AuthMessage } from "@/components/auth/AuthMessage";
 import { ThemeControls } from "@/components/app/ThemeControls";
 import { PageHeader } from "@/components/operations/PageHeader";
 import { SectionCard } from "@/components/operations/SectionCard";
+import { ReportingTimezoneForm } from "@/components/settings/ReportingTimezoneForm";
 import { changePasswordAction } from "@/lib/auth/actions";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
 import Link from "next/link";
@@ -19,6 +20,7 @@ export const dynamic = "force-dynamic";
 export default async function SettingsPage({ searchParams }: SettingsPageProps) {
   const params = await searchParams;
   const { context } = await requireWorkspacePage();
+  const reportingTimezone = context.activeWorkspace?.reporting_timezone ?? null;
 
   return (
     <div className="workspace-page workspace-settings mx-auto max-w-5xl space-y-5">
@@ -91,6 +93,16 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
             <dd className="mt-1 font-semibold text-ink">{context.membership?.role || "Setup pending"}</dd>
           </div>
         </dl>
+        {context.membership?.role === "owner" && context.activeWorkspace ? (
+          <ReportingTimezoneForm key={context.activeWorkspace.id}
+            workspaceId={context.activeWorkspace.id} reportingTimezone={reportingTimezone}
+            timeZones={[...new Set(["UTC", ...Intl.supportedValuesOf("timeZone"), ...(reportingTimezone ? [reportingTimezone] : [])])].sort()} />
+        ) : (
+          <dl className="mt-4 border-t border-line pt-4 text-sm">
+            <dt className="font-medium text-ink">Reporting timezone</dt>
+            <dd className="mt-1 break-words text-muted">{reportingTimezone ?? "Not configured (UTC)"}</dd>
+          </dl>
+        )}
       </SectionCard>
       </div>
 

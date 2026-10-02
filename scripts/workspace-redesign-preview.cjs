@@ -18,8 +18,12 @@ const actionModules = Object.freeze([
   "app/app/business-health-analysis/actions.ts", "app/app/finding-explanation/actions.ts",
   "app/app/intelligence/lifecycle-actions.ts", "app/app/intelligence/briefings/actions.ts",
   "app/app/reports/saved-analysis-actions.ts", "app/app/accountability/actions.ts",
-  "app/app/records/actions.ts", "app/app/record-management/actions.ts", "app/app/operations/record-management-actions.ts"
+  "app/app/records/actions.ts", "app/app/record-management/actions.ts", "app/app/operations/record-management-actions.ts",
+  "app/app/settings/reporting-timezone-action.ts"
 ]);
+const actionExportContracts = Object.freeze({
+  "app/app/settings/reporting-timezone-action.ts": Object.freeze(["saveReportingTimezoneAction"]),
+});
 const readModules = Object.freeze([
   "@/lib/workspaces/page-context", "@/lib/kpis/load-workspace-kpis", "@/lib/ai/evidence-index",
   "@/lib/files/storage-links", "@/lib/ai/providers/workflow-provider-policy",
@@ -41,6 +45,7 @@ async function build({ componentRoot = sourceRoot(), test = false } = {}) {
   for (const name of readModules) aliases[`${name}$`] = path.join(fixture, "read-adapters.ts");
   aliases["@"] = componentRoot;
   const allowedActions = actionModules.map(file => path.join(componentRoot, file));
+  const allowedActionExports = Object.fromEntries(Object.entries(actionExportContracts).map(([file, names]) => [path.join(componentRoot, file), names]));
   const moduleFiles = new Set();
   const boundary = { apply(compiler) {
     compiler.hooks.normalModuleFactory.tap("SyntheticBoundary", factory => {
@@ -62,7 +67,7 @@ async function build({ componentRoot = sourceRoot(), test = false } = {}) {
     entry: path.join(fixture, test ? "screens.tsx" : "entry.tsx"),
     output: { path: output, filename: test ? "render.cjs" : "preview.js", ...(test ? { library: { type: "commonjs2" } } : {}) },
     resolve: { extensions: [".tsx", ".ts", ".js"], alias: aliases, modules: [path.join(root, "node_modules"), "node_modules"] },
-    module: { rules: [{ test: /\.tsx?$/, exclude: /node_modules/, use: { loader: path.join(fixture, "loader.cjs"), options: { allowedActions, actionRuntime: path.join(fixture, "actions.ts"), intelligencePage: path.join(componentRoot, "app/app/intelligence/page.tsx"), readRuntime: path.join(fixture, "read-adapters.ts") } } }] },
+    module: { rules: [{ test: /\.tsx?$/, exclude: /node_modules/, use: { loader: path.join(fixture, "loader.cjs"), options: { allowedActions, allowedActionExports, actionRuntime: path.join(fixture, "actions.ts"), intelligencePage: path.join(componentRoot, "app/app/intelligence/page.tsx"), readRuntime: path.join(fixture, "read-adapters.ts") } } }] },
     plugins: [boundary, new webpack.NormalModuleReplacementPlugin(/^(?:node:)?crypto$/, path.join(fixture, "hash.ts")), new webpack.DefinePlugin({ "process.env": JSON.stringify({ NODE_ENV: "development", VERCEL_ENV: "preview" }), "process.env.NODE_ENV": JSON.stringify("development"), "process.env.VERCEL_ENV": JSON.stringify("preview") })],
   }, (error, stats) => error || stats.hasErrors() ? reject(error || new Error(stats.toString({ all: false, errors: true }))) : resolve()));
   if (!test) {
@@ -107,5 +112,5 @@ async function main() {
   const port = Number(process.env.WORKSPACE_PREVIEW_PORT || 3186);
   createServer({ ...result, port }).listen(port, "127.0.0.1", () => console.log(`workspace_redesign_preview_listening http://127.0.0.1:${port}/app`));
 }
-module.exports = { build, createServer, actionModules, readModules };
+module.exports = { build, createServer, actionModules, actionExportContracts, readModules };
 if (require.main === module) main().catch(error => { console.error(error.message); process.exitCode = 1; });

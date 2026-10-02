@@ -30,6 +30,7 @@ const instant = z.string().datetime({ offset: true }).transform(value => new Dat
 const timeZone = z.string().min(1).max(255).refine(value => {
   try { new Intl.DateTimeFormat("en-US", { timeZone: value }); return true; } catch { return false; }
 });
+const connectionStatus = DirectViewSchema.shape.connections.element.shape;
 export const DirectPaymentBrowserSchema = z.object({
   connectionId: z.string().uuid().nullable(), timeZone, timeZoneFallback: z.boolean(),
   currentConnection: DirectViewSchema.shape.connections.element.nullable(),
@@ -40,7 +41,13 @@ export const DirectPaymentBrowserSchema = z.object({
   connections: z.array(z.object({ connectionId: z.string().uuid(), businessEntityId: z.string().uuid(),
     businessEntityLabel: z.string().min(1).max(255), sellerLabel: z.string().max(255).nullable(),
     locationLabel: z.string().max(255).nullable(), state: DirectStateSchema, timeZone, timeZoneFallback: z.boolean(),
-    createdAt: instant, paymentCount: z.number().int().nonnegative().safe()
+    createdAt: instant, paymentCount: z.number().int().nonnegative().safe(),
+    logicalIdentityKey: z.string().regex(/^[a-f0-9]{64}$/).nullable().default(null),
+    lastSyncedAt: connectionStatus.lastSyncedAt.default(null), checkpointAt: connectionStatus.checkpointAt,
+    lastCompletedRead: connectionStatus.lastCompletedRead, activeRead: connectionStatus.activeRead,
+    lastError: connectionStatus.lastError.default(null),
+    // Older browse projections have no lifecycle evidence for historical rows.
+    hasMore: z.boolean().optional(), revocationPending: z.boolean().optional(), recoveryRequired: z.boolean().optional()
   }).strict())
 }).strict().refine(value => value.page <= value.totalPages && value.totalPages === Math.max(1, Math.ceil(value.totalCount / 25)));
 export type DirectPaymentBrowser = z.infer<typeof DirectPaymentBrowserSchema>;

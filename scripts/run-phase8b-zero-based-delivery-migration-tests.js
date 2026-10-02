@@ -283,12 +283,15 @@ function assertTargetIsSinglePendingMigration() {
     "20261002040024_google_sheets_complete.sql",
     "20261002040031_google_sheets_lifecycle.sql"
   ];
-  const reviewedTail = [...dormantSquareTail, ...separatelyQualifiedSheetsTail];
+  const separatelyQualifiedPreferencesTail = [
+    "20261002182049_integration_summary_preferences.sql"
+  ];
+  const reviewedTail = [...dormantSquareTail, ...separatelyQualifiedSheetsTail, ...separatelyQualifiedPreferencesTail];
   const laterMigrations = migrations.slice(targetIndex + 1);
   if (laterMigrations.length !== reviewedTail.length ||
       laterMigrations.some((migration, index) => migration !== reviewedTail[index])) {
     fail(
-      `Fixture-rich harness requires the reviewed dormant Square and Google Sheets tail after ${targetVersion}.`
+      `Fixture-rich harness requires the reviewed dormant Square, Google Sheets and personal summary preferences tail after ${targetVersion}.`
     );
   }
 }

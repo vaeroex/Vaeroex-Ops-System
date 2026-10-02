@@ -70,18 +70,24 @@ function nonPresentationLogic(tree) {
 
 const intelligenceFile = "app/app/intelligence/page.tsx";
 const integrationResultAdditions = [
-  'import { SquareSheetsResults } from "@/components/integrations/SquareSheetsResults";\n',
-  '      <SquareSheetsResults supabase={supabase} workspaceId={workspaceId} isOwner={context.membership?.role === "owner"} />\n',
+  'import { CurrentIntegrations } from "@/components/integrations/CurrentIntegrations";\n',
+  'import { loadIntegrationDashboard } from "@/lib/integrations/dashboard/server";\n',
+  '  const { dashboard, currentQboAccounting } = await loadIntegrationDashboard({ access, qbo: qboAccounting, eligibleKpis });\n',
+  '      ...(currentQboAccounting.kpis.length ? {\n'
+    + '        kpis: currentQboAccounting.kpis,\n'
+    + '        evidenceManifests: currentQboAccounting.evidenceManifests\n'
+    + '      } : {}),\n',
+  '      <CurrentIntegrations key={workspaceId} initial={dashboard} />\n',
+];
+const workspaceAccessReplacements = [
+  ['import { requireWorkspaceAccess } from "@/lib/security/require-workspace-access";\n',
+    'import { requireWorkspacePage } from "@/lib/workspaces/page-context";\n'],
+  ['  const access = await requireWorkspaceAccess();\n  const { supabase, workspaceId, context } = access;\n',
+    '  const { supabase, workspaceId, context } = await requireWorkspacePage();\n'],
 ];
 const qboAccountingAdditions = [
   'import { loadQboAccountingIntelligence } from "@/lib/integrations/qbo-customer/accounting-intelligence-server";\n',
-  'import { QboAccountingIntelligenceView } from "@/lib/integrations/qbo-customer/accounting-intelligence-view";\n',
   '  const qboAccounting = await loadQboAccountingIntelligence(workspaceId, snapshotAsOf);\n',
-  '      ...(qboAccounting.state === "available" && qboAccounting.data.kpis.length ? {\n'
-    + '        kpis: qboAccounting.data.kpis,\n'
-    + '        evidenceManifests: qboAccounting.data.evidenceManifests\n'
-    + '      } : {}),\n',
-  '      <QboAccountingIntelligenceView result={qboAccounting} />\n',
 ];
 
 function withoutQboAccounting(source) {
@@ -97,23 +103,32 @@ function withoutQboAccounting(source) {
 }
 
 function withoutIntegrationResults(source) {
-  // User-requested eligibility-qualified results replace the old unconditional
-  // diagnostic. Preserve exact session/workspace/owner wiring and all original
-  // 75c3d61 workflow hashes, rather than replacing the protected baseline.
+  // Strip only the reviewed dashboard bindings and restore the exact former
+  // access binding. The original 75c3d61 workflow hashes stay frozen.
   assert.doesNotMatch(source, /QboIntelligenceDiagnostic|qboProductionCustomerConnectionsEnabled|qbo-customer\/intelligence-diagnostic/,
     "Never restore the attempt-driven diagnostic on the business-results page");
+  assert.doesNotMatch(source, /\b(?:SquareSheetsResults|QboAccountingIntelligenceView)\b/,
+    "The dashboard replaces the former integration sections");
   const tree = ts.createSourceFile(intelligenceFile, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
-  const uses = { SquareSheetsResults: 0 };
+  const expectedUses = { CurrentIntegrations: 2, loadIntegrationDashboard: 2, dashboard: 2,
+    currentQboAccounting: 4, requireWorkspaceAccess: 2, access: 3 };
+  const uses = Object.fromEntries(Object.keys(expectedUses).map(name => [name, 0]));
   const visit = (node) => {
     if (ts.isIdentifier(node) && Object.hasOwn(uses, node.text)) uses[node.text]++;
     ts.forEachChild(node, visit);
   };
   visit(tree);
-  assert.deepEqual(Object.values(uses), [2], "Result binding is used only by its import and one scoped component");
+  assert.deepEqual(uses, expectedUses, "Dashboard and access bindings have only their reviewed usages");
   for (const addition of integrationResultAdditions) {
-    assert.equal(source.split(addition).length, 2, "Require exactly the approved result import/component addition");
+    assert.equal(source.split(addition).length, 2, "Require exactly the approved dashboard addition");
     source = source.replace(addition, "");
   }
+  for (const [current, original] of workspaceAccessReplacements) {
+    assert.equal(source.split(current).length, 2, "Require exactly the approved workspace access replacement");
+    source = source.replace(current, original);
+  }
+  assert.doesNotMatch(source, /\b(?:CurrentIntegrations|loadIntegrationDashboard|dashboard|currentQboAccounting|requireWorkspaceAccess|access)\b/,
+    "No extra dashboard or access uses may escape the exact addition contract");
   return withoutQboAccounting(source);
 }
 
@@ -138,21 +153,40 @@ for (const [file, count, actionsDigest, logicDigest] of contracts) {
   });
 }
 
-test("qualified integration results reject changed imports, authorization, scope, extra usages and restored diagnostics", () => {
+test("current integration dashboard rejects changed imports, authorization, scope, props and restored sections", () => {
   const source = fs.readFileSync(path.join(__dirname, "..", intelligenceFile), "utf8");
   const mutations = [
-    ["@/components/integrations/SquareSheetsResults", "@/components/integrations/UnreviewedResults"],
-    ["supabase={supabase}", "supabase={adminClient}"],
-    ['context.membership?.role === "owner"', 'context.membership?.role === "admin"'],
-    ["workspaceId={workspaceId}", 'workspaceId={"other-workspace"}'],
-    ["<SquareSheetsResults supabase={supabase}", "<SquareSheetsResults extra={true} supabase={supabase}"],
-    [integrationResultAdditions[1], integrationResultAdditions[1] + integrationResultAdditions[1]],
-    [integrationResultAdditions[0], integrationResultAdditions[0] + "const extraResult = SquareSheetsResults;\n"],
-    [integrationResultAdditions[1], integrationResultAdditions[1] + "      <QboIntelligenceDiagnostic workspaceId={workspaceId} />\n"],
+    ["@/components/integrations/CurrentIntegrations", "@/components/integrations/UnreviewedResults"],
+    ["@/lib/integrations/dashboard/server", "@/lib/integrations/dashboard/unreviewed-server"],
+    ["@/lib/security/require-workspace-access", "@/lib/security/unreviewed-access"],
+    ["await requireWorkspaceAccess()", 'await requireWorkspaceAccess({ workspaceId: "other-workspace" })'],
+    ["const { supabase, workspaceId, context } = access;", "const { supabase, workspaceId, context } = adminAccess;"],
+    ["loadIntegrationDashboard({ access,", "loadIntegrationDashboard({ access: adminAccess,"],
+    ["qbo: qboAccounting, eligibleKpis", "qbo: otherAccounting, eligibleKpis"],
+    ["qbo: qboAccounting, eligibleKpis", "qbo: qboAccounting, eligibleKpis: kpisResult.data"],
+    ["key={workspaceId}", 'key={"other-workspace"}'],
+    ["initial={dashboard}", "initial={unscopedDashboard}"],
+    ["<CurrentIntegrations key={workspaceId}", "<CurrentIntegrations extra={true} key={workspaceId}"],
+    [integrationResultAdditions[4], integrationResultAdditions[4] + "      <QboIntelligenceDiagnostic workspaceId={workspaceId} />\n"],
+    [integrationResultAdditions[4], integrationResultAdditions[4] + "      <SquareSheetsResults supabase={supabase} workspaceId={workspaceId} isOwner={true} />\n"],
+    [integrationResultAdditions[4], integrationResultAdditions[4] + "      <QboAccountingIntelligenceView result={qboAccounting} />\n"],
   ];
   for (const [before, after] of mutations) {
     assert(source.includes(before));
     assert.throws(() => withoutIntegrationResults(source.replace(before, after)), assert.AssertionError);
+  }
+});
+
+test("dashboard exceptions reject missing, duplicate and extra bindings", () => {
+  const source = fs.readFileSync(path.join(__dirname, "..", intelligenceFile), "utf8");
+  for (const binding of [...integrationResultAdditions, ...qboAccountingAdditions, ...workspaceAccessReplacements.map(([current]) => current)]) {
+    assert(source.includes(binding));
+    for (const replacement of ["", binding + binding]) {
+      assert.throws(() => withoutIntegrationResults(source.replace(binding, replacement)), assert.AssertionError);
+    }
+  }
+  for (const name of ["CurrentIntegrations", "loadIntegrationDashboard", "dashboard", "currentQboAccounting", "requireWorkspaceAccess", "access", "qboAccounting", "loadQboAccountingIntelligence"]) {
+    assert.throws(() => withoutIntegrationResults(source + `\nconst unreviewedBinding = ${name};\n`), assert.AssertionError);
   }
 });
 
@@ -172,17 +206,17 @@ test("the integration exception still detects changes to existing Intelligence i
   }
 });
 
-test("accounting exception rejects changed scope, timing, data and extra producer usages", () => {
+test("accounting exception rejects changed scope, timing and current evidence bindings", () => {
   const source = fs.readFileSync(path.join(__dirname, "..", intelligenceFile), "utf8");
   for (const [before, after] of [
     ["qbo-customer/accounting-intelligence-server", "qbo-customer/unreviewed-server"],
     ["loadQboAccountingIntelligence(workspaceId, snapshotAsOf)", "loadQboAccountingIntelligence(otherWorkspace, snapshotAsOf)"],
     ["loadQboAccountingIntelligence(workspaceId, snapshotAsOf)", "loadQboAccountingIntelligence(workspaceId, anotherTime)"],
-    ['qboAccounting.state === "available"', 'qboAccounting.state !== "hidden"'],
-    ["kpis: qboAccounting.data.kpis", "kpis: qboAccounting.data.rawSources"],
-    ["evidenceManifests: qboAccounting.data.evidenceManifests", "evidenceManifests: qboAccounting.data.summaries"],
-    ["result={qboAccounting}", "result={unscopedAccounting}"],
-    [qboAccountingAdditions[2], qboAccountingAdditions[2] + "  publish(qboAccounting);\n"],
+    ["currentQboAccounting.kpis.length ?", "qboAccounting.state === \"available\" ?"],
+    ["currentQboAccounting.kpis.length ?", "!currentQboAccounting.kpis.length ?"],
+    ["kpis: currentQboAccounting.kpis", "kpis: qboAccounting.data.kpis"],
+    ["evidenceManifests: currentQboAccounting.evidenceManifests", "evidenceManifests: qboAccounting.data.evidenceManifests"],
+    [qboAccountingAdditions[1], qboAccountingAdditions[1] + "  publish(qboAccounting);\n"],
   ]) {
     assert(source.includes(before));
     assert.throws(() => withoutIntegrationResults(source.replace(before, after)), assert.AssertionError);

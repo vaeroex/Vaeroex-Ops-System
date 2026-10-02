@@ -292,9 +292,10 @@ for (const field of ["role", "user_id", "status", "workspace_id", "workspaceId",
     assert.equal(browseCalls, 0); assert.equal(queryCalls, 0); assert.equal(rpcCalls.length, 0);
   });
 }
-test("authenticated loader uses only own-connection summary RPC and returns real producers", async () => {
+test("authenticated loader returns validated own-connection summaries without premature current producers", async () => {
   reset(); const result = await loadQboAccountingIntelligence(ids.workspace, now);
-  assert.equal(result.state, "available"); assert.equal(snapshot(result.data).kpis[0].observations.current.value, 100.25);
+  assert.equal(result.state, "available"); assert.equal(result.data.summaries[0].months[0].valueCanonical, "100.25");
+  assert.equal(result.data.kpis.length, 0, "current dashboard must establish freshness before contributions");
   assert.deepEqual(rpcCalls, [{ name: "read_qbo_customer_accounting_summary_v1", args: { p_connection_id: ids.connection } }]);
 });
 test("connection cap bounds work and reports partial coverage", async () => {
@@ -303,7 +304,7 @@ test("connection cap bounds work and reports partial coverage", async () => {
   const result = await loadQboAccountingIntelligence(ids.workspace, now);
   assert.equal(result.state, "available"); assert.equal(result.connectionsTruncated, true);
   assert.equal(rpcCalls.length, 5); assert.equal(browseCalls, 0); assert.equal(queryCalls, 2);
-  assert.equal(snapshot(result.data).kpis.length, 5);
+  assert.equal(result.data.summaries.length, 5); assert.equal(result.data.kpis.length, 0);
 });
 for (const failure of ["rpc", "projection", "workspace", "connection", "duplicate", "partial"]) test(`loader ${failure} failure never falls back to zero or exposes internal errors`, async () => {
   reset();
@@ -329,8 +330,9 @@ test("view escapes labels and provides internal native provenance links, not pro
 test("page loads the actual producers before snapshot build, not a browse-only diagnostic", () => {
   const page = fs.readFileSync(path.join(root, "app/app/intelligence/page.tsx"), "utf8");
   assert.ok(page.indexOf("await loadQboAccountingIntelligence(workspaceId, snapshotAsOf)") < page.indexOf("const snapshotBuild = buildIntelligenceSnapshotFromProducersV1"));
-  assert.match(page, /kpis: qboAccounting\.data\.kpis/); assert.match(page, /evidenceManifests: qboAccounting\.data\.evidenceManifests/);
-  assert.match(page, /<QboAccountingIntelligenceView result=\{qboAccounting\}/);
+  assert.match(page, /kpis: currentQboAccounting\.kpis/); assert.match(page, /evidenceManifests: currentQboAccounting\.evidenceManifests/);
+  assert.match(page, /await loadIntegrationDashboard\(\{ access, qbo: qboAccounting, eligibleKpis \}\)/);
+  assert.match(page, /<CurrentIntegrations key=\{workspaceId\} initial=\{dashboard\}/);
 });
 test("new scope has no privileged client, mutation, provider transport, or model execution path", () => {
   for (const file of ["accounting-intelligence.ts", "accounting-intelligence-server.ts", "accounting-intelligence-view.tsx"]) {
@@ -421,7 +423,7 @@ test("legitimate distinct companies stay separate; no financial combining or tec
   reset(); connections = [{ connectionId: ids.connection, label: "First company" }, { connectionId: id(51), label: "Second company" }];
   summaries.set(id(51), summary({ connectionId: id(51), businessEntityId: id(61), businessEntityName: "Second entity", months: [month(2, { valueCanonical: "80.25" })] }));
   const result = await loadQboAccountingIntelligence(ids.workspace, now), html = render(result);
-  assert.equal(result.data.kpis.length, 2); assert.equal(result.data.summaries.length, 2);
+  assert.equal(result.data.kpis.length, 0); assert.equal(result.data.summaries.length, 2);
   assert.match(html, /First company/); assert.match(html, /Second company/); assert.match(html, /100\.25/); assert.match(html, /80\.25/);
   assert.doesNotMatch(html, /180\.50|Entity |Fact |Source version /);
   assert.match(html, new RegExp(`connectionId=${id(51)}`)); assert.match(html, new RegExp(`connectionId=${ids.connection}`));

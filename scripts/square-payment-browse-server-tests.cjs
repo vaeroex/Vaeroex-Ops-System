@@ -75,6 +75,52 @@ test('normalized fallback metadata for an unselected historical connection does 
   assert.equal((await squareDirectPayments({})).timeZoneFallback, true);
   databaseData = null;
 });
+test('old browse projections keep identity and completion unknown without inventing lifecycle flags', async () => {
+  databaseData = { ...result, connections: [{ connectionId: ids.connection, businessEntityId: ids.workspace,
+    businessEntityLabel: 'Saved entity', sellerLabel: 'Saved seller', locationLabel: 'Saved location', state: 'disconnected',
+    timeZone: 'UTC', timeZoneFallback: false, createdAt: '2026-05-04T00:00:00Z', paymentCount: 0 }] };
+  try {
+    const row = (await squareDirectPayments({})).connections[0];
+    for (const field of ['logicalIdentityKey', 'lastSyncedAt', 'checkpointAt', 'lastCompletedRead', 'activeRead', 'lastError'])
+      assert.equal(row[field], null, field);
+    for (const field of ['hasMore', 'revocationPending', 'recoveryRequired']) assert.equal(row[field], undefined, field);
+    assert.equal(Object.hasOwn(row, 'noChanges'), false);
+  } finally { databaseData = null; }
+});
+test('new browse projections retain sanitized per-attempt success and incomplete-read evidence', async () => {
+  const row = { connectionId: ids.connection, businessEntityId: ids.workspace,
+    businessEntityLabel: 'Saved entity', sellerLabel: 'Saved seller', locationLabel: 'Saved location', state: 'disconnected',
+    timeZone: 'UTC', timeZoneFallback: false, createdAt: '2026-05-04T00:00:00Z', paymentCount: 0,
+    logicalIdentityKey: 'a'.repeat(64), lastSyncedAt: '2026-09-28T12:00:00+00:00', checkpointAt: '2026-09-28T11:59:00+00:00',
+    lastCompletedRead: { start: '2026-05-04T00:00:00+00:00', end: '2026-05-05T00:00:00+00:00', kind: 'created', completedAt: '2026-09-29T12:00:00+00:00' },
+    activeRead: { start: '2026-09-28T11:54:00+00:00', end: '2026-09-29T13:00:00+00:00', kind: 'updated' },
+    lastError: 'retry_required', hasMore: true, revocationPending: false, recoveryRequired: false };
+  databaseData = { ...result, connections: [row] };
+  try {
+    const parsed = (await squareDirectPayments({})).connections[0];
+    assert.equal(parsed.logicalIdentityKey, row.logicalIdentityKey);
+    assert.equal(parsed.lastSyncedAt, '2026-09-28T12:00:00.000Z');
+    assert.equal(parsed.checkpointAt, '2026-09-28T11:59:00.000Z');
+    assert.equal(parsed.lastCompletedRead.completedAt, '2026-09-29T12:00:00.000Z');
+    assert.equal(parsed.lastCompletedRead.kind, 'created');
+    assert.equal(parsed.activeRead.kind, 'updated');
+    assert.equal(parsed.hasMore, true);
+    assert.equal(parsed.lastError, 'retry_required');
+    assert.equal(parsed.revocationPending, false);
+    assert.equal(parsed.recoveryRequired, false);
+    assert.equal(Object.hasOwn(parsed, 'noChanges'), false, 'a completed empty read has no recorded change count');
+    for (const patch of [
+      { logicalIdentityKey: 'a'.repeat(63) }, { logicalIdentityKey: 'A'.repeat(64) },
+      { logicalIdentityKey: `sha256:${'a'.repeat(64)}` }, { merchantId: 'private-merchant' },
+      { applicationId: 'private-application' }, { ciphertext: 'private-credential' }, { noChanges: true },
+      { lastSyncedAt: 'invalid' }, { lastError: 'raw-provider-error' }, { hasMore: null },
+      { lastCompletedRead: { ...row.lastCompletedRead, kind: 'all', changeCount: 0 } }
+    ]) {
+      databaseData = { ...result, connections: [{ ...row, ...patch }] };
+      await assert.rejects(() => squareDirectPayments({}));
+    }
+  } finally { databaseData = null; }
+});
 test('invalid filters and unverified owner context make no database or provider call', async () => {
   for (const query of [{ page: '0' }, { page: ['1', '2'] }, { startDate: '2026-02-30' }, { status: 'anything' }, { connectionId: 'invalid' }]) {
     calls = []; await assert.rejects(() => squareDirectPayments(query)); assert.equal(calls.length, 0);

@@ -1,4 +1,5 @@
-import { AS_OF, WORKSPACE_ID, files, kpis, performanceKpis, performanceKpiSettings, profile, workspace, analyses, cards, briefings, type FixtureRole, type FixtureState } from "./data";
+import { AS_OF, WORKSPACE_ID, files, kpis, performanceKpis, performanceKpiSettings, profile, workspace, analyses, cards, briefings, freeze, type FixtureRole, type FixtureState } from "./data";
+import type { IntegrationDashboard } from "../../lib/integrations/dashboard/model";
 let current = { state: "populated" as FixtureState, role: "owner" as FixtureRole };
 export function setFixture(state: FixtureState, role: FixtureRole) { current = { state, role }; }
 const reportRows = analyses.map(analysis => ({ id: analysis.id, workspace_id: WORKSPACE_ID, archived_at: null, deleted_at: null, source_data_json: { record_kind: "saved_analysis", envelope_version: 1, saved_analysis_key: analysis.id, workspace_id: WORKSPACE_ID, release_channel: "preview", analysis_type: analysis.analysisType, title: analysis.title, source_artifact: { id: analysis.id, workflow: "synthetic", contract_id: "synthetic", contract_version: "synthetic", validator_version: "synthetic", policy_id: "synthetic" }, provider_attribution: { provider: "openai", model: "synthetic-not-generated", fallback_used: false }, generated_at: AS_OF, saved_at: AS_OF, confidence: analysis.confidence, freshness: "current", evidence_fingerprint: "synthetic", citations: [], evidence_lineage: [], display: { summary_label: "Synthetic analysis", summary: "Interface fixture; no model was called.", sections: [], evidence_status: analysis.evidenceStatus, date_range: analysis.dateRange }, artifact: {} } }));
@@ -49,4 +50,5 @@ export function squareDirectEnabled() { return true; }
 export async function readSquareWorkspaceEvidence() { return null; }
 export async function headers() { return new Headers(); }
 export const fixedAsOf = AS_OF;
-export function intelligenceFixture() { return { displayErrors: [], lifecycleCards: { current: current.state === "empty" ? [] : cards, history: [] }, explanationTokens: {}, canManageLifecycle: false, blockedState: null, briefingStates: briefings, isIntelligenceBriefingEnabled: () => false }; }
+const dashboard = freeze<IntegrationDashboard>({ workspaceId: WORKSPACE_ID, observedAt: AS_OF, timeZone: "UTC", timeZoneConfirmed: false, preferencesAvailable: false, entries: [], unavailable: [] });
+export function intelligenceFixture() { return { workspaceId: WORKSPACE_ID, dashboard, displayErrors: [], lifecycleCards: { current: current.state === "empty" ? [] : cards, history: [] }, explanationTokens: {}, canManageLifecycle: false, blockedState: null, briefingStates: briefings, isIntelligenceBriefingEnabled: () => false }; }
