@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 
 export default async function QuickBooksManagementPage({ searchParams }: {
   searchParams?: Promise<{ result?: string | string[]; error?: string | string[] }>;
-} = {}) {
+}) {
   if (!qboProductionCustomerConnectionsEnabled()) notFound();
   const params = await searchParams;
   const access = await requireWorkspacePage();
