@@ -1,0 +1,23 @@
+[Unit]
+Description=Renew only the isolated Square Sandbox TLS certificate
+After=network-online.target
+ConditionPathExists=/etc/letsencrypt/renewal/square-sandbox.vaeroex.com.conf
+
+[Service]
+Type=oneshot
+User=root
+UMask=0077
+ExecStart=/opt/vaeroex-square-callback/current/ops/renew-certificate.sh
+TimeoutStartSec=300
+LimitCORE=0
+MemorySwapMax=0
+StandardInput=null
+StandardOutput=null
+StandardError=null
+PrivateTmp=yes
+NoNewPrivileges=yes
+RuntimeDirectory=vaeroex-square-certbot
+RuntimeDirectoryMode=0700
+
+# Certbot handles ACME-only material. It never receives a callback or DB secret.
+# Its own logs/work directory must use /run (configured during initial issuance).

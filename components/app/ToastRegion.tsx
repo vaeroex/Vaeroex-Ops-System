@@ -13,14 +13,16 @@ function ToastContent() {
 
   useEffect(() => {
     setVisible(Boolean(message || error));
-
-    if (!message && !error) {
-      return;
-    }
-
-    const timer = window.setTimeout(() => setVisible(false), 6500);
-    return () => window.clearTimeout(timer);
   }, [message, error]);
+
+  function dismiss() {
+    setVisible(false);
+    // Remove only the acknowledged notice. Preserve filters, hash and the
+    // mounted form; a later identical outcome can then be announced again.
+    const url = new URL(window.location.href);
+    for (const key of ["saved", "message", "error"]) url.searchParams.delete(key);
+    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+  }
 
   if (!visible || (!message && !error)) {
     return null;
@@ -31,6 +33,9 @@ function ToastContent() {
       {error && isSecurityResponseMessage(error) ? (
         <div className="w-full max-w-3xl">
           <SecurityResponseNotice />
+          <button type="button" onClick={dismiss} className="mt-4 min-h-11 rounded-lg border border-white/20 px-4 py-2 text-sm font-semibold text-slate-100 hover:bg-white/5">
+            Return to workspace
+          </button>
         </div>
       ) : (
         <div
@@ -41,7 +46,7 @@ function ToastContent() {
         >
           <div className="flex items-start justify-between gap-3">
             <p>{error || message}</p>
-            <button className="text-xs font-semibold opacity-75" onClick={() => setVisible(false)}>
+            <button type="button" className="text-xs font-semibold opacity-75" onClick={dismiss}>
               Close
             </button>
           </div>

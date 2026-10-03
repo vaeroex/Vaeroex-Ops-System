@@ -1,0 +1,505 @@
+import assert from "node:assert/strict";
+import {
+  privateAccessClosedCheckpointTuple,
+  privateAccessOpeningTuple,
+  privateAccessRecoveryTuple,
+  verifyPrivateAccessPlan,
+} from "../scripts/verify-private-access-plan.mjs";
+import { OAUTH_PROOF_MODE, OAUTH_PROOF_ROLE, OAUTH_PROOF_PERMISSIONS, OAUTH_PROOF_TITLE,
+  OAUTH_PROOF_DESCRIPTION, oauthProofCondition } from "../scripts/oauth-candidate-proof-contract.mjs";
+
+const PRIOR_START = "2099-01-01T00:00:00Z";
+const PRIOR_EXPIRY = "2099-01-01T01:00:00Z";
+const NEXT_START = "2099-01-02T00:00:00Z";
+const NEXT_EXPIRY = "2099-01-02T01:00:00Z";
+const phaseVariables = (phase = "closed", profile = "oauth") => ({
+  administrative_access_enabled: { value: phase !== "closed" },
+  setup_https_enabled: { value: phase === "setup" },
+  temporary_access_enabled: { value: phase === "open" },
+  temporary_access_profiles: { value: phase === "open" ? [profile] : [] },
+  previous_access_expires_at: { value: "2098-12-31T23:00:00Z" },
+});
+
+const generationInput = (enabled, overrides = {}) => ({
+  enabled,
+  profiles: enabled ? ["oauth"] : [],
+  starts_at: enabled ? NEXT_START : PRIOR_START,
+  expires_at: enabled ? NEXT_EXPIRY : PRIOR_EXPIRY,
+  checkpoint_expires_at: enabled ? NEXT_EXPIRY : PRIOR_EXPIRY,
+  ...overrides,
+});
+
+const generation = (before, after, actions = ["update"], overrides = {}) => ({
+  address: "terraform_data.private_access_generation",
+  type: "terraform_data",
+  name: "private_access_generation",
+  change: {
+    actions,
+    before: before === null ? null : { input: generationInput(before, overrides.before) },
+    after: after === null ? null : { input: generationInput(after, overrides.after) },
+  },
+});
+
+const preservedCloseWindow = Object.freeze({
+  starts_at: NEXT_START,
+  expires_at: NEXT_EXPIRY,
+  checkpoint_expires_at: NEXT_EXPIRY,
+});
+
+const grantValue = (profile, overrides = {}) => {
+  const startsAt = overrides.starts_at ?? NEXT_START;
+  const expiresAt = overrides.expires_at ?? NEXT_EXPIRY;
+  return {
+    project: "vaeroex-integrations-prod",
+    secret_id: `square-production-${profile}-db`,
+    role: "projects/vaeroex-integrations-prod/roles/squareProductionPrivateVersions",
+    member: "serviceAccount:sq-prod-provisioner@vaeroex-integrations-prod.iam.gserviceaccount.com",
+    condition: [{
+      title: "bounded-native-provisioning",
+      description: "One exact database secret during the admitted maintenance window.",
+      expression: `request.time >= timestamp('${startsAt}') && request.time < timestamp('${expiresAt}')`,
+    }],
+    ...overrides,
+  };
+};
+
+const grant = (profile, before, after, actions, overrides = {}) => ({
+  address: `google_secret_manager_secret_iam_member.private_versions["${profile}"]`,
+  type: "google_secret_manager_secret_iam_member",
+  name: "private_versions",
+  index: profile,
+  change: {
+    actions,
+    before: before ? grantValue(profile, overrides.before) : null,
+    after: after ? grantValue(profile, overrides.after) : null,
+  },
+});
+
+function plan(...resourceChanges) {
+  const afterInput = resourceChanges.find(change => change.address === "terraform_data.private_access_generation")
+    ?.change?.after?.input;
+  const afterEnabled = afterInput?.enabled;
+  const expiry = Math.min(Date.parse(afterInput?.expires_at), Date.parse(afterInput?.starts_at) + 120 * 60 * 1000);
+  if (afterEnabled === true && Number.isFinite(expiry)) {
+    const expression = `request.time >= timestamp('${afterInput.starts_at}') && request.time < timestamp('${new Date(expiry).toISOString().replace(".000Z", "Z")}')`;
+    for (const [address, suffix] of [
+      ["google_compute_instance_iam_member.operator_oslogin[0]", ""],
+      ["google_iap_tunnel_instance_iam_member.operator_tunnel[0]", " && destination.port == 22"],
+      ["google_service_account_iam_member.operator_oslogin_service_account[0]", ""],
+    ]) {
+      resourceChanges.push({ address, change: { actions: ["create"], before: null, after: { condition: [{ expression: expression + suffix }] } } });
+    }
+  }
+  return {
+    format_version: "1.2",
+    complete: true,
+    variables: phaseVariables(afterEnabled === true ? "open" : "closed"),
+    resource_changes: resourceChanges,
+  };
+}
+
+function planInPhase(phase, ...resourceChanges) {
+  return { ...plan(...resourceChanges), variables: phaseVariables(phase) };
+}
+
+function rejects(candidate, label) {
+  assert.throws(() => verifyPrivateAccessPlan(candidate), error => error.fixedLabel === label);
+}
+
+assert.equal(
+  verifyPrivateAccessPlan(plan(generation(false, true), grant("oauth", false, true, ["create"]))),
+  "private_access_closed_to_one_grant_confirmed",
+);
+const twoHourExpiry = "2099-01-02T02:00:00Z";
+assert.equal(
+  verifyPrivateAccessPlan(plan(
+    generation(false, true, ["update"], {
+      after: { expires_at: twoHourExpiry, checkpoint_expires_at: twoHourExpiry },
+    }),
+    grant("oauth", false, true, ["create"], { after: { expires_at: twoHourExpiry } }),
+  )),
+  "private_access_closed_to_one_grant_confirmed",
+);
+const threeHourExpiry = "2099-01-02T03:00:00Z";
+for (const address of [
+  "google_compute_instance_iam_member.operator_oslogin[0]",
+  "google_iap_tunnel_instance_iam_member.operator_tunnel[0]",
+  "google_service_account_iam_member.operator_oslogin_service_account[0]",
+]) {
+  for (const mutation of ["longer", "missing", "duplicate", "unknown"]) {
+    const candidate = plan(
+      generation(false, true, ["update"], { after: { expires_at: threeHourExpiry, checkpoint_expires_at: threeHourExpiry } }),
+      grant("oauth", false, true, ["create"], { after: { expires_at: threeHourExpiry } }),
+    );
+    const resource = candidate.resource_changes.find(change => change.address === address);
+    if (mutation === "longer") resource.change.after.condition[0].expression = resource.change.after.condition[0].expression.replace("02:00:00Z", "03:00:00Z");
+    if (mutation === "missing") candidate.resource_changes = candidate.resource_changes.filter(change => change !== resource);
+    if (mutation === "duplicate") candidate.resource_changes.push(structuredClone(resource));
+    if (mutation === "unknown") resource.change.after.condition[0].expression = null;
+    rejects(candidate, "private_access_administrative_expiry_mismatch");
+  }
+}
+assert.equal(
+  verifyPrivateAccessPlan(plan(
+    generation(false, true, ["update"], {
+      after: { expires_at: threeHourExpiry, checkpoint_expires_at: threeHourExpiry },
+    }),
+    grant("oauth", false, true, ["create"], { after: { expires_at: threeHourExpiry } }),
+  )),
+  "private_access_closed_to_one_grant_confirmed",
+);
+for (const profile of ["broker", "runtime", "evidence", "scheduler", "webhook"]) {
+  const candidate = plan(
+    generation(false, true, ["update"], {
+      after: { profiles: [profile], expires_at: threeHourExpiry, checkpoint_expires_at: threeHourExpiry },
+    }),
+    grant(profile, false, true, ["create"], { after: { expires_at: threeHourExpiry } }),
+  );
+  candidate.variables = phaseVariables("open", profile);
+  rejects(candidate, "private_access_open_generation_invalid");
+}
+assert.equal(
+  verifyPrivateAccessPlan(plan(
+    generation(true, false, ["delete", "create"], {
+      before: { expires_at: threeHourExpiry, checkpoint_expires_at: threeHourExpiry },
+      after: { starts_at: NEXT_START, expires_at: threeHourExpiry, checkpoint_expires_at: threeHourExpiry },
+    }),
+    grant("oauth", true, false, ["delete"], { before: { expires_at: threeHourExpiry } }),
+  )),
+  "private_access_one_grant_to_closed_confirmed",
+);
+const overlongExpiry = "2099-01-02T03:00:01Z";
+for (const phase of ["setup", "administrative"]) {
+  rejects(planInPhase(phase, generation(false, false, ["no-op"], {
+    before: { starts_at: NEXT_START, expires_at: threeHourExpiry, checkpoint_expires_at: threeHourExpiry },
+    after: { starts_at: NEXT_START, expires_at: threeHourExpiry, checkpoint_expires_at: threeHourExpiry },
+  })), "private_access_non_oauth_window_too_long");
+}
+rejects(
+  plan(
+    generation(false, true, ["update"], {
+      after: { expires_at: overlongExpiry, checkpoint_expires_at: overlongExpiry },
+    }),
+    grant("oauth", false, true, ["create"], { after: { expires_at: overlongExpiry } }),
+  ),
+  "private_access_open_generation_invalid",
+);
+assert.equal(
+  verifyPrivateAccessPlan(plan(generation(true, false, ["delete", "create"], {
+    after: preservedCloseWindow,
+  }), grant("oauth", true, false, ["delete"]))),
+  "private_access_one_grant_to_closed_confirmed",
+);
+assert.equal(
+  verifyPrivateAccessPlan(plan(generation(null, false, ["create"], {
+    after: { checkpoint_expires_at: "2098-12-31T23:00:00Z" },
+  }))),
+  "private_access_plan_closed_bootstrap_confirmed",
+);
+assert.equal(
+  verifyPrivateAccessPlan({
+    ...plan(generation(null, false, ["create"], {
+      after: { checkpoint_expires_at: PRIOR_START },
+    })),
+    variables: {
+      ...phaseVariables("closed"),
+      previous_access_expires_at: { value: PRIOR_START },
+    },
+  }),
+  "private_access_plan_closed_bootstrap_confirmed",
+);
+rejects(
+  {
+    ...plan(generation(null, false, ["create"], {
+      after: { checkpoint_expires_at: "2098-12-31T23:00:00Z" },
+    })),
+    variables: {
+      ...phaseVariables("closed"),
+      previous_access_expires_at: { value: "2098-12-31T22:59:59Z" },
+    },
+  },
+  "private_access_closed_bootstrap_invalid",
+);
+rejects(
+  {
+    ...plan(generation(null, false, ["create"], {
+      after: { checkpoint_expires_at: "2099-01-01T00:00:01Z" },
+    })),
+    variables: {
+      ...phaseVariables("closed"),
+      previous_access_expires_at: { value: "2099-01-01T00:00:01Z" },
+    },
+  },
+  "private_access_closed_bootstrap_invalid",
+);
+assert.equal(
+  verifyPrivateAccessPlan(plan(generation(false, false, ["no-op"]))),
+  "private_access_plan_closed_no_transition_confirmed",
+);
+assert.equal(
+  verifyPrivateAccessPlan(planInPhase("setup", generation(false, false, ["no-op"]))),
+  "private_access_setup_phase_confirmed",
+);
+assert.equal(
+  verifyPrivateAccessPlan(planInPhase("administrative", generation(false, false, ["no-op"]))),
+  "private_access_administrative_phase_confirmed",
+);
+const bootstrapNoTransition = generation(false, false, ["no-op"], {
+  before: { checkpoint_expires_at: "2098-12-31T23:00:00Z" },
+  after: { checkpoint_expires_at: "2098-12-31T23:00:00Z" },
+});
+assert.equal(
+  verifyPrivateAccessPlan(plan(bootstrapNoTransition)),
+  "private_access_plan_closed_no_transition_confirmed",
+);
+assert.equal(
+  verifyPrivateAccessPlan(planInPhase("setup", bootstrapNoTransition)),
+  "private_access_setup_phase_confirmed",
+);
+assert.equal(
+  verifyPrivateAccessPlan(planInPhase("administrative", bootstrapNoTransition)),
+  "private_access_administrative_phase_confirmed",
+);
+rejects(
+  {
+    ...plan(bootstrapNoTransition),
+    variables: {
+      ...phaseVariables("closed"),
+      previous_access_expires_at: { value: "2098-12-31T22:59:59Z" },
+    },
+  },
+  "private_access_closed_checkpoint_invalid",
+);
+assert.throws(
+  () => privateAccessClosedCheckpointTuple(plan(bootstrapNoTransition)),
+  error => error.fixedLabel === "private_access_closed_checkpoint_invalid",
+);
+assert.deepEqual(privateAccessClosedCheckpointTuple(plan(generation(false, false, ["no-op"]))), {
+  windowStartsAt: PRIOR_START,
+  windowExpiresAt: PRIOR_EXPIRY,
+});
+assert.equal(
+  verifyPrivateAccessPlan(plan(generation(true, false, ["delete", "create"], {
+    after: preservedCloseWindow,
+  }))),
+  "private_access_open_generation_without_grant_to_closed_recovery_confirmed",
+);
+rejects(
+  plan(generation(true, true, ["no-op"]), grant("oauth", true, true, ["no-op"])),
+  "private_access_open_no_transition_rejected",
+);
+
+rejects(
+  plan(generation(true, true), grant("oauth", true, true, ["delete", "create"])),
+  "private_access_direct_open_to_open_rejected",
+);
+rejects(
+  plan(generation(true, true), grant("oauth", true, false, ["delete"]), grant("broker", false, true, ["create"])),
+  "private_access_direct_open_to_open_rejected",
+);
+rejects(
+  plan(generation(null, true, ["create"]), grant("oauth", false, true, ["create"])),
+  "private_access_open_requires_applied_closed_checkpoint",
+);
+rejects(
+  plan(generation(false, true), grant("oauth", false, true, ["create"]), grant("broker", false, true, ["create"])),
+  "private_access_plan_multiple_managed_grants",
+);
+rejects(
+  plan(generation(true, false)),
+  "private_access_closed_recovery_transition_invalid",
+);
+rejects(
+  plan(generation(true, false, ["delete", "create"], {
+    after: { ...preservedCloseWindow, checkpoint_expires_at: "2098-12-31T23:00:00Z" },
+  })),
+  "private_access_close_must_preserve_expiry",
+);
+rejects(
+  plan(generation(true, false, ["delete", "create"], {
+    after: { ...preservedCloseWindow, starts_at: PRIOR_START },
+  })),
+  "private_access_close_must_preserve_expiry",
+);
+rejects(
+  plan(generation(true, false, ["delete", "create"], {
+    after: { ...preservedCloseWindow, expires_at: PRIOR_EXPIRY },
+  })),
+  "private_access_close_must_preserve_expiry",
+);
+rejects(
+  plan(generation(true, true, ["no-op"])),
+  "private_access_closed_plan_omits_managed_grant",
+);
+rejects(
+  plan(generation(true, false, ["delete", "create"], {
+    after: { ...preservedCloseWindow, checkpoint_expires_at: "2098-12-31T23:00:00Z" },
+  }), grant("oauth", true, false, ["delete"])),
+  "private_access_close_must_preserve_expiry",
+);
+rejects(
+  plan(generation(false, true, ["update"], {
+    before: { checkpoint_expires_at: NEXT_EXPIRY },
+    after: { starts_at: NEXT_START, checkpoint_expires_at: NEXT_EXPIRY },
+  }), grant("oauth", false, true, ["create"])),
+  "private_access_successor_starts_before_checkpoint_expiry",
+);
+rejects(
+  plan(generation(false, false, ["update"], { after: { checkpoint_expires_at: "2098-12-31T23:00:00Z" } })),
+  "private_access_closed_checkpoint_rewrite_rejected",
+);
+rejects(
+  plan(generation(false, false, ["no-op"], {
+    before: { expires_at: "2099-01-01T03:00:01Z", checkpoint_expires_at: "2099-01-01T03:00:01Z" },
+    after: { expires_at: "2099-01-01T03:00:01Z", checkpoint_expires_at: "2099-01-01T03:00:01Z" },
+  })),
+  "private_access_closed_checkpoint_invalid",
+);
+rejects(
+  plan(generation(true, true, ["update"]), grant("oauth", true, true, ["no-op"])),
+  "private_access_open_no_transition_rejected",
+);
+rejects(
+  plan(
+    generation(true, false, ["delete", "create"], { after: preservedCloseWindow }),
+    grant("oauth", true, false, ["delete"], {
+      before: {
+        condition: [{
+          title: "bounded-native-provisioning",
+          description: "One exact database secret during the admitted maintenance window.",
+          expression: "request.time >= timestamp('2099-01-02T00:00:00Z') && request.time < timestamp('2099-01-03T01:00:00Z')",
+        }],
+      },
+    }),
+  ),
+  "private_access_managed_grant_contract_mismatch",
+);
+
+const temporaryAccessResources = [
+  ["google_compute_instance_iam_member.operator_oslogin[0]", "google_compute_instance_iam_member", "operator_oslogin"],
+  ["google_iap_tunnel_instance_iam_member.operator_tunnel[0]", "google_iap_tunnel_instance_iam_member", "operator_tunnel"],
+  ["google_service_account_iam_member.operator_oslogin_service_account[0]", "google_service_account_iam_member", "operator_oslogin_service_account"],
+  ["google_compute_firewall.iap_ssh[0]", "google_compute_firewall", "iap_ssh"],
+  ["google_compute_firewall.pooler[0]", "google_compute_firewall", "pooler"],
+  ["google_compute_firewall.google_api_https[0]", "google_compute_firewall", "google_api_https"],
+  ["google_compute_firewall.setup_https[0]", "google_compute_firewall", "setup_https"],
+];
+const retainedTemporaryResource = ([address, type, name]) => ({
+  address,
+  type,
+  name,
+  change: { actions: ["no-op"], before: {}, after: {} },
+});
+const closingGeneration = generation(true, false, ["delete", "create"], { after: preservedCloseWindow });
+const closingGrant = grant("oauth", true, false, ["delete"]);
+// Google 7.39 refresh uses the canonical resource path in the before value,
+// although the opening configuration supplies the short secret name.
+const refreshedCleanup = plan(
+  closingGeneration,
+  grant("oauth", true, false, ["delete"], {
+    before: { secret_id: "projects/vaeroex-integrations-prod/secrets/square-production-oauth-db" },
+  }),
+  ...temporaryAccessResources.filter(([, , name]) => name !== "setup_https")
+    .map(([address, type, name]) => ({
+      address, type, name,
+      change: { actions: ["delete"], before: { project: "vaeroex-integrations-prod" }, after: null },
+    })),
+);
+assert.equal(refreshedCleanup.complete, true);
+assert.equal(refreshedCleanup.resource_changes.filter(resource =>
+  resource.type.startsWith("google_") && resource.change.actions[0] === "delete").length, 7);
+assert.equal(verifyPrivateAccessPlan(refreshedCleanup), "private_access_one_grant_to_closed_confirmed");
+for (const secretId of [
+  "projects/vaeroex-square-sandbox/secrets/square-production-oauth-db",
+  "projects/vaeroex-integrations-prod/secrets/square-production-broker-db",
+  "square-production-broker-db",
+]) {
+  const candidate = structuredClone(refreshedCleanup);
+  candidate.resource_changes.find(resource => resource.type === "google_secret_manager_secret_iam_member")
+    .change.before.secret_id = secretId;
+  rejects(candidate, "private_access_managed_grant_contract_mismatch");
+}
+rejects(
+  planInPhase("administrative", closingGeneration, closingGrant, ...temporaryAccessResources.map(retainedTemporaryResource)),
+  "private_access_closed_controls_not_disabled",
+);
+for (const resource of temporaryAccessResources) {
+  rejects(
+    plan(closingGeneration, closingGrant, retainedTemporaryResource(resource)),
+    "private_access_closed_temporary_resource_present",
+  );
+}
+rejects(
+  { ...plan(generation(false, true), grant("oauth", false, true, ["create"])), complete: false },
+  "private_access_plan_incomplete",
+);
+
+const proofRoleValue = { project: "vaeroex-integrations-prod", role_id: "squareProductionOAuthCandidateProof",
+  permissions: [...OAUTH_PROOF_PERMISSIONS], deleted: false };
+function proofRole(existing = false) {
+  return { address: "google_project_iam_custom_role.oauth_candidate_proof", type: "google_project_iam_custom_role",
+    change: { actions: [existing ? "no-op" : "create"], before: existing ? structuredClone(proofRoleValue) : null,
+      after: structuredClone(proofRoleValue) } };
+}
+const proofGrantValue = { role: OAUTH_PROOF_ROLE, condition: [{ title: OAUTH_PROOF_TITLE,
+  description: OAUTH_PROOF_DESCRIPTION, expression: oauthProofCondition(NEXT_START, NEXT_EXPIRY) }] };
+function proofOpening() {
+  const value = plan(generation(false, true, ["delete", "create"], { after: { access_mode: OAUTH_PROOF_MODE } }),
+    grant("oauth", false, true, ["create"], { after: structuredClone(proofGrantValue) }), proofRole());
+  value.variables.oauth_candidate_proof_enabled = { value: true };
+  return value;
+}
+assert.equal(verifyPrivateAccessPlan(proofOpening()), "private_access_closed_to_one_grant_confirmed");
+assert.equal(privateAccessOpeningTuple(proofOpening()).accessMode, OAUTH_PROOF_MODE);
+for (const ordinary of [
+  plan(generation(false, true), grant("oauth", false, true, ["create"]), proofRole()),
+  plan(generation(true, false, ["delete", "create"], { after: preservedCloseWindow }),
+    grant("oauth", true, false, ["delete"]), proofRole()),
+]) rejects(ordinary, "private_access_proof_role_contract_mismatch");
+assert.equal(verifyPrivateAccessPlan(plan(generation(false, true),
+  grant("oauth", false, true, ["create"]), proofRole(true))), "private_access_closed_to_one_grant_confirmed");
+for (const permission of ["secretmanager.versions.add", "secretmanager.versions.disable", "secretmanager.versions.destroy", "secretmanager.versions.enable"]) {
+  const value = proofOpening();
+  value.resource_changes.find(x => x.type === "google_project_iam_custom_role").change.after.permissions.push(permission);
+  rejects(value, "private_access_proof_role_contract_mismatch");
+}
+for (const mutate of [
+  value => value.role = "projects/vaeroex-integrations-prod/roles/squareProductionPrivateVersions",
+  value => value.secret_id = "square-production-broker-db",
+  value => value.condition[0].expression = value.condition[0].expression.replace("/versions/1'", "/versions/latest'"),
+  value => value.condition[0].expression = value.condition[0].expression.replace("/versions/1'", "/versions/2'"),
+  value => value.condition[0].expression = value.condition[0].expression.replace("711446392261", "123456789012"),
+  value => value.condition[0].expression = `request.time >= timestamp('${NEXT_START}') && request.time < timestamp('${NEXT_EXPIRY}')`,
+]) {
+  const value = proofOpening();
+  mutate(value.resource_changes.find(x => x.type === "google_secret_manager_secret_iam_member").change.after);
+  rejects(value, "private_access_managed_grant_contract_mismatch");
+}
+const missingProofRole = proofOpening();
+missingProofRole.resource_changes = missingProofRole.resource_changes.filter(x => x.type !== "google_project_iam_custom_role");
+rejects(missingProofRole, "private_access_proof_role_contract_mismatch");
+const wrongProofFlag = proofOpening();
+wrongProofFlag.variables.oauth_candidate_proof_enabled.value = false;
+rejects(wrongProofFlag, "private_access_proof_mode_mismatch");
+const proofClose = plan(generation(true, false, ["delete", "create"], {
+  before: { access_mode: OAUTH_PROOF_MODE }, after: { ...preservedCloseWindow, access_mode: OAUTH_PROOF_MODE },
+}), grant("oauth", true, false, ["delete"], { before: proofGrantValue }), proofRole(true));
+proofClose.variables.oauth_candidate_proof_enabled = { value: true };
+assert.equal(verifyPrivateAccessPlan(proofClose), "private_access_one_grant_to_closed_confirmed");
+assert.equal(privateAccessRecoveryTuple(proofClose).accessMode, OAUTH_PROOF_MODE);
+const proofRecovery = structuredClone(proofClose);
+proofRecovery.resource_changes = proofRecovery.resource_changes.filter(x => x.type !== "google_secret_manager_secret_iam_member");
+assert.equal(verifyPrivateAccessPlan(proofRecovery), "private_access_open_generation_without_grant_to_closed_recovery_confirmed");
+const droppedCloseMode = structuredClone(proofClose);
+delete droppedCloseMode.resource_changes[0].change.after.input.access_mode;
+droppedCloseMode.variables.oauth_candidate_proof_enabled.value = false;
+rejects(droppedCloseMode, "private_access_close_must_preserve_expiry");
+const proofCheckpoint = plan(generation(false, false, ["no-op"], {
+  before: { ...preservedCloseWindow, access_mode: OAUTH_PROOF_MODE },
+  after: { ...preservedCloseWindow, access_mode: OAUTH_PROOF_MODE },
+}), proofRole(true));
+proofCheckpoint.variables.oauth_candidate_proof_enabled = { value: true };
+assert.equal(verifyPrivateAccessPlan(proofCheckpoint), "private_access_plan_closed_no_transition_confirmed");
+assert.equal(privateAccessClosedCheckpointTuple(proofCheckpoint).accessMode, OAUTH_PROOF_MODE);
+
+process.stdout.write("private_access_saved_plan_transition_guard_confirmed\n");

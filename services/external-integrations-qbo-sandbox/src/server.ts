@@ -15,10 +15,13 @@ import {
   type CredentialBrokerStore
 } from "@/lib/integrations/credentials/broker";
 import {
-  CredentialEnvelopeSchema,
-  PHASE_8B_REAUTHORIZATION_REDIRECT_URI,
   SecretManagerVersionResourceSchema
 } from "@/lib/integrations/credentials/contracts";
+import {
+  assertAuthorizedProviderEntityEvidence,
+  assertCredentialEnvelopeMatchesProviderOAuthPolicy,
+  validateProviderOAuthCallbackUri
+} from "@/lib/integrations/credentials/oauth-policy";
 import { isReauthorizationOAuthState } from "@/lib/integrations/credentials/oauth-state";
 import {
   credentialAad,
@@ -101,6 +104,11 @@ import {
   QboSandboxOAuthCredentialProvider,
   createQboSandboxAuthorizationUrl
 } from "@/lib/integrations/provider-runtime/qbo/oauth";
+import {
+  QBO_PHASE_8B_AUTHORIZATION_RETURN_PATH,
+  QBO_PHASE_8B_CALLBACK_URI,
+  QBO_PHASE_8B_OAUTH_POLICY
+} from "@/lib/integrations/provider-runtime/qbo/oauth-policy";
 import {
   parseQboOAuthCallbackHandoff,
   sanitizedQboOAuthConfirmationUrl
@@ -274,7 +282,10 @@ function requireCommonScope() {
 
 function exactPhase8bCallbackUrl() {
   const callbackUrl = env("PHASE8B_CALLBACK_URL");
-  if (callbackUrl !== PHASE_8B_REAUTHORIZATION_REDIRECT_URI) {
+  if (
+    validateProviderOAuthCallbackUri(QBO_PHASE_8B_OAUTH_POLICY, callbackUrl) !==
+    QBO_PHASE_8B_CALLBACK_URI
+  ) {
     throw new Error("phase8b_callback_url_invalid");
   }
   return callbackUrl;
@@ -489,6 +500,7 @@ function brokerDependencies(db: Phase8bDatabase) {
     kmsKeyResource,
     secrets,
     provider,
+    providerOAuthPolicy: QBO_PHASE_8B_OAUTH_POLICY,
     authorizedEntityVerifier: companyVerifier
   });
   return { broker, secrets, kms, companyVerifier };
@@ -554,7 +566,8 @@ async function recoverAuthorizationEvidence(
         additionalAuthenticatedData: credentialAad(credential.aadContext)
       })
     );
-    const envelope = CredentialEnvelopeSchema.parse(
+    const envelope = assertCredentialEnvelopeMatchesProviderOAuthPolicy(
+      QBO_PHASE_8B_OAUTH_POLICY,
       JSON.parse(plaintext.toString("utf8"))
     );
     const realmId = BoundedIdentifierSchema.parse(
@@ -571,7 +584,8 @@ async function recoverAuthorizationEvidence(
     ) {
       throw new Error("phase8b_authorization_recovery_binding_invalid");
     }
-    const evidence = AuthorizedProviderEntityEvidenceSchema.parse(
+    const evidence = assertAuthorizedProviderEntityEvidence(
+      QBO_PHASE_8B_OAUTH_POLICY,
       await dependencies.companyVerifier.verify({
         externalAuthorizedEntityReference: realmId,
         credential: new ProviderAccessCredential({
@@ -581,7 +595,8 @@ async function recoverAuthorizationEvidence(
           grantedScopes: envelope.grantedScopes,
           accessToken: envelope.accessToken
         })
-      })
+      }),
+      { externalAuthorizedEntityReference: realmId, purpose: "authorization" }
     );
     return { evidence, realmId } as const;
   } finally {
@@ -749,7 +764,7 @@ async function handleBroker(request: IncomingMessage, response: ServerResponse, 
         providerEnvironment: "sandbox",
         initiatedBy: scope.initiatedBy,
         requestedScopes: [QBO_ACCOUNTING_SCOPE],
-        returnIntent: "/phase8b/sandbox/authorized",
+        returnIntent: QBO_PHASE_8B_AUTHORIZATION_RETURN_PATH,
         requestId: `phase8b_oauth_begin_${randomUUID()}`
       });
       const secret = await dependencies.secrets.access("quickbooks_online", "sandbox");
@@ -850,7 +865,7 @@ async function handleBroker(request: IncomingMessage, response: ServerResponse, 
         providerEnvironment: "sandbox",
         initiatedBy: scope.initiatedBy,
         requestedScopes: [QBO_ACCOUNTING_SCOPE],
-        returnIntent: "/phase8b/sandbox/authorized",
+        returnIntent: QBO_PHASE_8B_AUTHORIZATION_RETURN_PATH,
         consumeRequestId: `phase8b_oauth_consume_${randomUUID()}`,
         storeRequestId: `phase8b_credential_store_${randomUUID()}`
       });

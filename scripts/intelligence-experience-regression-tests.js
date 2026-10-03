@@ -28,6 +28,7 @@ Module._load = function loadPatched(request, parent, isMain) {
 };
 
 const { buildIntelligenceLayer, consolidateDuplicateInsights } = require("../lib/intelligence/layer.ts");
+const { isWorkspacePathActive } = require("../lib/presentation/app-navigation.ts");
 const { buildOperationalEvidenceInsights } = require("../lib/intelligence/operational-evidence.ts");
 const { buildIntelligenceSnapshotFromProducersV1 } = require("../lib/intelligence/snapshot/v1/composition.ts");
 const {
@@ -284,13 +285,22 @@ const semanticSop = {
   deleted_at: null
 };
 function semanticHealth(name, values, setting, target = null) {
-  return buildIntelligenceLayer({
-    kpis: importedKpi(name, values, { target }),
-    kpiSettings: [setting],
-    files: [retailFile],
-    imports: [retailImport],
-    sops: [semanticSop]
-  });
+  // These July semantic fixtures must not acquire a stale-SOP finding as the
+  // real calendar advances; this test does not exercise document aging.
+  const asOf = "2026-07-14T12:00:00.000Z";
+  const originalNow = Date.now;
+  Date.now = () => Date.parse(asOf);
+  try {
+    return buildIntelligenceLayer({
+      kpis: importedKpi(name, values, { target }),
+      kpiSettings: [setting],
+      files: [retailFile],
+      imports: [retailImport],
+      sops: [semanticSop]
+    });
+  } finally {
+    Date.now = originalNow;
+  }
 }
 
 const maximizeRisk = semanticHealth("Revenue", [8, 8, 8, 8, 8, 8], kpiSetting("Revenue", "maximize"), 10);
@@ -602,7 +612,11 @@ assert.match(saveActionSource, /artifact: completed\.artifact/, "saved analyses 
 assert.match(saveActionSource, /source_data_json: envelope/, "saved analyses must persist the versioned copied envelope");
 assert.match(savedReportSource, /SavedAnalysisRenderer/, "saved analyses must reopen through the read-only renderer");
 assert.match(savedReportSource, /parseSavedAnalysisEnvelope/, "saved analysis detail must reject ambiguous legacy rows");
-assert.match(appNavigationSource, /pathname\.startsWith\(`\$\{href\}\//, "nested Intelligence and Reports routes must keep their sidebar section active");
+assert.match(appNavigationSource, /isWorkspacePathActive\(pathname, item\.href\)/, "navigation uses the shared active-destination predicate");
+for (const href of ["/app/intelligence", "/app/reports"]) {
+  assert.equal(isWorkspacePathActive(`${href}/detail`, href), true, "nested Intelligence and Reports routes must keep their sidebar section active");
+  assert.equal(isWorkspacePathActive(`${href}-other`, href), false, "a shared text prefix is not a nested destination");
+}
 assert.doesNotMatch(intelligencePageSource, /Forecast Summary/, "weak forecast readiness is not promoted into the executive summary");
 assert.match(intelligencePageSource, /from\("operational_metrics"\)/, "Intelligence loads bounded operational evidence");
 assert.match(intelligencePageSource, /from\("kpi_settings"\)/, "Intelligence loads canonical KPI semantics with its KPI evidence");

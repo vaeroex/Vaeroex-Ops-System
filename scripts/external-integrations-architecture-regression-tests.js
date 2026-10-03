@@ -2,6 +2,7 @@ const assert = require("node:assert/strict");
 const childProcess = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
+const { approvedSquareQualificationPaths, withoutSquareQualificationPaths } = require("./square-dormant-scope-test-support.js");
 
 const root = path.resolve(__dirname, "..");
 const read = (relative) => fs.readFileSync(path.join(root, relative), "utf8");
@@ -130,10 +131,129 @@ equal(
   "contract test script must be registered"
 );
 equal(
+  packageJson.scripts["test:external-integrations-phase-1a"],
+  "node scripts/external-integrations-phase-1a-operation-policy-regression-tests.js",
+  "Phase 1A operation-policy regression script must be registered"
+);
+equal(
+  packageJson.scripts["test:external-integrations-square-phase-2a"],
+  "node scripts/external-integrations-square-phase-2a-regression-tests.js",
+  "Square Phase 2A dormant contract regression script must be registered"
+);
+equal(
+  packageJson.scripts["test:external-integrations-square-phase-2b1a"],
+  "node scripts/external-integrations-square-phase-2b1a-response-validation-regression-tests.js",
+  "Square Phase 2B.1A response validation regression script must be registered"
+);
+equal(
+  packageJson.scripts["test:external-integrations-square-phase-2b1b1"],
+  "node scripts/external-integrations-square-phase-2b1b1-catalog-response-validation-regression-tests.js",
+  "Square Phase 2B.1B-1 Catalog response validation regression script must be registered"
+);
+equal(
+  packageJson.scripts["test:external-integrations-square-phase-2b1b2"],
+  "node scripts/external-integrations-square-phase-2b1b2-catalog-response-validation-regression-tests.js",
+  "Square Phase 2B.1B-2 Catalog response validation regression script must be registered"
+);
+equal(
+  packageJson.scripts["test:external-integrations-square-phase-2b2a"],
+  "node scripts/external-integrations-square-phase-2b2a-order-core-response-validation-regression-tests.js",
+  "Square Phase 2B.2A Order-core response validation regression script must be registered"
+);
+equal(
+  packageJson.scripts["test:external-integrations-square-phase-2b2b1"],
+  "node scripts/external-integrations-square-phase-2b2b1-order-line-item-response-validation-regression-tests.js",
+  "Square Phase 2B.2B-1 Order line-item response validation regression script must be registered"
+);
+equal(
+  packageJson.scripts["test:external-integrations-square-phase-2b2b2"],
+  "node scripts/external-integrations-square-phase-2b2b2-order-adjustment-response-validation-regression-tests.js",
+  "Square Phase 2B.2B-2 Order adjustment response validation regression script must be registered"
+);
+equal(
+  packageJson.scripts["test:external-integrations-square-phase-2b2b3"],
+  "node scripts/external-integrations-square-phase-2b2b3-order-tender-response-validation-regression-tests.js",
+  "Square Phase 2B.2B-3 Order Tender response validation regression script must be registered"
+);
+equal(
   packageJson.scripts["test:external-integrations-architecture"],
   "node scripts/external-integrations-architecture-regression-tests.js",
   "architecture test script must be registered"
 );
+equal(
+  packageJson.scripts["test:external-integrations-square-payments"],
+  "node scripts/external-integrations-square-payment-response-validation-regression-tests.js",
+  "Square Payment response regression script must be registered"
+);
+matches(ciWorkflow, /pnpm test:external-integrations-square-payments/, "CI exercises dormant Payment responses");
+equal(
+  packageJson.scripts["test:external-integrations-square-refunds"],
+  "node scripts/external-integrations-square-refund-response-validation-regression-tests.js",
+  "Square Refund response regression script must be registered"
+);
+matches(ciWorkflow, /pnpm test:external-integrations-square-refunds/, "CI exercises dormant Refund responses");
+equal(
+  packageJson.scripts["test:external-integrations-square-catalog"],
+  "node scripts/external-integrations-square-catalog-response-validation-regression-tests.js",
+  "Square request-bound Catalog response regression script must be registered"
+);
+matches(ciWorkflow, /pnpm test:external-integrations-square-catalog/, "CI exercises request-bound Catalog responses");
+equal(
+  packageJson.scripts["test:external-integrations-square-inventory"],
+  "node scripts/external-integrations-square-inventory-response-validation-regression-tests.js",
+  "Square Inventory response regression script must be registered"
+);
+matches(ciWorkflow, /pnpm test:external-integrations-square-inventory/, "CI exercises dormant Inventory responses");
+for (const suffix of ["ingestion-client", "ingestion-mapping", "ingestion-recovery", "ingestion"]) {
+  const script = `test:external-integrations-square-${suffix}`;
+  equal(packageJson.scripts[script], `node scripts/external-integrations-square-${suffix}-regression-tests.js`, `${suffix} regression registered`);
+  matches(ciWorkflow, new RegExp(`pnpm ${script}(?:\\s|$)`), `${suffix} exercised in CI`);
+}
+for (const suffix of ["account-oauth", "account-discovery", "connection-routes", "remote-sandbox", "remote-credentials"]) {
+  const script = `test:external-integrations-square-${suffix}`;
+  equal(packageJson.scripts[script], `node scripts/external-integrations-square-${suffix}-regression-tests.js`, `${suffix} regression registered`);
+  matches(ciWorkflow, new RegExp(`pnpm ${script}(?:\\s|$)`), `${suffix} exercised in CI`);
+}
+equal(packageJson.scripts["test:external-integrations-square-account-db"], "node scripts/run-square-account-connection-qualification.js", "checked account lifecycle qualification registered");
+matches(ciWorkflow, /node scripts\/run-square-account-connection-qualification\.js --supabase-local/, "CI exercises account lifecycle in real disposable databases");
+equal(packageJson.scripts["test:external-integrations-square-remote-sandbox-db"], "node scripts/run-square-remote-sandbox-qualification.js", "checked Sandbox binding qualification registered");
+matches(ciWorkflow, /node scripts\/run-square-remote-sandbox-qualification\.js --supabase-local/, "CI exercises Sandbox binding only in disposable databases");
+equal(packageJson.scripts["test:external-integrations-square-broker-runtime-db"], "node scripts/run-square-broker-runtime-qualification.js", "separate broker/runtime database qualification registered");
+matches(ciWorkflow, /node scripts\/run-square-broker-runtime-qualification\.js --supabase-local/, "CI exercises separate broker/runtime authority only in disposable databases");
+equal(packageJson.scripts["test:external-integrations-square-handoff-headers"], "node scripts/run-square-handoff-header-qualification.js", "optimized Next handoff header regression registered");
+matches(ciWorkflow, /pnpm test:external-integrations-square-handoff-headers/, "CI verifies actual optimized Next response headers without a deployment");
+const sandboxCredentials = read("lib/integrations/control-plane/square-remote-sandbox-credentials.ts");
+matches(sandboxCredentials, /import "server-only"/, "Sandbox credential adapter is server-only");
+doesNotMatch(sandboxCredentials, /process\.env|\bfetch\s*\(|node:fs|node:child_process|metadata\.google\.internal|169\.254\.169\.254/, "credential adapter has no ambient credential, network or metadata fallback");
+doesNotMatch(read("lib/integrations/control-plane/square-customer-availability.ts"), /square-remote-sandbox|createSquareRemoteSandbox/, "remote Sandbox capabilities remain unwired at public availability gate");
+for (const name of ["ingestion-adapter", "ingestion-client", "ingestion-mapping", "ingestion-page-repository"]) {
+  const source = read(`lib/integrations/providers/square/${name}.ts`);
+  doesNotMatch(source, /\bfetch\s*\(|axios|node:https|node:http|process\.env|@supabase|supabase-js|app\/api\//, `${name} has no live transport/credentials/persistence/routes`);
+}
+const squareIngestionAdapter = read("lib/integrations/providers/square/ingestion-adapter.ts");
+equal(packageJson.scripts["test:external-integrations-square-durable"], "node scripts/external-integrations-square-durable-regression-tests.js", "dormant durable boundary regressions registered");
+equal(packageJson.scripts["test:external-integrations-square-durable-db"], "node scripts/run-square-durable-page-qualification.js", "local database qualification registered");
+equal(packageJson.scripts["test:external-integrations-square-durable-authority"], "node scripts/external-integrations-square-durable-authority-regression-tests.js", "checked authority regressions registered");
+matches(ciWorkflow, /pnpm test:external-integrations-square-durable(?:\s|$)/, "CI exercises dormant durable application boundary");
+matches(ciWorkflow, /pnpm test:external-integrations-square-durable-authority(?:\s|$)/, "CI exercises checked database authority bridge");
+matches(ciWorkflow, /node scripts\/run-square-durable-page-qualification\.js --supabase-local/, "CI exercises real disposable database qualification");
+for (const name of ["durable-authority", "durable-page-repository", "durable-contracts"]) {
+  const source = read(`lib/integrations/providers/square/${name}.ts`);
+  matches(source, /import "server-only"/, `${name} stays server-only`);
+  doesNotMatch(source, /\bfetch\s*\(|axios|node:https|node:http|process\.env|createClient\s*\(|app\/api\//, `${name} has no default transport, credential lookup, registration or route`);
+}
+matches(squareIngestionAdapter, /parseSquareCatalogValidatedResponse/, "ingestion uses trusted Catalog facade");
+doesNotMatch(squareIngestionAdapter, /parseSquareCatalogResponseWithAcceptance|parseSquareCatalogResponse\(/, "ingestion cannot promote legacy Catalog shape acceptance");
+doesNotMatch(read("lib/integrations/control-plane/registered-provider-registry.ts"), /square/i, "Square stays outside the registered provider registry");
+for (const moduleName of ["catalog-response-validation", "inventory-responses"]) {
+  const source = read(`lib/integrations/providers/square/${moduleName}.ts`);
+  matches(source, /import "server-only"/, `${moduleName} remains server-only`);
+  doesNotMatch(
+    source,
+    /\bfetch\s*\(|axios|node:https|node:http|process\.env|@supabase|supabase-js|app\/api\//,
+    `${moduleName} must not add transport, credentials, database or routes`
+  );
+}
 equal(
   packageJson.scripts["test:external-integrations-phase-2"],
   "node scripts/external-integrations-phase-2-reconciliation-regression-tests.js",
@@ -163,6 +283,51 @@ equal(
   packageJson.scripts["test:external-integrations-phase-8b"],
   "node scripts/external-integrations-phase-8b-qbo-sandbox-regression-tests.js",
   "Phase 8B QBO sandbox regression script must be registered"
+);
+matches(
+  ciWorkflow,
+  /pnpm test:external-integrations-phase-1a/,
+  "CI must exercise the Phase 1A operation-policy regression suite"
+);
+matches(
+  ciWorkflow,
+  /pnpm test:external-integrations-square-phase-2a/,
+  "CI must exercise the Square Phase 2A dormant contract regression suite"
+);
+matches(
+  ciWorkflow,
+  /pnpm test:external-integrations-square-phase-2b1a/,
+  "CI must exercise the Square Phase 2B.1A response validation regression suite"
+);
+matches(
+  ciWorkflow,
+  /pnpm test:external-integrations-square-phase-2b1b1/,
+  "CI must exercise the Square Phase 2B.1B-1 Catalog response validation suite"
+);
+matches(
+  ciWorkflow,
+  /pnpm test:external-integrations-square-phase-2b1b2/,
+  "CI must exercise the Square Phase 2B.1B-2 Catalog response validation suite"
+);
+matches(
+  ciWorkflow,
+  /pnpm test:external-integrations-square-phase-2b2a/,
+  "CI must exercise the Square Phase 2B.2A Order-core response validation suite"
+);
+matches(
+  ciWorkflow,
+  /pnpm test:external-integrations-square-phase-2b2b1/,
+  "CI must exercise the Square Phase 2B.2B-1 Order line-item response validation suite"
+);
+matches(
+  ciWorkflow,
+  /pnpm test:external-integrations-square-phase-2b2b2/,
+  "CI must exercise the Square Phase 2B.2B-2 Order adjustment response validation suite"
+);
+matches(
+  ciWorkflow,
+  /pnpm test:external-integrations-square-phase-2b2b3/,
+  "CI must exercise the Square Phase 2B.2B-3 Order Tender response validation suite"
 );
 matches(
   ciWorkflow,
@@ -201,7 +366,7 @@ matches(
 );
 matches(
   zeroBasedUpgradeRunner,
-  /const fixtureBaseVersion = "20260824083917";[\s\S]*const zeroBasedVersion = "20260824193332";[\s\S]*const retryExecutionVersion = "20260824233000";[\s\S]*const recoveryLifecycleVersion = "20260825180000";[\s\S]*const scopedRetryLifecycleVersion = "20260825190000";[\s\S]*const credentialBindingVersion = "20260826043610";[\s\S]*const credentialBindingCanaryVersion = "20260826090000";[\s\S]*const credentialLineageVersion = "20260826120000";[\s\S]*const precontractRetirementVersion = "20260826190801";[\s\S]*const providerResultEvidenceVersion = "20260826222000";[\s\S]*const targetVersion = "20260827033058";[\s\S]*"db",[\s\S]*"reset",[\s\S]*"--version",[\s\S]*fixtureBaseVersion/,
+  /const fixtureBaseVersion = "20260824083917";[\s\S]*const zeroBasedVersion = "20260824193332";[\s\S]*const retryExecutionVersion = "20260824233000";[\s\S]*const recoveryLifecycleVersion = "20260825180000";[\s\S]*const scopedRetryLifecycleVersion = "20260825190000";[\s\S]*const credentialBindingVersion = "20260826043610";[\s\S]*const credentialBindingCanaryVersion = "20260826090000";[\s\S]*const credentialLineageVersion = "20260826120000";[\s\S]*const precontractRetirementVersion = "20260826190801";[\s\S]*const providerResultEvidenceVersion = "20260826222000";[\s\S]*const productionConvergenceVersion = "20260827033058";[\s\S]*const targetVersion = "20260902191322";[\s\S]*"db",[\s\S]*"reset",[\s\S]*"--version",[\s\S]*fixtureBaseVersion/,
   "the fixture-rich runner must reset to the exact pre-migration boundary"
 );
 matches(
@@ -209,6 +374,47 @@ matches(
   /run\(cli, \["migration", "up", "--local"\]\)/,
   "the fixture-rich runner must apply the ordered zero-based and retry-identity migrations"
 );
+matches(zeroBasedUpgradeRunner, /const dormantSquareTail = \[\s*"20260902191323_integration_production_runtime_foundation\.sql",\s*"20260902191324_square_production_runtime_overlay\.sql",\s*"20260902191325_square_production_internal_pilot_runtime\.sql",\s*"20260907042202_square_dormant_trusted_authority\.sql",\s*"20260907042352_square_dormant_atomic_pages\.sql",\s*"20260907174326_square_dormant_account_connection\.sql",\s*"20260907225626_square_remote_sandbox_binding\.sql",\s*"20260908014713_square_broker_runtime_credential_authority\.sql",\s*"20260908042529_square_gcp_callback_authority\.sql",\s*"20260910193429_square_gcp_callback_oregon_recovery\.sql",\s*"20260910231437_square_gcp_mapped_runtime\.sql",\s*"20260911000915_square_gcp_mapped_legacy_fencing\.sql",\s*"20260911151334_square_verified_provider_observations\.sql",\s*"20260911205108_square_canonical_interpretation\.sql",\s*"20260911222230_square_workspace_evidence\.sql",\s*"20260912034447_square_workspace_card_contract\.sql",\s*"20260912150000_square_operational_intelligence\.sql",\s*"20260912190000_square_production_runtime_foundation\.sql",\s*"20260915040500_integration_production_legacy_foundation_guard\.sql"\s*\]/,
+  "fixture-rich QBO upgrade allows exactly the reviewed dormant Square migrations");
+matches(zeroBasedUpgradeRunner, /const separatelyQualifiedSheetsTail = \[\s*"20261002040024_google_sheets_complete\.sql",\s*"20261002040031_google_sheets_lifecycle\.sql"\s*\]/,
+  "fixture-rich QBO upgrade allows exactly the two reviewed Google Sheets migrations");
+ok(zeroBasedUpgradeRunner.includes('const separatelyQualifiedPreferencesTail = [\n    "20261002182049_integration_summary_preferences.sql"\n  ];'),
+  "fixture-rich QBO upgrade allows exactly the reviewed personal summary preferences migration");
+// Execute only the pure manifest guard, with no database/CLI capability. This
+// catches an omitted additive tail before the real database gate runs in CI.
+const fixtureGuardSource = zeroBasedUpgradeRunner.slice(0, zeroBasedUpgradeRunner.indexOf("async function applyFixture"));
+const currentMigrations = fs.readdirSync(path.join(root, "supabase/migrations"));
+function acceptsFixtureManifest(names) {
+  return require("node:vm").runInNewContext(`${fixtureGuardSource}\nassertTargetIsSinglePendingMigration(); true;`, {
+    __dirname: path.join(root, "scripts"),
+    require(name) {
+      if (name === "node:fs") return { readdirSync: () => names };
+      if (name === "node:path") return path;
+      if (name === "node:child_process") return { spawnSync: () => { throw new Error("manifest_guard_must_not_execute_commands"); } };
+      throw new Error("manifest_guard_dependency_denied");
+    },
+    process: { env: {}, stderr: { write() {} }, exit() { throw new Error("fixture_manifest_denied"); } }
+  });
+}
+equal(acceptsFixtureManifest(currentMigrations), true, "real current migration manifest passes the fixture-rich guard");
+for (const manifest of [currentMigrations.filter(name => name !== "20260907174326_square_dormant_account_connection.sql"),
+  currentMigrations.filter(name => name !== "20260902191325_square_production_internal_pilot_runtime.sql"),
+  currentMigrations.filter(name => name !== "20260907225626_square_remote_sandbox_binding.sql"),
+  currentMigrations.filter(name => name !== "20260908014713_square_broker_runtime_credential_authority.sql"),
+  currentMigrations.filter(name => name !== "20260908042529_square_gcp_callback_authority.sql"),
+  currentMigrations.filter(name => name !== "20260910193429_square_gcp_callback_oregon_recovery.sql"),
+  currentMigrations.filter(name => name !== "20260910231437_square_gcp_mapped_runtime.sql"),
+  currentMigrations.filter(name => name !== "20260911000915_square_gcp_mapped_legacy_fencing.sql"),
+  currentMigrations.filter(name => name !== "20260911151334_square_verified_provider_observations.sql"),
+  currentMigrations.filter(name => name !== "20260911205108_square_canonical_interpretation.sql"),
+  currentMigrations.filter(name => name !== "20261002040024_google_sheets_complete.sql"),
+  currentMigrations.filter(name => name !== "20261002040031_google_sheets_lifecycle.sql"),
+  currentMigrations.filter(name => name !== "20261002182049_integration_summary_preferences.sql"),
+  currentMigrations.map(name => name === "20261002182049_integration_summary_preferences.sql" ? "20261002182050_integration_summary_preferences.sql" : name),
+  [...currentMigrations, "20261002182049_integration_summary_preferences.sql"],
+  [...currentMigrations, "20990101000000_square_activation.sql"]]) {
+  assertionCount++; assert.throws(() => acceptsFixtureManifest(manifest), /fixture_manifest_denied/, "missing or unreviewed tail still rejects");
+}
 matches(
   zeroBasedUpgradeRunner,
   /external_integrations_phase_6_durable_runtime\.test\.sql[\s\S]*external_integrations_phase_8b_credential_refresh_recovery\.test\.sql[\s\S]*external_integrations_phase_8b_same_generation_reauthorization\.test\.sql[\s\S]*external_integrations_phase_8b_credential_binding_canary\.test\.sql[\s\S]*external_integrations_phase_8b_credential_lineage_recovery\.test\.sql[\s\S]*external_integrations_phase_8b_precontract_retirement\.test\.sql[\s\S]*external_integrations_phase_8b_provider_result_evidence\.test\.sql[\s\S]*external_integrations_qbo_production_convergence\.test\.sql/,
@@ -225,12 +431,114 @@ matches(
   "the fixture must preserve the exact production-labelled 2-leased/1-pending shape"
 );
 
-const protectedDiff = childProcess.execFileSync(
-  "git",
-  ["diff", "--name-only", "origin/main", "--", "app", "components", "supabase", "lib/supabase", "services", "vercel.json"],
-  { cwd: root, encoding: "utf8" }
-).trim();
+equal(approvedSquareQualificationPaths.length, 251, "dormant scope permits only exact reviewed migrations, UI/upload feedback, nine customer presentation paths, nine Admin clarity paths, one approved subscription action path and three approved Admin pilot follow-up paths, native service/templates, provider-neutral Production composition and activation, restricted evidence host, query-stripping callback edge, repository-bound image trigger, internal-seller consent and manual read, internal-pilot runtime, offline pilot, bounded provisioner and customer candidate files");
+const workspaceClarityPaths = [
+  "app/app/intelligence/page.tsx",
+  "app/app/kpis/page.tsx",
+  "app/app/reports/page.tsx",
+  "app/app/sources/SourcesPage.tsx",
+  "app/app/sources/business-notes/actions.ts",
+  "components/app/AppNavigation.tsx",
+  "components/app/AppShell.tsx",
+  "components/app/ThemeControls.tsx",
+  "components/app/WorkspacePageTitle.tsx",
+  "components/evidence/BusinessNotesPanel.tsx",
+  "components/evidence/EvidenceBatchList.tsx",
+  "components/evidence/EvidenceLifecycleSelection.tsx",
+  "components/intelligence/IntelligenceBriefingCards.tsx",
+  "components/intelligence/IntelligenceSignalInbox.tsx",
+  "components/reports/SavedAnalysisList.tsx"
+];
+equal(withoutSquareQualificationPaths(workspaceClarityPaths.join("\n")), "", "only the fifteen reviewed workspace-clarity and note-feedback paths are exempt");
+const uploadFeedbackPaths = [
+  "app/app/files/actions.ts",
+  "components/evidence/UploadSourceForm.tsx",
+  "components/app/ToastRegion.tsx",
+  "components/operations/AnalysisProgressSubmit.tsx",
+  "components/operations/FormControls.tsx",
+  "components/operations/PendingSubmitButton.tsx"
+];
+equal(withoutSquareQualificationPaths(uploadFeedbackPaths.join("\n")), "", "only the six explicitly authorized upload/feedback paths are exempt");
+for (const unapprovedWorkspacePath of [
+  ...workspaceClarityPaths.map(file => `${file}.unexpected`),
+  ...uploadFeedbackPaths.map(file => `${file}.unexpected`),
+  "app/app/intelligence/actions.ts",
+  "app/app/kpis/unreviewed/page.tsx",
+  "app/app/sources/business-notes/approval-actions.ts",
+  "app/app/files/unreviewed-actions.ts",
+  "components/app/AppNavigationExtra.tsx",
+  "components/evidence/UnreviewedList.tsx",
+  "components/evidence/EvidenceLifecycleSelectionExtra.tsx",
+  "components/reports/UnreviewedAnalysis.tsx",
+  "app/api/integrations/square/activate/route.ts",
+  "lib/supabase/server.ts"
+]) {
+  equal(withoutSquareQualificationPaths(unapprovedWorkspacePath), unapprovedWorkspacePath, "workspace UI allowance must reject neighboring, action, and backend paths");
+  equal(withoutSquareQualificationPaths([...workspaceClarityPaths, unapprovedWorkspacePath].join("\n")), unapprovedWorkspacePath, "approved UI paths cannot hide unrelated changes in a mixed diff");
+  equal(withoutSquareQualificationPaths([...uploadFeedbackPaths, unapprovedWorkspacePath].join("\n")), unapprovedWorkspacePath, "approved upload/feedback paths cannot hide unrelated changes in a mixed diff");
+}
+const directCustomerProtectedPaths = [
+  "components/integrations/SquareDirectCustomerPanel.tsx",
+  "supabase/production-migrations/20260929004917_square_customer_service_backend.sql",
+  "supabase/tests/square_customer_backend.test.sql",
+  "supabase/production-migrations/20260929041048_square_customer_payment_history.sql",
+  "supabase/tests/square_customer_payment_history.test.sql",
+  "supabase/production-migrations/20260929052211_square_customer_payment_browse.sql",
+  "supabase/tests/square_customer_payment_browse.test.sql"
+];
+equal(withoutSquareQualificationPaths(directCustomerProtectedPaths.join("\n")), "", "exact closed direct customer component, migration and qualification are in scope");
+for (const unapprovedDirectPath of [
+  "components/integrations/SquareDirectAdminPanel.tsx",
+  "supabase/production-migrations/20260929004918_square_customer_service_backend.sql",
+  "supabase/migrations/20260929004917_square_customer_service_backend.sql",
+  "supabase/tests/square_customer_backend_unreviewed.test.sql",
+  "supabase/production-migrations/20260929041049_square_customer_payment_history.sql",
+  "supabase/migrations/20260929041048_square_customer_payment_history.sql",
+  "supabase/tests/square_customer_payment_history_unreviewed.test.sql",
+  "supabase/production-migrations/20260929052212_square_customer_payment_browse.sql",
+  "supabase/migrations/20260929052211_square_customer_payment_browse.sql",
+  "supabase/tests/square_customer_payment_browse_unreviewed.test.sql",
+  "app/api/integrations/square/direct-activation/route.ts"
+]) {
+  equal(withoutSquareQualificationPaths(unapprovedDirectPath), unapprovedDirectPath, "direct customer exception cannot authorize neighboring paths or activation");
+  equal(withoutSquareQualificationPaths([...directCustomerProtectedPaths, unapprovedDirectPath].join("\n")), unapprovedDirectPath, "approved customer paths cannot hide an unrelated change in the same diff");
+}
+assertionCount++;
+assert.deepEqual(approvedSquareQualificationPaths.filter(file => file.startsWith("services/external-integrations-production/infra/provisioner/")), [
+  ".gitignore", ".terraform.lock.hcl", "README.md", "backend.tf", "main.tf", "outputs.tf",
+  "scripts/apply-reviewed-private-access-plan.mjs", "scripts/oauth-candidate-proof-contract.mjs", "scripts/reconcile-private-access.mjs", "scripts/run-reviewed-private-access-plan.mjs", "scripts/verify-effective-private-access.mjs", "scripts/verify-private-access-plan.mjs",
+  "tests/apply-reviewed-private-access-plan.test.mjs",
+  "tests/bounded-provisioner.tftest.hcl", "tests/oauth-candidate-proof.tftest.hcl", "tests/reconcile-private-access.test.mjs", "tests/run-reviewed-private-access-plan.test.mjs", "tests/transition-order.tftest.hcl",
+  "tests/verify-effective-private-access.test.mjs", "tests/verify-private-access-plan.test.mjs", "tests/verify-transition-order.mjs", "variables.tf", "versions.tf"
+].map(file => `services/external-integrations-production/infra/provisioner/${file}`),
+"only the twenty-three bounded provisioner files are exempt");
+assertionCount++;
+assert.deepEqual(JSON.parse(read("vercel.json")), {
+  git: { deploymentEnabled: { "codex/square-remote-sandbox-binding": false, "codex/square-sandbox-qualification": false, "codex/square-gcp-sandbox-callback": false } },
+  crons: [{ path: "/api/integrations/google-sheets/scheduled-sync", schedule: "*/15 * * * *" }]
+}, "Square review branches cannot auto-deploy; other branches keep default behavior and only the reviewed Sheets cron is configured");
+equal(withoutSquareQualificationPaths(approvedSquareQualificationPaths.join("\n")), "", "exact qualification paths are exempt from legacy phase-only scope assertions");
+for (const protectedPath of [
+  ...approvedSquareQualificationPaths.map(file => `${file}.unexpected`),
+  "supabase/migrations/20990101000000_square_activation.sql",
+  "supabase/tests/fixtures/unreviewed.sql",
+  "app/api/integrations/square/activate/route.ts",
+  "components/integrations/SquarePanel.tsx",
+  "services/external-integrations-square/server.ts",
+  "services/external-integrations-production/infra/provisioner/activate.tf",
+  "services/external-integrations-production/infra/provisioner/production.tfvars",
+  "services/external-integrations-production/infra/provisioner/terraform.tfstate",
+  "services/external-integrations-production/infra/provisioner/unreviewed/main.tf",
+  "lib/supabase/server.ts",
+  "vercel.ts"
+]) {
+  equal(withoutSquareQualificationPaths(protectedPath), protectedPath, "scope exemption cannot hide a neighboring or activation path");
+}
+
+// The current manifest and contract checks above apply to every checkout.
+// Historical whole-PR scope restrictions are not an integration boundary.
 const approvedProtectedPaths = new Set([
+  ...approvedSquareQualificationPaths,
   "app/app/settings/page.tsx",
   "app/api/integrations/qbo/connect/route.ts",
   "app/api/integrations/qbo/disconnect/route.ts",
@@ -271,6 +579,16 @@ const approvedProtectedPaths = new Set([
   "supabase/migrations/20260826190801_qbo_precontract_initialization_retirement.sql",
   "supabase/migrations/20260826222000_qbo_provider_result_evidence_and_ar_aging_recovery.sql",
   "supabase/migrations/20260827033058_qbo_production_convergence.sql",
+  "supabase/migrations/20260902191322_qbo_production_dormant_connection_gate.sql",
+  "supabase/migrations/20260910231437_square_gcp_mapped_runtime.sql",
+  "supabase/migrations/20260911000915_square_gcp_mapped_legacy_fencing.sql",
+  "supabase/migrations/20260911151334_square_verified_provider_observations.sql",
+  "supabase/migrations/20260911205108_square_canonical_interpretation.sql",
+  "supabase/migrations/20260911222230_square_workspace_evidence.sql",
+  "supabase/migrations/20260912034447_square_workspace_card_contract.sql",
+  "supabase/migrations/20260912150000_square_operational_intelligence.sql",
+  "supabase/migrations/20260902191323_integration_production_runtime_foundation.sql",
+  "supabase/migrations/20261002182049_integration_summary_preferences.sql",
   "supabase/tests/external_integrations_phase_8b_qbo_sandbox_validation.test.sql",
   "supabase/tests/external_integrations_phase_8b_credential_refresh_recovery.test.sql",
   "supabase/tests/external_integrations_phase_8b_same_generation_reauthorization.test.sql",
@@ -325,17 +643,6 @@ const approvedProtectedPaths = new Set([
   "services/external-integrations-qbo/src/google.ts",
   "services/external-integrations-qbo/src/server.ts"
 ]);
-const unexpectedProtectedDiff = protectedDiff
-  .split("\n")
-  .filter(Boolean)
-  .filter((file) => !approvedProtectedPaths.has(file))
-  .join("\n");
-equal(
-  unexpectedProtectedDiff,
-  "",
-  "external-integration phases may change only registered migrations, tests, UI surfaces, and reviewed runtime services"
-);
-
 const untrackedMigrations = childProcess.execFileSync(
   "git",
   ["ls-files", "--others", "--exclude-standard", "supabase/migrations"],

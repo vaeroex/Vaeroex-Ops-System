@@ -57,6 +57,7 @@ export type QboReportParserOutcome = z.infer<
 >;
 export const QBO_PROVIDER_ADAPTER_VERSION = "qbo_provider_adapter_v1" as const;
 export const QBO_SOURCE_RECORD_CONTRACT_VERSION = "qbo_source_record_minimized_v1" as const;
+export const QBO_ACCOUNTING_MINIMIZATION_VERSION = "qbo_minimizer_v2" as const;
 export const QBO_REPORT_CONTRACT_VERSION = "qbo_report_control_observation_v1" as const;
 export const QBO_PAGINATION_POLICY_VERSION = "qbo_query_pagination_policy_v1" as const;
 export const QBO_CDC_POLICY_VERSION = "qbo_cdc_planning_policy_v1" as const;
@@ -178,6 +179,24 @@ const qboMoneySchema = z
   })
   .strict();
 
+const qboLineAccountingEvidenceSchema = z.object({
+  accountReferenceKind: z.enum(["item_account_ref", "account_ref"]).nullable(),
+  taxCodeRef: qboReferenceSchema.nullable(),
+  taxInclusiveAmount: qboMoneySchema.nullable(),
+  hasTaxDetail: z.boolean(),
+  hasDiscountDetail: z.boolean(),
+  hasGroupDetail: z.boolean()
+}).strict();
+
+const qboTransactionAccountingEvidenceSchema = z.object({
+  sparse: z.boolean(),
+  globalTaxCalculation: z.string().min(1).max(64).nullable(),
+  totalTax: qboMoneySchema.nullable(),
+  hasTaxDetail: z.boolean(),
+  hasTaxLines: z.boolean(),
+  hasDiscountDetail: z.boolean()
+}).strict();
+
 const qboLineSchema = z
   .object({
     lineId: z.string().min(1).max(128).nullable(),
@@ -186,7 +205,8 @@ const qboLineSchema = z
     postingType: z.enum(["debit", "credit", "unknown"]).nullable(),
     itemRef: qboReferenceSchema.nullable(),
     accountRef: qboReferenceSchema.nullable(),
-    entityRef: qboReferenceSchema.nullable()
+    entityRef: qboReferenceSchema.nullable(),
+    accountingEvidence: qboLineAccountingEvidenceSchema.optional()
   })
   .strict();
 
@@ -219,10 +239,16 @@ export const QboMinimizedSourceRecordSchema = z
     amounts: z.record(qboMoneySchema),
     lines: z.array(qboLineSchema).max(500),
     providerVersionReference: z.string().min(1).max(128).nullable(),
-    minimizationVersion: z.literal("qbo_minimizer_v1")
+    minimizationVersion: z.enum(["qbo_minimizer_v1", QBO_ACCOUNTING_MINIMIZATION_VERSION]),
+    accountingEvidence: qboTransactionAccountingEvidenceSchema.optional()
   })
   .strict()
   .superRefine((value, context) => {
+    if (value.minimizationVersion === QBO_ACCOUNTING_MINIMIZATION_VERSION &&
+      (!value.accountingEvidence || value.lines.some((line) => !line.accountingEvidence))) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["accountingEvidence"],
+        message: "Accounting minimization v2 requires complete record and line evidence" });
+    }
     const transactionTypes: ReadonlySet<string> = new Set(QBO_TRANSACTION_RECORD_TYPES);
     if (transactionTypes.has(value.recordType) && value.accounting.sourceCurrency === null) {
       context.addIssue({

@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { ExternalIntegrationsRpcClient } from "@/lib/integrations/persistence/repository";
+import { qboDatabaseConfiguration } from "./database-config";
 
 type PgClient = Readonly<{
   query(sql: string, values?: readonly unknown[]): Promise<{ rows: Array<{ data?: unknown }> }>;
@@ -25,6 +26,13 @@ const productionRoles = new Set([
   "integration_provider_source_authority"
 ]);
 
+// pg encodes JavaScript arrays as PostgreSQL arrays. These two arguments are
+// explicitly JSONB; reason-code text[] arguments retain normal pg encoding.
+const jsonArrayArguments: Readonly<Record<string, readonly string[]>> = {
+  commit_qbo_accounting_source_v1: ["p_facts"],
+  commit_qbo_accounting_calculation_v1: ["p_nodes"]
+};
+
 function identifier(value: string, allowed?: ReadonlySet<string>) {
   if (!/^[a-z][a-z0-9_]*$/.test(value) || (allowed && !allowed.has(value))) {
     throw new Error("qbo_production_database_identifier_denied");
@@ -36,18 +44,12 @@ export class QboProductionDatabase {
   readonly #pool: PgPool;
   readonly #roles: ReadonlySet<string>;
 
-  constructor(connectionString: string, roles: readonly string[]) {
+  constructor(connectionString: string, roles: readonly string[], ca = process.env.QBO_DATABASE_CA_PEM ?? "") {
     if (roles.length === 0 || roles.length > productionRoles.size) {
       throw new Error("qbo_production_database_roles_invalid");
     }
     this.#roles = new Set(roles.map((role) => identifier(role, productionRoles)));
-    this.#pool = new Pool({
-      connectionString,
-      max: 4,
-      idleTimeoutMillis: 10_000,
-      connectionTimeoutMillis: 10_000,
-      allowExitOnIdle: true
-    });
+    this.#pool = new Pool(qboDatabaseConfiguration(connectionString, ca));
   }
 
   role(role: string): ExternalIntegrationsRpcClient {
@@ -68,7 +70,7 @@ export class QboProductionDatabase {
           await client.query(`set local role ${checkedRole}`);
           const result = await client.query(
             `select public.${functionName}(${parameters.join(", ")}) as data`,
-            entries.map(([, value]) => value)
+            entries.map(([key, value]) => jsonArrayArguments[functionName]?.includes(key) ? JSON.stringify(value) : value)
           );
           await client.query("commit");
           return { data: result.rows[0]?.data ?? null, error: null };
@@ -87,6 +89,11 @@ export class QboProductionDatabase {
         }
       }
     };
+  }
+
+  async checkConnectivity() {
+    const client = await this.#pool.connect();
+    client.release();
   }
 
   async close() {

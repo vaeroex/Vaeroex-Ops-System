@@ -1,0 +1,42 @@
+[Unit]
+Description=Restricted Square Sandbox evidence qualification
+Conflicts=vaeroex-square-callback.service vaeroex-square-synthetic.service
+After=network-online.target
+
+[Service]
+Type=simple
+User=vaeroex-square-evidence
+Group=vaeroex-square-evidence
+WorkingDirectory=/opt/vaeroex-square-evidence
+ExecStart=/usr/bin/node --disable-sigusr1 --max-old-space-size=384 services/square-workspace-host/start.mjs
+EnvironmentFile=/etc/vaeroex-square-evidence/public.env
+Environment=NODE_ENV=production NEXT_TELEMETRY_DISABLED=1
+RuntimeDirectory=vaeroex-square-evidence
+RuntimeDirectoryMode=0700
+UMask=0077
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+LimitCORE=0
+MemoryMax=512M
+TasksMax=64
+RuntimeMaxSec=3600
+TimeoutStopSec=10
+Restart=no
+# Next can log upstream failures. Do not persist request-bearing diagnostics.
+# systemd retains service lifecycle/exit auditing; no application access logs.
+StandardOutput=null
+StandardError=null
+IPAddressDeny=169.254.169.254/32
+
+[Install]
+WantedBy=multi-user.target

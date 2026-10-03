@@ -71,6 +71,8 @@ export class QboCompanyVerifier
           version: QBO_PRODUCTION_COMPANY_VERIFICATION_VERSION
         };
     return {
+      providerKey: "quickbooks_online",
+      providerEnvironment: this.#providerEnvironment,
       externalAuthorizedEntityReference: realmId,
       providerEntityType: "company",
       safeDisplayName,

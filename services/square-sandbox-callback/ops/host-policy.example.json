@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "approvedUntil": null,
+  "operator": null,
+  "configurationEvidenceId": null,
+  "budgetDeliveryEvidenceId": null,
+  "nodeVersion": null,
+  "artifactSha256": null,
+  "hostConfigurationReviewed": false,
+  "syntheticPrivacyPassed": false
+}

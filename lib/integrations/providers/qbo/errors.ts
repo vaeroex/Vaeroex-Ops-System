@@ -111,7 +111,7 @@ export function classifyQboProviderError(input: {
     retryDisposition,
     safeCode: fault.code ?? `http_${input.httpStatus ?? "transport"}`,
     safeDetail: "QuickBooks Online provider response was classified with customer-safe metadata only.",
-    retryAfterMs,
+    retryAfterMs: kind === "rate_limit" ? Math.max(60_000, retryAfterMs ?? 0) : retryAfterMs,
     intuitTid
   } satisfies QboProviderErrorClassification;
 }

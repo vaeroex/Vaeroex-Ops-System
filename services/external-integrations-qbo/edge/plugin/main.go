@@ -1,6 +1,9 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
+	"io"
 	"strings"
 
 	callbackedge "vaeroex.local/qbo-oauth-callback-edge"
@@ -16,60 +19,177 @@ func init() {
 }
 
 type vmContext struct{ types.DefaultVMContext }
-type pluginContext struct{ types.DefaultPluginContext }
-type httpContext struct{ types.DefaultHttpContext }
+type pluginContext struct {
+	types.DefaultPluginContext
+	allowedHost string
+}
+type httpContext struct {
+	types.DefaultHttpContext
+	allowedHost string
+}
+
+const maxPluginConfigurationBytes = 1024
 
 func (*vmContext) NewPluginContext(uint32) types.PluginContext { return &pluginContext{} }
-func (*pluginContext) NewHttpContext(uint32) types.HttpContext { return &httpContext{} }
+func (p *pluginContext) NewHttpContext(uint32) types.HttpContext {
+	return &httpContext{allowedHost: p.allowedHost}
+}
 
-func (*httpContext) OnHttpRequestHeaders(headerCount int, endOfStream bool) (action types.Action) {
+func (p *pluginContext) OnPluginStart(size int) (status types.OnPluginStartStatus) {
+	p.allowedHost = ""
+	status = types.OnPluginStartStatusFailed
+	defer func() {
+		if recover() != nil {
+			p.allowedHost = ""
+			status = types.OnPluginStartStatusFailed
+		}
+	}()
+	if size <= 0 || size > maxPluginConfigurationBytes {
+		return status
+	}
+	configuration, err := proxywasm.GetPluginConfiguration()
+	defer zeroBytes(configuration)
+	if err != nil || len(configuration) != size {
+		return status
+	}
+	host, valid := parseAllowedHost(configuration)
+	if !valid {
+		return status
+	}
+	p.allowedHost = host
+	return types.OnPluginStartStatusOK
+}
+
+func parseAllowedHost(configuration []byte) (string, bool) {
+	if len(configuration) == 0 || len(configuration) > maxPluginConfigurationBytes {
+		return "", false
+	}
+	decoder := json.NewDecoder(bytes.NewReader(configuration))
+	start, err := decoder.Token()
+	if err != nil || start != json.Delim('{') {
+		return "", false
+	}
+	key, err := decoder.Token()
+	if err != nil || key != "allowedHost" {
+		return "", false
+	}
+	var host string
+	if decoder.Decode(&host) != nil || !validDNSHost(host) {
+		return "", false
+	}
+	// Token decoding rejects duplicate/case-aliased fields, unlike struct decoding.
+	end, err := decoder.Token()
+	if err != nil || end != json.Delim('}') {
+		return "", false
+	}
+	if _, err = decoder.Token(); err != io.EOF {
+		return "", false
+	}
+	return strings.ToLower(host), true
+}
+
+func validDNSHost(host string) bool {
+	if len(host) == 0 || len(host) > 253 {
+		return false
+	}
+	labels := strings.Split(host, ".")
+	if len(labels) < 2 {
+		return false
+	}
+	for _, label := range labels {
+		if len(label) == 0 || len(label) > 63 || label[0] == '-' || label[len(label)-1] == '-' {
+			return false
+		}
+		for index := 0; index < len(label); index++ {
+			c := label[index]
+			if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-') {
+				return false
+			}
+		}
+	}
+	// A DNS hostname has a nonnumeric final label; IP literals are never authority.
+	return strings.IndexAny(labels[len(labels)-1], "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ") >= 0
+}
+
+func matchesAllowedHost(requestHost, allowedHost string) bool {
+	if allowedHost == "" || len(requestHost) > 257 {
+		return false
+	}
+	host, port, hasPort := strings.Cut(requestHost, ":")
+	if hasPort && port != "443" {
+		return false
+	}
+	// DNS case is insignificant; only the default HTTPS port may be explicit.
+	return validDNSHost(host) && strings.EqualFold(host, allowedHost)
+}
+
+func (h *httpContext) OnHttpRequestHeaders(headerCount int, _ bool) (action types.Action) {
 	action = types.ActionPause
 	defer func() {
 		if recover() != nil {
+			proxywasm.ReplaceHttpRequestHeader(":path", callbackedge.CallbackPath)
+			clearReservedHandoffHeaders()
 			sendFixedResponse(500, "integration callback unavailable")
 		}
 	}()
+	method, methodError := proxywasm.GetProperty([]string{"request", "method"})
+	path, pathError := proxywasm.GetProperty([]string{"request", "path"})
+	rawQuery, queryError := proxywasm.GetProperty([]string{"request", "query"})
+	requestHost, hostError := proxywasm.GetProperty([]string{"request", "host"})
+	defer zeroBytes(method)
+	defer zeroBytes(path)
+	defer zeroBytes(rawQuery)
+	defer zeroBytes(requestHost)
+	webhook := methodError == nil && pathError == nil && queryError == nil &&
+		callbackedge.IsWebhookRequest(string(method), string(path), string(rawQuery))
+	// Preserve the raw attributes only in memory. Strip callback queries and
+	// caller-forged handoff headers before either forwarding or fixed rejection.
+	pathSanitized := webhook || proxywasm.ReplaceHttpRequestHeader(":path", callbackedge.CallbackPath) == nil
+	headersCleared := clearReservedHandoffHeaders()
+	if !pathSanitized || !headersCleared {
+		sendFixedResponse(500, "integration callback unavailable")
+		return action
+	}
+	if methodError != nil || pathError != nil || queryError != nil || hostError != nil || h.allowedHost == "" {
+		sendFixedResponse(500, "integration callback unavailable")
+		return action
+	}
 	if headerCount > callbackedge.MaxHeaderCount {
 		sendFixedResponse(400, "invalid integration request")
 		return action
 	}
-	method, methodError := proxywasm.GetProperty([]string{"request", "method"})
-	path, pathError := proxywasm.GetProperty([]string{"request", "path"})
-	rawQuery, queryError := proxywasm.GetProperty([]string{"request", "query"})
-	if methodError != nil || pathError != nil || queryError != nil {
-		sendFixedResponse(500, "integration callback unavailable")
+	if !matchesAllowedHost(string(requestHost), h.allowedHost) {
+		sendFixedResponse(400, "invalid integration request")
 		return action
 	}
-	defer zeroBytes(method)
-	defer zeroBytes(path)
-	defer zeroBytes(rawQuery)
-	if callbackedge.IsWebhookRequest(string(method), string(path), string(rawQuery)) {
-		if !clearReservedHandoffHeaders() {
-			sendFixedResponse(500, "integration callback unavailable")
-			return action
-		}
+	if webhook {
 		return types.ActionContinue
 	}
 	if hasForbiddenCallbackBodyHeaders() {
 		sendFixedResponse(400, "invalid integration callback")
 		return action
 	}
+	// Google's headers-only edge hook does not prove end-of-stream (its tester
+	// supplies false even for GET). Framing is checked above; ingress must observe
+	// an actually empty completed body before using either callback handoff.
 	handoff, err := callbackedge.ParseForwardedCallback(
-		string(method), string(path), string(rawQuery), endOfStream,
+		string(method), string(path), string(rawQuery), true,
 	)
 	if err != nil {
 		sendFixedResponse(400, "invalid integration callback")
 		return action
 	}
-	if !clearReservedHandoffHeaders() {
+	version := callbackedge.HandoffVersion
+	if handoff.Denied {
+		version = callbackedge.DeniedHandoffVersion
+	}
+	if proxywasm.AddHttpRequestHeader(callbackedge.HandoffVersionHeader, version) != nil ||
+		proxywasm.AddHttpRequestHeader(callbackedge.HandoffStateHeader, handoff.State) != nil {
 		sendFixedResponse(500, "integration callback unavailable")
 		return action
 	}
-	if proxywasm.ReplaceHttpRequestHeader(":path", callbackedge.CallbackPath) != nil ||
-		proxywasm.AddHttpRequestHeader(callbackedge.HandoffVersionHeader, callbackedge.HandoffVersion) != nil ||
-		proxywasm.AddHttpRequestHeader(callbackedge.HandoffCodeHeader, handoff.Code) != nil ||
-		proxywasm.AddHttpRequestHeader(callbackedge.HandoffStateHeader, handoff.State) != nil ||
-		proxywasm.AddHttpRequestHeader(callbackedge.HandoffRealmIDHeader, handoff.RealmID) != nil {
+	if !handoff.Denied && (proxywasm.AddHttpRequestHeader(callbackedge.HandoffCodeHeader, handoff.Code) != nil ||
+		proxywasm.AddHttpRequestHeader(callbackedge.HandoffRealmIDHeader, handoff.RealmID) != nil) {
 		sendFixedResponse(500, "integration callback unavailable")
 		return action
 	}
@@ -117,10 +237,14 @@ func zeroBytes(value []byte) {
 }
 
 func sendFixedResponse(status uint32, body string) {
-	proxywasm.SendHttpResponse(status, [][2]string{
+	if err := proxywasm.SendHttpResponse(status, [][2]string{
 		{"content-type", "text/plain; charset=utf-8"},
 		{"cache-control", "no-store"},
 		{"referrer-policy", "no-referrer"},
 		{"x-content-type-options", "nosniff"},
-	}, []byte(body), -1)
+	}, []byte(body), -1); err != nil {
+		// REQUEST_HEADERS pause alone is not a managed-edge rejection boundary.
+		// Propagate a failed local reply so the extension's fail_open=false applies.
+		panic(err)
+	}
 }

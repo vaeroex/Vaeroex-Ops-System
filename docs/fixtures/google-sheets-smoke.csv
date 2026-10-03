@@ -1,0 +1,5 @@
+Record ID,Date,Orders shipped,On-time rate,Location
+smoke-20261001-north,2026-10-01,120,0.95,North
+smoke-20261002-north,2026-10-02,125,0.96,North
+smoke-20261001-south,2026-10-01,80,0.90,South
+smoke-20261002-south,2026-10-02,85,0.92,South

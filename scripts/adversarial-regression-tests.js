@@ -498,7 +498,7 @@ function runFileAnalysisRequestSizingTests() {
   assert.equal((sourcesPage.match(/<SourceFileDetailPanel\b/g) || []).length, 1, "Evidence should render source detail through one focused component path");
   assert.doesNotMatch(sourcesPage, /export\s+(?:default\s+)?(?:async\s+)?function SourceFileDetailPanel\b|export\s*\{[^}]*\bSourceFileDetailPanel\b/, "The focused source-detail component should remain private to SourcesPage");
   assert.doesNotMatch(`${sourcesRoute}\n${sourceDetailRoute}`, /SourceFileDetailPanel/, "Evidence routes should not duplicate or bypass the focused source-detail component");
-  assert.match(sourcesPage, /Open a source to review its analysis, imported data, history, and lifecycle\./, "Evidence rows should stay compact and point users to source detail");
+  assert.match(sourcesPage, /Open a file for review, imports, and history\./, "Evidence rows should stay compact and point users to source detail");
   assert.match(sourcesPage, /Open source/, "Evidence rows should expose one clear source action");
   assert.match(sourcesPage, /Needs Review/, "Sources should expose review only when confidence or risk requires it");
   assert.match(sourcesPage, /Learned/, "Sources should expose automatically learned file evidence");

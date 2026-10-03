@@ -53,7 +53,7 @@ const ConnectionResultSchema = z
   })
   .strict();
 
-export async function createIntegrationConnectionIntent(
+export function integrationConnectionIntentCommand(
   input: {
     id: string;
     workspaceId: string;
@@ -64,8 +64,7 @@ export async function createIntegrationConnectionIntent(
     requestedScopes: readonly string[];
     configurationVersion?: number;
     requestedAt: string;
-  },
-  client: ExternalIntegrationsRpcClient
+  }
 ) {
   const entry = providerDescriptor(
     input.providerKey,
@@ -85,7 +84,7 @@ export async function createIntegrationConnectionIntent(
   ) {
     throw new Error("integration_connection_scope_set_invalid");
   }
-  const command = CreateIntegrationConnectionIntentSchema.parse({
+  return CreateIntegrationConnectionIntentSchema.parse({
     contractVersion: "integration_connection_control_v1",
     id: input.id,
     workspaceId: input.workspaceId,
@@ -103,6 +102,13 @@ export async function createIntegrationConnectionIntent(
     configurationVersion: input.configurationVersion ?? 1,
     requestedAt: input.requestedAt
   });
+}
+
+export async function createIntegrationConnectionIntent(
+  input: Parameters<typeof integrationConnectionIntentCommand>[0],
+  client: ExternalIntegrationsRpcClient
+) {
+  const command = integrationConnectionIntentCommand(input);
   const data = await controlPlaneRpc(
     "create_integration_connection_intent_v1",
     { p_command: command },

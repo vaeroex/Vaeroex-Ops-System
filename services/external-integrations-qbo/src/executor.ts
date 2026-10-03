@@ -10,14 +10,14 @@ import {
   recordQboReportParserResult
 } from "@/lib/integrations/persistence/qbo-production-repository";
 import { commitProviderExternalSourceRecordVersion } from "@/lib/integrations/persistence/provider-source-repository";
+import { validateQboProductionSourcePage } from "@/lib/integrations/persistence/qbo-production-validation-repository";
 import {
   PROVIDER_SOURCE_STATE_READ_CONTRACT_VERSION,
   readProviderExternalSourceRecordState
 } from "@/lib/integrations/persistence/provider-validation-repository";
-import { QboReadOnlyClient } from "@/lib/integrations/provider-runtime/qbo/client";
+import { QboReadOnlyClient, type QboRuntimeHttpTransport } from "@/lib/integrations/provider-runtime/qbo/client";
 import { FetchQboRuntimeTransport } from "@/lib/integrations/provider-runtime/qbo/fetch-transport";
 import {
-  QBO_MASTER_RECORD_TYPES,
   QBO_REPORT_TYPES,
   QBO_TRANSACTION_RECORD_TYPES,
   QboMinimizedSourceRecordSchema,
@@ -27,14 +27,13 @@ import {
   type QboSupportedObjectType
 } from "@/lib/integrations/providers/qbo/contracts";
 import { minimizeQboSourceRecord } from "@/lib/integrations/providers/qbo/minimizers";
-import {
-  bisectQboCdcEntityTypesIfDense,
-  bisectQboCdcWindowIfDense,
-  planQboCdcWindow
-} from "@/lib/integrations/providers/qbo/planning";
+import { parseQboCdcTombstone, type QboCdcTombstone } from "@/lib/integrations/providers/qbo/tombstones";
+import { fetchCompleteQboCdc } from "./cdc";
 import { QboReportContractError, parseQboReport } from "@/lib/integrations/providers/qbo/reports";
 import {
   qboMinimizedRecordToExternalSourceVersion,
+  qboCdcTombstoneToExternalSourceVersion,
+  assertQboCdcTombstoneBinding,
   qboReportProviderRecordId,
   qboReportToExternalSourceVersion
 } from "@/lib/integrations/providers/qbo/source-records";
@@ -88,10 +87,6 @@ const reportStreams: Readonly<Record<string, QboReportType>> = {
   qbo_profitandloss: "ProfitAndLoss",
   qbo_trialbalance: "TrialBalance"
 };
-const cdcTypes = [
-  ...QBO_MASTER_RECORD_TYPES.filter((value) => value !== "CompanyInfo" && value !== "Preferences"),
-  ...QBO_TRANSACTION_RECORD_TYPES
-] as readonly QboSupportedObjectType[];
 
 function deterministicUuid(value: string) {
   const bytes = createHash("sha256").update(value, "utf8").digest().subarray(0, 16);
@@ -144,10 +139,11 @@ async function commitEntity(input: {
   mappingVersion: number;
   sourceClient: ExternalIntegrationsRpcClient;
   now: string;
+  tombstone?: QboCdcTombstone | null;
 }) {
   const mappingId = input.task.controlMetadata.mappingId;
   if (!mappingId) throw new Error("qbo_production_mapping_missing");
-  const record = minimizeQboSourceRecord({
+  const record = input.tombstone ?? minimizeQboSourceRecord({
     recordType: input.recordType,
     raw: input.raw,
     provider: { providerKey: "quickbooks_online", realmId: input.realmId, sourceEnvironment: "production" }
@@ -156,21 +152,28 @@ async function commitEntity(input: {
     sourceStateCommand(input.task, input.leaseId, input.owner, input.recordType, record.id),
     input.sourceClient
   );
-  const previous = state.state === "available" && state.normalizedProjection
+  if (input.tombstone && state.state === "available" && state.changeKind === "deleted" &&
+      state.normalizedProjection === null && state.providerVersionReference === input.tombstone.providerVersionReference) {
+    return null;
+  }
+  const previous = !input.tombstone && state.state === "available" && state.normalizedProjection
     ? QboMinimizedSourceRecordSchema.parse(state.normalizedProjection)
     : null;
-  const version = qboMinimizedRecordToExternalSourceVersion({
+  const versionInput = {
     context: sourceContext(input),
-    record,
     id: randomUUID(),
     immutableVersion: state.state === "available" ? state.immutableVersion + 1 : 1,
     priorVersionId: state.state === "available" ? state.currentVersionId : null,
-    previousRecord: previous,
     observedAt: input.now,
     synchronizedAt: input.now,
     ingestedAt: input.now,
     receivedAt: input.now
-  });
+  };
+  const version = input.tombstone
+    ? qboCdcTombstoneToExternalSourceVersion({ ...versionInput, tombstone: input.tombstone,
+        taskId: input.task.taskId, connectionGeneration: input.task.connectionGeneration })
+    : qboMinimizedRecordToExternalSourceVersion({ ...versionInput,
+        record: QboMinimizedSourceRecordSchema.parse(record), previousRecord: previous });
   if (version.changeKind === "unchanged") return null;
   return commitProviderExternalSourceRecordVersion(
     {
@@ -263,23 +266,6 @@ async function commitReport(input: {
   );
 }
 
-async function fetchCdc(input: { client: QboReadOnlyClient; changedSince: string; accessToken: string; window: ReturnType<typeof planQboCdcWindow> }) {
-  let requestCount = 0;
-  const visit = async (recordTypes: readonly QboSupportedObjectType[]): Promise<Array<{ recordType: QboSupportedObjectType; raw: unknown }>> => {
-    const page = await input.client.fetchCdc({ recordTypes, changedSince: input.changedSince, accessToken: input.accessToken });
-    requestCount += 1;
-    if (bisectQboCdcWindowIfDense({ window: input.window, observedObjectCount: page.observedObjectCount }).length === 1) {
-      return page.records;
-    }
-    const records: Array<{ recordType: QboSupportedObjectType; raw: unknown }> = [];
-    for (const partition of bisectQboCdcEntityTypesIfDense({ recordTypes, observedObjectCount: page.observedObjectCount })) {
-      records.push(...await visit(partition));
-    }
-    return records;
-  };
-  return { records: await visit(cdcTypes), requestCount } as const;
-}
-
 export async function executeQboProductionRead(input: {
   task: QboProductionLeasedTask;
   leaseId: string;
@@ -292,13 +278,16 @@ export async function executeQboProductionRead(input: {
   mappingVersion: number;
   runtimeClient: ExternalIntegrationsRpcClient;
   sourceClient: ExternalIntegrationsRpcClient;
+  transport?: QboRuntimeHttpTransport;
+  now?: () => Date;
 }) {
   let ordinal = 0;
   let reportEvidenceId: string | null = null;
+  const cdcEvidence = new Map<string, string>();
   const client = new QboReadOnlyClient({
     realmId: input.realmId,
     providerEnvironment: "production",
-    transport: new FetchQboRuntimeTransport(),
+    transport: input.transport ?? new FetchQboRuntimeTransport(),
     providerResultObserver: async (observation) => {
       ordinal += 1;
       const evidence = await recordQboProviderResult(
@@ -309,26 +298,45 @@ export async function executeQboProductionRead(input: {
       if (observation.endpointDomain === "report" && observation.providerOutcome === "provider_success") {
         reportEvidenceId = evidence.providerResultEvidenceId;
       }
+      if (observation.endpointDomain === "cdc" && observation.providerOutcome === "provider_success") {
+        cdcEvidence.set(observation.providerRequestFingerprint, evidence.providerResultEvidenceId);
+      }
     }
   });
-  const now = new Date().toISOString();
+  const now = (input.now?.() ?? new Date()).toISOString();
   const common = { ...input, now };
   const committed: Array<{ sourceVersionId: string; sourceFingerprint: string }> = [];
   let observed = 0;
   let nextStartPosition: number | null = null;
   let cdcRequestCount = 0;
+  let providerWatermarkAt = now;
   const entityType = entityStreams[input.task.streamKey];
   const reportType = reportStreams[input.task.streamKey];
   if (input.task.streamKey === "qbo_cdc") {
     if (!input.task.controlMetadata.windowStartAt || !input.task.controlMetadata.windowEndAt) {
       throw new Error("qbo_production_cdc_window_missing");
     }
-    const window = planQboCdcWindow({ changedSince: input.task.controlMetadata.windowStartAt, until: input.task.controlMetadata.windowEndAt });
-    const page = await fetchCdc({ client, changedSince: window.changedSince, accessToken: input.accessToken, window });
+    const page = await fetchCompleteQboCdc({ client, changedSince: input.task.controlMetadata.windowStartAt,
+      until: input.task.controlMetadata.windowEndAt, accessToken: input.accessToken, now: input.now });
+    providerWatermarkAt = page.watermarkAt;
     observed = page.records.length;
     cdcRequestCount = page.requestCount;
-    for (const item of page.records) {
-      const result = await commitEntity({ ...common, raw: item.raw, recordType: item.recordType });
+    const observedAt = (input.now?.() ?? new Date()).toISOString();
+    // Validate every sparse deletion and its exact successful request before any source writes.
+    const records = page.records.map(item => {
+      const providerResultEvidenceId = cdcEvidence.get(item.providerRequestFingerprint);
+      if (!providerResultEvidenceId) throw new Error("qbo_production_cdc_evidence_missing");
+      const tombstone = parseQboCdcTombstone({ raw: item.raw, recordType: item.recordType,
+        provider: { providerKey: "quickbooks_online", realmId: input.realmId, sourceEnvironment: "production" },
+        evidence: { taskId: input.task.taskId, connectionId: input.task.connectionId,
+          connectionGeneration: input.task.connectionGeneration, providerResultEvidenceId,
+          providerRequestFingerprint: item.providerRequestFingerprint } });
+      if (tombstone) assertQboCdcTombstoneBinding({ context: sourceContext(input),
+        taskId: input.task.taskId, connectionGeneration: input.task.connectionGeneration, tombstone, observedAt });
+      return { ...item, tombstone };
+    });
+    for (const item of records) {
+      const result = await commitEntity({ ...common, now: observedAt, raw: item.raw, recordType: item.recordType, tombstone: item.tombstone });
       if (result) committed.push(result);
     }
   } else if (entityType) {
@@ -368,6 +376,23 @@ export async function executeQboProductionRead(input: {
     throw new Error("qbo_production_stream_key_denied");
   }
 
+  // Persisted pages must be validated before their checkpoint can advance. The
+  // database also fences outstanding claims held by another validation worker.
+  let validationDrained = false;
+  for (let page = 0; page < 200; page++) {
+    const validation = await validateQboProductionSourcePage({
+      taskId: input.task.taskId,
+      workerFingerprint: input.owner,
+      maximumResults: 100,
+      requestId: `qbo_validate_${randomUUID()}`
+    }, input.sourceClient);
+    if (validation.results.some((result) => result.state === "quarantined")) {
+      throw new Error("qbo_production_source_quarantined");
+    }
+    if (!validation.fullPage) { validationDrained = true; break; }
+  }
+  if (!validationDrained) throw new Error("qbo_production_validation_page_limit");
+
   const durableEffectFingerprint = contractSha256({
     fingerprintPurpose: "qbo_production_durable_source_page",
     fingerprintVersion: "qbo_production_durable_source_page_v2",
@@ -396,7 +421,7 @@ export async function executeQboProductionRead(input: {
           nextStartPosition,
           pageOrdinal: input.task.controlMetadata.pageOrdinal
         }),
-        providerWatermarkAt: now,
+        providerWatermarkAt,
         overlapSeconds: 300,
         fullReconciliation: input.task.taskKind === "full_reconciliation",
         downstreamCommitFingerprint: durableEffectFingerprint

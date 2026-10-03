@@ -9,6 +9,8 @@ const config = [
   {
     ignores: [
       ".next/**",
+      "services/square-workspace-host/.next/**",
+      "services/square-workspace-host/next-env.d.ts",
       "out/**",
       "build/**",
       "coverage/**",

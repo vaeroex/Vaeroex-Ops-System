@@ -39,7 +39,7 @@ These are remote Supabase Auth settings and are not changed by this branch:
 
 The previously observed `refresh_token_not_found` event is consistent with a browser presenting an old cookie after its single-use refresh token was rotated, revoked, or replaced by another tab. The application creates one SSR client per request and protected routes call `getUser()`, so an invalid token fails closed and cannot become an authenticated identity. Login remains the recovery path; genuine Auth errors are not suppressed.
 
-The installed `@supabase/ssr` 0.5.2 predates the package's lazy-initialization refresh-race correction. Moving to a current release is not a narrow patch: current releases require a much newer `@supabase/supabase-js` contract and add response-cache-header handling. Upgrade both packages together in a dedicated Preview-tested auth dependency change, including concurrent-tab, callback, recovery, sign-out, and CDN `Set-Cookie` cache tests.
+The installed `@supabase/ssr` 0.7.0 still predates the package's lazy-initialization refresh-race correction. Moving to the current release is not a narrow patch: current releases require a much newer `@supabase/supabase-js` contract and add response-cache-header handling. Upgrade both packages together in a dedicated Preview-tested auth dependency change, including concurrent-tab, callback, recovery, sign-out, and CDN `Set-Cookie` cache tests.
 
 ## Vaeroex administrator MFA
 

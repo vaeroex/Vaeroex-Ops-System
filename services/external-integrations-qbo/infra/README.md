@@ -1,10 +1,26 @@
 # QBO Production Runtime
 
+The Google provider is pinned to `7.39.0`, the first release supporting the edge extension's `forward_attributes` field. The edge explicitly receives only `request.host`, `request.method`, `request.path`, and `request.query` for validation and query stripping. Schema validation is required in CI; a local Wasm emulator does not prove hosted attribute forwarding. See the [provider release](https://github.com/hashicorp/terraform-provider-google/releases/tag/v7.39.0) and [Google attribute contract](https://docs.cloud.google.com/service-extensions/docs/attributes).
+
+Initial deployment leaves the queue and all three scheduler jobs paused (`execution_enabled = false`): initialization/maintenance, bulk dispatch, and interactive CDC dispatch. Enable execution only after the immutable runtime, callback, database authority, and customer consent gates have been verified. Pausing execution does not delete queued tasks or retained evidence.
+
+Every database pool verifies the session-pooler certificate and hostname against the repository's pinned public Supabase CA. Connection-string TLS settings cannot override certificate verification; passwords remain in numeric Secret Manager versions only.
+
 This Terraform module defines the permanent multi-tenant QBO execution surface. It is intentionally separate from qualification resources and does not contain project IDs, connection IDs, provider credentials, secret values, or disposable queue bindings.
+
+For HTTPS setup before Intuit exposes a Production webhook verifier, use the
+separately reviewed [disabled ingress bootstrap](bootstrap/README.md), not this
+full execution root and not placeholder secret versions. Both roots reuse the
+same callback module. Public ingress uses the supported load-balancer-only
+Invoker-IAM-disabled pattern without an `allUsers` grant; all private modes
+retain their Invoker IAM checks. Do not apply either root without a reviewed
+plan and explicit deployment approval.
 
 The same immutable image digest runs in five modes: public OAuth/webhook ingress, private credential broker, database-derived initialization scheduler, fair task dispatcher, and provider runtime. The public Cloud Run service accepts traffic only through the managed HTTPS load balancer. A separately digest-pinned, fail-closed Wasm edge removes OAuth query parameters before Cloud Run request logging, rejects forged handoff headers, and allows only the exact signed webhook path through unchanged. Load-balancer and plugin request logging are disabled. All other services require the exact scheduler, task-invoker, ingress, or runtime identity declared by the module.
 
-Database credentials are separate, version-pinned Secret Manager inputs for each service mode. The broker alone receives the Intuit credential secret, the independently pinned webhook verifier secret, and KMS encrypt/decrypt authority. Webhook payloads are verified over their exact raw bytes by the broker before the ingress can record bounded hint-only replay evidence. The initialization scheduler can create only database-selected initial QBO runs, the dispatcher alone can enqueue tasks, and only the dedicated task-invoker identity can call the provider runtime.
+The edge applies to every request on the forwarding rule, including unexpected Host headers, and rejects hosts other than its explicit configuration. The public ingress service's default Cloud Run URL is disabled so internal/default-URL traffic cannot bypass sanitization. Service creation waits for the database-secret accessor grants; effective secret access is verified again before releasing traffic.
+
+Database credentials are separate, version-pinned Secret Manager inputs for each service mode. The broker alone receives the Intuit credential secret, the independently pinned webhook verifier secret, and KMS encrypt/decrypt authority. Webhook payloads are verified over their exact raw bytes by the broker before the ingress can record bounded hint-only replay evidence. The scheduler creates database-selected initial and ongoing QBO runs and invokes bounded pending-validation and customer-disconnect drains through exact service OIDC audiences. The dispatcher alone can enqueue tasks. Provider execution still requires the dedicated Cloud Tasks identity, delivery metadata, and a legitimate database lease; scheduler invocation is not task-execution authority.
 
 Intuit-facing outbound traffic has one permanent Production identity. The credential broker and provider runtime alone route all traffic through a dedicated custom VPC subnet and a manual Cloud NAT backed by one reserved regional address. OAuth ingress, schedulers, and the dispatcher do not receive Direct VPC egress. The `provider_egress_ip` output is the only address suitable for Intuit's Production hosting-IP registration; the callback load-balancer address is ingress-only and must not be substituted.
 

@@ -1,0 +1,123 @@
+# Square production-readiness checklist
+
+## Current operational baseline — September 11, 2026
+
+PR384/main `7b2584a0fce916065d4241b165826ae1c4aa69e9` supersedes the historical
+"no Sandbox evidence" statements below. Isolated generation4 consent, explicit
+mapping/enrollment, encrypted native broker credentials and read-only populated
+sync have been qualified. Thirteen immutable source versions have separate
+verified non-economic admissions: Payment1, Refund1, Orders3, Catalog variations2,
+and six distinct Inventory observations. Replay and descriptive reconciliation
+are qualified; original sources remain pending/untrusted. Economics and history
+completeness remain blocked/unknown. This is not Production activation.
+
+The next implemented operational slice is `--run-sync` in the dedicated Sandbox
+runtime: at most10 sequential page invocations within five minutes, using only
+the existing root-owned task, current operator session, mapped generation and
+native authority. It retains per-page hard deadlines, a500ms minimum separation,
+and stops on any retry/uncertain result instead of guessing commit success.
+Its bounded nonsecret summary distinguishes exhausted scan, partial page budget,
+deadline, cancellation, retry deferral, recovery, blocked/rejected and conflict.
+Observation counts are acknowledged page observations, not new record counts.
+No new database privileges, scheduler, refresh, consent or admission is added.
+
+The bounded multi-page command has since passed the hosted Catalog pagination
+and fresh-process replay window without adding duplicate source versions.
+Remaining operational dependencies: separately qualify ongoing query-window planning, credential refresh and
+distributed scheduling/rate fairness before unattended operation. Never advance
+a time watermark from local wall time, interpret a finished cursor as complete
+history, or retain old admission as proof of current authorization. The current
+command deliberately does not mint follow-up tasks or claim freshness.
+
+The next code slice is [canonical interpretation and reconciliation v1](square-canonical-interpretation.md):
+immutable non-economic interpretations, evidence-only reference relationships,
+incremental descriptive counts and a no-dispatch explanation policy. It reuses
+the admitted baseline; it does not enable economics or Production. Its additive
+private migration and checked native worker require hosted qualification after
+review/CI. Source observation age is not a claim of current synchronization health.
+
+The remainder of this file is the historical account-connection audit baseline,
+not a directive to recreate or requalify completed Sandbox setup.
+
+## Current broker-authentication decision — September 9, 2026
+
+The permanent path is native PostgreSQL SCRAM plus Secret Manager, preserving
+native `session_user` and the existing transactional authority model. See the
+[managed maintenance runbook](../../tools/native-broker-provisioning/MANAGED-SCRAM.md)
+for reviewed scope, practical security policy, operations and remaining hosted
+gates. Temporary Access/JIT is permanently parked after the scoped invitation
+HTTP500 and verified cleanup; it is not a Sandbox or Production prerequisite.
+Local qualification is not hosted qualification. Production Square remains
+disabled and QBO is unchanged. Historical milestone statements below retain
+their original scope/date; they do not reinstate superseded authorization or
+absolute provider-diagnostic nonrecording gates.
+
+Audit baseline: `0a4b18be14b01d8d2be8d1e4525b47d7d190e551` (PR #351 merged). This milestone adds **dormant Square account connection**, using the existing checked authority and atomic durable-page persistence. OAuth-verified enrollment is distinct from synthetic disposable enrollment. API `2026-08-19`, SDK `45.1.0` at `e4a5bf7e1a2b97c2b995fde28c55ddbc35dc0e76`, existing fingerprints and shared limits remain unchanged. No new phase identifier is assigned. See the [account contract](square-account-connection-contract.md) and [unresolved sandbox approval worksheet](square-sandbox-approval-worksheet.md).
+
+## Subsequent code-only Sandbox preparation
+
+The [remote Sandbox preparation record](square-remote-sandbox-binding.md) supplements the account-connection baseline below. It adds disabled, **unwired** host identity, checked database binding, operator authentication, bounded transport and an injected enrolled-credential adapter. These are synthetic/local-tested components, not a deployed connection flow. No remote handler is installed and no provider registration, ingestion or economic gate changes.
+
+Under earlier explicit authorization, the canonical 104-migration baseline was installed only in the confirmed Free isolated project `oysjpoondtcrqpghhrbd`. The new remote-binding migration remains repository-only; the current code-only authorization forbids further remote database mutations. Historical “no remote database changes” statements below describe the original account-connection delivery, not that separately approved baseline installation. Production, Preview and QBO databases were not changed.
+
+The current PR must remain open and unmerged, with Git deployments disabled for its exact branch. Before a real run, separately authorize the new migration/LOGINs, real secret/KMS/IAM resources and costs, operator and finite retention policy, reviewed live authority composition (including first consent), dedicated host/deployment, privacy-safe callbacks/webhooks and bounded provider calls. None is implied by synthetic credentials or test enrollment. The unresolved worksheet and acceptance tests below remain applicable.
+
+## Evidence levels
+
+- **Implemented** means executable code exists for the stated boundary, not merely a descriptor declaration.
+- **Fixture-tested** means deterministic synthetic/local coverage. The delivery PR's exact-head CI is the validation record.
+- **Database-qualified** requires real disposable-database transactions through the least-privileged checked boundary, including failure/restart and independent-session races. It does not verify a real seller, provider behavior, host/power-loss durability or distributed exactly-once execution. The [qualification record](square-durable-page-qualification.md) states the completed evidence and limitations.
+- **Sandbox-qualified / provider end-to-end tested** requires a real, authorized isolated Square sandbox flow through OAuth-verified authority, runtime and persistence. **No Square sandbox/E2E evidence exists here.** Synthetic identities, local database qualification and historical synthetic GCP verification are not Square E2E.
+- **Activated** requires separately authorized registry, database, credential, runtime and operational gates. **Square is not activated or registered.** QBO source, bindings, fingerprints and disabled-gate implementations are unchanged; fixture results do not attest to current live environment/database settings.
+
+The [descriptor](../../lib/integrations/providers/square/descriptor.ts) still declares streams, backfill, concurrency two and a 500 ms default delay. These are not deployed synchronization or measured provider readiness. Its historical unsupported labels are preserved fingerprinted declarations, not an up-to-date inventory of dormant modules.
+
+## Current capabilities and remaining requirements
+
+All Square rows remain **not provider-E2E-tested / not activated**. Implementation here does not authorize the next column.
+
+| Requirement | Implemented and synthetic evidence | Missing dependencies and acceptance test |
+| --- | --- | --- |
+| Trusted seller/location/tenant authority | Authenticated token introspection, merchant/current-location/default discovery and explicit tenant/entity/location mapping feed a separate checked `oauth_verified` enrollment path. Actual configured broker/enroller LOGINs and an active host session are required. Immutable generations/tasks preserve the existing runtime identity and query/location fences. | Real sandbox verification, approved mapping and finite retention configuration; explicit remote capabilities and deployment authorization. No default configuration or role memberships exist. ListPayments without a selector still requires an explicitly mapped trusted default. |
+| Orders and Tenders | Four unchanged parsers plus separate core/line-item/adjustment/Tender pending-source scopes and checked durable pending versions. Combined tests cover Retrieve/Batch/Search for each. | Provider sandbox qualification and separately authorized economic/overlap policy. Modifications/cancellation/late observations stay immutable; richer scopes/Tender references cannot duplicate economic effects. |
+| Payments and Refunds | Unchanged List/Get parsers plus durable pending observations; exact Money, independent fees, nullable/unlinked semantics and unresolved references preserved. | Provider eventual-consistency qualification and explicit reconciliation. Multiple/partial payments/refunds remain distinct; equal-clock conflict and late updates never silently replace newer state. Refunded aggregates are not Refund or settlement authority. |
+| Catalog | Trusted four-operation facade, seven MVP types, explicit tombstones, separate primary/related/included observation roles and immutable pending versions. Existing [contract audit](square-catalog-response-contract.md) and bounds still apply. | Approved production retention and provider supported-variant qualification. Missing objects are never deletion; nested/related objects and applicability cannot resolve references or grant location authority. |
+| Inventory | Five-operation parser, mapping and durable pending observations for snapshots, physical counts and adjustments. [Pinned contract](square-inventory-response-contract.md) unchanged, including **unsigned cost_money**. | Real supported-state/consistency qualification. Exact quantity strings survive; UNTRACKED remains a provider observation, SUPPORTED_BY_NEWER_VERSION blocks the page, and no stock/valuation inference is made. |
+| Returns, unsupported data and completeness | [Explicit policy](square-dormant-ingestion-contract.md): historical unknown, economic blocked, Orders always returns unknown. Unsupported/identity-less mixed pages cannot advance. | Versioned historical/backfill/overlap policy and later economic authority work. Return-bearing Orders, omitted fields, interrupted pages and finished cursors must never imply complete history, Current freshness or economic truth. No OrderReturn parser added. |
+| Immutable pending versions | [Checked durable repository](../../lib/integrations/providers/square/durable-page-repository.ts) atomically retains minimized versions, provenance/completeness, deduplication/receipt, private cursor and checkpoint. Resource identity differs from content and observation identity; replay preserves first observation. Missing/equal revisions remain unordered/conflicted, late values do not replace current state, and explicit tombstones retain history. | Approved production retention/purge decisions and separately reviewed validation/economic authority. Dedicated qualification RPCs do not grant generic source or registry authorization. All versions remain pending/untrusted. |
+| Read client and errors | [Bounded client](../../lib/integrations/providers/square/ingestion-client.ts): injected synthetic transport only, existing policies, streamed byte limits, exact bounded decoder, redirect/destination denial, deadline/cancellation/cleanup and fixed safe codes. | Separately authorized live transport/credential integration, provider qualification and measured rate policy. Tests cover 16/64 MiB, precision/hostile JSON, 401/403/429/5xx, Retry-After, slow I/O/cancellation and sensitive canaries. |
+| Page planning, restart and retries | Existing [page interface/model](../../lib/integrations/providers/square/ingestion-page-repository.ts) now also has checked PostgreSQL transactions. Private 4,096-character cursors, durable receipts, task/lease/generation/checkpoint CAS and cumulative limitations survive worker replacement. One bounded page per invocation; expired/revoked authority closes reads and commits. | Production cursor retention, overlap/backfill policy, distributed rate coordination, scheduling and freshness thresholds. Tested transaction/connection interruption is not host/power-loss qualification or distributed exactly-once. Generic QBO cursors remain 1,024 characters. |
+| OAuth and credentials | Confidential code flow, exact five read scopes, short-lived access tokens, introspection, bounded exchange/refresh and signed revocation notifications. Existing broker/secret/KMS/AAD interfaces are reused through dedicated Square persistence. State is hash-only, session-bound and consumed before exchange; only an identical ciphertext-storage acknowledgement may be retried. Disconnect and token/refresh failures fence only the affected connection, preserving other workspaces and possibly shared grants. Only authenticated provider authorization-revocation evidence fences the exact seller/application/environment group internally. Customer provider-revoke/retry paths are denied. | Real sandbox token/scope/expiry/notification behavior and isolated secret access/IAM. Any app-wide revoke needs a separately authorized grant-level action; single-token revoke cannot replace refresh-authorization revocation or prove token exclusivity. No actual secrets, live token requests or webhook registration. The generic refresh diagnostic measures lifetime from validated provider issuance; QBO semantics/goldens remain unchanged. |
+| Registration and database | Three additive Square migrations provide forced-RLS private tables, immutable evidence, checked RPCs and separate synthetic versus OAuth-verified enrollment gates. New broker/enroller capabilities have no default memberships. [Registered registry](../../lib/integrations/control-plane/registered-provider-registry.ts), generic source authorization and QBO-specific RPCs still reject Square. | Separately approved remote migrations, exact LOGIN capabilities, versioned retention/revocation policy and later registration. Applying migrations alone must not enable Square. No remote database was changed. |
+| Private runtime/scheduling/freshness | Existing generic task/checkpoint/CAS, Cloud Tasks/OIDC, lifecycle and freshness structures remain unchanged. Adapter returns plans only. | Deployment/IAM/queues, worker credentials, distributed rate fairness, overlap windows and thresholds. Restart/revocation/outage tests must recover boundedly; incomplete scans never become Current. No worker loop deployed here. |
+| UI, sandbox E2E and activation | Disabled-by-default connection panel/page and seven routes: connect, callback, mapping, status, reauthorize, disconnect and webhook. All methods return 404 while closed, before authentication. Explicit loopback-only qualification installs injected dependencies and refuses Vercel/Production. Standalone callback handoff removes the code URL before ordinary assets. | No live Square E2E or deployed webhook service. Approve isolated app/seller, credentials, remote configuration, query-log suppression and cleanup before a real sandbox run. Automatic Preview is a build, not activation. Authorized status never means Synced/Current/history-complete. |
+
+## Reuse boundaries
+
+Reuse unchanged generic exact/source/fact contracts and serializers; Square request/response policies; generic read-only POST policy; credential/state/KMS interfaces; task/lease/CAS concepts; lifecycle/freshness and safe status components. The new page contract requires one atomic transaction for source versions and checkpoint advancement; composing separate existing RPCs is not equivalent.
+
+Do not reuse QBO-specific OAuth/realm verification, transport, revenue mapping, services, deployment bindings or credentials as generic infrastructure. [Provider validation repository](../../lib/integrations/persistence/provider-validation-repository.ts) still contains QBO-specific RPCs despite its generic name. TypeScript pending envelopes and the synthetic repository do not grant SQL/registry authority. The new mapper is not a canonical economic contribution mapper.
+
+## Recommended next grouped milestone
+
+**Explicitly authorized isolated Square sandbox qualification, with Production activation still closed.** Resolve only the choices in the [approval worksheet](square-sandbox-approval-worksheet.md), then separately authorize the exact sandbox credentials, remote configuration and bounded live transport needed to qualify this implemented connection flow. Do not start economic reconciliation, Production registration or scheduling as part of that qualification.
+
+Dependencies: independent review and exact-head checks of the account-connection milestone; preserved parser/request/descriptor goldens; approved versioned source/cursor retention, revocation access and a separately decided purge policy; confirmed sandbox app/seller/redirect/entity/location mapping; scoped credentials/IAM, remote migration and dedicated LOGIN approval; safe callback query-log handling and payload-free observability. The synthetic disposable gate cannot be repurposed as OAuth verification. Never use Production credentials for sandbox qualification.
+
+Acceptance tests:
+
+- Verified seller/default-location discovery and explicit Business Entity mapping bind every grant; foreign scope and revocation/generation races deny reads and commits.
+- Local disconnect and token failures preserve other workspaces even with shared provider credentials; authenticated shared-authorization revocation fences all affected connections without cross-tenant disclosure. Delayed old-grant events cannot revoke newer verified consent. No customer app-wide revoke is available.
+- Real seller/location evidence replaces synthetic qualification evidence only through a reviewed enrollment path; customer confirmation and tenant/entity separation are enforced. Unconfigured retention, missing discovery or revoked consent leave activation closed.
+- Checked production authorization stays closed until separately reviewed registration; additive changes repeat clean-install/upgrade/failure recovery, tenant/role isolation and unchanged QBO fixtures.
+- Source deduplication, immutable ordinals, revision conflicts/tombstones and private cursor/CAS advance in one durable transaction. Real connection/process interruption and lost acknowledgement recover without skips or duplicate versions.
+- Cursor expiry, overlapping-window restart, unsupported/return limitations, retention/capacity and outages preserve incomplete state and bounded retries. Pagination alone never implies history-complete, Current or economic authority.
+- Secret/cursor/provider canaries stay absent from logs; source envelopes remain pending/untrusted and canonical contributions blocked.
+
+The account routes remain locally injectable only: an approved sandbox host/transport binding is still required before any remote run. Private bounded runtime orchestration, payload-free operational observability and sandbox E2E remain necessary before customer activation. This recommendation is evidence for the next prompt, not authorization to begin it.
+
+## This delivery's boundary
+
+Implemented: OAuth lifecycle, broker integration, authenticated discovery, explicit mapping, separately gated checked enrollment, safe closed routes/UI and synthetic-provider/disposable-database/browser qualification. Existing client/decoder, eight pending projection scopes, completeness policy and 25 synthetic operation/projection combinations remain unchanged. Atomic source/version/receipt/checkpoint transactions, private 4,096-character cursors and actual LOGIN/lease/generation/CAS fences remain mandatory. The new approved cursor lifetime is enforced within the existing one-hour ceiling; changing an enrolled policy closes that generation until fresh approved enrollment.
+
+No remote database changes, actual Square calls, real credential access, Production enrollment/registry activation, runtime provisioning, queues/scheduler deployment, live webhook registration, purge, economic reconciliation, force-pushes or manual deployment. Database mutations are limited to authorized disposable local qualification. Original dirty QBO work remains outside this branch. The delivery PR remains open and unmerged for independent review.

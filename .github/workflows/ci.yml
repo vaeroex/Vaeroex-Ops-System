@@ -19,17 +19,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
       - name: Set up pnpm
-        uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda # v4.1.0
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
         with:
           run_install: false
 
       - name: Set up Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
           cache: pnpm
@@ -41,6 +41,7 @@ jobs:
           cache-dependency-path: |
             services/external-integrations-qbo-sandbox/edge/go.sum
             services/external-integrations-qbo/edge/go.sum
+            services/external-integrations-production/callback-edge/go.sum
 
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
@@ -51,11 +52,131 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Workspace navigation and bounded-list regressions
+        run: pnpm test:workspace-clarity
+
+      - name: Restricted Square workspace host Linux qualification
+        run: |
+          node services/square-workspace-host/window-plan.test.mjs
+          node services/square-workspace-host/boundary.test.mjs
+          node services/square-workspace-host/wire.test.mjs
+          node --require ./scripts/square-no-ai-runtime-test-guard.js scripts/square-workspace-host-handler-tests.js
+          NEXT_TELEMETRY_DISABLED=1 pnpm exec next build services/square-workspace-host
+          NEXT_TELEMETRY_DISABLED=1 node services/square-workspace-host/next.test.mjs
+
+      - name: Google Sheets runtime and database admission regressions
+        run: pnpm test:google-sheets
+
       - name: External integrations contract regressions
         run: pnpm test:external-integrations-contracts
 
+      - name: External integrations Phase 1A operation-policy regressions
+        run: pnpm test:external-integrations-phase-1a
+
+      - name: External integrations Phase 1B OAuth authority regressions
+        run: pnpm test:external-integrations-phase-1b
+
+      - name: External integrations Square Phase 2A dormant contract regressions
+        run: pnpm test:external-integrations-square-phase-2a
+
+      - name: External integrations Square Phase 2B.1A response validation regressions
+        run: pnpm test:external-integrations-square-phase-2b1a
+
+      - name: External integrations Square Phase 2B.1B-1 Catalog response validation regressions
+        run: pnpm test:external-integrations-square-phase-2b1b1
+
+      - name: External integrations Square Phase 2B.1B-2 Catalog response validation regressions
+        run: pnpm test:external-integrations-square-phase-2b1b2
+
+      - name: External integrations Square Phase 2B.2A Order-core response validation regressions
+        run: pnpm test:external-integrations-square-phase-2b2a
+
+      - name: External integrations Square Phase 2B.2B-1 Order line-item response validation regressions
+        run: pnpm test:external-integrations-square-phase-2b2b1
+
+      - name: External integrations Square Phase 2B.2B-2 Order adjustment response validation regressions
+        run: pnpm test:external-integrations-square-phase-2b2b2
+
+      - name: External integrations Square Phase 2B.2B-3 Order Tender response validation regressions
+        run: pnpm test:external-integrations-square-phase-2b2b3
+
+      - name: External integrations Square Payment response validation regressions
+        run: pnpm test:external-integrations-square-payments
+
+      - name: External integrations Square Refund response validation regressions
+        run: pnpm test:external-integrations-square-refunds
+
+      - name: External integrations Square Catalog request-bound response validation regressions
+        run: pnpm test:external-integrations-square-catalog
+
+      - name: External integrations Square Inventory response validation regressions
+        run: pnpm test:external-integrations-square-inventory
+
+      - name: External integrations Square dormant ingestion regressions
+        run: |
+          pnpm test:external-integrations-square-ingestion-client
+          pnpm test:external-integrations-square-ingestion-mapping
+          pnpm test:external-integrations-square-ingestion-recovery
+          pnpm test:external-integrations-square-ingestion
+
+      - name: External integrations Square dormant durable boundary regressions
+        run: |
+          pnpm test:external-integrations-square-durable
+          pnpm test:external-integrations-square-durable-authority
+
+      - name: Verify dormant Square account connection contracts and closed routes
+        run: |
+          pnpm test:external-integrations-square-account-oauth
+          pnpm test:external-integrations-square-account-discovery
+          pnpm test:external-integrations-square-connection-routes
+
       - name: External integrations architecture regressions
         run: pnpm test:external-integrations-architecture
+
+      - name: Native broker provisioning lifecycle and closed release boundary
+        run: |
+          pnpm test:native-broker-provisioning
+          # The runner's /dev/shm may be executable. Give this test an actual
+          # noexec scratch mount only inside a disposable private namespace.
+          timeout 120 sudo -n unshare --mount --propagation private /bin/bash -euo pipefail -c '
+            mount -t tmpfs -o noexec,nosuid,nodev,size=32m,mode=1777 tmpfs /dev/shm
+            exec runuser -u "$1" -- "$2" --test "$3"
+          ' -- "$(id -un)" "$(node -p process.execPath)" "$PWD/tools/native-broker-provisioning/ops/install-production-profiles.test.mjs"
+          terraform -chdir=services/external-integrations-production/infra/provisioner init -backend=false -input=false -lockfile=readonly
+          terraform -chdir=services/external-integrations-production/infra/provisioner validate
+          terraform -chdir=services/external-integrations-production/infra/provisioner test
+          node services/external-integrations-production/infra/provisioner/tests/verify-transition-order.mjs
+          node services/external-integrations-production/infra/provisioner/tests/verify-effective-private-access.test.mjs
+          node services/external-integrations-production/infra/provisioner/tests/verify-private-access-plan.test.mjs
+          node services/external-integrations-production/infra/provisioner/tests/reconcile-private-access.test.mjs
+          node services/external-integrations-production/infra/provisioner/tests/apply-reviewed-private-access-plan.test.mjs
+          node services/external-integrations-production/infra/provisioner/tests/run-reviewed-private-access-plan.test.mjs
+
+      - name: Verify isolated Square remote Sandbox binding and closed Production gates
+        run: |
+          pnpm test:external-integrations-square-remote-sandbox
+          pnpm test:external-integrations-square-remote-credentials
+
+      - name: Google Sheets desktop and mobile customer flow
+        run: |
+          pnpm exec playwright install --with-deps chromium
+          pnpm test:google-sheets-ui
+
+      - name: Verify optimized Square handoff headers and isolated synthetic browser navigation
+        run: |
+          pnpm exec playwright install --with-deps chromium
+          SQUARE_HOST_BROWSER_TEST=1 node --require ./scripts/square-no-ai-runtime-test-guard.js scripts/square-workspace-host-handler-tests.js
+          pnpm test:external-integrations-square-handoff-headers --browser
+
+      - name: Verify isolated native Square callback credentials, portal and guest controls
+        run: |
+          pnpm test:external-integrations-square-gcp-credentials
+          pnpm test:external-integrations-square-mapped
+          pnpm test:external-integrations-square-observations
+          pnpm test:external-integrations-square-consent-diagnostics
+          pnpm test:external-integrations-square-gcp-portal --browser
+          pnpm test:external-integrations-square-gcp-ops
+          pnpm build:external-integrations-square-gcp-callback
 
       - name: External integrations Phase 1 regressions
         run: pnpm test:external-integrations-phase-1
@@ -88,7 +209,13 @@ jobs:
         run: pnpm test:external-integrations-phase-8b
 
       - name: External integrations QBO Production multi-tenant regressions
-        run: pnpm test:external-integrations-qbo-production
+        run: |
+          pnpm test:external-integrations-qbo-production
+          pnpm test:qbo-production-completion
+          pnpm test:qbo-production-browser
+
+      - name: Current integrations dashboard, preferences and browser regressions
+        run: pnpm test:current-integrations
 
       - name: External integrations Phase 8B OAuth callback edge tests
         working-directory: services/external-integrations-qbo-sandbox/edge
@@ -101,18 +228,71 @@ jobs:
         working-directory: services/external-integrations-qbo/edge
         run: |
           test -z "$(gofmt -l .)"
-          go test -count=1 .
+          go test -count=1 ./...
           GOOS=wasip1 GOARCH=wasm go build -buildvcs=false -buildmode=c-shared -trimpath -o /tmp/qbo-production-callback-edge.wasm ./plugin
+
+      - name: External integrations Square Production callback edge tests
+        working-directory: services/external-integrations-production/callback-edge
+        run: |
+          test -z "$(gofmt -l .)"
+          go test -count=1 ./...
+          GOOS=wasip1 GOARCH=wasm go build -buildvcs=false -buildmode=c-shared -trimpath -o /tmp/square-production-callback-edge.wasm ./plugin
 
       - name: Validate external integrations QBO Production infrastructure
         working-directory: services/external-integrations-qbo/infra
         run: |
           terraform fmt -check -recursive
+          terraform init -backend=false -input=false -lockfile=readonly
+          terraform validate
+
+      - name: Validate dormant provider-neutral Production integration composition
+        working-directory: services/external-integrations-production/infra
+        run: |
+          terraform fmt -check -recursive
           terraform init -backend=false -input=false
           terraform validate
+          terraform test
+
+      - name: Test provider-neutral and Square Production contracts
+        run: pnpm test:external-integrations-square-production-foundation
+
+      - name: Test closed Square Production internal-pilot runtime contract
+        run: pnpm test:external-integrations-square-production-internal-runtime
+
+      - name: Test Square internal seller consent handlers
+        run: |
+          node scripts/square-production-internal-consent-tests.js
+          node scripts/square-production-customer-flow-tests.js
+          node scripts/square-production-customer-workspace-tests.js
+          node scripts/square-direct-provider-tests.cjs
+          node scripts/square-direct-service-tests.cjs
+          node scripts/square-payment-browse-server-tests.cjs
+          node scripts/square-direct-customer-ui-tests.js
+          pnpm exec ncc build services/external-integrations-production/internal-consent/entry.ts -o services/external-integrations-production/internal-consent/dist --no-cache --transpile-only --external server-only
+          node services/external-integrations-production/internal-consent/package-release.cjs
+
+      - name: Test Production Square one-customer pilot package
+        run: pnpm test:external-integrations-production-square-pilot
+
+      - name: Test repository-bound Production image trigger
+        run: pnpm test:external-integrations-production-image-trigger
 
       - name: Build external integrations QBO sandbox runtime
         run: pnpm build:external-integrations-qbo-sandbox
+
+      - name: Set up pinned Terraform for isolated Square template tests
+        uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: 1.16.1
+          terraform_wrapper: false
+
+      - name: Validate dormant Square resources with mocked provider only
+        working-directory: services/square-sandbox-callback/infra
+        run: |
+          terraform fmt -check -recursive
+          terraform init -backend=false -input=false
+          terraform validate
+          terraform test
 
       - name: Build external integrations QBO Production runtime
         run: pnpm build:external-integrations-qbo
@@ -135,20 +315,322 @@ jobs:
       - name: Whitespace check
         run: git diff --check origin/main...HEAD
 
+  native-broker-qualification:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+        with:
+          run_install: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install frozen synthetic test dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install public native build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --allow-downgrades build-essential libssl-dev libcurl4-openssl-dev zlib1g-dev bison flex curl git bzip2 python3 openssl libpq5=16.15-0ubuntu0.24.04.1 libpq-dev=16.15-0ubuntu0.24.04.1
+          test "$(dpkg-query -W -f='${Version}' libpq5)" = 16.15-0ubuntu0.24.04.1
+
+      - name: Qualify fixed native provisioning against private local PostgreSQL
+        # No remote DSN, provider credential, cloud identity or artifact upload.
+        # The release binary is unconditionally closed; only a local-only test
+        # build exercises generated synthetic credentials in disposable clusters.
+        shell: bash
+        run: |
+          set -euo pipefail
+          # This file contains only the public dependency manifest path and
+          # sanitized synthetic counts, never credentials or database logs.
+          node tools/native-broker-provisioning/tests/bootstrap.cjs --qualify | tee "$RUNNER_TEMP/native-broker-qualification.jsonl"
+
+      - name: Qualify managed SCRAM profile using the same private local database build
+        shell: bash
+        run: |
+          set -euo pipefail
+          native_manifest="$(node -e 'const fs=require("node:fs"); const rows=fs.readFileSync(process.argv[1],"utf8").trim().split("\n").map(JSON.parse); if(rows.length!==2 || rows[1].failure!==null) process.exit(2); process.stdout.write(rows[0].manifestPath)' "$RUNNER_TEMP/native-broker-qualification.jsonl")"
+          VAEROEX_NATIVE_TEST_DEPENDENCIES="$native_manifest" node tools/native-broker-provisioning/tests/managed-qualify.cjs
+          VAEROEX_NATIVE_TEST_DEPENDENCIES="$native_manifest" VAEROEX_MANAGED_TEST_SYSTEM_LIBPQ=16.15 node tools/native-broker-provisioning/tests/managed-qualify.cjs
+          VAEROEX_NATIVE_TEST_DEPENDENCIES="$native_manifest" node tools/native-broker-provisioning/tests/mapped-qualify.cjs
+          VAEROEX_NATIVE_TEST_DEPENDENCIES="$native_manifest" node tools/native-broker-provisioning/tests/production-native-qualify.cjs
+          VAEROEX_NATIVE_TEST_DEPENDENCIES="$native_manifest" pnpm test:native-broker-production-catalog
+          node tools/native-broker-provisioning/build-managed.mjs "$RUNNER_TEMP/native-managed-sandbox"
+          node tools/native-broker-provisioning/build-managed.mjs "$RUNNER_TEMP/native-managed-enroller" enroller
+          node tools/native-broker-provisioning/build-managed.mjs "$RUNNER_TEMP/native-managed-runtime" runtime
+          # Explicit build only: never execute this hosted-profile binary in CI.
+          node --test tools/native-broker-provisioning/tests/maintenance-launcher.test.mjs
+          python3 -S tools/native-broker-provisioning/tests/private-pty.py
+
+      - name: Record public mapped-maintenance binary provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+          sha256sum native-managed-enroller native-managed-enroller.launcher native-managed-runtime native-managed-runtime.launcher > mapped-maintenance.sha256
+          for profile in enroller runtime; do
+            sha256sum "native-managed-$profile" | cut -d ' ' -f 1 > "native-managed-$profile.sha256"
+            test "$(wc -c < "native-managed-$profile.sha256")" -eq 65
+            grep -Eq '^[0-9a-f]{64}$' "native-managed-$profile.sha256"
+          done
+          {
+            printf 'source_commit=%s\n' "$GITHUB_SHA"
+            printf 'run_id=%s\n' "$GITHUB_RUN_ID"
+            printf 'run_attempt=%s\n' "$GITHUB_RUN_ATTEMPT"
+            dpkg-query -W -f='${Package}=${Version}\n' libpq5 libpq-dev libc6
+          } > mapped-maintenance-build.txt
+
+      - name: Preserve only public mapped-maintenance binaries for later installation
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: square-mapped-maintenance-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/native-managed-enroller
+            ${{ runner.temp }}/native-managed-enroller.launcher
+            ${{ runner.temp }}/native-managed-enroller.sha256
+            ${{ runner.temp }}/native-managed-runtime
+            ${{ runner.temp }}/native-managed-runtime.launcher
+            ${{ runner.temp }}/native-managed-runtime.sha256
+            ${{ runner.temp }}/mapped-maintenance.sha256
+            ${{ runner.temp }}/mapped-maintenance-build.txt
+          if-no-files-found: error
+          include-hidden-files: false
+          overwrite: false
+          retention-days: 7
+
+      - name: Qualify parked JIT regression tools offline only
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Reuse the exact PostgreSQL 17.6 build above. No second download,
+          # remote DSN, PAT, cloud identity, or approved hosted executable run.
+          jit_pg_prefix="$(node -e '
+            const fs = require("node:fs");
+            const path = require("node:path");
+            const rows = fs.readFileSync(process.argv[1], "utf8").trim().split("\n").map(line => JSON.parse(line));
+            if (rows.length !== 2 || rows[0].publicSourceBuildOnly !== true || rows[0].postgres !== "17.6" || rows[1].failure !== null)
+              throw new Error("pinned_local_build_required");
+            const manifest = JSON.parse(fs.readFileSync(rows[0].manifestPath, "utf8"));
+            const prefix = fs.realpathSync(manifest.pgRoot);
+            if (!path.isAbsolute(prefix) || /[\r\n]/.test(prefix)) throw new Error("local_prefix_required");
+            process.stdout.write(prefix);
+          ' "$RUNNER_TEMP/native-broker-qualification.jsonl")"
+          # -S excludes optional site/crash-report hooks; all Python inputs are
+          # synthetic, and the real credential boundary remains native C only.
+          python3 -S tools/jit-access-feasibility/validate.py --include "$jit_pg_prefix/include"
+          python3 -S tools/jit-access-feasibility/validate-native-canary.py --pg-prefix "$jit_pg_prefix"
+          python3 -S tools/jit-access-feasibility/validate-admin-helper.py
+          python3 -S tools/jit-access-feasibility/validate-admin-helper.py --ubsan
+          python3 -S tools/jit-access-feasibility/validate-admin-helper.py --sanitize
+          python3 -S tools/jit-access-feasibility/validate-private-entry.py --include "$jit_pg_prefix/include"
+          python3 -S tools/jit-access-feasibility/verify-fixture.py --pg-prefix "$jit_pg_prefix"
+          python3 -S tools/jit-access-feasibility/verify-fixture.py --pg-prefix "$jit_pg_prefix" --dashboard
+
+  jit-canary-linux-qualification:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact canary source revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Install and verify exact isolated-host libpq packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          . /etc/os-release
+          test "$ID" = ubuntu
+          test "$VERSION_ID" = 24.04
+          test "$(dpkg --print-architecture)" = amd64
+          sudo apt-get update
+          # Only this disposable CI runner is changed. A newer preinstalled
+          # package must not silently substitute for the reviewed host build.
+          sudo apt-get install -y --no-install-recommends --allow-downgrades \
+            build-essential libssl-dev libcurl4-openssl-dev python3 openssl \
+            libpq5=16.15-0ubuntu0.24.04.1 libpq-dev=16.15-0ubuntu0.24.04.1
+          test "$(dpkg-query -W -f='${Version}' libpq5)" = 16.15-0ubuntu0.24.04.1
+          test "$(dpkg-query -W -f='${Version}' libpq-dev)" = 16.15-0ubuntu0.24.04.1
+          python3 -S -c 'import ctypes; p = ctypes.CDLL("/usr/lib/x86_64-linux-gnu/libpq.so.5"); assert p.PQlibVersion() == 160015; print("exact_libpq_16_15_verified")'
+
+      - name: Qualify changed canary with native loopback TLS only
+        shell: bash
+        run: |
+          set -euo pipefail
+          # No PAT, database, remote connection, VM, or approved-profile run.
+          # -S excludes optional Python site/crash-report hooks.
+          python3 -S tools/jit-access-feasibility/validate-native-canary.py --pg-prefix /usr
+          python3 -S tools/jit-access-feasibility/validate-native-canary.py --pg-prefix /usr --ubsan
+          python3 -S tools/jit-access-feasibility/validate-native-canary.py --pg-prefix /usr --sanitize
+
+      - name: Qualify private entry on the exact Linux client profile
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Fake libraries and synthetic PTYs only; no credential or remote I/O.
+          python3 -S tools/jit-access-feasibility/validate-private-entry.py --include /usr/include/postgresql
+          python3 -S tools/jit-access-feasibility/validate-private-entry.py --include /usr/include/postgresql --ubsan
+          python3 -S tools/jit-access-feasibility/validate-private-entry.py --include /usr/include/postgresql --sanitize
+
+      - name: Build inert private-entry clients and record nonsecret provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir "$RUNNER_TEMP/jit-private-entry-public"
+          cc -std=c11 -Wall -Wextra -Werror -O2 \
+            -DJIT_ADMIN_APPROVED_SANDBOX_20260909 \
+            tools/jit-access-feasibility/admin-helper.c -lcurl \
+            -o "$RUNNER_TEMP/jit-private-entry-public/jit-admin-helper-approved"
+          cc -std=c11 -Wall -Wextra -Werror -O2 \
+            -DJIT_APPROVED_SANDBOX_20260908 -I/usr/include/postgresql \
+            tools/jit-access-feasibility/runner.c -lpq -lcurl \
+            -o "$RUNNER_TEMP/jit-private-entry-public/jit-runner-approved"
+          python3 -S - <<'PY'
+          import hashlib, json, os, subprocess
+          from pathlib import Path
+          folder = Path(os.environ['RUNNER_TEMP']) / 'jit-private-entry-public'
+          names = ['jit-admin-helper-approved', 'jit-runner-approved']
+          assert sorted(p.name for p in folder.iterdir()) == names
+          def output(*args):
+              return subprocess.check_output(args, text=True, timeout=10).strip()
+          def digest(p):
+              p = Path(p)
+              assert p.is_file() and not p.is_symlink()
+              return hashlib.sha256(p.read_bytes()).hexdigest()
+          evidence = {
+              'schema': 'vaeroex_private_entry_build_v1',
+              'checkout_sha': output('git', 'rev-parse', 'HEAD'),
+              'checkout_tree': output('git', 'rev-parse', 'HEAD^{tree}'),
+              'actions_run_id': os.environ['GITHUB_RUN_ID'],
+              'actions_run_attempt': os.environ['GITHUB_RUN_ATTEMPT'],
+              'hosted_profiles_executed': False,
+              'hosted_qualification': False,
+              'platform': 'ubuntu-24.04-amd64',
+              'compiler': output('cc', '--version'),
+              'packages': {n: output('dpkg-query', '-W', '-f=${Version}', n)
+                           for n in ['libpq5', 'libpq-dev', 'libcurl4t64', 'libssl3t64', 'libc6']},
+              'sources': {str(p): digest(p) for p in [
+                  Path('.github/workflows/ci.yml'),
+                  *[Path('tools/jit-access-feasibility') / n for n in [
+                    'admin-helper.c', 'runner.c', 'private-entry-clock-test.c',
+                    'validate-private-entry.py']]]},
+              'binaries': {n: {'sha256': digest(folder / n),
+                              'elf_dependencies': output('readelf', '--dynamic', str(folder / n)),
+                              'elf_symbol_versions': output('readelf', '--version-info', str(folder / n))}
+                           for n in names},
+          }
+          (folder / 'provenance.json').write_text(json.dumps(evidence, indent=2, sort_keys=True) + '\n')
+          PY
+
+      - name: Upload only inert private-entry binaries and provenance
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: jit-private-entry-ubuntu24-libpq1615-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/jit-private-entry-public/jit-admin-helper-approved
+            ${{ runner.temp }}/jit-private-entry-public/jit-runner-approved
+            ${{ runner.temp }}/jit-private-entry-public/provenance.json
+          if-no-files-found: error
+          include-hidden-files: false
+          overwrite: false
+
+      - name: Build inert public canary artifact and record provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir "$RUNNER_TEMP/jit-native-canary-public"
+          # Build only: never execute this hosted profile in CI. The preceding
+          # tests execute a separate loopback-only profile with public fixtures.
+          cc -std=c11 -Wall -Wextra -Werror -O2 \
+            -DJIT_CANARY_APPROVED_SANDBOX_20260908 -I/usr/include/postgresql \
+            tools/jit-access-feasibility/native-canary.c \
+            /usr/lib/x86_64-linux-gnu/libpq.so.5 \
+            -o "$RUNNER_TEMP/jit-native-canary-public/jit-native-canary-approved"
+          python3 -S - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+          import subprocess
+
+          artifact = Path(os.environ['RUNNER_TEMP']) / 'jit-native-canary-public'
+          binary = artifact / 'jit-native-canary-approved'
+          assert binary.is_file() and not binary.is_symlink()
+          assert 0 < binary.stat().st_size <= 1048576
+          def output(*args):
+              return subprocess.check_output(args, text=True, timeout=10).strip()
+          def digest(path):
+              path = Path(path)
+              return {'path': str(path), 'sha256': hashlib.sha256(path.read_bytes()).hexdigest()}
+          sources = ['.github/workflows/ci.yml',
+                     'tools/jit-access-feasibility/native-canary.c',
+                     'tools/jit-access-feasibility/validate-native-canary.py']
+          manifest = {
+              'schema': 'vaeroex_public_native_canary_build_v1',
+              'checkout_sha': output('git', 'rev-parse', 'HEAD'),
+              'checkout_tree': output('git', 'rev-parse', 'HEAD^{tree}'),
+              'actions_run_id': os.environ['GITHUB_RUN_ID'],
+              'actions_run_attempt': os.environ['GITHUB_RUN_ATTEMPT'],
+              'platform': 'ubuntu-24.04-amd64',
+              'profile': 'JIT_CANARY_APPROVED_SANDBOX_20260908',
+              'hosted_profile_executed': False,
+              'hosted_qualification': False,
+              'qualification': ['loopback-normal', 'loopback-ubsan', 'loopback-asan-ubsan'],
+              'compiler': output('cc', '--version'),
+              'packages': {name: output('dpkg-query', '-W', '-f=${Version}', name)
+                           for name in ['libpq5', 'libpq-dev', 'libssl3t64', 'libc6',
+                                        'gcc', 'binutils', 'python3', 'openssl']},
+              'sources': [digest(path) for path in sources],
+              'libpq': digest(Path('/usr/lib/x86_64-linux-gnu/libpq.so.5').resolve(strict=True)),
+              'binary': {'name': binary.name, 'sha256': digest(binary)['sha256']},
+              # readelf inspects the file; unlike a loader-based probe it does
+              # not execute the approved hosted-profile artifact.
+              'elf_dependencies': output('readelf', '--dynamic', str(binary)),
+              'elf_symbol_versions': output('readelf', '--version-info', str(binary)),
+          }
+          encoded = json.dumps(manifest, indent=2, sort_keys=True) + '\n'
+          assert len(encoded.encode()) <= 131072
+          (artifact / 'provenance.json').write_text(encoded)
+          assert sorted(path.name for path in artifact.iterdir()) == [binary.name, 'provenance.json']
+          PY
+
+      - name: Upload only public canary binary and nonsecret provenance
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: jit-native-canary-ubuntu24-libpq1615-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/jit-native-canary-public/jit-native-canary-approved
+            ${{ runner.temp }}/jit-native-canary-public/provenance.json
+          if-no-files-found: error
+          include-hidden-files: false
+          overwrite: false
+          retention-days: 7
+
   security-database:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - name: Check out repository
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up pnpm
-        uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda # v4.1.0
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
         with:
           run_install: false
 
       - name: Set up Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
           cache: pnpm
@@ -157,7 +639,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Set up Supabase CLI
-        uses: supabase/setup-cli@3c2f5e2ae34c34e428e8e206e2c4d21fa2d20fbf # v2.1.1
+        uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520 # v3.0.0
         with:
           version: 2.111.0
 
@@ -165,7 +647,11 @@ jobs:
         run: supabase init --force
 
       - name: Apply migrations to isolated local Postgres
-        run: supabase db start
+        id: isolated_database_setup
+        run: |
+          env -u SUPABASE_INTERNAL_IMAGE_REGISTRY SUPABASE_DB_MIGRATIONS_ENABLED=false supabase db start
+          node scripts/prepare-production-shaped-local-database.js
+          supabase migration up --local
 
       - name: Verify authorization and Customer #1 billing behavior
         run: |
@@ -190,8 +676,69 @@ jobs:
             supabase/tests/external_integrations_phase_8b_provider_result_evidence.test.sql \
             supabase/tests/external_integrations_qbo_production_convergence.test.sql
 
+      # Preserve earlier failures while still collecting independent Square
+      # evidence. Never run these checks without successful disposable setup.
+      - name: Verify Square Production runtime foundation in the isolated database
+        if: ${{ !cancelled() && steps.isolated_database_setup.outcome == 'success' }}
+        run: node scripts/run-isolated-database-tests.js supabase/tests/square_production_runtime_foundation.test.sql
+
+      - name: Qualify dormant Square authority and atomic pages in disposable local databases
+        if: ${{ !cancelled() && steps.isolated_database_setup.outcome == 'success' }}
+        run: node scripts/run-square-durable-page-qualification.js --supabase-local
+
+      - name: Qualify dormant Square account lifecycle in disposable local databases
+        if: ${{ !cancelled() && steps.isolated_database_setup.outcome == 'success' }}
+        # Install only in this explicit disposable test job, never application build/Preview.
+        run: |
+          pnpm exec playwright install --with-deps chromium
+          node scripts/run-square-account-connection-qualification.js --supabase-local
+
       - name: Verify fixture-rich zero-based delivery migration
         run: node scripts/run-phase8b-zero-based-delivery-migration-tests.js
+
+      - name: Qualify remote Sandbox binding in disposable local databases only
+        if: ${{ !cancelled() && steps.isolated_database_setup.outcome == 'success' }}
+        run: node scripts/run-square-remote-sandbox-qualification.js --supabase-local
+
+      - name: Qualify separate Square broker and runtime authority in disposable databases only
+        if: ${{ !cancelled() && steps.isolated_database_setup.outcome == 'success' }}
+        run: node scripts/run-square-broker-runtime-qualification.js --supabase-local
+
+      - name: Qualify native GCP callback first-consent authority in disposable databases only
+        if: ${{ !cancelled() && steps.isolated_database_setup.outcome == 'success' }}
+        run: node scripts/run-square-gcp-callback-database-qualification.js --supabase-local
+
+      - name: Qualify mapped Square native role and recovery boundaries in disposable databases only
+        if: ${{ !cancelled() && steps.isolated_database_setup.outcome == 'success' }}
+        run: node scripts/run-square-gcp-mapped-database-qualification.js --supabase-local
+
+      - name: Qualify non-economic Square observation admission in disposable databases only
+        if: ${{ !cancelled() && steps.isolated_database_setup.outcome == 'success' }}
+        run: node scripts/run-square-observation-database-qualification.js --supabase-local
+
+      - name: Qualify the exact Production baseline and dormant Square runtime overlay
+        if: ${{ !cancelled() && steps.isolated_database_setup.outcome == 'success' }}
+        run: node scripts/run-square-production-overlay-qualification.js
+
+      - name: Qualify the closed Square Production internal-pilot runtime
+        if: ${{ !cancelled() && steps.isolated_database_setup.outcome == 'success' }}
+        run: node scripts/run-square-production-internal-pilot-runtime-qualification.js
+
+      - name: Qualify closed Square Production customer authority in disposable PostgreSQL
+        if: ${{ !cancelled() && steps.isolated_database_setup.outcome == 'success' }}
+        run: node scripts/run-square-production-customer-qualification.js
+
+      - name: Qualify dormant customer Square backend on the exact 105-migration baseline
+        if: ${{ !cancelled() && steps.isolated_database_setup.outcome == 'success' }}
+        run: node scripts/run-square-customer-backend-qualification.js
+
+      - name: Verify manual pilot activation in the isolated database
+        if: ${{ !cancelled() && steps.isolated_database_setup.outcome == 'success' }}
+        run: node scripts/run-isolated-database-tests.js supabase/tests/manual_activation_entitlement.test.sql
+
+      - name: Qualify QBO completion on canonical and exact Production migration shapes
+        if: ${{ !cancelled() && steps.isolated_database_setup.outcome == 'success' }}
+        run: pnpm test:qbo-production-database --supabase-local
 
       - name: Remove isolated database state
         if: always()

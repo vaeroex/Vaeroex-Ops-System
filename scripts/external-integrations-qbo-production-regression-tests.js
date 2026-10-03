@@ -17,14 +17,30 @@ const excludes = (value, pattern, message) => {
   assertionCount += 1;
   assert.doesNotMatch(value, pattern, message);
 };
+const precedes = (value, earlier, later, message) => {
+  assertionCount += 1;
+  const earlierIndex = value.indexOf(earlier);
+  const laterIndex = value.indexOf(later);
+  assert.ok(
+    earlierIndex >= 0 && laterIndex >= 0 && earlierIndex < laterIndex,
+    message
+  );
+};
 
 const migration = read("supabase/migrations/20260827033058_qbo_production_convergence.sql");
+const dormantMigration = read("supabase/migrations/20260902191322_qbo_production_dormant_connection_gate.sql");
 const connect = read("app/api/integrations/qbo/connect/route.ts");
 const disconnect = read("app/api/integrations/qbo/disconnect/route.ts");
 const disconnectPage = read("app/app/settings/integrations/quickbooks/disconnect/page.tsx");
 const reauthorize = read("app/api/integrations/qbo/reauthorize/route.ts");
+const settings = read("app/app/settings/page.tsx");
+const integrationsPage = read("app/app/integrations/page.tsx");
+const managementPage = read("app/app/settings/integrations/quickbooks/page.tsx");
+const integrationStatusReader = read("app/app/integrations/_qbo.ts");
+const customerAvailability = read("lib/integrations/control-plane/qbo-customer-availability.ts");
 const oauth = read("lib/integrations/control-plane/qbo-customer-oauth.ts");
 const customerRoutes = read("lib/integrations/control-plane/qbo-customer-routes.ts");
+const qboOAuthPolicy = read("lib/integrations/provider-runtime/qbo/oauth-policy.ts");
 const customerStatus = read("lib/integrations/control-plane/customer-status.ts");
 const connectionPanel = read("components/integrations/ConnectionStatusPanel.tsx");
 const controlPlaneRepository = read("lib/integrations/persistence/control-plane-repository.ts");
@@ -39,7 +55,8 @@ const webhookSignature = read("lib/integrations/providers/qbo/webhook-signature.
 const edgeCallback = read("services/external-integrations-qbo/edge/callback.go");
 const edgePlugin = read("services/external-integrations-qbo/edge/plugin/main.go");
 const edgeTests = read("services/external-integrations-qbo/edge/callback_test.go");
-const terraform = read("services/external-integrations-qbo/infra/main.tf");
+const terraform = read("services/external-integrations-qbo/infra/main.tf") + "\n" +
+  read("services/external-integrations-qbo/infra/modules/callback/main.tf");
 const variables = read("services/external-integrations-qbo/infra/variables.tf");
 const terraformOutputs = read("services/external-integrations-qbo/infra/outputs.tf");
 const terraformVersions = read("services/external-integrations-qbo/infra/versions.tf");
@@ -54,27 +71,54 @@ const status = read("lib/integrations/control-plane/customer-status.ts");
 const schedulerRepositoryCall = repository.match(
   /"schedule_qbo_initialization_v2",\s*\{([\s\S]*?)\},\s*client/
 )?.[1] ?? "";
-const publicCallbackGrant = terraform.match(
-  /resource "google_cloud_run_v2_service_iam_member" "public_callback" \{([\s\S]*?)\n\}/
-)?.[1] ?? "";
 const providerEgressModes = terraform.match(
   /provider_egress_modes = toset\(\[([\s\S]*?)\]\)/
 )?.[0] ?? "";
 
+matches(customerAvailability, /import "server-only"/, "customer connection availability is server-only");
+matches(customerAvailability, /QBO_PRODUCTION_CUSTOMER_CONNECTIONS_ENABLED/, "customer connection availability uses the explicit Production gate");
+matches(customerAvailability, /process\.env\[QBO_CUSTOMER_CONNECTIONS_ENABLED_ENV\] === "true"/, "customer connection availability is absent-by-default and requires exact opt-in");
+excludes(customerAvailability, /NEXT_PUBLIC_/, "customer connection availability is never exposed to the browser environment");
+matches(customerAvailability, /status: 404/, "disabled customer connection routes return the established not-found response");
+matches(customerAvailability, /"cache-control": "no-store"/, "disabled customer connection responses are not cached");
+matches(settings, /href="\/app\/integrations"/, "settings links to the dedicated integrations surface");
+excludes(settings, /ConnectionStatusPanel|\.from\(/, "settings does not read or render provider connection details");
+matches(integrationsPage, /const qboEnabled = qboProductionCustomerConnectionsEnabled\(\)/, "integrations derives QBO visibility from the server-only gate");
+matches(integrationsPage, /qboEnabled \? readQuickBooksStatus\(access\) : null/, "disabled integrations skip the connection-summary reader");
+matches(integrationsPage, /\{qboEnabled \? <ProviderCard/, "disabled integrations hide the QuickBooks card");
+precedes(integrationStatusReader, "if (!qboProductionCustomerConnectionsEnabled()) return null", '.from("integration_connection_summaries")', "disabled reader skips connection-summary queries");
+precedes(managementPage, "if (!qboProductionCustomerConnectionsEnabled()) notFound()", "requireWorkspacePage()", "disabled management stops before identity and integration queries");
+matches(managementPage, /<ConnectionStatusPanel/, "management retains the existing QuickBooks connection panel");
+precedes(connect, "if (!qboProductionCustomerConnectionsEnabled())", "assertQboCustomerRequestOrigin(request)", "connect denies disabled access before request processing");
+precedes(connect, "if (!qboProductionCustomerConnectionsEnabled())", "requireWorkspaceAccess()", "connect denies disabled access before authentication and database access");
+precedes(connect, "const configuration = qboProductionOAuthConfiguration()", "beginQboCustomerConnection(", "connect validates OAuth configuration before creating an atomic pending intent/state");
+precedes(reauthorize, "if (!qboProductionCustomerConnectionsEnabled())", "requireWorkspaceAccess()", "reauthorization denies disabled access before authentication and database access");
+precedes(disconnect, "if (!qboProductionCustomerConnectionsEnabled())", "requireWorkspaceAccess()", "disconnect denies disabled access before authentication and database access");
+precedes(disconnectPage, "if (!qboProductionCustomerConnectionsEnabled()) notFound()", "requireWorkspacePage()", "the disabled disconnect page stops before authentication and integration queries");
+matches(dormantMigration, /before insert on private\.integration_connections/, "the dormant database guard runs before any connection mutation");
+matches(dormantMigration, /new\.provider_key = 'quickbooks_online'[\s\S]*new\.provider_environment = 'production'/, "the dormant database guard is QBO Production-specific");
+matches(dormantMigration, /configuration\.configuration_version = new\.configuration_version[\s\S]*configuration\.enabled/, "the dormant database guard requires the exact enabled runtime configuration");
+matches(dormantMigration, /message = 'qbo_production_customer_connections_disabled'/, "disabled direct RPC access fails closed with a stable diagnostic");
+matches(dormantMigration, /security definer[\s\S]*set search_path = ''/, "the dormant database guard fixes an empty search path");
+matches(dormantMigration, /revoke all on function[\s\S]*from public, anon, authenticated, service_role/, "no caller receives direct execution authority over the trigger guard");
+excludes(terraform, /QBO_PRODUCTION_CUSTOMER_CONNECTIONS_ENABLED/, "Production runtime IaC cannot implicitly enable the customer connection surface");
+
 matches(connect, /requireWorkspaceAccess\(\)/, "connect derives workspace authority from the server session");
 matches(connect, /\.eq\("workspace_id", access\.workspaceId\)/, "connect binds the entity to the authorized workspace");
 matches(connect, /\.eq\("status", "active"\)/, "connect requires an active business entity");
-matches(connect, /\['owner', 'admin', 'manager'\]/, "connect requires a management role");
+matches(connect, /access\.membership\.role !== "owner"/, "connect requires the authenticated workspace owner");
 matches(connect, /assertQboCustomerRequestOrigin\(request\)/, "connect enforces same-origin request provenance");
 excludes(connect, /input\.workspaceId/, "connect never trusts a caller workspace ID");
 excludes(connect, /input\.providerEnvironment/, "connect never trusts a caller provider environment");
 matches(connect, /randomBytes\(32\)\.toString\("base64url"\)/, "OAuth state uses server-generated entropy");
 matches(connect, /`i1_\$\{randomBytes\(32\)\.toString\("base64url"\)\}`/, "initial OAuth state has an unambiguous server-owned namespace");
-matches(connect, /createQboCustomerOAuthState/, "connect persists state through the customer-bound V2 RPC");
-matches(connect, /NextResponse\.redirect/, "the browser receives only the provider redirect");
+matches(connect, /beginQboCustomerConnection/, "connect persists intent and customer-bound state in one transaction");
+matches(connect, /authorizationUrl: createQboAuthorizationUrl/, "the browser receives only the canonical provider navigation target");
+matches(connect, /request\.headers\.get\("accept"\) !== "application\/json"/, "native form handoff is rejected before intent creation");
 excludes(connect, /accessToken|refreshToken|clientSecret/, "connect does not expose credential material");
 
 matches(reauthorize, /requireWorkspaceAccess\(\)/, "reauthorization derives workspace authority from the server session");
+matches(reauthorize, /access\.membership\.role !== "owner"/, "reauthorization requires the authenticated workspace owner");
 matches(reauthorize, /createQboCustomerReauthorizationState/, "reauthorization uses the Production V2 state contract");
 matches(reauthorize, /expectedConnectionRowVersion/, "reauthorization carries an exact connection CAS snapshot");
 excludes(reauthorize, /input\.workspaceId/, "reauthorization cannot substitute caller workspace authority");
@@ -82,7 +126,7 @@ excludes(reauthorize, /input\.mappingId/, "reauthorization cannot substitute a c
 excludes(reauthorize, /input\.credentialId/, "reauthorization cannot substitute a caller credential");
 
 matches(disconnect, /requireWorkspaceAccess\(\)/, "disconnect derives workspace authority from the server session");
-matches(disconnect, /\["owner", "admin", "manager"\]/, "disconnect requires a management role");
+matches(disconnect, /new Set\(\["owner"\]\)/, "disconnect requires the authenticated workspace owner");
 matches(disconnect, /assertQboCustomerRequestOrigin\(request\)/, "disconnect enforces same-origin request provenance");
 matches(disconnect, /\.eq\("workspace_id", access\.workspaceId\)/, "disconnect scopes the connection to the authenticated workspace");
 matches(disconnect, /\.eq\("provider_key", "quickbooks_online"\)/, "disconnect is QBO-only");
@@ -98,7 +142,8 @@ matches(disconnectPage, /requireWorkspacePage\(\)/, "disconnect URL is an authen
 matches(disconnectPage, /\.eq\("workspace_id", workspaceId\)/, "disconnect page lists only the active workspace's connections");
 matches(disconnectPage, /action="\/api\/integrations\/qbo\/disconnect"/, "disconnect confirmation posts only to the checked route");
 matches(disconnectPage, /Historical Vaeroex records and audit evidence remain unchanged/, "disconnect truthfully preserves historical evidence");
-matches(customerRoutes, /QBO_CUSTOMER_DISCONNECT_PATH\s*=\s*[\s\S]*"\/app\/settings\/integrations\/quickbooks\/disconnect"/, "disconnect has one stable customer-facing route");
+matches(customerRoutes, /QBO_CUSTOMER_DISCONNECT_PATH[\s\S]*oauth-policy/, "disconnect route constant is QBO policy-owned");
+matches(qboOAuthPolicy, /QBO_CUSTOMER_DISCONNECT_PATH\s*=[\s\S]*"\/app\/settings\/integrations\/quickbooks\/disconnect"/, "disconnect has one stable customer-facing route");
 matches(connectionPanel, /QBO_CUSTOMER_DISCONNECT_PATH/, "settings exposes the customer disconnect surface");
 matches(customerStatus, /connection\.status === "disconnecting"[\s\S]*status = "Disconnecting"/, "customer status reports a pending disconnect truthfully");
 matches(controlPlaneRepository, /request_integration_disconnect_v1/, "the customer route delegates to the audited database disconnect RPC");
@@ -165,8 +210,8 @@ matches(server, /parseQboProductionCloudTaskDelivery/, "runtime validates Cloud 
 matches(server, /qbo_production_oauth_state_namespace_invalid/, "broker rejects OAuth state namespaces it did not issue");
 matches(server, /\^\(\?:i1_\|r1_\)\[A-Za-z0-9_-\]\{43\}\$/, "broker accepts only exact initial and reauthorization state namespaces");
 matches(terraform, /google_cloud_run_v2_service_iam_member" "task_to_runtime"[\s\S]*roles\/run\.invoker[\s\S]*task_invoker/, "Cloud Run admits task delivery only from the dedicated OIDC identity");
-matches(publicCallbackGrant, /service\["oauth_ingress"\]/, "the only public invoker grant targets OAuth ingress");
-excludes(publicCallbackGrant, /provider_runtime/, "the public callback grant cannot reach the provider runtime");
+matches(terraform, /invoker_iam_disabled\s*= each\.key == "oauth_ingress"/, "only load-balancer-bound public ingress disables the Invoker IAM check");
+excludes(terraform, /member\s*=\s*"allUsers"/, "domain-restricted sharing is preserved without public IAM grants");
 matches(server, /BoundedIdentifierSchema\.parse\(credential\.externalAuthorizedEntityReference\)/, "QBO runtime requires the broker-authorized realm");
 matches(server, /externalReferenceFingerprint\(realmId\) !== authority\.providerTenantReferenceFingerprint/, "decrypted realm is compared by fingerprint");
 matches(companyVerifier, /qbo_sandbox_company_verification_v1/, "generic verifier preserves the historical sandbox fingerprint contract");
@@ -215,6 +260,13 @@ matches(terraform, /dispatch_scheduler\s+= "qbo-dispatch-scheduler"/, "dispatche
 matches(terraform, /initialization_scheduler\s+= "qbo-initialization-scheduler"/, "initialization invocation has a distinct identity");
 matches(terraform, /google_cloud_scheduler_job" "initializer"/, "initialization scheduling is permanent IaC");
 matches(terraform, /google_cloud_scheduler_job" "dispatcher"/, "dispatch scheduling is permanent IaC");
+matches(variables, /variable "execution_enabled"[\s\S]*type\s+= bool[\s\S]*default\s+= false/, "Production execution is disabled by default during provisioning");
+matches(terraform, /desired_state\s+= var\.execution_enabled \? "RUNNING" : "PAUSED"/, "queue dispatch requires explicit verified activation");
+ok((terraform.match(/paused\s+= !var\.execution_enabled/g) ?? []).length === 2, "both scheduler resource blocks remain paused until verified activation");
+matches(terraform, /bulk\s*= \{ name = var\.scheduler_name, queue_class = "provider_bulk" \}/, "the bulk dispatcher schedule is explicit");
+matches(terraform, /interactive\s*= \{ name = "\$\{var\.scheduler_name\}-interactive", queue_class = "provider_interactive" \}/, "ongoing CDC has a distinct interactive dispatcher schedule");
+matches(terraform, /queueClass\s*= each\.value\.queue_class/, "each dispatcher schedule invokes its exact queue class");
+matches(terraform, /name\s+= "QBO_DATABASE_CA_PEM"[\s\S]*supabase-root-2021\.crt/, "all service modes receive the pinned public database CA");
 matches(terraform, /roles\/cloudtasks\.enqueuer[\s\S]*task_dispatcher/, "only the dispatcher is a Cloud Tasks enqueuer");
 matches(terraform, /roles\/cloudkms\.cryptoKeyEncrypterDecrypter[\s\S]*credential_broker/, "only the broker receives KMS authority");
 matches(terraform, /provider_secret_version/, "provider secret access is version pinned");
@@ -234,29 +286,41 @@ matches(terraform, /google_compute_router_nat" "provider_egress"[\s\S]*nat_ip_al
 matches(terraform, /google_compute_router_nat" "provider_egress"[\s\S]*source_subnetwork_ip_ranges_to_nat = "LIST_OF_SUBNETWORKS"[\s\S]*endpoint_types\s+= \["ENDPOINT_TYPE_VM"\][\s\S]*min_ports_per_vm\s+= 128/, "Cloud NAT is scoped to Direct VPC egress with bounded port capacity");
 matches(providerEgressModes, /provider_egress_modes = toset\(\[\s*"credential_broker",\s*"provider_runtime",\s*\]\)/, "only Intuit-facing service modes are eligible for static egress");
 matches(terraform, /dynamic "vpc_access"[\s\S]*contains\(local\.provider_egress_modes, each\.key\)[\s\S]*egress = "ALL_TRAFFIC"[\s\S]*google_compute_subnetwork\.provider_egress\.id/, "eligible Cloud Run revisions route all traffic through Direct VPC egress");
+matches(terraform, /dynamic "startup_probe"\s*\{\s*for_each = contains\(local\.provider_egress_modes, each\.key\) \? \[each\.key\] : \[\]/, "only Direct VPC modes require startup egress readiness");
+matches(terraform, /startup_probe[\s\S]*timeout_seconds\s*= 15[\s\S]*period_seconds\s*= 15[\s\S]*failure_threshold\s*= 16[\s\S]*http_get\s*\{\s*path = "\/health\/ready"\s*port = 8080/, "startup retries are bounded to 240 seconds before accepting operational traffic");
 excludes(providerEgressModes, /oauth_ingress|task_scheduler|task_dispatcher/, "ingress and control-plane services cannot acquire provider static egress");
 matches(terraformOutputs, /output "provider_egress_ip"[\s\S]*google_compute_address\.provider_egress\.address/, "Terraform exposes only the reserved public provider egress IP");
 excludes(terraform, /nat_ips\s+= \[google_compute_global_address\.callback/, "callback ingress can never become provider egress authority");
 matches(terraform, /oauth_ingress" \? "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER"/, "direct callback service ingress is closed outside the load balancer");
+matches(terraform, /default_uri_disabled\s*= each\.key == "oauth_ingress"/, "the public callback default Cloud Run URL cannot bypass the edge");
+matches(terraform, /depends_on\s*= \[google_secret_manager_secret_iam_member\.database\]/, "service creation waits for database secret accessor grants");
+matches(terraform, /cel_expression\s*= "true"/, "callback sanitization covers every forwarding-rule request, not only expected hosts");
+matches(terraform, /plugin_config_data\s*= base64encode\(jsonencode\(\{ allowedHost = var\.oauth_callback_hostname \}\)\)/, "the edge receives its explicit allowed host through reviewed configuration");
+matches(terraform, /forward_attributes\s*= \[\s*"request.host",\s*"request.method",\s*"request.path",\s*"request.query",\s*\]/, "the edge receives exactly the documented attributes needed for host and query validation");
 matches(terraform, /google_network_services_wasm_plugin" "callback"/, "Production callback uses a managed immutable edge plugin");
 matches(terraform, /google_network_services_lb_edge_extension" "callback"[\s\S]*fail_open\s+= false/, "callback edge extension fails closed");
 matches(terraform, /forward_headers = \[[\s\S]*content-length[\s\S]*x-vaeroex-oauth-state[\s\S]*\]/, "callback edge receives only the headers required for body and handoff fencing");
 matches(terraform, /google_compute_backend_service" "callback"[\s\S]*log_config \{[\s\S]*enable = false/, "callback load-balancer request logging is disabled");
-matches(terraform, /google_network_services_wasm_plugin" "callback"[\s\S]*log_config \{[\s\S]*enable = false/, "callback plugin logging is disabled");
+matches(terraform, /google_network_services_wasm_plugin" "callback"[\s\S]*postcondition \{\s*condition\s*= alltrue\(\[for logging in self\.log_config : logging\.enable == false\]\)/, "callback plugin logging uses the API disabled default with an enforced postcondition");
 matches(terraform, /deletion_policy\s+= "PREVENT"/, "callback edge artifacts cannot be deleted accidentally");
-matches(terraformVersions, /version = "7\.34\.0"/, "Google provider version is pinned for the reviewed edge resources");
+matches(terraformVersions, /version = "7\.39\.0"/, "Google provider version supports explicit edge attribute forwarding");
 matches(terraformLock, /provider "registry\.terraform\.io\/hashicorp\/google"/, "the Terraform dependency lock pins the exact Google provider source");
-matches(terraformLock, /version\s+= "7\.34\.0"[\s\S]*constraints = "7\.34\.0"/, "the Terraform dependency lock pins the reviewed Google provider version");
+matches(terraformLock, /version\s+= "7\.39\.0"[\s\S]*constraints = "7\.39\.0"/, "the Terraform dependency lock pins the reviewed Google provider version");
 matches(terraformLock, /hashes = \[[\s\S]*"zh:[a-f0-9]{64}"/, "the Terraform dependency lock records provider package checksums");
 matches(variables, /image_digest must be an immutable sha256 image reference/, "IaC requires an immutable image digest");
 matches(variables, /source_commit must be a full Git commit SHA/, "IaC records the exact source commit");
 excludes(terraform, /p8b-qbo|canary|sslip\.io|sandbox-quickbooks|intuit.*development/i, "deployable IaC contains no qualification resource binding");
 matches(dockerfile, /FROM node:22\.23\.1-bookworm-slim@sha256:/, "build image is digest pinned");
-matches(dockerfile, /FROM gcr\.io\/distroless\/nodejs22-debian12@sha256:/, "runtime image is digest pinned");
+matches(dockerfile, /FROM gcr\.io\/distroless\/nodejs22-debian13:nonroot@sha256:5ef534d3db0ac0c43bee379af4ae49cfbfc0ef38a46c94c52d87c68f32f34d8a/, "supported nonroot Node 22 runtime image is digest pinned");
 matches(dockerfile, /LABEL org\.opencontainers\.image\.revision=\$QBO_SOURCE_COMMIT/, "runtime image records its exact source revision");
 matches(cloudbuild, /QBO_SOURCE_COMMIT=\$\{_SOURCE_COMMIT\}/, "runtime publication supplies the reviewed source revision");
+matches(cloudbuild, /--network=none[\s\S]*--read-only[\s\S]*--cap-drop=ALL[\s\S]*--security-opt=no-new-privileges/, "finished image smoke has no external network or elevated capabilities");
+matches(cloudbuild, /image-smoke\.mjs:ro[\s\S]*\$\{_IMAGE\}[\s\S]*\/image-smoke\.mjs[\s\S]*\$\{_SOURCE_COMMIT\}/, "publication qualifies the actual image and source before pushing");
 matches(edgeCloudbuild, /_SOURCE_COMMIT[\s\S]*\^\[a-f0-9\]\{40\}\$/, "callback edge publication validates and records the reviewed source revision");
-excludes(edgeDockerfile, /\b(?:ARG|LABEL)\b/, "Wasm callback packaging remains a canonical config-free scratch image");
+matches(edgeDockerfile, /^FROM scratch\nCOPY plugin\.wasm \/plugin\.wasm\nARG QBO_SOURCE_COMMIT\nLABEL org\.opencontainers\.image\.revision=\$QBO_SOURCE_COMMIT\n$/, "Wasm callback packaging establishes its platform before metadata and contains only the plugin and nonsecret source provenance");
+matches(edgeCloudbuild, /QBO_SOURCE_COMMIT=\$\{_SOURCE_COMMIT\}/, "callback publication passes the reviewed commit into immutable artifact provenance");
+matches(terraform, /"initializer_to_validation_runtime"[\s\S]*service\["provider_runtime"\][\s\S]*roles\/run\.invoker[\s\S]*service\["task_scheduler"\]/, "only the existing initializer identity gains bounded validation-drain invocation");
+matches(terraform, /"initializer_to_revocation_broker"[\s\S]*service\["credential_broker"\][\s\S]*roles\/run\.invoker[\s\S]*service\["task_scheduler"\]/, "the initializer can invoke the broker for canonical pending revocations");
 matches(recordManagement, /export type ManagedRecordCollection =/, "shared record types remain available to reduced runtime builds");
 excludes(recordManagement, /@\/components\//, "shared runtime libraries do not type-depend on React components");
 

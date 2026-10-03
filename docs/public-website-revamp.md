@@ -184,3 +184,12 @@ Two local review recordings show the live rendered canvas with the actual chapte
 Intentional simplifications: the molecular surface is a smooth approximate Gaussian envelope, not a solvent-excluded surface or density map; water and hydrogens are omitted. Molecular paths are authored. Cell and protein sizes/timing are composed for legibility, neighboring cells have reduced anatomy, and the generic receptor/transport process does not assert a named mechanism. Mobile receives lower geometric detail. No placeholder models remain in either five-act sequence.
 
 Verification for this refinement: `pnpm build` passed including TypeScript and static page generation; `pnpm lint` passed with 0 errors and 57 pre-existing warnings; `pnpm test:public-clarity` passed all public rendering, policy, original Clarity motion, and scientific suites; `pnpm security:check` passed. Browser checks covered every act, forward and reverse scrolling, native chapter navigation, pause/resume, offscreen inactivity, desktop resizing, 390×844 compact rendering, and 844×390 landscape layout. These are browser viewport checks, not claims about a physical phone benchmark. The final local production-mode previews on port 3100 reported no browser errors. Production deployment remains on hold for review.
+
+
+## Approved merge and production hold
+
+The redesign was approved for merge on October 2, 2026. The current `main` branch was integrated before verification, retaining its integration and workspace changes.
+
+Vercel tracks `main` as Production and automatically assigns production domains. To preserve the requested production hold while merging, `vercel.json` explicitly sets `git.deploymentEnabled.main` to `false`. This pauses automatic Git deployments from `main` for this project; preview branches retain their existing behavior. It does not disable the running site or prevent an explicitly authorized manual deployment.
+
+Release requires separate approval. Once release is approved, remove the `main: false` entry and merge that change to restore automatic deployment, or perform a separately approved manual release. Do not remove the existing Square branch exclusions.

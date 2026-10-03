@@ -1173,6 +1173,87 @@ button.bg-vaeroex-blue:hover {
   animation: vaeroex-story-change 260ms ease-out both;
 }
 
+/* Customer workspace presentation. Admin/public surfaces deliberately keep their
+   independently approved styles. All colors come from the existing brand palette. */
+.workspace-nav-icon,
+.workspace-nav-active { display: none; }
+
+.vaeroex-customer-workspace {
+  --workspace-surface: #ffffff;
+  --workspace-border: #d1d5db;
+  --workspace-muted: #64748b;
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.pulsar .vaeroex-customer-workspace {
+  --workspace-surface: #111827;
+  --workspace-border: #253041;
+  --workspace-muted: #94a3b8;
+}
+
+.vaeroex-customer-workspace .workspace-nav-icon,
+.vaeroex-customer-workspace .workspace-nav-active { display: block; flex-shrink: 0; }
+.vaeroex-customer-workspace .workspace-nav-icon { color: #94a3b8; }
+.vaeroex-customer-workspace .workspace-nav-link[aria-current="page"] .workspace-nav-icon { color: #38bdf8; }
+.vaeroex-customer-workspace .workspace-nav-link { min-height: 46px; border: 1px solid transparent; border-radius: 8px; }
+.vaeroex-customer-workspace .workspace-sidebar .workspace-nav-link[aria-current="page"] {
+  background: rgba(37, 99, 235, 0.16);
+  border-color: rgba(56, 189, 248, 0.18);
+  color: #f8fafc;
+  box-shadow: none;
+}
+.vaeroex-customer-workspace .workspace-sidebar { box-shadow: none; background: #0b1220; padding: 20px 14px; }
+.vaeroex-customer-workspace .workspace-sidebar > a { border: 0; background: transparent; padding-left: 10px; box-shadow: none; }
+.vaeroex-customer-workspace .workspace-switcher { box-shadow: none; margin: 24px 0 16px; border-color: #253041; background: #111827; }
+.vaeroex-customer-workspace .workspace-topbar { box-shadow: none; background: #0b1220; border-color: #253041; }
+.vaeroex-customer-workspace .workspace-topbar > div > div > span:first-child { display: none; }
+.vaeroex-customer-workspace .workspace-topbar p:first-child { text-transform: none; letter-spacing: 0; color: #94a3b8; font-size: 12px; overflow-wrap: anywhere; }
+.vaeroex-customer-workspace .workspace-topbar p:last-child { font-size: 15px; letter-spacing: 0; margin-top: 2px; }
+.vaeroex-customer-workspace .workspace-main { overflow: visible; padding-top: 28px; padding-bottom: 36px; }
+.vaeroex-customer-workspace .workspace-main > * + * { margin-top: 24px; }
+.vaeroex-customer-workspace .workspace-main > details:first-child { background: transparent; border-color: var(--workspace-border); padding: 8px 12px; }
+.vaeroex-customer-workspace .workspace-main > details:first-child:not([open]) > summary { color: var(--workspace-muted); font-weight: 500; }
+.vaeroex-customer-workspace .workspace-page-header { border: 0; padding: 0 0 4px; border-radius: 0; background: transparent; box-shadow: none; }
+.vaeroex-customer-workspace .workspace-page-header h1 { font-size: clamp(25px, 2.3vw, 32px); line-height: 1.2; letter-spacing: -0.035em; font-weight: 600; }
+.vaeroex-customer-workspace .workspace-page-header p:first-child { font-size: 10px; letter-spacing: 0.16em; }
+.vaeroex-customer-workspace .workspace-page-header p:last-child { color: var(--workspace-muted); max-width: 64ch; }
+.vaeroex-customer-workspace .workspace-section-card { border-color: var(--workspace-border); border-radius: 12px; box-shadow: none; }
+.vaeroex-customer-workspace .workspace-section-card > div:first-child { border-color: var(--workspace-border); }
+.vaeroex-customer-workspace .workspace-section-card h3 { font-size: 15px; letter-spacing: -0.01em; }
+.vaeroex-customer-workspace .workspace-main h1,
+.vaeroex-customer-workspace .workspace-main h2,
+.vaeroex-customer-workspace .workspace-main h3 { overflow-wrap: anywhere; }
+.vaeroex-customer-workspace :is(input,select,textarea) { border-radius: 7px; box-shadow: none; }
+.vaeroex-customer-workspace :is(input,select):not([type="checkbox"]):not([type="radio"]):not([type="hidden"]) { min-height: 42px; }
+.vaeroex-customer-workspace select { padding-right: 28px; }
+.vaeroex-customer-workspace :is(button,a,summary,input,select,textarea):focus-visible { outline: 2px solid #38bdf8; outline-offset: 3px; }
+.vaeroex-customer-workspace button:disabled { cursor: not-allowed; }
+.vaeroex-customer-workspace table { width: 100%; border-collapse: collapse; }
+.vaeroex-customer-workspace th { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; padding-top: 12px; padding-bottom: 12px; white-space: nowrap; }
+.vaeroex-customer-workspace td { font-size: 13px; padding-top: 14px; padding-bottom: 14px; }
+.vaeroex-customer-workspace tbody tr { border-color: var(--workspace-border); }
+.vaeroex-customer-workspace .workspace-switcher-summary::after { content: "⌄"; flex-shrink: 0; color: #94a3b8; }
+.vaeroex-customer-workspace .workspace-switcher-summary::-webkit-details-marker { display: none; }
+.vaeroex-customer-workspace .workspace-filter-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; color: var(--workspace-muted); font-size: 12px; }
+.vaeroex-customer-workspace .workspace-filter-summary strong { color: #38bdf8; font-weight: 500; }
+.vaeroex-customer-workspace .workspace-tabs > a,
+.vaeroex-customer-workspace .workspace-tabs > a > span { flex-shrink: 0; }
+
+@media (min-width: 1024px) {
+  .vaeroex-customer-workspace .workspace-sidebar { width: 236px; }
+  .vaeroex-customer-workspace .workspace-body { padding-left: 236px; }
+  .vaeroex-customer-workspace .workspace-main { padding-left: 32px; padding-right: 32px; }
+}
+@media (max-width: 639px) {
+  .vaeroex-customer-workspace .workspace-main { padding: 20px 14px 28px; }
+  .vaeroex-customer-workspace .workspace-main > * + * { margin-top: 20px; }
+  .vaeroex-customer-workspace .workspace-page-header { padding-top: 2px; }
+  .vaeroex-customer-workspace .workspace-section-card { padding: 16px; }
+  .vaeroex-customer-workspace .workspace-nav-link { font-size: 13px; gap: 10px; }
+}
+
 .pulsar .vaeroex-app-shell {
   background:
     radial-gradient(circle at 12% 0%, rgba(30, 107, 255, 0.15), transparent 30%),
@@ -1260,6 +1341,76 @@ button.bg-vaeroex-blue:hover {
 .pulsar .vaeroex-app-shell .shadow-command {
   box-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
 }
+
+.pulsar .vaeroex-customer-workspace.vaeroex-app-shell { background: #0b1220; }
+.vaeroex-customer-workspace .workspace-page-header h1 { color: #0b1f4d; }
+.pulsar .vaeroex-customer-workspace .workspace-page-header h1 { color: #f8fafc; }
+.pulsar .vaeroex-customer-workspace :is(.workspace-section-card,.workspace-panel,.workspace-briefing-card,.workspace-priority-card,.workspace-kpi-tile) { background: #111827; border-color: #253041; box-shadow: none; }
+.pulsar .vaeroex-customer-workspace .workspace-page-header { background: transparent; box-shadow: none; }
+.pulsar .vaeroex-customer-workspace :is(.bg-red-50,.bg-rose-50) { background-color: rgba(248,113,113,.09); }
+.pulsar .vaeroex-customer-workspace :is(.text-red-700,.text-red-800,.text-rose-700) { color: #fca5a5; }
+.pulsar .vaeroex-customer-workspace :is(.bg-amber-50,.bg-yellow-50) { background-color: rgba(251,191,36,.09); }
+.pulsar .vaeroex-customer-workspace :is(.text-amber-700,.text-amber-800,.text-yellow-800) { color: #fcd34d; }
+.pulsar .vaeroex-customer-workspace .bg-emerald-50 { background-color: rgba(52,211,153,.09); }
+.pulsar .vaeroex-customer-workspace :is(.text-emerald-700,.text-emerald-800) { color: #6ee7b7; }
+.pulsar .vaeroex-customer-workspace :is(.border-red-200,.border-amber-200,.border-emerald-200) { border-color: currentColor; }
+.vaeroex-customer-workspace .workspace-panel { border: 1px solid var(--workspace-border); border-radius: 12px; background: var(--workspace-surface); }
+.vaeroex-customer-workspace .workspace-toolbar { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; }
+.vaeroex-customer-workspace .workspace-list-row { border-color: var(--workspace-border); border-radius: 8px; box-shadow: none; }
+.vaeroex-customer-workspace .workspace-list-row + .workspace-list-row { margin-top: 8px; }
+.vaeroex-customer-workspace .workspace-secondary-details { border-color: var(--workspace-border); box-shadow: none; }
+.vaeroex-customer-workspace .workspace-secondary-details > summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; font-weight: 500; }
+.vaeroex-customer-workspace .workspace-secondary-details > summary::after { content: "+"; color: var(--workspace-muted); flex-shrink: 0; }
+.vaeroex-customer-workspace .workspace-secondary-details[open] > summary::after { content: "−"; }
+.vaeroex-customer-workspace .workspace-executive-overview > header h1 { font-size: clamp(25px,2.3vw,32px); font-weight: 600; letter-spacing: -.035em; }
+.vaeroex-customer-workspace .workspace-business-health { border-radius: 12px; border-color: var(--workspace-border); box-shadow: none; }
+.vaeroex-customer-workspace .workspace-priority-card { border-radius: 12px; box-shadow: none; }
+.vaeroex-customer-workspace .workspace-priority-card h2 { font-size: 17px; line-height: 1.4; letter-spacing: -.015em; }
+.vaeroex-customer-workspace .workspace-finding-list,
+.vaeroex-customer-workspace .workspace-finding-detail { border-color: var(--workspace-border); border-radius: 12px; box-shadow: none; }
+.vaeroex-customer-workspace .workspace-finding-detail h2 { font-size: 22px; line-height: 1.4; letter-spacing: -.02em; }
+.vaeroex-customer-workspace .workspace-kpi-tile { border-radius: 10px; }
+.vaeroex-customer-workspace .workspace-kpi-detail { scroll-margin-top: 92px; }
+.vaeroex-customer-workspace.workspace-square { min-height: 100dvh; }
+
+/* Light-mode content on the newly white list surfaces. Keep dark review forms,
+   source-detail panels, navigation and white-on-blue primary actions untouched. */
+html:not(.pulsar) .vaeroex-customer-workspace :is(
+  .workspace-files-notes .workspace-panel h2,
+  .workspace-files-notes .workspace-panel .workspace-list-row h3,
+  .workspace-files-notes .workspace-panel .workspace-list-row h4,
+  .workspace-saved-analyses .workspace-analysis-row h3,
+  .workspace-saved-analyses > label > span
+) { color: #0b1f4d; }
+html:not(.pulsar) .vaeroex-customer-workspace :is(
+  .workspace-files-notes .workspace-panel > .flex p,
+  .workspace-files-notes .workspace-panel > div > div > p[role="status"],
+  .workspace-files-notes .workspace-panel .workspace-list-row p,
+  .workspace-business-notes > .flex > span,
+  .workspace-saved-analyses .workspace-toolbar p,
+  .workspace-saved-analyses .workspace-analysis-row dt,
+  .workspace-saved-analyses .workspace-analysis-row dd,
+  .workspace-saved-analyses .workspace-analysis-row p,
+  .workspace-saved-analyses .workspace-selection-bar > span
+) { color: #475569; }
+html:not(.pulsar) .vaeroex-customer-workspace :is(
+  .workspace-files-notes .workspace-panel .workspace-row-link,
+  .workspace-files-notes .workspace-panel > div > div > button,
+  .workspace-files-notes .workspace-note-entry > summary,
+  .workspace-files-notes .workspace-tabs a:not([class~="bg-vaeroex-blue"]),
+  .workspace-saved-analyses .workspace-row-link,
+  .workspace-saved-analyses > button,
+  .workspace-saved-analyses .workspace-analysis-row summary,
+  .workspace-saved-analyses .workspace-selection-bar > button:not([class*="text-red"])
+) { color: #2563eb; border-color: #d1d5db; }
+html:not(.pulsar) .vaeroex-customer-workspace .workspace-saved-analyses .workspace-selection-bar > button[class*="text-red"] { color: #b91c1c; }
+html:not(.pulsar) .vaeroex-customer-workspace .workspace-analysis-row span.text-cyan-100 { color: #2563eb; background: #eaf4ff; border-color: #d1d5db; }
+html:not(.pulsar) .vaeroex-customer-workspace .workspace-business-notes .workspace-list-row span.text-emerald-100 { color: #047857; background: #ecfdf5; border-color: #a7f3d0; }
+html:not(.pulsar) .vaeroex-customer-workspace .workspace-business-notes .workspace-list-row span.text-slate-300 { color: #475569; background: #f1f5f9; border-color: #d1d5db; }
+html:not(.pulsar) .vaeroex-customer-workspace .workspace-reports .workspace-page-header > p:first-child { color: #2563eb; }
+html:not(.pulsar) .vaeroex-customer-workspace .workspace-saved-analyses .workspace-toolbar input,
+html:not(.pulsar) .vaeroex-customer-workspace .workspace-saved-analyses > label > select { background: #ffffff; color: #0b1f4d; border-color: #64748b; }
+html:not(.pulsar) .vaeroex-customer-workspace .workspace-saved-analyses .workspace-toolbar input::placeholder { color: #475569; opacity: 1; }
 
 @keyframes vaeroex-fade-up {
   from {
@@ -2730,6 +2881,131 @@ button.bg-vaeroex-blue:hover {
   .vaeroex-spatial-surface--selected {
     box-shadow: var(--vaeroex-spatial-shadow-subtle);
   }
+}
+
+/* Customer presentation owns these surfaces after the legacy Pulsar utilities.
+   Keep the brand palette, semantic badges, Admin and public pages unchanged. */
+.pulsar .vaeroex-customer-workspace.vaeroex-app-shell,
+.pulsar .vaeroex-customer-workspace :is(.workspace-sidebar,.workspace-topbar) {
+  background: #0b1220 !important;
+  box-shadow: none;
+}
+.pulsar .vaeroex-customer-workspace :is(.workspace-section-card,.workspace-panel,.workspace-briefing-card,.workspace-priority-card,.workspace-kpi-tile,.workspace-change-summary) {
+  background: #111827 !important;
+  box-shadow: none !important;
+}
+.pulsar .vaeroex-customer-workspace .workspace-page-header {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+.pulsar .vaeroex-customer-workspace .workspace-business-health {
+  border: 1px solid #253041;
+  border-radius: 12px !important;
+  background: #111827 !important;
+  box-shadow: none !important;
+}
+.pulsar .vaeroex-customer-workspace .workspace-sidebar .workspace-nav-link[aria-current="page"] {
+  background: rgba(56,189,248,.09) !important;
+  border-color: rgba(56,189,248,.15);
+  box-shadow: none;
+}
+.vaeroex-customer-workspace .workspace-health-facts { font-size: 12px; }
+
+/* Business Health alternatives share the supplied status color and score.
+   Equal segments indicate the 0–100 scale, not new classification thresholds. */
+.workspace-health-instrument {
+  --health-track: rgba(148, 163, 184, .18);
+  position: relative;
+  width: 100%;
+  max-width: 340px;
+  color: #f8fafc;
+}
+.workspace-health-instrument__value { display: flex; align-items: baseline; gap: 12px; }
+.workspace-health-instrument__score { font-size: clamp(64px, 6vw, 80px); font-weight: 600; letter-spacing: -.065em; line-height: 1; font-variant-numeric: tabular-nums; }
+.workspace-health-instrument__scale { color: #94a3b8; font-size: 13px; font-weight: 500; }
+.workspace-health-instrument__unavailable { color: #cbd5e1; font-size: 22px; line-height: 1.25; font-weight: 500; }
+.workspace-health-instrument--scorecard { padding-top: 10px; }
+.workspace-health-instrument--scorecard .workspace-health-instrument__value { min-height: 80px; }
+.workspace-health-instrument__bar { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 4px; margin-top: 22px; }
+.workspace-health-instrument__bar > span { height: 7px; border-radius: 2px; overflow: hidden; background: var(--health-track); }
+.workspace-health-instrument__bar i { display: block; width: var(--health-segment-fill); height: 100%; background: var(--semantic-current-border, #94a3b8); }
+.workspace-health-instrument__range { display: flex; justify-content: space-between; margin-top: 9px; color: #94a3b8; font-size: 10px; font-variant-numeric: tabular-nums; }
+.workspace-health-instrument--arc { max-width: 280px; margin-inline: auto; }
+.workspace-health-instrument__arc { display: block; width: 100%; overflow: visible; fill: none; stroke-width: 8; stroke-linecap: butt; }
+.workspace-health-instrument__track { stroke: var(--health-track); }
+.workspace-health-instrument__fill { stroke: var(--semantic-current-border, #94a3b8); }
+.workspace-health-instrument--arc .workspace-health-instrument__value { position: absolute; inset: 53px 30px 22px; flex-direction: column; align-items: center; justify-content: center; gap: 4px; }
+.workspace-health-instrument--arc .workspace-health-instrument__score { font-size: 68px; }
+.workspace-health-instrument--arc .workspace-health-instrument__unavailable { max-width: 160px; text-align: center; font-size: 21px; }
+.workspace-health-instrument--arc .workspace-health-instrument__range { margin-top: 0; padding-inline: 12px; }
+.workspace-health-instrument[data-available="false"] .workspace-health-instrument__bar { margin-top: 22px; }
+
+/* Performance uses the same read-only metrics in a compact, responsive list. */
+.vaeroex-customer-workspace .workspace-metric-summary-strip { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding-block: 2px 8px; font-size: 14px; }
+.vaeroex-customer-workspace .workspace-metric-summary-strip strong { font-size: 22px; font-weight: 600; letter-spacing: -.04em; }
+.vaeroex-customer-workspace .workspace-metric-summary-strip p > span { color: #64748b; margin-left: 4px; font-size: 12px; }
+.vaeroex-customer-workspace .workspace-metric-attention { display: inline-flex; align-items: center; gap: 16px; min-height: 40px; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 12px; font-weight: 600; }
+.vaeroex-customer-workspace .workspace-metric-attention[aria-current="true"] { border-color: #b45309; background: #fffbeb; color: #92400e; }
+.vaeroex-customer-workspace .workspace-metric-filters { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(140px, .5fr) minmax(160px, .55fr) auto; align-items: end; gap: 12px; }
+.vaeroex-customer-workspace .workspace-metric-filters label { display: flex; flex-direction: column; gap: 6px; min-width: 0; color: #64748b; font-size: 11px; font-weight: 600; }
+.vaeroex-customer-workspace .workspace-metric-filters :is(input,select) { width: 100%; min-width: 0; height: 42px; padding: 9px 11px; border: 1px solid #cbd5e1; border-radius: 8px; background: #fff; color: #0f172a; font-size: 13px; font-weight: 400; }
+.vaeroex-customer-workspace .workspace-metric-filter-submit { min-height: 42px; border-radius: 8px; padding: 9px 15px; background: #153c63; color: #fff; font-size: 12px; font-weight: 600; }
+.vaeroex-customer-workspace .workspace-metric-context { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; color: #64748b; font-size: 12px; line-height: 1.6; }
+.vaeroex-customer-workspace .workspace-metric-context p { overflow-wrap: anywhere; }
+.vaeroex-customer-workspace .workspace-metric-context a { flex-shrink: 0; color: #075985; text-decoration: underline; text-underline-offset: 3px; }
+.vaeroex-customer-workspace .workspace-performance-range > summary { padding: 11px 14px; }
+@media (min-width: 768px) {
+  .vaeroex-customer-workspace .workspace-performance-range > summary > div { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 12px; }
+  .vaeroex-customer-workspace .workspace-performance-range > summary > div p { margin: 0; }
+}
+.vaeroex-customer-workspace .workspace-metric-list { overflow: hidden; border: 1px solid #dbe3ec; border-radius: 12px; background: #fff; }
+.vaeroex-customer-workspace :is(.workspace-metric-table-heading,.workspace-metric-row-link) { display: grid; grid-template-columns: minmax(0, 1.75fr) minmax(115px, .95fr) minmax(140px, 1.1fr) minmax(115px, .95fr) 16px; align-items: center; gap: 20px; padding: 17px 20px; }
+.vaeroex-customer-workspace .workspace-metric-table-heading { background: #f8fafc; color: #64748b; font-size: 10px; font-weight: 600; letter-spacing: .035em; }
+.vaeroex-customer-workspace .workspace-metric-row { border-top: 1px solid #e2e8f0; }
+.vaeroex-customer-workspace .workspace-metric-row-link { min-height: 90px; color: #0f172a; }
+.vaeroex-customer-workspace .workspace-metric-row-link:hover { background: #f8fafc; }
+.vaeroex-customer-workspace .workspace-metric-row-link:focus-visible { outline: 2px solid #0284c7; outline-offset: -3px; border-radius: 6px; }
+.vaeroex-customer-workspace .workspace-metric-identity h2 { font-size: 14px; font-weight: 600; letter-spacing: -.01em; line-height: 1.45; overflow-wrap: anywhere; }
+.vaeroex-customer-workspace .workspace-metric-row-link p { margin-top: 5px; font-size: 11px; line-height: 1.45; color: #64748b; overflow-wrap: anywhere; }
+.vaeroex-customer-workspace .workspace-metric-value strong { font-size: 20px; font-weight: 600; letter-spacing: -.025em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.vaeroex-customer-workspace .workspace-metric-status { min-width: 0; }
+.vaeroex-customer-workspace .workspace-metric-period time { font-size: 12px; font-variant-numeric: tabular-nums; }
+.vaeroex-customer-workspace .workspace-metric-open { color: #64748b; font-size: 17px; }
+.vaeroex-customer-workspace .workspace-metric-mobile-label { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.pulsar .vaeroex-customer-workspace :is(.workspace-metric-summary-strip p > span,.workspace-metric-context,.workspace-metric-filters label,.workspace-metric-row-link p,.workspace-metric-open) { color: #94a3b8; }
+.pulsar .vaeroex-customer-workspace .workspace-metric-attention { border-color: #334155; color: #cbd5e1; }
+.pulsar .vaeroex-customer-workspace .workspace-metric-attention[aria-current="true"] { border-color: #a16207; background: #422006; color: #fde68a; }
+.pulsar .vaeroex-customer-workspace .workspace-metric-filters :is(input,select) { border-color: #334155; background: #0b1220; color: #e2e8f0; }
+.pulsar .vaeroex-customer-workspace .workspace-metric-filter-submit { background: #16466b; }
+.pulsar .vaeroex-customer-workspace .workspace-metric-context a { color: #7dd3fc; }
+.pulsar .vaeroex-customer-workspace .workspace-metric-list { border-color: #253041; background: #111827; }
+.pulsar .vaeroex-customer-workspace .workspace-metric-table-heading { background: #0e1726; color: #94a3b8; }
+.pulsar .vaeroex-customer-workspace .workspace-metric-row { border-color: #253041; }
+.pulsar .vaeroex-customer-workspace .workspace-metric-row-link { color: #f1f5f9; }
+.pulsar .vaeroex-customer-workspace .workspace-metric-row-link:hover { background: #162033; }
+@media (max-width: 1050px) {
+  .vaeroex-customer-workspace :is(.workspace-metric-table-heading,.workspace-metric-row-link) { gap: 12px; padding-inline: 16px; grid-template-columns: minmax(0,1.5fr) minmax(100px,1fr) minmax(110px,1fr) minmax(100px,1fr) 12px; }
+  .vaeroex-customer-workspace .workspace-metric-filters { grid-template-columns: minmax(0,1fr) minmax(0,1fr); }
+}
+@media (max-width: 767px) {
+  .vaeroex-customer-workspace .workspace-metric-summary-strip { gap: 10px; }
+  .vaeroex-customer-workspace .workspace-metric-summary-strip p > span { display: block; margin-left: 0; margin-top: 3px; }
+  .vaeroex-customer-workspace .workspace-metric-filters { gap: 10px; }
+  .vaeroex-customer-workspace .workspace-metric-filters label:first-of-type { grid-column: 1 / -1; }
+  .vaeroex-customer-workspace .workspace-metric-filter-submit { grid-column: 1 / -1; }
+  .vaeroex-customer-workspace .workspace-metric-table-heading { display: none; }
+  .vaeroex-customer-workspace .workspace-metric-row:first-child { border-top: 0; }
+  .vaeroex-customer-workspace .workspace-metric-row-link { position: relative; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 12px 16px; padding: 16px; }
+  .vaeroex-customer-workspace .workspace-metric-identity { grid-column: 1 / -1; padding-right: 20px; }
+  .vaeroex-customer-workspace .workspace-metric-identity h2 { font-size: 14px; }
+  .vaeroex-customer-workspace .workspace-metric-value strong { font-size: 22px; }
+  .vaeroex-customer-workspace .workspace-metric-mobile-label { position: static; display: block; width: auto; height: auto; margin: 0 0 5px; overflow: visible; clip: auto; white-space: normal; color: #64748b; font-size: 10px; }
+  .pulsar .vaeroex-customer-workspace .workspace-metric-mobile-label { color: #94a3b8; }
+  .vaeroex-customer-workspace .workspace-metric-period { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: baseline; gap: 5px; }
+  .vaeroex-customer-workspace .workspace-metric-period :is(.workspace-metric-mobile-label,p) { margin: 0; font-size: 10px; }
+  .vaeroex-customer-workspace .workspace-metric-period p::before { content: "· "; }
+  .vaeroex-customer-workspace .workspace-metric-period time { font-size: 10px; }
+  .vaeroex-customer-workspace .workspace-metric-open { position: absolute; top: 17px; right: 16px; }
 }
 
 /* Pulsar keeps visualization mode controls legible on the dark workspace. */

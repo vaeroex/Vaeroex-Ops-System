@@ -10,6 +10,7 @@ import {
   CredentialEnvelopeSchema,
   type CredentialEnvelope
 } from "@/lib/integrations/credentials/contracts";
+import { ProviderOAuthPolicySchema } from "@/lib/integrations/credentials/oauth-policy";
 import type {
   CredentialKms,
   CredentialKmsDecryptRequest,
@@ -24,6 +25,33 @@ export type SyntheticProviderFailureCode =
   | "provider_revoked"
   | "provider_transient"
   | "scope_loss";
+
+export const SYNTHETIC_OAUTH_POLICY = ProviderOAuthPolicySchema.parse({
+  contractVersion: "provider_oauth_policy_v1",
+  policyVersion: "synthetic_oauth_policy_v1",
+  providerKey: "synthetic",
+  providerEnvironment: "test",
+  authorizationMode: "oauth2_confidential_authorization_code",
+  authorizationEndpoint: "https://oauth.synthetic.example/authorize",
+  tokenEndpoint: "https://oauth.synthetic.example/token",
+  revocationEndpoint: "https://oauth.synthetic.example/revoke",
+  callbackUri: "https://oauth.synthetic.example/oauth/callback",
+  callbackPath: "/oauth/callback",
+  defaultAuthorizationReturnPath: "/app/integrations",
+  defaultReauthorizationReturnPath: "/app/integrations",
+  permittedReturnPaths: ["/app/integrations"],
+  requestedScopes: ["read_synthetic_business_data"],
+  tokenLifetime: {
+    accessTokenMaximumSeconds: 86_400,
+    requiredAccessTokenLifetimeSeconds: null,
+    providerShortLivedAccessTokenRequired: false
+  },
+  externalEntityAuthority: {
+    requiredForAuthorization: false,
+    authorizedEntityTypes: ["synthetic_entity"],
+    reauthorizationEntityTypes: ["synthetic_entity"]
+  }
+});
 
 export class SyntheticProviderFailure extends ProviderCredentialRefreshFailure {
   constructor(code: SyntheticProviderFailureCode) {

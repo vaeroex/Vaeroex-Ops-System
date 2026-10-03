@@ -9,6 +9,18 @@ steps:
       - --build-arg
       - QBO_SOURCE_COMMIT=${_SOURCE_COMMIT}
       - .
+  - name: gcr.io/cloud-builders/docker@sha256:f8b08c609fdc392ee6827ff3e1725e4980f7d96bde9f76f4695086405c96c147
+    args:
+      - run
+      - --rm
+      - --network=none
+      - --read-only
+      - --cap-drop=ALL
+      - --security-opt=no-new-privileges
+      - --volume=/workspace/services/external-integrations-qbo/image-smoke.mjs:/image-smoke.mjs:ro
+      - ${_IMAGE}
+      - /image-smoke.mjs
+      - ${_SOURCE_COMMIT}
 images:
   - ${_IMAGE}
 options:

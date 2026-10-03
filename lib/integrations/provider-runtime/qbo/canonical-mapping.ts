@@ -1,6 +1,7 @@
 import {
   canonicalFactFingerprint,
-  contractSha256
+  contractSha256,
+  externalSourceFingerprint
 } from "@/lib/integrations/contracts/canonical";
 import {
   CanonicalBusinessFactVersionSchema,
@@ -10,8 +11,10 @@ import {
 } from "@/lib/integrations/contracts/source-facts";
 import {
   PersistedFactDecimalSchema,
-  Sha256FingerprintSchema
+  Sha256FingerprintSchema,
+  UuidSchema
 } from "@/lib/integrations/contracts/primitives";
+import { externalSourceIdentityFingerprint } from "@/lib/integrations/persistence/identity";
 import { EXTERNAL_INTEGRATION_CONTRACT_VERSIONS } from "@/lib/integrations/contracts/versions";
 import { negateCanonicalDecimal } from "@/lib/integrations/deterministic/decimal";
 import {
@@ -47,6 +50,9 @@ const QboRevenueMappingAuthoritySchema = z
     contractVersion: z.literal(QBO_REVENUE_MAPPING_AUTHORITY_VERSION),
     providerKey: z.literal(QBO_PROVIDER_KEY),
     providerEnvironment: QboProviderEnvironmentSchema,
+    workspaceId: UuidSchema,
+    businessEntityId: UuidSchema,
+    connectionId: UuidSchema,
     realmId: z.string().min(1).max(64).regex(/^[A-Za-z0-9._:-]+$/),
     incomeAccountRefs: z.array(z.string().min(1).max(128)).max(10_000),
     revenueItemRefs: z.array(z.string().min(1).max(128)).max(100_000),
@@ -66,16 +72,19 @@ const QboRevenueMappingAuthoritySchema = z
     }
   });
 
-type FactIdentity = Readonly<{
+export type QboFactIdentity = Readonly<{
   id: string;
   immutableVersion: number;
   priorVersionId: string | null;
 }>;
 
-type Candidate = Readonly<{
+export type QboRevenueCandidate = Readonly<{
   fact: CanonicalBusinessFactVersion;
   representation: ReconciliationRepresentation;
 }>;
+
+type FactIdentity = QboFactIdentity;
+type Candidate = QboRevenueCandidate;
 
 const eligibleRevenueTypes = new Set([
   "Invoice",
@@ -116,6 +125,11 @@ export function deriveQboRevenueMappingAuthority(input: {
     }
     return [{ source, record }];
   });
+  const first = records[0]?.source;
+  if (!first || first.connectionId === null || records.some(({ source }) => source.workspaceId !== first.workspaceId
+    || source.businessEntityId !== first.businessEntityId || source.connectionId !== first.connectionId)) {
+    throw new Error("qbo_revenue_authority_scope_denied");
+  }
   const incomeAccountRefs = records
     .filter(
       ({ record }) =>
@@ -143,6 +157,9 @@ export function deriveQboRevenueMappingAuthority(input: {
     contractVersion: QBO_REVENUE_MAPPING_AUTHORITY_VERSION,
     providerKey: QBO_PROVIDER_KEY,
     providerEnvironment,
+    workspaceId: first.workspaceId,
+    businessEntityId: first.businessEntityId,
+    connectionId: first.connectionId,
     realmId: input.expectedRealmId,
     incomeAccountRefs,
     revenueItemRefs,
@@ -157,13 +174,17 @@ export function deriveQboRevenueMappingAuthority(input: {
 function checkedRevenueAuthority(
   input: unknown,
   realmId: string,
-  providerEnvironment: QboProviderEnvironment
+  providerEnvironment: QboProviderEnvironment,
+  source: ExternalSourceRecordVersion
 ) {
   const authority = QboRevenueMappingAuthoritySchema.parse(input);
   const { authorityFingerprint, ...draft } = authority;
   if (
     authority.realmId !== realmId ||
     authority.providerEnvironment !== providerEnvironment ||
+    authority.workspaceId !== source.workspaceId ||
+    authority.businessEntityId !== source.businessEntityId ||
+    authority.connectionId !== source.connectionId ||
     authorityFingerprint !== contractSha256(authorityFingerprintInput(draft))
   ) {
     throw new Error("qbo_revenue_mapping_authority_denied");
@@ -176,7 +197,8 @@ function sourceProjection(version: ExternalSourceRecordVersion) {
     version.source.kind !== "provider" ||
     version.source.providerKey !== QBO_PROVIDER_KEY ||
     version.validation.state !== "valid" ||
-    version.sourceFingerprint === undefined
+    version.sourceFingerprint === undefined ||
+    version.sourceFingerprint !== externalSourceFingerprint(version)
   ) {
     throw new Error("qbo_canonical_mapping_source_denied");
   }
@@ -192,10 +214,11 @@ function stableFactKey(input: {
   recordId: string;
   lineIdentity: string;
   measure: string;
+  providerEnvironment?: "production";
 }) {
   const fingerprint = contractSha256({
     fingerprintPurpose: "qbo_canonical_fact_identity",
-    fingerprintVersion: "qbo_canonical_fact_identity_v1",
+    fingerprintVersion: input.providerEnvironment ? "qbo_canonical_fact_identity_v2" : "qbo_canonical_fact_identity_v1",
     ...input
   }).slice("sha256:".length);
   return `qbo_${input.measure}/${input.recordType.toLowerCase()}/${fingerprint}`;
@@ -280,6 +303,74 @@ function lineAmount(record: QboMinimizedSourceRecord, amount: string) {
     : value;
 }
 
+/** Pure candidate construction. Eligibility and durable authority belong to the caller. */
+export function buildQboRevenueCandidate(input: {
+  source: ExternalSourceRecordVersion;
+  record: QboMinimizedSourceRecord;
+  line: QboMinimizedSourceRecord["lines"][number];
+  amount: string;
+  sourceIdentityFingerprint: string;
+  reportingCurrency: string;
+  mappedAt: string;
+  mappingVersion: string;
+  reasonCodes: string[];
+  ordinal: number;
+  identityForFact: (factKey: string, ordinal: number) => FactIdentity;
+  representationIdForFact: (factKey: string, ordinal: number) => string;
+  priorFactByKey?: Readonly<Record<string, CanonicalBusinessFactVersion>>;
+  accountingSources?: readonly ExternalSourceRecordVersion[];
+}): Candidate {
+  const { source, record, line } = input;
+  const postingDate = record.temporal.postingDate;
+  const sourceCurrency = record.accounting.sourceCurrency;
+  if (line.lineId === null || postingDate === null || sourceCurrency === null) {
+    throw new Error("qbo_revenue_candidate_context_missing");
+  }
+  const factKey = stableFactKey({
+    realmId: record.provider.realmId, recordType: record.recordType, recordId: record.id,
+    lineIdentity: line.lineId, measure: "recognized_revenue",
+    ...(record.provider.sourceEnvironment === "production" ? { providerEnvironment: "production" as const } : {})
+  });
+  const identity = input.identityForFact(factKey, input.ordinal);
+  const prior = input.priorFactByKey?.[factKey];
+  if (prior && (prior.workspaceId !== source.workspaceId || prior.businessEntityId !== source.businessEntityId ||
+    prior.factKey !== factKey || prior.factKind !== "recognized_revenue" ||
+    prior.factFingerprint !== canonicalFactFingerprint(prior) || identity.priorVersionId !== prior.id ||
+    identity.immutableVersion !== prior.immutableVersion + 1 || identity.id === prior.id)) {
+    throw new Error("qbo_revenue_prior_fact_binding_denied");
+  }
+  const dimensions = [
+    line.itemRef ? { key: "item_ref", value: line.itemRef.value } : null,
+    line.accountRef ? { key: "account_ref", value: line.accountRef.value } : null,
+    line.entityRef ? { key: "entity_ref", value: line.entityRef.value } : null
+  ].filter((value): value is { key: string; value: string } => value !== null);
+  const fact = factWithFingerprint({
+    contractVersion: EXTERNAL_INTEGRATION_CONTRACT_VERSIONS.canonicalFact,
+    id: identity.id, workspaceId: source.workspaceId, businessEntityId: source.businessEntityId,
+    immutableVersion: identity.immutableVersion, factKind: "recognized_revenue", factKey, dimensions,
+    temporal: { effectiveAt: `${postingDate}T00:00:00.000Z`, postingDate, periodStart: null, periodEnd: null,
+      fiscalYear: null, fiscalPeriod: null, sourceTimeZone: null, closedPeriod: false },
+    accounting: { basis: "accrual", sourceCurrency, reportingCurrency: input.reportingCurrency,
+      exchangeRate: null, exchangeRateSource: null },
+    value: { kind: "money", amount: input.amount, currency: sourceCurrency },
+    reconciliationState: "accepted", validationState: "valid",
+    sources: [sourceReference(source), ...(input.accountingSources ?? []).map((evidence) => ({
+      ...sourceReference(evidence), sourceRole: "corroborating" as const, contributionWeight: "0"
+    }))],
+    decision: { authority: "deterministic_policy", policyVersion: input.mappingVersion, actorId: null,
+      decidedAt: input.mappedAt, reasonCodes: input.reasonCodes },
+    normalizationVersion: input.mappingVersion, transformationVersion: input.mappingVersion,
+    sourceObservedAt: source.temporal.observedAt, createdAt: input.mappedAt
+  });
+  return { fact, representation: representation({
+    fact, source, sourceIdentityFingerprint: input.sourceIdentityFingerprint,
+    representationId: input.representationIdForFact(factKey, input.ordinal), familyKind: "additive_transaction",
+    familyKey: QBO_RECOGNIZED_REVENUE_FAMILY_KEY, transactionIdentity: factKey, value: input.amount,
+    lineage: prior ? { kind: "correction", priorSourceRecordVersionId: null, priorCanonicalFactVersionId: prior.id }
+      : { kind: "none" }
+  }) };
+}
+
 export function mapValidatedQboRevenueSource(input: {
   sourceVersion: unknown;
   sourceIdentityFingerprint: string;
@@ -293,10 +384,17 @@ export function mapValidatedQboRevenueSource(input: {
 }) {
   const source = ExternalSourceRecordVersionSchema.parse(input.sourceVersion);
   const projection = sourceProjection(source);
+  if (input.sourceIdentityFingerprint !== externalSourceIdentityFingerprint(source)) {
+    throw new Error("qbo_canonical_mapping_source_identity_denied");
+  }
   if (projection.contractVersion !== QBO_SOURCE_RECORD_CONTRACT_VERSION) {
     return { disposition: "not_applicable" as const, candidates: [] as Candidate[], reasonCodes: ["qbo_not_transaction_source"] };
   }
   const record = QboMinimizedSourceRecordSchema.parse(projection);
+  if (record.provider.sourceEnvironment !== "sandbox") {
+    return { disposition: "quarantined" as const, candidates: [] as Candidate[],
+      reasonCodes: ["qbo_production_accounting_normalizer_required"] };
+  }
   if (!eligibleRevenueTypes.has(record.recordType)) {
     return { disposition: "not_applicable" as const, candidates: [] as Candidate[], reasonCodes: ["qbo_no_v1_revenue_mapping"] };
   }
@@ -317,12 +415,15 @@ export function mapValidatedQboRevenueSource(input: {
   const authority = checkedRevenueAuthority(
     input.revenueAuthority,
     record.provider.realmId,
-    providerEnvironment
+    providerEnvironment,
+    source
   );
-  const postingDate = record.temporal.postingDate;
-  const sourceCurrency = record.accounting.sourceCurrency;
   const incomeAccountRefs = new Set(authority.incomeAccountRefs);
   const revenueItemRefs = new Set(authority.revenueItemRefs);
+  const lineIds = record.lines.flatMap((line) => line.lineId === null ? [] : [line.lineId]);
+  if (new Set(lineIds).size !== lineIds.length) {
+    return { disposition: "quarantined" as const, candidates: [] as Candidate[], reasonCodes: ["qbo_revenue_line_identity_ambiguous"] };
+  }
   const eligibleLines = record.lines
     .map((line) => ({ line }))
     .filter(
@@ -330,9 +431,11 @@ export function mapValidatedQboRevenueSource(input: {
         line.detailType === "SalesItemLineDetail" &&
         line.amount !== null &&
         line.lineId !== null &&
+        line.itemRef !== null &&
         (
-          incomeAccountRefs.has(line.accountRef?.value ?? "") ||
-          revenueItemRefs.has(line.itemRef?.value ?? "")
+          line.accountRef !== null
+            ? incomeAccountRefs.has(line.accountRef.value)
+            : revenueItemRefs.has(line.itemRef.value)
         )
     );
   const eligibleLineIds = new Set(eligibleLines.map(({ line }) => line.lineId));
@@ -341,6 +444,7 @@ export function mapValidatedQboRevenueSource(input: {
       line.amount !== null &&
       line.amount.amount !== "0" &&
       line.detailType !== "SubTotalLineDetail" &&
+      !(line.detailType === "SalesItemLineDetail" && line.itemRef === null) &&
       !eligibleLineIds.has(line.lineId)
   );
   if (unsupportedEconomicLine) {
@@ -355,82 +459,9 @@ export function mapValidatedQboRevenueSource(input: {
   }
   const candidates = eligibleLines.map(({ line }, ordinal): Candidate => {
     if (!line.amount) throw new Error("qbo_revenue_line_amount_missing");
-    const lineIdentity = line.lineId;
-    if (lineIdentity === null) throw new Error("qbo_revenue_line_identity_missing");
-    const factKey = stableFactKey({
-      realmId: record.provider.realmId,
-      recordType: record.recordType,
-      recordId: record.id,
-      lineIdentity,
-      measure: "recognized_revenue"
-    });
-    const identity = input.identityForFact(factKey, ordinal);
-    const prior = input.priorFactByKey?.[factKey];
-    const amount = lineAmount(record, line.amount.amount);
-    const dimensions = [
-      line.itemRef ? { key: "item_ref", value: line.itemRef.value } : null,
-      line.accountRef ? { key: "account_ref", value: line.accountRef.value } : null,
-      line.entityRef ? { key: "entity_ref", value: line.entityRef.value } : null
-    ].filter((value): value is { key: string; value: string } => value !== null);
-    const fact = factWithFingerprint({
-      contractVersion: EXTERNAL_INTEGRATION_CONTRACT_VERSIONS.canonicalFact,
-      id: identity.id,
-      workspaceId: source.workspaceId,
-      businessEntityId: source.businessEntityId,
-      immutableVersion: identity.immutableVersion,
-      factKind: "recognized_revenue",
-      factKey,
-      dimensions,
-      temporal: {
-        effectiveAt: `${postingDate}T00:00:00.000Z`,
-        postingDate,
-        periodStart: null,
-        periodEnd: null,
-        fiscalYear: null,
-        fiscalPeriod: null,
-        sourceTimeZone: null,
-        closedPeriod: false
-      },
-      accounting: {
-        basis: "accrual",
-        sourceCurrency,
-        reportingCurrency: input.reportingCurrency,
-        exchangeRate: null,
-        exchangeRateSource: null
-      },
-      value: { kind: "money", amount, currency: sourceCurrency },
-      reconciliationState: "accepted",
-      validationState: "valid",
-      sources: [sourceReference(source)],
-      decision: {
-        authority: "deterministic_policy",
-        policyVersion: QBO_CANONICAL_MAPPING_VERSION,
-        actorId: null,
-        decidedAt: input.mappedAt,
-        reasonCodes: ["qbo_exact_sales_line_mapping"]
-      },
-      normalizationVersion: QBO_CANONICAL_MAPPING_VERSION,
-      transformationVersion: QBO_CANONICAL_MAPPING_VERSION,
-      sourceObservedAt: source.temporal.observedAt,
-      createdAt: input.mappedAt,
-      factFingerprint: undefined
-    });
-    return {
-      fact,
-      representation: representation({
-        fact,
-        source,
-        sourceIdentityFingerprint: input.sourceIdentityFingerprint,
-        representationId: input.representationIdForFact(factKey, ordinal),
-        familyKind: "additive_transaction",
-        familyKey: QBO_RECOGNIZED_REVENUE_FAMILY_KEY,
-        transactionIdentity: factKey,
-        value: amount,
-        lineage: prior
-          ? { kind: "correction", priorSourceRecordVersionId: null, priorCanonicalFactVersionId: prior.id }
-          : { kind: "none" }
-      })
-    };
+    return buildQboRevenueCandidate({ ...input, source, record, line, ordinal,
+      amount: lineAmount(record, line.amount.amount), mappingVersion: QBO_CANONICAL_MAPPING_VERSION,
+      reasonCodes: ["qbo_exact_sales_line_mapping"] });
   });
   return { disposition: "mapped" as const, candidates, reasonCodes: ["qbo_exact_sales_line_mapping"] };
 }
@@ -476,10 +507,17 @@ export function mapValidatedQboProfitAndLossControl(input: {
 }) {
   const source = ExternalSourceRecordVersionSchema.parse(input.sourceVersion);
   const projection = sourceProjection(source);
+  if (input.sourceIdentityFingerprint !== externalSourceIdentityFingerprint(source)) {
+    throw new Error("qbo_canonical_mapping_source_identity_denied");
+  }
   if (projection.contractVersion !== QBO_REPORT_CONTRACT_VERSION) {
     return { disposition: "not_applicable" as const, candidate: null };
   }
   const report = QboReportControlObservationSchema.parse(projection);
+  if (report.provider.sourceEnvironment !== "sandbox") {
+    return { disposition: "quarantined" as const, candidate: null,
+      reasonCodes: ["qbo_production_report_control_requires_explicit_semantics"] };
+  }
   const value = extractQboProfitAndLossIncomeControl(report);
   if (
     value === null ||

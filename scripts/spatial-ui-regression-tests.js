@@ -71,7 +71,8 @@ for (const retiredPath of retiredWorkspacePaths) {
   assert.equal(exists(retiredPath), false, retiredPath + " must not remain in the authenticated workspace runtime");
 }
 
-assert.match(shell, /<ComplianceNotice compact \/>[\s\S]*\{children\}[\s\S]*<footer/, "the authenticated shell must render routed DOM content directly");
+assert.match(shell, /<main\b[^>]*>[\s\S]*\{children\}[\s\S]*<footer/, "the authenticated shell must render routed DOM content directly");
+assert.doesNotMatch(shell, /ComplianceNotice|Sensitive information reminder/, "the generic sensitive-data reminder belongs only in file upload, not every workspace screen");
 assert.doesNotMatch(shell, /ExperienceControls|WorkspaceExperienceProvider|SpatialWorkspaceShell|vaeroex-spatial-shell|vaeroex-spatial-scene/, "the authenticated shell must not mount an experience selector or spatial runtime");
 assert.match(navigation, /<Link[\s\S]*href=\{item\.href as Route\}/, "authenticated navigation must use normal Next links");
 assert.doesNotMatch(navigation, /preventDefault|setTimeout|useRouter|SPATIAL_NAVIGATION_INTENT_EVENT|data-spatial-destination|spatialTravelPlan/, "authenticated navigation must not delay routing for a camera handoff");
@@ -93,8 +94,8 @@ assert.match(kpiPage, /const chartColor = kpiColor\(metricName, settings\)/, "pe
 assert.doesNotMatch(kpiPage, /KpiVisualizationSwitcher|KpiSpatialCanvas|spatial-kpi|2D\s*\/\s*3D/, "KPI Performance must not regain a 3D mode");
 
 assert.equal(packageJson.dependencies.three, "0.185.1", "Three.js must remain available to the public cinematic website");
-assert.equal(packageJson.dependencies["@react-three/fiber"], "9.6.1", "R3F must remain available to the public cinematic website");
-assert.equal(packageJson.dependencies["@react-three/drei"], "10.7.7", "Drei must remain available to the public cinematic website");
+assert.equal(packageJson.dependencies["@react-three/fiber"], "9.7.0", "R3F must remain available to the public cinematic website");
+assert.equal(packageJson.dependencies["@react-three/drei"], "10.7.8", "Drei must remain available to the public cinematic website");
 assert.match(publicSpatialSource, /@react-three\/fiber/, "public marketing experiences must retain R3F rendering");
 assert.match(publicSpatialSource, /<Canvas\b/, "public marketing experiences must retain their WebGL canvases");
 assert.match(publicSpatialSource, /useSpatialCapability/, "public marketing experiences must retain capability-tier fallbacks");

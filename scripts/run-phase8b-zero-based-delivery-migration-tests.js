@@ -14,7 +14,8 @@ const credentialBindingCanaryVersion = "20260826090000";
 const credentialLineageVersion = "20260826120000";
 const precontractRetirementVersion = "20260826190801";
 const providerResultEvidenceVersion = "20260826222000";
-const targetVersion = "20260827033058";
+const productionConvergenceVersion = "20260827033058";
+const targetVersion = "20260902191322";
 const fixturePath = path.join(
   root,
   "supabase/tests/fixtures/external_integrations_phase_8b_zero_based_legacy.sql"
@@ -28,7 +29,8 @@ const testPaths = [
   "supabase/tests/external_integrations_phase_8b_credential_lineage_recovery.test.sql",
   "supabase/tests/external_integrations_phase_8b_precontract_retirement.test.sql",
   "supabase/tests/external_integrations_phase_8b_provider_result_evidence.test.sql",
-  "supabase/tests/external_integrations_qbo_production_convergence.test.sql"
+  "supabase/tests/external_integrations_qbo_production_convergence.test.sql",
+  "supabase/tests/square_production_runtime_foundation.test.sql"
 ];
 
 function fail(message, status = 1) {
@@ -62,6 +64,28 @@ function parseEnvValue(output, name) {
   return value.startsWith('"') && value.endsWith('"')
     ? value.slice(1, -1)
     : value;
+}
+
+function localMigrationAdministratorUrl(databaseUrl) {
+  const parsed = new URL(databaseUrl);
+  if (!["postgres:", "postgresql:"].includes(parsed.protocol)) {
+    throw new Error("Migration-administrator qualification requires a PostgreSQL URL.");
+  }
+  if (!["127.0.0.1", "localhost"].includes(parsed.hostname)) {
+    throw new Error("Migration-administrator qualification is restricted to local Supabase only.");
+  }
+  // node-postgres connection query parameters override URI authority fields.
+  // Reject every parameter and fragment rather than trying to enumerate current
+  // and future routing/auth aliases before preserving the disposable password.
+  if (parsed.search || parsed.hash) {
+    throw new Error("Migration-administrator qualification requires a canonical local URL.");
+  }
+  // PostgreSQL 16+ assigns the automatic ADMIN-only creator edge to the role
+  // that applied the migration. Local Supabase applies migrations as its fixed
+  // supabase_admin role; retain the disposable local password and change only
+  // the identity so the drift witness is created and recovered by its owner.
+  parsed.username = "supabase_admin";
+  return parsed.toString();
 }
 
 function assertTargetIsSinglePendingMigration() {
@@ -208,17 +232,66 @@ function assertTargetIsSinglePendingMigration() {
       `Migration ${providerResultEvidenceVersion} no longer immediately follows ${precontractRetirementVersion}.`
     );
   }
+  const productionConvergenceIndex = migrations.findIndex((name) =>
+    name.startsWith(`${productionConvergenceVersion}_`)
+  );
+  if (productionConvergenceIndex < 0) {
+    fail(
+      `Production convergence migration ${productionConvergenceVersion} is missing.`
+    );
+  }
   if (
-    migrations[targetIndex - 1]?.slice(0, 14) !==
+    migrations[productionConvergenceIndex - 1]?.slice(0, 14) !==
       providerResultEvidenceVersion
   ) {
     fail(
-      `Migration ${targetVersion} no longer immediately follows ${providerResultEvidenceVersion}.`
+      `Migration ${productionConvergenceVersion} no longer immediately follows ${providerResultEvidenceVersion}.`
     );
   }
-  if (targetIndex !== migrations.length - 1) {
+  if (
+    migrations[targetIndex - 1]?.slice(0, 14) !==
+      productionConvergenceVersion
+  ) {
     fail(
-      `Fixture-rich harness requires ${targetVersion} to remain the latest migration.`
+      `Migration ${targetVersion} no longer immediately follows ${productionConvergenceVersion}.`
+    );
+  }
+  // Keep the entire historical QBO upgrade chain pinned. The independently
+  // qualified dormant Square additions run AFTER it and must leave QBO closed
+  // and unchanged; they do not replace the fixture's QBO target or assertions.
+  const dormantSquareTail = [
+    "20260902191323_integration_production_runtime_foundation.sql",
+    "20260902191324_square_production_runtime_overlay.sql",
+    "20260902191325_square_production_internal_pilot_runtime.sql",
+    "20260907042202_square_dormant_trusted_authority.sql",
+    "20260907042352_square_dormant_atomic_pages.sql",
+    "20260907174326_square_dormant_account_connection.sql",
+    "20260907225626_square_remote_sandbox_binding.sql",
+    "20260908014713_square_broker_runtime_credential_authority.sql",
+    "20260908042529_square_gcp_callback_authority.sql",
+  "20260910193429_square_gcp_callback_oregon_recovery.sql",
+  "20260910231437_square_gcp_mapped_runtime.sql",
+  "20260911000915_square_gcp_mapped_legacy_fencing.sql",
+  "20260911151334_square_verified_provider_observations.sql",
+  "20260911205108_square_canonical_interpretation.sql", "20260911222230_square_workspace_evidence.sql",
+  "20260912034447_square_workspace_card_contract.sql",
+  "20260912150000_square_operational_intelligence.sql",
+  "20260912190000_square_production_runtime_foundation.sql",
+  "20260915040500_integration_production_legacy_foundation_guard.sql"
+  ];
+  const separatelyQualifiedSheetsTail = [
+    "20261002040024_google_sheets_complete.sql",
+    "20261002040031_google_sheets_lifecycle.sql"
+  ];
+  const separatelyQualifiedPreferencesTail = [
+    "20261002182049_integration_summary_preferences.sql"
+  ];
+  const reviewedTail = [...dormantSquareTail, ...separatelyQualifiedSheetsTail, ...separatelyQualifiedPreferencesTail];
+  const laterMigrations = migrations.slice(targetIndex + 1);
+  if (laterMigrations.length !== reviewedTail.length ||
+      laterMigrations.some((migration, index) => migration !== reviewedTail[index])) {
+    fail(
+      `Fixture-rich harness requires the reviewed dormant Square, Google Sheets and personal summary preferences tail after ${targetVersion}.`
     );
   }
 }
@@ -240,22 +313,66 @@ async function applyFixture(databaseUrl) {
   }
 }
 
+async function qualifyProductionRoleDrift(databaseUrl) {
+  const { Client } = require("pg");
+  const client = new Client({ connectionString: databaseUrl });
+  await client.connect();
+  try {
+    await client.query(`do $role$
+      begin
+        if exists(select 1 from pg_roles where rolname='square_production_evidence_authority') then
+          alter role square_production_evidence_authority login noinherit nosuperuser nocreatedb nocreaterole noreplication nobypassrls;
+        else
+          create role square_production_evidence_authority login noinherit nosuperuser nocreatedb nocreaterole noreplication nobypassrls;
+        end if;
+      end $role$`);
+    await client.query(`do $memberships$
+      declare edge record;
+      begin
+        for edge in select parent.rolname as parent_name,child.rolname as child_name
+          from pg_auth_members m join pg_roles parent on parent.oid=m.roleid join pg_roles child on child.oid=m.member
+          where parent.rolname='square_production_evidence_authority' or child.rolname='square_production_evidence_authority'
+        loop execute format('revoke %I from %I',edge.parent_name,edge.child_name); end loop;
+      end $memberships$`);
+  } finally {
+    await client.end();
+  }
+
+  const rejected = spawnSync(cli, ["migration", "up", "--local"], {
+    cwd: root,
+    env: process.env,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"]
+  });
+  const diagnostic = `${rejected.stdout || ""}\n${rejected.stderr || ""}`;
+  if (rejected.status === 0 || !diagnostic.includes("square_production_authority_role_drift")) {
+    fail("Unsafe pre-existing Production authority role was not rejected atomically.");
+  }
+
+  const recovery = new Client({ connectionString: databaseUrl });
+  await recovery.connect();
+  try {
+    const state = (await recovery.query(
+      "select r.rolcanlogin, to_regrole('square_production_oauth_authority') is null as rolled_back from pg_roles r where r.rolname='square_production_evidence_authority'"
+    )).rows[0];
+    if (!state?.rolcanlogin || !state?.rolled_back) {
+      fail("Production foundation drift rejection did not preserve atomic rollback.");
+    }
+    await recovery.query("alter role square_production_evidence_authority nologin noinherit nosuperuser nocreatedb nocreaterole noreplication nobypassrls");
+  } finally {
+    await recovery.end();
+  }
+}
+
 async function main() {
   assertTargetIsSinglePendingMigration();
 
   const status = run(cli, ["status", "-o", "env"], { capture: true });
   const databaseUrl = parseEnvValue(status.stdout, "DB_URL");
   if (!databaseUrl) fail("The isolated local database URL is unavailable.");
-
-  let parsed;
-  try {
-    parsed = new URL(databaseUrl);
-  } catch {
-    fail("The isolated local database URL is invalid.");
-  }
-  if (!["127.0.0.1", "localhost"].includes(parsed.hostname)) {
-    fail("Fixture-rich migration reset is restricted to local Supabase only.");
-  }
+  // Validate every effective routing/authentication field before the reset or
+  // any node-postgres connection, then retain the checked migration identity.
+  const localMigrationAdministratorDatabaseUrl = localMigrationAdministratorUrl(databaseUrl);
 
   run(cli, [
     "db",
@@ -265,7 +382,9 @@ async function main() {
     "--version",
     fixtureBaseVersion
   ]);
+  await require("./prepare-production-shaped-local-database.js").normalizeLocalFixture();
   await applyFixture(databaseUrl);
+  await qualifyProductionRoleDrift(localMigrationAdministratorDatabaseUrl);
   run(cli, ["migration", "up", "--local"]);
   run(process.execPath, [
     "scripts/run-isolated-database-tests.js",
@@ -273,6 +392,10 @@ async function main() {
   ]);
 }
 
-main().catch((error) => {
-  fail(error instanceof Error ? error.message : "Fixture-rich migration test failed.");
-});
+if (require.main === module) {
+  main().catch((error) => {
+    fail(error instanceof Error ? error.message : "Fixture-rich migration test failed.");
+  });
+}
+
+module.exports = { localMigrationAdministratorUrl };

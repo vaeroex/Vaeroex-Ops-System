@@ -4,13 +4,16 @@ This note records the verified migration-history state for Supabase project
 `mdiianhfrojmxqpwrflh`. It does not authorize or execute migration-history repair
 or migration SQL.
 
-The current Production ledger was reverified on 2026-08-27 with 75 unique rows
-and fingerprint
+The Production ledger was reconciled on 2026-08-27 at 75 unique rows with
+fingerprint
 `ef87be4520d35e5ab7a443c5fe2c359f3aaa3be1910de89610d2a7de24bcc08a`.
-All 60 canonical/history-only reconciliation versions are present, all 42 paired
-remote aliases are absent, and the four recovered historical Production versions
-below remain present exactly once. No further history repair is required for
-those sets.
+The ledger was reverified on 2026-09-02 at 100 unique rows after the approved
+application of the 25 QBO migrations through
+`20260827033058_qbo_production_convergence.sql`. All 60 canonical/history-only
+reconciliation versions and all 25 reviewed QBO versions are present, all 42
+paired remote aliases are absent, and the four recovered historical Production
+versions below remain present exactly once. No further history repair is
+required for those sets.
 
 ## Canonical historical Production migrations
 
@@ -51,12 +54,44 @@ not be marked reverted or replayed.
   an empty search path and authenticated execution. There are zero generation
   conflicts across the one qualifying Intelligence Briefing row.
 
+## Verified applied QBO migrations
+
+The 25 reviewed QBO migrations were applied through the normal migration path
+and were present exactly once in the 2026-09-02 read-only ledger verification:
+
+1. `20260820233007_external_integrations_phase_1_canonical_foundation.sql`
+2. `20260821064333_external_integrations_phase_2_reconciliation.sql`
+3. `20260821172015_external_integrations_phase_3_deterministic_dependencies.sql`
+4. `20260821201220_external_integrations_phase_4_control_plane.sql`
+5. `20260821220853_external_integrations_phase_5_credential_security.sql`
+6. `20260822012253_external_integrations_phase_6_durable_runtime.sql`
+7. `20260822035335_external_integrations_phase_8a0_provider_contract_convergence.sql`
+8. `20260823042718_external_integrations_phase_8b_qbo_sandbox_validation.sql`
+9. `20260823111004_scope_qbo_sandbox_dispatch_candidates.sql`
+10. `20260823113832_qbo_sandbox_scoped_dispatch_recovery.sql`
+11. `20260823115807_reserve_qbo_sandbox_scoped_dispatch.sql`
+12. `20260823121454_qbo_sandbox_dispatch_run_lock.sql`
+13. `20260823205806_qbo_sandbox_credential_refresh_recovery.sql`
+14. `20260824071101_qbo_sandbox_same_generation_reauthorization.sql`
+15. `20260824083917_qbo_sandbox_expired_refresh_lease_reclamation.sql`
+16. `20260824193332_qbo_cloud_tasks_zero_based_delivery.sql`
+17. `20260824233000_qbo_retry_execution_and_reauthorization_recovery.sql`
+18. `20260825180000_qbo_reauthorization_required_lifecycle.sql`
+19. `20260825190000_qbo_scoped_dispatch_retry_lifecycle.sql`
+20. `20260826043610_qbo_credential_envelope_binding_convergence.sql`
+21. `20260826090000_qbo_credential_envelope_binding_incident_canary.sql`
+22. `20260826120000_qbo_credential_lineage_incident_recovery.sql`
+23. `20260826190801_qbo_precontract_initialization_retirement.sql`
+24. `20260826222000_qbo_provider_result_evidence_and_ar_aging_recovery.sql`
+25. `20260827033058_qbo_production_convergence.sql`
+
 ## Historical checkpointed history repair
 
-The status sets below describe the reconciliation that is already reflected in
-the verified 75-row Production ledger. They are retained as an audit record, not
-as an instruction to rerun repair. Any future incident-specific repair requires
-separate approval and must use the exact Production target suffix:
+The status sets below describe the reconciliation recorded by the 75-row
+pre-QBO checkpoint and retained in the verified 100-row Production ledger. They
+are retained as an audit record, not as an instruction to rerun repair. Any
+future incident-specific repair requires separate approval and must use the
+exact Production target suffix:
 
 ```text
 --linked --project-ref mdiianhfrojmxqpwrflh --dns-resolver native
@@ -102,10 +137,11 @@ through every checkpoint.
 ## Reconciliation safety boundary
 
 Do not attempt to restore the superseded 50-row pre-reconciliation ledger. The
-verified 75-row ledger and its fingerprint above are the current checkpoint.
-The four verified canonical applied migrations in the preceding section are
-outside both the canonical repair set and the alias set and must remain applied.
-Any unexpected deviation requires a new read-only catalog proof before repair.
+verified 100-row ledger consists of the fingerprinted 75-row reconciliation
+checkpoint plus the 25 subsequently applied QBO migrations. The four verified
+canonical applied migrations in the preceding section are outside both the
+canonical repair set and the alias set and must remain applied. Any unexpected
+deviation requires a new read-only catalog proof before repair.
 
 ## Expected post-reconciliation dry run
 
@@ -116,32 +152,8 @@ so the future dry run must include `--skip-vault`:
 supabase db push --linked --project-ref mdiianhfrojmxqpwrflh --dns-resolver native --skip-vault --dry-run
 ```
 
-It must list exactly the 25 pending QBO migrations:
+It must list exactly one pending migration:
 
-1. `20260820233007_external_integrations_phase_1_canonical_foundation.sql`
-2. `20260821064333_external_integrations_phase_2_reconciliation.sql`
-3. `20260821172015_external_integrations_phase_3_deterministic_dependencies.sql`
-4. `20260821201220_external_integrations_phase_4_control_plane.sql`
-5. `20260821220853_external_integrations_phase_5_credential_security.sql`
-6. `20260822012253_external_integrations_phase_6_durable_runtime.sql`
-7. `20260822035335_external_integrations_phase_8a0_provider_contract_convergence.sql`
-8. `20260823042718_external_integrations_phase_8b_qbo_sandbox_validation.sql`
-9. `20260823111004_scope_qbo_sandbox_dispatch_candidates.sql`
-10. `20260823113832_qbo_sandbox_scoped_dispatch_recovery.sql`
-11. `20260823115807_reserve_qbo_sandbox_scoped_dispatch.sql`
-12. `20260823121454_qbo_sandbox_dispatch_run_lock.sql`
-13. `20260823205806_qbo_sandbox_credential_refresh_recovery.sql`
-14. `20260824071101_qbo_sandbox_same_generation_reauthorization.sql`
-15. `20260824083917_qbo_sandbox_expired_refresh_lease_reclamation.sql`
-16. `20260824193332_qbo_cloud_tasks_zero_based_delivery.sql`
-17. `20260824233000_qbo_retry_execution_and_reauthorization_recovery.sql`
-18. `20260825180000_qbo_reauthorization_required_lifecycle.sql`
-19. `20260825190000_qbo_scoped_dispatch_retry_lifecycle.sql`
-20. `20260826043610_qbo_credential_envelope_binding_convergence.sql`
-21. `20260826090000_qbo_credential_envelope_binding_incident_canary.sql`
-22. `20260826120000_qbo_credential_lineage_incident_recovery.sql`
-23. `20260826190801_qbo_precontract_initialization_retirement.sql`
-24. `20260826222000_qbo_provider_result_evidence_and_ar_aging_recovery.sql`
-25. `20260827033058_qbo_production_convergence.sql`
+1. `20260902191322_qbo_production_dormant_connection_gate.sql`
 
 Anything else is a stop condition.

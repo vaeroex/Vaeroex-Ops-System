@@ -21,6 +21,19 @@ export async function loadActiveWorkspaceKpis({
   workspaceId: string;
 }): Promise<WorkspaceKpiLoadResult> {
   const rows: KpiRow[] = [];
+  const resolveSheetsAuthority = async (): Promise<WorkspaceKpiLoadResult> => {
+    const hasSheets = rows.some(row => row.raw_data_json && typeof row.raw_data_json === "object" && !Array.isArray(row.raw_data_json) && "googleSheets" in row.raw_data_json);
+    if (!hasSheets) return { data: rows, error: null, complete: true };
+    const result = await supabase.rpc("read_google_sheets_operational_conflicts_v1", { p_workspace_id: workspaceId });
+    const authorityError: WorkspaceKpiLoadResult = { data: [], error: new Error("Google Sheets source authority could not be verified."), complete: false };
+    if (result.error || !Array.isArray(result.data) || result.data.length > WORKSPACE_KPI_LOAD_LIMIT) return authorityError;
+    const conflicts = new Set<string>();
+    for (const row of result.data) {
+      if (!row || typeof row !== "object" || Array.isArray(row) || typeof row.kpi_id !== "string") return authorityError;
+      conflicts.add(row.kpi_id);
+    }
+    return { data: rows.filter(row => !conflicts.has(row.id)), error: null, complete: true };
+  };
 
   for (let from = 0; from < WORKSPACE_KPI_LOAD_LIMIT; from += WORKSPACE_KPI_PAGE_SIZE) {
     const { data, error } = await supabase
@@ -37,7 +50,7 @@ export async function loadActiveWorkspaceKpis({
     if (error) return { data: [], error: new Error(error.message), complete: false };
     rows.push(...(data || []));
     if (!data || data.length < WORKSPACE_KPI_PAGE_SIZE) {
-      return { data: rows, error: null, complete: true };
+      return resolveSheetsAuthority();
     }
   }
 
@@ -59,5 +72,5 @@ export async function loadActiveWorkspaceKpis({
     };
   }
 
-  return { data: rows, error: null, complete: true };
+  return resolveSheetsAuthority();
 }

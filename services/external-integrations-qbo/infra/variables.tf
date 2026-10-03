@@ -2,6 +2,12 @@ variable "project_id" {
   type = string
 }
 
+variable "execution_enabled" {
+  type        = bool
+  default     = false
+  description = "Enable dispatch and scheduled work only after runtime, callback, and database authority verification."
+}
+
 variable "region" {
   type = string
   validation {

@@ -79,7 +79,7 @@ const verifiedCanonicalApplied = [
   "20260811233219_restore_manual_activation_review_rpc.sql",
   "20260817185529_intelligence_briefing_storage_contract.sql"
 ];
-const expectedQboPending = [
+const expectedQboApplied = [
   "20260820233007_external_integrations_phase_1_canonical_foundation.sql",
   "20260821064333_external_integrations_phase_2_reconciliation.sql",
   "20260821172015_external_integrations_phase_3_deterministic_dependencies.sql",
@@ -106,6 +106,9 @@ const expectedQboPending = [
   "20260826222000_qbo_provider_result_evidence_and_ar_aging_recovery.sql",
   "20260827033058_qbo_production_convergence.sql"
 ];
+const expectedQboPending = [
+  "20260902191322_qbo_production_dormant_connection_gate.sql"
+];
 
 assert.equal(canonicalApplied.length, 60, "the proposed plan must retain exactly 60 canonical/history-only apply commands");
 assert.equal(new Set(canonicalApplied).size, 60, "canonical/history-only apply versions must be unique");
@@ -125,7 +128,7 @@ for (const version of [...canonicalApplied, ...aliasesReverted]) {
 }
 
 assert.doesNotMatch(reconciliation, /## Qualified pending migrations/, "the stale four-migration pending claim must not return");
-assert.match(reconciliation, /75 unique rows/, "the verified current Production ledger size must be documented");
+assert.match(reconciliation, /100 unique rows/, "the verified current Production ledger size must be documented");
 assert.match(
   reconciliation,
   /ef87be4520d35e5ab7a443c5fe2c359f3aaa3be1910de89610d2a7de24bcc08a/,
@@ -139,8 +142,16 @@ for (const name of verifiedCanonicalApplied) {
   assert.equal(aliasesReverted.includes(version), false, `${version} must not enter the alias revert set`);
 }
 
-assert.equal(expectedQboPending.length, 25, "the expected Production pending set must contain exactly 25 QBO migrations");
-assert.equal(new Set(expectedQboPending).size, 25, "the expected Production pending QBO migrations must be unique");
+assert.equal(expectedQboApplied.length, 25, "the verified Production applied set must contain exactly 25 QBO migrations");
+assert.equal(new Set(expectedQboApplied).size, 25, "the verified Production applied QBO migrations must be unique");
+for (const name of expectedQboApplied) {
+  assert.equal(migrationNames.includes(name), true, `${name} must exist in the canonical migration directory`);
+  assert.match(reconciliation, new RegExp(`\\b${name.replaceAll(".", "\\.")}\\b`), `${name} must remain documented as applied`);
+}
+
+assert.deepEqual(expectedQboPending, [
+  "20260902191322_qbo_production_dormant_connection_gate.sql"
+], "only the dormant customer-connection guard may remain pending");
 for (const name of expectedQboPending) {
   assert.equal(migrationNames.includes(name), true, `${name} must exist in the canonical migration directory`);
   assert.match(reconciliation, new RegExp(`\\b${name.replaceAll(".", "\\.")}\\b`), `${name} must remain in the expected dry run`);

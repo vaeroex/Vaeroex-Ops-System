@@ -1,0 +1,172 @@
+package main
+
+import (
+	"strings"
+
+	callbackedge "vaeroex.local/square-oauth-callback-edge"
+
+	"github.com/proxy-wasm/proxy-wasm-go-sdk/proxywasm"
+	"github.com/proxy-wasm/proxy-wasm-go-sdk/proxywasm/types"
+)
+
+func main() {}
+
+func init() {
+	proxywasm.SetVMContext(&vmContext{})
+}
+
+type vmContext struct{ types.DefaultVMContext }
+type pluginContext struct{ types.DefaultPluginContext }
+type httpContext struct{ types.DefaultHttpContext }
+
+const diagnosticCanaryTarget = callbackedge.CallbackPath + "?state=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA&code=VAEROEX_PUBLIC_NEVER_ISSUED_CANARY"
+
+func (*vmContext) NewPluginContext(uint32) types.PluginContext { return &pluginContext{} }
+func (*pluginContext) NewHttpContext(uint32) types.HttpContext { return &httpContext{} }
+
+func (*httpContext) OnHttpRequestHeaders(headerCount int, _ bool) (action types.Action) {
+	action = types.ActionPause
+	defer func() {
+		if recover() != nil {
+			if isExactDiagnosticTargetHeader() {
+				sendFixedResponse(500, "callback_predicate_internal_failure")
+				return
+			}
+			sendFixedResponse(500, "integration callback unavailable")
+		}
+	}()
+	if headerCount > callbackedge.MaxInputHeaderCount {
+		if isExactDiagnosticTargetHeader() {
+			sendFixedResponse(400, "callback_predicate_header_count")
+			return action
+		}
+		sendFixedResponse(400, "invalid integration request")
+		return action
+	}
+	method, methodError := proxywasm.GetProperty([]string{"request", "method"})
+	path, pathError := proxywasm.GetProperty([]string{"request", "path"})
+	rawQuery, queryError := proxywasm.GetProperty([]string{"request", "query"})
+	if methodError != nil || pathError != nil || queryError != nil {
+		if isExactDiagnosticTargetHeader() {
+			sendFixedResponse(500, "callback_predicate_request_properties_unavailable")
+			return action
+		}
+		sendFixedResponse(500, "integration callback unavailable")
+		return action
+	}
+	defer zeroBytes(method)
+	defer zeroBytes(path)
+	defer zeroBytes(rawQuery)
+
+	headers, headersError := proxywasm.GetHttpRequestHeaders()
+	if headersError != nil {
+		if isExactDiagnosticRequest(string(method), string(path), string(rawQuery)) {
+			sendFixedResponse(400, "callback_predicate_header_map_unavailable")
+			return action
+		}
+		sendFixedResponse(400, "invalid integration request")
+		return action
+	}
+	if !callbackedge.IsBoundedClientHeaderMap(headers) || callbackedge.HasForbiddenClientHeaders(headers) {
+		_, reason := callbackedge.DiagnoseForwardedHeaderCallback(string(method), string(path), string(rawQuery), headers)
+		if isExactDiagnosticRequest(string(method), string(path), string(rawQuery)) {
+			sendFixedResponse(400, "callback_predicate_"+string(reason))
+			return action
+		}
+		sendFixedResponse(400, "invalid integration request")
+		return action
+	}
+
+	if callbackedge.IsHealthRequest(string(method), string(path), string(rawQuery)) ||
+		callbackedge.IsWebhookRequest(string(method), string(path), string(rawQuery)) ||
+		callbackedge.IsInternalConnectRequest(string(method), string(path), string(rawQuery), headers) {
+		if !clearReservedHandoffHeaders() {
+			sendFixedResponse(500, "integration callback unavailable")
+			return action
+		}
+		return types.ActionContinue
+	}
+	// LbEdgeExtension invokes only REQUEST_HEADERS and does not expose request
+	// bodies to the plugin. Its callback flag is therefore not body evidence.
+	// Reject every forwarded HTTP body indicator instead.
+	if isExactDiagnosticRequest(string(method), string(path), string(rawQuery)) {
+		_, rejectionReason := callbackedge.DiagnoseForwardedHeaderCallback(
+			string(method), string(path), string(rawQuery), headers,
+		)
+		status := uint32(200)
+		if rejectionReason != callbackedge.RejectionNone {
+			status = 400
+		}
+		sendFixedResponse(status, "callback_predicate_"+string(rejectionReason))
+		return action
+	}
+	handoff, parseError := callbackedge.ParseForwardedHeaderCallback(
+		string(method), string(path), string(rawQuery), headers,
+	)
+	if parseError != nil {
+		sendFixedResponse(400, "invalid integration callback")
+		return action
+	}
+	if !clearReservedHandoffHeaders() {
+		sendFixedResponse(500, "integration callback unavailable")
+		return action
+	}
+	if proxywasm.ReplaceHttpRequestHeader(":path", callbackedge.CallbackPath) != nil ||
+		proxywasm.AddHttpRequestHeader(callbackedge.HandoffVersionHeader, callbackedge.HandoffVersion) != nil ||
+		proxywasm.AddHttpRequestHeader(callbackedge.HandoffQueryHeader, handoff.EncodedQuery) != nil {
+		sendFixedResponse(500, "integration callback unavailable")
+		return action
+	}
+	return types.ActionContinue
+}
+
+func isExactDiagnosticRequest(method, pathAttribute, queryAttribute string) bool {
+	if method != "GET" {
+		return false
+	}
+	query := strings.TrimPrefix(queryAttribute, "?")
+	return query != "" && (pathAttribute == callbackedge.CallbackPath || pathAttribute == callbackedge.CallbackPath+"?"+query) &&
+		callbackedge.CallbackPath+"?"+query == diagnosticCanaryTarget
+}
+
+func isExactDiagnosticTargetHeader() bool {
+	target, err := proxywasm.GetHttpRequestHeader(":path")
+	if err != nil || target != diagnosticCanaryTarget {
+		return false
+	}
+	method, err := proxywasm.GetHttpRequestHeader(":method")
+	return err == nil && method == "GET"
+}
+
+func clearReservedHandoffHeaders() bool {
+	for _, name := range callbackedge.ReservedHandoffHeaders {
+		err := proxywasm.RemoveHttpRequestHeader(name)
+		if err != nil && err != types.ErrorStatusNotFound {
+			return false
+		}
+		if _, err = proxywasm.GetHttpRequestHeader(name); err != types.ErrorStatusNotFound {
+			return false
+		}
+	}
+	return true
+}
+
+func zeroBytes(value []byte) {
+	for index := range value {
+		value[index] = 0
+	}
+}
+
+func sendFixedResponse(status uint32, body string) {
+	if err := proxywasm.SendHttpResponse(status, [][2]string{
+		{"content-type", "text/plain; charset=utf-8"},
+		{"cache-control", "no-store"},
+		{"referrer-policy", "no-referrer"},
+		{"x-content-type-options", "nosniff"},
+	}, []byte(body), -1); err != nil {
+		// The managed extension ignores a pause return value. Escalate a failed
+		// local response to a plugin failure so fail_open=false remains the
+		// authoritative rejection boundary.
+		panic(err)
+	}
+}

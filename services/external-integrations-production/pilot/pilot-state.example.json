@@ -1,0 +1,79 @@
+{
+  "contractVersion": "square_production_internal_seller_pilot_evidence_v2",
+  "sourceCommit": "6b5ccc4513150312e5c3a1dbcce81fab111571e7",
+  "projectId": "vaeroex-integrations-prod",
+  "region": "us-west1",
+  "hostname": "square.vaeroex.com",
+  "callbackUrl": "https://square.vaeroex.com/api/integrations/square/callback",
+  "webhookUrl": "https://square.vaeroex.com/api/integrations/square/webhook",
+  "database": {
+    "ledgerHead": "20260902191323",
+    "foundationVersion": "20260902191323",
+    "overlayPath": null,
+    "overlaySourceCommit": null,
+    "overlaySha256": null,
+    "overlayObjectPostflight": null,
+    "rolePostflight": null
+  },
+  "productionReleaseDeployment": {
+    "sharedBootstrapSourceCommit": null,
+    "sharedBootstrapImageDigest": null,
+    "callbackEdgeSourceCommit": null,
+    "callbackEdgeImageDigest": null,
+    "oauthCallbackSourceCommit": null,
+    "oauthCallbackImageDigest": null
+  },
+  "credentialVersionsPresent": {
+    "application": { "version": null, "state": "ABSENT", "totalCount": 0 },
+    "webhookSignature": { "version": null, "state": "ABSENT", "totalCount": 0 },
+    "databaseOauth": { "version": null, "state": "ABSENT", "totalCount": 0 },
+    "databaseBroker": { "version": null, "state": "ABSENT", "totalCount": 0 },
+    "databaseScheduler": { "version": null, "state": "ABSENT", "totalCount": 0 },
+    "databaseWebhook": { "version": null, "state": "ABSENT", "totalCount": 0 },
+    "databaseRuntime": { "version": null, "state": "ABSENT", "totalCount": 0 },
+    "databaseEvidence": { "version": null, "state": "ABSENT", "totalCount": 0 }
+  },
+  "activationGates": {
+    "runtimeEnabled": false,
+    "providerCallsEnabled": false,
+    "customerOnboardingEnabled": false,
+    "webhookIntakeEnabled": false,
+    "evidenceEnabled": false,
+    "economicContributionsEnabled": false,
+    "aiDispatchEnabled": false
+  },
+  "pilotScopeCounts": {
+    "allowlistEntryCount": 0,
+    "distinctWorkspaceCount": 0,
+    "distinctSellerCount": 0
+  },
+  "phaseReceipts": {
+    "consent": { "marker": null, "fingerprint": null },
+    "locationMapping": { "marker": null, "fingerprint": null },
+    "initialSync": { "marker": null, "fingerprint": null },
+    "replay": { "marker": null, "fingerprint": null },
+    "workspaceEvidence": { "marker": null, "fingerprint": null },
+    "cleanupGateReadback": { "marker": null, "fingerprint": null },
+    "refresh": { "marker": null, "fingerprint": null },
+    "webhookDeduplication": { "marker": null, "fingerprint": null },
+    "revocation": { "marker": null, "fingerprint": null },
+    "disconnect": { "marker": null, "fingerprint": null },
+    "recovery": { "marker": null, "fingerprint": null }
+  },
+  "operationalChecks": {
+    "callbackHealthAlert": false,
+    "signatureFailureAlert": false,
+    "credentialRefreshAlert": false,
+    "providerAuthAlert": false,
+    "rateLimitAlert": false,
+    "providerServerErrorAlert": false,
+    "taskAgeRetryDeadLetterAlert": false,
+    "staleIncompleteSyncAlert": false,
+    "backupFailureAlert": false,
+    "primaryAndBackupAlertDelivery": false,
+    "backupReadback": false,
+    "restoreDrill": false,
+    "rollbackDrill": false,
+    "incidentContacts": false
+  }
+}

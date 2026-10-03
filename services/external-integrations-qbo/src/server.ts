@@ -8,7 +8,6 @@ import { z } from "zod";
 import { canonicalContractJson, contractSha256 } from "@/lib/integrations/contracts/canonical";
 import { BoundedIdentifierSchema, UuidSchema } from "@/lib/integrations/contracts/primitives";
 import {
-  AuthorizedProviderEntityEvidenceSchema,
   IntegrationCredentialBroker,
   ProviderAccessCredential,
   ProviderCredentialReadFailure,
@@ -56,7 +55,6 @@ import {
   discoverQboRuntimeDispatchReconciliation,
   readQboRuntimeConfiguration,
   readQboRuntimeTaskDelivery,
-  scheduleQboProductionInitialization,
   storeQboCustomerReauthorizedCredential
 } from "@/lib/integrations/persistence/qbo-production-repository";
 import {
@@ -66,6 +64,17 @@ import {
   recordVerifiedWebhookEvent
 } from "@/lib/integrations/persistence/runtime-repository";
 import { resolveProviderAccessCredential } from "@/lib/integrations/provider-runtime/credential-resolution";
+import { scheduleQboProductionWork, runQboSchedulerMaintenance } from "./scheduler";
+import { QboCdcCoverageError } from "./cdc";
+import { recoverQboProductionValidation, QboValidationRecoveryResultSchema } from "./validation-recovery";
+import { recoverQboProductionAccounting, QboAccountingRecoveryResultSchema } from "./accounting-recovery";
+import {
+  assertAuthorizedProviderEntityEvidence,
+  assertCredentialEnvelopeMatchesProviderOAuthPolicy,
+  normalizeProviderOAuthReturnPath,
+  validateProviderOAuthCallbackUri,
+  type ProviderOAuthPolicy
+} from "@/lib/integrations/credentials/oauth-policy";
 import {
   parseQboOAuthCallbackHandoff,
   sanitizedQboOAuthConfirmationUrl
@@ -77,6 +86,7 @@ import {
   QBO_ACCOUNTING_SCOPE,
   QboOAuthCredentialProvider
 } from "@/lib/integrations/provider-runtime/qbo/oauth";
+import { QBO_PRODUCTION_OAUTH_POLICY } from "@/lib/integrations/provider-runtime/qbo/oauth-policy";
 import {
   QBO_WEBHOOK_MAX_RAW_BODY_BYTES,
   QBO_WEBHOOK_SIGNATURE_HEADER,
@@ -86,6 +96,12 @@ import { CloudTaskEnvelopeSchema, RUNTIME_CONTRACT_VERSIONS } from "@/lib/integr
 
 import { parseQboProductionCloudTaskDelivery } from "./cloud-task-delivery";
 import { QboProductionDatabase } from "./database";
+import { beginCustomerAuthorization, completeCustomerAuthorization, persistBeforeDiscovery } from "./oauth-completion";
+import { completePendingCustomerDisconnects } from "./customer-disconnect";
+import { createQboInternalOperationAuthorizer } from "./service-identity";
+import { createQboStartupReadiness } from "./startup-readiness";
+import { parseQboProductionDeniedHandoff, completeQboProductionDeniedHandoff } from "./oauth-denied-handoff";
+import { requireEmptyQboCallbackBody } from "./callback-body";
 import { executeQboProductionRead, type QboProductionLeasedTask } from "./executor";
 import {
   googleCloudKmsTransport,
@@ -95,6 +111,7 @@ import {
 } from "./google";
 
 const MAX_BODY_BYTES = 32 * 1024;
+const authorizeInternalOperation = createQboInternalOperationAuthorizer(process.env);
 const ServiceModeSchema = z.enum([
   "oauth_ingress",
   "credential_broker",
@@ -158,6 +175,15 @@ for (const value of Object.values(config)) {
 function database() {
   return new QboProductionDatabase(config.databaseUrl, rolesByMode[config.mode]);
 }
+
+const startupReady = createQboStartupReadiness(async () => {
+  const db = database();
+  try {
+    await db.checkConnectivity();
+  } finally {
+    await db.close();
+  }
+});
 
 function json(response: ServerResponse, status: number, value: unknown) {
   const body = Buffer.from(JSON.stringify(value), "utf8");
@@ -243,11 +269,10 @@ async function readRawBody(request: IncomingMessage, maximumBytes: number) {
 }
 
 function callbackUrl() {
-  const value = new URL(config.callbackUrl ?? "");
-  if (value.protocol !== "https:" || value.username || value.password || value.search || value.hash) {
-    throw new Error("qbo_production_callback_invalid");
-  }
-  return value.toString();
+  return validateProviderOAuthCallbackUri(
+    QBO_PRODUCTION_OAUTH_POLICY,
+    config.callbackUrl ?? ""
+  );
 }
 
 function queueConfiguration() {
@@ -322,6 +347,7 @@ function brokerDependencies(db: QboProductionDatabase) {
     kmsKeyResource,
     secrets,
     provider,
+    providerOAuthPolicy: QBO_PRODUCTION_OAUTH_POLICY,
     authorizedEntityVerifier: verifier
   });
   return { broker, kms, kmsKeyResource, provider, secrets, verifier } as const;
@@ -333,37 +359,54 @@ const CallbackSchema = z.object({
   realmId: BoundedIdentifierSchema
 }).strict();
 
-async function exchangeAndVerify(
+async function exchangeAuthorization(
   callback: z.infer<typeof CallbackSchema>,
   consumed: {
     providerEnvironment: "production";
     requestedScopes: readonly string[];
     consumedAt: string;
   },
-  dependencies: ReturnType<typeof brokerDependencies>
+  dependencies: ReturnType<typeof brokerDependencies>,
+  policy: ProviderOAuthPolicy
 ) {
   const secret = await dependencies.secrets.access("quickbooks_online", "production");
-  const envelope = CredentialEnvelopeSchema.parse(await dependencies.provider.exchangeAuthorizationCode({
-    authorizationCode: callback.code,
-    externalAuthorizedEntityReference: callback.realmId,
-    applicationSecret: secret,
-    requestedScopes: consumed.requestedScopes,
-    now: new Date(consumed.consumedAt)
-  }));
-  const evidence = AuthorizedProviderEntityEvidenceSchema.parse(await dependencies.verifier.verify({
-    externalAuthorizedEntityReference: callback.realmId,
-    credential: new ProviderAccessCredential({
-      providerKey: envelope.providerKey,
-      providerEnvironment: envelope.environment,
-      accessExpiresAt: envelope.accessExpiresAt,
-      grantedScopes: envelope.grantedScopes,
-      accessToken: envelope.accessToken
+  const envelope = assertCredentialEnvelopeMatchesProviderOAuthPolicy(
+    policy,
+    await dependencies.provider.exchangeAuthorizationCode({
+      authorizationCode: callback.code,
+      externalAuthorizedEntityReference: callback.realmId,
+      applicationSecret: secret,
+      requestedScopes: consumed.requestedScopes,
+      now: new Date(consumed.consumedAt)
     })
-  }));
+  );
+  return envelope;
+}
+
+async function verifyStoredAuthorization(
+  callback: z.infer<typeof CallbackSchema>,
+  envelope: z.infer<typeof CredentialEnvelopeSchema>,
+  dependencies: ReturnType<typeof brokerDependencies>,
+  purpose: "authorization" | "reauthorization"
+) {
+  const evidence = assertAuthorizedProviderEntityEvidence(
+    QBO_PRODUCTION_OAUTH_POLICY,
+    await dependencies.verifier.verify({
+      externalAuthorizedEntityReference: callback.realmId,
+      credential: new ProviderAccessCredential({
+        providerKey: envelope.providerKey,
+        providerEnvironment: envelope.environment,
+        accessExpiresAt: envelope.accessExpiresAt,
+        grantedScopes: envelope.grantedScopes,
+        accessToken: envelope.accessToken
+      })
+    }),
+    { externalAuthorizedEntityReference: callback.realmId, purpose }
+  );
   if (evidence.externalAuthorizedEntityReference !== callback.realmId) {
     throw new Error("qbo_production_authorized_entity_mismatch");
   }
-  return { envelope, evidence } as const;
+  return evidence;
 }
 
 async function encryptedCredential(input: {
@@ -416,104 +459,122 @@ async function completeInitialAuthorization(
     db.role("integration_oauth_ingress_authority")
   );
   if (!consumed.accepted) throw new Error("qbo_production_oauth_state_rejected");
-  const { envelope, evidence } = await exchangeAndVerify(callback, consumed, dependencies);
-  const credentialId = randomUUID();
-  const encrypted = await encryptedCredential({
-    envelope,
-    workspaceId: consumed.workspaceId,
-    connectionId: consumed.connectionId,
-    connectionGeneration: consumed.connectionGeneration,
-    credentialId,
-    dependencies
-  });
-  const stored = await storeIntegrationCredential(
-    StoreCredentialCommandSchema.parse({
-      contractVersion: CREDENTIAL_SECURITY_CONTRACT_VERSIONS.credentialAuthority,
-      id: credentialId,
-      oauthStateId: consumed.stateId,
-      workspaceId: consumed.workspaceId,
-      businessEntityId: consumed.businessEntityId,
-      connectionId: consumed.connectionId,
-      connectionGeneration: consumed.connectionGeneration,
-      providerKey: consumed.providerKey,
-      providerEnvironment: consumed.providerEnvironment,
-      initiatedBy: consumed.initiatedBy,
-      expectedConnectionRowVersion: consumed.expectedConnectionRowVersion,
-      credentialVersion: 1,
-      envelopeSchemaVersion: CREDENTIAL_SECURITY_CONTRACT_VERSIONS.credentialEnvelope,
-      aadSchemaVersion: CREDENTIAL_SECURITY_CONTRACT_VERSIONS.credentialAad,
-      aadDigest: encrypted.aadDigest,
-      kmsKeyResource: dependencies.kmsKeyResource,
-      ciphertextBase64: encrypted.ciphertextBase64,
-      accessExpiresAt: envelope.accessExpiresAt,
-      refreshExpiresAt: envelope.refreshExpiresAt,
-      grantedScopes: envelope.grantedScopes,
-      externalEntityReferenceFingerprint: externalReferenceFingerprint(callback.realmId),
-      authorizedAt: consumed.consumedAt
-    }),
-    `qbo_credential_store_${randomUUID()}`,
-    db.role("integration_credential_broker_authority")
-  );
-  if (stored.connectionStatus !== "authorized_unmapped") {
-    throw new Error("qbo_production_authorization_store_state_invalid");
-  }
-  const mappingId = randomUUID();
-  const control = db.role("integration_control_plane_authority");
-  const mapping = await createProviderEntityMapping(
-    {
-      contractVersion: "provider_entity_mapping_v1",
-      id: mappingId,
-      workspaceId: consumed.workspaceId,
-      businessEntityId: consumed.businessEntityId,
-      connectionId: consumed.connectionId,
-      providerEntityType: "company",
-      providerEntityReferenceFingerprint: externalReferenceFingerprint(callback.realmId),
-      safeDisplayName: evidence.safeDisplayName,
-      mappingRole: "primary",
-      mappedAt: consumed.consumedAt,
-      replacesMappingId: null
-    },
-    `qbo_mapping_create_${credentialId}`,
-    "qbo_credential_broker",
-    control
-  );
-  const activeMapping = await transitionProviderEntityMapping(
-    {
-      workspaceId: consumed.workspaceId,
-      businessEntityId: consumed.businessEntityId,
-      connectionId: consumed.connectionId,
-      mappingId,
-      expectedRowVersion: mapping.rowVersion,
-      targetStatus: "active",
-      verificationFingerprint: evidence.verificationFingerprint,
-      transitionedAt: new Date().toISOString()
-    },
-    `qbo_mapping_verify_${credentialId}`,
-    "qbo_credential_broker",
-    control
-  );
-  const connection = await transitionIntegrationConnection(
-    {
-      workspaceId: consumed.workspaceId,
-      businessEntityId: consumed.businessEntityId,
-      connectionId: consumed.connectionId,
-      expectedRowVersion: consumed.expectedConnectionRowVersion + 1,
-      expectedGeneration: consumed.connectionGeneration,
-      targetStatus: "initializing",
-      stateReasonCode: "initial_sync_pending",
-      providerTenantReferenceFingerprint: externalReferenceFingerprint(callback.realmId),
-      grantedScopes: [QBO_ACCOUNTING_SCOPE],
-      transitionedAt: new Date().toISOString()
-    },
-    `qbo_connection_initialize_${credentialId}`,
-    "qbo_credential_broker",
-    control
-  );
-  return {
-    connectionStatus: connection.connection.status,
-    mappingStatus: activeMapping.status,
-    returnIntent: consumed.returnIntent
-  } as const;
+  const brokerClient = db.role("integration_credential_broker_authority");
+  return completeCustomerAuthorization({
+    client: brokerClient, stateId: consumed.stateId, complete: async () => {
+      const realmFingerprint = externalReferenceFingerprint(callback.realmId);
+      if (!realmFingerprint) throw new Error("qbo_production_authorized_entity_mismatch");
+      const { credentialId } = await beginCustomerAuthorization(brokerClient, consumed.stateId, realmFingerprint);
+      const envelope = await exchangeAuthorization(
+        callback,
+        consumed,
+        dependencies,
+        QBO_PRODUCTION_OAUTH_POLICY
+      );
+      const encrypted = await encryptedCredential({
+        envelope,
+        workspaceId: consumed.workspaceId,
+        connectionId: consumed.connectionId,
+        connectionGeneration: consumed.connectionGeneration,
+        credentialId,
+        dependencies
+      });
+      const evidence = await persistBeforeDiscovery({
+        client: brokerClient, stateId: consumed.stateId, credentialId,
+        store: async () => {
+          const stored = await storeIntegrationCredential(
+            StoreCredentialCommandSchema.parse({
+              contractVersion: CREDENTIAL_SECURITY_CONTRACT_VERSIONS.credentialAuthority,
+              id: credentialId,
+              oauthStateId: consumed.stateId,
+              workspaceId: consumed.workspaceId,
+              businessEntityId: consumed.businessEntityId,
+              connectionId: consumed.connectionId,
+              connectionGeneration: consumed.connectionGeneration,
+              providerKey: consumed.providerKey,
+              providerEnvironment: consumed.providerEnvironment,
+              initiatedBy: consumed.initiatedBy,
+              expectedConnectionRowVersion: consumed.expectedConnectionRowVersion,
+              credentialVersion: 1,
+              envelopeSchemaVersion: CREDENTIAL_SECURITY_CONTRACT_VERSIONS.credentialEnvelope,
+              aadSchemaVersion: CREDENTIAL_SECURITY_CONTRACT_VERSIONS.credentialAad,
+              aadDigest: encrypted.aadDigest,
+              kmsKeyResource: dependencies.kmsKeyResource,
+              ciphertextBase64: encrypted.ciphertextBase64,
+              accessExpiresAt: envelope.accessExpiresAt,
+              refreshExpiresAt: envelope.refreshExpiresAt,
+              grantedScopes: envelope.grantedScopes,
+              externalEntityReferenceFingerprint: externalReferenceFingerprint(callback.realmId),
+              authorizedAt: consumed.consumedAt
+            }),
+            `qbo_credential_store_${randomUUID()}`,
+            db.role("integration_credential_broker_authority")
+          );
+          if (stored.connectionStatus !== "authorized_unmapped") {
+            throw new Error("qbo_production_authorization_store_state_invalid");
+          }
+        },
+        discover: () => verifyStoredAuthorization(callback, envelope, dependencies, "authorization")
+      });
+      const mappingId = randomUUID();
+      const control = db.role("integration_control_plane_authority");
+      const mapping = await createProviderEntityMapping(
+        {
+          contractVersion: "provider_entity_mapping_v1",
+          id: mappingId,
+          workspaceId: consumed.workspaceId,
+          businessEntityId: consumed.businessEntityId,
+          connectionId: consumed.connectionId,
+          providerEntityType: "company",
+          providerEntityReferenceFingerprint: externalReferenceFingerprint(callback.realmId),
+          safeDisplayName: evidence.safeDisplayName,
+          mappingRole: "primary",
+          mappedAt: consumed.consumedAt,
+          replacesMappingId: null
+        },
+        `qbo_mapping_create_${credentialId}`,
+        "qbo_credential_broker",
+        control
+      );
+      const activeMapping = await transitionProviderEntityMapping(
+        {
+          workspaceId: consumed.workspaceId,
+          businessEntityId: consumed.businessEntityId,
+          connectionId: consumed.connectionId,
+          mappingId,
+          expectedRowVersion: mapping.rowVersion,
+          targetStatus: "active",
+          verificationFingerprint: evidence.verificationFingerprint,
+          transitionedAt: new Date().toISOString()
+        },
+        `qbo_mapping_verify_${credentialId}`,
+        "qbo_credential_broker",
+        control
+      );
+      const connection = await transitionIntegrationConnection(
+        {
+          workspaceId: consumed.workspaceId,
+          businessEntityId: consumed.businessEntityId,
+          connectionId: consumed.connectionId,
+          expectedRowVersion: consumed.expectedConnectionRowVersion + 1,
+          expectedGeneration: consumed.connectionGeneration,
+          targetStatus: "initializing",
+          stateReasonCode: "initial_sync_pending",
+          providerTenantReferenceFingerprint: externalReferenceFingerprint(callback.realmId),
+          grantedScopes: [QBO_ACCOUNTING_SCOPE],
+          transitionedAt: new Date().toISOString()
+        },
+        `qbo_connection_initialize_${credentialId}`,
+        "qbo_credential_broker",
+        control
+      );
+      return {
+        connectionStatus: connection.connection.status,
+        mappingStatus: activeMapping.status,
+        returnIntent: consumed.returnIntent
+      } as const;
+    }
+});
 }
 
 async function completeReauthorization(
@@ -536,45 +597,69 @@ async function completeReauthorization(
   if (!consumed.accepted || consumed.providerEntityReferenceFingerprint !== realmFingerprint) {
     throw new Error("qbo_production_reauthorization_state_rejected");
   }
-  const { envelope, evidence } = await exchangeAndVerify(callback, consumed, dependencies);
-  const credentialId = randomUUID();
-  const encrypted = await encryptedCredential({
-    envelope,
-    workspaceId: consumed.workspaceId,
-    connectionId: consumed.connectionId,
-    connectionGeneration: consumed.connectionGeneration,
-    credentialId,
-    dependencies
-  });
-  const result = await storeQboCustomerReauthorizedCredential(
-    {
-      contractVersion: "qbo_customer_credential_reauthorization_v2",
-      id: credentialId,
-      reauthorizationStateId: consumed.stateId,
-      workspaceId: consumed.workspaceId,
-      businessEntityId: consumed.businessEntityId,
-      connectionId: consumed.connectionId,
-      connectionGeneration: consumed.connectionGeneration,
-      mappingId: consumed.mappingId,
-      providerKey: consumed.providerKey,
-      providerEnvironment: consumed.providerEnvironment,
-      initiatedBy: consumed.initiatedBy,
-      envelopeSchemaVersion: CREDENTIAL_SECURITY_CONTRACT_VERSIONS.credentialEnvelope,
-      aadSchemaVersion: CREDENTIAL_SECURITY_CONTRACT_VERSIONS.credentialAad,
-      aadDigest: encrypted.aadDigest,
-      kmsKeyResource: dependencies.kmsKeyResource,
-      ciphertextBase64: encrypted.ciphertextBase64,
-      accessExpiresAt: envelope.accessExpiresAt,
-      refreshExpiresAt: envelope.refreshExpiresAt,
-      grantedScopes: envelope.grantedScopes,
-      externalEntityReferenceFingerprint: realmFingerprint,
-      mappingRevalidationFingerprint: evidence.verificationFingerprint,
-      reauthorizedAt: consumed.consumedAt
-    },
-    `qbo_reauthorization_store_${randomUUID()}`,
-    db.role("integration_credential_broker_authority")
-  );
-  return { connectionStatus: result.connectionStatus, mappingStatus: result.mappingStatus, returnIntent: consumed.returnIntent } as const;
+  const brokerClient = db.role("integration_credential_broker_authority");
+  return completeCustomerAuthorization({
+    client: brokerClient, stateId: consumed.stateId, complete: async () => {
+      const { credentialId, priorMappingVerificationFingerprint } = await beginCustomerAuthorization(
+        brokerClient, consumed.stateId, realmFingerprint
+      );
+      if (!priorMappingVerificationFingerprint) throw new Error("qbo_production_reauthorization_mapping_invalid");
+      const envelope = await exchangeAuthorization(
+        callback,
+        consumed,
+        dependencies,
+        QBO_PRODUCTION_OAUTH_POLICY
+      );
+      const encrypted = await encryptedCredential({
+        envelope,
+        workspaceId: consumed.workspaceId,
+        connectionId: consumed.connectionId,
+        connectionGeneration: consumed.connectionGeneration,
+        credentialId,
+        dependencies
+      });
+      await persistBeforeDiscovery({
+        client: brokerClient, stateId: consumed.stateId, credentialId,
+        store: () => storeQboCustomerReauthorizedCredential(
+          {
+            contractVersion: "qbo_customer_credential_reauthorization_v2",
+            id: credentialId,
+            reauthorizationStateId: consumed.stateId,
+            workspaceId: consumed.workspaceId,
+            businessEntityId: consumed.businessEntityId,
+            connectionId: consumed.connectionId,
+            connectionGeneration: consumed.connectionGeneration,
+            mappingId: consumed.mappingId,
+            providerKey: consumed.providerKey,
+            providerEnvironment: consumed.providerEnvironment,
+            initiatedBy: consumed.initiatedBy,
+            envelopeSchemaVersion: CREDENTIAL_SECURITY_CONTRACT_VERSIONS.credentialEnvelope,
+            aadSchemaVersion: CREDENTIAL_SECURITY_CONTRACT_VERSIONS.credentialAad,
+            aadDigest: encrypted.aadDigest,
+            kmsKeyResource: dependencies.kmsKeyResource,
+            ciphertextBase64: encrypted.ciphertextBase64,
+            accessExpiresAt: envelope.accessExpiresAt,
+            refreshExpiresAt: envelope.refreshExpiresAt,
+            grantedScopes: envelope.grantedScopes,
+            externalEntityReferenceFingerprint: realmFingerprint,
+            mappingRevalidationFingerprint: priorMappingVerificationFingerprint,
+            reauthorizedAt: consumed.consumedAt
+          },
+          `qbo_reauthorization_store_${randomUUID()}`,
+          db.role("integration_credential_broker_authority")
+        ),
+        discover: () => verifyStoredAuthorization(callback, envelope, dependencies, "reauthorization")
+      });
+      return { connectionStatus: "initializing", mappingStatus: "active", returnIntent: consumed.returnIntent } as const;
+    }
+});
+}
+
+async function internalAuthorizationHeaders(audience: string) {
+  const authorization = `Bearer ${await googleIdentityToken(audience)}`;
+  // Cloud Run checks/strips X-Serverless-Authorization while preserving the
+  // signed Authorization token for the application-level operation allowlist.
+  return { authorization, "x-serverless-authorization": authorization };
 }
 
 async function callBroker(path: string, body: unknown) {
@@ -590,7 +675,7 @@ async function callBroker(path: string, body: unknown) {
     signal: AbortSignal.timeout(60_000),
     headers: {
       accept: "application/json",
-      authorization: `Bearer ${await googleIdentityToken(broker.origin)}`,
+      ...await internalAuthorizationHeaders(broker.origin),
       "content-type": "application/json"
     },
     body: JSON.stringify(body)
@@ -614,7 +699,7 @@ async function callBrokerWebhook(rawBody: Buffer, intuitSignature: string) {
       signal: AbortSignal.timeout(60_000),
       headers: {
         accept: "application/json",
-        authorization: `Bearer ${await googleIdentityToken(broker.origin)}`,
+        ...await internalAuthorizationHeaders(broker.origin),
         "content-type": "application/octet-stream",
         [QBO_WEBHOOK_SIGNATURE_HEADER]: intuitSignature
       },
@@ -669,6 +754,24 @@ async function handleBroker(request: IncomingMessage, response: ServerResponse, 
       }
     }
     const dependencies = brokerDependencies(db);
+    if (url.pathname === "/oauth/denied") {
+      const callback = z.object({ state: CallbackSchema.shape.state, error: z.literal("access_denied") }).strict().parse(await readBody(request));
+      const reauthorization = callback.state.startsWith("r1_");
+      const result = await db.role("integration_oauth_ingress_authority").rpc("deny_qbo_customer_authorization_v1", {
+        p_state_hash: reauthorization ? reauthorizationStateHash(callback.state) : oauthStateHash(callback.state),
+        p_state_kind: reauthorization ? "reauthorization" : "initial", p_redirect_uri: callbackUrl()
+      });
+      if (result.error) throw new Error("qbo_customer_denied_callback_invalid");
+      const denied = z.object({ returnIntent: z.string().startsWith("/").max(512), outcome: z.literal("denied") }).strict().parse(result.data);
+      return json(response, 200, denied);
+    }
+    if (url.pathname === "/credentials/revoke-pending") {
+      const body = z.object({ maximumConnections: z.number().int().min(1).max(25) }).strict().parse(await readBody(request));
+      const result = await completePendingCustomerDisconnects({ ...dependencies,
+        client: db.role("integration_credential_broker_authority"), maximumConnections: body.maximumConnections });
+      safeEvent("customer_disconnect_completed", result);
+      return json(response, 200, { ...result, promotionAuthorized: false, modelCallCount: 0 });
+    }
     if (url.pathname === "/oauth/complete") {
       const callback = CallbackSchema.parse(await readBody(request));
       const isReauthorization = callback.state.startsWith("r1_");
@@ -903,21 +1006,67 @@ async function handleScheduler(request: IncomingMessage, response: ServerRespons
   try {
     const client = db.role("integration_task_scheduler_authority");
     await readQboRuntimeConfiguration(client);
-    const result = await scheduleQboProductionInitialization(
+    const result = await scheduleQboProductionWork(
       body.maximumConnections,
-      `qbo_initialization_schedule_${randomUUID()}`,
+      `qbo_schedule_${randomUUID()}`,
       client
     );
-    safeEvent("initialization_runs_scheduled", {
+    safeEvent("qbo_runs_scheduled", {
       scheduledConnectionCount: result.scheduledConnectionCount,
-      scheduledTaskCount: result.scheduledTaskCount
+      scheduledTaskCount: result.scheduledTaskCount,
+      settledRunCount: result.settledRunCount,
+      blockedCdcCount: result.blockedCdcCount
     });
+    const maintenance = await runQboSchedulerMaintenance({
+      validate: () => callValidationRecovery(Math.min(body.maximumConnections, 5)),
+      disconnect: () => callBroker("/credentials/revoke-pending", { maximumConnections: Math.min(body.maximumConnections, 5) })
+    });
+    safeEvent("qbo_scheduler_maintenance", {
+      validationFailed: maintenance.validationFailed, disconnectFailed: maintenance.disconnectFailed,
+      disconnectedCount: maintenance.disconnect?.disconnectedCount ?? 0,
+      providerUnconfirmedCount: maintenance.disconnect?.providerUnconfirmedCount ?? 0
+    });
+    if (maintenance.validationFailed || maintenance.disconnectFailed) throw new Error("qbo_scheduler_maintenance_failed");
     return json(response, 200, {
       scheduledConnectionCount: result.scheduledConnectionCount,
       scheduledTaskCount: result.scheduledTaskCount,
+      settledRunCount: result.settledRunCount,
+      blockedCdcCount: result.blockedCdcCount,
+      validation: maintenance.validation,
+      disconnect: maintenance.disconnect,
       promotionAuthorized: false,
       modelCallCount: 0
     });
+  } finally {
+    await db.close();
+  }
+}
+
+async function callValidationRecovery(maximumTasks: number) {
+  const runtime = new URL(config.runtimeUrl ?? "");
+  if (runtime.protocol !== "https:" || runtime.pathname !== "/" || runtime.search || runtime.hash || runtime.username || runtime.password) {
+    throw new Error("qbo_production_runtime_url_invalid");
+  }
+  const response = await fetch(new URL("/tasks/validate-pending", runtime), {
+    method: "POST", redirect: "error", signal: AbortSignal.timeout(60_000),
+    headers: { accept: "application/json", ...await internalAuthorizationHeaders(runtime.origin), "content-type": "application/json" },
+    body: JSON.stringify({ maximumTasks })
+  });
+  if (!response.ok) throw new Error("qbo_validation_recovery_failed");
+  return QboValidationRecoveryResultSchema.extend({ accounting: QboAccountingRecoveryResultSchema }).parse(await response.json());
+}
+
+async function handleValidationRecovery(request: IncomingMessage, response: ServerResponse) {
+  const body = z.object({ maximumTasks: z.number().int().min(1).max(25) }).strict().parse(await readBody(request));
+  const db = database();
+  try {
+    const source = db.role("integration_provider_source_authority");
+    const validated = await recoverQboProductionValidation(source, body.maximumTasks);
+    const accounting = await recoverQboProductionAccounting(source, Math.min(body.maximumTasks, 5));
+    const result = { ...validated, accounting };
+    safeEvent("qbo_validation_recovered", validated);
+    safeEvent("qbo_accounting_processed", accounting);
+    return json(response, 200, result);
   } finally {
     await db.close();
   }
@@ -1090,8 +1239,8 @@ async function executeTask(request: IncomingMessage, response: ServerResponse) {
         expectedRowVersion: leased.rowVersion,
         leaseId,
         leaseOwnerFingerprint: owner,
-        failureCategory: classification?.kind === "rate_limit" ? "rate_limit" : classification?.retryDisposition === "retry_with_backoff" ? "availability" : "contract",
-        failureCode: classification?.safeCode ?? "qbo_provider_task_failed",
+        failureCategory: error instanceof QboCdcCoverageError ? "data_anomaly" : classification?.kind === "rate_limit" ? "rate_limit" : classification?.retryDisposition === "retry_with_backoff" ? "availability" : "contract",
+        failureCode: error instanceof QboCdcCoverageError ? error.code : classification?.safeCode ?? "qbo_provider_task_failed",
         retryable: classification?.retryDisposition === "retry_with_backoff",
         retryAfterSeconds: classification?.retryAfterMs ? Math.ceil(classification.retryAfterMs / 1_000) : null
       },
@@ -1180,6 +1329,21 @@ async function handleIngress(request: IncomingMessage, response: ServerResponse,
   if (request.method !== "GET" || url.pathname !== "/oauth/callback") {
     return json(response, 404, { error: "not_found" });
   }
+  await requireEmptyQboCallbackBody(request);
+  const denied = parseQboProductionDeniedHandoff({
+    method: request.method,
+    requestUrl: request.url ?? "",
+    headers: request.headers,
+    rawHeaders: request.rawHeaders
+  });
+  if (denied) {
+    safeEvent("oauth_callback_denial_handoff_accepted");
+    const target = await completeQboProductionDeniedHandoff({
+      callback: denied, applicationOrigin: env("QBO_APPLICATION_ORIGIN"), callBroker
+    });
+    safeEvent("oauth_callback_denial_completed");
+    return redirect(response, target);
+  }
   const callback = CallbackSchema.parse(parseQboOAuthCallbackHandoff({
     method: request.method,
     requestUrl: request.url ?? "",
@@ -1187,7 +1351,10 @@ async function handleIngress(request: IncomingMessage, response: ServerResponse,
   }));
   safeEvent("oauth_callback_handoff_accepted");
   const result = await callBroker("/oauth/complete", callback);
-  const returnIntent = z.string().startsWith("/").max(512).parse(result.returnIntent);
+  const returnIntent = normalizeProviderOAuthReturnPath(
+    QBO_PRODUCTION_OAUTH_POLICY,
+    z.string().startsWith("/").max(512).parse(result.returnIntent)
+  );
   const appOrigin = new URL(env("QBO_APPLICATION_ORIGIN"));
   const target = new URL(returnIntent, appOrigin);
   if (target.origin !== appOrigin.origin) throw new Error("qbo_production_return_intent_invalid");
@@ -1197,6 +1364,14 @@ async function handleIngress(request: IncomingMessage, response: ServerResponse,
 
 async function route(request: IncomingMessage, response: ServerResponse) {
   const url = new URL(request.url ?? "/", "http://qbo-production.invalid");
+  if (url.pathname === "/health/ready") {
+    if (request.method !== "GET" || request.url !== "/health/ready" ||
+        (config.mode !== "credential_broker" && config.mode !== "provider_runtime")) {
+      return json(response, 404, { error: "not_found" });
+    }
+    const ready = await startupReady();
+    return json(response, ready ? 200 : 503, { ready });
+  }
   if (url.pathname === "/health") {
     return json(response, 200, {
       ok: true,
@@ -1208,9 +1383,16 @@ async function route(request: IncomingMessage, response: ServerResponse) {
     });
   }
   if (config.mode === "oauth_ingress") return handleIngress(request, response, url);
+  if (!await authorizeInternalOperation({ mode: config.mode, method: request.method, url,
+    headers: request.headers, rawHeaders: request.rawHeaders })) {
+    return json(response, 403, { error: "not_authorized" });
+  }
   if (config.mode === "credential_broker") return handleBroker(request, response, url);
   if (config.mode === "task_scheduler") return handleScheduler(request, response, url);
   if (config.mode === "task_dispatcher") return handleDispatcher(request, response, url);
+  if (request.method === "POST" && url.pathname === "/tasks/validate-pending") {
+    return handleValidationRecovery(request, response);
+  }
   if (request.method === "POST" && url.pathname === "/tasks/execute") {
     return executeTask(request, response);
   }

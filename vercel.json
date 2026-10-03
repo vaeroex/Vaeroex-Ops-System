@@ -1,1 +1,16 @@
-{}
+{
+  "git": {
+    "deploymentEnabled": {
+      "codex/square-remote-sandbox-binding": false,
+      "codex/square-sandbox-qualification": false,
+      "codex/square-gcp-sandbox-callback": false,
+      "main": false
+    }
+  },
+  "crons": [
+    {
+      "path": "/api/integrations/google-sheets/scheduled-sync",
+      "schedule": "*/15 * * * *"
+    }
+  ]
+}

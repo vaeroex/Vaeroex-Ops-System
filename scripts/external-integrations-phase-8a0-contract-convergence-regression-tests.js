@@ -48,6 +48,7 @@ const credentials = require("../lib/integrations/credentials/contracts.ts");
 const brokerModule = require("../lib/integrations/credentials/broker.ts");
 const credentialKms = require("../lib/integrations/credentials/kms.ts");
 const syntheticCredentials = require("../lib/integrations/credentials/synthetic-provider.ts");
+const qboOAuthPolicy = require("../lib/integrations/provider-runtime/qbo/oauth-policy.ts");
 const redaction = require("../lib/integrations/credentials/redaction.ts");
 const qbo = require("../lib/integrations/providers/qbo/index.ts");
 
@@ -460,6 +461,7 @@ async function main() {
       refreshCredential: unavailable,
       revokeCredential: unavailable
     },
+    providerOAuthPolicy: qboOAuthPolicy.QBO_PHASE_8B_OAUTH_POLICY,
     clock: () => now
   });
   const readInput = {
@@ -509,6 +511,7 @@ async function main() {
       refreshCredential: unavailable,
       revokeCredential: unavailable
     },
+    providerOAuthPolicy: qboOAuthPolicy.QBO_PHASE_8B_OAUTH_POLICY,
     clock: () => now
   });
   await rejects(
@@ -536,6 +539,7 @@ async function main() {
       refreshCredential: unavailable,
       revokeCredential: unavailable
     },
+    providerOAuthPolicy: qboOAuthPolicy.QBO_PHASE_8B_OAUTH_POLICY,
     clock: () => now
   });
   const expiryBindingFailure = await expiryBindingBroker
@@ -606,6 +610,7 @@ async function main() {
       refreshCredential: unavailable,
       revokeCredential: unavailable
     },
+    providerOAuthPolicy: qboOAuthPolicy.QBO_PHASE_8B_OAUTH_POLICY,
     clock: () => now
   });
   equal(

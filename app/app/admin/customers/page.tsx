@@ -1,5 +1,4 @@
 import Link from "next/link";
-import type { Route } from "next";
 import { AdminCompanyFilters } from "@/components/admin/AdminCompanyFilters";
 import { AdminCompanyTable } from "@/components/admin/AdminCompanyTable";
 import { AdminPagination } from "@/components/admin/AdminPagination";
@@ -46,7 +45,7 @@ export default async function AdminCustomersPage({ searchParams }: AdminCustomer
       <PageHeader
         eyebrow="Internal admin"
         title="Customers"
-        description="Manage one company per workspace, with contact, lifecycle, subscription, and agreement status in one directory."
+        description="One customer record per workspace. Manage workspace access and subscription records here; login accounts are separate."
       />
       <ErrorNotice message={params.error || (companyPage.error ? "The company directory could not be loaded." : null)} />
       <AdminCompanyFilters basePath="/app/admin/customers" filters={filters} />
@@ -56,10 +55,9 @@ export default async function AdminCustomersPage({ searchParams }: AdminCustomer
         <AdminPagination basePath="/app/admin/customers" filters={filters} total={companyPage.count} />
       </SectionCard>
 
-      <SectionCard
-        title="Unlinked customer records"
-        description="Profiles, subscriptions, and activation requests not represented as separate company rows remain available for investigation."
-      >
+      <details className="rounded-xl border border-line bg-white p-4 shadow-panel" open={Boolean(unlinked.error)}>
+        <summary className="cursor-pointer font-semibold text-ink">Unlinked customer records{unlinked.error ? " · unavailable" : ` · ${unlinkedRows.length}${unlinkedRows.length === 25 ? "+" : ""}`}</summary>
+        <p className="my-3 text-sm text-muted">Profiles, subscriptions, and activation requests without a linked workspace. These are not additional workspace accounts. Showing up to 25 recent records.</p>
         {unlinked.error ? <ErrorNotice message="Unlinked customer records could not be loaded." /> : null}
         <div className="divide-y divide-line">
           {unlinkedRows.length ? unlinkedRows.map((record) => (
@@ -73,9 +71,9 @@ export default async function AdminCustomersPage({ searchParams }: AdminCustomer
                 <Link href="/app/admin/subscriptions" className="text-sm font-semibold text-vaeroex-blue hover:underline">Review activation</Link>
               ) : <span className="text-xs font-medium text-slate-500">{record.record_type.replace("_", " ")}</span>}
             </article>
-          )) : <EmptyState title="No unlinked records" description="No unlinked customer records match the current search." />}
+          )) : !unlinked.error ? <EmptyState title="No unlinked records" description="No unlinked customer records match the current search." /> : null}
         </div>
-      </SectionCard>
+      </details>
     </div>
   );
 }

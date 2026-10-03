@@ -106,23 +106,24 @@ export function ThemeControls({ variant = "panel" }: ThemeControlsProps) {
     );
   }
 
-  return (
-    <div className="space-y-5">
-      <div className="rounded-lg border border-vaeroex-silver bg-white p-5 shadow-panel dark:border-vaeroex-dark-border dark:bg-vaeroex-dark-card">
-        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-vaeroex-blue">Theme Settings</p>
-            <h2 className="mt-2 text-xl font-semibold text-ink">Choose your Vaeroex appearance</h2>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
-              Pulsar is the default Vaeroex visual identity. System and Light remain available when you want them.
-            </p>
-          </div>
-          <span className="inline-flex w-fit rounded-full border border-vaeroex-accent/40 bg-vaeroex-soft px-3 py-1 text-xs font-semibold text-vaeroex-blue dark:bg-white/10 dark:text-vaeroex-accent">
-            Current: {resolvedThemeLabel(resolvedMode)}
-          </span>
-        </div>
+  const preferenceLabel = preferences.find((item) => item.value === preference)?.label ?? "Pulsar";
 
-        <div className="mt-5 grid gap-3 lg:grid-cols-3">
+  return (
+    <details className="workspace-secondary-details workspace-settings-appearance rounded-lg border border-vaeroex-silver bg-white p-4 dark:border-vaeroex-dark-border dark:bg-vaeroex-dark-card sm:p-5">
+      <summary className="cursor-pointer rounded-md text-ink outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-blue focus-visible:ring-offset-2">
+        <span className="ml-1 inline-flex max-w-full flex-wrap items-center gap-x-4 gap-y-1 align-middle">
+          <span className="text-base font-semibold">Appearance</span>
+          <span className="text-sm text-muted">
+            Current: {preferenceLabel}{preference === "system" ? ` · ${resolvedThemeLabel(resolvedMode)}` : ""}
+          </span>
+          <span className="text-sm font-semibold text-vaeroex-blue">Change theme</span>
+        </span>
+      </summary>
+
+      <div className="mt-4 border-t border-line pt-4">
+        <p className="text-sm text-muted">Theme settings are personal to this browser. Workspace access and account permissions remain unchanged.</p>
+
+        <div className="mt-4 grid gap-3 lg:grid-cols-3" aria-label="Theme choices">
           {preferences.map((item) => {
             const active = preference === item.value;
             const activeClass =
@@ -148,23 +149,22 @@ export function ThemeControls({ variant = "panel" }: ThemeControlsProps) {
             );
           })}
         </div>
+        <details className="mt-4 rounded-lg border border-line p-3">
+          <summary className="cursor-pointer rounded-md text-sm font-semibold text-ink outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-blue focus-visible:ring-offset-2">Theme preview</summary>
+          <div className="mt-3 grid gap-3 lg:grid-cols-3">
+            {[
+              ["Business Health", "Executive scorecard surfaces stay high contrast."],
+              ["Search and Intelligence", "Search locates records; Intelligence provides structured, evidence-backed analysis."],
+              ["Pulsar", "Signal accents create the official Vaeroex visual experience without sacrificing readability."]
+            ].map(([title, description]) => (
+              <div key={title} className="rounded-lg border border-line bg-slate-50 p-4 dark:border-vaeroex-dark-border dark:bg-vaeroex-dark-secondary">
+                <p className="text-sm font-semibold text-vaeroex-blue">{title}</p>
+                <p className="mt-2 text-sm leading-6 text-muted">{description}</p>
+              </div>
+            ))}
+          </div>
+        </details>
       </div>
-
-      <div className="rounded-lg border border-vaeroex-silver bg-white p-5 shadow-panel dark:border-vaeroex-dark-border dark:bg-vaeroex-dark-card">
-        <p className="text-sm font-semibold text-ink">Premium Theme Preview</p>
-        <div className="mt-4 grid gap-3 lg:grid-cols-3">
-          {[
-            ["Business Health", "Executive scorecard surfaces stay high contrast."],
-            ["Search and Intelligence", "Search locates records; Intelligence provides structured, evidence-backed analysis."],
-            ["Pulsar", "Signal accents create the official Vaeroex visual experience without sacrificing readability."]
-          ].map(([title, description]) => (
-            <div key={title} className="rounded-lg border border-line bg-slate-50 p-4 dark:border-vaeroex-dark-border dark:bg-vaeroex-dark-secondary">
-              <p className="text-sm font-semibold text-vaeroex-blue">{title}</p>
-              <p className="mt-2 text-sm leading-6 text-muted">{description}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
+    </details>
   );
 }

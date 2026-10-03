@@ -17,7 +17,6 @@ import { PrimaryButton, TextArea, TextInput } from "@/components/operations/Form
 import { ManagedRecordList, type ManagedRecordEditField } from "@/components/operations/ManagedRecordList";
 import { ModuleTabs } from "@/components/operations/ModuleTabs";
 import { PageHeader } from "@/components/operations/PageHeader";
-import { spatialSurfaceClassName } from "@/components/spatial/SpatialSurface";
 import { filterBySourceParentEligibility, loadSourceParentEligibilityResult } from "@/lib/intelligence/source-parent-eligibility";
 import { buildIntelligenceSnapshotFromProducersV1 } from "@/lib/intelligence/snapshot/v1/composition";
 import {
@@ -71,6 +70,7 @@ import {
 } from "@/lib/kpis/semantics";
 import { getRecordFolders, managedValues, shortPreview } from "@/lib/records/management";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
+import { listBatchCount, performanceSection } from "@/lib/presentation/list-batch";
 import type { Database } from "@/lib/supabase/types";
 
 type KpisPageProps = {
@@ -91,6 +91,8 @@ type KpisPageProps = {
     end?: string;
     q?: string;
     limit?: string;
+    metricSearch?: string | string[];
+    category?: string | string[];
   }>;
 };
 
@@ -296,17 +298,21 @@ function SuccessNotice({ message }: { message?: string | null }) {
 function TimelineControls({
   timeline,
   range,
-  status
+  status,
+  metricSearch,
+  category
 }: {
   timeline: KpiTimeline;
   range: { label: string; startDate: string; endDate: string };
   status: KpiStatusFilter;
+  metricSearch?: string;
+  category?: string;
 }) {
   return (
-    <details open={timeline !== "90D"} className="rounded-lg border border-white/10 bg-[#08111f] text-slate-100 shadow-panel">
+    <details open={timeline !== "90D"} className="workspace-performance-range rounded-lg border border-white/10 bg-[#08111f] text-slate-100 shadow-panel">
       <summary className="flex cursor-pointer list-none flex-col gap-2 p-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-sm font-semibold text-white">Timeline: {timeline}</p>
+          <p className="text-sm font-semibold text-white">Chart date range: {timeline}</p>
           <p className="mt-1 text-xs leading-5 text-slate-400">
             {range.label}: {range.startDate} to {range.endDate}
           </p>
@@ -316,11 +322,12 @@ function TimelineControls({
         </span>
       </summary>
       <div className="border-t border-white/10 p-4">
+        <p className="mb-3 text-xs text-muted">Date range applies to comparison charts and records. The list and detail history retain all recorded dates.</p>
         <div className="flex flex-wrap gap-2">
           {KPI_TIMELINES.map((item) => (
             <Link
               key={item}
-              href={timelineHref(item, status)}
+              href={kpiHref({ timeline: item, status, metricSearch, category })}
               className={`rounded-lg border px-3 py-2 text-xs font-semibold transition ${
                 item === timeline
                   ? "border-vaeroex-blue bg-vaeroex-blue text-white"
@@ -331,9 +338,11 @@ function TimelineControls({
             </Link>
           ))}
         </div>
-        {timeline === "Custom Range" ? <form method="get" className="mt-4 grid gap-3 md:grid-cols-[1fr_1fr_auto]">
+        {timeline === "Custom Range" ? <form method="get" action="/app/kpis" className="mt-4 grid gap-3 md:grid-cols-[1fr_1fr_auto]">
           <input type="hidden" name="timeline" value="Custom Range" />
           {status !== "all" ? <input type="hidden" name="status" value={status} /> : null}
+          {metricSearch ? <input type="hidden" name="metricSearch" value={metricSearch} /> : null}
+          {category ? <input type="hidden" name="category" value={category} /> : null}
           <label className="block text-xs font-semibold uppercase tracking-wide text-slate-400">
             Start
             <input
@@ -399,47 +408,16 @@ function SummaryStat({ label, value, detail, tone = "neutral" }: { label: string
   );
 }
 
-function StatusFilterCard({
-  label,
-  value,
-  detail,
-  tone,
-  active,
-  href
-}: {
-  label: string;
-  value: string | number;
-  detail: string;
-  tone: KpiTone;
-  active: boolean;
-  href: Route;
-}) {
-  const status = statusForTone(tone);
-  return (
-    <Link
-      href={href}
-      aria-current={active ? "true" : undefined}
-      className={`${spatialSurfaceClassName({ depth: active ? "raised" : "subtle", interactive: true, selected: active })} vaeroex-semantic-interactive ${toneClasses(tone)} block rounded-lg border p-3 transition ${active ? "shadow-panel ring-2 ring-current/30" : "hover:brightness-[1.03]"}`}
-    >
-      <span className="text-xs font-semibold uppercase tracking-[0.14em] opacity-80">{label}</span>
-      <span className="mt-2 block text-2xl font-semibold">{value}</span>
-      <span className="mt-1 block text-xs leading-5 opacity-80">{detail}</span>
-    </Link>
-  );
-}
-
 function KpiTile({
   kpi,
   deterministic,
   settings,
-  color,
-  index
+  href
 }: {
   kpi: KpiRow;
   deterministic: KpiPageConsumerStateV1;
   settings: KpiSettingRow[];
-  color: string;
-  index: number;
+  href: Route;
 }) {
   const direction = deterministic.semantics.desiredDirection;
   const targetReference = deterministic.targetReference;
@@ -450,30 +428,25 @@ function KpiTile({
     hasTarget: targetReference.kind !== "none",
     hasDirection: direction !== "unknown"
   });
-  const href = `/app/kpis?metric=${encodeURIComponent(kpi.name)}&section=detail#kpi-detail` as Route;
   const difference = kpi.actual_value !== null && targetReference.kind === "scalar"
     ? formatNumericValue(kpi.actual_value - targetReference.value, kpi.name)
     : "Not available";
 
   return (
-    <article className={`${spatialSurfaceClassName({ depth: "subtle", interactive: true })} vaeroex-semantic-card vaeroex-priority-surface ${semanticStatusClass(semanticStatus)} rounded-lg border p-3 text-slate-100 shadow-panel`}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: color }} />
-            <h2 className="truncate text-sm font-semibold text-white">{kpi.name}</h2>
-          </div>
+    <li className="workspace-metric-row" data-performance-metric-row={kpi.name}>
+      <Link href={href} className="workspace-metric-row-link">
+        <div className="workspace-metric-identity">
+          <h2>{kpi.name}</h2>
+          <p>{kpi.category || "Not categorized"}</p>
         </div>
-        <KpiStatusBadge label={deterministic.statusText} status={semanticStatus} />
-      </div>
-      <p className="mt-3 text-2xl font-semibold text-white">{formatSettingValue(kpi.actual_value, kpi.name, settings)}</p>
-      <div className="mt-3 grid gap-2 text-xs leading-5 text-slate-300 sm:grid-cols-3">
-        <p>
-          <span className="block text-slate-500">Target</span>
-          {formatTargetReference(targetReference, kpi.name, settings)}
-        </p>
-        <p>
-          <span className="block text-slate-500">{direction !== "unknown" ? "Performance effect" : "Difference"}</span>
+        <div className="workspace-metric-value">
+          <span className="workspace-metric-mobile-label">Current value</span>
+          <strong>{formatSettingValue(kpi.actual_value, kpi.name, settings)}</strong>
+          <p>Target: {formatTargetReference(targetReference, kpi.name, settings)}</p>
+        </div>
+        <div className="workspace-metric-status">
+          <KpiStatusBadge label={deterministic.statusText} status={semanticStatus} />
+          <p><span className={direction !== "unknown" ? "sr-only" : undefined}>{direction !== "unknown" ? "Performance effect: " : "Difference: "}</span>
           {direction !== "unknown"
             ? deterministic.evaluation.rawMovement === "insufficient_data"
               ? "Not enough history"
@@ -485,17 +458,17 @@ function KpiTile({
                     ? "No meaningful change"
                     : deterministic.evaluation.rawMovement === "increased" ? "Increased" : "Decreased"
             : difference}
-        </p>
-        <p>
-          <span className="block text-slate-500">Last updated</span>
-          {kpi.updated_at ? formatShortDate(kpi.updated_at.slice(0, 10)) : formatShortDate(kpi.metric_date)}
-        </p>
-      </div>
-      <Link href={href} className="vaeroex-semantic-interactive mt-3 inline-flex min-h-10 items-center rounded-lg border border-current/25 px-3 py-2 text-xs font-semibold hover:bg-white/40">
-        View details
+          </p>
+        </div>
+        <div className="workspace-metric-period">
+          <span className="workspace-metric-mobile-label">Recorded</span>
+          <time dateTime={kpi.metric_date}>{formatLongDate(kpi.metric_date)}</time>
+          <p>Updated {kpi.updated_at ? formatShortDate(kpi.updated_at.slice(0, 10)) : formatShortDate(kpi.metric_date)}</p>
+        </div>
+        <span className="workspace-metric-open" aria-hidden="true">↗</span>
+        <span className="sr-only">View details and history</span>
       </Link>
-      <span className="sr-only">KPI tile {index + 1}</span>
-    </article>
+    </li>
   );
 }
 
@@ -663,10 +636,6 @@ function timelineRange(timeline: KpiTimeline, rows: KpiRow[], customStart?: stri
 
 function filterKpisByTimeline(rows: KpiRow[], range: { startDate: string; endDate: string }) {
   return rows.filter((row) => row.metric_date >= range.startDate && row.metric_date <= range.endDate);
-}
-
-function timelineHref(timeline: KpiTimeline, status: KpiStatusFilter) {
-  return kpiHref({ timeline, status });
 }
 
 function compareHref({
@@ -1155,7 +1124,7 @@ function KpiSettingHiddenFields({
       <input type="hidden" name="display_unit" value={setting?.display_unit ?? ""} />
       <input type="hidden" name="value_format" value={setting?.value_format ?? ""} />
       <input type="hidden" name="x_axis_label" value={setting?.x_axis_label ?? "Date"} />
-      <input type="hidden" name="y_axis_label" value={setting?.y_axis_label ?? metricName} />
+      <input type="hidden" name="y_axis_label" value={setting?.y_axis_label ?? metricName.slice(0, 80).replace(/[\uD800-\uDBFF]$/, "")} />
       <input type="hidden" name="preferred_chart_type" value={setting?.preferred_chart_type ?? "line"} />
       <input type="hidden" name="is_visible" value={(setting?.is_visible ?? true) ? "true" : "false"} />
     </>
@@ -1495,7 +1464,7 @@ function KpiChartSettingsForm({
         Y-axis label
         <input
           name="y_axis_label"
-          defaultValue={setting?.y_axis_label ?? metricName}
+          defaultValue={setting?.y_axis_label ?? metricName.slice(0, 80).replace(/[\uD800-\uDBFF]$/, "")}
           className="mt-2 min-h-11 w-full rounded-lg border border-white/10 bg-slate-950/70 px-3 py-2 text-sm normal-case tracking-normal text-slate-100 outline-none focus:border-vaeroex-accent"
         />
       </label>
@@ -1599,7 +1568,6 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
   const timeline = isKpiTimeline(params?.timeline) ? params.timeline : "90D";
   const selectedTimelineRange = timelineRange(timeline, adjustedKpis.length ? adjustedKpis : rawKpis, params?.start, params?.end);
   const activeStatusFilter = isKpiStatusFilter(params?.status) ? params.status : "all";
-  const showAllTiles = params?.show === "all";
   const kpis = filterKpisByTimeline(adjustedKpis, selectedTimelineRange);
   const allVisibleKpis = adjustedKpis;
   const people = (peopleResult.data || []) as TeamPersonOption[];
@@ -1665,32 +1633,31 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
   };
   const latestKpiRows = latestRowsByMetric(allVisibleKpis, metricNames);
   const kpiTone = (kpi: KpiRow) => kpiStateForName(kpi.name).tone;
-  const behindTargetCount = latestKpiRows.filter((kpi) => ["red", "yellow"].includes(kpiTone(kpi))).length;
-  const onTrackCount = latestKpiRows.filter((kpi) => kpiTone(kpi) === "green").length;
-  const missingOrStaleCount = metricNames.filter((name) => {
-    const row = latestKpiRows.find((kpi) => kpi.name === name);
-    return !row || row.actual_value === null || !updatedThisMonth(row);
-  }).length;
   const filteredLatestKpiRows = latestKpiRows.filter((kpi) => matchesStatusFilter(kpi, activeStatusFilter, kpiTone(kpi)));
   const filteredMetricNames = new Set(filteredLatestKpiRows.map((kpi) => kpi.name));
   const filteredKpis = activeStatusFilter === "all" ? kpis : kpis.filter((kpi) => filteredMetricNames.has(kpi.name));
-  const visibleTileRows = showAllTiles ? filteredLatestKpiRows : filteredLatestKpiRows.slice(0, INITIAL_KPI_CARD_COUNT);
-  const canToggleTileExpansion = filteredLatestKpiRows.length > INITIAL_KPI_CARD_COUNT;
-  const filterCount = activeStatusFilter === "all" ? metricNames.length : filteredLatestKpiRows.length;
+  // List-only filters never alter the records, comparison or detail datasets.
+  const metricSearchValue = params?.metricSearch;
+  const metricSearch = (Array.isArray(metricSearchValue) ? metricSearchValue[0] || "" : metricSearchValue || "").trim();
+  const categoryValue = params?.category;
+  const categoryFilter = Array.isArray(categoryValue) ? categoryValue[0] || "" : categoryValue || "";
+  const metricCategories = [...new Set(latestKpiRows.map((kpi) => kpi.category).filter((category): category is string => Boolean(category)))].sort();
+  const matchingMetricRows = filteredLatestKpiRows.filter((kpi) =>
+    (!metricSearch || `${kpi.name} ${kpi.category || ""}`.toLowerCase().includes(metricSearch.toLowerCase()))
+    && (!categoryFilter || kpi.category === categoryFilter)
+  );
+  const listQuery = { metricSearch, category: categoryFilter };
+  const tileCount = listBatchCount(params?.show, matchingMetricRows.length, INITIAL_KPI_CARD_COUNT);
+  const visibleTileRows = matchingMetricRows.slice(0, tileCount);
+  const canLoadMoreTiles = tileCount < matchingMetricRows.length;
+  const filterCount = matchingMetricRows.length;
   const selectedMetrics = resolveSelectedKpiNames(params?.metric, metricNames);
   const primaryMetric = selectedMetrics[0] || "";
   const selectedTrends = buildTrends(kpis, selectedMetrics, kpiSettings);
   const hasComparison = selectedMetrics.length > 1;
   const comparisonMode = isComparisonMode(params?.mode) ? params.mode : defaultComparisonMode(selectedTrends);
   const selectedComparisonContext = comparisonContext(selectedTimelineRange);
-  const activeSection =
-    params?.section === "compare" || params?.metric === "compare"
-      ? "compare"
-      : params?.section === "records" || params?.sort
-        ? "records"
-        : params?.section === "detail"
-          ? "detail"
-          : "overview";
+  const activeSection = performanceSection(params, primaryMetric);
   const selectedMetricRows = primaryMetric ? getMetricHistoryRows(allVisibleKpis, primaryMetric) : [];
   const selectedMetricActualValues = selectedMetricRows.map((row) => row.actual_value).filter((value): value is number => value !== null);
   const selectedLatestKpi = selectedMetricRows.at(-1);
@@ -1808,10 +1775,10 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
   });
 
   return (
-    <div className="vaeroex-priority-surface space-y-6">
+    <div className="workspace-performance vaeroex-priority-surface space-y-6">
       <PageHeader
         eyebrow="Measurement Layer"
-        title="KPIs"
+        title="Performance"
         description="Track the numbers that shape Vaeroex intelligence."
         actions={
           <div className="flex flex-wrap gap-2">
@@ -1826,7 +1793,7 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
       />
       <ModuleTabs
         tabs={[
-          { label: "Overview", href: kpiHref({ ...timelineQueryParams(timeline, selectedTimelineRange), status: activeStatusFilter }), active: activeSection === "overview" || activeSection === "detail" },
+          { label: "Overview", href: kpiHref({ ...timelineQueryParams(timeline, selectedTimelineRange), ...listQuery, status: activeStatusFilter, show: params?.show }), active: activeSection === "overview" || activeSection === "detail" },
           { label: "Compare", href: "/app/kpis?section=compare" as Route, active: activeSection === "compare" }
         ]}
       />
@@ -1853,76 +1820,66 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
 
       {activeSection === "overview" || activeSection === "detail" ? (
         <>
-          <TimelineControls timeline={timeline} range={selectedTimelineRange} status={activeStatusFilter} />
-
-          <section className="grid gap-3 sm:grid-cols-3">
-            <StatusFilterCard
-              label="On Track"
-              value={onTrackCount}
-              detail="Latest value meets target"
-              tone={onTrackCount ? "green" : "neutral"}
-              active={activeStatusFilter === "on-track"}
-              href={kpiHref({ ...timelineQueryParams(timeline, selectedTimelineRange), status: "on-track" })}
-            />
-            <StatusFilterCard
-              label="Needs Attention"
-              value={behindTargetCount}
-              detail="Explicit target direction only"
-              tone={behindTargetCount ? "red" : "green"}
-              active={activeStatusFilter === "behind-target"}
-              href={kpiHref({ ...timelineQueryParams(timeline, selectedTimelineRange), status: "behind-target" })}
-            />
-            <StatusFilterCard
-              label="Missing or Stale"
-              value={missingOrStaleCount}
-              detail="Needs a current update"
-              tone={missingOrStaleCount ? "yellow" : "green"}
-              active={activeStatusFilter === "missing-data"}
-              href={kpiHref({ ...timelineQueryParams(timeline, selectedTimelineRange), status: "missing-data" })}
-            />
+          {activeSection === "overview" ? <>
+          <section aria-label="Performance summary" className="workspace-performance-summary space-y-3">
+            <div className="workspace-metric-summary-strip">
+              <p data-performance-counts data-total={latestKpiRows.length} data-matching={filterCount} data-shown={visibleTileRows.length}>
+                <strong>{filterCount}</strong> matching metrics <span>· {latestKpiRows.length} total · {visibleTileRows.length} shown</span>
+              </p>
+              <Link href={kpiHref({ ...timelineQueryParams(timeline, selectedTimelineRange), ...listQuery, status: activeStatusFilter === "behind-target" ? "all" : "behind-target" })} aria-current={activeStatusFilter === "behind-target" ? "true" : undefined} className="workspace-metric-attention" title="Metrics with the existing Behind or Near Target status">
+                Needs attention <span aria-hidden="true">{activeStatusFilter === "behind-target" ? "✓" : "→"}</span>
+              </Link>
+            </div>
+            <form key={`${metricSearch}:${categoryFilter}:${activeStatusFilter}`} method="get" action="/app/kpis" aria-label="Filter metrics" className="workspace-metric-filters">
+              <input type="hidden" name="timeline" value={timeline} />
+              {timeline === "Custom Range" ? <><input type="hidden" name="start" value={selectedTimelineRange.startDate} /><input type="hidden" name="end" value={selectedTimelineRange.endDate} /></> : null}
+              <label className="workspace-metric-search">Search metrics<input name="metricSearch" type="search" defaultValue={metricSearch} placeholder="Metric name or category" /></label>
+              <label>Category<select key={JSON.stringify([categoryFilter, metricCategories])} name="category" defaultValue={categoryFilter}><option value="">All categories</option>{categoryFilter && !metricCategories.includes(categoryFilter) ? <option value={categoryFilter}>{categoryFilter} (not available)</option> : null}{metricCategories.map((category) => <option key={category} value={category}>{category}</option>)}</select></label>
+              <label>Status<select name="status" defaultValue={activeStatusFilter}><option value="all">All statuses</option><option value="on-track">On track</option><option value="behind-target">Needs attention</option><option value="missing-data">Missing or stale</option><option value="updated-this-month">Updated this month</option></select></label>
+              <button type="submit" className="workspace-metric-filter-submit">Apply filters</button>
+            </form>
+            <div className="workspace-metric-context">
+              <p>{metricSearch || categoryFilter || activeStatusFilter !== "all" ? <>Filters: {metricSearch ? `“${metricSearch}” · ` : ""}{categoryFilter ? `${categoryFilter} · ` : ""}{activeStatusFilter === "all" ? "All statuses" : statusFilterLabel(activeStatusFilter)}</> : "Latest recorded values across all available history."}</p>
+              {metricSearch || categoryFilter || activeStatusFilter !== "all" ? <Link href={kpiHref({ ...timelineQueryParams(timeline, selectedTimelineRange), status: "all" })}>Clear filters</Link> : null}
+            </div>
+            {metricNames.length > latestKpiRows.length ? <p className="text-xs text-muted">{metricNames.length - latestKpiRows.length} additional configured metrics have no recorded observations.</p> : null}
+            <TimelineControls timeline={timeline} range={selectedTimelineRange} status={activeStatusFilter} metricSearch={metricSearch} category={categoryFilter} />
           </section>
 
-          <div className="flex flex-col gap-2 rounded-lg border border-white/10 bg-[#08111f] px-4 py-3 text-sm text-slate-300 sm:flex-row sm:items-center sm:justify-between">
-            <p>
-              Showing <span className="font-semibold text-white">{filterCount}</span> {statusFilterLabel(activeStatusFilter)} KPI{filterCount === 1 ? "" : "s"}.
-            </p>
-            {activeStatusFilter !== "all" ? (
-              <Link href={kpiHref({ ...timelineQueryParams(timeline, selectedTimelineRange), status: "all" })} className="w-fit text-xs font-semibold text-vaeroex-accent underline underline-offset-4">
-                Clear filter
-              </Link>
-            ) : null}
-          </div>
-
-          {filteredLatestKpiRows.length ? (
-            <section className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
-              {visibleTileRows.map((kpi, index) => (
+          {matchingMetricRows.length ? (
+            <section aria-label="KPI performance" className="workspace-metric-list">
+              <div className="workspace-metric-table-heading" aria-hidden="true"><span>Metric / category</span><span>Current / target</span><span>Status / change</span><span>Recorded / updated</span><span /></div>
+              <ul aria-label="Metrics">
+              {visibleTileRows.map((kpi) => (
                 <KpiTile
                   key={kpi.id}
                   kpi={kpi}
                   deterministic={kpiStateForName(kpi.name)}
                   settings={kpiSettings}
-                  color={kpiColor(kpi.name, kpiSettings, index)}
-                  index={index}
+                  href={`${kpiHref({ ...timelineQueryParams(timeline, selectedTimelineRange), ...listQuery, status: activeStatusFilter, show: params?.show, metric: kpi.name, section: "detail" })}#kpi-detail` as Route}
                 />
               ))}
+              </ul>
             </section>
           ) : (
-            <EmptyState title="No KPIs match this filter" description="Clear the filter, create a KPI manually, or import reviewed CSV/XLSX data to continue building the measurement layer." />
+            <EmptyState title={latestKpiRows.length ? "No metrics match these filters" : "No recorded metrics yet"} description={latestKpiRows.length ? "Try a different search, category or status. Your saved metrics have not changed." : "Create a KPI or import reviewed data to begin. Missing information is not a zero result."} />
           )}
 
-          {canToggleTileExpansion ? (
+          {canLoadMoreTiles ? (
             <div className="flex justify-center">
               <Link
-                href={kpiHref({ ...timelineQueryParams(timeline, selectedTimelineRange), status: activeStatusFilter, show: showAllTiles ? null : "all" })}
+                href={kpiHref({ ...timelineQueryParams(timeline, selectedTimelineRange), ...listQuery, status: activeStatusFilter, show: tileCount + INITIAL_KPI_CARD_COUNT })}
                 className="rounded-lg border border-white/10 px-4 py-2 text-sm font-semibold text-cyan-100 hover:border-vaeroex-accent/50 hover:bg-cyan-950/40 hover:text-vaeroex-accent"
               >
-                {showAllTiles ? "Show fewer KPIs" : `Show all ${filteredLatestKpiRows.length} KPIs`}
+                Show next {Math.min(INITIAL_KPI_CARD_COUNT, matchingMetricRows.length - tileCount)} metrics
               </Link>
             </div>
           ) : null}
+          </> : null}
 
           {activeSection === "detail" && primaryMetric ? (
-            <section id="kpi-detail" className="grid gap-4 xl:grid-cols-[1.15fr_.85fr]">
+            <section id="kpi-detail" className="workspace-kpi-detail grid gap-4 xl:grid-cols-[1.15fr_.85fr]">
+              <Link href={kpiHref({ ...timelineQueryParams(timeline, selectedTimelineRange), ...listQuery, status: activeStatusFilter, show: params?.show })} className="inline-flex min-h-11 w-fit items-center text-sm font-semibold text-vaeroex-accent hover:underline xl:col-span-2">← Back to Performance</Link>
               <div className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-panel">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div>
@@ -1992,7 +1949,7 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
                   ) : null}
                 </div>
               </div>
-              <div className="space-y-4">
+              <div className="workspace-kpi-detail-controls space-y-4">
                 {selectedRecommendation ? (
                   <KpiTargetRecommendationPanel
                     metricName={primaryMetric}
@@ -2073,7 +2030,7 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
       ) : null}
 
       {activeSection === "compare" ? (
-        <section id="trend-analysis" className="space-y-5">
+        <section id="trend-analysis" className="workspace-kpi-compare space-y-5">
           {metricNames.length ? (
             <>
               <div className="space-y-5 rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-panel">
@@ -2195,7 +2152,7 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
                 </form>
               </div>
 
-              <div className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-panel">
+              <div className="workspace-kpi-comparison-result rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-panel">
                 <div className="mb-4">
                   <h2 className="text-base font-semibold text-white">KPI comparison</h2>
                   <p className="mt-1 text-sm leading-6 text-slate-400">

@@ -4,7 +4,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import { useRouter } from "next/navigation";
 import { Check, ChevronRight, History, Pin, PinOff, X } from "lucide-react";
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { explainFindingAction } from "@/app/app/finding-explanation/actions";
 import { mutateIntelligenceCardLifecycleAction } from "@/app/app/intelligence/lifecycle-actions";
 import { SaveAnalysisButton } from "@/components/reports/SaveAnalysisButton";
@@ -62,7 +62,10 @@ function formatSignalDate(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "Date unavailable";
 
-  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(date);
+  // Reporting dates are calendar days, not browser-local midnight instants.
+  // Actual timestamps use an explicit, labeled zone on both server and client.
+  const label = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }).format(date);
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) ? label : `${label} UTC`;
 }
 
 function formatLifecycleTimestamp(value: string) {
@@ -71,8 +74,9 @@ function formatLifecycleTimestamp(value: string) {
 
   return new Intl.DateTimeFormat("en-US", {
     dateStyle: "medium",
-    timeStyle: "short"
-  }).format(date);
+    timeStyle: "short",
+    timeZone: "UTC"
+  }).format(date) + " UTC";
 }
 
 function dismissalReasonLabel(reason: IntelligenceCardLifecycleReason | null) {
@@ -128,7 +132,7 @@ function PanelTabs({
   ];
 
   return (
-    <div className={`grid ${analysisAvailable ? "grid-cols-3" : "grid-cols-2"} rounded-lg border border-white/10 bg-slate-950/50 p-1`} role="tablist" aria-label="Selected finding view">
+    <div className={`workspace-finding-tabs grid ${analysisAvailable ? "grid-cols-3" : "grid-cols-2"} rounded-lg border border-white/10 bg-slate-950/50 p-1`} role="tablist" aria-label="Selected finding view">
       {tabs.map((tab) => (
         <button
           key={tab.id}
@@ -463,7 +467,8 @@ export function IntelligenceSignalInbox({
   const requestedCard = initialFindingId ? [...currentCards, ...historyCards].find((card) => card.findingId === initialFindingId) : null;
   const [lifecycleView, setLifecycleView] = useState<LifecycleView>(requestedCard?.view || "current");
   const [activeType, setActiveType] = useState<SignalView>("All");
-  const [selectedKey, setSelectedKey] = useState<string>(requestedCard?.findingKeyHash || currentCards[0]?.findingKeyHash || historyCards[0]?.findingKeyHash || "");
+  const [selectedKey, setSelectedKey] = useState<string>(() => requestedCard?.findingKeyHash || sortIntelligenceLifecycleCardsV1(currentCards)[0]?.findingKeyHash || "");
+  const [mobileDetailOpen, setMobileDetailOpen] = useState(Boolean(requestedCard));
   const [hideLowConfidence, setHideLowConfidence] = useState(false);
   const [visibleCount, setVisibleCount] = useState(pageSize);
   const [panelMode, setPanelMode] = useState<PanelMode>("summary");
@@ -475,6 +480,14 @@ export function IntelligenceSignalInbox({
   const [isExplanationPending, startExplanationTransition] = useTransition();
   const [isLifecyclePending, startLifecycleTransition] = useTransition();
   const explanationInFlight = useRef<Set<string>>(new Set());
+  const detailRef = useRef<HTMLElement>(null);
+  const listReturnRef = useRef<{ top: number; trigger: HTMLButtonElement | null }>({ top: 0, trigger: null });
+
+  useEffect(() => {
+    if (!mobileDetailOpen || !window.matchMedia("(max-width: 1279px)").matches) return;
+    detailRef.current?.focus({ preventScroll: true });
+    detailRef.current?.scrollIntoView({ block: "start" });
+  }, [mobileDetailOpen, selectedKey]);
 
   const viewCards = lifecycleView === "current" ? currentCards : historyCards;
   const counts = useMemo(
@@ -488,38 +501,72 @@ export function IntelligenceSignalInbox({
       .filter((card) => !hideLowConfidence || card.snapshot.confidence !== "Low")),
     [activeType, hideLowConfidence, viewCards]
   );
-  const pagedCards = activeType === "All" && lifecycleView === "current" ? filteredCards : filteredCards.slice(0, visibleCount);
-  const selectedCard = selectedKey ? filteredCards.find((card) => card.findingKeyHash === selectedKey) || pagedCards[0] || null : pagedCards[0] || null;
+  const pagedCards = filteredCards.slice(0, visibleCount);
+  const selectedCard = selectedKey ? filteredCards.find((card) => card.findingKeyHash === selectedKey) || pagedCards[0] || null : null;
   const selectedInsight = selectedCard?.insight || null;
   const currentAttention = pagedCards.filter((card) => attentionTypes.has(card.snapshot.type));
   const currentImprovements = pagedCards.filter((card) => improvementTypes.has(card.snapshot.type));
+  const remainingAttention = filteredCards.slice(visibleCount).some((card) => attentionTypes.has(card.snapshot.type));
+  const remainingImprovements = filteredCards.slice(visibleCount).some((card) => improvementTypes.has(card.snapshot.type));
   const totalCurrentAttention = currentCards.filter((card) => attentionTypes.has(card.snapshot.type));
   const totalCurrentImprovements = currentCards.filter((card) => improvementTypes.has(card.snapshot.type));
   const surfacedAttention = [...currentCards, ...historyCards].filter((card) => card.currentFeedStatus === "surfaced" && attentionTypes.has(card.snapshot.type));
 
   function selectView(view: LifecycleView) {
-    const cards = view === "current" ? currentCards : historyCards;
+    const cards = sortIntelligenceLifecycleCardsV1((view === "current" ? currentCards : historyCards)
+      .filter((card) => !hideLowConfidence || card.snapshot.confidence !== "Low"));
     setLifecycleView(view);
     setActiveType("All");
     setSelectedKey(cards[0]?.findingKeyHash || "");
+    setMobileDetailOpen(false);
     setVisibleCount(pageSize);
     setPanelMode("summary");
     setDismissOpen(false);
   }
 
   function selectType(type: SignalView) {
-    const firstCard = type === "All" ? viewCards[0] : viewCards.find((card) => card.snapshot.type === type);
+    const firstCard = sortIntelligenceLifecycleCardsV1(viewCards
+      .filter((card) => type === "All" || card.snapshot.type === type)
+      .filter((card) => !hideLowConfidence || card.snapshot.confidence !== "Low"))[0];
     setActiveType(type);
     setSelectedKey(firstCard?.findingKeyHash || "");
+    setMobileDetailOpen(false);
     setVisibleCount(pageSize);
     setPanelMode("summary");
     setDismissOpen(false);
   }
 
-  function selectCard(card: IntelligenceLifecycleCardV1) {
+  function changeConfidenceFilter(hide: boolean) {
+    const nextCards = sortIntelligenceLifecycleCardsV1(viewCards
+      .filter((card) => activeType === "All" || card.snapshot.type === activeType)
+      .filter((card) => !hide || card.snapshot.confidence !== "Low"));
+    if (selectedKey && !nextCards.some((card) => card.findingKeyHash === selectedKey) && nextCards[0]) {
+      setSelectedKey(nextCards[0].findingKeyHash);
+      setPanelMode("summary");
+      setDismissOpen(false);
+    }
+    setHideLowConfidence(hide);
+    setVisibleCount(pageSize);
+    setMobileDetailOpen(false);
+  }
+
+  function selectCard(card: IntelligenceLifecycleCardV1, trigger: HTMLButtonElement) {
+    listReturnRef.current = { top: window.scrollY, trigger };
     setSelectedKey(card.findingKeyHash);
+    setMobileDetailOpen(true);
     setPanelMode("summary");
     setDismissOpen(false);
+  }
+
+  function backToList() {
+    setMobileDetailOpen(false);
+    setSelectedKey("");
+    setDismissOpen(false);
+    const { top, trigger } = listReturnRef.current;
+    window.requestAnimationFrame(() => {
+      trigger?.focus({ preventScroll: true });
+      window.scrollTo({ top, behavior: "instant" });
+    });
   }
 
   function requestExplanation(insightId: string) {
@@ -585,7 +632,7 @@ export function IntelligenceSignalInbox({
     const selected = selectedCard?.findingKeyHash === card.findingKeyHash;
     const historyAffordance = card.view === "history";
     return (
-      <button key={card.findingKeyHash} type="button" aria-current={selected ? "true" : undefined} onClick={() => selectCard(card)} className={`${spatialSurfaceClassName({ depth: selected ? "raised" : "subtle", interactive: true, selected })} vaeroex-semantic-card vaeroex-semantic-interactive ${semanticStatusClass(categoryStatus)} block w-full rounded-lg border p-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/80 ${historyAffordance ? "cursor-pointer" : ""} ${selected ? historyAffordance ? "border-cyan-300/55 bg-cyan-950/25 ring-2 ring-cyan-300/55 shadow-[0_0_0_1px_rgba(103,232,249,0.08)]" : "ring-1 ring-current/30" : historyAffordance ? "hover:border-cyan-300/50 hover:bg-cyan-950/20 hover:shadow-md" : "hover:brightness-[1.03]"}`}>
+      <button key={card.findingKeyHash} type="button" data-finding-key={card.findingKeyHash} aria-current={selected ? "true" : undefined} onClick={(event) => selectCard(card, event.currentTarget)} className={`workspace-finding-card ${spatialSurfaceClassName({ depth: selected ? "raised" : "subtle", interactive: true, selected })} vaeroex-semantic-card vaeroex-semantic-interactive ${semanticStatusClass(categoryStatus)} block w-full rounded-lg border p-4 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/80 ${historyAffordance ? "cursor-pointer" : ""} ${selected ? historyAffordance ? "border-cyan-300/55 bg-cyan-950/25 ring-2 ring-cyan-300/55 shadow-[0_0_0_1px_rgba(103,232,249,0.08)]" : "ring-1 ring-current/30" : historyAffordance ? "hover:border-cyan-300/50 hover:bg-cyan-950/20 hover:shadow-md" : "hover:brightness-[1.03]"}`}>
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0">
             <div className="mb-2 flex flex-wrap gap-2">
@@ -595,7 +642,7 @@ export function IntelligenceSignalInbox({
               {statusLabel ? <span className="rounded-full border border-white/15 bg-white/[0.04] px-2.5 py-1 text-xs font-semibold text-slate-200">{statusLabel}</span> : null}
             </div>
             <h3 className="text-sm font-semibold leading-5 text-white">{compactText(card.snapshot.title, 110)}</h3>
-            <p className="mt-1 text-sm leading-5 text-slate-300">{compactText(card.snapshot.summary)}</p>
+            <p className="mt-1 line-clamp-2 text-sm leading-5 text-slate-300">{compactText(card.snapshot.summary)}</p>
           </div>
           <div className="flex shrink-0 flex-col items-end gap-2">
             <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${confidenceClass(card.snapshot.confidence)}`}>Confidence: {card.snapshot.confidence}</span>
@@ -608,29 +655,31 @@ export function IntelligenceSignalInbox({
   }
 
   return (
-    <section className="vaeroex-intelligence-inbox vaeroex-priority-surface rounded-xl border border-white/10 bg-[#07101f] p-4 text-slate-100 shadow-command">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+    <section className="workspace-findings vaeroex-intelligence-inbox vaeroex-priority-surface rounded-xl border border-white/10 bg-[#07101f] p-4 text-slate-100 shadow-command">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-vaeroex-accent">Intelligence</p>
-          <h2 className="mt-1 text-xl font-semibold text-white">Leadership intelligence</h2>
+          <h2 className="text-base font-semibold text-white">Current findings and history</h2>
         </div>
-        <label className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-xs text-slate-200">
-          <input type="checkbox" checked={hideLowConfidence} onChange={(event) => setHideLowConfidence(event.currentTarget.checked)} className="h-4 w-4 rounded border-white/20 bg-slate-950 text-vaeroex-blue focus:ring-vaeroex-accent" />
+        <p className="text-xs text-slate-400">Showing {filteredCards.length ? `1-${pagedCards.length}` : "0"} of {filteredCards.length}.</p>
+      </div>
+
+      <div className="workspace-inbox-toolbar mt-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="inline-grid grid-cols-2 rounded-lg border border-white/10 bg-slate-950/50 p-1" role="tablist" aria-label="Intelligence lifecycle view">
+          {(["current", "history"] as LifecycleView[]).map((view) => (
+            <button key={view} type="button" role="tab" aria-selected={lifecycleView === view} onClick={() => selectView(view)} className={`inline-flex min-h-10 items-center justify-center gap-2 rounded-md px-4 py-2 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/60 ${lifecycleView === view ? "bg-vaeroex-blue text-white" : "text-slate-300 hover:bg-cyan-950/30 hover:text-white"}`}>
+              {view === "current" ? <Check aria-hidden="true" className="h-4 w-4" /> : <History aria-hidden="true" className="h-4 w-4" />}
+              {view === "current" ? "Current" : "History"}
+              <span className="rounded-full bg-white/10 px-2 py-0.5 text-[0.7rem]">{view === "current" ? currentCards.length : historyCards.length}</span>
+            </button>
+          ))}
+        </div>
+        <label className="inline-flex min-h-10 items-center gap-2 text-xs text-slate-300">
+          <input type="checkbox" checked={hideLowConfidence} onChange={(event) => changeConfidenceFilter(event.currentTarget.checked)} className="h-4 w-4 rounded border-white/20 bg-slate-950 text-vaeroex-blue focus:ring-vaeroex-accent" />
           Hide low confidence
         </label>
       </div>
 
-      <div className="mt-4 inline-grid grid-cols-2 rounded-lg border border-white/10 bg-slate-950/50 p-1" role="tablist" aria-label="Intelligence lifecycle view">
-        {(["current", "history"] as LifecycleView[]).map((view) => (
-          <button key={view} type="button" role="tab" aria-selected={lifecycleView === view} onClick={() => selectView(view)} className={`inline-flex min-h-10 items-center justify-center gap-2 rounded-md px-4 py-2 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/60 ${lifecycleView === view ? "bg-vaeroex-blue text-white" : "text-slate-300 hover:bg-cyan-950/30 hover:text-white"}`}>
-            {view === "current" ? <Check aria-hidden="true" className="h-4 w-4" /> : <History aria-hidden="true" className="h-4 w-4" />}
-            {view === "current" ? "Current" : "History"}
-            <span className="rounded-full bg-white/10 px-2 py-0.5 text-[0.7rem]">{view === "current" ? currentCards.length : historyCards.length}</span>
-          </button>
-        ))}
-      </div>
-
-      <div className="mt-4 flex gap-2 overflow-x-auto border-b border-white/10 pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="workspace-finding-categories mt-4 flex gap-2 overflow-x-auto border-b border-white/10 pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {visibleTypes.map((type) => (
           <button key={type} type="button" onClick={() => selectType(type)} className={`inline-flex min-h-10 shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/60 ${activeType === type ? "bg-vaeroex-blue text-white" : "text-slate-300 hover:bg-cyan-950/30 hover:text-white"}`}>
             {typeTabLabel(type)} <span className="rounded-full bg-white/10 px-2 py-0.5 text-[0.7rem]">{counts[type]}</span>
@@ -639,8 +688,7 @@ export function IntelligenceSignalInbox({
       </div>
 
       <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(23rem,.82fr)]">
-        <div className="space-y-5 xl:max-h-[calc(100dvh-10rem)] xl:overflow-y-auto xl:pr-1">
-          <p className="text-xs text-slate-400">Showing {filteredCards.length ? `1-${pagedCards.length}` : "0"} of {filteredCards.length}.</p>
+        <div data-finding-list className={`${mobileDetailOpen && selectedCard ? "hidden xl:block" : "block"} workspace-finding-list space-y-5 xl:max-h-[calc(100dvh-10rem)] xl:overflow-y-auto xl:pr-1`}>
           {lifecycleView === "current" && activeType === "All" ? (
             <>
               <section className="space-y-3" aria-labelledby="attention-findings-heading">
@@ -650,7 +698,7 @@ export function IntelligenceSignalInbox({
                 </div>
                 {currentAttention.length ? currentAttention.map(renderCard) : (
                   <div className="rounded-lg border border-dashed border-white/15 bg-slate-950/35 p-5 text-sm leading-6 text-slate-300">
-                    {hideLowConfidence && totalCurrentAttention.length
+                    {remainingAttention ? "More attention findings are available. Load more to view them." : hideLowConfidence && totalCurrentAttention.length
                       ? "No current attention findings match the selected filter."
                       : surfacedAttention.length
                         ? "No undismissed issues are in the current feed. Dismissed findings remain in History."
@@ -664,7 +712,7 @@ export function IntelligenceSignalInbox({
                   <p className="mt-1 text-xs text-slate-400">Current opportunities, recommendations, and forecasts already produced by deterministic intelligence.</p>
                 </div>
                 {currentImprovements.length ? currentImprovements.map(renderCard) : (
-                  <div className="rounded-lg border border-dashed border-white/15 bg-slate-950/35 p-5 text-sm leading-6 text-slate-300">{hideLowConfidence && totalCurrentImprovements.length ? "No improvement findings match the selected filter." : blockedState?.title || "No evidence-backed improvement finding is currently surfaced."}</div>
+                  <div className="rounded-lg border border-dashed border-white/15 bg-slate-950/35 p-5 text-sm leading-6 text-slate-300">{remainingImprovements ? "More improvement findings are available. Load more to view them." : hideLowConfidence && totalCurrentImprovements.length ? "No improvement findings match the selected filter." : blockedState?.title || "No evidence-backed improvement finding is currently surfaced."}</div>
                 )}
               </section>
             </>
@@ -676,7 +724,7 @@ export function IntelligenceSignalInbox({
           {filteredCards.length > pagedCards.length ? <button type="button" onClick={() => setVisibleCount((count) => count + pageSize)} className="min-h-10 rounded-lg border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-semibold text-slate-100 hover:border-cyan-300/40 hover:bg-cyan-950/30">Load more</button> : null}
         </div>
 
-        <aside className={`${spatialSurfaceClassName({ depth: "raised", selected: Boolean(selectedCard) })} vaeroex-semantic-card ${selectedCard ? semanticStatusClass(findingCategoryStatus(selectedCard.snapshot.type)) : semanticStatusClass("neutral")} rounded-lg border p-4 shadow-panel xl:sticky xl:top-24 xl:max-h-[calc(100dvh-8rem)] xl:self-start xl:overflow-y-auto`}>
+        <aside ref={detailRef} tabIndex={-1} aria-label="Selected finding" className={`${mobileDetailOpen && selectedCard ? "block" : "hidden xl:block"} workspace-finding-detail scroll-mt-24 ${spatialSurfaceClassName({ depth: "raised", selected: Boolean(selectedCard) })} vaeroex-semantic-card ${selectedCard ? semanticStatusClass(findingCategoryStatus(selectedCard.snapshot.type)) : semanticStatusClass("neutral")} rounded-lg border p-4 shadow-panel xl:sticky xl:top-24 xl:max-h-[calc(100dvh-8rem)] xl:self-start xl:overflow-y-auto`}>
           {selectedCard ? (
             <div className="space-y-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
@@ -688,7 +736,7 @@ export function IntelligenceSignalInbox({
                   </div>
                   <h3 className="mt-3 break-words text-lg font-semibold leading-7 text-white">{compactText(selectedCard.snapshot.title, 140)}</h3>
                 </div>
-                <button type="button" onClick={() => setSelectedKey("")} className="min-h-10 rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-slate-300 hover:bg-cyan-950/30 xl:hidden">Back to list</button>
+                <button type="button" onClick={backToList} className="min-h-10 rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-slate-300 hover:bg-cyan-950/30 xl:hidden">← Back to list</button>
               </div>
 
               {selectedCard.view === "history" && selectedCard.lifecycleState === "dismissed" ? <LeadershipDisposition card={selectedCard} /> : null}

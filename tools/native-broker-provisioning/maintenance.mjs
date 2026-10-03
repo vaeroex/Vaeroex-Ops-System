@@ -1,0 +1,218 @@
+import { createHash } from "node:crypto";
+import { execFile } from "node:child_process";
+import { constants, closeSync, fsyncSync, fstatSync, lstatSync, openSync, readFileSync, unlinkSync, writeSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname } from "node:path";
+import { promisify } from "node:util";
+import { createManagedProductionNativeAdapter, createManagedSupabaseNativeAdapter } from "./adapter.mjs";
+import { createManagedProductionProvisioningCoordinator, createManagedSupabaseProvisioningCoordinator } from "./lifecycle.mjs";
+import { createGoogleSecretManagerStagingStore } from "./secret-store.mjs";
+import { createPinnedSecretManagerRestClient } from "./secret-manager-rest.mjs";
+import { createPinnedSupabaseDsnCodec } from "./dsn-codec.mjs";
+import { createPinnedGceMaintenanceIdentity } from "./maintenance-identity.mjs";
+import { readPrivateAdministrator, releasePrivateAdministratorInput } from "./private-entry.mjs";
+import { sandboxProvisioningInstallation } from "./sandbox-profile.mjs";
+import { productionProvisioningInstallation } from "./production-profile.mjs";
+import { maintenanceWindow, requireMutationWindow, requiresClearance, checkRecoveryClearance } from "./maintenance-policy.mjs";
+
+// Dedicated operator CLI. Never imported by an application or invoked on boot.
+// All command arguments are public correlation/target metadata, not credentials.
+// Enter only through the reviewed static maintenance-launcher. The checks below
+// are defense in depth, not protection from hooks that ran before JavaScript.
+let profile;
+try { profile = sandboxProvisioningInstallation(dirname(fileURLToPath(import.meta.url))); profile = Object.freeze({ kind: "sandbox", ...profile }); }
+catch {
+  try { profile = productionProvisioningInstallation(dirname(fileURLToPath(import.meta.url))); }
+  catch { process.stdout.write("native_maintenance_denied\n"); process.exit(2); }
+}
+const { install, target: pinnedTarget, maintenance: pin } = profile;
+const executable = `${install}/native-managed`;
+const journal = `${profile.state}/maintenance.jsonl`;
+const denied = () => new Error("native_maintenance_denied");
+let password, journalFd, lockFd, lockIdentity, native, reservation, store, softTimer, hardTimer, releaseHangup, clearanceExpiry = Infinity, finished = false;
+const lockPath = `${profile.state}/maintenance.lock`;
+const cancellation = new AbortController();
+const cancel = () => cancellation.abort();
+const timedOut = () => cancellation.abort("timeout");
+process.on("SIGINT", cancel); process.on("SIGTERM", cancel);
+
+function trustedFile(path, maximum, privateFile = false) {
+  const stat = lstatSync(path);
+  if (!stat.isFile() || stat.isSymbolicLink() || stat.uid !== 0 || (stat.mode & (privateFile ? 0o077 : 0o022)) || stat.size > maximum) throw denied();
+  return stat;
+}
+function append(event) {
+  // Callers construct only finite schema-checked nonsecret metadata. No errors,
+  // SQL, URLs, input bytes, token values or secret payload are accepted here.
+  const bytes = Buffer.from(JSON.stringify(event) + "\n");
+  if (bytes.length > 4096) throw denied();
+  let offset = 0;
+  while (offset < bytes.length) { const n = writeSync(journalFd, bytes, offset); if (!n) throw denied(); offset += n; }
+  fsyncSync(journalFd);
+}
+async function main() {
+  const [operation, roleOid, intent, approvalId, deadlineText] = process.argv.slice(2);
+  if (process.argv.length !== 7 || process.execArgv.length || process.platform !== "linux" || process.getuid() !== 0 ||
+      fileURLToPath(import.meta.url) !== `${install}/maintenance.mjs` ||
+      !["create", "rotate", "recover", "admit", "reconcile"].includes(operation) || !/^(0|[1-9][0-9]{0,9})$/.test(roleOid ?? "") ||
+      operation === "create" && roleOid !== "0" || operation !== "create" && roleOid === "0" ||
+      ![intent, approvalId].every(x => /^[a-zA-Z0-9_-]{1,80}$/.test(x ?? "")) || !/^[1-9][0-9]{12}$/.test(deadlineText ?? "") ||
+      Object.keys(process.env).some(k => /^(NODE_|PG|LD_|DYLD_|MALLOC|LIBPQ)/.test(k))) throw denied();
+  const deadline = Number(deadlineText);
+  if (operation === "reconcile" && (profile.kind !== "production" || profile.name !== "oauth" || roleOid !== "34220")) throw denied();
+  const window = maintenanceWindow(deadline, Date.now());
+  softTimer = setTimeout(operation === "reconcile" ? timedOut : cancel, window.softCancelAfterMs);
+  // Reconciliation owns bounded drain/fence cleanup. Its hard deadline cancels
+  // work but cannot exit or wipe the administrator input before fencing ends.
+  // Other maintenance modes retain their existing deadline behavior.
+  hardTimer = setTimeout(operation === "reconcile" ? timedOut : () => {
+    cancel(); void native?.abortAndDrain().catch(() => undefined); password?.fill(0);
+    process.stdout.write("native_deadline_interrupted_recovery_required\n"); process.exit(2);
+  }, window.hardStopAfterMs);
+  trustedFile(executable, 1048576);
+  trustedFile(`${install}/native-managed.sha256`, 128);
+  const expectedHash = readFileSync(`${install}/native-managed.sha256`, "ascii").trim();
+  if (!/^[a-f0-9]{64}$/.test(expectedHash) || createHash("sha256").update(readFileSync(executable)).digest("hex") !== expectedHash) throw denied();
+  trustedFile(pinnedTarget.rootCertificate, 16384);
+  if (createHash("sha256").update(readFileSync(pinnedTarget.rootCertificate)).digest("hex") !== pin.caSha256) throw denied();
+  trustedFile(journal, 1048576, true);
+  lockFd = openSync(lockPath, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600);
+  lockIdentity = fstatSync(lockFd);
+  writeSync(lockFd, JSON.stringify({ pid: process.pid, intent, time: Date.now() }) + "\n"); fsyncSync(lockFd);
+  const journalBytes = readFileSync(journal);
+  const prior = journalBytes.toString("utf8").trim().split("\n").filter(Boolean).map(line => JSON.parse(line));
+  if (prior.some(e => e.intent === intent)) throw denied();
+  const last = prior.at(-1);
+  // Existing Sandbox installations never load or expose this Production lane.
+  const admission = operation === "admit" && profile.kind === "production"
+    ? await import("./service-admission.mjs") : undefined;
+  if (operation === "admit" && !admission) throw denied();
+  const admissionVersion = admission ? admission.serviceAdmissionReceipt({ profile, last, roleOid, prior, intent, approvalId,
+    secretParent: pin.secretParent.replace(`projects/${pin.projectId}/`, `projects/${pin.projectNumber}/`) }) : undefined;
+  const reconciliation = operation === "reconcile" ? await import("./existing-candidate-reconciliation.mjs") : undefined;
+  // No process restart silently forgets an interrupted/uncertain invocation.
+  // Recovery requires independent exact-role/version reconciliation recorded by
+  // the operator in the runbook, not a successful-looking audit event.
+  if (reconciliation) {
+    const clearancePath = `${profile.state}/recovery-clearance.json`;
+    trustedFile(clearancePath, 4096, true);
+    clearanceExpiry = reconciliation.checkExistingCandidateClearance({ profile, prior, roleOid, intent, approvalId,
+      journalSha256: createHash("sha256").update(journalBytes).digest("hex"),
+      clearance: JSON.parse(readFileSync(clearancePath, "utf8")), now: Date.now() });
+  } else if (operation !== "admit" && requiresClearance(last, operation)) {
+    const clearancePath = `${profile.state}/recovery-clearance.json`;
+    trustedFile(clearancePath, 4096, true);
+    const clearance = JSON.parse(readFileSync(clearancePath, "utf8"));
+    clearanceExpiry = checkRecoveryClearance({ last, operation, roleOid, intent, approvalId, clearance,
+      now: Date.now(), profile: profile.name, profileKind: profile.kind });
+  }
+  journalFd = openSync(journal, constants.O_WRONLY | constants.O_APPEND | constants.O_NOFOLLOW);
+  const identity = createPinnedGceMaintenanceIdentity({ pin });
+  await identity.verify();
+  const client = createPinnedSecretManagerRestClient({ withAccessToken: identity.withAccessToken,
+    secretParent: pin.secretParent, projectId: pin.projectId, projectNumber: pin.projectNumber });
+  let notify;
+  if (reconciliation) {
+    const hangup = (await import("./service-admission.mjs")).admissionHangup(cancel);
+    process.stdout.on("error", cancel);
+    releaseHangup = () => { hangup(); process.stdout.removeListener("error", cancel); };
+    reconciliation.checkExistingCandidateMetadata(await client.getSecretVersion({ name: reconciliation.existingOAuthCandidate.versionName }));
+  } else if (operation === "admit") {
+    releaseHangup = admission.admissionHangup(cancel);
+    notify = admission.admissionOutput(process.stdout, cancel);
+    const version = await client.getSecretVersion({ name: admissionVersion });
+    if (version.name !== admissionVersion || version.state !== "ENABLED") throw denied();
+  } else await client.preflight();
+  // Public TLS evidence only, before private administrator entry. The presented
+  // chain is never itself promoted to a trust root.
+  const tls = promisify(execFile)("/usr/bin/openssl", ["s_client", "-starttls", "postgres", "-connect", `${pinnedTarget.host}:${pinnedTarget.port}`,
+    "-servername", pinnedTarget.host, "-verify_hostname", pinnedTarget.host, "-CAfile", pinnedTarget.rootCertificate,
+    "-verify_return_error", "-brief"], { env: { PATH: "/usr/bin:/bin", LANG: "C", LC_ALL: "C" },
+    timeout: 10000, maxBuffer: 32768, signal: cancellation.signal });
+  tls.child.stdin.end();
+  await tls;
+  if (cancellation.signal.aborted) throw denied();
+  const entryWindow = maintenanceWindow(deadline, Date.now());
+  process.stdout.write("native_nonsecret_preflight_passed\n");
+  password = await readPrivateAdministrator({ timeoutMs: entryWindow.entryTimeoutMs, signal: cancellation.signal });
+  if (cancellation.signal.aborted) throw denied();
+  requireMutationWindow(deadline, clearanceExpiry, Date.now());
+  const target = Object.freeze({ ...pinnedTarget, roleOid });
+  const adapterOptions = { executable, target, withAdministrator: async (consume, signal) => {
+    if (!password || signal.aborted) throw denied();
+    await consume(password);
+    if (signal.aborted) throw denied();
+    return { ack: true };
+  } };
+  native = profile.kind === "production"
+    ? createManagedProductionNativeAdapter({ ...adapterOptions, profileName: profile.name })
+    : createManagedSupabaseNativeAdapter(adapterOptions);
+  if (reconciliation) {
+    const result = await reconciliation.reconcileExistingOAuthCandidate({ native, client, target, intent, approvalId,
+      signal: cancellation.signal,
+      record: async stage => append({ kind: "existing_candidate_reconciliation", stage, intent, approvalId,
+        priorIntent: reconciliation.existingOAuthCandidate.priorIntent, roleOid,
+        versionName: reconciliation.existingOAuthCandidate.versionName, time: Date.now() }) });
+    // New evidence is appended, never substituted for the old uncertain record.
+    // This is proof, not historical COMMIT confirmation or service admission.
+    // Only its conclusive authenticated/fenced result can qualify a later admit.
+    append({ kind: "existing_candidate_reconciliation_finished", intent, approvalId, time: Date.now(), ...result });
+    finished = true;
+    if (result.failureCategory !== null) process.stdout.write(`native_existing_candidate_failure_${result.failureStage}_${result.failureCategory}\n`);
+    process.stdout.write(`native_${result.outcome}\n`);
+    if (result.outcome !== "existing_candidate_verified_closed") process.exitCode = 2;
+    return;
+  }
+  if (operation === "admit") {
+    // Existing soft cancellation starts a minute before the unchanged hard stop.
+    // Admission fencing has its own 30-second bound; no ACK means reconciliation.
+    const result = await admission.superviseServiceAdmission({ native, target, intent, approvalId, signal: cancellation.signal,
+      record: async stage => append({ kind: "service_admission", stage, intent, approvalId, roleOid,
+        targetRole: target.role, provisioningIntent: last.intent, versionName: admissionVersion, time: Date.now() }),
+      notify });
+    finished = true;
+    process.stdout.write(`native_maintenance_${result.outcome}\n`);
+    if (result.outcome !== "service_closed") process.exitCode = 2;
+    return;
+  }
+  const underlyingStore = createGoogleSecretManagerStagingStore({ client, projectId: pin.projectId,
+    projectNumber: pin.projectNumber, secretParent: pin.secretParent,
+    payloadCodec: createPinnedSupabaseDsnCodec({ role: target.role, projectReference: target.projectReference,
+      host: target.host, port: target.port }) });
+  store = Object.freeze({ ...underlyingStore, reserve(context) { reservation = underlyingStore.reserve(context); return reservation; } });
+  const coordinatorOptions = { target, native, secretStore: store,
+    audit: { async append(event) { append({ kind: "lifecycle", ...event }); return { ack: true }; } } };
+  const coordinator = profile.kind === "production"
+    ? createManagedProductionProvisioningCoordinator({ ...coordinatorOptions, profileName: profile.name })
+    : createManagedSupabaseProvisioningCoordinator(coordinatorOptions);
+  append({ kind: "maintenance_started", actor: pin.serviceAccount, targetRole: pinnedTarget.role, operation, intent, approvalId, time: Date.now() });
+  const result = await coordinator.run({ operation, actor: "isolated_native_postgres_operator", intent, approvalId,
+    deadlineMs: 30000, cleanupTimeoutMs: 10000, signal: cancellation.signal });
+  const metadata = reservation ? store.metadata(reservation) : undefined;
+  append({ kind: "maintenance_finished", time: Date.now(), intent, ...result, ...(metadata ? { secret: metadata } : {}) });
+  process.stdout.write(`native_maintenance_${result.outcome}\n`);
+  if (metadata?.versionName && result.outcome === "staged_ready") process.stdout.write(`native_staged_version ${metadata.versionName}\n`);
+  finished = true;
+  if (result.outcome !== "staged_ready") process.exitCode = 2;
+}
+try { await main(); }
+catch {
+  process.stdout.write("native_maintenance_failed_requires_checked_recovery\n"); process.exitCode = 2;
+} finally {
+  cancellation.abort();
+  await native?.abortAndDrain().catch(() => undefined);
+  if (!finished && reservation) await store.discard(reservation).catch(() => undefined);
+  password?.fill(0); password = undefined;
+  releasePrivateAdministratorInput();
+  clearTimeout(softTimer); clearTimeout(hardTimer);
+  if (journalFd !== undefined) closeSync(journalFd);
+  if (lockFd !== undefined) {
+    closeSync(lockFd);
+    try {
+      const current = lstatSync(lockPath);
+      if (current.dev === lockIdentity.dev && current.ino === lockIdentity.ino) unlinkSync(lockPath);
+    } catch { /* A stale/changed lock requires explicit operator recovery. */ }
+  }
+  process.removeListener("SIGINT", cancel); process.removeListener("SIGTERM", cancel);
+  releaseHangup?.();
+}

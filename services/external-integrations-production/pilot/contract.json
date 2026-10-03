@@ -1,0 +1,433 @@
+{
+  "contractVersion": "square_production_internal_seller_pilot_v3",
+  "environment": "production",
+  "projectId": "vaeroex-integrations-prod",
+  "region": "us-west1",
+  "hostname": "square.vaeroex.com",
+  "callbackUrl": "https://square.vaeroex.com/api/integrations/square/callback",
+  "webhookUrl": "https://square.vaeroex.com/api/integrations/square/webhook",
+  "providerOrigin": "https://connect.squareup.com",
+  "apiVersion": "2026-08-19",
+  "requiredScopes": [
+    "INVENTORY_READ",
+    "ITEMS_READ",
+    "MERCHANT_PROFILE_READ",
+    "ORDERS_READ",
+    "PAYMENTS_READ"
+  ],
+  "database": {
+    "requiredFoundationVersion": "20260902191323",
+    "requiredOverlayVersion": "20260902191324",
+    "requiredOverlayPath": "supabase/migrations/20260902191324_square_production_runtime_overlay.sql",
+    "requiredOverlaySourceCommit": "aec44f42f216ceeb447b2b909eb2c6c78c02340e",
+    "requiredOverlaySha256": "2cc43a9313d056e58b75143f032f347cb0972f45cc1edbd484f6b1fb0574661f",
+    "requiredPostflight": "square_production_overlay_structural_and_authorization_postflight_passed",
+    "requiredOverlayObjects": {
+      "relations": [
+        "private.square_production_configuration_generations",
+        "private.square_production_runtime_bindings",
+        "private.square_production_generation_fences",
+        "private.square_production_lifecycle_audit_events"
+      ],
+      "privateFunctions": [
+        "private.square_production_generation_fingerprint_v1(bigint,text[])",
+        "private.square_production_configuration_fingerprint_v1(bigint,text,text,text,text,text,text,text,text,text,text,text,text,text,text,text,text,text[],text,text,text,text[],text,text,boolean,boolean,boolean,boolean,boolean,boolean,boolean)",
+        "private.reject_square_production_immutable_mutation_v1()",
+        "private.validate_square_production_runtime_binding_v1()",
+        "private.record_square_production_lifecycle_audit_v1()",
+        "private.check_square_production_operational_generation_v1(text,text,text,bigint,text,text)"
+      ],
+      "triggers": [
+        "private.square_production_configuration_generations:square_production_configuration_immutable",
+        "private.square_production_configuration_generations:square_production_configuration_truncate_immutable",
+        "private.square_production_configuration_generations:square_production_configuration_audit",
+        "private.square_production_runtime_bindings:square_production_binding_authority",
+        "private.square_production_runtime_bindings:square_production_binding_immutable",
+        "private.square_production_runtime_bindings:square_production_binding_truncate_immutable",
+        "private.square_production_runtime_bindings:square_production_binding_audit",
+        "private.square_production_generation_fences:square_production_fence_immutable",
+        "private.square_production_generation_fences:square_production_fence_truncate_immutable",
+        "private.square_production_generation_fences:square_production_fence_audit",
+        "private.square_production_lifecycle_audit_events:square_production_audit_immutable",
+        "private.square_production_lifecycle_audit_events:square_production_audit_truncate_immutable"
+      ]
+    },
+    "loginBindings": {
+      "square_production_oauth": "square_production_oauth_authority",
+      "square_production_broker": "square_production_broker_authority",
+      "square_production_scheduler": "square_production_scheduler_authority",
+      "square_production_webhook": "square_production_webhook_authority",
+      "square_production_runtime": "square_production_runtime_authority",
+      "square_production_evidence": "square_production_evidence_authority"
+    },
+    "authorityRpcBindings": {
+      "square_production_oauth_authority": "public.check_square_production_oauth_authority_v1(text,text,text,bigint,text)",
+      "square_production_broker_authority": "public.check_square_production_broker_authority_v1(text,text,text,bigint,text)",
+      "square_production_scheduler_authority": "public.check_square_production_scheduler_authority_v1(text,text,text,bigint,text)",
+      "square_production_webhook_authority": "public.check_square_production_webhook_authority_v1(text,text,text,bigint,text)",
+      "square_production_runtime_authority": "public.check_square_production_runtime_authority_v1(text,text,text,bigint,text)",
+      "square_production_evidence_authority": "public.check_square_production_evidence_authority_v1(text,text,text,bigint,text)"
+    },
+    "loginPolicy": {
+      "superuser": false,
+      "createDatabase": false,
+      "createRole": false,
+      "replication": false,
+      "bypassRls": false,
+      "inherit": false,
+      "directTablePrivileges": false,
+      "authorityMembershipsPerLogin": 1
+    }
+  },
+  "reviewedProductionRelease": {
+    "sharedBootstrapSourceCommit": "f4915edadbe2abddd7993c74c1fc3e80e1d1f821",
+    "sharedBootstrapImageDigest": "us-west1-docker.pkg.dev/vaeroex-integrations-prod/vaeroex-integrations-images/production-bootstrap@sha256:d56fe933eab1322bb4fe905b183964a980d641af23d69904e15989add501dc6f",
+    "oauthCallbackSourceCommit": "45cc2193dd87270ef413f2e21c65cf3b05c1c255",
+    "oauthCallbackImageDigest": "us-west1-docker.pkg.dev/vaeroex-integrations-prod/vaeroex-integrations-images/production-bootstrap@sha256:ebd5e50ab854ca3de3f49ee51ea8fbef0dfa5510b74c19b0ec6e9c367fffeddf",
+    "callbackEdgeSourceCommit": "45cc2193dd87270ef413f2e21c65cf3b05c1c255",
+    "callbackEdgeImageDigest": "us-west1-docker.pkg.dev/vaeroex-integrations-prod/vaeroex-integrations-images/square-callback-edge@sha256:0a841f23b5a45edbbdca61ab4a8a5c2391a377cef1f5a5c00e113db1a33c5bf9"
+  },
+  "priorProductionRelease": {
+    "sharedBootstrapSourceCommit": "f4915edadbe2abddd7993c74c1fc3e80e1d1f821",
+    "sharedBootstrapImageDigest": "us-west1-docker.pkg.dev/vaeroex-integrations-prod/vaeroex-integrations-images/production-bootstrap@sha256:d56fe933eab1322bb4fe905b183964a980d641af23d69904e15989add501dc6f",
+    "oauthCallbackSourceCommit": "f4915edadbe2abddd7993c74c1fc3e80e1d1f821",
+    "oauthCallbackImageDigest": "us-west1-docker.pkg.dev/vaeroex-integrations-prod/vaeroex-integrations-images/production-bootstrap@sha256:d56fe933eab1322bb4fe905b183964a980d641af23d69904e15989add501dc6f",
+    "callbackEdgeSourceCommit": "bb4ad8d3653ca0eecdada88eeeea8a86fa76fc81",
+    "callbackEdgeImageDigest": "us-west1-docker.pkg.dev/vaeroex-integrations-prod/vaeroex-integrations-images/square-callback-edge@sha256:f9ef2ebc1669e86f549cb7d24f5bb8f40b4a54e4cd14a70a2d3cfb1b6e8e8012"
+  },
+  "expectedReleasePairChanges": {
+    "sharedBootstrap": false,
+    "oauthCallback": true,
+    "callbackEdge": true
+  },
+  "activationGates": [
+    "runtimeEnabled",
+    "providerCallsEnabled",
+    "customerOnboardingEnabled",
+    "webhookIntakeEnabled",
+    "evidenceEnabled",
+    "economicContributionsEnabled",
+    "aiDispatchEnabled"
+  ],
+  "credentialSlots": [
+    "application",
+    "webhookSignature",
+    "databaseOauth",
+    "databaseBroker",
+    "databaseScheduler",
+    "databaseWebhook",
+    "databaseRuntime",
+    "databaseEvidence"
+  ],
+  "qualificationPhases": {
+    "precredential_nonsecret": {
+      "enabledCredentialSlots": [],
+      "absentCredentialSlots": [
+        "application",
+        "webhookSignature",
+        "databaseOauth",
+        "databaseBroker",
+        "databaseScheduler",
+        "databaseWebhook",
+        "databaseRuntime",
+        "databaseEvidence"
+      ],
+      "requiresPilotScope": false,
+      "requiresProductionRuntime": true,
+      "fixedBlocker": null,
+      "requiredDatabaseRolePostflight": "square_production_native_all_profiles_fenced_assertion",
+      "requiredPhaseReceipts": [],
+      "requiredOperationalChecks": [
+        "callbackHealthAlert",
+        "primaryAndBackupAlertDelivery",
+        "backupReadback",
+        "restoreDrill",
+        "rollbackDrill",
+        "incidentContacts"
+      ]
+    },
+    "internal_consent_ready": {
+      "enabledCredentialSlots": [
+        "application",
+        "databaseOauth",
+        "databaseBroker"
+      ],
+      "absentCredentialSlots": [
+        "webhookSignature",
+        "databaseScheduler",
+        "databaseWebhook",
+        "databaseRuntime",
+        "databaseEvidence"
+      ],
+      "requiresPilotScope": true,
+      "requiresProductionRuntime": true,
+      "fixedBlocker": null,
+      "requiredDatabaseRolePostflight": "square_production_native_all_profiles_fenced_assertion",
+      "requiredPhaseReceipts": [],
+      "requiredOperationalChecks": [
+        "callbackHealthAlert",
+        "providerAuthAlert",
+        "backupFailureAlert",
+        "primaryAndBackupAlertDelivery",
+        "backupReadback",
+        "restoreDrill",
+        "rollbackDrill",
+        "incidentContacts"
+      ]
+    },
+    "internal_manual_sync_complete": {
+      "enabledCredentialSlots": [
+        "application",
+        "databaseOauth",
+        "databaseBroker",
+        "databaseRuntime",
+        "databaseEvidence"
+      ],
+      "absentCredentialSlots": [
+        "webhookSignature",
+        "databaseScheduler",
+        "databaseWebhook"
+      ],
+      "requiresPilotScope": true,
+      "requiresProductionRuntime": true,
+      "fixedBlocker": null,
+      "requiredDatabaseRolePostflight": "square_production_native_all_profiles_fenced_assertion",
+      "requiredPhaseReceipts": [
+        "consent",
+        "locationMapping",
+        "initialSync",
+        "replay",
+        "workspaceEvidence",
+        "cleanupGateReadback"
+      ],
+      "requiredOperationalChecks": [
+        "callbackHealthAlert",
+        "providerAuthAlert",
+        "rateLimitAlert",
+        "providerServerErrorAlert",
+        "taskAgeRetryDeadLetterAlert",
+        "staleIncompleteSyncAlert",
+        "backupFailureAlert",
+        "primaryAndBackupAlertDelivery",
+        "backupReadback",
+        "restoreDrill",
+        "rollbackDrill",
+        "incidentContacts"
+      ]
+    },
+    "post_initial_lifecycle": {
+      "enabledCredentialSlots": [
+        "application",
+        "webhookSignature",
+        "databaseOauth",
+        "databaseBroker",
+        "databaseScheduler",
+        "databaseWebhook",
+        "databaseRuntime",
+        "databaseEvidence"
+      ],
+      "absentCredentialSlots": [],
+      "requiresPilotScope": true,
+      "requiresProductionRuntime": true,
+      "fixedBlocker": "post_initial_lifecycle_runtime_not_implemented",
+      "requiredDatabaseRolePostflight": "square_production_native_all_profiles_fenced_assertion",
+      "requiredPhaseReceipts": [
+        "consent",
+        "locationMapping",
+        "initialSync",
+        "replay",
+        "workspaceEvidence",
+        "cleanupGateReadback",
+        "refresh",
+        "webhookDeduplication",
+        "revocation",
+        "disconnect",
+        "recovery"
+      ],
+      "requiredOperationalChecks": [
+        "callbackHealthAlert",
+        "signatureFailureAlert",
+        "credentialRefreshAlert",
+        "providerAuthAlert",
+        "rateLimitAlert",
+        "providerServerErrorAlert",
+        "taskAgeRetryDeadLetterAlert",
+        "staleIncompleteSyncAlert",
+        "backupFailureAlert",
+        "primaryAndBackupAlertDelivery",
+        "backupReadback",
+        "restoreDrill",
+        "rollbackDrill",
+        "incidentContacts"
+      ]
+    },
+    "external_customer_blocked": {
+      "enabledCredentialSlots": [],
+      "absentCredentialSlots": [
+        "application",
+        "webhookSignature",
+        "databaseOauth",
+        "databaseBroker",
+        "databaseScheduler",
+        "databaseWebhook",
+        "databaseRuntime",
+        "databaseEvidence"
+      ],
+      "requiresPilotScope": false,
+      "requiresProductionRuntime": false,
+      "fixedBlocker": "external_customer_activation_forbidden",
+      "requiredDatabaseRolePostflight": null,
+      "requiredPhaseReceipts": [],
+      "requiredOperationalChecks": []
+    }
+  },
+  "phaseReceiptMarkers": {
+    "consent": "square_production_internal_consent_postflight_passed",
+    "locationMapping": "square_production_internal_location_mapping_postflight_passed",
+    "initialSync": "square_production_internal_initial_sync_postflight_passed",
+    "replay": "square_production_internal_replay_postflight_passed",
+    "workspaceEvidence": "square_production_internal_workspace_evidence_postflight_passed",
+    "cleanupGateReadback": "square_production_internal_cleanup_gate_readback_postflight_passed",
+    "refresh": "square_production_internal_refresh_postflight_passed",
+    "webhookDeduplication": "square_production_internal_webhook_deduplication_postflight_passed",
+    "revocation": "square_production_internal_revocation_postflight_passed",
+    "disconnect": "square_production_internal_disconnect_postflight_passed",
+    "recovery": "square_production_internal_recovery_postflight_passed"
+  },
+  "productionRuntimeSurface": {
+    "baselineMigrationCount": 103,
+    "baselineHead": "20260902191324",
+    "baselineMigrationSourceSha256": "f66fee303a0b6462fb531d63a82f0868d6c04783a91db603a7572ed572f9abc5",
+    "baselineAuthorityRpcs": [
+      "square_production_broker_authority=public.check_square_production_broker_authority_v1(text,text,text,bigint,text)",
+      "square_production_evidence_authority=public.check_square_production_evidence_authority_v1(text,text,text,bigint,text)",
+      "square_production_oauth_authority=public.check_square_production_oauth_authority_v1(text,text,text,bigint,text)",
+      "square_production_runtime_authority=public.check_square_production_runtime_authority_v1(text,text,text,bigint,text)",
+      "square_production_scheduler_authority=public.check_square_production_scheduler_authority_v1(text,text,text,bigint,text)",
+      "square_production_webhook_authority=public.check_square_production_webhook_authority_v1(text,text,text,bigint,text)"
+    ],
+    "baselineBlockingPredicates": [
+      "customer_onboarding_enabled_constrained_false",
+      "oauth_requires_customer_onboarding_enabled",
+      "provider_calls_enabled_constrained_false",
+      "runtime_enabled_constrained_false"
+    ],
+    "runtimeContract": {
+      "status": "pending_reviewed_runtime_migration",
+      "sourceCommit": null,
+      "sourcePath": null,
+      "migrationCount": null,
+      "ledgerHead": null,
+      "ledgerFingerprint": null,
+      "migrationSourceSha256": null,
+      "authorityRpcs": [],
+      "requiredFunctions": []
+    }
+  },
+  "productionNativeProvisioning": {
+    "status": "reviewed_source_pending_execution_environment",
+    "sourceCommit": "0efed0c395335b74af480fcc367ecdf5e0694f23",
+    "sourceSha256": "09fcf252cf11eb733505664a6ea55ab2d1df1bc4e1eafc9de7d618d280f6801b",
+    "sourcePaths": [
+      ".github/workflows/ci.yml",
+      "package.json",
+      "scripts/run-square-production-overlay-qualification.js",
+      "tools/native-broker-provisioning/PRODUCTION-PROFILES.md",
+      "tools/native-broker-provisioning/adapter.mjs",
+      "tools/native-broker-provisioning/build-production.mjs",
+      "tools/native-broker-provisioning/dsn-codec.mjs",
+      "tools/native-broker-provisioning/lifecycle.mjs",
+      "tools/native-broker-provisioning/maintenance-identity.mjs",
+      "tools/native-broker-provisioning/maintenance-launcher.c",
+      "tools/native-broker-provisioning/maintenance-policy.mjs",
+      "tools/native-broker-provisioning/maintenance.mjs",
+      "tools/native-broker-provisioning/native.c",
+      "tools/native-broker-provisioning/production-profile.mjs",
+      "tools/native-broker-provisioning/production-source.mjs",
+      "tools/native-broker-provisioning/secret-manager-rest.mjs",
+      "tools/native-broker-provisioning/tests/bootstrap.cjs",
+      "tools/native-broker-provisioning/tests/dsn-codec.test.mjs",
+      "tools/native-broker-provisioning/tests/fixture.cjs",
+      "tools/native-broker-provisioning/tests/lifecycle.test.mjs",
+      "tools/native-broker-provisioning/tests/maintenance-launcher.test.mjs",
+      "tools/native-broker-provisioning/tests/maintenance.test.mjs",
+      "tools/native-broker-provisioning/tests/production-catalog-qualify.c",
+      "tools/native-broker-provisioning/tests/production-catalog-qualify.cjs",
+      "tools/native-broker-provisioning/tests/production-concurrency.cjs",
+      "tools/native-broker-provisioning/tests/production-native-qualify.cjs",
+      "tools/native-broker-provisioning/tests/production-profiles.test.mjs"
+    ],
+    "profileNames": [
+      "square_production_broker",
+      "square_production_evidence",
+      "square_production_oauth",
+      "square_production_runtime",
+      "square_production_scheduler",
+      "square_production_webhook"
+    ],
+    "deploymentIdentityManifestSha256": null
+  },
+  "pilotCallbackRelease": {
+    "status": "pending_immutable_callback_release",
+    "sourceCommit": "52a18bbbaa9dbbd6054aa1aa4b3ab56c94883f52",
+    "imageDigest": null,
+    "scanMarker": null
+  },
+  "pilotPolicy": {
+    "maximumAllowlistedWorkspaces": 1,
+    "maximumAllowlistedSellers": 1,
+    "requiresInternalSeller": true,
+    "requiresExplicitBusinessEntityMapping": true,
+    "requiresExplicitLocationMapping": true,
+    "automaticMapping": false,
+    "economicContributionsAllowed": false,
+    "aiDispatchAllowed": false
+  },
+  "qualificationBoundary": {
+    "scope": "sanitized_preflight_only",
+    "privateMappingVerification": "required_outside_qualifier",
+    "identifiersAllowedInEvidence": false,
+    "activationAuthority": "not_granted"
+  },
+  "requiredOperationalChecks": [
+    "callbackHealthAlert",
+    "signatureFailureAlert",
+    "credentialRefreshAlert",
+    "providerAuthAlert",
+    "rateLimitAlert",
+    "providerServerErrorAlert",
+    "taskAgeRetryDeadLetterAlert",
+    "staleIncompleteSyncAlert",
+    "backupFailureAlert",
+    "primaryAndBackupAlertDelivery",
+    "backupReadback",
+    "restoreDrill",
+    "rollbackDrill",
+    "incidentContacts"
+  ],
+  "requiredSyntheticScenarios": [
+    "initialSync",
+    "incrementalSync",
+    "pagination",
+    "replay",
+    "refresh",
+    "webhookDeduplication",
+    "disconnect",
+    "providerRevocation",
+    "cancellation",
+    "timeout",
+    "lostAcknowledgement",
+    "generationFencing",
+    "atomicPageValidation",
+    "canonicalSourceVersion"
+  ],
+  "prohibitedActions": [
+    "activateGate",
+    "createCredential",
+    "readCredential",
+    "providerCall",
+    "customerConsent",
+    "quickBooksMutation",
+    "infrastructureMutation"
+  ]
+}

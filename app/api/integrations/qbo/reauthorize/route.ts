@@ -7,6 +7,10 @@ import {
   readQboReauthorizationRequest
 } from "@/lib/integrations/control-plane/qbo-customer-oauth";
 import {
+  qboCustomerConnectionsUnavailableResponse,
+  qboProductionCustomerConnectionsEnabled
+} from "@/lib/integrations/control-plane/qbo-customer-availability";
+import {
   createQboCustomerReauthorizationState,
   QBO_CUSTOMER_REAUTHORIZATION_STATE_CONTRACT_VERSION
 } from "@/lib/integrations/persistence/qbo-production-repository";
@@ -18,11 +22,20 @@ import {
 import { requireWorkspaceAccess } from "@/lib/security/require-workspace-access";
 
 export async function POST(request: Request) {
+  if (!qboProductionCustomerConnectionsEnabled()) {
+    return qboCustomerConnectionsUnavailableResponse();
+  }
+  if (request.headers.get("accept") !== "application/json") {
+    return NextResponse.json({ ok: false, error: "Open QuickBooks from its connection page." },
+      { status: 406, headers: { "cache-control": "no-store" } });
+  }
+
   try {
+    const configuration = qboProductionOAuthConfiguration();
     assertQboCustomerRequestOrigin(request);
     const input = await readQboReauthorizationRequest(request);
     const access = await requireWorkspaceAccess();
-    if (!["owner", "admin", "manager"].includes(access.membership.role)) {
+    if (access.membership.role !== "owner") {
       return NextResponse.json({ ok: false, error: "Connection management is not permitted." }, { status: 403 });
     }
     const { data: connection } = await access.supabase
@@ -39,7 +52,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, error: "Connection is unavailable." }, { status: 403 });
     }
 
-    const configuration = qboProductionOAuthConfiguration();
     const now = new Date();
     const state = `r1_${randomBytes(32).toString("base64url")}`;
     const stateId = randomUUID();
@@ -64,13 +76,13 @@ export async function POST(request: Request) {
     if (result.connectionId !== connection.id) {
       throw new Error("qbo_reauthorization_state_binding_mismatch");
     }
-    return NextResponse.redirect(
-      createQboAuthorizationUrl({
+    return NextResponse.json(
+      { ok: true, authorizationUrl: createQboAuthorizationUrl({
         clientId: configuration.clientId,
         redirectUri: configuration.redirectUri,
         state
-      }),
-      303
+      }) },
+      { headers: { "cache-control": "no-store", "referrer-policy": "no-referrer" } }
     );
   } catch {
     return NextResponse.json(

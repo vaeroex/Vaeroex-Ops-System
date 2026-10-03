@@ -29,7 +29,10 @@ import { buildIntelligenceInboxFromSnapshotV1 } from "@/lib/intelligence/snapsho
 import { projectIntelligenceInboxV1 } from "@/lib/intelligence/snapshot/v1/projections";
 import type { IntelligenceSnapshotV1 } from "@/lib/intelligence/snapshot/v1/types";
 import { isSecurityResponseMessage } from "@/lib/security/security-response";
-import { requireWorkspacePage } from "@/lib/workspaces/page-context";
+import { requireWorkspaceAccess } from "@/lib/security/require-workspace-access";
+import { loadQboAccountingIntelligence } from "@/lib/integrations/qbo-customer/accounting-intelligence-server";
+import { CurrentIntegrations } from "@/components/integrations/CurrentIntegrations";
+import { loadIntegrationDashboard } from "@/lib/integrations/dashboard/server";
 
 export const dynamic = "force-dynamic";
 
@@ -39,7 +42,8 @@ type IntelligencePageProps = {
 
 export default async function IntelligencePage({ searchParams }: IntelligencePageProps) {
   const params = await searchParams;
-  const { supabase, workspaceId, context } = await requireWorkspacePage();
+  const access = await requireWorkspaceAccess();
+  const { supabase, workspaceId, context } = access;
   const [issuesResult, kpisResult, kpiSettingsResult, filesResult, crmResult, importsResult, sopsResult, formsResult, submissionsResult, peopleResult, decisionsResult, metricsResult, memoryResult, lifecycleResult, briefingStates] = await Promise.all([
     supabase.from("issues").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
     loadActiveWorkspaceKpis({ supabase, workspaceId }),
@@ -170,6 +174,8 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
       reason: businessNoteContext.error.message
     }));
   }
+  const qboAccounting = await loadQboAccountingIntelligence(workspaceId, snapshotAsOf);
+  const { dashboard, currentQboAccounting } = await loadIntegrationDashboard({ access, qbo: qboAccounting, eligibleKpis });
   let intelligenceSnapshot: IntelligenceSnapshotV1 | null = null;
   let displayedInsights = intelligence.insights;
   try {
@@ -177,6 +183,10 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
       workspaceId,
       asOf: snapshotAsOf,
       intelligence,
+      ...(currentQboAccounting.kpis.length ? {
+        kpis: currentQboAccounting.kpis,
+        evidenceManifests: currentQboAccounting.evidenceManifests
+      } : {}),
       ...(businessNoteContext.records.length ? {
         contextualEvidence: {
           releaseChannel: businessNoteContextReleaseChannel,
@@ -249,30 +259,16 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
     actorDisplayNames
   });
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-3 border-b border-white/10 pb-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="workspace-intelligence space-y-6">
+      <header className="workspace-page-header workspace-intelligence-header flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan-200">Executive Intelligence</p>
-          <p className="mt-1 text-sm text-slate-400">Review current signals and rolling leadership briefings.</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan-200">Leadership review</p>
+          <h1 className="mt-2 text-2xl font-semibold text-white sm:text-3xl">Intelligence</h1>
+          <p className="mt-2 text-sm text-slate-400">Review current signals and rolling leadership briefings.</p>
         </div>
-      </div>
+      </header>
       <ErrorNotice message={displayErrors[0]?.message || null} />
-      <section aria-labelledby="intelligence-briefings-heading" className="space-y-4 border-b border-white/10 pb-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan-200">Leadership cadence</p>
-            <h2 id="intelligence-briefings-heading" className="mt-1 text-xl font-semibold text-white">Intelligence Briefings</h2>
-            <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-400">Generate rolling weekly and monthly syntheses from eligible business evidence, or return to the latest current briefing.</p>
-          </div>
-          <Link href="/app/intelligence/briefings" className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-cyan-200 hover:underline">
-            <CalendarRange aria-hidden="true" className="h-4 w-4" /> Open Briefings
-          </Link>
-        </div>
-        <IntelligenceBriefingCards
-          states={briefingStates}
-          generationEnabled={isIntelligenceBriefingEnabled()}
-        />
-      </section>
+      <CurrentIntegrations key={workspaceId} initial={dashboard} />
       <IntelligenceSignalInbox
         currentCards={lifecycleCards.current}
         historyCards={lifecycleCards.history}
@@ -281,6 +277,22 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
         canManageLifecycle={canManageLifecycle}
         blockedState={blockedState}
       />
+      <section aria-labelledby="intelligence-briefings-heading" className="workspace-briefings-section space-y-4 border-t border-white/10 pt-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h2 id="intelligence-briefings-heading" className="mt-1 text-xl font-semibold text-white">Intelligence Briefings</h2>
+            <p className="mt-1 text-sm text-slate-400">Weekly and monthly summaries of eligible evidence.</p>
+          </div>
+          <Link href="/app/intelligence/briefings" className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-cyan-200 hover:underline">
+            <CalendarRange aria-hidden="true" className="h-4 w-4" /> Open Briefings
+          </Link>
+        </div>
+        <IntelligenceBriefingCards
+          states={briefingStates}
+          generationEnabled={isIntelligenceBriefingEnabled()}
+          compactUnavailable
+        />
+      </section>
     </div>
   );
 }

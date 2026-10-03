@@ -28,18 +28,20 @@ function readableDate(value: string) {
     : new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(date);
 }
 
-export function SavedAnalysisList({ analyses }: { analyses: readonly SavedAnalysisListItem[] }) {
+export function SavedAnalysisList({ analyses, loadLimitReached = false }: { analyses: readonly SavedAnalysisListItem[]; loadLimitReached?: boolean }) {
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
+  const [visibleCount, setVisibleCount] = useState(25);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-  const visible = useMemo(() => analyses.filter((analysis) => {
+  const matching = useMemo(() => analyses.filter((analysis) => {
     if (filter !== "all" && analysis.analysisType !== filter) return false;
     const search = query.trim().toLowerCase();
     return !search || `${analysis.title} ${savedAnalysisTypeLabel(analysis.analysisType)} ${analysis.evidenceStatus}`.toLowerCase().includes(search);
   }), [analyses, filter, query]);
+  const visible = matching.slice(0, visibleCount);
   const allVisibleSelected = visible.length > 0 && visible.every((analysis) => selected.has(analysis.id));
 
   function toggle(id: string) {
@@ -72,11 +74,12 @@ export function SavedAnalysisList({ analyses }: { analyses: readonly SavedAnalys
   }
 
   return (
-    <section className="space-y-4" aria-labelledby="saved-analyses-heading">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+    <section className="workspace-saved-analyses space-y-4" aria-labelledby="saved-analyses-heading">
+      <div className="workspace-toolbar flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h2 id="saved-analyses-heading" className="text-lg font-semibold text-white">Saved Analyses</h2>
-          <p className="mt-1 text-sm text-slate-400">Analyses leadership explicitly chose to preserve.</p>
+          <h2 id="saved-analyses-heading" className="sr-only">Browse saved analyses</h2>
+          <p className="text-sm text-slate-400" role="status">Showing {visible.length} of {matching.length} matching loaded analyses.</p>
+          {loadLimitReached ? <p className="mt-1 text-xs text-slate-500">Search covers this loaded set (up to 300 recent analyses), not older history.</p> : null}
         </div>
         <label className="relative block min-w-0 lg:w-80">
           <span className="sr-only">Search saved analyses</span>
@@ -85,6 +88,7 @@ export function SavedAnalysisList({ analyses }: { analyses: readonly SavedAnalys
             value={query}
             onChange={(event) => {
               setQuery(event.currentTarget.value);
+              setVisibleCount(25);
               setSelected(new Set());
             }}
             placeholder="Search saved analyses"
@@ -93,25 +97,25 @@ export function SavedAnalysisList({ analyses }: { analyses: readonly SavedAnalys
         </label>
       </div>
 
-      <div className="vaeroex-mobile-safe-scroll flex gap-2 overflow-x-auto pb-1" aria-label="Saved analysis filters">
-        {filters.map((item) => (
-          <button
-            key={item.value}
-            type="button"
-            onClick={() => {
-              setFilter(item.value);
-              setSelected(new Set());
-            }}
-            className={`inline-flex min-h-11 shrink-0 items-center rounded-lg border px-3 py-2 text-sm font-semibold ${filter === item.value ? "border-cyan-300/40 bg-cyan-950/35 text-cyan-100" : "border-white/10 bg-white/[0.04] text-slate-300 hover:bg-cyan-950/25"}`}
-          >
-            {item.label}
-          </button>
-        ))}
-      </div>
+      <label className="flex flex-wrap items-center gap-3 text-sm text-slate-300">
+        <span className="font-medium">Analysis type</span>
+        <select
+          aria-label="Analysis type"
+          value={filter}
+          onChange={(event) => {
+            setFilter(event.currentTarget.value as Filter);
+            setVisibleCount(25);
+            setSelected(new Set());
+          }}
+          className="min-h-11 w-full rounded-lg border border-white/10 bg-slate-950/75 px-3 py-2 text-sm text-white sm:w-auto sm:min-w-48"
+        >
+          {filters.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+        </select>
+      </label>
 
       {visible.length ? (
         <>
-          <div className="flex min-h-11 flex-wrap items-center gap-3 rounded-lg border border-white/10 bg-white/[0.025] px-3 py-2">
+          <div className="workspace-selection-bar flex min-h-11 flex-wrap items-center gap-3 border-y border-white/10 px-1 py-2">
             <button type="button" onClick={selectAllVisible} disabled={allVisibleSelected} className="text-sm font-semibold text-cyan-200 disabled:text-slate-500">Select all visible</button>
             {selected.size ? <button type="button" onClick={() => setSelected(new Set())} className="text-sm font-semibold text-slate-300">Clear selection</button> : null}
             <span className="text-sm text-slate-400">{selected.size} selected</span>
@@ -122,9 +126,9 @@ export function SavedAnalysisList({ analyses }: { analyses: readonly SavedAnalys
             ) : null}
           </div>
 
-          <div className="grid gap-3 xl:grid-cols-2">
+          <div className="workspace-list divide-y divide-white/10">
             {visible.map((analysis) => (
-              <article key={analysis.id} className="rounded-lg border border-white/10 bg-[#08111f] p-4 shadow-panel">
+              <article key={analysis.id} className="workspace-list-row workspace-analysis-row py-4">
                 <div className="flex items-start gap-3">
                   <input
                     type="checkbox"
@@ -143,8 +147,8 @@ export function SavedAnalysisList({ analyses }: { analyses: readonly SavedAnalys
                         </div>
                       </details>
                     </div>
-                    <h3 className="mt-3 break-words text-lg font-semibold leading-6 text-white">{analysis.title}</h3>
-                    <dl className="mt-3 grid gap-2 text-xs text-slate-400 sm:grid-cols-2">
+                    <h3 className="mt-2 break-words text-base font-semibold leading-6 text-white">{analysis.title}</h3>
+                    <dl className="mt-2 flex flex-wrap gap-x-6 gap-y-2 text-xs text-slate-400">
                       <div><dt className="font-semibold text-slate-300">Generated</dt><dd className="mt-0.5">{readableDate(analysis.generatedAt)}</dd></div>
                       <div><dt className="font-semibold text-slate-300">Saved</dt><dd className="mt-0.5">{readableDate(analysis.savedAt)}</dd></div>
                       <div><dt className="font-semibold text-slate-300">Confidence</dt><dd className="mt-0.5">{analysis.confidence}</dd></div>
@@ -152,16 +156,17 @@ export function SavedAnalysisList({ analyses }: { analyses: readonly SavedAnalys
                     </dl>
                     {analysis.dateRange ? <p className="mt-2 text-xs text-slate-500">{analysis.dateRange}</p> : null}
                     {analysis.businessHealthState ? <p className="mt-1 text-xs text-slate-500">Business Health: {analysis.businessHealthState}</p> : null}
-                    <Link href={`/app/reports/${analysis.id}`} className="mt-4 inline-flex min-h-11 items-center rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white hover:bg-cyan-400 hover:text-vaeroex-navy">{analysis.analysisType.endsWith("_briefing") ? "View Briefing" : "View Analysis"}</Link>
+                    <Link href={`/app/reports/${analysis.id}`} className="workspace-row-link mt-3 inline-flex min-h-10 items-center rounded-md border border-white/15 px-3 py-2 text-sm font-semibold text-cyan-100 hover:bg-white/[0.05]">{analysis.analysisType.endsWith("_briefing") ? "View Briefing" : "View Analysis"}</Link>
                   </div>
                 </div>
               </article>
             ))}
           </div>
+          {visible.length < matching.length ? <button type="button" onClick={() => setVisibleCount((count) => count + 25)} className="min-h-11 rounded-lg border border-white/10 px-4 py-2 text-sm font-semibold text-cyan-100">Load more analyses</button> : null}
         </>
       ) : (
         <div className="rounded-lg border border-dashed border-white/15 bg-[#08111f] p-6 text-center">
-          <h3 className="text-base font-semibold text-white">No saved analyses match this view</h3>
+          <h3 className="text-base font-semibold text-white">{analyses.length ? "No saved analyses match this view" : "No saved analyses yet"}</h3>
           <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-400">Open a completed analysis or Intelligence Briefing and choose Save.</p>
         </div>
       )}

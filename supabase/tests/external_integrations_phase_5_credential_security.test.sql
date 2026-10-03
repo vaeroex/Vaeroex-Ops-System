@@ -1202,8 +1202,9 @@ select extensions.dblink_exec(
       ),
       'projects/vaeroex-phase5-test/locations/us-central1/keyRings/phase5-test/cryptoKeys/oauth-credentials',
       convert_to(repeat('z', 32), 'UTF8'),
-      '2026-08-21T23:30:00Z',
-      '2026-09-21T22:30:00Z',
+      -- Direct inserts bypass the storage RPC's database-clock normalization.
+      pg_catalog.transaction_timestamp() + interval '1 hour',
+      pg_catalog.transaction_timestamp() + interval '31 days',
       array['read_synthetic_business_data']::text[],
       extensions.digest(convert_to('phase5-concurrency-entity', 'UTF8'), 'sha256'),
       'active',
@@ -1309,6 +1310,80 @@ select is(
    where result ->> 'reasonCode' = 'refresh_lease_held'),
   1,
   'the concurrent loser receives no credential ciphertext'
+);
+
+select is(
+  (select count(*)::integer
+   from phase5_concurrent_refresh_results
+   where (result ->> 'acquired')::boolean
+     and result ->> 'ciphertextBase64' = pg_catalog.encode(
+       pg_catalog.convert_to(repeat('z', 32), 'UTF8'), 'base64'
+     )),
+  1,
+  'only the concurrent lease winner receives the stored ciphertext'
+);
+select is(
+  (select count(*)::integer
+   from phase5_concurrent_refresh_results
+   where result = pg_catalog.jsonb_build_object(
+     'acquired', false,
+     'reasonCode', 'refresh_lease_held'
+   )),
+  1,
+  'the concurrent loser response contains only the denial and reason code'
+);
+
+-- Keep expiry enforcement covered after the live-credential lease race.
+select extensions.dblink_exec(
+  'phase5_refresh_concurrency_1',
+  $expire$
+    reset role;
+    update private.integration_credentials
+    set refresh_expires_at = pg_catalog.transaction_timestamp() - interval '1 second',
+        row_version = row_version + 1,
+        updated_at = pg_catalog.transaction_timestamp()
+    where id = 'f5950000-0000-4000-8000-000000000001';
+    set role integration_credential_broker_authority;
+  $expire$
+);
+select is(
+  (select count(*)::integer
+   from extensions.dblink(
+     'phase5_refresh_concurrency_1',
+     $query$
+       select public.acquire_integration_credential_refresh_lease_v1(
+         jsonb_build_object(
+           'workspaceId', 'f5910000-0000-4000-8000-000000000001',
+           'businessEntityId', 'f5920000-0000-4000-8000-000000000001',
+           'connectionId', 'f5930000-0000-4000-8000-000000000001',
+           'connectionGeneration', 1,
+           'credentialId', 'f5950000-0000-4000-8000-000000000001',
+           'expectedCredentialVersion', 1,
+           'leaseId', 'f5960000-0000-4000-8000-000000000003',
+           'leaseOwnerFingerprint', 'sha256:3333333333333333333333333333333333333333333333333333333333333333',
+           'acquiredAt', '2026-08-21T22:31:00.000Z',
+           'leaseExpiresAt', '2026-08-21T22:33:00.000Z'
+         ),
+         'phase5_concurrent_lease_expired'
+       )
+     $query$
+   ) as response(result jsonb)
+   where result = pg_catalog.jsonb_build_object(
+     'acquired', false,
+     'reasonCode', 'credential_inactive'
+   )),
+  1,
+  'database-expired refresh credentials disclose no ciphertext despite a caller-supplied timestamp'
+);
+select ok(
+  (select credential.status = 'reauthorization_required'
+      and connection.status = 'reauthorization_required'
+   from private.integration_credentials as credential
+   join private.integration_connections as connection
+     on connection.id = credential.connection_id
+     and connection.workspace_id = credential.workspace_id
+   where credential.id = 'f5950000-0000-4000-8000-000000000001'),
+  'database refresh expiry requires reauthorization for both credential and connection'
 );
 
 select extensions.dblink_disconnect(connection_name)
