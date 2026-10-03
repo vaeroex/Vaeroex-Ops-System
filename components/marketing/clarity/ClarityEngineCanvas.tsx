@@ -1,55 +1,77 @@
 "use client";
 
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 import {
   ACESFilmicToneMapping,
-  Group,
   MathUtils,
   PCFShadowMap,
   PerspectiveCamera,
   SRGBColorSpace,
-  Vector3,
 } from "three";
 import { PublicSpatialContextGuard } from "@/components/spatial/PublicSpatialCanvasGuard";
 import { probeRenderedCanvas } from "@/components/spatial/CanvasPixelProbe";
 import { SpatialResizeObserver } from "@/components/spatial/SpatialResizeObserver";
-import { ClarityEngineWorld } from "./ClarityEngineWorld";
+import {
+  ClarityEngineWorld,
+  type ClarityWorldController,
+} from "./ClarityEngineWorld";
+import {
+  evaluateClarityMotion,
+  normalizeClarityProgress,
+  type ClarityVariant,
+} from "./clarityMotion";
 import styles from "./ClarityEngine.module.css";
 
 type EngineCanvasProps = {
   active: boolean;
+  progress: number;
+  compact: boolean;
+  variant: ClarityVariant;
   onReady: () => void;
   onFailure: () => void;
 };
-const BASE_CAMERA = new Vector3(4.3, 2.5, 9);
-const LOOK_AT = new Vector3(-0.18, -0.22, 0);
 
-function DirectedStructure({ active }: { active: boolean }) {
-  const sculpture = useRef<Group>(null);
+function DirectedStructure({
+  active,
+  progress,
+  compact,
+  variant,
+  proofRef,
+}: Pick<EngineCanvasProps, "active" | "progress" | "compact" | "variant"> & {
+  proofRef: RefObject<HTMLDivElement | null>;
+}) {
+  const world = useRef<ClarityWorldController>(null);
   const { camera, gl, invalidate, size } = useThree();
-  const desired = useRef({ x: 0, y: 0, scroll: 0 });
-  const current = useRef({ x: 0, y: 0, scroll: 0, entry: 0 });
+  const desiredPointer = useRef({ x: 0, y: 0 });
+  const current = useRef({
+    x: 0,
+    y: 0,
+    progress: normalizeClarityProgress(progress),
+    painted: false,
+  });
+  const requested = normalizeClarityProgress(progress);
+  const layoutDirty = useRef(true);
 
   useEffect(() => {
-    camera.position.copy(BASE_CAMERA);
-    camera.lookAt(LOOK_AT);
+    layoutDirty.current = true;
     invalidate();
-  }, [camera, invalidate]);
+  }, [compact, variant, size.width, size.height, invalidate]);
 
   useEffect(() => {
-    if (camera instanceof PerspectiveCamera) {
-      camera.fov = Math.min(
-        46,
-        38 + Math.max(0, 1.2 - size.width / Math.max(1, size.height)) * 12,
-      );
-      camera.updateProjectionMatrix();
-      invalidate();
-    }
-  }, [camera, invalidate, size.width, size.height]);
+    if (active || !current.current.painted) invalidate();
+  }, [
+    active,
+    requested,
+    variant,
+    compact,
+    size.width,
+    size.height,
+    invalidate,
+  ]);
 
   useEffect(() => {
-    if (!active) return;
+    if (!active || compact) return;
     const updatePointer = (event: PointerEvent) => {
       if (event.pointerType !== "mouse") return;
       const bounds = gl.domElement.getBoundingClientRect();
@@ -64,106 +86,164 @@ function DirectedStructure({ active }: { active: boolean }) {
       const y = inside
         ? ((event.clientY - bounds.top) / bounds.height - 0.5) * 2
         : 0;
-      if (x === desired.current.x && y === desired.current.y) return;
-      desired.current.x = x;
-      desired.current.y = y;
-      invalidate();
-    };
-    const updateScroll = () => {
-      const bounds = gl.domElement.getBoundingClientRect();
-      desired.current.scroll = MathUtils.clamp(
-        -bounds.top / Math.max(1, bounds.height),
-        0,
-        1,
-      );
+      if (x === desiredPointer.current.x && y === desiredPointer.current.y)
+        return;
+      desiredPointer.current = { x, y };
       invalidate();
     };
     const resetPointer = () => {
-      desired.current.x = 0;
-      desired.current.y = 0;
+      desiredPointer.current = { x: 0, y: 0 };
       invalidate();
     };
-    updateScroll();
     window.addEventListener("pointermove", updatePointer, { passive: true });
-    window.addEventListener("scroll", updateScroll, { passive: true });
     window.addEventListener("blur", resetPointer);
     document.documentElement.addEventListener("pointerleave", resetPointer);
     return () => {
       window.removeEventListener("pointermove", updatePointer);
-      window.removeEventListener("scroll", updateScroll);
       window.removeEventListener("blur", resetPointer);
       document.documentElement.removeEventListener(
         "pointerleave",
         resetPointer,
       );
     };
-  }, [active, gl, invalidate]);
+  }, [active, compact, gl, invalidate]);
 
   useFrame((_, delta) => {
-    if (!active || !sculpture.current) return;
-    const elapsed = Math.min(delta, 0.05);
     const next = current.current;
-    const target = desired.current;
-    next.x = MathUtils.damp(next.x, target.x, 4.2, elapsed);
-    next.y = MathUtils.damp(next.y, target.y, 4.2, elapsed);
-    next.scroll = MathUtils.damp(next.scroll, target.scroll, 4.2, elapsed);
-    next.entry = MathUtils.damp(next.entry, 1, 3.4, elapsed);
-    camera.position.set(
-      BASE_CAMERA.x + next.x * 0.24 - next.scroll * 0.28,
-      BASE_CAMERA.y - next.y * 0.15 + next.scroll * 0.22,
-      BASE_CAMERA.z + next.scroll * 0.12,
-    );
-    camera.lookAt(LOOK_AT);
-    sculpture.current.rotation.z = -0.15 + next.scroll * 0.035;
-    const fragments = sculpture.current.getObjectByName("clarity-fragments");
-    if (fragments) {
-      fragments.position.x = -(1 - next.entry) * 0.32 + next.scroll * 0.27;
-      fragments.position.z = (1 - next.entry) * 0.24 - next.scroll * 0.08;
+    if ((!active && next.painted && !layoutDirty.current) || !world.current)
+      return;
+    const elapsed = Math.min(delta, 0.05);
+    if (active) {
+      next.x = MathUtils.damp(
+        next.x,
+        compact ? 0 : desiredPointer.current.x,
+        5,
+        elapsed,
+      );
+      next.y = MathUtils.damp(
+        next.y,
+        compact ? 0 : desiredPointer.current.y,
+        5,
+        elapsed,
+      );
+      next.progress =
+        Math.abs(next.progress - requested) < 0.0003
+          ? requested
+          : MathUtils.damp(next.progress, requested, 10, elapsed);
     }
-    // The renderer sleeps completely once this short transition has settled.
+    // A paused resize re-frames the frozen pose once; it never advances the story.
+    if (compact) {
+      next.x = 0;
+      next.y = 0;
+    }
+    const state = evaluateClarityMotion(next.progress, variant, compact);
+    camera.position.set(
+      state.camera[0] + next.x * 0.15,
+      state.camera[1] - next.y * 0.1,
+      state.camera[2],
+    );
+    camera.lookAt(...state.target);
+    if (camera instanceof PerspectiveCamera) {
+      // Portrait stages get more breathing room without changing the four-act trajectory.
+      const framing =
+        Math.max(0, 1.06 - size.width / Math.max(1, size.height)) * 20;
+      const fov = Math.min(62, state.fov + framing);
+      if (Math.abs(camera.fov - fov) > 0.001) {
+        camera.fov = fov;
+        camera.updateProjectionMatrix();
+      }
+    }
+    world.current.apply(state);
+    next.painted = true;
+    layoutDirty.current = false;
+    const proof = proofRef.current;
+    if (proof) {
+      proof.dataset.clarityProgress = state.progress.toFixed(4);
+      proof.dataset.clarityStage = String(state.stage);
+      proof.dataset.clarityCamera = camera.position
+        .toArray()
+        .map((value) => value.toFixed(3))
+        .join(",");
+      proof.dataset.clarityTarget = state.target
+        .map((value) => value.toFixed(3))
+        .join(",");
+      proof.dataset.clarityCoreReveal = state.core.reveal.toFixed(3);
+      proof.dataset.clarityPose = JSON.stringify({
+        rotation: state.structure.rotation,
+        firstLayer: state.layers[0].position,
+        lastLayer: state.layers[state.layers.length - 1].position,
+        fragment: state.fragments[0].position,
+        core: state.core.position,
+      });
+    }
+    // Scroll is the only narrative clock. The renderer sleeps once smoothing settles.
     const unsettled =
-      Math.abs(next.x - target.x) +
-        Math.abs(next.y - target.y) +
-        Math.abs(next.scroll - target.scroll) +
-        (1 - next.entry) >
-      0.001;
-    if (unsettled) invalidate();
+      Math.abs(next.progress - requested) +
+        Math.abs(next.x - (compact ? 0 : desiredPointer.current.x)) +
+        Math.abs(next.y - (compact ? 0 : desiredPointer.current.y)) >
+      0.0004;
+    if (active && unsettled) invalidate();
   });
 
-  return <ClarityEngineWorld motion={sculpture} />;
+  return <ClarityEngineWorld controllerRef={world} compact={compact} />;
 }
 
 export default function ClarityEngineCanvas({
   active,
+  progress,
+  compact,
+  variant,
   onReady,
   onFailure,
 }: EngineCanvasProps) {
+  const proof = useRef<HTMLDivElement>(null);
+  const [initial] = useState(() =>
+    evaluateClarityMotion(progress, variant, compact),
+  );
+  const cameraSettings = useRef({
+    position: [...initial.camera] as [number, number, number],
+    fov: initial.fov,
+    near: 0.1,
+    far: 90,
+  });
   return (
     <div
+      ref={proof}
       className={styles.canvas}
       data-clarity-canvas
       data-spatial-webgl
+      data-clarity-variant={variant}
+      data-clarity-quality={compact ? "compact" : "full"}
+      data-clarity-requested-progress={normalizeClarityProgress(
+        progress,
+      ).toFixed(4)}
       aria-hidden="true"
     >
       <Canvas
-        camera={{ position: [4.3, 2.5, 9], fov: 38, near: 0.1, far: 60 }}
-        dpr={[1, 1.5]}
+        camera={cameraSettings.current}
+        dpr={compact ? 1 : [1, 1.5]}
         frameloop="demand"
-        shadows={{ type: PCFShadowMap }}
+        shadows={compact ? false : { type: PCFShadowMap }}
         gl={{ antialias: true, alpha: true, powerPreference: "low-power" }}
         resize={{ polyfill: SpatialResizeObserver }}
         onCreated={(state) => {
           state.gl.toneMapping = ACESFilmicToneMapping;
           state.gl.toneMappingExposure = 1.08;
           state.gl.outputColorSpace = SRGBColorSpace;
-          state.gl.setClearColor("#090b10", 0);
+          state.gl.setClearColor("#08090b", 0);
           probeRenderedCanvas(state, (result) =>
             result === "nonblank" ? onReady() : onFailure(),
           );
         }}
       >
         <PublicSpatialContextGuard onFailure={onFailure} />
-        <DirectedStructure active={active} />
+        <DirectedStructure
+          active={active}
+          progress={progress}
+          compact={compact}
+          variant={variant}
+          proofRef={proof}
+        />
       </Canvas>
     </div>
   );

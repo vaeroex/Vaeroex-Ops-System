@@ -145,6 +145,127 @@ async function main() {
     );
   }
 
+  // Validate the real server output: chapter text and native links work before
+  // hydration, and each page owns one persistent scene instead of stacked canvases.
+  for (const [route, variant] of [
+    ["/", "home"],
+    ["/executive-intelligence", "executive"],
+    ["/intelligence-systems", "systems"],
+    ["/drug-discovery-intelligence", "research"],
+    ["/biological-intelligence", "research"],
+  ]) {
+    const html = htmlByRoute.get(route);
+    assert.equal(
+      (html.match(/data-clarity-journey=/g) || []).length,
+      1,
+      `${route} needs one continuous journey`,
+    );
+    assert.equal(
+      (html.match(/data-clarity-engine=/g) || []).length,
+      1,
+      `${route} must share a single scene across its chapters`,
+    );
+    assert.match(html, new RegExp(`data-clarity-variant="${variant}"`));
+    const chapters = [
+      ...html.matchAll(
+        /<section\b([^>]*data-clarity-chapter="([0-9]+)"[^>]*)>([\s\S]*?)<\/section>/g,
+      ),
+    ];
+    assert.ok(
+      chapters.length >= 3,
+      `${route} must render a multi-chapter story without JavaScript`,
+    );
+    const chapterNavigation = html.match(
+      /<nav[^>]*aria-label="Clarity journey chapters"[^>]*>([\s\S]*?)<\/nav>/,
+    );
+    assert.ok(
+      chapterNavigation,
+      `${route} must expose accessible native chapter navigation`,
+    );
+    assert.equal(
+      (chapterNavigation[1].match(/aria-current="step"/g) || []).length,
+      1,
+    );
+    for (let index = 0; index < chapters.length; index++) {
+      const [, attributes, chapterIndex, body] = chapters[index];
+      assert.equal(
+        Number(chapterIndex),
+        index,
+        `${route} chapters must follow document order`,
+      );
+      const id = attributes.match(/\bid="([^"]+)"/)[1];
+      assert.match(attributes, /aria-label="[^"]+"/);
+      assert.match(
+        body,
+        /<h[12](?:\s|>)/,
+        `${route} chapter ${index + 1} needs a readable heading`,
+      );
+      assert.ok(
+        chapterNavigation[1].includes(`href="#${id}"`),
+        `${route} chapter ${index + 1} must be reachable by a native anchor`,
+      );
+    }
+    assert.match(
+      html,
+      /data-clarity-poster/,
+      `${route} must retain its no-JavaScript/render-failure image`,
+    );
+    assert.doesNotMatch(
+      html,
+      /data-clarity-mode="interactive"/,
+      `${route} cannot claim WebGL readiness in server HTML`,
+    );
+  }
+
+  const policy = loadTs(
+    "components/marketing/clarity/clarityDevicePolicy.ts",
+  ).clarityDevicePolicy;
+  const decide = (overrides = {}) =>
+    policy({ reducedMotion: false, compact: false, ...overrides });
+  assert.equal(
+    decide().fallback,
+    null,
+    "Unknown optional hardware APIs must not disable the scene",
+  );
+  for (const compact of [false, true]) {
+    const capable = decide({ compact, memory: 8, cores: 8 });
+    assert.equal(capable.compact, compact);
+    assert.equal(
+      capable.fallback,
+      null,
+      "Narrow width or a touch pointer alone must preserve real-time 3D",
+    );
+    const balanced = decide({ compact, memory: 4, cores: 4 });
+    assert.equal(
+      balanced.compact,
+      true,
+      "Moderate hardware must select cheaper geometry",
+    );
+    assert.equal(
+      balanced.fallback,
+      null,
+      "Common four-core/four-GB hardware must remain interactive",
+    );
+    assert.equal(
+      decide({ compact, reducedMotion: true }).fallback,
+      "reduced-motion",
+    );
+    assert.equal(decide({ compact, saveData: true }).fallback, "low-power");
+    for (const constrained of [{ memory: 2 }, { cores: 2 }]) {
+      assert.equal(decide({ compact, ...constrained }).fallback, "low-power");
+      assert.equal(
+        decide({ compact, ...constrained, reducedMotion: true }).fallback,
+        "reduced-motion",
+        "Explicit motion preferences take precedence",
+      );
+    }
+    assert.equal(
+      decide({ compact, memory: 0, cores: 0 }).fallback,
+      null,
+      "Missing hardware hints represented as zero must not invent a low-power condition",
+    );
+  }
+
   const pricing = htmlByRoute.get("/pricing");
   assert.equal(
     (pricing.match(/href="\/checkout\/legal"/g) || []).length,
@@ -320,7 +441,36 @@ async function main() {
   assert.match(canvas, /probeRenderedCanvas/);
   assert.match(canvas, /PublicSpatialContextGuard/);
   assert.match(guard, /webglcontextlost/);
-  assert.match(engine, /REAL-TIME STRUCTURE[\s\S]*CONCEPT RENDER/);
+  assert.match(engine, /SCROLL TO EXPLORE[\s\S]*CONCEPT RENDER/);
+  assert.match(
+    engine,
+    /ResizeObserver/,
+    "Chapter measurement must respond to changing content height",
+  );
+  assert.match(
+    engine,
+    /data-clarity-chapter/,
+    "Progress must follow actual chapters instead of whole-page height",
+  );
+  assert.match(
+    engine,
+    /addEventListener\("scroll",\s*schedule,\s*\{\s*passive:\s*true/,
+  );
+  assert.doesNotMatch(
+    engine,
+    /preventDefault\(|addEventListener\(["'](?:wheel|touchmove)["']/,
+    "Scene motion must preserve native scrolling",
+  );
+  assert.match(
+    engine,
+    /progress=\{progress\}/,
+    "Document progress must reach the genuine scene",
+  );
+  assert.match(
+    canvas,
+    /evaluateClarityMotion/,
+    "The renderer must use the tested choreography",
+  );
 
   const form = read("components/legal/PublicRequestForm.tsx");
   assert.match(

@@ -1,0 +1,292 @@
+.journey {
+  --journey-header: 86px;
+  position: relative;
+  isolation: isolate;
+  max-width: 1680px;
+  margin-inline: auto;
+  background: #08090b;
+  color: #f2f3f5;
+}
+.visualTrack {
+  position: absolute;
+  inset: 0 0 66px;
+  pointer-events: none;
+}
+.stickyVisual {
+  position: sticky;
+  top: var(--journey-header);
+  width: 61%;
+  margin-left: 39%;
+  height: calc(100svh - var(--journey-header));
+  max-height: 1000px;
+  min-height: 490px;
+  pointer-events: auto;
+}
+.contentTrack {
+  position: relative;
+  z-index: 2;
+  pointer-events: none;
+  padding-inline: 56px;
+}
+.chapter {
+  display: flex;
+  align-items: center;
+  width: 41%;
+  min-height: calc(91svh - var(--journey-header));
+  padding: 100px 0;
+  scroll-margin-top: 110px;
+}
+.introChapter {
+  min-height: calc(100svh - var(--journey-header));
+  padding: 40px 0 70px;
+}
+.chapter a {
+  pointer-events: auto;
+}
+.chapterCopy {
+  width: 100%;
+}
+.chapterLabel {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font:
+    10px/1.8 "SFMono-Regular",
+    Consolas,
+    monospace;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: #9babc7;
+}
+.chapterLabel span {
+  color: #7b99ff;
+}
+.chapter h2 {
+  font-size: clamp(40px, 4.7vw, 68px);
+  font-weight: 500;
+  line-height: 1.09;
+  letter-spacing: -0.055em;
+  margin: 27px 0;
+}
+.description {
+  max-width: 395px;
+  color: #c2c9d6;
+  font-size: 17px;
+  line-height: 1.75;
+  letter-spacing: -0.018em;
+}
+.detail {
+  max-width: 370px;
+  color: #8c99b0;
+  font-size: 13px;
+  line-height: 1.9;
+  margin-top: 20px;
+}
+.chapterRule {
+  width: 125px;
+  height: 1px;
+  margin-top: 38px;
+  background: #ffffff1f;
+}
+.chapterRule span {
+  display: block;
+  width: 32px;
+  height: 1px;
+  background: #7494ff;
+}
+.baseline {
+  position: relative;
+  z-index: 2;
+  margin-inline: 56px;
+  min-height: 66px;
+  border-top: 1px solid #ffffff20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  font: 9px/1.6 monospace;
+  letter-spacing: 0.1em;
+  color: #9aa9c0;
+}
+.baseline a {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  min-height: 44px;
+  font:
+    12px/1.6 Manrope,
+    Arial,
+    sans-serif;
+  letter-spacing: 0;
+  color: #d5dae4;
+}
+.endAnchor {
+  scroll-margin-top: 110px;
+}
+.shortJourney .chapter {
+  min-height: 75svh;
+  padding: 70px 0;
+}
+.shortJourney .chapter h2 {
+  font-size: clamp(36px, 4.1vw, 58px);
+}
+@media (max-width: 1100px) and (min-width: 768px) {
+  .contentTrack {
+    padding-inline: 32px;
+  }
+  .chapter {
+    width: 44%;
+  }
+  .chapter h2 {
+    font-size: 44px;
+  }
+  .stickyVisual {
+    width: 58%;
+    margin-left: 42%;
+  }
+  .baseline {
+    margin-inline: 32px;
+  }
+}
+@media (max-width: 767px) {
+  .journey {
+    --journey-header: 70px;
+    --journey-visual-height: clamp(250px, 39svh, 390px);
+  }
+  .visualTrack {
+    position: sticky;
+    inset: auto;
+    top: var(--journey-header);
+    height: var(--journey-visual-height);
+    z-index: 3;
+    background: #08090b;
+    border-bottom: 1px solid #ffffff13;
+  }
+  .stickyVisual {
+    position: relative;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    height: 100%;
+    min-height: 0;
+    max-height: none;
+  }
+  .contentTrack {
+    padding: 0 24px;
+  }
+  .journey .chapter[id],
+  .shortJourney .chapter[id] {
+    width: 100%;
+    min-height: 60svh;
+    padding: 55px 0 75px;
+    scroll-margin-top: calc(var(--journey-visual-height) + 100px);
+  }
+  .introChapter {
+    min-height: 65svh;
+    padding-top: 34px;
+  }
+  .chapter h2,
+  .shortJourney .chapter h2 {
+    font-size: 42px;
+    line-height: 1.12;
+    margin: 22px 0;
+    max-width: 430px;
+  }
+  .chapterLabel {
+    font-size: 9px;
+    gap: 12px;
+  }
+  .description {
+    font-size: 15px;
+    max-width: 440px;
+  }
+  .detail {
+    font-size: 12px;
+    margin-top: 17px;
+  }
+  .chapterRule {
+    margin-top: 25px;
+  }
+  .baseline {
+    margin: 0 24px;
+    min-height: 80px;
+    align-items: flex-start;
+    justify-content: center;
+    flex-direction: column;
+    gap: 0;
+    padding: 13px 0;
+    font-size: 7px;
+  }
+}
+@media (max-height: 600px) and (min-width: 768px) {
+  .stickyVisual {
+    min-height: 0;
+  }
+  .chapter {
+    min-height: 650px;
+  }
+}
+/* Landscape phones retain a side-by-side view rather than covering the reading area. */
+@media (max-width: 767px) and (max-height: 500px) {
+  .visualTrack {
+    position: absolute;
+    inset: 0 0 66px;
+    height: auto;
+    border: 0;
+    background: none;
+    z-index: 1;
+  }
+  .stickyVisual {
+    position: sticky;
+    top: 70px;
+    width: 55%;
+    margin-left: 45%;
+    height: calc(100svh - 70px);
+  }
+  .contentTrack {
+    padding-inline: 24px;
+  }
+  .journey .chapter[id] {
+    width: 44%;
+    min-height: 85svh;
+    padding: 45px 0;
+    scroll-margin-top: 90px;
+  }
+  .chapter h2,
+  .shortJourney .chapter h2 {
+    font-size: 31px;
+  }
+  .description {
+    font-size: 13px;
+    line-height: 1.75;
+  }
+  .detail {
+    font-size: 11px;
+  }
+  .chapterLabel {
+    font-size: 8px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .journey .chapter[id],
+  .shortJourney .chapter[id] {
+    min-height: 0;
+    padding-block: 65px;
+  }
+  .introChapter {
+    min-height: 650px;
+  }
+  .visualTrack {
+    position: absolute;
+  }
+  @media (max-width: 767px) {
+    .visualTrack {
+      position: relative;
+      top: 0;
+    }
+    .introChapter {
+      min-height: 0;
+    }
+  }
+}

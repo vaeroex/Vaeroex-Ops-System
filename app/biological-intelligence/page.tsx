@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { ArrowRight } from "lucide-react";
 import { PublicFooter } from "@/components/legal/PublicFooter";
 import { PublicSiteHeader } from "@/components/legal/PublicSiteHeader";
+import { ClarityJourney } from "@/components/marketing/clarity/ClarityJourney";
 import { BIOLOGICAL_INTELLIGENCE_SYSTEM } from "@/lib/marketing/public-systems";
 import { publicPageMetadata } from "@/lib/seo/public-seo";
 import styles from "@/components/marketing/IntelligencePages.module.css";
@@ -52,6 +53,31 @@ const capabilities = [
     "Help researchers identify signals, hypotheses, or experiments that may deserve further investigation.",
   ],
 ] as const;
+
+const biologicalJourney = [
+  {
+    label: "Sequence & context",
+    title: "A signal is the beginning of a question.",
+    description:
+      "The intended environment connects genomic, molecular, cellular, experimental, and scientific evidence. Begin with variation, regulatory context, expression, and relevant observations. Evaluate consequence instead of assuming it.",
+    detail: "Planned research direction · Genomic context · Observations",
+  },
+  {
+    label: "Structure & system",
+    title: "Follow relationships across scale.",
+    description:
+      "Consider proteins, pathways, and cellular behavior as related sources of evidence while preserving their distinct meanings. A possible mechanism remains a hypothesis until the evidence supports it.",
+    detail:
+      "Planned research direction · Protein · Pathway · Cellular behavior",
+  },
+  {
+    label: "Hypothesis & investigation",
+    title: "Keep the unresolved question visible.",
+    description:
+      "Bring support, contradiction, and missing measurements into view before choosing the next research direction. Researchers assess what has been tested, what remains uncertain, and which investigation could add useful evidence.",
+    detail: "Planned research direction · Contradictions · Evidence gaps",
+  },
+];
 
 function BiologicalDiagram() {
   return (
@@ -193,58 +219,12 @@ export default function BiologicalIntelligencePage() {
         </div>
       </section>
 
-      <section id="biological-context" className={styles.section}>
-        <div className={`${styles.container} ${styles.split}`}>
-          <div>
-            <p className={styles.sectionLabel}>
-              <span>01</span>Relationships across scale
-            </p>
-            <h2>
-              A signal is the
-              <br />
-              beginning of a question.
-            </h2>
-            <p className={styles.copy}>
-              The intended environment connects genomic, molecular, cellular,
-              experimental, and scientific evidence. A possible mechanism
-              remains a hypothesis until the evidence supports it.
-            </p>
-          </div>
-          <ol className={styles.method}>
-            <li>
-              <span>01</span>
-              <div>
-                <h3>Sequence and context</h3>
-                <p>
-                  Connect variation with regulatory context, expression, and
-                  relevant observations. Evaluate consequence instead of
-                  assuming it.
-                </p>
-              </div>
-            </li>
-            <li>
-              <span>02</span>
-              <div>
-                <h3>Structure and system</h3>
-                <p>
-                  Consider proteins, pathways, and cellular behavior as related
-                  sources of evidence while preserving their distinct meanings.
-                </p>
-              </div>
-            </li>
-            <li>
-              <span>03</span>
-              <div>
-                <h3>Hypothesis and investigation</h3>
-                <p>
-                  Bring support, contradiction, and missing measurements into
-                  view before choosing the next research direction.
-                </p>
-              </div>
-            </li>
-          </ol>
-        </div>
-      </section>
+      <ClarityJourney
+        id="biological-context"
+        variant="research"
+        compact
+        stages={biologicalJourney}
+      />
 
       <section id="biological-capabilities" className={styles.section}>
         <div className={styles.container}>

@@ -5,6 +5,7 @@ import { PublicFooter } from "@/components/legal/PublicFooter";
 import { PublicSiteHeader } from "@/components/legal/PublicSiteHeader";
 import { StartWithVaeroexMenu } from "@/components/legal/StartWithVaeroexMenu";
 import { OperationsIntelligenceEngineDemo } from "@/components/motion/OperationsIntelligenceEngineDemo";
+import { ClarityJourney } from "@/components/marketing/clarity/ClarityJourney";
 import {
   operationsIntelligenceJsonLd,
   publicPageMetadata,
@@ -60,6 +61,37 @@ const information = [
   ],
 ] as const;
 
+const evidenceJourney = [
+  {
+    label: "Sources",
+    title: "A clearer decision starts with evidence.",
+    description:
+      "Return to supporting sources, freshness, and evidence limits behind important conclusions. Evidence stays available as you move from an overview into a finding.",
+    detail: "Source information · Freshness · Evidence limits",
+  },
+  {
+    label: "Context",
+    title: "Your numbers stay your numbers.",
+    description:
+      "Review business facts alongside the targets and context your business has confirmed. Facts remain separate from explanation and interpretation.",
+    detail: "Confirmed measures · Business context · Traceable evidence",
+  },
+  {
+    label: "Interpretation",
+    title: "Understand what a finding may mean.",
+    description:
+      "See context around supported patterns without treating generated reasoning as a new business fact. Recommendations remain available for your review, with the context needed to assess them.",
+    detail: "Supported patterns · Reviewable reasoning · Visible limitations",
+  },
+  {
+    label: "Decision",
+    title: "Decide what happens next.",
+    description:
+      "Leadership decides what deserves attention and what to investigate. Confirm any proposed record creation or change. Consequential decisions remain with the people responsible for them.",
+    detail: "Human review · Explicit confirmation · Leadership control",
+  },
+];
+
 export default function OperationsIntelligencePage() {
   return (
     <main className={`${styles.site} vaeroex-public-site`}>
@@ -111,12 +143,19 @@ export default function OperationsIntelligencePage() {
         </div>
       </section>
 
+      <ClarityJourney
+        id="executive-control"
+        variant="executive"
+        compact
+        stages={evidenceJourney}
+      />
+
       <section id="product-experience" className={styles.sectionTight}>
         <div className={styles.container}>
           <div className={styles.sectionHead}>
             <div>
               <p className={styles.sectionLabel}>
-                <span>01</span>The product experience
+                <span>02</span>The product experience
               </p>
               <h2>
                 From an overview
@@ -148,7 +187,7 @@ export default function OperationsIntelligencePage() {
           <div className={styles.sectionHead}>
             <div>
               <p className={styles.sectionLabel}>
-                <span>02</span>A connected leadership view
+                <span>03</span>A connected leadership view
               </p>
               <h2>
                 Clarity at every
@@ -177,7 +216,7 @@ export default function OperationsIntelligencePage() {
         <div className={`${styles.container} ${styles.split}`}>
           <div>
             <p className={styles.sectionLabel}>
-              <span>03</span>Start with what you have
+              <span>04</span>Start with what you have
             </p>
             <h2>Business information rarely arrives in perfect order.</h2>
             <p className={styles.copy}>
@@ -190,6 +229,12 @@ export default function OperationsIntelligencePage() {
               medical record numbers, insurance IDs, or regulated healthcare
               data.
             </div>
+            <div className={styles.actions}>
+              <Link href="/trust" className={styles.textLink}>
+                Explore the Trust Center
+                <ArrowRight aria-hidden="true" />
+              </Link>
+            </div>
           </div>
           <div>
             {information.map(([title, body]) => (
@@ -199,64 +244,6 @@ export default function OperationsIntelligencePage() {
               </details>
             ))}
           </div>
-        </div>
-      </section>
-
-      <section id="executive-control" className={styles.section}>
-        <div className={`${styles.container} ${styles.split}`}>
-          <div>
-            <p className={styles.sectionLabel}>
-              <span>04</span>Leadership remains in control
-            </p>
-            <h2>
-              Your numbers
-              <br />
-              stay your numbers.
-            </h2>
-            <p className={styles.copy}>
-              Business facts remain separate from explanation and
-              interpretation. Recommendations are there for your review, with
-              the context needed to assess them.
-            </p>
-            <div className={styles.actions}>
-              <Link href="/trust" className={styles.textLink}>
-                Explore the Trust Center
-                <ArrowRight aria-hidden="true" />
-              </Link>
-            </div>
-          </div>
-          <ol className={styles.method}>
-            <li>
-              <span>01</span>
-              <div>
-                <h3>Inspect the basis</h3>
-                <p>
-                  Return to supporting sources, freshness, and evidence limits
-                  behind important conclusions.
-                </p>
-              </div>
-            </li>
-            <li>
-              <span>02</span>
-              <div>
-                <h3>Understand the interpretation</h3>
-                <p>
-                  See context around supported patterns without treating
-                  generated reasoning as a new business fact.
-                </p>
-              </div>
-            </li>
-            <li>
-              <span>03</span>
-              <div>
-                <h3>Decide what happens next</h3>
-                <p>
-                  Confirm any proposed record creation or change. Consequential
-                  decisions remain with the people responsible for them.
-                </p>
-              </div>
-            </li>
-          </ol>
         </div>
       </section>
 

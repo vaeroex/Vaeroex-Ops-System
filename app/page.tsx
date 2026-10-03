@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import {
-  ArrowDown,
   ArrowRight,
   ArrowUpRight,
   FileText,
@@ -11,8 +10,7 @@ import {
 } from "lucide-react";
 import { PublicFooter } from "@/components/legal/PublicFooter";
 import { PublicSiteHeader } from "@/components/legal/PublicSiteHeader";
-import { ClarityEngine } from "@/components/marketing/clarity/ClarityEngine";
-import { SignalSequence } from "@/components/marketing/SignalSequence";
+import { ClarityJourney } from "@/components/marketing/clarity/ClarityJourney";
 import { PUBLIC_SYSTEMS } from "@/lib/marketing/public-systems";
 import { publicPageMetadata } from "@/lib/seo/public-seo";
 import styles from "./public-home.module.css";
@@ -28,13 +26,59 @@ export default function HomePage() {
   return (
     <main className={`vaeroex-public-site ${styles.home}`}>
       <PublicSiteHeader />
-      <section
-        id="main-content"
-        className={styles.hero}
-        aria-labelledby="home-title"
-      >
-        <div className={styles.heroGrid}>
-          <div className={styles.heroCopy}>
+      <ClarityJourney
+        id="the-signal"
+        variant="home"
+        stages={[
+          {
+            label: "Fragmented inputs",
+            title: "Complexity, made clear.",
+            description: "Your business has the information.",
+          },
+          {
+            label: "Information in motion",
+            title: (
+              <>
+                Bring the fragments
+                <br />
+                together.
+              </>
+            ),
+            description:
+              "A spreadsheet tells one story. A report tells another. The important questions live between them.",
+            detail:
+              "Bring supported spreadsheets, reports, PDFs, and business notes into your private workspace. Keep the source context attached.",
+          },
+          {
+            label: "Layers of context",
+            title: (
+              <>
+                See the
+                <br />
+                relationships.
+              </>
+            ),
+            description:
+              "A wider perspective begins when performance, business conditions, and evidence can be considered together.",
+            detail:
+              "Inspect supported findings, understand changes, and keep uncertainty and missing information in view.",
+          },
+          {
+            label: "A clear intelligence core",
+            title: (
+              <>
+                Arrive at a<br />
+                clearer decision.
+              </>
+            ),
+            description:
+              "Turn a complicated picture into a useful next question. Investigate what matters, then decide with context.",
+            detail:
+              "Recommendations remain drafts. You review the evidence and confirm before records are created or changed.",
+          },
+        ]}
+        intro={
+          <div className={`${styles.heroCopy} ${styles.journeyHero}`}>
             <p className={styles.eyebrow}>
               <span className={styles.signalDot} /> THE ADVANTAGE OF KNOWING
               FIRST
@@ -67,63 +111,8 @@ export default function HomePage() {
               </Link>
             </div>
           </div>
-          <div className={styles.heroVisual}>
-            <ClarityEngine className={styles.engine} />
-          </div>
-        </div>
-        <div className={styles.heroBaseline}>
-          <span>
-            <i /> THE CLARITY ENGINE <em>/ CONCEPT STUDY 01</em>
-          </span>
-          <a href="#the-signal">
-            From information to intelligence{" "}
-            <ArrowDown size={14} aria-hidden="true" />
-          </a>
-        </div>
-      </section>
-
-      <div className={styles.progression} aria-label="The Vaeroex approach">
-        {[
-          ["01", "Bring it together", "Your business information"],
-          ["02", "See what matters", "Evidence in context"],
-          ["03", "Decide with clarity", "Your judgment, better informed"],
-        ].map(([n, title, text]) => (
-          <div key={n}>
-            <span>{n}</span>
-            <div>
-              <strong>{title}</strong>
-              <p>{text}</p>
-            </div>
-            <ArrowUpRight size={19} aria-hidden="true" />
-          </div>
-        ))}
-      </div>
-
-      <section id="the-signal" className={styles.story}>
-        <div className={styles.sectionLabel}>
-          <span>01 / THE SIGNAL IN THE NOISE</span>
-          <span>DESIGNED FOR A CLEARER PERSPECTIVE</span>
-        </div>
-        <div className={styles.storyIntro}>
-          <h2>
-            More information.
-            <br />
-            <span>Less uncertainty.</span>
-          </h2>
-          <div>
-            <p>
-              A spreadsheet tells one story. A report tells another. The
-              important questions live between them.
-            </p>
-            <p>
-              Vaeroex brings supported business information into context, so you
-              can understand changes, investigate risks, and focus your
-              attention where it matters.
-            </p>
-          </div>
-        </div>
-        <SignalSequence />
-      </section>
+        }
+      />
 
       <section className={styles.product} aria-labelledby="product-title">
         <div className={styles.productIntro}>

@@ -2,12 +2,12 @@
   position: relative;
   width: 100%;
   height: 100%;
-  min-height: 360px;
+  min-height: 0;
   isolation: isolate;
 }
 .visual {
   position: absolute;
-  inset: 0;
+  inset: 0 0 95px;
   overflow: hidden;
 }
 .poster {
@@ -36,7 +36,7 @@
 }
 .caption {
   position: absolute;
-  bottom: 18px;
+  bottom: 78px;
   left: 7%;
   right: 7%;
   display: flex;
@@ -104,12 +104,15 @@
 }
 @media (max-width: 767px) {
   .engine {
-    min-height: 310px;
+    min-height: 0;
+  }
+  .visual {
+    bottom: 85px;
   }
   .caption {
     left: 4%;
     right: 4%;
-    bottom: 8px;
+    bottom: 50px;
   }
   .mode {
     font-size: 8px;
@@ -120,5 +123,73 @@
   .canvas,
   .motionControl {
     transition: none;
+  }
+}
+
+.chapters {
+  position: absolute;
+  left: 7%;
+  right: 7%;
+  bottom: 16px;
+  display: flex;
+  gap: 13px;
+  z-index: 2;
+}
+.chapters a {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font: 8px/1.6 monospace;
+  color: #7f8a9e;
+  letter-spacing: 0.03em;
+}
+.chapterLine {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: #ffffff24;
+}
+.chapterLine i {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: #718fff;
+  transform-origin: left;
+}
+.chapters a[aria-current] {
+  color: #d5ddec;
+}
+.chapters a:focus-visible {
+  outline: 2px solid #88a2ff;
+  outline-offset: 4px;
+}
+.chapterName {
+  max-width: 130px;
+}
+@media (max-width: 767px) {
+  .chapters {
+    left: 7%;
+    right: 7%;
+    bottom: 0;
+    gap: 15px;
+  }
+  .chapterName {
+    display: none;
+  }
+  .chapters a {
+    font-size: 8px;
+  }
+  .caption {
+    left: 7%;
+    right: 7%;
+  }
+  .motionControl {
+    min-height: 36px;
   }
 }

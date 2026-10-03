@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useRef, type RefObject } from "react";
+import {
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  type RefObject,
+} from "react";
 import { useThree } from "@react-three/fiber";
 import {
   DoubleSide,
@@ -21,6 +27,11 @@ import {
   LinearFilter,
 } from "three";
 import { apertureGeometry, plateGeometry } from "./clarityGeometry";
+import {
+  CLARITY_LAYER_COUNT,
+  type ClarityMotionState,
+  type ClarityPose,
+} from "./clarityMotion";
 
 export const ENGINE_BLUE = "#446dff";
 
@@ -160,6 +171,20 @@ function useEngineParts() {
         emissive: ENGINE_BLUE,
         emissiveIntensity: 0.1,
       }),
+      coreGlow: new MeshPhysicalMaterial({
+        color: ENGINE_BLUE,
+        emissive: ENGINE_BLUE,
+        emissiveIntensity: 0.2,
+        metalness: 0.55,
+        roughness: 0.26,
+      }),
+      signal: new MeshStandardMaterial({
+        color: "#7692ff",
+        emissive: ENGINE_BLUE,
+        emissiveIntensity: 1.15,
+        metalness: 0.45,
+        roughness: 0.28,
+      }),
       core: new MeshPhysicalMaterial({
         color: "#1c2a43",
         metalness: 0.72,
@@ -169,6 +194,7 @@ function useEngineParts() {
       }),
     };
     const geometry = {
+      signal: plateGeometry(0.45, 0.11, 0.12, 0.025, 0.007),
       bezel: apertureGeometry(4.16, 4.62, 0.34, 0.23, 0.52, 0.046),
       lip: apertureGeometry(4.08, 4.54, 0.035, 0.025, 0.5, 0.013),
       lamella: apertureGeometry(4.02, 4.48, 0.21, 0.1, 0.49, 0.026),
@@ -202,22 +228,65 @@ function useEngineParts() {
   return parts;
 }
 
+export type ClarityWorldController = {
+  apply: (state: ClarityMotionState) => void;
+};
+
+function applyPose(group: Group | Mesh | null | undefined, pose: ClarityPose) {
+  if (!group) return;
+  group.position.set(...pose.position);
+  group.rotation.set(...pose.rotation);
+  group.scale.setScalar(pose.scale);
+}
+
 export function ClarityEngineWorld({
-  motion,
+  controllerRef,
+  compact,
 }: {
-  motion: RefObject<Group | null>;
+  controllerRef: RefObject<ClarityWorldController | null>;
+  compact: boolean;
 }) {
   const { materials: material, geometry: shape } = useEngineParts();
-  const fragments = useRef<Group>(null);
+  const structure = useRef<Group>(null);
+  const front = useRef<Group>(null);
+  const back = useRef<Mesh>(null);
+  const core = useRef<Group>(null);
+  const mark = useRef<Group>(null);
+  const layers = useRef<(Group | null)[]>([]);
+  const fragments = useRef<(Group | null)[]>([]);
+  const signals = useRef<(Mesh | null)[]>([]);
+  useImperativeHandle(
+    controllerRef,
+    () => ({
+      apply: (state) => {
+        applyPose(structure.current, state.structure);
+        applyPose(front.current, state.front);
+        applyPose(back.current, state.back);
+        applyPose(core.current, state.core);
+        state.layers.forEach((pose, index) =>
+          applyPose(layers.current[index], pose),
+        );
+        state.fragments.forEach((pose, index) =>
+          applyPose(fragments.current[index], pose),
+        );
+        state.signals.forEach((pose, index) =>
+          applyPose(signals.current[index], pose),
+        );
+        material.coreGlow.emissiveIntensity = 0.18 + state.core.reveal * 0.62;
+        mark.current?.scale.setScalar(0.45 + state.core.reveal * 0.55);
+      },
+    }),
+    [material],
+  );
   return (
     <>
       <StudioEnvironment />
-      <ambientLight intensity={0.22} color="#c5d0ed" />
+      <ambientLight intensity={compact ? 0.4 : 0.22} color="#c5d0ed" />
       <directionalLight
         position={[-3.5, 7.5, 7]}
         color="#edf0ff"
         intensity={3.4}
-        castShadow
+        castShadow={!compact}
         shadow-mapSize={[2048, 2048]}
         shadow-radius={3}
         shadow-camera-left={-6}
@@ -234,67 +303,86 @@ export function ClarityEngineWorld({
         color="#5b7cff"
         intensity={2.1}
       />
-      <directionalLight position={[6, 2, 6]} color="#c4cde4" intensity={0.65} />
-      <pointLight
-        position={[-0.3, 0, 0.2]}
-        color={ENGINE_BLUE}
-        intensity={0.75}
-        distance={5}
-        decay={2}
+      <directionalLight
+        position={[6, 2, 6]}
+        color="#c4cde4"
+        intensity={compact ? 1.0 : 0.65}
       />
+      {!compact ? (
+        <pointLight
+          position={[-0.3, 0, 0.2]}
+          color={ENGINE_BLUE}
+          intensity={0.75}
+          distance={5}
+          decay={2}
+        />
+      ) : null}
       <group
-        ref={motion}
+        ref={structure}
         rotation={[-0.025, -0.13, -0.15]}
         position={[0.28, 0.12, 0]}
         dispose={null}
       >
         {/* The shell's repeated lamellae reveal actual depth and carry a continuous internal light seam. */}
-        {Array.from({ length: 8 }, (_, index) => (
-          <group
-            key={index}
-            position={[0, 0, 0.71 - index * 0.237]}
-            scale={1 - index * 0.008}
-          >
-            <mesh
-              geometry={shape.lamella}
-              material={index % 3 === 0 ? material.titanium : material.graphite}
-              castShadow
-              receiveShadow
-            />
-            <mesh
-              geometry={shape.lamellaEdge}
-              material={material.milled}
-              position={[0, 0, 0.063]}
-            />
-            <mesh
-              geometry={shape.innerLight}
-              material={
-                index === 3 || index === 6 ? material.blue : material.softBlue
-              }
-              position={[0, 0, 0.037]}
-            />
-            <mesh
-              geometry={shape.tab}
-              material={material.ceramic}
-              position={[-1.995, 0.62, 0]}
-              castShadow
-            />
-            <mesh
-              geometry={shape.tab}
-              material={material.ceramic}
-              position={[1.995, -0.62, 0]}
-              castShadow
-            />
-          </group>
-        ))}
+        {Array.from(
+          {
+            length: compact
+              ? CLARITY_LAYER_COUNT.compact
+              : CLARITY_LAYER_COUNT.full,
+          },
+          (_, index) => (
+            <group
+              key={index}
+              ref={(element) => {
+                layers.current[index] = element;
+              }}
+              position={[0, 0, 0.71 - index * 0.237]}
+              scale={1 - index * 0.008}
+            >
+              <mesh
+                geometry={shape.lamella}
+                material={
+                  index % 3 === 0 ? material.titanium : material.graphite
+                }
+                castShadow
+                receiveShadow
+              />
+              <mesh
+                geometry={shape.lamellaEdge}
+                material={material.milled}
+                position={[0, 0, 0.063]}
+              />
+              <mesh
+                geometry={shape.innerLight}
+                material={
+                  index === 3 || index === 6 ? material.blue : material.softBlue
+                }
+                position={[0, 0, 0.037]}
+              />
+              <mesh
+                geometry={shape.tab}
+                material={material.ceramic}
+                position={[-1.995, 0.62, 0]}
+                castShadow
+              />
+              <mesh
+                geometry={shape.tab}
+                material={material.ceramic}
+                position={[1.995, -0.62, 0]}
+                castShadow
+              />
+            </group>
+          ),
+        )}
         <mesh
+          ref={back}
           geometry={shape.back}
           material={material.graphite}
           position={[0, 0, -1.18]}
           castShadow
           receiveShadow
         />
-        <group position={[0, 0, 1.055]}>
+        <group ref={front} position={[0, 0, 1.055]}>
           <mesh
             geometry={shape.bezel}
             material={material.graphite}
@@ -356,7 +444,7 @@ export function ClarityEngineWorld({
           />
         </group>
         {/* The resolved core: machined ceramic, nested light, and a physical chevron. */}
-        <group position={[0, 0, -1.01]}>
+        <group ref={core} position={[0, 0, -1.01]}>
           <mesh
             geometry={shape.core}
             material={material.core}
@@ -365,7 +453,7 @@ export function ClarityEngineWorld({
           />
           <mesh
             geometry={shape.coreRim}
-            material={material.blue}
+            material={material.coreGlow}
             position={[0, 0, 0.012]}
           />
           <mesh
@@ -373,26 +461,28 @@ export function ClarityEngineWorld({
             material={material.milled}
             position={[0, 0, 0.117]}
           />
-          <mesh
-            geometry={shape.coreRail}
-            material={material.mark}
-            position={[-0.29, 0.16, 0.145]}
-            rotation={[0, 0, 0.42]}
-            castShadow
-          />
-          <mesh
-            geometry={shape.coreRail}
-            material={material.mark}
-            position={[0.29, 0.16, 0.145]}
-            rotation={[0, 0, -0.42]}
-            castShadow
-          />
-          <mesh
-            geometry={shape.coreChip}
-            material={material.blue}
-            position={[0, -0.86, 0.115]}
-            scale={[0.5, 0.16, 0.7]}
-          />
+          <group ref={mark}>
+            <mesh
+              geometry={shape.coreRail}
+              material={material.mark}
+              position={[-0.29, 0.16, 0.145]}
+              rotation={[0, 0, 0.42]}
+              castShadow
+            />
+            <mesh
+              geometry={shape.coreRail}
+              material={material.mark}
+              position={[0.29, 0.16, 0.145]}
+              rotation={[0, 0, -0.42]}
+              castShadow
+            />
+            <mesh
+              geometry={shape.coreChip}
+              material={material.blue}
+              position={[0, -0.86, 0.115]}
+              scale={[0.5, 0.16, 0.7]}
+            />
+          </group>
           {Array.from({ length: 6 }, (_, index) => (
             <mesh
               key={index}
@@ -403,49 +493,49 @@ export function ClarityEngineWorld({
             />
           ))}
         </group>
-        {/* Three input fragments, cut from the same material as the ordered structure. */}
-        <group ref={fragments} name="clarity-fragments">
-          <group position={[-2.75, 1.17, 1.14]} rotation={[0.13, -0.29, -0.27]}>
+        {/* The plates and illuminated signals physically travel into the stack as the story resolves. */}
+        {Array.from({ length: compact ? 3 : 6 }, (_, index) => (
+          <group
+            key={`fragment-${index}`}
+            ref={(element) => {
+              fragments.current[index] = element;
+            }}
+          >
             <mesh
-              geometry={shape.fragment}
-              material={material.graphite}
+              geometry={index % 3 === 0 ? shape.fragment : shape.fragmentWide}
+              material={index % 2 ? material.titanium : material.graphite}
               castShadow
               receiveShadow
             />
             <mesh
               geometry={shape.engravedLine}
               material={material.softBlue}
-              position={[0.11, 0.22, 0.108]}
-              scale={[2, 1.7, 1]}
+              position={[0.1, 0, 0.108]}
+              scale={[1.5, index % 3 === 0 ? 1.5 : 0.4, 1]}
             />
           </group>
+        ))}
+        {Array.from({ length: compact ? 3 : 6 }, (_, index) => (
           <mesh
-            geometry={shape.fragmentWide}
-            material={material.titanium}
-            position={[-3.3, -0.05, 0.29]}
-            rotation={[-0.14, 0.28, 0.18]}
-            castShadow
-            receiveShadow
+            key={`signal-${index}`}
+            ref={(element) => {
+              signals.current[index] = element;
+            }}
+            geometry={shape.signal}
+            material={material.signal}
           />
-          <mesh
-            geometry={shape.fragmentWide}
-            material={material.graphite}
-            position={[-2.55, -1.14, 0.63]}
-            rotation={[0.12, -0.14, -0.21]}
-            scale={[0.88, 1.2, 1]}
-            castShadow
-            receiveShadow
-          />
-        </group>
+        ))}
       </group>
-      <mesh
-        receiveShadow
-        rotation={[-Math.PI / 2, 0, 0]}
-        position={[0, -2.9, 0]}
-      >
-        <planeGeometry args={[40, 40]} />
-        <shadowMaterial color="#000000" transparent opacity={0.23} />
-      </mesh>
+      {!compact ? (
+        <mesh
+          receiveShadow
+          rotation={[-Math.PI / 2, 0, 0]}
+          position={[0, -2.9, 0]}
+        >
+          <planeGeometry args={[40, 40]} />
+          <shadowMaterial color="#000000" transparent opacity={0.23} />
+        </mesh>
+      ) : null}
     </>
   );
 }

@@ -10,6 +10,8 @@ import {
   type ReactNode,
 } from "react";
 import styles from "./ClarityEngine.module.css";
+import type { ClarityVariant } from "./clarityMotion";
+import { clarityDevicePolicy } from "./clarityDevicePolicy";
 
 const EngineCanvas = dynamic(() => import("./ClarityEngineCanvas"), {
   ssr: false,
@@ -37,7 +39,17 @@ class SceneBoundary extends Component<
 }
 
 /** A real-time sculpture with an independent, server-rendered image fallback. */
-export function ClarityEngine({ className = "" }: { className?: string }) {
+export function ClarityEngine({
+  className = "",
+  journeyId,
+  variant = "home",
+  chapters = [],
+}: {
+  className?: string;
+  journeyId?: string;
+  variant?: ClarityVariant;
+  chapters?: Array<{ label: string; id: string }>;
+}) {
   const container = useRef<HTMLDivElement>(null);
   const [mode, setMode] = useState<RenderMode>("pending");
   const [reason, setReason] = useState("loading");
@@ -46,6 +58,70 @@ export function ClarityEngine({ className = "" }: { className?: string }) {
   const [pageVisible, setPageVisible] = useState(true);
   const [ready, setReady] = useState(false);
   const [paused, setPaused] = useState(false);
+  const [compact, setCompact] = useState(false);
+  const [progress, setProgress] = useState(0);
+
+  useEffect(() => {
+    if (!journeyId || !inViewport || !pageVisible || paused) return;
+    const journey = document.getElementById(journeyId);
+    if (!journey) return;
+    const sections = Array.from(
+      journey.querySelectorAll<HTMLElement>("[data-clarity-chapter]"),
+    );
+    let frame = 0;
+    const measure = () => {
+      frame = 0;
+      const visual = container.current?.getBoundingClientRect();
+      // Align motion to actual story centers, including variable mobile copy heights.
+      const narrowLayout = window.matchMedia(
+        "(max-width: 767px) and (min-height: 501px)",
+      ).matches;
+      const focus =
+        narrowLayout && visual
+          ? visual.bottom +
+            Math.max(0, window.innerHeight - visual.bottom) * 0.48
+          : 86 + (window.innerHeight - 86) * 0.5;
+      const anchors = sections.map((section) => {
+        const bounds = section.getBoundingClientRect();
+        return bounds.top + bounds.height * 0.5 - focus;
+      });
+      let value = 0;
+      if (anchors.length > 1) {
+        if (anchors[anchors.length - 1] <= 0) value = 1;
+        else {
+          for (let index = 0; index < anchors.length - 1; index += 1) {
+            if (anchors[index] <= 0 && anchors[index + 1] > 0) {
+              value =
+                (index +
+                  -anchors[index] /
+                    Math.max(1, anchors[index + 1] - anchors[index])) /
+                (anchors.length - 1);
+              break;
+            }
+          }
+        }
+      }
+      setProgress(value);
+    };
+    const schedule = () => {
+      if (!frame) frame = window.requestAnimationFrame(measure);
+    };
+    const observer =
+      typeof ResizeObserver === "undefined"
+        ? null
+        : new ResizeObserver(schedule);
+    observer?.observe(journey);
+    sections.forEach((section) => observer?.observe(section));
+    window.addEventListener("scroll", schedule, { passive: true });
+    window.addEventListener("resize", schedule, { passive: true });
+    schedule();
+    return () => {
+      window.cancelAnimationFrame(frame);
+      observer?.disconnect();
+      window.removeEventListener("scroll", schedule);
+      window.removeEventListener("resize", schedule);
+    };
+  }, [journeyId, inViewport, pageVisible, paused, compact]);
   const handleReady = useCallback(() => setReady(true), []);
   const handleFailure = useCallback(() => {
     setMode("poster");
@@ -89,20 +165,22 @@ export function ClarityEngine({ className = "" }: { className?: string }) {
   useEffect(() => {
     if (!nearViewport) return;
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const compact = window.matchMedia("(max-width: 767px), (pointer: coarse)");
+    const compactQuery = window.matchMedia(
+      "(max-width: 767px), (pointer: coarse)",
+    );
     let cancelled = false;
     const evaluate = () => {
       if (cancelled) return;
       const device = navigator as DeviceNavigator;
-      const fallback = reducedMotion.matches
-        ? "reduced-motion"
-        : compact.matches
-          ? "compact-device"
-          : device.connection?.saveData ||
-              (device.deviceMemory && device.deviceMemory <= 4) ||
-              (device.hardwareConcurrency && device.hardwareConcurrency <= 4)
-            ? "low-power"
-            : null;
+      const policy = clarityDevicePolicy({
+        reducedMotion: reducedMotion.matches,
+        compact: compactQuery.matches,
+        saveData: device.connection?.saveData,
+        memory: device.deviceMemory,
+        cores: device.hardwareConcurrency,
+      });
+      setCompact(policy.compact);
+      const fallback = policy.fallback;
       if (fallback) {
         setReason(fallback);
         setMode("poster");
@@ -118,11 +196,12 @@ export function ClarityEngine({ className = "" }: { className?: string }) {
         const adequate = context.getParameter(context.MAX_TEXTURE_SIZE) >= 4096;
         context.getExtension("WEBGL_lose_context")?.loseContext();
         if (!adequate) throw new Error("Constrained GPU");
-        setReason("supported");
+        setReason(policy.compact ? "supported-compact" : "supported");
         setMode("interactive");
       } catch {
         setReason("webgl-unavailable");
         setMode("poster");
+        setReady(false);
       }
     };
     // The poster and page become usable before any Three.js code is requested.
@@ -132,23 +211,30 @@ export function ClarityEngine({ className = "" }: { className?: string }) {
         : null;
     const timeout = idle === null ? window.setTimeout(evaluate, 350) : null;
     reducedMotion.addEventListener("change", evaluate);
-    compact.addEventListener("change", evaluate);
+    compactQuery.addEventListener("change", evaluate);
     return () => {
       cancelled = true;
       if (idle !== null) window.cancelIdleCallback(idle);
       if (timeout !== null) window.clearTimeout(timeout);
       reducedMotion.removeEventListener("change", evaluate);
-      compact.removeEventListener("change", evaluate);
+      compactQuery.removeEventListener("change", evaluate);
     };
   }, [nearViewport]);
 
   const active = inViewport && pageVisible && !paused;
   const interactive = mode === "interactive" && ready;
+  const chapterIndex = Math.min(
+    chapters.length - 1,
+    Math.round(progress * (chapters.length - 1)),
+  );
   return (
     <div
       ref={container}
       className={`${styles.engine} ${className}`}
       data-clarity-engine
+      data-clarity-progress={progress.toFixed(4)}
+      data-clarity-quality={compact ? "compact" : "full"}
+      data-clarity-variant={variant}
       data-clarity-mode={interactive ? "interactive" : "poster"}
       data-clarity-state={mode === "interactive" && !ready ? "loading" : mode}
       data-clarity-reason={reason}
@@ -171,6 +257,9 @@ export function ClarityEngine({ className = "" }: { className?: string }) {
           <SceneBoundary onFailure={handleFailure}>
             <EngineCanvas
               active={active}
+              progress={progress}
+              compact={compact}
+              variant={variant}
               onReady={handleReady}
               onFailure={handleFailure}
             />
@@ -183,7 +272,7 @@ export function ClarityEngine({ className = "" }: { className?: string }) {
             className={styles.indicator}
             data-live={interactive && active}
           />
-          {interactive ? "REAL-TIME STRUCTURE" : "THE CLARITY ENGINE"}
+          {interactive ? "SCROLL TO EXPLORE" : "THE CLARITY ENGINE"}
         </span>
         {interactive ? (
           <button
@@ -212,6 +301,28 @@ export function ClarityEngine({ className = "" }: { className?: string }) {
           <span className={styles.renderLabel}>CONCEPT RENDER</span>
         )}
       </div>
+      {chapters.length > 0 ? (
+        <nav className={styles.chapters} aria-label="Clarity journey chapters">
+          {chapters.map((chapter, index) => (
+            <a
+              key={chapter.id}
+              href={`#${chapter.id}`}
+              aria-label={`${index + 1}. ${chapter.label}`}
+              aria-current={chapterIndex === index ? "step" : undefined}
+            >
+              <span className={styles.chapterLine}>
+                <i
+                  style={{
+                    transform: `scaleX(${Math.max(0, Math.min(1, progress * (chapters.length - 1) - index + 1))})`,
+                  }}
+                />
+              </span>
+              <span>0{index + 1}</span>
+              <span className={styles.chapterName}>{chapter.label}</span>
+            </a>
+          ))}
+        </nav>
+      ) : null}
     </div>
   );
 }

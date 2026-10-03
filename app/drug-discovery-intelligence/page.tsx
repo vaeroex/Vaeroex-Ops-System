@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { ArrowRight } from "lucide-react";
 import { PublicFooter } from "@/components/legal/PublicFooter";
 import { PublicSiteHeader } from "@/components/legal/PublicSiteHeader";
+import { ClarityJourney } from "@/components/marketing/clarity/ClarityJourney";
 import { DRUG_DISCOVERY_INTELLIGENCE_SYSTEM } from "@/lib/marketing/public-systems";
 import { publicPageMetadata } from "@/lib/seo/public-seo";
 import styles from "@/components/marketing/IntelligencePages.module.css";
@@ -55,6 +56,31 @@ const researchPrinciples = [
     "Surface conflicts between computational predictions and laboratory observations. Generated reasoning does not become experimental fact.",
   ],
 ] as const;
+
+const discoveryJourney = [
+  {
+    label: "Target & constraints",
+    title: "Every iteration adds context.",
+    description:
+      "The planned workflow begins with researcher-defined constraints, target preparation, and supported computational approaches. Inputs and parameters give each experiment an inspectable starting point.",
+    detail:
+      "Planned workflow · Target context · Researcher-defined constraints",
+  },
+  {
+    label: "Candidates & evidence",
+    title: "Compare and investigate.",
+    description:
+      "Evaluate candidates, predicted interactions, and explicit filter outcomes while retaining the evidence behind them. Candidate branches and comparisons are intended to remain part of a connected research history.",
+    detail: "Planned workflow · Candidate comparison · Evidence retained",
+  },
+  {
+    label: "Researcher review",
+    title: "Review and validate.",
+    description:
+      "Keep researcher review in the workflow. Add laboratory findings as new evidence, including results that contradict earlier predictions. Each iteration adds context for the next research decision.",
+    detail: "Planned workflow · Laboratory validation · Visible disagreement",
+  },
+];
 
 function DiscoveryDiagram() {
   return (
@@ -198,12 +224,19 @@ export default function DrugDiscoveryIntelligencePage() {
         </div>
       </section>
 
+      <ClarityJourney
+        id="discovery-continuity"
+        variant="research"
+        compact
+        stages={discoveryJourney}
+      />
+
       <section id="discovery-capabilities" className={styles.section}>
         <div className={styles.container}>
           <div className={styles.sectionHead}>
             <div>
               <p className={styles.sectionLabel}>
-                <span>01</span>Planned scientific capabilities
+                <span>02</span>Planned scientific capabilities
               </p>
               <h2>
                 From a biological target
@@ -226,63 +259,10 @@ export default function DrugDiscoveryIntelligencePage() {
               </article>
             ))}
           </div>
-        </div>
-      </section>
-
-      <section className={styles.section}>
-        <div className={`${styles.container} ${styles.split}`}>
-          <div>
-            <p className={styles.sectionLabel}>
-              <span>02</span>Experimental continuity
-            </p>
-            <h2>
-              Every iteration
-              <br />
-              adds context.
-            </h2>
-            <p className={styles.copy}>
-              The intended workspace brings experimental constraints, candidate
-              branches, comparisons, and laboratory results into a connected
-              research history.
-            </p>
-            <div className={styles.note}>
-              A computational prediction is a research input. It is not proof of
-              efficacy, safety, or a successful experimental outcome.
-            </div>
+          <div className={styles.note}>
+            A computational prediction is a research input. It is not proof of
+            efficacy, safety, or a successful experimental outcome.
           </div>
-          <ol className={styles.method}>
-            <li>
-              <span>01</span>
-              <div>
-                <h3>Define and explore</h3>
-                <p>
-                  Set researcher-defined constraints, prepare a target, and
-                  explore supported computational approaches.
-                </p>
-              </div>
-            </li>
-            <li>
-              <span>02</span>
-              <div>
-                <h3>Compare and investigate</h3>
-                <p>
-                  Evaluate candidates, predicted interactions, and explicit
-                  filter outcomes while retaining the evidence behind them.
-                </p>
-              </div>
-            </li>
-            <li>
-              <span>03</span>
-              <div>
-                <h3>Review and validate</h3>
-                <p>
-                  Keep researcher review in the workflow. Add laboratory
-                  findings as new evidence, including results that contradict
-                  earlier predictions.
-                </p>
-              </div>
-            </li>
-          </ol>
         </div>
       </section>
 

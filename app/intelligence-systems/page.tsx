@@ -1,9 +1,9 @@
-import Image from "next/image";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { ArrowRight } from "lucide-react";
 import { PublicFooter } from "@/components/legal/PublicFooter";
 import { PublicSiteHeader } from "@/components/legal/PublicSiteHeader";
+import { ClarityJourney } from "@/components/marketing/clarity/ClarityJourney";
 import { PUBLIC_SYSTEMS } from "@/lib/marketing/public-systems";
 import { publicPageMetadata } from "@/lib/seo/public-seo";
 import styles from "@/components/marketing/IntelligencePages.module.css";
@@ -16,27 +16,36 @@ export const metadata: Metadata = publicPageMetadata({
 });
 
 const intelligencePath = [
-  [
-    "Information",
-    "Begin with the records, observations, and context an environment produces. Keep their origins and limitations visible.",
-  ],
-  [
-    "Visibility",
-    "Bring important conditions, relationships, and changes into view so they can be examined together.",
-  ],
-  [
-    "Awareness",
-    "Understand what a signal may mean in its wider context, why it matters, and what remains uncertain.",
-  ],
-  [
-    "Prediction",
-    "Recognize supported patterns and possible outcomes. A possibility stays distinct from an established fact.",
-  ],
-  [
-    "Action",
-    "Give people a clearer basis for attention, investigation, prioritization, and decisions.",
-  ],
-] as const;
+  {
+    label: "Information",
+    title: "A useful relationship with information.",
+    description:
+      "Begin with the records, observations, and context an environment produces. A number becomes more useful when you can see what surrounds it. Keep the origins and limitations of the evidence visible.",
+    detail:
+      "A conceptual intelligence path, not a diagram of Vaeroex’s private technical architecture.",
+  },
+  {
+    label: "Visibility",
+    title: "A shared standard. Distinct domains.",
+    description:
+      "Bring important conditions, relationships, and changes into view so they can be examined together. Each intelligence environment is shaped around the evidence, constraints, and expertise its domain requires.",
+    detail: "Executive · Drug Discovery · Biological Intelligence",
+  },
+  {
+    label: "Awareness & prediction",
+    title: "See a signal in its wider context.",
+    description:
+      "Understand why a signal may matter and what remains uncertain. Recognize supported patterns and possible outcomes. A possibility stays distinct from an established fact.",
+    detail: "Context · Supported patterns · Explicit uncertainty",
+  },
+  {
+    label: "Action",
+    title: "Make room for an informed decision.",
+    description:
+      "Give people a clearer basis for attention, investigation, prioritization, and decisions. A recommendation earns attention when its limits are clear and its supporting evidence can be reviewed.",
+    detail: "Review · Prioritization · Human judgment",
+  },
+];
 
 export default function IntelligenceSystemsPage() {
   return (
@@ -75,56 +84,12 @@ export default function IntelligenceSystemsPage() {
         </div>
       </section>
 
-      <div className={styles.container}>
-        <figure className={styles.material}>
-          <Image
-            src="/brand/clarity-material.webp"
-            width={1536}
-            height={1024}
-            sizes="(max-width: 800px) 100vw, 1280px"
-            alt="Conceptual material study of layered graphite surfaces resolving around a precise blue illuminated core"
-          />
-          <figcaption>
-            <span>Material study / Clarity through layers</span>
-            <span>Conceptual brand illustration</span>
-          </figcaption>
-        </figure>
-      </div>
-
-      <section id="intelligence-path" className={styles.section}>
-        <div className={`${styles.container} ${styles.split}`}>
-          <div>
-            <p className={styles.sectionLabel}>
-              <span>01</span>How understanding takes shape
-            </p>
-            <h2>
-              A useful relationship
-              <br />
-              with information.
-            </h2>
-            <p className={styles.copy}>
-              A number becomes more useful when you can see what surrounds it. A
-              finding matters more when you can inspect its evidence. A
-              recommendation earns attention when its limits are clear.
-            </p>
-            <p className={styles.caption}>
-              A conceptual intelligence path, not a diagram of Vaeroex&apos;s
-              private technical architecture.
-            </p>
-          </div>
-          <ol className={styles.method}>
-            {intelligencePath.map(([title, description], index) => (
-              <li key={title} id={title.toLowerCase()}>
-                <span>0{index + 1}</span>
-                <div>
-                  <h3>{title}</h3>
-                  <p>{description}</p>
-                </div>
-              </li>
-            ))}
-          </ol>
-        </div>
-      </section>
+      <ClarityJourney
+        id="intelligence-path"
+        variant="systems"
+        compact
+        stages={intelligencePath}
+      />
 
       <section id="specialized-intelligence" className={styles.section}>
         <div className={styles.container}>
