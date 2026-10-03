@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
-import { ClarityEngine } from "./ClarityEngine";
-import type { ClarityVariant } from "./clarityMotion";
+import { ClarityEngine, type JourneyVariant } from "./ClarityEngine";
 import styles from "./ClarityJourney.module.css";
 
 type JourneyStage = {
@@ -19,16 +18,18 @@ export function ClarityJourney({
   compact = false,
 }: {
   id: string;
-  variant: ClarityVariant;
+  variant: JourneyVariant;
   stages: JourneyStage[];
   intro?: ReactNode;
   compact?: boolean;
 }) {
+  const scientific = variant === "drug-discovery" || variant === "biology";
   return (
     <section
       id={id}
-      className={`${styles.journey} ${compact ? styles.shortJourney : ""} ${intro ? styles.withIntro : ""}`}
+      className={`${styles.journey} ${compact ? styles.shortJourney : ""} ${intro ? styles.withIntro : ""} ${scientific ? styles.scientificJourney : ""}`}
       data-clarity-journey
+      data-science-journey={scientific ? variant : undefined}
       aria-label={
         variant === "home"
           ? "From fragmented information to clear decisions"
@@ -45,6 +46,13 @@ export function ClarityJourney({
               id: `${id}-stage-${index}`,
             }))}
           />
+          {scientific ? (
+            <p className={styles.scienceNote}>
+              {variant === "drug-discovery"
+                ? "PDB 1AZM / CARBONIC ANHYDRASE I · CONCEPTUAL CHOREOGRAPHY"
+                : "GENERIC EUKARYOTIC CELL · CONCEPTUAL PROCESS / NOT TO SCALE"}
+            </p>
+          ) : null}
         </div>
       </div>
       <div className={styles.contentTrack}>
@@ -77,7 +85,11 @@ export function ClarityJourney({
         ))}
       </div>
       <div className={styles.baseline}>
-        <span>THE CLARITY ENGINE / CONCEPTUAL JOURNEY</span>
+        <span>
+          {scientific
+            ? "VAEROEX / SCIENTIFIC VISUAL STUDY"
+            : "THE CLARITY ENGINE / CONCEPTUAL JOURNEY"}
+        </span>
         <a href={`#${id}-end`}>
           Continue exploring <span aria-hidden="true">↓</span>
         </a>

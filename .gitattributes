@@ -1,1 +1,4 @@
 services/document-extraction-worker/fixtures/synthetic-v1/generated/*.pdf binary
+
+# Preserve exact official scientific source bytes, including fixed-width PDB padding.
+scripts/science-sources/* -text -whitespace

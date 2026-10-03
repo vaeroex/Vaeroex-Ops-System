@@ -56,130 +56,41 @@ const capabilities = [
 
 const biologicalJourney = [
   {
-    label: "Sequence & context",
-    title: "A signal is the beginning of a question.",
+    label: "A cellular environment",
+    title: "Begin with the living system.",
     description:
-      "The intended environment connects genomic, molecular, cellular, experimental, and scientific evidence. Begin with variation, regulatory context, expression, and relevant observations. Evaluate consequence instead of assuming it.",
-    detail: "Planned research direction · Genomic context · Observations",
+      "Approach a community of cells, each shaped by membranes, internal structures, and its surrounding environment. This generic eukaryotic cell is an authored scientific illustration, with scale and timing composed for clarity.",
+    detail: "Conceptual cellular environment · Not to scale",
   },
   {
-    label: "Structure & system",
-    title: "Follow relationships across scale.",
+    label: "The membrane",
+    title: "Cross a selective boundary.",
     description:
-      "Consider proteins, pathways, and cellular behavior as related sources of evidence while preserving their distinct meanings. A possible mechanism remains a hypothesis until the evidence supports it.",
-    detail:
-      "Planned research direction · Protein · Pathway · Cellular behavior",
+      "A cutaway opens the membrane, revealing a phospholipid bilayer and embedded protein forms. The camera follows the boundary inward, connecting the cell’s exterior with the organization beneath it.",
+    detail: "Illustrative membrane · Lipid bilayer · Embedded proteins",
   },
   {
-    label: "Hypothesis & investigation",
-    title: "Keep the unresolved question visible.",
+    label: "The interior",
+    title: "Discover an organized world.",
     description:
-      "Bring support, contradiction, and missing measurements into view before choosing the next research direction. Researchers assess what has been tested, what remains uncertain, and which investigation could add useful evidence.",
-    detail: "Planned research direction · Contradictions · Evidence gaps",
+      "A nucleus, folded membranes, mitochondria, vesicles, and structural filaments emerge in a coherent interior. Their arrangement illustrates cellular organization without claiming a measured cell or a specific biological state.",
+    detail: "Nucleus · Endoplasmic reticulum · Golgi · Mitochondria",
+  },
+  {
+    label: "Protein-scale detail",
+    title: "Follow a possible connection.",
+    description:
+      "Move toward a membrane-spanning protein and an illustrative intracellular relay. Coordinated motion connects scales; these generic forms and signals do not represent an established pathway or a simulated mechanism.",
+    detail: "Generic receptor · Conceptual process · No validated mechanism",
+  },
+  {
+    label: "Biological intelligence",
+    title: "Reconnect the wider picture.",
+    description:
+      "Pull back from molecular detail to the cell and its neighbors. Vaeroex is being developed to connect evidence across these scales—preserving supporting observations, contradictions, and unanswered questions for researchers.",
+    detail: "In development · Connected evidence · Researcher interpretation",
   },
 ];
-
-function BiologicalDiagram() {
-  return (
-    <figure className={styles.researchVisual}>
-      <svg
-        viewBox="0 0 420 420"
-        role="img"
-        aria-labelledby="biological-diagram-title biological-diagram-desc"
-      >
-        <title id="biological-diagram-title">
-          Conceptual biological evidence map
-        </title>
-        <desc id="biological-diagram-desc">
-          Genomic, protein, and experimental observations connect around a
-          proposed mechanism, with an unresolved evidence gap remaining visible.
-        </desc>
-        <defs>
-          <pattern
-            id="biological-grid"
-            width="28"
-            height="28"
-            patternUnits="userSpaceOnUse"
-          >
-            <path
-              d="M28 0H0V28"
-              fill="none"
-              stroke="#263044"
-              strokeWidth=".5"
-            />
-          </pattern>
-        </defs>
-        <rect
-          width="420"
-          height="420"
-          fill="url(#biological-grid)"
-          opacity=".65"
-        />
-        <g fill="none" stroke="#293c62">
-          <ellipse cx="210" cy="210" rx="144" ry="144" />
-          <ellipse cx="210" cy="210" rx="99" ry="99" strokeDasharray="2 6" />
-          <path d="M30 210H390M210 30V390" />
-        </g>
-        <g fill="none" stroke="#738bd9" strokeWidth="1.2">
-          <path d="M210 70L210 184M73 262L187 223M348 262L232 223M103 110L190 191" />
-          <path d="M210 237V348" strokeDasharray="4 6" />
-        </g>
-        <g fill="#0e182b" stroke="#6684e5">
-          <path d="M210 178L238 194V226L210 242L182 226V194Z" />
-          <circle cx="210" cy="70" r="13" />
-          <circle cx="73" cy="262" r="13" />
-          <circle cx="348" cy="262" r="13" />
-          <circle cx="103" cy="110" r="7" />
-        </g>
-        <circle cx="210" cy="210" r="7" fill="#8da6ff" />
-        <circle
-          cx="210"
-          cy="348"
-          r="16"
-          fill="#0d1119"
-          stroke="#a0abc2"
-          strokeDasharray="3 4"
-        />
-        <g
-          fill="#b7c4e3"
-          fontFamily="monospace"
-          fontSize="9"
-          textAnchor="middle"
-          letterSpacing="1"
-        >
-          <text x="210" y="42">
-            GENOMIC CONTEXT
-          </text>
-          <text x="70" y="295">
-            PROTEIN
-          </text>
-          <text x="345" y="295">
-            EXPERIMENT
-          </text>
-          <text x="210" y="270">
-            PROPOSED MECHANISM
-          </text>
-          <text x="210" y="386">
-            EVIDENCE GAP
-          </text>
-        </g>
-        <text
-          x="210"
-          y="353"
-          fill="#c0cadf"
-          fontFamily="monospace"
-          fontSize="14"
-          textAnchor="middle"
-        >
-          ?
-        </text>
-      </svg>
-      <figcaption>
-        Conceptual evidence map · Not an established biological finding
-      </figcaption>
-    </figure>
-  );
-}
 
 export default function BiologicalIntelligencePage() {
   const system = BIOLOGICAL_INTELLIGENCE_SYSTEM;
@@ -215,13 +126,25 @@ export default function BiologicalIntelligencePage() {
               </a>
             </div>
           </div>
-          <BiologicalDiagram />
+          <figure className={styles.researchVisual}>
+            {/* A still from this page’s actual interactive geometry. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/brand/science/biology-poster.webp"
+              alt="Conceptual eukaryotic cell with membrane detail and organized internal structures"
+              width="680"
+              height="680"
+            />
+            <figcaption>
+              Generic eukaryotic cell · Conceptual illustration · Not to scale
+            </figcaption>
+          </figure>
         </div>
       </section>
 
       <ClarityJourney
         id="biological-context"
-        variant="research"
+        variant="biology"
         compact
         stages={biologicalJourney}
       />

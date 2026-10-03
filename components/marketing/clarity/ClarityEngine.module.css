@@ -193,3 +193,37 @@
     min-height: 36px;
   }
 }
+
+.compoundLabels {
+  position: absolute;
+  left: 14%;
+  right: 14%;
+  bottom: 20%;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  text-align: center;
+  font: 10px/1.8 monospace;
+  letter-spacing: 0.1em;
+  color: #aec5e1;
+  pointer-events: none;
+}
+.compoundLabels small {
+  display: block;
+  color: #8391a7;
+  font:
+    10px/1.8 Manrope,
+    Arial,
+    sans-serif;
+  letter-spacing: 0;
+}
+@media (max-width: 767px) {
+  .compoundLabels {
+    font-size: 8px;
+    left: 9%;
+    right: 9%;
+    bottom: 12%;
+  }
+  .compoundLabels small {
+    font-size: 7px;
+  }
+}

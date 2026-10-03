@@ -11,11 +11,17 @@ import {
 } from "react";
 import styles from "./ClarityEngine.module.css";
 import type { ClarityVariant } from "./clarityMotion";
+import type { ScienceKind } from "../science/scienceTypes";
+export type JourneyVariant = ClarityVariant | ScienceKind;
 import { clarityDevicePolicy } from "./clarityDevicePolicy";
 
 const EngineCanvas = dynamic(() => import("./ClarityEngineCanvas"), {
   ssr: false,
 });
+const ScientificCanvas = dynamic(() => import("../science/ScientificCanvas"), {
+  ssr: false,
+});
+
 type RenderMode = "pending" | "interactive" | "poster";
 type DeviceNavigator = Navigator & {
   deviceMemory?: number;
@@ -47,9 +53,16 @@ export function ClarityEngine({
 }: {
   className?: string;
   journeyId?: string;
-  variant?: ClarityVariant;
+  variant?: JourneyVariant;
   chapters?: Array<{ label: string; id: string }>;
 }) {
+  const scientific = variant === "drug-discovery" || variant === "biology";
+  const sceneName =
+    variant === "drug-discovery"
+      ? "Molecular journey"
+      : variant === "biology"
+        ? "Cellular journey"
+        : "Clarity Engine";
   const container = useRef<HTMLDivElement>(null);
   const [mode, setMode] = useState<RenderMode>("pending");
   const [reason, setReason] = useState("loading");
@@ -244,7 +257,11 @@ export function ClarityEngine({
         {/* A local, optimized art-directed render is also the no-JavaScript experience. */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src="/brand/clarity-engine-poster.webp"
+          src={
+            scientific
+              ? `/brand/science/${variant}-poster.webp`
+              : "/brand/clarity-engine-poster.webp"
+          }
           alt=""
           width="1400"
           height="1400"
@@ -255,15 +272,44 @@ export function ClarityEngine({
         />
         {mode === "interactive" ? (
           <SceneBoundary onFailure={handleFailure}>
-            <EngineCanvas
-              active={active}
-              progress={progress}
-              compact={compact}
-              variant={variant}
-              onReady={handleReady}
-              onFailure={handleFailure}
-            />
+            {scientific ? (
+              <ScientificCanvas
+                active={active}
+                progress={progress}
+                compact={compact}
+                variant={variant}
+                onReady={handleReady}
+                onFailure={handleFailure}
+              />
+            ) : (
+              <EngineCanvas
+                active={active}
+                progress={progress}
+                compact={compact}
+                variant={variant}
+                onReady={handleReady}
+                onFailure={handleFailure}
+              />
+            )}
           </SceneBoundary>
+        ) : null}
+        {variant === "drug-discovery" && interactive ? (
+          <div
+            className={styles.compoundLabels}
+            style={{
+              opacity: Math.max(0, Math.min(1, (progress - 0.87) / 0.1)),
+            }}
+          >
+            <span>
+              AZM<small>Acetazolamide</small>
+            </span>
+            <span>
+              MZM<small>Methazolamide</small>
+            </span>
+            <span>
+              EZL<small>Ethoxzolamide</small>
+            </span>
+          </div>
         ) : null}
       </div>
       <div className={styles.caption}>
@@ -272,7 +318,7 @@ export function ClarityEngine({
             className={styles.indicator}
             data-live={interactive && active}
           />
-          {interactive ? "SCROLL TO EXPLORE" : "THE CLARITY ENGINE"}
+          {interactive ? "SCROLL TO EXPLORE" : sceneName.toUpperCase()}
         </span>
         {interactive ? (
           <button
@@ -281,8 +327,8 @@ export function ClarityEngine({
             onClick={() => setPaused((current) => !current)}
             aria-label={
               paused
-                ? "Enable Clarity Engine motion"
-                : "Pause Clarity Engine motion"
+                ? `Enable ${sceneName} motion`
+                : `Pause ${sceneName} motion`
             }
             aria-pressed={paused}
           >
@@ -302,7 +348,12 @@ export function ClarityEngine({
         )}
       </div>
       {chapters.length > 0 ? (
-        <nav className={styles.chapters} aria-label="Clarity journey chapters">
+        <nav
+          className={styles.chapters}
+          aria-label={
+            scientific ? `${sceneName} chapters` : "Clarity journey chapters"
+          }
+        >
           {chapters.map((chapter, index) => (
             <a
               key={chapter.id}

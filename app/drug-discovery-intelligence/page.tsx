@@ -59,132 +59,42 @@ const researchPrinciples = [
 
 const discoveryJourney = [
   {
-    label: "Target & constraints",
-    title: "Every iteration adds context.",
+    label: "The molecular landscape",
+    title: "Enter the structure.",
     description:
-      "The planned workflow begins with researcher-defined constraints, target preparation, and supported computational approaches. Inputs and parameters give each experiment an inspectable starting point.",
+      "A folded protein becomes a landscape of ribbons, cavities, and molecular surfaces. Travel into human carbonic anhydrase I, using coordinates from the experimentally determined 1AZM structure.",
+    detail: "Structural reference · PDB 1AZM · X-ray crystallography, 2.00 Å",
+  },
+  {
+    label: "The binding pocket",
+    title: "Find the relevant detail.",
+    description:
+      "The backbone gives way to an atom-derived surface, opening a view toward the zinc-containing pocket. Changing representations makes the same structural evidence easier to inspect.",
     detail:
-      "Planned workflow · Target context · Researcher-defined constraints",
+      "Illustrative surface · Backbone and pocket share deposited coordinates",
   },
   {
-    label: "Candidates & evidence",
-    title: "Compare and investigate.",
+    label: "Candidate chemistry",
+    title: "Explore the differences.",
     description:
-      "Evaluate candidates, predicted interactions, and explicit filter outcomes while retaining the evidence behind them. Candidate branches and comparisons are intended to remain part of a connected research history.",
-    detail: "Planned workflow · Candidate comparison · Evidence retained",
+      "Acetazolamide, methazolamide, and ethoxzolamide enter as connected molecular structures. Their distinct rings and substituents provide a concrete starting point for comparison.",
+    detail: "Reference structures · AZM / MZM / EZL · No ranking implied",
   },
   {
-    label: "Researcher review",
-    title: "Review and validate.",
+    label: "An illustrative interaction",
+    title: "Bring target and compound together.",
     description:
-      "Keep researcher review in the workflow. Add laboratory findings as new evidence, including results that contradict earlier predictions. Each iteration adds context for the next research decision.",
-    detail: "Planned workflow · Laboratory validation · Visible disagreement",
+      "Acetazolamide approaches, aligns, and settles into the position observed in the deposited complex. The approach is authored choreography; it is not a docking calculation, simulation, or demonstration of therapeutic effect.",
+    detail: "Observed endpoint · Conceptual approach · No interaction scores",
+  },
+  {
+    label: "Research intelligence",
+    title: "Keep the evidence connected.",
+    description:
+      "Candidates separate for comparison. Vaeroex’s planned research environment connects structural references, computational experiments, conflicting findings, and researcher decisions—so every next step has an inspectable basis.",
+    detail: "In development · Planned workflow · Scientific review required",
   },
 ];
-
-function DiscoveryDiagram() {
-  return (
-    <figure className={styles.researchVisual}>
-      <svg
-        viewBox="0 0 420 420"
-        role="img"
-        aria-labelledby="discovery-diagram-title discovery-diagram-desc"
-      >
-        <title id="discovery-diagram-title">
-          Conceptual discovery evidence path
-        </title>
-        <desc id="discovery-diagram-desc">
-          A research target branches into candidate paths. Supporting and
-          conflicting evidence are retained before researcher review.
-        </desc>
-        <defs>
-          <pattern
-            id="discovery-grid"
-            width="28"
-            height="28"
-            patternUnits="userSpaceOnUse"
-          >
-            <path
-              d="M28 0H0V28"
-              fill="none"
-              stroke="#263044"
-              strokeWidth=".5"
-            />
-          </pattern>
-        </defs>
-        <rect
-          width="420"
-          height="420"
-          fill="url(#discovery-grid)"
-          opacity=".65"
-        />
-        <g fill="none" stroke="#657392" strokeWidth="1">
-          <path d="M210 73V108M210 108H70V160M210 108H350V160M210 108V160M70 208V261H210M350 208V261H210M210 208V327" />
-          <path d="M70 184H160M350 184H260" strokeDasharray="3 6" />
-        </g>
-        <g fill="#121a2a" stroke="#597bff">
-          <path d="M178 23H242V73H178Z" />
-          <path d="M47 160H93V208H47Z" />
-          <path d="M187 160H233V208H187Z" />
-          <path d="M327 160H373V208H327Z" />
-        </g>
-        <path d="M198 35L220 48L198 61Z" fill="#90a4ff" />
-        <g
-          fill="#bac7e9"
-          fontFamily="monospace"
-          fontSize="12"
-          textAnchor="middle"
-        >
-          <text x="70" y="189">
-            A
-          </text>
-          <text x="210" y="189">
-            B
-          </text>
-          <text x="350" y="189">
-            C
-          </text>
-        </g>
-        <path d="M198 250L210 238L222 250L210 262Z" fill="#6e87ec" />
-        <rect
-          x="125"
-          y="327"
-          width="170"
-          height="49"
-          fill="#26395f"
-          stroke="#6e87ec"
-        />
-        <g
-          fill="#b2c0de"
-          fontFamily="monospace"
-          fontSize="10"
-          textAnchor="middle"
-          letterSpacing="1.2"
-        >
-          <text x="210" y="96">
-            RESEARCH TARGET
-          </text>
-          <text x="210" y="141">
-            CANDIDATE PATHS
-          </text>
-          <text x="210" y="292">
-            EVIDENCE RETAINED
-          </text>
-          <text x="210" y="356">
-            RESEARCHER REVIEW
-          </text>
-        </g>
-        <g fill="#7185b0">
-          <circle cx="70" cy="261" r="3" />
-          <circle cx="350" cy="261" r="3" />
-        </g>
-      </svg>
-      <figcaption>
-        Conceptual workflow illustration · Planned research direction
-      </figcaption>
-    </figure>
-  );
-}
 
 export default function DrugDiscoveryIntelligencePage() {
   const system = DRUG_DISCOVERY_INTELLIGENCE_SYSTEM;
@@ -220,16 +130,41 @@ export default function DrugDiscoveryIntelligencePage() {
               </a>
             </div>
           </div>
-          <DiscoveryDiagram />
+          <figure className={styles.researchVisual}>
+            {/* A still from this page’s actual interactive geometry. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/brand/science/drug-discovery-poster.webp"
+              alt="Carbonic anhydrase I structure with a folded protein backbone"
+              width="680"
+              height="680"
+            />
+            <figcaption>
+              PDB 1AZM · Carbonic anhydrase I · Conceptual molecular journey
+            </figcaption>
+          </figure>
         </div>
       </section>
 
       <ClarityJourney
         id="discovery-continuity"
-        variant="research"
+        variant="drug-discovery"
         compact
         stages={discoveryJourney}
       />
+      <p className={styles.scientificReference}>
+        Structural source:{" "}
+        <a
+          href="https://www.rcsb.org/structure/1AZM"
+          target="_blank"
+          rel="noreferrer"
+        >
+          RCSB PDB 1AZM
+        </a>{" "}
+        and its Chemical Component Dictionary. Molecular surfaces are
+        approximations derived from atomic coordinates. Camera paths and
+        compound approaches are conceptual illustrations.
+      </p>
 
       <section id="discovery-capabilities" className={styles.section}>
         <div className={styles.container}>

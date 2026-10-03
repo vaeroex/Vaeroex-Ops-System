@@ -151,8 +151,8 @@ async function main() {
     ["/", "home"],
     ["/executive-intelligence", "executive"],
     ["/intelligence-systems", "systems"],
-    ["/drug-discovery-intelligence", "research"],
-    ["/biological-intelligence", "research"],
+    ["/drug-discovery-intelligence", "drug-discovery"],
+    ["/biological-intelligence", "biology"],
   ]) {
     const html = htmlByRoute.get(route);
     assert.equal(
@@ -175,8 +175,12 @@ async function main() {
       chapters.length >= 3,
       `${route} must render a multi-chapter story without JavaScript`,
     );
+    if (variant === "drug-discovery" || variant === "biology") {
+      assert.equal(chapters.length, 5, `${route} must expose all five scientific stages`);
+      assert.match(html, new RegExp(`data-science-journey="${variant}"`));
+    }
     const chapterNavigation = html.match(
-      /<nav[^>]*aria-label="Clarity journey chapters"[^>]*>([\s\S]*?)<\/nav>/,
+      /<nav[^>]*aria-label="(?:Clarity|Molecular|Cellular) journey chapters"[^>]*>([\s\S]*?)<\/nav>/,
     );
     assert.ok(
       chapterNavigation,
@@ -377,10 +381,20 @@ async function main() {
     );
     assert.match(
       html,
-      /<svg[^>]*role="img"[^>]*aria-labelledby=/,
-      "Static research diagrams need accessible descriptions",
+      /<img[^>]*src="\/brand\/science\/[^"]+"[^>]*alt="[^"]+"/,
+      "Scientific poster images need accessible descriptions",
     );
   }
+
+  const discovery = htmlByRoute.get("/drug-discovery-intelligence");
+  assert.match(discovery, /href="https:\/\/www\.rcsb\.org\/structure\/1AZM"/, "Observed structural references must remain inspectable");
+  assert.match(discovery, /Carbonic anhydrase I|carbonic anhydrase I/);
+  assert.doesNotMatch(discovery, /carbonic anhydrase II/i, "The illustrative structure is isoform I");
+  assert.match(discovery, /surfaces are approximations derived from atomic coordinates/);
+  assert.match(discovery, /conceptual illustrations/);
+  const biological = htmlByRoute.get("/biological-intelligence");
+  assert.match(biological, /[Gg]eneric eukaryotic cell/);
+  assert.match(biological, /[Nn]ot to scale|NOT TO SCALE/);
 
   const home = htmlByRoute.get("/");
   assert.match(
