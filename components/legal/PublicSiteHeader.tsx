@@ -32,7 +32,7 @@ export async function PublicSiteHeader() {
             {loggedIn ? "Go to App" : "Login"}
           </Link>
           <Link href="/checkout/legal" className="vx-button vx-button--primary">
-            Start with Vaeroex
+            Get Executive Intelligence
             <ArrowUpRight size={15} aria-hidden="true" />
           </Link>
         </div>
