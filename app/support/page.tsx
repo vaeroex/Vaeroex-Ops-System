@@ -14,10 +14,10 @@ export default async function PublicSupportPage({ searchParams }: SupportPagePro
   const params = await searchParams;
 
   return (
-    <main className="min-h-screen bg-slate-50 text-ink">
+    <main className="vaeroex-public-site vx-utility min-h-screen bg-slate-50 text-ink">
       <PublicSiteHeader />
       <section className="mx-auto max-w-3xl px-6 py-10">
-      <div className="rounded-lg border border-line bg-white p-7 shadow-panel">
+      <div className="vx-request-form rounded-lg border border-line bg-white p-7 shadow-panel">
         <Link href="/" className="text-sm font-semibold text-vaeroex-blue">Vaeroex</Link>
         <h1 className="mt-4 text-3xl font-semibold">Contact Vaeroex support</h1>
         <p className="mt-3 text-sm leading-6 text-muted">

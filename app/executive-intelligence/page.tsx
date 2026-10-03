@@ -1,259 +1,288 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import {
-  ArrowDown,
-  ArrowRight,
-  Brain,
-  FileSearch2,
-  FileText,
-  Gauge,
-  ScanSearch,
-  ShieldCheck
-} from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { PublicFooter } from "@/components/legal/PublicFooter";
 import { PublicSiteHeader } from "@/components/legal/PublicSiteHeader";
 import { StartWithVaeroexMenu } from "@/components/legal/StartWithVaeroexMenu";
-import { ExecutiveIntelligenceSpatialBackdrop } from "@/components/marketing/executive-intelligence/ExecutiveIntelligenceSpatialBackdrop";
 import { OperationsIntelligenceEngineDemo } from "@/components/motion/OperationsIntelligenceEngineDemo";
-import { operationsIntelligenceJsonLd, publicPageMetadata } from "@/lib/seo/public-seo";
-import styles from "./executive-intelligence.module.css";
+import { ClarityJourney } from "@/components/marketing/clarity/ClarityJourney";
+import {
+  operationsIntelligenceJsonLd,
+  publicPageMetadata,
+} from "@/lib/seo/public-seo";
+import styles from "@/components/marketing/IntelligencePages.module.css";
 
 export const metadata: Metadata = publicPageMetadata({
   title: "Executive Intelligence | Vaeroex",
-  description: "Executive Intelligence helps businesses turn scattered information into a clearer view of performance, KPIs, changes, risks, opportunities, and what deserves attention.",
-  path: "/executive-intelligence"
+  description:
+    "Turn fragmented business information into a clearer view of Business Health, performance, risks, opportunities, and what deserves leadership attention.",
+  path: "/executive-intelligence",
 });
 
 const capabilities = [
-  { title: "Business Health and KPIs", body: "See a quick view of current business conditions, the measures behind it, how performance is moving, and where targets are being met or missed.", icon: Gauge },
-  { title: "Intelligence", body: "See findings, risks, opportunities, and meaningful changes in one prioritized view.", icon: ScanSearch },
-  { title: "Explain Finding", body: "Take a closer look at one supported issue, why it may matter, and what leadership should investigate next.", icon: FileSearch2 },
-  { title: "Evidence", body: "See what an insight is based on and trace important numbers and findings back to the supporting business information.", icon: Brain },
-  { title: "Briefings and Saved Analyses", body: "Generate eligible Weekly and Monthly Intelligence Briefings, then preserve useful briefings and analyses for later review.", icon: FileText }
-] as const;
-
-type DisclosureItem = readonly [title: string, summary: string, detail: string];
-
-const informationDisclosures: readonly DisclosureItem[] = [
   [
-    "What can I give Vaeroex?",
-    "Spreadsheets, PDFs, reports, screenshots, exports, photos, paper records, handwritten notes, and other supported business information.",
-    "You do not need to rebuild your business around one perfect reporting system first. Vaeroex brings supported information into a clearer intelligence picture while keeping its source context available."
+    "Business Health and KPIs",
+    "See current business conditions, the measures behind them, and how performance is moving against the targets your business has confirmed.",
   ],
   [
-    "Still working with paper records or handwritten notes?",
-    "Take a photo. Vaeroex can decipher handwritten business information with high accuracy and bring it into the broader intelligence picture.",
-    "Paper logs, photographed records, and handwritten business notes do not have to remain trapped offline. Upload a clear image alongside your spreadsheets, PDFs, reports, and screenshots. Results still remain reviewable rather than being treated as perfect or guaranteed recognition."
+    "Prioritized Intelligence",
+    "Bring supported findings, risks, opportunities, and meaningful changes into one prioritized view of what deserves attention.",
+  ],
+  [
+    "Explain Finding",
+    "Investigate one finding in depth. Understand why it may matter, review its supporting context, and consider what to investigate next.",
+  ],
+  [
+    "Evidence",
+    "Trace important numbers and findings back to their supporting business information. Review sources, freshness, confidence, and limitations.",
+  ],
+  [
+    "Briefings and Saved Analyses",
+    "Generate eligible Weekly and Monthly Intelligence Briefings on demand. Preserve useful briefings and analyses for later review.",
+  ],
+] as const;
+
+const information = [
+  [
+    "What information can I bring?",
+    "Supported spreadsheets, PDFs, reports, screenshots, exports, photos, paper records, and handwritten business notes. Clear images can help bring offline information into the workspace. Recognition and analysis remain reviewable, with no guarantee that every source can be interpreted perfectly.",
   ],
   [
     "What can Vaeroex help me notice?",
-    "KPI movement, missed targets, meaningful changes, risks, opportunities, developing problems, and areas that may deserve attention.",
-    "Executive Intelligence helps keep your KPIs organized, preserves the targets and meaning confirmed by your business, and connects important movement with broader findings and supporting information. It can help you investigate whether sales are improving while margins weaken, costs are rising, targets are being missed, or separate records point toward the same developing issue."
+    "KPI movement, missed targets, meaningful changes, risks, opportunities, and developing issues. For example, it can help investigate whether sales are improving while margins weaken, or whether separate records point toward the same operational problem.",
   ],
   [
-    "What are generated intelligence briefings?",
-    "Stay informed without manually comparing every new report, spreadsheet, file, and note.",
-    "When enough supported business information is available, you can generate a Weekly Intelligence Briefing for the rolling last 7 days or a Monthly Intelligence Briefing for the rolling last 30 days. Briefings may surface supported changes, KPI movement, risks, opportunities, findings, and evidence limits. They are generated on demand; an upload does not automatically create one."
-  ]
-] as const;
-
-const trustDisclosures: readonly DisclosureItem[] = [
-  [
-    "See what an insight is based on",
-    "Review the supporting information, sources, freshness, confidence, and limitations behind important insights.",
-    "Important conclusions remain connected to supporting business information instead of being hidden behind a confident-sounding answer."
+    "How do intelligence briefings work?",
+    "When enough supported business information is available, you can generate a Weekly Intelligence Briefing for the rolling last 7 days or a Monthly Intelligence Briefing for the rolling last 30 days. Briefings are generated on demand; an upload does not automatically create one.",
   ],
   [
-    "Understand the explanation",
-    "Vaeroex can add context and interpretation without changing the underlying business facts.",
-    "Executive Intelligence can connect supported patterns, priorities, and limitations while leaving your original business information intact."
+    "Does Vaeroex make decisions or change records for me?",
+    "Vaeroex provides drafts and recommendations for human review. Leadership decides what to investigate and what to do next. Vaeroex does not autonomously change customer systems or business records.",
   ],
-  [
-    "You stay in control",
-    "Vaeroex informs decisions. Leadership remains in control. Recommendations are there for review—not actions Vaeroex takes on its own.",
-    "Leadership decides what to investigate and what to do next. Vaeroex does not autonomously change customer systems or business records."
-  ]
 ] as const;
 
-const audience = [
-  "Growing businesses where the owner can no longer keep every important number in their head",
-  "Businesses with information spread across spreadsheets, reports, screenshots, files, and paperwork",
-  "Teams tracking performance but struggling to connect the numbers with what is actually happening operationally"
-] as const;
-const ongoingValue = [
-  "Add supported business information as the business evolves",
-  "Follow KPI movement and targets, plus findings, risks, and opportunities over time",
-  "Generate eligible Weekly and Monthly Intelligence Briefings",
-  "Return to saved briefings, analyses, and evidence without starting from scratch"
-] as const;
-
-const operationsIntelligenceSchema = JSON.stringify(operationsIntelligenceJsonLd);
-
-function StageMarker({ index, label }: { index: string; label: string }) {
-  return (
-    <div className={styles.stageMarker} aria-hidden="true">
-      <span>{index}</span>
-      <span>{label}</span>
-    </div>
-  );
-}
-
-function DisclosureList({ items }: { items: readonly DisclosureItem[] }) {
-  return (
-    <div className={styles.disclosureList}>
-      {items.map(([title, summary, detail], index) => (
-        <details key={title} className={styles.disclosure}>
-          <summary>
-            <span className={styles.disclosureIndex}>{String(index + 1).padStart(2, "0")}</span>
-            <span className={styles.disclosureLabel}>
-              <strong>{title}</strong>
-              <span>{summary}</span>
-            </span>
-            <span className={styles.disclosureAction} aria-hidden="true">Learn more</span>
-          </summary>
-          <p>{detail}</p>
-        </details>
-      ))}
-    </div>
-  );
-}
+const evidenceJourney = [
+  {
+    label: "Operational activity",
+    title: "Begin with the business in motion.",
+    description:
+      "Sales records, operating costs, reports, and business notes each reveal part of the picture. Bring supported information into one private workspace.",
+    detail:
+      "Conceptual visualization of business information and relationships. No customer data.",
+  },
+  {
+    label: "Financial relationships",
+    title: "Read the relationships.",
+    description:
+      "Revenue can improve while margins weaken. Review related measures together, with the context and targets your business has confirmed.",
+    detail: "Business Health · KPI movement · Confirmed targets",
+  },
+  {
+    label: "Emerging risks",
+    title: "Bring what matters into focus.",
+    description:
+      "Surface supported risks, meaningful changes, and opportunities. A prioritized view helps you decide which questions deserve a closer look.",
+    detail:
+      "Prioritized Intelligence · Supported findings · Visible uncertainty",
+  },
+  {
+    label: "Explain the finding",
+    title: "Follow the evidence.",
+    description:
+      "Examine why a change may matter. Separate the underlying business facts from interpretation, and review the sources and limits behind a conclusion.",
+    detail: "Explain Finding · Evidence · Source freshness and limitations",
+  },
+  {
+    label: "Executive priorities",
+    title: "Set the agenda. Keep the judgment.",
+    description:
+      "Return to useful analyses and generate eligible intelligence briefings on demand. Decide what to investigate, what to prioritize, and what to do next.",
+    detail: "Saved Analyses · Weekly and Monthly Briefings · Human review",
+  },
+];
 
 export default function OperationsIntelligencePage() {
   return (
     <main className={`${styles.site} vaeroex-public-site`}>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: operationsIntelligenceSchema }} />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(operationsIntelligenceJsonLd),
+        }}
+      />
       <PublicSiteHeader />
+      <section id="executive-opening" className={styles.hero}>
+        <div className={styles.container}>
+          <p className={styles.eyebrow}>
+            Executive Intelligence{" "}
+            <span className={styles.status}>Available</span>
+          </p>
+          <h1>
+            See the business.
+            <br />
+            <em>Know what matters.</em>
+          </h1>
+          <div className={styles.heroGrid}>
+            <div>
+              <p className={styles.heroLead}>
+                Your numbers, reports, and business context. Connected into a
+                clearer view of performance, risk, and what deserves your
+                attention.
+              </p>
+              <div className={styles.actions}>
+                <StartWithVaeroexMenu
+                  className={styles.primary}
+                  label="Start Executive Intelligence"
+                />
+                <a href="#product-experience" className={styles.textLink}>
+                  Explore the experience
+                  <ArrowRight aria-hidden="true" />
+                </a>
+              </div>
+            </div>
+            <div className={styles.heroSide}>
+              <strong>A second set of eyes on your business.</strong>
+              <p>
+                Vaeroex&apos;s flagship Executive Intelligence platform helps
+                owners and operations leaders make sense of information they
+                already have. Supporting evidence stays available for review.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
 
-      <div className={styles.journey} data-executive-intelligence-journey>
-        <ExecutiveIntelligenceSpatialBackdrop />
-        <div className={styles.atmosphere} aria-hidden="true" />
+      <ClarityJourney
+        id="executive-control"
+        variant="business"
+        compact
+        stages={evidenceJourney}
+      />
 
-        <nav className={styles.journeyIndex} aria-label="Executive Intelligence chapters">
-          <a href="#executive-opening"><span>01</span><strong>Overview</strong></a>
-          <a href="#product-experience"><span>02</span><strong>Product</strong></a>
-          <a href="#executive-method"><span>03</span><strong>Information</strong></a>
-          <a href="#executive-capabilities"><span>04</span><strong>Outcomes</strong></a>
-          <a href="#executive-control"><span>05</span><strong>Ongoing</strong></a>
-          <a href="#executive-close"><span>06</span><strong>Next</strong></a>
-        </nav>
+      <section id="product-experience" className={styles.sectionTight}>
+        <div className={styles.container}>
+          <div className={styles.sectionHead}>
+            <div>
+              <p className={styles.sectionLabel}>
+                <span>02</span>The product experience
+              </p>
+              <h2>
+                From an overview
+                <br />
+                to the evidence behind it.
+              </h2>
+            </div>
+            <p className={styles.copy}>
+              Explore how Business Health, prioritized intelligence, and
+              supporting information connect.
+            </p>
+          </div>
+          <div className={styles.productCaption}>
+            <span>Interactive product walkthrough</span>
+            <span>Illustrative sample information · No customer data</span>
+          </div>
+          <div className={styles.productFrame} data-executive-product-mount>
+            <OperationsIntelligenceEngineDemo />
+          </div>
+          <p className={styles.caption}>
+            This walkthrough illustrates the product experience. Example
+            findings are not live business results or promises of an outcome.
+          </p>
+        </div>
+      </section>
 
-        <section id="executive-opening" className={`${styles.chapter} ${styles.hero}`} data-ei-stage="business-complexity">
-          <div className={`${styles.content} ${styles.contentLeft} ${styles.heroContent}`}>
-            <p className={styles.eyebrow}>Executive Intelligence · A Vaeroex product</p>
-            <h1>Executive Intelligence</h1>
-            <p className={styles.heroBody}>See what&apos;s changing in your business—and what deserves your attention. Vaeroex&apos;s flagship Executive Intelligence platform turns the information you already have into a clearer view of performance, KPIs, trends, risks, opportunities, and emerging problems.</p>
-            <p className={styles.heroDefinition}>Executive Intelligence is a business analysis system that helps turn the information you already have into a clearer picture of your business. Think of it as a second set of eyes and a second brain that helps make sense of your business information.</p>
-            <div className={styles.heroActions}>
-              <StartWithVaeroexMenu />
-              <Link href="#product-experience" className={styles.secondaryAction}>
-                See the product experience
+      <section id="executive-capabilities" className={styles.section}>
+        <div className={styles.container}>
+          <div className={styles.sectionHead}>
+            <div>
+              <p className={styles.sectionLabel}>
+                <span>03</span>A connected leadership view
+              </p>
+              <h2>
+                Clarity at every
+                <br />
+                level of the decision.
+              </h2>
+            </div>
+            <p className={styles.copy}>
+              Start with the condition of the business. Follow what changed.
+              Investigate what matters.
+            </p>
+          </div>
+          <div className={styles.capabilities}>
+            {capabilities.map(([title, body], index) => (
+              <article className={styles.capability} key={title}>
+                <span>0{index + 1}</span>
+                <h3>{title}</h3>
+                <p>{body}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section id="executive-method" className={styles.section}>
+        <div className={`${styles.container} ${styles.split}`}>
+          <div>
+            <p className={styles.sectionLabel}>
+              <span>04</span>Start with what you have
+            </p>
+            <h2>Business information rarely arrives in perfect order.</h2>
+            <p className={styles.copy}>
+              Bring supported business information together in one private
+              workspace. Keep adding evidence as the business evolves and return
+              to the analyses that matter.
+            </p>
+            <div className={styles.note}>
+              Do not upload patient data, PHI, ePHI, Social Security numbers,
+              medical record numbers, insurance IDs, or regulated healthcare
+              data.
+            </div>
+            <div className={styles.actions}>
+              <Link href="/trust" className={styles.textLink}>
+                Explore the Trust Center
                 <ArrowRight aria-hidden="true" />
               </Link>
             </div>
-            <div className={styles.heroCoordinates} aria-label="Executive Intelligence focus">
-              <span><small>01</small>KPIs and targets</span>
-              <span><small>02</small>Risks and opportunities</span>
-              <span><small>03</small>Briefings and evidence</span>
-            </div>
           </div>
-          <div className={styles.nextChapter} aria-hidden="true"><span>02 / See it in use</span><ArrowDown /></div>
-        </section>
-
-        <section id="product-experience" className={`${styles.chapter} ${styles.productChapter}`} data-ei-stage="command-surface">
-          <div className={styles.productLayout}>
-            <div className={styles.productIntro}>
-              <StageMarker index="02" label="Product experience" />
-            </div>
-            <div className={styles.productMount} data-executive-product-mount>
-              <span className={styles.mountRail} aria-hidden="true" />
-              <OperationsIntelligenceEngineDemo />
-            </div>
+          <div>
+            {information.map(([title, body]) => (
+              <details key={title} className={styles.disclosure}>
+                <summary>{title}</summary>
+                <p>{body}</p>
+              </details>
+            ))}
           </div>
-        </section>
+        </div>
+      </section>
 
-        <section id="executive-method" className={`${styles.chapter} ${styles.methodChapter}`} data-ei-stage="performance-landscape">
-          <span id="executive-evidence" className={styles.legacyAnchor} aria-hidden="true" />
-          <span className={styles.spatialStageMap} data-ei-preserved-stage="evidence-depth" aria-hidden="true" />
-          <div className={styles.informationLayout}>
-            <div className={styles.informationIntro}>
-              <StageMarker index="03" label="Start with what you have" />
-              <FileSearch2 className={styles.sectionIcon} aria-hidden="true" />
-              <h2>Your business information can be messy. Your understanding of it doesn&apos;t have to be.</h2>
-              <p className={styles.copy}>Business information may be spread across spreadsheets, PDFs, reports, screenshots, exports, photos, paper records, and handwritten notes. Instead of reviewing every file in isolation, Vaeroex brings supported business information together in one intelligence workspace, helping you see connections, changes, and patterns over time.</p>
-            </div>
-            <DisclosureList items={informationDisclosures} />
+      <section id="executive-close" className={styles.closing}>
+        <div className={`${styles.container} ${styles.closingLayout}`}>
+          <div>
+            <p className={styles.sectionLabel}>
+              Executive Intelligence / Available now
+            </p>
+            <h2>
+              Build a clearer picture
+              <br />
+              of your business.
+            </h2>
+            <p className={styles.copy}>
+              One private workspace for the information, evidence, and decisions
+              leadership needs to connect.
+            </p>
           </div>
-        </section>
-
-        <section id="executive-capabilities" className={`${styles.chapter} ${styles.capabilitiesChapter}`} data-ei-stage="executive-focus">
-          <div className={styles.wideContent}>
-            <div className={styles.capabilityHeading}>
-              <div>
-                <StageMarker index="04" label="What you get" />
-                <h2>One clearer view of performance and what deserves attention.</h2>
-              </div>
-              <p>KPIs and targets · Business Health · risks and opportunities · findings · evidence · Weekly and Monthly Intelligence Briefings</p>
-            </div>
-            <div className={styles.capabilityGrid}>
-              {capabilities.map((capability, index) => {
-                const Icon = capability.icon;
-                return (
-                  <article key={capability.title} className={index === 0 ? styles.primaryCapability : undefined}>
-                    <div className={styles.capabilityIndex}><span>{String(index + 1).padStart(2, "0")}</span><Icon aria-hidden="true" /></div>
-                    <h3>{capability.title}</h3>
-                    <p>{capability.body}</p>
-                  </article>
-                );
-              })}
-            </div>
+          <div className={styles.actions}>
+            <Link href="/pricing" className={styles.primary}>
+              View pricing
+              <ArrowRight aria-hidden="true" />
+            </Link>
+            <Link href="/contact" className={styles.secondary}>
+              Talk with Vaeroex
+            </Link>
           </div>
-        </section>
-
-        <section id="executive-control" className={`${styles.chapter} ${styles.controlChapter}`} data-ei-stage="leadership-control">
-          <span id="executive-context" className={styles.legacyAnchor} aria-hidden="true" />
-          <span className={styles.spatialStageMap} data-ei-preserved-stage="historical-context" aria-hidden="true" />
-          <div className={styles.ongoingTrustLayout}>
-            <div className={styles.ongoingStatement}>
-              <StageMarker index="05" label="Ongoing intelligence & trust" />
-              <p className={styles.contextStatus}>Ongoing intelligence</p>
-              <h2>An ongoing second set of eyes on your business.</h2>
-              <p className={styles.copy}>Keep adding supported information, follow what changes, and return to the evidence and intelligence that matter over time.</p>
-              <ul className={styles.ongoingList}>
-                {ongoingValue.map((item) => <li key={item}>{item}</li>)}
-              </ul>
-            </div>
-
-            <div className={styles.trustPanel}>
-              <div className={styles.iconFrame}><ShieldCheck aria-hidden="true" /></div>
-              <h2>Your numbers stay your numbers.</h2>
-              <p>Vaeroex keeps business facts and calculations grounded in the information your business provides, while clearly separating those facts from AI-generated explanation and interpretation.</p>
-              <DisclosureList items={trustDisclosures} />
-            </div>
-          </div>
-        </section>
-
-        <section id="executive-close" className={`${styles.chapter} ${styles.closingChapter}`} data-ei-stage="executive-clarity">
-          <div className={styles.closingLayout}>
-            <div className={styles.audiencePanel}>
-              <StageMarker index="06" label="Who it helps / next" />
-              <p className={styles.contextStatus}>Who it helps</p>
-              <h2>Businesses that have information—but not always the time or visibility to make sense of all of it.</h2>
-              <ul className={styles.audienceList}>
-                {audience.map((item) => <li key={item}>{item}</li>)}
-              </ul>
-            </div>
-            <div className={styles.closingContent}>
-              <h2>Start building a clearer intelligence picture of your business.</h2>
-              <p>Bring together the information you already have, follow what changes, and give leadership a clearer basis for deciding what deserves attention next.</p>
-              <div className={styles.closingActions}>
-                <Link href="/pricing" className={styles.primaryAction}>View pricing<ArrowRight aria-hidden="true" /></Link>
-                <Link href="/contact" className={styles.secondaryAction}>Talk with Vaeroex</Link>
-              </div>
-            </div>
-          </div>
-        </section>
-      </div>
-
+        </div>
+      </section>
       <PublicFooter />
     </main>
   );

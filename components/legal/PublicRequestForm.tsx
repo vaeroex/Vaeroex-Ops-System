@@ -15,7 +15,7 @@ export function PublicRequestForm({ returnPath, issueType, issueOptions, message
   const showInquiryType = Boolean(issueOptions?.length);
 
   return (
-    <div className="rounded-lg border border-line bg-white p-6 shadow-panel">
+    <div className="vx-request-form rounded-lg border border-line bg-white p-6 shadow-panel">
       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-vaeroex-blue">Contact form</p>
       <h2 className="mt-2 text-2xl font-semibold text-ink">Send a message to Vaeroex.</h2>
       <p className="mt-2 text-sm leading-6 text-muted">Choose the request type and provide enough context for the right team to respond.</p>

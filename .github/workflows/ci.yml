@@ -303,6 +303,9 @@ jobs:
       - name: ESLint
         run: pnpm lint
 
+      - name: Public website rendering and policy regressions
+        run: pnpm test:public-clarity
+
       - name: Production build
         run: pnpm build
 
