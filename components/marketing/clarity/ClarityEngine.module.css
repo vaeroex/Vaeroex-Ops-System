@@ -1,0 +1,124 @@
+.engine {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 360px;
+  isolation: isolate;
+}
+.visual {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+.poster {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  opacity: 1;
+  transition: opacity 650ms ease;
+}
+.posterHidden {
+  opacity: 0;
+  pointer-events: none;
+}
+.canvas {
+  position: absolute !important;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  transition: opacity 650ms ease;
+}
+.engine[data-clarity-mode="interactive"] .canvas {
+  opacity: 1;
+}
+.caption {
+  position: absolute;
+  bottom: 18px;
+  left: 7%;
+  right: 7%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  pointer-events: none;
+}
+.mode,
+.renderLabel {
+  display: inline-flex;
+  gap: 9px;
+  align-items: center;
+  font-family: var(--font-geist-mono, monospace);
+  font-size: 9px;
+  font-weight: 400;
+  letter-spacing: 0.14em;
+  color: #89909e;
+}
+.indicator {
+  display: block;
+  width: 4px;
+  height: 4px;
+  background: #687389;
+}
+.indicator[data-live="true"] {
+  background: #6989ff;
+  box-shadow: 0 0 9px #446dff66;
+}
+.renderLabel {
+  color: #747b89;
+  font-size: 8px;
+}
+.motionControl {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 5px 9px;
+  border: 1px solid #ffffff17;
+  background: #0a0d12aa;
+  color: #b6becc;
+  cursor: pointer;
+  font: inherit;
+  font-size: 10px;
+  transition:
+    border-color 180ms ease,
+    color 180ms ease;
+}
+.motionControl:hover {
+  border-color: #7895ff80;
+  color: #fff;
+}
+.motionControl:focus-visible {
+  outline: 2px solid #88a2ff;
+  outline-offset: 4px;
+}
+.motionControl svg {
+  width: 12px;
+  height: 12px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.6;
+}
+@media (max-width: 767px) {
+  .engine {
+    min-height: 310px;
+  }
+  .caption {
+    left: 4%;
+    right: 4%;
+    bottom: 8px;
+  }
+  .mode {
+    font-size: 8px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .poster,
+  .canvas,
+  .motionControl {
+    transition: none;
+  }
+}

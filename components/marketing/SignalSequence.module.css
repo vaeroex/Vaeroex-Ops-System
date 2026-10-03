@@ -1,0 +1,215 @@
+.sequence {
+  border-top: 1px solid #ffffff24;
+  border-bottom: 1px solid #ffffff24;
+}
+.selectors {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border-bottom: 1px solid #ffffff20;
+}
+.selectors button {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  text-align: left;
+  padding: 26px 18px;
+  background: none;
+  color: #929aa9;
+  border: 0;
+  border-right: 1px solid #ffffff15;
+  font-size: 13px;
+  position: relative;
+}
+.selectors button:last-child {
+  border-right: 0;
+}
+.selectors button > span {
+  font-family: monospace;
+  font-size: 10px;
+  color: #7a86a0;
+}
+.selectors button svg {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.selectors button[aria-selected="true"] {
+  color: white;
+  background: #ffffff04;
+}
+.selectors button[aria-selected="true"]:after {
+  content: "";
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #6386ff;
+}
+.panel {
+  display: grid;
+  grid-template-columns: 1.35fr 1fr;
+  position: relative;
+  gap: 70px;
+  padding: 62px 26px 75px;
+  background: #0a0b0e;
+}
+.diagram {
+  display: flex;
+  align-items: center;
+  min-height: 200px;
+}
+.sources {
+  display: grid;
+  gap: 17px;
+  flex: 0 0 135px;
+}
+.sources > span {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font: 8px monospace;
+  letter-spacing: 0.05em;
+  color: #afb8c9;
+}
+.sources svg {
+  color: #78859a;
+}
+.connection {
+  display: grid;
+  align-content: space-between;
+  width: 50px;
+  height: 109px;
+  flex: 1;
+}
+.connection i {
+  display: block;
+  height: 1px;
+  background: #46536b;
+}
+.connection i:first-child {
+  transform: rotate(23deg);
+  transform-origin: left;
+}
+.connection i:last-child {
+  transform: rotate(-23deg);
+  transform-origin: left;
+}
+.aperture {
+  display: grid;
+  place-items: center;
+  gap: 8px;
+  width: 98px;
+  height: 118px;
+  flex-shrink: 0;
+  border: 1px solid #6386ff;
+  background: #17254655;
+  outline: 1px solid #6386ff25;
+  outline-offset: 7px;
+  box-shadow: inset 0 0 35px #3053b82a;
+}
+.aperture svg {
+  color: #97acff;
+}
+.aperture span {
+  font: 8px monospace;
+  letter-spacing: 0.13em;
+}
+.outputLine {
+  height: 1px;
+  background: #6386ff;
+  flex: 1;
+  min-width: 22px;
+}
+.output {
+  display: grid;
+  gap: 12px;
+  max-width: 83px;
+  color: #b9c9ff;
+  font-size: 11px;
+  line-height: 1.6;
+}
+.output i {
+  width: 7px;
+  height: 7px;
+  background: #6f8eff;
+}
+.panelCopy > span {
+  font: 10px monospace;
+  letter-spacing: 0.12em;
+  color: #829cff;
+}
+.panelCopy h3 {
+  font-size: 27px;
+  letter-spacing: -0.035em;
+  margin: 16px 0;
+}
+.panelCopy p {
+  font-size: 14px;
+  color: #a7adba;
+  line-height: 1.85;
+  max-width: 360px;
+}
+.caption {
+  position: absolute;
+  bottom: 20px;
+  left: 26px;
+  font: 8px monospace;
+  letter-spacing: 0.12em;
+  color: #828b9c;
+}
+.diagram[data-stage="0"] .output,
+.diagram[data-stage="0"] .outputLine {
+  opacity: 0.4;
+}
+.diagram[data-stage="2"] .sources {
+  opacity: 0.6;
+}
+@media (max-width: 760px) {
+  .selectors button {
+    padding: 20px 12px;
+    gap: 8px;
+    align-items: flex-start;
+    font-size: 11px;
+    line-height: 1.5;
+  }
+  .selectors button svg {
+    display: none;
+  }
+  .selectors button > span {
+    font-size: 9px;
+    padding-top: 2px;
+  }
+  .panel {
+    grid-template-columns: 1fr;
+    padding: 28px 20px 60px;
+    gap: 25px;
+  }
+  .diagram {
+    min-height: 170px;
+  }
+  .sources {
+    flex-basis: 108px;
+  }
+  .sources > span {
+    font-size: 7px;
+    gap: 7px;
+  }
+  .aperture {
+    width: 68px;
+    height: 92px;
+  }
+  .output {
+    font-size: 9px;
+    max-width: 66px;
+  }
+  .panelCopy h3 {
+    font-size: 24px;
+  }
+  .caption {
+    font-size: 7px;
+    left: 20px;
+  }
+  .panelCopy p {
+    max-width: none;
+  }
+}
