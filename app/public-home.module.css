@@ -292,21 +292,6 @@
   border-top: 1px solid #ffffff18;
   border-bottom: 1px solid #ffffff18;
 }
-.materialImage {
-  object-fit: cover;
-  z-index: -2;
-}
-.materialShade {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    90deg,
-    #08090be8 0%,
-    #08090b90 40%,
-    transparent 80%
-  );
-  z-index: -1;
-}
 .materialCopy {
   max-width: 1328px;
   margin: auto;
@@ -327,14 +312,6 @@
 }
 .materialCopy > a {
   margin-top: 28px;
-}
-.materialCaption {
-  position: absolute;
-  bottom: 24px;
-  right: 56px;
-  font: 8px monospace;
-  letter-spacing: 0.12em;
-  color: #b5bcc9;
 }
 .trustPrinciples {
   max-width: 1328px;
@@ -695,12 +672,6 @@
   .material {
     height: 590px;
   }
-  .materialImage {
-    object-position: 61% center;
-  }
-  .materialShade {
-    background: linear-gradient(90deg, #08090bea, #08090b33);
-  }
   .materialCopy {
     padding-top: 68px;
     margin: 0 24px;
@@ -711,11 +682,6 @@
   .materialCopy > p:not(.eyebrow) {
     max-width: 270px;
     font-size: 13px;
-  }
-  .materialCaption {
-    right: 24px;
-    left: 24px;
-    font-size: 7px;
   }
   .trustPrinciples {
     grid-template-columns: 1fr;
@@ -852,5 +818,67 @@
   }
   .journeyHero .heroDescription {
     font-size: 12px;
+  }
+}
+
+/* Evidence section: a source-to-interpretation diagram, independent of the journey. */
+.material {
+  height: auto;
+  padding: 95px max(32px, calc((100vw - 1328px) / 2));
+  display: grid;
+  grid-template-columns: minmax(260px, 0.72fr) minmax(0, 1.7fr);
+  align-items: center;
+  gap: 55px;
+  background:
+    radial-gradient(ellipse at 80% 45%, #13203a52, transparent 65%), #0a0c10;
+}
+.materialCopy {
+  margin: 0;
+  padding: 0;
+}
+.material h2 {
+  font-size: clamp(42px, 3.7vw, 54px);
+}
+.evidenceVisual {
+  min-width: 0;
+}
+@media (max-width: 1150px) {
+  .material {
+    grid-template-columns: 1fr;
+    gap: 50px;
+    padding: 70px 32px;
+  }
+  .materialCopy {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 48px;
+    align-items: center;
+  }
+  .materialCopy .eyebrow {
+    grid-column: 1/-1;
+  }
+  .materialCopy h2 {
+    grid-row: 2/4;
+  }
+  .materialCopy > p:not(.eyebrow) {
+    max-width: 420px;
+  }
+  .materialCopy > a {
+    margin: 0;
+  }
+}
+@media (max-width: 760px) {
+  .material {
+    padding: 58px 24px;
+    gap: 30px;
+  }
+  .materialCopy {
+    display: block;
+  }
+  .materialCopy h2 {
+    font-size: 48px;
+  }
+  .materialCopy > a {
+    margin-top: 22px;
   }
 }

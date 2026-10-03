@@ -63,32 +63,41 @@ const information = [
 
 const evidenceJourney = [
   {
-    label: "Sources",
-    title: "A clearer decision starts with evidence.",
+    label: "Operational activity",
+    title: "Begin with the business in motion.",
     description:
-      "Return to supporting sources, freshness, and evidence limits behind important conclusions. Evidence stays available as you move from an overview into a finding.",
-    detail: "Source information · Freshness · Evidence limits",
+      "Sales records, operating costs, reports, and business notes each reveal part of the picture. Bring supported information into one private workspace.",
+    detail:
+      "Conceptual visualization of business information and relationships. No customer data.",
   },
   {
-    label: "Context",
-    title: "Your numbers stay your numbers.",
+    label: "Financial relationships",
+    title: "Read the relationships.",
     description:
-      "Review business facts alongside the targets and context your business has confirmed. Facts remain separate from explanation and interpretation.",
-    detail: "Confirmed measures · Business context · Traceable evidence",
+      "Revenue can improve while margins weaken. Review related measures together, with the context and targets your business has confirmed.",
+    detail: "Business Health · KPI movement · Confirmed targets",
   },
   {
-    label: "Interpretation",
-    title: "Understand what a finding may mean.",
+    label: "Emerging risks",
+    title: "Bring what matters into focus.",
     description:
-      "See context around supported patterns without treating generated reasoning as a new business fact. Recommendations remain available for your review, with the context needed to assess them.",
-    detail: "Supported patterns · Reviewable reasoning · Visible limitations",
+      "Surface supported risks, meaningful changes, and opportunities. A prioritized view helps you decide which questions deserve a closer look.",
+    detail:
+      "Prioritized Intelligence · Supported findings · Visible uncertainty",
   },
   {
-    label: "Decision",
-    title: "Decide what happens next.",
+    label: "Explain the finding",
+    title: "Follow the evidence.",
     description:
-      "Leadership decides what deserves attention and what to investigate. Confirm any proposed record creation or change. Consequential decisions remain with the people responsible for them.",
-    detail: "Human review · Explicit confirmation · Leadership control",
+      "Examine why a change may matter. Separate the underlying business facts from interpretation, and review the sources and limits behind a conclusion.",
+    detail: "Explain Finding · Evidence · Source freshness and limitations",
+  },
+  {
+    label: "Executive priorities",
+    title: "Set the agenda. Keep the judgment.",
+    description:
+      "Return to useful analyses and generate eligible intelligence briefings on demand. Decide what to investigate, what to prioritize, and what to do next.",
+    detail: "Saved Analyses · Weekly and Monthly Briefings · Human review",
   },
 ];
 
@@ -145,7 +154,7 @@ export default function OperationsIntelligencePage() {
 
       <ClarityJourney
         id="executive-control"
-        variant="executive"
+        variant="business"
         compact
         stages={evidenceJourney}
       />

@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { PublicFooter } from "@/components/legal/PublicFooter";
 import { PublicSiteHeader } from "@/components/legal/PublicSiteHeader";
+import { EvidenceVisualization } from "@/components/marketing/EvidenceVisualization";
 import { ClarityJourney } from "@/components/marketing/clarity/ClarityJourney";
 import { PUBLIC_SYSTEMS } from "@/lib/marketing/public-systems";
 import { publicPageMetadata } from "@/lib/seo/public-seo";
@@ -28,15 +29,16 @@ export default function HomePage() {
       <PublicSiteHeader />
       <ClarityJourney
         id="the-signal"
-        variant="home"
+        variant="landing"
         stages={[
           {
-            label: "Fragmented inputs",
+            label: "Source fragments",
             title: "Complexity, made clear.",
-            description: "Your business has the information.",
+            description:
+              "Your business has the information. Vaeroex helps you see what it means.",
           },
           {
-            label: "Information in motion",
+            label: "Connected signals",
             title: (
               <>
                 Bring the fragments
@@ -47,34 +49,49 @@ export default function HomePage() {
             description:
               "A spreadsheet tells one story. A report tells another. The important questions live between them.",
             detail:
-              "Bring supported spreadsheets, reports, PDFs, and business notes into your private workspace. Keep the source context attached.",
+              "Bring supported records and business notes into your private workspace. Preserve the context that gives each signal meaning.",
           },
           {
-            label: "Layers of context",
+            label: "An inspectable atlas",
             title: (
               <>
-                See the
+                Look through
                 <br />
-                relationships.
+                the layers.
               </>
             ),
             description:
-              "A wider perspective begins when performance, business conditions, and evidence can be considered together.",
+              "An interpretation becomes more useful when you can examine the evidence beneath it.",
             detail:
-              "Inspect supported findings, understand changes, and keep uncertainty and missing information in view.",
+              "Keep source information, supported patterns, and uncertainty distinct. Move between the wider picture and the detail behind a finding.",
           },
           {
-            label: "A clear intelligence core",
+            label: "Distinct perspectives",
             title: (
               <>
-                Arrive at a<br />
-                clearer decision.
+                One philosophy.
+                <br />
+                Different worlds.
               </>
             ),
             description:
-              "Turn a complicated picture into a useful next question. Investigate what matters, then decide with context.",
+              "Intelligence takes its shape from the questions, evidence, and constraints of each domain.",
             detail:
-              "Recommendations remain drafts. You review the evidence and confirm before records are created or changed.",
+              "Executive Intelligence is available now. Drug Discovery and Biological Intelligence are in development, each with its own research focus.",
+          },
+          {
+            label: "Clarity for people",
+            title: (
+              <>
+                A clearer view.
+                <br />
+                Your next decision.
+              </>
+            ),
+            description:
+              "Bring complexity into focus. See what deserves attention, investigate the context, and decide what happens next.",
+            detail:
+              "Recommendations remain drafts. People review the evidence and confirm before records are created or changed.",
           },
         ]}
         intro={
@@ -168,14 +185,6 @@ export default function HomePage() {
       </section>
 
       <section className={styles.material} aria-labelledby="trust-title">
-        <Image
-          src="/brand/clarity-material.webp"
-          alt="Conceptual material study: precision graphite layers brought into alignment by a narrow blue seam"
-          fill
-          sizes="100vw"
-          className={styles.materialImage}
-        />
-        <div className={styles.materialShade} />
         <div className={styles.materialCopy}>
           <p className={styles.eyebrow}>03 / BUILT TO BE INSPECTED</p>
           <h2 id="trust-title">
@@ -192,9 +201,9 @@ export default function HomePage() {
             <ArrowUpRight size={18} aria-hidden="true" />
           </Link>
         </div>
-        <span className={styles.materialCaption}>
-          MATERIAL STUDY 02 / CONCEPTUAL ILLUSTRATION
-        </span>
+        <div className={styles.evidenceVisual}>
+          <EvidenceVisualization />
+        </div>
       </section>
       <section
         className={styles.trustPrinciples}

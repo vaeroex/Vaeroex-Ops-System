@@ -12,13 +12,18 @@ import {
 import styles from "./ClarityEngine.module.css";
 import type { ClarityVariant } from "./clarityMotion";
 import type { ScienceKind } from "../science/scienceTypes";
-export type JourneyVariant = ClarityVariant | ScienceKind;
+import type { SignatureKind } from "../signature/signatureTypes";
+export type JourneyVariant = ClarityVariant | ScienceKind | SignatureKind;
 import { clarityDevicePolicy } from "./clarityDevicePolicy";
 
 const EngineCanvas = dynamic(() => import("./ClarityEngineCanvas"), {
   ssr: false,
 });
 const ScientificCanvas = dynamic(() => import("../science/ScientificCanvas"), {
+  ssr: false,
+});
+
+const SignatureCanvas = dynamic(() => import("../signature/SignatureCanvas"), {
   ssr: false,
 });
 
@@ -57,12 +62,17 @@ export function ClarityEngine({
   chapters?: Array<{ label: string; id: string }>;
 }) {
   const scientific = variant === "drug-discovery" || variant === "biology";
+  const signature = variant === "landing" || variant === "business";
   const sceneName =
-    variant === "drug-discovery"
-      ? "Molecular journey"
-      : variant === "biology"
-        ? "Cellular journey"
-        : "Clarity Engine";
+    variant === "landing"
+      ? "Signal Atlas"
+      : variant === "business"
+        ? "Business landscape"
+        : variant === "drug-discovery"
+          ? "Molecular journey"
+          : variant === "biology"
+            ? "Cellular journey"
+            : "Clarity Engine";
   const container = useRef<HTMLDivElement>(null);
   const [mode, setMode] = useState<RenderMode>("pending");
   const [reason, setReason] = useState("loading");
@@ -258,9 +268,11 @@ export function ClarityEngine({
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={
-            scientific
-              ? `/brand/science/${variant}-poster.webp`
-              : "/brand/clarity-engine-poster.webp"
+            signature
+              ? `/brand/signature/${variant}-poster.webp`
+              : scientific
+                ? `/brand/science/${variant}-poster.webp`
+                : "/brand/clarity-engine-poster.webp"
           }
           alt=""
           width="1400"
@@ -272,7 +284,16 @@ export function ClarityEngine({
         />
         {mode === "interactive" ? (
           <SceneBoundary onFailure={handleFailure}>
-            {scientific ? (
+            {signature ? (
+              <SignatureCanvas
+                active={active}
+                progress={progress}
+                compact={compact}
+                variant={variant}
+                onReady={handleReady}
+                onFailure={handleFailure}
+              />
+            ) : scientific ? (
               <ScientificCanvas
                 active={active}
                 progress={progress}
@@ -351,7 +372,9 @@ export function ClarityEngine({
         <nav
           className={styles.chapters}
           aria-label={
-            scientific ? `${sceneName} chapters` : "Clarity journey chapters"
+            scientific || signature
+              ? `${sceneName} chapters`
+              : "Clarity journey chapters"
           }
         >
           {chapters.map((chapter, index) => (

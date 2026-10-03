@@ -148,8 +148,8 @@ async function main() {
   // Validate the real server output: chapter text and native links work before
   // hydration, and each page owns one persistent scene instead of stacked canvases.
   for (const [route, variant] of [
-    ["/", "home"],
-    ["/executive-intelligence", "executive"],
+    ["/", "landing"],
+    ["/executive-intelligence", "business"],
     ["/intelligence-systems", "systems"],
     ["/drug-discovery-intelligence", "drug-discovery"],
     ["/biological-intelligence", "biology"],
@@ -176,11 +176,15 @@ async function main() {
       `${route} must render a multi-chapter story without JavaScript`,
     );
     if (variant === "drug-discovery" || variant === "biology") {
-      assert.equal(chapters.length, 5, `${route} must expose all five scientific stages`);
+      assert.equal(
+        chapters.length,
+        5,
+        `${route} must expose all five scientific stages`,
+      );
       assert.match(html, new RegExp(`data-science-journey="${variant}"`));
     }
     const chapterNavigation = html.match(
-      /<nav[^>]*aria-label="(?:Clarity|Molecular|Cellular) journey chapters"[^>]*>([\s\S]*?)<\/nav>/,
+      /<nav[^>]*aria-label="(?:(?:Clarity|Molecular|Cellular) journey|Signal Atlas|Business landscape) chapters"[^>]*>([\s\S]*?)<\/nav>/,
     );
     assert.ok(
       chapterNavigation,
@@ -387,10 +391,21 @@ async function main() {
   }
 
   const discovery = htmlByRoute.get("/drug-discovery-intelligence");
-  assert.match(discovery, /href="https:\/\/www\.rcsb\.org\/structure\/1AZM"/, "Observed structural references must remain inspectable");
+  assert.match(
+    discovery,
+    /href="https:\/\/www\.rcsb\.org\/structure\/1AZM"/,
+    "Observed structural references must remain inspectable",
+  );
   assert.match(discovery, /Carbonic anhydrase I|carbonic anhydrase I/);
-  assert.doesNotMatch(discovery, /carbonic anhydrase II/i, "The illustrative structure is isoform I");
-  assert.match(discovery, /surfaces are approximations derived from atomic coordinates/);
+  assert.doesNotMatch(
+    discovery,
+    /carbonic anhydrase II/i,
+    "The illustrative structure is isoform I",
+  );
+  assert.match(
+    discovery,
+    /surfaces are approximations derived from atomic coordinates/,
+  );
   assert.match(discovery, /conceptual illustrations/);
   const biological = htmlByRoute.get("/biological-intelligence");
   assert.match(biological, /[Gg]eneric eukaryotic cell/);

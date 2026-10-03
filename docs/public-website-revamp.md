@@ -20,7 +20,49 @@ pnpm exec next start --hostname 127.0.0.1 --port 3100
 
 No production environment file was copied into this isolated worktree. The primary checkout's unrelated integration work was preserved.
 
-## Scroll refinement
+## Signature journeys — current refinement
+
+The Intelligence landing page (`/`) now owns the **Signal Atlas**, while Executive Intelligence owns a separate **Business Landscape**. The existing Vaeroex Approach (`/intelligence-systems`) retains its original Clarity Engine sequence. Scientific pages retain their molecular and cellular worlds from `e625f1f`.
+
+Both new worlds use actual authored geometry, five reversible stages, independent camera trajectories, and their own compact geometry. They are conceptual visualizations, not product screenshots or claims about private technical architecture. Normal document scrolling drives their progress. Page-specific classes in `SignatureJourney.module.css` apply only to the new variants; no Approach or scientific stylesheet was changed.
+
+| Act | Signal Atlas                                            | Executive Intelligence                                            |
+| --- | ------------------------------------------------------- | ----------------------------------------------------------------- |
+| 01  | Engraved source fragments suspended in depth            | Operational records spread across a machined business terrain     |
+| 02  | Three shingled channels connect the information         | Connected ledger terraces reveal financial relationships          |
+| 03  | An exploded relationship atlas exposes its layers       | A divergent measure separates and receives an amber emphasis      |
+| 04  | Three distinct domain structures emerge                 | A finding opens into source, measure, and interpretation layers   |
+| 05  | Fragments resolve into a cohesive intelligence landmark | Evidence consolidates beside a priority briefing for human review |
+
+Executive copy is limited to existing Business Health, KPIs and confirmed targets, prioritized intelligence, Explain Finding, Evidence, Saved Analyses, and eligible on-demand Weekly/Monthly Briefings. The geometry contains no invented live financial values, guaranteed forecasts, or autonomous actions.
+
+The home page’s “Clarity you can look into” section replaces the material photo with an accessible evidence diagram. Its clearly labeled synthetic figures show revenue of $100,000 → $112,000 (+12%) and listed costs of $70,000 → $82,600 (+18%). The displayed formula yields illustrative margins of 30% → 26.25%, a reduction of 3.75 percentage points. Undated periods, incomplete cost coverage, and unknown freshness are visible limitations. It is a teaching illustration, not a product result or customer data.
+
+The material-study asset remains archived in the repository; it is no longer used in this section. Original scientific data, source archives, geometry, product copy, and posters remain intact.
+
+### Current assets and motion deliverables
+
+All new scene meshes, engraved details, connections, procedural material maps, and reflection studios are authored in this repository. Executive’s object labels use a local system font drawn to small CanvasTextures; no external font, HDR, image, or model service is requested. The main structures are actual 3D geometry.
+
+`public/brand/signature/landing-poster.webp` and `business-poster.webp` are optimized 900×663 captures of their own rendered worlds, approximately 28KB and 15KB. There are no placeholder images in the finished implementation. Abstract forms and illustrated business relationships are deliberate conceptual representations.
+
+Review recordings are saved in the primary checkout’s ignored `outputs/intelligence-journeys/` folder:
+
+- `landing-journey.mp4`: the complete five-act Signal Atlas and reverse traversal.
+- `executive-journey.mp4`: the complete business landscape and reverse traversal.
+
+These are recordings of the live browser canvas, composed with the actual page’s chapter captions at 1440×900/30fps; they are not full-window screen captures. A temporary localhost capture control scrolled the ordinary document through the five chapter centers and back. It did not inject scene poses. Background capture temporarily kept its local canvas active. The control and capture override were removed before the final build; ordinary hidden-tab/offscreen pausing remains enabled. Original WebM captures and contact sheets accompany the MP4s. The initial idle frames before the landing canvas first produced a video frame were trimmed; every stage and the complete reversal remain.
+
+### Current verification
+
+- Both new worlds inspected in actual forward and backward browser scrolling. Five stages remain native document chapters with keyboard-accessible anchor navigation.
+- Portrait viewport 390×844 renders real compact geometry with no horizontal overflow. Landscape 844×390 retains a scene alongside the copy. These are desktop-browser viewport checks, not physical-device benchmarks.
+- Pause/Resume and offscreen inactivity exercised. Reduced-motion/resource policy regressions cover retained poster fallbacks and ensure small screens alone cannot disable 3D.
+- Signature regression tests sample 801 poses in full and compact quality, verify continuous/reversible motion and distinct camera paths, validate real geometry budgets/stable curve buffers, and derive the diagram’s arithmetic from its rendered table.
+- The original Approach world/motion/styles/page, both scientific worlds/pages, and their source assets match commit `e625f1f`. Only the new variants receive the signature renderer and layout.
+- Final production build and all five public suites passed. Lint passed with zero errors and 57 existing warnings. Full security regressions passed. The final local build reloaded Approach, Molecular, and Cellular WebGL successfully with no recorded console errors.
+
+## Earlier scroll refinement
 
 The hero-only interaction in commit `927de4b` has been replaced with a persistent native-scroll journey. Open <http://127.0.0.1:3100/> and scroll forward through chapters 01–04, then backward. The chapter links also work with keyboard navigation. The preview itself is the motion deliverable; the stills below are supporting evidence only.
 
@@ -50,7 +92,7 @@ Capable phones render simplified real geometry. Width and touch select compact q
 
 Motion screenshots and the observed scroll/camera log are in the primary checkout's `outputs/public-revamp/`: `scroll-01-inputs.png`, `scroll-02-depth.png`, `scroll-03-alignment.png`, `scroll-04-core.png`, `scroll-mobile.png`, and `motion-verification.json`.
 
-## Direction and implementation
+## Initial direction and implementation
 
 **The Clarity Engine** turns fragmented information into an ordered, illuminated center. A bespoke layered graphite aperture, blue recessed seams, chamfered metal edges, and a central Vaeroex chevron establish the visual identity. Manrope typography, broad dark space, ruled editorial lists, and restrained transitions carry it through the public site. Concept illustrations and sample data are explicitly labeled.
 
@@ -67,7 +109,7 @@ The available product remains Executive Intelligence at **$500/month**, sourced 
 
 No authenticated application, API, integration, billing implementation, security control, database policy, form action, middleware, or dependency lockfile changed. The request form's change is presentation only. Existing legal/company details, brand icon, and NVIDIA Inception membership attribution remain intact.
 
-## Rendering and performance
+## Initial rendering and performance
 
 The interactive journey uses actual modeled geometry. The static image is the previously commissioned resolved render of the same modeled structure and is labeled as a concept render when used. The separate material study is also explicitly illustrative.
 
@@ -82,12 +124,12 @@ The interactive journey uses actual modeled geometry. The static image is the pr
 
 ## Assets and provenance
 
-| Asset | Source | Delivery |
-| --- | --- | --- |
-| `public/brand/clarity-engine-poster.webp` | Screenshot render of the custom project geometry, composed in a temporary local studio route; route removed after capture | 850 × 850, about 78 kB |
-| `public/brand/clarity-material.webp` | Original image created with the built-in image generation tool, inspected visually and resized/compressed | 1920 × 960, about 132 kB |
-| `public/fonts/manrope/Manrope.ttf` | Official Google Fonts repository, Manrope variable font | Approximately 161 kB; local delivery, `font-display: swap` |
-| `public/fonts/manrope/OFL.txt` | Upstream SIL Open Font License | Included with font |
+| Asset                                     | Source                                                                                                                    | Delivery                                                   |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| `public/brand/clarity-engine-poster.webp` | Screenshot render of the custom project geometry, composed in a temporary local studio route; route removed after capture | 850 × 850, about 78 kB                                     |
+| `public/brand/clarity-material.webp`      | Original image created with the built-in image generation tool, inspected visually and resized/compressed                 | 1920 × 960, about 132 kB                                   |
+| `public/fonts/manrope/Manrope.ttf`        | Official Google Fonts repository, Manrope variable font                                                                   | Approximately 161 kB; local delivery, `font-display: swap` |
+| `public/fonts/manrope/OFL.txt`            | Upstream SIL Open Font License                                                                                            | Included with font                                         |
 
 Original generated image on the commissioning machine: `/Users/isaacvizcarra/.codex/generated_images/01a0fef8-b24e-70d1-b0b3-1c2d51e39c6c/exec-be493e22-ebfa-4547-8a69-2f0713b69a9c.png`.
 

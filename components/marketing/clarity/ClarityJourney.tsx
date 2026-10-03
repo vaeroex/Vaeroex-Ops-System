@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { ClarityEngine, type JourneyVariant } from "./ClarityEngine";
 import styles from "./ClarityJourney.module.css";
+import signatureStyles from "../signature/SignatureJourney.module.css";
 
 type JourneyStage = {
   label: string;
@@ -24,20 +25,24 @@ export function ClarityJourney({
   compact?: boolean;
 }) {
   const scientific = variant === "drug-discovery" || variant === "biology";
+  const signature = variant === "landing" || variant === "business";
   return (
     <section
       id={id}
-      className={`${styles.journey} ${compact ? styles.shortJourney : ""} ${intro ? styles.withIntro : ""} ${scientific ? styles.scientificJourney : ""}`}
+      className={`${styles.journey} ${compact ? styles.shortJourney : ""} ${intro ? styles.withIntro : ""} ${scientific ? styles.scientificJourney : ""} ${signature ? signatureStyles.journey : ""}`}
       data-clarity-journey
       data-science-journey={scientific ? variant : undefined}
+      data-signature-journey={signature ? variant : undefined}
       aria-label={
-        variant === "home"
+        variant === "home" || variant === "landing"
           ? "From fragmented information to clear decisions"
-          : "Explore the intelligence approach"
+          : variant === "business"
+            ? "Explore the business landscape"
+            : "Explore the intelligence approach"
       }
     >
       <div className={styles.visualTrack}>
-        <div className={styles.stickyVisual}>
+        <div className={styles.stickyVisual} data-journey-visual>
           <ClarityEngine
             journeyId={id}
             variant={variant}
@@ -46,6 +51,13 @@ export function ClarityJourney({
               id: `${id}-stage-${index}`,
             }))}
           />
+          {signature ? (
+            <p className={signatureStyles.note}>
+              {variant === "landing"
+                ? "SIGNAL ATLAS / A CONCEPTUAL JOURNEY"
+                : "BUSINESS LANDSCAPE / ILLUSTRATIVE RELATIONSHIPS"}
+            </p>
+          ) : null}
           {scientific ? (
             <p className={styles.scienceNote}>
               {variant === "drug-discovery"
@@ -86,9 +98,13 @@ export function ClarityJourney({
       </div>
       <div className={styles.baseline}>
         <span>
-          {scientific
-            ? "VAEROEX / SCIENTIFIC VISUAL STUDY"
-            : "THE CLARITY ENGINE / CONCEPTUAL JOURNEY"}
+          {signature
+            ? variant === "landing"
+              ? "VAEROEX / THE SIGNAL ATLAS"
+              : "EXECUTIVE INTELLIGENCE / CONCEPTUAL JOURNEY"
+            : scientific
+              ? "VAEROEX / SCIENTIFIC VISUAL STUDY"
+              : "THE CLARITY ENGINE / CONCEPTUAL JOURNEY"}
         </span>
         <a href={`#${id}-end`}>
           Continue exploring <span aria-hidden="true">↓</span>
