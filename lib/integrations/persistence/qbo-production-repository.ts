@@ -306,6 +306,29 @@ export async function scheduleQboProductionInitialization(
   ));
 }
 
+export async function recoverQboRuntimeTasks(
+  queueClass: "provider_interactive" | "provider_bulk",
+  limit: number,
+  requestId: string,
+  client: ExternalIntegrationsRpcClient
+) {
+  const maximum = z.number().int().min(1).max(100).parse(limit);
+  const result = z.object({
+    recoveredCount: z.number().int().min(0).max(maximum),
+    readyCount: z.number().int().min(0).max(maximum),
+    deadLetterCount: z.number().int().min(0).max(maximum),
+    cancelledCount: z.number().int().min(0).max(maximum)
+  }).strict().parse(await rpc("recover_qbo_runtime_tasks_v1", {
+    p_queue_class: z.enum(["provider_interactive", "provider_bulk"]).parse(queueClass),
+    p_limit: maximum,
+    p_request_id: BoundedIdentifierSchema.parse(requestId)
+  }, client));
+  if (result.recoveredCount !== result.readyCount + result.deadLetterCount + result.cancelledCount) {
+    throw new Error("qbo_runtime_recovery_result_inconsistent");
+  }
+  return result;
+}
+
 export async function discoverQboRuntimeDispatch(
   queueClass: "provider_interactive" | "provider_bulk",
   limit: number,

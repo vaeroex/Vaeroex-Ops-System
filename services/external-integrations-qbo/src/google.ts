@@ -86,6 +86,9 @@ export async function googleCreateCloudTask(input: {
       body: JSON.stringify({
         task: {
           name: taskName,
+          // The handler stops useful work at 240s and fenced cleanup by 285s.
+          // Delivery must not retain a worker for the default 600s past its 300s lease.
+          dispatchDeadline: "300s",
           httpRequest: {
             httpMethod: "POST",
             url: target.toString(),
