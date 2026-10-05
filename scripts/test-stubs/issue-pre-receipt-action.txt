@@ -31,4 +31,3 @@ export async function createIssueAction(formData: FormData) {
   revalidatePath(path);
   redirectWithMessage(path, "Issue logged.");
 }
-

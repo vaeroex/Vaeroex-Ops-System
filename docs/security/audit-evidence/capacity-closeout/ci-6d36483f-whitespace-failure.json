@@ -1,0 +1,42 @@
+{
+  "kind": "final_review_ci_whitespace_failure",
+  "head": "6d36483f5a0f73ccacd12c795f27d1ac6f700043",
+  "runId": 37375683046,
+  "url": "https://github.com/vaeroex/Vaeroex-Ops-System/actions/runs/37375683046",
+  "jobs": [
+    {
+      "name": "verify",
+      "id": 111983693460,
+      "conclusion": "failure",
+      "failedStep": "Whitespace check",
+      "allEarlierChecksIncludingBuildAndSecurity": "success"
+    },
+    {
+      "name": "native-broker-qualification",
+      "id": 111983693615,
+      "conclusion": "success"
+    },
+    {
+      "name": "security-database",
+      "id": 111983693665,
+      "conclusion": "success"
+    },
+    {
+      "name": "jit-canary-linux-qualification",
+      "id": 111983693798,
+      "conclusion": "success"
+    }
+  ],
+  "failure": "scripts/test-stubs/issue-pre-receipt-action.txt:34: new blank line at EOF.",
+  "reproducedCommand": "git diff --check origin/main...HEAD",
+  "correction": {
+    "path": "scripts/test-stubs/issue-pre-receipt-action.txt",
+    "removedCharacters": 1,
+    "oldSha256": "e39cc095de53800dfca8680c0ef9b9e2490b5a6328e30bcaaaa561cdfb8ef9be",
+    "newSha256": "977b96b7ae24c3e4b6d059908d04ad4d2744f7e94d42a15b8023894a96a15113",
+    "transpiledFixtureIdentical": true,
+    "applicationSourceChanged": false
+  },
+  "historicalHashes": "Earlier fixture/test execution hashes remain unchanged in retained evidence; this correction is a separate capture.",
+  "finalCorrectedHeadCi": "Must be checked independently; actual final status is maintained on PR #464."
+}

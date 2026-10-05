@@ -408,6 +408,12 @@
       "sourceBasename": "final-original-preservation.json",
       "originalSha256": "041201cd7a1d63681112a1d16f964ad770f31bd7d1b2b6f7259270658584f655",
       "sanitization": "Synthetic runtime identity/status and source preservation metadata only; no credentials or record contents."
+    },
+    {
+      "file": "ci-6d36483f-whitespace-failure.json",
+      "sha256": "945e099289546ff6f619dad6c3a1a327a81cbfc28ed72a5a0b349584391ea9b6",
+      "sourceBasename": "GitHub run37375683046 and local exact-diff reproduction",
+      "sanitization": "Only public CI status, exact fixture error and source hashes; no raw CI environment/log dump."
     }
   ],
   "sourceFiles": [
