@@ -282,19 +282,7 @@
       "status": "pass"
     },
     {
-      "name": "service role retains the existing private schema usage barrier",
-      "status": "pass"
-    },
-    {
-      "name": "service role has no direct exemption table privileges",
-      "status": "pass"
-    },
-    {
-      "name": "service client cannot configure platform subscription exemptions",
-      "status": "pass"
-    },
-    {
-      "name": "trusted database owner can configure a verified auth user exemption",
+      "name": "trusted service can configure a verified auth user exemption",
       "status": "pass"
     },
     {

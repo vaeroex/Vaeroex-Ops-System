@@ -1,0 +1,136 @@
+{
+  "scope": "Second hosted attempt before the Storage positive-path, recovery-projection, test collation and deterministic browser follow-ups. Exact successful checks remain distinct from later untested source.",
+  "runs": [
+    {
+      "runId": 37260917737,
+      "jobs": [
+        {
+          "id": 111607770543,
+          "name": "jit-canary-linux-qualification",
+          "status": "completed",
+          "conclusion": "success",
+          "failedSteps": []
+        },
+        {
+          "id": 111607770557,
+          "name": "native-broker-qualification",
+          "status": "completed",
+          "conclusion": "success",
+          "failedSteps": []
+        },
+        {
+          "id": 111607770621,
+          "name": "verify",
+          "status": "completed",
+          "conclusion": "failure",
+          "failedSteps": [
+            "External integrations QBO Production multi-tenant regressions"
+          ]
+        },
+        {
+          "id": 111607770629,
+          "name": "security-database",
+          "status": "completed",
+          "conclusion": "failure",
+          "failedSteps": [
+            "Verify authorization and Customer",
+            "Qualify QBO completion on canonical and exact Production migration shapes"
+          ]
+        }
+      ]
+    },
+    {
+      "runId": 37260917008,
+      "jobs": [
+        {
+          "id": 111607770399,
+          "name": "security-database",
+          "status": "completed",
+          "conclusion": "failure",
+          "failedSteps": [
+            "Verify authorization and Customer",
+            "Qualify QBO completion on canonical and exact Production migration shapes"
+          ]
+        },
+        {
+          "id": 111607770485,
+          "name": "jit-canary-linux-qualification",
+          "status": "completed",
+          "conclusion": "success",
+          "failedSteps": []
+        },
+        {
+          "id": 111607770526,
+          "name": "verify",
+          "status": "completed",
+          "conclusion": "failure",
+          "failedSteps": [
+            "External integrations QBO Production multi-tenant regressions"
+          ]
+        },
+        {
+          "id": 111607770534,
+          "name": "native-broker-qualification",
+          "status": "completed",
+          "conclusion": "success",
+          "failedSteps": []
+        }
+      ]
+    },
+    {
+      "runId": 37260918412,
+      "jobs": [
+        {
+          "id": 111607775815,
+          "name": "jit-canary-linux-qualification",
+          "status": "completed",
+          "conclusion": "success",
+          "failedSteps": []
+        },
+        {
+          "id": 111607775976,
+          "name": "security-database",
+          "status": "completed",
+          "conclusion": "failure",
+          "failedSteps": [
+            "Verify authorization and Customer",
+            "Qualify QBO completion on canonical and exact Production migration shapes"
+          ]
+        },
+        {
+          "id": 111607776084,
+          "name": "verify",
+          "status": "completed",
+          "conclusion": "failure",
+          "failedSteps": [
+            "Workspace audit desktop/mobile keyboard and form regressions"
+          ]
+        },
+        {
+          "id": 111607776188,
+          "name": "native-broker-qualification",
+          "status": "completed",
+          "conclusion": "success",
+          "failedSteps": []
+        }
+      ]
+    }
+  ],
+  "selectedDatabaseErrors": [
+    "2026-10-05T03:50:59.5728756Z supabase/tests/external_integrations_phase_1_canonical_foundation.test.sql: database test failed (42P22): could not determine which collation to use for string comparison Context: PL/pgSQL function results_eq(refcursor,refcursor,text) line 17 at IF",
+    "2026-10-05T03:58:49.1744110Z {\"shape\":\"canonical\",\"file\":\"supabase/tests/qbo_customer_oauth_completion.test.sql\",\"sha256\":\"f0d100e561cad006a471f97ab6763d56acbc6d2bfec1d41545cf8b279a911753\",\"passed\":false,\"assertions\":44,\"executedSqlSha256\":\"f0d100e561cad006a471f97ab6763d56acbc6d2bfec1d41545cf8b279a911753\",\"protocolRequests\":2,\"error\":{\"code\":\"40001\",\"message\":\"qbo_customer_disconnect_stale\",\"where\":\"PL/pgSQL function public.complete_qbo_customer_disconnect_v1(uuid,uuid,text) line 7 at RAISE\"}}",
+    "2026-10-05T03:58:59.5881008Z {\"shape\":\"canonical\",\"file\":\"scripts/qbo-pending-cancellation-eligibility-database-tests.cjs\",\"sha256\":\"51cb4385901d93cfec028af6500d92a098bcf7aa7ad877adbe47090e757bf753\",\"passed\":false,\"assertions\":0,\"error\":{\"code\":\"42501\",\"message\":\"workspace_subscription_required\",\"where\":\"PL/pgSQL function private.guard_workspace_mutation_entitlement_v1() line 18 at RAISE\"}}"
+  ],
+  "applicationErrors": [
+    {
+      "jobId": 111607770621,
+      "file": "scripts/qbo-production-candidate-runner-tests.cjs:28",
+      "error": "canonical count remains exact; obsolete123 regex after explicit125 runner update"
+    },
+    {
+      "jobId": 111607776084,
+      "file": "scripts/workspace-workflow-browser-tests.cjs:88",
+      "error": "30s timeout waiting for transient aria-busy pending state"
+    }
+  ]
+}

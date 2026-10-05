@@ -1,0 +1,69 @@
+{
+  "scope": "Actual source manifest assertions evaluated without DB/provider calls; no full Square qualification claim",
+  "migrationCount": 125,
+  "results": [
+    {
+      "file": "run-square-account-connection-qualification.js",
+      "currentManifest": "fail",
+      "error": {
+        "name": "AssertionError",
+        "message": "account and separately qualified remote Sandbox and broker corrections are the exact additive tail"
+      },
+      "unexpectedMigrationRejected": true
+    },
+    {
+      "file": "run-square-remote-sandbox-qualification.js",
+      "currentManifest": "fail",
+      "error": {
+        "name": "AssertionError",
+        "message": "remote binding and separately qualified broker correction are the exact additive tail"
+      },
+      "unexpectedMigrationRejected": true
+    },
+    {
+      "file": "run-square-broker-runtime-qualification.js",
+      "currentManifest": "fail",
+      "error": {
+        "name": "AssertionError",
+        "message": "exact reviewed corrective and GCP callback tail"
+      },
+      "unexpectedMigrationRejected": true
+    },
+    {
+      "file": "run-square-gcp-callback-database-qualification.js",
+      "currentManifest": "fail",
+      "error": {
+        "name": "AssertionError",
+        "message": "explicit callback, Oregon recovery and separately qualified mapped runtime tail"
+      },
+      "unexpectedMigrationRejected": true
+    },
+    {
+      "file": "run-square-gcp-mapped-database-qualification.js",
+      "currentManifest": "fail",
+      "error": {
+        "name": "AssertionError",
+        "message": "exact mapped extension, inherited-entry fencing and separately qualified observation admission"
+      },
+      "unexpectedMigrationRejected": true
+    },
+    {
+      "file": "run-square-durable-page-qualification.js",
+      "currentManifest": "fail",
+      "error": {
+        "name": "AssertionError",
+        "message": "migration manifest is explicit"
+      },
+      "unexpectedMigrationRejected": true
+    },
+    {
+      "file": "run-square-observation-database-qualification.js",
+      "currentManifest": "fail",
+      "error": {
+        "name": "AssertionError",
+        "message": "full canonical chain, including the separately qualified Production runtime, compatibility guards, Google Sheets connector and personal summary preferences"
+      },
+      "unexpectedMigrationRejected": true
+    }
+  ]
+}

@@ -1,0 +1,141 @@
+{
+  "scope": "Initial draft heads, before CI compatibility and private-schema barrier correction. Preserve failures rather than relabel as final-head passes.",
+  "runs": [
+    {
+      "runId": 37259377096,
+      "url": "https://github.com/vaeroex/Vaeroex-Ops-System/actions/runs/37259377096",
+      "jobs": [
+        {
+          "id": 111603152467,
+          "name": "jit-canary-linux-qualification",
+          "status": "completed",
+          "conclusion": "success",
+          "failedSteps": []
+        },
+        {
+          "id": 111603152564,
+          "name": "native-broker-qualification",
+          "status": "completed",
+          "conclusion": "success",
+          "failedSteps": []
+        },
+        {
+          "id": 111603152608,
+          "name": "verify",
+          "status": "completed",
+          "conclusion": "success",
+          "failedSteps": []
+        },
+        {
+          "id": 111603152654,
+          "name": "security-database",
+          "status": "completed",
+          "conclusion": "failure",
+          "failedSteps": [
+            "Verify authorization and Customer",
+            "Qualify dormant Square authority and atomic pages in disposable local databases",
+            "Qualify dormant Square account lifecycle in disposable local databases",
+            "Qualify remote Sandbox binding in disposable local databases only",
+            "Qualify separate Square broker and runtime authority in disposable databases only",
+            "Qualify native GCP callback first-consent authority in disposable databases only",
+            "Qualify mapped Square native role and recovery boundaries in disposable databases only",
+            "Qualify non-economic Square observation admission in disposable databases only",
+            "Qualify QBO completion on canonical and exact Production migration shapes"
+          ]
+        }
+      ]
+    },
+    {
+      "runId": 37259392388,
+      "url": "https://github.com/vaeroex/Vaeroex-Ops-System/actions/runs/37259392388",
+      "jobs": [
+        {
+          "id": 111603200768,
+          "name": "native-broker-qualification",
+          "status": "completed",
+          "conclusion": "success",
+          "failedSteps": []
+        },
+        {
+          "id": 111603200909,
+          "name": "security-database",
+          "status": "completed",
+          "conclusion": "failure",
+          "failedSteps": [
+            "Verify authorization and Customer",
+            "Qualify dormant Square authority and atomic pages in disposable local databases",
+            "Qualify dormant Square account lifecycle in disposable local databases",
+            "Qualify remote Sandbox binding in disposable local databases only",
+            "Qualify separate Square broker and runtime authority in disposable databases only",
+            "Qualify native GCP callback first-consent authority in disposable databases only",
+            "Qualify mapped Square native role and recovery boundaries in disposable databases only",
+            "Qualify non-economic Square observation admission in disposable databases only",
+            "Qualify QBO completion on canonical and exact Production migration shapes"
+          ]
+        },
+        {
+          "id": 111603200922,
+          "name": "verify",
+          "status": "completed",
+          "conclusion": "failure",
+          "failedSteps": [
+            "Workspace navigation and bounded-list regressions"
+          ]
+        },
+        {
+          "id": 111603200934,
+          "name": "jit-canary-linux-qualification",
+          "status": "completed",
+          "conclusion": "success",
+          "failedSteps": []
+        }
+      ]
+    },
+    {
+      "runId": 37259407400,
+      "url": "https://github.com/vaeroex/Vaeroex-Ops-System/actions/runs/37259407400",
+      "jobs": [
+        {
+          "id": 111603247694,
+          "name": "native-broker-qualification",
+          "status": "completed",
+          "conclusion": "success",
+          "failedSteps": []
+        },
+        {
+          "id": 111603247846,
+          "name": "jit-canary-linux-qualification",
+          "status": "completed",
+          "conclusion": "success",
+          "failedSteps": []
+        },
+        {
+          "id": 111603247881,
+          "name": "security-database",
+          "status": "completed",
+          "conclusion": "failure",
+          "failedSteps": [
+            "Verify authorization and Customer",
+            "Qualify dormant Square authority and atomic pages in disposable local databases",
+            "Qualify dormant Square account lifecycle in disposable local databases",
+            "Qualify remote Sandbox binding in disposable local databases only",
+            "Qualify separate Square broker and runtime authority in disposable databases only",
+            "Qualify native GCP callback first-consent authority in disposable databases only",
+            "Qualify mapped Square native role and recovery boundaries in disposable databases only",
+            "Qualify non-economic Square observation admission in disposable databases only",
+            "Qualify QBO completion on canonical and exact Production migration shapes"
+          ]
+        },
+        {
+          "id": 111603247890,
+          "name": "verify",
+          "status": "completed",
+          "conclusion": "failure",
+          "failedSteps": [
+            "Workspace navigation and bounded-list regressions"
+          ]
+        }
+      ]
+    }
+  ]
+}

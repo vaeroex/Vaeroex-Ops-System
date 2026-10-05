@@ -1,0 +1,20 @@
+✔ components/intelligence/ExecutiveHomepage.tsx preserves the inventoried workflow beneath its presentation (19.668916ms)
+✔ components/intelligence/IntelligenceSignalInbox.tsx preserves the inventoried workflow beneath its presentation (20.548958ms)
+✔ components/intelligence/IntelligenceBriefingCards.tsx preserves the inventoried workflow beneath its presentation (2.534833ms)
+✔ components/intelligence/IntelligenceBriefingViewer.tsx preserves the inventoried workflow beneath its presentation (2.214834ms)
+✔ app/app/intelligence/page.tsx preserves the inventoried workflow beneath its presentation (7.364125ms)
+✔ app/app/intelligence/briefings/page.tsx preserves the inventoried workflow beneath its presentation (1.010833ms)
+✔ current integration dashboard rejects changed imports, authorization, scope, props and restored sections (18.595958ms)
+✔ dashboard exceptions reject missing, duplicate and extra bindings (29.92025ms)
+✔ the integration exception still detects changes to existing Intelligence imports, queries and state (15.619ms)
+✔ accounting exception rejects changed scope, timing and current evidence bindings (10.784875ms)
+✔ source-parent completeness exception rejects altered scope, rows and consumer evidence (24.820709ms)
+✔ source-parent completeness exception rejects missing, duplicate and extra bindings (15.367042ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 172.50625

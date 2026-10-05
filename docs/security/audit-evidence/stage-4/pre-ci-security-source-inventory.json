@@ -2318,12 +2318,12 @@
     }
   ],
   "implementation_manifest": {
-    "refreshed_at": "2026-10-05T03:44:52.231783+00:00",
+    "refreshed_at": "2026-10-05T03:18:11.081119+00:00",
     "scope": "Hash inventory of stage4 security implementation files; distinct from baseline source schema inventory; not deployed/catalog verification.",
     "files": [
       {
         "path": "supabase/migrations/20261005022017_workspace_security_boundaries.sql",
-        "sha256": "1cd376c41b5b980c0bd1ca09f3a0053d7a167644af16fdafc3bb32de0388363a"
+        "sha256": "9b054c6275bae431fb1d5df32ef8eb1cf26a0b1b34a7fe1b26187d7ea00eeecd"
       },
       {
         "path": "supabase/migrations/20261005022445_workspace_persisted_usage_limits.sql",
@@ -2351,7 +2351,7 @@
       },
       {
         "path": "scripts/workspace-security-database-tests.cjs",
-        "sha256": "f7617805f8cff576c9faa6ffaa17cf1daf4cb796573f3fe18257a446e740290b"
+        "sha256": "6fee85900f344ea7be570f1525a9d6620d198ff643c748c29da0ff947b4a24a9"
       },
       {
         "path": "scripts/workspace-security-helper-tests.cjs",
@@ -2389,8 +2389,8 @@
   },
   "implementation_verification": {
     "native_postgres_version": "17.11",
-    "native_checks": 106,
-    "native_checks_passed": 106,
+    "native_checks": 103,
+    "native_checks_passed": 103,
     "scope": "focused repository-SQL fixture, synthetic JWT roles, owned native PostgreSQL, no HTTP/provider verification",
     "input_shape_measurements": [
       {
@@ -2427,7 +2427,6 @@
       "lib/ai/business-health-explanation/generation-claim.ts",
       "lib/ai/intelligence-briefing/generation-claim.ts",
       "app/app/finding-explanation/actions.ts"
-    ],
-    "admin_exemption_configuration": "Trusted database owner/operator only; no service-role private schema usage or exemption table CRUD"
+    ]
   }
 }

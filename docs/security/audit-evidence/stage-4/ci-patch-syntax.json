@@ -1,0 +1,42 @@
+{
+  "scope": "Syntax only; not full hosted integration replay",
+  "checks": [
+    {
+      "file": "scripts/run-square-account-connection-qualification.js",
+      "syntaxCheck": true
+    },
+    {
+      "file": "scripts/run-square-remote-sandbox-qualification.js",
+      "syntaxCheck": true
+    },
+    {
+      "file": "scripts/run-square-broker-runtime-qualification.js",
+      "syntaxCheck": true
+    },
+    {
+      "file": "scripts/run-square-gcp-callback-database-qualification.js",
+      "syntaxCheck": true
+    },
+    {
+      "file": "scripts/run-square-gcp-mapped-database-qualification.js",
+      "syntaxCheck": true
+    },
+    {
+      "file": "scripts/run-square-durable-page-qualification.js",
+      "syntaxCheck": true
+    },
+    {
+      "file": "scripts/run-square-observation-database-qualification.js",
+      "syntaxCheck": true
+    },
+    {
+      "file": "scripts/run-qbo-production-candidate-database-tests.cjs",
+      "syntaxCheck": true
+    },
+    {
+      "file": "scripts/workspace-security-database-tests.cjs",
+      "syntaxCheck": true
+    }
+  ],
+  "gitDiffCheck": "pass"
+}
