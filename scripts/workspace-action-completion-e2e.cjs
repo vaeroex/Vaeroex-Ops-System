@@ -168,7 +168,7 @@ const failure = u => u.searchParams.has('error');
       f = await formPage(page, formId, label); await f.locator('[name="submission_request_id"]').evaluate((e, value) => { e.value = value; }, requestId);
       await submit(page, f.getByRole('button', { name: 'Save submission', exact: true }), stage + '_replay', success);
       assert.deepEqual(check(await client.from('form_submissions').select('id,data_json').eq('submitter_name', label), 'form_replay'), saved);
-      await page.getByText(label, { exact: true }).first().waitFor();
+      await page.locator('article').getByText(label, { exact: true }).first().waitFor();
       if (iteration === 0) await page.screenshot({ path: path.join(output, `form-${width}.png`), fullPage: true });
       stage = `memory_${width}_${iteration}`;
       const fileId = randomUUID(), runId = randomUUID();
