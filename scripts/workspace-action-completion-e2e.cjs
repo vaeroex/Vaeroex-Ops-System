@@ -101,7 +101,7 @@ const failure = u => u.searchParams.has('error');
     owner = { id: user.id, email: user.email, password, workspaceId: a };
     const foreignOwner = check(await admin.from('workspace_members').select('user_id').eq('workspace_id', b).eq('role', 'owner').single(), 'owned_foreign_fixture');
     const foreignFile = randomUUID();
-    check(await admin.from('file_uploads').insert({ id: foreignFile, workspace_id: b, created_by: foreignOwner.user_id, original_name: 'vxa039-foreign.csv', file_extension: 'csv', mime_type: 'text/csv', file_size_bytes: 10, storage_bucket: 'workspace-files', storage_path: `${b}/${foreignFile}/fixture.csv`, processing_status: 'ready' }), 'foreign_record_fixture');
+    check(await admin.from('file_uploads').insert({ id: foreignFile, workspace_id: b, created_by: foreignOwner.user_id, original_name: 'vxa039-foreign.csv', display_name: prefix + ' foreign denial', file_extension: 'csv', mime_type: 'text/csv', file_size_bytes: 10, storage_bucket: 'workspace-files', storage_path: `${b}/${foreignFile}/fixture.csv`, processing_status: 'ready' }), 'foreign_record_fixture');
     // Reuse the preserved, deliberately partial receipt; never reset or finish it.
     const held = check(await admin.from('file_imports').select('id,file_upload_id').eq('workspace_id', a).eq('recovery_status', 'running').limit(10), 'held_fixture');
     assert(held.length > 0); const heldImport = held[0];
