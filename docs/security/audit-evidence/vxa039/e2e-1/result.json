@@ -1,0 +1,19 @@
+{
+  "passed": false,
+  "executionId": "d98808e2-6f68-4288-b5e6-1f4336bee5d9",
+  "runId": "1061111f-557e-49af-a2cd-145cc6e9949f",
+  "results": [
+    {
+      "name": "seed",
+      "passed": false,
+      "error": "foreign_record_fixture:23502"
+    }
+  ],
+  "actionResponses": [],
+  "requests": [],
+  "browserErrors": [],
+  "limitations": [
+    "Real isolated Auth/PostgREST/Storage; synthetic seeded legal acceptance and completed model outputs",
+    "No provider calls, production configuration, capacity or full lifecycle qualification"
+  ]
+}

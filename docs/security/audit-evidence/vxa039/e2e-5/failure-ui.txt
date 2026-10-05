@@ -1,0 +1,142 @@
+Vaeroex
+
+CLOSEOUT 1061111f 45708faa A
+
+ACTIVE
+Overview
+Intelligence
+Performance
+Files & Notes
+Saved Analyses
+Integrations
+Settings
+Sign out
+
+CLOSEOUT 1061111f 45708faa A · Active
+
+Files & Notes
+
+Search
+K
+
+WORKSPACE INPUTS
+
+Files & Notes
+
+Add business information. Review it before it becomes evidence.
+
+Upload file
+
+Upload file
+
+Reports, spreadsheets, SOPs, notes, and operational files.
+
+Upload once. Spreadsheet rows are prepared automatically for your mapping review. Nothing is added to active KPI or metric history until you approve it.
+
+This looks like a duplicate of "CLOSEOUT 1061111f c80ff0e8 1440 0 upload". Check "Upload anyway" if you intentionally want another copy.
+
+Your selected file and entered details remain here. Correct the issue before submitting again.
+
+File
+Display name
+Folder
+No folder
+Intentional duplicate upload
+
+Documents and images are saved for a separate analysis decision.
+
+Do not upload patient data, PHI/ePHI, Social Security numbers, insurance IDs, or other regulated sensitive information.
+
+Upload and prepare review
+Add business note
+Active Sources
+8
+Learned Knowledge
+4
+Legal & Agreements
+Archived
+0
+Search files
+Source Files
+
+Open a file for review, imports, and history.
+
+Showing 8 of 8 loaded files matching this view.
+
+CLOSEOUT 1061111f efb1bd24 1440 0
+Learned
+
+vxa039-memory.csv · 189 B · Uploaded Oct 5, 2026
+
+This source is available to Vaeroex intelligence.
+
+Open source
+CLOSEOUT 1061111f c80ff0e8 1440 0 upload
+Import Review
+
+vxa039.csv · 41 B · Uploaded Oct 5, 2026
+
+Review detected rows and mapping before approving an import.
+
+Open source
+CLOSEOUT 1061111f c80ff0e8 1440 0
+Learned
+
+vxa039-memory.csv · 189 B · Uploaded Oct 5, 2026
+
+This source is available to Vaeroex intelligence.
+
+Open source
+CLOSEOUT 1061111f 39f4465b 1440 0
+Needs Review
+
+vxa039-memory.csv · 189 B · Uploaded Oct 5, 2026
+
+Analysis needs a human check before Vaeroex uses it.
+
+Open source
+CLOSEOUT 1061111f cb920153 held history boundary
+Import held
+
+held-history.csv · 27 B · Uploaded Oct 5, 2026
+
+This import is held for reconciliation. Previously completed evidence remains available.
+
+Open source
+CLOSEOUT 1061111f cb920153 partial attempt
+Import held
+
+synthetic-partial.csv · 27 B · Uploaded Oct 5, 2026
+
+This import is held for reconciliation. Previously completed evidence remains available.
+
+Open source
+CLOSEOUT 1061111f cb920153 uploaded source
+Learned
+
+closeout-1061111f-cb920153.csv · 41 B · Uploaded Oct 5, 2026
+
+This source is available to Vaeroex intelligence.
+
+Open source
+CLOSEOUT 1061111f 45708faa reviewed source
+Learned
+
+synthetic-memory.csv · 189 B · Uploaded Oct 5, 2026
+
+This source is available to Vaeroex intelligence.
+
+Open source
+Business Notes
+
+Review pending notes before approving them as contextual evidence.
+
+0 awaiting review · 0 approved (loaded)
+
+Vaeroex turns business evidence into leadership clarity.
+
+Help Center
+Trust Center
+Terms
+Privacy
+Support

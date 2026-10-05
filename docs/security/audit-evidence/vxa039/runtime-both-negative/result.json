@@ -1,0 +1,11 @@
+{
+  "passed": false,
+  "negativeControl": true,
+  "rendererSha256": "65934a5a1038f6905498e9d2231a38caec9b9e0fd504cbdf16ad4573e792e8a7",
+  "installedRendererSha256": "21db913ff9b172770b3329353b29295e31151fa2b8e21fbe888e6e4db0ba33fd",
+  "checks": [],
+  "errors": [
+    "synchronous_wakeup_did_not_complete:1440:0"
+  ],
+  "scope": "Bundled production React renderer; no simulated API, reload, polling state update, authentication or database."
+}

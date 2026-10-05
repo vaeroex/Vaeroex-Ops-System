@@ -1,0 +1,952 @@
+{
+  "applicationHead": "5035ec1392c705c1516339bd6f64586f8a67848b",
+  "builds": [
+    "Ug6sQYtV6sEa6wP77d9Jq",
+    "R6-Cy-krVnBTNH1eYoFwW"
+  ],
+  "applicationManifestsEqual": true,
+  "automaticActionTransitions": 156,
+  "persistedIntegrityGroups": 12,
+  "browserErrors": 0,
+  "everyActionOnePost": true,
+  "originalSourceFilesUnchanged": 1044,
+  "textSecretsCheck": "Exact private config values and token-pattern matches absent; synthetic screenshots reviewed, no automated OCR claim",
+  "files": [
+    {
+      "path": "docs/security/audit-evidence/vxa039/midrender-probe.png",
+      "sha256": "0124e6c861092423af9a04a1172694e1cb50155b4e886e8458997fd9c15c91d3",
+      "bytes": 97223
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/build-baseline.cjs",
+      "sha256": "4d6b4b7a146f10d5a3e1f9a1f41fd2b0860fd5fcea8ea5a99ff7f1ff9146fc03",
+      "bytes": 1265
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/hydration-probe.cjs",
+      "sha256": "07c288bf6edb3467bbbfa1fb9e84a38260c118317fac5c10ddec150c371bd933",
+      "bytes": 13144
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/clarity.log",
+      "sha256": "62b5a170ffac285fcf9c70ca7c11d61d7cb4f7972d27a75a778c6aaf4aca8b28",
+      "bytes": 7800
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/independent-review.md",
+      "sha256": "eb13c54e1756f93707dc58399c19db793aa38bab6bf18b121f16a46d8ec3dbe3",
+      "bytes": 940
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/workflow-tests.log",
+      "sha256": "ab64016cc0afad084700ed0ca98d701767613229bf31fa24b47cf76637b481c0",
+      "bytes": 2206
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/feedback-negative.log",
+      "sha256": "906a2647e648af89887aa31b9d5015b50dee071bdd98c9bbb5a9a5f8a6166d97",
+      "bytes": 3054
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/baseline-probe.json",
+      "sha256": "e6a710e6231b84b8507d65978ef6a3919a9a5ec07a9f38a171499afca0b20f12",
+      "bytes": 4815
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/workbook-tests.json",
+      "sha256": "97925a83ef506bcbe7c55ade244b04a4f743d03ff1a5bb24926391aeccce2ea6",
+      "bytes": 6449
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/security-throttle.json",
+      "sha256": "6bf2813f2dcd0b4eb815eb48432ef3616853dd71f4f490769dc8befc577c583a",
+      "bytes": 2289
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/browser-suite.log",
+      "sha256": "bb4396593bf26cacdc09fe24e20c239214ca3728b2299b00a351427dac89e61b",
+      "bytes": 4783
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/workbook-browser-2.log",
+      "sha256": "a03f5fc4ec09ad24a3c285e0234287fab592f3ca8c556d55d9c259956a916efc",
+      "bytes": 5134
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/preservation.json",
+      "sha256": "e577ef06f726def5a24cb6a90060fc3dd317e7b2cb1f37343cc169c8a7534033",
+      "bytes": 564
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/workbook-browser-result.json",
+      "sha256": "a4bfb5e0dc27527f94511aaee7168d62193c512c675f92f39c5b5b89da9022f3",
+      "bytes": 5079
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/baseline-probe.cjs",
+      "sha256": "d14da3c4ae82062b7555a2ffe86499c7fca7010894d459cbb6e8cf11e56a65ce",
+      "bytes": 9083
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/pingfix-control.cjs",
+      "sha256": "e6a3534bca780cda24f192aebc48c56bfdd541f2912904065247c080cfc9d325",
+      "bytes": 9314
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/workbook-unpatched.tsx",
+      "sha256": "616361a2d197afb0b270305e780154b0fc0bfc103a1ce66ac6c64528a49fc6ff",
+      "bytes": 13108
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/comparison.json",
+      "sha256": "b8bca3f1237627c0757d5ace4f5b44fb47d8362a3c5fd0d00b58274d23222289",
+      "bytes": 1771
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/baseline-build.log",
+      "sha256": "ade8b8616627375bc48c068052828d591b9e37fdbe438b3b70ceb6a7efc649c3",
+      "bytes": 19404
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/README.md",
+      "sha256": "ca9831f43b99f3eeaad7bcb1873afcb1150c4440a82e3fb8eb2a1ad56ff7d160",
+      "bytes": 18703
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/cleanup.json",
+      "sha256": "46807036e6233e0defca5a8b27063f14a6c0833efc19cebc242dc4f7b7c95e4a",
+      "bytes": 339
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/midrender-probe.cjs",
+      "sha256": "5b139c4f1c882146a0f599341c62018ca8fd592fc5991d9c7e4e1bd0fb7e2b7f",
+      "bytes": 9190
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/import-replay-tests.json",
+      "sha256": "dcd8f671b3335c2ee30bff332447b524a1ba63e7c75c3ed3a1a225cee7729e7c",
+      "bytes": 6842
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/hydration-matrix-detail.cjs",
+      "sha256": "1e2527baa6ec2a6a6b1aa496bcb6965fc360d3c3e3a6b5fae9257cbf8fea7d6c",
+      "bytes": 30192
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/clarity-2.log",
+      "sha256": "ba9eef21abda5d81d92130f8ab0c4019e198b6c79ee800ddb2a83f5cec9af3fd",
+      "bytes": 13527
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/workbook-negative.cjs",
+      "sha256": "a825023f9c95b5a8c5ec1d07ec87c7ee88adaea209f3209f66148068d104f2b6",
+      "bytes": 22451
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/pingfix-control.json",
+      "sha256": "e07073b3122297236b2c7dcac5c1a308f1c41d86a2dc452110aae5b0471ff9e6",
+      "bytes": 107101
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/feedback-tests.log",
+      "sha256": "e374b391915dce66532b43e7c6a43b6c141477d5b32618c5ae78412de719bff1",
+      "bytes": 918
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/doubleclick-probe.cjs",
+      "sha256": "e6eb38577d5f7dcdd8ce902906a60e532eeeb6d668a80b92a033bfa5230fdbef",
+      "bytes": 23647
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/hydration-matrix.cjs",
+      "sha256": "88ebeb77bf39342c1594f6c0b10337d3edcb851d47937139218b51ae94eb68b2",
+      "bytes": 29966
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/midrender-probe.json",
+      "sha256": "d6c2fbbe0decc47bde8789d46d1a765f1cf623592844860cc0a35edfad09ccb0",
+      "bytes": 60563
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/workbook-browser.log",
+      "sha256": "c0b0dcfb9d63447f936c40ba66df43585b3012177dab88171580965d86cbf155",
+      "bytes": 342
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/baseline-probe.png",
+      "sha256": "9553d108b0ab3cdc20a00524509987b0c78585037138a3558fb5ae0353229d57",
+      "bytes": 79776
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/pingfix-control.png",
+      "sha256": "913aa53e3680d0a6fbc5f475b0d6bf3d592ab667f118127d97d3f38489971c67",
+      "bytes": 192474
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/preservation-final.json",
+      "sha256": "ea02bc5aee5d8dce74ab8f6e6088d5305cfcf45cc0a58c0e2c910ce847824599",
+      "bytes": 564
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/feedback-negative.js",
+      "sha256": "f4cf471cf224b0af28146b6a310ba792b75306eb4b98045ce39953c8f8b6cc93",
+      "bytes": 12629
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/workbook-negative.log",
+      "sha256": "bc85d9196e0b47636dce807fee4aab1720d7f97d653cf34c688e9173f9dc0039",
+      "bytes": 150
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/runtime-positive/result.json",
+      "sha256": "940d8ff5bcd854863a1370ee549d741a45bc0247a1d3031744be690d6e72e5d5",
+      "bytes": 1923
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-5/source-manifest.json",
+      "sha256": "7f4333b357504bbc1459573caab520dec5f3add6d0cae2a2e3a3b5f8a47ea9a8",
+      "bytes": 423592
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-5/result.json",
+      "sha256": "c6bf73b630848833a3e96b2b69bf135bb1a32acd1a4349f654192d98abc263ea",
+      "bytes": 17173
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-5/failure-ui.txt",
+      "sha256": "777755a6b52b9c1096f1b2b99405d69e28d80d13d501ee8e4fa387375cf62ac1",
+      "bytes": 2926
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-5/failure.png",
+      "sha256": "957774dc8dc9ac4e230913c4b684c1e3245a84c6f512a7a8bf62915e37db986f",
+      "bytes": 193487
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-5/app.log",
+      "sha256": "b0be8372b8b95b6b25b32084023eff5db5aeda12c2e32d31a4b54da39a7f8377",
+      "bytes": 145
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-2/source-manifest.json",
+      "sha256": "46bf14686f81ba64097cc4f1bf2f3b8e1505aae2db7fdda8089ad49c00a21a79",
+      "bytes": 423592
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-2/result.json",
+      "sha256": "a0b2eb3185dce6d53c83fc4042d780b8be107c2395a14ba9d13e972b1207e784",
+      "bytes": 2509
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-2/failure-ui.txt",
+      "sha256": "12947ec5696b37d535e4c1b43eb1d6b2c88151bd1f3ca991b55c1373f8a9f2a5",
+      "bytes": 1337
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-2/failure.png",
+      "sha256": "b40cd5a67bbfbc3ecf8abf72253fd638b51a8d736852fc81b3d59b311994b17c",
+      "bytes": 41255
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-2/app.log",
+      "sha256": "03b2db2d7c350b2fd43dddf393c207b2a3af56dae655e68c5585a78449ed06d5",
+      "bytes": 145
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/hydration-hardloads/result.json",
+      "sha256": "d749f6a92a5a0c29e68a044920a6c49c0e98a42eb8b22ddbf93a03a2d1714b9f",
+      "bytes": 49303
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/hydration-hardloads/app.log",
+      "sha256": "349134225c4e82703ef53533f8dd5b3361fa04ed85d09d052ee34cd5f103a4f8",
+      "bytes": 145
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-3/source-manifest.json",
+      "sha256": "ddd25ed8bc8a0ac3d74ca3f4508a2ec9d3873930a4c604470213cd4ff10f0847",
+      "bytes": 423592
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-3/result.json",
+      "sha256": "8bb00bdc65f67dfa0a76db75556d423bf7fed5fa3e8697356847265cfada85b3",
+      "bytes": 9918
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-3/failure-ui.txt",
+      "sha256": "fba5dc607fa0242078b92f0f4ff3ff5d4f9271389154eb5c0d506d94b1af8049",
+      "bytes": 1235
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-3/failure.png",
+      "sha256": "b40cd5a67bbfbc3ecf8abf72253fd638b51a8d736852fc81b3d59b311994b17c",
+      "bytes": 41255
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-3/app.log",
+      "sha256": "925a10d66aa5cf09ec54a50f66455a4006f99f92f6b0a02ef6a51707d0ef6871",
+      "bytes": 145
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-4/source-manifest.json",
+      "sha256": "cd3ba3935314b5951cf74d2c46b4b6b5b7d37df849beda4271a5c793a2dfb544",
+      "bytes": 423592
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-4/result.json",
+      "sha256": "da4a70495a047ea66bd05e90dbbcb45dc5235f8fd47bcb04c69e64f6410a2082",
+      "bytes": 17693
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-4/failure-ui.txt",
+      "sha256": "8fb612652a0fcc758ec3257ab98c05de0c1f8f059dab1a82004bd57bf053197b",
+      "bytes": 636
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-4/failure.png",
+      "sha256": "910e546dd850e98fb4b39687576b248e1c8f34e72ccc860c4ba13d4a73948c0a",
+      "bytes": 75240
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-4/app.log",
+      "sha256": "b6272edba1807661c051429cae5b2ee612c18c22e5604b38ad45013467887c51",
+      "bytes": 889
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/hydration-matrix-1/memory-390.png",
+      "sha256": "df4cb61a4b93f4689db0563b771aa1b6568d3a724d593bf2faa2bad8246cf0b9",
+      "bytes": 105964
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/hydration-matrix-1/source-manifest.json",
+      "sha256": "e4b02eb952f4d4f81fac25dff2c9361add937bdb373b3ab689af8dd895354b19",
+      "bytes": 424084
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/hydration-matrix-1/result.json",
+      "sha256": "b5c3c23ac1753c7b0a18b3a350af72a98f3e95ffbadc08eaa4f876c54b85ecf6",
+      "bytes": 491565
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/hydration-matrix-1/worksheet-390.png",
+      "sha256": "db7e2cc1e54a265845b171a0ab0e511921509e9e967aa82c171ea38c165104d3",
+      "bytes": 110363
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/hydration-matrix-1/completed-1440-0.png",
+      "sha256": "ffb4abbe399ab791b06ea9ef193633b35f40315324cb55a4ed397644e4162d6c",
+      "bytes": 72628
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/hydration-matrix-1/completed-1440-1.png",
+      "sha256": "ffb4abbe399ab791b06ea9ef193633b35f40315324cb55a4ed397644e4162d6c",
+      "bytes": 72628
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/hydration-matrix-1/form-390.png",
+      "sha256": "21e3821a96b321a6b054a009215c55a02c3e9b9c5a75541344a256714b7aff58",
+      "bytes": 409859
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/hydration-matrix-1/completed-1440-2.png",
+      "sha256": "ffb4abbe399ab791b06ea9ef193633b35f40315324cb55a4ed397644e4162d6c",
+      "bytes": 72628
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/hydration-matrix-1/form-1440.png",
+      "sha256": "bda4211e267ac8b0aa976954760cfb006d49d5efdbc8966cf6eddcac5e726dfb",
+      "bytes": 196861
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/hydration-matrix-1/memory-1440.png",
+      "sha256": "dc0db5175252529c671ffbef5b31fd7c6395218a0a0464a1905baa99c8833a1d",
+      "bytes": 124800
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/hydration-matrix-1/completed-390-2.png",
+      "sha256": "019e6bdb07234b358781b8c20bf941dba7b7e26b5bd767d695449875c07acbbb",
+      "bytes": 50052
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/hydration-matrix-1/completed-390-1.png",
+      "sha256": "019e6bdb07234b358781b8c20bf941dba7b7e26b5bd767d695449875c07acbbb",
+      "bytes": 50052
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/hydration-matrix-1/worksheet-1440.png",
+      "sha256": "77f9994be9d1346857036ba120f6119a743e6c39e67565e3787a45f4f682f0c0",
+      "bytes": 131366
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/hydration-matrix-1/completed-390-0.png",
+      "sha256": "019e6bdb07234b358781b8c20bf941dba7b7e26b5bd767d695449875c07acbbb",
+      "bytes": 50052
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/hydration-matrix-1/app.log",
+      "sha256": "e9cc7d82bd6bba5721e149279fafd2b846d56911d047e1fc8f995b7f7e52799f",
+      "bytes": 145
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/hydration-matrix-1/build.log",
+      "sha256": "959486ccc511c86277cfd7e9f9091e4f82c67f247798a97d86f7008688ca5633",
+      "bytes": 81
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-14/memory-390.png",
+      "sha256": "bc9afdd7f5c2ce1c3e0425b5bf1a7790bf517e14596650a43325a71af6707f43",
+      "bytes": 106321
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-14/source-manifest.json",
+      "sha256": "823c2949ad688b7200409d3bfc5d703eb28f610373c8fc3b32473c5c230582f7",
+      "bytes": 424084
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-14/result.json",
+      "sha256": "bb00eed69f57cc5a244a19f5dec4a2b5058f8483d14feed9ab84fa8540260a60",
+      "bytes": 352587
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-14/worksheet-390.png",
+      "sha256": "0534aea357cda756230555758d69e786ed758824fa66713d59a7acc9c79189d0",
+      "bytes": 109771
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-14/completed-1440-0.png",
+      "sha256": "ffb4abbe399ab791b06ea9ef193633b35f40315324cb55a4ed397644e4162d6c",
+      "bytes": 72628
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-14/completed-1440-1.png",
+      "sha256": "ffb4abbe399ab791b06ea9ef193633b35f40315324cb55a4ed397644e4162d6c",
+      "bytes": 72628
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-14/form-390.png",
+      "sha256": "46ac824f5596ca0928279c9cf07460bbaf7d48a6dca6624fa74aaafb785e595b",
+      "bytes": 411180
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-14/completed-1440-2.png",
+      "sha256": "ffb4abbe399ab791b06ea9ef193633b35f40315324cb55a4ed397644e4162d6c",
+      "bytes": 72628
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-14/form-1440.png",
+      "sha256": "1289b3f6d3565d40414021c63d8b12f77859e08b1f25e22b9cca19774ecf3eec",
+      "bytes": 198137
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-14/memory-1440.png",
+      "sha256": "1e6668f7a83b5c5590f0742a4221860c57bda417d919fb9a3b5856a8b875a5d4",
+      "bytes": 124513
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-14/completed-390-2.png",
+      "sha256": "019e6bdb07234b358781b8c20bf941dba7b7e26b5bd767d695449875c07acbbb",
+      "bytes": 50052
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-14/completed-390-1.png",
+      "sha256": "019e6bdb07234b358781b8c20bf941dba7b7e26b5bd767d695449875c07acbbb",
+      "bytes": 50052
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-14/worksheet-1440.png",
+      "sha256": "47981260fe958e09a9a9b968453b34f7fd56feca3c289ab4885ed8bd4bd1249f",
+      "bytes": 130150
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-14/completed-390-0.png",
+      "sha256": "019e6bdb07234b358781b8c20bf941dba7b7e26b5bd767d695449875c07acbbb",
+      "bytes": 50052
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-14/app.log",
+      "sha256": "92cc51bcca012f1c59815896ada2da5a9e63f41292370a26e62fc996492508b9",
+      "bytes": 145
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-14/build.log",
+      "sha256": "123bb2599537773a413d51fefd9865d7e28265f78288b90c9f629586ae9cef40",
+      "bytes": 19485
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/doubleclick-probe/source-manifest.json",
+      "sha256": "61b52032948f87130f622a716fde8b28c87f2aaa1fe538b82bdaaaeafec94874",
+      "bytes": 423592
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/doubleclick-probe/result.json",
+      "sha256": "98385c402a30d1b5a76a34b747a1dff134c0418e8b0e4259bf83e8d39e3e7c4a",
+      "bytes": 12031
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/doubleclick-probe/page-events.json",
+      "sha256": "e968e8adfa89654934bb3ffac5ee2447e8687fd44104367d4f523a1881972ee3",
+      "bytes": 4549
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/doubleclick-probe/failure-ui.txt",
+      "sha256": "909854b84b9cdcb6350737c3b469c82cb32939c9109094f20053568decca145c",
+      "bytes": 1467
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/doubleclick-probe/failure.png",
+      "sha256": "2f49926fa299e55d38fb10cb872eeaf83c3e8aa44c92f1fc7ed2bf56a630fbda",
+      "bytes": 113608
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/doubleclick-probe/app.log",
+      "sha256": "7df430bc4cf7958b042f12802ffaac1549235a78233eff93b9a166709e3337a0",
+      "bytes": 145
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-13/memory-390.png",
+      "sha256": "63566f01bf28162d30c5db20c137db7313ea09439250e3e38921e67020beeb5d",
+      "bytes": 106417
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-13/source-manifest.json",
+      "sha256": "e4b02eb952f4d4f81fac25dff2c9361add937bdb373b3ab689af8dd895354b19",
+      "bytes": 424084
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-13/result.json",
+      "sha256": "5583ee046cd7de60385055221ed762f586962e89382fe780a02f7ddb5a0924ef",
+      "bytes": 177201
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-13/worksheet-390.png",
+      "sha256": "631f14609b6e464492e1293ebc9732c5f6a4e597ba1285e011e7d44a2a249465",
+      "bytes": 110763
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-13/completed-1440-0.png",
+      "sha256": "ffb4abbe399ab791b06ea9ef193633b35f40315324cb55a4ed397644e4162d6c",
+      "bytes": 72628
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-13/completed-1440-1.png",
+      "sha256": "ffb4abbe399ab791b06ea9ef193633b35f40315324cb55a4ed397644e4162d6c",
+      "bytes": 72628
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-13/form-390.png",
+      "sha256": "85e20410a26322c60a240b8997ed9fc4217919b2a014d42d957920ee06ed2677",
+      "bytes": 410617
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-13/completed-1440-2.png",
+      "sha256": "ffb4abbe399ab791b06ea9ef193633b35f40315324cb55a4ed397644e4162d6c",
+      "bytes": 72628
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-13/form-1440.png",
+      "sha256": "8411a3c570ac4cbab30b93f83264906eb8d262b2c62673e3ed8755681f80961b",
+      "bytes": 197708
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-13/memory-1440.png",
+      "sha256": "ebfd84175a09d9a79fd269757a7d61963f47976bc843d60824776cba58a56e01",
+      "bytes": 124625
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-13/completed-390-2.png",
+      "sha256": "019e6bdb07234b358781b8c20bf941dba7b7e26b5bd767d695449875c07acbbb",
+      "bytes": 50052
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-13/completed-390-1.png",
+      "sha256": "019e6bdb07234b358781b8c20bf941dba7b7e26b5bd767d695449875c07acbbb",
+      "bytes": 50052
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-13/worksheet-1440.png",
+      "sha256": "d40e8d3392f5c649ea893c5574014c32c7548da513641de88555777504502cef",
+      "bytes": 131490
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-13/completed-390-0.png",
+      "sha256": "019e6bdb07234b358781b8c20bf941dba7b7e26b5bd767d695449875c07acbbb",
+      "bytes": 50052
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-13/app.log",
+      "sha256": "d8e6f2ab8d83717ca515c3a9143147510b97273e9920b017e6b391827730f873",
+      "bytes": 145
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-13/build.log",
+      "sha256": "6b4375eb25fb05c0534daddc5aaed78d04ff5ce72e9525c54c16af580f7385a7",
+      "bytes": 19484
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-12/source-manifest.json",
+      "sha256": "8466d44efeccf218550cb1b30fbb5623ae3350150cbcb84ab855fed755b44f2e",
+      "bytes": 424084
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-12/result.json",
+      "sha256": "732bc045dc24c375d3dcbea0b001b308c0b760ce3eec02abb382de81039c4521",
+      "bytes": 8470
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-12/failure-ui.txt",
+      "sha256": "0890504b94f48931674249d04a5f1ff0cc6854c0a775bc5c2d39eb442d091339",
+      "bytes": 1061
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-12/failure.png",
+      "sha256": "3a59b0e87763bddf01f4117cba364bcec1999e5d96b6f961ea0e5f7b544fe0b3",
+      "bytes": 186250
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-12/app.log",
+      "sha256": "92ad9f0fe4ae219075cd66e469eda7c08c5f3907f29a924ea4b62ece2112f783",
+      "bytes": 145
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/hydration-negative/result.json",
+      "sha256": "997aa9c9cf24a6cbc1c51e8b19843c8ea755b146bbc83780c33af12e455da8c7",
+      "bytes": 11785
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-15/memory-390.png",
+      "sha256": "32e9ef4b1b06042220f286252868ab69f348a7a25ba78ef4c426e54fc9b9780e",
+      "bytes": 106777
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-15/source-manifest.json",
+      "sha256": "f048774a070035176f88f40d45680cc621c2ebfe2c9be11d2a39e95a533ec314",
+      "bytes": 424084
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-15/result.json",
+      "sha256": "863cb1dfff1af17df12c410f405e48216feddc7b3a78b93926bd37c25cee3725",
+      "bytes": 351002
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-15/worksheet-390.png",
+      "sha256": "b7f929a81804ab03304b67a9a5745b3f5fc59cfb7fbdfd61213da18368a1a4c9",
+      "bytes": 110487
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-15/completed-1440-0.png",
+      "sha256": "ffb4abbe399ab791b06ea9ef193633b35f40315324cb55a4ed397644e4162d6c",
+      "bytes": 72628
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-15/completed-1440-1.png",
+      "sha256": "ffb4abbe399ab791b06ea9ef193633b35f40315324cb55a4ed397644e4162d6c",
+      "bytes": 72628
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-15/form-390.png",
+      "sha256": "122a98b448c6c7d81c0667e1c9ba7cae93d0cd8e0fb17f3759af7323d422b48c",
+      "bytes": 414289
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-15/completed-1440-2.png",
+      "sha256": "ffb4abbe399ab791b06ea9ef193633b35f40315324cb55a4ed397644e4162d6c",
+      "bytes": 72628
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-15/form-1440.png",
+      "sha256": "ae00a0df3c2c3bee2e5c00406dfe83f4d47807355bf4a303e87b1612d1fb41d7",
+      "bytes": 198870
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-15/memory-1440.png",
+      "sha256": "ce3e27415542e82da43b54ddc6d08660d793bb4b94d2b14b5973c01db4a62194",
+      "bytes": 125174
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-15/completed-390-2.png",
+      "sha256": "019e6bdb07234b358781b8c20bf941dba7b7e26b5bd767d695449875c07acbbb",
+      "bytes": 50052
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-15/completed-390-1.png",
+      "sha256": "019e6bdb07234b358781b8c20bf941dba7b7e26b5bd767d695449875c07acbbb",
+      "bytes": 50052
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-15/worksheet-1440.png",
+      "sha256": "51016c9169ad58b7aac5266eb590e2649ca360222b409120572951135900e040",
+      "bytes": 131839
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-15/completed-390-0.png",
+      "sha256": "019e6bdb07234b358781b8c20bf941dba7b7e26b5bd767d695449875c07acbbb",
+      "bytes": 50052
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-15/app.log",
+      "sha256": "cc394856d403475c9776b7c7ff6980a450a2d1b55b694710bd3af553a03b6797",
+      "bytes": 145
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-15/build.log",
+      "sha256": "6761f11e3cc18cd66c878266009aa6b0c4f74cc8040150ef74acabdbea82f405",
+      "bytes": 19485
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/hydration-positive/result.json",
+      "sha256": "27a8c551b3d720306c71b3461f210d049623e6b2f959e615ef8b81aabbd99cc7",
+      "bytes": 7447
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/runtime-negative/result.json",
+      "sha256": "e257bd5d4ab5b5ec62d7c284c4d2902ce85cb4bb687e7cdd21cbf163487f2d94",
+      "bytes": 443
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-1/result.json",
+      "sha256": "cfbd0151733ea68e8dc8ff8f13169f69a484f76f6d9c19700e29528c3affdaf9",
+      "bytes": 542
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-6/source-manifest.json",
+      "sha256": "61b52032948f87130f622a716fde8b28c87f2aaa1fe538b82bdaaaeafec94874",
+      "bytes": 423592
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-6/result.json",
+      "sha256": "13a6dbc68fdddb35b1840790ef82908f294e4bf73088664c9e6034d3fffef6ff",
+      "bytes": 28145
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-6/failure-ui.txt",
+      "sha256": "098e97876e030d6fc602a9b3f0ccdc50797d7126bdbe4874d2ceed522084205c",
+      "bytes": 1467
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-6/failure.png",
+      "sha256": "7d715ee9070d03bcb47b89460d67fa80238ef573b0d34599365ca8b0bd2333de",
+      "bytes": 113189
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-6/app.log",
+      "sha256": "076fd44f141a1251b77a262e35c25c852e18ea53c57d79e18326533f255987e5",
+      "bytes": 145
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-8/source-manifest.json",
+      "sha256": "2432cbec34f008debb7b68b93a17b530f7c7744c2f55d7b7095e785947042d15",
+      "bytes": 282723
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-8/result.json",
+      "sha256": "ea23e119a3a59bc76777a07cdbf890f613266198b6aab4d6495ce769b5853113",
+      "bytes": 570
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-8/app.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-8/build.log",
+      "sha256": "5c012137e6a595cb5704deee28644f819c8175586a3a092f643e9fc9922e0ab7",
+      "bytes": 11177
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-9/source-manifest.json",
+      "sha256": "58faafdf9c19571be7f79aa0a409aa02274dbbbdd8783317f6cb101acb245355",
+      "bytes": 424084
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-9/result.json",
+      "sha256": "402af0ffdecf704f84bc5f3ed013a497efe22d6b38d82e09f524213abd1d9eba",
+      "bytes": 24733
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-9/failure-ui.txt",
+      "sha256": "9425e76e8987462bbf7e0c22d58029aed2df41f87de6f0e79aa7ca2785fcde81",
+      "bytes": 1467
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-9/failure.png",
+      "sha256": "e7d8cc0cc10e0db0a4d02920b7db0a9142b6dd3e4e2e656b0c85034446fd9ef8",
+      "bytes": 113261
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-9/app.log",
+      "sha256": "920bbf6212e5ec9494de338575b78f82181076b04c4ffa0dc2ee0b08b6b14deb",
+      "bytes": 145
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-9/build.log",
+      "sha256": "6b4375eb25fb05c0534daddc5aaed78d04ff5ce72e9525c54c16af580f7385a7",
+      "bytes": 19484
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-7/source-manifest.json",
+      "sha256": "6c7da4e9eeb44ea5ee8efbb6c2b31beb994bf19bf2818250c16142a56c24ca64",
+      "bytes": 282723
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-7/result.json",
+      "sha256": "c0541efcfe66ed697d4b75a89f98d189b44eb1d6f74259fcf612be53c51daf8b",
+      "bytes": 570
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-7/app.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-7/build.log",
+      "sha256": "ca5abe3185acc1701c1f76b7512c69a74bd793678e3628dd0c16b607761302b7",
+      "bytes": 10409
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/runtime-both/result.json",
+      "sha256": "d74bf3bfbdf46522c751a565f44c273463fa19728b3bcba7ca7184021f388464",
+      "bytes": 1923
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-10/source-manifest.json",
+      "sha256": "40ad25ad138da73da1c1129608502347764a3754a010a4d4386e0b21919b61e8",
+      "bytes": 424084
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-10/result.json",
+      "sha256": "e849f715dcf92c9d4efb34f43ec47608610611c1bdc2232e3c4db339c8da3d59",
+      "bytes": 32273
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-10/failure-ui.txt",
+      "sha256": "bd192636ba72f247071ac800d2b8d7d00f2a659e3fceb8c1ff27711faae3ef9d",
+      "bytes": 1209
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-10/failure.png",
+      "sha256": "beabfb12929b56734db24b29e5fe3c558e01f4d81ceb969ab23b524f03a2d4bd",
+      "bytes": 120508
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-10/app.log",
+      "sha256": "5e3cf8322de5764fd4a7e26de9ad269dd2b5addece0b6bc04faf52bd2c4db384",
+      "bytes": 145
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/hydration-matrix-2/memory-390.png",
+      "sha256": "498f19dc570190a747327f8880e0d46a91a5e2251e9f1e3f284bd0e29fc08a45",
+      "bytes": 106679
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/hydration-matrix-2/source-manifest.json",
+      "sha256": "e4b02eb952f4d4f81fac25dff2c9361add937bdb373b3ab689af8dd895354b19",
+      "bytes": 424084
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/hydration-matrix-2/result.json",
+      "sha256": "3db800bc6e0ce9095b1d6f1f1149c817a1f166c967d47c42c00f414350e93c9d",
+      "bytes": 502381
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/hydration-matrix-2/worksheet-390.png",
+      "sha256": "102e9fe9f247874cfa646cca116be8d00d0169e6cc3a42994c342d8e25c1357c",
+      "bytes": 111223
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/hydration-matrix-2/completed-1440-0.png",
+      "sha256": "ffb4abbe399ab791b06ea9ef193633b35f40315324cb55a4ed397644e4162d6c",
+      "bytes": 72628
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/hydration-matrix-2/completed-1440-1.png",
+      "sha256": "ffb4abbe399ab791b06ea9ef193633b35f40315324cb55a4ed397644e4162d6c",
+      "bytes": 72628
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/hydration-matrix-2/form-390.png",
+      "sha256": "af7fc4ffb10fa2f9adc54a85f52ad5ab7b3da94ff1998312a93adb33ecc65fc4",
+      "bytes": 415003
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/hydration-matrix-2/completed-1440-2.png",
+      "sha256": "ffb4abbe399ab791b06ea9ef193633b35f40315324cb55a4ed397644e4162d6c",
+      "bytes": 72628
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/hydration-matrix-2/form-1440.png",
+      "sha256": "1bbf5432b9512912b41d5f8f170e947e8b2920297f0b1c1650f45dc0e88ab4c9",
+      "bytes": 199500
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/hydration-matrix-2/memory-1440.png",
+      "sha256": "64acc68211ef5c16d612dc3cdfbf697b9dd8d234966f2ad9a680cd6aef81d690",
+      "bytes": 125194
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/hydration-matrix-2/completed-390-2.png",
+      "sha256": "019e6bdb07234b358781b8c20bf941dba7b7e26b5bd767d695449875c07acbbb",
+      "bytes": 50052
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/hydration-matrix-2/completed-390-1.png",
+      "sha256": "019e6bdb07234b358781b8c20bf941dba7b7e26b5bd767d695449875c07acbbb",
+      "bytes": 50052
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/hydration-matrix-2/worksheet-1440.png",
+      "sha256": "4a801907be5adc3dc6c764c8eb4415aedb58c8b35c31e4f29cbeca7fd5c080cb",
+      "bytes": 131890
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/hydration-matrix-2/completed-390-0.png",
+      "sha256": "019e6bdb07234b358781b8c20bf941dba7b7e26b5bd767d695449875c07acbbb",
+      "bytes": 50052
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/hydration-matrix-2/app.log",
+      "sha256": "8462a8a9c99ae5239f65836dd8a9d8bad6b24a048a8863ddfdb175ef971a05e5",
+      "bytes": 145
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/hydration-matrix-2/build.log",
+      "sha256": "959486ccc511c86277cfd7e9f9091e4f82c67f247798a97d86f7008688ca5633",
+      "bytes": 81
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-11/source-manifest.json",
+      "sha256": "1851127d3d32b2de2f7c6565959fb4688d96115becfa1d1f0703f552af3ce5cc",
+      "bytes": 424084
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-11/result.json",
+      "sha256": "9537d000d0a4b5b426e433fb306a3d4cc57b71034cef89f339d45d83e78afbd0",
+      "bytes": 116687
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-11/failure-ui.txt",
+      "sha256": "2cb287acf64e83246cb43332f8fa56357a33a01f130858b8e261ab31eb26bfb6",
+      "bytes": 1338
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-11/failure.png",
+      "sha256": "557c074134b68136ead0a7b374c1659a3d99977332a5f3c99df8f76732f32ae8",
+      "bytes": 78445
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/e2e-11/app.log",
+      "sha256": "0bb70fd6422f1cdef4d2d666227353c246558ded3dccc07332cb4bb784cc66b5",
+      "bytes": 145
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/runtime-both-negative/result.json",
+      "sha256": "f463a0880aec5b8c0100f85d5295c1e74e0caaba1012ba0fa29cb982bfc7b662",
+      "bytes": 443
+    },
+    {
+      "path": "docs/security/audit-evidence/vxa039/runtime-both-negative/failed-render.png",
+      "sha256": "7660b6b96234bc7b574be014c6a64e92ae9a497f591af53bc6ce40d7980f57fe",
+      "bytes": 8131
+    }
+  ],
+  "ownedServicesStopped": true
+}

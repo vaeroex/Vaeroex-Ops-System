@@ -1,0 +1,17 @@
+✔ security feedback remains explicit without trapping workspace navigation (35.771334ms)
+✔ error feedback stays readable until explicitly dismissed (7.596417ms)
+✔ message feedback stays readable until explicitly dismissed (5.024ms)
+✔ first submission is acknowledged and a repeated submit before render is blocked (7.140583ms)
+✔ controlled action pending keeps the capture lock when host form context resets (4.542917ms)
+✔ cancelled submissions do not lock the form (3.723208ms)
+✔ an uncertain timeout keeps the submission locked without inviting a blind retry (4.690125ms)
+✔ a completed action releases the submission lock for a subsequent intentional submission (3.854417ms)
+✔ primary and analysis actions use the guarded submit control without changing their button styles (6.752083ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 88.632

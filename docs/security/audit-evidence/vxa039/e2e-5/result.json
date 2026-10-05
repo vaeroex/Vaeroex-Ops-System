@@ -1,0 +1,783 @@
+{
+  "passed": false,
+  "sourceCommit": "9c43adf8bf7d2ef7f30044e4496afd2910a3bb19",
+  "executionId": "efb1bd24-67ff-40bc-bdf8-450adc48d078",
+  "runId": "1061111f-557e-49af-a2cd-145cc6e9949f",
+  "results": [
+    {
+      "name": "form_1440_0_denied",
+      "passed": true,
+      "navigationFailuresBeforeCheck": 0,
+      "automatic": true,
+      "pendingCleared": true,
+      "feedbackVisible": true
+    },
+    {
+      "name": "form_1440_0",
+      "passed": true,
+      "navigationFailuresBeforeCheck": 0,
+      "automatic": true,
+      "pendingCleared": true,
+      "feedbackVisible": true
+    },
+    {
+      "name": "form_1440_0_replay",
+      "passed": true,
+      "navigationFailuresBeforeCheck": 0,
+      "automatic": true,
+      "pendingCleared": true,
+      "feedbackVisible": true
+    },
+    {
+      "name": "memory_1440_0_denied",
+      "passed": true,
+      "navigationFailuresBeforeCheck": 0,
+      "automatic": true,
+      "pendingCleared": true,
+      "feedbackVisible": true
+    },
+    {
+      "name": "memory_1440_0",
+      "passed": true,
+      "navigationFailuresBeforeCheck": 0,
+      "automatic": true,
+      "pendingCleared": true,
+      "feedbackVisible": true
+    },
+    {
+      "name": "memory_1440_0_stale_replay",
+      "passed": true,
+      "navigationFailuresBeforeCheck": 0,
+      "automatic": true,
+      "pendingCleared": true,
+      "feedbackVisible": true
+    },
+    {
+      "name": "worksheet_1440_0",
+      "passed": false,
+      "error": "page.waitForURL: Timeout 20000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation until \"load\"\n============================================================"
+    }
+  ],
+  "actionResponses": [
+    {
+      "label": "form_1440_0_denied",
+      "status": 303,
+      "redirect": "/app/forms/35cab9e5-a2a1-4c2d-be7a-a619d86d1597?error=You+do+not+have+permission+to+submit+this+form.;push",
+      "destination": "/app/forms/35cab9e5-a2a1-4c2d-be7a-a619d86d1597?error=You+do+not+have+permission+to+submit+this+form.",
+      "feedback": "You do not have permission to submit this form.",
+      "actionRequests": 1
+    },
+    {
+      "label": "form_1440_0",
+      "status": 303,
+      "redirect": "/app/forms/35cab9e5-a2a1-4c2d-be7a-a619d86d1597?message=Submission+saved.;push",
+      "destination": "/app/forms/35cab9e5-a2a1-4c2d-be7a-a619d86d1597?message=Submission+saved.",
+      "feedback": "Submission saved.",
+      "actionRequests": 1
+    },
+    {
+      "label": "form_1440_0_replay",
+      "status": 303,
+      "redirect": "/app/forms/35cab9e5-a2a1-4c2d-be7a-a619d86d1597?message=Submission+saved.;push",
+      "destination": "/app/forms/35cab9e5-a2a1-4c2d-be7a-a619d86d1597?message=Submission+saved.",
+      "feedback": "Submission saved.",
+      "actionRequests": 1
+    },
+    {
+      "label": "memory_1440_0_denied",
+      "status": 303,
+      "redirect": "/app/sources/79816582-4f48-4d92-8ad6-21407b5c7515?file=79816582-4f48-4d92-8ad6-21407b5c7515&error=This+request+cannot+be+performed+because+it+conflicts+with+platform+security+requirements.;push",
+      "destination": "/app/sources/79816582-4f48-4d92-8ad6-21407b5c7515?file=79816582-4f48-4d92-8ad6-21407b5c7515&error=This+request+cannot+be+performed+because+it+conflicts+with+platform+security+requirements.",
+      "feedback": "This request cannot be performed because it conflicts with platform security requirements.",
+      "actionRequests": 1
+    },
+    {
+      "label": "memory_1440_0",
+      "status": 303,
+      "redirect": "/app/sources/79816582-4f48-4d92-8ad6-21407b5c7515?file=79816582-4f48-4d92-8ad6-21407b5c7515&message=Findings+approved.+This+source+is+now+available+to+Business+Memory%2C+Search%2C+and+Intelligence.;push",
+      "destination": "/app/sources/79816582-4f48-4d92-8ad6-21407b5c7515?file=79816582-4f48-4d92-8ad6-21407b5c7515&message=Findings+approved.+This+source+is+now+available+to+Business+Memory%2C+Search%2C+and+Intelligence.",
+      "feedback": "Findings approved. This source is now available to Business Memory, Search, and Intelligence.",
+      "actionRequests": 1
+    },
+    {
+      "label": "memory_1440_0_stale_replay",
+      "status": 303,
+      "redirect": "/app/sources/79816582-4f48-4d92-8ad6-21407b5c7515?file=79816582-4f48-4d92-8ad6-21407b5c7515&message=Findings+approved.+This+source+is+now+available+to+Business+Memory%2C+Search%2C+and+Intelligence.;push",
+      "destination": "/app/sources/79816582-4f48-4d92-8ad6-21407b5c7515?file=79816582-4f48-4d92-8ad6-21407b5c7515&message=Findings+approved.+This+source+is+now+available+to+Business+Memory%2C+Search%2C+and+Intelligence.",
+      "feedback": "Findings approved. This source is now available to Business Memory, Search, and Intelligence.",
+      "actionRequests": 1
+    }
+  ],
+  "requests": [
+    {
+      "path": "/app/forms/35cab9e5-a2a1-4c2d-be7a-a619d86d1597",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/intelligence",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/kpis",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/sources",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/reports",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/integrations",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/settings",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/help",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/help/trust",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/terms",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/privacy",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/support",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/forms",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/forms/35cab9e5-a2a1-4c2d-be7a-a619d86d1597",
+      "method": "POST",
+      "status": 303
+    },
+    {
+      "path": "/app/forms/35cab9e5-a2a1-4c2d-be7a-a619d86d1597",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/forms/35cab9e5-a2a1-4c2d-be7a-a619d86d1597",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/intelligence",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/kpis",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/sources",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/reports",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/integrations",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/settings",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/help",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/help/trust",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/terms",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/privacy",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/support",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/forms",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/forms/35cab9e5-a2a1-4c2d-be7a-a619d86d1597",
+      "method": "POST",
+      "status": 303
+    },
+    {
+      "path": "/app/forms/35cab9e5-a2a1-4c2d-be7a-a619d86d1597",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/forms",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/forms/35cab9e5-a2a1-4c2d-be7a-a619d86d1597",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/intelligence",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/kpis",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/sources",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/reports",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/integrations",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/settings",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/help",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/help/trust",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/terms",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/privacy",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/support",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/forms",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/forms/35cab9e5-a2a1-4c2d-be7a-a619d86d1597",
+      "method": "POST",
+      "status": 303
+    },
+    {
+      "path": "/app/forms/35cab9e5-a2a1-4c2d-be7a-a619d86d1597",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/help",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/help/trust",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/terms",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/privacy",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/support",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/forms",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/sources/79816582-4f48-4d92-8ad6-21407b5c7515",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/intelligence",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/kpis",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/sources",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/reports",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/integrations",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/settings",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/help",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/help/trust",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/terms",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/privacy",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/support",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/sources/79816582-4f48-4d92-8ad6-21407b5c7515",
+      "method": "POST",
+      "status": 303
+    },
+    {
+      "path": "/app/sources/79816582-4f48-4d92-8ad6-21407b5c7515",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/sources/79816582-4f48-4d92-8ad6-21407b5c7515",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/intelligence",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/kpis",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/sources",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/reports",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/integrations",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/settings",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/help",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/help/trust",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/terms",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/privacy",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/support",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/sources/79816582-4f48-4d92-8ad6-21407b5c7515",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/intelligence",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/kpis",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/sources",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/reports",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/integrations",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/settings",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/help",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/help/trust",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/terms",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/privacy",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/support",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/sources/79816582-4f48-4d92-8ad6-21407b5c7515",
+      "method": "POST",
+      "status": 303
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/sources/79816582-4f48-4d92-8ad6-21407b5c7515",
+      "method": "POST",
+      "status": 303
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/sources",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/intelligence",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/kpis",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/reports",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/integrations",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/settings",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/help",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/help/trust",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/terms",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/privacy",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/support",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/sources/79816582-4f48-4d92-8ad6-21407b5c7515",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/sources/93c7fc48-b7ae-48ec-b4c3-70a16ff0c725",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/sources/75994eaf-9196-4a50-8232-e17ccb53ecdf",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/sources/fba68ae9-b31c-46bf-8cd4-1eae34619f28",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/sources/6792b8bd-2cb3-4481-ada2-cfdbccccc327",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/sources/448a4109-f529-4bdd-a8fe-78d810d76c71",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/sources",
+      "method": "POST",
+      "status": 200
+    }
+  ],
+  "browserErrors": [],
+  "limitations": [
+    "Real isolated Auth/PostgREST/Storage; synthetic seeded legal acceptance and completed model outputs",
+    "No provider calls, production configuration, capacity or full lifecycle qualification"
+  ]
+}

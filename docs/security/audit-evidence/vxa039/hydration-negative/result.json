@@ -1,0 +1,392 @@
+{
+  "passed": false,
+  "negativeControl": true,
+  "rendererSha256": "b1162faf5eca9ae2c5b74c3cedeabf59cea29c6741b05e8f2b676143ad996697",
+  "installedRendererSha256": "21db913ff9b172770b3329353b29295e31151fa2b8e21fbe888e6e4db0ba33fd",
+  "checks": [
+    {
+      "width": 1440,
+      "iteration": 0,
+      "passed": false,
+      "lazyInitializations": 1,
+      "fulfilledChunks": 1,
+      "beforeRenders": 2,
+      "afterRenders": 1,
+      "recoverableErrors": [
+        "Minified React error #418; visit https://react.dev/errors/418?args[]=HTML&args[]= for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
+      ],
+      "sameServerNodes": [
+        false,
+        false,
+        false
+      ],
+      "sameServerHtml": true,
+      "pageErrors": []
+    },
+    {
+      "width": 1440,
+      "iteration": 1,
+      "passed": false,
+      "lazyInitializations": 1,
+      "fulfilledChunks": 1,
+      "beforeRenders": 2,
+      "afterRenders": 1,
+      "recoverableErrors": [
+        "Minified React error #418; visit https://react.dev/errors/418?args[]=HTML&args[]= for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
+      ],
+      "sameServerNodes": [
+        false,
+        false,
+        false
+      ],
+      "sameServerHtml": true,
+      "pageErrors": []
+    },
+    {
+      "width": 1440,
+      "iteration": 2,
+      "passed": false,
+      "lazyInitializations": 1,
+      "fulfilledChunks": 1,
+      "beforeRenders": 2,
+      "afterRenders": 1,
+      "recoverableErrors": [
+        "Minified React error #418; visit https://react.dev/errors/418?args[]=HTML&args[]= for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
+      ],
+      "sameServerNodes": [
+        false,
+        false,
+        false
+      ],
+      "sameServerHtml": true,
+      "pageErrors": []
+    },
+    {
+      "width": 1440,
+      "iteration": 3,
+      "passed": false,
+      "lazyInitializations": 1,
+      "fulfilledChunks": 1,
+      "beforeRenders": 2,
+      "afterRenders": 1,
+      "recoverableErrors": [
+        "Minified React error #418; visit https://react.dev/errors/418?args[]=HTML&args[]= for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
+      ],
+      "sameServerNodes": [
+        false,
+        false,
+        false
+      ],
+      "sameServerHtml": true,
+      "pageErrors": []
+    },
+    {
+      "width": 1440,
+      "iteration": 4,
+      "passed": false,
+      "lazyInitializations": 1,
+      "fulfilledChunks": 1,
+      "beforeRenders": 2,
+      "afterRenders": 1,
+      "recoverableErrors": [
+        "Minified React error #418; visit https://react.dev/errors/418?args[]=HTML&args[]= for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
+      ],
+      "sameServerNodes": [
+        false,
+        false,
+        false
+      ],
+      "sameServerHtml": true,
+      "pageErrors": []
+    },
+    {
+      "width": 1440,
+      "iteration": 5,
+      "passed": false,
+      "lazyInitializations": 1,
+      "fulfilledChunks": 1,
+      "beforeRenders": 2,
+      "afterRenders": 1,
+      "recoverableErrors": [
+        "Minified React error #418; visit https://react.dev/errors/418?args[]=HTML&args[]= for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
+      ],
+      "sameServerNodes": [
+        false,
+        false,
+        false
+      ],
+      "sameServerHtml": true,
+      "pageErrors": []
+    },
+    {
+      "width": 1440,
+      "iteration": 6,
+      "passed": false,
+      "lazyInitializations": 1,
+      "fulfilledChunks": 1,
+      "beforeRenders": 2,
+      "afterRenders": 1,
+      "recoverableErrors": [
+        "Minified React error #418; visit https://react.dev/errors/418?args[]=HTML&args[]= for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
+      ],
+      "sameServerNodes": [
+        false,
+        false,
+        false
+      ],
+      "sameServerHtml": true,
+      "pageErrors": []
+    },
+    {
+      "width": 1440,
+      "iteration": 7,
+      "passed": false,
+      "lazyInitializations": 1,
+      "fulfilledChunks": 1,
+      "beforeRenders": 2,
+      "afterRenders": 1,
+      "recoverableErrors": [
+        "Minified React error #418; visit https://react.dev/errors/418?args[]=HTML&args[]= for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
+      ],
+      "sameServerNodes": [
+        false,
+        false,
+        false
+      ],
+      "sameServerHtml": true,
+      "pageErrors": []
+    },
+    {
+      "width": 1440,
+      "iteration": 8,
+      "passed": false,
+      "lazyInitializations": 1,
+      "fulfilledChunks": 1,
+      "beforeRenders": 2,
+      "afterRenders": 1,
+      "recoverableErrors": [
+        "Minified React error #418; visit https://react.dev/errors/418?args[]=HTML&args[]= for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
+      ],
+      "sameServerNodes": [
+        false,
+        false,
+        false
+      ],
+      "sameServerHtml": true,
+      "pageErrors": []
+    },
+    {
+      "width": 1440,
+      "iteration": 9,
+      "passed": false,
+      "lazyInitializations": 1,
+      "fulfilledChunks": 1,
+      "beforeRenders": 2,
+      "afterRenders": 1,
+      "recoverableErrors": [
+        "Minified React error #418; visit https://react.dev/errors/418?args[]=HTML&args[]= for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
+      ],
+      "sameServerNodes": [
+        false,
+        false,
+        false
+      ],
+      "sameServerHtml": true,
+      "pageErrors": []
+    },
+    {
+      "width": 390,
+      "iteration": 0,
+      "passed": false,
+      "lazyInitializations": 1,
+      "fulfilledChunks": 1,
+      "beforeRenders": 2,
+      "afterRenders": 1,
+      "recoverableErrors": [
+        "Minified React error #418; visit https://react.dev/errors/418?args[]=HTML&args[]= for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
+      ],
+      "sameServerNodes": [
+        false,
+        false,
+        false
+      ],
+      "sameServerHtml": true,
+      "pageErrors": []
+    },
+    {
+      "width": 390,
+      "iteration": 1,
+      "passed": false,
+      "lazyInitializations": 1,
+      "fulfilledChunks": 1,
+      "beforeRenders": 2,
+      "afterRenders": 1,
+      "recoverableErrors": [
+        "Minified React error #418; visit https://react.dev/errors/418?args[]=HTML&args[]= for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
+      ],
+      "sameServerNodes": [
+        false,
+        false,
+        false
+      ],
+      "sameServerHtml": true,
+      "pageErrors": []
+    },
+    {
+      "width": 390,
+      "iteration": 2,
+      "passed": false,
+      "lazyInitializations": 1,
+      "fulfilledChunks": 1,
+      "beforeRenders": 2,
+      "afterRenders": 1,
+      "recoverableErrors": [
+        "Minified React error #418; visit https://react.dev/errors/418?args[]=HTML&args[]= for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
+      ],
+      "sameServerNodes": [
+        false,
+        false,
+        false
+      ],
+      "sameServerHtml": true,
+      "pageErrors": []
+    },
+    {
+      "width": 390,
+      "iteration": 3,
+      "passed": false,
+      "lazyInitializations": 1,
+      "fulfilledChunks": 1,
+      "beforeRenders": 2,
+      "afterRenders": 1,
+      "recoverableErrors": [
+        "Minified React error #418; visit https://react.dev/errors/418?args[]=HTML&args[]= for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
+      ],
+      "sameServerNodes": [
+        false,
+        false,
+        false
+      ],
+      "sameServerHtml": true,
+      "pageErrors": []
+    },
+    {
+      "width": 390,
+      "iteration": 4,
+      "passed": false,
+      "lazyInitializations": 1,
+      "fulfilledChunks": 1,
+      "beforeRenders": 2,
+      "afterRenders": 1,
+      "recoverableErrors": [
+        "Minified React error #418; visit https://react.dev/errors/418?args[]=HTML&args[]= for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
+      ],
+      "sameServerNodes": [
+        false,
+        false,
+        false
+      ],
+      "sameServerHtml": true,
+      "pageErrors": []
+    },
+    {
+      "width": 390,
+      "iteration": 5,
+      "passed": false,
+      "lazyInitializations": 1,
+      "fulfilledChunks": 1,
+      "beforeRenders": 2,
+      "afterRenders": 1,
+      "recoverableErrors": [
+        "Minified React error #418; visit https://react.dev/errors/418?args[]=HTML&args[]= for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
+      ],
+      "sameServerNodes": [
+        false,
+        false,
+        false
+      ],
+      "sameServerHtml": true,
+      "pageErrors": []
+    },
+    {
+      "width": 390,
+      "iteration": 6,
+      "passed": false,
+      "lazyInitializations": 1,
+      "fulfilledChunks": 1,
+      "beforeRenders": 2,
+      "afterRenders": 1,
+      "recoverableErrors": [
+        "Minified React error #418; visit https://react.dev/errors/418?args[]=HTML&args[]= for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
+      ],
+      "sameServerNodes": [
+        false,
+        false,
+        false
+      ],
+      "sameServerHtml": true,
+      "pageErrors": []
+    },
+    {
+      "width": 390,
+      "iteration": 7,
+      "passed": false,
+      "lazyInitializations": 1,
+      "fulfilledChunks": 1,
+      "beforeRenders": 2,
+      "afterRenders": 1,
+      "recoverableErrors": [
+        "Minified React error #418; visit https://react.dev/errors/418?args[]=HTML&args[]= for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
+      ],
+      "sameServerNodes": [
+        false,
+        false,
+        false
+      ],
+      "sameServerHtml": true,
+      "pageErrors": []
+    },
+    {
+      "width": 390,
+      "iteration": 8,
+      "passed": false,
+      "lazyInitializations": 1,
+      "fulfilledChunks": 1,
+      "beforeRenders": 2,
+      "afterRenders": 1,
+      "recoverableErrors": [
+        "Minified React error #418; visit https://react.dev/errors/418?args[]=HTML&args[]= for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
+      ],
+      "sameServerNodes": [
+        false,
+        false,
+        false
+      ],
+      "sameServerHtml": true,
+      "pageErrors": []
+    },
+    {
+      "width": 390,
+      "iteration": 9,
+      "passed": false,
+      "lazyInitializations": 1,
+      "fulfilledChunks": 1,
+      "beforeRenders": 2,
+      "afterRenders": 1,
+      "recoverableErrors": [
+        "Minified React error #418; visit https://react.dev/errors/418?args[]=HTML&args[]= for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
+      ],
+      "sameServerNodes": [
+        false,
+        false,
+        false
+      ],
+      "sameServerHtml": true,
+      "pageErrors": []
+    }
+  ],
+  "errors": [
+    "hydration_replay_must_retain_server_dom_without_errors\n\n20 !== 0\n"
+  ],
+  "scope": "Bundled production React renderer; microtask-resolved Flight-shaped lazy child; exact SSR node identity and HTML; no reload, state polling update, authentication or database."
+}

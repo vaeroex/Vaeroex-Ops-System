@@ -1,0 +1,211 @@
+{
+  "checks": [
+    {
+      "elapsedMs": 5,
+      "url": "/app/forms/c58f5e45-05f2-4c7b-a80f-80557b205f8d",
+      "buttons": [
+        {
+          "text": "Save submission",
+          "busy": "false",
+          "disabled": false
+        }
+      ],
+      "persisted": 0
+    },
+    {
+      "elapsedMs": 1035,
+      "url": "/app/forms/c58f5e45-05f2-4c7b-a80f-80557b205f8d",
+      "buttons": [
+        {
+          "text": "Save submission",
+          "busy": "false",
+          "disabled": false
+        }
+      ],
+      "persisted": 1
+    },
+    {
+      "elapsedMs": 6052,
+      "url": "/app/forms/c58f5e45-05f2-4c7b-a80f-80557b205f8d",
+      "buttons": [
+        {
+          "text": "Save submission",
+          "busy": "false",
+          "disabled": false
+        }
+      ],
+      "persisted": 1
+    },
+    {
+      "pings": [],
+      "lastRoot": null,
+      "render": null,
+      "wip": []
+    }
+  ],
+  "errors": [],
+  "responses": [
+    {
+      "asset": "/_next/static/css/408116bc75d7928e.css",
+      "status": 200
+    },
+    {
+      "asset": "/_next/image",
+      "status": 200
+    },
+    {
+      "asset": "/_next/static/chunks/webpack-9f7933cfb451a5ba.js",
+      "status": 200
+    },
+    {
+      "asset": "/_next/static/chunks/main-app-7fa232120c9d8d33.js",
+      "status": 200
+    },
+    {
+      "asset": "/_next/static/chunks/app/error-9f62abe691737df5.js",
+      "status": 200
+    },
+    {
+      "asset": "/_next/static/chunks/app/layout-605dd253feeb30ff.js",
+      "status": 200
+    },
+    {
+      "asset": "/_next/static/chunks/3086-d2b3ac3bc86e125c.js",
+      "status": 200
+    },
+    {
+      "asset": "/_next/static/chunks/488-ee3992e3bc13b348.js",
+      "status": 200
+    },
+    {
+      "asset": "/_next/static/chunks/5395-f0f62460d0b83751.js",
+      "status": 200
+    },
+    {
+      "asset": "/_next/static/chunks/app/app/forms/%5Bid%5D/page-910b4c536484fd30.js",
+      "status": 200
+    },
+    {
+      "asset": "/_next/static/chunks/7998-4e21746a549e98e3.js",
+      "status": 200
+    },
+    {
+      "asset": "/_next/static/chunks/e6dfdfb1-aea6cc49abd0925a.js",
+      "status": 200
+    },
+    {
+      "asset": "/_next/static/chunks/app/app/error-5c52e961e54be163.js",
+      "status": 200
+    },
+    {
+      "asset": "/_next/static/chunks/app/app/layout-fa2e03873c2af42a.js",
+      "status": 200
+    },
+    {
+      "asset": "/_next/static/chunks/app/app/sources/loading-fcf7c5e18226411c.js",
+      "status": 200
+    },
+    {
+      "asset": "/_next/static/chunks/1345-d00be613becb5ef0.js",
+      "status": 200
+    },
+    {
+      "asset": "/_next/static/chunks/app/app/kpis/page-9004f32a98279db9.js",
+      "status": 200
+    },
+    {
+      "asset": "/_next/static/chunks/8649-3b700e80bae11e67.js",
+      "status": 200
+    },
+    {
+      "asset": "/_next/static/chunks/app/app/reports/loading-fcf7c5e18226411c.js",
+      "status": 200
+    },
+    {
+      "path": "/app/forms/c58f5e45-05f2-4c7b-a80f-80557b205f8d",
+      "status": 303,
+      "headers": {
+        "x-action-redirect": "/app/forms/c58f5e45-05f2-4c7b-a80f-80557b205f8d?message=Submission+saved.;push",
+        "location": null,
+        "content-type": "text/x-component",
+        "content-length": null,
+        "transfer-encoding": "chunked",
+        "x-action-revalidated": "[[],1,0]"
+      },
+      "request": {
+        "resourceType": "fetch",
+        "nextAction": true
+      },
+      "body": {
+        "error": "response.body: Response body is unavailable for redirect responses"
+      }
+    }
+  ],
+  "failedRequests": [
+    {
+      "url": "/app",
+      "method": "GET",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "url": "/app/intelligence",
+      "method": "GET",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "url": "/app/kpis",
+      "method": "GET",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "url": "/app/sources",
+      "method": "GET",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "url": "/app/reports",
+      "method": "GET",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "url": "/app/integrations",
+      "method": "GET",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "url": "/app/settings",
+      "method": "GET",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "url": "/app/help",
+      "method": "GET",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "url": "/app/help/trust",
+      "method": "GET",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "url": "/terms",
+      "method": "GET",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "url": "/privacy",
+      "method": "GET",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "url": "/app/support",
+      "method": "GET",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "url": "/app/forms/c58f5e45-05f2-4c7b-a80f-80557b205f8d",
+      "method": "POST",
+      "error": "net::ERR_ABORTED"
+    }
+  ]
+}
