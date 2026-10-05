@@ -197,6 +197,10 @@ async function migrationQualification(target, administrator) {
   const sheetsCompleteTail = files.filter(name => name === "20261002040024_google_sheets_complete.sql");
   const sheetsLifecycleTail = files.filter(name => name === "20261002040031_google_sheets_lifecycle.sql");
   const preferencesTail = files.filter(name => name === "20261002182049_integration_summary_preferences.sql");
+  // Reviewed independently by the workspace security SQL suite. Keep the
+  // historical Square baseline pinned and reject any other unreviewed tail.
+  const workspaceSecurityTail = files.filter(name => name === "20261005022017_workspace_security_boundaries.sql");
+  const workspaceQuotaTail = files.filter(name => name === "20261005022445_workspace_persisted_usage_limits.sql");
   equal(added.length, 2, "both additive Square migrations present");
   equal(accountTail.length, 1, "account-connection migration present");
   equal(remoteTail.length, 1, "remote Sandbox binding migration present");
@@ -218,7 +222,9 @@ async function migrationQualification(target, administrator) {
   equal(sheetsCompleteTail.length, 1, "separately qualified Google Sheets connector migration present");
   equal(sheetsLifecycleTail.length, 1, "separately qualified Google Sheets lifecycle migration present");
   equal(preferencesTail.length, 1, "separately qualified personal summary preferences migration present");
-  equal(baseline.length + added.length + accountTail.length + remoteTail.length + brokerTail.length + gcpTail.length + recoveryTail.length + mappedTail.length + mappedFenceTail.length + observationTail.length + interpretationTail.length + evidenceTail.length + cardTail.length + operationalTail.length + productionFoundationTail.length + productionOverlayTail.length + productionInternalRuntimeTail.length + productionFoundationMarkerTail.length + productionLegacyGuardTail.length + sheetsCompleteTail.length + sheetsLifecycleTail.length + preferencesTail.length, files.length, "migration manifest is explicit");
+  equal(workspaceSecurityTail.length, 1, "separately qualified workspace security migration present");
+  equal(workspaceQuotaTail.length, 1, "separately qualified persisted usage migration present");
+  equal(baseline.length + added.length + accountTail.length + remoteTail.length + brokerTail.length + gcpTail.length + recoveryTail.length + mappedTail.length + mappedFenceTail.length + observationTail.length + interpretationTail.length + evidenceTail.length + cardTail.length + operationalTail.length + productionFoundationTail.length + productionOverlayTail.length + productionInternalRuntimeTail.length + productionFoundationMarkerTail.length + productionLegacyGuardTail.length + sheetsCompleteTail.length + sheetsLifecycleTail.length + preferencesTail.length + workspaceSecurityTail.length + workspaceQuotaTail.length, files.length, "migration manifest is explicit");
   const clean = await createDatabase(target, administrator, "clean");
   await applyMigrations(clean.client, baseline);
   const before = await sourceSchemaFingerprint(clean.client);

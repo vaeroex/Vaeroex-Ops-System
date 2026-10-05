@@ -3,16 +3,15 @@ begin;
 -- Explicit platform authority, never inferred from email or JWT metadata.
 -- RELEASE PREREQUISITE: an authorized operator must reconcile the configured
 -- VAEROEX_ADMIN_EMAILS against verified auth.users identities, seed only those
--- approved IDs, and keep this table synchronized on admin revocation. There is
--- deliberately no seed or exposed mutation RPC in this migration.
+-- approved IDs as the database owner, and keep this table synchronized on admin
+-- revocation. Service clients cannot configure exemptions or traverse private.
+-- There is deliberately no seed or exposed mutation RPC in this migration.
 create table private.platform_admin_subscription_exemptions (
   user_id uuid primary key references auth.users(id) on delete cascade,
   created_at timestamptz not null default clock_timestamp()
 );
 alter table private.platform_admin_subscription_exemptions enable row level security;
 revoke all on private.platform_admin_subscription_exemptions from public,anon,authenticated,service_role;
-grant usage on schema private to service_role;
-grant select,insert,update,delete on private.platform_admin_subscription_exemptions to service_role;
 
 create function private.platform_admin_subscription_exempt_v1(p_workspace_id uuid)
 returns boolean language sql stable security definer set search_path='' as $$

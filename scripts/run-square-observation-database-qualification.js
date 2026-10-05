@@ -31,11 +31,17 @@ async function qualify(runtime) {
   const separatelyQualifiedPreferencesTail=[
     "20261002182049_integration_summary_preferences.sql"
   ];
-  eq(files.length,123,"full canonical chain, including the separately qualified Production runtime, compatibility guards, Google Sheets connector and personal summary preferences");
-  for (const name of [...additiveSquareTail,...productionFoundation,...productionOverlay,...productionInternalRuntime,...productionCompatibility,...separatelyQualifiedSheetsTail,...separatelyQualifiedPreferencesTail])
+  // The workspace SQL suite qualifies these exact additions independently;
+  // this fixture continues to exercise its pinned historical observation chain.
+  const separatelyQualifiedWorkspaceAuditTail=[
+    "20261005022017_workspace_security_boundaries.sql",
+    "20261005022445_workspace_persisted_usage_limits.sql"
+  ];
+  eq(files.length,125,"full canonical chain, including the separately qualified Production runtime, compatibility guards, Google Sheets connector, personal summary preferences and workspace audit");
+  for (const name of [...additiveSquareTail,...productionFoundation,...productionOverlay,...productionInternalRuntime,...productionCompatibility,...separatelyQualifiedSheetsTail,...separatelyQualifiedPreferencesTail,...separatelyQualifiedWorkspaceAuditTail])
     eq(files.filter(file=>file===name).length,1,`canonical manifest contains ${name} exactly once`);
   stage="migrations";
-  const staged=new Set([...additiveSquareTail,...productionFoundation,...productionOverlay,...productionInternalRuntime,...productionCompatibility,...separatelyQualifiedSheetsTail,...separatelyQualifiedPreferencesTail]);
+  const staged=new Set([...additiveSquareTail,...productionFoundation,...productionOverlay,...productionInternalRuntime,...productionCompatibility,...separatelyQualifiedSheetsTail,...separatelyQualifiedPreferencesTail,...separatelyQualifiedWorkspaceAuditTail]);
   await runtime.applyMigrations(c,files.filter(file=>!staged.has(file)));
   // Production authority roles are cluster-wide. A Supabase-local `db start`
   // has already installed this separately tested foundation in its canonical

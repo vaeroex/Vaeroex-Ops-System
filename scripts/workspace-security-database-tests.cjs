@@ -298,9 +298,16 @@ async function tests(c) {
   await actor(c,1);
   await denied(c,"unconfigured admin-style account obeys normal expired rules",`insert into tasks(workspace_id,title) values('${A}','Unconfigured exemption')`);
   await actor(c,0,"service_role");
+  pass("service role retains the existing private schema usage barrier",(await c.query("select has_schema_privilege('service_role','private','USAGE') allowed")).rows[0].allowed,false);
+  await admin(c);
+  pass("service role has no direct exemption table privileges",(await c.query("select has_table_privilege('service_role','private.platform_admin_subscription_exemptions','SELECT,INSERT,UPDATE,DELETE') allowed")).rows[0].allowed,false);
+  await actor(c,0,"service_role");
+  await denied(c,"service client cannot configure platform subscription exemptions",`insert into private.platform_admin_subscription_exemptions(user_id) values('${user(1)}')`);
+  await admin(c);
   await c.query(`insert into private.platform_admin_subscription_exemptions(user_id) values('${user(1)}')`);
-  results.push({name:"trusted service can configure a verified auth user exemption",status:"pass"});
+  results.push({name:"trusted database owner can configure a verified auth user exemption",status:"pass"});
   await denied(c,"exemption requires an existing auth.users identity",`insert into private.platform_admin_subscription_exemptions(user_id) values('99999999-9999-4999-8999-999999999999')`,"23503");
+  await actor(c,0,"service_role");
   const rpcSql=(actorId,workflow="business_health_explanation_v1",input="{}")=>`select * from create_trusted_analysis_run_v1('${A}','${actorId}','${workflow}','${input}'::jsonb)`;
   const rpcInput=JSON.stringify({fingerprint:"synthetic-exempt-fingerprint",generation_policy_version:"synthetic-policy"});
   const trustedRun=(await c.query(rpcSql(user(1),"business_health_explanation_v1",rpcInput))).rows[0].id;
@@ -346,7 +353,7 @@ async function tests(c) {
   await denied(c,"staff cannot use another admin exemption",`insert into asset_checks(workspace_id,asset_id,status) values('${A}','${asset(1)}','Borrowed exemption')`);
   await c.query("select set_config('request.jwt.claims',$1,false)",[JSON.stringify({sub:user(2),role:"authenticated",email:"synthetic1@example.invalid",user_metadata:{vaeroex_admin:true},app_metadata:{vaeroex_admin:true}})]);
   await denied(c,"email or metadata claims cannot forge exemption",`insert into asset_checks(workspace_id,asset_id,status) values('${A}','${asset(1)}','Forged exemption')`);
-  await actor(c,0,"service_role");
+  await admin(c);
   await c.query(`insert into private.platform_admin_subscription_exemptions(user_id) values('${user(3)}')`);
   await actor(c,3);
   await denied(c,"configured exemption does not upgrade viewer mutation permissions",`insert into asset_checks(workspace_id,asset_id,status) values('${A}','${asset(1)}','Viewer exemption')`);
@@ -355,7 +362,7 @@ async function tests(c) {
   await denied(c,"service RPC refuses disabled actor despite configured exemption",rpcSql(user(1)));
   await actor(c,1);
   await denied(c,"disabled membership cannot use configured exemption",`insert into tasks(workspace_id,title) values('${A}','Disabled exemption')`);
-  await actor(c,0,"service_role");
+  await admin(c);
   await c.query(`update workspace_members set status='active' where workspace_id='${A}' and user_id='${user(1)}'; delete from private.platform_admin_subscription_exemptions where user_id in ('${user(1)}','${user(3)}')`);
   await actor(c,1);
   await denied(c,"removing exemption resumes expired subscription enforcement",`insert into tasks(workspace_id,title) values('${A}','Revoked exemption')`);

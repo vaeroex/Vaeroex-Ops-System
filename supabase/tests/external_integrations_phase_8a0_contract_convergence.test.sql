@@ -283,9 +283,11 @@ insert into public.profiles (id, email, full_name) values
   ('a8000000-0000-4000-8000-000000000001', 'phase8a0-owner-a@example.test', 'Phase 8A.0 Owner A'),
   ('a8000000-0000-4000-8000-000000000002', 'phase8a0-owner-b@example.test', 'Phase 8A.0 Owner B');
 
-insert into public.workspaces (id, name, created_by) values
-  ('b8000000-0000-4000-8000-000000000001', 'Phase 8A.0 Workspace A', 'a8000000-0000-4000-8000-000000000001'),
-  ('b8000000-0000-4000-8000-000000000002', 'Phase 8A.0 Workspace B', 'a8000000-0000-4000-8000-000000000002');
+-- Provider contract positives use authenticated connection-intent writes.
+-- Seed a bounded trial so entitlement remains enforced independently.
+insert into public.workspaces (id, name, created_by, subscription_status, trial_ends_at) values
+  ('b8000000-0000-4000-8000-000000000001', 'Phase 8A.0 Workspace A', 'a8000000-0000-4000-8000-000000000001', 'trialing', now() + interval '1 day'),
+  ('b8000000-0000-4000-8000-000000000002', 'Phase 8A.0 Workspace B', 'a8000000-0000-4000-8000-000000000002', 'trialing', now() + interval '1 day');
 
 insert into public.workspace_members (
   id,
