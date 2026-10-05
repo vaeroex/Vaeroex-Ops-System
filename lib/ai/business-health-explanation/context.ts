@@ -220,26 +220,24 @@ function candidateFromRecord({
 function selectSubmode({
   available,
   status,
-  trend,
   trendDelta,
   stale
 }: {
   available: boolean;
   status: string;
-  trend: string | null;
   trendDelta: number | null;
   stale: boolean;
 }): BusinessHealthExplanationSubmode {
   if (!available) return "evidence_limited";
   if (stale) return "evidence_stale";
   const normalizedStatus = status.toLowerCase();
-  const normalizedTrend = (trend || "").toLowerCase();
-  const improving = normalizedTrend.includes("improving") || (trendDelta !== null && trendDelta > 0);
-  const worsening = normalizedTrend.includes("declining") || (trendDelta !== null && trendDelta < 0);
+  const improving = trendDelta !== null && trendDelta > 0;
+  const worsening = trendDelta !== null && trendDelta < 0;
 
   if ((normalizedStatus.includes("healthy") || normalizedStatus.includes("strong")) && improving) return "healthy_improving";
   if ((normalizedStatus.includes("healthy") || normalizedStatus.includes("strong")) && worsening) return "healthy_slowing";
   if ((normalizedStatus.includes("watch") || normalizedStatus.includes("critical") || normalizedStatus.includes("at risk")) && improving) return "watch_recovering";
+  if (normalizedStatus.includes("watch") && worsening) return "watch_worsening";
   if ((normalizedStatus.includes("critical") || normalizedStatus.includes("at risk")) && worsening) return "at_risk_worsening";
   return "stable";
 }
@@ -456,7 +454,6 @@ export function buildBusinessHealthExplanationPackage({
   const submode = selectSubmode({
     available,
     status: homepage.health.status,
-    trend: homepage.health.trend,
     trendDelta: homepage.health.trendDelta,
     stale: freshness.stale
   });
