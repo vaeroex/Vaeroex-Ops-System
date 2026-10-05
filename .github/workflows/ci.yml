@@ -57,7 +57,13 @@ jobs:
 
       - name: Isolated workspace authorization and concurrent slot regressions
         # Creates a fresh Unix-socket-only cluster; accepts no hosted database URL.
-        run: WORKSPACE_AUDIT_PG_BIN="$(pg_config --bindir)" pnpm test:workspace-audit:database
+        run: |
+          audit_pg_bin="$(pg_config --bindir)"
+          WORKSPACE_AUDIT_PG_BIN="$audit_pg_bin" pnpm test:workspace-audit:database
+          ISSUE_TEST_PG_BIN="$audit_pg_bin" node scripts/issue-submission-native-tests.cjs
+          SHEETS_TEST_PG_BIN="$audit_pg_bin" node scripts/google-sheets-dispatch-native-tests.cjs
+          SHEETS_TEST_PG_BIN="$audit_pg_bin" node scripts/google-sheets-recovery-continuation-native-tests.cjs
+          SHEETS_TEST_PG_BIN="$audit_pg_bin" node scripts/google-sheets-failure-cleanup-native-tests.cjs
 
       - name: Workspace navigation and bounded-list regressions
         run: pnpm test:workspace-clarity
