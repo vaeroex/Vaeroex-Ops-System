@@ -1,0 +1,38 @@
+{
+  "passed": true,
+  "checks": 36,
+  "baseline": {
+    "checks": 103,
+    "largeRows": 750,
+    "largeFacts": 1500,
+    "liveProviderCalls": 0,
+    "fullCanonicalBootstrap": false,
+    "abandonedRecovery": {
+      "scope": "Persisted SQL with accelerated lease expiry; no worker kill or provider transport",
+      "leaseSeconds": 270,
+      "automaticRetrySeconds": 3600,
+      "originalEligibilityPreserved": true,
+      "independentTerminalRecovery": true,
+      "staleCommitDenied": true,
+      "lateCleanupPreservesSuccess": true,
+      "recovery300SecondsQualified": false
+    }
+  },
+  "negativeControl": {
+    "errorCode": "42501",
+    "failureRpcRolledBack": true
+  },
+  "actualCanonicalFacts": 1,
+  "retiredOnAuthorizationTransition": true,
+  "retiredOnAuthorizationTransitionAfterFix": true,
+  "failureTerminalAndLeaseCleared": true,
+  "duplicateFailureUnchanged": true,
+  "staleFailurePreservesReplacement": true,
+  "staleCommitDenied": true,
+  "staleGenerationDenied": true,
+  "committedSuccessPreserved": true,
+  "privilegesUnchanged": true,
+  "historicalFactsPreserved": true,
+  "liveProviders": 0,
+  "limitations": "Fresh Unix-socket native PostgreSQL with reduced fixture schema; real full-schema rollback proof and HTTP qualification are separate."
+}

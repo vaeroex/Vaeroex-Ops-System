@@ -1,0 +1,223 @@
+{
+  "at": "2026-10-05T20:09:39.498Z",
+  "applicationCommit": "0a15ddcd3b564086280fec21b79b6976b3a3cc44",
+  "buildId": "ReUcdHr1ALEejCvoUeFTc",
+  "productionCapacityClaim": false,
+  "providerMode": "local_simulation",
+  "positive": [
+    {
+      "kind": "provider_throttle",
+      "file": "/tmp/vaeroex-capacity-small-02/fault-qualified-02/provider_throttle/provider_throttle.json",
+      "passed": true,
+      "recoveryMs": 455,
+      "canonicalBaselines": [
+        {
+          "workspaceId": "c347b4e6-d38f-457b-8667-a117e3c2423b",
+          "total": 100,
+          "active": 100
+        },
+        {
+          "workspaceId": "94e1e8b3-a38c-4780-9870-702dd157ebb1",
+          "total": 100,
+          "active": 100
+        }
+      ],
+      "acceptedWork": [
+        {
+          "id": "4b53cd48-953e-42f2-ae15-b325646c75ab",
+          "status": "failed",
+          "errorCode": "provider_request_failed"
+        },
+        {
+          "id": "9af74626-9d14-4fec-8a08-d7c8b68e1d15",
+          "status": "succeeded",
+          "errorCode": null
+        }
+      ],
+      "integrity": {
+        "duplicateCanonicalFacts": 0,
+        "acceptedWorkTerminal": true,
+        "acceptedClaimsHaveDurableRuns": true,
+        "interruptedRunsTruthfullyFailed": null
+      },
+      "loadedHarnessSha256": "c05bad2f85da493b72ba928378545c335b3a0d2d9771f293cfcb8d06785d9d14"
+    },
+    {
+      "kind": "expired_authorization",
+      "file": "/tmp/vaeroex-capacity-small-02/fault-qualified-02/expired_authorization/expired_authorization.json",
+      "passed": true,
+      "recoveryMs": 858,
+      "canonicalBaselines": [
+        {
+          "workspaceId": "c347b4e6-d38f-457b-8667-a117e3c2423b",
+          "total": 100,
+          "active": 100
+        },
+        {
+          "workspaceId": "94e1e8b3-a38c-4780-9870-702dd157ebb1",
+          "total": 100,
+          "active": 100
+        }
+      ],
+      "acceptedWork": [
+        {
+          "id": "42556aff-ceda-461e-b409-01ba6872d02e",
+          "status": "failed",
+          "errorCode": "authorization_required"
+        },
+        {
+          "id": "251687be-1276-4533-8a0c-9d05ffe2cc6a",
+          "status": "succeeded",
+          "errorCode": null
+        }
+      ],
+      "integrity": {
+        "duplicateCanonicalFacts": 0,
+        "acceptedWorkTerminal": true,
+        "acceptedClaimsHaveDurableRuns": true,
+        "interruptedRunsTruthfullyFailed": null
+      },
+      "loadedHarnessSha256": "c05bad2f85da493b72ba928378545c335b3a0d2d9771f293cfcb8d06785d9d14"
+    },
+    {
+      "kind": "partial_read",
+      "file": "/tmp/vaeroex-capacity-small-02/fault-qualified-02/partial_read/partial_read.json",
+      "passed": true,
+      "recoveryMs": 480,
+      "canonicalBaselines": [
+        {
+          "workspaceId": "c347b4e6-d38f-457b-8667-a117e3c2423b",
+          "total": 100,
+          "active": 100
+        },
+        {
+          "workspaceId": "94e1e8b3-a38c-4780-9870-702dd157ebb1",
+          "total": 100,
+          "active": 100
+        }
+      ],
+      "acceptedWork": [
+        {
+          "id": "77eb94e1-f5e9-435c-bd72-fb37d52c57c3",
+          "status": "failed",
+          "errorCode": "sync_failed"
+        },
+        {
+          "id": "023c362d-46ce-4ff9-8933-66c72ceff169",
+          "status": "succeeded",
+          "errorCode": null
+        }
+      ],
+      "integrity": {
+        "duplicateCanonicalFacts": 0,
+        "acceptedWorkTerminal": true,
+        "acceptedClaimsHaveDurableRuns": true,
+        "interruptedRunsTruthfullyFailed": null
+      },
+      "loadedHarnessSha256": "c05bad2f85da493b72ba928378545c335b3a0d2d9771f293cfcb8d06785d9d14"
+    },
+    {
+      "kind": "commit_ack_loss",
+      "file": "/tmp/vaeroex-capacity-small-02/fault-qualified-02/commit_ack_loss/commit_ack_loss.json",
+      "passed": true,
+      "recoveryMs": 468,
+      "canonicalBaselines": [
+        {
+          "workspaceId": "c347b4e6-d38f-457b-8667-a117e3c2423b",
+          "total": 100,
+          "active": 100
+        },
+        {
+          "workspaceId": "94e1e8b3-a38c-4780-9870-702dd157ebb1",
+          "total": 100,
+          "active": 100
+        }
+      ],
+      "acceptedWork": [
+        {
+          "id": "5c0ac4ca-a58d-4c39-955d-4a9b01f1fb79",
+          "status": "succeeded",
+          "errorCode": null
+        },
+        {
+          "id": "b3bf2812-bbe8-4f3f-9e19-6e7250168db8",
+          "status": "succeeded",
+          "errorCode": null
+        }
+      ],
+      "integrity": {
+        "duplicateCanonicalFacts": 0,
+        "acceptedWorkTerminal": true,
+        "acceptedClaimsHaveDurableRuns": true,
+        "interruptedRunsTruthfullyFailed": null
+      },
+      "loadedHarnessSha256": "c05bad2f85da493b72ba928378545c335b3a0d2d9771f293cfcb8d06785d9d14"
+    },
+    {
+      "kind": "slow_workspace",
+      "file": "/tmp/vaeroex-capacity-small-02/fault-qualified-02/slow_workspace/slow_workspace.json",
+      "passed": true,
+      "recoveryMs": 466,
+      "canonicalBaselines": [
+        {
+          "workspaceId": "c347b4e6-d38f-457b-8667-a117e3c2423b",
+          "total": 100,
+          "active": 100
+        },
+        {
+          "workspaceId": "94e1e8b3-a38c-4780-9870-702dd157ebb1",
+          "total": 100,
+          "active": 100
+        }
+      ],
+      "acceptedWork": [
+        {
+          "id": "979c734c-2782-468f-985c-bbdf46e98869",
+          "status": "succeeded",
+          "errorCode": null
+        },
+        {
+          "id": "4e65b9dc-6fa9-4af0-82b3-a4a9ab550b31",
+          "status": "succeeded",
+          "errorCode": null
+        }
+      ],
+      "integrity": {
+        "duplicateCanonicalFacts": 0,
+        "acceptedWorkTerminal": true,
+        "acceptedClaimsHaveDurableRuns": true,
+        "interruptedRunsTruthfullyFailed": null
+      },
+      "loadedHarnessSha256": "c05bad2f85da493b72ba928378545c335b3a0d2d9771f293cfcb8d06785d9d14"
+    }
+  ],
+  "worker": {
+    "passed": false,
+    "forcedOutageProfile": "forced_three_second_outage_v1",
+    "actualKillToReadyMs": 4134,
+    "maximumUnavailableMs": 3000,
+    "manifestSpawnDelayMs": 3008,
+    "acceptedRun": "ec7de4b1-dc10-4f6e-8b3b-9559d51ddd7e",
+    "acceptedRunTerminal": "failed lease_expired",
+    "acceptedToTerminalMs": 284954,
+    "postFaultSuccess": "0ac5f7c0-955b-4c14-8340-7a2f578b5a8b",
+    "postFaultRows": 100,
+    "postFaultFacts": 100,
+    "recoveryThresholdPassed": false,
+    "remainingDueQueueAtFailure": 1,
+    "queueCause": "Quiet workspace next_sync_at reached20:00 UTC but standalone component test had noquarter-hour scheduler. The actual scheduled endpoint subsequently reconciled it withoutretiming.",
+    "reconciledQueueFile": "/tmp/vaeroex-capacity-small-02/fault-qualified-02/reconcile-untriggered-wall-clock-tick/result.json",
+    "historicalFailurePreserved": true
+  },
+  "provenance": [
+    "/tmp/vaeroex-capacity-small-02/fault-qualified-02/controller-provenance.json",
+    "/tmp/vaeroex-capacity-small-02/fault-qualified-02/preload-provenance.json"
+  ],
+  "unexecutedCorrections": [
+    "Explicit immediate_supervisor_recovery_v1 profile requires actual qualification after active baseline.",
+    "Controller measures kill to actual worker-ready event, preserves3000ms limit.",
+    "Component qualification now invokes real scheduled endpoint at wall-clockquarter-hour boundaries; primary workload retains ticks0/900.",
+    "Faultwindows aligned to unchanged existing10/100/250/500 actionselector; offline143checks passed, actualprimaryinjection remains unproven."
+  ],
+  "currentControllerSha256": "6a2cae6f62cf1552edbf5b5af803f7ae835508fe239ada52c38584ced3bf5deb"
+}

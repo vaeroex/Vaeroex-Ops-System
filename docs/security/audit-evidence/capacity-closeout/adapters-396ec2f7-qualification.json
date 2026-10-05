@@ -1,0 +1,279 @@
+{
+  "runId": "99799ab6-c939-4b3e-aacc-2a30ffaeb14f",
+  "sourceCommit": "396ec2f7752eb30fea99f30a73068d53ff29cc0a",
+  "schemaFingerprint": "41a316952fddf5da306655c42b58c4667fc70c0678b27ff7b93b43973adeaac8",
+  "ready": true,
+  "results": [
+    {
+      "kind": "create",
+      "actorId": "ebb7a533-c9ad-4e22-ac9e-fa1febf448cd",
+      "logicalId": "324a8446-adea-46ec-9250-a7df27f44d37",
+      "persisted": true,
+      "duplicate": false
+    },
+    {
+      "kind": "upload",
+      "actorId": "ebb7a533-c9ad-4e22-ac9e-fa1febf448cd",
+      "logicalId": "8ef5ec42-83e6-4887-ad86-72873227038a",
+      "persisted": true,
+      "duplicate": false
+    },
+    {
+      "kind": "ai",
+      "actorId": "ebb7a533-c9ad-4e22-ac9e-fa1febf448cd",
+      "logicalId": "7cd917f1-628b-47f5-be89-1f842503b31e",
+      "persisted": true,
+      "provider": "local_simulation"
+    },
+    {
+      "kind": "create",
+      "actorId": "3d55f8eb-a862-4530-87fd-982671e95fca",
+      "logicalId": "967f4ed1-af53-494e-b061-a97d35212544",
+      "persisted": true,
+      "duplicate": false
+    },
+    {
+      "kind": "upload",
+      "actorId": "3d55f8eb-a862-4530-87fd-982671e95fca",
+      "logicalId": "ba4305d4-901a-4aad-a7b6-f2f1462ef537",
+      "persisted": true,
+      "duplicate": false
+    },
+    {
+      "kind": "ai",
+      "actorId": "3d55f8eb-a862-4530-87fd-982671e95fca",
+      "logicalId": "49c76c6e-a296-4b3f-bd52-2940d2b960bf",
+      "persisted": true,
+      "provider": "local_simulation"
+    },
+    {
+      "kind": "create",
+      "actorId": "004b67df-e2b3-405f-80ca-4412fbb9985f",
+      "logicalId": "75db71b4-8877-40de-95c4-309c58829d26",
+      "persisted": true,
+      "duplicate": false
+    },
+    {
+      "kind": "upload",
+      "actorId": "004b67df-e2b3-405f-80ca-4412fbb9985f",
+      "logicalId": "6cdb24c8-f331-46dc-824f-f48e01fd1ae0",
+      "persisted": true,
+      "duplicate": false
+    },
+    {
+      "kind": "ai",
+      "actorId": "004b67df-e2b3-405f-80ca-4412fbb9985f",
+      "logicalId": "f3bf839e-b658-465e-a020-47f5518a5ce7",
+      "persisted": true,
+      "provider": "local_simulation"
+    },
+    {
+      "kind": "create",
+      "actorId": "4bb30f29-4544-42fc-9468-887c45bc5b82",
+      "logicalId": "dbd1a20e-cca4-4fa5-8dc5-725b55987483",
+      "persisted": true,
+      "duplicate": false
+    },
+    {
+      "kind": "upload",
+      "actorId": "4bb30f29-4544-42fc-9468-887c45bc5b82",
+      "logicalId": "b88064a7-f8bd-43c4-9b58-707a26052250",
+      "persisted": true,
+      "duplicate": false
+    },
+    {
+      "kind": "ai",
+      "actorId": "4bb30f29-4544-42fc-9468-887c45bc5b82",
+      "logicalId": "0829e997-093a-40bc-9a3c-e3a8448d15aa",
+      "persisted": true,
+      "provider": "local_simulation"
+    },
+    {
+      "kind": "create",
+      "actorId": "40f97c63-4ed0-44be-8bbd-a80ceba04b74",
+      "logicalId": "5fc95d56-ed3e-495e-93ec-e5e8fdecd788",
+      "persisted": true,
+      "duplicate": false
+    },
+    {
+      "kind": "upload",
+      "actorId": "40f97c63-4ed0-44be-8bbd-a80ceba04b74",
+      "logicalId": "b84776c6-89f7-4a79-8a2b-4f8bef2b1c7f",
+      "persisted": true,
+      "duplicate": false
+    },
+    {
+      "kind": "ai",
+      "actorId": "40f97c63-4ed0-44be-8bbd-a80ceba04b74",
+      "logicalId": "804c50cf-3b05-4cc1-9841-373b7a55fe76",
+      "persisted": true,
+      "provider": "local_simulation"
+    },
+    {
+      "kind": "create",
+      "actorId": "efc4b566-e536-43bc-b6d0-23a06752dffd",
+      "logicalId": "1189c6e8-4711-4dc1-9325-eb5b876d81b0",
+      "persisted": true,
+      "duplicate": false
+    },
+    {
+      "kind": "upload",
+      "actorId": "efc4b566-e536-43bc-b6d0-23a06752dffd",
+      "logicalId": "1c48aae8-7352-4907-b311-c4f725202569",
+      "persisted": true,
+      "duplicate": false
+    },
+    {
+      "kind": "ai",
+      "actorId": "efc4b566-e536-43bc-b6d0-23a06752dffd",
+      "logicalId": "e918b3d9-20d2-464b-8b7a-b0d02766f845",
+      "persisted": true,
+      "provider": "local_simulation"
+    },
+    {
+      "kind": "create",
+      "actorId": "86fe0576-b0a4-435f-b418-6a1254b62e24",
+      "logicalId": "8915d956-7479-4480-86e4-e62b429bec91",
+      "persisted": true,
+      "duplicate": false
+    },
+    {
+      "kind": "upload",
+      "actorId": "86fe0576-b0a4-435f-b418-6a1254b62e24",
+      "logicalId": "52eb77bb-a31b-41e9-8c17-9543582143c3",
+      "persisted": true,
+      "duplicate": false
+    },
+    {
+      "kind": "ai",
+      "actorId": "86fe0576-b0a4-435f-b418-6a1254b62e24",
+      "logicalId": "df426023-1bc3-42f8-b094-4f018977c292",
+      "persisted": true,
+      "provider": "local_simulation"
+    },
+    {
+      "kind": "create",
+      "actorId": "d9b7a491-3f93-4947-b5b4-710093edfd87",
+      "logicalId": "619bfc3a-6118-42b1-8e83-7df0df878ca5",
+      "persisted": true,
+      "duplicate": false
+    },
+    {
+      "kind": "upload",
+      "actorId": "d9b7a491-3f93-4947-b5b4-710093edfd87",
+      "logicalId": "71292886-cb91-4598-bd1a-ebf12e8265b2",
+      "persisted": true,
+      "duplicate": false
+    },
+    {
+      "kind": "ai",
+      "actorId": "d9b7a491-3f93-4947-b5b4-710093edfd87",
+      "logicalId": "58e057fc-4bef-4d7e-92e5-e7f69dadbf23",
+      "persisted": true,
+      "provider": "local_simulation"
+    },
+    {
+      "kind": "create",
+      "actorId": "b647518b-daba-453b-b009-4b23777bacd0",
+      "logicalId": "b139f71a-94df-4d32-9391-ef0e5479dd0b",
+      "persisted": true,
+      "duplicate": false
+    },
+    {
+      "kind": "upload",
+      "actorId": "b647518b-daba-453b-b009-4b23777bacd0",
+      "logicalId": "f49f89f4-d83c-4b2f-9a44-1a07796d7afa",
+      "persisted": true,
+      "duplicate": false
+    },
+    {
+      "kind": "ai",
+      "actorId": "b647518b-daba-453b-b009-4b23777bacd0",
+      "logicalId": "789c022b-5c33-4758-a825-b00356d0da80",
+      "persisted": true,
+      "provider": "local_simulation"
+    },
+    {
+      "kind": "create",
+      "actorId": "e2b4cca2-73df-42d3-ba78-569298a60e27",
+      "logicalId": "291782ad-72d8-4a18-99dd-542fc1888e81",
+      "persisted": true,
+      "duplicate": false
+    },
+    {
+      "kind": "upload",
+      "actorId": "e2b4cca2-73df-42d3-ba78-569298a60e27",
+      "logicalId": "877d1d32-ed6f-4953-9c99-87739d13e5a6",
+      "persisted": true,
+      "duplicate": false
+    },
+    {
+      "kind": "ai",
+      "actorId": "e2b4cca2-73df-42d3-ba78-569298a60e27",
+      "logicalId": "9eb6b7b2-db95-4348-bb96-8a1eb02427dc",
+      "persisted": true,
+      "provider": "local_simulation"
+    },
+    {
+      "kind": "manualSync",
+      "workspaceId": "c347b4e6-d38f-457b-8667-a117e3c2423b",
+      "logicalId": "1196ebd6-f72c-4ae3-a6aa-2c7a41b145fd",
+      "run": {
+        "id": "6e67d28d-c58b-4320-b134-33ddaa6da532",
+        "status": "succeeded",
+        "row_count": 100,
+        "fact_count": 100
+      }
+    },
+    {
+      "kind": "manualSync",
+      "workspaceId": "94e1e8b3-a38c-4780-9870-702dd157ebb1",
+      "logicalId": "52bd9457-bf46-4347-99cd-88e2772bfb99",
+      "run": {
+        "id": "1903f181-92d8-40f1-bd3e-a70409e3fb25",
+        "status": "succeeded",
+        "row_count": 100,
+        "fact_count": 100
+      }
+    },
+    {
+      "kind": "scheduled",
+      "logicalId": "99799ab6-c939-4b3e-aacc-2a30ffaeb14f:qualification:scheduled",
+      "result": {
+        "enabled": true,
+        "attempted": 2,
+        "succeeded": 2,
+        "failed": 0,
+        "deferred": 0,
+        "backoffFailed": 0,
+        "peakActive": 2,
+        "admissionRpcAttempts": 2,
+        "admissionRetries": 0,
+        "admissionWaitMs": 4
+      },
+      "syntheticDueSetup": {
+        "before": [
+          {
+            "id": "7018c44f-29de-476f-a189-e6351e92f1ec",
+            "next_sync_at": "2026-10-05T21:00:00.000Z"
+          },
+          {
+            "id": "ad09dca8-e02d-41c4-bd80-9239fa56477a",
+            "next_sync_at": "2026-10-05T21:00:00.000Z"
+          }
+        ],
+        "at": "2026-10-05T20:46:48.297Z"
+      }
+    }
+  ],
+  "inventoryCompleteness": {
+    "databaseRows": true,
+    "storageObjects": true,
+    "primaryMutationMapping": true,
+    "allRelations": true,
+    "citations": true,
+    "jobs": true,
+    "actorVisibility": true
+  },
+  "readbackCatalog": "/tmp/vaeroex-capacity-small-02/readback-catalog.json"
+}

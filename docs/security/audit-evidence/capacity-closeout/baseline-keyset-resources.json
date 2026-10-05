@@ -1,0 +1,13 @@
+{
+  "samples": 1182,
+  "peakAggregateRssBytes": 1442103296,
+  "meanCpuCores": 0.6237387685414594,
+  "p95CpuCores": 1.3349778708668207,
+  "peakCpuCores": 2.395119123053779,
+  "peakDatabaseConnections": 9,
+  "peakQueueDepth": 2,
+  "peakInFlightJobs": 1,
+  "peakQueueAgeMs": 39259,
+  "egressViolations": 0,
+  "integrityViolations": 0
+}

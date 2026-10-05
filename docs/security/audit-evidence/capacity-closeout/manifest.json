@@ -1,0 +1,848 @@
+{
+  "kind": "capacity_component_evidence_manifest",
+  "capturedAt": "2026-10-05T19:20:05.189695+00:00",
+  "applicationCommit": "0a15ddcd3b564086280fec21b79b6976b3a3cc44",
+  "browserBuildId": "Al9qF5_qWkauu-mtndnoO",
+  "scope": "Component protocol/browser evidence only; no full active-user workload verdict. QBO/component result files without embedded commit are not retrospectively assigned an execution commit. Source hashes below identify retained implementation and comparison with the explicit built application commit.",
+  "files": [
+    {
+      "file": "sheets-dispatch-native.json",
+      "sha256": "87b89227f95fd56c574c8346509cbee691599dbaf0ac3418759d24359a7bf7f3",
+      "sourceBasename": "vaeroex-capacity-sheets-native-2.json",
+      "originalSha256": "87b89227f95fd56c574c8346509cbee691599dbaf0ac3418759d24359a7bf7f3",
+      "sanitization": "Only repository absolute prefix converted to relative path; parsed JSON verified for disallowed secret/body fields and credential patterns."
+    },
+    {
+      "file": "sheets-data-embedded.json",
+      "sha256": "396c3690a53217bb8b4f5f834df0612fd5ca9adb70b7b872af950017cc0cb617",
+      "sourceBasename": "vaeroex-capacity-sheets-embedded-final.json",
+      "originalSha256": "8f37a9bb7b2512c8a6d375b9de233d4c8713612e594970b981afb6c708feaf25",
+      "sanitization": "Only repository absolute prefix converted to relative path; parsed JSON verified for disallowed secret/body fields and credential patterns."
+    },
+    {
+      "file": "sheets-sync-component.json",
+      "sha256": "0fa843b11e5f86b8577a7d9b00c5f7be1353adfb96b0e44598966233e72a72b5",
+      "sourceBasename": "vaeroex-capacity-sheets-sync-final.json",
+      "originalSha256": "08858bf07775c4b9103eba71dc23800e228e913c54bcda690f182bd5f96f0d37",
+      "sanitization": "Only repository absolute prefix converted to relative path; parsed JSON verified for disallowed secret/body fields and credential patterns."
+    },
+    {
+      "file": "sheets-scheduler-virtual.json",
+      "sha256": "27cb384cd541d1b81839ea191158ac609737e9f1438571b1d40261c91f4f6d8a",
+      "sourceBasename": "vaeroex-capacity-scheduler-virtual-final.json",
+      "originalSha256": "2285c94f082ca1d419523d9bea265b23361082946d3c55b188458e885dd39ae6",
+      "sanitization": "Only repository absolute prefix converted to relative path; parsed JSON verified for disallowed secret/body fields and credential patterns."
+    },
+    {
+      "file": "sheets-recovery-fair-scan-native.json",
+      "sha256": "167cd069245053049e8ac679d9483998b4cb566127191bc057bef360a2cc4350",
+      "sourceBasename": "vaeroex-sheets-recovery-continuation-native-result.json",
+      "originalSha256": "167cd069245053049e8ac679d9483998b4cb566127191bc057bef360a2cc4350",
+      "sanitization": "Only repository absolute prefix converted to relative path; parsed JSON verified for disallowed secret/body fields and credential patterns."
+    },
+    {
+      "file": "issue-receipts-native.json",
+      "sha256": "92df174c373048564c662a0d8c150dfaa0e0822fef6372a218a48bb21edcefa3",
+      "sourceBasename": "vaeroex-capacity-issue-native.json",
+      "originalSha256": "92df174c373048564c662a0d8c150dfaa0e0822fef6372a218a48bb21edcefa3",
+      "sanitization": "Only repository absolute prefix converted to relative path; parsed JSON verified for disallowed secret/body fields and credential patterns."
+    },
+    {
+      "file": "issue-receipts-embedded.json",
+      "sha256": "aedbdeab249f23cf9217788082f38c8f4e4c39fb4058431379649b0d880fac61",
+      "sourceBasename": "vaeroex-capacity-issue-embedded.json",
+      "originalSha256": "aedbdeab249f23cf9217788082f38c8f4e4c39fb4058431379649b0d880fac61",
+      "sanitization": "Only repository absolute prefix converted to relative path; parsed JSON verified for disallowed secret/body fields and credential patterns."
+    },
+    {
+      "file": "qbo-pool-native.json",
+      "sha256": "29d1705e617c6c7a495b78c49dc3c2ca3be81ed14cfd2c0058a7b96a3ac9e768",
+      "sourceBasename": "vaeroex-qbo-budget-native-result.json",
+      "originalSha256": "29d1705e617c6c7a495b78c49dc3c2ca3be81ed14cfd2c0058a7b96a3ac9e768",
+      "sanitization": "Only repository absolute prefix converted to relative path; parsed JSON verified for disallowed secret/body fields and credential patterns."
+    },
+    {
+      "file": "qbo-worker-budget-component.json",
+      "sha256": "2485d6f5a0f346076a564f7c1181a9a85b97c5f49a1c47e8607e13aa175f2b63",
+      "sourceBasename": "vaeroex-qbo-worker-budget-result.json",
+      "originalSha256": "2485d6f5a0f346076a564f7c1181a9a85b97c5f49a1c47e8607e13aa175f2b63",
+      "sanitization": "Only repository absolute prefix converted to relative path; parsed JSON verified for disallowed secret/body fields and credential patterns."
+    },
+    {
+      "file": "qbo-recovery-component.json",
+      "sha256": "8da80a5276241ed20cc2ef40a8c7d9851cbfe2c425a56939b4e26feb96a489d6",
+      "sourceBasename": "vaeroex-qbo-runtime-recovery-result.json",
+      "originalSha256": "8da80a5276241ed20cc2ef40a8c7d9851cbfe2c425a56939b4e26feb96a489d6",
+      "sanitization": "Only repository absolute prefix converted to relative path; parsed JSON verified for disallowed secret/body fields and credential patterns."
+    },
+    {
+      "file": "qbo-recovery-native.json",
+      "sha256": "2e9c5039958a05d805a4e0fedf497bb32cf2dc2f88e731809b5ff7babdb92f72",
+      "sourceBasename": "vaeroex-qbo-runtime-recovery-native-result.json",
+      "originalSha256": "2e9c5039958a05d805a4e0fedf497bb32cf2dc2f88e731809b5ff7babdb92f72",
+      "sanitization": "Only repository absolute prefix converted to relative path; parsed JSON verified for disallowed secret/body fields and credential patterns."
+    },
+    {
+      "file": "qbo-kill-native.json",
+      "sha256": "d600e1a8001a3582d8e8fe430926eeab640a2a74ac1212d3bcd3fd3b6ed35c1a",
+      "sourceBasename": "vaeroex-qbo-runtime-kill-native-result.json",
+      "originalSha256": "d600e1a8001a3582d8e8fe430926eeab640a2a74ac1212d3bcd3fd3b6ed35c1a",
+      "sanitization": "Only repository absolute prefix converted to relative path; parsed JSON verified for disallowed secret/body fields and credential patterns."
+    },
+    {
+      "file": "issue-browser-final.json",
+      "sha256": "40758d7a088c3272b230db73ecf06ed6a7babd3b38593351faa8d14227c60b81",
+      "sourceBasename": "result.json",
+      "originalSha256": "40758d7a088c3272b230db73ecf06ed6a7babd3b38593351faa8d14227c60b81",
+      "sanitization": "Only repository absolute prefix converted to relative path; parsed JSON verified for disallowed secret/body fields and credential patterns."
+    },
+    {
+      "file": "migrations-applied-local.json",
+      "sha256": "eecfa32e05eaffe98ee29bc664e5f10135ae57268d721d53561d43c83aa91752",
+      "sourceBasename": "migrations-applied.json",
+      "originalSha256": "eecfa32e05eaffe98ee29bc664e5f10135ae57268d721d53561d43c83aa91752",
+      "sanitization": "Only repository absolute prefix converted to relative path; parsed JSON verified for disallowed secret/body fields and credential patterns."
+    },
+    {
+      "file": "recovery-migration-applied-local.json",
+      "sha256": "1367218fe51dbf9f9ebc550e73ae1f47f07c033ed1f67677b59be07297327aa0",
+      "sourceBasename": "recovery-migration-applied.json",
+      "originalSha256": "1367218fe51dbf9f9ebc550e73ae1f47f07c033ed1f67677b59be07297327aa0",
+      "sanitization": "Only repository absolute prefix converted to relative path; parsed JSON verified for disallowed secret/body fields and credential patterns."
+    },
+    {
+      "file": "sheets-failure-cleanup-native.json",
+      "sha256": "52815551cc7fcdbd9c8d952f227f641eedd8b65a595d42ef810e3f8b54ef2ad8",
+      "sourceRelativeToOwnedOutput": "fault-qualified-01/failure-cleanup-native-final-02.json",
+      "originalSha256": "52815551cc7fcdbd9c8d952f227f641eedd8b65a595d42ef810e3f8b54ef2ad8",
+      "sanitization": "Only repository absolute prefix converted to relative path; parsed JSON structurally reviewed and checked for prohibited secret/header/body fields and credential patterns."
+    },
+    {
+      "file": "sheets-failure-cleanup-full-schema-rollback.json",
+      "sha256": "5920c9d60f87a8c92e05d65248ebf531d82c3a42f5d136fb74461ce3e4f55773",
+      "sourceRelativeToOwnedOutput": "fault-qualified-01/expired-fail-rpc-positive-rollback.json",
+      "originalSha256": "5920c9d60f87a8c92e05d65248ebf531d82c3a42f5d136fb74461ce3e4f55773",
+      "sanitization": "Only repository absolute prefix converted to relative path; parsed JSON structurally reviewed and checked for prohibited secret/header/body fields and credential patterns."
+    },
+    {
+      "file": "sheets-failure-cleanup-negative.json",
+      "sha256": "d1b2fb3298edf6e77beec36f99d1c15b6b1d8177b332844d8a9a3e4ac29ce6f1",
+      "sourceRelativeToOwnedOutput": "fault-qualified-01/expired-fail-rpc-before.json",
+      "originalSha256": "d1b2fb3298edf6e77beec36f99d1c15b6b1d8177b332844d8a9a3e4ac29ce6f1",
+      "sanitization": "Only repository absolute prefix converted to relative path; parsed JSON structurally reviewed and checked for prohibited secret/header/body fields and credential patterns."
+    },
+    {
+      "file": "sheets-expired-authorization-original-failure.json",
+      "sha256": "282e79eccf22ca9b776b96ff19ed96ce005fbe1cc7ff1d9f94d7c5f16645848d",
+      "sourceRelativeToOwnedOutput": "fault-qualified-01/expired_authorization-final/expired_authorization.json",
+      "originalSha256": "282e79eccf22ca9b776b96ff19ed96ce005fbe1cc7ff1d9f94d7c5f16645848d",
+      "sanitization": "Only repository absolute prefix converted to relative path; parsed JSON structurally reviewed and checked for prohibited secret/header/body fields and credential patterns."
+    },
+    {
+      "file": "sheets-original-run-recovery.json",
+      "sha256": "52f236ef6d9df17c1af03270cde2acddd83944f600198c934c82fce38a6a7846",
+      "sourceRelativeToOwnedOutput": "fault-qualified-02/reconcile-original-expired-run/result.json",
+      "originalSha256": "52f236ef6d9df17c1af03270cde2acddd83944f600198c934c82fce38a6a7846",
+      "sanitization": "Only repository absolute prefix converted to relative path; parsed JSON structurally reviewed and checked for prohibited secret/header/body fields and credential patterns."
+    },
+    {
+      "file": "failure-cleanup-migration-applied-local.json",
+      "sha256": "11b6f52d6c434f2ad52e17ff52fa5da2cafc16caedb64b133e8e0445b0835fb5",
+      "sourceRelativeToOwnedOutput": "failure-cleanup-migration-applied.json",
+      "originalSha256": "11b6f52d6c434f2ad52e17ff52fa5da2cafc16caedb64b133e8e0445b0835fb5",
+      "sanitization": "Only repository absolute prefix converted to relative path; parsed JSON structurally reviewed and checked for prohibited secret/header/body fields and credential patterns."
+    },
+    {
+      "file": "upload-original-boundaries-summary.json",
+      "sha256": "5bb5d4551feb99a3b90299a607bcc6896b2c4134335d5212e58ff9e15f057e54",
+      "sourceRelativeToOwnedOutput": "upload-boundaries/qualified-summary.json",
+      "originalSha256": "5bb5d4551feb99a3b90299a607bcc6896b2c4134335d5212e58ff9e15f057e54",
+      "sanitization": "Only repository absolute prefix converted to relative path; parsed JSON structurally reviewed and checked for prohibited secret/header/body fields and credential patterns."
+    },
+    {
+      "file": "upload-supported-rows-v1.json",
+      "sha256": "aea10faf90433cd41c3464585a51f9100d8c9526ca2c27bde81cb8421f3ea79f",
+      "sourceRelativeToOwnedOutput": "upload-boundaries/b68365ad-d259-4387-b04a-41b6e8267d22/result.json",
+      "originalSha256": "aea10faf90433cd41c3464585a51f9100d8c9526ca2c27bde81cb8421f3ea79f",
+      "sanitization": "Only repository absolute prefix converted to relative path; parsed JSON structurally reviewed and checked for prohibited secret/header/body fields and credential patterns."
+    },
+    {
+      "file": "upload-boundaries-initial-observations.json",
+      "sha256": "04abfe1a5b4e9cd27c87779ed77e1991c7a162c3c4475fb1b7837570781847ac",
+      "sourceRelativeToOwnedOutput": "upload-boundaries/f0e73dfd-b746-4504-8ca5-d1ca5a46ed79/result.json",
+      "originalSha256": "04abfe1a5b4e9cd27c87779ed77e1991c7a162c3c4475fb1b7837570781847ac",
+      "sanitization": "Only repository absolute prefix converted to relative path; parsed JSON structurally reviewed and checked for prohibited secret/header/body fields and credential patterns."
+    },
+    {
+      "file": "upload-boundaries-render-qualified.json",
+      "sha256": "2abe7fa8f741e0e16297b7cf7a1584b83250d099f03eb81dd225d6774cc1aaf9",
+      "sourceRelativeToOwnedOutput": "upload-boundaries/ae24159f-f8b9-405a-85ae-473e991b6765/result.json",
+      "originalSha256": "2abe7fa8f741e0e16297b7cf7a1584b83250d099f03eb81dd225d6774cc1aaf9",
+      "sanitization": "Only repository absolute prefix converted to relative path; parsed JSON structurally reviewed and checked for prohibited secret/header/body fields and credential patterns."
+    },
+    {
+      "file": "baseline-small-summary.json",
+      "sha256": "c9614dcc19e70b06fe9b7ac0005fc673e0274af58cb1cf84bc2d22f400ec53ff",
+      "sourceRelativeToOwnedOutput": "baseline/summary.json",
+      "originalSha256": "c9614dcc19e70b06fe9b7ac0005fc673e0274af58cb1cf84bc2d22f400ec53ff",
+      "sanitization": "Repository absolute source prefix made relative; selected result only, disallowed fields and credential patterns checked."
+    },
+    {
+      "file": "baseline-small-resources.json",
+      "sha256": "9222c29fbb7a18f024dcd3065011772a30f763ffc3be158a7eae75fee4170dd8",
+      "sourceRelativeToOwnedOutput": "baseline/resource-summary.json",
+      "originalSha256": "9222c29fbb7a18f024dcd3065011772a30f763ffc3be158a7eae75fee4170dd8",
+      "sanitization": "Repository absolute source prefix made relative; selected result only, disallowed fields and credential patterns checked."
+    },
+    {
+      "file": "baseline-small-integrity.json",
+      "sha256": "ebb8be4b4fc8962ab08b66e1900691a98fe061e8a7032e38443ad80056f8344d",
+      "sourceRelativeToOwnedOutput": "baseline/integrity.json",
+      "originalSha256": "ebb8be4b4fc8962ab08b66e1900691a98fe061e8a7032e38443ad80056f8344d",
+      "sanitization": "Repository absolute source prefix made relative; selected result only, disallowed fields and credential patterns checked."
+    },
+    {
+      "file": "baseline-small-source-manifest.json",
+      "sha256": "becadd2e90f0903fed550ac6493da4879f6a78e5f4fdc19cce85e1c2e7589175",
+      "sourceRelativeToOwnedOutput": "baseline/evidence-manifest.json",
+      "originalSha256": "447eb3ef1af4129131fd8d0055283731847b2e6fe8857fa45ad12776c32c0e6d",
+      "sanitization": "Repository absolute source prefix made relative; selected result only, disallowed fields and credential patterns checked."
+    },
+    {
+      "file": "baseline-small-inventory-counts.json",
+      "sha256": "be61fbf45179dda7dcdf583523f8e6388a80dbf470627558035bbeffc6a3f554",
+      "sanitization": "New aggregate-only summary derived from two exports whose original hashes are independently matched to the retained baseline manifest. No source row contents copied."
+    },
+    {
+      "file": "sheets-dispatch-round-robin-native.json",
+      "sha256": "8ddd3499743406ba8317732a71d6f2fd7ca6657459e837fd47c885db5bcd0abe",
+      "sourceBasename": "vaeroex-sheets-dispatch-fairness-native-result.json",
+      "originalSha256": "8ddd3499743406ba8317732a71d6f2fd7ca6657459e837fd47c885db5bcd0abe",
+      "sanitization": "Only repository absolute prefix converted to relative path; selected result JSON reviewed and scanned for secret fields/credential patterns. No raw exports, sessions, headers, bodies or configurations retained."
+    },
+    {
+      "file": "sheets-dispatch-100-virtual.json",
+      "sha256": "70a482369acec7ea140a898af26958c040d5a31aacc79edc9cde7ff35d7ba3f5",
+      "sourceBasename": "vaeroex-sheets-100-dispatch-virtual.json",
+      "originalSha256": "86adc1a1dff9311ac4a3e3f1b71303dba0ca09a5e51192f54fe370d9bbe2c052",
+      "sanitization": "Only repository absolute prefix converted to relative path; selected result JSON reviewed and scanned for secret fields/credential patterns. No raw exports, sessions, headers, bodies or configurations retained."
+    },
+    {
+      "file": "qbo-kill-270-native.json",
+      "sha256": "2e932f817a8cc5ab49e14e4218b0b82e31377c867347614dc557684c21fa448d",
+      "sourceBasename": "vaeroex-qbo-runtime-kill-270-native-result.json",
+      "originalSha256": "2e932f817a8cc5ab49e14e4218b0b82e31377c867347614dc557684c21fa448d",
+      "sanitization": "Only repository absolute prefix converted to relative path; selected result JSON reviewed and scanned for secret fields/credential patterns. No raw exports, sessions, headers, bodies or configurations retained."
+    },
+    {
+      "file": "dispatch-fairness-migration-applied-local.json",
+      "sha256": "4c463d7898ff80507ec612b6839c49e8ebfee248d476ee7ce39cbc01130506ee",
+      "sourceBasename": "dispatch-fairness-migration-applied.json",
+      "originalSha256": "4c463d7898ff80507ec612b6839c49e8ebfee248d476ee7ce39cbc01130506ee",
+      "sanitization": "Only repository absolute prefix converted to relative path; selected result JSON reviewed and scanned for secret fields/credential patterns. No raw exports, sessions, headers, bodies or configurations retained."
+    },
+    {
+      "file": "ci-05dbc9c5-manifest-failures.json",
+      "sha256": "3dac0ebc7e6da50f29396bb8b9c8c346ae4b84c30e235266e7be29d90a4c9cf1",
+      "sourceBasename": "vaeroex-ci-05dbc9c5-failure.json",
+      "originalSha256": "3dac0ebc7e6da50f29396bb8b9c8c346ae4b84c30e235266e7be29d90a4c9cf1",
+      "sanitization": "Only repository absolute prefix converted to relative path; selected result JSON reviewed and scanned for secret fields/credential patterns. No raw exports, sessions, headers, bodies or configurations retained."
+    },
+    {
+      "file": "kpi-offset-diagnostic.json",
+      "sha256": "ade748737093d97f1ab7fef6f326e17c868674d19cd1bb8bedd0799a28751ac9",
+      "sourceBasename": "result.json",
+      "originalSha256": "ade748737093d97f1ab7fef6f326e17c868674d19cd1bb8bedd0799a28751ac9",
+      "sanitization": "Only repository absolute prefix converted to relative path; selected result JSON reviewed and scanned for secret fields/credential patterns. No raw exports, sessions, headers, bodies or configurations retained."
+    },
+    {
+      "file": "kpi-keyset-authenticated-comparison.json",
+      "sha256": "2b66953ec674539c58d812158f35ea52693fa19c6dd7be01cb141ca60c33311b",
+      "sourceBasename": "result.json",
+      "originalSha256": "2b66953ec674539c58d812158f35ea52693fa19c6dd7be01cb141ca60c33311b",
+      "sanitization": "Only repository absolute prefix converted to relative path; selected result JSON reviewed and scanned for secret fields/credential patterns. No raw exports, sessions, headers, bodies or configurations retained."
+    },
+    {
+      "file": "kpi-keyset-component-checks.json",
+      "sha256": "45793f195e3885a78a46f0527d6b5c87539fbd6f7b1fe3aadbc04dbc110348f6",
+      "sourceBasename": "implementation-checks.json",
+      "originalSha256": "45793f195e3885a78a46f0527d6b5c87539fbd6f7b1fe3aadbc04dbc110348f6",
+      "sanitization": "Only repository absolute prefix converted to relative path; selected result JSON reviewed and scanned for secret fields/credential patterns. No raw exports, sessions, headers, bodies or configurations retained."
+    },
+    {
+      "file": "qbo-candidate-capacity-tail-native.json",
+      "sha256": "380df619ec0a5a78fe21c3ebed1facacdfd80795bc3269e89617f1b213f4b1cb",
+      "sourceBasename": "results.json",
+      "originalSha256": "22d33d051f0c298c6cb17db30901a2727bcf2c640ba0aa451dd01ee4966b5bc5",
+      "sanitization": "Selected synthetic native result only; all secret fields/credential patterns checked. No configurations, credentials, raw records, headers or SQL fixtures copied."
+    },
+    {
+      "file": "kpi-browser-final.json",
+      "sha256": "8249cd399e8d5a418b1037f0f1cbe5aa61dcee13184b95e7747e35e805ca6ecf",
+      "sourceBasename": "result.json",
+      "originalSha256": "8249cd399e8d5a418b1037f0f1cbe5aa61dcee13184b95e7747e35e805ca6ecf",
+      "sanitization": "Selected synthetic result only; credential/key scan passed. Failure reconciliation additionally records exact original negative-result hashes and diagnostic counts. No private configuration, sessions, headers or bodies retained."
+    },
+    {
+      "file": "kpi-browser-failure-reconciliation.json",
+      "sha256": "7385889398c7aeeb608b220feaf6ea4b3b5100a01495af9243323fda330d7e05",
+      "sourceBasename": "reconciliation.json",
+      "originalSha256": "8c4d4926d89df36d2aeb61ce7d9922be3bd3d66ae5bf3b178956a2e23da7009c",
+      "sanitization": "Selected synthetic result only; credential/key scan passed. Failure reconciliation additionally records exact original negative-result hashes and diagnostic counts. No private configuration, sessions, headers or bodies retained."
+    },
+    {
+      "file": "adapters-396ec2f7-qualification.json",
+      "sha256": "91ca92dc66f2a653dd6c08851ebcffbb5256cc96cec69a447651e7ef1d188728",
+      "sourceBasename": "qualification-result.json",
+      "originalSha256": "91ca92dc66f2a653dd6c08851ebcffbb5256cc96cec69a447651e7ef1d188728",
+      "sanitization": "Selected synthetic result only; credential/key scan passed. Failure reconciliation additionally records exact original negative-result hashes and diagnostic counts. No private configuration, sessions, headers or bodies retained."
+    },
+    {
+      "file": "worker-immediate-qualification.json",
+      "sha256": "8c6cf95015b9450620d5c06d591beff650be97008e6ecd0816b878dbadcdd96c",
+      "sourceBasename": "fault-worker-immediate-01/worker_interruption.json",
+      "originalSha256": "8c6cf95015b9450620d5c06d591beff650be97008e6ecd0816b878dbadcdd96c",
+      "sanitization": "Selected synthetic component result/provenance only; all prohibited-key and credential-pattern checks passed. Raw transport journals, sessions, headers, request bodies and configurations excluded."
+    },
+    {
+      "file": "worker-forced-outage-original.json",
+      "sha256": "f1895cbf859d0ca40f14f73cf809d32889c71f4d0f9fe584b5ad2b5e4ba9e3b4",
+      "sourceBasename": "fault-qualified-02/worker_interruption/worker_interruption.json",
+      "originalSha256": "f1895cbf859d0ca40f14f73cf809d32889c71f4d0f9fe584b5ad2b5e4ba9e3b4",
+      "sanitization": "Selected synthetic component result/provenance only; all prohibited-key and credential-pattern checks passed. Raw transport journals, sessions, headers, request bodies and configurations excluded."
+    },
+    {
+      "file": "fault-components-original-summary.json",
+      "sha256": "3a2a9a4adfb00c66efdbacb90b2d4fd7f759f1dcabbcc77b320aaac27d7fb2a4",
+      "sourceBasename": "fault-qualified-02/component-summary.json",
+      "originalSha256": "3a2a9a4adfb00c66efdbacb90b2d4fd7f759f1dcabbcc77b320aaac27d7fb2a4",
+      "sanitization": "Selected synthetic component result/provenance only; all prohibited-key and credential-pattern checks passed. Raw transport journals, sessions, headers, request bodies and configurations excluded."
+    },
+    {
+      "file": "worker-original-controller-provenance.json",
+      "sha256": "573fd44c6cd5cdcbd7a76266c045976a8e94af03c5bbe46681d540df3f679a7e",
+      "sourceBasename": "fault-qualified-02/controller-provenance.json",
+      "originalSha256": "573fd44c6cd5cdcbd7a76266c045976a8e94af03c5bbe46681d540df3f679a7e",
+      "sanitization": "Selected synthetic component result/provenance only; all prohibited-key and credential-pattern checks passed. Raw transport journals, sessions, headers, request bodies and configurations excluded."
+    },
+    {
+      "file": "worker-original-preload-provenance.json",
+      "sha256": "1a5137fb8f66d2edd19bd6449c0bd5ccb0d7cb4b42101192a266f3aa023c3385",
+      "sourceBasename": "fault-qualified-02/preload-provenance.json",
+      "originalSha256": "1a5137fb8f66d2edd19bd6449c0bd5ccb0d7cb4b42101192a266f3aa023c3385",
+      "sanitization": "Selected synthetic component result/provenance only; all prohibited-key and credential-pattern checks passed. Raw transport journals, sessions, headers, request bodies and configurations excluded."
+    },
+    {
+      "file": "ci-396ec2f7-hosted-runner-unavailable.json",
+      "sha256": "2bc1f823ba34342dca4050f6e09962e019660bc8bc938061c33a7ba13a5df07e",
+      "sourceBasename": "vaeroex-ci-396ec2f7-runner-failure.json",
+      "originalSha256": "76e33e616a0c43c58533570f0c300b1ddd2e4871ab6d26431b4fb8323e80caf6",
+      "sanitization": "Original public CI annotations plus independent run/job/log status recheck. Credential fields/patterns checked; no runtime configurations, headers or records retained."
+    },
+    {
+      "file": "baseline-keyset-summary.json",
+      "sha256": "b0dd8e4cefb202a5386c220ccc6f00834f2c9f359c77ca0f7058a0ae3637846e",
+      "sourceBasename": "summary.json",
+      "originalSha256": "b0dd8e4cefb202a5386c220ccc6f00834f2c9f359c77ca0f7058a0ae3637846e",
+      "sanitization": "Selected synthetic result only; repository prefix normalized in source paths. Credential fields/patterns checked. Raw inventory, sessions, headers, request/response bodies and runtime configuration not copied."
+    },
+    {
+      "file": "baseline-keyset-integrity.json",
+      "sha256": "ebb8be4b4fc8962ab08b66e1900691a98fe061e8a7032e38443ad80056f8344d",
+      "sourceBasename": "integrity.json",
+      "originalSha256": "ebb8be4b4fc8962ab08b66e1900691a98fe061e8a7032e38443ad80056f8344d",
+      "sanitization": "Selected synthetic result only; repository prefix normalized in source paths. Credential fields/patterns checked. Raw inventory, sessions, headers, request/response bodies and runtime configuration not copied."
+    },
+    {
+      "file": "baseline-keyset-resources.json",
+      "sha256": "3ffe4457abd9e97c3b607063d8402e435186f3e1e28bb04c40eff7fa307d1ab7",
+      "sourceBasename": "resource-summary.json",
+      "originalSha256": "3ffe4457abd9e97c3b607063d8402e435186f3e1e28bb04c40eff7fa307d1ab7",
+      "sanitization": "Selected synthetic result only; repository prefix normalized in source paths. Credential fields/patterns checked. Raw inventory, sessions, headers, request/response bodies and runtime configuration not copied."
+    },
+    {
+      "file": "baseline-keyset-inventory-counts.json",
+      "sha256": "c41e54049989c04e4f539b9c8b009a6e28696e569d01f3b19eea0f04e45b65ef",
+      "sourceBasename": "inventory-counts.json",
+      "originalSha256": "c41e54049989c04e4f539b9c8b009a6e28696e569d01f3b19eea0f04e45b65ef",
+      "sanitization": "Selected synthetic result only; repository prefix normalized in source paths. Credential fields/patterns checked. Raw inventory, sessions, headers, request/response bodies and runtime configuration not copied."
+    },
+    {
+      "file": "baseline-keyset-source-manifest.json",
+      "sha256": "458007383ede4fd4ce2150725b90c867f845a46349eed535caa71ab0b989846c",
+      "sourceBasename": "evidence-manifest.json",
+      "originalSha256": "ba3036c92841c5bdd0683fc27dd7912dc5ff00e8404258c5c2b7e617f04a4210",
+      "sanitization": "Selected synthetic result only; repository prefix normalized in source paths. Credential fields/patterns checked. Raw inventory, sessions, headers, request/response bodies and runtime configuration not copied."
+    },
+    {
+      "file": "baseline-keyset-drain-gap.json",
+      "sha256": "32e9f4a2732802270bfae1f7a84bb1c8e667cf4c28ac5d0555aeaa5f5ff2ba3b",
+      "sourceBasename": "drain-gap.json",
+      "originalSha256": "e3e84d3568ffecf4003f871fdceb4dd7f877d7fecbc81e1e9c833c9070dd2f32",
+      "sanitization": "Selected synthetic result only; repository prefix normalized in source paths. Credential fields/patterns checked. Raw inventory, sessions, headers, request/response bodies and runtime configuration not copied."
+    },
+    {
+      "file": "rollout-thirteen-final.json",
+      "sha256": "913f00fa9a02297ea31fca120f05a24e7cf9ba77749f7128d67b10fdc5ede4d8",
+      "sourceBasename": "result.json",
+      "originalSha256": "913f00fa9a02297ea31fca120f05a24e7cf9ba77749f7128d67b10fdc5ede4d8",
+      "sanitization": "Selected synthetic rehearsal result; repository prefix normalized if present. Credential key/pattern scan passed. No runtime configuration, Auth tokens, request headers or customer records retained."
+    },
+    {
+      "file": "rollout-thirteen-fixture-failure.json",
+      "sha256": "7cbfd1e69a570edc4f92b5cf1ef07fc66f6b9f57d2d4ad5f419603a5bdaba4e4",
+      "sourceBasename": "result.json",
+      "originalSha256": "7cbfd1e69a570edc4f92b5cf1ef07fc66f6b9f57d2d4ad5f419603a5bdaba4e4",
+      "sanitization": "Selected synthetic rehearsal result; repository prefix normalized if present. Credential key/pattern scan passed. No runtime configuration, Auth tokens, request headers or customer records retained."
+    },
+    {
+      "file": "final-owned-shutdown.json",
+      "sha256": "9d5666b74e80a8fc52b4f7cea4147b84425777bb91fa596736587a459ee0aa00",
+      "sourceBasename": "final-owned-shutdown.json",
+      "originalSha256": "9d5666b74e80a8fc52b4f7cea4147b84425777bb91fa596736587a459ee0aa00",
+      "sanitization": "Synthetic runtime identity/status and source preservation metadata only; no credentials or record contents."
+    },
+    {
+      "file": "final-original-preservation.json",
+      "sha256": "041201cd7a1d63681112a1d16f964ad770f31bd7d1b2b6f7259270658584f655",
+      "sourceBasename": "final-original-preservation.json",
+      "originalSha256": "041201cd7a1d63681112a1d16f964ad770f31bd7d1b2b6f7259270658584f655",
+      "sanitization": "Synthetic runtime identity/status and source preservation metadata only; no credentials or record contents."
+    }
+  ],
+  "sourceFiles": [
+    {
+      "path": "app/api/integrations/google-sheets/recover-syncs/route.ts",
+      "sha256AtRetention": "ed64339d3599de6a1b3be8ba5ca63a54cefd5634d06efc0f51b3dfacea7556c9",
+      "matchesApplicationCommit": true,
+      "priorComponentManifestSha256": "ed64339d3599de6a1b3be8ba5ca63a54cefd5634d06efc0f51b3dfacea7556c9",
+      "matchesPriorComponentManifest": true
+    },
+    {
+      "path": "app/api/integrations/google-sheets/scheduled-sync/route.ts",
+      "sha256AtRetention": "6ca9b8abcec965d9b621b87e5b4c81c3dcd4a89c35ed5edc5810c86c3c0ca809",
+      "matchesApplicationCommit": true,
+      "priorComponentManifestSha256": "6ca9b8abcec965d9b621b87e5b4c81c3dcd4a89c35ed5edc5810c86c3c0ca809",
+      "matchesPriorComponentManifest": true
+    },
+    {
+      "path": "app/app/issues/page.tsx",
+      "sha256AtRetention": "30b6765389917786d1f828ac565baf057bb77353b841a517fa80a5a1f6071cf5",
+      "matchesApplicationCommit": true,
+      "priorComponentManifestSha256": "30b6765389917786d1f828ac565baf057bb77353b841a517fa80a5a1f6071cf5",
+      "matchesPriorComponentManifest": true
+    },
+    {
+      "path": "app/app/operations/actions.ts",
+      "sha256AtRetention": "b5397ab53a34098ebfcd9bfe737edecd1f084033f9009a56129f05bcbaec99eb",
+      "matchesApplicationCommit": true,
+      "priorComponentManifestSha256": "b5397ab53a34098ebfcd9bfe737edecd1f084033f9009a56129f05bcbaec99eb",
+      "matchesPriorComponentManifest": true
+    },
+    {
+      "path": "app/app/operations/issue-submission-action.ts",
+      "sha256AtRetention": "d4f8f9506178c02fc5753d4407e63468fc0d9b618b64df3349a134a94861d3c4",
+      "matchesApplicationCommit": true,
+      "priorComponentManifestSha256": "d4f8f9506178c02fc5753d4407e63468fc0d9b618b64df3349a134a94861d3c4",
+      "matchesPriorComponentManifest": true
+    },
+    {
+      "path": "components/integrations/google-sheets/status.ts",
+      "sha256AtRetention": "aa6bcb636682652cdc9a561102b141516c4233a1867c70f7eb16571baec260fc",
+      "matchesApplicationCommit": true,
+      "priorComponentManifestSha256": "aa6bcb636682652cdc9a561102b141516c4233a1867c70f7eb16571baec260fc",
+      "matchesPriorComponentManifest": true
+    },
+    {
+      "path": "components/operations/IssueCreateForm.tsx",
+      "sha256AtRetention": "ba5c2a0c68d3403a153e7511c4df9cf63e8f1e6f06a7abf265bc89c7086dcb92",
+      "matchesApplicationCommit": true,
+      "priorComponentManifestSha256": "ba5c2a0c68d3403a153e7511c4df9cf63e8f1e6f06a7abf265bc89c7086dcb92",
+      "matchesPriorComponentManifest": true
+    },
+    {
+      "path": "lib/integrations/google-sheets/ingestion.ts",
+      "sha256AtRetention": "0ff60a237a2c214746eb8dc8b4621108d81f280c321a1881639cf4c9044de83f",
+      "matchesApplicationCommit": true,
+      "priorComponentManifestSha256": "0ff60a237a2c214746eb8dc8b4621108d81f280c321a1881639cf4c9044de83f",
+      "matchesPriorComponentManifest": true
+    },
+    {
+      "path": "lib/integrations/google-sheets/recovery.ts",
+      "sha256AtRetention": "f078f56986905e0e14915c83f967367d9c0e2eba209954e3d351e0d540456ada",
+      "matchesApplicationCommit": true,
+      "priorComponentManifestSha256": "f078f56986905e0e14915c83f967367d9c0e2eba209954e3d351e0d540456ada",
+      "matchesPriorComponentManifest": true
+    },
+    {
+      "path": "lib/integrations/google-sheets/scheduler.ts",
+      "sha256AtRetention": "c63e9f175227a45d1d8ef8d36bddf85532a2ecfe80056f8d3734a1f0c77d46dc",
+      "matchesApplicationCommit": true,
+      "priorComponentManifestSha256": "c63e9f175227a45d1d8ef8d36bddf85532a2ecfe80056f8d3734a1f0c77d46dc",
+      "matchesPriorComponentManifest": true
+    },
+    {
+      "path": "lib/integrations/google-sheets/sync.ts",
+      "sha256AtRetention": "46ad570f3790f0dcc17debb47bd0123b3f2a2bdae3001247db2730f3cb1205b6",
+      "matchesApplicationCommit": true,
+      "priorComponentManifestSha256": "46ad570f3790f0dcc17debb47bd0123b3f2a2bdae3001247db2730f3cb1205b6",
+      "matchesPriorComponentManifest": true
+    },
+    {
+      "path": "lib/integrations/persistence/qbo-production-repository.ts",
+      "sha256AtRetention": "86c6654639786e1e5b99328da4f92bc4d81cc0df63cbec89b98a7048d2865512",
+      "matchesApplicationCommit": true
+    },
+    {
+      "path": "lib/supabase/types.ts",
+      "sha256AtRetention": "89460b39f9be464cb094aa1c1a1049ff00b7649cd7281d5bd3b9cd1ea386e1cb",
+      "matchesApplicationCommit": true,
+      "priorComponentManifestSha256": "89460b39f9be464cb094aa1c1a1049ff00b7649cd7281d5bd3b9cd1ea386e1cb",
+      "matchesPriorComponentManifest": true
+    },
+    {
+      "path": "scripts/audit-scheduler-regression.cjs",
+      "sha256AtRetention": "15773a0fff6b610dc16497e6a6cd8bf855babe47cf144bc16925a07c1aaa0053",
+      "matchesApplicationCommit": true,
+      "priorComponentManifestSha256": "15773a0fff6b610dc16497e6a6cd8bf855babe47cf144bc16925a07c1aaa0053",
+      "matchesPriorComponentManifest": true
+    },
+    {
+      "path": "scripts/google-sheets-data-tests.cjs",
+      "sha256AtRetention": "767a83dbfcf0fabb1e3650f67c8f975d49214e353d36663feac8dccf81d5f5a1",
+      "matchesApplicationCommit": true,
+      "priorComponentManifestSha256": "767a83dbfcf0fabb1e3650f67c8f975d49214e353d36663feac8dccf81d5f5a1",
+      "matchesPriorComponentManifest": true
+    },
+    {
+      "path": "scripts/google-sheets-dispatch-native-tests.cjs",
+      "sha256AtRetention": "66470208d3969b940ae59256af739a784ad627e06818f17b0ec09e76ab8f0e60",
+      "matchesApplicationCommit": true,
+      "priorComponentManifestSha256": "66470208d3969b940ae59256af739a784ad627e06818f17b0ec09e76ab8f0e60",
+      "matchesPriorComponentManifest": true
+    },
+    {
+      "path": "scripts/google-sheets-recovery-continuation-native-tests.cjs",
+      "sha256AtRetention": "4293800739bdc41b24ad95d46b905a42afe45bf8e4f5b82fe97cc6894ca8b9b3",
+      "matchesApplicationCommit": false
+    },
+    {
+      "path": "scripts/google-sheets-runtime-tests.cjs",
+      "sha256AtRetention": "275619040d93b3588dbb9424e28d2888da2266cc6117c82181e621cb101da1ed",
+      "matchesApplicationCommit": true,
+      "priorComponentManifestSha256": "275619040d93b3588dbb9424e28d2888da2266cc6117c82181e621cb101da1ed",
+      "matchesPriorComponentManifest": true
+    },
+    {
+      "path": "scripts/google-sheets-sync-tests.cjs",
+      "sha256AtRetention": "a7d3617dcf16714f07dea9b64986d6517e1a74b43b3f4205aabd55b8b0c19390",
+      "matchesApplicationCommit": true,
+      "priorComponentManifestSha256": "a7d3617dcf16714f07dea9b64986d6517e1a74b43b3f4205aabd55b8b0c19390",
+      "matchesPriorComponentManifest": true
+    },
+    {
+      "path": "scripts/issue-submission-native-tests.cjs",
+      "sha256AtRetention": "6ce5909eb3df214aa54a8bf5ec493ee9d18821f7da9dd8f279076dc38e6741c6",
+      "matchesApplicationCommit": true,
+      "priorComponentManifestSha256": "6ce5909eb3df214aa54a8bf5ec493ee9d18821f7da9dd8f279076dc38e6741c6",
+      "matchesPriorComponentManifest": true
+    },
+    {
+      "path": "scripts/issue-submission-tests.cjs",
+      "sha256AtRetention": "c200b3b44a89682ddb094618c6d26f1844f014fd870c3d136d41a93df654c133",
+      "matchesApplicationCommit": true,
+      "priorComponentManifestSha256": "c200b3b44a89682ddb094618c6d26f1844f014fd870c3d136d41a93df654c133",
+      "matchesPriorComponentManifest": true
+    },
+    {
+      "path": "scripts/qbo-customer-oauth-completion-tests.cjs",
+      "sha256AtRetention": "fa2570c0630f1e63e17529b2eae07bc7a31242daf65cca9444cc3a93df4d3b2a",
+      "matchesApplicationCommit": true
+    },
+    {
+      "path": "scripts/qbo-database-budget-tests.cjs",
+      "sha256AtRetention": "ee9532f9936552c60ec26e54a463f1009a3e96c94f7ff3b64d0fcf23fd0d3c67",
+      "matchesApplicationCommit": true
+    },
+    {
+      "path": "scripts/qbo-runtime-kill-native-tests.cjs",
+      "sha256AtRetention": "599259f28edf747f859e1f7a1bcb84c5f816d9fbd4383c2f97284fcffd49ebc9",
+      "matchesApplicationCommit": false
+    },
+    {
+      "path": "scripts/qbo-runtime-recovery-native-tests.cjs",
+      "sha256AtRetention": "feb59486e307ea86c8fce0cfa648811b77accc7fd0ac23e8f0e3bd03580b7601",
+      "matchesApplicationCommit": true
+    },
+    {
+      "path": "scripts/qbo-worker-budget-tests.cjs",
+      "sha256AtRetention": "5bdd622e083fc408a0843d683ea247b9c4624580ba93e61967895b14ad26c307",
+      "matchesApplicationCommit": true
+    },
+    {
+      "path": "scripts/test-stubs/issue-pre-receipt-action.txt",
+      "sha256AtRetention": "e39cc095de53800dfca8680c0ef9b9e2490b5a6328e30bcaaaa561cdfb8ef9be",
+      "matchesApplicationCommit": true,
+      "priorComponentManifestSha256": "e39cc095de53800dfca8680c0ef9b9e2490b5a6328e30bcaaaa561cdfb8ef9be",
+      "matchesPriorComponentManifest": true
+    },
+    {
+      "path": "scripts/test-stubs/workspace-workflow-actions.tsx",
+      "sha256AtRetention": "b69a1092f4883b4b41736a0a8b36d1d5972ca494e0db682342ff14abc38ad0a3",
+      "matchesApplicationCommit": true,
+      "priorComponentManifestSha256": "b69a1092f4883b4b41736a0a8b36d1d5972ca494e0db682342ff14abc38ad0a3",
+      "matchesPriorComponentManifest": true
+    },
+    {
+      "path": "scripts/test-stubs/workspace-workflow-entry.tsx",
+      "sha256AtRetention": "fa45cea24838bed75a79eb910ccee320514d327b25f05a29ebe1d7e7d4d8cbce",
+      "matchesApplicationCommit": true,
+      "priorComponentManifestSha256": "fa45cea24838bed75a79eb910ccee320514d327b25f05a29ebe1d7e7d4d8cbce",
+      "matchesPriorComponentManifest": true
+    },
+    {
+      "path": "scripts/workspace-capacity-issue-browser.cjs",
+      "sha256AtRetention": "80eb075c44ff954cf12df62f6c0fb9a3b222aa20276e1f61164868c2dde21d99",
+      "matchesApplicationCommit": false
+    },
+    {
+      "path": "scripts/workspace-workflow-browser-tests.cjs",
+      "sha256AtRetention": "f4c5da233d1a8a29fb7d868e308c8c819eddf7fd16373a6eb365c09f2b584bda",
+      "matchesApplicationCommit": true,
+      "priorComponentManifestSha256": "f4c5da233d1a8a29fb7d868e308c8c819eddf7fd16373a6eb365c09f2b584bda",
+      "matchesPriorComponentManifest": true
+    },
+    {
+      "path": "scripts/workspace-workflow-tests.cjs",
+      "sha256AtRetention": "f054d51d519d845d13f9e4db7d46dfb8c2b028b9db583dc4291dd5bd6a2ae215",
+      "matchesApplicationCommit": true,
+      "priorComponentManifestSha256": "f054d51d519d845d13f9e4db7d46dfb8c2b028b9db583dc4291dd5bd6a2ae215",
+      "matchesPriorComponentManifest": true
+    },
+    {
+      "path": "services/external-integrations-qbo/src/database.ts",
+      "sha256AtRetention": "405f8b67aca6c3632348a9c42be739c5bc8cf9ec17fe7af7ae4e4b7c6083cfa3",
+      "matchesApplicationCommit": true
+    },
+    {
+      "path": "services/external-integrations-qbo/src/execution-budget.ts",
+      "sha256AtRetention": "797eec63179e457c83f39a16cb0ce5609a6f1c2ec41e5400b928d3788083268c",
+      "matchesApplicationCommit": true
+    },
+    {
+      "path": "services/external-integrations-qbo/src/google.ts",
+      "sha256AtRetention": "db341c09c910ad60782261678ed73e0083ffd9190e6af506eb389537a4cd915f",
+      "matchesApplicationCommit": true
+    },
+    {
+      "path": "services/external-integrations-qbo/src/server.ts",
+      "sha256AtRetention": "eeb39664fde220342d15c072eeff5f040053bfb6eb2f6ce9818b5858684f5316",
+      "matchesApplicationCommit": true
+    },
+    {
+      "path": "supabase/migrations/20261005182541_bounded_google_sheets_dispatch.sql",
+      "sha256AtRetention": "65aefcf36bec8de2bbf3bdcd9e3a02fc3a12547a554d3f9443076fc67248b119",
+      "matchesApplicationCommit": true,
+      "priorComponentManifestSha256": "65aefcf36bec8de2bbf3bdcd9e3a02fc3a12547a554d3f9443076fc67248b119",
+      "matchesPriorComponentManifest": true
+    },
+    {
+      "path": "supabase/migrations/20261005183352_issue_submission_receipts.sql",
+      "sha256AtRetention": "7d6f6bbe69e43da35adb43e40f55e6369b2251db911a74faf845234a626f9e34",
+      "matchesApplicationCommit": true,
+      "priorComponentManifestSha256": "7d6f6bbe69e43da35adb43e40f55e6369b2251db911a74faf845234a626f9e34",
+      "matchesPriorComponentManifest": true
+    },
+    {
+      "path": "supabase/migrations/20261005184031_qbo_scoped_runtime_recovery.sql",
+      "sha256AtRetention": "02250c444a352454f0a46baf9842efa2aa9db23fc878c4b1637e39054929f51c",
+      "matchesApplicationCommit": true
+    },
+    {
+      "path": "supabase/migrations/20261005190709_sheets_recovery_fair_scan.sql",
+      "sha256AtRetention": "77be0bade0e5e5f1b529235fdbe569aaf8226b2969be1e7f6c1f7240d316712f",
+      "matchesApplicationCommit": false
+    }
+  ],
+  "secretScan": {
+    "files": 56,
+    "disallowedFields": [
+      "accessToken",
+      "access_token",
+      "anonKey",
+      "authorization",
+      "body",
+      "clientSecret",
+      "client_secret",
+      "cookie",
+      "cookies",
+      "cronSecret",
+      "dbUrl",
+      "headers",
+      "password",
+      "refreshToken",
+      "refresh_token",
+      "requestBody",
+      "responseBody",
+      "secret",
+      "serviceKey",
+      "sheetsEncryptionKey"
+    ],
+    "credentialPatterns": 5,
+    "passed": true,
+    "limitations": "Pattern/key checks complement explicit selection and structural review; not a general secret-detector guarantee."
+  },
+  "extensions": [
+    {
+      "capturedAt": "2026-10-05T19:59:10.879368+00:00",
+      "scope": "Failure-cleanup negative/positive/local-application/recovery component evidence and separately approved supported_rows_v1 upload qualification. Older source capture is preserved; this capture is not retroactively assigned as the execution source of a result. No full workload result is included.",
+      "files": [
+        "sheets-failure-cleanup-native.json",
+        "sheets-failure-cleanup-full-schema-rollback.json",
+        "sheets-failure-cleanup-negative.json",
+        "sheets-expired-authorization-original-failure.json",
+        "sheets-original-run-recovery.json",
+        "failure-cleanup-migration-applied-local.json",
+        "upload-original-boundaries-summary.json",
+        "upload-supported-rows-v1.json",
+        "upload-boundaries-initial-observations.json",
+        "upload-boundaries-render-qualified.json"
+      ],
+      "applicationCommitFromHTTPResults": "0a15ddcd3b564086280fec21b79b6976b3a3cc44",
+      "buildIdFromHTTPResults": "ReUcdHr1ALEejCvoUeFTc",
+      "sourceFiles": [
+        {
+          "path": "supabase/migrations/20261005194244_google_sheets_failure_cleanup_transition.sql",
+          "sha256AtRetention": "a77bd7729038b76ac0f2d1be3e92d713ea5bee828d0d3dbd7049e36f16c4fd5c"
+        },
+        {
+          "path": "scripts/google-sheets-failure-cleanup-native-tests.cjs",
+          "sha256AtRetention": "ebd39b674a63d63d9ae97c95759f420bce167630856f2af5cce741161cc707ad"
+        },
+        {
+          "path": "scripts/workspace-capacity-upload-boundaries.cjs",
+          "sha256AtRetention": "a819664e19e3fd114fc9839a09f6dd0912dd157cb261a0be2f57575785958d10"
+        },
+        {
+          "path": "scripts/workspace-capacity-next-config.cjs",
+          "sha256AtRetention": "795a3cf0790176d88b6f688ae5e3f27abaa9181d2a7a28336804f57103fd4e47"
+        },
+        {
+          "path": "scripts/workspace-capacity-next-server.cjs",
+          "sha256AtRetention": "26fe8ba0ff955747f61bf71ab384e879f26b60c22780812d0a716e18fb1f378c"
+        },
+        {
+          "path": "scripts/workspace-capacity-faults.cjs",
+          "sha256AtRetention": "e41c6fb32622e1bfd847c0c3e1a270398eaef1382818b36fdb8ed5a45413e053"
+        }
+      ]
+    },
+    {
+      "capturedAt": "2026-10-05T20:29:57.006556+00:00",
+      "scope": "Completed10-active/2-workspace supported_rows_v1 quiet baseline: readp95fails, exported integrity passes; no primary/fault/burst capacity claim. Original loaded source and export hashes retained.",
+      "files": [
+        "baseline-small-summary.json",
+        "baseline-small-resources.json",
+        "baseline-small-integrity.json",
+        "baseline-small-source-manifest.json",
+        "baseline-small-inventory-counts.json"
+      ],
+      "applicationCommitFromHTTPResults": "0a15ddcd3b564086280fec21b79b6976b3a3cc44",
+      "buildIdFromHTTPResults": "ReUcdHr1ALEejCvoUeFTc",
+      "sourceManifest": "baseline-small-source-manifest.json",
+      "schemaFingerprint": "f79faa0d1db281ff3e7c830051f118ffe2c7c700723e5456902b6ce0d80c7d1c"
+    },
+    {
+      "capturedAt": "2026-10-05T20:42:16.632752+00:00",
+      "scope": "Post-baseline component/diagnostic continuation: migration13/native round-robin proof; virtual scheduling model; actual270-second QBO retry-ready drill; preserved CI exact-tail failure; authenticated KPI diagnostic/A-B/component checks. None is a new full workload or production rollout result. Source hashes embedded in the results identify their scope, not a retroactively invented execution commit.",
+      "files": [
+        "sheets-dispatch-round-robin-native.json",
+        "sheets-dispatch-100-virtual.json",
+        "qbo-kill-270-native.json",
+        "dispatch-fairness-migration-applied-local.json",
+        "ci-05dbc9c5-manifest-failures.json",
+        "kpi-offset-diagnostic.json",
+        "kpi-keyset-authenticated-comparison.json",
+        "kpi-keyset-component-checks.json"
+      ]
+    },
+    {
+      "capturedAt": "2026-10-05T20:46:09.411966+00:00",
+      "scope": "Fresh owned Unix-only native PostgreSQL candidate qualification; canonical and production-shaped fixtures include thirteen audit/capacity migrations. Both stopped,28suites1408assertions. Does not rehearse operator exemption seeding or coordinated production outage/recovery.",
+      "files": [
+        "qbo-candidate-capacity-tail-native.json"
+      ],
+      "verifiedHarnessAndMigrationCommit": "396ec2f7752eb30fea99f30a73068d53ff29cc0a",
+      "distinctCapturedFilesComparedToCommit": 170,
+      "actualMainSupabaseDatabaseUsed": false,
+      "actualProductionAccess": false
+    },
+    {
+      "capturedAt": "2026-10-05T20:49:31.423358+00:00",
+      "scope": "Rebuilt application owner-browser verification, earlier assertion-failure reconciliation and33 complete adapter qualifications. Capacity remains unproven.",
+      "files": [
+        "kpi-browser-final.json",
+        "kpi-browser-failure-reconciliation.json",
+        "adapters-396ec2f7-qualification.json"
+      ],
+      "applicationCommit": "396ec2f7752eb30fea99f30a73068d53ff29cc0a",
+      "buildId": "Auls728kWl18cXUO1oXpO"
+    },
+    {
+      "capturedAt": "2026-10-05T20:55:15.098189+00:00",
+      "scope": "Two distinct worker interruption profiles: original forced3-second pause remains failed; new immediate supervisor profile actual readiness1031ms and component recovery284420ms pass. Earlier source-provenance caveats preserved; no primary workload or production recovery claim.",
+      "files": [
+        "worker-immediate-qualification.json",
+        "worker-forced-outage-original.json",
+        "fault-components-original-summary.json",
+        "worker-original-controller-provenance.json",
+        "worker-original-preload-provenance.json"
+      ],
+      "newApplicationCommit": "396ec2f7752eb30fea99f30a73068d53ff29cc0a",
+      "newBuildId": "Auls728kWl18cXUO1oXpO",
+      "oldApplicationCommit": "0a15ddcd3b564086280fec21b79b6976b3a3cc44"
+    },
+    {
+      "capturedAt": "2026-10-05T21:04:42.801709+00:00",
+      "scope": "Exact-head external CI hosted-runner availability failure, distinct from the earlier corrected fixture-manifest failure. No test steps executed and no pass claimed.",
+      "files": [
+        "ci-396ec2f7-hosted-runner-unavailable.json"
+      ],
+      "commit": "396ec2f7752eb30fea99f30a73068d53ff29cc0a",
+      "workflowRun": 37371525237
+    },
+    {
+      "capturedAt": "2026-10-05T21:18:42.945124+00:00",
+      "scope": "Completed unchanged20-minute10-active/20-registered/two-workspace supported_rows_v1 quiet baseline. Aggregate latency/error thresholds pass; independent accepted-work inventory passes. Arrival-free drain is NOT_QUALIFIED, and scheduled/fairness/fault full-workload coverage is absent. No complete capacity pass or production capacity claim. Earlier failed baseline preserved.",
+      "files": [
+        "baseline-keyset-summary.json",
+        "baseline-keyset-integrity.json",
+        "baseline-keyset-resources.json",
+        "baseline-keyset-inventory-counts.json",
+        "baseline-keyset-source-manifest.json",
+        "baseline-keyset-drain-gap.json"
+      ],
+      "applicationCommit": "396ec2f7752eb30fea99f30a73068d53ff29cc0a",
+      "buildId": "Auls728kWl18cXUO1oXpO",
+      "schemaFingerprint": "41a316952fddf5da306655c42b58c4667fc70c0678b27ff7b93b43973adeaac8",
+      "sourceManifest": "baseline-keyset-source-manifest.json",
+      "independentOriginalManifestFileHashesVerified": 11
+    },
+    {
+      "capturedAt": "2026-10-05T21:21:14.542582+00:00",
+      "scope": "Targeted thirteen-migration coordinated SQL rehearsal: original25 plus79 new checks pass; first42P08 fixture failure retained. Real transactional COMMIT/rollback with a modeled atomic SQL ledger, simulated acknowledgement loss and no reapply. Not a Supabase CLI/production deployment-method, Auth HTTP, production-volume timing or real operator approval qualification.",
+      "files": [
+        "rollout-thirteen-final.json",
+        "rollout-thirteen-fixture-failure.json"
+      ],
+      "sourceCommitAtExecution": "0c46dc0688bec6fa1a387ad593e029c1ebcbfc1f",
+      "loadedHarnessSha256": "4d4fd6b53abd1ccf79f16f7ba96121ead8b73ec204688ab01c8f3d0fbcb10bef",
+      "sourceCaveat": "Three test-only UUID/text parameter casts were uncommitted at execution; the exact loaded harness hash subsequently matches committed5dac46c2a3c34ce59430dc0fdd84fdfa511b131e. The original result sourceCommit remains unchanged.",
+      "ownedClustersStopped": true,
+      "postmasterPidFilesAbsentVerified": true,
+      "productionAccess": false,
+      "verifiedFinalHarnessCommit": "5dac46c2a3c34ce59430dc0fdd84fdfa511b131e",
+      "matchesCommittedHarnessBytes": true
+    }
+  ]
+}

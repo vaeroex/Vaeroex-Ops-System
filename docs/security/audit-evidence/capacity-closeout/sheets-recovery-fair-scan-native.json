@@ -1,0 +1,108 @@
+{
+  "passed": true,
+  "checks": 27,
+  "baseline": {
+    "checks": 103,
+    "largeRows": 750,
+    "largeFacts": 1500,
+    "liveProviderCalls": 0,
+    "fullCanonicalBootstrap": false,
+    "abandonedRecovery": {
+      "scope": "Persisted SQL with accelerated lease expiry; no worker kill or provider transport",
+      "leaseSeconds": 270,
+      "automaticRetrySeconds": 3600,
+      "originalEligibilityPreserved": true,
+      "independentTerminalRecovery": true,
+      "staleCommitDenied": true,
+      "lateCleanupPreservesSuccess": true,
+      "recovery300SecondsQualified": false
+    }
+  },
+  "negativeControl": {
+    "historicalMismatches": 101,
+    "calls": [
+      {
+        "skipped": 100,
+        "recovered": 0,
+        "remainingExpired": 102,
+        "oldestExpiredSeconds": 5400.092859
+      },
+      {
+        "skipped": 100,
+        "recovered": 0,
+        "remainingExpired": 102,
+        "oldestExpiredSeconds": 5400.094723
+      }
+    ],
+    "targetRemainedRunning": true
+  },
+  "repaired": {
+    "skipped": 101,
+    "examined": 1,
+    "scanBusy": false,
+    "recovered": 1,
+    "remainingExpired": 101,
+    "historicalMismatches": 101,
+    "oldestExpiredSeconds": 5400.097395
+  },
+  "rowLockedOldest": 101,
+  "rowSkipMs": 3,
+  "rowSkipped": {
+    "skipped": 101,
+    "examined": 1,
+    "scanBusy": false,
+    "recovered": 1,
+    "remainingExpired": 202,
+    "historicalMismatches": 101,
+    "oldestExpiredSeconds": 5400.182354
+  },
+  "advisoryLockedOldest": 101,
+  "firstPage": {
+    "skipped": 201,
+    "examined": 100,
+    "scanBusy": false,
+    "recovered": 0,
+    "remainingExpired": 203,
+    "historicalMismatches": 101,
+    "oldestExpiredSeconds": 5400.187025
+  },
+  "secondPage": {
+    "skipped": 200,
+    "examined": 100,
+    "scanBusy": false,
+    "recovered": 1,
+    "remainingExpired": 202,
+    "historicalMismatches": 101,
+    "oldestExpiredSeconds": 5400.190075
+  },
+  "overlap": [
+    {
+      "skipped": 101,
+      "examined": 0,
+      "scanBusy": true,
+      "recovered": 0,
+      "remainingExpired": 202,
+      "historicalMismatches": 101,
+      "oldestExpiredSeconds": 5400.194804
+    },
+    {
+      "skipped": 101,
+      "examined": 100,
+      "scanBusy": false,
+      "recovered": 100,
+      "remainingExpired": 102,
+      "historicalMismatches": 101,
+      "oldestExpiredSeconds": 5400.21003
+    }
+  ],
+  "terminalRuns": 104,
+  "preservedHistoricalMismatches": 101,
+  "sourceInventory": {
+    "sources": 759,
+    "versions": 760,
+    "facts": 1509
+  },
+  "sourceInventoryPreserved": true,
+  "liveProviders": 0,
+  "limitations": "Fresh Unix-socket-only native PostgreSQL with reduced fixture schema. Accelerated expiry and SQL lock holders; no elapsed kill recovery or active-user capacity qualification."
+}
