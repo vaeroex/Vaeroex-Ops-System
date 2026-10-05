@@ -3706,17 +3706,21 @@ async function saveWorkbookImport({
   const enabledRows = stagedRows.filter((row) => planByIndex.get(worksheetIndexForRow(row))?.enabled);
   if (!enabledRows.length) redirectWithFileError("The approved worksheets contain no importable rows.", file.id, "imported");
 
-  await requireToolExecution(
-    { supabase, workspaceId, userId: user.id, userRole: membership.role },
-    {
-      toolName: "approve_workbook_import",
-      args: { fileId: file.id, importId: importRecord.id, importType: "metrics", rowsApproved: enabledRows.length },
-      initiatedBy: "user",
-      confirmationReceived: true,
-      targetRecordId: importRecord.id,
-      metadata: { source: "workbook_import_approval", file_id: file.id, worksheet_count: enabledPlans.length } satisfies Json
-    }
-  );
+  try {
+    await requireToolExecution(
+      { supabase, workspaceId, userId: user.id, userRole: membership.role },
+      {
+        toolName: "approve_workbook_import",
+        args: { fileId: file.id, importId: importRecord.id, importType: "metrics", rowsApproved: enabledRows.length },
+        initiatedBy: "user",
+        confirmationReceived: true,
+        targetRecordId: importRecord.id,
+        metadata: { source: "workbook_import_approval", file_id: file.id, worksheet_count: enabledPlans.length } satisfies Json
+      }
+    );
+  } catch (error) {
+    redirectWithFileError(actionErrorMessage(error, "Worksheet approval could not be authorized."), file.id, "imported");
+  }
 
   const diagnostics = stagedRows.map((row) => {
     const plan = planByIndex.get(worksheetIndexForRow(row));

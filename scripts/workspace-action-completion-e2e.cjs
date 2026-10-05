@@ -48,10 +48,13 @@ async function session(actor) {
 async function context(actor, width) {
   assertOwnedApp(); const s = await session(actor); const c = await browser.newContext({ viewport: { width, height: 900 } }); await c.addCookies(s.cookies);
   await c.route('**/*', route => { const u = new URL(route.request().url()); return [appOrigin, new URL(config.apiUrl).origin].includes(u.origin) ? route.continue() : route.abort(); });
-  const page = await c.newPage(); page.setDefaultTimeout(20000);
-  page.on('pageerror', e => browserErrors.push({path:new URL(page.url()).pathname,message:sanitize(e.message),stack:sanitize(e.stack||'')}));
-  page.on('response', r => { const u = new URL(r.url()); if (u.origin === appOrigin && !u.pathname.startsWith('/_next')) requests.push({ path: u.pathname, method: r.request().method(), status: r.status() }); });
-  return { c, page, client: s.client };
+  const newPage = async () => {
+    const page = await c.newPage(); page.setDefaultTimeout(20000);
+    page.on('pageerror', e => browserErrors.push({ path: new URL(page.url()).pathname, message: sanitize(e.message), stack: sanitize(e.stack || '') }));
+    page.on('response', r => { const u = new URL(r.url()); if (u.origin === appOrigin && !u.pathname.startsWith('/_next')) requests.push({ path: u.pathname, method: r.request().method(), status: r.status() }); });
+    return page;
+  };
+  return { c, page: await newPage(), client: s.client, newPage };
 }
 async function submit(page, button, label, outcome, repeated = true) {
   const initial = page.url();
@@ -141,7 +144,7 @@ const failure = u => u.searchParams.has('error');
       try { await submit(page, button, label, failure); } finally { await role('owner'); }
     }
     for (const width of [1440, 390]) for (let iteration = 0; iteration < 3; iteration++) {
-      const { c, page, client } = await context(owner, width);
+      const { c, page, client, newPage } = await context(owner, width);
       const label = `${prefix} ${width} ${iteration}`;
       stage = `form_${width}_${iteration}`;
       let f = await formPage(page, formId, label + ' denied');
@@ -168,10 +171,14 @@ const failure = u => u.searchParams.has('error');
       await denied(page, page.getByRole('button', { name: 'Approve learning', exact: true }), stage + '_denied');
       assert.equal(check(await client.from('business_memory_chunks').select('id').eq('source_file_id', fileId), 'denied_memory').length, 0);
       await page.goto(`${appOrigin}/app/sources/${fileId}`);
+      const memoryReplay = await newPage(); await memoryReplay.goto(`${appOrigin}/app/sources/${fileId}`);
       await submit(page, page.getByRole('button', { name: 'Approve learning', exact: true }), stage, success);
       const chunks = check(await client.from('business_memory_chunks').select('id,source_metadata').eq('source_file_id', fileId), 'memory_saved');
       assert.equal(chunks.length, 1); assert.equal(chunks[0].source_metadata.source_run_id, runId);
       await page.getByText('Available to Intelligence and Learned Knowledge.', { exact: true }).waitFor();
+      await submit(memoryReplay, memoryReplay.getByRole('button', { name: 'Approve learning', exact: true }), stage + '_stale_replay', success);
+      assert.deepEqual(check(await client.from('business_memory_chunks').select('id,source_metadata').eq('source_file_id', fileId), 'memory_replay'), chunks);
+      await memoryReplay.close();
       stage = `worksheet_${width}_${iteration}`;
       await page.goto(appOrigin + '/app/sources'); await page.locator('#workspace-file-upload > summary').click();
       await page.locator('input[type="file"]').setInputFiles({ name: 'vxa039.csv', mimeType: 'text/csv', buffer: Buffer.from('date,revenue\n2026-01-01,42\n2026-02-01,43\n') });
@@ -179,14 +186,15 @@ const failure = u => u.searchParams.has('error');
       await submit(page, page.getByRole('button', { name: 'Upload and prepare review', exact: true }), stage + '_upload', u => /^\/app\/sources\/[0-9a-f-]{36}$/.test(u.pathname) && u.searchParams.has('message'), false);
       const uploaded = check(await client.from('file_uploads').select('id,storage_path').eq('display_name', label + ' upload').single(), 'uploaded_source');
       assert.equal(Buffer.from(await check(await client.storage.from('workspace-files').download(uploaded.storage_path), 'uploaded_bytes').arrayBuffer()).toString(), 'date,revenue\n2026-01-01,42\n2026-02-01,43\n');
-      async function importForm() {
-        await page.goto(`${appOrigin}/app/sources/${uploaded.id}?section=imported`);
-        const f = page.locator('form').filter({ has: page.locator('[name="workbook_mode"]') });
+      async function importForm(target = page) {
+        await target.goto(`${appOrigin}/app/sources/${uploaded.id}?section=imported`);
+        const f = target.locator('form').filter({ has: target.locator('[name="workbook_mode"]') });
         await f.locator('[name="worksheet_1_enabled"]').check(); await f.locator('[name="worksheet_1_type"]').selectOption('wide_time_series'); await f.locator('[name="worksheet_1_map_period"]').selectOption('date'); return f;
       }
       f = await importForm(); const importId = await f.locator('[name="import_id"]').inputValue();
       await denied(page, f.getByRole('button', { name: 'Import 1 approved worksheet', exact: true }), stage + '_denied');
       assert.equal(check(await client.from('kpis').select('id').eq('source_file_id', uploaded.id), 'denied_kpis').length, 0);
+      const worksheetReplay = await newPage(); const staleImportForm = await importForm(worksheetReplay);
       f = await importForm(); await submit(page, f.getByRole('button', { name: 'Import 1 approved worksheet', exact: true }), stage, success);
       const kpis = check(await client.from('kpis').select('id,actual_value,metric_date,source_file_id,import_id,raw_data_json').eq('import_id', importId).order('metric_date'), 'saved_kpis');
       assert.equal(kpis.length, 2); assert.deepEqual(kpis.map(x => [x.metric_date, Number(x.actual_value)]), [['2026-01-01', 42], ['2026-02-01', 43]]);
@@ -195,6 +203,10 @@ const failure = u => u.searchParams.has('error');
       const attempts = (await db.query('select status,approved_mapping,approved_row_ids from private.file_import_attempts where workspace_id=$1 and import_id=$2', [a, importId])).rows;
       assert.equal(attempts.length, 1); assert.equal(attempts[0].status, 'completed');
       await page.getByText('2 of 2 rows were saved from this source.', { exact: true }).waitFor();
+      await submit(worksheetReplay, staleImportForm.getByRole('button', { name: 'Import 1 approved worksheet', exact: true }), stage + '_stale_replay', u => u.searchParams.get('error') === 'No extracted rows were found to save.');
+      assert.deepEqual(check(await client.from('kpis').select('id,actual_value,metric_date,source_file_id,import_id,raw_data_json').eq('import_id', importId).order('metric_date'), 'worksheet_replay'), kpis);
+      assert.deepEqual((await db.query('select status,approved_mapping,approved_row_ids from private.file_import_attempts where workspace_id=$1 and import_id=$2', [a, importId])).rows, attempts);
+      await worksheetReplay.close();
       stage = `reconciliation_${width}_${iteration}`;
       const heldUrl = `${appOrigin}/app/sources/${heldImport.file_upload_id}?section=imported`;
       await page.goto(heldUrl);
@@ -206,6 +218,10 @@ const failure = u => u.searchParams.has('error');
       await page.goto(heldUrl);
       await submit(page, page.getByRole('button', { name: 'Check saved results', exact: true }), stage, u => !!u.searchParams.get('error')?.includes('Accepted work remains held'));
       assert.deepEqual(await heldInventory(), heldBefore); await page.getByText('Import results need reconciliation', { exact: true }).waitFor();
+      await page.getByRole('button', { name: 'Close', exact: true }).click();
+      await page.waitForURL(u => !u.searchParams.has('error'));
+      await submit(page, page.getByRole('button', { name: 'Check saved results', exact: true }), stage + '_repeat', u => !!u.searchParams.get('error')?.includes('Accepted work remains held'));
+      assert.deepEqual(await heldInventory(), heldBefore);
       const heads = check(await client.rpc('get_worksheet_publication_heads_v1', { p_workspace_id: a, p_file_ids: [heldImport.file_upload_id] }), 'held_head'); assert.equal(heads[0].completed_attempt_id, null);
       await page.screenshot({ path: path.join(output, `completed-${width}-${iteration}.png`) });
       result('persisted_integrity', { width, iteration, formRecords: 1, memoryChunks: 1, kpiRecords: 2, importAttempts: 1, heldInventoryUnchanged: true });
