@@ -32,7 +32,7 @@ createRoot(document.getElementById("fixture")!, { onCaughtError(error) {
   <GlobalSearch variant="icon" className="xl:hidden" />
   <GlobalSearchTrigger id="external-search" initialQuery="synthetic">Search evidence</GlobalSearchTrigger>
   <button id="last">Outside last</button>
-  <section><h2>Internal form</h2><SyntheticActionBoundary><InternalFormSubmissionForm forms={[
+  <section><h2>Internal form</h2><SyntheticActionBoundary><InternalFormSubmissionForm requestId="11111111-1111-4111-8111-111111111111" forms={[
     { id: "00000000-0000-4000-8000-000000000001", name: "Inspection", schema_json: createSubmissionSchema("Business detail\nInspection date\nPriority") },
     { id: "00000000-0000-4000-8000-000000000002", name: "Second form", schema_json: createSubmissionSchema("Location\nContact") }
   ]} returnPath="/app/form-submissions" /></SyntheticActionBoundary></section>

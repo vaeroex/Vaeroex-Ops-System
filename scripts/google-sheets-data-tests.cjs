@@ -91,6 +91,44 @@ async function verifyWorkspaceEntitlements(db,call,deny) {
   const automatic=await call('claim_google_sheets_sync_v1',[entitlementWs,fallbackConnection,null,null,'scheduled']);
   await call('fail_google_sheets_sync_v1',[entitlementWs,fallbackConnection,automatic.runId,'fixture_failure']);checks++;
 }
+async function verifyAbandonedSyncRecovery(db, call, deny) {
+  const id = randomUUID();
+  await db.query("insert into public.google_sheets_connections(id,workspace_id,business_entity_id,created_by,status,display_name,spreadsheet_id,sheet_id,sheet_title,headers) values($1,$2,$3,$4,'connected','Interrupted sync fixture',$5,0,'Metrics',$6)", [id, ws, entity, actor, spreadsheet, headers]);
+  await call('approve_google_sheets_mapping_v1', [ws,id,actor,session,mapping,true]);
+  const first = await call('claim_google_sheets_sync_v1', [ws,id,null,null,'scheduled']);
+  const timing = (await db.query('select extract(epoch from (sync_lease_expires_at-updated_at))::int lease_seconds,extract(epoch from (next_sync_at-updated_at))::int retry_seconds from public.google_sheets_connections where id=$1', [id])).rows[0];
+  assert.deepEqual(timing, { lease_seconds: 480, retry_seconds: 3600 }); checks++;
+  // Accelerate only persisted expiry in the owned synthetic database. This
+  // proves SQL state transitions, not process-kill or elapsed recovery latency.
+  await db.query("update public.google_sheets_connections set sync_lease_expires_at=now()-interval '1 second' where id=$1", [id]);
+  assert.equal((await db.query("select count(*)::int n from public.google_sheets_connections where id=$1 and status='connected' and automatic_refresh_enabled and active_approval_id is not null and next_sync_at<=now()", [id])).rows[0].n, 0); checks++;
+  assert.equal((await db.query('select status from public.google_sheets_sync_runs where id=$1',[first.runId])).rows[0].status, 'running'); checks++;
+  await deny(() => call('claim_google_sheets_sync_v1',[ws,id,null,null,'scheduled']), 'schedule_denied');
+  const resumed = await call('claim_google_sheets_sync_v1',[ws,id,actor,session,'manual']);
+  assert.equal((await db.query('select status,error_code from public.google_sheets_sync_runs where id=$1',[first.runId])).rows[0].error_code, 'lease_expired'); checks++;
+  await call('fail_google_sheets_sync_v1',[ws,id,first.runId,'late_failure']);
+  assert.equal((await db.query('select sync_lease_run_id from public.google_sheets_connections where id=$1',[id])).rows[0].sync_lease_run_id,resumed.runId); checks++;
+  await deny(() => call('commit_google_sheets_sync_v1',[ws,id,first.runId,[],true]),'fence_denied');
+  const rows = normalizeSheetsRows({workspaceId:ws,businessEntityId:entity,connectionId:id,spreadsheetId:spreadsheet,sheetId:0,headerRow:1,mapping,rows:[['recovery-once','2040-01-01',7,0.5]]});
+  const committed = await call('commit_google_sheets_sync_v1',[ws,id,resumed.runId,rows,true]);
+  assert.equal(committed.factCount,2); checks++;
+  // Simulate lost commit acknowledgement by invoking normal failure cleanup
+  // after the transaction succeeded. It must retain both facts and success.
+  await call('fail_google_sheets_sync_v1',[ws,id,resumed.runId,'request_timeout']);
+  assert.equal((await db.query('select status from public.google_sheets_sync_runs where id=$1',[resumed.runId])).rows[0].status,'succeeded'); checks++;
+  assert.equal((await db.query('select count(*)::int n from public.google_sheets_fact_links where connection_id=$1',[id])).rows[0].n,2); checks++;
+  await deny(() => call('commit_google_sheets_sync_v1',[ws,id,resumed.runId,rows,true]),'fence_denied');
+  await db.query('update public.google_sheets_connections set automatic_refresh_enabled=false,next_sync_at=null where id=$1',[id]);
+  const manual = await call('claim_google_sheets_sync_v1',[ws,id,actor,session,'manual']);
+  await db.query("update public.google_sheets_connections set sync_lease_expires_at=now()-interval '1 second' where id=$1",[id]);
+  assert.equal((await db.query('select next_sync_at from public.google_sheets_connections where id=$1',[id])).rows[0].next_sync_at,null); checks++;
+  assert.equal((await db.query('select status from public.google_sheets_sync_runs where id=$1',[manual.runId])).rows[0].status,'running'); checks++;
+  const final = await call('claim_google_sheets_sync_v1',[ws,id,actor,session,'manual']);
+  assert.equal((await db.query('select error_code from public.google_sheets_sync_runs where id=$1',[manual.runId])).rows[0].error_code,'lease_expired'); checks++;
+  await call('fail_google_sheets_sync_v1',[ws,id,final.runId,'fixture_cleanup']);
+  return { scope: 'Persisted SQL with accelerated lease expiry; no worker kill or provider transport', leaseSeconds:480, automaticRetrySeconds:3600, expiredAutomaticRemainsUndue:true, expiredManualRemainsRunningUntilClaim:true, staleCommitDenied:true, lateCleanupPreservesSuccess:true, recovery300SecondsQualified:false };
+}
+
 async function qualify(db) {
   await db.exec(`create schema private; create schema auth; create schema extensions;
     create role anon; create role authenticated; create role service_role bypassrls;
@@ -270,7 +308,8 @@ async function qualify(db) {
   assert.equal((await db.query('select count(*)::int n from public.google_sheets_connections where workspace_id=$1',[otherWs])).rows[0].n,0);checks++;
   await deny(()=>db.query('select token_ciphertext from public.google_sheets_credentials'));
   await db.exec('reset role');
-  return {checks,largeRows:750,largeFacts:1500,liveProviderCalls:0,fullCanonicalBootstrap:false};
+  const abandonedRecovery = await verifyAbandonedSyncRecovery(db,call,deny);
+  return {checks,largeRows:750,largeFacts:1500,liveProviderCalls:0,fullCanonicalBootstrap:false,abandonedRecovery};
 }
 function verifySensitiveFieldBoundaries() {
   const restricted = [

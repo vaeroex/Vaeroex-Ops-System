@@ -6,7 +6,7 @@ import { PrimaryButton, SelectInput, TextArea, TextInput } from "@/components/op
 import { FORM_PRIORITIES, MAX_FIELD_LENGTH, parseSubmissionSchema, type SubmissionField } from "@/lib/forms/submission-schema";
 
 type FormChoice = { id: string; name: string; schema_json: unknown };
-export function InternalFormSubmissionForm({ forms, returnPath }: { forms: FormChoice[]; returnPath: string }) {
+export function InternalFormSubmissionForm({ forms, returnPath, requestId }: { forms: FormChoice[]; returnPath: string; requestId: string }) {
   // Track the submitted action itself: host form context can transiently reset
   // during a child render while its request is still in flight.
   const [, submitForm, submissionPending] = useActionState(submitInternalForm, null);
@@ -19,6 +19,7 @@ export function InternalFormSubmissionForm({ forms, returnPath }: { forms: FormC
   return (
     <form action={submitForm} className="grid gap-4 lg:grid-cols-2">
       <input type="hidden" name="return_path" value={returnPath} />
+      <input type="hidden" name="submission_request_id" value={requestId} />
       {forms.length > 1 ? (
         <label className="block text-sm font-medium">Form
           <select name="form_id" aria-label="Form" required value={formId} onChange={(event) => setFormId(event.target.value)} className="mt-2 w-full rounded-lg border border-line px-3 py-2">

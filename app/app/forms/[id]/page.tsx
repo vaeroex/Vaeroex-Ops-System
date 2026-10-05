@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { InternalFormSubmissionForm } from "@/components/operations/InternalFormSubmissionForm";
@@ -51,7 +52,7 @@ export default async function FormDetailPage({ params, searchParams }: FormDetai
 
       <section className="space-y-6">
         <CreateDrawer title="Submit form" description="Capture an operational submission for manager review." triggerLabel="New Submission">
-          {managedValues(form).archivedAt || managedValues(form).deletedAt ? <p>This form is archived or hidden. Existing submissions remain available below.</p> : <InternalFormSubmissionForm forms={[{ id: form.id, name: form.name, schema_json: form.schema_json }]} returnPath={`/app/forms/${form.id}`} />}
+          {managedValues(form).archivedAt || managedValues(form).deletedAt ? <p>This form is archived or hidden. Existing submissions remain available below.</p> : <InternalFormSubmissionForm requestId={randomUUID()} forms={[{ id: form.id, name: form.name, schema_json: form.schema_json }]} returnPath={`/app/forms/${form.id}`} />}
         </CreateDrawer>
 
         <SectionCard title="Form schema">

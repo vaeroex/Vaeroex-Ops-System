@@ -41,13 +41,6 @@ function bool(formData: FormData, key: string) {
   return formData.get(key) === "on" || formData.get(key) === "true";
 }
 
-function lines(value: string) {
-  return value
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean);
-}
-
 function slugify(value: string) {
   return value
     .toLowerCase()
@@ -201,11 +194,15 @@ export async function createFormAction(formData: FormData) {
 export async function createFormSubmissionAction(formData: FormData) {
   const formId = text(formData, "form_id");
   const path = returnPath(formData, formId ? `/app/forms/${formId}` : "/app/forms");
-  const { supabase, user, workspaceId, membership } = await requireWorkspace(path);
+  const { supabase, workspaceId, membership } = await requireWorkspace(path);
   if (!["owner", "admin", "manager", "staff"].includes(membership.role)) {
     redirectWithError(path, "You do not have permission to submit this form.");
   }
   const summary = text(formData, "summary");
+  const requestId = text(formData, "submission_request_id");
+  if (formData.getAll("submission_request_id").length !== 1 || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(requestId)) {
+    redirectWithError(path, "Refresh this form before starting a submission.");
+  }
 
   requireValue(path, "Form", formId);
   requireValue(path, "Submission summary", summary, 3000);
@@ -236,19 +233,19 @@ export async function createFormSubmissionAction(formData: FormData) {
     follow_up: text(formData, "follow_up")
   } satisfies Json;
 
-  const { error } = await supabase.from("form_submissions").insert({
-    workspace_id: workspaceId,
-    form_id: formId,
-    submitted_by: user.id,
-    submitter_name: text(formData, "submitter_name"),
-    submitter_email: text(formData, "submitter_email"),
-    data_json: dataJson,
-    ai_summary: text(formData, "summary") ? `Vaeroex summary draft: ${text(formData, "summary")}` : null,
-    ai_detected_priority: text(formData, "priority") || "Medium",
-    ai_detected_followups_json: lines(text(formData, "follow_up")) as Json
+  const { data: saved, error } = await supabase.rpc("submit_internal_form_v1", {
+    p_workspace_id: workspaceId,
+    p_form_id: formId,
+    p_request_id: requestId,
+    p_submitter_name: text(formData, "submitter_name"),
+    p_submitter_email: text(formData, "submitter_email"),
+    p_data_json: dataJson
   });
 
-  if (error) {
+  if (error?.message.includes("internal_form_request_conflict")) {
+    redirectWithError(path, "This submission request was already used with different responses. Open a new submission to save another response.");
+  }
+  if (error || !saved || typeof saved !== "object" || Array.isArray(saved) || typeof saved.submissionId !== "string") {
     redirectWithError(path, "Submission could not be saved. Check your access and try again.");
   }
 

@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import Link from "next/link";
 import { InternalFormSubmissionForm } from "@/components/operations/InternalFormSubmissionForm";
 import { CreateDrawer } from "@/components/operations/CreateDrawer";
@@ -96,7 +97,7 @@ export default async function FormSubmissionsPage({ searchParams }: FormSubmissi
       <section className="space-y-6">
         <CreateDrawer title="Add submission" description="Record an internal submission for an existing form." triggerLabel="New Submission">
           {forms?.length ? (
-            <InternalFormSubmissionForm forms={forms.map(({ id, name, schema_json }) => ({ id, name, schema_json }))} returnPath="/app/form-submissions" />
+            <InternalFormSubmissionForm requestId={randomUUID()} forms={forms.map(({ id, name, schema_json }) => ({ id, name, schema_json }))} returnPath="/app/form-submissions" />
           ) : (
             <EmptyState
               title="Create a form first"

@@ -24,7 +24,12 @@ const history = load('lib/records/asset-check-history.ts');
 let checks = 0;
 function ok(label, fn) { fn(); checks++; console.log(`PASS ${label}`); }
 function adapter(db) {
-  return { auth: { getUser: async () => ({ data: { user: { id: actor, email: 'synthetic@example.invalid' } } }) }, from(table) {
+  return { auth: { getUser: async () => ({ data: { user: { id: actor, email: 'synthetic@example.invalid' } } }) }, async rpc(name, args) {
+    assert.equal(name, 'submit_internal_form_v1');
+    try { return { data: (await db.query('select public.submit_internal_form_v1($1,$2,$3,$4,$5,$6) value',
+      [args.p_workspace_id,args.p_form_id,args.p_request_id,args.p_submitter_name,args.p_submitter_email,args.p_data_json])).rows[0].value, error: null }; }
+    catch (error) { return { data: null, error }; }
+  }, from(table) {
     assert(['forms', 'form_submissions', 'asset_checks', 'assets'].includes(table));
     let conditions = [], values = [], orders = [], range = null, inserted = null, single = false, wantsCount = false;
     const column = name => { assert(/^[a-z_]+$/.test(name)); return `"${name}"`; };
@@ -67,6 +72,18 @@ const form = entries => { const data = new FormData(); Object.entries(entries).f
     await db.exec(`create table forms(id uuid primary key default gen_random_uuid(),workspace_id uuid,name text,schema_json jsonb,archived_at timestamptz,deleted_at timestamptz,description text,form_type text,is_public boolean,public_slug text,created_by uuid);
       create table form_submissions(id uuid primary key default gen_random_uuid(),workspace_id uuid,form_id uuid,submitted_by uuid,submitter_name text,submitter_email text,data_json jsonb,ai_summary text,ai_detected_priority text,ai_detected_followups_json jsonb);
       create table asset_checks(id uuid primary key default gen_random_uuid(),workspace_id uuid,asset_id uuid,checked_by uuid,status text,notes text,photos_json jsonb,created_at timestamptz default now(),archived_at timestamptz,deleted_at timestamptz,folder_id uuid);`);
+    // Authentication/entitlement are synthetic here; the native companion
+    // suite verifies the real repository role/entitlement functions and races.
+    await db.exec(`create schema private; create schema auth; create role anon; create role authenticated; create role service_role;
+      create table workspaces(id uuid primary key); create table workspace_members(workspace_id uuid,user_id uuid,role text,status text);
+      create table auth.users(id uuid primary key,deleted_at timestamptz,banned_until timestamptz);
+      create function auth.uid() returns uuid language sql as $$select '${actor}'::uuid$$;
+      create function auth.role() returns text language sql as $$select 'authenticated'::text$$;
+      create function private.workspace_entitlement_active_v1(uuid) returns boolean language sql as $$select true$$;`);
+    await db.query('insert into workspaces values($1),($2)',[workspace,foreignWorkspace]);
+    await db.query("insert into workspace_members values($1,$2,'owner','active')",[workspace,actor]);
+    await db.query('insert into auth.users(id) values($1)',[actor]);
+    await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261005061024_internal_form_submission_idempotency.sql'),'utf8'));
     const storedSchema = schema.createSubmissionSchema('Business detail\nInspection date\nPriority');
     await db.query('insert into forms(id,workspace_id,name,schema_json) values($1,$2,$3,$4),($5,$6,$3,$4)', [formId, workspace, 'Synthetic internal form', storedSchema, foreignFormId, foreignWorkspace]);
     const legacy = { summary: 'Historical submission stays unchanged', priority: 'Medium', follow_up: '' };
@@ -98,7 +115,7 @@ const form = entries => { const data = new FormData(); Object.entries(entries).f
     }
     ok('server state adapter forwards errors and framework redirects without catching or rewriting', () => {});
 
-    const valid = () => form({ form_id: formId, submitter_name: 'Synthetic operator', submitter_email: 'operator@example.invalid', summary: 'Inspection recorded', priority: 'Medium', follow_up: '', 'field:business-detail': 'Synthetic unit inspected', 'field:inspection-date': '2026-10-04', 'field:priority': 'High' });
+    const valid = () => form({ submission_request_id: randomUUID(), form_id: formId, submitter_name: 'Synthetic operator', submitter_email: 'operator@example.invalid', summary: 'Inspection recorded', priority: 'Medium', follow_up: '', 'field:business-detail': 'Synthetic unit inspected', 'field:inspection-date': '2026-10-04', 'field:priority': 'High' });
     ok('schema preserves supported field types and deduplicates keys', () => {
       assert.deepEqual(schema.createSubmissionSchema('Name\nName').map(f => f.key), ['name', 'name-1']);
       assert.deepEqual(schema.parseSubmissionSchema(storedSchema), storedSchema);
@@ -109,6 +126,8 @@ const form = entries => { const data = new FormData(); Object.entries(entries).f
       assert.throws(() => schema.createSubmissionSchema(Array(51).fill('Name').join('\n')));
     });
     for (const [label, mutate, message] of [
+      ['missing request identity', data => data.delete('submission_request_id'), /Refresh this form/],
+      ['repeated request identity', data => data.append('submission_request_id', randomUUID()), /Refresh this form/],
       ['required field', data => data.delete('field:business-detail'), /Business detail is required/],
       ['impossible date', data => data.set('field:inspection-date', '2026-02-30'), /valid date/],
       ['unsupported priority', data => data.set('field:priority', 'Emergency'), /listed priority/],
@@ -122,7 +141,13 @@ const form = entries => { const data = new FormData(); Object.entries(entries).f
       assert.equal((await db.query('select count(*) n from form_submissions')).rows[0].n, 1);
       checks++; console.log(`PASS server rejects ${label} without persistence`);
     }
-    await actions.createFormSubmissionAction(valid()).catch(error => assert.match(error.message, /Submission saved/));
+    const accepted = valid();
+    await actions.createFormSubmissionAction(accepted).catch(error => assert.match(error.message, /Submission saved/));
+    await actions.createFormSubmissionAction(accepted).catch(error => assert.match(error.message, /Submission saved/));
+    ok('actual action replay returns success without a second persisted response', () => {});
+    accepted.set('summary','Different response using the same identity');
+    await assert.rejects(actions.createFormSubmissionAction(accepted), /already used with different responses/); checks++;
+    assert.equal((await db.query('select count(*) n from form_submissions')).rows[0].n,2);
     const saved = (await db.query('select * from form_submissions where submitted_by=$1', [actor])).rows[0];
     ok('actual action persists fields and schema snapshot in isolated PostgreSQL', () => {
       assert.equal(saved.workspace_id, workspace); assert.equal(saved.form_id, formId);

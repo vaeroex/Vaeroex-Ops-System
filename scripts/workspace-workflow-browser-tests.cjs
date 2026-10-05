@@ -146,7 +146,7 @@ const fixture = name => path.join(root, 'scripts/test-stubs', name);
     await page.waitForFunction(() => !document.querySelector('button[aria-busy="true"]'), undefined, { timeout: 10000 });
     assert.equal(await page.getByRole('button', { name: 'Save submission' }).isEnabled(), true);
    } finally { gate.cleanup(); submissionGate = undefined; }
-   assert.equal(submitted.length, prior + 1); assert.equal(submitted.at(-1)['field:business-detail'], 'Synthetic inspection'); assert.equal(submitted.at(-1)['field:inspection-date'], '2026-10-04');
+   assert.equal(submitted.length, prior + 1); assert.equal(submitted.at(-1)['field:business-detail'], 'Synthetic inspection'); assert.equal(submitted.at(-1)['field:inspection-date'], '2026-10-04'); assert.equal(submitted.at(-1).submission_request_id, '11111111-1111-4111-8111-111111111111');
    if (theme === 'pulsar' && width === 390) {
     const fillIntentionalSubmission = async () => {
      await page.getByLabel('Business detail (required)').fill('Synthetic intentional retry');
