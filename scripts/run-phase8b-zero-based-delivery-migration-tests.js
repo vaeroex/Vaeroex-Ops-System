@@ -290,7 +290,7 @@ function assertTargetIsSinglePendingMigration() {
   // This list is exact; no wildcard or production admission rule is relaxed.
   const workspaceAuditTail = [
     "20261005022017_workspace_security_boundaries.sql",
-    "20261005022445_workspace_persisted_usage_limits.sql"
+    "20261005022445_workspace_persisted_usage_limits.sql", "20261005060101_atomic_confirmed_memory_publication.sql", "20261005060258_asset_check_server_chronology.sql", "20261005061024_internal_form_submission_idempotency.sql", "20261005062005_durable_import_attempt_reconciliation.sql"
   ];
   const reviewedTail = [...dormantSquareTail, ...separatelyQualifiedSheetsTail, ...separatelyQualifiedPreferencesTail, ...workspaceAuditTail];
   const laterMigrations = migrations.slice(targetIndex + 1);

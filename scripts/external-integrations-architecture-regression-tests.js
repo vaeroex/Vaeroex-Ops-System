@@ -399,6 +399,10 @@ function acceptsFixtureManifest(names) {
 equal(acceptsFixtureManifest(currentMigrations), true, "real current migration manifest passes the fixture-rich guard");
 for (const manifest of [currentMigrations.filter(name => name !== "20261005022017_workspace_security_boundaries.sql"),
   currentMigrations.filter(name => name !== "20261005022445_workspace_persisted_usage_limits.sql"),
+  currentMigrations.filter(name => name !== "20261005060101_atomic_confirmed_memory_publication.sql"),
+  currentMigrations.filter(name => name !== "20261005060258_asset_check_server_chronology.sql"),
+  currentMigrations.filter(name => name !== "20261005061024_internal_form_submission_idempotency.sql"),
+  currentMigrations.filter(name => name !== "20261005062005_durable_import_attempt_reconciliation.sql"),
   currentMigrations.filter(name => name !== "20260907174326_square_dormant_account_connection.sql"),
   currentMigrations.filter(name => name !== "20260902191325_square_production_internal_pilot_runtime.sql"),
   currentMigrations.filter(name => name !== "20260907225626_square_remote_sandbox_binding.sql"),

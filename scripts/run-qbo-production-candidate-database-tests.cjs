@@ -15,6 +15,20 @@ const productionSquare = [
   '20260929041048_square_customer_payment_history.sql',
   '20260929052211_square_customer_payment_browse.sql',
 ];
+const productionSheets = [
+  '20261002040024_google_sheets_complete.sql',
+  '20261002040031_google_sheets_lifecycle.sql',
+];
+// Apply this shared tail only after each shape's provider/dashboard history.
+// The entitlement migration inspects the tables present at application time.
+const auditMigrations = [
+  '20261005022017_workspace_security_boundaries.sql',
+  '20261005022445_workspace_persisted_usage_limits.sql',
+  '20261005060101_atomic_confirmed_memory_publication.sql',
+  '20261005060258_asset_check_server_chronology.sql',
+  '20261005061024_internal_form_submission_idempotency.sql',
+  '20261005062005_durable_import_attempt_reconciliation.sql',
+];
 const candidates = [
   '20260930001000_qbo_customer_oauth_completion.sql',
   '20260930002000_qbo_production_ongoing_sync.sql',
@@ -201,6 +215,15 @@ async function executeDashboardSuite(client, suite, inputs, lines) {
 }
 const quote = value => '"' + value.replaceAll('"', '""') + '"';
 const digest = value => crypto.createHash('sha256').update(value).digest('hex');
+function assertProductionBaselineLedger(versions) {
+  // Read-only hosted capture: 120 versions through 20261002182746, including
+  // the two Google Sheets entries. No endpoint or credential is needed here.
+  assert.equal(versions.length, 120, 'exact reviewed Production history before audit corrections');
+  assert.equal(new Set(versions).size, 120, 'Production ledger contains no duplicate version');
+  assert.equal(digest([...versions].sort().join('\n')),
+    '881b0e53e1c1a8144aba0c6ff6d895ca859cfe62544f0808df991b3959685b84',
+    'Production migration versions must match the independently captured hosted ledger');
+}
 const fixtureInclude = '\\ir fixtures/qbo-production-native.sql';
 
 function expandFixture(sql, fixture) {
@@ -343,18 +366,25 @@ async function main() {
   const canonical = fs.readdirSync(path.join(root, 'supabase/migrations'))
     .filter(name => /^\d+_.+\.sql$/.test(name)).sort().map(name => snapshot(`supabase/migrations/${name}`));
   const prefix = canonical.filter(item => item.version <= '20260902191325');
-  assert.equal(canonical.length, 125, 'review the canonical migration manifest if it changes');
+  assert.equal(canonical.length, 129, 'review the canonical migration manifest if it changes');
   assert.deepEqual(canonical.filter(item => item.version > '20260915040500').map(item => path.basename(item.file)), [
     '20261002040024_google_sheets_complete.sql',
     '20261002040031_google_sheets_lifecycle.sql',
     '20261002182049_integration_summary_preferences.sql',
-    '20261005022017_workspace_security_boundaries.sql',
-    '20261005022445_workspace_persisted_usage_limits.sql',
-  ], 'the canonical extension contains exactly two Google Sheets migrations, dashboard preferences and both reviewed workspace audit migrations');
+    ...auditMigrations,
+  ], 'the canonical extension contains exactly two Google Sheets migrations, dashboard preferences and the six reviewed audit/closeout migrations');
   assert.equal(prefix.length, 104, 'exact reviewed Production prefix');
   const square = productionSquare.map(name => snapshot(`supabase/production-migrations/${name}`));
   const qbo = candidates.map(name => snapshot(`supabase/production-migrations/${name}`));
+  const sheets = productionSheets.map(name => snapshot(`supabase/production-migrations/${name}`));
   const dashboard = Object.values(dashboardMigrations).map(name => snapshot(`supabase/production-migrations/${name}`));
+  const audit = auditMigrations.map(name => snapshot(`supabase/production-migrations/${name}`));
+  for (const item of [...sheets, ...audit]) {
+    assert.equal(item.sha256, canonical.find(saved => path.basename(saved.file) === path.basename(item.file))?.sha256,
+      'shared canonical and Production migration SQL must match exactly');
+  }
+  const canonicalBaseline = canonical.filter(item => !auditMigrations.includes(path.basename(item.file)));
+  assert.equal(canonicalBaseline.length, 123, 'audit tail must be applied exactly once after provider setup');
   assert.equal(dashboard[0].sha256, canonical.find(item => path.basename(item.file) === dashboardMigrations.preferences)?.sha256,
     'canonical and Production preference SQL must match exactly');
   const squareFixture = snapshot('supabase/tests/square_customer_payment_browse.test.sql');
@@ -373,11 +403,13 @@ async function main() {
       'scripts/run-square-durable-page-qualification.js', 'supabase/tests/fixtures/square-durable-platform.sql']
       .map(file => { const value = snapshot(file); return { file, sha256: value.sha256 }; }),
     candidateHashes: qbo.map(({ file, sha256 }) => ({ file, sha256 })),
+    productionSheetsHashes: sheets.map(({ file, sha256 }) => ({ file, sha256 })),
+    sharedAuditTailHashes: audit.map(({ file, sha256 }) => ({ file, sha256 })),
     dashboardCandidateHashes: dashboard.map(({ file, sha256 }) => ({ file, sha256 })),
     squareDashboardFixture: { file: squareFixture.file, sha256: squareFixture.sha256 },
     sharedFixture: fixture && { file: fixture.file, sha256: fixture.sha256 }, runs: [] };
   const save = () => fs.writeFileSync(path.join(evidence, 'results.json'), JSON.stringify(report, null, 2));
-  for (const shape of [{ name: 'canonical', migrations: canonical }, { name: 'production', migrations: [...prefix, ...square] }]) {
+  for (const shape of [{ name: 'canonical', migrations: canonicalBaseline }, { name: 'production', migrations: [...prefix, ...square] }]) {
     const plan = dashboardPlan(shape.name);
     const shapeSuites = [...suites, ...plan.suites.map(suite => {
       if (suite.file === squareDependencySuite.file) return {
@@ -422,11 +454,17 @@ async function main() {
         for (const item of qbo) await apply(item);
         assert.equal(await squareCatalog(client), before, 'QBO candidates preserve the Square catalog');
         result.squareCatalogSha256 = before;
+        // These two migrations are present in the independently inspected
+        // 120-entry hosted ledger. Canonical already contains the same SQL.
+        if (shape.name === 'production') for (const item of sheets) await apply(item);
         // Square's new read projection is intentionally outside the QBO-only
         // catalog comparison; all original lifecycle/ledger guards remain on.
         for (const name of plan.migrations) await apply(dashboard.find(item => path.basename(item.file) === name));
+        if (shape.name === 'production') assertProductionBaselineLedger(ledger);
+        result.preAuditLedger = [...ledger].sort();
+        for (const item of audit) await apply(item);
         result.finalLedger = [...ledger].sort();
-        console.log(`${shape.name}: ${shape.migrations.length}+${qbo.length}+${plan.migrations.length} migrations applied; exact ledger and QBO-only Square catalog guard verified.`);
+        console.log(`${shape.name}: ${ledger.length} migrations applied including the shared audit tail; exact ledger and QBO-only Square catalog guard verified.`);
         // pgTAP's test metadata ACLs are not part of the pristine migration catalog.
         await client.query('create extension if not exists pgtap with schema extensions');
         // OAuth spans commits. A clean template clone per suite prevents fixture
@@ -533,5 +571,6 @@ async function main() {
 
 if (require.main === module) main().catch(error => { console.error(error); process.exitCode = 1; });
 module.exports = { checkTap, expandFixture, suiteRequests, candidateDblinkSetting, candidates, pendingSuite, eligibilitySuite,
+  productionSquare, productionSheets, auditMigrations, assertProductionBaselineLedger,
   dashboardMigrations, dashboardSuites, dashboardPlan, checkDashboardAssertionNames, composeSquareIdentitySuite, executeDashboardSuite,
   preferenceAssertionNames, reportingTimezoneAssertionNames, squareIdentityAssertionNames, squareCatalog };

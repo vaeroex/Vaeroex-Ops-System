@@ -6,6 +6,7 @@ const os = require('node:os');
 const { spawnSync } = require('node:child_process');
 const vm = require('node:vm');
 const { checkTap, expandFixture, suiteRequests, candidateDblinkSetting, candidates, pendingSuite, eligibilitySuite,
+  productionSquare, productionSheets, auditMigrations, assertProductionBaselineLedger,
   dashboardMigrations, dashboardSuites, dashboardPlan, checkDashboardAssertionNames, composeSquareIdentitySuite, executeDashboardSuite,
   preferenceAssertionNames, reportingTimezoneAssertionNames, squareIdentityAssertionNames } = require('./run-qbo-production-candidate-database-tests.cjs');
 const { verifyLocalContext, verifyOwnedContainer, verifyBridgeGateway } = require('./qbo-candidate-local-container.cjs');
@@ -25,10 +26,39 @@ assert.match(candidateRunner, /outcome\.assertions = await require\('\.\/qbo-pen
   'eligibility tests use the owned per-suite database clone'); assertions++;
 assert.match(candidateRunner, /assert\.equal\(outcome\.assertions, suite\.expectedScenarios/, 'incomplete native coverage fails the candidate run'); assertions++;
 assert.match(candidateRunner, /result\.suites\.length === shapeSuites\.length \+ 4/, 'candidate success requires the registered dashboard suites and all four existing native suites'); assertions++;
-assert.match(candidateRunner, /assert\.equal\(canonical\.length, 125,/, 'canonical count remains exact'); assertions++;
-assert.match(candidateRunner, /'20261002040024_google_sheets_complete\.sql',\s*'20261002040031_google_sheets_lifecycle\.sql',\s*'20261002182049_integration_summary_preferences\.sql',\s*'20261005022017_workspace_security_boundaries\.sql',\s*'20261005022445_workspace_persisted_usage_limits\.sql',\s*\]/,
-  'canonical tail remains exactly the two Sheets migrations, preferences and both audit migrations'); assertions++;
+assert.match(candidateRunner, /assert\.equal\(canonical\.length, 129,/, 'canonical count remains exact'); assertions++;
+assert.deepEqual(productionSheets, ['20261002040024_google_sheets_complete.sql', '20261002040031_google_sheets_lifecycle.sql']); assertions++;
+assert.deepEqual(auditMigrations, [
+  '20261005022017_workspace_security_boundaries.sql', '20261005022445_workspace_persisted_usage_limits.sql',
+  '20261005060101_atomic_confirmed_memory_publication.sql', '20261005060258_asset_check_server_chronology.sql',
+  '20261005061024_internal_form_submission_idempotency.sql', '20261005062005_durable_import_attempt_reconciliation.sql',
+]); assertions++;
+assert.match(candidateRunner, /'20261002040024_google_sheets_complete\.sql',\s*'20261002040031_google_sheets_lifecycle\.sql',\s*'20261002182049_integration_summary_preferences\.sql',\s*\.\.\.auditMigrations,\s*\]/,
+  'canonical tail remains exactly Sheets, preferences and the reviewed audit tail'); assertions++;
+assert.match(candidateRunner, /canonical\.filter\(item => !auditMigrations\.includes\(path\.basename\(item\.file\)\)\)/,
+  'canonical does not apply audit guards before new provider tables exist'); assertions++;
+assert.match(candidateRunner, /assert\.equal\(canonicalBaseline\.length, 123,/, 'canonical baseline stays exact'); assertions++;
+assert.match(candidateRunner, /if \(shape\.name === 'production'\) for \(const item of sheets\) await apply\(item\)/,
+  'Production includes both hosted Sheets migrations exactly once'); assertions++;
+assert.ok(candidateRunner.indexOf('for (const item of audit) await apply(item);')
+  > candidateRunner.indexOf('for (const name of plan.migrations) await apply('),
+  'audit tail follows complete provider and dashboard history'); assertions++;
+assert.ok(candidateRunner.indexOf('for (const item of audit) await apply(item);')
+  < candidateRunner.indexOf("await client.query('create extension if not exists pgtap with schema extensions')"),
+  'every suite clone includes the security and closeout corrections'); assertions++;
+assert.match(candidateRunner, /for \(const item of \[\.\.\.sheets, \.\.\.audit\]\)/,
+  'shared migration hashes checked across both layouts'); assertions++;
 assert.match(candidateRunner, /assert\.equal\(prefix\.length, 104,/, 'production baseline remains exactly 104'); assertions++;
+const productionVersions = [
+  ...fs.readdirSync(path.join(__dirname, '../supabase/migrations')).filter(name => /^\d+_.+\.sql$/.test(name) && name.split('_')[0] <= '20260902191325'),
+  ...productionSquare, ...candidates, ...productionSheets, ...Object.values(dashboardMigrations),
+].map(name => name.split('_')[0]);
+assertProductionBaselineLedger(productionVersions); assertions++;
+assertProductionBaselineLedger([...productionVersions].reverse()); assertions++;
+for (const changed of [productionVersions.slice(1), [...productionVersions, '99999999999999'],
+  ['99999999999999', ...productionVersions.slice(1)], [productionVersions[1], ...productionVersions.slice(1)]]) {
+  assert.throws(() => assertProductionBaselineLedger(changed)); assertions++;
+}
 assert.ok(candidateRunner.indexOf('for (const item of qbo) await apply(item);')
   < candidateRunner.indexOf("assert.equal(await squareCatalog(client), before")); assertions++;
 assert.ok(candidateRunner.indexOf("assert.equal(await squareCatalog(client), before")
