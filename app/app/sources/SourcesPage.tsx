@@ -19,7 +19,7 @@ import { UploadSourceForm, UploadSourceTrigger } from "@/components/evidence/Upl
 import { LoadingLink } from "@/components/operations/LoadingLink";
 import { PendingSubmitButton } from "@/components/operations/PendingSubmitButton";
 import { StatusBadge } from "@/components/operations/StatusBadge";
-import { SourceImportReview } from "@/components/evidence/SourceImportReview";
+import { SourceImportReview, sourceImportReviewRecords } from "@/components/evidence/SourceImportReview";
 import { BusinessNoteEntry, BusinessNotesPanel, type BusinessNotesObservability } from "@/components/evidence/BusinessNotesPanel";
 import { EvidenceLifecycleCheckbox } from "@/components/evidence/EvidenceLifecycleSelection";
 import { EvidenceBatchList } from "@/components/evidence/EvidenceBatchList";
@@ -482,6 +482,7 @@ function SourceFileDetailPanel({
   access,
   folders,
   fileImports,
+  statusImports = fileImports,
   fileImportRows,
   linkedKpis,
   linkedRuns,
@@ -493,6 +494,7 @@ function SourceFileDetailPanel({
   access?: FileAccessLinks | null;
   folders: Pick<FolderRow, "id" | "name">[];
   fileImports: FileImportRow[];
+  statusImports?: FileImportRow[];
   fileImportRows: FileImportDataRow[];
   linkedKpis: KpiRow[];
   linkedRuns: VaeroexRunRow[];
@@ -500,7 +502,7 @@ function SourceFileDetailPanel({
   importStatusUnavailable?: boolean;
   activeSection?: SourceDetailSection;
 }) {
-  const status = fileStatus(file, linkedRuns, fileImports, importStatusUnavailable);
+  const status = fileStatus(file, linkedRuns, statusImports, importStatusUnavailable);
   const output = fileAnalysisOutput(file);
   const failureMessage = latestAnalysisFailureMessage(file);
   const summary =
@@ -641,7 +643,7 @@ function SourceFileDetailPanel({
           {status === "Archived" ? (
             <div className="rounded-lg border border-white/10 bg-slate-950/45 p-4 text-sm leading-6 text-slate-400">Restore this source before preparing or approving imported data.</div>
           ) : (
-            <SourceImportReview file={file} imports={fileImports} rows={fileImportRows} />
+            <SourceImportReview file={file} imports={sourceImportReviewRecords(file.id, fileImports, statusImports)} rows={fileImportRows} statusUnavailable={importStatusUnavailable} />
           )}
         </div>
       ) : null}
@@ -1238,6 +1240,7 @@ export async function renderSourcesPage(params: SourceSearchParams = {}, options
             file={linkedFile}
             folders={folders}
             fileImports={linkedFileImports}
+            statusImports={statusImports}
             fileImportRows={fileImportRows}
             linkedKpis={linkedKpis}
             linkedRuns={linkedRuns}

@@ -236,15 +236,25 @@ function WorkbookReprepareControl({ file, importRecord }: { file: FileUploadRow;
   );
 }
 
+export function sourceImportReviewRecords(fileId: string, imports: FileImportRow[], statusImports: FileImportRow[]) {
+  const held = statusImports.find((item) => item.file_upload_id === fileId && ["running", "reconciliation_required"].includes(item.recovery_status));
+  return held ? [held] : imports;
+}
+
 export function SourceImportReview({
   file,
   imports,
-  rows
+  rows,
+  statusUnavailable = false
 }: {
   file: FileUploadRow;
   imports: FileImportRow[];
   rows: FileImportDataRow[];
+  statusUnavailable?: boolean;
 }) {
+  if (statusUnavailable) {
+    return <div role="status" className="rounded-lg border border-amber-300/30 bg-amber-950/20 p-4 text-sm leading-6 text-amber-50">Import status could not be verified. Reload before preparing or approving this source. Saved records have not been changed.</div>;
+  }
   const latestImport = imports[0];
 
   if (!latestImport) {
