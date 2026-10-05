@@ -23,7 +23,7 @@ createRoot(document.getElementById("fixture")!, { onCaughtError(error) {
 } }).render(new URL(location.href).searchParams.get('fixture') === 'worksheet' ? <main className="vaeroex-app-shell vaeroex-customer-workspace">
   <WorkbookImportReview
     file={{ id: 'synthetic-file', display_name: 'Synthetic worksheet' } as ComponentProps<typeof WorkbookImportReview>["file"]}
-    importRecord={{ id: 'synthetic-import', mapping_json: { mode: 'workbook', worksheets: [{ index: 1, name: 'CSV', detected_type: 'sales', selected_type: 'sales', enabled: true, status: 'parsed', row_count: 1, columns: ['date', 'revenue'], mapping: {}, metric_columns: [] }] } } as ComponentProps<typeof WorkbookImportReview>["importRecord"]}
+    importRecord={{ id: 'synthetic-import', workspace_id: 'synthetic-workspace', file_upload_id: 'synthetic-file', import_type: 'metrics', status: 'extracted', recovery_status: 'not_started', rows_total: 1, rows_imported: 0, extraction_summary: null, errors_json: [], reviewed_at: null, imported_at: null, created_by: null, created_at: '2026-01-01T00:00:00Z', mapping_json: { mode: 'workbook', worksheets: [{ index: 1, name: 'CSV', detected_type: 'sales', selected_type: 'sales', enabled: true, status: 'parsed', row_count: 1, columns: ['date', 'revenue'], mapping: {}, metric_columns: [] }] } } as ComponentProps<typeof WorkbookImportReview>["importRecord"]}
     rows={[{ id: 'synthetic-row', row_number: 2, data_json: { date: '2026-01-01', revenue: 42 }, mapped_data_json: { __source: { worksheet_index: 1, row_number: 2 } } } as ComponentProps<typeof WorkbookImportReview>["rows"][number]]}
   />
 </main> : <main className="vaeroex-app-shell vaeroex-customer-workspace">
