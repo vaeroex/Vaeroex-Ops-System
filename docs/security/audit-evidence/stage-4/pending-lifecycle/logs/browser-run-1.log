@@ -1,0 +1,125 @@
+{
+  "scope": "Actual hydrated components, repository Tailwind config and app/globals.css under the exact workspace shell classes in light and pulsar themes, in a loopback-only synthetic fixture. Browser submission transport, search responses, navigation and activity are stubs; server actions and database persistence are tested separately. No auth or production/provider access.",
+  "results": [
+    {
+      "theme": "light",
+      "width": 1440,
+      "drawerTheme": {
+        "customerScope": true,
+        "surface": "#ffffff",
+        "fontSize": "14px",
+        "inputRadius": "7px",
+        "inputMinimum": "42px",
+        "inputBackground": "rgb(255, 255, 255)"
+      },
+      "searchTheme": {
+        "surface": "#ffffff",
+        "inputRadius": "7px",
+        "customerScope": true
+      },
+      "passed": [
+        "workspace_scoped_theme_inheritance",
+        "drawer_initial_focus_tab_wrap_inert_background_escape_restore",
+        "single_responsive_search_shortcut",
+        "search_results_tab_wrap_external_invoker_restore",
+        "nested_escape_scroll_lock_restore",
+        "schema_field_switch_reset_and_submission_payload",
+        "pending_repeat_click_single_request",
+        "native_validation_preserves_inputs",
+        "no_horizontal_overflow"
+      ]
+    },
+    {
+      "theme": "light",
+      "width": 390,
+      "drawerTheme": {
+        "customerScope": true,
+        "surface": "#ffffff",
+        "fontSize": "14px",
+        "inputRadius": "7px",
+        "inputMinimum": "42px",
+        "inputBackground": "rgb(255, 255, 255)"
+      },
+      "searchTheme": {
+        "surface": "#ffffff",
+        "inputRadius": "7px",
+        "customerScope": true
+      },
+      "passed": [
+        "workspace_scoped_theme_inheritance",
+        "drawer_initial_focus_tab_wrap_inert_background_escape_restore",
+        "single_responsive_search_shortcut",
+        "search_results_tab_wrap_external_invoker_restore",
+        "nested_escape_scroll_lock_restore",
+        "schema_field_switch_reset_and_submission_payload",
+        "pending_repeat_click_single_request",
+        "native_validation_preserves_inputs",
+        "no_horizontal_overflow"
+      ]
+    },
+    {
+      "theme": "pulsar",
+      "width": 1440,
+      "drawerTheme": {
+        "customerScope": true,
+        "surface": "#111827",
+        "fontSize": "14px",
+        "inputRadius": "7px",
+        "inputMinimum": "42px",
+        "inputBackground": "rgba(3, 7, 18, 0.78)"
+      },
+      "searchTheme": {
+        "surface": "#111827",
+        "inputRadius": "7px",
+        "customerScope": true
+      },
+      "passed": [
+        "workspace_scoped_theme_inheritance",
+        "drawer_initial_focus_tab_wrap_inert_background_escape_restore",
+        "single_responsive_search_shortcut",
+        "search_results_tab_wrap_external_invoker_restore",
+        "nested_escape_scroll_lock_restore",
+        "schema_field_switch_reset_and_submission_payload",
+        "pending_repeat_click_single_request",
+        "native_validation_preserves_inputs",
+        "no_horizontal_overflow"
+      ]
+    },
+    {
+      "theme": "pulsar",
+      "width": 390,
+      "drawerTheme": {
+        "customerScope": true,
+        "surface": "#111827",
+        "fontSize": "14px",
+        "inputRadius": "7px",
+        "inputMinimum": "42px",
+        "inputBackground": "rgba(3, 7, 18, 0.78)"
+      },
+      "searchTheme": {
+        "surface": "#111827",
+        "inputRadius": "7px",
+        "customerScope": true
+      },
+      "passed": [
+        "workspace_scoped_theme_inheritance",
+        "drawer_initial_focus_tab_wrap_inert_background_escape_restore",
+        "single_responsive_search_shortcut",
+        "search_results_tab_wrap_external_invoker_restore",
+        "nested_escape_scroll_lock_restore",
+        "schema_field_switch_reset_and_submission_payload",
+        "pending_repeat_click_single_request",
+        "native_validation_preserves_inputs",
+        "no_horizontal_overflow"
+      ]
+    }
+  ],
+  "errors": [],
+  "submittedCount": 6,
+  "runtime": "Next App Router compiled React client",
+  "expectedTransportFailures": [
+    "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+  ],
+  "errorRecovery": "Synthetic 503 caught by fixture boundary; no automatic retry; explicit remount and intentional retry. Does not qualify real Next redirects or backend-error input retention.",
+  "output": "/tmp/vaeroex-stage4-workflow-browser-final-1"
+}
