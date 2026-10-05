@@ -16,9 +16,9 @@ function loadBudget(){const context={exports:{},performance,require:name=>{asser
  vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(root,'services/external-integrations-qbo/src/execution-budget.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,context);return context.exports;}
 async function offline(){
  const {createQboExecutionBudget,QBO_TASK_LEASE_SECONDS}=loadBudget();let now=0;const budget=createQboExecutionBudget(()=>now);
- assert.equal(QBO_TASK_LEASE_SECONDS,300);assert.equal(budget.remainingMilliseconds(),240000);now=239990;assert.equal(budget.timeout(30000),10);
+ assert.equal(QBO_TASK_LEASE_SECONDS,270);assert.equal(budget.remainingMilliseconds(),240000);now=239990;assert.equal(budget.timeout(30000),10);
  now=240000;assert.throws(()=>budget.remainingMilliseconds(),/budget_exhausted/);assert.equal(budget.workExhausted(),true);
- assert.equal(budget.beginCleanup(),45000);now=284999;assert.equal(budget.remainingMilliseconds(),1);now=285000;assert.throws(()=>budget.remainingMilliseconds(),/budget_exhausted/);
+ assert.equal(budget.beginCleanup(),15000);now=254999;assert.equal(budget.remainingMilliseconds(),1);now=255000;assert.throws(()=>budget.remainingMilliseconds(),/budget_exhausted/);
  const clients=[],operations=[];let instances=0;let failRollback=false;
  class TestPool{constructor(){instances++;this.totalCount=1;this.idleCount=1;this.waitingCount=0;}on(){}async connect(){const client={release:destroy=>operations.push(['release',destroy]),query:async(sql)=>{const text=typeof sql==='string'?sql:sql.text;operations.push(text);if(text.startsWith('select public.'))throw Object.assign(Error('private_query_failure'),{code:'40001'});if(text==='rollback'&&failRollback)throw Error('private_rollback_failure');return {rows:[]};}};clients.push(client);return client;}async end(){operations.push('end');}}
  const Database=load({max:4},TestPool),db=new Database('synthetic',roles,'synthetic');

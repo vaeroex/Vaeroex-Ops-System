@@ -1,10 +1,12 @@
 import "server-only";
 
-// Keep the 300-second database lease and its expiry-bound evidence immutable.
-// Useful work stops with a minute still reserved for fenced failure recording.
-export const QBO_TASK_LEASE_SECONDS = 300;
+// New claims reserve 30 seconds for post-expiry recovery inside the 300-second
+// recovery target. Already-issued database lease expiries are never rewritten.
+// Useful work retains 240 seconds; cleanup gets 15 seconds, then a further
+// 15-second fencing margin before expiry. Cleanup failure remains explicit.
+export const QBO_TASK_LEASE_SECONDS = 270;
 export const QBO_TASK_WORK_MS = 240_000;
-export const QBO_TASK_CLEANUP_MS = 285_000;
+export const QBO_TASK_CLEANUP_MS = 255_000;
 
 export class QboExecutionBudgetError extends Error {
   constructor() { super("qbo_production_execution_budget_exhausted"); }

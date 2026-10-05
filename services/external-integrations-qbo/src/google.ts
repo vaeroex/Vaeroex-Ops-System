@@ -86,8 +86,8 @@ export async function googleCreateCloudTask(input: {
       body: JSON.stringify({
         task: {
           name: taskName,
-          // The handler stops useful work at 240s and fenced cleanup by 285s.
-          // Delivery must not retain a worker for the default 600s past its 300s lease.
+          // Useful work stops at240s, fenced cleanup at255s, and new leases at270s.
+          // Delivery retains its300s bound; SQL denies writes after lease expiry.
           dispatchDeadline: "300s",
           httpRequest: {
             httpMethod: "POST",
