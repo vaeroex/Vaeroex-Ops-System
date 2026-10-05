@@ -276,3 +276,15 @@ test('harness-only scheduled burst coverage aggregates verified admissions acros
   const r = verifyDispatchAccounting(f.plan, f.requests, f.jobs, f.dispatches); assert.deepEqual(r.blocked, []); assert.deepEqual(r.violations, []); assert.equal(r.scheduledCoverage.complete, true);
   f.jobs[1].workspaceId = '00000000-0000-4000-8000-000000000099'; assert(verifyDispatchAccounting(f.plan, f.requests, f.jobs, f.dispatches).violations.some(v => v.code === 'cross_workspace_dispatch'));
 });
+
+
+test('harness-only a lost scheduler completion acknowledgement needs exact persisted-run injection evidence', () => {
+  const f = scheduledFixture(), e = f.dispatches[0].scheduling; e.response.attempted = 1; e.response.failed = 1;
+  e.dueQueries[0].connections = [{ id: f.connection, workspaceId: f.a, eligibleAt: f.at }];
+  f.jobs = [{ id: 'completed-run', workspaceId: f.a, connectionId: f.connection, status: 'completed', accepted: true }]; f.dispatches[0].jobIds = ['completed-run'];
+  assert(verifyDispatchAccounting(f.plan, f.requests, f.jobs, f.dispatches).blocked.includes('scheduled_dispatch_evidence_mismatch'));
+  e.acknowledgementLossRunIds = ['completed-run'];
+  const verified = verifyDispatchAccounting(f.plan, f.requests, f.jobs, f.dispatches); assert.deepEqual(verified.blocked, []); assert.deepEqual(verified.violations, []);
+  e.acknowledgementLossRunIds = ['foreign-run']; assert(verifyDispatchAccounting(f.plan, f.requests, f.jobs, f.dispatches).blocked.length);
+  e.acknowledgementLossRunIds = ['completed-run', 'completed-run']; assert(verifyDispatchAccounting(f.plan, f.requests, f.jobs, f.dispatches).blocked.length);
+});

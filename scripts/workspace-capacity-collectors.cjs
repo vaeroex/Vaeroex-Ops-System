@@ -60,9 +60,13 @@ function createCollectors({ runtimeFile, state, baselineRunIds = [] }) {
     }
     const dueEvents = readEvents(cfg.transportEvents).filter(e => e.runId === plan.runId && e.event === 'rpc_response' && e.rpc === 'due_google_sheets_syncs_v1' && e.status === 200);
     const deniedClaims = readEvents(cfg.transportEvents).filter(e => e.runId === plan.runId && e.event === 'rpc_response' && e.rpc === 'claim_google_sheets_sync_v1' && e.status !== 200);
+    const acknowledgementLosses = readEvents(cfg.transportEvents).filter(e => e.runId === plan.runId && e.event === 'fault_injected' && e.kind === 'commit_ack_loss' && e.actualInjection === true);
     for (const req of requests.filter(r => r.action === 'scheduled')) {
       const item = dispatch.get(req.logicalId) || { requestLogicalId: req.logicalId, jobIds: [] };
+      const lostAcknowledgements = acknowledgementLosses.filter(e => e.logicalId === req.logicalId);
+      for (const e of lostAcknowledgements) assert(jobs.some(j => j.id === e.runIdAccepted && j.workspaceId === e.workspaceId && j.requestLogicalId === req.logicalId && j.status === 'completed'), 'lost_ack_durable_run_mismatch');
       item.scheduling = { response: req.schedulingResponse || null,
+        acknowledgementLossRunIds: [...new Set(lostAcknowledgements.map(e => e.runIdAccepted))],
         dueQueries: dueEvents.filter(e => e.logicalId === req.logicalId).map(e => ({ at: e.at, tickAt: e.tickAt, limit: e.limit, excludedConnectionIds: e.excludedConnectionIds, connections: e.connections })),
         claimDenials: deniedClaims.filter(e => e.logicalId === req.logicalId).map(e => ({ at: e.at, workspaceId: e.workspaceId, connectionId: e.connectionId, errorCode: e.outcomeCode })) };
       dispatch.set(req.logicalId, item);

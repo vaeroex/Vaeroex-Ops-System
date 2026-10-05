@@ -55,8 +55,10 @@ export function verifyDispatchAccounting(plan,requests,jobs,dispatchRows){
   const busy=new Set(),rejected=new Set();
   for(const d of denials){const pair=d.workspaceId+':'+d.connectionId;if(!Number.isFinite(Date.parse(d.at))||!duePairs.has(pair)||!/^google_sheets_[a-z_]+$/.test(d.errorCode||'')){valid=false;continue;}if(admittedPairs.has(pair))continue;if(/^google_sheets_(?:capacity|workspace|sync)_busy$/.test(d.errorCode))busy.add(pair);else rejected.add(pair);}
   for(const pair of rejected)busy.delete(pair);
+  const losses=evidence.acknowledgementLossRunIds??[];if(!Array.isArray(losses)||new Set(losses).size!==losses.length||losses.some(id=>!admitted.some(j=>j.id===id&&j.status==='completed')))valid=false;
+  const lossIds=new Set(Array.isArray(losses)?losses:[]),lostCompletionAcks=admitted.filter(j=>j.status==='completed'&&lossIds.has(j.id)).length;
   const completed=admitted.filter(j=>j.status==='completed').length,failed=admitted.filter(j=>['failed_explicitly','cancelled_explicitly'].includes(j.status)).length;
-  if(response.succeeded!==completed||response.failed!==failed+rejected.size||response.deferred!==busy.size||response.attempted!==admitted.length+rejected.size+busy.size||response.attempted===0&&duePairs.size!==0)valid=false;
+  if(response.succeeded!==completed-lostCompletionAcks||response.failed!==failed+rejected.size+lostCompletionAcks||response.deferred!==busy.size||response.attempted!==admitted.length+rejected.size+busy.size||response.attempted===0&&duePairs.size!==0)valid=false;
   if(!valid){blocked.push('scheduled_dispatch_evidence_mismatch');continue;}for(const j of admitted)covered.add(j.workspaceId);
  }
  const missingWorkspaceIds=plan.workspaces.map(w=>w.id).filter(id=>!covered.has(id));
