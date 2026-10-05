@@ -66,7 +66,7 @@ async function submit(page, button, label, outcome, repeated = true) {
   const headers = await r.allHeaders();
   const feedback = new URL(page.url()).searchParams.get('message') || new URL(page.url()).searchParams.get('error');
   assert(feedback, 'saved_or_denied_feedback_required');
-  if (/do not have permission|not authorized|not allowed|permission denied/i.test(feedback)) {
+  if (/do not have permission|not authorized|not allowed|permission denied|security requirements/i.test(feedback)) {
     // These deliberate role denials use the existing security alert, not a toast.
     await page.getByRole('alert').filter({ hasText: 'Action Blocked' }).last().waitFor({ timeout: 20000 });
     await page.getByRole('alert').filter({ hasText: 'No changes were made.' }).last().waitFor();
