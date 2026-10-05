@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { RecordDetailDrawer } from "@/components/operations/RecordDetailDrawer";
 import { GlobalSearch } from "@/components/app/GlobalSearch";
 import { GlobalSearchTrigger } from "@/components/app/GlobalSearchTrigger";
+import { IssueCreateForm } from "@/components/operations/IssueCreateForm";
 import { InternalFormSubmissionForm } from "@/components/operations/InternalFormSubmissionForm";
 import { WorkbookImportReview } from "@/components/evidence/WorkbookImportReview";
 import { createSubmissionSchema } from "@/lib/forms/submission-schema";
@@ -20,7 +21,7 @@ class SyntheticActionBoundary extends Component<{ children: ReactNode }, { faile
 }
 createRoot(document.getElementById("fixture")!, { onCaughtError(error) {
   if (!(error instanceof Error) || error.message !== "Synthetic submission failed") throw error;
-} }).render(new URL(location.href).searchParams.get('fixture') === 'worksheet' ? <main className="vaeroex-app-shell vaeroex-customer-workspace">
+} }).render(new URL(location.href).searchParams.get('fixture') === 'issue' ? <main className="vaeroex-app-shell vaeroex-customer-workspace"><SyntheticActionBoundary><IssueCreateForm requestId="22222222-2222-4222-8222-222222222222" /></SyntheticActionBoundary></main> : new URL(location.href).searchParams.get('fixture') === 'worksheet' ? <main className="vaeroex-app-shell vaeroex-customer-workspace">
   <WorkbookImportReview
     file={{ id: 'synthetic-file', display_name: 'Synthetic worksheet' } as ComponentProps<typeof WorkbookImportReview>["file"]}
     importRecord={{ id: 'synthetic-import', workspace_id: 'synthetic-workspace', file_upload_id: 'synthetic-file', import_type: 'metrics', status: 'extracted', recovery_status: 'not_started', rows_total: 1, rows_imported: 0, extraction_summary: null, errors_json: [], reviewed_at: null, imported_at: null, created_by: null, created_at: '2026-01-01T00:00:00Z', mapping_json: { mode: 'workbook', worksheets: [{ index: 1, name: 'CSV', detected_type: 'sales', selected_type: 'sales', enabled: true, status: 'parsed', row_count: 1, columns: ['date', 'revenue'], mapping: {}, metric_columns: [] }] } } as ComponentProps<typeof WorkbookImportReview>["importRecord"]}

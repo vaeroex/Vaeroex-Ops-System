@@ -7,10 +7,10 @@ const output = process.env.WORKFLOW_TEST_OUTPUT || fs.mkdtempSync(path.join(os.t
 fs.mkdirSync(output, { recursive: true });
 const fixture = name => path.join(root, 'scripts/test-stubs', name);
 (async () => {
- await new Promise((resolve, reject) => webpack.webpack({ mode: 'production', context: root, target: 'web', devtool: false, optimization: { minimize: false }, entry: fixture('workspace-workflow-entry.tsx'), output: { path: output, filename: 'fixture.js' }, resolve: { extensions: ['.tsx', '.ts', '.js'], modules: [root + '/node_modules', 'node_modules'], alias: { 'react$': require.resolve('next/dist/compiled/react'), 'react/jsx-runtime$': require.resolve('next/dist/compiled/react/jsx-runtime'), 'react/jsx-dev-runtime$': require.resolve('next/dist/compiled/react/jsx-dev-runtime'), 'react-dom$': require.resolve('next/dist/compiled/react-dom'), 'react-dom/client$': require.resolve('next/dist/compiled/react-dom/client'), 'next/navigation$': fixture('workspace-workflow-navigation.tsx'), 'next/link$': fixture('current-integrations-link.tsx'), '@/components/app/ActivityProvider$': fixture('workspace-workflow-activity.tsx'), '@/app/app/operations/form-submission-action$': fixture('workspace-workflow-actions.tsx'), '@/app/app/files/worksheet-approval-action$': fixture('workspace-workflow-actions.tsx'), '@': root } }, module: { rules: [{ test: /\.tsx?$/, exclude: /node_modules/, use: fixture('qbo-browser-typescript-loader.cjs') }] } }, (error, stats) => error || stats.hasErrors() ? reject(error || new Error(stats.toString({ all: false, errors: true }))) : resolve()));
+ await new Promise((resolve, reject) => webpack.webpack({ mode: 'production', context: root, target: 'web', devtool: false, optimization: { minimize: false }, entry: fixture('workspace-workflow-entry.tsx'), output: { path: output, filename: 'fixture.js' }, resolve: { extensions: ['.tsx', '.ts', '.js'], modules: [root + '/node_modules', 'node_modules'], alias: { 'react$': require.resolve('next/dist/compiled/react'), 'react/jsx-runtime$': require.resolve('next/dist/compiled/react/jsx-runtime'), 'react/jsx-dev-runtime$': require.resolve('next/dist/compiled/react/jsx-dev-runtime'), 'react-dom$': require.resolve('next/dist/compiled/react-dom'), 'react-dom/client$': require.resolve('next/dist/compiled/react-dom/client'), 'next/navigation$': fixture('workspace-workflow-navigation.tsx'), 'next/link$': fixture('current-integrations-link.tsx'), '@/components/app/ActivityProvider$': fixture('workspace-workflow-activity.tsx'), '@/app/app/operations/form-submission-action$': fixture('workspace-workflow-actions.tsx'), '@/app/app/operations/issue-submission-action$': fixture('workspace-workflow-actions.tsx'), '@/app/app/files/worksheet-approval-action$': fixture('workspace-workflow-actions.tsx'), '@': root } }, module: { rules: [{ test: /\.tsx?$/, exclude: /node_modules/, use: fixture('qbo-browser-typescript-loader.cjs') }] } }, (error, stats) => error || stats.hasErrors() ? reject(error || new Error(stats.toString({ all: false, errors: true }))) : resolve()));
  const postcss = require('postcss'), tailwind = require('tailwindcss');
  const tailwindConfig = require('./integrations-ui-test-support').loadSource('tailwind.config.ts').default;
- const css = (await postcss([tailwind({ ...tailwindConfig, content: [root + '/components/operations/{ModalDialog,RecordDetailDrawer,InternalFormSubmissionForm,FormControls,PendingSubmitButton}.tsx', root + '/components/app/GlobalSearch.tsx', root + '/components/evidence/WorkbookImportReview.tsx', fixture('workspace-workflow-entry.tsx')] })]).process(fs.readFileSync(path.join(root, 'app/globals.css'), 'utf8'), { from: undefined })).css;
+ const css = (await postcss([tailwind({ ...tailwindConfig, content: [root + '/components/operations/{ModalDialog,RecordDetailDrawer,InternalFormSubmissionForm,IssueCreateForm,FormControls,PendingSubmitButton}.tsx', root + '/components/app/GlobalSearch.tsx', root + '/components/evidence/WorkbookImportReview.tsx', fixture('workspace-workflow-entry.tsx')] })]).process(fs.readFileSync(path.join(root, 'app/globals.css'), 'utf8'), { from: undefined })).css;
  const submitted = [], requests = [], errors = [], results = [];
  let submissionGate, expectSubmissionFailure = false;
  const expectedTransportFailures = [];
@@ -218,6 +218,27 @@ const fixture = name => path.join(root, 'scripts/test-stubs', name);
     assert.equal(await button.isEnabled(), true); assert.equal(submitted.length, prior + 1);
     results.push({ theme, width, passed: ['worksheet_pending_survives_mapping_rerender_repeated_submit_until_completion'] });
    } finally { gate.cleanup(); submissionGate = undefined; }
+  }
+  for (const theme of ['light', 'pulsar']) for (const width of [1440, 390]) {
+   await page.setViewportSize({ width, height: 900 }); await page.goto(`${origin}/?fixture=issue&theme=${theme}`);
+   await page.getByLabel('Issue title', { exact: true }).fill('Synthetic issue');
+   await page.getByLabel('Description', { exact: true }).fill('Synthetic persisted payload');
+   const prior = submitted.length, gate = submissionGate = createSubmissionGate();
+   try {
+    await page.getByRole('button', { name: 'Log issue', exact: true }).dblclick({ delay: 20 });
+    assert.equal(await gate.arrived, true);
+    const button=page.locator('form button[type="submit"]');
+    await page.waitForFunction(() => document.querySelector('form button[aria-busy="true"]')?.disabled);
+    await page.locator('[name="severity"]').selectOption('High');
+    await button.evaluate(b => { b.click(); b.form.requestSubmit(b); });
+    assert.equal(await button.isDisabled(),true);assert.equal(gate.state,'pending');assert.equal(submitted.length,prior+1);
+    const received=submitted.at(-1);assert.equal(received.issue_request_id,'22222222-2222-4222-8222-222222222222');assert.equal(received.severity,'Medium');
+    const response=page.waitForResponse(r=>r.url().endsWith('/fixture-submit'));gate.release();assert.equal((await response).status(),200);
+    await page.waitForFunction(()=>!document.querySelector('form button[aria-busy="true"]'));
+    assert.equal(await button.isEnabled(),true);assert.equal(submitted.length,prior+1);
+    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+    results.push({theme,width,passed:['issue_request_key_pending_repeated_submit_until_completion']});
+   } finally { gate.cleanup();submissionGate=undefined; }
   }
   assert.deepEqual(errors, []); assert(requests.every(url => url.startsWith(origin + '/')));
   const result = { scope: 'Actual hydrated components, repository Tailwind config and app/globals.css under the exact workspace shell classes in light and pulsar themes, in a loopback-only synthetic fixture. Browser submission transport, search responses, navigation and activity are stubs; server actions and database persistence are tested separately. No auth or production/provider access.', results, errors, submittedCount: submitted.length, runtime: 'Next App Router compiled React client', expectedTransportFailures, errorRecovery: 'Synthetic 503 caught by fixture boundary; no automatic retry; explicit remount and intentional retry. Does not qualify real Next redirects or backend-error input retention.' };

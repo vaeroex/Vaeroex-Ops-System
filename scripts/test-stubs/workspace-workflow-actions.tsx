@@ -12,3 +12,8 @@ export async function submitWorksheetApproval(_previous: null, data: FormData) {
   await createFormSubmissionAction(data);
   return null;
 }
+
+export async function submitIssue(_previous: null, data: FormData) {
+  await createFormSubmissionAction(data);
+  return null;
+}

@@ -835,34 +835,36 @@ export async function acceptKpiSemanticSuggestionAction(formData: FormData) {
 
 export async function createIssueAction(formData: FormData) {
   const path = "/app/issues";
-  const { supabase, user, workspaceId } = await requireWorkspace(path);
-  const title = text(formData, "title");
-
+  const { supabase, workspaceId, membership } = await requireWorkspace(path);
+  if (!["owner", "admin", "manager"].includes(membership.role)) {
+    redirectWithError(path, "You do not have permission to log an issue.");
+  }
+  const title = text(formData, "title"), requestId = text(formData, "issue_request_id");
+  if (formData.getAll("issue_request_id").length !== 1 || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(requestId)) {
+    redirectWithError(path, "Refresh this form before logging an issue.");
+  }
   requireValue(path, "Issue title", title);
   validateLength(path, "Issue description", text(formData, "description"), 2000);
-
-  const { error } = await supabase.from("issues").insert({
-    workspace_id: workspaceId,
-    title,
-    description: text(formData, "description"),
-    issue_type: text(formData, "issue_type"),
-    severity: text(formData, "severity") || "Medium",
-    status: text(formData, "status") || "Open",
-    root_cause: text(formData, "root_cause"),
-    recommended_fix: text(formData, "recommended_fix"),
-    assigned_person_id: text(formData, "person_id") || null,
-    assigned_role: text(formData, "role") || null,
-    assigned_department: text(formData, "department") || null,
-    due_date: text(formData, "due_date") || null,
-    created_by: user.id
+  const { data: saved, error } = await supabase.rpc("submit_issue_v1", {
+    p_workspace_id: workspaceId,
+    p_request_id: requestId,
+    p_payload: {
+      title, description: text(formData, "description"), issue_type: text(formData, "issue_type"),
+      severity: text(formData, "severity") || "Medium", status: text(formData, "status") || "Open",
+      root_cause: text(formData, "root_cause"), recommended_fix: text(formData, "recommended_fix"),
+      assigned_person_id: text(formData, "person_id") || null, assigned_role: text(formData, "role") || null,
+      assigned_department: text(formData, "department") || null, due_date: text(formData, "due_date") || null
+    }
   });
-
-  if (error) {
-    redirectWithError(path, error.message);
+  if (error || !saved || typeof saved !== "object" || Array.isArray(saved) || typeof saved.issueId !== "string") {
+    const message = error?.message || "";
+    redirectWithError(path, message.includes("request_conflict") ? "This request was already used for different issue details. Start a new issue."
+      : message.includes("access_denied") ? "You no longer have permission to log an issue in this workspace."
+      : message.includes("issue_unavailable") ? "The previously logged issue is no longer available. It was not recreated."
+      : "The issue could not be saved. Check the details and try again.");
   }
-
   revalidatePath(path);
-  redirectWithMessage(path, "Issue logged.");
+  redirectWithMessage(path, saved.replayed ? "Issue already logged. No duplicate was created." : "Issue logged.");
 }
 
 export async function createAssetAction(formData: FormData) {

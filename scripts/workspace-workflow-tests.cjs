@@ -101,7 +101,8 @@ const form = entries => { const data = new FormData(); Object.entries(entries).f
     const payload = new FormData(); payload.set('synthetic', 'unchanged');
     for (const [modulePath, exportName, originalName] of [
       ['app/app/operations/form-submission-action.ts', 'submitInternalForm', 'createFormSubmissionAction'],
-      ['app/app/files/worksheet-approval-action.ts', 'submitWorksheetApproval', 'saveExtractedImportAction']
+      ['app/app/files/worksheet-approval-action.ts', 'submitWorksheetApproval', 'saveExtractedImportAction'],
+      ['app/app/operations/issue-submission-action.ts', 'submitIssue', 'createIssueAction']
     ]) {
       let releaseAdapter, adapterCompleted = false, adapterCalls = 0;
       const adapterWait = new Promise(resolve => { releaseAdapter = resolve; });

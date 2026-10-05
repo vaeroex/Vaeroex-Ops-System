@@ -1,7 +1,7 @@
-import { createIssueAction } from "@/app/app/operations/actions";
+import { randomUUID } from "node:crypto";
+import { IssueCreateForm } from "@/components/operations/IssueCreateForm";
 import { CreateDrawer } from "@/components/operations/CreateDrawer";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
-import { PrimaryButton, SelectInput, TextArea, TextInput } from "@/components/operations/FormControls";
 import { ManagedRecordList, type ManagedRecordEditField } from "@/components/operations/ManagedRecordList";
 import { PageHeader } from "@/components/operations/PageHeader";
 import { getRecordFolders, managedValues, shortPreview } from "@/lib/records/management";
@@ -91,18 +91,7 @@ export default async function IssuesPage({ searchParams }: IssuesPageProps) {
 
       <section className="space-y-6">
         <CreateDrawer title="Log issue" description="Capture enough detail for leadership to understand the risk." triggerLabel="New Issue">
-          <form action={createIssueAction} className="grid gap-4 lg:grid-cols-2">
-            <TextInput label="Issue title" name="title" required />
-            <TextInput label="Issue type" name="issue_type" placeholder="Process, customer, safety, equipment" />
-            <TextArea label="Description" name="description" rows={4} />
-            <SelectInput label="Severity" name="severity" defaultValue="Medium" options={issueSeverities} />
-            <SelectInput label="Status" name="status" defaultValue="Open" options={issueStatuses} />
-            <TextArea label="Root cause" name="root_cause" rows={3} />
-            <TextArea label="Leadership review note" name="recommended_fix" rows={3} />
-            <div className="lg:col-span-2">
-              <PrimaryButton>Log issue</PrimaryButton>
-            </div>
-          </form>
+          <IssueCreateForm requestId={randomUUID()} />
         </CreateDrawer>
 
         <ManagedRecordList
