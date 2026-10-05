@@ -1,0 +1,148 @@
+{
+  "scope": "Real hydrated deployed-reference components in isolated browser fixture; no auth/backend/storage/provider; all non-loopback traffic denied",
+  "commit": "d91be079c7beb0b6f21a4c5e6b451f90ca06e035",
+  "sourceFilesIdenticalToWorkingTree": true,
+  "results": [
+    {
+      "width": 1440,
+      "component": "RecordDetailDrawer",
+      "opened": {
+        "active": "Open synthetic record",
+        "inside": false
+      },
+      "tabFromLast": {
+        "id": "after",
+        "inside": false
+      },
+      "closed": {
+        "active": "BODY",
+        "id": "",
+        "triggerRestored": false
+      }
+    },
+    {
+      "width": 1440,
+      "component": "GlobalSearch",
+      "searchOpened": {
+        "tag": "INPUT",
+        "inside": true
+      },
+      "tabSteps": [
+        {
+          "tag": "BUTTON",
+          "id": "last",
+          "text": "Outside last",
+          "inside": false
+        },
+        {
+          "tag": "BODY",
+          "id": "",
+          "text": "Synthetic keyboard audit fixtureOutside beforeOpen synthetic",
+          "inside": false
+        },
+        {
+          "tag": "BUTTON",
+          "id": "before",
+          "text": "Outside before",
+          "inside": false
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "text": "Open synthetic record",
+          "inside": false
+        },
+        {
+          "tag": "BUTTON",
+          "id": "after",
+          "text": "Outside after",
+          "inside": false
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "text": "Search K",
+          "inside": false
+        }
+      ],
+      "searchClosed": {
+        "id": "",
+        "tag": "BODY"
+      }
+    },
+    {
+      "width": 390,
+      "component": "RecordDetailDrawer",
+      "opened": {
+        "active": "Open synthetic record",
+        "inside": false
+      },
+      "tabFromLast": {
+        "id": "after",
+        "inside": false
+      },
+      "closed": {
+        "active": "BODY",
+        "id": "",
+        "triggerRestored": false
+      }
+    },
+    {
+      "width": 390,
+      "component": "GlobalSearch",
+      "searchOpened": {
+        "tag": "INPUT",
+        "inside": true
+      },
+      "tabSteps": [
+        {
+          "tag": "BUTTON",
+          "id": "last",
+          "text": "Outside last",
+          "inside": false
+        },
+        {
+          "tag": "BUTTON",
+          "id": "before",
+          "text": "Outside before",
+          "inside": false
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "text": "Open synthetic record",
+          "inside": false
+        },
+        {
+          "tag": "BUTTON",
+          "id": "after",
+          "text": "Outside after",
+          "inside": false
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "text": "",
+          "inside": true
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "text": "",
+          "inside": true
+        }
+      ],
+      "searchClosed": {
+        "id": "",
+        "tag": "BODY"
+      }
+    }
+  ],
+  "errors": [],
+  "requests": [
+    "/",
+    "/fixture.js",
+    "/",
+    "/fixture.js"
+  ]
+}

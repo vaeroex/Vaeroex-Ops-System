@@ -1,0 +1,107 @@
+{
+  "testedRoot": "/tmp/vaeroex-audit-production",
+  "csvHeaderCollision": {
+    "input": [
+      "10",
+      "20",
+      "30"
+    ],
+    "output": [
+      {
+        "Amount": "10",
+        "Amount (2)": "30"
+      }
+    ]
+  },
+  "csvRowLineage": {
+    "actualPhysicalLine": 4,
+    "reportedRow": 3
+  },
+  "duplicateImports": {
+    "uniqueMeasurementDates": 1,
+    "observations": 3,
+    "recommendation": {
+      "value": 102,
+      "range": null,
+      "confidence": "Low",
+      "reason": "The recommendation is a conservative increase from recent performance because higher is better.",
+      "dataUsed": "3 KPI values",
+      "limitation": "This uses workspace history rather than an industry benchmark and never overwrites a manual target.",
+      "outliers": 0
+    }
+  },
+  "conflictingSameDate": {
+    "latestPerformanceEffect": "favorable",
+    "latest": 150,
+    "previous": 100
+  },
+  "unsupportedNumberAccepted": {
+    "eligible": true,
+    "classification": "business_evidence",
+    "extractionOutcome": "facts_extracted",
+    "reason": null,
+    "factCount": 1,
+    "requiresReview": false,
+    "sourceGrounding": "local_extraction"
+  },
+  "overviewParentCap": {
+    "completeHistoryCount": 1,
+    "cappedHistoryCount": 0,
+    "completeHealth": {
+      "available": true,
+      "unavailableReason": null,
+      "score": 32,
+      "status": "At Risk",
+      "trend": "Holding steady",
+      "components": {
+        "dataQualityBase": 50,
+        "riskPenalty": 18,
+        "opportunityAdjustment": 0,
+        "driverImpacts": [
+          {
+            "findingId": "kpi-risk-row-0",
+            "kind": "risk",
+            "scoreImpact": -18
+          }
+        ]
+      }
+    },
+    "cappedHealth": {
+      "available": false,
+      "unavailableReason": "insufficient_original_evidence",
+      "score": 0,
+      "status": "Insufficient Data",
+      "trend": "Not enough history",
+      "components": {
+        "dataQualityBase": 50,
+        "riskPenalty": 0,
+        "opportunityAdjustment": 0,
+        "driverImpacts": []
+      }
+    }
+  },
+  "lifecycleDatabaseFailure": {
+    "eligibleOnSuccess": 1,
+    "eligibleOnFailure": 0,
+    "threwOnFailure": false,
+    "errorSurface": "indistinguishable from no eligible memory"
+  },
+  "sheetsFormattedValues": [
+    {
+      "value": "1234.50",
+      "result": "1234.5"
+    },
+    {
+      "value": "$1,234.50",
+      "result": "rejected"
+    },
+    {
+      "value": "1,234.50",
+      "result": "rejected"
+    },
+    {
+      "value": "12.5%",
+      "result": "rejected"
+    }
+  ]
+}

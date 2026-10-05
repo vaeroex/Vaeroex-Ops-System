@@ -1,0 +1,15 @@
+✔ harness-only literal loopback rejects production, DNS, credentials and URL escapes (0.574375ms)
+✔ harness-only external redirect refused without followup (10.011917ms)
+✔ harness-only same-origin redirect inspected not followed, with explicit ack (0.246917ms)
+✔ harness-only hard-stop abort reaches fetch (0.305458ms)
+✔ harness-only max body and error thresholds retain planned failures separately (3.14575ms)
+✔ harness-only mix totals one hundred actions and generated plans preserve required cohort/corpus (122.627875ms)
+✔ harness-only empty or missing exported evidence cannot verify integrity (108.866292ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 295.926208

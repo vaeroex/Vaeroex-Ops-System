@@ -1,0 +1,5 @@
+{
+  "status": "blocked",
+  "services": null,
+  "reason": "Gcloud session reauthentication required; no service inventory available."
+}

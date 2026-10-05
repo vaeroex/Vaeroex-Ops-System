@@ -1,0 +1,445 @@
+{
+  "scope": "focused repository-SQL fixture, synthetic JWT roles, owned native PostgreSQL, no HTTP/provider verification",
+  "migrations": [
+    "20261005022017_workspace_security_boundaries.sql",
+    "20261005022445_workspace_persisted_usage_limits.sql"
+  ],
+  "version": "17.11",
+  "inputShapeMeasurements": [
+    {
+      "source": "app/app/business-health-analysis/actions.ts",
+      "workflow": "business_health_explanation_v1",
+      "jsonbBytes": 7546,
+      "limitBytes": 262144,
+      "fixture": "1024-byte strings; MAX_SAFE_INTEGER counts; actual caller initializer"
+    },
+    {
+      "source": "app/app/intelligence/briefings/actions.ts",
+      "workflow": "intelligence_briefing_v1",
+      "jsonbBytes": 11704,
+      "limitBytes": 262144,
+      "fixture": "1024-byte strings; MAX_SAFE_INTEGER counts; actual caller initializer"
+    },
+    {
+      "source": "app/app/finding-explanation/actions.ts",
+      "workflow": "finding_explanation_v1",
+      "jsonbBytes": 5454,
+      "limitBytes": 262144,
+      "fixture": "1024-byte strings; MAX_SAFE_INTEGER counts; actual caller initializer"
+    }
+  ],
+  "results": [
+    {
+      "name": "before migration: staff can persist a cross-workspace form parent",
+      "status": "pass"
+    },
+    {
+      "name": "historical mismatched asset row retained",
+      "status": "pass"
+    },
+    {
+      "name": "tenant FK remains NOT VALID pending historical review",
+      "status": "pass"
+    },
+    {
+      "name": "form tenant FK remains NOT VALID pending historical review",
+      "status": "pass"
+    },
+    {
+      "name": "client cannot forge trusted security events",
+      "status": "pass"
+    },
+    {
+      "name": "client definer cannot stamp trusted security events",
+      "status": "pass"
+    },
+    {
+      "name": "client cannot insert another tenant's asset check",
+      "status": "pass"
+    },
+    {
+      "name": "nonmember cannot read other tenant",
+      "status": "pass"
+    },
+    {
+      "name": "tenant read isolation",
+      "status": "pass"
+    },
+    {
+      "name": "viewer cannot contribute checks",
+      "status": "pass"
+    },
+    {
+      "name": "after migration: foreign form parent blocked",
+      "status": "pass"
+    },
+    {
+      "name": "same-tenant staff form submission succeeds",
+      "status": "pass"
+    },
+    {
+      "name": "staff cannot independently update parent asset",
+      "status": "pass"
+    },
+    {
+      "name": "staff check atomically updates parent readiness",
+      "status": "pass"
+    },
+    {
+      "name": "older check cannot replace newer readiness",
+      "status": "pass"
+    },
+    {
+      "name": "hiding latest check reselects active predecessor",
+      "status": "pass"
+    },
+    {
+      "name": "no active check clears checked time",
+      "status": "pass"
+    },
+    {
+      "name": "restore updates readiness",
+      "status": "pass"
+    },
+    {
+      "name": "rollback preserves both check history and parent",
+      "status": "pass"
+    },
+    {
+      "name": "foreign parent deletion retains mismatched history",
+      "status": "pass"
+    },
+    {
+      "name": "foreign form deletion retains mismatched historical submission",
+      "status": "pass"
+    },
+    {
+      "name": "server writer provenance and timestamp enforced",
+      "status": "pass"
+    },
+    {
+      "name": "legacy security events excluded from trusted counts",
+      "status": "pass"
+    },
+    {
+      "name": "expired membership retains historical reads",
+      "status": "pass"
+    },
+    {
+      "name": "expired direct data insert denied",
+      "status": "pass"
+    },
+    {
+      "name": "expired definer RPC data insert denied",
+      "status": "pass"
+    },
+    {
+      "name": "expired private integration_connections insert blocked through definer",
+      "status": "pass"
+    },
+    {
+      "name": "expired private integration_oauth_states insert blocked through definer",
+      "status": "pass"
+    },
+    {
+      "name": "expired private integration_qbo_oauth_state_bindings_v2 insert blocked through definer",
+      "status": "pass"
+    },
+    {
+      "name": "expired private integration_reauthorization_states insert blocked through definer",
+      "status": "pass"
+    },
+    {
+      "name": "private disconnect update remains available after expiry (trigger scope only)",
+      "status": "pass"
+    },
+    {
+      "name": "expired storage metadata insert denied",
+      "status": "pass"
+    },
+    {
+      "name": "expired direct update has no persisted result",
+      "status": "pass"
+    },
+    {
+      "name": "expired delete preserves history",
+      "status": "pass"
+    },
+    {
+      "name": "future workspace trial",
+      "status": "pass"
+    },
+    {
+      "name": "expired workspace trial",
+      "status": "pass"
+    },
+    {
+      "name": "demo workspace",
+      "status": "pass"
+    },
+    {
+      "name": "active flag without authoritative subscription",
+      "status": "pass"
+    },
+    {
+      "name": "manual entitlement write",
+      "status": "pass"
+    },
+    {
+      "name": "canceled Stripe overrides manual/demo/not-required fallback",
+      "status": "pass"
+    },
+    {
+      "name": "active Stripe future period",
+      "status": "pass"
+    },
+    {
+      "name": "trialing Stripe future period",
+      "status": "pass"
+    },
+    {
+      "name": "active Stripe expired period",
+      "status": "pass"
+    },
+    {
+      "name": "past due Stripe",
+      "status": "pass"
+    },
+    {
+      "name": "active Stripe missing customer",
+      "status": "pass"
+    },
+    {
+      "name": "service billing recovery remains writable",
+      "status": "pass"
+    },
+    {
+      "name": "service workspace bootstrap can create first membership before entitlement link",
+      "status": "pass"
+    },
+    {
+      "name": "authorized active workspace deletion retains FK cascade behavior",
+      "status": "pass"
+    },
+    {
+      "name": "active invite acceptance without prior membership",
+      "status": "pass"
+    },
+    {
+      "name": "expired invite definer cannot mutate membership",
+      "status": "pass"
+    },
+    {
+      "name": "16 concurrent final AI slots admit exactly one",
+      "status": "pass"
+    },
+    {
+      "name": "15 excess AI slots fail closed",
+      "status": "pass"
+    },
+    {
+      "name": "authenticated backdating cannot bypass monthly count",
+      "status": "pass"
+    },
+    {
+      "name": "16 concurrent final file slots admit exactly one",
+      "status": "pass"
+    },
+    {
+      "name": "15 excess file slots fail closed",
+      "status": "pass"
+    },
+    {
+      "name": "hidden-file restore cannot overfill quota",
+      "status": "pass"
+    },
+    {
+      "name": "repeatable-read stale final slot fails serialization",
+      "status": "pass"
+    },
+    {
+      "name": "idempotent run upsert at full quota preserves one persisted slot",
+      "status": "pass"
+    },
+    {
+      "name": "run timestamp cannot be moved to evade usage",
+      "status": "pass"
+    },
+    {
+      "name": "concurrent checks serialize and retain latest readiness",
+      "status": "pass"
+    },
+    {
+      "name": "parent failure rolls back check insert",
+      "status": "pass"
+    },
+    {
+      "name": "failed parent update persists no child",
+      "status": "pass"
+    },
+    {
+      "name": "unconfigured admin-style account obeys normal expired rules",
+      "status": "pass"
+    },
+    {
+      "name": "trusted service can configure a verified auth user exemption",
+      "status": "pass"
+    },
+    {
+      "name": "exemption requires an existing auth.users identity",
+      "status": "pass"
+    },
+    {
+      "name": "service RPC accepts configured admin after expiry with authoritative fields",
+      "status": "pass"
+    },
+    {
+      "name": "service RPC preserves Business Health duplicate23505",
+      "status": "pass"
+    },
+    {
+      "name": "service RPC preserves Briefing duplicate23505",
+      "status": "pass"
+    },
+    {
+      "name": "service RPC accepts allowlisted Finding Explanation workflow",
+      "status": "pass"
+    },
+    {
+      "name": "actual business_health_explanation_v1 shape fits bounded RPC with generous scalar values",
+      "status": "pass"
+    },
+    {
+      "name": "actual intelligence_briefing_v1 shape fits bounded RPC with generous scalar values",
+      "status": "pass"
+    },
+    {
+      "name": "actual finding_explanation_v1 shape fits bounded RPC with generous scalar values",
+      "status": "pass"
+    },
+    {
+      "name": "RPC accepts exact256KiB JSONB payload boundary",
+      "status": "pass"
+    },
+    {
+      "name": "RPC rejects payload exceeding256KiB JSONB boundary",
+      "status": "pass"
+    },
+    {
+      "name": "service RPC cannot grant ordinary actor expired access",
+      "status": "pass"
+    },
+    {
+      "name": "service RPC refuses actor outside selected workspace",
+      "status": "pass"
+    },
+    {
+      "name": "service RPC refuses unregistered workflow",
+      "status": "pass"
+    },
+    {
+      "name": "service client cannot forge a private per-run authorization",
+      "status": "pass"
+    },
+    {
+      "name": "direct service insert cannot borrow exemption through created_by",
+      "status": "pass"
+    },
+    {
+      "name": "service JWT subject alone does not create a global quota bypass",
+      "status": "pass"
+    },
+    {
+      "name": "authenticated admin cannot invoke trusted service RPC",
+      "status": "pass"
+    },
+    {
+      "name": "configured active-member admin remains entitled after expiry",
+      "status": "pass"
+    },
+    {
+      "name": "configured admin retains unlimited persisted AI slots",
+      "status": "pass"
+    },
+    {
+      "name": "configured admin retains unlimited persisted file slots",
+      "status": "pass"
+    },
+    {
+      "name": "exempt account cannot mutate a workspace without membership",
+      "status": "pass"
+    },
+    {
+      "name": "authenticated staff cannot invoke RPC with another admin identity",
+      "status": "pass"
+    },
+    {
+      "name": "staff cannot grant a subscription exemption",
+      "status": "pass"
+    },
+    {
+      "name": "staff cannot change another admin exemption",
+      "status": "pass"
+    },
+    {
+      "name": "staff cannot read private exemption identities",
+      "status": "pass"
+    },
+    {
+      "name": "staff cannot use another admin exemption",
+      "status": "pass"
+    },
+    {
+      "name": "email or metadata claims cannot forge exemption",
+      "status": "pass"
+    },
+    {
+      "name": "configured exemption does not upgrade viewer mutation permissions",
+      "status": "pass"
+    },
+    {
+      "name": "service RPC refuses disabled actor despite configured exemption",
+      "status": "pass"
+    },
+    {
+      "name": "disabled membership cannot use configured exemption",
+      "status": "pass"
+    },
+    {
+      "name": "removing exemption resumes expired subscription enforcement",
+      "status": "pass"
+    },
+    {
+      "name": "ordinary service RPC actor remains subject to quota",
+      "status": "pass"
+    },
+    {
+      "name": "ordinary actor retry preserves23505 at full quota",
+      "status": "pass"
+    },
+    {
+      "name": "removing exemption resumes the normal AI quota",
+      "status": "pass"
+    },
+    {
+      "name": "removing exemption resumes the normal file quota",
+      "status": "pass"
+    },
+    {
+      "name": "service RPC preserves owner staff and viewer active analysis behavior under quota",
+      "status": "pass"
+    },
+    {
+      "name": "successful and failed RPCs leave no reusable actor authorizations",
+      "status": "pass"
+    },
+    {
+      "name": "fixture anonymous ACL has no read grant (not a hosted ACL assertion)",
+      "status": "pass"
+    },
+    {
+      "name": "private mutation functions not directly executable",
+      "status": "pass"
+    }
+  ]
+}

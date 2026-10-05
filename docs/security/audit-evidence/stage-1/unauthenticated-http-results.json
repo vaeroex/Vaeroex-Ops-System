@@ -1,0 +1,648 @@
+{
+  "scope": "Production commit local dev server; no sessions; dummy loopback Supabase configuration; not authenticated role or production HTTP verification",
+  "results": [
+    {
+      "route": "/app",
+      "status": 307,
+      "basis": "recovered server log; redirect location not retained"
+    },
+    {
+      "route": "/app/11111111-1111-4111-8111-111111111111",
+      "status": 307,
+      "basis": "recovered server log; redirect location not retained"
+    },
+    {
+      "route": "/app/account/subscription",
+      "status": 307,
+      "basis": "recovered server log; redirect location not retained"
+    },
+    {
+      "route": "/app/admin/ai-trust",
+      "status": 307,
+      "basis": "recovered server log; redirect location not retained"
+    },
+    {
+      "route": "/app/admin/ai-usage",
+      "status": 307,
+      "basis": "recovered server log; redirect location not retained"
+    },
+    {
+      "route": "/app/admin/audit-logs",
+      "status": 307,
+      "basis": "recovered server log; redirect location not retained"
+    },
+    {
+      "route": "/app/admin/customers/11111111-1111-4111-8111-111111111111",
+      "status": 307,
+      "basis": "recovered server log; redirect location not retained"
+    },
+    {
+      "route": "/app/admin/customers",
+      "status": 307,
+      "basis": "recovered server log; redirect location not retained"
+    },
+    {
+      "route": "/app/admin/nvidia-qualification",
+      "status": 307,
+      "basis": "recovered server log; redirect location not retained"
+    },
+    {
+      "route": "/app/admin/nvidia-qualification/stage-three-a",
+      "status": 307,
+      "basis": "recovered server log; redirect location not retained"
+    },
+    {
+      "route": "/app/admin/nvidia-qualification/stage-three-b",
+      "status": 307,
+      "basis": "recovered server log; redirect location not retained"
+    },
+    {
+      "route": "/app/admin/nvidia-qualification/stage-two",
+      "status": 307,
+      "basis": "recovered server log; redirect location not retained"
+    },
+    {
+      "route": "/app/admin",
+      "status": 307,
+      "basis": "recovered server log; redirect location not retained"
+    },
+    {
+      "route": "/app/admin/subscriptions",
+      "status": 307,
+      "basis": "recovered server log; redirect location not retained"
+    },
+    {
+      "route": "/app/admin/support-requests",
+      "status": 307,
+      "basis": "recovered server log; redirect location not retained"
+    },
+    {
+      "route": "/app/admin/workspace-agreements/11111111-1111-4111-8111-111111111111",
+      "status": 307,
+      "basis": "recovered server log; redirect location not retained"
+    },
+    {
+      "route": "/app/admin/workspace-agreements",
+      "status": 307,
+      "basis": "recovered server log; redirect location not retained"
+    },
+    {
+      "route": "/app/admin/workspaces",
+      "status": 307,
+      "basis": "recovered server log; redirect location not retained"
+    },
+    {
+      "route": "/app/agents",
+      "status": 307,
+      "basis": "recovered server log; redirect location not retained"
+    },
+    {
+      "route": "/app/ask",
+      "status": 307,
+      "basis": "recovered server log; redirect location not retained"
+    },
+    {
+      "route": "/app/assets",
+      "status": 307,
+      "basis": "recovered server log; redirect location not retained"
+    },
+    {
+      "route": "/app/checklist-runs",
+      "status": 307,
+      "basis": "recovered server log; redirect location not retained"
+    },
+    {
+      "route": "/app/checklists",
+      "status": 307,
+      "basis": "recovered server log; redirect location not retained"
+    },
+    {
+      "route": "/app/crm",
+      "status": 307,
+      "basis": "recovered server log; redirect location not retained"
+    },
+    {
+      "route": "/app/files",
+      "status": 307,
+      "basis": "recovered server log; redirect location not retained"
+    },
+    {
+      "route": "/app/form-submissions",
+      "status": 307,
+      "basis": "recovered server log; redirect location not retained"
+    },
+    {
+      "route": "/app/forms/11111111-1111-4111-8111-111111111111",
+      "status": 307,
+      "basis": "recovered server log; redirect location not retained"
+    },
+    {
+      "route": "/app/forms",
+      "status": 307,
+      "basis": "recovered server log; redirect location not retained"
+    },
+    {
+      "route": "/app/help",
+      "status": 307,
+      "basis": "recovered server log; redirect location not retained"
+    },
+    {
+      "route": "/app/help/release-notes",
+      "status": 307,
+      "basis": "recovered server log; redirect location not retained"
+    },
+    {
+      "route": "/app/help/trust",
+      "status": 307,
+      "basis": "recovered server log; redirect location not retained"
+    },
+    {
+      "route": "/app/integrations",
+      "status": 307,
+      "basis": "recovered server log; redirect location not retained"
+    },
+    {
+      "route": "/app/integrations/square",
+      "status": 307,
+      "basis": "recovered server log; redirect location not retained"
+    },
+    {
+      "route": "/app/intelligence/briefings/11111111-1111-4111-8111-111111111111",
+      "status": 307,
+      "basis": "recovered server log; redirect location not retained"
+    },
+    {
+      "route": "/app/intelligence/briefings",
+      "status": 307,
+      "basis": "recovered server log; redirect location not retained"
+    },
+    {
+      "route": "/app/intelligence",
+      "status": 307,
+      "basis": "recovered server log; redirect location not retained"
+    },
+    {
+      "route": "/app/issues",
+      "status": 307,
+      "basis": "recovered server log; redirect location not retained"
+    },
+    {
+      "route": "/app/kpis",
+      "status": 307,
+      "basis": "recovered server log; redirect location not retained"
+    },
+    {
+      "route": "/app/kpis/profit-leakage",
+      "status": 307,
+      "basis": "recovered server log; redirect location not retained"
+    },
+    {
+      "route": "/app/kpis/settings",
+      "status": 307,
+      "basis": "recovered server log; redirect location not retained"
+    },
+    {
+      "route": "/app/legal/agreements/11111111-1111-4111-8111-111111111111",
+      "status": 307,
+      "basis": "recovered server log; redirect location not retained"
+    },
+    {
+      "route": "/app/notifications",
+      "status": 307,
+      "basis": "recovered server log; redirect location not retained"
+    },
+    {
+      "route": "/app/people",
+      "status": 307,
+      "basis": "recovered server log; redirect location not retained"
+    },
+    {
+      "route": "/app/reports/11111111-1111-4111-8111-111111111111",
+      "status": 307,
+      "basis": "recovered server log; redirect location not retained"
+    },
+    {
+      "route": "/app/reports",
+      "status": 307,
+      "basis": "recovered server log; redirect location not retained"
+    },
+    {
+      "route": "/app/settings/integrations/google-sheets",
+      "status": 307,
+      "basis": "recovered server log; redirect location not retained"
+    },
+    {
+      "route": "/app/settings/integrations/quickbooks/accounting",
+      "status": 307,
+      "basis": "recovered server log; redirect location not retained"
+    },
+    {
+      "route": "/app/settings/integrations/quickbooks/data",
+      "status": 307,
+      "basis": "recovered server log; redirect location not retained"
+    },
+    {
+      "route": "/app/settings/integrations/quickbooks/disconnect",
+      "status": 307,
+      "basis": "recovered server log; redirect location not retained"
+    },
+    {
+      "route": "/app/settings/integrations/quickbooks",
+      "status": 307,
+      "basis": "recovered server log; redirect location not retained"
+    },
+    {
+      "route": "/app/settings",
+      "status": 307,
+      "basis": "recovered server log; redirect location not retained"
+    },
+    {
+      "route": "/app/setup",
+      "status": 307,
+      "basis": "recovered server log; redirect location not retained"
+    },
+    {
+      "route": "/app/sops",
+      "status": 307,
+      "basis": "recovered server log; redirect location not retained"
+    },
+    {
+      "route": "/app/sources/11111111-1111-4111-8111-111111111111",
+      "status": 307,
+      "location": "/login",
+      "result": "passed-login-or-retirement-redirect",
+      "bodyIncludesLoginRedirect": true
+    },
+    {
+      "route": "/app/sources",
+      "status": 307,
+      "location": "/login",
+      "result": "passed-login-or-retirement-redirect",
+      "bodyIncludesLoginRedirect": true
+    },
+    {
+      "route": "/app/support",
+      "status": 307,
+      "location": "/login",
+      "result": "passed-login-or-retirement-redirect",
+      "bodyIncludesLoginRedirect": true
+    },
+    {
+      "route": "/app/tasks",
+      "status": 307,
+      "location": "/login",
+      "result": "passed-login-or-retirement-redirect",
+      "bodyIncludesLoginRedirect": true
+    },
+    {
+      "route": "/api/admin/workspace-agreements/11111111-1111-4111-8111-111111111111/pdf",
+      "method": "GET",
+      "status": 404,
+      "location": null,
+      "body": "{\"error\":\"Not found.\"}"
+    },
+    {
+      "route": "/api/health/openai",
+      "method": "GET",
+      "status": 401,
+      "location": null,
+      "body": "{\"ok\":false,\"error\":\"Sign in before checking AI provider configuration.\"}"
+    },
+    {
+      "route": "/api/integrations/dashboard/preferences",
+      "method": "PATCH",
+      "status": 403,
+      "location": null,
+      "body": "{\"ok\":false,\"error\":\"origin_denied\"}"
+    },
+    {
+      "route": "/api/integrations/dashboard",
+      "method": "GET",
+      "status": 400,
+      "location": null,
+      "body": "{\"error\":\"invalid_request\"}"
+    },
+    {
+      "route": "/api/integrations/google-sheets/callback",
+      "method": "GET",
+      "status": 400,
+      "location": null,
+      "body": "{\"ok\":false,\"error\":\"Google Sheets request could not be completed.\"}"
+    },
+    {
+      "route": "/api/integrations/google-sheets/connect",
+      "method": "POST",
+      "status": 406,
+      "location": null,
+      "body": "{\"ok\":false,\"error\":\"Open Google Sheets from its connection page.\"}"
+    },
+    {
+      "route": "/api/integrations/google-sheets/disconnect",
+      "method": "POST",
+      "status": 400,
+      "location": null,
+      "body": "{\"ok\":false,\"error\":\"Google Sheets request could not be completed.\"}"
+    },
+    {
+      "route": "/api/integrations/google-sheets/entity",
+      "method": "POST",
+      "status": 400,
+      "location": null,
+      "body": "Business entity could not be created."
+    },
+    {
+      "route": "/api/integrations/google-sheets/mapping",
+      "method": "POST",
+      "status": 400,
+      "location": null,
+      "body": "{\"ok\":false,\"error\":\"Google Sheets request could not be completed.\"}"
+    },
+    {
+      "route": "/api/integrations/google-sheets/preview",
+      "method": "POST",
+      "status": 400,
+      "location": null,
+      "body": "{\"ok\":false,\"error\":\"Preview is unavailable. Check the connection, tab and selected columns.\"}"
+    },
+    {
+      "route": "/api/integrations/google-sheets/reconnect",
+      "method": "POST",
+      "status": 406,
+      "location": null,
+      "body": "{\"ok\":false,\"error\":\"Open Google Sheets from its connection page.\"}"
+    },
+    {
+      "route": "/api/integrations/google-sheets/recovery",
+      "method": "POST",
+      "status": 400,
+      "location": null,
+      "body": "{\"ok\":false,\"error\":\"Google Sheets request could not be completed.\"}"
+    },
+    {
+      "route": "/api/integrations/google-sheets/scheduled-sync",
+      "method": "GET",
+      "status": 401,
+      "location": null,
+      "body": "{\"error\":\"Unauthorized\"}"
+    },
+    {
+      "route": "/api/integrations/google-sheets/spreadsheet",
+      "method": "POST",
+      "status": 400,
+      "location": null,
+      "body": "{\"ok\":false,\"error\":\"Google Sheets request could not be completed.\"}"
+    },
+    {
+      "route": "/api/integrations/google-sheets/sync",
+      "method": "POST",
+      "status": 400,
+      "location": null,
+      "body": "{\"ok\":false,\"error\":\"Google Sheets request could not be completed.\"}"
+    },
+    {
+      "route": "/api/integrations/google-sheets/tab",
+      "method": "POST",
+      "status": 400,
+      "location": null,
+      "body": "{\"ok\":false,\"error\":\"Google Sheets request could not be completed.\"}"
+    },
+    {
+      "route": "/api/integrations/qbo/accounting-authority",
+      "method": "GET",
+      "status": 404,
+      "location": null,
+      "body": "{\"ok\":false,\"error\":\"QuickBooks connections are unavailable.\"}"
+    },
+    {
+      "route": "/api/integrations/qbo/accounting-authority",
+      "method": "POST",
+      "status": 404,
+      "location": null,
+      "body": "{\"ok\":false,\"error\":\"QuickBooks connections are unavailable.\"}"
+    },
+    {
+      "route": "/api/integrations/qbo/cancel",
+      "method": "POST",
+      "status": 404,
+      "location": null,
+      "body": "{\"ok\":false,\"error\":\"QuickBooks connections are unavailable.\"}"
+    },
+    {
+      "route": "/api/integrations/qbo/connect",
+      "method": "POST",
+      "status": 404,
+      "location": null,
+      "body": "{\"ok\":false,\"error\":\"QuickBooks connections are unavailable.\"}"
+    },
+    {
+      "route": "/api/integrations/qbo/disconnect",
+      "method": "POST",
+      "status": 404,
+      "location": null,
+      "body": "{\"ok\":false,\"error\":\"QuickBooks connections are unavailable.\"}"
+    },
+    {
+      "route": "/api/integrations/qbo/reauthorize",
+      "method": "POST",
+      "status": 404,
+      "location": null,
+      "body": "{\"ok\":false,\"error\":\"QuickBooks connections are unavailable.\"}"
+    },
+    {
+      "route": "/api/integrations/square/callback",
+      "method": "GET",
+      "status": 404,
+      "location": null,
+      "body": "{\"ok\":false,\"error\":\"Square connections are unavailable.\"}"
+    },
+    {
+      "route": "/api/integrations/square/connect",
+      "method": "POST",
+      "status": 404,
+      "location": null,
+      "body": "{\"ok\":false,\"error\":\"Square connections are unavailable.\"}"
+    },
+    {
+      "route": "/api/integrations/square/disconnect",
+      "method": "POST",
+      "status": 404,
+      "location": null,
+      "body": "{\"ok\":false,\"error\":\"Square connections are unavailable.\"}"
+    },
+    {
+      "route": "/api/integrations/square/internal/manual/11111111-1111-4111-8111-111111111111",
+      "method": "POST",
+      "status": 404,
+      "location": null,
+      "body": "{\"error\":\"Square internal pilot is unavailable.\"}"
+    },
+    {
+      "route": "/api/integrations/square/mapping",
+      "method": "POST",
+      "status": 404,
+      "location": null,
+      "body": "{\"ok\":false,\"error\":\"Square connections are unavailable.\"}"
+    },
+    {
+      "route": "/api/integrations/square/read",
+      "method": "POST",
+      "status": 404,
+      "location": null,
+      "body": "{\"error\":\"Square connection unavailable.\"}"
+    },
+    {
+      "route": "/api/integrations/square/reauthorize",
+      "method": "POST",
+      "status": 404,
+      "location": null,
+      "body": "{\"ok\":false,\"error\":\"Square connections are unavailable.\"}"
+    },
+    {
+      "route": "/api/integrations/square/status",
+      "method": "GET",
+      "status": 404,
+      "location": null,
+      "body": "{\"ok\":false,\"error\":\"Square connections are unavailable.\"}"
+    },
+    {
+      "route": "/api/integrations/square/webhook",
+      "method": "POST",
+      "status": 404,
+      "location": null,
+      "body": "{\"ok\":false,\"error\":\"Square connections are unavailable.\"}"
+    },
+    {
+      "route": "/api/internal/nvidia-qualification",
+      "method": "GET",
+      "status": 404,
+      "location": null,
+      "body": "{\"ok\":false,\"error\":\"Qualification is unavailable in this environment.\"}"
+    },
+    {
+      "route": "/api/internal/nvidia-qualification",
+      "method": "POST",
+      "status": 404,
+      "location": null,
+      "body": "{\"ok\":false,\"error\":\"Qualification is unavailable in this environment.\"}"
+    },
+    {
+      "route": "/api/internal/nvidia-qualification/stage-three-a",
+      "method": "GET",
+      "status": 404,
+      "location": null,
+      "body": "{\"ok\":false,\"error\":\"Qualification is unavailable.\"}"
+    },
+    {
+      "route": "/api/internal/nvidia-qualification/stage-three-a",
+      "method": "POST",
+      "status": 404,
+      "location": null,
+      "body": "{\"ok\":false,\"error\":\"Qualification is unavailable.\"}"
+    },
+    {
+      "route": "/api/internal/nvidia-qualification/stage-three-b",
+      "method": "GET",
+      "status": 404,
+      "location": null,
+      "body": "{\"ok\":false,\"error\":\"Qualification is unavailable.\"}"
+    },
+    {
+      "route": "/api/internal/nvidia-qualification/stage-three-b",
+      "method": "POST",
+      "status": 404,
+      "location": null,
+      "body": "{\"ok\":false,\"error\":\"Qualification is unavailable.\"}"
+    },
+    {
+      "route": "/api/internal/nvidia-qualification/stage-two",
+      "method": "GET",
+      "status": 404,
+      "location": null,
+      "body": "{\"ok\":false,\"error\":\"Qualification is unavailable.\"}"
+    },
+    {
+      "route": "/api/internal/nvidia-qualification/stage-two",
+      "method": "POST",
+      "status": 404,
+      "location": null,
+      "body": "{\"ok\":false,\"error\":\"Qualification is unavailable.\"}"
+    },
+    {
+      "route": "/api/legal/workspace-agreements/11111111-1111-4111-8111-111111111111/pdf",
+      "method": "GET",
+      "status": 401,
+      "location": null,
+      "body": "{\"error\":\"Authentication required.\"}"
+    },
+    {
+      "route": "/api/public/forms/11111111-1111-4111-8111-111111111111/submit",
+      "method": "POST",
+      "status": 503,
+      "location": null,
+      "body": "{\"accepted\":false,\"error\":\"This public form is not available.\"}"
+    },
+    {
+      "route": "/api/search",
+      "method": "GET",
+      "status": 200,
+      "location": null,
+      "body": "{\"query\":\"\",\"groups\":[]}"
+    },
+    {
+      "route": "/api/search",
+      "method": "POST",
+      "status": 404,
+      "location": null,
+      "body": "{\"error\":\"Conversational analysis is not available in this product version.\"}"
+    },
+    {
+      "route": "/api/stripe/checkout",
+      "method": "GET",
+      "status": 303,
+      "location": "http://127.0.0.1:3211/pricing?checkout_error=Checkout%20is%20temporarily%20unavailable.%20Contact%20hq%40vaeroex.com.",
+      "body": ""
+    },
+    {
+      "route": "/api/stripe/checkout",
+      "method": "POST",
+      "status": 303,
+      "location": "http://127.0.0.1:3211/pricing?checkout_error=Checkout%20is%20temporarily%20unavailable.%20Contact%20hq%40vaeroex.com.",
+      "body": ""
+    },
+    {
+      "route": "/api/stripe/portal",
+      "method": "GET",
+      "status": 303,
+      "location": "http://127.0.0.1:3211/login?error=Log%20in%20before%20managing%20billing.",
+      "body": ""
+    },
+    {
+      "route": "/api/stripe/portal",
+      "method": "POST",
+      "status": 303,
+      "location": "http://127.0.0.1:3211/login?error=Log%20in%20before%20managing%20billing.",
+      "body": ""
+    },
+    {
+      "route": "/api/stripe/webhook",
+      "method": "POST",
+      "status": 503,
+      "location": null,
+      "body": "{\"ok\":false,\"error\":\"Supabase service role is not configured.\"}"
+    },
+    {
+      "route": "/api/subscription/request-activation",
+      "method": "POST",
+      "status": 307,
+      "location": "http://127.0.0.1:3211/billing-required?error=Subscription%20activation%20requests%20are%20not%20configured%20yet.",
+      "body": ""
+    },
+    {
+      "route": "/api/subscription/status",
+      "method": "GET",
+      "status": 401,
+      "location": null,
+      "body": "{\"ok\":false,\"error\":\"Not authenticated.\"}"
+    }
+  ]
+}

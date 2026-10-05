@@ -1,0 +1,210 @@
+{
+  "retrieved_at": "2026-10-04",
+  "sources": {
+    "cloud_run": {
+      "url": "https://cloud.google.com/run/pricing",
+      "region": "us-central1",
+      "currency": "USD",
+      "request_vcpu_second": 2.4e-05,
+      "request_gib_second": 2.5e-06,
+      "idle_min_vcpu_second": 2.5e-06,
+      "idle_min_gib_second": 2.5e-06,
+      "requests_per_million": 0.4,
+      "instance_vcpu_second": 1.8e-05,
+      "instance_gib_second": 2e-06,
+      "worker_vcpu_second": 1.1244e-05,
+      "worker_gib_second": 1.235e-06,
+      "free_tier_scope": "billing account; excluded from gross scenarios"
+    },
+    "tasks": {
+      "url": "https://cloud.google.com/tasks/pricing",
+      "usd_per_million_ops_after_first_million": 0.4,
+      "chunk_bytes": 32768,
+      "billable": "API call or push attempt; retries count"
+    },
+    "scheduler": {
+      "url": "https://cloud.google.com/scheduler/pricing",
+      "usd_per_job_31days": 0.1,
+      "free_jobs_per_billing_account": 3,
+      "paused_job_billable": true
+    },
+    "load_balancing": {
+      "url": "https://cloud.google.com/load-balancing/pricing",
+      "usd_per_hour_first_5_global_rules_per_project": 0.025,
+      "usd_per_gib_inbound_uscentral": 0.008,
+      "usd_per_gib_outbound_uscentral": 0.008
+    },
+    "nat": {
+      "url": "https://cloud.google.com/nat/pricing",
+      "usd_per_hour_per_assigned_vm_up_to32": 0.0014,
+      "usd_per_hour_more_than32": 0.044,
+      "usd_per_hour_ip": 0.005,
+      "usd_per_gib_processed": 0.045,
+      "note": "Actual VM/NAT assignment metering and chargeable IPs unknown; not a per-cloudrun-instance claim"
+    },
+    "document_ocr": {
+      "url": "https://cloud.google.com/products/document-ai/pricing",
+      "usd_per_1000_enterprise_ocr_pages_standard_under5million": 1.5,
+      "free_first_pages_shown": 1000,
+      "note": "No add-ons, processor upgrade, discounts or inference included; qualification gate not changed"
+    },
+    "kms": {
+      "url": "https://cloud.google.com/kms/pricing",
+      "usd_per_10000_software_crypto_operations": 0.03,
+      "usd_per_active_software_key_version_hour": 8.2192e-05
+    },
+    "secret_manager": {
+      "url": "https://cloud.google.com/secret-manager/pricing",
+      "usd_per_10000_access_operations_after_first10000": 0.03,
+      "usd_per_active_version_hour_after_first6": 8.2192e-05
+    },
+    "logging": {
+      "url": "https://cloud.google.com/products/observability/pricing",
+      "usd_per_gib_nonvended_after_first50_per_project": 0.5,
+      "usd_per_gib_month_retention_beyond30days": 0.01,
+      "alerting_price_start_not_before": "2027-09-01"
+    },
+    "edge_plugins": {
+      "url": "https://cloud.google.com/vpc/network-pricing#service-extensions",
+      "usd_per_million_callbacks_after_first2million": 0.1
+    },
+    "vercel_plan": {
+      "url": "https://vercel.com/pricing",
+      "pro_usd_month": 20,
+      "pro_usage_credit_usd_month": 20,
+      "actual_plan": "unverified"
+    },
+    "vercel_fluid": {
+      "url": "https://vercel.com/docs/functions/usage-and-pricing",
+      "scenario_region": "iad1",
+      "active_cpu_usd_hour": 0.128,
+      "provisioned_memory_usd_GBhour": 0.0106,
+      "actual_fluid_mode_region_memory": "unverified"
+    },
+    "supabase_plan": {
+      "url": "https://supabase.com/pricing",
+      "pro_usd_month": 25,
+      "pro_mau_allowance": 100000,
+      "pro_disk_GB_per_project": 8,
+      "pro_files_GB_allowance": 100,
+      "pro_uncached_egress_GB_allowance": 250,
+      "pro_cached_egress_GB_allowance": 250,
+      "mau_overage_usd": 0.00325,
+      "disk_GB_overage_usd": 0.125,
+      "files_GB_overage_usd": 0.0213,
+      "uncached_egress_GB_overage_usd": 0.09,
+      "cached_egress_GB_overage_usd": 0.03,
+      "actual_plan_compute_quotas": "unverified"
+    },
+    "supabase_compute": {
+      "url": "https://supabase.com/docs/guides/platform/manage-your-usage/compute",
+      "micro_usd_hour": 0.01344,
+      "small_usd_hour": 0.0206,
+      "paid_org_compute_credit_usd_month": 10,
+      "spend_cap_covers_compute": false
+    },
+    "sheets": {
+      "url": "https://developers.google.com/workspace/sheets/api/limits",
+      "read_requests_per_minute_project": 300,
+      "read_requests_per_minute_user_project": 60,
+      "standard_additional_api_cost_usd": 0,
+      "overquota_price": "unknown; official page announces planned charges later in2026",
+      "actual_configured_quota": "unverified"
+    },
+    "qbo": {
+      "url": "https://static.developer.intuit.com/output_html/qbo/docs/learn/limits-and-throttles.html",
+      "requests_minute_realm": 500,
+      "requests_second_realm_app": 10,
+      "builder_coreplus_included_per_provider_workspace_month": 500000,
+      "actual_partner_tier": "unverified"
+    },
+    "openai_models": {
+      "currency": "USD",
+      "unit": "per million tokens",
+      "actual_live_flags_model_overrides_usage": "unverified",
+      "gpt-4o-mini": {
+        "url": "https://developers.openai.com/api/docs/models/gpt-4o-mini",
+        "input": 0.15,
+        "cached_input": 0.075,
+        "output": 0.6
+      },
+      "gpt-5.6-luna": {
+        "url": "https://developers.openai.com/api/docs/models/gpt-5.6-luna",
+        "input": 0.2,
+        "cached_input": 0.02,
+        "output": 1.2
+      },
+      "gpt-5.6-terra": {
+        "url": "https://developers.openai.com/api/docs/models/gpt-5.6-terra",
+        "input": 2,
+        "cached_input": 0.2,
+        "output": 12
+      },
+      "gpt-5.6-sol": {
+        "url": "https://developers.openai.com/api/docs/models/gpt-5.6-sol",
+        "input": 4,
+        "cached_input": 0.4,
+        "output": 20,
+        "promotion_at_least_through": "2026-11-21"
+      },
+      "text-embedding-3-small": {
+        "url": "https://developers.openai.com/api/docs/models/text-embedding-3-small",
+        "input": 0.02
+      },
+      "nvidia": "No verified account tariff; not estimated as free"
+    }
+  },
+  "scenarios": {
+    "assumptions": [
+      "illustrative gross USD,730hours; no taxes,credits,discounts or shared free-tier credits",
+      "Not current bills or enabled-resource assertions",
+      "CloudRun rates use us-central1 from official page; actual region/billing SKU needs invoice reconciliation"
+    ],
+    "one_worker_1cpu_2gib_730hours_gross": 36.0404,
+    "one_request_based_min_instance_1cpu_half_gib_idle730hours_gross": 9.855,
+    "one_instance_based_1cpu_half_gib730hours_gross": 49.932,
+    "square4warm_request_idle730hours_gross": 39.42,
+    "square3request_idle_plus1_instance_based730hours_gross": 79.497,
+    "qbo_global_forwarding_rule_block_730hours_gross": 18.25,
+    "one_nat_used_ip730hours_gross_excluding_gateway_traffic": 3.65,
+    "cloudrun_100000_active_instance_seconds_1cpu_half_gib_gross_excluding_requests": 2.525,
+    "one_worker_max_idle_polls_at5seconds_per730hours": 525600.0,
+    "qbo_default_dispatch_per_class_hour": 600,
+    "qbo_default_dispatch_both_classes_hour": 1200,
+    "qbo_default_dispatch_requests_month3jobs5min": 26280,
+    "ocr_10000_pages_gross_before_free": 15.0,
+    "ocr_100000_pages_gross_before_free": 150.0,
+    "ocr_1000000_pages_gross_before_free": 1500.0,
+    "tasks_1000000_new_tasks_one_attempt_2million_min_operations_after_free": 0.4,
+    "tasks_1000000_new_tasks_eight_attempts_9million_min_operations_after_free": 3.2,
+    "vercel_iad1_100_active_cpu_hours_1000_GBhours_before_credits_invocations": 23.4,
+    "supabase_two_micro_730h_compute": 19.6224,
+    "supabase_hypothetical_pro_two_micro_730h_after_one_compute_credit_before_other_skus": 34.6224,
+    "sheets_full10000row_sync_read_requests_no_retries": 44,
+    "sheets_two_full_syncs_same_user_same_quota_minute": 88,
+    "sheets_seven_full_syncs_project_same_quota_minute": 308,
+    "openai_10k_input_1k_output_uncached_standard_short_context_per_attempt_usd": {
+      "gpt-4o-mini": 0.0021,
+      "gpt-5.6-luna": 0.0032,
+      "gpt-5.6-terra": 0.032,
+      "gpt-5.6-sol": 0.06
+    },
+    "sol_then_terra_same_hypothetical_tokens": 0.092,
+    "embedding100million_tokens_usd": 2,
+    "source_rounding_example_gpt4omini_10000_calls_10kinput_1koutput_each": {
+      "official_raw_token_usd": 21,
+      "source_entry_cents_aggregation_usd": 100,
+      "actual_workload_observed": false
+    }
+  },
+  "formula_notes": [
+    "task scenarios use one create plus push attempts; listing/admin/reconciliation calls add operations",
+    "worker cost applies for whole active pool lifetime including idle time",
+    "CloudRun services use billed instance time; requestcount times latency overstates costs when requests overlap; measure concurrency",
+    "Source execution flags, enabled pools, current service counts and invoices unavailable",
+    "AI scenarios exclude image/tools/cache-write/long-context/service-tier adjustments; output assumed all billable output including reasoning; policies may be disabled.",
+    "Vercel provisioned memory uses instance lifetime, not summed overlapping request latencies.",
+    "Supabase project count and Micro configuration in scenario are hypothetical; no live plan identification.",
+    "Sheets arithmetic excludes retries/credential calls; rate quotas depend on quota-minute distribution and configured account limits."
+  ]
+}

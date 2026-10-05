@@ -1,0 +1,103 @@
+{
+  "status": "passed",
+  "baseline": true,
+  "checks": 3,
+  "results": [
+    {
+      "failedBoundary": "file_import_rows:imported",
+      "acceptedKpiRows": 1,
+      "successRedirect": true,
+      "importStatus": "completed",
+      "fileStatus": "imported",
+      "finalImport": {
+        "status": "completed",
+        "rows_imported": 1,
+        "mapping_json": {
+          "mode": "workbook",
+          "worksheets": [
+            {
+              "index": 1,
+              "name": "Metrics",
+              "state": "visible",
+              "relationship_id": null,
+              "relationship_target": null,
+              "status": "parsed",
+              "row_count": 1,
+              "columns": [
+                "Metric",
+                "Value",
+                "Date"
+              ],
+              "detected_type": "kpis",
+              "selected_type": "kpis",
+              "enabled": true,
+              "mapping": {
+                "name": "Metric",
+                "actual_value": "Value",
+                "metric_date": "Date"
+              },
+              "metric_columns": []
+            }
+          ],
+          "detection_version": 3
+        },
+        "reviewed_at": "2026-10-05T02:34:36.956Z",
+        "imported_at": "2026-10-05T02:34:36.956Z",
+        "extraction_summary": "1 worksheet processed independently. 1 row accepted, 0 issues recorded, and 1 evidence chunk added to Business Memory.",
+        "errors_json": []
+      }
+    },
+    {
+      "failedBoundary": "file_imports:completed",
+      "acceptedKpiRows": 1,
+      "successRedirect": true,
+      "importStatus": "staged",
+      "fileStatus": "imported"
+    },
+    {
+      "failedBoundary": "file_uploads:imported",
+      "acceptedKpiRows": 1,
+      "successRedirect": true,
+      "importStatus": "completed",
+      "fileStatus": "ready",
+      "finalImport": {
+        "status": "completed",
+        "rows_imported": 1,
+        "mapping_json": {
+          "mode": "workbook",
+          "worksheets": [
+            {
+              "index": 1,
+              "name": "Metrics",
+              "state": "visible",
+              "relationship_id": null,
+              "relationship_target": null,
+              "status": "parsed",
+              "row_count": 1,
+              "columns": [
+                "Metric",
+                "Value",
+                "Date"
+              ],
+              "detected_type": "kpis",
+              "selected_type": "kpis",
+              "enabled": true,
+              "mapping": {
+                "name": "Metric",
+                "actual_value": "Value",
+                "metric_date": "Date"
+              },
+              "metric_columns": []
+            }
+          ],
+          "detection_version": 3
+        },
+        "reviewed_at": "2026-10-05T02:34:37.188Z",
+        "imported_at": "2026-10-05T02:34:37.188Z",
+        "extraction_summary": "1 worksheet processed independently. 1 row accepted, 0 issues recorded, and 1 evidence chunk added to Business Memory.",
+        "errors_json": []
+      }
+    }
+  ],
+  "limitation": "Actual workbook function, synthetic in-memory DB and indexing adapter. No real SQL transaction/concurrent retry or UI validation."
+}

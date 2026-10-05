@@ -1,0 +1,204 @@
+{
+  "actions": [
+    {
+      "action": "update",
+      "resolves": [
+        {
+          "id": 1124066,
+          "path": ".>next>sharp",
+          "dev": false,
+          "optional": false,
+          "bundled": false
+        },
+        {
+          "id": 1193725,
+          "path": ".>next>sharp",
+          "dev": false,
+          "optional": false,
+          "bundled": false
+        }
+      ],
+      "module": null,
+      "target": null,
+      "depth": 3
+    },
+    {
+      "action": "review",
+      "module": "next",
+      "resolves": [
+        {
+          "id": 1193677,
+          "path": ".>next",
+          "dev": false,
+          "optional": false,
+          "bundled": false
+        },
+        {
+          "id": 1193733,
+          "path": ".>next",
+          "dev": false,
+          "optional": false,
+          "bundled": false
+        }
+      ]
+    }
+  ],
+  "advisories": {
+    "1124066": {
+      "findings": [
+        {
+          "version": "0.34.5",
+          "paths": []
+        }
+      ],
+      "found_by": null,
+      "deleted": null,
+      "references": "- https://github.com/libvips/libvips/security/advisories/GHSA-2fcj-gj27-279x\n- https://github.com/libvips/libvips/security/advisories/GHSA-523x-vhfw-6r76\n- https://github.com/libvips/libvips/security/advisories/GHSA-jmwm-wc68-mhwm\n- https://github.com/libvips/libvips/security/advisories/GHSA-r98w-4fp7-m9c7\n- https://github.com/lovell/sharp/security/advisories/GHSA-f88m-g3jw-g9cj\n- https://github.com/advisories/GHSA-f88m-g3jw-g9cj",
+      "created": "2026-07-21T22:07:17.000Z",
+      "id": 1124066,
+      "npm_advisory_id": null,
+      "overview": "### Impact\n\nA number of vulnerabilities, two rated as \"High\" severity using CVSSv4, have been discovered and fixed in the upstream libvips dependency.\n\nThose processing untrusted input with versions of sharp prior to 0.35.0 are affected.\n\n### Patches\n\n#### Using prebuilt binaries provided by sharp?\n\nMost people rely on the prebuilt binaries provided by sharp.\n\nPlease upgrade sharp to the latest version, currently 0.35.3, which provides libvips 8.18.3.\n\n#### Using a globally-installed libvips?\n\nPlease ensure you are using the latest libvips 8.18.3.\n\n### Workarounds\nAdd the following to your code to prevent sharp from decoding GIF, TIFF and VIPS images.\n```js\nsharp.block({ operation: [\"VipsForeignLoadNsgif\", \"VipsForeignLoadTiff\", \"VipsForeignLoadVips\"] });\n```",
+      "reported_by": null,
+      "title": "sharp inherited vulnerabilities in libvips: CVE-2026-33327, CVE-2026-33328, CVE-2026-35590, CVE-2026-35591",
+      "metadata": null,
+      "cves": [],
+      "access": "public",
+      "severity": "high",
+      "module_name": "sharp",
+      "vulnerable_versions": "<0.35.0",
+      "github_advisory_id": "GHSA-f88m-g3jw-g9cj",
+      "recommendation": "Upgrade to version 0.35.0 or later",
+      "patched_versions": ">=0.35.0",
+      "updated": "2026-07-21T22:07:18.000Z",
+      "cvss": {
+        "score": 0,
+        "vectorString": null
+      },
+      "cwe": [
+        "CWE-1395"
+      ],
+      "url": "https://github.com/advisories/GHSA-f88m-g3jw-g9cj"
+    },
+    "1193677": {
+      "findings": [
+        {
+          "version": "15.5.21",
+          "paths": []
+        }
+      ],
+      "found_by": null,
+      "deleted": null,
+      "references": "- https://github.com/vercel/next.js/security/advisories/GHSA-p293-qw3h-jr36\n- https://nvd.nist.gov/vuln/detail/CVE-2026-75604\n- https://github.com/vercel/next.js/commit/968b9fcb26bdeb8e0a861a9df05361474666d51b\n- https://github.com/vercel/next.js/commit/b0f3460a92b955d3ca41fccff9a525a2b910fbf3\n- https://github.com/vercel/next.js/releases/tag/v15.5.24\n- https://github.com/vercel/next.js/releases/tag/v16.3.3\n- https://github.com/advisories/GHSA-p293-qw3h-jr36",
+      "created": "2026-09-08T20:51:40.000Z",
+      "id": 1193677,
+      "npm_advisory_id": null,
+      "overview": "## Impact\n\nA vulnerability in applications using Pages and App router without Cache Component can lead to remote code execution when the server is hosted on machines using a Windows filesystem.\n\n## Workaround\n\nThere is no known workaround for affected windows-hosted applications. You should upgrade immediately if your server is hosted on Windows.",
+      "reported_by": null,
+      "title": "Next.js: Unauthenticated Remote Code Execution on windows-hosted servers",
+      "metadata": null,
+      "cves": [
+        "CVE-2026-75604"
+      ],
+      "access": "public",
+      "severity": "critical",
+      "module_name": "next",
+      "vulnerable_versions": ">=13.4.0 <15.5.24",
+      "github_advisory_id": "GHSA-p293-qw3h-jr36",
+      "recommendation": "Upgrade to version 15.5.24 or later",
+      "patched_versions": ">=15.5.24",
+      "updated": "2026-09-08T20:51:43.000Z",
+      "cvss": {
+        "score": 9,
+        "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:C/C:H/I:H/A:H"
+      },
+      "cwe": [
+        "CWE-22"
+      ],
+      "url": "https://github.com/advisories/GHSA-p293-qw3h-jr36"
+    },
+    "1193725": {
+      "findings": [
+        {
+          "version": "0.34.5",
+          "paths": []
+        }
+      ],
+      "found_by": null,
+      "deleted": null,
+      "references": "- https://github.com/lovell/sharp/security/advisories/GHSA-rgj7-g3m4-5g8c\n- https://github.com/strukturag/libheif/security/advisories/GHSA-2jg2-4ch7-h545\n- https://github.com/strukturag/libheif/security/advisories/GHSA-g89c-p67h-r497\n- https://github.com/lovell/sharp/releases/tag/v0.35.4\n- https://github.com/advisories/GHSA-rgj7-g3m4-5g8c",
+      "created": "2026-09-08T21:25:11.000Z",
+      "id": 1193725,
+      "npm_advisory_id": null,
+      "overview": "### Impact\nA number of vulnerabilities, two rated as \"Critical\" severity using CVSSv3, have been discovered and fixed in the upstream libheif dependency. These can lead to possible remote code execution (RCE) on glibc-based Linux when run under certain conditions.\n\nThe attack vector for these claims to be \"network\" however sharp does not provide any networking features so this vulnerability is down-rated to a \"High\" severity using CVSSv4 but please note its Subsequent System Impact.\n\nThose processing untrusted input with versions of sharp prior to 0.35.4 are affected.\n\n### Patches\n\n#### Using prebuilt binaries provided by sharp?\n\nMost people rely on the prebuilt binaries provided by sharp.\n\nPlease upgrade sharp to the latest version, currently 0.35.4, which provides libheif 1.23.2.\n\n#### Using a globally-installed libheif?\n\nPlease ensure you are using the latest libheif 1.23.2.\n\n### Workarounds\nAdd the following to your code to prevent sharp from decoding AVIF images.\n```js\nsharp.block({ operation: [\"VipsForeignLoadHeif\"] });\n```\n\nEnsure you are using a `node` executable binary compiled as a Position Independent Executable (PIE). Most Linux package managers already do this for protection against RCE however be warned that the \"official\" Node.js binaries do not.\n\n### References\n- [CVE-2026-84383](https://github.com/strukturag/libheif/security/advisories/GHSA-g89c-p67h-r497)\n- https://github.com/strukturag/libheif/security/advisories/GHSA-2jg2-4ch7-h545",
+      "reported_by": null,
+      "title": "sharp: Vulnerabilities in libheif: GHSA-g89c-p67h-r497 and GHSA-2jg2-4ch7-h545",
+      "metadata": null,
+      "cves": [],
+      "access": "public",
+      "severity": "high",
+      "module_name": "sharp",
+      "vulnerable_versions": "<0.35.4",
+      "github_advisory_id": "GHSA-rgj7-g3m4-5g8c",
+      "recommendation": "Upgrade to version 0.35.4 or later",
+      "patched_versions": ">=0.35.4",
+      "updated": "2026-09-08T21:25:12.000Z",
+      "cvss": {
+        "score": 0,
+        "vectorString": null
+      },
+      "cwe": [
+        "CWE-122"
+      ],
+      "url": "https://github.com/advisories/GHSA-rgj7-g3m4-5g8c"
+    },
+    "1193733": {
+      "findings": [
+        {
+          "version": "15.5.21",
+          "paths": []
+        }
+      ],
+      "found_by": null,
+      "deleted": null,
+      "references": "- https://github.com/strukturag/libheif/security/advisories/GHSA-g89c-p67h-r497\n- https://github.com/vercel/next.js/security/advisories/GHSA-2xp9-vwfh-vxw4\n- https://github.com/vercel/next.js/pull/97875\n- https://github.com/vercel/next.js/pull/97931\n- https://github.com/vercel/next.js/commit/3a15b4ac6ac8e70b1a9b18ecc18e8434462899b3\n- https://github.com/vercel/next.js/commit/409772ec807def20132d251ad48fd8d8ad4c73c2\n- https://github.com/vercel/next.js/commit/7a5937a8ab20b89d0a961f75eabb11577f5d5998\n- https://github.com/vercel/next.js/releases/tag/v15.5.24\n- https://github.com/vercel/next.js/releases/tag/v16.3.3\n- https://github.com/advisories/GHSA-2xp9-vwfh-vxw4",
+      "created": "2026-09-08T21:21:12.000Z",
+      "id": 1193733,
+      "npm_advisory_id": null,
+      "overview": "A vulnerability in the underlying `libheif` library used by `sharp` which Next.js uses for image optimization can lead to remote code execution when AVIF files are optimized.\n\nUntil a fix has propagated, optimization of AVIF files is disabled.",
+      "reported_by": null,
+      "title": "Next.js: Unauthenticated Remote Code Execution in Image Optimization API when AVIF files are used",
+      "metadata": null,
+      "cves": [],
+      "access": "public",
+      "severity": "critical",
+      "module_name": "next",
+      "vulnerable_versions": ">=10.0.0 <15.5.24",
+      "github_advisory_id": "GHSA-2xp9-vwfh-vxw4",
+      "recommendation": "Upgrade to version 15.5.24 or later",
+      "patched_versions": ">=15.5.24",
+      "updated": "2026-09-08T21:21:13.000Z",
+      "cvss": {
+        "score": 0,
+        "vectorString": null
+      },
+      "cwe": [
+        "CWE-1395"
+      ],
+      "url": "https://github.com/advisories/GHSA-2xp9-vwfh-vxw4"
+    }
+  },
+  "muted": [],
+  "metadata": {
+    "vulnerabilities": {
+      "info": 0,
+      "low": 0,
+      "moderate": 0,
+      "high": 2,
+      "critical": 2
+    },
+    "dependencies": 178,
+    "devDependencies": 0,
+    "optionalDependencies": 0,
+    "totalDependencies": 178
+  }
+}

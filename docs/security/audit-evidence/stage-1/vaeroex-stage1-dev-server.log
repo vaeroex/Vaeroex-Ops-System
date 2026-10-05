@@ -1,0 +1,308 @@
+   ▲ Next.js 15.5.24
+   - Local:        http://127.0.0.1:3211
+   - Network:      http://127.0.0.1:3211
+   - Experiments (use with caution):
+     · serverActions
+
+ ✓ Starting...
+ ✓ Ready in 3.8s
+ ○ Compiling /app ...
+ ✓ Compiled /app in 5.2s (1333 modules)
+ GET /app 307 in 5741ms
+ ✓ Compiled /login in 424ms (1355 modules)
+ GET /login 200 in 674ms
+ GET /app 307 in 173ms
+ GET /login 200 in 58ms
+ ✓ Compiled /app/[module] in 457ms (1347 modules)
+ GET /app/11111111-1111-4111-8111-111111111111 307 in 1226ms
+ ✓ Compiled /app/account/subscription in 230ms (1351 modules)
+ GET /app/account/subscription 307 in 378ms
+ ✓ Compiled /app/admin/ai-trust in 298ms (1374 modules)
+ GET /app/admin/ai-trust 307 in 442ms
+ ✓ Compiled /app/admin/ai-usage in 257ms (1382 modules)
+ GET /app/admin/ai-usage 307 in 391ms
+ ✓ Compiled /app/admin/audit-logs in 265ms (1385 modules)
+ GET /app/admin/audit-logs 307 in 394ms
+ ○ Compiling /app/admin/customers/[workspaceId] ...
+ ✓ Compiled /app/admin/customers/[workspaceId] in 1184ms (1422 modules)
+ GET /app/admin/customers/11111111-1111-4111-8111-111111111111 307 in 1794ms
+ ○ Compiling /app/admin/customers ...
+ ✓ Compiled /app/admin/customers in 699ms (1427 modules)
+ GET /app/admin/customers 307 in 882ms
+ ○ Compiling /app/admin/nvidia-qualification ...
+ ✓ Compiled /app/admin/nvidia-qualification in 575ms (1437 modules)
+ GET /app/admin/nvidia-qualification 307 in 772ms
+ ✓ Compiled /app/admin/nvidia-qualification/stage-three-a in 407ms (1443 modules)
+ GET /app/admin/nvidia-qualification/stage-three-a 307 in 557ms
+ ✓ Compiled /app/admin/nvidia-qualification/stage-three-b in 415ms (1450 modules)
+ GET /app/admin/nvidia-qualification/stage-three-b 307 in 591ms
+ ✓ Compiled /app/admin/nvidia-qualification/stage-two in 412ms (1453 modules)
+ GET /app/admin/nvidia-qualification/stage-two 307 in 560ms
+ ✓ Compiled /app/admin in 403ms (1455 modules)
+ GET /app/admin 307 in 542ms
+ ✓ Compiled /app/admin/subscriptions in 447ms (1462 modules)
+ GET /app/admin/subscriptions 307 in 584ms
+ ✓ Compiled /app/admin/support-requests in 465ms (1473 modules)
+ GET /app/admin/support-requests 307 in 597ms
+ ○ Compiling /app/admin/workspace-agreements/[agreementId] ...
+ ✓ Compiled /app/admin/workspace-agreements/[agreementId] in 504ms (1485 modules)
+ GET /app/admin/workspace-agreements/11111111-1111-4111-8111-111111111111 307 in 1094ms
+ ○ Compiling /app/admin/workspace-agreements ...
+ ✓ Compiled /app/admin/workspace-agreements in 525ms (1487 modules)
+ GET /app/admin/workspace-agreements 307 in 649ms
+ ○ Compiling /app/admin/workspaces ...
+ ✓ Compiled /app/admin/workspaces in 592ms (1493 modules)
+ GET /app/admin/workspaces 307 in 779ms
+ ○ Compiling /app/agents ...
+ ✓ Compiled /app/agents in 766ms (1495 modules)
+ GET /app/agents 307 in 980ms
+ ○ Compiling /app/ask ...
+ ✓ Compiled /app/ask in 968ms (1523 modules)
+ GET /app/ask 307 in 1169ms
+ ○ Compiling /app/assets ...
+ ✓ Compiled /app/assets in 2.2s (1540 modules)
+ GET /app/assets 307 in 5225ms
+ ○ Compiling /app/checklist-runs ...
+ ✓ Compiled /app/checklist-runs in 4.2s (1542 modules)
+ GET /app/checklist-runs 307 in 4674ms
+ ○ Compiling /app/checklists ...
+ ✓ Compiled /app/checklists in 1158ms (1544 modules)
+ GET /app/checklists 307 in 1332ms
+ ○ Compiling /app/crm ...
+ ✓ Compiled /app/crm in 1004ms (1549 modules)
+ GET /app/crm 307 in 1192ms
+ ○ Compiling /app/files ...
+ ✓ Compiled /app/files in 721ms (1552 modules)
+ GET /app/files 307 in 839ms
+ ○ Compiling /app/form-submissions ...
+ ✓ Compiled /app/form-submissions in 1172ms (1556 modules)
+ GET /app/form-submissions 307 in 1377ms
+ ○ Compiling /app/forms/[id] ...
+ ✓ Compiled /app/forms/[id] in 2.1s (1563 modules)
+ GET /app/forms/11111111-1111-4111-8111-111111111111 307 in 3153ms
+ ○ Compiling /app/forms ...
+ ✓ Compiled /app/forms in 985ms (1566 modules)
+ GET /app/forms 307 in 1214ms
+ ○ Compiling /app/help ...
+ ✓ Compiled /app/help in 2.8s (1569 modules)
+ GET /app/help 307 in 3080ms
+ ○ Compiling /app/help/release-notes ...
+ ✓ Compiled /app/help/release-notes in 1126ms (1606 modules)
+ GET /app/help/release-notes 307 in 1268ms
+ ○ Compiling /app/help/trust ...
+ ✓ Compiled /app/help/trust in 787ms (1600 modules)
+ GET /app/help/trust 307 in 936ms
+ ○ Compiling /app/integrations ...
+ ✓ Compiled /app/integrations in 1159ms (1666 modules)
+ GET /app/integrations 307 in 1451ms
+ ○ Compiling /app/integrations/square ...
+ ✓ Compiled /app/integrations/square in 833ms (1671 modules)
+ GET /app/integrations/square 307 in 1021ms
+ ○ Compiling /app/intelligence/briefings/[type] ...
+ ✓ Compiled /app/intelligence/briefings/[type] in 880ms (1686 modules)
+ GET /app/intelligence/briefings/11111111-1111-4111-8111-111111111111 307 in 1525ms
+ ○ Compiling /app/intelligence/briefings ...
+ ✓ Compiled /app/intelligence/briefings in 1844ms (1771 modules)
+ GET /app/intelligence/briefings 307 in 2097ms
+ ○ Compiling /app/intelligence ...
+ ✓ Compiled /app/intelligence in 1347ms (1857 modules)
+ GET /app/intelligence 307 in 1674ms
+ ○ Compiling /app/issues ...
+ ✓ Compiled /app/issues in 941ms (1860 modules)
+ GET /app/issues 307 in 1103ms
+ ○ Compiling /app/kpis ...
+ ✓ Compiled /app/kpis in 1790ms (1878 modules)
+ GET /app/kpis 307 in 2136ms
+ ○ Compiling /app/kpis/profit-leakage ...
+ ✓ Compiled /app/kpis/profit-leakage in 1364ms (1885 modules)
+ GET /app/kpis/profit-leakage 307 in 1585ms
+ ○ Compiling /app/kpis/settings ...
+ ✓ Compiled /app/kpis/settings in 1026ms (1890 modules)
+ GET /app/kpis/settings 307 in 1189ms
+ ○ Compiling /app/legal/agreements/[agreementId] ...
+ ✓ Compiled /app/legal/agreements/[agreementId] in 1414ms (1892 modules)
+ GET /app/legal/agreements/11111111-1111-4111-8111-111111111111 307 in 5095ms
+ ○ Compiling /app/notifications ...
+ ✓ Compiled /app/notifications in 4.9s (1851 modules)
+ GET /app/notifications 307 in 5766ms
+ ○ Compiling /app ...
+ ✓ Compiled /app in 2.8s (1476 modules)
+ GET /app 307 in 3176ms
+ ○ Compiling /app/people ...
+ ✓ Compiled /app/people in 1199ms (1874 modules)
+ GET /app/people 307 in 1392ms
+ ○ Compiling /app/reports/[id] ...
+ ✓ Compiled /app/reports/[id] in 2.5s (1880 modules)
+ GET /app/reports/11111111-1111-4111-8111-111111111111 307 in 3176ms
+ ○ Compiling /app/reports ...
+ ✓ Compiled /app/reports in 5.5s (1896 modules)
+ GET /app/reports 307 in 5773ms
+ ○ Compiling /app/settings/integrations/google-sheets ...
+ ✓ Compiled /app/settings/integrations/google-sheets in 3.9s (1914 modules)
+ GET /app/settings/integrations/google-sheets 307 in 4102ms
+ ○ Compiling /app/settings/integrations/quickbooks/accounting ...
+ ✓ Compiled /app/settings/integrations/quickbooks/accounting in 1233ms (1922 modules)
+ GET /app/settings/integrations/quickbooks/accounting 307 in 1430ms
+ ○ Compiling /app/settings/integrations/quickbooks/data ...
+ ✓ Compiled /app/settings/integrations/quickbooks/data in 1062ms (1930 modules)
+ GET /app/settings/integrations/quickbooks/data 307 in 1238ms
+ ○ Compiling /app/settings/integrations/quickbooks/disconnect ...
+ ✓ Compiled /app/settings/integrations/quickbooks/disconnect in 1976ms (1942 modules)
+ GET /app/settings/integrations/quickbooks/disconnect 307 in 6084ms
+ ○ Compiling /app/settings/integrations/quickbooks ...
+ ✓ Compiled /app/settings/integrations/quickbooks in 14.7s (1835 modules)
+ GET /app/settings/integrations/quickbooks 307 in 15029ms
+ ○ Compiling /app/settings ...
+ ✓ Compiled /app/settings in 1097ms (1858 modules)
+ GET /app/settings 307 in 1267ms
+ ○ Compiling /app/setup ...
+ ✓ Compiled /app/setup in 13.1s (2070 modules)
+ GET /app/setup 307 in 15592ms
+ ○ Compiling /app/sops ...
+ ✓ Compiled /app/sops in 18.8s (2076 modules)
+ GET /app/sops 307 in 20435ms
+ ○ Compiling /app/sources/[fileId] ...
+ ✓ Compiled /app/sources/[fileId] in 72s (2145 modules)
+ GET /app/sources/11111111-1111-4111-8111-111111111111 307 in 598ms
+ ○ Compiling /app/sources ...
+ ✓ Compiled /app/sources in 8.2s (1185 modules)
+ GET /app/sources 307 in 9621ms
+ ○ Compiling /app/support ...
+ ✓ Compiled /app/support in 12.4s (1199 modules)
+ GET /app/support 307 in 12925ms
+ ○ Compiling /app/tasks ...
+ ✓ Compiled /app/tasks in 915ms (1203 modules)
+ GET /app/tasks 307 in 1298ms
+ ○ Compiling /api/admin/workspace-agreements/[agreementId]/pdf ...
+ ✓ Compiled /api/admin/workspace-agreements/[agreementId]/pdf in 24.9s (1221 modules)
+ GET /api/admin/workspace-agreements/11111111-1111-4111-8111-111111111111/pdf 404 in 26172ms
+ ○ Compiling /api/health/openai ...
+ ✓ Compiled /api/health/openai in 1111ms (1223 modules)
+ GET /api/health/openai 401 in 1301ms
+ ○ Compiling /api/integrations/dashboard/preferences ...
+ ✓ Compiled /api/integrations/dashboard/preferences in 1315ms (1226 modules)
+ PATCH /api/integrations/dashboard/preferences 403 in 1425ms
+ ○ Compiling /api/integrations/dashboard ...
+ ✓ Compiled /api/integrations/dashboard in 1048ms (1284 modules)
+ GET /api/integrations/dashboard 400 in 1194ms
+ ✓ Compiled /api/integrations/google-sheets/callback in 424ms (1287 modules)
+ GET /api/integrations/google-sheets/callback 400 in 491ms
+ ✓ Compiled /api/integrations/google-sheets/connect in 439ms (1289 modules)
+ POST /api/integrations/google-sheets/connect 406 in 2220ms
+ ○ Compiling /api/integrations/google-sheets/disconnect ...
+ ✓ Compiled /api/integrations/google-sheets/disconnect in 1082ms (1291 modules)
+ POST /api/integrations/google-sheets/disconnect 400 in 1235ms
+ ○ Compiling /api/integrations/google-sheets/entity ...
+ ✓ Compiled /api/integrations/google-sheets/entity in 573ms (1299 modules)
+ POST /api/integrations/google-sheets/entity 400 in 666ms
+ ✓ Compiled /api/integrations/google-sheets/mapping in 402ms (1301 modules)
+ POST /api/integrations/google-sheets/mapping 400 in 472ms
+ ✓ Compiled /api/integrations/google-sheets/preview in 381ms (1303 modules)
+ POST /api/integrations/google-sheets/preview 400 in 467ms
+ ✓ Compiled /api/integrations/google-sheets/reconnect in 317ms (1305 modules)
+ POST /api/integrations/google-sheets/reconnect 406 in 396ms
+ ✓ Compiled /api/integrations/google-sheets/recovery in 318ms (1307 modules)
+ POST /api/integrations/google-sheets/recovery 400 in 412ms
+ ○ Compiling /api/integrations/google-sheets/scheduled-sync ...
+ ✓ Compiled /api/integrations/google-sheets/scheduled-sync in 3s (1312 modules)
+ GET /api/integrations/google-sheets/scheduled-sync 401 in 3110ms
+ ○ Compiling /api/integrations/google-sheets/spreadsheet ...
+ ✓ Compiled /api/integrations/google-sheets/spreadsheet in 724ms (1314 modules)
+ POST /api/integrations/google-sheets/spreadsheet 400 in 818ms
+ ✓ Compiled /api/integrations/google-sheets/sync in 455ms (1316 modules)
+ POST /api/integrations/google-sheets/sync 400 in 531ms
+ ✓ Compiled /api/integrations/google-sheets/tab in 426ms (1318 modules)
+ POST /api/integrations/google-sheets/tab 400 in 495ms
+ ○ Compiling /api/integrations/qbo/accounting-authority ...
+ ✓ Compiled /api/integrations/qbo/accounting-authority in 3.2s (1323 modules)
+ GET /api/integrations/qbo/accounting-authority 404 in 3298ms
+ POST /api/integrations/qbo/accounting-authority 404 in 47ms
+ ○ Compiling /api/integrations/qbo/cancel ...
+ ✓ Compiled /api/integrations/qbo/cancel in 628ms (1333 modules)
+ POST /api/integrations/qbo/cancel 404 in 730ms
+ ○ Compiling /api/integrations/qbo/connect ...
+ ✓ Compiled /api/integrations/qbo/connect in 573ms (1350 modules)
+ POST /api/integrations/qbo/connect 404 in 685ms
+ ✓ Compiled /api/integrations/qbo/disconnect in 442ms (1353 modules)
+ POST /api/integrations/qbo/disconnect 404 in 526ms
+ ○ Compiling /api/integrations/qbo/reauthorize ...
+ ✓ Compiled /api/integrations/qbo/reauthorize in 636ms (1357 modules)
+ POST /api/integrations/qbo/reauthorize 404 in 811ms
+ ○ Compiling /api/integrations/square/callback ...
+ ✓ Compiled /api/integrations/square/callback in 504ms (1365 modules)
+ GET /api/integrations/square/callback 404 in 637ms
+ ○ Compiling /api/integrations/square/connect ...
+ ✓ Compiled /api/integrations/square/connect in 562ms (1367 modules)
+ POST /api/integrations/square/connect 404 in 698ms
+ ○ Compiling /api/integrations/square/disconnect ...
+ ✓ Compiled /api/integrations/square/disconnect in 508ms (1369 modules)
+ POST /api/integrations/square/disconnect 404 in 3140ms
+ ○ Compiling /api/integrations/square/internal/manual/[action] ...
+ ✓ Compiled /api/integrations/square/internal/manual/[action] in 1081ms (1288 modules)
+ POST /api/integrations/square/internal/manual/11111111-1111-4111-8111-111111111111 404 in 1980ms
+ ○ Compiling /api/integrations/square/mapping ...
+ ✓ Compiled /api/integrations/square/mapping in 617ms (1290 modules)
+ POST /api/integrations/square/mapping 404 in 767ms
+ ○ Compiling /api/integrations/square/read ...
+ ✓ Compiled /api/integrations/square/read in 658ms (1292 modules)
+ POST /api/integrations/square/read 404 in 765ms
+ ✓ Compiled /api/integrations/square/reauthorize in 419ms (1294 modules)
+ POST /api/integrations/square/reauthorize 404 in 519ms
+ ✓ Compiled /api/integrations/square/status in 438ms (1296 modules)
+ GET /api/integrations/square/status 404 in 546ms
+ ○ Compiling /api/integrations/square/webhook ...
+ ✓ Compiled /api/integrations/square/webhook in 563ms (1298 modules)
+ POST /api/integrations/square/webhook 404 in 727ms
+ ○ Compiling /api/internal/nvidia-qualification ...
+ ✓ Compiled /api/internal/nvidia-qualification in 1279ms (1313 modules)
+ GET /api/internal/nvidia-qualification 404 in 4244ms
+ POST /api/internal/nvidia-qualification 404 in 154ms
+ ○ Compiling /api/internal/nvidia-qualification/stage-three-a ...
+ ✓ Compiled /api/internal/nvidia-qualification/stage-three-a in 1749ms (1235 modules)
+ GET /api/internal/nvidia-qualification/stage-three-a 404 in 2181ms
+ POST /api/internal/nvidia-qualification/stage-three-a 404 in 40ms
+ ○ Compiling /api/internal/nvidia-qualification/stage-three-b ...
+ ✓ Compiled /api/internal/nvidia-qualification/stage-three-b in 746ms (1242 modules)
+ GET /api/internal/nvidia-qualification/stage-three-b 404 in 886ms
+ POST /api/internal/nvidia-qualification/stage-three-b 404 in 19ms
+ ○ Compiling /api/internal/nvidia-qualification/stage-two ...
+ ✓ Compiled /api/internal/nvidia-qualification/stage-two in 754ms (1245 modules)
+ GET /api/internal/nvidia-qualification/stage-two 404 in 873ms
+ POST /api/internal/nvidia-qualification/stage-two 404 in 22ms
+ ○ Compiling /api/legal/workspace-agreements/[agreementId]/pdf ...
+ ✓ Compiled /api/legal/workspace-agreements/[agreementId]/pdf in 929ms (1247 modules)
+ GET /api/legal/workspace-agreements/11111111-1111-4111-8111-111111111111/pdf 401 in 1739ms
+ ○ Compiling /api/public/forms/[slug]/submit ...
+ ✓ Compiled /api/public/forms/[slug]/submit in 574ms (1249 modules)
+ POST /api/public/forms/11111111-1111-4111-8111-111111111111/submit 503 in 986ms
+ ○ Compiling /api/search ...
+ ✓ Compiled /api/search in 6s (1280 modules)
+ GET /api/search 200 in 6246ms
+ POST /api/search 404 in 22ms
+ ○ Compiling /api/stripe/checkout ...
+ ✓ Compiled /api/stripe/checkout in 4.6s (1284 modules)
+ GET /api/stripe/checkout 303 in 4775ms
+ POST /api/stripe/checkout 303 in 25ms
+ ○ Compiling /api/stripe/portal ...
+ ✓ Compiled /api/stripe/portal in 740ms (1286 modules)
+ GET /api/stripe/portal 303 in 818ms
+ POST /api/stripe/portal 303 in 19ms
+ ○ Compiling /api/stripe/webhook ...
+ ✓ Compiled /api/stripe/webhook in 4s (1289 modules)
+ POST /api/stripe/webhook 503 in 4114ms
+ ○ Compiling /api/subscription/request-activation ...
+ ✓ Compiled /api/subscription/request-activation in 988ms (1291 modules)
+ POST /api/subscription/request-activation 307 in 1058ms
+ ○ Compiling /api/subscription/status ...
+ ✓ Compiled /api/subscription/status in 1232ms (1293 modules)
+ GET /api/subscription/status 401 in 3490ms
+ GET /api/search?q=synthetic-audit 401 in 811ms
+ GET /api/integrations/dashboard?workspaceId=11111111-1111-4111-8111-111111111111 503 in 657ms
+ ○ Compiling /api/integrations/square/internal/connect ...
+ ✓ Compiled /api/integrations/square/internal/connect in 11.7s (1147 modules)
+ POST /api/integrations/square/internal/connect 404 in 12192ms
+ ○ Compiling /api/internal/document-extraction/broker ...
+ ✓ Compiled /api/internal/document-extraction/broker in 11.2s (1162 modules)
+ GET /api/internal/document-extraction/broker 404 in 11382ms
+ POST /api/internal/document-extraction/broker 404 in 22ms
+[?25h

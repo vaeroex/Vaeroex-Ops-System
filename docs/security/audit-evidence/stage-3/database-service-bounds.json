@@ -1,0 +1,83 @@
+{
+  "readOnly": true,
+  "source": "Supabase metadata query during stage 3",
+  "note": "statement_stats_reset is a Boolean indicating extension availability, not a timestamp; no statement reset time was obtained.",
+  "data": [
+    {
+      "service_bounds": {
+        "settings": [
+          {
+            "name": "log_min_duration_statement",
+            "setting": "-1"
+          },
+          {
+            "name": "max_parallel_workers",
+            "setting": "2"
+          },
+          {
+            "name": "track_activity_query_size",
+            "setting": "1024"
+          },
+          {
+            "name": "track_io_timing",
+            "setting": "off"
+          }
+        ],
+        "bucket_bounds": [
+          {
+            "name": "workspace-files",
+            "public": false,
+            "file_size_limit": 26214400,
+            "allowed_mime_types": [
+              "text/csv",
+              "application/csv",
+              "application/vnd.ms-excel",
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+              "application/pdf",
+              "image/png",
+              "image/jpeg",
+              "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            ]
+          },
+          {
+            "name": "workspace-agreements",
+            "public": false,
+            "file_size_limit": 5242880,
+            "allowed_mime_types": [
+              "application/pdf"
+            ]
+          }
+        ],
+        "role_timeouts": [
+          {
+            "role": "authenticated",
+            "setting": "statement_timeout=8s",
+            "database": "all"
+          },
+          {
+            "role": "anon",
+            "setting": "statement_timeout=3s",
+            "database": "all"
+          },
+          {
+            "role": "authenticator",
+            "setting": "statement_timeout=8s",
+            "database": "all"
+          },
+          {
+            "role": "authenticator",
+            "setting": "lock_timeout=8s",
+            "database": "all"
+          },
+          {
+            "role": "supabase_auth_admin",
+            "setting": "idle_in_transaction_session_timeout=60000",
+            "database": "all"
+          }
+        ],
+        "statements_view": "pg_stat_statements",
+        "statement_stats_reset": true
+      }
+    }
+  ]
+}

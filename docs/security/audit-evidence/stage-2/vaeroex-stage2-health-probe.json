@@ -1,0 +1,70 @@
+{
+  "sourceRoot": "/tmp/vaeroex-audit-production",
+  "recordedAt": "2026-10-05T01:26:26.644Z",
+  "asOf": "2026-10-05T00:00:00.000Z",
+  "clock": "Fixed fixture date including internal Date.now(), override VAEROEX_AUDIT_AS_OF",
+  "scope": "Actual pure source functions, synthetic rows, no DB/provider/model/browser calls",
+  "unchanged": {
+    "score": 60,
+    "currentCountTrajectory": "Improving",
+    "previousScore": 60,
+    "previousStatus": "Watch",
+    "displayedTrajectory": "Improving",
+    "delta": 0,
+    "comparison": "Unchanged 0 points since the previous stored review.",
+    "analysisSubmode": "watch_recovering",
+    "evidenceFreshness": "current",
+    "latestEvidenceAt": "2026-10-05T00:00:00.000Z",
+    "confidence": "Medium",
+    "coveragePercentage": 24,
+    "readinessFromLayer": 56,
+    "healthAvailable": true,
+    "healthState": "Watch",
+    "citationHasHref": false,
+    "driverPoints": [
+      10
+    ]
+  },
+  "declining": {
+    "score": 60,
+    "currentCountTrajectory": "Improving",
+    "previousScore": 90,
+    "previousStatus": "Strong",
+    "displayedTrajectory": "Improving",
+    "delta": -30,
+    "comparison": "Down 30 points since the previous stored review.",
+    "analysisSubmode": "watch_recovering",
+    "evidenceFreshness": "current",
+    "latestEvidenceAt": "2026-10-05T00:00:00.000Z",
+    "confidence": "Medium",
+    "coveragePercentage": 24,
+    "readinessFromLayer": 56,
+    "healthAvailable": true,
+    "healthState": "Watch",
+    "citationHasHref": false,
+    "driverPoints": [
+      10
+    ]
+  },
+  "stale": {
+    "score": 60,
+    "currentCountTrajectory": "Improving",
+    "previousScore": 60,
+    "previousStatus": "Watch",
+    "displayedTrajectory": "Improving",
+    "delta": 0,
+    "comparison": "Unchanged 0 points since the previous stored review.",
+    "analysisSubmode": "evidence_stale",
+    "evidenceFreshness": "stale",
+    "latestEvidenceAt": "2026-06-07T00:00:00.000Z",
+    "confidence": "Low",
+    "coveragePercentage": 28,
+    "readinessFromLayer": 46,
+    "healthAvailable": true,
+    "healthState": "Watch",
+    "citationHasHref": false,
+    "driverPoints": [
+      10
+    ]
+  }
+}

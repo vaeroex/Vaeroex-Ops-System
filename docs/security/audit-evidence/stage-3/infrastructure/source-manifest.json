@@ -1,0 +1,290 @@
+{
+  "observed_at": "2026-10-04",
+  "roots": {
+    "checkout": "/Users/isaacvizcarra/Documents/ChatGPT/Vaeroex",
+    "production_git_source": "/tmp/vaeroex-audit-production"
+  },
+  "scope": "Selected infrastructure source/configuration; no tfstate, tfvars, env values, tokens, or secret material inspected. Git export is application deployment source, not proof GCP configuration applied.",
+  "files": [
+    {
+      "path": "services/external-integrations-qbo/infra/main.tf",
+      "snapshots": {
+        "checkout": {
+          "present": true,
+          "sha256": "d7102420dab8c1da038c035e9469d7949b305046e2cbabc07ae880a4aa26c3cb"
+        },
+        "production_git_source": {
+          "present": true,
+          "sha256": "7d3ef1506058afc3a19e5be539f593e91269cefeb3ed58eea2cd03f4f7cbedd6"
+        }
+      },
+      "identical": false
+    },
+    {
+      "path": "services/external-integrations-qbo/infra/variables.tf",
+      "snapshots": {
+        "checkout": {
+          "present": true,
+          "sha256": "da4c99eaf4ee940d6837a35651aaf55b2f3d8b1e6f5311f1f232e410896215f2"
+        },
+        "production_git_source": {
+          "present": true,
+          "sha256": "10d0ae8d2107ff442db695b1258049a5b50586042d73208b7d0e9d58e6b1b7b5"
+        }
+      },
+      "identical": false
+    },
+    {
+      "path": "services/external-integrations-qbo/infra/modules/callback/main.tf",
+      "snapshots": {
+        "checkout": {
+          "present": false,
+          "sha256": null
+        },
+        "production_git_source": {
+          "present": true,
+          "sha256": "313ccb3319dc07309fc9125c4c2b753decb966d50d0da30049429862ce6612fc"
+        }
+      },
+      "identical": false
+    },
+    {
+      "path": "services/external-integrations-qbo/src/database-config.ts",
+      "snapshots": {
+        "checkout": {
+          "present": false,
+          "sha256": null
+        },
+        "production_git_source": {
+          "present": true,
+          "sha256": "fabe5d705abd50d704e73c0896972f9c834ae79c049f0b693aa8e607dbbfb8de"
+        }
+      },
+      "identical": false
+    },
+    {
+      "path": "services/external-integrations-qbo/src/database.ts",
+      "snapshots": {
+        "checkout": {
+          "present": true,
+          "sha256": "ee20f2c647fa01d325e95b264ef15ef17c790dd33539bb64334949453b49a350"
+        },
+        "production_git_source": {
+          "present": true,
+          "sha256": "4221cd6b7fd774e07afe95c79dc4bf732b3bb209801014f0836f9a2607c89e9c"
+        }
+      },
+      "identical": false
+    },
+    {
+      "path": "services/external-integrations-qbo/src/server.ts",
+      "snapshots": {
+        "checkout": {
+          "present": true,
+          "sha256": "038848999da74cc4761aeed6c033dd6737d1513a15c60ed5dd48f2bcd2c22b8d"
+        },
+        "production_git_source": {
+          "present": true,
+          "sha256": "93812ca582e134b53b1cfc42df91f9d18c8719ad88e01dbf9cc69367b5c53799"
+        }
+      },
+      "identical": false
+    },
+    {
+      "path": "services/external-integrations-qbo/src/google.ts",
+      "snapshots": {
+        "checkout": {
+          "present": true,
+          "sha256": "524d84cd1cd06b6c3cdb0076ecb24228df8458ebc00a622ce218db4032351a48"
+        },
+        "production_git_source": {
+          "present": true,
+          "sha256": "2507a4ea089b5c5e85b7d62bd2a4f5d18e1dff53908c1ecf0d2cd2d0b8e0aa5a"
+        }
+      },
+      "identical": false
+    },
+    {
+      "path": "services/external-integrations-qbo/src/executor.ts",
+      "snapshots": {
+        "checkout": {
+          "present": true,
+          "sha256": "006335185451f788aca645f00d4360054012ae59adf6a201f76c1a86fbf036ab"
+        },
+        "production_git_source": {
+          "present": true,
+          "sha256": "b3a47e42a6ff515ebf38c0991e0b3ed9f820467d9f92e6bf2f9b8b6a1d05301e"
+        }
+      },
+      "identical": false
+    },
+    {
+      "path": "services/external-integrations-production/infra/activation/main.tf",
+      "snapshots": {
+        "checkout": {
+          "present": false,
+          "sha256": null
+        },
+        "production_git_source": {
+          "present": true,
+          "sha256": "d2093daf0ae98b4880a66811b6b6397577cf3c74ef993d0168d154210bb0f899"
+        }
+      },
+      "identical": false
+    },
+    {
+      "path": "services/square-sandbox-callback/infra/main.tf",
+      "snapshots": {
+        "checkout": {
+          "present": false,
+          "sha256": null
+        },
+        "production_git_source": {
+          "present": true,
+          "sha256": "56006e35405002d722b7cd834aceeda37cfa11fcec6501e5db939d57c4a2ec64"
+        }
+      },
+      "identical": false
+    },
+    {
+      "path": "services/document-extraction-worker/cloud-run-worker-pool.yaml.template",
+      "snapshots": {
+        "checkout": {
+          "present": true,
+          "sha256": "f1ffb23cdf88f3296bf226b7f78675d71c21c5edcbda1b6420c3122dee067492"
+        },
+        "production_git_source": {
+          "present": true,
+          "sha256": "f1ffb23cdf88f3296bf226b7f78675d71c21c5edcbda1b6420c3122dee067492"
+        }
+      },
+      "identical": true
+    },
+    {
+      "path": "services/document-extraction-worker/cloud-run-google-document-ai-worker-pool.yaml.template",
+      "snapshots": {
+        "checkout": {
+          "present": true,
+          "sha256": "1c685ec2dd7cf2958ed98f09a5304c3b1c3fef1b15c8a6e3141aca22b93999ea"
+        },
+        "production_git_source": {
+          "present": true,
+          "sha256": "1c685ec2dd7cf2958ed98f09a5304c3b1c3fef1b15c8a6e3141aca22b93999ea"
+        }
+      },
+      "identical": true
+    },
+    {
+      "path": "services/document-extraction-worker/src/vaeroex_document_worker/daemon.py",
+      "snapshots": {
+        "checkout": {
+          "present": true,
+          "sha256": "4fbe3474b41195d277b7572271bd6750a89f2c6db3df06634c456e3a413c8100"
+        },
+        "production_git_source": {
+          "present": true,
+          "sha256": "4fbe3474b41195d277b7572271bd6750a89f2c6db3df06634c456e3a413c8100"
+        }
+      },
+      "identical": true
+    },
+    {
+      "path": "services/document-extraction-worker/src/vaeroex_document_worker/renderer.py",
+      "snapshots": {
+        "checkout": {
+          "present": true,
+          "sha256": "0b4a890293846d1c9700443679885a188d958e87b817323d2644c539855daf47"
+        },
+        "production_git_source": {
+          "present": true,
+          "sha256": "0b4a890293846d1c9700443679885a188d958e87b817323d2644c539855daf47"
+        }
+      },
+      "identical": true
+    },
+    {
+      "path": "services/document-extraction-worker/src/vaeroex_document_worker/resources.py",
+      "snapshots": {
+        "checkout": {
+          "present": true,
+          "sha256": "dacb484111186376b17ab452047415b95971ad28d1abe67819419cb8467d5e1e"
+        },
+        "production_git_source": {
+          "present": true,
+          "sha256": "dacb484111186376b17ab452047415b95971ad28d1abe67819419cb8467d5e1e"
+        }
+      },
+      "identical": true
+    },
+    {
+      "path": "services/document-extraction-worker/src/vaeroex_document_worker/telemetry.py",
+      "snapshots": {
+        "checkout": {
+          "present": true,
+          "sha256": "8989003eaf7e293310a8676a10190c9333e9b81dffbd5badabadad9e45b85fde"
+        },
+        "production_git_source": {
+          "present": true,
+          "sha256": "8989003eaf7e293310a8676a10190c9333e9b81dffbd5badabadad9e45b85fde"
+        }
+      },
+      "identical": true
+    },
+    {
+      "path": "lib/document-extraction/broker-service.ts",
+      "snapshots": {
+        "checkout": {
+          "present": true,
+          "sha256": "9fe9bcdef92e5acfde7eaeb3bb9f84d0c605f4738d5ca721be20a5dee6496906"
+        },
+        "production_git_source": {
+          "present": true,
+          "sha256": "9fe9bcdef92e5acfde7eaeb3bb9f84d0c605f4738d5ca721be20a5dee6496906"
+        }
+      },
+      "identical": true
+    },
+    {
+      "path": "lib/document-extraction/eligibility.ts",
+      "snapshots": {
+        "checkout": {
+          "present": true,
+          "sha256": "353ef4533bb9e06c9a5a662dfb34d22edf3b0dc1e26621ba0586382434c13dfc"
+        },
+        "production_git_source": {
+          "present": true,
+          "sha256": "353ef4533bb9e06c9a5a662dfb34d22edf3b0dc1e26621ba0586382434c13dfc"
+        }
+      },
+      "identical": true
+    },
+    {
+      "path": "lib/integrations/provider-runtime/qbo/client.ts",
+      "snapshots": {
+        "checkout": {
+          "present": true,
+          "sha256": "f88893e1b773f07720aef0f8100a1df6ea9b4d1b1267dc2447b598dd6f9464a4"
+        },
+        "production_git_source": {
+          "present": true,
+          "sha256": "938e8c55b0dbf82631e09a9eb339d07437cb5177d825531f7068a4a0d1769bf6"
+        }
+      },
+      "identical": false
+    },
+    {
+      "path": "supabase/migrations/20260827033058_qbo_production_convergence.sql",
+      "snapshots": {
+        "checkout": {
+          "present": true,
+          "sha256": "040a21080562441764a395ebac62874629d918522e9a88adb19793c491ffdec7"
+        },
+        "production_git_source": {
+          "present": true,
+          "sha256": "040a21080562441764a395ebac62874629d918522e9a88adb19793c491ffdec7"
+        }
+      },
+      "identical": true
+    }
+  ]
+}

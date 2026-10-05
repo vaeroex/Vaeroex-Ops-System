@@ -1,0 +1,10 @@
+✔ projection migration fails explicitly before its production Square browse dependency (902.552125ms)
+✔ forward browse migration preserves authority and exercises real tenant-scoped projection SQL (3088.517916ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4084.126458

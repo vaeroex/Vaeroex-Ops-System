@@ -1,0 +1,68 @@
+{
+  "scope": "Stage 3 actual local parser/canonical/intelligence components and mocked usage preflight; no user capacity claim",
+  "sourceCommit": "d91be079c7beb0b6f21a4c5e6b451f90ca06e035",
+  "sourceRoot": "/Users/isaacvizcarra/.codex/worktrees/workspace-audit-fixes/Vaeroex",
+  "predeclared": true,
+  "hardBounds": {
+    "sequentialChildren": true,
+    "csvBytes": 10485760,
+    "maxRssBytes": 536870912,
+    "rssWatchdogIntervalMs": 100,
+    "wallMsPerChild": 60000,
+    "nodeHeapMiB": 256,
+    "network": "blocked"
+  },
+  "datasets": [
+    {
+      "kind": "import",
+      "rows": 1000,
+      "series": 25,
+      "months": 24,
+      "iterations": 5
+    },
+    {
+      "kind": "import",
+      "rows": 10000,
+      "series": 25,
+      "months": 24,
+      "iterations": 5
+    },
+    {
+      "kind": "import",
+      "rows": 50000,
+      "series": 25,
+      "months": 24,
+      "iterations": 5
+    },
+    {
+      "kind": "sources",
+      "files": 200,
+      "months": 12,
+      "series": 24,
+      "iterations": 3
+    },
+    {
+      "kind": "sources",
+      "files": 2000,
+      "months": 24,
+      "series": 24,
+      "iterations": 3
+    }
+  ],
+  "acceptance": {
+    "integrity": "Exact parsed counts, all IDs and checksum; canonical total observations and current values; eligible linked source/KPI counts; same digest across repeats",
+    "resource": "No RSS/watchdog/heap/timeout stop; any stop aborts larger cases",
+    "diagnosticBudget": "Per-sample parse+map+canonical <=5000ms, source layer+coverage <=10000ms; these are provisional local benchmark thresholds, not product SLOs",
+    "percentiles": "Nearest rank p50/p95/max; only 5 or 3 samples per dataset, no statistical tail guarantee",
+    "quota": "Positive controls at limit deny; count-query errors should report unavailable or deny; simultaneous distinct requests with one slot left should admit at most one under an atomic quota contract"
+  },
+  "limitations": [
+    "No actual upload/storage/DB/API/UI/network/provider persistence",
+    "CSV observations deliberately repeat dates across 24 months; tests volume integrity, not source reconciliation or unique-period semantics",
+    "Import producer series bounded to25; source layer to24; cannot infer high-cardinality limits",
+    "RSS monitored externally every100ms; transient overshoot between samples is possible; child maxRSS recorded",
+    "No repeated earlier stage test unless new dataset/fault/concurrency"
+  ],
+  "sourceDatasetAmendmentBeforeLargeRun": "Confirmed maximize semantics for each of24 series and assert24 emitted findings; preserves earlier unclassified200-file pilot as limited evidence.",
+  "stage": "stage-4 implementation replay; prior stage-3 evidence preserved"
+}

@@ -1,0 +1,22 @@
+// Static assessment helper. Does not execute application code, network, or mutations.
+const fs=require('node:fs'),path=require('node:path'),{execFileSync}=require('node:child_process');
+const ts=require('/tmp/vaeroex-audit-production/node_modules/typescript');
+const out='/tmp/vaeroex-stage2-product-evidence';fs.mkdirSync(out,{recursive:true});
+for(const [name,root] of [['checkout','/Users/isaacvizcarra/Documents/ChatGPT/Vaeroex'],['deployed','/tmp/vaeroex-audit-production']]){
+ const files=execFileSync('rg',['--files',root],{maxBuffer:15e6,encoding:'utf8'}).trim().split('\n').filter(f=>/\.(?:ts|tsx|js|jsx|mjs|cjs)$/.test(f)&&!f.includes('/audit-evidence/'));
+ const rel=f=>path.relative(root,f);const all=new Set(files);const graph={};const packages={};const unresolved=[];
+ function resolve(from,s){let base=s.startsWith('@/')?path.join(root,s.slice(2)):s.startsWith('.')?path.resolve(path.dirname(from),s):null;if(!base)return null;return [base,...['.ts','.tsx','.js','.jsx','.mjs','.cjs'].map(x=>base+x),...['/index.ts','/index.tsx','/index.js'].map(x=>base+x)].find(x=>all.has(x));}
+ for(const file of files){const src=fs.readFileSync(file,'utf8'),sf=ts.createSourceFile(file,src,ts.ScriptTarget.Latest,true);const edges=[];
+ function add(node,literal,kind){if(!literal||!ts.isStringLiteralLike(literal))return;const s=literal.text,location={file:rel(file),line:sf.getLineAndCharacterOfPosition(node.getStart(sf)).line+1,kind,specifier:s};const resolved=resolve(file,s);if(resolved)edges.push({...location,to:rel(resolved)});else if(s.startsWith('@/')||s.startsWith('.'))unresolved.push(location);else if(!s.startsWith('node:')){const pkg=s.startsWith('@')?s.split('/').slice(0,2).join('/'):s.split('/')[0];(packages[pkg]??=[]).push(location);}}
+ function walk(node){if(ts.isImportDeclaration(node)||ts.isExportDeclaration(node))add(node,node.moduleSpecifier,'import/export');if(ts.isCallExpression(node)){const e=node.expression;if(e.kind===ts.SyntaxKind.ImportKeyword)add(node,node.arguments[0],'dynamic import');if(ts.isIdentifier(e)&&['require','loadSource','loadModule','read'].includes(e.text))add(node,node.arguments[0],e.text);}ts.forEachChild(node,walk);}walk(sf);graph[rel(file)]=edges;
+ }
+ const runtimeRoots=Object.keys(graph).filter(f=>/^app\/(?:.*\/)?(?:page|layout|route|loading|error|not-found|global-error|default|template|sitemap|robots|manifest|icon|opengraph-image|twitter-image)\.[cm]?[jt]sx?$/.test(f)||/^(?:middleware|instrumentation|next\.config|tailwind\.config|postcss\.config)\./.test(f)||f.startsWith('services/'));
+ const scriptRoots=Object.keys(graph).filter(f=>f.startsWith('scripts/'));
+ function traverse(roots){const seen=new Set(),parent={};const stack=[...roots];while(stack.length){const f=stack.pop();if(seen.has(f))continue;seen.add(f);for(const e of graph[f]||[]){if(!(e.to in parent))parent[e.to]=f;stack.push(e.to);}}return {seen:[...seen].sort(),parent};}
+ const runtime=traverse(runtimeRoots),scripts=traverse(scriptRoots);const rt=new Set(runtime.seen),sc=new Set(scripts.seen);
+ const components=Object.keys(graph).filter(f=>f.startsWith('components/')).map(f=>({file:f,runtimeReachable:rt.has(f),scriptsReachable:sc.has(f),incoming:Object.values(graph).flat().filter(e=>e.to===f).map(({file,line,kind})=>({file,line,kind}))}));
+ const pkg=JSON.parse(fs.readFileSync(root+'/package.json','utf8'));const declared=Object.keys({...pkg.dependencies,...pkg.devDependencies}).map(p=>({package:p,declaredAs:pkg.dependencies?.[p]?'runtime':'dev',references:packages[p]||[]}));
+ const result={snapshot:name,root,method:'Conservative literal-import/dynamic-import/require graph. Runtime roots are Next convention entries plus config plus every services source file; scripts separate. Config/script string paths captured only by selected read/load calls; external/dynamic/generated consumers remain manually reviewable. Unreachable means candidate only, never deletion proof.',fileCount:files.length,runtimeRoots,runtimeReachable:runtime.seen,scriptReachable:scripts.seen,components,declared,unresolved};
+ fs.writeFileSync(out+'/'+name+'-static-graph.json',JSON.stringify(result,null,2));
+ console.log(JSON.stringify({snapshot:name,fileCount:files.length,runtimeRoots:runtimeRoots.length,runtimeReachable:runtime.seen.length,unreachableComponents:components.filter(c=>!c.runtimeReachable&&!c.file.includes('/marketing/')&&!c.file.includes('/easter-egg/')&&!c.file.includes('/motion/')&&!c.file.includes('/spatial/')),packagesNoParsedRefs:declared.filter(p=>!p.references.length).map(p=>p.package)},null,2));
+}

@@ -1,0 +1,151 @@
+{
+  "scope": "Real hydrated components in isolated browser fixture; no auth/backend/storage/provider; all non-loopback traffic denied",
+  "sourceRoot": "/tmp/vaeroex-audit-production",
+  "sourceFingerprints": {
+    "components/operations/RecordDetailDrawer.tsx": "679b898f208da16f5880050ad6dff5ebe87c65f61d975ab0e5b57b2d01afee65",
+    "components/app/GlobalSearch.tsx": "59fa70a0fc8fe6d04a149c41c14ec8b7e42a18c0eb1fc188498bb28ea24bd941"
+  },
+  "results": [
+    {
+      "width": 1440,
+      "component": "RecordDetailDrawer",
+      "opened": {
+        "active": "Open synthetic record",
+        "inside": false
+      },
+      "tabFromLast": {
+        "id": "after",
+        "inside": false
+      },
+      "closed": {
+        "active": "BODY",
+        "id": "",
+        "triggerRestored": false
+      }
+    },
+    {
+      "width": 1440,
+      "component": "GlobalSearch",
+      "searchOpened": {
+        "tag": "INPUT",
+        "inside": true
+      },
+      "tabSteps": [
+        {
+          "tag": "BUTTON",
+          "id": "last",
+          "text": "Outside last",
+          "inside": false
+        },
+        {
+          "tag": "BODY",
+          "id": "",
+          "text": "Synthetic keyboard audit fixtureOutside beforeOpen synthetic",
+          "inside": false
+        },
+        {
+          "tag": "BUTTON",
+          "id": "before",
+          "text": "Outside before",
+          "inside": false
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "text": "Open synthetic record",
+          "inside": false
+        },
+        {
+          "tag": "BUTTON",
+          "id": "after",
+          "text": "Outside after",
+          "inside": false
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "text": "Search K",
+          "inside": false
+        }
+      ],
+      "searchClosed": {
+        "id": "",
+        "tag": "BODY"
+      }
+    },
+    {
+      "width": 390,
+      "component": "RecordDetailDrawer",
+      "opened": {
+        "active": "Open synthetic record",
+        "inside": false
+      },
+      "tabFromLast": {
+        "id": "after",
+        "inside": false
+      },
+      "closed": {
+        "active": "BODY",
+        "id": "",
+        "triggerRestored": false
+      }
+    },
+    {
+      "width": 390,
+      "component": "GlobalSearch",
+      "searchOpened": {
+        "tag": "INPUT",
+        "inside": true
+      },
+      "tabSteps": [
+        {
+          "tag": "BUTTON",
+          "id": "last",
+          "text": "Outside last",
+          "inside": false
+        },
+        {
+          "tag": "BUTTON",
+          "id": "before",
+          "text": "Outside before",
+          "inside": false
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "text": "Open synthetic record",
+          "inside": false
+        },
+        {
+          "tag": "BUTTON",
+          "id": "after",
+          "text": "Outside after",
+          "inside": false
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "text": "",
+          "inside": true
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "text": "",
+          "inside": true
+        }
+      ],
+      "searchClosed": {
+        "id": "",
+        "tag": "BODY"
+      }
+    }
+  ],
+  "errors": [],
+  "requests": [
+    "/",
+    "/fixture.js",
+    "/",
+    "/fixture.js"
+  ]
+}

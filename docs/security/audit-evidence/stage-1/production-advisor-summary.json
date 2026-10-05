@@ -1,0 +1,18 @@
+{
+  "observedAt": "2026-10-04",
+  "lints": [
+    {
+      "name": "rls_enabled_no_policy",
+      "level": "INFO",
+      "count": 96,
+      "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy"
+    },
+    {
+      "name": "authenticated_security_definer_function_executable",
+      "level": "WARN",
+      "count": 30,
+      "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable"
+    }
+  ],
+  "interpretation": "Advisory inventory, not verified defects. Private RLS tables with no policies intentionally deny ordinary access; callable security-definer functions require individual authorization review."
+}

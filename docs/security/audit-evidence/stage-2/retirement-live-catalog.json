@@ -1,0 +1,419 @@
+[
+  {
+    "retirement_catalog": {
+      "views": null,
+      "tables": [
+        {
+          "rls": true,
+          "table": "business_decisions",
+          "force_rls": false,
+          "anon_insert": true,
+          "anon_select": true,
+          "authenticated_delete": true,
+          "authenticated_insert": true,
+          "authenticated_select": true,
+          "authenticated_update": true
+        },
+        {
+          "rls": true,
+          "table": "business_memory_chunks",
+          "force_rls": false,
+          "anon_insert": true,
+          "anon_select": true,
+          "authenticated_delete": true,
+          "authenticated_insert": true,
+          "authenticated_select": true,
+          "authenticated_update": true
+        },
+        {
+          "rls": true,
+          "table": "checklist_runs",
+          "force_rls": false,
+          "anon_insert": true,
+          "anon_select": true,
+          "authenticated_delete": true,
+          "authenticated_insert": true,
+          "authenticated_select": true,
+          "authenticated_update": true
+        },
+        {
+          "rls": true,
+          "table": "checklists",
+          "force_rls": false,
+          "anon_insert": true,
+          "anon_select": true,
+          "authenticated_delete": true,
+          "authenticated_insert": true,
+          "authenticated_select": true,
+          "authenticated_update": true
+        },
+        {
+          "rls": true,
+          "table": "crm_lead_history",
+          "force_rls": false,
+          "anon_insert": true,
+          "anon_select": true,
+          "authenticated_delete": true,
+          "authenticated_insert": true,
+          "authenticated_select": true,
+          "authenticated_update": true
+        },
+        {
+          "rls": true,
+          "table": "crm_leads",
+          "force_rls": false,
+          "anon_insert": true,
+          "anon_select": true,
+          "authenticated_delete": true,
+          "authenticated_insert": true,
+          "authenticated_select": true,
+          "authenticated_update": true
+        },
+        {
+          "rls": true,
+          "table": "file_import_rows",
+          "force_rls": false,
+          "anon_insert": true,
+          "anon_select": true,
+          "authenticated_delete": true,
+          "authenticated_insert": true,
+          "authenticated_select": true,
+          "authenticated_update": true
+        },
+        {
+          "rls": true,
+          "table": "file_imports",
+          "force_rls": false,
+          "anon_insert": true,
+          "anon_select": true,
+          "authenticated_delete": true,
+          "authenticated_insert": true,
+          "authenticated_select": true,
+          "authenticated_update": true
+        },
+        {
+          "rls": true,
+          "table": "operational_assignments",
+          "force_rls": false,
+          "anon_insert": true,
+          "anon_select": true,
+          "authenticated_delete": true,
+          "authenticated_insert": true,
+          "authenticated_select": true,
+          "authenticated_update": true
+        },
+        {
+          "rls": true,
+          "table": "record_folders",
+          "force_rls": false,
+          "anon_insert": true,
+          "anon_select": true,
+          "authenticated_delete": true,
+          "authenticated_insert": true,
+          "authenticated_select": true,
+          "authenticated_update": true
+        },
+        {
+          "rls": true,
+          "table": "tasks",
+          "force_rls": false,
+          "anon_insert": true,
+          "anon_select": true,
+          "authenticated_delete": true,
+          "authenticated_insert": true,
+          "authenticated_select": true,
+          "authenticated_update": true
+        },
+        {
+          "rls": true,
+          "table": "vaeroex_recommendation_outcomes",
+          "force_rls": false,
+          "anon_insert": true,
+          "anon_select": true,
+          "authenticated_delete": true,
+          "authenticated_insert": true,
+          "authenticated_select": true,
+          "authenticated_update": true
+        }
+      ],
+      "policies": [
+        {
+          "cmd": "INSERT",
+          "qual": null,
+          "roles": [
+            "authenticated"
+          ],
+          "tablename": "crm_lead_history",
+          "permissive": "PERMISSIVE",
+          "policyname": "crm lead history contributors create",
+          "schemaname": "public",
+          "with_check": "can_contribute_workspace(workspace_id)"
+        },
+        {
+          "cmd": "UPDATE",
+          "qual": "can_contribute_workspace(workspace_id)",
+          "roles": [
+            "authenticated"
+          ],
+          "tablename": "crm_lead_history",
+          "permissive": "PERMISSIVE",
+          "policyname": "crm lead history contributors update",
+          "schemaname": "public",
+          "with_check": "can_contribute_workspace(workspace_id)"
+        },
+        {
+          "cmd": "DELETE",
+          "qual": "can_edit_operations(workspace_id)",
+          "roles": [
+            "authenticated"
+          ],
+          "tablename": "crm_lead_history",
+          "permissive": "PERMISSIVE",
+          "policyname": "crm lead history managers delete",
+          "schemaname": "public",
+          "with_check": null
+        },
+        {
+          "cmd": "SELECT",
+          "qual": "is_workspace_member(workspace_id)",
+          "roles": [
+            "authenticated"
+          ],
+          "tablename": "crm_lead_history",
+          "permissive": "PERMISSIVE",
+          "policyname": "crm lead history members read",
+          "schemaname": "public",
+          "with_check": null
+        },
+        {
+          "cmd": "INSERT",
+          "qual": null,
+          "roles": [
+            "authenticated"
+          ],
+          "tablename": "crm_leads",
+          "permissive": "PERMISSIVE",
+          "policyname": "crm_leads contributors create",
+          "schemaname": "public",
+          "with_check": "can_contribute_workspace(workspace_id)"
+        },
+        {
+          "cmd": "UPDATE",
+          "qual": "can_contribute_workspace(workspace_id)",
+          "roles": [
+            "authenticated"
+          ],
+          "tablename": "crm_leads",
+          "permissive": "PERMISSIVE",
+          "policyname": "crm_leads contributors update",
+          "schemaname": "public",
+          "with_check": "can_contribute_workspace(workspace_id)"
+        },
+        {
+          "cmd": "DELETE",
+          "qual": "can_edit_operations(workspace_id)",
+          "roles": [
+            "authenticated"
+          ],
+          "tablename": "crm_leads",
+          "permissive": "PERMISSIVE",
+          "policyname": "crm_leads managers delete",
+          "schemaname": "public",
+          "with_check": null
+        },
+        {
+          "cmd": "SELECT",
+          "qual": "is_workspace_member(workspace_id)",
+          "roles": [
+            "authenticated"
+          ],
+          "tablename": "crm_leads",
+          "permissive": "PERMISSIVE",
+          "policyname": "crm_leads members read",
+          "schemaname": "public",
+          "with_check": null
+        },
+        {
+          "cmd": "UPDATE",
+          "qual": "(can_contribute_workspace(workspace_id) AND (assigned_to = auth.uid()))",
+          "roles": [
+            "authenticated"
+          ],
+          "tablename": "tasks",
+          "permissive": "PERMISSIVE",
+          "policyname": "assigned contributors can update assigned tasks",
+          "schemaname": "public",
+          "with_check": "(can_contribute_workspace(workspace_id) AND (assigned_to = auth.uid()))"
+        },
+        {
+          "cmd": "INSERT",
+          "qual": null,
+          "roles": [
+            "authenticated"
+          ],
+          "tablename": "tasks",
+          "permissive": "PERMISSIVE",
+          "policyname": "managers can create tasks",
+          "schemaname": "public",
+          "with_check": "can_edit_operations(workspace_id)"
+        },
+        {
+          "cmd": "DELETE",
+          "qual": "can_edit_operations(workspace_id)",
+          "roles": [
+            "authenticated"
+          ],
+          "tablename": "tasks",
+          "permissive": "PERMISSIVE",
+          "policyname": "managers can delete tasks",
+          "schemaname": "public",
+          "with_check": null
+        },
+        {
+          "cmd": "UPDATE",
+          "qual": "can_edit_operations(workspace_id)",
+          "roles": [
+            "authenticated"
+          ],
+          "tablename": "tasks",
+          "permissive": "PERMISSIVE",
+          "policyname": "managers can update tasks",
+          "schemaname": "public",
+          "with_check": "can_edit_operations(workspace_id)"
+        },
+        {
+          "cmd": "SELECT",
+          "qual": "is_workspace_member(workspace_id)",
+          "roles": [
+            "authenticated"
+          ],
+          "tablename": "tasks",
+          "permissive": "PERMISSIVE",
+          "policyname": "members can read tasks",
+          "schemaname": "public",
+          "with_check": null
+        }
+      ],
+      "triggers": [
+        {
+          "name": "set_tasks_updated_at",
+          "table": "tasks",
+          "definition": "CREATE TRIGGER set_tasks_updated_at BEFORE UPDATE ON public.tasks FOR EACH ROW EXECUTE FUNCTION set_updated_at()"
+        },
+        {
+          "name": "set_crm_leads_updated_at",
+          "table": "crm_leads",
+          "definition": "CREATE TRIGGER set_crm_leads_updated_at BEFORE UPDATE ON public.crm_leads FOR EACH ROW EXECUTE FUNCTION set_updated_at()"
+        }
+      ],
+      "functions": [
+        {
+          "acl": [
+            "postgres=X/postgres",
+            "authenticated=X/postgres",
+            "service_role=X/postgres"
+          ],
+          "name": "public.update_business_signal_lifecycle",
+          "arguments": "p_workspace_id uuid, p_signal_id uuid, p_action text",
+          "definition": "CREATE OR REPLACE FUNCTION public.update_business_signal_lifecycle(p_workspace_id uuid, p_signal_id uuid, p_action text)\n RETURNS TABLE(signal_id uuid, affected_memory_chunks integer)\n LANGUAGE plpgsql\n SET search_path TO 'public'\nAS $function$\ndeclare\n  v_now timestamptz := now();\n  v_signal_id uuid;\n  v_chunks integer := 0;\nbegin\n  if p_action not in ('archive', 'delete', 'restore') then\n    raise exception 'Unsupported Business Signal lifecycle action';\n  end if;\n\n  update public.tasks\n  set\n    archived_at = case when p_action in ('archive', 'delete') then coalesce(archived_at, v_now) else null end,\n    deleted_at = case when p_action = 'delete' then coalesce(deleted_at, v_now) else null end\n  where id = p_signal_id\n    and workspace_id = p_workspace_id\n  returning id into v_signal_id;\n\n  if v_signal_id is null then\n    raise exception 'Business Signal not found in this workspace';\n  end if;\n\n  update public.business_memory_chunks\n  set\n    archived_at = case when p_action in ('archive', 'delete') then coalesce(archived_at, v_now) else null end,\n    deleted_at = case when p_action = 'delete' then coalesce(deleted_at, v_now) else null end,\n    updated_at = case\n      when p_action = 'restore' and (archived_at is not null or deleted_at is not null) then v_now\n      when p_action in ('archive', 'delete') and (archived_at is null or (p_action = 'delete' and deleted_at is null)) then v_now\n      else updated_at\n    end\n  where workspace_id = p_workspace_id\n    and source_type = 'business_signal'\n    and source_id = p_signal_id;\n\n  get diagnostics v_chunks = row_count;\n  return query select v_signal_id, v_chunks;\nend;\n$function$\n",
+          "anon_execute": false,
+          "security_definer": false,
+          "authenticated_execute": true
+        }
+      ],
+      "constraints": [
+        {
+          "name": "crm_leads_workspace_id_fkey",
+          "table": "crm_leads",
+          "definition": "FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE"
+        },
+        {
+          "name": "crm_leads_source_file_id_fkey",
+          "table": "crm_leads",
+          "definition": "FOREIGN KEY (source_file_id) REFERENCES file_uploads(id) ON DELETE SET NULL"
+        },
+        {
+          "name": "crm_leads_created_by_fkey",
+          "table": "crm_leads",
+          "definition": "FOREIGN KEY (created_by) REFERENCES profiles(id) ON DELETE SET NULL"
+        },
+        {
+          "name": "tasks_workspace_id_fkey",
+          "table": "tasks",
+          "definition": "FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE"
+        },
+        {
+          "name": "tasks_assigned_to_fkey",
+          "table": "tasks",
+          "definition": "FOREIGN KEY (assigned_to) REFERENCES profiles(id) ON DELETE SET NULL"
+        },
+        {
+          "name": "tasks_created_by_fkey",
+          "table": "tasks",
+          "definition": "FOREIGN KEY (created_by) REFERENCES profiles(id) ON DELETE SET NULL"
+        },
+        {
+          "name": "tasks_folder_id_fkey",
+          "table": "tasks",
+          "definition": "FOREIGN KEY (folder_id) REFERENCES record_folders(id) ON DELETE SET NULL"
+        },
+        {
+          "name": "crm_leads_import_id_fkey",
+          "table": "crm_leads",
+          "definition": "FOREIGN KEY (import_id) REFERENCES file_imports(id) ON DELETE SET NULL"
+        },
+        {
+          "name": "crm_leads_import_row_id_fkey",
+          "table": "crm_leads",
+          "definition": "FOREIGN KEY (import_row_id) REFERENCES file_import_rows(id) ON DELETE SET NULL"
+        },
+        {
+          "name": "crm_lead_history_workspace_id_fkey",
+          "table": "crm_lead_history",
+          "definition": "FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE"
+        },
+        {
+          "name": "crm_lead_history_lead_id_fkey",
+          "table": "crm_lead_history",
+          "definition": "FOREIGN KEY (lead_id) REFERENCES crm_leads(id) ON DELETE CASCADE"
+        },
+        {
+          "name": "crm_lead_history_source_file_id_fkey",
+          "table": "crm_lead_history",
+          "definition": "FOREIGN KEY (source_file_id) REFERENCES file_uploads(id) ON DELETE SET NULL"
+        },
+        {
+          "name": "crm_lead_history_import_id_fkey",
+          "table": "crm_lead_history",
+          "definition": "FOREIGN KEY (import_id) REFERENCES file_imports(id) ON DELETE SET NULL"
+        },
+        {
+          "name": "crm_lead_history_import_row_id_fkey",
+          "table": "crm_lead_history",
+          "definition": "FOREIGN KEY (import_row_id) REFERENCES file_import_rows(id) ON DELETE SET NULL"
+        },
+        {
+          "name": "crm_lead_history_created_by_fkey",
+          "table": "crm_lead_history",
+          "definition": "FOREIGN KEY (created_by) REFERENCES profiles(id) ON DELETE SET NULL"
+        },
+        {
+          "name": "crm_leads_folder_id_fkey",
+          "table": "crm_leads",
+          "definition": "FOREIGN KEY (folder_id) REFERENCES record_folders(id) ON DELETE SET NULL"
+        },
+        {
+          "name": "tasks_assigned_person_id_fkey",
+          "table": "tasks",
+          "definition": "FOREIGN KEY (assigned_person_id) REFERENCES people(id) ON DELETE SET NULL"
+        },
+        {
+          "name": "vaeroex_recommendation_outcomes_related_task_id_fkey",
+          "table": "vaeroex_recommendation_outcomes",
+          "definition": "FOREIGN KEY (related_task_id) REFERENCES tasks(id) ON DELETE SET NULL"
+        }
+      ],
+      "migration_head": "20261002182746"
+    }
+  }
+]
