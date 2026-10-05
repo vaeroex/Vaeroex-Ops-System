@@ -940,18 +940,16 @@
       "path": "supabase/migrations/20260821201220_external_integrations_phase_4_control_plane.sql",
       "line": 852,
       "workspace_uuid": true,
-      "proposed_guard_candidate": false,
-      "runtime_requirement": "pg_class.relrowsecurity=true and uuid workspace_id; deployment catalog must verify",
-      "guard_exclusion_reason": "Existing SELECT-only customer projection; actual private trigger must propagate disconnect/freshness withdrawal after expiry. Private admission guards remain."
+      "proposed_guard_candidate": true,
+      "runtime_requirement": "pg_class.relrowsecurity=true and uuid workspace_id; deployment catalog must verify"
     },
     {
       "name": "public.integration_freshness_summaries",
       "path": "supabase/migrations/20260821201220_external_integrations_phase_4_control_plane.sql",
       "line": 893,
       "workspace_uuid": true,
-      "proposed_guard_candidate": false,
-      "runtime_requirement": "pg_class.relrowsecurity=true and uuid workspace_id; deployment catalog must verify",
-      "guard_exclusion_reason": "Existing SELECT-only customer projection; actual private trigger must propagate disconnect/freshness withdrawal after expiry. Private admission guards remain."
+      "proposed_guard_candidate": true,
+      "runtime_requirement": "pg_class.relrowsecurity=true and uuid workspace_id; deployment catalog must verify"
     },
     {
       "name": "public.integration_summary_preferences",
@@ -2320,12 +2318,12 @@
     }
   ],
   "implementation_manifest": {
-    "refreshed_at": "2026-10-05T04:08:36.384643+00:00",
+    "refreshed_at": "2026-10-05T03:44:52.231783+00:00",
     "scope": "Hash inventory of stage4 security implementation files; distinct from baseline source schema inventory; not deployed/catalog verification.",
     "files": [
       {
         "path": "supabase/migrations/20261005022017_workspace_security_boundaries.sql",
-        "sha256": "16974e4960b31dcbd80479e27734bf82cda7fb0cfc63c7a3d1d56b32114b661d"
+        "sha256": "1cd376c41b5b980c0bd1ca09f3a0053d7a167644af16fdafc3bb32de0388363a"
       },
       {
         "path": "supabase/migrations/20261005022445_workspace_persisted_usage_limits.sql",
@@ -2353,7 +2351,7 @@
       },
       {
         "path": "scripts/workspace-security-database-tests.cjs",
-        "sha256": "91084205f86920627499f74d24d12ce6cd4987f49eb4561563ec3a3eee4230cc"
+        "sha256": "f7617805f8cff576c9faa6ffaa17cf1daf4cb796573f3fe18257a446e740290b"
       },
       {
         "path": "scripts/workspace-security-helper-tests.cjs",
@@ -2386,17 +2384,13 @@
       {
         "path": "scripts/agents-retirement-regression-tests.js",
         "sha256": "42853fc73373729890fd92a16a1b83c37b7523f0eff5ac6f9d9919c60379ee8b"
-      },
-      {
-        "path": "scripts/qbo-pending-cancellation-eligibility-database-tests.cjs",
-        "sha256": "a48abbdc50bb39e7e4956ea7b28a3a6556802ad12b666d5bcbb63c49cc7a9862"
       }
     ]
   },
   "implementation_verification": {
     "native_postgres_version": "17.11",
-    "native_checks": 119,
-    "native_checks_passed": 119,
+    "native_checks": 106,
+    "native_checks_passed": 106,
     "scope": "focused repository-SQL fixture, synthetic JWT roles, owned native PostgreSQL, no HTTP/provider verification",
     "input_shape_measurements": [
       {
@@ -2434,10 +2428,6 @@
       "lib/ai/intelligence-briefing/generation-claim.ts",
       "app/app/finding-explanation/actions.ts"
     ],
-    "admin_exemption_configuration": "Trusted database owner/operator only; no service-role private schema usage or exemption table CRUD",
-    "recovery_projection_exclusions": [
-      "public.integration_connection_summaries",
-      "public.integration_freshness_summaries"
-    ]
+    "admin_exemption_configuration": "Trusted database owner/operator only; no service-role private schema usage or exemption table CRUD"
   }
 }

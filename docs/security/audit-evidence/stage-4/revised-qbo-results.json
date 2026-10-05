@@ -1,0 +1,251 @@
+{
+  "runId": 37260917737,
+  "jobId": 111607770629,
+  "scope": "Structured QBO candidate results from completed CI; canonical shape includes audit migrations, historical Production shape does not.",
+  "outcomes": [
+    {
+      "shape": "canonical",
+      "file": "supabase/tests/qbo_customer_oauth_completion.test.sql",
+      "sha256": "f0d100e561cad006a471f97ab6763d56acbc6d2bfec1d41545cf8b279a911753",
+      "passed": false,
+      "assertions": 44,
+      "executedSqlSha256": "f0d100e561cad006a471f97ab6763d56acbc6d2bfec1d41545cf8b279a911753",
+      "protocolRequests": 2,
+      "error": {
+        "code": "40001",
+        "message": "qbo_customer_disconnect_stale",
+        "where": "PL/pgSQL function public.complete_qbo_customer_disconnect_v1(uuid,uuid,text) line 7 at RAISE"
+      }
+    },
+    {
+      "shape": "canonical",
+      "file": "supabase/tests/external_integrations_qbo_ongoing_sync.test.sql",
+      "sha256": "eda89088b46a585d82899fd88f830316ae7867a3468e32db26048a6d0d85afb5",
+      "passed": true,
+      "assertions": 35,
+      "executedSqlSha256": "e2234809fd9d540a0051df012b98885b16c839585b031b073bf001f9fbc04ba4",
+      "protocolRequests": 1
+    },
+    {
+      "shape": "canonical",
+      "file": "supabase/tests/qbo_customer_source_browse.test.sql",
+      "sha256": "6188d85bb197d2791d01addd2109e2022949cb306d563d7876a4440bb0c24ef7",
+      "passed": true,
+      "assertions": 45,
+      "executedSqlSha256": "65972909ed95c359c9c693d209e9aaf465ae988423b2e5dbdecba630e3b536ae",
+      "protocolRequests": 1
+    },
+    {
+      "shape": "canonical",
+      "file": "supabase/tests/qbo_production_source_validation.test.sql",
+      "sha256": "19ef01c530b1774618207ef17922783aecbf620d2217fc2c6cec05c22b340cb3",
+      "passed": true,
+      "assertions": 84,
+      "executedSqlSha256": "fab1437cc34a452524dbc2965e52df4a00489adf7912c6e43e3a75b827f6c319",
+      "protocolRequests": 1
+    },
+    {
+      "shape": "canonical",
+      "file": "supabase/tests/qbo_production_accounting_intake.test.sql",
+      "sha256": "32213d70fa54a3c58aef9e9a581d89208d4b436d848c3db915b5f1192a37d9ac",
+      "passed": true,
+      "assertions": 23,
+      "executedSqlSha256": "7c1bfc0ce8eba7968936137046d7ebfe48b0142fbde46a5d5208da605a831753",
+      "protocolRequests": 1
+    },
+    {
+      "shape": "canonical",
+      "file": "supabase/tests/external_integrations_phase_3_deterministic_dependencies.test.sql",
+      "sha256": "dbe893f874268f1bf8aafcdbf33592af2c7e5a171836225193b75b7ef563f5fd",
+      "passed": true,
+      "assertions": 50,
+      "executedSqlSha256": "dbe893f874268f1bf8aafcdbf33592af2c7e5a171836225193b75b7ef563f5fd",
+      "protocolRequests": 1
+    },
+    {
+      "shape": "canonical",
+      "file": "supabase/tests/qbo_customer_dashboard_metadata.test.sql",
+      "sha256": "aad8efca4d639acc561e6e99fa860b8786c7f93f99cb27d161fcc671723c5da5",
+      "passed": true,
+      "assertions": 55,
+      "executedSqlSha256": "886b2b41438f39390287e9852e5eea24fabe2cff9888e7b5111f76c52b017f17",
+      "protocolRequests": 1
+    },
+    {
+      "shape": "canonical",
+      "file": "supabase/tests/integration_summary_preferences.test.sql",
+      "sha256": "38ecdaa35badeba30e9879ff09504c23e231fc7d40ec6d56344b00622e24b9db",
+      "passed": true,
+      "assertions": 45,
+      "executedSqlSha256": "38ecdaa35badeba30e9879ff09504c23e231fc7d40ec6d56344b00622e24b9db",
+      "protocolRequests": 1
+    },
+    {
+      "shape": "canonical",
+      "file": "supabase/tests/workspace_reporting_timezone.test.sql",
+      "sha256": "6b0575146d33fd16d3b239acbdbbdd06950a3175816dd5d71548d05e325247fc",
+      "passed": true,
+      "assertions": 33,
+      "executedSqlSha256": "6b0575146d33fd16d3b239acbdbbdd06950a3175816dd5d71548d05e325247fc",
+      "protocolRequests": 1
+    },
+    {
+      "shape": "canonical",
+      "file": "canonical_square_identity_dependency_denial",
+      "sha256": "db81fc308477e216f6a72978ee93cf255a3ba43f24d03f2f37b605f58447d65b",
+      "passed": true,
+      "assertions": 3,
+      "executedSqlSha256": "db81fc308477e216f6a72978ee93cf255a3ba43f24d03f2f37b605f58447d65b",
+      "protocolRequests": 1
+    },
+    {
+      "shape": "canonical",
+      "file": "native_scheduler_concurrency",
+      "passed": true,
+      "assertions": 5
+    },
+    {
+      "shape": "canonical",
+      "file": "native_accounting_qualification",
+      "sha256": "7a66d74af4f00912f33989c037a4737db63d646507af98faf28dd03d2dbdb3ad",
+      "passed": true,
+      "assertions": 215
+    },
+    {
+      "shape": "canonical",
+      "file": "scripts/qbo-pending-connection-database-tests.cjs",
+      "sha256": "43d75f4d43aaefcd0f1634a09cdb6845d1498957d5bd4b8f6633fed0aee766d1",
+      "passed": true,
+      "assertions": 14
+    },
+    {
+      "shape": "canonical",
+      "file": "scripts/qbo-pending-cancellation-eligibility-database-tests.cjs",
+      "sha256": "51cb4385901d93cfec028af6500d92a098bcf7aa7ad877adbe47090e757bf753",
+      "passed": false,
+      "assertions": 0,
+      "error": {
+        "code": "42501",
+        "message": "workspace_subscription_required",
+        "where": "PL/pgSQL function private.guard_workspace_mutation_entitlement_v1() line 18 at RAISE"
+      }
+    },
+    {
+      "shape": "production",
+      "file": "supabase/tests/qbo_customer_oauth_completion.test.sql",
+      "sha256": "f0d100e561cad006a471f97ab6763d56acbc6d2bfec1d41545cf8b279a911753",
+      "passed": true,
+      "assertions": 63,
+      "executedSqlSha256": "f0d100e561cad006a471f97ab6763d56acbc6d2bfec1d41545cf8b279a911753",
+      "protocolRequests": 2
+    },
+    {
+      "shape": "production",
+      "file": "supabase/tests/external_integrations_qbo_ongoing_sync.test.sql",
+      "sha256": "eda89088b46a585d82899fd88f830316ae7867a3468e32db26048a6d0d85afb5",
+      "passed": true,
+      "assertions": 35,
+      "executedSqlSha256": "e2234809fd9d540a0051df012b98885b16c839585b031b073bf001f9fbc04ba4",
+      "protocolRequests": 1
+    },
+    {
+      "shape": "production",
+      "file": "supabase/tests/qbo_customer_source_browse.test.sql",
+      "sha256": "6188d85bb197d2791d01addd2109e2022949cb306d563d7876a4440bb0c24ef7",
+      "passed": true,
+      "assertions": 45,
+      "executedSqlSha256": "65972909ed95c359c9c693d209e9aaf465ae988423b2e5dbdecba630e3b536ae",
+      "protocolRequests": 1
+    },
+    {
+      "shape": "production",
+      "file": "supabase/tests/qbo_production_source_validation.test.sql",
+      "sha256": "19ef01c530b1774618207ef17922783aecbf620d2217fc2c6cec05c22b340cb3",
+      "passed": true,
+      "assertions": 84,
+      "executedSqlSha256": "fab1437cc34a452524dbc2965e52df4a00489adf7912c6e43e3a75b827f6c319",
+      "protocolRequests": 1
+    },
+    {
+      "shape": "production",
+      "file": "supabase/tests/qbo_production_accounting_intake.test.sql",
+      "sha256": "32213d70fa54a3c58aef9e9a581d89208d4b436d848c3db915b5f1192a37d9ac",
+      "passed": true,
+      "assertions": 23,
+      "executedSqlSha256": "7c1bfc0ce8eba7968936137046d7ebfe48b0142fbde46a5d5208da605a831753",
+      "protocolRequests": 1
+    },
+    {
+      "shape": "production",
+      "file": "supabase/tests/external_integrations_phase_3_deterministic_dependencies.test.sql",
+      "sha256": "dbe893f874268f1bf8aafcdbf33592af2c7e5a171836225193b75b7ef563f5fd",
+      "passed": true,
+      "assertions": 50,
+      "executedSqlSha256": "dbe893f874268f1bf8aafcdbf33592af2c7e5a171836225193b75b7ef563f5fd",
+      "protocolRequests": 1
+    },
+    {
+      "shape": "production",
+      "file": "supabase/tests/qbo_customer_dashboard_metadata.test.sql",
+      "sha256": "aad8efca4d639acc561e6e99fa860b8786c7f93f99cb27d161fcc671723c5da5",
+      "passed": true,
+      "assertions": 55,
+      "executedSqlSha256": "886b2b41438f39390287e9852e5eea24fabe2cff9888e7b5111f76c52b017f17",
+      "protocolRequests": 1
+    },
+    {
+      "shape": "production",
+      "file": "supabase/tests/integration_summary_preferences.test.sql",
+      "sha256": "38ecdaa35badeba30e9879ff09504c23e231fc7d40ec6d56344b00622e24b9db",
+      "passed": true,
+      "assertions": 45,
+      "executedSqlSha256": "38ecdaa35badeba30e9879ff09504c23e231fc7d40ec6d56344b00622e24b9db",
+      "protocolRequests": 1
+    },
+    {
+      "shape": "production",
+      "file": "supabase/tests/workspace_reporting_timezone.test.sql",
+      "sha256": "6b0575146d33fd16d3b239acbdbbdd06950a3175816dd5d71548d05e325247fc",
+      "passed": true,
+      "assertions": 33,
+      "executedSqlSha256": "6b0575146d33fd16d3b239acbdbbdd06950a3175816dd5d71548d05e325247fc",
+      "protocolRequests": 1
+    },
+    {
+      "shape": "production",
+      "file": "supabase/tests/square_customer_browse_identity.test.sql",
+      "sha256": "f340653231f65dcbbc68191c102d9b31e963ffa5730a79343b3ec14772d362d9",
+      "passed": true,
+      "assertions": 33,
+      "executedSqlSha256": "bea4f06a80e5f3fcde394438222f3e76d116c408062ce7530848e29f929daad6",
+      "protocolRequests": 1
+    },
+    {
+      "shape": "production",
+      "file": "native_scheduler_concurrency",
+      "passed": true,
+      "assertions": 5
+    },
+    {
+      "shape": "production",
+      "file": "native_accounting_qualification",
+      "sha256": "7a66d74af4f00912f33989c037a4737db63d646507af98faf28dd03d2dbdb3ad",
+      "passed": true,
+      "assertions": 215
+    },
+    {
+      "shape": "production",
+      "file": "scripts/qbo-pending-connection-database-tests.cjs",
+      "sha256": "43d75f4d43aaefcd0f1634a09cdb6845d1498957d5bd4b8f6633fed0aee766d1",
+      "passed": true,
+      "assertions": 14
+    },
+    {
+      "shape": "production",
+      "file": "scripts/qbo-pending-cancellation-eligibility-database-tests.cjs",
+      "sha256": "51cb4385901d93cfec028af6500d92a098bcf7aa7ad877adbe47090e757bf753",
+      "passed": true,
+      "assertions": 19
+    }
+  ]
+}

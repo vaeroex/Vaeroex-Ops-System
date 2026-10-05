@@ -46,34 +46,6 @@
       "status": "pass"
     },
     {
-      "name": "entitled owner can insert own workspace storage metadata",
-      "status": "pass"
-    },
-    {
-      "name": "entitled owner can update own workspace storage metadata",
-      "status": "pass"
-    },
-    {
-      "name": "owner cannot move storage metadata into a foreign workspace",
-      "status": "pass"
-    },
-    {
-      "name": "owner cannot insert foreign workspace storage metadata",
-      "status": "pass"
-    },
-    {
-      "name": "malformed workspace storage path is denied",
-      "status": "pass"
-    },
-    {
-      "name": "entitled staff can insert own workspace storage metadata",
-      "status": "pass"
-    },
-    {
-      "name": "viewer cannot insert workspace storage metadata",
-      "status": "pass"
-    },
-    {
       "name": "client cannot forge trusted security events",
       "status": "pass"
     },
@@ -178,27 +150,7 @@
       "status": "pass"
     },
     {
-      "name": "expired owner disconnect reaches actual connection projection writer",
-      "status": "pass"
-    },
-    {
-      "name": "expired owner withdrawal reaches actual freshness projection writer",
-      "status": "pass"
-    },
-    {
-      "name": "authenticated direct integration_connection_summaries insert remains denied",
-      "status": "pass"
-    },
-    {
-      "name": "authenticated direct integration_connection_summaries update remains denied",
-      "status": "pass"
-    },
-    {
-      "name": "authenticated direct integration_freshness_summaries insert remains denied",
-      "status": "pass"
-    },
-    {
-      "name": "authenticated direct integration_freshness_summaries update remains denied",
+      "name": "private disconnect update remains available after expiry (trigger scope only)",
       "status": "pass"
     },
     {
@@ -215,10 +167,6 @@
     },
     {
       "name": "future workspace trial",
-      "status": "pass"
-    },
-    {
-      "name": "entitled owner can refresh both recovery projections",
       "status": "pass"
     },
     {
