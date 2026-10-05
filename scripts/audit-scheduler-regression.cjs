@@ -96,7 +96,10 @@ async function scenario(name, count, durationMs, options={}) {
   const recovered=results.find(r=>r.name==='failed-backoff-head-blocking');
   assert.equal(recovered.healthyAttempts,10,'healthy workspaces must progress despite failed backoff');
   assert.equal(recovered.workspacesServed,10);
-  assert.equal(results.find(r=>r.name==='burst-100-500ms').ticks[0].attempted,50,'preserve bounded tick budget');
+  assert.equal(results.find(r=>r.name==='burst-100-500ms').ticks[0].attempted,100,'serve the bounded 100-workspace burst');
+  const bounded=await scenario('burst-150-attempt-bound',150,500);
+  assert.equal(bounded.ticks[0].attempted,100,'preserve bounded tick budget');
+  assert.equal(bounded.ticks[0].pendingDue,50); results.push(bounded);
   clearTimeout(watchdog);
   console.log(JSON.stringify({sourcePath,sourceSha256:createHash('sha256').update(source).digest('hex'),thresholds,executedAt:new Date().toISOString(),
     runtime:{node:process.version,platform:process.platform,arch:process.arch},wallElapsedMs:performance.now()-started,rssBytes:process.memoryUsage().rss,

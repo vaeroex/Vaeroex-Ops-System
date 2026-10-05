@@ -62,6 +62,7 @@ jobs:
           WORKSPACE_AUDIT_PG_BIN="$audit_pg_bin" pnpm test:workspace-audit:database
           ISSUE_TEST_PG_BIN="$audit_pg_bin" node scripts/issue-submission-native-tests.cjs
           SHEETS_TEST_PG_BIN="$audit_pg_bin" node scripts/google-sheets-dispatch-native-tests.cjs
+          SHEETS_TEST_PG_BIN="$audit_pg_bin" node scripts/google-sheets-dispatch-fairness-native-tests.cjs
           SHEETS_TEST_PG_BIN="$audit_pg_bin" node scripts/google-sheets-recovery-continuation-native-tests.cjs
           SHEETS_TEST_PG_BIN="$audit_pg_bin" node scripts/google-sheets-failure-cleanup-native-tests.cjs
 

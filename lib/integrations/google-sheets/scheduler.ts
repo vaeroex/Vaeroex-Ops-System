@@ -7,7 +7,9 @@ export type DueSheetsConnection = { id: string; workspace_id: string };
 // Matches the authoritative SQL admission budget. This is a per-invocation
 // bound; the database also covers overlapping schedulers and manual refreshes.
 export const SHEETS_SCHEDULER_CONCURRENCY = 4;
-export const SHEETS_SCHEDULER_MAX_ATTEMPTS = 50;
+// Bound one tick to the 100-workspace target; concurrency and useful-work
+// deadline remain unchanged. SQL maintains tenant order across due pages.
+export const SHEETS_SCHEDULER_MAX_ATTEMPTS = 100;
 
 export type SheetsScheduledAdmission = { run: <T>(claim: () => Promise<T>) => Promise<T> };
 

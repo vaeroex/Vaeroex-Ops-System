@@ -206,9 +206,9 @@ async function main() {
   assert.equal(validSheetsSchedulerSecret('Bearer wrong', schedulerSecret), false);
   assert.equal(validSheetsSchedulerSecret(null, schedulerSecret), false);
   assert.equal(validSheetsSchedulerSecret('Bearer short', 'short'), false); checks+=4;
-  // One tick drains fresh pages, never exceeds 50 attempts, and stops at its deadline.
+  // One tick drains fresh pages, never exceeds 100 attempts, and stops at its deadline.
   let clock = Date.parse('2026-10-02T12:00:00.000Z'), dueCalls = 0;
-  const remaining = Array.from({ length: 61 }, () => ({ id: randomUUID(), workspace_id: ws }));
+  const remaining = Array.from({ length: 111 }, () => ({ id: randomUUID(), workspace_id: ws }));
   const original = [...remaining], attempted = [];
   const batchResult = await runDueSheetsRefreshes({ now: () => clock,
     due: async (tickAt, limit, _deadline, excluded) => { dueCalls++; assert.equal(limit, 10); assert.equal(tickAt, '2026-10-02T12:00:00.000Z'); return remaining.filter(c => !excluded.includes(c.id)).slice(0, limit); },
@@ -218,8 +218,8 @@ async function main() {
       attempted.push(connection.id); remaining.splice(remaining.findIndex(item => item.id === connection.id), 1); clock += 1000; },
     backoff: async () => { throw Error('Unexpected backoff'); }
   });
-  assert.deepEqual(batchResult, { attempted: 50, succeeded: 50, failed: 0, deferred: 0, backoffFailed: 0, peakActive: 1, admissionRpcAttempts: 0, admissionRetries: 0, admissionWaitMs: 0 });
-  assert.equal(dueCalls, 5); assert.equal(new Set(attempted).size, 50); assert.equal(remaining.length, 11); checks+=4;
+  assert.deepEqual(batchResult, { attempted: 100, succeeded: 100, failed: 0, deferred: 0, backoffFailed: 0, peakActive: 1, admissionRpcAttempts: 0, admissionRetries: 0, admissionWaitMs: 0 });
+  assert.equal(dueCalls, 10); assert.equal(new Set(attempted).size, 100); assert.equal(remaining.length, 11); checks+=4;
   // A persistence outage can leave the same rows due; do not loop on them.
   let retries = 0, backoffs = 0, repeatedQueries = 0;
   const repeated = original.slice(0, 10);
