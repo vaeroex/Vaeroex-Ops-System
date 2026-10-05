@@ -173,7 +173,7 @@
     "test:google-sheets-ui": "node scripts/google-sheets-ui-browser-tests.cjs",
     "test:workspace-audit": "node scripts/workspace-security-helper-tests.cjs && node scripts/audit-import-evidence-fixes.cjs && node scripts/audit-import-finalization.cjs && node scripts/audit-principal-parent-regression.cjs && node scripts/audit-health-trend-regression.cjs && node scripts/audit-cost-regression.cjs && node scripts/audit-scheduler-regression.cjs && node scripts/workspace-workflow-tests.cjs && node scripts/workspace-import-recovery-tests.cjs && node scripts/workspace-closeout-egress-tests.cjs && node scripts/workspace-closeout-local-stack-tests.cjs",
     "test:workspace-audit:database": "node scripts/workspace-security-database-tests.cjs && node scripts/workspace-asset-chronology-database-tests.cjs && node scripts/workspace-memory-publication-tests.cjs && node scripts/internal-form-idempotency-tests.cjs && node scripts/workspace-import-attempt-database-tests.cjs",
-    "test:workspace-audit:browser": "node scripts/workspace-workflow-browser-tests.cjs && node scripts/workspace-action-completion-runtime-tests.cjs"
+    "test:workspace-audit:browser": "node scripts/workspace-workflow-browser-tests.cjs && node scripts/workspace-action-completion-runtime-tests.cjs && node scripts/workspace-hydration-replay-tests.cjs"
   },
   "dependencies": {
     "@pdf-lib/fontkit": "1.1.1",

@@ -30,7 +30,7 @@ const db = new Client({ connectionString: config.dbUrl, ssl: false, connectionTi
 const executionId = randomUUID();
 const prefix = `CLOSEOUT ${config.runId.slice(0, 8)} ${executionId.slice(0,8)}`;
 let app, browser, stage = 'seed', buildLog = '', appLog = '';
-let appOrigin;
+let appOrigin, pageSequence = 0;
 let sourceStart, sourceBuilt, sourceEnd;
 const sourceManifest = () => { const files = spawnSync('git',['ls-files','-co','--exclude-standard'],{cwd:root,encoding:'utf8'}).stdout.trim().split('\n').filter(p=>!['docs/','scripts/','supabase/','.github/','services/','tools/'].some(prefix=>p.startsWith(prefix))&&fs.existsSync(path.join(root,p))); return {head:spawnSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8'}).stdout.trim(),files:[...new Set(files)].sort().map(p=>({path:p,sha256:createHash('sha256').update(fs.readFileSync(path.join(root,p))).digest('hex')}))}; };
 const assertOwnedApp = () => { assert(app && app.exitCode===null && !app.signalCode, 'owned_app_exited'); };
@@ -49,9 +49,9 @@ async function context(actor, width) {
   assertOwnedApp(); const s = await session(actor); const c = await browser.newContext({ viewport: { width, height: 900 } }); await c.addCookies(s.cookies);
   await c.route('**/*', route => { const u = new URL(route.request().url()); return [appOrigin, new URL(config.apiUrl).origin].includes(u.origin) ? route.continue() : route.abort(); });
   const newPage = async () => {
-    const page = await c.newPage(); page.setDefaultTimeout(20000);
-    page.on('pageerror', e => browserErrors.push({ path: new URL(page.url()).pathname, message: sanitize(e.message), stack: sanitize(e.stack || '') }));
-    page.on('response', r => { const u = new URL(r.url()); if (u.origin === appOrigin && !u.pathname.startsWith('/_next')) requests.push({ path: u.pathname, method: r.request().method(), status: r.status() }); });
+    const page = await c.newPage(); const pageId = ++pageSequence; page.setDefaultTimeout(20000);
+    page.on('pageerror', e => browserErrors.push({ at: Date.now(), stage, pageId, path: new URL(page.url()).pathname, message: sanitize(e.message), stack: sanitize(e.stack || '') }));
+    page.on('response', r => { const u = new URL(r.url()); if (u.origin === appOrigin && !u.pathname.startsWith('/_next')) requests.push({ at: Date.now(), stage, pageId, path: u.pathname + u.search, resourceType: r.request().resourceType(), document: r.request().isNavigationRequest(), method: r.request().method(), status: r.status() }); });
     return page;
   };
   return { c, page: await newPage(), client: s.client, newPage };
