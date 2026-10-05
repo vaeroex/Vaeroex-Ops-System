@@ -66,7 +66,14 @@ async function submit(page, button, label, outcome, repeated = true) {
   const headers = await r.allHeaders();
   const feedback = new URL(page.url()).searchParams.get('message') || new URL(page.url()).searchParams.get('error');
   assert(feedback, 'saved_or_denied_feedback_required');
-  await page.getByRole('status').filter({ hasText: feedback }).waitFor({ timeout: 20000 });
+  if (/do not have permission|not authorized|not allowed|permission denied/i.test(feedback)) {
+    // These deliberate role denials use the existing security alert, not a toast.
+    await page.getByRole('alert').filter({ hasText: 'Action Blocked' }).last().waitFor({ timeout: 20000 });
+    await page.getByRole('alert').filter({ hasText: 'No changes were made.' }).last().waitFor();
+    await page.getByRole('button', { name: 'Return to workspace', exact: true }).waitFor();
+  } else {
+    await page.getByRole('status').filter({ hasText: feedback }).waitFor({ timeout: 20000 });
+  }
   await page.waitForFunction(() => !document.querySelector('button[aria-busy="true"]'), undefined, { timeout: 20000 });
   actionResponses.push({ label, status: r.status(), redirect: sanitize(headers['x-action-redirect']), destination: new URL(page.url()).pathname + new URL(page.url()).search, feedback, actionRequests: requests.filter(r => r.method === 'POST').length - before });
   result(label, { automatic: true, pendingCleared: true, feedbackVisible: true });

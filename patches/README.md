@@ -1,6 +1,6 @@
 # Next 15.5.24: synchronous render wakeup backport
 
-`next@15.5.24.patch` backports the retry-lane branch from [React PR #36134](https://github.com/facebook/react/pull/36134), “Fix pingSuspendedRoot to mark workInProgressRootPingedLanes when interrupted”, to the four standard vendored client/profiling renderers. Next bundles React `19.2.0-canary-0bdb9206-20250818`; changing the top-level React package does not update these renderers.
+`next@15.5.24.patch` backports the retry-lane branch from [React PR #36134](https://github.com/react/react/pull/36134), “Fix useDeferredValue getting stuck”, to the four standard vendored client/profiling renderers. Next bundles React `19.2.0-canary-0bdb9206-20250818`; changing the top-level React package does not update these renderers.
 
 A resource can resolve synchronously during a suspended render. Restarting the stack is prohibited inside render, but the old branch also discarded the retry lanes. An authenticated action could therefore persist, return its redirect and decode all Flight resources while the browser never committed the new page. This was reproduced on both the accepted pre-audit baseline and the proposed stack (VXA-039 / CL-01).
 
