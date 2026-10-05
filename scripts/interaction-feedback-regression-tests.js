@@ -139,13 +139,13 @@ function pendingFixture(run) {
       removeEventListener(type, fn) { if (type === "submit") listeners.delete(fn); },
     };
     const submitter = Object.assign(new Element(), { form });
-    let pending = false;
+    let pending = false, controlledPending;
     const { PendingSubmitButton } = loadSource("components/operations/PendingSubmitButton.tsx", {
       react: fixture.hooks,
       "react-dom": { useFormStatus: () => ({ pending }) },
       "@/components/app/ActivityProvider": activity,
     });
-    const render = () => fixture.render(PendingSubmitButton, { children: "Save", pendingLabel: "Saving...", className: "approved-style" });
+    const render = () => fixture.render(PendingSubmitButton, { children: "Save", pendingLabel: "Saving...", className: "approved-style", pendingOverride: controlledPending });
     const submit = (overrides = {}) => {
       const event = { submitter, defaultPrevented: false, preventDefault() { this.defaultPrevented = true; }, ...overrides };
       listeners.forEach((listener) => listener(event));
@@ -154,7 +154,7 @@ function pendingFixture(run) {
     try {
       button(render()).props.ref.current = submitter;
       fixture.effects();
-      return run({ fixture, render, submit, setPending(value) { pending = value; } });
+      return run({ fixture, render, submit, setPending(value) { pending = value; }, setControlledPending(value) { controlledPending = value; } });
     } finally { global.HTMLElement = previousElement; }
   });
 }
@@ -165,6 +165,23 @@ test("first submission is acknowledged and a repeated submit before render is bl
   const tree = render();
   assert.equal(button(tree).props.disabled, true);
   assert.match(content(tree), /Saving\.\.\./);
+}));
+
+test("controlled action pending keeps the capture lock when host form context resets", () => pendingFixture(({ fixture, render, submit, setPending, setControlledPending }) => {
+  setControlledPending(false);
+  assert.equal(submit().defaultPrevented, false, "The first legitimate submission still reaches the action");
+  setControlledPending(true);
+  setPending(true);
+  render(); fixture.effects();
+  setPending(false);
+  render(); fixture.effects();
+  assert.equal(button(render()).props.disabled, true, "A transient host-context false must not release the real action lock");
+  assert.equal(button(render()).props["aria-busy"], true);
+  assert.equal(submit().defaultPrevented, true);
+  setControlledPending(false);
+  render(); fixture.effects();
+  assert.equal(button(render()).props.disabled, false, "Only authoritative action completion unlocks the controlled caller");
+  assert.equal(submit().defaultPrevented, false, "A later intentional submission remains available");
 }));
 
 test("cancelled submissions do not lock the form", () => pendingFixture(({ render, submit }) => {
@@ -203,6 +220,8 @@ test("primary and analysis actions use the guarded submit control without changi
   const primary = PrimaryButton({ children: "Save KPI" });
   assert.equal(primary.type, PendingSubmitButton);
   assert.match(primary.props.className, /min-h-11 rounded-lg bg-vaeroex-blue/);
+  assert.equal(primary.props.pendingOverride, undefined, "Existing callers retain host-form pending behavior");
+  assert.equal(PrimaryButton({ children: "Save", pending: true }).props.pendingOverride, true);
   const { AnalysisProgressSubmit } = loadSource("components/operations/AnalysisProgressSubmit.tsx", {
     ...shared,
     react: fixture.hooks,

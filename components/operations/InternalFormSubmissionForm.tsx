@@ -1,12 +1,15 @@
 "use client";
 
-import { useState } from "react";
-import { createFormSubmissionAction } from "@/app/app/operations/actions";
+import { useActionState, useState } from "react";
+import { submitInternalForm } from "@/app/app/operations/form-submission-action";
 import { PrimaryButton, SelectInput, TextArea, TextInput } from "@/components/operations/FormControls";
 import { FORM_PRIORITIES, MAX_FIELD_LENGTH, parseSubmissionSchema, type SubmissionField } from "@/lib/forms/submission-schema";
 
 type FormChoice = { id: string; name: string; schema_json: unknown };
 export function InternalFormSubmissionForm({ forms, returnPath }: { forms: FormChoice[]; returnPath: string }) {
+  // Track the submitted action itself: host form context can transiently reset
+  // during a child render while its request is still in flight.
+  const [, submitForm, submissionPending] = useActionState(submitInternalForm, null);
   const [formId, setFormId] = useState(forms[0]?.id || "");
   const selected = forms.find((form) => form.id === formId);
   let fields: SubmissionField[] = [];
@@ -14,7 +17,7 @@ export function InternalFormSubmissionForm({ forms, returnPath }: { forms: FormC
   try { fields = parseSubmissionSchema(selected?.schema_json); }
   catch (error) { schemaError = error instanceof Error ? error.message : "This form cannot accept responses."; }
   return (
-    <form action={createFormSubmissionAction} className="grid gap-4 lg:grid-cols-2">
+    <form action={submitForm} className="grid gap-4 lg:grid-cols-2">
       <input type="hidden" name="return_path" value={returnPath} />
       {forms.length > 1 ? (
         <label className="block text-sm font-medium">Form
@@ -44,7 +47,7 @@ export function InternalFormSubmissionForm({ forms, returnPath }: { forms: FormC
           <SelectInput label="Priority" name="priority" defaultValue="Medium" options={FORM_PRIORITIES} />
           <div className="lg:col-span-2"><TextArea label="Submission summary" name="summary" required rows={4} /></div>
           <div className="lg:col-span-2"><TextArea label="Signals or evidence, one per line" name="follow_up" rows={4} /></div>
-          <div className="lg:col-span-2"><PrimaryButton>Save submission</PrimaryButton></div>
+          <div className="lg:col-span-2"><PrimaryButton pending={submissionPending}>Save submission</PrimaryButton></div>
         </>
       )}
     </form>
