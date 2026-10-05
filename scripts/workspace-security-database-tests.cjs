@@ -73,6 +73,29 @@ async function actor(c,n,role="authenticated") {
   if(role!=="postgres") await c.query(`set role ${role}`);
 }
 async function admin(c) { await actor(c,0,"postgres"); }
+async function projectionFixture(c) {
+  const source=read("20260821201220_external_integrations_phase_4_control_plane.sql");
+  // Column shapes, SELECT policies, and both complete AFTER writers come from
+  // source. This focused fixture does not replay all provider validators/RPCs.
+  for(const [summary,backing,label] of [
+    ["integration_connection_summaries","integration_connections","connection"],
+    ["integration_freshness_summaries","integration_freshness_states","freshness"]
+  ]) {
+    const ddl=table(summary,source);
+    const columns=[...ddl.matchAll(/^  ([a-z_]+) (uuid|text\[\]|text|jsonb|bigint|timestamptz)\b/gm)].map(m=>[m[1],m[2]]);
+    // The word boundary does not consume the closing bracket in text[].
+    for(const column of columns)if(new RegExp(`^  ${column[0]} text\\[\\]`,'m').test(ddl))column[1]='text[]';
+    assert(columns.length>=19,`projection column fixture incomplete: ${summary}`);
+    const definition=columns.map(([name,type])=>`${name} ${type}${name==='id'?' primary key':''}`).join(',');
+    await c.query(`create table public.${summary}(${definition});alter table public.${summary} enable row level security;alter table public.${summary} force row level security;revoke all on public.${summary} from public,anon,authenticated,service_role;grant select on public.${summary} to authenticated`);
+    await c.query(policy(`workspace members read integration ${label} summaries`,source));
+    if(backing==='integration_connections') {
+      for(const [name,type] of columns.filter(([name])=>!['id','workspace_id','status'].includes(name)))await c.query(`alter table private.${backing} add column ${name} ${type}`);
+    } else await c.query(`create table private.${backing}(${definition})`);
+    await c.query(must(new RegExp(`create or replace function private\\.sync_integration_${label}_summary_v1\\(\\)[\\s\\S]*?\\n\\$function\\$;`),source));
+    await c.query(must(new RegExp(`create trigger sync_integration_${label}_summary_v1[\\s\\S]*?;`),source));
+  }
+}
 async function fixture(c) {
   await c.query(`create role authenticated; create role anon; create role service_role bypassrls;
     create schema auth; create schema storage; create schema private;
@@ -127,6 +150,7 @@ async function fixture(c) {
   await c.query(policy("security audit events contributors create",high));
   for(const n of ["workspace files members read"]) await c.query(policy(n,files));
   for(const n of ["workspace files contributors insert","workspace files contributors update"]) await c.query(policy(n,high));
+  await projectionFixture(c);
   await c.query(`create function public.synthetic_definer_write(p_workspace uuid) returns void language plpgsql security definer set search_path='' as $$begin insert into public.tasks(workspace_id,title) values(p_workspace,'Synthetic definer'); end$$;
     grant execute on function public.synthetic_definer_write(uuid) to authenticated;
     insert into profiles(id,email) values ${[1,2,3,4,5,6,7].map(n=>`('${user(n)}','synthetic${n}@example.invalid')`).join(",")};
@@ -152,6 +176,19 @@ async function tests(c) {
   pass("historical mismatched asset row retained",(await c.query(`select count(*)::int n from asset_checks where id='${check(99)}'`)).rows[0].n,1);
   pass("tenant FK remains NOT VALID pending historical review",(await c.query("select convalidated from pg_constraint where conname='asset_checks_workspace_asset_fkey'")).rows[0].convalidated,false);
   pass("form tenant FK remains NOT VALID pending historical review",(await c.query("select convalidated from pg_constraint where conname='form_submissions_workspace_form_fkey'")).rows[0].convalidated,false);
+  await actor(c,1);
+  await c.query(`insert into storage.objects(bucket_id,name) values('workspace-files','${A}/owner-upload')`);
+  results.push({name:"entitled owner can insert own workspace storage metadata",status:"pass"});
+  await c.query(`update storage.objects set name='${A}/owner-renamed' where bucket_id='workspace-files' and name='${A}/owner-upload'`);
+  pass("entitled owner can update own workspace storage metadata",(await c.query(`select count(*)::int n from storage.objects where name='${A}/owner-renamed'`)).rows[0].n,1);
+  await denied(c,"owner cannot move storage metadata into a foreign workspace",`update storage.objects set name='${B}/foreign-move' where bucket_id='workspace-files' and name='${A}/owner-renamed'`);
+  await denied(c,"owner cannot insert foreign workspace storage metadata",`insert into storage.objects(bucket_id,name) values('workspace-files','${B}/foreign-upload')`);
+  await denied(c,"malformed workspace storage path is denied",`insert into storage.objects(bucket_id,name) values('workspace-files','invalid-workspace/upload')`);
+  await actor(c,2);
+  await c.query(`insert into storage.objects(bucket_id,name) values('workspace-files','${A}/staff-upload')`);
+  results.push({name:"entitled staff can insert own workspace storage metadata",status:"pass"});
+  await actor(c,3);
+  await denied(c,"viewer cannot insert workspace storage metadata",`insert into storage.objects(bucket_id,name) values('workspace-files','${A}/viewer-upload')`);
   await actor(c,1);
   await denied(c,"client cannot forge trusted security events",`insert into security_audit_events(workspace_id,user_id,action_name,operation_type,initiated_by,allowed) values('${A}','${user(2)}','Forged','SYSTEM','user',false)`);
   await admin(c);
@@ -203,9 +240,20 @@ async function tests(c) {
     await c.query(`create function public.synthetic_${n}() returns void language plpgsql security definer set search_path='' as $$begin insert into private.${n}(workspace_id) values('${A}'); end$$;grant execute on function public.synthetic_${n}() to authenticated;`);
     await actor(c,1); await denied(c,`expired private ${n} insert blocked through definer`,`select synthetic_${n}()`); await admin(c);
   }
-  await c.query(`insert into private.integration_connections(workspace_id) values('${A}'); create function public.synthetic_disconnect() returns void language plpgsql security definer set search_path='' as $$begin update private.integration_connections set status='disconnecting' where workspace_id='${A}'; end$$; grant execute on function public.synthetic_disconnect() to authenticated;`);
+  await c.query(`insert into private.integration_connections(workspace_id) values('${A}');
+    insert into private.integration_freshness_states(id,workspace_id,status) values(gen_random_uuid(),'${A}','current');
+    create function public.synthetic_disconnect() returns void language plpgsql security definer set search_path='' as $$begin
+      if not public.can_edit_operations('${A}') then raise exception 'synthetic_disconnect_denied' using errcode='42501';end if;
+      update private.integration_connections set status='disconnecting' where workspace_id='${A}';
+      update private.integration_freshness_states set status='disconnected',blocking_level='all_derived' where workspace_id='${A}';
+    end$$; grant execute on function public.synthetic_disconnect() to authenticated;`);
   await actor(c,1); await c.query("select synthetic_disconnect()");
-  results.push({name:"private disconnect update remains available after expiry (trigger scope only)",status:"pass"});
+  pass("expired owner disconnect reaches actual connection projection writer",(await c.query(`select status from integration_connection_summaries where workspace_id='${A}'`)).rows[0].status,"disconnecting");
+  pass("expired owner withdrawal reaches actual freshness projection writer",(await c.query(`select status,blocking_level from integration_freshness_summaries where workspace_id='${A}'`)).rows[0],{status:"disconnected",blocking_level:"all_derived"});
+  for(const summary of ["integration_connection_summaries","integration_freshness_summaries"]) {
+    await denied(c,`authenticated direct ${summary} insert remains denied`,`insert into public.${summary}(id,workspace_id,status) values(gen_random_uuid(),'${A}','active')`);
+    await denied(c,`authenticated direct ${summary} update remains denied`,`update public.${summary} set status='active' where workspace_id='${A}'`);
+  }
   await denied(c,"expired storage metadata insert denied",`insert into storage.objects(bucket_id,name) values('workspace-files','${A}/file')`);
   pass("expired direct update has no persisted result",(await c.query(`update tasks set title='Expired update' where workspace_id='${A}' returning id`)).rowCount,0);
   pass("expired delete preserves history",(await c.query(`delete from tasks where workspace_id='${A}' returning id`)).rowCount,0);
@@ -221,6 +269,12 @@ async function tests(c) {
     await actor(c,1); const sql=`insert into tasks(workspace_id,title) values('${A}','Matrix')`;
     if(t.allowed) { await c.query(sql); results.push({name:t.name,status:"pass"}); }
     else await denied(c,t.name,sql);
+    if(t.name==="future workspace trial") {
+      await c.query("select synthetic_disconnect()");
+      pass("entitled owner can refresh both recovery projections",(await c.query(`select
+        (select status='disconnecting' from integration_connection_summaries where workspace_id='${A}') connection_ok,
+        (select status='disconnected' from integration_freshness_summaries where workspace_id='${A}') freshness_ok`)).rows[0],{connection_ok:true,freshness_ok:true});
+    }
   }
   await admin(c);
   await c.query(`update workspaces set manually_unlocked=true,subscription_status='demo',subscription_required=false where id='${A}';

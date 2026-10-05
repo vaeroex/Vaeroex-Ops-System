@@ -202,25 +202,22 @@ select ok(
   (select relrowsecurity and relforcerowsecurity from pg_class where oid = 'public.business_entities'::regclass),
   'Business Entities have forced RLS'
 );
-select results_eq(
-  $$select policyname::text, cmd::text, roles::text
+select ok(
+  (select jsonb_agg(jsonb_build_array(policyname, cmd, roles::text) order by policyname collate "C")
     from pg_policies
     where schemaname = 'public' and tablename = 'business_entities'
-      and permissive = 'PERMISSIVE'
-    order by policyname$$,
-  $$values ('workspace members read business entities'::text, 'SELECT'::text, '{authenticated}'::text)$$,
+      and permissive = 'PERMISSIVE')
+    = '[["workspace members read business entities", "SELECT", "{authenticated}"]]'::jsonb,
   'Business Entities retain exactly the original permissive member-read policy'
 );
-select results_eq(
-  $$select policyname::text, cmd::text, roles::text
+select ok(
+  (select jsonb_agg(jsonb_build_array(policyname, cmd, roles::text) order by policyname collate "C")
     from pg_policies
     where schemaname = 'public' and tablename = 'business_entities'
-      and permissive = 'RESTRICTIVE'
-    order by policyname$$,
-  $$values
-    ('audit_entitled_delete'::text, 'DELETE'::text, '{authenticated}'::text),
-    ('audit_entitled_insert'::text, 'INSERT'::text, '{authenticated}'::text),
-    ('audit_entitled_update'::text, 'UPDATE'::text, '{authenticated}'::text)$$,
+      and permissive = 'RESTRICTIVE')
+    = '[["audit_entitled_delete", "DELETE", "{authenticated}"],
+        ["audit_entitled_insert", "INSERT", "{authenticated}"],
+        ["audit_entitled_update", "UPDATE", "{authenticated}"]]'::jsonb,
   'Business Entities add only the three restrictive authenticated entitlement guards'
 );
 select ok(

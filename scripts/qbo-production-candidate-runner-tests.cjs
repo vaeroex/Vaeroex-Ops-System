@@ -25,9 +25,9 @@ assert.match(candidateRunner, /outcome\.assertions = await require\('\.\/qbo-pen
   'eligibility tests use the owned per-suite database clone'); assertions++;
 assert.match(candidateRunner, /assert\.equal\(outcome\.assertions, suite\.expectedScenarios/, 'incomplete native coverage fails the candidate run'); assertions++;
 assert.match(candidateRunner, /result\.suites\.length === shapeSuites\.length \+ 4/, 'candidate success requires the registered dashboard suites and all four existing native suites'); assertions++;
-assert.match(candidateRunner, /assert\.equal\(canonical\.length, 123,/, 'canonical count remains exact'); assertions++;
-assert.match(candidateRunner, /'20261002040024_google_sheets_complete\.sql',\s*'20261002040031_google_sheets_lifecycle\.sql',\s*'20261002182049_integration_summary_preferences\.sql',/,
-  'canonical tail remains the two Sheets migrations plus preferences'); assertions++;
+assert.match(candidateRunner, /assert\.equal\(canonical\.length, 125,/, 'canonical count remains exact'); assertions++;
+assert.match(candidateRunner, /'20261002040024_google_sheets_complete\.sql',\s*'20261002040031_google_sheets_lifecycle\.sql',\s*'20261002182049_integration_summary_preferences\.sql',\s*'20261005022017_workspace_security_boundaries\.sql',\s*'20261005022445_workspace_persisted_usage_limits\.sql',\s*\]/,
+  'canonical tail remains exactly the two Sheets migrations, preferences and both audit migrations'); assertions++;
 assert.match(candidateRunner, /assert\.equal\(prefix\.length, 104,/, 'production baseline remains exactly 104'); assertions++;
 assert.ok(candidateRunner.indexOf('for (const item of qbo) await apply(item);')
   < candidateRunner.indexOf("assert.equal(await squareCatalog(client), before")); assertions++;

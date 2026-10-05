@@ -100,6 +100,9 @@ revoke all on function private.guard_workspace_mutation_entitlement_v1() from pu
 -- Apply only to existing tenant tables with RLS. No permissive policies or
 -- grants are added. Support/entitlement records are recovery surfaces, not
 -- operational data. New tables must receive the same restrictions explicitly.
+-- The two integration summaries are SELECT-only customer projections. Their
+-- existing private AFTER triggers must publish disconnect/freshness withdrawal
+-- after expiry; private connection/OAuth INSERT guards still enforce admission.
 do $$
 declare item record;
 begin
@@ -108,7 +111,8 @@ begin
     where n.nspname='public' and c.relkind='r' and c.relrowsecurity
       and a.atttypid='uuid'::regtype and c.relname not in
         ('support_requests','customer_subscriptions','subscription_events','security_audit_events',
-         'manual_activation_requests','stripe_checkout_intents','workspace_agreements')
+         'manual_activation_requests','stripe_checkout_intents','workspace_agreements',
+         'integration_connection_summaries','integration_freshness_summaries')
   loop
     execute format('create policy audit_entitled_insert on public.%I as restrictive for insert to authenticated with check (private.workspace_mutation_entitled_v1(workspace_id))',item.relname);
     execute format('create policy audit_entitled_update on public.%I as restrictive for update to authenticated using (private.workspace_mutation_entitled_v1(workspace_id)) with check (private.workspace_mutation_entitled_v1(workspace_id))',item.relname);
@@ -138,7 +142,9 @@ create trigger audit_workspace_entitlement before insert on private.integration_
   for each row execute function private.guard_workspace_mutation_entitlement_v1('workspace_id');
 
 create function private.workspace_storage_mutation_entitled_v1(p_bucket text,p_name text)
-returns boolean language sql stable security invoker set search_path = '' as $$
+-- Resolve the nested private predicate as the owner without granting private
+-- schema access to callers. That predicate still checks the original auth.uid.
+returns boolean language sql stable security definer set search_path = '' as $$
   select case when p_bucket<>'workspace-files' then true
     when split_part(p_name,'/',1) ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
     then private.workspace_mutation_entitled_v1(split_part(p_name,'/',1)::uuid) else false end;
