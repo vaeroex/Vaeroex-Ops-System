@@ -103,6 +103,17 @@ test("security feedback remains explicit without trapping workspace navigation",
 for (const kind of ["error", "message"]) {
   test(`${kind} feedback stays readable until explicitly dismissed`, () => withWindow((fixture) => {
     const searchParams = new URLSearchParams({ [kind]: `Synthetic ${kind}` });
+    fixture.window.history.state = { __NA: true, __PRIVATE_NEXTJS_INTERNALS_TREE: ['synthetic'] };
+    const replaceState = fixture.window.history.replaceState.bind(fixture.window.history);
+    fixture.window.history.replaceState = (state, title, url) => {
+      replaceState(state, title, url);
+      // Next15's installed app-router ignores updates bearing its private marker.
+      if (state?.__NA || state?._N) return;
+      const next = new URL(url, 'http://localhost').searchParams;
+      for (const key of ['error', 'message', 'saved']) {
+        if (next.has(key)) searchParams.set(key, next.get(key)); else searchParams.delete(key);
+      }
+    };
     const { ToastRegion } = loadSource("components/app/ToastRegion.tsx", {
       react: fixture.hooks,
       "next/navigation": { useSearchParams: () => searchParams },
@@ -118,7 +129,7 @@ for (const kind of ["error", "message"]) {
     button(tree).props.onClick();
     assert.equal(fixture.render(ToastContent), null, "explicit dismissal still works");
     assert.equal(fixture.window.history.url, "/app/sources?folder=one#current", "dismissal preserves view state and clears only feedback");
-    searchParams.delete(kind);
+    assert.equal(searchParams.has(kind), false, "dismissal must synchronize the native URL with router search params");
     fixture.render(ToastContent);
     fixture.effects();
     searchParams.set(kind, `Synthetic ${kind}`);
