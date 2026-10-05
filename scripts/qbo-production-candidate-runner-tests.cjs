@@ -6,7 +6,7 @@ const os = require('node:os');
 const { spawnSync } = require('node:child_process');
 const vm = require('node:vm');
 const { checkTap, expandFixture, suiteRequests, candidateDblinkSetting, candidates, pendingSuite, eligibilitySuite,
-  productionSquare, productionSheets, auditMigrations, assertProductionBaselineLedger,
+  productionSquare, productionSheets, auditMigrations, capacityMigrations, assertProductionBaselineLedger,
   dashboardMigrations, dashboardSuites, dashboardPlan, checkDashboardAssertionNames, composeSquareIdentitySuite, executeDashboardSuite,
   preferenceAssertionNames, reportingTimezoneAssertionNames, squareIdentityAssertionNames } = require('./run-qbo-production-candidate-database-tests.cjs');
 const { verifyLocalContext, verifyOwnedContainer, verifyBridgeGateway } = require('./qbo-candidate-local-container.cjs');
@@ -26,7 +26,7 @@ assert.match(candidateRunner, /outcome\.assertions = await require\('\.\/qbo-pen
   'eligibility tests use the owned per-suite database clone'); assertions++;
 assert.match(candidateRunner, /assert\.equal\(outcome\.assertions, suite\.expectedScenarios/, 'incomplete native coverage fails the candidate run'); assertions++;
 assert.match(candidateRunner, /result\.suites\.length === shapeSuites\.length \+ 4/, 'candidate success requires the registered dashboard suites and all four existing native suites'); assertions++;
-assert.match(candidateRunner, /assert\.equal\(canonical\.length, 130,/, 'canonical count remains exact'); assertions++;
+assert.match(candidateRunner, /assert\.equal\(canonical\.length, 136,/, 'canonical count remains exact'); assertions++;
 assert.deepEqual(productionSheets, ['20261002040024_google_sheets_complete.sql', '20261002040031_google_sheets_lifecycle.sql']); assertions++;
 assert.deepEqual(auditMigrations, [
   '20261005022017_workspace_security_boundaries.sql', '20261005022445_workspace_persisted_usage_limits.sql',
@@ -34,10 +34,22 @@ assert.deepEqual(auditMigrations, [
   '20261005061024_internal_form_submission_idempotency.sql', '20261005062005_durable_import_attempt_reconciliation.sql',
   '20261005070311_worksheet_import_publication_heads.sql',
 ]); assertions++;
-assert.match(candidateRunner, /'20261002040024_google_sheets_complete\.sql',\s*'20261002040031_google_sheets_lifecycle\.sql',\s*'20261002182049_integration_summary_preferences\.sql',\s*\.\.\.auditMigrations,\s*\]/,
-  'canonical tail remains exactly Sheets, preferences and the reviewed audit tail'); assertions++;
-assert.match(candidateRunner, /canonical\.filter\(item => !auditMigrations\.includes\(path\.basename\(item\.file\)\)\)/,
+assert.match(candidateRunner, /'20261002040024_google_sheets_complete\.sql',\s*'20261002040031_google_sheets_lifecycle\.sql',\s*'20261002182049_integration_summary_preferences\.sql',\s*\.\.\.auditMigrations,\s*\.\.\.capacityMigrations,\s*\]/,
+  'canonical tail remains exactly Sheets, preferences, audit and capacity tails'); assertions++;
+assert.match(candidateRunner, /canonical\.filter\(item => !\[\.\.\.auditMigrations, \.\.\.capacityMigrations\]\.includes\(path\.basename\(item\.file\)\)\)/,
   'canonical does not apply audit guards before new provider tables exist'); assertions++;
+assert.deepEqual(capacityMigrations, [
+  '20261005182541_bounded_google_sheets_dispatch.sql',
+  '20261005183352_issue_submission_receipts.sql',
+  '20261005184031_qbo_scoped_runtime_recovery.sql',
+  '20261005190709_sheets_recovery_fair_scan.sql',
+  '20261005194244_google_sheets_failure_cleanup_transition.sql',
+  '20261005202215_sheets_dispatch_round_robin.sql',
+]); assertions++;
+assert.ok(candidateRunner.indexOf('for (const item of capacity) await apply(item);') > candidateRunner.indexOf('for (const item of audit) await apply(item);'),
+  'capacity changes follow their audit helper dependencies in both isolated shapes'); assertions++;
+assert.ok(candidateRunner.indexOf('for (const item of capacity) await apply(item);') < candidateRunner.indexOf("await client.query('create extension if not exists pgtap with schema extensions')"),
+  'every behavior suite includes the capacity changes'); assertions++;
 assert.match(candidateRunner, /assert\.equal\(canonicalBaseline\.length, 123,/, 'canonical baseline stays exact'); assertions++;
 assert.match(candidateRunner, /if \(shape\.name === 'production'\) for \(const item of sheets\) await apply\(item\)/,
   'Production includes both hosted Sheets migrations exactly once'); assertions++;

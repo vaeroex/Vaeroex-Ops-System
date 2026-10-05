@@ -30,6 +30,16 @@ const auditMigrations = [
   '20261005062005_durable_import_attempt_reconciliation.sql',
   '20261005070311_worksheet_import_publication_heads.sql',
 ];
+// Canonical-only capacity SQL is also rehearsed after the shared audit tail
+// in each disposable shape; this does not add Production activation candidates.
+const capacityMigrations = [
+  '20261005182541_bounded_google_sheets_dispatch.sql',
+  '20261005183352_issue_submission_receipts.sql',
+  '20261005184031_qbo_scoped_runtime_recovery.sql',
+  '20261005190709_sheets_recovery_fair_scan.sql',
+  '20261005194244_google_sheets_failure_cleanup_transition.sql',
+  '20261005202215_sheets_dispatch_round_robin.sql',
+];
 const candidates = [
   '20260930001000_qbo_customer_oauth_completion.sql',
   '20260930002000_qbo_production_ongoing_sync.sql',
@@ -367,25 +377,27 @@ async function main() {
   const canonical = fs.readdirSync(path.join(root, 'supabase/migrations'))
     .filter(name => /^\d+_.+\.sql$/.test(name)).sort().map(name => snapshot(`supabase/migrations/${name}`));
   const prefix = canonical.filter(item => item.version <= '20260902191325');
-  assert.equal(canonical.length, 130, 'review the canonical migration manifest if it changes');
+  assert.equal(canonical.length, 136, 'review the canonical migration manifest if it changes');
   assert.deepEqual(canonical.filter(item => item.version > '20260915040500').map(item => path.basename(item.file)), [
     '20261002040024_google_sheets_complete.sql',
     '20261002040031_google_sheets_lifecycle.sql',
     '20261002182049_integration_summary_preferences.sql',
     ...auditMigrations,
-  ], 'the canonical extension contains exactly two Google Sheets migrations, dashboard preferences and the seven reviewed audit/closeout migrations');
+    ...capacityMigrations,
+  ], 'the canonical extension contains exactly two Google Sheets migrations, dashboard preferences and the seven reviewed audit/closeout and six capacity migrations');
   assert.equal(prefix.length, 104, 'exact reviewed Production prefix');
   const square = productionSquare.map(name => snapshot(`supabase/production-migrations/${name}`));
   const qbo = candidates.map(name => snapshot(`supabase/production-migrations/${name}`));
   const sheets = productionSheets.map(name => snapshot(`supabase/production-migrations/${name}`));
   const dashboard = Object.values(dashboardMigrations).map(name => snapshot(`supabase/production-migrations/${name}`));
   const audit = auditMigrations.map(name => snapshot(`supabase/production-migrations/${name}`));
+  const capacity = capacityMigrations.map(name => snapshot(`supabase/migrations/${name}`));
   for (const item of [...sheets, ...audit]) {
     assert.equal(item.sha256, canonical.find(saved => path.basename(saved.file) === path.basename(item.file))?.sha256,
       'shared canonical and Production migration SQL must match exactly');
   }
-  const canonicalBaseline = canonical.filter(item => !auditMigrations.includes(path.basename(item.file)));
-  assert.equal(canonicalBaseline.length, 123, 'audit tail must be applied exactly once after provider setup');
+  const canonicalBaseline = canonical.filter(item => ![...auditMigrations, ...capacityMigrations].includes(path.basename(item.file)));
+  assert.equal(canonicalBaseline.length, 123, 'audit and capacity tails must be applied exactly once after provider setup');
   assert.equal(dashboard[0].sha256, canonical.find(item => path.basename(item.file) === dashboardMigrations.preferences)?.sha256,
     'canonical and Production preference SQL must match exactly');
   const squareFixture = snapshot('supabase/tests/square_customer_payment_browse.test.sql');
@@ -406,6 +418,7 @@ async function main() {
     candidateHashes: qbo.map(({ file, sha256 }) => ({ file, sha256 })),
     productionSheetsHashes: sheets.map(({ file, sha256 }) => ({ file, sha256 })),
     sharedAuditTailHashes: audit.map(({ file, sha256 }) => ({ file, sha256 })),
+    capacityTailHashes: capacity.map(({ file, sha256 }) => ({ file, sha256 })),
     dashboardCandidateHashes: dashboard.map(({ file, sha256 }) => ({ file, sha256 })),
     squareDashboardFixture: { file: squareFixture.file, sha256: squareFixture.sha256 },
     sharedFixture: fixture && { file: fixture.file, sha256: fixture.sha256 }, runs: [] };
@@ -464,8 +477,9 @@ async function main() {
         if (shape.name === 'production') assertProductionBaselineLedger(ledger);
         result.preAuditLedger = [...ledger].sort();
         for (const item of audit) await apply(item);
+        for (const item of capacity) await apply(item);
         result.finalLedger = [...ledger].sort();
-        console.log(`${shape.name}: ${ledger.length} migrations applied including the shared audit tail; exact ledger and QBO-only Square catalog guard verified.`);
+        console.log(`${shape.name}: ${ledger.length} migrations applied including the shared audit and capacity tails; exact ledger and QBO-only Square catalog guard verified.`);
         // pgTAP's test metadata ACLs are not part of the pristine migration catalog.
         await client.query('create extension if not exists pgtap with schema extensions');
         // OAuth spans commits. A clean template clone per suite prevents fixture
@@ -572,6 +586,6 @@ async function main() {
 
 if (require.main === module) main().catch(error => { console.error(error); process.exitCode = 1; });
 module.exports = { checkTap, expandFixture, suiteRequests, candidateDblinkSetting, candidates, pendingSuite, eligibilitySuite,
-  productionSquare, productionSheets, auditMigrations, assertProductionBaselineLedger,
+  productionSquare, productionSheets, auditMigrations, capacityMigrations, assertProductionBaselineLedger,
   dashboardMigrations, dashboardSuites, dashboardPlan, checkDashboardAssertionNames, composeSquareIdentitySuite, executeDashboardSuite,
   preferenceAssertionNames, reportingTimezoneAssertionNames, squareIdentityAssertionNames, squareCatalog };

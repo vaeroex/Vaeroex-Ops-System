@@ -35,9 +35,9 @@ async function qualify(runtime) {
   // this fixture continues to exercise its pinned historical observation chain.
   const separatelyQualifiedWorkspaceAuditTail=[
     "20261005022017_workspace_security_boundaries.sql",
-    "20261005022445_workspace_persisted_usage_limits.sql", "20261005060101_atomic_confirmed_memory_publication.sql", "20261005060258_asset_check_server_chronology.sql", "20261005061024_internal_form_submission_idempotency.sql", "20261005062005_durable_import_attempt_reconciliation.sql", "20261005070311_worksheet_import_publication_heads.sql"
+    "20261005022445_workspace_persisted_usage_limits.sql", "20261005060101_atomic_confirmed_memory_publication.sql", "20261005060258_asset_check_server_chronology.sql", "20261005061024_internal_form_submission_idempotency.sql", "20261005062005_durable_import_attempt_reconciliation.sql", "20261005070311_worksheet_import_publication_heads.sql", "20261005182541_bounded_google_sheets_dispatch.sql", "20261005183352_issue_submission_receipts.sql", "20261005184031_qbo_scoped_runtime_recovery.sql", "20261005190709_sheets_recovery_fair_scan.sql", "20261005194244_google_sheets_failure_cleanup_transition.sql", "20261005202215_sheets_dispatch_round_robin.sql"
   ];
-  eq(files.length,130,"full canonical chain, including the separately qualified Production runtime, compatibility guards, Google Sheets connector, personal summary preferences and workspace audit");
+  eq(files.length,136,"full canonical chain, including the separately qualified Production runtime, compatibility guards, Google Sheets connector, personal summary preferences and workspace audit");
   for (const name of [...additiveSquareTail,...productionFoundation,...productionOverlay,...productionInternalRuntime,...productionCompatibility,...separatelyQualifiedSheetsTail,...separatelyQualifiedPreferencesTail,...separatelyQualifiedWorkspaceAuditTail])
     eq(files.filter(file=>file===name).length,1,`canonical manifest contains ${name} exactly once`);
   stage="migrations";
