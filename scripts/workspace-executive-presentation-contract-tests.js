@@ -90,6 +90,53 @@ const qboAccountingAdditions = [
   '  const qboAccounting = await loadQboAccountingIntelligence(workspaceId, snapshotAsOf);\n',
 ];
 
+// Stage 4 separately qualifies source-parent completeness as a functional fix.
+// Normalize only these three reviewed bindings; the original action and logic
+// digests above remain unchanged, including every existing query and state guard.
+const sourceParentCompletenessReplacements = [
+  [
+    '  const sourceParentResult = await loadSourceParentEligibilityResult({\n'
+      + '    supabase,\n'
+      + '    workspaceId,\n'
+      + '    rows: [\n'
+      + '      ...(kpisResult.data || []),\n'
+      + '      ...(crmResult.data || []),\n'
+      + '      ...(metricsResult.data || []),\n'
+      + '      ...(memoryResult.data || [])\n'
+      + '    ]\n'
+      + '  });\n',
+    '  const sourceParentResult = await loadSourceParentEligibilityResult({\n'
+      + '    supabase,\n'
+      + '    workspaceId,\n'
+      + '    rows: [\n'
+      + '      ...(kpisResult.data || []),\n'
+      + '      ...(crmResult.data || []),\n'
+      + '      ...(metricsResult.data || [])\n'
+      + '    ]\n'
+      + '  });\n',
+  ],
+  [
+    '  const operationalInsights = buildOperationalEvidenceInsights({\n'
+      + '    sourceParents: sourceParentResult.eligibility.records,\n',
+    '  const operationalInsights = buildOperationalEvidenceInsights({\n',
+  ],
+  [
+    '  const intelligence = buildIntelligenceLayer({\n'
+      + '    sourceParents: sourceParentResult.eligibility.records,\n',
+    '  const intelligence = buildIntelligenceLayer({\n',
+  ],
+];
+
+function withoutSourceParentCompleteness(source) {
+  for (const [current, original] of sourceParentCompletenessReplacements) {
+    assert.equal(source.split(current).length, 2, "Require exactly the reviewed source-parent completeness binding");
+    source = source.replace(current, original);
+  }
+  assert.doesNotMatch(source, /\bsourceParents\b/,
+    "No additional source-parent consumer may escape the exact functional exception");
+  return source;
+}
+
 function withoutQboAccounting(source) {
   // The separately qualified owner-authorized producer is an additive product
   // change, not a presentation refactor. Preserve all preexisting workflow hashes.
@@ -129,7 +176,7 @@ function withoutIntegrationResults(source) {
   }
   assert.doesNotMatch(source, /\b(?:CurrentIntegrations|loadIntegrationDashboard|dashboard|currentQboAccounting|requireWorkspaceAccess|access)\b/,
     "No extra dashboard or access uses may escape the exact addition contract");
-  return withoutQboAccounting(source);
+  return withoutSourceParentCompleteness(withoutQboAccounting(source));
 }
 
 for (const [file, count, actionsDigest, logicDigest] of contracts) {
@@ -220,5 +267,52 @@ test("accounting exception rejects changed scope, timing and current evidence bi
   ]) {
     assert(source.includes(before));
     assert.throws(() => withoutIntegrationResults(source.replace(before, after)), assert.AssertionError);
+  }
+});
+
+
+test("source-parent completeness exception rejects altered scope, rows and consumer evidence", () => {
+  const source = fs.readFileSync(path.join(__dirname, "..", intelligenceFile), "utf8");
+  for (const [before, after] of [
+    ['loadSourceParentEligibilityResult({\n    supabase,\n    workspaceId,', 'loadSourceParentEligibilityResult({\n    supabase,\n    workspaceId: "other-workspace",'],
+    ['loadSourceParentEligibilityResult({\n    supabase,', 'loadSourceParentEligibilityResult({\n    supabase: adminClient,'],
+    ['...(memoryResult.data || [])', '...(unscopedMemory.data || [])'],
+    ['...(metricsResult.data || []),\n      ...(memoryResult.data || [])', '...(metricsResult.data || []),\n      ...(memoryResult.data || []),\n      ...unreviewedRows'],
+    ['sourceParents: sourceParentResult.eligibility.records', 'sourceParents: otherWorkspaceParents'],
+    ['sourceParents: sourceParentResult.eligibility.records', 'sourceParents: []'],
+    ['sourceParents: sourceParentResult.eligibility.records', 'sourceParents: sourceParentResult.eligibility'],
+    ['const operationalInsights = buildOperationalEvidenceInsights({', 'const operationalInsights = buildUnreviewedEvidenceInsights({'],
+    ['const intelligence = buildIntelligenceLayer({', 'const intelligence = buildUnreviewedIntelligenceLayer({'],
+  ]) {
+    assert(source.includes(before));
+    assert.throws(() => withoutIntegrationResults(source.replace(before, after)), assert.AssertionError);
+  }
+  const originalDigest = contracts.find(([file]) => file === intelligenceFile)[3];
+  for (const [before, after] of [
+    ['kpis: eligibleKpis,', 'kpis: kpisResult.data || [],'],
+    ['operationalMetrics: eligibleOperationalMetrics,', 'operationalMetrics: metricsResult.data || [],'],
+    ['memoryChunks: eligibleMemoryChunks,', 'memoryChunks: memoryResult.data || [],'],
+    ['crmLeads: eligibleCustomerEvidence,', 'crmLeads: crmResult.data || [],'],
+  ]) {
+    assert(source.includes(before));
+    const changed = withoutIntegrationResults(source.replace(before, after));
+    const tree = ts.createSourceFile(intelligenceFile, changed, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+    assert.notEqual(digest(nonPresentationLogic(tree)), originalDigest, "Source-parent exception must not permit existing eligibility bypasses");
+  }
+});
+
+test("source-parent completeness exception rejects missing, duplicate and extra bindings", () => {
+  const source = fs.readFileSync(path.join(__dirname, "..", intelligenceFile), "utf8");
+  for (const [current, original] of sourceParentCompletenessReplacements) {
+    assert(source.includes(current));
+    for (const replacement of [original, current + current]) {
+      assert.throws(() => withoutIntegrationResults(source.replace(current, replacement)), assert.AssertionError);
+    }
+  }
+  for (const addition of [
+    '\nconst unreviewedParents = sourceParents;\n',
+    '\nconst extraConsumer = buildIntelligenceLayer({ sourceParents: sourceParentResult.eligibility.records });\n',
+  ]) {
+    assert.throws(() => withoutIntegrationResults(source + addition), assert.AssertionError);
   }
 });
