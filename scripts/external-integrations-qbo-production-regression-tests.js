@@ -62,6 +62,11 @@ const terraformOutputs = read("services/external-integrations-qbo/infra/outputs.
 const terraformVersions = read("services/external-integrations-qbo/infra/versions.tf");
 const terraformLock = read("services/external-integrations-qbo/infra/.terraform.lock.hcl");
 const dockerfile = read("services/external-integrations-qbo/Dockerfile");
+// The shared lockfile requires these inputs even when lifecycle scripts are disabled.
+for (const patch of Object.values(JSON.parse(read("package.json")).pnpm?.patchedDependencies ?? {})) {
+  ok(fs.existsSync(path.join(root, patch)), `required dependency patch exists: ${patch}`);
+  precedes(dockerfile, "COPY patches ./patches", "RUN pnpm install", `dependency install receives ${patch}`);
+}
 const cloudbuild = read("services/external-integrations-qbo/cloudbuild.yaml");
 const edgeDockerfile = read("services/external-integrations-qbo/edge/package/Dockerfile");
 const edgeCloudbuild = read("services/external-integrations-qbo/edge/cloudbuild.yaml");
