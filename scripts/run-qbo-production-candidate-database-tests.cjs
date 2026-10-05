@@ -28,6 +28,7 @@ const auditMigrations = [
   '20261005060258_asset_check_server_chronology.sql',
   '20261005061024_internal_form_submission_idempotency.sql',
   '20261005062005_durable_import_attempt_reconciliation.sql',
+  '20261005070311_worksheet_import_publication_heads.sql',
 ];
 const candidates = [
   '20260930001000_qbo_customer_oauth_completion.sql',
@@ -366,13 +367,13 @@ async function main() {
   const canonical = fs.readdirSync(path.join(root, 'supabase/migrations'))
     .filter(name => /^\d+_.+\.sql$/.test(name)).sort().map(name => snapshot(`supabase/migrations/${name}`));
   const prefix = canonical.filter(item => item.version <= '20260902191325');
-  assert.equal(canonical.length, 129, 'review the canonical migration manifest if it changes');
+  assert.equal(canonical.length, 130, 'review the canonical migration manifest if it changes');
   assert.deepEqual(canonical.filter(item => item.version > '20260915040500').map(item => path.basename(item.file)), [
     '20261002040024_google_sheets_complete.sql',
     '20261002040031_google_sheets_lifecycle.sql',
     '20261002182049_integration_summary_preferences.sql',
     ...auditMigrations,
-  ], 'the canonical extension contains exactly two Google Sheets migrations, dashboard preferences and the six reviewed audit/closeout migrations');
+  ], 'the canonical extension contains exactly two Google Sheets migrations, dashboard preferences and the seven reviewed audit/closeout migrations');
   assert.equal(prefix.length, 104, 'exact reviewed Production prefix');
   const square = productionSquare.map(name => snapshot(`supabase/production-migrations/${name}`));
   const qbo = candidates.map(name => snapshot(`supabase/production-migrations/${name}`));

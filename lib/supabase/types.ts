@@ -70,6 +70,10 @@ export type Database = {
         Args: { p_workspace_id: string; p_form_id: string; p_request_id: string; p_submitter_name: string; p_submitter_email: string; p_data_json: Json };
         Returns: Json;
       };
+      get_worksheet_publication_heads_v1: {
+        Args: { p_workspace_id: string; p_file_ids: string[] };
+        Returns: { file_id: string; completed_attempt_id: string | null }[];
+      };
       publish_confirmed_file_memory_v1: {
         Args: { p_workspace_id: string; p_file_id: string; p_run_id: string; p_confirmed_by: string; p_chunks: Json; p_summary: string; p_embedding_error?: string | null };
         Returns: Json;

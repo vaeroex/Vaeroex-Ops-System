@@ -167,7 +167,7 @@ function client(failTable, options = {}) {
           if (operation === 'update') { for (const row of memory.filter(row => predicates.every(p => p(row)))) Object.assign(row, value); return { data: [], error: null }; }
           if (operation === 'upsert') { const result = value.map(row => { let target = memory.find(item => item.content_hash === row.content_hash && item.chunk_index === row.chunk_index); if (!target) { target = { id: 'memory-' + memory.length }; memory.push(target); } Object.assign(target, row); return { id: target.id }; }); return { data: result, error: null }; }
         }
-        return { data: table === 'ai_agent_runs' ? sourceRun : table === 'file_processing_jobs' ? { id: 'job-one' } : [], error: null };
+        return { data: table === 'ai_agent_runs' ? sourceRun : table === 'file_processing_jobs' ? { id: 'job-one' } : table === 'file_uploads' && operation === 'update' ? [{ id: 'file-one' }] : [], error: null };
       }).then(resolve, reject); }
     }; return query;
   } };
@@ -199,9 +199,10 @@ function client(failTable, options = {}) {
   const originalCitation = structuredClone(db.memory[0]);
   result = await evidence.indexWorksheetImportEvidence({ ...worksheetInput, importAttemptId: 'attempt-two' });
   assert.equal(result.indexedChunks, 1); assert.equal(db.memory.length, 2); assert.notEqual(db.memory[1].id, originalCitation.id); assert.notEqual(db.memory[1].content_hash, originalCitation.content_hash);
-  assert.equal(db.memory[0].id, originalCitation.id); assert.equal(db.memory[0].source_excerpt, originalCitation.source_excerpt); assert.equal(db.memory[0].source_metadata.import_id, originalCitation.source_metadata.import_id); assert.equal(db.memory[0].source_metadata.import_attempt_id, 'attempt-one'); assert.equal(db.memory[1].source_metadata.import_attempt_id, 'attempt-two'); assert.ok(db.memory[0].archived_at);
+  assert.equal(db.memory[0].id, originalCitation.id); assert.equal(db.memory[0].source_excerpt, originalCitation.source_excerpt); assert.equal(db.memory[0].source_metadata.import_id, originalCitation.source_metadata.import_id); assert.equal(db.memory[0].source_metadata.import_attempt_id, 'attempt-one'); assert.equal(db.memory[1].source_metadata.import_attempt_id, 'attempt-two'); assert.equal(db.memory[0].archived_at, null);
   checks.push('separate worksheet approvals with identical text preserve old citation identity and import provenance');
   const sameAttemptId = db.memory[1].id; await evidence.indexWorksheetImportEvidence({ ...worksheetInput, importAttemptId: 'attempt-two' }); assert.equal(db.memory.length, 2); assert.equal(db.memory[1].id, sameAttemptId); checks.push('same durable worksheet attempt keeps a stable content identity');
   const writesBefore = db.writes.length; result = await evidence.indexWorksheetImportEvidence({ ...worksheetInput, importAttemptId: '' }); assert.equal(result.indexedChunks, 0); assert.equal(db.writes.length, writesBefore); checks.push('worksheet publication without durable approval identity fails before writes');
+  await require('./workspace-worksheet-publication-tests.cjs').qualify({ evidence, checks });
   console.log(JSON.stringify({ kind: 'audit_import_evidence_regression', status: 'passed', checks: checks.length, names: checks, inflations, resourceUsage: process.resourceUsage(), limitation: 'Actual parser and indexer functions; synthetic query responses and in-memory write recording, no real database/provider/UI.' }, null, 2));
 })().catch(error => { console.error(error); process.exitCode = 1; });

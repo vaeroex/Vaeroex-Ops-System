@@ -577,12 +577,14 @@ export function filterEligibleMemoryRows<T extends MemoryChunkRow | MatchMemoryC
   files,
   runs,
   notes = [],
+  worksheetHeads = new Map<string, string | null>(),
   workspaceId
 }: {
   rows: T[];
   files: Array<Pick<FileUploadRow, "id" | "deleted_at" | "archived_at" | "metadata_json">>;
   runs: Array<Pick<AiAgentRunRow, "id" | "status" | "deleted_at" | "archived_at" | "input_json" | "output_json">>;
   notes?: Array<Pick<BusinessNoteRow, "id" | "workspace_id" | "release_channel" | "status" | "evidence_lifecycle_status" | "deleted_at" | "archived_at">>;
+  worksheetHeads?: Map<string, string | null>;
   workspaceId?: string;
 }) {
   const filesById = new Map(files.map((file) => [file.id, file]));
@@ -600,6 +602,15 @@ export function filterEligibleMemoryRows<T extends MemoryChunkRow | MatchMemoryC
     if (isFileEvidence) {
       const sourceFile = fileId ? filesById.get(fileId) : null;
       if (!sourceFile || !isBusinessEvidenceEligible(sourceFile) || !metadataIsEligible(sourceFile.metadata_json)) return false;
+    }
+
+    if (metadataRecord(row.source_metadata).indexing_method === "worksheet_import") {
+      if (!fileId || !worksheetHeads.has(fileId)) return false;
+      const head = worksheetHeads.get(fileId);
+      const attempt = metadataRecord(row.source_metadata).import_attempt_id;
+      // Legacy evidence remains available until the first durable publication.
+      // A held attempt never replaces the most recent completed generation.
+      if (head ? attempt !== head : Boolean(attempt)) return false;
     }
 
     const runId = runIdForChunk(row);
@@ -669,8 +680,34 @@ export async function filterEligibleMemoryRowsByLifecycle<T extends MemoryChunkR
   if (filesResult.error || runsResult.error || notesResult.error) {
     throw new Error("Business Memory source availability could not be verified. Please try again.");
   }
+  const worksheetFileIds = Array.from(new Set(rows.flatMap((row) =>
+    metadataRecord(row.source_metadata).indexing_method === "worksheet_import"
+      ? [row.source_file_id || row.source_id].filter((id): id is string => Boolean(id))
+      : []
+  )));
+  const worksheetHeads = new Map<string, string | null>();
+  for (let offset = 0; offset < worksheetFileIds.length; offset += 200) {
+    const requested = worksheetFileIds.slice(offset, offset + 200);
+    const { data, error } = await supabase.rpc("get_worksheet_publication_heads_v1", {
+      p_workspace_id: workspaceId, p_file_ids: requested
+    });
+    if (error || !Array.isArray(data)) throw new Error("Worksheet evidence publication could not be verified. Please try again.");
+    for (const head of data) {
+      if (!head || typeof head.file_id !== "string" || !requested.includes(head.file_id) || worksheetHeads.has(head.file_id)
+        || (head.completed_attempt_id !== null && (typeof head.completed_attempt_id !== "string" || !head.completed_attempt_id))) {
+        throw new Error("Worksheet evidence publication could not be verified. Please try again.");
+      }
+      worksheetHeads.set(head.file_id, head.completed_attempt_id);
+    }
+    // Missing parents are already ineligible; an existing parent without its
+    // authority row is an unavailable/truncated response, never legacy fallback.
+    if (requested.some((id) => (filesResult.data || []).some((file) => file.id === id) && !worksheetHeads.has(id))) {
+      throw new Error("Worksheet evidence publication could not be verified. Please try again.");
+    }
+  }
   return filterEligibleMemoryRows({
     rows,
+    worksheetHeads,
     files: filesResult.data || [],
     runs: runsResult.data || [],
     notes: notesResult.data || [],
@@ -1275,20 +1312,6 @@ export async function indexWorksheetImportEvidence({
   }
 
   const indexedAt = new Date().toISOString();
-  const { data: existingRows, error: existingError } = await supabase
-    .from("business_memory_chunks")
-    .select("id,content_hash,chunk_index,source_metadata")
-    .eq("workspace_id", workspaceId)
-    .eq("source_type", "file")
-    .eq("source_file_id", file.id)
-    .is("deleted_at", null)
-    .is("archived_at", null)
-    .limit(MAX_INDEXED_CHUNKS_PER_FILE * 4);
-
-  if (existingError) {
-    return { indexedChunks: 0, error: existingError.message };
-  }
-
   const embedding = await createEmbeddings(chunks.map((chunk) => chunk.text));
   const rows = chunks.map<MemoryChunkInsert>((chunk, index) => {
     const rowNumbers = chunk.rows.map((row) => row.rowNumber);
@@ -1337,61 +1360,14 @@ export async function indexWorksheetImportEvidence({
       deleted_at: null
     };
   });
-  const currentChunkKeys = new Set(rows.map((row) => `${row.content_hash}:${row.chunk_index}`));
-  const previousWorksheetRows = (existingRows || []).filter((row) =>
-    metadataRecord(row.source_metadata).indexing_method === "worksheet_import" && !currentChunkKeys.has(`${row.content_hash}:${row.chunk_index}`)
-  );
-  const restoreSupersededWorksheetRows = async () => {
-    const results = await Promise.all(previousWorksheetRows.map((row) => supabase
-      .from("business_memory_chunks")
-      .update({
-        archived_at: null,
-        deleted_at: null,
-        source_metadata: row.source_metadata
-      })
-      .eq("workspace_id", workspaceId)
-      .eq("id", row.id)));
-    return results.find((result) => result.error)?.error || null;
-  };
-  for (let index = 0; index < previousWorksheetRows.length; index += 20) {
-    const batch = previousWorksheetRows.slice(index, index + 20);
-    const updates = await Promise.all(batch.map((row) => {
-      const metadata = metadataRecord(row.source_metadata);
-      return supabase
-        .from("business_memory_chunks")
-        .update({
-          archived_at: indexedAt,
-          deleted_at: indexedAt,
-          source_metadata: {
-            ...metadata,
-            invalidated_at: indexedAt,
-            invalidation_reason: "Superseded by a newly approved worksheet import."
-          }
-        })
-        .eq("workspace_id", workspaceId)
-        .eq("id", row.id);
-    }));
-    const updateError = updates.find((result) => result.error)?.error;
-    if (updateError) {
-      const rollbackError = await restoreSupersededWorksheetRows();
-      return {
-        indexedChunks: 0,
-        error: rollbackError
-          ? `${updateError.message} Superseded evidence restoration also failed: ${rollbackError.message}`
-          : updateError.message
-      };
-    }
-  }
-
-  const { error } = await supabase.from("business_memory_chunks").upsert(rows, {
+  // Append this uncommitted generation only. Retrieval consults the durable
+  // completed head; previous evidence stays intact if this attempt is held.
+  const { data: savedChunks, error } = await supabase.from("business_memory_chunks").upsert(rows, {
     onConflict: "workspace_id,source_type,source_id,content_hash,chunk_index"
-  });
+  }).select("id");
 
-  if (error) {
-    const rollbackError = await restoreSupersededWorksheetRows();
-    const errorMessage = rollbackError
-      ? `${error.message} Superseded evidence restoration also failed: ${rollbackError.message}`
-      : error.message;
+  if (error || !Array.isArray(savedChunks) || savedChunks.length !== rows.length) {
+    const errorMessage = "Worksheet evidence persistence could not be verified. Saved rows remain held for reconciliation.";
     await supabase
       .from("file_uploads")
       .update({ index_status: "failed", index_error: errorMessage, indexed_at: indexedAt })
@@ -1400,28 +1376,23 @@ export async function indexWorksheetImportEvidence({
     return { indexedChunks: 0, error: errorMessage };
   }
 
-  const { count, error: countError } = await supabase
-    .from("business_memory_chunks")
-    .select("id", { count: "exact", head: true })
-    .eq("workspace_id", workspaceId)
-    .eq("source_type", "file")
-    .eq("source_file_id", file.id)
-    .is("deleted_at", null)
-    .is("archived_at", null);
-
-  await supabase
+  const { data: updatedFiles, error: updateError } = await supabase
     .from("file_uploads")
     .update({
       index_status: "ready",
-      index_error: embedding.error || countError?.message || null,
+      index_error: embedding.error || null,
       indexed_at: indexedAt,
-      indexed_chunk_count: count ?? rows.length
+      indexed_chunk_count: rows.length
     })
     .eq("workspace_id", workspaceId)
-    .eq("id", file.id);
+    .eq("id", file.id)
+    .select("id");
+  if (updateError || !Array.isArray(updatedFiles) || updatedFiles.length !== 1) {
+    return { indexedChunks: 0, error: "Worksheet indexing status could not be verified. Saved rows remain held for reconciliation." };
+  }
 
   return {
     indexedChunks: rows.length,
-    error: embedding.error || countError?.message || null
+    error: embedding.error || null
   };
 }

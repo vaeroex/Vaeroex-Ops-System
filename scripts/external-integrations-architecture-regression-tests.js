@@ -403,6 +403,7 @@ for (const manifest of [currentMigrations.filter(name => name !== "2026100502201
   currentMigrations.filter(name => name !== "20261005060258_asset_check_server_chronology.sql"),
   currentMigrations.filter(name => name !== "20261005061024_internal_form_submission_idempotency.sql"),
   currentMigrations.filter(name => name !== "20261005062005_durable_import_attempt_reconciliation.sql"),
+  currentMigrations.filter(name => name !== "20261005070311_worksheet_import_publication_heads.sql"),
   currentMigrations.filter(name => name !== "20260907174326_square_dormant_account_connection.sql"),
   currentMigrations.filter(name => name !== "20260902191325_square_production_internal_pilot_runtime.sql"),
   currentMigrations.filter(name => name !== "20260907225626_square_remote_sandbox_binding.sql"),

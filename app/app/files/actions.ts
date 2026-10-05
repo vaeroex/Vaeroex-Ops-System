@@ -921,7 +921,7 @@ export async function reconcileFileImportAction(formData: FormData) {
   revalidatePath(SOURCES_PATH);
   if (!result) redirectWithFileError("Persisted import results could not be verified. No data was resubmitted; the recovery hold remains in place.", file.id, "imported");
   if (result.status === "completed") redirectWithMessage("Import completion verified from saved results. No rows were resubmitted.", file.id, "imported");
-  const counts = `${Number(result.kpi_records || 0)} KPI records, ${Number(result.metric_records || 0)} metric records and ${Number(result.active_memory_chunks || 0)} active evidence chunks are currently saved.`;
+  const counts = `${Number(result.kpi_records || 0)} KPI records, ${Number(result.metric_records || 0)} metric records and ${Number(result.active_memory_chunks || 0)} stored evidence chunks are currently saved; only a completed publication is used as current worksheet evidence.`;
   redirectWithFileError(`${counts} Accepted work remains held for operator reconciliation. A still-running or partial attempt cannot be retried automatically.`, file.id, "imported");
 }
 

@@ -86,6 +86,7 @@ async function tests(c){
  await begin(c,25);await c.query(`update file_imports set status='completed',imported_at=now() where id=$1`,[imported(25)]);await c.query(`update file_uploads set import_status='imported',metadata_json=metadata_json||jsonb_build_object('last_import',jsonb_build_object('import_id',$1::text,'imported_at',(select imported_at from file_imports where id=$1::uuid))) where id=$2`,[imported(25),file(25)]);
  pass('staged rows prevent a false completed reconciliation',(await reconcile(c,25,true)).status,'reconciliation_required');
  await base.actor(c,0,'anon');await rejects('anonymous cannot access attempt authority',begin(c,26),'42501');await base.actor(c,0,'service_role');await rejects('generic service role cannot invent user approval',begin(c,26),'42501');
+ await require('./workspace-worksheet-publication-database-tests.cjs').qualify({c,base,read,A,B,file,prepare,imported,row,begin,reconcile,connect,pass,rejects});
  return {migration:importMigration,checks:checks.length,results:checks};
 }
 

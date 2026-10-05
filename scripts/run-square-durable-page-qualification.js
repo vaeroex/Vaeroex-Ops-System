@@ -209,6 +209,8 @@ async function migrationQualification(target, administrator) {
   equal(workspaceCloseoutTail2.length, 1, "reviewed closeout migration 20261005061024_internal_form_submission_idempotency.sql present");
   const workspaceCloseoutTail3 = files.filter(name => name === "20261005062005_durable_import_attempt_reconciliation.sql");
   equal(workspaceCloseoutTail3.length, 1, "reviewed closeout migration 20261005062005_durable_import_attempt_reconciliation.sql present");
+  const workspaceCloseoutTail4 = files.filter(name => name === "20261005070311_worksheet_import_publication_heads.sql");
+  equal(workspaceCloseoutTail4.length, 1, "reviewed closeout migration 20261005070311_worksheet_import_publication_heads.sql present");
   equal(added.length, 2, "both additive Square migrations present");
   equal(accountTail.length, 1, "account-connection migration present");
   equal(remoteTail.length, 1, "remote Sandbox binding migration present");
@@ -232,7 +234,7 @@ async function migrationQualification(target, administrator) {
   equal(preferencesTail.length, 1, "separately qualified personal summary preferences migration present");
   equal(workspaceSecurityTail.length, 1, "separately qualified workspace security migration present");
   equal(workspaceQuotaTail.length, 1, "separately qualified persisted usage migration present");
-  equal(baseline.length + added.length + accountTail.length + remoteTail.length + brokerTail.length + gcpTail.length + recoveryTail.length + mappedTail.length + mappedFenceTail.length + observationTail.length + interpretationTail.length + evidenceTail.length + cardTail.length + operationalTail.length + productionFoundationTail.length + productionOverlayTail.length + productionInternalRuntimeTail.length + productionFoundationMarkerTail.length + productionLegacyGuardTail.length + sheetsCompleteTail.length + sheetsLifecycleTail.length + preferencesTail.length + workspaceSecurityTail.length + workspaceQuotaTail.length + workspaceCloseoutTail0.length + workspaceCloseoutTail1.length + workspaceCloseoutTail2.length + workspaceCloseoutTail3.length, files.length, "migration manifest is explicit");
+  equal(baseline.length + added.length + accountTail.length + remoteTail.length + brokerTail.length + gcpTail.length + recoveryTail.length + mappedTail.length + mappedFenceTail.length + observationTail.length + interpretationTail.length + evidenceTail.length + cardTail.length + operationalTail.length + productionFoundationTail.length + productionOverlayTail.length + productionInternalRuntimeTail.length + productionFoundationMarkerTail.length + productionLegacyGuardTail.length + sheetsCompleteTail.length + sheetsLifecycleTail.length + preferencesTail.length + workspaceSecurityTail.length + workspaceQuotaTail.length + workspaceCloseoutTail0.length + workspaceCloseoutTail1.length + workspaceCloseoutTail2.length + workspaceCloseoutTail3.length + workspaceCloseoutTail4.length, files.length, "migration manifest is explicit");
   const clean = await createDatabase(target, administrator, "clean");
   await applyMigrations(clean.client, baseline);
   const before = await sourceSchemaFingerprint(clean.client);
