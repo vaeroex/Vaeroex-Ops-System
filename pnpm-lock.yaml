@@ -10,6 +10,11 @@ overrides:
   nanoid: 3.3.18
   postcss: 8.5.23
 
+patchedDependencies:
+  next@15.5.24:
+    hash: 3ec6uzykcmw6tvnp7l6j3rj53q
+    path: patches/next@15.5.24.patch
+
 importers:
 
   .:
@@ -43,7 +48,7 @@ importers:
         version: 1.38.0(react@19.2.8)
       next:
         specifier: 15.5.24
-        version: 15.5.24(@types/node@22.19.21)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+        version: 15.5.24(patch_hash=3ec6uzykcmw6tvnp7l6j3rj53q)(@types/node@22.19.21)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       pdf-lib:
         specifier: 1.17.1
         version: 1.17.1
@@ -4118,7 +4123,7 @@ snapshots:
 
   natural-compare@1.4.0: {}
 
-  next@15.5.24(@types/node@22.19.21)(react-dom@19.2.8(react@19.2.8))(react@19.2.8):
+  next@15.5.24(patch_hash=3ec6uzykcmw6tvnp7l6j3rj53q)(@types/node@22.19.21)(react-dom@19.2.8(react@19.2.8))(react@19.2.8):
     dependencies:
       '@next/env': 15.5.24
       '@swc/helpers': 0.5.15
