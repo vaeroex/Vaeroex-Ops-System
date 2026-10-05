@@ -1,0 +1,1 @@
+{"scope":"Actual usage function and actual Supabase SDK with synthetic capped response; no sockets/provider calls/database","reads":1,"fullRecordedTokens":2000000,"returnedRows":1000,"matchingRows":1001,"result":{"allowed":true,"budget":{"monthlyTokens":2000000,"singleRequestTokens":120000},"usedTokens":0,"estimatedRequestTokens":1,"remainingTokens":1999999}}

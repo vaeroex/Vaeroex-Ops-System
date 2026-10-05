@@ -1,0 +1,43 @@
+{
+  "scope": "Security contributor closeout source, not the full shared worktree; types.ts also has workflow contributions. Native SQL proofs are focused synthetic fixtures, application adapters explicitly mocked.",
+  "created_at": "2026-10-05T07:27:15.393913+00:00",
+  "files": {
+    "supabase/migrations/20261005060101_atomic_confirmed_memory_publication.sql": "f861e70fe2e9a58599888b77263e9267ac1eae0642e153dc756f5bb3fb705288",
+    "supabase/migrations/20261005062005_durable_import_attempt_reconciliation.sql": "f3a127c605106d7b33c3a11d09490d39fae2c3d93d733bd205e2fda9d3ed5556",
+    "app/app/files/actions.ts": "9bc52a425c44d4408439110bbaa8f4c37cbb2e570e4070c5d4c51f892fcef9e4",
+    "lib/ai/evidence-index.ts": "4c4b183aa92af998d9a3f991b84621dc3e2aa5deb9e110d1e88a01498be75205",
+    "lib/supabase/types.ts": "d3a08df6988f59bba3f7fd137df0c0fbfbfe8a5bbfd6ccc404f0e6fd1c8f6d7a",
+    "components/evidence/SourceImportReview.tsx": "c8a486c4e179419addf13e4c4936604a4215c22737837b5b9f33cb305f77019f",
+    "scripts/workspace-memory-publication-tests.cjs": "83f26089547c1e2bea0c74b7de668ac038c41dc72042c9d0dc7cfc442e7f44cd",
+    "scripts/workspace-import-attempt-database-tests.cjs": "505facc4d5e5fd8fd85ec4cfb689971cb7f4f48114c8ec5e59e0b843284b4fae",
+    "scripts/workspace-import-recovery-tests.cjs": "f20a6d6db54fb20ac217faa910bdd34fda94916e8418d8b79134d879dc4cba86",
+    "scripts/audit-import-evidence-fixes.cjs": "7bbab283127a3b6921fdffc6d5a2c886137b5e5b1896ac652a0ff04d43de7cba",
+    "scripts/audit-import-finalization.cjs": "d1301125f8cec205aceac2788fe51cb1529aa677b265537efcb9ef6ded0806ac",
+    "scripts/source-upload-action-tests.js": "22592a531f15d628ae99db428d5b3b79979d8b8d7e0a1da882216b689665d951",
+    "scripts/workspace-security-database-tests.cjs": "91084205f86920627499f74d24d12ce6cd4987f49eb4561563ec3a3eee4230cc",
+    "supabase/migrations/20261005070311_worksheet_import_publication_heads.sql": "56c6a11c3317bee9f1f75269b94163a399539bae0272ed5a2a4451ec0eb283ca",
+    "app/app/sources/SourcesPage.tsx": "b2358cd22a0df17906c54e90ea3708fdff0212050dfdb8039346d51beae82edb",
+    "lib/imports/publication-status.ts": "c5e58014102a807ee8bb29ce2279d935aa874e49722baf7df8b4cdee873514a9",
+    "scripts/workspace-worksheet-publication-tests.cjs": "6eeca1335eb728f7bb0172af8fb3b55108c77ebb0202482a36d80a0b288ba242",
+    "scripts/workspace-worksheet-publication-database-tests.cjs": "57575631a3aa248b4db8c18bb94dfa931c1a49ea02dbaa81e551b3af3c685b1d"
+  },
+  "evidence": {
+    "/tmp/vaeroex-memory-publication-results.json": "46151c845f8f033792c192c5365f7457ff0e1000030a2a17e9237660b84b8c99",
+    "/tmp/vaeroex-import-attempt-results.json": "083703cca4e83613e379844c2175b3221cbd94c171738c508f58e379b194974a",
+    "/tmp/vaeroex-import-recovery-results.json": "c619d17fc95e22227f49713e5604a963f15d0088c0b1ddc2a891b4466b93301e",
+    "/tmp/vaeroex-import-workbook-finalization.json": "61e6d63091ab9a4cd26e48b59dde88cebe099e99e2f8ee33c914652c72e1731c",
+    "/tmp/vaeroex-memory-app-regression.json": "81ffe78b358f03e9c9d29288e4413508aa8a9d6cb7eb2308e23f536213e76e46",
+    "/tmp/vaeroex-claim-order-control.cjs": "d275a652f2506caff44a1b368c02ca377c876a9bc63a07d8cfd7c245fb0eee57",
+    "/tmp/vaeroex-claim-order-before-legacy.log": "fabceea1687054a26e00fb31f6e3311553f85e74f6d7057b0bd023c9923e7648",
+    "/tmp/vaeroex-claim-order-before-workbook.log": "4151b7145ac45e74d1ca6e04df69164c9dfaf08dfd82c772488224b795075445",
+    "/tmp/vaeroex-worksheet-generation-control.cjs": "655525a01c197b4305f88a3bc144f53919ee999130f936f7edc1abff882df3ba",
+    "/tmp/vaeroex-worksheet-generation-before.log": "ea951612e326de5e7b847acf054d9587babe1154da4359fbed6cfc908252f5de",
+    "/tmp/vaeroex-closeout-security-types5.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "/tmp/vaeroex-worksheet-held-retrieval-proof.json": "21e133a15595ca901f80ab243e0e8c04824dc10cd9bc2ed9fac48f6e23b06491",
+    "/tmp/vaeroex-worksheet-held-retrieval-proof.cjs": "00fab885691ab979283f35d91bb9553ee51fd85b272531e5014bda58c6f6f0fe",
+    "/tmp/vaeroex-memory-worksheet-app-results.json": "177f1f839b9f34edf0940b15efc4628d8db23e97dac4048f29b173cc3a9a870b",
+    "/tmp/vaeroex-import-attempt-with-heads-results.json": "623a941625d20bb55026da1186cbf6f82db1a0b582f11ad4e5501336f5b28905",
+    "/tmp/vaeroex-detail-status-301-proof.json": "e45583a306d94022f59af126cffade6ba590456611634f5b26ccb3e0b56e1001",
+    "/tmp/vaeroex-closeout-security-types8.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

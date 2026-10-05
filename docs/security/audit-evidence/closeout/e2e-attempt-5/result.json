@@ -1,0 +1,1294 @@
+{
+  "runId": "1061111f-557e-49af-a2cd-145cc6e9949f",
+  "executionId": "45708faa-1f61-428a-badf-e92e7ea24277",
+  "passed": false,
+  "sourceCommit": "1ba1cab876a17e183913df6f3c67ab828ea26440",
+  "results": [
+    {
+      "name": "real_auth_and_synthetic_seed",
+      "passed": true,
+      "navigationFailuresBeforeCheck": 0,
+      "registeredUsers": 7,
+      "workspaces": 3,
+      "db": {
+        "db": "postgres",
+        "version": "17.11",
+        "max_connections": "100",
+        "data_directory": "/private/tmp/vaeroex-closeout-assembly-final/home/stacks/2955723b0b149dc6874689e05b5918bfad2a5dbdde05d1f028faef2112c1ff22/data/eb46e0b8-720a-4463-b031-60e9bc435740/data"
+      },
+      "legalAcceptance": "seeded synthetic latest-policy acceptance"
+    },
+    {
+      "name": "browser_action_navigation",
+      "passed": false,
+      "actionLabel": "internal_form_owner_1440",
+      "response": {
+        "path": "/app/forms/9e3cabe0-37ee-49db-bdb7-b1ae043ca8d6",
+        "method": "POST",
+        "status": 303,
+        "xActionRedirect": "/app/forms/9e3cabe0-37ee-49db-bdb7-b1ae043ca8d6?message=Submission+saved.;push",
+        "contentType": "text/x-component"
+      },
+      "pending": [
+        {
+          "text": "Working...",
+          "disabled": true,
+          "ariaBusy": "true"
+        }
+      ],
+      "path": "/app/forms/9e3cabe0-37ee-49db-bdb7-b1ae043ca8d6",
+      "error": "page.waitForURL: Timeout 20000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation until \"load\"\n============================================================",
+      "screenshot": "navigation-failure-1.png",
+      "manualRecoveryRequested": true
+    },
+    {
+      "name": "manual_navigation_recovery",
+      "passed": true,
+      "navigationFailuresBeforeCheck": 1,
+      "actionLabel": "internal_form_owner_1440",
+      "destination": "/app/forms/9e3cabe0-37ee-49db-bdb7-b1ae043ca8d6?message=Submission+saved.",
+      "automaticNavigationPassed": false,
+      "purpose": "Continue independent persisted/UI checks; client behavior remains failed."
+    },
+    {
+      "name": "real_postgrest_form_replay_and_payload_conflict",
+      "passed": true,
+      "navigationFailuresBeforeCheck": 1,
+      "width": 1440
+    },
+    {
+      "name": "browser_form_persists_after_reload",
+      "passed": true,
+      "navigationFailuresBeforeCheck": 1,
+      "width": 1440
+    },
+    {
+      "name": "browser_complete_history_filter_pagination",
+      "passed": true,
+      "navigationFailuresBeforeCheck": 1,
+      "width": 1440
+    },
+    {
+      "name": "browser_action_navigation",
+      "passed": false,
+      "actionLabel": "internal_form_owner_390",
+      "response": {
+        "path": "/app/forms/9e3cabe0-37ee-49db-bdb7-b1ae043ca8d6",
+        "method": "POST",
+        "status": 303,
+        "xActionRedirect": "/app/forms/9e3cabe0-37ee-49db-bdb7-b1ae043ca8d6?message=Submission+saved.;push",
+        "contentType": "text/x-component"
+      },
+      "pending": [
+        {
+          "text": "Working...",
+          "disabled": true,
+          "ariaBusy": "true"
+        }
+      ],
+      "path": "/app/forms/9e3cabe0-37ee-49db-bdb7-b1ae043ca8d6",
+      "error": "page.waitForURL: Timeout 20000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation until \"load\"\n============================================================",
+      "screenshot": "navigation-failure-2.png",
+      "manualRecoveryRequested": true
+    },
+    {
+      "name": "manual_navigation_recovery",
+      "passed": true,
+      "navigationFailuresBeforeCheck": 2,
+      "actionLabel": "internal_form_owner_390",
+      "destination": "/app/forms/9e3cabe0-37ee-49db-bdb7-b1ae043ca8d6?message=Submission+saved.",
+      "automaticNavigationPassed": false,
+      "purpose": "Continue independent persisted/UI checks; client behavior remains failed."
+    },
+    {
+      "name": "real_postgrest_form_replay_and_payload_conflict",
+      "passed": true,
+      "navigationFailuresBeforeCheck": 2,
+      "width": 390
+    },
+    {
+      "name": "browser_form_persists_after_reload",
+      "passed": true,
+      "navigationFailuresBeforeCheck": 2,
+      "width": 390
+    },
+    {
+      "name": "browser_complete_history_filter_pagination",
+      "passed": true,
+      "navigationFailuresBeforeCheck": 2,
+      "width": 390
+    },
+    {
+      "name": "browser_action_navigation",
+      "passed": false,
+      "actionLabel": "internal_form_manager_390",
+      "response": {
+        "path": "/app/forms/9e3cabe0-37ee-49db-bdb7-b1ae043ca8d6",
+        "method": "POST",
+        "status": 303,
+        "xActionRedirect": "/app/forms/9e3cabe0-37ee-49db-bdb7-b1ae043ca8d6?message=Submission+saved.;push",
+        "contentType": "text/x-component"
+      },
+      "pending": [
+        {
+          "text": "Working...",
+          "disabled": true,
+          "ariaBusy": "true"
+        }
+      ],
+      "path": "/app/forms/9e3cabe0-37ee-49db-bdb7-b1ae043ca8d6",
+      "error": "page.waitForURL: Timeout 20000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation until \"load\"\n============================================================",
+      "screenshot": "navigation-failure-3.png",
+      "manualRecoveryRequested": true
+    },
+    {
+      "name": "manual_navigation_recovery",
+      "passed": true,
+      "navigationFailuresBeforeCheck": 3,
+      "actionLabel": "internal_form_manager_390",
+      "destination": "/app/forms/9e3cabe0-37ee-49db-bdb7-b1ae043ca8d6?message=Submission+saved.",
+      "automaticNavigationPassed": false,
+      "purpose": "Continue independent persisted/UI checks; client behavior remains failed."
+    },
+    {
+      "name": "browser_operator_form_persistence",
+      "passed": true,
+      "navigationFailuresBeforeCheck": 3,
+      "role": "manager"
+    },
+    {
+      "name": "browser_action_navigation",
+      "passed": false,
+      "actionLabel": "internal_form_admin_390",
+      "response": {
+        "path": "/app/forms/9e3cabe0-37ee-49db-bdb7-b1ae043ca8d6",
+        "method": "POST",
+        "status": 303,
+        "xActionRedirect": "/app/forms/9e3cabe0-37ee-49db-bdb7-b1ae043ca8d6?message=Submission+saved.;push",
+        "contentType": "text/x-component"
+      },
+      "pending": [
+        {
+          "text": "Working...",
+          "disabled": true,
+          "ariaBusy": "true"
+        }
+      ],
+      "path": "/app/forms/9e3cabe0-37ee-49db-bdb7-b1ae043ca8d6",
+      "error": "page.waitForURL: Timeout 20000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation until \"load\"\n============================================================",
+      "screenshot": "navigation-failure-4.png",
+      "manualRecoveryRequested": true
+    },
+    {
+      "name": "manual_navigation_recovery",
+      "passed": true,
+      "navigationFailuresBeforeCheck": 4,
+      "actionLabel": "internal_form_admin_390",
+      "destination": "/app/forms/9e3cabe0-37ee-49db-bdb7-b1ae043ca8d6?message=Submission+saved.",
+      "automaticNavigationPassed": false,
+      "purpose": "Continue independent persisted/UI checks; client behavior remains failed."
+    },
+    {
+      "name": "browser_operator_form_persistence",
+      "passed": true,
+      "navigationFailuresBeforeCheck": 4,
+      "role": "admin"
+    },
+    {
+      "name": "browser_action_navigation",
+      "passed": false,
+      "actionLabel": "memory_confirmation",
+      "response": {
+        "path": "/app/sources/6800357c-2436-45a4-8699-aebf2c3efe32",
+        "method": "POST",
+        "status": 303,
+        "xActionRedirect": "/app/sources/6800357c-2436-45a4-8699-aebf2c3efe32?file=6800357c-2436-45a4-8699-aebf2c3efe32&message=Findings+approved.+This+source+is+now+available+to+Business+Memory%2C+Search%2C+and+Intelligence.;push",
+        "contentType": "text/x-component"
+      },
+      "pending": [
+        {
+          "text": "Approving...",
+          "disabled": true,
+          "ariaBusy": "true"
+        }
+      ],
+      "path": "/app/sources/6800357c-2436-45a4-8699-aebf2c3efe32",
+      "error": "page.waitForURL: Timeout 20000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation until \"load\"\n============================================================",
+      "screenshot": "navigation-failure-5.png",
+      "manualRecoveryRequested": true
+    },
+    {
+      "name": "manual_navigation_recovery",
+      "passed": true,
+      "navigationFailuresBeforeCheck": 5,
+      "actionLabel": "memory_confirmation",
+      "destination": "/app/sources/6800357c-2436-45a4-8699-aebf2c3efe32?file=6800357c-2436-45a4-8699-aebf2c3efe32&message=Findings+approved.+This+source+is+now+available+to+Business+Memory%2C+Search%2C+and+Intelligence.",
+      "automaticNavigationPassed": false,
+      "purpose": "Continue independent persisted/UI checks; client behavior remains failed."
+    },
+    {
+      "name": "browser_confirmed_memory_atomic_publication",
+      "passed": true,
+      "navigationFailuresBeforeCheck": 5,
+      "width": 390,
+      "chunks": 1,
+      "model": "synthetic completed-run fixture, no model call",
+      "embeddings": "actual no-key text-only fallback with real pgvector column"
+    },
+    {
+      "name": "browser_action_navigation",
+      "passed": false,
+      "actionLabel": "viewer_form_denial",
+      "response": {
+        "path": "/app/forms/9e3cabe0-37ee-49db-bdb7-b1ae043ca8d6",
+        "method": "POST",
+        "status": 303,
+        "xActionRedirect": "/app/forms/9e3cabe0-37ee-49db-bdb7-b1ae043ca8d6?error=You+do+not+have+permission+to+submit+this+form.;push",
+        "contentType": "text/x-component"
+      },
+      "pending": [
+        {
+          "text": "Working...",
+          "disabled": true,
+          "ariaBusy": "true"
+        }
+      ],
+      "path": "/app/forms/9e3cabe0-37ee-49db-bdb7-b1ae043ca8d6",
+      "error": "page.waitForURL: Timeout 20000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation until \"load\"\n============================================================",
+      "screenshot": "navigation-failure-6.png",
+      "manualRecoveryRequested": true
+    },
+    {
+      "name": "manual_navigation_recovery",
+      "passed": true,
+      "navigationFailuresBeforeCheck": 6,
+      "actionLabel": "viewer_form_denial",
+      "destination": "/app/forms/9e3cabe0-37ee-49db-bdb7-b1ae043ca8d6?error=You+do+not+have+permission+to+submit+this+form.",
+      "automaticNavigationPassed": false,
+      "purpose": "Continue independent persisted/UI checks; client behavior remains failed."
+    },
+    {
+      "name": "browser_viewer_action_denied",
+      "passed": true,
+      "navigationFailuresBeforeCheck": 6
+    },
+    {
+      "name": "browser_action_navigation",
+      "passed": true,
+      "navigationFailuresBeforeCheck": 6,
+      "actionLabel": "staff_asset_check",
+      "response": {
+        "path": "/app/assets",
+        "method": "POST",
+        "status": 303,
+        "xActionRedirect": "/app/assets?message=Asset+check+saved.;push",
+        "contentType": "text/x-component"
+      },
+      "manualRecovery": false
+    },
+    {
+      "name": "browser_asset_check_atomic_readiness",
+      "passed": true,
+      "navigationFailuresBeforeCheck": 6
+    },
+    {
+      "name": "real_postgrest_foreign_memory_read_and_publication_denied",
+      "passed": true,
+      "navigationFailuresBeforeCheck": 6
+    },
+    {
+      "name": "postgrest_cross_workspace_parent_and_read_denied",
+      "passed": true,
+      "navigationFailuresBeforeCheck": 6
+    },
+    {
+      "name": "postgrest_expired_mutation_denied",
+      "passed": true,
+      "navigationFailuresBeforeCheck": 6
+    },
+    {
+      "name": "real_storage_owned_digest_foreign_and_expired_denials",
+      "passed": true,
+      "navigationFailuresBeforeCheck": 6
+    },
+    {
+      "name": "browser_upload",
+      "passed": false,
+      "error": "locator.click: Timeout 20000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('button', { name: 'Upload file', exact: true })\u001b[22m\n"
+    },
+    {
+      "name": "closeout_complete",
+      "passed": false,
+      "reason": "Qualification stopped before independent checks finished."
+    }
+  ],
+  "requests": [
+    {
+      "path": "/app/forms/9e3cabe0-37ee-49db-bdb7-b1ae043ca8d6",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/intelligence",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/kpis",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/sources",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/reports",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/integrations",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/settings",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/help",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/help/trust",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/terms",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/privacy",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/support",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/forms",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/forms/9e3cabe0-37ee-49db-bdb7-b1ae043ca8d6",
+      "method": "POST",
+      "status": 303
+    },
+    {
+      "path": "/app/forms/9e3cabe0-37ee-49db-bdb7-b1ae043ca8d6",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/forms/9e3cabe0-37ee-49db-bdb7-b1ae043ca8d6",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/intelligence",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/kpis",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/sources",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/reports",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/integrations",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/settings",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/help",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/help/trust",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/terms",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/privacy",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/support",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/forms",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/forms/9e3cabe0-37ee-49db-bdb7-b1ae043ca8d6",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/intelligence",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/kpis",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/sources",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/reports",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/integrations",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/settings",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/help",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/help/trust",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/terms",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/privacy",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/support",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/forms",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/assets/checks",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/intelligence",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/kpis",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/sources",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/reports",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/integrations",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/settings",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/help",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/help/trust",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/terms",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/privacy",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/support",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/assets",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/assets/checks",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/assets/checks",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/intelligence",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/kpis",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/sources",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/reports",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/integrations",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/settings",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/help",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/help/trust",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/forms/9e3cabe0-37ee-49db-bdb7-b1ae043ca8d6",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/forms",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/forms/9e3cabe0-37ee-49db-bdb7-b1ae043ca8d6",
+      "method": "POST",
+      "status": 303
+    },
+    {
+      "path": "/app/forms/9e3cabe0-37ee-49db-bdb7-b1ae043ca8d6",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/help",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/help/trust",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/terms",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/privacy",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/support",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/forms/9e3cabe0-37ee-49db-bdb7-b1ae043ca8d6",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/forms/9e3cabe0-37ee-49db-bdb7-b1ae043ca8d6",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/forms",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/assets/checks",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/assets",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/assets/checks",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/assets/checks",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/assets",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/forms/9e3cabe0-37ee-49db-bdb7-b1ae043ca8d6",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/forms",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/forms/9e3cabe0-37ee-49db-bdb7-b1ae043ca8d6",
+      "method": "POST",
+      "status": 303
+    },
+    {
+      "path": "/app/forms/9e3cabe0-37ee-49db-bdb7-b1ae043ca8d6",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/help",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/help/trust",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/terms",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/privacy",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/support",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/forms/9e3cabe0-37ee-49db-bdb7-b1ae043ca8d6",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/forms/9e3cabe0-37ee-49db-bdb7-b1ae043ca8d6",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/forms",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/forms/9e3cabe0-37ee-49db-bdb7-b1ae043ca8d6",
+      "method": "POST",
+      "status": 303
+    },
+    {
+      "path": "/app/forms/9e3cabe0-37ee-49db-bdb7-b1ae043ca8d6",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/help",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/help/trust",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/terms",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/privacy",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/support",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/forms/9e3cabe0-37ee-49db-bdb7-b1ae043ca8d6",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/sources/6800357c-2436-45a4-8699-aebf2c3efe32",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/help",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/help/trust",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/terms",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/privacy",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/support",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/sources",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/sources/6800357c-2436-45a4-8699-aebf2c3efe32",
+      "method": "POST",
+      "status": 303
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/sources/6800357c-2436-45a4-8699-aebf2c3efe32",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/sources/6800357c-2436-45a4-8699-aebf2c3efe32",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/sources",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/forms/9e3cabe0-37ee-49db-bdb7-b1ae043ca8d6",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/forms",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/forms/9e3cabe0-37ee-49db-bdb7-b1ae043ca8d6",
+      "method": "POST",
+      "status": 303
+    },
+    {
+      "path": "/app/forms/9e3cabe0-37ee-49db-bdb7-b1ae043ca8d6",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/assets",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/assets",
+      "method": "POST",
+      "status": 303
+    },
+    {
+      "path": "/app/sources",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/sources/6800357c-2436-45a4-8699-aebf2c3efe32",
+      "method": "GET",
+      "status": 200
+    }
+  ],
+  "browserErrors": [],
+  "actionResponses": [
+    {
+      "actionLabel": "internal_form_owner_1440",
+      "path": "/app/forms/9e3cabe0-37ee-49db-bdb7-b1ae043ca8d6",
+      "method": "POST",
+      "status": 303,
+      "xActionRedirect": "/app/forms/9e3cabe0-37ee-49db-bdb7-b1ae043ca8d6?message=Submission+saved.;push",
+      "contentType": "text/x-component"
+    },
+    {
+      "actionLabel": "internal_form_owner_390",
+      "path": "/app/forms/9e3cabe0-37ee-49db-bdb7-b1ae043ca8d6",
+      "method": "POST",
+      "status": 303,
+      "xActionRedirect": "/app/forms/9e3cabe0-37ee-49db-bdb7-b1ae043ca8d6?message=Submission+saved.;push",
+      "contentType": "text/x-component"
+    },
+    {
+      "actionLabel": "internal_form_manager_390",
+      "path": "/app/forms/9e3cabe0-37ee-49db-bdb7-b1ae043ca8d6",
+      "method": "POST",
+      "status": 303,
+      "xActionRedirect": "/app/forms/9e3cabe0-37ee-49db-bdb7-b1ae043ca8d6?message=Submission+saved.;push",
+      "contentType": "text/x-component"
+    },
+    {
+      "actionLabel": "internal_form_admin_390",
+      "path": "/app/forms/9e3cabe0-37ee-49db-bdb7-b1ae043ca8d6",
+      "method": "POST",
+      "status": 303,
+      "xActionRedirect": "/app/forms/9e3cabe0-37ee-49db-bdb7-b1ae043ca8d6?message=Submission+saved.;push",
+      "contentType": "text/x-component"
+    },
+    {
+      "actionLabel": "memory_confirmation",
+      "path": "/app/sources/6800357c-2436-45a4-8699-aebf2c3efe32",
+      "method": "POST",
+      "status": 303,
+      "xActionRedirect": "/app/sources/6800357c-2436-45a4-8699-aebf2c3efe32?file=6800357c-2436-45a4-8699-aebf2c3efe32&message=Findings+approved.+This+source+is+now+available+to+Business+Memory%2C+Search%2C+and+Intelligence.;push",
+      "contentType": "text/x-component"
+    },
+    {
+      "actionLabel": "viewer_form_denial",
+      "path": "/app/forms/9e3cabe0-37ee-49db-bdb7-b1ae043ca8d6",
+      "method": "POST",
+      "status": 303,
+      "xActionRedirect": "/app/forms/9e3cabe0-37ee-49db-bdb7-b1ae043ca8d6?error=You+do+not+have+permission+to+submit+this+form.;push",
+      "contentType": "text/x-component"
+    },
+    {
+      "actionLabel": "staff_asset_check",
+      "path": "/app/assets",
+      "method": "POST",
+      "status": 303,
+      "xActionRedirect": "/app/assets?message=Asset+check+saved.;push",
+      "contentType": "text/x-component"
+    }
+  ],
+  "navigationFailures": [
+    {
+      "name": "browser_action_navigation",
+      "passed": false,
+      "actionLabel": "internal_form_owner_1440",
+      "response": {
+        "path": "/app/forms/9e3cabe0-37ee-49db-bdb7-b1ae043ca8d6",
+        "method": "POST",
+        "status": 303,
+        "xActionRedirect": "/app/forms/9e3cabe0-37ee-49db-bdb7-b1ae043ca8d6?message=Submission+saved.;push",
+        "contentType": "text/x-component"
+      },
+      "pending": [
+        {
+          "text": "Working...",
+          "disabled": true,
+          "ariaBusy": "true"
+        }
+      ],
+      "path": "/app/forms/9e3cabe0-37ee-49db-bdb7-b1ae043ca8d6",
+      "error": "page.waitForURL: Timeout 20000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation until \"load\"\n============================================================",
+      "screenshot": "navigation-failure-1.png",
+      "manualRecoveryRequested": true
+    },
+    {
+      "name": "browser_action_navigation",
+      "passed": false,
+      "actionLabel": "internal_form_owner_390",
+      "response": {
+        "path": "/app/forms/9e3cabe0-37ee-49db-bdb7-b1ae043ca8d6",
+        "method": "POST",
+        "status": 303,
+        "xActionRedirect": "/app/forms/9e3cabe0-37ee-49db-bdb7-b1ae043ca8d6?message=Submission+saved.;push",
+        "contentType": "text/x-component"
+      },
+      "pending": [
+        {
+          "text": "Working...",
+          "disabled": true,
+          "ariaBusy": "true"
+        }
+      ],
+      "path": "/app/forms/9e3cabe0-37ee-49db-bdb7-b1ae043ca8d6",
+      "error": "page.waitForURL: Timeout 20000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation until \"load\"\n============================================================",
+      "screenshot": "navigation-failure-2.png",
+      "manualRecoveryRequested": true
+    },
+    {
+      "name": "browser_action_navigation",
+      "passed": false,
+      "actionLabel": "internal_form_manager_390",
+      "response": {
+        "path": "/app/forms/9e3cabe0-37ee-49db-bdb7-b1ae043ca8d6",
+        "method": "POST",
+        "status": 303,
+        "xActionRedirect": "/app/forms/9e3cabe0-37ee-49db-bdb7-b1ae043ca8d6?message=Submission+saved.;push",
+        "contentType": "text/x-component"
+      },
+      "pending": [
+        {
+          "text": "Working...",
+          "disabled": true,
+          "ariaBusy": "true"
+        }
+      ],
+      "path": "/app/forms/9e3cabe0-37ee-49db-bdb7-b1ae043ca8d6",
+      "error": "page.waitForURL: Timeout 20000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation until \"load\"\n============================================================",
+      "screenshot": "navigation-failure-3.png",
+      "manualRecoveryRequested": true
+    },
+    {
+      "name": "browser_action_navigation",
+      "passed": false,
+      "actionLabel": "internal_form_admin_390",
+      "response": {
+        "path": "/app/forms/9e3cabe0-37ee-49db-bdb7-b1ae043ca8d6",
+        "method": "POST",
+        "status": 303,
+        "xActionRedirect": "/app/forms/9e3cabe0-37ee-49db-bdb7-b1ae043ca8d6?message=Submission+saved.;push",
+        "contentType": "text/x-component"
+      },
+      "pending": [
+        {
+          "text": "Working...",
+          "disabled": true,
+          "ariaBusy": "true"
+        }
+      ],
+      "path": "/app/forms/9e3cabe0-37ee-49db-bdb7-b1ae043ca8d6",
+      "error": "page.waitForURL: Timeout 20000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation until \"load\"\n============================================================",
+      "screenshot": "navigation-failure-4.png",
+      "manualRecoveryRequested": true
+    },
+    {
+      "name": "browser_action_navigation",
+      "passed": false,
+      "actionLabel": "memory_confirmation",
+      "response": {
+        "path": "/app/sources/6800357c-2436-45a4-8699-aebf2c3efe32",
+        "method": "POST",
+        "status": 303,
+        "xActionRedirect": "/app/sources/6800357c-2436-45a4-8699-aebf2c3efe32?file=6800357c-2436-45a4-8699-aebf2c3efe32&message=Findings+approved.+This+source+is+now+available+to+Business+Memory%2C+Search%2C+and+Intelligence.;push",
+        "contentType": "text/x-component"
+      },
+      "pending": [
+        {
+          "text": "Approving...",
+          "disabled": true,
+          "ariaBusy": "true"
+        }
+      ],
+      "path": "/app/sources/6800357c-2436-45a4-8699-aebf2c3efe32",
+      "error": "page.waitForURL: Timeout 20000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation until \"load\"\n============================================================",
+      "screenshot": "navigation-failure-5.png",
+      "manualRecoveryRequested": true
+    },
+    {
+      "name": "browser_action_navigation",
+      "passed": false,
+      "actionLabel": "viewer_form_denial",
+      "response": {
+        "path": "/app/forms/9e3cabe0-37ee-49db-bdb7-b1ae043ca8d6",
+        "method": "POST",
+        "status": 303,
+        "xActionRedirect": "/app/forms/9e3cabe0-37ee-49db-bdb7-b1ae043ca8d6?error=You+do+not+have+permission+to+submit+this+form.;push",
+        "contentType": "text/x-component"
+      },
+      "pending": [
+        {
+          "text": "Working...",
+          "disabled": true,
+          "ariaBusy": "true"
+        }
+      ],
+      "path": "/app/forms/9e3cabe0-37ee-49db-bdb7-b1ae043ca8d6",
+      "error": "page.waitForURL: Timeout 20000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation until \"load\"\n============================================================",
+      "screenshot": "navigation-failure-6.png",
+      "manualRecoveryRequested": true
+    }
+  ],
+  "manualRecoveryMode": true,
+  "limitations": [
+    "Supabase native service versions differ from deployed PostgreSQL17.6",
+    "Synthetic legal acceptance seeded",
+    "No paid provider or customer connections",
+    "No full-system capacity target or worker soak performed",
+    "Known client navigation failures remain failed; explicit same-origin manual navigation was used only when the continuation flag was supplied."
+  ]
+}

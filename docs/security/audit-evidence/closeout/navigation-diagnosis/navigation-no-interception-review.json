@@ -1,0 +1,129 @@
+{
+  "checks": [
+    {
+      "elapsedMs": 3,
+      "url": "/app/forms/c58f5e45-05f2-4c7b-a80f-80557b205f8d",
+      "buttons": [
+        {
+          "text": "Working...",
+          "busy": "true",
+          "disabled": true
+        }
+      ],
+      "persisted": 0
+    },
+    {
+      "elapsedMs": 1029,
+      "url": "/app/forms/c58f5e45-05f2-4c7b-a80f-80557b205f8d",
+      "buttons": [
+        {
+          "text": "Working...",
+          "busy": "true",
+          "disabled": true
+        }
+      ],
+      "persisted": 1
+    },
+    {
+      "elapsedMs": 5047,
+      "url": "/app/forms/c58f5e45-05f2-4c7b-a80f-80557b205f8d",
+      "buttons": [
+        {
+          "text": "Working...",
+          "busy": "true",
+          "disabled": true
+        }
+      ],
+      "persisted": 1
+    },
+    {
+      "elapsedMs": 20067,
+      "url": "/app/forms/c58f5e45-05f2-4c7b-a80f-80557b205f8d",
+      "buttons": [
+        {
+          "text": "Working...",
+          "busy": "true",
+          "disabled": true
+        }
+      ],
+      "persisted": 1
+    },
+    {
+      "fetchTrace": [
+        {
+          "status": 303,
+          "redirect": "/app/forms/c58f5e45-05f2-4c7b-a80f-80557b205f8d?message=Submission+saved.;push",
+          "contentType": "text/x-component",
+          "bytes": 36757,
+          "done": true,
+          "firstLineKinds": [
+            "1",
+            "3",
+            "4",
+            "5",
+            "6"
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "responses": [
+    {
+      "path": "/app/forms/c58f5e45-05f2-4c7b-a80f-80557b205f8d",
+      "status": 303,
+      "headers": {
+        "x-action-redirect": "/app/forms/c58f5e45-05f2-4c7b-a80f-80557b205f8d?message=Submission+saved.;push",
+        "location": null,
+        "content-type": "text/x-component",
+        "content-length": null,
+        "transfer-encoding": "chunked",
+        "x-action-revalidated": "[[],1,0]"
+      },
+      "request": {
+        "resourceType": "fetch",
+        "nextAction": true
+      },
+      "body": {
+        "error": "response.body: Response body is unavailable for redirect responses"
+      }
+    }
+  ],
+  "failedRequests": [
+    {
+      "url": "/app",
+      "method": "GET",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "url": "/app/intelligence",
+      "method": "GET",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "url": "/app/integrations",
+      "method": "GET",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "url": "/app/kpis",
+      "method": "GET",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "url": "/app/sources",
+      "method": "GET",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "url": "/app/reports",
+      "method": "GET",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "url": "/app/forms",
+      "method": "GET",
+      "error": "net::ERR_ABORTED"
+    }
+  ]
+}

@@ -1,0 +1,159 @@
+{
+  "kind": "audit_import_evidence_regression",
+  "status": "passed",
+  "checks": 53,
+  "names": [
+    "CSV duplicate suffix collision retains all columns",
+    "header truncation, fallback, repeated suffixes and reserved keys retain values",
+    "XLSX duplicate suffix collision retains all columns",
+    "CSV physical start-line provenance survives blanks and quoted CRLF",
+    "ordinary DOCX and compressed PDF text still extract",
+    "forged DOCX size is stopped by zlib before output allocation",
+    "forged XLSX size is stopped by zlib before output allocation",
+    "unneeded DOCX/XLSX package parts are not inflated",
+    "ZIP duplicate entries, inconsistent local headers, excessive ratio reject",
+    "compressed PDF expansion rejects rather than falling through to model extraction",
+    "magnitude, signed values, percentage, small numbers, currency, labels, periods, direction fail closed",
+    "one supported fact cannot admit an unrelated false claim or summary",
+    "supported numerical claim is eligible only for explicit review",
+    "file_uploads lifecycle failure propagates a sanitized unavailable result",
+    "ai_agent_runs lifecycle failure propagates a sanitized unavailable result",
+    "business_notes lifecycle failure propagates a sanitized unavailable result",
+    "genuinely empty lifecycle evidence remains empty",
+    "missing or mismatched confirmation cannot write generated Business Memory",
+    "explicitly confirmed supported analysis reaches actual indexer write boundary",
+    "explicit confirmation cannot admit contradictory numerical output",
+    "failed replacement write preserves previously approved memory",
+    "indexer delegates replacement and retirement to one confirmed transaction",
+    "identical confirmed retry keeps its idempotent chunk active",
+    "separate worksheet approvals with identical text preserve old citation identity and import provenance",
+    "same durable worksheet attempt keeps a stable content identity",
+    "worksheet publication without durable approval identity fails before writes",
+    "append-only pending publication preserves321legacy rows and excludes the new attempt",
+    "completed head excludes all321older rows without a retirement lookup cap and counts only its own generation",
+    "failed or running newer import cannot hide prior completed evidence",
+    "switching completed head preserves previous citation ID and provenance",
+    "applied chunk write with lost acknowledgement stays invisible while prior evidence remains current",
+    "zero chunk acknowledgement cannot publish the appended generation",
+    "reject indexing-status acknowledgement cannot report completed publication",
+    "zero indexing-status acknowledgement cannot report completed publication",
+    "failed authority response fails closed instead of enabling legacy fallback",
+    "missing authority response fails closed instead of enabling legacy fallback",
+    "malformed authority response fails closed instead of enabling legacy fallback",
+    "null authority response fails closed instead of enabling legacy fallback",
+    "duplicate authority response fails closed instead of enabling legacy fallback",
+    "unrequested authority response fails closed instead of enabling legacy fallback",
+    "shared retrieval batches201distinct file heads as200plus1without truncation",
+    "worksheet authority preserves workspace isolation",
+    "source status shows held attempt instead of learned success and preserves completed label",
+    "visible old held source outside historical300list is resolved by bounded independent status lookup",
+    "truncated held-status response cannot label a source Learned",
+    "missing-count held-status response cannot label a source Learned",
+    "foreign held-status response cannot label a source Learned",
+    "error held-status response cannot label a source Learned",
+    "throw held-status response cannot label a source Learned",
+    "verified zero held rows remains distinguishable from unavailable status",
+    "actual review component renders the omitted oldest held import recovery ID and no approval or reprepare controls while300historical rows stay unchanged",
+    "actual review component renders unavailable feedback without mutation controls",
+    "source detail wires authoritative status and held selection separately from historical display"
+  ],
+  "inflations": [
+    {
+      "method": "inflateRawSync",
+      "compressedBytes": 54,
+      "maxOutputLength": 71,
+      "expandedBytes": 71
+    },
+    {
+      "method": "inflateRawSync",
+      "compressedBytes": 79,
+      "maxOutputLength": 110,
+      "expandedBytes": 110
+    },
+    {
+      "method": "inflateRawSync",
+      "compressedBytes": 130,
+      "maxOutputLength": 303,
+      "expandedBytes": 303
+    },
+    {
+      "method": "inflateRawSync",
+      "compressedBytes": 36,
+      "maxOutputLength": 36,
+      "expandedBytes": 36
+    },
+    {
+      "method": "inflateSync",
+      "compressedBytes": 39,
+      "maxOutputLength": 1048576,
+      "expandedBytes": 31
+    },
+    {
+      "method": "inflateRawSync",
+      "compressedBytes": 2050,
+      "maxOutputLength": 1,
+      "expandedBytes": null
+    },
+    {
+      "method": "inflateRawSync",
+      "compressedBytes": 2050,
+      "maxOutputLength": 1,
+      "expandedBytes": null
+    },
+    {
+      "method": "inflateRawSync",
+      "compressedBytes": 17,
+      "maxOutputLength": 18,
+      "expandedBytes": 18
+    },
+    {
+      "method": "inflateRawSync",
+      "compressedBytes": 54,
+      "maxOutputLength": 71,
+      "expandedBytes": 71
+    },
+    {
+      "method": "inflateRawSync",
+      "compressedBytes": 79,
+      "maxOutputLength": 110,
+      "expandedBytes": 110
+    },
+    {
+      "method": "inflateRawSync",
+      "compressedBytes": 130,
+      "maxOutputLength": 303,
+      "expandedBytes": 303
+    },
+    {
+      "method": "inflateRawSync",
+      "compressedBytes": 7,
+      "maxOutputLength": 5,
+      "expandedBytes": 5
+    },
+    {
+      "method": "inflateSync",
+      "compressedBytes": 2056,
+      "maxOutputLength": 1048576,
+      "expandedBytes": null
+    }
+  ],
+  "resourceUsage": {
+    "userCPUTime": 612377,
+    "systemCPUTime": 42755,
+    "maxRSS": 188640,
+    "sharedMemorySize": 0,
+    "unsharedDataSize": 0,
+    "unsharedStackSize": 0,
+    "minorPageFault": 12099,
+    "majorPageFault": 181,
+    "swappedOut": 0,
+    "fsRead": 0,
+    "fsWrite": 0,
+    "ipcSent": 0,
+    "ipcReceived": 0,
+    "signalsCount": 0,
+    "voluntaryContextSwitches": 107,
+    "involuntaryContextSwitches": 2026
+  },
+  "limitation": "Actual parser and indexer functions; synthetic query responses and in-memory write recording, no real database/provider/UI."
+}

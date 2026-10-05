@@ -1,0 +1,58 @@
+{
+  "capturedAt": "2026-10-05T06:49:08.762Z",
+  "prs": [
+    {
+      "number": 462,
+      "title": "fix(workspace): enforce tenant boundaries and safe import admission",
+      "url": "https://github.com/vaeroex/Vaeroex-Ops-System/pull/462",
+      "head": "codex/workspace-audit-security",
+      "headSha": "be65d144beac1ffa56aca48b6b82dc8d38401cb6",
+      "base": "main",
+      "baseSha": "d91be079c7beb0b6f21a4c5e6b451f90ca06e035",
+      "state": "open",
+      "draft": true,
+      "merged": false
+    },
+    {
+      "number": 463,
+      "title": "fix(intelligence): retain evidence and correct trends, estimates and sync progress",
+      "url": "https://github.com/vaeroex/Vaeroex-Ops-System/pull/463",
+      "head": "codex/workspace-audit-evidence",
+      "headSha": "9d0cfa328986cd7d1adaa079c99083659ecd54d0",
+      "base": "codex/workspace-audit-security",
+      "baseSha": "be65d144beac1ffa56aca48b6b82dc8d38401cb6",
+      "state": "open",
+      "draft": true,
+      "merged": false
+    },
+    {
+      "number": 464,
+      "title": "fix(workspace): restore forms, asset history and accessible dialogs",
+      "url": "https://github.com/vaeroex/Vaeroex-Ops-System/pull/464",
+      "head": "codex/workspace-audit-workflows",
+      "headSha": "d4e57b5652acfc8e2ce1ae6e47518eab06a81918",
+      "base": "codex/workspace-audit-evidence",
+      "baseSha": "9d0cfa328986cd7d1adaa079c99083659ecd54d0",
+      "state": "open",
+      "draft": true,
+      "merged": false
+    }
+  ],
+  "priorDocumentationCI": {
+    "head": "9359bb30b2e48f775dcecb666f3a61b571c8adf2",
+    "runId": 37264748528,
+    "conclusion": "success",
+    "jobs": [
+      111619067638,
+      111619067780,
+      111619067799,
+      111619067809
+    ]
+  },
+  "closeoutInitialCI": {
+    "head": "d4e57b5652acfc8e2ce1ae6e47518eab06a81918",
+    "runId": 37274031511,
+    "status": "in_progress"
+  },
+  "deploymentHolds": "All three audit branches and three Square branches retain deploymentEnabled:false."
+}

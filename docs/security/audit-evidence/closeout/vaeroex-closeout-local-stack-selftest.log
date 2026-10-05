@@ -1,0 +1,13 @@
+PASS requires explicit paths and checksum; dry-run default
+PASS output is a fresh direct /tmp child with owned prefix
+PASS accepts documented complete native status export without printing keys
+PASS rejects mixed or incomplete exports rather than guessing
+PASS requires exact owned project and native runtime
+PASS rejects remote API/database, credentials in API and connection overrides
+PASS accepts literal loopback endpoints with explicit ports only
+PASS environment excludes inherited database/provider/CLI credentials
+PASS private config is exclusive mode600 and never overwrites
+PASS dry plan snapshots exact bytes and uses local native commands
+PASS changed executable and duplicate migration version are rejected
+PASS linked source and migration symlinks are refused
+{"checks":12,"scope":"Guard/parser self-tests and dry plan only; zero CLI service starts, database/provider calls or captured live credentials"}

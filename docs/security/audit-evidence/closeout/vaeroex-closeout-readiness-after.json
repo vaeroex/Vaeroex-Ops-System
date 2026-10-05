@@ -1,0 +1,124 @@
+{
+  "scope": "Actual source SQL/RLS, full audit migrations, independent native sessions; selected original fixture setup. No Auth/PostgREST/Storage HTTP or real data. Before-correction assertions intentionally prove the defect.",
+  "migrations": [
+    "20261005022017_workspace_security_boundaries.sql",
+    "20261005022445_workspace_persisted_usage_limits.sql",
+    "20261005060258_asset_check_server_chronology.sql"
+  ],
+  "hashes": {
+    "20261005022017_workspace_security_boundaries.sql": "16974e4960b31dcbd80479e27734bf82cda7fb0cfc63c7a3d1d56b32114b661d",
+    "20261005022445_workspace_persisted_usage_limits.sql": "5fd3459dafcbe199c8ff893dfb726bce30d850e55a229375482e54f3256495e6",
+    "20261005060258_asset_check_server_chronology.sql": "a62006fb63a14cf9f018bab292a4b4ecfbcbee555b1bebcf841cdf7732211722"
+  },
+  "version": "17.11",
+  "results": [
+    {
+      "name": "before migration: staff can persist a cross-workspace form parent",
+      "status": "pass"
+    },
+    {
+      "name": "before correction: future staff check masks later owner check",
+      "status": "pass"
+    },
+    {
+      "name": "migration preserves every historical check without rewriting dates",
+      "status": "pass"
+    },
+    {
+      "name": "migration performs no historical parent status backfill",
+      "status": "pass"
+    },
+    {
+      "name": "historical tenant mismatch still retained",
+      "status": "pass"
+    },
+    {
+      "name": "historical tenant constraints remain NOT VALID",
+      "status": "pass"
+    },
+    {
+      "name": "authenticated future time is replaced by server insertion time",
+      "status": "pass"
+    },
+    {
+      "name": "new current check outranks retained future history",
+      "status": "pass"
+    },
+    {
+      "name": "staff cannot retime existing check",
+      "status": "pass"
+    },
+    {
+      "name": "owner cannot retime existing check",
+      "status": "pass"
+    },
+    {
+      "name": "ordinary authorized check edits remain available",
+      "status": "pass"
+    },
+    {
+      "name": "authenticated backdating is also replaced by server time",
+      "status": "pass"
+    },
+    {
+      "name": "original authenticated role remains guarded through a definer",
+      "status": "pass"
+    },
+    {
+      "name": "viewer insertion stays forbidden",
+      "status": "pass"
+    },
+    {
+      "name": "foreign workspace parent remains forbidden",
+      "status": "pass"
+    },
+    {
+      "name": "expired subscription still blocks check creation",
+      "status": "pass"
+    },
+    {
+      "name": "operator exemption permits access without bypassing chronology",
+      "status": "pass"
+    },
+    {
+      "name": "revoked exemption resumes billing denial",
+      "status": "pass"
+    },
+    {
+      "name": "trusted historical dates remain unchanged",
+      "status": "pass"
+    },
+    {
+      "name": "future trusted import remains history without becoming current readiness",
+      "status": "pass"
+    },
+    {
+      "name": "archiving latest valid check selects preceding valid check",
+      "status": "pass"
+    },
+    {
+      "name": "future-only history cannot imply a current checked state",
+      "status": "pass"
+    },
+    {
+      "name": "independent sessions serialize current checks and publish latest",
+      "status": "pass"
+    },
+    {
+      "name": "parent write failure rolls back new stamped child",
+      "status": "pass"
+    },
+    {
+      "name": "failed stamped child is absent",
+      "status": "pass"
+    },
+    {
+      "name": "failed parent recompute retains preceding readiness",
+      "status": "pass"
+    },
+    {
+      "name": "chronology guard is not an authenticated RPC",
+      "status": "pass"
+    }
+  ]
+}
