@@ -39,7 +39,9 @@ type CollectionConfig = {
 const RETIRED_CUSTOMER_RECORD_MUTATION_MESSAGE =
   "Customer record management in Vaeroex has been retired. Existing customer activity rows are historical evidence only; use Sources or external system integrations for new customer information.";
 
-const COLLECTIONS: Record<ManagedCollection, CollectionConfig> = {
+type MutableCollection = Exclude<ManagedCollection, "crm_leads">;
+
+const COLLECTIONS: Record<MutableCollection, CollectionConfig> = {
   forms: {
     table: "forms",
     path: "/app/forms",
@@ -135,21 +137,6 @@ const COLLECTIONS: Record<ManagedCollection, CollectionConfig> = {
       { name: "source", kind: "text", maxLength: 160 }
     ]
   },
-  crm_leads: {
-    table: "crm_leads",
-    path: "/app/sources",
-    titleField: "lead_name",
-    fields: [
-      { name: "lead_name", kind: "requiredText", maxLength: 180 },
-      { name: "company", kind: "text", maxLength: 180 },
-      { name: "email", kind: "text", maxLength: 220 },
-      { name: "phone", kind: "text", maxLength: 80 },
-      { name: "status", kind: "select", maxLength: 80 },
-      { name: "estimated_value", kind: "number" },
-      { name: "owner", kind: "text", maxLength: 120 },
-      { name: "notes", kind: "textarea", maxLength: 2000 }
-    ]
-  },
   support_requests: {
     table: "support_requests",
     path: "/app/admin/support-requests",
@@ -174,14 +161,15 @@ function lines(value: string) {
     .filter(Boolean);
 }
 
-function collectionFromForm(formData: FormData): ManagedCollection {
+function collectionFromForm(formData: FormData): MutableCollection {
   const collection = text(formData, "collection") as ManagedCollection;
 
-  if (!collection || !COLLECTIONS[collection]) {
+  assertMutationAllowed(collection, returnPath(formData, "/app/sources"));
+  if (!collection || collection === "crm_leads" || !Object.hasOwn(COLLECTIONS, collection)) {
     redirectWithError("/app", "Record type is not supported.");
   }
 
-  return collection;
+  return collection as MutableCollection;
 }
 
 function returnPath(formData: FormData, fallback: Route) {
@@ -190,11 +178,11 @@ function returnPath(formData: FormData, fallback: Route) {
 }
 
 function redirectWithError(path: Route | string, message: string): never {
-  redirect(`${path}?error=${encodeURIComponent(message)}` as Route);
+  redirect(`${path}${path.includes("?") ? "&" : "?"}error=${encodeURIComponent(message)}` as Route);
 }
 
 function redirectWithMessage(path: Route | string, message: string): never {
-  redirect(`${path}?message=${encodeURIComponent(message)}` as Route);
+  redirect(`${path}${path.includes("?") ? "&" : "?"}message=${encodeURIComponent(message)}` as Route);
 }
 
 function assertMutationAllowed(collection: ManagedCollection, path: Route | string) {
@@ -339,7 +327,11 @@ function parsedFieldValue(field: EditableField, formData: FormData, path: Route 
 }
 
 function revalidateRelatedPaths(collection: ManagedCollection, path: Route | string) {
-  revalidatePath(path);
+  revalidatePath(path.split("?")[0]);
+  if (collection === "asset_checks" || collection === "assets") {
+    revalidatePath("/app/assets");
+    revalidatePath("/app/assets/checks");
+  }
 
   // These collections can affect intelligence presentation or saved-output
   // availability. Revalidation does not make derived records original evidence.
@@ -484,27 +476,6 @@ export async function updateManagedRecordAction(formData: FormData) {
 
   if (error || !data) {
     redirectWithError(path, friendlyMutationError(error?.message, "Record could not be updated. Refresh and try again."));
-  }
-
-  if (collection === "crm_leads") {
-    const { error: historyError } = await supabase.from("crm_lead_history").insert({
-      workspace_id: workspaceId,
-      lead_id: recordId,
-      event_type: "updated",
-      status: typeof update.status === "string" ? update.status : null,
-      estimated_value: typeof update.estimated_value === "number" ? update.estimated_value : null,
-      owner: typeof update.owner === "string" ? update.owner : null,
-      notes: typeof update.notes === "string" ? update.notes : null,
-      raw_data_json: {
-        source: "manual_edit",
-        fields_changed: Object.keys(update)
-      } satisfies Json,
-      created_by: user.id
-    });
-
-    if (historyError) {
-      redirectWithError(path, historyError.message);
-    }
   }
 
   revalidateRelatedPaths(collection, path);
