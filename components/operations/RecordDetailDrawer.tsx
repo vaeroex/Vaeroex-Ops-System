@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useId, useState, type ReactNode } from "react";
+import { useId, useState, type ReactNode } from "react";
+
+import { ModalDialog } from "@/components/operations/ModalDialog";
 
 type RecordDetailDrawerProps = {
   title: string;
@@ -22,42 +24,25 @@ export function RecordDetailDrawer({
   const [open, setOpen] = useState(false);
   const titleId = useId();
 
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setOpen(false);
-      }
-    };
-
-    const originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    window.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      document.body.style.overflow = originalOverflow;
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [open]);
 
   return (
     <>
       <button
         type="button"
         className={triggerClassName}
+        aria-haspopup="dialog"
+        aria-expanded={open}
         onClick={() => setOpen(true)}
       >
         {triggerLabel}
       </button>
       {open ? (
-        <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-labelledby={titleId}>
+        <ModalDialog labelId={titleId} onClose={() => setOpen(false)}>
           <button
             type="button"
             className="absolute inset-0 bg-slate-950/35"
             aria-label="Close details"
+            tabIndex={-1}
             onClick={() => setOpen(false)}
           />
           <aside className="absolute inset-y-0 right-0 flex w-full max-w-3xl flex-col overflow-y-auto overflow-x-hidden border-l border-line bg-white shadow-2xl">
@@ -81,7 +66,7 @@ export function RecordDetailDrawer({
             </header>
             <div className="space-y-4 p-4 sm:p-5">{children}</div>
           </aside>
-        </div>
+        </ModalDialog>
       ) : null}
     </>
   );

@@ -169,6 +169,9 @@ jobs:
           pnpm exec playwright install --with-deps chromium
           pnpm test:google-sheets-ui
 
+      - name: Workspace audit desktop/mobile keyboard and form regressions
+        run: pnpm test:workspace-audit:browser
+
       - name: Verify optimized Square handoff headers and isolated synthetic browser navigation
         run: |
           pnpm exec playwright install --with-deps chromium

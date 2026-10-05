@@ -7,6 +7,7 @@ import {
   classifyAndPersistKpiSemantics,
   KPI_SEMANTIC_ACCEPTANCE_CONFIDENCE
 } from "@/lib/ai/kpi-semantics/service";
+import { createSubmissionSchema, FORM_PRIORITIES, parseSubmissionSchema, validateSubmissionFields } from "@/lib/forms/submission-schema";
 import { requireActiveSubscription } from "@/lib/billing/require-active-subscription";
 import {
   allocateAutomaticKpiColors,
@@ -165,18 +166,6 @@ function requireKpiSettingsAdministrator(path: string, role: string) {
   }
 }
 
-function formSchemaFromLines(fieldLines: string): Json {
-  const values = lines(fieldLines);
-  const fields = values.length ? values : ["Submitted by", "Business details", "Priority", "Manager notes"];
-
-  return fields.map((field, index) => ({
-    key: slugify(field) || `field-${index + 1}`,
-    label: field,
-    type: field.toLowerCase().includes("priority") ? "priority" : field.toLowerCase().includes("date") ? "date" : "text",
-    required: index < 2
-  })) as Json;
-}
-
 export async function createFormAction(formData: FormData) {
   const path = "/app/forms";
   const { supabase, user, workspaceId } = await requireWorkspace(path);
@@ -186,12 +175,16 @@ export async function createFormAction(formData: FormData) {
   validateLength(path, "Form type", text(formData, "form_type"), 80);
   validateLength(path, "Description", text(formData, "description"), 800);
 
+  let schema: Json;
+  try { schema = createSubmissionSchema(text(formData, "fields")); }
+  catch (error) { redirectWithError(path, error instanceof Error ? error.message : "Invalid form fields."); }
+
   const { error } = await supabase.from("forms").insert({
     workspace_id: workspaceId,
     name,
     description: text(formData, "description"),
     form_type: text(formData, "form_type") || "operations",
-    schema_json: formSchemaFromLines(text(formData, "fields")),
+    schema_json: schema,
     is_public: bool(formData, "is_public"),
     public_slug: bool(formData, "is_public") ? `${slugify(name)}-${workspaceId.slice(0, 6)}` : null,
     created_by: user.id
@@ -208,13 +201,36 @@ export async function createFormAction(formData: FormData) {
 export async function createFormSubmissionAction(formData: FormData) {
   const formId = text(formData, "form_id");
   const path = returnPath(formData, formId ? `/app/forms/${formId}` : "/app/forms");
-  const { supabase, user, workspaceId } = await requireWorkspace(path);
+  const { supabase, user, workspaceId, membership } = await requireWorkspace(path);
+  if (!["owner", "admin", "manager", "staff"].includes(membership.role)) {
+    redirectWithError(path, "You do not have permission to submit this form.");
+  }
   const summary = text(formData, "summary");
 
   requireValue(path, "Form", formId);
   requireValue(path, "Submission summary", summary, 3000);
 
+  requireValue(path, "Submitter name", text(formData, "submitter_name"));
+  validateLength(path, "Submitter email", text(formData, "submitter_email"), 220);
+  validateLength(path, "Signals or evidence", text(formData, "follow_up"), 5000);
+  if (text(formData, "submitter_email") && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(text(formData, "submitter_email"))) redirectWithError(path, "Enter a valid submitter email.");
+  if (!FORM_PRIORITIES.includes(text(formData, "priority"))) redirectWithError(path, "Choose a listed priority.");
+  const { data: form, error: formError } = await supabase.from("forms")
+    .select("id,schema_json").eq("workspace_id", workspaceId).eq("id", formId)
+    .is("archived_at", null).is("deleted_at", null).maybeSingle();
+  if (formError || !form) redirectWithError(path, "This form is unavailable in the current workspace.");
+  let schema: ReturnType<typeof parseSubmissionSchema>;
+  let fields: Record<string, string>;
+  try {
+    schema = parseSubmissionSchema(form.schema_json);
+    fields = validateSubmissionFields(schema, formData);
+  } catch (error) {
+    redirectWithError(path, error instanceof Error ? error.message : "Invalid form response.");
+  }
   const dataJson = {
+    schema_version: 1,
+    schema_snapshot: schema,
+    fields,
     summary,
     priority: text(formData, "priority"),
     follow_up: text(formData, "follow_up")
@@ -233,7 +249,7 @@ export async function createFormSubmissionAction(formData: FormData) {
   });
 
   if (error) {
-    redirectWithError(path, error.message);
+    redirectWithError(path, "Submission could not be saved. Check your access and try again.");
   }
 
   revalidatePath(path);

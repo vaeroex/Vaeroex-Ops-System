@@ -1,9 +1,8 @@
 import Link from "next/link";
-import { createFormSubmissionAction } from "@/app/app/operations/actions";
+import { InternalFormSubmissionForm } from "@/components/operations/InternalFormSubmissionForm";
 import { CreateDrawer } from "@/components/operations/CreateDrawer";
 import { EmptyState } from "@/components/operations/EmptyState";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
-import { PrimaryButton, SelectInput, TextArea, TextInput } from "@/components/operations/FormControls";
 import { ManagedRecordList, type ManagedRecordEditField } from "@/components/operations/ManagedRecordList";
 import { PageHeader } from "@/components/operations/PageHeader";
 import { ReadableData } from "@/components/operations/ReadableData";
@@ -97,35 +96,7 @@ export default async function FormSubmissionsPage({ searchParams }: FormSubmissi
       <section className="space-y-6">
         <CreateDrawer title="Add submission" description="Record an internal submission for an existing form." triggerLabel="New Submission">
           {forms?.length ? (
-            <form action={createFormSubmissionAction} className="grid gap-4 lg:grid-cols-2">
-              <input type="hidden" name="return_path" value="/app/form-submissions" />
-              <label className="block text-sm font-medium">
-                Form
-                <select
-                  name="form_id"
-                  required
-                  className="mt-2 w-full rounded-lg border border-line px-3 py-2 outline-none focus:border-vaeroex-blue"
-                >
-                  {forms.map((form) => (
-                    <option key={form.id} value={form.id}>
-                      {form.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <TextInput label="Submitter name" name="submitter_name" required />
-              <TextInput label="Submitter email" name="submitter_email" type="email" />
-              <SelectInput label="Priority" name="priority" defaultValue="Medium" options={priorityOptions} />
-              <div className="lg:col-span-2">
-                <TextArea label="Submission summary" name="summary" required rows={4} />
-              </div>
-              <div className="lg:col-span-2">
-                <TextArea label="Follow-up items, one per line" name="follow_up" rows={4} />
-              </div>
-              <div className="lg:col-span-2">
-                <PrimaryButton>Save submission</PrimaryButton>
-              </div>
-            </form>
+            <InternalFormSubmissionForm forms={forms.map(({ id, name, schema_json }) => ({ id, name, schema_json }))} returnPath="/app/form-submissions" />
           ) : (
             <EmptyState
               title="Create a form first"
