@@ -58,6 +58,22 @@ type GoogleSheetsFactLinkRow = {
 export type Database = {
   public: {
     Functions: {
+      begin_file_import_attempt_v1: {
+        Args: { p_workspace_id: string; p_file_id: string; p_import_id: string; p_approved_mapping: Json; p_row_ids: string[] };
+        Returns: Json;
+      };
+      reconcile_file_import_attempt_v1: {
+        Args: { p_workspace_id: string; p_file_id: string; p_import_id?: string | null; p_failed?: boolean };
+        Returns: Json;
+      };
+      submit_internal_form_v1: {
+        Args: { p_workspace_id: string; p_form_id: string; p_request_id: string; p_submitter_name: string; p_submitter_email: string; p_data_json: Json };
+        Returns: Json;
+      };
+      publish_confirmed_file_memory_v1: {
+        Args: { p_workspace_id: string; p_file_id: string; p_run_id: string; p_confirmed_by: string; p_chunks: Json; p_summary: string; p_embedding_error?: string | null };
+        Returns: Json;
+      };
       create_trusted_analysis_run_v1: {
         Args: { p_workspace_id: string; p_actor_id: string; p_agent_type: string; p_input_json: Json };
         Returns: { id: string }[];
@@ -2860,6 +2876,7 @@ export type Database = {
           file_upload_id: string;
           import_type: string;
           status: string;
+          recovery_status: string;
           rows_total: number;
           rows_imported: number;
           mapping_json: Json;
@@ -2876,6 +2893,7 @@ export type Database = {
           file_upload_id: string;
           import_type: string;
           status?: string;
+          recovery_status?: string;
           rows_total?: number;
           rows_imported?: number;
           mapping_json?: Json;

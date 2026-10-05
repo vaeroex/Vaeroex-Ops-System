@@ -390,7 +390,7 @@ function validImportType(value: string): ImportType {
   redirectWithError("Choose KPI data or business metrics before importing.");
 }
 
-async function requireWorkspace() {
+async function requireWorkspace({ allowExpired = false }: { allowExpired?: boolean } = {}) {
   const supabase = await createSupabaseServerClient();
 
   if (!supabase) {
@@ -415,12 +415,14 @@ async function requireWorkspace() {
     redirect("/app/setup?error=Workspace access is required.");
   }
 
+  if (!allowExpired) {
   await requireActiveSubscription({
     supabase,
     userId: user.id,
     email: user.email,
     workspaceId: context.activeWorkspace.id
   });
+  }
 
   return {
     supabase,
@@ -855,11 +857,12 @@ async function updateImportRowDiagnostics({
   for (let index = 0; index < results.length; index += 20) {
     const batch = results.slice(index, index + 20);
     const updates = await Promise.all(
-      batch.map(({ row, issues, mappedData }) =>
+      batch.map(({ row, issues }) =>
         supabase
           .from("file_import_rows")
           .update({
-            mapped_data_json: mappedData,
+            // Source mapping stays immutable once admitted; the durable receipt
+            // records the user-reviewed mapping for this import attempt.
             validation_errors_json: issues as unknown as Json,
             status: issues.length ? "rejected_validation" : "staged"
           })
@@ -875,11 +878,51 @@ async function updateImportRowDiagnostics({
   }
 }
 
-async function requireImportWrite(result: PromiseLike<{ error: { message: string } | null }>, operation: string) {
-  const { error } = await result;
-  if (error) {
+async function requireImportWrite(
+  result: { select(columns: string): PromiseLike<{ data: unknown; error: { message: string } | null }> },
+  operation: string,
+  expectedRows = 1
+) {
+  const { data, error } = await result.select("id");
+  if (error || !Array.isArray(data) || data.length !== expectedRows) {
     throw new Error(`Some import records may already be saved. ${operation} could not be confirmed. Reload this source and review its imported records before retrying.`);
   }
+}
+
+
+async function beginImportAttempt({ supabase, workspaceId, file, importId, mapping, rows }: {
+  supabase: SupabaseServerClient; workspaceId: string; file: FileUploadRow; importId: string; mapping: Json; rows: StagedImportRow[];
+}) {
+  const { data, error } = await supabase.rpc("begin_file_import_attempt_v1", {
+    p_workspace_id: workspaceId, p_file_id: file.id, p_import_id: importId,
+    p_approved_mapping: mapping, p_row_ids: rows.map((row) => row.id)
+  });
+  if (error || !isRecord(data) || data.admitted !== true || typeof data.attempt_id !== "string" || !data.attempt_id) {
+    redirectWithFileError("This import could not be admitted safely. Review its saved results before preparing or retrying the source; accepted work is never resubmitted automatically.", file.id, "imported");
+  }
+  return data.attempt_id as string;
+}
+
+async function reconcileImportAttempt(supabase: SupabaseServerClient, workspaceId: string, fileId: string, importId: string | null, failed = false) {
+  try {
+    const { data, error } = await supabase.rpc("reconcile_file_import_attempt_v1", {
+      p_workspace_id: workspaceId, p_file_id: fileId, p_import_id: importId, p_failed: failed
+    });
+    return !error && isRecord(data) ? data : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function reconcileFileImportAction(formData: FormData) {
+  const { supabase, workspaceId } = await requireWorkspace({ allowExpired: true });
+  const file = await getFileForWorkspace(text(formData, "file_id"), workspaceId);
+  const result = await reconcileImportAttempt(supabase, workspaceId, file.id, text(formData, "import_id") || null);
+  revalidatePath(SOURCES_PATH);
+  if (!result) redirectWithFileError("Persisted import results could not be verified. No data was resubmitted; the recovery hold remains in place.", file.id, "imported");
+  if (result.status === "completed") redirectWithMessage("Import completion verified from saved results. No rows were resubmitted.", file.id, "imported");
+  const counts = `${Number(result.kpi_records || 0)} KPI records, ${Number(result.metric_records || 0)} metric records and ${Number(result.active_memory_chunks || 0)} active evidence chunks are currently saved.`;
+  redirectWithFileError(`${counts} Accepted work remains held for operator reconciliation. A still-running or partial attempt cannot be retried automatically.`, file.id, "imported");
 }
 
 function buildKpiRecords(
@@ -2703,7 +2746,6 @@ export async function approveFileAnalysisAction(formData: FormData) {
   const { supabase, user, workspaceId, membership } = await requireWorkspace();
   const returnPath = safeFileReturnPath(text(formData, "return_path"));
   const file = await getFileForWorkspace(text(formData, "file_id"), workspaceId);
-  const metadata = isRecord(file.metadata_json) ? file.metadata_json : {};
   const runId = text(formData, "run_id") || latestAnalysisRunId(file);
   const summary = text(formData, "summary") || file.analysis_summary || "Approved file analysis.";
 
@@ -2787,36 +2829,8 @@ export async function approveFileAnalysisAction(formData: FormData) {
       throw new Error(indexResult.error);
     }
 
-    await supabase
-      .from("file_uploads")
-      .update({
-        metadata_json: {
-          ...metadata,
-          latest_analysis_status: "approved",
-          analysis_review_status: "approved",
-          business_memory_trust_level: "trusted",
-          analysis_review_updated_at: approvedAt,
-          analysis_approved_at: approvedAt,
-          analysis_approved_by: user.id,
-          business_memory: {
-            saved: true,
-            saved_at: approvedAt,
-            saved_by: user.id,
-            source: "file_analysis_approval",
-            source_file_id: file.id,
-            source_file_name: file.display_name,
-            run_id: runId,
-            summary,
-            indexed_chunk_count: indexResult.indexedChunks
-          } satisfies JsonObject
-        } satisfies Json,
-        processing_status: "ready",
-        processing_error: null,
-        processed_at: approvedAt,
-        updated_at: approvedAt
-      })
-      .eq("id", file.id)
-      .eq("workspace_id", workspaceId);
+    // The publication RPC owns approval metadata in the same transaction as
+    // its chunks. Do not overwrite the current source with a pre-embedding snapshot.
   } catch (error) {
     redirectWithPathError(returnPath, error instanceof Error ? error.message : "Findings could not be approved.", file.id);
   }
@@ -2924,6 +2938,10 @@ export async function importFileAction(formData: FormData): Promise<never> {
   const { supabase, user, workspaceId, membership } = await requireWorkspace();
   const importType: ImportType = "metrics";
   const file = await getFileForWorkspace(text(formData, "file_id"), workspaceId);
+  const priorRecovery = await reconcileImportAttempt(supabase, workspaceId, file.id, null);
+  if (!priorRecovery || !["not_started", "completed"].includes(String(priorRecovery.status))) {
+    redirectWithFileError("Accepted import work must be reconciled before this source can be prepared again. Review its saved results; no rows were resubmitted.", file.id, "imported");
+  }
   const reprepareImportId = text(formData, "import_id");
   let reprepareImport: Database["public"]["Tables"]["file_imports"]["Row"] | null = null;
 
@@ -3705,18 +3723,6 @@ async function saveWorkbookImport({
     if (!plan || !plan.enabled) return { row, issues: [] as ImportPipelineIssue[], mappedData: row.mapped_data_json };
     return { row, issues: validateWorksheetImportRow(row, plan), mappedData: worksheetMappedData(row, plan) };
   });
-  await updateImportRowDiagnostics({ supabase, workspaceId, importId: importRecord.id, results: diagnostics });
-
-  const kpiRowIds = diagnostics.filter((result) => ["kpis", "wide_time_series", "kpi_targets"].includes(planByIndex.get(worksheetIndexForRow(result.row))?.selected_type || "")).map((result) => result.row.id);
-  const metricRowIds = diagnostics.filter((result) => !["kpis", "wide_time_series", "kpi_targets"].includes(planByIndex.get(worksheetIndexForRow(result.row))?.selected_type || "")).map((result) => result.row.id);
-  if (kpiRowIds.length) await supabase.from("file_import_rows").update({ import_type: "kpi" }).eq("workspace_id", workspaceId).eq("import_id", importRecord.id).in("id", kpiRowIds);
-  if (metricRowIds.length) await supabase.from("file_import_rows").update({ import_type: "metrics" }).eq("workspace_id", workspaceId).eq("import_id", importRecord.id).in("id", metricRowIds);
-
-  const skippedRows = diagnostics.filter((result) => !planByIndex.get(worksheetIndexForRow(result.row))?.enabled).map((result) => result.row.id);
-  if (skippedRows.length) {
-    await supabase.from("file_import_rows").update({ status: "skipped_worksheet" }).eq("workspace_id", workspaceId).eq("import_id", importRecord.id).in("id", skippedRows);
-  }
-
   const validRows = diagnostics.filter((result) => planByIndex.get(worksheetIndexForRow(result.row))?.enabled && !result.issues.length).map((result) => result.row);
   const rejectedIssues = diagnostics.flatMap((result) => result.issues);
   const parserIssues = Array.isArray(importRecord.errors_json) ? importRecord.errors_json.filter(isRecord) : [];
@@ -3725,7 +3731,6 @@ async function saveWorkbookImport({
     const message = first
       ? `No approved rows were imported. First failure: ${first.worksheet}, row ${first.row_number}: ${first.message}`
       : "No approved rows were available to import.";
-    await supabase.from("file_imports").update({ status: "failed", rows_imported: 0, mapping_json: workbookMappingWithPlans(importRecord.mapping_json, plans), errors_json: [...parserIssues, ...rejectedIssues] as unknown as Json }).eq("workspace_id", workspaceId).eq("id", importRecord.id);
     redirectWithFileError(message, file.id, "imported");
   }
 
@@ -3736,21 +3741,10 @@ async function saveWorkbookImport({
   );
   if (targetRegistry.hasTargetContract && (invalidTargetRows.length || targetRegistry.errors.length || !targetRegistry.bindings.length)) {
     const firstIssue = invalidTargetRows[0]?.issues[0]?.message || targetRegistry.errors[0] || "No target metadata matched an approved KPI metric column.";
-    const targetIssues = targetRegistry.errors.map((message) => ({
-      stage: "import_validation" as const,
-      worksheet: "KPI Targets",
-      row_number: null,
-      field: "target_binding",
-      message
-    }));
-    await supabase.from("file_imports").update({
-      status: "failed",
-      rows_imported: 0,
-      mapping_json: workbookMappingWithPlans(importRecord.mapping_json, plans),
-      errors_json: [...parserIssues, ...rejectedIssues, ...targetIssues] as unknown as Json
-    }).eq("workspace_id", workspaceId).eq("id", importRecord.id);
     redirectWithFileError(`KPI target metadata could not be bound safely. ${firstIssue}`, file.id, "imported");
   }
+
+  const importAttemptId = await beginImportAttempt({ supabase, workspaceId, file, importId: importRecord.id, mapping: workbookMappingWithPlans(importRecord.mapping_json, plans), rows: validRows });
 
   let insertedStructuredRows = 0;
   const duplicateIds = new Set<string>();
@@ -3759,6 +3753,18 @@ async function saveWorkbookImport({
   const runtimeIssues: ImportPipelineIssue[] = [];
   let indexedImportRows = 0;
   try {
+    await updateImportRowDiagnostics({ supabase, workspaceId, importId: importRecord.id, results: diagnostics });
+
+    const kpiRowIds = diagnostics.filter((result) => ["kpis", "wide_time_series", "kpi_targets"].includes(planByIndex.get(worksheetIndexForRow(result.row))?.selected_type || "")).map((result) => result.row.id);
+    const metricRowIds = diagnostics.filter((result) => !["kpis", "wide_time_series", "kpi_targets"].includes(planByIndex.get(worksheetIndexForRow(result.row))?.selected_type || "")).map((result) => result.row.id);
+    if (kpiRowIds.length) await supabase.from("file_import_rows").update({ import_type: "kpi" }).eq("workspace_id", workspaceId).eq("import_id", importRecord.id).in("id", kpiRowIds);
+    if (metricRowIds.length) await supabase.from("file_import_rows").update({ import_type: "metrics" }).eq("workspace_id", workspaceId).eq("import_id", importRecord.id).in("id", metricRowIds);
+
+    const skippedRows = diagnostics.filter((result) => !planByIndex.get(worksheetIndexForRow(result.row))?.enabled).map((result) => result.row.id);
+    if (skippedRows.length) {
+      await supabase.from("file_import_rows").update({ status: "skipped_worksheet" }).eq("workspace_id", workspaceId).eq("import_id", importRecord.id).in("id", skippedRows);
+    }
+
     await updateFileProcessingStatus({ supabase, file, status: "processing" });
     if (targetRegistry.hasTargetContract) {
       insertedStructuredRows += await upsertWorkbookKpiTargetSettings({
@@ -3845,7 +3851,7 @@ async function saveWorkbookImport({
       }));
       return rows.length ? [{ name: plan.name, index: plan.index, type: worksheetTypeLabel(plan.selected_type), rows }] : [];
     });
-    const indexing = await indexWorksheetImportEvidence({ supabase, workspaceId, userId: user.id, file, importId: importRecord.id, worksheets: evidenceWorksheets });
+    const indexing = await indexWorksheetImportEvidence({ supabase, workspaceId, userId: user.id, file, importId: importRecord.id, importAttemptId, worksheets: evidenceWorksheets });
     const indexingSucceeded = indexing.indexedChunks > 0;
     if (indexingSucceeded) indexedImportRows = validRows.length;
     if (!indexingSucceeded) {
@@ -3856,16 +3862,17 @@ async function saveWorkbookImport({
         field: "evidence",
         message: indexing.error || "Approved worksheet evidence could not be added to Business Memory."
       });
+      throw new Error("Structured records may already be saved, but approved worksheet evidence was not published. This import is held for reconciliation.");
     }
 
     const contextIds = validRows.filter((row) => !structuredIds.has(row.id) && !duplicateIds.has(row.id) && !structuredFailureIds.has(row.id)).map((row) => row.id);
     const structuredRowIds = Array.from(structuredIds);
     const duplicateRowIds = Array.from(duplicateIds);
     const structuredFailureRowIds = Array.from(structuredFailureIds);
-    if (structuredRowIds.length) await requireImportWrite(supabase.from("file_import_rows").update({ status: "imported" }).eq("workspace_id", workspaceId).eq("import_id", importRecord.id).in("id", structuredRowIds), "Imported row status");
-    if (contextIds.length) await requireImportWrite(supabase.from("file_import_rows").update({ status: indexingSucceeded ? "indexed" : "index_failed" }).eq("workspace_id", workspaceId).eq("import_id", importRecord.id).in("id", contextIds), "Evidence row status");
-    if (structuredFailureRowIds.length) await requireImportWrite(supabase.from("file_import_rows").update({ status: indexingSucceeded ? "indexed_with_import_error" : "rejected_import" }).eq("workspace_id", workspaceId).eq("import_id", importRecord.id).in("id", structuredFailureRowIds), "Failed row status");
-    if (duplicateRowIds.length) await requireImportWrite(supabase.from("file_import_rows").update({ status: "skipped_duplicate" }).eq("workspace_id", workspaceId).eq("import_id", importRecord.id).in("id", duplicateRowIds), "Duplicate row status");
+    if (structuredRowIds.length) await requireImportWrite(supabase.from("file_import_rows").update({ status: "imported" }).eq("workspace_id", workspaceId).eq("import_id", importRecord.id).in("id", structuredRowIds), "Imported row status", structuredRowIds.length);
+    if (contextIds.length) await requireImportWrite(supabase.from("file_import_rows").update({ status: indexingSucceeded ? "indexed" : "index_failed" }).eq("workspace_id", workspaceId).eq("import_id", importRecord.id).in("id", contextIds), "Evidence row status", contextIds.length);
+    if (structuredFailureRowIds.length) await requireImportWrite(supabase.from("file_import_rows").update({ status: indexingSucceeded ? "indexed_with_import_error" : "rejected_import" }).eq("workspace_id", workspaceId).eq("import_id", importRecord.id).in("id", structuredFailureRowIds), "Failed row status", structuredFailureRowIds.length);
+    if (duplicateRowIds.length) await requireImportWrite(supabase.from("file_import_rows").update({ status: "skipped_duplicate" }).eq("workspace_id", workspaceId).eq("import_id", importRecord.id).in("id", duplicateRowIds), "Duplicate row status", duplicateRowIds.length);
 
     const importedAt = new Date().toISOString();
     const acceptedRowCount = indexingSucceeded ? validRows.length : new Set([...structuredRowIds, ...duplicateRowIds]).size;
@@ -3904,7 +3911,14 @@ async function saveWorkbookImport({
         { import_id: importRecord.id, import_type: "workbook", rows_total: importRecord.rows_total, rows_imported: acceptedRowCount, structured_rows: insertedStructuredRows, worksheet_count: enabledPlans.length, imported_at: importedAt, source_file_id: file.id }
       )
     }).eq("workspace_id", workspaceId).eq("id", file.id), "Source completion");
+    const completion = await reconcileImportAttempt(supabase, workspaceId, file.id, importRecord.id);
+    if (completion?.status !== "completed") throw new Error("The import has partial or unverified saved results. It is held for reconciliation; do not resubmit the source.");
   } catch (error) {
+    const recovery = await reconcileImportAttempt(supabase, workspaceId, file.id, importRecord.id, true);
+    if (recovery?.status === "completed") {
+      revalidatePath(SOURCES_PATH);
+      redirectWithMessage("Import completion verified after an interrupted acknowledgement. No rows were resubmitted.", file.id, "imported");
+    }
     const message = actionErrorMessage(error, "The approved workbook could not be imported.");
     const issue = { stage: "import" as const, worksheet: "Workbook", row_number: null, field: "workbook", message };
     const persistedRowCount = Math.max(indexedImportRows, new Set([...structuredIds, ...duplicateIds]).size);
@@ -4050,38 +4064,13 @@ export async function saveExtractedImportAction(formData: FormData) {
     ? importRecord.errors_json.filter(isRecord).map((issue) => issue as JsonRecord)
     : [];
 
-  try {
-    await updateImportRowDiagnostics({ supabase, workspaceId, importId, results: diagnostics });
-  } catch (error) {
-    redirectWithFileError(error instanceof Error ? error.message : "Import diagnostics could not be saved.", file.id, "imported");
-  }
-
   if (!validRows.length) {
     const firstIssue = rejectedIssues[0];
     const message = `No ${importType === "kpi" ? "KPI" : "metric"} rows were imported. All ${stagedRows.length} extracted rows failed validation. First failure: ${firstIssue.worksheet}, row ${firstIssue.row_number}: ${firstIssue.message}`;
-    await supabase
-      .from("file_imports")
-      .update({
-        status: "failed",
-        rows_imported: 0,
-        mapping_json: savedMappingJson,
-        errors_json: [...parserIssues, ...rejectedIssues] as unknown as Json
-      })
-      .eq("id", importId)
-      .eq("workspace_id", workspaceId);
-    await supabase
-      .from("file_uploads")
-      .update({
-        import_status: "failed",
-        processing_status: "failed",
-        processing_error: message,
-        processed_at: new Date().toISOString(),
-        metadata_json: updateImportPipelineTrace(file.metadata_json, "failed", `${stagedRows.length} row(s) were rejected. No business records or Business Memory evidence were created.`)
-      })
-      .eq("id", file.id)
-      .eq("workspace_id", workspaceId);
     redirectWithFileError(message, file.id, "imported");
   }
+
+  await beginImportAttempt({ supabase, workspaceId, file, importId, mapping: savedMappingJson, rows: validRows as StagedImportRow[] });
 
   let importedRowCount = 0;
   let duplicateKpiRowCount = 0;
@@ -4091,6 +4080,7 @@ export async function saveExtractedImportAction(formData: FormData) {
   const rejectedRowCount = diagnostics.filter((result) => result.issues.length).length;
 
   try {
+    await updateImportRowDiagnostics({ supabase, workspaceId, importId, results: diagnostics });
     await updateFileProcessingStatus({ supabase, file, status: "processing" });
 
     if (importType === "kpi") {
@@ -4102,7 +4092,6 @@ export async function saveExtractedImportAction(formData: FormData) {
         sourceFileId: file.id
       });
       duplicateKpiRowCount = deduped.duplicateRows.length;
-      importedRowCount = deduped.rows.length;
       importedKpiImportRowIds = deduped.rows.map((row) => row.importRowId);
       duplicateKpiImportRowIds = deduped.duplicateRows.map((row) => row.importRowId);
 
@@ -4113,6 +4102,8 @@ export async function saveExtractedImportAction(formData: FormData) {
           throw new Error(error.message);
         }
       }
+
+      importedRowCount = deduped.rows.length;
 
       if (targetRows.length && kpiInterpretation) {
         const kpiSettingsSaved = await upsertImportedKpiSettings({
@@ -4126,7 +4117,6 @@ export async function saveExtractedImportAction(formData: FormData) {
       }
     } else {
       const targetRows = buildOperationalMetricRecords(validRows, workspaceId, user.id, file, importId, mapping);
-      importedRowCount = targetRows.length;
 
       if (targetRows.length) {
         const { error } = await supabase.from("operational_metrics").insert(targetRows.map((row) => row.record));
@@ -4135,6 +4125,7 @@ export async function saveExtractedImportAction(formData: FormData) {
           throw new Error(error.message);
         }
       }
+      importedRowCount = targetRows.length;
     }
 
     const importedAt = new Date().toISOString();
@@ -4149,41 +4140,41 @@ export async function saveExtractedImportAction(formData: FormData) {
 
     if (importType === "kpi") {
       if (importedKpiImportRowIds.length) {
-        await supabase
+        await requireImportWrite(supabase
           .from("file_import_rows")
           .update({
             status: "imported"
           })
           .eq("workspace_id", workspaceId)
           .eq("import_id", importId)
-          .in("id", importedKpiImportRowIds);
+          .in("id", importedKpiImportRowIds), "Imported row status", importedKpiImportRowIds.length);
       }
 
       if (duplicateKpiImportRowIds.length) {
-        await supabase
+        await requireImportWrite(supabase
           .from("file_import_rows")
           .update({
             status: "skipped_duplicate"
           })
           .eq("workspace_id", workspaceId)
           .eq("import_id", importId)
-          .in("id", duplicateKpiImportRowIds);
+          .in("id", duplicateKpiImportRowIds), "Imported row status", duplicateKpiImportRowIds.length);
       }
     } else {
       const importedMetricRowIds = validRows.map((row) => row.id);
       if (importedMetricRowIds.length) {
-        await supabase
+        await requireImportWrite(supabase
           .from("file_import_rows")
           .update({
             status: "imported"
           })
           .eq("workspace_id", workspaceId)
           .eq("import_id", importId)
-          .in("id", importedMetricRowIds);
+          .in("id", importedMetricRowIds), "Imported row status", importedMetricRowIds.length);
       }
     }
 
-    await supabase
+    await requireImportWrite(supabase
       .from("file_imports")
       .update({
         status: "completed",
@@ -4195,9 +4186,9 @@ export async function saveExtractedImportAction(formData: FormData) {
         errors_json: [...parserIssues, ...rejectedIssues] as unknown as Json
       })
       .eq("id", importId)
-      .eq("workspace_id", workspaceId);
+      .eq("workspace_id", workspaceId), "Import completion");
 
-    await supabase
+    await requireImportWrite(supabase
       .from("file_uploads")
       .update({
         import_type: importType,
@@ -4216,8 +4207,15 @@ export async function saveExtractedImportAction(formData: FormData) {
         )
       })
       .eq("id", file.id)
-      .eq("workspace_id", workspaceId);
+      .eq("workspace_id", workspaceId), "Source completion");
+    const completion = await reconcileImportAttempt(supabase, workspaceId, file.id, importId);
+    if (completion?.status !== "completed") throw new Error("The import has partial or unverified saved results. It is held for reconciliation; do not resubmit the source.");
   } catch (error) {
+    const recovery = await reconcileImportAttempt(supabase, workspaceId, file.id, importId, true);
+    if (recovery?.status === "completed") {
+      revalidatePath(SOURCES_PATH);
+      redirectWithMessage("Import completion verified after an interrupted acknowledgement. No rows were resubmitted.", file.id, "imported");
+    }
     const message = actionErrorMessage(error, "Imported data could not be saved.");
     const importIssues = validRows.map((row) => issueForImportRow(row, "import", message));
 
@@ -4241,7 +4239,7 @@ export async function saveExtractedImportAction(formData: FormData) {
 
     await supabase
       .from("file_imports")
-      .update({ status: "failed", errors_json: [...parserIssues, ...rejectedIssues, ...importIssues] as unknown as Json })
+      .update({ status: "failed", rows_imported: importedRowCount, errors_json: [...parserIssues, ...rejectedIssues, ...importIssues] as unknown as Json })
       .eq("id", importId)
       .eq("workspace_id", workspaceId);
 

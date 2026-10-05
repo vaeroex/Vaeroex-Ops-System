@@ -1144,46 +1144,6 @@ export async function indexFileAnalysisEvidence({
     return { indexedChunks: 0, error: "No readable evidence chunks were available to index." };
   }
 
-  // Preserve the previous version until the complete replacement is persisted.
-  // Capture IDs, rather than archiving every file chunk after the write: another
-  // approval may publish different chunks while embeddings are being prepared.
-  const { data: previousChunks, error: previousChunksError } = await supabase
-    .from("business_memory_chunks")
-    .select("id")
-    .eq("workspace_id", workspaceId)
-    .eq("source_type", "file_analysis")
-    .eq("source_file_id", file.id)
-    .is("deleted_at", null)
-    .is("archived_at", null);
-  if (previousChunksError) return { indexedChunks: 0, error: "The previous Business Memory version could not be verified. Try again before replacing it." };
-
-  const { data: job } = await supabase
-    .from("file_processing_jobs")
-    .insert({
-      workspace_id: workspaceId,
-      file_upload_id: file.id,
-      job_type: "index",
-      status: "processing",
-      attempts: 1,
-      started_at: startedAt,
-      created_by: userId || null,
-      metadata_json: {
-        source: "file_analysis",
-        run_id: runId || null,
-        chunk_count: chunks.length,
-        evidence_classification: "business_evidence",
-        extraction_outcome: "facts_extracted"
-      }
-    })
-    .select("id")
-    .maybeSingle();
-
-  await supabase
-    .from("file_uploads")
-    .update({ index_status: "processing", index_error: null })
-    .eq("id", file.id)
-    .eq("workspace_id", workspaceId);
-
   const embedding = await createEmbeddings(chunks);
   const quality = sourceQualityForFile(file, normalized);
   const confidenceScore = chunkConfidenceScore({ quality, chunkCount: chunks.length, textLength: normalized.length });
@@ -1225,86 +1185,25 @@ export async function indexFileAnalysisEvidence({
     archived_at: null,
     deleted_at: null
   }));
-  const { data: publishedChunks, error } = await supabase.from("business_memory_chunks").upsert(rows, {
-    onConflict: "workspace_id,source_type,source_id,content_hash,chunk_index"
-  }).select("id");
-  const completedAt = new Date().toISOString();
-
-  if (error) {
-    await Promise.all([
-      supabase
-        .from("file_uploads")
-        .update({
-          index_status: "failed",
-          index_error: error.message,
-          indexed_at: completedAt
-        })
-        .eq("id", file.id)
-        .eq("workspace_id", workspaceId),
-      job?.id
-        ? supabase
-            .from("file_processing_jobs")
-            .update({ status: "failed", error_message: error.message, completed_at: completedAt })
-            .eq("id", job.id)
-            .eq("workspace_id", workspaceId)
-        : Promise.resolve()
-    ]);
-
-    return { indexedChunks: 0, error: error.message };
+  // Publication, retirement and its durable receipt are one database commit.
+  // A retry reuses the confirmed run and can recover a lost RPC acknowledgement.
+  const { data, error } = await supabase.rpc("publish_confirmed_file_memory_v1", {
+    p_workspace_id: workspaceId,
+    p_file_id: file.id,
+    p_run_id: runId,
+    p_confirmed_by: confirmation.userId,
+    p_chunks: rows as unknown as Json,
+    p_summary: summary || file.analysis_summary || "Approved file analysis.",
+    p_embedding_error: embedding.error || null
+  });
+  if (error || !isRecord(data) || data.indexed_chunks !== rows.length) {
+    return {
+      indexedChunks: 0,
+      error: error?.code === "40001"
+        ? "This analysis or its saved memory changed. Reload the source before confirming it again."
+        : "Business Memory publication could not be confirmed. Reload this source and retry the same reviewed analysis to reconcile its saved result."
+    };
   }
-
-  if (!publishedChunks || publishedChunks.length !== rows.length) {
-    return { indexedChunks: 0, error: "The replacement Business Memory write could not be confirmed. The previous version was preserved; retry to reconcile this analysis." };
-  }
-  const publishedIds = new Set(publishedChunks.map((chunk) => chunk.id));
-  const previousIds = (previousChunks || []).map((chunk) => chunk.id).filter((id) => !publishedIds.has(id));
-  if (previousIds.length) {
-    const { error: archiveError } = await supabase.from("business_memory_chunks")
-      .update({ archived_at: completedAt, updated_at: completedAt })
-      .eq("workspace_id", workspaceId)
-      .eq("source_type", "file_analysis")
-      .eq("source_file_id", file.id)
-      .in("id", previousIds)
-      .lt("indexed_at", startedAt)
-      .is("deleted_at", null)
-      .is("archived_at", null);
-    if (archiveError) return { indexedChunks: 0, error: "The new analysis was saved, but the previous Business Memory version could not be retired. Retry to reconcile the versions." };
-  }
-
-  await Promise.all([
-    supabase
-      .from("file_uploads")
-      .update({
-        index_status: "ready",
-        index_error: embedding.error || null,
-        indexed_at: completedAt,
-        indexed_chunk_count: rows.length
-      })
-      .eq("id", file.id)
-      .eq("workspace_id", workspaceId),
-    job?.id
-      ? supabase
-          .from("file_processing_jobs")
-          .update({
-            status: "completed",
-            error_message: embedding.error || null,
-            completed_at: completedAt,
-            metadata_json: {
-              source: "file_analysis",
-              run_id: runId || null,
-              chunk_count: rows.length,
-              evidence_classification: "business_evidence",
-              extraction_outcome: "facts_extracted",
-              embedding_model: embedding.model,
-              embedding_tokens: embedding.tokens,
-              embedding_error: embedding.error || null
-            }
-          })
-          .eq("id", job.id)
-          .eq("workspace_id", workspaceId)
-      : Promise.resolve()
-  ]);
-
   return { indexedChunks: rows.length, error: embedding.error };
 }
 
@@ -1321,6 +1220,7 @@ export async function indexWorksheetImportEvidence({
   userId,
   file,
   importId,
+  importAttemptId,
   worksheets
 }: {
   supabase: SupabaseClient<Database>;
@@ -1328,8 +1228,12 @@ export async function indexWorksheetImportEvidence({
   userId?: string | null;
   file: FileUploadRow;
   importId: string;
+  importAttemptId: string;
   worksheets: WorksheetImportEvidence[];
 }) {
+  if (typeof importAttemptId !== "string" || !importAttemptId.trim()) {
+    return { indexedChunks: 0, error: "A durable approved import attempt is required for worksheet evidence." };
+  }
   if (file.deleted_at || file.archived_at) {
     return { indexedChunks: 0, error: "Inactive source files cannot be added to Business Memory." };
   }
@@ -1397,7 +1301,7 @@ export async function indexWorksheetImportEvidence({
       source_excerpt: chunk.text,
       summary: `${chunk.worksheet.name} from ${file.display_name}`,
       chunk_index: index,
-      content_hash: hashContent(`${file.id}:${chunk.worksheet.index}:${chunk.text}`),
+      content_hash: hashContent(`${file.id}:${importAttemptId}:${chunk.worksheet.index}:${chunk.text}`),
       embedding: embedding.embeddings[index] || null,
       embedding_model: embedding.embeddings[index] ? embedding.model : null,
       source_metadata: {
@@ -1407,6 +1311,7 @@ export async function indexWorksheetImportEvidence({
         source_record_type: "file_upload",
         source_record_id: file.id,
         import_id: importId,
+        import_attempt_id: importAttemptId,
         worksheet_name: chunk.worksheet.name,
         worksheet_index: chunk.worksheet.index,
         worksheet_type: chunk.worksheet.type,

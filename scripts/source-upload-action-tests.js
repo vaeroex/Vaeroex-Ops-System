@@ -45,6 +45,7 @@ function harness(options = {}) {
   let storageCalls = 0;
   let savedBuffer;
   const supabase = {
+    rpc: async () => ({ data: { status: "not_started" }, error: null }),
     auth: { getUser: async () => ({ data: { user: { id: "user-one", email: "fixture@example.invalid" } } }) },
     storage: { from: () => ({
       async upload(storagePath, buffer, settings) {
