@@ -16,11 +16,17 @@ export async function GET(request: Request) {
   if (!sheetsEnabled()) return NextResponse.json({ enabled: false, attempted: 0 }, { headers });
   try {
     const result = await runDueSheetsRefreshes({
-      due: async (tickAt, limit, deadlineAt) => {
-        const { data, error } = await withSheetsRequest(deadlineAt, 10_000, signal => sheetsAdmin().from("google_sheets_connections")
-          .select("id,workspace_id").eq("status", "connected").eq("automatic_refresh_enabled", true)
-          .not("active_approval_id", "is", null).lte("next_sync_at", tickAt)
-          .order("next_sync_at").limit(limit).abortSignal(signal));
+      due: async (tickAt, limit, deadlineAt, excludedConnectionIds) => {
+        const { data, error } = await withSheetsRequest(deadlineAt, 10_000, signal => {
+          let query = sheetsAdmin().from("google_sheets_connections")
+            .select("id,workspace_id").eq("status", "connected").eq("automatic_refresh_enabled", true)
+            .not("active_approval_id", "is", null).lte("next_sync_at", tickAt);
+          // IDs come from this tick's database results; the bound is 50. Exclude
+          // attempted rows even when their backoff write failed, so later tenants
+          // can progress without increasing provider concurrency or retrying here.
+          if (excludedConnectionIds.length) query = query.not("id", "in", `(${excludedConnectionIds.join(",")})`);
+          return query.order("next_sync_at").order("id").limit(limit).abortSignal(signal);
+        });
         if (error) throw new Error("google_sheets_scheduling_unavailable");
         return data ?? [];
       },

@@ -1,0 +1,11 @@
+{
+  "declaredBeforeExecution": true,
+  "scope": "Actual deployed Sheets scheduler with synthetic due queue and virtual clock; no database, HTTP, provider, or user capacity claim",
+  "singleBurstWorkspaces": [20, 50, 100],
+  "connectionsPerWorkspace": 1,
+  "assumedSyncDurationsMs": [500, 5000],
+  "nominalAcceptance": {"allOfferedConnectionsAttemptedWithinTick": true, "queueP95Ms": 30000, "noDuplicateAttemptsPerTick": true},
+  "faultAcceptance": {"healthyWorkspaceProgressDespiteFailedBackoff": true, "quietWorkspaceQueueDelayRatioToBaselineMax": 2, "failedAttemptsTruthfullyCounted": true},
+  "bounds": {"maxSimulatedTicksPerScenario": 4, "maxConnections": 100, "maxNodeHeapMiB": 256, "wallTimeoutMs": 10000},
+  "interpretation": "Simulated service times are assumptions. Threshold failures identify scheduling behavior only; measured wall time is reported separately. Failure scenarios are expected to expose concerns and must not be counted as passing service SLOs."
+}
