@@ -96,13 +96,18 @@ async function verifyAbandonedSyncRecovery(db, call, deny) {
   await db.query("insert into public.google_sheets_connections(id,workspace_id,business_entity_id,created_by,status,display_name,spreadsheet_id,sheet_id,sheet_title,headers) values($1,$2,$3,$4,'connected','Interrupted sync fixture',$5,0,'Metrics',$6)", [id, ws, entity, actor, spreadsheet, headers]);
   await call('approve_google_sheets_mapping_v1', [ws,id,actor,session,mapping,true]);
   const first = await call('claim_google_sheets_sync_v1', [ws,id,null,null,'scheduled']);
-  const timing = (await db.query('select extract(epoch from (sync_lease_expires_at-updated_at))::int lease_seconds,extract(epoch from (next_sync_at-updated_at))::int retry_seconds from public.google_sheets_connections where id=$1', [id])).rows[0];
-  assert.deepEqual(timing, { lease_seconds: 480, retry_seconds: 3600 }); checks++;
+  const timing = (await db.query('select extract(epoch from (sync_lease_expires_at-updated_at))::int lease_seconds,next_sync_at<=$2::timestamptz original_due_preserved from public.google_sheets_connections where id=$1', [id,new Date().toISOString()])).rows[0];
+  assert.deepEqual(timing, { lease_seconds: 270, original_due_preserved: true }); checks++;
+  assert.equal((await db.query('select r.eligible_at=c.next_sync_at same_eligibility from public.google_sheets_sync_runs r join public.google_sheets_connections c on c.sync_lease_run_id=r.id where r.id=$1',[first.runId])).rows[0].same_eligibility,true); checks++;
+  await deny(()=>call('recover_google_sheets_syncs_v1',[100],'authenticated'),'permission denied|service_denied');
+  await deny(()=>call('due_google_sheets_syncs_v1',[new Date().toISOString(),10,'{}'],'anon'),'permission denied|service_denied');
   // Accelerate only persisted expiry in the owned synthetic database. This
   // proves SQL state transitions, not process-kill or elapsed recovery latency.
   await db.query("update public.google_sheets_connections set sync_lease_expires_at=now()-interval '1 second' where id=$1", [id]);
-  assert.equal((await db.query("select count(*)::int n from public.google_sheets_connections where id=$1 and status='connected' and automatic_refresh_enabled and active_approval_id is not null and next_sync_at<=now()", [id])).rows[0].n, 0); checks++;
+  assert.equal((await db.query("select count(*)::int n from public.google_sheets_connections where id=$1 and status='connected' and automatic_refresh_enabled and active_approval_id is not null and next_sync_at<=now()", [id])).rows[0].n, 1); checks++;
   assert.equal((await db.query('select status from public.google_sheets_sync_runs where id=$1',[first.runId])).rows[0].status, 'running'); checks++;
+  const repaired=await call('recover_google_sheets_syncs_v1',[100]);
+  assert.equal(repaired.recovered,1);assert.equal(repaired.remainingExpired,0); checks+=2;
   await deny(() => call('claim_google_sheets_sync_v1',[ws,id,null,null,'scheduled']), 'schedule_denied');
   const resumed = await call('claim_google_sheets_sync_v1',[ws,id,actor,session,'manual']);
   assert.equal((await db.query('select status,error_code from public.google_sheets_sync_runs where id=$1',[first.runId])).rows[0].error_code, 'lease_expired'); checks++;
@@ -120,13 +125,16 @@ async function verifyAbandonedSyncRecovery(db, call, deny) {
   await deny(() => call('commit_google_sheets_sync_v1',[ws,id,resumed.runId,rows,true]),'fence_denied');
   await db.query('update public.google_sheets_connections set automatic_refresh_enabled=false,next_sync_at=null where id=$1',[id]);
   const manual = await call('claim_google_sheets_sync_v1',[ws,id,actor,session,'manual']);
+  assert.equal((await db.query('select eligible_at=started_at valid_manual_timing from public.google_sheets_sync_runs where id=$1',[manual.runId])).rows[0].valid_manual_timing,true); checks++;
   await db.query("update public.google_sheets_connections set sync_lease_expires_at=now()-interval '1 second' where id=$1",[id]);
   assert.equal((await db.query('select next_sync_at from public.google_sheets_connections where id=$1',[id])).rows[0].next_sync_at,null); checks++;
   assert.equal((await db.query('select status from public.google_sheets_sync_runs where id=$1',[manual.runId])).rows[0].status,'running'); checks++;
+  const repairedManual=await call('recover_google_sheets_syncs_v1',[100]);
+  assert.equal(repairedManual.recovered,1); checks++;
   const final = await call('claim_google_sheets_sync_v1',[ws,id,actor,session,'manual']);
   assert.equal((await db.query('select error_code from public.google_sheets_sync_runs where id=$1',[manual.runId])).rows[0].error_code,'lease_expired'); checks++;
   await call('fail_google_sheets_sync_v1',[ws,id,final.runId,'fixture_cleanup']);
-  return { scope: 'Persisted SQL with accelerated lease expiry; no worker kill or provider transport', leaseSeconds:480, automaticRetrySeconds:3600, expiredAutomaticRemainsUndue:true, expiredManualRemainsRunningUntilClaim:true, staleCommitDenied:true, lateCleanupPreservesSuccess:true, recovery300SecondsQualified:false };
+  return { scope: 'Persisted SQL with accelerated lease expiry; no worker kill or provider transport', leaseSeconds:270, automaticRetrySeconds:3600, originalEligibilityPreserved:true, independentTerminalRecovery:true, staleCommitDenied:true, lateCleanupPreservesSuccess:true, recovery300SecondsQualified:false };
 }
 
 async function qualify(db) {
@@ -157,6 +165,7 @@ async function qualify(db) {
   await db.exec(fn(phase3,'private.phase_3_contract_fingerprint_v1'));
   await db.exec(source('20261002040024_google_sheets_complete.sql'));
   await db.exec(source('20261002040031_google_sheets_lifecycle.sql'));
+  await db.exec(source('20261005182541_bounded_google_sheets_dispatch.sql'));
   assert((await db.query("select not has_schema_privilege('anon','private','USAGE') and not has_schema_privilege('authenticated','private','USAGE') and not has_schema_privilege('service_role','private','USAGE') as private_boundary")).rows[0].private_boundary);checks++;
   assert((await db.query("select not has_function_privilege('service_role','private.require_google_sheets_owner_v1(uuid,uuid,uuid,uuid)','EXECUTE') and not has_function_privilege('service_role','private.retire_google_sheets_facts_v1(uuid,uuid)','EXECUTE') and not has_function_privilege('service_role','private.require_google_sheets_eligible_v1(uuid)','EXECUTE') as helper_boundary")).rows[0].helper_boundary);checks++;
   await db.query('insert into public.workspaces(id) values($1),($2)',[ws,otherWs]);

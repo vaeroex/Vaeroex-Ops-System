@@ -28,6 +28,7 @@ type GoogleSheetsCredentialRow = {
   granted_scope: string; generation: number; credential_version: number; updated_at: string;
 };
 export type GoogleSheetsSyncRunRow = {
+  eligible_at: string | null;
   id: string; workspace_id: string; connection_id: string; initiated_by: string | null;
   trigger_kind: "manual" | "scheduled"; approval_id: string;
   status: "running" | "succeeded" | "failed"; row_count: number; fact_count: number;
@@ -58,6 +59,18 @@ type GoogleSheetsFactLinkRow = {
 export type Database = {
   public: {
     Functions: {
+      submit_issue_v1: {
+        Args: { p_workspace_id: string; p_request_id: string; p_payload: Json };
+        Returns: Json;
+      };
+      due_google_sheets_syncs_v1: {
+        Args: { p_tick_at: string; p_limit: number; p_excluded_ids?: string[] };
+        Returns: { id: string; workspace_id: string; next_sync_at: string }[];
+      };
+      recover_google_sheets_syncs_v1: {
+        Args: { p_limit?: number };
+        Returns: Json;
+      };
       begin_file_import_attempt_v1: {
         Args: { p_workspace_id: string; p_file_id: string; p_import_id: string; p_approved_mapping: Json; p_row_ids: string[] };
         Returns: Json;

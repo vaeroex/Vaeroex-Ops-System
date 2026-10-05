@@ -22,6 +22,8 @@ export const googleSheetsErrors: Record<string, string> = {
   headers_changed: "The spreadsheet headers changed. Discover the headers again and approve the updated mapping before syncing.",
   tab_missing: "The selected tab is no longer in the spreadsheet. Choose a tab and approve its mapping again.",
   sync_busy: "A sync is already running. Refresh this page after it completes.",
+  capacity_busy: "The sync service is at its safe concurrency limit. No new sync was started. Try again shortly.",
+  workspace_busy: "Another spreadsheet is syncing in this workspace. No new sync was started. Try again after it completes.",
   mapping_required: "Review and approve the field mapping before syncing. The current workspace owner must approve the source.",
   row_key_invalid: "A data row has an empty or invalid row ID. Fill every data row with a stable business record ID and sync again.",
   workspace_capacity: "This import would exceed the workspace’s 20,000 active metric limit. Reduce the report or archive older metrics before syncing again.",
