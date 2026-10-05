@@ -99,21 +99,25 @@ const form = entries => { const data = new FormData(); Object.entries(entries).f
     };
     const actions = load('app/app/operations/actions.ts', mocks);
     const payload = new FormData(); payload.set('synthetic', 'unchanged');
-    let releaseAdapter, adapterCompleted = false, adapterCalls = 0;
-    const adapterWait = new Promise(resolve => { releaseAdapter = resolve; });
-    const stateAdapter = load('app/app/operations/form-submission-action.ts', { './actions': { createFormSubmissionAction: async data => {
-      assert.equal(data, payload); adapterCalls++; await adapterWait;
-    } } });
-    const adapterResult = stateAdapter.submitInternalForm(null, payload).then(value => { adapterCompleted = true; return value; });
-    await Promise.resolve();
-    assert.equal(adapterCompleted, false); releaseAdapter();
-    assert.equal(await adapterResult, null);
-    ok('server state adapter preserves FormData and awaits the original action once', () => { assert.equal(adapterCalls, 1); });
-    for (const thrown of [new Error('Synthetic action failure'), Object.assign(new Error('Synthetic redirect'), { digest: 'NEXT_REDIRECT;replace;/app/form-submissions;303;' })]) {
-      const failedAdapter = load('app/app/operations/form-submission-action.ts', { './actions': { createFormSubmissionAction: async () => { throw thrown; } } });
-      await assert.rejects(failedAdapter.submitInternalForm(null, payload), error => error === thrown);
+    for (const [modulePath, exportName, originalName] of [
+      ['app/app/operations/form-submission-action.ts', 'submitInternalForm', 'createFormSubmissionAction'],
+      ['app/app/files/worksheet-approval-action.ts', 'submitWorksheetApproval', 'saveExtractedImportAction']
+    ]) {
+      let releaseAdapter, adapterCompleted = false, adapterCalls = 0;
+      const adapterWait = new Promise(resolve => { releaseAdapter = resolve; });
+      const stateAdapter = load(modulePath, { './actions': { [originalName]: async data => {
+        assert.equal(data, payload); adapterCalls++; await adapterWait;
+      } } });
+      const adapterResult = stateAdapter[exportName](null, payload).then(value => { adapterCompleted = true; return value; });
+      await Promise.resolve(); assert.equal(adapterCompleted, false); releaseAdapter();
+      assert.equal(await adapterResult, null);
+      ok(`${exportName} preserves FormData and awaits the original action once`, () => { assert.equal(adapterCalls, 1); });
+      for (const thrown of [new Error('Synthetic action failure'), Object.assign(new Error('Synthetic redirect'), { digest: 'NEXT_REDIRECT;replace;/app/form-submissions;303;' })]) {
+        const failedAdapter = load(modulePath, { './actions': { [originalName]: async () => { throw thrown; } } });
+        await assert.rejects(failedAdapter[exportName](null, payload), error => error === thrown);
+      }
+      ok(`${exportName} forwards errors and framework redirects without catching or rewriting`, () => {});
     }
-    ok('server state adapter forwards errors and framework redirects without catching or rewriting', () => {});
 
     const valid = () => form({ submission_request_id: randomUUID(), form_id: formId, submitter_name: 'Synthetic operator', submitter_email: 'operator@example.invalid', summary: 'Inspection recorded', priority: 'Medium', follow_up: '', 'field:business-detail': 'Synthetic unit inspected', 'field:inspection-date': '2026-10-04', 'field:priority': 'High' });
     ok('schema preserves supported field types and deduplicates keys', () => {

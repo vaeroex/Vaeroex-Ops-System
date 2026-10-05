@@ -199,7 +199,7 @@ const failure = u => u.searchParams.has('error');
       const worksheetReplay = await newPage(); const staleImportForm = await importForm(worksheetReplay);
       f = await importForm(); await submit(page, f.getByRole('button', { name: 'Import 1 approved worksheet', exact: true }), stage, success);
       const kpis = check(await client.from('kpis').select('id,actual_value,metric_date,source_file_id,import_id,raw_data_json').eq('import_id', importId).order('metric_date'), 'saved_kpis');
-      assert.equal(kpis.length, 2); assert.deepEqual(kpis.map(x => [x.metric_date, Number(x.actual_value)]), [['2026-01-01', 42], ['2026-02-01', 43]]);
+      assert.equal(kpis.length, 2); assert.deepEqual(kpis.map(x => [new Date(x.metric_date).toISOString(), Number(x.actual_value)]), [['2026-01-01T08:00:00.000Z', 42], ['2026-02-01T08:00:00.000Z', 43]]);
       assert(kpis.every(x => x.source_file_id === uploaded.id && x.import_id === importId && x.raw_data_json['Vaeroex source file ID'] === uploaded.id));
       assert.deepEqual(kpis.map(x => Number(x.raw_data_json['Vaeroex source row'])), [2, 3]);
       const attempts = (await db.query('select status,approved_mapping,approved_row_ids from private.file_import_attempts where workspace_id=$1 and import_id=$2', [a, importId])).rows;

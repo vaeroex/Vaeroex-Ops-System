@@ -1,9 +1,10 @@
-import { Component, type ReactNode } from "react";
+import { Component, type ComponentProps, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { RecordDetailDrawer } from "@/components/operations/RecordDetailDrawer";
 import { GlobalSearch } from "@/components/app/GlobalSearch";
 import { GlobalSearchTrigger } from "@/components/app/GlobalSearchTrigger";
 import { InternalFormSubmissionForm } from "@/components/operations/InternalFormSubmissionForm";
+import { WorkbookImportReview } from "@/components/evidence/WorkbookImportReview";
 import { createSubmissionSchema } from "@/lib/forms/submission-schema";
 class SyntheticActionBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
   state = { failed: false };
@@ -19,7 +20,13 @@ class SyntheticActionBoundary extends Component<{ children: ReactNode }, { faile
 }
 createRoot(document.getElementById("fixture")!, { onCaughtError(error) {
   if (!(error instanceof Error) || error.message !== "Synthetic submission failed") throw error;
-} }).render(<main className="vaeroex-app-shell vaeroex-customer-workspace">
+} }).render(new URL(location.href).searchParams.get('fixture') === 'worksheet' ? <main className="vaeroex-app-shell vaeroex-customer-workspace">
+  <WorkbookImportReview
+    file={{ id: 'synthetic-file', display_name: 'Synthetic worksheet' } as ComponentProps<typeof WorkbookImportReview>["file"]}
+    importRecord={{ id: 'synthetic-import', mapping_json: { mode: 'workbook', worksheets: [{ index: 1, name: 'CSV', detected_type: 'sales', selected_type: 'sales', enabled: true, status: 'parsed', row_count: 1, columns: ['date', 'revenue'], mapping: {}, metric_columns: [] }] } } as ComponentProps<typeof WorkbookImportReview>["importRecord"]}
+    rows={[{ id: 'synthetic-row', row_number: 2, data_json: { date: '2026-01-01', revenue: 42 }, mapped_data_json: { __source: { worksheet_index: 1, row_number: 2 } } } as ComponentProps<typeof WorkbookImportReview>["rows"][number]]}
+  />
+</main> : <main className="vaeroex-app-shell vaeroex-customer-workspace">
   <h1>Synthetic workspace workflow verification</h1>
   <button id="before">Outside before</button>
   <RecordDetailDrawer title="Synthetic record" triggerLabel="Open synthetic record">
