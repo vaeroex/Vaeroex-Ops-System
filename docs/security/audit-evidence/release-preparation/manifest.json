@@ -1,0 +1,21 @@
+{
+  "createdAt": "2026-10-05",
+  "sourceCommit": "3764d62d45103d341f77f093a5fe7b83555f1e3b",
+  "scope": "focused CL-02 preparation only",
+  "validation": {
+    "migrationHashes": 13,
+    "privateCandidateIdentifiersExcluded": true,
+    "localProposalLinksValid": true,
+    "qboRegressionAssertions": 248,
+    "negativeControlRejectsPriorContext": true
+  },
+  "files": {
+    "README.md": "63053f8b55d37184806653f686d41fea4122280cc56b0e7856f47beb6f0e31f8",
+    "ci-4c28c134.json": "cad78912518b1bed691260338947be9763384c337d4e347ffd567853b2e366db",
+    "destination-readonly.json": "85114c706eafb5a032f178f7f536a7f91a5c97fd562a3570aab0b0700a9da6dd",
+    "gcp-readonly-status.json": "25225220acb0dc807be360fc0bea3c4e331ed6c781f144055dc80b333f294c30",
+    "qbo-docker-context-result-host.json": "a4c3cab64fd1564216ffa020114b10522a1b9e0fb1e535736e31a39bf11f4209",
+    "qbo-summary.json": "73a68ac00c628f4f3c80a0ac9ea1b844af88014a6ccf860d0c544bc94342edf3",
+    "qbo-with-required-patch-result.json": "f99dd168ba5c7f3553b8317758b2e5b4dd2e1a4965218a0a199ad048b330e0e9"
+  }
+}

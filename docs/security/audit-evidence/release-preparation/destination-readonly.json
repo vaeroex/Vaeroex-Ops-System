@@ -1,0 +1,147 @@
+{
+  "capturedAt": "2026-10-05T22:48:42Z",
+  "method": "Read-only project/deployment metadata, production SQL aggregates/catalog and local source inspection; no customer contents, credentials or identities retained here.",
+  "target": {
+    "vercelProjectId": "prj_J810bZ9ECoN4CyLKujUoEEH8N6ja",
+    "teamId": "team_uORtrMvad77Qz6HikOgD4cnp",
+    "productionDeployment": "dpl_A9tgEHvj54MkLCxCyac7FGokaM1t",
+    "productionCommit": "d91be079c7beb0b6f21a4c5e6b451f90ca06e035",
+    "node": "24.x",
+    "region": "iad1",
+    "canonicalOrigin": "https://www.vaeroex.com",
+    "supabaseProject": "mdiianhfrojmxqpwrflh",
+    "regionDb": "us-west-2",
+    "postgres": "17.6.1.127",
+    "ledgerCount": 120,
+    "latest": "20261002182746",
+    "versionsMd5": "038dca41d1a1b4bc32cf2903ad0ff1be"
+  },
+  "access": {
+    "vercelEnv": "403 projectEnvVars:list; scoped official API also403",
+    "gcp": "Existing account refresh requires interactive reauthentication; IAM not established denied",
+    "firewall": "active config returned404 Seawall Config not found; no verified maintenance rule"
+  },
+  "admin": {
+    "metadataCandidates": 1,
+    "confirmed": true,
+    "deleted": false,
+    "banned": false,
+    "activeOwnerMemberships": 3,
+    "ordinaryEntitlement": {
+      "entitled": 2,
+      "notEntitled": 1
+    },
+    "approvedExemptions": 0,
+    "actualEmailConfiguredRoster": "unknown; environment read denied"
+  },
+  "operational": [
+    {
+      "operational_counts": {
+        "file_jobs": [
+          {
+            "count": 18,
+            "status": "completed"
+          },
+          {
+            "count": 37,
+            "status": "queued"
+          }
+        ],
+        "sheets_runs": [
+          {
+            "count": 8,
+            "status": "succeeded"
+          }
+        ],
+        "file_imports": [
+          {
+            "count": 1,
+            "status": "needs_review"
+          },
+          {
+            "count": 5,
+            "status": "failed"
+          },
+          {
+            "count": 18,
+            "status": "completed"
+          }
+        ],
+        "analysis_runs": [
+          {
+            "count": 55,
+            "status": "failed"
+          },
+          {
+            "count": 220,
+            "status": "completed"
+          },
+          {
+            "count": 2,
+            "status": "blocked"
+          }
+        ],
+        "provider_tasks": [],
+        "sheets_connections": [
+          {
+            "count": 1,
+            "status": "disconnected",
+            "automatic_refresh_enabled": true
+          },
+          {
+            "count": 1,
+            "status": "pending_authorization",
+            "automatic_refresh_enabled": false
+          }
+        ],
+        "provider_connections": [
+          {
+            "count": 7,
+            "status": "disconnected",
+            "provider_key": "quickbooks_online",
+            "provider_environment": "production"
+          }
+        ]
+      }
+    }
+  ],
+  "fileBookkeeping": [
+    {
+      "job_type": "extract",
+      "status": "queued",
+      "count": 37,
+      "oldest_queued_at": "2026-07-06 22:07:59.339977+00",
+      "newest_queued_at": "2026-09-29 18:20:29.531378+00",
+      "started_count": 0,
+      "attempted_count": 0,
+      "missing_parent_count": 0,
+      "inactive_parent_count": 27
+    }
+  ],
+  "extractionLinkage": [
+    {
+      "kind": "extraction_jobs",
+      "summary": {
+        "count": 1,
+        "stage": "awaiting_review",
+        "status": "needs_review"
+      }
+    },
+    {
+      "kind": "queued_bookkeeping_linkage",
+      "summary": {
+        "queued_count": 37,
+        "with_any_extraction_job": 1,
+        "with_nonterminal_extraction_job": 1
+      }
+    }
+  ],
+  "square": [],
+  "frozenQualificationBinding": {
+    "catalog": [],
+    "conclusion": "Preview-only binding relation absent from production catalog; canonical history-only migration is not evidence of installed table. Original lookup42P01 preserved privately; no schema repair implied."
+  },
+  "productionMutations": 0,
+  "providerCalls": 0,
+  "spend": 0
+}
