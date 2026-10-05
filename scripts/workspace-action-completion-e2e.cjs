@@ -93,7 +93,7 @@ async function formPage(page, formId, label) {
 const success = u => u.searchParams.has('message');
 const failure = u => u.searchParams.has('error');
 (async () => {
-  let owner, a;
+  let owner, caseActor, a;
   try {
     await db.connect();
     const identity = (await db.query("select current_database() db,current_setting('data_directory') directory,current_setting('server_version') version")).rows[0];
@@ -101,9 +101,9 @@ const failure = u => u.searchParams.has('error');
     const ownership = JSON.parse(fs.readFileSync(configFile + '.fixtures.json'));
     assert.equal(ownership.runId, config.runId); const existing = ownership.executions.at(-1); assert(existing);
     a = existing.workspaces[0]; const b = existing.workspaces[1];
-    const workspace = check(await admin.from('workspaces').select('name').eq('id', a).single(), 'owned_workspace');
+    const workspace = check(await admin.from('workspaces').select('name,created_by').eq('id', a).single(), 'owned_workspace');
     assert(workspace.name.startsWith(`CLOSEOUT ${config.runId.slice(0, 8)} `));
-    const member = check(await admin.from('workspace_members').select('user_id,role').eq('workspace_id', a).eq('role', 'owner').eq('status', 'active').single(), 'existing_owner');
+    const member = check(await admin.from('workspace_members').select('user_id,role').eq('workspace_id', a).eq('role', 'owner').eq('user_id', workspace.created_by).eq('status', 'active').single(), 'existing_owner');
     const user = check(await admin.auth.admin.getUserById(member.user_id), 'synthetic_user').user;
     assert(/^closeout-[a-f0-9-]+@example\.test$/.test(user.email));
     const password = randomBytes(24).toString('base64url'); secrets.push(password);
@@ -138,13 +138,22 @@ const failure = u => u.searchParams.has('error');
     app.stdout.on('data', b => { appLog += b; }); app.stderr.on('data', b => { appLog += b; });
     await waitFor(async () => { try { return (await fetch(appOrigin + '/login')).status === 200; } catch { return false; } }, 'app_ready');
     browser = await chromium.launch({ headless: true, executablePath: process.env.CHROME_EXECUTABLE_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' });
-    async function role(value) { check(await admin.from('workspace_members').update({ role: value }).eq('workspace_id', a).eq('user_id', owner.id), 'synthetic_role'); }
+    async function role(value) { check(await admin.from('workspace_members').update({ role: value }).eq('workspace_id', a).eq('user_id', caseActor.id), 'synthetic_role'); }
     async function denied(page, button, label) {
       await role('viewer');
       try { await submit(page, button, label, failure); } finally { await role('owner'); }
     }
     for (const width of [1440, 390]) for (let iteration = 0; iteration < 3; iteration++) {
-      const { c, page, client, newPage } = await context(owner, width);
+      const actorId = randomUUID(), actorEmail = `closeout-${actorId}@example.test`, actorPassword = randomBytes(24).toString('base64url');
+      secrets.push(actorPassword);
+      check(await admin.auth.admin.createUser({ id: actorId, email: actorEmail, password: actorPassword, email_confirm: true, user_metadata: { full_name: `${prefix} ${width} ${iteration}` } }), 'isolated_case_actor');
+      check(await admin.from('workspace_members').insert({ workspace_id: a, user_id: actorId, role: 'owner', status: 'active' }), 'case_membership');
+      const legal = /terms: "([\d-]+)"/.exec(fs.readFileSync(path.join(root, 'lib/legal/content.ts'), 'utf8'))[1];
+      check(await admin.from('legal_acceptances').insert({ user_id: actorId, workspace_id: a, terms_version: legal, privacy_version: legal, ai_disclaimer_version: legal, sensitive_data_policy_version: legal, user_email: actorEmail, user_agent: 'Synthetic focused action fixture' }), 'case_legal');
+      caseActor = { id: actorId, email: actorEmail, password: actorPassword, workspaceId: a };
+      ownership.vxa039Actors ||= []; ownership.vxa039Actors.push({ executionId, id: actorId, workspaceId: a });
+      fs.writeFileSync(configFile + '.fixtures.json', JSON.stringify(ownership, null, 2), { mode: 0o600 });
+      const { c, page, client, newPage } = await context(caseActor, width);
       const label = `${prefix} ${width} ${iteration}`;
       stage = `form_${width}_${iteration}`;
       let f = await formPage(page, formId, label + ' denied');
@@ -159,15 +168,16 @@ const failure = u => u.searchParams.has('error');
       f = await formPage(page, formId, label); await f.locator('[name="submission_request_id"]').evaluate((e, value) => { e.value = value; }, requestId);
       await submit(page, f.getByRole('button', { name: 'Save submission', exact: true }), stage + '_replay', success);
       assert.deepEqual(check(await client.from('form_submissions').select('id,data_json').eq('submitter_name', label), 'form_replay'), saved);
-      if (iteration === 0) await page.screenshot({ path: path.join(output, `form-${width}.png`) });
+      await page.getByText(label, { exact: true }).first().waitFor();
+      if (iteration === 0) await page.screenshot({ path: path.join(output, `form-${width}.png`), fullPage: true });
       stage = `memory_${width}_${iteration}`;
       const fileId = randomUUID(), runId = randomUUID();
       const evidence = 'Revenue amount October 100. This financial worksheet records the actual October revenue amount for the business. The owner reviews the revenue worksheet before making operational decisions.';
       const analysis = { evidence_classification: 'business_evidence', extraction_outcome: 'facts_extracted', findings: ['Revenue amount October 100'], summary: 'Revenue amount October 100' };
       const key = `${a}/${fileId}/vxa039-memory.csv`;
       check(await client.storage.from('workspace-files').upload(key, Buffer.from(evidence), { contentType: 'text/csv' }), 'memory_storage');
-      check(await admin.from('file_uploads').insert({ id: fileId, workspace_id: a, original_name: 'vxa039-memory.csv', display_name: label, file_extension: 'csv', mime_type: 'text/csv', file_size_bytes: evidence.length, storage_bucket: 'workspace-files', storage_path: key, created_by: owner.id, processing_status: 'ready', analysis_summary: analysis.summary, metadata_json: { latest_analysis_run_id: runId, latest_analysis_status: 'needs_review', analysis_review_status: 'needs_review', latest_analysis_output: analysis, latest_text_extraction: { extracted_text: evidence } } }), 'memory_file');
-      await db.query("insert into ai_agent_runs(id,workspace_id,agent_type,status,input_json,output_json,created_by) values($1,$2,'file_analysis','completed',$3::jsonb,$4::jsonb,$5)", [runId, a, JSON.stringify({ evidence_lineage: { source_file_id: fileId }, extra_inputs: { file: { id: fileId } } }), JSON.stringify(analysis), owner.id]);
+      check(await admin.from('file_uploads').insert({ id: fileId, workspace_id: a, original_name: 'vxa039-memory.csv', display_name: label, file_extension: 'csv', mime_type: 'text/csv', file_size_bytes: evidence.length, storage_bucket: 'workspace-files', storage_path: key, created_by: caseActor.id, processing_status: 'ready', analysis_summary: analysis.summary, metadata_json: { latest_analysis_run_id: runId, latest_analysis_status: 'needs_review', analysis_review_status: 'needs_review', latest_analysis_output: analysis, latest_text_extraction: { extracted_text: evidence } } }), 'memory_file');
+      await db.query("insert into ai_agent_runs(id,workspace_id,agent_type,status,input_json,output_json,created_by) values($1,$2,'file_analysis','completed',$3::jsonb,$4::jsonb,$5)", [runId, a, JSON.stringify({ evidence_lineage: { source_file_id: fileId }, extra_inputs: { file: { id: fileId } } }), JSON.stringify(analysis), caseActor.id]);
       await page.goto(`${appOrigin}/app/sources/${fileId}`);
       await denied(page, page.getByRole('button', { name: 'Approve learning', exact: true }), stage + '_denied');
       assert.equal(check(await client.from('business_memory_chunks').select('id').eq('source_file_id', fileId), 'denied_memory').length, 0);
@@ -179,7 +189,7 @@ const failure = u => u.searchParams.has('error');
       await page.getByText('Available to Intelligence and Learned Knowledge.', { exact: true }).waitFor();
       await submit(memoryReplay, memoryReplay.getByRole('button', { name: 'Approve learning', exact: true }), stage + '_stale_replay', success);
       assert.deepEqual(check(await client.from('business_memory_chunks').select('id,source_metadata').eq('source_file_id', fileId), 'memory_replay'), chunks);
-      if (iteration === 0) await memoryReplay.screenshot({ path: path.join(output, `memory-${width}.png`) });
+      if (iteration === 0) await memoryReplay.screenshot({ path: path.join(output, `memory-${width}.png`), fullPage: true });
       await memoryReplay.close();
       stage = `worksheet_${width}_${iteration}`;
       await page.goto(appOrigin + '/app/sources'); await page.locator('#workspace-file-upload > summary').click();
@@ -205,7 +215,7 @@ const failure = u => u.searchParams.has('error');
       const attempts = (await db.query('select status,approved_mapping,approved_row_ids from private.file_import_attempts where workspace_id=$1 and import_id=$2', [a, importId])).rows;
       assert.equal(attempts.length, 1); assert.equal(attempts[0].status, 'completed');
       await page.getByText('2 of 2 rows were saved from this source.', { exact: true }).waitFor();
-      if (iteration === 0) await page.screenshot({ path: path.join(output, `worksheet-${width}.png`) });
+      if (iteration === 0) await page.screenshot({ path: path.join(output, `worksheet-${width}.png`), fullPage: true });
       await submit(worksheetReplay, staleImportForm.getByRole('button', { name: 'Import 1 approved worksheet', exact: true }), stage + '_stale_replay', u => u.searchParams.get('message') === 'Import completion verified from saved results. No rows were resubmitted.');
       assert.deepEqual(check(await client.from('kpis').select('id,actual_value,metric_date,source_file_id,import_id,raw_data_json').eq('import_id', importId).order('metric_date'), 'worksheet_replay'), kpis);
       assert.deepEqual((await db.query('select status,approved_mapping,approved_row_ids from private.file_import_attempts where workspace_id=$1 and import_id=$2', [a, importId])).rows, attempts);
@@ -235,7 +245,7 @@ const failure = u => u.searchParams.has('error');
     results.push({ name: stage, passed: false, error: sanitize(error.message) }); console.error(JSON.stringify({ stage, error: sanitize(error.message) })); process.exitCode = 1;
     if (browser) for (const c of browser.contexts()) for (const page of c.pages()) { await page.screenshot({ path: path.join(output, 'failure.png') }).catch(() => {}); fs.writeFileSync(path.join(output, 'failure-ui.txt'), sanitize(await page.locator('body').innerText().catch(() => ''))); }
   } finally {
-    if (owner && a) await admin.from('workspace_members').update({ role: 'owner' }).eq('workspace_id', a).eq('user_id', owner.id);
+    if (caseActor && a) await admin.from('workspace_members').update({ role: 'owner' }).eq('workspace_id', a).eq('user_id', caseActor.id);
     if (browser) await browser.close(); if (app) { app.kill('SIGTERM'); await Promise.race([new Promise(resolve => app.once('exit', resolve)), sleep(5000)]); if (app.exitCode === null) app.kill('SIGKILL'); } await db.end().catch(() => {});
     sourceEnd = sourceManifest(); if (sourceBuilt && JSON.stringify(sourceBuilt) !== JSON.stringify(sourceEnd)) { results.push({ name: 'source_stability', passed: false }); process.exitCode = 1; }
     fs.writeFileSync(path.join(output, 'source-manifest.json'), JSON.stringify({ start: sourceStart, built: sourceBuilt, end: sourceEnd }, null, 2)+'\n');
