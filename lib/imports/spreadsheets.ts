@@ -17,6 +17,7 @@ export type SpreadsheetWorksheet = {
   relationshipId?: string;
   relationshipTarget?: string;
   columns: string[];
+  columnSources?: Array<{ key: string; originalHeader: string; columnNumber: number }>;
   rows: SpreadsheetRow[];
   status: "parsed" | "empty" | "unsupported" | "failed";
   error?: string;
@@ -60,13 +61,22 @@ type NumberedGridRow = {
 };
 
 function uniqueHeaders(headerRow: ImportCellValue[]) {
-  const counts = new Map<string, number>();
+  // Reserve source labels before allocating suffixes, so a duplicate cannot
+  // consume a later column's original name (for example Amount (2)).
+  const originals = headerRow.map(cleanHeader);
+  const reserved = new Set(originals);
+  const used = new Set<string>();
 
-  return headerRow.map((value, index) => {
-    const header = cleanHeader(value, index);
-    const count = (counts.get(header) || 0) + 1;
-    counts.set(header, count);
-    return count === 1 ? header : `${header} (${count})`;
+  return originals.map((header) => {
+    let candidate = header;
+    let suffix = 2;
+    while (used.has(candidate)) {
+      do {
+        candidate = `${header} (${suffix++})`;
+      } while (reserved.has(candidate));
+    }
+    used.add(candidate);
+    return candidate;
   });
 }
 
@@ -78,10 +88,11 @@ function recordsFromNumberedGrid(grid: NumberedGridRow[]) {
 
   return {
     headers,
+    columnSources: headers.map((key, index) => ({ key, originalHeader: String(headerRow[index] ?? ""), columnNumber: index + 1 })),
     rows: dataRows.map(({ rowNumber, cells }) => {
       const record: ImportRow = {};
       headers.forEach((header, index) => {
-        record[header] = cells[index] ?? null;
+        Object.defineProperty(record, header, { value: cells[index] ?? null, enumerable: true, writable: true, configurable: true });
       });
 
       return { rowNumber, values: record };
@@ -89,19 +100,18 @@ function recordsFromNumberedGrid(grid: NumberedGridRow[]) {
   };
 }
 
-function rowsFromGrid(grid: ImportCellValue[][]) {
-  return recordsFromNumberedGrid(grid.map((cells, index) => ({ rowNumber: index + 1, cells }))).rows.map((row) => row.values);
-}
-
 function parseCsvGrid(content: string) {
-  const rows: string[][] = [];
+  const rows: NumberedGridRow[] = [];
   let row: string[] = [];
   let cell = "";
   let inQuotes = false;
+  let physicalLine = 1;
+  let recordStartLine = 1;
 
   for (let index = 0; index < content.length; index += 1) {
     const character = content[index];
     const next = content[index + 1];
+    if (character === "\n" || (character === "\r" && next !== "\n")) physicalLine += 1;
 
     if (inQuotes) {
       if (character === "\"" && next === "\"") {
@@ -120,20 +130,27 @@ function parseCsvGrid(content: string) {
     } else if (character === ",") {
       row.push(cell.trim());
       cell = "";
-    } else if (character === "\n") {
+    } else if (character === "\n" || character === "\r") {
       row.push(cell.trim());
-      rows.push(row);
+      rows.push({ rowNumber: recordStartLine, cells: row });
       row = [];
       cell = "";
-    } else if (character !== "\r") {
+      if (character === "\r" && next === "\n") {
+        physicalLine += 1;
+        index += 1;
+      }
+      recordStartLine = physicalLine;
+    } else {
       cell += character;
     }
   }
 
   row.push(cell.trim());
-  rows.push(row);
+  rows.push({ rowNumber: recordStartLine, cells: row });
 
-  return rows.filter((candidate) => candidate.some((value) => value.trim() !== ""));
+  // CSV row locations are physical start lines, including quoted multiline
+  // records. Blank records are removed only after their locations are retained.
+  return rows;
 }
 
 function decodeXml(value: string) {
@@ -210,7 +227,7 @@ function findEndOfCentralDirectory(buffer: Buffer) {
   const minimumOffset = Math.max(0, buffer.length - 65557);
 
   for (let offset = buffer.length - 22; offset >= minimumOffset; offset -= 1) {
-    if (buffer.readUInt32LE(offset) === 0x06054b50) {
+    if (buffer.readUInt32LE(offset) === 0x06054b50 && offset + 22 + buffer.readUInt16LE(offset + 20) === buffer.length) {
       return offset;
     }
   }
@@ -226,19 +243,26 @@ function readZipEntries(buffer: Buffer) {
   const eocdOffset = findEndOfCentralDirectory(buffer);
   const entryCount = buffer.readUInt16LE(eocdOffset + 10);
   let offset = buffer.readUInt32LE(eocdOffset + 16);
+  const directoryEnd = offset + buffer.readUInt32LE(eocdOffset + 12);
   const entries = new Map<string, ZipEntry>();
   let totalUncompressedBytes = 0;
+  let totalExpandedBytes = 0;
 
   if (entryCount > MAX_ZIP_ENTRIES) {
     throw new Error("The XLSX package contains too many files to process safely.");
   }
+  if (buffer.readUInt16LE(eocdOffset + 4) !== 0 || buffer.readUInt16LE(eocdOffset + 6) !== 0 ||
+      buffer.readUInt16LE(eocdOffset + 8) !== entryCount || directoryEnd !== eocdOffset) {
+    throw new Error("Spreadsheet file structure is not supported.");
+  }
 
   for (let entryIndex = 0; entryIndex < entryCount; entryIndex += 1) {
-    if (offset + 46 > buffer.length || buffer.readUInt32LE(offset) !== 0x02014b50) {
+    if (offset + 46 > directoryEnd || buffer.readUInt32LE(offset) !== 0x02014b50) {
       throw new Error("Spreadsheet file structure is not supported.");
     }
 
     const method = buffer.readUInt16LE(offset + 10);
+    const flags = buffer.readUInt16LE(offset + 8);
     const compressedSize = buffer.readUInt32LE(offset + 20);
     const uncompressedSize = buffer.readUInt32LE(offset + 24);
     const fileNameLength = buffer.readUInt16LE(offset + 28);
@@ -257,6 +281,7 @@ function readZipEntries(buffer: Buffer) {
     if (method !== 0 && method !== 8) {
       throw new Error("The XLSX package uses an unsupported compression method.");
     }
+    if (flags & 1) throw new Error("Encrypted XLSX workbooks are not supported.");
     if (uncompressedSize > MAX_ZIP_ENTRY_BYTES) {
       throw new Error("The XLSX package contains an oversized file entry.");
     }
@@ -268,30 +293,49 @@ function readZipEntries(buffer: Buffer) {
     if (compressedSize > 0 && uncompressedSize > 1024 * 1024 && uncompressedSize / compressedSize > MAX_DECOMPRESSION_RATIO) {
       throw new Error("The XLSX package has an unsafe decompression ratio.");
     }
-    if (localHeaderOffset + 30 > buffer.length || buffer.readUInt32LE(localHeaderOffset) !== 0x04034b50) {
+    if (localHeaderOffset + 30 > offset || buffer.readUInt32LE(localHeaderOffset) !== 0x04034b50) {
       throw new Error("Spreadsheet file structure is not supported.");
     }
 
-    if (offset + 46 + fileNameLength + extraLength + commentLength > buffer.length) {
+    if (offset + 46 + fileNameLength + extraLength + commentLength > directoryEnd) {
       throw new Error("Spreadsheet file structure is not supported.");
     }
 
     const localNameLength = buffer.readUInt16LE(localHeaderOffset + 26);
     const localExtraLength = buffer.readUInt16LE(localHeaderOffset + 28);
     const dataStart = localHeaderOffset + 30 + localNameLength + localExtraLength;
-    if (dataStart + compressedSize > buffer.length || (compressedSize === 0 && uncompressedSize > 0)) {
+    const localName = buffer.subarray(localHeaderOffset + 30, localHeaderOffset + 30 + localNameLength).toString("utf8");
+    if (localName !== name || buffer.readUInt16LE(localHeaderOffset + 8) !== method ||
+        buffer.readUInt16LE(localHeaderOffset + 6) !== flags ||
+        (!(flags & 8) && (buffer.readUInt32LE(localHeaderOffset + 18) !== compressedSize || buffer.readUInt32LE(localHeaderOffset + 22) !== uncompressedSize))) {
+      throw new Error("The XLSX package contains inconsistent file headers.");
+    }
+    if (dataStart + compressedSize > buffer.readUInt32LE(eocdOffset + 16) || (compressedSize === 0 && uncompressedSize > 0)) {
       throw new Error("The XLSX package contains an incomplete file entry.");
     }
     const compressedData = buffer.subarray(dataStart, dataStart + compressedSize);
-    const data = method === 0 ? compressedData : method === 8 ? inflateRawSync(compressedData) : null;
-
-    if (!data || data.length !== uncompressedSize) {
-      throw new Error("The XLSX package contains an incomplete file entry.");
-    }
-    entries.set(name, { name, data });
+    let expanded: Buffer | undefined;
+    // Inflate only parts consumed by the workbook parser. Enforce actual output
+    // size inside zlib; untrusted declared sizes are never allocation authority.
+    entries.set(name, { name, get data() {
+      if (expanded) return expanded;
+      const maxOutputLength = Math.max(1, Math.min(uncompressedSize, MAX_XML_BYTES, MAX_XLSX_UNCOMPRESSED_BYTES - totalExpandedBytes));
+      if (uncompressedSize > MAX_XML_BYTES || totalExpandedBytes + uncompressedSize > MAX_XLSX_UNCOMPRESSED_BYTES) {
+        throw new Error("The XLSX package expands beyond the safe processing limit.");
+      }
+      try {
+        expanded = method === 0 ? compressedData : inflateRawSync(compressedData, { maxOutputLength });
+      } catch {
+        throw new Error("The XLSX package contains an invalid or oversized compressed entry.");
+      }
+      if (expanded.length !== uncompressedSize) throw new Error("The XLSX package contains an incomplete file entry.");
+      totalExpandedBytes += expanded.length;
+      return expanded;
+    } });
 
     offset += 46 + fileNameLength + extraLength + commentLength;
   }
+  if (offset !== directoryEnd) throw new Error("Spreadsheet file structure is not supported.");
 
   return entries;
 }
@@ -515,6 +559,7 @@ export function parseXlsxWorkbookEntries(entries: Map<string, ZipEntry>): Spread
         relationshipId,
         relationshipTarget,
         columns: parsed.headers,
+        columnSources: parsed.columnSources,
         rows,
         status: rows.length ? "parsed" : "empty"
       });
@@ -533,7 +578,7 @@ export function parseXlsxWorkbookEntries(entries: Map<string, ZipEntry>): Spread
 }
 
 export function parseCsvRows(content: string) {
-  return rowsFromGrid(parseCsvGrid(content.replace(/^\uFEFF/, "")));
+  return recordsFromNumberedGrid(parseCsvGrid(content.replace(/^\uFEFF/, ""))).rows.map((row) => row.values);
 }
 
 export function parseXlsxRows(buffer: Buffer) {
@@ -550,11 +595,11 @@ export function parseSpreadsheetWorkbook({
   const lowerName = fileName.toLowerCase();
 
   if (lowerName.endsWith(".csv")) {
-    const parsedRows = parseCsvRows(buffer.toString("utf8"));
-    const rows = parsedRows.map((values, index) => ({
+    const parsed = recordsFromNumberedGrid(parseCsvGrid(buffer.toString("utf8").replace(/^\uFEFF/, "")));
+    const rows = parsed.rows.map(({ values, rowNumber }) => ({
       worksheetName: "CSV",
       worksheetIndex: 1,
-      worksheetRowNumber: index + 2,
+      worksheetRowNumber: rowNumber,
       values
     }));
     return {
@@ -563,7 +608,8 @@ export function parseSpreadsheetWorkbook({
         name: "CSV",
         index: 1,
         state: "visible",
-        columns: Object.keys(parsedRows[0] || {}),
+        columns: parsed.headers,
+        columnSources: parsed.columnSources,
         rows,
         status: rows.length ? "parsed" : "empty"
       }],

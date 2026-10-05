@@ -875,6 +875,13 @@ async function updateImportRowDiagnostics({
   }
 }
 
+async function requireImportWrite(result: PromiseLike<{ error: { message: string } | null }>, operation: string) {
+  const { error } = await result;
+  if (error) {
+    throw new Error(`Some import records may already be saved. ${operation} could not be confirmed. Reload this source and review its imported records before retrying.`);
+  }
+}
+
 function buildKpiRecords(
   importRows: Pick<FileImportRow, "id" | "data_json">[],
   workspaceId: string,
@@ -2074,7 +2081,7 @@ async function runFileVaeroexAnalysis({
       confidenceLabel: learningDecision.confidenceLabel === "High" ? "Medium" : learningDecision.confidenceLabel,
       trustLevel: "needs_review",
       reviewRequired: true,
-      reviewReasons: [...learningDecision.reviewReasons, "Direct visual extraction requires review before it becomes Business Memory."],
+      reviewReasons: [...learningDecision.reviewReasons, "Confirm the generated findings before they become Business Memory."],
       learningMode: "review_required"
     };
   }
@@ -2132,7 +2139,6 @@ async function runFileVaeroexAnalysis({
   const analysisUpdatedAt = new Date().toISOString();
 
   if (learningDecision.status === "auto_learned") {
-    await archiveFileAnalysisMemoryChunks({ supabase, workspaceId, fileId: file.id, archivedAt: analysisUpdatedAt });
     indexResult = await indexFileAnalysisEvidence({
       supabase,
       workspaceId,
@@ -2751,7 +2757,6 @@ export async function approveFileAnalysisAction(formData: FormData) {
       throw new Error("This analysis did not produce eligible source-grounded business facts and cannot be approved as Business Memory.");
     }
 
-    await archiveFileAnalysisMemoryChunks({ supabase, workspaceId, fileId: file.id, archivedAt: approvedAt });
     const indexResult = await indexFileAnalysisEvidence({
       supabase,
       workspaceId,
@@ -2760,6 +2765,7 @@ export async function approveFileAnalysisAction(formData: FormData) {
       runId,
       extractedText,
       summary,
+      confirmation: { userId: user.id, runId },
       metadata: {
         analysis_run_id: runId,
         source_run_id: runId,
@@ -3751,6 +3757,7 @@ async function saveWorkbookImport({
   const structuredIds = new Set<string>();
   const structuredFailureIds = new Set<string>();
   const runtimeIssues: ImportPipelineIssue[] = [];
+  let indexedImportRows = 0;
   try {
     await updateFileProcessingStatus({ supabase, file, status: "processing" });
     if (targetRegistry.hasTargetContract) {
@@ -3840,6 +3847,7 @@ async function saveWorkbookImport({
     });
     const indexing = await indexWorksheetImportEvidence({ supabase, workspaceId, userId: user.id, file, importId: importRecord.id, worksheets: evidenceWorksheets });
     const indexingSucceeded = indexing.indexedChunks > 0;
+    if (indexingSucceeded) indexedImportRows = validRows.length;
     if (!indexingSucceeded) {
       runtimeIssues.push({
         stage: "business_memory_indexing",
@@ -3854,15 +3862,15 @@ async function saveWorkbookImport({
     const structuredRowIds = Array.from(structuredIds);
     const duplicateRowIds = Array.from(duplicateIds);
     const structuredFailureRowIds = Array.from(structuredFailureIds);
-    if (structuredRowIds.length) await supabase.from("file_import_rows").update({ status: "imported" }).eq("workspace_id", workspaceId).eq("import_id", importRecord.id).in("id", structuredRowIds);
-    if (contextIds.length) await supabase.from("file_import_rows").update({ status: indexingSucceeded ? "indexed" : "index_failed" }).eq("workspace_id", workspaceId).eq("import_id", importRecord.id).in("id", contextIds);
-    if (structuredFailureRowIds.length) await supabase.from("file_import_rows").update({ status: indexingSucceeded ? "indexed_with_import_error" : "rejected_import" }).eq("workspace_id", workspaceId).eq("import_id", importRecord.id).in("id", structuredFailureRowIds);
-    if (duplicateRowIds.length) await supabase.from("file_import_rows").update({ status: "skipped_duplicate" }).eq("workspace_id", workspaceId).eq("import_id", importRecord.id).in("id", duplicateRowIds);
+    if (structuredRowIds.length) await requireImportWrite(supabase.from("file_import_rows").update({ status: "imported" }).eq("workspace_id", workspaceId).eq("import_id", importRecord.id).in("id", structuredRowIds), "Imported row status");
+    if (contextIds.length) await requireImportWrite(supabase.from("file_import_rows").update({ status: indexingSucceeded ? "indexed" : "index_failed" }).eq("workspace_id", workspaceId).eq("import_id", importRecord.id).in("id", contextIds), "Evidence row status");
+    if (structuredFailureRowIds.length) await requireImportWrite(supabase.from("file_import_rows").update({ status: indexingSucceeded ? "indexed_with_import_error" : "rejected_import" }).eq("workspace_id", workspaceId).eq("import_id", importRecord.id).in("id", structuredFailureRowIds), "Failed row status");
+    if (duplicateRowIds.length) await requireImportWrite(supabase.from("file_import_rows").update({ status: "skipped_duplicate" }).eq("workspace_id", workspaceId).eq("import_id", importRecord.id).in("id", duplicateRowIds), "Duplicate row status");
 
     const importedAt = new Date().toISOString();
     const acceptedRowCount = indexingSucceeded ? validRows.length : new Set([...structuredRowIds, ...duplicateRowIds]).size;
     const mappingJson = workbookMappingWithPlans(importRecord.mapping_json, plans);
-    await supabase.from("file_imports").update({
+    await requireImportWrite(supabase.from("file_imports").update({
       status: "completed",
       rows_imported: acceptedRowCount,
       mapping_json: mappingJson,
@@ -3870,11 +3878,11 @@ async function saveWorkbookImport({
       imported_at: importedAt,
       extraction_summary: `${enabledPlans.length} worksheet${enabledPlans.length === 1 ? "" : "s"} processed independently. ${acceptedRowCount} row${acceptedRowCount === 1 ? "" : "s"} accepted, ${rejectedIssues.length + runtimeIssues.length} issue${rejectedIssues.length + runtimeIssues.length === 1 ? "" : "s"} recorded, and ${indexing.indexedChunks} evidence chunk${indexing.indexedChunks === 1 ? "" : "s"} added to Business Memory.`,
       errors_json: [...parserIssues, ...rejectedIssues, ...runtimeIssues] as unknown as Json
-    }).eq("workspace_id", workspaceId).eq("id", importRecord.id);
+    }).eq("workspace_id", workspaceId).eq("id", importRecord.id), "Import completion");
 
     const validationIssueCount = rejectedIssues.length + runtimeIssues.filter((issue) => issue.stage === "import_validation").length;
     const importFailureCount = runtimeIssues.filter((issue) => issue.stage === "import").length;
-    await supabase.from("file_uploads").update({
+    await requireImportWrite(supabase.from("file_uploads").update({
       import_type: "metrics",
       import_status: "imported",
       imported_rows: Math.max(file.imported_rows, acceptedRowCount),
@@ -3895,12 +3903,13 @@ async function saveWorkbookImport({
         ) as Json,
         { import_id: importRecord.id, import_type: "workbook", rows_total: importRecord.rows_total, rows_imported: acceptedRowCount, structured_rows: insertedStructuredRows, worksheet_count: enabledPlans.length, imported_at: importedAt, source_file_id: file.id }
       )
-    }).eq("workspace_id", workspaceId).eq("id", file.id);
+    }).eq("workspace_id", workspaceId).eq("id", file.id), "Source completion");
   } catch (error) {
     const message = actionErrorMessage(error, "The approved workbook could not be imported.");
     const issue = { stage: "import" as const, worksheet: "Workbook", row_number: null, field: "workbook", message };
-    await supabase.from("file_imports").update({ status: "failed", mapping_json: workbookMappingWithPlans(importRecord.mapping_json, plans), errors_json: [...parserIssues, ...rejectedIssues, issue] as unknown as Json }).eq("workspace_id", workspaceId).eq("id", importRecord.id);
-    await supabase.from("file_uploads").update({ import_status: "failed", processing_status: "failed", processing_error: message, processed_at: new Date().toISOString(), metadata_json: updateImportPipelineTrace(file.metadata_json, "failed", message) }).eq("workspace_id", workspaceId).eq("id", file.id);
+    const persistedRowCount = Math.max(indexedImportRows, new Set([...structuredIds, ...duplicateIds]).size);
+    await supabase.from("file_imports").update({ status: "failed", rows_imported: persistedRowCount, mapping_json: workbookMappingWithPlans(importRecord.mapping_json, plans), errors_json: [...parserIssues, ...rejectedIssues, issue] as unknown as Json }).eq("workspace_id", workspaceId).eq("id", importRecord.id);
+    await supabase.from("file_uploads").update({ import_status: "failed", imported_rows: Math.max(file.imported_rows, persistedRowCount), processing_status: "failed", processing_error: message, processed_at: new Date().toISOString(), metadata_json: updateImportPipelineTrace(file.metadata_json, "failed", message) }).eq("workspace_id", workspaceId).eq("id", file.id);
     redirectWithFileError(message, file.id, "imported");
   }
 

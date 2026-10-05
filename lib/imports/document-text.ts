@@ -5,6 +5,20 @@ type ZipEntry = {
   data: Buffer;
 };
 
+const MAX_DOCUMENT_BYTES = 25 * 1024 * 1024;
+const MAX_PART_BYTES = 8 * 1024 * 1024;
+const MAX_EXPANDED_BYTES = 32 * 1024 * 1024;
+const MAX_DOCUMENT_PARTS = 1_000;
+const MAX_DECOMPRESSION_RATIO = 200;
+
+function expansionLimit(compressedBytes: number, remainingBytes: number) {
+  return Math.min(MAX_PART_BYTES, remainingBytes, Math.max(1024 * 1024, compressedBytes * MAX_DECOMPRESSION_RATIO));
+}
+
+function documentLimitError() {
+  return new Error("This document exceeds the safe extraction limits. Export a smaller document and try again.");
+}
+
 function decodeXml(value: string) {
   return value
     .replace(/&lt;/g, "<")
@@ -29,7 +43,7 @@ function findEndOfCentralDirectory(buffer: Buffer) {
   const minimumOffset = Math.max(0, buffer.length - 65557);
 
   for (let offset = buffer.length - 22; offset >= minimumOffset; offset -= 1) {
-    if (buffer.readUInt32LE(offset) === 0x06054b50) {
+    if (buffer.readUInt32LE(offset) === 0x06054b50 && offset + 22 + buffer.readUInt16LE(offset + 20) === buffer.length) {
       return offset;
     }
   }
@@ -38,35 +52,69 @@ function findEndOfCentralDirectory(buffer: Buffer) {
 }
 
 function readZipEntries(buffer: Buffer) {
+  if (buffer.length > MAX_DOCUMENT_BYTES) throw documentLimitError();
   const eocdOffset = findEndOfCentralDirectory(buffer);
   const entryCount = buffer.readUInt16LE(eocdOffset + 10);
   let offset = buffer.readUInt32LE(eocdOffset + 16);
+  const directoryStart = offset;
+  const directoryEnd = offset + buffer.readUInt32LE(eocdOffset + 12);
   const entries = new Map<string, ZipEntry>();
+  const names = new Set<string>();
+  let expandedBytes = 0;
+  if (entryCount > MAX_DOCUMENT_PARTS) throw documentLimitError();
+  if (buffer.readUInt16LE(eocdOffset + 4) !== 0 || buffer.readUInt16LE(eocdOffset + 6) !== 0 ||
+      buffer.readUInt16LE(eocdOffset + 8) !== entryCount || directoryEnd !== eocdOffset) {
+    throw new Error("DOCX file structure is not supported.");
+  }
 
   for (let entryIndex = 0; entryIndex < entryCount; entryIndex += 1) {
-    if (buffer.readUInt32LE(offset) !== 0x02014b50) {
+    if (offset + 46 > directoryEnd || buffer.readUInt32LE(offset) !== 0x02014b50) {
       throw new Error("DOCX file structure is not supported.");
     }
 
     const method = buffer.readUInt16LE(offset + 10);
+    const flags = buffer.readUInt16LE(offset + 8);
     const compressedSize = buffer.readUInt32LE(offset + 20);
+    const uncompressedSize = buffer.readUInt32LE(offset + 24);
     const fileNameLength = buffer.readUInt16LE(offset + 28);
     const extraLength = buffer.readUInt16LE(offset + 30);
     const commentLength = buffer.readUInt16LE(offset + 32);
     const localHeaderOffset = buffer.readUInt32LE(offset + 42);
+    if (offset + 46 + fileNameLength + extraLength + commentLength > directoryEnd ||
+        localHeaderOffset + 30 > directoryStart || buffer.readUInt32LE(localHeaderOffset) !== 0x04034b50) {
+      throw new Error("DOCX file structure is not supported.");
+    }
     const name = buffer.subarray(offset + 46, offset + 46 + fileNameLength).toString("utf8");
     const localNameLength = buffer.readUInt16LE(localHeaderOffset + 26);
     const localExtraLength = buffer.readUInt16LE(localHeaderOffset + 28);
     const dataStart = localHeaderOffset + 30 + localNameLength + localExtraLength;
-    const compressedData = buffer.subarray(dataStart, dataStart + compressedSize);
-    const data = method === 0 ? compressedData : method === 8 ? inflateRawSync(compressedData) : null;
-
-    if (data) {
+    if (!name || name.includes("\0") || name.includes("\\") || name.startsWith("/") || name.split("/").includes("..") || names.has(name) ||
+        flags & 1 || (method !== 0 && method !== 8) || dataStart + compressedSize > directoryStart ||
+        buffer.subarray(localHeaderOffset + 30, localHeaderOffset + 30 + localNameLength).toString("utf8") !== name ||
+        buffer.readUInt16LE(localHeaderOffset + 8) !== method || buffer.readUInt16LE(localHeaderOffset + 6) !== flags ||
+        (!(flags & 8) && (buffer.readUInt32LE(localHeaderOffset + 18) !== compressedSize || buffer.readUInt32LE(localHeaderOffset + 22) !== uncompressedSize))) {
+      throw new Error("DOCX file contains an unsupported or inconsistent entry.");
+    }
+    names.add(name);
+    // Images, embedded files, and other unused package parts are never inflated.
+    if (name === "word/document.xml" || /^word\/(header|footer|footnotes|endnotes)\d*\.xml$/.test(name)) {
+      const limit = expansionLimit(compressedSize, MAX_EXPANDED_BYTES - expandedBytes);
+      if (uncompressedSize > limit || (compressedSize === 0 && uncompressedSize > 0)) throw documentLimitError();
+      const compressedData = buffer.subarray(dataStart, dataStart + compressedSize);
+      let data: Buffer;
+      try {
+        data = method === 0 ? compressedData : inflateRawSync(compressedData, { maxOutputLength: Math.max(1, Math.min(uncompressedSize, limit)) });
+      } catch {
+        throw documentLimitError();
+      }
+      if (data.length !== uncompressedSize || data.length > limit) throw documentLimitError();
+      expandedBytes += data.length;
       entries.set(name, { name, data });
     }
 
     offset += 46 + fileNameLength + extraLength + commentLength;
   }
+  if (offset !== directoryEnd) throw new Error("DOCX file structure is not supported.");
 
   return entries;
 }
@@ -100,13 +148,18 @@ export function extractDocxText(buffer: Buffer) {
 }
 
 function utf16BeToString(buffer: Buffer, start = 0) {
-  const codeUnits: number[] = [];
+  const parts: string[] = [];
+  let codeUnits: number[] = [];
 
   for (let index = start; index + 1 < buffer.length; index += 2) {
     codeUnits.push(buffer.readUInt16BE(index));
+    if (codeUnits.length === 4096) {
+      parts.push(String.fromCharCode(...codeUnits));
+      codeUnits = [];
+    }
   }
 
-  return String.fromCharCode(...codeUnits);
+  return parts.join("") + String.fromCharCode(...codeUnits);
 }
 
 function decodePdfHexString(value: string) {
@@ -211,34 +264,44 @@ function trimPdfStreamBoundaries(buffer: Buffer) {
   return buffer.subarray(start, end);
 }
 
-function decodePdfStream(header: string, rawStream: string) {
+function decodePdfStream(header: string, rawStream: string, remainingBytes: number) {
   const streamBuffer = trimPdfStreamBoundaries(Buffer.from(rawStream, "latin1"));
+  const limit = expansionLimit(streamBuffer.length, remainingBytes);
 
   if (!/\/FlateDecode\b/.test(header)) {
-    return streamBuffer.toString("latin1");
+    if (streamBuffer.length > limit) throw documentLimitError();
+    return streamBuffer;
   }
 
   try {
-    return inflateSync(streamBuffer).toString("latin1");
-  } catch {
+    return inflateSync(streamBuffer, { maxOutputLength: Math.max(1, limit) });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ERR_BUFFER_TOO_LARGE") throw documentLimitError();
     try {
-      return inflateRawSync(streamBuffer).toString("latin1");
-    } catch {
-      return "";
+      return inflateRawSync(streamBuffer, { maxOutputLength: Math.max(1, limit) });
+    } catch (rawError) {
+      if ((rawError as NodeJS.ErrnoException).code === "ERR_BUFFER_TOO_LARGE") throw documentLimitError();
+      return Buffer.alloc(0);
     }
   }
 }
 
 export function extractPdfText(buffer: Buffer) {
+  if (buffer.length > MAX_DOCUMENT_BYTES) throw documentLimitError();
   const content = buffer.toString("latin1");
   const pieces: string[] = [];
+  let expandedBytes = 0;
+  let streamCount = 0;
 
   for (const match of content.matchAll(/<<(?:.|\n|\r)*?>>\s*stream((?:.|\n|\r)*?)endstream/g)) {
     const fullMatch = match[0];
     const streamBody = match[1];
     const header = fullMatch.slice(0, fullMatch.indexOf("stream"));
-    const decoded = decodePdfStream(header, streamBody);
-    const text = decoded ? extractPdfTextOperators(decoded) : "";
+    if (++streamCount > MAX_DOCUMENT_PARTS) throw documentLimitError();
+    const decoded = decodePdfStream(header, streamBody, MAX_EXPANDED_BYTES - expandedBytes);
+    expandedBytes += decoded.length;
+    if (expandedBytes > MAX_EXPANDED_BYTES) throw documentLimitError();
+    const text = decoded.length ? extractPdfTextOperators(decoded.toString("latin1")) : "";
 
     if (text) {
       pieces.push(text);

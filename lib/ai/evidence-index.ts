@@ -183,9 +183,9 @@ function stringItems(value: unknown): string[] {
     .map((item) => {
       if (typeof item === "string") return item.trim();
       if (!isRecord(item)) return "";
-      return Object.values(item)
-        .filter((entry) => typeof entry === "string" || typeof entry === "number")
-        .map(String)
+      return Object.entries(item)
+        .filter(([, entry]) => typeof entry === "string" || typeof entry === "number")
+        .map(([key, entry]) => `${key.replace(/_/g, " ")} ${String(entry)}`)
         .join(" ")
         .trim();
     })
@@ -201,15 +201,61 @@ function evidenceTerms(value: string) {
   );
 }
 
-function isClaimSupportedBySource(claim: string, sourceTerms: Set<string>) {
+const NUMERIC_CONTEXT_STOP_WORDS = new Set([
+  "name", "amount", "actual", "value", "was", "were", "has", "had", "with", "compared", "against", "than", "from", "into", "for", "the", "and", "that", "this", "which", "recorded", "reported"
+]);
+const PERIOD_TERMS = /\b(?:january|february|march|april|may|june|july|august|september|october|november|december|q[1-4])\b/gi;
+
+function numericEvidence(value: string) {
+  const normalized = value.toLowerCase().replace(/\u2212/g, "-").replace(/\bpercent\b/g, "%");
+  const matches = Array.from(normalized.matchAll(/(?:[-+]?\s*[$€£]\s*|[$€£]?\s*[-+]?)\d+(?:,\d{3})*(?:\.\d+)?(?:\s*\/\s*\d+(?:\.\d+)?)?(?:\s*(?:%|usd\b|eur\b|gbp\b|dollars?\b|euros?\b|pounds?\b|days?\b|hours?\b|units?\b))?/g));
+  return matches.map((match, index) => {
+    const start = match.index!;
+    const end = start + match[0].length;
+    const before = normalized.slice(index ? matches[index - 1].index! + matches[index - 1][0].length : 0, start);
+    const after = normalized.slice(end, matches[index + 1]?.index ?? normalized.length);
+    const context = `${before} ${after}`;
+    const contextLabels = (text: string) => Array.from(evidenceTerms(text)).filter((term) => !NUMERIC_CONTEXT_STOP_WORDS.has(term) && !/\d/.test(term));
+    const beforeLabels = contextLabels(before);
+    const labels = beforeLabels.length ? beforeLabels : contextLabels(after);
+    let token = match[0].replace(/[\s,]/g, "").replace(/^\+/, "");
+    if (normalized[start - 1] === "(" && normalized[end] === ")") token = `-${token}`;
+    token = token.replace(/^(\$)(-)/, "$2$1").replace(/(?:usd|dollars?)$/, "USD").replace(/(?:eur|euros?)$/, "EUR").replace(/(?:gbp|pounds?)$/, "GBP");
+    token = token.replace(/\$/, "USD").replace(/€/, "EUR").replace(/£/, "GBP").replace(/^(.*?)(USD|EUR|GBP)$/, "$2$1").replace(/^(USD|EUR|GBP)-/, "-$1");
+    return { token, labels, periods: Array.from(context.matchAll(PERIOD_TERMS), (period) => period[0]) };
+  });
+}
+
+function isClaimSupportedBySource(claim: string, sourceText: string) {
+  const sourceTerms = evidenceTerms(sourceText);
   const claimTerms = evidenceTerms(claim);
   if (!claimTerms.size || !sourceTerms.size) return false;
 
   const sharedTerms = Array.from(claimTerms).filter((term) => sourceTerms.has(term));
-  const numericTerms = Array.from(claimTerms).filter((term) => /\d|[$%]/.test(term));
-  const numericSupport = numericTerms.length > 0 && numericTerms.every((term) => sourceTerms.has(term));
-
-  return numericSupport ? sharedTerms.length >= 2 : sharedTerms.length >= Math.min(3, claimTerms.size);
+  const numbers = numericEvidence(claim);
+  if (numbers.length) {
+    let precedingPeriods: string[] = [];
+    const sourceFacts = sourceText.split(/\n|(?<=[.!?;])\s+/).flatMap((statement) => {
+      const periods = Array.from(statement.matchAll(PERIOD_TERMS), (period) => period[0].toLowerCase());
+      if (periods.length) precedingPeriods = periods;
+      return numericEvidence(statement).map((fact) => ({ ...fact, periods: fact.periods.length ? fact.periods : precedingPeriods }));
+    });
+    // Match a number to its surrounding metric/period, never to an unrelated
+    // number elsewhere in the file. This is a conservative screening gate;
+    // it does not replace the user's confirmation of generated assertions.
+    if (!numbers.every((number) => sourceFacts.some((fact) => {
+      if (fact.token !== number.token) return false;
+      const claimedPeriods = number.periods;
+      if (claimedPeriods.length && fact.periods.length && !claimedPeriods.every((period) => fact.periods.includes(period))) return false;
+      if (claimedPeriods.some((period) => !sourceTerms.has(period))) return false;
+      const labels = number.labels.filter((label) => !claimedPeriods.includes(label));
+      const common = labels.filter((label) => fact.labels.includes(label));
+      return labels.length > 0 && common.length === labels.length;
+    }))) return false;
+    const directions = claim.match(/\b(?:increased|decreased|grew|rose|fell|declined|improved|worsened)\b/gi) || [];
+    if (directions.some((direction) => !sourceTerms.has(direction.toLowerCase()))) return false;
+  }
+  return sharedTerms.length >= Math.min(numbers.length ? 2 : 3, claimTerms.size);
 }
 
 export function assessFileAnalysisEvidence({
@@ -244,8 +290,7 @@ export function assessFileAnalysisEvidence({
     (item) => !TECHNICAL_FAILURE_LANGUAGE.test(item) && !UNGROUNDED_VISIBILITY_LANGUAGE.test(item)
   );
   const sourceText = normalizeText(extractedSourceText);
-  const sourceTerms = evidenceTerms(sourceText);
-  const supportedFacts = cleanFacts.filter((item) => isClaimSupportedBySource(item, sourceTerms));
+  const supportedFacts = cleanFacts.filter((item) => isClaimSupportedBySource(item, sourceText));
   const sourceHasContent = extractedRowCount > 0 || sourceText.length >= 80;
   const hasTechnicalFailure = isPlatformFailureText(combined) || TECHNICAL_FAILURE_LANGUAGE.test(combined);
   const narrativeHasBusinessDetail = /\b\d+(?:\.\d+)?%?\b|[$€£]|\b(?:revenue|sales|orders?|inventory|customers?|employees?|delivery|invoice|margin|cost|owner|department|policy|procedure|deadline|status)\b/i.test(
@@ -256,9 +301,10 @@ export function assessFileAnalysisEvidence({
     (extractedRowCount > 0 || sourceText.length >= 160) &&
     narrative.length >= 80 &&
     narrativeHasBusinessDetail &&
-    isClaimSupportedBySource(narrative, sourceTerms) &&
+    isClaimSupportedBySource(narrative, sourceText) &&
     !UNGROUNDED_VISIBILITY_LANGUAGE.test(narrative);
-  const factsExtracted = sourceHasContent && (supportedFacts.length > 0 || groundedNarrative);
+  const unsupportedNumericNarrative = numericEvidence(narrative).length > 0 && !isClaimSupportedBySource(narrative, sourceText);
+  const factsExtracted = sourceHasContent && supportedFacts.length === cleanFacts.length && !unsupportedNumericNarrative && (supportedFacts.length > 0 || groundedNarrative);
 
   if (hasTechnicalFailure) {
     return {
@@ -290,7 +336,7 @@ export function assessFileAnalysisEvidence({
     extractionOutcome: "facts_extracted",
     reason: null,
     factCount: supportedFacts.length,
-    requiresReview: sourceGrounding === "model_extraction",
+    requiresReview: true,
     sourceGrounding
   };
 }
@@ -620,7 +666,9 @@ export async function filterEligibleMemoryRowsByLifecycle<T extends MemoryChunkR
       : Promise.resolve({ data: [], error: null })
   ]);
 
-  if (filesResult.error || runsResult.error || notesResult.error) return [];
+  if (filesResult.error || runsResult.error || notesResult.error) {
+    throw new Error("Business Memory source availability could not be verified. Please try again.");
+  }
   return filterEligibleMemoryRows({
     rows,
     files: filesResult.data || [],
@@ -1005,7 +1053,8 @@ export async function indexFileAnalysisEvidence({
   runId,
   extractedText,
   summary,
-  metadata
+  metadata,
+  confirmation
 }: {
   supabase: SupabaseClient<Database>;
   workspaceId: string;
@@ -1015,7 +1064,11 @@ export async function indexFileAnalysisEvidence({
   extractedText: string;
   summary?: string | null;
   metadata?: Json;
+  confirmation?: { userId: string; runId: string };
 }) {
+  if (!confirmation || confirmation.userId !== userId || confirmation.runId !== runId) {
+    return { indexedChunks: 0, error: "Confirm the generated findings before adding this analysis to Business Memory." };
+  }
   // Relational extraction lineage is checked before chunking or embedding.
   // Editable file metadata cannot downgrade a review-gated source to native.
   const extractionEligibility = await assertDocumentExtractionAuthority({
@@ -1091,6 +1144,19 @@ export async function indexFileAnalysisEvidence({
     return { indexedChunks: 0, error: "No readable evidence chunks were available to index." };
   }
 
+  // Preserve the previous version until the complete replacement is persisted.
+  // Capture IDs, rather than archiving every file chunk after the write: another
+  // approval may publish different chunks while embeddings are being prepared.
+  const { data: previousChunks, error: previousChunksError } = await supabase
+    .from("business_memory_chunks")
+    .select("id")
+    .eq("workspace_id", workspaceId)
+    .eq("source_type", "file_analysis")
+    .eq("source_file_id", file.id)
+    .is("deleted_at", null)
+    .is("archived_at", null);
+  if (previousChunksError) return { indexedChunks: 0, error: "The previous Business Memory version could not be verified. Try again before replacing it." };
+
   const { data: job } = await supabase
     .from("file_processing_jobs")
     .insert({
@@ -1153,11 +1219,15 @@ export async function indexFileAnalysisEvidence({
     },
     source_quality: quality,
     confidence_score: confidenceScore,
-    token_estimate: estimateTokenCount(chunk)
+    token_estimate: estimateTokenCount(chunk),
+    indexed_at: startedAt,
+    updated_at: startedAt,
+    archived_at: null,
+    deleted_at: null
   }));
-  const { error } = await supabase.from("business_memory_chunks").upsert(rows, {
+  const { data: publishedChunks, error } = await supabase.from("business_memory_chunks").upsert(rows, {
     onConflict: "workspace_id,source_type,source_id,content_hash,chunk_index"
-  });
+  }).select("id");
   const completedAt = new Date().toISOString();
 
   if (error) {
@@ -1181,6 +1251,24 @@ export async function indexFileAnalysisEvidence({
     ]);
 
     return { indexedChunks: 0, error: error.message };
+  }
+
+  if (!publishedChunks || publishedChunks.length !== rows.length) {
+    return { indexedChunks: 0, error: "The replacement Business Memory write could not be confirmed. The previous version was preserved; retry to reconcile this analysis." };
+  }
+  const publishedIds = new Set(publishedChunks.map((chunk) => chunk.id));
+  const previousIds = (previousChunks || []).map((chunk) => chunk.id).filter((id) => !publishedIds.has(id));
+  if (previousIds.length) {
+    const { error: archiveError } = await supabase.from("business_memory_chunks")
+      .update({ archived_at: completedAt, updated_at: completedAt })
+      .eq("workspace_id", workspaceId)
+      .eq("source_type", "file_analysis")
+      .eq("source_file_id", file.id)
+      .in("id", previousIds)
+      .lt("indexed_at", startedAt)
+      .is("deleted_at", null)
+      .is("archived_at", null);
+    if (archiveError) return { indexedChunks: 0, error: "The new analysis was saved, but the previous Business Memory version could not be retired. Retry to reconcile the versions." };
   }
 
   await Promise.all([
