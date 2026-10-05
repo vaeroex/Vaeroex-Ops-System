@@ -1,0 +1,41 @@
+{
+  "commit": "5ff62601ffd12fb9b882b21f8d30edf246efda91",
+  "capturedAt": "2026-10-05",
+  "run": {
+    "id": 37385878145,
+    "name": "Vaeroex CI",
+    "status": "completed",
+    "conclusion": "success",
+    "run_number": 1609,
+    "jobs_url": "https://api.github.com/repos/vaeroex/Vaeroex-Ops-System/actions/runs/37385878145/jobs",
+    "logs_url": "https://api.github.com/repos/vaeroex/Vaeroex-Ops-System/actions/runs/37385878145/logs",
+    "workflow_id": 298750702
+  },
+  "jobs": [
+    {
+      "id": 112018918393,
+      "name": "security-database",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 112018918630,
+      "name": "jit-canary-linux-qualification",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 112018918668,
+      "name": "native-broker-qualification",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 112018918771,
+      "name": "verify",
+      "status": "completed",
+      "conclusion": "success"
+    }
+  ],
+  "scope": "All four required jobs actually passed before Linux image qualification was added. Not a claim that later heads passed."
+}

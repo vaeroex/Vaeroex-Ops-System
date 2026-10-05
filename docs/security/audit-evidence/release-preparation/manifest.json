@@ -12,8 +12,11 @@
   "files": {
     "README.md": "63053f8b55d37184806653f686d41fea4122280cc56b0e7856f47beb6f0e31f8",
     "ci-4c28c134.json": "cad78912518b1bed691260338947be9763384c337d4e347ffd567853b2e366db",
+    "ci-5ff62601.json": "6c9ecdfb690de679379d183528f36c82342db0569957ea279332f8989f4f8440",
     "destination-readonly.json": "85114c706eafb5a032f178f7f536a7f91a5c97fd562a3570aab0b0700a9da6dd",
     "gcp-readonly-status.json": "25225220acb0dc807be360fc0bea3c4e331ed6c781f144055dc80b333f294c30",
+    "linux-image-guard-results.json": "0aa9cd11c88eebb7742227e356978f508e9d1af91b4715ff3dd2a6e432c72153",
+    "linux-image-runtime-discovery.json": "94580b8db63a3ad4c911b17457a73de62b519acb1e91484f1b4cf4f47d6ccd10",
     "qbo-docker-context-result-host.json": "a4c3cab64fd1564216ffa020114b10522a1b9e0fb1e535736e31a39bf11f4209",
     "qbo-summary.json": "73a68ac00c628f4f3c80a0ac9ea1b844af88014a6ccf860d0c544bc94342edf3",
     "qbo-with-required-patch-result.json": "f99dd168ba5c7f3553b8317758b2e5b4dd2e1a4965218a0a199ad048b330e0e9"

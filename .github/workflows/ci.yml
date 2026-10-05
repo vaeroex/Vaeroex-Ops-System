@@ -314,6 +314,11 @@ jobs:
       - name: Build external integrations QBO Production runtime
         run: pnpm build:external-integrations-qbo
 
+      - name: Qualify QBO Linux amd64 credential-free build and network-isolated smoke
+        # Public-repository standard runner; no image push or artifact storage.
+        timeout-minutes: 20
+        run: node scripts/qbo-worker-image-qualification.cjs
+
       - name: TypeScript check
         run: pnpm typecheck
 
