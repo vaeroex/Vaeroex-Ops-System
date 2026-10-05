@@ -3,7 +3,10 @@
     "deploymentEnabled": {
       "codex/square-remote-sandbox-binding": false,
       "codex/square-sandbox-qualification": false,
-      "codex/square-gcp-sandbox-callback": false
+      "codex/square-gcp-sandbox-callback": false,
+      "codex/workspace-audit-security": false,
+      "codex/workspace-audit-evidence": false,
+      "codex/workspace-audit-workflows": false
     }
   },
   "crons": [

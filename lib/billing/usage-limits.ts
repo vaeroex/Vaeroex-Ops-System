@@ -11,6 +11,15 @@ function monthStart() {
   return date.toISOString();
 }
 
+function verifiedCount(result: { count: number | null; error?: unknown }): number {
+  if (result.error || typeof result.count !== "number" || !Number.isSafeInteger(result.count) || result.count < 0) {
+    // Unknown usage must never become a free slot. Keep database details out of
+    // errors that can reach an action response or a server log.
+    throw new Error("Workspace usage could not be verified. Please try again.");
+  }
+  return result.count;
+}
+
 export async function getUsageSnapshot({
   supabase,
   workspaceId,
@@ -42,12 +51,12 @@ export async function getUsageSnapshot({
   ]);
 
   return {
-    workspaces: workspaces.count ?? 0,
-    users: users.count ?? 0,
-    forms: forms.count ?? 0,
-    checklists: checklists.count ?? 0,
-    ai_runs_this_month: aiRuns.count ?? 0,
-    files: files.count ?? 0
+    workspaces: verifiedCount(workspaces),
+    users: verifiedCount(users),
+    forms: verifiedCount(forms),
+    checklists: verifiedCount(checklists),
+    ai_runs_this_month: verifiedCount(aiRuns),
+    files: verifiedCount(files)
   };
 }
 
@@ -134,7 +143,7 @@ export async function isAiRunUsageLimitReached({
     .select("id", { count: "exact", head: true })
     .eq("workspace_id", workspaceId)
     .gte("created_at", monthStart());
-  const count = result.count ?? 0;
+  const count = verifiedCount(result);
 
   return {
     reached: count >= limitValue,

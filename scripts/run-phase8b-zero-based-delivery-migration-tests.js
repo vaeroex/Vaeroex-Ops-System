@@ -286,12 +286,18 @@ function assertTargetIsSinglePendingMigration() {
   const separatelyQualifiedPreferencesTail = [
     "20261002182049_integration_summary_preferences.sql"
   ];
-  const reviewedTail = [...dormantSquareTail, ...separatelyQualifiedSheetsTail, ...separatelyQualifiedPreferencesTail];
+  // Reviewed audit additions follow the pinned historical integration chain.
+  // This list is exact; no wildcard or production admission rule is relaxed.
+  const workspaceAuditTail = [
+    "20261005022017_workspace_security_boundaries.sql",
+    "20261005022445_workspace_persisted_usage_limits.sql"
+  ];
+  const reviewedTail = [...dormantSquareTail, ...separatelyQualifiedSheetsTail, ...separatelyQualifiedPreferencesTail, ...workspaceAuditTail];
   const laterMigrations = migrations.slice(targetIndex + 1);
   if (laterMigrations.length !== reviewedTail.length ||
       laterMigrations.some((migration, index) => migration !== reviewedTail[index])) {
     fail(
-      `Fixture-rich harness requires the reviewed dormant Square, Google Sheets and personal summary preferences tail after ${targetVersion}.`
+      `Fixture-rich harness requires the reviewed dormant Square, Google Sheets and personal summary preferences and workspace audit tail after ${targetVersion}.`
     );
   }
 }

@@ -3,7 +3,8 @@ import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { SectionCard } from "@/components/operations/SectionCard";
 import { StatusBadge } from "@/components/operations/StatusBadge";
 import { displayPlanName, displaySubscriptionStatus, normalizePlanLimits, VAEROEX_PLAN_LIMITS } from "@/lib/billing/plans";
-import { getSubscriptionUsageStatus } from "@/lib/billing/usage-limits";
+import { getSubscriptionStatus } from "@/lib/billing/get-subscription-status";
+import { getUsageSnapshot } from "@/lib/billing/usage-limits";
 import { VAEROEX_CONTACT_EMAILS, VAEROEX_MAILTO_LINKS } from "@/lib/contact/emails";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getWorkspaceContext } from "@/lib/workspaces/current";
@@ -24,12 +25,16 @@ export default async function AccountSubscriptionPage({ searchParams }: AccountS
     data: { user }
   } = await supabase.auth.getUser();
   const context = await getWorkspaceContext();
-  const { subscription, usage } = await getSubscriptionUsageStatus({
+  const accessContext = {
     supabase,
     userId: user?.id,
     email: user?.email,
     workspaceId: context.activeWorkspace?.id
-  });
+  };
+  const [subscription, usage] = await Promise.all([
+    getSubscriptionStatus(accessContext),
+    getUsageSnapshot(accessContext).catch(() => null)
+  ]);
   const limits = normalizePlanLimits(subscription.plan) || (subscription.allowed ? VAEROEX_PLAN_LIMITS : null);
 
   return (
@@ -88,7 +93,7 @@ export default async function AccountSubscriptionPage({ searchParams }: AccountS
       </SectionCard>
 
       <SectionCard title="Current usage" description="Usage is checked against active Vaeroex access limits. All product features are included.">
-        <div className="grid gap-4 md:grid-cols-4">
+        {!usage ? <ErrorNotice message="Current usage is temporarily unavailable. Reload to try again. Billing controls remain available above." /> : <div className="grid gap-4 md:grid-cols-4">
           {[
             ["Workspaces", usage.workspaces, limits?.max_workspaces],
             ["Users", usage.users, limits?.max_users],
@@ -102,7 +107,7 @@ export default async function AccountSubscriptionPage({ searchParams }: AccountS
               </p>
             </div>
           ))}
-        </div>
+        </div>}
       </SectionCard>
     </div>
   );

@@ -74,7 +74,9 @@ export async function enforceRateLimit(options: RateLimitOptions): Promise<RateL
     options.workspaceId ? `workspace:${options.workspaceId}` : "",
     options.userId ? `user:${options.userId}` : "",
     ...((options.identifiers || []).filter(Boolean).map((item) => `extra:${item}`) as string[]),
-    `ip:${ip}`
+    // Authenticated quotas follow the principal across devices and networks.
+    // Anonymous/public actions retain their independent IP partition.
+    !options.userId && !options.workspaceId ? `ip:${ip}` : ""
   ]
     .filter(Boolean)
     .join("|");

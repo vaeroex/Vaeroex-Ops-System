@@ -52,6 +52,13 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Workspace audit security, evidence and workflow regressions
+        run: pnpm test:workspace-audit
+
+      - name: Isolated workspace authorization and concurrent slot regressions
+        # Creates a fresh Unix-socket-only cluster; accepts no hosted database URL.
+        run: WORKSPACE_AUDIT_PG_BIN="$(pg_config --bindir)" pnpm test:workspace-audit:database
+
       - name: Workspace navigation and bounded-list regressions
         run: pnpm test:workspace-clarity
 
