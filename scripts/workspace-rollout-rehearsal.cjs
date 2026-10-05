@@ -80,8 +80,8 @@ async function qualifies(c,name,nativeOwnedDirectory){
 
 async function prepareImport(c,workspace,owner,label){
  const f=id(),i=id(),r=id();
- await c.query("insert into public.file_uploads(id,workspace_id,original_name,display_name,file_extension,mime_type,storage_path,created_by) values($1,$2,$3,$3,'csv','text/csv','synthetic-rollout/'||$1::text,$4)",[f,workspace,label,owner]);
- await c.query("insert into public.file_imports(id,workspace_id,file_upload_id,import_type,status,rows_total,mapping_json,created_by)values($1,$2,$3,'metrics','needs_review',1,jsonb_build_object('preparation_id',$1::text),$4)",[i,workspace,f,owner]);
+ await c.query("insert into public.file_uploads(id,workspace_id,original_name,display_name,file_extension,mime_type,storage_path,created_by) values($1,$2,$3,$3,'csv','text/csv','synthetic-rollout/'||$1::uuid::text,$4)",[f,workspace,label,owner]);
+ await c.query("insert into public.file_imports(id,workspace_id,file_upload_id,import_type,status,rows_total,mapping_json,created_by)values($1,$2,$3,'metrics','needs_review',1,jsonb_build_object('preparation_id',$1::uuid::text),$4)",[i,workspace,f,owner]);
  await c.query("insert into public.file_import_rows(id,workspace_id,file_upload_id,import_id,import_type,row_number,data_json)values($1,$2,$3,$4,'metrics',2,'{\"Value\":100}')",[r,workspace,f,i]);
  return {workspace,owner,file:f,import:i,row:r};
 }
@@ -90,7 +90,7 @@ const reconcileImport=(c,x,failed=false)=>as(c,x.owner,'authenticated',()=>c.que
 async function completeMarkers(c,x){await as(c,x.owner,'authenticated',async()=>{
  await c.query("update public.file_import_rows set status='imported' where id=$1",[x.row]);
  await c.query("update public.file_imports set status='completed',rows_imported=1,imported_at=clock_timestamp() where id=$1",[x.import]);
- await c.query("update public.file_uploads set import_status='imported',metadata_json=metadata_json||jsonb_build_object('last_import',jsonb_build_object('import_id',$1::text,'imported_at',(select imported_at from public.file_imports where id=$1::uuid))) where id=$2",[x.import,x.file]);
+ await c.query("update public.file_uploads set import_status='imported',metadata_json=metadata_json||jsonb_build_object('last_import',jsonb_build_object('import_id',$1::uuid::text,'imported_at',(select imported_at from public.file_imports where id=$1::uuid))) where id=$2",[x.import,x.file]);
  });}
 async function importHistory(c,x){return{
  file:(await c.query('select to_jsonb(f) row from public.file_uploads f where id=$1',[x.file])).rows,
