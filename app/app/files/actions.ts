@@ -4000,6 +4000,12 @@ export async function saveExtractedImportAction(formData: FormData) {
   }
 
   if (!stagedRows?.length) {
+    // A repeated approval can arrive after the accepted attempt consumed its
+    // staged rows. Acknowledge only a completion verified by the durable receipt.
+    const recovery = await reconcileImportAttempt(supabase, workspaceId, file.id, importId);
+    if (recovery?.status === "completed") {
+      redirectWithMessage("Import completion verified from saved results. No rows were resubmitted.", file.id, "imported");
+    }
     redirectWithFileError("No extracted rows were found to save.", file.id, "imported");
   }
 
