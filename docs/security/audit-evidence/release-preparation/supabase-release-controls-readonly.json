@@ -1,0 +1,97 @@
+{
+  "schemaVersion": 1,
+  "observedAt": "2026-10-05 23:42:26 UTC",
+  "method": "Read-only existing Chrome dashboard session via cua_repl",
+  "projectRef": "mdiianhfrojmxqpwrflh",
+  "projectBranch": "main / PRODUCTION",
+  "organizationPlan": "PRO",
+  "productionMutated": false,
+  "customerRecordsRead": false,
+  "backupDownloaded": false,
+  "restoreAttempted": false,
+  "credentialFetched": false,
+  "settingsChanged": false,
+  "backup": {
+    "view": "Database / Backups / Scheduled backups",
+    "physicalSnapshotsVisible": [
+      "2026-10-05T13:52:00Z",
+      "2026-10-04T13:50:40Z",
+      "2026-10-03T13:52:22Z",
+      "2026-10-02T13:48:38Z",
+      "2026-10-01T13:45:43Z",
+      "2026-09-30T13:49:37Z",
+      "2026-09-29T13:52:02Z",
+      "2026-09-28T13:48:21Z"
+    ],
+    "restoreControlsVisible": true,
+    "warning": "Database backups do not include Storage API objects; restoring an older backup does not restore objects deleted since then.",
+    "pitr": {
+      "view": "Database / Backups / Point in time",
+      "enabled": false,
+      "observedText": "Point in Time Recovery is available as an add-on. Enable the add-on to add point-in-time recovery to your project."
+    },
+    "proofLimit": "Dashboard availability establishes listed snapshot/control presence, not successful restore, RTO, complete object recovery, or authorization to restore over accepted work."
+  },
+  "projectAvailability": {
+    "view": "Project Settings / General",
+    "restartControlVisible": true,
+    "pauseControlDisabled": true,
+    "disabledReason": "not established; no tooltip or activation was attempted"
+  },
+  "dataApi": {
+    "view": "Integrations / Data API / Settings",
+    "exposedSchemas": 2,
+    "totalSchemasListed": 4,
+    "exposedTables": 41,
+    "totalTablesListed": 165,
+    "exposedFunctions": 3,
+    "totalFunctionsListed": 437,
+    "autoExposeNewTables": true,
+    "maxRows": 1000,
+    "poolSize": "unset in UI; described as auto-configured based on compute",
+    "exposureSelectorsAvailable": true,
+    "globalWriteOnlyHold": "not observed in this settings view",
+    "noChangesPending": true,
+    "proofLimit": "Schema/table/function exposure controls are not a rehearsed write-only maintenance gate. Broad exposure changes can affect reads/RPCs; no service-role/direct-SQL containment was established by this inspection."
+  },
+  "storage": {
+    "settingsView": "Storage / Files / Settings",
+    "globalFileSizeLimit": {
+      "value": 50,
+      "unit": "MB"
+    },
+    "imageTransformationEnabled": true,
+    "spendCapNotice": "Reduced max upload file size limit due to spend cap",
+    "globalWriteOnlyHold": "not observed in this settings view",
+    "policiesView": "Storage / Files / Policies",
+    "workspaceFilesPolicies": {
+      "roles": [
+        "authenticated"
+      ],
+      "commands": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ]
+    },
+    "workspaceAgreementsPolicies": {
+      "roles": [
+        "authenticated"
+      ],
+      "commands": [
+        "SELECT"
+      ]
+    },
+    "otherObjectPoliciesShown": 0,
+    "bucketPoliciesShown": 0,
+    "policyControlsAvailable": true,
+    "proofLimit": "Existing policy management UI is available; no policy predicate was changed or universal write hold proven. Privileged services and direct database writers require their own coordinated admission/drain controls."
+  },
+  "remainingOperatorEvidence": [
+    "Verify a recoverable database artifact and approved recovery procedure without overwriting accepted post-cutoff work.",
+    "Establish separate preservation/recovery evidence for Storage objects; database snapshot metadata alone is insufficient.",
+    "Name and qualify maintenance controls across browser/API/OAuth/webhooks, direct PostgREST/Storage and service/direct-SQL writers.",
+    "Verify the actual permissions and propagation/recovery behavior for any proposed exposure or policy control in approved isolation before changing production."
+  ]
+}

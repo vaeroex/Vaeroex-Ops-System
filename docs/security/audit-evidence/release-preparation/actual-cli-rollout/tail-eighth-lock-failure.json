@@ -1,0 +1,9 @@
+{
+  "label": "tail-eighth-lock-failure",
+  "code": 1,
+  "signal": null,
+  "timedOut": false,
+  "durationMs": 1213.1565419999997,
+  "stdout": "",
+  "stderr": "Connecting to remote database...\nDo you want to push these migrations to the remote database?\n • 20261005182541_bounded_google_sheets_dispatch.sql\n • 20261005183352_issue_submission_receipts.sql\n • 20261005184031_qbo_scoped_runtime_recovery.sql\n • 20261005190709_sheets_recovery_fair_scan.sql\n • 20261005194244_google_sheets_failure_cleanup_transition.sql\n • 20261005202215_sheets_dispatch_round_robin.sql\n [Y/n] y\nApplying migration 20261005182541_bounded_google_sheets_dispatch.sql...\nERROR: canceling statement due to lock timeout (SQLSTATE 55P03)\nAt statement: 3\ncreate index google_sheets_connections_due_dispatch_idx\n  on public.google_sheets_connections(next_sync_at,workspace_id,id)\n  where status='connected' and automatic_refresh_enabled and active_approval_id is not null\nTry rerunning the command with --debug to troubleshoot the error.\n"
+}
