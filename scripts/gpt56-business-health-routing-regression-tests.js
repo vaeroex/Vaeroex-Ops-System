@@ -511,7 +511,7 @@ function storageAndTelemetryTests() {
         { runtime_model: "gpt-5.6-terra", input_tokens: 1_000_000, output_tokens: 1_000_000 }
       ]
     }
-  }), 5_250, "cost accounting must include both safe same-provider attempt records");
+  }), 6_000, "cost accounting must include both long-context attempts at the versioned standard rates");
 }
 
 async function main() {

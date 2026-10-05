@@ -13,12 +13,16 @@ export type VaeroexTokenUsage = {
   metadata?: Json;
 };
 
+// Standard text-token catalog checked 2026-10-05 against the official model pages.
+// https://developers.openai.com/api/docs/models/gpt-5.6-sol (and luna/terra).
+// Estimates exclude cache discounts/write charges, tool charges, service-tier/regional adjustments
+// and unreported usage. They are not provider invoices or customer billing.
 const DEFAULT_MODEL_COST_CENTS_PER_1M: Record<string, { input: number; output: number }> = {
   "gpt-4o-mini": { input: 15, output: 60 },
   "gpt-5.4-mini": { input: 75, output: 450 },
-  "gpt-5.6-luna": { input: 100, output: 600 },
-  "gpt-5.6-terra": { input: 250, output: 1_500 },
-  "gpt-5.6-sol": { input: 500, output: 3_000 }
+  "gpt-5.6-luna": { input: 20, output: 120 },
+  "gpt-5.6-terra": { input: 200, output: 1_200 },
+  "gpt-5.6-sol": { input: 400, output: 2_000 }
 };
 const CONSERVATIVE_UNKNOWN_MODEL_COST_CENTS_PER_1M = { input: 500, output: 3_000 };
 const DEFAULT_WORKSPACE_MONTHLY_TOKEN_BUDGET = 2_000_000;
@@ -42,7 +46,11 @@ export function modelCost(model: string) {
   return {
     input: inputOverride ?? defaults.input,
     output: outputOverride ?? defaults.output,
-    estimated: !exact && !matchedPrefix && inputOverride === null && outputOverride === null
+    catalogKnown: Boolean(exact || matchedPrefix),
+    inputOverride: inputOverride !== null,
+    outputOverride: outputOverride !== null,
+    estimated: !exact && !matchedPrefix && inputOverride === null && outputOverride === null,
+    basis: inputOverride !== null || outputOverride !== null ? "environment_override" : exact || matchedPrefix ? "standard_catalog" : "conservative_unknown"
   };
 }
 
@@ -74,12 +82,30 @@ function monthStart() {
   return date.toISOString();
 }
 
-export function estimatedCostCents(usage: Pick<VaeroexTokenUsage, "inputTokens" | "outputTokens" | "model">) {
-  const cost = modelCost(usage.model);
-  const inputCost = (usage.inputTokens / 1_000_000) * cost.input;
-  const outputCost = (usage.outputTokens / 1_000_000) * cost.output;
+const COST_ESTIMATE_VERSION = "standard-text-2026-10-05-v1";
 
-  return Math.max(0, Math.ceil(inputCost + outputCost));
+function estimateAttempt(usage: Pick<VaeroexTokenUsage, "inputTokens" | "outputTokens" | "model">) {
+  const cost = modelCost(usage.model);
+  const inputTokens = Number.isFinite(usage.inputTokens) ? Math.max(0, usage.inputTokens) : 0;
+  const outputTokens = Number.isFinite(usage.outputTokens) ? Math.max(0, usage.outputTokens) : 0;
+  const longContext = /^gpt-5\.6-(luna|terra|sol)(?:-|$)/.test(usage.model.trim().toLowerCase()) && inputTokens > 272_000;
+  const inputRate = cost.input * (longContext && !cost.inputOverride ? 2 : 1);
+  const outputRate = cost.output * (longContext && !cost.outputOverride ? 1.5 : 1);
+  return {
+    model: usage.model,
+    input_tokens: inputTokens,
+    output_tokens: outputTokens,
+    input_cents_per_million: inputRate,
+    output_cents_per_million: outputRate,
+    rate_basis: cost.basis,
+    input_rate_basis: cost.inputOverride ? "environment_override" : cost.catalogKnown ? "standard_catalog" : "conservative_unknown",
+    output_rate_basis: cost.outputOverride ? "environment_override" : cost.catalogKnown ? "standard_catalog" : "conservative_unknown",
+    amount_microcents: Math.round(inputTokens * inputRate + outputTokens * outputRate)
+  };
+}
+
+export function estimatedCostCents(usage: Pick<VaeroexTokenUsage, "inputTokens" | "outputTokens" | "model">) {
+  return Math.ceil(estimateAttempt(usage).amount_microcents / 1_000_000);
 }
 
 function providerAttempts(metadata: Json | undefined) {
@@ -111,15 +137,32 @@ function providerAttempts(metadata: Json | undefined) {
   });
 }
 
-export function estimatedProviderCostCents(usage: VaeroexTokenUsage) {
-  const attempts = providerAttempts(usage.metadata);
-  if (!attempts.length) return estimatedCostCents(usage);
+export function providerCostEstimate(usage: VaeroexTokenUsage) {
+  const suppliedAttempts = providerAttempts(usage.metadata);
+  const attempts = (suppliedAttempts.length ? suppliedAttempts : [usage]).map(estimateAttempt);
+  return {
+    schema_version: 1,
+    version: COST_ESTIMATE_VERSION,
+    currency: "USD",
+    kind: "uncached_text_token_estimate",
+    amount_microcents: attempts.reduce((total, attempt) => total + attempt.amount_microcents, 0),
+    attempts
+  };
+}
 
-  const total = attempts.reduce((sum, attempt) => {
-    const cost = modelCost(attempt.model);
-    return sum + (attempt.inputTokens / 1_000_000) * cost.input + (attempt.outputTokens / 1_000_000) * cost.output;
-  }, 0);
-  return Math.max(0, Math.ceil(total));
+export function estimatedProviderCostCents(usage: VaeroexTokenUsage) {
+  return Math.ceil(providerCostEstimate(usage).amount_microcents / 1_000_000);
+}
+
+/** New rows retain precision; pre-versioned rows keep their historical estimate. */
+export function recordedEstimatedCostCents(row: { estimated_cost_cents: number; metadata_json: Json }) {
+  const metadata = row.metadata_json;
+  const value = metadata && !Array.isArray(metadata) && typeof metadata === "object" ? metadata.cost_estimate : null;
+  if (value && !Array.isArray(value) && typeof value === "object" && value.schema_version === 1 && typeof value.version === "string" && value.currency === "USD"
+    && typeof value.amount_microcents === "number" && Number.isSafeInteger(value.amount_microcents) && value.amount_microcents >= 0) {
+    return value.amount_microcents / 1_000_000;
+  }
+  return row.estimated_cost_cents;
 }
 
 export async function assertWorkspaceTokenBudget({
@@ -212,7 +255,10 @@ export async function recordVaeroexAiUsage({
     request_id: usage.requestId || null,
     latency_ms: usage.latencyMs ?? null,
     status: usage.status || "completed",
-    metadata_json: usage.metadata || {}
+    metadata_json: {
+      ...(usage.metadata && !Array.isArray(usage.metadata) && typeof usage.metadata === "object" ? usage.metadata : {}),
+      cost_estimate: providerCostEstimate(usage)
+    }
   });
 
   if (error) {
