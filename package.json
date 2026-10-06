@@ -170,7 +170,9 @@
     "test:public-clarity": "node scripts/public-clarity-regression-tests.js && node scripts/public-policy-regression-tests.js && node scripts/clarity-motion-regression-tests.js && node scripts/science-regression-tests.js && node scripts/signature-regression-tests.js",
     "test:science": "node scripts/science-regression-tests.js",
     "test:google-sheets": "node scripts/google-sheets-runtime-tests.cjs && node scripts/google-sheets-data-tests.cjs && node scripts/google-sheets-sync-tests.cjs && node scripts/google-sheets-entity-tests.cjs",
-    "test:google-sheets-ui": "node scripts/google-sheets-ui-browser-tests.cjs"
+    "test:google-sheets-ui": "node scripts/google-sheets-ui-browser-tests.cjs",
+    "test:workspace-audit": "node scripts/workspace-security-helper-tests.cjs && node scripts/audit-import-evidence-fixes.cjs && node scripts/audit-import-finalization.cjs && node scripts/audit-principal-parent-regression.cjs --quota-only",
+    "test:workspace-audit:database": "node scripts/workspace-security-database-tests.cjs"
   },
   "dependencies": {
     "@pdf-lib/fontkit": "1.1.1",

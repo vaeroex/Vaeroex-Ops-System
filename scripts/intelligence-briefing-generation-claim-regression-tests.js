@@ -51,6 +51,12 @@ const inputJson = {
 
 function createAdmin(existingRows) {
   return {
+    rpc(name, args) {
+      assert.equal(name, "create_trusted_analysis_run_v1");
+      assert.equal(args.p_actor_id, userId);
+      return this.from("ai_agent_runs").insert({ workspace_id: args.p_workspace_id, agent_type: args.p_agent_type,
+        input_json: args.p_input_json, output_json: {}, status: "processing", created_by: args.p_actor_id }).select("id");
+    },
     from(table) {
       assert.equal(table, "ai_agent_runs");
       return {

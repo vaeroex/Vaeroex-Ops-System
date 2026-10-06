@@ -887,26 +887,24 @@ export async function createAssetCheckAction(formData: FormData) {
   requireValue(path, "Asset", assetId);
   validateLength(path, "Asset check notes", text(formData, "notes"), 1000);
 
-  const { error } = await supabase.from("asset_checks").insert({
+  if (!["Ready", "Needs attention", "Out of service", "Missing"].includes(status)) redirectWithError(path, "Choose a listed asset status.");
+
+  const { data: savedCheck, error } = await supabase.from("asset_checks").insert({
     workspace_id: workspaceId,
     asset_id: assetId,
     checked_by: user.id,
     status,
     notes: text(formData, "notes"),
     photos_json: [] as Json
-  });
+  }).select("id").single();
 
-  if (error) {
-    redirectWithError(path, error.message);
+  if (error || !savedCheck) {
+    redirectWithError(path, error?.message || "Asset check could not be saved.");
   }
 
-  await supabase
-    .from("assets")
-    .update({ status, last_checked_at: new Date().toISOString() })
-    .eq("id", assetId)
-    .eq("workspace_id", workspaceId);
-
+  // The database trigger updates parent readiness in the same transaction.
   revalidatePath(path);
+  revalidatePath("/app/assets/checks");
   redirectWithMessage(path, "Asset check saved.");
 }
 

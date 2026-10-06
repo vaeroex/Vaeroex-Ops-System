@@ -58,6 +58,10 @@ type GoogleSheetsFactLinkRow = {
 export type Database = {
   public: {
     Functions: {
+      create_trusted_analysis_run_v1: {
+        Args: { p_workspace_id: string; p_actor_id: string; p_agent_type: string; p_input_json: Json };
+        Returns: { id: string }[];
+      };
       read_google_sheets_operational_conflicts_v1: {
         Args: { p_workspace_id: string };
         Returns: Json;
@@ -3131,6 +3135,7 @@ export type Database = {
       };
       security_audit_events: {
         Row: {
+          server_recorded: boolean;
           id: string;
           workspace_id: string | null;
           user_id: string | null;
@@ -3149,6 +3154,7 @@ export type Database = {
           created_at: string;
         };
         Insert: {
+          server_recorded?: boolean;
           id?: string;
           workspace_id?: string | null;
           user_id?: string | null;
@@ -3363,7 +3369,13 @@ export type Database = {
           deleted_at?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["form_submissions"]["Insert"]>;
-        Relationships: [];
+        Relationships: [{
+          foreignKeyName: "form_submissions_workspace_form_fkey";
+          columns: ["workspace_id", "form_id"];
+          isOneToOne: false;
+          referencedRelation: "forms";
+          referencedColumns: ["workspace_id", "id"];
+        }];
       };
       checklists: {
         Row: {
@@ -3724,7 +3736,13 @@ export type Database = {
           created_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["asset_checks"]["Insert"]>;
-        Relationships: [];
+        Relationships: [{
+          foreignKeyName: "asset_checks_workspace_asset_fkey";
+          columns: ["workspace_id", "asset_id"];
+          isOneToOne: false;
+          referencedRelation: "assets";
+          referencedColumns: ["workspace_id", "id"];
+        }];
       };
       people: {
         Row: {

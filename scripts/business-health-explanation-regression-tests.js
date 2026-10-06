@@ -633,7 +633,7 @@ assert.ok(
 assert.match(actionSource, /generation_policy_version:\s*analysisPackage\.generationPolicyVersion/, "run input must persist the application-owned generation-policy version");
 assert.match(serviceSource, /generation_policy_version:\s*analysisPackage\.generationPolicyVersion/, "usage telemetry must retain the privacy-safe generation-policy version");
 assert.doesNotMatch(JSON.stringify(businessHealthProviderRequestPayload(analysisPackage)), /generationPolicyVersion|generation_policy_version|business_health_generation_policy_v2/, "the generation-policy version must not be sent to Sol or Terra");
-assert.match(claimSource, /insert\([\s\S]*status:\s*"processing"[\s\S]*\.select\("id"\)/, "the processing-row insert must be the atomic claim");
+assert.match(claimSource, /\.rpc\("create_trusted_analysis_run_v1",[\s\S]*p_actor_id:\s*userId[\s\S]*\.maybeSingle\(\)/, "the service-only actor-bound processing-row RPC must be the atomic claim");
 assert.match(claimSource, /insertError\?\.code !== "23505"/, "only a database uniqueness conflict may enter conflict resolution");
 assert.match(claimSource, /\.eq\("workspace_id", workspaceId\)/, "conflict lookup must remain workspace scoped");
 assert.match(claimMigration, /create unique index if not exists ai_agent_runs_business_health_generation_claim_uidx/i);
@@ -732,7 +732,11 @@ function fakeClaimAdmin() {
     };
     return builder;
   }
-  return { rows, from: () => query() };
+  return { rows, from: () => query(), rpc(name, args) {
+    assert.equal(name, "create_trusted_analysis_run_v1");
+    return query().insert({ workspace_id: args.p_workspace_id, agent_type: args.p_agent_type,
+      input_json: args.p_input_json, output_json: {}, status: "processing", created_by: args.p_actor_id });
+  } };
 }
 
 function claimInput(packageUnderTest = analysisPackage) {

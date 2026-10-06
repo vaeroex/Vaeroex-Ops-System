@@ -33,9 +33,13 @@ Module._resolveFilename = function resolveAlias(request, parent, isMain, options
 };
 
 const originalLoad = Module._load;
+let trustedAuditClient = null;
 Module._load = function loadPatched(request, parent, isMain) {
   if (request === "server-only") {
     return {};
+  }
+  if (request === "@/lib/supabase/admin") {
+    return { createSupabaseAdminClient: () => trustedAuditClient };
   }
 
   return originalLoad.call(this, request, parent, isMain);
@@ -82,12 +86,13 @@ class FakeQuery {
 function fakeSupabase() {
   const auditRows = [];
 
-  return {
+  trustedAuditClient = {
     auditRows,
     from(table) {
       return new FakeQuery(table, auditRows);
     }
   };
+  return trustedAuditClient;
 }
 
 const {

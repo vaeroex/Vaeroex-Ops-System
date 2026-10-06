@@ -180,9 +180,11 @@ insert into public.profiles (id, email, full_name) values
   ('a7100000-0000-4000-8000-000000000006', 'phase1-nonmember@example.test', 'Phase 1 Nonmember'),
   ('a7100000-0000-4000-8000-000000000007', 'phase1-other-owner@example.test', 'Phase 1 Other Owner');
 
-insert into public.workspaces (id, name, created_by) values
-  ('b7100000-0000-4000-8000-000000000001', 'Phase 1 Workspace A', 'a7100000-0000-4000-8000-000000000001'),
-  ('b7100000-0000-4000-8000-000000000002', 'Phase 1 Workspace B', 'a7100000-0000-4000-8000-000000000007');
+-- Isolate the role/tenant contract from entitlement denial without bypassing
+-- the subscription guard on the authenticated Business Entity RPC writes.
+insert into public.workspaces (id, name, created_by, subscription_status, trial_ends_at) values
+  ('b7100000-0000-4000-8000-000000000001', 'Phase 1 Workspace A', 'a7100000-0000-4000-8000-000000000001', 'trialing', now() + interval '1 day'),
+  ('b7100000-0000-4000-8000-000000000002', 'Phase 1 Workspace B', 'a7100000-0000-4000-8000-000000000007', 'trialing', now() + interval '1 day');
 
 insert into public.workspace_members (id, workspace_id, user_id, role, status) values
   ('c7100000-0000-4000-8000-000000000001', 'b7100000-0000-4000-8000-000000000001', 'a7100000-0000-4000-8000-000000000001', 'owner', 'active'),
@@ -200,10 +202,23 @@ select ok(
   (select relrowsecurity and relforcerowsecurity from pg_class where oid = 'public.business_entities'::regclass),
   'Business Entities have forced RLS'
 );
-select is(
-  (select count(*)::integer from pg_policies where schemaname = 'public' and tablename = 'business_entities'),
-  1,
-  'Business Entities expose only the member-read RLS policy'
+select ok(
+  (select jsonb_agg(jsonb_build_array(policyname, cmd, roles::text) order by policyname collate "C")
+    from pg_policies
+    where schemaname = 'public' and tablename = 'business_entities'
+      and permissive = 'PERMISSIVE')
+    = '[["workspace members read business entities", "SELECT", "{authenticated}"]]'::jsonb,
+  'Business Entities retain exactly the original permissive member-read policy'
+);
+select ok(
+  (select jsonb_agg(jsonb_build_array(policyname, cmd, roles::text) order by policyname collate "C")
+    from pg_policies
+    where schemaname = 'public' and tablename = 'business_entities'
+      and permissive = 'RESTRICTIVE')
+    = '[["audit_entitled_delete", "DELETE", "{authenticated}"],
+        ["audit_entitled_insert", "INSERT", "{authenticated}"],
+        ["audit_entitled_update", "UPDATE", "{authenticated}"]]'::jsonb,
+  'Business Entities add only the three restrictive authenticated entitlement guards'
 );
 select ok(
   not has_schema_privilege('anon', 'private', 'USAGE')

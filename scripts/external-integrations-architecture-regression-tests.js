@@ -397,7 +397,9 @@ function acceptsFixtureManifest(names) {
   });
 }
 equal(acceptsFixtureManifest(currentMigrations), true, "real current migration manifest passes the fixture-rich guard");
-for (const manifest of [currentMigrations.filter(name => name !== "20260907174326_square_dormant_account_connection.sql"),
+for (const manifest of [currentMigrations.filter(name => name !== "20261005022017_workspace_security_boundaries.sql"),
+  currentMigrations.filter(name => name !== "20261005022445_workspace_persisted_usage_limits.sql"),
+  currentMigrations.filter(name => name !== "20260907174326_square_dormant_account_connection.sql"),
   currentMigrations.filter(name => name !== "20260902191325_square_production_internal_pilot_runtime.sql"),
   currentMigrations.filter(name => name !== "20260907225626_square_remote_sandbox_binding.sql"),
   currentMigrations.filter(name => name !== "20260908014713_square_broker_runtime_credential_authority.sql"),
@@ -514,9 +516,9 @@ assert.deepEqual(approvedSquareQualificationPaths.filter(file => file.startsWith
 "only the twenty-three bounded provisioner files are exempt");
 assertionCount++;
 assert.deepEqual(JSON.parse(read("vercel.json")), {
-  git: { deploymentEnabled: { "codex/square-remote-sandbox-binding": false, "codex/square-sandbox-qualification": false, "codex/square-gcp-sandbox-callback": false } },
+  git: { deploymentEnabled: { "main": false, "codex/square-remote-sandbox-binding": false, "codex/square-sandbox-qualification": false, "codex/square-gcp-sandbox-callback": false, "codex/workspace-audit-security": false, "codex/workspace-audit-evidence": false, "codex/workspace-audit-workflows": false } },
   crons: [{ path: "/api/integrations/google-sheets/scheduled-sync", schedule: "*/15 * * * *" }]
-}, "Square review branches cannot auto-deploy; other branches keep default behavior and only the reviewed Sheets cron is configured");
+}, "Main and held review branches cannot auto-deploy; only the reviewed Sheets cron is configured");
 equal(withoutSquareQualificationPaths(approvedSquareQualificationPaths.join("\n")), "", "exact qualification paths are exempt from legacy phase-only scope assertions");
 for (const protectedPath of [
   ...approvedSquareQualificationPaths.map(file => `${file}.unexpected`),

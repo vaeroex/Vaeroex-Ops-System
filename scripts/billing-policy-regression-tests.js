@@ -6,7 +6,8 @@ const root = process.cwd();
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 
 const legalContent = read("lib/legal/content.ts");
-const pricingPage = read("app/pricing/page.tsx");
+// Compare rendered prose across source formatting; retain every policy assertion.
+const pricingPage = read("app/pricing/page.tsx").replace(/\s+/g, " ");
 const accountSubscriptionPage = read("app/app/account/subscription/page.tsx");
 const checkoutSuccessPage = read("app/checkout/success/page.tsx");
 const publicHelpPage = read("app/help/page.tsx");

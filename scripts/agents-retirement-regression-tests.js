@@ -86,7 +86,7 @@ assert.match(adminAudit, /security_audit_events/);
 assert.match(adminAudit, /audit_logs/);
 
 assert.match(businessHealthActions, /claimBusinessHealthGeneration/, "Business Health generation must delegate the atomic run claim before provider execution");
-assert.match(businessHealthGenerationClaim, /\.from\("ai_agent_runs"\)[\s\S]*\.insert\(\{[\s\S]*agent_type: BUSINESS_HEALTH_EXPLANATION_CONTRACT_ID/, "the durable generation claim helper must own the active Business Health run insert");
+assert.match(businessHealthGenerationClaim, /\.rpc\("create_trusted_analysis_run_v1"[\s\S]*p_agent_type: BUSINESS_HEALTH_EXPLANATION_CONTRACT_ID/, "the durable generation claim helper must own the actor-bound Business Health run RPC");
 assert.match(businessHealthGenerationClaim, /\.eq\("workspace_id", workspaceId\)[\s\S]*\.eq\("agent_type", BUSINESS_HEALTH_EXPLANATION_CONTRACT_ID\)/, "conflict resolution must remain workspace- and workflow-scoped");
 assert.match(findingActions, /agent_type: FINDING_EXPLANATION_CONTRACT_ID/);
 assert.match(fileActions, /getVaeroexWorkflow\("file_analysis"\)[\s\S]*agent_type: workflow\.key/);

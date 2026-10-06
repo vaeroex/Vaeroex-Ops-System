@@ -81,7 +81,10 @@ assert.ok(
   analysisRunner.indexOf("validateFileAnalysisOutputContract(outputJson)") < analysisRunner.indexOf("indexFileAnalysisEvidence("),
   "the dedicated output contract must be validated before Business Memory indexing"
 );
-assert.match(actions, /archiveFileAnalysisMemoryChunks[\s\S]{0,500}indexFileAnalysisEvidence/, "reanalyzing must retire prior active analysis chunks before indexing replacements");
+assert.doesNotMatch(analysisRunner, /await archiveFileAnalysisMemoryChunks/, "generation must preserve the previous approved memory until a confirmed replacement is persisted");
+const approvalAction = actions.slice(actions.indexOf("export async function approveFileAnalysisAction"), actions.indexOf("export async function discardFileAnalysisAction"));
+assert.doesNotMatch(approvalAction, /await archiveFileAnalysisMemoryChunks/, "approval delegates safe replacement to the indexer; actual failure/retry behavior is covered by audit-import-evidence-fixes.cjs");
+assert.match(approvalAction, /confirmation: \{ userId: user\.id, runId \}/, "the user approval action must pass explicit actor/run confirmation to the memory boundary");
 
 for (const status of ["Uploaded", "Analyzing", "No usable data found", "Needs clearer file", "Analysis failed", "Archived"]) {
   assert.match(sources, new RegExp(status), `Sources must support the ${status} state`);
