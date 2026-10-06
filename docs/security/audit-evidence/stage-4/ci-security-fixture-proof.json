@@ -1,0 +1,58 @@
+{
+  "scope": "Focused actual fixture seed/KPI statement and production SQL, not full pgTAP suite",
+  "version": "17.11",
+  "migrations": [
+    "20261005022017_workspace_security_boundaries.sql",
+    "20261005022445_workspace_persisted_usage_limits.sql"
+  ],
+  "results": [
+    {
+      "name": "before migration: staff can persist a cross-workspace form parent",
+      "status": "pass"
+    },
+    {
+      "name": "old default-entitlement fixture reproduces CI42501 at Staff KPI insert",
+      "status": "pass"
+    },
+    {
+      "name": "actual corrected bounded-trial fixture permits legitimate Staff KPI",
+      "status": "pass"
+    },
+    {
+      "name": "entitled fixture still rejects cross-workspace Staff KPI",
+      "status": "pass"
+    },
+    {
+      "name": "entitled fixture still rejects Viewer KPI",
+      "status": "pass"
+    },
+    {
+      "name": "entitled Owner can update safe workspace name",
+      "status": "pass"
+    },
+    {
+      "name": "old preferences fixture rejects positive Viewer save without entitlement",
+      "status": "pass"
+    },
+    {
+      "name": "corrected actual preferences fixture permits own Viewer preferences",
+      "status": "pass"
+    },
+    {
+      "name": "corrected preferences fixture still denies inaccessible workspace",
+      "status": "pass"
+    },
+    {
+      "name": "old timezone fixture cannot persist positive Owner update without entitlement",
+      "status": "pass"
+    },
+    {
+      "name": "corrected actual timezone fixture permits active Owner update",
+      "status": "pass"
+    },
+    {
+      "name": "corrected timezone fixture still denies foreign workspace update",
+      "status": "pass"
+    }
+  ]
+}

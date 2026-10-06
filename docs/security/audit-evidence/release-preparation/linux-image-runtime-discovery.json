@@ -1,0 +1,111 @@
+{
+  "observedAt": "2026-10-05T23:20:48.259793+00:00",
+  "sourceCommit": "5ff62601ffd12fb9b882b21f8d30edf246efda91",
+  "host": {
+    "system": "Darwin",
+    "machine": "arm64",
+    "freeTmpBytes": 34850816000
+  },
+  "localRuntimeCandidates": [
+    {
+      "path": "/Applications/Docker.app",
+      "exists": false
+    },
+    {
+      "path": "/Applications/Podman Desktop.app",
+      "exists": false
+    },
+    {
+      "path": "/Applications/OrbStack.app",
+      "exists": false
+    },
+    {
+      "path": "/opt/homebrew/bin/docker",
+      "exists": false
+    },
+    {
+      "path": "/usr/local/bin/docker",
+      "exists": false
+    },
+    {
+      "path": "/opt/homebrew/bin/colima",
+      "exists": false
+    },
+    {
+      "path": "/opt/homebrew/bin/podman",
+      "exists": false
+    },
+    {
+      "path": "/opt/homebrew/bin/limactl",
+      "exists": false
+    },
+    {
+      "path": "/opt/homebrew/bin/nerdctl",
+      "exists": false
+    },
+    {
+      "path": "/opt/homebrew/bin/qemu-system-x86_64",
+      "exists": false
+    },
+    {
+      "path": "/opt/homebrew/bin/qemu-system-aarch64",
+      "exists": false
+    },
+    {
+      "path": "/opt/homebrew/bin/container",
+      "exists": false
+    },
+    {
+      "path": "/var/run/docker.sock",
+      "exists": false
+    },
+    {
+      "path": "/Users/isaacvizcarra/.docker/run/docker.sock",
+      "exists": false
+    },
+    {
+      "path": "/Users/isaacvizcarra/.colima/default/docker.sock",
+      "exists": false
+    },
+    {
+      "path": "/Users/isaacvizcarra/.orbstack/run/docker.sock",
+      "exists": false
+    }
+  ],
+  "otherInspections": [
+    "No VM app in system/user Applications.",
+    "No .docker/.colima/.lima/.orbstack user runtime directories.",
+    "No alternate Linux VM runtime executable in bundled dependencies."
+  ],
+  "localImageExecution": "not_available_no_linux_runtime",
+  "alternative": {
+    "repository": "vaeroex/Vaeroex-Ops-System",
+    "visibility": "public",
+    "visibilitySource": "GitHub connector get_repo read",
+    "runner": "existing verify job ubuntu-latest standard hosted",
+    "pricingSource": "https://docs.github.com/en/actions/reference/runners/github-hosted-runners",
+    "pricing": "standard public-repository runner free; no paid runner or artifact upload proposed"
+  },
+  "priorCI": {
+    "head": "5ff62601ffd12fb9b882b21f8d30edf246efda91",
+    "runId": 37385878145,
+    "status": "completed",
+    "conclusion": "success",
+    "url": "https://github.com/vaeroex/Vaeroex-Ops-System/actions/runs/37385878145"
+  },
+  "offlineGuardProof": {
+    "guardChecks": 16,
+    "syntaxPassed": true,
+    "dockerInvoked": false,
+    "remoteHostsRejected": true,
+    "wrongPlatformArchitectureUserCommitCommandRejected": true
+  },
+  "files": {
+    "services/external-integrations-qbo/Dockerfile": "23b4aaa6e03e4eb5c6187a15173484284b519993d2982aeb4fe2a9be2af91b81",
+    "services/external-integrations-qbo/image-smoke.mjs": "715577f1bd7b5d27ee1f09fa351e977c310e15011cb0c87881527312e6a4309b",
+    "scripts/qbo-worker-image-qualification.cjs": "691fc2517db82b47a2111879033e4e804d7a17a1c92d0be026a71ee6910bb685",
+    ".github/workflows/ci.yml": "bcd3cf515d4885d88a474ac9df037105c535579fbb380fd8f22ffc8ec8533f2d"
+  },
+  "productionMutations": false,
+  "capacityEnvironmentRestarted": false
+}

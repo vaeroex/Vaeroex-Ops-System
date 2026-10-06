@@ -1,0 +1,50 @@
+Vaeroex
+
+CLOSEOUT 1061111f 45708faa A
+
+ACTIVE
+Overview
+Intelligence
+Performance
+Files & Notes
+Saved Analyses
+Integrations
+Settings
+Sign out
+
+CLOSEOUT 1061111f 45708faa A · Active
+
+Files & Notes
+
+Search
+K
+Files & Notes
+/
+CLOSEOUT 1061111f cb920153 held history boundary
+CLOSEOUT 1061111f cb920153 held history boundary
+Import held
+
+held-history.csv
+
+CSV · 27 B · Uploaded Oct 5, 2026
+
+Summary
+Imported Data
+History
+0 KPI records, 0 metric records and 0 stored evidence chunks are currently saved; only a completed publication is used as current worksheet evidence. Accepted work remains held for operator reconciliation. A still-running or partial attempt cannot be retried automatically.
+
+Import results need reconciliation
+
+Accepted work may still be running or may have saved only part of its results. Saved records remain available. Preparing or submitting this source again is held to prevent duplicate records.
+
+Check saved results
+
+This check never resubmits rows. Partial results require an operator to verify the worker has stopped and reconcile the saved inventory before releasing the hold.
+
+Vaeroex turns business evidence into leadership clarity.
+
+Help Center
+Trust Center
+Terms
+Privacy
+Support

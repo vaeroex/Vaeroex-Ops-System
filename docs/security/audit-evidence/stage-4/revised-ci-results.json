@@ -1,0 +1,17 @@
+{
+  "runId": 37260917737,
+  "jobId": 111607770629,
+  "scope": "Selected fixture/qualification result lines from completed CI, not complete logs",
+  "lines": [
+    "2026-10-05T03:50:59.1567248Z supabase/tests/security_high_findings_remediation.test.sql: 31 assertions passed.",
+    "2026-10-05T03:50:59.4526864Z supabase/tests/customer_1_billing_entitlement.test.sql: 28 assertions passed.",
+    "2026-10-05T03:50:59.5728756Z supabase/tests/external_integrations_phase_1_canonical_foundation.test.sql: database test failed (42P22): could not determine which collation to use for string comparison Context: PL/pgSQL function results_eq(refcursor,refcursor,text) line 17 at IF",
+    "2026-10-05T03:51:00.8143432Z supabase/tests/square_production_runtime_foundation.test.sql: 27 assertions passed.",
+    "2026-10-05T03:53:06.3957434Z Square GCP callback database qualification passed (256 assertions).",
+    "2026-10-05T03:53:11.3066148Z Square GCP mapped database qualification passed (171 assertions).",
+    "2026-10-05T03:53:22.4120528Z Square observation database qualification passed (244 assertions; 116 migrations; seven SQL/TS parity cases).",
+    "2026-10-05T03:56:35.6789295Z supabase/tests/square_production_runtime_overlay.test.sql: 72 assertions passed.",
+    "2026-10-05T03:57:33.0637776Z supabase/tests/square_production_internal_pilot_runtime.test.sql: 34 assertions passed.",
+    "2026-10-05T03:58:43.9459643Z supabase/tests/manual_activation_entitlement.test.sql: 21 assertions passed."
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "kind": "source-contract-inventory-only",
+  "reviewedCommit": "d91be079c7beb0b6f21a4c5e6b451f90ca06e035",
+  "notLiveVerification": true,
+  "reads": [
+    {"method":"GET","path":"/app","source":"app/app/page.tsx","qualification":"HTML document only; assets/hydration/browser CPU not simulated."},
+    {"method":"GET","path":"/app/intelligence","source":"app/app/intelligence/page.tsx"},
+    {"method":"GET","path":"/app/kpis","source":"app/app/kpis/page.tsx"},
+    {"method":"GET","path":"/app/sources?q=SYNTHETIC&tab=files","source":"app/app/sources/SourcesPage.tsx","qualification":"Server query filtering; does not claim client-only table controls were exercised."},
+    {"method":"GET","path":"/app/reports","source":"app/app/reports/page.tsx"},
+    {"method":"GET","path":"/api/search?q=SYNTHETIC","source":"app/api/search/route.ts:209","qualification":"Deterministic authenticated GET; short empty query must not stand in for auth."},
+    {"method":"GET","path":"/api/integrations/dashboard?workspaceId=UUID","source":"app/api/integrations/dashboard/route.ts","qualification":"Validates exact active workspace during preflight."}
+  ],
+  "mutations": [
+    {"action":"create/repeat","method":"POST","path":"/app/issues","export":"createIssueAction","source":"app/app/operations/actions.ts:823","adapter":"Private same-build, per-actor captured Next form; title contains logicalId. Repeat uses identical logicalId twice; existing VXA-028 predicts duplication, not success."},
+    {"action":"upload","method":"POST","path":"/app/sources","export":"uploadSourceAction","source":"app/app/files/actions.ts:2450","adapter":"Capture actual UploadSourceForm with useActionState binding; never fabricate a REST upload route or action ID."},
+    {"action":"ai","method":"POST","path":"/api/search","source":"app/api/search/route.ts:611","adapter":"Explicit premium policy and isolated model transport required; otherwise blocked. Body query/sessionId/followUpNumber=0; no paid key."},
+    {"action":"manualSync","method":"POST","path":"/api/integrations/google-sheets/sync","source":"app/api/integrations/google-sheets/sync/route.ts","body":"application/x-www-form-urlencoded connectionId=UUID&confirmation=sync","adapter":"Owner/session, local approved connection and local Sheets stub; redirects inspected without following."},
+    {"action":"scheduled","method":"GET","path":"/api/integrations/google-sheets/scheduled-sync","source":"app/api/integrations/google-sheets/scheduled-sync/route.ts","adapter":"Local-only cron secret. One tick covers all due seeded workspaces; not one request per workspace. Original due time retained across ticks/retries."}
+  ],
+  "blockedUntilQualified": ["schema-matched disposable database/auth/storage", "full corpus and legal acceptance", "same-build per-actor action capture/ack", "local provider/model transport and due approved connections", "fresh independent telemetry with enforced egress denial", "complete independent DB/storage/citation/job/actor-readback exporter", "local fault injector evidence"]
+}

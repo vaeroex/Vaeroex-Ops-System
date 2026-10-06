@@ -1,0 +1,181 @@
+{
+  "result": {
+    "deployments": {
+      "pagination": {
+        "count": 8,
+        "next": 1790978232922,
+        "prev": 1791001097151
+      },
+      "deployments": [
+        {
+          "id": "dpl_A9tgEHvj54MkLCxCyac7FGokaM1t",
+          "name": "vaeroex-ops-system",
+          "url": "vaeroex-ops-system-2y5y78sld-vaeroex-2167s-projects.vercel.app",
+          "created": 1791001097151,
+          "state": "READY",
+          "target": "production",
+          "creator": {
+            "uid": "DGcOjIb9zmUPuI2DL6p4WWVu",
+            "username": "vaeroex-2167"
+          },
+          "meta": {
+            "githubCommitRef": "main",
+            "githubCommitSha": "d91be079c7beb0b6f21a4c5e6b451f90ca06e035",
+            "githubCommitMessage": "Merge pull request #461 from vaeroex/codex/public-production-release\n\nRelease approved public website by lifting the main deployment hold",
+            "githubRepo": "Vaeroex-Ops-System",
+            "githubOrg": "vaeroex"
+          },
+          "inspectorUrl": "https://vercel.com/vaeroex-2167s-projects/vaeroex-ops-system/A9tgEHvj54MkLCxCyac7FGokaM1t",
+          "isRollbackCandidate": true
+        },
+        {
+          "id": "dpl_ADbszQ2aM8qvmUiNZYZwSK7bwpoY",
+          "name": "vaeroex-ops-system",
+          "url": "vaeroex-ops-system-1xp6i4ae1-vaeroex-2167s-projects.vercel.app",
+          "created": 1791000341003,
+          "state": "READY",
+          "target": null,
+          "creator": {
+            "uid": "DGcOjIb9zmUPuI2DL6p4WWVu",
+            "username": "vaeroex-2167"
+          },
+          "meta": {
+            "githubCommitRef": "codex/public-production-release",
+            "githubCommitSha": "07fc4d43cbfdb151dde8ad57acee6ed69cff2cb4",
+            "githubCommitMessage": "Release approved public website by lifting main deployment hold",
+            "githubRepo": "Vaeroex-Ops-System",
+            "githubOrg": "vaeroex"
+          },
+          "inspectorUrl": "https://vercel.com/vaeroex-2167s-projects/vaeroex-ops-system/ADbszQ2aM8qvmUiNZYZwSK7bwpoY",
+          "isRollbackCandidate": false
+        },
+        {
+          "id": "dpl_HxuhGvN5ihJijNwzw3hw1LshKnRE",
+          "name": "vaeroex-ops-system",
+          "url": "vaeroex-ops-system-fcibcaw7c-vaeroex-2167s-projects.vercel.app",
+          "created": 1790999198370,
+          "state": "READY",
+          "target": null,
+          "creator": {
+            "uid": "DGcOjIb9zmUPuI2DL6p4WWVu",
+            "username": "vaeroex-2167"
+          },
+          "meta": {
+            "githubCommitRef": "codex/executive-checkout-label",
+            "githubCommitSha": "020dda4cb38fa9061a42eba39377c566058736d9",
+            "githubCommitMessage": "Clarify global checkout CTA as Executive Intelligence",
+            "githubRepo": "Vaeroex-Ops-System",
+            "githubOrg": "vaeroex"
+          },
+          "inspectorUrl": "https://vercel.com/vaeroex-2167s-projects/vaeroex-ops-system/HxuhGvN5ihJijNwzw3hw1LshKnRE",
+          "isRollbackCandidate": false
+        },
+        {
+          "id": "dpl_996H4XGpFrpBJNofSkEx85DCnvD7",
+          "name": "vaeroex-ops-system",
+          "url": "vaeroex-ops-system-78l997nf4-vaeroex-2167s-projects.vercel.app",
+          "created": 1790998060041,
+          "state": "READY",
+          "target": null,
+          "creator": {
+            "uid": "DGcOjIb9zmUPuI2DL6p4WWVu",
+            "username": "vaeroex-2167"
+          },
+          "meta": {
+            "githubCommitRef": "codex/vaeroex-public-revamp",
+            "githubCommitSha": "85348ea5fc18e2d3d82739b45b1e5dac60fb50dc",
+            "githubCommitMessage": "Require production deployment hold in architecture regression",
+            "githubRepo": "Vaeroex-Ops-System",
+            "githubOrg": "vaeroex"
+          },
+          "inspectorUrl": "https://vercel.com/vaeroex-2167s-projects/vaeroex-ops-system/996H4XGpFrpBJNofSkEx85DCnvD7",
+          "isRollbackCandidate": false
+        },
+        {
+          "id": "dpl_8Gj37cmBrXHAJubjgQ7NQgKuynr7",
+          "name": "vaeroex-ops-system",
+          "url": "vaeroex-ops-system-pz7i3o8mi-vaeroex-2167s-projects.vercel.app",
+          "created": 1790997739721,
+          "state": "READY",
+          "target": null,
+          "creator": {
+            "uid": "DGcOjIb9zmUPuI2DL6p4WWVu",
+            "username": "vaeroex-2167"
+          },
+          "meta": {
+            "githubCommitRef": "codex/vaeroex-public-revamp",
+            "githubCommitSha": "5e2903065b70e03b88984edf762414549c3937c7",
+            "githubCommitMessage": "Integrate current main and preserve production deployment hold",
+            "githubRepo": "Vaeroex-Ops-System",
+            "githubOrg": "vaeroex"
+          },
+          "inspectorUrl": "https://vercel.com/vaeroex-2167s-projects/vaeroex-ops-system/8Gj37cmBrXHAJubjgQ7NQgKuynr7",
+          "isRollbackCandidate": false
+        },
+        {
+          "id": "dpl_D9CDGPUL6dfh761WGwvH4NyF4XCS",
+          "name": "vaeroex-ops-system",
+          "url": "vaeroex-ops-system-fywxrijnx-vaeroex-2167s-projects.vercel.app",
+          "created": 1790984209349,
+          "state": "READY",
+          "target": null,
+          "creator": {
+            "uid": "DGcOjIb9zmUPuI2DL6p4WWVu",
+            "username": "vaeroex-2167"
+          },
+          "meta": {
+            "githubCommitRef": "codex/google-sheets-erasure",
+            "githubCommitSha": "e03ae9feb55191aa5baf2b924b7bfc8ef6303084",
+            "githubCommitMessage": "feat(sheets): checkpoint erasure approval and isolated safety proofs",
+            "githubRepo": "Vaeroex-Ops-System",
+            "githubOrg": "vaeroex"
+          },
+          "inspectorUrl": "https://vercel.com/vaeroex-2167s-projects/vaeroex-ops-system/D9CDGPUL6dfh761WGwvH4NyF4XCS",
+          "isRollbackCandidate": false
+        },
+        {
+          "id": "dpl_B7VhSV15j8g1j1k1geboyQTKq2dQ",
+          "name": "vaeroex-ops-system",
+          "url": "vaeroex-ops-system-hzervmhvi-vaeroex-2167s-projects.vercel.app",
+          "created": 1790980466809,
+          "state": "READY",
+          "target": null,
+          "creator": {
+            "uid": "DGcOjIb9zmUPuI2DL6p4WWVu",
+            "username": "vaeroex-2167"
+          },
+          "meta": {
+            "githubCommitRef": "codex/google-sheets-verification",
+            "githubCommitSha": "39a096d2a379db38f2c75e9087cea880f9f1e595",
+            "githubCommitMessage": "docs(sheets): qualify retention gaps and disclosure prerequisites",
+            "githubRepo": "Vaeroex-Ops-System",
+            "githubOrg": "vaeroex"
+          },
+          "inspectorUrl": "https://vercel.com/vaeroex-2167s-projects/vaeroex-ops-system/B7VhSV15j8g1j1k1geboyQTKq2dQ",
+          "isRollbackCandidate": false
+        },
+        {
+          "id": "dpl_84HtXormgupib5oHPfDdn6E4UYyX",
+          "name": "vaeroex-ops-system",
+          "url": "vaeroex-ops-system-cqiuoag5t-vaeroex-2167s-projects.vercel.app",
+          "created": 1790978232922,
+          "state": "READY",
+          "target": null,
+          "creator": {
+            "uid": "DGcOjIb9zmUPuI2DL6p4WWVu",
+            "username": "vaeroex-2167"
+          },
+          "meta": {
+            "githubCommitRef": "codex/google-sheets-verification",
+            "githubCommitSha": "ff5f40380dba644cae25250060e48306afb124c7",
+            "githubCommitMessage": "docs: prepare Google Sheets OAuth verification review",
+            "githubRepo": "Vaeroex-Ops-System",
+            "githubOrg": "vaeroex"
+          },
+          "inspectorUrl": "https://vercel.com/vaeroex-2167s-projects/vaeroex-ops-system/84HtXormgupib5oHPfDdn6E4UYyX",
+          "isRollbackCandidate": false
+        }
+      ]
+    }
+  }
+}

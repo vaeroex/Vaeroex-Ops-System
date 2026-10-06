@@ -27,21 +27,6 @@ const comingSoonCopy: Record<string, ComingSoonCopy> = {
       "Vaeroex recommendations for bottlenecks and missed handoffs"
     ]
   },
-  settings: {
-    title: "Workspace Settings",
-    whatItWillDo: [
-      "Manage workspace profile, business details, and default workspace preferences.",
-      "Review member roles and workspace access settings.",
-      "Control compliance reminders and future integration settings."
-    ],
-    whyItMatters:
-      "Settings should give owners control without turning the product into an admin maze. It needs to be built carefully around roles, subscriptions, and tenant safety.",
-    futureCapability: [
-      "Workspace profile editing",
-      "Member and role management",
-      "Future integrations and branding controls"
-    ]
-  },
   intake: {
     title: "Business Intake",
     whatItWillDo: [

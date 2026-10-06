@@ -1,0 +1,6 @@
+DIAGNOSTIC ONLY: App Router client React aliases + held-response two-paint invariant; application source unchanged.
+page.waitForFunction: Timeout 10000ms exceeded.
+    at /Users/isaacvizcarra/.codex/worktrees/workspace-audit-fixes/Vaeroex/scripts/workspace-workflow-browser-tests.cjs:133:17 {
+  log: [],
+  name: 'TimeoutError'
+}

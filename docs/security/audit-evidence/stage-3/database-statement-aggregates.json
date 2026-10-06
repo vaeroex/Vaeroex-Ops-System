@@ -1,0 +1,67 @@
+{
+  "capturedAt": "2026-10-05T01:44:03.22955Z",
+  "readOnly": true,
+  "scope": "Aggregate pg_stat_statements metadata; no query text or customer rows",
+  "statisticsWindow": "Unknown; cumulative retained entries, not a load test",
+  "aggregate": {
+    "calls": 501039,
+    "entries": 4189,
+    "maxExecutionMs": 6497.669526,
+    "totalExecutionMs": 955320.267126001,
+    "tempReadBlocks": 30197,
+    "tempWrittenBlocks": 30299
+  },
+  "topTempStatements": [
+    {
+      "fingerprint": "-8183625911953458627",
+      "calls": 1200,
+      "rows": 1200,
+      "meanMs": 108.95,
+      "maxMs": 889.81,
+      "tempReadBlocks": 13758,
+      "tempWrittenBlocks": 13818,
+      "kind": "with"
+    },
+    {
+      "fingerprint": "-8937419483619991982",
+      "calls": 4,
+      "rows": 72,
+      "meanMs": 1353.74,
+      "maxMs": 1417.46,
+      "tempReadBlocks": 5680,
+      "tempWrittenBlocks": 5696,
+      "kind": "select"
+    },
+    {
+      "fingerprint": "-7366420456369310291",
+      "calls": 2,
+      "rows": 36,
+      "meanMs": 1124.27,
+      "maxMs": 1516.3,
+      "tempReadBlocks": 2840,
+      "tempWrittenBlocks": 2848,
+      "kind": "select"
+    },
+    {
+      "fingerprint": "5545150051436019894",
+      "calls": 1,
+      "rows": 1,
+      "meanMs": 1724.41,
+      "maxMs": 1724.41,
+      "tempReadBlocks": 1499,
+      "tempWrittenBlocks": 1504,
+      "kind": "select"
+    },
+    {
+      "fingerprint": "-5708723254081763768",
+      "calls": 29,
+      "rows": 1132,
+      "meanMs": 71.18,
+      "maxMs": 666.09,
+      "tempReadBlocks": 1360,
+      "tempWrittenBlocks": 1362,
+      "kind": "select"
+    }
+  ],
+  "interpretation": "This does not attribute latency or spills to a workspace workflow. Query text was deliberately not captured. Do not extrapolate throughput or correlate counters with a different reset window."
+}

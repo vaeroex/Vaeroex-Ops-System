@@ -1,3 +1,4 @@
+import { loadHeldImportStatus } from "@/lib/imports/publication-status";
 import Link from "next/link";
 import type { Route } from "next";
 import { permanentRedirect, redirect } from "next/navigation";
@@ -18,7 +19,7 @@ import { UploadSourceForm, UploadSourceTrigger } from "@/components/evidence/Upl
 import { LoadingLink } from "@/components/operations/LoadingLink";
 import { PendingSubmitButton } from "@/components/operations/PendingSubmitButton";
 import { StatusBadge } from "@/components/operations/StatusBadge";
-import { SourceImportReview } from "@/components/evidence/SourceImportReview";
+import { SourceImportReview, sourceImportReviewRecords } from "@/components/evidence/SourceImportReview";
 import { BusinessNoteEntry, BusinessNotesPanel, type BusinessNotesObservability } from "@/components/evidence/BusinessNotesPanel";
 import { EvidenceLifecycleCheckbox } from "@/components/evidence/EvidenceLifecycleSelection";
 import { EvidenceBatchList } from "@/components/evidence/EvidenceBatchList";
@@ -289,7 +290,7 @@ function importStatusLabel(value: string) {
   return "Not imported";
 }
 
-function fileStatus(file: FileUploadRow, runs: VaeroexRunRow[]) {
+function fileStatus(file: FileUploadRow, runs: VaeroexRunRow[], imports: FileImportRow[] = [], importStatusUnavailable = false) {
   const reviewStatus = analysisReviewStatus(file);
   const latestRun = runs[0];
   const runIsActive = latestRun && ["queued", "pending", "running", "processing"].includes(latestRun.status);
@@ -297,6 +298,8 @@ function fileStatus(file: FileUploadRow, runs: VaeroexRunRow[]) {
 
   if (file.deleted_at) return "Deleted";
   if (file.archived_at) return "Archived";
+  if (importStatusUnavailable) return "Status unavailable";
+  if (imports.some((item) => item.file_upload_id === file.id && ["running", "reconciliation_required"].includes(item.recovery_status))) return "Import held";
   if (runIsActive) return "Analyzing";
   if (file.import_status === "failed" && latestRun?.status !== "failed" && reviewStatus !== "failed" && !hasUsableAnalysis) return "Import failed";
   if ((file.import_status !== "failed" && (file.processing_status || "") === "failed") || latestRun?.status === "failed" || reviewStatus === "failed") return failedAnalysisStatus(file);
@@ -317,8 +320,8 @@ function fileCategory(file: FileUploadRow, folders: Pick<FolderRow, "id" | "name
   return `${file.file_extension.toUpperCase()} source`;
 }
 
-function fileMatchesStatus(file: FileUploadRow, status: string, runs: VaeroexRunRow[]) {
-  const label = fileStatus(file, runs);
+function fileMatchesStatus(file: FileUploadRow, status: string, runs: VaeroexRunRow[], imports: FileImportRow[], importStatusUnavailable: boolean) {
+  const label = fileStatus(file, runs, imports, importStatusUnavailable);
 
   if (!status) return true;
   if (status === "Recent Uploads") return true;
@@ -330,20 +333,24 @@ function filteredFiles({
   status,
   query,
   view,
-  runsByFile
+  runsByFile,
+  imports,
+  unavailableImportFileIds
 }: {
   files: FileUploadRow[];
   status?: string;
   query?: string;
   view?: string;
   runsByFile: Map<string, VaeroexRunRow[]>;
+  imports: FileImportRow[];
+  unavailableImportFileIds: Set<string>;
 }) {
   const normalizedQuery = (query || "").trim().toLowerCase();
   const includeHidden = view === "hidden";
 
   return files
     .filter((file) => (includeHidden ? Boolean(file.archived_at && !file.deleted_at) : !file.deleted_at && !file.archived_at))
-    .filter((file) => fileMatchesStatus(file, status || "", runsByFile.get(file.id) || []))
+    .filter((file) => fileMatchesStatus(file, status || "", runsByFile.get(file.id) || [], imports, unavailableImportFileIds.has(file.id)))
     .filter((file) => {
       if (!normalizedQuery) return true;
 
@@ -475,23 +482,27 @@ function SourceFileDetailPanel({
   access,
   folders,
   fileImports,
+  statusImports = fileImports,
   fileImportRows,
   linkedKpis,
   linkedRuns,
   actionError,
+  importStatusUnavailable = false,
   activeSection = "summary"
 }: {
   file: FileUploadRow;
   access?: FileAccessLinks | null;
   folders: Pick<FolderRow, "id" | "name">[];
   fileImports: FileImportRow[];
+  statusImports?: FileImportRow[];
   fileImportRows: FileImportDataRow[];
   linkedKpis: KpiRow[];
   linkedRuns: VaeroexRunRow[];
   actionError?: string | null;
+  importStatusUnavailable?: boolean;
   activeSection?: SourceDetailSection;
 }) {
-  const status = fileStatus(file, linkedRuns);
+  const status = fileStatus(file, linkedRuns, statusImports, importStatusUnavailable);
   const output = fileAnalysisOutput(file);
   const failureMessage = latestAnalysisFailureMessage(file);
   const summary =
@@ -514,7 +525,11 @@ function SourceFileDetailPanel({
   const latestRunId = stringValue(fileMetadata(file).latest_analysis_run_id) || linkedRuns[0]?.id || "";
   const confidence = fileConfidence(file, linkedRuns);
   const memoryStatus =
-    status === "Learned"
+    status === "Status unavailable"
+      ? "Import publication status could not be verified. Reload before relying on this source."
+      : status === "Import held"
+      ? "This import is not yet published. Any previously completed worksheet evidence remains available while its saved results are reconciled."
+      : status === "Learned"
       ? trustLevel === "tentative"
         ? "Available to Intelligence as a medium-confidence, directional observation."
         : "Available to Intelligence and Learned Knowledge."
@@ -628,7 +643,7 @@ function SourceFileDetailPanel({
           {status === "Archived" ? (
             <div className="rounded-lg border border-white/10 bg-slate-950/45 p-4 text-sm leading-6 text-slate-400">Restore this source before preparing or approving imported data.</div>
           ) : (
-            <SourceImportReview file={file} imports={fileImports} rows={fileImportRows} />
+            <SourceImportReview file={file} imports={sourceImportReviewRecords(file.id, fileImports, statusImports)} rows={fileImportRows} statusUnavailable={importStatusUnavailable} />
           )}
         </div>
       ) : null}
@@ -719,15 +734,19 @@ function SourceFileRow({
   file,
   folders,
   runs,
+  imports,
+  importStatusUnavailable = false,
   selectable = false
 }: {
   file: FileUploadRow;
   folders: Pick<FolderRow, "id" | "name">[];
   runs: VaeroexRunRow[];
+  imports: FileImportRow[];
+  importStatusUnavailable?: boolean;
   selectable?: boolean;
 }) {
   const linkedRuns = runs.filter((run) => runFileId(run) === file.id);
-  const status = fileStatus(file, linkedRuns);
+  const status = fileStatus(file, linkedRuns, imports, importStatusUnavailable);
 
   return (
     <article id={`file-${file.id}`} className="workspace-list-row workspace-source-row border-b border-white/10 px-1 py-4 text-slate-100 last:border-b-0">
@@ -752,7 +771,11 @@ function SourceFileRow({
             {file.original_name !== file.display_name ? `${file.original_name} · ` : ""}{fileSizeLabel(file.file_size_bytes)} · Uploaded {formatDate(file.created_at)}
           </p>
           <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-400">
-            {status === "Needs Review"
+            {status === "Status unavailable"
+              ? "Import publication status could not be verified. Reload to check this source."
+              : status === "Import held"
+              ? "This import is held for reconciliation. Previously completed evidence remains available."
+              : status === "Needs Review"
               ? "Analysis needs a human check before Vaeroex uses it."
               : status === "Learned"
                 ? "This source is available to Vaeroex intelligence."
@@ -1059,7 +1082,7 @@ export async function renderSourcesPage(params: SourceSearchParams = {}, options
   const [filesResult, foldersResult, importsResult, importRowsResult, kpisResult, runsResult, memoryResult, notesResult, agreementsResult] = await Promise.all([
     supabase.from("file_uploads").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
     getRecordFolders(supabase, workspaceId, "files"),
-    supabase.from("file_imports").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(300),
+    (params.file ? supabase.from("file_imports").select("*").eq("workspace_id", workspaceId).eq("file_upload_id", params.file) : supabase.from("file_imports").select("*").eq("workspace_id", workspaceId)).order("created_at", { ascending: false }).limit(300),
     importRowsQuery,
     supabase.from("kpis").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("metric_date", { ascending: false }).limit(500),
     supabase
@@ -1096,6 +1119,8 @@ export async function renderSourcesPage(params: SourceSearchParams = {}, options
   const files = (filesResult.data || []) as FileUploadRow[];
   const folders = foldersResult.folders as Pick<FolderRow, "id" | "name">[];
   const imports = (importsResult.data || []) as FileImportRow[];
+  const heldImportStatus = await loadHeldImportStatus({ supabase, workspaceId, fileIds: files.map((file) => file.id) });
+  const statusImports = [...imports, ...heldImportStatus.imports];
   const importRows = (importRowsResult.data || []) as FileImportDataRow[];
   const kpis = (kpisResult.data || []) as KpiRow[];
   const runs = (runsResult.data || []) as VaeroexRunRow[];
@@ -1129,7 +1154,9 @@ export async function renderSourcesPage(params: SourceSearchParams = {}, options
     status: params.status,
     query: params.q,
     view: activeTab === "archived" ? "hidden" : params.view,
-    runsByFile
+    runsByFile,
+    imports: statusImports,
+    unavailableImportFileIds: heldImportStatus.unavailableFileIds
   });
   const linkedFile = params.file ? files.find((file) => file.id === params.file && !file.deleted_at) : null;
   const linkedFileImports = linkedFile ? imports.filter((item) => item.file_upload_id === linkedFile.id) : [];
@@ -1213,11 +1240,13 @@ export async function renderSourcesPage(params: SourceSearchParams = {}, options
             file={linkedFile}
             folders={folders}
             fileImports={linkedFileImports}
+            statusImports={statusImports}
             fileImportRows={fileImportRows}
             linkedKpis={linkedKpis}
             linkedRuns={linkedRuns}
             access={accessByFileId.get(linkedFile.id)}
             actionError={selectedFileActionError}
+            importStatusUnavailable={heldImportStatus.unavailableFileIds.has(linkedFile.id)}
             activeSection={activeSection}
           />
         )}
@@ -1334,7 +1363,7 @@ export async function renderSourcesPage(params: SourceSearchParams = {}, options
                   <EvidenceBatchList
                     key={`archived:${params.q || ""}:${params.status || ""}`}
                     pluralLabel="files"
-                    items={visibleFiles.map((file) => ({ id: file.id, label: file.display_name, content: <SourceFileRow file={file} folders={folders} runs={runs} /> }))}
+                    items={visibleFiles.map((file) => ({ id: file.id, label: file.display_name, content: <SourceFileRow file={file} folders={folders} runs={runs} imports={statusImports} importStatusUnavailable={heldImportStatus.unavailableFileIds.has(file.id)} /> }))}
                   />
                 ) : (
                   <div className="rounded-lg border border-dashed border-white/15 bg-slate-950/45 p-8 text-center">
@@ -1359,7 +1388,7 @@ export async function renderSourcesPage(params: SourceSearchParams = {}, options
                   <EvidenceBatchList
                     key={`active:${params.q || ""}:${params.status || ""}`}
                     pluralLabel="files"
-                    items={visibleFiles.map((file) => ({ id: file.id, label: file.display_name, content: <SourceFileRow file={file} folders={folders} runs={runs} /> }))}
+                    items={visibleFiles.map((file) => ({ id: file.id, label: file.display_name, content: <SourceFileRow file={file} folders={folders} runs={runs} imports={statusImports} importStatusUnavailable={heldImportStatus.unavailableFileIds.has(file.id)} /> }))}
                   />
                 ) : (
                   <div className="rounded-lg border border-dashed border-white/15 bg-slate-950/45 p-8 text-center">

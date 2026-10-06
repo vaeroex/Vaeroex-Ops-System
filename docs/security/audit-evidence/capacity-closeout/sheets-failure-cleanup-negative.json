@@ -1,0 +1,75 @@
+{
+  "at": "2026-10-05T19:41:10.975Z",
+  "kind": "rolled_back_expired_authorization_fail_rpc",
+  "ownedDatabaseVerified": true,
+  "before": {
+    "run": [
+      {
+        "id": "78fb5fd2-ab84-44fc-800f-dde70632715c",
+        "status": "running",
+        "error_code": null,
+        "completed_at": null,
+        "hash": "75eb3be238b3fa1b4212531c4550493b"
+      }
+    ],
+    "connection": [
+      {
+        "id": "ad09dca8-e02d-41c4-bd80-9239fa56477a",
+        "status": "reauthorization_required",
+        "generation": "1",
+        "sync_lease_run_id": "78fb5fd2-ab84-44fc-800f-dde70632715c",
+        "sync_lease_expires_at": "2026-10-05T19:42:57.552Z",
+        "hash": "114da6711e95362fc0435179b3662cf9"
+      }
+    ]
+  },
+  "result": {
+    "code": "42501",
+    "message": "permission denied for schema private",
+    "where": "PL/pgSQL function private.google_sheets_connection_retirement_v1() line 6 at PERFORM\nSQL statement \"update public.google_sheets_connections set sync_lease_run_id=null,sync_lease_expires_at=null,last_error_code=case when p_error_code ~ '^[a-z_]{1,64}$' then p_error_code else 'sync_failed' end,\n    next_sync_at=case when automatic_refresh_enabled then now()+interval '1 hour' else null end,updated_at=now()\n    where workspace_id=p_workspace_id and id=p_connection_id and sync_lease_run_id=p_run_id\"\nPL/pgSQL function public.fail_google_sheets_sync_v1(uuid,uuid,uuid,text) line 7 at SQL statement"
+  },
+  "after": {
+    "run": [
+      {
+        "id": "78fb5fd2-ab84-44fc-800f-dde70632715c",
+        "status": "running",
+        "error_code": null,
+        "completed_at": null,
+        "hash": "75eb3be238b3fa1b4212531c4550493b"
+      }
+    ],
+    "connection": [
+      {
+        "id": "ad09dca8-e02d-41c4-bd80-9239fa56477a",
+        "status": "reauthorization_required",
+        "generation": "1",
+        "sync_lease_run_id": "78fb5fd2-ab84-44fc-800f-dde70632715c",
+        "sync_lease_expires_at": "2026-10-05T19:42:57.552Z",
+        "hash": "114da6711e95362fc0435179b3662cf9"
+      }
+    ]
+  },
+  "rolledBack": true,
+  "unchanged": true,
+  "defs": [
+    {
+      "definition": "CREATE OR REPLACE FUNCTION public.fail_google_sheets_sync_v1(p_workspace_id uuid, p_connection_id uuid, p_run_id uuid, p_error_code text)\n RETURNS void\n LANGUAGE plpgsql\n SET search_path TO ''\nAS $function$\nbegin\n  perform pg_advisory_xact_lock(hashtextextended('google_sheets:'||p_workspace_id::text,0));\n  perform 1 from public.google_sheets_connections where workspace_id=p_workspace_id and id=p_connection_id for update;\n  update public.google_sheets_sync_runs set status='failed',error_code=case when p_error_code ~ '^[a-z_]{1,64}$' then p_error_code else 'sync_failed' end,completed_at=now()\n    where workspace_id=p_workspace_id and connection_id=p_connection_id and id=p_run_id and status='running';\n  update public.google_sheets_connections set sync_lease_run_id=null,sync_lease_expires_at=null,last_error_code=case when p_error_code ~ '^[a-z_]{1,64}$' then p_error_code else 'sync_failed' end,\n    next_sync_at=case when automatic_refresh_enabled then now()+interval '1 hour' else null end,updated_at=now()\n    where workspace_id=p_workspace_id and id=p_connection_id and sync_lease_run_id=p_run_id;\nend;\n$function$\n"
+    }
+  ],
+  "triggers": [
+    {
+      "tgname": "audit_workspace_entitlement",
+      "definition": "CREATE TRIGGER audit_workspace_entitlement BEFORE INSERT OR DELETE OR UPDATE ON public.google_sheets_connections FOR EACH ROW EXECUTE FUNCTION private.guard_workspace_mutation_entitlement_v1('workspace_id')",
+      "prosecdef": true,
+      "nspname": "private",
+      "proname": "guard_workspace_mutation_entitlement_v1"
+    },
+    {
+      "tgname": "google_sheets_connection_retirement",
+      "definition": "CREATE TRIGGER google_sheets_connection_retirement BEFORE UPDATE ON public.google_sheets_connections FOR EACH ROW EXECUTE FUNCTION private.google_sheets_connection_retirement_v1()",
+      "prosecdef": false,
+      "nspname": "private",
+      "proname": "google_sheets_connection_retirement_v1"
+    }
+  ]
+}

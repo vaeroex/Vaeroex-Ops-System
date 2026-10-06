@@ -1,0 +1,14 @@
+{
+  "kind": "final-contribution-source-hashes",
+  "baseline": "d91be079c7beb0b6f21a4c5e6b451f90ca06e035",
+  "files": {
+    "lib/imports/spreadsheets.ts": "49b1990d6e727aa8e090ea84332b359bf21bd0a02a0725af630eb2de05823fbc",
+    "lib/imports/document-text.ts": "1263041f478e77c2aedff610bf83d9aa788b24f97c9adb69c16d317db4e8750a",
+    "lib/ai/evidence-index.ts": "4ac0a846387efe07e32093c9b58d856406f3e3ced4283e1caec1ebc69d62d6c1",
+    "app/app/files/actions.ts": "58831a8ce63ac919e27f54c8e403f1881ecc46b1ddd9142fe9601b4f85cba274",
+    "scripts/audit-import-evidence-fixes.cjs": "0d66e5b7dfd16e00b92492ff4b0bb006ffd4b33ceef26f389588f2a36ae1a5db",
+    "scripts/audit-import-finalization.cjs": "2b7b653f060a5d274c7e880faa5a8268c1c4353d366ceb6fd31ce32a5970ad63",
+    "scripts/audit-bounded-run.cjs": "f3b3bd7b09cbb194a133b8c97eb23d5b8767e38e94a733615164a2b42026f856",
+    "scripts/file-analysis-regression-tests.js": "f280ca38136bc1eefb8561f90a076d19f9254af81cd2eb2cae1412308e03495f"
+  }
+}

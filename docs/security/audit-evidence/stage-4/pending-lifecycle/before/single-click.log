@@ -1,0 +1,6 @@
+DIAGNOSTIC ONLY: single click substituted for same-turn double click; no repeated-click qualification from this run.
+page.waitForFunction: Timeout 10000ms exceeded.
+    at /Users/isaacvizcarra/.codex/worktrees/workspace-audit-fixes/Vaeroex/scripts/workspace-workflow-browser-tests.cjs:123:17 {
+  log: [],
+  name: 'TimeoutError'
+}

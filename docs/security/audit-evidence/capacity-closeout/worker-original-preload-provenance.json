@@ -1,0 +1,10 @@
+{
+  "reconstructedPriorSource": "/tmp/vaeroex-capacity-small-02/preload-before-scheduler-observation.cjs",
+  "reconstructedSha256": "eef433dcc48689b564e62185aada44f0d4adaeb07251835218837ac2a2cfabd6",
+  "launchTimeHashAttested": false,
+  "parentReportedModificationEpochSeconds": 1791230305.7459402,
+  "parentReportedModificationAt": "2026-10-05T19:58:25.745Z",
+  "actualReplacementManifestAt": "2026-10-05T19:56:22.599Z",
+  "replacementBeforeSourceModification": true,
+  "note": "Parent reconstructed exact prior preload by reversing its single scheduler-inventory edit. No launch-time preload attestation existed. Both original app/worker and replacement worker started before edit; this is reconstructed provenance, not a launch attestation."
+}

@@ -91,6 +91,52 @@ async function verifyWorkspaceEntitlements(db,call,deny) {
   const automatic=await call('claim_google_sheets_sync_v1',[entitlementWs,fallbackConnection,null,null,'scheduled']);
   await call('fail_google_sheets_sync_v1',[entitlementWs,fallbackConnection,automatic.runId,'fixture_failure']);checks++;
 }
+async function verifyAbandonedSyncRecovery(db, call, deny) {
+  const id = randomUUID();
+  await db.query("insert into public.google_sheets_connections(id,workspace_id,business_entity_id,created_by,status,display_name,spreadsheet_id,sheet_id,sheet_title,headers) values($1,$2,$3,$4,'connected','Interrupted sync fixture',$5,0,'Metrics',$6)", [id, ws, entity, actor, spreadsheet, headers]);
+  await call('approve_google_sheets_mapping_v1', [ws,id,actor,session,mapping,true]);
+  const first = await call('claim_google_sheets_sync_v1', [ws,id,null,null,'scheduled']);
+  const timing = (await db.query('select extract(epoch from (sync_lease_expires_at-updated_at))::int lease_seconds,next_sync_at<=$2::timestamptz original_due_preserved from public.google_sheets_connections where id=$1', [id,new Date().toISOString()])).rows[0];
+  assert.deepEqual(timing, { lease_seconds: 270, original_due_preserved: true }); checks++;
+  assert.equal((await db.query('select r.eligible_at=c.next_sync_at same_eligibility from public.google_sheets_sync_runs r join public.google_sheets_connections c on c.sync_lease_run_id=r.id where r.id=$1',[first.runId])).rows[0].same_eligibility,true); checks++;
+  await deny(()=>call('recover_google_sheets_syncs_v1',[100],'authenticated'),'permission denied|service_denied');
+  await deny(()=>call('due_google_sheets_syncs_v1',[new Date().toISOString(),10,'{}'],'anon'),'permission denied|service_denied');
+  // Accelerate only persisted expiry in the owned synthetic database. This
+  // proves SQL state transitions, not process-kill or elapsed recovery latency.
+  await db.query("update public.google_sheets_connections set sync_lease_expires_at=now()-interval '1 second' where id=$1", [id]);
+  assert.equal((await db.query("select count(*)::int n from public.google_sheets_connections where id=$1 and status='connected' and automatic_refresh_enabled and active_approval_id is not null and next_sync_at<=now()", [id])).rows[0].n, 1); checks++;
+  assert.equal((await db.query('select status from public.google_sheets_sync_runs where id=$1',[first.runId])).rows[0].status, 'running'); checks++;
+  const repaired=await call('recover_google_sheets_syncs_v1',[100]);
+  assert.equal(repaired.recovered,1);assert.equal(repaired.remainingExpired,0); checks+=2;
+  await deny(() => call('claim_google_sheets_sync_v1',[ws,id,null,null,'scheduled']), 'schedule_denied');
+  const resumed = await call('claim_google_sheets_sync_v1',[ws,id,actor,session,'manual']);
+  assert.equal((await db.query('select status,error_code from public.google_sheets_sync_runs where id=$1',[first.runId])).rows[0].error_code, 'lease_expired'); checks++;
+  await call('fail_google_sheets_sync_v1',[ws,id,first.runId,'late_failure']);
+  assert.equal((await db.query('select sync_lease_run_id from public.google_sheets_connections where id=$1',[id])).rows[0].sync_lease_run_id,resumed.runId); checks++;
+  await deny(() => call('commit_google_sheets_sync_v1',[ws,id,first.runId,[],true]),'fence_denied');
+  const rows = normalizeSheetsRows({workspaceId:ws,businessEntityId:entity,connectionId:id,spreadsheetId:spreadsheet,sheetId:0,headerRow:1,mapping,rows:[['recovery-once','2040-01-01',7,0.5]]});
+  const committed = await call('commit_google_sheets_sync_v1',[ws,id,resumed.runId,rows,true]);
+  assert.equal(committed.factCount,2); checks++;
+  // Simulate lost commit acknowledgement by invoking normal failure cleanup
+  // after the transaction succeeded. It must retain both facts and success.
+  await call('fail_google_sheets_sync_v1',[ws,id,resumed.runId,'request_timeout']);
+  assert.equal((await db.query('select status from public.google_sheets_sync_runs where id=$1',[resumed.runId])).rows[0].status,'succeeded'); checks++;
+  assert.equal((await db.query('select count(*)::int n from public.google_sheets_fact_links where connection_id=$1',[id])).rows[0].n,2); checks++;
+  await deny(() => call('commit_google_sheets_sync_v1',[ws,id,resumed.runId,rows,true]),'fence_denied');
+  await db.query('update public.google_sheets_connections set automatic_refresh_enabled=false,next_sync_at=null where id=$1',[id]);
+  const manual = await call('claim_google_sheets_sync_v1',[ws,id,actor,session,'manual']);
+  assert.equal((await db.query('select eligible_at=started_at valid_manual_timing from public.google_sheets_sync_runs where id=$1',[manual.runId])).rows[0].valid_manual_timing,true); checks++;
+  await db.query("update public.google_sheets_connections set sync_lease_expires_at=now()-interval '1 second' where id=$1",[id]);
+  assert.equal((await db.query('select next_sync_at from public.google_sheets_connections where id=$1',[id])).rows[0].next_sync_at,null); checks++;
+  assert.equal((await db.query('select status from public.google_sheets_sync_runs where id=$1',[manual.runId])).rows[0].status,'running'); checks++;
+  const repairedManual=await call('recover_google_sheets_syncs_v1',[100]);
+  assert.equal(repairedManual.recovered,1); checks++;
+  const final = await call('claim_google_sheets_sync_v1',[ws,id,actor,session,'manual']);
+  assert.equal((await db.query('select error_code from public.google_sheets_sync_runs where id=$1',[manual.runId])).rows[0].error_code,'lease_expired'); checks++;
+  await call('fail_google_sheets_sync_v1',[ws,id,final.runId,'fixture_cleanup']);
+  return { scope: 'Persisted SQL with accelerated lease expiry; no worker kill or provider transport', leaseSeconds:270, automaticRetrySeconds:3600, originalEligibilityPreserved:true, independentTerminalRecovery:true, staleCommitDenied:true, lateCleanupPreservesSuccess:true, recovery300SecondsQualified:false };
+}
+
 async function qualify(db) {
   await db.exec(`create schema private; create schema auth; create schema extensions;
     create role anon; create role authenticated; create role service_role bypassrls;
@@ -119,6 +165,7 @@ async function qualify(db) {
   await db.exec(fn(phase3,'private.phase_3_contract_fingerprint_v1'));
   await db.exec(source('20261002040024_google_sheets_complete.sql'));
   await db.exec(source('20261002040031_google_sheets_lifecycle.sql'));
+  await db.exec(source('20261005182541_bounded_google_sheets_dispatch.sql'));
   assert((await db.query("select not has_schema_privilege('anon','private','USAGE') and not has_schema_privilege('authenticated','private','USAGE') and not has_schema_privilege('service_role','private','USAGE') as private_boundary")).rows[0].private_boundary);checks++;
   assert((await db.query("select not has_function_privilege('service_role','private.require_google_sheets_owner_v1(uuid,uuid,uuid,uuid)','EXECUTE') and not has_function_privilege('service_role','private.retire_google_sheets_facts_v1(uuid,uuid)','EXECUTE') and not has_function_privilege('service_role','private.require_google_sheets_eligible_v1(uuid)','EXECUTE') as helper_boundary")).rows[0].helper_boundary);checks++;
   await db.query('insert into public.workspaces(id) values($1),($2)',[ws,otherWs]);
@@ -212,7 +259,7 @@ async function qualify(db) {
   assert.equal((await db.query("select count(*)::int n from public.kpis where metric_date='2031-01-02' and archived_at is null")).rows[0].n,1);checks++;
   await db.query("select set_config('request.jwt.claim.sub',$1,false)",[actor]);
   const asPostgrest=row=>({...row,actual_value:row.actual_value===null?null:Number(row.actual_value),target:row.target===null?null:Number(row.target),metric_date:new Date(row.metric_date).toISOString().slice(0,10),created_at:new Date(row.created_at).toISOString(),updated_at:new Date(row.updated_at).toISOString()});
-  const reader={from(name){assert.equal(name,'kpis');return{select(){return this;},eq(){return this;},is(){return this;},order(){return this;},async range(from,to){return{data:(await db.query('select * from public.kpis where workspace_id=$1 and archived_at is null and deleted_at is null order by metric_date desc,id limit $2 offset $3',[ws,to-from+1,from])).rows.map(asPostgrest),error:null};}};},async rpc(name,args){try{return{data:await call(name,[args.p_workspace_id],'authenticated'),error:null};}catch(error){return{data:null,error};}}};
+  const reader={from(name){assert.equal(name,'kpis');return{select(){return this;},eq(){return this;},is(){return this;},order(){return this;},async limit(size){const rows=(await db.query('select * from public.kpis where workspace_id=$1 and archived_at is null and deleted_at is null order by metric_date desc,created_at desc,id desc limit $2',[ws,size])).rows;assert(rows.length<size,'this Sheets authority fixture fits within a single KPI page');return{data:rows.map(asPostgrest),error:null};}};},async rpc(name,args){try{return{data:await call(name,[args.p_workspace_id],'authenticated'),error:null};}catch(error){return{data:null,error};}}};
   // JSON aggregation avoids PostgREST row caps on the conflict result.
   reader.rpc=async(name,args)=>{await db.exec("set role authenticated; select set_config('request.jwt.claim.role','authenticated',false)");try{return{data:(await db.query(`select public.${name}($1) as result`,[args.p_workspace_id])).rows[0].result,error:null};}finally{await db.exec("reset role; select set_config('request.jwt.claim.role','service_role',false)");}};
   assert.equal((await db.query("select prorettype::regtype::text result_type from pg_proc where proname='read_google_sheets_operational_conflicts_v1'")).rows[0].result_type,'jsonb');checks++;
@@ -270,7 +317,8 @@ async function qualify(db) {
   assert.equal((await db.query('select count(*)::int n from public.google_sheets_connections where workspace_id=$1',[otherWs])).rows[0].n,0);checks++;
   await deny(()=>db.query('select token_ciphertext from public.google_sheets_credentials'));
   await db.exec('reset role');
-  return {checks,largeRows:750,largeFacts:1500,liveProviderCalls:0,fullCanonicalBootstrap:false};
+  const abandonedRecovery = await verifyAbandonedSyncRecovery(db,call,deny);
+  return {checks,largeRows:750,largeFacts:1500,liveProviderCalls:0,fullCanonicalBootstrap:false,abandonedRecovery};
 }
 function verifySensitiveFieldBoundaries() {
   const restricted = [

@@ -1,0 +1,48 @@
+{
+  "passed": true,
+  "databaseName": "vxa_qbo_recovery_3a6f1517bd7e4040",
+  "canonicalSchemaOnlyClone": true,
+  "appliesWithoutCandidateSchema": true,
+  "candidateMigrations": [
+    "20260930001000_qbo_customer_oauth_completion.sql",
+    "20260930002000_qbo_production_ongoing_sync.sql",
+    "20260930003000_qbo_customer_source_browse.sql",
+    "20260930004000_qbo_production_source_validation.sql",
+    "20260930193412_qbo_production_accounting_intake.sql",
+    "20261002012700_qbo_customer_pending_attempt_control.sql",
+    "20261002025212_qbo_customer_pending_cancellation_eligibility.sql"
+  ],
+  "syntheticWorkspaces": 2,
+  "acceptedTasks": 48,
+  "baselineStrandedDemonstrated": 4,
+  "recoveredDistinct": 6,
+  "ready": 4,
+  "deadLetter": 2,
+  "oneCallFairness": {
+    "readyCount": 1,
+    "cancelledCount": 0,
+    "recoveredCount": 2,
+    "deadLetterCount": 1
+  },
+  "concurrent": [
+    {
+      "readyCount": 1,
+      "cancelledCount": 0,
+      "recoveredCount": 2,
+      "deadLetterCount": 1
+    },
+    {
+      "readyCount": 2,
+      "cancelledCount": 0,
+      "recoveredCount": 2,
+      "deadLetterCount": 0
+    }
+  ],
+  "repeatIdempotent": true,
+  "liveAndFutureUnchanged": true,
+  "originalQueueAgePreserved": true,
+  "staleWorkerDenied": true,
+  "audits": 8,
+  "limitations": "Expiry timestamps accelerated; actual killed-worker timing and300second recovery objective are not established by this test. No provider transport or customer data copied.",
+  "preserved": true
+}

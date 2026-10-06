@@ -1,0 +1,486 @@
+{
+  "capturedAt": "2026-10-05T06:19:45.870Z",
+  "source": "read-only Supabase migration ledger metadata",
+  "migrations": [
+    {
+      "version": "202606170001",
+      "name": "phase_1_schema_rls"
+    },
+    {
+      "version": "202606170002",
+      "name": "phase_2_invites"
+    },
+    {
+      "version": "202606170003",
+      "name": "phase_6_squarespace_subscriptions"
+    },
+    {
+      "version": "202606170004",
+      "name": "admin_support_tools"
+    },
+    {
+      "version": "202606180002",
+      "name": "kpi_dashboard"
+    },
+    {
+      "version": "202606180003",
+      "name": "record_management"
+    },
+    {
+      "version": "202606180004",
+      "name": "files_imports"
+    },
+    {
+      "version": "202606180005",
+      "name": "file_kpi_historical_memory"
+    },
+    {
+      "version": "202606180006",
+      "name": "start_from_scratch_crm"
+    },
+    {
+      "version": "202606180007",
+      "name": "file_processing_status"
+    },
+    {
+      "version": "202606180008",
+      "name": "people_record_management"
+    },
+    {
+      "version": "202606180009",
+      "name": "team_accountability"
+    },
+    {
+      "version": "202606180010",
+      "name": "report_subscription_preferences"
+    },
+    {
+      "version": "202606180011",
+      "name": "report_subscription_schedule_controls"
+    },
+    {
+      "version": "202606180012",
+      "name": "prestige_operations_intelligence"
+    },
+    {
+      "version": "20260618025749",
+      "name": "fix_workspace_setup_rls"
+    },
+    {
+      "version": "20260619095238",
+      "name": "single_vaeroex_plan"
+    },
+    {
+      "version": "20260619110000",
+      "name": "legal_acceptance_logging"
+    },
+    {
+      "version": "202606220001",
+      "name": "stripe_billing_migration"
+    },
+    {
+      "version": "202606220002",
+      "name": "stripe_onboarding_email"
+    },
+    {
+      "version": "202606230001",
+      "name": "kpi_settings"
+    },
+    {
+      "version": "202606260001",
+      "name": "kpi_measurement_layer_settings"
+    },
+    {
+      "version": "202607060001",
+      "name": "business_memory_evidence_index"
+    },
+    {
+      "version": "202607070001",
+      "name": "update_vaeroex_price_to_500"
+    },
+    {
+      "version": "202607080001",
+      "name": "business_health_snapshots"
+    },
+    {
+      "version": "202607080002",
+      "name": "ai_tool_execution_security"
+    },
+    {
+      "version": "202607080003",
+      "name": "security_audit_service_events"
+    },
+    {
+      "version": "202607080004",
+      "name": "smb_launch_hardening"
+    },
+    {
+      "version": "202607110001",
+      "name": "business_memory_evidence_eligibility"
+    },
+    {
+      "version": "202607110002",
+      "name": "business_signal_lifecycle_integrity"
+    },
+    {
+      "version": "20260713204716",
+      "name": "restrict_lifecycle_rpc_to_authenticated"
+    },
+    {
+      "version": "20260721220519",
+      "name": "saved_analysis_uniqueness"
+    },
+    {
+      "version": "202607250001",
+      "name": "business_notes_evidence"
+    },
+    {
+      "version": "202607250002",
+      "name": "workspace_agreements"
+    },
+    {
+      "version": "202607260001",
+      "name": "manual_activation_entitlement"
+    },
+    {
+      "version": "20260726042242",
+      "name": "business_notes_least_privilege"
+    },
+    {
+      "version": "20260726205442",
+      "name": "workspace_agreement_admin_email_delivery"
+    },
+    {
+      "version": "202607270001",
+      "name": "admin_workspace_lifecycle"
+    },
+    {
+      "version": "202607270002",
+      "name": "kpi_semantic_direction"
+    },
+    {
+      "version": "20260727013628",
+      "name": "workspace_agreement_admin_email_delivery_least_privilege"
+    },
+    {
+      "version": "202607300001",
+      "name": "ai_trust_admin_dashboard"
+    },
+    {
+      "version": "20260731071855",
+      "name": "business_health_generation_claim"
+    },
+    {
+      "version": "20260731092011",
+      "name": "intelligence_card_lifecycle"
+    },
+    {
+      "version": "20260731093656",
+      "name": "intelligence_card_lifecycle_event_index"
+    },
+    {
+      "version": "20260731213000",
+      "name": "easter_egg_runner_v1"
+    },
+    {
+      "version": "20260731224500",
+      "name": "easter_egg_runner_v2_contract"
+    },
+    {
+      "version": "20260731231500",
+      "name": "easter_egg_runner_v3_contract"
+    },
+    {
+      "version": "20260803052701",
+      "name": "document_extraction_production_foundation_phase_a"
+    },
+    {
+      "version": "20260803172709",
+      "name": "document_extraction_private_worker_phase_b"
+    },
+    {
+      "version": "20260803181405",
+      "name": "document_extraction_dispatch_unknown_circuit"
+    },
+    {
+      "version": "20260803204552",
+      "name": "document_extraction_private_worker_phase_b_security_fixes"
+    },
+    {
+      "version": "20260803205520",
+      "name": "document_extraction_dispatch_authorization_single_use"
+    },
+    {
+      "version": "20260803230226",
+      "name": "document_extraction_rest_adapter_contract"
+    },
+    {
+      "version": "20260804010000",
+      "name": "document_extraction_worker_phase_c1_protocol"
+    },
+    {
+      "version": "20260804160932",
+      "name": "document_extraction_hosted_tool_call_v2"
+    },
+    {
+      "version": "20260805011604",
+      "name": "document_extraction_profile_bound_review_identity"
+    },
+    {
+      "version": "20260805163333",
+      "name": "google_document_ai_enterprise_ocr_v1"
+    },
+    {
+      "version": "20260806180609",
+      "name": "document_extraction_google_frozen_qualification_controller"
+    },
+    {
+      "version": "20260807172710",
+      "name": "document_extraction_google_frozen_qualification_concrete_fixes"
+    },
+    {
+      "version": "20260807181420",
+      "name": "document_extraction_google_qualification_claim_phase_fix"
+    },
+    {
+      "version": "20260807185224",
+      "name": "document_extraction_google_qualification_cleanup_order_fix"
+    },
+    {
+      "version": "20260807195152",
+      "name": "document_extraction_google_qualification_processing_cleanup_proof"
+    },
+    {
+      "version": "20260807203645",
+      "name": "document_extraction_google_qualification_claim_cleanup_merge"
+    },
+    {
+      "version": "20260807215440",
+      "name": "document_extraction_google_qualification_dispatch_quota_guard"
+    },
+    {
+      "version": "20260808060301",
+      "name": "document_extraction_google_qualification_planned_cleanup"
+    },
+    {
+      "version": "20260808064500",
+      "name": "document_extraction_google_qualification_planned_cleanup_multifixture"
+    },
+    {
+      "version": "20260808070000",
+      "name": "document_extraction_google_qualification_planned_cleanup_signed_binding"
+    },
+    {
+      "version": "20260811233219",
+      "name": "restore_manual_activation_review_rpc"
+    },
+    {
+      "version": "20260812051159",
+      "name": "persistent_kpi_colors"
+    },
+    {
+      "version": "20260812060853",
+      "name": "initialize_existing_kpi_colors"
+    },
+    {
+      "version": "20260812064259",
+      "name": "repair_existing_kpi_color_initialization"
+    },
+    {
+      "version": "20260817185529",
+      "name": "intelligence_briefing_storage_contract"
+    },
+    {
+      "version": "20260819174100",
+      "name": "security_high_findings_remediation"
+    },
+    {
+      "version": "20260820053955",
+      "name": "customer_1_billing_entitlement_remediation"
+    },
+    {
+      "version": "20260820170000",
+      "name": "pre_checkout_legal_acceptance"
+    },
+    {
+      "version": "20260820233007",
+      "name": "external_integrations_phase_1_canonical_foundation"
+    },
+    {
+      "version": "20260821064333",
+      "name": "external_integrations_phase_2_reconciliation"
+    },
+    {
+      "version": "20260821172015",
+      "name": "external_integrations_phase_3_deterministic_dependencies"
+    },
+    {
+      "version": "20260821201220",
+      "name": "external_integrations_phase_4_control_plane"
+    },
+    {
+      "version": "20260821220853",
+      "name": "external_integrations_phase_5_credential_security"
+    },
+    {
+      "version": "20260822012253",
+      "name": "external_integrations_phase_6_durable_runtime"
+    },
+    {
+      "version": "20260822035335",
+      "name": "external_integrations_phase_8a0_provider_contract_convergence"
+    },
+    {
+      "version": "20260823042718",
+      "name": "external_integrations_phase_8b_qbo_sandbox_validation"
+    },
+    {
+      "version": "20260823111004",
+      "name": "scope_qbo_sandbox_dispatch_candidates"
+    },
+    {
+      "version": "20260823113832",
+      "name": "qbo_sandbox_scoped_dispatch_recovery"
+    },
+    {
+      "version": "20260823115807",
+      "name": "reserve_qbo_sandbox_scoped_dispatch"
+    },
+    {
+      "version": "20260823121454",
+      "name": "qbo_sandbox_dispatch_run_lock"
+    },
+    {
+      "version": "20260823205806",
+      "name": "qbo_sandbox_credential_refresh_recovery"
+    },
+    {
+      "version": "20260824071101",
+      "name": "qbo_sandbox_same_generation_reauthorization"
+    },
+    {
+      "version": "20260824083917",
+      "name": "qbo_sandbox_expired_refresh_lease_reclamation"
+    },
+    {
+      "version": "20260824193332",
+      "name": "qbo_cloud_tasks_zero_based_delivery"
+    },
+    {
+      "version": "20260824233000",
+      "name": "qbo_retry_execution_and_reauthorization_recovery"
+    },
+    {
+      "version": "20260825180000",
+      "name": "qbo_reauthorization_required_lifecycle"
+    },
+    {
+      "version": "20260825190000",
+      "name": "qbo_scoped_dispatch_retry_lifecycle"
+    },
+    {
+      "version": "20260826043610",
+      "name": "qbo_credential_envelope_binding_convergence"
+    },
+    {
+      "version": "20260826090000",
+      "name": "qbo_credential_envelope_binding_incident_canary"
+    },
+    {
+      "version": "20260826120000",
+      "name": "qbo_credential_lineage_incident_recovery"
+    },
+    {
+      "version": "20260826190801",
+      "name": "qbo_precontract_initialization_retirement"
+    },
+    {
+      "version": "20260826222000",
+      "name": "qbo_provider_result_evidence_and_ar_aging_recovery"
+    },
+    {
+      "version": "20260827033058",
+      "name": "qbo_production_convergence"
+    },
+    {
+      "version": "20260902191322",
+      "name": "qbo_production_dormant_connection_gate"
+    },
+    {
+      "version": "20260902191323",
+      "name": "integration_production_runtime_foundation"
+    },
+    {
+      "version": "20260902191324",
+      "name": "square_production_runtime_overlay"
+    },
+    {
+      "version": "20260902191325",
+      "name": "square_production_internal_pilot_runtime"
+    },
+    {
+      "version": "20260925032300",
+      "name": "square_production_customer_connection"
+    },
+    {
+      "version": "20260929004917",
+      "name": "square_customer_service_backend"
+    },
+    {
+      "version": "20260929041048",
+      "name": "square_customer_payment_history"
+    },
+    {
+      "version": "20260929052211",
+      "name": "square_customer_payment_browse"
+    },
+    {
+      "version": "20260930001000",
+      "name": "qbo_customer_oauth_completion"
+    },
+    {
+      "version": "20260930002000",
+      "name": "qbo_production_ongoing_sync"
+    },
+    {
+      "version": "20260930003000",
+      "name": "qbo_customer_source_browse"
+    },
+    {
+      "version": "20260930004000",
+      "name": "qbo_production_source_validation"
+    },
+    {
+      "version": "20260930193412",
+      "name": "qbo_production_accounting_intake"
+    },
+    {
+      "version": "20261002012700",
+      "name": "qbo_customer_pending_attempt_control"
+    },
+    {
+      "version": "20261002025212",
+      "name": "qbo_customer_pending_cancellation_eligibility"
+    },
+    {
+      "version": "20261002040024",
+      "name": "google_sheets_complete"
+    },
+    {
+      "version": "20261002040031",
+      "name": "google_sheets_lifecycle"
+    },
+    {
+      "version": "20261002182049",
+      "name": "integration_summary_preferences"
+    },
+    {
+      "version": "20261002182147",
+      "name": "square_customer_browse_identity"
+    },
+    {
+      "version": "20261002182746",
+      "name": "qbo_customer_dashboard_metadata"
+    }
+  ]
+}

@@ -2,3 +2,6 @@ services/document-extraction-worker/fixtures/synthetic-v1/generated/*.pdf binary
 
 # Preserve exact official scientific source bytes, including fixed-width PDB padding.
 scripts/science-sources/* -text -whitespace
+
+# Preserve raw audit logs, including terminal carriage returns and final newlines.
+docs/security/audit-evidence/**/*.log -text -whitespace

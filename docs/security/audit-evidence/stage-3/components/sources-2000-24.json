@@ -1,0 +1,90 @@
+{
+  "started": "2026-10-05T01:45:22.774Z",
+  "elapsedMs": 3393,
+  "job": {
+    "kind": "sources",
+    "files": 2000,
+    "months": 24,
+    "series": 24,
+    "iterations": 3
+  },
+  "code": 0,
+  "signal": null,
+  "stopReason": null,
+  "observedRssBytes": 349077504,
+  "output": {
+    "job": {
+      "kind": "sources",
+      "files": 2000,
+      "months": 24,
+      "series": 24,
+      "iterations": 3
+    },
+    "sourceRoot": "/tmp/vaeroex-audit-production",
+    "node": "v24.19.0",
+    "platform": "darwin",
+    "bytes": 0,
+    "integrity": {
+      "files": 2000,
+      "rows": 48000,
+      "eligibleKpiRecords": 48000,
+      "eligibleFiles": 2000,
+      "findings": 24
+    },
+    "deterministicDigest": "20d48482afd68c21aebf25239a75d232dc879135000989ad8473986e9cdcc472",
+    "samples": [
+      {
+        "iteration": 0,
+        "layerMs": 602.644666,
+        "coverageMs": 426.30262500000003,
+        "totalMs": 1028.947291,
+        "cpuMs": 1286.168,
+        "rssBytes": 341770240
+      },
+      {
+        "iteration": 1,
+        "layerMs": 550.709208,
+        "coverageMs": 409.6728750000002,
+        "totalMs": 960.3820830000002,
+        "cpuMs": 1191.612,
+        "rssBytes": 340656128
+      },
+      {
+        "iteration": 2,
+        "layerMs": 542.2095419999996,
+        "coverageMs": 416.27525000000014,
+        "totalMs": 958.4847919999997,
+        "cpuMs": 1159.948,
+        "rssBytes": 340754432
+      }
+    ],
+    "summary": {
+      "p50Ms": 960.3820830000002,
+      "p95Ms": 1028.947291,
+      "maxMs": 1028.947291,
+      "diagnosticBudgetMs": 10000,
+      "withinDiagnosticBudget": true
+    },
+    "resourceUsage": {
+      "userCPUTime": 4149975,
+      "systemCPUTime": 106468,
+      "maxRSS": 341088,
+      "sharedMemorySize": 0,
+      "unsharedDataSize": 0,
+      "unsharedStackSize": 0,
+      "minorPageFault": 29013,
+      "majorPageFault": 101,
+      "swappedOut": 0,
+      "fsRead": 0,
+      "fsWrite": 0,
+      "ipcSent": 0,
+      "ipcReceived": 0,
+      "signalsCount": 0,
+      "voluntaryContextSwitches": 19,
+      "involuntaryContextSwitches": 4875
+    },
+    "maxRssBytes": 349274112,
+    "scope": "actual functions with synthetic in-memory inputs; excludes IO/persistence/API/model/user capacity"
+  },
+  "stderr": ""
+}

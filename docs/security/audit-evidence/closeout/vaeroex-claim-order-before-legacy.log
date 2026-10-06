@@ -1,0 +1,13 @@
+AssertionError [ERR_ASSERTION]: losing or ambiguous claim must precede every import mutation
+
+1 !== 0
+
+    at scenario (/Users/isaacvizcarra/.codex/worktrees/workspace-audit-fixes/Vaeroex/scripts/workspace-import-recovery-tests.cjs:35:39)
+    at async /Users/isaacvizcarra/.codex/worktrees/workspace-audit-fixes/Vaeroex/scripts/workspace-import-recovery-tests.cjs:43:63 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: 1,
+  expected: 0,
+  operator: 'strictEqual',
+  diff: 'simple'
+}

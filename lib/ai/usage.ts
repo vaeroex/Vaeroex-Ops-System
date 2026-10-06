@@ -190,9 +190,9 @@ export async function assertWorkspaceTokenBudget({
     };
   }
 
-  const { data, error } = await supabase
+  const { data, error, count } = await supabase
     .from("ai_usage")
-    .select("tokens_used")
+    .select("tokens_used", { count: "exact" })
     .eq("workspace_id", workspaceId)
     .gte("created_at", monthStart())
     .limit(MAX_MONTHLY_USAGE_ROWS_FOR_BUDGET_CHECK);
@@ -203,18 +203,21 @@ export async function assertWorkspaceTokenBudget({
         level: "warn",
         component: "vaeroex-usage",
         event: "token_budget_check_failed",
-        workspaceId,
-        message: error.message
+        workspaceId
       })
     );
     throw new Error("Vaeroex could not verify this workspace’s intelligence usage budget. Please try again shortly.");
   }
 
-  if ((data || []).length >= MAX_MONTHLY_USAGE_ROWS_FOR_BUDGET_CHECK) {
+  // PostgREST can cap the response below our requested limit. A partial
+  // history must never authorize a provider call as if missing usage were zero.
+  if (!Array.isArray(data) || !Number.isSafeInteger(count) || count !== data.length
+    || data.length >= MAX_MONTHLY_USAGE_ROWS_FOR_BUDGET_CHECK
+    || data.some((row) => !Number.isSafeInteger(row.tokens_used) || row.tokens_used < 0)) {
     throw new Error("Vaeroex could not safely calculate this workspace’s monthly token usage. Contact Vaeroex support before running more intelligence requests.");
   }
 
-  const usedTokens = (data || []).reduce((sum, row) => sum + (row.tokens_used || 0), 0);
+  const usedTokens = data.reduce((sum, row) => sum + row.tokens_used, 0);
   const projectedTokens = usedTokens + estimatedRequestTokens;
 
   if (projectedTokens > budget.monthlyTokens) {

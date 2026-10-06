@@ -1,0 +1,192 @@
+{
+  "format": "vaeroex-relative-audit-evidence-v1",
+  "relativeTo": ".",
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 2174,
+      "sha256": "9d35c3ceb6482ea52cf235649a2c582eeb529014e6f20dfccf9c6159921d0b71"
+    },
+    {
+      "path": "before/next-runtime-failure.json",
+      "bytes": 2574,
+      "sha256": "c083b6e9d1c3d3f53fad25314527d0cc40b64a509353749671dfc97838413c8d"
+    },
+    {
+      "path": "before/next-runtime.log",
+      "bytes": 329,
+      "sha256": "7764034523459d7439b4529b895a24603ce84c1e59a313dc67e28acd003c0d95"
+    },
+    {
+      "path": "before/request-timeline-failure.json",
+      "bytes": 2375,
+      "sha256": "d1e91ec4240504a3fe7c040c6915260410df192e60adafeaed94e41d8f39c2aa"
+    },
+    {
+      "path": "before/request-timeline.log",
+      "bytes": 213,
+      "sha256": "674592ab5b9ab25a8d55a22af457b7089b0569733003496b672c2c8b9d6a4a59"
+    },
+    {
+      "path": "before/single-click-failure.json",
+      "bytes": 1960,
+      "sha256": "1b527a4033a99e9be04c0535c9f19a286c562df2ae0f82d45b4278668817362d"
+    },
+    {
+      "path": "before/single-click.log",
+      "bytes": 330,
+      "sha256": "07be23851cab877a7da597fe917ae8d1aa93d03c6f1daccf6078f5cf65abc643"
+    },
+    {
+      "path": "browser/run-1/global-search-light-1440.png",
+      "bytes": 80866,
+      "sha256": "b8c558cfbf6f014d87a3c0a8db8d4f839b757935ade8d074999da56178afe7f4"
+    },
+    {
+      "path": "browser/run-1/global-search-light-390.png",
+      "bytes": 50900,
+      "sha256": "be6fd80b42c99a55cbd686893d84bf4d932cc7780aa44bbe513931c45944df6a"
+    },
+    {
+      "path": "browser/run-1/global-search-pulsar-1440.png",
+      "bytes": 80466,
+      "sha256": "3da4d8197e98c75c2220d2b5d670c15c78df797dac9e235d5f78e37ced817660"
+    },
+    {
+      "path": "browser/run-1/global-search-pulsar-390.png",
+      "bytes": 49639,
+      "sha256": "e28daa12b55eaac04258c418d47821571d80667bdd138a34c36e7f8880c9dfea"
+    },
+    {
+      "path": "browser/run-1/record-detail-light-1440.png",
+      "bytes": 54843,
+      "sha256": "4d620c536997f9b613ecd021c076f3816f736de2667d5c2899ee3d9343cc3e67"
+    },
+    {
+      "path": "browser/run-1/record-detail-light-390.png",
+      "bytes": 14480,
+      "sha256": "3f77a2f1b7cafbf14cdfa34408d44e44918be31238a7be428a2d233c02889635"
+    },
+    {
+      "path": "browser/run-1/record-detail-pulsar-1440.png",
+      "bytes": 206897,
+      "sha256": "47107ad48fe327645bc89dfd15a06995da76e593193c32c18850111be455b572"
+    },
+    {
+      "path": "browser/run-1/record-detail-pulsar-390.png",
+      "bytes": 97531,
+      "sha256": "c3a802ad3037f08143377f5aaf56608ef4fbcf255591015503849c05f0b36698"
+    },
+    {
+      "path": "browser/run-1/result.json",
+      "bytes": 4394,
+      "sha256": "895dad34071d302140c36f13a701a71d1d12ac4ebab3b3ba5339411d6dd56166"
+    },
+    {
+      "path": "browser/run-2/global-search-light-1440.png",
+      "bytes": 80866,
+      "sha256": "b8c558cfbf6f014d87a3c0a8db8d4f839b757935ade8d074999da56178afe7f4"
+    },
+    {
+      "path": "browser/run-2/global-search-light-390.png",
+      "bytes": 50900,
+      "sha256": "be6fd80b42c99a55cbd686893d84bf4d932cc7780aa44bbe513931c45944df6a"
+    },
+    {
+      "path": "browser/run-2/global-search-pulsar-1440.png",
+      "bytes": 80466,
+      "sha256": "3da4d8197e98c75c2220d2b5d670c15c78df797dac9e235d5f78e37ced817660"
+    },
+    {
+      "path": "browser/run-2/global-search-pulsar-390.png",
+      "bytes": 49639,
+      "sha256": "e28daa12b55eaac04258c418d47821571d80667bdd138a34c36e7f8880c9dfea"
+    },
+    {
+      "path": "browser/run-2/record-detail-light-1440.png",
+      "bytes": 54673,
+      "sha256": "69430d84ad0dcbd567acd32739a03bee450aea3ce533488ea4a9f6ecf3ad9ae3"
+    },
+    {
+      "path": "browser/run-2/record-detail-light-390.png",
+      "bytes": 14480,
+      "sha256": "3f77a2f1b7cafbf14cdfa34408d44e44918be31238a7be428a2d233c02889635"
+    },
+    {
+      "path": "browser/run-2/record-detail-pulsar-1440.png",
+      "bytes": 206987,
+      "sha256": "593cf31c15865b58f2d252a0529bddadc981e5068e55764736f3d74f57e12a08"
+    },
+    {
+      "path": "browser/run-2/record-detail-pulsar-390.png",
+      "bytes": 97531,
+      "sha256": "c3a802ad3037f08143377f5aaf56608ef4fbcf255591015503849c05f0b36698"
+    },
+    {
+      "path": "browser/run-2/result.json",
+      "bytes": 4394,
+      "sha256": "895dad34071d302140c36f13a701a71d1d12ac4ebab3b3ba5339411d6dd56166"
+    },
+    {
+      "path": "logs/browser-run-1.log",
+      "bytes": 4455,
+      "sha256": "e73a8e3d6dd9417828aee35df2b015833fe5f276ef71c6d9e6f80ee1c10db0f5"
+    },
+    {
+      "path": "logs/browser-run-2.log",
+      "bytes": 4455,
+      "sha256": "678889f1f5803ab5c99a8ea7a050145e209aa83f2b2f68288d6557f7d47c15b6"
+    },
+    {
+      "path": "logs/interaction-feedback.log",
+      "bytes": 924,
+      "sha256": "b2e51e4ea08a88ab8e63915efb1b79ae77123c23689a8503bbafbaca815b01c6"
+    },
+    {
+      "path": "logs/lint.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "logs/typecheck.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "logs/workflow-contracts.log",
+      "bytes": 1818,
+      "sha256": "2fbfd10e7cb0138bf2d6b7100d662ca7edcf885a54d97cf3d929cabae417c262"
+    },
+    {
+      "path": "report.md",
+      "bytes": 3255,
+      "sha256": "e9ed8ba127687cfdc3c6e116b0869e0f0fa8fc0ef82a9ee00514a1c74670dfc1"
+    },
+    {
+      "path": "verification.json",
+      "bytes": 3486,
+      "sha256": "445d38a3176e1af22ac4499c5a541f61863655df5a2a67b01300d6b00dab065c"
+    }
+  ],
+  "totalBytes": 1308300,
+  "excluded": [
+    "generated fixture.js bundles",
+    "generated CSS",
+    "temporary diagnostic programs"
+  ],
+  "review": {
+    "textCredentialPatterns": [
+      "private-key",
+      "jwt-value",
+      "credential-token",
+      "bearer-value",
+      "credential-assignment"
+    ],
+    "textCredentialPatternMatches": 0,
+    "screenshots": 16,
+    "uniqueImagesVisuallyReviewed": 10,
+    "syntheticOnly": true,
+    "limits": "Bounded text-pattern and visual review; no automated OCR/general secret-scan certification."
+  },
+  "sourceProvenance": "Verification source hashes identify tested files; headBeforeUncommittedFix is intentionally historical. Root records final commit in the persistent ledger."
+}

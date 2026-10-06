@@ -409,7 +409,7 @@ assert.match(actions, /const evidenceWorksheets = enabledPlans\.flatMap/, "every
 assert.match(actions, /indexWorksheetImportEvidence\([\s\S]{0,180}worksheets: evidenceWorksheets/, "supporting measures must remain retrievable through indexed workbook evidence");
 assert.match(loader, /WORKSPACE_KPI_PAGE_SIZE = 1_000/);
 assert.match(loader, /WORKSPACE_KPI_LOAD_LIMIT = 20_000/);
-assert.match(loader, /\.range\(from, from \+ WORKSPACE_KPI_PAGE_SIZE - 1\)/, "large KPI history must use explicit deterministic pagination");
+assert.match(loader, /queryPage\(WORKSPACE_KPI_PAGE_SIZE\)/, "large KPI history must use bounded deterministic pagination");
 assert.match(loader, /exceeds the supported/, "history overflow must fail closed instead of silently truncating");
 for (const route of ["app/app/page.tsx", "app/app/kpis/page.tsx", "app/app/intelligence/page.tsx"]) {
   const source = read(route);
@@ -436,58 +436,11 @@ const archivedEligibility = sourceEligibility.buildSourceParentEligibility({
 });
 assert.deepStrictEqual(sourceEligibility.filterBySourceParentEligibility(importedRows, archivedEligibility), [], "archiving a source must make both direct and import-linked KPI observations parent-ineligible for future intelligence");
 
-function paginatedSupabase(totalRows) {
-  const ranges = [];
-  return {
-    ranges,
-    client: {
-      from(table) {
-        assert.strictEqual(table, "kpis");
-        let selected = "";
-        let requestedFrom = 0;
-        const query = {
-          select(columns) {
-            selected = columns;
-            return query;
-          },
-          eq() { return query; },
-          is() { return query; },
-          order() { return query; },
-          range(from, to) {
-            requestedFrom = from;
-            ranges.push([from, to]);
-            if (selected === "*") {
-              const size = Math.max(0, Math.min(to + 1, totalRows) - from);
-              return Promise.resolve({
-                data: Array.from({ length: size }, (_, index) => ({ id: `kpi-${from + index}`, name: "Revenue" })),
-                error: null
-              });
-            }
-            return query;
-          },
-          maybeSingle() {
-            return Promise.resolve({ data: requestedFrom < totalRows ? { id: `kpi-${requestedFrom}` } : null, error: null });
-          }
-        };
-        return query;
-      }
-    }
-  };
-}
-
 async function verifyPagination() {
-  const workspaceKpis = loadTypeScriptModule("lib/kpis/load-workspace-kpis.ts");
-  const bounded = paginatedSupabase(2_005);
-  const boundedResult = await workspaceKpis.loadActiveWorkspaceKpis({ supabase: bounded.client, workspaceId: "workspace-stress" });
-  assert.strictEqual(boundedResult.complete, true);
-  assert.strictEqual(boundedResult.data.length, 2_005, "all observations across more than two PostgREST pages must reach intelligence consumers");
-  assert.deepStrictEqual(bounded.ranges, [[0, 999], [1000, 1999], [2000, 2999]], "pagination must be deterministic and contiguous");
-
-  const overflow = paginatedSupabase(20_001);
-  const overflowResult = await workspaceKpis.loadActiveWorkspaceKpis({ supabase: overflow.client, workspaceId: "workspace-overflow" });
-  assert.strictEqual(overflowResult.complete, false);
-  assert.strictEqual(overflowResult.data.length, 0, "bounded overflow must fail closed without returning a partial history");
-  assert.match(overflowResult.error.message, /exceeds the supported 20,000-observation workspace bound/);
+  const result = await require("./workspace-kpi-pagination-tests.cjs").verify();
+  assert.strictEqual(result.passed, true);
+  assert.strictEqual(result.maximumAccepted, 20_000);
+  assert.strictEqual(result.overflowRejected, 20_001);
 }
 
 verifyPagination()

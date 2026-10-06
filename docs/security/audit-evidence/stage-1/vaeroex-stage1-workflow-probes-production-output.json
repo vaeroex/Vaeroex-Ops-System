@@ -1,0 +1,140 @@
+{
+  "scope": "Isolated action fault injection only; mocked database/auth; no network or real persistence",
+  "root": "/tmp/vaeroex-audit-production",
+  "results": [
+    {
+      "label": "asset update error after check insert",
+      "functionName": "createAssetCheckAction",
+      "writes": [
+        {
+          "table": "asset_checks",
+          "operation": "insert",
+          "payload": {
+            "workspace_id": "synthetic-workspace",
+            "asset_id": "synthetic-asset",
+            "checked_by": "synthetic-user",
+            "status": "Out of service",
+            "notes": "synthetic outage test",
+            "photos_json": []
+          }
+        },
+        {
+          "table": "assets",
+          "operation": "update",
+          "payload": {
+            "status": "Out of service",
+            "last_checked_at": "2026-10-04T09:59:08.047Z"
+          }
+        }
+      ],
+      "redirects": [
+        "/app/assets?message=Asset+check+saved."
+      ]
+    },
+    {
+      "label": "asset update silently matches zero rows",
+      "functionName": "createAssetCheckAction",
+      "writes": [
+        {
+          "table": "asset_checks",
+          "operation": "insert",
+          "payload": {
+            "workspace_id": "synthetic-workspace",
+            "asset_id": "synthetic-asset",
+            "checked_by": "synthetic-user",
+            "status": "Out of service",
+            "notes": "",
+            "photos_json": []
+          }
+        },
+        {
+          "table": "assets",
+          "operation": "update",
+          "payload": {
+            "status": "Out of service",
+            "last_checked_at": "2026-10-04T09:59:08.050Z"
+          }
+        }
+      ],
+      "redirects": [
+        "/app/assets?message=Asset+check+saved."
+      ]
+    },
+    {
+      "label": "submission ignores configured custom field",
+      "functionName": "createFormSubmissionAction",
+      "writes": [
+        {
+          "table": "form_submissions",
+          "operation": "insert",
+          "payload": {
+            "workspace_id": "synthetic-workspace",
+            "form_id": "synthetic-form",
+            "submitted_by": "synthetic-user",
+            "submitter_name": "",
+            "submitter_email": "",
+            "data_json": {
+              "summary": "Synthetic inspection",
+              "priority": "Medium",
+              "follow_up": ""
+            },
+            "ai_summary": "Vaeroex summary draft: Synthetic inspection",
+            "ai_detected_priority": "Medium",
+            "ai_detected_followups_json": []
+          }
+        }
+      ],
+      "redirects": [
+        "/app/forms/synthetic-form?message=Submission+saved."
+      ]
+    },
+    {
+      "label": "replayed create has no application deduplication",
+      "functionName": "createIssueAction",
+      "writes": [
+        {
+          "table": "issues",
+          "operation": "insert",
+          "payload": {
+            "workspace_id": "synthetic-workspace",
+            "title": "Synthetic repeated click",
+            "description": "synthetic",
+            "issue_type": "",
+            "severity": "Medium",
+            "status": "Open",
+            "root_cause": "",
+            "recommended_fix": "",
+            "assigned_person_id": null,
+            "assigned_role": null,
+            "assigned_department": null,
+            "due_date": null,
+            "created_by": "synthetic-user"
+          }
+        },
+        {
+          "table": "issues",
+          "operation": "insert",
+          "payload": {
+            "workspace_id": "synthetic-workspace",
+            "title": "Synthetic repeated click",
+            "description": "synthetic",
+            "issue_type": "",
+            "severity": "Medium",
+            "status": "Open",
+            "root_cause": "",
+            "recommended_fix": "",
+            "assigned_person_id": null,
+            "assigned_role": null,
+            "assigned_department": null,
+            "due_date": null,
+            "created_by": "synthetic-user"
+          }
+        }
+      ],
+      "redirects": [
+        "/app/issues?message=Issue+logged.",
+        "/app/issues?message=Issue+logged."
+      ]
+    }
+  ]
+}

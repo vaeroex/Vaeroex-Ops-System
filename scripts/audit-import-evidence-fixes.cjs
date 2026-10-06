@@ -143,20 +143,31 @@ function client(failTable, options = {}) {
   const writes = [];
   const memory = (options.memory || []).map(row => ({ ...row }));
   const sourceRun = { id: 'run-one', status: 'completed', deleted_at: null, archived_at: null, input_json: {}, output_json: {} };
-  return { writes, memory, rpc: async () => ({ data: { eligible: true, mode: 'existing_native_file_analysis' }, error: null }), from(table) {
+  return { writes, memory, rpc: async (name, args) => {
+    if (name !== 'publish_confirmed_file_memory_v1') return { data: { eligible: true, mode: 'existing_native_file_analysis' }, error: null };
+    writes.push({ table: 'business_memory_chunks', operation: 'publication_rpc', args });
+    if (options.failUpsert) return { data: null, error: { message: 'Synthetic transaction failure' } };
+    const published = args.p_chunks.map(row => {
+      let item = memory.find(item => item.content_hash === row.content_hash && item.source_metadata?.run_id === args.p_run_id);
+      if (!item) { item = { ...row, id: 'memory-' + memory.length }; memory.push(item); }
+      return item.id;
+    });
+    for (const row of memory) if (!published.includes(row.id)) row.archived_at = '2026-10-05T00:00:00Z';
+    return { data: { indexed_chunks: published.length, chunk_ids: published }, error: null };
+  }, from(table) {
     let operation = 'select', value; const predicates = []; const query = {
-      select() { return query; }, eq(k,v) { predicates.push(row => row[k] === v); return query; }, in(k,v) { predicates.push(row => v.includes(row[k])); return query; }, is(k,v) { predicates.push(row => (row[k] ?? null) === v); return query; }, lt(k,v) { predicates.push(row => row[k] < v); return query; }, maybeSingle() { return query; },
+      select() { return query; }, limit() { return query; }, eq(k,v) { predicates.push(row => row[k] === v); return query; }, in(k,v) { predicates.push(row => v.includes(row[k])); return query; }, is(k,v) { predicates.push(row => (row[k] ?? null) === v); return query; }, lt(k,v) { predicates.push(row => row[k] < v); return query; }, maybeSingle() { return query; },
       insert(v) { operation = 'insert'; value = v; return query; }, update(v) { operation = 'update'; value = v; return query; }, upsert(v) { operation = 'upsert'; value = v; return query; },
       then(resolve, reject) { return Promise.resolve().then(() => {
         if (table === failTable) return { data: null, error: { message: 'Synthetic private database detail' } };
         if (table === 'business_memory_chunks' && operation === 'upsert' && options.failUpsert) return { data: null, error: { message: 'Synthetic replacement write failure' } };
         if (operation !== 'select') writes.push({ table, operation, value });
         if (table === 'business_memory_chunks') {
-          if (operation === 'select') return { data: memory.filter(row => predicates.every(p => p(row))).map(row => ({ id: row.id })), error: null };
+          if (operation === 'select') return { data: memory.filter(row => predicates.every(p => p(row))).map(row => structuredClone(row)), count: memory.filter(row => predicates.every(p => p(row))).length, error: null };
           if (operation === 'update') { for (const row of memory.filter(row => predicates.every(p => p(row)))) Object.assign(row, value); return { data: [], error: null }; }
           if (operation === 'upsert') { const result = value.map(row => { let target = memory.find(item => item.content_hash === row.content_hash && item.chunk_index === row.chunk_index); if (!target) { target = { id: 'memory-' + memory.length }; memory.push(target); } Object.assign(target, row); return { id: target.id }; }); return { data: result, error: null }; }
         }
-        return { data: table === 'ai_agent_runs' ? sourceRun : table === 'file_processing_jobs' ? { id: 'job-one' } : [], error: null };
+        return { data: table === 'ai_agent_runs' ? sourceRun : table === 'file_processing_jobs' ? { id: 'job-one' } : table === 'file_uploads' && operation === 'update' ? [{ id: 'file-one' }] : [], error: null };
       }).then(resolve, reject); }
     }; return query;
   } };
@@ -177,11 +188,21 @@ function client(failTable, options = {}) {
   for (const confirmation of [undefined, { userId: 'other-user', runId: 'run-one' }, { userId: 'user-one', runId: 'other-run' }]) {
     const db = client(); const result = await evidence.indexFileAnalysisEvidence({ ...input, supabase: db, confirmation }); assert.equal(result.indexedChunks, 0); assert.equal(db.writes.length, 0);
   } checks.push('missing or mismatched confirmation cannot write generated Business Memory');
-  let db = client(); let result = await evidence.indexFileAnalysisEvidence({ ...input, supabase: db, confirmation: { userId: 'user-one', runId: 'run-one' } }); assert.ok(result.indexedChunks > 0); assert.equal(db.writes.filter(w => w.table === 'business_memory_chunks' && w.operation === 'upsert').length, 1); checks.push('explicitly confirmed supported analysis reaches actual indexer write boundary');
+  let db = client(); let result = await evidence.indexFileAnalysisEvidence({ ...input, supabase: db, confirmation: { userId: 'user-one', runId: 'run-one' } }); assert.ok(result.indexedChunks > 0); assert.equal(db.writes.filter(w => w.table === 'business_memory_chunks' && w.operation === 'publication_rpc').length, 1); checks.push('explicitly confirmed supported analysis reaches actual indexer write boundary');
   db = client(); result = await evidence.indexFileAnalysisEvidence({ ...input, supabase: db, metadata: { ...metadata, analysis_output: { findings: ['Revenue amount October 999'] } }, confirmation: { userId: 'user-one', runId: 'run-one' } }); assert.equal(result.indexedChunks, 0); assert.equal(db.writes.length, 0); checks.push('explicit confirmation cannot admit contradictory numerical output');
   const previous = { id: 'previous-approved', workspace_id: input.workspaceId, source_type: 'file_analysis', source_file_id: file.id, content_hash: 'old-distinct-content', chunk_index: 0, indexed_at: '2020-01-01T00:00:00Z', archived_at: null, deleted_at: null };
   db = client(null, { memory: [previous], failUpsert: true }); result = await evidence.indexFileAnalysisEvidence({ ...input, supabase: db, confirmation: { userId: 'user-one', runId: 'run-one' } }); assert.equal(result.indexedChunks, 0); assert.deepEqual(db.memory, [previous]); checks.push('failed replacement write preserves previously approved memory');
-  db = client(null, { memory: [previous] }); result = await evidence.indexFileAnalysisEvidence({ ...input, supabase: db, confirmation: { userId: 'user-one', runId: 'run-one' } }); assert.ok(result.indexedChunks > 0); assert.ok(db.memory[0].archived_at); assert.equal(db.memory[1].archived_at, null); assert.equal(db.memory[1].deleted_at, null); const memoryWrites = db.writes.filter(w => w.table === 'business_memory_chunks'); assert.deepEqual(memoryWrites.map(w => w.operation), ['upsert', 'update']); checks.push('previous IDs retire only after complete replacement acknowledgement');
+  db = client(null, { memory: [previous] }); result = await evidence.indexFileAnalysisEvidence({ ...input, supabase: db, confirmation: { userId: 'user-one', runId: 'run-one' } }); assert.ok(result.indexedChunks > 0); assert.ok(db.memory[0].archived_at); assert.equal(db.memory[1].archived_at, null); assert.equal(db.memory[1].deleted_at, null); const memoryWrites = db.writes.filter(w => w.table === 'business_memory_chunks'); assert.deepEqual(memoryWrites.map(w => w.operation), ['publication_rpc']); checks.push('indexer delegates replacement and retirement to one confirmed transaction');
   result = await evidence.indexFileAnalysisEvidence({ ...input, supabase: db, confirmation: { userId: 'user-one', runId: 'run-one' } }); assert.ok(result.indexedChunks > 0); assert.equal(db.memory.filter(row => !row.archived_at && !row.deleted_at).length, 1); checks.push('identical confirmed retry keeps its idempotent chunk active');
+  const worksheetInput = { supabase: client(), workspaceId: input.workspaceId, userId: input.userId, file, importId: 'reused-import-record', importAttemptId: 'attempt-one', worksheets: [{ name: 'Metrics', index: 0, type: 'KPIs', rows: [{ rowNumber: 2, values: { Revenue: 100 } }] }] };
+  db = worksheetInput.supabase; result = await evidence.indexWorksheetImportEvidence(worksheetInput); assert.equal(result.indexedChunks, 1);
+  const originalCitation = structuredClone(db.memory[0]);
+  result = await evidence.indexWorksheetImportEvidence({ ...worksheetInput, importAttemptId: 'attempt-two' });
+  assert.equal(result.indexedChunks, 1); assert.equal(db.memory.length, 2); assert.notEqual(db.memory[1].id, originalCitation.id); assert.notEqual(db.memory[1].content_hash, originalCitation.content_hash);
+  assert.equal(db.memory[0].id, originalCitation.id); assert.equal(db.memory[0].source_excerpt, originalCitation.source_excerpt); assert.equal(db.memory[0].source_metadata.import_id, originalCitation.source_metadata.import_id); assert.equal(db.memory[0].source_metadata.import_attempt_id, 'attempt-one'); assert.equal(db.memory[1].source_metadata.import_attempt_id, 'attempt-two'); assert.equal(db.memory[0].archived_at, null);
+  checks.push('separate worksheet approvals with identical text preserve old citation identity and import provenance');
+  const sameAttemptId = db.memory[1].id; await evidence.indexWorksheetImportEvidence({ ...worksheetInput, importAttemptId: 'attempt-two' }); assert.equal(db.memory.length, 2); assert.equal(db.memory[1].id, sameAttemptId); checks.push('same durable worksheet attempt keeps a stable content identity');
+  const writesBefore = db.writes.length; result = await evidence.indexWorksheetImportEvidence({ ...worksheetInput, importAttemptId: '' }); assert.equal(result.indexedChunks, 0); assert.equal(db.writes.length, writesBefore); checks.push('worksheet publication without durable approval identity fails before writes');
+  await require('./workspace-worksheet-publication-tests.cjs').qualify({ evidence, checks });
   console.log(JSON.stringify({ kind: 'audit_import_evidence_regression', status: 'passed', checks: checks.length, names: checks, inflations, resourceUsage: process.resourceUsage(), limitation: 'Actual parser and indexer functions; synthetic query responses and in-memory write recording, no real database/provider/UI.' }, null, 2));
 })().catch(error => { console.error(error); process.exitCode = 1; });

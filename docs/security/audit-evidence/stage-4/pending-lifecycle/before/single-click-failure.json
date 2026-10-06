@@ -1,0 +1,100 @@
+{
+  "theme": "pulsar",
+  "width": 390,
+  "gateState": "pending",
+  "submittedCount": 4,
+  "prior": 3,
+  "errors": [],
+  "trace": {
+    "events": [
+      {
+        "phase": "before-click",
+        "at": 654.8000000044703,
+        "busy": "false",
+        "disabled": false
+      },
+      {
+        "phase": "form-capture-prevented:false",
+        "at": 655.1000000014901,
+        "busy": "false",
+        "disabled": false
+      },
+      {
+        "phase": "after-click",
+        "at": 655.7000000029802,
+        "busy": "false",
+        "disabled": false
+      },
+      {
+        "phase": "submit-after-prevented:true",
+        "at": 655.8999999985099,
+        "busy": "true",
+        "disabled": true
+      },
+      {
+        "phase": "button-change",
+        "at": 655.8999999985099,
+        "busy": "true",
+        "disabled": true
+      },
+      {
+        "phase": "button-change",
+        "at": 657.6000000014901,
+        "busy": "false",
+        "disabled": false
+      }
+    ],
+    "visibility": "visible",
+    "now": 10675.20000000298
+  },
+  "buttons": [
+    {
+      "text": "Outside before",
+      "busy": null,
+      "disabled": false,
+      "type": "submit"
+    },
+    {
+      "text": "Open synthetic record",
+      "busy": null,
+      "disabled": false,
+      "type": "button"
+    },
+    {
+      "text": "Outside after",
+      "busy": null,
+      "disabled": false,
+      "type": "submit"
+    },
+    {
+      "text": "Search K",
+      "busy": null,
+      "disabled": false,
+      "type": "button"
+    },
+    {
+      "text": "",
+      "busy": null,
+      "disabled": false,
+      "type": "button"
+    },
+    {
+      "text": "Search evidence",
+      "busy": null,
+      "disabled": false,
+      "type": "button"
+    },
+    {
+      "text": "Outside last",
+      "busy": null,
+      "disabled": false,
+      "type": "submit"
+    },
+    {
+      "text": "Save submission",
+      "busy": "false",
+      "disabled": false,
+      "type": "submit"
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "files": {
+    "linux-image-result.json": "13b25aacf586479ed786c357128b0db46a39b96d9111f3e41c2c1663af84e0ce",
+    "ci-cea1a1f2-success.json": "e3fb161c903e621abbb6adf3929b4d01236267fbe29bff0a2aaa95a07146133d",
+    "linux-image-build-and-smoke.log": "7a03319aaee998851354d027bed95eb150d5f2d5b5769f74828d0b5dcf5c1f0f",
+    "runtime-discovery-and-ci-baseline.json": "94580b8db63a3ad4c911b17457a73de62b519acb1e91484f1b4cf4f47d6ccd10",
+    "guard-results.json": "0aa9cd11c88eebb7742227e356978f508e9d1af91b4715ff3dd2a6e432c72153"
+  },
+  "currentSourceInputsMatchQualifiedMerge": true,
+  "limits": [
+    "No provider or database operation was exercised; this proves the pinned image builds and passes the existing startup/authentication-denial/ELF smoke.",
+    "The image remained local to the disposable runner and was removed after qualification; no registry digest or deployment artifact was published.",
+    "Runtime Node22.23.3/OpenSSL3.5.8 come from the pinned Distroless stage; build stage is pinned Node22.23.1."
+  ]
+}

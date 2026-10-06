@@ -1,0 +1,116 @@
+{
+  "checks": [
+    {
+      "elapsedMs": 4,
+      "url": "/app/forms/c58f5e45-05f2-4c7b-a80f-80557b205f8d",
+      "buttons": [
+        {
+          "text": "Working...",
+          "busy": "true",
+          "disabled": true
+        }
+      ],
+      "persisted": 0
+    },
+    {
+      "elapsedMs": 1033,
+      "url": "/app/forms/c58f5e45-05f2-4c7b-a80f-80557b205f8d",
+      "buttons": [
+        {
+          "text": "Working...",
+          "busy": "true",
+          "disabled": true
+        }
+      ],
+      "persisted": 1
+    },
+    {
+      "elapsedMs": 5056,
+      "url": "/app/forms/c58f5e45-05f2-4c7b-a80f-80557b205f8d",
+      "buttons": [
+        {
+          "text": "Working...",
+          "busy": "true",
+          "disabled": true
+        }
+      ],
+      "persisted": 1
+    },
+    {
+      "elapsedMs": 20071,
+      "url": "/app/forms/c58f5e45-05f2-4c7b-a80f-80557b205f8d",
+      "buttons": [
+        {
+          "text": "Working...",
+          "busy": "true",
+          "disabled": true
+        }
+      ],
+      "persisted": 1
+    }
+  ],
+  "errors": [],
+  "responses": [
+    {
+      "path": "/app/forms/c58f5e45-05f2-4c7b-a80f-80557b205f8d",
+      "status": 303,
+      "headers": {
+        "x-action-redirect": "/app/forms/c58f5e45-05f2-4c7b-a80f-80557b205f8d?message=Submission+saved.;push",
+        "location": null,
+        "content-type": "text/x-component",
+        "content-length": null,
+        "transfer-encoding": "chunked",
+        "x-action-revalidated": "[[],1,0]"
+      },
+      "request": {
+        "resourceType": "fetch",
+        "nextAction": true
+      },
+      "body": {
+        "error": "response.body: Response body is unavailable for redirect responses"
+      }
+    }
+  ],
+  "failedRequests": [
+    {
+      "url": "/app",
+      "method": "GET",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "url": "/app/intelligence",
+      "method": "GET",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "url": "/app/kpis",
+      "method": "GET",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "url": "/app/sources",
+      "method": "GET",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "url": "/app/reports",
+      "method": "GET",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "url": "/app/integrations",
+      "method": "GET",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "url": "/app/help",
+      "method": "GET",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "url": "/app/forms/c58f5e45-05f2-4c7b-a80f-80557b205f8d",
+      "method": "POST",
+      "error": "net::ERR_ABORTED"
+    }
+  ]
+}

@@ -57,7 +57,14 @@ jobs:
 
       - name: Isolated workspace authorization and concurrent slot regressions
         # Creates a fresh Unix-socket-only cluster; accepts no hosted database URL.
-        run: WORKSPACE_AUDIT_PG_BIN="$(pg_config --bindir)" pnpm test:workspace-audit:database
+        run: |
+          audit_pg_bin="$(pg_config --bindir)"
+          WORKSPACE_AUDIT_PG_BIN="$audit_pg_bin" pnpm test:workspace-audit:database
+          ISSUE_TEST_PG_BIN="$audit_pg_bin" node scripts/issue-submission-native-tests.cjs
+          SHEETS_TEST_PG_BIN="$audit_pg_bin" node scripts/google-sheets-dispatch-native-tests.cjs
+          SHEETS_TEST_PG_BIN="$audit_pg_bin" node scripts/google-sheets-dispatch-fairness-native-tests.cjs
+          SHEETS_TEST_PG_BIN="$audit_pg_bin" node scripts/google-sheets-recovery-continuation-native-tests.cjs
+          SHEETS_TEST_PG_BIN="$audit_pg_bin" node scripts/google-sheets-failure-cleanup-native-tests.cjs
 
       - name: Workspace navigation and bounded-list regressions
         run: pnpm test:workspace-clarity
@@ -168,6 +175,9 @@ jobs:
         run: |
           pnpm exec playwright install --with-deps chromium
           pnpm test:google-sheets-ui
+
+      - name: Workspace audit desktop/mobile keyboard and form regressions
+        run: pnpm test:workspace-audit:browser
 
       - name: Verify optimized Square handoff headers and isolated synthetic browser navigation
         run: |
@@ -303,6 +313,11 @@ jobs:
 
       - name: Build external integrations QBO Production runtime
         run: pnpm build:external-integrations-qbo
+
+      - name: Qualify QBO Linux amd64 credential-free build and network-isolated smoke
+        # Public-repository standard runner; no image push or artifact storage.
+        timeout-minutes: 20
+        run: node scripts/qbo-worker-image-qualification.cjs
 
       - name: TypeScript check
         run: pnpm typecheck

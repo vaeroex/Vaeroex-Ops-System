@@ -1,0 +1,19 @@
+ M .env.example
+ M README.md
+ M app/app/settings/page.tsx
+ M lib/supabase/types.ts
+ M scripts/external-integrations-qbo-production-regression-tests.js
+ M services/external-integrations-qbo/infra/README.md
+ M services/external-integrations-qbo/infra/main.tf
+ M services/external-integrations-qbo/infra/outputs.tf
+?? app/api/integrations/google-sheets/
+?? app/app/settings/integrations/google-sheets/
+?? atlantic-3d-dental-demo/
+?? docs/google-sheets-connector-setup.md
+?? docs/security/audit-evidence/
+?? docs/security/workspace-audit.md
+?? docs/supabase-production-direct-ipv6-support-draft.md
+?? lib/integrations/google-sheets/
+?? services/external-integrations-qbo/infra/foundation/
+?? supabase/.temp/
+?? supabase/migrations/20261002020000_google_sheets_read_only_foundation.sql

@@ -1,5 +1,6 @@
 import "server-only";
 import { z } from "zod";
+import type { SheetsScheduledAdmission } from "./scheduler";
 import {
   assertMapping, GOOGLE_SHEETS_MAX_ROWS, GOOGLE_SHEETS_READ_BATCH_ROWS,
   mappedColumnIndexes, sheetColumn, sheetRange
@@ -10,7 +11,7 @@ import { assertSheetsTimeRemaining, withSheetsRequest, type SheetsAbortableResul
 
 export async function runSheetsSync(input: {
   workspaceId: string; connectionId: string; actorId: string | null; sessionId: string | null;
-  trigger: "manual" | "scheduled"; execution?: SheetsExecutionBudget;
+  trigger: "manual" | "scheduled"; execution?: SheetsExecutionBudget; admission?: SheetsScheduledAdmission;
 }) {
   const startedAt = Date.now();
   // Manual runs share the route's five-minute ceiling. Scheduled runs inherit
@@ -21,14 +22,19 @@ export async function runSheetsSync(input: {
     SheetsAbortableResult<{ data: unknown; error: { message?: string } | null }>;
   const rpc = (name: string, args: Record<string, unknown>, deadlineAt = execution.deadlineAt, timeoutMs = 10_000) =>
     withSheetsRequest(deadlineAt, timeoutMs, signal => rawRpc(name, args).abortSignal(signal));
-  const claimed = await rpc("claim_google_sheets_sync_v1", {
-    p_workspace_id: input.workspaceId, p_connection_id: input.connectionId,
-    p_actor_id: input.actorId, p_session_id: input.sessionId, p_trigger: input.trigger
-  });
-  if (claimed.error) {
-    const message = claimed.error.message || "";
-    throw new Error(message.includes("google_sheets_sync_busy") ? "google_sheets_sync_busy" : "google_sheets_mapping_required");
-  }
+  const claim = async () => {
+    const claimed = await rpc("claim_google_sheets_sync_v1", {
+      p_workspace_id: input.workspaceId, p_connection_id: input.connectionId,
+      p_actor_id: input.actorId, p_session_id: input.sessionId, p_trigger: input.trigger
+    });
+    if (claimed.error) {
+      const message = claimed.error.message || "";
+      const admissionBusy = message.match(/google_sheets_(?:capacity|workspace|sync)_busy/)?.[0];
+      throw new Error(admissionBusy ?? "google_sheets_mapping_required");
+    }
+    return claimed;
+  };
+  const claimed = input.trigger === "scheduled" && input.admission ? await input.admission.run(claim) : await claim();
   const { runId } = z.object({ runId: z.string().uuid() }).parse(claimed.data);
   try {
     const result = await withSheetsRequest(execution.deadlineAt, 10_000, signal => admin.from("google_sheets_connections").select("*")

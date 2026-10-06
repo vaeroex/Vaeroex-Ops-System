@@ -1,0 +1,9 @@
+{
+  "label": "first-seven",
+  "code": 0,
+  "signal": null,
+  "timedOut": false,
+  "durationMs": 258.38329200000044,
+  "stdout": "Finished supabase db push.\n",
+  "stderr": "Connecting to remote database...\nDo you want to push these migrations to the remote database?\n • 20261005022017_workspace_security_boundaries.sql\n • 20261005022445_workspace_persisted_usage_limits.sql\n • 20261005060101_atomic_confirmed_memory_publication.sql\n • 20261005060258_asset_check_server_chronology.sql\n • 20261005061024_internal_form_submission_idempotency.sql\n • 20261005062005_durable_import_attempt_reconciliation.sql\n • 20261005070311_worksheet_import_publication_heads.sql\n [Y/n] y\nApplying migration 20261005022017_workspace_security_boundaries.sql...\nApplying migration 20261005022445_workspace_persisted_usage_limits.sql...\nApplying migration 20261005060101_atomic_confirmed_memory_publication.sql...\nApplying migration 20261005060258_asset_check_server_chronology.sql...\nApplying migration 20261005061024_internal_form_submission_idempotency.sql...\nApplying migration 20261005062005_durable_import_attempt_reconciliation.sql...\nApplying migration 20261005070311_worksheet_import_publication_heads.sql...\n"
+}

@@ -1,0 +1,112 @@
+
+/Users/isaacvizcarra/.codex/worktrees/workspace-audit-fixes/Vaeroex/app/api/internal/nvidia-qualification/stage-three-a/route.ts
+  57:24  warning  '_blindOutput' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/isaacvizcarra/.codex/worktrees/workspace-audit-fixes/Vaeroex/app/api/internal/nvidia-qualification/stage-three-b/route.ts
+  82:24  warning  '_blindOutput' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/isaacvizcarra/.codex/worktrees/workspace-audit-fixes/Vaeroex/app/api/internal/nvidia-qualification/stage-two/route.ts
+  45:24  warning  '_blindOutput' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/isaacvizcarra/.codex/worktrees/workspace-audit-fixes/Vaeroex/app/app/admin/audit-logs/page.tsx
+  3:10  warning  'CompactRunTable' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/isaacvizcarra/.codex/worktrees/workspace-audit-fixes/Vaeroex/app/app/admin/nvidia-qualification/stage-three-a/page.tsx
+  65:24  warning  '_blindOutput' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/isaacvizcarra/.codex/worktrees/workspace-audit-fixes/Vaeroex/app/app/admin/nvidia-qualification/stage-three-b/page.tsx
+  79:24  warning  '_blindOutput' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/isaacvizcarra/.codex/worktrees/workspace-audit-fixes/Vaeroex/app/app/admin/nvidia-qualification/stage-two/page.tsx
+  51:24  warning  '_blindOutput' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/isaacvizcarra/.codex/worktrees/workspace-audit-fixes/Vaeroex/app/app/files/actions.ts
+    18:3   warning  'previewRows' is defined but never used        @typescript-eslint/no-unused-vars
+   335:10  warning  'fileExtension' is defined but never used      @typescript-eslint/no-unused-vars
+   590:10  warning  'inferMapping' is defined but never used       @typescript-eslint/no-unused-vars
+  1611:10  warning  'fileContentStatus' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/isaacvizcarra/.codex/worktrees/workspace-audit-fixes/Vaeroex/app/app/kpis/page.tsx
+  152:10  warning  'explicitKpiDirection' is defined but never used  @typescript-eslint/no-unused-vars
+  194:10  warning  'formatMetricValue' is defined but never used     @typescript-eslint/no-unused-vars
+  373:10  warning  'MetricCard' is defined but never used            @typescript-eslint/no-unused-vars
+  401:10  warning  'SummaryStat' is defined but never used           @typescript-eslint/no-unused-vars
+  475:10  warning  'KpiDetailPanel' is defined but never used        @typescript-eslint/no-unused-vars
+  502:10  warning  'metricDetailsHref' is defined but never used     @typescript-eslint/no-unused-vars
+  764:10  warning  'trendDeltaLabel' is defined but never used       @typescript-eslint/no-unused-vars
+
+/Users/isaacvizcarra/.codex/worktrees/workspace-audit-fixes/Vaeroex/app/app/page.tsx
+    50:25  warning  'Json' is defined but never used                         @typescript-eslint/no-unused-vars
+   130:10  warning  'dashboardHref' is defined but never used                @typescript-eslint/no-unused-vars
+   230:10  warning  'isRecord' is defined but never used                     @typescript-eslint/no-unused-vars
+   294:10  warning  'metricNames' is defined but never used                  @typescript-eslint/no-unused-vars
+   553:10  warning  'severityTone' is defined but never used                 @typescript-eslint/no-unused-vars
+   730:10  warning  'signalRecommendedAction' is defined but never used      @typescript-eslint/no-unused-vars
+   798:10  warning  'IntelligenceLayerSummary' is defined but never used     @typescript-eslint/no-unused-vars
+  1162:9   warning  'weeklyTrends' is assigned a value but never used        @typescript-eslint/no-unused-vars
+  1190:9   warning  'risks' is assigned a value but never used               @typescript-eslint/no-unused-vars
+  1195:9   warning  'opportunities' is assigned a value but never used       @typescript-eslint/no-unused-vars
+  1201:9   warning  'recommendedActions' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  1225:9   warning  'smartAlerts' is assigned a value but never used         @typescript-eslint/no-unused-vars
+
+/Users/isaacvizcarra/.codex/worktrees/workspace-audit-fixes/Vaeroex/app/app/sources/SourcesPage.tsx
+  1137:9  warning  'isArchivedView' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/isaacvizcarra/.codex/worktrees/workspace-audit-fixes/Vaeroex/components/evidence/BusinessNotesPanel.tsx
+  80:108  warning  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  80:127  warning  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+
+/Users/isaacvizcarra/.codex/worktrees/workspace-audit-fixes/Vaeroex/components/intelligence/IntelligenceSignalInbox.tsx
+  37:7  warning  'confidenceOptions' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/isaacvizcarra/.codex/worktrees/workspace-audit-fixes/Vaeroex/components/marketing/spatial/PublicSpatialCanvas.tsx
+  9:3  warning  'Group' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/isaacvizcarra/.codex/worktrees/workspace-audit-fixes/Vaeroex/components/operations/ManagedRecordList.tsx
+  161:10  warning  'collectionLabel' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/isaacvizcarra/.codex/worktrees/workspace-audit-fixes/Vaeroex/components/spatial/PublicSpatialCanvasGuard.tsx
+  24:21  warning  '_error' is defined but never used  @typescript-eslint/no-unused-vars
+  24:36  warning  '_info' is defined but never used   @typescript-eslint/no-unused-vars
+
+/Users/isaacvizcarra/.codex/worktrees/workspace-audit-fixes/Vaeroex/lib/ai/bounded-context.ts
+  29:10  warning  'compactText' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/isaacvizcarra/.codex/worktrees/workspace-audit-fixes/Vaeroex/lib/ai/business-health-explanation/snapshot-context.ts
+  27:26  warning  '_fingerprint' is assigned a value but never used         @typescript-eslint/no-unused-vars
+  27:60  warning  '_contextualEvidence' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  27:99  warning  '_contextAuthority' is assigned a value but never used    @typescript-eslint/no-unused-vars
+
+/Users/isaacvizcarra/.codex/worktrees/workspace-audit-fixes/Vaeroex/lib/ai/evidence-engine/benchmark.ts
+  202:7   warning  'POC_RECALL_CUTOFFS' is assigned a value but never used     @typescript-eslint/no-unused-vars
+  203:7   warning  'POC_PRECISION_CUTOFFS' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  874:17  warning  '_runs' is assigned a value but never used                  @typescript-eslint/no-unused-vars
+
+/Users/isaacvizcarra/.codex/worktrees/workspace-audit-fixes/Vaeroex/lib/ai/executive-output.ts
+  344:10  warning  'citationObjects' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/isaacvizcarra/.codex/worktrees/workspace-audit-fixes/Vaeroex/lib/ai/finding-explanation/snapshot-context.ts
+  20:26  warning  '_fingerprint' is assigned a value but never used         @typescript-eslint/no-unused-vars
+  20:60  warning  '_contextualEvidence' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  20:99  warning  '_contextAuthority' is assigned a value but never used    @typescript-eslint/no-unused-vars
+
+/Users/isaacvizcarra/.codex/worktrees/workspace-audit-fixes/Vaeroex/lib/ai/intelligence-briefing/storage.ts
+  12:3  warning  'INTELLIGENCE_BRIEFING_PROMPT_VERSION' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/isaacvizcarra/.codex/worktrees/workspace-audit-fixes/Vaeroex/lib/ai/kpi-overview.ts
+  109:10  warning  'numberValue' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/isaacvizcarra/.codex/worktrees/workspace-audit-fixes/Vaeroex/lib/ai/qualification/stage-three-b.ts
+  229:7  warning  'parsedValue' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/isaacvizcarra/.codex/worktrees/workspace-audit-fixes/Vaeroex/lib/ai/qualification/stage-two-fixtures.ts
+  15:8  warning  'EvidenceManifest' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/isaacvizcarra/.codex/worktrees/workspace-audit-fixes/Vaeroex/lib/ai/trust/workflows/business-health.ts
+  243:562  warning  '_text' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/isaacvizcarra/.codex/worktrees/workspace-audit-fixes/Vaeroex/lib/intelligence/operational-evidence.ts
+  311:17  warning  '_kind' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+✖ 55 problems (0 errors, 55 warnings)
+

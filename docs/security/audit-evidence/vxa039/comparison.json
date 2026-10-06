@@ -1,0 +1,20 @@
+{
+  "baselineCommit": "d91be079c7beb0b6f21a4c5e6b451f90ca06e035",
+  "baselineBuildId": "Z8feQTCDPf-4jTQB1lnDT",
+  "proposedDiagnosticHead": "62731a03a6b577b0bdb4da8db84f19352063e4ad",
+  "proposedDiagnosticBuildId": "cSVqf7vjN_9OKube66GYE",
+  "baselineRendererSha256": "9bcaacd92279559075407d2fb09b19893f03f9b93ad74eb0ef42b31b66f6053e",
+  "patchedRendererSha256": "0c1060e8755fbbedefcc3d60b911e73a4f29f1857067e2cab08ecd7b621771a3",
+  "baselinePackageMatchesCommit": true,
+  "baselineLockMatchesCommit": true,
+  "database": "Same preserved native local Supabase with 130 canonical additive migrations; form persistence admitted for both baseline and proposal. No rollback or schema downgrade.",
+  "configuration": "Equivalent scrubbed production env: owned loopback Supabase/Auth/Storage and app origin, no hosted provider keys, UTC, 2GB heap; exact local origin port differs.",
+  "baselineLimit": "Baseline bundle filename differs: probe did not instrument its renderer. Observed baseline saved row and 303 with unchanged URL are direct; internal lane trace is from proposal only.",
+  "scopeReview": {
+    "authorization": "Gateway invocation and all scope/role/confirmation checks preserved; denied gateway errors become source-scoped feedback before admission.",
+    "replay": "Only existing authorized reconciliation status=completed acknowledges empty staged-row submissions. No new claim, forced completion, deletion or resubmission.",
+    "client": "Worksheet-only action-state adapter delegates identical FormData and propagates errors/redirects; generic controls unchanged.",
+    "runtime": "Pinned upstream retry-lane backport only; no timer, reload or weakened assertions.",
+    "migrations": "No migration added or modified by this focused continuation."
+  }
+}

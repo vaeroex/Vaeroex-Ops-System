@@ -1,0 +1,23 @@
+PASS server state adapter preserves FormData and awaits the original action once
+PASS server state adapter forwards errors and framework redirects without catching or rewriting
+PASS schema preserves supported field types and deduplicates keys
+PASS schema rejects duplicate keys, unsupported types and excessive fields
+PASS server rejects required field without persistence
+PASS server rejects impossible date without persistence
+PASS server rejects unsupported priority without persistence
+PASS server rejects forged field without persistence
+PASS server rejects duplicate value without persistence
+PASS server rejects oversized field without persistence
+PASS server rejects foreign parent without persistence
+PASS actual action persists fields and schema snapshot in isolated PostgreSQL
+PASS legacy submission payload remains unchanged
+PASS bounded pages reach all 60 checks exactly once, with tied timestamps
+PASS literal wildcard search and workspace scoping are applied in SQL
+PASS out-of-range pagination clamps without hiding the last page
+PASS invalid filter IDs and calendar dates are rejected before SQL
+PASS actual HTTP client: stale last page recovers within three scoped requests
+PASS actual HTTP client: all matching rows disappeared
+PASS actual HTTP client: persistent range failure remains an error
+PASS actual HTTP client: second recovery race stops at the three-request budget
+PASS actual HTTP client: non-range failure is never hidden or retried
+{"checks":36,"scope":"Actual schema validator, server actions and history query builder with isolated PGlite persistence; installed Supabase client range recovery through synthetic fetch responses. Auth, billing and Next redirect/cache are stubbed. Asset parent transaction is covered by separate migration tests; no deployed Supabase/provider access."}

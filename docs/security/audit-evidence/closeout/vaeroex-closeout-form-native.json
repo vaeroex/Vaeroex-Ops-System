@@ -1,0 +1,203 @@
+{
+  "scope": "Focused repository SQL, real native independent transactions; synthetic JWT roles, no Auth HTTP/browser/provider proof",
+  "migration": "20261005061024_internal_form_submission_idempotency.sql",
+  "checks": 49,
+  "results": [
+    {
+      "name": "staff first request creates a response",
+      "status": "pass"
+    },
+    {
+      "name": "lost acknowledgement retry returns the same submission",
+      "status": "pass"
+    },
+    {
+      "name": "retry is marked replayed",
+      "status": "pass"
+    },
+    {
+      "name": "one scoped request persists only once",
+      "status": "pass"
+    },
+    {
+      "name": "server derives actor and summary fields",
+      "status": "pass"
+    },
+    {
+      "name": "same identity with a changed response conflicts",
+      "status": "pass"
+    },
+    {
+      "name": "intentional fresh identity creates another response",
+      "status": "pass"
+    },
+    {
+      "name": "identity is scoped to the selected form",
+      "status": "pass"
+    },
+    {
+      "name": "identity is scoped to the authenticated actor",
+      "status": "pass"
+    },
+    {
+      "name": "replay cannot overwrite later reviewed content",
+      "status": "pass"
+    },
+    {
+      "name": "direct authenticated RPC denies missing required field",
+      "status": "pass"
+    },
+    {
+      "name": "direct authenticated RPC denies blank required field",
+      "status": "pass"
+    },
+    {
+      "name": "direct authenticated RPC denies unlisted priority",
+      "status": "pass"
+    },
+    {
+      "name": "direct authenticated RPC denies impossible date",
+      "status": "pass"
+    },
+    {
+      "name": "direct authenticated RPC denies non-text value",
+      "status": "pass"
+    },
+    {
+      "name": "direct authenticated RPC denies unknown field",
+      "status": "pass"
+    },
+    {
+      "name": "direct authenticated RPC denies forged schema snapshot",
+      "status": "pass"
+    },
+    {
+      "name": "direct authenticated RPC denies oversized text",
+      "status": "pass"
+    },
+    {
+      "name": "direct authenticated RPC denies UTF16 oversized text",
+      "status": "pass"
+    },
+    {
+      "name": "direct authenticated RPC denies unknown envelope field",
+      "status": "pass"
+    },
+    {
+      "name": "direct authenticated RPC denies missing summary",
+      "status": "pass"
+    },
+    {
+      "name": "direct authenticated RPC denies unknown envelope priority",
+      "status": "pass"
+    },
+    {
+      "name": "valid leap date remains accepted",
+      "status": "pass"
+    },
+    {
+      "name": "ISO year zero matches existing JavaScript validation",
+      "status": "pass"
+    },
+    {
+      "name": "direct RPC denies invalid email",
+      "status": "pass"
+    },
+    {
+      "name": "same workspace cannot claim a foreign form",
+      "status": "pass"
+    },
+    {
+      "name": "foreign actor cannot claim selected workspace",
+      "status": "pass"
+    },
+    {
+      "name": "viewer direct RPC is denied",
+      "status": "pass"
+    },
+    {
+      "name": "anonymous RPC is denied",
+      "status": "pass"
+    },
+    {
+      "name": "service RPC cannot invent an actor",
+      "status": "pass"
+    },
+    {
+      "name": "archived parent denies even matching replay",
+      "status": "pass"
+    },
+    {
+      "name": "hidden parent denies matching replay",
+      "status": "pass"
+    },
+    {
+      "name": "revoked membership denies matching replay",
+      "status": "pass"
+    },
+    {
+      "name": "expired subscription denies matching replay",
+      "status": "pass"
+    },
+    {
+      "name": "banned account denies matching replay",
+      "status": "pass"
+    },
+    {
+      "name": "deleted account denies matching replay",
+      "status": "pass"
+    },
+    {
+      "name": "private receipt cannot be read by the caller",
+      "status": "pass"
+    },
+    {
+      "name": "no private schema usage or receipt DML is granted",
+      "status": "pass"
+    },
+    {
+      "name": "sixteen independent transactions create exactly one response",
+      "status": "pass"
+    },
+    {
+      "name": "sixteen concurrent replies return the same identity",
+      "status": "pass"
+    },
+    {
+      "name": "race leaves one durable submission",
+      "status": "pass"
+    },
+    {
+      "name": "conflicting concurrent payloads admit one only",
+      "status": "pass"
+    },
+    {
+      "name": "other concurrent payload receives conflict",
+      "status": "pass"
+    },
+    {
+      "name": "receipt failure rolls back its preceding response insert",
+      "status": "pass"
+    },
+    {
+      "name": "failed receipt leaves no orphan response",
+      "status": "pass"
+    },
+    {
+      "name": "failed receipt leaves no receipt",
+      "status": "pass"
+    },
+    {
+      "name": "intentional retry after rollback succeeds once",
+      "status": "pass"
+    },
+    {
+      "name": "replay never recreates a removed response",
+      "status": "pass"
+    },
+    {
+      "name": "historical row 5fef1e70-cce5-4ad3-8b96-b149b8ed4b92 remains unchanged",
+      "status": "pass"
+    }
+  ]
+}

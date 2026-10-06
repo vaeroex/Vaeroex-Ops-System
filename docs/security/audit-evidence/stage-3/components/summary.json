@@ -1,0 +1,145 @@
+[
+  {
+    "dataset": "import-1000",
+    "samples": 5,
+    "csvBytes": 39801,
+    "p50Ms": 3.815,
+    "p95Ms": 6.328,
+    "maxMs": 6.328,
+    "childElapsedMs": 400,
+    "cpuPerSampleMs": [
+      21.6,
+      12.94,
+      14.18,
+      12.28,
+      9.2
+    ],
+    "childMaxRssMiB": 163.92,
+    "watcherMaxRssMiB": 152.95,
+    "integrity": {
+      "rows": 1000,
+      "series": 25,
+      "valueChecksum": 500500,
+      "allIdsPreserved": true
+    },
+    "diagnosticBudgetPassed": true,
+    "resourceGuardPassed": true,
+    "p99Ms": 6.328,
+    "deterministicDigest": "7c74fa5e105f161d54e9165ab7ab657ade829e3038723d5e654ec83638b38689",
+    "percentileQualification": "Nearest rank; p95 and p99 equal max with only3 or5 samples; no production tail guarantee"
+  },
+  {
+    "dataset": "import-10000",
+    "samples": 5,
+    "csvBytes": 417802,
+    "p50Ms": 32.242,
+    "p95Ms": 36.803,
+    "maxMs": 36.803,
+    "childElapsedMs": 593,
+    "cpuPerSampleMs": [
+      70.41,
+      71.61,
+      61.23,
+      56.15,
+      58.33
+    ],
+    "childMaxRssMiB": 196.0,
+    "watcherMaxRssMiB": 195.77,
+    "integrity": {
+      "rows": 10000,
+      "series": 25,
+      "valueChecksum": 50005000,
+      "allIdsPreserved": true
+    },
+    "diagnosticBudgetPassed": true,
+    "resourceGuardPassed": true,
+    "p99Ms": 36.803,
+    "deterministicDigest": "def576fbb8476a9a9c1ff6a7d96e6426ea40ff299a310fd2f08785201f38c535",
+    "percentileQualification": "Nearest rank; p95 and p99 equal max with only3 or5 samples; no production tail guarantee"
+  },
+  {
+    "dataset": "import-50000",
+    "samples": 5,
+    "csvBytes": 2177802,
+    "p50Ms": 142.485,
+    "p95Ms": 170.488,
+    "maxMs": 170.488,
+    "childElapsedMs": 1441,
+    "cpuPerSampleMs": [
+      343.08,
+      272.38,
+      265.4,
+      270.6,
+      256.13
+    ],
+    "childMaxRssMiB": 285.41,
+    "watcherMaxRssMiB": 285.41,
+    "integrity": {
+      "rows": 50000,
+      "series": 25,
+      "valueChecksum": 1250025000,
+      "allIdsPreserved": true
+    },
+    "diagnosticBudgetPassed": true,
+    "resourceGuardPassed": true,
+    "p99Ms": 170.488,
+    "deterministicDigest": "e9a0fc6d72443ce58a5640ebc84569b0e90e5dd0adfe904ace2f0fe405e35600",
+    "percentileQualification": "Nearest rank; p95 and p99 equal max with only3 or5 samples; no production tail guarantee"
+  },
+  {
+    "dataset": "sources-200-12",
+    "samples": 3,
+    "csvBytes": 0,
+    "p50Ms": 44.793,
+    "p95Ms": 60.309,
+    "maxMs": 60.309,
+    "childElapsedMs": 495,
+    "cpuPerSampleMs": [
+      109.66,
+      73.22,
+      72.29
+    ],
+    "childMaxRssMiB": 206.7,
+    "watcherMaxRssMiB": 178.44,
+    "integrity": {
+      "files": 200,
+      "rows": 2400,
+      "eligibleKpiRecords": 2400,
+      "eligibleFiles": 200,
+      "findings": 24
+    },
+    "diagnosticBudgetPassed": true,
+    "resourceGuardPassed": true,
+    "p99Ms": 60.309,
+    "deterministicDigest": "dc5c37cc06a71d533eb636c0e6fa9343d185cb4c76a771a0d1d33452bed38b42",
+    "percentileQualification": "Nearest rank; p95 and p99 equal max with only3 or5 samples; no production tail guarantee"
+  },
+  {
+    "dataset": "sources-2000-24",
+    "samples": 3,
+    "csvBytes": 0,
+    "p50Ms": 960.382,
+    "p95Ms": 1028.947,
+    "maxMs": 1028.947,
+    "childElapsedMs": 3393,
+    "cpuPerSampleMs": [
+      1286.17,
+      1191.61,
+      1159.95
+    ],
+    "childMaxRssMiB": 333.09,
+    "watcherMaxRssMiB": 332.91,
+    "integrity": {
+      "files": 2000,
+      "rows": 48000,
+      "eligibleKpiRecords": 48000,
+      "eligibleFiles": 2000,
+      "findings": 24
+    },
+    "diagnosticBudgetPassed": true,
+    "resourceGuardPassed": true,
+    "p99Ms": 1028.947,
+    "deterministicDigest": "20d48482afd68c21aebf25239a75d232dc879135000989ad8473986e9cdcc472",
+    "percentileQualification": "Nearest rank; p95 and p99 equal max with only3 or5 samples; no production tail guarantee"
+  }
+]

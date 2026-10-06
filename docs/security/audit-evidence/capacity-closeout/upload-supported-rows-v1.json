@@ -1,0 +1,239 @@
+{
+  "kind": "isolated_upload_boundary_verification",
+  "executionId": "b68365ad-d259-4387-b04a-41b6e8267d22",
+  "runId": "99799ab6-c939-4b3e-aacc-2a30ffaeb14f",
+  "sourceCommit": "0a15ddcd3b564086280fec21b79b6976b3a3cc44",
+  "buildId": "ReUcdHr1ALEejCvoUeFTc",
+  "uploadProfile": "supported_rows_v1",
+  "schemaFingerprint": "70296597bd7052059ad724071493758968ec4f032b5607753cbf65e6c96af0eb",
+  "nextConfigOverride": {
+    "skipMiddlewareUrlNormalize": true,
+    "originalConfigSha256": "ab9707ea1b885652c1281f96d314492fa1fc81321c5257f539901dfea8b1a663",
+    "originalLoaderSha256": "b570ac53c237e06a066c86781a8666026aa088bc82a27d8ac60f5be480e405fe"
+  },
+  "osExternalNetworkDenied": "EPERM",
+  "results": [
+    {
+      "label": "supported-http-1000-medium",
+      "transport": "captured_authenticated_server_action",
+      "expectedRows": 1000,
+      "bytes": 419430,
+      "status": 303,
+      "ackMs": 947.6848329999999,
+      "preparationAccepted": true,
+      "workloadMutationAckThresholdMs": 2000,
+      "individuallyWithinAckThreshold": true,
+      "persisted": {
+        "fileId": "c91dce9c-5845-450b-a3af-ffdd7c8eb46e",
+        "fileSizeBytes": 419430,
+        "originalSha256": "4c51fd2a249d168067e811b47cce630be3a67f1c9be1ab93d7a2b1f2347eb8ae",
+        "storedSha256": "4c51fd2a249d168067e811b47cce630be3a67f1c9be1ab93d7a2b1f2347eb8ae",
+        "originalRetained": true,
+        "ownerDownloadVerified": true,
+        "importStatus": "extracted",
+        "processingStatus": "ready",
+        "processingError": null,
+        "stagedRows": 1000,
+        "importRecords": 1,
+        "kpiWrites": 0,
+        "metricWrites": 0,
+        "duplicateOrLostStagedRows": 0
+      },
+      "resourceSnapshots": {
+        "before": {
+          "observedAt": "2026-10-05T19:48:50.534Z",
+          "source": "darwin_libproc_same_uid",
+          "uid": 501,
+          "missingRoots": 0,
+          "processes": [
+            {
+              "pid": 76514,
+              "ppid": 76510,
+              "rootIndex": 0,
+              "rssBytes": 33144832,
+              "userCpuNanoseconds": 3742616625,
+              "systemCpuNanoseconds": 809752041,
+              "startSeconds": 1791229314,
+              "startMicroseconds": 17799,
+              "startTimestamp": "2026-10-05T19:41:54.017Z",
+              "startedAtUnixMs": 1791229314017.799
+            }
+          ]
+        },
+        "after": {
+          "observedAt": "2026-10-05T19:48:51.486Z",
+          "source": "darwin_libproc_same_uid",
+          "uid": 501,
+          "missingRoots": 0,
+          "processes": [
+            {
+              "pid": 76514,
+              "ppid": 76510,
+              "rootIndex": 0,
+              "rssBytes": 175833088,
+              "userCpuNanoseconds": 3983992708,
+              "systemCpuNanoseconds": 877051833,
+              "startSeconds": 1791229314,
+              "startMicroseconds": 17799,
+              "startTimestamp": "2026-10-05T19:41:54.017Z",
+              "startedAtUnixMs": 1791229314017.799
+            }
+          ]
+        }
+      }
+    },
+    {
+      "label": "supported-http-1000-large",
+      "transport": "captured_authenticated_server_action",
+      "expectedRows": 1000,
+      "bytes": 2202009,
+      "status": 303,
+      "ackMs": 1005.9960829999998,
+      "preparationAccepted": true,
+      "workloadMutationAckThresholdMs": 2000,
+      "individuallyWithinAckThreshold": true,
+      "persisted": {
+        "fileId": "56779e69-0fcd-4cae-a96e-7097a3fab19a",
+        "fileSizeBytes": 2202009,
+        "originalSha256": "f60fa6cfe6aa8b284e9e7eb3db97d6c6e28589849d37dfaa4ce493413ba2e4e8",
+        "storedSha256": "f60fa6cfe6aa8b284e9e7eb3db97d6c6e28589849d37dfaa4ce493413ba2e4e8",
+        "originalRetained": true,
+        "ownerDownloadVerified": true,
+        "importStatus": "extracted",
+        "processingStatus": "ready",
+        "processingError": null,
+        "stagedRows": 1000,
+        "importRecords": 1,
+        "kpiWrites": 0,
+        "metricWrites": 0,
+        "duplicateOrLostStagedRows": 0
+      },
+      "resourceSnapshots": {
+        "before": {
+          "observedAt": "2026-10-05T19:48:51.540Z",
+          "source": "darwin_libproc_same_uid",
+          "uid": 501,
+          "missingRoots": 0,
+          "processes": [
+            {
+              "pid": 76514,
+              "ppid": 76510,
+              "rootIndex": 0,
+              "rssBytes": 175734784,
+              "userCpuNanoseconds": 3983992708,
+              "systemCpuNanoseconds": 877051833,
+              "startSeconds": 1791229314,
+              "startMicroseconds": 17799,
+              "startTimestamp": "2026-10-05T19:41:54.017Z",
+              "startedAtUnixMs": 1791229314017.799
+            }
+          ]
+        },
+        "after": {
+          "observedAt": "2026-10-05T19:48:52.552Z",
+          "source": "darwin_libproc_same_uid",
+          "uid": 501,
+          "missingRoots": 0,
+          "processes": [
+            {
+              "pid": 76514,
+              "ppid": 76510,
+              "rootIndex": 0,
+              "rssBytes": 221036544,
+              "userCpuNanoseconds": 4345533458,
+              "systemCpuNanoseconds": 991356000,
+              "startSeconds": 1791229314,
+              "startMicroseconds": 17799,
+              "startTimestamp": "2026-10-05T19:41:54.017Z",
+              "startedAtUnixMs": 1791229314017.799
+            }
+          ]
+        }
+      }
+    },
+    {
+      "label": "supported-browser-mobile-1000-large",
+      "transport": "authenticated_browser",
+      "width": 390,
+      "expectedRows": 1000,
+      "bytes": 2202009,
+      "status": 303,
+      "ackMs": 884.7317499999999,
+      "preparationAccepted": true,
+      "workloadMutationAckThresholdMs": 2000,
+      "individuallyWithinAckThreshold": true,
+      "browser": {
+        "automatic": true,
+        "feedbackVisible": true,
+        "pendingCleared": true,
+        "destinationRendered": true,
+        "manualRecoveryNavigation": false,
+        "transitionMs": 1845.3817500000005
+      },
+      "persisted": {
+        "fileId": "9e82658e-17bf-47f1-93a8-ac88e6cc92db",
+        "fileSizeBytes": 2202009,
+        "originalSha256": "f60fa6cfe6aa8b284e9e7eb3db97d6c6e28589849d37dfaa4ce493413ba2e4e8",
+        "storedSha256": "f60fa6cfe6aa8b284e9e7eb3db97d6c6e28589849d37dfaa4ce493413ba2e4e8",
+        "originalRetained": true,
+        "ownerDownloadVerified": true,
+        "importStatus": "extracted",
+        "processingStatus": "ready",
+        "processingError": null,
+        "stagedRows": 1000,
+        "importRecords": 1,
+        "kpiWrites": 0,
+        "metricWrites": 0,
+        "duplicateOrLostStagedRows": 0
+      },
+      "resourceSnapshots": {
+        "before": {
+          "observedAt": "2026-10-05T19:48:54.929Z",
+          "source": "darwin_libproc_same_uid",
+          "uid": 501,
+          "missingRoots": 0,
+          "processes": [
+            {
+              "pid": 76514,
+              "ppid": 76510,
+              "rootIndex": 0,
+              "rssBytes": 131153920,
+              "userCpuNanoseconds": 4550811375,
+              "systemCpuNanoseconds": 1062207041,
+              "startSeconds": 1791229314,
+              "startMicroseconds": 17799,
+              "startTimestamp": "2026-10-05T19:41:54.017Z",
+              "startedAtUnixMs": 1791229314017.799
+            }
+          ]
+        },
+        "after": {
+          "observedAt": "2026-10-05T19:48:56.841Z",
+          "source": "darwin_libproc_same_uid",
+          "uid": 501,
+          "missingRoots": 0,
+          "processes": [
+            {
+              "pid": 76514,
+              "ppid": 76510,
+              "rootIndex": 0,
+              "rssBytes": 217972736,
+              "userCpuNanoseconds": 5167352958,
+              "systemCpuNanoseconds": 1266132791,
+              "startSeconds": 1791229314,
+              "startMicroseconds": 17799,
+              "startTimestamp": "2026-10-05T19:41:54.017Z",
+              "startedAtUnixMs": 1791229314017.799
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "browserErrors": [],
+  "foreignRequests": [],
+  "allOriginalsAndRowsRetained": true,
+  "activeUserCapacityClaim": false,
+  "limits": "Sequential component checks with local Supabase; 30-second diagnostic bound is not a relaxed workload threshold. Over-limit uploads are preparation failures, never successful import workload samples.",
+  "passed": true
+}

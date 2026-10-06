@@ -1,0 +1,18 @@
+{
+  "checkedAt": "2026-10-05T04:30:39.433159+00:00",
+  "originalCommit": "90982062976ca905095ba68c193c52eddf795f1b",
+  "originalBranch": "codex/external-integrations-phase-8b-qbo-sandbox",
+  "sourceFilesChecked": 1044,
+  "changed": [],
+  "missing": [],
+  "trackedDirtyPaths": [
+    ".env.example",
+    "README.md",
+    "app/app/settings/page.tsx",
+    "lib/supabase/types.ts",
+    "scripts/external-integrations-qbo-production-regression-tests.js",
+    "services/external-integrations-qbo/infra/README.md",
+    "services/external-integrations-qbo/infra/main.tf",
+    "services/external-integrations-qbo/infra/outputs.tf"
+  ]
+}

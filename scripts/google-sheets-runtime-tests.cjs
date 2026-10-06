@@ -206,20 +206,20 @@ async function main() {
   assert.equal(validSheetsSchedulerSecret('Bearer wrong', schedulerSecret), false);
   assert.equal(validSheetsSchedulerSecret(null, schedulerSecret), false);
   assert.equal(validSheetsSchedulerSecret('Bearer short', 'short'), false); checks+=4;
-  // One tick drains fresh pages, never exceeds 50 attempts, and stops at its deadline.
+  // One tick drains fresh pages, never exceeds 100 attempts, and stops at its deadline.
   let clock = Date.parse('2026-10-02T12:00:00.000Z'), dueCalls = 0;
-  const remaining = Array.from({ length: 61 }, () => ({ id: randomUUID(), workspace_id: ws }));
+  const remaining = Array.from({ length: 111 }, () => ({ id: randomUUID(), workspace_id: ws }));
   const original = [...remaining], attempted = [];
   const batchResult = await runDueSheetsRefreshes({ now: () => clock,
-    due: async (tickAt, limit) => { dueCalls++; assert.equal(limit, 10); assert.equal(tickAt, '2026-10-02T12:00:00.000Z'); return remaining.slice(0, limit); },
+    due: async (tickAt, limit, _deadline, excluded) => { dueCalls++; assert.equal(limit, 10); assert.equal(tickAt, '2026-10-02T12:00:00.000Z'); return remaining.filter(c => !excluded.includes(c.id)).slice(0, limit); },
     sync: async (connection, execution) => {
       assert.equal(execution.deadlineAt, Date.parse('2026-10-02T12:04:00.000Z'));
       assert.equal(execution.cleanupDeadlineAt, Date.parse('2026-10-02T12:04:45.000Z'));
       attempted.push(connection.id); remaining.splice(remaining.findIndex(item => item.id === connection.id), 1); clock += 1000; },
     backoff: async () => { throw Error('Unexpected backoff'); }
   });
-  assert.deepEqual(batchResult, { attempted: 50, succeeded: 50, failed: 0 });
-  assert.equal(dueCalls, 5); assert.equal(new Set(attempted).size, 50); assert.equal(remaining.length, 11); checks+=4;
+  assert.deepEqual(batchResult, { attempted: 100, succeeded: 100, failed: 0, deferred: 0, backoffFailed: 0, peakActive: 1, admissionRpcAttempts: 0, admissionRetries: 0, admissionWaitMs: 0 });
+  assert.equal(dueCalls, 10); assert.equal(new Set(attempted).size, 100); assert.equal(remaining.length, 11); checks+=4;
   // A persistence outage can leave the same rows due; do not loop on them.
   let retries = 0, backoffs = 0, repeatedQueries = 0;
   const repeated = original.slice(0, 10);
@@ -228,12 +228,12 @@ async function main() {
     sync: async () => { retries++; throw Error('Synthetic claim failure'); },
     backoff: async () => { backoffs++; throw Error('Synthetic lost acknowledgement'); }
   });
-  assert.deepEqual(failedBatch, { attempted: 10, succeeded: 0, failed: 10 });
+  assert.deepEqual(failedBatch, { attempted: 10, succeeded: 0, failed: 10, deferred: 0, backoffFailed: 10, peakActive: 1, admissionRpcAttempts: 0, admissionRetries: 0, admissionWaitMs: 0 });
   assert.equal(retries, 10); assert.equal(backoffs, 10); assert.equal(repeatedQueries, 2); checks+=4;
   clock = 0; let timedAttempts = 0;
   const timed = await runDueSheetsRefreshes({ now: () => clock, due: async () => original.slice(0, 10),
     sync: async () => { timedAttempts++; clock += 60_000; }, backoff: async () => {} });
-  assert.deepEqual(timed, { attempted: 4, succeeded: 4, failed: 0 }); assert.equal(timedAttempts, 4); checks+=2;
+  assert.deepEqual(timed, { attempted: 4, succeeded: 4, failed: 0, deferred: 0, backoffFailed: 0, peakActive: 1, admissionRpcAttempts: 0, admissionRetries: 0, admissionWaitMs: 0 }); assert.equal(timedAttempts, 4); checks+=2;
   // A slow due lookup exhausting the budget must not start any provider work.
   clock = 0;
   const slowLookup = await runDueSheetsRefreshes({ now: () => clock,
@@ -246,9 +246,68 @@ async function main() {
     sync: async (_connection, execution) => { receivedBudget = execution; clock = 240_000; throw Error('google_sheets_deadline_exceeded'); },
     backoff: async (_connection, _tickAt, deadlineAt) => { cleanupAt = deadlineAt; }
   });
-  assert.deepEqual(nearlyExpired, { attempted: 1, succeeded: 0, failed: 1 });
+  assert.deepEqual(nearlyExpired, { attempted: 1, succeeded: 0, failed: 1, deferred: 0, backoffFailed: 0, peakActive: 1, admissionRpcAttempts: 0, admissionRetries: 0, admissionWaitMs: 0 });
   assert.deepEqual(receivedBudget, { deadlineAt: 240_000, cleanupDeadlineAt: 285_000 });
   assert.equal(cleanupAt, 285_000); checks+=3;
+  // A held workspace cannot prevent healthy tenants from using the other
+  // slots. This uses real overlapping promises, not a serial virtual clock.
+  const fairQueue = Array.from({ length: 20 }, (_, i) => ({ id: `fair-${i}`, workspace_id: `tenant-${i < 5 ? 0 : i}` }));
+  let releaseSlow; const slow = new Promise(resolve => { releaseSlow = resolve; });
+  let healthyFinished = 0, live = 0, maximumLive = 0; const liveTenants = new Set();
+  const fair = await runDueSheetsRefreshes({
+    due: async (_tick, limit, _deadline, excluded) => fairQueue.filter(c => !excluded.includes(c.id)).slice(0, limit),
+    sync: async c => {
+      assert(!liveTenants.has(c.workspace_id)); liveTenants.add(c.workspace_id);
+      maximumLive = Math.max(maximumLive, ++live);
+      if (c.id === 'fair-0') await slow;
+      else { await new Promise(resolve => setTimeout(resolve, 2)); if (c.workspace_id !== 'tenant-0' && ++healthyFinished === 15) releaseSlow(); }
+      live--; liveTenants.delete(c.workspace_id);
+    }, backoff: async () => { throw Error('Unexpected backoff'); }
+  });
+  assert.equal(healthyFinished,15);assert.equal(fair.succeeded,20);assert.equal(maximumLive,4);assert.equal(fair.peakActive,4);checks+=4;
+  let admissionBackoffs=0;
+  const deferred = await runDueSheetsRefreshes({ due: async (_tick,limit,_deadline,excluded) => fairQueue.filter(c=>!excluded.includes(c.id)).slice(0,limit),
+    sync: async () => { throw Error('google_sheets_capacity_busy'); }, backoff: async () => { admissionBackoffs++; } });
+  assert.equal(deferred.deferred,20);assert.equal(deferred.failed,0);assert.equal(admissionBackoffs,0);checks+=3;
+  // If a later due query fails, return only after already-started work settles.
+  let queries=0,finished=false,releaseOutstanding;
+  const outstanding=new Promise(resolve=>{releaseOutstanding=resolve;});
+  const queryFailure=runDueSheetsRefreshes({ due: async () => { if (++queries===1) return [fairQueue[0]]; setTimeout(releaseOutstanding,5); throw Error('due_unavailable'); },
+    sync: async () => { await outstanding;finished=true; },backoff:async()=>{} });
+  await assert.rejects(queryFailure,/due_unavailable/);assert.equal(finished,true);checks+=2;
+  // Four external/manual leases occupy every slot for five seconds. Queued
+  // scheduled work must wait inside this tick rather than next quarter-hour.
+  clock=0;const admissionAttempts=[],admitted=[];
+  const overlap=await runDueSheetsRefreshes({now:()=>clock,wait:async milliseconds=>{clock+=milliseconds;},
+    due:async(_tick,limit,_deadline,excluded)=>fairQueue.filter(c=>!excluded.includes(c.id)).slice(0,limit),
+    sync:async(c,_execution,admission)=>{await admission.run(async()=>{admissionAttempts.push(clock);if(clock<5000)throw Error('google_sheets_capacity_busy');});admitted.push(clock);},
+    backoff:async()=>{throw Error('Busy admission is not an accepted failure');}});
+  assert.equal(overlap.succeeded,20);assert.equal(overlap.deferred,0);assert.equal(overlap.admissionRpcAttempts,25);
+  assert.equal(overlap.admissionRetries,5);assert.deepEqual(admissionAttempts.slice(0,6),[0,1000,2000,3000,4000,5000]);
+  assert(admitted.every(at=>at>=5000&&at<=30000));checks+=6;
+  clock=0;const workspaceAdmission=[];
+  const {createSheetsScheduledAdmission}=require('../lib/integrations/google-sheets/scheduler.ts');
+  const shared=createSheetsScheduledAdmission(10000,()=>clock,async ms=>{clock+=ms;});
+  await Promise.all([shared.run(async()=>{if(clock<5000)throw Error('google_sheets_workspace_busy');workspaceAdmission.push(['busy',clock]);}),
+    shared.run(async()=>{workspaceAdmission.push(['healthy',clock]);})]);
+  assert.equal(workspaceAdmission[0][0],'healthy');assert(workspaceAdmission[0][1]<5000);checks+=2;
+  clock=0;const bounded=createSheetsScheduledAdmission(2500,()=>clock,async ms=>{clock+=ms;});
+  await assert.rejects(bounded.run(async()=>{throw Error('google_sheets_capacity_busy');}),/capacity_busy/);
+  assert.equal(clock,2500);assert.equal(bounded.metrics().admissionRpcAttempts,3);checks+=3;
+  const recoveryRoute = require('../app/api/integrations/google-sheets/recover-syncs/route.ts');
+  let recoveryCalls=0;
+  rpcHandler=async(name,args)=>{recoveryCalls++;assert.equal(name,'recover_google_sheets_syncs_v1');assert.equal(args.p_limit,100);
+    return {data:{recovered:1,skipped:0,remainingExpired:0,oldestExpiredSeconds:0},error:null};};
+  assert.equal((await recoveryRoute.GET(new Request('http://localhost/api/integrations/google-sheets/recover-syncs'))).status,401);
+  assert.equal(recoveryCalls,0);checks+=2;
+  const recoveryRequest=()=>new Request('http://localhost/api/integrations/google-sheets/recover-syncs',{headers:{authorization:`Bearer ${process.env.CRON_SECRET}`}});
+  process.env.GOOGLE_SHEETS_ENABLED='false';
+  assert.equal((await recoveryRoute.GET(recoveryRequest())).status,200);assert.equal(recoveryCalls,1);checks+=2;
+  rpcHandler=async()=>({data:{recovered:0,skipped:1,remainingExpired:1,oldestExpiredSeconds:5},error:null});
+  assert.equal((await recoveryRoute.GET(recoveryRequest())).status,503);checks++;
+  rpcHandler=async()=>({data:null,error:{message:'synthetic private database detail'}});
+  const unavailable=await recoveryRoute.GET(recoveryRequest());assert.equal(unavailable.status,503);
+  assert.equal((await unavailable.text()).includes('private'),false);checks+=2;
   console.log(`Google Sheets runtime: ${checks} focused checks passed.`);
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

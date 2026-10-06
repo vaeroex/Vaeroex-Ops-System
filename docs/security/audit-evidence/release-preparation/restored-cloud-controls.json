@@ -1,0 +1,84 @@
+{
+  "checkedAt": "2026-10-05T23:39:11.659935+00:00",
+  "readOnly": true,
+  "iam": {
+    "qbo-production-credential-broker": {
+      "invokerCount": 3,
+      "publicInvokers": false,
+      "expectedPrincipals": {
+        "qbo-oauth-ingress": true,
+        "qbo-provider-runtime": true,
+        "qbo-task-scheduler": true
+      }
+    },
+    "qbo-production-oauth-ingress": {
+      "policyFieldsAbsent": true
+    },
+    "qbo-production-provider-runtime": {
+      "invokerCount": 2,
+      "publicInvokers": false,
+      "expectedPrincipals": {
+        "qbo-task-invoker": true,
+        "qbo-task-scheduler": true
+      },
+      "matchesCheckedInBindingCount": true
+    },
+    "qbo-production-task-dispatcher": {
+      "invokerCount": 1,
+      "publicInvokers": false,
+      "expectedPrincipals": {
+        "qbo-dispatch-scheduler": true
+      }
+    },
+    "qbo-production-task-scheduler": {
+      "invokerCount": 1,
+      "publicInvokers": false,
+      "expectedPrincipals": {
+        "qbo-initialization-scheduler": true
+      }
+    }
+  },
+  "taskInventory": {
+    "count": 0,
+    "completeUnderBound": true,
+    "dispatches": 0,
+    "responses": 0
+  },
+  "extractionWorkerPools": [
+    {
+      "metadata": {
+        "name": "vaeroex-document-extraction-preview"
+      },
+      "status": {
+        "latestReadyRevisionName": "vaeroex-document-extraction-preview-00091-sdt"
+      }
+    },
+    {
+      "metadata": {
+        "name": "vaeroex-document-extraction-production"
+      },
+      "status": {
+        "latestReadyRevisionName": "vaeroex-document-extraction-production-00009-x9d"
+      }
+    }
+  ],
+  "deployedImage": {
+    "image_summary": {
+      "digest": "sha256:4c4bfbcf29cc6587a4ab8f84170a94b1d6b8cb688fe46c1fa8a4b665014bfb07",
+      "fully_qualified_digest": "us-central1-docker.pkg.dev/vaeroex-qbo-prod-20260827/qbo-production/runtime@sha256:4c4bfbcf29cc6587a4ab8f84170a94b1d6b8cb688fe46c1fa8a4b665014bfb07"
+    }
+  },
+  "ingress": {
+    "observedAt": "2026-10-05",
+    "defaultUrlDisabled": true,
+    "invokerIamDisabled": true,
+    "ingress": "internal-and-cloud-load-balancing",
+    "trafficLatestRevisionPercent": 100,
+    "note": "Existing callback edge architecture; not a new public-access grant."
+  },
+  "extractionProductionWorker": {
+    "revision": "vaeroex-document-extraction-production-00009-x9d",
+    "image": "us-west1-docker.pkg.dev/vaeroex-document-worker/vaeroex-document-workers-preview/document-extraction-worker@sha256:398333567e99c3dce83486fdea4d5f8ceca1c94d8bfe639b1768966312c32d58",
+    "trafficLatestRevisionPercent": 100
+  }
+}

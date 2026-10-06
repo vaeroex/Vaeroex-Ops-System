@@ -1,0 +1,686 @@
+{
+  "recordedAt": "2026-10-05T04:30:11.770Z",
+  "sourceCommit": "43217051098b489c3a1a7083c8d44b060b279a47",
+  "run": 37262436522,
+  "url": "https://github.com/vaeroex/Vaeroex-Ops-System/actions/runs/37262436522",
+  "jobs": [
+    {
+      "id": 111612291219,
+      "name": "verify",
+      "status": "completed",
+      "conclusion": "failure",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Check out repository",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Set up pnpm",
+          "conclusion": "success"
+        },
+        {
+          "number": 4,
+          "name": "Set up Node.js",
+          "conclusion": "success"
+        },
+        {
+          "number": 5,
+          "name": "Set up Go",
+          "conclusion": "success"
+        },
+        {
+          "number": 6,
+          "name": "Set up Terraform",
+          "conclusion": "success"
+        },
+        {
+          "number": 7,
+          "name": "Install dependencies",
+          "conclusion": "success"
+        },
+        {
+          "number": 8,
+          "name": "Workspace audit security, evidence and workflow regressions",
+          "conclusion": "success"
+        },
+        {
+          "number": 9,
+          "name": "Isolated workspace authorization and concurrent slot regressions",
+          "conclusion": "success"
+        },
+        {
+          "number": 10,
+          "name": "Workspace navigation and bounded-list regressions",
+          "conclusion": "success"
+        },
+        {
+          "number": 11,
+          "name": "Restricted Square workspace host Linux qualification",
+          "conclusion": "success"
+        },
+        {
+          "number": 12,
+          "name": "Google Sheets runtime and database admission regressions",
+          "conclusion": "success"
+        },
+        {
+          "number": 13,
+          "name": "External integrations contract regressions",
+          "conclusion": "success"
+        },
+        {
+          "number": 14,
+          "name": "External integrations Phase 1A operation-policy regressions",
+          "conclusion": "success"
+        },
+        {
+          "number": 15,
+          "name": "External integrations Phase 1B OAuth authority regressions",
+          "conclusion": "success"
+        },
+        {
+          "number": 16,
+          "name": "External integrations Square Phase 2A dormant contract regressions",
+          "conclusion": "success"
+        },
+        {
+          "number": 17,
+          "name": "External integrations Square Phase 2B.1A response validation regressions",
+          "conclusion": "success"
+        },
+        {
+          "number": 18,
+          "name": "External integrations Square Phase 2B.1B-1 Catalog response validation regressions",
+          "conclusion": "success"
+        },
+        {
+          "number": 19,
+          "name": "External integrations Square Phase 2B.1B-2 Catalog response validation regressions",
+          "conclusion": "success"
+        },
+        {
+          "number": 20,
+          "name": "External integrations Square Phase 2B.2A Order-core response validation regressions",
+          "conclusion": "success"
+        },
+        {
+          "number": 21,
+          "name": "External integrations Square Phase 2B.2B-1 Order line-item response validation regressions",
+          "conclusion": "success"
+        },
+        {
+          "number": 22,
+          "name": "External integrations Square Phase 2B.2B-2 Order adjustment response validation regressions",
+          "conclusion": "success"
+        },
+        {
+          "number": 23,
+          "name": "External integrations Square Phase 2B.2B-3 Order Tender response validation regressions",
+          "conclusion": "success"
+        },
+        {
+          "number": 24,
+          "name": "External integrations Square Payment response validation regressions",
+          "conclusion": "success"
+        },
+        {
+          "number": 25,
+          "name": "External integrations Square Refund response validation regressions",
+          "conclusion": "success"
+        },
+        {
+          "number": 26,
+          "name": "External integrations Square Catalog request-bound response validation regressions",
+          "conclusion": "success"
+        },
+        {
+          "number": 27,
+          "name": "External integrations Square Inventory response validation regressions",
+          "conclusion": "success"
+        },
+        {
+          "number": 28,
+          "name": "External integrations Square dormant ingestion regressions",
+          "conclusion": "success"
+        },
+        {
+          "number": 29,
+          "name": "External integrations Square dormant durable boundary regressions",
+          "conclusion": "success"
+        },
+        {
+          "number": 30,
+          "name": "Verify dormant Square account connection contracts and closed routes",
+          "conclusion": "success"
+        },
+        {
+          "number": 31,
+          "name": "External integrations architecture regressions",
+          "conclusion": "success"
+        },
+        {
+          "number": 32,
+          "name": "Native broker provisioning lifecycle and closed release boundary",
+          "conclusion": "success"
+        },
+        {
+          "number": 33,
+          "name": "Verify isolated Square remote Sandbox binding and closed Production gates",
+          "conclusion": "success"
+        },
+        {
+          "number": 34,
+          "name": "Google Sheets desktop and mobile customer flow",
+          "conclusion": "success"
+        },
+        {
+          "number": 35,
+          "name": "Verify optimized Square handoff headers and isolated synthetic browser navigation",
+          "conclusion": "success"
+        },
+        {
+          "number": 36,
+          "name": "Verify isolated native Square callback credentials, portal and guest controls",
+          "conclusion": "success"
+        },
+        {
+          "number": 37,
+          "name": "External integrations Phase 1 regressions",
+          "conclusion": "success"
+        },
+        {
+          "number": 38,
+          "name": "External integrations Phase 2 reconciliation regressions",
+          "conclusion": "success"
+        },
+        {
+          "number": 39,
+          "name": "External integrations Phase 3 deterministic dependency regressions",
+          "conclusion": "success"
+        },
+        {
+          "number": 40,
+          "name": "External integrations Phase 4 control-plane regressions",
+          "conclusion": "success"
+        },
+        {
+          "number": 41,
+          "name": "External integrations Phase 5 credential-security regressions",
+          "conclusion": "success"
+        },
+        {
+          "number": 42,
+          "name": "External integrations Phase 6 durable-runtime regressions",
+          "conclusion": "success"
+        },
+        {
+          "number": 43,
+          "name": "External integrations Phase 7 QBO provider regressions",
+          "conclusion": "success"
+        },
+        {
+          "number": 44,
+          "name": "External integrations Phase 8A.0 contract-convergence regressions",
+          "conclusion": "success"
+        },
+        {
+          "number": 45,
+          "name": "External integrations Phase 8A live-GCP readiness regressions",
+          "conclusion": "success"
+        },
+        {
+          "number": 46,
+          "name": "External integrations Phase 8B QBO sandbox regressions",
+          "conclusion": "success"
+        },
+        {
+          "number": 47,
+          "name": "External integrations QBO Production multi-tenant regressions",
+          "conclusion": "success"
+        },
+        {
+          "number": 48,
+          "name": "Current integrations dashboard, preferences and browser regressions",
+          "conclusion": "failure"
+        },
+        {
+          "number": 49,
+          "name": "External integrations Phase 8B OAuth callback edge tests",
+          "conclusion": "skipped"
+        },
+        {
+          "number": 50,
+          "name": "External integrations QBO Production callback edge tests",
+          "conclusion": "skipped"
+        },
+        {
+          "number": 51,
+          "name": "External integrations Square Production callback edge tests",
+          "conclusion": "skipped"
+        },
+        {
+          "number": 52,
+          "name": "Validate external integrations QBO Production infrastructure",
+          "conclusion": "skipped"
+        },
+        {
+          "number": 53,
+          "name": "Validate dormant provider-neutral Production integration composition",
+          "conclusion": "skipped"
+        },
+        {
+          "number": 54,
+          "name": "Test provider-neutral and Square Production contracts",
+          "conclusion": "skipped"
+        },
+        {
+          "number": 55,
+          "name": "Test closed Square Production internal-pilot runtime contract",
+          "conclusion": "skipped"
+        },
+        {
+          "number": 56,
+          "name": "Test Square internal seller consent handlers",
+          "conclusion": "skipped"
+        },
+        {
+          "number": 57,
+          "name": "Test Production Square one-customer pilot package",
+          "conclusion": "skipped"
+        },
+        {
+          "number": 58,
+          "name": "Test repository-bound Production image trigger",
+          "conclusion": "skipped"
+        },
+        {
+          "number": 59,
+          "name": "Build external integrations QBO sandbox runtime",
+          "conclusion": "skipped"
+        },
+        {
+          "number": 60,
+          "name": "Set up pinned Terraform for isolated Square template tests",
+          "conclusion": "skipped"
+        },
+        {
+          "number": 61,
+          "name": "Validate dormant Square resources with mocked provider only",
+          "conclusion": "skipped"
+        },
+        {
+          "number": 62,
+          "name": "Build external integrations QBO Production runtime",
+          "conclusion": "skipped"
+        },
+        {
+          "number": 63,
+          "name": "TypeScript check",
+          "conclusion": "skipped"
+        },
+        {
+          "number": 64,
+          "name": "ESLint",
+          "conclusion": "skipped"
+        },
+        {
+          "number": 65,
+          "name": "Public website rendering and policy regressions",
+          "conclusion": "skipped"
+        },
+        {
+          "number": 66,
+          "name": "Production build",
+          "conclusion": "skipped"
+        },
+        {
+          "number": 67,
+          "name": "Security regression check",
+          "conclusion": "skipped"
+        },
+        {
+          "number": 68,
+          "name": "Whitespace check",
+          "conclusion": "skipped"
+        },
+        {
+          "number": 133,
+          "name": "Post Set up Go",
+          "conclusion": "skipped"
+        },
+        {
+          "number": 134,
+          "name": "Post Set up Node.js",
+          "conclusion": "skipped"
+        },
+        {
+          "number": 135,
+          "name": "Post Set up pnpm",
+          "conclusion": "success"
+        },
+        {
+          "number": 136,
+          "name": "Post Check out repository",
+          "conclusion": "success"
+        },
+        {
+          "number": 137,
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 111612291329,
+      "name": "jit-canary-linux-qualification",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Check out exact canary source revision",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Install and verify exact isolated-host libpq packages",
+          "conclusion": "success"
+        },
+        {
+          "number": 4,
+          "name": "Qualify changed canary with native loopback TLS only",
+          "conclusion": "success"
+        },
+        {
+          "number": 5,
+          "name": "Qualify private entry on the exact Linux client profile",
+          "conclusion": "success"
+        },
+        {
+          "number": 6,
+          "name": "Build inert private-entry clients and record nonsecret provenance",
+          "conclusion": "success"
+        },
+        {
+          "number": 7,
+          "name": "Upload only inert private-entry binaries and provenance",
+          "conclusion": "success"
+        },
+        {
+          "number": 8,
+          "name": "Build inert public canary artifact and record provenance",
+          "conclusion": "success"
+        },
+        {
+          "number": 9,
+          "name": "Upload only public canary binary and nonsecret provenance",
+          "conclusion": "success"
+        },
+        {
+          "number": 18,
+          "name": "Post Check out exact canary source revision",
+          "conclusion": "success"
+        },
+        {
+          "number": 19,
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 111612291417,
+      "name": "native-broker-qualification",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Check out repository",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Set up pnpm",
+          "conclusion": "success"
+        },
+        {
+          "number": 4,
+          "name": "Set up Node.js",
+          "conclusion": "success"
+        },
+        {
+          "number": 5,
+          "name": "Install frozen synthetic test dependencies",
+          "conclusion": "success"
+        },
+        {
+          "number": 6,
+          "name": "Install public native build dependencies",
+          "conclusion": "success"
+        },
+        {
+          "number": 7,
+          "name": "Qualify fixed native provisioning against private local PostgreSQL",
+          "conclusion": "success"
+        },
+        {
+          "number": 8,
+          "name": "Qualify managed SCRAM profile using the same private local database build",
+          "conclusion": "success"
+        },
+        {
+          "number": 9,
+          "name": "Record public mapped-maintenance binary provenance",
+          "conclusion": "success"
+        },
+        {
+          "number": 10,
+          "name": "Preserve only public mapped-maintenance binaries for later installation",
+          "conclusion": "success"
+        },
+        {
+          "number": 11,
+          "name": "Qualify parked JIT regression tools offline only",
+          "conclusion": "success"
+        },
+        {
+          "number": 20,
+          "name": "Post Set up Node.js",
+          "conclusion": "success"
+        },
+        {
+          "number": 21,
+          "name": "Post Set up pnpm",
+          "conclusion": "success"
+        },
+        {
+          "number": 22,
+          "name": "Post Check out repository",
+          "conclusion": "success"
+        },
+        {
+          "number": 23,
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 111612291476,
+      "name": "security-database",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Check out repository",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Set up pnpm",
+          "conclusion": "success"
+        },
+        {
+          "number": 4,
+          "name": "Set up Node.js",
+          "conclusion": "success"
+        },
+        {
+          "number": 5,
+          "name": "Install database test dependencies",
+          "conclusion": "success"
+        },
+        {
+          "number": 6,
+          "name": "Set up Supabase CLI",
+          "conclusion": "success"
+        },
+        {
+          "number": 7,
+          "name": "Initialize isolated local Supabase configuration",
+          "conclusion": "success"
+        },
+        {
+          "number": 8,
+          "name": "Apply migrations to isolated local Postgres",
+          "conclusion": "success"
+        },
+        {
+          "number": 9,
+          "name": "Verify authorization and Customer",
+          "conclusion": "success"
+        },
+        {
+          "number": 10,
+          "name": "Verify Square Production runtime foundation in the isolated database",
+          "conclusion": "success"
+        },
+        {
+          "number": 11,
+          "name": "Qualify dormant Square authority and atomic pages in disposable local databases",
+          "conclusion": "success"
+        },
+        {
+          "number": 12,
+          "name": "Qualify dormant Square account lifecycle in disposable local databases",
+          "conclusion": "success"
+        },
+        {
+          "number": 13,
+          "name": "Verify fixture-rich zero-based delivery migration",
+          "conclusion": "success"
+        },
+        {
+          "number": 14,
+          "name": "Qualify remote Sandbox binding in disposable local databases only",
+          "conclusion": "success"
+        },
+        {
+          "number": 15,
+          "name": "Qualify separate Square broker and runtime authority in disposable databases only",
+          "conclusion": "success"
+        },
+        {
+          "number": 16,
+          "name": "Qualify native GCP callback first-consent authority in disposable databases only",
+          "conclusion": "success"
+        },
+        {
+          "number": 17,
+          "name": "Qualify mapped Square native role and recovery boundaries in disposable databases only",
+          "conclusion": "success"
+        },
+        {
+          "number": 18,
+          "name": "Qualify non-economic Square observation admission in disposable databases only",
+          "conclusion": "success"
+        },
+        {
+          "number": 19,
+          "name": "Qualify the exact Production baseline and dormant Square runtime overlay",
+          "conclusion": "success"
+        },
+        {
+          "number": 20,
+          "name": "Qualify the closed Square Production internal-pilot runtime",
+          "conclusion": "success"
+        },
+        {
+          "number": 21,
+          "name": "Qualify closed Square Production customer authority in disposable PostgreSQL",
+          "conclusion": "success"
+        },
+        {
+          "number": 22,
+          "name": "Qualify dormant customer Square backend on the exact 105-migration baseline",
+          "conclusion": "success"
+        },
+        {
+          "number": 23,
+          "name": "Verify manual pilot activation in the isolated database",
+          "conclusion": "success"
+        },
+        {
+          "number": 24,
+          "name": "Qualify QBO completion on canonical and exact Production migration shapes",
+          "conclusion": "success"
+        },
+        {
+          "number": 25,
+          "name": "Remove isolated database state",
+          "conclusion": "success"
+        },
+        {
+          "number": 47,
+          "name": "Post Set up Supabase CLI",
+          "conclusion": "success"
+        },
+        {
+          "number": 48,
+          "name": "Post Set up Node.js",
+          "conclusion": "success"
+        },
+        {
+          "number": 49,
+          "name": "Post Set up pnpm",
+          "conclusion": "success"
+        },
+        {
+          "number": 50,
+          "name": "Post Check out repository",
+          "conclusion": "success"
+        },
+        {
+          "number": 51,
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    }
+  ],
+  "interpretation": "Full security-database job passed. Application verify failed at the reduced dashboard fixture missing subscription_status; corrected separately in be65d144. No deployed Auth/API/Storage or full-user capacity claim."
+}

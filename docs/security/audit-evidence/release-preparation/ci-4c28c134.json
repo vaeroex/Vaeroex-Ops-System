@@ -1,0 +1,35 @@
+{
+  "head": "4c28c134fe6751347ca98e86241bcce104836467",
+  "runId": 37377345465,
+  "url": "https://github.com/vaeroex/Vaeroex-Ops-System/actions/runs/37377345465",
+  "conclusion": "success",
+  "jobs": [
+    {
+      "id": 111989839072,
+      "name": "jit-canary-linux-qualification",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 111989839284,
+      "name": "security-database",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 111989839357,
+      "name": "native-broker-qualification",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 111989839605,
+      "name": "verify",
+      "status": "completed",
+      "conclusion": "success"
+    }
+  ],
+  "applicationMeasuredCommit": "396ec2f7752eb30fea99f30a73068d53ff29cc0a",
+  "hold": "CL-02 operator inputs, destination preflight and explicit release authorization",
+  "productionChanged": false
+}

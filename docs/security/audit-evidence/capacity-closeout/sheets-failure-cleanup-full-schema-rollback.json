@@ -1,0 +1,99 @@
+{
+  "at": "2026-10-05T19:50:22.099Z",
+  "kind": "full_schema_rollback_only_failure_cleanup_positive",
+  "passed": true,
+  "ownedDatabaseVerified": true,
+  "before": {
+    "run": [
+      {
+        "id": "78fb5fd2-ab84-44fc-800f-dde70632715c",
+        "status": "running",
+        "error_code": null,
+        "completed_at": null,
+        "hash": "75eb3be238b3fa1b4212531c4550493b"
+      }
+    ],
+    "connection": [
+      {
+        "id": "ad09dca8-e02d-41c4-bd80-9239fa56477a",
+        "status": "reauthorization_required",
+        "generation": "1",
+        "sync_lease_run_id": "78fb5fd2-ab84-44fc-800f-dde70632715c",
+        "sync_lease_expires_at": "2026-10-05T19:42:57.552Z",
+        "hash": "114da6711e95362fc0435179b3662cf9"
+      }
+    ],
+    "definition": [
+      {
+        "hash": "2f87a95bfc91796b12dced3c1840e39a",
+        "prosecdef": false,
+        "proacl": "{postgres=X/postgres}"
+      }
+    ],
+    "facts": []
+  },
+  "during": {
+    "run": [
+      {
+        "id": "78fb5fd2-ab84-44fc-800f-dde70632715c",
+        "status": "failed",
+        "error_code": "authorization_required",
+        "completed_at": "2026-10-05T19:50:22.087Z",
+        "hash": "82ebceed70b72bc4a7f6959c085723f0"
+      }
+    ],
+    "connection": [
+      {
+        "id": "ad09dca8-e02d-41c4-bd80-9239fa56477a",
+        "status": "reauthorization_required",
+        "generation": "1",
+        "sync_lease_run_id": null,
+        "sync_lease_expires_at": null,
+        "hash": "dad645cfa73e42b7e0795e0af971ed54"
+      }
+    ],
+    "definition": [
+      {
+        "hash": "7dc0cf6fb0be1867af665a304e85af7e",
+        "prosecdef": false,
+        "proacl": "{postgres=X/postgres}"
+      }
+    ],
+    "facts": []
+  },
+  "after": {
+    "run": [
+      {
+        "id": "78fb5fd2-ab84-44fc-800f-dde70632715c",
+        "status": "running",
+        "error_code": null,
+        "completed_at": null,
+        "hash": "75eb3be238b3fa1b4212531c4550493b"
+      }
+    ],
+    "connection": [
+      {
+        "id": "ad09dca8-e02d-41c4-bd80-9239fa56477a",
+        "status": "reauthorization_required",
+        "generation": "1",
+        "sync_lease_run_id": "78fb5fd2-ab84-44fc-800f-dde70632715c",
+        "sync_lease_expires_at": "2026-10-05T19:42:57.552Z",
+        "hash": "114da6711e95362fc0435179b3662cf9"
+      }
+    ],
+    "definition": [
+      {
+        "hash": "2f87a95bfc91796b12dced3c1840e39a",
+        "prosecdef": false,
+        "proacl": "{postgres=X/postgres}"
+      }
+    ],
+    "facts": []
+  },
+  "rolledBack": true,
+  "unchangedAfterRollback": true,
+  "aclUnchanged": true,
+  "factsUnchanged": true,
+  "migrationSha256": "a77bd7729038b76ac0f2d1be3e92d713ea5bee828d0d3dbd7049e36f16c4fd5c",
+  "productionTouched": false
+}

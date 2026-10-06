@@ -1,14 +1,15 @@
+import { randomUUID } from "node:crypto";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { createFormSubmissionAction } from "@/app/app/operations/actions";
+import { InternalFormSubmissionForm } from "@/components/operations/InternalFormSubmissionForm";
 import { CreateDrawer } from "@/components/operations/CreateDrawer";
 import { EmptyState } from "@/components/operations/EmptyState";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
-import { TextArea, TextInput, SelectInput, PrimaryButton } from "@/components/operations/FormControls";
 import { PageHeader } from "@/components/operations/PageHeader";
 import { ReadableData } from "@/components/operations/ReadableData";
 import { SectionCard } from "@/components/operations/SectionCard";
 import { StatusBadge } from "@/components/operations/StatusBadge";
+import { managedValues } from "@/lib/records/management";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
 
 type FormDetailPageProps = {
@@ -51,21 +52,7 @@ export default async function FormDetailPage({ params, searchParams }: FormDetai
 
       <section className="space-y-6">
         <CreateDrawer title="Submit form" description="Capture an operational submission for manager review." triggerLabel="New Submission">
-          <form action={createFormSubmissionAction} className="grid gap-4 lg:grid-cols-2">
-            <input type="hidden" name="form_id" value={form.id} />
-            <TextInput label="Submitter name" name="submitter_name" required />
-            <TextInput label="Submitter email" name="submitter_email" type="email" />
-            <div className="lg:col-span-2">
-              <TextArea label="Submission summary" name="summary" required rows={4} />
-            </div>
-            <SelectInput label="Priority" name="priority" defaultValue="Medium" options={["Low", "Medium", "High", "Urgent"]} />
-            <div className="lg:col-span-2">
-              <TextArea label="Signals or evidence, one per line" name="follow_up" rows={4} />
-            </div>
-            <div className="lg:col-span-2">
-              <PrimaryButton>Save submission</PrimaryButton>
-            </div>
-          </form>
+          {managedValues(form).archivedAt || managedValues(form).deletedAt ? <p>This form is archived or hidden. Existing submissions remain available below.</p> : <InternalFormSubmissionForm requestId={randomUUID()} forms={[{ id: form.id, name: form.name, schema_json: form.schema_json }]} returnPath={`/app/forms/${form.id}`} />}
         </CreateDrawer>
 
         <SectionCard title="Form schema">
@@ -92,7 +79,7 @@ export default async function FormDetailPage({ params, searchParams }: FormDetai
               ))}
             </div>
           ) : (
-            <EmptyState title="No submissions yet" description="Submit a test response or share the public link when enabled." />
+            <EmptyState title="No submissions yet" description="Capture an internal response using this form." />
           )}
         </SectionCard>
 

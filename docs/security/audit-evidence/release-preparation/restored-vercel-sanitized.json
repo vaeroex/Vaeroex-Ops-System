@@ -1,0 +1,366 @@
+{
+  "checkedAt": "2026-10-05T23:28:57.658Z",
+  "project": {
+    "nodeVersion": "24.x",
+    "framework": "nextjs",
+    "ssoProtection": {
+      "deploymentType": "all_except_custom_domains"
+    },
+    "passwordProtectionConfigured": false,
+    "trustedIpsConfigured": false,
+    "production": {
+      "id": "dpl_A9tgEHvj54MkLCxCyac7FGokaM1t",
+      "createdAt": 1791001097151,
+      "readyState": "READY",
+      "commit": "d91be079c7beb0b6f21a4c5e6b451f90ca06e035",
+      "url": "vaeroex-ops-system-2y5y78sld-vaeroex-2167s-projects.vercel.app"
+    }
+  },
+  "team": "team_uORtrMvad77Qz6HikOgD4cnp",
+  "http": 200,
+  "credentialSource": "refreshed local CLI",
+  "decryptedEnvValuesPublished": false,
+  "production": [
+    {
+      "key": "GOOGLE_SHEETS_ENABLED",
+      "type": "plain",
+      "target": [
+        "production"
+      ],
+      "createdAt": 1790916029736,
+      "updatedAt": 1790921064469,
+      "value": "true",
+      "metadataValueReadable": true
+    },
+    {
+      "key": "GOOGLE_SHEETS_REDIRECT_URI",
+      "type": "plain",
+      "target": [
+        "production"
+      ],
+      "createdAt": 1790916029736,
+      "updatedAt": 1790916029736,
+      "value": "https://www.vaeroex.com/api/integrations/google-sheets/callback",
+      "metadataValueReadable": true
+    },
+    {
+      "key": "GOOGLE_SHEETS_TOKEN_ENCRYPTION_KEY",
+      "type": "sensitive",
+      "target": [
+        "production"
+      ],
+      "createdAt": 1790916029736,
+      "updatedAt": 1790916029736,
+      "metadataValueReadable": false
+    },
+    {
+      "key": "GOOGLE_SHEETS_CLIENT_SECRET",
+      "type": "sensitive",
+      "target": [
+        "production"
+      ],
+      "createdAt": 1790916027408,
+      "updatedAt": 1790916027408,
+      "metadataValueReadable": false
+    },
+    {
+      "key": "GOOGLE_SHEETS_CLIENT_ID",
+      "type": "sensitive",
+      "target": [
+        "production"
+      ],
+      "createdAt": 1790915973687,
+      "updatedAt": 1790921528715,
+      "metadataValueReadable": false
+    },
+    {
+      "key": "QBO_APPLICATION_ORIGIN",
+      "type": "encrypted",
+      "target": [
+        "production"
+      ],
+      "createdAt": 1790842170554,
+      "updatedAt": 1790842170554,
+      "valueStatus": "encoded-or-unrecognized",
+      "metadataValueReadable": false
+    },
+    {
+      "key": "QBO_PRODUCTION_CALLBACK_URI",
+      "type": "encrypted",
+      "target": [
+        "production"
+      ],
+      "createdAt": 1790842170554,
+      "updatedAt": 1790842170554,
+      "valueStatus": "encoded-or-unrecognized",
+      "metadataValueReadable": false
+    },
+    {
+      "key": "QBO_PRODUCTION_RETURN_INTENT",
+      "type": "encrypted",
+      "target": [
+        "production"
+      ],
+      "createdAt": 1790842170554,
+      "updatedAt": 1790842170554,
+      "valueStatus": "encoded-or-unrecognized",
+      "metadataValueReadable": false
+    },
+    {
+      "key": "QBO_PRODUCTION_CLIENT_ID",
+      "type": "encrypted",
+      "target": [
+        "production"
+      ],
+      "createdAt": 1790842170554,
+      "updatedAt": 1790842170554,
+      "metadataValueReadable": false
+    },
+    {
+      "key": "QBO_PRODUCTION_CUSTOMER_CONNECTIONS_ENABLED",
+      "type": "encrypted",
+      "target": [
+        "production"
+      ],
+      "createdAt": 1790842170554,
+      "updatedAt": 1790845107053,
+      "valueStatus": "encoded-or-unrecognized",
+      "metadataValueReadable": false
+    },
+    {
+      "key": "SQUARE_CUSTOMER_BACKEND_ENABLED",
+      "type": "sensitive",
+      "target": [
+        "production"
+      ],
+      "createdAt": 1790650847128,
+      "updatedAt": 1790650847128,
+      "metadataValueReadable": false
+    },
+    {
+      "key": "SQUARE_CUSTOMER_APPLICATION_ID",
+      "type": "sensitive",
+      "target": [
+        "production"
+      ],
+      "createdAt": 1790650203685,
+      "updatedAt": 1790650203685,
+      "metadataValueReadable": false
+    },
+    {
+      "key": "SQUARE_CUSTOMER_APPLICATION_SECRET",
+      "type": "sensitive",
+      "target": [
+        "production"
+      ],
+      "createdAt": 1790650203685,
+      "updatedAt": 1790650203685,
+      "metadataValueReadable": false
+    },
+    {
+      "key": "SQUARE_CUSTOMER_ENCRYPTION_KEY",
+      "type": "sensitive",
+      "target": [
+        "production"
+      ],
+      "createdAt": 1790650203685,
+      "updatedAt": 1790650203685,
+      "metadataValueReadable": false
+    },
+    {
+      "key": "NEXT_PUBLIC_TURNSTILE_SITE_KEY",
+      "type": "sensitive",
+      "target": [
+        "production"
+      ],
+      "createdAt": 1787185738762,
+      "updatedAt": 1787185738762,
+      "metadataValueReadable": false
+    },
+    {
+      "key": "VAEROEX_INTELLIGENCE_BRIEFING_POLICY",
+      "type": "sensitive",
+      "target": [
+        "production"
+      ],
+      "createdAt": 1787105551111,
+      "updatedAt": 1787105551111,
+      "metadataValueReadable": false
+    },
+    {
+      "key": "RESEND_API_KEY",
+      "type": "sensitive",
+      "target": [
+        "preview",
+        "production"
+      ],
+      "createdAt": 1785112796878,
+      "updatedAt": 1785112796878,
+      "metadataValueReadable": false
+    },
+    {
+      "key": "VAEROEX_BUSINESS_NOTES_POLICY",
+      "type": "sensitive",
+      "target": [
+        "production"
+      ],
+      "createdAt": 1785040550383,
+      "updatedAt": 1785040550383,
+      "metadataValueReadable": false
+    },
+    {
+      "key": "VAEROEX_EXECUTIVE_SYNTHESIS_POLICY",
+      "type": "sensitive",
+      "target": [
+        "production"
+      ],
+      "createdAt": 1784934430256,
+      "updatedAt": 1784934430256,
+      "metadataValueReadable": false
+    },
+    {
+      "key": "VAEROEX_FINDING_EXPLANATION_POLICY",
+      "type": "sensitive",
+      "target": [
+        "production"
+      ],
+      "createdAt": 1784632764544,
+      "updatedAt": 1784632764544,
+      "metadataValueReadable": false
+    },
+    {
+      "key": "AI_PROVIDER",
+      "type": "sensitive",
+      "target": [
+        "production",
+        "preview"
+      ],
+      "createdAt": 1784243265173,
+      "updatedAt": 1784256917417,
+      "metadataValueReadable": false
+    },
+    {
+      "key": "NVIDIA_API_KEY",
+      "type": "sensitive",
+      "target": [
+        "production",
+        "preview"
+      ],
+      "createdAt": 1784236993136,
+      "updatedAt": 1784256961697,
+      "metadataValueReadable": false
+    },
+    {
+      "key": "STRIPE_WEBHOOK_SECRET",
+      "type": "sensitive",
+      "target": [
+        "production",
+        "preview"
+      ],
+      "createdAt": 1782139363072,
+      "updatedAt": 1782181569755,
+      "metadataValueReadable": false
+    },
+    {
+      "key": "STRIPE_SECRET_KEY",
+      "type": "sensitive",
+      "target": [
+        "production",
+        "preview"
+      ],
+      "createdAt": 1782138698937,
+      "updatedAt": 1782181043834,
+      "metadataValueReadable": false
+    },
+    {
+      "key": "STRIPE_PRICE_OPERATIONS_INTELLIGENCE_MONTHLY",
+      "type": "sensitive",
+      "target": [
+        "production",
+        "preview"
+      ],
+      "createdAt": 1782138323702,
+      "updatedAt": 1783459097669,
+      "metadataValueReadable": false
+    },
+    {
+      "key": "CRON_SECRET",
+      "type": "sensitive",
+      "target": [
+        "preview",
+        "production"
+      ],
+      "createdAt": 1781844180362,
+      "updatedAt": 1781844180362,
+      "metadataValueReadable": false
+    },
+    {
+      "key": "NEXT_PUBLIC_APP_URL",
+      "type": "sensitive",
+      "target": [
+        "production",
+        "preview"
+      ],
+      "createdAt": 1781744834875,
+      "updatedAt": 1781947716084,
+      "metadataValueReadable": false
+    },
+    {
+      "key": "NEXT_PUBLIC_SUPABASE_URL",
+      "type": "sensitive",
+      "target": [
+        "production"
+      ],
+      "createdAt": 1781743396496,
+      "updatedAt": 1785292759940,
+      "metadataValueReadable": false
+    },
+    {
+      "key": "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+      "type": "sensitive",
+      "target": [
+        "production"
+      ],
+      "createdAt": 1781743396496,
+      "updatedAt": 1785292761568,
+      "metadataValueReadable": false
+    },
+    {
+      "key": "SUPABASE_SERVICE_ROLE_KEY",
+      "type": "sensitive",
+      "target": [
+        "production"
+      ],
+      "createdAt": 1781743396496,
+      "updatedAt": 1785292763187,
+      "metadataValueReadable": false
+    },
+    {
+      "key": "OPENAI_API_KEY",
+      "type": "sensitive",
+      "target": [
+        "production",
+        "preview"
+      ],
+      "createdAt": 1781743396496,
+      "updatedAt": 1781756908308,
+      "metadataValueReadable": false
+    },
+    {
+      "key": "VAEROEX_ADMIN_EMAILS",
+      "type": "sensitive",
+      "target": [
+        "production",
+        "preview"
+      ],
+      "createdAt": 1781743396496,
+      "updatedAt": 1781828021888,
+      "metadataValueReadable": false
+    }
+  ],
+  "firewall": {
+    "http": 404,
+    "errorCode": "not_found",
+    "exists": false
+  }
+}

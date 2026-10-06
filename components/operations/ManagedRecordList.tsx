@@ -79,6 +79,8 @@ type ManagedRecordListProps = {
   returnPath?: string;
   searchParams?: Record<string, string | string[] | undefined>;
   activeRecordId?: string | null;
+  /** The caller has already filtered, sorted and paginated these rows on the server. */
+  serverManaged?: boolean;
   defaultView?: "active" | "current" | "archived" | "deleted" | "all";
   labels?: {
     status?: string;
@@ -613,6 +615,7 @@ export function ManagedRecordList({
   returnPath: configuredReturnPath,
   searchParams,
   activeRecordId,
+  serverManaged = false,
   defaultView = "active",
   labels: configuredLabels
 }: ManagedRecordListProps) {
@@ -623,10 +626,10 @@ export function ManagedRecordList({
     date: configuredLabels?.date || "Date"
   };
   const sort = param(searchParams?.sort) || "newest";
-  const visibleRecords = sortedRecords(filteredRecords(records, folders, searchParams, defaultView), sort);
+  const visibleRecords = serverManaged ? records : sortedRecords(filteredRecords(records, folders, searchParams, defaultView), sort);
   const limitValue = param(searchParams?.limit);
   const visibleLimit = pageLimit(limitValue, visibleRecords.length);
-  const displayedRecords = visibleRecords.slice(0, visibleLimit);
+  const displayedRecords = serverManaged ? visibleRecords : visibleRecords.slice(0, visibleLimit);
   const returnPath = configuredReturnPath || `/app/${collection.replace("_", "-")}`;
   const activeFolders = folderOptions(folders);
   const statusOptions = uniqueOptions(records, "status");
@@ -672,7 +675,7 @@ export function ManagedRecordList({
             </details>
           ) : null}
         </div>
-        <CompactSummaryChips items={summaryChips} />
+        {!serverManaged ? <CompactSummaryChips items={summaryChips} /> : null}
       </div>
 
       {successMessage ? (
@@ -680,6 +683,7 @@ export function ManagedRecordList({
       ) : null}
       {errorMessage ? <div className="rounded-lg border border-red-400/35 bg-red-950/30 p-3 text-sm text-red-100">{errorMessage}</div> : null}
 
+      {!serverManaged ? (
       <form method="get" className="rounded-lg border border-white/10 bg-[#08111f] p-3 shadow-sm">
         <div className="grid gap-2 lg:grid-cols-[minmax(180px,1fr)_160px_140px_130px_auto_auto] lg:items-center">
           <input
@@ -762,6 +766,7 @@ export function ManagedRecordList({
           </button>
         </div>
       </form>
+      ) : null}
 
       <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div className="flex min-w-0 flex-wrap gap-2">
@@ -813,6 +818,7 @@ export function ManagedRecordList({
 
           {visibleRecords.length ? (
             <div className="rounded-lg border border-line bg-white">
+              {!serverManaged ? (
               <div className="flex flex-col gap-3 border-b border-line px-3 py-3 text-sm md:flex-row md:items-center md:justify-between">
                 <p className="text-muted">
                   Showing <span className="font-semibold text-ink">{displayedRecords.length}</span> of{" "}
@@ -836,6 +842,7 @@ export function ManagedRecordList({
                   </Link>
                 </div>
               </div>
+              ) : null}
               <div className="hidden border-b border-line bg-slate-50 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted lg:grid lg:grid-cols-[32px_minmax(220px,1.5fr)_110px_110px_110px_120px_44px] lg:gap-3">
                 <span />
                 <span>Title</span>

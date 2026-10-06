@@ -1,0 +1,92 @@
+Vaeroex
+
+CLOSEOUT 1061111f 45708faa A
+
+ACTIVE
+Overview
+Intelligence
+Performance
+Files & Notes
+Saved Analyses
+Integrations
+Settings
+Sign out
+
+CLOSEOUT 1061111f 45708faa A · Active
+
+Files & Notes
+
+Search
+K
+Files & Notes
+/
+CLOSEOUT 1061111f ab49ae65 1440 0 upload
+CLOSEOUT 1061111f ab49ae65 1440 0 upload
+Import Review
+
+vxa039-ab49ae65-ad49-4c05-8227-9b51178e24a5-1440-0.csv
+
+CSV · 41 B · Uploaded Oct 5, 2026
+
+Summary
+Imported Data
+History
+
+Worksheet detection
+
+Re-run worksheet detection using the latest import rules. Existing approved records will not be duplicated.
+
+Re-prepare workbook
+Worksheets inspected (1)
+Ingestion pipeline trace
+
+WORKBOOK
+
+CLOSEOUT 1061111f ab49ae65 1440 0 upload
+
+Vaeroex inspected each worksheet independently. Confirm the detected context and mapping for each dataset you want to import.
+
+CSV
+
+Detected: Sales · 2 rows
+
+Import worksheet
+Dataset type
+Company Profile
+Time Series
+KPI Targets
+KPIs
+Sales
+Financials
+Inventory
+Orders
+Customers
+Employees
+Vendors
+Marketing
+Unknown
+TIME SERIES MAPPING
+Date or period *
+Do not import
+date
+revenue
+
+METRIC SERIES
+
+Each valid numeric cell becomes a dated metric. Invalid cells are reported individually without rejecting other metrics in that row.
+
+revenue
+Row	date	revenue
+2	2026-01-01	42
+3	2026-02-01	43
+Import 1 approved worksheet
+
+Only approved worksheets are validated and imported.
+
+Vaeroex turns business evidence into leadership clarity.
+
+Help Center
+Trust Center
+Terms
+Privacy
+Support

@@ -1,0 +1,518 @@
+{
+  "sourcePath": "lib/integrations/google-sheets/scheduler.ts",
+  "sourceSha256": "c63e9f175227a45d1d8ef8d36bddf85532a2ecfe80056f8d3734a1f0c77d46dc",
+  "thresholds": {
+    "declaredBeforeExecution": true,
+    "scope": "Actual deployed Sheets scheduler with synthetic due queue and virtual clock; no database, HTTP, provider, or user capacity claim",
+    "singleBurstWorkspaces": [
+      20,
+      50,
+      100
+    ],
+    "connectionsPerWorkspace": 1,
+    "assumedSyncDurationsMs": [
+      500,
+      5000
+    ],
+    "nominalAcceptance": {
+      "allOfferedConnectionsAttemptedWithinTick": true,
+      "queueP95Ms": 30000,
+      "noDuplicateAttemptsPerTick": true
+    },
+    "faultAcceptance": {
+      "healthyWorkspaceProgressDespiteFailedBackoff": true,
+      "quietWorkspaceQueueDelayRatioToBaselineMax": 2,
+      "failedAttemptsTruthfullyCounted": true
+    },
+    "bounds": {
+      "maxSimulatedTicksPerScenario": 4,
+      "maxConnections": 100,
+      "maxNodeHeapMiB": 256,
+      "wallTimeoutMs": 10000
+    },
+    "interpretation": "Simulated service times are assumptions. Threshold failures identify scheduling behavior only; measured wall time is reported separately. Failure scenarios are expected to expose concerns and must not be counted as passing service SLOs."
+  },
+  "executedAt": "2026-10-05T18:55:56.796Z",
+  "runtime": {
+    "node": "v24.19.0",
+    "platform": "darwin",
+    "arch": "arm64"
+  },
+  "wallElapsedMs": 11.266707999999994,
+  "rssBytes": 137527296,
+  "networkCalls": 0,
+  "limits": "Virtual service times and in-memory queue: not HTTP, DB, persistence, provider, resource-soak or concurrent-user capacity evidence.",
+  "results": [
+    {
+      "name": "burst-20-500ms",
+      "workspaces": 20,
+      "assumedSyncDurationMs": 500,
+      "virtualTime": true,
+      "maximumActive": 4,
+      "ticks": [
+        {
+          "tick": 0,
+          "attempted": 20,
+          "succeeded": 20,
+          "failed": 0,
+          "deferred": 0,
+          "backoffFailed": 0,
+          "peakActive": 4,
+          "admissionRpcAttempts": 0,
+          "admissionRetries": 0,
+          "admissionWaitMs": 0,
+          "simulatedElapsedMs": 2500,
+          "pendingDue": 0,
+          "oldestPendingAgeMs": 0,
+          "attemptedQueueP50Ms": 1000,
+          "attemptedQueueP95Ms": 2000,
+          "attemptedQueueP99Ms": 2000
+        }
+      ],
+      "healthyAttempts": 20,
+      "workspacesServed": 20,
+      "quietWorkspaceFirstDelayMs": 0,
+      "allAcceptanceThresholdsPassed": true,
+      "acceptance": {
+        "allOfferedAttempted": true,
+        "queueP95": true,
+        "noDuplicatesPerTick": true
+      }
+    },
+    {
+      "name": "burst-50-500ms",
+      "workspaces": 50,
+      "assumedSyncDurationMs": 500,
+      "virtualTime": true,
+      "maximumActive": 4,
+      "ticks": [
+        {
+          "tick": 0,
+          "attempted": 50,
+          "succeeded": 50,
+          "failed": 0,
+          "deferred": 0,
+          "backoffFailed": 0,
+          "peakActive": 4,
+          "admissionRpcAttempts": 0,
+          "admissionRetries": 0,
+          "admissionWaitMs": 0,
+          "simulatedElapsedMs": 6500,
+          "pendingDue": 0,
+          "oldestPendingAgeMs": 0,
+          "attemptedQueueP50Ms": 3000,
+          "attemptedQueueP95Ms": 5500,
+          "attemptedQueueP99Ms": 6000
+        }
+      ],
+      "healthyAttempts": 50,
+      "workspacesServed": 50,
+      "quietWorkspaceFirstDelayMs": 0,
+      "allAcceptanceThresholdsPassed": true,
+      "acceptance": {
+        "allOfferedAttempted": true,
+        "queueP95": true,
+        "noDuplicatesPerTick": true
+      }
+    },
+    {
+      "name": "burst-100-500ms",
+      "workspaces": 100,
+      "assumedSyncDurationMs": 500,
+      "virtualTime": true,
+      "maximumActive": 4,
+      "ticks": [
+        {
+          "tick": 0,
+          "attempted": 50,
+          "succeeded": 50,
+          "failed": 0,
+          "deferred": 0,
+          "backoffFailed": 0,
+          "peakActive": 4,
+          "admissionRpcAttempts": 0,
+          "admissionRetries": 0,
+          "admissionWaitMs": 0,
+          "simulatedElapsedMs": 6500,
+          "pendingDue": 50,
+          "oldestPendingAgeMs": 6500,
+          "attemptedQueueP50Ms": 3000,
+          "attemptedQueueP95Ms": 5500,
+          "attemptedQueueP99Ms": 6000
+        }
+      ],
+      "healthyAttempts": 50,
+      "workspacesServed": 50,
+      "quietWorkspaceFirstDelayMs": 0,
+      "allAcceptanceThresholdsPassed": false,
+      "acceptance": {
+        "allOfferedAttempted": false,
+        "queueP95": true,
+        "noDuplicatesPerTick": true
+      }
+    },
+    {
+      "name": "burst-20-5000ms",
+      "workspaces": 20,
+      "assumedSyncDurationMs": 5000,
+      "virtualTime": true,
+      "maximumActive": 4,
+      "ticks": [
+        {
+          "tick": 0,
+          "attempted": 20,
+          "succeeded": 20,
+          "failed": 0,
+          "deferred": 0,
+          "backoffFailed": 0,
+          "peakActive": 4,
+          "admissionRpcAttempts": 0,
+          "admissionRetries": 0,
+          "admissionWaitMs": 0,
+          "simulatedElapsedMs": 25000,
+          "pendingDue": 0,
+          "oldestPendingAgeMs": 0,
+          "attemptedQueueP50Ms": 10000,
+          "attemptedQueueP95Ms": 20000,
+          "attemptedQueueP99Ms": 20000
+        }
+      ],
+      "healthyAttempts": 20,
+      "workspacesServed": 20,
+      "quietWorkspaceFirstDelayMs": 0,
+      "allAcceptanceThresholdsPassed": true,
+      "acceptance": {
+        "allOfferedAttempted": true,
+        "queueP95": true,
+        "noDuplicatesPerTick": true
+      }
+    },
+    {
+      "name": "burst-50-5000ms",
+      "workspaces": 50,
+      "assumedSyncDurationMs": 5000,
+      "virtualTime": true,
+      "maximumActive": 4,
+      "ticks": [
+        {
+          "tick": 0,
+          "attempted": 50,
+          "succeeded": 50,
+          "failed": 0,
+          "deferred": 0,
+          "backoffFailed": 0,
+          "peakActive": 4,
+          "admissionRpcAttempts": 0,
+          "admissionRetries": 0,
+          "admissionWaitMs": 0,
+          "simulatedElapsedMs": 65000,
+          "pendingDue": 0,
+          "oldestPendingAgeMs": 0,
+          "attemptedQueueP50Ms": 30000,
+          "attemptedQueueP95Ms": 55000,
+          "attemptedQueueP99Ms": 60000
+        }
+      ],
+      "healthyAttempts": 50,
+      "workspacesServed": 50,
+      "quietWorkspaceFirstDelayMs": 0,
+      "allAcceptanceThresholdsPassed": false,
+      "acceptance": {
+        "allOfferedAttempted": true,
+        "queueP95": false,
+        "noDuplicatesPerTick": true
+      }
+    },
+    {
+      "name": "burst-100-5000ms",
+      "workspaces": 100,
+      "assumedSyncDurationMs": 5000,
+      "virtualTime": true,
+      "maximumActive": 4,
+      "ticks": [
+        {
+          "tick": 0,
+          "attempted": 50,
+          "succeeded": 50,
+          "failed": 0,
+          "deferred": 0,
+          "backoffFailed": 0,
+          "peakActive": 4,
+          "admissionRpcAttempts": 0,
+          "admissionRetries": 0,
+          "admissionWaitMs": 0,
+          "simulatedElapsedMs": 65000,
+          "pendingDue": 50,
+          "oldestPendingAgeMs": 65000,
+          "attemptedQueueP50Ms": 30000,
+          "attemptedQueueP95Ms": 55000,
+          "attemptedQueueP99Ms": 60000
+        }
+      ],
+      "healthyAttempts": 50,
+      "workspacesServed": 50,
+      "quietWorkspaceFirstDelayMs": 0,
+      "allAcceptanceThresholdsPassed": false,
+      "acceptance": {
+        "allOfferedAttempted": false,
+        "queueP95": false,
+        "noDuplicatesPerTick": true
+      }
+    },
+    {
+      "name": "quiet-baseline",
+      "workspaces": 20,
+      "assumedSyncDurationMs": 500,
+      "virtualTime": true,
+      "maximumActive": 4,
+      "ticks": [
+        {
+          "tick": 0,
+          "attempted": 20,
+          "succeeded": 20,
+          "failed": 0,
+          "deferred": 0,
+          "backoffFailed": 0,
+          "peakActive": 4,
+          "admissionRpcAttempts": 0,
+          "admissionRetries": 0,
+          "admissionWaitMs": 0,
+          "simulatedElapsedMs": 2500,
+          "pendingDue": 0,
+          "oldestPendingAgeMs": 0,
+          "attemptedQueueP50Ms": 1000,
+          "attemptedQueueP95Ms": 2000,
+          "attemptedQueueP99Ms": 2000
+        }
+      ],
+      "healthyAttempts": 20,
+      "workspacesServed": 20,
+      "quietWorkspaceFirstDelayMs": 0,
+      "allAcceptanceThresholdsPassed": true,
+      "acceptance": {
+        "allOfferedAttempted": true,
+        "queueP95": true,
+        "noDuplicatesPerTick": true
+      }
+    },
+    {
+      "name": "one-slow-workspace",
+      "workspaces": 20,
+      "assumedSyncDurationMs": 500,
+      "slowFirstDurationMs": 239000,
+      "virtualTime": true,
+      "maximumActive": 4,
+      "ticks": [
+        {
+          "tick": 0,
+          "attempted": 20,
+          "succeeded": 20,
+          "failed": 0,
+          "deferred": 0,
+          "backoffFailed": 0,
+          "peakActive": 4,
+          "admissionRpcAttempts": 0,
+          "admissionRetries": 0,
+          "admissionWaitMs": 0,
+          "simulatedElapsedMs": 239000,
+          "pendingDue": 0,
+          "oldestPendingAgeMs": 0,
+          "attemptedQueueP50Ms": 1000,
+          "attemptedQueueP95Ms": 2500,
+          "attemptedQueueP99Ms": 3000
+        }
+      ],
+      "healthyAttempts": 20,
+      "workspacesServed": 20,
+      "quietWorkspaceFirstDelayMs": 0,
+      "allAcceptanceThresholdsPassed": true,
+      "acceptance": {
+        "allOfferedAttempted": true,
+        "queueP95": true,
+        "noDuplicatesPerTick": true,
+        "quietDelayRatio": true
+      },
+      "quietDelayRatio": 1
+    },
+    {
+      "name": "failed-backoff-head-blocking",
+      "workspaces": 20,
+      "assumedSyncDurationMs": 500,
+      "virtualTime": true,
+      "maximumActive": 4,
+      "ticks": [
+        {
+          "tick": 0,
+          "attempted": 20,
+          "succeeded": 10,
+          "failed": 10,
+          "deferred": 0,
+          "backoffFailed": 10,
+          "peakActive": 4,
+          "admissionRpcAttempts": 0,
+          "admissionRetries": 0,
+          "admissionWaitMs": 0,
+          "simulatedElapsedMs": 2500,
+          "pendingDue": 10,
+          "oldestPendingAgeMs": 2500,
+          "attemptedQueueP50Ms": 1000,
+          "attemptedQueueP95Ms": 2000,
+          "attemptedQueueP99Ms": 2000
+        },
+        {
+          "tick": 1,
+          "attempted": 10,
+          "succeeded": 0,
+          "failed": 10,
+          "deferred": 0,
+          "backoffFailed": 10,
+          "peakActive": 4,
+          "admissionRpcAttempts": 0,
+          "admissionRetries": 0,
+          "admissionWaitMs": 0,
+          "simulatedElapsedMs": 1500,
+          "pendingDue": 10,
+          "oldestPendingAgeMs": 901500,
+          "attemptedQueueP50Ms": 900500,
+          "attemptedQueueP95Ms": 901000,
+          "attemptedQueueP99Ms": 901000
+        },
+        {
+          "tick": 2,
+          "attempted": 10,
+          "succeeded": 0,
+          "failed": 10,
+          "deferred": 0,
+          "backoffFailed": 10,
+          "peakActive": 4,
+          "admissionRpcAttempts": 0,
+          "admissionRetries": 0,
+          "admissionWaitMs": 0,
+          "simulatedElapsedMs": 1500,
+          "pendingDue": 10,
+          "oldestPendingAgeMs": 1801500,
+          "attemptedQueueP50Ms": 1800500,
+          "attemptedQueueP95Ms": 1801000,
+          "attemptedQueueP99Ms": 1801000
+        },
+        {
+          "tick": 3,
+          "attempted": 10,
+          "succeeded": 0,
+          "failed": 10,
+          "deferred": 0,
+          "backoffFailed": 10,
+          "peakActive": 4,
+          "admissionRpcAttempts": 0,
+          "admissionRetries": 0,
+          "admissionWaitMs": 0,
+          "simulatedElapsedMs": 1500,
+          "pendingDue": 10,
+          "oldestPendingAgeMs": 2701500,
+          "attemptedQueueP50Ms": 2700500,
+          "attemptedQueueP95Ms": 2701000,
+          "attemptedQueueP99Ms": 2701000
+        }
+      ],
+      "healthyAttempts": 10,
+      "workspacesServed": 10,
+      "quietWorkspaceFirstDelayMs": 0,
+      "allAcceptanceThresholdsPassed": true,
+      "acceptance": {
+        "healthyWorkspaceProgress": true,
+        "truthfulFailureCounts": true,
+        "noDuplicatesPerTick": true
+      }
+    },
+    {
+      "name": "recurring-100-workspaces-four-ticks",
+      "workspaces": 100,
+      "assumedSyncDurationMs": 500,
+      "virtualTime": true,
+      "maximumActive": 4,
+      "ticks": [
+        {
+          "tick": 0,
+          "attempted": 50,
+          "succeeded": 50,
+          "failed": 0,
+          "deferred": 0,
+          "backoffFailed": 0,
+          "peakActive": 4,
+          "admissionRpcAttempts": 0,
+          "admissionRetries": 0,
+          "admissionWaitMs": 0,
+          "simulatedElapsedMs": 6500,
+          "pendingDue": 50,
+          "oldestPendingAgeMs": 6500,
+          "attemptedQueueP50Ms": 3000,
+          "attemptedQueueP95Ms": 5500,
+          "attemptedQueueP99Ms": 6000
+        },
+        {
+          "tick": 1,
+          "attempted": 50,
+          "succeeded": 50,
+          "failed": 0,
+          "deferred": 0,
+          "backoffFailed": 0,
+          "peakActive": 4,
+          "admissionRpcAttempts": 0,
+          "admissionRetries": 0,
+          "admissionWaitMs": 0,
+          "simulatedElapsedMs": 6500,
+          "pendingDue": 50,
+          "oldestPendingAgeMs": 6500,
+          "attemptedQueueP50Ms": 903000,
+          "attemptedQueueP95Ms": 905500,
+          "attemptedQueueP99Ms": 906000
+        },
+        {
+          "tick": 2,
+          "attempted": 50,
+          "succeeded": 50,
+          "failed": 0,
+          "deferred": 0,
+          "backoffFailed": 0,
+          "peakActive": 4,
+          "admissionRpcAttempts": 0,
+          "admissionRetries": 0,
+          "admissionWaitMs": 0,
+          "simulatedElapsedMs": 6500,
+          "pendingDue": 50,
+          "oldestPendingAgeMs": 6500,
+          "attemptedQueueP50Ms": 903000,
+          "attemptedQueueP95Ms": 905500,
+          "attemptedQueueP99Ms": 906000
+        },
+        {
+          "tick": 3,
+          "attempted": 50,
+          "succeeded": 50,
+          "failed": 0,
+          "deferred": 0,
+          "backoffFailed": 0,
+          "peakActive": 4,
+          "admissionRpcAttempts": 0,
+          "admissionRetries": 0,
+          "admissionWaitMs": 0,
+          "simulatedElapsedMs": 6500,
+          "pendingDue": 50,
+          "oldestPendingAgeMs": 6500,
+          "attemptedQueueP50Ms": 903000,
+          "attemptedQueueP95Ms": 905500,
+          "attemptedQueueP99Ms": 906000
+        }
+      ],
+      "healthyAttempts": 200,
+      "workspacesServed": 100,
+      "quietWorkspaceFirstDelayMs": 0,
+      "allAcceptanceThresholdsPassed": false,
+      "acceptance": {
+        "allOfferedAttempted": false,
+        "queueP95": false,
+        "noDuplicatesPerTick": true
+      }
+    }
+  ]
+}

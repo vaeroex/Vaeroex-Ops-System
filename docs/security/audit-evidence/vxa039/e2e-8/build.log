@@ -1,0 +1,132 @@
+   ▲ Next.js 15.5.24
+   - Experiments (use with caution):
+     · serverActions
+
+   Creating an optimized production build ...
+ ✓ Compiled successfully in 8.8s
+   Linting and checking validity of types ...
+
+./app/api/internal/nvidia-qualification/stage-three-a/route.ts
+57:24  Warning: '_blindOutput' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./app/api/internal/nvidia-qualification/stage-three-b/route.ts
+82:24  Warning: '_blindOutput' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./app/api/internal/nvidia-qualification/stage-two/route.ts
+45:24  Warning: '_blindOutput' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./app/app/admin/audit-logs/page.tsx
+3:10  Warning: 'CompactRunTable' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./app/app/admin/nvidia-qualification/stage-three-a/page.tsx
+65:24  Warning: '_blindOutput' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./app/app/admin/nvidia-qualification/stage-three-b/page.tsx
+79:24  Warning: '_blindOutput' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./app/app/admin/nvidia-qualification/stage-two/page.tsx
+51:24  Warning: '_blindOutput' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./app/app/files/actions.ts
+18:3  Warning: 'previewRows' is defined but never used.  @typescript-eslint/no-unused-vars
+335:10  Warning: 'fileExtension' is defined but never used.  @typescript-eslint/no-unused-vars
+592:10  Warning: 'inferMapping' is defined but never used.  @typescript-eslint/no-unused-vars
+1654:10  Warning: 'fileContentStatus' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./app/app/kpis/page.tsx
+152:10  Warning: 'explicitKpiDirection' is defined but never used.  @typescript-eslint/no-unused-vars
+194:10  Warning: 'formatMetricValue' is defined but never used.  @typescript-eslint/no-unused-vars
+373:10  Warning: 'MetricCard' is defined but never used.  @typescript-eslint/no-unused-vars
+401:10  Warning: 'SummaryStat' is defined but never used.  @typescript-eslint/no-unused-vars
+475:10  Warning: 'KpiDetailPanel' is defined but never used.  @typescript-eslint/no-unused-vars
+502:10  Warning: 'metricDetailsHref' is defined but never used.  @typescript-eslint/no-unused-vars
+764:10  Warning: 'trendDeltaLabel' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./app/app/page.tsx
+50:25  Warning: 'Json' is defined but never used.  @typescript-eslint/no-unused-vars
+130:10  Warning: 'dashboardHref' is defined but never used.  @typescript-eslint/no-unused-vars
+230:10  Warning: 'isRecord' is defined but never used.  @typescript-eslint/no-unused-vars
+294:10  Warning: 'metricNames' is defined but never used.  @typescript-eslint/no-unused-vars
+553:10  Warning: 'severityTone' is defined but never used.  @typescript-eslint/no-unused-vars
+730:10  Warning: 'signalRecommendedAction' is defined but never used.  @typescript-eslint/no-unused-vars
+798:10  Warning: 'IntelligenceLayerSummary' is defined but never used.  @typescript-eslint/no-unused-vars
+1162:9  Warning: 'weeklyTrends' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+1190:9  Warning: 'risks' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+1195:9  Warning: 'opportunities' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+1201:9  Warning: 'recommendedActions' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+1225:9  Warning: 'smartAlerts' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./app/app/sources/SourcesPage.tsx
+1164:9  Warning: 'isArchivedView' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./components/evidence/BusinessNotesPanel.tsx
+80:108  Warning: `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities
+80:127  Warning: `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities
+
+./components/intelligence/IntelligenceSignalInbox.tsx
+37:7  Warning: 'confidenceOptions' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./components/marketing/spatial/PublicSpatialCanvas.tsx
+9:3  Warning: 'Group' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./components/operations/ManagedRecordList.tsx
+161:10  Warning: 'collectionLabel' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./components/spatial/PublicSpatialCanvasGuard.tsx
+24:21  Warning: '_error' is defined but never used.  @typescript-eslint/no-unused-vars
+24:36  Warning: '_info' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./lib/ai/bounded-context.ts
+29:10  Warning: 'compactText' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./lib/ai/business-health-explanation/snapshot-context.ts
+27:26  Warning: '_fingerprint' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+27:60  Warning: '_contextualEvidence' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+27:99  Warning: '_contextAuthority' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./lib/ai/evidence-engine/benchmark.ts
+202:7  Warning: 'POC_RECALL_CUTOFFS' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+203:7  Warning: 'POC_PRECISION_CUTOFFS' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+874:17  Warning: '_runs' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./lib/ai/executive-output.ts
+344:10  Warning: 'citationObjects' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./lib/ai/finding-explanation/snapshot-context.ts
+20:26  Warning: '_fingerprint' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+20:60  Warning: '_contextualEvidence' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+20:99  Warning: '_contextAuthority' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./lib/ai/intelligence-briefing/storage.ts
+12:3  Warning: 'INTELLIGENCE_BRIEFING_PROMPT_VERSION' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./lib/ai/kpi-overview.ts
+109:10  Warning: 'numberValue' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./lib/ai/qualification/stage-three-b.ts
+229:7  Warning: 'parsedValue' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./lib/ai/qualification/stage-two-fixtures.ts
+15:8  Warning: 'EvidenceManifest' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./lib/ai/trust/workflows/business-health.ts
+243:562  Warning: '_text' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./lib/intelligence/operational-evidence.ts
+311:17  Warning: '_kind' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+info  - Need to disable some ESLint rules? Learn more here: https://nextjs.org/docs/app/api-reference/config/eslint#disabling-rules
+Failed to compile.
+
+./scripts/test-stubs/workspace-workflow-entry.tsx:27:12
+Type error: Conversion of type '{ id: string; row_number: number; data_json: { date: string; revenue: number; }; mapped_data_json: { __source: { worksheet_index: number; row_number: number; }; }; }' to type '{ id: string; workspace_id: string; file_upload_id: string; import_id: string; import_type: string; row_number: number; data_json: Json; mapped_data_json: Json; validation_errors_json: Json; status: string; imported_record_type: string | null; imported_record_id: string | null; created_at: string; }' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type '{ id: string; row_number: number; data_json: { date: string; revenue: number; }; mapped_data_json: { __source: { worksheet_index: number; row_number: number; }; }; }' is missing the following properties from type '{ id: string; workspace_id: string; file_upload_id: string; import_id: string; import_type: string; row_number: number; data_json: Json; mapped_data_json: Json; validation_errors_json: Json; status: string; imported_record_type: string | null; imported_record_id: string | null; created_at: string; }': workspace_id, file_upload_id, import_id, import_type, and 5 more.
+
+[0m [90m 25 |[39m     file[33m=[39m{{ id[33m:[39m [32m'synthetic-file'[39m[33m,[39m display_name[33m:[39m [32m'Synthetic worksheet'[39m } [36mas[39m [33mComponentProps[39m[33m<[39m[36mtypeof[39m [33mWorkbookImportReview[39m[33m>[39m[[32m"file"[39m]}
+ [90m 26 |[39m     importRecord[33m=[39m{{ id[33m:[39m [32m'synthetic-import'[39m[33m,[39m workspace_id[33m:[39m [32m'synthetic-workspace'[39m[33m,[39m file_upload_id[33m:[39m [32m'synthetic-file'[39m[33m,[39m import_type[33m:[39m [32m'metrics'[39m[33m,[39m status[33m:[39m [32m'extracted'[39m[33m,[39m recovery_status[33m:[39m [32m'not_started'[39m[33m,[39m rows_total[33m:[39m [35m1[39m[33m,[39m rows_imported[33m:[39m [35m0[39m[33m,[39m extraction_summary[33m:[39m [36mnull[39m[33m,[39m errors_json[33m:[39m [][33m,[39m reviewed_at[33m:[39m [36mnull[39m[33m,[39m imported_at[33m:[39m [36mnull[39m[33m,[39m created_by[33m:[39m [36mnull[39m[33m,[39m created_at[33m:[39m [32m'2026-01-01T00:00:00Z'[39m[33m,[39m mapping_json[33m:[39m { mode[33m:[39m [32m'workbook'[39m[33m,[39m worksheets[33m:[39m [{ index[33m:[39m [35m1[39m[33m,[39m name[33m:[39m [32m'CSV'[39m[33m,[39m detected_type[33m:[39m [32m'sales'[39m[33m,[39m selected_type[33m:[39m [32m'sales'[39m[33m,[39m enabled[33m:[39m [36mtrue[39m[33m,[39m status[33m:[39m [32m'parsed'[39m[33m,[39m row_count[33m:[39m [35m1[39m[33m,[39m columns[33m:[39m [[32m'date'[39m[33m,[39m [32m'revenue'[39m][33m,[39m mapping[33m:[39m {}[33m,[39m metric_columns[33m:[39m [] }] } } [36mas[39m [33mComponentProps[39m[33m<[39m[36mtypeof[39m [33mWorkbookImportReview[39m[33m>[39m[[32m"importRecord"[39m]}
+[31m[1m>[22m[39m[90m 27 |[39m     rows[33m=[39m{[{ id[33m:[39m [32m'synthetic-row'[39m[33m,[39m row_number[33m:[39m [35m2[39m[33m,[39m data_json[33m:[39m { date[33m:[39m [32m'2026-01-01'[39m[33m,[39m revenue[33m:[39m [35m42[39m }[33m,[39m mapped_data_json[33m:[39m { __source[33m:[39m { worksheet_index[33m:[39m [35m1[39m[33m,[39m row_number[33m:[39m [35m2[39m } } } [36mas[39m [33mComponentProps[39m[33m<[39m[36mtypeof[39m [33mWorkbookImportReview[39m[33m>[39m[[32m"rows"[39m][number]]}
+ [90m    |[39m            [31m[1m^[22m[39m
+ [90m 28 |[39m   [33m/[39m[33m>[39m
+ [90m 29 |[39m [33m<[39m[33m/[39m[33mmain[39m[33m>[39m [33m:[39m [33m<[39m[33mmain[39m className[33m=[39m[32m"vaeroex-app-shell vaeroex-customer-workspace"[39m[33m>[39m
+ [90m 30 |[39m   [33m<[39m[33mh1[39m[33m>[39m[33mSynthetic[39m workspace workflow verification[33m<[39m[33m/[39m[33mh1[39m[33m>[39m[0m
+Next.js build worker exited with code: 1 and signal: null

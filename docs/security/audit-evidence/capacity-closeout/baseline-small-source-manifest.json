@@ -1,0 +1,86 @@
+{
+  "runId": "99799ab6-c939-4b3e-aacc-2a30ffaeb14f",
+  "runningApplicationCommit": "0a15ddcd3b564086280fec21b79b6976b3a3cc44",
+  "buildId": "ReUcdHr1ALEejCvoUeFTc",
+  "sourceFingerprints": {
+    "scripts/workspace-capacity-measure.cjs": "0a3ca8db1acd0fac35651da7b8caf057e7d9686006bd9e0bd02f682724897673",
+    "scripts/workspace-capacity-state.cjs": "ad00eb935574a4fe10d68f61477f610bd289410186a7883da7fcac2c7fec8f48",
+    "scripts/workspace-capacity-collectors.cjs": "b34a583ba352622de94f77d4bb31045fb5b3fbe6f49400486f875912b9cf950c",
+    "scripts/workspace-capacity-proc.c": "c48a2e323df03c1a16326bb4a8a71a7e47b48e8bb1affb21b0ea4d8fe6e244d8",
+    "scripts/workspace-capacity-environment.cjs": "092a11c3ec303259a662dabebfaf85724d7548c6ddd1d1e586ce9510b1cce9ae",
+    "scripts/workspace-capacity-preload.cjs": "7d01f2ad6fee9004570d61834d620c1520ae60eb584e53b89dacc7e86ea6065d",
+    "scripts/workspace-capacity-providers.cjs": "26b35b290afe6fbf2431848e07dee2f4d55a57a37e2fe91fd0958bfc1a7ce677",
+    "docs/security/audit-evidence/stage-3/http/core.mjs": "24e707051d812edfdb4890af8263429c3b5e2f77a0b80398b6d343a3d3678f06",
+    "docs/security/audit-evidence/stage-3/http/run.mjs": "f25c495b81d4359805090a523e23d0ad17e41c41d62713703832179250a2a7fc",
+    "scripts/workspace-capacity-next-config.cjs": "795a3cf0790176d88b6f688ae5e3f27abaa9181d2a7a28336804f57103fd4e47",
+    "scripts/workspace-capacity-next-server.cjs": "26fe8ba0ff955747f61bf71ab384e879f26b60c22780812d0a716e18fb1f378c",
+    "app/api/integrations/google-sheets/sync/route.ts": "e8f35eb8ef5325b62c8b2a795aaa3b1a740671bdda3d7ad4d4ab919571f8bddc",
+    "lib/integrations/google-sheets/sync.ts": "46ad570f3790f0dcc17debb47bd0123b3f2a2bdae3001247db2730f3cb1205b6",
+    "app/app/files/actions.ts": "e512127d3103b75a6e7785f09154c15b80b99d0bc95f2e8380c65bf105a6d082",
+    "app/app/operations/actions.ts": "b5397ab53a34098ebfcd9bfe737edecd1f084033f9009a56129f05bcbaec99eb",
+    "app/api/search/route.ts": "149b405312a35b7bccb67d4d755ed88b8cce68deff3910c2c306f1ec17824cfc",
+    "next.config.mjs": "ab9707ea1b885652c1281f96d314492fa1fc81321c5257f539901dfea8b1a663",
+    "patches/next@15.5.24.patch": "72d9011592c467205574770e1d8f1ef3329602d1774a52730120e491be2158ad",
+    "pnpm-lock.yaml": "40bc351ed2e2d30f313ba0014f3777bbd563b59fc988b120c00d5cc67ec89c59",
+    ".next/BUILD_ID": "1d6f7beae9bbf3fe47df7bab179e1b13213f894caae3fd1569afe370b36f3195",
+    "supabase/migrations/20261005182541_bounded_google_sheets_dispatch.sql": "65aefcf36bec8de2bbf3bdcd9e3a02fc3a12547a554d3f9443076fc67248b119",
+    "supabase/migrations/20261005183352_issue_submission_receipts.sql": "7d6f6bbe69e43da35adb43e40f55e6369b2251db911a74faf845234a626f9e34",
+    "supabase/migrations/20261005184031_qbo_scoped_runtime_recovery.sql": "02250c444a352454f0a46baf9842efa2aa9db23fc878c4b1637e39054929f51c",
+    "supabase/migrations/20261005190709_sheets_recovery_fair_scan.sql": "77be0bade0e5e5f1b529235fdbe569aaf8226b2969be1e7f6c1f7240d316712f",
+    "supabase/migrations/20261005194244_google_sheets_failure_cleanup_transition.sql": "a77bd7729038b76ac0f2d1be3e92d713ea5bee828d0d3dbd7049e36f16c4fd5c"
+  },
+  "files": [
+    {
+      "path": "baseline/summary.json",
+      "bytes": 3821,
+      "sha256": "c9614dcc19e70b06fe9b7ac0005fc673e0274af58cb1cf84bc2d22f400ec53ff"
+    },
+    {
+      "path": "baseline/resource-summary.json",
+      "bytes": 333,
+      "sha256": "9222c29fbb7a18f024dcd3065011772a30f763ffc3be158a7eae75fee4170dd8"
+    },
+    {
+      "path": "baseline/integrity.json",
+      "bytes": 829,
+      "sha256": "ebb8be4b4fc8962ab08b66e1900691a98fe061e8a7032e38443ad80056f8344d"
+    },
+    {
+      "path": "baseline/actions.jsonl",
+      "bytes": 279026,
+      "sha256": "ad233d73479f7bb6e9f9e5dbf71084546d7337e1d02d86002a59673d8c74b0d4"
+    },
+    {
+      "path": "baseline/requests-reconciled.jsonl",
+      "bytes": 578793,
+      "sha256": "2d416cba6662a569cd2e2a2b589ea13e198ebc678932792ae03be4ae6509066c"
+    },
+    {
+      "path": "baseline/readbacks.jsonl",
+      "bytes": 198049,
+      "sha256": "4290d88969b60a907e4e1f6e272d9e0f5a90fc4382bb79456553dd71c2a77727"
+    },
+    {
+      "path": "baseline/telemetry.jsonl",
+      "bytes": 13081053,
+      "sha256": "04d59bfb2e84f6d1db16d00b3eec4099d629f2cb01bf977d3294e48edaece32e"
+    },
+    {
+      "path": "inventory-before.json",
+      "bytes": 10709625,
+      "sha256": "5ebc4af6d21441cb9f99fb297b8c13275e0e8a820a541dcedb1e2ea20a591264"
+    },
+    {
+      "path": "inventory-after-baseline.json",
+      "bytes": 52178372,
+      "sha256": "fbfa23a37ee5a1c8902296f77144637d150ec25386bdfc6b11549c10aec1cb1d"
+    },
+    {
+      "path": "baseline-runs.private.json",
+      "bytes": 1508,
+      "sha256": "d917f32bd1682605db8c31f5ab8b40dea5fec96b28248a843193c666c80b91e4"
+    }
+  ],
+  "thresholdsUnchanged": true,
+  "capacityClaim": false
+}

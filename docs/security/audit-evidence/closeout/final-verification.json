@@ -1,0 +1,647 @@
+{
+  "capturedAt": "2026-10-05T07:43:59.154931+00:00",
+  "applicationCommit": "6407d26670886f6b1f16db03a78187cd84334a8a",
+  "latestApplicationChangeCommit": "8bf378a148bd602a57e70033c1ef847500be27f2",
+  "releaseRecommendation": "HOLD: VXA-039/CL-01 and operator release prerequisites CL-02",
+  "capacityTargetsExecuted": [],
+  "maximumFullSystemActiveUsersDemonstrated": null,
+  "originalPreservation": {
+    "checkedAt": "2026-10-05T07:43:59.121947+00:00",
+    "sourceFilesChecked": 1044,
+    "changed": [],
+    "missing": []
+  },
+  "secretPatternScan": {
+    "textFilesChecked": 106,
+    "knownLocalCredentialMatches": 0,
+    "JWTMatches": 0,
+    "scope": "selected audit text only, not a historical secrets incident scan; no OCR claim"
+  },
+  "evidence": [
+    {
+      "path": "e2e-attempt-1/result.json",
+      "bytes": 2545,
+      "sha256": "f581bd94a7439ff02981cda39184e6d4e07666ca3729a173d15c8750e4510d28"
+    },
+    {
+      "path": "e2e-attempt-1/source-manifest.json",
+      "bytes": 422266,
+      "sha256": "0394c508a0960eaaeff17e56742a0ec9df88616b6c02d8617c5bd662a52a402b"
+    },
+    {
+      "path": "e2e-attempt-2/failure.png",
+      "bytes": 238959,
+      "sha256": "83fec2a71fac2c8cedaa7c6c249faa1616cb22ec810833cb93ff60aa4f3c187b"
+    },
+    {
+      "path": "e2e-attempt-2/result.json",
+      "bytes": 5801,
+      "sha256": "b5d0bc0ceea2476bc845d110698f4a9c5cdd598efa1d22d0fb8f616ab2112430"
+    },
+    {
+      "path": "e2e-attempt-2/source-manifest.json",
+      "bytes": 422266,
+      "sha256": "0394c508a0960eaaeff17e56742a0ec9df88616b6c02d8617c5bd662a52a402b"
+    },
+    {
+      "path": "e2e-attempt-3/failure.png",
+      "bytes": 47185,
+      "sha256": "cd26c9e73534c694d76509c9087f179792386aed5992ca1ad0a5af457fb3bf86"
+    },
+    {
+      "path": "e2e-attempt-3/history-1440.png",
+      "bytes": 181556,
+      "sha256": "135999998812ab1769d9b6f57d0565986eb330e23231e8f529af53cddac55ce7"
+    },
+    {
+      "path": "e2e-attempt-3/history-390.png",
+      "bytes": 90699,
+      "sha256": "2f3841ed1c5091e1796793d68960964eb3816284f73fc8f1e519bed1bd2ec650"
+    },
+    {
+      "path": "e2e-attempt-3/result.json",
+      "bytes": 11972,
+      "sha256": "84ba1417d489db68211ef39d98bfbf0c2d83b3ff5407d500a6289802d758c3e6"
+    },
+    {
+      "path": "e2e-attempt-3/source-manifest.json",
+      "bytes": 422266,
+      "sha256": "041971bdc9a5fe00c6a627334ee973be9ed2e83982a312a7c7d0986d88016a9b"
+    },
+    {
+      "path": "e2e-attempt-4/failure.png",
+      "bytes": 106263,
+      "sha256": "b859df4ebb6fd14d705528a58fa0806d58655b04ae66ffa8682a3ec5c8bc5089"
+    },
+    {
+      "path": "e2e-attempt-4/result.json",
+      "bytes": 2728,
+      "sha256": "d7a0a83945385c1960bbee3d0f0dc6c631fe3807e51bbab9cb1f6e061ef7f202"
+    },
+    {
+      "path": "e2e-attempt-4/source-manifest.json",
+      "bytes": 422266,
+      "sha256": "bf6c5ffc4034e43836d7a37cfc2a85f18e314602fb552124f831e8a56916ddea"
+    },
+    {
+      "path": "e2e-attempt-5/app.log",
+      "bytes": 145,
+      "sha256": "0bd5dcee90fb6158ce99e33d0298648e4e37c236d576983f82d9305be076d405"
+    },
+    {
+      "path": "e2e-attempt-5/build.log",
+      "bytes": 19485,
+      "sha256": "3312b1f6e8b6fa7a292931ed146ad0088c1cf5d84d7425e8945eaaba4342ea7f"
+    },
+    {
+      "path": "e2e-attempt-5/failure.png",
+      "bytes": 70014,
+      "sha256": "d7204ca076d054dc48a7ee58f554b2f82cba3bc46f1d30086283537ed4413388"
+    },
+    {
+      "path": "e2e-attempt-5/history-1440.png",
+      "bytes": 181542,
+      "sha256": "20097e9b23308247c28ada741ca36c354e3edcbdee1414c47adc390c437e4397"
+    },
+    {
+      "path": "e2e-attempt-5/history-390.png",
+      "bytes": 90708,
+      "sha256": "53db730e6d2accff1a297d2ba1fcfc40906cc1efd7cdf08e637a28d439bee829"
+    },
+    {
+      "path": "e2e-attempt-5/navigation-failure-1.png",
+      "bytes": 105886,
+      "sha256": "0e823596e8ae43e01c1e500b18c1ab697884a5bf5fb0e8dbb5312471d9a95cfa"
+    },
+    {
+      "path": "e2e-attempt-5/navigation-failure-2.png",
+      "bytes": 45416,
+      "sha256": "258b58af22918aa1fe5e903024d4cfad15af2baf78ff0e6fed1ef0e6cd904cbe"
+    },
+    {
+      "path": "e2e-attempt-5/navigation-failure-3.png",
+      "bytes": 45911,
+      "sha256": "2a740dc726abcf0816fa6ed2997b23b16c2e9bc04f834a5f5912279065dfd11c"
+    },
+    {
+      "path": "e2e-attempt-5/navigation-failure-4.png",
+      "bytes": 45550,
+      "sha256": "9702a1da60d4c3a606c617fb29992cbb1b7abf78de7750d7a1904a64a268b92d"
+    },
+    {
+      "path": "e2e-attempt-5/navigation-failure-5.png",
+      "bytes": 77126,
+      "sha256": "0d35340ac018809afada041bf9b991eddd263f799a5bdfc51faeaad18483af7d"
+    },
+    {
+      "path": "e2e-attempt-5/navigation-failure-6.png",
+      "bytes": 46153,
+      "sha256": "283108eb9c1aff8fba81200d122e1c1bb2f2908d040950cf90874dca7e144d3c"
+    },
+    {
+      "path": "e2e-attempt-5/result.json",
+      "bytes": 34779,
+      "sha256": "be54fdb16fbe151789ebcb34400c5345c9b089d2944777bf1c795a3b04f3cd55"
+    },
+    {
+      "path": "e2e-attempt-5/source-manifest.json",
+      "bytes": 422731,
+      "sha256": "c5741f63632419e46d54c1a75cde41a946985d0adb38baad0333835acf8e72dd"
+    },
+    {
+      "path": "e2e-attempts.md",
+      "bytes": 895,
+      "sha256": "aa63e429ede177e0db5b929e79914e23c9e73b0aa23adb8042d9bcedd4374860"
+    },
+    {
+      "path": "final-full-schema-replay.json",
+      "bytes": 82878,
+      "sha256": "1b95701ba761db943a9467115fa24bf1f162d4ced3676199a844afcfc8dcacaa"
+    },
+    {
+      "path": "native-stack-assembly.json",
+      "bytes": 31314,
+      "sha256": "7655e3d215fd901c1fd5d831dcaba198f4c6fc8ee6d8d057762be2a592c9ffde"
+    },
+    {
+      "path": "native-stack-forward-upgrade.cjs",
+      "bytes": 3323,
+      "sha256": "ff96d1a2d8f2454e00dbe20403a7dfd227bc5e9bb4014675640af2539c071511"
+    },
+    {
+      "path": "native-stack-forward-upgrade.json",
+      "bytes": 395,
+      "sha256": "962c780fc770a48e57a95460acdc4040c340300495e941d21852e30bbce090fb"
+    },
+    {
+      "path": "navigation-diagnosis/README.md",
+      "bytes": 6518,
+      "sha256": "8f8b869087de5a9634cf3d7467e749b9408b3068d561ca888e6720f98379eadd"
+    },
+    {
+      "path": "navigation-diagnosis/manifest.json",
+      "bytes": 2841,
+      "sha256": "b012174ece616533aa8264973268f94769ced01202f4f5c04b496543c038927f"
+    },
+    {
+      "path": "navigation-diagnosis/navigation-decoder-review.cjs",
+      "bytes": 8843,
+      "sha256": "b04ebace86300ec6346efd1cc0af9cab31de394c1dc5de0f1b96d1b7bf9aa842"
+    },
+    {
+      "path": "navigation-diagnosis/navigation-decoder-review.json",
+      "bytes": 3781,
+      "sha256": "6b36c03f673b7209c487496bb5fea5ee42e7eaf74943758d37306db2b79dabe8"
+    },
+    {
+      "path": "navigation-diagnosis/navigation-lazy-no-preload-review.cjs",
+      "bytes": 10757,
+      "sha256": "0b2be081b971ec49be27c1515a7820611db6ea83e642233789fb0b7d7658e2b9"
+    },
+    {
+      "path": "navigation-diagnosis/navigation-lazy-no-preload-review.json",
+      "bytes": 43918,
+      "sha256": "18ece4542d6abe2cc53acfaf097a15bf1da911a42b198f31744a45b010a81e73"
+    },
+    {
+      "path": "navigation-diagnosis/navigation-no-interception-review.cjs",
+      "bytes": 7553,
+      "sha256": "2c74dae6f8041acb111055698f6e174b90b1488b50bde172635859f674834420"
+    },
+    {
+      "path": "navigation-diagnosis/navigation-no-interception-review.json",
+      "bytes": 2830,
+      "sha256": "be7079972cc5d5d4c4403c8ad836fae8e76476f739cd8f5c4e1b35bd425a980d"
+    },
+    {
+      "path": "navigation-diagnosis/navigation-reducer-review.cjs",
+      "bytes": 10180,
+      "sha256": "fb3547934dda279981e2814dabddb16d34bebb3235d16f0006c5453eb1ce0de2"
+    },
+    {
+      "path": "navigation-diagnosis/navigation-reducer-review.json",
+      "bytes": 4367,
+      "sha256": "6fd67892177bbda70eb450c21898bd021285dc21bd66bbe2f4303001918433f6"
+    },
+    {
+      "path": "navigation-diagnosis/navigation-review.cjs",
+      "bytes": 6435,
+      "sha256": "f687499beb89a417f46fe83b391e9b633e2d999ca332074346b7ad2d9bff9fbe"
+    },
+    {
+      "path": "navigation-diagnosis/navigation-review.json",
+      "bytes": 2551,
+      "sha256": "0b1152fc1d2045c35e4aaed0875849d1e40b674b6d1b7728b1e4f371be9da738"
+    },
+    {
+      "path": "navigation-diagnosis/navigation-root-state-review.cjs",
+      "bytes": 11739,
+      "sha256": "d6f9e7b4e8cd25fbcca75a1113d53300faa04235f17d41aa3d92f6ec7b93eb20"
+    },
+    {
+      "path": "navigation-diagnosis/navigation-root-state-review.json",
+      "bytes": 59061,
+      "sha256": "0c0b268c0b4777916f14e05f711455f91fc25bbda53fb152e2582c5829e8eb9d"
+    },
+    {
+      "path": "navigation-diagnosis/navigation-suspension-review.cjs",
+      "bytes": 12323,
+      "sha256": "7ffc884502a2f136c13475fd755c0af916d6da24851461e08197f2776528170e"
+    },
+    {
+      "path": "navigation-diagnosis/navigation-suspension-review.json",
+      "bytes": 69318,
+      "sha256": "6ef3b3f32bd9985fbab3a3c61d2ff63cc9c99833d121bcaea0d9d0e5e5726a78"
+    },
+    {
+      "path": "navigation-diagnosis/vaeroex-closeout-e2e-navigation-lint.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "navigation-diagnosis/vaeroex-closeout-navigation-helper-selftest.cjs",
+      "bytes": 6344,
+      "sha256": "908e493acd618b7751ad7d1492eecf44dd21e7501b7e19a76889c9cc36ea49f4"
+    },
+    {
+      "path": "navigation-diagnosis/vaeroex-closeout-navigation-helper-selftest.log",
+      "bytes": 2459,
+      "sha256": "835980477864ed77930a01eb455bfd5a6c965cfef95aea85ac70cb0db28cb4c0"
+    },
+    {
+      "path": "pre-worksheet-full-schema-replay.json",
+      "bytes": 82200,
+      "sha256": "7ea049e02b1ee11cc7184d1314500eaaf966521953b8fb7b61ad93ed80d897fc"
+    },
+    {
+      "path": "recovery-control-1/app.log",
+      "bytes": 145,
+      "sha256": "2047c86053fb25564fb282e11527a58cbb164bdf0c65f88a59023e0103a8e03b"
+    },
+    {
+      "path": "recovery-control-1/build.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "recovery-control-1/check-saved-results-held-390.png",
+      "bytes": 106783,
+      "sha256": "2cac476df9ba2267ac00e9ed6a424207863ec600c485cdb4db63012ff84da5b4"
+    },
+    {
+      "path": "recovery-control-1/held-inventory.json",
+      "bytes": 8026,
+      "sha256": "e36cbd34aa32b44647ca8f8957e958083a5a933626f5f198a476456b0ea07ec1"
+    },
+    {
+      "path": "recovery-control-1/navigation-failure-1.png",
+      "bytes": 82945,
+      "sha256": "95649c2e0540490d252c6a13b74c4800791fff3d7b23b15a90229258d09817f7"
+    },
+    {
+      "path": "recovery-control-1/result.json",
+      "bytes": 7571,
+      "sha256": "32fd52ff3e3997870e9c2da2f01efc720d1fca858d60b392aa9c5e75f46ba84e"
+    },
+    {
+      "path": "recovery-control-1/source-manifest.json",
+      "bytes": 422731,
+      "sha256": "1f4cff8e1fa22f1280c294e9764e64cd3b14d6bf45c724253b87f09b346e10bf"
+    },
+    {
+      "path": "source-tail-1/app.log",
+      "bytes": 145,
+      "sha256": "1b83a845c7f87aa32444279ce633765c226bbdde698aa38f7d3d6ebe348812c6"
+    },
+    {
+      "path": "source-tail-1/build.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "source-tail-1/held-history-preserved-390.png",
+      "bytes": 79402,
+      "sha256": "df4945beb25d3171ea6e635d1c9098355989ced546f9c63fe6eadb6ecb5a3038"
+    },
+    {
+      "path": "source-tail-1/held-history-recovery-390.png",
+      "bytes": 83088,
+      "sha256": "d9230e18a65ce9509a0d719f5cafb9bb1a8b7597b8e7aa8801e9c704df953fec"
+    },
+    {
+      "path": "source-tail-1/held-import-390.png",
+      "bytes": 82508,
+      "sha256": "8b3ed82f40a396e39b695795f4616de607eee16f16cabf9fff6cdcb2aeb11c41"
+    },
+    {
+      "path": "source-tail-1/navigation-failure-1.png",
+      "bytes": 52505,
+      "sha256": "94c52b14702953f0359b878ca0c10d370ce45be0f8e61a718b79865613885265"
+    },
+    {
+      "path": "source-tail-1/result.json",
+      "bytes": 12876,
+      "sha256": "4899a9a6b50a089ed505570e902739f230ee0f6217ab217d15554f2735552f65"
+    },
+    {
+      "path": "source-tail-1/source-manifest.json",
+      "bytes": 422731,
+      "sha256": "1f4cff8e1fa22f1280c294e9764e64cd3b14d6bf45c724253b87f09b346e10bf"
+    },
+    {
+      "path": "tail-build/build.log",
+      "bytes": 19485,
+      "sha256": "ae8b47ceb02c19110d4e61d4c05a42d0cc5cdd0f3d5efe6b0dded14819a14d4b"
+    },
+    {
+      "path": "tail-build/manifest.json",
+      "bytes": 141298,
+      "sha256": "f79757847e23d05e50acc6645c1c468ae4102e89542343ca65d0cf4ed04e3d4a"
+    },
+    {
+      "path": "vaeroex-claim-order-before-legacy.log",
+      "bytes": 498,
+      "sha256": "fabceea1687054a26e00fb31f6e3311553f85e74f6d7057b0bd023c9923e7648"
+    },
+    {
+      "path": "vaeroex-claim-order-before-workbook.log",
+      "bytes": 488,
+      "sha256": "4151b7145ac45e74d1ca6e04df69164c9dfaf08dfd82c772488224b795075445"
+    },
+    {
+      "path": "vaeroex-claim-order-control.cjs",
+      "bytes": 1379,
+      "sha256": "d275a652f2506caff44a1b368c02ca377c876a9bc63a07d8cfd7c245fb0eee57"
+    },
+    {
+      "path": "vaeroex-closeout-1ba1-hosted-ci.json",
+      "bytes": 24572,
+      "sha256": "2c3a566da121563f675c4918505e0b69fcd214069805adef32bbcaacce60ff5c"
+    },
+    {
+      "path": "vaeroex-closeout-cost.log",
+      "bytes": 562,
+      "sha256": "aa74896a9a92b45d73eab371d0d0ddef138b0ebf9d1411b6f85108d7d392e99a"
+    },
+    {
+      "path": "vaeroex-closeout-d4-hosted-ci.json",
+      "bytes": 24572,
+      "sha256": "e469a91003ef867ad1a4f5bcf77de66cb28fab7bbc0e0b51bb607d6c7828087c"
+    },
+    {
+      "path": "vaeroex-closeout-data-review.md",
+      "bytes": 25082,
+      "sha256": "05e3d8b12fa3332b8af41d8da3568177c01d18bdb3839aecf2c61005455dfb86"
+    },
+    {
+      "path": "vaeroex-closeout-final-build.cjs",
+      "bytes": 2993,
+      "sha256": "d7a01ed84d16b1fa1ae64309025da4813a2e24c1b06e28ab39769c9d4d8d289f"
+    },
+    {
+      "path": "vaeroex-closeout-form-native.json",
+      "bytes": 5048,
+      "sha256": "84a585d876bdd23608269dbb403987daec94c40670d05f3709afb31124cfc3c8"
+    },
+    {
+      "path": "vaeroex-closeout-local-stack-README.md",
+      "bytes": 6033,
+      "sha256": "4f2ef8eec7f56d00a890c98e60625c1819ec71b2bcbb132f77b949089a66f2cf"
+    },
+    {
+      "path": "vaeroex-closeout-local-stack-selftest.log",
+      "bytes": 919,
+      "sha256": "50c12131827a0046dce0b76cdb55a25655cb27abad230a963592c14088fda908"
+    },
+    {
+      "path": "vaeroex-closeout-native-stop.json",
+      "bytes": 273,
+      "sha256": "f8e8406e00b9bcb2a7e13b6fb5556f4c260fd9726f555985221e374b6cb29dca"
+    },
+    {
+      "path": "vaeroex-closeout-original-preservation.json",
+      "bytes": 118,
+      "sha256": "ead4685c503fbb56e6e10f8d91820ee33605250acf3d4cf9720d6baa7a8b63e7"
+    },
+    {
+      "path": "vaeroex-closeout-pr-reconciliation.json",
+      "bytes": 1967,
+      "sha256": "6eff7f6c74784b7feff56417232e6bb24ce0fd1dd3186aa91dc0b6bbb9d80136"
+    },
+    {
+      "path": "vaeroex-closeout-production-migration-ledger.json",
+      "bytes": 12150,
+      "sha256": "390a37f05d3b521005865eb1c91824986899af5021b8500a5f1d715f05edd0e9"
+    },
+    {
+      "path": "vaeroex-closeout-production-shape-results.json",
+      "bytes": 29054,
+      "sha256": "825ed7a72d7008f0deebc9d2d498e602979c5054d41545e7c7c9ff84f04b0a12"
+    },
+    {
+      "path": "vaeroex-closeout-production-shape-seven-results.json",
+      "bytes": 29290,
+      "sha256": "0d71b15e9ae740119a3b519c3b682fbedfed4b5d5dc2c8c2d0b5a7c6962acd81"
+    },
+    {
+      "path": "vaeroex-closeout-production-shape-seven.cjs",
+      "bytes": 4782,
+      "sha256": "69dc02661a3bad78f4edfeec0ca3e6fceb2c3b1cdad88ff2edadae5c68be4032"
+    },
+    {
+      "path": "vaeroex-closeout-production-shape.cjs",
+      "bytes": 4768,
+      "sha256": "a35590d617ecea6cebf903f9ace0cb86776c98cb0b0cf7a538d71009e6ccfdd0"
+    },
+    {
+      "path": "vaeroex-closeout-readiness-after.json",
+      "bytes": 3684,
+      "sha256": "305bb16f8015f8101316fa0917bde582ede5ea80ed9853947fb7650b3bbf9b3e"
+    },
+    {
+      "path": "vaeroex-closeout-readiness-ordering.json",
+      "bytes": 1573,
+      "sha256": "b93aff1fa82206ec32783ce351ea194e8a4ba667a51b913af2fea7cee03bae38"
+    },
+    {
+      "path": "vaeroex-closeout-recovery-control-README.md",
+      "bytes": 2068,
+      "sha256": "3d1bdeed003deba864add90ca72c3b6db7b9413e683ce9114bb5515d7d826f00"
+    },
+    {
+      "path": "vaeroex-closeout-recovery-control-lint.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "vaeroex-closeout-recovery-control.cjs",
+      "bytes": 23289,
+      "sha256": "f2d77ef9ef50b6a3f2eec5d35e21c37d268e6bb54a59a29b3e4c0403464c90c4"
+    },
+    {
+      "path": "vaeroex-closeout-rollout-rehearsal-seven.cjs",
+      "bytes": 12849,
+      "sha256": "c13c9f63027008bd82958614a35da794b79101deca458b6840fd5c073e37c756"
+    },
+    {
+      "path": "vaeroex-closeout-rollout-rehearsal.cjs",
+      "bytes": 12793,
+      "sha256": "3989347e67fab70f3fa5ef183386097b37b272271d17b464b2f45d5429084c95"
+    },
+    {
+      "path": "vaeroex-closeout-rollout-results.json",
+      "bytes": 5523,
+      "sha256": "31c584dc8e84080d4eeb1eceda4f5f9282f428133223fbe3a202735cf6658094"
+    },
+    {
+      "path": "vaeroex-closeout-root-helpers-lint.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "vaeroex-closeout-scheduler-spend.md",
+      "bytes": 11506,
+      "sha256": "3aad193eab18b7fe322886396ad73bc8370b7678dc0fe3702c9a5485780e2daf"
+    },
+    {
+      "path": "vaeroex-closeout-security-source.json",
+      "bytes": 4505,
+      "sha256": "94f04c89972d6e5a0e1fd3ff3f4e36e355d20670fc4e608ee655ae3d555756bf"
+    },
+    {
+      "path": "vaeroex-closeout-security-types5.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "vaeroex-closeout-security-types8.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "vaeroex-closeout-security.md",
+      "bytes": 15062,
+      "sha256": "4848475a7e5bbe962abde32c2c20fc1ea5231a7d913a8bb49247f6dc679a66c2"
+    },
+    {
+      "path": "vaeroex-closeout-sheets-native.cjs",
+      "bytes": 2360,
+      "sha256": "4e89d92a534563e59ce75b07464792d0c5e66daae471212f53de2bcdd058a4a1"
+    },
+    {
+      "path": "vaeroex-closeout-sheets-native.json",
+      "bytes": 822,
+      "sha256": "155eb46983821018878942af6365e860d704216c2880557a136911a43f6c10f8"
+    },
+    {
+      "path": "vaeroex-closeout-sheets-recovery.log",
+      "bytes": 483,
+      "sha256": "e2bc25afe56636cf7cbd2f5fe6413d6a497fce80df1d3c94db5a2edf57ec6981"
+    },
+    {
+      "path": "vaeroex-closeout-source-tail-README.md",
+      "bytes": 3988,
+      "sha256": "61e371b16e726e40a0d69f3e629209661798f7da9796fbe3344a6d9241d509b2"
+    },
+    {
+      "path": "vaeroex-closeout-source-tail-lint.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "vaeroex-closeout-source-tail.cjs",
+      "bytes": 34706,
+      "sha256": "472d930813526d6bf50e88fb6846c3e62bc8c2e92f61b87a8893cb2daa9cb09e"
+    },
+    {
+      "path": "vaeroex-closeout-workflows.log",
+      "bytes": 2027,
+      "sha256": "2fc61c21c75c941ad8bd531ffef810742fed11884c5db11d5d097ecc01e868dd"
+    },
+    {
+      "path": "vaeroex-detail-status-301-proof.cjs",
+      "bytes": 3007,
+      "sha256": "78aa325b7566ebc9cf9644139bb1adc7162eca9ed5b64cf24d662516ccc4b9ee"
+    },
+    {
+      "path": "vaeroex-detail-status-301-proof.json",
+      "bytes": 594,
+      "sha256": "e45583a306d94022f59af126cffade6ba590456611634f5b26ccb3e0b56e1001"
+    },
+    {
+      "path": "vaeroex-hydration-action-review.json",
+      "bytes": 218,
+      "sha256": "4b324f1392e3af00612e6cc0cfe8bf9ef2a8bb60688dd7b4dbbc658d92b99542"
+    },
+    {
+      "path": "vaeroex-hydration-review.json",
+      "bytes": 537,
+      "sha256": "1f755f78b09039a54c414cc78ad75ee50aa63266470a6b847321e3ea02e5535c"
+    },
+    {
+      "path": "vaeroex-import-attempt-results.json",
+      "bytes": 3664,
+      "sha256": "083703cca4e83613e379844c2175b3221cbd94c171738c508f58e379b194974a"
+    },
+    {
+      "path": "vaeroex-import-attempt-with-heads-results.json",
+      "bytes": 6521,
+      "sha256": "623a941625d20bb55026da1186cbf6f82db1a0b582f11ad4e5501336f5b28905"
+    },
+    {
+      "path": "vaeroex-import-recovery-results.json",
+      "bytes": 5384,
+      "sha256": "c619d17fc95e22227f49713e5604a963f15d0088c0b1ddc2a891b4466b93301e"
+    },
+    {
+      "path": "vaeroex-import-workbook-finalization.json",
+      "bytes": 6292,
+      "sha256": "61e6d63091ab9a4cd26e48b59dde88cebe099e99e2f8ee33c914652c72e1731c"
+    },
+    {
+      "path": "vaeroex-memory-app-regression.json",
+      "bytes": 4397,
+      "sha256": "81ffe78b358f03e9c9d29288e4413508aa8a9d6cb7eb2308e23f536213e76e46"
+    },
+    {
+      "path": "vaeroex-memory-publication-results.json",
+      "bytes": 3744,
+      "sha256": "46151c845f8f033792c192c5365f7457ff0e1000030a2a17e9237660b84b8c99"
+    },
+    {
+      "path": "vaeroex-memory-worksheet-app-results.json",
+      "bytes": 6704,
+      "sha256": "177f1f839b9f34edf0940b15efc4628d8db23e97dac4048f29b173cc3a9a870b"
+    },
+    {
+      "path": "vaeroex-token-budget-before.cjs",
+      "bytes": 1686,
+      "sha256": "03dc974657bdd86de0241e9294090986dd2af994750444bacc61d3ba949d95fe"
+    },
+    {
+      "path": "vaeroex-token-budget-before.json",
+      "bytes": 362,
+      "sha256": "99bcd7b5736b313684f39757a731b0ef1d00782edf1c2c07c113c07de9f34026"
+    },
+    {
+      "path": "vaeroex-worksheet-generation-before.log",
+      "bytes": 329,
+      "sha256": "ea951612e326de5e7b847acf054d9587babe1154da4359fbed6cfc908252f5de"
+    },
+    {
+      "path": "vaeroex-worksheet-generation-control.cjs",
+      "bytes": 626,
+      "sha256": "655525a01c197b4305f88a3bc144f53919ee999130f936f7edc1abff882df3ba"
+    },
+    {
+      "path": "vaeroex-worksheet-held-retrieval-proof.cjs",
+      "bytes": 4639,
+      "sha256": "00fab885691ab979283f35d91bb9553ee51fd85b272531e5014bda58c6f6f0fe"
+    },
+    {
+      "path": "vaeroex-worksheet-held-retrieval-proof.json",
+      "bytes": 935,
+      "sha256": "21e133a15595ca901f80ab243e0e8c04824dc10cd9bc2ed9fac48f6e23b06491"
+    }
+  ]
+}

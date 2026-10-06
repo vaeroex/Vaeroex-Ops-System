@@ -1,0 +1,141 @@
+{
+  "kind": "isolated_http_workload_observation",
+  "mode": "baseline",
+  "uploadProfile": "supported_rows_v1",
+  "uploadRowsPerTier": [
+    1000,
+    1000,
+    1000
+  ],
+  "runId": "99799ab6-c939-4b3e-aacc-2a30ffaeb14f",
+  "sourceCommit": "0a15ddcd3b564086280fec21b79b6976b3a3cc44",
+  "status": "observed",
+  "stopReason": null,
+  "startedAt": "2026-10-05T20:06:42.385Z",
+  "durationSeconds": 1200.112792209,
+  "actors": 10,
+  "targetUserActionsPerSecond": 1,
+  "offeredUserActions": 1199,
+  "droppedUserActions": 0,
+  "totalHttpRequests": 1267,
+  "actionMixCounts": {
+    "pages": 359,
+    "search": 240,
+    "filters": 240,
+    "upload": 96,
+    "create": 96,
+    "repeat": 48,
+    "ai": 60,
+    "manualSync": 60
+  },
+  "achievedSteadyUserActionsPerSecond": 0.9991666666666666,
+  "generatorLagP95Ms": 3.476208999978775,
+  "generatorLagP99Ms": 5.379625000068694,
+  "actualDistinctActors": 10,
+  "allPhaseStats": {
+    "requests": 1247,
+    "readP95Ms": 2185.183707999997,
+    "readP99Ms": 2636.2878749999945,
+    "mutationAckP95Ms": 778.0427079999354,
+    "unplannedFailureRate": 0,
+    "unplannedFailureRateAllRequests": 0,
+    "eligibleUnplannedRequests": 1247,
+    "expectedDenialAcknowledgments": 0,
+    "plannedFaultFailures": 0
+  },
+  "steadyStateStats": {
+    "requests": 1247,
+    "readP95Ms": 2185.183707999997,
+    "readP99Ms": 2636.2878749999945,
+    "mutationAckP95Ms": 778.0427079999354,
+    "unplannedFailureRate": 0,
+    "unplannedFailureRateAllRequests": 0,
+    "eligibleUnplannedRequests": 1247,
+    "expectedDenialAcknowledgments": 0,
+    "plannedFaultFailures": 0
+  },
+  "requests": 1247,
+  "readP95Ms": 2185.183707999997,
+  "readP99Ms": 2636.2878749999945,
+  "mutationAckP95Ms": 778.0427079999354,
+  "unplannedFailureRate": 0,
+  "unplannedFailureRateAllRequests": 0,
+  "eligibleUnplannedRequests": 1247,
+  "expectedDenialAcknowledgments": 0,
+  "plannedFaultFailures": 0,
+  "queueP95Ms": 0,
+  "queueDelaySampleCount": 60,
+  "drainMs": 15,
+  "recovery": [],
+  "byWorkspace": {
+    "c347b4e6-d38f-457b-8667-a117e3c2423b": {
+      "count": 420,
+      "p95Ms": 2168.4589160000032,
+      "baselineP95Ms": null,
+      "routes": {
+        "/app": {
+          "count": 36,
+          "p95Ms": 2349.439333999995
+        },
+        "/app/intelligence": {
+          "count": 36,
+          "p95Ms": 2740.0489579999994
+        },
+        "/app/kpis": {
+          "count": 36,
+          "p95Ms": 1940.3831250000512
+        },
+        "/app/sources": {
+          "count": 36,
+          "p95Ms": 214.9833750000107
+        },
+        "/app/reports": {
+          "count": 36,
+          "p95Ms": 378.2695829999866
+        }
+      }
+    },
+    "94e1e8b3-a38c-4780-9870-702dd157ebb1": {
+      "count": 419,
+      "p95Ms": 2207.065209000022,
+      "baselineP95Ms": null,
+      "routes": {
+        "/app": {
+          "count": 36,
+          "p95Ms": 2259.745708000002
+        },
+        "/app/intelligence": {
+          "count": 36,
+          "p95Ms": 2643.523792000022
+        },
+        "/app/kpis": {
+          "count": 36,
+          "p95Ms": 2011.6363750000019
+        },
+        "/app/sources": {
+          "count": 36,
+          "p95Ms": 485.1273330000695
+        },
+        "/app/reports": {
+          "count": 35,
+          "p95Ms": 94.30408300005365
+        }
+      }
+    }
+  },
+  "thresholds": {
+    "actionMix": true,
+    "readP95": false,
+    "readP99": true,
+    "mutationAckP95": true,
+    "unplannedFailureRate": true,
+    "queueP95": true,
+    "nominalDrain": true,
+    "faultRecovery": null,
+    "fairness": null,
+    "generatorTiming": true,
+    "offeredLoad": true
+  },
+  "integrity": "BLOCKED until independent complete inventory verification",
+  "capacityVerdict": "NOT_ESTABLISHED: HTTP observations require inventory, throughput, coverage, chaos and recovery review; no automatic safe-user ceiling"
+}

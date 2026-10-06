@@ -1,0 +1,162 @@
+diff --git a/dist/compiled/react-dom/cjs/react-dom-client.production.js b/dist/compiled/react-dom/cjs/react-dom-client.production.js
+--- a/dist/compiled/react-dom/cjs/react-dom-client.production.js
++++ b/dist/compiled/react-dom/cjs/react-dom-client.production.js
+@@ -2835,6 +2835,17 @@
+       default:
+         hydrationParentFiber = hydrationParentFiber.return;
+     }
++}
++function popHydrationStateOnInterruptedWork(fiber) {
++  if (fiber !== hydrationParentFiber) return;
++  if (!isHydrating) {
++    popToNextHostParent(fiber);
++    isHydrating = true;
++    return;
++  }
++  popToNextHostParent(fiber);
++  if (fiber.tag === 5 && fiber.stateNode !== null)
++    nextHydratableInstance = fiber.stateNode;
+ }
+ function popHydrationState(fiber) {
+   if (fiber !== hydrationParentFiber) return !1;
+@@ -11210,6 +11221,7 @@
+       break;
+     case 5:
+       resetHooksOnUnwind(next);
++      popHydrationStateOnInterruptedWork(next);
+     default:
+       unwindInterruptedWork(current, next),
+         (next = workInProgress =
+@@ -11733,7 +11745,9 @@
+       (workInProgressRootRenderLanes & 62914560) ===
+         workInProgressRootRenderLanes &&
+       300 > now() - globalMostRecentFallbackTime)
+-      ? 0 === (executionContext & 2) && prepareFreshStack(root, 0)
++      ? 0 === (executionContext & 2)
++        ? prepareFreshStack(root, 0)
++        : (workInProgressRootPingedLanes |= pingedLanes)
+       : (workInProgressRootPingedLanes |= pingedLanes),
+     workInProgressSuspendedRetryLanes === workInProgressRootRenderLanes &&
+       (workInProgressSuspendedRetryLanes = 0));
+diff --git a/dist/compiled/react-dom/cjs/react-dom-client.development.js b/dist/compiled/react-dom/cjs/react-dom-client.development.js
+--- a/dist/compiled/react-dom/cjs/react-dom-client.development.js
++++ b/dist/compiled/react-dom/cjs/react-dom-client.development.js
+@@ -4615,6 +4615,17 @@
+           default:
+             hydrationParentFiber = hydrationParentFiber.return;
+         }
++    }
++    function popHydrationStateOnInterruptedWork(fiber) {
++      if (fiber !== hydrationParentFiber) return;
++      if (!isHydrating) {
++        popToNextHostParent(fiber);
++        isHydrating = true;
++        return;
++      }
++      popToNextHostParent(fiber);
++      if (fiber.tag === 5 && fiber.stateNode !== null)
++        nextHydratableInstance = fiber.stateNode;
+     }
+     function popHydrationState(fiber) {
+       if (fiber !== hydrationParentFiber) return !1;
+@@ -15776,6 +15787,7 @@
+           break;
+         case 5:
+           resetHooksOnUnwind(unitOfWork);
++          popHydrationStateOnInterruptedWork(unitOfWork);
+         default:
+           unwindInterruptedWork(current, unitOfWork),
+             (unitOfWork = workInProgress =
+@@ -16469,8 +16481,9 @@
+           (workInProgressRootRenderLanes & 62914560) ===
+             workInProgressRootRenderLanes &&
+           now$1() - globalMostRecentFallbackTime < FALLBACK_THROTTLE_MS)
+-          ? (executionContext & RenderContext) === NoContext &&
+-            prepareFreshStack(root, 0)
++          ? (executionContext & RenderContext) === NoContext
++            ? prepareFreshStack(root, 0)
++            : (workInProgressRootPingedLanes |= pingedLanes)
+           : (workInProgressRootPingedLanes |= pingedLanes),
+         workInProgressSuspendedRetryLanes === workInProgressRootRenderLanes &&
+           (workInProgressSuspendedRetryLanes = 0));
+diff --git a/dist/compiled/react-dom/cjs/react-dom-profiling.profiling.js b/dist/compiled/react-dom/cjs/react-dom-profiling.profiling.js
+--- a/dist/compiled/react-dom/cjs/react-dom-profiling.profiling.js
++++ b/dist/compiled/react-dom/cjs/react-dom-profiling.profiling.js
+@@ -2929,6 +2929,17 @@
+       default:
+         hydrationParentFiber = hydrationParentFiber.return;
+     }
++}
++function popHydrationStateOnInterruptedWork(fiber) {
++  if (fiber !== hydrationParentFiber) return;
++  if (!isHydrating) {
++    popToNextHostParent(fiber);
++    isHydrating = true;
++    return;
++  }
++  popToNextHostParent(fiber);
++  if (fiber.tag === 5 && fiber.stateNode !== null)
++    nextHydratableInstance = fiber.stateNode;
+ }
+ function popHydrationState(fiber) {
+   if (fiber !== hydrationParentFiber) return !1;
+@@ -11814,6 +11825,7 @@
+       break;
+     case 5:
+       resetHooksOnUnwind(next);
++      popHydrationStateOnInterruptedWork(next);
+     default:
+       unwindInterruptedWork(current, next),
+         (next = workInProgress =
+@@ -12404,7 +12416,9 @@
+       (workInProgressRootRenderLanes & 62914560) ===
+         workInProgressRootRenderLanes &&
+       300 > now$1() - globalMostRecentFallbackTime)
+-      ? 0 === (executionContext & 2) && prepareFreshStack(root, 0)
++      ? 0 === (executionContext & 2)
++        ? prepareFreshStack(root, 0)
++        : (workInProgressRootPingedLanes |= pingedLanes)
+       : (workInProgressRootPingedLanes |= pingedLanes),
+     workInProgressSuspendedRetryLanes === workInProgressRootRenderLanes &&
+       (workInProgressSuspendedRetryLanes = 0));
+diff --git a/dist/compiled/react-dom/cjs/react-dom-profiling.development.js b/dist/compiled/react-dom/cjs/react-dom-profiling.development.js
+--- a/dist/compiled/react-dom/cjs/react-dom-profiling.development.js
++++ b/dist/compiled/react-dom/cjs/react-dom-profiling.development.js
+@@ -4623,6 +4623,17 @@
+           default:
+             hydrationParentFiber = hydrationParentFiber.return;
+         }
++    }
++    function popHydrationStateOnInterruptedWork(fiber) {
++      if (fiber !== hydrationParentFiber) return;
++      if (!isHydrating) {
++        popToNextHostParent(fiber);
++        isHydrating = true;
++        return;
++      }
++      popToNextHostParent(fiber);
++      if (fiber.tag === 5 && fiber.stateNode !== null)
++        nextHydratableInstance = fiber.stateNode;
+     }
+     function popHydrationState(fiber) {
+       if (fiber !== hydrationParentFiber) return !1;
+@@ -15784,6 +15795,7 @@
+           break;
+         case 5:
+           resetHooksOnUnwind(unitOfWork);
++          popHydrationStateOnInterruptedWork(unitOfWork);
+         default:
+           unwindInterruptedWork(current, unitOfWork),
+             (unitOfWork = workInProgress =
+@@ -16477,8 +16489,9 @@
+           (workInProgressRootRenderLanes & 62914560) ===
+             workInProgressRootRenderLanes &&
+           now$1() - globalMostRecentFallbackTime < FALLBACK_THROTTLE_MS)
+-          ? (executionContext & RenderContext) === NoContext &&
+-            prepareFreshStack(root, 0)
++          ? (executionContext & RenderContext) === NoContext
++            ? prepareFreshStack(root, 0)
++            : (workInProgressRootPingedLanes |= pingedLanes)
+           : (workInProgressRootPingedLanes |= pingedLanes),
+         workInProgressSuspendedRetryLanes === workInProgressRootRenderLanes &&
+           (workInProgressSuspendedRetryLanes = 0));

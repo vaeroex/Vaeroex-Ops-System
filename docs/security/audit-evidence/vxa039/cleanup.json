@@ -1,0 +1,8 @@
+{
+  "stoppedAt": "2026-10-05T09:46:24.090Z",
+  "ownedNativeStackStopped": true,
+  "scope": "/private/tmp/vaeroex-closeout-assembly-final/project",
+  "fixturesPreserved": true,
+  "credentialsPublished": false,
+  "appBrowsers": "All bounded E2E and renderer processes exited through their finally blocks; no unrelated process terminated."
+}

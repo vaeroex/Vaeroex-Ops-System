@@ -1,0 +1,11 @@
+{
+  "id": "mdiianhfrojmxqpwrflh",
+  "region": "us-west-2",
+  "status": "ACTIVE_HEALTHY",
+  "database": {
+    "host": "db.mdiianhfrojmxqpwrflh.supabase.co",
+    "version": "17.6.1.127",
+    "postgres_engine": "17",
+    "release_channel": "ga"
+  }
+}

@@ -7,6 +7,7 @@ import {
   classifyAndPersistKpiSemantics,
   KPI_SEMANTIC_ACCEPTANCE_CONFIDENCE
 } from "@/lib/ai/kpi-semantics/service";
+import { createSubmissionSchema, FORM_PRIORITIES, parseSubmissionSchema, validateSubmissionFields } from "@/lib/forms/submission-schema";
 import { requireActiveSubscription } from "@/lib/billing/require-active-subscription";
 import {
   allocateAutomaticKpiColors,
@@ -38,13 +39,6 @@ function text(formData: FormData, key: string) {
 
 function bool(formData: FormData, key: string) {
   return formData.get(key) === "on" || formData.get(key) === "true";
-}
-
-function lines(value: string) {
-  return value
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean);
 }
 
 function slugify(value: string) {
@@ -165,18 +159,6 @@ function requireKpiSettingsAdministrator(path: string, role: string) {
   }
 }
 
-function formSchemaFromLines(fieldLines: string): Json {
-  const values = lines(fieldLines);
-  const fields = values.length ? values : ["Submitted by", "Business details", "Priority", "Manager notes"];
-
-  return fields.map((field, index) => ({
-    key: slugify(field) || `field-${index + 1}`,
-    label: field,
-    type: field.toLowerCase().includes("priority") ? "priority" : field.toLowerCase().includes("date") ? "date" : "text",
-    required: index < 2
-  })) as Json;
-}
-
 export async function createFormAction(formData: FormData) {
   const path = "/app/forms";
   const { supabase, user, workspaceId } = await requireWorkspace(path);
@@ -186,12 +168,16 @@ export async function createFormAction(formData: FormData) {
   validateLength(path, "Form type", text(formData, "form_type"), 80);
   validateLength(path, "Description", text(formData, "description"), 800);
 
+  let schema: Json;
+  try { schema = createSubmissionSchema(text(formData, "fields")); }
+  catch (error) { redirectWithError(path, error instanceof Error ? error.message : "Invalid form fields."); }
+
   const { error } = await supabase.from("forms").insert({
     workspace_id: workspaceId,
     name,
     description: text(formData, "description"),
     form_type: text(formData, "form_type") || "operations",
-    schema_json: formSchemaFromLines(text(formData, "fields")),
+    schema_json: schema,
     is_public: bool(formData, "is_public"),
     public_slug: bool(formData, "is_public") ? `${slugify(name)}-${workspaceId.slice(0, 6)}` : null,
     created_by: user.id
@@ -208,32 +194,59 @@ export async function createFormAction(formData: FormData) {
 export async function createFormSubmissionAction(formData: FormData) {
   const formId = text(formData, "form_id");
   const path = returnPath(formData, formId ? `/app/forms/${formId}` : "/app/forms");
-  const { supabase, user, workspaceId } = await requireWorkspace(path);
+  const { supabase, workspaceId, membership } = await requireWorkspace(path);
+  if (!["owner", "admin", "manager", "staff"].includes(membership.role)) {
+    redirectWithError(path, "You do not have permission to submit this form.");
+  }
   const summary = text(formData, "summary");
+  const requestId = text(formData, "submission_request_id");
+  if (formData.getAll("submission_request_id").length !== 1 || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(requestId)) {
+    redirectWithError(path, "Refresh this form before starting a submission.");
+  }
 
   requireValue(path, "Form", formId);
   requireValue(path, "Submission summary", summary, 3000);
 
+  requireValue(path, "Submitter name", text(formData, "submitter_name"));
+  validateLength(path, "Submitter email", text(formData, "submitter_email"), 220);
+  validateLength(path, "Signals or evidence", text(formData, "follow_up"), 5000);
+  if (text(formData, "submitter_email") && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(text(formData, "submitter_email"))) redirectWithError(path, "Enter a valid submitter email.");
+  if (!FORM_PRIORITIES.includes(text(formData, "priority"))) redirectWithError(path, "Choose a listed priority.");
+  const { data: form, error: formError } = await supabase.from("forms")
+    .select("id,schema_json").eq("workspace_id", workspaceId).eq("id", formId)
+    .is("archived_at", null).is("deleted_at", null).maybeSingle();
+  if (formError || !form) redirectWithError(path, "This form is unavailable in the current workspace.");
+  let schema: ReturnType<typeof parseSubmissionSchema>;
+  let fields: Record<string, string>;
+  try {
+    schema = parseSubmissionSchema(form.schema_json);
+    fields = validateSubmissionFields(schema, formData);
+  } catch (error) {
+    redirectWithError(path, error instanceof Error ? error.message : "Invalid form response.");
+  }
   const dataJson = {
+    schema_version: 1,
+    schema_snapshot: schema,
+    fields,
     summary,
     priority: text(formData, "priority"),
     follow_up: text(formData, "follow_up")
   } satisfies Json;
 
-  const { error } = await supabase.from("form_submissions").insert({
-    workspace_id: workspaceId,
-    form_id: formId,
-    submitted_by: user.id,
-    submitter_name: text(formData, "submitter_name"),
-    submitter_email: text(formData, "submitter_email"),
-    data_json: dataJson,
-    ai_summary: text(formData, "summary") ? `Vaeroex summary draft: ${text(formData, "summary")}` : null,
-    ai_detected_priority: text(formData, "priority") || "Medium",
-    ai_detected_followups_json: lines(text(formData, "follow_up")) as Json
+  const { data: saved, error } = await supabase.rpc("submit_internal_form_v1", {
+    p_workspace_id: workspaceId,
+    p_form_id: formId,
+    p_request_id: requestId,
+    p_submitter_name: text(formData, "submitter_name"),
+    p_submitter_email: text(formData, "submitter_email"),
+    p_data_json: dataJson
   });
 
-  if (error) {
-    redirectWithError(path, error.message);
+  if (error?.message.includes("internal_form_request_conflict")) {
+    redirectWithError(path, "This submission request was already used with different responses. Open a new submission to save another response.");
+  }
+  if (error || !saved || typeof saved !== "object" || Array.isArray(saved) || typeof saved.submissionId !== "string") {
+    redirectWithError(path, "Submission could not be saved. Check your access and try again.");
   }
 
   revalidatePath(path);
@@ -822,34 +835,36 @@ export async function acceptKpiSemanticSuggestionAction(formData: FormData) {
 
 export async function createIssueAction(formData: FormData) {
   const path = "/app/issues";
-  const { supabase, user, workspaceId } = await requireWorkspace(path);
-  const title = text(formData, "title");
-
+  const { supabase, workspaceId, membership } = await requireWorkspace(path);
+  if (!["owner", "admin", "manager"].includes(membership.role)) {
+    redirectWithError(path, "You do not have permission to log an issue.");
+  }
+  const title = text(formData, "title"), requestId = text(formData, "issue_request_id");
+  if (formData.getAll("issue_request_id").length !== 1 || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(requestId)) {
+    redirectWithError(path, "Refresh this form before logging an issue.");
+  }
   requireValue(path, "Issue title", title);
   validateLength(path, "Issue description", text(formData, "description"), 2000);
-
-  const { error } = await supabase.from("issues").insert({
-    workspace_id: workspaceId,
-    title,
-    description: text(formData, "description"),
-    issue_type: text(formData, "issue_type"),
-    severity: text(formData, "severity") || "Medium",
-    status: text(formData, "status") || "Open",
-    root_cause: text(formData, "root_cause"),
-    recommended_fix: text(formData, "recommended_fix"),
-    assigned_person_id: text(formData, "person_id") || null,
-    assigned_role: text(formData, "role") || null,
-    assigned_department: text(formData, "department") || null,
-    due_date: text(formData, "due_date") || null,
-    created_by: user.id
+  const { data: saved, error } = await supabase.rpc("submit_issue_v1", {
+    p_workspace_id: workspaceId,
+    p_request_id: requestId,
+    p_payload: {
+      title, description: text(formData, "description"), issue_type: text(formData, "issue_type"),
+      severity: text(formData, "severity") || "Medium", status: text(formData, "status") || "Open",
+      root_cause: text(formData, "root_cause"), recommended_fix: text(formData, "recommended_fix"),
+      assigned_person_id: text(formData, "person_id") || null, assigned_role: text(formData, "role") || null,
+      assigned_department: text(formData, "department") || null, due_date: text(formData, "due_date") || null
+    }
   });
-
-  if (error) {
-    redirectWithError(path, error.message);
+  if (error || !saved || typeof saved !== "object" || Array.isArray(saved) || typeof saved.issueId !== "string") {
+    const message = error?.message || "";
+    redirectWithError(path, message.includes("request_conflict") ? "This request was already used for different issue details. Start a new issue."
+      : message.includes("access_denied") ? "You no longer have permission to log an issue in this workspace."
+      : message.includes("issue_unavailable") ? "The previously logged issue is no longer available. It was not recreated."
+      : "The issue could not be saved. Check the details and try again.");
   }
-
   revalidatePath(path);
-  redirectWithMessage(path, "Issue logged.");
+  redirectWithMessage(path, saved.replayed ? "Issue already logged. No duplicate was created." : "Issue logged.");
 }
 
 export async function createAssetAction(formData: FormData) {

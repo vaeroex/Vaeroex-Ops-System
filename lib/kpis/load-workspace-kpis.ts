@@ -35,8 +35,11 @@ export async function loadActiveWorkspaceKpis({
     return { data: rows.filter(row => !conflicts.has(row.id)), error: null, complete: true };
   };
 
-  for (let from = 0; from < WORKSPACE_KPI_LOAD_LIMIT; from += WORKSPACE_KPI_PAGE_SIZE) {
-    const { data, error } = await supabase
+  // These three database columns are NOT NULL. Keep the database's timestamp
+  // string (including microseconds) instead of round-tripping through Date.
+  let cursor: Pick<KpiRow, "metric_date" | "created_at" | "id"> | undefined;
+  const queryPage = (limit: number) => {
+    let query = supabase
       .from("kpis")
       .select("*")
       .eq("workspace_id", workspaceId)
@@ -45,23 +48,33 @@ export async function loadActiveWorkspaceKpis({
       .order("metric_date", { ascending: false })
       .order("created_at", { ascending: false })
       .order("id", { ascending: false })
-      .range(from, from + WORKSPACE_KPI_PAGE_SIZE - 1);
+      .limit(limit);
+    if (cursor) {
+      // Quote each typed database value for PostgREST's filter grammar. The
+      // cursor is never supplied by a caller. The date bound also lets the
+      // existing workspace/date index skip pages already read.
+      const metricDate = JSON.stringify(cursor.metric_date);
+      const createdAt = JSON.stringify(cursor.created_at);
+      const id = JSON.stringify(cursor.id);
+      query = query.lte("metric_date", cursor.metric_date).or(
+        `metric_date.lt.${metricDate},and(metric_date.eq.${metricDate},created_at.lt.${createdAt}),and(metric_date.eq.${metricDate},created_at.eq.${createdAt},id.lt.${id})`
+      );
+    }
+    return query;
+  };
+
+  for (let from = 0; from < WORKSPACE_KPI_LOAD_LIMIT; from += WORKSPACE_KPI_PAGE_SIZE) {
+    const { data, error } = await queryPage(WORKSPACE_KPI_PAGE_SIZE);
 
     if (error) return { data: [], error: new Error(error.message), complete: false };
     rows.push(...(data || []));
+    cursor = data?.at(-1) ?? cursor;
     if (!data || data.length < WORKSPACE_KPI_PAGE_SIZE) {
       return resolveSheetsAuthority();
     }
   }
 
-  const { data: overflow, error: overflowError } = await supabase
-    .from("kpis")
-    .select("id")
-    .eq("workspace_id", workspaceId)
-    .is("archived_at", null)
-    .is("deleted_at", null)
-    .range(WORKSPACE_KPI_LOAD_LIMIT, WORKSPACE_KPI_LOAD_LIMIT)
-    .maybeSingle();
+  const { data: overflow, error: overflowError } = await queryPage(1).maybeSingle();
 
   if (overflowError) return { data: [], error: new Error(overflowError.message), complete: false };
   if (overflow) {

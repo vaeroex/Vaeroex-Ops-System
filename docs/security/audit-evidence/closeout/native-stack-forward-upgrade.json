@@ -1,0 +1,10 @@
+{
+  "passed": true,
+  "sourceCommit": "d4e57b5652acfc8e2ce1ae6e47518eab06a81918",
+  "migration": "20261005070311_worksheet_import_publication_heads.sql",
+  "sha256": "56c6a11c3317bee9f1f75269b94163a399539bae0272ed5a2a4451ec0eb283ca",
+  "beforeCount": 129,
+  "afterCount": 130,
+  "serverVersion": "17.11",
+  "method": "CLI migration up --local in verified owned native stack; no hosted target"
+}

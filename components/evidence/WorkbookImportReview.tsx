@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { saveExtractedImportAction } from "@/app/app/files/actions";
+import { useActionState, useMemo, useState } from "react";
+import { submitWorksheetApproval } from "@/app/app/files/worksheet-approval-action";
 import { PendingSubmitButton } from "@/components/operations/PendingSubmitButton";
 import {
   WORKSHEET_IMPORT_FIELDS,
@@ -96,6 +96,7 @@ export function WorkbookImportReview({
   importRecord: FileImportRow;
   rows: FileImportDataRow[];
 }) {
+  const [, submitApproval, approvalPending] = useActionState(submitWorksheetApproval, null);
   const [plans, setPlans] = useState(() => parsePlans(importRecord.mapping_json));
   const enabledCount = plans.filter((plan) => plan.enabled).length;
   const inputClass = "mt-2 min-h-11 w-full rounded-md border border-white/10 bg-slate-950/80 px-3 py-2 text-sm text-slate-100 outline-none focus:border-vaeroex-accent disabled:opacity-50";
@@ -126,7 +127,7 @@ export function WorkbookImportReview({
   }
 
   return (
-    <form action={saveExtractedImportAction} className="space-y-5">
+    <form action={submitApproval} className="space-y-5">
       <input type="hidden" name="file_id" value={file.id} />
       <input type="hidden" name="import_id" value={importRecord.id} />
       <input type="hidden" name="import_type" value="metrics" />
@@ -268,6 +269,7 @@ export function WorkbookImportReview({
       <div className="flex flex-wrap items-center gap-3">
         <PendingSubmitButton
           pendingLabel="Importing approved worksheets..."
+          pendingOverride={approvalPending}
           disabled={enabledCount === 0}
           className="min-h-11 rounded-md bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
         >

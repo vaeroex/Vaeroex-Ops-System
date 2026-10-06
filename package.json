@@ -72,7 +72,7 @@
     "test:external-integrations-phase-8a-live": "node scripts/external-integrations-phase-8a-live-gcp-regression-tests.js",
     "test:external-integrations-phase-8b": "node scripts/external-integrations-phase-8b-qbo-sandbox-regression-tests.js",
     "test:external-integrations-qbo-production": "node scripts/external-integrations-qbo-production-regression-tests.js && node --test scripts/integrations-ui-regression-tests.js scripts/square-sheets-result-visibility-tests.cjs && node scripts/integrations-ui-browser-tests.js",
-    "test:qbo-production-completion": "node scripts/qbo-database-tls-tests.cjs && node scripts/qbo-customer-oauth-completion-tests.cjs && node scripts/qbo-ongoing-runtime-tests.cjs && node scripts/qbo-production-source-validation-tests.cjs && node scripts/qbo-production-source-validation-database-tests.cjs && node scripts/qbo-production-candidate-runner-tests.cjs && node scripts/qbo-customer-server-tests.cjs && node scripts/qbo-customer-source-browse-tests.cjs && node --test scripts/qbo-webhook-tests.cjs scripts/qbo-accounting-mapping-tests.cjs scripts/qbo-accounting-persistence-tests.cjs scripts/qbo-accounting-calculation-tests.cjs scripts/qbo-accounting-recovery-tests.cjs scripts/qbo-accounting-authority-ui-tests.cjs scripts/qbo-accounting-intelligence-tests.cjs scripts/qbo-pending-connection-tests.cjs",
+    "test:qbo-production-completion": "node scripts/qbo-database-tls-tests.cjs && node scripts/qbo-database-budget-tests.cjs && node scripts/qbo-worker-budget-tests.cjs && node scripts/qbo-runtime-recovery-tests.cjs && node scripts/qbo-customer-oauth-completion-tests.cjs && node scripts/qbo-ongoing-runtime-tests.cjs && node scripts/qbo-production-source-validation-tests.cjs && node scripts/qbo-production-source-validation-database-tests.cjs && node scripts/qbo-production-candidate-runner-tests.cjs && node scripts/qbo-customer-server-tests.cjs && node scripts/qbo-customer-source-browse-tests.cjs && node --test scripts/qbo-webhook-tests.cjs scripts/qbo-accounting-mapping-tests.cjs scripts/qbo-accounting-persistence-tests.cjs scripts/qbo-accounting-calculation-tests.cjs scripts/qbo-accounting-recovery-tests.cjs scripts/qbo-accounting-authority-ui-tests.cjs scripts/qbo-accounting-intelligence-tests.cjs scripts/qbo-pending-connection-tests.cjs",
     "test:qbo-production-browser": "node scripts/qbo-customer-browser-tests.cjs && node scripts/qbo-accounting-authority-ui-tests.cjs --browser && node scripts/qbo-accounting-intelligence-tests.cjs --browser && node scripts/qbo-connect-navigation-browser-tests.cjs",
     "test:qbo-production-database": "node scripts/run-qbo-production-candidate-database-tests.cjs",
     "test:current-integrations": "node --test scripts/current-integrations-tests.cjs scripts/integration-summary-preferences-route-tests.cjs scripts/workspace-reporting-timezone-tests.cjs && node scripts/integration-summary-preferences-database-tests.cjs && node scripts/square-payment-browse-identity-tests.cjs && node scripts/current-integrations-browser-tests.cjs && node scripts/workspace-reporting-timezone-browser-tests.cjs",
@@ -171,8 +171,9 @@
     "test:science": "node scripts/science-regression-tests.js",
     "test:google-sheets": "node scripts/google-sheets-runtime-tests.cjs && node scripts/google-sheets-data-tests.cjs && node scripts/google-sheets-sync-tests.cjs && node scripts/google-sheets-entity-tests.cjs",
     "test:google-sheets-ui": "node scripts/google-sheets-ui-browser-tests.cjs",
-    "test:workspace-audit": "node scripts/workspace-security-helper-tests.cjs && node scripts/audit-import-evidence-fixes.cjs && node scripts/audit-import-finalization.cjs && node scripts/audit-principal-parent-regression.cjs && node scripts/audit-health-trend-regression.cjs && node scripts/audit-cost-regression.cjs && node scripts/audit-scheduler-regression.cjs",
-    "test:workspace-audit:database": "node scripts/workspace-security-database-tests.cjs"
+    "test:workspace-audit": "node scripts/workspace-security-helper-tests.cjs && node scripts/audit-import-evidence-fixes.cjs && node scripts/audit-import-finalization.cjs && node scripts/audit-principal-parent-regression.cjs && node scripts/audit-health-trend-regression.cjs && node scripts/audit-cost-regression.cjs && node scripts/audit-scheduler-regression.cjs && node scripts/workspace-workflow-tests.cjs && node scripts/workspace-import-recovery-tests.cjs && node scripts/workspace-closeout-egress-tests.cjs && node scripts/workspace-closeout-local-stack-tests.cjs && node --test scripts/workspace-capacity-state-tests.cjs && node --test scripts/workspace-capacity-collector-tests.cjs && node scripts/workspace-capacity-fault-plan-tests.cjs && node --test scripts/workspace-capacity-upload-shape-tests.cjs && node --test docs/security/audit-evidence/stage-3/http/selftest.mjs",
+    "test:workspace-audit:database": "node scripts/workspace-security-database-tests.cjs && node scripts/workspace-asset-chronology-database-tests.cjs && node scripts/workspace-memory-publication-tests.cjs && node scripts/internal-form-idempotency-tests.cjs && node scripts/workspace-import-attempt-database-tests.cjs && node scripts/issue-submission-tests.cjs",
+    "test:workspace-audit:browser": "node scripts/workspace-workflow-browser-tests.cjs && node scripts/workspace-action-completion-runtime-tests.cjs && node scripts/workspace-hydration-replay-tests.cjs"
   },
   "dependencies": {
     "@pdf-lib/fontkit": "1.1.1",
@@ -221,6 +222,9 @@
     "onlyBuiltDependencies": [
       "sharp",
       "unrs-resolver"
-    ]
+    ],
+    "patchedDependencies": {
+      "next@15.5.24": "patches/next@15.5.24.patch"
+    }
   }
 }

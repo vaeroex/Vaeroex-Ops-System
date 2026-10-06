@@ -1,0 +1,138 @@
+{
+  "kind": "bounded_component_comparison",
+  "rows": [
+    {
+      "dataset": "import-1000",
+      "samples": 5,
+      "before": {
+        "p50Ms": 3.815499999999986,
+        "p95Ms": 6.328125,
+        "maxMs": 6.328125,
+        "diagnosticBudgetMs": 5000,
+        "withinDiagnosticBudget": true
+      },
+      "after": {
+        "p50Ms": 4.651499999999999,
+        "p95Ms": 7.09295800000001,
+        "maxMs": 7.09295800000001,
+        "diagnosticBudgetMs": 5000,
+        "withinDiagnosticBudget": true
+      },
+      "afterSampledRssBytes": 160907264,
+      "afterChildWallMs": 397,
+      "integrity": {
+        "rows": 1000,
+        "series": 25,
+        "valueChecksum": 500500,
+        "allIdsPreserved": true
+      }
+    },
+    {
+      "dataset": "import-10000",
+      "samples": 5,
+      "before": {
+        "p50Ms": 32.242208000000005,
+        "p95Ms": 36.80275,
+        "maxMs": 36.80275,
+        "diagnosticBudgetMs": 5000,
+        "withinDiagnosticBudget": true
+      },
+      "after": {
+        "p50Ms": 35.11054200000001,
+        "p95Ms": 39.16216700000001,
+        "maxMs": 39.16216700000001,
+        "diagnosticBudgetMs": 5000,
+        "withinDiagnosticBudget": true
+      },
+      "afterSampledRssBytes": 206815232,
+      "afterChildWallMs": 617,
+      "integrity": {
+        "rows": 10000,
+        "series": 25,
+        "valueChecksum": 50005000,
+        "allIdsPreserved": true
+      }
+    },
+    {
+      "dataset": "import-50000",
+      "samples": 5,
+      "before": {
+        "p50Ms": 142.48454200000015,
+        "p95Ms": 170.48758400000003,
+        "maxMs": 170.48758400000003,
+        "diagnosticBudgetMs": 5000,
+        "withinDiagnosticBudget": true
+      },
+      "after": {
+        "p50Ms": 184.0970000000001,
+        "p95Ms": 210.05033399999996,
+        "maxMs": 210.05033399999996,
+        "diagnosticBudgetMs": 5000,
+        "withinDiagnosticBudget": true
+      },
+      "afterSampledRssBytes": 340754432,
+      "afterChildWallMs": 1712,
+      "integrity": {
+        "rows": 50000,
+        "series": 25,
+        "valueChecksum": 1250025000,
+        "allIdsPreserved": true
+      }
+    },
+    {
+      "dataset": "sources-200-12",
+      "samples": 3,
+      "before": {
+        "p50Ms": 44.79250000000002,
+        "p95Ms": 60.308625000000006,
+        "maxMs": 60.308625000000006,
+        "diagnosticBudgetMs": 10000,
+        "withinDiagnosticBudget": true
+      },
+      "after": {
+        "p50Ms": 46.51095800000002,
+        "p95Ms": 62.46554199999997,
+        "maxMs": 62.46554199999997,
+        "diagnosticBudgetMs": 10000,
+        "withinDiagnosticBudget": true
+      },
+      "afterSampledRssBytes": 217874432,
+      "afterChildWallMs": 517,
+      "integrity": {
+        "files": 200,
+        "rows": 2400,
+        "eligibleKpiRecords": 2400,
+        "eligibleFiles": 200,
+        "findings": 24
+      }
+    },
+    {
+      "dataset": "sources-2000-24",
+      "samples": 3,
+      "before": {
+        "p50Ms": 960.3820830000002,
+        "p95Ms": 1028.947291,
+        "maxMs": 1028.947291,
+        "diagnosticBudgetMs": 10000,
+        "withinDiagnosticBudget": true
+      },
+      "after": {
+        "p50Ms": 1044.2592920000002,
+        "p95Ms": 1112.8109590000001,
+        "maxMs": 1112.8109590000001,
+        "diagnosticBudgetMs": 10000,
+        "withinDiagnosticBudget": true
+      },
+      "afterSampledRssBytes": 382484480,
+      "afterChildWallMs": 3672,
+      "integrity": {
+        "files": 2000,
+        "rows": 48000,
+        "eligibleKpiRecords": 48000,
+        "eligibleFiles": 2000,
+        "findings": 24
+      }
+    }
+  ],
+  "limitation": "Sequential local component observations, small samples; not HTTP capacity or a controlled performance significance test."
+}
