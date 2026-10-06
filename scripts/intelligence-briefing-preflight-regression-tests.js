@@ -109,7 +109,7 @@ assert.ok(historyTable, "the canonical CRM history table migration must be prese
 assert.doesNotMatch(historyTable, /deleted_at|archived_at/, "CRM history has no row lifecycle column silently bypassed by the briefing query");
 assert.match(historyTable, /lead_id uuid not null references public\.crm_leads\(id\) on delete cascade/, "CRM history retains its canonical parent relationship");
 
-for (const consumer of ["app/app/page.tsx", "app/app/crm/page.tsx"]) {
+for (const consumer of ["lib/intelligence/workspace-health.ts", "app/app/crm/page.tsx"]) {
   const source = read(consumer);
   assert.match(source, /from\("crm_lead_history"\)\.select\("\*"\)\.eq\("workspace_id", workspaceId\)\.order\("created_at"/, `${consumer} must use the canonical workspace-scoped history query`);
   assert.doesNotMatch(source, /from\("crm_lead_history"\)[^\n]*\.is\("deleted_at"/, `${consumer} must not invent a CRM history lifecycle column`);

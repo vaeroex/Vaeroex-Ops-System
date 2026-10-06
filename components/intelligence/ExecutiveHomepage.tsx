@@ -1,9 +1,6 @@
 import Link from "next/link";
 import { ArrowRight, ShieldCheck, TrendingUp } from "lucide-react";
-import { BusinessHealthInstrument } from "@/components/intelligence/BusinessHealthInstrument";
-import { BusinessHealthAnalysisPanel } from "@/components/intelligence/BusinessHealthAnalysisPanel";
-import { BusinessHealthTrendChart, type BusinessHealthTrendPoint } from "@/components/intelligence/BusinessHealthTrendChart";
-import { EligibleBusinessSignals } from "@/components/intelligence/EligibleBusinessSignals";
+import { type BusinessHealthTrendPoint } from "@/components/intelligence/BusinessHealthTrendChart";
 import { SpatialSurface } from "@/components/spatial/SpatialSurface";
 import type {
   BusinessHealthAnalysisState,
@@ -12,7 +9,6 @@ import type {
 } from "@/lib/ai/business-health-explanation/contracts";
 import type { ExecutiveHomepageModel, ExecutivePriorityCard } from "@/lib/intelligence/executive-homepage";
 import {
-  businessHealthStatus,
   findingPriorityStatus,
   intelligenceReadinessStatus,
   semanticPresentation,
@@ -80,24 +76,10 @@ function PriorityCard({ card }: { card: ExecutivePriorityCard }) {
 export function ExecutiveHomepage({
   lastUpdatedLabel,
   model,
-  healthHistory,
-  healthHistoryAsOfDate,
-  healthHistoryError,
-  healthVisual = "scorecard",
-  businessHealthAnalysis
 }: ExecutiveHomepageProps) {
-  const trendDelta = model.health.trendDelta;
-  const previousReviewSummary = trendDelta === null
-    ? "No previous review available."
-    : trendDelta === 0
-      ? "Unchanged"
-      : `${trendDelta > 0 ? "Up" : "Down"} ${Math.abs(trendDelta)} point${Math.abs(trendDelta) === 1 ? "" : "s"}`;
   const risk = model.priorities[0];
   const opportunity = model.priorities[1];
   const decision = model.priorities[2];
-  const healthStatus = businessHealthStatus(model.health.status);
-  const healthPresentation = semanticPresentation(healthStatus);
-  const HealthIcon = healthPresentation.Icon;
   const riskStatus = priorityStatus(risk);
   const riskPresentation = semanticPresentation(riskStatus);
   const RiskIcon = riskPresentation.Icon;
@@ -117,81 +99,17 @@ export function ExecutiveHomepage({
         <p className="shrink-0 text-xs text-muted">Last updated {lastUpdatedLabel}</p>
       </header>
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,3fr)_minmax(360px,2fr)]" data-executive-opening>
-        <SpatialSurface as="section" depth="focus" className={`workspace-business-health vaeroex-business-health-surface vaeroex-semantic-frame ${semanticStatusClass(healthStatus)} overflow-hidden border-x-0 bg-vaeroex-navy p-5 text-white shadow-command xl:col-span-2`} ariaLabelledBy="business-health-heading">
-          <div className="mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-4">
-            <p id="business-health-heading" className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-200">Business Health</p>
-            <span className={`vaeroex-semantic-badge inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold ${semanticStatusClass(healthStatus)}`}><HealthIcon aria-hidden="true" className="h-3.5 w-3.5" />{model.health.status}</span>
+      <section aria-label="Business Health in Intelligence" className="rounded-xl border border-cyan-200/25 bg-vaeroex-navy p-5 text-white">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="font-semibold">Business Health is part of Intelligence</h2>
+            <p className="mt-1 text-sm text-slate-300">Review the score, movement, freshness and contributing evidence alongside current findings.</p>
           </div>
-          <div className="grid gap-5 lg:grid-cols-[minmax(220px,.62fr)_minmax(0,1.38fr)] lg:items-start">
-            <div className="workspace-health-score">
-              <div className="flex justify-center lg:justify-start">
-                <BusinessHealthInstrument score={model.health.available ? model.health.score : null} status={model.health.status} variant={healthVisual} />
-              </div>
-              {!model.health.available ? <p className="mt-4 text-xl font-semibold">Business Health is not yet evaluable.</p> : null}
-              {model.health.available ? (
-                <dl className="workspace-health-facts mt-5 grid grid-cols-3 gap-3 border-t border-white/10 pt-4 text-sm">
-                  <div>
-                    <dt className="text-xs font-semibold text-cyan-200">Current state</dt>
-                    <dd className="mt-1 font-semibold text-white">
-                      {model.health.status} · {model.health.trend || "Trajectory unavailable"}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs font-semibold text-cyan-200">Since previous review</dt>
-                    <dd className="mt-1 text-slate-200">{previousReviewSummary}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs font-semibold text-cyan-200">Confidence</dt>
-                    <dd className="mt-1 font-semibold text-white">{model.health.confidence}</dd>
-                  </div>
-                </dl>
-              ) : null}
-            </div>
-
-            <div className="workspace-health-assessment min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan-200">
-                {businessHealthAnalysis.state.status === "current" ? "Validated executive interpretation" : "Current assessment"}
-              </p>
-              <h2 className="mt-2 text-xl font-semibold leading-7 sm:text-2xl">{model.health.displayTitle}</h2>
-              {businessHealthAnalysis.state.status === "current" && businessHealthAnalysis.state.artifact ? (
-                <p className="mt-3 text-sm leading-6 text-slate-200">{businessHealthAnalysis.state.artifact.analysis.executive_interpretation}</p>
-              ) : null}
-              <dl className="mt-4 border-t border-white/10 pt-4 text-sm">
-                <div className={`vaeroex-semantic-detail border-l-2 pl-3 ${semanticStatusClass(healthStatus)}`}>
-                  <dt className="text-xs font-semibold text-cyan-200">Highest Impact Driver</dt>
-                  <dd className="mt-1 leading-6 text-slate-200">
-                    <span className="block font-semibold text-white">{model.health.driverPresentation.identity}</span>
-                    {model.health.driverPresentation.details.map((detail) => (
-                      <span key={detail} className="block">{detail}</span>
-                    ))}
-                  </dd>
-                </div>
-              </dl>
-              <div className="workspace-health-actions mt-5 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-white/10 pt-1">
-                <BusinessHealthAnalysisPanel
-                  initialState={businessHealthAnalysis.state}
-                  requestToken={businessHealthAnalysis.requestToken}
-                  currentFacts={businessHealthAnalysis.facts}
-                  currentCitations={businessHealthAnalysis.citations}
-                />
-                <EligibleBusinessSignals
-                  total={model.health.memorySignals}
-                  categories={model.health.eligibleSignalCategories}
-                />
-              </div>
-            </div>
-          </div>
-
-          {model.health.available ? (
-            <BusinessHealthTrendChart
-              points={healthHistory}
-              asOfDate={healthHistoryAsOfDate}
-              errorMessage={healthHistoryError}
-            />
-          ) : null}
-        </SpatialSurface>
-      </div>
+          <Link href="/app/intelligence#business-health" className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-lg border border-cyan-200/30 px-4 py-2 text-sm font-semibold text-cyan-100 hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300">
+            Review Business Health <ArrowRight aria-hidden="true" className="h-4 w-4" />
+          </Link>
+        </div>
+      </section>
 
       <section aria-label="Executive priorities" className="workspace-executive-priorities grid items-stretch gap-4 lg:grid-cols-[1fr_1fr_.78fr]">
         <SpatialSurface as="article" depth="raised" interactive className={`workspace-priority-card vaeroex-semantic-card ${semanticStatusClass(riskStatus)} flex flex-col rounded-lg border p-4 shadow-panel`}>

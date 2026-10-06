@@ -107,7 +107,7 @@ const sourceParentEligibilityHelper = read("lib/intelligence/source-parent-eligi
 const recordActions = read("app/app/operations/record-management-actions.ts");
 const intelligenceLayer = read("lib/intelligence/layer.ts");
 const coverage = read("lib/intelligence/coverage.ts");
-const homepage = read("app/app/page.tsx");
+const homepage = read("app/app/page.tsx") + "\n" + read("lib/intelligence/workspace-health.ts");
 const formSubmissionsPage = read("app/app/form-submissions/page.tsx");
 const checklistRunsPage = read("app/app/checklist-runs/page.tsx");
 

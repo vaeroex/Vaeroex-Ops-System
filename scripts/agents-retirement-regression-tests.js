@@ -11,6 +11,7 @@ const askRoute = read("app/app/ask/page.tsx");
 const search = read("app/api/search/route.ts");
 const searchTypes = read("lib/search/types.ts");
 const overview = read("app/app/page.tsx");
+const overviewHealth = read("lib/intelligence/workspace-health.ts");
 const overviewCompatibility = read("lib/intelligence/overview-run-compatibility.ts");
 const intelligence = read("app/app/intelligence/page.tsx");
 const workflows = read("lib/ai/vaeroex-workflows.ts");
@@ -45,8 +46,9 @@ for (const source of [search, searchTypes]) {
 }
 assert.doesNotMatch(search, /from\("ai_agent_runs"\)/, "deterministic Search must not query historical run payloads");
 
-assert.match(overview, /buildOverviewRunCompatibility/, "Overview must retain its isolated compatibility aggregate");
-assert.match(overview, /agent_type,input_json,output_json,status,error_message,created_at,updated_at,archived_at,deleted_at/, "Overview must select only compatibility fields");
+assert.match(overview, /loadWorkspaceHealthEvidence/, "Overview must load its scoped Health evidence once");
+assert.match(overviewHealth, /buildOverviewRunCompatibility/, "Overview must retain its isolated compatibility aggregate");
+assert.match(overviewHealth, /agent_type,input_json,output_json,status,error_message,created_at,updated_at,archived_at,deleted_at/, "Overview must select only compatibility fields");
 assert.doesNotMatch(overview, /Vaeroex insights|Recent Vaeroex decision support|businessEvidenceRuns/, "Overview must not render the retired run panel");
 for (const field of ["derivedFindingCount", "latestEvidenceUpdate", "snapshotSourceCount"]) {
   assert.match(overviewCompatibility, new RegExp(field), `Overview compatibility must preserve ${field}`);

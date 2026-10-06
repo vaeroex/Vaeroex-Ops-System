@@ -596,6 +596,7 @@ const missingPolicyToken = sealBusinessHealthExplanationPackage({
 assert.equal(openBusinessHealthExplanationPackage(missingPolicyToken, { workspaceId, userId }, now.getTime()).ok, false, "a missing sealed generation-policy version must fail closed");
 
 const pageSource = read("app/app/page.tsx");
+const healthLoaderSource = read("lib/intelligence/workspace-health.ts");
 const actionSource = read("app/app/business-health-analysis/actions.ts");
 const serviceSource = read("lib/ai/business-health-explanation/service.ts");
 const contextSource = read("lib/ai/business-health-explanation/context.ts");
@@ -604,8 +605,10 @@ const workflowPolicySource = read("lib/ai/providers/workflow-provider-policy.ts"
 const panelSource = read("components/intelligence/BusinessHealthAnalysisPanel.tsx");
 const claimSource = read("lib/ai/business-health-explanation/generation-claim.ts");
 const claimMigration = read("supabase/migrations/20260731071855_business_health_generation_claim.sql");
-assert.match(pageSource, /buildBusinessHealthExplanationFromSnapshotV1/, "Overview must build the deterministic package from the scoped snapshot projection during server rendering");
-assert.doesNotMatch(pageSource, /generateBusinessHealthExplanation\(/, "server rendering must never invoke a generation provider");
+assert.match(pageSource, /buildWorkspaceHealthView/, "Overview must use the shared server Health view");
+assert.match(healthLoaderSource, /import "server-only"/, "Health evidence and signed request preparation must remain server-only");
+assert.match(healthLoaderSource, /buildBusinessHealthExplanationFromSnapshotV1/, "Overview must build the deterministic package from the scoped snapshot projection during server rendering");
+assert.doesNotMatch(pageSource + healthLoaderSource, /generateBusinessHealthExplanation\(/, "server rendering must never invoke a generation provider");
 assert.doesNotMatch(snapshotContextSource, /runStructuredAI|generateBusinessHealthExplanation\(/, "snapshot construction must never invoke a provider");
 assert.match(snapshotContextSource, /process\.env\.VERCEL_ENV === "preview"/, "legacy parity fallback must remain Preview-only");
 assert.match(snapshotContextSource, /projectBusinessHealthExplanationV1/, "the live consumer must receive the bounded V1 projection");

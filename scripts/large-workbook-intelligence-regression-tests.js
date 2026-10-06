@@ -412,7 +412,7 @@ assert.match(loader, /WORKSPACE_KPI_LOAD_LIMIT = 20_000/);
 assert.match(loader, /queryPage\(WORKSPACE_KPI_PAGE_SIZE\)/, "large KPI history must use bounded deterministic pagination");
 assert.match(loader, /exceeds the supported/, "history overflow must fail closed instead of silently truncating");
 for (const route of ["app/app/page.tsx", "app/app/kpis/page.tsx", "app/app/intelligence/page.tsx"]) {
-  const source = read(route);
+  const source = read(route) + (route === "app/app/page.tsx" ? "\n" + read("lib/intelligence/workspace-health.ts") : "");
   assert.match(source, /loadActiveWorkspaceKpis/, `${route} must share the bounded complete-history loader`);
   assert.doesNotMatch(source, /from\("kpis"\)[\s\S]{0,260}\.limit\(500\)/, `${route} must not silently cap KPI input at 500 observations`);
 }

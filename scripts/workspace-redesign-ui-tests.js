@@ -110,24 +110,22 @@ async function main() {
   const result = await build({ test: true });
   const screens = require(path.join(result.output, "render.cjs"));
   const { renderToStaticMarkup } = require("react-dom/server");
-  const alternatives = await Promise.all(["scorecard", "arc"].map(async variant => renderToStaticMarkup(await screens.renderScreen("/app", "populated", "owner", new URLSearchParams({ healthVisual: variant })))));
-  const withoutInstrument = html => {
-    const start = html.indexOf('<div class="workspace-health-instrument ');
-    const end = html.indexOf('<dl class="workspace-health-facts', start);
-    assert.ok(start >= 0 && end > start);
-    return html.slice(0, start) + html.slice(end);
-  };
-  assert.equal(withoutInstrument(alternatives[0]), withoutInstrument(alternatives[1]), "Both visuals must use identical breakdown, assessment, actions, trend history and other screen content");
-  for (const healthVisual of ["scorecard", "arc"]) {
-    const emptyBody = await screens.renderScreen("/app", "empty", "owner", new URLSearchParams({ healthVisual }));
+  const overviewHtml = renderToStaticMarkup(await screens.renderScreen("/app", "populated", "owner"));
+  assert.match(overviewHtml, /href="\/app\/intelligence#business-health"/, "Overview retains a direct path to Health");
+  assert.doesNotMatch(overviewHtml, /id="business-health"|View analysis/, "Health review controls belong to Intelligence");
+  for (const role of ["owner", "viewer"]) {
+    const emptyBody = await screens.renderScreen("/app/intelligence", "empty", role);
     const emptyHtml = renderToStaticMarkup(emptyBody);
-    const { model, businessHealthAnalysis } = emptyBody.props;
-    assert.match(emptyHtml, /Business Health unavailable\. Limited evidence\./);
-    assert.doesNotMatch(emptyHtml, /87%|95%|Order fulfillment|Watch|Improving|Up 4 points/);
-    assert.equal(model.health.trend, null);
-    assert.equal(model.health.confidence, "Low");
-    // Verify the actual props passed to the closed analysis drawer too: SSR
-    // alone does not render its facts until the existing View analysis opens it.
+    const snapshot = findElements(emptyBody, "IntelligenceHealthSnapshot")[0];
+    assert.ok(snapshot, "the actual Intelligence render contains its Health snapshot");
+    const { health, facts, analysis } = snapshot.props;
+    const model = { health };
+    const businessHealthAnalysis = { facts, ...analysis };
+    assert.match(emptyHtml, /Business Health score unavailable/);
+    assert.doesNotMatch(emptyHtml, /87%|95%|Order fulfillment|Up 4 points/);
+    assert.equal(health.trend, null);
+    assert.equal(health.confidence, "Low");
+    // Inspect the actual immutable props forwarded to the unchanged analysis drawer.
     assert.deepEqual(businessHealthAnalysis.facts, {
       available: false, score: null, status: "Limited evidence", trajectory: null,
       comparison: "No valid previous review is available for comparison.", comparisonDelta: null,
@@ -144,7 +142,7 @@ async function main() {
       const body = await screens.renderScreen(route.href, state, role);
       const html = renderToStaticMarkup(screens.wrapScreen(body, role, route.href));
       if (route.href === "/app/settings/integrations/square") {
-        assert.doesNotMatch(html, /workspace-content|workspace-sidebar|workspace-topbar|aria-label="Vaeroex Overview"|aria-label="Workspace switcher"/, "Square is standalone, matching its real route group; its own theme wrapper is allowed");
+        assert.doesNotMatch(html, /workspace-content|workspace-sidebar|workspace-topbar|aria-label="Vaeroex (?:Overview|Intelligence)"|aria-label="Workspace switcher"/, "Square is standalone, matching its real route group; its own theme wrapper is allowed");
         if (state === "populated" || state === "empty") assert.match(html, /Back to Settings/);
       } else {
         assert.ok(html.includes("Harbor Supply"), `${route.label}: real shell workspace`);

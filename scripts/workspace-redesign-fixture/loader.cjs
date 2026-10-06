@@ -16,6 +16,8 @@ module.exports = function(source) {
       throw new Error("Intelligence dashboard binding changed; review the fixture adapter");
     }
     source = `import Link from "next/link"; import { CalendarRange } from "lucide-react";
+      import { HealthSnapshotUnavailable } from "@/components/intelligence/HealthSnapshotUnavailable";
+      import { IntelligenceHealthSnapshot } from "@/components/intelligence/IntelligenceHealthSnapshot";
       import { IntelligenceBriefingCards } from "@/components/intelligence/IntelligenceBriefingCards";
       import { IntelligenceSignalInbox } from "@/components/intelligence/IntelligenceSignalInbox";
       import { ErrorNotice } from "@/components/operations/ErrorNotice";
@@ -23,7 +25,7 @@ module.exports = function(source) {
       import { intelligenceFixture } from ${JSON.stringify(options.readRuntime)};
       export default async function IntelligencePage({searchParams}) {
         const params = await searchParams;
-        const {workspaceId,dashboard,displayErrors,lifecycleCards,explanationTokens,canManageLifecycle,blockedState,briefingStates,isIntelligenceBriefingEnabled} = intelligenceFixture();
+        const {healthView,workspaceId,dashboard,displayErrors,lifecycleCards,explanationTokens,canManageLifecycle,blockedState,briefingStates,isIntelligenceBriefingEnabled} = intelligenceFixture();
         return ${render};
       }`;
   }

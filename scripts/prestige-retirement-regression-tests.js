@@ -45,7 +45,7 @@ for (const file of [...sourceFiles("app"), ...sourceFiles("components"), ...sour
   assert.doesNotMatch(source, /buildPrestigeIntelligence|PrestigeOperationsPanel|projectPeoplePrestigeV1/, `${file} must not import or construct retired intelligence`);
 }
 
-const overview = read("app/app/page.tsx");
+const overview = read("app/app/page.tsx") + "\n" + read("lib/intelligence/workspace-health.ts");
 const kpis = read("app/app/kpis/page.tsx");
 const decisionJournal = read("components/intelligence/LeadershipDecisionJournal.tsx");
 const intelligenceActions = read("app/app/intelligence/actions.ts");

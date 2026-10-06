@@ -136,7 +136,7 @@ export const helpArticles: HelpArticle[] = [
   ),
   ...[
     ["executive-dashboard", "Executive Dashboard", "A leadership view of business health, signals, risks, and recommended actions.", "/app"],
-    ["business-health-score", "Business Health Score", "A directional score built from available workspace signals.", "/app"],
+    ["business-health-score", "Business Health Score", "Review the score, movement, freshness, history and evidence in Intelligence.", "/app/intelligence#business-health"],
     ["business-memory", "Business Memory", "Relevant historical context from imports, decisions, recommendations, and outcomes.", "/app"],
     ["profit-leak-detector", "Profit Leakage Review", "A KPI-based review of supported revenue leakage indicators.", "/app/kpis/profit-leakage"],
     ["focus-on", "What Should Leadership Review?", "A prioritized list of evidence-backed topics to review.", "/app"],

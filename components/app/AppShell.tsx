@@ -17,11 +17,11 @@ const baseNavSections = [
     label: "Primary",
     collapsible: false,
     items: [
+      { href: "/app/intelligence", label: "Intelligence" },
       { href: "/app", label: "Overview" },
       ...(isPremiumConversationalVaeroexEnabled()
         ? [{ href: "/app/ask", label: "Ask Vaeroex" }]
         : []),
-      { href: "/app/intelligence", label: "Intelligence" },
       { href: "/app/kpis", label: "Performance" },
       { href: "/app/sources", label: "Files & Notes" },
       { href: "/app/reports", label: "Saved Analyses" },
@@ -77,7 +77,7 @@ export function AppShell({ children, profile, workspaces, activeWorkspace, isVae
   return (
     <WorkspacePresentation className="vaeroex-app-shell min-h-dvh overflow-x-hidden bg-[#f8fafc] text-ink">
       <aside className="workspace-sidebar fixed inset-y-0 left-0 hidden w-64 border-r border-slate-800 bg-vaeroex-navy p-3 text-white shadow-command lg:flex lg:flex-col">
-        <Link href="/app" aria-label="Vaeroex Overview" className="group flex h-12 items-center rounded-lg border border-white/10 bg-white/[0.04] px-3 shadow-sm shadow-black/10">
+        <Link href="/app/intelligence" aria-label="Vaeroex Intelligence" className="group flex h-12 items-center rounded-lg border border-white/10 bg-white/[0.04] px-3 shadow-sm shadow-black/10">
           <VaeroexLogo variant="symbol" size="sm" priority className="transition group-hover:scale-[1.01]" />
           <span className="ml-3 text-sm font-semibold tracking-wide text-white">Vaeroex</span>
         </Link>
