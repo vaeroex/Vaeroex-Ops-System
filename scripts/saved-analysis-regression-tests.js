@@ -118,6 +118,39 @@ for (const retiredPath of [
   "lib/reports/generation-policy.ts",
   "lib/reports/legacy-executive-brief-artifact.ts"
 ]) assert.equal(fs.existsSync(path.join(root, retiredPath)), false, `${retiredPath} must stay retired`);
-assert.doesNotMatch(vercel, /report-subscriptions|crons/);
+assert.doesNotMatch(vercel, /report-subscriptions/, "retired report scheduling remains absent");
+assert.deepEqual(JSON.parse(vercel).crons, [
+  { path: "/api/integrations/google-sheets/scheduled-sync", schedule: "*/15 * * * *" }
+], "only the established Sheets schedule is permitted; this does not authorize additional cron jobs");
 
-console.log("Saved-analysis regressions passed.");
+// Run the actual client date formatter in independent host timezone contexts.
+// SSR and hydration must agree even when a UTC timestamp crosses a local date.
+const ts = require("typescript");
+const { spawnSync } = require("node:child_process");
+const listTree = ts.createSourceFile("SavedAnalysisList.tsx", list, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+const dateFunctions = listTree.statements.filter(node => ts.isFunctionDeclaration(node) && node.name?.text === "readableDate");
+assert.equal(dateFunctions.length, 1, "qualify the exact Saved Analyses formatter");
+const compiledDateFormatter = ts.transpileModule(dateFunctions[0].getText(listTree), {
+  compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS }
+}).outputText;
+const dateInputs = ["2026-10-01T00:44:00.000Z", "2026-10-02T02:10:00.000Z", "2026-12-31T23:59:59.000Z", "2026-03-08T09:30:00.000Z", "invalid-date"];
+const expectedDates = ["Oct 1, 2026", "Oct 2, 2026", "Dec 31, 2026", "Mar 8, 2026", "Date unavailable"];
+const observations = [];
+for (const timeZone of ["UTC", "America/Los_Angeles", "Asia/Tokyo"]) {
+  const child = spawnSync(process.execPath, ["-e", `${compiledDateFormatter}
+    const inputs = ${JSON.stringify(dateInputs)};
+    console.log(JSON.stringify({
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      defaultDate: new Intl.DateTimeFormat("en-US", {month:"short",day:"numeric",year:"numeric"}).format(new Date(inputs[0])),
+      dates: inputs.map(readableDate)
+    }));
+  `], { encoding: "utf8", env: { ...process.env, TZ: timeZone }, timeout: 5000 });
+  assert.equal(child.status, 0, `formatter child completes in ${timeZone}: ${child.stderr}`);
+  const result = JSON.parse(child.stdout);
+  assert.equal(result.timeZone, timeZone, "exercise a real independent timezone context");
+  assert.deepEqual(result.dates, expectedDates, `server/client dates agree in ${timeZone}`);
+  observations.push(result);
+}
+assert.notEqual(observations[0].defaultDate, observations[1].defaultDate, "the fixture crosses the UTC/Los Angeles calendar boundary and detects the original mismatch");
+
+console.log("Saved-analysis regressions passed (including UTC, Los Angeles and Tokyo date rendering).");
