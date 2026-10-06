@@ -22,10 +22,35 @@ function evidenceDate(value: string | null) {
   return new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: "UTC" }).format(new Date(value));
 }
 
+function contributionPresentation(scoreImpact: number) {
+  if (scoreImpact < -5) {
+    return { className: "text-red-300", description: "Negative contribution", tone: "negative" };
+  }
+  if (scoreImpact > 5) {
+    return { className: "text-vaeroex-accent", description: "Positive contribution", tone: "positive" };
+  }
+  return {
+    className: "text-amber-200",
+    description: scoreImpact === 0 ? "Neutral contribution" : "Minor contribution",
+    tone: "minor"
+  };
+}
+
+function evidenceLinkLabel(citation: BusinessHealthCitationView | undefined) {
+  if (!citation) return "View supporting evidence";
+  const source = citation.sourceLabel.trim() || citation.title.trim();
+  const dated = citation.recordedAt && Number.isFinite(Date.parse(citation.recordedAt));
+  if (source && dated) return `${source} · ${evidenceDate(citation.recordedAt)}`;
+  if (source) return `View ${source}`;
+  if (dated) return `Supporting evidence · ${evidenceDate(citation.recordedAt)}`;
+  return "View supporting evidence";
+}
+
 // Presentation only: all values and citations come from the existing scoped
 // Health calculation/explanation package, including its version-aware comparison.
 export function IntelligenceHealthSnapshot({ health, facts, citations, history, asOfDate, historyError, analysis }: IntelligenceHealthSnapshotProps) {
   const status = businessHealthStatus(health.status);
+  const citationsById = new Map(citations.map((citation) => [citation.citationId, citation]));
   return (
     <section id="business-health" aria-labelledby="intelligence-health-heading" className="scroll-mt-24 rounded-xl border border-cyan-200/20 bg-vaeroex-navy p-4 text-white sm:p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -59,12 +84,22 @@ export function IntelligenceHealthSnapshot({ health, facts, citations, history, 
         <summary className="min-h-11 cursor-pointer py-3 text-sm font-semibold text-cyan-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300">Contributing factors and evidence</summary>
         {health.available ? <p className="mt-2 text-sm leading-6 text-slate-300">Performance baseline {facts.dataQualityBase} + positive performance {facts.opportunityAdjustment} − negative performance {facts.riskPenalty} = {health.score} out of 100. Confidence describes evidence coverage; it is not an extra score adjustment.</p> : <p className="mt-2 text-sm leading-6 text-slate-300">{health.summary}</p>}
         <ul className="mt-3 space-y-3">
-          {facts.drivers.map((driver, index) => <li key={`${driver.kind}-${driver.label}-${index}`} className="border-l-2 border-cyan-200/40 pl-3 text-sm">
-            <p className="font-semibold">{driver.label} <span className="font-normal text-slate-300">({driver.scoreImpact > 0 ? "+" : ""}{driver.scoreImpact} points)</span></p>
-            <p className="mt-1 leading-6 text-slate-300">{driver.fact}</p>
-            {driver.limitation ? <p className="mt-1 text-slate-300">{driver.limitation}</p> : null}
-            <div className="flex flex-wrap gap-3">{driver.citationIds.map(id => <a key={id} href={`#health-evidence-${id}`} className="inline-flex min-h-11 items-center text-cyan-100 underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300">Evidence [{id}]</a>)}</div>
-          </li>)}
+          {facts.drivers.map((driver, index) => {
+            const contribution = contributionPresentation(driver.scoreImpact);
+            const signedImpact = `${driver.scoreImpact > 0 ? "+" : ""}${driver.scoreImpact}`;
+            return <li key={`${driver.kind}-${driver.label}-${index}`} className="border-l-2 border-cyan-200/40 pl-3 text-sm">
+              <p className="font-semibold">{driver.label} <span data-health-score-impact={contribution.tone} className={`font-semibold ${contribution.className}`}><span aria-hidden="true">({signedImpact} points)</span><span className="sr-only">{contribution.description}: {signedImpact} points</span></span></p>
+              <p className="mt-1 leading-6 text-slate-300">{driver.fact}</p>
+              {driver.limitation ? <p className="mt-1 text-slate-300">{driver.limitation}</p> : null}
+              {driver.citationIds.length ? <div className="mt-2"><p className="text-xs font-semibold uppercase tracking-wide text-slate-300">Supporting evidence for this factor</p><div className="mt-1 flex flex-wrap gap-2">{driver.citationIds.map((id) => {
+                const citation = citationsById.get(id);
+                const label = evidenceLinkLabel(citation);
+                return <a key={id} href={`#health-evidence-${id}`} aria-label={`${label}. Supporting evidence citation ${id}.`} className="inline-flex min-h-11 items-center gap-2 rounded-md border border-cyan-200/30 bg-white/[0.04] px-3 py-2 text-cyan-100 hover:bg-white/[0.1] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300" data-health-evidence-link={id}>
+                  <span>{label}</span><span className="text-xs text-slate-300">Citation {id}</span>
+                </a>;
+              })}</div></div> : null}
+            </li>;
+          })}
         </ul>
         {facts.limitations.length ? <div className="mt-4"><h3 className="text-sm font-semibold">Known limitations</h3><ul className="mt-2 list-disc space-y-2 pl-5 text-sm text-slate-300">{facts.limitations.map(item => <li key={item}>{item}</li>)}</ul></div> : null}
         <h3 className="mt-5 text-sm font-semibold">Supporting evidence ({citations.length})</h3>
