@@ -197,8 +197,8 @@ function homepage(overrides = {}) {
 }
 
 const snapshots = [
-  { snapshot_date: "2026-07-18", score: 42 },
-  { snapshot_date: "2026-07-11", score: 42 }
+  { workspace_id: workspaceId, snapshot_date: "2026-07-18", score: 42, source_summary: { business_health_calculation_version: "business_health_calculation_v2" } },
+  { workspace_id: workspaceId, snapshot_date: "2026-07-11", score: 42, source_summary: { business_health_calculation_version: "business_health_calculation_v2" } }
 ];
 
 function build(overrides = {}) {
@@ -350,6 +350,70 @@ assert.throws(() => buildBusinessHealthExplanationFromSnapshotV1({
   sourceLabelsByKey: {},
   asOf: now.toISOString()
 }), /presentation disagrees/, "Production must not silently fall back to the legacy context on a projection disagreement");
+// Evidence trajectory counts current drivers; stored movement compares daily reviews.
+// They can legitimately disagree without changing the score, evidence or citations.
+function movementSnapshot(score, date = "2026-07-18", version = "business_health_calculation_v2") {
+  return { workspace_id: workspaceId, snapshot_date: date, score, source_summary: { business_health_calculation_version: version } };
+}
+function projectedMovement({ evidenceTrend = "Improving", delta = -11, trend = "Declining", history = [movementSnapshot(53)], patch = {} } = {}) {
+  return buildBusinessHealthExplanationFromSnapshotV1({
+    workspaceId,
+    intelligence: intelligence({ businessHealth: { ...intelligence().businessHealth, trend: evidenceTrend } }),
+    homepage: homepage({ trend, trendDelta: delta, ...patch }),
+    snapshots: history,
+    coverage: foundationCoverageOutput(),
+    asOf: now.toISOString()
+  });
+}
+const fallingStoredReview = projectedMovement();
+assert.equal(fallingStoredReview.projection.businessHealth.value.trajectory, "Improving");
+assert.equal(fallingStoredReview.analysisPackage.facts.trajectory, "Declining");
+assert.equal(fallingStoredReview.analysisPackage.facts.comparisonDelta, -11);
+assert.match(fallingStoredReview.analysisPackage.facts.comparison, /Down 11 points/);
+assert.equal(fallingStoredReview.analysisPackage.facts.score, 42);
+assert.deepEqual(fallingStoredReview.analysisPackage.citations, analysisPackage.citations);
+const risingStoredReview = projectedMovement({ evidenceTrend: "Declining", delta: 11, trend: "Improving", history: [movementSnapshot(31)] });
+assert.equal(risingStoredReview.projection.businessHealth.value.trajectory, "Declining");
+assert.equal(risingStoredReview.analysisPackage.facts.trajectory, "Improving");
+assert.equal(risingStoredReview.analysisPackage.facts.comparisonDelta, 11);
+const unchangedStoredReview = projectedMovement({ delta: 0, trend: "Holding steady", history: [movementSnapshot(42)] });
+assert.equal(unchangedStoredReview.analysisPackage.facts.comparisonDelta, 0);
+assert.match(unchangedStoredReview.analysisPackage.facts.comparison, /Unchanged 0 points/);
+const sameDayReview = projectedMovement({ history: [movementSnapshot(53), movementSnapshot(99, "2026-07-19")] });
+assert.equal(sameDayReview.analysisPackage.facts.comparisonDelta, -11, "today's first stored score is not the previous review");
+const formulaBoundary = projectedMovement({ delta: null, trend: null, history: [movementSnapshot(53, "2026-07-18", "business_health_calculation_v1")] });
+assert.equal(formulaBoundary.analysisPackage.facts.comparisonDelta, null, "historical V1 remains readable without a cross-formula movement");
+assert.equal(projectedMovement({ delta: null, trend: null, history: [] }).analysisPackage.facts.trajectory, null);
+for (const invalid of [
+  { delta: -10 },
+  { trend: "Improving" },
+  { delta: null, trend: null },
+  { delta: 0, trend: "Holding steady", history: [] },
+  { history: [{ ...movementSnapshot(53), workspace_id: "33333333-3333-4333-8333-333333333333" }] }
+]) {
+  assert.throws(() => projectedMovement(invalid), /stored review/, "invalid or foreign history-derived movement must fail closed");
+}
+for (const patch of [{ score: 43 }, { status: "Strong" }, { confidence: "High" }]) {
+  assert.throws(() => projectedMovement({ patch }), /presentation disagrees/, "authoritative score, status and confidence checks remain enforced");
+}
+assert.throws(() => buildBusinessHealthExplanationPackage({
+  workspaceId,
+  intelligence: intelligence({ businessHealth: { ...intelligence().businessHealth, trend: "Declining" } }),
+  homepage: homepage({ trend: "Declining", trendDelta: -11 }),
+  snapshots: [movementSnapshot(53)],
+  projection: fallingStoredReview.projection,
+  now
+}), /presentation disagrees/, "a tampered current-evidence trajectory still fails independently of stored movement");
+assert.throws(() => buildBusinessHealthExplanationPackage({
+  workspaceId: "33333333-3333-4333-8333-333333333333",
+  intelligence: intelligence(), homepage: homepage(), snapshots,
+  projection: fallingStoredReview.projection, now
+}), /another workspace/, "the scoped projection cannot cross workspaces");
+assert.throws(() => buildBusinessHealthExplanationPackage({
+  workspaceId, intelligence: intelligence({ businessHealth: { ...intelligence().businessHealth, trend: "Improving" } }),
+  homepage: homepage({ trend: "Declining", trendDelta: -11 }),
+  snapshots: [movementSnapshot(53)], projection: { ...fallingStoredReview.projection, citations: [] }, now
+}), /missing evidence-manifest citations/, "historical movement cannot bypass citation verification");
 process.env.VERCEL_ENV = "preview";
 
 const laterPackage = build({ now: new Date("2026-07-19T12:10:00.000Z") });
