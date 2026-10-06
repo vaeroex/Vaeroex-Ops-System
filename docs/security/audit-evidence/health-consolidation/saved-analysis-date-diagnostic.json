@@ -1,0 +1,59 @@
+{
+  "applicationCommit": "8a0c172577b7262603737546342d2b61d013fb1c",
+  "observations": [
+    {
+      "timezoneId": "UTC",
+      "entry": "own-list",
+      "finalPath": "/app/reports",
+      "ssrGenerated": "Oct 1, 2026",
+      "ssrSaved": "Oct 2, 2026",
+      "hydratedGenerated": "Oct 1, 2026",
+      "hydratedSaved": "Oct 2, 2026",
+      "errors": [],
+      "controlsRecover": true,
+      "foreignLabelVisible": false
+    },
+    {
+      "timezoneId": "UTC",
+      "entry": "foreign-detail",
+      "finalPath": "/app/reports",
+      "ssrGenerated": "Oct 1, 2026",
+      "ssrSaved": "Oct 2, 2026",
+      "hydratedGenerated": "Oct 1, 2026",
+      "hydratedSaved": "Oct 2, 2026",
+      "errors": [],
+      "controlsRecover": true,
+      "foreignLabelVisible": false
+    },
+    {
+      "timezoneId": "America/Los_Angeles",
+      "entry": "own-list",
+      "finalPath": "/app/reports",
+      "ssrGenerated": "Oct 1, 2026",
+      "ssrSaved": "Oct 2, 2026",
+      "hydratedGenerated": "Sep 30, 2026",
+      "hydratedSaved": "Oct 1, 2026",
+      "errors": [
+        "Minified React error #418; visit https://react.dev/errors/418?args[]=text&args[]= for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
+      ],
+      "controlsRecover": true,
+      "foreignLabelVisible": false
+    },
+    {
+      "timezoneId": "America/Los_Angeles",
+      "entry": "foreign-detail",
+      "finalPath": "/app/reports",
+      "ssrGenerated": "Oct 1, 2026",
+      "ssrSaved": "Oct 2, 2026",
+      "hydratedGenerated": "Sep 30, 2026",
+      "hydratedSaved": "Oct 1, 2026",
+      "errors": [
+        "Minified React error #418; visit https://react.dev/errors/418?args[]=text&args[]= for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
+      ],
+      "controlsRecover": true,
+      "foreignLabelVisible": false
+    }
+  ],
+  "productionTouched": false,
+  "providerCalls": 0
+}

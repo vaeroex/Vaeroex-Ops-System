@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "observedAt": "2026-10-06 00:36:23 UTC",
+  "method": "Read-only authenticated Supabase dashboard through cua_repl",
+  "projectRef": "mdiianhfrojmxqpwrflh",
+  "productionMutated": false,
+  "configurationChanged": false,
+  "jobTriggered": false,
+  "credentialsRead": false,
+  "paidActions": 0,
+  "githubIntegration": {
+    "settingsUrl": "https://supabase.com/dashboard/project/mdiianhfrojmxqpwrflh/settings/integrations",
+    "repositorySelection": "No repository selected; selector offers only Add GitHub Repositories",
+    "branchingUrl": "https://supabase.com/dashboard/project/mdiianhfrojmxqpwrflh/branches",
+    "explicitStatus": "GitHub connection Not connected",
+    "productionBranch": "main",
+    "persistentBranches": "No persistent branches",
+    "previewBranches": "Create your first preview branch (none listed)",
+    "scheduledDeletionBranches": "No branches scheduled for deletion"
+  },
+  "vercelIntegration": {
+    "sameProjectSettingsView": true,
+    "observedStatus": "Install Vercel integration link; no linked Vercel project shown",
+    "scope": "Supabase project integration view only; not an independent audit of Vercel project deployments or Git hooks"
+  },
+  "conclusion": "The inspected production project's native Supabase GitHub integration is not connected, so that integration has no repository/main-merge trigger configured to apply production migrations.",
+  "limits": [
+    "This evidence does not establish the absence of external GitHub Actions, repository webhooks, Vercel hooks, Cloud Build triggers or other independently configured automation.",
+    "No migration ledger or customer data queried in this check.",
+    "No settings, repository binding, branch creation, migration, deployment, purchase or credential retrieval performed."
+  ]
+}

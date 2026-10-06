@@ -1,0 +1,19 @@
+{
+  "defect": "Implicit runtime timezone makes SSR and client render different Saved Analyses calendar dates.",
+  "priorApplicationCommit": "8a0c172577b7262603737546342d2b61d013fb1c",
+  "originalSourceUnchangedSinceBaseline": true,
+  "browserDiagnostic": "/tmp/vaeroex-capacity-health-02/report-date-diagnostic.json",
+  "beforeRegression": "failed on America/Los_Angeles previous-day dates",
+  "afterRegression": "passed15datecases in3real timezone child processes",
+  "fullSavedAnalysisSuite": "passed",
+  "scopedLint": "passed",
+  "diffCheck": "passed",
+  "runtimeBrowserRetest": "pending committed build",
+  "sourceSha256": {
+    "components/reports/SavedAnalysisList.tsx": "6cdf372b7fb42b90817ca28f8f95b6977178f8f27477be868f4e1d0f04c413b5",
+    "scripts/saved-analysis-regression-tests.js": "0e2d9ead3af7b7b44ec1db205f7bd2671a4acfdff9e7aa7cac1da82bc9242122",
+    "package.json": "6b53dfe920445dd96987fac12347886689e832fb53a3d9c4bcb3a3befc9469d9"
+  },
+  "schemaOrDataChanges": false,
+  "permissionsChanged": false
+}
