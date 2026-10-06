@@ -1067,7 +1067,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
   const sourceParentResult = await loadSourceParentEligibilityResult({
     supabase,
     workspaceId,
-    rows: [...rawKpis, ...rawCrmLeads, ...rawCrmHistory, ...rawOperationalMetrics]
+    rows: [...rawKpis, ...rawCrmLeads, ...rawCrmHistory, ...rawOperationalMetrics, ...(memoryChunksResult.data || [])]
   });
   const sourceParentEligibility = sourceParentResult.eligibility;
   const kpiSettings = (kpiSettingsResult.data || []) as KpiSettingRow[];
@@ -1375,6 +1375,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     return "Entire workspace";
   };
   const operationalInsights = buildOperationalEvidenceInsights({
+    sourceParents: sourceParentResult.eligibility.records,
     kpis: intelligenceKpis,
     kpiSettings: intelligenceKpiSettings,
     operationalMetrics: intelligenceOperationalMetrics,
@@ -1384,6 +1385,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
   });
   const businessHealthExplanationAsOf = new Date().toISOString();
   const intelligenceLayer = buildIntelligenceLayer({
+    sourceParents: sourceParentResult.eligibility.records,
     asOf: businessHealthExplanationAsOf,
     workspace: context.activeWorkspace,
     kpis: intelligenceKpis,
@@ -1432,13 +1434,13 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     calculationVersion: businessHealthSnapshotCalculationVersion(snapshot)
   }));
   const businessIntelligenceCoverage = buildBusinessIntelligenceCoverage({
+    sourceParents: sourceParentResult.eligibility.records,
     kpis: intelligenceKpis,
     issues,
     files,
     imports,
     sops,
     crmLeads,
-    crmHistory,
     overviewRunCompatibility,
     operationalMetrics: intelligenceOperationalMetrics,
     assets,

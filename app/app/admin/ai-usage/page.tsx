@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { recordedEstimatedCostCents } from "@/lib/ai/usage";
 import type { Route } from "next";
 import { CompactRunTable, GroupedErrorRuns, type AdminRunLog } from "@/components/admin/AdminLogViews";
 import { EmptyState } from "@/components/operations/EmptyState";
@@ -82,7 +83,7 @@ export default async function AdminAiUsagePage({ searchParams }: AdminAiUsagePag
   monthStart.setUTCDate(1);
   monthStart.setUTCHours(0, 0, 0, 0);
 
-  const [{ data: usage }, { data: runs }, { data: workspaces }, { data: failedRuns }] = await Promise.all([
+  const [{ data: usage, error: usageError }, { data: runs }, { data: workspaces }, { data: failedRuns }] = await Promise.all([
     access.admin.from("ai_usage").select("*").gte("created_at", monthStart.toISOString()).order("created_at", { ascending: false }).limit(200),
     access.admin
       .from("ai_agent_runs")
@@ -100,6 +101,8 @@ export default async function AdminAiUsagePage({ searchParams }: AdminAiUsagePag
       .limit(25)
   ]);
 
+  if (usageError) return <ErrorNotice message="Provider usage could not be loaded. Please try again." />;
+
   const workspaceName = new Map((workspaces || []).map((workspace) => [workspace.id, workspace.name]));
   const usageByWorkspace = new Map<string, { runs: number; tokens: number; cost: number }>();
   const allRuns = (runs || []) as AdminRunLog[];
@@ -111,7 +114,7 @@ export default async function AdminAiUsagePage({ searchParams }: AdminAiUsagePag
     usageByWorkspace.set(key, {
       runs: current.runs + 1,
       tokens: current.tokens + row.tokens_used,
-      cost: current.cost + row.estimated_cost_cents
+      cost: current.cost + recordedEstimatedCostCents(row)
     });
   }
 
@@ -137,13 +140,13 @@ export default async function AdminAiUsagePage({ searchParams }: AdminAiUsagePag
       <PageHeader
         eyebrow="Internal admin"
         title="Vaeroex usage"
-        description="Review monthly provider usage and current supported analysis artifacts."
+        description="Review recent provider usage recorded this month and current supported analysis artifacts."
       />
       <ErrorNotice message={params?.error} />
 
       <section className="vaeroex-mobile-safe-scroll flex gap-2 overflow-x-auto pb-1">
         {[
-          { label: "Usage rows this month", value: usage?.length || 0 },
+          { label: "Recent usage rows (up to 200)", value: usage?.length || 0 },
           { label: "Completed runs", value: completedCount },
           { label: "Failed runs", value: failedCount },
           { label: "File analyses", value: fileAnalysisCount },
@@ -158,7 +161,7 @@ export default async function AdminAiUsagePage({ searchParams }: AdminAiUsagePag
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[1fr_1.2fr]">
-        <SectionCard title="Monthly usage by workspace" description="Top workspace usage this month. Expand only when you need the longer list.">
+        <SectionCard title="Recent usage by workspace" description="Totals cover the latest 200 recorded entries this month. Costs are token estimates, not invoices; older entries retain their historical estimates.">
           {visibleUsageRows.length ? (
             <div className="overflow-hidden rounded-lg border border-line">
               <table className="min-w-full divide-y divide-line text-sm">
@@ -190,7 +193,7 @@ export default async function AdminAiUsagePage({ searchParams }: AdminAiUsagePag
           )}
           {usageRows.length > visibleUsageRows.length ? (
             <Link href="/app/admin/ai-usage?usage=all" className="mt-3 inline-flex text-sm font-semibold text-vaeroex-blue">
-              Show all workspace usage
+              Show all workspaces in these entries
             </Link>
           ) : showAllUsage && usageRows.length > 10 ? (
             <Link href="/app/admin/ai-usage" className="mt-3 inline-flex text-sm font-semibold text-vaeroex-blue">

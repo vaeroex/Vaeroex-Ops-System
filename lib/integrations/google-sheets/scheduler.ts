@@ -7,7 +7,7 @@ export type DueSheetsConnection = { id: string; workspace_id: string };
 /** Bounded dispatcher on the existing application scheduler. A seen set also
  * prevents repeated attempts when a failed backoff acknowledgement is lost. */
 export async function runDueSheetsRefreshes(input: {
-  due: (tickAt: string, limit: number, deadlineAt: number) => Promise<DueSheetsConnection[]>;
+  due: (tickAt: string, limit: number, deadlineAt: number, excludedConnectionIds: readonly string[]) => Promise<DueSheetsConnection[]>;
   sync: (connection: DueSheetsConnection, execution: SheetsExecutionBudget) => Promise<unknown>;
   backoff: (connection: DueSheetsConnection, tickAt: string, deadlineAt: number) => Promise<unknown>;
   now?: () => number;
@@ -15,10 +15,10 @@ export async function runDueSheetsRefreshes(input: {
   const now = input.now ?? Date.now;
   const startedAt = now(), tickAt = new Date(startedAt).toISOString();
   const execution = { deadlineAt: startedAt + 240_000, cleanupDeadlineAt: startedAt + 285_000 };
-  const deadline = execution.deadlineAt, seen = new Set<string>();
+  const deadline = execution.deadlineAt, seen = new Set<string>(), seenIds = new Set<string>();
   let succeeded = 0, failed = 0;
   for (let batch = 0; batch < 5 && now() < deadline; batch++) {
-    const due = await input.due(tickAt, 10, deadline);
+    const due = await input.due(tickAt, 10, deadline, [...seenIds]);
     if (due.length > 10) throw new Error("google_sheets_scheduler_result_invalid");
     const candidates = due.filter(connection => !seen.has(`${connection.workspace_id}:${connection.id}`));
     if (candidates.length === 0) break;
@@ -27,6 +27,7 @@ export async function runDueSheetsRefreshes(input: {
       const key = `${connection.workspace_id}:${connection.id}`;
       if (seen.has(key)) continue;
       seen.add(key);
+      seenIds.add(connection.id);
       try { await input.sync(connection, execution); succeeded++; }
       catch {
         failed++;

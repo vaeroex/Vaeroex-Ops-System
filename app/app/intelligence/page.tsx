@@ -110,7 +110,8 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
     rows: [
       ...(kpisResult.data || []),
       ...(crmResult.data || []),
-      ...(metricsResult.data || [])
+      ...(metricsResult.data || []),
+      ...(memoryResult.data || [])
     ]
   });
   const sourceParentEligibility = sourceParentResult.eligibility;
@@ -129,6 +130,7 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
     memoryEligibilityError = error instanceof Error ? error : new Error("Business Memory eligibility could not be verified.");
   }
   const operationalInsights = buildOperationalEvidenceInsights({
+    sourceParents: sourceParentResult.eligibility.records,
     kpis: eligibleKpis,
     kpiSettings: kpiSettingsResult.data || [],
     operationalMetrics: eligibleOperationalMetrics,
@@ -139,6 +141,7 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
   const displayErrors = [...errors, sourceParentResult.error, memoryEligibilityError].filter(Boolean) as Array<{ message: string }>;
   const snapshotAsOf = new Date().toISOString();
   const intelligence = buildIntelligenceLayer({
+    sourceParents: sourceParentResult.eligibility.records,
     asOf: snapshotAsOf,
     workspace: context.activeWorkspace,
     issues: issuesResult.data || [],

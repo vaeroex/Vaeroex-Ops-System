@@ -145,7 +145,8 @@ assert.doesNotMatch(intelligenceLayer, /ReportRow|input\.reports|const reports/,
 assert.doesNotMatch(coverage, /ReportRow|input\.reports|reports: \[\]/, "report rows must not increase coverage");
 assert.doesNotMatch(coverage, /checklists|checklistRuns|activeChecklistIds/, "retired Checklist inputs cannot affect active intelligence coverage");
 assert.match(coverage, /activeFormIds\.has\(submission\.form_id\)/, "form submissions require an active form parent");
-assert.match(coverage, /activeCrmLeadIds\.has\(history\.lead_id\)/, "customer history requires active eligible customer evidence");
+assert.doesNotMatch(coverage, /crmHistory|crm_lead_history/, "unused customer history cannot affect coverage or add a query dependency");
+assert.match(homepage, /activeCustomerEvidenceIds\.has\(history\.lead_id\)/, "retained customer-history consumers still require active eligible customer evidence");
 assert.match(coverage, /activeSourceFileIds\.has\(item\.file_upload_id\)/, "imports require an active Source parent");
 assert.match(intelligenceLayer, /activeFormIds\.has\(submission\.form_id\)/, "Intelligence submissions require an active form parent");
 assert.match(homepage, /const intelligenceLayer = buildIntelligenceLayer\(/, "Executive Overview must delegate Business Health to the canonical layer that excludes derived reports");

@@ -7,7 +7,7 @@ import {
   calculateIntelligenceReadiness,
   type BusinessHealthPerformanceSignal
 } from "@/lib/intelligence/business-health-formula";
-import { buildSourceParentEligibility, filterBySourceParentEligibility } from "@/lib/intelligence/source-parent-eligibility";
+import { buildSourceParentEligibility, filterBySourceParentEligibility, type SourceParentRecords } from "@/lib/intelligence/source-parent-eligibility";
 import { compareKpiRowsNewest, groupKpisByNormalizedName, normalizeKpiName } from "@/lib/intelligence/kpi-identity";
 import { applyKpiSettingsToRows, kpiSemantics, type KpiSettingRow } from "@/lib/kpis/settings";
 import {
@@ -162,6 +162,7 @@ export type IntelligenceLayerInput = {
   kpiSettings?: KpiSettingRow[];
   issues?: IssueRow[];
   files?: FileUploadRow[];
+  sourceParents?: SourceParentRecords;
   vaeroexRuns?: VaeroexRunRow[];
   crmLeads?: CrmLeadRow[];
   imports?: FileImportRow[];
@@ -554,7 +555,10 @@ function isMaterialTargetMiss(row: KpiRow, semantics: KpiSemantics) {
 export function buildIntelligenceLayer(input: IntelligenceLayerInput): IntelligenceLayerResult {
   const workspace = input.workspace || null;
   const files = filterOriginalBusinessEvidence(input.files);
-  const parentEligibility = buildSourceParentEligibility({ files, imports: input.imports || [] });
+  const parentEligibility = buildSourceParentEligibility({
+    files: filterOriginalBusinessEvidence(input.sourceParents?.files ?? files),
+    imports: input.sourceParents?.imports ?? input.imports ?? []
+  });
   const kpiSettings = excludeChecklistDerivedMetrics(input.kpiSettings || []);
   const kpis = applyKpiSettingsToRows(
     excludeChecklistDerivedMetrics(filterBySourceParentEligibility(filterOriginalBusinessEvidence(input.kpis), parentEligibility)),

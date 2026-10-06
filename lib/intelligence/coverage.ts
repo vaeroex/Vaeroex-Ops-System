@@ -6,7 +6,7 @@ import {
   filterOriginalBusinessEvidence,
   sanitizeBusinessEvidenceText
 } from "@/lib/intelligence/evidence-eligibility";
-import { buildSourceParentEligibility, filterBySourceParentEligibility } from "@/lib/intelligence/source-parent-eligibility";
+import { buildSourceParentEligibility, filterBySourceParentEligibility, type SourceParentRecords } from "@/lib/intelligence/source-parent-eligibility";
 import type { OverviewRunCompatibility } from "@/lib/intelligence/overview-run-compatibility";
 
 type TableRow<T extends keyof Database["public"]["Tables"]> = Database["public"]["Tables"][T]["Row"];
@@ -89,13 +89,13 @@ export type BusinessIntelligenceCoverageInput = {
   kpis?: TableRow<"kpis">[];
   issues?: TableRow<"issues">[];
   files?: TableRow<"file_uploads">[];
+  sourceParents?: SourceParentRecords;
   imports?: TableRow<"file_imports">[];
   sops?: TableRow<"sops">[];
   forms?: TableRow<"forms">[];
   submissions?: TableRow<"form_submissions">[];
   people?: TableRow<"people">[];
   crmLeads?: TableRow<"crm_leads">[];
-  crmHistory?: TableRow<"crm_lead_history">[];
   overviewRunCompatibility?: Pick<OverviewRunCompatibility, "derivedFindingCount">;
   operationalMetrics?: TableRow<"operational_metrics">[];
   assets?: TableRow<"assets">[];
@@ -424,11 +424,13 @@ export function buildBusinessIntelligenceCoverage(input: BusinessIntelligenceCov
   const activeFiles = activeRows(input.files || []);
   const activeSourceFileIds = new Set(activeFiles.map((file) => file.id));
   const activeImports = (input.imports || []).filter((item) => activeSourceFileIds.has(item.file_upload_id));
-  const parentEligibility = buildSourceParentEligibility({ files: activeFiles, imports: activeImports });
+  const parentEligibility = buildSourceParentEligibility({
+    files: activeRows(input.sourceParents?.files ?? activeFiles),
+    imports: input.sourceParents?.imports ?? activeImports
+  });
   const activeForms = activeRows(input.forms || []);
   const activeFormIds = new Set(activeForms.map((form) => form.id));
   const activeCrmLeads = filterBySourceParentEligibility(activeRows(input.crmLeads || []), parentEligibility);
-  const activeCrmLeadIds = new Set(activeCrmLeads.map((lead) => lead.id));
   input = {
     ...input,
     kpis: excludeChecklistDerivedMetrics(filterBySourceParentEligibility(activeRows(input.kpis || []), parentEligibility)),
@@ -440,8 +442,6 @@ export function buildBusinessIntelligenceCoverage(input: BusinessIntelligenceCov
     submissions: activeRows(input.submissions || []).filter((submission) => activeFormIds.has(submission.form_id)),
     people: activeRows(input.people || []),
     crmLeads: activeCrmLeads,
-    crmHistory: filterBySourceParentEligibility(activeRows(input.crmHistory || []), parentEligibility)
-      .filter((history) => activeCrmLeadIds.has(history.lead_id)),
     overviewRunCompatibility: undefined,
     operationalMetrics: excludeChecklistDerivedMetrics(filterBySourceParentEligibility(activeRows(input.operationalMetrics || []), parentEligibility)),
     assets: activeRows(input.assets || []),
@@ -528,11 +528,10 @@ export function buildBusinessIntelligenceCoverage(input: BusinessIntelligenceCov
     ...activeRows(input.issues || []).map((issue) => evidence(`issue:${issue.id}`, issue.title, "Issues", issue.updated_at || issue.created_at, true, "developing")),
     ...activeRows(input.operationalMetrics || []).map((metric) => evidence(`metric:${metric.source_file_id || metric.import_id || "manual"}:${lower(metric.metric_name)}`, metric.metric_name, "Operational metrics", metric.metric_date || metric.created_at, true, metric.source_file_id || metric.import_id ? "strong" : "developing"))
   ]);
-  const activeFileIds = new Set(activeRows(input.files || []).map((file) => file.id));
   const memoryItemCount = filterBusinessEvidence(input.memoryChunks || []).filter((chunk) => {
     const sourceType = lower(chunk.source_type);
     if (sourceType.includes("signal") || sourceType === "task") return false;
-    if (chunk.source_file_id) return activeFileIds.has(chunk.source_file_id);
+    if (chunk.source_file_id) return parentEligibility.activeFileIds.has(chunk.source_file_id);
     return sourceType !== "platform_run" && sourceType !== "ai_agent_run";
   }).length;
   const weakestCategories = categories.filter((item) => item.coverage < 46).sort((a, b) => a.coverage - b.coverage).slice(0, 5);
