@@ -1,0 +1,639 @@
+{
+  "baselineCommit": "2cde427c8b30cf34702baf43f7b3fc2d17f48b81",
+  "baselinePageSha256": "4c643260a8e9c3d552d5030a37395e5a9a6b33c6a24f47ecbb849d72f7691fd5",
+  "sharedLoaderSha256": "e6db70c3191d7aa40ed58ac6aea67a87512d8c090a0dcfd129e5782757f1df56",
+  "limitations": "Isolated synthetic request/database adapters; pure production filters, formula, snapshot producers, projections and explanation construction execute unchanged. No Auth/RLS/provider/browser claim.",
+  "cases": [
+    {
+      "name": "populated",
+      "componentHashes": {
+        "trace": "a9ed3c62c98e1090af20fc08e6b3e2859f341dc4010d41c19921c695628490d8",
+        "model": "39f12f53ed8888867b21fb7afda18c7890db46ec0fa75731ee7b733f4adc4cb4",
+        "evidence": "22d99988873a63257e959b3492899fc6b480645f849bdc960fb98f6b2719f44f",
+        "history": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "analysisPackage": "31628513d161e16302f281860bf2ae82194153b891c924eb7874b844a912fbf9",
+        "token": "42fddb8e6f7ce546d895bfd4b97f1948cd357364c5483f3a63d1949dfdc9c225",
+        "state": "9398f7494047ff16eb123e5b6060e4eaf66446e0a035a071c69035d0d00834e0",
+        "writes": "130eb815bfce3e5db4146cf5cfc4e7c67b5603701dbb00533a0e4c75e8fe0885"
+      }
+    },
+    {
+      "name": "empty",
+      "componentHashes": {
+        "trace": "e9b51c7f868d8350092ba0f439d3b7ce26820df5842810bb8f899418b63b21e7",
+        "model": "64feedd59f17cc6251f193a7253b7bab576840aa27ae9b2b59de4841ce15756f",
+        "evidence": "3ab3f4f0a85d284300a583bed54a6a06ec992c4b86592b200c9fd3f13d98bb98",
+        "history": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "analysisPackage": "49ad0713184697859878b6a7b7678c0753d6fb0b1acce97399ddc2b597851efb",
+        "token": "c0cc5d9f2182e85dd4c8703421e62a69594c077f411286336f6e9601a0027c47",
+        "state": "9398f7494047ff16eb123e5b6060e4eaf66446e0a035a071c69035d0d00834e0",
+        "writes": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "name": "inactive-parent",
+      "componentHashes": {
+        "trace": "fe5c347bee281ab47989682c93145f556196a201bed71c2900d122c6937fc0fc",
+        "model": "c1125d0c66ba25d1883ceca4d42f4d449e41f19173b78cf638a3913c7de3684b",
+        "evidence": "10ca4d7e6c0ba05eff1ac54f2636a8686b8fea4c7ac74097a9e0c4e2ca30e77b",
+        "history": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "analysisPackage": "4a4cbe76e65315d5789b693f12558f9259713027d5dc71b71f2c3f9d43861d16",
+        "token": "f42fae727850c52c5f93bcdfbd6bfdd0f9c7e5647268447701273b15b379664c",
+        "state": "9398f7494047ff16eb123e5b6060e4eaf66446e0a035a071c69035d0d00834e0",
+        "writes": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "name": "no-user",
+      "componentHashes": {
+        "trace": "c23d72d31655ed1847a99609f59df908d280bb684b95990f21343b9f57aad6a6",
+        "model": "39f12f53ed8888867b21fb7afda18c7890db46ec0fa75731ee7b733f4adc4cb4",
+        "evidence": "22d99988873a63257e959b3492899fc6b480645f849bdc960fb98f6b2719f44f",
+        "history": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "analysisPackage": "31628513d161e16302f281860bf2ae82194153b891c924eb7874b844a912fbf9",
+        "token": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "state": "9398f7494047ff16eb123e5b6060e4eaf66446e0a035a071c69035d0d00834e0",
+        "writes": "130eb815bfce3e5db4146cf5cfc4e7c67b5603701dbb00533a0e4c75e8fe0885"
+      }
+    },
+    {
+      "name": "analysis-disabled",
+      "componentHashes": {
+        "trace": "84fd527a18dd0b49f614bae2d4c5553ed945f82755ba396679ef1106cd83a25c",
+        "model": "39f12f53ed8888867b21fb7afda18c7890db46ec0fa75731ee7b733f4adc4cb4",
+        "evidence": "22d99988873a63257e959b3492899fc6b480645f849bdc960fb98f6b2719f44f",
+        "history": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "analysisPackage": "31628513d161e16302f281860bf2ae82194153b891c924eb7874b844a912fbf9",
+        "token": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "state": "9398f7494047ff16eb123e5b6060e4eaf66446e0a035a071c69035d0d00834e0",
+        "writes": "130eb815bfce3e5db4146cf5cfc4e7c67b5603701dbb00533a0e4c75e8fe0885"
+      }
+    },
+    {
+      "name": "failure:forms",
+      "componentHashes": {
+        "trace": "a9ed3c62c98e1090af20fc08e6b3e2859f341dc4010d41c19921c695628490d8",
+        "model": "39f12f53ed8888867b21fb7afda18c7890db46ec0fa75731ee7b733f4adc4cb4",
+        "evidence": "298ab0c7b3548349d75ff47ed02db9607431c11b74242b58affc2f8e0e1828de",
+        "history": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "analysisPackage": "31628513d161e16302f281860bf2ae82194153b891c924eb7874b844a912fbf9",
+        "token": "42fddb8e6f7ce546d895bfd4b97f1948cd357364c5483f3a63d1949dfdc9c225",
+        "state": "9398f7494047ff16eb123e5b6060e4eaf66446e0a035a071c69035d0d00834e0",
+        "writes": "130eb815bfce3e5db4146cf5cfc4e7c67b5603701dbb00533a0e4c75e8fe0885"
+      }
+    },
+    {
+      "name": "failure:form_submissions",
+      "componentHashes": {
+        "trace": "a9ed3c62c98e1090af20fc08e6b3e2859f341dc4010d41c19921c695628490d8",
+        "model": "39f12f53ed8888867b21fb7afda18c7890db46ec0fa75731ee7b733f4adc4cb4",
+        "evidence": "a5fe8a42c77e2ed71efbc5c80a6f4439e91f95bd74b6565908e2da4ed04b87c3",
+        "history": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "analysisPackage": "31628513d161e16302f281860bf2ae82194153b891c924eb7874b844a912fbf9",
+        "token": "42fddb8e6f7ce546d895bfd4b97f1948cd357364c5483f3a63d1949dfdc9c225",
+        "state": "9398f7494047ff16eb123e5b6060e4eaf66446e0a035a071c69035d0d00834e0",
+        "writes": "130eb815bfce3e5db4146cf5cfc4e7c67b5603701dbb00533a0e4c75e8fe0885"
+      }
+    },
+    {
+      "name": "failure:history",
+      "componentHashes": {
+        "trace": "a9ed3c62c98e1090af20fc08e6b3e2859f341dc4010d41c19921c695628490d8",
+        "model": "39f12f53ed8888867b21fb7afda18c7890db46ec0fa75731ee7b733f4adc4cb4",
+        "evidence": "22d99988873a63257e959b3492899fc6b480645f849bdc960fb98f6b2719f44f",
+        "history": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "analysisPackage": "31628513d161e16302f281860bf2ae82194153b891c924eb7874b844a912fbf9",
+        "token": "42fddb8e6f7ce546d895bfd4b97f1948cd357364c5483f3a63d1949dfdc9c225",
+        "state": "9398f7494047ff16eb123e5b6060e4eaf66446e0a035a071c69035d0d00834e0",
+        "writes": "130eb815bfce3e5db4146cf5cfc4e7c67b5603701dbb00533a0e4c75e8fe0885"
+      }
+    }
+  ],
+  "reviewablePopulatedContract": {
+    "directQueries": [
+      [
+        "query",
+        "kpi_settings",
+        [
+          "select",
+          "*"
+        ],
+        [
+          "eq",
+          "workspace_id",
+          "11111111-1111-4111-8111-111111111111"
+        ],
+        [
+          "order",
+          "sort_order",
+          {
+            "ascending": true
+          }
+        ],
+        [
+          "order",
+          "weight",
+          {
+            "ascending": false
+          }
+        ]
+      ],
+      [
+        "query",
+        "issues",
+        [
+          "select",
+          "*"
+        ],
+        [
+          "eq",
+          "workspace_id",
+          "11111111-1111-4111-8111-111111111111"
+        ],
+        [
+          "order",
+          "created_at",
+          {
+            "ascending": false
+          }
+        ],
+        [
+          "limit",
+          300
+        ]
+      ],
+      [
+        "query",
+        "sops",
+        [
+          "select",
+          "*"
+        ],
+        [
+          "eq",
+          "workspace_id",
+          "11111111-1111-4111-8111-111111111111"
+        ],
+        [
+          "order",
+          "updated_at",
+          {
+            "ascending": false
+          }
+        ],
+        [
+          "limit",
+          200
+        ]
+      ],
+      [
+        "query",
+        "file_uploads",
+        [
+          "select",
+          "*"
+        ],
+        [
+          "eq",
+          "workspace_id",
+          "11111111-1111-4111-8111-111111111111"
+        ],
+        [
+          "order",
+          "created_at",
+          {
+            "ascending": false
+          }
+        ],
+        [
+          "limit",
+          200
+        ]
+      ],
+      [
+        "query",
+        "file_imports",
+        [
+          "select",
+          "*"
+        ],
+        [
+          "eq",
+          "workspace_id",
+          "11111111-1111-4111-8111-111111111111"
+        ],
+        [
+          "order",
+          "created_at",
+          {
+            "ascending": false
+          }
+        ],
+        [
+          "limit",
+          200
+        ]
+      ],
+      [
+        "query",
+        "assets",
+        [
+          "select",
+          "*"
+        ],
+        [
+          "eq",
+          "workspace_id",
+          "11111111-1111-4111-8111-111111111111"
+        ],
+        [
+          "order",
+          "updated_at",
+          {
+            "ascending": false
+          }
+        ],
+        [
+          "limit",
+          200
+        ]
+      ],
+      [
+        "query",
+        "crm_leads",
+        [
+          "select",
+          "*"
+        ],
+        [
+          "eq",
+          "workspace_id",
+          "11111111-1111-4111-8111-111111111111"
+        ],
+        [
+          "order",
+          "created_at",
+          {
+            "ascending": false
+          }
+        ],
+        [
+          "limit",
+          300
+        ]
+      ],
+      [
+        "query",
+        "crm_lead_history",
+        [
+          "select",
+          "*"
+        ],
+        [
+          "eq",
+          "workspace_id",
+          "11111111-1111-4111-8111-111111111111"
+        ],
+        [
+          "order",
+          "created_at",
+          {
+            "ascending": false
+          }
+        ],
+        [
+          "limit",
+          300
+        ]
+      ],
+      [
+        "query",
+        "ai_agent_runs",
+        [
+          "select",
+          "agent_type,input_json,output_json,status,error_message,created_at,updated_at,archived_at,deleted_at"
+        ],
+        [
+          "eq",
+          "workspace_id",
+          "11111111-1111-4111-8111-111111111111"
+        ],
+        [
+          "order",
+          "created_at",
+          {
+            "ascending": false
+          }
+        ],
+        [
+          "limit",
+          10
+        ]
+      ],
+      [
+        "query",
+        "operational_metrics",
+        [
+          "select",
+          "*"
+        ],
+        [
+          "eq",
+          "workspace_id",
+          "11111111-1111-4111-8111-111111111111"
+        ],
+        [
+          "order",
+          "metric_date",
+          {
+            "ascending": false
+          }
+        ],
+        [
+          "limit",
+          500
+        ]
+      ],
+      [
+        "query",
+        "people",
+        [
+          "select",
+          "*"
+        ],
+        [
+          "eq",
+          "workspace_id",
+          "11111111-1111-4111-8111-111111111111"
+        ],
+        [
+          "is",
+          "deleted_at",
+          null
+        ],
+        [
+          "order",
+          "full_name"
+        ],
+        [
+          "limit",
+          100
+        ]
+      ],
+      [
+        "query",
+        "business_decisions",
+        [
+          "select",
+          "*"
+        ],
+        [
+          "eq",
+          "workspace_id",
+          "11111111-1111-4111-8111-111111111111"
+        ],
+        [
+          "is",
+          "deleted_at",
+          null
+        ],
+        [
+          "order",
+          "created_at",
+          {
+            "ascending": false
+          }
+        ],
+        [
+          "limit",
+          30
+        ]
+      ],
+      [
+        "query",
+        "business_memory_chunks",
+        [
+          "select",
+          "*"
+        ],
+        [
+          "eq",
+          "workspace_id",
+          "11111111-1111-4111-8111-111111111111"
+        ],
+        [
+          "is",
+          "deleted_at",
+          null
+        ],
+        [
+          "is",
+          "archived_at",
+          null
+        ],
+        [
+          "limit",
+          500
+        ]
+      ],
+      [
+        "query",
+        "forms",
+        [
+          "select",
+          "*"
+        ],
+        [
+          "eq",
+          "workspace_id",
+          "11111111-1111-4111-8111-111111111111"
+        ],
+        [
+          "order",
+          "updated_at",
+          {
+            "ascending": false
+          }
+        ],
+        [
+          "limit",
+          200
+        ]
+      ],
+      [
+        "query",
+        "form_submissions",
+        [
+          "select",
+          "*"
+        ],
+        [
+          "eq",
+          "workspace_id",
+          "11111111-1111-4111-8111-111111111111"
+        ],
+        [
+          "order",
+          "created_at",
+          {
+            "ascending": false
+          }
+        ],
+        [
+          "limit",
+          500
+        ]
+      ]
+    ],
+    "model": {
+      "health": {
+        "available": true,
+        "score": 14,
+        "status": "At Risk",
+        "trend": null,
+        "trendDelta": null,
+        "summary": "Observed delay",
+        "driver": "Issue status: Open",
+        "displayTitle": "Synthetic late delivery",
+        "driverPresentation": {
+          "identity": "Synthetic late delivery",
+          "details": [
+            "Issue status: Open",
+            "Severity: High"
+          ]
+        },
+        "confidence": "Medium",
+        "memorySignals": 6,
+        "eligibleSignalCategories": [
+          {
+            "id": "kpi_observations",
+            "label": "KPI observations",
+            "count": 3
+          },
+          {
+            "id": "kpi_series",
+            "label": "KPI series",
+            "count": 1
+          },
+          {
+            "id": "files",
+            "label": "Files",
+            "count": 1
+          },
+          {
+            "id": "process_documents",
+            "label": "SOPs and process documents",
+            "count": 0
+          },
+          {
+            "id": "forms",
+            "label": "Forms",
+            "count": 0
+          },
+          {
+            "id": "form_submissions",
+            "label": "Form submissions",
+            "count": 0
+          },
+          {
+            "id": "operational_issues",
+            "label": "Operational evidence",
+            "count": 1
+          },
+          {
+            "id": "customer_records",
+            "label": "Customer records",
+            "count": 0
+          },
+          {
+            "id": "organization_context",
+            "label": "Organization context",
+            "count": 0
+          }
+        ]
+      },
+      "priorities": [
+        {
+          "label": "Top Risk",
+          "title": "Synthetic late delivery",
+          "summary": "Observed delay",
+          "metadata": "Evidence: 1 supporting item",
+          "confidence": "High",
+          "priority": "High",
+          "actionLabel": "Review risk",
+          "href": "/app/intelligence",
+          "tone": "risk",
+          "empty": false
+        },
+        {
+          "label": "Top Opportunity",
+          "title": "No evidence-backed opportunity requires attention",
+          "summary": "Current eligible evidence does not support a specific opportunity claim yet.",
+          "metadata": "More relevant history may reveal one",
+          "confidence": "Low",
+          "priority": "Low",
+          "actionLabel": "Review intelligence",
+          "href": "/app/intelligence",
+          "tone": "opportunity",
+          "empty": true
+        },
+        {
+          "label": "Recommended Decision",
+          "title": "Review Synthetic late delivery",
+          "summary": "Decide whether this issue requires an investigation and what evidence should be collected next.",
+          "metadata": "Priority: High",
+          "confidence": "High",
+          "priority": "High",
+          "actionLabel": "Review decision",
+          "href": "/app/intelligence",
+          "tone": "decision",
+          "empty": false
+        }
+      ],
+      "changes": {
+        "state": "first_review",
+        "items": [],
+        "message": "Changes will appear after the next intelligence review."
+      },
+      "readiness": {
+        "available": true,
+        "coverage": 24,
+        "label": "Limited",
+        "strongestArea": "Business Memory",
+        "strongestCoverage": 50,
+        "largestGap": "Operations",
+        "recommendedNextSource": "Upload operating logs, job volume, service activity, or recurring workflow data.",
+        "showAddInformation": true
+      }
+    },
+    "writes": [
+      {
+        "workspaceId": "11111111-1111-4111-8111-111111111111",
+        "score": 14,
+        "status": "At Risk",
+        "trend": "Declining",
+        "dataConfidence": "Medium",
+        "dataQualityScore": 72,
+        "memorySignalCount": 6,
+        "sourceSummary": {
+          "kpis": 3,
+          "files": 1,
+          "issues": 1,
+          "crm_leads": 0,
+          "business_memory_signals": 6,
+          "vaeroex_runs": 0,
+          "performance_baseline": 50,
+          "positive_performance": 0,
+          "negative_performance": 36,
+          "evidence_classification": "business_evidence",
+          "evidence_lifecycle": "active",
+          "evidence_lineage": {
+            "source_type": "business_health_snapshot",
+            "source_id": null
+          }
+        }
+      }
+    ]
+  },
+  "hashScope": "SHA256(JSON.stringify(component)) with the retained synthetic fixture and fixed clock. Each component is asserted separately; complete old/new comparison report is retained as audit evidence. No failures are converted to success."
+}

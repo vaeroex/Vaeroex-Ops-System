@@ -149,7 +149,22 @@ function withoutQboAccounting(source) {
   return source;
 }
 
+// Explicitly approved Health relocation, independently qualified by the loader,
+// presentation and authenticated-browser tests. Normalize only its exact reviewed
+// hunks before applying the original frozen workflow hashes; neither hash is reset.
+const healthConsolidation = require("./fixtures/health-consolidation-presentation-exception.json");
+function withoutHealthConsolidation(file, source) {
+  const entry = healthConsolidation.files.find(item => item.file === file);
+  assert(entry, "Require a reviewed Health consolidation path");
+  for (const { before, after } of entry.changes) {
+    assert.equal(source.split(after).length, 2, "Require exactly the reviewed Health relocation binding");
+    source = source.replace(after, before);
+  }
+  return source;
+}
+
 function withoutIntegrationResults(source) {
+  source = withoutHealthConsolidation(intelligenceFile, source);
   // Strip only the reviewed dashboard bindings and restore the exact former
   // access binding. The original 75c3d61 workflow hashes stay frozen.
   assert.doesNotMatch(source, /QboIntelligenceDiagnostic|qboProductionCustomerConnectionsEnabled|qbo-customer\/intelligence-diagnostic/,
@@ -183,6 +198,7 @@ for (const [file, count, actionsDigest, logicDigest] of contracts) {
   test(`${file} preserves the inventoried workflow beneath its presentation`, () => {
     let source = fs.readFileSync(path.join(__dirname, "..", file), "utf8");
     if (file === "components/intelligence/ExecutiveHomepage.tsx") {
+      source = withoutHealthConsolidation(file, source);
       // User-requested visual comparison adds only a typed presentation prop.
       // Remove those two exact declarations before checking the original logic
       // fingerprint; calculations, imports and every action remain frozen.
@@ -247,9 +263,11 @@ test("the integration exception still detects changes to existing Intelligence i
     ["const snapshotAsOf = new Date().toISOString();", 'const snapshotAsOf = "fixed-time";'],
   ]) {
     assert(source.includes(before));
-    const changed = withoutIntegrationResults(source.replace(before, after));
-    const tree = ts.createSourceFile(intelligenceFile, changed, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
-    assert.notEqual(digest(nonPresentationLogic(tree)), originalDigest, "Original non-presentation logic remains protected");
+    assert.throws(() => {
+      const changed = withoutIntegrationResults(source.replace(before, after));
+      const tree = ts.createSourceFile(intelligenceFile, changed, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+      assert.equal(digest(nonPresentationLogic(tree)), originalDigest, "Original non-presentation logic remains protected");
+    }, assert.AssertionError, "Reject the mutation either at the exact addition boundary or the frozen original logic hash");
   }
 });
 
@@ -314,5 +332,17 @@ test("source-parent completeness exception rejects missing, duplicate and extra 
     '\nconst extraConsumer = buildIntelligenceLayer({ sourceParents: sourceParentResult.eligibility.records });\n',
   ]) {
     assert.throws(() => withoutIntegrationResults(source + addition), assert.AssertionError);
+  }
+});
+
+
+test("Health relocation exception rejects missing, duplicate and altered reviewed hunks", () => {
+  for (const { file, changes } of healthConsolidation.files) {
+    const source = fs.readFileSync(path.join(__dirname, "..", file), "utf8");
+    for (const { after } of changes) {
+      for (const replacement of ["", after + after, after.replace(/\S/, "!")]) {
+        assert.throws(() => withoutHealthConsolidation(file, source.replace(after, replacement)), assert.AssertionError);
+      }
+    }
   }
 });

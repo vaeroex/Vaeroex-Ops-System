@@ -258,14 +258,14 @@ function healthStatusLabel(status: IntelligenceLayerResult["businessHealth"]["st
   return status;
 }
 
-function previousReviewSnapshot(snapshots: BusinessHealthSnapshotRow[]) {
+export function previousReviewSnapshot(snapshots: readonly BusinessHealthSnapshotRow[], asOf = new Date()) {
   const ordered = snapshots
     .filter((snapshot) => businessHealthSnapshotCalculationVersion(snapshot) === BUSINESS_HEALTH_CALCULATION_VERSION)
     .sort((a, b) => a.snapshot_date.localeCompare(b.snapshot_date));
   const latest = ordered.at(-1);
   if (!latest) return null;
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = asOf.toISOString().slice(0, 10);
   return latest.snapshot_date === today ? ordered.at(-2) || null : latest;
 }
 

@@ -474,10 +474,12 @@ assert.doesNotMatch(
 );
 
 const overviewPage = read("app/app/page.tsx");
+const healthLoader = read("lib/intelligence/workspace-health.ts");
 const intelligencePage = read("app/app/intelligence/page.tsx");
 const kpiPage = read("app/app/kpis/page.tsx");
-assert.match(overviewPage, /projectExecutiveOverviewV1/);
-assert.match(overviewPage, /buildExecutiveHomepageFromSnapshotV1/);
+assert.match(overviewPage, /buildWorkspaceHealthView/);
+assert.match(healthLoader, /projectExecutiveOverviewV1/);
+assert.match(healthLoader, /buildExecutiveHomepageFromSnapshotV1/);
 assert.match(intelligencePage, /projectIntelligenceInboxV1/);
 assert.match(intelligencePage, /buildFindingExplanationFromSnapshotV1/);
 assert.match(kpiPage, /projectKpiPageV1/);

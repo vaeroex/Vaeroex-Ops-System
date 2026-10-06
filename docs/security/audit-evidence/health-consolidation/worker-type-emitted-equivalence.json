@@ -1,0 +1,12 @@
+{
+  "baseline": "5d838cb79e70944a44687c9f19adf725505881e6",
+  "sourceFile": "lib/intelligence/workspace-health.ts",
+  "beforeSourceSha256": "e6db70c3191d7aa40ed58ac6aea67a87512d8c090a0dcfd129e5782757f1df56",
+  "afterSourceSha256": "d1eea97ebb8e8b848159b1c2a0e3711aa8fd77d2aaabcc300349e9c13de3b6a5",
+  "typescriptVersion": "5.9.3",
+  "typescriptEmittedEqual": true,
+  "typescriptCodeSha256": "9c285d7e0f8bd239bc6aca8ce6dff85c37394ed6ba7683bcfb9dc286353f880b",
+  "nextSwcEmittedEqual": true,
+  "nextSwcCodeSha256": "464ab4f8e096714a82931d5738d60e56f0a34a514a0068b67beeacfb2131432c",
+  "limitations": "Same installed compiler versions; no source maps. Type-only emission proof, not a substitute for worker semantic module resolution."
+}

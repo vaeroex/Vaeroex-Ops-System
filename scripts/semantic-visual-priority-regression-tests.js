@@ -9,6 +9,7 @@ const semanticSource = read("lib/presentation/semantic-status.ts");
 const styles = read("app/globals.css");
 const homepage = read("components/intelligence/ExecutiveHomepage.tsx");
 const inbox = read("components/intelligence/IntelligenceSignalInbox.tsx");
+const healthSnapshot = read("components/intelligence/IntelligenceHealthSnapshot.tsx");
 const healthPanel = read("components/intelligence/BusinessHealthAnalysisPanel.tsx");
 const kpis = read("app/app/kpis/page.tsx");
 const homepageModel = read("lib/intelligence/executive-homepage.ts");
@@ -46,7 +47,7 @@ assert.match(homepage, /label: "Top Opportunity"/, "Overview must use the approv
 assert.doesNotMatch(homepage, /Positive Signal/, "Overview must not relabel an opportunity as a generic positive signal");
 assert.match(homepage, /card\.tone === "risk"\) return "critical"/, "risk category identity must not inherit its priority color");
 assert.match(homepage, /\{!card\.empty \? <span className=\{`vaeroex-semantic-badge/, "each non-empty executive priority must display urgency separately from category identity");
-assert.match(homepage, /businessHealthStatus\(model\.health\.status\)/, "Business Health state must be rendered through the shared semantic layer");
+assert.match(healthSnapshot, /businessHealthStatus\(health\.status\)/, "Business Health state must be rendered through the shared semantic layer");
 assert.match(homepage, /intelligenceReadinessStatus\(model\.readiness\.label\)/, "Readiness state must be rendered through the shared semantic layer");
 assert.match(inbox, /findingCategoryStatus\(card\.snapshot\.type\)/, "finding category identity must be applied from the lifecycle card's immutable deterministic snapshot");
 assert.match(inbox, /findingPriorityStatus\(card\.snapshot\.priority\)/, "finding urgency must remain separate from category identity after lifecycle presentation wrapping");

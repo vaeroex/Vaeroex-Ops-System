@@ -322,6 +322,7 @@ assert.equal(partial.readiness.label, "Partial");
 assert.equal(partial.readiness.largestGap, "Financials");
 
 const loadingSource = fs.readFileSync(path.join(root, "app/app/loading.tsx"), "utf8");
+const healthSnapshotSource = fs.readFileSync(path.join(root, "components/intelligence/IntelligenceHealthSnapshot.tsx"), "utf8");
 const homepageSource = fs.readFileSync(path.join(root, "components/intelligence/ExecutiveHomepage.tsx"), "utf8");
 const appShellSource = fs.readFileSync(path.join(root, "components/app/AppShell.tsx"), "utf8");
 const navigationSource = fs.readFileSync(path.join(root, "components/app/AppNavigation.tsx"), "utf8");
@@ -336,27 +337,25 @@ assert.match(loadingSource, /animate-pulse/, "homepage route must retain a visib
 assert.match(homepageSource, /lg:grid-cols-\[1fr_1fr_\.78fr\]/, "executive focus and readiness cards must use horizontal space without forcing mobile columns");
 assert.match(homepageSource, /Needs Attention/, "risk and leadership decision must be consolidated into one focus card");
 assert.match(homepageSource, /Top Opportunity/, "the opportunity must remain distinct without being presented as a positive signal");
-assert.match(homepageSource, /Business Health is not yet evaluable/, "homepage must include a calm fail-closed state without mislabeling KPI meaning as missing evidence");
-assert.match(homepageSource, /Validated executive interpretation/, "the Version 1 homepage must label the visible validated interpretation correctly");
-assert.match(homepageSource, /lg:grid-cols-\[minmax\(220px,\.62fr\)_minmax\(0,1\.38fr\)\]/, "the Version 1 Business Health snapshot must retain its score and interpretation columns");
 assert.match(homepageSource, />Executive Overview<\//, "Overview must use a stable executive heading instead of a time-based greeting");
 assert.doesNotMatch(homepageSource, /Good morning|Good afternoon|Good evening/, "Overview must not contain time-of-day greetings");
-for (const label of ["Current state", "Since previous review", "Confidence"]) {
-  assert.match(homepageSource, new RegExp(`>${label}<`), `the compact Business Health summary must expose ${label}`);
-}
-assert.match(homepageSource, /No previous review available\./, "the compact summary must handle a missing prior review cleanly");
-assert.match(homepageSource, /trendDelta === 0[\s\S]*\? "Unchanged"/, "an unchanged review must use concise deterministic wording");
-assert.equal((homepageSource.match(/>Highest Impact Driver<\//g) || []).length, 1, "Highest Impact Driver must not be duplicated");
+assert.match(homepageSource, /href="\/app\/intelligence#business-health"/, "Overview must route Health review to Intelligence");
+assert.doesNotMatch(homepageSource, /<BusinessHealthAnalysisPanel|<BusinessHealthTrendChart/, "Overview must not duplicate the Health review controls");
+assert.match(intelligencePageSource, /<IntelligenceHealthSnapshot/, "Intelligence must own the compact Health snapshot");
+assert.match(healthSnapshotSource, /health\.available \? health\.score : "Not yet evaluable"/, "unavailable Health must not render zero");
+assert.match(healthSnapshotSource, /facts\.comparison/, "movement must use the authoritative version-aware comparison");
+assert.match(healthSnapshotSource, /facts\.freshness === "stale"/, "stale evidence remains visibly distinct");
+assert.match(healthSnapshotSource, /<BusinessHealthTrendChart points=\{history\}/, "history must remain accessible even when the current score is unavailable");
+assert.match(healthSnapshotSource, /<BusinessHealthAnalysisPanel/, "existing analysis generation, saved analyses and citations remain reachable");
+
 assert.doesNotMatch(homepageModelSource, /runStructuredAI|OpenAIProvider|NvidiaProvider|createAI|fetch\(/, "Overview presentation must make zero provider calls");
 assert.match(businessHealthContextSource, /deterministicSummary:\s*homepage\.health\.summary/, "Business Health provider context must keep the existing deterministic summary field");
 assert.doesNotMatch(businessHealthContextSource, /displayTitle|driverPresentation/, "presentation-only fields must not enter Business Health provider context");
 assert.doesNotMatch(snapshotFingerprintSource, /displayTitle|driverPresentation/, "presentation-only fields must not affect snapshot fingerprints");
 assert.doesNotMatch(homepageSource, /<ExecutiveBriefPanel/, "the Version 1 homepage must keep Business Health as the cohesive opening snapshot");
 assert.doesNotMatch(homepageSource, /GlobalSearchTrigger|Ask Vaeroex|Help/, "executive header must not duplicate global navigation actions");
-assert.match(homepageSource, /model\.health\.available[\s\S]*<BusinessHealthTrendChart/, "the stored-history chart must own its insufficient-history state whenever Business Health is available");
 assert.doesNotMatch(healthTrendSource, /buildDemoTrendPoints|Sample demo trend/, "Business Health must not fabricate a demo trend when history is insufficient");
 assert.doesNotMatch(homepageSource, /View full intelligence|Executive Brief/, "Overview must not expose redundant page actions or report generation");
-assert.doesNotMatch(intelligencePageSource, /Business Health|Business Intelligence Coverage|What leadership should know/, "Intelligence must start with findings instead of repeating Overview");
 for (const label of ["Overview", "Intelligence", "Performance", "Files & Notes", "Saved Analyses", "Settings"]) {
   assert.match(appShellSource, new RegExp(`label: "${label}"`), `authenticated navigation must expose ${label} as a primary concept`);
 }

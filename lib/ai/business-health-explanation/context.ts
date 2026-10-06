@@ -23,7 +23,7 @@ import {
   BUSINESS_HEALTH_EXPLANATION_VALIDATOR_VERSION
 } from "@/lib/ai/business-health-explanation/contracts";
 import type { BusinessHealthSnapshotRow } from "@/lib/intelligence/business-health-history";
-import type { ExecutiveHomepageModel } from "@/lib/intelligence/executive-homepage";
+import { previousReviewSnapshot, type ExecutiveHomepageModel } from "@/lib/intelligence/executive-homepage";
 import type { IntelligenceEvidenceRecord, IntelligenceInsight, IntelligenceLayerResult } from "@/lib/intelligence/layer";
 import {
   businessHealthDriverStableKey,
@@ -440,9 +440,22 @@ export function buildBusinessHealthExplanationPackage({
       homepage.health.score !== projectedHealth.score
       || homepage.health.status !== healthStatusLabel(projectedHealth.status)
       || homepage.health.confidence !== projectedHealth.confidence
-      || (homepage.health.trend !== null && homepage.health.trend !== projectedHealth.trajectory)
+      || intelligence.businessHealth.trend !== projectedHealth.trajectory
     ) {
       throw new Error("Business Health presentation disagrees with the scoped IntelligenceSnapshotV1 projection.");
+    }
+    // The projection's trajectory describes current evidence. The homepage's
+    // movement compares same-formula stored reviews and can point the other way.
+    // Validate each against its own source instead of equating those meanings.
+    const previousSnapshot = previousReviewSnapshot(snapshots, now);
+    const expectedDelta = previousSnapshot ? projectedHealth.score - previousSnapshot.score : null;
+    const expectedTrend = expectedDelta === null ? null : expectedDelta > 0 ? "Improving" : expectedDelta < 0 ? "Declining" : "Holding steady";
+    if (
+      (previousSnapshot && previousSnapshot.workspace_id !== workspaceId)
+      || homepage.health.trendDelta !== expectedDelta
+      || homepage.health.trend !== expectedTrend
+    ) {
+      throw new Error("Business Health movement disagrees with its scoped stored review.");
     }
     const projectedCitationIds = new Set(projection.citations.map((citation) => citation.id));
     const expectedCitationIds = manifest.evidence.map((entry) => `manifest:${manifest.manifestId}:citation:${entry.citationId}`);

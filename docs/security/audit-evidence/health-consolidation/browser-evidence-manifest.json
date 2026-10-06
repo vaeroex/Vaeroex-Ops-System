@@ -1,0 +1,117 @@
+{
+  "applicationCommit": "639c4670895c835a62de51f0999e5e48cd3d6434",
+  "buildId": "Nn-YxH6DTf0HzOgt91urw",
+  "nativeMigrationCount": 136,
+  "migrationApplied": false,
+  "productionTouched": false,
+  "generationSubmitted": false,
+  "providerRequests": 0,
+  "capacityClaim": false,
+  "screenshotsContainSyntheticOnly": true,
+  "privateCredentialsExcluded": true,
+  "files": [
+    {
+      "path": "browser-final-639c4670.json",
+      "sha256": "8b67117753c5f973c480096adb0218c79cb3d54b924830ec14a83b1e37c19bd8",
+      "bytes": 22687
+    },
+    {
+      "path": "save-browser-final-639c4670.json",
+      "sha256": "fa0dfb47a5f92fb8959fc707416a8ddaa96cc509d12bc0b4fe8301031e26262c",
+      "bytes": 1956
+    },
+    {
+      "path": "browser-native-identity.json",
+      "sha256": "2a2d46e11140627049b1a1cad109e24acb4b18ad61075f5cc795f8539bd82cce",
+      "bytes": 329
+    },
+    {
+      "path": "browser-shutdown.json",
+      "sha256": "de0e2b69105ffb3c15f12e4ecdf84d7bb66afc2dd402c2d9ed49273e2391f5a7",
+      "bytes": 1057
+    },
+    {
+      "path": "screenshots/current-1440-default-viewport.png",
+      "sha256": "466dc8145f9db150871ad7fa00519f389b2da4d7a9bcb4fe3d5c1b1fd6f07946",
+      "bytes": 312408
+    },
+    {
+      "path": "screenshots/current-1440-default.png",
+      "sha256": "e468803db777316bff12a97ece6bddbc471835cbf16c6f129e12eb214edb3131",
+      "bytes": 454575
+    },
+    {
+      "path": "screenshots/current-390-default.png",
+      "sha256": "2aea03db48731600efe44537517e1859b55b4e82d52e3be58a2f7702f4d5e720",
+      "bytes": 258499
+    },
+    {
+      "path": "screenshots/current-1440.png",
+      "sha256": "4b574e83f181324cd9c72a9fd76e1cc18ec855729b6861a9641292f2ccc30527",
+      "bytes": 838156
+    },
+    {
+      "path": "screenshots/current-390.png",
+      "sha256": "42bd637074afbfdd393fea671d9668fd815fa8c0e8d34427bbe2ba5ee3c97288",
+      "bytes": 534047
+    },
+    {
+      "path": "screenshots/health-unavailable-1440.png",
+      "sha256": "549e16d52e97907edb970fd87fb79eae5511ff55c8e87a03c454c7d3fd1c99cb",
+      "bytes": 313293
+    },
+    {
+      "path": "screenshots/health-recovered-1440.png",
+      "sha256": "69d17bc55e7d0c3d7f80adaad3934bf2962fbbe9e2d78b121f9fd0ea28dc3f30",
+      "bytes": 454613
+    },
+    {
+      "path": "screenshots/health-unavailable-390.png",
+      "sha256": "184b0d5308dbeb956f9907e3a5501dd965e93dc265cdae1aff17ff3981f34a5f",
+      "bytes": 170289
+    },
+    {
+      "path": "screenshots/health-recovered-390.png",
+      "sha256": "2aea03db48731600efe44537517e1859b55b4e82d52e3be58a2f7702f4d5e720",
+      "bytes": 258499
+    },
+    {
+      "path": "screenshots/saved-desktop.png",
+      "sha256": "c572d42bd79fe334ccc223a7c046f571db99d3f84f36b5ed39e1fb7089241b69",
+      "bytes": 553534
+    },
+    {
+      "path": "screenshots/saved-mobile.png",
+      "sha256": "aeda94a14c7faad6a52ec978f03797ccca8bd71c8e6b3e4b434f5ff7fe9dae05",
+      "bytes": 304531
+    },
+    {
+      "path": "browser-fault-events.json",
+      "sha256": "ec025776828a8481ae1e7e176f97f40bdc99fb5159f27662589b2689682dc72e",
+      "bytes": 900
+    },
+    {
+      "path": "browser-preserved-failure-summary.json",
+      "sha256": "bcf2be60037b0f5bb9a166ea9aac591cd6ad242c82522c52b7ab9b205e8105f3",
+      "bytes": 3286
+    }
+  ],
+  "harnessFiles": [
+    {
+      "path": "scripts/intelligence-health-fixtures.cjs",
+      "sha256": "943231c1862c60e668308930b8176c426add4c1ba306523ddeeb317d3877a76d"
+    },
+    {
+      "path": "scripts/intelligence-health-runtime.cjs",
+      "sha256": "630ccb245e363d13d994fa9a1ea3181ec09519346e789222cca44c9bc1e257f0"
+    },
+    {
+      "path": "scripts/intelligence-health-browser.cjs",
+      "sha256": "5d620d627e64b2dbb156f4612e256d05efc608217d7488c9c96f5b7728b2b3bd"
+    },
+    {
+      "path": "scripts/intelligence-health-save-browser.cjs",
+      "sha256": "4a3c2dbb6a55380d7fcbe97f120c50482ff0ac69edb6aa79340b3035b193cdc2"
+    }
+  ]
+}

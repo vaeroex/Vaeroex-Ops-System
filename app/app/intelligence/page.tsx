@@ -1,5 +1,9 @@
 import Link from "next/link";
+import { unstable_rethrow } from "next/navigation";
+import { HealthSnapshotUnavailable } from "@/components/intelligence/HealthSnapshotUnavailable";
 import { CalendarRange } from "lucide-react";
+import { IntelligenceHealthSnapshot } from "@/components/intelligence/IntelligenceHealthSnapshot";
+import { loadWorkspaceHealth } from "@/lib/intelligence/workspace-health";
 import { IntelligenceBriefingCards } from "@/components/intelligence/IntelligenceBriefingCards";
 import { IntelligenceSignalInbox } from "@/components/intelligence/IntelligenceSignalInbox";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
@@ -44,7 +48,7 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
   const params = await searchParams;
   const access = await requireWorkspaceAccess();
   const { supabase, workspaceId, context } = access;
-  const [issuesResult, kpisResult, kpiSettingsResult, filesResult, crmResult, importsResult, sopsResult, formsResult, submissionsResult, peopleResult, decisionsResult, metricsResult, memoryResult, lifecycleResult, briefingStates] = await Promise.all([
+  const [issuesResult, kpisResult, kpiSettingsResult, filesResult, crmResult, importsResult, sopsResult, formsResult, submissionsResult, peopleResult, decisionsResult, metricsResult, memoryResult, lifecycleResult, briefingStates, healthView] = await Promise.all([
     supabase.from("issues").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
     loadActiveWorkspaceKpis({ supabase, workspaceId }),
     supabase.from("kpi_settings").select("*").eq("workspace_id", workspaceId).order("sort_order", { ascending: true }).order("weight", { ascending: false }),
@@ -63,6 +67,13 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
       supabase,
       workspaceId,
       workspace: context.activeWorkspace || {}
+    }),
+    loadWorkspaceHealth({ supabase, workspaceId, workspace: context.activeWorkspace, userId: access.user.id }).catch(error => {
+      unstable_rethrow(error);
+      // Keep the established findings workflow available if the additional Health
+      // dependency fails. Do not disclose raw database details or fabricate a score.
+      console.error(JSON.stringify({ component: "intelligence-health", event: "health_snapshot_unavailable" }));
+      return null;
     })
   ]);
 
@@ -267,10 +278,19 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan-200">Leadership review</p>
           <h1 className="mt-2 text-2xl font-semibold text-white sm:text-3xl">Intelligence</h1>
-          <p className="mt-2 text-sm text-slate-400">Review current signals and rolling leadership briefings.</p>
+          <p className="mt-2 text-sm text-slate-400">Review Business Health, current signals and leadership briefings.</p>
         </div>
       </header>
       <ErrorNotice message={displayErrors[0]?.message || null} />
+      {healthView ? <IntelligenceHealthSnapshot
+        health={healthView.executiveHomepageModel.health}
+        facts={healthView.businessHealthAnalysisPackage.facts}
+        citations={healthView.businessHealthAnalysisPackage.citations}
+        history={healthView.businessHealthHistory}
+        asOfDate={healthView.businessHealthExplanationAsOf.slice(0, 10)}
+        historyError={healthView.businessHealthSnapshotResult.errorMessage}
+        analysis={{ state: healthView.businessHealthAnalysisState, requestToken: healthView.businessHealthAnalysisToken }}
+      /> : <HealthSnapshotUnavailable />}
       <CurrentIntegrations key={workspaceId} initial={dashboard} />
       <IntelligenceSignalInbox
         currentCards={lifecycleCards.current}

@@ -1,0 +1,244 @@
+{
+  "qualification": "qbo_linux_image",
+  "sourceCommit": "c3918e098dc8f31f038917e21383b534eda34f13",
+  "sourceTree": "ac5944410c45bd46e4e9191e4cccefbfda08f8f0",
+  "workflowSha": "c3918e098dc8f31f038917e21383b534eda34f13",
+  "runId": "37400860319",
+  "runAttempt": "1",
+  "limits": {
+    "buildMs": 900000,
+    "smokeMs": 120000,
+    "commandMs": 30000,
+    "minimumFreeBytes": 10737418240,
+    "maximumDiskGrowthBytes": 8589934592,
+    "smokeMemoryBytes": 268435456,
+    "smokeCpus": 1,
+    "smokePids": 128
+  },
+  "host": {
+    "platform": "linux",
+    "architecture": "x64",
+    "cpus": 4,
+    "memoryBytes": 16765378560,
+    "initialFreeBytes": 87773085696
+  },
+  "docker": {
+    "serverVersion": "28.0.4",
+    "cpus": 4,
+    "memoryBytes": 16765378560,
+    "driver": "overlay2",
+    "architecture": "x86_64"
+  },
+  "commands": [
+    {
+      "executable": "docker",
+      "args": [
+        "info",
+        "--format",
+        "{{json .}}"
+      ],
+      "timeoutMs": 30000
+    },
+    {
+      "executable": "docker",
+      "args": [
+        "build",
+        "--platform=linux/amd64",
+        "--pull",
+        "--progress=plain",
+        "--iidfile",
+        "/tmp/qbo-image-qualification-Tgojyx/image-id",
+        "--build-arg",
+        "QBO_SOURCE_COMMIT=c3918e098dc8f31f038917e21383b534eda34f13",
+        "--tag",
+        "vaeroex-qbo-qualification:926dba4128c598364569",
+        "--file",
+        "/tmp/qbo-image-qualification-Tgojyx/context/services/external-integrations-qbo/Dockerfile",
+        "/tmp/qbo-image-qualification-Tgojyx/context"
+      ],
+      "timeoutMs": 900000
+    },
+    {
+      "executable": "docker",
+      "args": [
+        "image",
+        "inspect",
+        "sha256:2690e27479b426060a6fdf4805a069a179b3db7d55c21cb23c201abb22c0b23e"
+      ],
+      "timeoutMs": 30000
+    },
+    {
+      "executable": "docker",
+      "args": [
+        "create",
+        "--name",
+        "vaeroex-qbo-smoke-926dba4128c598364569",
+        "--label",
+        "com.vaeroex.qbo-image-qualification=926dba4128c598364569",
+        "--pull=never",
+        "--platform=linux/amd64",
+        "--network=none",
+        "--read-only",
+        "--cap-drop=ALL",
+        "--security-opt=no-new-privileges:true",
+        "--cpus=1",
+        "--memory=256m",
+        "--memory-swap=256m",
+        "--pids-limit=128",
+        "--tmpfs",
+        "/tmp:rw,noexec,nosuid,nodev,size=16m,mode=1777",
+        "--mount",
+        "type=bind,source=/tmp/qbo-image-qualification-Tgojyx/context/services/external-integrations-qbo/image-smoke.mjs,target=/qbo-image-smoke.mjs,readonly",
+        "sha256:2690e27479b426060a6fdf4805a069a179b3db7d55c21cb23c201abb22c0b23e",
+        "/qbo-image-smoke.mjs",
+        "c3918e098dc8f31f038917e21383b534eda34f13"
+      ],
+      "timeoutMs": 30000
+    },
+    {
+      "executable": "docker",
+      "args": [
+        "inspect",
+        "vaeroex-qbo-smoke-926dba4128c598364569"
+      ],
+      "timeoutMs": 30000
+    },
+    {
+      "executable": "docker",
+      "args": [
+        "start",
+        "--attach",
+        "vaeroex-qbo-smoke-926dba4128c598364569"
+      ],
+      "timeoutMs": 120000
+    },
+    {
+      "executable": "docker",
+      "args": [
+        "inspect",
+        "vaeroex-qbo-smoke-926dba4128c598364569"
+      ],
+      "timeoutMs": 30000
+    },
+    {
+      "executable": "docker",
+      "args": [
+        "inspect",
+        "vaeroex-qbo-smoke-926dba4128c598364569"
+      ],
+      "timeoutMs": 30000
+    },
+    {
+      "executable": "docker",
+      "args": [
+        "rm",
+        "--force",
+        "vaeroex-qbo-smoke-926dba4128c598364569"
+      ],
+      "timeoutMs": 30000
+    },
+    {
+      "executable": "docker",
+      "args": [
+        "image",
+        "rm",
+        "vaeroex-qbo-qualification:926dba4128c598364569"
+      ],
+      "timeoutMs": 30000
+    }
+  ],
+  "network": {
+    "build": "public pinned images and dependency downloads only; no inherited credentials",
+    "smoke": "none"
+  },
+  "imagePushed": false,
+  "providerCalls": 0,
+  "databaseConnections": 0,
+  "pullRequestHead": "7090198137261c850a3bcca8248813f5deed923c",
+  "inputs": {
+    "dockerfileSha256": "23b4aaa6e03e4eb5c6187a15173484284b519993d2982aeb4fe2a9be2af91b81",
+    "smokeSha256": "715577f1bd7b5d27ee1f09fa351e977c310e15011cb0c87881527312e6a4309b",
+    "packageSha256": "6b53dfe920445dd96987fac12347886689e832fb53a3d9c4bcb3a3befc9469d9",
+    "lockfileSha256": "40bc351ed2e2d30f313ba0014f3777bbd563b59fc988b120c00d5cc67ec89c59",
+    "patchSha256": "72d9011592c467205574770e1d8f1ef3329602d1774a52730120e491be2158ad",
+    "archiveSha256": "b9716eff2e40a69b3ab54ded4eb6797d71ed11f7a9020103ae9cb6ce06f755e1",
+    "bases": [
+      "node:22.23.1-bookworm-slim@sha256:6c74791e557ce11fc957704f6d4fe134a7bc8d6f5ca4403205b2966bd488f6b3",
+      "gcr.io/distroless/nodejs22-debian13:nonroot@sha256:5ef534d3db0ac0c43bee379af4ae49cfbfc0ef38a46c94c52d87c68f32f34d8a"
+    ]
+  },
+  "image": {
+    "id": "sha256:2690e27479b426060a6fdf4805a069a179b3db7d55c21cb23c201abb22c0b23e",
+    "repoDigests": [],
+    "sizeBytes": 153852117,
+    "architecture": "amd64",
+    "os": "linux",
+    "user": "65532:65532",
+    "sourceCommit": "c3918e098dc8f31f038917e21383b534eda34f13",
+    "rootFsLayers": [
+      "sha256:9486261b5a13f63ca6904b36721527ac8f19df53d300560138d69ae9b4c203de",
+      "sha256:621c35e751a51a9a9dc3e80aa0b7fe8be2a93402ea6ccd307d30852cd7776cda",
+      "sha256:763a77745f27b86cf26b97887b6842d83720e63b1c48848c0ba9ee54e351d63a",
+      "sha256:f0d0eff4c2312a7bd6e21797bdfea5eb35f60e76b555ce2b22794424af2cad36",
+      "sha256:275a30dd8ce958b21daa9ad962c6fbc09f98306ee2f486b65c9075dc257b1412",
+      "sha256:4d049f83d9cf21d1f5cc0e11deaf36df02790d0e60c1a3829538fb4b61685368",
+      "sha256:af5aa97ebe6ce1604747ec1e21af7136ded391bcabe4acef882e718a87c86bcc",
+      "sha256:6f1cdceb6a3146f0ccb986521156bef8a422cdbb0863396f7f751f575ba308f4",
+      "sha256:bd3cdfae1d3fdd83a2231d608969b38b82349777c2fff9a7c12d54f8ac5c9b38",
+      "sha256:4cde6b0bb6f50a5f255eef7b2a42162c661cf776b803225dcac9a659e396bb6b",
+      "sha256:ad51d0769d16ba578106a177987dfe3d2e02c1668c852b795b2f6b024068242a",
+      "sha256:187cfc6d1e3e8a40a5e64653bcd3239c140807dcf1c09e48021178705a5a6139",
+      "sha256:f2392a9484bf6b18f06beaf705b994e31dbb2716c99cf7d03c9c495cd107f364",
+      "sha256:8a3b315d45080ecb38e39d42d28e951303c67c2ce7482bcdbbc3b5424be19013",
+      "sha256:ada8421c741188c83c2e6de96450043e65ce6233e7d2a1d84cd789a0ad97f420",
+      "sha256:c0e409312adc366898967307565f692bb33d43a439d3de48e27d14b742389725",
+      "sha256:e4ba966d7f0527dfe0fcb559e4e18d4da42c4e6beae924719255e0dedb554ed0",
+      "sha256:1f5d28bd51650f429293f7730ede274b81dc0744aa918bc887133c4ad610258c",
+      "sha256:6e18ad80f3d64a8cbbcd1ff2e8a0d5ce7282cf664e816b86183a59d30a618e8a",
+      "sha256:c16b2ec4b1493bad1b1de23d659c899e60abb166bda756d02792f0a03ba54a43",
+      "sha256:7db505d90756626f425c6c5468eca565c82f589b144ecaa4f411ad9bbf79e614",
+      "sha256:d99e6a7fc3457e2fe86160ade531b8036e86ad14e576e5c09d4e94da2e132ff6",
+      "sha256:728c66a782e7f880fc0f55d997935fa6979a5e36ad0a0c25cdbd13134d244dbd",
+      "sha256:82486d61bb942fa60be2c28a43f4ed0d2b46937a03d642b4683f2c4ca4cca271",
+      "sha256:211ab0106da3e16364f42768ad3c0503d79f4a61e437bd14344c5a032d3acf72"
+    ]
+  },
+  "smoke": {
+    "imageSmoke": "passed",
+    "modes": 6,
+    "network": "none",
+    "databaseConnections": 0,
+    "providerCalls": 0,
+    "node": "22.23.3",
+    "openssl": "3.5.8",
+    "systemOpenSslLinked": false,
+    "nativeAddons": 0,
+    "pgNativeAvailable": false,
+    "quicBuiltinAvailable": false,
+    "kernelVdsoVerified": true,
+    "elfNeeded": [
+      "ld-linux-x86-64.so.2",
+      "libc.so.6",
+      "libdl.so.2",
+      "libgcc_s.so.1",
+      "libm.so.6",
+      "libpthread.so.0",
+      "libstdc++.so.6"
+    ],
+    "bundleSha256": "96e1dd5e3b66879cf4368c37ade7685f037cabf861e7c71b6023e72ba78d1ead",
+    "uid": 65532
+  },
+  "containerState": {
+    "exitCode": 0,
+    "oomKilled": false
+  },
+  "status": "passed",
+  "stage": "complete",
+  "elapsedMs": 40753,
+  "diskGrowthBytes": 1682591744,
+  "cleanup": [
+    "owned smoke container removed",
+    "owned image tag removed"
+  ],
+  "buildCancellationUnconfirmed": false
+}

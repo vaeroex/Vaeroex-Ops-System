@@ -1,0 +1,89 @@
+{
+  "qualification": "qbo_linux_image",
+  "sourceCommit": "e361bf5ac58a4aff2030153477a3343cc19f9b5e",
+  "sourceTree": "d61e84e7b3df51104692059ce16d9c3e925bcabb",
+  "workflowSha": "e361bf5ac58a4aff2030153477a3343cc19f9b5e",
+  "runId": "37399264231",
+  "runAttempt": "1",
+  "limits": {
+    "buildMs": 900000,
+    "smokeMs": 120000,
+    "commandMs": 30000,
+    "minimumFreeBytes": 10737418240,
+    "maximumDiskGrowthBytes": 8589934592,
+    "smokeMemoryBytes": 268435456,
+    "smokeCpus": 1,
+    "smokePids": 128
+  },
+  "host": {
+    "platform": "linux",
+    "architecture": "x64",
+    "cpus": 4,
+    "memoryBytes": 16766414848,
+    "initialFreeBytes": 87771762688
+  },
+  "docker": {
+    "serverVersion": "28.0.4",
+    "cpus": 4,
+    "memoryBytes": 16766414848,
+    "driver": "overlay2",
+    "architecture": "x86_64"
+  },
+  "commands": [
+    {
+      "executable": "docker",
+      "args": [
+        "info",
+        "--format",
+        "{{json .}}"
+      ],
+      "timeoutMs": 30000
+    },
+    {
+      "executable": "docker",
+      "args": [
+        "build",
+        "--platform=linux/amd64",
+        "--pull",
+        "--progress=plain",
+        "--iidfile",
+        "/tmp/qbo-image-qualification-Ipn2T3/image-id",
+        "--build-arg",
+        "QBO_SOURCE_COMMIT=e361bf5ac58a4aff2030153477a3343cc19f9b5e",
+        "--tag",
+        "vaeroex-qbo-qualification:fe8f2fb2b0112ebdc941",
+        "--file",
+        "/tmp/qbo-image-qualification-Ipn2T3/context/services/external-integrations-qbo/Dockerfile",
+        "/tmp/qbo-image-qualification-Ipn2T3/context"
+      ],
+      "timeoutMs": 900000
+    }
+  ],
+  "network": {
+    "build": "public pinned images and dependency downloads only; no inherited credentials",
+    "smoke": "none"
+  },
+  "imagePushed": false,
+  "providerCalls": 0,
+  "databaseConnections": 0,
+  "pullRequestHead": "5d838cb79e70944a44687c9f19adf725505881e6",
+  "inputs": {
+    "dockerfileSha256": "23b4aaa6e03e4eb5c6187a15173484284b519993d2982aeb4fe2a9be2af91b81",
+    "smokeSha256": "715577f1bd7b5d27ee1f09fa351e977c310e15011cb0c87881527312e6a4309b",
+    "packageSha256": "6b53dfe920445dd96987fac12347886689e832fb53a3d9c4bcb3a3befc9469d9",
+    "lockfileSha256": "40bc351ed2e2d30f313ba0014f3777bbd563b59fc988b120c00d5cc67ec89c59",
+    "patchSha256": "72d9011592c467205574770e1d8f1ef3329602d1774a52730120e491be2158ad",
+    "archiveSha256": "a965d24c0fb4aa3bd028037d8348fda6ad4403954d39e4fcfff4f293721056f6",
+    "bases": [
+      "node:22.23.1-bookworm-slim@sha256:6c74791e557ce11fc957704f6d4fe134a7bc8d6f5ca4403205b2966bd488f6b3",
+      "gcr.io/distroless/nodejs22-debian13:nonroot@sha256:5ef534d3db0ac0c43bee379af4ae49cfbfc0ef38a46c94c52d87c68f32f34d8a"
+    ]
+  },
+  "status": "failed",
+  "stage": "linux_image_build",
+  "elapsedMs": 40617,
+  "diskGrowthBytes": 1671413760,
+  "cleanup": [],
+  "buildCancellationUnconfirmed": false,
+  "failure": "build.log failed (1); exact output retained in CI logs.\n\n1 !== 0\n"
+}
