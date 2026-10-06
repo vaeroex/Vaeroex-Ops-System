@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { BusinessHealthTrendPoint } from "@/components/intelligence/BusinessHealthTrendChart";
+import type { StoredBusinessHealthTrendPoint as BusinessHealthTrendPoint } from "@/lib/intelligence/business-health-trend";
 import { filterEligibleMemoryRowsByLifecycle } from "@/lib/ai/evidence-index";
 import { loadApprovedBusinessNoteContextV1 } from "@/lib/ai/business-notes/contextual-evidence";
 import { businessNoteReleaseChannel } from "@/lib/ai/business-notes/release-channel";

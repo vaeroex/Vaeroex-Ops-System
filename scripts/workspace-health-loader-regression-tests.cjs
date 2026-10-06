@@ -2,6 +2,30 @@
 // Pure production filters/calculations execute; database, history storage, token signing and approved-note I/O are synthetic.
 const fs = require('node:fs'), path = require('node:path'), Module = require('node:module'), assert = require('node:assert/strict'), crypto = require('node:crypto');
 const root = path.resolve(__dirname, '..'), req = Module.createRequire(path.join(root, 'package.json')), ts = req('typescript');
+// Shared lib modules are included in worker images without the UI tree. Even
+// erased type imports must resolve during those image builds.
+function assertSharedLoaderDependencies(source) {
+    const tree = ts.createSourceFile('workspace-health.ts', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+    const specifiers = [];
+    const visit = node => {
+        if ((ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) && node.moduleSpecifier && ts.isStringLiteral(node.moduleSpecifier)) specifiers.push(node.moduleSpecifier.text);
+        if (ts.isImportTypeNode(node) && ts.isLiteralTypeNode(node.argument) && ts.isStringLiteral(node.argument.literal)) specifiers.push(node.argument.literal.text);
+        if (ts.isCallExpression(node) && (node.expression.kind === ts.SyntaxKind.ImportKeyword || ts.isIdentifier(node.expression) && node.expression.text === 'require') && node.arguments.length && ts.isStringLiteral(node.arguments[0])) specifiers.push(node.arguments[0].text);
+        ts.forEachChild(node, visit);
+    };
+    visit(tree);
+    for (const specifier of specifiers) {
+        const resolved = specifier.startsWith('@/') ? path.resolve(root, specifier.slice(2)) : specifier.startsWith('.') ? path.resolve(root, 'lib/intelligence', specifier) : null;
+        assert(!resolved || resolved !== path.join(root, 'components') && !resolved.startsWith(path.join(root, 'components') + path.sep), 'shared Health loader must not depend on UI components, including type-only imports');
+    }
+}
+const loaderSource = fs.readFileSync(path.join(root, 'lib/intelligence/workspace-health.ts'), 'utf8');
+assertSharedLoaderDependencies(loaderSource);
+for (const uiImport of [
+    'import type { BusinessHealthTrendPoint } from "@/components/intelligence/BusinessHealthTrendChart";',
+    'type ForbiddenUiType = import("../../components/intelligence/BusinessHealthTrendChart").BusinessHealthTrendPoint;',
+    'export type { BusinessHealthTrendPoint } from "@/components/intelligence/BusinessHealthTrendChart";'
+]) assert.throws(() => assertSharedLoaderDependencies(loaderSource + '\n' + uiImport), /must not depend on UI/);
 require.extensions['.ts'] = (m, f) => m._compile(ts.transpileModule(fs.readFileSync(f, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true } }).outputText, f);
 const resolve = Module._resolveFilename;
 Module._resolveFilename = function (r, p, ...args) { return resolve.call(this, r.startsWith('@/') ? path.join(root, r.slice(2)) : r, p, ...args); };
