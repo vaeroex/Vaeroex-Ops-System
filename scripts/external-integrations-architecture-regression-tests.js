@@ -527,9 +527,9 @@ assert.deepEqual(approvedSquareQualificationPaths.filter(file => file.startsWith
 "only the twenty-three bounded provisioner files are exempt");
 assertionCount++;
 assert.deepEqual(JSON.parse(read("vercel.json")), {
-  git: { deploymentEnabled: { "codex/square-remote-sandbox-binding": false, "codex/square-sandbox-qualification": false, "codex/square-gcp-sandbox-callback": false, "codex/workspace-audit-security": false, "codex/workspace-audit-evidence": false, "codex/workspace-audit-workflows": false } },
+  git: { deploymentEnabled: { "main": false, "codex/square-remote-sandbox-binding": false, "codex/square-sandbox-qualification": false, "codex/square-gcp-sandbox-callback": false, "codex/workspace-audit-security": false, "codex/workspace-audit-evidence": false, "codex/workspace-audit-workflows": false } },
   crons: [{ path: "/api/integrations/google-sheets/scheduled-sync", schedule: "*/15 * * * *" }]
-}, "Square review branches cannot auto-deploy; other branches keep default behavior and only the reviewed Sheets cron is configured");
+}, "Main and held review branches cannot auto-deploy; only the reviewed Sheets cron is configured");
 equal(withoutSquareQualificationPaths(approvedSquareQualificationPaths.join("\n")), "", "exact qualification paths are exempt from legacy phase-only scope assertions");
 for (const protectedPath of [
   ...approvedSquareQualificationPaths.map(file => `${file}.unexpected`),
