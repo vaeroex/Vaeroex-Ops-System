@@ -107,6 +107,11 @@ catch (e) {
         assert.equal(evidence.businessHealthSourceErrors.length, 1, error + ' is not silently treated as complete data');
         assert.equal(evidence.errors.length, 1, error + ' propagates its source failure');
         assert.equal(state.writes.length, 0, 'loading evidence never writes a snapshot');
+        // Execute the actual full view too: a later presentation error must not
+        // hide a snapshot already persisted from incomplete source evidence.
+        const fullView = await run(shared, { error });
+        assert.equal(fullView.writes.length, 0, error + ' prevents snapshot persistence through the full Health view');
+        assert.equal(fullView.trace.filter(entry => entry[0] === 'recordDaily').length, 0, error + ' never calls the snapshot writer');
     }
     console.log(`Workspace Health loader regression passed: ${cases.length} exact baseline contracts and ${errors.length} source-error cases.`);
 })().catch(error => { console.error(error); process.exitCode = 1; });

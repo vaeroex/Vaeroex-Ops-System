@@ -466,7 +466,41 @@ check(
 check(intelligenceCoverage.includes("filterOriginalBusinessEvidence") && intelligenceCoverage.includes("uniqueSources") && !intelligenceCoverage.includes('label: "Vaeroex Memory"'), "Derived runs and chunks must not inflate coverage or Source Mix.");
 check(boundedContextRuntime.includes("sanitizeBusinessEvidenceText") && boundedContextRuntime.includes("filterOriginalBusinessEvidence") && boundedContextRuntime.includes("filterBusinessEvidence"), "Bounded conversational context must sanitize platform failures and reject ineligible business evidence.");
 const dashboardRuntime = read("app/app/page.tsx");
-check(dashboardRuntime.includes("businessHealthSourceErrors") && dashboardRuntime.includes("intelligenceLayer.businessHealth.available"), "Business Health snapshots must not persist when required source queries fail or evidence is insufficient.");
+const healthRuntime = read("lib/intelligence/workspace-health.ts");
+const securityTs: typeof import("typescript") = require("typescript");
+function preservesBusinessHealthSnapshotGate(source: string) {
+  const tree = securityTs.createSourceFile("workspace-health.ts", source, securityTs.ScriptTarget.Latest, true);
+  const writes: import("typescript").CallExpression[] = [];
+  function visit(node: import("typescript").Node) {
+    if (securityTs.isCallExpression(node) && securityTs.isIdentifier(node.expression) && node.expression.text === "recordDailyBusinessHealthSnapshot") writes.push(node);
+    securityTs.forEachChild(node, visit);
+  }
+  visit(tree);
+  if (writes.length !== 1) return false;
+  const write = writes[0];
+  if (!securityTs.isAwaitExpression(write.parent) || write.arguments[0]?.getText(tree) !== "supabase") return false;
+  const input = write.arguments[1];
+  if (!input || !securityTs.isObjectLiteralExpression(input) || !input.properties.some(property => securityTs.isShorthandPropertyAssignment(property) && property.name.text === "workspaceId")) return false;
+  for (let child: import("typescript").Node = write; child.parent; child = child.parent) {
+    const parent = child.parent;
+    if (securityTs.isIfStatement(parent) && parent.thenStatement === child
+      && parent.expression.getText(tree).replace(/\s+/g, "") === "!businessHealthSourceErrors.length&&intelligenceLayer.businessHealth.available") return true;
+  }
+  return false;
+}
+check(dashboardRuntime.includes("buildWorkspaceHealthView"), "Overview must use the shared guarded Health view.");
+check(preservesBusinessHealthSnapshotGate(healthRuntime), "Business Health snapshots must persist only inside the source-success AND sufficient-evidence gate, using the scoped client and workspace.");
+const healthGate = "if (!businessHealthSourceErrors.length && intelligenceLayer.businessHealth.available) {";
+for (const replacement of [
+  "if (intelligenceLayer.businessHealth.available) {",
+  "if (!businessHealthSourceErrors.length) {",
+  "if (!businessHealthSourceErrors.length || intelligenceLayer.businessHealth.available) {",
+  "{",
+  healthGate + "} else {"
+]) check(!preservesBusinessHealthSnapshotGate(healthRuntime.replace(healthGate, replacement)), "The Health security contract must reject removed, bypassed or else-branch snapshot gates.");
+check(!preservesBusinessHealthSnapshotGate(healthRuntime + "\nawait recordDailyBusinessHealthSnapshot(supabase, { workspaceId });"), "The Health security contract must reject an extra unguarded snapshot write.");
+check(!preservesBusinessHealthSnapshotGate(healthRuntime.replace("await recordDailyBusinessHealthSnapshot", "await unreviewedSnapshotWriter")), "The Health security contract must reject a missing guarded snapshot writer.");
+check(!preservesBusinessHealthSnapshotGate(healthRuntime.replace("      workspaceId,\n      score:", '      workspaceId: "other-workspace",\n      score:')), "The Health security contract must reject changed snapshot workspace scope.");
 const evidenceRetrievalMigration = read("supabase/migrations/202607110001_business_memory_evidence_eligibility.sql");
 check(evidenceRetrievalMigration.includes("left join public.file_uploads source_file") && evidenceRetrievalMigration.includes("left join public.ai_agent_runs source_run"), "Vector retrieval must validate source file and source run lifecycle before limiting evidence.");
 check(evidenceRetrievalMigration.includes("security invoker") && evidenceRetrievalMigration.includes("public.is_workspace_member"), "Evidence retrieval migration must preserve invoker security and workspace authorization.");
