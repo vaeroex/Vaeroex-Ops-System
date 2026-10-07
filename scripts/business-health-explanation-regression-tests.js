@@ -84,7 +84,7 @@ function insight(overrides = {}) {
     summary: "Monthly Revenue is below its explicit target.",
     why: "The latest eligible value is lower than the recorded target.",
     impact: "The gap requires context before an impact can be established.",
-    recommendedAction: "Review the next reporting period.",
+    recommendedAction: "Inspect Monthly Revenue KPI source measurements for July; compare with prior periods and assign an owner to verify the gap.",
     confidence: "Medium",
     evidence: ["Actual: $92,000", "Target: $100,000"],
     evidenceCount: 1,
@@ -219,6 +219,14 @@ assert.equal(analysisPackage.facts.score, 42, "the contract must preserve the ap
 assert.equal(analysisPackage.facts.riskPenalty, 12, "the contract must preserve the deterministic risk penalty");
 assert.equal(analysisPackage.facts.opportunityAdjustment, 4, "the contract must preserve the deterministic opportunity adjustment");
 assert.equal(analysisPackage.facts.drivers.length, 2, "the bounded package must retain the top risk and opportunity");
+assert.ok(analysisPackage.facts.limitations.filter((limitation) => /\b(?:cause|causation|caused)\b/i.test(limitation)).length <= 1,
+  "the global Health limitations should not repeat a generic causal caveat across drivers");
+const specificLimitPackage = build({ intelligence: intelligence({
+  topRisk: insight({ limitation: "The KPI history cannot establish how many unique reviews contributed or what caused them." }),
+  insights: [insight({ limitation: "The KPI history cannot establish how many unique reviews contributed or what caused them." }), opportunity]
+}) });
+assert.ok(specificLimitPackage.facts.limitations.some((limitation) => /unique reviews/i.test(limitation)),
+  "a distinct source-specific evidence limit remains visible when generic caveats are deduplicated");
 assert.ok(analysisPackage.requiredCitationIds.length >= 2, "the package must attach application-generated citations");
 assert.equal(analysisPackage.manifest.policy.citationsApplicationGenerated, true);
 assert.equal(analysisPackage.manifest.policy.derivedOutputsExcludedFromOriginalEvidence, true);
@@ -485,7 +493,7 @@ assert.equal(build({ homepage: homepage({ available: false, score: null }) }).su
 const validOutput = {
   executive_interpretation: "Monthly Revenue remains the main negative score driver, while Customer Retention provides a smaller positive counterweight.",
   why_it_matters: "Leadership has a mixed operating picture rather than one uniformly positive or negative signal.",
-  leadership_consideration: "Review the Revenue gap while preserving visibility into the supported Retention result.",
+  leadership_consideration: "Inspect Monthly Revenue KPI source measurements for July; compare with prior periods and assign an owner to verify the gap.",
   provisional_hypothesis: null
 };
 assert.equal(validateBusinessHealthExplanationOutput(validOutput, analysisPackage).ok, true, "grounded fixed-contract wording must validate");

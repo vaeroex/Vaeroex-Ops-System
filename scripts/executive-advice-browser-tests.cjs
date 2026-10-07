@@ -40,6 +40,14 @@ const card = {
   lifecycleState: "active", pinned: false, view: "current", currentFeedStatus: "surfaced", reopenReason: null,
   reopenedFrom: null, reasonCode: null, reasonText: null, dismissedBy: null, recheckAfter: null, stateChangedAt: null, lifecycleToken: null
 };
+function additionalCard(id, type, title, recommendedAction) {
+  const next = { ...insight, id, type, title, recommendedAction, fingerprint: id, priority: type === "Opportunity" ? "Medium" : "High" };
+  return { ...card, findingKeyHash: id, findingId: id, materialSignature: `material-${id}`, insight: next,
+    snapshot: { ...card.snapshot, findingId: id, type, title, priority: next.priority } };
+}
+const coldAction = "Now inspect Cold-chain excursion rate KPI source measurements for 2026-04-01 to 2026-06-01. Compare dated values with the maximum target and prior periods (percent). Obtain dated shipment-level numerator and denominator source rows with IDs; verify the calculation before assigning a cause. Assign an owner to verify the largest gap and document follow-up or unknowns.";
+const anomalyAction = "Now inspect Pick log · row 14 and Pick log · row 21 for 2026-06-10 to 2026-06-11. Compare dated records by Site, Shift, Status where comparable groups exist; otherwise obtain them. Obtain pick event timestamps and reason codes before assigning a cause. Assign an owner to verify each affected record and document resolution, escalation, or unknowns.";
+const opportunityAction = "Inspect Billable utilization KPI source measurements for 2026-04-01 to 2026-06-01. Compare dated records by Team where comparable groups exist; otherwise obtain them. Obtain dated numerator and denominator source rows with IDs; verify the calculation before assigning a cause. Assign an owner to verify repeatability and document what, if anything, should be preserved or tested.";
 const healthFacts = {
   score: 50, status: "Watch", trajectory: "Holding steady", comparison: "Unchanged", dataQualityBase: 50,
   riskPenalty: 18, opportunityAdjustment: 18, confidence: "Medium", freshness: "stale",
@@ -56,7 +64,11 @@ const artifact = { analysis: {
   leadership_consideration: "Refresh the review KPI and source records now; then inspect the underlying reviews and assign an owner for verified complaint themes.",
   provisional_hypothesis: null
 }, facts: healthFacts, citations: [citation], fingerprint: "synthetic-health", generatedAt: "2026-07-15T00:00:00Z" };
-const fixture = { findings: { currentCards: [card], historyCards: [], canManageLifecycle: false },
+const fixture = { findings: { currentCards: [card,
+  additionalCard("synthetic-cold-risk", "Risk", "Cold-chain excursion rate remained above target for 3 periods", coldAction),
+  additionalCard("synthetic-pick-anomaly", "Anomaly", "Warehouse pick exceptions", anomalyAction),
+  additionalCard("synthetic-utilization-opportunity", "Opportunity", "Billable utilization is on or above target", opportunityAction)
+], historyCards: [], canManageLifecycle: false },
   health: { initialState: { status: "current", artifact, message: null }, requestToken: null, currentFacts: healthFacts, currentCitations: [citation] } };
 
 async function main() {
@@ -93,10 +105,19 @@ async function main() {
       page.on("pageerror", error => errors.push(error.message));
       await page.route("**/*", route => new URL(route.request().url()).origin === origin ? route.continue() : route.abort());
       await page.goto(origin, { waitUntil: "networkidle" });
-      if (width === 390) await page.getByRole("button", { name: /1-Star Reviews remained above target/ }).click();
+      await page.getByRole("button", { name: /1-Star Reviews remained above target/ }).click();
       const detail = page.getByRole("complementary", { name: "Selected finding" });
       await detail.getByText(/Confirm how the KPI counts reviews before treating its value as unique reviews/).waitFor();
       assert.equal(await detail.getByText(/Decide whether leadership should investigate/).count(), 0);
+      for (const [title, actionText] of [
+        ["Cold-chain excursion rate remained above target for 3 periods", /shipment-level numerator and denominator/],
+        ["Warehouse pick exceptions", /Pick log · row 14 and Pick log · row 21/],
+        ["Billable utilization is on or above target", /verify repeatability and document what/]
+      ]) {
+        if (width === 390) await detail.getByRole("button", { name: /Back to list/ }).click();
+        await page.getByRole("button", { name: new RegExp(title) }).click();
+        await detail.getByText(actionText).waitFor();
+      }
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true, `findings overflow at ${width}px`);
       await page.getByRole("button", { name: "View analysis" }).click();
       const dialog = page.getByRole("dialog");

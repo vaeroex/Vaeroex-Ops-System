@@ -96,7 +96,7 @@ const receivingExplanation = {
   ...reviewExplanation,
   what_happened: "Receiving Delay (hrs) remained above its configured maximum across the recorded periods.",
   why_evidence_suggests: "The recorded delay was above the confirmed KPI target; the source does not identify a cause.",
-  why_leadership_should_care: "The gap needs context before it can be tied to a cause or business impact.",
+  why_leadership_should_care: "This high-priority target miss across three recorded periods warrants an owner-led source review now.",
   investigate_next: receivingFinding.recommendedAction,
   what_evidence_does_not_prove: "The aggregate does not establish a supplier cause or a link to customer exceptions."
 };
