@@ -9,7 +9,7 @@
       "name": "populated",
       "componentHashes": {
         "trace": "f5e511286f88dd7d6d19f8a9113985e6e1837124a41aad9154f6b1aa8f5b568b",
-        "model": "f5316ea0176f9b0ac0171ce63e1a0be8fbf123129ff96a0e985b6dd3d5fca9f2",
+        "model": "cd0295cf5470b7645b9742a58ecb321dffdf992f909a20bb0f08055bd0064468",
         "evidence": "22d99988873a63257e959b3492899fc6b480645f849bdc960fb98f6b2719f44f",
         "history": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
         "analysisPackage": "e5024ee017a769d1e6ef3088cd9f04b25ad31f2cbf0fc236e1c7f44592359a7b",
@@ -48,7 +48,7 @@
       "name": "no-user",
       "componentHashes": {
         "trace": "cb1d85f6e15e7090865f3e111c04947aa359041ab1b6d7676ae6baeb27596635",
-        "model": "f5316ea0176f9b0ac0171ce63e1a0be8fbf123129ff96a0e985b6dd3d5fca9f2",
+        "model": "cd0295cf5470b7645b9742a58ecb321dffdf992f909a20bb0f08055bd0064468",
         "evidence": "22d99988873a63257e959b3492899fc6b480645f849bdc960fb98f6b2719f44f",
         "history": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
         "analysisPackage": "e5024ee017a769d1e6ef3088cd9f04b25ad31f2cbf0fc236e1c7f44592359a7b",
@@ -61,7 +61,7 @@
       "name": "analysis-disabled",
       "componentHashes": {
         "trace": "84fd527a18dd0b49f614bae2d4c5553ed945f82755ba396679ef1106cd83a25c",
-        "model": "f5316ea0176f9b0ac0171ce63e1a0be8fbf123129ff96a0e985b6dd3d5fca9f2",
+        "model": "cd0295cf5470b7645b9742a58ecb321dffdf992f909a20bb0f08055bd0064468",
         "evidence": "22d99988873a63257e959b3492899fc6b480645f849bdc960fb98f6b2719f44f",
         "history": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
         "analysisPackage": "e5024ee017a769d1e6ef3088cd9f04b25ad31f2cbf0fc236e1c7f44592359a7b",
@@ -74,7 +74,7 @@
       "name": "failure:forms",
       "componentHashes": {
         "trace": "f5e511286f88dd7d6d19f8a9113985e6e1837124a41aad9154f6b1aa8f5b568b",
-        "model": "f5316ea0176f9b0ac0171ce63e1a0be8fbf123129ff96a0e985b6dd3d5fca9f2",
+        "model": "cd0295cf5470b7645b9742a58ecb321dffdf992f909a20bb0f08055bd0064468",
         "evidence": "298ab0c7b3548349d75ff47ed02db9607431c11b74242b58affc2f8e0e1828de",
         "history": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
         "analysisPackage": "e5024ee017a769d1e6ef3088cd9f04b25ad31f2cbf0fc236e1c7f44592359a7b",
@@ -87,7 +87,7 @@
       "name": "failure:form_submissions",
       "componentHashes": {
         "trace": "f5e511286f88dd7d6d19f8a9113985e6e1837124a41aad9154f6b1aa8f5b568b",
-        "model": "f5316ea0176f9b0ac0171ce63e1a0be8fbf123129ff96a0e985b6dd3d5fca9f2",
+        "model": "cd0295cf5470b7645b9742a58ecb321dffdf992f909a20bb0f08055bd0064468",
         "evidence": "a5fe8a42c77e2ed71efbc5c80a6f4439e91f95bd74b6565908e2da4ed04b87c3",
         "history": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
         "analysisPackage": "e5024ee017a769d1e6ef3088cd9f04b25ad31f2cbf0fc236e1c7f44592359a7b",
@@ -100,7 +100,7 @@
       "name": "failure:history",
       "componentHashes": {
         "trace": "f5e511286f88dd7d6d19f8a9113985e6e1837124a41aad9154f6b1aa8f5b568b",
-        "model": "f5316ea0176f9b0ac0171ce63e1a0be8fbf123129ff96a0e985b6dd3d5fca9f2",
+        "model": "cd0295cf5470b7645b9742a58ecb321dffdf992f909a20bb0f08055bd0064468",
         "evidence": "22d99988873a63257e959b3492899fc6b480645f849bdc960fb98f6b2719f44f",
         "history": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
         "analysisPackage": "e5024ee017a769d1e6ef3088cd9f04b25ad31f2cbf0fc236e1c7f44592359a7b",
@@ -581,7 +581,7 @@
         {
           "label": "Recommended Decision",
           "title": "Review Synthetic late delivery",
-          "summary": "Now inspect Synthetic late delivery for 2026-10.",
+          "summary": "Now inspect Synthetic late delivery for 2026-10. Compare with earlier comparable records from that source; obtain them if absent.",
           "metadata": "Priority: High",
           "confidence": "High",
           "priority": "High",

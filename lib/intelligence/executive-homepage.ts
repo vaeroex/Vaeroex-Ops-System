@@ -236,7 +236,7 @@ function decisionFromIntelligence(intelligence: IntelligenceLayerResult): Execut
   return {
     label: "Recommended Decision",
     title,
-    summary: conciseSentences(recommendation.recommendedAction, recommendation.why, 1),
+    summary: conciseSentences(recommendation.recommendedAction, recommendation.why, 2),
     metadata: `Priority: ${recommendation.priority}`,
     confidence: recommendation.confidence,
     priority: recommendation.priority,

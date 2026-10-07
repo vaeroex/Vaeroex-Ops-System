@@ -174,6 +174,13 @@ assert.deepEqual(populated.health.driverPresentation, {
 assert.equal(populated.health.summary, "Revenue is below its current target.", "the existing deterministic summary contract must remain unchanged");
 assert.equal(populated.health.driver, "Actual: $7,000", "the existing deterministic driver contract must remain unchanged");
 assert.equal(populated.priorities.length, 3, "exactly three priorities must render");
+const plannedDecision = buildExecutiveHomepageModel({
+  intelligence: intelligence({
+    topRecommendation: insight({ recommendedAction: "Inspect the dated Revenue source measurements. Compare the values with prior periods before assigning a cause. Obtain underlying transaction rows and assign an owner." })
+  }),
+  coverage: coverage(), snapshots: [], kpiTrends: [], sourceDataAvailable: true
+});
+assert.match(plannedDecision.priorities[2].summary, /Compare the values with prior periods/, "the homepage decision must show the investigation step, not just its opening sentence");
 assert.doesNotMatch(populated.priorities[0].title, /may indicate a pattern/i, "homepage titles must state the supported issue directly");
 assert.equal(populated.changes.state, "changes");
 
