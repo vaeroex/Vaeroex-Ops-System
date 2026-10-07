@@ -290,3 +290,21 @@ test("the main route places findings before briefings without changing their dat
   assert.ok(source.indexOf("<IntelligenceSignalInbox") < source.indexOf("<IntelligenceBriefingCards"));
   assert.match(source, /<IntelligenceBriefingCards[\s\S]*compactUnavailable/);
 });
+
+test("the selected finding shows the complete approved investigation", () => {
+  const action = "Examine the underlying reviews for the affected periods, group recurring complaint themes, and assign an owner to follow up on each verified theme. No review text accompanies this KPI record; obtain review text, dates, and identifiers from the source. Confirm how the KPI counts reviews before treating its value as unique reviews.";
+  const insight = {
+    id: "synthetic-review-risk", type: "Risk", title: "1-Star Reviews remained above target for 6 periods",
+    summary: "Actual 37 vs target 0.", why: "The recorded KPI remains above its configured maximum.",
+    impact: "The gap requires source review before business impact can be inferred.", recommendedAction: action,
+    confidence: "Medium", evidence: [], evidenceCount: 1, supportingRecords: [], independentSourceCount: 1,
+    contradictoryEvidence: [], missingEvidence: ["Review-level text, dates, and identifiers"], sourceTypes: ["KPIs"],
+    sourceHref: "/app/kpis", priority: "High", lastUpdated: "2026-06-01", affectedArea: "Customer feedback",
+    timePeriod: "2026-06-01", limitation: "The KPI aggregate does not establish a cause or unique-review count.", fingerprint: "synthetic-review-risk"
+  };
+  const selected = card(0, { insight, snapshot: { ...card(0).snapshot, title: insight.title, summary: insight.summary } });
+  const { IntelligenceSignalInbox } = loadSource("components/intelligence/IntelligenceSignalInbox.tsx", sharedMocks);
+  const html = renderToStaticMarkup(React.createElement(IntelligenceSignalInbox, { currentCards: [selected], historyCards: [], canManageLifecycle: false }));
+  assert.match(html, /Confirm how the KPI counts reviews before treating its value as unique reviews/);
+  assert.doesNotMatch(html, /Decide whether leadership should investigate/);
+});
