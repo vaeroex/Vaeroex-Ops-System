@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports -- Isolated CommonJS evaluation loads the production TypeScript modules. */
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const Module = require("node:module");
