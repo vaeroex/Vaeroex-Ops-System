@@ -191,6 +191,23 @@ export function validateFindingExplanationOutput(
     });
   }
 
+  const title = context.facts.title.toLowerCase();
+  const next = output.investigate_next.toLowerCase();
+  const oneStarReview = /(?:^|\b)1[ -]?star reviews?\b/.test(title);
+  const receivingDelay = /\breceiving delay\b/.test(title);
+  const specificReviewStep = /\b(?:reviews|review text|complaints?)\b/.test(next) && /\b(?:text|themes?|complaints?|review records?)\b/.test(next);
+  const specificReceivingStep = /\breceiving\b/.test(next) && /\b(?:transactions?|timestamps?|suppliers?|sites?|shifts?)\b/.test(next);
+  const staleStep = context.facts.freshness !== "stale" || /\b(?:refresh|update|recheck)\b/.test(next);
+  if ((oneStarReview && !specificReviewStep) || (receivingDelay && !specificReceivingStep) || ((oneStarReview || receivingDelay) && !staleStep)) {
+    return validationFailure("The next step must name the approved source records and account for stale evidence.", {
+      reasonCode: "contextual_validation_failed",
+      stage: "contextual_validation",
+      expectedField: "investigate_next",
+      expectedType: "string",
+      observedType: "string"
+    });
+  }
+
   const securityValidation = validateAiGeneratedOutput(output as unknown as Json);
   if (!securityValidation.ok) {
     return validationFailure("The response failed shared output safety validation.", {

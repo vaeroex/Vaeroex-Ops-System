@@ -9,6 +9,7 @@ import {
 } from "@/lib/intelligence/business-health-formula";
 import { buildSourceParentEligibility, filterBySourceParentEligibility, type SourceParentRecords } from "@/lib/intelligence/source-parent-eligibility";
 import { compareKpiRowsNewest, groupKpisByNormalizedName, normalizeKpiName } from "@/lib/intelligence/kpi-identity";
+import { kpiRiskInvestigation } from "@/lib/intelligence/kpi-investigation";
 import { applyKpiSettingsToRows, kpiSemantics, type KpiSettingRow } from "@/lib/kpis/settings";
 import {
   effectiveKpiTarget,
@@ -714,6 +715,7 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
       };
     }),
     ...materialTargetMisses.map(({ kpi, semantics, evaluation, history: kpiHistory }) => {
+      const investigation = kpiRiskInvestigation(kpi, input.asOf);
       const key = normalizeKpiName(kpi.name);
       const history = historyCounts.get(key) || 1;
       const targetMissPeriods = kpiHistory.filter((row) => isMaterialTargetMiss(row, semantics)).length;
@@ -739,14 +741,14 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
         summary: `Actual ${formatMetric(kpi.actual_value, kpi.name)}${reference ? ` vs ${reference}` : ""}.`,
         why: `The latest recorded value is ${condition} under the canonical KPI semantics.`,
         impact: "The gap needs context before it can be tied to a cause or business impact.",
-        recommendedAction: "Decide whether leadership should investigate the cause now or continue monitoring the next reporting period.",
+        recommendedAction: investigation.action,
         confidence: history >= 3 && independentSourceCount >= 2 ? "High" : "Medium",
         evidence,
         evidenceCount: supportingRecords.length,
         supportingRecords,
         independentSourceCount,
         contradictoryEvidence: [],
-        missingEvidence: history < 3 ? ["At least three comparable historical periods", "Evidence explaining the change"] : ["Evidence explaining the change"],
+        missingEvidence: history < 3 ? ["At least three comparable historical periods", ...investigation.missingEvidence] : investigation.missingEvidence,
         sourceTypes: ["KPIs"],
         sourceHref: "/app/kpis",
         priority: "High" as const,

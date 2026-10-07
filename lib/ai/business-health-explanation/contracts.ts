@@ -53,6 +53,7 @@ export type BusinessHealthExplanationDriver = Readonly<{
   scoreImpact: number;
   citationIds: readonly number[];
   limitation: string | null;
+  investigationNext?: string;
 }>;
 
 export type BusinessHealthExplanationFacts = Readonly<{

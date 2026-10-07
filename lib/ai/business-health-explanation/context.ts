@@ -399,7 +399,8 @@ export function buildBusinessHealthExplanationPackage({
     fact: compactText(`${driver.insight.summary} ${driver.insight.why}`, 420),
     scoreImpact: driver.scoreImpact,
     citationIds: citationIdsByDriver.get(driver.stableKey) || [],
-    limitation: compactText(driver.insight.limitation, 240) || null
+    limitation: compactText(driver.insight.limitation, 240) || null,
+    investigationNext: compactText(driver.insight.recommendedAction, 420)
   })).filter((driver) => driver.citationIds.length > 0);
   const requiredCitationIds = Array.from(new Set(drivers.flatMap((driver) => driver.citationIds))).sort((a, b) => a - b);
   const citationVerification = verifyEvidenceManifestCitations({
@@ -528,7 +529,8 @@ export function buildBusinessHealthExplanationPackage({
           label: compactText(driver.insight.title, 180),
           fact: compactText(`${driver.insight.summary} ${driver.insight.why}`, 420),
           scoreImpact: driver.scoreImpact,
-          limitation: compactText(driver.insight.limitation, 240) || null
+          limitation: compactText(driver.insight.limitation, 240) || null,
+          investigationNext: compactText(driver.insight.recommendedAction, 420)
         }))
     },
     evidence: candidates

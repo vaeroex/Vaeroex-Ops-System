@@ -183,7 +183,7 @@ function SummaryPanel({
       </section>
       <section className={`vaeroex-semantic-detail border-l-2 pl-3 ${semanticStatusClass(categoryStatus)}`}>
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan-100">Leadership decision</p>
-        <p className="mt-2 text-slate-100">{compactText(insight.recommendedAction, 260)}</p>
+        <p className="mt-2 break-words text-slate-100">{insight.recommendedAction}</p>
       </section>
       <section>
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Limitation</p>

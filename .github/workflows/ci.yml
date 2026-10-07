@@ -69,6 +69,9 @@ jobs:
       - name: Workspace navigation and bounded-list regressions
         run: pnpm test:workspace-clarity
 
+      - name: Executive Intelligence advice quality and analysis regressions
+        run: pnpm test:executive-advice-quality
+
       - name: Restricted Square workspace host Linux qualification
         run: |
           node services/square-workspace-host/window-plan.test.mjs
@@ -175,6 +178,9 @@ jobs:
         run: |
           pnpm exec playwright install --with-deps chromium
           pnpm test:google-sheets-ui
+
+      - name: Executive Intelligence advice desktop and mobile flow
+        run: pnpm test:executive-advice-browser
 
       - name: Workspace audit desktop/mobile keyboard and form regressions
         run: pnpm test:workspace-audit:browser

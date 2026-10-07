@@ -98,6 +98,8 @@
     "test:saved-analyses": "node scripts/saved-analysis-regression-tests.js",
     "test:profit-leakage": "node scripts/profit-leakage-regression-tests.js",
     "test:intelligence": "node scripts/intelligence-experience-regression-tests.js",
+    "test:executive-advice-quality": "node scripts/executive-advice-quality-evaluation.cjs && pnpm test:intelligence && pnpm test:finding-explanation && pnpm test:business-health-explanation",
+    "test:executive-advice-browser": "node scripts/executive-advice-browser-tests.cjs",
     "test:intelligence-briefings": "node scripts/intelligence-briefing-regression-tests.js && node scripts/intelligence-briefing-v4-replay-tests.js && node scripts/intelligence-briefing-plain-language-regression-tests.js && node scripts/intelligence-briefing-generation-claim-regression-tests.js",
     "test:intelligence-briefing-preflight": "node scripts/intelligence-briefing-preflight-regression-tests.js",
     "test:intelligence-card-lifecycle": "node scripts/intelligence-card-lifecycle-regression-tests.js",

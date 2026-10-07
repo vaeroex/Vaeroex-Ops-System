@@ -28,7 +28,8 @@ const driverSchema = z.object({
   fact: z.string(),
   scoreImpact: z.number(),
   citationIds: z.array(z.number()),
-  limitation: z.string().nullable()
+  limitation: z.string().nullable(),
+  investigationNext: z.string().optional()
 }).strict();
 
 const factsSchema = z.object({
