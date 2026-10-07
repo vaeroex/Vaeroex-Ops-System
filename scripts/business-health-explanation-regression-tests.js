@@ -84,7 +84,7 @@ function insight(overrides = {}) {
     summary: "Monthly Revenue is below its explicit target.",
     why: "The latest eligible value is lower than the recorded target.",
     impact: "The gap requires context before an impact can be established.",
-    recommendedAction: "Review the next reporting period.",
+    recommendedAction: "Inspect Monthly Revenue KPI source measurements for July; compare with prior periods and assign an owner to verify the gap.",
     confidence: "Medium",
     evidence: ["Actual: $92,000", "Target: $100,000"],
     evidenceCount: 1,
@@ -485,7 +485,7 @@ assert.equal(build({ homepage: homepage({ available: false, score: null }) }).su
 const validOutput = {
   executive_interpretation: "Monthly Revenue remains the main negative score driver, while Customer Retention provides a smaller positive counterweight.",
   why_it_matters: "Leadership has a mixed operating picture rather than one uniformly positive or negative signal.",
-  leadership_consideration: "Review the Revenue gap while preserving visibility into the supported Retention result.",
+  leadership_consideration: "Inspect Monthly Revenue KPI source measurements for July; compare with prior periods and assign an owner to verify the gap.",
   provisional_hypothesis: null
 };
 assert.equal(validateBusinessHealthExplanationOutput(validOutput, analysisPackage).ok, true, "grounded fixed-contract wording must validate");

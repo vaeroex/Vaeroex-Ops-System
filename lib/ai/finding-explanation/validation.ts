@@ -12,6 +12,7 @@ import {
 import type { StructuredOutputValidation } from "@/lib/ai/providers/provider-manager";
 import { validationFailure, validationValueType } from "@/lib/ai/validation-diagnostics";
 import { validateAiGeneratedOutput } from "@/lib/security/ai-output-validation";
+import { followsApprovedInvestigation } from "@/lib/ai/investigation-action-quality";
 import type { Json } from "@/lib/supabase/types";
 
 const outputSchema = z.object({
@@ -191,14 +192,9 @@ export function validateFindingExplanationOutput(
     });
   }
 
-  const title = context.facts.title.toLowerCase();
-  const next = output.investigate_next.toLowerCase();
-  const oneStarReview = /(?:^|\b)1[ -]?star reviews?\b/.test(title);
-  const receivingDelay = /\breceiving delay\b/.test(title);
-  const specificReviewStep = /\b(?:reviews|review text|complaints?)\b/.test(next) && /\b(?:text|themes?|complaints?|review records?)\b/.test(next);
-  const specificReceivingStep = /\breceiving\b/.test(next) && /\b(?:transactions?|timestamps?|suppliers?|sites?|shifts?)\b/.test(next);
-  const staleStep = context.facts.freshness !== "stale" || /\b(?:refresh|update|recheck)\b/.test(next);
-  if ((oneStarReview && !specificReviewStep) || (receivingDelay && !specificReceivingStep) || ((oneStarReview || receivingDelay) && !staleStep)) {
+  const repeatedCauseCaveats = [output.what_happened, output.why_evidence_suggests, output.why_leadership_should_care, output.investigate_next]
+    .filter((field) => /\b(?:does not|cannot|can.t|not enough to)\b.{0,55}\b(?:cause|causation)\b/i.test(field)).length;
+  if (!followsApprovedInvestigation(output.investigate_next, context.facts.approvedInvestigationNext, context.facts.freshness === "stale") || repeatedCauseCaveats > 1) {
     return validationFailure("The next step must name the approved source records and account for stale evidence.", {
       reasonCode: "contextual_validation_failed",
       stage: "contextual_validation",

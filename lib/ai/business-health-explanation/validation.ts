@@ -10,6 +10,7 @@ import {
   unattributedContextField
 } from "@/lib/ai/business-notes/reasoning-context";
 import { validateAiGeneratedOutput } from "@/lib/security/ai-output-validation";
+import { followsApprovedInvestigation } from "@/lib/ai/investigation-action-quality";
 import type { StructuredOutputValidation } from "@/lib/ai/providers/provider-manager";
 import { validationFailure, validationValueType } from "@/lib/ai/validation-diagnostics";
 import type { Json } from "@/lib/supabase/types";
@@ -223,15 +224,10 @@ export function validateBusinessHealthExplanationOutput(
   }
 
   const consideration = output.leadership_consideration.toLowerCase();
-  const highestRisk = context.facts.drivers.find((driver) => driver.kind === "risk" && driver.investigationNext);
-  const reviewRisk = highestRisk && /(?:^|\b)1[ -]?star reviews?\b/i.test(highestRisk.label);
-  const receivingRisk = highestRisk && /\breceiving delay\b/i.test(highestRisk.label);
-  const specificReviewStep = /\b(?:reviews|review text|complaints?)\b/.test(consideration) && /\b(?:text|themes?|complaints?|review records?)\b/.test(consideration);
-  const specificReceivingStep = /\breceiving\b/.test(consideration) && /\b(?:transactions?|timestamps?|suppliers?|sites?|shifts?)\b/.test(consideration);
-  const staleStep = context.facts.freshness !== "stale" || /\b(?:refresh|update|recheck)\b/.test(consideration);
+  const approvedInvestigations = context.facts.drivers.map((driver) => driver.investigationNext).filter((step): step is string => Boolean(step));
   const repeatedCauseCaveats = [output.executive_interpretation, output.why_it_matters, output.leadership_consideration]
     .filter((field) => /\b(?:does not|cannot|can.t|not enough to)\b.{0,55}\b(?:cause|causation)\b/i.test(field)).length;
-  if ((reviewRisk && !specificReviewStep) || (receivingRisk && !specificReceivingStep) || (!staleStep && Boolean(highestRisk)) || repeatedCauseCaveats > 1) {
+  if ((approvedInvestigations.length > 0 && !approvedInvestigations.some((step) => followsApprovedInvestigation(consideration, step, context.facts.freshness === "stale"))) || repeatedCauseCaveats > 1) {
     return validationFailure("The leadership step must use the approved investigation and avoid repeating the same limitation.", {
       reasonCode: "contextual_validation_failed",
       stage: "contextual_validation",
