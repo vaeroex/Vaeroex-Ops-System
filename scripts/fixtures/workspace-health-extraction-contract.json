@@ -2,17 +2,18 @@
   "baselineCommit": "2cde427c8b30cf34702baf43f7b3fc2d17f48b81",
   "baselinePageSha256": "4c643260a8e9c3d552d5030a37395e5a9a6b33c6a24f47ecbb849d72f7691fd5",
   "sharedLoaderSha256": "e6db70c3191d7aa40ed58ac6aea67a87512d8c090a0dcfd129e5782757f1df56",
+  "adviceRevision": "Executive advice is now part of the analysis package and token. Only their hashes and the loader trace changed; score model, evidence, history, state, and writes retain the earlier contract hashes.",
   "limitations": "Isolated synthetic request/database adapters; pure production filters, formula, snapshot producers, projections and explanation construction execute unchanged. No Auth/RLS/provider/browser claim.",
   "cases": [
     {
       "name": "populated",
       "componentHashes": {
-        "trace": "a9ed3c62c98e1090af20fc08e6b3e2859f341dc4010d41c19921c695628490d8",
+        "trace": "632e05e638f8338bb65c1bf17450aa7d8cc27094650103ec9f2b57d43fdff36f",
         "model": "39f12f53ed8888867b21fb7afda18c7890db46ec0fa75731ee7b733f4adc4cb4",
         "evidence": "22d99988873a63257e959b3492899fc6b480645f849bdc960fb98f6b2719f44f",
         "history": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-        "analysisPackage": "31628513d161e16302f281860bf2ae82194153b891c924eb7874b844a912fbf9",
-        "token": "42fddb8e6f7ce546d895bfd4b97f1948cd357364c5483f3a63d1949dfdc9c225",
+        "analysisPackage": "b03df9b428743c07584c2f9647fb65a1422cd3fdd3aaa9765274cf60ef4d9fdd",
+        "token": "ebc073067e250f588b23137e3097a95fc2bc3dec9926bcbe91bca65cb68c9f55",
         "state": "9398f7494047ff16eb123e5b6060e4eaf66446e0a035a071c69035d0d00834e0",
         "writes": "130eb815bfce3e5db4146cf5cfc4e7c67b5603701dbb00533a0e4c75e8fe0885"
       }
@@ -33,12 +34,12 @@
     {
       "name": "inactive-parent",
       "componentHashes": {
-        "trace": "fe5c347bee281ab47989682c93145f556196a201bed71c2900d122c6937fc0fc",
+        "trace": "6c7742e84328af247429d9703692c1210f5eca1f71b44e943454afbc412aca95",
         "model": "c1125d0c66ba25d1883ceca4d42f4d449e41f19173b78cf638a3913c7de3684b",
         "evidence": "10ca4d7e6c0ba05eff1ac54f2636a8686b8fea4c7ac74097a9e0c4e2ca30e77b",
         "history": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-        "analysisPackage": "4a4cbe76e65315d5789b693f12558f9259713027d5dc71b71f2c3f9d43861d16",
-        "token": "f42fae727850c52c5f93bcdfbd6bfdd0f9c7e5647268447701273b15b379664c",
+        "analysisPackage": "65589cf4d64a35d67f210bded87ef9e1802844f77f843692b02e37f9c0088483",
+        "token": "5ec98f6ddd1070ab36b9296354c8d0a921d95d321402d92e1ab842f0157d6171",
         "state": "9398f7494047ff16eb123e5b6060e4eaf66446e0a035a071c69035d0d00834e0",
         "writes": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
       }
@@ -46,11 +47,11 @@
     {
       "name": "no-user",
       "componentHashes": {
-        "trace": "c23d72d31655ed1847a99609f59df908d280bb684b95990f21343b9f57aad6a6",
+        "trace": "eb386c7a2752972f1042fda976506734fcbfee62c9613ce0f900058f60b848b9",
         "model": "39f12f53ed8888867b21fb7afda18c7890db46ec0fa75731ee7b733f4adc4cb4",
         "evidence": "22d99988873a63257e959b3492899fc6b480645f849bdc960fb98f6b2719f44f",
         "history": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-        "analysisPackage": "31628513d161e16302f281860bf2ae82194153b891c924eb7874b844a912fbf9",
+        "analysisPackage": "b03df9b428743c07584c2f9647fb65a1422cd3fdd3aaa9765274cf60ef4d9fdd",
         "token": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
         "state": "9398f7494047ff16eb123e5b6060e4eaf66446e0a035a071c69035d0d00834e0",
         "writes": "130eb815bfce3e5db4146cf5cfc4e7c67b5603701dbb00533a0e4c75e8fe0885"
@@ -63,7 +64,7 @@
         "model": "39f12f53ed8888867b21fb7afda18c7890db46ec0fa75731ee7b733f4adc4cb4",
         "evidence": "22d99988873a63257e959b3492899fc6b480645f849bdc960fb98f6b2719f44f",
         "history": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-        "analysisPackage": "31628513d161e16302f281860bf2ae82194153b891c924eb7874b844a912fbf9",
+        "analysisPackage": "b03df9b428743c07584c2f9647fb65a1422cd3fdd3aaa9765274cf60ef4d9fdd",
         "token": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
         "state": "9398f7494047ff16eb123e5b6060e4eaf66446e0a035a071c69035d0d00834e0",
         "writes": "130eb815bfce3e5db4146cf5cfc4e7c67b5603701dbb00533a0e4c75e8fe0885"
@@ -72,12 +73,12 @@
     {
       "name": "failure:forms",
       "componentHashes": {
-        "trace": "a9ed3c62c98e1090af20fc08e6b3e2859f341dc4010d41c19921c695628490d8",
+        "trace": "632e05e638f8338bb65c1bf17450aa7d8cc27094650103ec9f2b57d43fdff36f",
         "model": "39f12f53ed8888867b21fb7afda18c7890db46ec0fa75731ee7b733f4adc4cb4",
         "evidence": "298ab0c7b3548349d75ff47ed02db9607431c11b74242b58affc2f8e0e1828de",
         "history": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-        "analysisPackage": "31628513d161e16302f281860bf2ae82194153b891c924eb7874b844a912fbf9",
-        "token": "42fddb8e6f7ce546d895bfd4b97f1948cd357364c5483f3a63d1949dfdc9c225",
+        "analysisPackage": "b03df9b428743c07584c2f9647fb65a1422cd3fdd3aaa9765274cf60ef4d9fdd",
+        "token": "ebc073067e250f588b23137e3097a95fc2bc3dec9926bcbe91bca65cb68c9f55",
         "state": "9398f7494047ff16eb123e5b6060e4eaf66446e0a035a071c69035d0d00834e0",
         "writes": "130eb815bfce3e5db4146cf5cfc4e7c67b5603701dbb00533a0e4c75e8fe0885"
       }
@@ -85,12 +86,12 @@
     {
       "name": "failure:form_submissions",
       "componentHashes": {
-        "trace": "a9ed3c62c98e1090af20fc08e6b3e2859f341dc4010d41c19921c695628490d8",
+        "trace": "632e05e638f8338bb65c1bf17450aa7d8cc27094650103ec9f2b57d43fdff36f",
         "model": "39f12f53ed8888867b21fb7afda18c7890db46ec0fa75731ee7b733f4adc4cb4",
         "evidence": "a5fe8a42c77e2ed71efbc5c80a6f4439e91f95bd74b6565908e2da4ed04b87c3",
         "history": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-        "analysisPackage": "31628513d161e16302f281860bf2ae82194153b891c924eb7874b844a912fbf9",
-        "token": "42fddb8e6f7ce546d895bfd4b97f1948cd357364c5483f3a63d1949dfdc9c225",
+        "analysisPackage": "b03df9b428743c07584c2f9647fb65a1422cd3fdd3aaa9765274cf60ef4d9fdd",
+        "token": "ebc073067e250f588b23137e3097a95fc2bc3dec9926bcbe91bca65cb68c9f55",
         "state": "9398f7494047ff16eb123e5b6060e4eaf66446e0a035a071c69035d0d00834e0",
         "writes": "130eb815bfce3e5db4146cf5cfc4e7c67b5603701dbb00533a0e4c75e8fe0885"
       }
@@ -98,12 +99,12 @@
     {
       "name": "failure:history",
       "componentHashes": {
-        "trace": "a9ed3c62c98e1090af20fc08e6b3e2859f341dc4010d41c19921c695628490d8",
+        "trace": "632e05e638f8338bb65c1bf17450aa7d8cc27094650103ec9f2b57d43fdff36f",
         "model": "39f12f53ed8888867b21fb7afda18c7890db46ec0fa75731ee7b733f4adc4cb4",
         "evidence": "22d99988873a63257e959b3492899fc6b480645f849bdc960fb98f6b2719f44f",
         "history": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-        "analysisPackage": "31628513d161e16302f281860bf2ae82194153b891c924eb7874b844a912fbf9",
-        "token": "42fddb8e6f7ce546d895bfd4b97f1948cd357364c5483f3a63d1949dfdc9c225",
+        "analysisPackage": "b03df9b428743c07584c2f9647fb65a1422cd3fdd3aaa9765274cf60ef4d9fdd",
+        "token": "ebc073067e250f588b23137e3097a95fc2bc3dec9926bcbe91bca65cb68c9f55",
         "state": "9398f7494047ff16eb123e5b6060e4eaf66446e0a035a071c69035d0d00834e0",
         "writes": "130eb815bfce3e5db4146cf5cfc4e7c67b5603701dbb00533a0e4c75e8fe0885"
       }
