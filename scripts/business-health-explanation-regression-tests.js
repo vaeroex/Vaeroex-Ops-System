@@ -219,6 +219,14 @@ assert.equal(analysisPackage.facts.score, 42, "the contract must preserve the ap
 assert.equal(analysisPackage.facts.riskPenalty, 12, "the contract must preserve the deterministic risk penalty");
 assert.equal(analysisPackage.facts.opportunityAdjustment, 4, "the contract must preserve the deterministic opportunity adjustment");
 assert.equal(analysisPackage.facts.drivers.length, 2, "the bounded package must retain the top risk and opportunity");
+assert.ok(analysisPackage.facts.limitations.filter((limitation) => /\b(?:cause|causation|caused)\b/i.test(limitation)).length <= 1,
+  "the global Health limitations should not repeat a generic causal caveat across drivers");
+const specificLimitPackage = build({ intelligence: intelligence({
+  topRisk: insight({ limitation: "The KPI history cannot establish how many unique reviews contributed or what caused them." }),
+  insights: [insight({ limitation: "The KPI history cannot establish how many unique reviews contributed or what caused them." }), opportunity]
+}) });
+assert.ok(specificLimitPackage.facts.limitations.some((limitation) => /unique reviews/i.test(limitation)),
+  "a distinct source-specific evidence limit remains visible when generic caveats are deduplicated");
 assert.ok(analysisPackage.requiredCitationIds.length >= 2, "the package must attach application-generated citations");
 assert.equal(analysisPackage.manifest.policy.citationsApplicationGenerated, true);
 assert.equal(analysisPackage.manifest.policy.derivedOutputsExcludedFromOriginalEvidence, true);

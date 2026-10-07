@@ -261,7 +261,16 @@ function uniqueStrings(values: Array<string | null | undefined>, maximum = 4) {
   const normalized = values
     .map((value) => compactText(value, 260))
     .filter(Boolean);
-  return normalized.filter((value, index) => normalized.findIndex((candidate) => candidate.toLowerCase() === value.toLowerCase()) === index).slice(0, maximum);
+  const seen = new Set<string>();
+  return normalized.filter((value) => {
+    const lower = value.toLowerCase();
+    const genericCause = /\b(?:cause|causation|caused)\b/.test(lower)
+      && !/\b(?:unique|review text|supplier|site|shift|customer|order|transaction|source record)\b/.test(lower);
+    const key = genericCause ? "generic-cause" : lower;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).slice(0, maximum);
 }
 
 function sourceLabelForCitation(
