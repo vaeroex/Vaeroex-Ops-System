@@ -167,7 +167,7 @@ export function planInvestigation(insight: IntelligenceInsight, asOf: Date | str
         : "Have the person responsible for this measure check the flagged entries and assign follow-up for affected records."
     : insight.type === "Opportunity"
       ? "Have the person responsible for these records document any confirmed change before repeating it."
-      : "Have the person responsible for these records mark each flagged one as confirmed, corrected, or still unexplained.";
+      : "Have the person responsible for these records mark each flagged record as confirmed, corrected, or still unexplained.";
 
   // Never slice a sentence to satisfy an arbitrary character count. Under length pressure,
   // omit optional grouping and boilerplate; keep the source action and supported comparison.

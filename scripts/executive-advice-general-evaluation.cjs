@@ -39,7 +39,7 @@ function metricCase(id, name, values, target, direction, unit, definition, raw =
   const rows = values.map((value, index) => kpi(name, dates[index], value, target, raw));
   const insight = buildIntelligenceLayer({ asOf: observedAsOf, kpis: rows, kpiSettings: [setting(name, direction, unit, definition, target)] }).insights.find((item) => item.id.startsWith("kpi-"));
   assert.ok(insight, `${id} generated a finding`);
-  return { id, type: insight.type, title: insight.title, action: insight.recommendedAction, impact: insight.impact, missing: insight.missingEvidence, evidence: insight.supportingRecords.map((r) => ({ title: r.title, date: r.date, fields: r.availableFields || [] })) };
+  return { id, kind: "kpi", type: insight.type, title: insight.title, action: insight.recommendedAction, impact: insight.impact, missing: insight.missingEvidence, evidence: insight.supportingRecords.map((r) => ({ title: r.title, date: r.date, fields: r.availableFields || [] })) };
 }
 function importedCase(id, type, title, records, missing, period, priority = "High", sourceAction = "") {
   const input = { id, type, title, summary: "Synthetic imported source shows a measured exception.", why: "The source rows contain the observed values.",
@@ -52,7 +52,7 @@ function importedCase(id, type, title, records, missing, period, priority = "Hig
     ...(sourceAction ? { investigationContext: { kind: "records", sourceAction } } : {}) };
   const insight = buildIntelligenceLayer({ asOf, operationalInsights: [input] }).insights.find((item) => item.id === id);
   assert.ok(insight, `${id} generated a finding`);
-  return { id, type: insight.type, title: insight.title, action: insight.recommendedAction, impact: insight.impact, missing: insight.missingEvidence,
+  return { id, kind: "records", type: insight.type, title: insight.title, action: insight.recommendedAction, impact: insight.impact, missing: insight.missingEvidence,
     evidence: insight.supportingRecords.map((r) => ({ title: r.title, date: r.date, fields: r.availableFields || [] })) };
 }
 const cases = [
@@ -95,6 +95,7 @@ if (!process.argv.includes("--baseline")) {
     assert.equal(followsApprovedInvestigation("Decide whether to investigate now or continue monitoring.", item.action, false), false, `${item.id} rejects generic model advice`);
     assert.doesNotMatch(item.action, /\b(?:numerator|denominator|row\s*#?\d+|current imported records|verify repeatability)\b/i, `${item.id} keeps technical details in evidence`);
     assert.match(item.action, /\b(?:ask|review|check|update)\b/i, `${item.id} starts with a practical action`);
+    if (item.kind === "kpi") assert.equal((item.action.match(/\bGet\b/g) || []).length, 1, `${item.id} asks for the underlying data once`);
   }
   assert.match(cases.find((item) => item.id === "cold-chain-aggregate").action, /figures used to calculate the percentage/i);
   assert.match(cases.find((item) => item.id === "customer-order-risk").action, /oldest records/i, "specific existing source action is retained");
