@@ -188,7 +188,7 @@ export function buildFindingExplanationPackage({
   };
   const contextualEvidence = projection?.contextualEvidence || [];
   const fingerprint = evidenceEngineHash({
-    adviceLanguageVersion: "plain_english_v5",
+    adviceLanguageVersion: "plain_english_v6",
     contractId: FINDING_EXPLANATION_CONTRACT_ID,
     contractVersion: FINDING_EXPLANATION_CONTRACT_VERSION,
     validatorVersion: FINDING_EXPLANATION_VALIDATOR_VERSION,
