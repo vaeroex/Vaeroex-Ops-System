@@ -40,7 +40,7 @@ async function main() {
         assert.equal(body ? body.expectedWorkspaceId : url.searchParams.get("workspaceId"), workspaceId);
         if (lost) return send({ code: "workspace_mismatch", message: "Your workspace changed. Reload to continue." }, 409);
         const route = url.pathname.replace("/api/vsi", "");
-        if (route === "/usage") { usageReads++; return send({ used: answers.size, limit: 100, remaining: 100 - answers.size, workspaceBudget: { spentUsd: 0.04, reservedUsd: 0, limitUsd: 100, periodStart: now } }); }
+        if (route === "/usage") { usageReads++; return send({ used: answers.size, limit: 100, remaining: 100 - answers.size, resetsAt: "2026-10-09T18:00:00.000Z", workspaceBudget: { spentUsd: 0.04, reservedUsd: 0, limitUsd: 100, periodStart: now } }); }
         if (route === "/conversations" && req.method === "GET") return send({ conversations: [...stored.values()].filter(value => (value.conversation.id === "old") === Boolean(url.searchParams.get("before"))).map(value => value.conversation), nextCursor: url.searchParams.get("before") ? null : "older-cursor", canEditBusinessNotes: true });
         if (route === "/conversations" && req.method === "POST") { const id = `chat-${stored.size}`; const value = { conversation: { ...chat(id, 0), title: body.title || "New chat" }, exchanges: [] }; stored.set(id, value); return send(value); }
         const [, , id, action] = route.split("/"); const value = stored.get(id); assert(value, "conversation exists");
@@ -124,6 +124,8 @@ async function main() {
       await renderedEvidence.screenshot({ path: path.join(output, `vsi-answer-${theme}-${width}.png`) });
     }
     await page.getByRole("button", { name: "Usage", exact: true }).click(); await page.getByText(/4 of 100 questions/).waitFor(); assert.equal(usageReads, 1);
+    assert.equal(await page.getByText(/Your oldest counted question leaves this window after Oct 9, 2026/).count(), 1, "rolling expiry must not imply available questions are blocked");
+    assert.equal(await page.getByText(/Next question becomes available/).count(), 0);
     await composer.fill("other tab filled this chat"); await composer.press("Enter");
     await page.getByRole("button", { name: "Continue in a new chat" }).waitFor();
     assert.equal(await composer.count(), 0); await page.getByRole("button", { name: "Continue in a new chat" }).click();

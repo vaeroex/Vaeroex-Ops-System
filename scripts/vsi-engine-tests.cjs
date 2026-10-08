@@ -30,6 +30,7 @@ const {vsiEstimatedCost,getVsiConfig} = require('../lib/vsi/config.ts');
 const {resetAIProviderCircuitForTests} = require('../lib/ai/provider-resilience.ts');
 const calls=[];
 let mode='normal';
+const staleObservationTime=new Date(Date.now()-4*60*60*1000).toISOString();
 const response = (body) => new Response(JSON.stringify(body), {status:200,headers:{'x-request-id':'synthetic-vsi'}});
 global.fetch = async (url, init) => {
   assert.equal(url, 'https://api.openai.com/v1/responses');
@@ -38,7 +39,7 @@ global.fetch = async (url, init) => {
   if(mode==='transport') throw new Error('synthetic connection failure');
   if(mode==='429') return new Response('{}',{status:429});
   const usage={input_tokens:1000, output_tokens:100, input_tokens_details:{cached_tokens:200},output_tokens_details:{reasoning_tokens:30}};
-  if(body.tools) return response({model:'gpt-6-luna',status:'completed',usage,output_text:'At 12:00 UTC, Seattle is 14°C.',
+  if(body.tools) return response({model:'gpt-6-luna',status:'completed',usage,output_text:mode==='stale_weather'?`Seattle observation at ${staleObservationTime}: 14°C. Forecast period: today.`:'At 12:00 UTC, Seattle is 14°C.',
     output:[{type:'web_search_call',status:'completed',action:{type:'search',sources:mode==='action_sources'?[{type:'url',url:'https://forecast.weather.gov/MapClick.php?lat=47.6&lon=-122.3'}]:mode==='feed_only'?[{type:'url',url:'oai-weather'}]:[]}}, {type:'message',content:[{type:'output_text',text:'Seattle: 14°C.',
       annotations:['no_source','action_sources','feed_only'].includes(mode)?[]:[{type:'url_citation',title:'Official forecast',url:'https://weather.gov/seattle'}]}]}]});
   const payload=JSON.parse(body.input[1].content);
@@ -107,6 +108,14 @@ async function main(){
   const webCall=calls.find(call=>call.tools);assert.equal(webCall.max_tool_calls,2);assert.equal(webCall.tool_choice,'required');
   assert.ok(!JSON.stringify(webCall).includes('TOP SECRET'));
   assert.match(webCall.input[0].content,/citable public webpage/);
+  mode='stale_weather';await runVsiAnswer(input('Weather in Seattle today?'));
+  const staleLookup=calls.at(-2),staleAnswer=calls.at(-1),stalePayload=JSON.parse(staleAnswer.input[1].content);
+  assert.match(stalePayload.livePublicLookup.text,new RegExp(staleObservationTime.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')));
+  assert.ok(Date.parse(stalePayload.now)-Date.parse(staleObservationTime)>3*60*60*1000,'final answer receives both old observation time and current time');
+  assert.ok(Date.parse(stalePayload.livePublicLookup.sources[0].retrievedAt)>Date.parse(staleObservationTime),'citation keeps lookup time separate from source observation');
+  for(const prompt of [staleLookup.input[0].content,staleAnswer.input[0].content]){
+    assert.match(prompt,/more than about one hour old/);assert.match(prompt,/freshness cannot be verified/);assert.match(prompt,/never describe that reading as current or latest/);assert.match(prompt,/observation time, forecast period and lookup time separate/);
+  }
   mode='action_sources';const sourceFallback=await runVsiAnswer(input('Weather in Seattle today?'));assert.equal(sourceFallback.citations[0].url,'https://forecast.weather.gov/MapClick.php?lat=47.6&lon=-122.3');assert.equal(sourceFallback.usage.webSearchCalls,1);mode='normal';
   const business=await runVsiAnswer(input('Why did repair turnaround rise?'));assert.equal(retrievalCalls,1);assert.equal(business.citations[0].id,'B1');
   assert.match(business.content,/does not establish a cause/);
