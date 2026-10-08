@@ -9,6 +9,15 @@ export function hasTechnicalAdviceLanguage(value: string) {
   return /\b(?:numerator|denominator|row-level|source rows?|current imported records|refresh source first|verify repeatability|kpi source row|row\s*#?\d+)\b/i.test(value);
 }
 
+// Keep details named by a later check from being mistaken for the object of a source request.
+const NEXT_ACTION = /\b(?:and|then)\s+(?:(?:review|check)\s+(?=the\b|a\b|an\b|whether\b|how\b|which\b|what\b|if\b)|(?:confirm|examine|inspect|identify|find|see|verify|determine|decide|note|state|compare|group|assign)\b)/i;
+function sourceRequestObjects(text: string) {
+  return [...text.matchAll(/\b(get|obtain|request|ask)\b([^.!?;]*)/gi)]
+    .map(([, verb, rest]) => ({ verb: verb.toLowerCase(), object: rest.split(NEXT_ACTION, 1)[0].split(/\b(?:whether|if)\b/i, 1)[0].toLowerCase() }))
+    .filter(({ verb, object }) => verb !== "ask" || /\bfor\b|\bto\s+(?:provide|send|share|supply|obtain|get|export|retrieve|collect)\b/.test(object))
+    .map(({ object }) => object);
+}
+
 /** Reject generic model paraphrases that discard the approved source and investigation. */
 function followsApprovedInvestigationCore(output: string, approved: string, stale: boolean, requireMissingDetail: boolean) {
   const text = output.toLowerCase();
@@ -16,8 +25,8 @@ function followsApprovedInvestigationCore(output: string, approved: string, stal
   const unavailableDetail = approved.match(/(?:^|[.;]\s*)([a-z][a-z -]{2,70}?)\s+(?:is|are)\s+not available\b/i)?.[1];
   if (requireMissingDetail && unavailableDetail) {
     const detailTerms = unavailableDetail.toLowerCase().match(/[a-z][a-z-]{3,}/g)?.filter((term) => !SOURCE_STOP_WORDS.has(term)) || [];
-    if (!/\b(?:not available|unavailable|missing)\b/.test(text) || !/\b(?:get|obtain|request|ask)\b/.test(text)
-      || (detailTerms.length > 0 && !detailTerms.some((term) => text.includes(term)))) return false;
+    if (!/\b(?:not available|unavailable|missing)\b/.test(text)
+      || !sourceRequestObjects(text).some((object) => detailTerms.length === 0 || detailTerms.some((term) => object.includes(term)))) return false;
   }
   const planned = /\b(?:inspect|examine|review|check|update|get)\b/i.test(approved);
   if (!planned) return true;
@@ -48,8 +57,7 @@ export function completeApprovedMissingDetail(output: string, approved: string, 
   const requestTerms = request.toLowerCase().match(/[a-z][a-z-]{3,}/g)?.filter((term) => !SOURCE_STOP_WORDS.has(term)
     && !["obtain", "request"].includes(term)) || [];
   const alreadyRequested = (text: string) => requestTerms.length > 0
-    && (text.match(/\b(?:get|obtain|request|ask)\b[^.!?;]*/gi) || [])
-      .some((clause) => requestTerms.every((term) => clause.toLowerCase().includes(term)));
+    && sourceRequestObjects(text).some((object) => requestTerms.every((term) => object.includes(term)));
   const exactSentenceAt = output.toLowerCase().indexOf(missingDetailSentence.toLowerCase());
   if (exactSentenceAt >= 0) {
     const withoutApprovedSentence = `${output.slice(0, exactSentenceAt)} ${output.slice(exactSentenceAt + missingDetailSentence.length)}`;
