@@ -98,8 +98,10 @@ async function main(){
   const general=await runVsiAnswer(input('Write a friendly invitation to dinner.'));
   assert.equal(retrievalCalls,0);assert.equal(calls.length,1);assert.equal(calls[0].tools,undefined);assert.equal(general.noteDraft,undefined);
   assert.equal(general.usage.inputTokens,1000);assert.equal(general.usage.cachedInputTokens,200);assert.equal(general.usage.reasoningTokens,30);
-  await assert.rejects(runVsiAnswer(input('Remember this: My SSN is 123-45-6789.')),/Social Security|regulated|sensitive|healthcare/);
-  assert.equal(calls.length,1);
+  for(const prohibited of ['Remember this: My SSN is 123-45-6789.','Patient Jane Doe has diabetes.','Remember this: Patient Jane Doe has diabetes.']){
+    await assert.rejects(runVsiAnswer(input(prohibited)),/Social Security|patient-identifying/);
+    assert.equal(calls.length,1,'prohibited patient/identifier content must be rejected before provider dispatch or note proposal');
+  }
   const note=await runVsiAnswer(input('Remember this: We sell bicycle repairs.'));
   assert.equal(note.noteDraft.content,'We sell bicycle repairs.');assert.equal(calls.length,1);
   const missing=await runVsiAnswer(input('Weather today?')); assert.match(missing.content,/city|location/); assert.equal(calls.length,1);
