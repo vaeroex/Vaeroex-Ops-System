@@ -39,8 +39,20 @@ process.env.SUPABASE_SERVICE_ROLE_KEY = "local-business-health-regression-secret
 
 const {
   buildBusinessHealthExplanationPackage,
-  businessHealthExplanationFingerprint
+  businessHealthExplanationFingerprint,
+  plainHealthDataQualityReason
 } = require("../lib/ai/business-health-explanation/context.ts");
+
+assert.equal(
+  plainHealthDataQualityReason("Authoritative evidence is usable, but source diversity, KPI history, or freshness still limits confidence."),
+  "The score uses available records, but limited history, few independent sources, or older data may lower confidence.",
+  "new Health explanations should state the confidence limit in familiar language"
+);
+assert.equal(
+  plainHealthDataQualityReason("The newest supporting evidence is older than 45 days."),
+  "The newest supporting evidence is older than 45 days.",
+  "specific factual limitations must remain intact"
+);
 const {
   BUSINESS_HEALTH_GENERATION_POLICY_VERSION
 } = require("../lib/ai/business-health-explanation/contracts.ts");
