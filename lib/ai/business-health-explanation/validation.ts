@@ -10,7 +10,7 @@ import {
   unattributedContextField
 } from "@/lib/ai/business-notes/reasoning-context";
 import { validateAiGeneratedOutput } from "@/lib/security/ai-output-validation";
-import { followsApprovedInvestigation, hasTechnicalAdviceLanguage } from "@/lib/ai/investigation-action-quality";
+import { completeApprovedMissingDetail, followsApprovedInvestigation, hasTechnicalAdviceLanguage } from "@/lib/ai/investigation-action-quality";
 import type { StructuredOutputValidation } from "@/lib/ai/providers/provider-manager";
 import { validationFailure, validationValueType } from "@/lib/ai/validation-diagnostics";
 import type { Json } from "@/lib/supabase/types";
@@ -118,7 +118,17 @@ export function validateBusinessHealthExplanationOutput(
     });
   }
 
-  const output = parsed.data;
+  const approvedInvestigations = context.facts.drivers.map((driver) => driver.investigationNext).filter((step): step is string => Boolean(step));
+  const approvedStep = approvedInvestigations.find((step) => followsApprovedInvestigation(parsed.data.leadership_consideration, step, context.facts.freshness === "stale"))
+    || context.facts.drivers.find((driver) => driver.investigationNext
+      && driverTerms(driver.label).some((term) => parsed.data.leadership_consideration.toLowerCase().includes(term))
+      && completeApprovedMissingDetail(parsed.data.leadership_consideration, driver.investigationNext, context.facts.freshness === "stale", 620) !== parsed.data.leadership_consideration)?.investigationNext;
+  const output = {
+    ...parsed.data,
+    leadership_consideration: approvedStep
+      ? completeApprovedMissingDetail(parsed.data.leadership_consideration, approvedStep, context.facts.freshness === "stale", 620)
+      : parsed.data.leadership_consideration
+  };
   const text = combinedText(output);
   if (hasTechnicalAdviceLanguage(text)) {
     return validationFailure("The explanation used technical source language instead of plain business English.", {
@@ -241,7 +251,6 @@ export function validateBusinessHealthExplanationOutput(
   }
 
   const consideration = output.leadership_consideration.toLowerCase();
-  const approvedInvestigations = context.facts.drivers.map((driver) => driver.investigationNext).filter((step): step is string => Boolean(step));
   const repeatedCauseCaveats = [output.executive_interpretation, output.why_it_matters, output.leadership_consideration]
     .filter((field) => /\b(?:does not|cannot|can.t|not enough to)\b.{0,55}\b(?:cause|causation)\b/i.test(field)).length;
   if ((approvedInvestigations.length > 0 && !approvedInvestigations.some((step) => followsApprovedInvestigation(consideration, step, context.facts.freshness === "stale"))) || repeatedCauseCaveats > 1) {
