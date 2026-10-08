@@ -32,6 +32,7 @@ const { findingExplanationModelInput } = require("../lib/ai/finding-explanation/
 const { validateFindingExplanationOutput } = require("../lib/ai/finding-explanation/validation.ts");
 const { businessHealthProviderRequestPayload } = require("../lib/ai/business-health-explanation/service.ts");
 const { validateBusinessHealthExplanationOutput } = require("../lib/ai/business-health-explanation/validation.ts");
+const { followsApprovedInvestigation } = require("../lib/ai/investigation-action-quality.ts");
 const { parseBusinessHealthExplanationArtifact } = require("../lib/ai/business-health-explanation/storage.ts");
 
 const asOf = "2026-07-15T00:00:00.000Z";
@@ -68,6 +69,16 @@ const reviewExplanation = {
 assert.equal(validateFindingExplanationOutput(reviewExplanation, reviewPackage).ok, true, "a specific bounded review explanation validates");
 assert.equal(validateFindingExplanationOutput({ ...reviewExplanation, investigate_next: "Review source records and decide whether to continue monitoring the KPI." }, reviewPackage).ok, false, "the former generic step must fail quality validation");
 assert.equal(validateFindingExplanationOutput({ ...reviewExplanation, investigate_next: "Check row 2 numerator and denominator figures before acting." }, reviewPackage).ok, false, "technical row detail cannot replace owner-facing advice");
+const omittedReviewAvailability = reviewFinding.recommendedAction.replace(
+  "Review text is not available here; get the review text and dates from the original source.",
+  "Examine dated review text for recurring themes."
+);
+assert.equal(followsApprovedInvestigation(omittedReviewAvailability, reviewFinding.recommendedAction, false), false,
+  "a model may not imply missing review text is already available");
+assert.equal(followsApprovedInvestigation(reviewFinding.recommendedAction.replace(
+  "Review text is not available here; get the review text and dates from the original source.",
+  "Review text is missing here; ask the source owner for the text and dates."
+), reviewFinding.recommendedAction, false), true, "a plain request for missing review text remains valid");
 
 const withReviewText = kpiRiskInvestigation(kpi("1-Star Reviews", "2026-06-01", 37, 0, {
   raw_data_json: { "Review Text": "Synthetic review text for fixture only." }
@@ -146,6 +157,12 @@ const healthExplanation = {
   provisional_hypothesis: null
 };
 assert.equal(validateBusinessHealthExplanationOutput(healthExplanation, healthContext).ok, true, "a stale, specific Health action validates");
+assert.equal(validateBusinessHealthExplanationOutput({ ...healthExplanation,
+  leadership_consideration: staleReview.action.replace(
+    "Review text is not available here; get the review text and dates from the original source.",
+    "Examine dated review text for recurring themes."
+  )
+}, healthContext).ok, false, "Health must carry forward unavailable source detail");
 assert.equal(validateBusinessHealthExplanationOutput({ ...healthExplanation, leadership_consideration: "Decide whether to investigate the cause now or continue monitoring the score." }, healthContext).ok, false, "generic stale Health advice fails validation");
 assert.equal(validateBusinessHealthExplanationOutput({ ...healthExplanation, leadership_consideration: "Refresh source first, then verify repeatability." }, healthContext).ok, false, "technical shorthand cannot replace the approved Health action");
 assert.equal(validateBusinessHealthExplanationOutput({ ...healthExplanation,
