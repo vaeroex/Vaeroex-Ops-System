@@ -87,20 +87,20 @@ function calculationDetail(context: InvestigationContext | undefined, label: str
   if (/\b(?:share|rate|ratio|percent(?:age)?|divided by|per hundred|per thousand)\b/.test(meaning)) {
     const measure = /\b(?:percent|percentage|share)\b/.test(`${context?.definition || ""} ${context?.unit || ""}`.toLowerCase()) ? "percentage" : "rate";
     const subject = definedRecordSubject(context?.definition);
-    return subject
-      ? `Get dated records for ${subject} and the figures used to calculate the ${measure}; check the calculation.`
-      : `Get the dated figures used to calculate the ${measure} and check the calculation.`;
+    return { records: subject
+      ? `dated records for ${subject} and the figures used to calculate the ${measure}`
+      : `dated figures used to calculate the ${measure}`, check: "Check the calculation." };
   }
   if (/\b(?:elapsed|duration|latency|time between|time from|hours between|minutes between)\b/.test(meaning)) {
-    return "Get the start and end times for the underlying records to check the delay.";
+    return { records: "underlying records with start and end times", check: "" };
   }
   if (/\b(?:currency|revenue|cost|spend|sales|price|amount|usd|dollars?)\b/.test(meaning)) {
-    return "Get the dated transactions and amounts behind the total.";
+    return { records: "dated transactions and amounts behind the total", check: "" };
   }
   if (/\b(?:count|number|total|volume)\b/.test(meaning)) {
-    return "Get the individual dated records and check what the count includes.";
+    return { records: "individual dated records behind the count", check: "Check what the count includes." };
   }
-  return "Get the dated records and figures behind this measure.";
+  return { records: "dated records behind this measure", check: "" };
 }
 
 function missingDetail(value: string | undefined) {
@@ -129,44 +129,51 @@ export function planInvestigation(insight: IntelligenceInsight, asOf: Date | str
   const isStale = stale(insight, asOf);
   const first = isStale
     ? isKpi
-      ? `Update the figures behind ${name} before using this finding for a current decision.`
-      : `Get the latest ${subject} before using this finding for a current decision.`
+      ? `Update ${name} before making a current decision.`
+      : `Get the latest ${subject} before making a current decision.`
     : insight.priority === "High"
-      ? `Check ${subject} now${period ? `, focusing on ${period}` : ""}.`
+      ? `Check ${subject} now${period ? ` for ${period}` : ""}.`
       : `Review ${subject}${period ? ` for ${period}` : ""}.`;
-  const review = isStale ? `Then review the results from ${period || "the recorded period"}.` : "";
+  const review = isStale ? `Review the recorded ${period || "past"} results while waiting for current data.` : "";
+  const specific = context?.sourceAction ? sourceInstruction(context.sourceAction) : "";
+  const missing = missingDetail(insight.missingEvidence[0]);
 
   // A KPI row is an aggregate even when it contains a grouping column. It does not prove
   // that comparable underlying groups or individual events are available.
   const comparison = isKpi
     ? context?.targetAvailable && dated.length > 1
-      ? "Compare the dated values with the target and earlier periods."
-      : context?.targetAvailable ? "Check the value against its target."
-        : dated.length > 1 ? "Compare the dated values with earlier periods." : "Get another dated value for comparison."
-    : originals.length > 1 && dated.length > 1
-      ? "Get more records from those dates before comparing the pattern."
-      : originals.length > 1 ? "Compare these records from the same period." :
-        context?.sourceAction ? "" : "Get comparable records from the same source to see whether this repeats.";
+      ? "Compare each period with the target and earlier results."
+      : context?.targetAvailable ? "Check the result against its target."
+        : dated.length > 1 ? "Compare the results across the recorded periods." : "Get another dated result for comparison."
+    : specific ? "" : originals.length > 1 && dated.length > 1
+      ? "Get other records from those dates before comparing the pattern."
+      : originals.length > 1 ? "Compare the records from this period." :
+        /\b(?:records?|transactions?|events?|cases?|entries)\b/i.test(insight.missingEvidence[0] || "")
+          ? "" : "Get comparable records from the same source to see whether this repeats.";
 
   const sharedFields = distinct([...(context?.availableFields || []), ...originals.flatMap((record) => record.availableFields || [])]
     .map(readable)).filter((field) => !PRIVATE_OR_SYSTEM_FIELD.test(field) && !MEASURE_FIELD.test(field)).slice(0, 2);
-  const groupStep = sharedFields.length && originals.length > 1
-    ? isKpi
-      ? `Get detailed records by ${sharedFields.join(" and ").toLowerCase()} before comparing those groups.`
-      : `Check ${sharedFields.join(" and ").toLowerCase()} for each record.`
-    : "";
-  const specific = context?.sourceAction ? sourceInstruction(context.sourceAction) : "";
-  const detail = isKpi ? calculationDetail(context, name) : missingDetail(insight.missingEvidence[0]);
-  const next = specific ? "" : insight.type === "Opportunity"
-    ? `Ask the ${isKpi ? "measure's" : "source"} owner what changed, then use the records to decide whether this result can be repeated.`
-    : isKpi ? "Ask the measure's owner to check the largest gap and identify which underlying entries need follow-up."
-      : "Ask the source owner to mark each flagged record as confirmed, corrected, or still unexplained.";
+  const group = sharedFields.length && originals.length > 1 ? sharedFields.join(" and ").toLowerCase() : "";
+  const detail = calculationDetail(context, name);
+  const recordRequest = isKpi
+    ? `Get ${detail.records}${group ? `, broken down by ${group}` : ""}.`
+    : missing;
+  const groupStep = !isKpi && group ? `Check ${group} for each record.` : "";
+  const next = specific ? "" : isKpi
+    ? insight.type === "Opportunity"
+      ? "Have the person responsible for this measure review the best period's entries and document any confirmed process difference before repeating it."
+      : context?.targetAvailable
+        ? "Have the person responsible for this measure check the entries behind the largest gap and assign follow-up for affected records."
+        : "Have the person responsible for this measure check the flagged entries and assign follow-up for affected records."
+    : insight.type === "Opportunity"
+      ? "Have the person responsible for these records document any confirmed change before repeating it."
+      : "Have the person responsible for these records mark each flagged one as confirmed, corrected, or still unexplained.";
 
   // Never slice a sentence to satisfy an arbitrary character count. Under length pressure,
   // omit optional grouping and boilerplate; keep the source action and supported comparison.
-  const parts = [first, review, comparison, groupStep, specific, detail, next].filter(Boolean);
+  const parts = [first, review, comparison, groupStep, specific, recordRequest, isKpi ? detail.check : "", next].filter(Boolean);
   if (parts.join(" ").length <= 620) return parts.join(" ");
-  const withoutOptionalGroup = [first, review, comparison, specific, detail, next].filter(Boolean);
+  const withoutOptionalGroup = [first, review, comparison, specific, recordRequest, next].filter(Boolean);
   if (withoutOptionalGroup.join(" ").length <= 620) return withoutOptionalGroup.join(" ");
-  return [first, comparison, specific || detail, specific ? detail : next].filter(Boolean).join(" ");
+  return [first, comparison, specific || recordRequest, specific ? recordRequest : next].filter(Boolean).join(" ");
 }

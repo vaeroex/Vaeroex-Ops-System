@@ -110,7 +110,7 @@ if (!process.argv.includes("--baseline")) {
   assert.ok(longAction.length <= 620, "long source metadata must not silently truncate the approved action");
   assert.match(longAction, /compare/i, "long metadata must not drop the comparison to meet the length bound");
   assert.match(longAction, /oldest unresolved service cases/i, "length pressure must retain the meaningful source-specific instruction");
-  assert.match(cases.find((item) => item.id === "inventory-accuracy-live-shape").action, /target and earlier periods/i, "stale aggregate opportunity keeps its supported comparison");
+  assert.match(cases.find((item) => item.id === "inventory-accuracy-live-shape").action, /target and earlier results/i, "stale aggregate opportunity keeps its supported comparison");
   assert.match(cases.find((item) => item.id === "field-service-duration").action, /start and end times/i);
   assert.match(cases.find((item) => item.id === "fleet-currency").action, /transactions and amounts/i);
   assert.match(cases.find((item) => item.id === "construction-rich-bottleneck").action, /crew and job type/i);
