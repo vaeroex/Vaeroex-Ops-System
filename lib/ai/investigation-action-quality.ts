@@ -13,6 +13,12 @@ export function hasTechnicalAdviceLanguage(value: string) {
 export function followsApprovedInvestigation(output: string, approved: string, stale: boolean) {
   const text = output.toLowerCase();
   if (/\b(?:decide whether to investigate|continue monitoring|review the (?:data|source records|kpi) and decide)\b/i.test(output)) return false;
+  const unavailableDetail = approved.match(/(?:^|[.;]\s*)([a-z][a-z -]{2,70}?)\s+(?:is|are)\s+not available\b/i)?.[1];
+  if (unavailableDetail) {
+    const detailTerms = unavailableDetail.toLowerCase().match(/[a-z][a-z-]{3,}/g)?.filter((term) => !SOURCE_STOP_WORDS.has(term)) || [];
+    if (!/\b(?:not available|unavailable|missing)\b/.test(text) || !/\b(?:get|obtain|request|ask)\b/.test(text)
+      || (detailTerms.length > 0 && !detailTerms.some((term) => text.includes(term)))) return false;
+  }
   const planned = /\b(?:inspect|examine|review|check|update|get)\b/i.test(approved);
   if (!planned) return true;
   if (!/\b(?:inspect|examine|review|check|compare|refresh|update|obtain|get)\b/.test(text)) return false;
