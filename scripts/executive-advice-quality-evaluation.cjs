@@ -78,6 +78,13 @@ assert.equal(followsApprovedInvestigation(omittedReviewAvailability, reviewFindi
 const completedReview = validateFindingExplanationOutput({ ...reviewExplanation, investigate_next: omittedReviewAvailability }, reviewPackage);
 assert.equal(completedReview.ok, true, "a source-specific model step can retain the application's approved missing-detail instruction");
 assert.match(completedReview.value.investigate_next, /Review text is not available here; get the review text and dates from the original source/);
+const alreadyRequestedReview = validateFindingExplanationOutput({ ...reviewExplanation,
+  investigate_next: "Update the review figures before making a current decision. Get the review text and dates from the original source, group recurring complaint themes, and assign someone to follow up on each verified theme. Check how the measure counts reviews before treating its value as a count of unique reviews."
+}, reviewPackage);
+assert.equal(alreadyRequestedReview.ok, true, "an approved source request remains valid when availability must be added");
+assert.match(alreadyRequestedReview.value.investigate_next, /Review text is not available here\./);
+assert.equal((alreadyRequestedReview.value.investigate_next.match(/get the review text and dates/gi) || []).length, 1,
+  "completion must not repeat an existing source request");
 assert.equal(validateFindingExplanationOutput({ ...reviewExplanation,
   investigate_next: "Decide whether to investigate the reviews now or continue monitoring."
 }, reviewPackage).ok, false, "completion must not rescue a generic model step");
