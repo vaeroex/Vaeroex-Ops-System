@@ -269,7 +269,7 @@ const askSession = read("lib/search/ask-session.ts");
 const askSessionToken = read("lib/search/ask-session-token.ts");
 const conversationalPolicy = read("lib/product/conversational-vaeroex.ts");
 check(conversationalPolicy.includes('VAEROEX_CONVERSATIONAL_POLICY') && conversationalPolicy.includes('premium_conversational_v1'), "Dormant conversational access must require its dedicated server-side premium policy.");
-check(appShell.includes("isPremiumConversationalVaeroexEnabled") && appShell.includes('href: "/app/ask"'), "The future premium Ask destination must remain hidden unless its dedicated policy is enabled.");
+check(appShell.includes('href: "/app/si"') && !appShell.includes("isPremiumConversationalVaeroexEnabled"), "VSI navigation must use the dedicated customer chat route without the retired premium Ask gate.");
 check(appShell.includes("GlobalSearch"), "The authenticated shell must preserve the separate global Search overlay.");
 check(globalSearch.includes("Search workspace") && globalSearch.includes("vaeroex:open-global-search"), "Global Search must remain a Search-only in-place panel.");
 check(globalSearch.includes("openSelectedResult") && globalSearch.includes("/api/search?q="), "Global Search Enter must navigate deterministic GET results.");
@@ -291,7 +291,7 @@ check(!/kpiOverviewIntent\.matched\s*\|\|\s*\/\\b\(kpi\|kpis\|metric\|metrics\|w
 check(searchRoute.includes("business_memory_chunks") && searchRoute.includes('"Learned Knowledge"'), "Global Search or Ask must search active Learned Knowledge instead of implementation-only result records.");
 check(!searchRoute.includes("/app/agents") && !searchRoute.includes('"Diagnostics"'), "Global Search must not expose the retired Agents diagnostics destination.");
 check(!/sourceType:\s*"Vaeroex Result"/.test(searchRoute), "Global Search or Ask must not expose Vaeroex Result records as ordinary customer-facing knowledge.");
-check(legacyAskPage.includes("AskVaeroexWorkspace") && legacyAskPage.includes("isPremiumConversationalVaeroexEnabled") && legacyAskPage.includes('redirect("/app/intelligence")'), "The dormant premium Ask workspace must fail closed to Intelligence in Version 1.");
+check(legacyAskPage.includes("requireWorkspacePage") && legacyAskPage.includes("/app/si") && !legacyAskPage.includes("AskVaeroexWorkspace") && legacyAskPage.includes('redirect("/app/intelligence")'), "Authorized freeform Ask links must redirect to VSI while legacy saved analyses still resolve to Intelligence.");
 check(legacyAskPage.includes("params.run") && legacyAskPage.includes("requireWorkspacePage") && !legacyAskPage.includes("/app/agents"), "Saved legacy result URLs must authorize and return to Intelligence.");
 check(agentsPage.indexOf("requireWorkspacePage()") < agentsPage.indexOf('permanentRedirect("/app/intelligence")'), "Every retired Agents URL must authorize before redirecting to structured Intelligence.");
 check(!exists("app/app/agents/actions.ts") && !exists("app/app/agents/loading.tsx"), "The retired Agents action and loading surfaces must stay deleted.");

@@ -26,7 +26,7 @@ assert.match(candidateRunner, /outcome\.assertions = await require\('\.\/qbo-pen
   'eligibility tests use the owned per-suite database clone'); assertions++;
 assert.match(candidateRunner, /assert\.equal\(outcome\.assertions, suite\.expectedScenarios/, 'incomplete native coverage fails the candidate run'); assertions++;
 assert.match(candidateRunner, /result\.suites\.length === shapeSuites\.length \+ 4/, 'candidate success requires the registered dashboard suites and all four existing native suites'); assertions++;
-assert.match(candidateRunner, /assert\.equal\(canonical\.length, 136,/, 'canonical count remains exact'); assertions++;
+assert.match(candidateRunner, /assert\.equal\(canonical\.length, 137,/, 'canonical count remains exact'); assertions++;
 assert.deepEqual(productionSheets, ['20261002040024_google_sheets_complete.sql', '20261002040031_google_sheets_lifecycle.sql']); assertions++;
 assert.deepEqual(auditMigrations, [
   '20261005022017_workspace_security_boundaries.sql', '20261005022445_workspace_persisted_usage_limits.sql',
@@ -34,10 +34,12 @@ assert.deepEqual(auditMigrations, [
   '20261005061024_internal_form_submission_idempotency.sql', '20261005062005_durable_import_attempt_reconciliation.sql',
   '20261005070311_worksheet_import_publication_heads.sql',
 ]); assertions++;
-assert.match(candidateRunner, /'20261002040024_google_sheets_complete\.sql',\s*'20261002040031_google_sheets_lifecycle\.sql',\s*'20261002182049_integration_summary_preferences\.sql',\s*\.\.\.auditMigrations,\s*\.\.\.capacityMigrations,\s*\]/,
-  'canonical tail remains exactly Sheets, preferences, audit and capacity tails'); assertions++;
-assert.match(candidateRunner, /canonical\.filter\(item => !\[\.\.\.auditMigrations, \.\.\.capacityMigrations\]\.includes\(path\.basename\(item\.file\)\)\)/,
+assert.match(candidateRunner, /'20261002040024_google_sheets_complete\.sql',\s*'20261002040031_google_sheets_lifecycle\.sql',\s*'20261002182049_integration_summary_preferences\.sql',\s*\.\.\.auditMigrations,\s*\.\.\.capacityMigrations,\s*vsiMigration,\s*\]/,
+  'canonical tail remains exactly Sheets, preferences, audit, capacity and VSI tails'); assertions++;
+assert.match(candidateRunner, /canonical\.filter\(item => !\[\.\.\.auditMigrations, \.\.\.capacityMigrations, vsiMigration\]\.includes\(path\.basename\(item\.file\)\)\)/,
   'canonical does not apply audit guards before new provider tables exist'); assertions++;
+assert.match(candidateRunner, /const vsiMigration = '20261008190000_vsi_private_chat\.sql'/, 'VSI tail is explicitly reviewed'); assertions++;
+assert.ok(candidateRunner.indexOf('await apply(vsi);') > candidateRunner.indexOf('for (const item of capacity) await apply(item);'), 'VSI follows its authorization dependencies in both database shapes'); assertions++;
 assert.deepEqual(capacityMigrations, [
   '20261005182541_bounded_google_sheets_dispatch.sql',
   '20261005183352_issue_submission_receipts.sql',

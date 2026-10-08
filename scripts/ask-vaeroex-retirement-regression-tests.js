@@ -16,9 +16,11 @@ assert.match(policy, /import "server-only"/, "the conversational policy must rem
 assert.match(policy, /VAEROEX_CONVERSATIONAL_POLICY/, "future conversational access must use its own explicit policy variable");
 assert.match(policy, /premium_conversational_v1/, "future conversational access must require the approved premium policy value");
 assert.doesNotMatch(policy, /NEXT_PUBLIC_/, "the conversational policy must not be controlled by a client-exposed variable");
-assert.match(appShell, /isPremiumConversationalVaeroexEnabled\(\)[\s\S]*href:\s*"\/app\/ask"/, "Ask navigation must be hidden by default and available only to the future premium policy");
-assert.match(askPage, /if \(!isPremiumConversationalVaeroexEnabled\(\)\) redirect\("\/app\/intelligence"\)/, "direct Version 1 Ask visits must return to Intelligence");
-assert.match(askPage, /params\.run[\s\S]*requireWorkspacePage\(\)[\s\S]*redirect\("\/app\/intelligence"\)/, "bookmarked historical result URLs must authorize and return to Intelligence");
+assert.match(appShell, /href:\s*"\/app\/si"/, "VSI must be available in workspace navigation");
+assert.doesNotMatch(appShell, /isPremiumConversationalVaeroexEnabled/, "VSI must not depend on the retired Ask premium gate");
+assert.match(askPage, /requireWorkspacePage\(\)[\s\S]*params\.run[\s\S]*redirect\("\/app\/intelligence"\)/, "historical result URLs must authorize and return to Intelligence");
+assert.match(askPage, /redirect\([\s\S]*\/app\/si/, "freeform Ask links must redirect to VSI");
+assert.doesNotMatch(askPage, /AskVaeroexWorkspace|isPremiumConversationalVaeroexEnabled/, "legacy Ask renderer and scope gate must stay separate from VSI");
 assert.match(agentsPage, /requireWorkspacePage\(\)[\s\S]*permanentRedirect\("\/app\/intelligence"\)/, "the retired Agents route must authorize before redirecting");
 assert.doesNotMatch(agentsPage, /href="\/app\/ask"|pathname:\s*"\/app\/ask"|return_path" value=\{`\/app\/ask/, "historical result controls must not send Version 1 users back into Ask");
 
