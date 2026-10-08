@@ -134,7 +134,7 @@ export function planInvestigation(insight: IntelligenceInsight, asOf: Date | str
     : insight.priority === "High"
       ? `Check ${subject} now${period ? ` for ${period}` : ""}.`
       : `Review ${subject}${period ? ` for ${period}` : ""}.`;
-  const review = isStale ? `Review the recorded ${period || "past"} results while waiting for current data.` : "";
+  const review = isStale && !isKpi ? `Review the ${period || "past"} records while waiting for current data.` : "";
   const specific = context?.sourceAction ? sourceInstruction(context.sourceAction) : "";
   const missing = missingDetail(insight.missingEvidence[0]);
 
@@ -142,9 +142,9 @@ export function planInvestigation(insight: IntelligenceInsight, asOf: Date | str
   // that comparable underlying groups or individual events are available.
   const comparison = isKpi
     ? context?.targetAvailable && dated.length > 1
-      ? "Compare each period with the target and earlier results."
-      : context?.targetAvailable ? "Check the result against its target."
-        : dated.length > 1 ? "Compare the results across the recorded periods." : "Get another dated result for comparison."
+      ? isStale ? `Compare the ${period || "recorded"} values with the target and earlier results.` : "Compare each period with the target and earlier results."
+      : context?.targetAvailable ? `Check the ${isStale ? `${period || "recorded"} ` : ""}result against its target.`
+        : dated.length > 1 ? `Compare the ${isStale ? `${period || "recorded"} ` : ""}results across periods.` : "Get another dated result for comparison."
     : specific ? "" : originals.length > 1 && dated.length > 1
       ? "Get other records from those dates before comparing the pattern."
       : originals.length > 1 ? "Compare the records from this period." :
