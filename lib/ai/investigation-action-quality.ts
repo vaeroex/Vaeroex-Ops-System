@@ -10,11 +10,11 @@ export function hasTechnicalAdviceLanguage(value: string) {
 }
 
 // Keep details named by a later check from being mistaken for the object of a source request.
-const NEXT_ACTION = /\b(?:and|then)\s+(?:confirm|check|review|examine|inspect|identify|find|see|verify|determine|decide|note|state|compare|group|assign)\b/i;
+const NEXT_ACTION = /\b(?:and|then)\s+(?:(?:review|check)\s+(?=the\b|a\b|an\b|whether\b|how\b|which\b|what\b|if\b)|(?:confirm|examine|inspect|identify|find|see|verify|determine|decide|note|state|compare|group|assign)\b)/i;
 function sourceRequestObjects(text: string) {
   return [...text.matchAll(/\b(get|obtain|request|ask)\b([^.!?;]*)/gi)]
     .map(([, verb, rest]) => ({ verb: verb.toLowerCase(), object: rest.split(NEXT_ACTION, 1)[0].split(/\b(?:whether|if)\b/i, 1)[0].toLowerCase() }))
-    .filter(({ verb, object }) => verb !== "ask" || /\bfor\b/.test(object))
+    .filter(({ verb, object }) => verb !== "ask" || /\bfor\b|\bto\s+(?:provide|send|share|supply|obtain|get|export|retrieve|collect)\b/.test(object))
     .map(({ object }) => object);
 }
 

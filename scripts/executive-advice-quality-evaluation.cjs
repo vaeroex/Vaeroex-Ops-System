@@ -115,6 +115,22 @@ const availabilityQuestion = completeApprovedMissingDetail(
 );
 assert.match(availabilityQuestion, /get the review text and dates from the original source/i,
   "asking whether details exist does not replace an instruction to obtain them");
+const reorderedRequest = completeApprovedMissingDetail(
+  "Get the dates and review text from the original source.",
+  "Review text is not available here; get the review text and dates from the original source.",
+  false,
+  620
+);
+assert.equal((reorderedRequest.match(/from the original source/gi) || []).length, 1,
+  "review text remains a requested record when its words follow 'and'");
+const askToProvide = completeApprovedMissingDetail(
+  "Ask the source owner to provide the review text and dates.",
+  "Review text is not available here; get the review text and dates from the original source.",
+  false,
+  620
+);
+assert.equal((askToProvide.match(/review text and dates/gi) || []).length, 1,
+  "asking the source owner to provide details is already a valid acquisition step");
 assert.equal(validateFindingExplanationOutput({ ...reviewExplanation,
   investigate_next: "Decide whether to investigate the reviews now or continue monitoring."
 }, reviewPackage).ok, false, "completion must not rescue a generic model step");
