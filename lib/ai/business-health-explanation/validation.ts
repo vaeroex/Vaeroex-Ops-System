@@ -10,7 +10,7 @@ import {
   unattributedContextField
 } from "@/lib/ai/business-notes/reasoning-context";
 import { validateAiGeneratedOutput } from "@/lib/security/ai-output-validation";
-import { followsApprovedInvestigation } from "@/lib/ai/investigation-action-quality";
+import { followsApprovedInvestigation, hasTechnicalAdviceLanguage } from "@/lib/ai/investigation-action-quality";
 import type { StructuredOutputValidation } from "@/lib/ai/providers/provider-manager";
 import { validationFailure, validationValueType } from "@/lib/ai/validation-diagnostics";
 import type { Json } from "@/lib/supabase/types";
@@ -18,7 +18,7 @@ import type { Json } from "@/lib/supabase/types";
 const outputSchema = z.object({
   executive_interpretation: z.string().trim().min(30).max(700),
   why_it_matters: z.string().trim().min(20).max(420),
-  leadership_consideration: z.string().trim().min(20).max(420),
+  leadership_consideration: z.string().trim().min(20).max(620),
   provisional_hypothesis: z.string().trim().min(20).max(420).nullable()
 }).strict();
 
@@ -120,6 +120,15 @@ export function validateBusinessHealthExplanationOutput(
 
   const output = parsed.data;
   const text = combinedText(output);
+  if (hasTechnicalAdviceLanguage(text)) {
+    return validationFailure("The explanation used technical source language instead of plain business English.", {
+      reasonCode: "contextual_validation_failed",
+      stage: "contextual_validation",
+      expectedField: hasTechnicalAdviceLanguage(output.leadership_consideration) ? "leadership_consideration" : "$",
+      expectedType: "string",
+      observedType: "string"
+    });
+  }
   if (UUID_PATTERN.test(text) || CITATION_PATTERN.test(text)) {
     return validationFailure("The provider must not generate record identifiers or citation IDs.", {
       reasonCode: "invalid_citation_id",

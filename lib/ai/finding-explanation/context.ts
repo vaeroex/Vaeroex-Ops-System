@@ -171,11 +171,11 @@ export function buildFindingExplanationPackage({
     title: compactText(insight.title, 180),
     priority: insight.priority,
     confidence: insight.confidence,
-    timePeriod: compactText(insight.timePeriod, 120),
+    timePeriod: compactText(insight.timePeriod === "Current imported records" ? "Dates shown in supporting evidence" : insight.timePeriod, 120),
     approvedDevelopment: compactText(insight.summary, 520),
     approvedEvidenceBasis: compactText(insight.why, 520),
     approvedLeadershipRelevance: compactText(insight.impact, 420),
-    approvedInvestigationNext: compactText(insight.recommendedAction, 420),
+    approvedInvestigationNext: compactText(insight.recommendedAction, 620),
     approvedLimitations: uniqueStrings([
       insight.limitation,
       ...insight.missingEvidence,
@@ -188,6 +188,7 @@ export function buildFindingExplanationPackage({
   };
   const contextualEvidence = projection?.contextualEvidence || [];
   const fingerprint = evidenceEngineHash({
+    adviceLanguageVersion: "plain_english_v2",
     contractId: FINDING_EXPLANATION_CONTRACT_ID,
     contractVersion: FINDING_EXPLANATION_CONTRACT_VERSION,
     validatorVersion: FINDING_EXPLANATION_VALIDATOR_VERSION,

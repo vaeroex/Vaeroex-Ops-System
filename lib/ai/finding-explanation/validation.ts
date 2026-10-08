@@ -12,14 +12,14 @@ import {
 import type { StructuredOutputValidation } from "@/lib/ai/providers/provider-manager";
 import { validationFailure, validationValueType } from "@/lib/ai/validation-diagnostics";
 import { validateAiGeneratedOutput } from "@/lib/security/ai-output-validation";
-import { followsApprovedInvestigation } from "@/lib/ai/investigation-action-quality";
+import { followsApprovedInvestigation, hasTechnicalAdviceLanguage } from "@/lib/ai/investigation-action-quality";
 import type { Json } from "@/lib/supabase/types";
 
 const outputSchema = z.object({
   what_happened: z.string().trim().min(25).max(520),
   why_evidence_suggests: z.string().trim().min(25).max(620),
   why_leadership_should_care: z.string().trim().min(25).max(520),
-  investigate_next: z.string().trim().min(20).max(520),
+  investigate_next: z.string().trim().min(20).max(620),
   what_evidence_does_not_prove: z.string().trim().min(20).max(420)
 }).strict();
 
@@ -116,6 +116,15 @@ export function validateFindingExplanationOutput(
       reasonCode: "invalid_citation_id",
       stage: "citation_provenance",
       expectedField: fieldWithMatch(output, UUID_PATTERN.test(text) ? UUID_PATTERN : INTERNAL_IDENTIFIER_PATTERN),
+      expectedType: "string",
+      observedType: "string"
+    });
+  }
+  if (hasTechnicalAdviceLanguage(text)) {
+    return validationFailure("The next step used technical source language instead of plain business English.", {
+      reasonCode: "contextual_validation_failed",
+      stage: "contextual_validation",
+      expectedField: OUTPUT_FIELDS.find((field) => hasTechnicalAdviceLanguage(output[field])) || "$",
       expectedType: "string",
       observedType: "string"
     });
