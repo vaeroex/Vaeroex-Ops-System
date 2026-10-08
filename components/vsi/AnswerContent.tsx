@@ -1,6 +1,11 @@
 import type { ReactNode } from "react";
 
-type AnswerBlock = { kind: "heading" | "paragraph" | "code"; text: string } | { kind: "ordered" | "unordered"; items: string[] };
+type AnswerBlock =
+  | { kind: "heading"; text: string }
+  | { kind: "paragraph"; text: string }
+  | { kind: "code"; text: string }
+  | { kind: "ordered"; items: string[] }
+  | { kind: "unordered"; items: string[] };
 const headingPattern = /^ {0,3}#{1,6}(?:[ \t]+(.*))?$/;
 const fencePattern = /^ {0,3}(`{3,}|~{3,})(.*)$/;
 const listPattern = /^ {0,3}([-*+]|\d{1,9}[.)])[ \t]+(.*)$/;
