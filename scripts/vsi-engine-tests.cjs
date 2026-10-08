@@ -25,7 +25,7 @@ require.cache[retrievalPath].exports = { ...actualRetrieval,
   authorizeVsiRead: async () => { if (!permitted) throw new Error('Workspace denied'); return {}; },
   retrieveVsiEvidence: async () => { retrievalCalls++; return { sources:[source], limitations:['Only aggregate measurements are available.'] }; }
 };
-const {runVsiAnswer,planVsiLiveLookup,explicitVsiNoteDraft,boundedVsiHistory,validateVsiAnswer,VsiEngineError,VSI_SYSTEM_PROMPT} = require('../lib/vsi/engine.ts');
+const {runVsiAnswer,planVsiLiveLookup,explicitVsiNoteDraft,boundedVsiHistory,validateVsiAnswer,readVsiWebSources,vsiLiveLookupDiagnostic,VsiEngineError,VSI_SYSTEM_PROMPT} = require('../lib/vsi/engine.ts');
 const {vsiEstimatedCost,getVsiConfig} = require('../lib/vsi/config.ts');
 const {resetAIProviderCircuitForTests} = require('../lib/ai/provider-resilience.ts');
 const calls=[];
@@ -39,8 +39,8 @@ global.fetch = async (url, init) => {
   if(mode==='429') return new Response('{}',{status:429});
   const usage={input_tokens:1000, output_tokens:100, input_tokens_details:{cached_tokens:200},output_tokens_details:{reasoning_tokens:30}};
   if(body.tools) return response({model:'gpt-6-luna',status:'completed',usage,output_text:'At 12:00 UTC, Seattle is 14°C.',
-    output:[{type:'web_search_call',status:'completed'}, {type:'message',content:[{type:'output_text',text:'Seattle: 14°C.',
-      annotations:mode==='no_source'?[]:[{type:'url_citation',title:'Official forecast',url:'https://weather.gov/seattle'}]}]}]});
+    output:[{type:'web_search_call',status:'completed',action:{type:'search',sources:mode==='action_sources'?[{type:'url',url:'https://forecast.weather.gov/MapClick.php?lat=47.6&lon=-122.3'}]:mode==='feed_only'?[{type:'url',url:'oai-weather'}]:[]}}, {type:'message',content:[{type:'output_text',text:'Seattle: 14°C.',
+      annotations:['no_source','action_sources','feed_only'].includes(mode)?[]:[{type:'url_citation',title:'Official forecast',url:'https://weather.gov/seattle'}]}]}]});
   const payload=JSON.parse(body.input[1].content);
   const isWeb=Boolean(payload.livePublicLookup), isBusiness=payload.businessSources.length>0;
   const content=isWeb?'Seattle is 14°C. Live lookup: 2026-10-08T12:00:00Z [W1]':isBusiness?'Turnaround is 4 days, up from 2. The aggregate does not establish a cause [B1].':'Here is a clear three-step writing plan.';
@@ -78,6 +78,22 @@ async function main(){
   assert.throws(()=>validateVsiAnswer({content:'[B2]',citationIds:['B2']},[source]));
   assert.throws(()=>validateVsiAnswer({content:'See https://evil.test',citationIds:[]},[]));
   assert.equal('text' in validateVsiAnswer({content:'Supported [B1]',citationIds:['B1']},[source]).citations[0],false);
+  const lookedUpAt='2026-10-08T12:00:00Z';
+  const documentedSource={type:'web_search_call',status:'completed',action:{type:'search',sources:[{type:'url',url:'https://forecast.weather.gov/seattle'}]}};
+  const sourceOnly=readVsiWebSources({output:[documentedSource]},lookedUpAt);
+  assert.equal(sourceOnly.length,1);assert.equal(sourceOnly[0].url,'https://forecast.weather.gov/seattle');assert.equal(sourceOnly[0].title,'forecast.weather.gov');assert.equal(sourceOnly[0].retrievedAt,lookedUpAt);
+  const annotated={type:'message',content:[{type:'output_text',annotations:[{type:'url_citation',url:'https://forecast.weather.gov/seattle',title:'Seattle official forecast'}]}]};
+  const combined=readVsiWebSources({output:[documentedSource,annotated]},lookedUpAt);assert.equal(combined.length,1);assert.equal(combined[0].title,'Seattle official forecast');
+  for(const status of ['failed','incomplete','in_progress',undefined])assert.equal(readVsiWebSources({output:[{...documentedSource,status},annotated]},lookedUpAt).length,0);
+  assert.equal(readVsiWebSources({output:[annotated]},lookedUpAt).length,0);
+  assert.equal(readVsiWebSources({output:[{...documentedSource,action:{type:'open_page',sources:documentedSource.action.sources}}]},lookedUpAt).length,0);
+  const invalidUrls=['oai-weather','javascript:alert(1)','data:text/html,private','file:///private/data','https://user:secret@weather.test/','https://','https://weather.test/'+'a'.repeat(2001)];
+  for(const url of invalidUrls)assert.equal(readVsiWebSources({output:[{...documentedSource,action:{type:'search',sources:[{type:'url',url}]}}]},lookedUpAt).length,0);
+  assert.equal(readVsiWebSources({output:[{...documentedSource,action:{type:'search',sources:Array.from({length:30},(_,i)=>({type:'url',url:`https://weather.test/${i}`}))}}]},lookedUpAt).length,10);
+  const diagnostic=vsiLiveLookupDiagnostic({output:[{type:'PRIVATE QUESTION',status:'SECRET TOKEN',content:[{type:'output_text',text:'PRIVATE ANSWER',annotations:[{type:'url_citation',url:'https://private.invalid/SECRET_TOKEN'}]}]},
+    {...documentedSource,status:'SECRET TOKEN',action:{type:'search',sources:[{type:'url',url:'https://private.invalid/SECRET_TOKEN'},{type:'url',url:'oai-weather'}]}}]});
+  assert.deepEqual(diagnostic.feedLabels,['oai-weather']);assert.deepEqual(diagnostic.searchStatuses,['other']);
+  assert.ok(!/PRIVATE|SECRET|private.invalid|https:/.test(JSON.stringify(diagnostic)));
   const general=await runVsiAnswer(input('Write a friendly invitation to dinner.'));
   assert.equal(retrievalCalls,0);assert.equal(calls.length,1);assert.equal(calls[0].tools,undefined);assert.equal(general.noteDraft,undefined);
   assert.equal(general.usage.inputTokens,1000);assert.equal(general.usage.cachedInputTokens,200);assert.equal(general.usage.reasoningTokens,30);
@@ -90,13 +106,22 @@ async function main(){
   assert.equal(current.usage.webSearchCalls,1);assert.equal(current.citations[0].sourceType,'web');
   const webCall=calls.find(call=>call.tools);assert.equal(webCall.max_tool_calls,2);assert.equal(webCall.tool_choice,'required');
   assert.ok(!JSON.stringify(webCall).includes('TOP SECRET'));
+  assert.match(webCall.input[0].content,/citable public webpage/);
+  mode='action_sources';const sourceFallback=await runVsiAnswer(input('Weather in Seattle today?'));assert.equal(sourceFallback.citations[0].url,'https://forecast.weather.gov/MapClick.php?lat=47.6&lon=-122.3');assert.equal(sourceFallback.usage.webSearchCalls,1);mode='normal';
   const business=await runVsiAnswer(input('Why did repair turnaround rise?'));assert.equal(retrievalCalls,1);assert.equal(business.citations[0].id,'B1');
   assert.match(business.content,/does not establish a cause/);
   assert.match(VSI_SYSTEM_PROMPT,/aggregate review count cannot establish/);assert.match(VSI_SYSTEM_PROMPT,/untrusted data/);
   mode='bad_cite'; await assert.rejects(runVsiAnswer(input('Explain gravity')),error=>error instanceof VsiEngineError && error.usage.outputTokens===100);
   mode='wrong_model';await assert.rejects(runVsiAnswer(input('Explain gravity')),/required Luna/);
   mode='incomplete';await assert.rejects(runVsiAnswer(input('Explain gravity')),/response limit/);
-  mode='no_source';await assert.rejects(runVsiAnswer(input('Weather in Seattle today?')),error=>error instanceof VsiEngineError && error.usage.webSearchCalls===1);
+  const failureLogs=[],originalError=console.error;console.error=(...args)=>failureLogs.push(args);
+  try {
+    mode='no_source';await assert.rejects(runVsiAnswer(input('Weather in Seattle today?')),error=>error instanceof VsiEngineError && error.usage.webSearchCalls===1);
+    mode='feed_only';await assert.rejects(runVsiAnswer(input('Weather in Seattle today?')),error=>error instanceof VsiEngineError && /verifiable source/.test(error.message) && error.usage.webSearchCalls===1);
+  } finally { console.error=originalError; }
+  assert.equal(failureLogs.length,2);assert.deepEqual(failureLogs[1][1].feedLabels,['oai-weather']);
+  assert.ok(!/Seattle|synthetic-test-key|https:|PRIVATE/.test(JSON.stringify(failureLogs)));
+
   mode='transport';await assert.rejects(runVsiAnswer(input('Explain gravity')),error=>error instanceof VsiEngineError && error.accountingUncertain);
   resetAIProviderCircuitForTests();mode='429';await assert.rejects(runVsiAnswer(input('Explain gravity')),error=>error instanceof VsiEngineError && !error.accountingUncertain && error.usage.estimatedCostUsd===0);
   resetAIProviderCircuitForTests();mode='normal';permitted=false;

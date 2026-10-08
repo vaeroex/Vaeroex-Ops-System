@@ -8,6 +8,8 @@ const { safeSourceUrl } = loadSource("components/vsi/contracts.ts");
 const workspaceId = "10000000-0000-4000-8000-000000000001", now = "2026-10-08T18:00:00.000Z";
 const chat = (id, count = 1) => ({ id, title: id === "closed" ? "Long-running project" : id === "warning" ? "Planning history" : "Private planning", exchangeCount: count, createdAt: now, updatedAt: now });
 const exchange = (id, message = "Help me plan my week") => ({ id, userMessage: message, answer: "**Start with your priorities.**\n\n1. Choose three outcomes.\n2. Leave time for interruptions.", citations: [], createdAt: now });
+const literalCode = "## Keep this code heading literal\n\n<img src=x onerror=alert('unsafe')>\n[Unsafe link](javascript:alert('unsafe'))";
+const structuredAnswer = "## Repair turnaround\nThe latest KPI is **3.8 days** against a two-day target [B1].\n\n### What to check first\n1. Compare dated repair tickets.\n2. Confirm parts availability.\n\n```text\n" + literalCode + "\n```\n\nAfter the code, [the guide](https://untrusted.example/guide) stays plain text.\n![Not an attachment](https://untrusted.example/attachment.png)";
 const stored = new Map(), answers = new Map();
 let posts = [], noteSaves = 0, usageReads = 0, firstFailure = true, lost = false, serverError = null;
 const output = fs.mkdtempSync(path.join(os.tmpdir(), "vsi-ui-browser-"));
@@ -49,7 +51,7 @@ async function main() {
           if (!answer) {
             answer = exchange(body.requestId, body.message);
             if (body.message.includes("remember")) answer.rememberProposal = { title: "Business focus", content: "We sell handmade furniture." };
-            if (body.message.includes("evidence")) { answer.answer = "The file reports a delivery change [B1]. This does not establish a cause."; answer.citations = [{ id: "B1", title: "Delivery record", url: "/app/sources/delivery", sourceType: "file", sourceId: "delivery", evidenceDate: "2026-10-01T00:00:00Z", retrievedAt: now, excerpt: "Deliveries fell 10%." }]; }
+            if (body.message.includes("evidence")) { answer.answer = structuredAnswer; answer.citations = [{ id: "B1", title: "Delivery record", url: "/app/sources/delivery", sourceType: "file", sourceId: "delivery", evidenceDate: "2026-10-01T00:00:00Z", retrievedAt: now, excerpt: "Deliveries fell 10%." }]; }
             value.exchanges.push(answer); value.conversation.exchangeCount++; answers.set(body.requestId, answer);
           }
           if (body.message === "retry safely" && firstFailure) { firstFailure = false; return send({ message: "Connection interrupted after saving. Retry to retrieve your answer." }, 503); }
@@ -90,6 +92,16 @@ async function main() {
     await composer.fill("Explain the evidence"); await composer.press("Enter"); await page.getByText("Sources (1)", { exact: true }).click(); await page.getByRole("link", { name: "Delivery record" }).waitFor();
     assert.match(await page.getByRole("link", { name: "Delivery record" }).getAttribute("href"), /\/app\/sources/);
     assert.equal(await page.getByText("Evidence: Oct 1, 2026", { exact: true }).count(), 1);
+    const renderedEvidence = page.getByRole("article").last();
+    await renderedEvidence.getByRole("heading", { name: "Repair turnaround", exact: true }).waitFor();
+    assert.equal(await renderedEvidence.getByRole("heading", { name: "What to check first", exact: true }).count(), 1, "headings must render without a blank line before following text");
+    assert.equal(await renderedEvidence.locator("strong").innerText(), "3.8 days");
+    assert.equal(await renderedEvidence.locator("ol.list-decimal li").count(), 2, "list may follow heading immediately");
+    assert.equal(await renderedEvidence.locator("pre code").textContent(), literalCode, "fenced code keeps blank lines and literal Markdown/HTML");
+    assert.equal(await renderedEvidence.getByRole("heading", { name: "Keep this code heading literal" }).count(), 0);
+    assert.equal(await renderedEvidence.locator("img, iframe, video, audio, script").count(), 0, "model text never creates HTML or media");
+    assert.equal(await renderedEvidence.locator("a").count(), 1, "only the separately verified source becomes a link");
+    assert((await renderedEvidence.innerText()).includes("[the guide](https://untrusted.example/guide)"), "model-selected URLs stay literal");
     await page.getByRole("button", { name: "Rename", exact: true }).click(); await page.getByRole("textbox", { name: "Chat name" }).fill("Furniture project"); await page.getByRole("button", { name: "Save name" }).click();
     await page.getByRole("heading", { name: "Furniture project", exact: true }).waitFor(); await page.reload();
     await page.getByRole("heading", { name: "Furniture project", exact: true }).waitFor(); assert.equal(await page.getByText("retry safely", { exact: true }).count(), 1);
@@ -109,6 +121,7 @@ async function main() {
         assert.equal(colors.activeBackground, colors.noteBackground, "active chat uses the same themed highlight");
       }
       await page.screenshot({ path: path.join(output, `vsi-${theme}-${width}.png`), fullPage: true });
+      await renderedEvidence.screenshot({ path: path.join(output, `vsi-answer-${theme}-${width}.png`) });
     }
     await page.getByRole("button", { name: "Usage", exact: true }).click(); await page.getByText(/4 of 100 questions/).waitFor(); assert.equal(usageReads, 1);
     await composer.fill("other tab filled this chat"); await composer.press("Enter");
@@ -126,7 +139,7 @@ async function main() {
     lost = true; await page.getByRole("button", { name: "Usage", exact: true }).click(); await page.getByRole("button", { name: "Reload your active workspace" }).waitFor();
     assert.equal(await page.getByText("Start with your priorities.", { exact: true }).count(), 0); assert.equal(await page.getByRole("heading", { name: "Long-running project" }).count(), 0); assert.equal(await page.getByRole("alert").evaluate(element => getComputedStyle(element).color), "rgb(252, 165, 165)", "dark-theme errors must stay legible");
     assert.equal(serverError, null); assert.deepEqual(errors, []);
-    console.log(JSON.stringify({ passed: true, checks: ["general question", "App Router searchParams update", "older history pagination", "keyboard", "stable retry", "explicit note confirmation", "citation dates", "rename reopen delete", "225 warning", "250 handoff preserves transcript", "second-tab thread boundary preserves unsent draft", "workspace access loss clears transcript", "on-demand usage", "desktop mobile no overflow", "actual global CSS light/Pulsar contrast"], widths: [1440, 390, 320], output, scope: "Hydrated UI with synthetic loopback API; authenticated API and provider qualification are separate." }));
+    console.log(JSON.stringify({ passed: true, checks: ["general question", "App Router searchParams update", "older history pagination", "keyboard", "stable retry", "explicit note confirmation", "citation dates", "Markdown headings and fenced code stay safe and readable", "rename reopen delete", "225 warning", "250 handoff preserves transcript", "second-tab thread boundary preserves unsent draft", "workspace access loss clears transcript", "on-demand usage", "desktop mobile no overflow", "actual global CSS light/Pulsar contrast"], widths: [1440, 390, 320], output, scope: "Hydrated UI with synthetic loopback API; authenticated API and provider qualification are separate." }));
   } finally { if (browser) await browser.close(); await new Promise(resolve => server.close(resolve)); }
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });
