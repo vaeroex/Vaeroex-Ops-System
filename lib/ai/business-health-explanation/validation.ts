@@ -173,9 +173,17 @@ export function validateBusinessHealthExplanationOutput(
     dataQualityBase: context.facts.dataQualityBase,
     riskPenalty: context.facts.riskPenalty,
     opportunityAdjustment: context.facts.opportunityAdjustment,
+    comparison: context.facts.comparison,
+    deterministicSummary: context.facts.deterministicSummary,
+    limitations: context.facts.limitations,
+    latestEvidenceAt: context.facts.latestEvidenceAt,
     drivers: context.facts.drivers.map((driver) => ({
       scoreImpact: driver.scoreImpact,
       fact: driver.fact
+    })),
+    citations: (context.citations || []).map((citation) => ({
+      recordedAt: citation.recordedAt,
+      excerpt: citation.excerpt
     }))
   });
   const approvedFactText = JSON.stringify({

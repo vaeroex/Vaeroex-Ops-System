@@ -521,7 +521,7 @@ export function buildBusinessHealthExplanationPackage({
   };
   const contextualEvidence = projection?.contextualEvidence || [];
   const packageFingerprintInput = {
-    adviceLanguageVersion: "plain_english_v3",
+    adviceLanguageVersion: "plain_english_v4",
     contractId: BUSINESS_HEALTH_EXPLANATION_CONTRACT_ID,
     contractVersion: BUSINESS_HEALTH_EXPLANATION_CONTRACT_VERSION,
     validatorVersion: BUSINESS_HEALTH_EXPLANATION_VALIDATOR_VERSION,
