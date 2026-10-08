@@ -47,6 +47,12 @@ export function completeApprovedMissingDetail(output: string, approved: string, 
   const missingDetailSentence = approved.match(/(?:^|[.!?]\s+)([^.!?]*\b(?:is|are) not available\b[^.!?]*[.!?])/i)?.[1]?.trim();
   if (!missingDetailSentence || !/\b(?:get|obtain|request|ask)\b/i.test(missingDetailSentence)) return output;
 
-  const completed = `${output.trim()} ${missingDetailSentence}`;
+  const [availability, request = ""] = missingDetailSentence.split(";");
+  const requestTerms = request.toLowerCase().match(/[a-z][a-z-]{3,}/g)?.filter((term) => !SOURCE_STOP_WORDS.has(term)
+    && !["obtain", "request"].includes(term)) || [];
+  const requestClauses = output.match(/(?:^|[.!?;]\s*)\b(?:get|obtain|request|ask)\b[^.!?;]*/gi) || [];
+  const alreadyRequested = requestTerms.length > 0
+    && requestClauses.some((clause) => requestTerms.every((term) => clause.toLowerCase().includes(term)));
+  const completed = `${output.trim()} ${alreadyRequested ? `${availability.trim()}.` : missingDetailSentence}`;
   return completed.length <= maxLength ? completed : approved.length <= maxLength ? approved : output;
 }
