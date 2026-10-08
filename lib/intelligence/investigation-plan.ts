@@ -162,7 +162,7 @@ export function planInvestigation(insight: IntelligenceInsight, asOf: Date | str
           ? "" : "Get comparable records from the same source to see whether this repeats.";
 
   const sharedFields = distinct([...(context?.availableFields || []), ...originals.flatMap((record) => record.availableFields || [])]
-    .map(readable)).filter((field) => !PRIVATE_OR_SYSTEM_FIELD.test(field) && !MEASURE_FIELD.test(field)).slice(0, 2);
+    .map(readable)).filter((field) => !PRIVATE_OR_SYSTEM_FIELD.test(field) && !MEASURE_FIELD.test(field) && !REPORTING_PERIOD_FIELD.test(field)).slice(0, 2);
   const group = sharedFields.length && originals.length > 1 ? sharedFields.join(" and ").toLowerCase() : "";
   const detail = calculationDetail(context, name);
   const recordRequest = isKpi

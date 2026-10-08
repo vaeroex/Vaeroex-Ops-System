@@ -273,6 +273,16 @@ function uniqueStrings(values: Array<string | null | undefined>, maximum = 4) {
   }).slice(0, maximum);
 }
 
+export function plainHealthDataQualityReason(reason: string) {
+  if (reason === "Authoritative evidence is usable, but source diversity, KPI history, or freshness still limits confidence.") {
+    return "The score uses available records, but limited history, few independent sources, or older data may lower confidence.";
+  }
+  if (reason === "Authoritative evidence remains limited in completeness, independent-source diversity, KPI history, or freshness.") {
+    return "Missing details, limited history, few independent sources, or older data may make this score less certain.";
+  }
+  return reason;
+}
+
 function sourceLabelForCitation(
   sourceOrdinal: string,
   sourceEntries: Map<string, { title: string; sourceType: string }>
@@ -485,7 +495,7 @@ export function buildBusinessHealthExplanationPackage({
   const independentSourceCount = evidence.independentSourceCount;
   const limitations = uniqueStrings([
     ...drivers.map((driver) => driver.limitation),
-    projection?.limitations.find((limitation) => limitation.code === "data_quality_reason")?.message || intelligence.dataQuality.reason,
+    plainHealthDataQualityReason(projection?.limitations.find((limitation) => limitation.code === "data_quality_reason")?.message || intelligence.dataQuality.reason),
     freshness.stale ? "The newest supporting evidence is older than 45 days." : null,
     snapshots.length < 2 ? "A reliable score trajectory requires at least two stored Business Health reviews." : null
   ]);
@@ -511,7 +521,7 @@ export function buildBusinessHealthExplanationPackage({
   };
   const contextualEvidence = projection?.contextualEvidence || [];
   const packageFingerprintInput = {
-    adviceLanguageVersion: "plain_english_v2",
+    adviceLanguageVersion: "plain_english_v3",
     contractId: BUSINESS_HEALTH_EXPLANATION_CONTRACT_ID,
     contractVersion: BUSINESS_HEALTH_EXPLANATION_CONTRACT_VERSION,
     validatorVersion: BUSINESS_HEALTH_EXPLANATION_VALIDATOR_VERSION,
