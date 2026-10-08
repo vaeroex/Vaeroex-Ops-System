@@ -649,6 +649,22 @@ for (const inventedClaim of [
 const numericFailure = validateBusinessHealthExplanationOutput({ ...validOutput, executive_interpretation: "Monthly Revenue is 99 points and Customer Retention remains visible." }, analysisPackage);
 assert.equal(numericFailure.ok, false, "invented numbers must be rejected");
 assert.equal(numericFailure.diagnostic.reasonCode, "numeric_integrity_failed", "numeric failures must remain distinguishable for the bounded fallback allowlist");
+const datedEvidencePackage = {
+  ...analysisPackage,
+  facts: {
+    ...analysisPackage.facts,
+    limitations: ["The newest supporting evidence is older than 45 days."],
+    latestEvidenceAt: "2026-06-01T00:00:00.000Z"
+  },
+  citations: [{ ...analysisPackage.citations[0], recordedAt: "2026-06-01T00:00:00.000Z" }]
+};
+assert.equal(validateBusinessHealthExplanationOutput({
+  ...validOutput,
+  why_it_matters: "Leadership should check the mixed result because the newest evidence is older than 45 days, as of June 2026."
+}, datedEvidencePackage).ok, true, "approved freshness age and cited dates may appear in plain-language Health prose");
+expectNumericIntegrityFailure({ ...validOutput,
+  why_it_matters: "Leadership should check the mixed result because the newest evidence is older than 60 days."
+}, datedEvidencePackage, "an age absent from the approved limitation must remain blocked");
 assert.equal(validateBusinessHealthExplanationOutput({ ...validOutput, provisional_hypothesis: "Revenue was caused by customer behavior." }, analysisPackage).ok, false, "unauthorized hypotheses must be rejected");
 assert.equal(validateBusinessHealthExplanationOutput({ ...validOutput, executive_interpretation: "Monthly Revenue was caused by weak execution while Customer Retention remains visible." }, analysisPackage).ok, false, "unsupported causation must be rejected");
 assert.equal(validateBusinessHealthExplanationOutput({
