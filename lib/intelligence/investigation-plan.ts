@@ -14,6 +14,7 @@ export type InvestigationContext = {
 // Field names guide an investigation; field values and record IDs stay in linked evidence.
 const PRIVATE_OR_SYSTEM_FIELD = /(?:^|[ _-])(?:vaeroex|workspace|source|import|raw|created|updated|evidence|secret|token|password|email|phone|address|ssn|patient|medical|insurance)(?:$|[ _-])|(?:^|[ _-])id$|^row(?:[ _-]?(?:id|number))?$/i;
 const MEASURE_FIELD = /(?:^|[ _-])(?:value|amount|total|count|rate|percent|percentage|hours?|minutes?|seconds?|date|time|timestamp|text|description|comment|notes?|reason|number)(?:$|[ _-])/i;
+const REPORTING_PERIOD_FIELD = /(?:^|[ _-])(?:day|week|month|quarter|year|period)(?:$|[ _-])/i;
 const INSTRUCTION_FIELD = /\b(?:ignore|instructions?|prompt|system|execute|delete|reveal|send|override|admin|model|policy)\b/i;
 
 function readable(value: string) {
@@ -23,7 +24,16 @@ function readable(value: string) {
 export function availableInvestigationFields(raw: unknown): string[] {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return [];
   return Object.entries(raw)
-    .filter(([key, value]) => !PRIVATE_OR_SYSTEM_FIELD.test(readable(key)) && !INSTRUCTION_FIELD.test(readable(key)) && readable(key).split(" ").length <= 3 && value !== null && value !== undefined && String(value).trim() !== "")
+    // A populated KPI row can contain amounts and reporting dates as well as categories.
+    // Only categorical text can justify asking for a breakdown by that field.
+    .filter(([key, value]) => {
+      const field = readable(key);
+      if (PRIVATE_OR_SYSTEM_FIELD.test(field) || MEASURE_FIELD.test(field) || REPORTING_PERIOD_FIELD.test(field) || INSTRUCTION_FIELD.test(field) || field.split(" ").length > 3) return false;
+      if (typeof value !== "string") return false;
+      const detail = value.trim();
+      return detail.length > 0 && detail.length <= 64 && !/^[+-]?(?:[$€£])?\d[\d,.]*(?:\s*%|\s*(?:hours?|minutes?|days?))?$/.test(detail)
+        && !/^\d{4}[-/]\d{1,2}(?:[-/]\d{1,2})?$/.test(detail);
+    })
     .map(([key]) => readable(key).replace(/[^a-zA-Z0-9 ]/g, "").slice(0, 32))
     .filter(Boolean)
     .slice(0, 12);

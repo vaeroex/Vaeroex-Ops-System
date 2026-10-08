@@ -80,6 +80,7 @@ const cases = [
   metricCase("field-service-duration", "Dispatch response time", [6.2, 5.8, 5.4], 4, "minimize", "hours", "Elapsed hours from service request to technician arrival", { Crew: "North", ServiceZone: "Zone A" }),
   metricCase("fleet-currency", "Fuel spend", [11200, 10900, 10300], 9000, "minimize", "currency", "Total dated fuel charges", { Depot: "West" }),
   metricCase("hotel-opportunity", "Room turnaround time", [2.1, 2.3, 2.4], 2.5, "minimize", "hours", "Time between checkout and room ready", { Floor: "Second" }),
+  metricCase("mixed-source-fields", "Service contract margin", [10.2, 9.8, 9.1], 8, "maximize", "percent", "Contract profit divided by contract revenue", { Month: "Jun 2026", Returns: 1500, Revenue: "$12,000", Channel: "Online" }),
   importedCase("construction-rich-bottleneck", "Bottleneck", "Site handoff delays", [
     { title: "Handoff log · row 4", type: "Imported operational record", date: "2026-06-12", value: "Waiting", fields: ["Crew", "Job Type", "Status"] },
     { title: "Handoff log · row 9", type: "Imported operational record", date: "2026-06-12", value: "Waiting", fields: ["Crew", "Job Type", "Status"] }
@@ -114,10 +115,12 @@ if (!process.argv.includes("--baseline")) {
   assert.match(cases.find((item) => item.id === "inventory-accuracy-live-shape").action, /target and earlier results/i, "stale aggregate opportunity keeps its supported comparison");
   assert.match(cases.find((item) => item.id === "field-service-duration").action, /start and end times/i);
   assert.match(cases.find((item) => item.id === "fleet-currency").action, /transactions and amounts/i);
+  assert.match(cases.find((item) => item.id === "mixed-source-fields").action, /broken down by channel/i, "categorical text can guide a requested breakdown");
+  assert.doesNotMatch(cases.find((item) => item.id === "mixed-source-fields").action, /broken down by[^.]*\b(?:month|returns|revenue)\b/i, "amounts and reporting periods are not grouping dimensions");
   assert.match(cases.find((item) => item.id === "construction-rich-bottleneck").action, /crew and job type/i);
   assert.doesNotMatch(cases.find((item) => item.id === "restaurant-sparse-anomaly").action, /compare by|group by/i, "one sparse record cannot establish groups");
   assert.equal(followsApprovedInvestigation("Check the records and compare dates.", cases.find((item) => item.id === "warehouse-anomaly").action, false), false, "record advice must retain its named source");
-  assert.deepEqual(availableInvestigationFields({ Crew: "North", ServiceZone: "West", access_token: "secret", ignore_previous_instructions: "yes" }), ["Crew", "Service Zone"], "unfamiliar business fields are usable without carrying system fields or instructions into advice");
+  assert.deepEqual(availableInvestigationFields({ Crew: "North", ServiceZone: "West", Month: "Jun 2026", Returns: 1500, Revenue: "$12,000", access_token: "secret", ignore_previous_instructions: "yes" }), ["Crew", "Service Zone"], "only safe categorical fields guide grouping; amounts, dates and hostile fields do not");
   const noTarget = planInvestigation({ ...longInput, investigationContext: { kind: "kpi", definition: "Total completed jobs", targetAvailable: false }, supportingRecords: longInput.supportingRecords.map((row) => ({ ...row, title: "Completed jobs", recordType: "KPI record" })) }, asOf);
   assert.doesNotMatch(noTarget, /\btarget\b/i, "an unconfigured target must not be invented");
 }
