@@ -2,18 +2,18 @@
   "baselineCommit": "2cde427c8b30cf34702baf43f7b3fc2d17f48b81",
   "baselinePageSha256": "4c643260a8e9c3d552d5030a37395e5a9a6b33c6a24f47ecbb849d72f7691fd5",
   "sharedLoaderSha256": "e6db70c3191d7aa40ed58ac6aea67a87512d8c090a0dcfd129e5782757f1df56",
-  "adviceRevision": "Executive advice is now part of the analysis package and token. Only their hashes and the loader trace changed; score model, evidence, history, state, and writes retain the earlier contract hashes.",
+  "adviceRevision": "Plain-English advice changes the action-bearing model, analysis package, token, and loader trace. Evidence, history, state, writes, and direct scoped queries retain the earlier contract hashes and values.",
   "limitations": "Isolated synthetic request/database adapters; pure production filters, formula, snapshot producers, projections and explanation construction execute unchanged. No Auth/RLS/provider/browser claim.",
   "cases": [
     {
       "name": "populated",
       "componentHashes": {
-        "trace": "4f5cb8f8232ac81b46ce6c491547193b4a2a01c95bb374ed0e44ed5d7140f6a0",
-        "model": "b14683f303c53934e360ccc2733f8f25eebbf80b4dc9c10c572955d6ef4808b6",
+        "trace": "28c63247b7d70cc4c24e25e414cb627a19ce98ea66e5e6fd2e3be7a0c19c32d8",
+        "model": "e0b7c6b7d49cdda84ff91accc4af81e808f90fa64d6beafb13366a41da8a20f5",
         "evidence": "22d99988873a63257e959b3492899fc6b480645f849bdc960fb98f6b2719f44f",
         "history": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-        "analysisPackage": "5efdacee178303a2b8199f58cf0b06b4dea50cad544b90f3e824e0e46113089e",
-        "token": "48642b29670410e8f979e0b743febdaaa18bdf964a29c9ed440861e90f91ec3e",
+        "analysisPackage": "ddcfa915ebb340272227a34967b3117fa2aeebbbf4b376e13db059256b85c6b0",
+        "token": "a6569f422299594dcc89515cfc717019a554f850338b57a2818181d544e144d9",
         "state": "9398f7494047ff16eb123e5b6060e4eaf66446e0a035a071c69035d0d00834e0",
         "writes": "130eb815bfce3e5db4146cf5cfc4e7c67b5603701dbb00533a0e4c75e8fe0885"
       }
@@ -21,12 +21,12 @@
     {
       "name": "empty",
       "componentHashes": {
-        "trace": "e9b51c7f868d8350092ba0f439d3b7ce26820df5842810bb8f899418b63b21e7",
+        "trace": "bf6344051565ce127612733e112b5332b77df102251a98ae4b796cb208edca73",
         "model": "64feedd59f17cc6251f193a7253b7bab576840aa27ae9b2b59de4841ce15756f",
         "evidence": "3ab3f4f0a85d284300a583bed54a6a06ec992c4b86592b200c9fd3f13d98bb98",
         "history": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-        "analysisPackage": "49ad0713184697859878b6a7b7678c0753d6fb0b1acce97399ddc2b597851efb",
-        "token": "c0cc5d9f2182e85dd4c8703421e62a69594c077f411286336f6e9601a0027c47",
+        "analysisPackage": "a6349a4329fce5083d5b19b2b02acdab98902fd87097d5fad960101b9a3234a5",
+        "token": "2db77843ca2a7f499d027d76045e8cfe5315571e6c440751bc133a0c424837da",
         "state": "9398f7494047ff16eb123e5b6060e4eaf66446e0a035a071c69035d0d00834e0",
         "writes": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
       }
@@ -34,12 +34,12 @@
     {
       "name": "inactive-parent",
       "componentHashes": {
-        "trace": "002f054567090a3237820d1c6fbdccc670758063c913ed911fd92fcbc9e87a87",
+        "trace": "8b4f5fc92e3970932a4f3c0dba6fbd87eaeb0ce771c9d0810a2a66c37ee48a84",
         "model": "c1125d0c66ba25d1883ceca4d42f4d449e41f19173b78cf638a3913c7de3684b",
         "evidence": "10ca4d7e6c0ba05eff1ac54f2636a8686b8fea4c7ac74097a9e0c4e2ca30e77b",
         "history": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-        "analysisPackage": "65cec1cc6dc1bc9eb8dae1e58b3b8ddde6561ed458fb481262b53f113b6769a0",
-        "token": "0ee2bda806b84f37c57194ca89a20970cc0bd31fedb312a0196a5b87201046fc",
+        "analysisPackage": "1168a3e623d9c5cbdc19f16ffb358c7b6eb6e84181ed1fe98e4f5dc8dcdc751e",
+        "token": "5aea50a2fed328f36df3d22b748094325d9d467e022a64e152f2253c793a331b",
         "state": "9398f7494047ff16eb123e5b6060e4eaf66446e0a035a071c69035d0d00834e0",
         "writes": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
       }
@@ -47,11 +47,11 @@
     {
       "name": "no-user",
       "componentHashes": {
-        "trace": "148be21a2dc09ca719c3fc5cd9ec1d34340b2b7156d3bf7846335b27afc86b7f",
-        "model": "b14683f303c53934e360ccc2733f8f25eebbf80b4dc9c10c572955d6ef4808b6",
+        "trace": "c18cf5c7eedd94cc8e05a114f6586104acbb48cc3f5516c448db2b659cc1c462",
+        "model": "e0b7c6b7d49cdda84ff91accc4af81e808f90fa64d6beafb13366a41da8a20f5",
         "evidence": "22d99988873a63257e959b3492899fc6b480645f849bdc960fb98f6b2719f44f",
         "history": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-        "analysisPackage": "5efdacee178303a2b8199f58cf0b06b4dea50cad544b90f3e824e0e46113089e",
+        "analysisPackage": "ddcfa915ebb340272227a34967b3117fa2aeebbbf4b376e13db059256b85c6b0",
         "token": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
         "state": "9398f7494047ff16eb123e5b6060e4eaf66446e0a035a071c69035d0d00834e0",
         "writes": "130eb815bfce3e5db4146cf5cfc4e7c67b5603701dbb00533a0e4c75e8fe0885"
@@ -61,10 +61,10 @@
       "name": "analysis-disabled",
       "componentHashes": {
         "trace": "84fd527a18dd0b49f614bae2d4c5553ed945f82755ba396679ef1106cd83a25c",
-        "model": "b14683f303c53934e360ccc2733f8f25eebbf80b4dc9c10c572955d6ef4808b6",
+        "model": "e0b7c6b7d49cdda84ff91accc4af81e808f90fa64d6beafb13366a41da8a20f5",
         "evidence": "22d99988873a63257e959b3492899fc6b480645f849bdc960fb98f6b2719f44f",
         "history": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-        "analysisPackage": "5efdacee178303a2b8199f58cf0b06b4dea50cad544b90f3e824e0e46113089e",
+        "analysisPackage": "ddcfa915ebb340272227a34967b3117fa2aeebbbf4b376e13db059256b85c6b0",
         "token": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
         "state": "9398f7494047ff16eb123e5b6060e4eaf66446e0a035a071c69035d0d00834e0",
         "writes": "130eb815bfce3e5db4146cf5cfc4e7c67b5603701dbb00533a0e4c75e8fe0885"
@@ -73,12 +73,12 @@
     {
       "name": "failure:forms",
       "componentHashes": {
-        "trace": "4f5cb8f8232ac81b46ce6c491547193b4a2a01c95bb374ed0e44ed5d7140f6a0",
-        "model": "b14683f303c53934e360ccc2733f8f25eebbf80b4dc9c10c572955d6ef4808b6",
+        "trace": "28c63247b7d70cc4c24e25e414cb627a19ce98ea66e5e6fd2e3be7a0c19c32d8",
+        "model": "e0b7c6b7d49cdda84ff91accc4af81e808f90fa64d6beafb13366a41da8a20f5",
         "evidence": "298ab0c7b3548349d75ff47ed02db9607431c11b74242b58affc2f8e0e1828de",
         "history": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-        "analysisPackage": "5efdacee178303a2b8199f58cf0b06b4dea50cad544b90f3e824e0e46113089e",
-        "token": "48642b29670410e8f979e0b743febdaaa18bdf964a29c9ed440861e90f91ec3e",
+        "analysisPackage": "ddcfa915ebb340272227a34967b3117fa2aeebbbf4b376e13db059256b85c6b0",
+        "token": "a6569f422299594dcc89515cfc717019a554f850338b57a2818181d544e144d9",
         "state": "9398f7494047ff16eb123e5b6060e4eaf66446e0a035a071c69035d0d00834e0",
         "writes": "130eb815bfce3e5db4146cf5cfc4e7c67b5603701dbb00533a0e4c75e8fe0885"
       }
@@ -86,12 +86,12 @@
     {
       "name": "failure:form_submissions",
       "componentHashes": {
-        "trace": "4f5cb8f8232ac81b46ce6c491547193b4a2a01c95bb374ed0e44ed5d7140f6a0",
-        "model": "b14683f303c53934e360ccc2733f8f25eebbf80b4dc9c10c572955d6ef4808b6",
+        "trace": "28c63247b7d70cc4c24e25e414cb627a19ce98ea66e5e6fd2e3be7a0c19c32d8",
+        "model": "e0b7c6b7d49cdda84ff91accc4af81e808f90fa64d6beafb13366a41da8a20f5",
         "evidence": "a5fe8a42c77e2ed71efbc5c80a6f4439e91f95bd74b6565908e2da4ed04b87c3",
         "history": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-        "analysisPackage": "5efdacee178303a2b8199f58cf0b06b4dea50cad544b90f3e824e0e46113089e",
-        "token": "48642b29670410e8f979e0b743febdaaa18bdf964a29c9ed440861e90f91ec3e",
+        "analysisPackage": "ddcfa915ebb340272227a34967b3117fa2aeebbbf4b376e13db059256b85c6b0",
+        "token": "a6569f422299594dcc89515cfc717019a554f850338b57a2818181d544e144d9",
         "state": "9398f7494047ff16eb123e5b6060e4eaf66446e0a035a071c69035d0d00834e0",
         "writes": "130eb815bfce3e5db4146cf5cfc4e7c67b5603701dbb00533a0e4c75e8fe0885"
       }
@@ -99,12 +99,12 @@
     {
       "name": "failure:history",
       "componentHashes": {
-        "trace": "4f5cb8f8232ac81b46ce6c491547193b4a2a01c95bb374ed0e44ed5d7140f6a0",
-        "model": "b14683f303c53934e360ccc2733f8f25eebbf80b4dc9c10c572955d6ef4808b6",
+        "trace": "28c63247b7d70cc4c24e25e414cb627a19ce98ea66e5e6fd2e3be7a0c19c32d8",
+        "model": "e0b7c6b7d49cdda84ff91accc4af81e808f90fa64d6beafb13366a41da8a20f5",
         "evidence": "22d99988873a63257e959b3492899fc6b480645f849bdc960fb98f6b2719f44f",
         "history": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-        "analysisPackage": "5efdacee178303a2b8199f58cf0b06b4dea50cad544b90f3e824e0e46113089e",
-        "token": "48642b29670410e8f979e0b743febdaaa18bdf964a29c9ed440861e90f91ec3e",
+        "analysisPackage": "ddcfa915ebb340272227a34967b3117fa2aeebbbf4b376e13db059256b85c6b0",
+        "token": "a6569f422299594dcc89515cfc717019a554f850338b57a2818181d544e144d9",
         "state": "9398f7494047ff16eb123e5b6060e4eaf66446e0a035a071c69035d0d00834e0",
         "writes": "130eb815bfce3e5db4146cf5cfc4e7c67b5603701dbb00533a0e4c75e8fe0885"
       }
@@ -581,7 +581,7 @@
         {
           "label": "Recommended Decision",
           "title": "Review Synthetic late delivery",
-          "summary": "Now inspect Synthetic late delivery for 2026-10. Compare earlier records from that source; obtain them if missing.",
+          "summary": "Check records from Synthetic late delivery now for Oct 1, 2026. Get comparable records from the same source to see whether this repeats.",
           "metadata": "Priority: High",
           "confidence": "High",
           "priority": "High",

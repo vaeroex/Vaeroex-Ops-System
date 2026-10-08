@@ -23,7 +23,7 @@ const mocks = {
 };
 const { IntelligenceSignalInbox } = loadSource("components/intelligence/IntelligenceSignalInbox.tsx", mocks);
 const { BusinessHealthAnalysisPanel } = loadSource("components/intelligence/BusinessHealthAnalysisPanel.tsx", mocks);
-const action = "Now examine the underlying reviews for the affected periods, group recurring complaint themes, and assign an owner to follow up on each verified theme. No review text accompanies this KPI record; obtain review text, dates, and identifiers from the source. Confirm how the KPI counts reviews before treating its value as unique reviews.";
+const action = "Now examine the reviews for the affected periods, group recurring complaint themes, and assign someone to follow up on each verified theme. Review text is not available here; get the review text and dates from the original source. Check how the measure counts reviews before treating its value as a count of unique reviews.";
 const insight = {
   id: "synthetic-review-risk", type: "Risk", title: "1-Star Reviews remained above target for 6 periods",
   summary: "Actual 37 vs target 0.", why: "The recorded KPI is above its confirmed maximum.",
@@ -45,23 +45,23 @@ function additionalCard(id, type, title, recommendedAction) {
   return { ...card, findingKeyHash: id, findingId: id, materialSignature: `material-${id}`, insight: next,
     snapshot: { ...card.snapshot, findingId: id, type, title, priority: next.priority } };
 }
-const coldAction = "Now inspect Cold-chain excursion rate KPI source measurements for 2026-04-01 to 2026-06-01. Compare dated values with the maximum target and prior periods (percent). Obtain dated shipment-level numerator and denominator source rows with IDs; verify the calculation before assigning a cause. Assign an owner to verify the largest gap and document follow-up or unknowns.";
-const anomalyAction = "Now inspect Pick log · row 14 and Pick log · row 21 for 2026-06-10 to 2026-06-11. Compare dated records by Site, Shift, Status where comparable groups exist; otherwise obtain them. Obtain pick event timestamps and reason codes before assigning a cause. Assign an owner to verify each affected record and document resolution, escalation, or unknowns.";
-const opportunityAction = "Inspect Billable utilization KPI source measurements for 2026-04-01 to 2026-06-01. Compare dated records by Team where comparable groups exist; otherwise obtain them. Obtain dated numerator and denominator source rows with IDs; verify the calculation before assigning a cause. Assign an owner to verify repeatability and document what, if anything, should be preserved or tested.";
+const coldAction = "Check Cold-chain excursion rate figures now, focusing on Apr–Jun 2026. Compare the dated values with the target and earlier periods. Get dated records for shipments and the figures used to calculate the percentage; check the calculation. Ask the measure's owner to check the largest gap and identify which underlying entries need follow-up.";
+const anomalyAction = "Check records from Pick log now, focusing on Jun 10, 2026 to Jun 11, 2026. Get more records from those dates before comparing the pattern. Check site and shift for each record. Get the pick event times and reason codes from the source. Ask the source owner to mark each flagged record as confirmed, corrected, or still unexplained.";
+const opportunityAction = "Review Billable utilization figures for Apr–Jun 2026. Compare the dated values with the target and earlier periods. Get detailed records by team before comparing those groups. Get the dated figures used to calculate the percentage and check the calculation. Ask the measure's owner what changed, then use the records to decide whether this result can be repeated.";
 const healthFacts = {
   score: 50, status: "Watch", trajectory: "Holding steady", comparison: "Unchanged", dataQualityBase: 50,
   riskPenalty: 18, opportunityAdjustment: 18, confidence: "Medium", freshness: "stale",
   limitations: ["The newest supporting evidence is older than 45 days."], available: true, comparisonDelta: 0,
   latestEvidenceAt: "2026-06-01T00:00:00Z", deterministicSummary: "The score is watch; the review KPI is a negative driver.",
   drivers: [{ kind: "risk", label: insight.title, fact: insight.summary, scoreImpact: -18, citationIds: [1],
-    limitation: insight.limitation, investigationNext: "Refresh the review KPI and source records now; then examine the underlying reviews." }]
+    limitation: insight.limitation, investigationNext: "Update the review figures before making a current decision. Then examine the reviews." }]
 };
 const citation = { citationId: 1, title: "1-Star Reviews", sourceLabel: "Synthetic KPI workbook", sourceType: "KPI",
   excerpt: "A review KPI value was recorded.", recordedAt: "2026-06-01T00:00:00Z" };
 const artifact = { analysis: {
   executive_interpretation: "1-Star Reviews is the main negative driver of the recorded Business Health score.",
   why_it_matters: "Leadership should prioritize checking the review KPI while treating the stale score as historical.",
-  leadership_consideration: "Refresh the review KPI and source records now; then inspect the underlying reviews and assign an owner for verified complaint themes.",
+  leadership_consideration: "Update the review figures before making a current decision. Then examine the reviews and assign someone to follow up on verified complaint themes.",
   provisional_hypothesis: null
 }, facts: healthFacts, citations: [citation], fingerprint: "synthetic-health", generatedAt: "2026-07-15T00:00:00Z" };
 const fixture = { findings: { currentCards: [card,
@@ -107,24 +107,26 @@ async function main() {
       await page.goto(origin, { waitUntil: "networkidle" });
       await page.getByRole("button", { name: /1-Star Reviews remained above target/ }).click();
       const detail = page.getByRole("complementary", { name: "Selected finding" });
-      await detail.getByText(/Confirm how the KPI counts reviews before treating its value as unique reviews/).waitFor();
+      await detail.getByText(/Check how the measure counts reviews before treating its value as a count of unique reviews/).waitFor();
       assert.equal(await detail.getByText(/Decide whether leadership should investigate/).count(), 0);
       for (const [title, actionText] of [
-        ["Cold-chain excursion rate remained above target for 3 periods", /shipment-level numerator and denominator/],
-        ["Warehouse pick exceptions", /Pick log · row 14 and Pick log · row 21/],
-        ["Billable utilization is on or above target", /verify repeatability and document what/]
+        ["Cold-chain excursion rate remained above target for 3 periods", /records for shipments and the figures used to calculate the percentage/],
+        ["Warehouse pick exceptions", /Check site and shift for each record/],
+        ["Billable utilization is on or above target", /dated values with the target and earlier periods/]
       ]) {
         if (width === 390) await detail.getByRole("button", { name: /Back to list/ }).click();
         await page.getByRole("button", { name: new RegExp(title) }).click();
         await detail.getByText(actionText).waitFor();
       }
+      await page.screenshot({ path: path.join(output, `finding-${width}.png`), fullPage: true });
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true, `findings overflow at ${width}px`);
       await page.getByRole("button", { name: "View analysis" }).click();
       const dialog = page.getByRole("dialog");
-      await dialog.getByText(/Refresh the review KPI and source records now/).waitFor();
+      await dialog.getByText(/Update the review figures before making a current decision/).waitFor();
       await dialog.getByText("The newest supporting evidence is older than 45 days.").waitFor();
       await dialog.locator("summary").filter({ hasText: /^Supporting evidence/ }).click();
       await dialog.getByText("Synthetic KPI workbook").waitFor();
+      await page.screenshot({ path: path.join(output, `health-${width}.png`), fullPage: true });
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true, `Health dialog overflow at ${width}px`);
       await page.keyboard.press("Escape"); await dialog.waitFor({ state: "hidden" });
       assert.deepEqual(errors, []);

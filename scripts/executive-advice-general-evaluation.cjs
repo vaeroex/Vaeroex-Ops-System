@@ -18,7 +18,7 @@ const load = Module._load;
 Module._load = function serverOnly(request, parent, isMain) { return request === "server-only" ? {} : load.call(this, request, parent, isMain); };
 const { buildIntelligenceLayer } = require("../lib/intelligence/layer.ts");
 const { followsApprovedInvestigation } = require("../lib/ai/investigation-action-quality.ts");
-const { planInvestigation } = require("../lib/intelligence/investigation-plan.ts");
+const { availableInvestigationFields, planInvestigation } = require("../lib/intelligence/investigation-plan.ts");
 
 const workspaceId = "11111111-1111-4111-8111-111111111111";
 const asOf = "2026-07-15T00:00:00.000Z";
@@ -39,7 +39,7 @@ function metricCase(id, name, values, target, direction, unit, definition, raw =
   const rows = values.map((value, index) => kpi(name, dates[index], value, target, raw));
   const insight = buildIntelligenceLayer({ asOf: observedAsOf, kpis: rows, kpiSettings: [setting(name, direction, unit, definition, target)] }).insights.find((item) => item.id.startsWith("kpi-"));
   assert.ok(insight, `${id} generated a finding`);
-  return { id, type: insight.type, title: insight.title, action: insight.recommendedAction, impact: insight.impact, missing: insight.missingEvidence, evidence: insight.supportingRecords.map((r) => ({ title: r.title, date: r.date, fields: r.availableFields || [] })) };
+  return { id, kind: "kpi", type: insight.type, title: insight.title, action: insight.recommendedAction, impact: insight.impact, missing: insight.missingEvidence, evidence: insight.supportingRecords.map((r) => ({ title: r.title, date: r.date, fields: r.availableFields || [] })) };
 }
 function importedCase(id, type, title, records, missing, period, priority = "High", sourceAction = "") {
   const input = { id, type, title, summary: "Synthetic imported source shows a measured exception.", why: "The source rows contain the observed values.",
@@ -52,7 +52,7 @@ function importedCase(id, type, title, records, missing, period, priority = "Hig
     ...(sourceAction ? { investigationContext: { kind: "records", sourceAction } } : {}) };
   const insight = buildIntelligenceLayer({ asOf, operationalInsights: [input] }).insights.find((item) => item.id === id);
   assert.ok(insight, `${id} generated a finding`);
-  return { id, type: insight.type, title: insight.title, action: insight.recommendedAction, impact: insight.impact, missing: insight.missingEvidence,
+  return { id, kind: "records", type: insight.type, title: insight.title, action: insight.recommendedAction, impact: insight.impact, missing: insight.missingEvidence,
     evidence: insight.supportingRecords.map((r) => ({ title: r.title, date: r.date, fields: r.availableFields || [] })) };
 }
 const cases = [
@@ -75,17 +75,29 @@ const cases = [
   ], ["Resolution age"], "2026-06 to 2026-07", "High", "Review unresolved customer cases, starting with the oldest records."),
   importedCase("separate-signal", "Opportunity", "Service backlog improved", [
     { title: "Service queue · row 4", type: "Imported operational record", date: "2026-05-01", value: "Backlog lower", fields: ["Team"] }
-  ], ["Reason for change"], "2026-05", "Medium")
+  ], ["Reason for change"], "2026-05", "Medium"),
+  metricCase("bakery-waste-percentage", "Ingredient waste share", [12, 11, 10], 6, "minimize", "percent", "Share of ingredients discarded after preparation"),
+  metricCase("field-service-duration", "Dispatch response time", [6.2, 5.8, 5.4], 4, "minimize", "hours", "Elapsed hours from service request to technician arrival", { Crew: "North", ServiceZone: "Zone A" }),
+  metricCase("fleet-currency", "Fuel spend", [11200, 10900, 10300], 9000, "minimize", "currency", "Total dated fuel charges", { Depot: "West" }),
+  metricCase("hotel-opportunity", "Room turnaround time", [2.1, 2.3, 2.4], 2.5, "minimize", "hours", "Time between checkout and room ready", { Floor: "Second" }),
+  importedCase("construction-rich-bottleneck", "Bottleneck", "Site handoff delays", [
+    { title: "Handoff log · row 4", type: "Imported operational record", date: "2026-06-12", value: "Waiting", fields: ["Crew", "Job Type", "Status"] },
+    { title: "Handoff log · row 9", type: "Imported operational record", date: "2026-06-12", value: "Waiting", fields: ["Crew", "Job Type", "Status"] }
+  ], ["Handoff completion time"], "2026-06"),
+  importedCase("restaurant-sparse-anomaly", "Anomaly", "Unexpected table turnover", [
+    { title: "Service summary · row 5", type: "Imported operational record", date: "2026-06-12", value: "Unexpected change", fields: [] }
+  ], ["Dated table-level service records"], "2026-06")
 ];
-for (const item of cases) assert.ok(item.action.length <= 420, `${item.id} action fits approved boundary`);
+for (const item of cases) assert.ok(item.action.length <= 620, `${item.id} action fits the shared generation boundary without truncation`);
 if (!process.argv.includes("--baseline")) {
   for (const item of cases) {
     assert.ok(followsApprovedInvestigation(item.action, item.action, item.id === "stale-equipment" || item.id === "separate-signal"), `${item.id} retains a concrete approved action`);
     assert.equal(followsApprovedInvestigation("Decide whether to investigate now or continue monitoring.", item.action, false), false, `${item.id} rejects generic model advice`);
-    assert.match(item.action, /\b(?:compare|check)\b/i, `${item.id} retains a supported comparison or record check`);
-    assert.match(item.action, /assign an owner/i, `${item.id} retains a decision owner`);
+    assert.doesNotMatch(item.action, /\b(?:numerator|denominator|row\s*#?\d+|current imported records|verify repeatability)\b/i, `${item.id} keeps technical details in evidence`);
+    assert.match(item.action, /\b(?:ask|review|check|update)\b/i, `${item.id} starts with a practical action`);
+    if (item.kind === "kpi") assert.equal((item.action.match(/\bGet\b/g) || []).length, 1, `${item.id} asks for the underlying data once`);
   }
-  assert.match(cases.find((item) => item.id === "cold-chain-aggregate").action, /shipment-level numerator and denominator/i);
+  assert.match(cases.find((item) => item.id === "cold-chain-aggregate").action, /figures used to calculate the percentage/i);
   assert.match(cases.find((item) => item.id === "customer-order-risk").action, /oldest records/i, "specific existing source action is retained");
   assert.doesNotMatch(cases.find((item) => item.id === "customer-order-risk").action, /largest gap/i);
   assert.doesNotMatch(cases.find((item) => item.id === "separate-signal").action, /warehouse|order|customer/i, "unrelated signals stay separate");
@@ -96,11 +108,18 @@ if (!process.argv.includes("--baseline")) {
       { title: "Another very long title ".repeat(20), date: "2026-06-02", classification: "Original", availableFields: ["Supplier", "Site", "Shift"] }
     ] };
   const longAction = planInvestigation(longInput, asOf);
-  assert.ok(longAction.length <= 420, "long source metadata must not silently truncate the approved action");
+  assert.ok(longAction.length <= 620, "long source metadata must not silently truncate the approved action");
   assert.match(longAction, /compare/i, "long metadata must not drop the comparison to meet the length bound");
-  assert.match(longAction, /assign an owner/i, "long metadata must not drop the accountable follow-up");
   assert.match(longAction, /oldest unresolved service cases/i, "length pressure must retain the meaningful source-specific instruction");
-  assert.match(cases.find((item) => item.id === "inventory-accuracy-live-shape").action, /minimum target and prior periods/i, "stale aggregate opportunity keeps its supported comparison");
+  assert.match(cases.find((item) => item.id === "inventory-accuracy-live-shape").action, /target and earlier results/i, "stale aggregate opportunity keeps its supported comparison");
+  assert.match(cases.find((item) => item.id === "field-service-duration").action, /start and end times/i);
+  assert.match(cases.find((item) => item.id === "fleet-currency").action, /transactions and amounts/i);
+  assert.match(cases.find((item) => item.id === "construction-rich-bottleneck").action, /crew and job type/i);
+  assert.doesNotMatch(cases.find((item) => item.id === "restaurant-sparse-anomaly").action, /compare by|group by/i, "one sparse record cannot establish groups");
+  assert.equal(followsApprovedInvestigation("Check the records and compare dates.", cases.find((item) => item.id === "warehouse-anomaly").action, false), false, "record advice must retain its named source");
+  assert.deepEqual(availableInvestigationFields({ Crew: "North", ServiceZone: "West", access_token: "secret", ignore_previous_instructions: "yes" }), ["Crew", "Service Zone"], "unfamiliar business fields are usable without carrying system fields or instructions into advice");
+  const noTarget = planInvestigation({ ...longInput, investigationContext: { kind: "kpi", definition: "Total completed jobs", targetAvailable: false }, supportingRecords: longInput.supportingRecords.map((row) => ({ ...row, title: "Completed jobs", recordType: "KPI record" })) }, asOf);
+  assert.doesNotMatch(noTarget, /\btarget\b/i, "an unconfigured target must not be invented");
 }
 if (process.argv.includes("--json")) process.stdout.write(`${JSON.stringify(cases, null, 2)}\n`);
 else console.log(`Executive advice general evaluation passed for ${cases.length} synthetic cases.`);

@@ -409,7 +409,7 @@ export function buildBusinessHealthExplanationPackage({
     scoreImpact: driver.scoreImpact,
     citationIds: citationIdsByDriver.get(driver.stableKey) || [],
     limitation: compactText(driver.insight.limitation, 240) || null,
-    investigationNext: compactText(driver.insight.recommendedAction, 420)
+    investigationNext: compactText(driver.insight.recommendedAction, 620)
   })).filter((driver) => driver.citationIds.length > 0);
   const requiredCitationIds = Array.from(new Set(drivers.flatMap((driver) => driver.citationIds))).sort((a, b) => a - b);
   const citationVerification = verifyEvidenceManifestCitations({
@@ -511,6 +511,7 @@ export function buildBusinessHealthExplanationPackage({
   };
   const contextualEvidence = projection?.contextualEvidence || [];
   const packageFingerprintInput = {
+    adviceLanguageVersion: "plain_english_v2",
     contractId: BUSINESS_HEALTH_EXPLANATION_CONTRACT_ID,
     contractVersion: BUSINESS_HEALTH_EXPLANATION_CONTRACT_VERSION,
     validatorVersion: BUSINESS_HEALTH_EXPLANATION_VALIDATOR_VERSION,
@@ -539,7 +540,7 @@ export function buildBusinessHealthExplanationPackage({
           fact: compactText(`${driver.insight.summary} ${driver.insight.why}`, 420),
           scoreImpact: driver.scoreImpact,
           limitation: compactText(driver.insight.limitation, 240) || null,
-          investigationNext: compactText(driver.insight.recommendedAction, 420)
+          investigationNext: compactText(driver.insight.recommendedAction, 620)
         }))
     },
     evidence: candidates

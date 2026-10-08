@@ -27,7 +27,7 @@ export function kpiRiskInvestigation(kpi: KpiRow, asOf?: Date | string) {
     const reviewTextAvailable = sourceRowHasReviewText(kpi.raw_data_json);
     return {
       specific: true,
-      action: `${stale ? "Refresh the review KPI and source records now; then " : "Now "}examine the underlying reviews for the affected periods, group recurring complaint themes, and assign an owner to follow up on each verified theme. ${reviewTextAvailable ? "This KPI source row includes review text; inspect the full review-level records." : "No review text accompanies this KPI record; obtain review text, dates, and identifiers from the source."} Confirm how the KPI counts reviews before treating its value as unique reviews.`,
+      action: `${stale ? "Update the review figures before making a current decision. Then " : "Now "}examine the reviews for the affected periods, group recurring complaint themes, and assign someone to follow up on each verified theme. ${reviewTextAvailable ? "Review text is available with this measure; read the full reviews." : "Review text is not available here; get the review text and dates from the original source."} Check how the measure counts reviews before treating its value as a count of unique reviews.`,
       missingEvidence: [
         ...(reviewTextAvailable ? [] : ["Review-level text, dates, and identifiers"]),
         "Verified KPI definition and whether the value counts unique reviews",
@@ -39,7 +39,7 @@ export function kpiRiskInvestigation(kpi: KpiRow, asOf?: Date | string) {
   if (/^receiving delay(?: \((?:hrs?|hours?)\))?$/.test(name)) {
     return {
       specific: true,
-      action: `${stale ? "Refresh the receiving-delay KPI and source records now; then " : "Now "}inspect receiving transactions for the affected periods. Compare arrival and completion timestamps by supplier, site, and shift where recorded; obtain missing transaction detail from the receiving system. Assign an operations owner to investigate the largest verified delays and record findings or unknowns. Link order or customer exceptions only after matching period, site, and source records.`,
+      action: `${stale ? "Update the receiving-delay figures before making a current decision. Then " : "Now "}check receiving transactions for the affected periods. Compare arrival and completion times by supplier, site, or shift when those details are recorded; get missing details from the receiving system. Ask the operations owner to follow up on the largest verified delays. Compare with order or customer issues only if the dates, sites, and source records match.`,
       missingEvidence: ["Receiving transaction timestamps and supplier, site, or shift details", "Verified cause of the delay"]
     };
   }

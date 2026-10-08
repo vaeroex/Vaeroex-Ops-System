@@ -50,11 +50,11 @@ const reviewRows = dates.map((date) => kpi("1-Star Reviews", date, 37, 0));
 const reviewFinding = buildIntelligenceLayer({ asOf, kpis: reviewRows }).insights.find((item) => item.id.startsWith("kpi-risk-"));
 assert.ok(reviewFinding, "the review KPI must produce a live-style finding");
 assert.match(reviewFinding.title, /6 periods/);
-assert.match(reviewFinding.recommendedAction, /examine the underlying reviews.*group recurring complaint themes.*assign an owner/i);
-assert.match(reviewFinding.recommendedAction, /No review text accompanies this KPI record/);
-assert.match(reviewFinding.recommendedAction, /before treating its value as unique reviews/);
+assert.match(reviewFinding.recommendedAction, /examine the reviews.*group recurring complaint themes.*assign someone to follow up/i);
+assert.match(reviewFinding.recommendedAction, /Review text is not available here/);
+assert.match(reviewFinding.recommendedAction, /before treating its value as a count of unique reviews/);
 assert.doesNotMatch(reviewFinding.recommendedAction, /37 unique reviews|caused/i);
-assert.ok(reviewFinding.recommendedAction.length <= 420, "the approved review action must fit the Explain Finding input without truncation");
+assert.ok(reviewFinding.recommendedAction.length <= 620, "the approved review action must fit the Explain Finding input without truncation");
 const reviewPackage = buildFindingExplanationPackage({ workspaceId: reviewRows[0].workspace_id, insight: reviewFinding, now: new Date(asOf) });
 assert.equal(findingExplanationModelInput(reviewPackage).finding.approved_investigation_next, reviewFinding.recommendedAction);
 assert.equal(reviewPackage.requiredCitationIds.length > 0, true, "approved investigation retains source citations");
@@ -67,12 +67,13 @@ const reviewExplanation = {
 };
 assert.equal(validateFindingExplanationOutput(reviewExplanation, reviewPackage).ok, true, "a specific bounded review explanation validates");
 assert.equal(validateFindingExplanationOutput({ ...reviewExplanation, investigate_next: "Review source records and decide whether to continue monitoring the KPI." }, reviewPackage).ok, false, "the former generic step must fail quality validation");
+assert.equal(validateFindingExplanationOutput({ ...reviewExplanation, investigate_next: "Check row 2 numerator and denominator figures before acting." }, reviewPackage).ok, false, "technical row detail cannot replace owner-facing advice");
 
 const withReviewText = kpiRiskInvestigation(kpi("1-Star Reviews", "2026-06-01", 37, 0, {
   raw_data_json: { "Review Text": "Synthetic review text for fixture only." }
 }), asOf);
-assert.match(withReviewText.action, /source row includes review text/);
-assert.doesNotMatch(withReviewText.action, /No review text accompanies/);
+assert.match(withReviewText.action, /Review text is available with this measure/);
+assert.doesNotMatch(withReviewText.action, /Review text is not available/);
 assert.doesNotMatch(withReviewText.action, /Synthetic review text/, "review contents are not copied into advice");
 
 const receivingRows = ["2026-06-01", "2026-05-01", "2026-04-01"].map((date) => kpi("Receiving Delay (hrs)", date, 5.9, 4.97));
@@ -86,10 +87,10 @@ const receivingSetting = {
 };
 const receivingFinding = buildIntelligenceLayer({ asOf, kpis: receivingRows, kpiSettings: [receivingSetting] }).insights.find((item) => item.id.startsWith("kpi-risk-"));
 assert.ok(receivingFinding, "the receiving KPI must produce a live-style finding");
-assert.match(receivingFinding.recommendedAction, /receiving transactions.*arrival and completion timestamps.*supplier, site, and shift/i);
-assert.match(receivingFinding.recommendedAction, /only after matching period, site, and source records/i);
+assert.match(receivingFinding.recommendedAction, /receiving transactions.*arrival and completion times.*supplier, site, or shift/i);
+assert.match(receivingFinding.recommendedAction, /only if the dates, sites, and source records match/i);
 assert.doesNotMatch(receivingFinding.recommendedAction, /receiving delays caused.*customer|customer complaints caused.*delay/i);
-assert.ok(receivingFinding.recommendedAction.length <= 420, "the approved receiving action must fit the Explain Finding input without truncation");
+assert.ok(receivingFinding.recommendedAction.length <= 620, "the approved receiving action must fit the Explain Finding input without truncation");
 const receivingPackage = buildFindingExplanationPackage({ workspaceId: receivingRows[0].workspace_id, insight: receivingFinding, now: new Date(asOf) });
 assert.equal(findingExplanationModelInput(receivingPackage).finding.approved_investigation_next, receivingFinding.recommendedAction);
 const receivingExplanation = {
@@ -117,8 +118,8 @@ const stillSeparate = withSeparateSignal.insights.find((item) => item.id === rec
 assert.equal(stillSeparate.recommendedAction, receivingFinding.recommendedAction, "unrelated customer data must not change the receiving investigation or establish a link");
 
 const staleReview = kpiRiskInvestigation(reviewRows[0], "2026-10-06T00:00:00.000Z");
-assert.match(staleReview.action, /^Refresh the review KPI and source records now/);
-assert.ok(staleReview.action.length <= 420, "stale review action must fit without truncation");
+assert.match(staleReview.action, /^Update the review figures before making a current decision/);
+assert.ok(staleReview.action.length <= 620, "stale review action must fit without truncation");
 const healthPayload = businessHealthProviderRequestPayload({
   contractId: "business_health_explanation_v1", submode: "evidence_stale", hypothesisAllowed: false,
   facts: {
@@ -146,6 +147,7 @@ const healthExplanation = {
 };
 assert.equal(validateBusinessHealthExplanationOutput(healthExplanation, healthContext).ok, true, "a stale, specific Health action validates");
 assert.equal(validateBusinessHealthExplanationOutput({ ...healthExplanation, leadership_consideration: "Decide whether to investigate the cause now or continue monitoring the score." }, healthContext).ok, false, "generic stale Health advice fails validation");
+assert.equal(validateBusinessHealthExplanationOutput({ ...healthExplanation, leadership_consideration: "Refresh source first, then verify repeatability." }, healthContext).ok, false, "technical shorthand cannot replace the approved Health action");
 assert.equal(validateBusinessHealthExplanationOutput({ ...healthExplanation,
   executive_interpretation: "1-Star Reviews is a negative score driver, but the KPI does not establish its cause.",
   why_it_matters: "Leadership should review 1-Star Reviews, but the available KPI does not establish its cause."

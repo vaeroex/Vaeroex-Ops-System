@@ -310,7 +310,7 @@ function EvidencePanel({ insight }: { insight: IntelligenceInsight }) {
         <p><span className="font-semibold text-slate-100">Supporting records:</span> {insight.evidenceCount}</p>
         <p><span className="font-semibold text-slate-100">Independent sources:</span> {insight.independentSourceCount}</p>
         <p><span className="font-semibold text-slate-100">Recent evidence:</span> {formatSignalDate(latestEvidenceDate)}</p>
-        <p><span className="font-semibold text-slate-100">Period:</span> {insight.timePeriod}</p>
+        <p><span className="font-semibold text-slate-100">Period:</span> {insight.timePeriod === "Current imported records" ? "Dates shown in supporting evidence" : insight.timePeriod}</p>
         <p><span className="font-semibold text-slate-100">Evidence strength:</span> {insight.confidence}</p>
         {insight.contradictoryEvidence.length ? <p><span className="font-semibold text-slate-100">Contradictions:</span> {insight.contradictoryEvidence.length}</p> : null}
       </div>

@@ -753,6 +753,7 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
           definition: kpiSettingForName(kpiSettings, kpi.name)?.definition,
           unit: semantics.unit,
           direction: semantics.desiredDirection,
+          targetAvailable: Boolean(reference),
           availableFields: availableInvestigationFields(kpi.raw_data_json),
           preserveSpecificAction: investigation.specific === true
         },
@@ -834,7 +835,7 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
         why: `The latest recorded value is ${condition} under the canonical KPI semantics.`,
         impact: `This target achievement has ${history} recorded period${history === 1 ? "" : "s"} of context and merits a repeatability check before adopting it as a practice.`,
         recommendedAction: "Decide whether the practice behind this result is clear enough to preserve or requires a focused review.",
-        investigationContext: { kind: "kpi" as const, definition: kpiSettingForName(kpiSettings, kpi.name)?.definition, unit: semantics.unit, direction: semantics.desiredDirection, availableFields: availableInvestigationFields(kpi.raw_data_json) },
+        investigationContext: { kind: "kpi" as const, definition: kpiSettingForName(kpiSettings, kpi.name)?.definition, unit: semantics.unit, direction: semantics.desiredDirection, targetAvailable: Boolean(reference), availableFields: availableInvestigationFields(kpi.raw_data_json) },
         confidence: history >= 3 && independentSourceCount >= 2 ? "High" : "Medium",
         evidence: [`Metric date: ${kpi.metric_date}`, `Historical records: ${history}`, kpi.source ? `Source: ${kpi.source}` : "Source not recorded"],
         evidenceCount: supportingRecords.length,
