@@ -77,6 +77,7 @@ catch (e) {
 (async () => {
     const shared = req(path.join(root, 'lib/intelligence/workspace-health.ts')).loadWorkspaceHealth;
     const fixture = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures/workspace-health-extraction-contract.json'), 'utf8'));
+    const recordContract = process.argv.includes('--record-contract');
     const cases = [{ name: 'populated' }, { name: 'empty', empty: true }, { name: 'inactive-parent', inactive: true }, { name: 'no-user', userId: null }, { name: 'analysis-disabled', includeAnalysis: false }, ...['forms', 'form_submissions', 'history'].map(error => ({ name: 'failure:' + error, error }))];
     for (const test of cases) {
         const result = await run(shared, test);
@@ -84,18 +85,26 @@ catch (e) {
         const contract = JSON.parse(JSON.stringify({ trace: result.trace, model: result.value.executiveHomepageModel, evidence: result.value.evidence, history: result.value.businessHealthHistory, analysisPackage: result.value.businessHealthAnalysisPackage, token: result.value.businessHealthAnalysisToken, state: result.value.businessHealthAnalysisState, error: result.error, writes: result.writes }, (_key, value) => value instanceof Error ? { name: value.name, message: value.message } : value));
         const expected = fixture.cases.find(x => x.name === test.name).componentHashes;
         for (const [key, value] of Object.entries(contract)) {
-            assert.equal(sha(JSON.stringify(value)), expected[key], test.name + ' preserves baseline ' + key);
+            if (recordContract) expected[key] = sha(JSON.stringify(value));
+            else assert.equal(sha(JSON.stringify(value)), expected[key], test.name + ' preserves baseline ' + key);
         }
         assert.deepEqual(Object.keys(contract), Object.keys(expected), test.name + ' checks every retained component');
         if (test.name === 'populated') {
-            assert.deepEqual(contract.model, fixture.reviewablePopulatedContract.model);
-            assert.deepEqual(contract.writes, fixture.reviewablePopulatedContract.writes);
-            assert.deepEqual(contract.trace.filter(x => x[0] === 'query'), fixture.reviewablePopulatedContract.directQueries);
+            if (recordContract) {
+                fixture.reviewablePopulatedContract.model = contract.model;
+                fixture.reviewablePopulatedContract.writes = contract.writes;
+                fixture.reviewablePopulatedContract.directQueries = contract.trace.filter(x => x[0] === 'query');
+            } else {
+                assert.deepEqual(contract.model, fixture.reviewablePopulatedContract.model);
+                assert.deepEqual(contract.writes, fixture.reviewablePopulatedContract.writes);
+                assert.deepEqual(contract.trace.filter(x => x[0] === 'query'), fixture.reviewablePopulatedContract.directQueries);
+            }
         }
         const queries = result.trace.filter(x => x[0] === 'query');
         assert.equal(queries.length, 15, test.name + ' has fifteen direct queries and one complete KPI loader');
         assert(queries.every(x => x.some(op => Array.isArray(op) && op[0] === 'eq' && op[1] === 'workspace_id' && op[2] === workspaceId)), test.name + ' scopes every query to the authenticated workspace');
     }
+    if (recordContract) { console.log(JSON.stringify(fixture, null, 2)); return; }
     // Core source failures must remain visible in evidence. The pre-existing full-view
     // consistency assertion on these failures is recorded in one-off parity evidence,
     // not blessed as the desired UI contract by this regression.
