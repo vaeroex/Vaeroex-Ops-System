@@ -41,18 +41,25 @@ export function followsApprovedInvestigation(output: string, approved: string, s
 
 /** Retain the application's approved missing-source instruction when a model omits it. */
 export function completeApprovedMissingDetail(output: string, approved: string, stale: boolean, maxLength: number) {
-  if (followsApprovedInvestigation(output, approved, stale)
-    || !followsApprovedInvestigationCore(output, approved, stale, false)) return output;
-
   const missingDetailSentence = approved.match(/(?:^|[.!?]\s+)([^.!?]*\b(?:is|are) not available\b[^.!?]*[.!?])/i)?.[1]?.trim();
   if (!missingDetailSentence || !/\b(?:get|obtain|request|ask)\b/i.test(missingDetailSentence)) return output;
 
   const [availability, request = ""] = missingDetailSentence.split(";");
   const requestTerms = request.toLowerCase().match(/[a-z][a-z-]{3,}/g)?.filter((term) => !SOURCE_STOP_WORDS.has(term)
     && !["obtain", "request"].includes(term)) || [];
-  const requestClauses = output.match(/(?:^|[.!?;]\s*)\b(?:get|obtain|request|ask)\b[^.!?;]*/gi) || [];
-  const alreadyRequested = requestTerms.length > 0
-    && requestClauses.some((clause) => requestTerms.every((term) => clause.toLowerCase().includes(term)));
-  const completed = `${output.trim()} ${alreadyRequested ? `${availability.trim()}.` : missingDetailSentence}`;
+  const alreadyRequested = (text: string) => requestTerms.length > 0
+    && (text.match(/(?:^|[.!?;]\s*)\b(?:get|obtain|request|ask)\b[^.!?;]*/gi) || [])
+      .some((clause) => requestTerms.every((term) => clause.toLowerCase().includes(term)));
+  const exactSentenceAt = output.toLowerCase().indexOf(missingDetailSentence.toLowerCase());
+  if (exactSentenceAt >= 0) {
+    const withoutApprovedSentence = `${output.slice(0, exactSentenceAt)} ${output.slice(exactSentenceAt + missingDetailSentence.length)}`;
+    if (alreadyRequested(withoutApprovedSentence)) {
+      return `${output.slice(0, exactSentenceAt)}${availability.trim()}.${output.slice(exactSentenceAt + missingDetailSentence.length)}`.trim();
+    }
+  }
+  if (followsApprovedInvestigation(output, approved, stale)
+    || !followsApprovedInvestigationCore(output, approved, stale, false)) return output;
+
+  const completed = `${output.trim()} ${alreadyRequested(output) ? `${availability.trim()}.` : missingDetailSentence}`;
   return completed.length <= maxLength ? completed : approved.length <= maxLength ? approved : output;
 }

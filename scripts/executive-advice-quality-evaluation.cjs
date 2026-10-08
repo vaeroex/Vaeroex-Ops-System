@@ -85,6 +85,13 @@ assert.equal(alreadyRequestedReview.ok, true, "an approved source request remain
 assert.match(alreadyRequestedReview.value.investigate_next, /Review text is not available here\./);
 assert.equal((alreadyRequestedReview.value.investigate_next.match(/get the review text and dates/gi) || []).length, 1,
   "completion must not repeat an existing source request");
+const modelRepeatedReview = validateFindingExplanationOutput({ ...reviewExplanation,
+  investigate_next: "Check and update the 1-Star Reviews figures before making a current decision. Get the review text and dates from the original source, examine the affected periods, group recurring complaint themes, and assign someone to follow up on each verified theme. Confirm how the measure counts reviews before treating its value as a count of unique reviews. Review text is not available here; get the review text and dates from the original source."
+}, reviewPackage);
+assert.equal(modelRepeatedReview.ok, true, "an otherwise grounded live-style draft validates after removing its duplicated request");
+assert.equal((modelRepeatedReview.value.investigate_next.match(/get the review text and dates/gi) || []).length, 1,
+  "a model-supplied duplicate request is removed while its approved availability statement remains");
+assert.match(modelRepeatedReview.value.investigate_next, /Review text is not available here\./);
 assert.equal(validateFindingExplanationOutput({ ...reviewExplanation,
   investigate_next: "Decide whether to investigate the reviews now or continue monitoring."
 }, reviewPackage).ok, false, "completion must not rescue a generic model step");

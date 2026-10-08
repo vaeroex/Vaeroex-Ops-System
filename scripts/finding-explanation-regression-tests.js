@@ -36,6 +36,7 @@ process.env.SUPABASE_SERVICE_ROLE_KEY = "local-finding-explanation-regression-se
 
 const { buildFindingExplanationPackage } = require("../lib/ai/finding-explanation/context.ts");
 const { validateFindingExplanationOutput } = require("../lib/ai/finding-explanation/validation.ts");
+const { parseFindingExplanationArtifact } = require("../lib/ai/finding-explanation/storage.ts");
 const { openFindingExplanationPackage, sealFindingExplanationPackage } = require("../lib/ai/finding-explanation/token.ts");
 const { verifyEvidenceManifestCitations } = require("../lib/ai/evidence-engine/citation-verification.ts");
 const {
@@ -126,6 +127,17 @@ const validOutput = {
   what_evidence_does_not_prove: "The evidence does not establish why revenue fell or returns increased."
 };
 assert.equal(validateFindingExplanationOutput(validOutput, analysisPackage).ok, true, "a bounded, grounded explanation must validate");
+assert.ok(parseFindingExplanationArtifact({
+  contractId: analysisPackage.contractId,
+  contractVersion: analysisPackage.contractVersion,
+  validatorVersion: analysisPackage.validatorVersion,
+  fingerprint: "a".repeat(64),
+  generatedAt: "2026-07-20T00:00:00.000Z",
+  analysis: validOutput,
+  facts: analysisPackage.facts,
+  citations: analysisPackage.citations,
+  providerAttribution: { provider: "openai", model: "historical-model", fallbackUsed: false, providerPolicyId: "historical-policy" }
+}), "older saved explanations remain readable after the advice fingerprint advances");
 assert.equal(validateFindingExplanationOutput({ ...validOutput, why_evidence_suggests: "Weak execution caused the decline in revenue." }, analysisPackage).diagnostic.reasonCode, "unsupported_inference");
 assert.equal(validateFindingExplanationOutput({ ...validOutput, what_happened: "Revenue fell by 47% during the latest reporting period, which requires leadership review." }, analysisPackage).diagnostic.reasonCode, "numeric_integrity_failed");
 assert.equal(validateFindingExplanationOutput({ ...validOutput, investigate_next: "Inspect source_file_id within the approved reporting records before proceeding." }, analysisPackage).diagnostic.reasonCode, "invalid_citation_id");
