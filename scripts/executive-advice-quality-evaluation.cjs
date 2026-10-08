@@ -92,6 +92,13 @@ assert.equal(modelRepeatedReview.ok, true, "an otherwise grounded live-style dra
 assert.equal((modelRepeatedReview.value.investigate_next.match(/get the review text and dates/gi) || []).length, 1,
   "a model-supplied duplicate request is removed while its approved availability statement remains");
 assert.match(modelRepeatedReview.value.investigate_next, /Review text is not available here\./);
+const modelMidSentenceRequest = validateFindingExplanationOutput({ ...reviewExplanation,
+  investigate_next: "Update the review figures before making a current decision. Then get the review text and dates from the original source, group recurring complaint themes across the affected periods, and assign someone to follow up on each verified theme. Check how the measure counts reviews before treating the value as a count of unique reviews. Review text is not available here; get the review text and dates from the original source."
+}, reviewPackage);
+assert.equal(modelMidSentenceRequest.ok, true, "the live mid-sentence source request validates");
+assert.equal((modelMidSentenceRequest.value.investigate_next.match(/get the review text and dates/gi) || []).length, 1,
+  "a request after 'Then' must not be repeated");
+assert.match(modelMidSentenceRequest.value.investigate_next, /Review text is not available here\./);
 assert.equal(validateFindingExplanationOutput({ ...reviewExplanation,
   investigate_next: "Decide whether to investigate the reviews now or continue monitoring."
 }, reviewPackage).ok, false, "completion must not rescue a generic model step");

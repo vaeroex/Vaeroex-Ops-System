@@ -48,7 +48,7 @@ export function completeApprovedMissingDetail(output: string, approved: string, 
   const requestTerms = request.toLowerCase().match(/[a-z][a-z-]{3,}/g)?.filter((term) => !SOURCE_STOP_WORDS.has(term)
     && !["obtain", "request"].includes(term)) || [];
   const alreadyRequested = (text: string) => requestTerms.length > 0
-    && (text.match(/(?:^|[.!?;]\s*)\b(?:get|obtain|request|ask)\b[^.!?;]*/gi) || [])
+    && (text.match(/\b(?:get|obtain|request|ask)\b[^.!?;]*/gi) || [])
       .some((clause) => requestTerms.every((term) => clause.toLowerCase().includes(term)));
   const exactSentenceAt = output.toLowerCase().indexOf(missingDetailSentence.toLowerCase());
   if (exactSentenceAt >= 0) {
