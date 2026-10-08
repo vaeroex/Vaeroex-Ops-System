@@ -12,7 +12,7 @@ import {
 import type { StructuredOutputValidation } from "@/lib/ai/providers/provider-manager";
 import { validationFailure, validationValueType } from "@/lib/ai/validation-diagnostics";
 import { validateAiGeneratedOutput } from "@/lib/security/ai-output-validation";
-import { followsApprovedInvestigation, hasTechnicalAdviceLanguage } from "@/lib/ai/investigation-action-quality";
+import { completeApprovedMissingDetail, followsApprovedInvestigation, hasTechnicalAdviceLanguage } from "@/lib/ai/investigation-action-quality";
 import type { Json } from "@/lib/supabase/types";
 
 const outputSchema = z.object({
@@ -109,7 +109,15 @@ export function validateFindingExplanationOutput(
     });
   }
 
-  const output = parsed.data;
+  const output = {
+    ...parsed.data,
+    investigate_next: completeApprovedMissingDetail(
+      parsed.data.investigate_next,
+      context.facts.approvedInvestigationNext,
+      context.facts.freshness === "stale",
+      620
+    )
+  };
   const text = combinedText(output);
   if (UUID_PATTERN.test(text) || CITATION_PATTERN.test(text) || INTERNAL_IDENTIFIER_PATTERN.test(text)) {
     return validationFailure("The provider must not generate identifiers or citations.", {

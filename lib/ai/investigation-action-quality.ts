@@ -10,11 +10,11 @@ export function hasTechnicalAdviceLanguage(value: string) {
 }
 
 /** Reject generic model paraphrases that discard the approved source and investigation. */
-export function followsApprovedInvestigation(output: string, approved: string, stale: boolean) {
+function followsApprovedInvestigationCore(output: string, approved: string, stale: boolean, requireMissingDetail: boolean) {
   const text = output.toLowerCase();
   if (/\b(?:decide whether to investigate|continue monitoring|review the (?:data|source records|kpi) and decide)\b/i.test(output)) return false;
   const unavailableDetail = approved.match(/(?:^|[.;]\s*)([a-z][a-z -]{2,70}?)\s+(?:is|are)\s+not available\b/i)?.[1];
-  if (unavailableDetail) {
+  if (requireMissingDetail && unavailableDetail) {
     const detailTerms = unavailableDetail.toLowerCase().match(/[a-z][a-z-]{3,}/g)?.filter((term) => !SOURCE_STOP_WORDS.has(term)) || [];
     if (!/\b(?:not available|unavailable|missing)\b/.test(text) || !/\b(?:get|obtain|request|ask)\b/.test(text)
       || (detailTerms.length > 0 && !detailTerms.some((term) => text.includes(term)))) return false;
@@ -33,4 +33,20 @@ export function followsApprovedInvestigation(output: string, approved: string, s
   if (sourceTerms.length && !sourceTerms.some((term) => text.includes(term))) return false;
   if (/\bcompare\b/i.test(approved) && !/\b(?:compare|segment|group|contrast|check .{0,60} against)\b/i.test(output)) return false;
   return true;
+}
+
+export function followsApprovedInvestigation(output: string, approved: string, stale: boolean) {
+  return followsApprovedInvestigationCore(output, approved, stale, true);
+}
+
+/** Retain the application's approved missing-source instruction when a model omits it. */
+export function completeApprovedMissingDetail(output: string, approved: string, stale: boolean, maxLength: number) {
+  if (followsApprovedInvestigation(output, approved, stale)
+    || !followsApprovedInvestigationCore(output, approved, stale, false)) return output;
+
+  const missingDetailSentence = approved.match(/(?:^|[.!?]\s+)([^.!?]*\b(?:is|are) not available\b[^.!?]*[.!?])/i)?.[1]?.trim();
+  if (!missingDetailSentence || !/\b(?:get|obtain|request|ask)\b/i.test(missingDetailSentence)) return output;
+
+  const completed = `${output.trim()} ${missingDetailSentence}`;
+  return completed.length <= maxLength ? completed : approved.length <= maxLength ? approved : output;
 }

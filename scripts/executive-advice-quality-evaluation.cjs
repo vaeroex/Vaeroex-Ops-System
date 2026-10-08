@@ -75,6 +75,12 @@ const omittedReviewAvailability = reviewFinding.recommendedAction.replace(
 );
 assert.equal(followsApprovedInvestigation(omittedReviewAvailability, reviewFinding.recommendedAction, false), false,
   "a model may not imply missing review text is already available");
+const completedReview = validateFindingExplanationOutput({ ...reviewExplanation, investigate_next: omittedReviewAvailability }, reviewPackage);
+assert.equal(completedReview.ok, true, "a source-specific model step can retain the application's approved missing-detail instruction");
+assert.match(completedReview.value.investigate_next, /Review text is not available here; get the review text and dates from the original source/);
+assert.equal(validateFindingExplanationOutput({ ...reviewExplanation,
+  investigate_next: "Decide whether to investigate the reviews now or continue monitoring."
+}, reviewPackage).ok, false, "completion must not rescue a generic model step");
 assert.equal(followsApprovedInvestigation(reviewFinding.recommendedAction.replace(
   "Review text is not available here; get the review text and dates from the original source.",
   "Review text is missing here; ask the source owner for the text and dates."
@@ -157,12 +163,14 @@ const healthExplanation = {
   provisional_hypothesis: null
 };
 assert.equal(validateBusinessHealthExplanationOutput(healthExplanation, healthContext).ok, true, "a stale, specific Health action validates");
-assert.equal(validateBusinessHealthExplanationOutput({ ...healthExplanation,
+const completedHealth = validateBusinessHealthExplanationOutput({ ...healthExplanation,
   leadership_consideration: staleReview.action.replace(
     "Review text is not available here; get the review text and dates from the original source.",
     "Examine dated review text for recurring themes."
   )
-}, healthContext).ok, false, "Health must carry forward unavailable source detail");
+}, healthContext);
+assert.equal(completedHealth.ok, true, "Health retains unavailable source detail from the approved investigation");
+assert.match(completedHealth.value.leadership_consideration, /Review text is not available here; get the review text and dates from the original source/);
 assert.equal(validateBusinessHealthExplanationOutput({ ...healthExplanation, leadership_consideration: "Decide whether to investigate the cause now or continue monitoring the score." }, healthContext).ok, false, "generic stale Health advice fails validation");
 assert.equal(validateBusinessHealthExplanationOutput({ ...healthExplanation, leadership_consideration: "Refresh source first, then verify repeatability." }, healthContext).ok, false, "technical shorthand cannot replace the approved Health action");
 assert.equal(validateBusinessHealthExplanationOutput({ ...healthExplanation,
