@@ -120,7 +120,9 @@ export function validateBusinessHealthExplanationOutput(
 
   const approvedInvestigations = context.facts.drivers.map((driver) => driver.investigationNext).filter((step): step is string => Boolean(step));
   const approvedStep = approvedInvestigations.find((step) => followsApprovedInvestigation(parsed.data.leadership_consideration, step, context.facts.freshness === "stale"))
-    || approvedInvestigations.find((step) => completeApprovedMissingDetail(parsed.data.leadership_consideration, step, context.facts.freshness === "stale", 620) !== parsed.data.leadership_consideration);
+    || context.facts.drivers.find((driver) => driver.investigationNext
+      && driverTerms(driver.label).some((term) => parsed.data.leadership_consideration.toLowerCase().includes(term))
+      && completeApprovedMissingDetail(parsed.data.leadership_consideration, driver.investigationNext, context.facts.freshness === "stale", 620) !== parsed.data.leadership_consideration)?.investigationNext;
   const output = {
     ...parsed.data,
     leadership_consideration: approvedStep
