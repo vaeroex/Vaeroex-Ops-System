@@ -1,0 +1,16 @@
+begin;
+create extension if not exists pgtap with schema extensions;
+set local search_path=public,extensions;
+select plan(10);
+select ok((select bool_and(relrowsecurity) from pg_class where oid in ('public.vsi_conversations'::regclass,'public.vsi_exchanges'::regclass,'public.vsi_requests'::regclass,'public.vsi_cost_events'::regclass)), 'RLS covers every VSI table');
+select ok(not has_table_privilege('anon','public.vsi_conversations','select'), 'anonymous users cannot list private chats');
+select ok(not has_table_privilege('authenticated','public.vsi_conversations','insert'), 'customers cannot bypass conversation controls');
+select ok(not has_table_privilege('authenticated','public.vsi_exchanges','insert'), 'customers cannot forge model answers');
+select ok(not has_table_privilege('authenticated','public.vsi_requests','select'), 'quota ledger does not expose other actors');
+select ok(not has_table_privilege('authenticated','public.vsi_cost_events','select'), 'provider ledger is server only');
+select ok(not has_function_privilege('authenticated','public.vsi_mutate_v1(uuid,uuid,text,jsonb)','execute'), 'customers cannot invoke trusted persistence RPC');
+select ok(has_function_privilege('service_role','public.vsi_mutate_v1(uuid,uuid,text,jsonb)','execute'), 'trusted server can call persistence RPC');
+select ok((select qual like '%workspace_mutation_entitled_v1%' and qual like '%actor_role%' from pg_policies where tablename='vsi_conversations'), 'read policy enforces entitlement and role snapshot');
+select ok((select confdeltype='n' from pg_constraint where conrelid='public.vsi_requests'::regclass and confrelid='public.vsi_conversations'::regclass), 'transcript deletion retains content-free quota ledger');
+select * from finish();
+rollback;

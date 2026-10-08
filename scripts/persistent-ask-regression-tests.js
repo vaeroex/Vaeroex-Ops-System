@@ -49,7 +49,7 @@ const conversationalPolicy = read("lib/product/conversational-vaeroex.ts");
 
 assert.match(conversationalPolicy, /VAEROEX_CONVERSATIONAL_POLICY/, "future conversational access must use a dedicated server policy variable");
 assert.match(conversationalPolicy, /premium_conversational_v1/, "future conversational access must require the approved premium policy value");
-assert.match(appShell, /isPremiumConversationalVaeroexEnabled\(\)[\s\S]*href:\s*"\/app\/ask"/, "Ask must stay hidden unless the premium conversational policy is enabled");
+assert.match(appShell, /href:\s*"\/app\/si"/, "Customer navigation must expose the dedicated VSI route");
 assert.match(globalSearch, /Cmd\/Ctrl \+ K opens Search/, "Cmd/Ctrl + K must remain Search-only");
 assert.match(globalSearch, /fetch\(`\/api\/search\?q=\$\{encodeURIComponent\(trimmedQuery\)\}`/, "typing must use deterministic GET search");
 assert.doesNotMatch(globalSearch, /method:\s*"POST"|submitQuestion|ExecutiveIntelligenceAnswer/, "Global Search must not contain generation state or POST behavior");
@@ -61,8 +61,8 @@ assert.match(globalSearch, /function updateQuery[\s\S]*setGroups\(\[\]\)[\s\S]*s
 assert.match(globalSearch, /searchParams\.get\("ask"\) === "1"[\s\S]{0,180}router\.replace\("\/app\/intelligence"/, "legacy ?ask=1 links must return to structured Intelligence");
 assert.doesNotMatch(route, /shouldBuildAnswer|buildGeneralBusinessAnswer|\.limit\(120\)/, "GET Search must not retain the old broad answer-building queries");
 
-assert.match(askPage, /isPremiumConversationalVaeroexEnabled[\s\S]*redirect\("\/app\/intelligence"\)/, "Version 1 Ask visits must fail closed to Intelligence");
-assert.match(askPage, /params\.run[\s\S]*requireWorkspacePage\(\)[\s\S]*redirect\("\/app\/intelligence"\)/, "legacy Ask result URLs must authorize and return to Intelligence");
+assert.match(askPage, /requireWorkspacePage\(\)[\s\S]*\/app\/si/, "freeform Ask visits must authorize and redirect to VSI");
+assert.match(askPage, /requireWorkspacePage\(\)[\s\S]*params\.run[\s\S]*redirect\("\/app\/intelligence"\)/, "legacy result links must authorize and return to Intelligence");
 assert.match(agentsPage, /requireWorkspacePage\(\)[\s\S]*permanentRedirect\("\/app\/intelligence"\)/, "all legacy Agents URLs must authorize and return to structured Intelligence");
 assert.match(askWorkspace, /sessionStorage\.getItem\(storageKey\)/, "Ask must restore the active browser-session analysis");
 assert.match(askWorkspace, /sessionStorage\.setItem\(storageKey, serialized\)/, "Ask must persist the active analysis in sessionStorage");

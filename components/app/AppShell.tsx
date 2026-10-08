@@ -9,7 +9,6 @@ import { GlobalSearch } from "@/components/app/GlobalSearch";
 import { ToastRegion } from "@/components/app/ToastRegion";
 import { VaeroexLogo } from "@/components/brand/VaeroexLogo";
 import { legalLinks } from "@/lib/legal/content";
-import { isPremiumConversationalVaeroexEnabled } from "@/lib/product/conversational-vaeroex";
 import type { Profile, Workspace, WorkspaceMember } from "@/lib/supabase/types";
 
 const baseNavSections = [
@@ -19,9 +18,7 @@ const baseNavSections = [
     items: [
       { href: "/app/intelligence", label: "Intelligence" },
       { href: "/app", label: "Overview" },
-      ...(isPremiumConversationalVaeroexEnabled()
-        ? [{ href: "/app/ask", label: "Ask Vaeroex" }]
-        : []),
+      { href: "/app/si", label: "Super Intelligence" },
       { href: "/app/kpis", label: "Performance" },
       { href: "/app/sources", label: "Files & Notes" },
       { href: "/app/reports", label: "Saved Analyses" },

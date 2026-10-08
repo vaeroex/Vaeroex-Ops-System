@@ -179,6 +179,9 @@ jobs:
           pnpm exec playwright install --with-deps chromium
           pnpm test:google-sheets-ui
 
+      - name: VSI desktop and mobile chat flow
+        run: pnpm test:vsi-ui
+
       - name: Executive Intelligence advice desktop and mobile flow
         run: pnpm test:executive-advice-browser
 
@@ -339,6 +342,9 @@ jobs:
 
       - name: Security regression check
         run: pnpm security:check
+
+      - name: VSI Luna and evidence boundary regressions
+        run: pnpm test:vsi
 
       - name: Whitespace check
         run: git diff --check origin/main...HEAD
@@ -685,6 +691,7 @@ jobs:
         run: |
           node scripts/run-isolated-database-tests.js \
             supabase/tests/security_high_findings_remediation.test.sql \
+            supabase/tests/vsi_private_chat.test.sql \
             supabase/tests/customer_1_billing_entitlement.test.sql \
             supabase/tests/external_integrations_phase_1_canonical_foundation.test.sql \
             supabase/tests/external_integrations_phase_2_reconciliation.test.sql \
@@ -706,6 +713,14 @@ jobs:
 
       # Preserve earlier failures while still collecting independent Square
       # evidence. Never run these checks without successful disposable setup.
+      - name: Verify VSI private transcripts, concurrency, rolling quotas and cost accounting
+        if: ${{ !cancelled() && steps.isolated_database_setup.outcome == 'success' }}
+        # Discovers and verifies the local Docker database; rejects hosted URLs,
+        # inherited service credentials, linked projects and fabricated configs.
+        # The previous migration step owns schema changes; this only uses its
+        # own synthetic actors/workspaces and cleans them up after qualification.
+        run: node scripts/vsi-database-tests.cjs --supabase-local
+
       - name: Verify Square Production runtime foundation in the isolated database
         if: ${{ !cancelled() && steps.isolated_database_setup.outcome == 'success' }}
         run: node scripts/run-isolated-database-tests.js supabase/tests/square_production_runtime_foundation.test.sql
