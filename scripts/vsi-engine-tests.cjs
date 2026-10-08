@@ -54,6 +54,10 @@ async function main(){
   assert.equal(needsBusinessEvidence('Help me plan a focused writing week.'),false);
   assert.equal(needsBusinessEvidence('Could you help me plan a focused writing week?'),false);
   assert.equal(needsBusinessEvidence('Why did repair turnaround rise?'),true);
+  assert.equal(needsBusinessEvidence('Explain profit margin.'),false);
+  assert.equal(needsBusinessEvidence('A project costs $640 and sells for $800. Calculate profit, margin and markup.'),false);
+  assert.equal(needsBusinessEvidence('Explain why repair turnaround is rising.'),true);
+  assert.equal(needsBusinessEvidence('What is causing cancelled appointments?'),true);
   assert.equal(needsBusinessEvidence('What are our sales today?'),true);
   assert.equal(planVsiLiveLookup('What are our sales today?').query,null);
   assert.equal(planVsiLiveLookup('Forecast next month revenue').needsLocation,false);

@@ -410,6 +410,7 @@ for (const manifest of [currentMigrations.filter(name => name !== "2026100502201
   currentMigrations.filter(name => name !== "20261005190709_sheets_recovery_fair_scan.sql"),
   currentMigrations.filter(name => name !== "20261005194244_google_sheets_failure_cleanup_transition.sql"),
   currentMigrations.filter(name => name !== "20261005202215_sheets_dispatch_round_robin.sql"),
+  currentMigrations.filter(name => name !== "20261008190000_vsi_private_chat.sql"),
   currentMigrations.filter(name => name !== "20260907174326_square_dormant_account_connection.sql"),
   currentMigrations.filter(name => name !== "20260902191325_square_production_internal_pilot_runtime.sql"),
   currentMigrations.filter(name => name !== "20260907225626_square_remote_sandbox_binding.sql"),

@@ -85,7 +85,7 @@ async function main() {
     assert.equal(await page.getByText("retry safely", { exact: true }).count(), 1);
     await composer.fill("remember this: We sell handmade furniture."); await composer.press("Enter");
     await page.getByRole("button", { name: "Confirm and save this note" }).waitFor(); assert.equal(noteSaves, 0);
-    await page.getByRole("button", { name: "Confirm and save this note" }).click(); await page.getByText("Business Note draft saved", { exact: true }).waitFor();
+    await page.getByRole("button", { name: "Confirm and save this note" }).click(); await page.getByText("Saved to Business Notes", { exact: true }).waitFor();
     assert.equal(noteSaves, 1); assert.equal(await page.getByRole("button", { name: "Confirm and save this note" }).count(), 0);
     await composer.fill("Explain the evidence"); await composer.press("Enter"); await page.getByText("Sources (1)", { exact: true }).click(); await page.getByRole("link", { name: "Delivery record" }).waitFor();
     assert.match(await page.getByRole("link", { name: "Delivery record" }).getAttribute("href"), /\/app\/sources/);
@@ -122,8 +122,9 @@ async function main() {
     await page.goto(`${origin}/?chat=closed`); await page.getByText(/This chat has reached 250 exchanges/).waitFor(); assert.equal(await composer.count(), 0);
     await page.getByRole("button", { name: "Continue in a new chat" }).click(); await page.getByRole("link", { name: "the original transcript" }).waitFor(); assert(stored.has("closed"));
     await page.getByRole("link", { name: "the original transcript" }).click(); await page.getByText(/This chat has reached 250 exchanges/).waitFor();
+    await page.evaluate(() => { document.documentElement.className = "pulsar dark"; document.documentElement.dataset.theme = "pulsar"; });
     lost = true; await page.getByRole("button", { name: "Usage", exact: true }).click(); await page.getByRole("button", { name: "Reload your active workspace" }).waitFor();
-    assert.equal(await page.getByText("Start with your priorities.", { exact: true }).count(), 0); assert.equal(await page.getByRole("heading", { name: "Long-running project" }).count(), 0);
+    assert.equal(await page.getByText("Start with your priorities.", { exact: true }).count(), 0); assert.equal(await page.getByRole("heading", { name: "Long-running project" }).count(), 0); assert.equal(await page.getByRole("alert").evaluate(element => getComputedStyle(element).color), "rgb(252, 165, 165)", "dark-theme errors must stay legible");
     assert.equal(serverError, null); assert.deepEqual(errors, []);
     console.log(JSON.stringify({ passed: true, checks: ["general question", "App Router searchParams update", "older history pagination", "keyboard", "stable retry", "explicit note confirmation", "citation dates", "rename reopen delete", "225 warning", "250 handoff preserves transcript", "second-tab thread boundary preserves unsent draft", "workspace access loss clears transcript", "on-demand usage", "desktop mobile no overflow", "actual global CSS light/Pulsar contrast"], widths: [1440, 390, 320], output, scope: "Hydrated UI with synthetic loopback API; authenticated API and provider qualification are separate." }));
   } finally { if (browser) await browser.close(); await new Promise(resolve => server.close(resolve)); }

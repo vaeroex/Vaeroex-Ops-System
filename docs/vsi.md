@@ -27,9 +27,9 @@ At 225 exchanges the UI warns gently. At 250 it makes the original transcript re
 | Workspace monthly VSI spending safeguard | USD 50, separate from Executive Intelligence |
 | Environment configuration | `VAEROEX_VSI_WORKSPACE_MONTHLY_BUDGET_USD` |
 | Question length | 8,000 characters |
-| Combined model input | 48,000 characters |
-| Output per provider call | 3,000 tokens |
-| Web calls per question | 2 maximum |
+| Combined model input | 48,000 characters (`VAEROEX_VSI_MAX_INPUT_CHARS`, 32,000–48,000) |
+| Output per provider call | 3,000 tokens (`VAEROEX_VSI_MAX_OUTPUT_TOKENS`, 1,000–6,000) |
+| Web calls per question | 2 maximum (`VAEROEX_VSI_MAX_WEB_SEARCH_CALLS`, 1–2) |
 | Automatic provider retries | 0 |
 | Reservation per logical attempt | USD 0.10 |
 | Overall engine deadline | 65 seconds (`VAEROEX_VSI_TIMEOUT_MS`, max 90 seconds) |
@@ -44,6 +44,8 @@ The cost catalog dated 2026-10-08 uses the standard Luna prices: USD 0.10/millio
 - `pnpm test:vsi`: Luna-only request/response handling, live-lookup selection, evidence revocation, source validation, bounded context, accounting, origin/body boundaries, prohibited identifiers.
 - `pnpm test:vsi-ui`: hydrated desktop/mobile chat behavior, keyboard composer, retries, history, confirmation, pagination, App Router navigation, and cross-tab handoff.
 - `VSI_TEST_CONFIG=/private/owned/local-config.json pnpm test:vsi-database`: real local Postgres concurrency, RLS, limits, retry/crash/month-boundary behavior, note confirmation, handoff, deletion. The harness refuses remote databases.
+- `node scripts/vsi-database-tests.cjs --supabase-local`: CI variant discovers and verifies its local Docker Supabase container and requires the migration ledger entry; it cannot apply migrations.
+- `scripts/vsi-image-pipeline-integration.cjs`: existing Files PNG reader pipeline with controlled bytes/reader response, actual stored run and explicit approval action, atomic Memory publication, then authorized VSI retrieval. This verifies the connection, not live image-reader accuracy.
 - `scripts/vsi-retrieval-integration.cjs`: authenticated synthetic workspace retrieval and cross-workspace/source-revocation exclusions against the owned local stack.
 - `scripts/vsi-browser-e2e.cjs <local-config> <synthetic-fixture> <private-output-dir> [http://127.0.0.1:49941]`: real browser → authentication → API → retrieval → persisted chat/note. Use `scripts/vsi-provider-stub.cjs` solely as an explicit local Node preload when testing transport without a paid provider. It is never imported by application code and is not proof of Luna answer quality.
 - `scripts/vsi-real-provider-qualification.cjs <local-config> <synthetic-fixture> <private-output>`: 12 representative general/current/business cases, requires an externally supplied provider credential, maximum USD 2 reservation envelope, full sanitized answer/usage evidence for human review. Never commit credentials or private fixture files.

@@ -31,9 +31,14 @@ export async function authorizeVsiRead(input: Pick<VsiRunInput, "supabase" | "wo
 
 export function needsBusinessEvidence(question: string, previousQuestion = "") {
   const explicitBusiness = /\b(?:our|my business|my company|workspace|company|sales|revenue|profit|inventory|kpis?|metrics?|customers?|receiving|turnaround|uploaded|notes?|memory|findings?|health|overview|integration|square|quickbooks|supplier|orders?|churn|conversion)\b/i;
-  if (explicitBusiness.test(question) || (question.length < 200 && explicitBusiness.test(previousQuestion))) return true;
   const generalQuestion = question.replace(/^(?:can|could|would) you(?: please)?\s+/i, "");
-  const clearlyGeneral = /^(?:write|draft|rewrite|compose|brainstorm|plan|help me (?:write|plan|organize|brainstorm|draft|rewrite|compose|understand|learn)|explain|calculate|translate|summarize this|what is|what's|who is|tell me about)\b/i.test(generalQuestion)
+  const ownedContext = /\b(?:our|my (?:business|company|workspace|sales|customers?|files?|notes?|kpis?|metrics?)|workspace|uploaded|business notes|business memory)\b/i.test(question);
+  const asksAboutObservedChange = /\b(?:caus\w*|driv\w*|increas\w*|decreas\w*|declin\w*|fall\w*|ris\w*|fell|rose|chang\w*|delay\w*|late|slower|longer|shorter|higher|lower)\b/i.test(question);
+  const educational = /^(?:what (?:is|are)|explain|teach me|help me understand|define)\b/i.test(generalQuestion) && !asksAboutObservedChange;
+  const suppliedArithmetic = /\d/.test(question) && /\b(?:calculate|multiply|divide|add|subtract)\b/i.test(question);
+  if (!ownedContext && (educational || suppliedArithmetic)) return false;
+  if (explicitBusiness.test(question) || (question.length < 200 && explicitBusiness.test(previousQuestion))) return true;
+  const clearlyGeneral = /^(?:write|draft|rewrite|compose|brainstorm|plan|help me (?:write|plan|organize|brainstorm|draft|rewrite|compose|understand|learn)|calculate|translate|summarize this|who is|tell me about)\b/i.test(generalQuestion)
     || /\b(?:weather|poem|recipe|vacation|travel itinerary|current events|latest news|science|history|mathematics)\b/i.test(question);
   // Unknown metric names and questions such as 'Why did repair turnaround rise?' get retrieval.
   return !clearlyGeneral;
