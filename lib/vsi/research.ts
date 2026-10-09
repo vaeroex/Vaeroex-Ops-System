@@ -125,7 +125,7 @@ export function prepareVsiHistory(messages: VsiMessage[], currentlyPermitted: Vs
     const id = stableVsiCitationId(source);
     if (citations.has(id) || citations.size >= 16) continue;
     citations.set(id, { ...source, snapshotHash: typeof source.snapshotHash === "string" && /^[a-f0-9]{64}$/.test(source.snapshotHash) ? source.snapshotHash : undefined,
-      id, ...(source.excerpt ? { excerpt: source.excerpt.slice(0, 600) } : {}) });
+      id, excerpt: source.sourceType === "web" ? undefined : source.excerpt?.slice(0, 600) });
   }
   const history = [...selectedMessages].reverse().flatMap(message => {
     if (remaining <= 0) return [];
@@ -223,14 +223,14 @@ export function validateVsiPublicResearch(value: unknown, sources: VsiCitation[]
     const dateClaim = dateKeys.size === 1 ? dated[0] : undefined;
     const result = { ...source, evidenceDate: dateClaim?.evidenceDate || null,
       evidenceDateKind: dateClaim ? dateClaim.dateProvenance.kind as Exclude<typeof dateClaim.dateProvenance.kind, "unknown"> : undefined,
-      evidenceDateText: dateClaim?.dateProvenance.sourceText || undefined, excerpt: matching.map(claim => claim.text).join(" ").slice(0, 1600) };
+      evidenceDateText: dateClaim?.dateProvenance.sourceText || undefined, excerpt: undefined };
     return [{ ...result, id: stableVsiCitationId(result) }];
   });
   return { ...parsed, claims, sources: cited };
 }
 
-/** Fit whole claims together with their exact source metadata; source excerpts stay in
- * persisted citations, so the model does not receive the same claim text twice. */
+/** Fit whole claims together with their exact source metadata. Model summaries are
+ * not verified page excerpts and must never be presented as per-source quotations. */
 export function boundedVsiPublicEvidence(claims: VsiPublicResearchResult["claims"], sources: VsiCitation[], maximumChars: number) {
   const byUrl = new Map(sources.map(source => [source.url, source]));
   const unique = [...new Map(claims.map(claim => [JSON.stringify([claim.text, claim.urls]), claim])).values()]
