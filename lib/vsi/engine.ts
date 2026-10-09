@@ -138,7 +138,15 @@ ${VSI_LIVE_FRESHNESS_INSTRUCTION}`;
 function totalWebTools(usage: VsiUsage) { return usage.webSearchCalls + (usage.webOpenCalls || 0) + (usage.webFindCalls || 0); }
 
 export async function runVsiAnswer(input: VsiRunInput): Promise<VsiAnswer> {
-  const startedAt = Date.now(), config = getVsiConfig(), usage = emptyVsiUsage();
+  const startedAt = Date.now();
+  try { return await runVsiAnswerInternal(input, startedAt); }
+  catch (error) {
+    if (error instanceof VsiEngineError) error.usage.latencyMs = Math.max(0, Date.now() - startedAt);
+    throw error;
+  }
+}
+async function runVsiAnswerInternal(input: VsiRunInput, startedAt: number): Promise<VsiAnswer> {
+  const config = getVsiConfig(), usage = emptyVsiUsage();
   let access;
   try { access = await authorizeVsiRead(input); }
   catch (error) { throw new VsiEngineError(error instanceof Error ? error.message : "Workspace access could not be verified. Please retry.", usage); }
@@ -155,6 +163,7 @@ export async function runVsiAnswer(input: VsiRunInput): Promise<VsiAnswer> {
   const key = process.env.OPENAI_API_KEY?.trim();
   if (!key) throw new VsiEngineError("Vaeroex Super Intelligence is temporarily unavailable because its Luna connection is not configured. Please try again later.", usage);
   const call = async (body: Record<string, unknown>, reserveAnswerMs = 0) => {
+    if (usage.estimatedCostUsd >= config.requestReserveUsd) throw new VsiEngineError("This question reached its spending safeguard. Please narrow it and retry.", usage);
     const remaining = config.timeoutMs - (Date.now() - startedAt) - reserveAnswerMs;
     if (remaining < 4000) throw new VsiEngineError("This answer took too long. Please retry or ask a narrower question.", usage);
     if ((usage.providerCalls || 0) >= config.maxProviderCalls || Buffer.byteLength(JSON.stringify(body.input), "utf8") > config.maxProviderInputBytes) {
@@ -178,7 +187,7 @@ export async function runVsiAnswer(input: VsiRunInput): Promise<VsiAnswer> {
       }
       if (value.model && !new RegExp(`^${VSI_MODEL}(?:-|$)`).test(value.model)) throw new VsiEngineError("The required Luna model was not returned. Please retry later.", usage);
       if (value.status === "incomplete" || !outputText(value)) throw new VsiEngineError("Luna could not finish this answer within the response limit. Try a narrower question.", usage);
-      if (totalWebTools(usage) > config.maxWebSearchCalls || usage.estimatedCostUsd > config.requestReserveUsd) throw new VsiEngineError("This question exceeded its tool or spending safeguard. Please narrow it and retry.", usage);
+      if (usage.estimatedCostUsd >= config.requestReserveUsd) throw new VsiEngineError("This question reached its spending safeguard. Please narrow it and retry.", usage);
       return value;
     } catch (error) {
       if (error instanceof VsiEngineError) throw error;
@@ -230,12 +239,19 @@ export async function runVsiAnswer(input: VsiRunInput): Promise<VsiAnswer> {
         tool_choice: "required", max_tool_calls: roundTools, include: ["web_search_call.action.sources"],
         text: { format: { type: "json_schema", name: "vsi_public_research_v1", strict: true, schema: VSI_PUBLIC_RESEARCH_JSON_SCHEMA } } }, 45_000);
       } catch (error) {
-        if (!(error instanceof VsiEngineError) || !webSources.length) throw error;
+        if (totalWebTools(usage) - toolsBeforeRound > roundTools || totalWebTools(usage) > limits.totalTools) usage.toolAllowanceExceeded = true;
+        if (!(error instanceof VsiEngineError) || !webSources.length || usage.estimatedCostUsd >= config.requestReserveUsd) throw error;
         if (error.accountingUncertain) usage.costEstimated = true;
         researchPartial = true; researchLimitations.push("A later public lookup could not complete. The answer uses the verified sources already obtained, and any remaining checks are unresolved.");
         break;
       }
-      if (totalWebTools(usage) - toolsBeforeRound > roundTools || totalWebTools(usage) > limits.totalTools) throw new VsiEngineError("This lookup exceeded its research tool allowance. Please narrow it and retry.", usage);
+      // A completed Responses call can expose more search/open/find actions than
+      // requested. Count all of them, stop research, and retain verifiable evidence.
+      const roundAllowanceExceeded = totalWebTools(usage) - toolsBeforeRound > roundTools || totalWebTools(usage) > limits.totalTools;
+      if (roundAllowanceExceeded) {
+        usage.toolAllowanceExceeded = true; researchPartial = true;
+        researchLimitations.push("Research used more lookup steps than planned, so further checking was stopped. Use only the sources already verified and clearly identify any verification that remains incomplete.");
+      }
       researchRounds++;
       const consulted = readVsiWebSources(web, lookedUpAt);
       let result;
@@ -247,7 +263,7 @@ export async function runVsiAnswer(input: VsiRunInput): Promise<VsiAnswer> {
       if (!result.sources.length) {
         console.error("[vsi-live-lookup]", vsiLiveLookupDiagnostic(web));
         if (webSources.length) { researchPartial = true; researchLimitations.push("A follow-up lookup did not return another verifiable source."); break; }
-        if (researchRounds < limits.rounds && totalWebTools(usage) < limits.totalTools) { needsMore = true; continue; }
+        if (!roundAllowanceExceeded && researchRounds < limits.rounds && totalWebTools(usage) < limits.totalTools) { needsMore = true; continue; }
         throw new VsiEngineError("The live lookup did not return a verifiable source. Please retry shortly.", usage);
       }
       for (const source of result.sources) {
@@ -259,6 +275,7 @@ export async function runVsiAnswer(input: VsiRunInput): Promise<VsiAnswer> {
         && Date.parse(claim.evidenceDate) <= Date.now() && Date.now() - Date.parse(claim.evidenceDate) <= 60 * 60 * 1000);
       needsMore = result.needsMoreResearch || weatherNeedsFreshness;
       if (weatherNeedsFreshness) researchLimitations.push("A current weather observation within the last hour was not established; older observations or forecast information must be labeled with their actual dates.");
+      if (roundAllowanceExceeded) break;
     }
     if (needsMore) { researchPartial = true; researchLimitations.push("This bounded research pass left some questions or freshness checks unresolved; the answer must say which findings remain uncertain."); }
   }
@@ -275,7 +292,7 @@ export async function runVsiAnswer(input: VsiRunInput): Promise<VsiAnswer> {
     businessSources: evidence.sources.map(withVsiSourceSnapshot).map(source => ({ ...source, id: stableVsiCitationId(source) })),
     evidenceLimitations: [...evidence.limitations, ...product.limitations],
     livePublicLookup: webSources.length ? publicSelection.lookup : null,
-    researchStatus: { tier: plan.mode === "research" ? plan.tier : null, rounds: researchRounds, partial: researchPartial, limitations: [...new Set(researchLimitations)].slice(-8) } };
+    researchStatus: { tier: plan.mode === "research" ? plan.tier : null, rounds: researchRounds, partial: researchPartial, toolAllowanceExceeded: usage.toolAllowanceExceeded === true, limitations: [...new Set(researchLimitations)].slice(-8) } };
   // Bound whole records, not serialized fragments. Preserve the newest conversation and its source snapshot.
   while (JSON.stringify(payload).length + VSI_SYSTEM_PROMPT.length > config.maxInputChars && payload.businessSources.length > 2) payload.businessSources.pop();
   while (JSON.stringify(payload).length + VSI_SYSTEM_PROMPT.length > config.maxInputChars && payload.recentConversation.length > 2) payload.recentConversation.shift();
