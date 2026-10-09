@@ -14,6 +14,8 @@ export type VsiSource = {
   sourceType: string;
   sourceId: string | null;
   evidenceDate: string | null;
+  evidenceDateKind?: "publication" | "updated" | "observation" | "event";
+  evidenceDateText?: string;
   retrievedAt: string;
   excerpt?: string;
 };

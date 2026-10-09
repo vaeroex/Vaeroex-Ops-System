@@ -13,7 +13,7 @@ const structuredAnswer = "## Repair turnaround\nThe latest KPI is **3.8 days** a
 const briefTable = "## Corporate brief\n| Measure | Current | Next check |\n| --- | ---: | --- |\n| Repair turnaround | **3.8 days** | Match dated repair tickets [B1] |\n| Target | 2 days | Confirm parts availability |\n| Safe cell | <img src=x onerror=alert(1)> | [Guide](https://untrusted.example/) |";
 const longExchanges = () => Array.from({ length: 20 }, (_, index) => ({ ...exchange(`long-${index}`, `Planning question ${index + 1}: what should our workshop check next?`),
   answer: index === 19 ? briefTable : `## Workshop planning ${index + 1}\nReview the dated repair tickets and compare the promised completion date with the actual collection date. The current records do not establish why a repair was late. [B1]\n\nChoose one owner to inspect the matched records, then update the team with what they show.`,
-  citations: Array.from({ length: index === 19 ? 8 : 2 }, (_, source) => ({ id: `B${source + 1}`, title: `Workshop source ${source + 1}`, url: `/app/sources/workshop-${source + 1}`, sourceType: "file", sourceId: `workshop-${source + 1}`, evidenceDate: now, retrievedAt: now, excerpt: "Approved workshop record with dated repair details. ".repeat(4) })) }));
+  citations: Array.from({ length: index === 19 ? 8 : 2 }, (_, source) => ({ id: `B${source + 1}`, title: `Workshop source ${source + 1}`, url: `/app/sources/workshop-${source + 1}`, sourceType: "file", sourceId: `workshop-${source + 1}`, evidenceDate: source === 4 ? null : now, evidenceDateKind: ["publication", "updated", "observation", "event"][source], retrievedAt: now, excerpt: "Approved workshop record with dated repair details. ".repeat(4) })) }));
 const stored = new Map(), answers = new Map();
 let posts = [], noteSaves = 0, usageReads = 0, firstFailure = true, lost = false, serverError = null, releaseDelayedAnswer = null;
 const output = fs.mkdtempSync(path.join(os.tmpdir(), "vsi-ui-browser-"));
@@ -170,6 +170,11 @@ async function main() {
       await transcript.getByRole("article").last().getByText("Sources (8)", { exact: true }).click();
       const sourceList = transcript.getByRole("article").last().locator("details ol");
       assert.equal(await sourceList.getByRole("link").count(), 8);
+      for (const label of ["Published", "Updated", "Event"]) assert.equal(await sourceList.getByText(`${label}: Oct 8, 2026`, { exact: true }).count(), 1, "source date type must remain distinct from lookup time");
+      assert.equal(await sourceList.getByText("Observed: Oct 8, 2026, 6:00 PM UTC", { exact: true }).count(), 1, "observation timestamps preserve the observation clock and timezone separately from lookup time");
+      assert.equal(await sourceList.getByText("Source date not provided", { exact: true }).count(), 1, "lookup time must not replace a missing source date");
+      assert.equal(await sourceList.getByText("Evidence: Oct 8, 2026", { exact: true }).count(), 3, "existing source dates preserve their generic label");
+      assert.equal(await sourceList.getByText(/^Checked: Oct 8, 2026/).count(), 8, "all sources separately show the lookup timestamp");
       assert(await sourceList.evaluate(node => node.clientHeight <= 288 && node.scrollHeight > node.clientHeight), "many source details stay in a bounded disclosure");
       await transcript.getByRole("article").last().getByText("Sources (8)", { exact: true }).click();
       await panel.screenshot({ path: path.join(output, `vsi-20-exchanges-${width}.png`) });

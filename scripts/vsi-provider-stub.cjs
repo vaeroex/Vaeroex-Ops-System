@@ -28,7 +28,8 @@ globalThis.fetch=async function(input,init){
    clarification:missing?'Which city or location should I check?':'',publicTargets:weather&&!missing?[{text:'Portland, Oregon',origin:'question'}]:[],objectives:weather&&!missing?['weather']:[]});
   }
  } else if(web){
-  answer=JSON.stringify({claims:[{text:webUrl.includes('vsi-handoff')?'Synthetic founder finding: Lumen Packaging was founded by Morgan Example.':'Portland weather source checked for this synthetic transport test.',urls:[webUrl],evidenceDate:new Date().toISOString()}],limitations:['Synthetic transport, not actual weather.'],needsMoreResearch:false});
+  const observationDate=new Date().toISOString();
+  answer=JSON.stringify({claims:[{text:webUrl.includes('vsi-handoff')?'Synthetic founder finding: Lumen Packaging was founded by Morgan Example.':'Portland weather source checked for this synthetic transport test.',urls:[webUrl],evidenceDate:observationDate,dateProvenance:{kind:'observation',sourceUrl:webUrl,sourceText:`Synthetic source observation at ${observationDate}`}}],limitations:['Synthetic transport, not actual weather.'],needsMoreResearch:false});
  } else if(payload.question===inheritedQuestion){
   const old=payload.historicalSources?.find(source=>source.url==='https://example.org/vsi-handoff-original'),current=payload.livePublicLookup?.sources?.find(source=>source.url==='https://example.org/vsi-handoff-founder');
   if(!old||!current||!JSON.stringify(payload.recentConversation).includes(handoffFinding))throw Error('Synthetic continuation lost its source snapshot or new lookup');

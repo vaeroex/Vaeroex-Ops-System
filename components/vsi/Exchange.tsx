@@ -2,6 +2,8 @@ import Link from "next/link";
 import { AnswerContent } from "@/components/vsi/AnswerContent";
 import { displayDate, safeSourceUrl, type VsiExchange } from "@/components/vsi/contracts";
 
+const sourceDateLabels = { publication: "Published", updated: "Updated", observation: "Observed", event: "Event" } as const;
+
 export function Exchange({ exchange, canEditNotes, saving, disabled, workspaceName, onRemember }: {
   exchange: VsiExchange;
   canEditNotes: boolean;
@@ -29,7 +31,7 @@ export function Exchange({ exchange, canEditNotes, saving, disabled, workspaceNa
             return <li key={source.id} className="min-w-0 rounded-md border border-slate-200 bg-white p-3 text-xs leading-5">
               <span className="font-semibold text-slate-500">[{source.id}] </span>
               {href ? <a href={href} {...(href.startsWith("https:") ? { target: "_blank", rel: "noopener noreferrer" } : {})} className="break-words font-semibold text-vaeroex-blue underline decoration-slate-300 underline-offset-2 focus-visible:outline-2 focus-visible:outline-vaeroex-blue">{source.title}</a> : <span className="font-semibold text-slate-700">{source.title}</span>}
-              <p className="mt-1 text-slate-600">Evidence: {displayDate(source.evidenceDate)}</p>
+              <p className="mt-1 text-slate-600">{source.evidenceDate ? `${source.evidenceDateKind ? sourceDateLabels[source.evidenceDateKind] ?? "Evidence" : "Evidence"}: ${displayDate(source.evidenceDate, source.evidenceDateKind === "observation" && source.evidenceDate.includes("T"))}` : "Source date not provided"}</p>
               <p className="text-slate-500">Checked: {displayDate(source.retrievedAt, true)}</p>
               {source.excerpt ? <p className="mt-1 break-words text-slate-600 [overflow-wrap:anywhere]">{source.excerpt}</p> : null}
             </li>;

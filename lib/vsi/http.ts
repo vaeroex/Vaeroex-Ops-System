@@ -98,7 +98,7 @@ export async function vsiRoute(request: Request, action: RouteAction, conversati
     } catch (error) {
       const engineError = error instanceof VsiEngineError ? error : null;
       const uncertainCost = !engineError || engineError.accountingUncertain || engineError.usage.costEstimated === true;
-      const usage = { ...engineError?.usage, estimatedCostUsd: uncertainCost ? config.requestReserveUsd : engineError.usage.estimatedCostUsd,
+      const usage = { ...engineError?.usage, estimatedCostUsd: uncertainCost ? Math.max(config.requestReserveUsd, engineError?.usage.estimatedCostUsd || 0) : engineError.usage.estimatedCostUsd,
         failed: true, costEstimated: uncertainCost };
       await mutateVsi(access, "settle", { conversationId, id: claim.request.id, attempt: claim.request.attempt, usage });
       if (engineError) throw new VsiHttpError(503, "answer_unavailable", engineError.message);
