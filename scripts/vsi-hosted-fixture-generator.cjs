@@ -10,7 +10,7 @@ const hash=value=>createHash('sha256').update(value).digest('hex');
 const literal=value=>value===null?'null':typeof value==='boolean'?(value?'true':'false'):typeof value==='number'?(assert(Number.isFinite(value)),String(value)):typeof value==='object'?`'${JSON.stringify(value).replaceAll("'","''")}'::jsonb`:`'${String(value).replaceAll("'","''")}'`;
 const statement=(table,row)=>`insert into ${table} (${Object.keys(row).join(',')}) values (${Object.values(row).map(literal).join(',')});`;
 const privateWrite=(dir,name,text)=>fs.writeFileSync(path.join(dir,name),text,{mode:0o600,flag:'wx'});
-async function generate(localConfigPath,outputDir){
+async function generate(localConfigPath,outputDir,{includeEmpty=false}={}){
  const c=readConfig(localConfigPath);assert(path.isAbsolute(outputDir),'Output directory must be absolute');
  fs.mkdirSync(outputDir,{recursive:false,mode:0o700});assert.equal(fs.statSync(outputDir).mode&0o077,0);
  const db=new Client({connectionString:c.dbUrl,ssl:false});await db.connect();
@@ -18,16 +18,16 @@ async function generate(localConfigPath,outputDir){
   const identity=(await db.query("select current_setting('data_directory') directory")).rows[0];assert(fs.realpathSync(identity.directory).startsWith(fs.realpathSync(c.ownedSupabaseHome)+'/stacks/'));
   const cryptSchema=(await db.query("select n.nspname from pg_proc p join pg_namespace n on n.oid=p.pronamespace where p.proname='crypt' and n.nspname in ('public','extensions') limit 1")).rows[0]?.nspname;assert(['public','extensions'].includes(cryptSchema));
   const now=new Date().toISOString(),today=now.slice(0,10),marker='VSI-'+randomUUID();
-  const fixture={synthetic:true,marker,generatedAt:now,releaseChannel:'production',workspaces:[randomUUID(),randomUUID()],actors:[],sources:{},integration:{},reportId:randomUUID()};
+  const fixture={synthetic:true,marker,generatedAt:now,releaseChannel:'production',workspaces:Array.from({length:includeEmpty?3:2},()=>randomUUID()),actors:[],sources:{},integration:{},reportId:randomUUID()};
   const sql=['-- Synthetic VSI qualification only. No customer IDs, provider credentials, storage objects, or remote refresh.','begin;','set local statement_timeout = \'30s\';',"select set_config('request.jwt.claim.role','service_role',true);", "select set_config('request.jwt.claims','{\"role\":\"service_role\"}',true);"];
   const legal=fs.readFileSync(path.join(root,'lib/legal/content.ts'),'utf8');const version=key=>new RegExp(key+': "([\\d-]+)"').exec(legal)[1];
-  for(const [index,role] of ['owner','viewer','owner'].entries()){
-   const actor={id:randomUUID(),email:`vsi-${randomUUID()}@example.invalid`,password:randomBytes(32).toString('base64url'),role,workspaceId:fixture.workspaces[index===2?1:0]};fixture.actors.push(actor);
+  for(const [index,role] of (includeEmpty?['owner','viewer','owner','owner']:['owner','viewer','owner']).entries()){
+   const actor={id:randomUUID(),email:`vsi-${randomUUID()}@example.invalid`,password:randomBytes(32).toString('base64url'),role,workspaceId:fixture.workspaces[index>1?index-1:0]};fixture.actors.push(actor);
    const passwordHash=(await db.query(`select ${cryptSchema}.crypt($1,${cryptSchema}.gen_salt('bf',10)) value`,[actor.password])).rows[0].value;
    sql.push(statement('auth.users',{instance_id:'00000000-0000-0000-0000-000000000000',id:actor.id,aud:'authenticated',role:'authenticated',email:actor.email,encrypted_password:passwordHash,email_confirmed_at:now,
     confirmation_token:'',recovery_token:'',email_change_token_new:'',email_change:'',email_change_token_current:'',reauthentication_token:'',raw_app_meta_data:{provider:'email',providers:['email']},raw_user_meta_data:{full_name:'Synthetic VSI '+role,synthetic_fixture:marker},is_super_admin:false,is_sso_user:false,is_anonymous:false,created_at:now,updated_at:now}));
    sql.push(statement('auth.identities',{id:randomUUID(),provider_id:actor.id,user_id:actor.id,identity_data:{sub:actor.id,email:actor.email,email_verified:true,phone_verified:false},provider:'email',created_at:now,updated_at:now}));
-   if(index!==1){sql.push(statement('public.workspaces',{id:actor.workspaceId,name:`SYNTHETIC VSI ${index===0?'Bicycle Shop':'Catering'} ${marker}`,created_by:actor.id,primary_contact_email:actor.email,industry:'Synthetic VSI qualification',reporting_timezone:'UTC',subscription_required:true,subscription_status:'active',manually_unlocked:true,plan_slug:'vaeroex'}));
+   if(index!==1){sql.push(statement('public.workspaces',{id:actor.workspaceId,name:`SYNTHETIC VSI ${index===0?'Bicycle Shop':index===2?'Catering':'Empty Software Studio'} ${marker}`,created_by:actor.id,primary_contact_email:actor.email,industry:'Synthetic VSI qualification',reporting_timezone:'UTC',subscription_required:true,subscription_status:'active',manually_unlocked:true,plan_slug:'vaeroex'}));
     sql.push(statement('public.customer_subscriptions',{id:randomUUID(),user_id:actor.id,workspace_id:actor.workspaceId,customer_email:actor.email,customer_name:'Synthetic VSI',source:'manual',billing_provider:'manual',status:'active',plan_slug:'vaeroex',manually_activated:true,manually_activated_by:actor.id,onboarding_email_status:'skipped',notes:marker+' synthetic qualification only; no billing or email'}));}
    sql.push(statement('public.workspace_members',{id:randomUUID(),workspace_id:actor.workspaceId,user_id:actor.id,role,status:'active'}));
    sql.push(statement('public.legal_acceptances',{id:randomUUID(),user_id:actor.id,workspace_id:actor.workspaceId,terms_version:version('terms'),privacy_version:version('privacy'),ai_disclaimer_version:version('aiDisclaimer'),sensitive_data_policy_version:version('sensitiveData'),user_email:actor.email}));
@@ -72,7 +72,7 @@ async function generate(localConfigPath,outputDir){
   const wsList=fixture.workspaces.map(literal).join(','),actorList=fixture.actors.map(a=>literal(a.id)).join(',');
   sql.push(`do $vsi_guard$ begin if exists(select 1 from public.google_sheets_credentials where workspace_id in (${wsList})) or exists(select 1 from public.google_sheets_connections where workspace_id in (${wsList}) and (automatic_refresh_enabled or next_sync_at is not null)) then raise exception 'synthetic fixture unexpectedly has credentials or dispatch eligibility'; end if; end $vsi_guard$;`);
   sql.push('commit;');
-  const guard=`do $vsi_guard$ begin if (select count(*) from public.workspaces where id in (${wsList}) and name like ${literal('%'+marker)})<>2 or exists(select 1 from public.workspace_members where workspace_id in (${wsList}) and (user_id is null or user_id not in (${actorList}))) or (select count(*) from auth.users where id in (${actorList}) and raw_user_meta_data->>'synthetic_fixture'=${literal(marker)})<>3 then raise exception 'synthetic cleanup ownership guard failed'; end if; end $vsi_guard$;`;
+  const guard=`do $vsi_guard$ begin if (select count(*) from public.workspaces where id in (${wsList}) and name like ${literal('%'+marker)})<>${fixture.workspaces.length} or exists(select 1 from public.workspace_members where workspace_id in (${wsList}) and (user_id is null or user_id not in (${actorList}))) or (select count(*) from auth.users where id in (${actorList}) and raw_user_meta_data->>'synthetic_fixture'=${literal(marker)})<>${fixture.actors.length} then raise exception 'synthetic cleanup ownership guard failed'; end if; end $vsi_guard$;`;
   const cleanup=['-- Retire only this fixture; immutable integration history and paid-cost accounting are retained.','begin;',"set local statement_timeout = '30s';","select set_config('request.jwt.claim.role','service_role',true);","select set_config('request.jwt.claims','{\"role\":\"service_role\"}',true);",guard,
    `update auth.users set banned_until='infinity',updated_at=now() where id in (${actorList}) and raw_user_meta_data->>'synthetic_fixture'=${literal(marker)};`,
    `delete from auth.refresh_tokens where user_id in (${actorList});`,`delete from auth.sessions where user_id in (${actorList});`,
@@ -101,5 +101,5 @@ async function generate(localConfigPath,outputDir){
   console.log(JSON.stringify({outputDir,...manifest}));return manifest;
  } catch(error){await db.query('rollback').catch(()=>{});throw error;} finally {await db.end();}
 }
-if(require.main===module){assert(process.argv[2]&&process.argv[3],'Pass disposable local config and NEW absolute private output directory.');generate(process.argv[2],process.argv[3]).catch(error=>{console.error('Fixture generation failed: '+error.message);process.exitCode=1});}
+if(require.main===module){assert(process.argv[2]&&process.argv[3],'Pass disposable local config and NEW absolute private output directory.');generate(process.argv[2],process.argv[3],{includeEmpty:process.argv.includes('--include-empty')}).catch(error=>{console.error('Fixture generation failed: '+error.message);process.exitCode=1});}
 module.exports={generate,literal};

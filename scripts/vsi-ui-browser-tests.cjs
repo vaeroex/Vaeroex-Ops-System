@@ -10,8 +10,12 @@ const chat = (id, count = 1) => ({ id, title: id === "closed" ? "Long-running pr
 const exchange = (id, message = "Help me plan my week") => ({ id, userMessage: message, answer: "**Start with your priorities.**\n\n1. Choose three outcomes.\n2. Leave time for interruptions.", citations: [], createdAt: now });
 const literalCode = "## Keep this code heading literal\n\n<img src=x onerror=alert('unsafe')>\n[Unsafe link](javascript:alert('unsafe'))";
 const structuredAnswer = "## Repair turnaround\nThe latest KPI is **3.8 days** against a two-day target [B1].\n\n### What to check first\n1. Compare dated repair tickets.\n2. Confirm parts availability.\n\n```text\n" + literalCode + "\n```\n\nAfter the code, [the guide](https://untrusted.example/guide) stays plain text.\n![Not an attachment](https://untrusted.example/attachment.png)";
+const briefTable = "## Corporate brief\n| Measure | Current | Next check |\n| --- | ---: | --- |\n| Repair turnaround | **3.8 days** | Match dated repair tickets [B1] |\n| Target | 2 days | Confirm parts availability |\n| Safe cell | <img src=x onerror=alert(1)> | [Guide](https://untrusted.example/) |";
+const longExchanges = () => Array.from({ length: 20 }, (_, index) => ({ ...exchange(`long-${index}`, `Planning question ${index + 1}: what should our workshop check next?`),
+  answer: index === 19 ? briefTable : `## Workshop planning ${index + 1}\nReview the dated repair tickets and compare the promised completion date with the actual collection date. The current records do not establish why a repair was late. [B1]\n\nChoose one owner to inspect the matched records, then update the team with what they show.`,
+  citations: Array.from({ length: index === 19 ? 8 : 2 }, (_, source) => ({ id: `B${source + 1}`, title: `Workshop source ${source + 1}`, url: `/app/sources/workshop-${source + 1}`, sourceType: "file", sourceId: `workshop-${source + 1}`, evidenceDate: now, retrievedAt: now, excerpt: "Approved workshop record with dated repair details. ".repeat(4) })) }));
 const stored = new Map(), answers = new Map();
-let posts = [], noteSaves = 0, usageReads = 0, firstFailure = true, lost = false, serverError = null;
+let posts = [], noteSaves = 0, usageReads = 0, firstFailure = true, lost = false, serverError = null, releaseDelayedAnswer = null;
 const output = fs.mkdtempSync(path.join(os.tmpdir(), "vsi-ui-browser-"));
 async function main() {
   assert.equal(safeSourceUrl("javascript:alert(1)"), null); assert.equal(safeSourceUrl("//evil.example/"), null);
@@ -47,6 +51,7 @@ async function main() {
         if (action === "messages") {
           if (body.message === "other tab filled this chat") { value.conversation.exchangeCount = 250; return send({ code: "thread_full", message: "This chat has reached 250 exchanges. Continue in a new chat." }, 409); }
           posts.push(body);
+          if (body.message.startsWith("Keep my reading position")) await new Promise(resolve => { releaseDelayedAnswer = resolve; });
           let answer = answers.get(body.requestId);
           if (!answer) {
             answer = exchange(body.requestId, body.message);
@@ -121,7 +126,7 @@ async function main() {
         assert.equal(colors.activeBackground, colors.noteBackground, "active chat uses the same themed highlight");
       }
       await page.screenshot({ path: path.join(output, `vsi-${theme}-${width}.png`), fullPage: true });
-      await renderedEvidence.screenshot({ path: path.join(output, `vsi-answer-${theme}-${width}.png`) });
+      await page.getByRole("region", { name: "Conversation", exact: true }).screenshot({ path: path.join(output, `vsi-answer-${theme}-${width}.png`) });
     }
     await page.getByRole("button", { name: "Usage", exact: true }).click(); await page.getByText(/4 of 100 questions/).waitFor(); assert.equal(usageReads, 1);
     assert.equal(await page.getByText(/Your oldest counted question leaves this window after Oct 9, 2026/).count(), 1, "rolling expiry must not imply available questions are blocked");
@@ -133,6 +138,85 @@ async function main() {
     await page.getByRole("link", { name: "the original transcript" }).click(); await page.getByRole("button", { name: "Continue in a new chat" }).waitFor();
     await page.getByRole("button", { name: "Delete", exact: true }).click(); await page.getByRole("button", { name: "Delete this chat", exact: true }).click(); await page.getByText("Chat deleted.", { exact: true }).waitFor();
     assert.equal(await page.getByText("Furniture project", { exact: true }).count(), 0);
+    for (let index = 0; index < 24; index++) stored.set(`history-${index}`, { conversation: { ...chat(`history-${index}`), title: `Saved project ${index + 1}` }, exchanges: [] });
+    for (const [width, height] of [[1440, 900], [390, 844], [320, 740]]) {
+      stored.set("long", { conversation: { ...chat("long", 20), title: "Workshop planning · 20 exchanges" }, exchanges: longExchanges() });
+      await page.setViewportSize({ width, height }); await page.goto(`${origin}/?chat=long`);
+      await page.getByRole("heading", { name: "Workshop planning · 20 exchanges", exact: true }).waitFor();
+      await page.evaluate(() => { document.documentElement.className = "pulsar dark"; document.documentElement.dataset.theme = "pulsar"; });
+      const transcript = page.getByRole("region", { name: "Conversation transcript", exact: true }), panel = page.getByRole("region", { name: "Conversation", exact: true });
+      await page.waitForFunction(() => { const node = document.getElementById("vsi-transcript"); return node && node.querySelectorAll("article").length === 20 && node.scrollHeight - node.scrollTop - node.clientHeight < 5; });
+      const historyDisclosure = page.getByRole("complementary", { name: "Private chat history" }).locator("details");
+      if (width < 1280) {
+        assert.equal(await historyDisclosure.getAttribute("open"), null, "mobile history starts collapsed");
+        await historyDisclosure.locator("summary").focus(); await page.keyboard.press("Enter");
+      }
+      const historyViewport = historyDisclosure.getByRole("navigation", { name: "Your chats" });
+      assert(await historyViewport.evaluate(node => node.clientHeight <= Math.max(160, innerHeight * 0.45) + 1 && node.scrollHeight > node.clientHeight), "history stays scroll-bounded with many saved chats");
+      if (width < 1280) { await historyDisclosure.locator("summary").focus(); await page.keyboard.press("Enter"); }
+      assert.equal(await transcript.getByRole("article").count(), 20);
+      assert(await transcript.evaluate(node => node.scrollHeight > node.clientHeight * 5), "twenty exchanges scroll inside a bounded transcript");
+      assert(await panel.evaluate(node => node.clientHeight <= innerHeight), "conversation panel is bounded by the viewport");
+      assert(await page.evaluate(() => document.documentElement.scrollHeight < innerHeight * 2), "page height does not grow with the whole transcript");
+      const table = transcript.getByRole("table");
+      assert.equal(await table.getByRole("columnheader").count(), 3); assert.equal(await table.getByRole("cell", { name: "3.8 days", exact: true }).count(), 1);
+      assert.equal(await table.locator("img,a,script").count(), 0, "table cell HTML and model URLs remain inert");
+      assert(await transcript.getByRole("region", { name: "Answer table" }).evaluate(node => node.scrollWidth >= node.clientWidth), "brief table has its own horizontal viewport");
+      if (width < 1280) {
+        const tableViewport = transcript.getByRole("region", { name: "Answer table" }); await tableViewport.focus(); await page.keyboard.press("ArrowRight");
+        await page.waitForFunction(() => document.querySelector('[aria-label="Answer table"]').scrollLeft > 0);
+        await tableViewport.evaluate(node => { node.scrollLeft = 0; });
+      }
+      await transcript.getByRole("article").last().getByText("Sources (8)", { exact: true }).click();
+      const sourceList = transcript.getByRole("article").last().locator("details ol");
+      assert.equal(await sourceList.getByRole("link").count(), 8);
+      assert(await sourceList.evaluate(node => node.clientHeight <= 288 && node.scrollHeight > node.clientHeight), "many source details stay in a bounded disclosure");
+      await transcript.getByRole("article").last().getByText("Sources (8)", { exact: true }).click();
+      await panel.screenshot({ path: path.join(output, `vsi-20-exchanges-${width}.png`) });
+      await composer.fill(`Keep my reading position at ${width}`); await composer.press("Enter");
+      await page.getByText("Vaeroex is preparing your answer…", { exact: true }).waitFor();
+      await page.waitForFunction(() => { const node = document.getElementById("vsi-transcript"); return node.scrollHeight - node.scrollTop - node.clientHeight < 5; });
+      await transcript.evaluate(node => { const anchor = node.querySelectorAll("article")[7]; node.scrollTop += anchor.getBoundingClientRect().top - node.getBoundingClientRect().top - 12; });
+      await transcript.focus(); await page.getByRole("button", { name: "Jump to latest", exact: true }).waitFor();
+      const before = await transcript.evaluate(node => ({ top: node.scrollTop, anchor: node.querySelectorAll("article")[7].getBoundingClientRect().top - node.getBoundingClientRect().top }));
+      assert(releaseDelayedAnswer, "fixture received the pending question"); releaseDelayedAnswer(); releaseDelayedAnswer = null;
+      await page.getByRole("button", { name: "New answer · Jump to latest", exact: true }).waitFor();
+      const after = await transcript.evaluate(node => ({ top: node.scrollTop, anchor: node.querySelectorAll("article")[7].getBoundingClientRect().top - node.getBoundingClientRect().top, focused: document.activeElement === node }));
+      assert(Math.abs(after.top - before.top) < 2 && Math.abs(after.anchor - before.anchor) < 2, "new answer preserves the older reading position");
+      assert(after.focused, "answer completion does not steal focus from the reader");
+      assert.equal(await page.getByRole("button", { name: "New answer · Jump to latest", exact: true }).evaluate(node => getComputedStyle(node).backgroundColor), "rgb(17, 24, 39)", "floating jump control stays opaque over earlier messages");
+      await panel.screenshot({ path: path.join(output, `vsi-earlier-reading-${width}.png`) });
+      await page.getByRole("button", { name: "New answer · Jump to latest", exact: true }).focus(); await page.keyboard.press("Enter");
+      await page.waitForFunction(() => { const node = document.getElementById("vsi-transcript"); return node.scrollHeight - node.scrollTop - node.clientHeight < 5; });
+      await transcript.focus(); const bottomTop = await transcript.evaluate(node => node.scrollTop); await page.keyboard.press("PageUp");
+      await page.waitForFunction(value => document.getElementById("vsi-transcript").scrollTop < value - 20, bottomTop);
+      await page.getByRole("button", { name: "Jump to latest", exact: true }).click();
+      await composer.focus(); await composer.scrollIntoViewIfNeeded();
+      await page.screenshot({ path: path.join(output, `vsi-long-${width}-composer-check.png`) });
+      const composerPosition = await composer.evaluate(node => { const rect = node.getBoundingClientRect(); return { top: rect.top, bottom: rect.bottom, viewport: innerHeight, pageTop: scrollY, panel: node.closest('[aria-label="Conversation"]').getBoundingClientRect().toJSON() }; });
+      assert(composerPosition.top >= 0 && composerPosition.bottom <= composerPosition.viewport, `composer remains reachable after 21 exchanges at ${width}: ${JSON.stringify(composerPosition)}; output ${output}`);
+      assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `long chat has no page overflow at ${width}`);
+      await page.screenshot({ path: path.join(output, `vsi-long-${width}.png`) });
+      await panel.screenshot({ path: path.join(output, `vsi-long-panel-${width}.png`) });
+      if (width === 390) {
+        await page.setViewportSize({ width, height: 420 }); await composer.focus(); await composer.scrollIntoViewIfNeeded();
+        assert(await composer.evaluate(node => { const rect = node.getBoundingClientRect(); return rect.top >= 0 && rect.bottom <= innerHeight; }), "composer remains visible in a software-keyboard-sized viewport");
+        assert(await page.getByRole("button", { name: "Send", exact: true }).evaluate(node => node.getBoundingClientRect().bottom <= innerHeight), "Send remains reachable with a reduced viewport");
+        await page.screenshot({ path: path.join(output, "vsi-mobile-keyboard-height.png") });
+      }
+    }
+    await page.clock.install();
+    await page.goto(`${origin}/?chat=long`); await page.getByRole("heading", { name: "Workshop planning · 20 exchanges", exact: true }).waitFor();
+    await composer.fill("Keep my reading position while this request times out"); await composer.press("Enter");
+    await page.getByText("Vaeroex is preparing your answer…", { exact: true }).waitFor();
+    await page.clock.fastForward(10_100);
+    await page.getByText("Some questions take about three minutes. You can keep reading while Vaeroex finishes.", { exact: true }).waitFor();
+    await page.clock.fastForward(195_100);
+    await page.getByRole("button", { name: "Retry this question", exact: true }).waitFor();
+    assert.match(await page.getByRole("alert").innerText(), /took too long/);
+    assert.equal(await page.getByText(/Vaeroex is preparing your answer/).count(), 0, "timed-out request must clear the pending state");
+    assert.equal(await page.getByRole("button", { name: "Retry this question", exact: true }).isEnabled(), true);
+    assert(releaseDelayedAnswer); releaseDelayedAnswer(); releaseDelayedAnswer = null;
     await page.goto(`${origin}/?chat=warning`); await page.getByText(/This is a long conversation/).waitFor(); assert.equal(await composer.count(), 1);
     await page.goto(`${origin}/?chat=closed`); await page.getByText(/This chat has reached 250 exchanges/).waitFor(); assert.equal(await composer.count(), 0);
     await page.getByRole("button", { name: "Continue in a new chat" }).click(); await page.getByRole("link", { name: "the original transcript" }).waitFor(); assert(stored.has("closed"));
@@ -141,7 +225,7 @@ async function main() {
     lost = true; await page.getByRole("button", { name: "Usage", exact: true }).click(); await page.getByRole("button", { name: "Reload your active workspace" }).waitFor();
     assert.equal(await page.getByText("Start with your priorities.", { exact: true }).count(), 0); assert.equal(await page.getByRole("heading", { name: "Long-running project" }).count(), 0); assert.equal(await page.getByRole("alert").evaluate(element => getComputedStyle(element).color), "rgb(252, 165, 165)", "dark-theme errors must stay legible");
     assert.equal(serverError, null); assert.deepEqual(errors, []);
-    console.log(JSON.stringify({ passed: true, checks: ["general question", "App Router searchParams update", "older history pagination", "keyboard", "stable retry", "explicit note confirmation", "citation dates", "Markdown headings and fenced code stay safe and readable", "rename reopen delete", "225 warning", "250 handoff preserves transcript", "second-tab thread boundary preserves unsent draft", "workspace access loss clears transcript", "on-demand usage", "desktop mobile no overflow", "actual global CSS light/Pulsar contrast"], widths: [1440, 390, 320], output, scope: "Hydrated UI with synthetic loopback API; authenticated API and provider qualification are separate." }));
+    console.log(JSON.stringify({ passed: true, checks: ["general question", "App Router searchParams update", "older history pagination", "keyboard", "stable retry", "explicit note confirmation", "citation dates", "Markdown headings and fenced code stay safe and readable", "rename reopen delete", "225 warning", "250 handoff preserves transcript", "second-tab thread boundary preserves unsent draft", "workspace access loss clears transcript", "on-demand usage", "desktop mobile no overflow", "20-exchange bounded transcript and composer", "old reading position and focus survive delayed answers", "keyboard jump and transcript scrolling", "safe compact business tables", "software-keyboard-sized viewport", "slow-response notice and recoverable 205-second timeout", "actual global CSS light/Pulsar contrast"], widths: [1440, 390, 320], output, scope: "Hydrated UI with synthetic loopback API; authenticated API and provider qualification are separate." }));
   } finally { if (browser) await browser.close(); await new Promise(resolve => server.close(resolve)); }
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

@@ -5,7 +5,7 @@ const { createServerClient } = require("@supabase/ssr");
 const { chromium } = require("playwright");
 const { cases } = require("./vsi-real-provider-qualification.cjs");
 
-const MAX_QUESTIONS = 12, CEILING_USD = 2, REQUEST_RESERVATION_USD = 0.10;
+const MAX_QUESTIONS = 12, CEILING_USD = 3, REQUEST_RESERVATION_USD = 0.25;
 const UI_CASE_IDS = ["general-writing", "current-weather", "repair-kpi"];
 const uuid = value => typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 function stageOrigin(value) {
@@ -144,7 +144,7 @@ async function main(configPath, outputDirectory, { full = false, validateOnly = 
     if (method === "GET") url.searchParams.set("workspaceId", state.actor.workspaceId);
     else assertMutation(state, url.pathname, { ...body, expectedWorkspaceId: state.actor.workspaceId });
     const response = await state.context.request.fetch(url.href, { method, headers: { origin: config.origin, "content-type": "application/json", ...oidcHeaders() },
-      ...(method !== "GET" ? { data: { ...body, expectedWorkspaceId: state.actor.workspaceId } } : {}), timeout: 120_000, maxRedirects: 0 });
+      ...(method !== "GET" ? { data: { ...body, expectedWorkspaceId: state.actor.workspaceId } } : {}), timeout: 210_000, maxRedirects: 0 });
     let data; try { data = await response.json(); } catch { throw new Error(`api_non_json_${response.status()}_check_deployment_protection`); }
     if (data.workspaceId !== undefined) assert.equal(data.workspaceId, state.actor.workspaceId, "response_workspace_mismatch");
     if (response.status() >= 400) throw new Error(`api_${response.status()}_${sanitize(data.code || "unavailable")}: ${sanitize(data.error || data.message || "Request failed")}`);
@@ -202,7 +202,7 @@ async function main(configPath, outputDirectory, { full = false, validateOnly = 
         return route.continue({ headers });
       } catch (error) { fail("browser_request_guard", error, state.activeCase?.id); save(); return route.abort(); }
     });
-    state.page.setDefaultTimeout(120_000); state.page.on("pageerror", error => { report.browserErrors.push(sanitize(error.message)); save(); });
+    state.page.setDefaultTimeout(210_000); state.page.on("pageerror", error => { report.browserErrors.push(sanitize(error.message)); save(); });
     if (config.vercelShareUrl) await state.page.goto(config.vercelShareUrl, { waitUntil: "domcontentloaded" });
     await usage(state, "before");
     return state;

@@ -5,7 +5,7 @@ VSI restores open-ended, text-only chat at `/app/si`: **Ask anything. Grounded i
 ## Behavior and permissions
 
 - The sole reasoning/chat model is `gpt-6-luna` through OpenAI Responses, with `store: false`, no automatic retries, and no alternate-model fallback. Missing model/provider/tool access produces a recoverable error.
-- Current public questions use a separate Luna web-search call. Only the public question goes to search; workspace evidence and private history do not. Weather asks for a location when absent. Ordinary writing and explanations need no search or business evidence.
+- A private Luna planning call interprets the question and follow-ups. Public research receives only validated public entity/topic spans supplied by the user, fixed research objectives, and earlier public research evidence. Private notes, files, metrics, workspace labels, and conversation history never enter the web-enabled channel. Approved Business Notes do not grant public-export permission. Competitor research asks for a public name or market when none has been supplied. Ordinary writing and explanations need no search. Weather asks for a location and rechecks stale observations within the tool budget.
 - Business retrieval reuses authenticated workspace loaders, approved Business Notes/Memory, current source authority, Health, KPIs, saved analyses, and the canonical supported-integration dashboard. File-linked evidence is excluded when extraction approval or file lifecycle authority is revoked. Derived findings are interpretations, not independent corroboration. Citations identify original sources and evidence/lookup dates.
 - Workspace, actor, active membership, subscription, source authority, and applicable integration permissions are enforced server-side. Source text and web pages are untrusted evidence. No tool performs arbitrary external actions.
 - Chats belong to their actor and workspace. RLS prevents direct transcript writes and cross-actor reads. A changed membership role invalidates access to chats created under the previous role; this deliberately fails closed after a downgrade. Source links continue to use their normal current authorization. Historical answers are retained as historical conversation, not re-indexed facts.
@@ -14,13 +14,13 @@ VSI restores open-ended, text-only chat at `/app/si`: **Ask anything. Grounded i
 
 ## Persistence, limits, and accounting
 
-Migration: `supabase/migrations/20261008190000_vsi_private_chat.sql`.
+Migrations: `20261008190000_vsi_private_chat.sql` (private chat) and `20261009041421_vsi_adaptive_research.sql` (private public-search provenance and a longer bounded request lease).
 
 The migration adds private conversations/exchanges and service-only content-free request/cost ledgers. It makes no destructive change to existing customer tables. Deleting a chat removes its transcript; accounting receipts remain to prevent quota evasion. Workspace/user deletion cascades through the applicable foreign keys. No 24-hour transcript expiry is scheduled.
 
 The database serializes quota reservation by actor and workspace: 100 successfully answered questions per actor across workspaces in a rolling 24 hours; 10 attempted questions/minute; one concurrent request per actor and four per workspace. Stable request IDs replay an existing exchange instead of charging a second question. Failed unanswered requests do not consume the rolling allowance. Their known provider spending is still recorded. Expired or uncertain attempts conservatively retain their reservation. Immutable cost events attribute each retry to the month it actually ran, including retries crossing a month boundary.
 
-At 225 exchanges the UI warns gently. At 250 it makes the original transcript read-only and offers a new chat with a bounded private summary and an authorized link back. The model receives at most 24 recent messages/9,000 characters, a 7,000-character private summary, and bounded evidence—not all 250 exchanges. Summary compaction is deliberately lossy; the complete original transcript remains available.
+At 225 exchanges the UI warns gently. At 250 it makes the original transcript read-only and offers a new chat with a bounded private summary and an authorized link back. The model receives a bounded selection of recent messages and relevant earlier source turns (at most 24 messages/16,000 characters), plus permitted evidence. Full recent answers are preferred over clipping every reply to 1,800 characters. The compact private continuation context contains only bounded user requests; older assistant claims cannot bypass current source permissions through a summary. Earlier web links retain original lookup dates. Historical business answers are omitted from model context when their evidence is no longer permitted or has changed. The original transcript remains available under its existing access rules. During the first four exchanges of a continued chat, a four-exchange parent window carries exact approved public research topics and source snapshots forward through the same actor/workspace access checks.
 
 | Control | Default |
 | --- | --- |
@@ -28,29 +28,39 @@ At 225 exchanges the UI warns gently. At 250 it makes the original transcript re
 | Environment configuration | `VAEROEX_VSI_WORKSPACE_MONTHLY_BUDGET_USD` |
 | Question length | 8,000 characters |
 | Combined model input | 48,000 characters (`VAEROEX_VSI_MAX_INPUT_CHARS`, 32,000–48,000) |
-| Output per provider call | 3,000 tokens (`VAEROEX_VSI_MAX_OUTPUT_TOKENS`, 1,000–6,000) |
-| Web calls per question | 2 maximum (`VAEROEX_VSI_MAX_WEB_SEARCH_CALLS`, 1–2) |
+| Final output per provider call | 4,000 tokens (`VAEROEX_VSI_MAX_OUTPUT_TOKENS`, 2,000–6,000) |
+| Total search/open/find actions per question | Simple 2, standard 6, deep 12; configurable overall maximum `VAEROEX_VSI_MAX_WEB_SEARCH_CALLS` (2–12) |
+| Public research rounds / total Luna calls | Up to 3 / 5, including private planning and synthesis |
+| Research context and effort | Simple low search context; standard medium; deep high. Luna reasoning varies by stage and task |
 | Automatic provider retries | 0 |
-| Reservation per logical attempt | USD 0.10 |
-| Overall engine deadline | 65 seconds (`VAEROEX_VSI_TIMEOUT_MS`, max 90 seconds) |
-| Request lease | 120 seconds |
+| Reservation per logical attempt | USD 0.25 (`VAEROEX_VSI_REQUEST_RESERVE_USD`, 0.25–1); recorded usage settles the reservation |
+| Overall engine deadline | 180 seconds (`VAEROEX_VSI_TIMEOUT_MS`, 60–180 seconds), reserving synthesis time |
+| API / browser deadline / database lease | 210 seconds / 205 seconds / 240 seconds |
 
 Usage is available on demand, with a clear rolling-limit or workspace-spending explanation when relevant. The 100-question ceiling does not promise unlimited spending. The initial USD 50 safeguard is configurable; representative real-provider measurements must accompany the release qualification before treating this as a commercial allowance promise.
 
-The cost catalog dated 2026-10-08 uses the standard Luna prices: USD 0.10/million input tokens, USD 0.01/million cached input tokens, USD 0.50/million output tokens, and USD 0.01/web search call, plus model tokens. Token counts, cached/reasoning tokens, tool calls, retry attempts, provider request ID, latency, and estimated dollars are recorded separately from Executive Intelligence. Estimates are not provider invoices. Sources: [Luna model](https://developers.openai.com/api/docs/models/gpt-6-luna), [OpenAI pricing](https://developers.openai.com/api/docs/pricing).
+The cost catalog dated 2026-10-08 uses the standard Luna prices: USD 0.10/million input tokens, USD 0.01/million cached input tokens, USD 0.50/million output tokens, and USD 0.01/web search call, plus model tokens. Token counts, cached/reasoning tokens, chargeable searches, page opens, page finds, Luna call count, research tier, retry attempts, provider request ID, latency, and estimated dollars are recorded separately from Executive Intelligence. Open/find actions count against the research ceiling; only search actions incur the listed web-call fee. A later failed research round can still yield a truthful partial answer from verified sources. Unknown provider costs retain the full reservation and are explicitly marked estimated. Estimates are not provider invoices. Sources: [Luna model](https://developers.openai.com/api/docs/models/gpt-6-luna), [OpenAI pricing](https://developers.openai.com/api/docs/pricing).
+
+## Research and product knowledge
+
+The original lookup regression came from narrow phrase matching and dropping persisted citations from subsequent model input. The new path plans from intent and context, preserves dated source snapshots, and reports actual lookup state instead of treating missing current results as tool unavailability. Company, market, public professional background, and changing-topic questions can use multiple queries, inspect pages, and compare independent sources. Each public claim must reference a URL returned by the tool; unverified URLs are discarded. A bounded pass is never presented as exhaustive research.
+
+Product context imports maintained company identity, published pricing and features, Help content, and actual workspace entitlement/permission/connection loaders. Product citations are separate from customer business evidence. Published price is not an invoice; a workspace name or demo dataset does not establish Vaeroex company ownership. Model identity is the configured Luna model. Missing connection information is unknown rather than proof that nothing is connected.
+
+The larger research allowance does not raise the shared USD 50 monthly safeguard. Research-heavy use spends that allowance faster; 100 accepted questions per person remains a ceiling, not a guaranteed daily allowance. A request needs its conservative reservation available before dispatch, so a small unspent remainder can be unavailable until the next period or an explicitly approved budget adjustment. Qualification results must report actual searches, tokens, latency, partial outcomes, and estimated costs before proposing a customer allowance.
 
 ## Verification
 
-- `pnpm test:vsi`: Luna-only request/response handling, live-lookup selection, evidence revocation, source validation, bounded context, accounting, origin/body boundaries, prohibited identifiers.
+- `pnpm test:vsi`: Luna-only planning/research/synthesis, research privacy validators, follow-up/source preservation, maintained product context, evidence revocation, source validation, bounded context, accounting, origin/body boundaries, prohibited identifiers.
 - `pnpm test:vsi-ui`: hydrated desktop/mobile chat behavior, keyboard composer, retries, history, confirmation, pagination, App Router navigation, and cross-tab handoff.
 - `VSI_TEST_CONFIG=/private/owned/local-config.json pnpm test:vsi-database`: real local Postgres concurrency, RLS, limits, retry/crash/month-boundary behavior, note confirmation, handoff, deletion. The harness refuses remote databases.
 - `node scripts/vsi-database-tests.cjs --supabase-local`: CI variant discovers and verifies its local Docker Supabase container and requires the migration ledger entry; it cannot apply migrations.
 - `scripts/vsi-image-pipeline-integration.cjs`: existing Files PNG reader pipeline with controlled bytes/reader response, actual stored run and explicit approval action, atomic Memory publication, then authorized VSI retrieval. This verifies the connection, not live image-reader accuracy.
 - `scripts/vsi-retrieval-integration.cjs`: authenticated synthetic workspace retrieval and cross-workspace/source-revocation exclusions against the owned local stack.
 - `scripts/vsi-browser-e2e.cjs <local-config> <synthetic-fixture> <private-output-dir> [http://127.0.0.1:49941]`: real browser → authentication → API → retrieval → persisted chat/note. Use `scripts/vsi-provider-stub.cjs` solely as an explicit local Node preload when testing transport without a paid provider. It is never imported by application code and is not proof of Luna answer quality.
-- `scripts/vsi-real-provider-qualification.cjs <local-config> <synthetic-fixture> <private-output>`: 12 representative general/current/business cases, requires an externally supplied provider credential, maximum USD 2 reservation envelope, full sanitized answer/usage evidence for human review. Never commit credentials or private fixture files.
+- `scripts/vsi-research-qualification.cjs`: reviewable general/research/business conversation suite across three synthetic workspaces, including an empty workspace; a bounded USD 10 qualification envelope within the user-authorized cumulative testing ceiling. Full sanitized answers, sources, accounting and human grades accompany the release. The original twelve-case direct-provider runner remains available with a USD 3 worst-case reservation envelope; it requires an externally supplied credential and never falls back to another model. Never commit credentials or private fixture files.
 
-Keep real-provider output/quality results separate from mocked transport checks. The local fixture helpers require a repository-owned disposable local stack and refuse hosted targets. For an explicitly authorized hosted release qualification, `scripts/vsi-hosted-fixture-generator.cjs` creates private reviewed seed/cleanup SQL without executing it remotely. `scripts/vsi-hosted-browser-qualification.cjs` accepts only an allowlisted protected Vercel stage and the exact synthetic workspaces; its guard tests run in CI. It dispatches at most 12 questions under a separate USD 2 ceiling and records answers for human grading. Credentials and seed output stay outside the repository. Retire only these synthetic identities/evidence after verification, preserving immutable audit and cost records.
+Keep real-provider output/quality results separate from mocked transport checks. The local fixture helpers require a repository-owned disposable local stack and refuse hosted targets. For an explicitly authorized hosted release qualification, `scripts/vsi-hosted-fixture-generator.cjs` creates private reviewed seed/cleanup SQL without executing it remotely. `scripts/vsi-hosted-browser-qualification.cjs` accepts only an allowlisted protected Vercel stage and the exact synthetic workspaces; its guard tests run in CI. It dispatches at most 12 questions under a separate USD 3 ceiling and records answers for human grading. Credentials and seed output stay outside the repository. Retire only these synthetic identities/evidence after verification, preserving immutable audit and cost records.
 
 ## Release
 

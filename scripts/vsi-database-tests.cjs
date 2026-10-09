@@ -9,6 +9,7 @@ const { discoverVsiDatabaseTarget } = require('./vsi-local-database-target.cjs')
 const root = path.resolve(__dirname, '..');
 const target = discoverVsiDatabaseTarget();
 const migration = fs.readFileSync(path.join(root, 'supabase/migrations/20261008190000_vsi_private_chat.sql'), 'utf8');
+const researchMigration = fs.readFileSync(path.join(root, 'supabase/migrations/20261009041421_vsi_adaptive_research.sql'), 'utf8');
 const A = randomUUID(), B = randomUUID(), actors = Array.from({ length: 8 }, () => randomUUID());
 const clients = [], passed = [];
 async function connect() { const c = new Client({ ...target.connection, connectionTimeoutMillis: 5000, statement_timeout: 15000 }); await c.connect(); clients.push(c); return c; }
@@ -35,6 +36,12 @@ async function run() {
     await admin.query(fn.replace('create function', 'create or replace function'));
     for (const index of migration.matchAll(/create index [^;]+;/g)) await admin.query(index[0].replace('create index', 'create index if not exists'));
   }
+  const researchExists = (await admin.query("select 1 from information_schema.columns where table_schema='public' and table_name='vsi_exchanges' and column_name='public_research_topics'")).rowCount === 1;
+  if (target.kind === 'supabase-local') assert(researchExists, 'CI must apply the adaptive research migration');
+  else if (!researchExists) await admin.query(researchMigration);
+  else if (process.env.VSI_REFRESH_LOCAL_RPC === '1') {
+    await admin.query(researchMigration.match(/create or replace function public\.vsi_mutate_v1\([\s\S]*?\n\$\$;/)[0]);
+  }
   await admin.query('insert into public.profiles(id,email) select x, x::text||\'@vsi-test.invalid\' from unnest($1::uuid[]) x', [actors]);
   await admin.query("insert into public.workspaces(id,name,subscription_required,subscription_status) values($1,'VSI synthetic A',false,'demo'),($2,'VSI synthetic B',false,'demo')", [A, B]);
   for (let i = 0; i < actors.length; i++) await admin.query('insert into public.workspace_members(workspace_id,user_id,role) values($1,$2,$3)', [i === 7 ? B : A, actors[i], i === 2 ? 'viewer' : i === 0 || i === 7 ? 'owner' : 'staff']);
@@ -45,16 +52,31 @@ async function run() {
   const input = reservation();
   const first = await rpc(server, actors[0], 'reserve', input);
   ok('First question reserves once', first.state, 'reserved');
+  ok('Research lease allows bounded engine plus settlement', Math.round((Date.parse(first.request.lease_until) - Date.parse(first.request.started_at)) / 1000), 240);
   ok('In-flight idempotent retry is pending', (await rpc(server, actors[0], 'reserve', input)).error, 'in_progress');
   ok('Idempotency key cannot change question', (await rpc(server, actors[0], 'reserve', { ...input, questionHash: 'changed' })).error, 'idempotency_conflict');
-  const complete = { conversationId: chat.id, id: first.request.id, attempt: first.request.attempt, question: 'Synthetic question', answer: 'Synthetic answer', citations: [], usage: { model: 'gpt-6-luna', inputTokens: 30, outputTokens: 20, webSearchCalls: 0, estimatedCostUsd: .002 }, summary: 'Private synthetic context' };
+  const complete = { conversationId: chat.id, id: first.request.id, attempt: first.request.attempt, question: 'Synthetic question', answer: 'Synthetic answer', citations: [{ id: 'W1', sourceType: 'web', url: 'https://example.org/public', retrievedAt: new Date().toISOString() }], publicResearchTopics: ['Public Bicycle Industry'], usage: { model: 'gpt-6-luna', inputTokens: 30, outputTokens: 20, webSearchCalls: 0, estimatedCostUsd: .002 }, summary: 'Private synthetic context' };
   await rpc(server, actors[0], 'settle', complete);
   await rpc(server, actors[0], 'settle', complete);
+  ok('Private research provenance survives settlement', (await admin.query('select public_research_topics from public.vsi_exchanges where id=$1', [first.request.id])).rows[0].public_research_topics, ['Public Bicycle Industry']);
+  ok('Public topics never enter retained usage ledger', (await admin.query("select usage_json::text like '%Public Bicycle Industry%' leaked from public.vsi_cost_events where request_id=$1", [first.request.id])).rows[0].leaked, false);
+  for (const [name, value] of [
+    ['Research provenance rejects non-array', { topic: 'Public industry' }],
+    ['Research provenance rejects non-string members', ['Public industry', 42]],
+    ['Research provenance rejects more than twelve terms', Array(13).fill('Public industry')],
+    ['Research provenance rejects oversized content', ['x'.repeat(2600)]]
+  ]) {
+    await assert.rejects(() => admin.query('update public.vsi_exchanges set public_research_topics=$1::jsonb where id=$2', [JSON.stringify(value), first.request.id]),
+      error => ['23514', '22023'].includes(error.code), name);
+    passed.push(name);
+  }
+  ok('Rejected provenance updates preserve the original terms', (await admin.query('select public_research_topics from public.vsi_exchanges where id=$1', [first.request.id])).rows[0].public_research_topics, ['Public Bicycle Industry']);
   ok('Completed retry replays', (await rpc(server, actors[0], 'reserve', input)).state, 'completed');
   ok('Duplicate completion counted exactly once', (await rpc(server, actors[0], 'usage')).used, 1);
   ok('Ordinary chat creates no note', (await admin.query('select count(*)::int n from public.business_notes where workspace_id=$1', [A])).rows[0].n, 0);
   const actor = await connect(); await identity(actor, 'authenticated');
   ok('Owner reads private transcript', (await actor.query('select count(*)::int n from public.vsi_exchanges where conversation_id=$1', [chat.id])).rows[0].n, 1);
+  await denied('Authenticated owner cannot forge public research provenance', () => actor.query('update public.vsi_exchanges set public_research_topics=$1::jsonb where id=$2', [JSON.stringify(['Forged target']), first.request.id]));
   await denied('Authenticated caller cannot forge completion', () => rpc(actor, actors[0], 'settle', complete));
   await denied('Authenticated caller cannot insert chat', () => actor.query('insert into public.vsi_conversations(workspace_id,actor_user_id,actor_role) values($1,$2,\'owner\')', [A, actors[0]]));
   await identity(actor, 'authenticated', actors[1]);

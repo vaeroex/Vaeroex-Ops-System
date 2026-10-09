@@ -10,10 +10,10 @@ export function Exchange({ exchange, canEditNotes, saving, disabled, workspaceNa
   workspaceName: string;
   onRemember: (exchangeId: string) => void;
 }) {
-  return <article className="space-y-5 border-b border-slate-200 pb-7 last:border-0" aria-label={`Exchange from ${displayDate(exchange.createdAt, true)}`}>
-    <div className="ml-auto max-w-[92%] rounded-2xl rounded-tr-sm bg-slate-100 px-4 py-3 sm:max-w-[85%]">
+  return <article className="space-y-3 border-b border-slate-200 pb-5 last:border-0" aria-label={`Exchange from ${displayDate(exchange.createdAt, true)}`}>
+    <div className="ml-auto max-w-[92%] rounded-2xl rounded-tr-sm bg-slate-100 px-3 py-2 sm:max-w-[85%]">
       <p className="mb-1 text-xs font-semibold text-slate-500">You</p>
-      <p className="whitespace-pre-wrap break-words text-sm leading-7 text-slate-900 [overflow-wrap:anywhere]">{exchange.userMessage}</p>
+      <p className="whitespace-pre-wrap break-words text-sm leading-6 text-slate-900 [overflow-wrap:anywhere]">{exchange.userMessage}</p>
     </div>
     <div>
       <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -21,9 +21,9 @@ export function Exchange({ exchange, canEditNotes, saving, disabled, workspaceNa
         <time dateTime={exchange.createdAt} className="text-xs text-slate-500">{displayDate(exchange.createdAt, true)}</time>
       </div>
       <AnswerContent content={exchange.answer} />
-      {exchange.citations.length > 0 ? <details className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
-        <summary className="min-h-11 cursor-pointer text-xs font-semibold text-slate-700">Sources ({exchange.citations.length})</summary>
-        <ol className="mt-2 grid gap-3 sm:grid-cols-2">
+      {exchange.citations.length > 0 ? <details className="mt-3 rounded-lg border border-slate-200 bg-slate-50">
+        <summary className="min-h-11 cursor-pointer px-3 py-2.5 text-xs font-semibold text-slate-700">Sources ({exchange.citations.length})</summary>
+        <ol className="grid max-h-72 gap-2 overflow-y-auto overscroll-contain px-3 pb-3 sm:grid-cols-2">
           {exchange.citations.map((source) => {
             const href = safeSourceUrl(source.url);
             return <li key={source.id} className="min-w-0 rounded-md border border-slate-200 bg-white p-3 text-xs leading-5">

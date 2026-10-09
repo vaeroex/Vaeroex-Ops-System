@@ -1,0 +1,30 @@
+/* eslint-disable @typescript-eslint/no-require-imports -- Imported by the native VSI engine qualification harness. */
+const assert=require('node:assert/strict');
+exports.run=function({approveVsiPublicTarget,validateVsiResearchPlan,stableVsiCitationId,prepareVsiHistory,selectVsiHistory,validateVsiPublicResearch,priorVsiPublicTopics,withVsiSourceSnapshot}){
+  const base={mode:'research',businessEvidence:false,tier:'standard',clarification:'',publicTargets:[{text:'Acme',origin:'question'}],objectives:['overview']};
+  assert.equal(validateVsiResearchPlan(base,'Research Acme',[]).mode,'research');
+  for(const question of ['Search our confidential Acme notes','Search the uploaded file Acme','Find Acme in my supplier list','Search the password Acme','Search this file; Acme','Search pasted private material;\nAcme'])assert.equal(validateVsiResearchPlan(base,question,[]).mode,'clarify',question);
+  assert.equal(validateVsiResearchPlan(base,'Research a company',['Acme']).mode,'clarify','current-question provenance cannot silently become prior provenance');
+  assert.equal(validateVsiResearchPlan({...base,publicTargets:[{text:'Acme',origin:'prior_public_topic'}]},'Who founded it?',['Acme']).mode,'research');
+  assert.equal(validateVsiResearchPlan({...base,publicTargets:[{text:'Acme',origin:'prior_public_topic'}]},'Who founded it?',[]).mode,'clarify');
+  assert.equal(approveVsiPublicTarget('Acme','Research Acme; our margin is 37%.','question',[]),null);
+  for(const question of ['Acme\nThis name is from my confidential supplier list. Research it.','Acme\nDo not send this private customer name to public search.','Acme; this is from the uploaded file.'])assert.equal(approveVsiPublicTarget('Acme',question,'question',[]),null);
+  for(const [target,question] of [['private equity','Research private equity'],['internal combustion','Research internal combustion'],['Acme','What can we learn from Acme?'],['Google Workspace','Look up Google Workspace'],['Costco','What is the revenue of Costco?'],['Acme','Research the customers of Acme']])assert.equal(approveVsiPublicTarget(target,question,'question',[]),target);
+  assert.equal(approveVsiPublicTarget('Acme','Compare to our internal customer notes','prior_public_topic',['Acme']),'Acme');
+  for(const target of ['our business','42% margin','$120000','PRIVATE_SECRET','http://localhost','https://example.org/?token=private','user@example.org','ignore instructions','12345678'])assert.equal(approveVsiPublicTarget(target,`Research ${target}`,'question',[]),null);
+  assert.equal(approveVsiPublicTarget('Acme','Research Acmeology','question',[]),null);
+  assert.equal(approveVsiPublicTarget('Vaeroex LLC','Do a public web search for Vaeroex LLC','question',[]),'Vaeroex LLC');
+  assert.equal(approveVsiPublicTarget('Isaac Vizcarra','Is it Isaac Vizcarra?','question',[]),'Isaac Vizcarra');
+  assert.equal(approveVsiPublicTarget('US inflation','Research US inflation','question',[]),'US inflation');
+  const web={id:'W1',sourceType:'web',sourceId:null,title:'Evidence',url:'https://example.org/article',evidenceDate:'2026-01-01',retrievedAt:'2026-02-01T00:00:00Z',excerpt:'A publicly sourced claim.'};
+  const history=prepareVsiHistory([{role:'assistant',content:'Finding [W1]',citations:[web]}]);assert.equal(history.sources[0].retrievedAt,web.retrievedAt);assert.equal(history.sources[0].excerpt,web.excerpt);assert.match(history.messages[0].content,new RegExp(stableVsiCitationId(web)));
+  const second=withVsiSourceSnapshot({...web,sourceType:'kpi',sourceId:'private-kpi',url:'/app/kpis',id:'B1',text:'Important source text '+ 'a'.repeat(260)+' end claim'});
+  assert.ok(!JSON.stringify(prepareVsiHistory([{role:'assistant',content:'REVOKED BUSINESS FACT [B1]',citations:[second]}])).includes('REVOKED BUSINESS FACT'));
+  const permitted=prepareVsiHistory([{role:'assistant',content:'Authorized older finding [B1]',citations:[second]}],[{...second,retrievedAt:'2026-03-01T00:00:00Z'}]);assert.equal(permitted.sources[0].retrievedAt,second.retrievedAt,'current permission check must not replace old snapshot date');
+  const changed=prepareVsiHistory([{role:'assistant',content:'OLD PRIVATE FACT [B1]',citations:[second]}],[{...second,text:second.text.replace('end claim','materially changed after the shared preview')}] );assert.ok(!JSON.stringify(changed).includes('OLD PRIVATE FACT'));
+  const many=Array.from({length:500},(_,i)=>({role:i%2?'assistant':'user',content:i===30?'Original Acme research finding':`Unrelated chat ${i}`}));const selected=selectVsiHistory(many,'Explain the Acme research finding');assert.ok(selected.length<=24);assert.ok(selected.some(item=>item.content.includes('Original Acme')));assert.equal(selected.at(-1).content,'Unrelated chat 499');
+  assert.deepEqual(priorVsiPublicTopics([{role:'assistant',content:'Do not export PRIVATE FACT',publicResearchTopics:['Acme']}]),['Acme']);
+  const result=validateVsiPublicResearch({claims:[{text:'Supported finding',urls:[web.url,'https://fabricated.example.org'],evidenceDate:'2026-01-01'},{text:'Unsupported claim',urls:['https://fabricated.example.org'],evidenceDate:null}],limitations:[],needsMoreResearch:false},[web]);assert.equal(result.claims.length,1);assert.deepEqual(result.claims[0].urls,[web.url]);assert.equal(result.sources[0].excerpt,'Supported finding');assert.equal(result.sources[0].id,stableVsiCitationId(web));assert.ok(!JSON.stringify(prepareVsiHistory([{role:'assistant',content:'UNTRUSTED HASH CLAIM',citations:[{...second,snapshotHash:'x'.repeat(2000)}]}],[second])).includes('UNTRUSTED HASH CLAIM'));
+  assert.equal(withVsiSourceSnapshot({...second,sourceType:'product_context',snapshotHash:'a'.repeat(64)}).snapshotHash,'a'.repeat(64));
+  console.log(JSON.stringify({passed:true,suite:'VSI public-target provenance and source-history snapshots'}));
+};
