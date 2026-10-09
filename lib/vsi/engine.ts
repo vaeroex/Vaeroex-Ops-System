@@ -315,7 +315,7 @@ async function runVsiAnswerInternal(input: VsiRunInput, startedAt: number): Prom
     throw new VsiEngineError("This question and its sources are too large for one answer. Please narrow the question.", usage);
   }
   const reply = await call({ input: [{ role: "system", content: VSI_SYSTEM_PROMPT }, { role: "user", content: JSON.stringify(payload) }],
-    reasoning: { effort: plan.tier === "deep" ? "high" : "medium" },
+    reasoning: { effort: plan.tier === "deep" ? "high" : "medium" }, max_output_tokens: Math.min(config.maxOutputTokens, plan.tier === "deep" ? 6000 : 4000),
     text: { format: { type: "json_schema", name: "vsi_answer_v1", strict: true, schema: answerJsonSchema } } });
   try {
     const answer = validateVsiAnswer(JSON.parse(outputText(reply)), [...payload.businessSources, ...payload.productSources, ...payload.historicalSources, ...publicSelection.citations]);
