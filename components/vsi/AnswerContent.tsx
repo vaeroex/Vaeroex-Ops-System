@@ -5,10 +5,21 @@ type AnswerBlock =
   | { kind: "paragraph"; text: string }
   | { kind: "code"; text: string }
   | { kind: "ordered"; items: string[] }
-  | { kind: "unordered"; items: string[] };
+  | { kind: "unordered"; items: string[] }
+  | { kind: "table"; headers: string[]; rows: string[][] };
 const headingPattern = /^ {0,3}#{1,6}(?:[ \t]+(.*))?$/;
 const fencePattern = /^ {0,3}(`{3,}|~{3,})(.*)$/;
 const listPattern = /^ {0,3}([-*+]|\d{1,9}[.)])[ \t]+(.*)$/;
+
+function tableCells(line: string): string[] {
+  return line.trim().replace(/^\|/, "").replace(/(?<!\\)\|$/, "").split(/(?<!\\)\|/).map((cell) => cell.trim().replace(/\\\|/g, "|"));
+}
+
+function isTableStart(lines: string[], index: number): boolean {
+  if (!lines[index]?.includes("|") || !lines[index + 1]?.includes("|")) return false;
+  const headers = tableCells(lines[index]), separators = tableCells(lines[index + 1]);
+  return headers.length > 1 && headers.length === separators.length && separators.every((cell) => /^:?-{3,}:?$/.test(cell));
+}
 
 /** Parse structural lines before blank lines so fenced text stays intact. */
 function answerBlocks(content: string): AnswerBlock[] {
@@ -28,6 +39,15 @@ function answerBlocks(content: string): AnswerBlock[] {
       }
       blocks.push({ kind: "code", text: code.join("\n") }); continue;
     }
+    if (isTableStart(lines, index)) {
+      const headers = tableCells(line), rows: string[][] = []; index += 2;
+      while (index < lines.length && lines[index].trim() && lines[index].includes("|")) {
+        const row = tableCells(lines[index]);
+        if (row.length !== headers.length) break;
+        rows.push(row); index++;
+      }
+      blocks.push({ kind: "table", headers, rows }); continue;
+    }
     const heading = line.match(headingPattern);
     if (heading) {
       blocks.push({ kind: "heading", text: (heading[1] || "").replace(/[ \t]+#+[ \t]*$/, "") }); index++; continue;
@@ -43,7 +63,7 @@ function answerBlocks(content: string): AnswerBlock[] {
       blocks.push({ kind: ordered ? "ordered" : "unordered", items }); continue;
     }
     const paragraph = [line]; index++;
-    while (index < lines.length && lines[index].trim() && !headingPattern.test(lines[index]) && !fencePattern.test(lines[index]) && !listPattern.test(lines[index])) {
+    while (index < lines.length && lines[index].trim() && !headingPattern.test(lines[index]) && !fencePattern.test(lines[index]) && !listPattern.test(lines[index]) && !isTableStart(lines, index)) {
       paragraph.push(lines[index++]);
     }
     blocks.push({ kind: "paragraph", text: paragraph.join("\n") });
@@ -61,9 +81,15 @@ function inline(text: string): ReactNode[] {
 }
 
 export function AnswerContent({ content }: { content: string }) {
-  return <div className="space-y-3 break-words text-sm leading-7 text-slate-800 [overflow-wrap:anywhere]">
+  return <div className="space-y-2 break-words text-sm leading-6 text-slate-800 [overflow-wrap:anywhere]">
     {answerBlocks(content).map((block, index) => {
       if (block.kind === "code") return <pre key={index} className="overflow-x-auto rounded-lg bg-slate-100 p-3 text-xs leading-6"><code>{block.text}</code></pre>;
+      if (block.kind === "table") return <div key={index} role="region" aria-label="Answer table" tabIndex={0} className="overflow-x-auto rounded-lg border border-slate-200 focus-visible:outline-2 focus-visible:outline-vaeroex-blue">
+        <table className="w-full min-w-[360px] border-collapse text-left text-xs leading-5">
+          <thead className="bg-slate-50 text-slate-700"><tr>{block.headers.map((cell, cellIndex) => <th key={cellIndex} scope="col" className="px-3 py-2 font-semibold">{inline(cell)}</th>)}</tr></thead>
+          <tbody>{block.rows.map((row, rowIndex) => <tr key={rowIndex} className="border-t border-slate-200">{row.map((cell, cellIndex) => <td key={cellIndex} className="px-3 py-2 align-top">{inline(cell)}</td>)}</tr>)}</tbody>
+        </table>
+      </div>;
       if (block.kind === "heading") return <h3 key={index} className="font-semibold text-slate-900">{inline(block.text)}</h3>;
       if (block.kind === "unordered") return <ul key={index} className="list-disc space-y-1 pl-5">{block.items.map((item, itemIndex) => <li key={itemIndex}>{inline(item)}</li>)}</ul>;
       if (block.kind === "ordered") return <ol key={index} className="list-decimal space-y-1 pl-5">{block.items.map((item, itemIndex) => <li key={itemIndex}>{inline(item)}</li>)}</ol>;

@@ -28,7 +28,7 @@ if(require.main===module){
   assert(process.env.OPENAI_API_KEY?.trim(),'An externally supplied OPENAI_API_KEY is required. No paid calls made.');
   const config=readConfig(configPath),fixture=JSON.parse(fs.readFileSync(fixturePath));assert.equal(fixture.synthetic,true);
   process.env.VERCEL_ENV='preview';delete process.env.GOOGLE_SHEETS_ENABLED;delete process.env.SQUARE_DIRECT_ENABLED;
-  const allowance=2,maxQuestions=12,reserve=getVsiConfig().requestReserveUsd;assert(cases.length<=maxQuestions);assert(cases.length*reserve<=allowance);
+  const allowance=3,maxQuestions=12,reserve=getVsiConfig().requestReserveUsd;assert(cases.length<=maxQuestions);assert(cases.length*reserve<=allowance);
   const admin=createClient(config.apiUrl,config.serviceKey,{auth:{persistSession:false,autoRefreshToken:false}}),sessions=new Map(),added=[];
   const log={synthetic:true,model:'gpt-6-luna',startedAt:new Date().toISOString(),catalog:VSI_COST_CATALOG,ceilingUsd:allowance,reservedWorstCaseUsd:cases.length*reserve,
    estimatedCostUsd:0,uncertainReservedUsd:0,questions:[],humanReviewRequired:true,imageProcessorE2E:false};

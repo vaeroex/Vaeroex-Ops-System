@@ -72,6 +72,13 @@ export async function vsiRoute(request: Request, action: RouteAction, conversati
     const input = base.extend({ message: z.string().trim().min(1).max(config.maxQuestionChars), requestId: vsiUuid }).strict().parse(raw);
     if (hasProhibitedVsiIdentifiers(input.message)) throw new VsiHttpError(422, "prohibited_identifiers", VSI_PROHIBITED_INPUT_MESSAGE);
     const chat = await loadVsiConversation(access, conversationId);
+    // A continued chat may reuse a small, permission-checked context window
+    // from its original transcript. No names are inferred from a prose summary.
+    let inheritedExchanges: typeof chat.exchanges = [];
+    if (chat.row.parent_conversation_id && chat.exchanges.length < 4) {
+      try { inheritedExchanges = (await loadVsiConversation(access, chat.row.parent_conversation_id)).exchanges.slice(-4); }
+      catch (error) { if (!(error instanceof VsiHttpError && error.status === 404)) throw error; }
+    }
     const claim = await mutateVsi<{ state: "reserved" | "completed"; request: { id: string; attempt: number } }>(access, "reserve", {
       conversationId, requestId: input.requestId, questionHash: questionHash(input.message), reserveUsd: config.requestReserveUsd, monthlyBudgetUsd: config.workspaceMonthlyBudgetUsd
     });
@@ -84,20 +91,21 @@ export async function vsiRoute(request: Request, action: RouteAction, conversati
     let generated;
     try {
       generated = await runVsiAnswer({ supabase: access.supabase, workspaceId, actorUserId: access.userId, question: input.message,
-        recentMessages: chat.exchanges.slice(-12).flatMap((item) => [
-          { role: "user" as const, content: item.userMessage.slice(0, 1600) },
-          { role: "assistant" as const, content: item.answer.slice(0, 2400) }
+        recentMessages: [...inheritedExchanges, ...chat.exchanges].flatMap((item) => [
+          { role: "user" as const, content: item.userMessage },
+          { role: "assistant" as const, content: item.answer, citations: item.citations, publicResearchTopics: item.publicResearchTopics }
         ]), contextSummary: chat.row.context_summary, requestId: input.requestId });
     } catch (error) {
       const engineError = error instanceof VsiEngineError ? error : null;
-      const usage = { ...engineError?.usage, estimatedCostUsd: !engineError || engineError.accountingUncertain ? config.requestReserveUsd : engineError.usage.estimatedCostUsd,
-        failed: true, costEstimated: !engineError || engineError.accountingUncertain };
+      const uncertainCost = !engineError || engineError.accountingUncertain || engineError.usage.costEstimated === true;
+      const usage = { ...engineError?.usage, estimatedCostUsd: uncertainCost ? Math.max(config.requestReserveUsd, engineError?.usage.estimatedCostUsd || 0) : engineError.usage.estimatedCostUsd,
+        failed: true, costEstimated: uncertainCost };
       await mutateVsi(access, "settle", { conversationId, id: claim.request.id, attempt: claim.request.attempt, usage });
       if (engineError) throw new VsiHttpError(503, "answer_unavailable", engineError.message);
       throw new VsiHttpError(503, "answer_unavailable", "Vaeroex could not complete this answer. Please retry; this question was not counted.");
     }
     await mutateVsi(access, "settle", { conversationId, id: claim.request.id, attempt: claim.request.attempt, question: input.message, answer: generated.content,
-      citations: generated.citations, rememberProposal: generated.noteDraft || null, usage: generated.usage,
+      citations: generated.citations, publicResearchTopics: generated.publicResearchTopics || [], rememberProposal: generated.noteDraft || null, usage: generated.usage,
       summary: updateVsiSummary(chat.row.context_summary, input.message, generated.content) });
     const saved = await loadVsiConversation(access, conversationId);
     return json({ ...common, conversation: saved.conversation, exchange: saved.exchanges.find((item) => item.id === claim.request.id) });

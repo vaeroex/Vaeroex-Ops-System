@@ -30,7 +30,7 @@ test("private configuration must be a caller-owned regular 0600 file", () => {
 test("bounded cases always begin with real UI general/current/business questions and remap catering to workspace B", () => {
   assert.deepEqual(selectCases(false).map(item => item.id), ["general-writing", "current-weather", "repair-kpi"]);
   const full = selectCases(true); assert.equal(full.length, 12); assert.equal(new Set(full.map(item => item.id)).size, 12);
-  assert(full.length * 0.10 <= 2); assert.equal(actorForCase(config(), full.find(item => item.id === "catering-business")).workspaceId, config().allowedWorkspaceIds[1]);
+  assert(full.length * 0.25 <= 3); assert.equal(actorForCase(config(), full.find(item => item.id === "catering-business")).workspaceId, config().allowedWorkspaceIds[1]);
 });
 
 test("sanitized evidence cannot expose configured credentials or token-bearing query strings", () => {

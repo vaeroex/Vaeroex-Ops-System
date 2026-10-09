@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createHash } from "crypto";
+import { updateVsiPrivateSummary } from "./summary";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { getSubscriptionStatus } from "@/lib/billing/get-subscription-status";
@@ -25,7 +26,7 @@ export type ConversationRow = {
 };
 export type ExchangeRow = {
   id: string; workspace_id: string; actor_user_id: string; conversation_id: string;
-  user_message: string; answer: string; citations: Json; remember_proposal: Json | null; saved_note_id: string | null; created_at: string;
+  user_message: string; answer: string; citations: Json; public_research_topics?: Json; remember_proposal: Json | null; saved_note_id: string | null; created_at: string;
 };
 type Table<Row> = { Row: Row; Insert: Partial<Row>; Update: Partial<Row>; Relationships: [] };
 type VsiDatabase = Database & { public: Database["public"] & {
@@ -61,6 +62,7 @@ export function conversationView(row: ConversationRow) {
 }
 export function exchangeView(row: ExchangeRow) {
   return { id: row.id, userMessage: row.user_message, answer: row.answer, citations: row.citations as unknown as VsiCitation[],
+    publicResearchTopics: Array.isArray(row.public_research_topics) ? row.public_research_topics.filter((term): term is string => typeof term === "string" && term.length <= 160).slice(0, 12) : [],
     createdAt: row.created_at, rememberProposal: row.remember_proposal as { title: string; content: string } | null, savedNoteId: row.saved_note_id };
 }
 export async function listVsiConversations(access: VsiAccess, before?: string | null) {
@@ -94,7 +96,7 @@ const ERROR_MESSAGES: Record<string, [number, string]> = {
   workspace_busy: [429, "This workspace is preparing several answers. Please try again shortly; this question has not been counted."],
   daily_limit: [429, "You have reached 100 answered questions in the past 24 hours. Earlier questions will leave that window gradually."],
   burst_limit: [429, "Please wait a minute before sending another question."],
-  workspace_budget: [429, "This workspace has reached its monthly Vaeroex Super Intelligence spending safeguard. Ask a workspace owner to review the allowance."],
+  workspace_budget: [429, "This workspace does not have enough monthly Vaeroex Super Intelligence budget left to safely start this answer. Research reserves its maximum cost, then charges only recorded usage. Ask a workspace owner to review the allowance."],
   thread_full: [409, "This chat has reached 250 exchanges. Continue in a new chat to keep talking."],
   thread_not_full: [409, "This chat can still accept questions. Start a separate new chat if you prefer."],
   idempotency_conflict: [409, "This retry does not match the original question. Start a new submission."],
@@ -122,13 +124,11 @@ export async function mutateVsi<T>(access: VsiAccess, action: string, input: Rec
 
 export function questionHash(question: string) { return createHash("sha256").update(question).digest("hex"); }
 
-/** Lossy conversation aid, explicitly user statements and assistant drafts.
- * Kept private, capped independently of the 250-exchange transcript boundary. */
+/** Only user-authored conversation context is compacted. Historical answers require
+ * their source permissions to be rechecked by the research/history layer. */
 export function updateVsiSummary(previous: string, question: string, answer: string) {
-  const entry = `User: ${question.slice(0, 700)}\nVaeroex draft: ${answer.slice(0, 500)}`;
-  const joined = previous ? `${previous}\n\n${entry}` : entry;
-  if (joined.length <= 7000) return joined;
-  return `${joined.slice(0, 1800)}\n[Middle exchanges omitted; consult original transcript.]\n${joined.slice(-5000)}`;
+  void answer;
+  return updateVsiPrivateSummary(previous, question);
 }
 
 export async function confirmVsiNote(access: VsiAccess, conversationId: string, exchangeId: string) {

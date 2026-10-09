@@ -41,6 +41,7 @@ const capacityMigrations = [
   '20261005202215_sheets_dispatch_round_robin.sql',
 ];
 const vsiMigration = '20261008190000_vsi_private_chat.sql';
+const vsiResearchMigration = '20261009041421_vsi_adaptive_research.sql';
 const candidates = [
   '20260930001000_qbo_customer_oauth_completion.sql',
   '20260930002000_qbo_production_ongoing_sync.sql',
@@ -378,7 +379,7 @@ async function main() {
   const canonical = fs.readdirSync(path.join(root, 'supabase/migrations'))
     .filter(name => /^\d+_.+\.sql$/.test(name)).sort().map(name => snapshot(`supabase/migrations/${name}`));
   const prefix = canonical.filter(item => item.version <= '20260902191325');
-  assert.equal(canonical.length, 137, 'review the canonical migration manifest if it changes');
+  assert.equal(canonical.length, 138, 'review the canonical migration manifest if it changes');
   assert.deepEqual(canonical.filter(item => item.version > '20260915040500').map(item => path.basename(item.file)), [
     '20261002040024_google_sheets_complete.sql',
     '20261002040031_google_sheets_lifecycle.sql',
@@ -386,6 +387,7 @@ async function main() {
     ...auditMigrations,
     ...capacityMigrations,
     vsiMigration,
+    vsiResearchMigration,
   ], 'the canonical extension contains the reviewed Sheets, dashboard, audit, capacity and independently qualified VSI migrations');
   assert.equal(prefix.length, 104, 'exact reviewed Production prefix');
   const square = productionSquare.map(name => snapshot(`supabase/production-migrations/${name}`));
@@ -395,11 +397,12 @@ async function main() {
   const audit = auditMigrations.map(name => snapshot(`supabase/production-migrations/${name}`));
   const capacity = capacityMigrations.map(name => snapshot(`supabase/migrations/${name}`));
   const vsi = snapshot(`supabase/migrations/${vsiMigration}`);
+  const vsiResearch = snapshot(`supabase/migrations/${vsiResearchMigration}`);
   for (const item of [...sheets, ...audit]) {
     assert.equal(item.sha256, canonical.find(saved => path.basename(saved.file) === path.basename(item.file))?.sha256,
       'shared canonical and Production migration SQL must match exactly');
   }
-  const canonicalBaseline = canonical.filter(item => ![...auditMigrations, ...capacityMigrations, vsiMigration].includes(path.basename(item.file)));
+  const canonicalBaseline = canonical.filter(item => ![...auditMigrations, ...capacityMigrations, vsiMigration, vsiResearchMigration].includes(path.basename(item.file)));
   assert.equal(canonicalBaseline.length, 123, 'audit, capacity and VSI tails must be applied exactly once after provider setup');
   assert.equal(dashboard[0].sha256, canonical.find(item => path.basename(item.file) === dashboardMigrations.preferences)?.sha256,
     'canonical and Production preference SQL must match exactly');
@@ -423,6 +426,7 @@ async function main() {
     sharedAuditTailHashes: audit.map(({ file, sha256 }) => ({ file, sha256 })),
     capacityTailHashes: capacity.map(({ file, sha256 }) => ({ file, sha256 })),
     vsiTailHash: { file: vsi.file, sha256: vsi.sha256 },
+    vsiResearchTailHash: { file: vsiResearch.file, sha256: vsiResearch.sha256 },
     dashboardCandidateHashes: dashboard.map(({ file, sha256 }) => ({ file, sha256 })),
     squareDashboardFixture: { file: squareFixture.file, sha256: squareFixture.sha256 },
     sharedFixture: fixture && { file: fixture.file, sha256: fixture.sha256 }, runs: [] };
@@ -483,6 +487,7 @@ async function main() {
         for (const item of audit) await apply(item);
         for (const item of capacity) await apply(item);
         await apply(vsi);
+        await apply(vsiResearch);
         result.finalLedger = [...ledger].sort();
         console.log(`${shape.name}: ${ledger.length} migrations applied including the shared audit, capacity and VSI tails; exact ledger and QBO-only Square catalog guard verified.`);
         // pgTAP's test metadata ACLs are not part of the pristine migration catalog.
