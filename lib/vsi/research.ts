@@ -64,6 +64,13 @@ export function validateVsiResearchPlan(value: unknown, question: string, approv
     return { mode: "clarify", businessEvidence: false, tier: "simple", publicTargets: [], objectives: [],
       clarification: "Which public business name, website or topic should I research? Please provide it separately from private business details so I can keep those details out of web searches." };
   }
+  const topics = [...new Set(publicTargets.map(target => target.text!))];
+  // PostgreSQL jsonb::text also inserts separator spaces. Leave headroom within its
+  // 2,500-byte private-column constraint; do not finish paid research that cannot persist.
+  if (Buffer.byteLength(JSON.stringify(topics), "utf8") + Math.max(0, topics.length - 1) > 2450) {
+    return { mode: "clarify", businessEvidence: false, tier: "simple", publicTargets: [], objectives: [],
+      clarification: "Please narrow this research request to fewer public names or shorter topic phrases. I can then keep the research and its sources together in this chat." };
+  }
   return { ...plan, publicTargets: publicTargets as VsiResearchPlan["publicTargets"], clarification: "" };
 }
 
@@ -100,12 +107,17 @@ export function prepareVsiHistory(messages: VsiMessage[], currentlyPermitted: Vs
   let remaining = 16_000;
   const citations = new Map<string, VsiCitation>();
   const history = messages.slice(-24).reverse().flatMap(message => {
+    if (remaining <= 0) return [];
     let content = message.content.slice(0, Math.min(8000, remaining));
     const included: VsiCitation[] = [];
     const unavailablePrivateSource = (message.citations || []).some(raw => raw.sourceType !== "web" && !currentlyPermitted.some(current =>
       current.sourceType === raw.sourceType && current.sourceId === raw.sourceId && current.url === raw.url
       && current.evidenceDate === raw.evidenceDate && samePrivateSnapshot(raw, current)));
-    if (message.role === "assistant" && unavailablePrivateSource) return [{ role: message.role, content: "[Earlier answer omitted: its business/product source must be checked again before its claims can be reused.]" }];
+    if (message.role === "assistant" && unavailablePrivateSource) {
+      const omitted = "[Earlier answer omitted: its business/product source must be checked again before its claims can be reused.]".slice(0, remaining);
+      remaining -= omitted.length;
+      return [{ role: message.role, content: omitted }];
+    }
     for (const raw of (message.citations || []).slice(0, 8)) {
       const source = raw.sourceType === "web" && publicVsiUrl(raw.url) ? raw : currentlyPermitted.some(current => current.sourceType === raw.sourceType && current.sourceId === raw.sourceId && current.url === raw.url
         && current.evidenceDate === raw.evidenceDate && samePrivateSnapshot(raw, current)) ? raw : undefined;
@@ -114,6 +126,8 @@ export function prepareVsiHistory(messages: VsiMessage[], currentlyPermitted: Vs
       content = content.replaceAll(`[${raw.id}]`, `[${normalized.id}]`);
       citations.set(normalized.id, normalized); included.push(normalized);
     }
+    // Expanded stable citation IDs and unavailable-reference labels also consume context.
+    content = content.slice(0, remaining);
     remaining -= content.length;
     return content ? [{ role: message.role, content, ...(included.length ? { citations: included } : {}) }] : [];
   }).reverse();

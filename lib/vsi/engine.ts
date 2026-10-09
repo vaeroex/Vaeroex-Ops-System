@@ -1,7 +1,7 @@
 import "server-only";
 import { z } from "zod";
 import { hasProhibitedVsiIdentifiers, VSI_PROHIBITED_INPUT_MESSAGE } from "./sensitive-input";
-import { consumeAIProviderResponse, getAIProviderRetrySettings } from "@/lib/ai/provider-resilience";
+import { consumeAIProviderResponse, getAIProviderRetrySettings, getAIProviderCircuitSnapshot } from "@/lib/ai/provider-resilience";
 import { authorizeVsiRead, retrieveVsiEvidence } from "./retrieval";
 import { getVsiConfig, VSI_MODEL, vsiEstimatedCost, vsiResearchLimits } from "./config";
 import { readVsiPrivateSummary } from "./summary";
@@ -160,6 +160,9 @@ export async function runVsiAnswer(input: VsiRunInput): Promise<VsiAnswer> {
     if ((usage.providerCalls || 0) >= config.maxProviderCalls || Buffer.byteLength(JSON.stringify(body.input), "utf8") > config.maxProviderInputBytes) {
       throw new VsiEngineError("This question exceeded its research context safeguard. Please narrow it and retry.", usage);
     }
+    // The shared provider guard rejects an open circuit synchronously, before fetch.
+    // That is known-zero work, not an uncertain paid transport failure.
+    if (getAIProviderCircuitSnapshot("openai").open) throw new VsiEngineError("Luna is temporarily unavailable after repeated failed requests. Please retry shortly. Your question has not been counted.", usage);
     usage.providerCalls = (usage.providerCalls || 0) + 1;
     try {
       const { response, value } = await consumeAIProviderResponse("openai", "https://api.openai.com/v1/responses", {

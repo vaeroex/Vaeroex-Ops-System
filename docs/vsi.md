@@ -28,7 +28,7 @@ At 225 exchanges the UI warns gently. At 250 it makes the original transcript re
 | Environment configuration | `VAEROEX_VSI_WORKSPACE_MONTHLY_BUDGET_USD` |
 | Question length | 8,000 characters |
 | Combined model input | 48,000 characters (`VAEROEX_VSI_MAX_INPUT_CHARS`, 32,000–48,000) |
-| Final output per provider call | 4,000 tokens (`VAEROEX_VSI_MAX_OUTPUT_TOKENS`, 2,000–6,000) |
+| Final synthesis output | 4,000 tokens (`VAEROEX_VSI_MAX_OUTPUT_TOKENS`, 2,000–6,000); planning is capped at 1,600 tokens, and each research round at 2,500 tokens for simple questions or 4,000 for standard/deep questions |
 | Total search/open/find actions per question | Simple 2, standard 6, deep 12; configurable overall maximum `VAEROEX_VSI_MAX_WEB_SEARCH_CALLS` (2–12) |
 | Public research rounds / total Luna calls | Up to 3 / 5, including private planning and synthesis |
 | Research context and effort | Simple low search context; standard medium; deep high. Luna reasoning varies by stage and task |

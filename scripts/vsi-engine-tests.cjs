@@ -27,7 +27,7 @@ mock('lib/vsi/product-context.ts',{loadVsiProductContext:async()=>{if(!productAv
 const {runVsiAnswer,explicitVsiNoteDraft,boundedVsiHistory,validateVsiAnswer,readVsiWebSources,vsiLiveLookupDiagnostic,VsiEngineError,VSI_SYSTEM_PROMPT} = require('../lib/vsi/engine.ts');
 const research = require('../lib/vsi/research.ts');
 const {vsiEstimatedCost,getVsiConfig,vsiResearchLimits} = require('../lib/vsi/config.ts');
-const {resetAIProviderCircuitForTests} = require('../lib/ai/provider-resilience.ts');
+const {resetAIProviderCircuitForTests,recordAIProviderFailure,getAIProviderRetrySettings} = require('../lib/ai/provider-resilience.ts');
 const calls=[];
 let mode='normal', customPlan=null, currentRound=0;
 const usage={input_tokens:1000,output_tokens:100,input_tokens_details:{cached_tokens:200},output_tokens_details:{reasoning_tokens:30}};
@@ -72,6 +72,8 @@ const input=(question,extras={})=>({supabase:{},workspaceId:'synthetic-a',actorU
 const answerPayload=()=>JSON.parse(calls.at(-1).input[1].content);
 async function main(){
   process.env.OPENAI_API_KEY='synthetic-test-key';
+  const circuitSettings={...getAIProviderRetrySettings('openai'),circuitFailureThreshold:2};recordAIProviderFailure('openai',circuitSettings);recordAIProviderFailure('openai',circuitSettings);
+  await assert.rejects(runVsiAnswer(input('Explain gravity')),error=>error instanceof VsiEngineError&&!error.accountingUncertain&&error.usage.estimatedCostUsd===0&&(error.usage.providerCalls||0)===0);assert.equal(calls.length,0,'an open circuit must not dispatch or charge the uncertainty reserve');resetAIProviderCircuitForTests();
   assert.equal(explicitVsiNoteDraft('remember this'),undefined);assert.equal(explicitVsiNoteDraft('Remember this:'),undefined);assert.equal(explicitVsiNoteDraft('Do not remember this: private detail'),undefined);
   assert.deepEqual(explicitVsiNoteDraft('Please remember this: We sell bicycle repairs.'),{title:'We sell bicycle repairs',content:'We sell bicycle repairs.'});assert.equal(explicitVsiNoteDraft('remember this: '+'x'.repeat(1801)),undefined);
   const bounded=boundedVsiHistory(Array.from({length:500},(_,i)=>({role:i%2?'assistant':'user',content:`message ${i} `+'x'.repeat(2000)})));
@@ -118,6 +120,7 @@ async function main(){
   const privatePlan=await runVsiAnswer(input('Search our internal notes about Secret Supplier.'));assert.match(privatePlan.content,/separately from private/);assert.equal(calls.filter(call=>call.tools).length,beforeUnsafe);
   customPlan=researchPlan('Lumen Packaging');const mixedPrivate=await runVsiAnswer(input('Research Lumen Packaging; our revenue is $123456.',{contextSummary:'PRIVATE INTERNAL SECRET'}));assert.match(mixedPrivate.content,/separately from private/);customPlan=plan('research',{publicTargets:[{text:'Lumen Packaging',origin:'prior_public_topic'}],objectives:['overview']});await runVsiAnswer(input('Compare with our revenue of $123456',{priorPublicResearchTopics:['Lumen Packaging']}));assert.ok(!JSON.stringify(calls.filter(call=>call.tools).at(-1)).includes('123456'));
 
+  const cjkTopics=Array.from({length:6},(_,i)=>'企'.repeat(159)+String.fromCodePoint(0x4e00+i));customPlan=plan('research',{publicTargets:cjkTopics.map(text=>({text,origin:'question'})),objectives:['overview']});const beforeCjk=calls.filter(call=>call.tools).length;const cjk=await runVsiAnswer(input('Research '+cjkTopics.join('; ')));assert.match(cjk.content,/fewer public names/);assert.equal(calls.filter(call=>call.tools).length,beforeCjk,'oversized persisted topics must clarify before public dispatch');assert.equal(cjk.publicResearchTopics,undefined);
   mode='stale_weather';customPlan=researchPlan('Seattle','simple',['weather']);const weather=await runVsiAnswer(input('Weather in Seattle today?'));
   assert.equal(weather.usage.webSearchCalls,2,'stale observation triggers a second lookup');assert.equal(answerPayload().researchStatus.rounds,2);
   const weatherCalls=calls.filter(call=>call.tools).slice(-2);assert.ok(weatherCalls.every(call=>call.max_tool_calls===1));

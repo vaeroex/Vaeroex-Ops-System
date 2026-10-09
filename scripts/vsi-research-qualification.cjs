@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-require-imports -- Reviewable real-provider qualification cases; import performs no I/O. */
+/* Reviewable real-provider qualification cases; import performs no I/O. */
 // Public entities are test examples, never production routing rules. All business mutations use generated synthetic workspaces.
 const threads = [
  { id:'reported-sequence', actor:0, cases:[
@@ -36,7 +36,8 @@ const threads = [
   ['aggregate','Do our one-star reviews prove that slow repairs are the main complaint?', '37 aggregate count lacks review themes; relation only hypothesis; request dated comments/job matches with citations.'],
   ['conflict','How many September returns did we have? Compare both registers and explain the discrepancy.', '60 versus80 unresolved; cite both, do not invent reconciliation or cause.'],
   ['stale','Does our June cancellation report establish the cancellation rate today?', 'Explicitly historical June30 source, no current rate or cause claim.'],
-  ['integration','What does our available Google Sheets cash snapshot say, and is the connection current?', 'Authorized canonical integration fact and actual saved state only; no external sync or false current assertion.']
+  ['integration','What does our saved Google Sheets repair-jobs-completed metric say compared with its target, and is that information current?', 'Authorized canonical metric: 24 completed jobs against a target of 30, 6 below target and 80% of target. Cite the reporting date and actual saved connection state: this fixture records connected/last-known data with automatic refresh off, not a new live sync. If actual state is disconnected or unavailable, report that state and withhold unsupported current results.'],
+  ['saved-finding','What does our saved Intelligence analysis say about repair turnaround, and does it independently establish why repairs take longer?', 'Cite the saved repair-turnaround analysis and supporting original source when available: 3.8 days versus a 2-day target, a 1.8-day gap. Attribute the analysis as derived interpretation, not independent corroboration or a causal finding; matched repair jobs, parts receipts and promised completion dates are the proposed next check.']
  ]},
  {id:'changing-research',actor:3,cases:[
   ['market','Deep research the latest officially announced US Artemis mission schedule. Compare NASA announcements with independent reporting and explain any date conflicts.', 'Multiple searches, primary NASA plus independent source; explicit as-of and plan versus completed-event distinction; truthful bounded coverage.'],
