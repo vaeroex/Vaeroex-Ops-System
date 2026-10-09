@@ -19,7 +19,9 @@ import type { VsiEvidence } from "./types";
 /** Workspace labels, approved notes and integration labels are private context.
  * None of the current schemas grants permission to disclose them in a public query. */
 export type VsiPublicResearchProfile = null;
-export const VSI_PRODUCT_CONTEXT_MAX_CHARS = 6_000;
+// The maintained catalog and four bounded connection summaries fit inside this
+// private sub-budget; the engine still enforces its combined 48,000-character cap.
+export const VSI_PRODUCT_CONTEXT_MAX_CHARS = 8_000;
 
 const boundedText = (value: unknown, maximum: number) =>
   typeof value === "string" && value.trim() ? value.trim().slice(0, maximum) : null;
@@ -27,6 +29,7 @@ const featureIds = ["executive-dashboard", "business-health-score", "kpis", "fil
 
 type ConnectionContext = {
   state: "ready" | "unavailable";
+  omittedCount: number | null;
   entries: Array<{ provider: string; name: string; state: string; freshness: string; lastSuccessfulRefreshAt: string | null }>;
   interpretation: string;
 };
@@ -34,7 +37,7 @@ type ConnectionContext = {
 /** Read saved, permission-filtered status through the same producer as Overview.
  * No OAuth action, external refresh, provider request or financial result is returned. */
 async function connectionContext(access: WorkspaceAccess, observedAt: string): Promise<ConnectionContext> {
-  const unknown: ConnectionContext = { state: "unavailable", entries: [],
+  const unknown: ConnectionContext = { state: "unavailable", omittedCount: null, entries: [],
     interpretation: "Connection status could not be verified. Do not infer that nothing is connected." };
   try {
     const loaded = await loadIntegrationDashboard({ access, eligibleKpis: [] });
@@ -42,13 +45,15 @@ async function connectionContext(access: WorkspaceAccess, observedAt: string): P
     if (loaded.loadFailed || !parsed.success || parsed.data.workspaceId !== access.workspaceId) return unknown;
     const permitted = parsed.data.entries.filter(entry => !entry.hidden
       && (access.membership.role === "owner" || entry.provider === "Google Sheets"));
-    return { state: "ready", entries: permitted.slice(0, 4).map(entry => ({
+    return { state: "ready", omittedCount: Math.max(0, permitted.length - 4), entries: permitted.slice(0, 4).map(entry => ({
       provider: entry.provider, name: boundedText(entry.name, 80) || entry.provider,
       state: entry.connectionState, freshness: integrationDashboardStatus(entry, observedAt).label,
       lastSuccessfulRefreshAt: entry.lastSuccessfulRefreshAt
-    })), interpretation: parsed.data.unavailable.length
-      ? "Some saved connections are unavailable; only permitted records are listed. Check Integrations."
-      : "Saved states, not a fresh sync. Missing entries do not prove no connection; access or hidden records may apply." };
+    })), interpretation: [
+      "Saved states, not a fresh sync. Missing entries do not prove no connection; access or hidden records may apply.",
+      ...(permitted.length > 4 ? ["Additional permitted connections are omitted from this bounded summary; check Integrations for the full list."] : []),
+      ...(parsed.data.unavailable.length ? ["Some saved connections are unavailable; check Integrations."] : [])
+    ].join(" ") };
   } catch { return unknown; }
 }
 
@@ -119,9 +124,8 @@ export async function loadVsiProductContext(access: WorkspaceAccess) {
     ];
     sources.forEach((item, index) => { item.snapshotHash = createHash("sha256").update(JSON.stringify(facts[index])).digest("hex"); });
   };
-  refreshSourceSnapshots();
-  // Retain identity, permission and uncertainty facts when a workspace has many connections.
-  while (JSON.stringify(result).length > VSI_PRODUCT_CONTEXT_MAX_CHARS && authoritative.connections.entries.length) authoritative.connections.entries.pop();
+  // Never drop verified connection facts to make static catalog text fit. Future
+  // catalog growth must fail explicitly instead of turning connected into empty.
   refreshSourceSnapshots();
   if (JSON.stringify(result).length > VSI_PRODUCT_CONTEXT_MAX_CHARS) throw new Error("Vaeroex product context exceeded its safe size. Please retry after the catalog is updated.");
   return result;

@@ -38,19 +38,19 @@ async function main(){
  check(result.authoritative.workspace.website===null&&result.authoritative.workspace.city===null,'unsupported fields unknown');
  check(!JSON.stringify(result).includes('private-stripe')&&!JSON.stringify(result).includes('private-contact')&&!JSON.stringify(result).includes('private-subscription')&&!JSON.stringify(result).includes('private-size'),'private billing and contacts omitted');
  check(JSON.stringify(result).length<=VSI_PRODUCT_CONTEXT_MAX_CHARS,'bounded complete context');
- check(result.authoritative.connections.entries.length===0&&result.authoritative.connections.interpretation.includes('not prove no connection'),'empty saved state is not global absence');
+ check(result.authoritative.connections.entries.length===0&&result.authoritative.connections.omittedCount===0&&result.authoritative.connections.interpretation.includes('not prove no connection'),'empty saved state is not global absence');
  for(const source of queried)check(source.table==='workspaces'||source.table==='customer_subscriptions','no notes/intakes/files queried for public identifiers');
 
  const staleAccess=access();context={...context,membership:{...context.membership,role:'viewer'}};
  dashboard.dashboard.entries=[entry('QuickBooks','PRIVATE_OWNER_QBO'),entry('Square','PRIVATE_OWNER_SQUARE'),entry('Google Sheets','Visible Sheets'),entry('Google Sheets','HIDDEN_SHEETS',{hidden:true})];
  result=await loadVsiProductContext(staleAccess);
  check(result.authoritative.permissions.role==='viewer'&&!result.authoritative.permissions.canEditBusinessNotes&&!result.authoritative.permissions.canManageIntegrations,'current role overrides stale caller role');
- check(result.authoritative.connections.entries.length===1&&result.authoritative.connections.entries[0].provider==='Google Sheets','owner-only and hidden integration records excluded');
+ check(result.authoritative.connections.entries.length===1&&result.authoritative.connections.entries[0].provider==='Google Sheets'&&result.authoritative.connections.omittedCount===0,'owner-only and hidden integration records excluded without disclosing counts');
  check(result.authoritative.connections.entries[0].freshness==='Stale','expired currentUntil is not current');
  check(!JSON.stringify(result).includes('PRIVATE_OWNER')&&!JSON.stringify(result).includes('PRIVATE financial')&&!JSON.stringify(result).includes('987654321'),'connection context contains no provider results');
  for(const role of ['admin','manager','staff']){context.membership.role=role;result=await loadVsiProductContext(staleAccess);check(result.authoritative.permissions.canEditBusinessNotes&&!result.authoritative.permissions.canManageIntegrations,`${role} note/integration permissions`);}
 
- reset();dashboard.loadFailed=true;result=await loadVsiProductContext(access());check(result.authoritative.connections.state==='unavailable'&&result.authoritative.connections.entries.length===0,'dashboard failure fail closed');
+ reset();dashboard.loadFailed=true;result=await loadVsiProductContext(access());check(result.authoritative.connections.state==='unavailable'&&result.authoritative.connections.entries.length===0&&result.authoritative.connections.omittedCount===null,'dashboard failure fail closed without inventing a count');
  reset();dashboard.dashboard.workspaceId='33333333-3333-4333-8333-333333333333';result=await loadVsiProductContext(access());check(result.authoritative.connections.state==='unavailable','cross-workspace dashboard rejected');
  reset();dashboard=new Error('PRIVATE_PROVIDER_ERROR');result=await loadVsiProductContext(access());check(result.authoritative.connections.state==='unavailable'&&!JSON.stringify(result).includes('PRIVATE_PROVIDER_ERROR'),'thrown diagnostic not disclosed');
  reset();dashboard.dashboard.entries=[entry('Google Sheets','Future state',{connectionState:'unexpected'})];result=await loadVsiProductContext(access());check(result.authoritative.connections.state==='unavailable','unknown state fail closed');
@@ -89,8 +89,20 @@ async function main(){
  try{result=await loadVsiProductContext(access());check(hash(result,'P2')!==hash(beforePlan,'P2'),'published feature change invalidates old plan snapshot');}
  finally{VAEROEX_PLAN_FEATURES.pop();}
  subscription.status='trialing';result=await loadVsiProductContext(access());check(hash(result,'P3')!==hash(beforePlan,'P3'),'entitlement status change invalidates old subscription source');
+ // Use the real maintained catalog and max-length private labels, not a small stub.
+ reset();workspace.name='x'.repeat(1000);workspace.industry='y'.repeat(1000);dashboard.dashboard.entries=[entry('Google Sheets','Connected operations sheet')];result=await loadVsiProductContext(access());
+ check(JSON.stringify(result).length<=VSI_PRODUCT_CONTEXT_MAX_CHARS,'real catalog and maximum labels fit the product context budget');
+ check(result.authoritative.connections.entries.length===1&&result.authoritative.connections.entries[0].state==='connected'&&result.authoritative.connections.entries[0].provider==='Google Sheets','long workspace labels cannot silently remove the only connected Sheets source');
+ check(result.authoritative.connections.omittedCount===0,'single permitted source is completely represented');
+ const singleConnectionContextChars=JSON.stringify(result).length;
  reset();workspace.name='x'.repeat(1000);workspace.industry='y'.repeat(1000);dashboard.dashboard.entries=Array.from({length:8},(_,i)=>entry('Google Sheets',String(i)+'z'.repeat(500)));result=await loadVsiProductContext(access());check(JSON.stringify(result).length<=VSI_PRODUCT_CONTEXT_MAX_CHARS,'long labels/connections remain bounded');
+ check(result.authoritative.connections.entries.length===4&&result.authoritative.connections.entries.every(source=>source.provider==='Google Sheets'&&source.state==='connected'),'four permitted connection states survive the real maintained catalog');
+ check(result.authoritative.connections.omittedCount===4&&result.authoritative.connections.interpretation.includes('omitted'),'additional permitted connections are explicitly counted and explained');
  check(hash(result,'P4')===createHash('sha256').update(JSON.stringify({workspace:result.authoritative.workspace,permissions:result.authoritative.permissions,connections:result.authoritative.connections})).digest('hex'),'snapshot reflects final bounded connection facts');
- console.log(JSON.stringify({passed:true,suite:'VSI maintained product context, identity separation, authoritative subscription, permissions, connection failure and public disclosure boundary',assertions,paidProviderCalls:0}));
+ const fourConnectionContextChars=JSON.stringify(result).length;
+ VAEROEX_PLAN_FEATURES.push('Synthetic catalog expansion '.repeat(500));
+ try{await rejected(loadVsiProductContext(access()),/product context exceeded its safe size/);}
+ finally{VAEROEX_PLAN_FEATURES.pop();}
+ console.log(JSON.stringify({passed:true,suite:'VSI maintained product context, identity separation, authoritative subscription, permissions, connection failure and public disclosure boundary',assertions,singleConnectionContextChars,fourConnectionContextChars,paidProviderCalls:0}));
 }
 main().catch(error=>{console.error(error);process.exitCode=1});
