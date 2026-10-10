@@ -27,6 +27,12 @@ async function send(page,message){await page.getByLabel('Message Vaeroex',{exact
  const weather=await send(page,'Portland, Oregon');assert(weather.data.exchange.citations.some(x=>x.sourceType==='web'&&x.retrievedAt));record('selective_live_tool_transport_and_timestamp');
  const afterOrdinary=(await db.query('select count(*)::int n from public.business_notes where workspace_id=$1',[owner.workspaceId])).rows[0].n;assert.equal(afterOrdinary,beforeNotes);record('ordinary_chat_creates_no_business_note');
  const remember=await send(page,'Remember this: We offer free bicycle safety inspections every Saturday.');assert(remember.data.exchange.rememberProposal);assert.equal((await db.query('select count(*)::int n from public.business_notes where workspace_id=$1',[owner.workspaceId])).rows[0].n,beforeNotes);
+ for(const proposalWidth of [390,320]) {
+  const proposalView=await ctx(owner,proposalWidth);await proposalView.page.goto(origin+`/app/si?chat=${chat}`);
+  const confirm=proposalView.page.getByRole('button',{name:'Confirm and save this note',exact:true});await confirm.waitFor();await confirm.scrollIntoViewIfNeeded();
+  assert(await confirm.evaluate(node=>{const r=node.getBoundingClientRect();return r.left>=0&&r.right<=innerWidth&&r.top>=0&&r.bottom<=innerHeight}));
+  await proposalView.page.screenshot({path:path.join(output,`proposal-${proposalWidth}.png`),fullPage:true});await proposalView.context.close();record(`mobile_${proposalWidth}_expanded_note_confirmation_reachable`);
+ }
  const savedResponse=page.waitForResponse(r=>r.url().endsWith('/remember')&&r.request().method()==='POST');await page.getByRole('button',{name:'Confirm and save this note',exact:true}).click();const save=await savedResponse;assert.equal(save.status(),200,JSON.stringify(await save.json()));await page.getByText('Saved to Business Notes',{exact:true}).waitFor();
  const saveAgain=await api(a.context,owner,`/conversations/${chat}/remember`,'POST',{exchangeId:remember.data.exchange.id,confirm:true});assert.equal(saveAgain.status,200);
  const notes=await db.query('select original_note_text,status,evidence_lifecycle_status from public.business_notes where workspace_id=$1 and original_note_text=$2',[owner.workspaceId,remember.data.exchange.rememberProposal.content]);assert.equal(notes.rows.length,1);assert.equal(notes.rows[0].status,'review_required');assert.equal(notes.rows[0].evidence_lifecycle_status,'inactive');record('confirmed_verbatim_note_saved_once_for_normal_review');

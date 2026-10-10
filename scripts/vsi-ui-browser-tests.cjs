@@ -202,6 +202,12 @@ async function main() {
       assert(after.focused, "answer completion does not steal focus from the reader");
       assert.equal(await page.getByRole("button", { name: "New answer · Jump to latest", exact: true }).evaluate(node => getComputedStyle(node).backgroundColor), "rgb(17, 24, 39)", "floating jump control stays opaque over earlier messages");
       await panel.screenshot({ path: path.join(output, `vsi-earlier-reading-${width}.png`) });
+      const earlierSources = transcript.getByRole("article").nth(7).locator("summary");
+      await earlierSources.evaluate(node => node.scrollIntoView({ block: "center" }));
+      const beforeExpand = await transcript.evaluate(node => node.scrollTop);
+      await earlierSources.click();
+      assert(Math.abs(await transcript.evaluate(node => node.scrollTop) - beforeExpand) <= 2, `expanding earlier citations preserves the reader's scroll position: ${width}, ${beforeExpand} -> ${await transcript.evaluate(node => node.scrollTop)}`);
+      await earlierSources.click();
       await page.getByRole("button", { name: "New answer · Jump to latest", exact: true }).focus(); await page.keyboard.press("Enter");
       await page.waitForFunction(() => { const node = document.getElementById("vsi-transcript"); return node.scrollHeight - node.scrollTop - node.clientHeight < 5; });
       await transcript.focus(); const bottomTop = await transcript.evaluate(node => node.scrollTop); await page.keyboard.press("PageUp");
