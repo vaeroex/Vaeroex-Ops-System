@@ -54,3 +54,17 @@ export function displayDate(value: string | null | undefined, includeTime = fals
     ...(includeTime ? { hour: "numeric", minute: "2-digit", timeZoneName: "short" } : {})
   }).format(new Date(value));
 }
+
+/** Present capacity without exposing the internal provider-cost unit. */
+export function usagePercent(used: number, limit: number): string {
+  if (!Number.isFinite(used) || !Number.isFinite(limit) || limit <= 0) return "Unavailable";
+  const percent = Math.max(0, used / limit * 100);
+  return percent > 0 && percent < 0.1 ? "<0.1%" : `${Number(percent.toFixed(1))}%`;
+}
+
+export function monthlyResetAt(periodStart: string): string | null {
+  const start = new Date(periodStart);
+  if (!Number.isFinite(start.getTime())) return null;
+  // Match the server's UTC calendar-month accounting boundary, then display locally.
+  return new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 1)).toISOString();
+}

@@ -4,7 +4,7 @@ const { chromium } = require("playwright"), postcss = require("postcss"), tailwi
 const { root, loadSource, React } = require("./integrations-ui-test-support");
 const { renderToString } = require("react-dom/server");
 const { VsiWorkspace } = loadSource("components/vsi/VsiWorkspace.tsx", { "next/link": { __esModule: true, default: ({ children, ...props }) => React.createElement("a", props, children) } });
-const { safeSourceUrl, displayDate } = loadSource("components/vsi/contracts.ts");
+const { safeSourceUrl, displayDate, usagePercent, monthlyResetAt } = loadSource("components/vsi/contracts.ts");
 const workspaceId = "10000000-0000-4000-8000-000000000001", now = "2026-10-08T18:00:00.000Z";
 const chat = (id, count = 1) => ({ id, title: id === "closed" ? "Long-running project" : id === "warning" ? "Planning history" : "Private planning", exchangeCount: count, createdAt: now, updatedAt: now });
 const exchange = (id, message = "Help me plan my week") => ({ id, userMessage: message, answer: "**Start with your priorities.**\n\n1. Choose three outcomes.\n2. Leave time for interruptions.", citations: [], createdAt: now });
@@ -25,6 +25,14 @@ async function main() {
   assert.match(displayDate("2026-10-09T01:00:00Z", true, "America/Los_Angeles"), /Oct 8, 2026/);
   assert.match(displayDate("2026-10-09", false, "America/Los_Angeles"), /Oct 9, 2026/);
   assert.equal(displayDate("not-a-date"), "Date unavailable");
+  assert.equal(usagePercent(0, 100), "0%");
+  assert.equal(usagePercent(100, 100), "100%");
+  assert.equal(usagePercent(0.04, 100), "<0.1%");
+  assert.equal(usagePercent(120, 100), "120%");
+  assert.equal(usagePercent(1, 0), "Unavailable");
+  assert.equal(monthlyResetAt("2026-12-01T00:00:00Z"), "2027-01-01T00:00:00.000Z");
+  assert.match(displayDate(monthlyResetAt("2026-11-01T00:00:00Z"), true, "America/Los_Angeles"), /Nov 30, 2026, 4:00 PM PST/);
+
   const entry = path.join(output, "entry.tsx");
   fs.writeFileSync(entry, 'import React from "react"; import { hydrateRoot } from "react-dom/client"; import { VsiWorkspace } from "@/components/vsi/VsiWorkspace"; const props = JSON.parse(document.getElementById("props")!.textContent!); const app = hydrateRoot(document.getElementById("fixture")!, <VsiWorkspace {...props}/>); const originalReplace = history.replaceState.bind(history); history.replaceState = (...args) => { originalReplace(...args); queueMicrotask(() => app.render(<VsiWorkspace {...props} initialConversationId={new URL(location.href).searchParams.get("chat") || ""}/>)); };');
   const webpack = require("next/dist/compiled/webpack/webpack"); webpack.init();
@@ -133,9 +141,14 @@ async function main() {
       await page.screenshot({ path: path.join(output, `vsi-${theme}-${width}.png`), fullPage: true });
       await page.getByRole("region", { name: "Conversation", exact: true }).screenshot({ path: path.join(output, `vsi-answer-${theme}-${width}.png`) });
     }
-    await page.getByRole("button", { name: "Usage", exact: true }).click(); await page.getByText(/4 of 100 questions/).waitFor(); assert.equal(usageReads, 1);
-    assert.equal(await page.getByText(/Your oldest counted question leaves this window after Oct 9, 2026/).count(), 1, "rolling expiry must not imply available questions are blocked");
+    await page.getByRole("button", { name: "Usage", exact: true }).click(); await page.getByText(/Questions used: 4% of the rolling 24-hour limit/).waitFor(); assert.equal(usageReads, 1);
+    assert.equal(await page.getByText(/Next question leaves the window: Oct 9, 2026/).count(), 1, "rolling expiry must not imply available questions are blocked");
     assert.equal(await page.getByText(/Next question becomes available/).count(), 0);
+    const usageText = await page.getByRole("region", { name: "VSI usage", exact: true }).innerText();
+    assert.match(usageText, /Monthly VSI capacity used: <0.1%/);
+    assert.match(usageText, /Monthly capacity resets: Oct 31, 2026, 5:00 PM PDT/);
+    assert.doesNotMatch(usageText, /\$|USD|prepaid|purchase|credits/i);
+
     await page.getByRole("button", { name: "Close usage", exact: true }).click();
     await composer.fill("other tab filled this chat"); await composer.press("Enter");
     await page.getByRole("button", { name: "Continue in a new chat" }).waitFor();

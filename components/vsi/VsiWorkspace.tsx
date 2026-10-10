@@ -4,7 +4,7 @@ import Link from "next/link";
 import { ChatActions } from "@/components/vsi/ChatActions";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
 import { Exchange } from "@/components/vsi/Exchange";
-import { displayDate, type VsiChat, type VsiExchange, type VsiUsageView } from "@/components/vsi/contracts";
+import { displayDate, usagePercent, monthlyResetAt, type VsiChat, type VsiExchange, type VsiUsageView } from "@/components/vsi/contracts";
 
 type Props = { workspaceId: string; workspaceName: string; userId: string; timeZone?: string; initialConversationId?: string; initialPrompt?: string };
 type ChatResponse = { workspaceId: string; conversation: VsiChat; exchanges?: VsiExchange[]; exchange?: VsiExchange; canEditBusinessNotes?: boolean };
@@ -303,7 +303,7 @@ export function VsiWorkspace({ workspaceId, workspaceName, userId, timeZone: wor
         <div className="vsi-usage-control relative shrink-0 xl:mt-auto xl:border-t xl:border-slate-200 xl:pt-2">
           <button type="button" onClick={showUsage} disabled={disabled} aria-expanded={usageOpen} aria-controls="vsi-usage" className={`${button} w-full`}>Usage</button>
     {usageOpen ? <section id="vsi-usage" style={{ backgroundColor: "var(--workspace-surface, white)" }} aria-label="VSI usage" className="vsi-usage-panel absolute right-0 top-full z-20 mt-2 max-h-[50dvh] w-[min(18rem,calc(100vw-2rem))] overflow-y-auto rounded-lg border border-slate-200 bg-white p-3 text-sm leading-6 text-slate-700 shadow-lg xl:bottom-full xl:left-0 xl:top-auto xl:mb-2">
-      {usage ? <><p><strong>{usage.used} of {usage.limit} questions</strong> answered in your rolling 24-hour window. {usage.remaining} available within that ceiling.</p><p>Workspace spending protections also apply and can pause use earlier.</p>{usage.resetsAt ? <p>Your oldest counted question leaves this window after {displayDate(usage.resetsAt, true, timeZone)}.</p> : null}{usage.workspaceBudget ? <p>Workspace this month: ${usage.workspaceBudget.spentUsd.toFixed(2)} used of ${usage.workspaceBudget.limitUsd.toFixed(2)}.</p> : null}</> : <p>{pending === "usage" ? "Checking usage…" : "Usage is unavailable. Close this panel and try again."}</p>}
+      {usage ? <><p><strong>Questions used: {usagePercent(usage.used, usage.limit)} of the rolling 24-hour limit</strong></p><p>Each answered question leaves the limit 24 hours after it was counted; there is no single daily reset.</p>{usage.resetsAt ? <p>Next question leaves the window: {displayDate(usage.resetsAt, true, timeZone)}.</p> : <p>No answered questions are currently counted.</p>}{usage.workspaceBudget ? <><p><strong>Monthly VSI capacity used: {usagePercent(usage.workspaceBudget.spentUsd, usage.workspaceBudget.limitUsd)}</strong></p><p>Monthly capacity resets: {displayDate(monthlyResetAt(usage.workspaceBudget.periodStart), true, timeZone)}.</p></> : null}<p>Workspace capacity safeguards also apply and can pause use before the daily limit. In-progress requests may temporarily reserve capacity.</p></> : <p>{pending === "usage" ? "Checking usage…" : "Usage is unavailable. Close this panel and try again."}</p>}
       <button type="button" onClick={() => setUsageOpen(false)} className={`${button} mt-2`}>Close usage</button>
     </section> : null}
         </div>
