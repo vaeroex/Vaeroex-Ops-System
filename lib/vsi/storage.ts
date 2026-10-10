@@ -76,7 +76,10 @@ export async function listVsiConversations(access: VsiAccess, before?: string | 
     } catch { throw new VsiHttpError(400, "invalid_cursor", "Reload the chat history to continue."); }
   }
   const { data, error } = await query.order("updated_at", { ascending: false }).order("id", { ascending: false }).limit(101);
-  if (error) throw new VsiHttpError(503, "storage_unavailable", "Saved chats are temporarily unavailable. Please try again.");
+  if (error) {
+    console.error("[vsi-storage]", { operation: "vsi_conversations.select", code: /^(?:[A-Z0-9]{5}|PGRST[0-9]{3})$/.test(error.code || "") ? error.code : "unknown" });
+    throw new VsiHttpError(503, "storage_unavailable", "Saved chats are temporarily unavailable. Please try again.");
+  }
   const rows = data || [], page = rows.slice(0, 100), last = page.at(-1);
   return { conversations: page.map(conversationView), nextCursor: rows.length > 100 && last ? Buffer.from(JSON.stringify({ updatedAt: last.updated_at, id: last.id })).toString("base64url") : null };
 }

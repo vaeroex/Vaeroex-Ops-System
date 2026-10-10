@@ -15,6 +15,7 @@ function json(value: unknown, status = 200) { return NextResponse.json(value, { 
 
 export async function vsiRoute(request: Request, action: RouteAction, conversationId?: string) {
   let workspaceId: string | undefined;
+  let operation = "read_request";
   try {
     // A small bounded JSON body also rejects attachment payloads.
     let raw: unknown = {};
@@ -26,14 +27,17 @@ export async function vsiRoute(request: Request, action: RouteAction, conversati
       }
     }
     const expectedWorkspaceId = request.method === "GET" ? new URL(request.url).searchParams.get("workspaceId") : base.parse(raw).expectedWorkspaceId;
+    operation = "requireVsiAccess";
     const access = await requireVsiAccess(request, expectedWorkspaceId);
     workspaceId = access.workspaceId;
     const common = { workspaceId, canEditBusinessNotes: access.canEditBusinessNotes };
     if (request.method !== "GET") {
+      operation = "strict_rate_limit";
       const rate = await enforceRateLimit({ action: action === "messages" ? "vsi.questions" : "vsi.manage", limit: action === "messages" ? 10 : 60,
         windowSeconds: 60, userId: access.userId, requestHeaders: request.headers, strict: true });
       if (!rate.allowed) throw new VsiHttpError(429, "burst_limit", rateLimitMessage(rate));
     }
+    operation = action;
     if (action === "list") return json({ ...common, ...await listVsiConversations(access, new URL(request.url).searchParams.get("before")) });
     if (action === "usage") {
       const usage = await mutateVsi<{ used: number; resetsAt: string | null; spentUsd: number; reservedUsd: number; periodStart: string }>(access, "usage");
@@ -112,7 +116,14 @@ export async function vsiRoute(request: Request, action: RouteAction, conversati
   } catch (error) {
     if (error instanceof VsiHttpError) return json({ workspaceId, error: error.message, code: error.code }, error.status);
     if (error instanceof z.ZodError) return json({ workspaceId, error: "Check your message and try again. Chat accepts text only.", code: "invalid_request" }, 400);
-    console.error("[vsi-api]", { action, failure: error instanceof Error ? error.name : "unknown" });
+    console.error("[vsi-api]", { action, operation });
+    if (action === "create") console.error("[vsi-config]", {
+      NEXT_PUBLIC_SUPABASE_URL: Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL),
+      supabaseProjectRef: process.env.NEXT_PUBLIC_SUPABASE_URL?.match(/^https:\/\/([a-z0-9]{20})\.supabase\.co\/?$/)?.[1] || "custom_or_unset",
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: Boolean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
+      SUPABASE_SERVICE_ROLE_KEY: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
+      OPENAI_API_KEY: Boolean(process.env.OPENAI_API_KEY)
+    });
     return json({ workspaceId, error: "Vaeroex is temporarily unavailable. Please try again.", code: "unavailable" }, 503);
   }
 }
