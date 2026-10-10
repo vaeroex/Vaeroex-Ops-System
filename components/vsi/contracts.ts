@@ -47,10 +47,24 @@ export function safeSourceUrl(value: string): string | null {
   } catch { return null; }
 }
 
-export function displayDate(value: string | null | undefined, includeTime = false): string {
+export function displayDate(value: string | null | undefined, includeTime = false, timeZone?: string): string {
   if (!value || !Number.isFinite(Date.parse(value))) return "Date unavailable";
   return new Intl.DateTimeFormat("en-US", {
-    month: "short", day: "numeric", year: "numeric", timeZone: "UTC",
+    month: "short", day: "numeric", year: "numeric", timeZone: /^\d{4}-\d{2}-\d{2}$/.test(value) ? "UTC" : timeZone,
     ...(includeTime ? { hour: "numeric", minute: "2-digit", timeZoneName: "short" } : {})
   }).format(new Date(value));
+}
+
+/** Present capacity without exposing the internal provider-cost unit. */
+export function usagePercent(used: number, limit: number): string {
+  if (!Number.isFinite(used) || !Number.isFinite(limit) || limit <= 0) return "Unavailable";
+  const percent = Math.max(0, used / limit * 100);
+  return percent > 0 && percent < 0.1 ? "<0.1%" : `${Number(percent.toFixed(1))}%`;
+}
+
+export function monthlyResetAt(periodStart: string): string | null {
+  const start = new Date(periodStart);
+  if (!Number.isFinite(start.getTime())) return null;
+  // Match the server's UTC calendar-month accounting boundary, then display locally.
+  return new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 1)).toISOString();
 }

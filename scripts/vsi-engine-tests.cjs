@@ -172,9 +172,16 @@ async function main(){
   mode='normal';customPlan=plan('answer',{businessEvidence:true});const business=await runVsiAnswer(input('Why did repair turnaround rise?'));assert.equal(retrievalCalls,1);assert.match(business.citations[0].id,/^B\d+$/);assert.match(business.citations[0].snapshotHash,/^[a-f0-9]{64}$/);assert.match(business.content,/does not establish a cause/);
   const sourceMessage={role:'assistant',content:'SENSITIVE OLD BUSINESS FACT [B1]',citations:[source]};customPlan=plan();await runVsiAnswer(input('Explain your earlier finding',{recentMessages:[sourceMessage]}));assert.ok(!JSON.stringify(answerPayload()).includes('SENSITIVE OLD BUSINESS FACT'));
   mode='product';const product=await runVsiAnswer(input('What can Vaeroex do?'));assert.equal(product.citations[0].id,'P1');assert.equal(answerPayload().runtimeCapabilities.publicWebResearch,'available');assert.equal(answerPayload().runtimeCapabilities.lookupThisTurn,'not_needed');
+  for (const question of ['Who are you?', 'Tell me about yourself.', 'Are you Vaeroex?', 'What should I call you and what do you do?', 'Who trained and hosts your model?']) {
+    await runVsiAnswer(input(question));
+    assert.match(calls.at(-1).input[0].content, /Do not describe yourself as/);
+    assert.match(calls.at(-1).input[0].content, /Adapt this wording to the question; do not require an exact question match/);
+    assert.match(calls.at(-1).input[0].content, /does not train the underlying foundation model or host its inference on Vaeroex-owned servers/);
+  }
   assert.match(VSI_SYSTEM_PROMPT,/aggregate review count cannot establish/);assert.match(VSI_SYSTEM_PROMPT,/untrusted data/);assert.match(VSI_SYSTEM_PROMPT,/do not say you lack browsing/);
   mode='bad_cite';await assert.rejects(runVsiAnswer(input('Explain gravity')),error=>error instanceof VsiEngineError&&error.usage.outputTokens===200);
-  mode='wrong_model';await assert.rejects(runVsiAnswer(input('Explain gravity')),/required Luna/);mode='incomplete';await assert.rejects(runVsiAnswer(input('Explain gravity')),/response limit/);
+  assert.match(calls.at(-1).input[0].content,/Vaeroex does not publish its exact model configuration/);
+  mode='wrong_model';await assert.rejects(runVsiAnswer(input('Explain gravity')),/configured service/);mode='incomplete';await assert.rejects(runVsiAnswer(input('Explain gravity')),/response limit/);
   const failureLogs=[],originalError=console.error;console.error=(...args)=>failureLogs.push(args);
   try{mode='feed_only';customPlan=researchPlan('Seattle','simple',['weather']);await assert.rejects(runVsiAnswer(input('Weather in Seattle?')),error=>error instanceof VsiEngineError&&/verifiable source/.test(error.message)&&error.usage.webSearchCalls===2);}finally{console.error=originalError;}
   assert.equal(failureLogs.length,2);assert.ok(!/Seattle|synthetic-test-key|https:|PRIVATE/.test(JSON.stringify(failureLogs)));

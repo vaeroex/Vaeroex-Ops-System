@@ -8,6 +8,7 @@ export default async function SuperIntelligencePage({ searchParams }: { searchPa
   if (!user) redirect("/login");
   const params = (await searchParams) || {};
   return <VsiWorkspace key={`${workspaceId}:${user.id}`} workspaceId={workspaceId}
+    timeZone={context.activeWorkspace?.reporting_timezone || undefined}
     workspaceName={context.activeWorkspace?.name || "this workspace"} userId={user.id}
     initialConversationId={typeof params.chat === "string" ? params.chat : ""}
     initialPrompt={typeof params.prompt === "string" ? params.prompt.slice(0, 8000) : ""} />;

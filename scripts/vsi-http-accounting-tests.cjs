@@ -80,5 +80,49 @@ async function check(name, failure, expectedCost, estimated) {
   await check('fully accounted failure charges only its observed usage', new VsiEngineError(usage(0.012)), 0.012, false);
   await check('known zero-cost rejection remains free', new VsiEngineError({ ...usage(0), inputTokens: 0, outputTokens: 0, cachedInputTokens: 0, reasoningTokens: 0, providerCalls: 0, webSearchCalls: 0 }), 0, false);
   await check('untyped failure reserves uncertain cost', new Error('Synthetic unexpected failure'), 0.25, true);
+  const logs = [], originalError = console.error;
+  console.error = (...args) => logs.push(args);
+  try {
+    mocks['@/lib/security/rate-limit'].enforceRateLimit = async options => { assert.equal(options.strict, true); throw new Error('DO_NOT_LOG_PRIVATE_DETAILS'); };
+    mutations = []; engineCalls = 0;
+    const response = await vsiRoute(new Request('https://preview.example.test/api/vsi/conversations', {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ expectedWorkspaceId: workspaceId })
+    }), 'create');
+    assert.equal(response.status, 503); assert.deepEqual(mutations, []); assert.equal(engineCalls, 0);
+    assert.deepEqual(logs[0], ['[vsi-api]', { action: 'create', operation: 'strict_rate_limit' }]);
+    assert(!JSON.stringify(logs).includes('DO_NOT_LOG_PRIVATE_DETAILS'));
+    const config = logs[1][1];
+    for (const [key, value] of Object.entries(config)) if (key !== 'supabaseProjectRef') assert.equal(typeof value, 'boolean');
+  } finally { console.error = originalError; }
+  const loadDiagnosticModule = (file, dependencies) => {
+    const diagnosticModule = { exports: {} };
+    const code = ts.transpileModule(fs.readFileSync(require.resolve(file), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+    new Function('exports', 'require', 'module', code)(diagnosticModule.exports, name => dependencies[name] || (name === 'zod' ? { z } : name === 'crypto' ? require('node:crypto') : {}), diagnosticModule);
+    return diagnosticModule.exports;
+  };
+  const captured = [], oldError = console.error;
+  console.error = (...args) => captured.push(args);
+  try {
+    const storage = loadDiagnosticModule('../lib/vsi/storage.ts', {});
+    let code = 'PGRST205';
+    const query = { select() { return this; }, eq() { return this; }, order() { return this; }, async limit() { return { error: { code, message: 'PRIVATE_RECORD', details: 'SECRET_DETAILS' } }; } };
+    for (const expected of ['PGRST205', 'unknown']) {
+      await assert.rejects(storage.listVsiConversations({ workspaceId, userId: 'PRIVATE_ACTOR', supabase: { from: table => { assert.equal(table, 'vsi_conversations'); return query; } } }), error => error.status === 503);
+      assert.deepEqual(captured.pop(), ['[vsi-storage]', { operation: 'vsi_conversations.select', code: expected }]);
+      code = 'PRIVATE_RECORD';
+    }
+    let admin = null;
+    const rate = loadDiagnosticModule('../lib/security/rate-limit.ts', { '@/lib/supabase/admin': { createSupabaseAdminClient: () => admin } });
+    const options = { action: 'vsi.manage', strict: true, userId: 'PRIVATE_ACTOR', limit: 60, windowSeconds: 60, requestHeaders: new Headers() };
+    await assert.rejects(rate.enforceRateLimit(options));
+    assert.deepEqual(captured.pop(), ['[vsi-rate-limit]', { operation: 'createSupabaseAdminClient', code: 'configuration_missing' }]);
+    admin = { rpc: name => { assert.equal(name, 'consume_request_rate_limit_v1'); return { maybeSingle: async () => ({ error: { code: 'PGRST202', message: 'SECRET_DETAILS' } }) }; } };
+    await assert.rejects(rate.enforceRateLimit(options));
+    assert.deepEqual(captured.pop(), ['[vsi-rate-limit]', { operation: 'consume_request_rate_limit_v1', code: 'PGRST202' }]);
+    admin = { rpc: () => ({ maybeSingle: async () => ({ data: null }) }) };
+    await assert.rejects(rate.enforceRateLimit(options));
+    assert.deepEqual(captured.pop(), ['[vsi-rate-limit]', { operation: 'consume_request_rate_limit_v1', code: 'empty_result' }]);
+    assert.equal(captured.length, 0);
+  } finally { console.error = oldError; }
   console.log(JSON.stringify({ passed: true, suite: 'VSI HTTP failed-answer accounting preserves known cost and reservation floor', scenarios: 6, paidProviderCalls: 0, databaseCalls: 0 }));
 })().catch(error => { console.error(error); process.exitCode = 1; });

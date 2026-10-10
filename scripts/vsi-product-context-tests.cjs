@@ -25,7 +25,7 @@ async function rejected(run,pattern){await assert.rejects(run,pattern);assertion
 async function main(){
  reset();let result=await loadVsiProductContext(access());
  check(result.authoritative.company.legalName==='Vaeroex LLC','canonical legal identity');
- check(result.authoritative.assistant.model==='gpt-6-luna','actual configured model');
+ check(!JSON.stringify(result).includes('gpt-6-luna'),'public product context must not disclose routing'); check(result.authoritative.assistant.modelDisclosure==='Vaeroex does not publish its exact model configuration.','truthful public disclosure');
  check(result.authoritative.company.name!=='Synthetic Bicycle Store','workspace is not company identity');
  check(result.authoritative.publishedPlan.price===VAEROEX_PLAN_PRICE_LABEL,'canonical price');
  assert.deepEqual(result.authoritative.publishedPlan.advertisedFeatures,[...VAEROEX_PLAN_FEATURES]);assertions++;
