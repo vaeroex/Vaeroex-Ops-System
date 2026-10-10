@@ -200,7 +200,11 @@ async function main() {
       const after = await transcript.evaluate(node => ({ top: node.scrollTop, anchor: node.querySelectorAll("article")[7].getBoundingClientRect().top - node.getBoundingClientRect().top, focused: document.activeElement === node }));
       assert(Math.abs(after.top - before.top) < 2 && Math.abs(after.anchor - before.anchor) < 2, "new answer preserves the older reading position");
       assert(after.focused, "answer completion does not steal focus from the reader");
-      assert.equal(await page.getByRole("button", { name: "New answer · Jump to latest", exact: true }).evaluate(node => getComputedStyle(node).backgroundColor), "rgb(17, 24, 39)", "floating jump control stays opaque over earlier messages");
+      await page.mouse.move(0, 0);
+      assert.equal(await page.getByRole("button", { name: "New answer · Jump to latest", exact: true }).evaluate(node => getComputedStyle(node).backgroundColor), "rgb(17, 24, 39)", "floating jump control is opaque at rest");
+      await page.getByRole("button", { name: "New answer · Jump to latest", exact: true }).hover();
+      const jumpStyle = await page.getByRole("button", { name: "New answer · Jump to latest", exact: true }).evaluate(node => ({ background: getComputedStyle(node).backgroundColor, inline: node.getAttribute("style"), surface: getComputedStyle(node).getPropertyValue("--workspace-surface"), connected: node.isConnected, animations: node.getAnimations().map(animation => ({ state: animation.playState, frames: animation.effect?.getKeyframes() })) }));
+      assert.equal(jumpStyle.background, "rgb(17, 24, 39)", `floating jump control stays opaque over earlier messages: ${JSON.stringify(jumpStyle)}`);
       await panel.screenshot({ path: path.join(output, `vsi-earlier-reading-${width}.png`) });
       const earlierSources = transcript.getByRole("article").nth(7).locator("summary");
       await earlierSources.evaluate(node => node.scrollIntoView({ block: "center" }));
