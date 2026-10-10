@@ -12,7 +12,7 @@ import { PUBLIC_SYSTEMS } from "@/lib/marketing/public-systems";
 import { organizationJsonLd, PUBLIC_SITE_URL } from "@/lib/seo/public-seo";
 import type { WorkspaceAccess } from "@/lib/security/types";
 import { isDemoWorkspaceRecord } from "@/lib/workspaces/demo-compatibility";
-import { getVsiConfig, VSI_MODEL } from "./config";
+import { getVsiConfig } from "./config";
 import { authorizeVsiRead } from "./retrieval";
 import type { VsiEvidence } from "./types";
 
@@ -73,7 +73,7 @@ export async function loadVsiProductContext(access: WorkspaceAccess) {
     company: { name: organizationJsonLd.name, legalName: organizationJsonLd.legalName, website: PUBLIC_SITE_URL,
       meaning: "Platform provider; do not assume it is the signed-in person's business or a demo workspace.",
       ownershipOrFounders: "Not established by this product context." },
-    assistant: { name: "Vaeroex", feature: "Vaeroex Super Intelligence", model: VSI_MODEL, description: "Ask anything. Grounded in your business when it matters.",
+    assistant: { name: "Vaeroex", feature: "Vaeroex Super Intelligence", modelDisclosure: "Vaeroex does not publish its exact model configuration.", foundationModel: "Vaeroex uses externally provided models. Vaeroex builds the application, business retrieval and safeguards; it does not train the underlying foundation model or host its inference on Vaeroex-owned servers.", description: "Vaeroex Super Intelligence is Vaeroex’s brain for general and business questions.",
       capabilities: "Writing, planning, explanations, calculations, ideas and research, with permitted business evidence. This request's tools establish research availability.",
       actions: "No external account actions. Business Notes require explicit confirmation and normal review permissions." },
     productSystems: PUBLIC_SYSTEMS.map(system => ({ name: system.name, availability: system.availability, href: system.route })),
@@ -106,7 +106,7 @@ export async function loadVsiProductContext(access: WorkspaceAccess) {
     source("P4", "Current workspace and saved integrations", "/app/integrations",
       "Current permitted workspace, role and saved connection states."),
     source("P5", "Vaeroex feature help", "/app/help", "Maintained feature help and navigation."),
-    source("P6", "Vaeroex Super Intelligence", "/app/si", "Current Vaeroex capabilities and VSI allowance safeguards.")
+    source("P6", "Vaeroex Super Intelligence", "/app/help?q=Vaeroex%20Super%20Intelligence", "Current Vaeroex capabilities and VSI allowance safeguards.")
   ];
   const result = { authoritative, sources, limitations: [
     "For Vaeroex questions, use product facts; workspace and demo records do not establish company facts.",

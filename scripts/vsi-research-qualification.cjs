@@ -25,7 +25,7 @@ const threads = [
  {id:'empty-product',actor:3,cases:[
   ['general','Write a friendly 120-word invitation for a neighborhood book swap next Saturday. Leave the venue as a placeholder.', 'Useful writing without business-evidence demand or web lookup.'],
   ['product','What is Vaeroex, which features can this workspace use, what plan is it on, and what is actually connected?', 'Maintained product/actual subscription/connection data with product citations; do not claim unknown invoice/connection absence.'],
-  ['identity','Who owns you, what model are you using, and is the $500 monthly plan worth it for an empty workspace?', 'Vaeroex LLC product identity, gpt-6-luna configured model, published price versus actual bill unknown, practical conditional value explanation without invented usage.']
+  ['identity','Who owns you, what model are you using, and is the $500 monthly plan worth it for an empty workspace?', 'Vaeroex LLC product identity, exact model configuration is not published, published price versus actual bill unknown, practical conditional value explanation without invented usage.']
  ]},
  {id:'weather',actor:3,cases:[
   ['needs-location','What is the weather today?', 'Ask location; never infer from workspace/IP/history unrelated to weather.'],

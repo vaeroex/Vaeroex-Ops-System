@@ -4,15 +4,16 @@ import { displayDate, safeSourceUrl, type VsiExchange } from "@/components/vsi/c
 
 const sourceDateLabels = { publication: "Published", updated: "Updated", observation: "Observed", event: "Event" } as const;
 
-export function Exchange({ exchange, canEditNotes, saving, disabled, workspaceName, onRemember }: {
+export function Exchange({ exchange, canEditNotes, saving, disabled, workspaceName, timeZone, onRemember }: {
   exchange: VsiExchange;
   canEditNotes: boolean;
   saving: boolean;
   disabled: boolean;
   workspaceName: string;
+  timeZone?: string;
   onRemember: (exchangeId: string) => void;
 }) {
-  return <article className="space-y-3 border-b border-slate-200 pb-5 last:border-0" aria-label={`Exchange from ${displayDate(exchange.createdAt, true)}`}>
+  return <article className="space-y-3 border-b border-slate-200 pb-5 last:border-0" aria-label={`Exchange from ${displayDate(exchange.createdAt, true, timeZone)}`}>
     <div className="ml-auto max-w-[92%] rounded-2xl rounded-tr-sm bg-slate-100 px-3 py-2 sm:max-w-[85%]">
       <p className="mb-1 text-xs font-semibold text-slate-500">You</p>
       <p className="whitespace-pre-wrap break-words text-sm leading-6 text-slate-900 [overflow-wrap:anywhere]">{exchange.userMessage}</p>
@@ -20,19 +21,19 @@ export function Exchange({ exchange, canEditNotes, saving, disabled, workspaceNa
     <div>
       <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1">
         <h3 className="text-sm font-semibold text-vaeroex-blue">Vaeroex</h3>
-        <time dateTime={exchange.createdAt} className="text-xs text-slate-500">{displayDate(exchange.createdAt, true)}</time>
+        <time dateTime={exchange.createdAt} className="text-xs text-slate-500">{displayDate(exchange.createdAt, true, timeZone)}</time>
       </div>
       <AnswerContent content={exchange.answer} />
       {exchange.citations.length > 0 ? <details className="mt-3 rounded-lg border border-slate-200 bg-slate-50">
         <summary className="min-h-11 cursor-pointer px-3 py-2.5 text-xs font-semibold text-slate-700">Sources ({exchange.citations.length})</summary>
-        <ol className="grid max-h-72 gap-2 overflow-y-auto overscroll-contain px-3 pb-3 sm:grid-cols-2">
+        <ol className="grid gap-2 px-3 pb-3 sm:grid-cols-2">
           {exchange.citations.map((source) => {
             const href = safeSourceUrl(source.url);
-            return <li key={source.id} className="min-w-0 rounded-md border border-slate-200 bg-white p-3 text-xs leading-5">
+            return <li key={source.id} className="min-w-0 rounded-md border border-slate-200 bg-white p-2 text-xs leading-5">
               <span className="font-semibold text-slate-500">[{source.id}] </span>
               {href ? <a href={href} {...(href.startsWith("https:") ? { target: "_blank", rel: "noopener noreferrer" } : {})} className="break-words font-semibold text-vaeroex-blue underline decoration-slate-300 underline-offset-2 focus-visible:outline-2 focus-visible:outline-vaeroex-blue">{source.title}</a> : <span className="font-semibold text-slate-700">{source.title}</span>}
-              <p className="mt-1 text-slate-600">{source.evidenceDate ? `${source.evidenceDateKind ? sourceDateLabels[source.evidenceDateKind] ?? "Evidence" : "Evidence"}: ${displayDate(source.evidenceDate, source.evidenceDateKind === "observation" && source.evidenceDate.includes("T"))}` : source.sourceType === "web" ? "Source date not established by this lookup" : "Source date not provided"}</p>
-              <p className="text-slate-500">Checked: {displayDate(source.retrievedAt, true)}</p>
+              <p className="mt-1 text-slate-600">{source.evidenceDate ? `${source.evidenceDateKind ? sourceDateLabels[source.evidenceDateKind] ?? "Evidence" : "Evidence"}: ${displayDate(source.evidenceDateKind === "observation" ? source.evidenceDate : source.evidenceDate.slice(0, 10), source.evidenceDateKind === "observation" && source.evidenceDate.includes("T"), timeZone)}` : source.sourceType === "web" ? "Source date not established by this lookup" : "Source date not provided"}</p>
+              <p className="text-slate-500">Checked: {displayDate(source.retrievedAt, true, timeZone)}</p>
               {source.sourceType !== "web" && source.excerpt ? <p className="mt-1 break-words text-slate-600 [overflow-wrap:anywhere]">{source.excerpt}</p> : null}
             </li>;
           })}

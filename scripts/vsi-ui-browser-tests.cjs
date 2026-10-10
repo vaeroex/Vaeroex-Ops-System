@@ -4,7 +4,7 @@ const { chromium } = require("playwright"), postcss = require("postcss"), tailwi
 const { root, loadSource, React } = require("./integrations-ui-test-support");
 const { renderToString } = require("react-dom/server");
 const { VsiWorkspace } = loadSource("components/vsi/VsiWorkspace.tsx", { "next/link": { __esModule: true, default: ({ children, ...props }) => React.createElement("a", props, children) } });
-const { safeSourceUrl } = loadSource("components/vsi/contracts.ts");
+const { safeSourceUrl, displayDate } = loadSource("components/vsi/contracts.ts");
 const workspaceId = "10000000-0000-4000-8000-000000000001", now = "2026-10-08T18:00:00.000Z";
 const chat = (id, count = 1) => ({ id, title: id === "closed" ? "Long-running project" : id === "warning" ? "Planning history" : "Private planning", exchangeCount: count, createdAt: now, updatedAt: now });
 const exchange = (id, message = "Help me plan my week") => ({ id, userMessage: message, answer: "**Start with your priorities.**\n\n1. Choose three outcomes.\n2. Leave time for interruptions.", citations: [], createdAt: now });
@@ -20,6 +20,11 @@ const output = fs.mkdtempSync(path.join(os.tmpdir(), "vsi-ui-browser-"));
 async function main() {
   assert.equal(safeSourceUrl("javascript:alert(1)"), null); assert.equal(safeSourceUrl("//evil.example/"), null);
   assert.equal(safeSourceUrl("https://user:pass@example.test/"), null); assert.equal(safeSourceUrl("/app/sources/file-1"), "/app/sources/file-1");
+  assert.match(displayDate("2026-01-15T18:00:00Z", true, "America/Los_Angeles"), /10:00 AM PST/);
+  assert.match(displayDate("2026-07-15T18:00:00Z", true, "America/Los_Angeles"), /11:00 AM PDT/);
+  assert.match(displayDate("2026-10-09T01:00:00Z", true, "America/Los_Angeles"), /Oct 8, 2026/);
+  assert.match(displayDate("2026-10-09", false, "America/Los_Angeles"), /Oct 9, 2026/);
+  assert.equal(displayDate("not-a-date"), "Date unavailable");
   const entry = path.join(output, "entry.tsx");
   fs.writeFileSync(entry, 'import React from "react"; import { hydrateRoot } from "react-dom/client"; import { VsiWorkspace } from "@/components/vsi/VsiWorkspace"; const props = JSON.parse(document.getElementById("props")!.textContent!); const app = hydrateRoot(document.getElementById("fixture")!, <VsiWorkspace {...props}/>); const originalReplace = history.replaceState.bind(history); history.replaceState = (...args) => { originalReplace(...args); queueMicrotask(() => app.render(<VsiWorkspace {...props} initialConversationId={new URL(location.href).searchParams.get("chat") || ""}/>)); };');
   const webpack = require("next/dist/compiled/webpack/webpack"); webpack.init();
@@ -68,7 +73,7 @@ async function main() {
         if (req.method === "DELETE") { stored.delete(id); return send({ deleted: true }); }
         return send({ ...value, canEditBusinessNotes: true });
       }
-      const props = { workspaceId, workspaceName: "Synthetic furniture shop", userId: "synthetic-user", initialConversationId: url.searchParams.get("chat") || "" };
+      const props = { workspaceId, workspaceName: "Synthetic furniture shop", userId: "synthetic-user", initialConversationId: url.searchParams.get("chat") || "", timeZone: url.searchParams.get("zone") || undefined };
       res.writeHead(200, { "content-type": "text/html", "cache-control": "no-store" });
       res.end(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>VSI synthetic UI</title><style>${css}</style></head><body><div class="vaeroex-app-shell vaeroex-customer-workspace"><main class="workspace-main mx-auto max-w-6xl p-4"><div id="fixture">${renderToString(React.createElement(VsiWorkspace, props))}</div></main></div><script id="props" type="application/json">${JSON.stringify(props)}</script><script src="/fixture.js"></script></body></html>`);
     } catch (error) { serverError = error; res.writeHead(500); res.end("Fixture failed"); }
@@ -78,7 +83,7 @@ async function main() {
     await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
     const origin = `http://127.0.0.1:${server.address().port}`;
     browser = await chromium.launch({ headless: true, ...(process.env.CHROME_EXECUTABLE_PATH ? { executablePath: process.env.CHROME_EXECUTABLE_PATH } : {}) });
-    const page = await browser.newPage(), errors = []; page.on("pageerror", error => errors.push(error.message));
+    const page = await browser.newPage({ timezoneId: "America/Los_Angeles" }), errors = []; page.on("pageerror", error => errors.push(error.message));
     await page.route("**/*", route => new URL(route.request().url()).origin === origin ? route.continue() : route.abort());
     await page.goto(origin); await page.getByRole("button", { name: "New chat", exact: true }).waitFor();
     await page.waitForFunction(() => !document.querySelector('button')?.disabled);
@@ -171,7 +176,7 @@ async function main() {
       const sourceList = transcript.getByRole("article").last().locator("details ol");
       assert.equal(await sourceList.getByRole("link").count(), 8);
       for (const label of ["Published", "Updated", "Event"]) assert.equal(await sourceList.getByText(`${label}: Oct 8, 2026`, { exact: true }).count(), 1, "source date type must remain distinct from lookup time");
-      assert.equal(await sourceList.getByText("Observed: Oct 8, 2026, 6:00 PM UTC", { exact: true }).count(), 1, "observation timestamps preserve the observation clock and timezone separately from lookup time");
+      assert.equal(await sourceList.getByText("Observed: Oct 8, 2026, 11:00 AM PDT", { exact: true }).count(), 1, "observation timestamps preserve the observation clock and timezone separately from lookup time");
       assert.equal(await sourceList.getByText("Source date not provided", { exact: true }).count(), 1, "lookup time must not replace a missing source date");
       assert.equal(await sourceList.getByText("Evidence: Oct 8, 2026", { exact: true }).count(), 2, "existing source dates preserve their generic label");
       assert.equal(await sourceList.getByText(/^Checked: Oct 8, 2026/).count(), 8, "all sources separately show the lookup timestamp");
@@ -181,7 +186,7 @@ async function main() {
       const legacyWebCard = sourceList.locator("li").filter({ has: page.getByRole("link", { name: "Workshop source 6", exact: true }) });
       assert.equal(await legacyWebCard.getByRole("link").getAttribute("href"), "https://public.example.test/source-6");
       assert.equal(await legacyWebCard.getByText("Evidence: Oct 8, 2026", { exact: true }).count(), 1, "web date and source link stay visible when generated excerpt is hidden");
-      assert(await sourceList.evaluate(node => node.clientHeight <= 288 && node.scrollHeight > node.clientHeight), "many source details stay in a bounded disclosure");
+      assert(await sourceList.evaluate(node => node.scrollHeight <= node.clientHeight + 1), "source cards use the transcript scroll area without a competing scrollbar");
       await transcript.getByRole("article").last().getByText("Sources (8)", { exact: true }).click();
       await panel.screenshot({ path: path.join(output, `vsi-20-exchanges-${width}.png`) });
       await composer.fill(`Keep my reading position at ${width}`); await composer.press("Enter");
@@ -236,6 +241,10 @@ async function main() {
     lost = true; await page.getByRole("button", { name: "Usage", exact: true }).click(); await page.getByRole("button", { name: "Reload your active workspace" }).waitFor();
     assert.equal(await page.getByText("Start with your priorities.", { exact: true }).count(), 0); assert.equal(await page.getByRole("heading", { name: "Long-running project" }).count(), 0); assert.equal(await page.getByRole("alert").evaluate(element => getComputedStyle(element).color), "rgb(252, 165, 165)", "dark-theme errors must stay legible");
     assert.equal(serverError, null); assert.deepEqual(errors, []);
+    lost = false;
+    await page.goto(`${origin}/?chat=warning&zone=America/New_York`);
+    await page.getByRole("article").waitFor();
+    assert.match(await page.getByRole("article").locator("time").innerText(), /2:00 PM EDT/, "workspace timezone overrides viewer timezone");
     console.log(JSON.stringify({ passed: true, checks: ["general question", "App Router searchParams update", "older history pagination", "keyboard", "stable retry", "explicit note confirmation", "citation dates", "legacy web excerpts hidden without removing private evidence or public links", "Markdown headings and fenced code stay safe and readable", "rename reopen delete", "225 warning", "250 handoff preserves transcript", "second-tab thread boundary preserves unsent draft", "workspace access loss clears transcript", "on-demand usage", "desktop mobile no overflow", "20-exchange bounded transcript and composer", "old reading position and focus survive delayed answers", "keyboard jump and transcript scrolling", "safe compact business tables", "software-keyboard-sized viewport", "slow-response notice and recoverable 205-second timeout", "actual global CSS light/Pulsar contrast"], widths: [1440, 390, 320], output, scope: "Hydrated UI with synthetic loopback API; authenticated API and provider qualification are separate." }));
   } finally { if (browser) await browser.close(); await new Promise(resolve => server.close(resolve)); }
 }

@@ -3053,3 +3053,20 @@ html:not(.pulsar) .vaeroex-customer-workspace .workspace-saved-analyses .workspa
     box-shadow: var(--vaeroex-spatial-shadow-subtle);
   }
 }
+
+/* VSI owns one bounded reading viewport; other workspace pages keep their layout. */
+.workspace-main:has(.workspace-vsi) { padding: .5rem; max-width: none; }
+.workspace-main:has(.workspace-vsi) > footer { display: none; }
+.workspace-vsi { height: var(--vsi-available-height, calc(100dvh - 10rem)); }
+.workspace-vsi > header, .workspace-vsi > details { flex-shrink: 0; }
+.workspace-vsi > details[open] { max-height: 35%; overflow-y: auto; }
+.workspace-vsi .vsi-panels { grid-template-rows: auto minmax(0, 1fr); }
+.workspace-vsi .vsi-history { display: flex; align-items: start; gap: .75rem; }
+.workspace-vsi .vsi-history > button { width: auto; flex-shrink: 0; }
+.workspace-vsi .vsi-history > details { flex: 1; margin-top: .5rem; min-width: 0; }
+.workspace-vsi [data-vsi-composer] { padding: .5rem .75rem; }
+@media (min-width: 1280px) {
+  .workspace-vsi .vsi-panels { grid-template-rows: minmax(0, 1fr); }
+  .workspace-vsi .vsi-history { display: block; overflow-y: auto; }
+  .workspace-vsi .vsi-history > button { width: 100%; }
+}

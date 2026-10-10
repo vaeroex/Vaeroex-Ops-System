@@ -47,10 +47,10 @@ export function safeSourceUrl(value: string): string | null {
   } catch { return null; }
 }
 
-export function displayDate(value: string | null | undefined, includeTime = false): string {
+export function displayDate(value: string | null | undefined, includeTime = false, timeZone?: string): string {
   if (!value || !Number.isFinite(Date.parse(value))) return "Date unavailable";
   return new Intl.DateTimeFormat("en-US", {
-    month: "short", day: "numeric", year: "numeric", timeZone: "UTC",
+    month: "short", day: "numeric", year: "numeric", timeZone: /^\d{4}-\d{2}-\d{2}$/.test(value) ? "UTC" : timeZone,
     ...(includeTime ? { hour: "numeric", minute: "2-digit", timeZoneName: "short" } : {})
   }).format(new Date(value));
 }

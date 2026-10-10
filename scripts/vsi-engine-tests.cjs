@@ -174,7 +174,8 @@ async function main(){
   mode='product';const product=await runVsiAnswer(input('What can Vaeroex do?'));assert.equal(product.citations[0].id,'P1');assert.equal(answerPayload().runtimeCapabilities.publicWebResearch,'available');assert.equal(answerPayload().runtimeCapabilities.lookupThisTurn,'not_needed');
   assert.match(VSI_SYSTEM_PROMPT,/aggregate review count cannot establish/);assert.match(VSI_SYSTEM_PROMPT,/untrusted data/);assert.match(VSI_SYSTEM_PROMPT,/do not say you lack browsing/);
   mode='bad_cite';await assert.rejects(runVsiAnswer(input('Explain gravity')),error=>error instanceof VsiEngineError&&error.usage.outputTokens===200);
-  mode='wrong_model';await assert.rejects(runVsiAnswer(input('Explain gravity')),/required Luna/);mode='incomplete';await assert.rejects(runVsiAnswer(input('Explain gravity')),/response limit/);
+  assert.match(calls.at(-1).input[0].content,/Vaeroex does not publish its exact model configuration/);
+  mode='wrong_model';await assert.rejects(runVsiAnswer(input('Explain gravity')),/configured service/);mode='incomplete';await assert.rejects(runVsiAnswer(input('Explain gravity')),/response limit/);
   const failureLogs=[],originalError=console.error;console.error=(...args)=>failureLogs.push(args);
   try{mode='feed_only';customPlan=researchPlan('Seattle','simple',['weather']);await assert.rejects(runVsiAnswer(input('Weather in Seattle?')),error=>error instanceof VsiEngineError&&/verifiable source/.test(error.message)&&error.usage.webSearchCalls===2);}finally{console.error=originalError;}
   assert.equal(failureLogs.length,2);assert.ok(!/Seattle|synthetic-test-key|https:|PRIVATE/.test(JSON.stringify(failureLogs)));
