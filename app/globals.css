@@ -3070,3 +3070,10 @@ html:not(.pulsar) .vaeroex-customer-workspace .workspace-saved-analyses .workspa
   .workspace-vsi .vsi-history { display: block; overflow-y: auto; }
   .workspace-vsi .vsi-history > button { width: 100%; }
 }
+/* In a keyboard-sized viewport, keep the active conversation and composer
+     available. Navigation returns when focus leaves the composer. */
+.workspace-vsi[data-compact-viewport="true"]:has([data-vsi-composer] textarea:focus) > header,
+.workspace-vsi[data-compact-viewport="true"]:has([data-vsi-composer] textarea:focus) > details,
+.workspace-vsi[data-compact-viewport="true"]:has([data-vsi-composer] textarea:focus) .vsi-history,
+.workspace-vsi[data-compact-viewport="true"]:has([data-vsi-composer] textarea:focus) .vsi-conversation-heading { display: none; }
+.workspace-vsi[data-compact-viewport="true"]:has([data-vsi-composer] textarea:focus) .vsi-panels { grid-template-rows: minmax(0, 1fr); }
