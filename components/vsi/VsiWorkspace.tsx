@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Pencil, Trash2 } from "lucide-react";
+import { ChatActions } from "@/components/vsi/ChatActions";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
 import { Exchange } from "@/components/vsi/Exchange";
 import { displayDate, type VsiChat, type VsiExchange, type VsiUsageView } from "@/components/vsi/contracts";
@@ -25,7 +25,7 @@ export function VsiWorkspace({ workspaceId, workspaceName, userId, timeZone: wor
   const [pending, setPending] = useState<string | null>("history"), [error, setError] = useState(""), [notice, setNotice] = useState("");
   const [accessLost, setAccessLost] = useState(false), [canEditNotes, setCanEditNotes] = useState(false);
   const [failedQuestion, setFailedQuestion] = useState<FailedQuestion | null>(null);
-  const [renaming, setRenaming] = useState(false), [title, setTitle] = useState(""), [deleting, setDeleting] = useState(false);
+  const [renaming, setRenaming] = useState<VsiChat | null>(null), [title, setTitle] = useState(""), [deleting, setDeleting] = useState<VsiChat | null>(null);
   const [usageOpen, setUsageOpen] = useState(false), [usage, setUsage] = useState<VsiUsageView | null>(null);
   const controllers = useRef(new Set<AbortController>()), mounted = useRef(true), operation = useRef(false);
   const ownedNavigation = useRef<string | null>(null), viewEpoch = useRef(0);
@@ -55,7 +55,7 @@ export function VsiWorkspace({ workspaceId, workspaceName, userId, timeZone: wor
     setError(caught instanceof Error ? caught.message : "Vaeroex is temporarily unavailable. Please try again.");
     if (caught instanceof RequestError && caught.accessLost) {
       followLatest.current = true; setShowJump(false); setHasNewAnswer(false);
-      setAccessLost(true); setHistoryCursor(null); setChat(null); setExchanges([]); setChats([]); setMessage(""); setFailedQuestion(null); setUsage(null);
+      setAccessLost(true); setRenaming(null); setDeleting(null); setUsageOpen(false); setHistoryCursor(null); setChat(null); setExchanges([]); setChats([]); setMessage(""); setFailedQuestion(null); setUsage(null);
       for (const controller of controllers.current) controller.abort();
     }
   }, []);
@@ -165,7 +165,7 @@ export function VsiWorkspace({ workspaceId, workspaceName, userId, timeZone: wor
       if (!mounted.current || epoch !== viewEpoch.current) return;
       followLatest.current = true; setShowJump(false); setHasNewAnswer(false);
       rememberChat(detail.conversation); setExchanges(detail.exchanges || []); setMessage(""); setFailedQuestion(null);
-      setCanEditNotes(Boolean(detail.canEditBusinessNotes)); setRenaming(false); setDeleting(false);
+      setCanEditNotes(Boolean(detail.canEditBusinessNotes)); setRenaming(null); setDeleting(null);
     });
   }
 
@@ -182,7 +182,7 @@ export function VsiWorkspace({ workspaceId, workspaceName, userId, timeZone: wor
   function newChat() {
     if (pending || accessLost) return;
     followLatest.current = true; setShowJump(false); setHasNewAnswer(false);
-    setChat(null); setExchanges([]); setMessage(""); setFailedQuestion(null); setError(""); setNotice(""); setRenaming(false); setDeleting(false);
+    setChat(null); setExchanges([]); setMessage(""); setFailedQuestion(null); setError(""); setNotice(""); setRenaming(null); setDeleting(null);
     ownedNavigation.current = ""; window.history.replaceState(null, "", window.location.pathname); composer.current?.focus();
   }
 
@@ -242,23 +242,33 @@ export function VsiWorkspace({ workspaceId, workspaceName, userId, timeZone: wor
   }
 
   async function rename(event: FormEvent) {
-    event.preventDefault(); if (!chat || !title.trim()) return;
+    event.preventDefault(); if (!renaming || !title.trim()) return;
     await run("rename", async (epoch) => {
-      const saved = await request<ChatResponse>(`/conversations/${chat.id}`, { method: "PATCH", body: { title: title.trim() } });
+      const saved = await request<ChatResponse>(`/conversations/${renaming.id}`, { method: "PATCH", body: { title: title.trim() } });
       if (!mounted.current || epoch !== viewEpoch.current) return;
-      rememberChat(saved.conversation); setRenaming(false); setNotice("Chat renamed.");
+      if (chat?.id === saved.conversation.id) setChat(saved.conversation);
+      setChats((previous) => previous.map((entry) => entry.id === saved.conversation.id ? saved.conversation : entry)); setRenaming(null); setNotice("Chat renamed.");
     });
   }
 
   async function deleteChat() {
-    if (!chat) return;
+    if (!deleting) return;
     await run("delete", async (epoch) => {
-      await request(`/conversations/${chat.id}`, { method: "DELETE" });
+      await request(`/conversations/${deleting.id}`, { method: "DELETE" });
       if (!mounted.current || epoch !== viewEpoch.current) return;
-      setChats((previous) => previous.filter((entry) => entry.id !== chat.id)); setChat(null); setExchanges([]); setMessage(""); setFailedQuestion(null);
-      setDeleting(false); setRenaming(false); setNotice("Chat deleted."); ownedNavigation.current = ""; window.history.replaceState(null, "", window.location.pathname);
+      setChats((previous) => previous.filter((entry) => entry.id !== deleting.id));
+      if (chat?.id === deleting.id) { setChat(null); setExchanges([]); setMessage(""); setFailedQuestion(null); ownedNavigation.current = ""; window.history.replaceState(null, "", window.location.pathname); }
+      setDeleting(null); setRenaming(null); setNotice("Chat deleted.");
     });
   }
+
+  useEffect(() => {
+    if (!usageOpen) return;
+    const dismiss = (event: PointerEvent) => { if (!(event.target as Element)?.closest(".vsi-usage-control")) setUsageOpen(false); };
+    const escape = (event: KeyboardEvent) => { if (event.key === "Escape") setUsageOpen(false); };
+    document.addEventListener("pointerdown", dismiss); document.addEventListener("keydown", escape);
+    return () => { document.removeEventListener("pointerdown", dismiss); document.removeEventListener("keydown", escape); };
+  }, [usageOpen]);
 
   async function showUsage() {
     if (usageOpen) { setUsageOpen(false); return; }
@@ -268,15 +278,8 @@ export function VsiWorkspace({ workspaceId, workspaceName, userId, timeZone: wor
 
   const readOnly = (chat?.exchangeCount || 0) >= 250, disabled = Boolean(pending) || accessLost;
   return <div ref={workspace} className="workspace-vsi flex min-h-0 flex-col gap-2" data-vsi-workspace={workspaceId}>
-    <header className="flex flex-wrap items-start justify-between gap-3">
-      <div><h1 className="text-base font-semibold tracking-tight text-slate-900 sm:text-lg">Vaeroex Super Intelligence</h1></div>
-      <button type="button" onClick={showUsage} disabled={disabled} aria-expanded={usageOpen} aria-controls="vsi-usage" className={button}>Usage</button>
-    </header>
-    {usageOpen ? <section id="vsi-usage" aria-label="VSI usage" className="rounded-lg border border-slate-200 bg-white p-4 text-sm leading-6 text-slate-700">
-      {usage ? <><p><strong>{usage.used} of {usage.limit} questions</strong> answered in your rolling 24-hour window. {usage.remaining} available within that ceiling.</p><p>Workspace spending protections also apply and can pause use earlier.</p>{usage.resetsAt ? <p>Your oldest counted question leaves this window after {displayDate(usage.resetsAt, true, timeZone)}.</p> : null}{usage.workspaceBudget ? <p>Workspace this month: ${usage.workspaceBudget.spentUsd.toFixed(2)} used of ${usage.workspaceBudget.limitUsd.toFixed(2)}.</p> : null}</> : <p>{pending === "usage" ? "Checking usage…" : "Usage is unavailable. Close this panel and try again."}</p>}
-    </section> : null}
     <details className="rounded-lg border border-slate-200 bg-white px-3 py-1.5">
-      <summary className="cursor-pointer text-sm font-semibold text-slate-700">Business Context <span className="ml-1 font-normal text-slate-500">(optional)</span></summary>
+      <summary className="cursor-pointer text-sm font-semibold text-slate-700">Business Context <span className="sr-only ml-1 font-normal text-slate-500 sm:not-sr-only">(optional)</span></summary>
       <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">For more useful business answers, describe what you sell, your locations, customers, goals, and other relevant context in Business Notes. Approved notes become available through Business Memory. Your ordinary conversations stay private and do not become shared business facts.</p>
       <Link href="/app/sources#business-notes" className="mt-2 inline-flex min-h-11 items-center text-sm font-semibold text-vaeroex-blue underline">{canEditNotes ? "Add or manage Business Notes" : "View Business Notes"}</Link>
       <p className="text-xs leading-5 text-slate-500">Use Files &amp; Notes for file uploads. Chat accepts text only. <Link href="/app/help?q=Vaeroex%20Super%20Intelligence" className="underline">About Vaeroex and safe use</Link></p>
@@ -288,15 +291,27 @@ export function VsiWorkspace({ workspaceId, workspaceName, userId, timeZone: wor
         <button type="button" onClick={newChat} disabled={disabled} className={`${button} w-full`}>New chat</button>
         <details className="mt-2" open={historyOpen} onToggle={(event) => setHistoryOpen(event.currentTarget.open)}><summary className="cursor-pointer text-sm font-semibold text-slate-700">Your chats</summary><p className="mt-1 text-xs leading-5 text-slate-500">Private to you in {workspaceName}.</p>
           <nav aria-label="Your chats" className="mt-2 max-h-40 space-y-1 overflow-y-auto overscroll-contain xl:max-h-[min(28rem,45dvh)]">
-            {pending === "history" ? <p className="p-2 text-sm text-slate-500">Loading chats…</p> : chats.length ? chats.map((entry) => <button key={entry.id} type="button" onClick={() => openChat(entry.id)} disabled={disabled} aria-current={chat?.id === entry.id ? "page" : undefined} className={`w-full min-w-0 rounded-lg px-2 py-2 text-left text-sm focus-visible:outline-2 focus-visible:outline-vaeroex-blue disabled:opacity-60 ${chat?.id === entry.id ? "bg-vaeroex-soft text-vaeroex-blue" : "text-slate-700 hover:bg-slate-50"}`}><span className="block break-words font-medium [overflow-wrap:anywhere]">{entry.title}</span><span className="mt-1 block text-xs text-slate-500">{displayDate(entry.updatedAt, false, timeZone)}</span></button>) : <p className="p-2 text-sm text-slate-500">Your saved chats will appear here.</p>}
+            {pending === "history" ? <p className="p-2 text-sm text-slate-500">Loading chats…</p> : chats.length ? chats.map((entry) => <div key={entry.id} className="vsi-chat-row group relative min-w-0">
+              <div className="flex min-w-0 items-center">
+                <button type="button" title={entry.title} onClick={() => openChat(entry.id)} disabled={disabled} aria-current={chat?.id === entry.id ? "page" : undefined} className={`min-w-0 flex-1 rounded-lg px-2 py-2 text-left text-sm focus-visible:outline-2 focus-visible:outline-vaeroex-blue disabled:opacity-60 ${chat?.id === entry.id ? "bg-vaeroex-soft text-vaeroex-blue" : "text-slate-700 hover:bg-slate-50"}`}><span className="block truncate font-medium">{entry.title}</span><span className="mt-1 block text-xs text-slate-500">{displayDate(entry.updatedAt, false, timeZone)}</span></button>
+                <ChatActions title={entry.title} disabled={disabled} onRename={() => { setRenaming(entry); setTitle(entry.title); setDeleting(null); }} onDelete={() => { setDeleting(entry); setRenaming(null); }} />
+              </div>
+            </div>) : <p className="p-2 text-sm text-slate-500">Your saved chats will appear here.</p>}
           </nav>
           {historyCursor ? <button type="button" onClick={loadOlderChats} disabled={disabled} className={`${button} mt-3 w-full`}>{pending === "older" ? "Loading older chats…" : "Load older chats"}</button> : null}
         </details>
+        <div className="vsi-usage-control relative shrink-0 xl:mt-auto xl:border-t xl:border-slate-200 xl:pt-2">
+          <button type="button" onClick={showUsage} disabled={disabled} aria-expanded={usageOpen} aria-controls="vsi-usage" className={`${button} w-full`}>Usage</button>
+    {usageOpen ? <section id="vsi-usage" style={{ backgroundColor: "var(--workspace-surface, white)" }} aria-label="VSI usage" className="vsi-usage-panel absolute right-0 top-full z-20 mt-2 max-h-[50dvh] w-[min(18rem,calc(100vw-2rem))] overflow-y-auto rounded-lg border border-slate-200 bg-white p-3 text-sm leading-6 text-slate-700 shadow-lg xl:bottom-full xl:left-0 xl:top-auto xl:mb-2">
+      {usage ? <><p><strong>{usage.used} of {usage.limit} questions</strong> answered in your rolling 24-hour window. {usage.remaining} available within that ceiling.</p><p>Workspace spending protections also apply and can pause use earlier.</p>{usage.resetsAt ? <p>Your oldest counted question leaves this window after {displayDate(usage.resetsAt, true, timeZone)}.</p> : null}{usage.workspaceBudget ? <p>Workspace this month: ${usage.workspaceBudget.spentUsd.toFixed(2)} used of ${usage.workspaceBudget.limitUsd.toFixed(2)}.</p> : null}</> : <p>{pending === "usage" ? "Checking usage…" : "Usage is unavailable. Close this panel and try again."}</p>}
+      <button type="button" onClick={() => setUsageOpen(false)} className={`${button} mt-2`}>Close usage</button>
+    </section> : null}
+        </div>
       </aside>
       <section className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white" aria-label="Conversation" aria-busy={pending === "load"}>
-        <div className="vsi-conversation-heading flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-3 py-2 sm:px-4"><h2 className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-900">{chat?.title || "New conversation"}</h2>{chat ? <div className="flex gap-2"><button type="button" disabled={disabled} onClick={() => { setTitle(chat.title); setRenaming(!renaming); setDeleting(false); }} className={button} aria-label="Rename"><Pencil aria-hidden="true" className="h-4 w-4 sm:hidden" /><span className="sr-only sm:not-sr-only">Rename</span></button><button type="button" disabled={disabled} onClick={() => { setDeleting(!deleting); setRenaming(false); }} className={button} aria-label="Delete"><Trash2 aria-hidden="true" className="h-4 w-4 sm:hidden" /><span className="sr-only sm:not-sr-only">Delete</span></button></div> : null}</div>
-        {renaming ? <form data-vaeroex-skip-global-activity onSubmit={rename} className="flex shrink-0 flex-wrap items-end gap-2 border-b border-slate-200 p-3"><label className="min-w-0 flex-1 text-sm font-medium text-slate-700">Chat name<input autoFocus maxLength={120} required value={title} onChange={(event) => setTitle(event.target.value)} className="mt-1 block min-h-11 w-full rounded-lg border border-slate-300 px-3 text-slate-900 focus:outline-vaeroex-blue" /></label><button disabled={disabled || !title.trim()} className={button}>{pending === "rename" ? "Saving…" : "Save name"}</button><button type="button" onClick={() => setRenaming(false)} disabled={disabled} className={button}>Cancel</button></form> : null}
-        {deleting ? <div className="shrink-0 border-b border-red-200 bg-red-50 p-3"><p className="text-sm leading-6 text-red-800">Delete this chat and its transcript? This cannot be undone.</p><div className="mt-2 flex flex-wrap gap-2"><button type="button" onClick={deleteChat} disabled={disabled} className={button}>{pending === "delete" ? "Deleting…" : "Delete this chat"}</button><button type="button" onClick={() => setDeleting(false)} disabled={disabled} className={button}>Keep chat</button></div></div> : null}
+        <div className="vsi-conversation-heading min-w-0 shrink-0 border-b border-slate-200 px-3 py-2 sm:px-4"><h2 title={chat?.title || "New conversation"} className="truncate text-sm font-semibold text-slate-900">{chat?.title || "New conversation"}</h2></div>
+        {renaming ? <form data-vaeroex-skip-global-activity onSubmit={rename} className="flex shrink-0 flex-wrap items-end gap-2 border-b border-slate-200 p-3"><label className="min-w-0 flex-1 text-sm font-medium text-slate-700">Chat name<input autoFocus maxLength={120} required value={title} onChange={(event) => setTitle(event.target.value)} className="mt-1 block min-h-11 w-full rounded-lg border border-slate-300 px-3 text-slate-900 focus:outline-vaeroex-blue" /></label><button disabled={disabled || !title.trim()} className={button}>{pending === "rename" ? "Saving…" : "Save name"}</button><button type="button" onClick={() => setRenaming(null)} disabled={disabled} className={button}>Cancel</button></form> : null}
+        {deleting ? <div className="shrink-0 border-b border-red-200 bg-red-50 p-3"><p className="text-sm leading-6 text-red-800">Delete “{deleting.title}” and its transcript? This cannot be undone.</p><div className="mt-2 flex flex-wrap gap-2"><button type="button" autoFocus onClick={deleteChat} disabled={disabled} className={button}>{pending === "delete" ? "Deleting…" : "Delete this chat"}</button><button type="button" onClick={() => setDeleting(null)} disabled={disabled} className={button}>Keep chat</button></div></div> : null}
         {chat?.parentConversationId ? <p className="shrink-0 border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs leading-6 text-slate-600">Continued with a summary from <a href={`/app/si?chat=${encodeURIComponent(chat.parentConversationId)}`} onClick={(event) => { event.preventDefault(); if (!disabled) void openChat(chat.parentConversationId!); }} className="font-semibold text-vaeroex-blue underline">the original transcript</a>. The original chat remains available.</p> : null}
         <div className="relative min-h-0 flex-1">
         <div ref={transcript} id="vsi-transcript" role="region" aria-label="Conversation transcript" tabIndex={0} onScroll={trackTranscriptPosition} className="h-full space-y-5 overflow-y-auto overscroll-contain p-3 focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-vaeroex-blue sm:p-4">

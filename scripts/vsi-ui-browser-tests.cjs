@@ -83,11 +83,11 @@ async function main() {
     await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
     const origin = `http://127.0.0.1:${server.address().port}`;
     browser = await chromium.launch({ headless: true, ...(process.env.CHROME_EXECUTABLE_PATH ? { executablePath: process.env.CHROME_EXECUTABLE_PATH } : {}) });
-    const page = await browser.newPage({ timezoneId: "America/Los_Angeles" }), errors = []; page.on("pageerror", error => errors.push(error.message));
+    const page = await browser.newPage({ timezoneId: "America/Los_Angeles" }), errors = []; page.setDefaultTimeout(15000); page.on("pageerror", error => errors.push(error.message));
     await page.route("**/*", route => new URL(route.request().url()).origin === origin ? route.continue() : route.abort());
     await page.goto(origin); await page.getByRole("button", { name: "New chat", exact: true }).waitFor();
     await page.waitForFunction(() => !document.querySelector('button')?.disabled);
-    assert.equal(usageReads, 0); await page.getByRole("button", { name: "Load older chats" }).click(); await page.getByRole("button", { name: /Historical idea/ }).waitFor(); assert.equal(await page.getByRole("button", { name: "Load older chats" }).count(), 0); assert.equal(await page.locator('input[type="file"]').count(), 0);
+    assert.equal(usageReads, 0); await page.getByRole("button", { name: "Load older chats" }).click(); await page.getByRole("button", { name: /^Historical idea/ }).waitFor(); assert.equal(await page.getByRole("button", { name: "Load older chats" }).count(), 0); assert.equal(await page.locator('input[type="file"]').count(), 0);
     const composer = page.getByRole("textbox", { name: "Message Vaeroex" });
     await composer.fill("Help me plan my week"); await composer.press("Shift+Enter"); assert.equal(posts.length, 0);
     await composer.press("Enter"); await page.getByText("Answer saved.", { exact: true }).waitFor();
@@ -112,7 +112,7 @@ async function main() {
     assert.equal(await renderedEvidence.locator("img, iframe, video, audio, script").count(), 0, "model text never creates HTML or media");
     assert.equal(await renderedEvidence.locator("a").count(), 1, "only the separately verified source becomes a link");
     assert((await renderedEvidence.innerText()).includes("[the guide](https://untrusted.example/guide)"), "model-selected URLs stay literal");
-    await page.getByRole("button", { name: "Rename", exact: true }).click(); await page.getByRole("textbox", { name: "Chat name" }).fill("Furniture project"); await page.getByRole("button", { name: "Save name" }).click();
+    if (await page.locator(".vsi-history > details").getAttribute("open") === null) await page.getByText("Your chats", { exact: true }).click(); await page.locator(".vsi-chat-row").filter({ has: page.locator('[aria-current="page"]') }).getByRole("button", { name: /^Chat actions for / }).click(); await page.getByRole("menuitem", { name: "Rename", exact: true }).click(); await page.getByRole("textbox", { name: "Chat name" }).fill("Furniture project"); await page.getByRole("button", { name: "Save name" }).click();
     await page.getByRole("heading", { name: "Furniture project", exact: true }).waitFor(); await page.reload();
     await page.getByRole("heading", { name: "Furniture project", exact: true }).waitFor(); assert.equal(await page.getByText("retry safely", { exact: true }).count(), 1);
     for (const theme of ["light", "pulsar"]) for (const width of [1440, 390, 320]) {
@@ -122,7 +122,7 @@ async function main() {
       const colors = await page.evaluate(() => {
         const color = selector => getComputedStyle(document.querySelector(selector)).color;
         const background = selector => getComputedStyle(document.querySelector(selector)).backgroundColor;
-        return { header: color("[data-vsi-workspace] h1"), note: color('[aria-label="Proposed Business Note"] p'), noteBackground: background('[aria-label="Proposed Business Note"]'), activeBackground: background('[aria-label="Your chats"] [aria-current="page"]') };
+        return { header: color("[data-vsi-workspace] h2"), note: color('[aria-label="Proposed Business Note"] p'), noteBackground: background('[aria-label="Proposed Business Note"]'), activeBackground: background('[aria-label="Your chats"] [aria-current="page"]') };
       });
       if (theme === "pulsar") {
         assert.equal(colors.header, "rgb(248, 250, 252)", "page title must use readable dark-theme foreground");
@@ -136,13 +136,64 @@ async function main() {
     await page.getByRole("button", { name: "Usage", exact: true }).click(); await page.getByText(/4 of 100 questions/).waitFor(); assert.equal(usageReads, 1);
     assert.equal(await page.getByText(/Your oldest counted question leaves this window after Oct 9, 2026/).count(), 1, "rolling expiry must not imply available questions are blocked");
     assert.equal(await page.getByText(/Next question becomes available/).count(), 0);
+    await page.getByRole("button", { name: "Close usage", exact: true }).click();
     await composer.fill("other tab filled this chat"); await composer.press("Enter");
     await page.getByRole("button", { name: "Continue in a new chat" }).waitFor();
     assert.equal(await composer.count(), 0); await page.getByRole("button", { name: "Continue in a new chat" }).click();
     await composer.waitFor(); assert.equal(await composer.inputValue(), "other tab filled this chat");
     await page.getByRole("link", { name: "the original transcript" }).click(); await page.getByRole("button", { name: "Continue in a new chat" }).waitFor();
-    await page.getByRole("button", { name: "Delete", exact: true }).click(); await page.getByRole("button", { name: "Delete this chat", exact: true }).click(); await page.getByText("Chat deleted.", { exact: true }).waitFor();
+    if (await page.locator(".vsi-history > details").getAttribute("open") === null) await page.getByText("Your chats", { exact: true }).click(); await page.getByRole("button", { name: "Chat actions for Furniture project", exact: true }).click(); await page.getByRole("menuitem", { name: "Delete", exact: true }).click(); await page.getByRole("button", { name: "Delete this chat", exact: true }).click(); await page.getByText("Chat deleted.", { exact: true }).waitFor();
     assert.equal(await page.getByText("Furniture project", { exact: true }).count(), 0);
+    // Each row owns its actions; changing a different row must preserve the reader's chat.
+    const longTitle = "A long saved question about planning next quarter across several different locations and teams with many priorities";
+    for (const width of [1440, 390, 320]) {
+      const menuId = `menu-${width}`;
+      stored.set(menuId, { conversation: { ...chat(menuId), title: longTitle }, exchanges: [] });
+      const menuPage = await browser.newPage({ viewport: { width, height: 900 }, hasTouch: width < 1280, timezoneId: "America/Los_Angeles" });
+      menuPage.setDefaultTimeout(15000);
+      await menuPage.goto(`${origin}/?chat=warning`);
+      await menuPage.getByRole("heading", { name: "Planning history", exact: true }).waitFor();
+      const history = menuPage.locator(".vsi-history > details");
+      if (await history.getAttribute("open") === null) await history.locator("summary").click();
+      const trigger = menuPage.getByRole("button", { name: `Chat actions for ${longTitle}`, exact: true });
+      const row = menuPage.locator(".vsi-chat-row").filter({ has: trigger });
+      assert(await row.locator("span.truncate").evaluate(n => getComputedStyle(n).textOverflow === "ellipsis" && n.scrollWidth > n.clientWidth), "long list title truncates");
+      if (width === 1440) {
+        await trigger.focus(); await menuPage.keyboard.press("ArrowDown");
+        assert.equal(await menuPage.getByRole("menuitem", { name: "Rename" }).evaluate(n => n === document.activeElement), true);
+        await menuPage.keyboard.press("ArrowDown");
+        assert.equal(await menuPage.getByRole("menuitem", { name: "Delete", exact: true }).evaluate(n => n === document.activeElement), true);
+        await menuPage.keyboard.press("Escape"); assert.equal(await trigger.evaluate(n => n === document.activeElement), true);
+        await trigger.hover(); assert.equal(await trigger.evaluate(n => getComputedStyle(n).opacity), "1");
+        await trigger.click();
+      } else {
+        assert.equal(await trigger.evaluate(n => getComputedStyle(n).opacity), "1", "touch actions always visible");
+        await trigger.tap();
+      }
+      await menuPage.waitForFunction(() => { const menu = document.querySelector('[role="menu"]'); return menu && menu.getBoundingClientRect().left > 0 && menu.getBoundingClientRect().top > 0; });
+      for (const item of await menuPage.getByRole("menuitem").all()) assert(await item.evaluate(n => { const r = n.getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth && r.top >= 0 && r.bottom <= innerHeight && n.contains(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)); }), "entire menu is visible and tappable outside the history scroll clip");
+      await menuPage.screenshot({ path: path.join(output, `vsi-chat-menu-${width}.png`), fullPage: true });
+      await menuPage.getByRole("menuitem", { name: "Rename", exact: true }).click();
+      await menuPage.getByRole("textbox", { name: "Chat name" }).fill(`Renamed ${width}`);
+      await menuPage.getByRole("button", { name: "Save name", exact: true }).click();
+      await menuPage.getByText("Chat renamed.", { exact: true }).waitFor();
+      assert.equal(await menuPage.getByRole("heading", { name: "Planning history", exact: true }).count(), 1, "inactive rename preserves open transcript");
+      await menuPage.reload(); await menuPage.getByRole("heading", { name: "Planning history", exact: true }).waitFor();
+      if (await history.getAttribute("open") === null) await history.locator("summary").click();
+      const renamed = menuPage.getByRole("button", { name: `Chat actions for Renamed ${width}`, exact: true });
+      await renamed.click(); await menuPage.getByRole("menuitem", { name: "Delete", exact: true }).click();
+      assert(stored.has(menuId), "menu delete requires explicit confirmation");
+      await menuPage.getByRole("button", { name: "Keep chat", exact: true }).click(); assert(stored.has(menuId));
+      await renamed.click(); await menuPage.getByRole("menuitem", { name: "Delete", exact: true }).click();
+      await menuPage.getByRole("button", { name: "Delete this chat", exact: true }).click(); await menuPage.getByText("Chat deleted.", { exact: true }).waitFor();
+      assert.equal(await menuPage.getByRole("heading", { name: "Planning history", exact: true }).count(), 1, "inactive delete preserves open transcript");
+      await menuPage.reload(); await menuPage.getByRole("heading", { name: "Planning history", exact: true }).waitFor();
+      assert.equal(await menuPage.getByRole("button", { name: `Chat actions for Renamed ${width}`, exact: true }).count(), 0);
+      await menuPage.getByRole("button", { name: "Usage", exact: true }).click(); await menuPage.getByRole("region", { name: "VSI usage" }).waitFor();
+      assert(await menuPage.getByRole("region", { name: "VSI usage" }).evaluate(n => { const r = n.getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth && r.bottom <= innerHeight; }), "usage fits viewport");
+      await menuPage.screenshot({ path: path.join(output, `vsi-final-controls-${width}.png`), fullPage: true });
+      await menuPage.close();
+    }
     for (let index = 0; index < 24; index++) stored.set(`history-${index}`, { conversation: { ...chat(`history-${index}`), title: `Saved project ${index + 1}` }, exchanges: [] });
     for (const [width, height] of [[1440, 900], [390, 844], [320, 740]]) {
       stored.set("long", { conversation: { ...chat("long", 20), title: "Workshop planning · 20 exchanges" }, exchanges: longExchanges() });
@@ -255,7 +306,7 @@ async function main() {
     await page.goto(`${origin}/?chat=warning&zone=America/New_York`);
     await page.getByRole("article").waitFor();
     assert.match(await page.getByRole("article").locator("time").innerText(), /2:00 PM EDT/, "workspace timezone overrides viewer timezone");
-    console.log(JSON.stringify({ passed: true, checks: ["general question", "App Router searchParams update", "older history pagination", "keyboard", "stable retry", "explicit note confirmation", "citation dates", "legacy web excerpts hidden without removing private evidence or public links", "Markdown headings and fenced code stay safe and readable", "rename reopen delete", "225 warning", "250 handoff preserves transcript", "second-tab thread boundary preserves unsent draft", "workspace access loss clears transcript", "on-demand usage", "desktop mobile no overflow", "20-exchange bounded transcript and composer", "old reading position and focus survive delayed answers", "keyboard jump and transcript scrolling", "safe compact business tables", "software-keyboard-sized viewport", "slow-response notice and recoverable 205-second timeout", "actual global CSS light/Pulsar contrast"], widths: [1440, 390, 320], output, scope: "Hydrated UI with synthetic loopback API; authenticated API and provider qualification are separate." }));
+    console.log(JSON.stringify({ passed: true, checks: ["general question", "App Router searchParams update", "older history pagination", "keyboard", "stable retry", "explicit note confirmation", "citation dates", "legacy web excerpts hidden without removing private evidence or public links", "Markdown headings and fenced code stay safe and readable", "rename reopen delete", "keyboard arrows and Escape menu", "touch menu at 390 and 320", "inactive chat actions preserve transcript", "delete cancellation and reload", "truncated titles", "compact usage viewport", "225 warning", "250 handoff preserves transcript", "second-tab thread boundary preserves unsent draft", "workspace access loss clears transcript", "on-demand usage", "desktop mobile no overflow", "20-exchange bounded transcript and composer", "old reading position and focus survive delayed answers", "keyboard jump and transcript scrolling", "safe compact business tables", "software-keyboard-sized viewport", "slow-response notice and recoverable 205-second timeout", "actual global CSS light/Pulsar contrast"], widths: [1440, 390, 320], output, scope: "Hydrated UI with synthetic loopback API; authenticated API and provider qualification are separate." }));
   } finally { if (browser) await browser.close(); await new Promise(resolve => server.close(resolve)); }
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

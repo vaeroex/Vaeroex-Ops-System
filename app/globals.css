@@ -3061,13 +3061,15 @@ html:not(.pulsar) .vaeroex-customer-workspace .workspace-saved-analyses .workspa
 .workspace-vsi > header, .workspace-vsi > details { flex-shrink: 0; }
 .workspace-vsi > details[open] { max-height: 35%; overflow-y: auto; }
 .workspace-vsi .vsi-panels { grid-template-rows: auto minmax(0, 1fr); }
-.workspace-vsi .vsi-history { display: flex; align-items: start; gap: .75rem; }
+.workspace-vsi .vsi-history { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: .5rem; }
 .workspace-vsi .vsi-history > button { width: auto; flex-shrink: 0; }
-.workspace-vsi .vsi-history > details { flex: 1; margin-top: .5rem; min-width: 0; }
+.workspace-vsi .vsi-history > details { grid-column: 1 / -1; grid-row: 2; flex: 1; margin-top: 0; min-width: 0; }
+.workspace-vsi .vsi-usage-control { grid-column: 2; grid-row: 1; }
 .workspace-vsi [data-vsi-composer] { padding: .5rem .75rem; }
 @media (min-width: 1280px) {
   .workspace-vsi .vsi-panels { grid-template-rows: minmax(0, 1fr); }
-  .workspace-vsi .vsi-history { display: block; overflow-y: auto; }
+  .workspace-vsi .vsi-history { display: flex; flex-direction: column; align-items: stretch; }
+  .workspace-vsi .vsi-history > details { min-height: 0; overflow-y: auto; }
   .workspace-vsi .vsi-history > button { width: 100%; }
 }
 /* In a keyboard-sized viewport, keep the active conversation and composer
@@ -3077,3 +3079,10 @@ html:not(.pulsar) .vaeroex-customer-workspace .workspace-saved-analyses .workspa
 .workspace-vsi[data-compact-viewport="true"]:has([data-vsi-composer] textarea:focus) .vsi-history,
 .workspace-vsi[data-compact-viewport="true"]:has([data-vsi-composer] textarea:focus) .vsi-conversation-heading { display: none; }
 .workspace-vsi[data-compact-viewport="true"]:has([data-vsi-composer] textarea:focus) .vsi-panels { grid-template-rows: minmax(0, 1fr); }
+
+/* Actions remain discoverable by pointer, keyboard, and touch. */
+@media (hover: hover) and (pointer: fine) {
+  .vsi-chat-menu-trigger { opacity: 0; }
+  .vsi-chat-row:hover .vsi-chat-menu-trigger,
+  .vsi-chat-row:focus-within .vsi-chat-menu-trigger { opacity: 1; }
+}
