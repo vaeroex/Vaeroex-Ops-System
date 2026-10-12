@@ -1,0 +1,221 @@
+{
+  "status": "passed",
+  "baseline": false,
+  "checks": 7,
+  "results": [
+    {
+      "failedBoundary": "gateway",
+      "authorizationRetained": true,
+      "claims": 0,
+      "mutations": 0,
+      "feedbackRedirect": true
+    },
+    {
+      "failedBoundary": "claim:denied",
+      "mutations": 0,
+      "preservedWinningState": true
+    },
+    {
+      "failedBoundary": "claim:ack-lost",
+      "mutations": 0,
+      "preservedWinningState": true
+    },
+    {
+      "failedBoundary": "memory:failed",
+      "acceptedKpiRows": 1,
+      "successRedirect": false,
+      "importStatus": "failed",
+      "fileStatus": "failed",
+      "finalImport": {
+        "status": "failed",
+        "rows_imported": 1,
+        "mapping_json": {
+          "mode": "workbook",
+          "worksheets": [
+            {
+              "index": 1,
+              "name": "Metrics",
+              "state": "visible",
+              "relationship_id": null,
+              "relationship_target": null,
+              "status": "parsed",
+              "row_count": 1,
+              "columns": [
+                "Metric",
+                "Value",
+                "Date"
+              ],
+              "detected_type": "kpis",
+              "selected_type": "kpis",
+              "enabled": true,
+              "mapping": {
+                "name": "Metric",
+                "actual_value": "Value",
+                "metric_date": "Date"
+              },
+              "metric_columns": []
+            }
+          ],
+          "detection_version": 3
+        },
+        "errors_json": [
+          {
+            "stage": "import",
+            "worksheet": "Workbook",
+            "row_number": null,
+            "field": "workbook",
+            "message": "Structured records may already be saved, but approved worksheet evidence was not published. This import is held for reconciliation."
+          }
+        ]
+      }
+    },
+    {
+      "failedBoundary": "file_import_rows:imported",
+      "acceptedKpiRows": 1,
+      "successRedirect": false,
+      "importStatus": "failed",
+      "fileStatus": "failed",
+      "finalImport": {
+        "status": "failed",
+        "rows_imported": 1,
+        "mapping_json": {
+          "mode": "workbook",
+          "worksheets": [
+            {
+              "index": 1,
+              "name": "Metrics",
+              "state": "visible",
+              "relationship_id": null,
+              "relationship_target": null,
+              "status": "parsed",
+              "row_count": 1,
+              "columns": [
+                "Metric",
+                "Value",
+                "Date"
+              ],
+              "detected_type": "kpis",
+              "selected_type": "kpis",
+              "enabled": true,
+              "mapping": {
+                "name": "Metric",
+                "actual_value": "Value",
+                "metric_date": "Date"
+              },
+              "metric_columns": []
+            }
+          ],
+          "detection_version": 3
+        },
+        "errors_json": [
+          {
+            "stage": "import",
+            "worksheet": "Workbook",
+            "row_number": null,
+            "field": "workbook",
+            "message": "Some import records may already be saved. Imported row status could not be confirmed. Reload this source and review its imported records before retrying."
+          }
+        ]
+      }
+    },
+    {
+      "failedBoundary": "file_imports:completed",
+      "acceptedKpiRows": 1,
+      "successRedirect": false,
+      "importStatus": "failed",
+      "fileStatus": "failed",
+      "finalImport": {
+        "status": "failed",
+        "rows_imported": 1,
+        "mapping_json": {
+          "mode": "workbook",
+          "worksheets": [
+            {
+              "index": 1,
+              "name": "Metrics",
+              "state": "visible",
+              "relationship_id": null,
+              "relationship_target": null,
+              "status": "parsed",
+              "row_count": 1,
+              "columns": [
+                "Metric",
+                "Value",
+                "Date"
+              ],
+              "detected_type": "kpis",
+              "selected_type": "kpis",
+              "enabled": true,
+              "mapping": {
+                "name": "Metric",
+                "actual_value": "Value",
+                "metric_date": "Date"
+              },
+              "metric_columns": []
+            }
+          ],
+          "detection_version": 3
+        },
+        "errors_json": [
+          {
+            "stage": "import",
+            "worksheet": "Workbook",
+            "row_number": null,
+            "field": "workbook",
+            "message": "Some import records may already be saved. Import completion could not be confirmed. Reload this source and review its imported records before retrying."
+          }
+        ]
+      }
+    },
+    {
+      "failedBoundary": "file_uploads:imported",
+      "acceptedKpiRows": 1,
+      "successRedirect": false,
+      "importStatus": "failed",
+      "fileStatus": "failed",
+      "finalImport": {
+        "status": "failed",
+        "rows_imported": 1,
+        "mapping_json": {
+          "mode": "workbook",
+          "worksheets": [
+            {
+              "index": 1,
+              "name": "Metrics",
+              "state": "visible",
+              "relationship_id": null,
+              "relationship_target": null,
+              "status": "parsed",
+              "row_count": 1,
+              "columns": [
+                "Metric",
+                "Value",
+                "Date"
+              ],
+              "detected_type": "kpis",
+              "selected_type": "kpis",
+              "enabled": true,
+              "mapping": {
+                "name": "Metric",
+                "actual_value": "Value",
+                "metric_date": "Date"
+              },
+              "metric_columns": []
+            }
+          ],
+          "detection_version": 3
+        },
+        "errors_json": [
+          {
+            "stage": "import",
+            "worksheet": "Workbook",
+            "row_number": null,
+            "field": "workbook",
+            "message": "Some import records may already be saved. Source completion could not be confirmed. Reload this source and review its imported records before retrying."
+          }
+        ]
+      }
+    }
+  ],
+  "limitation": "Actual workbook function, synthetic in-memory DB and indexing adapter. No real SQL transaction/concurrent retry or UI validation."
+}

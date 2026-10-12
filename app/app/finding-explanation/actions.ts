@@ -142,16 +142,12 @@ export async function explainFindingAction(requestToken: string): Promise<Findin
     original_evidence_eligible: false
   } satisfies Json;
   const { data: run, error: insertError } = await admin
-    .from("ai_agent_runs")
-    .insert({
-      workspace_id: workspaceId,
-      agent_type: FINDING_EXPLANATION_CONTRACT_ID,
-      input_json: inputJson,
-      output_json: {},
-      status: "processing",
-      created_by: user.id
+    .rpc("create_trusted_analysis_run_v1", {
+      p_workspace_id: workspaceId,
+      p_actor_id: user.id,
+      p_agent_type: FINDING_EXPLANATION_CONTRACT_ID,
+      p_input_json: inputJson
     })
-    .select("id")
     .maybeSingle();
   if (insertError || !run) return { status: "failed", artifact: null, message: SAFE_FAILURE_MESSAGE };
 

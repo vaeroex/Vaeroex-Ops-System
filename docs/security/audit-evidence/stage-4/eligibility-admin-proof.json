@@ -1,0 +1,25 @@
+{
+  "scope": "Actual eligibility admin helper under JSON request-claim context; minimal local fixture, not full provider eligibility replay",
+  "results": [
+    {
+      "name": "before migration: staff can persist a cross-workspace form parent",
+      "status": "pass"
+    },
+    {
+      "name": "old RESET SESSION AUTHORIZATION leaves authenticated request context and blocks trusted unpaid membership setup",
+      "status": "pass"
+    },
+    {
+      "name": "corrected actual admin helper clears prior request identity",
+      "status": "pass"
+    },
+    {
+      "name": "owner setup retains unpaid entitlement state",
+      "status": "pass"
+    },
+    {
+      "name": "unpaid authenticated operational mutation remains denied after trusted fixture setup",
+      "status": "pass"
+    }
+  ]
+}

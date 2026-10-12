@@ -1,3 +1,5 @@
+import Link from "next/link";
+import type { Route } from "next";
 import { createAssetAction, createAssetCheckAction } from "@/app/app/operations/actions";
 import { CreateDrawer } from "@/components/operations/CreateDrawer";
 import { EmptyState } from "@/components/operations/EmptyState";
@@ -66,6 +68,7 @@ export default async function AssetsPage({ searchParams }: AssetsPageProps) {
         { label: "Location", value: asset.location || "Not set" },
         { label: "Last check", value: asset.last_checked_at ? new Date(asset.last_checked_at).toLocaleDateString() : "Never" }
       ],
+      inlineActions: <Link href={`/app/assets/checks?asset_id=${asset.id}` as Route} className="text-xs font-semibold text-vaeroex-blue underline">Check history</Link>,
       editFields: assetEditFields,
       editValues: {
         asset_name: asset.asset_name,
@@ -167,12 +170,13 @@ export default async function AssetsPage({ searchParams }: AssetsPageProps) {
           searchParams={params}
         />
 
+        <Link href="/app/assets/checks" className="inline-flex min-h-11 items-center rounded-lg border border-line px-4 py-2 font-semibold">View complete asset check history</Link>
         <ManagedRecordList
           collection="asset_checks"
           records={managedChecks}
           folders={checkFolders.folders}
-          title="Asset check records"
-          description="Recent checks can also be archived, moved, duplicated, or deleted."
+          title="Recent asset checks (latest 12)"
+          description="This preview contains the latest 12 checks. Open complete history to search and manage every check."
           emptyTitle="No asset checks"
           emptyDescription="Run a quick asset check to document readiness or needed repairs."
           returnPath="/app/assets"

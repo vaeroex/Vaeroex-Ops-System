@@ -1,0 +1,86 @@
+{
+  "failures": [
+    {
+      "resultSha256": "17220b66cfca353f2a5790bf62d67f052dbe29cfe6ee11a9c606fffd764494aa",
+      "sourceCommit": "4604d8f6e8f11c25a2132dab3b58863e94ce730e",
+      "buildId": "DXotK0faGZkQdtb1s6MiJ",
+      "harnessSha256": "f201b9829e745edeb1e09b161ed37837dfb80e00ba1abda1b0726261da0e568c",
+      "passedChecks": 0,
+      "failure": {
+        "stage": "current_1440_0",
+        "reason": "health_browser_assertion_failed",
+        "errorCode": "TimeoutError"
+      },
+      "browserErrors": [
+        {
+          "stage": "current_1440_0",
+          "kind": "console",
+          "hash": "682aee32d1feea18371c3c8c847086afb604dfb81a8677fd92edb69365433295"
+        }
+      ]
+    },
+    {
+      "resultSha256": "10a082fc1aacff9a5989bf2c2b151765b90e1257a023e7cd36ae2178b841e1b7",
+      "sourceCommit": "8a0c172577b7262603737546342d2b61d013fb1c",
+      "buildId": "aHRkxW3yGZt0RetedcZBI",
+      "harnessSha256": "5b50ed6554ddfb5c33a31f238efdd0f45be2fb3d4994426ac475a4fe4e1ecde5",
+      "passedChecks": 4,
+      "failure": {
+        "stage": "current_1440_0",
+        "reason": "health_browser_assertion_failed",
+        "errorCode": "TimeoutError"
+      },
+      "browserErrors": []
+    },
+    {
+      "resultSha256": "6c1bad97afc8dab430df6aa907fbd4f34d97dbcfa73379846d2c44205090beb8",
+      "sourceCommit": "8a0c172577b7262603737546342d2b61d013fb1c",
+      "buildId": "aHRkxW3yGZt0RetedcZBI",
+      "harnessSha256": "cc5fb2ec31f74af65dea9cbc55e019183f662e3cbbfc3108e8350d0ff7b28b01",
+      "passedChecks": 43,
+      "failure": {
+        "stage": "scoped_health_read_recovery_1440",
+        "reason": "health_browser_assertion_failed",
+        "errorCode": "TimeoutError"
+      },
+      "browserErrors": [
+        {
+          "stage": "cross_workspace_1440",
+          "kind": "pageerror",
+          "hash": "2bde0493b6146c98836ad3de14f729abaa4521a6fee4bdbb159f934dd9f9831d"
+        }
+      ]
+    },
+    {
+      "resultSha256": "a1924525c63af87195d9d20e2f46893267dc2dc6df9f70094700db4abceb73f6",
+      "sourceCommit": "8a0c172577b7262603737546342d2b61d013fb1c",
+      "buildId": "aHRkxW3yGZt0RetedcZBI",
+      "harnessSha256": "b5c28cb2e1f0a77d908c32c5d3f6a438e4bf9a689b342c7785a8d72e0d37510b",
+      "passedChecks": 88,
+      "failure": {
+        "stage": "scoped_health_read_recovery_390",
+        "reason": "health_browser_assertion_failed",
+        "errorCode": "ERR_ASSERTION"
+      },
+      "browserErrors": [
+        {
+          "stage": "cross_workspace_1440",
+          "kind": "pageerror",
+          "hash": "2bde0493b6146c98836ad3de14f729abaa4521a6fee4bdbb159f934dd9f9831d"
+        },
+        {
+          "stage": "cross_workspace_390",
+          "kind": "pageerror",
+          "hash": "2bde0493b6146c98836ad3de14f729abaa4521a6fee4bdbb159f934dd9f9831d"
+        }
+      ]
+    }
+  ],
+  "causesInOrder": [
+    "Existing historical movement versus current-evidence trajectory parity defect; preserved and fixed.",
+    "Test selector omitted displayed [1] prefix; citation was visible, exact selector corrected.",
+    "Identical fragment URL produced no new document read; nonce query used before fault injection, no navigation after Retry.",
+    "Existing Saved Analyses implicit-timezone hydration mismatch; preserved and fixed."
+  ],
+  "notOverwritten": true
+}

@@ -1,0 +1,34 @@
+{
+  "passed": true,
+  "databaseName": "vxa_qbo_recovery_3a6f1517bd7e4040",
+  "actualLeaseSeconds": 300,
+  "killedWall": "2026-10-05T18:54:10.146Z",
+  "leaseExpiresAt": "2026-10-05T18:59:10.133234+00:00",
+  "killToReadyMs": 300047.717625,
+  "recoveryCallMs": 45.652292000013404,
+  "originalEligibleAt": "2026-10-05T18:50:05.543Z",
+  "sourceCreatedAt": "2026-10-05T18:50:05.543Z",
+  "workerExit": {
+    "code": null,
+    "signal": "SIGKILL"
+  },
+  "beforeExpiryRecovered": 0,
+  "afterExpiry": {
+    "readyCount": 2,
+    "cancelledCount": 0,
+    "recoveredCount": 2,
+    "deadLetterCount": 0
+  },
+  "targetReady": true,
+  "lateDeadWorkerDenied": true,
+  "inventory": {
+    "tasks": 48,
+    "sources": 0,
+    "versions": 0,
+    "checkpoints": 0
+  },
+  "noLostOrDuplicatedSources": true,
+  "thresholdSeconds": 300,
+  "thresholdMet": false,
+  "limitations": "Immediate local recovery after observed expiry; declared production dispatch cadence is5minutes. Pending is retry eligibility, not completed provider work. No provider HTTP or automatic redispatch completion measured."
+}

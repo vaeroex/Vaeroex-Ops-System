@@ -52,8 +52,34 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Workspace audit security, evidence and workflow regressions
+        run: pnpm test:workspace-audit
+
+      - name: Isolated workspace authorization and concurrent slot regressions
+        # Creates a fresh Unix-socket-only cluster; accepts no hosted database URL.
+        run: |
+          audit_pg_bin="$(pg_config --bindir)"
+          WORKSPACE_AUDIT_PG_BIN="$audit_pg_bin" pnpm test:workspace-audit:database
+          WORKSPACE_STORAGE_PG_BIN="$audit_pg_bin" node scripts/workspace-storage-database-tests.cjs
+          ADMIN_METRICS_PG_BIN="$audit_pg_bin" node scripts/admin-metrics-database-tests.cjs
+          ISSUE_TEST_PG_BIN="$audit_pg_bin" node scripts/issue-submission-native-tests.cjs
+          SHEETS_TEST_PG_BIN="$audit_pg_bin" node scripts/google-sheets-dispatch-native-tests.cjs
+          SHEETS_TEST_PG_BIN="$audit_pg_bin" node scripts/google-sheets-dispatch-fairness-native-tests.cjs
+          SHEETS_TEST_PG_BIN="$audit_pg_bin" node scripts/google-sheets-recovery-continuation-native-tests.cjs
+          SHEETS_TEST_PG_BIN="$audit_pg_bin" node scripts/google-sheets-failure-cleanup-native-tests.cjs
+
+      - name: Workspace storage capacity policy and controlled billing regressions
+        run: |
+          node scripts/workspace-capacity-billing-tests.cjs
+          node scripts/stripe-webhook-receipt-tests.cjs
+          node scripts/storage-capacity-ui-tests.cjs
+          node scripts/storage-capacity-upload-client-tests.cjs
+
       - name: Workspace navigation and bounded-list regressions
         run: pnpm test:workspace-clarity
+
+      - name: Executive Intelligence advice quality and analysis regressions
+        run: pnpm test:executive-advice-quality
 
       - name: Restricted Square workspace host Linux qualification
         run: |
@@ -161,6 +187,20 @@ jobs:
         run: |
           pnpm exec playwright install --with-deps chromium
           pnpm test:google-sheets-ui
+
+      - name: Private admin telemetry and support regressions
+        run: |
+          pnpm test:admin-operations
+          pnpm test:admin-operations:browser
+
+      - name: VSI desktop and mobile chat flow
+        run: pnpm test:vsi-ui
+
+      - name: Executive Intelligence advice desktop and mobile flow
+        run: pnpm test:executive-advice-browser
+
+      - name: Workspace audit desktop/mobile keyboard and form regressions
+        run: pnpm test:workspace-audit:browser
 
       - name: Verify optimized Square handoff headers and isolated synthetic browser navigation
         run: |
@@ -297,17 +337,28 @@ jobs:
       - name: Build external integrations QBO Production runtime
         run: pnpm build:external-integrations-qbo
 
+      - name: Qualify QBO Linux amd64 credential-free build and network-isolated smoke
+        # Public-repository standard runner; no image push or artifact storage.
+        timeout-minutes: 20
+        run: node scripts/qbo-worker-image-qualification.cjs
+
       - name: TypeScript check
         run: pnpm typecheck
 
       - name: ESLint
         run: pnpm lint
 
+      - name: Public website rendering and policy regressions
+        run: pnpm test:public-clarity
+
       - name: Production build
         run: pnpm build
 
       - name: Security regression check
         run: pnpm security:check
+
+      - name: VSI Luna and evidence boundary regressions
+        run: pnpm test:vsi
 
       - name: Whitespace check
         run: git diff --check origin/main...HEAD
@@ -654,6 +705,7 @@ jobs:
         run: |
           node scripts/run-isolated-database-tests.js \
             supabase/tests/security_high_findings_remediation.test.sql \
+            supabase/tests/vsi_private_chat.test.sql \
             supabase/tests/customer_1_billing_entitlement.test.sql \
             supabase/tests/external_integrations_phase_1_canonical_foundation.test.sql \
             supabase/tests/external_integrations_phase_2_reconciliation.test.sql \
@@ -675,6 +727,14 @@ jobs:
 
       # Preserve earlier failures while still collecting independent Square
       # evidence. Never run these checks without successful disposable setup.
+      - name: Verify VSI private transcripts, concurrency, rolling quotas and cost accounting
+        if: ${{ !cancelled() && steps.isolated_database_setup.outcome == 'success' }}
+        # Discovers and verifies the local Docker database; rejects hosted URLs,
+        # inherited service credentials, linked projects and fabricated configs.
+        # The previous migration step owns schema changes; this only uses its
+        # own synthetic actors/workspaces and cleans them up after qualification.
+        run: node scripts/vsi-database-tests.cjs --supabase-local
+
       - name: Verify Square Production runtime foundation in the isolated database
         if: ${{ !cancelled() && steps.isolated_database_setup.outcome == 'success' }}
         run: node scripts/run-isolated-database-tests.js supabase/tests/square_production_runtime_foundation.test.sql

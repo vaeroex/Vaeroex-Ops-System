@@ -1,0 +1,22 @@
+{
+  "sourceCommit": "7090198137261c850a3bcca8248813f5deed923c",
+  "files": [
+    {
+      "file": "ci-465-preserved-security-location-failure.json",
+      "bytes": 1858,
+      "sha256": "5bd8adf98899b05bf18b3443725cba3143020e43e4825c241ed347efd76bdffe"
+    },
+    {
+      "file": "ci-465-linux-image-70901981.json",
+      "bytes": 8153,
+      "sha256": "dd199b9fd3a1e9f5302d7735d3153a6c1fb24ab7cf65f28e6a90467f951d590d"
+    },
+    {
+      "file": "security-location-correction-regression.json",
+      "bytes": 2431,
+      "sha256": "0ea58905f504e4c64f607659255d18431e7aace8c699a7055b67721484be7e19"
+    }
+  ],
+  "sourceImageReceiptSha256": "dd199b9fd3a1e9f5302d7735d3153a6c1fb24ab7cf65f28e6a90467f951d590d",
+  "selection": "Sanitized CI metadata and credential-free build/smoke result; raw logs and private configuration excluded."
+}

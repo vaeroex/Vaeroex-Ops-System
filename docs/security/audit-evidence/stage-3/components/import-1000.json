@@ -1,0 +1,110 @@
+{
+  "started": "2026-10-05T01:43:51.836Z",
+  "elapsedMs": 400,
+  "job": {
+    "kind": "import",
+    "rows": 1000,
+    "series": 25,
+    "months": 24,
+    "iterations": 5
+  },
+  "code": 0,
+  "signal": null,
+  "stopReason": null,
+  "observedRssBytes": 160382976,
+  "output": {
+    "job": {
+      "kind": "import",
+      "rows": 1000,
+      "series": 25,
+      "months": 24,
+      "iterations": 5
+    },
+    "sourceRoot": "/tmp/vaeroex-audit-production",
+    "node": "v24.19.0",
+    "platform": "darwin",
+    "bytes": 39801,
+    "integrity": {
+      "rows": 1000,
+      "series": 25,
+      "valueChecksum": 500500,
+      "allIdsPreserved": true
+    },
+    "deterministicDigest": "7c74fa5e105f161d54e9165ab7ab657ade829e3038723d5e654ec83638b38689",
+    "samples": [
+      {
+        "iteration": 0,
+        "parseMs": 1.6741250000000036,
+        "mapAndIntegrityMs": 0.3575000000000159,
+        "canonicalMs": 4.2964999999999804,
+        "totalMs": 6.328125,
+        "cpuMs": 21.598,
+        "rssBytes": 171737088
+      },
+      {
+        "iteration": 1,
+        "parseMs": 1.3174579999999878,
+        "mapAndIntegrityMs": 0.2074999999999818,
+        "canonicalMs": 2.2905420000000163,
+        "totalMs": 3.815499999999986,
+        "cpuMs": 12.944,
+        "rssBytes": 171884544
+      },
+      {
+        "iteration": 2,
+        "parseMs": 2.3358749999999873,
+        "mapAndIntegrityMs": 0.21966700000001538,
+        "canonicalMs": 2.096790999999996,
+        "totalMs": 4.652332999999999,
+        "cpuMs": 14.177,
+        "rssBytes": 171261952
+      },
+      {
+        "iteration": 3,
+        "parseMs": 0.8256670000000099,
+        "mapAndIntegrityMs": 0.21862500000003138,
+        "canonicalMs": 2.134832999999958,
+        "totalMs": 3.179124999999999,
+        "cpuMs": 12.284,
+        "rssBytes": 171261952
+      },
+      {
+        "iteration": 4,
+        "parseMs": 0.7275419999999713,
+        "mapAndIntegrityMs": 0.19870800000001054,
+        "canonicalMs": 2.023416999999995,
+        "totalMs": 2.9496669999999767,
+        "cpuMs": 9.197,
+        "rssBytes": 171261952
+      }
+    ],
+    "summary": {
+      "p50Ms": 3.815499999999986,
+      "p95Ms": 6.328125,
+      "maxMs": 6.328125,
+      "diagnosticBudgetMs": 5000,
+      "withinDiagnosticBudget": true
+    },
+    "resourceUsage": {
+      "userCPUTime": 671163,
+      "systemCPUTime": 38236,
+      "maxRSS": 167856,
+      "sharedMemorySize": 0,
+      "unsharedDataSize": 0,
+      "unsharedStackSize": 0,
+      "minorPageFault": 10543,
+      "majorPageFault": 96,
+      "swappedOut": 0,
+      "fsRead": 0,
+      "fsWrite": 0,
+      "ipcSent": 0,
+      "ipcReceived": 0,
+      "signalsCount": 0,
+      "voluntaryContextSwitches": 43,
+      "involuntaryContextSwitches": 2036
+    },
+    "maxRssBytes": 171884544,
+    "scope": "actual functions with synthetic in-memory inputs; excludes IO/persistence/API/model/user capacity"
+  },
+  "stderr": ""
+}

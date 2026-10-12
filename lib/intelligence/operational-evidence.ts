@@ -2,8 +2,9 @@ import type { Database, Json } from "@/lib/supabase/types";
 import { excludeChecklistDerivedMetrics } from "@/lib/intelligence/checklist-retirement";
 import { filterBusinessEvidence, filterOriginalBusinessEvidence } from "@/lib/intelligence/evidence-eligibility";
 import type { IntelligenceEvidenceRecord, IntelligenceInsight } from "@/lib/intelligence/layer";
+import { availableInvestigationFields } from "@/lib/intelligence/investigation-plan";
 import { compareKpiRowsNewest, normalizeKpiName } from "@/lib/intelligence/kpi-identity";
-import { buildSourceParentEligibility, filterBySourceParentEligibility } from "@/lib/intelligence/source-parent-eligibility";
+import { buildSourceParentEligibility, filterBySourceParentEligibility, type SourceParentRecords } from "@/lib/intelligence/source-parent-eligibility";
 import { applyKpiSettingsToRows, kpiSemantics, type KpiSettingRow } from "@/lib/kpis/settings";
 import { evaluateKpiPerformance, resolveKpiTargetReference } from "@/lib/kpis/semantics";
 
@@ -191,7 +192,8 @@ function operationalRecord(row: OperationalMetricRow, support: string, value: st
     href: sourceHref(row.source_file_id),
     classification: "Original",
     sourceKey,
-    groupHint: worksheet
+    groupHint: worksheet,
+    availableFields: availableInvestigationFields(raw)
   };
 }
 
@@ -218,7 +220,8 @@ function kpiRecord(row: KpiRow, support: string, settings: KpiSettingRow[]): Int
     href: sourceHref(row.source_file_id),
     classification: "Original",
     sourceKey,
-    groupHint: worksheet
+    groupHint: worksheet,
+    availableFields: availableInvestigationFields(raw)
   };
 }
 
@@ -315,6 +318,7 @@ function completeCandidate(group: SourceGroup, draft: CandidateDraft): Intellige
 
   return {
     ...insight,
+    investigationContext: { kind: "records", sourceAction: insight.recommendedAction },
     confidence: independentSourceCount >= 2 ? "High" : "Medium",
     evidenceCount: supportingRecords.length,
     supportingRecords,
@@ -693,18 +697,23 @@ export function buildOperationalEvidenceInsights({
   operationalMetrics = [],
   memoryChunks = [],
   files = [],
-  imports = []
+  imports = [],
+  sourceParents
 }: {
   kpis?: KpiRow[];
   kpiSettings?: KpiSettingRow[];
   operationalMetrics?: OperationalMetricRow[];
   memoryChunks?: MemoryChunkRow[];
   files?: FileUploadRow[];
+  sourceParents?: SourceParentRecords;
   imports?: FileImportRow[];
 }) {
   const activeFiles = filterOriginalBusinessEvidence(files);
   const activeImports = filterOriginalBusinessEvidence(imports).filter((item) => activeFiles.some((file) => file.id === item.file_upload_id));
-  const parentEligibility = buildSourceParentEligibility({ files: activeFiles, imports: activeImports });
+  const parentEligibility = buildSourceParentEligibility({
+    files: filterOriginalBusinessEvidence(sourceParents?.files ?? activeFiles),
+    imports: filterOriginalBusinessEvidence(sourceParents?.imports ?? activeImports)
+  });
   const activeKpiSettings = excludeChecklistDerivedMetrics(kpiSettings);
   const eligibleKpis = applyKpiSettingsToRows(
     excludeChecklistDerivedMetrics(filterBySourceParentEligibility(filterOriginalBusinessEvidence(kpis), parentEligibility))

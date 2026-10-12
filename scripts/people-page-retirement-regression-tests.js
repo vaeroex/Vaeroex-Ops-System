@@ -16,6 +16,7 @@ const accountabilityActions = read("app/app/accountability/actions.ts");
 const accountabilityForms = read("components/accountability/AccountabilityForms.tsx");
 const kpisPage = read("app/app/kpis/page.tsx");
 const overviewPage = read("app/app/page.tsx");
+const healthLoader = read("lib/intelligence/workspace-health.ts");
 const workspaceContext = read("lib/workspaces/current.ts");
 const adminAccess = read("lib/admin/admin-emails.ts");
 const databaseTypes = read("lib/supabase/types.ts");
@@ -45,7 +46,7 @@ assert.doesNotMatch(accountabilityActions, /export async function createAssignme
 assert.doesNotMatch(accountabilityForms, /export function AssignmentPanel/, "retired assignment UI must stay deleted");
 assert.match(accountabilityForms, /export function ShareRecordPanel/, "Sharing UI must remain available");
 assert.match(kpisPage, /from\("people"\)[\s\S]*ShareRecordPanel/, "KPI Records must preserve optional person recipients and sharing UI");
-assert.match(overviewPage, /from\("people"\)/, "Executive Overview must preserve optional people-context reads");
+assert.match(healthLoader, /from\("people"\)/, "Executive Overview must preserve optional people-context reads");
 assert.match(overviewPage, /from\("operational_assignments"\)/, "Executive Overview must preserve assignment history reads");
 assert.match(overviewPage, /from\("record_shares"\)/, "Executive Overview must preserve sharing history reads");
 assert.doesNotMatch(overviewPage, /buildPrestigeIntelligence/, "Executive Overview must not require the retired People-adjacent intelligence producer");

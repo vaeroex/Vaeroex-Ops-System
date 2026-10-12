@@ -217,6 +217,14 @@ assert.match(customerExceptions.summary, /12 delayed orders/);
 assert.match(customerExceptions.summary, /6 orders with customer complaints/);
 assert.match(customerExceptions.summary, /16 feedback ratings of two or lower/);
 assert.match(customerExceptions.summary, /13 unresolved feedback records/);
+const reviewedOperational = buildIntelligenceLayer({ asOf: "2026-07-15T00:00:00Z", kpis: retailKpis, kpiSettings: retailKpiSettings,
+  files: [retailFile], imports: [retailImport], operationalInsights: retailInsights });
+for (const original of retailInsights) {
+  const planned = reviewedOperational.insights.find((insight) => insight.id === original.id);
+  assert.ok(planned, `${original.title} remains visible`);
+  assert.ok(planned.recommendedAction.length <= 420, `${original.title} fits the generated-explanation boundary`);
+  assert.ok(planned.recommendedAction.includes(original.recommendedAction), `${original.title} retains its existing source-specific instruction`);
+}
 const inventoryFinding = retailInsights.find((insight) => insight.title === "Inventory increased while sales activity declined");
 assert.match(inventoryFinding.summary, /6 inventory items .*below reorder level/);
 assert.match(inventoryFinding.limitation, /do not prove|does not prove/i, "cross-metric language must reject causation");

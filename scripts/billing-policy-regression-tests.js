@@ -6,7 +6,8 @@ const root = process.cwd();
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 
 const legalContent = read("lib/legal/content.ts");
-const pricingPage = read("app/pricing/page.tsx");
+// Compare rendered prose across source formatting; retain every policy assertion.
+const pricingPage = read("app/pricing/page.tsx").replace(/\s+/g, " ");
 const accountSubscriptionPage = read("app/app/account/subscription/page.tsx");
 const checkoutSuccessPage = read("app/checkout/success/page.tsx");
 const publicHelpPage = read("app/help/page.tsx");
@@ -52,7 +53,10 @@ assert.match(legalContent, /Manage billing in the Stripe Customer Portal/);
 assert.match(legalContent, /Cancellation prevents the next renewal and takes effect at the end of the current paid billing period/);
 assert.match(legalContent, /Access continues through that paid period/);
 assert.match(pricingPage, /Payments are final and non-refundable except where required by applicable law/);
-assert.match(accountSubscriptionPage, /Use Manage billing to schedule cancellation through the Stripe Customer Portal/);
+assert.match(accountSubscriptionPage, /Use Manage billing to schedule cancellation of the base subscription through the Stripe Customer Portal/);
+assert.match(accountSubscriptionPage, /Optional capacity purchases have separate recurring charges/);
+assert.match(accountSubscriptionPage, /storage\.allowanceFiles\.toLocaleString/);
+assert.doesNotMatch(accountSubscriptionPage, /\["Files", usage\.files, limits\?\.max_files\]/, "paid workspace capacity must not render the base plan's fixed file ceiling");
 assert.match(checkoutSuccessPage, /paid access continues through the end of the current billing period/);
 assert.match(legalContent, /Your subscription price will not increase while your subscription remains continuously active/);
 assert.match(legalContent, /If Vaeroex lowers the applicable subscription price, active subscribers will receive the lower price for future renewals/);

@@ -1,0 +1,29 @@
+{
+  "loadedByWorkerQualificationSha256": "c05bad2f85da493b72ba928378545c335b3a0d2d9771f293cfcb8d06785d9d14",
+  "fileAfterQualificationStartedSha256": "e41c6fb32622e1bfd847c0c3e1a270398eaef1382818b36fdb8ed5a45413e053",
+  "previousCompletedFaults": [
+    {
+      "kind": "provider_throttle",
+      "sourceSha256": "c05bad2f85da493b72ba928378545c335b3a0d2d9771f293cfcb8d06785d9d14"
+    },
+    {
+      "kind": "expired_authorization",
+      "sourceSha256": "c05bad2f85da493b72ba928378545c335b3a0d2d9771f293cfcb8d06785d9d14"
+    },
+    {
+      "kind": "partial_read",
+      "sourceSha256": "c05bad2f85da493b72ba928378545c335b3a0d2d9771f293cfcb8d06785d9d14"
+    },
+    {
+      "kind": "commit_ack_loss",
+      "sourceSha256": "c05bad2f85da493b72ba928378545c335b3a0d2d9771f293cfcb8d06785d9d14"
+    },
+    {
+      "kind": "slow_workspace",
+      "sourceSha256": "c05bad2f85da493b72ba928378545c335b3a0d2d9771f293cfcb8d06785d9d14"
+    }
+  ],
+  "workerProcessStartedAt": "2026-10-05T19:56:18.626Z",
+  "harnessFileModifiedAt": "2026-10-05T19:56:22Z",
+  "caveat": "Worker qualification had loaded the earlier exact source above. Its dynamic harnessSha256 field reads current filesystem content and is not sufficient to identify loaded code. Use this sidecar. Explicit3-second assertion was added after load; assess raw actualUnavailableMs separately without overriding original evidence."
+}

@@ -1,0 +1,87 @@
+/* eslint-disable @typescript-eslint/no-require-imports -- Authenticated local-only VSI browser qualification. */
+const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
+const {randomUUID,createHash}=require('node:crypto');
+const {chromium}=require('playwright');const {Client}=require('pg');
+const {readConfig,session}=require('./vsi-e2e-fixture.cjs');
+const [configPath,fixturePath,output,origin='http://127.0.0.1:49941']=process.argv.slice(2);
+assert.equal(new URL(origin).hostname,'127.0.0.1');assert(output&&path.isAbsolute(output));
+const c=readConfig(configPath),f=JSON.parse(fs.readFileSync(fixturePath));assert.equal(f.synthetic,true);
+fs.mkdirSync(output,{recursive:true,mode:0o700});const results=[],errors=[];
+const record=(name,extra={})=>{results.push({name,passed:true,...extra});console.log(JSON.stringify({check:name,passed:true}));};
+let browser;const db=new Client({connectionString:c.dbUrl,ssl:false});
+async function ctx(actor,width){const s=await session(c,actor,origin),context=await browser.newContext({viewport:{width,height:900}});await context.addCookies(s.cookies);await context.route('**/*',route=>{const u=new URL(route.request().url());return [origin,new URL(c.apiUrl).origin].includes(u.origin)?route.continue():route.abort()});const page=await context.newPage();page.setDefaultTimeout(45000);page.on('pageerror',e=>errors.push(e.name));return{page,context,client:s.client};}
+async function api(context,actor,url,method='GET',body){const response=await context.request.fetch(origin+'/api/vsi'+url,{method,headers:{origin,'content-type':'application/json'},...(body?{data:{expectedWorkspaceId:actor.workspaceId,...body}}:{})});let value;try{value=await response.json()}catch{value={}}return{status:response.status(),value};}
+async function send(page,message){await page.getByLabel('Message Vaeroex',{exact:true}).fill(message);const result=page.waitForResponse(r=>r.url().includes('/messages')&&r.request().method()==='POST');await page.getByRole('button',{name:'Send',exact:true}).click();const r=await result;const data=await r.json();assert.equal(r.status(),200,JSON.stringify(data));await page.getByRole('button',{name:'Send',exact:true}).waitFor();return{data,request:r.request().postDataJSON()};}
+(async()=>{try{
+ await db.connect();browser=await chromium.launch({headless:true,executablePath:process.env.CHROME_EXECUTABLE_PATH||'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'});const owner=f.actors[0],a=await ctx(owner,1440),page=a.page;
+ await page.goto(origin+'/app/si');await page.getByRole('heading',{name:'Vaeroex Super Intelligence',exact:true}).waitFor();
+ assert.equal(await page.locator('input[type=file]').count(),0);record('desktop_text_only_authenticated_page');
+ const beforeNotes=(await db.query('select count(*)::int n from public.business_notes where workspace_id=$1',[owner.workspaceId])).rows[0].n;
+ const general=await send(page,'Help me plan a focused writing week.');const chat=general.data.conversation.id;
+ assert(general.data.exchange.answer.length>20);assert.equal(general.data.exchange.citations.length,0);record('general_answer_persisted_without_business_evidence');
+ const replay=await api(a.context,owner,`/conversations/${chat}/messages`,'POST',general.request);assert.equal(replay.status,200);assert.equal(replay.value.replayed,true);assert.equal(replay.value.exchange.id,general.data.exchange.id);record('same_question_retry_one_exchange');
+ await page.reload();await page.getByText(general.data.exchange.answer,{exact:true}).waitFor();record('conversation_reopens');
+ await page.getByRole('button',{name:'Rename',exact:true}).click();await page.getByLabel('Chat name').fill('Synthetic private writing');await page.getByRole('button',{name:'Save name',exact:true}).click();await page.getByRole('heading',{name:'Synthetic private writing',exact:true}).waitFor();record('rename_persists');
+ const business=await send(page,'What do our notes and files say about bicycle repairs and reviews?');assert(business.data.exchange.citations.length>0);assert(business.data.exchange.citations.every(x=>x.sourceId!==f.workspaces[1]));record('authenticated_permitted_business_evidence_cited',{sourceTypes:[...new Set(business.data.exchange.citations.map(x=>x.sourceType))]});
+ const weatherMissing=await send(page,'What is the weather today?');assert.match(weatherMissing.data.exchange.answer,/city|location/i);record('weather_requests_location');
+ const weather=await send(page,'Portland, Oregon');assert(weather.data.exchange.citations.some(x=>x.sourceType==='web'&&x.retrievedAt));record('selective_live_tool_transport_and_timestamp');
+ const afterOrdinary=(await db.query('select count(*)::int n from public.business_notes where workspace_id=$1',[owner.workspaceId])).rows[0].n;assert.equal(afterOrdinary,beforeNotes);record('ordinary_chat_creates_no_business_note');
+ const remember=await send(page,'Remember this: We offer free bicycle safety inspections every Saturday.');assert(remember.data.exchange.rememberProposal);assert.equal((await db.query('select count(*)::int n from public.business_notes where workspace_id=$1',[owner.workspaceId])).rows[0].n,beforeNotes);
+ for(const proposalWidth of [390,320]) {
+  const proposalView=await ctx(owner,proposalWidth);await proposalView.page.goto(origin+`/app/si?chat=${chat}`);
+  const confirm=proposalView.page.getByRole('button',{name:'Confirm and save this note',exact:true});await confirm.waitFor();await confirm.scrollIntoViewIfNeeded();
+  assert(await confirm.evaluate(node=>{const r=node.getBoundingClientRect();return r.left>=0&&r.right<=innerWidth&&r.top>=0&&r.bottom<=innerHeight}));
+  await proposalView.page.screenshot({path:path.join(output,`proposal-${proposalWidth}.png`),fullPage:true});await proposalView.context.close();record(`mobile_${proposalWidth}_expanded_note_confirmation_reachable`);
+ }
+ const savedResponse=page.waitForResponse(r=>r.url().endsWith('/remember')&&r.request().method()==='POST');await page.getByRole('button',{name:'Confirm and save this note',exact:true}).click();const save=await savedResponse;assert.equal(save.status(),200,JSON.stringify(await save.json()));await page.getByText('Saved to Business Notes',{exact:true}).waitFor();
+ const saveAgain=await api(a.context,owner,`/conversations/${chat}/remember`,'POST',{exchangeId:remember.data.exchange.id,confirm:true});assert.equal(saveAgain.status,200);
+ const notes=await db.query('select original_note_text,status,evidence_lifecycle_status from public.business_notes where workspace_id=$1 and original_note_text=$2',[owner.workspaceId,remember.data.exchange.rememberProposal.content]);assert.equal(notes.rows.length,1);assert.equal(notes.rows[0].status,'review_required');assert.equal(notes.rows[0].evidence_lifecycle_status,'inactive');record('confirmed_verbatim_note_saved_once_for_normal_review');
+ await page.screenshot({path:path.join(output,'desktop.png'),fullPage:true});
+ for(const mobileWidth of [390,320]) { const mobile=await ctx(owner,mobileWidth);await mobile.page.goto(origin+`/app/si?chat=${chat}`);await mobile.page.getByText('Saved to Business Notes',{exact:true}).waitFor();assert(await mobile.page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1));await mobile.page.screenshot({path:path.join(output,`mobile-${mobileWidth}.png`),fullPage:true});await mobile.page.getByRole('button',{name:'Usage',exact:true}).click();await mobile.page.getByRole('region',{name:'VSI usage'}).waitFor();record(`mobile_${mobileWidth}_persisted_chat_no_horizontal_overflow_usage_on_demand`);
+ await mobile.page.getByRole('button',{name:'Usage',exact:true}).click();await mobile.page.getByLabel('Message Vaeroex',{exact:true}).focus();await mobile.page.setViewportSize({width:mobileWidth,height:420});
+ assert(await mobile.page.getByRole('region',{name:'Conversation transcript',exact:true}).evaluate(node=>node.clientHeight>=100),'keyboard retains a usable reading area in the full app shell');
+ assert(await mobile.page.getByRole('button',{name:'Send',exact:true}).evaluate(node=>{const r=node.getBoundingClientRect();return r.top>=0&&r.bottom<=innerHeight}),'keyboard keeps Send reachable');
+ await mobile.page.screenshot({path:path.join(output,`keyboard-${mobileWidth}.png`),fullPage:true});record(`mobile_${mobileWidth}_keyboard_composer_and_reading_area`);await mobile.context.close(); }
+ const v=await ctx(f.actors[1],390),foreign=await ctx(f.actors[2],1440);
+ assert.equal((await api(v.context,f.actors[1],`/conversations/${chat}?workspaceId=${owner.workspaceId}`)).status,404);
+ assert.equal((await api(foreign.context,f.actors[2],`/conversations/${chat}?workspaceId=${f.actors[2].workspaceId}`)).status,404);record('same_workspace_other_actor_and_second_workspace_cannot_read_private_chat');
+ const denied=await api(v.context,f.actors[1],`/conversations/${chat}/remember`,'POST',{exchangeId:remember.data.exchange.id,confirm:true});assert.equal(denied.status,403);record('unauthorized_note_confirmation_denied');
+ const mismatch=await api(a.context,owner,'/conversations','POST',{expectedWorkspaceId:f.actors[2].workspaceId,title:'Must not exist'});assert.equal(mismatch.status,403);record('stale_workspace_submission_denied');
+ const prohibited=await api(a.context,owner,`/conversations/${chat}/messages`,'POST',{message:'Remember this: SSN 123-45-6789',requestId:randomUUID()});assert.equal(prohibited.status,422);assert.equal(prohibited.value.code,'prohibited_identifiers');record('prohibited_identifiers_rejected_before_persistence');
+ const failureId=randomUUID(),usageBefore=await api(a.context,owner,`/usage?workspaceId=${owner.workspaceId}`);const failed=await api(a.context,owner,`/conversations/${chat}/messages`,'POST',{message:'VSI_TEST_PROVIDER_FAILURE',requestId:failureId});assert.equal(failed.status,503);const usageAfter=await api(a.context,owner,`/usage?workspaceId=${owner.workspaceId}`);assert.equal(usageAfter.value.used,usageBefore.value.used);record('provider_failure_does_not_consume_question');
+ const boundary=await api(a.context,owner,'/conversations','POST',{title:'Synthetic historical boundary'});assert.equal(boundary.status,201);const bid=boundary.value.conversation.id;
+ const inheritedFinding='SYNTHETIC_HANDOFF_FINDING: Lumen Packaging makes reusable shipping boxes.';
+ const inheritedSource={id:'W1',title:'Synthetic original company research',url:'https://example.org/vsi-handoff-original',sourceType:'web',sourceId:null,evidenceDate:'2026-09-20',retrievedAt:'2026-09-21T12:00:00.000Z',excerpt:inheritedFinding};
+ for(let n=0;n<250;n++){
+  const id=randomUUID(),createdAt=new Date(Date.now()-14*86400000+n*1000).toISOString(),last=n===249;
+  await db.query("insert into public.vsi_requests(id,workspace_id,actor_user_id,conversation_id,request_id,question_hash,status,accepted_at,created_at,started_at) values($1,$2,$3,$4,$5,$6,'completed',$7,$7,$7)",[id,owner.workspaceId,owner.id,bid,randomUUID(),'f'.repeat(64),createdAt]);
+  await db.query('insert into public.vsi_exchanges(id,workspace_id,actor_user_id,conversation_id,user_message,answer,citations,public_research_topics,created_at) values($1,$2,$3,$4,$5,$6,$7,$8,$9)',[id,owner.workspaceId,owner.id,bid,last?'Research Lumen Packaging.':`Historical question ${n+1}`,last?inheritedFinding+' [W1]':`Historical answer ${n+1}`,JSON.stringify(last?[inheritedSource]:[]),JSON.stringify(last?['Lumen Packaging']:[]),createdAt]);
+ }
+ await db.query("update public.vsi_conversations set exchange_count=225,context_summary='User wants to improve bicycle repairs. Assistant recommendations remain drafts.' where id=$1",[bid]);await page.goto(origin+`/app/si?chat=${bid}`);await page.getByText(/This is a long conversation/).waitFor();record('225_exchange_warning');
+ await db.query('update public.vsi_conversations set exchange_count=250 where id=$1',[bid]);await page.reload();await page.getByText(/250 exchanges and is now read-only/).waitFor();assert.equal(await page.getByLabel('Message Vaeroex',{exact:true}).count(),0);
+ const old=(await db.query('select user_message,answer,citations,public_research_topics from public.vsi_exchanges where conversation_id=$1 order by created_at,id',[bid])).rows;const oldHash=createHash('sha256').update(JSON.stringify(old)).digest('hex');
+ const continuedResponse=page.waitForResponse(r=>r.url().endsWith('/continue')&&r.request().method()==='POST');await page.getByRole('button',{name:'Continue in a new chat',exact:true}).click();const continued=await continuedResponse;assert.equal(continued.status(),200);const current=(await continued.json()).conversation.id;await page.getByLabel('Message Vaeroex',{exact:true}).waitFor();await page.getByRole('link',{name:/original transcript/i}).waitFor();
+ assert.equal(createHash('sha256').update(JSON.stringify((await db.query('select user_message,answer,citations,public_research_topics from public.vsi_exchanges where conversation_id=$1 order by created_at,id',[bid])).rows)).digest('hex'),oldHash);record('250_handoff_preserves_two_week_transcript_and_private_summary');
+ const followup=await send(page,'Who founded the company from the previous chat?');
+ assert.equal(followup.data.conversation.id,current);assert.match(followup.data.exchange.answer,/reusable shipping boxes/);assert.match(followup.data.exchange.answer,/Morgan Example/);
+ const historical=followup.data.exchange.citations.find(source=>source.url===inheritedSource.url);assert(historical);assert.equal(historical.retrievedAt,inheritedSource.retrievedAt);assert.equal(historical.evidenceDate,inheritedSource.evidenceDate);assert(followup.data.exchange.citations.some(source=>source.url==='https://example.org/vsi-handoff-founder'));
+ assert.deepEqual(followup.data.exchange.publicResearchTopics,['Lumen Packaging']);
+ await page.reload();await page.getByText(/The previous chat found reusable shipping boxes/).waitFor();
+ assert.equal(createHash('sha256').update(JSON.stringify((await db.query('select user_message,answer,citations,public_research_topics from public.vsi_exchanges where conversation_id=$1 order by created_at,id',[bid])).rows)).digest('hex'),oldHash);
+ record('continued_chat_inherits_authorized_topic_and_source_snapshot_without_modifying_parent');
+ for(const [actor,context,label] of [[f.actors[1],v.context,'other_actor'],[f.actors[2],foreign.context,'other_workspace']]){
+  const child=await api(context,actor,'/conversations','POST',{title:'Synthetic inaccessible parent'});assert.equal(child.status,201);const childId=child.value.conversation.id;
+  // Privileged local fixture creates an invalid legacy linkage; the public API can never set this field.
+  await db.query('update public.vsi_conversations set parent_conversation_id=$1 where id=$2 and actor_user_id=$3',[bid,childId,actor.id]);
+  const deniedParent=await api(context,actor,`/conversations/${bid}?workspaceId=${actor.workspaceId}`);assert.equal(deniedParent.status,404);
+  const isolated=await api(context,actor,`/conversations/${childId}/messages`,'POST',{message:"Explain the previous chat's private finding.",requestId:randomUUID()});assert.equal(isolated.status,200,JSON.stringify(isolated.value));assert.equal(isolated.value.exchange.answer,'No permitted previous finding is available in this chat.');assert.deepEqual(isolated.value.exchange.citations,[]);assert.deepEqual(isolated.value.exchange.publicResearchTopics,[]);
+  assert.equal((await api(context,actor,`/conversations/${childId}`,'DELETE',{})).status,200);record('continued_chat_cannot_inherit_'+label+'_parent');
+ }
+ assert.equal(createHash('sha256').update(JSON.stringify((await db.query('select user_message,answer,citations,public_research_topics from public.vsi_exchanges where conversation_id=$1 order by created_at,id',[bid])).rows)).digest('hex'),oldHash);
+ await page.getByRole('button',{name:'Delete',exact:true}).click();await page.getByRole('button',{name:'Delete this chat',exact:true}).click();await page.getByRole('heading',{name:'New conversation',exact:true}).waitFor();assert.equal((await db.query('select count(*)::int n from public.vsi_conversations where id=$1',[current])).rows[0].n,0);record('explicit_chat_deletion');
+ const deletedRead=await api(a.context,owner,`/conversations/${current}?workspaceId=${owner.workspaceId}`);assert.equal(deletedRead.status,404);
+ const remainingHistory=await api(a.context,owner,`/conversations?workspaceId=${owner.workspaceId}`);assert(!remainingHistory.value.conversations.some(row=>row.id===current));
+ await page.reload();await page.getByRole('heading',{name:'New conversation',exact:true}).waitFor();assert.equal(await page.getByRole('article').count(),0);record('deleted_chat_absent_from_detail_history_and_reload');
+ assert.deepEqual(errors,[]);record('no_browser_runtime_errors');
+ fs.writeFileSync(path.join(output,'results.json'),JSON.stringify({synthetic:true,provider:'test_transport_not_real_Luna',results,browserErrors:errors},null,2));
+ }catch(e){fs.writeFileSync(path.join(output,'failure.json'),JSON.stringify({error:e.message,results,browserErrors:errors},null,2));console.error(e.message);process.exitCode=1;}finally{if(browser)await browser.close();await db.end();}})();

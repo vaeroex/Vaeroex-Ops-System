@@ -1,0 +1,16 @@
+{
+  "recordedAt": "2026-10-05T02:50:16.834641+00:00",
+  "originalBranch": "codex/external-integrations-phase-8b-qbo-sandbox",
+  "originalCommit": "90982062976ca905095ba68c193c52eddf795f1b",
+  "originalAuditedSourceFiles": 1044,
+  "changedOriginalSourcePaths": [],
+  "missingOriginalSourcePaths": [],
+  "implementationWorktree": "/Users/isaacvizcarra/.codex/worktrees/workspace-audit-fixes/Vaeroex",
+  "implementationBase": "d91be079c7beb0b6f21a4c5e6b451f90ca06e035",
+  "remoteMainRecheck": "d91be079c7beb0b6f21a4c5e6b451f90ca06e035",
+  "deployment": "No new deployment; production identity last observed in stage3",
+  "independentHeldPullRequests": [
+    457,
+    458
+  ]
+}

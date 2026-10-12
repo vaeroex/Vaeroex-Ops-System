@@ -1,0 +1,22 @@
+{
+  "observedAt": "2026-10-05T22:41:11.966786+00:00",
+  "sourceCommit": "4c28c134fe6751347ca98e86241bcce104836467",
+  "sdkExecutable": "/Users/isaacvizcarra/google-cloud-sdk/bin/gcloud",
+  "configuredProject": "vaeroex-document-worker",
+  "configuredRunRegion": "us-west1",
+  "activeConfiguredAccountConfirmed": true,
+  "tokenValuesReadOrPrinted": false,
+  "targetProject": "vaeroex-qbo-prod-20260827",
+  "targetRegion": "us-central1",
+  "operation": "Cloud Run services list projected to name, latest ready revision, traffic, concurrency, timeout, image",
+  "result": "blocked_reauthentication_required",
+  "remoteServiceDataObtained": false,
+  "exactError": "There was a problem refreshing your current auth tokens: Reauthentication failed. cannot prompt during non-interactive execution.",
+  "requiredAction": "Operator must reauthenticate the existing active account interactively; no login or account/config change was performed.",
+  "iamDenialVerified": false,
+  "queueSchedulerInspection": "unexecuted: same unavailable credential refresh prerequisite",
+  "configurationMutations": false,
+  "productionMutations": false,
+  "providerCalls": false,
+  "sandboxCacheBoundary": "Initial unprivileged auth.list could not access SDK credentials.db; approved read-only escalation resolved local cache access but remote credential refresh still failed."
+}

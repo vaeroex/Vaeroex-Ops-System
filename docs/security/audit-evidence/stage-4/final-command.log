@@ -1,0 +1,864 @@
+
+> vaeroex-ops-system@0.1.0 test:workspace-audit /Users/isaacvizcarra/.codex/worktrees/workspace-audit-fixes/Vaeroex
+> node scripts/workspace-security-helper-tests.cjs && node scripts/audit-import-evidence-fixes.cjs && node scripts/audit-import-finalization.cjs && node scripts/audit-principal-parent-regression.cjs && node scripts/audit-health-trend-regression.cjs && node scripts/audit-cost-regression.cjs && node scripts/audit-scheduler-regression.cjs && node scripts/workspace-workflow-tests.cjs
+
+{
+  "scope": "actual helper logic with synthetic database responses; no HTTP/provider calls",
+  "results": [
+    {
+      "name": "SQL count error blocks generic and AI quota preflights",
+      "status": "pass"
+    },
+    {
+      "name": "missing count blocks generic and AI quota preflights",
+      "status": "pass"
+    },
+    {
+      "name": "negative count blocks generic and AI quota preflights",
+      "status": "pass"
+    },
+    {
+      "name": "invalid count blocks generic and AI quota preflights",
+      "status": "pass"
+    },
+    {
+      "name": "known zero remains zero, known final count reaches limit",
+      "status": "pass"
+    },
+    {
+      "name": "missing workspace/user context uses intentional empty snapshot without queries",
+      "status": "pass"
+    },
+    {
+      "name": "preflight remains advisory; atomicity belongs to database trigger",
+      "status": "pass"
+    },
+    {
+      "name": "trusted service client handles audit writes and scoped trusted count",
+      "status": "pass"
+    },
+    {
+      "name": "missing audit credential fails closed",
+      "status": "pass"
+    },
+    {
+      "name": "audit count failure fails closed without raw details",
+      "status": "pass"
+    },
+    {
+      "name": "trusted blocked-event threshold rejects mutation",
+      "status": "pass"
+    },
+    {
+      "name": "confirmation remains required after trusted writer change",
+      "status": "pass"
+    },
+    {
+      "name": "billing recovery stays visible when usage is unknown",
+      "status": "pass"
+    },
+    {
+      "name": "subscription status API returns explicit unavailable response",
+      "status": "pass"
+    }
+  ]
+}
+{
+  "kind": "audit_import_evidence_regression",
+  "status": "passed",
+  "checks": 23,
+  "names": [
+    "CSV duplicate suffix collision retains all columns",
+    "header truncation, fallback, repeated suffixes and reserved keys retain values",
+    "XLSX duplicate suffix collision retains all columns",
+    "CSV physical start-line provenance survives blanks and quoted CRLF",
+    "ordinary DOCX and compressed PDF text still extract",
+    "forged DOCX size is stopped by zlib before output allocation",
+    "forged XLSX size is stopped by zlib before output allocation",
+    "unneeded DOCX/XLSX package parts are not inflated",
+    "ZIP duplicate entries, inconsistent local headers, excessive ratio reject",
+    "compressed PDF expansion rejects rather than falling through to model extraction",
+    "magnitude, signed values, percentage, small numbers, currency, labels, periods, direction fail closed",
+    "one supported fact cannot admit an unrelated false claim or summary",
+    "supported numerical claim is eligible only for explicit review",
+    "file_uploads lifecycle failure propagates a sanitized unavailable result",
+    "ai_agent_runs lifecycle failure propagates a sanitized unavailable result",
+    "business_notes lifecycle failure propagates a sanitized unavailable result",
+    "genuinely empty lifecycle evidence remains empty",
+    "missing or mismatched confirmation cannot write generated Business Memory",
+    "explicitly confirmed supported analysis reaches actual indexer write boundary",
+    "explicit confirmation cannot admit contradictory numerical output",
+    "failed replacement write preserves previously approved memory",
+    "previous IDs retire only after complete replacement acknowledgement",
+    "identical confirmed retry keeps its idempotent chunk active"
+  ],
+  "inflations": [
+    {
+      "method": "inflateRawSync",
+      "compressedBytes": 54,
+      "maxOutputLength": 71,
+      "expandedBytes": 71
+    },
+    {
+      "method": "inflateRawSync",
+      "compressedBytes": 79,
+      "maxOutputLength": 110,
+      "expandedBytes": 110
+    },
+    {
+      "method": "inflateRawSync",
+      "compressedBytes": 130,
+      "maxOutputLength": 303,
+      "expandedBytes": 303
+    },
+    {
+      "method": "inflateRawSync",
+      "compressedBytes": 36,
+      "maxOutputLength": 36,
+      "expandedBytes": 36
+    },
+    {
+      "method": "inflateSync",
+      "compressedBytes": 39,
+      "maxOutputLength": 1048576,
+      "expandedBytes": 31
+    },
+    {
+      "method": "inflateRawSync",
+      "compressedBytes": 2050,
+      "maxOutputLength": 1,
+      "expandedBytes": null
+    },
+    {
+      "method": "inflateRawSync",
+      "compressedBytes": 2050,
+      "maxOutputLength": 1,
+      "expandedBytes": null
+    },
+    {
+      "method": "inflateRawSync",
+      "compressedBytes": 17,
+      "maxOutputLength": 18,
+      "expandedBytes": 18
+    },
+    {
+      "method": "inflateRawSync",
+      "compressedBytes": 54,
+      "maxOutputLength": 71,
+      "expandedBytes": 71
+    },
+    {
+      "method": "inflateRawSync",
+      "compressedBytes": 79,
+      "maxOutputLength": 110,
+      "expandedBytes": 110
+    },
+    {
+      "method": "inflateRawSync",
+      "compressedBytes": 130,
+      "maxOutputLength": 303,
+      "expandedBytes": 303
+    },
+    {
+      "method": "inflateRawSync",
+      "compressedBytes": 7,
+      "maxOutputLength": 5,
+      "expandedBytes": 5
+    },
+    {
+      "method": "inflateSync",
+      "compressedBytes": 2056,
+      "maxOutputLength": 1048576,
+      "expandedBytes": null
+    }
+  ],
+  "resourceUsage": {
+    "userCPUTime": 632936,
+    "systemCPUTime": 38602,
+    "maxRSS": 181632,
+    "sharedMemorySize": 0,
+    "unsharedDataSize": 0,
+    "unsharedStackSize": 0,
+    "minorPageFault": 11647,
+    "majorPageFault": 84,
+    "swappedOut": 0,
+    "fsRead": 0,
+    "fsWrite": 0,
+    "ipcSent": 0,
+    "ipcReceived": 0,
+    "signalsCount": 0,
+    "voluntaryContextSwitches": 16,
+    "involuntaryContextSwitches": 1649
+  },
+  "limitation": "Actual parser and indexer functions; synthetic query responses and in-memory write recording, no real database/provider/UI."
+}
+{
+  "status": "passed",
+  "baseline": false,
+  "checks": 3,
+  "results": [
+    {
+      "failedBoundary": "file_import_rows:imported",
+      "acceptedKpiRows": 1,
+      "successRedirect": false,
+      "importStatus": "failed",
+      "fileStatus": "failed",
+      "finalImport": {
+        "status": "failed",
+        "rows_imported": 1,
+        "mapping_json": {
+          "mode": "workbook",
+          "worksheets": [
+            {
+              "index": 1,
+              "name": "Metrics",
+              "state": "visible",
+              "relationship_id": null,
+              "relationship_target": null,
+              "status": "parsed",
+              "row_count": 1,
+              "columns": [
+                "Metric",
+                "Value",
+                "Date"
+              ],
+              "detected_type": "kpis",
+              "selected_type": "kpis",
+              "enabled": true,
+              "mapping": {
+                "name": "Metric",
+                "actual_value": "Value",
+                "metric_date": "Date"
+              },
+              "metric_columns": []
+            }
+          ],
+          "detection_version": 3
+        },
+        "errors_json": [
+          {
+            "stage": "import",
+            "worksheet": "Workbook",
+            "row_number": null,
+            "field": "workbook",
+            "message": "Some import records may already be saved. Imported row status could not be confirmed. Reload this source and review its imported records before retrying."
+          }
+        ]
+      }
+    },
+    {
+      "failedBoundary": "file_imports:completed",
+      "acceptedKpiRows": 1,
+      "successRedirect": false,
+      "importStatus": "failed",
+      "fileStatus": "failed",
+      "finalImport": {
+        "status": "failed",
+        "rows_imported": 1,
+        "mapping_json": {
+          "mode": "workbook",
+          "worksheets": [
+            {
+              "index": 1,
+              "name": "Metrics",
+              "state": "visible",
+              "relationship_id": null,
+              "relationship_target": null,
+              "status": "parsed",
+              "row_count": 1,
+              "columns": [
+                "Metric",
+                "Value",
+                "Date"
+              ],
+              "detected_type": "kpis",
+              "selected_type": "kpis",
+              "enabled": true,
+              "mapping": {
+                "name": "Metric",
+                "actual_value": "Value",
+                "metric_date": "Date"
+              },
+              "metric_columns": []
+            }
+          ],
+          "detection_version": 3
+        },
+        "errors_json": [
+          {
+            "stage": "import",
+            "worksheet": "Workbook",
+            "row_number": null,
+            "field": "workbook",
+            "message": "Some import records may already be saved. Import completion could not be confirmed. Reload this source and review its imported records before retrying."
+          }
+        ]
+      }
+    },
+    {
+      "failedBoundary": "file_uploads:imported",
+      "acceptedKpiRows": 1,
+      "successRedirect": false,
+      "importStatus": "failed",
+      "fileStatus": "failed",
+      "finalImport": {
+        "status": "failed",
+        "rows_imported": 1,
+        "mapping_json": {
+          "mode": "workbook",
+          "worksheets": [
+            {
+              "index": 1,
+              "name": "Metrics",
+              "state": "visible",
+              "relationship_id": null,
+              "relationship_target": null,
+              "status": "parsed",
+              "row_count": 1,
+              "columns": [
+                "Metric",
+                "Value",
+                "Date"
+              ],
+              "detected_type": "kpis",
+              "selected_type": "kpis",
+              "enabled": true,
+              "mapping": {
+                "name": "Metric",
+                "actual_value": "Value",
+                "metric_date": "Date"
+              },
+              "metric_columns": []
+            }
+          ],
+          "detection_version": 3
+        },
+        "errors_json": [
+          {
+            "stage": "import",
+            "worksheet": "Workbook",
+            "row_number": null,
+            "field": "workbook",
+            "message": "Some import records may already be saved. Source completion could not be confirmed. Reload this source and review its imported records before retrying."
+          }
+        ]
+      }
+    }
+  ],
+  "limitation": "Actual workbook function, synthetic in-memory DB and indexing adapter. No real SQL transaction/concurrent retry or UI validation."
+}
+Audit principal-quota and authoritative-parent regressions passed (synthetic collaborators; actual source functions).
+{
+  "sourceRoot": "/Users/isaacvizcarra/.codex/worktrees/workspace-audit-fixes/Vaeroex",
+  "recordedAt": "2026-10-05T03:20:13.848Z",
+  "asOf": "2026-10-05T00:00:00.000Z",
+  "clock": "Fixed fixture date including internal Date.now(), override VAEROEX_AUDIT_AS_OF",
+  "scope": "Actual pure source functions, synthetic rows, no DB/provider/model/browser calls",
+  "unchanged": {
+    "score": 60,
+    "currentCountTrajectory": "Improving",
+    "previousScore": 60,
+    "previousStatus": "Watch",
+    "displayedTrajectory": "Holding steady",
+    "delta": 0,
+    "comparison": "Unchanged 0 points since the previous stored review.",
+    "analysisSubmode": "stable",
+    "evidenceFreshness": "current",
+    "latestEvidenceAt": "2026-10-05T00:00:00.000Z",
+    "confidence": "Medium",
+    "coveragePercentage": 24,
+    "readinessFromLayer": 56,
+    "healthAvailable": true,
+    "healthState": "Watch",
+    "citationHasHref": false,
+    "driverPoints": [
+      10
+    ]
+  },
+  "declining": {
+    "score": 60,
+    "currentCountTrajectory": "Improving",
+    "previousScore": 90,
+    "previousStatus": "Strong",
+    "displayedTrajectory": "Declining",
+    "delta": -30,
+    "comparison": "Down 30 points since the previous stored review.",
+    "analysisSubmode": "watch_worsening",
+    "evidenceFreshness": "current",
+    "latestEvidenceAt": "2026-10-05T00:00:00.000Z",
+    "confidence": "Medium",
+    "coveragePercentage": 24,
+    "readinessFromLayer": 56,
+    "healthAvailable": true,
+    "healthState": "Watch",
+    "citationHasHref": false,
+    "driverPoints": [
+      10
+    ]
+  },
+  "stale": {
+    "score": 60,
+    "currentCountTrajectory": "Improving",
+    "previousScore": 60,
+    "previousStatus": "Watch",
+    "displayedTrajectory": "Holding steady",
+    "delta": 0,
+    "comparison": "Unchanged 0 points since the previous stored review.",
+    "analysisSubmode": "evidence_stale",
+    "evidenceFreshness": "stale",
+    "latestEvidenceAt": "2026-06-07T00:00:00.000Z",
+    "confidence": "Low",
+    "coveragePercentage": 28,
+    "readinessFromLayer": 46,
+    "healthAvailable": true,
+    "healthState": "Watch",
+    "citationHasHref": false,
+    "driverPoints": [
+      10
+    ]
+  }
+}
+Versioned cost regressions passed: standard rates, context threshold, attempts, precision, legacy fallback, override and persisted metadata. Provider invoices not exercised.
+{
+  "sourcePath": "/Users/isaacvizcarra/.codex/worktrees/workspace-audit-fixes/Vaeroex/lib/integrations/google-sheets/scheduler.ts",
+  "sourceSha256": "40f8b92a19204ae4de7eadd96839ba48ca864905b71582a53b5197749f6b0b28",
+  "thresholds": {
+    "declaredBeforeExecution": true,
+    "scope": "Actual deployed Sheets scheduler with synthetic due queue and virtual clock; no database, HTTP, provider, or user capacity claim",
+    "singleBurstWorkspaces": [
+      20,
+      50,
+      100
+    ],
+    "connectionsPerWorkspace": 1,
+    "assumedSyncDurationsMs": [
+      500,
+      5000
+    ],
+    "nominalAcceptance": {
+      "allOfferedConnectionsAttemptedWithinTick": true,
+      "queueP95Ms": 30000,
+      "noDuplicateAttemptsPerTick": true
+    },
+    "faultAcceptance": {
+      "healthyWorkspaceProgressDespiteFailedBackoff": true,
+      "quietWorkspaceQueueDelayRatioToBaselineMax": 2,
+      "failedAttemptsTruthfullyCounted": true
+    },
+    "bounds": {
+      "maxSimulatedTicksPerScenario": 4,
+      "maxConnections": 100,
+      "maxNodeHeapMiB": 256,
+      "wallTimeoutMs": 10000
+    },
+    "interpretation": "Simulated service times are assumptions. Threshold failures identify scheduling behavior only; measured wall time is reported separately. Failure scenarios are expected to expose concerns and must not be counted as passing service SLOs."
+  },
+  "executedAt": "2026-10-05T03:20:14.502Z",
+  "runtime": {
+    "node": "v24.19.0",
+    "platform": "darwin",
+    "arch": "arm64"
+  },
+  "wallElapsedMs": 5.1682500000000005,
+  "rssBytes": 133365760,
+  "networkCalls": 0,
+  "limits": "Virtual service times and in-memory queue: not HTTP, DB, persistence, provider, resource-soak or concurrent-user capacity evidence.",
+  "results": [
+    {
+      "name": "burst-20-500ms",
+      "workspaces": 20,
+      "assumedSyncDurationMs": 500,
+      "virtualTime": true,
+      "maximumActive": 1,
+      "ticks": [
+        {
+          "tick": 0,
+          "attempted": 20,
+          "succeeded": 20,
+          "failed": 0,
+          "simulatedElapsedMs": 10000,
+          "pendingDue": 0,
+          "oldestPendingAgeMs": 0,
+          "attemptedQueueP50Ms": 4500,
+          "attemptedQueueP95Ms": 9000,
+          "attemptedQueueP99Ms": 9500
+        }
+      ],
+      "healthyAttempts": 20,
+      "workspacesServed": 20,
+      "quietWorkspaceFirstDelayMs": 500,
+      "allAcceptanceThresholdsPassed": true,
+      "acceptance": {
+        "allOfferedAttempted": true,
+        "queueP95": true,
+        "noDuplicatesPerTick": true
+      }
+    },
+    {
+      "name": "burst-50-500ms",
+      "workspaces": 50,
+      "assumedSyncDurationMs": 500,
+      "virtualTime": true,
+      "maximumActive": 1,
+      "ticks": [
+        {
+          "tick": 0,
+          "attempted": 50,
+          "succeeded": 50,
+          "failed": 0,
+          "simulatedElapsedMs": 25000,
+          "pendingDue": 0,
+          "oldestPendingAgeMs": 0,
+          "attemptedQueueP50Ms": 12000,
+          "attemptedQueueP95Ms": 23500,
+          "attemptedQueueP99Ms": 24500
+        }
+      ],
+      "healthyAttempts": 50,
+      "workspacesServed": 50,
+      "quietWorkspaceFirstDelayMs": 500,
+      "allAcceptanceThresholdsPassed": true,
+      "acceptance": {
+        "allOfferedAttempted": true,
+        "queueP95": true,
+        "noDuplicatesPerTick": true
+      }
+    },
+    {
+      "name": "burst-100-500ms",
+      "workspaces": 100,
+      "assumedSyncDurationMs": 500,
+      "virtualTime": true,
+      "maximumActive": 1,
+      "ticks": [
+        {
+          "tick": 0,
+          "attempted": 50,
+          "succeeded": 50,
+          "failed": 0,
+          "simulatedElapsedMs": 25000,
+          "pendingDue": 50,
+          "oldestPendingAgeMs": 25000,
+          "attemptedQueueP50Ms": 12000,
+          "attemptedQueueP95Ms": 23500,
+          "attemptedQueueP99Ms": 24500
+        }
+      ],
+      "healthyAttempts": 50,
+      "workspacesServed": 50,
+      "quietWorkspaceFirstDelayMs": 500,
+      "allAcceptanceThresholdsPassed": false,
+      "acceptance": {
+        "allOfferedAttempted": false,
+        "queueP95": true,
+        "noDuplicatesPerTick": true
+      }
+    },
+    {
+      "name": "burst-20-5000ms",
+      "workspaces": 20,
+      "assumedSyncDurationMs": 5000,
+      "virtualTime": true,
+      "maximumActive": 1,
+      "ticks": [
+        {
+          "tick": 0,
+          "attempted": 20,
+          "succeeded": 20,
+          "failed": 0,
+          "simulatedElapsedMs": 100000,
+          "pendingDue": 0,
+          "oldestPendingAgeMs": 0,
+          "attemptedQueueP50Ms": 45000,
+          "attemptedQueueP95Ms": 90000,
+          "attemptedQueueP99Ms": 95000
+        }
+      ],
+      "healthyAttempts": 20,
+      "workspacesServed": 20,
+      "quietWorkspaceFirstDelayMs": 5000,
+      "allAcceptanceThresholdsPassed": false,
+      "acceptance": {
+        "allOfferedAttempted": true,
+        "queueP95": false,
+        "noDuplicatesPerTick": true
+      }
+    },
+    {
+      "name": "burst-50-5000ms",
+      "workspaces": 50,
+      "assumedSyncDurationMs": 5000,
+      "virtualTime": true,
+      "maximumActive": 1,
+      "ticks": [
+        {
+          "tick": 0,
+          "attempted": 48,
+          "succeeded": 48,
+          "failed": 0,
+          "simulatedElapsedMs": 240000,
+          "pendingDue": 2,
+          "oldestPendingAgeMs": 240000,
+          "attemptedQueueP50Ms": 115000,
+          "attemptedQueueP95Ms": 225000,
+          "attemptedQueueP99Ms": 235000
+        }
+      ],
+      "healthyAttempts": 48,
+      "workspacesServed": 48,
+      "quietWorkspaceFirstDelayMs": 5000,
+      "allAcceptanceThresholdsPassed": false,
+      "acceptance": {
+        "allOfferedAttempted": false,
+        "queueP95": false,
+        "noDuplicatesPerTick": true
+      }
+    },
+    {
+      "name": "burst-100-5000ms",
+      "workspaces": 100,
+      "assumedSyncDurationMs": 5000,
+      "virtualTime": true,
+      "maximumActive": 1,
+      "ticks": [
+        {
+          "tick": 0,
+          "attempted": 48,
+          "succeeded": 48,
+          "failed": 0,
+          "simulatedElapsedMs": 240000,
+          "pendingDue": 52,
+          "oldestPendingAgeMs": 240000,
+          "attemptedQueueP50Ms": 115000,
+          "attemptedQueueP95Ms": 225000,
+          "attemptedQueueP99Ms": 235000
+        }
+      ],
+      "healthyAttempts": 48,
+      "workspacesServed": 48,
+      "quietWorkspaceFirstDelayMs": 5000,
+      "allAcceptanceThresholdsPassed": false,
+      "acceptance": {
+        "allOfferedAttempted": false,
+        "queueP95": false,
+        "noDuplicatesPerTick": true
+      }
+    },
+    {
+      "name": "quiet-baseline",
+      "workspaces": 20,
+      "assumedSyncDurationMs": 500,
+      "virtualTime": true,
+      "maximumActive": 1,
+      "ticks": [
+        {
+          "tick": 0,
+          "attempted": 20,
+          "succeeded": 20,
+          "failed": 0,
+          "simulatedElapsedMs": 10000,
+          "pendingDue": 0,
+          "oldestPendingAgeMs": 0,
+          "attemptedQueueP50Ms": 4500,
+          "attemptedQueueP95Ms": 9000,
+          "attemptedQueueP99Ms": 9500
+        }
+      ],
+      "healthyAttempts": 20,
+      "workspacesServed": 20,
+      "quietWorkspaceFirstDelayMs": 500,
+      "allAcceptanceThresholdsPassed": true,
+      "acceptance": {
+        "allOfferedAttempted": true,
+        "queueP95": true,
+        "noDuplicatesPerTick": true
+      }
+    },
+    {
+      "name": "one-slow-workspace",
+      "workspaces": 20,
+      "assumedSyncDurationMs": 500,
+      "slowFirstDurationMs": 239000,
+      "virtualTime": true,
+      "maximumActive": 1,
+      "ticks": [
+        {
+          "tick": 0,
+          "attempted": 3,
+          "succeeded": 3,
+          "failed": 0,
+          "simulatedElapsedMs": 240000,
+          "pendingDue": 17,
+          "oldestPendingAgeMs": 240000,
+          "attemptedQueueP50Ms": 239000,
+          "attemptedQueueP95Ms": 239500,
+          "attemptedQueueP99Ms": 239500
+        }
+      ],
+      "healthyAttempts": 3,
+      "workspacesServed": 3,
+      "quietWorkspaceFirstDelayMs": 239000,
+      "allAcceptanceThresholdsPassed": false,
+      "acceptance": {
+        "allOfferedAttempted": false,
+        "queueP95": false,
+        "noDuplicatesPerTick": true,
+        "quietDelayRatio": false
+      },
+      "quietDelayRatio": 478
+    },
+    {
+      "name": "failed-backoff-head-blocking",
+      "workspaces": 20,
+      "assumedSyncDurationMs": 500,
+      "virtualTime": true,
+      "maximumActive": 1,
+      "ticks": [
+        {
+          "tick": 0,
+          "attempted": 20,
+          "succeeded": 10,
+          "failed": 10,
+          "simulatedElapsedMs": 10000,
+          "pendingDue": 10,
+          "oldestPendingAgeMs": 10000,
+          "attemptedQueueP50Ms": 4500,
+          "attemptedQueueP95Ms": 9000,
+          "attemptedQueueP99Ms": 9500
+        },
+        {
+          "tick": 1,
+          "attempted": 10,
+          "succeeded": 0,
+          "failed": 10,
+          "simulatedElapsedMs": 5000,
+          "pendingDue": 10,
+          "oldestPendingAgeMs": 905000,
+          "attemptedQueueP50Ms": 902000,
+          "attemptedQueueP95Ms": 904500,
+          "attemptedQueueP99Ms": 904500
+        },
+        {
+          "tick": 2,
+          "attempted": 10,
+          "succeeded": 0,
+          "failed": 10,
+          "simulatedElapsedMs": 5000,
+          "pendingDue": 10,
+          "oldestPendingAgeMs": 1805000,
+          "attemptedQueueP50Ms": 1802000,
+          "attemptedQueueP95Ms": 1804500,
+          "attemptedQueueP99Ms": 1804500
+        },
+        {
+          "tick": 3,
+          "attempted": 10,
+          "succeeded": 0,
+          "failed": 10,
+          "simulatedElapsedMs": 5000,
+          "pendingDue": 10,
+          "oldestPendingAgeMs": 2705000,
+          "attemptedQueueP50Ms": 2702000,
+          "attemptedQueueP95Ms": 2704500,
+          "attemptedQueueP99Ms": 2704500
+        }
+      ],
+      "healthyAttempts": 10,
+      "workspacesServed": 10,
+      "quietWorkspaceFirstDelayMs": 500,
+      "allAcceptanceThresholdsPassed": true,
+      "acceptance": {
+        "healthyWorkspaceProgress": true,
+        "truthfulFailureCounts": true,
+        "noDuplicatesPerTick": true
+      }
+    },
+    {
+      "name": "recurring-100-workspaces-four-ticks",
+      "workspaces": 100,
+      "assumedSyncDurationMs": 500,
+      "virtualTime": true,
+      "maximumActive": 1,
+      "ticks": [
+        {
+          "tick": 0,
+          "attempted": 50,
+          "succeeded": 50,
+          "failed": 0,
+          "simulatedElapsedMs": 25000,
+          "pendingDue": 50,
+          "oldestPendingAgeMs": 25000,
+          "attemptedQueueP50Ms": 12000,
+          "attemptedQueueP95Ms": 23500,
+          "attemptedQueueP99Ms": 24500
+        },
+        {
+          "tick": 1,
+          "attempted": 50,
+          "succeeded": 50,
+          "failed": 0,
+          "simulatedElapsedMs": 25000,
+          "pendingDue": 50,
+          "oldestPendingAgeMs": 25000,
+          "attemptedQueueP50Ms": 912000,
+          "attemptedQueueP95Ms": 923500,
+          "attemptedQueueP99Ms": 924500
+        },
+        {
+          "tick": 2,
+          "attempted": 50,
+          "succeeded": 50,
+          "failed": 0,
+          "simulatedElapsedMs": 25000,
+          "pendingDue": 50,
+          "oldestPendingAgeMs": 25000,
+          "attemptedQueueP50Ms": 912000,
+          "attemptedQueueP95Ms": 923500,
+          "attemptedQueueP99Ms": 924500
+        },
+        {
+          "tick": 3,
+          "attempted": 50,
+          "succeeded": 50,
+          "failed": 0,
+          "simulatedElapsedMs": 25000,
+          "pendingDue": 50,
+          "oldestPendingAgeMs": 25000,
+          "attemptedQueueP50Ms": 912000,
+          "attemptedQueueP95Ms": 923500,
+          "attemptedQueueP99Ms": 924500
+        }
+      ],
+      "healthyAttempts": 200,
+      "workspacesServed": 100,
+      "quietWorkspaceFirstDelayMs": 500,
+      "allAcceptanceThresholdsPassed": false,
+      "acceptance": {
+        "allOfferedAttempted": false,
+        "queueP95": false,
+        "noDuplicatesPerTick": true
+      }
+    }
+  ]
+}
+PASS schema preserves supported field types and deduplicates keys
+PASS schema rejects duplicate keys, unsupported types and excessive fields
+PASS server rejects required field without persistence
+PASS server rejects impossible date without persistence
+PASS server rejects unsupported priority without persistence
+PASS server rejects forged field without persistence
+PASS server rejects duplicate value without persistence
+PASS server rejects oversized field without persistence
+PASS server rejects foreign parent without persistence
+PASS actual action persists fields and schema snapshot in isolated PostgreSQL
+PASS legacy submission payload remains unchanged
+PASS bounded pages reach all 60 checks exactly once, with tied timestamps
+PASS literal wildcard search and workspace scoping are applied in SQL
+PASS out-of-range pagination clamps without hiding the last page
+PASS invalid filter IDs and calendar dates are rejected before SQL
+PASS actual HTTP client: stale last page recovers within three scoped requests
+PASS actual HTTP client: all matching rows disappeared
+PASS actual HTTP client: persistent range failure remains an error
+PASS actual HTTP client: second recovery race stops at the three-request budget
+PASS actual HTTP client: non-range failure is never hidden or retried
+{"checks":34,"scope":"Actual schema validator, server actions and history query builder with isolated PGlite persistence; installed Supabase client range recovery through synthetic fetch responses. Auth, billing and Next redirect/cache are stubbed. Asset parent transaction is covered by separate migration tests; no deployed Supabase/provider access."}

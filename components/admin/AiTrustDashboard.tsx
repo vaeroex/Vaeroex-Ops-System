@@ -1,7 +1,9 @@
 import Link from "next/link";
 import type { Route } from "next";
 import type { ReactNode } from "react";
-import { AlertTriangle, ExternalLink, Filter, ShieldCheck } from "lucide-react";
+import { AlertTriangle, ExternalLink, Filter } from "lucide-react";
+import { AdminLocalTime } from "@/components/admin/AdminLocalTime";
+import { AdminReportControls } from "@/components/admin/AdminReportControls";
 import { EmptyState } from "@/components/operations/EmptyState";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { SectionCard } from "@/components/operations/SectionCard";
@@ -15,11 +17,11 @@ import {
 } from "@/lib/admin/ai-trust-dashboard";
 
 const RANGE_LABELS: Record<(typeof AI_TRUST_RANGE_OPTIONS)[number], string> = {
+  month: "This month (UTC)",
   "24h": "Last 24 hours",
   "7d": "Last 7 days",
   "30d": "Last 30 days",
-  "90d": "Last 90 days",
-  all: "All available"
+  "90d": "Last 90 days"
 };
 
 const WORKFLOW_LABELS: Record<(typeof AI_TRUST_WORKFLOW_FILTERS)[number], string> = {
@@ -52,7 +54,7 @@ function numberLabel(value: number | null) {
 }
 
 function dateLabel(value: string) {
-  return new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+  return <AdminLocalTime value={value} />;
 }
 
 function statusTone(status: string) {
@@ -89,7 +91,7 @@ function queryValue(filters: AiTrustFilters, key: keyof AiTrustFilters) {
 
 function trustHref(filters: AiTrustFilters, changes: Partial<Record<keyof AiTrustFilters, string | number>>) {
   const params = new URLSearchParams();
-  const keys: (keyof AiTrustFilters)[] = ["range", "workflow", "releaseChannel", "provider", "model", "ruleset", "rule", "outcome", "page", "evaluation"];
+  const keys: (keyof AiTrustFilters)[] = ["range", "workspace", "workflow", "releaseChannel", "provider", "model", "ruleset", "rule", "outcome", "page", "evaluation"];
   for (const key of keys) {
     const value = changes[key] ?? queryValue(filters, key);
     if (!value || value === "all" || (key === "page" && value === 1)) continue;
@@ -120,51 +122,83 @@ function FilterSelect({ name, label, value, options }: {
 
 export function AiTrustDashboard({ snapshot, filters }: { snapshot: AiTrustDashboardSnapshot; filters: AiTrustFilters }) {
   const pulse = snapshot.platform;
+  const operational = snapshot.operational;
+  const totals = operational && !operational.error ? operational.totals : null;
+  const previous = operational && !operational.error ? operational.previous : null;
+  const vsi = operational && !operational.error ? operational.features.find((feature) => feature.feature === "vsi") : null;
+  const scopedName = operational?.workspaceOptions.find((workspace) => workspace.id === filters.workspace)?.name;
+  const metric = (value: number | undefined | null) => value === null || value === undefined ? "Data unavailable" : value.toLocaleString();
+  const telemetry = Boolean(totals?.vsiTelemetrySamples);
+  const measured = (value: number | undefined) => !totals ? "Data unavailable" : !telemetry ? "Not measured" : metric(value);
+  const change = totals && previous ? totals.vsiCompleted - previous.vsiCompleted : null;
   const totalClassified = pulse.accepted + pulse.qualifierRequired + pulse.unresolved + pulse.wouldOmit + pulse.wouldReject;
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-4">
       <section className="rounded-lg border border-line bg-white p-4 shadow-panel sm:p-5">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <p className="text-xs font-semibold uppercase text-vaeroex-blue">Internal quality control</p>
-              <span className="inline-flex items-center gap-1 rounded-full border border-blue-300 bg-blue-50 px-2 py-1 text-[0.68rem] font-semibold text-blue-800">
-                <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />
-                Shadow Mode
-              </span>
+              <p className="text-xs font-semibold uppercase text-vaeroex-blue">Platform admin · reliability</p>
+
             </div>
             <h1 className="mt-2 text-2xl font-semibold text-ink">AI Trust</h1>
-            <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">Privacy-safe reliability, extraction, validation, latency, and provider telemetry for supported Vaeroex workflows.</p>
+            <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">Execution reliability and measured validation coverage. Successful execution and valid citations do not establish answer correctness.</p>
           </div>
           <div className="text-sm text-slate-600 lg:text-right">
             <p className="font-semibold text-ink">{RANGE_LABELS[filters.range]}</p>
             <p className="mt-1">Updated {dateLabel(snapshot.generatedAt)}</p>
+            <p className="mt-1 font-medium text-ink">{filters.workspace ? `Selected workspace: ${scopedName || filters.workspace}` : "All workspaces · platform-wide"}</p>
           </div>
         </div>
       </section>
 
-      <SectionCard title="Filters" description="All parameters are validated server-side. Workflow-specific filters return only telemetry that can be applied authoritatively.">
-        <form action="/app/admin/ai-trust" method="get" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
-          <FilterSelect name="range" label="Period" value={filters.range} options={AI_TRUST_RANGE_OPTIONS.map((value) => ({ value, label: RANGE_LABELS[value] }))} />
-          <FilterSelect name="workflow" label="Workflow" value={filters.workflow} options={AI_TRUST_WORKFLOW_FILTERS.map((value) => ({ value, label: WORKFLOW_LABELS[value] }))} />
+      <AdminReportControls action="/app/admin/ai-trust" range={filters.range} workspace={filters.workspace} workspaces={operational?.workspaceOptions || []} allowAll={false}>
+        <FilterSelect name="workflow" label="Diagnostic workflow" value={filters.workflow} options={AI_TRUST_WORKFLOW_FILTERS.map((value) => ({ value, label: WORKFLOW_LABELS[value] }))} />
+      </AdminReportControls>
+      {snapshot.periodStart && snapshot.periodEnd ? <p className="text-xs text-muted">Reporting window: {dateLabel(snapshot.periodStart)} – {dateLabel(snapshot.periodEnd)}. All metrics use this period and workspace scope; monthly reset boundaries remain UTC.</p> : null}
+      <details className="rounded-lg border border-line bg-white p-3">
+        <summary className="cursor-pointer text-sm font-semibold text-ink focus-visible:outline focus-visible:outline-2">Advanced diagnostic filters</summary>
+        <p className="mt-2 text-xs text-muted">These refine bounded workflow diagnostics below. The VSI overview uses the selected period and workspace only.</p>
+        <form action="/app/admin/ai-trust" method="get" className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <input type="hidden" name="range" value={filters.range} /><input type="hidden" name="workspace" value={filters.workspace} /><input type="hidden" name="workflow" value={filters.workflow} />
           <FilterSelect name="release_channel" label="Release channel" value={filters.releaseChannel} options={[{ value: "", label: "Any channel" }, ...snapshot.availableFilters.releaseChannels.map((value) => ({ value, label: value }))]} />
           <FilterSelect name="provider" label="Provider" value={filters.provider} options={[{ value: "", label: "Any provider" }, ...snapshot.availableFilters.providers.map((value) => ({ value, label: value }))]} />
           <FilterSelect name="model" label="Model" value={filters.model} options={[{ value: "", label: "Any model" }, ...snapshot.availableFilters.models.map((value) => ({ value, label: value }))]} />
           <FilterSelect name="ruleset" label="Ruleset" value={filters.ruleset} options={[{ value: "", label: "Any ruleset" }, ...snapshot.availableFilters.rulesets.map((value) => ({ value, label: value }))]} />
           <FilterSelect name="rule" label="Rule" value={filters.rule} options={[{ value: "", label: "Any rule" }, ...snapshot.availableFilters.rules.map((value) => ({ value, label: value.replaceAll("_", " ") }))]} />
           <FilterSelect name="outcome" label="Claim outcome" value={filters.outcome} options={AI_TRUST_OUTCOME_FILTERS.map((value) => ({ value, label: OUTCOME_LABELS[value] }))} />
-          <div className="flex items-end gap-2 sm:col-span-2 lg:col-span-4 xl:col-span-2">
-            <button type="submit" className="inline-flex min-h-10 items-center gap-2 rounded-md bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-blue/40">
-              <Filter className="h-4 w-4" aria-hidden="true" />
-              Apply filters
-            </button>
-            <Link href="/app/admin/ai-trust" className="inline-flex min-h-10 items-center rounded-md border border-line bg-white px-4 py-2 text-sm font-semibold text-ink hover:border-vaeroex-blue focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-blue/30">Clear</Link>
-          </div>
+          <div className="flex items-end gap-2"><button type="submit" className="inline-flex min-h-10 items-center gap-2 rounded-md bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white"><Filter className="h-4 w-4" aria-hidden="true" />Apply diagnostics</button><Link href={trustHref(filters, { releaseChannel: "", provider: "", model: "", ruleset: "", rule: "", outcome: "all", page: 1, evaluation: "" })} className="inline-flex min-h-10 items-center rounded-md border border-line px-3 text-sm font-semibold">Clear</Link></div>
         </form>
+      </details>
+      {operational?.error ? <ErrorNotice message={operational.error} /> : null}
+      <SectionCard title="VSI reliability" description="All matching requests and settled attempts are aggregated in the database. Questions, provider attempts and saved records are separate measurements.">
+        <MetricGrid>
+          <Metric label="Questions started" value={metric(totals?.vsiQuestions)} detail="Request creation in this period" />
+          <Metric label="Completed answers" value={metric(totals?.vsiCompleted)} detail={totals ? `${totals.vsiCompleted + totals.vsiFailed < 30 ? "Insufficient sample · " : ""}${percentageLabel((totals.vsiCompleted + totals.vsiFailed) ? totals.vsiCompleted / (totals.vsiCompleted + totals.vsiFailed) * 100 : null)} of finished requests` : "Data unavailable"} />
+          <Metric label="Failed requests" value={metric(totals?.vsiFailed)} detail="Final request state; details below" />
+          <Metric label="Pending requests" value={metric(totals?.vsiPending)} detail="Current state of this period’s requests" />
+        </MetricGrid>
+        <p className="mt-3 text-sm text-slate-600">{change === null ? "Change: data unavailable." : `Change: ${change > 0 ? "+" : ""}${change.toLocaleString()} completed answers versus the preceding equal-length period.`} Execution metrics are not an accuracy score. No recorded failure does not establish that no incident occurred.</p>
+        <details className="mt-4 border-t border-line pt-3">
+          <summary className="cursor-pointer text-sm font-semibold text-ink focus-visible:outline focus-visible:outline-2">VSI checks and telemetry coverage</summary>
+          <p className="mt-2 text-xs leading-5 text-muted">{metric(totals?.vsiTelemetrySamples)} settled attempts contain version 1 diagnostics. Earlier attempts and requests that fail before a particular check are not measured for that check. The counters below describe settled attempts in the selected period, including retries, and may differ from final request counts. Research completion means the bounded lookup completed, not that every claim is correct.</p>
+          <p className="mt-2 text-sm text-slate-600">Average response time: {vsi && vsi.latencySamples ? durationLabel(vsi.latencyTotalMs / vsi.latencySamples) : totals ? "Not measured" : "Data unavailable"} · {metric(vsi?.latencySamples ?? (totals ? 0 : null))} latency samples. Pending and failed settlement records may have no measured duration.</p>
+          <dl className="mt-3 grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
+            {[ ["Application failure outcomes", measured(totals?.vsiApplicationFailures)], ["Provider failure events", measured(totals?.vsiProviderFailures)], ["Timeout outcomes", measured(totals?.vsiTimeouts)], ["Output-validation failures", measured(totals?.vsiOutputValidationFailures)], ["Citation-validation failures", measured(totals?.vsiCitationValidationFailures)], ["Research completed / partial", telemetry ? `${metric(totals?.vsiResearchCompleted)} / ${metric(totals?.vsiResearchPartial)}` : measured(undefined)], ["Research failed", measured(totals?.vsiResearchFailed)], ["Research not required", measured(totals?.vsiResearchNotRequired)], ["Citations validated", measured(totals?.vsiCitationsValidated)], ["Citation check not applicable", measured(totals?.vsiCitationsNotRequired)], ["Evidence limitation flags", measured(totals?.vsiEvidenceLimitations)], ["Evidence unavailable outcomes", measured(totals?.vsiEvidenceUnavailable)], ["In-request budget / context blocks", telemetry ? `${metric(totals?.vsiBudgetBlocks)} / ${metric(totals?.vsiContextBlocks)}` : measured(undefined)], ["Quota / pre-admission budget blocks", "Not measured"], ["Business Note proposals", measured(totals?.vsiNoteProposals)], ["Confirmed note proposals", "Not measured"], ["Stale evidence separately", "Not measured"], ["Answer correctness", "Not measured"] ].map(([label, value]) => <div key={label}><dt className="text-muted">{label}</dt><dd className="mt-1 font-semibold text-ink">{value}</dd></div>)}
+          </dl>
+          <p className="mt-3 text-xs leading-5 text-muted">General conversation and creative answers without required citations are not applicable to citation checks. Validated source references do not prove claim support. Safeguard blocks are shown separately from application failures; the historical request state alone cannot distinguish them.</p>
+        </details>
       </SectionCard>
-
+      <SectionCard title="Coverage and attention" description="Operational checks cover different units. Open diagnostics for validation and provider details.">
+        <div className="vaeroex-mobile-safe-scroll overflow-x-auto"><table className="w-full min-w-[560px] text-left text-sm"><thead className="text-xs uppercase text-muted"><tr><th className="p-2">Feature</th><th className="p-2">Measured</th><th className="p-2">Needs attention</th></tr></thead><tbody className="divide-y divide-line">
+          <tr><th className="p-2 font-semibold">VSI</th><td className="p-2">Request outcomes; versioned execution checks</td><td className="p-2">{totals ? `${totals.vsiFailed} failed; ${totals.vsiPending} pending` : "Data unavailable"}</td></tr>
+          {snapshot.workflows.map((workflow) => <tr key={workflow.key}><th className="p-2 font-semibold">{workflow.label}</th><td className="p-2">{snapshot.sourceErrors.length ? "Data unavailable" : `${workflow.runs} sampled runs · ${workflow.sampleInsufficient ? "insufficient sample" : workflow.instrumentation}`}</td><td className="p-2">{snapshot.sourceErrors.length ? "Data unavailable" : `${workflow.failures} recorded failures${workflow.unresolvedOrNeedsReview === null ? "" : `; ${workflow.unresolvedOrNeedsReview} unresolved / awaiting review`}`}</td></tr>)}
+          <tr><th className="p-2 font-semibold">Briefings</th><td className="p-2">{metric(operational?.features.find((feature) => feature.feature === "intelligence_briefing_v1")?.usageRecords ?? (totals ? 0 : null))} usage records; spend in Usage</td><td className="p-2">Claim diagnostics not yet included here</td></tr>
+        </tbody></table></div>
+        <p className="mt-3 text-xs text-muted">Shadow Mode observes Business Health claim checks without necessarily blocking the response. This dashboard cannot activate enforcement. Other existing schema, citation and access enforcement remains unchanged.</p>
+      </SectionCard>
       {snapshot.sourceErrors.map((error) => <ErrorNotice key={error.source} message={error.message} />)}
-      {snapshot.truncated ? <ErrorNotice message="This period exceeds the bounded 5,000-row query limit for at least one source. Narrow the time range for complete metrics." /> : null}
+      {snapshot.truncated ? <ErrorNotice message="Workflow diagnostics show a bounded sample of the latest 5,000 rows per source. At least one source has more rows; narrow the period for complete diagnostic coverage. The VSI totals above are complete database aggregates." /> : null}
       {snapshot.unsafeTelemetryRows || snapshot.malformedTelemetryRows ? (
         <div className="flex gap-3 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
           <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
@@ -172,7 +206,8 @@ export function AiTrustDashboard({ snapshot, filters }: { snapshot: AiTrustDashb
         </div>
       ) : null}
 
-      <SectionCard title="Overall Platform Pulse" description="Compatible Business Health Trust Layer V1 claim telemetry only. Business Notes extraction outcomes are intentionally excluded.">
+      <details className="rounded-lg border border-line bg-white p-3"><summary className="cursor-pointer text-sm font-semibold text-ink focus-visible:outline focus-visible:outline-2">Workflow and shadow diagnostics</summary><div className="mt-4 space-y-4">
+      <SectionCard title="Business Health shadow pulse" description="Compatible Business Health Trust Layer V1 claim telemetry only. Business Notes extraction outcomes are intentionally excluded.">
         {pulse.instrumentedRuns ? (
           <>
             <MetricGrid columns={5}>
@@ -250,8 +285,8 @@ export function AiTrustDashboard({ snapshot, filters }: { snapshot: AiTrustDashb
             <div><dt className="text-muted">Would-reject rate</dt><dd className="mt-1 font-semibold text-ink">{percentageLabel(snapshot.readiness.wouldRejectRate)}</dd></div>
             <div><dt className="text-muted">False-positive reviews</dt><dd className="mt-1 font-semibold text-ink">Not instrumented</dd></div>
             <div><dt className="text-muted">Stable ruleset duration</dt><dd className="mt-1 font-semibold text-ink">{snapshot.readiness.stableRulesetDays === null ? "Not available" : `${snapshot.readiness.stableRulesetDays} days`}</dd></div>
-            <div><dt className="text-muted">Privacy incidents</dt><dd className="mt-1 font-semibold text-ink">{snapshot.readiness.privacyIncidents.toLocaleString()}</dd></div>
-            <div><dt className="text-muted">Cross-workspace failures</dt><dd className="mt-1 font-semibold text-ink">{snapshot.readiness.crossWorkspaceFailures.toLocaleString()}</dd></div>
+            <div><dt className="text-muted">Excluded unsafe telemetry</dt><dd className="mt-1 font-semibold text-ink">{snapshot.readiness.privacyIncidents.toLocaleString()}</dd></div>
+            <div><dt className="text-muted">Recorded workspace-scope failures</dt><dd className="mt-1 font-semibold text-ink">{snapshot.readiness.crossWorkspaceFailures.toLocaleString()}</dd></div>
             <div><dt className="text-muted">Additional provider calls</dt><dd className="mt-1 font-semibold text-ink">{snapshot.readiness.additionalProviderCalls.toLocaleString()}</dd></div>
             <div><dt className="text-muted">Latest ruleset</dt><dd className="mt-1 break-words font-mono text-xs text-ink">{snapshot.readiness.latestRulesetVersion || "Not recorded"}</dd></div>
           </dl>
@@ -316,6 +351,8 @@ export function AiTrustDashboard({ snapshot, filters }: { snapshot: AiTrustDashb
         <p className="mt-3 text-xs leading-5 text-muted">Duplicate-prevention events and structured rejection reason categories are not currently recorded as aggregate telemetry.</p>
       </SectionCard>
 
+      </div></details>
+      <details className="rounded-lg border border-line bg-white p-3"><summary className="cursor-pointer text-sm font-semibold text-ink focus-visible:outline focus-visible:outline-2">Rules and provider diagnostics</summary><div className="mt-4 space-y-4">
       <SectionCard title="Rule Health" description="Privacy-safe reason-code frequencies from instrumented Business Health shadow evaluations. No outcome is labeled a false positive without human review.">
         {snapshot.rules.length ? (
           <div className="vaeroex-mobile-safe-scroll overflow-x-auto rounded-lg border border-line">
@@ -337,7 +374,7 @@ export function AiTrustDashboard({ snapshot, filters }: { snapshot: AiTrustDashb
               </tbody>
             </table>
           </div>
-        ) : <EmptyState title="No rule issues" description="No privacy-safe Trust reason codes match the selected filters." />}
+        ) : <EmptyState title="No rule issues" description="No privacy-safe Trust reason codes match the selected filters. This does not prove that no incidents occurred." />}
       </SectionCard>
 
       <SectionCard title="Provider and Model Health" description="Provider attempts and existing validation diagnostics. A fallback is not interpreted as a quality failure by itself.">
@@ -364,6 +401,8 @@ export function AiTrustDashboard({ snapshot, filters }: { snapshot: AiTrustDashb
         ) : <EmptyState title="No provider telemetry" description="No provider attempts match the selected filters." />}
       </SectionCard>
 
+      </div></details>
+      <details open={Boolean(filters.evaluation)} className="rounded-lg border border-line bg-white p-3"><summary className="cursor-pointer text-sm font-semibold text-ink focus-visible:outline focus-visible:outline-2">Trust evaluation history and technical details</summary><div className="mt-4 space-y-4">
       {snapshot.selectedEvaluation ? (
         <SectionCard title="Privacy-Safe Evaluation Detail" description="Hashed references and approved operational metadata only. Customer content and raw identifiers are not queried.">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -401,12 +440,13 @@ export function AiTrustDashboard({ snapshot, filters }: { snapshot: AiTrustDashb
         {snapshot.evaluations.length ? (
           <>
             <div className="vaeroex-mobile-safe-scroll overflow-x-auto rounded-lg border border-line">
-              <table className="min-w-[900px] divide-y divide-line text-sm"><thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-muted"><tr><th className="px-3 py-2">Timestamp</th><th className="px-3 py-2">Provider / model</th><th className="px-3 py-2">Claims</th><th className="px-3 py-2">Outcome</th><th className="px-3 py-2">Latency</th><th className="px-3 py-2">State</th><th className="px-3 py-2"><span className="sr-only">Action</span></th></tr></thead><tbody className="divide-y divide-line bg-white">{snapshot.evaluations.map((evaluation) => <tr key={evaluation.id} className="hover:bg-blue-50/40 focus-within:bg-blue-50/40"><td className="px-3 py-3"><p className="font-medium text-ink">{dateLabel(evaluation.createdAt)}</p><p className="mt-1 font-mono text-[0.68rem] text-muted">{evaluation.releaseChannel}</p></td><td className="px-3 py-3"><p className="font-semibold text-ink">{evaluation.provider}</p><p className="mt-1 font-mono text-[0.68rem] text-muted">{evaluation.model}</p></td><td className="px-3 py-3 font-semibold text-ink">{evaluation.claimCount}</td><td className="px-3 py-3 text-xs text-slate-700">{evaluation.claimOutcomes.accepted} accepted, {evaluation.claimOutcomes.unresolved} unresolved</td><td className="px-3 py-3 text-slate-700">{durationLabel(evaluation.validationLatencyMs)}</td><td className="px-3 py-3 text-xs text-slate-700">{evaluation.cacheState}; {evaluation.fallbackUsed ? "fallback" : "primary"}</td><td className="px-3 py-3 text-right"><Link href={trustHref(filters, { evaluation: evaluation.id })} className="inline-flex min-h-10 items-center gap-1 rounded-md border border-line px-3 py-2 text-xs font-semibold text-vaeroex-blue hover:border-vaeroex-blue focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-blue/30">Inspect <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" /></Link></td></tr>)}</tbody></table>
+              <table className="min-w-[900px] divide-y divide-line text-sm"><thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-muted"><tr><th className="px-3 py-2">Timestamp</th><th className="px-3 py-2">Provider / model</th><th className="px-3 py-2">Claims</th><th className="px-3 py-2">Outcome</th><th className="px-3 py-2">Latency</th><th className="px-3 py-2">State</th><th className="relative px-3 py-2"><span className="sr-only">Action</span></th></tr></thead><tbody className="divide-y divide-line bg-white">{snapshot.evaluations.map((evaluation) => <tr key={evaluation.id} className="hover:bg-blue-50/40 focus-within:bg-blue-50/40"><td className="px-3 py-3"><p className="font-medium text-ink">{dateLabel(evaluation.createdAt)}</p><p className="mt-1 font-mono text-[0.68rem] text-muted">{evaluation.releaseChannel}</p></td><td className="px-3 py-3"><p className="font-semibold text-ink">{evaluation.provider}</p><p className="mt-1 font-mono text-[0.68rem] text-muted">{evaluation.model}</p></td><td className="px-3 py-3 font-semibold text-ink">{evaluation.claimCount}</td><td className="px-3 py-3 text-xs text-slate-700">{evaluation.claimOutcomes.accepted} accepted, {evaluation.claimOutcomes.unresolved} unresolved</td><td className="px-3 py-3 text-slate-700">{durationLabel(evaluation.validationLatencyMs)}</td><td className="px-3 py-3 text-xs text-slate-700">{evaluation.cacheState}; {evaluation.fallbackUsed ? "fallback" : "primary"}</td><td className="px-3 py-3 text-right"><Link href={trustHref(filters, { evaluation: evaluation.id })} className="inline-flex min-h-10 items-center gap-1 rounded-md border border-line px-3 py-2 text-xs font-semibold text-vaeroex-blue hover:border-vaeroex-blue focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-blue/30">Inspect <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" /></Link></td></tr>)}</tbody></table>
             </div>
             <div className="mt-3 flex flex-col gap-3 text-sm sm:flex-row sm:items-center sm:justify-between"><p className="text-muted">{snapshot.evaluationCount.toLocaleString()} matching evaluations</p><div className="flex items-center gap-2">{filters.page > 1 ? <Link href={trustHref(filters, { page: filters.page - 1, evaluation: "" })} className="inline-flex min-h-10 items-center rounded-md border border-line px-3 py-2 font-semibold text-ink hover:border-vaeroex-blue">Previous</Link> : <span className="inline-flex min-h-10 items-center rounded-md border border-line px-3 py-2 text-slate-400">Previous</span>}<span className="px-2 font-medium">Page {Math.min(filters.page, snapshot.totalEvaluationPages)} of {snapshot.totalEvaluationPages}</span>{filters.page < snapshot.totalEvaluationPages ? <Link href={trustHref(filters, { page: filters.page + 1, evaluation: "" })} className="inline-flex min-h-10 items-center rounded-md border border-line px-3 py-2 font-semibold text-ink hover:border-vaeroex-blue">Next</Link> : <span className="inline-flex min-h-10 items-center rounded-md border border-line px-3 py-2 text-slate-400">Next</span>}</div></div>
           </>
         ) : <EmptyState title="No Trust evaluations" description="No privacy-safe Business Health Trust evaluations match the selected filters." />}
       </SectionCard>
+      </div></details>
     </div>
   );
 }

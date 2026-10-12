@@ -1,0 +1,9 @@
+{
+  "label": "tail-interrupted",
+  "code": null,
+  "signal": "SIGKILL",
+  "timedOut": false,
+  "durationMs": 213.53899999999976,
+  "stdout": "",
+  "stderr": "Connecting to remote database...\nDo you want to push these migrations to the remote database?\n • 20261005182541_bounded_google_sheets_dispatch.sql\n • 20261005183352_issue_submission_receipts.sql\n • 20261005184031_qbo_scoped_runtime_recovery.sql\n • 20261005190709_sheets_recovery_fair_scan.sql\n • 20261005194244_google_sheets_failure_cleanup_transition.sql\n • 20261005202215_sheets_dispatch_round_robin.sql\n [Y/n] y\nApplying migration 20261005182541_bounded_google_sheets_dispatch.sql...\nApplying migration 20261005183352_issue_submission_receipts.sql...\n"
+}

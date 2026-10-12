@@ -245,24 +245,21 @@ function BusinessNoteSummaryCard({ note, archived = false }: { note: BusinessNot
 
 export function BusinessNoteEntry({ enabled }: { enabled: boolean }) {
   return (
-    <details className="workspace-note-entry workspace-secondary-details rounded-lg border border-white/10 p-3">
-      <summary className="cursor-pointer text-sm font-semibold text-cyan-100">Add business note</summary>
-      <form action={submitBusinessNoteForReviewAction} className="mt-4 space-y-3">
-        <BusinessNoteComposer disabled={!enabled} />
-        <label className="block max-w-xs text-sm text-slate-200">
-          <span className="mb-1 block text-xs font-semibold text-slate-300">Observation date (optional)</span>
-          <input type="date" name="observation_date" disabled={!enabled} className="min-h-11 w-full rounded-md border border-white/10 bg-slate-950/70 px-3 py-2 text-slate-100 outline-none focus:border-cyan-300 disabled:opacity-60" />
-        </label>
-        <p className="text-xs leading-5 text-slate-400">Review the extracted context before approving it as evidence. Upload documents and longer meeting notes instead.</p>
-        {enabled ? (
-          <PendingSubmitButton pendingLabel="Extracting business context..." className="min-h-11 rounded-md bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white">
-            Review &amp; Extract Business Context
-          </PendingSubmitButton>
-        ) : (
-          <p className="rounded-md border border-amber-300/20 bg-amber-950/15 p-3 text-sm text-amber-100">Business context extraction is not enabled in this environment.</p>
-        )}
-      </form>
-    </details>
+    <form action={submitBusinessNoteForReviewAction} className="workspace-note-entry space-y-3">
+      <BusinessNoteComposer disabled={!enabled} />
+      <label className="block max-w-xs text-sm text-slate-200">
+        <span className="mb-1 block text-xs font-semibold text-slate-300">Observation date (optional)</span>
+        <input type="date" name="observation_date" disabled={!enabled} className="min-h-11 w-full rounded-md border border-white/10 bg-slate-950/70 px-3 py-2 text-base sm:text-sm text-slate-100 outline-none focus:border-cyan-300 disabled:opacity-60" />
+      </label>
+      <p className="text-xs leading-5 text-slate-400">Review the extracted context before approving it as evidence.</p>
+      {enabled ? (
+        <PendingSubmitButton pendingLabel="Extracting business context..." className="min-h-11 w-full rounded-md bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white sm:w-auto">
+          Review &amp; Extract Business Context
+        </PendingSubmitButton>
+      ) : (
+        <p className="rounded-md border border-amber-300/20 bg-amber-950/15 p-3 text-sm text-amber-100">Business context extraction is not enabled in this environment.</p>
+      )}
+    </form>
   );
 }
 

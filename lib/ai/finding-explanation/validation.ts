@@ -12,13 +12,14 @@ import {
 import type { StructuredOutputValidation } from "@/lib/ai/providers/provider-manager";
 import { validationFailure, validationValueType } from "@/lib/ai/validation-diagnostics";
 import { validateAiGeneratedOutput } from "@/lib/security/ai-output-validation";
+import { completeApprovedMissingDetail, followsApprovedInvestigation, hasTechnicalAdviceLanguage } from "@/lib/ai/investigation-action-quality";
 import type { Json } from "@/lib/supabase/types";
 
 const outputSchema = z.object({
   what_happened: z.string().trim().min(25).max(520),
   why_evidence_suggests: z.string().trim().min(25).max(620),
   why_leadership_should_care: z.string().trim().min(25).max(520),
-  investigate_next: z.string().trim().min(20).max(520),
+  investigate_next: z.string().trim().min(20).max(620),
   what_evidence_does_not_prove: z.string().trim().min(20).max(420)
 }).strict();
 
@@ -108,13 +109,30 @@ export function validateFindingExplanationOutput(
     });
   }
 
-  const output = parsed.data;
+  const output = {
+    ...parsed.data,
+    investigate_next: completeApprovedMissingDetail(
+      parsed.data.investigate_next,
+      context.facts.approvedInvestigationNext,
+      context.facts.freshness === "stale",
+      620
+    )
+  };
   const text = combinedText(output);
   if (UUID_PATTERN.test(text) || CITATION_PATTERN.test(text) || INTERNAL_IDENTIFIER_PATTERN.test(text)) {
     return validationFailure("The provider must not generate identifiers or citations.", {
       reasonCode: "invalid_citation_id",
       stage: "citation_provenance",
       expectedField: fieldWithMatch(output, UUID_PATTERN.test(text) ? UUID_PATTERN : INTERNAL_IDENTIFIER_PATTERN),
+      expectedType: "string",
+      observedType: "string"
+    });
+  }
+  if (hasTechnicalAdviceLanguage(text)) {
+    return validationFailure("The next step used technical source language instead of plain business English.", {
+      reasonCode: "contextual_validation_failed",
+      stage: "contextual_validation",
+      expectedField: OUTPUT_FIELDS.find((field) => hasTechnicalAdviceLanguage(output[field])) || "$",
       expectedType: "string",
       observedType: "string"
     });
@@ -186,6 +204,18 @@ export function validateFindingExplanationOutput(
       reasonCode: "unsupported_inference",
       stage: "contextual_validation",
       expectedField: ungrounded[0],
+      expectedType: "string",
+      observedType: "string"
+    });
+  }
+
+  const repeatedCauseCaveats = [output.what_happened, output.why_evidence_suggests, output.why_leadership_should_care, output.investigate_next]
+    .filter((field) => /\b(?:does not|cannot|can.t|not enough to)\b.{0,55}\b(?:cause|causation)\b/i.test(field)).length;
+  if (!followsApprovedInvestigation(output.investigate_next, context.facts.approvedInvestigationNext, context.facts.freshness === "stale") || repeatedCauseCaveats > 1) {
+    return validationFailure("The next step must name the approved source records and account for stale evidence.", {
+      reasonCode: "contextual_validation_failed",
+      stage: "contextual_validation",
+      expectedField: "investigate_next",
       expectedType: "string",
       observedType: "string"
     });

@@ -35,6 +35,7 @@ const { buildOperationalEvidenceInsights } = require("../lib/intelligence/operat
 
 const coreFiles = [
   "app/app/page.tsx",
+  "lib/intelligence/workspace-health.ts",
   "app/app/intelligence/page.tsx",
   "app/app/kpis/page.tsx",
   "lib/intelligence/coverage.ts",

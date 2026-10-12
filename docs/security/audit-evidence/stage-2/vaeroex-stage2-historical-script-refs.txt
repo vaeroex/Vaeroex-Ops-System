@@ -1,0 +1,27 @@
+scripts/security-check.ts:98:  "tasks",
+scripts/security-check.ts:113:  "crm_leads",
+scripts/security-check.ts:114:  "crm_lead_history",
+scripts/security-check.ts:429:check(!operationsActions.includes("deleteBusinessSignalAction") && !operationsActions.includes('.from("tasks")'), "Retired Business Signal mutations must be removed from customer actions.");
+scripts/adversarial-regression-tests.js:828:  assert.doesNotMatch(operationsActions, /\.from\("crm_leads"\)\s*\.insert|entered_from:\s*"crm_module"/, "manual creation action must not insert CRM rows");
+scripts/adversarial-regression-tests.js:832:  assert.match(recordManagementActions, /collection === "crm_leads"/, "managed record mutations must explicitly block crm_leads");
+scripts/security-high-remediation-regression-tests.js:58:for (const table of ["form_submissions", "asset_checks", "file_uploads", "file_imports", "file_import_rows", "crm_leads", "operational_metrics"]) {
+scripts/prestige-retirement-regression-tests.js:89:assert.doesNotMatch(kpis, /from\("issues"\)|from\("crm_leads"\)|from\("reports"\)/, "KPI pages must not load retired diagnostic-only sources");
+scripts/executive-intelligence-regression-tests.js:788:  source_summary: { kpis: 4, files: 1, issues: 1, crm_leads: 0, reports: 0 }
+scripts/business-signals-retirement-regression-tests.js:51:  assert.doesNotMatch(source, /\.from\("tasks"\)|public\.tasks|update_business_signal_lifecycle/, `${file} must not access retired Business Signal storage`);
+scripts/business-signals-retirement-regression-tests.js:57:assert.doesNotMatch(tasksPage, /from\("tasks"\)|Business Signals?/, "the retired route must not read or render historical task rows");
+scripts/business-signals-retirement-regression-tests.js:63:assert.doesNotMatch(searchRoute, /\.from\("tasks"\)|Business Signals?|group:\s*"Business Signals"/);
+scripts/business-signals-retirement-regression-tests.js:69:assert.doesNotMatch(setupActions, /\.from\("tasks"\)\.insert|Business Signals?/);
+scripts/intelligence-briefing-preflight-regression-tests.js:71:      if (this.table === "crm_lead_history" && column === "deleted_at") {
+scripts/intelligence-briefing-preflight-regression-tests.js:72:        throw new Error("42703: crm_lead_history.deleted_at does not exist in the Production schema");
+scripts/intelligence-briefing-preflight-regression-tests.js:103:const historyType = typesSource.match(/crm_lead_history:\s*\{[\s\S]*?Relationships:/)?.[0] || "";
+scripts/intelligence-briefing-preflight-regression-tests.js:105:assert.doesNotMatch(historyType, /deleted_at/, "crm_lead_history genuinely has no deleted_at column");
+scripts/intelligence-briefing-preflight-regression-tests.js:108:const historyTable = historyMigration.match(/create table if not exists public\.crm_lead_history \([\s\S]*?\n\);/)?.[0] || "";
+scripts/intelligence-briefing-preflight-regression-tests.js:111:assert.match(historyTable, /lead_id uuid not null references public\.crm_leads\(id\) on delete cascade/, "CRM history retains its canonical parent relationship");
+scripts/intelligence-briefing-preflight-regression-tests.js:115:  assert.match(source, /from\("crm_lead_history"\)\.select\("\*"\)\.eq\("workspace_id", workspaceId\)\.order\("created_at"/, `${consumer} must use the canonical workspace-scoped history query`);
+scripts/intelligence-briefing-preflight-regression-tests.js:116:  assert.doesNotMatch(source, /from\("crm_lead_history"\)[^\n]*\.is\("deleted_at"/, `${consumer} must not invent a CRM history lifecycle column`);
+scripts/intelligence-briefing-preflight-regression-tests.js:137:  const historyFixture = createSupabaseFixture({ tables: { crm_lead_history: [historyRow] } });
+scripts/intelligence-briefing-preflight-regression-tests.js:142:    historyFixture.calls.some((call) => call.table === "crm_lead_history" && call.operation === "is"),
+scripts/intelligence-briefing-preflight-regression-tests.js:147:  const zeroFixture = createSupabaseFixture({ tables: { crm_lead_history: [historyRow] } });
+scripts/intelligence-briefing-preflight-regression-tests.js:248:      crm_lead_history: [historyRow],
+scripts/deletion-integrity-regression-tests.js:72:assert.doesNotMatch(operationsActions, /deleteBusinessSignalAction|\.from\("tasks"\)|update_business_signal_lifecycle/, "retired Business Signal mutations must be absent");
+scripts/deletion-integrity-regression-tests.js:83:  assert.doesNotMatch(source, /\.from\("tasks"\)/, "active retrieval paths must not read retired task storage");

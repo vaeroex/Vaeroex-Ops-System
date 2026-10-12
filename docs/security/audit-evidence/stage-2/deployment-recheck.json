@@ -1,0 +1,19 @@
+{
+  "projectId": "prj_J810bZ9ECoN4CyLKujUoEEH8N6ja",
+  "projectName": "vaeroex-ops-system",
+  "live": false,
+  "latestDeployment": {
+    "id": "dpl_A9tgEHvj54MkLCxCyac7FGokaM1t",
+    "url": "vaeroex-ops-system-2y5y78sld-vaeroex-2167s-projects.vercel.app",
+    "createdAt": 1791001097151,
+    "readyState": "READY",
+    "target": "production"
+  },
+  "domains": [
+    "www.vaeroex.com",
+    "vaeroex-ops-system.vercel.app",
+    "vaeroex.com",
+    "vaeroex-ops-system-vaeroex-2167s-projects.vercel.app",
+    "vaeroex-ops-system-git-main-vaeroex-2167s-projects.vercel.app"
+  ]
+}

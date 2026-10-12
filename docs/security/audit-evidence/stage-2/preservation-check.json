@@ -1,0 +1,10 @@
+{
+  "sourceFiles": 1044,
+  "changedSourceFiles": [],
+  "branch": "codex/external-integrations-phase-8b-qbo-sandbox",
+  "commit": "90982062976ca905095ba68c193c52eddf795f1b",
+  "missingLocalEvidenceLinks": [],
+  "healthProbeMatchesFinalAgentOutput": true,
+  "healthHarnessMatchesFinalAgentOutput": true,
+  "auditRecordSha256": "7104d470a2eda3cd1baa6df095852d00e38ce045975dad425316149ae7ec3539"
+}

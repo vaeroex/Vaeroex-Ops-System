@@ -176,16 +176,20 @@ insert into public.profiles (id, email, full_name) values
     'QBO Production Owner B'
   );
 
-insert into public.workspaces (id, name, created_by) values
+-- The production-provider configuration and tenant-bound OAuth assertions
+-- require entitled fixture workspaces, not a subscription bypass.
+insert into public.workspaces (id, name, created_by, subscription_status, trial_ends_at) values
   (
     'b9f00000-0000-4000-8000-000000000001',
     'QBO Production Workspace A',
-    'a9f00000-0000-4000-8000-000000000001'
+    'a9f00000-0000-4000-8000-000000000001',
+    'trialing', now() + interval '1 day'
   ),
   (
     'b9f00000-0000-4000-8000-000000000002',
     'QBO Production Workspace B',
-    'a9f00000-0000-4000-8000-000000000002'
+    'a9f00000-0000-4000-8000-000000000002',
+    'trialing', now() + interval '1 day'
   );
 
 insert into public.workspace_members (

@@ -1,0 +1,42 @@
+{
+  "capturedAt": "2026-10-05T01:56:45.749Z",
+  "source": "/tmp/vaeroex-audit-production/lib/ai/usage.ts",
+  "sha256": "9332cc7ebe59326a07a29a926f7d57010df4da929a3c10ba120cd9157048dc6e",
+  "scope": "Actual pure estimates with process-local cost overrides removed; no actual invoice, environment override or persisted usage examined",
+  "sourceDefaultsCentsPerMillion": {
+    "gpt-4o-mini": {
+      "input": 15,
+      "output": 60,
+      "estimated": false
+    },
+    "gpt-5.6-luna": {
+      "input": 100,
+      "output": 600,
+      "estimated": false
+    },
+    "gpt-5.6-terra": {
+      "input": 250,
+      "output": 1500,
+      "estimated": false
+    },
+    "gpt-5.6-sol": {
+      "input": 500,
+      "output": 3000,
+      "estimated": false
+    }
+  },
+  "fixture": {
+    "model": "gpt-4o-mini",
+    "inputTokens": 10000,
+    "outputTokens": 1000,
+    "totalTokens": 11000,
+    "returnedEstimatedCents": 1,
+    "rawCostCentsAtSourceRate": 0.21,
+    "hypothetical10000SeparateEntries": {
+      "summedStoredUsd": 100,
+      "unroundedTokenUsd": 21
+    },
+    "twoAttemptsOneEntryReturnedCents": 1
+  },
+  "networkCalls": 0
+}

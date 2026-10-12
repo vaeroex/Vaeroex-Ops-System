@@ -21,7 +21,8 @@ export function GlobalSearchTrigger({ children, initialQuery = "", type = "butto
 
         window.dispatchEvent(
           new CustomEvent("vaeroex:open-global-search", {
-            detail: { query: initialQuery }
+            detail: { query: initialQuery },
+            cancelable: true
           })
         );
       }}

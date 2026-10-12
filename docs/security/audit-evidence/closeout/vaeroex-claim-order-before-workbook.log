@@ -1,0 +1,13 @@
+AssertionError [ERR_ASSERTION]: claim loser cannot mutate row mapping/type/status or settings
+
+2 !== 0
+
+    at scenario (/Users/isaacvizcarra/.codex/worktrees/workspace-audit-fixes/Vaeroex/scripts/audit-import-finalization.cjs:48:39)
+    at async /Users/isaacvizcarra/.codex/worktrees/workspace-audit-fixes/Vaeroex/scripts/audit-import-finalization.cjs:55:110 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: 2,
+  expected: 0,
+  operator: 'strictEqual',
+  diff: 'simple'
+}

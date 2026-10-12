@@ -6,6 +6,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Command, Loader2, Search, X } from "lucide-react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type FormEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useActivitySignal } from "@/components/app/ActivityProvider";
+import { ModalDialog } from "@/components/operations/ModalDialog";
 import { SecurityResponseNotice } from "@/components/security/SecurityResponseNotice";
 import type { GlobalSearchGroup, GlobalSearchResponse } from "@/lib/search/types";
 
@@ -29,6 +30,7 @@ export function GlobalSearch({ className = "", variant = "desktop" }: GlobalSear
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const requestVersionRef = useRef(0);
   const searchAbortRef = useRef<AbortController | null>(null);
@@ -55,19 +57,22 @@ export function GlobalSearch({ className = "", variant = "desktop" }: GlobalSear
 
   useEffect(() => {
     function openSearch(nextQuery = "") {
+      if (!triggerRef.current?.getClientRects().length || document.querySelector("dialog[data-global-search]")) return;
       if (nextQuery) setQuery(nextQuery);
       setOpen(true);
     }
 
     function handleShortcut(event: globalThis.KeyboardEvent) {
+      if (event.defaultPrevented || !triggerRef.current?.getClientRects().length) return;
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
         openSearch();
       }
-      if (event.key === "Escape") closeSearch();
     }
 
     function handleGlobalSearchEvent(event: Event) {
+      if (event.defaultPrevented || !triggerRef.current?.getClientRects().length) return;
+      event.preventDefault();
       const detail = event instanceof CustomEvent ? (event.detail as { query?: string } | undefined) : undefined;
       openSearch(detail?.query || "");
     }
@@ -81,6 +86,7 @@ export function GlobalSearch({ className = "", variant = "desktop" }: GlobalSear
   }, [closeSearch]);
 
   useEffect(() => {
+    if (!triggerRef.current?.getClientRects().length) return;
     if (searchParams.get("ask") === "1") {
       router.replace("/app/intelligence" as Route, { scroll: false });
       return;
@@ -93,17 +99,6 @@ export function GlobalSearch({ className = "", variant = "desktop" }: GlobalSear
     const nextQuery = nextParams.toString();
     router.replace(`${pathname}${nextQuery ? `?${nextQuery}` : ""}` as Route, { scroll: false });
   }, [pathname, router, searchParams]);
-
-  useEffect(() => {
-    if (!open) return;
-    const originalOverflow = document.body.style.overflow;
-    const focusTimer = window.setTimeout(() => inputRef.current?.focus(), 30);
-    document.body.style.overflow = "hidden";
-    return () => {
-      window.clearTimeout(focusTimer);
-      document.body.style.overflow = originalOverflow;
-    };
-  }, [open]);
 
   useEffect(() => () => searchAbortRef.current?.abort(), []);
 
@@ -212,6 +207,7 @@ export function GlobalSearch({ className = "", variant = "desktop" }: GlobalSear
   return (
     <div className={isIconVariant ? className : `${className || "w-full"} max-w-xl`}>
       <button
+        ref={triggerRef}
         type="button"
         className={isIconVariant
           ? "grid h-11 w-11 place-items-center rounded-lg border border-white/15 bg-white/10 text-slate-100 shadow-sm shadow-black/10 hover:border-vaeroex-accent/50 hover:bg-cyan-950/40 hover:text-vaeroex-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/45"
@@ -235,8 +231,8 @@ export function GlobalSearch({ className = "", variant = "desktop" }: GlobalSear
       </button>
 
       {open ? (
-        <div className="fixed inset-0 z-50 px-3 py-4 sm:px-6 sm:py-8" role="dialog" aria-modal="true" aria-labelledby={titleId}>
-          <button type="button" className="absolute inset-0 bg-slate-950/70 backdrop-blur-sm" aria-label="Close Vaeroex search" onClick={closeSearch} />
+        <ModalDialog labelId={titleId} onClose={closeSearch} initialFocusRef={inputRef} search className="px-3 py-4 sm:px-6 sm:py-8">
+          <button type="button" className="absolute inset-0 bg-slate-950/70 backdrop-blur-sm" aria-label="Close Vaeroex search" tabIndex={-1} onClick={closeSearch} />
           <section className="relative mx-auto flex max-h-[calc(100dvh-2rem)] w-full max-w-3xl flex-col overflow-hidden rounded-lg border border-vaeroex-accent/25 bg-[#07111f] text-slate-100 shadow-command sm:max-h-[min(82dvh,44rem)]">
             <header className="border-b border-white/10 bg-white/[0.045] p-3 sm:p-4">
               <div className="flex items-center justify-between gap-3">
@@ -343,7 +339,7 @@ export function GlobalSearch({ className = "", variant = "desktop" }: GlobalSear
               Enter opens the selected result · Up and Down arrows move · Cmd/Ctrl + K opens Search
             </footer>
           </section>
-        </div>
+        </ModalDialog>
       ) : null}
     </div>
   );

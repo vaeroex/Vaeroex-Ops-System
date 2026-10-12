@@ -1,0 +1,46 @@
+{
+  "runId": "99799ab6-c939-4b3e-aacc-2a30ffaeb14f",
+  "at": "2026-10-05T19:54:52.170Z",
+  "passed": true,
+  "sourceCommit": "0a15ddcd3b564086280fec21b79b6976b3a3cc44",
+  "buildId": "ReUcdHr1ALEejCvoUeFTc",
+  "controllerSha256": "c05bad2f85da493b72ba928378545c335b3a0d2d9771f293cfcb8d06785d9d14",
+  "originalStalledRun": {
+    "id": "78fb5fd2-ab84-44fc-800f-dde70632715c",
+    "status": "failed",
+    "error_code": "lease_expired",
+    "started_at": "2026-10-05T19:38:27.552Z",
+    "completed_at": "2026-10-05T19:54:50.669Z"
+  },
+  "connectionId": "ad09dca8-e02d-41c4-bd80-9239fa56477a",
+  "realReconnectGenerationBefore": "1",
+  "realReconnectGenerationAfter": "2",
+  "approvalPreserved": true,
+  "canonicalBaseline": {
+    "total": 100,
+    "active": 100
+  },
+  "terminalRuns": [
+    {
+      "id": "78fb5fd2-ab84-44fc-800f-dde70632715c",
+      "status": "failed",
+      "started_at": "2026-10-05T19:38:27.552Z",
+      "completed_at": "2026-10-05T19:54:50.669Z",
+      "error_code": "lease_expired",
+      "row_count": 0,
+      "fact_count": 0
+    },
+    {
+      "id": "877fce9e-d520-44ef-bc30-3e695fc2a5f2",
+      "status": "succeeded",
+      "started_at": "2026-10-05T19:54:51.164Z",
+      "completed_at": "2026-10-05T19:54:51.475Z",
+      "error_code": null,
+      "row_count": 100,
+      "fact_count": 100
+    }
+  ],
+  "simulatedProvider": true,
+  "historicalRecordsDeleted": false,
+  "capacityClaim": false
+}

@@ -1,0 +1,32 @@
+{
+  "sourceCommit": "639c4670895c835a62de51f0999e5e48cd3d6434",
+  "events": [
+    {
+      "at": "2026-10-06T01:20:04.641Z",
+      "event": "health_read_fault",
+      "faultId": "77eba3bb-9c65-4833-8d7d-c45e3c5ebf21",
+      "workspaceId": "4505f08f-0980-4bbc-bbee-cbfc35b2a45c",
+      "path": "/rest/v1/assets",
+      "method": "GET",
+      "role": "authenticated",
+      "status": 503,
+      "pid": 74389,
+      "actualInjection": true
+    },
+    {
+      "at": "2026-10-06T01:20:35.482Z",
+      "event": "health_read_fault",
+      "faultId": "f17f7aec-b5f7-4210-8832-558f301a852b",
+      "workspaceId": "4505f08f-0980-4bbc-bbee-cbfc35b2a45c",
+      "path": "/rest/v1/assets",
+      "method": "GET",
+      "role": "authenticated",
+      "status": 503,
+      "pid": 74389,
+      "actualInjection": true
+    }
+  ],
+  "providerRequests": 0,
+  "externalNetworkDenial": "EPERM",
+  "capacityClaim": false
+}

@@ -1,0 +1,11 @@
+{
+  "passed": true,
+  "checks": 20,
+  "coverage": [
+    "validated bounded recovery response contract",
+    "actual dispatcher configuration gate and recovery-before-discovery order",
+    "recovery errors cannot dispatch unverified candidates",
+    "scope/legacy/queue/admission/locking source assertions"
+  ],
+  "limitation": "Scope predicate assertions are not substituted for native row-isolation tests"
+}

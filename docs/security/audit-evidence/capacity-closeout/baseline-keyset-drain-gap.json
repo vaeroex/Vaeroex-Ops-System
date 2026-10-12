@@ -1,0 +1,15 @@
+{
+  "runId": "99799ab6-c939-4b3e-aacc-2a30ffaeb14f",
+  "sourceCommit": "396ec2f7752eb30fea99f30a73068d53ff29cc0a",
+  "originalThresholdMs": 120000,
+  "originalSummaryDrainMs": null,
+  "originalSummaryNominalDrain": false,
+  "postRunObservationAt": "2026-10-05T21:16:32.756Z",
+  "postRunQueueDepth": 2,
+  "postRunInFlight": 0,
+  "postRunOldestEligibleAt": "2026-10-05T21:15:00.000Z",
+  "arrivalCutoff": "2026-10-05T21:14:10.400Z",
+  "reason": "Baseline duration equals arrival cutoff; final runner read used a pre-cutoff sample. By the first saved independent post-run sample, two connections became due at the next wall-clock quarter. Baseline intentionally issues no scheduled ticks. No additional sync was issued to force a pass. Accepted-work completion is reconciled separately.",
+  "result": "NOT_QUALIFIED",
+  "originalResultsPreserved": true
+}

@@ -1,0 +1,754 @@
+{
+  "passed": true,
+  "runId": "99799ab6-c939-4b3e-aacc-2a30ffaeb14f",
+  "executionId": "5c508d90-d64f-4f5b-a181-d4a399d0dd9a",
+  "applicationCommit": "0a15ddcd3b564086280fec21b79b6976b3a3cc44",
+  "buildId": "Al9qF5_qWkauu-mtndnoO",
+  "startedAt": "2026-10-05T19:06:46.650Z",
+  "finishedAt": "2026-10-05T19:07:24.183Z",
+  "harnessSha256": "80eb075c44ff954cf12df62f6c0fb9a3b222aa20276e1f61164868c2dde21d99",
+  "results": [
+    {
+      "label": "issue_1440_0_create",
+      "automatic": true,
+      "pendingCleared": true,
+      "feedbackVisible": true,
+      "destinationRendered": true,
+      "rapidClickPosts": 1,
+      "status": 303,
+      "elapsedMs": 557,
+      "feedback": "Issue logged.",
+      "destination": "/app/issues?message=Issue+logged.",
+      "requestBodySha256": "9072f391a3a281e1bad11e5616fbe15c70682e618fc91cd08664bf0c43b48c94"
+    },
+    {
+      "label": "issue_1440_0_identical_http_replay",
+      "identicalCapturedRequest": true,
+      "requestBodySha256": "9072f391a3a281e1bad11e5616fbe15c70682e618fc91cd08664bf0c43b48c94",
+      "status": 303,
+      "feedback": "Issue already logged. No duplicate was created."
+    },
+    {
+      "label": "issue_1440_0_browser_replay",
+      "automatic": true,
+      "pendingCleared": true,
+      "feedbackVisible": true,
+      "destinationRendered": true,
+      "rapidClickPosts": 1,
+      "status": 303,
+      "elapsedMs": 491,
+      "feedback": "Issue already logged. No duplicate was created.",
+      "destination": "/app/issues?message=Issue+already+logged.+No+duplicate+was+created.",
+      "requestBodySha256": "afd60a34049b62b63f033a7b5a0b457dd1295f5fceee49e9411c8dfae0894cd2"
+    },
+    {
+      "label": "issue_1440_0_conflict",
+      "automatic": true,
+      "pendingCleared": true,
+      "feedbackVisible": true,
+      "destinationRendered": true,
+      "rapidClickPosts": 1,
+      "status": 303,
+      "elapsedMs": 522,
+      "feedback": "This request was already used for different issue details. Start a new issue.",
+      "destination": "/app/issues?error=This+request+was+already+used+for+different+issue+details.+Start+a+new+issue.",
+      "requestBodySha256": "4a984e48f388fb58089370c627165631e18fd762667a406d0cfbfc8088e453f6"
+    },
+    {
+      "label": "issue_1440_0_persisted",
+      "issueId": "484700ad-5e27-47f8-a047-21b196dedae5",
+      "workspaceId": "c347b4e6-d38f-457b-8667-a117e3c2423b",
+      "actorRole": "owner",
+      "requestId": "84b8ea95-4a53-4b00-9789-ec4c8698e63c",
+      "issueRows": 1,
+      "receipts": 1,
+      "unchangedAfterReplaysAndConflict": true
+    },
+    {
+      "label": "issue_1440_0_staff_denied",
+      "automatic": true,
+      "pendingCleared": true,
+      "feedbackVisible": true,
+      "destinationRendered": true,
+      "rapidClickPosts": 1,
+      "status": 303,
+      "elapsedMs": 408,
+      "feedback": "You do not have permission to log an issue.",
+      "destination": "/app/issues?error=You+do+not+have+permission+to+log+an+issue.",
+      "requestBodySha256": "3309d3d57932d7a9b249f92fc987dc141cea02d54b31535f8a61623c95ac5686"
+    },
+    {
+      "label": "issue_1440_0_staff_denied_persisted",
+      "issueRows": 0,
+      "receipts": 0,
+      "role": "staff"
+    },
+    {
+      "label": "issue_1440_0_viewer_denied",
+      "automatic": true,
+      "pendingCleared": true,
+      "feedbackVisible": true,
+      "destinationRendered": true,
+      "rapidClickPosts": 1,
+      "status": 303,
+      "elapsedMs": 384,
+      "feedback": "You do not have permission to log an issue.",
+      "destination": "/app/issues?error=You+do+not+have+permission+to+log+an+issue.",
+      "requestBodySha256": "86048696e968d952b04bbd53328e931c9bada34f90f894aaf89d84d5ee7d9fde"
+    },
+    {
+      "label": "issue_1440_0_viewer_denied_persisted",
+      "issueRows": 0,
+      "receipts": 0,
+      "role": "viewer"
+    },
+    {
+      "label": "issue_1440_1_create",
+      "automatic": true,
+      "pendingCleared": true,
+      "feedbackVisible": true,
+      "destinationRendered": true,
+      "rapidClickPosts": 1,
+      "status": 303,
+      "elapsedMs": 520,
+      "feedback": "Issue logged.",
+      "destination": "/app/issues?message=Issue+logged.",
+      "requestBodySha256": "07b1405a691accdf3a15af4c4e886f620cb0b0a22311a83ca87e72b373b01447"
+    },
+    {
+      "label": "issue_1440_1_identical_http_replay",
+      "identicalCapturedRequest": true,
+      "requestBodySha256": "07b1405a691accdf3a15af4c4e886f620cb0b0a22311a83ca87e72b373b01447",
+      "status": 303,
+      "feedback": "Issue already logged. No duplicate was created."
+    },
+    {
+      "label": "issue_1440_1_browser_replay",
+      "automatic": true,
+      "pendingCleared": true,
+      "feedbackVisible": true,
+      "destinationRendered": true,
+      "rapidClickPosts": 1,
+      "status": 303,
+      "elapsedMs": 474,
+      "feedback": "Issue already logged. No duplicate was created.",
+      "destination": "/app/issues?message=Issue+already+logged.+No+duplicate+was+created.",
+      "requestBodySha256": "cbe2491d5df61190fca88d34cfd575cf40deb80780d3e4db45329ae0411aa095"
+    },
+    {
+      "label": "issue_1440_1_conflict",
+      "automatic": true,
+      "pendingCleared": true,
+      "feedbackVisible": true,
+      "destinationRendered": true,
+      "rapidClickPosts": 1,
+      "status": 303,
+      "elapsedMs": 470,
+      "feedback": "This request was already used for different issue details. Start a new issue.",
+      "destination": "/app/issues?error=This+request+was+already+used+for+different+issue+details.+Start+a+new+issue.",
+      "requestBodySha256": "c9986359c97b6df45772988c800e64a5e9479505aa36f7b6553b0b99b7d6abf5"
+    },
+    {
+      "label": "issue_1440_1_persisted",
+      "issueId": "9116fa09-14c4-4b67-a430-8af4063adb78",
+      "workspaceId": "c347b4e6-d38f-457b-8667-a117e3c2423b",
+      "actorRole": "manager",
+      "requestId": "53333697-418b-40cc-afe3-3dd4dfa3cd83",
+      "issueRows": 1,
+      "receipts": 1,
+      "unchangedAfterReplaysAndConflict": true
+    },
+    {
+      "label": "issue_1440_1_staff_denied",
+      "automatic": true,
+      "pendingCleared": true,
+      "feedbackVisible": true,
+      "destinationRendered": true,
+      "rapidClickPosts": 1,
+      "status": 303,
+      "elapsedMs": 362,
+      "feedback": "You do not have permission to log an issue.",
+      "destination": "/app/issues?error=You+do+not+have+permission+to+log+an+issue.",
+      "requestBodySha256": "5fe9914631d3dfc9100450ad4874c8bdb1778d651827809d8d16562cd7bf736e"
+    },
+    {
+      "label": "issue_1440_1_staff_denied_persisted",
+      "issueRows": 0,
+      "receipts": 0,
+      "role": "staff"
+    },
+    {
+      "label": "issue_1440_1_viewer_denied",
+      "automatic": true,
+      "pendingCleared": true,
+      "feedbackVisible": true,
+      "destinationRendered": true,
+      "rapidClickPosts": 1,
+      "status": 303,
+      "elapsedMs": 528,
+      "feedback": "You do not have permission to log an issue.",
+      "destination": "/app/issues?error=You+do+not+have+permission+to+log+an+issue.",
+      "requestBodySha256": "b11a8b6d1521c0df1950c3e1acd5c4155cd3387ca0019f60c3deedd23e4a30f3"
+    },
+    {
+      "label": "issue_1440_1_viewer_denied_persisted",
+      "issueRows": 0,
+      "receipts": 0,
+      "role": "viewer"
+    },
+    {
+      "label": "issue_1440_2_create",
+      "automatic": true,
+      "pendingCleared": true,
+      "feedbackVisible": true,
+      "destinationRendered": true,
+      "rapidClickPosts": 1,
+      "status": 303,
+      "elapsedMs": 608,
+      "feedback": "Issue logged.",
+      "destination": "/app/issues?message=Issue+logged.",
+      "requestBodySha256": "9419cbd131d32f65a0f4ef6c6586ec9513bddff08e3336d40573b2c41ef2144e"
+    },
+    {
+      "label": "issue_1440_2_identical_http_replay",
+      "identicalCapturedRequest": true,
+      "requestBodySha256": "9419cbd131d32f65a0f4ef6c6586ec9513bddff08e3336d40573b2c41ef2144e",
+      "status": 303,
+      "feedback": "Issue already logged. No duplicate was created."
+    },
+    {
+      "label": "issue_1440_2_browser_replay",
+      "automatic": true,
+      "pendingCleared": true,
+      "feedbackVisible": true,
+      "destinationRendered": true,
+      "rapidClickPosts": 1,
+      "status": 303,
+      "elapsedMs": 487,
+      "feedback": "Issue already logged. No duplicate was created.",
+      "destination": "/app/issues?message=Issue+already+logged.+No+duplicate+was+created.",
+      "requestBodySha256": "ba2b74fd402c892056aba9a5c19ffc4cdd41892357e0f12bad8a1f118999d3fd"
+    },
+    {
+      "label": "issue_1440_2_conflict",
+      "automatic": true,
+      "pendingCleared": true,
+      "feedbackVisible": true,
+      "destinationRendered": true,
+      "rapidClickPosts": 1,
+      "status": 303,
+      "elapsedMs": 474,
+      "feedback": "This request was already used for different issue details. Start a new issue.",
+      "destination": "/app/issues?error=This+request+was+already+used+for+different+issue+details.+Start+a+new+issue.",
+      "requestBodySha256": "f9a26ec370b2af67e08d82ffca289a2aa25950fca367686ce7ad9d8057cb6c3b"
+    },
+    {
+      "label": "issue_1440_2_persisted",
+      "issueId": "c5a22695-6cd8-4ed1-863c-15a0cc4e6c21",
+      "workspaceId": "94e1e8b3-a38c-4780-9870-702dd157ebb1",
+      "actorRole": "owner",
+      "requestId": "a60ba310-5c0a-4541-80c7-db6cf9c86208",
+      "issueRows": 1,
+      "receipts": 1,
+      "unchangedAfterReplaysAndConflict": true
+    },
+    {
+      "label": "issue_1440_2_staff_denied",
+      "automatic": true,
+      "pendingCleared": true,
+      "feedbackVisible": true,
+      "destinationRendered": true,
+      "rapidClickPosts": 1,
+      "status": 303,
+      "elapsedMs": 366,
+      "feedback": "You do not have permission to log an issue.",
+      "destination": "/app/issues?error=You+do+not+have+permission+to+log+an+issue.",
+      "requestBodySha256": "fa2574170e42082ce03c8f91507fffdb2a737a8b62ef081b4d68844e6fa6ef88"
+    },
+    {
+      "label": "issue_1440_2_staff_denied_persisted",
+      "issueRows": 0,
+      "receipts": 0,
+      "role": "staff"
+    },
+    {
+      "label": "issue_1440_2_viewer_denied",
+      "automatic": true,
+      "pendingCleared": true,
+      "feedbackVisible": true,
+      "destinationRendered": true,
+      "rapidClickPosts": 1,
+      "status": 303,
+      "elapsedMs": 397,
+      "feedback": "You do not have permission to log an issue.",
+      "destination": "/app/issues?error=You+do+not+have+permission+to+log+an+issue.",
+      "requestBodySha256": "bf673b8689e26a0baa44c7298413c4999a7447f1c4cdda15e48d616f352a7108"
+    },
+    {
+      "label": "issue_1440_2_viewer_denied_persisted",
+      "issueRows": 0,
+      "receipts": 0,
+      "role": "viewer"
+    },
+    {
+      "label": "issue_390_0_create",
+      "automatic": true,
+      "pendingCleared": true,
+      "feedbackVisible": true,
+      "destinationRendered": true,
+      "rapidClickPosts": 1,
+      "status": 303,
+      "elapsedMs": 500,
+      "feedback": "Issue logged.",
+      "destination": "/app/issues?message=Issue+logged.",
+      "requestBodySha256": "183890d3ce82103ee75aaa9a7e58e57f89f59c342d5e0ebc1cf974d1f43500c7"
+    },
+    {
+      "label": "issue_390_0_identical_http_replay",
+      "identicalCapturedRequest": true,
+      "requestBodySha256": "183890d3ce82103ee75aaa9a7e58e57f89f59c342d5e0ebc1cf974d1f43500c7",
+      "status": 303,
+      "feedback": "Issue already logged. No duplicate was created."
+    },
+    {
+      "label": "issue_390_0_browser_replay",
+      "automatic": true,
+      "pendingCleared": true,
+      "feedbackVisible": true,
+      "destinationRendered": true,
+      "rapidClickPosts": 1,
+      "status": 303,
+      "elapsedMs": 501,
+      "feedback": "Issue already logged. No duplicate was created.",
+      "destination": "/app/issues?message=Issue+already+logged.+No+duplicate+was+created.",
+      "requestBodySha256": "1704df5dc7673ca3e425d6611b4bf3f2a9d4ca5de812fc6c22602a00eb228439"
+    },
+    {
+      "label": "issue_390_0_conflict",
+      "automatic": true,
+      "pendingCleared": true,
+      "feedbackVisible": true,
+      "destinationRendered": true,
+      "rapidClickPosts": 1,
+      "status": 303,
+      "elapsedMs": 489,
+      "feedback": "This request was already used for different issue details. Start a new issue.",
+      "destination": "/app/issues?error=This+request+was+already+used+for+different+issue+details.+Start+a+new+issue.",
+      "requestBodySha256": "f5d8b9ec38c7807fbd830c0ceedfa0c2feb496b4c646d0f415b33a38976a9635"
+    },
+    {
+      "label": "issue_390_0_persisted",
+      "issueId": "b693496b-63e1-48ad-8123-2f69c7a2a373",
+      "workspaceId": "c347b4e6-d38f-457b-8667-a117e3c2423b",
+      "actorRole": "owner",
+      "requestId": "33414491-6c85-4b87-835f-e3f4c356527a",
+      "issueRows": 1,
+      "receipts": 1,
+      "unchangedAfterReplaysAndConflict": true
+    },
+    {
+      "label": "issue_390_0_staff_denied",
+      "automatic": true,
+      "pendingCleared": true,
+      "feedbackVisible": true,
+      "destinationRendered": true,
+      "rapidClickPosts": 1,
+      "status": 303,
+      "elapsedMs": 377,
+      "feedback": "You do not have permission to log an issue.",
+      "destination": "/app/issues?error=You+do+not+have+permission+to+log+an+issue.",
+      "requestBodySha256": "21e16c17eb61fa8759824e20b31af14aad288e32b00e4110b0a917761d089cce"
+    },
+    {
+      "label": "issue_390_0_staff_denied_persisted",
+      "issueRows": 0,
+      "receipts": 0,
+      "role": "staff"
+    },
+    {
+      "label": "issue_390_0_viewer_denied",
+      "automatic": true,
+      "pendingCleared": true,
+      "feedbackVisible": true,
+      "destinationRendered": true,
+      "rapidClickPosts": 1,
+      "status": 303,
+      "elapsedMs": 376,
+      "feedback": "You do not have permission to log an issue.",
+      "destination": "/app/issues?error=You+do+not+have+permission+to+log+an+issue.",
+      "requestBodySha256": "408c5f12119b2aa45167dd64f50053c30c8e142b98a05c4f7ecad90a67a80998"
+    },
+    {
+      "label": "issue_390_0_viewer_denied_persisted",
+      "issueRows": 0,
+      "receipts": 0,
+      "role": "viewer"
+    },
+    {
+      "label": "issue_390_1_create",
+      "automatic": true,
+      "pendingCleared": true,
+      "feedbackVisible": true,
+      "destinationRendered": true,
+      "rapidClickPosts": 1,
+      "status": 303,
+      "elapsedMs": 508,
+      "feedback": "Issue logged.",
+      "destination": "/app/issues?message=Issue+logged.",
+      "requestBodySha256": "d01a4f4a9a95fd0690a9b0997bddcb64fb4607df65110d437a5de5ce9d88873e"
+    },
+    {
+      "label": "issue_390_1_identical_http_replay",
+      "identicalCapturedRequest": true,
+      "requestBodySha256": "d01a4f4a9a95fd0690a9b0997bddcb64fb4607df65110d437a5de5ce9d88873e",
+      "status": 303,
+      "feedback": "Issue already logged. No duplicate was created."
+    },
+    {
+      "label": "issue_390_1_browser_replay",
+      "automatic": true,
+      "pendingCleared": true,
+      "feedbackVisible": true,
+      "destinationRendered": true,
+      "rapidClickPosts": 1,
+      "status": 303,
+      "elapsedMs": 506,
+      "feedback": "Issue already logged. No duplicate was created.",
+      "destination": "/app/issues?message=Issue+already+logged.+No+duplicate+was+created.",
+      "requestBodySha256": "291c3750f46773c9b3ec98edfc9eb8688b49de65e8aa82a75dd2cee367e2ed69"
+    },
+    {
+      "label": "issue_390_1_conflict",
+      "automatic": true,
+      "pendingCleared": true,
+      "feedbackVisible": true,
+      "destinationRendered": true,
+      "rapidClickPosts": 1,
+      "status": 303,
+      "elapsedMs": 475,
+      "feedback": "This request was already used for different issue details. Start a new issue.",
+      "destination": "/app/issues?error=This+request+was+already+used+for+different+issue+details.+Start+a+new+issue.",
+      "requestBodySha256": "e59b7f2eb31d070a5a58c6f662d9c878821ef6d658fc837febfdb04f4c3118ac"
+    },
+    {
+      "label": "issue_390_1_persisted",
+      "issueId": "1c828bf9-3290-44bd-a98d-03c23d1d6e52",
+      "workspaceId": "c347b4e6-d38f-457b-8667-a117e3c2423b",
+      "actorRole": "manager",
+      "requestId": "21989e99-75a1-42d7-876b-8061038b3f13",
+      "issueRows": 1,
+      "receipts": 1,
+      "unchangedAfterReplaysAndConflict": true
+    },
+    {
+      "label": "issue_390_1_staff_denied",
+      "automatic": true,
+      "pendingCleared": true,
+      "feedbackVisible": true,
+      "destinationRendered": true,
+      "rapidClickPosts": 1,
+      "status": 303,
+      "elapsedMs": 411,
+      "feedback": "You do not have permission to log an issue.",
+      "destination": "/app/issues?error=You+do+not+have+permission+to+log+an+issue.",
+      "requestBodySha256": "7502f78b58bf3f622415c1b0261e825421917596e20237dee8b02c5541e2e074"
+    },
+    {
+      "label": "issue_390_1_staff_denied_persisted",
+      "issueRows": 0,
+      "receipts": 0,
+      "role": "staff"
+    },
+    {
+      "label": "issue_390_1_viewer_denied",
+      "automatic": true,
+      "pendingCleared": true,
+      "feedbackVisible": true,
+      "destinationRendered": true,
+      "rapidClickPosts": 1,
+      "status": 303,
+      "elapsedMs": 342,
+      "feedback": "You do not have permission to log an issue.",
+      "destination": "/app/issues?error=You+do+not+have+permission+to+log+an+issue.",
+      "requestBodySha256": "3d3b931042642492da832a7158369c1d480da037beee0c692427d5a0255d682a"
+    },
+    {
+      "label": "issue_390_1_viewer_denied_persisted",
+      "issueRows": 0,
+      "receipts": 0,
+      "role": "viewer"
+    },
+    {
+      "label": "issue_390_2_create",
+      "automatic": true,
+      "pendingCleared": true,
+      "feedbackVisible": true,
+      "destinationRendered": true,
+      "rapidClickPosts": 1,
+      "status": 303,
+      "elapsedMs": 496,
+      "feedback": "Issue logged.",
+      "destination": "/app/issues?message=Issue+logged.",
+      "requestBodySha256": "2fb2f51cd3588420a0f146213dfab32f00018f78262d84b53c3540f34c091781"
+    },
+    {
+      "label": "issue_390_2_identical_http_replay",
+      "identicalCapturedRequest": true,
+      "requestBodySha256": "2fb2f51cd3588420a0f146213dfab32f00018f78262d84b53c3540f34c091781",
+      "status": 303,
+      "feedback": "Issue already logged. No duplicate was created."
+    },
+    {
+      "label": "issue_390_2_browser_replay",
+      "automatic": true,
+      "pendingCleared": true,
+      "feedbackVisible": true,
+      "destinationRendered": true,
+      "rapidClickPosts": 1,
+      "status": 303,
+      "elapsedMs": 490,
+      "feedback": "Issue already logged. No duplicate was created.",
+      "destination": "/app/issues?message=Issue+already+logged.+No+duplicate+was+created.",
+      "requestBodySha256": "3b6bc9c1662a3cb9dee0aefd37fb324c16a6f12353e170736e40a2476826cf65"
+    },
+    {
+      "label": "issue_390_2_conflict",
+      "automatic": true,
+      "pendingCleared": true,
+      "feedbackVisible": true,
+      "destinationRendered": true,
+      "rapidClickPosts": 1,
+      "status": 303,
+      "elapsedMs": 500,
+      "feedback": "This request was already used for different issue details. Start a new issue.",
+      "destination": "/app/issues?error=This+request+was+already+used+for+different+issue+details.+Start+a+new+issue.",
+      "requestBodySha256": "e9673b0ce642b0d4117f567ec696e6fa108c314fff347efd22ff2f42d781efb6"
+    },
+    {
+      "label": "issue_390_2_persisted",
+      "issueId": "4ff91752-2647-4e5b-8083-f3f04445e751",
+      "workspaceId": "94e1e8b3-a38c-4780-9870-702dd157ebb1",
+      "actorRole": "owner",
+      "requestId": "00dcfd1b-a271-4ea0-8ff6-0d2f55cf6ca3",
+      "issueRows": 1,
+      "receipts": 1,
+      "unchangedAfterReplaysAndConflict": true
+    },
+    {
+      "label": "issue_390_2_staff_denied",
+      "automatic": true,
+      "pendingCleared": true,
+      "feedbackVisible": true,
+      "destinationRendered": true,
+      "rapidClickPosts": 1,
+      "status": 303,
+      "elapsedMs": 371,
+      "feedback": "You do not have permission to log an issue.",
+      "destination": "/app/issues?error=You+do+not+have+permission+to+log+an+issue.",
+      "requestBodySha256": "aef2f36b26bf679aebeb099b94f7be219bbdc9aa42eb984f27896fdfc5182bdc"
+    },
+    {
+      "label": "issue_390_2_staff_denied_persisted",
+      "issueRows": 0,
+      "receipts": 0,
+      "role": "staff"
+    },
+    {
+      "label": "issue_390_2_viewer_denied",
+      "automatic": true,
+      "pendingCleared": true,
+      "feedbackVisible": true,
+      "destinationRendered": true,
+      "rapidClickPosts": 1,
+      "status": 303,
+      "elapsedMs": 357,
+      "feedback": "You do not have permission to log an issue.",
+      "destination": "/app/issues?error=You+do+not+have+permission+to+log+an+issue.",
+      "requestBodySha256": "d8cd2a568d0f98cafccb8667aa580d0d40d2f7e2f0914862fbacb3be302589f8"
+    },
+    {
+      "label": "issue_390_2_viewer_denied_persisted",
+      "issueRows": 0,
+      "receipts": 0,
+      "role": "viewer"
+    },
+    {
+      "label": "focused_complete",
+      "widths": [
+        1440,
+        390
+      ],
+      "repetitionsPerWidth": 3,
+      "createdIssues": 6,
+      "exactHttpReplays": 6,
+      "browserReplays": 6,
+      "conflicts": 6,
+      "roleDenials": 12,
+      "priorNegativeRowsPreserved": 2,
+      "existingIssuesUnchanged": 48,
+      "activePasswordsUnchanged": true,
+      "membershipsUnchanged": true,
+      "osNetworkDenial": "EPERM",
+      "noManualCompletionNavigation": true
+    }
+  ],
+  "requests": [
+    {
+      "stage": "issue_1440_0",
+      "path": "/app/issues",
+      "status": 303
+    },
+    {
+      "stage": "issue_1440_0",
+      "path": "/app/issues",
+      "status": 303
+    },
+    {
+      "stage": "issue_1440_0",
+      "path": "/app/issues",
+      "status": 303
+    },
+    {
+      "stage": "issue_1440_0_staff_denied",
+      "path": "/app/issues",
+      "status": 303
+    },
+    {
+      "stage": "issue_1440_0_viewer_denied",
+      "path": "/app/issues",
+      "status": 303
+    },
+    {
+      "stage": "issue_1440_1",
+      "path": "/app/issues",
+      "status": 303
+    },
+    {
+      "stage": "issue_1440_1",
+      "path": "/app/issues",
+      "status": 303
+    },
+    {
+      "stage": "issue_1440_1",
+      "path": "/app/issues",
+      "status": 303
+    },
+    {
+      "stage": "issue_1440_1_staff_denied",
+      "path": "/app/issues",
+      "status": 303
+    },
+    {
+      "stage": "issue_1440_1_viewer_denied",
+      "path": "/app/issues",
+      "status": 303
+    },
+    {
+      "stage": "issue_1440_2",
+      "path": "/app/issues",
+      "status": 303
+    },
+    {
+      "stage": "issue_1440_2",
+      "path": "/app/issues",
+      "status": 303
+    },
+    {
+      "stage": "issue_1440_2",
+      "path": "/app/issues",
+      "status": 303
+    },
+    {
+      "stage": "issue_1440_2_staff_denied",
+      "path": "/app/issues",
+      "status": 303
+    },
+    {
+      "stage": "issue_1440_2_viewer_denied",
+      "path": "/app/issues",
+      "status": 303
+    },
+    {
+      "stage": "issue_390_0",
+      "path": "/app/issues",
+      "status": 303
+    },
+    {
+      "stage": "issue_390_0",
+      "path": "/app/issues",
+      "status": 303
+    },
+    {
+      "stage": "issue_390_0",
+      "path": "/app/issues",
+      "status": 303
+    },
+    {
+      "stage": "issue_390_0_staff_denied",
+      "path": "/app/issues",
+      "status": 303
+    },
+    {
+      "stage": "issue_390_0_viewer_denied",
+      "path": "/app/issues",
+      "status": 303
+    },
+    {
+      "stage": "issue_390_1",
+      "path": "/app/issues",
+      "status": 303
+    },
+    {
+      "stage": "issue_390_1",
+      "path": "/app/issues",
+      "status": 303
+    },
+    {
+      "stage": "issue_390_1",
+      "path": "/app/issues",
+      "status": 303
+    },
+    {
+      "stage": "issue_390_1_staff_denied",
+      "path": "/app/issues",
+      "status": 303
+    },
+    {
+      "stage": "issue_390_1_viewer_denied",
+      "path": "/app/issues",
+      "status": 303
+    },
+    {
+      "stage": "issue_390_2",
+      "path": "/app/issues",
+      "status": 303
+    },
+    {
+      "stage": "issue_390_2",
+      "path": "/app/issues",
+      "status": 303
+    },
+    {
+      "stage": "issue_390_2",
+      "path": "/app/issues",
+      "status": 303
+    },
+    {
+      "stage": "issue_390_2_staff_denied",
+      "path": "/app/issues",
+      "status": 303
+    },
+    {
+      "stage": "issue_390_2_viewer_denied",
+      "path": "/app/issues",
+      "status": 303
+    }
+  ],
+  "browserErrors": [],
+  "foreignRequests": [],
+  "limitations": [
+    "Real isolated Supabase Auth/PostgREST and production Next build; existing synthetic seeded consent and entitlements.",
+    "Only the changed New Issue workflow is qualified; no capacity result or production equivalence is claimed.",
+    "Existing active actor sessions reused; inactive synthetic staff/viewer passwords changed only to perform actual Auth login."
+  ]
+}

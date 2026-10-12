@@ -66,29 +66,40 @@ test("refresh timestamps use explicit workspace timezone without changing report
   assert.throws(() => IntegrationDashboardSchema.parse({ ...dashboard([]), timeZone: "Untrusted/Zone" }));
 });
 
-function loaderFixture({ squares = [], sheets = [], kpis = [], preferences = [], qbo = { state: "hidden" }, qboMetadata = [] } = {}) {
-  const calls = [], user = { id: "10000000-0000-4000-8000-000000000002" };
+function loaderFixture({ squares = [], sheets = [], kpis = [], preferences = [], qbo = { state: "hidden" }, qboMetadata = [], owner = true, squareEnabled = true, sheetsEnabled = true, sheetsError = null, squareFailed = false, savedPayments = {} } = {}) {
+  const calls = [], sqlCalls = [], user = { id: "10000000-0000-4000-8000-000000000002" };
   const supabase = { from(table) {
     assert.equal(table, "google_sheets_connections", "only readonly metadata table");
+    sqlCalls.push(table);
     const filters = [];
     const query = { select(fields) { assert.doesNotMatch(fields, /ciphertext|token|secret|\*/); return this; }, eq(...args) { filters.push(args); return this; }, order() { return this; }, limit() { return this; },
       then(resolve) { assert(filters.some(([key, value]) => key === "workspace_id" && value === workspaceId));
-        return Promise.resolve({ data: sheets, error: null }).then(resolve); } };
+        return Promise.resolve({ data: sheets, error: sheetsError }).then(resolve); } };
     return query;
   }, async rpc(name, args) { assert.equal(name, "read_qbo_dashboard_metadata_v1"); assert.deepEqual(args, { p_workspace_id: workspaceId });
     calls.push("qbo-saved-metadata"); return { data: qboMetadata, error: null }; } };
   const api = loadSource("lib/integrations/dashboard/server.ts", {
     "@/lib/security/require-workspace-access": {},
     "@/lib/integrations/qbo-customer/accounting-intelligence-server": { loadQboAccountingIntelligence: async () => qbo },
-    "@/lib/integrations/square-direct/server": { squareSettingsPath: "/app/settings/integrations/square", squareDirectEnabled: () => true,
-      squareDirectPayments: async (query, expected) => { assert.deepEqual(query, {}); assert.equal(expected, workspaceId); calls.push("stored-payments"); return { connections: squares, currentConnection: null }; } },
-    "@/lib/integrations/google-sheets/server": { sheetsEnabled: () => true },
+    "@/lib/integrations/square-direct/server": { squareSettingsPath: "/app/settings/integrations/square", squareDirectEnabled: () => squareEnabled,
+      squareDirectPayments: async (query, expected) => {
+        assert.equal(owner, true, "non-owner cannot invoke the Square owner reader");
+        assert.equal(expected, workspaceId);
+        if (squareFailed) throw new Error("private provider diagnostic");
+        if (query.connectionId) {
+          assert.equal(query.status, "COMPLETED");
+          calls.push("stored-payment-detail");
+          return { payments: savedPayments[query.connectionId] || [] };
+        }
+        assert.deepEqual(query, {}); calls.push("stored-payments"); return { connections: squares, currentConnection: null };
+      } },
+    "@/lib/integrations/google-sheets/server": { sheetsEnabled: () => sheetsEnabled },
     "@/lib/kpis/load-workspace-kpis": {}, "@/lib/intelligence/source-parent-eligibility": {},
     "./preferences-server": { readIntegrationSummaryPreferences: async access => {
       assert.equal(access.user.id, user.id); assert.equal(access.workspaceId, workspaceId);
       return { state: "ready", preferences }; } }
   });
-  return { calls, run: () => api.loadIntegrationDashboard({ access: { supabase, workspaceId, workspace: { id: workspaceId, reporting_timezone: "America/Los_Angeles" }, user, membership: { role: "owner", user_id: user.id, workspace_id: workspaceId, status: "active" } }, eligibleKpis: kpis }) };
+  return { calls, sqlCalls, run: () => api.loadIntegrationDashboard({ access: { supabase, workspaceId, workspace: { id: workspaceId, reporting_timezone: "America/Los_Angeles" }, user, membership: { role: owner ? "owner" : "viewer", user_id: user.id, workspace_id: workspaceId, status: "active" } }, eligibleKpis: kpis }) };
 }
 test("readonly loader excludes unconsented attempts and collapses only verified Square identity", async () => {
   const attempt = { connectionId: "10000000-0000-4000-8000-000000000010", businessEntityLabel: "North", sellerLabel: null, locationLabel: null,
@@ -199,4 +210,44 @@ test("stored Sheets facts are shown only for the exact valid current approval, n
   assert.equal(unavailable.loadFailed, true); assert.deepEqual(unavailable.dashboard.entries, []);
   assert.deepEqual(unavailable.currentQboAccounting.kpis, []);
   assert.match(renderToStaticMarkup(React.createElement(CurrentIntegrations, { initial: unavailable.dashboard })), /Active integration status is unavailable/);
+});
+
+
+test("active dashboard preserves first import, failed consent, historical completion and exact separate payment values", async () => {
+  const square = { connectionId: "square-success", businessEntityLabel: "Company", sellerLabel: "Company", locationLabel: "North", locationId: "north", state: "connected", paymentCount: 0, lastSyncedAt: null, createdAt: now };
+  const sheet = { id: "sheet-success", business_entity_id: "entity", display_name: "Operations", status: "connected", credential_version: 1, spreadsheet_id: "sheet", sheet_id: 0, active_approval_id: "approval", last_sync_at: null, last_sync_fact_count: 0, last_error_code: null, revocation_pending: false, authorization_uncertain: false, automatic_refresh_enabled: true, created_at: now };
+  const first = await loaderFixture({ squares: [square], sheets: [sheet] }).run();
+  assert.equal(first.loadFailed, false); assert.equal(first.dashboard.entries.length, 2);
+  let html = renderToStaticMarkup(React.createElement(CurrentIntegrations, { initial: first.dashboard }));
+  assert.equal((html.match(/Awaiting first successful import/g) || []).length, 2);
+  assert.doesNotMatch(html, /Reconnect required|USD 0|>0(?:\s|<)|entity-a|approval-a/);
+  const failedConsent = await loaderFixture({ squares: [{ ...square, connectionId: "attempt", sellerLabel: null, locationId: null, state: "reauthorization_required", lastError: "reauthorization_required" }], sheets: [{ ...sheet, credential_version: 0, spreadsheet_id: null, active_approval_id: null, status: "reauthorization_required" }] }).run();
+  assert.deepEqual(failedConsent.dashboard.entries, []);
+  const oldSync = "2020-01-01T01:00:00Z";
+  const historical = { ...square, paymentCount: 1, lastCompletedRead: { start: "2020-01-01T00:00:00Z", end: "2020-01-02T00:00:00Z", kind: "created", completedAt: oldSync } };
+  const other = { ...historical, connectionId: "square-other", sellerLabel: "Other company" };
+  const payment = amountMinor => ({ status: "COMPLETED", amountMinor, currency: "USD", createdAt: oldSync });
+  const rows = await loaderFixture({ squares: [historical, other], savedPayments: { "square-success": [payment("12520")], "square-other": [payment("7580")] } }).run();
+  assert.equal(rows.dashboard.entries.length, 2);
+  assert.equal(rows.dashboard.entries[0].lastSuccessfulRefreshAt, oldSync);
+  assert.equal(historical.lastSyncedAt, null, "historical completion does not invent a checkpoint");
+  html = renderToStaticMarkup(React.createElement(CurrentIntegrations, { initial: rows.dashboard }));
+  assert.match(html, /USD 125\.20/); assert.match(html, /USD 75\.80/); assert.doesNotMatch(html, /USD 201\.00/);
+  assert.equal((html.match(/A payment is not posted revenue or a settlement total/g) || []).length, 2);
+  assert.equal((html.match(/Last successful refresh/g) || []).length, 2);
+});
+
+test("active loader scopes metadata, avoids owner readers for viewers and marks failed providers unavailable", async () => {
+  const sheet = { id: "sheet", business_entity_id: "entity", display_name: "Operations", status: "connected", credential_version: 1, spreadsheet_id: "sheet", sheet_id: 0, active_approval_id: "approval", last_sync_at: null, last_sync_fact_count: 0, last_error_code: null, revocation_pending: false, authorization_uncertain: false, automatic_refresh_enabled: true, created_at: now };
+  const viewer = loaderFixture({ owner: false, sheets: [sheet] });
+  const view = await viewer.run();
+  assert.equal(view.loadFailed, false); assert.equal(view.dashboard.entries.length, 1);
+  assert.deepEqual(viewer.calls, []); assert.deepEqual(viewer.sqlCalls, ["google_sheets_connections"]);
+  const disabled = loaderFixture({ squareEnabled: false, sheetsEnabled: false });
+  assert.deepEqual((await disabled.run()).dashboard.entries, []); assert.deepEqual(disabled.calls, []); assert.deepEqual(disabled.sqlCalls, []);
+  const failed = await loaderFixture({ sheets: [sheet], sheetsError: { message: "private SQL diagnostic" }, squareFailed: true }).run();
+  assert.equal(failed.loadFailed, false); assert.deepEqual(failed.dashboard.entries, []);
+  assert(failed.dashboard.unavailable.includes("Square")); assert(failed.dashboard.unavailable.includes("Google Sheets"));
+  const html = renderToStaticMarkup(React.createElement(CurrentIntegrations, { initial: failed.dashboard }));
+  assert.match(html, /Active integration status is unavailable/); assert.doesNotMatch(html, /private SQL|private provider/);
 });

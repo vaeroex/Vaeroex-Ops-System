@@ -1,0 +1,36 @@
+{
+  "scope": "Pure production functions with synthetic scoped history; no DB/provider/browser action. Real fixture diagnosis supplied independently.",
+  "baselineCommit": "2cde427c8b30cf34702baf43f7b3fc2d17f48b81",
+  "consolidationCommit": "4604d8f6e8f11c25a2132dab3b58863e94ce730e",
+  "originalDefectCodeUnchangedByConsolidation": {
+    "lib/ai/business-health-explanation/context.ts": true,
+    "lib/intelligence/executive-homepage.ts": true
+  },
+  "before": {
+    "status": "failed",
+    "log": "/tmp/vaeroex-health-movement-before.log",
+    "reason": "Business Health presentation disagrees with the scoped IntelligenceSnapshotV1 projection."
+  },
+  "after": {
+    "explanationRegression": "passed",
+    "newAssertions": 25,
+    "loaderBaselineContracts": "8 passed;16 source-errors passed without golden changes",
+    "executiveHomepageRegression": "passed",
+    "snapshotConsumerRegression": "passed"
+  },
+  "sourceSha256": {
+    "lib/ai/business-health-explanation/context.ts": "0fe80e44608ff37e4caf1eb75c36caf8404bce357ae76847f73ef6e55225c068",
+    "lib/intelligence/executive-homepage.ts": "56f722cd5002650167e342ea75bbd66e3c6e368318113051b74a6ce9bbcf765e",
+    "scripts/business-health-explanation-regression-tests.js": "7a84bcd0c2ea54387cce6b5bd1d672378ca0d2deb527dbcb613cfac52f617633"
+  },
+  "guardPreservation": [
+    "score",
+    "status",
+    "confidence",
+    "workspace",
+    "citation",
+    "current-evidence trajectory",
+    "history-derived direction and delta"
+  ],
+  "browserPending": true
+}

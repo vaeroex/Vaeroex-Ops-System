@@ -1,0 +1,27 @@
+{
+  "status": "verified",
+  "kind": "actual worksheet-indexer and lifecycle-functions with isolated persistence adapter",
+  "results": [
+    {
+      "scenario": "321 previous rows exceed 320 retirement lookup",
+      "reportedNewChunks": 1,
+      "eligibleOldChunks": 1,
+      "eligibleNewChunks": 1,
+      "sourceFailedStateIgnored": true
+    },
+    {
+      "scenario": "applied new batch acknowledgement lost then previous version restored",
+      "indexerReportedChunks": 0,
+      "eligibleOldChunks": 1,
+      "eligibleHeldAttemptChunks": 1,
+      "sourceImportStatus": "failed",
+      "indexStatus": "failed"
+    },
+    {
+      "scenario": "failed source and held attempt absent from lifecycle checks",
+      "eligibleHeldChunk": true,
+      "foreignTenantExcluded": true
+    }
+  ],
+  "limitation": "Synthetic DB responses, no real remote mutation or actual embedding provider; native vector SQL separately reviewed statically"
+}

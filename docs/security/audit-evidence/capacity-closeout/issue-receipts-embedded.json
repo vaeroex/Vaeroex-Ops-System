@@ -1,0 +1,19 @@
+{
+  "suite": "issue_submission_receipts",
+  "checks": 32,
+  "beforeRepeatedActionRecords": 2,
+  "afterRepeatedActionRecords": 1,
+  "concurrentSessions": 0,
+  "concurrentLogicalRequests": 1,
+  "uniqueRaceIssueIds": 1,
+  "deniedRoles": [
+    "staff",
+    "viewer",
+    "anon",
+    "service_role"
+  ],
+  "historicalDuplicateRowsPreserved": 2,
+  "preCorrectionActionSha256": "e39cc095de53800dfca8680c0ef9b9e2490b5a6328e30bcaaaa561cdfb8ef9be",
+  "liveProviderCalls": 0,
+  "limits": "Synthetic reduced schema; native companion proves concurrent receipt locks, browser/Auth qualification is separate."
+}

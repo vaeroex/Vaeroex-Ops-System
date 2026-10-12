@@ -40,9 +40,12 @@ insert into public.profiles (id, email, full_name) values
   ('a6900000-0000-4000-8000-000000000006', 'security-other-owner@example.test', 'Other Owner'),
   ('a6900000-0000-4000-8000-000000000007', 'security-other-member@example.test', 'Other Member');
 
-insert into public.workspaces (id, name, created_by) values
-  ('b6900000-0000-4000-8000-000000000001', 'Security Workspace A', 'a6900000-0000-4000-8000-000000000001'),
-  ('b6900000-0000-4000-8000-000000000002', 'Security Workspace B', 'a6900000-0000-4000-8000-000000000006');
+-- These role/tenant tests need entitled workspaces: otherwise the independent
+-- subscription guard correctly rejects even the legitimate Staff/Owner cases.
+-- Seed a bounded trial as the trusted fixture owner; do not bypass that guard.
+insert into public.workspaces (id, name, created_by, subscription_status, trial_ends_at) values
+  ('b6900000-0000-4000-8000-000000000001', 'Security Workspace A', 'a6900000-0000-4000-8000-000000000001', 'trialing', now() + interval '1 day'),
+  ('b6900000-0000-4000-8000-000000000002', 'Security Workspace B', 'a6900000-0000-4000-8000-000000000006', 'trialing', now() + interval '1 day');
 
 insert into public.workspace_members (id, workspace_id, user_id, role, status) values
   ('c6900000-0000-4000-8000-000000000001', 'b6900000-0000-4000-8000-000000000001', 'a6900000-0000-4000-8000-000000000001', 'owner', 'active'),

@@ -7,7 +7,7 @@ export function LegalDocumentPage({ documentId }: { documentId: LegalDocumentId 
   const document = legalDocuments[documentId];
 
   return (
-    <main className="min-h-screen bg-slate-50 text-ink">
+    <main className="vaeroex-public-site vx-legal min-h-screen bg-slate-50 text-ink">
       <PublicSiteHeader />
 
       <section className="mx-auto max-w-4xl px-6 py-10">

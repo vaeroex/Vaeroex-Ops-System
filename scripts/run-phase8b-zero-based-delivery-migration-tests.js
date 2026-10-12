@@ -286,12 +286,18 @@ function assertTargetIsSinglePendingMigration() {
   const separatelyQualifiedPreferencesTail = [
     "20261002182049_integration_summary_preferences.sql"
   ];
-  const reviewedTail = [...dormantSquareTail, ...separatelyQualifiedSheetsTail, ...separatelyQualifiedPreferencesTail];
+  // Reviewed audit additions follow the pinned historical integration chain.
+  // This list is exact; no wildcard or production admission rule is relaxed.
+  const workspaceAuditTail = [
+    "20261005022017_workspace_security_boundaries.sql",
+    "20261005022445_workspace_persisted_usage_limits.sql", "20261005060101_atomic_confirmed_memory_publication.sql", "20261005060258_asset_check_server_chronology.sql", "20261005061024_internal_form_submission_idempotency.sql", "20261005062005_durable_import_attempt_reconciliation.sql", "20261005070311_worksheet_import_publication_heads.sql", "20261005182541_bounded_google_sheets_dispatch.sql", "20261005183352_issue_submission_receipts.sql", "20261005184031_qbo_scoped_runtime_recovery.sql", "20261005190709_sheets_recovery_fair_scan.sql", "20261005194244_google_sheets_failure_cleanup_transition.sql", "20261005202215_sheets_dispatch_round_robin.sql", "20261008190000_vsi_private_chat.sql", "20261009041421_vsi_adaptive_research.sql", "20261012003846_workspace_storage_capacity.sql", "20261012003920_workspace_storage_capacity_billing.sql", "20261012013508_workspace_storage_invoice_capacity.sql", "20261012064502_vaeroex_subscription_price_250.sql", "20261012082738_pre_checkout_legal_entitlement_boundary.sql", "20261012091842_admin_usage_trust_support_telemetry.sql"
+  ];
+  const reviewedTail = [...dormantSquareTail, ...separatelyQualifiedSheetsTail, ...separatelyQualifiedPreferencesTail, ...workspaceAuditTail];
   const laterMigrations = migrations.slice(targetIndex + 1);
   if (laterMigrations.length !== reviewedTail.length ||
       laterMigrations.some((migration, index) => migration !== reviewedTail[index])) {
     fail(
-      `Fixture-rich harness requires the reviewed dormant Square, Google Sheets and personal summary preferences tail after ${targetVersion}.`
+      `Fixture-rich harness requires the reviewed dormant Square, Google Sheets and personal summary preferences and workspace audit tail after ${targetVersion}.`
     );
   }
 }

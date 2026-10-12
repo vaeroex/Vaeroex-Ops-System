@@ -1,0 +1,12 @@
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+1 !== 2
+
+    at /Users/isaacvizcarra/.codex/worktrees/workspace-audit-fixes/Vaeroex/scripts/audit-import-evidence-fixes.cjs:201:49 {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: 1,
+  expected: 2,
+  operator: 'strictEqual',
+  diff: 'simple'
+}

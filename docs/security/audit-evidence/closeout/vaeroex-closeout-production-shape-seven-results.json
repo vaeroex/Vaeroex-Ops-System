@@ -1,0 +1,785 @@
+{
+  "createdAt": "2026-10-05T07:11:13.203Z",
+  "productionAccess": false,
+  "providerCalls": false,
+  "scope": "Explicit 104 canonical-prefix +4 Square +7 QBO +2 Sheets +3 dashboard +7 audit/closeout shape. Native PostgreSQL in a new owned Unix-only cluster; reduced platform prerequisite fixture in a fresh database. No Auth HTTP, provider calls or production-volume/17.6 equivalence.",
+  "runs": [
+    {
+      "name": "explicit-production-migration-shape",
+      "checks": [
+        {
+          "name": "empty application database before synthetic seed",
+          "status": "pass"
+        },
+        {
+          "name": "aborted security migration removes new exemption table",
+          "status": "pass"
+        },
+        {
+          "name": "aborted security migration restores original single-parent foreign keys",
+          "status": "pass"
+        },
+        {
+          "name": "aborted migration preserves all preexisting rows",
+          "status": "pass"
+        },
+        {
+          "name": "successful migration preserves historical children and parent states",
+          "status": "pass"
+        },
+        {
+          "name": "both composite foreign keys remain NOT VALID",
+          "status": "pass"
+        },
+        {
+          "name": "constraint validation exposes existing asset mismatch without repairing it",
+          "status": "pass"
+        },
+        {
+          "name": "constraint validation exposes existing form mismatch without repairing it",
+          "status": "pass"
+        },
+        {
+          "name": "new cross-workspace check blocked",
+          "status": "pass"
+        },
+        {
+          "name": "new cross-workspace submission blocked",
+          "status": "pass"
+        },
+        {
+          "name": "unconfigured platform administrator has no expired workspace bypass",
+          "status": "pass"
+        },
+        {
+          "name": "database-owner configured exemption preserves legitimate expired-admin write",
+          "status": "pass"
+        },
+        {
+          "name": "service API cannot configure administrator exemptions",
+          "status": "pass"
+        },
+        {
+          "name": "authenticated API cannot configure administrator exemptions",
+          "status": "pass"
+        },
+        {
+          "name": "administrator exemption does not grant foreign workspace role",
+          "status": "pass"
+        },
+        {
+          "name": "removing administrator exemption immediately restores expiry denial",
+          "status": "pass"
+        },
+        {
+          "name": "latest legitimate check overrides historical future readiness",
+          "status": "pass"
+        },
+        {
+          "name": "authenticated future timestamp replaced by current server time",
+          "status": "pass"
+        },
+        {
+          "name": "authenticated retiming fails",
+          "status": "pass"
+        },
+        {
+          "name": "foreign parent deletion preserves mismatched historical check",
+          "status": "pass"
+        },
+        {
+          "name": "foreign parent deletion preserves mismatched historical form submission",
+          "status": "pass"
+        },
+        {
+          "name": "private schema still unavailable to API roles",
+          "status": "pass"
+        },
+        {
+          "name": "trusted analysis RPC remains inaccessible to authenticated clients",
+          "status": "pass"
+        },
+        {
+          "name": "trusted service analysis live member admitted",
+          "status": "pass"
+        },
+        {
+          "name": "trusted analysis transaction leaves no reusable authorization",
+          "status": "pass"
+        }
+      ],
+      "migrations": [
+        {
+          "name": "20261005022017_workspace_security_boundaries.sql",
+          "sha256": "16974e4960b31dcbd80479e27734bf82cda7fb0cfc63c7a3d1d56b32114b661d",
+          "milliseconds": 18.57
+        },
+        {
+          "name": "20261005022445_workspace_persisted_usage_limits.sql",
+          "sha256": "5fd3459dafcbe199c8ff893dfb726bce30d850e55a229375482e54f3256495e6",
+          "milliseconds": 3.5
+        },
+        {
+          "name": "20261005060101_atomic_confirmed_memory_publication.sql",
+          "sha256": "f861e70fe2e9a58599888b77263e9267ac1eae0642e153dc756f5bb3fb705288",
+          "milliseconds": 0.78
+        },
+        {
+          "name": "20261005060258_asset_check_server_chronology.sql",
+          "sha256": "a62006fb63a14cf9f018bab292a4b4ecfbcbee555b1bebcf841cdf7732211722",
+          "milliseconds": 0.31
+        },
+        {
+          "name": "20261005061024_internal_form_submission_idempotency.sql",
+          "sha256": "6db3df03b9fa2502e12fb71ddceb7a18c7cd26f6ad2a1f52a1bf10746f9cad03",
+          "milliseconds": 1.79
+        },
+        {
+          "name": "20261005062005_durable_import_attempt_reconciliation.sql",
+          "sha256": "f3a127c605106d7b33c3a11d09490d39fae2c3d93d733bd205e2fda9d3ed5556",
+          "milliseconds": 2.65
+        },
+        {
+          "name": "20261005070311_worksheet_import_publication_heads.sql",
+          "sha256": "56c6a11c3317bee9f1f75269b94163a399539bae0272ed5a2a4451ec0eb283ca",
+          "milliseconds": 0.94
+        }
+      ],
+      "notices": [
+        "Asset check tenant FK: 1 historical rows require review before VALIDATE CONSTRAINT",
+        "Form submission tenant FK: 1 historical rows require review before VALIDATE CONSTRAINT",
+        "Asset check tenant FK: 1 historical rows require review before VALIDATE CONSTRAINT",
+        "Form submission tenant FK: 1 historical rows require review before VALIDATE CONSTRAINT"
+      ],
+      "runtime": {
+        "version": "17.11",
+        "maxConnections": "20",
+        "database": "square_qualification_98d2e5f74802fe35191e_closeout_prod"
+      },
+      "finalProtectedHistory": {
+        "mismatchedChecks": 1,
+        "mismatchedSubmissions": 1,
+        "historicalFutureChecks": 1
+      },
+      "passed": true
+    }
+  ],
+  "migrationManifest": [
+    {
+      "name": "202606170001_phase_1_schema_rls.sql",
+      "sha256": "a479826e516951c093ae080c1c0f5aa06cefc6dd1217c4b9c6bdbb59c88f74e9"
+    },
+    {
+      "name": "202606170002_phase_2_invites.sql",
+      "sha256": "5157c46e08a4fdd563eb3bf3f5ecfc501d2f3ccdbf45eace6c52d02aa9d67f45"
+    },
+    {
+      "name": "202606170003_phase_6_squarespace_subscriptions.sql",
+      "sha256": "c0519967140cbb0a4e6b53d6a8aec079d6104271d5775a79b71af74864bfb27d"
+    },
+    {
+      "name": "202606170004_admin_support_tools.sql",
+      "sha256": "17bb4a49a12ec7cb77480418987014a845534c3d39cabc72cb26be12a532a203"
+    },
+    {
+      "name": "202606180002_kpi_dashboard.sql",
+      "sha256": "3d35292273f071d401af7a74769351aeeada7d7816188444ee5dd7ffee960b30"
+    },
+    {
+      "name": "202606180003_record_management.sql",
+      "sha256": "ad619b84add8c7825bc9752eed92b1b1ca5ae4e83a8969f7211e90f1e9ec7814"
+    },
+    {
+      "name": "202606180004_files_imports.sql",
+      "sha256": "1cf7972f6c9def3f8b2761e2558b464e4fe11f7beed0e3160f225bff2965c11e"
+    },
+    {
+      "name": "202606180005_file_kpi_historical_memory.sql",
+      "sha256": "aafeb1a3c2d797a3472e37dc5fa183d0253c5fe4d4da2e9c03f64c1c6c729b3a"
+    },
+    {
+      "name": "202606180006_start_from_scratch_crm.sql",
+      "sha256": "431e3c4238eb6b73a9281545a0c3ae2624cea771fc9326c4d783c4d568eab1ce"
+    },
+    {
+      "name": "202606180007_file_processing_status.sql",
+      "sha256": "5211d0acace7fecd84a8b1f368e39b4673212d0cbb3a23194c9ad13cec926447"
+    },
+    {
+      "name": "202606180008_people_record_management.sql",
+      "sha256": "960ab1d5f7b7b112af1db69593d47345b1b8a7ae5dd1aba7b43384fb6d2ec187"
+    },
+    {
+      "name": "202606180009_team_accountability.sql",
+      "sha256": "11d5767c7e822bf0eecac9eba251448d02a5f048d109a98d5f663dfa391044e9"
+    },
+    {
+      "name": "202606180010_report_subscription_preferences.sql",
+      "sha256": "386c0fc820d225a782ad44a7c5d7702a4b5122a0b387c2d2cc33e7ee0e30ccbd"
+    },
+    {
+      "name": "202606180011_report_subscription_schedule_controls.sql",
+      "sha256": "f0f7943d77368fd3ab5b7657851d2e8a73c9d024f41957f13e63ace28d584500"
+    },
+    {
+      "name": "202606180012_prestige_operations_intelligence.sql",
+      "sha256": "f7cc70bc7ed5927d770301fd76c57ef0c39ffcd8e6edaac1a2581d19a46d6839"
+    },
+    {
+      "name": "20260618025749_fix_workspace_setup_rls.sql",
+      "sha256": "acac92fa4f16fad3ed4e8a4c21e092b178fdd8b69cdc0c9f5ab2e1da1b1ef4fa"
+    },
+    {
+      "name": "20260619095238_single_vaeroex_plan.sql",
+      "sha256": "c5e9875ff0bb91993736ed2aed325ff8dc27de5f4db4648f8f36fdce6dfeb118"
+    },
+    {
+      "name": "20260619110000_legal_acceptance_logging.sql",
+      "sha256": "28e3265fcb2e349e1783b5ba8107ead282501aa00c01df2dc0fbf1689f2bc170"
+    },
+    {
+      "name": "202606220001_stripe_billing_migration.sql",
+      "sha256": "321335d4be9a78cdba250db8b48ddc24d24d8f5b6140b9c5231c407f9f2acd48"
+    },
+    {
+      "name": "202606220002_stripe_onboarding_email.sql",
+      "sha256": "f8e3c69bb5e584d8b94068cce4e960511d1585b1d61aebb7c64dad5c178063f7"
+    },
+    {
+      "name": "202606230001_kpi_settings.sql",
+      "sha256": "6db1fa625150ca98cbdee10115ec7f64bc7b817f9f5936a27edf46d133c46835"
+    },
+    {
+      "name": "202606260001_kpi_measurement_layer_settings.sql",
+      "sha256": "4ad447e73b2dfffdcfaef15725ec2cf77d8a5184a81c4ee0ef5a95e47794785a"
+    },
+    {
+      "name": "202607060001_business_memory_evidence_index.sql",
+      "sha256": "f311e29085835812719794ca3ca8bf2c697c8c15939159ad4c1940de24153de4"
+    },
+    {
+      "name": "202607070001_update_vaeroex_price_to_500.sql",
+      "sha256": "bf743b2a17a0f27813a54948b3f9176f537de9aa710ecbe1f0a2ac7cd8e8a69c"
+    },
+    {
+      "name": "202607080001_business_health_snapshots.sql",
+      "sha256": "398c637f1aa6717f38dcb64d12ba5b185797c7c463b98733dc7757533274f0be"
+    },
+    {
+      "name": "202607080002_ai_tool_execution_security.sql",
+      "sha256": "a12323d5dd6d23c78ff993c477b336bc4ae752292c7d3d0ecbbaf599e663c106"
+    },
+    {
+      "name": "202607080003_security_audit_service_events.sql",
+      "sha256": "2240f45c1b915f80a699ccd47df96fd4860612255e62aa08ce34a14b1e391aca"
+    },
+    {
+      "name": "202607080004_smb_launch_hardening.sql",
+      "sha256": "ba5d0bdad8471bed426e6975f62cd14d2f7d14891b4e40bd28bd31e097b66d8f"
+    },
+    {
+      "name": "202607110001_business_memory_evidence_eligibility.sql",
+      "sha256": "beee16c83e30b495ae5d7afeffaf32b990db365d58f963c28b9cd3e5bc50034a"
+    },
+    {
+      "name": "202607110002_business_signal_lifecycle_integrity.sql",
+      "sha256": "081027636a7b1c65ec1b2962bbdc516eb3b992bff605baffe227a69bb9a2928f"
+    },
+    {
+      "name": "20260713204716_restrict_lifecycle_rpc_to_authenticated.sql",
+      "sha256": "f12707c2c81db0085abdd165e775edb404bae8a879f33df82e16f329535a5b96"
+    },
+    {
+      "name": "20260721220519_saved_analysis_uniqueness.sql",
+      "sha256": "685c8f527fb962b1a0faac78e25234ec1508babac96762d1d4650308067d0a9c"
+    },
+    {
+      "name": "202607250001_business_notes_evidence.sql",
+      "sha256": "525fc5c829a4a11a677a9f87279e1fafb869ab5269265cdfbef0bbcdbf766b76"
+    },
+    {
+      "name": "202607250002_workspace_agreements.sql",
+      "sha256": "9da44cbd1fd2ba63b48f034df22c71f37d090a3647b77d79d66622bf00c7412a"
+    },
+    {
+      "name": "202607260001_manual_activation_entitlement.sql",
+      "sha256": "fb1bc100c0304982ac2e80b9ed1962712f0c953904dc9bad97cf22de0b9ead29"
+    },
+    {
+      "name": "20260726042242_business_notes_least_privilege.sql",
+      "sha256": "adb6b91104257f3326d8008a7a81b4d2219818d2c1492ee107ad9d9a8f3a78ca"
+    },
+    {
+      "name": "20260726205442_workspace_agreement_admin_email_delivery.sql",
+      "sha256": "1ab23ae5fea6179bbbe60d568e8b60cdc60a0041deb80deb7d9f23e9e1eb1208"
+    },
+    {
+      "name": "202607270001_admin_workspace_lifecycle.sql",
+      "sha256": "afce8c5e74b32edcb3d3471a33f7eb7099284267f7ab291a18abd0d5e90cbee8"
+    },
+    {
+      "name": "202607270002_kpi_semantic_direction.sql",
+      "sha256": "3fbe098a931d8c0f77d3f2b4104ea2fb66f93b7d834b2ef43f67740ebc1d88f1"
+    },
+    {
+      "name": "20260727013628_workspace_agreement_admin_email_delivery_least_privilege.sql",
+      "sha256": "a8017ecda61f7f4bc2fbeef20f1f2ba43c7ff271dff964a76fe0db51e6c327ac"
+    },
+    {
+      "name": "202607300001_ai_trust_admin_dashboard.sql",
+      "sha256": "2706a59c3113aa03ae5ba81bf2d7bac72eccd717ebe15fa32328a49e9a13229c"
+    },
+    {
+      "name": "20260731071855_business_health_generation_claim.sql",
+      "sha256": "4518a483ddb19961a6f4adf1ea4b30cb1632cc5914feb5452b0be9510a9b8f8d"
+    },
+    {
+      "name": "20260731092011_intelligence_card_lifecycle.sql",
+      "sha256": "731ac5b0cc888f65f83e85f5f564e482e6e686c67fb718f6eaf220084953c31f"
+    },
+    {
+      "name": "20260731093656_intelligence_card_lifecycle_event_index.sql",
+      "sha256": "ff6b7f923dde1ae729c668c278952e89cac91d75dc16aceaf3e2f99116ef9d3b"
+    },
+    {
+      "name": "20260731213000_easter_egg_runner_v1.sql",
+      "sha256": "1a77245173510ff976833c1e53a125e1aa1d07197d1036068137d2378bebb920"
+    },
+    {
+      "name": "20260731224500_easter_egg_runner_v2_contract.sql",
+      "sha256": "cbb6c1df9780f357e53c4cb12c7758d328a7c42f379c93a015f41d6e71b862a4"
+    },
+    {
+      "name": "20260731231500_easter_egg_runner_v3_contract.sql",
+      "sha256": "da46ba9deb76a849f4ffec635f4f3e93ad0ef6a5b693b3df8634099e8798ca27"
+    },
+    {
+      "name": "20260803052701_document_extraction_production_foundation_phase_a.sql",
+      "sha256": "89ce759a9ad042ccca5857a753256bd5740ebd4c3b128e0c84f56d903bf49a43"
+    },
+    {
+      "name": "20260803172709_document_extraction_private_worker_phase_b.sql",
+      "sha256": "58bbc2c9ca4d4dceb0b6fb007586a869d2ecabe9a8ea09625fbf831231802276"
+    },
+    {
+      "name": "20260803181405_document_extraction_dispatch_unknown_circuit.sql",
+      "sha256": "a935681423b90ac5d612203e3bbfac0063c7b077f1f7acd880efc1efbbfde9e3"
+    },
+    {
+      "name": "20260803204552_document_extraction_private_worker_phase_b_security_fixes.sql",
+      "sha256": "6342299d48aabfb708da35f687f4f863384a67c64b12fe3c13133ecd3b66b5c5"
+    },
+    {
+      "name": "20260803205520_document_extraction_dispatch_authorization_single_use.sql",
+      "sha256": "6cf82f2ed9fe79bf7c6f947c156daefe759cc1d46255e6b8f919a6809295f173"
+    },
+    {
+      "name": "20260803230226_document_extraction_rest_adapter_contract.sql",
+      "sha256": "d4762f0a9840962720e37059c8866ec8262f1e1aa9da26d1bcb4d63a40b272cc"
+    },
+    {
+      "name": "20260804010000_document_extraction_worker_phase_c1_protocol.sql",
+      "sha256": "af4319b9ffea7fbe34c78b49b57d7e82cbcbbb7fc49ace52085cdb767e849d22"
+    },
+    {
+      "name": "20260804160932_document_extraction_hosted_tool_call_v2.sql",
+      "sha256": "902339a9e01e8d8b0ced86677bf38e9e69c1fb603ee08156e035abb7f85a4540"
+    },
+    {
+      "name": "20260805011604_document_extraction_profile_bound_review_identity.sql",
+      "sha256": "f6d6ee491cf4bf46b6444c6e75e28f6902ce335ff8b1288964391fe93009f749"
+    },
+    {
+      "name": "20260805163333_google_document_ai_enterprise_ocr_v1.sql",
+      "sha256": "30d423c08e15d2f698252534d91a492ad58518237d5b591b84efdcba974aabbb"
+    },
+    {
+      "name": "20260806180609_document_extraction_google_frozen_qualification_controller.sql",
+      "sha256": "88ab0198a5d1c3096fd378d9401be3ab0e6155bf7baac1117b773bc7f6d723cf"
+    },
+    {
+      "name": "20260807172710_document_extraction_google_frozen_qualification_concrete_fixes.sql",
+      "sha256": "35cf2e38ad93ec498255295c002865a40a83bb65661c03e7d0381ba4ecdcf650"
+    },
+    {
+      "name": "20260807181420_document_extraction_google_qualification_claim_phase_fix.sql",
+      "sha256": "74ee723bad5369358bb1fbc463f667a3e783e418aee5a2ede1a4ecbee2e6cce3"
+    },
+    {
+      "name": "20260807185224_document_extraction_google_qualification_cleanup_order_fix.sql",
+      "sha256": "efa54669a615210339ab6a647840b9ed27b06d7335e49c1955b6ac2e33a9bc95"
+    },
+    {
+      "name": "20260807195152_document_extraction_google_qualification_processing_cleanup_proof.sql",
+      "sha256": "8a8864dd1858da5b8f9c30195c52c69ab27f27a4488ddb210f057bbdfd3246f6"
+    },
+    {
+      "name": "20260807203645_document_extraction_google_qualification_claim_cleanup_merge.sql",
+      "sha256": "636b2aa2dca34aa07039a6fc43fac62aaadf4e3da4202b62641eeb7c18823986"
+    },
+    {
+      "name": "20260807215440_document_extraction_google_qualification_dispatch_quota_guard.sql",
+      "sha256": "7a5cc5f7532869d986372a389fafc0d4619a168171f4783e42d24463cf27479e"
+    },
+    {
+      "name": "20260808060301_document_extraction_google_qualification_planned_cleanup.sql",
+      "sha256": "8f53a5d2616f7ba429df09a7100689630b89bb6d6967b244a9d3f11271f5b232"
+    },
+    {
+      "name": "20260808064500_document_extraction_google_qualification_planned_cleanup_multifixture.sql",
+      "sha256": "6919b451eaa6d99521c52806e8fc98b82b1bd3c064a8205c2eb9b5a3600b9e10"
+    },
+    {
+      "name": "20260808070000_document_extraction_google_qualification_planned_cleanup_signed_binding.sql",
+      "sha256": "56e4b6e60767e054f08662225ae253cbc6139087272c63e8214bb2beddbd9e3c"
+    },
+    {
+      "name": "20260811233219_restore_manual_activation_review_rpc.sql",
+      "sha256": "3ccaf7cb1d7560cd1c554126ee16205ec25eb7fa22b97c6396bec54968162b20"
+    },
+    {
+      "name": "20260812051159_persistent_kpi_colors.sql",
+      "sha256": "a11e5bb3c51180df33f059034a21e35b054f063d556f46456cda8e6ca2d01dcf"
+    },
+    {
+      "name": "20260812060853_initialize_existing_kpi_colors.sql",
+      "sha256": "78fc4f668b262c740466da82ef0e392fe450ee1a4236c6d00cd1d3fe57db84a8"
+    },
+    {
+      "name": "20260812064259_repair_existing_kpi_color_initialization.sql",
+      "sha256": "2804fa226e442a449a7e3e41b6acee7438829be9632db63c24a69beefc488e84"
+    },
+    {
+      "name": "20260817185529_intelligence_briefing_storage_contract.sql",
+      "sha256": "e7831ff72fab50f1bc682e1f043ea67289742ddd8af9bcd6c4fd32c92af20d85"
+    },
+    {
+      "name": "20260819174100_security_high_findings_remediation.sql",
+      "sha256": "3236bc16194d53a67eb3011758427f7ec4e3f4fd3d3ace0b95b53db039bff178"
+    },
+    {
+      "name": "20260820053955_customer_1_billing_entitlement_remediation.sql",
+      "sha256": "54525337ddca83d5b1e896dc8e47b548bdcc5ef3f1c7f370b7bc60d0173793b9"
+    },
+    {
+      "name": "20260820170000_pre_checkout_legal_acceptance.sql",
+      "sha256": "2bc6c496ad35cfda77ffef8ef8727157847194ccd12568a9f2fe07ff3f9ba4f2"
+    },
+    {
+      "name": "20260820233007_external_integrations_phase_1_canonical_foundation.sql",
+      "sha256": "c4bf0d9e86e09cc9a968e09d4515cb98ddad5d8e10d406fe05058829ad6897c5"
+    },
+    {
+      "name": "20260821064333_external_integrations_phase_2_reconciliation.sql",
+      "sha256": "f6382367178312140f8d67554b1b6300c1d90c90fe5ea4bf6b6dc48e4223a640"
+    },
+    {
+      "name": "20260821172015_external_integrations_phase_3_deterministic_dependencies.sql",
+      "sha256": "864243f09995be7b76d0b62775f5bcf32eb4359fc50a980c5da00667c4ea7731"
+    },
+    {
+      "name": "20260821201220_external_integrations_phase_4_control_plane.sql",
+      "sha256": "cb20eed663692e0e96c65e0e8a01f6f226fec2249899713e22444083fd8eb4fb"
+    },
+    {
+      "name": "20260821220853_external_integrations_phase_5_credential_security.sql",
+      "sha256": "879de5766d9077dd06800cf55dc86bcbdc076b256d7c49426ec95c0599d01a89"
+    },
+    {
+      "name": "20260822012253_external_integrations_phase_6_durable_runtime.sql",
+      "sha256": "72c4cb4d3db844c32bda9bf569c52776fbf1f98fd57d94aa46a54d677397f79a"
+    },
+    {
+      "name": "20260822035335_external_integrations_phase_8a0_provider_contract_convergence.sql",
+      "sha256": "3d8ee266723a39dd6ff0140e430d1227fa966d8f21ff5ef83d88e8e06104db22"
+    },
+    {
+      "name": "20260823042718_external_integrations_phase_8b_qbo_sandbox_validation.sql",
+      "sha256": "dc1a78d80bf821784e71f790a5ffca5f18db5a1d4e88da7bee237eef7aedb961"
+    },
+    {
+      "name": "20260823111004_scope_qbo_sandbox_dispatch_candidates.sql",
+      "sha256": "ebd677d3a3629f0734e50307d133bfd9168281500f7bd4e8f26d3418dcf3dc92"
+    },
+    {
+      "name": "20260823113832_qbo_sandbox_scoped_dispatch_recovery.sql",
+      "sha256": "bbdeec9f12ebcd52995ab5b72ca69ae5b45e900d69260b118ecda604fa3fe376"
+    },
+    {
+      "name": "20260823115807_reserve_qbo_sandbox_scoped_dispatch.sql",
+      "sha256": "49f2efc2fcc8c8813a0bbd3f16c76659fae847d84feda2be3f90b830cb8ff5b2"
+    },
+    {
+      "name": "20260823121454_qbo_sandbox_dispatch_run_lock.sql",
+      "sha256": "0c426c77e9107054d12463ef36d9f896c229163352adae07709e1b74487fd978"
+    },
+    {
+      "name": "20260823205806_qbo_sandbox_credential_refresh_recovery.sql",
+      "sha256": "f905937a0a6f32525c0a08cd6fed56085a5c57c75278502dbb6320deec3eca94"
+    },
+    {
+      "name": "20260824071101_qbo_sandbox_same_generation_reauthorization.sql",
+      "sha256": "103ab92697743bb7b8d30fa657571e7644b406b747ded9b9d51181c660fc0d18"
+    },
+    {
+      "name": "20260824083917_qbo_sandbox_expired_refresh_lease_reclamation.sql",
+      "sha256": "e8b4f4e71353e873fba550f7c9f5d60a5c8e0c0f5d98802b3201606fbecde99c"
+    },
+    {
+      "name": "20260824193332_qbo_cloud_tasks_zero_based_delivery.sql",
+      "sha256": "ed1974f49b03f5ec62695a19ea5f0f91046a69774a9bbbc8cc17fc74c67c911e"
+    },
+    {
+      "name": "20260824233000_qbo_retry_execution_and_reauthorization_recovery.sql",
+      "sha256": "2a03ec560bc1c8a827fb3e37fbb6295a39d328cfd9e78820f1cb1aa2b04de0df"
+    },
+    {
+      "name": "20260825180000_qbo_reauthorization_required_lifecycle.sql",
+      "sha256": "5e01053d34bac4a31f8a86ba8a3aa51c716933fdd370c390da38de301aadfba0"
+    },
+    {
+      "name": "20260825190000_qbo_scoped_dispatch_retry_lifecycle.sql",
+      "sha256": "2c7029c11b46088d4bccdec91adf67cc61dee17a1063a55e5eb76fa118340380"
+    },
+    {
+      "name": "20260826043610_qbo_credential_envelope_binding_convergence.sql",
+      "sha256": "2bfbe9378950345a25e27371776122a490d4a36fa15406769d919c8691c195b5"
+    },
+    {
+      "name": "20260826090000_qbo_credential_envelope_binding_incident_canary.sql",
+      "sha256": "59b0583db476fe7f9f725cd895af03cc617837888e79e0447663c6d416d43ee0"
+    },
+    {
+      "name": "20260826120000_qbo_credential_lineage_incident_recovery.sql",
+      "sha256": "abb37109938cc959a74709f49685c43b6c7fc8606f300f88e486b52f4ad50b0e"
+    },
+    {
+      "name": "20260826190801_qbo_precontract_initialization_retirement.sql",
+      "sha256": "77e0a7dd0b5bdc29a474b8303e996afc4f526f4013d366e04a3a89c9860bf2a8"
+    },
+    {
+      "name": "20260826222000_qbo_provider_result_evidence_and_ar_aging_recovery.sql",
+      "sha256": "b3c92e73cddbc3958b9a38d5eb4ff7e3e066b0ceb9edf55c0b44b0424daf86a0"
+    },
+    {
+      "name": "20260827033058_qbo_production_convergence.sql",
+      "sha256": "040a21080562441764a395ebac62874629d918522e9a88adb19793c491ffdec7"
+    },
+    {
+      "name": "20260902191322_qbo_production_dormant_connection_gate.sql",
+      "sha256": "a5b3db104c77e1ddba57824a681048146a6b835ac299ff36528781749f065866"
+    },
+    {
+      "name": "20260902191323_integration_production_runtime_foundation.sql",
+      "sha256": "f8598ca685c795ad56bfdb7a29a1ded3da1c096d42ffb62ea4e123271db54c6d"
+    },
+    {
+      "name": "20260902191324_square_production_runtime_overlay.sql",
+      "sha256": "2cc43a9313d056e58b75143f032f347cb0972f45cc1edbd484f6b1fb0574661f"
+    },
+    {
+      "name": "20260902191325_square_production_internal_pilot_runtime.sql",
+      "sha256": "ff2182044f28d6901f1582db3d31ef20d027a1e4590f0b295a7a64a1ad4c1325"
+    },
+    {
+      "name": "20260925032300_square_production_customer_connection.sql",
+      "sha256": "59261c8a3cc8c09cd83ea3817f5ad3adba89ef89aa735a1a611b3f3858ad3c92"
+    },
+    {
+      "name": "20260929004917_square_customer_service_backend.sql",
+      "sha256": "542c9febb877aecba7398250a3882b799213d4ff5ba33d12e5a9251e5ed042e4"
+    },
+    {
+      "name": "20260929041048_square_customer_payment_history.sql",
+      "sha256": "8c57ec547105f260c084b9a97586c4b99bb588c6cdbdd84b7678b2b5b2063942"
+    },
+    {
+      "name": "20260929052211_square_customer_payment_browse.sql",
+      "sha256": "3b7d1e3766b69b20da94358c181498b7a4852e0fb4aa97d17691114a5298f000"
+    },
+    {
+      "name": "20260930001000_qbo_customer_oauth_completion.sql",
+      "sha256": "ee124a7661319635e4f946c5fd1e0f9117c22020ae482585a73734cdee942a40"
+    },
+    {
+      "name": "20260930002000_qbo_production_ongoing_sync.sql",
+      "sha256": "e89d9b51fac13210af589651512fd999dfb2f72cc52fe0b9ff2f61785c61835d"
+    },
+    {
+      "name": "20260930003000_qbo_customer_source_browse.sql",
+      "sha256": "2fff16b9b0552e835989d9595167266418dde02de441d9617d81d412ac47cf8c"
+    },
+    {
+      "name": "20260930004000_qbo_production_source_validation.sql",
+      "sha256": "c2dc4cd7e0b648a3f59959263486baa3de55096ce11b4955605c133651d5a956"
+    },
+    {
+      "name": "20260930193412_qbo_production_accounting_intake.sql",
+      "sha256": "dd495af666ed2e9adfbe140f471380d3452dbef06e61d84fbd3655a685283bf8"
+    },
+    {
+      "name": "20261002012700_qbo_customer_pending_attempt_control.sql",
+      "sha256": "f19047331d8886198b6349c98455ca5ed21fb6f8c703e887b4ceb7217b1df17d"
+    },
+    {
+      "name": "20261002025212_qbo_customer_pending_cancellation_eligibility.sql",
+      "sha256": "5cbca0f8f81461b7624ba94c923f886eddcf72f9e5fce323327b4ec92a625921"
+    },
+    {
+      "name": "20261002040024_google_sheets_complete.sql",
+      "sha256": "ba524b91c26bb73f9ee22bf7ae960d248b7489df2842ac3a0151010dee139b9c"
+    },
+    {
+      "name": "20261002040031_google_sheets_lifecycle.sql",
+      "sha256": "7d24390a42fe34acebc563d49ef3dc733db672ef40ad23a221f2df0a6ba10013"
+    },
+    {
+      "name": "20261002182049_integration_summary_preferences.sql",
+      "sha256": "16a43fde588fcf7e375c3438887d150687ae25c121cec07505878662bbe96c13"
+    },
+    {
+      "name": "20261002182147_square_customer_browse_identity.sql",
+      "sha256": "db81fc308477e216f6a72978ee93cf255a3ba43f24d03f2f37b605f58447d65b"
+    },
+    {
+      "name": "20261002182746_qbo_customer_dashboard_metadata.sql",
+      "sha256": "9971726d78caba2ad8c4fe802149f840a4bfa1e3f5a244f5b9bcd29057c04aae"
+    }
+  ],
+  "nativeDirectory": "/private/tmp/square-qualification-loUxzE",
+  "platformFixtureSha256": "1613c8630c563eed640efc4d8b80278b67b4195fb9cdbad4bc97bd34dcb8c4de",
+  "qboOnlySquareCatalogPreserved": true,
+  "squareCatalogSha256": "5f546c7775b6478cc453a3d3400d05a3b7833fe5fd0f0ff9dbd2ee3e36119ac0",
+  "baselineMigrationCount": 120,
+  "finalLedger": [
+    "202606170001",
+    "202606170002",
+    "202606170003",
+    "202606170004",
+    "202606180002",
+    "202606180003",
+    "202606180004",
+    "202606180005",
+    "202606180006",
+    "202606180007",
+    "202606180008",
+    "202606180009",
+    "202606180010",
+    "202606180011",
+    "202606180012",
+    "20260618025749",
+    "20260619095238",
+    "20260619110000",
+    "202606220001",
+    "202606220002",
+    "202606230001",
+    "202606260001",
+    "202607060001",
+    "202607070001",
+    "202607080001",
+    "202607080002",
+    "202607080003",
+    "202607080004",
+    "202607110001",
+    "202607110002",
+    "20260713204716",
+    "20260721220519",
+    "202607250001",
+    "202607250002",
+    "202607260001",
+    "20260726042242",
+    "20260726205442",
+    "202607270001",
+    "202607270002",
+    "20260727013628",
+    "202607300001",
+    "20260731071855",
+    "20260731092011",
+    "20260731093656",
+    "20260731213000",
+    "20260731224500",
+    "20260731231500",
+    "20260803052701",
+    "20260803172709",
+    "20260803181405",
+    "20260803204552",
+    "20260803205520",
+    "20260803230226",
+    "20260804010000",
+    "20260804160932",
+    "20260805011604",
+    "20260805163333",
+    "20260806180609",
+    "20260807172710",
+    "20260807181420",
+    "20260807185224",
+    "20260807195152",
+    "20260807203645",
+    "20260807215440",
+    "20260808060301",
+    "20260808064500",
+    "20260808070000",
+    "20260811233219",
+    "20260812051159",
+    "20260812060853",
+    "20260812064259",
+    "20260817185529",
+    "20260819174100",
+    "20260820053955",
+    "20260820170000",
+    "20260820233007",
+    "20260821064333",
+    "20260821172015",
+    "20260821201220",
+    "20260821220853",
+    "20260822012253",
+    "20260822035335",
+    "20260823042718",
+    "20260823111004",
+    "20260823113832",
+    "20260823115807",
+    "20260823121454",
+    "20260823205806",
+    "20260824071101",
+    "20260824083917",
+    "20260824193332",
+    "20260824233000",
+    "20260825180000",
+    "20260825190000",
+    "20260826043610",
+    "20260826090000",
+    "20260826120000",
+    "20260826190801",
+    "20260826222000",
+    "20260827033058",
+    "20260902191322",
+    "20260902191323",
+    "20260902191324",
+    "20260902191325",
+    "20260925032300",
+    "20260929004917",
+    "20260929041048",
+    "20260929052211",
+    "20260930001000",
+    "20260930002000",
+    "20260930003000",
+    "20260930004000",
+    "20260930193412",
+    "20261002012700",
+    "20261002025212",
+    "20261002040024",
+    "20261002040031",
+    "20261002182049",
+    "20261002182147",
+    "20261002182746",
+    "20261005022017",
+    "20261005022445",
+    "20261005060101",
+    "20261005060258",
+    "20261005061024",
+    "20261005062005",
+    "20261005070311"
+  ],
+  "passed": true,
+  "ownedClusterStopped": true
+}

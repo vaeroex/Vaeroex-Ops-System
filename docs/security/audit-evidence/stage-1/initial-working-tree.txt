@@ -1,0 +1,55 @@
+ M .env.example
+ M README.md
+ M app/app/settings/page.tsx
+ M lib/supabase/types.ts
+ M scripts/external-integrations-qbo-production-regression-tests.js
+ M services/external-integrations-qbo/infra/README.md
+ M services/external-integrations-qbo/infra/main.tf
+ M services/external-integrations-qbo/infra/outputs.tf
+?? app/api/integrations/google-sheets/callback/route.ts
+?? app/api/integrations/google-sheets/connect/route.ts
+?? app/api/integrations/google-sheets/disconnect/route.ts
+?? app/api/integrations/google-sheets/mapping/route.ts
+?? app/api/integrations/google-sheets/spreadsheet/route.ts
+?? app/api/integrations/google-sheets/sync/route.ts
+?? app/api/integrations/google-sheets/tab/route.ts
+?? app/app/settings/integrations/google-sheets/page.tsx
+?? atlantic-3d-dental-demo/.openai/hosting.json
+?? atlantic-3d-dental-demo/ASSET-NOTES.md
+?? atlantic-3d-dental-demo/README.md
+?? atlantic-3d-dental-demo/prepare-dental-assets.mjs
+?? atlantic-3d-dental-demo/public/anatomy-models.js
+?? atlantic-3d-dental-demo/public/cbct-hero-original.png
+?? atlantic-3d-dental-demo/public/dental-viewer.js
+?? atlantic-3d-dental-demo/public/favicon.svg
+?? atlantic-3d-dental-demo/public/implant-planning.png
+?? atlantic-3d-dental-demo/public/index.html
+?? atlantic-3d-dental-demo/public/models/ATTRIBUTION.html
+?? atlantic-3d-dental-demo/public/models/provenance.json
+?? atlantic-3d-dental-demo/public/models/research-dental-arch.glb
+?? atlantic-3d-dental-demo/public/radiology-study.png
+?? atlantic-3d-dental-demo/public/site.js
+?? atlantic-3d-dental-demo/public/styles.css
+?? atlantic-3d-dental-demo/public/vendor/BufferGeometryUtils.js
+?? atlantic-3d-dental-demo/public/vendor/GLTFLoader.js
+?? atlantic-3d-dental-demo/public/vendor/LICENSE
+?? atlantic-3d-dental-demo/public/vendor/OrbitControls.js
+?? atlantic-3d-dental-demo/public/vendor/three.core.js
+?? atlantic-3d-dental-demo/public/vendor/three.module.js
+?? docs/google-sheets-connector-setup.md
+?? docs/supabase-production-direct-ipv6-support-draft.md
+?? lib/integrations/google-sheets/contracts.ts
+?? lib/integrations/google-sheets/route-helpers.ts
+?? lib/integrations/google-sheets/server.ts
+?? services/external-integrations-qbo/infra/foundation/.terraform.lock.hcl
+?? services/external-integrations-qbo/infra/foundation/README.md
+?? services/external-integrations-qbo/infra/foundation/main.tf
+?? services/external-integrations-qbo/infra/foundation/outputs.tf
+?? services/external-integrations-qbo/infra/foundation/terraform.tfstate
+?? services/external-integrations-qbo/infra/foundation/terraform.tfstate.1790840685.backup
+?? services/external-integrations-qbo/infra/foundation/terraform.tfstate.backup
+?? services/external-integrations-qbo/infra/foundation/variables.tf
+?? services/external-integrations-qbo/infra/foundation/versions.tf
+?? supabase/.temp/cli-latest
+?? supabase/.temp/linked-project.json
+?? supabase/migrations/20261002020000_google_sheets_read_only_foundation.sql

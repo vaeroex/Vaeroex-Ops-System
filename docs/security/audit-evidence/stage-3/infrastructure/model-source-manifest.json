@@ -1,0 +1,60 @@
+{
+  "checkout_head": "90982062976ca905095ba68c193c52eddf795f1b",
+  "production_source": "d91be079c7beb0b6f21a4c5e6b451f90ca06e035",
+  "files": [
+    {
+      "path": "lib/ai/model-routing.ts",
+      "checkout_sha256": "0fcca750c823900d2eac81e5a24832884bc9c714fd918045aa76cad1ba2ed298",
+      "deployed_source_sha256": "0fcca750c823900d2eac81e5a24832884bc9c714fd918045aa76cad1ba2ed298",
+      "identical": true
+    },
+    {
+      "path": "lib/ai/usage.ts",
+      "checkout_sha256": "9332cc7ebe59326a07a29a926f7d57010df4da929a3c10ba120cd9157048dc6e",
+      "deployed_source_sha256": "9332cc7ebe59326a07a29a926f7d57010df4da929a3c10ba120cd9157048dc6e",
+      "identical": true
+    },
+    {
+      "path": "lib/ai/providers/workflow-provider-policy.ts",
+      "checkout_sha256": "0f7ba588425e02d9bab581779a066a2b047406ae548bc957252aab1add91bdd2",
+      "deployed_source_sha256": "0f7ba588425e02d9bab581779a066a2b047406ae548bc957252aab1add91bdd2",
+      "identical": true
+    },
+    {
+      "path": "lib/ai/providers/provider-manager.ts",
+      "checkout_sha256": "e1678aa7fde5e531cc11c6bd0a09253702a62293a6ee4cc92ac15a90f768ce4b",
+      "deployed_source_sha256": "e1678aa7fde5e531cc11c6bd0a09253702a62293a6ee4cc92ac15a90f768ce4b",
+      "identical": true
+    },
+    {
+      "path": "lib/ai/kpi-semantics/service.ts",
+      "checkout_sha256": "2ef36caab5d93a94f119496ded72081536286837925cd7d0238063375bcf7ea3",
+      "deployed_source_sha256": "2ef36caab5d93a94f119496ded72081536286837925cd7d0238063375bcf7ea3",
+      "identical": true
+    },
+    {
+      "path": "lib/ai/vaeroex-client.ts",
+      "checkout_sha256": "10536eebe51387c5578871deea9d7bac40904b0eb7032e588c82f51dcc333b20",
+      "deployed_source_sha256": "10536eebe51387c5578871deea9d7bac40904b0eb7032e588c82f51dcc333b20",
+      "identical": true
+    },
+    {
+      "path": "lib/integrations/google-sheets/sync.ts",
+      "checkout_sha256": null,
+      "deployed_source_sha256": "0ac66ff9e7dc90fee9c949ce1be58ce2694ef648cc84f46a72337d0f918c723b",
+      "identical": false
+    },
+    {
+      "path": "lib/integrations/google-sheets/contracts.ts",
+      "checkout_sha256": "66db18e39e6519c085c0e004d40b3886ba1a8762b01092a79756d35504ce3035",
+      "deployed_source_sha256": "da28da1f4aed5a61f91abe77216131995e23dd9c531976c28dab4f8041ac0f1c",
+      "identical": false
+    },
+    {
+      "path": "lib/integrations/google-sheets/server.ts",
+      "checkout_sha256": "1007a49f195ba16ebebddde14e9809ad4088a30bc665f0a928f78a68d6ebb07d",
+      "deployed_source_sha256": "d91b5a1abe7fc8c1c8f0da11740bcb241139ff824e9f1e9fbe0c7c87cf31b099",
+      "identical": false
+    }
+  ]
+}

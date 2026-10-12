@@ -1,0 +1,18 @@
+{
+  "suite": "google_sheets_data_and_database",
+  "checks": 142,
+  "largeRows": 750,
+  "largeFacts": 1500,
+  "liveProviderCalls": 0,
+  "fullCanonicalBootstrap": false,
+  "abandonedRecovery": {
+    "scope": "Persisted SQL with accelerated lease expiry; no worker kill or provider transport",
+    "leaseSeconds": 270,
+    "automaticRetrySeconds": 3600,
+    "originalEligibilityPreserved": true,
+    "independentTerminalRecovery": true,
+    "staleCommitDenied": true,
+    "lateCleanupPreservesSuccess": true,
+    "recovery300SecondsQualified": false
+  }
+}

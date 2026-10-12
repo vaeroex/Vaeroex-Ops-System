@@ -1,0 +1,111 @@
+{
+  "started": "2026-10-05T01:43:00.550Z",
+  "elapsedMs": 430,
+  "job": {
+    "kind": "import",
+    "rows": 1000,
+    "series": 25,
+    "months": 24,
+    "iterations": 5
+  },
+  "code": 0,
+  "signal": null,
+  "stopReason": null,
+  "observedRssBytes": 0,
+  "output": {
+    "job": {
+      "kind": "import",
+      "rows": 1000,
+      "series": 25,
+      "months": 24,
+      "iterations": 5
+    },
+    "sourceRoot": "/tmp/vaeroex-audit-production",
+    "node": "v24.19.0",
+    "platform": "darwin",
+    "bytes": 39801,
+    "integrity": {
+      "rows": 1000,
+      "series": 25,
+      "valueChecksum": 500500,
+      "allIdsPreserved": true
+    },
+    "deterministicDigest": "7c74fa5e105f161d54e9165ab7ab657ade829e3038723d5e654ec83638b38689",
+    "samples": [
+      {
+        "iteration": 0,
+        "parseMs": 1.960583999999983,
+        "mapAndIntegrityMs": 0.33083299999998417,
+        "canonicalMs": 9.449792000000002,
+        "totalMs": 11.74120899999997,
+        "cpuMs": 23.136,
+        "rssBytes": 171687936
+      },
+      {
+        "iteration": 1,
+        "parseMs": 1.3199170000000322,
+        "mapAndIntegrityMs": 0.2161249999999768,
+        "canonicalMs": 2.5384579999999914,
+        "totalMs": 4.0745000000000005,
+        "cpuMs": 13.345,
+        "rssBytes": 171802624
+      },
+      {
+        "iteration": 2,
+        "parseMs": 2.1345830000000205,
+        "mapAndIntegrityMs": 0.22149999999999181,
+        "canonicalMs": 2.1149580000000014,
+        "totalMs": 4.471041000000014,
+        "cpuMs": 14.237,
+        "rssBytes": 171884544
+      },
+      {
+        "iteration": 3,
+        "parseMs": 0.8255829999999946,
+        "mapAndIntegrityMs": 0.20699999999999363,
+        "canonicalMs": 2.09858399999996,
+        "totalMs": 3.131166999999948,
+        "cpuMs": 12.271,
+        "rssBytes": 171507712
+      },
+      {
+        "iteration": 4,
+        "parseMs": 0.7170839999999998,
+        "mapAndIntegrityMs": 0.20066600000001245,
+        "canonicalMs": 2.020834000000036,
+        "totalMs": 2.9385840000000485,
+        "cpuMs": 8.939,
+        "rssBytes": 171540480
+      }
+    ],
+    "summary": {
+      "p50Ms": 4.0745000000000005,
+      "p95Ms": 11.74120899999997,
+      "maxMs": 11.74120899999997,
+      "diagnosticBudgetMs": 5000,
+      "withinDiagnosticBudget": true
+    },
+    "resourceUsage": {
+      "userCPUTime": 675317,
+      "systemCPUTime": 45874,
+      "maxRSS": 167872,
+      "sharedMemorySize": 0,
+      "unsharedDataSize": 0,
+      "unsharedStackSize": 0,
+      "minorPageFault": 10055,
+      "majorPageFault": 603,
+      "swappedOut": 0,
+      "fsRead": 0,
+      "fsWrite": 0,
+      "ipcSent": 0,
+      "ipcReceived": 0,
+      "signalsCount": 0,
+      "voluntaryContextSwitches": 53,
+      "involuntaryContextSwitches": 2644
+    },
+    "maxRssBytes": 171900928,
+    "scope": "actual functions with synthetic in-memory inputs; excludes IO/persistence/API/model/user capacity"
+  },
+  "stderr": "",
+  "qualification": "Pilot integrity only: RSS watcher unavailable due sandbox /bin/ps denial; not a fully guarded performance result"
+}

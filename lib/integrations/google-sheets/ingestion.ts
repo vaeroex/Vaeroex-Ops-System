@@ -72,7 +72,7 @@ export const SHEETS_SYNC_ERROR_CODES = new Set([
   "google_sheets_row_limit", "google_sheets_observation_limit", "google_sheets_row_key_invalid",
   "google_sheets_duplicate_row_key", "google_sheets_provider_request_failed", "google_sheets_response_too_large",
   "google_sheets_deadline_exceeded", "google_sheets_request_timeout",
-  "google_sheets_sync_busy", "google_sheets_mapping_required", "google_sheets_workspace_capacity", "google_sheets_snapshot_changed"
+  "google_sheets_sync_busy", "google_sheets_capacity_busy", "google_sheets_workspace_busy", "google_sheets_mapping_required", "google_sheets_workspace_capacity", "google_sheets_snapshot_changed"
 ]);
 export function sheetsSyncErrorCode(error: unknown) {
   const code = error instanceof Error ? error.message : "";

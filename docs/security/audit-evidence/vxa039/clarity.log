@@ -1,0 +1,72 @@
+
+> vaeroex-ops-system@0.1.0 test:workspace-clarity /Users/isaacvizcarra/.codex/worktrees/workspace-audit-fixes/Vaeroex
+> node --test scripts/workspace-navigation-list-regression-tests.js scripts/intelligence-inbox-ui-regression-tests.js scripts/evidence-browsing-clarity-regression-tests.js scripts/settings-clarity-regression-tests.js scripts/interaction-feedback-regression-tests.js scripts/source-upload-action-tests.js scripts/source-upload-form-tests.js && pnpm test:workspace-redesign && pnpm test:admin-company-management
+
+Evidence browsing clarity: 357-record batches, visible-only selection, mounted composer, filters, and lifecycle regressions passed.
+✔ 125 and 357 shown records retain a 100-ID action cap, truthful selection label, and one confirmed submission (235.493583ms)
+✔ incremental selection stays capped as batches grow and subset lists keep Select All behavior (22.979166ms)
+✔ Intelligence SSR dates match browser rendering across timezones and preserve reporting days (1245.789167ms)
+✔ 320 current findings are batched by ten in All, with truthful remaining-category text (604.017ms)
+✔ default desktop selection uses the first sorted visible finding, while explicit deep links override it (142.193166ms)
+✔ mobile selection and Back restore the list without resetting filters, batch, or scroll target (61.752959ms)
+✔ confidence and history changes reset the batch while deep links still open a finding beyond it (65.7235ms)
+✔ confidence-filter fallback becomes the selection and survives clearing the filter without reopening mobile Back (30.909209ms)
+✔ unavailable briefings collapse only on request, retaining completed and generatable briefings (18.5735ms)
+✔ the main route places findings before briefings without changing their data loading (0.5105ms)
+✔ security feedback remains explicit without trapping workspace navigation (266.419417ms)
+✔ error feedback stays readable until explicitly dismissed (62.728375ms)
+✔ message feedback stays readable until explicitly dismissed (24.8655ms)
+✔ first submission is acknowledged and a repeated submit before render is blocked (20.231041ms)
+✔ controlled action pending keeps the capture lock when host form context resets (142.171125ms)
+✔ cancelled submissions do not lock the form (26.075958ms)
+✔ an uncertain timeout keeps the submission locked without inviting a blind retry (60.924542ms)
+✔ a completed action releases the submission lock for a subsequent intentional submission (11.589167ms)
+✔ primary and analysis actions use the guarded submit control without changing their button styles (123.376625ms)
+✔ Settings puts the Integrations entry before account, workspace, and collapsed appearance (256.218958ms)
+✔ optional Square navigation retains its enabled-owner restriction on Integrations (553.498667ms)
+✔ password entry is collapsed until selected and response feedback opens it without changing the action (47.258583ms)
+✔ appearance shows a compact current setting with choices and preview disclosed separately (1.080708ms)
+Source upload action tests passed: retained validation state, one-time preparation, tenant/role gates, approval boundary, uncertain outcomes and legacy redirects.
+✔ scripts/source-upload-action-tests.js (4431.796834ms)
+✔ legacy dormant check exempts only the exact upload/feedback paths (16.514417ms)
+✔ one discreet generic reminder stays inside file upload without repeated workspace notices (6.995209ms)
+✔ both upload entry points reuse one persistent form with its reminder and entered work (250.827917ms)
+✔ first submit acknowledges immediately and blocks a repeated submission (107.385625ms)
+✔ recoverable validation preserves file and entered fields without resetting the form (0.612292ms)
+✔ lost transport acknowledgment stays readable and blocked without automatic retry (0.648375ms)
+✔ framework authentication redirects retain their control flow (0.604041ms)
+✔ workspace navigation matches path boundaries and labels the current destination without changing links (3.186458ms)
+✔ actual mobile menu and header expose the active destination before opening and preserve canonical navigation (446.824458ms)
+✔ mobile navigation closes its menu only for a link activation without intercepting normal navigation (150.296083ms)
+✔ numeric list batching is bounded and covers a 320-item list in six-row increments (0.512416ms)
+✔ stale Performance detail selections fall back to overview while ordinary section precedence is preserved (14.604417ms)
+✔ 300 saved analyses render in 25-row batches without changing or skipping a saved record (678.907375ms)
+✔ Saved Analyses Select all visible never selects unloaded cards and filtering clears selection and resets the batch (95.845833ms)
+✔ Saved Analyses search includes records beyond the first batch and empty states distinguish no records from no match (56.598167ms)
+ℹ tests 39
+ℹ suites 0
+ℹ pass 39
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4453.398083
+[WARN] The "pnpm" field in package.json is no longer read by pnpm. The following keys were ignored: "pnpm.overrides", "pnpm.onlyBuiltDependencies", "pnpm.patchedDependencies". See https://pnpm.io/settings for the new home of each setting.
+[WARN] The "pnpm" field in package.json is no longer read by pnpm. The following keys were ignored: "pnpm.overrides", "pnpm.onlyBuiltDependencies", "pnpm.patchedDependencies". See https://pnpm.io/settings for the new home of each setting.
+[ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY] Aborted removal of modules directory due to no TTY
+
+If you are running pnpm in CI, set the CI environment variable to "true", or set "confirmModulesPurge" to "false".
+[ERROR] Command failed with exit code 1: /Users/isaacvizcarra/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/isaacvizcarra/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/pnpm/bin/pnpm.mjs install
+
+pnpm: Command failed with exit code 1: /Users/isaacvizcarra/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/isaacvizcarra/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/pnpm/bin/pnpm.mjs install
+    at getFinalError (file:///Users/isaacvizcarra/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/pnpm/dist/pnpm.mjs:88973:14)
+    at makeError (file:///Users/isaacvizcarra/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/pnpm/dist/pnpm.mjs:91280:21)
+    at getSyncResult (file:///Users/isaacvizcarra/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/pnpm/dist/pnpm.mjs:93124:10)
+    at spawnSubprocessSync (file:///Users/isaacvizcarra/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/pnpm/dist/pnpm.mjs:93084:14)
+    at execaCoreSync (file:///Users/isaacvizcarra/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/pnpm/dist/pnpm.mjs:93014:23)
+    at callBoundExeca (file:///Users/isaacvizcarra/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/pnpm/dist/pnpm.mjs:95542:23)
+    at boundExeca (file:///Users/isaacvizcarra/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/pnpm/dist/pnpm.mjs:95519:49)
+    at sync2 (file:///Users/isaacvizcarra/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/pnpm/dist/pnpm.mjs:95678:10)
+    at runPnpmCli (file:///Users/isaacvizcarra/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/pnpm/dist/pnpm.mjs:252207:5)
+    at runDepsStatusCheck (file:///Users/isaacvizcarra/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/pnpm/dist/pnpm.mjs:253973:7)
+ ELIFECYCLE  Command failed with exit code 1.

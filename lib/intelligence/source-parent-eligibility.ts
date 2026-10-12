@@ -17,7 +17,14 @@ type FileImportRecord = {
   file_upload_id: string;
 };
 
+export type SourceParentRecords = {
+  files: Database["public"]["Tables"]["file_uploads"]["Row"][];
+  imports: Database["public"]["Tables"]["file_imports"]["Row"][];
+};
+
 export type SourceParentEligibility = {
+  // Authoritative referenced parents, independent of a display-list limit.
+  records?: SourceParentRecords;
   activeFileIds: Set<string>;
   importFileIds: Map<string, string>;
 };
@@ -65,12 +72,12 @@ export async function loadSourceParentEligibility({
 }) {
   const directFileIds = new Set(rows.flatMap((row) => row.source_file_id ? [row.source_file_id] : []));
   const importIds = Array.from(new Set(rows.flatMap((row) => row.import_id ? [row.import_id] : [])));
-  const imports: FileImportRecord[] = [];
+  const imports: SourceParentRecords["imports"] = [];
 
   for (const ids of batches(importIds)) {
     const { data, error } = await supabase
       .from("file_imports")
-      .select("id,file_upload_id")
+      .select("*")
       .eq("workspace_id", workspaceId)
       .in("id", ids);
 
@@ -79,12 +86,12 @@ export async function loadSourceParentEligibility({
   }
 
   imports.forEach((item) => directFileIds.add(item.file_upload_id));
-  const files: SourceFileRecord[] = [];
+  const files: SourceParentRecords["files"] = [];
 
   for (const ids of batches(Array.from(directFileIds))) {
     const { data, error } = await supabase
       .from("file_uploads")
-      .select("id,archived_at,deleted_at")
+      .select("*")
       .eq("workspace_id", workspaceId)
       .in("id", ids);
 
@@ -92,7 +99,7 @@ export async function loadSourceParentEligibility({
     files.push(...(data || []));
   }
 
-  return buildSourceParentEligibility({ files, imports });
+  return { ...buildSourceParentEligibility({ files, imports }), records: { files, imports } };
 }
 
 export async function loadSourceParentEligibilityResult(

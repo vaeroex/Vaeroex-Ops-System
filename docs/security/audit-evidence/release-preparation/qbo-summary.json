@@ -1,0 +1,28 @@
+{
+  "finding": "QBO Docker dependency stage omits required patched-dependency input",
+  "sourceCommit": "4c28c134fe6751347ca98e86241bcce104836467",
+  "status": "verified_dependency_context_defect",
+  "negative": {
+    "exitCode": 254,
+    "cause": "ENOENT patches/next@15.5.24.patch",
+    "evidenceFile": "docker-context-result-host.json"
+  },
+  "pairedCorrection": {
+    "exitCode": 0,
+    "onlyAddedInput": "patches/next@15.5.24.patch",
+    "packagesReused": 471,
+    "downloads": 0,
+    "evidenceFile": "with-required-patch-result.json"
+  },
+  "limits": [
+    "Host macOS/Node24.19.0; actual image Linux/Node22.23.1 was not built.",
+    "pnpm9.15.4 matches declared Dockerfile.",
+    "No lifecycle scripts, network access, container restart, application source change, deployment, or production mutation."
+  ],
+  "recommendedCorrection": "COPY patches ./patches before pnpm install in QBO Dockerfile",
+  "evidenceHashes": {
+    "docker-context-result.json": "7724652df7f205fb68b2c87e68d00e0e2f1339a02c49baeab0c468cfdcc65d6b",
+    "docker-context-result-host.json": "a4c3cab64fd1564216ffa020114b10522a1b9e0fb1e535736e31a39bf11f4209",
+    "with-required-patch-result.json": "f99dd168ba5c7f3553b8317758b2e5b4dd2e1a4965218a0a199ad048b330e0e9"
+  }
+}

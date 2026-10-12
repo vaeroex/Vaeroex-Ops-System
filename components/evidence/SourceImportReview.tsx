@@ -1,4 +1,4 @@
-import { importFileAction, saveExtractedImportAction } from "@/app/app/files/actions";
+import { importFileAction, reconcileFileImportAction, saveExtractedImportAction } from "@/app/app/files/actions";
 import { PendingSubmitButton } from "@/components/operations/PendingSubmitButton";
 import { WorkbookImportReview } from "@/components/evidence/WorkbookImportReview";
 import { workbookDetectionPlanIsStale } from "@/lib/imports/worksheet-types";
@@ -236,15 +236,25 @@ function WorkbookReprepareControl({ file, importRecord }: { file: FileUploadRow;
   );
 }
 
+export function sourceImportReviewRecords(fileId: string, imports: FileImportRow[], statusImports: FileImportRow[]) {
+  const held = statusImports.find((item) => item.file_upload_id === fileId && ["running", "reconciliation_required"].includes(item.recovery_status));
+  return held ? [held] : imports;
+}
+
 export function SourceImportReview({
   file,
   imports,
-  rows
+  rows,
+  statusUnavailable = false
 }: {
   file: FileUploadRow;
   imports: FileImportRow[];
   rows: FileImportDataRow[];
+  statusUnavailable?: boolean;
 }) {
+  if (statusUnavailable) {
+    return <div role="status" className="rounded-lg border border-amber-300/30 bg-amber-950/20 p-4 text-sm leading-6 text-amber-50">Import status could not be verified. Reload before preparing or approving this source. Saved records have not been changed.</div>;
+  }
   const latestImport = imports[0];
 
   if (!latestImport) {
@@ -260,6 +270,20 @@ export function SourceImportReview({
         </div>
       </div>
     );
+  }
+
+  if (["running", "reconciliation_required"].includes(latestImport.recovery_status)) {
+    return <div className="space-y-3 rounded-lg border border-amber-300/30 bg-amber-950/20 p-4 text-sm leading-6 text-amber-50" role="status">
+      <p className="font-semibold">Import results need reconciliation</p>
+      <p>Accepted work may still be running or may have saved only part of its results. Saved records remain available. Preparing or submitting this source again is held to prevent duplicate records.</p>
+      <form action={reconcileFileImportAction}>
+        <input type="hidden" name="file_id" value={file.id} />
+        <input type="hidden" name="import_id" value={latestImport.id} />
+        <PendingSubmitButton pendingLabel="Checking saved results..." className="min-h-11 rounded-md bg-vaeroex-blue px-4 py-2 font-semibold text-white">Check saved results</PendingSubmitButton>
+      </form>
+      <p className="text-xs">This check never resubmits rows. Partial results require an operator to verify the worker has stopped and reconcile the saved inventory before releasing the hold.</p>
+      <ImportDiagnostics file={file} latestImport={latestImport} />
+    </div>;
   }
 
   const importType = asImportType(latestImport.import_type);

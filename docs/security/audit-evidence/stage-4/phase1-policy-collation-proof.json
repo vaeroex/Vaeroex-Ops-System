@@ -1,0 +1,54 @@
+{
+  "scope": "Native pg_policies, actual source permissive policy and restrictive policy-generation loop; exact fixture JSONB aggregate assertions via an identity ok(bool,text) shim (not pgTAP itself). Minimal target table/predicate stubs only; no app behavior or full provider-suite claim.",
+  "bounds": {
+    "network": "disabled; private Unix socket",
+    "statementMs": 10000,
+    "utilityTimeoutMs": 30000
+  },
+  "serverVersion": "17.11",
+  "fixtureSha256": "5359c4d01e6219c790c257497ad31023ba8a31f60426ba5c76b1c7ff724ca7b0",
+  "results": [
+    {
+      "name": "exact original permissive tuple passes",
+      "expected": true,
+      "actual": true,
+      "status": "pass"
+    },
+    {
+      "name": "exact three restrictive tuples pass",
+      "expected": true,
+      "actual": true,
+      "status": "pass"
+    },
+    {
+      "name": "extra permissive policy fails",
+      "expected": false,
+      "actual": false,
+      "status": "pass"
+    },
+    {
+      "name": "extra restrictive policy fails",
+      "expected": false,
+      "actual": false,
+      "status": "pass"
+    },
+    {
+      "name": "wrong permissive role fails",
+      "expected": false,
+      "actual": false,
+      "status": "pass"
+    },
+    {
+      "name": "wrong restrictive role fails",
+      "expected": false,
+      "actual": false,
+      "status": "pass"
+    },
+    {
+      "name": "wrong restrictive command fails",
+      "expected": false,
+      "actual": false,
+      "status": "pass"
+    }
+  ]
+}

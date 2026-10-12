@@ -1,0 +1,114 @@
+{
+  "runId": "1061111f-557e-49af-a2cd-145cc6e9949f",
+  "executionId": "24665dbd-96b1-417d-9b31-9ddabd8d8009",
+  "sourceCommit": "d4e57b5652acfc8e2ce1ae6e47518eab06a81918",
+  "results": [
+    {
+      "name": "real_auth_and_synthetic_seed",
+      "passed": true,
+      "registeredUsers": 7,
+      "workspaces": 3,
+      "db": {
+        "db": "postgres",
+        "version": "17.11",
+        "max_connections": "100",
+        "data_directory": "/private/tmp/vaeroex-closeout-assembly-final/home/stacks/2955723b0b149dc6874689e05b5918bfad2a5dbdde05d1f028faef2112c1ff22/data/eb46e0b8-720a-4463-b031-60e9bc435740/data"
+      },
+      "legalAcceptance": "seeded synthetic latest-policy acceptance"
+    },
+    {
+      "name": "authenticated_browser",
+      "passed": false,
+      "error": "page.waitForURL: Timeout 20000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation until \"load\"\n============================================================"
+    }
+  ],
+  "requests": [
+    {
+      "path": "/app/forms/c58f5e45-05f2-4c7b-a80f-80557b205f8d",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/intelligence",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/kpis",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/sources",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/reports",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/integrations",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/settings",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/help",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/help/trust",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/terms",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/privacy",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/support",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/forms",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/forms/c58f5e45-05f2-4c7b-a80f-80557b205f8d",
+      "method": "POST",
+      "status": 303
+    }
+  ],
+  "browserErrors": [],
+  "limitations": [
+    "Supabase native service versions differ from deployed PostgreSQL17.6",
+    "Synthetic legal acceptance seeded",
+    "No paid provider or customer connections",
+    "No full-system capacity target or worker soak performed"
+  ]
+}

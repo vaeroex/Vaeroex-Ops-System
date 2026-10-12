@@ -41,6 +41,20 @@ function article(input: HelpArticle): HelpArticle {
 
 export const helpArticles: HelpArticle[] = [
   article({
+    id: "vaeroex-super-intelligence",
+    category: "Getting Started",
+    title: "Vaeroex Super Intelligence",
+    summary: "Vaeroex’s brain for general and business questions.",
+    what: "Vaeroex Super Intelligence helps with writing, planning, explanations, calculations, ideas and research. Business answers use evidence you are permitted to access in the active workspace. Vaeroex does not publish its exact model configuration. Vaeroex uses externally provided foundation models; it builds the application, business retrieval and safeguards, but does not train the underlying foundation model or host its inference on Vaeroex-owned servers.",
+    why: "Use general help and business evidence in one private conversation. Double-check important answers and inspect supporting sources and dates.",
+    when: "Ask an ordinary question, work through a business decision, or request current public research. Availability depends on your workspace access and spending safeguards.",
+    workflow: ["Start or reopen a private chat in Super Intelligence.", "Review citations and dates. A recent lookup can still contain older information.", "If you ask Vaeroex to remember something, review the exact proposed Business Note and confirm before saving. Normal note permissions and review still apply.", "Use Usage to check your rolling question allowance. Workspace spending protections may stop use earlier."],
+    mistakes: ["Treating an answer as a verified fact without checking its evidence.", "Entering sensitive personal or regulated healthcare data.", "Assuming ordinary private conversation becomes shared Business Memory."],
+    nextLabel: "Open Super Intelligence",
+    nextHref: "/app/si",
+    related: ["what-is-vaeroex"]
+  }),
+  article({
     id: "what-is-vaeroex",
     category: "Getting Started",
     title: "What is Vaeroex?",
@@ -136,7 +150,7 @@ export const helpArticles: HelpArticle[] = [
   ),
   ...[
     ["executive-dashboard", "Executive Dashboard", "A leadership view of business health, signals, risks, and recommended actions.", "/app"],
-    ["business-health-score", "Business Health Score", "A directional score built from available workspace signals.", "/app"],
+    ["business-health-score", "Business Health Score", "Review the score, movement, freshness, history and evidence in Intelligence.", "/app/intelligence#business-health"],
     ["business-memory", "Business Memory", "Relevant historical context from imports, decisions, recommendations, and outcomes.", "/app"],
     ["profit-leak-detector", "Profit Leakage Review", "A KPI-based review of supported revenue leakage indicators.", "/app/kpis/profit-leakage"],
     ["focus-on", "What Should Leadership Review?", "A prioritized list of evidence-backed topics to review.", "/app"],

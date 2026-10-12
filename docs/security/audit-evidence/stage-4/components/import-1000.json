@@ -1,0 +1,110 @@
+{
+  "started": "2026-10-05T02:26:59.450Z",
+  "elapsedMs": 397,
+  "job": {
+    "kind": "import",
+    "rows": 1000,
+    "series": 25,
+    "months": 24,
+    "iterations": 5
+  },
+  "code": 0,
+  "signal": null,
+  "stopReason": null,
+  "observedRssBytes": 160907264,
+  "output": {
+    "job": {
+      "kind": "import",
+      "rows": 1000,
+      "series": 25,
+      "months": 24,
+      "iterations": 5
+    },
+    "sourceRoot": "/Users/isaacvizcarra/.codex/worktrees/workspace-audit-fixes/Vaeroex",
+    "node": "v24.19.0",
+    "platform": "darwin",
+    "bytes": 39801,
+    "integrity": {
+      "rows": 1000,
+      "series": 25,
+      "valueChecksum": 500500,
+      "allIdsPreserved": true
+    },
+    "deterministicDigest": "7c74fa5e105f161d54e9165ab7ab657ade829e3038723d5e654ec83638b38689",
+    "samples": [
+      {
+        "iteration": 0,
+        "parseMs": 2.1337499999999636,
+        "mapAndIntegrityMs": 0.34112500000003365,
+        "canonicalMs": 4.618083000000013,
+        "totalMs": 7.09295800000001,
+        "cpuMs": 22.369,
+        "rssBytes": 172851200
+      },
+      {
+        "iteration": 1,
+        "parseMs": 1.948833000000036,
+        "mapAndIntegrityMs": 0.22545900000000074,
+        "canonicalMs": 2.477207999999962,
+        "totalMs": 4.651499999999999,
+        "cpuMs": 15.396,
+        "rssBytes": 172949504
+      },
+      {
+        "iteration": 2,
+        "parseMs": 2.95641599999999,
+        "mapAndIntegrityMs": 0.21608399999996664,
+        "canonicalMs": 2.2442910000000325,
+        "totalMs": 5.416790999999989,
+        "cpuMs": 16.009,
+        "rssBytes": 172949504
+      },
+      {
+        "iteration": 3,
+        "parseMs": 1.2770420000000513,
+        "mapAndIntegrityMs": 0.21854199999995672,
+        "canonicalMs": 2.3557500000000005,
+        "totalMs": 3.8513340000000085,
+        "cpuMs": 13.848,
+        "rssBytes": 172556288
+      },
+      {
+        "iteration": 4,
+        "parseMs": 1.3387910000000147,
+        "mapAndIntegrityMs": 0.22770900000000438,
+        "canonicalMs": 2.2076659999999606,
+        "totalMs": 3.7741659999999797,
+        "cpuMs": 11.101,
+        "rssBytes": 172556288
+      }
+    ],
+    "summary": {
+      "p50Ms": 4.651499999999999,
+      "p95Ms": 7.09295800000001,
+      "maxMs": 7.09295800000001,
+      "diagnosticBudgetMs": 5000,
+      "withinDiagnosticBudget": true
+    },
+    "resourceUsage": {
+      "userCPUTime": 751957,
+      "systemCPUTime": 34365,
+      "maxRSS": 168944,
+      "sharedMemorySize": 0,
+      "unsharedDataSize": 0,
+      "unsharedStackSize": 0,
+      "minorPageFault": 10605,
+      "majorPageFault": 105,
+      "swappedOut": 0,
+      "fsRead": 0,
+      "fsWrite": 0,
+      "ipcSent": 0,
+      "ipcReceived": 0,
+      "signalsCount": 0,
+      "voluntaryContextSwitches": 16,
+      "involuntaryContextSwitches": 1889
+    },
+    "maxRssBytes": 172998656,
+    "scope": "actual functions with synthetic in-memory inputs; excludes IO/persistence/API/model/user capacity"
+  },
+  "stderr": ""
+}

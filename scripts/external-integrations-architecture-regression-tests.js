@@ -397,7 +397,28 @@ function acceptsFixtureManifest(names) {
   });
 }
 equal(acceptsFixtureManifest(currentMigrations), true, "real current migration manifest passes the fixture-rich guard");
-for (const manifest of [currentMigrations.filter(name => name !== "20260907174326_square_dormant_account_connection.sql"),
+for (const manifest of [currentMigrations.filter(name => name !== "20261005022017_workspace_security_boundaries.sql"),
+  currentMigrations.filter(name => name !== "20261005022445_workspace_persisted_usage_limits.sql"),
+  currentMigrations.filter(name => name !== "20261005060101_atomic_confirmed_memory_publication.sql"),
+  currentMigrations.filter(name => name !== "20261005060258_asset_check_server_chronology.sql"),
+  currentMigrations.filter(name => name !== "20261005061024_internal_form_submission_idempotency.sql"),
+  currentMigrations.filter(name => name !== "20261005062005_durable_import_attempt_reconciliation.sql"),
+  currentMigrations.filter(name => name !== "20261005070311_worksheet_import_publication_heads.sql"),
+  currentMigrations.filter(name => name !== "20261005182541_bounded_google_sheets_dispatch.sql"),
+  currentMigrations.filter(name => name !== "20261005183352_issue_submission_receipts.sql"),
+  currentMigrations.filter(name => name !== "20261005184031_qbo_scoped_runtime_recovery.sql"),
+  currentMigrations.filter(name => name !== "20261005190709_sheets_recovery_fair_scan.sql"),
+  currentMigrations.filter(name => name !== "20261005194244_google_sheets_failure_cleanup_transition.sql"),
+  currentMigrations.filter(name => name !== "20261005202215_sheets_dispatch_round_robin.sql"),
+  currentMigrations.filter(name => name !== "20261008190000_vsi_private_chat.sql"),
+  currentMigrations.filter(name => name !== "20261009041421_vsi_adaptive_research.sql"),
+  currentMigrations.filter(name => name !== "20261012003846_workspace_storage_capacity.sql"),
+  currentMigrations.filter(name => name !== "20261012003920_workspace_storage_capacity_billing.sql"),
+  currentMigrations.filter(name => name !== "20261012013508_workspace_storage_invoice_capacity.sql"),
+  currentMigrations.filter(name => name !== "20261012064502_vaeroex_subscription_price_250.sql"),
+  currentMigrations.filter(name => name !== "20261012082738_pre_checkout_legal_entitlement_boundary.sql"),
+  currentMigrations.filter(name => name !== "20261012091842_admin_usage_trust_support_telemetry.sql"),
+  currentMigrations.filter(name => name !== "20260907174326_square_dormant_account_connection.sql"),
   currentMigrations.filter(name => name !== "20260902191325_square_production_internal_pilot_runtime.sql"),
   currentMigrations.filter(name => name !== "20260907225626_square_remote_sandbox_binding.sql"),
   currentMigrations.filter(name => name !== "20260908014713_square_broker_runtime_credential_authority.sql"),
@@ -514,9 +535,12 @@ assert.deepEqual(approvedSquareQualificationPaths.filter(file => file.startsWith
 "only the twenty-three bounded provisioner files are exempt");
 assertionCount++;
 assert.deepEqual(JSON.parse(read("vercel.json")), {
-  git: { deploymentEnabled: { "codex/square-remote-sandbox-binding": false, "codex/square-sandbox-qualification": false, "codex/square-gcp-sandbox-callback": false } },
-  crons: [{ path: "/api/integrations/google-sheets/scheduled-sync", schedule: "*/15 * * * *" }]
-}, "Square review branches cannot auto-deploy; other branches keep default behavior and only the reviewed Sheets cron is configured");
+  git: { deploymentEnabled: { "main": false, "codex/intelligence-health-consolidation": false, "codex/square-remote-sandbox-binding": false, "codex/square-sandbox-qualification": false, "codex/square-gcp-sandbox-callback": false, "codex/workspace-audit-security": false, "codex/workspace-audit-evidence": false, "codex/workspace-audit-workflows": false } },
+  crons: [
+    { path: "/api/storage-capacity/maintenance", schedule: "*/15 * * * *" },
+    { path: "/api/integrations/google-sheets/scheduled-sync", schedule: "*/15 * * * *" }
+  ]
+}, "Main and held review branches cannot auto-deploy; only reviewed authenticated storage and Sheets crons are configured");
 equal(withoutSquareQualificationPaths(approvedSquareQualificationPaths.join("\n")), "", "exact qualification paths are exempt from legacy phase-only scope assertions");
 for (const protectedPath of [
   ...approvedSquareQualificationPaths.map(file => `${file}.unexpected`),
@@ -547,6 +571,12 @@ const approvedProtectedPaths = new Set([
   "components/integrations/ConnectionStatusPanel.tsx",
   "components/operations/StatusBadge.tsx",
   "lib/supabase/types.ts",
+  "supabase/migrations/20261012003846_workspace_storage_capacity.sql",
+  "supabase/migrations/20261012003920_workspace_storage_capacity_billing.sql",
+  "supabase/migrations/20261012013508_workspace_storage_invoice_capacity.sql",
+  "supabase/migrations/20261012064502_vaeroex_subscription_price_250.sql",
+  "supabase/migrations/20261012082738_pre_checkout_legal_entitlement_boundary.sql",
+  "supabase/migrations/20261012091842_admin_usage_trust_support_telemetry.sql",
   "supabase/migrations/20260820233007_external_integrations_phase_1_canonical_foundation.sql",
   "supabase/tests/external_integrations_phase_1_canonical_foundation.test.sql",
   "supabase/migrations/20260821064333_external_integrations_phase_2_reconciliation.sql",
@@ -589,6 +619,12 @@ const approvedProtectedPaths = new Set([
   "supabase/migrations/20260912150000_square_operational_intelligence.sql",
   "supabase/migrations/20260902191323_integration_production_runtime_foundation.sql",
   "supabase/migrations/20261002182049_integration_summary_preferences.sql",
+  "supabase/migrations/20261005182541_bounded_google_sheets_dispatch.sql",
+  "supabase/migrations/20261005183352_issue_submission_receipts.sql",
+  "supabase/migrations/20261005184031_qbo_scoped_runtime_recovery.sql",
+  "supabase/migrations/20261005190709_sheets_recovery_fair_scan.sql",
+  "supabase/migrations/20261005194244_google_sheets_failure_cleanup_transition.sql",
+  "supabase/migrations/20261005202215_sheets_dispatch_round_robin.sql",
   "supabase/tests/external_integrations_phase_8b_qbo_sandbox_validation.test.sql",
   "supabase/tests/external_integrations_phase_8b_credential_refresh_recovery.test.sql",
   "supabase/tests/external_integrations_phase_8b_same_generation_reauthorization.test.sql",

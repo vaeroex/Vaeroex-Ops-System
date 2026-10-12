@@ -39,8 +39,20 @@ process.env.SUPABASE_SERVICE_ROLE_KEY = "local-business-health-regression-secret
 
 const {
   buildBusinessHealthExplanationPackage,
-  businessHealthExplanationFingerprint
+  businessHealthExplanationFingerprint,
+  plainHealthDataQualityReason
 } = require("../lib/ai/business-health-explanation/context.ts");
+
+assert.equal(
+  plainHealthDataQualityReason("Authoritative evidence is usable, but source diversity, KPI history, or freshness still limits confidence."),
+  "The score uses available records, but limited history, few independent sources, or older data may lower confidence.",
+  "new Health explanations should state the confidence limit in familiar language"
+);
+assert.equal(
+  plainHealthDataQualityReason("The newest supporting evidence is older than 45 days."),
+  "The newest supporting evidence is older than 45 days.",
+  "specific factual limitations must remain intact"
+);
 const {
   BUSINESS_HEALTH_GENERATION_POLICY_VERSION
 } = require("../lib/ai/business-health-explanation/contracts.ts");
@@ -84,7 +96,7 @@ function insight(overrides = {}) {
     summary: "Monthly Revenue is below its explicit target.",
     why: "The latest eligible value is lower than the recorded target.",
     impact: "The gap requires context before an impact can be established.",
-    recommendedAction: "Review the next reporting period.",
+    recommendedAction: "Inspect Monthly Revenue KPI source measurements for July; compare with prior periods and assign an owner to verify the gap.",
     confidence: "Medium",
     evidence: ["Actual: $92,000", "Target: $100,000"],
     evidenceCount: 1,
@@ -197,8 +209,8 @@ function homepage(overrides = {}) {
 }
 
 const snapshots = [
-  { snapshot_date: "2026-07-18", score: 42 },
-  { snapshot_date: "2026-07-11", score: 42 }
+  { workspace_id: workspaceId, snapshot_date: "2026-07-18", score: 42, source_summary: { business_health_calculation_version: "business_health_calculation_v2" } },
+  { workspace_id: workspaceId, snapshot_date: "2026-07-11", score: 42, source_summary: { business_health_calculation_version: "business_health_calculation_v2" } }
 ];
 
 function build(overrides = {}) {
@@ -219,6 +231,14 @@ assert.equal(analysisPackage.facts.score, 42, "the contract must preserve the ap
 assert.equal(analysisPackage.facts.riskPenalty, 12, "the contract must preserve the deterministic risk penalty");
 assert.equal(analysisPackage.facts.opportunityAdjustment, 4, "the contract must preserve the deterministic opportunity adjustment");
 assert.equal(analysisPackage.facts.drivers.length, 2, "the bounded package must retain the top risk and opportunity");
+assert.ok(analysisPackage.facts.limitations.filter((limitation) => /\b(?:cause|causation|caused)\b/i.test(limitation)).length <= 1,
+  "the global Health limitations should not repeat a generic causal caveat across drivers");
+const specificLimitPackage = build({ intelligence: intelligence({
+  topRisk: insight({ limitation: "The KPI history cannot establish how many unique reviews contributed or what caused them." }),
+  insights: [insight({ limitation: "The KPI history cannot establish how many unique reviews contributed or what caused them." }), opportunity]
+}) });
+assert.ok(specificLimitPackage.facts.limitations.some((limitation) => /unique reviews/i.test(limitation)),
+  "a distinct source-specific evidence limit remains visible when generic caveats are deduplicated");
 assert.ok(analysisPackage.requiredCitationIds.length >= 2, "the package must attach application-generated citations");
 assert.equal(analysisPackage.manifest.policy.citationsApplicationGenerated, true);
 assert.equal(analysisPackage.manifest.policy.derivedOutputsExcludedFromOriginalEvidence, true);
@@ -350,6 +370,70 @@ assert.throws(() => buildBusinessHealthExplanationFromSnapshotV1({
   sourceLabelsByKey: {},
   asOf: now.toISOString()
 }), /presentation disagrees/, "Production must not silently fall back to the legacy context on a projection disagreement");
+// Evidence trajectory counts current drivers; stored movement compares daily reviews.
+// They can legitimately disagree without changing the score, evidence or citations.
+function movementSnapshot(score, date = "2026-07-18", version = "business_health_calculation_v2") {
+  return { workspace_id: workspaceId, snapshot_date: date, score, source_summary: { business_health_calculation_version: version } };
+}
+function projectedMovement({ evidenceTrend = "Improving", delta = -11, trend = "Declining", history = [movementSnapshot(53)], patch = {} } = {}) {
+  return buildBusinessHealthExplanationFromSnapshotV1({
+    workspaceId,
+    intelligence: intelligence({ businessHealth: { ...intelligence().businessHealth, trend: evidenceTrend } }),
+    homepage: homepage({ trend, trendDelta: delta, ...patch }),
+    snapshots: history,
+    coverage: foundationCoverageOutput(),
+    asOf: now.toISOString()
+  });
+}
+const fallingStoredReview = projectedMovement();
+assert.equal(fallingStoredReview.projection.businessHealth.value.trajectory, "Improving");
+assert.equal(fallingStoredReview.analysisPackage.facts.trajectory, "Declining");
+assert.equal(fallingStoredReview.analysisPackage.facts.comparisonDelta, -11);
+assert.match(fallingStoredReview.analysisPackage.facts.comparison, /Down 11 points/);
+assert.equal(fallingStoredReview.analysisPackage.facts.score, 42);
+assert.deepEqual(fallingStoredReview.analysisPackage.citations, analysisPackage.citations);
+const risingStoredReview = projectedMovement({ evidenceTrend: "Declining", delta: 11, trend: "Improving", history: [movementSnapshot(31)] });
+assert.equal(risingStoredReview.projection.businessHealth.value.trajectory, "Declining");
+assert.equal(risingStoredReview.analysisPackage.facts.trajectory, "Improving");
+assert.equal(risingStoredReview.analysisPackage.facts.comparisonDelta, 11);
+const unchangedStoredReview = projectedMovement({ delta: 0, trend: "Holding steady", history: [movementSnapshot(42)] });
+assert.equal(unchangedStoredReview.analysisPackage.facts.comparisonDelta, 0);
+assert.match(unchangedStoredReview.analysisPackage.facts.comparison, /Unchanged 0 points/);
+const sameDayReview = projectedMovement({ history: [movementSnapshot(53), movementSnapshot(99, "2026-07-19")] });
+assert.equal(sameDayReview.analysisPackage.facts.comparisonDelta, -11, "today's first stored score is not the previous review");
+const formulaBoundary = projectedMovement({ delta: null, trend: null, history: [movementSnapshot(53, "2026-07-18", "business_health_calculation_v1")] });
+assert.equal(formulaBoundary.analysisPackage.facts.comparisonDelta, null, "historical V1 remains readable without a cross-formula movement");
+assert.equal(projectedMovement({ delta: null, trend: null, history: [] }).analysisPackage.facts.trajectory, null);
+for (const invalid of [
+  { delta: -10 },
+  { trend: "Improving" },
+  { delta: null, trend: null },
+  { delta: 0, trend: "Holding steady", history: [] },
+  { history: [{ ...movementSnapshot(53), workspace_id: "33333333-3333-4333-8333-333333333333" }] }
+]) {
+  assert.throws(() => projectedMovement(invalid), /stored review/, "invalid or foreign history-derived movement must fail closed");
+}
+for (const patch of [{ score: 43 }, { status: "Strong" }, { confidence: "High" }]) {
+  assert.throws(() => projectedMovement({ patch }), /presentation disagrees/, "authoritative score, status and confidence checks remain enforced");
+}
+assert.throws(() => buildBusinessHealthExplanationPackage({
+  workspaceId,
+  intelligence: intelligence({ businessHealth: { ...intelligence().businessHealth, trend: "Declining" } }),
+  homepage: homepage({ trend: "Declining", trendDelta: -11 }),
+  snapshots: [movementSnapshot(53)],
+  projection: fallingStoredReview.projection,
+  now
+}), /presentation disagrees/, "a tampered current-evidence trajectory still fails independently of stored movement");
+assert.throws(() => buildBusinessHealthExplanationPackage({
+  workspaceId: "33333333-3333-4333-8333-333333333333",
+  intelligence: intelligence(), homepage: homepage(), snapshots,
+  projection: fallingStoredReview.projection, now
+}), /another workspace/, "the scoped projection cannot cross workspaces");
+assert.throws(() => buildBusinessHealthExplanationPackage({
+  workspaceId, intelligence: intelligence({ businessHealth: { ...intelligence().businessHealth, trend: "Improving" } }),
+  homepage: homepage({ trend: "Declining", trendDelta: -11 }),
+  snapshots: [movementSnapshot(53)], projection: { ...fallingStoredReview.projection, citations: [] }, now
+}), /missing evidence-manifest citations/, "historical movement cannot bypass citation verification");
 process.env.VERCEL_ENV = "preview";
 
 const laterPackage = build({ now: new Date("2026-07-19T12:10:00.000Z") });
@@ -421,7 +505,7 @@ assert.equal(build({ homepage: homepage({ available: false, score: null }) }).su
 const validOutput = {
   executive_interpretation: "Monthly Revenue remains the main negative score driver, while Customer Retention provides a smaller positive counterweight.",
   why_it_matters: "Leadership has a mixed operating picture rather than one uniformly positive or negative signal.",
-  leadership_consideration: "Review the Revenue gap while preserving visibility into the supported Retention result.",
+  leadership_consideration: "Inspect Monthly Revenue KPI source measurements for July; compare with prior periods and assign an owner to verify the gap.",
   provisional_hypothesis: null
 };
 assert.equal(validateBusinessHealthExplanationOutput(validOutput, analysisPackage).ok, true, "grounded fixed-contract wording must validate");
@@ -565,6 +649,22 @@ for (const inventedClaim of [
 const numericFailure = validateBusinessHealthExplanationOutput({ ...validOutput, executive_interpretation: "Monthly Revenue is 99 points and Customer Retention remains visible." }, analysisPackage);
 assert.equal(numericFailure.ok, false, "invented numbers must be rejected");
 assert.equal(numericFailure.diagnostic.reasonCode, "numeric_integrity_failed", "numeric failures must remain distinguishable for the bounded fallback allowlist");
+const datedEvidencePackage = {
+  ...analysisPackage,
+  facts: {
+    ...analysisPackage.facts,
+    limitations: ["The newest supporting evidence is older than 45 days."],
+    latestEvidenceAt: "2026-06-01T00:00:00.000Z"
+  },
+  citations: [{ ...analysisPackage.citations[0], recordedAt: "2026-06-01T00:00:00.000Z" }]
+};
+assert.equal(validateBusinessHealthExplanationOutput({
+  ...validOutput,
+  why_it_matters: "Leadership should check the mixed result because the newest evidence is older than 45 days, as of June 2026."
+}, datedEvidencePackage).ok, true, "approved freshness age and cited dates may appear in plain-language Health prose");
+expectNumericIntegrityFailure({ ...validOutput,
+  why_it_matters: "Leadership should check the mixed result because the newest evidence is older than 60 days."
+}, datedEvidencePackage, "an age absent from the approved limitation must remain blocked");
 assert.equal(validateBusinessHealthExplanationOutput({ ...validOutput, provisional_hypothesis: "Revenue was caused by customer behavior." }, analysisPackage).ok, false, "unauthorized hypotheses must be rejected");
 assert.equal(validateBusinessHealthExplanationOutput({ ...validOutput, executive_interpretation: "Monthly Revenue was caused by weak execution while Customer Retention remains visible." }, analysisPackage).ok, false, "unsupported causation must be rejected");
 assert.equal(validateBusinessHealthExplanationOutput({
@@ -596,6 +696,7 @@ const missingPolicyToken = sealBusinessHealthExplanationPackage({
 assert.equal(openBusinessHealthExplanationPackage(missingPolicyToken, { workspaceId, userId }, now.getTime()).ok, false, "a missing sealed generation-policy version must fail closed");
 
 const pageSource = read("app/app/page.tsx");
+const healthLoaderSource = read("lib/intelligence/workspace-health.ts");
 const actionSource = read("app/app/business-health-analysis/actions.ts");
 const serviceSource = read("lib/ai/business-health-explanation/service.ts");
 const contextSource = read("lib/ai/business-health-explanation/context.ts");
@@ -604,8 +705,10 @@ const workflowPolicySource = read("lib/ai/providers/workflow-provider-policy.ts"
 const panelSource = read("components/intelligence/BusinessHealthAnalysisPanel.tsx");
 const claimSource = read("lib/ai/business-health-explanation/generation-claim.ts");
 const claimMigration = read("supabase/migrations/20260731071855_business_health_generation_claim.sql");
-assert.match(pageSource, /buildBusinessHealthExplanationFromSnapshotV1/, "Overview must build the deterministic package from the scoped snapshot projection during server rendering");
-assert.doesNotMatch(pageSource, /generateBusinessHealthExplanation\(/, "server rendering must never invoke a generation provider");
+assert.match(pageSource, /buildWorkspaceHealthView/, "Overview must use the shared server Health view");
+assert.match(healthLoaderSource, /import "server-only"/, "Health evidence and signed request preparation must remain server-only");
+assert.match(healthLoaderSource, /buildBusinessHealthExplanationFromSnapshotV1/, "Overview must build the deterministic package from the scoped snapshot projection during server rendering");
+assert.doesNotMatch(pageSource + healthLoaderSource, /generateBusinessHealthExplanation\(/, "server rendering must never invoke a generation provider");
 assert.doesNotMatch(snapshotContextSource, /runStructuredAI|generateBusinessHealthExplanation\(/, "snapshot construction must never invoke a provider");
 assert.match(snapshotContextSource, /process\.env\.VERCEL_ENV === "preview"/, "legacy parity fallback must remain Preview-only");
 assert.match(snapshotContextSource, /projectBusinessHealthExplanationV1/, "the live consumer must receive the bounded V1 projection");
@@ -633,7 +736,7 @@ assert.ok(
 assert.match(actionSource, /generation_policy_version:\s*analysisPackage\.generationPolicyVersion/, "run input must persist the application-owned generation-policy version");
 assert.match(serviceSource, /generation_policy_version:\s*analysisPackage\.generationPolicyVersion/, "usage telemetry must retain the privacy-safe generation-policy version");
 assert.doesNotMatch(JSON.stringify(businessHealthProviderRequestPayload(analysisPackage)), /generationPolicyVersion|generation_policy_version|business_health_generation_policy_v2/, "the generation-policy version must not be sent to Sol or Terra");
-assert.match(claimSource, /insert\([\s\S]*status:\s*"processing"[\s\S]*\.select\("id"\)/, "the processing-row insert must be the atomic claim");
+assert.match(claimSource, /\.rpc\("create_trusted_analysis_run_v1",[\s\S]*p_actor_id:\s*userId[\s\S]*\.maybeSingle\(\)/, "the service-only actor-bound processing-row RPC must be the atomic claim");
 assert.match(claimSource, /insertError\?\.code !== "23505"/, "only a database uniqueness conflict may enter conflict resolution");
 assert.match(claimSource, /\.eq\("workspace_id", workspaceId\)/, "conflict lookup must remain workspace scoped");
 assert.match(claimMigration, /create unique index if not exists ai_agent_runs_business_health_generation_claim_uidx/i);
@@ -732,7 +835,11 @@ function fakeClaimAdmin() {
     };
     return builder;
   }
-  return { rows, from: () => query() };
+  return { rows, from: () => query(), rpc(name, args) {
+    assert.equal(name, "create_trusted_analysis_run_v1");
+    return query().insert({ workspace_id: args.p_workspace_id, agent_type: args.p_agent_type,
+      input_json: args.p_input_json, output_json: {}, status: "processing", created_by: args.p_actor_id });
+  } };
 }
 
 function claimInput(packageUnderTest = analysisPackage) {

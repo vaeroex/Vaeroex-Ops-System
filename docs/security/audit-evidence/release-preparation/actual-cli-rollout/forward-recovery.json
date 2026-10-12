@@ -1,0 +1,9 @@
+{
+  "label": "forward-recovery",
+  "code": 0,
+  "signal": null,
+  "timedOut": false,
+  "durationMs": 226.14104100000077,
+  "stdout": "Finished supabase db push.\n",
+  "stderr": "Connecting to remote database...\nDo you want to push these migrations to the remote database?\n • 20261005183352_issue_submission_receipts.sql\n • 20261005184031_qbo_scoped_runtime_recovery.sql\n • 20261005190709_sheets_recovery_fair_scan.sql\n • 20261005194244_google_sheets_failure_cleanup_transition.sql\n • 20261005202215_sheets_dispatch_round_robin.sql\n [Y/n] y\nApplying migration 20261005183352_issue_submission_receipts.sql...\nApplying migration 20261005184031_qbo_scoped_runtime_recovery.sql...\nApplying migration 20261005190709_sheets_recovery_fair_scan.sql...\nApplying migration 20261005194244_google_sheets_failure_cleanup_transition.sql...\nApplying migration 20261005202215_sheets_dispatch_round_robin.sql...\n"
+}

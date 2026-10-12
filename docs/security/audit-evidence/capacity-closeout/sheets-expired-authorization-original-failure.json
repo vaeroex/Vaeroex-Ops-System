@@ -1,0 +1,57 @@
+{
+  "runId": "99799ab6-c939-4b3e-aacc-2a30ffaeb14f",
+  "sourceCommit": "0a15ddcd3b564086280fec21b79b6976b3a3cc44",
+  "buildId": "ReUcdHr1ALEejCvoUeFTc",
+  "harnessSha256": "bd45ea7843d56f1ef6796cde0803bd00aa949f7118115d4e849789215feca5c6",
+  "kind": "expired_authorization",
+  "localOnly": true,
+  "faultId": "0535a678-7a40-44ae-87c0-f7138f5583d1",
+  "mode": "single_qualification",
+  "plannedStartSecond": 0,
+  "plannedEndSecond": 10,
+  "controlStartedAt": "2026-10-05T19:38:27.444Z",
+  "controlEndedAt": "2026-10-05T19:38:37.637Z",
+  "acceptedDuringFault": [
+    {
+      "id": "78fb5fd2-ab84-44fc-800f-dde70632715c",
+      "status": "running",
+      "started_at": "2026-10-05T19:38:27.552Z",
+      "completed_at": null,
+      "error_code": null,
+      "row_count": 0,
+      "fact_count": 0
+    }
+  ],
+  "factsBeforeSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "integrity": null,
+  "observations": [
+    {
+      "startedAt": "2026-10-05T19:38:27.444Z",
+      "endedAt": "2026-10-05T19:38:37.621Z",
+      "actualInjection": true,
+      "workspaceId": "94e1e8b3-a38c-4780-9870-702dd157ebb1",
+      "observedInjectionEvents": [
+        {
+          "file": "/tmp/vaeroex-capacity-small-02/provider-events.jsonl",
+          "line": 84,
+          "eventSha256": "ccf46976152feb8c2de01f771a4cd23506b679b2285821858ed87807fc94651a",
+          "at": "2026-10-05T19:38:27.563Z",
+          "pid": null,
+          "workspaceId": "94e1e8b3-a38c-4780-9870-702dd157ebb1"
+        }
+      ]
+    }
+  ],
+  "recovery": null,
+  "requests": [
+    {
+      "label": "fault_trigger_expired_authorization",
+      "startedAt": "2026-10-05T19:38:27.448Z",
+      "endedAt": "2026-10-05T19:38:27.580Z",
+      "method": "POST",
+      "path": "/api/integrations/google-sheets/sync",
+      "status": 303,
+      "durationMs": 132
+    }
+  ]
+}

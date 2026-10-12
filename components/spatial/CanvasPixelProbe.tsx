@@ -36,8 +36,9 @@ export function probeRenderedCanvas(
   onResult: (result: Exclude<CanvasPixelProbeResult, "pending">) => void
 ) {
   gl.domElement.dataset.canvasProbe = "created";
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => {
+  let secondFrame = 0;
+  const firstFrame = requestAnimationFrame(() => {
+    secondFrame = requestAnimationFrame(() => {
       gl.render(scene, camera);
       const result = probeCanvasPixels(gl.domElement);
       gl.domElement.dataset.canvasProbe = result;
@@ -45,4 +46,8 @@ export function probeRenderedCanvas(
       onResult(result);
     });
   });
+  return () => {
+    cancelAnimationFrame(firstFrame);
+    cancelAnimationFrame(secondFrame);
+  };
 }

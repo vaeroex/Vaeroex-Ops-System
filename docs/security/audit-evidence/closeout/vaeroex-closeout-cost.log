@@ -1,0 +1,4 @@
+(node:1121) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+Token-budget completeness regressions passed: 15 actual SDK response fixtures, including truncated/unknown/malformed usage denial and complete zero/history controls. No providers or sockets.
+Versioned cost regressions passed: standard rates, context threshold, attempts, precision, legacy fallback, override and persisted metadata. Provider invoices not exercised.

@@ -20,13 +20,13 @@ function securityHeaders() {
     "object-src 'none'",
     "frame-ancestors 'none'",
     "form-action 'self' https://checkout.stripe.com https://*.stripe.com",
-    `script-src 'self' 'unsafe-inline'${scriptEvalSource} https://js.stripe.com https://checkout.stripe.com https://challenges.cloudflare.com`,
+    `script-src 'self' 'unsafe-inline'${scriptEvalSource} https://js.stripe.com https://*.js.stripe.com https://checkout.stripe.com https://challenges.cloudflare.com`,
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob: https:",
     "font-src 'self' data:",
     `connect-src 'self' ${supabaseOrigin} https://*.supabase.co wss://*.supabase.co https://api.stripe.com https://checkout.stripe.com https://vitals.vercel-insights.com`,
     "worker-src 'self' blob:",
-    "frame-src 'self' https://js.stripe.com https://checkout.stripe.com https://challenges.cloudflare.com",
+    "frame-src 'self' https://js.stripe.com https://*.js.stripe.com https://hooks.stripe.com https://checkout.stripe.com https://challenges.cloudflare.com",
     ...transportDirectives
   ].join("; ");
   const enforcedBaselineCsp = [
@@ -93,6 +93,16 @@ const nextConfig = {
         source: "/:path*",
         headers: securityHeaders()
       },
+      ...["/app/settings/storage/payment-return", "/api/storage-capacity/download"].map(source => ({
+        // Configured headers take precedence over Route Handler headers. These
+        // redirects can carry payment or signed-download credentials, so keep
+        // their stricter policy after the global defaults.
+        source,
+        headers: [
+          { key: "Referrer-Policy", value: "no-referrer" },
+          { key: "Cache-Control", value: "no-store" }
+        ]
+      })),
       {
         // Next 15 preserves configured headers over Route Handler headers, and
         // custom header matching is case-insensitive. Keep the global policy,

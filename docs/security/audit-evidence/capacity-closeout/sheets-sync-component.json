@@ -1,0 +1,5 @@
+{
+  "suite": "google_sheets_sync_adapter",
+  "scenarios": 14,
+  "liveProviderCalls": 0
+}

@@ -1,0 +1,21 @@
+{
+  "runId": 37259377096,
+  "jobId": 111603152654,
+  "scope": "Selected completed CI error lines only; no secrets, connection data or complete logs copied.",
+  "failures": [
+    "2026-10-05T03:27:31.7061685Z supabase/tests/security_high_findings_remediation.test.sql: database test failed (42501): workspace_subscription_required Context: PL/pgSQL function private.guard_workspace_mutation_entitlement_v1() line 18 at RAISE",
+    "2026-10-05T03:27:34.3173907Z Square durable qualification failed at startup (ERR_ASSERTION).",
+    "2026-10-05T03:27:34.3174814Z Assertion: migration manifest is explicit",
+    "2026-10-05T03:28:07.1152220Z Square account connection qualification failed at migration_clean_install (ERR_ASSERTION).",
+    "2026-10-05T03:28:07.1154046Z Assertion: account and separately qualified remote Sandbox and broker corrections are the exact additive tail",
+    "2026-10-05T03:28:08.3306712Z Square remote Sandbox qualification failed at canonical_migrations_and_atomic_additive_install (ERR_ASSERTION).",
+    "2026-10-05T03:28:08.3307804Z Assertion: remote binding and separately qualified broker correction are the exact additive tail",
+    "2026-10-05T03:28:10.4475550Z Square broker/runtime qualification failed at startup (ERR_ASSERTION).",
+    "2026-10-05T03:28:10.4476207Z Assertion: exact reviewed corrective and GCP callback tail",
+    "2026-10-05T03:28:13.1198200Z Square GCP callback database qualification failed at startup (ERR_ASSERTION).",
+    "2026-10-05T03:28:15.2185796Z Square GCP mapped database qualification failed at startup (ERR_ASSERTION).",
+    "2026-10-05T03:28:16.9429337Z Square observation database qualification failed at startup (ERR_ASSERTION).",
+    "2026-10-05T03:33:51.9124691Z AssertionError [ERR_ASSERTION]: review the canonical migration manifest if it changes",
+    "2026-10-05T03:33:51.9125349Z 125 !== 123"
+  ]
+}

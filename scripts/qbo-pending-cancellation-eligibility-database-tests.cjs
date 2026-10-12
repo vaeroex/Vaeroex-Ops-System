@@ -29,7 +29,12 @@ async function actor(client, role = 'authenticated', claims = {}) {
     [JSON.stringify({ role, sub: owner, session_id: session, ...claims })]);
   await client.query(`set session authorization ${role}`);
 }
-async function admin(client) { await client.query('reset session authorization'); }
+async function admin(client) {
+  await client.query('reset session authorization');
+  // Trusted fixture setup must clear the previous request identity as well as
+  // its SQL role. Production guards intentionally retain JWT identity in definers.
+  await client.query("select set_config('request.jwt.claims','{}',false)");
+}
 
 async function qualify({ client }) {
   let scenarios = 0;

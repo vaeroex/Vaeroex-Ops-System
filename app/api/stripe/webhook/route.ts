@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import { VAEROEX_PLAN_SLUG } from "@/lib/billing/plans";
+import { processCapacityStripeEvent } from "@/lib/storage-capacity/billing";
 import { sendVaeroexWelcomeEmail, type WelcomeEmailResult } from "@/lib/email/welcome";
 import { logSecurityAuditEvent } from "@/lib/security/tool-execution-gateway";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import type { Json } from "@/lib/supabase/types";
+import { minimizeStripeWebhookReceipt } from "@/lib/stripe/webhook-receipt";
 import {
   mapStripeStatus,
   retrieveStripeCustomer,
@@ -21,6 +23,7 @@ import {
 } from "@/lib/stripe/billing";
 
 export const runtime = "nodejs";
+export const maxDuration = 300;
 
 type AdminClient = NonNullable<ReturnType<typeof createSupabaseAdminClient>>;
 
@@ -32,10 +35,6 @@ type StripeSyncResult = {
   subscriptionRecordId: string | null;
   workspaceId: string | null;
 };
-
-function asJson(value: unknown): Json {
-  return value as Json;
-}
 
 function normalizeEmail(email?: string | null) {
   return String(email || "").trim().toLowerCase();
@@ -382,11 +381,12 @@ export async function POST(request: Request) {
   }
 
   const initialSubscriptionId = stripeObjectId((event.data.object as { subscription?: unknown }).subscription);
+  const receiptPayload = minimizeStripeWebhookReceipt(event);
   const { data: eventRow, error: eventError } = duplicate
     ? await admin
         .from("subscription_events")
         .update({
-          payload_json: asJson(event),
+          payload_json: receiptPayload,
           processing_error: null,
           stripe_subscription_id: initialSubscriptionId
         })
@@ -401,7 +401,7 @@ export async function POST(request: Request) {
           event_type: event.type,
           stripe_event_id: event.id,
           stripe_subscription_id: initialSubscriptionId,
-          payload_json: asJson(event),
+          payload_json: receiptPayload,
           processed: false,
           processing_error: null
         })
@@ -435,6 +435,17 @@ export async function POST(request: Request) {
   }
 
   try {
+    // Capacity has its own workspace-bound paid-invoice ledger. Never send add-on
+    // events through base-plan entitlement reconciliation or onboarding email.
+    const capacity = await processCapacityStripeEvent(admin, event);
+    if (capacity.handled) {
+      if (eventRow) {
+        const { error: capacityRecordError } = await admin.from("subscription_events")
+          .update({ processed: true, processing_error: null }).eq("id", eventRow.id);
+        if (capacityRecordError) throw new Error("Capacity webhook receipt could not be recorded.");
+      }
+      return NextResponse.json({ ok: true, processed: true, product: "workspace_storage_capacity", event_id: eventRow?.id ?? null });
+    }
     const result = await processStripeEvent(admin, event);
     const welcomeEmail = await sendWelcomeEmailOnce(admin, event, result);
 

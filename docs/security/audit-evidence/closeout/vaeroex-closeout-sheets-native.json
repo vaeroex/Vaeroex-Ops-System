@@ -1,0 +1,19 @@
+{
+  "scope": "Actual Sheets migration/RPC qualification on owned native PostgreSQL. Reduced repository schema; synthetic role GUCs; expiry accelerated in persisted state. No worker process kill, provider, or Auth HTTP.",
+  "sourceRoot": "/Users/isaacvizcarra/.codex/worktrees/workspace-audit-fixes/Vaeroex",
+  "checks": 96,
+  "largeRows": 750,
+  "largeFacts": 1500,
+  "liveProviderCalls": 0,
+  "fullCanonicalBootstrap": false,
+  "abandonedRecovery": {
+    "scope": "Persisted SQL with accelerated lease expiry; no worker kill or provider transport",
+    "leaseSeconds": 480,
+    "automaticRetrySeconds": 3600,
+    "expiredAutomaticRemainsUndue": true,
+    "expiredManualRemainsRunningUntilClaim": true,
+    "staleCommitDenied": true,
+    "lateCleanupPreservesSuccess": true,
+    "recovery300SecondsQualified": false
+  }
+}

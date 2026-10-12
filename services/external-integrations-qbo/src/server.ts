@@ -53,6 +53,7 @@ import {
   confirmQboRuntimeCloudTaskStaged,
   discoverQboRuntimeDispatch,
   discoverQboRuntimeDispatchReconciliation,
+  recoverQboRuntimeTasks,
   readQboRuntimeConfiguration,
   readQboRuntimeTaskDelivery,
   storeQboCustomerReauthorizedCredential
@@ -95,7 +96,8 @@ import {
 import { CloudTaskEnvelopeSchema, RUNTIME_CONTRACT_VERSIONS } from "@/lib/integrations/runtime/contracts";
 
 import { parseQboProductionCloudTaskDelivery } from "./cloud-task-delivery";
-import { QboProductionDatabase } from "./database";
+import { QboProductionDatabase, type QboProductionDatabaseSession } from "./database";
+import { createQboExecutionBudget, QboExecutionBudgetError, QBO_TASK_LEASE_SECONDS } from "./execution-budget";
 import { beginCustomerAuthorization, completeCustomerAuthorization, persistBeforeDiscovery } from "./oauth-completion";
 import { completePendingCustomerDisconnects } from "./customer-disconnect";
 import { createQboInternalOperationAuthorizer } from "./service-identity";
@@ -172,8 +174,11 @@ for (const value of Object.values(config)) {
   }
 }
 
-function database() {
-  return new QboProductionDatabase(config.databaseUrl, rolesByMode[config.mode]);
+// One bounded pool per process identity/mode, not one pool per HTTP handler.
+let instanceDatabase: QboProductionDatabase | null = null;
+function database(remainingMilliseconds?: () => number) {
+  instanceDatabase ??= new QboProductionDatabase(config.databaseUrl, rolesByMode[config.mode]);
+  return instanceDatabase.request(remainingMilliseconds);
 }
 
 const startupReady = createQboStartupReadiness(async () => {
@@ -293,7 +298,7 @@ function externalReferenceFingerprint(value: string | null) {
   });
 }
 
-function credentialStore(db: QboProductionDatabase): CredentialBrokerStore {
+function credentialStore(db: QboProductionDatabaseSession): CredentialBrokerStore {
   const oauth = db.role("integration_oauth_ingress_authority");
   const broker = db.role("integration_credential_broker_authority");
   return {
@@ -317,7 +322,7 @@ function credentialStore(db: QboProductionDatabase): CredentialBrokerStore {
   };
 }
 
-function brokerDependencies(db: QboProductionDatabase) {
+function brokerDependencies(db: QboProductionDatabaseSession) {
   const kmsKeyResource = env("QBO_KMS_KEY_RESOURCE");
   const providerSecretResource = SecretManagerVersionResourceSchema.parse(env("QBO_PROVIDER_SECRET_VERSION_RESOURCE"));
   const secrets = new GoogleSecretManagerProviderSecrets({
@@ -446,7 +451,7 @@ async function encryptedCredential(input: {
 
 async function completeInitialAuthorization(
   callback: z.infer<typeof CallbackSchema>,
-  db: QboProductionDatabase,
+  db: QboProductionDatabaseSession,
   dependencies: ReturnType<typeof brokerDependencies>
 ) {
   const consumed = await consumeQboCustomerOAuthState(
@@ -579,7 +584,7 @@ async function completeInitialAuthorization(
 
 async function completeReauthorization(
   callback: z.infer<typeof CallbackSchema>,
-  db: QboProductionDatabase,
+  db: QboProductionDatabaseSession,
   dependencies: ReturnType<typeof brokerDependencies>
 ) {
   const realmFingerprint = externalReferenceFingerprint(callback.realmId);
@@ -662,20 +667,22 @@ async function internalAuthorizationHeaders(audience: string) {
   return { authorization, "x-serverless-authorization": authorization };
 }
 
-async function callBroker(path: string, body: unknown) {
+async function callBroker(path: string, body: unknown, remainingMilliseconds?: () => number) {
   const broker = new URL(config.brokerUrl ?? "");
   if (broker.protocol !== "https:" || broker.pathname !== "/" || broker.search || broker.hash) {
     throw new Error("qbo_production_broker_url_invalid");
   }
   const url = new URL(path, broker);
   if (url.origin !== broker.origin) throw new Error("qbo_production_broker_url_invalid");
+  remainingMilliseconds?.();
+  const authorizationHeaders = await internalAuthorizationHeaders(broker.origin);
   const response = await fetch(url, {
     method: "POST",
     redirect: "error",
-    signal: AbortSignal.timeout(60_000),
+    signal: AbortSignal.timeout(Math.min(60_000, remainingMilliseconds?.() ?? 60_000)),
     headers: {
       accept: "application/json",
-      ...await internalAuthorizationHeaders(broker.origin),
+      ...authorizationHeaders,
       "content-type": "application/json"
     },
     body: JSON.stringify(body)
@@ -870,6 +877,10 @@ async function handleDispatcher(request: IncomingMessage, response: ServerRespon
     if (registered.queueName !== queueName || registered.queueAudience !== runtime.origin) {
       throw new Error("qbo_production_runtime_configuration_mismatch");
     }
+    const recovered = await recoverQboRuntimeTasks(
+      body.queueClass, body.maximumTasks, `qbo_recover_${randomUUID()}`, client
+    );
+    safeEvent("qbo_runtime_tasks_recovered", recovered);
     const reservations = await discoverQboRuntimeDispatchReconciliation(
       body.queueClass,
       body.maximumTasks,
@@ -1103,10 +1114,11 @@ const LeaseResultSchema = z.discriminatedUnion("acquired", [
 ]);
 
 async function executeTask(request: IncomingMessage, response: ServerResponse) {
+  const budget = createQboExecutionBudget();
   const envelope = CloudTaskEnvelopeSchema.parse(await readBody(request));
   const { queueName, queueResource } = queueConfiguration();
   const taskName = canonicalTaskName(request.headers["x-cloudtasks-taskname"]);
-  const db = database();
+  const db = database(budget.remainingMilliseconds);
   const runtimeClient = db.role("integration_provider_runtime_authority");
   const sourceClient = db.role("integration_provider_source_authority");
   const leaseId = randomUUID();
@@ -1155,7 +1167,7 @@ async function executeTask(request: IncomingMessage, response: ServerResponse) {
         workerKind: "provider_runtime",
         leaseId,
         leaseOwnerFingerprint: owner,
-        leaseSeconds: 300,
+        leaseSeconds: QBO_TASK_LEASE_SECONDS,
         dispatcherTaskName: taskName,
         deliveryDispatchGeneration: delivery.dispatchGeneration,
         deliveryRetryCount: delivery.retryCount,
@@ -1183,7 +1195,7 @@ async function executeTask(request: IncomingMessage, response: ServerResponse) {
         leaseId,
         leaseOwnerFingerprint: owner,
         expectedCredentialVersion: version
-      }),
+      }, budget.remainingMilliseconds),
       refreshCredential: (credentialId, version) => callBroker("/credentials/refresh", {
         workspaceId: authority.workspaceId,
         businessEntityId: authority.businessEntityId,
@@ -1191,7 +1203,7 @@ async function executeTask(request: IncomingMessage, response: ServerResponse) {
         connectionGeneration: authority.connectionGeneration,
         credentialId,
         expectedCredentialVersion: version
-      })
+      }, budget.remainingMilliseconds)
     });
     if (credential.state !== "available") {
       throw new Error(`qbo_credential_${credential.failureCode}`);
@@ -1212,7 +1224,10 @@ async function executeTask(request: IncomingMessage, response: ServerResponse) {
         connectionConfigurationVersion: authority.connectionConfigurationVersion,
         mappingVersion: authority.mappingVersion,
         runtimeClient,
-        sourceClient
+        sourceClient,
+        transport: { request: (input) => new FetchQboRuntimeTransport().request({
+          ...input, timeoutMs: budget.timeout(input.timeoutMs)
+        }) }
       });
       safeEvent("task_completed", { observed: result.observed, committed: result.committed });
       return json(response, 200, {
@@ -1228,6 +1243,8 @@ async function executeTask(request: IncomingMessage, response: ServerResponse) {
     }
   } catch (error) {
     if (!leased) throw error;
+    const timedOut = error instanceof QboExecutionBudgetError || budget.workExhausted();
+    budget.beginCleanup();
     const classification = error instanceof QboRuntimeProviderError ? error.classification : null;
     const failed = await failRuntimeTask(
       {
@@ -1239,9 +1256,9 @@ async function executeTask(request: IncomingMessage, response: ServerResponse) {
         expectedRowVersion: leased.rowVersion,
         leaseId,
         leaseOwnerFingerprint: owner,
-        failureCategory: error instanceof QboCdcCoverageError ? "data_anomaly" : classification?.kind === "rate_limit" ? "rate_limit" : classification?.retryDisposition === "retry_with_backoff" ? "availability" : "contract",
-        failureCode: error instanceof QboCdcCoverageError ? error.code : classification?.safeCode ?? "qbo_provider_task_failed",
-        retryable: classification?.retryDisposition === "retry_with_backoff",
+        failureCategory: timedOut ? "timeout" : error instanceof QboCdcCoverageError ? "data_anomaly" : classification?.kind === "rate_limit" ? "rate_limit" : classification?.retryDisposition === "retry_with_backoff" ? "availability" : "contract",
+        failureCode: timedOut ? "qbo_execution_budget_exhausted" : error instanceof QboCdcCoverageError ? error.code : classification?.safeCode ?? "qbo_provider_task_failed",
+        retryable: timedOut || classification?.retryDisposition === "retry_with_backoff",
         retryAfterSeconds: classification?.retryAfterMs ? Math.ceil(classification.retryAfterMs / 1_000) : null
       },
       `qbo_fail_${randomUUID()}`,
@@ -1408,3 +1425,9 @@ const server = createServer((request, response) => {
 });
 
 server.listen(config.port, "0.0.0.0", () => safeEvent("service_started"));
+
+// Stop admission before draining the instance-owned pool. A process killed before
+// cleanup still relies on the existing lease/generation fence and dispatcher.
+process.once("SIGTERM", () => {
+  server.close(() => { void instanceDatabase?.close(); });
+});

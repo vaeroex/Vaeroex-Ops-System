@@ -1,0 +1,30 @@
+{
+  "checks": [
+    {
+      "path": "/app/forms/c9b27a2d-9ab9-4375-aa30-c22340890332",
+      "errors": 0,
+      "loaded": true
+    },
+    {
+      "path": "/app/assets/checks?size=10",
+      "errors": 0,
+      "loaded": true
+    },
+    {
+      "path": "/app/sources/f945d9f8-9441-40b1-83c0-d39ba40c893e",
+      "errors": 0,
+      "loaded": true
+    },
+    {
+      "path": "/app/sources",
+      "errors": 0,
+      "loaded": true
+    },
+    {
+      "path": "/app/assets",
+      "errors": 0,
+      "loaded": true
+    }
+  ],
+  "errors": []
+}

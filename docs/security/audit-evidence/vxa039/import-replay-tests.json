@@ -1,0 +1,300 @@
+{
+  "status": "passed",
+  "baseline": false,
+  "checks": 36,
+  "results": [
+    {
+      "type": "kpi",
+      "mode": "empty-completed",
+      "mutations": 0,
+      "claims": 0,
+      "verifiedCompletion": true
+    },
+    {
+      "type": "kpi",
+      "mode": "empty-running",
+      "mutations": 0,
+      "claims": 0,
+      "verifiedCompletion": false
+    },
+    {
+      "type": "kpi",
+      "mode": "empty-reconciliation_required",
+      "mutations": 0,
+      "claims": 0,
+      "verifiedCompletion": false
+    },
+    {
+      "type": "kpi",
+      "mode": "empty-not_started",
+      "mutations": 0,
+      "claims": 0,
+      "verifiedCompletion": false
+    },
+    {
+      "type": "kpi",
+      "mode": "empty-error",
+      "mutations": 0,
+      "claims": 0,
+      "verifiedCompletion": false
+    },
+    {
+      "type": "kpi",
+      "mode": "claim-denied",
+      "mutations": 0,
+      "preservedWinningState": true
+    },
+    {
+      "type": "kpi",
+      "mode": "claim-ack-lost",
+      "mutations": 0,
+      "preservedWinningState": true
+    },
+    {
+      "type": "kpi",
+      "boundary": null,
+      "mode": "reject",
+      "success": true,
+      "savedBusinessRows": 1,
+      "recordStatus": "completed",
+      "acknowledgedRows": 1
+    },
+    {
+      "type": "kpi",
+      "boundary": "file_import_rows",
+      "mode": "reject",
+      "success": false,
+      "savedBusinessRows": 1,
+      "recordStatus": "failed",
+      "acknowledgedRows": 1
+    },
+    {
+      "type": "kpi",
+      "boundary": "file_import_rows",
+      "mode": "zero",
+      "success": false,
+      "savedBusinessRows": 1,
+      "recordStatus": "failed",
+      "acknowledgedRows": 1
+    },
+    {
+      "type": "kpi",
+      "boundary": "file_import_rows",
+      "mode": "ack-lost",
+      "success": false,
+      "savedBusinessRows": 1,
+      "recordStatus": "failed",
+      "acknowledgedRows": 1
+    },
+    {
+      "type": "kpi",
+      "boundary": "file_imports",
+      "mode": "reject",
+      "success": false,
+      "savedBusinessRows": 1,
+      "recordStatus": "failed",
+      "acknowledgedRows": 1
+    },
+    {
+      "type": "kpi",
+      "boundary": "file_imports",
+      "mode": "zero",
+      "success": false,
+      "savedBusinessRows": 1,
+      "recordStatus": "failed",
+      "acknowledgedRows": 1
+    },
+    {
+      "type": "kpi",
+      "boundary": "file_imports",
+      "mode": "ack-lost",
+      "success": false,
+      "savedBusinessRows": 1,
+      "recordStatus": "failed",
+      "acknowledgedRows": 1
+    },
+    {
+      "type": "kpi",
+      "boundary": "file_uploads",
+      "mode": "reject",
+      "success": false,
+      "savedBusinessRows": 1,
+      "recordStatus": "failed",
+      "acknowledgedRows": 1
+    },
+    {
+      "type": "kpi",
+      "boundary": "file_uploads",
+      "mode": "zero",
+      "success": false,
+      "savedBusinessRows": 1,
+      "recordStatus": "failed",
+      "acknowledgedRows": 1
+    },
+    {
+      "type": "kpi",
+      "boundary": "file_uploads",
+      "mode": "ack-lost",
+      "success": true,
+      "savedBusinessRows": 1,
+      "recordStatus": "completed",
+      "acknowledgedRows": 1
+    },
+    {
+      "type": "kpi",
+      "boundary": "kpis",
+      "mode": "ambiguous-business-insert",
+      "success": false,
+      "savedBusinessRows": 1,
+      "recordStatus": "failed",
+      "acknowledgedRows": 0
+    },
+    {
+      "type": "metrics",
+      "mode": "empty-completed",
+      "mutations": 0,
+      "claims": 0,
+      "verifiedCompletion": true
+    },
+    {
+      "type": "metrics",
+      "mode": "empty-running",
+      "mutations": 0,
+      "claims": 0,
+      "verifiedCompletion": false
+    },
+    {
+      "type": "metrics",
+      "mode": "empty-reconciliation_required",
+      "mutations": 0,
+      "claims": 0,
+      "verifiedCompletion": false
+    },
+    {
+      "type": "metrics",
+      "mode": "empty-not_started",
+      "mutations": 0,
+      "claims": 0,
+      "verifiedCompletion": false
+    },
+    {
+      "type": "metrics",
+      "mode": "empty-error",
+      "mutations": 0,
+      "claims": 0,
+      "verifiedCompletion": false
+    },
+    {
+      "type": "metrics",
+      "mode": "claim-denied",
+      "mutations": 0,
+      "preservedWinningState": true
+    },
+    {
+      "type": "metrics",
+      "mode": "claim-ack-lost",
+      "mutations": 0,
+      "preservedWinningState": true
+    },
+    {
+      "type": "metrics",
+      "boundary": null,
+      "mode": "reject",
+      "success": true,
+      "savedBusinessRows": 1,
+      "recordStatus": "completed",
+      "acknowledgedRows": 1
+    },
+    {
+      "type": "metrics",
+      "boundary": "file_import_rows",
+      "mode": "reject",
+      "success": false,
+      "savedBusinessRows": 1,
+      "recordStatus": "failed",
+      "acknowledgedRows": 1
+    },
+    {
+      "type": "metrics",
+      "boundary": "file_import_rows",
+      "mode": "zero",
+      "success": false,
+      "savedBusinessRows": 1,
+      "recordStatus": "failed",
+      "acknowledgedRows": 1
+    },
+    {
+      "type": "metrics",
+      "boundary": "file_import_rows",
+      "mode": "ack-lost",
+      "success": false,
+      "savedBusinessRows": 1,
+      "recordStatus": "failed",
+      "acknowledgedRows": 1
+    },
+    {
+      "type": "metrics",
+      "boundary": "file_imports",
+      "mode": "reject",
+      "success": false,
+      "savedBusinessRows": 1,
+      "recordStatus": "failed",
+      "acknowledgedRows": 1
+    },
+    {
+      "type": "metrics",
+      "boundary": "file_imports",
+      "mode": "zero",
+      "success": false,
+      "savedBusinessRows": 1,
+      "recordStatus": "failed",
+      "acknowledgedRows": 1
+    },
+    {
+      "type": "metrics",
+      "boundary": "file_imports",
+      "mode": "ack-lost",
+      "success": false,
+      "savedBusinessRows": 1,
+      "recordStatus": "failed",
+      "acknowledgedRows": 1
+    },
+    {
+      "type": "metrics",
+      "boundary": "file_uploads",
+      "mode": "reject",
+      "success": false,
+      "savedBusinessRows": 1,
+      "recordStatus": "failed",
+      "acknowledgedRows": 1
+    },
+    {
+      "type": "metrics",
+      "boundary": "file_uploads",
+      "mode": "zero",
+      "success": false,
+      "savedBusinessRows": 1,
+      "recordStatus": "failed",
+      "acknowledgedRows": 1
+    },
+    {
+      "type": "metrics",
+      "boundary": "file_uploads",
+      "mode": "ack-lost",
+      "success": true,
+      "savedBusinessRows": 1,
+      "recordStatus": "completed",
+      "acknowledgedRows": 1
+    },
+    {
+      "type": "metrics",
+      "boundary": "operational_metrics",
+      "mode": "ambiguous-business-insert",
+      "success": false,
+      "savedBusinessRows": 1,
+      "recordStatus": "failed",
+      "acknowledgedRows": 0
+    }
+  ],
+  "limitation": "Actual action, synthetic DB responses including applied-write/lost-ack; claim responses are mocked; native SQL suite separately verifies durable coordination."
+}

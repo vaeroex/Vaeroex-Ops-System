@@ -1,0 +1,8 @@
+{
+  "migrationCount": 136,
+  "migrationVersionsSha256": "cbbc1c11c27de71f59a2d12d223fd93708d023cc3e3d68160ae27a6251559817",
+  "schemaFingerprint": "41a316952fddf5da306655c42b58c4667fc70c0678b27ff7b93b43973adeaac8",
+  "exactRepositoryVersions": true,
+  "retainedCapacitySchemaMatched": true,
+  "productionPrefixDifferent": true
+}

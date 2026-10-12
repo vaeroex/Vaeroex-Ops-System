@@ -23,7 +23,7 @@ import {
   BUSINESS_HEALTH_EXPLANATION_VALIDATOR_VERSION
 } from "@/lib/ai/business-health-explanation/contracts";
 import type { BusinessHealthSnapshotRow } from "@/lib/intelligence/business-health-history";
-import type { ExecutiveHomepageModel } from "@/lib/intelligence/executive-homepage";
+import { previousReviewSnapshot, type ExecutiveHomepageModel } from "@/lib/intelligence/executive-homepage";
 import type { IntelligenceEvidenceRecord, IntelligenceInsight, IntelligenceLayerResult } from "@/lib/intelligence/layer";
 import {
   businessHealthDriverStableKey,
@@ -220,26 +220,24 @@ function candidateFromRecord({
 function selectSubmode({
   available,
   status,
-  trend,
   trendDelta,
   stale
 }: {
   available: boolean;
   status: string;
-  trend: string | null;
   trendDelta: number | null;
   stale: boolean;
 }): BusinessHealthExplanationSubmode {
   if (!available) return "evidence_limited";
   if (stale) return "evidence_stale";
   const normalizedStatus = status.toLowerCase();
-  const normalizedTrend = (trend || "").toLowerCase();
-  const improving = normalizedTrend.includes("improving") || (trendDelta !== null && trendDelta > 0);
-  const worsening = normalizedTrend.includes("declining") || (trendDelta !== null && trendDelta < 0);
+  const improving = trendDelta !== null && trendDelta > 0;
+  const worsening = trendDelta !== null && trendDelta < 0;
 
   if ((normalizedStatus.includes("healthy") || normalizedStatus.includes("strong")) && improving) return "healthy_improving";
   if ((normalizedStatus.includes("healthy") || normalizedStatus.includes("strong")) && worsening) return "healthy_slowing";
   if ((normalizedStatus.includes("watch") || normalizedStatus.includes("critical") || normalizedStatus.includes("at risk")) && improving) return "watch_recovering";
+  if (normalizedStatus.includes("watch") && worsening) return "watch_worsening";
   if ((normalizedStatus.includes("critical") || normalizedStatus.includes("at risk")) && worsening) return "at_risk_worsening";
   return "stable";
 }
@@ -263,7 +261,26 @@ function uniqueStrings(values: Array<string | null | undefined>, maximum = 4) {
   const normalized = values
     .map((value) => compactText(value, 260))
     .filter(Boolean);
-  return normalized.filter((value, index) => normalized.findIndex((candidate) => candidate.toLowerCase() === value.toLowerCase()) === index).slice(0, maximum);
+  const seen = new Set<string>();
+  return normalized.filter((value) => {
+    const lower = value.toLowerCase();
+    const genericCause = /\b(?:cause|causation|caused)\b/.test(lower)
+      && !/\b(?:unique|review text|supplier|site|shift|customer|order|transaction|source record)\b/.test(lower);
+    const key = genericCause ? "generic-cause" : lower;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).slice(0, maximum);
+}
+
+export function plainHealthDataQualityReason(reason: string) {
+  if (reason === "Authoritative evidence is usable, but source diversity, KPI history, or freshness still limits confidence.") {
+    return "The score uses available records, but limited history, few independent sources, or older data may lower confidence.";
+  }
+  if (reason === "Authoritative evidence remains limited in completeness, independent-source diversity, KPI history, or freshness.") {
+    return "Missing details, limited history, few independent sources, or older data may make this score less certain.";
+  }
+  return reason;
 }
 
 function sourceLabelForCitation(
@@ -401,7 +418,8 @@ export function buildBusinessHealthExplanationPackage({
     fact: compactText(`${driver.insight.summary} ${driver.insight.why}`, 420),
     scoreImpact: driver.scoreImpact,
     citationIds: citationIdsByDriver.get(driver.stableKey) || [],
-    limitation: compactText(driver.insight.limitation, 240) || null
+    limitation: compactText(driver.insight.limitation, 240) || null,
+    investigationNext: compactText(driver.insight.recommendedAction, 620)
   })).filter((driver) => driver.citationIds.length > 0);
   const requiredCitationIds = Array.from(new Set(drivers.flatMap((driver) => driver.citationIds))).sort((a, b) => a - b);
   const citationVerification = verifyEvidenceManifestCitations({
@@ -442,9 +460,22 @@ export function buildBusinessHealthExplanationPackage({
       homepage.health.score !== projectedHealth.score
       || homepage.health.status !== healthStatusLabel(projectedHealth.status)
       || homepage.health.confidence !== projectedHealth.confidence
-      || (homepage.health.trend !== null && homepage.health.trend !== projectedHealth.trajectory)
+      || intelligence.businessHealth.trend !== projectedHealth.trajectory
     ) {
       throw new Error("Business Health presentation disagrees with the scoped IntelligenceSnapshotV1 projection.");
+    }
+    // The projection's trajectory describes current evidence. The homepage's
+    // movement compares same-formula stored reviews and can point the other way.
+    // Validate each against its own source instead of equating those meanings.
+    const previousSnapshot = previousReviewSnapshot(snapshots, now);
+    const expectedDelta = previousSnapshot ? projectedHealth.score - previousSnapshot.score : null;
+    const expectedTrend = expectedDelta === null ? null : expectedDelta > 0 ? "Improving" : expectedDelta < 0 ? "Declining" : "Holding steady";
+    if (
+      (previousSnapshot && previousSnapshot.workspace_id !== workspaceId)
+      || homepage.health.trendDelta !== expectedDelta
+      || homepage.health.trend !== expectedTrend
+    ) {
+      throw new Error("Business Health movement disagrees with its scoped stored review.");
     }
     const projectedCitationIds = new Set(projection.citations.map((citation) => citation.id));
     const expectedCitationIds = manifest.evidence.map((entry) => `manifest:${manifest.manifestId}:citation:${entry.citationId}`);
@@ -456,7 +487,6 @@ export function buildBusinessHealthExplanationPackage({
   const submode = selectSubmode({
     available,
     status: homepage.health.status,
-    trend: homepage.health.trend,
     trendDelta: homepage.health.trendDelta,
     stale: freshness.stale
   });
@@ -465,7 +495,7 @@ export function buildBusinessHealthExplanationPackage({
   const independentSourceCount = evidence.independentSourceCount;
   const limitations = uniqueStrings([
     ...drivers.map((driver) => driver.limitation),
-    projection?.limitations.find((limitation) => limitation.code === "data_quality_reason")?.message || intelligence.dataQuality.reason,
+    plainHealthDataQualityReason(projection?.limitations.find((limitation) => limitation.code === "data_quality_reason")?.message || intelligence.dataQuality.reason),
     freshness.stale ? "The newest supporting evidence is older than 45 days." : null,
     snapshots.length < 2 ? "A reliable score trajectory requires at least two stored Business Health reviews." : null
   ]);
@@ -491,6 +521,7 @@ export function buildBusinessHealthExplanationPackage({
   };
   const contextualEvidence = projection?.contextualEvidence || [];
   const packageFingerprintInput = {
+    adviceLanguageVersion: "plain_english_v5",
     contractId: BUSINESS_HEALTH_EXPLANATION_CONTRACT_ID,
     contractVersion: BUSINESS_HEALTH_EXPLANATION_CONTRACT_VERSION,
     validatorVersion: BUSINESS_HEALTH_EXPLANATION_VALIDATOR_VERSION,
@@ -518,7 +549,8 @@ export function buildBusinessHealthExplanationPackage({
           label: compactText(driver.insight.title, 180),
           fact: compactText(`${driver.insight.summary} ${driver.insight.why}`, 420),
           scoreImpact: driver.scoreImpact,
-          limitation: compactText(driver.insight.limitation, 240) || null
+          limitation: compactText(driver.insight.limitation, 240) || null,
+          investigationNext: compactText(driver.insight.recommendedAction, 620)
         }))
     },
     evidence: candidates

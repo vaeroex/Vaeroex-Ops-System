@@ -6,6 +6,7 @@ import { IntelligenceSignalInbox } from "@/components/intelligence/IntelligenceS
 import { IntelligenceBriefingCards } from "@/components/intelligence/IntelligenceBriefingCards";
 import { EvidenceBatchList } from "@/components/evidence/EvidenceBatchList";
 import { EvidenceLifecycleCheckbox } from "@/components/evidence/EvidenceLifecycleSelection";
+import { BusinessInformationEntry } from "@/components/evidence/BusinessInformationEntry";
 import { BusinessNoteEntry } from "@/components/evidence/BusinessNotesPanel";
 import { SavedAnalysisList } from "@/components/reports/SavedAnalysisList";
 import SettingsPage from "@/app/app/settings/page";
@@ -35,7 +36,7 @@ function Evidence() {
   const [query, setQuery] = useState("");
   const records = Array.from({ length: 350 }, (_, index) => ({ id: `source-${index}`, label: `Synthetic file ${index + 1}`, content: <article data-fixture-source className="rounded-lg border border-white/10 bg-[#08111f] p-4"><div className="flex items-start gap-3"><EvidenceLifecycleCheckbox id={`source-${index}`} label={`Synthetic file ${index + 1}`} /><div><h3 className="font-semibold text-white">Synthetic file {index + 1}</h3><p className="text-sm text-slate-400">Saved source · Synthetic qualification data</p></div></div></article> }));
   const visible = records.filter((record) => record.label.toLowerCase().includes(query.toLowerCase()));
-  return <div className="space-y-5"><header className="rounded-lg border border-white/10 bg-[#08111f] p-4"><h1 className="text-2xl font-semibold text-white">Evidence</h1><p className="my-3 text-sm text-slate-300">Synthetic browser fixture. No uploads or submissions can execute.</p><BusinessNoteEntry enabled /></header><label className="block text-sm text-white">Search loaded files<input className="mt-2 w-full rounded-lg border border-white/10 bg-slate-950 p-3" value={query} onChange={(event) => setQuery(event.target.value)} /></label><h2 className="text-lg font-semibold text-white">Source Files</h2><EvidenceBatchList key={query} items={visible} pluralLabel="files" selection={{ singularLabel: "file", action: rejectAction }} /></div>;
+  return <div className="space-y-5"><header className="rounded-lg border border-white/10 bg-[#08111f] p-4"><h1 className="text-2xl font-semibold text-white">Evidence</h1><p className="my-3 text-sm text-slate-300">Synthetic browser fixture. No uploads or submissions can execute.</p><BusinessInformationEntry uploadAction={<button disabled>Upload file</button>}><BusinessNoteEntry enabled /></BusinessInformationEntry></header><label className="block text-sm text-white">Search loaded files<input className="mt-2 w-full rounded-lg border border-white/10 bg-slate-950 p-3" value={query} onChange={(event) => setQuery(event.target.value)} /></label><h2 className="text-lg font-semibold text-white">Source Files</h2><EvidenceBatchList key={query} items={visible} pluralLabel="files" selection={{ singularLabel: "file", action: rejectAction }} /></div>;
 }
 function App() {
   const pathname = usePathname();

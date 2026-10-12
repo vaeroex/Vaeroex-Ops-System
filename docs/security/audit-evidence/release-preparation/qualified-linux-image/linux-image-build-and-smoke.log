@@ -1,0 +1,245 @@
+2026-10-05T23:35:40.5308321Z ##[group]Run node scripts/qbo-worker-image-qualification.cjs
+2026-10-05T23:35:40.5308812Z [36;1mnode scripts/qbo-worker-image-qualification.cjs[0m
+2026-10-05T23:35:40.5372920Z shell: /usr/bin/bash -e {0}
+2026-10-05T23:35:40.5373184Z env:
+2026-10-05T23:35:40.5373461Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-10-05T23:35:40.5373796Z   GOTOOLCHAIN: local
+2026-10-05T23:35:40.5374023Z ##[endgroup]
+2026-10-05T23:35:41.3138279Z #0 building with "default" instance using docker driver
+2026-10-05T23:35:41.3138659Z 
+2026-10-05T23:35:41.3138916Z #1 [internal] load build definition from Dockerfile
+2026-10-05T23:35:41.3139720Z #1 transferring dockerfile: 1.41kB done
+2026-10-05T23:35:41.3141671Z #1 DONE 0.0s
+2026-10-05T23:35:41.3141907Z 
+2026-10-05T23:35:41.3142952Z #2 [internal] load metadata for gcr.io/distroless/nodejs22-debian13:nonroot@sha256:5ef534d3db0ac0c43bee379af4ae49cfbfc0ef38a46c94c52d87c68f32f34d8a
+2026-10-05T23:35:41.5598752Z #2 ...
+2026-10-05T23:35:41.5599077Z 
+2026-10-05T23:35:41.5600541Z #3 [internal] load metadata for docker.io/library/node:22.23.1-bookworm-slim@sha256:6c74791e557ce11fc957704f6d4fe134a7bc8d6f5ca4403205b2966bd488f6b3
+2026-10-05T23:35:41.5601580Z #3 DONE 0.4s
+2026-10-05T23:35:41.7105321Z 
+2026-10-05T23:35:41.7107443Z #2 [internal] load metadata for gcr.io/distroless/nodejs22-debian13:nonroot@sha256:5ef534d3db0ac0c43bee379af4ae49cfbfc0ef38a46c94c52d87c68f32f34d8a
+2026-10-05T23:35:42.0778395Z #2 DONE 0.9s
+2026-10-05T23:35:42.1780154Z 
+2026-10-05T23:35:42.1780909Z #4 [internal] load .dockerignore
+2026-10-05T23:35:42.1781564Z #4 transferring context: 382B done
+2026-10-05T23:35:42.1782035Z #4 DONE 0.0s
+2026-10-05T23:35:42.1782244Z 
+2026-10-05T23:35:42.1782509Z #5 [internal] load build context
+2026-10-05T23:35:42.1783101Z #5 transferring context: 4.76MB 0.1s done
+2026-10-05T23:35:42.1783622Z #5 DONE 0.1s
+2026-10-05T23:35:42.1783826Z 
+2026-10-05T23:35:42.1784718Z #6 [runtime 1/4] FROM gcr.io/distroless/nodejs22-debian13:nonroot@sha256:5ef534d3db0ac0c43bee379af4ae49cfbfc0ef38a46c94c52d87c68f32f34d8a
+2026-10-05T23:35:42.1786192Z #6 resolve gcr.io/distroless/nodejs22-debian13:nonroot@sha256:5ef534d3db0ac0c43bee379af4ae49cfbfc0ef38a46c94c52d87c68f32f34d8a done
+2026-10-05T23:35:42.2994356Z #6 sha256:e3f86147ff2d4a48db7cadfc3531f42cdafc0244f48b4fb6d3ad89949efa9820 4.83kB / 4.83kB done
+2026-10-05T23:35:42.2995562Z #6 sha256:e32ed02ee75844f958183c305aa2f182a7de71776a8e2b3820b518ed5626d363 4.64kB / 4.64kB done
+2026-10-05T23:35:42.2996496Z #6 sha256:c172f21841dff4c8cf45cde46589c1c2616cefe7e819965e92e6d3475c428aa0 0B / 12.68kB 0.2s
+2026-10-05T23:35:42.2997711Z #6 sha256:5ef534d3db0ac0c43bee379af4ae49cfbfc0ef38a46c94c52d87c68f32f34d8a 1.51kB / 1.51kB done
+2026-10-05T23:35:42.2998639Z #6 sha256:218cf840d0d95a86231eb9d33d26ac8a520a4299c6096cb70a0c2fb2a87c9e0a 0B / 288.06kB 0.2s
+2026-10-05T23:35:42.2999787Z #6 sha256:2cc7ee286bf3a9e6af5f71756d7fc8e22e23ce65fec9047d774511ffcef79fa8 0B / 124.53kB 0.2s
+2026-10-05T23:35:42.3998919Z #6 sha256:218cf840d0d95a86231eb9d33d26ac8a520a4299c6096cb70a0c2fb2a87c9e0a 288.06kB / 288.06kB 0.3s
+2026-10-05T23:35:42.4000876Z #6 sha256:2cc7ee286bf3a9e6af5f71756d7fc8e22e23ce65fec9047d774511ffcef79fa8 124.53kB / 124.53kB 0.3s done
+2026-10-05T23:35:42.4002032Z #6 extracting sha256:2cc7ee286bf3a9e6af5f71756d7fc8e22e23ce65fec9047d774511ffcef79fa8 done
+2026-10-05T23:35:42.4003164Z #6 sha256:f6069939f718601b38d25ec5ed5631ed047e4da24acec2e252f8f29d251be718 0B / 254.67kB 0.3s
+2026-10-05T23:35:42.6000843Z #6 sha256:c172f21841dff4c8cf45cde46589c1c2616cefe7e819965e92e6d3475c428aa0 12.68kB / 12.68kB 0.3s done
+2026-10-05T23:35:42.6001943Z #6 sha256:218cf840d0d95a86231eb9d33d26ac8a520a4299c6096cb70a0c2fb2a87c9e0a 288.06kB / 288.06kB 0.3s done
+2026-10-05T23:35:42.6002907Z #6 extracting sha256:c172f21841dff4c8cf45cde46589c1c2616cefe7e819965e92e6d3475c428aa0 done
+2026-10-05T23:35:42.6003815Z #6 extracting sha256:218cf840d0d95a86231eb9d33d26ac8a520a4299c6096cb70a0c2fb2a87c9e0a 0.0s done
+2026-10-05T23:35:42.6005035Z #6 sha256:2780920e5dbfbe103d03a583ed75345306e572ec5a48cb10361f046767d9f29a 0B / 67B 0.4s
+2026-10-05T23:35:42.6005950Z #6 sha256:d6b1b89eccacc15c2420b2776d72c1dae334a00805ed9af54bf2f71e4d536f28 0B / 32.09kB 0.4s
+2026-10-05T23:35:42.6006825Z #6 sha256:7c12895b777bcaa8ccae0605b4de635b68fc32d60fa08f421dc3818bf55ee212 0B / 188B 0.5s
+2026-10-05T23:35:42.7999864Z #6 sha256:f6069939f718601b38d25ec5ed5631ed047e4da24acec2e252f8f29d251be718 254.67kB / 254.67kB 0.5s done
+2026-10-05T23:35:42.8001455Z #6 sha256:2780920e5dbfbe103d03a583ed75345306e572ec5a48cb10361f046767d9f29a 67B / 67B 0.5s done
+2026-10-05T23:35:42.8002707Z #6 sha256:d6b1b89eccacc15c2420b2776d72c1dae334a00805ed9af54bf2f71e4d536f28 32.09kB / 32.09kB 0.5s done
+2026-10-05T23:35:42.8004271Z #6 sha256:7c12895b777bcaa8ccae0605b4de635b68fc32d60fa08f421dc3818bf55ee212 188B / 188B 0.6s done
+2026-10-05T23:35:42.8005489Z #6 extracting sha256:f6069939f718601b38d25ec5ed5631ed047e4da24acec2e252f8f29d251be718 0.0s done
+2026-10-05T23:35:42.8006727Z #6 sha256:52630fc75a18675c530ed9eba5f55eca09b03e91bd5bc15307918bbc1a7e7296 0B / 162B 0.7s
+2026-10-05T23:35:42.8008385Z #6 sha256:3214acf345c0cc6bbdb56b698a41ccdefc624a09d6beb0d38b5de0b2303ecaf4 123B / 123B 0.7s done
+2026-10-05T23:35:42.8010478Z #6 sha256:dd64bf2dd177757451a98fcdc999a339c35dee5d9872d8f4dc69c8f3c4dd0112 0B / 80B 0.7s
+2026-10-05T23:35:42.8011858Z #6 sha256:b839dfae01f66e15c6a8b63520557ed315bdfe036342fa7a0c537259f10d7a9a 0B / 351B 0.7s
+2026-10-05T23:35:42.9145008Z #6 sha256:52630fc75a18675c530ed9eba5f55eca09b03e91bd5bc15307918bbc1a7e7296 162B / 162B 0.7s done
+2026-10-05T23:35:42.9147345Z #6 sha256:dd64bf2dd177757451a98fcdc999a339c35dee5d9872d8f4dc69c8f3c4dd0112 80B / 80B 0.8s done
+2026-10-05T23:35:42.9150178Z #6 extracting sha256:d6b1b89eccacc15c2420b2776d72c1dae334a00805ed9af54bf2f71e4d536f28 done
+2026-10-05T23:35:42.9152473Z #6 extracting sha256:2780920e5dbfbe103d03a583ed75345306e572ec5a48cb10361f046767d9f29a done
+2026-10-05T23:35:42.9154188Z #6 extracting sha256:7c12895b777bcaa8ccae0605b4de635b68fc32d60fa08f421dc3818bf55ee212 done
+2026-10-05T23:35:42.9156332Z #6 extracting sha256:3214acf345c0cc6bbdb56b698a41ccdefc624a09d6beb0d38b5de0b2303ecaf4 done
+2026-10-05T23:35:42.9157883Z #6 extracting sha256:52630fc75a18675c530ed9eba5f55eca09b03e91bd5bc15307918bbc1a7e7296 done
+2026-10-05T23:35:42.9159203Z #6 extracting sha256:dd64bf2dd177757451a98fcdc999a339c35dee5d9872d8f4dc69c8f3c4dd0112 done
+2026-10-05T23:35:42.9160561Z #6 sha256:c4bc6f35ff5e25aa1afe7a148a0b6f10a760f54e298f86a4a4d44b91f1afbfab 0B / 143.34kB 0.8s
+2026-10-05T23:35:42.9161971Z #6 sha256:ebddc55facdc6b1f7e0f30816a5fc7cc62f38abdf76c0a8b0a0ce52085754795 0B / 311B 0.8s
+2026-10-05T23:35:42.9163272Z #6 extracting sha256:b839dfae01f66e15c6a8b63520557ed315bdfe036342fa7a0c537259f10d7a9a
+2026-10-05T23:35:43.0996964Z #6 sha256:b839dfae01f66e15c6a8b63520557ed315bdfe036342fa7a0c537259f10d7a9a 351B / 351B 0.8s done
+2026-10-05T23:35:43.0998554Z #6 sha256:ebddc55facdc6b1f7e0f30816a5fc7cc62f38abdf76c0a8b0a0ce52085754795 311B / 311B 0.9s done
+2026-10-05T23:35:43.1000289Z #6 extracting sha256:b839dfae01f66e15c6a8b63520557ed315bdfe036342fa7a0c537259f10d7a9a done
+2026-10-05T23:35:43.1001446Z #6 extracting sha256:ebddc55facdc6b1f7e0f30816a5fc7cc62f38abdf76c0a8b0a0ce52085754795 done
+2026-10-05T23:35:43.1002614Z #6 sha256:58c0c263dc73f20a6488f5a19989645aea42be93147eb5a52bf69112982e34a5 0B / 3.07MB 1.0s
+2026-10-05T23:35:43.1003870Z #6 sha256:b96fe2995f90d0ef0bf14f9b4a67b5f4e77d478e6108166e0565adc9efd6e4a3 0B / 5.08MB 1.0s
+2026-10-05T23:35:43.2633728Z #6 sha256:c4bc6f35ff5e25aa1afe7a148a0b6f10a760f54e298f86a4a4d44b91f1afbfab 143.34kB / 143.34kB 1.0s done
+2026-10-05T23:35:43.2635672Z #6 sha256:b96fe2995f90d0ef0bf14f9b4a67b5f4e77d478e6108166e0565adc9efd6e4a3 5.08MB / 5.08MB 1.1s done
+2026-10-05T23:35:43.2637004Z #6 extracting sha256:c4bc6f35ff5e25aa1afe7a148a0b6f10a760f54e298f86a4a4d44b91f1afbfab done
+2026-10-05T23:35:43.2638413Z #6 extracting sha256:b96fe2995f90d0ef0bf14f9b4a67b5f4e77d478e6108166e0565adc9efd6e4a3 0.1s
+2026-10-05T23:35:43.2640207Z #6 sha256:bd8962e292918c50c90edebd9684c053bc386b9c5503acd8fec75d0c6f93a0b7 0B / 372.77kB 1.1s
+2026-10-05T23:35:43.2642052Z #6 sha256:cac2ae0193cb073e7492050b05fc342a888651b4bbc966908c8793f889c299ba 0B / 96.15kB 1.1s
+2026-10-05T23:35:43.3992581Z #6 sha256:58c0c263dc73f20a6488f5a19989645aea42be93147eb5a52bf69112982e34a5 3.07MB / 3.07MB 1.3s done
+2026-10-05T23:35:43.3993597Z #6 extracting sha256:b96fe2995f90d0ef0bf14f9b4a67b5f4e77d478e6108166e0565adc9efd6e4a3 0.1s done
+2026-10-05T23:35:43.3994683Z #6 sha256:bd8962e292918c50c90edebd9684c053bc386b9c5503acd8fec75d0c6f93a0b7 372.77kB / 372.77kB 1.3s done
+2026-10-05T23:35:43.3995634Z #6 extracting sha256:58c0c263dc73f20a6488f5a19989645aea42be93147eb5a52bf69112982e34a5
+2026-10-05T23:35:43.3996614Z #6 sha256:dd0d9bfd3bee080ad25a464362ec4f37ec5ca625695a4d7179fe69d207dc068d 0B / 158.45kB 1.3s
+2026-10-05T23:35:43.3997833Z #6 sha256:7cc70dfd88cf2327bb827123c9156f7cb95de95b2f98f3a7a931296aacec5786 0B / 901.29kB 1.3s
+2026-10-05T23:35:43.5536750Z #6 extracting sha256:58c0c263dc73f20a6488f5a19989645aea42be93147eb5a52bf69112982e34a5 0.0s done
+2026-10-05T23:35:43.5539196Z #6 extracting sha256:bd8962e292918c50c90edebd9684c053bc386b9c5503acd8fec75d0c6f93a0b7 done
+2026-10-05T23:35:43.5541901Z #6 extracting sha256:cac2ae0193cb073e7492050b05fc342a888651b4bbc966908c8793f889c299ba
+2026-10-05T23:35:43.6994173Z #6 sha256:cac2ae0193cb073e7492050b05fc342a888651b4bbc966908c8793f889c299ba 96.15kB / 96.15kB 1.5s done
+2026-10-05T23:35:43.6995272Z #6 sha256:dd0d9bfd3bee080ad25a464362ec4f37ec5ca625695a4d7179fe69d207dc068d 158.45kB / 158.45kB 1.5s done
+2026-10-05T23:35:43.6996213Z #6 extracting sha256:cac2ae0193cb073e7492050b05fc342a888651b4bbc966908c8793f889c299ba done
+2026-10-05T23:35:43.6997110Z #6 extracting sha256:dd0d9bfd3bee080ad25a464362ec4f37ec5ca625695a4d7179fe69d207dc068d done
+2026-10-05T23:35:43.6998010Z #6 sha256:8224d91da70b7992430d3b04040ea38ecdef4a7b719bee38397c89aaa886e198 0B / 84.21kB 1.6s
+2026-10-05T23:35:43.6998917Z #6 sha256:1a4be5562d92d659f95e0b44b245ea5208bf5317481b9a351b07fad7fe5265ec 0B / 51.53kB 1.6s
+2026-10-05T23:35:43.8000542Z #6 sha256:7cc70dfd88cf2327bb827123c9156f7cb95de95b2f98f3a7a931296aacec5786 901.29kB / 901.29kB 1.7s done
+2026-10-05T23:35:43.8002166Z #6 extracting sha256:7cc70dfd88cf2327bb827123c9156f7cb95de95b2f98f3a7a931296aacec5786 0.0s done
+2026-10-05T23:35:43.8003364Z #6 sha256:7255d342dc6c559165d8b6b21ec572b476d8e68ff47814aa5843ef5323e51929 0B / 43.93MB 1.7s
+2026-10-05T23:35:43.9308835Z #6 sha256:1a4be5562d92d659f95e0b44b245ea5208bf5317481b9a351b07fad7fe5265ec 51.53kB / 51.53kB 1.7s done
+2026-10-05T23:35:43.9310351Z #6 extracting sha256:8224d91da70b7992430d3b04040ea38ecdef4a7b719bee38397c89aaa886e198
+2026-10-05T23:35:44.0344951Z #6 sha256:8224d91da70b7992430d3b04040ea38ecdef4a7b719bee38397c89aaa886e198 84.21kB / 84.21kB 1.8s done
+2026-10-05T23:35:44.0346905Z #6 extracting sha256:8224d91da70b7992430d3b04040ea38ecdef4a7b719bee38397c89aaa886e198 done
+2026-10-05T23:35:44.0348930Z #6 extracting sha256:1a4be5562d92d659f95e0b44b245ea5208bf5317481b9a351b07fad7fe5265ec done
+2026-10-05T23:35:44.1366157Z #6 sha256:7255d342dc6c559165d8b6b21ec572b476d8e68ff47814aa5843ef5323e51929 23.07MB / 43.93MB 2.0s
+2026-10-05T23:35:44.2396080Z #6 sha256:7255d342dc6c559165d8b6b21ec572b476d8e68ff47814aa5843ef5323e51929 43.93MB / 43.93MB 2.1s done
+2026-10-05T23:35:44.2398092Z #6 extracting sha256:7255d342dc6c559165d8b6b21ec572b476d8e68ff47814aa5843ef5323e51929
+2026-10-05T23:35:44.9320840Z #6 extracting sha256:7255d342dc6c559165d8b6b21ec572b476d8e68ff47814aa5843ef5323e51929 0.7s done
+2026-10-05T23:35:45.1397137Z #6 DONE 3.0s
+2026-10-05T23:35:45.1397580Z 
+2026-10-05T23:35:45.1398842Z #7 [build  1/10] FROM docker.io/library/node:22.23.1-bookworm-slim@sha256:6c74791e557ce11fc957704f6d4fe134a7bc8d6f5ca4403205b2966bd488f6b3
+2026-10-05T23:35:45.1401777Z #7 resolve docker.io/library/node:22.23.1-bookworm-slim@sha256:6c74791e557ce11fc957704f6d4fe134a7bc8d6f5ca4403205b2966bd488f6b3 done
+2026-10-05T23:35:45.1403627Z #7 sha256:6c74791e557ce11fc957704f6d4fe134a7bc8d6f5ca4403205b2966bd488f6b3 5.22kB / 5.22kB done
+2026-10-05T23:35:45.1405150Z #7 sha256:8607a9064d4a571140998ae9e52a3b3fcf9cff361d04642d5971e6cd76d39e27 1.93kB / 1.93kB done
+2026-10-05T23:35:45.1406272Z #7 sha256:bd16adabad7619222d4d0ab2d61f48391dacde03ad93f54d344683e326cbd0e2 6.83kB / 6.83kB done
+2026-10-05T23:35:45.1407606Z #7 sha256:597c6c618d36213af657a6a8444a5d87801f9a219682b206ad21ccb8f3e57bbd 28.23MB / 28.23MB 1.9s done
+2026-10-05T23:35:45.1409509Z #7 sha256:e33bee2ce77b0c3748e6a8f2b808a5ab1d2ed466d5ee5a9b991cba597bd028e2 3.31kB / 3.31kB 1.9s done
+2026-10-05T23:35:45.1411158Z #7 sha256:bb65bd65926c2b38f8a7d518cefa8524e1484182dd6ffba7883654d886b4cfb3 49.94MB / 49.94MB 2.0s done
+2026-10-05T23:35:45.1412669Z #7 sha256:392df1351ac2d7628088ee58b248e62a2c1b749e4beb94b7640994df1857c8ca 1.71MB / 1.71MB 2.0s done
+2026-10-05T23:35:45.1414078Z #7 extracting sha256:597c6c618d36213af657a6a8444a5d87801f9a219682b206ad21ccb8f3e57bbd 0.9s
+2026-10-05T23:35:45.1414874Z #7 sha256:437216719022b2853003498de36b055604c6ff1bcee290b912ed44226f2d3d46 446B / 446B 2.0s done
+2026-10-05T23:35:45.3498850Z #7 ...
+2026-10-05T23:35:45.3499152Z 
+2026-10-05T23:35:45.3499825Z #8 [runtime 2/4] WORKDIR /app
+2026-10-05T23:35:45.3500361Z #8 DONE 0.0s
+2026-10-05T23:35:45.3500928Z 
+2026-10-05T23:35:45.3502171Z #7 [build  1/10] FROM docker.io/library/node:22.23.1-bookworm-slim@sha256:6c74791e557ce11fc957704f6d4fe134a7bc8d6f5ca4403205b2966bd488f6b3
+2026-10-05T23:35:45.3503824Z #7 extracting sha256:597c6c618d36213af657a6a8444a5d87801f9a219682b206ad21ccb8f3e57bbd 1.3s done
+2026-10-05T23:35:45.5059664Z #7 extracting sha256:e33bee2ce77b0c3748e6a8f2b808a5ab1d2ed466d5ee5a9b991cba597bd028e2 done
+2026-10-05T23:35:45.5061875Z #7 extracting sha256:bb65bd65926c2b38f8a7d518cefa8524e1484182dd6ffba7883654d886b4cfb3 0.1s
+2026-10-05T23:35:46.7677459Z #7 extracting sha256:bb65bd65926c2b38f8a7d518cefa8524e1484182dd6ffba7883654d886b4cfb3 1.2s done
+2026-10-05T23:35:46.7678994Z #7 extracting sha256:392df1351ac2d7628088ee58b248e62a2c1b749e4beb94b7640994df1857c8ca
+2026-10-05T23:35:46.9899151Z #7 extracting sha256:392df1351ac2d7628088ee58b248e62a2c1b749e4beb94b7640994df1857c8ca 0.0s done
+2026-10-05T23:35:46.9900630Z #7 extracting sha256:437216719022b2853003498de36b055604c6ff1bcee290b912ed44226f2d3d46 done
+2026-10-05T23:35:46.9901375Z #7 DONE 4.7s
+2026-10-05T23:35:46.9901669Z 
+2026-10-05T23:35:46.9902350Z #9 [build  2/10] RUN corepack enable && corepack prepare pnpm@9.15.4 --activate
+2026-10-05T23:35:47.0921103Z #9 0.253 Preparing pnpm@9.15.4 for immediate activation...
+2026-10-05T23:35:47.9427786Z #9 DONE 1.1s
+2026-10-05T23:35:48.1315098Z 
+2026-10-05T23:35:48.1315614Z #10 [build  3/10] WORKDIR /app
+2026-10-05T23:35:48.1315958Z #10 DONE 0.0s
+2026-10-05T23:35:48.1316099Z 
+2026-10-05T23:35:48.1316368Z #11 [build  4/10] COPY package.json pnpm-lock.yaml ./
+2026-10-05T23:35:48.1316724Z #11 DONE 0.0s
+2026-10-05T23:35:48.1316853Z 
+2026-10-05T23:35:48.1317037Z #12 [build  5/10] COPY patches ./patches
+2026-10-05T23:35:48.1317349Z #12 DONE 0.0s
+2026-10-05T23:35:48.1317476Z 
+2026-10-05T23:35:48.1317790Z #13 [build  6/10] RUN pnpm install --frozen-lockfile --ignore-scripts
+2026-10-05T23:35:48.5644659Z #13 0.583 Lockfile is up to date, resolution step is skipped
+2026-10-05T23:35:48.7150319Z #13 0.635 Progress: resolved 1, reused 0, downloaded 0, added 0
+2026-10-05T23:35:48.7151649Z #13 0.734 Packages: +473
+2026-10-05T23:35:48.7152844Z #13 0.734 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+2026-10-05T23:35:49.0696706Z #13 1.089 
+2026-10-05T23:35:49.0698196Z #13 1.089    ╭──────────────────────────────────────────────────────────────────╮
+2026-10-05T23:35:49.0720539Z #13 1.089    │                                                                  │
+2026-10-05T23:35:49.0721768Z #13 1.089    │                Update available! 9.15.4 → 12.9.1.                │
+2026-10-05T23:35:49.0723158Z #13 1.089    │   Changelog: https://github.com/pnpm/pnpm/releases/tag/v12.9.1   │
+2026-10-05T23:35:49.0724473Z #13 1.089    │         Run "corepack install -g pnpm@12.9.1" to update.         │
+2026-10-05T23:35:49.0725671Z #13 1.089    │                                                                  │
+2026-10-05T23:35:49.0727139Z #13 1.089    ╰──────────────────────────────────────────────────────────────────╯
+2026-10-05T23:35:49.0727963Z #13 1.089 
+2026-10-05T23:35:49.6174575Z #13 1.636 Progress: resolved 473, reused 0, downloaded 60, added 45
+2026-10-05T23:35:50.6200388Z #13 2.639 Progress: resolved 473, reused 0, downloaded 113, added 106
+2026-10-05T23:35:51.6209634Z #13 3.640 Progress: resolved 473, reused 0, downloaded 126, added 113
+2026-10-05T23:35:52.6210492Z #13 4.640 Progress: resolved 473, reused 0, downloaded 139, added 126
+2026-10-05T23:35:53.6240801Z #13 5.641 Progress: resolved 473, reused 0, downloaded 236, added 224
+2026-10-05T23:35:54.6233943Z #13 6.642 Progress: resolved 473, reused 0, downloaded 366, added 362
+2026-10-05T23:35:55.1416650Z #13 7.161 Progress: resolved 473, reused 0, downloaded 473, added 473, done
+2026-10-05T23:35:56.0588884Z #13 8.078 
+2026-10-05T23:35:56.0589690Z #13 8.078 dependencies:
+2026-10-05T23:35:56.0590289Z #13 8.078 + @pdf-lib/fontkit 1.1.1
+2026-10-05T23:35:56.0590952Z #13 8.078 + @react-three/drei 10.7.8
+2026-10-05T23:35:56.0591507Z #13 8.078 + @react-three/fiber 9.7.0
+2026-10-05T23:35:56.0592523Z #13 8.078 + @supabase/ssr 0.7.0
+2026-10-05T23:35:56.0593103Z #13 8.078 + @supabase/supabase-js 2.45.4
+2026-10-05T23:35:56.0593748Z #13 8.078 + @vercel/oidc 3.8.5
+2026-10-05T23:35:56.0594193Z #13 8.078 + jose 6.2.12
+2026-10-05T23:35:56.0594717Z #13 8.078 + lossless-json 4.3.0
+2026-10-05T23:35:56.0595304Z #13 8.078 + lucide-react 1.38.0
+2026-10-05T23:35:56.0595815Z #13 8.078 + next 15.5.24
+2026-10-05T23:35:56.0596307Z #13 8.078 + pdf-lib 1.17.1
+2026-10-05T23:35:56.0596800Z #13 8.078 + pg 8.23.0
+2026-10-05T23:35:56.0597271Z #13 8.078 + phaser 3.90.0
+2026-10-05T23:35:56.0597751Z #13 8.078 + react 19.2.8
+2026-10-05T23:35:56.0598244Z #13 8.078 + react-dom 19.2.8
+2026-10-05T23:35:56.0598750Z #13 8.078 + server-only 0.0.1
+2026-10-05T23:35:56.0599494Z #13 8.078 + three 0.185.1
+2026-10-05T23:35:56.0599983Z #13 8.078 + zod 3.25.76
+2026-10-05T23:35:56.0600405Z #13 8.078 
+2026-10-05T23:35:56.0600857Z #13 8.078 devDependencies:
+2026-10-05T23:35:56.0601409Z #13 8.078 + @electric-sql/pglite 0.3.14
+2026-10-05T23:35:56.0601949Z #13 8.078 + @eslint/eslintrc 3.3.5
+2026-10-05T23:35:56.0602437Z #13 8.078 + @types/node 22.19.21
+2026-10-05T23:35:56.0602883Z #13 8.078 + @types/pg 8.23.1
+2026-10-05T23:35:56.0603339Z #13 8.078 + @types/react 19.2.18
+2026-10-05T23:35:56.0603829Z #13 8.078 + @types/react-dom 19.2.3
+2026-10-05T23:35:56.0604378Z #13 8.078 + @types/three 0.185.4
+2026-10-05T23:35:56.0604920Z #13 8.078 + @vercel/ncc 0.45.0
+2026-10-05T23:35:56.0605460Z #13 8.078 + autoprefixer 10.5.0
+2026-10-05T23:35:56.0605983Z #13 8.078 + eslint 9.39.4
+2026-10-05T23:35:56.0606540Z #13 8.078 + eslint-config-next 15.5.24
+2026-10-05T23:35:56.0607100Z #13 8.078 + playwright 1.62.1
+2026-10-05T23:35:56.0607613Z #13 8.078 + postcss 8.5.23
+2026-10-05T23:35:56.0608109Z #13 8.078 + tailwindcss 3.4.19
+2026-10-05T23:35:56.0608606Z #13 8.078 + typescript 5.9.3
+2026-10-05T23:35:56.0608998Z #13 8.078 
+2026-10-05T23:35:56.2104338Z #13 8.079 Done in 7.9s
+2026-10-05T23:35:58.3086361Z #13 DONE 10.3s
+2026-10-05T23:35:58.4154535Z 
+2026-10-05T23:35:58.4154988Z #14 [build  7/10] COPY lib ./lib
+2026-10-05T23:35:58.4155480Z #14 DONE 0.1s
+2026-10-05T23:35:58.4155698Z 
+2026-10-05T23:35:58.4156320Z #15 [build  8/10] COPY services/external-integrations-qbo/src ./services/external-integrations-qbo/src
+2026-10-05T23:35:58.4156862Z #15 DONE 0.0s
+2026-10-05T23:35:58.4156993Z 
+2026-10-05T23:35:58.4157353Z #16 [build  9/10] COPY tsconfig.json ./tsconfig.json
+2026-10-05T23:35:58.4157787Z #16 DONE 0.0s
+2026-10-05T23:35:58.5667698Z 
+2026-10-05T23:35:58.5670062Z #17 [build 10/10] RUN /app/node_modules/.bin/ncc build       services/external-integrations-qbo/src/entry.ts       -o services/external-integrations-qbo/dist       --minify       --no-cache       --license licenses.txt       --external server-only &&     ! grep -Fq '@/lib/' services/external-integrations-qbo/dist/index.js
+2026-10-05T23:35:58.7486906Z #17 0.332 ncc: Version 0.45.0
+2026-10-05T23:35:58.8992256Z #17 0.333 ncc: Compiling file index.js into CJS
+2026-10-05T23:35:59.3914939Z #17 0.975 ncc: Using typescript@5.9.3 (local user-provided)
+2026-10-05T23:36:21.4668306Z #17 23.05    4kB  services/external-integrations-qbo/dist/index.js
+2026-10-05T23:36:21.4669109Z #17 23.05   17kB  services/external-integrations-qbo/dist/licenses.txt
+2026-10-05T23:36:21.4670290Z #17 23.05  406kB  services/external-integrations-qbo/dist/424.index.js
+2026-10-05T23:36:21.4670919Z #17 23.05  726kB  services/external-integrations-qbo/dist/664.index.js
+2026-10-05T23:36:21.4671424Z #17 23.05 1153kB  [22886ms] - ncc 0.45.0
+2026-10-05T23:36:21.6604742Z #17 DONE 23.2s
+2026-10-05T23:36:21.8722690Z 
+2026-10-05T23:36:21.8723844Z #18 [runtime 3/4] COPY --from=build --chown=65532:65532 /app/services/external-integrations-qbo/dist ./
+2026-10-05T23:36:21.8724806Z #18 DONE 0.0s
+2026-10-05T23:36:21.8725041Z 
+2026-10-05T23:36:21.8726299Z #19 [runtime 4/4] COPY --from=build --chown=65532:65532 /app/node_modules/.pnpm/server-only@0.0.1/node_modules/server-only ./node_modules/server-only
+2026-10-05T23:36:21.8727433Z #19 DONE 0.0s
+2026-10-05T23:36:21.8728012Z 
+2026-10-05T23:36:21.8728785Z #20 exporting to image
+2026-10-05T23:36:21.8729153Z #20 exporting layers
+2026-10-05T23:36:22.0088790Z #20 exporting layers 0.3s done
+2026-10-05T23:36:22.0297978Z #20 writing image sha256:de993cbc14be21e92cff4d51cf5d8ac5100ea49a30fb718ea6ba0f06c0df6fa0 done
+2026-10-05T23:36:22.0299966Z #20 naming to docker.io/library/vaeroex-qbo-qualification:a42e28ab1ef6f890e102 done
+2026-10-05T23:36:22.0301038Z #20 DONE 0.3s
+2026-10-05T23:36:23.7091637Z {"imageSmoke":"passed","modes":6,"network":"none","databaseConnections":0,"providerCalls":0,"node":"22.23.3","openssl":"3.5.8","systemOpenSslLinked":false,"nativeAddons":0,"pgNativeAvailable":false,"quicBuiltinAvailable":false,"kernelVdsoVerified":true,"elfNeeded":["ld-linux-x86-64.so.2","libc.so.6","libdl.so.2","libgcc_s.so.1","libm.so.6","libpthread.so.0","libstdc++.so.6"],"bundleSha256":"96e1dd5e3b66879cf4368c37ade7685f037cabf861e7c71b6023e72ba78d1ead","uid":65532}
+2026-10-05T23:36:25.8386516Z {"qualification":"qbo_linux_image","sourceCommit":"9d1f685e0b045262841e15b4da50538b192baefe","sourceTree":"421d18fa21dcf77997a008ec7888e9adde4f0711","workflowSha":"9d1f685e0b045262841e15b4da50538b192baefe","runId":"37388239534","runAttempt":"1","limits":{"buildMs":900000,"smokeMs":120000,"commandMs":30000,"minimumFreeBytes":10737418240,"maximumDiskGrowthBytes":8589934592,"smokeMemoryBytes":268435456,"smokeCpus":1,"smokePids":128},"host":{"platform":"linux","architecture":"x64","cpus":4,"memoryBytes":16766414848,"initialFreeBytes":87782973440},"docker":{"serverVersion":"28.0.4","cpus":4,"memoryBytes":16766414848,"driver":"overlay2","architecture":"x86_64"},"commands":[{"executable":"docker","args":["info","--format","{{json .}}"],"timeoutMs":30000},{"executable":"docker","args":["build","--platform=linux/amd64","--pull","--progress=plain","--iidfile","/tmp/qbo-image-qualification-vHhtXO/image-id","--build-arg","QBO_SOURCE_COMMIT=9d1f685e0b045262841e15b4da50538b192baefe","--tag","vaeroex-qbo-qualification:a42e28ab1ef6f890e102","--file","/tmp/qbo-image-qualification-vHhtXO/context/services/external-integrations-qbo/Dockerfile","/tmp/qbo-image-qualification-vHhtXO/context"],"timeoutMs":900000},{"executable":"docker","args":["image","inspect","sha256:de993cbc14be21e92cff4d51cf5d8ac5100ea49a30fb718ea6ba0f06c0df6fa0"],"timeoutMs":30000},{"executable":"docker","args":["create","--name","vaeroex-qbo-smoke-a42e28ab1ef6f890e102","--label","com.vaeroex.qbo-image-qualification=a42e28ab1ef6f890e102","--pull=never","--platform=linux/amd64","--network=none","--read-only","--cap-drop=ALL","--security-opt=no-new-privileges:true","--cpus=1","--memory=256m","--memory-swap=256m","--pids-limit=128","--tmpfs","/tmp:rw,noexec,nosuid,nodev,size=16m,mode=1777","--mount","type=bind,source=/tmp/qbo-image-qualification-vHhtXO/context/services/external-integrations-qbo/image-smoke.mjs,target=/qbo-image-smoke.mjs,readonly","sha256:de993cbc14be21e92cff4d51cf5d8ac5100ea49a30fb718ea6ba0f06c0df6fa0","/qbo-image-smoke.mjs","9d1f685e0b045262841e15b4da50538b192baefe"],"timeoutMs":30000},{"executable":"docker","args":["inspect","vaeroex-qbo-smoke-a42e28ab1ef6f890e102"],"timeoutMs":30000},{"executable":"docker","args":["start","--attach","vaeroex-qbo-smoke-a42e28ab1ef6f890e102"],"timeoutMs":120000},{"executable":"docker","args":["inspect","vaeroex-qbo-smoke-a42e28ab1ef6f890e102"],"timeoutMs":30000},{"executable":"docker","args":["inspect","vaeroex-qbo-smoke-a42e28ab1ef6f890e102"],"timeoutMs":30000},{"executable":"docker","args":["rm","--force","vaeroex-qbo-smoke-a42e28ab1ef6f890e102"],"timeoutMs":30000},{"executable":"docker","args":["image","rm","vaeroex-qbo-qualification:a42e28ab1ef6f890e102"],"timeoutMs":30000}],"network":{"build":"public pinned images and dependency downloads only; no inherited credentials","smoke":"none"},"imagePushed":false,"providerCalls":0,"databaseConnections":0,"pullRequestHead":"cea1a1f23f9ab634b6993af7d86140cd98bac68a","inputs":{"dockerfileSha256":"23b4aaa6e03e4eb5c6187a15173484284b519993d2982aeb4fe2a9be2af91b81","smokeSha256":"715577f1bd7b5d27ee1f09fa351e977c310e15011cb0c87881527312e6a4309b","packageSha256":"6d3ba3ac193d7ed715e002bd54b77365e55186b230477b35c7c4a715594b65a9","lockfileSha256":"40bc351ed2e2d30f313ba0014f3777bbd563b59fc988b120c00d5cc67ec89c59","patchSha256":"72d9011592c467205574770e1d8f1ef3329602d1774a52730120e491be2158ad","archiveSha256":"74d8400040df86dcbff574e31aa5474daec8104687382c899ff17d91c70114de","bases":["node:22.23.1-bookworm-slim@sha256:6c74791e557ce11fc957704f6d4fe134a7bc8d6f5ca4403205b2966bd488f6b3","gcr.io/distroless/nodejs22-debian13:nonroot@sha256:5ef534d3db0ac0c43bee379af4ae49cfbfc0ef38a46c94c52d87c68f32f34d8a"]},"image":{"id":"sha256:de993cbc14be21e92cff4d51cf5d8ac5100ea49a30fb718ea6ba0f06c0df6fa0","repoDigests":[],"sizeBytes":153852117,"architecture":"amd64","os":"linux","user":"65532:65532","sourceCommit":"9d1f685e0b045262841e15b4da50538b192baefe","rootFsLayers":["sha256:9486261b5a13f63ca6904b36721527ac8f19df53d300560138d69ae9b4c203de","sha256:621c35e751a51a9a9dc3e80aa0b7fe8be2a93402ea6ccd307d30852cd7776cda","sha256:763a77745f27b86cf26b97887b6842d83720e63b1c48848c0ba9ee54e351d63a","sha256:f0d0eff4c2312a7bd6e21797bdfea5eb35f60e76b555ce2b22794424af2cad36","sha256:275a30dd8ce958b21daa9ad962c6fbc09f98306ee2f486b65c9075dc257b1412","sha256:4d049f83d9cf21d1f5cc0e11deaf36df02790d0e60c1a3829538fb4b61685368","sha256:af5aa97ebe6ce1604747ec1e21af7136ded391bcabe4acef882e718a87c86bcc","sha256:6f1cdceb6a3146f0ccb986521156bef8a422cdbb0863396f7f751f575ba308f4","sha256:bd3cdfae1d3fdd83a2231d608969b38b82349777c2fff9a7c12d54f8ac5c9b38","sha256:4cde6b0bb6f50a5f255eef7b2a42162c661cf776b803225dcac9a659e396bb6b","sha256:ad51d0769d16ba578106a177987dfe3d2e02c1668c852b795b2f6b024068242a","sha256:187cfc6d1e3e8a40a5e64653bcd3239c140807dcf1c09e48021178705a5a6139","sha256:f2392a9484bf6b18f06beaf705b994e31dbb2716c99cf7d03c9c495cd107f364","sha256:8a3b315d45080ecb38e39d42d28e951303c67c2ce7482bcdbbc3b5424be19013","sha256:ada8421c741188c83c2e6de96450043e65ce6233e7d2a1d84cd789a0ad97f420","sha256:c0e409312adc366898967307565f692bb33d43a439d3de48e27d14b742389725","sha256:e4ba966d7f0527dfe0fcb559e4e18d4da42c4e6beae924719255e0dedb554ed0","sha256:1f5d28bd51650f429293f7730ede274b81dc0744aa918bc887133c4ad610258c","sha256:6e18ad80f3d64a8cbbcd1ff2e8a0d5ce7282cf664e816b86183a59d30a618e8a","sha256:c16b2ec4b1493bad1b1de23d659c899e60abb166bda756d02792f0a03ba54a43","sha256:7db505d90756626f425c6c5468eca565c82f589b144ecaa4f411ad9bbf79e614","sha256:d99e6a7fc3457e2fe86160ade531b8036e86ad14e576e5c09d4e94da2e132ff6","sha256:8b269dca8ad534462ce27f8c288696b68f4aec2a1d18d478522aa303312cabff","sha256:4a46649a57e0672bbd0a2f23ec02ff617bc9dbc64649dffc65bd3d2711a3deae","sha256:26ceac8ada62d251ba6b89c95d0874a8acbdeabb128619e504bfb661b9c2978b"]},"smoke":{"imageSmoke":"passed","modes":6,"network":"none","databaseConnections":0,"providerCalls":0,"node":"22.23.3","openssl":"3.5.8","systemOpenSslLinked":false,"nativeAddons":0,"pgNativeAvailable":false,"quicBuiltinAvailable":false,"kernelVdsoVerified":true,"elfNeeded":["ld-linux-x86-64.so.2","libc.so.6","libdl.so.2","libgcc_s.so.1","libm.so.6","libpthread.so.0","libstdc++.so.6"],"bundleSha256":"96e1dd5e3b66879cf4368c37ade7685f037cabf861e7c71b6023e72ba78d1ead","uid":65532},"containerState":{"exitCode":0,"oomKilled":false},"status":"passed","stage":"complete","elapsedMs":45147,"diskGrowthBytes":1682563072,"cleanup":["owned smoke container removed","owned image tag removed"],"buildCancellationUnconfirmed":false}

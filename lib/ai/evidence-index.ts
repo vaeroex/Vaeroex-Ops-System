@@ -183,9 +183,9 @@ function stringItems(value: unknown): string[] {
     .map((item) => {
       if (typeof item === "string") return item.trim();
       if (!isRecord(item)) return "";
-      return Object.values(item)
-        .filter((entry) => typeof entry === "string" || typeof entry === "number")
-        .map(String)
+      return Object.entries(item)
+        .filter(([, entry]) => typeof entry === "string" || typeof entry === "number")
+        .map(([key, entry]) => `${key.replace(/_/g, " ")} ${String(entry)}`)
         .join(" ")
         .trim();
     })
@@ -201,15 +201,61 @@ function evidenceTerms(value: string) {
   );
 }
 
-function isClaimSupportedBySource(claim: string, sourceTerms: Set<string>) {
+const NUMERIC_CONTEXT_STOP_WORDS = new Set([
+  "name", "amount", "actual", "value", "was", "were", "has", "had", "with", "compared", "against", "than", "from", "into", "for", "the", "and", "that", "this", "which", "recorded", "reported"
+]);
+const PERIOD_TERMS = /\b(?:january|february|march|april|may|june|july|august|september|october|november|december|q[1-4])\b/gi;
+
+function numericEvidence(value: string) {
+  const normalized = value.toLowerCase().replace(/\u2212/g, "-").replace(/\bpercent\b/g, "%");
+  const matches = Array.from(normalized.matchAll(/(?:[-+]?\s*[$€£]\s*|[$€£]?\s*[-+]?)\d+(?:,\d{3})*(?:\.\d+)?(?:\s*\/\s*\d+(?:\.\d+)?)?(?:\s*(?:%|usd\b|eur\b|gbp\b|dollars?\b|euros?\b|pounds?\b|days?\b|hours?\b|units?\b))?/g));
+  return matches.map((match, index) => {
+    const start = match.index!;
+    const end = start + match[0].length;
+    const before = normalized.slice(index ? matches[index - 1].index! + matches[index - 1][0].length : 0, start);
+    const after = normalized.slice(end, matches[index + 1]?.index ?? normalized.length);
+    const context = `${before} ${after}`;
+    const contextLabels = (text: string) => Array.from(evidenceTerms(text)).filter((term) => !NUMERIC_CONTEXT_STOP_WORDS.has(term) && !/\d/.test(term));
+    const beforeLabels = contextLabels(before);
+    const labels = beforeLabels.length ? beforeLabels : contextLabels(after);
+    let token = match[0].replace(/[\s,]/g, "").replace(/^\+/, "");
+    if (normalized[start - 1] === "(" && normalized[end] === ")") token = `-${token}`;
+    token = token.replace(/^(\$)(-)/, "$2$1").replace(/(?:usd|dollars?)$/, "USD").replace(/(?:eur|euros?)$/, "EUR").replace(/(?:gbp|pounds?)$/, "GBP");
+    token = token.replace(/\$/, "USD").replace(/€/, "EUR").replace(/£/, "GBP").replace(/^(.*?)(USD|EUR|GBP)$/, "$2$1").replace(/^(USD|EUR|GBP)-/, "-$1");
+    return { token, labels, periods: Array.from(context.matchAll(PERIOD_TERMS), (period) => period[0]) };
+  });
+}
+
+function isClaimSupportedBySource(claim: string, sourceText: string) {
+  const sourceTerms = evidenceTerms(sourceText);
   const claimTerms = evidenceTerms(claim);
   if (!claimTerms.size || !sourceTerms.size) return false;
 
   const sharedTerms = Array.from(claimTerms).filter((term) => sourceTerms.has(term));
-  const numericTerms = Array.from(claimTerms).filter((term) => /\d|[$%]/.test(term));
-  const numericSupport = numericTerms.length > 0 && numericTerms.every((term) => sourceTerms.has(term));
-
-  return numericSupport ? sharedTerms.length >= 2 : sharedTerms.length >= Math.min(3, claimTerms.size);
+  const numbers = numericEvidence(claim);
+  if (numbers.length) {
+    let precedingPeriods: string[] = [];
+    const sourceFacts = sourceText.split(/\n|(?<=[.!?;])\s+/).flatMap((statement) => {
+      const periods = Array.from(statement.matchAll(PERIOD_TERMS), (period) => period[0].toLowerCase());
+      if (periods.length) precedingPeriods = periods;
+      return numericEvidence(statement).map((fact) => ({ ...fact, periods: fact.periods.length ? fact.periods : precedingPeriods }));
+    });
+    // Match a number to its surrounding metric/period, never to an unrelated
+    // number elsewhere in the file. This is a conservative screening gate;
+    // it does not replace the user's confirmation of generated assertions.
+    if (!numbers.every((number) => sourceFacts.some((fact) => {
+      if (fact.token !== number.token) return false;
+      const claimedPeriods = number.periods;
+      if (claimedPeriods.length && fact.periods.length && !claimedPeriods.every((period) => fact.periods.includes(period))) return false;
+      if (claimedPeriods.some((period) => !sourceTerms.has(period))) return false;
+      const labels = number.labels.filter((label) => !claimedPeriods.includes(label));
+      const common = labels.filter((label) => fact.labels.includes(label));
+      return labels.length > 0 && common.length === labels.length;
+    }))) return false;
+    const directions = claim.match(/\b(?:increased|decreased|grew|rose|fell|declined|improved|worsened)\b/gi) || [];
+    if (directions.some((direction) => !sourceTerms.has(direction.toLowerCase()))) return false;
+  }
+  return sharedTerms.length >= Math.min(numbers.length ? 2 : 3, claimTerms.size);
 }
 
 export function assessFileAnalysisEvidence({
@@ -244,8 +290,7 @@ export function assessFileAnalysisEvidence({
     (item) => !TECHNICAL_FAILURE_LANGUAGE.test(item) && !UNGROUNDED_VISIBILITY_LANGUAGE.test(item)
   );
   const sourceText = normalizeText(extractedSourceText);
-  const sourceTerms = evidenceTerms(sourceText);
-  const supportedFacts = cleanFacts.filter((item) => isClaimSupportedBySource(item, sourceTerms));
+  const supportedFacts = cleanFacts.filter((item) => isClaimSupportedBySource(item, sourceText));
   const sourceHasContent = extractedRowCount > 0 || sourceText.length >= 80;
   const hasTechnicalFailure = isPlatformFailureText(combined) || TECHNICAL_FAILURE_LANGUAGE.test(combined);
   const narrativeHasBusinessDetail = /\b\d+(?:\.\d+)?%?\b|[$€£]|\b(?:revenue|sales|orders?|inventory|customers?|employees?|delivery|invoice|margin|cost|owner|department|policy|procedure|deadline|status)\b/i.test(
@@ -256,9 +301,10 @@ export function assessFileAnalysisEvidence({
     (extractedRowCount > 0 || sourceText.length >= 160) &&
     narrative.length >= 80 &&
     narrativeHasBusinessDetail &&
-    isClaimSupportedBySource(narrative, sourceTerms) &&
+    isClaimSupportedBySource(narrative, sourceText) &&
     !UNGROUNDED_VISIBILITY_LANGUAGE.test(narrative);
-  const factsExtracted = sourceHasContent && (supportedFacts.length > 0 || groundedNarrative);
+  const unsupportedNumericNarrative = numericEvidence(narrative).length > 0 && !isClaimSupportedBySource(narrative, sourceText);
+  const factsExtracted = sourceHasContent && supportedFacts.length === cleanFacts.length && !unsupportedNumericNarrative && (supportedFacts.length > 0 || groundedNarrative);
 
   if (hasTechnicalFailure) {
     return {
@@ -290,7 +336,7 @@ export function assessFileAnalysisEvidence({
     extractionOutcome: "facts_extracted",
     reason: null,
     factCount: supportedFacts.length,
-    requiresReview: sourceGrounding === "model_extraction",
+    requiresReview: true,
     sourceGrounding
   };
 }
@@ -531,12 +577,14 @@ export function filterEligibleMemoryRows<T extends MemoryChunkRow | MatchMemoryC
   files,
   runs,
   notes = [],
+  worksheetHeads = new Map<string, string | null>(),
   workspaceId
 }: {
   rows: T[];
   files: Array<Pick<FileUploadRow, "id" | "deleted_at" | "archived_at" | "metadata_json">>;
   runs: Array<Pick<AiAgentRunRow, "id" | "status" | "deleted_at" | "archived_at" | "input_json" | "output_json">>;
   notes?: Array<Pick<BusinessNoteRow, "id" | "workspace_id" | "release_channel" | "status" | "evidence_lifecycle_status" | "deleted_at" | "archived_at">>;
+  worksheetHeads?: Map<string, string | null>;
   workspaceId?: string;
 }) {
   const filesById = new Map(files.map((file) => [file.id, file]));
@@ -554,6 +602,15 @@ export function filterEligibleMemoryRows<T extends MemoryChunkRow | MatchMemoryC
     if (isFileEvidence) {
       const sourceFile = fileId ? filesById.get(fileId) : null;
       if (!sourceFile || !isBusinessEvidenceEligible(sourceFile) || !metadataIsEligible(sourceFile.metadata_json)) return false;
+    }
+
+    if (metadataRecord(row.source_metadata).indexing_method === "worksheet_import") {
+      if (!fileId || !worksheetHeads.has(fileId)) return false;
+      const head = worksheetHeads.get(fileId);
+      const attempt = metadataRecord(row.source_metadata).import_attempt_id;
+      // Legacy evidence remains available until the first durable publication.
+      // A held attempt never replaces the most recent completed generation.
+      if (head ? attempt !== head : Boolean(attempt)) return false;
     }
 
     const runId = runIdForChunk(row);
@@ -620,9 +677,37 @@ export async function filterEligibleMemoryRowsByLifecycle<T extends MemoryChunkR
       : Promise.resolve({ data: [], error: null })
   ]);
 
-  if (filesResult.error || runsResult.error || notesResult.error) return [];
+  if (filesResult.error || runsResult.error || notesResult.error) {
+    throw new Error("Business Memory source availability could not be verified. Please try again.");
+  }
+  const worksheetFileIds = Array.from(new Set(rows.flatMap((row) =>
+    metadataRecord(row.source_metadata).indexing_method === "worksheet_import"
+      ? [row.source_file_id || row.source_id].filter((id): id is string => Boolean(id))
+      : []
+  )));
+  const worksheetHeads = new Map<string, string | null>();
+  for (let offset = 0; offset < worksheetFileIds.length; offset += 200) {
+    const requested = worksheetFileIds.slice(offset, offset + 200);
+    const { data, error } = await supabase.rpc("get_worksheet_publication_heads_v1", {
+      p_workspace_id: workspaceId, p_file_ids: requested
+    });
+    if (error || !Array.isArray(data)) throw new Error("Worksheet evidence publication could not be verified. Please try again.");
+    for (const head of data) {
+      if (!head || typeof head.file_id !== "string" || !requested.includes(head.file_id) || worksheetHeads.has(head.file_id)
+        || (head.completed_attempt_id !== null && (typeof head.completed_attempt_id !== "string" || !head.completed_attempt_id))) {
+        throw new Error("Worksheet evidence publication could not be verified. Please try again.");
+      }
+      worksheetHeads.set(head.file_id, head.completed_attempt_id);
+    }
+    // Missing parents are already ineligible; an existing parent without its
+    // authority row is an unavailable/truncated response, never legacy fallback.
+    if (requested.some((id) => (filesResult.data || []).some((file) => file.id === id) && !worksheetHeads.has(id))) {
+      throw new Error("Worksheet evidence publication could not be verified. Please try again.");
+    }
+  }
   return filterEligibleMemoryRows({
     rows,
+    worksheetHeads,
     files: filesResult.data || [],
     runs: runsResult.data || [],
     notes: notesResult.data || [],
@@ -1005,7 +1090,8 @@ export async function indexFileAnalysisEvidence({
   runId,
   extractedText,
   summary,
-  metadata
+  metadata,
+  confirmation
 }: {
   supabase: SupabaseClient<Database>;
   workspaceId: string;
@@ -1015,7 +1101,11 @@ export async function indexFileAnalysisEvidence({
   extractedText: string;
   summary?: string | null;
   metadata?: Json;
+  confirmation?: { userId: string; runId: string };
 }) {
+  if (!confirmation || confirmation.userId !== userId || confirmation.runId !== runId) {
+    return { indexedChunks: 0, error: "Confirm the generated findings before adding this analysis to Business Memory." };
+  }
   // Relational extraction lineage is checked before chunking or embedding.
   // Editable file metadata cannot downgrade a review-gated source to native.
   const extractionEligibility = await assertDocumentExtractionAuthority({
@@ -1091,33 +1181,6 @@ export async function indexFileAnalysisEvidence({
     return { indexedChunks: 0, error: "No readable evidence chunks were available to index." };
   }
 
-  const { data: job } = await supabase
-    .from("file_processing_jobs")
-    .insert({
-      workspace_id: workspaceId,
-      file_upload_id: file.id,
-      job_type: "index",
-      status: "processing",
-      attempts: 1,
-      started_at: startedAt,
-      created_by: userId || null,
-      metadata_json: {
-        source: "file_analysis",
-        run_id: runId || null,
-        chunk_count: chunks.length,
-        evidence_classification: "business_evidence",
-        extraction_outcome: "facts_extracted"
-      }
-    })
-    .select("id")
-    .maybeSingle();
-
-  await supabase
-    .from("file_uploads")
-    .update({ index_status: "processing", index_error: null })
-    .eq("id", file.id)
-    .eq("workspace_id", workspaceId);
-
   const embedding = await createEmbeddings(chunks);
   const quality = sourceQualityForFile(file, normalized);
   const confidenceScore = chunkConfidenceScore({ quality, chunkCount: chunks.length, textLength: normalized.length });
@@ -1153,70 +1216,31 @@ export async function indexFileAnalysisEvidence({
     },
     source_quality: quality,
     confidence_score: confidenceScore,
-    token_estimate: estimateTokenCount(chunk)
+    token_estimate: estimateTokenCount(chunk),
+    indexed_at: startedAt,
+    updated_at: startedAt,
+    archived_at: null,
+    deleted_at: null
   }));
-  const { error } = await supabase.from("business_memory_chunks").upsert(rows, {
-    onConflict: "workspace_id,source_type,source_id,content_hash,chunk_index"
+  // Publication, retirement and its durable receipt are one database commit.
+  // A retry reuses the confirmed run and can recover a lost RPC acknowledgement.
+  const { data, error } = await supabase.rpc("publish_confirmed_file_memory_v1", {
+    p_workspace_id: workspaceId,
+    p_file_id: file.id,
+    p_run_id: runId,
+    p_confirmed_by: confirmation.userId,
+    p_chunks: rows as unknown as Json,
+    p_summary: summary || file.analysis_summary || "Approved file analysis.",
+    p_embedding_error: embedding.error || null
   });
-  const completedAt = new Date().toISOString();
-
-  if (error) {
-    await Promise.all([
-      supabase
-        .from("file_uploads")
-        .update({
-          index_status: "failed",
-          index_error: error.message,
-          indexed_at: completedAt
-        })
-        .eq("id", file.id)
-        .eq("workspace_id", workspaceId),
-      job?.id
-        ? supabase
-            .from("file_processing_jobs")
-            .update({ status: "failed", error_message: error.message, completed_at: completedAt })
-            .eq("id", job.id)
-            .eq("workspace_id", workspaceId)
-        : Promise.resolve()
-    ]);
-
-    return { indexedChunks: 0, error: error.message };
+  if (error || !isRecord(data) || data.indexed_chunks !== rows.length) {
+    return {
+      indexedChunks: 0,
+      error: error?.code === "40001"
+        ? "This analysis or its saved memory changed. Reload the source before confirming it again."
+        : "Business Memory publication could not be confirmed. Reload this source and retry the same reviewed analysis to reconcile its saved result."
+    };
   }
-
-  await Promise.all([
-    supabase
-      .from("file_uploads")
-      .update({
-        index_status: "ready",
-        index_error: embedding.error || null,
-        indexed_at: completedAt,
-        indexed_chunk_count: rows.length
-      })
-      .eq("id", file.id)
-      .eq("workspace_id", workspaceId),
-    job?.id
-      ? supabase
-          .from("file_processing_jobs")
-          .update({
-            status: "completed",
-            error_message: embedding.error || null,
-            completed_at: completedAt,
-            metadata_json: {
-              source: "file_analysis",
-              run_id: runId || null,
-              chunk_count: rows.length,
-              evidence_classification: "business_evidence",
-              extraction_outcome: "facts_extracted",
-              embedding_model: embedding.model,
-              embedding_tokens: embedding.tokens,
-              embedding_error: embedding.error || null
-            }
-          })
-          .eq("id", job.id)
-          .eq("workspace_id", workspaceId)
-      : Promise.resolve()
-  ]);
-
   return { indexedChunks: rows.length, error: embedding.error };
 }
 
@@ -1233,6 +1257,7 @@ export async function indexWorksheetImportEvidence({
   userId,
   file,
   importId,
+  importAttemptId,
   worksheets
 }: {
   supabase: SupabaseClient<Database>;
@@ -1240,8 +1265,12 @@ export async function indexWorksheetImportEvidence({
   userId?: string | null;
   file: FileUploadRow;
   importId: string;
+  importAttemptId: string;
   worksheets: WorksheetImportEvidence[];
 }) {
+  if (typeof importAttemptId !== "string" || !importAttemptId.trim()) {
+    return { indexedChunks: 0, error: "A durable approved import attempt is required for worksheet evidence." };
+  }
   if (file.deleted_at || file.archived_at) {
     return { indexedChunks: 0, error: "Inactive source files cannot be added to Business Memory." };
   }
@@ -1283,20 +1312,6 @@ export async function indexWorksheetImportEvidence({
   }
 
   const indexedAt = new Date().toISOString();
-  const { data: existingRows, error: existingError } = await supabase
-    .from("business_memory_chunks")
-    .select("id,content_hash,chunk_index,source_metadata")
-    .eq("workspace_id", workspaceId)
-    .eq("source_type", "file")
-    .eq("source_file_id", file.id)
-    .is("deleted_at", null)
-    .is("archived_at", null)
-    .limit(MAX_INDEXED_CHUNKS_PER_FILE * 4);
-
-  if (existingError) {
-    return { indexedChunks: 0, error: existingError.message };
-  }
-
   const embedding = await createEmbeddings(chunks.map((chunk) => chunk.text));
   const rows = chunks.map<MemoryChunkInsert>((chunk, index) => {
     const rowNumbers = chunk.rows.map((row) => row.rowNumber);
@@ -1309,7 +1324,7 @@ export async function indexWorksheetImportEvidence({
       source_excerpt: chunk.text,
       summary: `${chunk.worksheet.name} from ${file.display_name}`,
       chunk_index: index,
-      content_hash: hashContent(`${file.id}:${chunk.worksheet.index}:${chunk.text}`),
+      content_hash: hashContent(`${file.id}:${importAttemptId}:${chunk.worksheet.index}:${chunk.text}`),
       embedding: embedding.embeddings[index] || null,
       embedding_model: embedding.embeddings[index] ? embedding.model : null,
       source_metadata: {
@@ -1319,6 +1334,7 @@ export async function indexWorksheetImportEvidence({
         source_record_type: "file_upload",
         source_record_id: file.id,
         import_id: importId,
+        import_attempt_id: importAttemptId,
         worksheet_name: chunk.worksheet.name,
         worksheet_index: chunk.worksheet.index,
         worksheet_type: chunk.worksheet.type,
@@ -1344,61 +1360,14 @@ export async function indexWorksheetImportEvidence({
       deleted_at: null
     };
   });
-  const currentChunkKeys = new Set(rows.map((row) => `${row.content_hash}:${row.chunk_index}`));
-  const previousWorksheetRows = (existingRows || []).filter((row) =>
-    metadataRecord(row.source_metadata).indexing_method === "worksheet_import" && !currentChunkKeys.has(`${row.content_hash}:${row.chunk_index}`)
-  );
-  const restoreSupersededWorksheetRows = async () => {
-    const results = await Promise.all(previousWorksheetRows.map((row) => supabase
-      .from("business_memory_chunks")
-      .update({
-        archived_at: null,
-        deleted_at: null,
-        source_metadata: row.source_metadata
-      })
-      .eq("workspace_id", workspaceId)
-      .eq("id", row.id)));
-    return results.find((result) => result.error)?.error || null;
-  };
-  for (let index = 0; index < previousWorksheetRows.length; index += 20) {
-    const batch = previousWorksheetRows.slice(index, index + 20);
-    const updates = await Promise.all(batch.map((row) => {
-      const metadata = metadataRecord(row.source_metadata);
-      return supabase
-        .from("business_memory_chunks")
-        .update({
-          archived_at: indexedAt,
-          deleted_at: indexedAt,
-          source_metadata: {
-            ...metadata,
-            invalidated_at: indexedAt,
-            invalidation_reason: "Superseded by a newly approved worksheet import."
-          }
-        })
-        .eq("workspace_id", workspaceId)
-        .eq("id", row.id);
-    }));
-    const updateError = updates.find((result) => result.error)?.error;
-    if (updateError) {
-      const rollbackError = await restoreSupersededWorksheetRows();
-      return {
-        indexedChunks: 0,
-        error: rollbackError
-          ? `${updateError.message} Superseded evidence restoration also failed: ${rollbackError.message}`
-          : updateError.message
-      };
-    }
-  }
-
-  const { error } = await supabase.from("business_memory_chunks").upsert(rows, {
+  // Append this uncommitted generation only. Retrieval consults the durable
+  // completed head; previous evidence stays intact if this attempt is held.
+  const { data: savedChunks, error } = await supabase.from("business_memory_chunks").upsert(rows, {
     onConflict: "workspace_id,source_type,source_id,content_hash,chunk_index"
-  });
+  }).select("id");
 
-  if (error) {
-    const rollbackError = await restoreSupersededWorksheetRows();
-    const errorMessage = rollbackError
-      ? `${error.message} Superseded evidence restoration also failed: ${rollbackError.message}`
-      : error.message;
+  if (error || !Array.isArray(savedChunks) || savedChunks.length !== rows.length) {
+    const errorMessage = "Worksheet evidence persistence could not be verified. Saved rows remain held for reconciliation.";
     await supabase
       .from("file_uploads")
       .update({ index_status: "failed", index_error: errorMessage, indexed_at: indexedAt })
@@ -1407,28 +1376,23 @@ export async function indexWorksheetImportEvidence({
     return { indexedChunks: 0, error: errorMessage };
   }
 
-  const { count, error: countError } = await supabase
-    .from("business_memory_chunks")
-    .select("id", { count: "exact", head: true })
-    .eq("workspace_id", workspaceId)
-    .eq("source_type", "file")
-    .eq("source_file_id", file.id)
-    .is("deleted_at", null)
-    .is("archived_at", null);
-
-  await supabase
+  const { data: updatedFiles, error: updateError } = await supabase
     .from("file_uploads")
     .update({
       index_status: "ready",
-      index_error: embedding.error || countError?.message || null,
+      index_error: embedding.error || null,
       indexed_at: indexedAt,
-      indexed_chunk_count: count ?? rows.length
+      indexed_chunk_count: rows.length
     })
     .eq("workspace_id", workspaceId)
-    .eq("id", file.id);
+    .eq("id", file.id)
+    .select("id");
+  if (updateError || !Array.isArray(updatedFiles) || updatedFiles.length !== 1) {
+    return { indexedChunks: 0, error: "Worksheet indexing status could not be verified. Saved rows remain held for reconciliation." };
+  }
 
   return {
     indexedChunks: rows.length,
-    error: embedding.error || countError?.message || null
+    error: embedding.error || null
   };
 }

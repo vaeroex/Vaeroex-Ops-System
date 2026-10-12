@@ -1,0 +1,28 @@
+{
+  "project": "mdiianhfrojmxqpwrflh",
+  "readOnly": true,
+  "maxConnections": 60,
+  "superuserReserved": 3,
+  "maxWorkerProcesses": 6,
+  "maxParallelWorkers": 2,
+  "observedConnections": 14,
+  "observedActiveQueries": 1,
+  "qboLoginRoles": {
+    "qbo_credential_broker_login": 4,
+    "qbo_oauth_ingress_login": 4,
+    "qbo_task_scheduler_login": 4,
+    "qbo_task_dispatcher_login": 4,
+    "qbo_provider_runtime_login": 4
+  },
+  "ledger": {
+    "count": 120,
+    "latest": "20261002182746",
+    "versionsMd5": "038dca41d1a1b4bc32cf2903ad0ff1be"
+  },
+  "limitations": [
+    "Separate read observations, not a release-cutoff snapshot.",
+    "Role connection limits protect database admission only if deployed DSNs use the intended roles; protected DSN contents were not fetched.",
+    "Supavisor queuing/client limits and peak shared headroom are not qualified by an idle snapshot."
+  ],
+  "observationDateUTC": "2026-10-05"
+}

@@ -119,7 +119,7 @@ export function executiveModel(empty = false) {
     readiness: { available: !empty, coverage: empty ? 0 : 68, label: "Partial", strongestArea: "Operations", strongestCoverage: 78, largestGap: "Financial history", recommendedNextSource: "Add the latest monthly financial summary.", showAddInformation: true },
   };
 }
-export const facts = freeze({ available: true, score: 76, status: "Watch", trajectory: "Improving", comparison: "Up 4 points", comparisonDelta: 4, dataQualityBase: 80, riskPenalty: 8, opportunityAdjustment: 4, confidence: "Medium", freshness: "current", latestEvidenceAt: AS_OF, deterministicSummary: "Synthetic operations review.", drivers: [], limitations: ["Synthetic preview; not a business assessment."] });
+export const facts = freeze({ available: true, score: 76, status: "Watch", trajectory: "Improving", comparison: "Up 4 points", comparisonDelta: 4, dataQualityBase: 50, riskPenalty: 8, opportunityAdjustment: 34, confidence: "Medium", freshness: "current", latestEvidenceAt: AS_OF, deterministicSummary: "Synthetic operations review.", drivers: [], limitations: ["Synthetic preview; not a business assessment."] });
 export function businessHealthFacts(empty = false) {
   if (!empty) return facts;
   return { ...facts, available: false, score: null, status: "Limited evidence", trajectory: null,

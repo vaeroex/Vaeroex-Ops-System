@@ -1,0 +1,66 @@
+[
+  {
+    "reason_blocked": "Too many blocked or suspicious actions in the last 10 minutes. Try again later or contact Vaeroex support.",
+    "created_at": "2026-10-05T09:12:10.167Z"
+  },
+  {
+    "reason_blocked": "User role is not allowed to execute this AI-mediated action.",
+    "created_at": "2026-10-05T09:12:08.462Z"
+  },
+  {
+    "reason_blocked": "User role is not allowed to execute this AI-mediated action.",
+    "created_at": "2026-10-05T09:12:05.126Z"
+  },
+  {
+    "reason_blocked": "User role is not allowed to execute this AI-mediated action.",
+    "created_at": "2026-10-05T09:11:59.063Z"
+  },
+  {
+    "reason_blocked": "User role is not allowed to execute this AI-mediated action.",
+    "created_at": "2026-10-05T09:11:55.913Z"
+  },
+  {
+    "reason_blocked": "User role is not allowed to execute this AI-mediated action.",
+    "created_at": "2026-10-05T09:11:49.587Z"
+  },
+  {
+    "reason_blocked": "User role is not allowed to execute this AI-mediated action.",
+    "created_at": "2026-10-05T09:11:46.439Z"
+  },
+  {
+    "reason_blocked": "User role is not allowed to execute this AI-mediated action.",
+    "created_at": "2026-10-05T09:11:40.009Z"
+  },
+  {
+    "reason_blocked": "User role is not allowed to execute this AI-mediated action.",
+    "created_at": "2026-10-05T09:11:36.693Z"
+  },
+  {
+    "reason_blocked": "User role is not allowed to execute this AI-mediated action.",
+    "created_at": "2026-10-05T09:07:12.600Z"
+  },
+  {
+    "reason_blocked": "User role is not allowed to execute this AI-mediated action.",
+    "created_at": "2026-10-05T09:07:09.395Z"
+  },
+  {
+    "reason_blocked": "User role is not allowed to execute this AI-mediated action.",
+    "created_at": "2026-10-05T09:03:18.575Z"
+  },
+  {
+    "reason_blocked": "User role is not allowed to execute this AI-mediated action.",
+    "created_at": "2026-10-05T09:03:15.235Z"
+  },
+  {
+    "reason_blocked": "User role is not allowed to execute this AI-mediated action.",
+    "created_at": "2026-10-05T08:51:35.444Z"
+  },
+  {
+    "reason_blocked": "User role is not allowed to execute this AI-mediated action.",
+    "created_at": "2026-10-05T08:51:35.314Z"
+  },
+  {
+    "reason_blocked": "User role is not allowed to execute this AI-mediated action.",
+    "created_at": "2026-10-05T08:48:35.622Z"
+  }
+]

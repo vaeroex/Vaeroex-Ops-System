@@ -183,7 +183,7 @@ function SummaryPanel({
       </section>
       <section className={`vaeroex-semantic-detail border-l-2 pl-3 ${semanticStatusClass(categoryStatus)}`}>
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan-100">Leadership decision</p>
-        <p className="mt-2 text-slate-100">{compactText(insight.recommendedAction, 260)}</p>
+        <p className="mt-2 break-words text-slate-100">{insight.recommendedAction}</p>
       </section>
       <section>
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Limitation</p>
@@ -310,7 +310,7 @@ function EvidencePanel({ insight }: { insight: IntelligenceInsight }) {
         <p><span className="font-semibold text-slate-100">Supporting records:</span> {insight.evidenceCount}</p>
         <p><span className="font-semibold text-slate-100">Independent sources:</span> {insight.independentSourceCount}</p>
         <p><span className="font-semibold text-slate-100">Recent evidence:</span> {formatSignalDate(latestEvidenceDate)}</p>
-        <p><span className="font-semibold text-slate-100">Period:</span> {insight.timePeriod}</p>
+        <p><span className="font-semibold text-slate-100">Period:</span> {insight.timePeriod === "Current imported records" ? "Dates shown in supporting evidence" : insight.timePeriod}</p>
         <p><span className="font-semibold text-slate-100">Evidence strength:</span> {insight.confidence}</p>
         {insight.contradictoryEvidence.length ? <p><span className="font-semibold text-slate-100">Contradictions:</span> {insight.contradictoryEvidence.length}</p> : null}
       </div>

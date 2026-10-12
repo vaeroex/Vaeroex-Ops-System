@@ -1,0 +1,40 @@
+{
+  "suite": "google_sheets_dispatch_native",
+  "checks": 25,
+  "baseline": {
+    "checks": 103,
+    "largeRows": 750,
+    "largeFacts": 1500,
+    "liveProviderCalls": 0,
+    "fullCanonicalBootstrap": false,
+    "abandonedRecovery": {
+      "scope": "Persisted SQL with accelerated lease expiry; no worker kill or provider transport",
+      "leaseSeconds": 270,
+      "automaticRetrySeconds": 3600,
+      "originalEligibilityPreserved": true,
+      "independentTerminalRecovery": true,
+      "staleCommitDenied": true,
+      "lateCleanupPreservesSuccess": true,
+      "recovery300SecondsQualified": false
+    }
+  },
+  "scheduledAdmissionDelayMs": 5031,
+  "admissionTelemetry": {
+    "admissionRpcAttempts": 6,
+    "admissionRetries": 5,
+    "admissionWaitMs": 5010
+  },
+  "concurrentClaimers": 8,
+  "accepted": 4,
+  "capacityDenied": 4,
+  "workspaceDenied": 1,
+  "recoveredAccepted": 4,
+  "staleCommitsDenied": 5,
+  "historicalMismatchPreserved": true,
+  "healthyRecoveryContinuesPastLockedTenant": true,
+  "originalEligibilityPreserved": true,
+  "liveProviderCalls": 0,
+  "workerKill": false,
+  "recoveryClockAccelerated": true,
+  "limits": "Owned native SQL protocol proof with reduced fixture schema. No elapsed worker recovery or active-user capacity claim."
+}

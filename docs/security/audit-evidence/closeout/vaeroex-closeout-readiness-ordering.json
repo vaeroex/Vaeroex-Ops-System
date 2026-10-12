@@ -1,0 +1,51 @@
+{
+  "scope": "New synthetic native SQL ordering probe using unchanged actual repository fixture policies/DDL and complete two audit migrations. Expected results reproduce a defect, not acceptance. No Auth/PostgREST/Storage HTTP or real data.",
+  "sourceCommit": "9359bb30b2e48f775dcecb666f3a61b571c8adf2",
+  "migrations": [
+    "20261005022017_workspace_security_boundaries.sql",
+    "20261005022445_workspace_persisted_usage_limits.sql"
+  ],
+  "version": "17.11",
+  "afterLaterLegitimateCheck": {
+    "status": "Ready",
+    "last_checked_at": "2300-01-01T00:00:00.000Z"
+  },
+  "afterRetiming": {
+    "status": "Ready",
+    "last_checked_at": "2400-01-01T08:00:00.000Z"
+  },
+  "checks": [
+    {
+      "status": "Out of service",
+      "created_at": "2026-10-05T06:02:00.333Z",
+      "checked_by": "33333333-3333-4333-8333-000000000001"
+    },
+    {
+      "status": "Ready",
+      "created_at": "2400-01-01T08:00:00.000Z",
+      "checked_by": "33333333-3333-4333-8333-000000000002"
+    }
+  ],
+  "results": [
+    {
+      "name": "before migration: staff can persist a cross-workspace form parent",
+      "status": "pass"
+    },
+    {
+      "name": "future-dated staff check pins Ready despite later owner Out of service check",
+      "status": "pass"
+    },
+    {
+      "name": "readiness date preserves untrusted future timestamp",
+      "status": "pass"
+    },
+    {
+      "name": "removing future order restores actual latest readiness",
+      "status": "pass"
+    },
+    {
+      "name": "staff can retime old check to pin Ready again",
+      "status": "pass"
+    }
+  ]
+}

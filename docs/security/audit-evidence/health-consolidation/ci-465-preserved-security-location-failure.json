@@ -1,0 +1,48 @@
+{
+  "capturedAt": "2026-10-06T02:01:24.222Z",
+  "head": "7090198137261c850a3bcca8248813f5deed923c",
+  "runId": 37400860319,
+  "runConclusion": "failure",
+  "testedMerge": "c3918e098dc8f31f038917e21383b534eda34f13",
+  "testedTree": "ac5944410c45bd46e4e9191e4cccefbfda08f8f0",
+  "failedStep": {
+    "job": 112067493126,
+    "name": "Security regression check",
+    "number": 69,
+    "message": "Business Health snapshots must not persist when required source queries fail or evidence is insufficient."
+  },
+  "buildAndTypes": "TypeScript, ESLint, public rendering and production build passed; security chain stopped at its first script, whitespace step skipped.",
+  "jobs": [
+    {
+      "id": 112067493126,
+      "name": "verify",
+      "status": "completed",
+      "conclusion": "failure"
+    },
+    {
+      "id": 112067493291,
+      "name": "native-broker-qualification",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 112067493303,
+      "name": "jit-canary-linux-qualification",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 112067493305,
+      "name": "security-database",
+      "status": "completed",
+      "conclusion": "success"
+    }
+  ],
+  "preservedSource": {
+    "sha256": "f6e99210a573b5751a175c27375f77c255c4e56d8007deb0a682106feb885388",
+    "failedSecurityLogSha256": "6c7a23270fad69ca52c50250bf6deba5ecdb6a5b3b66cd199301c3f9db5e604c",
+    "fullVerifyLogSha256": "8fd9b32e16814846a6cc6f31fe3d99149118d13098e3acc579dfc494074f8294"
+  },
+  "cause": "The unchanged snapshot-persistence source contract still inspected Overview after its implementation moved to the shared Health loader. The actual source-success AND sufficient-evidence gate remained in that loader.",
+  "correctionScope": "Tests and audit documentation only; final corrected-head CI remains required."
+}

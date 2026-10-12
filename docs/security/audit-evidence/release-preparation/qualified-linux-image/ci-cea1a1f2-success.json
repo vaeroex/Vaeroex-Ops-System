@@ -1,0 +1,42 @@
+{
+  "pullRequestHead": "cea1a1f23f9ab634b6993af7d86140cd98bac68a",
+  "sourceCommit": "9d1f685e0b045262841e15b4da50538b192baefe",
+  "sourceTree": "421d18fa21dcf77997a008ec7888e9adde4f0711",
+  "runId": 37388239534,
+  "runAttempt": 1,
+  "status": "completed",
+  "conclusion": "success",
+  "runUrl": "https://github.com/vaeroex/Vaeroex-Ops-System/actions/runs/37388239534",
+  "jobs": [
+    {
+      "id": 112026845622,
+      "name": "native-broker-qualification",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 112026845738,
+      "name": "security-database",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 112026845753,
+      "name": "jit-canary-linux-qualification",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 112026845818,
+      "name": "verify",
+      "status": "completed",
+      "conclusion": "success",
+      "imageStep": {
+        "name": "Qualify QBO Linux amd64 credential-free build and network-isolated smoke",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 64
+      }
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+   ▲ Next.js 15.5.24
+   - Local:        http://127.0.0.1:54558
+   - Network:      http://127.0.0.1:54558
+
+ ✓ Starting...
+ ✓ Ready in 217ms
+ ⨯ Error: This request cannot be performed because it conflicts with platform security requirements.
+    at G (.next/server/chunks/3260.js:1:13813)
+    at async bv (.next/server/chunks/7393.js:98:43399)
+    at async m (.next/server/app/app/sources/[fileId]/page.js:1:9248)
+    at async p (.next/server/app/app/sources/[fileId]/page.js:2:1861) {
+  digest: '3915124820'
+}
+ ⨯ Error: This request cannot be performed because it conflicts with platform security requirements.
+    at G (.next/server/chunks/3260.js:1:13813)
+    at async bv (.next/server/chunks/7393.js:98:43399)
+    at async m (.next/server/app/app/sources/[fileId]/page.js:1:9248)
+    at async p (.next/server/app/app/sources/[fileId]/page.js:2:1861) {
+  digest: '3915124820'
+}

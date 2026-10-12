@@ -1,0 +1,111 @@
+{
+  "capturedAt": "2026-10-05T01:46:39.318Z",
+  "sourceRoot": "/tmp/vaeroex-audit-production",
+  "scope": "Actual usage module and plan normalization; subscription authorization is a fixture; count DB responses mocked; no writes/providers/HTTP/actual concurrent SQL",
+  "planLimits": {
+    "max_workspaces": 1,
+    "max_users": 10,
+    "max_forms": null,
+    "max_checklists": null,
+    "max_ai_runs_per_month": 1000,
+    "max_files": 500
+  },
+  "positiveControls": {
+    "atLimit": {
+      "reached": true,
+      "limitValue": 1000,
+      "count": null,
+      "usage": {
+        "workspaces": 1,
+        "users": 1,
+        "forms": 1,
+        "checklists": 1,
+        "ai_runs_this_month": 1000,
+        "files": 499
+      },
+      "subscriptionAllowed": true,
+      "errorReported": false
+    },
+    "belowLimit": {
+      "reached": false,
+      "limitValue": 1000,
+      "count": null,
+      "usage": {
+        "workspaces": 1,
+        "users": 1,
+        "forms": 1,
+        "checklists": 1,
+        "ai_runs_this_month": 999,
+        "files": 499
+      },
+      "subscriptionAllowed": true,
+      "errorReported": false
+    }
+  },
+  "faults": {
+    "aggregateAI": {
+      "reached": false,
+      "limitValue": 1000,
+      "count": null,
+      "usage": {
+        "workspaces": 1,
+        "users": 1,
+        "forms": 1,
+        "checklists": 1,
+        "ai_runs_this_month": 0,
+        "files": 499
+      },
+      "subscriptionAllowed": true,
+      "errorReported": false
+    },
+    "specializedAI": {
+      "reached": false,
+      "limitValue": 1000,
+      "count": 0,
+      "usage": null,
+      "subscriptionAllowed": null,
+      "errorReported": false
+    },
+    "files": {
+      "reached": false,
+      "limitValue": 500,
+      "count": null,
+      "usage": {
+        "workspaces": 1,
+        "users": 1,
+        "forms": 1,
+        "checklists": 1,
+        "ai_runs_this_month": 999,
+        "files": 0
+      },
+      "subscriptionAllowed": true,
+      "errorReported": false
+    }
+  },
+  "concurrency": {
+    "requests": 16,
+    "ai": {
+      "startingCount": 999,
+      "limit": 1000,
+      "checksAdmitted": 16,
+      "hypotheticalCountIfEveryCallerCommits": 1015
+    },
+    "files": {
+      "startingCount": 499,
+      "limit": 500,
+      "checksAdmitted": 16,
+      "hypotheticalCountIfEveryCallerCommits": 515
+    },
+    "aggregateCountQueriesFor16Checks": 96,
+    "actualWrites": 0
+  },
+  "interpretation": "Preflight count-only helpers do not reserve the final slot. This proves helper fail-open and simultaneous admission, not observed persisted overspend; endpoint throttles/generation claims/database gates may limit particular paths.",
+  "host": {
+    "node": "v24.19.0",
+    "platform": "darwin",
+    "arch": "arm64",
+    "cpu": "Apple M1",
+    "logicalCpus": 8,
+    "totalMemoryBytes": 8589934592
+  }
+}

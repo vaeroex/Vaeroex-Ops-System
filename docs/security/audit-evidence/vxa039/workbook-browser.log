@@ -1,0 +1,8 @@
+locator.selectOption: Timeout 30000ms exceeded.
+Call log:
+[2m  - waiting for locator('[name="worksheet_1_type"]')[22m
+
+    at /Users/isaacvizcarra/.codex/worktrees/workspace-audit-fixes/Vaeroex/scripts/workspace-workflow-browser-tests.cjs:202:52 {
+  log: [ `  - waiting for locator('[name="worksheet_1_type"]')` ],
+  name: 'TimeoutError'
+}

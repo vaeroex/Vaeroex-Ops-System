@@ -1,0 +1,17 @@
+{"check":"default remains fail-fast with recorded navigation failure","passed":true,"qualification":"harness selftest only; no browser, Auth, server action, or database"}
+{"check":"explicit continuation retains failure and navigates once without resubmission","passed":true,"qualification":"harness selftest only; no browser, Auth, server action, or database"}
+{"check":"successful automatic navigation uses no recovery","passed":true,"qualification":"harness selftest only; no browser, Auth, server action, or database"}
+{"check":"external redirect denied","passed":true,"qualification":"harness selftest only; no browser, Auth, server action, or database"}
+{"check":"missing redirect denied","passed":true,"qualification":"harness selftest only; no browser, Auth, server action, or database"}
+{"check":"wrong outcome denied","passed":true,"qualification":"harness selftest only; no browser, Auth, server action, or database"}
+{"check":"non303 denied","passed":true,"qualification":"harness selftest only; no browser, Auth, server action, or database"}
+{"check":"missing response denied","passed":true,"qualification":"harness selftest only; no browser, Auth, server action, or database"}
+{"check":"credential-bearing redirect denied","passed":true,"qualification":"harness selftest only; no browser, Auth, server action, or database"}
+{"check":"non-workspace redirect denied","passed":true,"qualification":"harness selftest only; no browser, Auth, server action, or database"}
+{"check":"click failure cannot trigger recovery","passed":true,"qualification":"harness selftest only; no browser, Auth, server action, or database"}
+{"check":"overall outcome retains any recorded failure","passed":true,"qualification":"harness selftest only; no browser, Auth, server action, or database"}
+{"check":"continuation flag is explicitly opt-in","passed":true,"qualification":"harness selftest only; no browser, Auth, server action, or database"}
+{"check":"unknown options rejected","passed":true,"qualification":"harness selftest only; no browser, Auth, server action, or database"}
+{"check":"duplicate flags rejected","passed":true,"qualification":"harness selftest only; no browser, Auth, server action, or database"}
+{"check":"actual manager/admin loop labels resolve without owner-width scope","passed":true,"qualification":"harness selftest only; no browser, Auth, server action, or database"}
+{"checks":16,"passed":true,"qualification":"harness selftests only"}

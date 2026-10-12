@@ -1,0 +1,86 @@
+[
+  {
+    "script": "file-analysis-regression-tests.js",
+    "exitCode": 0,
+    "seconds": 0.044,
+    "log": "/tmp/vaeroex-stage4-check-file-analysis-regression-tests.js.log"
+  },
+  {
+    "script": "spreadsheet-ingestion-regression-tests.js",
+    "exitCode": 0,
+    "seconds": 0.241,
+    "log": "/tmp/vaeroex-stage4-check-spreadsheet-ingestion-regression-tests.js.log"
+  },
+  {
+    "script": "large-workbook-intelligence-regression-tests.js",
+    "exitCode": 0,
+    "seconds": 0.397,
+    "log": "/tmp/vaeroex-stage4-check-large-workbook-intelligence-regression-tests.js.log"
+  },
+  {
+    "script": "business-health-explanation-regression-tests.js",
+    "exitCode": 0,
+    "seconds": 0.491,
+    "log": "/tmp/vaeroex-stage4-check-business-health-explanation-regression-tests.js.log"
+  },
+  {
+    "script": "executive-homepage-regression-tests.js",
+    "exitCode": 0,
+    "seconds": 0.232,
+    "log": "/tmp/vaeroex-stage4-check-executive-homepage-regression-tests.js.log"
+  },
+  {
+    "script": "billing-policy-regression-tests.js",
+    "exitCode": 1,
+    "seconds": 0.038,
+    "log": "/tmp/vaeroex-stage4-check-billing-policy-regression-tests.js.log"
+  },
+  {
+    "script": "customer-1-billing-remediation-regression-tests.js",
+    "exitCode": 0,
+    "seconds": 0.191,
+    "log": "/tmp/vaeroex-stage4-check-customer-1-billing-remediation-regression-tests.js.log"
+  },
+  {
+    "script": "security-high-remediation-regression-tests.js",
+    "exitCode": 0,
+    "seconds": 0.098,
+    "log": "/tmp/vaeroex-stage4-check-security-high-remediation-regression-tests.js.log"
+  },
+  {
+    "script": "security-medium-hardening-regression-tests.js",
+    "exitCode": 0,
+    "seconds": 0.158,
+    "log": "/tmp/vaeroex-stage4-check-security-medium-hardening-regression-tests.js.log"
+  },
+  {
+    "script": "external-integrations-architecture-regression-tests.js",
+    "exitCode": 1,
+    "seconds": 0.04,
+    "log": "/tmp/vaeroex-stage4-check-external-integrations-architecture-regression-tests.js.log"
+  },
+  {
+    "script": "source-upload-action-tests.js",
+    "exitCode": 0,
+    "seconds": 1.939,
+    "log": "/tmp/vaeroex-stage4-check-source-upload-action-tests.js.log"
+  },
+  {
+    "script": "source-upload-form-tests.js",
+    "exitCode": 0,
+    "seconds": 0.222,
+    "log": "/tmp/vaeroex-stage4-check-source-upload-form-tests.js.log"
+  },
+  {
+    "script": "settings-clarity-regression-tests.js",
+    "exitCode": 0,
+    "seconds": 0.377,
+    "log": "/tmp/vaeroex-stage4-check-settings-clarity-regression-tests.js.log"
+  },
+  {
+    "script": "interaction-feedback-regression-tests.js",
+    "exitCode": 0,
+    "seconds": 0.212,
+    "log": "/tmp/vaeroex-stage4-check-interaction-feedback-regression-tests.js.log"
+  }
+]

@@ -1,0 +1,52 @@
+{
+  "kind": "kpi_keyset_regression_handoff_v1",
+  "observedAt": "2026-10-05T20:39:26.261190+00:00",
+  "sourceHashes": {
+    "lib/kpis/load-workspace-kpis.ts": "4373b24e3e5fe1ceebdbc8bd634e302fa5a2863383775e2a7028e78ce756e263",
+    "scripts/workspace-kpi-pagination-tests.cjs": "2c13ac5c97de04fe27f78ad6c7fb5bba9fabc6f69985fa5dc96e4f7173b8ab17",
+    "scripts/large-workbook-intelligence-regression-tests.js": "ba386eb281211caf44f6dc4b5181608dcd9c7b0a2327b2e112a443c408a41751",
+    "scripts/google-sheets-data-tests.cjs": "d3927278c0bd874d97277535acfb8c16db2bd3ca320d48a8093e9c8101ccae32"
+  },
+  "verified": {
+    "pagination": {
+      "passed": true,
+      "checks": 68,
+      "maximumAccepted": 20000,
+      "overflowRejected": 20001,
+      "querySemantics": "actual Supabase-js serialization; independently parameter-bound embedded PostgreSQL; fixture RLS"
+    },
+    "largeWorkbook": {
+      "passed": true,
+      "domains": 7,
+      "months": 20,
+      "measures": 175,
+      "authoritativeKpis": 48
+    },
+    "sheets": {
+      "passed": true,
+      "checks": 142,
+      "largeRows": 750,
+      "largeFacts": 1500,
+      "liveProviderCalls": 0
+    },
+    "lifecycleConsistency": {
+      "passed": true
+    },
+    "typescriptNoEmit": {
+      "passed": true,
+      "incremental": false
+    },
+    "focusedLint": {
+      "passed": true
+    },
+    "gitDiffCheck": {
+      "passed": true
+    }
+  },
+  "actualAuthenticatedComparison": "../kpi-keyset-01/result.json",
+  "limitations": [
+    "Application build and browser qualification await new runtime.",
+    "PostgreSQL keyset pages preserve full static-row payload/order; multiple requests do not create a database snapshot.",
+    "No infrastructure capacity claim."
+  ]
+}

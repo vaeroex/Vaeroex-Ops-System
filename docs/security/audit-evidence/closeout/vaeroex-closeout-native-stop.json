@@ -1,0 +1,9 @@
+{
+  "passed": true,
+  "exitCode": 0,
+  "operation": "scoped native Supabase stop",
+  "ownedHome": "/tmp/vaeroex-closeout-assembly-final/home",
+  "ownedProject": "/tmp/vaeroex-closeout-assembly-final/project",
+  "historicalDataDeleted": false,
+  "fixturesPreserved": true
+}

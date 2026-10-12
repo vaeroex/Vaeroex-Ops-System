@@ -1,0 +1,195 @@
+[
+  {
+    "capacity_metadata": {
+      "settings": [
+        {
+          "name": "idle_in_transaction_session_timeout",
+          "unit": "ms",
+          "source": "default",
+          "setting": "0"
+        },
+        {
+          "name": "lock_timeout",
+          "unit": "ms",
+          "source": "default",
+          "setting": "0"
+        },
+        {
+          "name": "maintenance_work_mem",
+          "unit": "kB",
+          "source": "configuration file",
+          "setting": "32768"
+        },
+        {
+          "name": "max_connections",
+          "unit": null,
+          "source": "configuration file",
+          "setting": "60"
+        },
+        {
+          "name": "max_parallel_workers_per_gather",
+          "unit": null,
+          "source": "configuration file",
+          "setting": "1"
+        },
+        {
+          "name": "max_worker_processes",
+          "unit": null,
+          "source": "configuration file",
+          "setting": "6"
+        },
+        {
+          "name": "shared_buffers",
+          "unit": "8kB",
+          "source": "configuration file",
+          "setting": "28672"
+        },
+        {
+          "name": "statement_timeout",
+          "unit": "ms",
+          "source": "configuration file",
+          "setting": "120000"
+        },
+        {
+          "name": "superuser_reserved_connections",
+          "unit": null,
+          "source": "default",
+          "setting": "3"
+        },
+        {
+          "name": "work_mem",
+          "unit": "kB",
+          "source": "configuration file",
+          "setting": "2184"
+        }
+      ],
+      "captured_at": "2026-10-05T01:42:00.318501+00:00",
+      "database_bytes": 64474259,
+      "database_stats": {
+        "deadlocks": 0,
+        "temp_bytes": 521716603422,
+        "temp_files": 137676,
+        "stats_reset": null,
+        "block_read_time_ms": 0,
+        "block_write_time_ms": 0,
+        "transactions_committed": 3892300,
+        "transactions_rolled_back": 1103
+      },
+      "migration_head": "20261002182746",
+      "table_estimates": [
+        {
+          "relname": "workspace_members",
+          "idx_scan": 3877973,
+          "seq_scan": 83,
+          "n_dead_tup": 20,
+          "n_live_tup": 3,
+          "schemaname": "public",
+          "last_autovacuum": null,
+          "last_autoanalyze": null
+        },
+        {
+          "relname": "ai_agent_runs",
+          "idx_scan": 4643,
+          "seq_scan": 146,
+          "n_dead_tup": 58,
+          "n_live_tup": 277,
+          "schemaname": "public",
+          "last_autovacuum": null,
+          "last_autoanalyze": "2026-08-05T02:30:39.059717+00:00"
+        },
+        {
+          "relname": "kpis",
+          "idx_scan": 4166,
+          "seq_scan": 220,
+          "n_dead_tup": 141,
+          "n_live_tup": 5623,
+          "schemaname": "public",
+          "last_autovacuum": "2026-08-12T01:11:40.328063+00:00",
+          "last_autoanalyze": "2026-09-29T18:21:25.191408+00:00"
+        },
+        {
+          "relname": "file_uploads",
+          "idx_scan": 16366,
+          "seq_scan": 1603,
+          "n_dead_tup": 11,
+          "n_live_tup": 44,
+          "schemaname": "public",
+          "last_autovacuum": "2026-08-12T03:16:45.997864+00:00",
+          "last_autoanalyze": "2026-08-12T03:43:47.239033+00:00"
+        },
+        {
+          "relname": "operational_metrics",
+          "idx_scan": 1271,
+          "seq_scan": 25,
+          "n_dead_tup": 49,
+          "n_live_tup": 924,
+          "schemaname": "public",
+          "last_autovacuum": null,
+          "last_autoanalyze": "2026-07-15T04:15:12.077701+00:00"
+        },
+        {
+          "relname": "business_memory_chunks",
+          "idx_scan": 1963,
+          "seq_scan": 261,
+          "n_dead_tup": 0,
+          "n_live_tup": 124,
+          "schemaname": "public",
+          "last_autovacuum": "2026-09-29T18:23:25.405702+00:00",
+          "last_autoanalyze": "2026-09-29T18:23:25.491079+00:00"
+        },
+        {
+          "relname": "business_health_snapshots",
+          "idx_scan": 515,
+          "seq_scan": 25,
+          "n_dead_tup": 0,
+          "n_live_tup": 35,
+          "schemaname": "public",
+          "last_autovacuum": null,
+          "last_autoanalyze": null
+        },
+        {
+          "relname": "google_sheets_connections",
+          "idx_scan": 694,
+          "seq_scan": 9,
+          "n_dead_tup": 7,
+          "n_live_tup": 2,
+          "schemaname": "public",
+          "last_autovacuum": null,
+          "last_autoanalyze": null
+        },
+        {
+          "relname": "google_sheets_sync_runs",
+          "idx_scan": 105,
+          "seq_scan": 7,
+          "n_dead_tup": 8,
+          "n_live_tup": 8,
+          "schemaname": "public",
+          "last_autovacuum": null,
+          "last_autoanalyze": null
+        }
+      ],
+      "connection_states": [
+        {
+          "state": "active",
+          "connections": 1,
+          "wait_event_type": null
+        },
+        {
+          "state": "idle",
+          "connections": 13,
+          "wait_event_type": "Client"
+        },
+        {
+          "state": "idle",
+          "connections": 1,
+          "wait_event_type": "Extension"
+        },
+        {
+          "state": null,
+          "connections": 1,
+          "wait_event_type": "Extension"
+        }
+      ]
+    }
+  }
+]

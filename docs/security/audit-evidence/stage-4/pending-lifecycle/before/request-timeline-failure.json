@@ -1,0 +1,118 @@
+{
+  "theme": "light",
+  "width": 1440,
+  "gateState": "pending",
+  "submittedCount": 1,
+  "prior": 0,
+  "errors": [],
+  "trace": {
+    "events": [
+      {
+        "phase": "before-click",
+        "at": 861.0999999940395,
+        "busy": "false",
+        "disabled": false
+      },
+      {
+        "phase": "form-capture-prevented:false",
+        "at": 861.7999999970198,
+        "busy": "false",
+        "disabled": false
+      },
+      {
+        "phase": "fetch-start",
+        "at": 864.2999999970198,
+        "busy": "false",
+        "disabled": false
+      },
+      {
+        "phase": "form-capture-prevented:true",
+        "at": 864.5999999940395,
+        "busy": "false",
+        "disabled": false
+      },
+      {
+        "phase": "after-click",
+        "at": 864.6999999955297,
+        "busy": "false",
+        "disabled": false
+      },
+      {
+        "phase": "submit-after-prevented:true",
+        "at": 864.8999999985099,
+        "busy": "true",
+        "disabled": true
+      },
+      {
+        "phase": "submit-after-prevented:true",
+        "at": 864.8999999985099,
+        "busy": "true",
+        "disabled": true
+      },
+      {
+        "phase": "button-change",
+        "at": 865,
+        "busy": "true",
+        "disabled": true
+      },
+      {
+        "phase": "button-change",
+        "at": 868.0999999940395,
+        "busy": "false",
+        "disabled": false
+      }
+    ],
+    "visibility": "visible",
+    "now": 10873.09999999404
+  },
+  "buttons": [
+    {
+      "text": "Outside before",
+      "busy": null,
+      "disabled": false,
+      "type": "submit"
+    },
+    {
+      "text": "Open synthetic record",
+      "busy": null,
+      "disabled": false,
+      "type": "button"
+    },
+    {
+      "text": "Outside after",
+      "busy": null,
+      "disabled": false,
+      "type": "submit"
+    },
+    {
+      "text": "Search K",
+      "busy": null,
+      "disabled": false,
+      "type": "button"
+    },
+    {
+      "text": "",
+      "busy": null,
+      "disabled": false,
+      "type": "button"
+    },
+    {
+      "text": "Search evidence",
+      "busy": null,
+      "disabled": false,
+      "type": "button"
+    },
+    {
+      "text": "Outside last",
+      "busy": null,
+      "disabled": false,
+      "type": "submit"
+    },
+    {
+      "text": "Save submission",
+      "busy": "false",
+      "disabled": false,
+      "type": "submit"
+    }
+  ]
+}

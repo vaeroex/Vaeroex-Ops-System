@@ -1,0 +1,1853 @@
+{
+  "description": "Read-only source references. Matches identify dependencies, not proof of runtime reachability. Generated 2026-10-04. Secret-bearing state and env files excluded.",
+  "baselines": {
+    "checkout": "/Users/isaacvizcarra/Documents/ChatGPT/Vaeroex",
+    "production_source": "/tmp/vaeroex-audit-production"
+  },
+  "patterns": {
+    "crm_table": "crm_leads|crm_lead_history",
+    "retired_tasks_table_or_rpc": "(?:from\\([\\\"\\']tasks[\\\"\\']\\)|public\\.tasks|update_business_signal_lifecycle|related_task_id)",
+    "compatibility_or_route": "/app/(?:crm|tasks)|\\[\\\"business_signal\\\", \\\"task\\\"|source_type\\s*=\\s*\\x27business_signal\\x27|Customer record imports are retired"
+  },
+  "references": [
+    {
+      "baseline": "checkout",
+      "path": "app/app/page.tsx",
+      "sha256": "41960a1bb933c49aff44379f88eb16cd7ad2e31d5becbfb46cad94518c7e9b76",
+      "matches": [
+        {
+          "line": 65,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "type CrmLeadRow = Database[\"public\"][\"Tables\"][\"crm_leads\"][\"Row\"];"
+        },
+        {
+          "line": 66,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "type CrmLeadHistoryRow = Database[\"public\"][\"Tables\"][\"crm_lead_history\"][\"Row\"];"
+        },
+        {
+          "line": 1045,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "supabase.from(\"crm_leads\").select(\"*\").eq(\"workspace_id\", workspaceId).order(\"created_at\", { ascending: false }).limit(300),"
+        },
+        {
+          "line": 1046,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "supabase.from(\"crm_lead_history\").select(\"*\").eq(\"workspace_id\", workspaceId).order(\"created_at\", { ascending: false }).limit(300),"
+        },
+        {
+          "line": 1416,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "crm_leads: crmLeads.length,"
+        }
+      ]
+    },
+    {
+      "baseline": "checkout",
+      "path": "app/api/search/route.ts",
+      "sha256": "149b405312a35b7bccb67d4d755ed88b8cce68deff3910c2c306f1ec17824cfc",
+      "matches": [
+        {
+          "line": 62,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "type CrmLeadRow = Database[\"public\"][\"Tables\"][\"crm_leads\"][\"Row\"];"
+        },
+        {
+          "line": 399,
+          "categories": [
+            "crm_table"
+          ],
+          "text": ".from(\"crm_leads\")"
+        }
+      ]
+    },
+    {
+      "baseline": "checkout",
+      "path": "app/app/intelligence/page.tsx",
+      "sha256": "fb5374c3716106e02a0bcec3491a0fba7baae2ed5aaffe5cbe8f2a7002408864",
+      "matches": [
+        {
+          "line": 48,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "supabase.from(\"crm_leads\").select(\"*\").eq(\"workspace_id\", workspaceId).is(\"deleted_at\", null).order(\"created_at\", { ascending: false }),"
+        }
+      ]
+    },
+    {
+      "baseline": "checkout",
+      "path": "app/app/crm/page.tsx",
+      "sha256": "28ff56758b4f0e5b162c7b103a079fb8c093ec7a1dc1515e82ddd214a0de2858",
+      "matches": [
+        {
+          "line": 12,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "type CrmLeadRow = Database[\"public\"][\"Tables\"][\"crm_leads\"][\"Row\"];"
+        },
+        {
+          "line": 13,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "type CrmLeadHistoryRow = Database[\"public\"][\"Tables\"][\"crm_lead_history\"][\"Row\"];"
+        },
+        {
+          "line": 51,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "supabase.from(\"crm_leads\").select(\"*\").eq(\"workspace_id\", workspaceId).is(\"archived_at\", null).is(\"deleted_at\", null).order(\"created_at\", { ascending: false }).limit(250),"
+        },
+        {
+          "line": 52,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "supabase.from(\"crm_lead_history\").select(\"*\").eq(\"workspace_id\", workspaceId).order(\"created_at\", { ascending: false }).limit(500),"
+        },
+        {
+          "line": 53,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "supabase.from(\"crm_leads\").select(\"id\", { count: \"exact\", head: true }).eq(\"workspace_id\", workspaceId).not(\"archived_at\", \"is\", null).is(\"deleted_at\", null)"
+        }
+      ]
+    },
+    {
+      "baseline": "checkout",
+      "path": "app/app/operations/record-management-actions.ts",
+      "sha256": "53a312a65015216e2060d28187ed7e1463e9bdb8b12ac9b12670d446742720e9",
+      "matches": [
+        {
+          "line": 20,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "| \"crm_leads\""
+        },
+        {
+          "line": 138,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "crm_leads: {"
+        },
+        {
+          "line": 139,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "table: \"crm_leads\","
+        },
+        {
+          "line": 201,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "if (collection === \"crm_leads\") {"
+        },
+        {
+          "line": 346,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "if ([\"kpis\", \"files\", \"issues\", \"crm_leads\"].includes(collection)) {"
+        },
+        {
+          "line": 489,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "if (collection === \"crm_leads\") {"
+        },
+        {
+          "line": 490,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "const { error: historyError } = await supabase.from(\"crm_lead_history\").insert({"
+        }
+      ]
+    },
+    {
+      "baseline": "checkout",
+      "path": "app/app/files/actions.ts",
+      "sha256": "ba7055fb410cda8d9e1966e509c94e6e80e6f41df74bddf4e4b4790b343af817",
+      "matches": [
+        {
+          "line": 1268,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "const suggestedCustomerEvidence = outputList(output, \"suggested_crm_records\").concat(outputList(output, \"crm_records\")).concat(outputList(output, \"crm_leads\"));"
+        }
+      ]
+    },
+    {
+      "baseline": "checkout",
+      "path": "lib/records/management.ts",
+      "sha256": "417352453236911d9f98daa422429574aa1232e15dbee159f9ae5db0a70e5bd2",
+      "matches": [
+        {
+          "line": 13,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "| \"crm_leads\""
+        }
+      ]
+    },
+    {
+      "baseline": "checkout",
+      "path": "lib/intelligence/layer.ts",
+      "sha256": "a25fd4ecdb629ae6c8b2ef8be0817a949d4e5f3e088990c7f44c16bf405fec71",
+      "matches": [
+        {
+          "line": 146,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "type CrmLeadRow = Database[\"public\"][\"Tables\"][\"crm_leads\"][\"Row\"];"
+        }
+      ]
+    },
+    {
+      "baseline": "checkout",
+      "path": "lib/intelligence/coverage.ts",
+      "sha256": "4b1140923f3758da6f2a77440a549312c484244006601c3736d7fd9d6119e270",
+      "matches": [
+        {
+          "line": 97,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "crmLeads?: TableRow<\"crm_leads\">[];"
+        },
+        {
+          "line": 98,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "crmHistory?: TableRow<\"crm_lead_history\">[];"
+        }
+      ]
+    },
+    {
+      "baseline": "checkout",
+      "path": "lib/supabase/types.ts",
+      "sha256": "3572559f3ede671305f706192d20ce384096a3daee14438dd7966f94ec97eaaa",
+      "matches": [
+        {
+          "line": 3154,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "crm_leads: {"
+        },
+        {
+          "line": 3201,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "Update: Partial<Database[\"public\"][\"Tables\"][\"crm_leads\"][\"Insert\"]>;"
+        },
+        {
+          "line": 3204,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "crm_lead_history: {"
+        },
+        {
+          "line": 3237,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "Update: Partial<Database[\"public\"][\"Tables\"][\"crm_lead_history\"][\"Insert\"]>;"
+        },
+        {
+          "line": 4053,
+          "categories": [
+            "retired_tasks_table_or_rpc"
+          ],
+          "text": "related_task_id: string | null;"
+        },
+        {
+          "line": 4082,
+          "categories": [
+            "retired_tasks_table_or_rpc"
+          ],
+          "text": "related_task_id?: string | null;"
+        }
+      ]
+    },
+    {
+      "baseline": "checkout",
+      "path": "lib/ai/business-health-context.ts",
+      "sha256": "fea2ab01db344322eadc1e9b16dc831c07a54949d2cb3ca5573d1a3b5f1c5d64",
+      "matches": [
+        {
+          "line": 47,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "customer_activity_records: countValue(sourceSummary.crm_leads),"
+        }
+      ]
+    },
+    {
+      "baseline": "checkout",
+      "path": "lib/ai/evidence-index.ts",
+      "sha256": "d67a4ee1e284582a14d2e49f9b7dedf41d0d4e2ebc0fe0b9ef975fe20c13dc07",
+      "matches": [
+        {
+          "line": 572,
+          "categories": [
+            "compatibility_or_route"
+          ],
+          "text": "if ([\"business_signal\", \"task\", \"report\", \"saved_analysis\"].includes(row.source_type) || row.source_type.endsWith(\"_brief\")) return false;"
+        }
+      ]
+    },
+    {
+      "baseline": "checkout",
+      "path": "lib/ai/bounded-context.ts",
+      "sha256": "f4e85e6050934b614257c2c19b8f5695436edf0f7de375bda6c6092adac305f8",
+      "matches": [
+        {
+          "line": 263,
+          "categories": [
+            "crm_table"
+          ],
+          "text": ".from(\"crm_leads\")"
+        }
+      ]
+    },
+    {
+      "baseline": "checkout",
+      "path": "lib/ai/intelligence-briefing/workspace-context.ts",
+      "sha256": "c33e8bc7c3e4752cdda6841cf6332ff70e7d8f4d85234c580ac15764151e219b",
+      "matches": [
+        {
+          "line": 51,
+          "categories": [
+            "crm_table"
+          ],
+          "text": ".from(\"crm_lead_history\")"
+        },
+        {
+          "line": 95,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "supabase.from(\"crm_leads\").select(\"*\").eq(\"workspace_id\", workspaceId).is(\"deleted_at\", null).order(\"created_at\", { ascending: false }),"
+        }
+      ]
+    },
+    {
+      "baseline": "checkout",
+      "path": "components/evidence/SourceImportReview.tsx",
+      "sha256": "7210baa671f37230a82ff423eb13ef1395d11a046904a3dcabe369061a375514",
+      "matches": [
+        {
+          "line": 289,
+          "categories": [
+            "compatibility_or_route"
+          ],
+          "text": "<p className=\"font-semibold\">Customer record imports are retired.</p>"
+        }
+      ]
+    },
+    {
+      "baseline": "checkout",
+      "path": "components/operations/ManagedRecordList.tsx",
+      "sha256": "e25811097395acac585da023490bd038c5e055691b453124e04e66ce6491636a",
+      "matches": [
+        {
+          "line": 27,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "| \"crm_leads\""
+        },
+        {
+          "line": 168,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "crm_leads: \"customer context\","
+        }
+      ]
+    },
+    {
+      "baseline": "checkout",
+      "path": "supabase/migrations/20260713204716_restrict_lifecycle_rpc_to_authenticated.sql",
+      "sha256": "f12707c2c81db0085abdd165e775edb404bae8a879f33df82e16f329535a5b96",
+      "matches": [
+        {
+          "line": 1,
+          "categories": [
+            "retired_tasks_table_or_rpc"
+          ],
+          "text": "revoke all on function public.update_business_signal_lifecycle(uuid, uuid, text) from anon;"
+        }
+      ]
+    },
+    {
+      "baseline": "checkout",
+      "path": "supabase/migrations/202606180012_prestige_operations_intelligence.sql",
+      "sha256": "f7cc70bc7ed5927d770301fd76c57ef0c39ffcd8e6edaac1a2581d19a46d6839",
+      "matches": [
+        {
+          "line": 35,
+          "categories": [
+            "retired_tasks_table_or_rpc"
+          ],
+          "text": "related_task_id uuid references public.tasks(id) on delete set null,"
+        }
+      ]
+    },
+    {
+      "baseline": "checkout",
+      "path": "supabase/migrations/202606180005_file_kpi_historical_memory.sql",
+      "sha256": "aafeb1a3c2d797a3472e37dc5fa183d0253c5fe4d4da2e9c03f64c1c6c729b3a",
+      "matches": [
+        {
+          "line": 33,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "alter table public.crm_leads"
+        },
+        {
+          "line": 42,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "create table if not exists public.crm_lead_history ("
+        },
+        {
+          "line": 45,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "lead_id uuid not null references public.crm_leads(id) on delete cascade,"
+        },
+        {
+          "line": 71,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "create index if not exists crm_leads_workspace_email_idx"
+        },
+        {
+          "line": 72,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "on public.crm_leads(workspace_id, email);"
+        },
+        {
+          "line": 74,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "create index if not exists crm_leads_workspace_import_idx"
+        },
+        {
+          "line": 75,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "on public.crm_leads(workspace_id, import_id);"
+        },
+        {
+          "line": 77,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "create index if not exists crm_lead_history_workspace_lead_idx"
+        },
+        {
+          "line": 78,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "on public.crm_lead_history(workspace_id, lead_id, created_at desc);"
+        },
+        {
+          "line": 80,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "create index if not exists crm_lead_history_workspace_import_idx"
+        },
+        {
+          "line": 81,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "on public.crm_lead_history(workspace_id, import_id);"
+        },
+        {
+          "line": 86,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "alter table public.crm_lead_history enable row level security;"
+        },
+        {
+          "line": 88,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "drop policy if exists \"crm lead history members read\" on public.crm_lead_history;"
+        },
+        {
+          "line": 90,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "on public.crm_lead_history for select"
+        },
+        {
+          "line": 94,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "drop policy if exists \"crm lead history members create\" on public.crm_lead_history;"
+        },
+        {
+          "line": 96,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "on public.crm_lead_history for insert"
+        },
+        {
+          "line": 100,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "drop policy if exists \"crm lead history members update\" on public.crm_lead_history;"
+        },
+        {
+          "line": 102,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "on public.crm_lead_history for update"
+        },
+        {
+          "line": 107,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "drop policy if exists \"crm lead history managers delete\" on public.crm_lead_history;"
+        },
+        {
+          "line": 109,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "on public.crm_lead_history for delete"
+        },
+        {
+          "line": 113,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "grant select, insert, update, delete on public.crm_lead_history to authenticated;"
+        }
+      ]
+    },
+    {
+      "baseline": "checkout",
+      "path": "supabase/migrations/202606180006_start_from_scratch_crm.sql",
+      "sha256": "431e3c4238eb6b73a9281545a0c3ae2624cea771fc9326c4d783c4d568eab1ce",
+      "matches": [
+        {
+          "line": 13,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "'crm_leads',"
+        },
+        {
+          "line": 24,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "alter table public.crm_leads"
+        },
+        {
+          "line": 27,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "create index if not exists crm_leads_workspace_folder_idx"
+        },
+        {
+          "line": 28,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "on public.crm_leads(workspace_id, folder_id);"
+        }
+      ]
+    },
+    {
+      "baseline": "checkout",
+      "path": "supabase/migrations/202607110002_business_signal_lifecycle_integrity.sql",
+      "sha256": "081027636a7b1c65ec1b2962bbdc516eb3b992bff605baffe227a69bb9a2928f",
+      "matches": [
+        {
+          "line": 4,
+          "categories": [
+            "retired_tasks_table_or_rpc"
+          ],
+          "text": "create or replace function public.update_business_signal_lifecycle("
+        },
+        {
+          "line": 22,
+          "categories": [
+            "retired_tasks_table_or_rpc"
+          ],
+          "text": "update public.tasks"
+        },
+        {
+          "line": 44,
+          "categories": [
+            "compatibility_or_route"
+          ],
+          "text": "and source_type = 'business_signal'"
+        },
+        {
+          "line": 52,
+          "categories": [
+            "retired_tasks_table_or_rpc"
+          ],
+          "text": "revoke all on function public.update_business_signal_lifecycle(uuid, uuid, text) from public;"
+        },
+        {
+          "line": 53,
+          "categories": [
+            "retired_tasks_table_or_rpc"
+          ],
+          "text": "grant execute on function public.update_business_signal_lifecycle(uuid, uuid, text) to authenticated;"
+        }
+      ]
+    },
+    {
+      "baseline": "checkout",
+      "path": "supabase/migrations/202606180009_team_accountability.sql",
+      "sha256": "11d5767c7e822bf0eecac9eba251448d02a5f048d109a98d5f663dfa391044e9",
+      "matches": [
+        {
+          "line": 5,
+          "categories": [
+            "retired_tasks_table_or_rpc"
+          ],
+          "text": "alter table public.tasks"
+        },
+        {
+          "line": 116,
+          "categories": [
+            "retired_tasks_table_or_rpc"
+          ],
+          "text": "on public.tasks(workspace_id, assigned_person_id, assigned_role, assigned_department);"
+        }
+      ]
+    },
+    {
+      "baseline": "checkout",
+      "path": "supabase/migrations/20260819174100_security_high_findings_remediation.sql",
+      "sha256": "3236bc16194d53a67eb3011758427f7ec4e3f4fd3d3ace0b95b53db039bff178",
+      "matches": [
+        {
+          "line": 110,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "'crm_leads',"
+        },
+        {
+          "line": 147,
+          "categories": [
+            "retired_tasks_table_or_rpc"
+          ],
+          "text": "drop policy if exists \"assigned users can update assigned tasks\" on public.tasks;"
+        },
+        {
+          "line": 149,
+          "categories": [
+            "retired_tasks_table_or_rpc"
+          ],
+          "text": "on public.tasks for update"
+        },
+        {
+          "line": 172,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "drop policy if exists \"crm lead history members create\" on public.crm_lead_history;"
+        },
+        {
+          "line": 173,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "drop policy if exists \"crm lead history members update\" on public.crm_lead_history;"
+        },
+        {
+          "line": 175,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "on public.crm_lead_history for insert"
+        },
+        {
+          "line": 179,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "on public.crm_lead_history for update"
+        }
+      ]
+    },
+    {
+      "baseline": "checkout",
+      "path": "supabase/migrations/202606180004_files_imports.sql",
+      "sha256": "1cf7972f6c9def3f8b2761e2558b464e4fe11f7beed0e3160f225bff2965c11e",
+      "matches": [
+        {
+          "line": 94,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "create table if not exists public.crm_leads ("
+        },
+        {
+          "line": 147,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "create index if not exists crm_leads_workspace_created_idx"
+        },
+        {
+          "line": 148,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "on public.crm_leads(workspace_id, created_at desc);"
+        },
+        {
+          "line": 158,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "drop trigger if exists set_crm_leads_updated_at on public.crm_leads;"
+        },
+        {
+          "line": 159,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "create trigger set_crm_leads_updated_at"
+        },
+        {
+          "line": 160,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "before update on public.crm_leads"
+        },
+        {
+          "line": 171,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "alter table public.crm_leads enable row level security;"
+        },
+        {
+          "line": 182,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "'crm_leads',"
+        },
+        {
+          "line": 201,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "grant select, insert, update, delete on public.crm_leads to authenticated;"
+        }
+      ]
+    },
+    {
+      "baseline": "checkout",
+      "path": "supabase/migrations/202606170001_phase_1_schema_rls.sql",
+      "sha256": "a479826e516951c093ae080c1c0f5aa06cefc6dd1217c4b9c6bdbb59c88f74e9",
+      "matches": [
+        {
+          "line": 178,
+          "categories": [
+            "retired_tasks_table_or_rpc"
+          ],
+          "text": "create table public.tasks ("
+        },
+        {
+          "line": 324,
+          "categories": [
+            "retired_tasks_table_or_rpc"
+          ],
+          "text": "create index on public.tasks(workspace_id, status, priority);"
+        },
+        {
+          "line": 607,
+          "categories": [
+            "retired_tasks_table_or_rpc"
+          ],
+          "text": "on public.tasks for select"
+        },
+        {
+          "line": 612,
+          "categories": [
+            "retired_tasks_table_or_rpc"
+          ],
+          "text": "on public.tasks for insert"
+        },
+        {
+          "line": 617,
+          "categories": [
+            "retired_tasks_table_or_rpc"
+          ],
+          "text": "on public.tasks for update"
+        },
+        {
+          "line": 623,
+          "categories": [
+            "retired_tasks_table_or_rpc"
+          ],
+          "text": "on public.tasks for update"
+        },
+        {
+          "line": 635,
+          "categories": [
+            "retired_tasks_table_or_rpc"
+          ],
+          "text": "on public.tasks for delete"
+        }
+      ]
+    },
+    {
+      "baseline": "production_source",
+      "path": "app/app/page.tsx",
+      "sha256": "41960a1bb933c49aff44379f88eb16cd7ad2e31d5becbfb46cad94518c7e9b76",
+      "matches": [
+        {
+          "line": 65,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "type CrmLeadRow = Database[\"public\"][\"Tables\"][\"crm_leads\"][\"Row\"];"
+        },
+        {
+          "line": 66,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "type CrmLeadHistoryRow = Database[\"public\"][\"Tables\"][\"crm_lead_history\"][\"Row\"];"
+        },
+        {
+          "line": 1045,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "supabase.from(\"crm_leads\").select(\"*\").eq(\"workspace_id\", workspaceId).order(\"created_at\", { ascending: false }).limit(300),"
+        },
+        {
+          "line": 1046,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "supabase.from(\"crm_lead_history\").select(\"*\").eq(\"workspace_id\", workspaceId).order(\"created_at\", { ascending: false }).limit(300),"
+        },
+        {
+          "line": 1416,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "crm_leads: crmLeads.length,"
+        }
+      ]
+    },
+    {
+      "baseline": "production_source",
+      "path": "app/api/search/route.ts",
+      "sha256": "149b405312a35b7bccb67d4d755ed88b8cce68deff3910c2c306f1ec17824cfc",
+      "matches": [
+        {
+          "line": 62,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "type CrmLeadRow = Database[\"public\"][\"Tables\"][\"crm_leads\"][\"Row\"];"
+        },
+        {
+          "line": 399,
+          "categories": [
+            "crm_table"
+          ],
+          "text": ".from(\"crm_leads\")"
+        }
+      ]
+    },
+    {
+      "baseline": "production_source",
+      "path": "app/app/intelligence/page.tsx",
+      "sha256": "3f7577f4c595b2dbbbbea837ce2f8f9b25f585122db7f259503eed4ebbb316ed",
+      "matches": [
+        {
+          "line": 52,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "supabase.from(\"crm_leads\").select(\"*\").eq(\"workspace_id\", workspaceId).is(\"deleted_at\", null).order(\"created_at\", { ascending: false }),"
+        }
+      ]
+    },
+    {
+      "baseline": "production_source",
+      "path": "app/app/crm/page.tsx",
+      "sha256": "28ff56758b4f0e5b162c7b103a079fb8c093ec7a1dc1515e82ddd214a0de2858",
+      "matches": [
+        {
+          "line": 12,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "type CrmLeadRow = Database[\"public\"][\"Tables\"][\"crm_leads\"][\"Row\"];"
+        },
+        {
+          "line": 13,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "type CrmLeadHistoryRow = Database[\"public\"][\"Tables\"][\"crm_lead_history\"][\"Row\"];"
+        },
+        {
+          "line": 51,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "supabase.from(\"crm_leads\").select(\"*\").eq(\"workspace_id\", workspaceId).is(\"archived_at\", null).is(\"deleted_at\", null).order(\"created_at\", { ascending: false }).limit(250),"
+        },
+        {
+          "line": 52,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "supabase.from(\"crm_lead_history\").select(\"*\").eq(\"workspace_id\", workspaceId).order(\"created_at\", { ascending: false }).limit(500),"
+        },
+        {
+          "line": 53,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "supabase.from(\"crm_leads\").select(\"id\", { count: \"exact\", head: true }).eq(\"workspace_id\", workspaceId).not(\"archived_at\", \"is\", null).is(\"deleted_at\", null)"
+        }
+      ]
+    },
+    {
+      "baseline": "production_source",
+      "path": "app/app/operations/record-management-actions.ts",
+      "sha256": "53a312a65015216e2060d28187ed7e1463e9bdb8b12ac9b12670d446742720e9",
+      "matches": [
+        {
+          "line": 20,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "| \"crm_leads\""
+        },
+        {
+          "line": 138,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "crm_leads: {"
+        },
+        {
+          "line": 139,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "table: \"crm_leads\","
+        },
+        {
+          "line": 201,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "if (collection === \"crm_leads\") {"
+        },
+        {
+          "line": 346,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "if ([\"kpis\", \"files\", \"issues\", \"crm_leads\"].includes(collection)) {"
+        },
+        {
+          "line": 489,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "if (collection === \"crm_leads\") {"
+        },
+        {
+          "line": 490,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "const { error: historyError } = await supabase.from(\"crm_lead_history\").insert({"
+        }
+      ]
+    },
+    {
+      "baseline": "production_source",
+      "path": "app/app/files/actions.ts",
+      "sha256": "b4e617f513be7978fac01900e034b7dc7e50e9be4dadd9124257b88833962a54",
+      "matches": [
+        {
+          "line": 1269,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "const suggestedCustomerEvidence = outputList(output, \"suggested_crm_records\").concat(outputList(output, \"crm_records\")).concat(outputList(output, \"crm_leads\"));"
+        }
+      ]
+    },
+    {
+      "baseline": "production_source",
+      "path": "lib/records/management.ts",
+      "sha256": "417352453236911d9f98daa422429574aa1232e15dbee159f9ae5db0a70e5bd2",
+      "matches": [
+        {
+          "line": 13,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "| \"crm_leads\""
+        }
+      ]
+    },
+    {
+      "baseline": "production_source",
+      "path": "lib/intelligence/layer.ts",
+      "sha256": "a25fd4ecdb629ae6c8b2ef8be0817a949d4e5f3e088990c7f44c16bf405fec71",
+      "matches": [
+        {
+          "line": 146,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "type CrmLeadRow = Database[\"public\"][\"Tables\"][\"crm_leads\"][\"Row\"];"
+        }
+      ]
+    },
+    {
+      "baseline": "production_source",
+      "path": "lib/intelligence/coverage.ts",
+      "sha256": "4b1140923f3758da6f2a77440a549312c484244006601c3736d7fd9d6119e270",
+      "matches": [
+        {
+          "line": 97,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "crmLeads?: TableRow<\"crm_leads\">[];"
+        },
+        {
+          "line": 98,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "crmHistory?: TableRow<\"crm_lead_history\">[];"
+        }
+      ]
+    },
+    {
+      "baseline": "production_source",
+      "path": "lib/supabase/types.ts",
+      "sha256": "6494719e0c4a28dee5e77cf60f03df889faedd9d08b913f49828a5e54e44fc9e",
+      "matches": [
+        {
+          "line": 3172,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "crm_leads: {"
+        },
+        {
+          "line": 3219,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "Update: Partial<Database[\"public\"][\"Tables\"][\"crm_leads\"][\"Insert\"]>;"
+        },
+        {
+          "line": 3222,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "crm_lead_history: {"
+        },
+        {
+          "line": 3255,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "Update: Partial<Database[\"public\"][\"Tables\"][\"crm_lead_history\"][\"Insert\"]>;"
+        },
+        {
+          "line": 4071,
+          "categories": [
+            "retired_tasks_table_or_rpc"
+          ],
+          "text": "related_task_id: string | null;"
+        },
+        {
+          "line": 4100,
+          "categories": [
+            "retired_tasks_table_or_rpc"
+          ],
+          "text": "related_task_id?: string | null;"
+        }
+      ]
+    },
+    {
+      "baseline": "production_source",
+      "path": "lib/ai/business-health-context.ts",
+      "sha256": "fea2ab01db344322eadc1e9b16dc831c07a54949d2cb3ca5573d1a3b5f1c5d64",
+      "matches": [
+        {
+          "line": 47,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "customer_activity_records: countValue(sourceSummary.crm_leads),"
+        }
+      ]
+    },
+    {
+      "baseline": "production_source",
+      "path": "lib/ai/evidence-index.ts",
+      "sha256": "d67a4ee1e284582a14d2e49f9b7dedf41d0d4e2ebc0fe0b9ef975fe20c13dc07",
+      "matches": [
+        {
+          "line": 572,
+          "categories": [
+            "compatibility_or_route"
+          ],
+          "text": "if ([\"business_signal\", \"task\", \"report\", \"saved_analysis\"].includes(row.source_type) || row.source_type.endsWith(\"_brief\")) return false;"
+        }
+      ]
+    },
+    {
+      "baseline": "production_source",
+      "path": "lib/ai/bounded-context.ts",
+      "sha256": "f4e85e6050934b614257c2c19b8f5695436edf0f7de375bda6c6092adac305f8",
+      "matches": [
+        {
+          "line": 263,
+          "categories": [
+            "crm_table"
+          ],
+          "text": ".from(\"crm_leads\")"
+        }
+      ]
+    },
+    {
+      "baseline": "production_source",
+      "path": "lib/ai/intelligence-briefing/workspace-context.ts",
+      "sha256": "c33e8bc7c3e4752cdda6841cf6332ff70e7d8f4d85234c580ac15764151e219b",
+      "matches": [
+        {
+          "line": 51,
+          "categories": [
+            "crm_table"
+          ],
+          "text": ".from(\"crm_lead_history\")"
+        },
+        {
+          "line": 95,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "supabase.from(\"crm_leads\").select(\"*\").eq(\"workspace_id\", workspaceId).is(\"deleted_at\", null).order(\"created_at\", { ascending: false }),"
+        }
+      ]
+    },
+    {
+      "baseline": "production_source",
+      "path": "components/evidence/SourceImportReview.tsx",
+      "sha256": "7210baa671f37230a82ff423eb13ef1395d11a046904a3dcabe369061a375514",
+      "matches": [
+        {
+          "line": 289,
+          "categories": [
+            "compatibility_or_route"
+          ],
+          "text": "<p className=\"font-semibold\">Customer record imports are retired.</p>"
+        }
+      ]
+    },
+    {
+      "baseline": "production_source",
+      "path": "components/operations/ManagedRecordList.tsx",
+      "sha256": "e25811097395acac585da023490bd038c5e055691b453124e04e66ce6491636a",
+      "matches": [
+        {
+          "line": 27,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "| \"crm_leads\""
+        },
+        {
+          "line": 168,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "crm_leads: \"customer context\","
+        }
+      ]
+    },
+    {
+      "baseline": "production_source",
+      "path": "supabase/migrations/20260713204716_restrict_lifecycle_rpc_to_authenticated.sql",
+      "sha256": "f12707c2c81db0085abdd165e775edb404bae8a879f33df82e16f329535a5b96",
+      "matches": [
+        {
+          "line": 1,
+          "categories": [
+            "retired_tasks_table_or_rpc"
+          ],
+          "text": "revoke all on function public.update_business_signal_lifecycle(uuid, uuid, text) from anon;"
+        }
+      ]
+    },
+    {
+      "baseline": "production_source",
+      "path": "supabase/migrations/202606180012_prestige_operations_intelligence.sql",
+      "sha256": "f7cc70bc7ed5927d770301fd76c57ef0c39ffcd8e6edaac1a2581d19a46d6839",
+      "matches": [
+        {
+          "line": 35,
+          "categories": [
+            "retired_tasks_table_or_rpc"
+          ],
+          "text": "related_task_id uuid references public.tasks(id) on delete set null,"
+        }
+      ]
+    },
+    {
+      "baseline": "production_source",
+      "path": "supabase/migrations/202606180005_file_kpi_historical_memory.sql",
+      "sha256": "aafeb1a3c2d797a3472e37dc5fa183d0253c5fe4d4da2e9c03f64c1c6c729b3a",
+      "matches": [
+        {
+          "line": 33,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "alter table public.crm_leads"
+        },
+        {
+          "line": 42,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "create table if not exists public.crm_lead_history ("
+        },
+        {
+          "line": 45,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "lead_id uuid not null references public.crm_leads(id) on delete cascade,"
+        },
+        {
+          "line": 71,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "create index if not exists crm_leads_workspace_email_idx"
+        },
+        {
+          "line": 72,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "on public.crm_leads(workspace_id, email);"
+        },
+        {
+          "line": 74,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "create index if not exists crm_leads_workspace_import_idx"
+        },
+        {
+          "line": 75,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "on public.crm_leads(workspace_id, import_id);"
+        },
+        {
+          "line": 77,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "create index if not exists crm_lead_history_workspace_lead_idx"
+        },
+        {
+          "line": 78,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "on public.crm_lead_history(workspace_id, lead_id, created_at desc);"
+        },
+        {
+          "line": 80,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "create index if not exists crm_lead_history_workspace_import_idx"
+        },
+        {
+          "line": 81,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "on public.crm_lead_history(workspace_id, import_id);"
+        },
+        {
+          "line": 86,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "alter table public.crm_lead_history enable row level security;"
+        },
+        {
+          "line": 88,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "drop policy if exists \"crm lead history members read\" on public.crm_lead_history;"
+        },
+        {
+          "line": 90,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "on public.crm_lead_history for select"
+        },
+        {
+          "line": 94,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "drop policy if exists \"crm lead history members create\" on public.crm_lead_history;"
+        },
+        {
+          "line": 96,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "on public.crm_lead_history for insert"
+        },
+        {
+          "line": 100,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "drop policy if exists \"crm lead history members update\" on public.crm_lead_history;"
+        },
+        {
+          "line": 102,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "on public.crm_lead_history for update"
+        },
+        {
+          "line": 107,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "drop policy if exists \"crm lead history managers delete\" on public.crm_lead_history;"
+        },
+        {
+          "line": 109,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "on public.crm_lead_history for delete"
+        },
+        {
+          "line": 113,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "grant select, insert, update, delete on public.crm_lead_history to authenticated;"
+        }
+      ]
+    },
+    {
+      "baseline": "production_source",
+      "path": "supabase/migrations/202606180006_start_from_scratch_crm.sql",
+      "sha256": "431e3c4238eb6b73a9281545a0c3ae2624cea771fc9326c4d783c4d568eab1ce",
+      "matches": [
+        {
+          "line": 13,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "'crm_leads',"
+        },
+        {
+          "line": 24,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "alter table public.crm_leads"
+        },
+        {
+          "line": 27,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "create index if not exists crm_leads_workspace_folder_idx"
+        },
+        {
+          "line": 28,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "on public.crm_leads(workspace_id, folder_id);"
+        }
+      ]
+    },
+    {
+      "baseline": "production_source",
+      "path": "supabase/migrations/202607110002_business_signal_lifecycle_integrity.sql",
+      "sha256": "081027636a7b1c65ec1b2962bbdc516eb3b992bff605baffe227a69bb9a2928f",
+      "matches": [
+        {
+          "line": 4,
+          "categories": [
+            "retired_tasks_table_or_rpc"
+          ],
+          "text": "create or replace function public.update_business_signal_lifecycle("
+        },
+        {
+          "line": 22,
+          "categories": [
+            "retired_tasks_table_or_rpc"
+          ],
+          "text": "update public.tasks"
+        },
+        {
+          "line": 44,
+          "categories": [
+            "compatibility_or_route"
+          ],
+          "text": "and source_type = 'business_signal'"
+        },
+        {
+          "line": 52,
+          "categories": [
+            "retired_tasks_table_or_rpc"
+          ],
+          "text": "revoke all on function public.update_business_signal_lifecycle(uuid, uuid, text) from public;"
+        },
+        {
+          "line": 53,
+          "categories": [
+            "retired_tasks_table_or_rpc"
+          ],
+          "text": "grant execute on function public.update_business_signal_lifecycle(uuid, uuid, text) to authenticated;"
+        }
+      ]
+    },
+    {
+      "baseline": "production_source",
+      "path": "supabase/migrations/202606180009_team_accountability.sql",
+      "sha256": "11d5767c7e822bf0eecac9eba251448d02a5f048d109a98d5f663dfa391044e9",
+      "matches": [
+        {
+          "line": 5,
+          "categories": [
+            "retired_tasks_table_or_rpc"
+          ],
+          "text": "alter table public.tasks"
+        },
+        {
+          "line": 116,
+          "categories": [
+            "retired_tasks_table_or_rpc"
+          ],
+          "text": "on public.tasks(workspace_id, assigned_person_id, assigned_role, assigned_department);"
+        }
+      ]
+    },
+    {
+      "baseline": "production_source",
+      "path": "supabase/migrations/20260819174100_security_high_findings_remediation.sql",
+      "sha256": "3236bc16194d53a67eb3011758427f7ec4e3f4fd3d3ace0b95b53db039bff178",
+      "matches": [
+        {
+          "line": 110,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "'crm_leads',"
+        },
+        {
+          "line": 147,
+          "categories": [
+            "retired_tasks_table_or_rpc"
+          ],
+          "text": "drop policy if exists \"assigned users can update assigned tasks\" on public.tasks;"
+        },
+        {
+          "line": 149,
+          "categories": [
+            "retired_tasks_table_or_rpc"
+          ],
+          "text": "on public.tasks for update"
+        },
+        {
+          "line": 172,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "drop policy if exists \"crm lead history members create\" on public.crm_lead_history;"
+        },
+        {
+          "line": 173,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "drop policy if exists \"crm lead history members update\" on public.crm_lead_history;"
+        },
+        {
+          "line": 175,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "on public.crm_lead_history for insert"
+        },
+        {
+          "line": 179,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "on public.crm_lead_history for update"
+        }
+      ]
+    },
+    {
+      "baseline": "production_source",
+      "path": "supabase/migrations/202606180004_files_imports.sql",
+      "sha256": "1cf7972f6c9def3f8b2761e2558b464e4fe11f7beed0e3160f225bff2965c11e",
+      "matches": [
+        {
+          "line": 94,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "create table if not exists public.crm_leads ("
+        },
+        {
+          "line": 147,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "create index if not exists crm_leads_workspace_created_idx"
+        },
+        {
+          "line": 148,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "on public.crm_leads(workspace_id, created_at desc);"
+        },
+        {
+          "line": 158,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "drop trigger if exists set_crm_leads_updated_at on public.crm_leads;"
+        },
+        {
+          "line": 159,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "create trigger set_crm_leads_updated_at"
+        },
+        {
+          "line": 160,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "before update on public.crm_leads"
+        },
+        {
+          "line": 171,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "alter table public.crm_leads enable row level security;"
+        },
+        {
+          "line": 182,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "'crm_leads',"
+        },
+        {
+          "line": 201,
+          "categories": [
+            "crm_table"
+          ],
+          "text": "grant select, insert, update, delete on public.crm_leads to authenticated;"
+        }
+      ]
+    },
+    {
+      "baseline": "production_source",
+      "path": "supabase/migrations/202606170001_phase_1_schema_rls.sql",
+      "sha256": "a479826e516951c093ae080c1c0f5aa06cefc6dd1217c4b9c6bdbb59c88f74e9",
+      "matches": [
+        {
+          "line": 178,
+          "categories": [
+            "retired_tasks_table_or_rpc"
+          ],
+          "text": "create table public.tasks ("
+        },
+        {
+          "line": 324,
+          "categories": [
+            "retired_tasks_table_or_rpc"
+          ],
+          "text": "create index on public.tasks(workspace_id, status, priority);"
+        },
+        {
+          "line": 607,
+          "categories": [
+            "retired_tasks_table_or_rpc"
+          ],
+          "text": "on public.tasks for select"
+        },
+        {
+          "line": 612,
+          "categories": [
+            "retired_tasks_table_or_rpc"
+          ],
+          "text": "on public.tasks for insert"
+        },
+        {
+          "line": 617,
+          "categories": [
+            "retired_tasks_table_or_rpc"
+          ],
+          "text": "on public.tasks for update"
+        },
+        {
+          "line": 623,
+          "categories": [
+            "retired_tasks_table_or_rpc"
+          ],
+          "text": "on public.tasks for update"
+        },
+        {
+          "line": 635,
+          "categories": [
+            "retired_tasks_table_or_rpc"
+          ],
+          "text": "on public.tasks for delete"
+        }
+      ]
+    }
+  ],
+  "additional_inspected_files": [
+    {
+      "baseline": "checkout",
+      "path": "components/app/AppShell.tsx",
+      "sha256": "419c3363180ecde5d532ad0c9640e0a5886abc5be62548285a7155b17a9eed37"
+    },
+    {
+      "baseline": "checkout",
+      "path": "components/app/GlobalSearch.tsx",
+      "sha256": "59fa70a0fc8fe6d04a149c41c14ec8b7e42a18c0eb1fc188498bb28ea24bd941"
+    },
+    {
+      "baseline": "checkout",
+      "path": "lib/help/content.ts",
+      "sha256": "0c9f9beb4b833bfedbc091f20506bd54e3580673d45851aa03e2369f88553c61"
+    },
+    {
+      "baseline": "checkout",
+      "path": "components/evidence/SourceImportReview.tsx",
+      "sha256": "7210baa671f37230a82ff423eb13ef1395d11a046904a3dcabe369061a375514"
+    },
+    {
+      "baseline": "checkout",
+      "path": "lib/ai/evidence-index.ts",
+      "sha256": "d67a4ee1e284582a14d2e49f9b7dedf41d0d4e2ebc0fe0b9ef975fe20c13dc07"
+    },
+    {
+      "baseline": "checkout",
+      "path": "lib/reports/saved-analysis.ts",
+      "sha256": "1ebb0d6dd509ebd6d26c5c8450644ed3da94c10bc1a4ee6df1dd8296802ba0cd"
+    },
+    {
+      "baseline": "checkout",
+      "path": "lib/intelligence/source-parent-eligibility.ts",
+      "sha256": "2ff074238598f229ee814f94ea94adf9e551e579ea2187a4c0d5188dc212955d"
+    },
+    {
+      "baseline": "checkout",
+      "path": "app/app/sources/SourcesPage.tsx",
+      "sha256": "5dc6a1b3ee8cc57f24ba9f35b1d0f174b8e29fcfbc6d976f7f6de7d62cc6e730"
+    },
+    {
+      "baseline": "checkout",
+      "path": "app/app/accountability/actions.ts",
+      "sha256": "9106d68620fa9c576f1ebf05339c9eff943d51edf1b6aa15fb4757c029e991dd"
+    },
+    {
+      "baseline": "checkout",
+      "path": "scripts/business-signals-retirement-regression-tests.js",
+      "sha256": "fa37bc77c2f0b4949bdf6a15ce61b36a598b59820e24b4de4bf891ccd793f509"
+    },
+    {
+      "baseline": "checkout",
+      "path": "vercel.json",
+      "sha256": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356"
+    },
+    {
+      "baseline": "production_source",
+      "path": "components/app/AppShell.tsx",
+      "sha256": "e7d6bcebaa9bfca233cb1dd41629c3d76d01faf782b204cdab5da13e79298cb9"
+    },
+    {
+      "baseline": "production_source",
+      "path": "components/app/GlobalSearch.tsx",
+      "sha256": "59fa70a0fc8fe6d04a149c41c14ec8b7e42a18c0eb1fc188498bb28ea24bd941"
+    },
+    {
+      "baseline": "production_source",
+      "path": "lib/help/content.ts",
+      "sha256": "0c9f9beb4b833bfedbc091f20506bd54e3580673d45851aa03e2369f88553c61"
+    },
+    {
+      "baseline": "production_source",
+      "path": "components/evidence/SourceImportReview.tsx",
+      "sha256": "7210baa671f37230a82ff423eb13ef1395d11a046904a3dcabe369061a375514"
+    },
+    {
+      "baseline": "production_source",
+      "path": "lib/ai/evidence-index.ts",
+      "sha256": "d67a4ee1e284582a14d2e49f9b7dedf41d0d4e2ebc0fe0b9ef975fe20c13dc07"
+    },
+    {
+      "baseline": "production_source",
+      "path": "lib/reports/saved-analysis.ts",
+      "sha256": "1ebb0d6dd509ebd6d26c5c8450644ed3da94c10bc1a4ee6df1dd8296802ba0cd"
+    },
+    {
+      "baseline": "production_source",
+      "path": "lib/intelligence/source-parent-eligibility.ts",
+      "sha256": "2ff074238598f229ee814f94ea94adf9e551e579ea2187a4c0d5188dc212955d"
+    },
+    {
+      "baseline": "production_source",
+      "path": "app/app/sources/SourcesPage.tsx",
+      "sha256": "b391e8a5f5614367f5c2d57c1481aaba9791f8d5ffa3a15f77480151ec89a727"
+    },
+    {
+      "baseline": "production_source",
+      "path": "app/app/accountability/actions.ts",
+      "sha256": "9106d68620fa9c576f1ebf05339c9eff943d51edf1b6aa15fb4757c029e991dd"
+    },
+    {
+      "baseline": "production_source",
+      "path": "scripts/business-signals-retirement-regression-tests.js",
+      "sha256": "fa37bc77c2f0b4949bdf6a15ce61b36a598b59820e24b4de4bf891ccd793f509"
+    },
+    {
+      "baseline": "production_source",
+      "path": "vercel.json",
+      "sha256": "f12aa61c78f0325a5d482a8ee8e05b1113a05cdebdd254aff4509a09bf6f4213"
+    }
+  ],
+  "negative_runtime_scan": {
+    "scope": [
+      "app",
+      "lib",
+      "components"
+    ],
+    "extensions": [
+      ".ts",
+      ".tsx"
+    ],
+    "pattern": "\\.from\\([\\\"\\x27]tasks[\\\"\\x27]\\)|public\\.tasks|update_business_signal_lifecycle",
+    "results": [
+      {
+        "baseline": "checkout",
+        "hits": []
+      },
+      {
+        "baseline": "production_source",
+        "hits": []
+      }
+    ],
+    "limitation": "No code reference is not proof that no external client calls the live database endpoint."
+  },
+  "lifecycle_analysis": {
+    "source_file_rpc": "supabase/migrations/202607110002_business_signal_lifecycle_integrity.sql:57-107",
+    "write_targets": [
+      "public.file_uploads",
+      "public.business_memory_chunks"
+    ],
+    "crm_child_mutation_found": false,
+    "crm_withdrawal": "read-time source-parent eligibility",
+    "tasks_rpc": "update_business_signal_lifecycle remains SECURITY INVOKER and requires tasks update authority; preserve explicitly authorized historical maintenance."
+  }
+}

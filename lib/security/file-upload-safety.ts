@@ -123,7 +123,7 @@ export function validateUploadFileSafety({
   }
 
   if (size > MAX_UPLOAD_FILE_SIZE_BYTES) {
-    return { ok: false as const, error: "Files must be 25 MB or smaller." };
+    return { ok: false as const, error: "Files must be 25 MiB (26,214,400 bytes) or smaller." };
   }
 
   const extension = fileExtension(fileName);

@@ -1,0 +1,53 @@
+{
+  "capturedAt": "2026-10-06T00:41:16.288Z",
+  "repo": "vaeroex/Vaeroex-Ops-System",
+  "head": "98d14c124297d899b8a36a8a243a58d2a87d3881",
+  "priorHead": "16ac195b32ad046521bfe4f4e8726ae71094df1a",
+  "protection": {
+    "connectorBranchProtected": false,
+    "connectorRequiredContexts": [],
+    "connectorRulesets": [],
+    "directBranchProtection": {
+      "status": 404,
+      "message": "Branch not protected"
+    },
+    "directEffectiveRules": [],
+    "directRepoWebhooks": [],
+    "directReceipt": "/tmp/vaeroex-merge-read-protections-curl.json",
+    "autoMerge": false
+  },
+  "sourceAutomation": {
+    "workflowFiles": [
+      ".github/workflows/ci.yml"
+    ],
+    "triggers": [
+      "pull_request",
+      "push:main",
+      "push:kpi-management-ready"
+    ],
+    "permissions": {
+      "contents": "read"
+    },
+    "productionDeploymentCommands": [],
+    "productionMigrationCommands": [],
+    "localMigrationCommand": "supabase migration up --local",
+    "packageInstallBuildLifecycle": {
+      "build": "next build"
+    },
+    "vercelMainDeploymentEnabled": false,
+    "cloudBuildImageSource": {
+      "branch": "main",
+      "approvalRequired": true,
+      "verifiesApprovedDecision": true,
+      "buildsAndPushesImages": true,
+      "deploys": false
+    },
+    "limitation": "GitHub and source reads alone do not prove external integration state; parent/budget agent owns live Vercel, Supabase and Cloud Build confirmations."
+  },
+  "strictAssertionCorrection": {
+    "failedJob": 112047904138,
+    "line": 518,
+    "previousHead": "16ac195b32ad046521bfe4f4e8726ae71094df1a",
+    "cause": "Old exact deployment hold assertion rejected authorized main:false; parent updated strict expected map in new head."
+  }
+}

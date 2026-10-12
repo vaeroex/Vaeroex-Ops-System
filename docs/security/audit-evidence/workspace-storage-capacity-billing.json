@@ -1,0 +1,267 @@
+{
+  "feature": "Workspace uploaded-file capacity purchases",
+  "qualified_at_utc": "2026-10-12T02:15:24.788890+00:00",
+  "live_purchases_activated": false,
+  "production_changed_by_this_qualification": false,
+  "approved_price": {
+    "currency": "usd",
+    "per_pack_first_payment_cents": 500,
+    "per_pack_monthly_cents": 500,
+    "tax_behavior": "inclusive; automatic Stripe Tax calculation; no extra customer tax charge",
+    "payment_interface": "Fixed-USD invoice PaymentIntent using Stripe Payment Element; no hosted invoice or Adaptive Pricing redirect",
+    "scope": "Each purchase belongs to exactly one workspace and has a separately reviewed monthly renewal date"
+  },
+  "controlled_provider_tests": {
+    "command": "node --test scripts/workspace-capacity-billing-tests.cjs",
+    "passed": 35,
+    "failed": 0,
+    "scope": "Exact inclusive price, consent, immutable provider attribution, no automatic payment preparation, duplicate events, current-invoice recovery, partial/full refunds, disputes, workspace isolation, rate limit and legacy event compatibility."
+  },
+  "actual_stripe_test_provider": {
+    "api_version": "2024-06-20",
+    "mode": "test",
+    "passed": 109,
+    "failed": 0,
+    "counting_note": "Executed checks across suites include repeated price and idempotency assertions, not unique scenarios.",
+    "database": "Isolated native local Supabase with synthetic workspaces",
+    "payment_confirmation": "New purchase completed in the actual browser Payment Element after a declined card and successful3DS retry; additional automated test-method confirmations qualify renewal/refund/dispute behavior.",
+    "future_clock_scope": "Stripe test clocks advanced actual provider objects. For future-renewal recovery only, the qualification runner aligns Date.now with the synthetic provider clock; production code has no clock override. SQL/database time remains wallclock.",
+    "suites": [
+      {
+        "command": "node scripts/workspace-capacity-invoice-qualification.cjs prepare",
+        "passed": 6,
+        "checked_at_utc": "2026-10-12T01:55:36.643Z",
+        "checks": [
+          "Exact first gross price",
+          "Positive included NJ tax",
+          "No charge during review",
+          "Unpaid subscription",
+          "Exact provider renewal in review",
+          "Review contains no payment credential"
+        ]
+      },
+      {
+        "command": "node scripts/workspace-capacity-invoice-qualification.cjs prepare-clock",
+        "passed": 6,
+        "checked_at_utc": "2026-10-12T01:58:05.210Z",
+        "checks": [
+          "Exact first gross price",
+          "Positive included NJ tax",
+          "No charge during review",
+          "Unpaid subscription",
+          "Exact provider renewal in review",
+          "Review contains no payment credential"
+        ]
+      },
+      {
+        "command": "node scripts/workspace-capacity-invoice-qualification.cjs clock",
+        "passed": 27,
+        "checked_at_utc": "2026-10-12T01:59:07.078Z",
+        "checks": [
+          "Fixed USD PaymentIntent",
+          "Exact fixed first payment",
+          "No hosted invoice redirect",
+          "Retry keeps the same PaymentIntent",
+          "Synthetic test payment succeeds",
+          "Actual successful gross payment",
+          "Actual positive tax included within500",
+          "Invoice paid",
+          "Saved default method for explicit recurring consent",
+          "Provider PaymentIntent stays USD",
+          "Payment remains exactly500",
+          "Actual invoice.paid event handled",
+          "Duplicate event grants exactly one paid invoice",
+          "Saved card automatically pays monthly renewal",
+          "Automatic renewal remains exact inclusive500",
+          "Recurring subscription remains active",
+          "Actual invoice.paid event handled",
+          "Real failed renewal requires payment",
+          "Failed invoice unpaid",
+          "Actual invoice.payment_failed event handled",
+          "Failed invoice never grants capacity",
+          "Recovery is exact existing overdue invoice",
+          "Recovery due remains500",
+          "Existing overdue invoice can recover",
+          "Actual invoice.paid event handled",
+          "Payment recovery keeps same subscription",
+          "Payment recovery restores active status"
+        ]
+      },
+      {
+        "command": "node scripts/workspace-capacity-invoice-qualification.cjs expire",
+        "passed": 17,
+        "checked_at_utc": "2026-10-12T01:59:29.993Z",
+        "checks": [
+          "Exact first gross price",
+          "Positive included NJ tax",
+          "No charge during review",
+          "Unpaid subscription",
+          "Exact provider renewal in review",
+          "Review contains no payment credential",
+          "Fixed USD PaymentIntent",
+          "Exact fixed first payment",
+          "No hosted invoice redirect",
+          "Retry keeps the same PaymentIntent",
+          "Unfinished confirmed quote holds reservation",
+          "Provider expires incomplete subscription",
+          "Provider voids unpaid invoice",
+          "Expired invoice never charged",
+          "Actual customer.subscription.updated event handled",
+          "Provider void releases pending reservation",
+          "Unpaid expiration creates no capacity"
+        ]
+      },
+      {
+        "command": "node scripts/workspace-capacity-invoice-qualification.cjs dispute",
+        "passed": 26,
+        "checked_at_utc": "2026-10-12T02:03:01.721Z",
+        "checks": [
+          "Exact first gross price",
+          "Positive included NJ tax",
+          "No charge during review",
+          "Unpaid subscription",
+          "Exact provider renewal in review",
+          "Review contains no payment credential",
+          "Fixed USD PaymentIntent",
+          "Exact fixed first payment",
+          "No hosted invoice redirect",
+          "Retry keeps the same PaymentIntent",
+          "Synthetic test payment succeeds",
+          "Actual successful gross payment",
+          "Actual positive tax included within500",
+          "Invoice paid",
+          "Saved default method for explicit recurring consent",
+          "Provider PaymentIntent stays USD",
+          "Payment remains exactly500",
+          "Actual invoice.paid event handled",
+          "Duplicate event grants exactly one paid invoice",
+          "Actual charge.dispute.created event handled",
+          "Actual dispute withdraws affected capacity only",
+          "Actual charge.dispute.created event handled",
+          "Actual dispute withdraws affected capacity only",
+          "Synthetic dispute won at provider",
+          "Actual charge.dispute.closed event handled",
+          "Won dispute restores existing paid period"
+        ]
+      },
+      {
+        "command": "node scripts/workspace-capacity-invoice-qualification.cjs cancel-refund",
+        "passed": 7,
+        "checked_at_utc": "2026-10-12T02:03:15.390Z",
+        "checks": [
+          "Cancellation scheduled without immediate removal",
+          "Cancellation preserves paid period",
+          "Actual charge.refunded event handled",
+          "Partial refund preserves paid capacity",
+          "Actual charge.refunded event handled",
+          "Full refund withdraws only affected paid pack",
+          "Cancellation and refunds retain uploaded files"
+        ]
+      },
+      {
+        "command": "node scripts/workspace-capacity-invoice-qualification.cjs paid",
+        "passed": 8,
+        "checked_at_utc": "2026-10-12T02:04:28.120Z",
+        "checks": [
+          "Actual successful gross payment",
+          "Actual positive tax included within500",
+          "Invoice paid",
+          "Saved default method for explicit recurring consent",
+          "Provider PaymentIntent stays USD",
+          "Payment remains exactly500",
+          "Actual invoice.paid event handled",
+          "Duplicate event grants exactly one paid invoice"
+        ]
+      },
+      {
+        "command": "Read-only verification following mobile browser overdue-invoice payment",
+        "passed": 12,
+        "checked_at_utc": "2026-10-12T02:14:51.811Z",
+        "checks": [
+          "Recovery pays the existing invoice",
+          "Recovery does not create another subscription",
+          "Provider subscription returns active",
+          "Scheduled cancellation remains in force",
+          "Existing invoice paid exactly500",
+          "Historic fixture tax disclosure matches provider",
+          "PaymentIntent stays exact USD500",
+          "Replacement card saved for the existing subscription",
+          "Actual Stripe signed invoice event delivered200",
+          "Exactly one paid ledger invoice",
+          "Paid capacity period matches reviewed recovery period",
+          "Recovery increases only other workspace byone"
+        ]
+      }
+    ]
+  },
+  "browser_payment_observation": {
+    "declined_card": "Owner sees declined message and can retry; current allowance remains unchanged.",
+    "3ds_retry": "Same invoice PaymentIntent completed3DS; exact5USD charged,31cents tax included; current allowance becomes35GB and1500slots for two paid packs.",
+    "currency": "USD remains fixed for the international3DS card; no customer currency conversion selector or added amount.",
+    "privacy": "Synthetic fixtures and Stripe published test cards only; no customer files or live charges."
+  },
+  "actual_stripe_cli_delivery": {
+    "mode": "test",
+    "cli_version": "1.53.1",
+    "official_release_sha256": "bbc6ff9da6242912049ef44eca293a028130884a8ea7d9345e8ae09460319bc6",
+    "http_200_count": 36,
+    "event_types_with_http200": {
+      "customer.subscription.created": 4,
+      "customer.subscription.updated": 16,
+      "invoice.paid": 7,
+      "invoice.payment_failed": 4,
+      "charge.dispute.created": 1,
+      "charge.dispute.updated": 1,
+      "charge.dispute.closed": 1,
+      "charge.refunded": 2
+    },
+    "scope": "Actual Stripe-signed remote events forwarded by official CLI into production-mode local Next.js, including the browser invoice.paid event. No locally constructed webhook signatures for this evidence. Hosted release delivery remains a deployment check."
+  },
+  "shared_storage_database_qualification": {
+    "passed": 143,
+    "existing_ci_sql_assertions": 1001,
+    "existing_ci_sql_suites": 20,
+    "fresh_migration_count": 141,
+    "billing_migration_sha256": "116db7bd6b31b1f14cf5648db22a400b22718dd7be465073b1971419cf45c256",
+    "commitment_union_requalification": "143 focused checks pass, including per-subscription renewable-or-unrefunded-period union, disputed potential, and confirm-time ceiling. Final full141-migration and1001-assertion normal-CI rerun remains a release check.",
+    "invoice_migration_sha256": "fa35570963f772e0c5f459ffcd85ee230feb7728c0a807b09ef736831e8b5e27",
+    "existing_ci_sql_assertions_scope": "1001 assertions across20 suites passed before the final committed-pack union refinement; final CI checks the committed revision."
+  },
+  "historical_checkout_qualification": {
+    "status": "Superseded for new purchases by exact-price inclusive-tax Payment Element flow; retained only as legacy-event compatibility evidence.",
+    "controlled_checks": 19,
+    "actual_provider_checks": 28,
+    "actual_cli_checks": 5
+  },
+  "release_requirements_still_separate": [
+    "Normal release checks on final committed revision",
+    "Real merchant tax setup/registration and launch-country decision; no legal registrations invented",
+    "Remote webhook delivery to release deployment and explicit activation gates"
+  ],
+  "privacy": "No customer names, document contents, billing addresses, card numbers, private fixture identifiers, payment credentials, provider secrets, or hosted payment URLs are published in this evidence.",
+  "browser_recovery_observation": {
+    "passed": 12,
+    "scope": "Actual mobile browser recovery of real current unpaid test-provider invoice; synthetic historical original purchase binding only, no manually credited capacity",
+    "amount_paid_cents": 500,
+    "currency": "usd",
+    "same_invoice_and_subscription": true,
+    "replacement_card_saved": true,
+    "cancel_at_period_end_preserved": true,
+    "other_workspace_before": {
+      "paid_packs": 3,
+      "allowance_gb": 45,
+      "file_slots": 2000
+    },
+    "other_workspace_after": {
+      "paid_packs": 4,
+      "allowance_gb": 55,
+      "file_slots": 2500
+    },
+    "original_workspace_unchanged": {
+      "paid_packs": 2,
+      "allowance_gb": 35,
+      "file_slots": 1500
+    },
+    "tax_note": "Historical fixture invoice predates synthetic NJ registration activation. Provider inclusive tax is0; separate new-purchase and renewal tests prove31cents included within5USD."
+  }
+}

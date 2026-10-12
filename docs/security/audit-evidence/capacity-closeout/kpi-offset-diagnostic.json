@@ -1,0 +1,2274 @@
+{
+  "kind": "bounded_kpi_diagnostic_v1",
+  "runId": "99799ab6-c939-4b3e-aacc-2a30ffaeb14f",
+  "applicationRequests": 32,
+  "measuredApplicationRequests": 24,
+  "routeRepetitions": 3,
+  "workspaces": 2,
+  "authenticatedLoaderRepetitions": 3,
+  "sqlOffsets": [
+    0,
+    5000,
+    10000
+  ],
+  "sqlStatementTimeoutMs": 5000,
+  "sortRepetitions": 7,
+  "capacityClaim": false,
+  "productionTouched": false,
+  "readOnlySql": true,
+  "applicationGetSideEffects": "Overview may update its normal daily health snapshot; no synthetic facts or customer records are modified by SQL profiling.",
+  "startedAt": "2026-10-05T20:28:11.025Z",
+  "sourceCommit": "0a15ddcd3b564086280fec21b79b6976b3a3cc44",
+  "buildId": "ReUcdHr1ALEejCvoUeFTc",
+  "instanceNonce": "776ae9b5aacd7201c222333817171d6b828872e0b79be274",
+  "loadedRuntimeSourceFiles": {
+    "workspace-capacity-environment.cjs": "092a11c3ec303259a662dabebfaf85724d7548c6ddd1d1e586ce9510b1cce9ae",
+    "workspace-capacity-preload.cjs": "7d01f2ad6fee9004570d61834d620c1520ae60eb584e53b89dacc7e86ea6065d",
+    "workspace-capacity-providers.cjs": "26b35b290afe6fbf2431848e07dee2f4d55a57a37e2fe91fd0958bfc1a7ce677",
+    "workspace-capacity-next-server.cjs": "26fe8ba0ff955747f61bf71ab384e879f26b60c22780812d0a716e18fb1f378c",
+    "workspace-capacity-next-config.cjs": "795a3cf0790176d88b6f688ae5e3f27abaa9181d2a7a28336804f57103fd4e47"
+  },
+  "profileHarnessSha256": "526d20368a1047938490736ff629b61059aa2042378f74431b15e0f1a7598c53",
+  "sources": {
+    "lib/kpis/load-workspace-kpis.ts": "9af3975fcb1459951e4fc896dbf354724df2b0f46e5ac436b5bb03ba79a0052d",
+    "lib/kpis/settings.ts": "37b0f17e25542b3c98bf4d3b5143f3c1d39719436ae458028026c129557f03fa",
+    "lib/kpis/semantics.ts": "833b24726772659d7801258014f1f45098aae02320977a8c2d3f77f3d49d2654"
+  },
+  "pageRequests": [
+    {
+      "route": "/app",
+      "workspaceId": "c347b4e6-d38f-457b-8667-a117e3c2423b",
+      "round": 0,
+      "warmup": true,
+      "status": 200,
+      "headersMs": 105.83441700000003,
+      "totalMs": 1766.0179169999997,
+      "bytes": 109361
+    },
+    {
+      "route": "/app/intelligence",
+      "workspaceId": "c347b4e6-d38f-457b-8667-a117e3c2423b",
+      "round": 0,
+      "warmup": true,
+      "status": 200,
+      "headersMs": 52.644582999999784,
+      "totalMs": 1690.1465000000003,
+      "bytes": 190693
+    },
+    {
+      "route": "/app/kpis",
+      "workspaceId": "c347b4e6-d38f-457b-8667-a117e3c2423b",
+      "round": 0,
+      "warmup": true,
+      "status": 200,
+      "headersMs": 56.37687499999993,
+      "totalMs": 941.786709,
+      "bytes": 94656
+    },
+    {
+      "route": "/app/reports",
+      "workspaceId": "c347b4e6-d38f-457b-8667-a117e3c2423b",
+      "round": 0,
+      "warmup": true,
+      "status": 200,
+      "headersMs": 52.14587500000016,
+      "totalMs": 57.119542000000365,
+      "bytes": 55888
+    },
+    {
+      "route": "/app",
+      "workspaceId": "94e1e8b3-a38c-4780-9870-702dd157ebb1",
+      "round": 0,
+      "warmup": true,
+      "status": 200,
+      "headersMs": 54.668915999999626,
+      "totalMs": 1288.6624999999995,
+      "bytes": 109361
+    },
+    {
+      "route": "/app/intelligence",
+      "workspaceId": "94e1e8b3-a38c-4780-9870-702dd157ebb1",
+      "round": 0,
+      "warmup": true,
+      "status": 200,
+      "headersMs": 51.33233399999972,
+      "totalMs": 1653.3377499999997,
+      "bytes": 190689
+    },
+    {
+      "route": "/app/kpis",
+      "workspaceId": "94e1e8b3-a38c-4780-9870-702dd157ebb1",
+      "round": 0,
+      "warmup": true,
+      "status": 200,
+      "headersMs": 52.3901249999999,
+      "totalMs": 988.5644589999993,
+      "bytes": 94656
+    },
+    {
+      "route": "/app/reports",
+      "workspaceId": "94e1e8b3-a38c-4780-9870-702dd157ebb1",
+      "round": 0,
+      "warmup": true,
+      "status": 200,
+      "headersMs": 51.99837500000103,
+      "totalMs": 54.29058299999997,
+      "bytes": 55888
+    },
+    {
+      "route": "/app",
+      "workspaceId": "c347b4e6-d38f-457b-8667-a117e3c2423b",
+      "round": 1,
+      "warmup": false,
+      "status": 200,
+      "headersMs": 49.54412500000035,
+      "totalMs": 1247.8393749999996,
+      "bytes": 109361
+    },
+    {
+      "route": "/app/intelligence",
+      "workspaceId": "c347b4e6-d38f-457b-8667-a117e3c2423b",
+      "round": 1,
+      "warmup": false,
+      "status": 200,
+      "headersMs": 52.2453749999986,
+      "totalMs": 1693.9730839999993,
+      "bytes": 190693
+    },
+    {
+      "route": "/app/kpis",
+      "workspaceId": "c347b4e6-d38f-457b-8667-a117e3c2423b",
+      "round": 1,
+      "warmup": false,
+      "status": 200,
+      "headersMs": 52.554292000000714,
+      "totalMs": 932.0625830000008,
+      "bytes": 94656
+    },
+    {
+      "route": "/app/reports",
+      "workspaceId": "c347b4e6-d38f-457b-8667-a117e3c2423b",
+      "round": 1,
+      "warmup": false,
+      "status": 200,
+      "headersMs": 52.35291700000016,
+      "totalMs": 54.75237500000003,
+      "bytes": 55888
+    },
+    {
+      "route": "/app",
+      "workspaceId": "94e1e8b3-a38c-4780-9870-702dd157ebb1",
+      "round": 1,
+      "warmup": false,
+      "status": 200,
+      "headersMs": 50.077125000001615,
+      "totalMs": 1223.6606250000004,
+      "bytes": 109361
+    },
+    {
+      "route": "/app/intelligence",
+      "workspaceId": "94e1e8b3-a38c-4780-9870-702dd157ebb1",
+      "round": 1,
+      "warmup": false,
+      "status": 200,
+      "headersMs": 49.96112499999981,
+      "totalMs": 1678.9922500000011,
+      "bytes": 190689
+    },
+    {
+      "route": "/app/kpis",
+      "workspaceId": "94e1e8b3-a38c-4780-9870-702dd157ebb1",
+      "round": 1,
+      "warmup": false,
+      "status": 200,
+      "headersMs": 51.475915999999415,
+      "totalMs": 963.1483329999992,
+      "bytes": 94656
+    },
+    {
+      "route": "/app/reports",
+      "workspaceId": "94e1e8b3-a38c-4780-9870-702dd157ebb1",
+      "round": 1,
+      "warmup": false,
+      "status": 200,
+      "headersMs": 52.22674999999799,
+      "totalMs": 55.181790999999066,
+      "bytes": 55888
+    },
+    {
+      "route": "/app",
+      "workspaceId": "c347b4e6-d38f-457b-8667-a117e3c2423b",
+      "round": 2,
+      "warmup": false,
+      "status": 200,
+      "headersMs": 52.14574999999968,
+      "totalMs": 1192.3888750000006,
+      "bytes": 109361
+    },
+    {
+      "route": "/app/intelligence",
+      "workspaceId": "c347b4e6-d38f-457b-8667-a117e3c2423b",
+      "round": 2,
+      "warmup": false,
+      "status": 200,
+      "headersMs": 55.95262499999808,
+      "totalMs": 1697.9395000000004,
+      "bytes": 190693
+    },
+    {
+      "route": "/app/kpis",
+      "workspaceId": "c347b4e6-d38f-457b-8667-a117e3c2423b",
+      "round": 2,
+      "warmup": false,
+      "status": 200,
+      "headersMs": 52.63654099999985,
+      "totalMs": 930.2573330000014,
+      "bytes": 94656
+    },
+    {
+      "route": "/app/reports",
+      "workspaceId": "c347b4e6-d38f-457b-8667-a117e3c2423b",
+      "round": 2,
+      "warmup": false,
+      "status": 200,
+      "headersMs": 50.63316599999962,
+      "totalMs": 52.91608300000007,
+      "bytes": 55888
+    },
+    {
+      "route": "/app",
+      "workspaceId": "94e1e8b3-a38c-4780-9870-702dd157ebb1",
+      "round": 2,
+      "warmup": false,
+      "status": 200,
+      "headersMs": 48.835917000000336,
+      "totalMs": 1236.826333000001,
+      "bytes": 109361
+    },
+    {
+      "route": "/app/intelligence",
+      "workspaceId": "94e1e8b3-a38c-4780-9870-702dd157ebb1",
+      "round": 2,
+      "warmup": false,
+      "status": 200,
+      "headersMs": 55.63416700000016,
+      "totalMs": 1651.9572919999991,
+      "bytes": 190689
+    },
+    {
+      "route": "/app/kpis",
+      "workspaceId": "94e1e8b3-a38c-4780-9870-702dd157ebb1",
+      "round": 2,
+      "warmup": false,
+      "status": 200,
+      "headersMs": 50.81837500000256,
+      "totalMs": 970.5882500000007,
+      "bytes": 94656
+    },
+    {
+      "route": "/app/reports",
+      "workspaceId": "94e1e8b3-a38c-4780-9870-702dd157ebb1",
+      "round": 2,
+      "warmup": false,
+      "status": 200,
+      "headersMs": 49.61624999999913,
+      "totalMs": 53.203042000001005,
+      "bytes": 55888
+    },
+    {
+      "route": "/app",
+      "workspaceId": "c347b4e6-d38f-457b-8667-a117e3c2423b",
+      "round": 3,
+      "warmup": false,
+      "status": 200,
+      "headersMs": 53.382708000001,
+      "totalMs": 1544.5997080000016,
+      "bytes": 109361
+    },
+    {
+      "route": "/app/intelligence",
+      "workspaceId": "c347b4e6-d38f-457b-8667-a117e3c2423b",
+      "round": 3,
+      "warmup": false,
+      "status": 200,
+      "headersMs": 64.55641699999978,
+      "totalMs": 1658.7842500000006,
+      "bytes": 190693
+    },
+    {
+      "route": "/app/kpis",
+      "workspaceId": "c347b4e6-d38f-457b-8667-a117e3c2423b",
+      "round": 3,
+      "warmup": false,
+      "status": 200,
+      "headersMs": 53.67766599999959,
+      "totalMs": 945.8300410000011,
+      "bytes": 94656
+    },
+    {
+      "route": "/app/reports",
+      "workspaceId": "c347b4e6-d38f-457b-8667-a117e3c2423b",
+      "round": 3,
+      "warmup": false,
+      "status": 200,
+      "headersMs": 51.24774999999863,
+      "totalMs": 54.31683299999713,
+      "bytes": 55888
+    },
+    {
+      "route": "/app",
+      "workspaceId": "94e1e8b3-a38c-4780-9870-702dd157ebb1",
+      "round": 3,
+      "warmup": false,
+      "status": 200,
+      "headersMs": 56.88904200000252,
+      "totalMs": 1239.8552500000005,
+      "bytes": 109361
+    },
+    {
+      "route": "/app/intelligence",
+      "workspaceId": "94e1e8b3-a38c-4780-9870-702dd157ebb1",
+      "round": 3,
+      "warmup": false,
+      "status": 200,
+      "headersMs": 53.56133300000147,
+      "totalMs": 1722.4281250000022,
+      "bytes": 190689
+    },
+    {
+      "route": "/app/kpis",
+      "workspaceId": "94e1e8b3-a38c-4780-9870-702dd157ebb1",
+      "round": 3,
+      "warmup": false,
+      "status": 200,
+      "headersMs": 54.11962499999936,
+      "totalMs": 983.4378340000039,
+      "bytes": 94656
+    },
+    {
+      "route": "/app/reports",
+      "workspaceId": "94e1e8b3-a38c-4780-9870-702dd157ebb1",
+      "round": 3,
+      "warmup": false,
+      "status": 200,
+      "headersMs": 51.01145800000086,
+      "totalMs": 59.64058300000033,
+      "bytes": 55888
+    }
+  ],
+  "loaders": [
+    {
+      "workspaceId": "c347b4e6-d38f-457b-8667-a117e3c2423b",
+      "repetition": 0,
+      "rows": 10100,
+      "rowOrderSha256": "b8fd0e9e7273d5371ffddea76707037d1d3777b37d8f75b620bb47bdbf10321f",
+      "totalMs": 762.6437910000022,
+      "calls": [
+        {
+          "phase": "complete_authorized_loader",
+          "path": "/rest/v1/kpis",
+          "offset": "0",
+          "limit": "1000",
+          "range": null,
+          "method": "GET",
+          "status": 200,
+          "headersMs": 18.775334000005387,
+          "totalBodyMs": 20.117834000004223,
+          "bytes": 724717
+        },
+        {
+          "phase": "complete_authorized_loader",
+          "path": "/rest/v1/kpis",
+          "offset": "1000",
+          "limit": "1000",
+          "range": null,
+          "method": "GET",
+          "status": 200,
+          "headersMs": 29.408166000001074,
+          "totalBodyMs": 30.17529099999956,
+          "bytes": 702563
+        },
+        {
+          "phase": "complete_authorized_loader",
+          "path": "/rest/v1/kpis",
+          "offset": "2000",
+          "limit": "1000",
+          "range": null,
+          "method": "GET",
+          "status": 200,
+          "headersMs": 38.046667000002344,
+          "totalBodyMs": 38.67154199999641,
+          "bytes": 682048
+        },
+        {
+          "phase": "complete_authorized_loader",
+          "path": "/rest/v1/kpis",
+          "offset": "3000",
+          "limit": "1000",
+          "range": null,
+          "method": "GET",
+          "status": 200,
+          "headersMs": 47.6875,
+          "totalBodyMs": 48.484375,
+          "bytes": 682058
+        },
+        {
+          "phase": "complete_authorized_loader",
+          "path": "/rest/v1/kpis",
+          "offset": "4000",
+          "limit": "1000",
+          "range": null,
+          "method": "GET",
+          "status": 200,
+          "headersMs": 57.94904099999985,
+          "totalBodyMs": 58.65004100000078,
+          "bytes": 682058
+        },
+        {
+          "phase": "complete_authorized_loader",
+          "path": "/rest/v1/kpis",
+          "offset": "5000",
+          "limit": "1000",
+          "range": null,
+          "method": "GET",
+          "status": 200,
+          "headersMs": 70.9696249999979,
+          "totalBodyMs": 71.5479589999959,
+          "bytes": 682053
+        },
+        {
+          "phase": "complete_authorized_loader",
+          "path": "/rest/v1/kpis",
+          "offset": "6000",
+          "limit": "1000",
+          "range": null,
+          "method": "GET",
+          "status": 200,
+          "headersMs": 77.82970799999748,
+          "totalBodyMs": 78.50308299999597,
+          "bytes": 681048
+        },
+        {
+          "phase": "complete_authorized_loader",
+          "path": "/rest/v1/kpis",
+          "offset": "7000",
+          "limit": "1000",
+          "range": null,
+          "method": "GET",
+          "status": 200,
+          "headersMs": 87.26487500000076,
+          "totalBodyMs": 87.98941599999671,
+          "bytes": 682053
+        },
+        {
+          "phase": "complete_authorized_loader",
+          "path": "/rest/v1/kpis",
+          "offset": "8000",
+          "limit": "1000",
+          "range": null,
+          "method": "GET",
+          "status": 200,
+          "headersMs": 96.18241699999635,
+          "totalBodyMs": 96.77108299999963,
+          "bytes": 682058
+        },
+        {
+          "phase": "complete_authorized_loader",
+          "path": "/rest/v1/kpis",
+          "offset": "9000",
+          "limit": "1000",
+          "range": null,
+          "method": "GET",
+          "status": 200,
+          "headersMs": 106.89058300000033,
+          "totalBodyMs": 107.45908300000156,
+          "bytes": 682058
+        },
+        {
+          "phase": "complete_authorized_loader",
+          "path": "/rest/v1/kpis",
+          "offset": "10000",
+          "limit": "1000",
+          "range": null,
+          "method": "GET",
+          "status": 200,
+          "headersMs": 103.75716600000305,
+          "totalBodyMs": 103.87504099999933,
+          "bytes": 68198
+        },
+        {
+          "phase": "complete_authorized_loader",
+          "path": "/rest/v1/rpc/read_google_sheets_operational_conflicts_v1",
+          "offset": null,
+          "limit": null,
+          "range": null,
+          "method": "POST",
+          "status": 200,
+          "headersMs": 5.403792000004614,
+          "totalBodyMs": 5.52979200000118,
+          "bytes": 2
+        }
+      ]
+    },
+    {
+      "workspaceId": "c347b4e6-d38f-457b-8667-a117e3c2423b",
+      "repetition": 1,
+      "rows": 10100,
+      "rowOrderSha256": "b8fd0e9e7273d5371ffddea76707037d1d3777b37d8f75b620bb47bdbf10321f",
+      "totalMs": 762.6441249999989,
+      "calls": [
+        {
+          "phase": "complete_authorized_loader",
+          "path": "/rest/v1/kpis",
+          "offset": "0",
+          "limit": "1000",
+          "range": null,
+          "method": "GET",
+          "status": 200,
+          "headersMs": 18.67333299999882,
+          "totalBodyMs": 19.632332999994105,
+          "bytes": 724717
+        },
+        {
+          "phase": "complete_authorized_loader",
+          "path": "/rest/v1/kpis",
+          "offset": "1000",
+          "limit": "1000",
+          "range": null,
+          "method": "GET",
+          "status": 200,
+          "headersMs": 29.264000000002852,
+          "totalBodyMs": 29.82679199999984,
+          "bytes": 702563
+        },
+        {
+          "phase": "complete_authorized_loader",
+          "path": "/rest/v1/kpis",
+          "offset": "2000",
+          "limit": "1000",
+          "range": null,
+          "method": "GET",
+          "status": 200,
+          "headersMs": 38.1784589999952,
+          "totalBodyMs": 38.71295899999677,
+          "bytes": 682048
+        },
+        {
+          "phase": "complete_authorized_loader",
+          "path": "/rest/v1/kpis",
+          "offset": "3000",
+          "limit": "1000",
+          "range": null,
+          "method": "GET",
+          "status": 200,
+          "headersMs": 48.89624999999796,
+          "totalBodyMs": 49.545791999997164,
+          "bytes": 682058
+        },
+        {
+          "phase": "complete_authorized_loader",
+          "path": "/rest/v1/kpis",
+          "offset": "4000",
+          "limit": "1000",
+          "range": null,
+          "method": "GET",
+          "status": 200,
+          "headersMs": 58.37249999999767,
+          "totalBodyMs": 58.954375000001164,
+          "bytes": 682058
+        },
+        {
+          "phase": "complete_authorized_loader",
+          "path": "/rest/v1/kpis",
+          "offset": "5000",
+          "limit": "1000",
+          "range": null,
+          "method": "GET",
+          "status": 200,
+          "headersMs": 68.09324999999808,
+          "totalBodyMs": 68.70599999999831,
+          "bytes": 682053
+        },
+        {
+          "phase": "complete_authorized_loader",
+          "path": "/rest/v1/kpis",
+          "offset": "6000",
+          "limit": "1000",
+          "range": null,
+          "method": "GET",
+          "status": 200,
+          "headersMs": 78.20937499999854,
+          "totalBodyMs": 78.80491599999368,
+          "bytes": 681048
+        },
+        {
+          "phase": "complete_authorized_loader",
+          "path": "/rest/v1/kpis",
+          "offset": "7000",
+          "limit": "1000",
+          "range": null,
+          "method": "GET",
+          "status": 200,
+          "headersMs": 87.0245419999992,
+          "totalBodyMs": 87.57754199999908,
+          "bytes": 682053
+        },
+        {
+          "phase": "complete_authorized_loader",
+          "path": "/rest/v1/kpis",
+          "offset": "8000",
+          "limit": "1000",
+          "range": null,
+          "method": "GET",
+          "status": 200,
+          "headersMs": 99.82104199999594,
+          "totalBodyMs": 100.33666699999594,
+          "bytes": 682058
+        },
+        {
+          "phase": "complete_authorized_loader",
+          "path": "/rest/v1/kpis",
+          "offset": "9000",
+          "limit": "1000",
+          "range": null,
+          "method": "GET",
+          "status": 200,
+          "headersMs": 107.48908400000073,
+          "totalBodyMs": 108.21462500000052,
+          "bytes": 682058
+        },
+        {
+          "phase": "complete_authorized_loader",
+          "path": "/rest/v1/kpis",
+          "offset": "10000",
+          "limit": "1000",
+          "range": null,
+          "method": "GET",
+          "status": 200,
+          "headersMs": 104.27379199999996,
+          "totalBodyMs": 104.39254200000141,
+          "bytes": 68198
+        },
+        {
+          "phase": "complete_authorized_loader",
+          "path": "/rest/v1/rpc/read_google_sheets_operational_conflicts_v1",
+          "offset": null,
+          "limit": null,
+          "range": null,
+          "method": "POST",
+          "status": 200,
+          "headersMs": 3.787917000001471,
+          "totalBodyMs": 3.8381250000020373,
+          "bytes": 2
+        }
+      ]
+    },
+    {
+      "workspaceId": "c347b4e6-d38f-457b-8667-a117e3c2423b",
+      "repetition": 2,
+      "rows": 10100,
+      "rowOrderSha256": "b8fd0e9e7273d5371ffddea76707037d1d3777b37d8f75b620bb47bdbf10321f",
+      "totalMs": 754.9273749999993,
+      "calls": [
+        {
+          "phase": "complete_authorized_loader",
+          "path": "/rest/v1/kpis",
+          "offset": "0",
+          "limit": "1000",
+          "range": null,
+          "method": "GET",
+          "status": 200,
+          "headersMs": 18.767083000006096,
+          "totalBodyMs": 19.354292000003625,
+          "bytes": 724717
+        },
+        {
+          "phase": "complete_authorized_loader",
+          "path": "/rest/v1/kpis",
+          "offset": "1000",
+          "limit": "1000",
+          "range": null,
+          "method": "GET",
+          "status": 200,
+          "headersMs": 27.948458999999275,
+          "totalBodyMs": 28.62687499999447,
+          "bytes": 702563
+        },
+        {
+          "phase": "complete_authorized_loader",
+          "path": "/rest/v1/kpis",
+          "offset": "2000",
+          "limit": "1000",
+          "range": null,
+          "method": "GET",
+          "status": 200,
+          "headersMs": 39.01395799999591,
+          "totalBodyMs": 39.53479199999856,
+          "bytes": 682048
+        },
+        {
+          "phase": "complete_authorized_loader",
+          "path": "/rest/v1/kpis",
+          "offset": "3000",
+          "limit": "1000",
+          "range": null,
+          "method": "GET",
+          "status": 200,
+          "headersMs": 47.8570830000026,
+          "totalBodyMs": 48.32766600000468,
+          "bytes": 682058
+        },
+        {
+          "phase": "complete_authorized_loader",
+          "path": "/rest/v1/kpis",
+          "offset": "4000",
+          "limit": "1000",
+          "range": null,
+          "method": "GET",
+          "status": 200,
+          "headersMs": 57.55970800000068,
+          "totalBodyMs": 58.02191600000515,
+          "bytes": 682058
+        },
+        {
+          "phase": "complete_authorized_loader",
+          "path": "/rest/v1/kpis",
+          "offset": "5000",
+          "limit": "1000",
+          "range": null,
+          "method": "GET",
+          "status": 200,
+          "headersMs": 67.46241699999518,
+          "totalBodyMs": 68.04087499999878,
+          "bytes": 682053
+        },
+        {
+          "phase": "complete_authorized_loader",
+          "path": "/rest/v1/kpis",
+          "offset": "6000",
+          "limit": "1000",
+          "range": null,
+          "method": "GET",
+          "status": 200,
+          "headersMs": 77.41545800000313,
+          "totalBodyMs": 77.88225000000239,
+          "bytes": 681048
+        },
+        {
+          "phase": "complete_authorized_loader",
+          "path": "/rest/v1/kpis",
+          "offset": "7000",
+          "limit": "1000",
+          "range": null,
+          "method": "GET",
+          "status": 200,
+          "headersMs": 86.94895800000086,
+          "totalBodyMs": 87.41366700000071,
+          "bytes": 682053
+        },
+        {
+          "phase": "complete_authorized_loader",
+          "path": "/rest/v1/kpis",
+          "offset": "8000",
+          "limit": "1000",
+          "range": null,
+          "method": "GET",
+          "status": 200,
+          "headersMs": 99.01375000000553,
+          "totalBodyMs": 99.59454100000585,
+          "bytes": 682058
+        },
+        {
+          "phase": "complete_authorized_loader",
+          "path": "/rest/v1/kpis",
+          "offset": "9000",
+          "limit": "1000",
+          "range": null,
+          "method": "GET",
+          "status": 200,
+          "headersMs": 106.17320800000016,
+          "totalBodyMs": 106.64712499999587,
+          "bytes": 682058
+        },
+        {
+          "phase": "complete_authorized_loader",
+          "path": "/rest/v1/kpis",
+          "offset": "10000",
+          "limit": "1000",
+          "range": null,
+          "method": "GET",
+          "status": 200,
+          "headersMs": 103.73033299999952,
+          "totalBodyMs": 103.83058299999539,
+          "bytes": 68198
+        },
+        {
+          "phase": "complete_authorized_loader",
+          "path": "/rest/v1/rpc/read_google_sheets_operational_conflicts_v1",
+          "offset": null,
+          "limit": null,
+          "range": null,
+          "method": "POST",
+          "status": 200,
+          "headersMs": 3.9968750000043656,
+          "totalBodyMs": 4.064667000006011,
+          "bytes": 2
+        },
+        {
+          "phase": "settings_for_exact_sort",
+          "path": "/rest/v1/kpi_settings",
+          "offset": null,
+          "limit": null,
+          "range": null,
+          "method": "GET",
+          "status": 200,
+          "headersMs": 3.6995410000017728,
+          "totalBodyMs": 3.7614580000008573,
+          "bytes": 22158
+        }
+      ]
+    },
+    {
+      "workspaceId": "94e1e8b3-a38c-4780-9870-702dd157ebb1",
+      "repetition": 0,
+      "rows": 10100,
+      "rowOrderSha256": "b035703e1942a8c512d020196e3dc12c502d81b3e43a95aa8b0f10947eeddbc2",
+      "totalMs": 846.8309169999993,
+      "calls": [
+        {
+          "phase": "complete_authorized_loader",
+          "path": "/rest/v1/kpis",
+          "offset": "0",
+          "limit": "1000",
+          "range": null,
+          "method": "GET",
+          "status": 200,
+          "headersMs": 19.519291999997222,
+          "totalBodyMs": 20.240375000001222,
+          "bytes": 724786
+        },
+        {
+          "phase": "complete_authorized_loader",
+          "path": "/rest/v1/kpis",
+          "offset": "1000",
+          "limit": "1000",
+          "range": null,
+          "method": "GET",
+          "status": 200,
+          "headersMs": 29.34870800000499,
+          "totalBodyMs": 29.900832999999693,
+          "bytes": 702594
+        },
+        {
+          "phase": "complete_authorized_loader",
+          "path": "/rest/v1/kpis",
+          "offset": "2000",
+          "limit": "1000",
+          "range": null,
+          "method": "GET",
+          "status": 200,
+          "headersMs": 39.78187500000058,
+          "totalBodyMs": 40.33070800000132,
+          "bytes": 682048
+        },
+        {
+          "phase": "complete_authorized_loader",
+          "path": "/rest/v1/kpis",
+          "offset": "3000",
+          "limit": "1000",
+          "range": null,
+          "method": "GET",
+          "status": 200,
+          "headersMs": 50.181666999997105,
+          "totalBodyMs": 50.70091700000194,
+          "bytes": 682058
+        },
+        {
+          "phase": "complete_authorized_loader",
+          "path": "/rest/v1/kpis",
+          "offset": "4000",
+          "limit": "1000",
+          "range": null,
+          "method": "GET",
+          "status": 200,
+          "headersMs": 61.837500000001455,
+          "totalBodyMs": 62.40337500000169,
+          "bytes": 682058
+        },
+        {
+          "phase": "complete_authorized_loader",
+          "path": "/rest/v1/kpis",
+          "offset": "5000",
+          "limit": "1000",
+          "range": null,
+          "method": "GET",
+          "status": 200,
+          "headersMs": 71.79204200000095,
+          "totalBodyMs": 72.30449999999837,
+          "bytes": 682053
+        },
+        {
+          "phase": "complete_authorized_loader",
+          "path": "/rest/v1/kpis",
+          "offset": "6000",
+          "limit": "1000",
+          "range": null,
+          "method": "GET",
+          "status": 200,
+          "headersMs": 81.39870900000096,
+          "totalBodyMs": 81.91179199999897,
+          "bytes": 682048
+        },
+        {
+          "phase": "complete_authorized_loader",
+          "path": "/rest/v1/kpis",
+          "offset": "7000",
+          "limit": "1000",
+          "range": null,
+          "method": "GET",
+          "status": 200,
+          "headersMs": 91.81700000000274,
+          "totalBodyMs": 92.32891699999891,
+          "bytes": 682053
+        },
+        {
+          "phase": "complete_authorized_loader",
+          "path": "/rest/v1/kpis",
+          "offset": "8000",
+          "limit": "1000",
+          "range": null,
+          "method": "GET",
+          "status": 200,
+          "headersMs": 101.71691699999792,
+          "totalBodyMs": 103.29020799999853,
+          "bytes": 681058
+        },
+        {
+          "phase": "complete_authorized_loader",
+          "path": "/rest/v1/kpis",
+          "offset": "9000",
+          "limit": "1000",
+          "range": null,
+          "method": "GET",
+          "status": 200,
+          "headersMs": 166.90587499999674,
+          "totalBodyMs": 167.46616699999868,
+          "bytes": 681258
+        },
+        {
+          "phase": "complete_authorized_loader",
+          "path": "/rest/v1/kpis",
+          "offset": "10000",
+          "limit": "1000",
+          "range": null,
+          "method": "GET",
+          "status": 200,
+          "headersMs": 108.77524999999878,
+          "totalBodyMs": 108.8894999999975,
+          "bytes": 67998
+        },
+        {
+          "phase": "complete_authorized_loader",
+          "path": "/rest/v1/rpc/read_google_sheets_operational_conflicts_v1",
+          "offset": null,
+          "limit": null,
+          "range": null,
+          "method": "POST",
+          "status": 200,
+          "headersMs": 3.708915999995952,
+          "totalBodyMs": 3.7595409999994445,
+          "bytes": 2
+        }
+      ]
+    },
+    {
+      "workspaceId": "94e1e8b3-a38c-4780-9870-702dd157ebb1",
+      "repetition": 1,
+      "rows": 10100,
+      "rowOrderSha256": "b035703e1942a8c512d020196e3dc12c502d81b3e43a95aa8b0f10947eeddbc2",
+      "totalMs": 795.3193329999995,
+      "calls": [
+        {
+          "phase": "complete_authorized_loader",
+          "path": "/rest/v1/kpis",
+          "offset": "0",
+          "limit": "1000",
+          "range": null,
+          "method": "GET",
+          "status": 200,
+          "headersMs": 19.405624999999418,
+          "totalBodyMs": 20.010667000002286,
+          "bytes": 724786
+        },
+        {
+          "phase": "complete_authorized_loader",
+          "path": "/rest/v1/kpis",
+          "offset": "1000",
+          "limit": "1000",
+          "range": null,
+          "method": "GET",
+          "status": 200,
+          "headersMs": 31.003916999994544,
+          "totalBodyMs": 31.549707999998645,
+          "bytes": 702594
+        },
+        {
+          "phase": "complete_authorized_loader",
+          "path": "/rest/v1/kpis",
+          "offset": "2000",
+          "limit": "1000",
+          "range": null,
+          "method": "GET",
+          "status": 200,
+          "headersMs": 39.49370800000179,
+          "totalBodyMs": 40.04054100000212,
+          "bytes": 682048
+        },
+        {
+          "phase": "complete_authorized_loader",
+          "path": "/rest/v1/kpis",
+          "offset": "3000",
+          "limit": "1000",
+          "range": null,
+          "method": "GET",
+          "status": 200,
+          "headersMs": 50.54204100000061,
+          "totalBodyMs": 51.05383299999812,
+          "bytes": 682058
+        },
+        {
+          "phase": "complete_authorized_loader",
+          "path": "/rest/v1/kpis",
+          "offset": "4000",
+          "limit": "1000",
+          "range": null,
+          "method": "GET",
+          "status": 200,
+          "headersMs": 61.51937500000349,
+          "totalBodyMs": 62.054582999997365,
+          "bytes": 682058
+        },
+        {
+          "phase": "complete_authorized_loader",
+          "path": "/rest/v1/kpis",
+          "offset": "5000",
+          "limit": "1000",
+          "range": null,
+          "method": "GET",
+          "status": 200,
+          "headersMs": 71.6229170000006,
+          "totalBodyMs": 72.16225000000122,
+          "bytes": 682053
+        },
+        {
+          "phase": "complete_authorized_loader",
+          "path": "/rest/v1/kpis",
+          "offset": "6000",
+          "limit": "1000",
+          "range": null,
+          "method": "GET",
+          "status": 200,
+          "headersMs": 81.19812500000262,
+          "totalBodyMs": 81.77241700000013,
+          "bytes": 682048
+        },
+        {
+          "phase": "complete_authorized_loader",
+          "path": "/rest/v1/kpis",
+          "offset": "7000",
+          "limit": "1000",
+          "range": null,
+          "method": "GET",
+          "status": 200,
+          "headersMs": 92.22141700000066,
+          "totalBodyMs": 92.73237499999959,
+          "bytes": 682053
+        },
+        {
+          "phase": "complete_authorized_loader",
+          "path": "/rest/v1/kpis",
+          "offset": "8000",
+          "limit": "1000",
+          "range": null,
+          "method": "GET",
+          "status": 200,
+          "headersMs": 101.96887499999866,
+          "totalBodyMs": 102.48504200000025,
+          "bytes": 681058
+        },
+        {
+          "phase": "complete_authorized_loader",
+          "path": "/rest/v1/kpis",
+          "offset": "9000",
+          "limit": "1000",
+          "range": null,
+          "method": "GET",
+          "status": 200,
+          "headersMs": 113.05833300000086,
+          "totalBodyMs": 113.63183299999946,
+          "bytes": 681258
+        },
+        {
+          "phase": "complete_authorized_loader",
+          "path": "/rest/v1/kpis",
+          "offset": "10000",
+          "limit": "1000",
+          "range": null,
+          "method": "GET",
+          "status": 200,
+          "headersMs": 110.69150000000081,
+          "totalBodyMs": 110.83304199999839,
+          "bytes": 67998
+        },
+        {
+          "phase": "complete_authorized_loader",
+          "path": "/rest/v1/rpc/read_google_sheets_operational_conflicts_v1",
+          "offset": null,
+          "limit": null,
+          "range": null,
+          "method": "POST",
+          "status": 200,
+          "headersMs": 3.651625000005879,
+          "totalBodyMs": 3.7024160000000848,
+          "bytes": 2
+        }
+      ]
+    },
+    {
+      "workspaceId": "94e1e8b3-a38c-4780-9870-702dd157ebb1",
+      "repetition": 2,
+      "rows": 10100,
+      "rowOrderSha256": "b035703e1942a8c512d020196e3dc12c502d81b3e43a95aa8b0f10947eeddbc2",
+      "totalMs": 800.9040419999947,
+      "calls": [
+        {
+          "phase": "complete_authorized_loader",
+          "path": "/rest/v1/kpis",
+          "offset": "0",
+          "limit": "1000",
+          "range": null,
+          "method": "GET",
+          "status": 200,
+          "headersMs": 19.341874999998254,
+          "totalBodyMs": 19.96354099999735,
+          "bytes": 724786
+        },
+        {
+          "phase": "complete_authorized_loader",
+          "path": "/rest/v1/kpis",
+          "offset": "1000",
+          "limit": "1000",
+          "range": null,
+          "method": "GET",
+          "status": 200,
+          "headersMs": 29.845957999998063,
+          "totalBodyMs": 30.464790999998513,
+          "bytes": 702594
+        },
+        {
+          "phase": "complete_authorized_loader",
+          "path": "/rest/v1/kpis",
+          "offset": "2000",
+          "limit": "1000",
+          "range": null,
+          "method": "GET",
+          "status": 200,
+          "headersMs": 39.65020799999911,
+          "totalBodyMs": 40.15245800000412,
+          "bytes": 682048
+        },
+        {
+          "phase": "complete_authorized_loader",
+          "path": "/rest/v1/kpis",
+          "offset": "3000",
+          "limit": "1000",
+          "range": null,
+          "method": "GET",
+          "status": 200,
+          "headersMs": 50.42316600000049,
+          "totalBodyMs": 50.94195800000307,
+          "bytes": 682058
+        },
+        {
+          "phase": "complete_authorized_loader",
+          "path": "/rest/v1/kpis",
+          "offset": "4000",
+          "limit": "1000",
+          "range": null,
+          "method": "GET",
+          "status": 200,
+          "headersMs": 60.05845799999952,
+          "totalBodyMs": 60.78204099999857,
+          "bytes": 682058
+        },
+        {
+          "phase": "complete_authorized_loader",
+          "path": "/rest/v1/kpis",
+          "offset": "5000",
+          "limit": "1000",
+          "range": null,
+          "method": "GET",
+          "status": 200,
+          "headersMs": 70.80316699999821,
+          "totalBodyMs": 71.95033400000102,
+          "bytes": 682053
+        },
+        {
+          "phase": "complete_authorized_loader",
+          "path": "/rest/v1/kpis",
+          "offset": "6000",
+          "limit": "1000",
+          "range": null,
+          "method": "GET",
+          "status": 200,
+          "headersMs": 83.330541000003,
+          "totalBodyMs": 83.85991600000125,
+          "bytes": 682048
+        },
+        {
+          "phase": "complete_authorized_loader",
+          "path": "/rest/v1/kpis",
+          "offset": "7000",
+          "limit": "1000",
+          "range": null,
+          "method": "GET",
+          "status": 200,
+          "headersMs": 99.5328340000051,
+          "totalBodyMs": 100.06200000000536,
+          "bytes": 682053
+        },
+        {
+          "phase": "complete_authorized_loader",
+          "path": "/rest/v1/kpis",
+          "offset": "8000",
+          "limit": "1000",
+          "range": null,
+          "method": "GET",
+          "status": 200,
+          "headersMs": 102.30562500000087,
+          "totalBodyMs": 102.90487500000017,
+          "bytes": 681058
+        },
+        {
+          "phase": "complete_authorized_loader",
+          "path": "/rest/v1/kpis",
+          "offset": "9000",
+          "limit": "1000",
+          "range": null,
+          "method": "GET",
+          "status": 200,
+          "headersMs": 112.70183299999917,
+          "totalBodyMs": 113.20833300000231,
+          "bytes": 681258
+        },
+        {
+          "phase": "complete_authorized_loader",
+          "path": "/rest/v1/kpis",
+          "offset": "10000",
+          "limit": "1000",
+          "range": null,
+          "method": "GET",
+          "status": 200,
+          "headersMs": 109.31175000000076,
+          "totalBodyMs": 109.43091700000514,
+          "bytes": 67998
+        },
+        {
+          "phase": "complete_authorized_loader",
+          "path": "/rest/v1/rpc/read_google_sheets_operational_conflicts_v1",
+          "offset": null,
+          "limit": null,
+          "range": null,
+          "method": "POST",
+          "status": 200,
+          "headersMs": 3.878833000002487,
+          "totalBodyMs": 3.9439169999968726,
+          "bytes": 2
+        },
+        {
+          "phase": "settings_for_exact_sort",
+          "path": "/rest/v1/kpi_settings",
+          "offset": null,
+          "limit": null,
+          "range": null,
+          "method": "GET",
+          "status": 200,
+          "headersMs": 3.8781659999949625,
+          "totalBodyMs": 3.945207999997365,
+          "bytes": 22198
+        }
+      ]
+    }
+  ],
+  "sql": [
+    {
+      "workspaceId": "c347b4e6-d38f-457b-8667-a117e3c2423b",
+      "role": "authenticated",
+      "authenticatedMembershipVerified": true,
+      "offset": 0,
+      "clientMs": 9.135499999996682,
+      "plan": [
+        {
+          "Plan": {
+            "Node Type": "Limit",
+            "Parallel Aware": false,
+            "Async Capable": false,
+            "Startup Cost": 14.23,
+            "Total Cost": 2224.93,
+            "Plan Rows": 1000,
+            "Plan Width": 325,
+            "Actual Rows": 1000,
+            "Actual Loops": 1,
+            "Shared Hit Blocks": 2249,
+            "Shared Read Blocks": 0,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Local Hit Blocks": 0,
+            "Local Read Blocks": 0,
+            "Local Dirtied Blocks": 0,
+            "Local Written Blocks": 0,
+            "Temp Read Blocks": 0,
+            "Temp Written Blocks": 0,
+            "Plans": [
+              {
+                "Node Type": "Incremental Sort",
+                "Parent Relationship": "Outer",
+                "Parallel Aware": false,
+                "Async Capable": false,
+                "Startup Cost": 14.23,
+                "Total Cost": 7457.65,
+                "Plan Rows": 3367,
+                "Plan Width": 325,
+                "Actual Rows": 1000,
+                "Actual Loops": 1,
+                "Sort Key": [
+                  "metric_date DESC",
+                  "created_at DESC",
+                  "id DESC"
+                ],
+                "Presorted Key": [
+                  "metric_date"
+                ],
+                "Full-sort Groups": {
+                  "Group Count": 24,
+                  "Sort Methods Used": [
+                    "quicksort"
+                  ],
+                  "Sort Space Memory": {
+                    "Average Sort Space Used": 47,
+                    "Peak Sort Space Used": 47
+                  }
+                },
+                "Shared Hit Blocks": 2249,
+                "Shared Read Blocks": 0,
+                "Shared Dirtied Blocks": 0,
+                "Shared Written Blocks": 0,
+                "Local Hit Blocks": 0,
+                "Local Read Blocks": 0,
+                "Local Dirtied Blocks": 0,
+                "Local Written Blocks": 0,
+                "Temp Read Blocks": 0,
+                "Temp Written Blocks": 0,
+                "Plans": [
+                  {
+                    "Node Type": "Index Scan",
+                    "Parent Relationship": "Outer",
+                    "Parallel Aware": false,
+                    "Async Capable": false,
+                    "Scan Direction": "Forward",
+                    "Index Name": "kpis_workspace_date_idx",
+                    "Relation Name": "kpis",
+                    "Alias": "kpis",
+                    "Startup Cost": 0.29,
+                    "Total Cost": 7360.08,
+                    "Plan Rows": 3367,
+                    "Plan Width": 325,
+                    "Actual Rows": 1009,
+                    "Actual Loops": 1,
+                    "Index Cond": "(workspace_id = 'c347b4e6-d38f-457b-8667-a117e3c2423b'::uuid)",
+                    "Rows Removed by Index Recheck": 0,
+                    "Filter": "((archived_at IS NULL) AND (deleted_at IS NULL) AND is_workspace_member(workspace_id))",
+                    "Rows Removed by Filter": 0,
+                    "Shared Hit Blocks": 2237,
+                    "Shared Read Blocks": 0,
+                    "Shared Dirtied Blocks": 0,
+                    "Shared Written Blocks": 0,
+                    "Local Hit Blocks": 0,
+                    "Local Read Blocks": 0,
+                    "Local Dirtied Blocks": 0,
+                    "Local Written Blocks": 0,
+                    "Temp Read Blocks": 0,
+                    "Temp Written Blocks": 0
+                  }
+                ]
+              }
+            ]
+          },
+          "Planning": {
+            "Shared Hit Blocks": 269,
+            "Shared Read Blocks": 0,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Local Hit Blocks": 0,
+            "Local Read Blocks": 0,
+            "Local Dirtied Blocks": 0,
+            "Local Written Blocks": 0,
+            "Temp Read Blocks": 0,
+            "Temp Written Blocks": 0
+          },
+          "Planning Time": 0.762,
+          "Triggers": [],
+          "Execution Time": 7
+        }
+      ]
+    },
+    {
+      "workspaceId": "c347b4e6-d38f-457b-8667-a117e3c2423b",
+      "role": "authenticated",
+      "authenticatedMembershipVerified": true,
+      "offset": 5000,
+      "clientMs": 72.68104099999618,
+      "plan": [
+        {
+          "Plan": {
+            "Node Type": "Limit",
+            "Parallel Aware": false,
+            "Async Capable": false,
+            "Startup Cost": 4259.81,
+            "Total Cost": 4259.81,
+            "Plan Rows": 1,
+            "Plan Width": 325,
+            "Actual Rows": 1000,
+            "Actual Loops": 1,
+            "Shared Hit Blocks": 20651,
+            "Shared Read Blocks": 0,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Local Hit Blocks": 0,
+            "Local Read Blocks": 0,
+            "Local Dirtied Blocks": 0,
+            "Local Written Blocks": 0,
+            "Temp Read Blocks": 336,
+            "Temp Written Blocks": 350,
+            "Plans": [
+              {
+                "Node Type": "Sort",
+                "Parent Relationship": "Outer",
+                "Parallel Aware": false,
+                "Async Capable": false,
+                "Startup Cost": 4251.39,
+                "Total Cost": 4259.81,
+                "Plan Rows": 3367,
+                "Plan Width": 325,
+                "Actual Rows": 6000,
+                "Actual Loops": 1,
+                "Sort Key": [
+                  "metric_date DESC",
+                  "created_at DESC",
+                  "id DESC"
+                ],
+                "Sort Method": "external merge",
+                "Sort Space Used": 2792,
+                "Sort Space Type": "Disk",
+                "Shared Hit Blocks": 20651,
+                "Shared Read Blocks": 0,
+                "Shared Dirtied Blocks": 0,
+                "Shared Written Blocks": 0,
+                "Local Hit Blocks": 0,
+                "Local Read Blocks": 0,
+                "Local Dirtied Blocks": 0,
+                "Local Written Blocks": 0,
+                "Temp Read Blocks": 336,
+                "Temp Written Blocks": 350,
+                "Plans": [
+                  {
+                    "Node Type": "Bitmap Heap Scan",
+                    "Parent Relationship": "Outer",
+                    "Parallel Aware": false,
+                    "Async Capable": false,
+                    "Relation Name": "kpis",
+                    "Alias": "kpis",
+                    "Startup Cost": 128.88,
+                    "Total Cost": 4054.13,
+                    "Plan Rows": 3367,
+                    "Plan Width": 325,
+                    "Actual Rows": 10100,
+                    "Actual Loops": 1,
+                    "Recheck Cond": "(workspace_id = 'c347b4e6-d38f-457b-8667-a117e3c2423b'::uuid)",
+                    "Rows Removed by Index Recheck": 0,
+                    "Filter": "((archived_at IS NULL) AND (deleted_at IS NULL) AND is_workspace_member(workspace_id))",
+                    "Rows Removed by Filter": 0,
+                    "Exact Heap Blocks": 438,
+                    "Lossy Heap Blocks": 0,
+                    "Shared Hit Blocks": 20651,
+                    "Shared Read Blocks": 0,
+                    "Shared Dirtied Blocks": 0,
+                    "Shared Written Blocks": 0,
+                    "Local Hit Blocks": 0,
+                    "Local Read Blocks": 0,
+                    "Local Dirtied Blocks": 0,
+                    "Local Written Blocks": 0,
+                    "Temp Read Blocks": 0,
+                    "Temp Written Blocks": 0,
+                    "Plans": [
+                      {
+                        "Node Type": "Bitmap Index Scan",
+                        "Parent Relationship": "Outer",
+                        "Parallel Aware": false,
+                        "Async Capable": false,
+                        "Index Name": "kpis_workspace_import_idx",
+                        "Startup Cost": 0,
+                        "Total Cost": 128.04,
+                        "Plan Rows": 10100,
+                        "Plan Width": 0,
+                        "Actual Rows": 10488,
+                        "Actual Loops": 1,
+                        "Index Cond": "(workspace_id = 'c347b4e6-d38f-457b-8667-a117e3c2423b'::uuid)",
+                        "Shared Hit Blocks": 12,
+                        "Shared Read Blocks": 0,
+                        "Shared Dirtied Blocks": 0,
+                        "Shared Written Blocks": 0,
+                        "Local Hit Blocks": 0,
+                        "Local Read Blocks": 0,
+                        "Local Dirtied Blocks": 0,
+                        "Local Written Blocks": 0,
+                        "Temp Read Blocks": 0,
+                        "Temp Written Blocks": 0
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "Planning": {
+            "Shared Hit Blocks": 0,
+            "Shared Read Blocks": 0,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Local Hit Blocks": 0,
+            "Local Read Blocks": 0,
+            "Local Dirtied Blocks": 0,
+            "Local Written Blocks": 0,
+            "Temp Read Blocks": 0,
+            "Temp Written Blocks": 0
+          },
+          "Planning Time": 0.048,
+          "Triggers": [],
+          "Execution Time": 71.947
+        }
+      ]
+    },
+    {
+      "workspaceId": "c347b4e6-d38f-457b-8667-a117e3c2423b",
+      "role": "authenticated",
+      "authenticatedMembershipVerified": true,
+      "offset": 10000,
+      "clientMs": 72.00099999999657,
+      "plan": [
+        {
+          "Plan": {
+            "Node Type": "Limit",
+            "Parallel Aware": false,
+            "Async Capable": false,
+            "Startup Cost": 4259.81,
+            "Total Cost": 4259.81,
+            "Plan Rows": 1,
+            "Plan Width": 325,
+            "Actual Rows": 100,
+            "Actual Loops": 1,
+            "Shared Hit Blocks": 20651,
+            "Shared Read Blocks": 0,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Local Hit Blocks": 0,
+            "Local Read Blocks": 0,
+            "Local Dirtied Blocks": 0,
+            "Local Written Blocks": 0,
+            "Temp Read Blocks": 349,
+            "Temp Written Blocks": 350,
+            "Plans": [
+              {
+                "Node Type": "Sort",
+                "Parent Relationship": "Outer",
+                "Parallel Aware": false,
+                "Async Capable": false,
+                "Startup Cost": 4251.39,
+                "Total Cost": 4259.81,
+                "Plan Rows": 3367,
+                "Plan Width": 325,
+                "Actual Rows": 10100,
+                "Actual Loops": 1,
+                "Sort Key": [
+                  "metric_date DESC",
+                  "created_at DESC",
+                  "id DESC"
+                ],
+                "Sort Method": "external merge",
+                "Sort Space Used": 2792,
+                "Sort Space Type": "Disk",
+                "Shared Hit Blocks": 20651,
+                "Shared Read Blocks": 0,
+                "Shared Dirtied Blocks": 0,
+                "Shared Written Blocks": 0,
+                "Local Hit Blocks": 0,
+                "Local Read Blocks": 0,
+                "Local Dirtied Blocks": 0,
+                "Local Written Blocks": 0,
+                "Temp Read Blocks": 349,
+                "Temp Written Blocks": 350,
+                "Plans": [
+                  {
+                    "Node Type": "Bitmap Heap Scan",
+                    "Parent Relationship": "Outer",
+                    "Parallel Aware": false,
+                    "Async Capable": false,
+                    "Relation Name": "kpis",
+                    "Alias": "kpis",
+                    "Startup Cost": 128.88,
+                    "Total Cost": 4054.13,
+                    "Plan Rows": 3367,
+                    "Plan Width": 325,
+                    "Actual Rows": 10100,
+                    "Actual Loops": 1,
+                    "Recheck Cond": "(workspace_id = 'c347b4e6-d38f-457b-8667-a117e3c2423b'::uuid)",
+                    "Rows Removed by Index Recheck": 0,
+                    "Filter": "((archived_at IS NULL) AND (deleted_at IS NULL) AND is_workspace_member(workspace_id))",
+                    "Rows Removed by Filter": 0,
+                    "Exact Heap Blocks": 438,
+                    "Lossy Heap Blocks": 0,
+                    "Shared Hit Blocks": 20651,
+                    "Shared Read Blocks": 0,
+                    "Shared Dirtied Blocks": 0,
+                    "Shared Written Blocks": 0,
+                    "Local Hit Blocks": 0,
+                    "Local Read Blocks": 0,
+                    "Local Dirtied Blocks": 0,
+                    "Local Written Blocks": 0,
+                    "Temp Read Blocks": 0,
+                    "Temp Written Blocks": 0,
+                    "Plans": [
+                      {
+                        "Node Type": "Bitmap Index Scan",
+                        "Parent Relationship": "Outer",
+                        "Parallel Aware": false,
+                        "Async Capable": false,
+                        "Index Name": "kpis_workspace_import_idx",
+                        "Startup Cost": 0,
+                        "Total Cost": 128.04,
+                        "Plan Rows": 10100,
+                        "Plan Width": 0,
+                        "Actual Rows": 10488,
+                        "Actual Loops": 1,
+                        "Index Cond": "(workspace_id = 'c347b4e6-d38f-457b-8667-a117e3c2423b'::uuid)",
+                        "Shared Hit Blocks": 12,
+                        "Shared Read Blocks": 0,
+                        "Shared Dirtied Blocks": 0,
+                        "Shared Written Blocks": 0,
+                        "Local Hit Blocks": 0,
+                        "Local Read Blocks": 0,
+                        "Local Dirtied Blocks": 0,
+                        "Local Written Blocks": 0,
+                        "Temp Read Blocks": 0,
+                        "Temp Written Blocks": 0
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "Planning": {
+            "Shared Hit Blocks": 0,
+            "Shared Read Blocks": 0,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Local Hit Blocks": 0,
+            "Local Read Blocks": 0,
+            "Local Dirtied Blocks": 0,
+            "Local Written Blocks": 0,
+            "Temp Read Blocks": 0,
+            "Temp Written Blocks": 0
+          },
+          "Planning Time": 0.072,
+          "Triggers": [],
+          "Execution Time": 71.286
+        }
+      ]
+    },
+    {
+      "workspaceId": "94e1e8b3-a38c-4780-9870-702dd157ebb1",
+      "role": "authenticated",
+      "authenticatedMembershipVerified": true,
+      "offset": 0,
+      "clientMs": 9.576874999998836,
+      "plan": [
+        {
+          "Plan": {
+            "Node Type": "Limit",
+            "Parallel Aware": false,
+            "Async Capable": false,
+            "Startup Cost": 14.23,
+            "Total Cost": 2224.93,
+            "Plan Rows": 1000,
+            "Plan Width": 325,
+            "Actual Rows": 1000,
+            "Actual Loops": 1,
+            "Shared Hit Blocks": 2159,
+            "Shared Read Blocks": 0,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Local Hit Blocks": 0,
+            "Local Read Blocks": 0,
+            "Local Dirtied Blocks": 0,
+            "Local Written Blocks": 0,
+            "Temp Read Blocks": 0,
+            "Temp Written Blocks": 0,
+            "Plans": [
+              {
+                "Node Type": "Incremental Sort",
+                "Parent Relationship": "Outer",
+                "Parallel Aware": false,
+                "Async Capable": false,
+                "Startup Cost": 14.23,
+                "Total Cost": 7457.65,
+                "Plan Rows": 3367,
+                "Plan Width": 325,
+                "Actual Rows": 1000,
+                "Actual Loops": 1,
+                "Sort Key": [
+                  "metric_date DESC",
+                  "created_at DESC",
+                  "id DESC"
+                ],
+                "Presorted Key": [
+                  "metric_date"
+                ],
+                "Full-sort Groups": {
+                  "Group Count": 24,
+                  "Sort Methods Used": [
+                    "quicksort"
+                  ],
+                  "Sort Space Memory": {
+                    "Average Sort Space Used": 47,
+                    "Peak Sort Space Used": 47
+                  }
+                },
+                "Shared Hit Blocks": 2159,
+                "Shared Read Blocks": 0,
+                "Shared Dirtied Blocks": 0,
+                "Shared Written Blocks": 0,
+                "Local Hit Blocks": 0,
+                "Local Read Blocks": 0,
+                "Local Dirtied Blocks": 0,
+                "Local Written Blocks": 0,
+                "Temp Read Blocks": 0,
+                "Temp Written Blocks": 0,
+                "Plans": [
+                  {
+                    "Node Type": "Index Scan",
+                    "Parent Relationship": "Outer",
+                    "Parallel Aware": false,
+                    "Async Capable": false,
+                    "Scan Direction": "Forward",
+                    "Index Name": "kpis_workspace_date_idx",
+                    "Relation Name": "kpis",
+                    "Alias": "kpis",
+                    "Startup Cost": 0.29,
+                    "Total Cost": 7360.08,
+                    "Plan Rows": 3367,
+                    "Plan Width": 325,
+                    "Actual Rows": 1009,
+                    "Actual Loops": 1,
+                    "Index Cond": "(workspace_id = '94e1e8b3-a38c-4780-9870-702dd157ebb1'::uuid)",
+                    "Rows Removed by Index Recheck": 0,
+                    "Filter": "((archived_at IS NULL) AND (deleted_at IS NULL) AND is_workspace_member(workspace_id))",
+                    "Rows Removed by Filter": 0,
+                    "Shared Hit Blocks": 2159,
+                    "Shared Read Blocks": 0,
+                    "Shared Dirtied Blocks": 0,
+                    "Shared Written Blocks": 0,
+                    "Local Hit Blocks": 0,
+                    "Local Read Blocks": 0,
+                    "Local Dirtied Blocks": 0,
+                    "Local Written Blocks": 0,
+                    "Temp Read Blocks": 0,
+                    "Temp Written Blocks": 0
+                  }
+                ]
+              }
+            ]
+          },
+          "Planning": {
+            "Shared Hit Blocks": 0,
+            "Shared Read Blocks": 0,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Local Hit Blocks": 0,
+            "Local Read Blocks": 0,
+            "Local Dirtied Blocks": 0,
+            "Local Written Blocks": 0,
+            "Temp Read Blocks": 0,
+            "Temp Written Blocks": 0
+          },
+          "Planning Time": 0.179,
+          "Triggers": [],
+          "Execution Time": 8.62
+        }
+      ]
+    },
+    {
+      "workspaceId": "94e1e8b3-a38c-4780-9870-702dd157ebb1",
+      "role": "authenticated",
+      "authenticatedMembershipVerified": true,
+      "offset": 5000,
+      "clientMs": 80.42962500000431,
+      "plan": [
+        {
+          "Plan": {
+            "Node Type": "Limit",
+            "Parallel Aware": false,
+            "Async Capable": false,
+            "Startup Cost": 4259.81,
+            "Total Cost": 4259.81,
+            "Plan Rows": 1,
+            "Plan Width": 325,
+            "Actual Rows": 1000,
+            "Actual Loops": 1,
+            "Shared Hit Blocks": 20661,
+            "Shared Read Blocks": 0,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Local Hit Blocks": 0,
+            "Local Read Blocks": 0,
+            "Local Dirtied Blocks": 0,
+            "Local Written Blocks": 0,
+            "Temp Read Blocks": 336,
+            "Temp Written Blocks": 350,
+            "Plans": [
+              {
+                "Node Type": "Sort",
+                "Parent Relationship": "Outer",
+                "Parallel Aware": false,
+                "Async Capable": false,
+                "Startup Cost": 4251.39,
+                "Total Cost": 4259.81,
+                "Plan Rows": 3367,
+                "Plan Width": 325,
+                "Actual Rows": 6000,
+                "Actual Loops": 1,
+                "Sort Key": [
+                  "metric_date DESC",
+                  "created_at DESC",
+                  "id DESC"
+                ],
+                "Sort Method": "external merge",
+                "Sort Space Used": 2792,
+                "Sort Space Type": "Disk",
+                "Shared Hit Blocks": 20661,
+                "Shared Read Blocks": 0,
+                "Shared Dirtied Blocks": 0,
+                "Shared Written Blocks": 0,
+                "Local Hit Blocks": 0,
+                "Local Read Blocks": 0,
+                "Local Dirtied Blocks": 0,
+                "Local Written Blocks": 0,
+                "Temp Read Blocks": 336,
+                "Temp Written Blocks": 350,
+                "Plans": [
+                  {
+                    "Node Type": "Bitmap Heap Scan",
+                    "Parent Relationship": "Outer",
+                    "Parallel Aware": false,
+                    "Async Capable": false,
+                    "Relation Name": "kpis",
+                    "Alias": "kpis",
+                    "Startup Cost": 128.88,
+                    "Total Cost": 4054.13,
+                    "Plan Rows": 3367,
+                    "Plan Width": 325,
+                    "Actual Rows": 10100,
+                    "Actual Loops": 1,
+                    "Recheck Cond": "(workspace_id = '94e1e8b3-a38c-4780-9870-702dd157ebb1'::uuid)",
+                    "Rows Removed by Index Recheck": 0,
+                    "Filter": "((archived_at IS NULL) AND (deleted_at IS NULL) AND is_workspace_member(workspace_id))",
+                    "Rows Removed by Filter": 0,
+                    "Exact Heap Blocks": 448,
+                    "Lossy Heap Blocks": 0,
+                    "Shared Hit Blocks": 20661,
+                    "Shared Read Blocks": 0,
+                    "Shared Dirtied Blocks": 0,
+                    "Shared Written Blocks": 0,
+                    "Local Hit Blocks": 0,
+                    "Local Read Blocks": 0,
+                    "Local Dirtied Blocks": 0,
+                    "Local Written Blocks": 0,
+                    "Temp Read Blocks": 0,
+                    "Temp Written Blocks": 0,
+                    "Plans": [
+                      {
+                        "Node Type": "Bitmap Index Scan",
+                        "Parent Relationship": "Outer",
+                        "Parallel Aware": false,
+                        "Async Capable": false,
+                        "Index Name": "kpis_workspace_import_idx",
+                        "Startup Cost": 0,
+                        "Total Cost": 128.04,
+                        "Plan Rows": 10100,
+                        "Plan Width": 0,
+                        "Actual Rows": 10562,
+                        "Actual Loops": 1,
+                        "Index Cond": "(workspace_id = '94e1e8b3-a38c-4780-9870-702dd157ebb1'::uuid)",
+                        "Shared Hit Blocks": 12,
+                        "Shared Read Blocks": 0,
+                        "Shared Dirtied Blocks": 0,
+                        "Shared Written Blocks": 0,
+                        "Local Hit Blocks": 0,
+                        "Local Read Blocks": 0,
+                        "Local Dirtied Blocks": 0,
+                        "Local Written Blocks": 0,
+                        "Temp Read Blocks": 0,
+                        "Temp Written Blocks": 0
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "Planning": {
+            "Shared Hit Blocks": 0,
+            "Shared Read Blocks": 0,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Local Hit Blocks": 0,
+            "Local Read Blocks": 0,
+            "Local Dirtied Blocks": 0,
+            "Local Written Blocks": 0,
+            "Temp Read Blocks": 0,
+            "Temp Written Blocks": 0
+          },
+          "Planning Time": 0.083,
+          "Triggers": [],
+          "Execution Time": 79.708
+        }
+      ]
+    },
+    {
+      "workspaceId": "94e1e8b3-a38c-4780-9870-702dd157ebb1",
+      "role": "authenticated",
+      "authenticatedMembershipVerified": true,
+      "offset": 10000,
+      "clientMs": 80.30404099999578,
+      "plan": [
+        {
+          "Plan": {
+            "Node Type": "Limit",
+            "Parallel Aware": false,
+            "Async Capable": false,
+            "Startup Cost": 4259.81,
+            "Total Cost": 4259.81,
+            "Plan Rows": 1,
+            "Plan Width": 325,
+            "Actual Rows": 100,
+            "Actual Loops": 1,
+            "Shared Hit Blocks": 20661,
+            "Shared Read Blocks": 0,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Local Hit Blocks": 0,
+            "Local Read Blocks": 0,
+            "Local Dirtied Blocks": 0,
+            "Local Written Blocks": 0,
+            "Temp Read Blocks": 349,
+            "Temp Written Blocks": 350,
+            "Plans": [
+              {
+                "Node Type": "Sort",
+                "Parent Relationship": "Outer",
+                "Parallel Aware": false,
+                "Async Capable": false,
+                "Startup Cost": 4251.39,
+                "Total Cost": 4259.81,
+                "Plan Rows": 3367,
+                "Plan Width": 325,
+                "Actual Rows": 10100,
+                "Actual Loops": 1,
+                "Sort Key": [
+                  "metric_date DESC",
+                  "created_at DESC",
+                  "id DESC"
+                ],
+                "Sort Method": "external merge",
+                "Sort Space Used": 2792,
+                "Sort Space Type": "Disk",
+                "Shared Hit Blocks": 20661,
+                "Shared Read Blocks": 0,
+                "Shared Dirtied Blocks": 0,
+                "Shared Written Blocks": 0,
+                "Local Hit Blocks": 0,
+                "Local Read Blocks": 0,
+                "Local Dirtied Blocks": 0,
+                "Local Written Blocks": 0,
+                "Temp Read Blocks": 349,
+                "Temp Written Blocks": 350,
+                "Plans": [
+                  {
+                    "Node Type": "Bitmap Heap Scan",
+                    "Parent Relationship": "Outer",
+                    "Parallel Aware": false,
+                    "Async Capable": false,
+                    "Relation Name": "kpis",
+                    "Alias": "kpis",
+                    "Startup Cost": 128.88,
+                    "Total Cost": 4054.13,
+                    "Plan Rows": 3367,
+                    "Plan Width": 325,
+                    "Actual Rows": 10100,
+                    "Actual Loops": 1,
+                    "Recheck Cond": "(workspace_id = '94e1e8b3-a38c-4780-9870-702dd157ebb1'::uuid)",
+                    "Rows Removed by Index Recheck": 0,
+                    "Filter": "((archived_at IS NULL) AND (deleted_at IS NULL) AND is_workspace_member(workspace_id))",
+                    "Rows Removed by Filter": 0,
+                    "Exact Heap Blocks": 448,
+                    "Lossy Heap Blocks": 0,
+                    "Shared Hit Blocks": 20661,
+                    "Shared Read Blocks": 0,
+                    "Shared Dirtied Blocks": 0,
+                    "Shared Written Blocks": 0,
+                    "Local Hit Blocks": 0,
+                    "Local Read Blocks": 0,
+                    "Local Dirtied Blocks": 0,
+                    "Local Written Blocks": 0,
+                    "Temp Read Blocks": 0,
+                    "Temp Written Blocks": 0,
+                    "Plans": [
+                      {
+                        "Node Type": "Bitmap Index Scan",
+                        "Parent Relationship": "Outer",
+                        "Parallel Aware": false,
+                        "Async Capable": false,
+                        "Index Name": "kpis_workspace_import_idx",
+                        "Startup Cost": 0,
+                        "Total Cost": 128.04,
+                        "Plan Rows": 10100,
+                        "Plan Width": 0,
+                        "Actual Rows": 10562,
+                        "Actual Loops": 1,
+                        "Index Cond": "(workspace_id = '94e1e8b3-a38c-4780-9870-702dd157ebb1'::uuid)",
+                        "Shared Hit Blocks": 12,
+                        "Shared Read Blocks": 0,
+                        "Shared Dirtied Blocks": 0,
+                        "Shared Written Blocks": 0,
+                        "Local Hit Blocks": 0,
+                        "Local Read Blocks": 0,
+                        "Local Dirtied Blocks": 0,
+                        "Local Written Blocks": 0,
+                        "Temp Read Blocks": 0,
+                        "Temp Written Blocks": 0
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "Planning": {
+            "Shared Hit Blocks": 0,
+            "Shared Read Blocks": 0,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Local Hit Blocks": 0,
+            "Local Read Blocks": 0,
+            "Local Dirtied Blocks": 0,
+            "Local Written Blocks": 0,
+            "Temp Read Blocks": 0,
+            "Temp Written Blocks": 0
+          },
+          "Planning Time": 0.081,
+          "Triggers": [],
+          "Execution Time": 79.574
+        }
+      ]
+    }
+  ],
+  "sort": [
+    {
+      "workspaceId": "c347b4e6-d38f-457b-8667-a117e3c2423b",
+      "rows": 10100,
+      "settings": 20,
+      "identicalOrder": true,
+      "orderedIdsSha256": "b8fd0e9e7273d5371ffddea76707037d1d3777b37d8f75b620bb47bdbf10321f",
+      "actualSettingWeights": [
+        1
+      ],
+      "current": {
+        "count": 7,
+        "minMs": 35.47404100000131,
+        "medianMs": 35.649334000001545,
+        "p95Ms": 38.510833000000275,
+        "maxMs": 38.510833000000275
+      },
+      "precomputedMap": {
+        "count": 7,
+        "minMs": 1.9385000000038417,
+        "medianMs": 2.0759580000012647,
+        "p95Ms": 2.358124999998836,
+        "maxMs": 2.358124999998836
+      },
+      "scope": "Actual input, pure in-memory candidate only; no source or persisted change."
+    },
+    {
+      "workspaceId": "94e1e8b3-a38c-4780-9870-702dd157ebb1",
+      "rows": 10100,
+      "settings": 20,
+      "identicalOrder": true,
+      "orderedIdsSha256": "b035703e1942a8c512d020196e3dc12c502d81b3e43a95aa8b0f10947eeddbc2",
+      "actualSettingWeights": [
+        1
+      ],
+      "current": {
+        "count": 7,
+        "minMs": 35.52320800000598,
+        "medianMs": 37.99954099999741,
+        "p95Ms": 40.1427909999984,
+        "maxMs": 40.1427909999984
+      },
+      "precomputedMap": {
+        "count": 7,
+        "minMs": 1.8989169999986188,
+        "medianMs": 2.2732079999987036,
+        "p95Ms": 2.542790999999852,
+        "maxMs": 2.542790999999852
+      },
+      "scope": "Actual input, pure in-memory candidate only; no source or persisted change."
+    }
+  ],
+  "passed": true,
+  "actualIndexes": [
+    {
+      "tablename": "kpis",
+      "indexname": "kpis_archived_idx",
+      "indexdef": "CREATE INDEX kpis_archived_idx ON public.kpis USING btree (workspace_id, archived_at)"
+    },
+    {
+      "tablename": "kpis",
+      "indexname": "kpis_deleted_idx",
+      "indexdef": "CREATE INDEX kpis_deleted_idx ON public.kpis USING btree (workspace_id, deleted_at)"
+    },
+    {
+      "tablename": "kpis",
+      "indexname": "kpis_folder_idx",
+      "indexdef": "CREATE INDEX kpis_folder_idx ON public.kpis USING btree (workspace_id, folder_id)"
+    },
+    {
+      "tablename": "kpis",
+      "indexname": "kpis_pkey",
+      "indexdef": "CREATE UNIQUE INDEX kpis_pkey ON public.kpis USING btree (id)"
+    },
+    {
+      "tablename": "kpis",
+      "indexname": "kpis_workspace_category_idx",
+      "indexdef": "CREATE INDEX kpis_workspace_category_idx ON public.kpis USING btree (workspace_id, category)"
+    },
+    {
+      "tablename": "kpis",
+      "indexname": "kpis_workspace_date_idx",
+      "indexdef": "CREATE INDEX kpis_workspace_date_idx ON public.kpis USING btree (workspace_id, metric_date DESC)"
+    },
+    {
+      "tablename": "kpis",
+      "indexname": "kpis_workspace_import_idx",
+      "indexdef": "CREATE INDEX kpis_workspace_import_idx ON public.kpis USING btree (workspace_id, import_id)"
+    },
+    {
+      "tablename": "kpis",
+      "indexname": "kpis_workspace_source_file_idx",
+      "indexdef": "CREATE INDEX kpis_workspace_source_file_idx ON public.kpis USING btree (workspace_id, source_file_id, metric_date DESC)"
+    },
+    {
+      "tablename": "workspace_members",
+      "indexname": "workspace_members_pkey",
+      "indexdef": "CREATE UNIQUE INDEX workspace_members_pkey ON public.workspace_members USING btree (id)"
+    },
+    {
+      "tablename": "workspace_members",
+      "indexname": "workspace_members_unique_invite",
+      "indexdef": "CREATE UNIQUE INDEX workspace_members_unique_invite ON public.workspace_members USING btree (workspace_id, lower(invited_email)) WHERE (invited_email IS NOT NULL)"
+    },
+    {
+      "tablename": "workspace_members",
+      "indexname": "workspace_members_unique_user",
+      "indexdef": "CREATE UNIQUE INDEX workspace_members_unique_user ON public.workspace_members USING btree (workspace_id, user_id) WHERE (user_id IS NOT NULL)"
+    },
+    {
+      "tablename": "workspace_members",
+      "indexname": "workspace_members_user_id_idx",
+      "indexdef": "CREATE INDEX workspace_members_user_id_idx ON public.workspace_members USING btree (user_id)"
+    },
+    {
+      "tablename": "workspace_members",
+      "indexname": "workspace_members_workspace_id_idx",
+      "indexdef": "CREATE INDEX workspace_members_workspace_id_idx ON public.workspace_members USING btree (workspace_id)"
+    }
+  ],
+  "actualPolicies": [
+    {
+      "tablename": "kpis",
+      "policyname": "audit_entitled_delete",
+      "cmd": "DELETE",
+      "roles": "{authenticated}",
+      "qual": "private.workspace_mutation_entitled_v1(workspace_id)",
+      "with_check": null
+    },
+    {
+      "tablename": "kpis",
+      "policyname": "audit_entitled_insert",
+      "cmd": "INSERT",
+      "roles": "{authenticated}",
+      "qual": null,
+      "with_check": "private.workspace_mutation_entitled_v1(workspace_id)"
+    },
+    {
+      "tablename": "kpis",
+      "policyname": "audit_entitled_update",
+      "cmd": "UPDATE",
+      "roles": "{authenticated}",
+      "qual": "private.workspace_mutation_entitled_v1(workspace_id)",
+      "with_check": "private.workspace_mutation_entitled_v1(workspace_id)"
+    },
+    {
+      "tablename": "kpis",
+      "policyname": "kpis contributors create",
+      "cmd": "INSERT",
+      "roles": "{authenticated}",
+      "qual": null,
+      "with_check": "can_contribute_workspace(workspace_id)"
+    },
+    {
+      "tablename": "kpis",
+      "policyname": "kpis managers delete",
+      "cmd": "DELETE",
+      "roles": "{authenticated}",
+      "qual": "can_edit_operations(workspace_id)",
+      "with_check": null
+    },
+    {
+      "tablename": "kpis",
+      "policyname": "kpis managers update",
+      "cmd": "UPDATE",
+      "roles": "{authenticated}",
+      "qual": "can_edit_operations(workspace_id)",
+      "with_check": "can_edit_operations(workspace_id)"
+    },
+    {
+      "tablename": "kpis",
+      "policyname": "kpis members read",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "is_workspace_member(workspace_id)",
+      "with_check": null
+    }
+  ],
+  "finishedAt": "2026-10-05T20:28:49.343Z"
+}
