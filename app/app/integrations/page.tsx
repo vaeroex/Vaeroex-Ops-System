@@ -59,7 +59,7 @@ export default async function IntegrationsPage() {
             statuses={!googleSheetsEnabled ? ["Configuration required"] : googleSheets?.error ? ["Status unavailable"] : googleSheets?.data?.length ? [...new Set(googleSheets.data.map((connection) =>
               connection.revocation_pending ? "Disconnect needs another attempt" : connection.authorization_uncertain ? "Authorization needs recovery" : connection.status === "connected" ? connection.active_approval_id ? "Connected" : "Mapping needs approval" : connection.status === "reauthorization_required" ? "Reauthorization required" : connection.status === "pending_authorization" ? "Waiting for Google authorization" : "Disconnected"))] : ["Not connected"]}
             href="/app/settings/integrations/google-sheets" action={googleSheetsEnabled ? "Manage Google Sheets" : "View Google Sheets setup"}>
-            <Link href="/app/sources" className="text-sm font-semibold text-vaeroex-blue underline underline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">Upload spreadsheet files instead</Link>
+            <Link href="/app/sources" prefetch={false} className="text-sm font-semibold text-vaeroex-blue underline underline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">Upload spreadsheet files instead</Link>
           </ProviderCard> : null}
           {squareEvidence ? <ProviderCard name="Square Sandbox" description="Verified non-economic observations."
             statuses={["Sync health unknown"]} href="/app/integrations/square" action="View Square Sandbox" /> : null}

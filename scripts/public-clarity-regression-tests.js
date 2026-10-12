@@ -10,8 +10,10 @@ const { renderToStaticMarkup } = require("react-dom/server");
 const root = process.cwd();
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 const modules = new Map();
-const link = ({ href, children, ...props }) =>
-  React.createElement("a", { href, ...props }, children);
+const link = ({ href, children, ...props }) => {
+  delete props.prefetch;
+  return React.createElement("a", { href, ...props }, children);
+};
 const image = ({ src, alt, sizes, ...props }) => {
   delete props.fill;
   delete props.priority;

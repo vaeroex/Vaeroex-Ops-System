@@ -8,7 +8,10 @@ const landing = "app/app/integrations/page.tsx";
 const management = "app/app/settings/integrations/quickbooks/page.tsx";
 
 test("Sheets pilot eligibility is disclosed before purchase and connection, with an upload fallback", async () => {
-  const Link = ({ children, ...props }) => React.createElement("a", props, children);
+  const Link = ({ children, prefetch, ...props }) => {
+    if (props.href === "/app/sources") assert.equal(prefetch, false, "Upload fallbacks must preserve app navigation without prefetch");
+    return React.createElement("a", props, children);
+  };
   let user = null;
   const mocks = {
     "next/link": { __esModule: true, default: Link },
