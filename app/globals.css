@@ -1396,7 +1396,7 @@ html:not(.pulsar) .vaeroex-customer-workspace :is(
 html:not(.pulsar) .vaeroex-customer-workspace :is(
   .workspace-files-notes .workspace-panel .workspace-row-link,
   .workspace-files-notes .workspace-panel > div > div > button,
-  .workspace-files-notes .workspace-note-entry > summary,
+  .workspace-files-notes .workspace-note-entry > summary:not([class~="bg-vaeroex-blue"]),
   .workspace-files-notes .workspace-tabs a:not([class~="bg-vaeroex-blue"]),
   .workspace-saved-analyses .workspace-row-link,
   .workspace-saved-analyses > button,

@@ -370,7 +370,7 @@ function UploadSourceDrawer({ folders, workspaceId }: { folders: Pick<FolderRow,
       <summary className="workspace-primary-action inline-flex min-h-11 cursor-pointer list-none items-center justify-center rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white transition hover:bg-cyan-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/60">
         Upload file
       </summary>
-      <div className="absolute right-0 z-30 mt-2 w-[min(34rem,calc(100vw-2rem))] rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-2xl shadow-black/40">
+      <div className="absolute left-0 z-30 mt-2 w-[min(34rem,calc(100vw-3rem))] rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-2xl shadow-black/40">
         <div className="mb-4">
           <p className="text-sm font-semibold text-white">Upload file</p>
           <p className="mt-1 text-xs leading-5 text-slate-400">Reports, spreadsheets, SOPs, notes, and operational files.</p>
@@ -1268,19 +1268,30 @@ export async function renderSourcesPage(params: SourceSearchParams = {}, options
 
   return (
     <div className="evidence-workspace workspace-page workspace-files-notes space-y-5">
-      <section className="workspace-page-header text-slate-100">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div className="min-w-0">
-            <p className="workspace-eyebrow text-xs font-semibold uppercase tracking-wide text-slate-400">Workspace inputs</p>
-            <h1 className="mt-1 text-2xl font-semibold tracking-normal text-white">Files &amp; Notes</h1>
-            <p className="mt-1 text-sm leading-6 text-slate-300">{activeTab === "legal" ? "View immutable legal records retained for this workspace." : "Add business information. Review it before it becomes evidence."}</p>
+      <header className="workspace-page-header text-slate-100">
+        <p className="workspace-eyebrow text-xs font-semibold uppercase tracking-wide text-slate-400">Workspace inputs</p>
+        <h1 className="mt-1 text-2xl font-semibold tracking-normal text-white">Files &amp; Notes</h1>
+        {activeTab === "legal" ? <p className="mt-1 text-sm leading-6 text-slate-300">View immutable legal records retained for this workspace.</p> : null}
+      </header>
+
+      {activeTab !== "legal" ? (
+        <div className="space-y-2" aria-label="Add business information">
+          <div className="grid items-start gap-3 md:grid-cols-2">
+            <section aria-labelledby="upload-files-heading" className="workspace-panel min-w-0 p-3 sm:p-4">
+              <h2 id="upload-files-heading" className="text-sm font-semibold text-slate-100">Upload files</h2>
+              <p className="mt-1 text-sm leading-5 text-[color:var(--workspace-muted)]">Add reports, spreadsheets, documents, or photos of business records for Vaeroex to review.</p>
+              <p className="mt-1 text-xs leading-5 text-[color:var(--workspace-muted)]">Supports PDF, CSV, Excel (.xlsx), Word (.docx), and PNG/JPG images.</p>
+              <div className="mt-3"><UploadSourceDrawer folders={folders} workspaceId={workspaceId} /></div>
+            </section>
+            <section aria-labelledby="business-notes-heading" className="workspace-panel min-w-0 p-3 sm:p-4">
+              <h2 id="business-notes-heading" className="text-sm font-semibold text-slate-100">Business Notes</h2>
+              <p className="mt-1 text-sm leading-5 text-[color:var(--workspace-muted)]">Give Vaeroex context about your business—what you sell, your locations, operating hours, goals, and important details. You can also add meeting notes, decisions, and updates.</p>
+              <div className="mt-3"><BusinessNoteEntry enabled={isBusinessNoteExtractionEnabled()} /></div>
+            </section>
           </div>
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            {activeTab === "legal" ? null : <UploadSourceDrawer folders={folders} workspaceId={workspaceId} />}
-          </div>
+          <p className="text-xs leading-5 text-[color:var(--workspace-muted)]">Review and approve information before Vaeroex uses it as business evidence.</p>
         </div>
-        {activeTab === "files" ? <div className="mt-3"><BusinessNoteEntry enabled={isBusinessNoteExtractionEnabled()} /></div> : null}
-      </section>
+      ) : null}
 
       {showNoteFeedback ? notesPanel : actionFeedback}
 
