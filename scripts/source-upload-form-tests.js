@@ -50,11 +50,15 @@ function fixture(server, props = {}) {
   Function("require", "module", "exports", compiled)((name) => {
     if (name === "react") return hooks;
     if (name === "next/link") return { default: "a" };
-    if (name === "@/app/app/files/actions") return { uploadSourceAction: server };
+    if (name === "@/app/app/files/actions") return { prepareUploadedSourceAction: server };
+    if (name === "@/lib/storage-capacity/upload-client") return { uploadSourceDirect: (workspaceId, data, prepare) => {
+      assert.equal(workspaceId, "workspace-one");
+      return prepare({ error: null }, data);
+    } };
     return require(name);
   }, loaded, loaded.exports);
   return {
-    render() { index = 0; const tree = loaded.exports.UploadSourceForm({ folders: [{ id: "folder-one", name: "Monthly review" }], ...props }); effects.splice(0).forEach((callback) => callback()); return tree; },
+    render() { index = 0; const tree = loaded.exports.UploadSourceForm({ folders: [{ id: "folder-one", name: "Monthly review" }], workspaceId: "workspace-one", ...props }); effects.splice(0).forEach((callback) => callback()); return tree; },
     trigger: () => loaded.exports.UploadSourceTrigger(),
     finish: () => running,
     timers,

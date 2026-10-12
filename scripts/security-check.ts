@@ -329,7 +329,9 @@ for (const file of workspaceActionFiles) {
 
 const fileActions = read("app/app/files/actions.ts");
 check(fileActions.includes("getFileForWorkspace") && fileActions.includes('.eq("workspace_id", workspaceId)'), "File actions must read files through workspace-scoped lookup.");
-check(fileActions.includes("storagePath = `${workspaceId}/"), "Uploaded file storage paths must start with workspaceId.");
+const storageCapacityMigration = read("supabase/migrations/20261012003846_workspace_storage_capacity.sql");
+check(storageCapacityMigration.includes("p_workspace_id::text||'/reserved/'||rid::text"), "Reserved uploaded-file storage paths must start with the authorized workspace ID.");
+check(read("app/api/storage-capacity/complete/route.ts").includes("startsWith(`${access.workspaceId}/`)"), "Upload completion must reject storage paths outside the authorized workspace.");
 
 const supportActions = read("app/support/actions.ts");
 check(supportActions.includes(".from(\"workspace_members\")") && supportActions.includes(".eq(\"user_id\", user.id)"), "Support requests must validate workspace membership before storing workspace_id.");

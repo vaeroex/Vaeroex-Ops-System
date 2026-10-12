@@ -1,0 +1,100 @@
+{
+  "feature": "Workspace uploaded-file capacity purchases",
+  "qualified_at_utc": "2026-10-12T01:18:37.883Z",
+  "customer_local_date": "2026-10-11",
+  "live_purchases_activated": false,
+  "production_changed_by_this_qualification": false,
+  "controlled_provider_tests": {
+    "command": "node --test scripts/workspace-capacity-billing-tests.cjs",
+    "passed": 19,
+    "failed": 0,
+    "scope": "Executable server behavior with controlled provider I/O; includes price/mode validation, consent before URL release, payment attribution, refund and dispute behavior, fixed-anchor proration, recurring charge totals independent of paid capacity, and bounded invoice reconciliation."
+  },
+  "actual_stripe_test_provider": {
+    "api_version": "2024-06-20",
+    "mode": "test",
+    "passed": 28,
+    "failed": 0,
+    "payment_confirmation": "Stripe hosted Checkout in a browser with synthetic accounts and test cards",
+    "database": "Native local Supabase with synthetic workspaces",
+    "webhook_delivery": "Actual provider Event objects fetched from Stripe and replayed through the application using a LOCAL test webhook signature; not remote delivery qualification",
+    "suites": [
+      {
+        "command": "node scripts/workspace-capacity-stripe-qualification.cjs paid appCheckoutFinal",
+        "passed": 9,
+        "completed_at_utc": "2026-10-12T01:06:33.936Z",
+        "checks": [
+          "Invalid signature rejected",
+          "Actual paid event accepted",
+          "Duplicate event acknowledged without granting twice",
+          "Existing files unchanged",
+          "Invoice grants exactly purchased quantity",
+          "Recorded paid amount matches provider invoice",
+          "Actual renewal matches accepted fixed date",
+          "Payment does not exceed reviewed amount",
+          "Initial capacity period expires on fixed renewal"
+        ]
+      },
+      {
+        "command": "node scripts/workspace-capacity-stripe-qualification.cjs cancel-refund appCheckout",
+        "passed": 8,
+        "completed_at_utc": "2026-10-12T01:07:11.900Z",
+        "checks": [
+          "Owner cancellation returns paid-through date",
+          "Cancellation retains current paid capacity",
+          "Stripe cancellation is scheduled at period end",
+          "Actual partial refund event accepted",
+          "Partial refund retains capacity",
+          "Actual full refund event accepted",
+          "Full refund removes only matching purchased packs",
+          "Refund retains all existing files"
+        ]
+      },
+      {
+        "command": "node scripts/workspace-capacity-stripe-qualification.cjs clock-fail",
+        "passed": 11,
+        "completed_at_utc": "2026-10-12T01:07:54.985Z",
+        "checks": [
+          "Invalid signature rejected",
+          "Actual initial paid event accepted",
+          "Duplicate initial event is idempotent",
+          "Existing files unchanged",
+          "Correct initial quantity granted",
+          "Correct initial paid amount recorded",
+          "Real renewal payment declines",
+          "Stripe subscription becomes past_due",
+          "Actual failed-renewal event accepted",
+          "Failed renewal does not extend paid-through date",
+          "Failed invoice creates no capacity grant"
+        ],
+        "clock_limit": "Stripe clock advanced into renewal; database clock remains real. Automatic expiry without an event is covered separately by SQL qualification."
+      }
+    ]
+  },
+  "shared_storage_database_qualification": {
+    "passed": 85,
+    "billing_migration_sha256": "a98df7850e47fd6448dc21fa7d6a3b1db931386bbc86e14bbe130d88529ef153",
+    "scope": "Combined storage and billing suite, not 85 billing-only checks; includes complete fresh migration replay, renewable commitment ceiling after a refund, and synthetic 115 GB/5,500-file capacity with five concurrent writers."
+  },
+  "actual_stripe_cli_delivery": {
+    "mode": "test",
+    "cli_version": "1.53.1",
+    "official_release_sha256": "bbc6ff9da6242912049ef44eca293a028130884a8ea7d9345e8ae09460319bc6",
+    "checked_at_utc": "2026-10-12T01:18:37.883Z",
+    "event_api_version": "2026-05-27.dahlia",
+    "provider_retrieval_api_version": "2024-06-20",
+    "event_id": "evt_1UPXstCABvOBnRjZLUbaqDa5",
+    "event_type": "customer.subscription.updated",
+    "http_status": 200,
+    "passed": 5,
+    "failed": 0,
+    "scope": "Remote-origin signed event forwarding through official Stripe CLI to the production-mode local staging application; no locally constructed replay. The provider cancellation event automatically updated the capacity ledger while retaining current paid packs and all files. Hosted release endpoint delivery remains a deployment check."
+  },
+  "release_requirements_still_separate": [
+    "Normal release checks on the final committed revision",
+    "Remote Stripe webhook delivery to the release deployment",
+    "One concrete owner review of pricing, proration, USD/tax treatment, cancellation/refunds and operating limit",
+    "Explicit live-purchase activation after that approval"
+  ],
+  "privacy": "No card numbers, API keys, webhook secrets, login credentials, customer documents, or customer names are contained in this evidence."
+}

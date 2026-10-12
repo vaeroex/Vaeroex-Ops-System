@@ -13,6 +13,10 @@
   },
   "crons": [
     {
+      "path": "/api/storage-capacity/maintenance",
+      "schedule": "*/15 * * * *"
+    },
+    {
       "path": "/api/integrations/google-sheets/scheduled-sync",
       "schedule": "*/15 * * * *"
     }

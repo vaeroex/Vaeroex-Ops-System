@@ -150,7 +150,18 @@ function harness(options = {}) {
     }) }
   };
   const actions = load("app/app/files/actions.ts", mocks);
-  return { actions, files, imports, rows, writes, authorizations, rateChecks, storageCalls: () => storageCalls };
+  return { actions, files, imports, rows, writes, authorizations, rateChecks, storageCalls: () => storageCalls,
+    async seedConfirmedUpload(payload) {
+      const file = payload.get("file");
+      savedBuffer = Buffer.from(await file.arrayBuffer());
+      files.set("saved-source", { id: "saved-source", workspace_id: workspaceId, original_name: file.name, display_name: "September operations",
+        file_extension: file.name.split(".").pop(), storage_bucket: "workspace-files", storage_path: `${workspaceId}/saved/source`,
+        mime_type: file.type, file_size_bytes: file.size, imported_rows: 0, metadata_json: {}, archived_at: null, deleted_at: null });
+      const metadata = new FormData();
+      metadata.set("file_id", "saved-source"); metadata.set("expectedWorkspaceId", workspaceId);
+      return metadata;
+    }
+  };
 }
 
 function form(filename = "metrics.csv", content = "Metric,Value,Date\nOrders,10,2026-09-01\n", type = "text/csv") {
@@ -170,86 +181,65 @@ async function redirected(promise) {
 }
 
 async function main() {
-  for (const [options, payload, expected] of [
-    [{}, new FormData(), /Choose a file/],
-    [{}, form("script.exe", "bad", "application/octet-stream"), /not allowed|not supported|supported file|blocked/i],
-    [{ duplicate: true }, form(), /duplicate/],
-    [{ rateDenied: true }, form(), /limit reached/],
-    [{ fileLimit: true }, form(), /upload limit/],
-    [{ invalidFolder: true }, form(), /Folder not found/],
-    [{ duplicateError: true }, form(), /could not be checked/]
-  ]) {
-    const test = harness(options);
-    const selectedFile = payload.get("file");
-    const result = await test.actions.uploadSourceAction({ error: null }, payload);
-    assert.match(result.error, expected);
-    assert.ok(!result.blocked);
-    assert.equal(test.storageCalls(), 0, "validation must not upload");
-    assert.equal(payload.get("file"), selectedFile, "the submitted File remains available for a corrected retry");
-    if (selectedFile) assert.equal(payload.get("display_name"), "September operations");
-  }
-
   for (const payload of [form(), form("workbook.xlsx", fs.readFileSync(path.join(root, "scripts/fixtures/Vaeroex_Retail_Full_Demo_Dataset_Dated.xlsx")), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")]) {
     const test = harness();
-    const url = await redirected(test.actions.uploadSourceAction({ error: null }, payload));
+    const metadata = await test.seedConfirmedUpload(payload);
+    assert.equal(metadata.has("file"), false);
+    const url = await redirected(test.actions.prepareUploadedSourceAction({ error: null }, metadata));
     assert.equal(url.pathname, "/app/sources/saved-source");
     assert.equal(url.searchParams.get("section"), "imported");
     assert.match(url.searchParams.get("message"), /Review the mappings before saving/);
-    assert.equal(test.storageCalls(), 1);
+    assert.equal(test.storageCalls(), 0, "preparation must never upload another copy");
     assert.equal(test.imports.length, 1);
     assert.equal(test.imports[0].status, "needs_review");
     assert.equal(test.imports[0].rows_imported, 0);
     assert.equal(test.rows.length, payload.get("file").name.endsWith("xlsx") ? 303 : 1);
-    assert.ok(test.rows.every((row) => row.status === "staged" && row.workspace_id === "workspace-one"));
+    assert.ok(test.rows.every(row => row.status === "staged" && row.workspace_id === "workspace-one"));
     assert.equal(test.authorizations.length, 1);
     assert.equal(test.authorizations[0].request.args.rowsDetected, test.rows.length);
-    assert.deepEqual(test.rateChecks.map((request) => request.action), ["file.upload", "file.import_stage"]);
+    assert.deepEqual(test.rateChecks.map(request => request.action), ["file.import_stage"]);
     assert.equal(test.files.get("saved-source").imported_rows, 0);
-    assert.ok(!test.writes.some((write) => ["kpis", "operational_metrics", "business_memory_chunks", "ai_agent_runs"].includes(write.table)));
+    assert.ok(!test.writes.some(write => ["kpis", "operational_metrics", "business_memory_chunks", "ai_agent_runs"].includes(write.table)));
   }
-
-  const duplicate = harness({ duplicate: true });
-  const override = form();
-  override.set("allow_duplicate", "on");
-  await redirected(duplicate.actions.uploadSourceAction({ error: null }, override));
-  assert.equal(duplicate.storageCalls(), 1, "explicit duplicate override performs exactly one upload");
-
   const document = harness();
-  const documentUrl = await redirected(document.actions.uploadSourceAction({ error: null }, form("notes.pdf", "%PDF-1.7\nfixture", "application/pdf")));
+  const docMetadata = await document.seedConfirmedUpload(form("notes.pdf", "%PDF-1.7\nfixture", "application/pdf"));
+  const documentUrl = await redirected(document.actions.prepareUploadedSourceAction({ error: null }, docMetadata));
   assert.equal(documentUrl.pathname, "/app/sources/saved-source");
   assert.match(documentUrl.searchParams.get("message"), /Choose Analyze source/);
-  assert.match(documentUrl.searchParams.get("message"), /not yet available/);
   assert.equal(document.imports.length, 0);
   assert.equal(document.authorizations.length, 0);
 
-  for (const options of [{ role: "viewer" }, { downloadThrows: true }]) {
-    const test = harness(options);
-    const url = await redirected(test.actions.uploadSourceAction({ error: null }, form()));
-    assert.equal(url.pathname, "/app/sources/saved-source");
-    assert.ok(url.searchParams.get("error"));
-    assert.equal(test.storageCalls(), 1);
-    assert.equal(test.files.size, 1, "preparation failure preserves the uploaded source");
-    assert.notEqual(test.files.get("saved-source").processing_status, "processing");
-    assert.equal(test.imports.length, 0);
-  }
+  const failed = harness({ downloadThrows: true });
+  const failedMetadata = await failed.seedConfirmedUpload(form());
+  const failedUrl = await redirected(failed.actions.prepareUploadedSourceAction({ error: null }, failedMetadata));
+  assert.ok(failedUrl.searchParams.get("error"));
+  assert.equal(failed.files.size, 1, "preparation failure preserves the confirmed upload");
+  assert.equal(failed.files.get("saved-source").processing_status, "failed");
+  assert.equal(failed.imports.length, 0);
 
-  for (const options of [{ storageThrows: true }, { storageError: true }, { recordThrows: true }, { recordError: true }]) {
-    const test = harness(options);
-    const url = await redirected(test.actions.uploadSourceAction({ error: null }, form()));
-    assert.match(url.searchParams.get("error"), /Check Sources before uploading/);
-    assert.equal(test.storageCalls(), 1, "uncertain results must not automatically retry the upload");
+  for (const kind of ["viewer", "workspace-change", "binary", "archived", "deleted"]) {
+    const test = harness({ role: kind === "viewer" ? "viewer" : "owner" });
+    const metadata = await test.seedConfirmedUpload(form());
+    if (kind === "workspace-change") metadata.set("expectedWorkspaceId", "workspace-two");
+    if (kind === "binary") metadata.set("file", form().get("file"));
+    if (kind === "archived") test.files.get("saved-source").archived_at = "2026-10-12T00:00:00Z";
+    if (kind === "deleted") test.files.get("saved-source").deleted_at = "2026-10-12T00:00:00Z";
+    const result = await test.actions.prepareUploadedSourceAction({ error: null }, metadata);
+    assert.equal(result.blocked, true, kind);
     assert.equal(test.imports.length, 0);
+    assert.equal(test.writes.length, 0);
+    assert.equal(test.storageCalls(), 0);
   }
-  const uncertain = harness({ duplicateThrows: true });
-  const uncertainState = await uncertain.actions.uploadSourceAction({ error: null }, form());
-  assert.equal(uncertainState.blocked, true, "unexpected SDK exceptions must not produce a retryable form");
-  assert.match(uncertainState.error, /Check Sources before uploading/);
   const auth = harness({ authRedirect: true });
-  assert.equal((await redirected(auth.actions.uploadSourceAction({ error: null }, form()))).pathname, "/login");
-  const legacy = harness({ duplicate: true });
-  assert.match((await redirected(legacy.actions.uploadFileAction(form()))).searchParams.get("error"), /duplicate/);
+  assert.equal((await redirected(auth.actions.prepareUploadedSourceAction({ error: null }, await auth.seedConfirmedUpload(form())))).pathname, "/login");
+  const legacy = harness();
+  const blocked = await legacy.actions.uploadSourceAction({ error: null }, form());
+  assert.equal(blocked.blocked, true);
+  assert.match(blocked.error, /secure direct upload/);
+  assert.match((await redirected(legacy.actions.uploadFileAction(form()))).searchParams.get("error"), /secure direct upload/);
   assert.equal(legacy.storageCalls(), 0);
-  console.log("Source upload action tests passed: retained validation state, one-time preparation, tenant/role gates, approval boundary, uncertain outcomes and legacy redirects.");
+  assert.equal(legacy.writes.length, 0);
+  console.log("Source preparation tests passed: metadata-only calls, tenant/role gates, staged-only rows, preserved originals, and disabled legacy binary actions.");
 }
 
 main().catch((error) => { console.error(error); process.exitCode = 1; });

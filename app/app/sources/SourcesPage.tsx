@@ -27,6 +27,7 @@ import { collapseBusinessNoteKnowledgeRows } from "@/lib/ai/business-notes/knowl
 import { businessNoteReleaseChannel } from "@/lib/ai/business-notes/release-channel";
 import { isBusinessNoteExtractionEnabled } from "@/lib/ai/providers/workflow-provider-policy";
 import { createFileAccessLinkMap, type FileAccessLinks } from "@/lib/files/storage-links";
+import { currentSourceRuns, loadSourceFiles, loadSourceRuns } from "@/lib/files/source-browse";
 import { shouldClearSourceImportError } from "@/lib/imports/source-import-notices";
 import { getRecordFolders } from "@/lib/records/management";
 import type { Database } from "@/lib/supabase/types";
@@ -276,7 +277,7 @@ function analysisStatus(file: FileUploadRow, runs: VaeroexRunRow[]) {
   const runIsActive = latestRun && ["queued", "pending", "running", "processing"].includes(latestRun.status);
   const hasCompletedAnalysis = latestRun?.status === "completed" || Boolean(file.analysis_summary || latestAnalysisAt(file));
 
-  if (runIsActive) return "Analyzing";
+  if (runIsActive || file.processing_status === "processing") return "Analyzing";
   if ((file.processing_status || "") === "failed" || latestRun?.status === "failed") return failedAnalysisStatus(file);
   if (hasCompletedAnalysis) return "Needs Review";
   return "Not reviewed";
@@ -300,7 +301,7 @@ function fileStatus(file: FileUploadRow, runs: VaeroexRunRow[], imports: FileImp
   if (file.archived_at) return "Archived";
   if (importStatusUnavailable) return "Status unavailable";
   if (imports.some((item) => item.file_upload_id === file.id && ["running", "reconciliation_required"].includes(item.recovery_status))) return "Import held";
-  if (runIsActive) return "Analyzing";
+  if (runIsActive || file.processing_status === "processing") return "Analyzing";
   if (file.import_status === "failed" && latestRun?.status !== "failed" && reviewStatus !== "failed" && !hasUsableAnalysis) return "Import failed";
   if ((file.import_status !== "failed" && (file.processing_status || "") === "failed") || latestRun?.status === "failed" || reviewStatus === "failed") return failedAnalysisStatus(file);
   if (reviewStatus === "discarded" || reviewStatus === "excluded") return "Uploaded";
@@ -363,7 +364,7 @@ function filteredFiles({
     });
 }
 
-function UploadSourceDrawer({ folders }: { folders: Pick<FolderRow, "id" | "name">[] }) {
+function UploadSourceDrawer({ folders, workspaceId }: { folders: Pick<FolderRow, "id" | "name">[]; workspaceId: string }) {
   return (
     <details id="workspace-file-upload" className="group relative">
       <summary className="workspace-primary-action inline-flex min-h-11 cursor-pointer list-none items-center justify-center rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white transition hover:bg-cyan-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/60">
@@ -374,7 +375,7 @@ function UploadSourceDrawer({ folders }: { folders: Pick<FolderRow, "id" | "name
           <p className="text-sm font-semibold text-white">Upload file</p>
           <p className="mt-1 text-xs leading-5 text-slate-400">Reports, spreadsheets, SOPs, notes, and operational files.</p>
         </div>
-        <UploadSourceForm folders={folders} />
+        <UploadSourceForm key={workspaceId} folders={folders} workspaceId={workspaceId} />
       </div>
     </details>
   );
@@ -467,8 +468,8 @@ function SourceFileActions({
             <input type="hidden" name="file_id" value={file.id} />
             <input type="hidden" name="source_action" value="delete" />
             <input type="hidden" name="return_path" value={file.archived_at ? "/app/sources?tab=archived" : "/app/sources"} />
-            <ConfirmSubmitButton message={`Delete this file from current Sources? This uses a workspace-safe soft delete and may remove supporting evidence from active views.${referenceWarning}`} pendingLabel="Deleting file..." className="w-full rounded-md px-3 py-2 text-left text-xs font-semibold text-red-200 hover:bg-red-950/35">
-              Delete File
+            <ConfirmSubmitButton message={`Move this file to Trash for 30 days? Its original stays recoverable in Settings → Usage & Storage and continues to use bytes and a file slot until permanent deletion. Its learned evidence is excluded from future answers.${referenceWarning}`} pendingLabel="Moving to Trash..." className="w-full rounded-md px-3 py-2 text-left text-xs font-semibold text-red-200 hover:bg-red-950/35">
+              Move to Trash
             </ConfirmSubmitButton>
           </form>
         </div>
@@ -1080,19 +1081,12 @@ export async function renderSourcesPage(params: SourceSearchParams = {}, options
         .limit(2000)
     : Promise.resolve({ data: [], error: null });
   const [filesResult, foldersResult, importsResult, importRowsResult, kpisResult, runsResult, memoryResult, notesResult, agreementsResult] = await Promise.all([
-    supabase.from("file_uploads").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
+    loadSourceFiles(supabase, workspaceId, options.sourceDetail ? params.file : undefined),
     getRecordFolders(supabase, workspaceId, "files"),
     (params.file ? supabase.from("file_imports").select("*").eq("workspace_id", workspaceId).eq("file_upload_id", params.file) : supabase.from("file_imports").select("*").eq("workspace_id", workspaceId)).order("created_at", { ascending: false }).limit(300),
     importRowsQuery,
-    supabase.from("kpis").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("metric_date", { ascending: false }).limit(500),
-    supabase
-      .from("ai_agent_runs")
-      .select("*")
-      .eq("workspace_id", workspaceId)
-      .eq("agent_type", "file_analysis")
-      .is("deleted_at", null)
-      .is("archived_at", null)
-      .order("created_at", { ascending: false }),
+    (options.sourceDetail && params.file ? supabase.from("kpis").select("*").eq("workspace_id", workspaceId).eq("source_file_id", params.file) : supabase.from("kpis").select("*").eq("workspace_id", workspaceId)).is("archived_at", null).is("deleted_at", null).order("metric_date", { ascending: false }).limit(500),
+    loadSourceRuns(supabase, workspaceId, options.sourceDetail ? params.file : undefined),
     supabase
       .from("business_memory_chunks")
       .select("*")
@@ -1123,7 +1117,8 @@ export async function renderSourcesPage(params: SourceSearchParams = {}, options
   const statusImports = [...imports, ...heldImportStatus.imports];
   const importRows = (importRowsResult.data || []) as FileImportDataRow[];
   const kpis = (kpisResult.data || []) as KpiRow[];
-  const runs = (runsResult.data || []) as VaeroexRunRow[];
+  const loadedRuns = (runsResult.data || []) as VaeroexRunRow[];
+  const runs = options.sourceDetail ? loadedRuns : currentSourceRuns(files, loadedRuns);
   const rawMemoryChunks = (memoryResult.data || []) as MemoryChunkRow[];
   const businessNotes = (notesResult.data || []) as BusinessNoteRow[];
   const workspaceAgreements = (agreementsResult.data || []) as WorkspaceAgreementRow[];
@@ -1161,7 +1156,6 @@ export async function renderSourcesPage(params: SourceSearchParams = {}, options
   const linkedFile = params.file ? files.find((file) => file.id === params.file && !file.deleted_at) : null;
   const linkedFileImports = linkedFile ? imports.filter((item) => item.file_upload_id === linkedFile.id) : [];
   const activeFilterLabel = params.status || (activeTab === "archived" ? "Archived" : "") || params.q || params.trust || params.source_type || "";
-  const isArchivedView = activeTab === "archived";
   const successMessage = cleanNoticeMessage(params.message, "File action completed.");
   const loadErrorMessage = cleanNoticeMessage(errors[0]?.message, "Source data could not be loaded.");
   const actionErrorMessage = cleanNoticeMessage(params.error, "Source data could not be loaded.");
@@ -1282,7 +1276,7 @@ export async function renderSourcesPage(params: SourceSearchParams = {}, options
             <p className="mt-1 text-sm leading-6 text-slate-300">{activeTab === "legal" ? "View immutable legal records retained for this workspace." : "Add business information. Review it before it becomes evidence."}</p>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            {activeTab === "legal" ? null : <UploadSourceDrawer folders={folders} />}
+            {activeTab === "legal" ? null : <UploadSourceDrawer folders={folders} workspaceId={workspaceId} />}
           </div>
         </div>
         {activeTab === "files" ? <div className="mt-3"><BusinessNoteEntry enabled={isBusinessNoteExtractionEnabled()} /></div> : null}
@@ -1355,7 +1349,7 @@ export async function renderSourcesPage(params: SourceSearchParams = {}, options
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <h2 className="text-base font-semibold text-white">Archived Files</h2>
-                  <p className="mt-1 text-sm text-slate-400">Source files removed from current views.</p>
+                  <p className="mt-1 text-sm text-slate-400">Archived files still use storage and file slots. <Link href="/app/settings/storage#storage-trash" className="font-semibold text-cyan-200 underline">View Trash &amp; recovery</Link>.</p>
                 </div>
               </div>
               <div className="mt-4 space-y-3">
