@@ -245,8 +245,11 @@ function BusinessNoteSummaryCard({ note, archived = false }: { note: BusinessNot
 
 export function BusinessNoteEntry({ enabled }: { enabled: boolean }) {
   return (
-    <details className="workspace-note-entry">
-      <summary className="inline-flex min-h-11 cursor-pointer list-none items-center justify-center rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white transition hover:bg-cyan-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/60">Add business note</summary>
+    <details className="workspace-note-entry group/note-entry">
+      <summary className="inline-flex min-h-11 cursor-pointer list-none items-center justify-center rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white transition hover:bg-cyan-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/60">
+        <span className="group-open/note-entry:hidden">Add business note</span>
+        <span className="hidden group-open/note-entry:inline">Close note editor</span>
+      </summary>
       <form action={submitBusinessNoteForReviewAction} className="mt-4 space-y-3">
         <BusinessNoteComposer disabled={!enabled} />
         <label className="block max-w-xs text-sm text-slate-200">
