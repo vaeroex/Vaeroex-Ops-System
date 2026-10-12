@@ -12,7 +12,7 @@ The hosted review fixture renders these actual UI components with synthetic data
 
 ## Data and privacy contract
 
-The migration adds service-role-only, SECURITY INVOKER RPCs and explicit nested scalar/enum allowlists. Each reusable server loader independently checks the existing platform-admin authorization. Usage and Trust never fall back to fetching raw JSON when their RPC is unavailable. Unsupported or missing financial data is unavailable, uncertain, or unknown rather than silently zero.
+The migration adds service-role-only, SECURITY INVOKER RPCs and explicit nested scalar/enum allowlists. Its helpers and operation receipts occupy a dedicated `admin_telemetry` schema. Existing denial of API-role access to the integration `private` schema remains unchanged. Each reusable server loader independently checks the existing platform-admin authorization. Usage and Trust never fall back to fetching raw JSON when their RPC is unavailable. Unsupported or missing financial data is unavailable, uncertain, or unknown rather than silently zero.
 
 No customer prompts, answers, chat titles, summaries, Business Note/file contents, research queries, full research URLs, or raw provider payloads are returned by the admin telemetry RPCs. Support messages are excluded from the inbox list and load only through a separately authorized action when a request is expanded. Audit metadata contains actor, operation, request IDs and counts, not message bodies.
 

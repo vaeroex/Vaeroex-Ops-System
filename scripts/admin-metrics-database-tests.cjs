@@ -18,6 +18,8 @@ function equal(name,value,expected) { assert.deepEqual(value,expected,name); che
 async function rejects(name,operation,code) { await assert.rejects(operation,error=>error.code===code,name);checks.push(name); }
 async function fixture(c) {
  await c.query(`create role anon;create role authenticated;create role service_role bypassrls;create schema private;
+ create table private.synthetic_private_guard(id integer);
+ grant select on private.synthetic_private_guard to service_role;
  create table profiles(id uuid primary key);create table workspaces(id uuid primary key,name text);
  create table ai_usage(id uuid primary key default gen_random_uuid(),workspace_id uuid,user_id uuid,agent_type text,tokens_used integer default 0,input_tokens integer default 0,output_tokens integer default 0,estimated_cost_cents integer default 0,model text,request_id text,latency_ms integer,status text default 'completed',metadata_json jsonb default '{}',created_at timestamptz default now());
  create table vsi_requests(id uuid primary key default gen_random_uuid(),workspace_id uuid,request_id uuid,status text,reservation_usd numeric default 0,cost_usd numeric default 0,created_at timestamptz default now());
@@ -27,7 +29,7 @@ async function fixture(c) {
  create table business_notes(id uuid primary key default gen_random_uuid(),workspace_id uuid,status text,evidence_lifecycle_status text,provider_name text,model_used text,fallback_used boolean,provider_attempts_json jsonb,release_channel text,latency_ms integer,extracted_at timestamptz,approved_at timestamptz,archived_at timestamptz,deleted_at timestamptz,created_at timestamptz,extraction_json jsonb,user_corrections_json jsonb);
  create table support_requests(id uuid primary key,workspace_id uuid,name text,email text,message text,priority text default 'Medium',status text default 'open',archived_at timestamptz,deleted_at timestamptz,created_at timestamptz default now(),updated_at timestamptz default now());
  create table security_audit_events(id uuid primary key default gen_random_uuid(),workspace_id uuid,user_id uuid,action_name text,operation_type text,target_table text,initiated_by text,required_confirmation boolean,confirmation_received boolean,allowed boolean,request_id text,metadata_json jsonb,created_at timestamptz default now());
- grant usage on schema public,private to service_role;grant all on all tables in schema public to service_role;
+ grant usage on schema public to service_role;grant all on all tables in schema public to service_role;
  insert into profiles values('${U}');insert into workspaces values('${A}','Synthetic A'),('${B}','Synthetic B');
  insert into ai_usage(workspace_id,agent_type,tokens_used,input_tokens,output_tokens,estimated_cost_cents,model,latency_ms,created_at,metadata_json)
  select '${A}','file_analysis',300,100,200,1,'gpt-5.6-luna',100,'2026-10-05T12:00:00Z',jsonb_build_object('cost_estimate',jsonb_build_object('schema_version',1,'version','standard-text-2026-10-05-v1','currency','USD','amount_microcents',1000000),'provider_attempts',jsonb_build_array(jsonb_build_object('provider','openai','model','gpt-5.6-luna','success',true,'raw_payload','PRIVATE_SENTINEL','prompt','PRIVATE_SENTINEL')),'prompt','PRIVATE_SENTINEL') from generate_series(1,6001);
@@ -43,8 +45,17 @@ async function fixture(c) {
  insert into ai_agent_runs(workspace_id,agent_type,status,created_at) values('${A}','file_analysis','completed','2026-10-05Z'),('${B}','intelligence_briefing_v1','completed','2026-10-05Z'),('${A}','retired_workflow','completed','2026-10-05Z');
  insert into reports(workspace_id,report_type,source_data_json,created_at) select '${A}','Saved Analysis','{"record_kind":"saved_analysis","analysis_type":"finding_explanation","answer":"PRIVATE_SENTINEL"}','2026-10-05Z' from generate_series(1,6002);
  insert into support_requests(id,workspace_id,name,email,message) select ('44444444-4444-4444-8444-'||lpad(n::text,12,'0'))::uuid,'${A}','Synthetic','test@example.invalid','PRIVATE_SENTINEL' from generate_series(201,270) n;`);
+ const beforePrivate=(await c.query("select role,has_schema_privilege(role,'private','USAGE') usage,has_schema_privilege(role,'private','CREATE') create_privilege from unnest(array['anon','authenticated','service_role']) role order by role")).rows;
+ equal('all API roles start without private schema usage or create',beforePrivate.every(row=>!row.usage&&!row.create_privilege),true);
  await c.query(migration);
+ equal('migration preserves private schema privilege matrix',(await c.query("select role,has_schema_privilege(role,'private','USAGE') usage,has_schema_privilege(role,'private','CREATE') create_privilege from unnest(array['anon','authenticated','service_role']) role order by role")).rows,beforePrivate);
+ equal('dedicated schema role matrix is service usage only',(await c.query("select bool_and(has_schema_privilege(role,'admin_telemetry','USAGE')=(role='service_role') and not has_schema_privilege(role,'admin_telemetry','CREATE')) allowed from unnest(array['anon','authenticated','service_role']) role")).rows[0].allowed,true);
  await c.query(`set role service_role`);
+ equal('service role retains no access to existing private schema',(await c.query("select has_schema_privilege('service_role','private','USAGE') allowed")).rows[0].allowed,false);
+ await rejects('existing private objects remain unreachable by service role',()=>c.query('select * from private.synthetic_private_guard'),'42501');
+ equal('service role can use only dedicated admin telemetry schema',(await c.query("select has_schema_privilege('service_role','admin_telemetry','USAGE') allowed")).rows[0].allowed,true);
+ equal('service role cannot create objects in telemetry schema',(await c.query("select has_schema_privilege('service_role','admin_telemetry','CREATE') allowed")).rows[0].allowed,false);
+ equal('dedicated helper executes with service role',(await c.query("select admin_telemetry.admin_nonnegative_number_v1('12'::jsonb) n")).rows[0].n,'12');
 }
 async function snapshot(c,workspace=null,page=1,workspacePage=1) { return (await c.query("select admin_usage_snapshot_v1('2026-10-01Z','2026-10-11Z',$1,$2,25,$3) result",[workspace,page,workspacePage])).rows[0].result; }
 async function support(c,ids,action,operation,status=null,priority=null) { return (await c.query('select admin_manage_support_requests_v1($1,$2,$3,$4,$5,$6) result',[U,ids,action,operation,status,priority])).rows[0].result; }
@@ -95,12 +106,12 @@ async function tests(c) {
  await rejects('report rejects invalid range',()=>c.query("select admin_usage_snapshot_v1('2026-10-01Z','2026-01-01Z')"),'22023');
  await rejects('report rejects unbounded range',()=>c.query("select admin_usage_snapshot_v1('2020-01-01Z','2026-10-11Z')"),'22023');
  await rejects('trust rejects null limit',()=>c.query("select admin_ai_trust_rows_v1(null,now(),null,null)"),'22023');
- equal('safe projection tolerates poisoned scalar',(await c.query("select private.admin_trust_scalar_v1('\"PRIVATE_SENTINEL\"','number') result")).rows[0].result,null);
+ equal('safe projection tolerates poisoned scalar',(await c.query("select admin_telemetry.admin_trust_scalar_v1('\"PRIVATE_SENTINEL\"','number') result")).rows[0].result,null);
  const supportedModels = ['nvidia/llama-3.3-nemotron-super-49b-v1.5','nvidia/nemotron-3-nano-30b-a3b','nvidia/nemotron-3-nano-omni-30b-a3b-reasoning','nvidia/nemotron-3-super-120b-a12b','nvidia/nemotron-3-ultra-550b-a55b','meta/llama-3.3-70b-instruct','deepseek-ai/deepseek-v4-flash','deepseek-ai/deepseek-v4-pro','openai/gpt-oss-20b','z-ai/glm-5.2','gpt-5.4-mini','gpt-5.4-mini-2026-03-17','gpt-6-luna'];
- equal('known provider profiles and priced historical models preserved', (await c.query("select private.admin_trust_scalar_v1(to_jsonb(model),'model') result from unnest($1::text[]) model",[supportedModels])).rows.map(row=>row.result), supportedModels);
+ equal('known provider profiles and priced historical models preserved', (await c.query("select admin_telemetry.admin_trust_scalar_v1(to_jsonb(model),'model') result from unnest($1::text[]) model",[supportedModels])).rows.map(row=>row.result), supportedModels);
  const excludedModels = ['nvidia/PRIVATE_SENTINEL','gpt-5.4-mini-PRIVATE_SENTINEL','https://private.invalid/PRIVATE_SENTINEL','claude-sonnet-'+ '1'.repeat(101)];
- equal('unknown or oversized model text cannot leave projection', (await c.query("select private.admin_trust_scalar_v1(to_jsonb(model),'model') result from unnest($1::text[]) model",[excludedModels])).rows.map(row=>row.result), excludedModels.map(()=>null));
- const modelAttempts = (await c.query("select private.admin_trust_attempts_v1($1::jsonb) result",[JSON.stringify([{provider:'nvidia',runtime_model:supportedModels[0],success:true,prompt:'PRIVATE_SENTINEL',raw_payload:'PRIVATE_SENTINEL'}])])).rows[0].result;
+ equal('unknown or oversized model text cannot leave projection', (await c.query("select admin_telemetry.admin_trust_scalar_v1(to_jsonb(model),'model') result from unnest($1::text[]) model",[excludedModels])).rows.map(row=>row.result), excludedModels.map(()=>null));
+ const modelAttempts = (await c.query("select admin_telemetry.admin_trust_attempts_v1($1::jsonb) result",[JSON.stringify([{provider:'nvidia',runtime_model:supportedModels[0],success:true,prompt:'PRIVATE_SENTINEL',raw_payload:'PRIVATE_SENTINEL'}])])).rows[0].result;
  equal('real NVIDIA model survives nested attempt projection',modelAttempts[0].runtime_model,supportedModels[0]);
  equal('nested model projection still strips customer/provider payload',JSON.stringify(modelAttempts).includes('PRIVATE_SENTINEL'),false);
 
@@ -109,7 +120,10 @@ async function tests(c) {
   await rejects(`${role} denied usage aggregate`,()=>snapshot(c),'42501');
   await rejects(`${role} denied trust projection`,()=>c.query('select admin_ai_trust_rows_v1(null,now())'),'42501');
   await rejects(`${role} denied support mutation`,()=>support(c,[uuid(201)],'delete',uuid(301)),'42501');
-  await rejects(`${role} denied receipts`,()=>c.query('select * from private.admin_support_operation_receipts'),'42501');
+  equal(`${role} denied admin telemetry schema usage`,(await c.query("select has_schema_privilege(current_user,'admin_telemetry','USAGE') allowed")).rows[0].allowed,false);
+  equal(`${role} retains no private schema usage`,(await c.query("select has_schema_privilege(current_user,'private','USAGE') allowed")).rows[0].allowed,false);
+  await rejects(`${role} denied direct telemetry helper`,()=>c.query("select admin_telemetry.admin_nonnegative_number_v1('12'::jsonb)"),'42501');
+  await rejects(`${role} denied receipts`,()=>c.query('select * from admin_telemetry.admin_support_operation_receipts'),'42501');
  }
  await c.query('reset role');await c.query('set role service_role');
  const deleted=await support(c,[uuid(201),uuid(202)],'delete',uuid(301));
@@ -137,14 +151,20 @@ async function tests(c) {
  await c.query('reset role');await c.query(`alter table security_audit_events add constraint synthetic_audit_reject check(request_id<>'${uuid(313)}')`);await c.query('set role service_role');
  await rejects('audit failure rolls back lifecycle mutation',()=>support(c,[uuid(207)],'delete',uuid(313)),'23514');
  equal('failed atomic operation retains original lifecycle',(await c.query('select deleted_at from support_requests where id=$1',[uuid(207)])).rows[0].deleted_at,null);
- equal('failed atomic operation has no receipt',(await c.query('select count(*)::int n from private.admin_support_operation_receipts where operation_id=$1',[uuid(313)])).rows[0].n,0);
+ equal('failed atomic operation has no receipt',(await c.query('select count(*)::int n from admin_telemetry.admin_support_operation_receipts where operation_id=$1',[uuid(313)])).rows[0].n,0);
  await c.query(`insert into ai_usage(workspace_id,agent_type,created_at,status,input_tokens) values('${A}','file_analysis','2026-10-05Z','completed',0),('${A}','file_analysis','2026-10-05Z','completed',10);insert into vsi_cost_events(workspace_id,request_id,occurred_at,cost_usd,usage_json) values('${A}','${uuid(1)}','2026-10-05Z',0.5,'{}');`);
  const missing=await snapshot(c);
  equal('missing and rounded legacy zero costs are unknown rather than confirmed free',missing.totals.unknownCostCount,3);
  equal('cost without observed usage is an uncertain estimate',missing.totals.uncertainEstimateUsd,2.75);
  await c.query('reset role');
- const security=(await c.query(`select count(*)::int n from pg_proc p join pg_namespace n on n.oid=p.pronamespace where p.proname like 'admin_%' and n.nspname in ('private','public') and (p.prosecdef or not ('search_path=""'=any(p.proconfig)) or has_function_privilege('authenticated',p.oid,'EXECUTE') or has_function_privilege('anon',p.oid,'EXECUTE'))`)).rows[0].n;
+ const security=(await c.query(`select count(*)::int n from pg_proc p join pg_namespace n on n.oid=p.pronamespace where p.proname like 'admin_%' and n.nspname in ('admin_telemetry','public') and (p.prosecdef or not ('search_path=""'=any(p.proconfig)) or has_function_privilege('authenticated',p.oid,'EXECUTE') or has_function_privilege('anon',p.oid,'EXECUTE'))`)).rows[0].n;
  equal('local security advisor check invoker ACL and empty search path',security,0);
+ const functionScope="(n.nspname='admin_telemetry' or (n.nspname='public' and p.proname in ('admin_usage_snapshot_v1','admin_ai_trust_rows_v1','admin_manage_support_requests_v1')))";
+ equal('all telemetry functions executable only by service API role',(await c.query(`select bool_and(has_function_privilege('service_role',p.oid,'EXECUTE') and not has_function_privilege('anon',p.oid,'EXECUTE') and not has_function_privilege('authenticated',p.oid,'EXECUTE')) valid from pg_proc p join pg_namespace n on n.oid=p.pronamespace where ${functionScope}`)).rows[0].valid,true);
+ equal('function ACLs exclude PUBLIC and extra or delegatable grants',(await c.query(`select count(*)::int n from pg_proc p join pg_namespace n on n.oid=p.pronamespace cross join lateral aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) acl where ${functionScope} and (acl.grantee=0 or acl.grantee not in (p.proowner,'service_role'::regrole) or (acl.grantee='service_role'::regrole and acl.is_grantable))`)).rows[0].n,0);
+ equal('receipt RLS is enabled',(await c.query("select relrowsecurity enabled from pg_class where oid='admin_telemetry.admin_support_operation_receipts'::regclass")).rows[0].enabled,true);
+ equal('service receipt privileges are limited to read and append',(await c.query("select bool_and(has_table_privilege('service_role','admin_telemetry.admin_support_operation_receipts',privilege)=(privilege in ('SELECT','INSERT'))) valid from unnest(array['SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER']) privilege")).rows[0].valid,true);
+ equal('customer roles have no receipt table privileges',(await c.query("select bool_and(not has_table_privilege(role,'admin_telemetry.admin_support_operation_receipts',privilege)) valid from unnest(array['anon','authenticated']) role cross join unnest(array['SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER']) privilege")).rows[0].valid,true);
  return checks;
 }
 (async()=>{

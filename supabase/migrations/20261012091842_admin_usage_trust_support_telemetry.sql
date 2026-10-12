@@ -1,5 +1,9 @@
 begin;
-grant usage on schema private to service_role;
+-- Keep the existing provider/security private-schema boundary unchanged.
+-- Only these new telemetry helpers and content-free receipts use this schema.
+create schema admin_telemetry;
+revoke all on schema admin_telemetry from public,anon,authenticated,service_role;
+grant usage on schema admin_telemetry to service_role;
 -- Complete-period aggregation is database-side. Only explicitly constructed
 -- scalar telemetry leaves PostgreSQL; transcripts and opaque payloads never do.
 -- SECURITY INVOKER + explicit ACLs keep this an internal service-role API.
@@ -9,15 +13,15 @@ create index if not exists admin_vsi_requests_period_idx on public.vsi_requests(
 create index if not exists admin_ai_runs_period_idx on public.ai_agent_runs(created_at desc,id);
 create index if not exists admin_support_active_period_idx on public.support_requests(created_at desc,id desc) where archived_at is null and deleted_at is null;
 
-create or replace function private.admin_nonnegative_number_v1(p_value jsonb)
+create or replace function admin_telemetry.admin_nonnegative_number_v1(p_value jsonb)
 returns numeric language sql immutable security invoker set search_path='' as $$
  select case when jsonb_typeof(p_value)='number' and length(p_value::text)<32
  then case when p_value::numeric between 0 and 9007199254740991 then p_value::numeric else null end else null end;
 $$;
-revoke all on function private.admin_nonnegative_number_v1(jsonb) from public,anon,authenticated;
-grant execute on function private.admin_nonnegative_number_v1(jsonb) to service_role;
+revoke all on function admin_telemetry.admin_nonnegative_number_v1(jsonb) from public,anon,authenticated,service_role;
+grant execute on function admin_telemetry.admin_nonnegative_number_v1(jsonb) to service_role;
 
-create or replace function private.admin_usage_facts_v1(p_start timestamptz,p_end timestamptz,p_workspace_id uuid)
+create or replace function admin_telemetry.admin_usage_facts_v1(p_start timestamptz,p_end timestamptz,p_workspace_id uuid)
 returns table(id uuid,workspace_id uuid,feature text,source text,status text,occurred_at timestamptz,metrics jsonb)
 language sql stable security invoker set search_path='' as $$
 with ai as (
@@ -28,14 +32,14 @@ with ai as (
  case when jsonb_typeof(a.metadata_json->'provider_attempts')='array' then jsonb_array_length(a.metadata_json->'provider_attempts') else null end attempts,
  case when a.metadata_json#>'{cost_estimate,schema_version}'='1'::jsonb
  and jsonb_typeof(a.metadata_json#>'{cost_estimate,version}')='string' and a.metadata_json#>>'{cost_estimate,currency}'='USD'
- and private.admin_nonnegative_number_v1(a.metadata_json#>'{cost_estimate,amount_microcents}') is not null
- and trunc(private.admin_nonnegative_number_v1(a.metadata_json#>'{cost_estimate,amount_microcents}'))=private.admin_nonnegative_number_v1(a.metadata_json#>'{cost_estimate,amount_microcents}')
- then private.admin_nonnegative_number_v1(a.metadata_json#>'{cost_estimate,amount_microcents}')/100000000
+ and admin_telemetry.admin_nonnegative_number_v1(a.metadata_json#>'{cost_estimate,amount_microcents}') is not null
+ and trunc(admin_telemetry.admin_nonnegative_number_v1(a.metadata_json#>'{cost_estimate,amount_microcents}'))=admin_telemetry.admin_nonnegative_number_v1(a.metadata_json#>'{cost_estimate,amount_microcents}')
+ then admin_telemetry.admin_nonnegative_number_v1(a.metadata_json#>'{cost_estimate,amount_microcents}')/100000000
  else greatest(a.estimated_cost_cents,0)::numeric/100 end cost,
  (not coalesce((a.metadata_json#>'{cost_estimate,schema_version}'='1'::jsonb
  and jsonb_typeof(a.metadata_json#>'{cost_estimate,version}')='string' and a.metadata_json#>>'{cost_estimate,currency}'='USD'
- and private.admin_nonnegative_number_v1(a.metadata_json#>'{cost_estimate,amount_microcents}') is not null
- and trunc(private.admin_nonnegative_number_v1(a.metadata_json#>'{cost_estimate,amount_microcents}'))=private.admin_nonnegative_number_v1(a.metadata_json#>'{cost_estimate,amount_microcents}')),false)
+ and admin_telemetry.admin_nonnegative_number_v1(a.metadata_json#>'{cost_estimate,amount_microcents}') is not null
+ and trunc(admin_telemetry.admin_nonnegative_number_v1(a.metadata_json#>'{cost_estimate,amount_microcents}'))=admin_telemetry.admin_nonnegative_number_v1(a.metadata_json#>'{cost_estimate,amount_microcents}')),false)
  or exists(select 1 from jsonb_array_elements(case when jsonb_typeof(a.metadata_json#>'{cost_estimate,attempts}')='array' then a.metadata_json#>'{cost_estimate,attempts}' else '[]'::jsonb end) x where x->>'rate_basis'='conservative_unknown' or x->>'input_rate_basis'='conservative_unknown' or x->>'output_rate_basis'='conservative_unknown')) uncertain
  from public.ai_usage a
  where a.created_at>=p_start and a.created_at<p_end and (p_workspace_id is null or a.workspace_id=p_workspace_id)
@@ -45,20 +49,20 @@ with ai as (
  and not exists(select 1 from public.vsi_requests r where r.workspace_id=a.workspace_id and (a.request_id=r.id::text or a.request_id=r.request_id::text))
 ), vsi as (
  select e.id,e.workspace_id,e.occurred_at,e.cost_usd,e.attempt,
- private.admin_nonnegative_number_v1(e.usage_json->'retries') provider_retries,
+ admin_telemetry.admin_nonnegative_number_v1(e.usage_json->'retries') provider_retries,
  case when e.usage_json->>'failed'='true' or e.usage_json->>'status'='expired' then 'failed' else 'completed' end status,
- e.usage_json->>'costEstimated'='true' or e.usage_json->>'status'='expired' or (e.cost_usd>0 and (private.admin_nonnegative_number_v1(e.usage_json->'inputTokens') is null or private.admin_nonnegative_number_v1(e.usage_json->'outputTokens') is null)) uncertain,
- private.admin_nonnegative_number_v1(e.usage_json->'inputTokens') input_tokens,
- private.admin_nonnegative_number_v1(e.usage_json->'outputTokens') output_tokens,
- private.admin_nonnegative_number_v1(e.usage_json->'cachedInputTokens') cached_tokens,
- private.admin_nonnegative_number_v1(e.usage_json->'providerCalls') calls,
- private.admin_nonnegative_number_v1(e.usage_json->'webSearchCalls') searches,
- private.admin_nonnegative_number_v1(e.usage_json->'webOpenCalls') opens,
- private.admin_nonnegative_number_v1(e.usage_json->'webFindCalls') finds,
- private.admin_nonnegative_number_v1(e.usage_json->'latencyMs') latency_ms,
- private.admin_nonnegative_number_v1(e.usage_json->'providerFailures') provider_failures,
- private.admin_nonnegative_number_v1(e.usage_json->'outputValidationFailures') output_validation_failures,
- private.admin_nonnegative_number_v1(e.usage_json->'citationValidationFailures') citation_validation_failures,
+ e.usage_json->>'costEstimated'='true' or e.usage_json->>'status'='expired' or (e.cost_usd>0 and (admin_telemetry.admin_nonnegative_number_v1(e.usage_json->'inputTokens') is null or admin_telemetry.admin_nonnegative_number_v1(e.usage_json->'outputTokens') is null)) uncertain,
+ admin_telemetry.admin_nonnegative_number_v1(e.usage_json->'inputTokens') input_tokens,
+ admin_telemetry.admin_nonnegative_number_v1(e.usage_json->'outputTokens') output_tokens,
+ admin_telemetry.admin_nonnegative_number_v1(e.usage_json->'cachedInputTokens') cached_tokens,
+ admin_telemetry.admin_nonnegative_number_v1(e.usage_json->'providerCalls') calls,
+ admin_telemetry.admin_nonnegative_number_v1(e.usage_json->'webSearchCalls') searches,
+ admin_telemetry.admin_nonnegative_number_v1(e.usage_json->'webOpenCalls') opens,
+ admin_telemetry.admin_nonnegative_number_v1(e.usage_json->'webFindCalls') finds,
+ admin_telemetry.admin_nonnegative_number_v1(e.usage_json->'latencyMs') latency_ms,
+ admin_telemetry.admin_nonnegative_number_v1(e.usage_json->'providerFailures') provider_failures,
+ admin_telemetry.admin_nonnegative_number_v1(e.usage_json->'outputValidationFailures') output_validation_failures,
+ admin_telemetry.admin_nonnegative_number_v1(e.usage_json->'citationValidationFailures') citation_validation_failures,
  e.usage_json->>'telemetryVersion'='1' measured,
  e.usage_json->>'outcomeFailure' failure,
  e.usage_json->>'researchStatus' research,
@@ -77,16 +81,16 @@ select r.id,r.workspace_id,case when r.agent_type in ('business_health_explanati
 union all
 select r.id,r.workspace_id,'saved_analysis','reports','saved',r.created_at,jsonb_build_object('savedAnalyses',1) from public.reports r where r.report_type='Saved Analysis' and r.created_at>=p_start and r.created_at<p_end and (p_workspace_id is null or r.workspace_id=p_workspace_id);
 $$;
-revoke all on function private.admin_usage_facts_v1(timestamptz,timestamptz,uuid) from public,anon,authenticated;
-grant execute on function private.admin_usage_facts_v1(timestamptz,timestamptz,uuid) to service_role;
+revoke all on function admin_telemetry.admin_usage_facts_v1(timestamptz,timestamptz,uuid) from public,anon,authenticated,service_role;
+grant execute on function admin_telemetry.admin_usage_facts_v1(timestamptz,timestamptz,uuid) to service_role;
 
 create or replace function public.admin_usage_snapshot_v1(p_start timestamptz,p_end timestamptz,p_workspace_id uuid default null,p_page integer default 1,p_page_size integer default 25,p_workspace_page integer default 1)
 returns jsonb language plpgsql stable security invoker set search_path='' as $$
 declare result jsonb; v_month timestamptz:=date_trunc('month',now() at time zone 'UTC') at time zone 'UTC';
 begin
  if p_start is null or p_end is null or p_end<=p_start or p_end-p_start>interval '93 days' or p_page is null or p_page<1 or p_page>100000 or p_page_size is null or p_page_size<1 or p_page_size>50 or p_workspace_page is null or p_workspace_page<1 or p_workspace_page>100000 then raise exception 'invalid_admin_report_parameters' using errcode='22023'; end if;
- with facts as materialized(select * from private.admin_usage_facts_v1(p_start,p_end,p_workspace_id)),
- previous as materialized(select * from private.admin_usage_facts_v1(p_start-(p_end-p_start),p_start,p_workspace_id)),
+ with facts as materialized(select * from admin_telemetry.admin_usage_facts_v1(p_start,p_end,p_workspace_id)),
+ previous as materialized(select * from admin_telemetry.admin_usage_facts_v1(p_start-(p_end-p_start),p_start,p_workspace_id)),
  workspace_groups as (select f.workspace_id,jsonb_build_object('estimatedSpendUsd',coalesce(sum((f.metrics->>'estimatedSpendUsd')::numeric),0),'uncertainEstimateUsd',coalesce(sum((f.metrics->>'uncertainEstimateUsd')::numeric),0),'unknownCostCount',coalesce(sum((f.metrics->>'unknownCostCount')::numeric),0),'usageRecords',coalesce(sum((f.metrics->>'usageRecords')::numeric),0),'providerAttempts',coalesce(sum((f.metrics->>'providerAttempts')::numeric),0),'providerAttemptSamples',coalesce(sum((f.metrics->>'providerAttemptSamples')::numeric),0),'inputTokens',coalesce(sum((f.metrics->>'inputTokens')::numeric),0),'outputTokens',coalesce(sum((f.metrics->>'outputTokens')::numeric),0),'cachedInputTokens',coalesce(sum((f.metrics->>'cachedInputTokens')::numeric),0),'webSearchCalls',coalesce(sum((f.metrics->>'webSearchCalls')::numeric),0),'webOpenCalls',coalesce(sum((f.metrics->>'webOpenCalls')::numeric),0),'webFindCalls',coalesce(sum((f.metrics->>'webFindCalls')::numeric),0),'researchToolUsd',coalesce(sum((f.metrics->>'researchToolUsd')::numeric),0),'latencySamples',coalesce(sum((f.metrics->>'latencySamples')::numeric),0),'latencyTotalMs',coalesce(sum((f.metrics->>'latencyTotalMs')::numeric),0),'vsiQuestions',coalesce(sum((f.metrics->>'vsiQuestions')::numeric),0),'vsiSettledAttempts',coalesce(sum((f.metrics->>'vsiSettledAttempts')::numeric),0),'vsiRetryAttempts',coalesce(sum((f.metrics->>'vsiRetryAttempts')::numeric),0),'vsiProviderRetries',coalesce(sum((f.metrics->>'vsiProviderRetries')::numeric),0),'vsiCompleted',coalesce(sum((f.metrics->>'vsiCompleted')::numeric),0),'vsiFailed',coalesce(sum((f.metrics->>'vsiFailed')::numeric),0),'vsiPending',coalesce(sum((f.metrics->>'vsiPending')::numeric),0),'artifactRuns',coalesce(sum((f.metrics->>'artifactRuns')::numeric),0),'savedAnalyses',coalesce(sum((f.metrics->>'savedAnalyses')::numeric),0),'vsiTelemetrySamples',coalesce(sum((f.metrics->>'vsiTelemetrySamples')::numeric),0),'vsiApplicationFailures',coalesce(sum((f.metrics->>'vsiApplicationFailures')::numeric),0),'vsiProviderFailures',coalesce(sum((f.metrics->>'vsiProviderFailures')::numeric),0),'vsiTimeouts',coalesce(sum((f.metrics->>'vsiTimeouts')::numeric),0),'vsiOutputValidationFailures',coalesce(sum((f.metrics->>'vsiOutputValidationFailures')::numeric),0),'vsiCitationValidationFailures',coalesce(sum((f.metrics->>'vsiCitationValidationFailures')::numeric),0),'vsiBudgetBlocks',coalesce(sum((f.metrics->>'vsiBudgetBlocks')::numeric),0),'vsiContextBlocks',coalesce(sum((f.metrics->>'vsiContextBlocks')::numeric),0),'vsiEvidenceUnavailable',coalesce(sum((f.metrics->>'vsiEvidenceUnavailable')::numeric),0),'vsiResearchCompleted',coalesce(sum((f.metrics->>'vsiResearchCompleted')::numeric),0),'vsiResearchPartial',coalesce(sum((f.metrics->>'vsiResearchPartial')::numeric),0),'vsiResearchFailed',coalesce(sum((f.metrics->>'vsiResearchFailed')::numeric),0),'vsiResearchNotRequired',coalesce(sum((f.metrics->>'vsiResearchNotRequired')::numeric),0),'vsiCitationsValidated',coalesce(sum((f.metrics->>'vsiCitationsValidated')::numeric),0),'vsiCitationsNotRequired',coalesce(sum((f.metrics->>'vsiCitationsNotRequired')::numeric),0),'vsiEvidenceLimitations',coalesce(sum((f.metrics->>'vsiEvidenceLimitations')::numeric),0),'vsiNoteProposals',coalesce(sum((f.metrics->>'vsiNoteProposals')::numeric),0)) totals from facts f group by f.workspace_id),
  workspace_page as (select w.id,w.name,coalesce(g.totals,'{"estimatedSpendUsd":0,"uncertainEstimateUsd":0,"unknownCostCount":0,"usageRecords":0,"providerAttempts":0,"providerAttemptSamples":0,"inputTokens":0,"outputTokens":0,"cachedInputTokens":0,"webSearchCalls":0,"webOpenCalls":0,"webFindCalls":0,"researchToolUsd":0,"latencySamples":0,"latencyTotalMs":0,"vsiQuestions":0,"vsiSettledAttempts":0,"vsiRetryAttempts":0,"vsiProviderRetries":0,"vsiCompleted":0,"vsiFailed":0,"vsiPending":0,"artifactRuns":0,"savedAnalyses":0,"vsiTelemetrySamples":0,"vsiApplicationFailures":0,"vsiProviderFailures":0,"vsiTimeouts":0,"vsiOutputValidationFailures":0,"vsiCitationValidationFailures":0,"vsiBudgetBlocks":0,"vsiContextBlocks":0,"vsiEvidenceUnavailable":0,"vsiResearchCompleted":0,"vsiResearchPartial":0,"vsiResearchFailed":0,"vsiResearchNotRequired":0,"vsiCitationsValidated":0,"vsiCitationsNotRequired":0,"vsiEvidenceLimitations":0,"vsiNoteProposals":0}'::jsonb) totals
  from public.workspaces w left join workspace_groups g on g.workspace_id=w.id
@@ -115,12 +119,12 @@ begin
  return result;
 end;
 $$;
-revoke all on function public.admin_usage_snapshot_v1(timestamptz,timestamptz,uuid,integer,integer,integer) from public,anon,authenticated;
+revoke all on function public.admin_usage_snapshot_v1(timestamptz,timestamptz,uuid,integer,integer,integer) from public,anon,authenticated,service_role;
 grant execute on function public.admin_usage_snapshot_v1(timestamptz,timestamptz,uuid,integer,integer,integer) to service_role;
 
 -- Durable receipts make repeated support actions safe even after a network
 -- retry. Message bodies are never copied into receipts or the audit ledger.
-create table private.admin_support_operation_receipts (
+create table admin_telemetry.admin_support_operation_receipts (
  actor_user_id uuid not null references public.profiles(id),
  operation_id uuid not null,
  arguments jsonb not null,
@@ -128,13 +132,13 @@ create table private.admin_support_operation_receipts (
  created_at timestamptz not null default now(),
  primary key(actor_user_id,operation_id)
 );
-alter table private.admin_support_operation_receipts enable row level security;
-revoke all on private.admin_support_operation_receipts from public,anon,authenticated;
-grant select,insert on private.admin_support_operation_receipts to service_role;
+alter table admin_telemetry.admin_support_operation_receipts enable row level security;
+revoke all on admin_telemetry.admin_support_operation_receipts from public,anon,authenticated,service_role;
+grant select,insert on admin_telemetry.admin_support_operation_receipts to service_role;
 
 create or replace function public.admin_manage_support_requests_v1(p_actor_user_id uuid,p_request_ids uuid[],p_action text,p_operation_id uuid,p_status text default null,p_priority text default null)
 returns jsonb language plpgsql security invoker set search_path='' as $$
-declare v_ids uuid[]; v_changed uuid[]; v_args jsonb; v_receipt private.admin_support_operation_receipts; v_now timestamptz:=clock_timestamp(); v_result jsonb;
+declare v_ids uuid[]; v_changed uuid[]; v_args jsonb; v_receipt admin_telemetry.admin_support_operation_receipts; v_now timestamptz:=clock_timestamp(); v_result jsonb;
 begin
  if p_actor_user_id is null or p_operation_id is null or p_request_ids is null or cardinality(p_request_ids) not between 1 and 50
  or array_position(p_request_ids,null) is not null or p_action is null or p_action not in ('delete','archive','restore','update')
@@ -144,7 +148,7 @@ begin
  if cardinality(v_ids)<>cardinality(p_request_ids) then raise exception 'duplicate_support_ids' using errcode='22023'; end if;
  v_args:=jsonb_build_object('ids',to_jsonb(v_ids),'action',p_action,'status',p_status,'priority',p_priority);
  perform pg_advisory_xact_lock(hashtextextended('admin-support:'||p_actor_user_id::text||':'||p_operation_id::text,0));
- select * into v_receipt from private.admin_support_operation_receipts where actor_user_id=p_actor_user_id and operation_id=p_operation_id;
+ select * into v_receipt from admin_telemetry.admin_support_operation_receipts where actor_user_id=p_actor_user_id and operation_id=p_operation_id;
  if found then
   if v_receipt.arguments<>v_args then raise exception 'support_operation_reuse_mismatch' using errcode='22023'; end if;
   return v_receipt.result||jsonb_build_object('replayed',true);
@@ -168,14 +172,14 @@ begin
  insert into public.security_audit_events(workspace_id,user_id,action_name,operation_type,target_table,initiated_by,required_confirmation,confirmation_received,allowed,request_id,metadata_json)
  values(null,p_actor_user_id,'admin.'||p_action||'_support_request','ADMIN','support_requests','user',true,true,true,p_operation_id::text,
  jsonb_build_object('source','admin_support_request_action','requested_ids',to_jsonb(v_ids),'affected_ids',to_jsonb(v_changed),'requested_count',cardinality(v_ids),'changed_count',cardinality(v_changed)));
- insert into private.admin_support_operation_receipts(actor_user_id,operation_id,arguments,result) values(p_actor_user_id,p_operation_id,v_args,v_result);
+ insert into admin_telemetry.admin_support_operation_receipts(actor_user_id,operation_id,arguments,result) values(p_actor_user_id,p_operation_id,v_args,v_result);
  return v_result;
 end;
 $$;
-revoke all on function public.admin_manage_support_requests_v1(uuid,uuid[],text,uuid,text,text) from public,anon,authenticated;
+revoke all on function public.admin_manage_support_requests_v1(uuid,uuid[],text,uuid,text,text) from public,anon,authenticated,service_role;
 grant execute on function public.admin_manage_support_requests_v1(uuid,uuid[],text,uuid,text,text) to service_role;
 -- Values are reconstructed inside PostgreSQL; nested provider JSON never reaches the admin server.
-create or replace function private.admin_trust_scalar_v1(p_value jsonb, p_kind text)
+create or replace function admin_telemetry.admin_trust_scalar_v1(p_value jsonb, p_kind text)
 returns jsonb language sql immutable security invoker set search_path = '' as $fn$
  select case
  when p_kind='number' then case when jsonb_typeof(p_value)='number' then case when p_value::numeric between 0 and 1000000000000 then p_value else 'null'::jsonb end else 'null'::jsonb end
@@ -185,56 +189,56 @@ returns jsonb language sql immutable security invoker set search_path = '' as $f
  when p_kind='provider' and p_value#>>'{}'=any(array['openai','nvidia','anthropic','google','unknown']) then p_value
  else 'null'::jsonb end
 $fn$;
-create or replace function private.admin_trust_enum_v1(p_value jsonb, p_allowed text[])
+create or replace function admin_telemetry.admin_trust_enum_v1(p_value jsonb, p_allowed text[])
 returns jsonb language sql immutable security invoker set search_path = '' as $fn$
  select case when jsonb_typeof(p_value)='string' and p_value#>>'{}'=any(p_allowed) then p_value else 'null'::jsonb end
 $fn$;
-create or replace function private.admin_trust_attempts_v1(p_value jsonb)
+create or replace function admin_telemetry.admin_trust_attempts_v1(p_value jsonb)
 returns jsonb language sql immutable security invoker set search_path = '' as $fn$
  select coalesce(jsonb_agg(jsonb_build_object(
- 'provider', private.admin_trust_scalar_v1(a->'provider','provider'),
- 'runtime_model',private.admin_trust_scalar_v1(coalesce(a->'runtime_model',a->'runtimeModel',a->'model',a->'requested_model',a->'requestedModel'),'model'),
- 'success',private.admin_trust_scalar_v1(a->'success','boolean'),
- 'fallback',private.admin_trust_scalar_v1(a->'fallback','boolean'),
- 'role',private.admin_trust_enum_v1(a->'role',array['primary','fallback']),
- 'latency_ms',private.admin_trust_scalar_v1(coalesce(a->'latency_ms',a->'latencyMs'),'number'),
- 'failure_type',private.admin_trust_enum_v1(coalesce(a->'failure_type',a->'failureType'),array['transport','structured_output','unsupported_input','deadline']),
- 'validation_reason_code',private.admin_trust_enum_v1(coalesce(a->'validation_reason_code',a->'validationReasonCode'),array['response_not_json', 'root_not_object', 'missing_analysis', 'invalid_analysis_shape', 'missing_findings', 'findings_not_array', 'insufficient_required_findings', 'unknown_signal_id', 'duplicate_signal_id', 'missing_required_signal', 'invalid_relationship', 'unsupported_relationship', 'invalid_action', 'invalid_citation_id', 'missing_summary_signal_ids', 'invalid_summary_signal_ids', 'executive_summary_missing', 'executive_summary_signal_coverage_failed', 'invalid_overall_confidence', 'confidence_ceiling_exceeded', 'evidence_sufficiency_invalid', 'agreement_invalid', 'uncertainty_invalid', 'schema_field_type_mismatch', 'unexpected_truncation', 'unsupported_inference', 'numeric_integrity_failed', 'contextual_validation_failed', 'ambiguous_extraction', 'source_quote_missing', 'source_quote_not_found', 'unsupported_entity', 'contextual_inconsistency', 'reasoning_leakage', 'unsafe_generated_output', 'unknown_validation_failure']::text[])
+ 'provider', admin_telemetry.admin_trust_scalar_v1(a->'provider','provider'),
+ 'runtime_model',admin_telemetry.admin_trust_scalar_v1(coalesce(a->'runtime_model',a->'runtimeModel',a->'model',a->'requested_model',a->'requestedModel'),'model'),
+ 'success',admin_telemetry.admin_trust_scalar_v1(a->'success','boolean'),
+ 'fallback',admin_telemetry.admin_trust_scalar_v1(a->'fallback','boolean'),
+ 'role',admin_telemetry.admin_trust_enum_v1(a->'role',array['primary','fallback']),
+ 'latency_ms',admin_telemetry.admin_trust_scalar_v1(coalesce(a->'latency_ms',a->'latencyMs'),'number'),
+ 'failure_type',admin_telemetry.admin_trust_enum_v1(coalesce(a->'failure_type',a->'failureType'),array['transport','structured_output','unsupported_input','deadline']),
+ 'validation_reason_code',admin_telemetry.admin_trust_enum_v1(coalesce(a->'validation_reason_code',a->'validationReasonCode'),array['response_not_json', 'root_not_object', 'missing_analysis', 'invalid_analysis_shape', 'missing_findings', 'findings_not_array', 'insufficient_required_findings', 'unknown_signal_id', 'duplicate_signal_id', 'missing_required_signal', 'invalid_relationship', 'unsupported_relationship', 'invalid_action', 'invalid_citation_id', 'missing_summary_signal_ids', 'invalid_summary_signal_ids', 'executive_summary_missing', 'executive_summary_signal_coverage_failed', 'invalid_overall_confidence', 'confidence_ceiling_exceeded', 'evidence_sufficiency_invalid', 'agreement_invalid', 'uncertainty_invalid', 'schema_field_type_mismatch', 'unexpected_truncation', 'unsupported_inference', 'numeric_integrity_failed', 'contextual_validation_failed', 'ambiguous_extraction', 'source_quote_missing', 'source_quote_not_found', 'unsupported_entity', 'contextual_inconsistency', 'reasoning_leakage', 'unsafe_generated_output', 'unknown_validation_failure']::text[])
  )), '[]'::jsonb) from (select a from jsonb_array_elements(case when jsonb_typeof(p_value)='array' then p_value else '[]'::jsonb end) a limit 16) bounded
 $fn$;
-create or replace function private.admin_trust_shadow_v1(p_value jsonb)
+create or replace function admin_telemetry.admin_trust_shadow_v1(p_value jsonb)
 returns jsonb language sql immutable security invoker set search_path = '' as $fn$
  select case when jsonb_typeof(p_value)='object' then jsonb_build_object(
-'event',private.admin_trust_enum_v1(p_value->'event',array['trust_shadow_evaluation', 'trust_shadow_internal_failure']::text[]),
-'mode',private.admin_trust_enum_v1(p_value->'mode',array['shadow']::text[]),
-'workflow_id',private.admin_trust_enum_v1(p_value->'workflow_id',array['business_health_explanation_v1', 'intelligence_briefing_v1']::text[]),
-'release_channel',private.admin_trust_enum_v1(p_value->'release_channel',array['production', 'preview', 'development']::text[]),
-'ruleset_version',private.admin_trust_enum_v1(p_value->'ruleset_version',array['business_health_trust_rules_v1', 'intelligence_briefing_trust_rules_v1']::text[]),
-'output_contract_version',private.admin_trust_enum_v1(p_value->'output_contract_version',array['business_health_explanation_v1', 'intelligence_briefing_v1']::text[]),
-'validator_version',private.admin_trust_enum_v1(p_value->'validator_version',array['business_health_explanation_validator_v1', 'intelligence_briefing_validator_v1']::text[]),
-'cache_state',private.admin_trust_enum_v1(p_value->'cache_state',array['hit', 'miss', 'not_applicable']::text[]),
-'shadow_status',private.admin_trust_enum_v1(p_value->'shadow_status',array['accepted', 'qualifier_required', 'unresolved', 'would_omit', 'would_reject', 'internal_failure']::text[]),
-'provider',private.admin_trust_scalar_v1(p_value->'provider','provider'),
-'model',private.admin_trust_scalar_v1(p_value->'model','model'),
-'snapshot_fingerprint',private.admin_trust_scalar_v1(p_value->'snapshot_fingerprint','hash'),
-'projection_fingerprint',private.admin_trust_scalar_v1(p_value->'projection_fingerprint','hash'),
-'manifest_identity',private.admin_trust_scalar_v1(p_value->'manifest_identity','hash'),
-'response_hash',private.admin_trust_scalar_v1(p_value->'response_hash','hash'),
-'trust_fingerprint',private.admin_trust_scalar_v1(p_value->'trust_fingerprint','hash'),
-'validation_latency_ms',private.admin_trust_scalar_v1(p_value->'validation_latency_ms','number'),
-'repair_count',private.admin_trust_scalar_v1(p_value->'repair_count','number'),
-'additional_provider_calls',private.admin_trust_scalar_v1(p_value->'additional_provider_calls','number'),
-'total_claims',private.admin_trust_scalar_v1(p_value->'total_claims','number'),
-'fallback_used',private.admin_trust_scalar_v1(p_value->'fallback_used','boolean'),
-'stale',private.admin_trust_scalar_v1(p_value->'stale','boolean'),
+'event',admin_telemetry.admin_trust_enum_v1(p_value->'event',array['trust_shadow_evaluation', 'trust_shadow_internal_failure']::text[]),
+'mode',admin_telemetry.admin_trust_enum_v1(p_value->'mode',array['shadow']::text[]),
+'workflow_id',admin_telemetry.admin_trust_enum_v1(p_value->'workflow_id',array['business_health_explanation_v1', 'intelligence_briefing_v1']::text[]),
+'release_channel',admin_telemetry.admin_trust_enum_v1(p_value->'release_channel',array['production', 'preview', 'development']::text[]),
+'ruleset_version',admin_telemetry.admin_trust_enum_v1(p_value->'ruleset_version',array['business_health_trust_rules_v1', 'intelligence_briefing_trust_rules_v1']::text[]),
+'output_contract_version',admin_telemetry.admin_trust_enum_v1(p_value->'output_contract_version',array['business_health_explanation_v1', 'intelligence_briefing_v1']::text[]),
+'validator_version',admin_telemetry.admin_trust_enum_v1(p_value->'validator_version',array['business_health_explanation_validator_v1', 'intelligence_briefing_validator_v1']::text[]),
+'cache_state',admin_telemetry.admin_trust_enum_v1(p_value->'cache_state',array['hit', 'miss', 'not_applicable']::text[]),
+'shadow_status',admin_telemetry.admin_trust_enum_v1(p_value->'shadow_status',array['accepted', 'qualifier_required', 'unresolved', 'would_omit', 'would_reject', 'internal_failure']::text[]),
+'provider',admin_telemetry.admin_trust_scalar_v1(p_value->'provider','provider'),
+'model',admin_telemetry.admin_trust_scalar_v1(p_value->'model','model'),
+'snapshot_fingerprint',admin_telemetry.admin_trust_scalar_v1(p_value->'snapshot_fingerprint','hash'),
+'projection_fingerprint',admin_telemetry.admin_trust_scalar_v1(p_value->'projection_fingerprint','hash'),
+'manifest_identity',admin_telemetry.admin_trust_scalar_v1(p_value->'manifest_identity','hash'),
+'response_hash',admin_telemetry.admin_trust_scalar_v1(p_value->'response_hash','hash'),
+'trust_fingerprint',admin_telemetry.admin_trust_scalar_v1(p_value->'trust_fingerprint','hash'),
+'validation_latency_ms',admin_telemetry.admin_trust_scalar_v1(p_value->'validation_latency_ms','number'),
+'repair_count',admin_telemetry.admin_trust_scalar_v1(p_value->'repair_count','number'),
+'additional_provider_calls',admin_telemetry.admin_trust_scalar_v1(p_value->'additional_provider_calls','number'),
+'total_claims',admin_telemetry.admin_trust_scalar_v1(p_value->'total_claims','number'),
+'fallback_used',admin_telemetry.admin_trust_scalar_v1(p_value->'fallback_used','boolean'),
+'stale',admin_telemetry.admin_trust_scalar_v1(p_value->'stale','boolean'),
 'provider_request_ref',case when (p_value->>'provider_request_ref') ~ '^provider_request_[a-f0-9]{24}$' then p_value->'provider_request_ref' else 'null'::jsonb end,
-'claims_by_taxonomy',(select coalesce(jsonb_object_agg(k,private.admin_trust_scalar_v1(p_value->'claims_by_taxonomy'->k,'number')),'{}'::jsonb) from unnest(array['deterministic_fact', 'supported_evidence_fact', 'contextual_business_note_fact', 'comparison', 'inference', 'causal_claim', 'recommendation', 'prediction', 'assumption', 'limitation', 'uncertainty_statement', 'citation_bearing_claim', 'connective_language', 'unknown_material_claim', 'non_material_language']::text[]) k where p_value->'claims_by_taxonomy' ? k),
-'reason_frequencies',(select coalesce(jsonb_object_agg(k,private.admin_trust_scalar_v1(p_value->'reason_frequencies'->k,'number')),'{}'::jsonb) from unnest(array['actual_target_role_reversed', 'bounded_contradiction_not_visible', 'business_note_claim_not_attributed', 'causal_relationship_not_authorized', 'citation_identity_not_in_manifest', 'claim_level_evidence_support_unresolved', 'confidence_language_exceeds_deterministic_ceiling', 'date_or_reporting_period_not_in_bounded_input', 'inference_requires_qualifier', 'kpi_direction_or_semantic_meaning_reversed', 'material_claim_kpi_identity_unresolved', 'numeric_binding_ambiguous', 'numeric_precision_mismatch', 'numeric_unit_mismatch', 'numeric_value_not_in_bounded_input', 'projection_fingerprint_mismatch', 'recommendation_rationale_unresolved', 'required_limitation_not_visible_in_generated_prose', 'shadow_save_eligibility_blocked', 'snapshot_fingerprint_mismatch', 'stale_input_described_as_current', 'trust_projection_binding_missing', 'workflow_contract_mismatch', 'workspace_scope_mismatch', 'trust_shadow_internal_failure']::text[]) k where p_value->'reason_frequencies' ? k),
+'claims_by_taxonomy',(select coalesce(jsonb_object_agg(k,admin_telemetry.admin_trust_scalar_v1(p_value->'claims_by_taxonomy'->k,'number')),'{}'::jsonb) from unnest(array['deterministic_fact', 'supported_evidence_fact', 'contextual_business_note_fact', 'comparison', 'inference', 'causal_claim', 'recommendation', 'prediction', 'assumption', 'limitation', 'uncertainty_statement', 'citation_bearing_claim', 'connective_language', 'unknown_material_claim', 'non_material_language']::text[]) k where p_value->'claims_by_taxonomy' ? k),
+'reason_frequencies',(select coalesce(jsonb_object_agg(k,admin_telemetry.admin_trust_scalar_v1(p_value->'reason_frequencies'->k,'number')),'{}'::jsonb) from unnest(array['actual_target_role_reversed', 'bounded_contradiction_not_visible', 'business_note_claim_not_attributed', 'causal_relationship_not_authorized', 'citation_identity_not_in_manifest', 'claim_level_evidence_support_unresolved', 'confidence_language_exceeds_deterministic_ceiling', 'date_or_reporting_period_not_in_bounded_input', 'inference_requires_qualifier', 'kpi_direction_or_semantic_meaning_reversed', 'material_claim_kpi_identity_unresolved', 'numeric_binding_ambiguous', 'numeric_precision_mismatch', 'numeric_unit_mismatch', 'numeric_value_not_in_bounded_input', 'projection_fingerprint_mismatch', 'recommendation_rationale_unresolved', 'required_limitation_not_visible_in_generated_prose', 'shadow_save_eligibility_blocked', 'snapshot_fingerprint_mismatch', 'stale_input_described_as_current', 'trust_projection_binding_missing', 'workflow_contract_mismatch', 'workspace_scope_mismatch', 'trust_shadow_internal_failure']::text[]) k where p_value->'reason_frequencies' ? k),
 'claim_refs',(select coalesce(jsonb_agg(jsonb_build_object(
  'claim_id','claim_'||md5(coalesce(c->>'claim_id','')),
  'section_id','section_'||md5(coalesce(c->>'section_id','')),
- 'claim_text_hash',private.admin_trust_scalar_v1(c->'claim_text_hash','hash'),
- 'claim_type',private.admin_trust_enum_v1(c->'claim_type',array['deterministic_fact', 'supported_evidence_fact', 'contextual_business_note_fact', 'comparison', 'inference', 'causal_claim', 'recommendation', 'prediction', 'assumption', 'limitation', 'uncertainty_statement', 'citation_bearing_claim', 'connective_language', 'unknown_material_claim', 'non_material_language']::text[]),
+ 'claim_text_hash',admin_telemetry.admin_trust_scalar_v1(c->'claim_text_hash','hash'),
+ 'claim_type',admin_telemetry.admin_trust_enum_v1(c->'claim_type',array['deterministic_fact', 'supported_evidence_fact', 'contextual_business_note_fact', 'comparison', 'inference', 'causal_claim', 'recommendation', 'prediction', 'assumption', 'limitation', 'uncertainty_statement', 'citation_bearing_claim', 'connective_language', 'unknown_material_claim', 'non_material_language']::text[]),
  'outcomes',(select coalesce(jsonb_agg(o),'[]'::jsonb) from jsonb_array_elements(case when jsonb_typeof(c->'outcomes')='array' then c->'outcomes' else '[]'::jsonb end) o where o#>>'{}'=any(array['accepted','qualifier_required','unresolved','would_omit','would_reject']))
  )),'[]'::jsonb) from (select c from jsonb_array_elements(case when jsonb_typeof(p_value->'claim_refs')='array' then p_value->'claim_refs' else '[]'::jsonb end) c limit 500) bounded)
 ) else 'null'::jsonb end
@@ -259,36 +263,36 @@ begin
  )
  select jsonb_build_object(
  'usage',(select coalesce(jsonb_agg(jsonb_build_object(
-  'id',id,'agent_type',agent_type,'status',private.admin_trust_enum_v1(to_jsonb(status),array['completed','failed','pending','running','blocked']),
-  'model',private.admin_trust_scalar_v1(to_jsonb(model),'model'),'latency_ms',latency_ms,'created_at',created_at,
-  'provider',private.admin_trust_scalar_v1(metadata_json->'provider','provider'),
-  'fallback_used',private.admin_trust_scalar_v1(metadata_json->'fallback_used','boolean'),
-  'provider_attempts',private.admin_trust_attempts_v1(metadata_json->'provider_attempts'),
-  'trust_shadow',private.admin_trust_shadow_v1(metadata_json->'trust_shadow'))),'[]'::jsonb)
+  'id',id,'agent_type',agent_type,'status',admin_telemetry.admin_trust_enum_v1(to_jsonb(status),array['completed','failed','pending','running','blocked']),
+  'model',admin_telemetry.admin_trust_scalar_v1(to_jsonb(model),'model'),'latency_ms',latency_ms,'created_at',created_at,
+  'provider',admin_telemetry.admin_trust_scalar_v1(metadata_json->'provider','provider'),
+  'fallback_used',admin_telemetry.admin_trust_scalar_v1(metadata_json->'fallback_used','boolean'),
+  'provider_attempts',admin_telemetry.admin_trust_attempts_v1(metadata_json->'provider_attempts'),
+  'trust_shadow',admin_telemetry.admin_trust_shadow_v1(metadata_json->'trust_shadow'))),'[]'::jsonb)
    from (select * from usage_scope order by created_at desc,id desc limit p_limit) u),
- 'runs',(select coalesce(jsonb_agg(jsonb_build_object('id',id,'agent_type',agent_type,'status',private.admin_trust_enum_v1(to_jsonb(status),array['completed','failed','pending','running','blocked']),'created_at',created_at)),'[]'::jsonb) from (select * from run_scope order by created_at desc,id desc limit p_limit) r),
+ 'runs',(select coalesce(jsonb_agg(jsonb_build_object('id',id,'agent_type',agent_type,'status',admin_telemetry.admin_trust_enum_v1(to_jsonb(status),array['completed','failed','pending','running','blocked']),'created_at',created_at)),'[]'::jsonb) from (select * from run_scope order by created_at desc,id desc limit p_limit) r),
  'notes',(select coalesce(jsonb_agg(jsonb_build_object(
-  'id',id,'status',private.admin_trust_enum_v1(to_jsonb(status),array['draft','extracting','review_required','approved','rejected','extraction_failed','archived']),
-  'evidence_lifecycle_status',private.admin_trust_enum_v1(to_jsonb(evidence_lifecycle_status),array['active','inactive','archived','deleted']),
-  'provider_name',private.admin_trust_scalar_v1(to_jsonb(provider_name),'provider'),'model_used',private.admin_trust_scalar_v1(to_jsonb(model_used),'model'),
-  'fallback_used',fallback_used,'provider_attempts_json',private.admin_trust_attempts_v1(provider_attempts_json),
-  'release_channel',private.admin_trust_enum_v1(to_jsonb(release_channel),array['production','preview','development']),
+  'id',id,'status',admin_telemetry.admin_trust_enum_v1(to_jsonb(status),array['draft','extracting','review_required','approved','rejected','extraction_failed','archived']),
+  'evidence_lifecycle_status',admin_telemetry.admin_trust_enum_v1(to_jsonb(evidence_lifecycle_status),array['active','inactive','archived','deleted']),
+  'provider_name',admin_telemetry.admin_trust_scalar_v1(to_jsonb(provider_name),'provider'),'model_used',admin_telemetry.admin_trust_scalar_v1(to_jsonb(model_used),'model'),
+  'fallback_used',fallback_used,'provider_attempts_json',admin_telemetry.admin_trust_attempts_v1(provider_attempts_json),
+  'release_channel',admin_telemetry.admin_trust_enum_v1(to_jsonb(release_channel),array['production','preview','development']),
   'latency_ms',latency_ms,'extracted_at',extracted_at,'approved_at',approved_at,'archived_at',archived_at,'deleted_at',deleted_at,'created_at',created_at,
-  'extraction_confidence',private.admin_trust_scalar_v1(extraction_confidence,'number'),'correction_count',private.admin_trust_scalar_v1(correction_count,'number'))),'[]'::jsonb) from (select * from note_scope order by created_at desc,id desc limit p_limit) n),
+  'extraction_confidence',admin_telemetry.admin_trust_scalar_v1(extraction_confidence,'number'),'correction_count',admin_telemetry.admin_trust_scalar_v1(correction_count,'number'))),'[]'::jsonb) from (select * from note_scope order by created_at desc,id desc limit p_limit) n),
  'counts',jsonb_build_object('usage',(select count(*) from usage_scope),'runs',(select count(*) from run_scope),'notes',(select count(*) from note_scope),
  'saved_analyses',(select count(*) from public.reports where report_type='Saved Analysis' and source_data_json @> '{"record_kind":"saved_analysis","analysis_type":"finding_explanation"}'::jsonb and (p_start is null or created_at>=p_start) and created_at<p_end and (p_workspace_id is null or workspace_id=p_workspace_id))))
  );
 end
 $fn$;
-revoke all on function private.admin_trust_scalar_v1(jsonb,text) from public,anon,authenticated;
-grant execute on function private.admin_trust_scalar_v1(jsonb,text) to service_role;
-revoke all on function private.admin_trust_enum_v1(jsonb,text[]) from public,anon,authenticated;
-grant execute on function private.admin_trust_enum_v1(jsonb,text[]) to service_role;
-revoke all on function private.admin_trust_attempts_v1(jsonb) from public,anon,authenticated;
-grant execute on function private.admin_trust_attempts_v1(jsonb) to service_role;
-revoke all on function private.admin_trust_shadow_v1(jsonb) from public,anon,authenticated;
-grant execute on function private.admin_trust_shadow_v1(jsonb) to service_role;
-revoke all on function public.admin_ai_trust_rows_v1(timestamptz,timestamptz,uuid,integer) from public,anon,authenticated;
+revoke all on function admin_telemetry.admin_trust_scalar_v1(jsonb,text) from public,anon,authenticated,service_role;
+grant execute on function admin_telemetry.admin_trust_scalar_v1(jsonb,text) to service_role;
+revoke all on function admin_telemetry.admin_trust_enum_v1(jsonb,text[]) from public,anon,authenticated,service_role;
+grant execute on function admin_telemetry.admin_trust_enum_v1(jsonb,text[]) to service_role;
+revoke all on function admin_telemetry.admin_trust_attempts_v1(jsonb) from public,anon,authenticated,service_role;
+grant execute on function admin_telemetry.admin_trust_attempts_v1(jsonb) to service_role;
+revoke all on function admin_telemetry.admin_trust_shadow_v1(jsonb) from public,anon,authenticated,service_role;
+grant execute on function admin_telemetry.admin_trust_shadow_v1(jsonb) to service_role;
+revoke all on function public.admin_ai_trust_rows_v1(timestamptz,timestamptz,uuid,integer) from public,anon,authenticated,service_role;
 grant execute on function public.admin_ai_trust_rows_v1(timestamptz,timestamptz,uuid,integer) to service_role;
 
 commit;
