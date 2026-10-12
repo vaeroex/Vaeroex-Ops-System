@@ -10,8 +10,10 @@ const { renderToStaticMarkup } = require("react-dom/server");
 const root = process.cwd();
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 const modules = new Map();
-const link = ({ href, children, ...props }) =>
-  React.createElement("a", { href, ...props }, children);
+const link = ({ href, children, ...props }) => {
+  delete props.prefetch;
+  return React.createElement("a", { href, ...props }, children);
+};
 const image = ({ src, alt, sizes, ...props }) => {
   delete props.fill;
   delete props.priority;
@@ -540,6 +542,10 @@ async function main() {
       `Image must be meaningful and bounded below 900 KB: ${asset}`,
     );
   }
+  assert.match(pricing, /Google Sheets limited pilot/);
+  assert.match(pricing, /Google account must be an approved test user/);
+  assert.match(pricing, /paid Vaeroex subscription does not grant pilot access/);
+  assert.match(pricing, /href="\/app\/sources"[^>]*>Upload supported spreadsheet files/);
   process.stdout.write(
     "Public clarity rendering, commerce, availability, and fallback regressions passed.\n",
   );

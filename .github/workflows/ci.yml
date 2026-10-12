@@ -62,6 +62,7 @@ jobs:
           WORKSPACE_AUDIT_PG_BIN="$audit_pg_bin" pnpm test:workspace-audit:database
           WORKSPACE_STORAGE_PG_BIN="$audit_pg_bin" node scripts/workspace-storage-database-tests.cjs
           ADMIN_METRICS_PG_BIN="$audit_pg_bin" node scripts/admin-metrics-database-tests.cjs
+          BILLING_TEST_PG_BIN="$audit_pg_bin" node scripts/base-billing-observation-database-tests.cjs
           ISSUE_TEST_PG_BIN="$audit_pg_bin" node scripts/issue-submission-native-tests.cjs
           SHEETS_TEST_PG_BIN="$audit_pg_bin" node scripts/google-sheets-dispatch-native-tests.cjs
           SHEETS_TEST_PG_BIN="$audit_pg_bin" node scripts/google-sheets-dispatch-fairness-native-tests.cjs

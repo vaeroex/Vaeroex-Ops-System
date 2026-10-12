@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { GOOGLE_SHEETS_CALLBACK_PATH, GOOGLE_SHEETS_READ_SCOPE } from "@/lib/integrations/google-sheets/contracts";
+import { GOOGLE_SHEETS_PILOT } from "@/lib/integrations/google-sheets/availability";
 
 export function googleSheetsAuthorizationTarget(value: unknown) {
   if (typeof value !== "string" || value.length > 8192) throw new Error("invalid_authorization_url");
@@ -59,6 +60,7 @@ export function GoogleSheetsAuthorizationForm({ children, mode = "connect", clas
 
   return <form action={`/api/integrations/google-sheets/${mode}`} method="post" onSubmit={submit} className={className} aria-busy={pending}>
     {children}
+    <p className="text-sm leading-6 text-slate-600 sm:col-span-full"><strong>{GOOGLE_SHEETS_PILOT.title}.</strong> {GOOGLE_SHEETS_PILOT.eligibility}</p>
     <button type="submit" disabled={!ready || pending} className="min-h-11 justify-self-start rounded-md bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white disabled:cursor-wait disabled:opacity-60">{pending ? "Opening Google…" : mode === "connect" ? "Connect Google Sheets" : "Reconnect Google Sheets"}</button>
     {pending ? <p role="status" className="text-sm text-slate-600 sm:col-span-full">Opening Google securely…</p> : null}
     {error ? <p role="alert" className="text-sm text-red-700 sm:col-span-full">{error}</p> : null}
