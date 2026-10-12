@@ -56,7 +56,7 @@ export function decodeAdminUsageSnapshot(value: unknown, input: AdminUsageInput,
 export const USAGE_FEATURE_LABELS: Record<string, string> = {
   vsi: "VSI questions", business_health_explanation_v1: "Business Health explanations", finding_explanation_v1: "Finding explanations",
   file_analysis: "File analysis", business_note_extraction_v1: "Business Note extraction", intelligence_briefing_v1: "Weekly and monthly briefings",
-  global_search_or_ask: "Search and Ask", saved_analysis: "Saved analyses", other_recorded_workflow: "Other recorded workflows"
+  global_search_or_ask: "Search and Ask", kpi_semantic_classification_v1: "KPI semantic suggestions", evidence_retrieval_services: "Evidence embeddings and reranking", document_extraction_services: "Document extraction services", saved_analysis: "Saved analyses", other_recorded_workflow: "Other recorded workflows"
 };
 export const USAGE_COVERAGE = [
   { feature: "vsi", measurement: "Requests measure questions; cost events measure settled attempts, tokens and web tools. Request cumulative costs are excluded." },
@@ -65,5 +65,8 @@ export const USAGE_COVERAGE = [
   { feature: "finding_explanation_v1", measurement: "Recorded provider usage and generated artifacts; saved analyses are counted separately." },
   { feature: "file_analysis", measurement: "Recorded provider usage and generated artifacts." },
   { feature: "business_note_extraction_v1", measurement: "Recorded extraction provider usage. Confirming an explicit VSI note is not an extraction call." },
-  { feature: "global_search_or_ask", measurement: "Recorded Search and Ask provider usage. Deterministic search does not imply a provider call." }
+  { feature: "global_search_or_ask", measurement: "Recorded Search and Ask answer-generation usage. Deterministic search does not imply a provider call; separate retrieval services below are not metered here." },
+  { feature: "kpi_semantic_classification_v1", measurement: "When enabled, semantic suggestions can call a provider. This path does not write an authoritative cost event to these ledgers; cost and attempt coverage are not measured here." },
+  { feature: "evidence_retrieval_services", measurement: "When enabled, evidence indexing/query embeddings and optional reranking can incur provider charges. Their costs are not measured by these ledgers and are excluded from this report." },
+  { feature: "document_extraction_services", measurement: "Document-extraction worker/OCR charges are outside these AI usage ledgers. File-analysis generation above does not include those processing costs." }
 ] as const;

@@ -20,8 +20,11 @@ Module._load = function(request, ...rest) {
   return originalLoad.call(this, request, ...rest);
 };
 const { getAdminUsageData } = require('../lib/admin/usage-data.ts');
-const { decodeAdminUsageSnapshot, USAGE_METRIC_KEYS } = require('../lib/admin/usage-metrics.ts');
+const { decodeAdminUsageSnapshot, USAGE_METRIC_KEYS, USAGE_COVERAGE } = require('../lib/admin/usage-metrics.ts');
 const { adminReportPeriod, adminWorkspaceFilter, adminReportPage } = require('../lib/admin/report-period.ts');
+assert(USAGE_COVERAGE.some(row => row.feature === 'kpi_semantic_classification_v1' && /not measured/.test(row.measurement)));
+assert(USAGE_COVERAGE.some(row => row.feature === 'evidence_retrieval_services' && /excluded/.test(row.measurement)));
+assert(USAGE_COVERAGE.some(row => row.feature === 'document_extraction_services' && /outside/.test(row.measurement)));
 const A = '11111111-1111-4111-8111-111111111111';
 const B = '22222222-2222-4222-8222-222222222222';
 const input = { start: '2026-10-01T00:00:00.000Z', end: '2026-10-08T00:00:00.000Z', workspaceId: A, page: 2, workspacePage: 3 };
