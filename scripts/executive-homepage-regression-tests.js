@@ -346,7 +346,9 @@ assert.match(homepageSource, /Needs Attention/, "risk and leadership decision mu
 assert.match(homepageSource, /Top Opportunity/, "the opportunity must remain distinct without being presented as a positive signal");
 assert.match(homepageSource, />Executive Overview<\//, "Overview must use a stable executive heading instead of a time-based greeting");
 assert.doesNotMatch(homepageSource, /Good morning|Good afternoon|Good evening/, "Overview must not contain time-of-day greetings");
-assert.match(homepageSource, /href="\/app\/intelligence#business-health"/, "Overview must route Health review to Intelligence");
+assert.ok(!homepageSource.includes("Business Health is part of Intelligence")
+  && !homepageSource.includes('href="/app/intelligence#business-health"'), "Overview omits the redundant Health announcement");
+assert.ok(appShellSource.includes('{ href: "/app/intelligence", label: "Intelligence" }'), "Primary navigation still reaches Health in Intelligence");
 assert.doesNotMatch(homepageSource, /<BusinessHealthAnalysisPanel|<BusinessHealthTrendChart/, "Overview must not duplicate the Health review controls");
 assert.match(intelligencePageSource, /<IntelligenceHealthSnapshot/, "Intelligence must own the compact Health snapshot");
 assert.match(healthSnapshotSource, /health\.available \? health\.score : "Not yet evaluable"/, "unavailable Health must not render zero");
