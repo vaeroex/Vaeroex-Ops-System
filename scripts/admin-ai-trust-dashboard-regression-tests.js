@@ -144,7 +144,7 @@ function note(index, overrides = {}) {
 
 function filters(overrides = {}) {
   return {
-    range: "7d", workflow: "all", releaseChannel: "", provider: "", model: "", ruleset: "", rule: "", outcome: "all", page: 1, evaluation: "", ...overrides
+    range: "7d", workspace: "", workflow: "all", releaseChannel: "", provider: "", model: "", ruleset: "", rule: "", outcome: "all", page: 1, evaluation: "", ...overrides
   };
 }
 
@@ -220,6 +220,16 @@ assert.equal(filtered.businessHealth.terraFallbackRuns, 1);
 assert.equal(filtered.businessNotes.submitted, 0, "release-channel filter must not mix Production Business Notes into Preview results");
 assert.ok(filtered.providers.every((item) => item.provider === "nvidia" && item.model === "gpt-5.6-terra"));
 
+const nvidiaModel = "nvidia/llama-3.3-nemotron-super-49b-v1.5";
+assert.equal(parseAiTrustFilters({ model: nvidiaModel }).error, null, "known NVIDIA model filters remain usable");
+assert.equal(parseAiTrustFilters({ model: "gpt-5.4-mini" }).error, null);
+assert.ok(parseAiTrustFilters({ model: "nvidia/private-customer-question" }).error, "arbitrary slash-bearing provider values are not metadata");
+const nvidia = snapshot({ businessHealthUsage: [usage(5, { trust: { provider: "nvidia", model: nvidiaModel }, model: nvidiaModel, provider_attempts: [{ provider: "nvidia", runtime_model: nvidiaModel, success: true }] })] });
+assert.equal(nvidia.businessHealth.totalRuns, 1, "the actual active NVIDIA model is not dropped from safe Trust rows");
+assert.ok(nvidia.providers.some(row => row.model === nvidiaModel));
+const legacyModel = snapshot({ businessHealthUsage: [usage(6, { model: "gpt-5.4-mini", trust: { model: "gpt-5.4-mini" } })] });
+assert.equal(legacyModel.businessHealth.totalRuns, 1, "historical priced models remain measurable");
+
 const ruleFiltered = snapshot({ filters: filters({ rule: "recommendation_rationale_unresolved", outcome: "unresolved" }) });
 assert.equal(ruleFiltered.businessHealth.totalRuns, 1);
 assert.equal(ruleFiltered.findingExplanation.runs, 0, "Trust-only filters must not be applied to partially instrumented workflows");
@@ -264,7 +274,14 @@ assert.match(route, /requireVaeroexAdmin\("\/app"\)[\s\S]+getAiTrustDashboardDat
 assert.match(adminLayout, /requireVaeroexAdmin\("\/app"\)/, "admin layout must independently authorize the route");
 assert.match(data, /^import "server-only";/, "cross-workspace aggregation must remain server-only");
 assert.match(data, /MAX_ROWS_PER_SOURCE = 5_000/);
-assert.doesNotMatch(data, /original_note_text|reviewed_extraction_json|source_spans_json|workspace_id|author_user_id|user_id|source_file_id/, "query adapter must not select raw customer content or identifiers");
+assert.match(data, /getVaeroexAdminAccess/, "data boundary must independently authorize platform admins");
+assert.match(data, /admin_ai_trust_rows_v1/, "nested telemetry must be projected inside the database");
+assert.doesNotMatch(data, /\.from\(|\.select\(/, "admin reader must never fetch raw nested customer/provider JSON");
+assert.match(data, /p_workspace_id: input.filters.workspace/, "workspace scope is passed into the authoritative query");
+assert.equal(parseAiTrustFilters({range: "all"}).filters.range, "90d", "legacy unbounded range becomes an explicit supported 90-day period");
+assert.equal(parseAiTrustFilters({workspace: "not-a-workspace"}).error !== null, true);
+assert.equal(aiTrustRangeStart("month", new Date(NOW)), "2026-07-01T00:00:00.000Z");
+assert.doesNotMatch(data, /original_note_text|reviewed_extraction_json|source_spans_json|author_user_id|user_id|source_file_id/, "query adapter must not select raw customer content or user identifiers");
 assert.doesNotMatch(data + route, /openai|generateText|generateObject|runVaeroexCompletion|createChatCompletion/, "dashboard rendering must make no LLM call");
 assert.doesNotMatch(data + route, /\.insert\(|\.update\(|\.upsert\(|\.delete\(|"use server"/, "dashboard must expose no mutation or server action");
 assert.equal(exists("app/api/admin/ai-trust/route.ts"), false, "no separate aggregation API should exist to attack directly");
@@ -275,6 +292,13 @@ assert.doesNotMatch(globalSearch, /\/app\/admin\/ai-trust|AI Trust/, "Global Sea
 assert.doesNotMatch(dashboard, /raw generated prose|enable enforcement|type="checkbox"|environment-variable|rollout control/i);
 assert.doesNotMatch(dashboard, /customer name|workspace name|source filename/i);
 assert.match(dashboard, /Shadow Mode/);
+assert.match(dashboard, /<details/);
+assert.match(dashboard, /AdminReportControls/);
+assert.match(dashboard, /AdminLocalTime/);
+assert.match(dashboard, /Citation check not applicable/);
+assert.match(dashboard, /Execution metrics are not an accuracy score/);
+assert.match(dashboard, /Quota \/ pre-admission budget blocks/);
+assert.match(dashboard, /All workspaces · platform-wide/);
 assert.match(dashboard, /Trust claim validation: Not yet instrumented/);
 assert.match(dashboard, /Claim Trust: Not yet instrumented/);
 assert.match(dashboard, /This dashboard cannot activate enforcement/);

@@ -1,4 +1,6 @@
-export const AI_TRUST_RANGE_OPTIONS = ["24h", "7d", "30d", "90d", "all"] as const;
+import type { AdminUsageSnapshot } from "@/lib/admin/usage-metrics";
+
+export const AI_TRUST_RANGE_OPTIONS = ["month", "24h", "7d", "30d", "90d"] as const;
 export const AI_TRUST_WORKFLOW_FILTERS = ["all", "business_health", "finding_explanation", "file_analysis", "business_notes"] as const;
 export const AI_TRUST_OUTCOME_FILTERS = ["all", "accepted", "qualifier_required", "unresolved", "would_omit", "would_reject"] as const;
 export const AI_TRUST_EVALUATION_PAGE_SIZE = 20;
@@ -10,6 +12,7 @@ export type ClaimOutcome = Exclude<AiTrustOutcomeFilter, "all">;
 
 export type AiTrustFilters = Readonly<{
   range: AiTrustRange;
+  workspace: string;
   workflow: AiTrustWorkflowFilter;
   releaseChannel: string;
   provider: string;
@@ -225,6 +228,9 @@ export type AiTrustEnforcementReadiness = Readonly<{
 }>;
 
 export type AiTrustDashboardSnapshot = Readonly<{
+  operational?: AdminUsageSnapshot;
+  periodStart?: string;
+  periodEnd?: string;
   generatedAt: string;
   platform: AiTrustPlatformPulse;
   workflows: readonly AiTrustWorkflowSummary[];
@@ -269,6 +275,19 @@ export type AiTrustDashboardInput = Readonly<{
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const FILTER_TOKEN_PATTERN = /^[a-zA-Z0-9._:-]{1,100}$/;
 const HASH_PATTERN = /^(?:sha256:)?[a-f0-9]{16,128}$/i;
+// Model names are operational metadata, but never accept arbitrary strings from
+// provider payloads. Slash-bearing names below are checked-in provider profiles.
+const KNOWN_PROFILE_MODELS = new Set([
+  "nvidia/llama-3.3-nemotron-super-49b-v1.5", "nvidia/nemotron-3-nano-30b-a3b",
+  "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning", "nvidia/nemotron-3-super-120b-a12b",
+  "nvidia/nemotron-3-ultra-550b-a55b", "meta/llama-3.3-70b-instruct",
+  "deepseek-ai/deepseek-v4-flash", "deepseek-ai/deepseek-v4-pro", "openai/gpt-oss-20b", "z-ai/glm-5.2"
+]);
+const KNOWN_MODEL_PATTERN = /^(gpt-(5\.6|6|6\.1)-(sol|terra|luna|astra)|gpt-5\.4-mini|gpt-4o(-mini)?|gpt-4\.1(-mini|-nano)?|claude-(sonnet|haiku|opus)-[0-9-]+)(-[0-9]{4}-[0-9]{2}-[0-9]{2})?$/;
+function safeModel(value: unknown) {
+  return typeof value === "string" && value.length <= 100 && (KNOWN_PROFILE_MODELS.has(value) || KNOWN_MODEL_PATTERN.test(value)) ? value : "";
+}
+
 const SAFE_CODE_PATTERN = /^[a-zA-Z0-9._:-]{1,160}$/;
 const CLAIM_OUTCOMES: readonly ClaimOutcome[] = ["accepted", "qualifier_required", "unresolved", "would_omit", "would_reject"];
 const FORBIDDEN_TELEMETRY_KEYS = new Set([
@@ -368,7 +387,8 @@ function rawParam(value: string | string[] | undefined) {
 }
 
 export function parseAiTrustFilters(params: Record<string, string | string[] | undefined>): { filters: AiTrustFilters; error: string | null } {
-  const range = rawParam(params.range) || "7d";
+  const range = rawParam(params.range) === "all" ? "90d" : rawParam(params.range) || "month";
+  const workspace = rawParam(params.workspace);
   const workflow = rawParam(params.workflow) || "all";
   const outcome = rawParam(params.outcome) || "all";
   const releaseChannel = rawParam(params.release_channel);
@@ -383,16 +403,19 @@ export function parseAiTrustFilters(params: Record<string, string | string[] | u
     !AI_TRUST_RANGE_OPTIONS.includes(range as AiTrustRange) ||
     !AI_TRUST_WORKFLOW_FILTERS.includes(workflow as AiTrustWorkflowFilter) ||
     !AI_TRUST_OUTCOME_FILTERS.includes(outcome as AiTrustOutcomeFilter) ||
-    [releaseChannel, provider, model, ruleset, rule].some((value) => value && !FILTER_TOKEN_PATTERN.test(value)) ||
+    [releaseChannel, provider, ruleset, rule].some((value) => value && !FILTER_TOKEN_PATTERN.test(value)) ||
+    (model && !safeModel(model)) ||
+    (workspace && !UUID_PATTERN.test(workspace)) ||
     (evaluation && !UUID_PATTERN.test(evaluation)) ||
     !Number.isInteger(parsedPage) || parsedPage < 1 || parsedPage > 250;
   return {
     filters: {
-      range: AI_TRUST_RANGE_OPTIONS.includes(range as AiTrustRange) ? range as AiTrustRange : "7d",
+      range: AI_TRUST_RANGE_OPTIONS.includes(range as AiTrustRange) ? range as AiTrustRange : "month",
+      workspace: UUID_PATTERN.test(workspace) ? workspace : "",
       workflow: AI_TRUST_WORKFLOW_FILTERS.includes(workflow as AiTrustWorkflowFilter) ? workflow as AiTrustWorkflowFilter : "all",
       releaseChannel: FILTER_TOKEN_PATTERN.test(releaseChannel) ? releaseChannel : "",
       provider: FILTER_TOKEN_PATTERN.test(provider) ? provider : "",
-      model: FILTER_TOKEN_PATTERN.test(model) ? model : "",
+      model: safeModel(model),
       ruleset: FILTER_TOKEN_PATTERN.test(ruleset) ? ruleset : "",
       rule: FILTER_TOKEN_PATTERN.test(rule) ? rule : "",
       outcome: AI_TRUST_OUTCOME_FILTERS.includes(outcome as AiTrustOutcomeFilter) ? outcome as AiTrustOutcomeFilter : "all",
@@ -403,7 +426,8 @@ export function parseAiTrustFilters(params: Record<string, string | string[] | u
   };
 }
 
-export function aiTrustRangeStart(range: AiTrustRange, now = new Date()) {
+export function aiTrustRangeStart(range: AiTrustRange | "all", now = new Date()) {
+  if (range === "month") return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
   if (range === "all") return null;
   const hours = range === "24h" ? 24 : range === "7d" ? 168 : range === "30d" ? 720 : 2160;
   return new Date(now.getTime() - hours * 60 * 60 * 1000).toISOString();
@@ -446,7 +470,7 @@ export function parseTrustEvaluation(row: AiTrustUsageRow): { evaluation: AiTrus
   const workflow = safeCode(telemetry.workflow_id);
   const createdAt = safeDate(row.created_at);
   const provider = safeCode(telemetry.provider);
-  const model = safeCode(telemetry.model);
+  const model = safeModel(telemetry.model);
   const releaseChannel = safeCode(telemetry.release_channel);
   const rulesetVersion = safeCode(telemetry.ruleset_version);
   const outputContractVersion = safeCode(telemetry.output_contract_version);
@@ -499,7 +523,7 @@ function providerAttempts(metadataValue: unknown, row: Pick<AiTrustUsageRow, "mo
   const parsed = attempts.flatMap((candidate) => {
     const attempt = record(candidate);
     const provider = safeCode(attempt.provider) || safeCode(metadata.provider) || "unknown";
-    const model = safeCode(attempt.runtime_model) || safeCode(attempt.runtimeModel) || safeCode(attempt.model) || safeCode(attempt.requested_model) || safeCode(attempt.requestedModel);
+    const model = safeModel(attempt.runtime_model) || safeModel(attempt.runtimeModel) || safeModel(attempt.model) || safeModel(attempt.requested_model) || safeModel(attempt.requestedModel);
     if (!model) return [];
     return [{
       provider,
@@ -511,7 +535,7 @@ function providerAttempts(metadataValue: unknown, row: Pick<AiTrustUsageRow, "mo
     }];
   });
   if (parsed.length) return parsed;
-  const model = safeCode(row.model);
+  const model = safeModel(row.model);
   return model ? [{
     provider: safeCode(metadata.provider) || "unknown",
     model,
