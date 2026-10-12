@@ -70,6 +70,7 @@ jobs:
       - name: Workspace storage capacity policy and controlled billing regressions
         run: |
           node scripts/workspace-capacity-billing-tests.cjs
+          node scripts/stripe-webhook-receipt-tests.cjs
           node scripts/storage-capacity-ui-tests.cjs
           node scripts/storage-capacity-upload-client-tests.cjs
 

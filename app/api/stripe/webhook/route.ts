@@ -5,6 +5,7 @@ import { sendVaeroexWelcomeEmail, type WelcomeEmailResult } from "@/lib/email/we
 import { logSecurityAuditEvent } from "@/lib/security/tool-execution-gateway";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import type { Json } from "@/lib/supabase/types";
+import { minimizeStripeWebhookReceipt } from "@/lib/stripe/webhook-receipt";
 import {
   mapStripeStatus,
   retrieveStripeCustomer,
@@ -34,10 +35,6 @@ type StripeSyncResult = {
   subscriptionRecordId: string | null;
   workspaceId: string | null;
 };
-
-function asJson(value: unknown): Json {
-  return value as Json;
-}
 
 function normalizeEmail(email?: string | null) {
   return String(email || "").trim().toLowerCase();
@@ -384,11 +381,12 @@ export async function POST(request: Request) {
   }
 
   const initialSubscriptionId = stripeObjectId((event.data.object as { subscription?: unknown }).subscription);
+  const receiptPayload = minimizeStripeWebhookReceipt(event);
   const { data: eventRow, error: eventError } = duplicate
     ? await admin
         .from("subscription_events")
         .update({
-          payload_json: asJson(event),
+          payload_json: receiptPayload,
           processing_error: null,
           stripe_subscription_id: initialSubscriptionId
         })
@@ -403,7 +401,7 @@ export async function POST(request: Request) {
           event_type: event.type,
           stripe_event_id: event.id,
           stripe_subscription_id: initialSubscriptionId,
-          payload_json: asJson(event),
+          payload_json: receiptPayload,
           processed: false,
           processing_error: null
         })

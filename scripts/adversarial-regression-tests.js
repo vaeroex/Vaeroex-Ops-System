@@ -440,7 +440,10 @@ function runWebhookReplayTests() {
   const webhookRoute = read("app/api/stripe/webhook/route.ts");
 
   assert.match(webhookRoute, /duplicate\?\.processed/, "processed duplicate Stripe events may be acknowledged");
-  assert.match(webhookRoute, /\.update\(\{\s*payload_json: asJson\(event\)/s, "unprocessed duplicate Stripe events should be retried");
+  assert.match(webhookRoute, /const receiptPayload = minimizeStripeWebhookReceipt\(event\)/, "Stripe receipts must be minimized before persistence");
+  assert.match(webhookRoute, /\.update\(\{\s*payload_json: receiptPayload/s, "unprocessed duplicate Stripe events should retry with a minimized receipt");
+  assert.equal((webhookRoute.match(/payload_json: receiptPayload/g) || []).length, 2, "both first receipt and retry must minimize persisted data");
+  assert.doesNotMatch(webhookRoute, /payload_json: asJson\(event\)/, "raw events must not bypass receipt minimization");
   assert.match(webhookRoute, /status: 500/, "failed Stripe processing must return a retryable status");
   assert.doesNotMatch(webhookRoute, /status: 202/, "failed Stripe processing must not be acknowledged with 202");
 
