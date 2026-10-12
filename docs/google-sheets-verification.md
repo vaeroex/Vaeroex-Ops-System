@@ -1,3 +1,9 @@
+# Verification continuation — October12,2026
+
+The October2 implementation record below is historical. The live connector was subsequently released. Current verification work is tracked by PR#457’s submission packet and PR#458’s exact erasure/retention release plan. The current baseline main and public app commit is002c2536583ce455f2ce8ee1bc58b430c3da3b74. Google remains External/Testing, not submitted. The new release remains held pending its exact approval and operational checks.
+
+## Historical implementation record
+
 # Google Sheets verification record
 
 Checkpoint: October 2, 2026 UTC, branch `codex/google-sheets-complete`. This records completed local checks during implementation. Typecheck and the production build passed after the change to automatic refresh every 15 minutes. The final operational-metric eligibility fix also passed typecheck and database qualification. No migration or deployment has occurred at this checkpoint.
