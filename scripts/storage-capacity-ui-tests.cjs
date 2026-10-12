@@ -22,9 +22,12 @@ function load(relative, mocks = {}) {
 }
 const link = { __esModule: true, default: ({ children, ...props }) => React.createElement("a", props, children) };
 const policy = load("lib/storage-capacity/policy.ts");
+const addressFields = load("components/storage-capacity/BillingAddressFields.tsx");
+const paymentComponent = { CapacityPayment: () => null };
+const recoveryComponent = { CapacityRecovery: () => null };
 const { StorageUsageOverview } = load("components/storage-capacity/StorageUsageOverview.tsx", { "next/link": link, "@/lib/storage-capacity/policy": policy });
 const { StorageFileList } = load("components/storage-capacity/StorageFileList.tsx", { "next/link": link, "next/navigation": { useRouter: () => ({ refresh() {} }) }, "@/lib/storage-capacity/policy": policy });
-const { CapacityPurchase } = load("components/storage-capacity/CapacityPurchase.tsx", { "next/link": link, "next/navigation": { useRouter: () => ({ refresh() {} }) }, "@/lib/storage-capacity/policy": policy });
+const { CapacityPurchase } = load("components/storage-capacity/CapacityPurchase.tsx", { "@/components/storage-capacity/CapacityRecovery": recoveryComponent, "@/components/storage-capacity/CapacityPayment": paymentComponent, "@/components/storage-capacity/BillingAddressFields": addressFields, "next/link": link, "next/navigation": { useRouter: () => ({ refresh() {} }) }, "@/lib/storage-capacity/policy": policy });
 const render = (Component, props) => renderToStaticMarkup(React.createElement(Component, props));
 const emptyGroup = { bytes: 0, files: 0 };
 function usage(overrides = {}) {
@@ -194,18 +197,21 @@ test("page loads only current-workspace aggregates, and never reads billing or r
   assert.match(html, /A workspace owner can buy capacity/);
 });
 
-function interactionFixture(relative, componentName, props) {
+function interactionFixture(relative, componentName, props, extraMocks = {}) {
   const slots = [];
   let index = 0;
   let refreshes = 0;
   const hooks = { ...React, useEffect() {}, useRef(value) { const key = index++; return slots[key] ??= { current: value }; },
     useState(value) { const key = index++; if (!(key in slots)) slots[key] = value; return [slots[key], next => { slots[key] = typeof next === "function" ? next(slots[key]) : next; }]; } };
-  const component = load(relative, { react: hooks, "next/navigation": { useRouter: () => ({ refresh() { refreshes++; } }) }, "next/link": link, "@/lib/storage-capacity/policy": policy })[componentName];
+  const component = load(relative, { react: hooks, "@/components/storage-capacity/CapacityRecovery": recoveryComponent, "@/components/storage-capacity/CapacityPayment": paymentComponent, "@/components/storage-capacity/BillingAddressFields": addressFields, "next/navigation": { useRouter: () => ({ refresh() { refreshes++; } }) }, "next/link": link, "@/lib/storage-capacity/policy": policy, ...extraMocks })[componentName];
   return { render() { index = 0; return component(props); }, get refreshes() { return refreshes; } };
 }
 function nodes(tree) { return Array.isArray(tree) ? tree.flatMap(nodes) : tree && typeof tree === "object" ? [tree, ...nodes(tree.props?.children)] : []; }
 function text(tree) { return Array.isArray(tree) ? tree.map(text).join("") : tree && typeof tree === "object" ? text(tree.props?.children) : tree == null || typeof tree === "boolean" ? "" : String(tree); }
 const button = (tree, label) => nodes(tree).find(node => node.type === "button" && text(node) === label);
+const syntheticBillingAddress = { line1: "123 Test Street", line2: "", city: "San Francisco", state: "CA", postalCode: "94103", country: "US" };
+function enterBillingAddress(fixture, value = syntheticBillingAddress) { nodes(fixture.render()).find(node => node.type === addressFields.BillingAddressFields).props.onChange(value); }
+function reviewPurchase(fixture) { return nodes(fixture.render()).find(node => node.type === "form" && node.props["data-capacity-review"]).props.onSubmit({ preventDefault() {} }); }
 
 test("purchase requires an explicit reviewed recurring authorization, binds the workspace, and rejects a stale quote", async () => {
   const oldFetch = global.fetch, oldWindow = global.window;
@@ -213,18 +219,25 @@ test("purchase requires an explicit reviewed recurring authorization, binds the 
   const quote = { quoteId: "quote-a", workspaceId: "workspace-a", packs: 2, currentPacks: 0, totalPacks: 2, totalBytes: 35e9, totalFiles: 1500,
     currency: "usd", monthlyCents: 1000, existingMonthlyCents: 0, amountDueTodayCents: 1000, renewalDate: "2026-11-12T00:00:00Z", expiresAt: "2099-01-01T00:00:00Z",
     cancellationEffect: "Capacity ends after the paid period. Existing files remain.", checkoutTerms: "Recurring until canceled.", termsVersion: "storage-capacity-v1" };
-  global.fetch = async (url, options) => { calls.push({ url, body: JSON.parse(options.body) }); return { ok: true, json: async () => url.endsWith("quote") ? quote : { url: "https://checkout.stripe.com/c/pay/synthetic" } }; };
-  let destination;
-  global.window = { location: { assign(url) { destination = url; } } };
+  const session = { clientSecret: "pi_synthetic_secret_private", publishableKey: "pk_test_synthetic", amountCents: 1000, currency: "usd", renewalDate: quote.renewalDate };
+  global.fetch = async (url, options) => { calls.push({ url, body: JSON.parse(options.body) }); return { ok: true, json: async () => url.endsWith("quote") ? quote : session }; };
+  global.window = { location: { assign() { throw new Error("Invoice redirect is forbidden"); } } };
   try {
     const fixture = interactionFixture("components/storage-capacity/CapacityPurchase.tsx", "CapacityPurchase", { workspaceId: "workspace-a", workspaceName: "Synthetic A", currentPacks: 0, billing });
     button(fixture.render(), "Buy capacity").props.onClick();
     const select = nodes(fixture.render()).find(node => node.type === "select");
     select.props.onChange({ target: { value: "2" } });
-    await button(fixture.render(), "Review purchase").props.onClick();
+    enterBillingAddress(fixture);
+    await reviewPurchase(fixture);
     let tree = fixture.render();
     assert.match(text(tree), /35 GB · 1,500 files/);
     assert.match(text(tree), /Amount due today\$10.00 USD/);
+    assert.match(text(tree), /Total recurring capacity charges after purchase/);
+    assert.match(text(tree), /first payment and each monthly renewal are exactly \$5 USD per pack/);
+    assert.match(text(tree), /Applicable tax is included in that price/);
+    assert.match(text(tree), /authorize Stripe to save my payment method for these monthly renewals/);
+    assert.doesNotMatch(text(tree), /may be prorated/);
+    assert.equal(nodes(tree).find(node => node.type === "input" && node.props.type === "checkbox").props.checked, false);
     assert.equal(button(tree, "Continue to secure payment").props.disabled, true);
     await button(tree, "Continue to secure payment").props.onClick();
     assert.equal(calls.length, 1, "calling the handler before acceptance cannot begin checkout");
@@ -232,18 +245,212 @@ test("purchase requires an explicit reviewed recurring authorization, binds the 
     tree = fixture.render();
     assert.equal(button(tree, "Continue to secure payment").props.disabled, false);
     await button(tree, "Continue to secure payment").props.onClick();
-    assert.deepEqual(calls[0].body, { workspaceId: "workspace-a", packs: 2 });
+    assert.deepEqual(calls[0].body, { workspaceId: "workspace-a", packs: 2, billingAddress: syntheticBillingAddress });
     assert.deepEqual(calls[1].body, { workspaceId: "workspace-a", quoteId: "quote-a", acceptedTerms: true });
-    assert.equal(destination, "https://checkout.stripe.com/c/pay/synthetic");
+    assert.equal(nodes(fixture.render()).find(node => node.type === paymentComponent.CapacityPayment).props.session, session);
     quote.expiresAt = "2000-01-01T00:00:00Z";
     const stale = interactionFixture("components/storage-capacity/CapacityPurchase.tsx", "CapacityPurchase", { workspaceId: "workspace-a", workspaceName: "Synthetic A", currentPacks: 0, billing });
     button(stale.render(), "Buy capacity").props.onClick();
-    await button(stale.render(), "Review purchase").props.onClick();
+    nodes(stale.render()).find(node => node.type === "select").props.onChange({ target: { value: "2" } });
+    enterBillingAddress(stale);
+    await reviewPurchase(stale);
     nodes(stale.render()).find(node => node.type === "input" && node.props.type === "checkbox").props.onChange({ target: { checked: true } });
     await button(stale.render(), "Continue to secure payment").props.onClick();
     assert.equal(calls.length, 3, "expired review makes no checkout request");
     assert.match(text(stale.render()), /purchase review expired/);
   } finally { global.fetch = oldFetch; global.window = oldWindow; }
+});
+
+test("billing address validation requests only the location fields needed by the selected country, and no incomplete address is submitted", async () => {
+  const { billingAddressError, BillingAddressFields } = addressFields;
+  assert.equal(billingAddressError(syntheticBillingAddress), null);
+  assert.match(billingAddressError({ ...syntheticBillingAddress, state: "" }), /state or province/);
+  assert.match(billingAddressError({ ...syntheticBillingAddress, postalCode: "" }), /ZIP or postal/);
+  assert.equal(billingAddressError({ ...syntheticBillingAddress, country: "GB", state: "", postalCode: "SW1A 1AA" }), null);
+  assert.equal(billingAddressError({ ...syntheticBillingAddress, country: "HK", state: "", postalCode: "" }), null);
+  assert.match(billingAddressError({ ...syntheticBillingAddress, country: "XX" }), /country/);
+  const html = render(BillingAddressFields, { value: syntheticBillingAddress, onChange() {}, disabled: false });
+  assert.match(html, /not saved in Vaeroex workspace records/);
+  assert.match(html, /Enter card details only in Stripe’s secure payment fields/);
+  assert.doesNotMatch(html, /name="(?:card|credit|cvc|ssn|taxId)/i);
+  const oldFetch = global.fetch;
+  let requests = 0;
+  global.fetch = async () => { requests++; throw new Error("Incomplete address must not leave the browser"); };
+  try {
+    const fixture = interactionFixture("components/storage-capacity/CapacityPurchase.tsx", "CapacityPurchase", { workspaceId: "workspace-a", workspaceName: "Synthetic A", currentPacks: 0, billing });
+    button(fixture.render(), "Buy capacity").props.onClick();
+    await reviewPurchase(fixture);
+    assert.equal(requests, 0);
+    assert.match(text(fixture.render()), /billing street address, city, and country/);
+  } finally { global.fetch = oldFetch; }
+});
+
+test("a purchase review rejects a different first charge, extra tax, or unconfirmed renewal before exposing payment consent", async () => {
+  const oldFetch = global.fetch;
+  const base = { quoteId: "quote-a", workspaceId: "workspace-a", packs: 1, currentPacks: 0, totalPacks: 1, totalBytes: 25e9, totalFiles: 1000,
+    currency: "usd", monthlyCents: 500, existingMonthlyCents: 0, amountDueTodayCents: 500, renewalDate: "2099-02-12T00:00:00Z", expiresAt: "2099-01-12T00:00:00Z" };
+  try {
+    for (const changed of [{ amountDueTodayCents: 499 }, { amountDueTodayCents: 530 }, { monthlyCents: 530 }, { workspaceId: "workspace-b" }, { renewalDate: "" }, { expiresAt: "invalid" }]) {
+      global.fetch = async () => ({ ok: true, json: async () => ({ ...base, ...changed }) });
+      const fixture = interactionFixture("components/storage-capacity/CapacityPurchase.tsx", "CapacityPurchase", { workspaceId: "workspace-a", workspaceName: "Synthetic A", currentPacks: 0, billing });
+      button(fixture.render(), "Buy capacity").props.onClick();
+      enterBillingAddress(fixture);
+      await reviewPurchase(fixture);
+      const tree = fixture.render();
+      assert.match(text(tree), /exact price and renewal could not be verified/);
+      assert.equal(button(tree, "Continue to secure payment"), undefined);
+    }
+  } finally { global.fetch = oldFetch; }
+});
+
+test("payment credentials remain private until consent and a mismatched fixed-USD session cannot mount card fields", async () => {
+  const oldFetch = global.fetch, oldWindow = global.window;
+  const quote = { quoteId: "quote-a", workspaceId: "workspace-a", packs: 1, currentPacks: 0, totalPacks: 1, totalBytes: 25e9, totalFiles: 1000,
+    currency: "usd", monthlyCents: 500, existingMonthlyCents: 0, amountDueTodayCents: 500, renewalDate: "2099-02-12T00:00:00Z", expiresAt: "2099-01-12T00:00:00Z", cancellationEffect: "Retain files", checkoutTerms: "Recurring", termsVersion: "storage-capacity-v1" };
+  const validSession = { clientSecret: "pi_synthetic_secret_private", publishableKey: "pk_test_synthetic", amountCents: 500, currency: "usd", renewalDate: quote.renewalDate };
+  global.window = { location: { assign() { throw new Error("Invoice redirect is forbidden"); } } };
+  try {
+    for (const changed of [{ amountCents: 530 }, { currency: "eur" }, { renewalDate: "2099-03-12T00:00:00Z" }, { publishableKey: "sk_test_forbidden" }, { clientSecret: "cs_forbidden_secret" }, { url: "https://invoice.stripe.com/i/forbidden", clientSecret: undefined }]) {
+      let requests = 0;
+      global.fetch = async endpoint => { requests++; return { ok: true, json: async () => endpoint.endsWith("quote") ? quote : { ...validSession, ...changed } }; };
+      const fixture = interactionFixture("components/storage-capacity/CapacityPurchase.tsx", "CapacityPurchase", { workspaceId: "workspace-a", workspaceName: "Synthetic A", currentPacks: 0, billing });
+      button(fixture.render(), "Buy capacity").props.onClick();
+      enterBillingAddress(fixture);
+      await reviewPurchase(fixture);
+      const tree = fixture.render();
+      assert.equal(nodes(tree).filter(node => node.type === paymentComponent.CapacityPayment).length, 0);
+      await button(tree, "Continue to secure payment").props.onClick();
+      assert.equal(requests, 1);
+      nodes(tree).find(node => node.type === "input" && node.props.type === "checkbox").props.onChange({ target: { checked: true } });
+      await button(fixture.render(), "Continue to secure payment").props.onClick();
+      assert.match(text(fixture.render()), /exact USD payment could not be verified/);
+      assert.equal(nodes(fixture.render()).filter(node => node.type === paymentComponent.CapacityPayment).length, 0);
+    }
+  } finally { global.fetch = oldFetch; global.window = oldWindow; }
+});
+
+test("Stripe card form blocks duplicate confirmation during authentication, uses a clean workspace-bound return, and never grants capacity locally", async () => {
+  const oldWindow = global.window;
+  global.window = { location: { origin: "https://vaeroex.example" } };
+  const calls = [];
+  let finish;
+  const elements = {};
+  const StripeFields = () => null;
+  const fixture = interactionFixture("components/storage-capacity/CapacityPayment.tsx", "CapacityPaymentForm", { amountCents: 1000, workspaceId: "workspace-a", expiresAt: "2099-01-01T00:00:00Z" }, {
+    "@stripe/react-stripe-js": { PaymentElement: StripeFields, useElements: () => elements, useStripe: () => ({ confirmPayment(input) { calls.push(input); return new Promise(resolve => { finish = resolve; }); } }) },
+    "@stripe/stripe-js/pure": { loadStripe: async () => null }
+  });
+  try {
+    assert.equal(button(fixture.render(), "Pay $10.00 USD and subscribe").props.disabled, true);
+    nodes(fixture.render()).find(node => node.type === StripeFields).props.onReady();
+    const submit = () => nodes(fixture.render()).find(node => node.type === "form").props.onSubmit({ preventDefault() {} });
+    const first = submit();
+    await submit();
+    assert.equal(calls.length, 1, "authentication or pending confirmation cannot submit twice");
+    assert.deepEqual(calls[0], { elements, confirmParams: { return_url: "https://vaeroex.example/app/settings/storage/payment-return?workspaceId=workspace-a" }, redirect: "if_required" });
+    finish({ paymentIntent: { status: "succeeded" } }); await first;
+    assert.match(text(fixture.render()), /updates only after the server receives confirmed payment/);
+    assert.equal(nodes(fixture.render()).filter(node => node.type === "form").length, 0);
+  } finally { global.window = oldWindow; }
+});
+
+test("declines allow only an explicit retry, while interrupted or unknown payment responses block resubmission", async () => {
+  const oldWindow = global.window;
+  global.window = { location: { origin: "https://vaeroex.example" } };
+  try {
+    for (const response of [{ error: { type: "card_error", message: "Your card was declined." } }, { error: { type: "api_connection_error" } }, "interrupted"]) {
+      const StripeFields = () => null;
+      let calls = 0;
+      const fixture = interactionFixture("components/storage-capacity/CapacityPayment.tsx", "CapacityPaymentForm", { amountCents: 500, workspaceId: "workspace-a", expiresAt: "2099-01-01T00:00:00Z" }, {
+        "@stripe/react-stripe-js": { PaymentElement: StripeFields, useElements: () => ({}), useStripe: () => ({ async confirmPayment() { calls++; if (response === "interrupted") throw new Error("network"); return response; } }) },
+        "@stripe/stripe-js/pure": { loadStripe: async () => null }
+      });
+      nodes(fixture.render()).find(node => node.type === StripeFields).props.onReady();
+      const submit = () => nodes(fixture.render()).find(node => node.type === "form").props.onSubmit({ preventDefault() {} });
+      await submit();
+      assert.equal(calls, 1);
+      if (response.error?.type === "card_error") {
+        assert.match(text(fixture.render()), /card was declined/);
+        assert.equal(button(fixture.render(), "Pay $5.00 USD and subscribe").props.disabled, false);
+        await submit(); assert.equal(calls, 2);
+      } else {
+        assert.equal(button(fixture.render(), "Pay $5.00 USD and subscribe").props.disabled, true);
+        await submit(); assert.equal(calls, 1);
+      }
+    }
+  } finally { global.window = oldWindow; }
+});
+
+test("payment return strips provider credentials, ignores claimed payment status, and preserves only a validated workspace hint", () => {
+  const { GET } = load("app/app/settings/storage/payment-return/route.ts");
+  const workspaceId = "11111111-1111-4111-8111-111111111111";
+  const url = new URL(`https://vaeroex.example/app/settings/storage/payment-return?workspaceId=${workspaceId}&payment_intent=pi_synthetic&payment_intent_client_secret=pi_synthetic_secret_private&redirect_status=succeeded&redirect=https://attacker.invalid`);
+  const result = GET({ url: url.href, nextUrl: url });
+  assert.equal(result.status, 303);
+  assert.equal(result.headers.get("location"), `/app/settings/storage?checkout=complete&returnWorkspaceId=${workspaceId}`);
+  assert.equal(result.headers.get("cache-control"), "no-store");
+  assert.equal(result.headers.get("referrer-policy"), "no-referrer");
+  assert.equal(GET({ url: "http://0.0.0.0:3100/app/settings/storage/payment-return", nextUrl: url }).headers.get("location"), result.headers.get("location"), "an internal server bind host cannot change the browser's return origin");
+});
+
+test("effective Next headers preserve no-referrer on payment and signed-download redirects after global defaults", async () => {
+  const { pathToFileURL } = require("node:url");
+  const { getPathMatch } = require("next/dist/shared/lib/router/utils/path-match");
+  const { default: config } = await import(pathToFileURL(path.join(root, "next.config.mjs")).href);
+  const rules = await config.headers();
+  const effectiveHeaders = pathname => {
+    const headers = new Headers();
+    for (const rule of rules) {
+      if (getPathMatch(rule.source)(pathname) !== false) {
+        for (const { key, value } of rule.headers) headers.set(key, value);
+      }
+    }
+    return headers;
+  };
+  for (const pathname of ["/app/settings/storage/payment-return", "/api/storage-capacity/download"]) {
+    for (const variant of [pathname, `${pathname}/`, pathname.toUpperCase()]) {
+      const headers = effectiveHeaders(variant);
+      assert.equal(headers.get("referrer-policy"), "no-referrer", variant);
+      assert.equal(headers.get("cache-control"), "no-store", variant);
+      assert.equal(headers.get("x-content-type-options"), "nosniff", "global security headers remain effective");
+    }
+  }
+  for (const pathname of ["/app/settings/storage", "/app/settings/storage/payment-return/other", "/api/storage-capacity/usage", "/api/storage-capacity/download/other"]) {
+    assert.equal(effectiveHeaders(pathname).get("referrer-policy"), "strict-origin-when-cross-origin", "exception is limited to the two credential redirects");
+  }
+});
+
+test("failed renewal recovery reviews only an existing invoice, requires consent, and never restarts canceled renewals or buys packs", async () => {
+  const oldFetch = global.fetch;
+  const calls = [];
+  const quote = { subscriptionId: "sub-failed", invoiceId: "in-renewal", packs: 2, amountDueTodayCents: 1000, currency: "usd", taxIncludedCents: 100,
+    periodStart: "2099-01-01T00:00:00Z", periodEnd: "2099-02-01T00:00:00Z", renewalDate: "2099-02-01T00:00:00Z", cancelAtPeriodEnd: true, cancellationEffect: "No future renewal. Existing files retained." };
+  const session = { clientSecret: "pi_synthetic_secret_private", publishableKey: "pk_test_synthetic", amountCents: 1000, currency: "usd", renewalDate: quote.renewalDate };
+  global.fetch = async (url, options) => { const body = JSON.parse(options.body); calls.push({ url, body }); return { ok: true, json: async () => body.acceptedTerms ? session : quote }; };
+  try {
+    const fixture = interactionFixture("components/storage-capacity/CapacityRecovery.tsx", "CapacityRecovery", { workspaceId: "workspace-a", workspaceName: "Synthetic A", subscriptionId: "sub-failed" });
+    await button(fixture.render(), "Resolve payment").props.onClick();
+    let tree = fixture.render();
+    assert.match(text(tree), /failed renewal for 2 existing packs/);
+    assert.match(text(tree), /\$10.00 USD, including \$1.00 tax/);
+    assert.match(text(tree), /Invoice capacity period/);
+    assert.match(text(tree), /No further renewal scheduled/);
+    assert.match(text(tree), /does not buy more packs or restart canceled renewals/);
+    assert.equal(button(tree, "Continue to invoice payment").props.disabled, true);
+    await button(tree, "Continue to invoice payment").props.onClick();
+    assert.equal(calls.length, 1);
+    nodes(tree).find(node => node.type === "input" && node.props.type === "checkbox").props.onChange({ target: { checked: true } });
+    await button(fixture.render(), "Continue to invoice payment").props.onClick();
+    assert.deepEqual(calls, [
+      { url: "/api/storage/capacity/recovery", body: { workspaceId: "workspace-a", subscriptionId: "sub-failed" } },
+      { url: "/api/storage/capacity/recovery", body: { workspaceId: "workspace-a", subscriptionId: "sub-failed", invoiceId: "in-renewal", acceptedTerms: true } }
+    ]);
+    tree = fixture.render();
+    const payment = nodes(tree).find(node => node.type === paymentComponent.CapacityPayment);
+    assert.equal(payment.props.isRecovery, true);
+    assert.equal(payment.props.willRenew, false);
+    assert.equal(payment.props.expiresAt, quote.periodEnd);
+  } finally { global.fetch = oldFetch; }
 });
 
 test("permanent deletion is explicitly confirmed before a workspace-bound mutation", async () => {
@@ -305,6 +512,40 @@ test("refunded renewable packs reserve purchase slots, and canceling them does n
     assert.equal(calls[0].subscriptionId, "refunded");
     assert.match(text(fixture.render()), /This purchase has no current paid capacity/);
   } finally { global.fetch = oldFetch; global.window = oldWindow; }
+});
+
+test("committed purchase choices count a paid canceled subscription once and exclude canceled fully refunded packs", () => {
+  const fixture = interactionFixture("components/storage-capacity/CapacityPurchase.tsx", "CapacityPurchase", {
+    workspaceId: "workspace-a", workspaceName: "Synthetic A", currentPacks: 1,
+    billing: { ...billing, committedPacks: 1, subscriptions: [
+      { id: "paid-canceled", packs: 1, status: "active", paidThrough: "2099-11-12T00:00:00Z", cancelAtPeriodEnd: true, monthlyCents: 500 },
+      { id: "refunded-canceled", packs: 2, status: "active", paidThrough: null, cancelAtPeriodEnd: true, monthlyCents: 1000 },
+    ] },
+  });
+  button(fixture.render(), "Buy capacity").props.onClick();
+  const tree = fixture.render();
+  const choices = nodes(tree).filter(node => node.type === "option");
+  assert.deepEqual(choices.map(node => node.props.value), [1, 2, 3, 4, 5, 6, 7, 8, 9]);
+  assert.doesNotMatch(text(tree), /3 packs are committed/);
+  assert.match(text(tree), /No current paid capacity/);
+  assert.equal(nodes(tree).filter(node => node.type === "button" && text(node) === "Cancel renewal").length, 0);
+});
+
+test("disputed paid periods reserve purchase slots without promising that canceling renewal frees those slots", () => {
+  const fixture = interactionFixture("components/storage-capacity/CapacityPurchase.tsx", "CapacityPurchase", {
+    workspaceId: "workspace-a", workspaceName: "Synthetic A", currentPacks: 0,
+    billing: { ...billing, committedPacks: 2, subscriptions: [
+      { id: "disputed-canceled", packs: 2, status: "active", paidThrough: null, cancelAtPeriodEnd: true, monthlyCents: 1000 },
+    ] },
+  });
+  button(fixture.render(), "Buy capacity").props.onClick();
+  const tree = fixture.render();
+  assert.equal(nodes(tree).filter(node => node.type === "option").length, 8);
+  assert.match(text(tree), /2 packs are committed/);
+  assert.match(text(tree), /Each subscription counts once/);
+  assert.match(text(tree), /Disputed periods also reserve their packs until the period ends/);
+  assert.match(text(tree), /only when no other qualifying paid period remains/);
+  assert.doesNotMatch(text(tree), /Manage those renewals below before buying more/);
 });
 
 test("Trash loads the API's first page, exposes every page, and disables navigation at the boundaries", async () => {

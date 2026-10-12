@@ -1,13 +1,14 @@
 import "server-only";
 
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { getAppUrl } from "@/lib/supabase/config";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { stripeObjectId, type StripeEvent } from "@/lib/stripe/billing";
 import { StorageAccessError } from "@/lib/storage-capacity/access";
 import { capacityAllowance, CAPACITY_PACK_MONTHLY_CENTS, MAX_SELF_SERVE_PACKS } from "@/lib/storage-capacity/policy";
-import type { CapacityQuote, WorkspaceCapacityBilling } from "@/lib/storage-capacity/billing-contracts";
+import type { CapacityBillingAddress, CapacityPaymentSession, CapacityQuote, CapacityRecoveryQuote, WorkspaceCapacityBilling } from "@/lib/storage-capacity/billing-contracts";
+import { capacityBillingAddressSchema } from "@/lib/storage-capacity/billing-address";
+import { enforceRateLimit, rateLimitMessage } from "@/lib/security/rate-limit";
 
 export const CAPACITY_TERMS_VERSION = "storage-capacity-v1";
 const PRODUCT = "workspace_storage_capacity";
@@ -18,13 +19,16 @@ type RpcClient = { rpc(name: string, args: Record<string, unknown>): PromiseLike
 type Intent = {
   id:string;workspace_id:string;actor_id:string;packs:number;current_packs:number;stripe_price_id:string;
   livemode:boolean;terms_version:string;state:string;stripe_session_id:string|null;stripe_customer_id:string|null;
-  expires_at:string;created_at:string;pricing_mode?:"full_month"|"fixed_anchor";renewal_at?:string|null;quoted_cents?:number|null;
+  expires_at:string;created_at:string;pricing_mode?:"full_month"|"fixed_anchor"|"invoice_monthly";renewal_at?:string|null;quoted_cents?:number|null;
+  stripe_initial_invoice_id?:string|null;stripe_subscription_id?:string|null;billing_address_hash?:string|null;
+  terms_accepted_at?:string|null;
 };
 type Price = {id:string;active:boolean;livemode:boolean;currency:string;unit_amount:number;type:string;recurring?:{interval:string;interval_count:number;usage_type:string};tax_behavior?:string;billing_scheme:string};
 type Session = {id:string;url?:string;status:string;payment_status:string;expires_at:number;amount_total:number;currency:string;customer:unknown;subscription:unknown;client_reference_id:string;metadata?:Record<string,string>;livemode:boolean};
-type Subscription = {id:string;customer:unknown;metadata?:Record<string,string>;status:string;livemode:boolean;cancel_at_period_end:boolean;ended_at:number|null;billing_cycle_anchor:number;items:{data:Array<{quantity:number;price:Price}>};latest_invoice:unknown};
+type Subscription = {id:string;customer:unknown;metadata?:Record<string,string>;status:string;livemode:boolean;cancel_at_period_end:boolean;ended_at:number|null;billing_cycle_anchor:number;current_period_start:number;current_period_end:number;created:number;automatic_tax?:{enabled:boolean};payment_settings?:{save_default_payment_method:string};items:{data:Array<{quantity:number;price:Price}>};latest_invoice:unknown};
 type Charge = {id:string;invoice:unknown;paid:boolean;amount:number;amount_refunded:number;disputed:boolean;currency:string;customer:unknown};
-type Invoice = {id:string;customer:unknown;subscription:unknown;billing_reason:string;status:string;paid:boolean;currency:string;amount_paid:number;amount_due:number;charge:unknown;lines:{has_more:boolean;data:Array<{type:string;subscription:unknown;price?:{id:string};quantity:number;amount:number;proration:boolean;period:{start:number;end:number}}>}};
+type Invoice = {id:string;customer:unknown;subscription:unknown;billing_reason:string;status:string;paid:boolean;currency:string;amount_paid:number;amount_due:number;charge:unknown;payment_intent?:unknown;total?:number;tax?:number;automatic_tax?:{enabled:boolean;status:string|null};auto_advance?:boolean;lines:{has_more:boolean;data:Array<{type:string;subscription:unknown;price?:{id:string;tax_behavior?:string};quantity:number;amount:number;proration:boolean;period:{start:number;end:number}}>}};
+type PaymentIntent = {id:string;client_secret:string|null;customer:unknown;invoice:unknown;amount:number;currency:string;livemode:boolean;status:string;setup_future_usage:string|null;payment_method_types:string[]};
 type PaidPeriod = {id:string;packs:number;period_start:string;period_end:string;paid_cents:number;refunded_cents:number;disputed:boolean;initial_period:boolean};
 
 export function capacityBillingMode(): WorkspaceCapacityBilling["mode"] {
@@ -33,6 +37,7 @@ export function capacityBillingMode(): WorkspaceCapacityBilling["mode"] {
 }
 export function capacityPurchasesEnabled() {
   return Boolean(process.env.STRIPE_PRICE_WORKSPACE_CAPACITY_MONTHLY && process.env.NEXT_PUBLIC_APP_URL
+    && process.env.STRIPE_PUBLISHABLE_KEY?.startsWith(`pk_${capacityBillingMode()}_`)
     && (capacityBillingMode() === "test" || (capacityBillingMode() === "live"
       && process.env.WORKSPACE_CAPACITY_PURCHASES_APPROVED_TERMS === CAPACITY_TERMS_VERSION)));
 }
@@ -55,16 +60,24 @@ async function stripe<T>(path:string,params?:URLSearchParams,idempotencyKey?:str
       ...(params?{"Content-Type":"application/x-www-form-urlencoded"}:{}),...(idempotencyKey?{"Idempotency-Key":idempotencyKey}:{})},
     ...(params?{body:params.toString()}:{})
   });
-  if(!response.ok) throw new StorageAccessError(503,"Stripe could not confirm capacity billing. Please try again.");
+  if(!response.ok) {
+    const error=await response.json().catch(()=>null) as {error?:{code?:string}}|null;
+    if(error?.error?.code==="customer_tax_location_invalid")throw new StorageAccessError(400,"Stripe could not validate the billing address. Check the address and postal code before continuing.");
+    throw new StorageAccessError(503,"Stripe could not confirm capacity billing. Please try again.");
+  }
   return await response.json() as T;
 }
 function requirePurchasesEnabled() {
   if(!capacityPurchasesEnabled()) throw new StorageAccessError(503,"Capacity purchases are awaiting release approval. Existing capacity and files remain available.");
 }
+async function limitPaymentPreparation(workspaceId:string,actorId:string) {
+  const limit=await enforceRateLimit({action:"storage.capacity.payment",limit:20,windowSeconds:600,workspaceId,userId:actorId,strict:true});
+  if(!limit.allowed)throw new StorageAccessError(429,rateLimitMessage(limit));
+}
 export function validateCapacityPrice(price:Price) {
   if(!price.active || price.currency!=="usd" || price.unit_amount!==CAPACITY_PACK_MONTHLY_CENTS || price.type!=="recurring"
     || price.recurring?.interval!=="month" || price.recurring.interval_count!==1 || price.recurring.usage_type!=="licensed"
-    || price.billing_scheme!=="per_unit" || price.livemode!==(capacityBillingMode()==="live")) {
+    || price.billing_scheme!=="per_unit" || price.tax_behavior!=="inclusive" || price.livemode!==(capacityBillingMode()==="live")) {
     throw new StorageAccessError(503,"The capacity price does not match the approved $5 monthly pack.");
   }
 }
@@ -74,36 +87,41 @@ async function verifiedPrice() {
   const price=await stripe<Price>(`/prices/${encodeURIComponent(id)}`);
   validateCapacityPrice(price);return price;
 }
-async function verifyCapacityCustomer(customerId:string|null) {
-  if(!customerId)return;
-  const customer=await stripe<{balance:number;discount:unknown;deleted?:boolean}>(`/customers/${encodeURIComponent(customerId)}`);
-  if(customer.deleted || customer.balance!==0 || customer.discount) {
-    throw new StorageAccessError(409,"This workspace's capacity billing account needs a billing review before another purchase. No payment has been taken.");
-  }
-}
 export function nextMonthlyDate(value:string) {
   const date=new Date(value); const day=date.getUTCDate();
   date.setUTCDate(1);date.setUTCMonth(date.getUTCMonth()+1);
   const lastDay=new Date(Date.UTC(date.getUTCFullYear(),date.getUTCMonth()+1,0)).getUTCDate();
   date.setUTCDate(Math.min(day,lastDay));return date.toISOString();
 }
-function quoteFromIntent(intent:Intent,existingMonthlyCents:number):CapacityQuote {
+function quoteFromIntent(intent:Intent,existingMonthlyCents:number,invoice:Invoice):CapacityQuote {
   const allowance=capacityAllowance(intent.current_packs+intent.packs);
   return {quoteId:intent.id,workspaceId:intent.workspace_id,packs:intent.packs,currentPacks:intent.current_packs,
     totalPacks:intent.current_packs+intent.packs,totalBytes:allowance.bytes,totalFiles:allowance.files,currency:"usd",
     monthlyCents:intent.packs*CAPACITY_PACK_MONTHLY_CENTS,existingMonthlyCents,
-    amountDueTodayCents:intent.quoted_cents ?? intent.packs*CAPACITY_PACK_MONTHLY_CENTS,renewalDate:intent.renewal_at || nextMonthlyDate(new Date().toISOString()),
+    amountDueTodayCents:invoice.amount_due,taxIncludedCents:invoice.tax||0,renewalDate:intent.renewal_at!,
     expiresAt:intent.expires_at,termsVersion:intent.terms_version,
     cancellationEffect:"Cancel renewal at any time. Purchased capacity ends at the end of its paid period. Files are retained; only new uploads exceeding the remaining allowance are blocked.",
-    checkoutTerms:"Each purchase is a separate monthly subscription renewing on the date shown. The first period may be prorated; Stripe shows the current amount before payment, up to the amount reviewed here. Subsequent periods cost $5 USD per pack per month. No automatic additional packs or usage overage charges. Partial refunds keep capacity; full refunds and active or lost payment disputes withdraw the affected paid period. A won dispute or closed inquiry restores any remaining eligible paid period."};
+    checkoutTerms:"Each purchase is a separate monthly subscription: $5 USD per pack for the first month and each monthly renewal, with applicable tax included. There is no proration or added tax at payment. The first renewal is on the exact date shown. By confirming, you authorize Stripe to save your payment method for these monthly renewals. No automatic additional packs or usage overage charges. Partial refunds keep capacity; full refunds and active or lost payment disputes withdraw the affected paid period. A won dispute or closed inquiry restores any remaining eligible paid period."};
 }
 
 async function state(admin:Admin,workspaceId:string,actorId:string) {
-  return rpc<{committedPacks:number;subscriptions:WorkspaceCapacityBilling["subscriptions"];pendingIntents:Array<{id:string;sessionId:string|null;packs:number;state:string}>}>(admin,"workspace_capacity_state_v1",{p_workspace_id:workspaceId,p_actor_id:actorId});
+  return rpc<{committedPacks:number;subscriptions:WorkspaceCapacityBilling["subscriptions"];pendingIntents:Array<{id:string;sessionId:string|null;packs:number;state:string;pricingMode?:string;subscriptionId?:string|null;invoiceId?:string|null;expiresAt?:string;addressHash?:string|null}>}>(admin,"workspace_capacity_state_v1",{p_workspace_id:workspaceId,p_actor_id:actorId});
 }
-async function recoverExpiredCheckouts(admin:Admin,workspaceId:string,actorId:string,requestedPacks:number) {
+async function recoverExpiredCheckouts(admin:Admin,workspaceId:string,actorId:string,requestedPacks:number,addressHash:string) {
   const current=await state(admin,workspaceId,actorId);
   for(const pending of current.pendingIntents) {
+    if(pending.pricingMode==="invoice_monthly") {
+      if(!pending.invoiceId)continue;
+      let invoice=await stripe<Invoice>(`/invoices/${encodeURIComponent(pending.invoiceId)}`);
+      if(invoice.status==="open" && pending.state==="quoted" && (pending.packs!==requestedPacks || pending.addressHash!==addressHash)) {
+        // Stripe refuses to void a paid invoice, making the payment/expiry race safe.
+        try { invoice=await stripe<Invoice>(`/invoices/${encodeURIComponent(invoice.id)}/void`,new URLSearchParams(),`capacity-void:${invoice.id}`); }
+        catch { invoice=await stripe<Invoice>(`/invoices/${encodeURIComponent(invoice.id)}`); if(invoice.status!=="paid" && invoice.status!=="void")throw new StorageAccessError(409,"The previous capacity invoice is still open. Finish it before reviewing another purchase."); }
+      }
+      if(invoice.status==="void")await rpc(admin,"workspace_capacity_expire_invoice_v1",{p_intent_id:pending.id,p_invoice_id:invoice.id});
+      else if(invoice.status==="paid" && pending.subscriptionId)await syncCapacitySubscription(admin,pending.subscriptionId,`reconcile:${randomUUID()}`,"invoice.reconciled",invoice.id);
+      continue;
+    }
     if(!pending.sessionId) continue;
     let session=await stripe<Session>(`/checkout/sessions/${encodeURIComponent(pending.sessionId)}`);
     if(session.status==="open" && pending.state==="quoted" && pending.packs!==requestedPacks) {
@@ -123,79 +141,163 @@ export async function getWorkspaceCapacityBilling(workspaceId:string,actorId?:st
   const result=await state(adminClient(),workspaceId,actorId);
   return {purchasesEnabled:capacityPurchasesEnabled(),mode:capacityBillingMode(),maxPacks:MAX_SELF_SERVE_PACKS,committedPacks:result.committedPacks,subscriptions:result.subscriptions};
 }
-export async function quoteWorkspaceCapacity(workspaceId:string,actorId:string,packs:number) {
+export async function quoteWorkspaceCapacity(workspaceId:string,actorId:string,packs:number,billingAddress:CapacityBillingAddress) {
   requirePurchasesEnabled();
   if(!Number.isSafeInteger(packs) || packs<1 || packs>MAX_SELF_SERVE_PACKS) throw new StorageAccessError(400,"Choose between 1 and 10 capacity packs.");
-  const admin=adminClient();await recoverExpiredCheckouts(admin,workspaceId,actorId,packs);
+  const parsed=capacityBillingAddressSchema.safeParse(billingAddress);
+  if(!parsed.success)throw new StorageAccessError(400,"Enter a complete, valid billing address before reviewing capacity.");
+  await limitPaymentPreparation(workspaceId,actorId);
+  const address=parsed.data;
+  const addressHash=createHash("sha256").update(JSON.stringify([address.line1,address.line2||"",address.city,address.state||"",address.postalCode||"",address.country])).digest("hex");
+  const admin=adminClient();await recoverExpiredCheckouts(admin,workspaceId,actorId,packs,addressHash);
   const price=await verifiedPrice();
-  const intent=await rpc<Intent>(admin,"workspace_capacity_quote_v1",{p_workspace_id:workspaceId,p_actor_id:actorId,p_packs:packs,p_price_id:price.id,p_livemode:price.livemode,p_terms_version:CAPACITY_TERMS_VERSION});
-  await verifyCapacityCustomer(intent.stripe_customer_id);
-  // Preparing an unpaid Checkout provides Stripe's actual first-period amount.
-  // The payment URL is withheld until the owner accepts this exact review.
-  await prepareCheckout(admin,intent,price,actorId);
+  const intent=await rpc<Intent>(admin,"workspace_capacity_invoice_quote_v1",{p_workspace_id:workspaceId,p_actor_id:actorId,p_packs:packs,p_price_id:price.id,p_livemode:price.livemode,p_terms_version:CAPACITY_TERMS_VERSION,p_address_hash:addressHash});
+  const invoice=await prepareCapacityInvoice(admin,intent,price,actorId,address);
   const current=await state(admin,workspaceId,actorId);
   // Paid capacity can outlast a canceled renewal, while a failed/refunded
   // subscription may still renew. Price the recurring commitments separately.
   const existingMonthlyCents=current.subscriptions
     .filter(subscription=>!subscription.cancelAtPeriodEnd && !["canceled","incomplete_expired"].includes(subscription.status))
     .reduce((total,subscription)=>total+subscription.monthlyCents,0);
-  return quoteFromIntent(intent,existingMonthlyCents);
+  return quoteFromIntent(intent,existingMonthlyCents,invoice);
 }
-export async function checkoutWorkspaceCapacity(workspaceId:string,actorId:string,email:string,quoteId:string) {
-  requirePurchasesEnabled();const admin=adminClient();const price=await verifiedPrice();
+export async function checkoutWorkspaceCapacity(workspaceId:string,actorId:string,_email:string,quoteId:string):Promise<CapacityPaymentSession> {
+  requirePurchasesEnabled();await limitPaymentPreparation(workspaceId,actorId);const admin=adminClient();const price=await verifiedPrice();
   const intent=await rpc<Intent>(admin,"workspace_capacity_confirm_v1",{p_workspace_id:workspaceId,p_actor_id:actorId,p_intent_id:quoteId});
   if(intent.stripe_price_id!==price.id || intent.livemode!==price.livemode) throw new StorageAccessError(409,"Capacity pricing changed. Review a new quote.");
-  await verifyCapacityCustomer(intent.stripe_customer_id);
-  if(intent.stripe_session_id) {
-    const existing=await stripe<Session>(`/checkout/sessions/${encodeURIComponent(intent.stripe_session_id)}`);
-    if(existing.status==="open" && existing.url) return {url:existing.url};
-    if(existing.status==="complete") return {url:`${getAppUrl()}/app/settings/storage?checkout=complete`};
-    await rpc(admin,"workspace_capacity_expire_v1",{p_intent_id:intent.id,p_session_id:existing.id});
-    throw new StorageAccessError(409,"Checkout expired. Review a new quote.");
+  if(intent.pricing_mode==="invoice_monthly") {
+    if(!intent.stripe_initial_invoice_id || !intent.stripe_subscription_id || !intent.terms_accepted_at)throw new StorageAccessError(409,"Review and confirm this workspace's capacity invoice before paying.");
+    const [invoice,subscription]=await Promise.all([
+      stripe<Invoice>(`/invoices/${encodeURIComponent(intent.stripe_initial_invoice_id)}`),
+      stripe<Subscription>(`/subscriptions/${encodeURIComponent(intent.stripe_subscription_id)}`)
+    ]);
+    verifyUnpaidCapacityInvoice(intent,subscription,invoice);
+    const paymentIntentId=stripeObjectId(invoice.payment_intent);
+    if(!paymentIntentId)throw new StorageAccessError(503,"Stripe did not return the reviewed capacity payment.");
+    const payment=await stripe<PaymentIntent>(`/payment_intents/${encodeURIComponent(paymentIntentId)}`);
+    if(payment.invoice!==invoice.id || stripeObjectId(payment.customer)!==intent.stripe_customer_id
+      || payment.amount!==intent.packs*500 || payment.currency!=="usd" || payment.livemode!==intent.livemode
+      || !payment.client_secret || !["requires_payment_method","requires_confirmation","requires_action"].includes(payment.status)
+      || payment.payment_method_types.length!==1 || payment.payment_method_types[0]!=="card" || payment.setup_future_usage!=="off_session") {
+      throw new StorageAccessError(409,"The reviewed USD payment cannot be confirmed. Refresh usage before attempting another payment.");
+    }
+    return {clientSecret:payment.client_secret,publishableKey:process.env.STRIPE_PUBLISHABLE_KEY!,amountCents:payment.amount,currency:"usd",renewalDate:intent.renewal_at!};
   }
-  const session=await prepareCheckout(admin,intent,price,actorId,email);
-  return {url:session.url};
+  throw new StorageAccessError(409,"This older payment review is no longer available. Review a new exact-price capacity purchase.");
 }
-async function prepareCheckout(admin:Admin,intent:Intent,price:Price,actorId:string,email?:string) {
-  if(intent.stripe_session_id) {
-    const existing=await stripe<Session>(`/checkout/sessions/${encodeURIComponent(intent.stripe_session_id)}`);
-    if(existing.status!=="open" || !existing.url)throw new StorageAccessError(409,"This checkout is no longer open. Refresh usage before buying capacity.");
-    await recordQuoteAmount(admin,intent,actorId,existing);return existing;
+
+export async function recoverWorkspaceCapacityPayment(workspaceId:string,actorId:string,subscriptionId:string,acceptedInvoiceId?:string):Promise<CapacityRecoveryQuote|CapacityPaymentSession> {
+  // Recovery remains available when new purchases are disabled for a rollout.
+  if(!process.env.STRIPE_PUBLISHABLE_KEY?.startsWith(`pk_${capacityBillingMode()}_`))throw new StorageAccessError(503,"Capacity payment recovery is temporarily unavailable.");
+  await limitPaymentPreparation(workspaceId,actorId);
+  const admin=adminClient();const current=await state(admin,workspaceId,actorId);
+  if(!current.subscriptions.some(item=>item.id===subscriptionId))throw new StorageAccessError(403,"This capacity subscription does not belong to this workspace.");
+  const subscription=await stripe<Subscription>(`/subscriptions/${encodeURIComponent(subscriptionId)}`);
+  const intentId=subscription.metadata?.capacity_intent_id;
+  const intent=intentId?await rpc<Intent|null>(admin,"workspace_capacity_provider_intent_v1",{p_intent_id:intentId}):null;
+  if(!intent || intent.pricing_mode!=="invoice_monthly" || !intent.terms_accepted_at || intent.workspace_id!==workspaceId
+    || intent.stripe_subscription_id!==subscription.id || stripeObjectId(subscription.customer)!==intent.stripe_customer_id
+    || subscription.metadata?.workspace_id!==workspaceId || subscription.metadata?.product!==PRODUCT || subscription.livemode!==intent.livemode
+    || subscription.automatic_tax?.enabled!==true || subscription.payment_settings?.save_default_payment_method!=="on_subscription"
+    || !["past_due","unpaid"].includes(subscription.status) || subscription.ended_at
+    || subscription.items.data.length!==1 || subscription.items.data[0].price.id!==intent.stripe_price_id
+    || subscription.items.data[0].price.tax_behavior!=="inclusive" || subscription.items.data[0].quantity!==intent.packs) {
+    throw new StorageAccessError(409,"This subscription has no eligible overdue monthly payment. Refresh its billing status.");
   }
-  if(!email) {
-    const {data,error}=await admin.auth.admin.getUserById(actorId);
-    if(error || !data.user?.email || !data.user.email_confirmed_at)throw new StorageAccessError(403,"Verify your email before reviewing capacity checkout.");
-    email=data.user.email;
+  const invoiceId=stripeObjectId(subscription.latest_invoice);
+  if(!invoiceId || (acceptedInvoiceId && acceptedInvoiceId!==invoiceId))throw new StorageAccessError(409,"The overdue invoice changed. Review the current payment before continuing.");
+  const invoice=await stripe<Invoice>(`/invoices/${encodeURIComponent(invoiceId)}`);const line=invoice.lines.data[0];const now=Math.floor(Date.now()/1000);
+  if(invoice.status!=="open" || invoice.paid || invoice.amount_paid!==0 || invoice.billing_reason!=="subscription_cycle"
+    || stripeObjectId(invoice.subscription)!==subscription.id || stripeObjectId(invoice.customer)!==intent.stripe_customer_id
+    || invoice.currency!=="usd" || invoice.total!==intent.packs*500 || invoice.amount_due!==intent.packs*500
+    || invoice.automatic_tax?.enabled!==true || invoice.automatic_tax.status!=="complete" || invoice.lines.has_more || invoice.lines.data.length!==1
+    || !line || line.type!=="subscription" || stripeObjectId(line.subscription)!==subscription.id || line.price?.id!==intent.stripe_price_id
+    || line.price.tax_behavior!=="inclusive" || line.quantity!==intent.packs || line.proration || line.amount!==intent.packs*500
+    || line.period.start!==subscription.current_period_start || line.period.end!==subscription.current_period_end
+    || line.period.start>now || line.period.end<=now) {
+    throw new StorageAccessError(409,"There is no unpaid invoice for the current capacity period at the agreed price. Refresh its billing status.");
   }
-  const workspaceId=intent.workspace_id;
-  const params=new URLSearchParams({mode:"subscription",client_reference_id:intent.id,
-    "line_items[0][price]":price.id,"line_items[0][quantity]":String(intent.packs),"payment_method_types[0]":"card",
-    allow_promotion_codes:"false","automatic_tax[enabled]":"false","adaptive_pricing[enabled]":"false",
-    billing_address_collection:"auto",expires_at:String(Math.floor(Date.now()/1000)+1800),
-    success_url:`${getAppUrl()}/app/settings/storage?checkout=complete`,cancel_url:`${getAppUrl()}/app/settings/storage?checkout=cancelled`,
-    "custom_text[submit][message]":`First renewal: ${intent.renewal_at ? new Date(intent.renewal_at).toUTCString() : "one month after purchase"}. Then $${(intent.packs*5).toFixed(2)} USD monthly. Capacity applies only to this workspace. Cancel renewal at any time; existing files are retained. No automatic additional packs or usage overage charges.`,
-    "metadata[product]":PRODUCT,"metadata[capacity_intent_id]":intent.id,"metadata[workspace_id]":workspaceId,
-    "subscription_data[metadata][product]":PRODUCT,"subscription_data[metadata][capacity_intent_id]":intent.id,
-    "subscription_data[metadata][workspace_id]":workspaceId});
-  if(intent.pricing_mode==="fixed_anchor" && intent.renewal_at) {
-    params.set("subscription_data[billing_cycle_anchor]",String(Math.floor(new Date(intent.renewal_at).getTime()/1000)));
-    params.set("subscription_data[proration_behavior]","create_prorations");
+  const renewalDate=new Date(line.period.end*1000).toISOString();
+  if(!acceptedInvoiceId)return {subscriptionId,invoiceId,packs:intent.packs,amountDueTodayCents:invoice.amount_due,currency:"usd",taxIncludedCents:invoice.tax||0,
+    periodStart:new Date(line.period.start*1000).toISOString(),periodEnd:renewalDate,renewalDate,cancelAtPeriodEnd:subscription.cancel_at_period_end,
+    cancellationEffect:subscription.cancel_at_period_end?"Renewal is canceled. This payment covers only the period shown. Files remain retained afterward.":"This pays the existing overdue monthly invoice. The same packs renew monthly on the date shown. Cancel renewal at any time; retained files are kept."};
+  const paymentIntentId=stripeObjectId(invoice.payment_intent);
+  if(!paymentIntentId)throw new StorageAccessError(409,"The overdue payment is being updated. Refresh its billing status.");
+  let payment=await stripe<PaymentIntent>(`/payment_intents/${encodeURIComponent(paymentIntentId)}`);
+  if(stripeObjectId(payment.invoice)!==invoice.id || stripeObjectId(payment.customer)!==intent.stripe_customer_id
+    || payment.amount!==intent.packs*500 || payment.currency!=="usd" || payment.livemode!==intent.livemode
+    || !payment.client_secret || !["requires_payment_method","requires_confirmation","requires_action"].includes(payment.status)
+    || payment.payment_method_types.length!==1 || payment.payment_method_types[0]!=="card" || ![null,"off_session"].includes(payment.setup_future_usage)) {
+    throw new StorageAccessError(409,"The overdue USD payment cannot be confirmed. Refresh its billing status before paying again.");
   }
-  if(intent.stripe_customer_id)params.set("customer",intent.stripe_customer_id);else params.set("customer_email",email);
-  const session=await stripe<Session>("/checkout/sessions",params,`workspace-capacity:${intent.id}`);
-  if(!session.id || !session.url || session.client_reference_id!==intent.id) throw new StorageAccessError(503,"Stripe did not return a valid capacity checkout.");
-  await rpc(admin,"workspace_capacity_record_checkout_v1",{p_workspace_id:workspaceId,p_actor_id:actorId,p_intent_id:intent.id,
-    p_session_id:session.id,p_customer_id:stripeObjectId(session.customer)||"",p_expires_at:new Date(session.expires_at*1000).toISOString()});
-  intent.stripe_session_id=session.id;
-  await recordQuoteAmount(admin,intent,actorId,session);
-  return session;
+  // Stripe renewal attempts can omit setup_future_usage. After the owner's
+  // explicit recovery consent, prepare saving the replacement card without
+  // confirming or charging this existing invoice's PaymentIntent.
+  if(payment.setup_future_usage===null) {
+    payment=await stripe<PaymentIntent>(`/payment_intents/${encodeURIComponent(paymentIntentId)}`,new URLSearchParams({setup_future_usage:"off_session"}),`capacity-recovery-save:${invoice.id}`);
+    if(payment.setup_future_usage!=="off_session" || stripeObjectId(payment.invoice)!==invoice.id || stripeObjectId(payment.customer)!==intent.stripe_customer_id
+      || payment.amount!==intent.packs*500 || payment.currency!=="usd" || payment.livemode!==intent.livemode || !payment.client_secret
+      || !["requires_payment_method","requires_confirmation","requires_action"].includes(payment.status))throw new StorageAccessError(409,"The overdue payment changed. Refresh its billing status before paying again.");
+  }
+  return {clientSecret:payment.client_secret,publishableKey:process.env.STRIPE_PUBLISHABLE_KEY!,amountCents:payment.amount,currency:"usd",renewalDate};
 }
-async function recordQuoteAmount(admin:Admin,intent:Intent,actorId:string,session:Session) {
-  if(session.currency!=="usd" || !Number.isSafeInteger(session.amount_total) || session.amount_total<=0 || session.amount_total>intent.packs*500) {
-    throw new StorageAccessError(503,"Stripe did not return the expected capacity amount. No purchase has been confirmed.");
+function verifyUnpaidCapacityInvoice(intent:Intent,subscription:Subscription,invoice:Invoice) {
+  const line=invoice.lines.data[0];
+  if(subscription.id!==intent.stripe_subscription_id || stripeObjectId(subscription.customer)!==intent.stripe_customer_id
+    || subscription.metadata?.capacity_intent_id!==intent.id || subscription.metadata?.workspace_id!==intent.workspace_id
+    || subscription.metadata?.product!==PRODUCT || subscription.livemode!==intent.livemode
+    || subscription.status!=="incomplete" || subscription.automatic_tax?.enabled!==true
+    || subscription.payment_settings?.save_default_payment_method!=="on_subscription"
+    || subscription.items.data.length!==1 || subscription.items.data[0].price.id!==intent.stripe_price_id
+    || subscription.items.data[0].price.tax_behavior!=="inclusive" || subscription.items.data[0].quantity!==intent.packs
+    || subscription.current_period_end!==Math.floor(new Date(intent.renewal_at||"").getTime()/1000)
+    || invoice.id!==intent.stripe_initial_invoice_id || stripeObjectId(invoice.subscription)!==subscription.id
+    || stripeObjectId(invoice.customer)!==intent.stripe_customer_id || invoice.status!=="open" || invoice.paid
+    || invoice.auto_advance!==false || invoice.amount_paid!==0 || invoice.currency!=="usd"
+    || invoice.amount_due!==intent.packs*500 || invoice.total!==intent.packs*500
+    || invoice.automatic_tax?.enabled!==true || invoice.automatic_tax.status!=="complete"
+    || invoice.lines.has_more || invoice.lines.data.length!==1 || !line || line.type!=="subscription"
+    || stripeObjectId(line.subscription)!==subscription.id || line.price?.id!==intent.stripe_price_id
+    || line.quantity!==intent.packs || line.proration || line.amount!==intent.packs*500
+    || line.period.end!==subscription.current_period_end || line.period.start!==subscription.current_period_start) {
+    throw new StorageAccessError(409,"The exact capacity invoice, tax-inclusive price, or renewal changed. No payment has been authorized; review the purchase again.");
   }
-  await rpc(admin,"workspace_capacity_record_quote_price_v1",{p_workspace_id:intent.workspace_id,p_actor_id:actorId,p_intent_id:intent.id,p_quoted_cents:session.amount_total});
-  intent.quoted_cents=session.amount_total;intent.expires_at=new Date(session.expires_at*1000).toISOString();
+}
+async function prepareCapacityInvoice(admin:Admin,intent:Intent,price:Price,actorId:string,address:CapacityBillingAddress):Promise<Invoice> {
+  if(intent.stripe_initial_invoice_id && intent.stripe_subscription_id) {
+    const [invoice,subscription]=await Promise.all([
+      stripe<Invoice>(`/invoices/${encodeURIComponent(intent.stripe_initial_invoice_id)}`),
+      stripe<Subscription>(`/subscriptions/${encodeURIComponent(intent.stripe_subscription_id)}`)
+    ]);
+    verifyUnpaidCapacityInvoice(intent,subscription,invoice);return invoice;
+  }
+  const {data,error}=await admin.auth.admin.getUserById(actorId);
+  if(error || !data.user?.email || !data.user.email_confirmed_at)throw new StorageAccessError(403,"Verify your email before reviewing capacity.");
+  // A fresh customer per purchase has no saved card, balance or discount. Never
+  // reuse a previous subscription's default method while preparing a review.
+  const customer=await stripe<{id:string;balance:number;default_source:unknown;invoice_settings:{default_payment_method:unknown};discount:unknown}>("/customers",new URLSearchParams({
+    email:data.user.email,"address[line1]":address.line1,"address[line2]":address.line2||"","address[city]":address.city,
+    "address[state]":address.state||"","address[postal_code]":address.postalCode||"","address[country]":address.country,
+    "tax[validate_location]":"immediately","metadata[product]":PRODUCT,"metadata[workspace_id]":intent.workspace_id,"metadata[capacity_intent_id]":intent.id
+  }),`capacity-invoice-customer:${intent.id}`);
+  if(!customer.id || customer.balance!==0 || customer.default_source || customer.invoice_settings.default_payment_method || customer.discount) {
+    throw new StorageAccessError(409,"Capacity review requires a new unpaid billing account. No payment has been authorized.");
+  }
+  const subscription=await stripe<Subscription>("/subscriptions",new URLSearchParams({
+    customer:customer.id,"items[0][price]":price.id,"items[0][quantity]":String(intent.packs),payment_behavior:"default_incomplete",
+    proration_behavior:"none","automatic_tax[enabled]":"true","payment_settings[save_default_payment_method]":"on_subscription",
+    "payment_settings[payment_method_types][0]":"card","metadata[product]":PRODUCT,"metadata[workspace_id]":intent.workspace_id,"metadata[capacity_intent_id]":intent.id
+  }),`capacity-invoice-subscription:${intent.id}`);
+  const invoiceId=stripeObjectId(subscription.latest_invoice);
+  if(!invoiceId)throw new StorageAccessError(503,"Stripe did not produce a capacity invoice.");
+  const invoice=await stripe<Invoice>(`/invoices/${encodeURIComponent(invoiceId)}`);
+  intent.stripe_customer_id=customer.id;intent.stripe_subscription_id=subscription.id;intent.stripe_initial_invoice_id=invoice.id;
+  intent.renewal_at=new Date(subscription.current_period_end*1000).toISOString();
+  intent.expires_at=new Date((subscription.created+23*3600)*1000).toISOString();intent.quoted_cents=intent.packs*500;
+  verifyUnpaidCapacityInvoice(intent,subscription,invoice);
+  await rpc(admin,"workspace_capacity_record_invoice_v1",{p_workspace_id:intent.workspace_id,p_actor_id:actorId,p_intent_id:intent.id,
+    p_customer_id:customer.id,p_subscription_id:subscription.id,p_invoice_id:invoice.id,p_renewal_at:intent.renewal_at,p_expires_at:intent.expires_at,p_quoted_cents:intent.quoted_cents});
+  return invoice;
 }
 
 export function capacityInvoicePeriod(invoice:Invoice,subscription:Subscription,priceId:string,packs:number,charge:Charge|null,intent?:Intent):PaidPeriod|null {
@@ -206,6 +308,12 @@ export function capacityInvoicePeriod(invoice:Invoice,subscription:Subscription,
     || invoice.lines.has_more || invoice.lines.data.length!==1) throw new Error("Capacity invoice attribution or price is invalid.");
   const line=invoice.lines.data[0];
   const initialPeriod=Boolean(intent?.pricing_mode==="fixed_anchor" && invoice.billing_reason==="subscription_create" && line.proration);
+  if(intent?.pricing_mode==="invoice_monthly" && (invoice.automatic_tax?.enabled!==true || invoice.automatic_tax.status!=="complete"
+    || line.price?.tax_behavior!=="inclusive" || invoice.total!==packs*500 || invoice.amount_paid!==packs*500
+    || (invoice.billing_reason==="subscription_create" && (invoice.id!==intent.stripe_initial_invoice_id
+      || line.period.end!==Math.floor(new Date(intent.renewal_at||"").getTime()/1000))))) {
+    throw new Error("Capacity invoice must match the exact tax-inclusive monthly price and accepted renewal.");
+  }
   if((line.type!=="subscription" && !(initialPeriod && line.type==="invoiceitem")) || stripeObjectId(line.subscription)!==subscription.id || line.price?.id!==priceId || line.quantity!==packs
     || line.amount!==invoice.amount_paid || (!initialPeriod && (line.proration || invoice.amount_paid!==packs*500))
     || (initialPeriod && (invoice.amount_paid>(intent?.quoted_cents??0) || line.period.end!==Math.floor(new Date(intent?.renewal_at||"").getTime()/1000)))
@@ -227,12 +335,42 @@ async function syncCapacitySubscription(admin:Admin,subscriptionId:string,eventK
   const intentId=subscription.metadata.capacity_intent_id;
   if(!intentId || !/^[0-9a-f-]{36}$/i.test(intentId)) throw new Error("Capacity subscription has no trusted purchase intent.");
   const intent=await rpc<Intent|null>(admin,"workspace_capacity_provider_intent_v1",{p_intent_id:intentId});
-  if(!intent || !intent.stripe_session_id) throw new Error("Capacity Checkout attribution is pending.");
-  const session=await stripe<Session>(`/checkout/sessions/${encodeURIComponent(intent.stripe_session_id)}`);
-  if(session.client_reference_id!==intent.id || session.metadata?.capacity_intent_id!==intent.id || session.metadata.product!==PRODUCT
-    || session.status!=="complete" || stripeObjectId(session.subscription)!==subscription.id
-    || stripeObjectId(session.customer)!==stripeObjectId(subscription.customer) || session.livemode!==intent.livemode
-    || subscription.livemode!==intent.livemode || subscription.metadata.workspace_id!==intent.workspace_id
+  if(!intent)throw new Error("Capacity purchase attribution is pending.");
+  let purchaseReference:string;
+  if(intent.pricing_mode==="invoice_monthly") {
+    // Creating the unpaid invoice emits events before the owner accepts terms.
+    // Acknowledge those events without granting any capacity or base-plan access.
+    if(!intent.stripe_initial_invoice_id || !intent.stripe_subscription_id) {
+      if(subscription.status==="incomplete")return {workspace_id:intent.workspace_id,paid_packs:0};
+      throw new Error("Capacity invoice attribution is pending.");
+    }
+    purchaseReference=intent.stripe_initial_invoice_id;
+    if(intent.stripe_subscription_id!==subscription.id || intent.stripe_customer_id!==stripeObjectId(subscription.customer)
+      || subscription.automatic_tax?.enabled!==true || subscription.items.data[0]?.price.tax_behavior!=="inclusive") {
+      throw new Error("Capacity subscription does not match its reviewed tax-inclusive invoice.");
+    }
+    if(subscription.status==="incomplete")return {workspace_id:intent.workspace_id,paid_packs:0};
+    if(subscription.status==="incomplete_expired") {
+      const initial=await stripe<Invoice>(`/invoices/${encodeURIComponent(purchaseReference)}`);
+      if(initial.status!=="void")throw new Error("Capacity invoice expiry has not been confirmed.");
+      await rpc(admin,"workspace_capacity_expire_invoice_v1",{p_intent_id:intent.id,p_invoice_id:initial.id});
+      return {workspace_id:intent.workspace_id,paid_packs:0};
+    }
+    if(!intent.terms_accepted_at) {
+      if(subscription.status==="canceled")return {workspace_id:intent.workspace_id,paid_packs:0};
+      throw new Error("Capacity payment requires the owner's explicit recurring purchase consent.");
+    }
+  } else {
+    if(!intent.stripe_session_id)throw new Error("Capacity Checkout attribution is pending.");
+    const session=await stripe<Session>(`/checkout/sessions/${encodeURIComponent(intent.stripe_session_id)}`);
+    if(session.client_reference_id!==intent.id || session.metadata?.capacity_intent_id!==intent.id || session.metadata.product!==PRODUCT
+      || session.status!=="complete" || stripeObjectId(session.subscription)!==subscription.id
+      || stripeObjectId(session.customer)!==stripeObjectId(subscription.customer) || session.livemode!==intent.livemode) {
+      throw new Error("Capacity Checkout does not match its confirmed workspace purchase.");
+    }
+    purchaseReference=session.id;
+  }
+  if(subscription.livemode!==intent.livemode || subscription.metadata.workspace_id!==intent.workspace_id
     || subscription.items.data.length!==1 || subscription.items.data[0].price.id!==intent.stripe_price_id
     || subscription.items.data[0].quantity!==intent.packs) throw new Error("Capacity subscription does not match its confirmed workspace purchase.");
   if(intent.pricing_mode==="fixed_anchor" && subscription.billing_cycle_anchor!==Math.floor(new Date(intent.renewal_at||"").getTime()/1000)) {
@@ -270,7 +408,7 @@ async function syncCapacitySubscription(admin:Admin,subscriptionId:string,eventK
   }));
   const periods=reconciled.filter((period):period is PaidPeriod=>period!==null);
   return rpc<{workspace_id:string;paid_packs:number}>(admin,"workspace_capacity_sync_v1",{
-    p_event_key:eventKey,p_event_type:eventType,p_intent_id:intent.id,p_session_id:session.id,p_subscription_id:subscription.id,
+    p_event_key:eventKey,p_event_type:eventType,p_intent_id:intent.id,p_session_id:purchaseReference,p_subscription_id:subscription.id,
     p_customer_id:stripeObjectId(subscription.customer),p_price_id:intent.stripe_price_id,p_livemode:intent.livemode,
     p_packs:intent.packs,p_status:subscription.status,p_cancel_at_period_end:subscription.cancel_at_period_end,
     p_ended_at:subscription.ended_at?new Date(subscription.ended_at*1000).toISOString():null,p_checked_at:checkedAt,p_invoices:periods});

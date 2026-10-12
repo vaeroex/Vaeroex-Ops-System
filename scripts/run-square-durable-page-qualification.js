@@ -218,6 +218,9 @@ async function migrationQualification(target, administrator) {
     "20261005190709_sheets_recovery_fair_scan.sql",
     "20261005194244_google_sheets_failure_cleanup_transition.sql",
     "20261005202215_sheets_dispatch_round_robin.sql",
+    "20261012003846_workspace_storage_capacity.sql",
+    "20261012003920_workspace_storage_capacity_billing.sql",
+    "20261012013508_workspace_storage_invoice_capacity.sql",
   ];
   const workspaceCapacityTail = files.filter(name => workspaceCapacityMigrations.includes(name));
   equal(workspaceCapacityTail.join("\n"), workspaceCapacityMigrations.join("\n"), "exact separately qualified capacity migration tail present");

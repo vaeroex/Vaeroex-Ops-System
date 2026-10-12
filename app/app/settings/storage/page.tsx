@@ -12,7 +12,7 @@ import { getWorkspaceStorageUsage } from "@/lib/storage-capacity/server";
 export const dynamic = "force-dynamic";
 
 export default async function WorkspaceStoragePage({ searchParams }: {
-  searchParams?: Promise<{ checkout?: string | string[] }>;
+  searchParams?: Promise<{ checkout?: string | string[]; returnWorkspaceId?: string | string[] }>;
 }) {
   const access = await requireStorageAccess({ allowExpired: true });
   const isOwner = access.membership.role === "owner";
@@ -29,6 +29,7 @@ export default async function WorkspaceStoragePage({ searchParams }: {
   return <div className="workspace-page mx-auto max-w-5xl space-y-5">
     <PageHeader eyebrow="Settings" title="Usage & Storage" description={`Storage and capacity for ${access.workspace.name}. Allowances belong only to this workspace.`}
       actions={<Link href="/app/settings" title="Back to Settings" aria-label="Back to Settings" className="inline-flex h-11 w-11 items-center justify-center rounded-md border border-line bg-white text-ink hover:bg-slate-50"><ArrowLeft aria-hidden="true" className="h-4 w-4" /></Link>} />
+    {typeof params?.returnWorkspaceId === "string" && params.returnWorkspaceId !== access.workspaceId ? <p role="status" className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">Your payment was started for a different workspace. Use the workspace switcher to return to that business and check its capacity. This page shows only the current workspace; returning from payment does not move capacity between businesses.</p> : null}
     <nav aria-label="Storage sections" className="flex flex-wrap gap-x-5 gap-y-2 text-sm font-semibold text-vaeroex-blue">
       <a href="#largest-storage-files" className="inline-flex min-h-11 items-center">Largest files</a>
       <a href="#storage-trash" className="inline-flex min-h-11 items-center">Trash & recovery</a>

@@ -56,6 +56,7 @@ async function fixture(c){
  }
  await c.query(read('20261012003846_workspace_storage_capacity.sql'));
  await c.query(read('20261012003920_workspace_storage_capacity_billing.sql'));
+ await c.query(read('20261012013508_workspace_storage_invoice_capacity.sql'));
  await c.query(read('202607110002_business_signal_lifecycle_integrity.sql').slice(read('202607110002_business_signal_lifecycle_integrity.sql').indexOf('create or replace function public.update_source_file_lifecycle(')));
 }
 async function qualifyMaximum(c,workspace){ maximumWorkspace=workspace;
@@ -206,6 +207,7 @@ async function run(c){
  await c.query("select update_source_file_lifecycle($1,$2,'restore')",[maximumWorkspace,retained]);
  ok('existing original restores after packs revoked below current usage',true,true);
  await denied('only a new upload is blocked after pack revocation',()=>reserve(c,maximumWorkspace,1));
+ await require('./workspace-capacity-invoice-database-checks.cjs')(c,{owner,other,actor,ok,denied});
  console.log(JSON.stringify({status:'passed',checks:results.length,results,qualification:{fileSlots:500,maxFileBytes:26214400,concurrentWriters:2,lastSlotMilliseconds:Date.now()-start,scope:'Synthetic PostgreSQL, not provider HTTP',maximum:maximumQualification}},null,2));
 }
 (async()=>{try{cmd('initdb',['-D',path.join(work,'data'),'-U','postgres','--auth=trust','--no-locale']);cmd('pg_ctl',['-D',path.join(work,'data'),'-l',path.join(work,'server.log'),'-o',`-p 55331 -h '' -k ${work}`,'start']);started=true;await run(await connect());}finally{await Promise.allSettled(clients.map(c=>c.end()));if(started)cmd('pg_ctl',['-D',path.join(work,'data'),'-m','immediate','stop']);}})().catch(e=>{console.error(e);process.exitCode=1;});

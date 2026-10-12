@@ -1,5 +1,6 @@
 -- Uploaded-file expansion is purchased for one workspace, never an account-wide pool.
 create schema if not exists private;
+revoke usage on schema private from public,anon,authenticated,service_role;
 
 create table private.workspace_capacity_intents (
   id uuid primary key default gen_random_uuid(),
@@ -65,10 +66,7 @@ alter table private.workspace_capacity_subscriptions enable row level security;
 alter table private.workspace_capacity_invoices enable row level security;
 alter table private.workspace_capacity_events enable row level security;
 revoke all on private.workspace_capacity_intents, private.workspace_capacity_subscriptions,
-  private.workspace_capacity_invoices, private.workspace_capacity_events from public, anon, authenticated;
-grant usage on schema private to service_role;
-grant select, insert, update on private.workspace_capacity_intents, private.workspace_capacity_subscriptions,
-  private.workspace_capacity_invoices, private.workspace_capacity_events to service_role;
+  private.workspace_capacity_invoices, private.workspace_capacity_events from public, anon, authenticated, service_role;
 
 create or replace function private.workspace_storage_paid_packs_v1(p_workspace_id uuid)
 returns integer language sql stable security definer set search_path = '' as $$
@@ -85,24 +83,33 @@ returns integer language sql stable security definer set search_path = '' as $$
     group by s.stripe_subscription_id
   ) eligible;
 $$;
-revoke all on function private.workspace_storage_paid_packs_v1(uuid) from public, anon, authenticated;
-grant execute on function private.workspace_storage_paid_packs_v1(uuid) to service_role;
+revoke all on function private.workspace_storage_paid_packs_v1(uuid) from public, anon, authenticated, service_role;
+
+create or replace function private.require_capacity_service_v1()
+returns void language plpgsql security invoker set search_path = '' as $$
+begin
+  if (select auth.role()) is distinct from 'service_role' then
+    raise exception using errcode='42501',message='Capacity billing requires the service role.';
+  end if;
+end;
+$$;
+revoke all on function private.require_capacity_service_v1() from public,anon,authenticated,service_role;
 
 create or replace function private.require_capacity_owner_v1(p_workspace_id uuid, p_actor_id uuid)
 returns void language plpgsql security invoker set search_path = '' as $$
 begin
+  perform private.require_capacity_service_v1();
   if not exists(select 1 from public.workspace_members m where m.workspace_id = p_workspace_id
     and m.user_id = p_actor_id and m.role = 'owner' and m.status = 'active') then
     raise exception using errcode = '42501', message = 'Only the active workspace owner can manage capacity.';
   end if;
 end;
 $$;
-revoke all on function private.require_capacity_owner_v1(uuid,uuid) from public, anon, authenticated;
-grant execute on function private.require_capacity_owner_v1(uuid,uuid) to service_role;
+revoke all on function private.require_capacity_owner_v1(uuid,uuid) from public, anon, authenticated, service_role;
 
 create or replace function public.workspace_capacity_quote_v1(
   p_workspace_id uuid, p_actor_id uuid, p_packs integer, p_price_id text, p_livemode boolean, p_terms_version text
-) returns jsonb language plpgsql security invoker set search_path = '' as $$
+) returns jsonb language plpgsql security definer set search_path = '' as $$
 declare v_intent private.workspace_capacity_intents; v_committed integer; v_current integer; v_customer text;
 begin
   perform private.require_capacity_owner_v1(p_workspace_id,p_actor_id);
@@ -139,7 +146,7 @@ end;
 $$;
 
 create or replace function public.workspace_capacity_intent_v1(p_workspace_id uuid,p_actor_id uuid,p_intent_id uuid)
-returns jsonb language plpgsql security invoker set search_path = '' as $$
+returns jsonb language plpgsql security definer set search_path = '' as $$
 declare v_intent private.workspace_capacity_intents;
 begin
   perform private.require_capacity_owner_v1(p_workspace_id,p_actor_id);
@@ -150,7 +157,7 @@ end;
 $$;
 
 create or replace function public.workspace_capacity_confirm_v1(p_workspace_id uuid,p_actor_id uuid,p_intent_id uuid)
-returns jsonb language plpgsql security invoker set search_path = '' as $$
+returns jsonb language plpgsql security definer set search_path = '' as $$
 declare v_intent private.workspace_capacity_intents;
 begin
   perform private.require_capacity_owner_v1(p_workspace_id,p_actor_id);
@@ -169,7 +176,7 @@ end;
 $$;
 
 create or replace function public.workspace_capacity_record_checkout_v1(p_workspace_id uuid,p_actor_id uuid,p_intent_id uuid,p_session_id text,p_customer_id text,p_expires_at timestamptz)
-returns boolean language plpgsql security invoker set search_path = '' as $$
+returns boolean language plpgsql security definer set search_path = '' as $$
 begin
   perform private.require_capacity_owner_v1(p_workspace_id,p_actor_id);
   perform pg_advisory_xact_lock(hashtextextended('workspace-storage:' || p_workspace_id::text,0));
@@ -183,7 +190,7 @@ end;
 $$;
 
 create or replace function public.workspace_capacity_record_quote_price_v1(p_workspace_id uuid,p_actor_id uuid,p_intent_id uuid,p_quoted_cents integer)
-returns boolean language plpgsql security invoker set search_path = '' as $$
+returns boolean language plpgsql security definer set search_path = '' as $$
 begin
   perform private.require_capacity_owner_v1(p_workspace_id,p_actor_id);
   update private.workspace_capacity_intents set quoted_cents=p_quoted_cents
@@ -196,14 +203,18 @@ $$;
 
 -- Privileged provider resolver. No email/customer OR lookup can attach a purchase to a workspace.
 create or replace function public.workspace_capacity_provider_intent_v1(p_intent_id uuid)
-returns jsonb language sql stable security invoker set search_path = '' as $$
-  select to_jsonb(i) from private.workspace_capacity_intents i where id=p_intent_id;
+returns jsonb language plpgsql stable security definer set search_path = '' as $$
+begin
+  perform private.require_capacity_service_v1();
+  return (select to_jsonb(i) from private.workspace_capacity_intents i where id=p_intent_id);
+end;
 $$;
 
 create or replace function public.workspace_capacity_expire_v1(p_intent_id uuid,p_session_id text)
-returns boolean language plpgsql security invoker set search_path = '' as $$
+returns boolean language plpgsql security definer set search_path = '' as $$
 declare v_workspace uuid;
 begin
+  perform private.require_capacity_service_v1();
   select workspace_id into v_workspace from private.workspace_capacity_intents where id=p_intent_id and stripe_session_id=p_session_id;
   if v_workspace is null then raise exception using errcode='42501',message='Capacity checkout attribution failed.'; end if;
   perform pg_advisory_xact_lock(hashtextextended('workspace-storage:' || v_workspace::text,0));
@@ -213,7 +224,7 @@ end;
 $$;
 
 create or replace function public.workspace_capacity_state_v1(p_workspace_id uuid,p_actor_id uuid)
-returns jsonb language plpgsql stable security invoker set search_path = '' as $$
+returns jsonb language plpgsql stable security definer set search_path = '' as $$
 declare v_result jsonb;
 begin
   perform private.require_capacity_owner_v1(p_workspace_id,p_actor_id);
@@ -234,9 +245,10 @@ create or replace function public.workspace_capacity_sync_v1(
   p_event_key text,p_event_type text,p_intent_id uuid,p_session_id text,p_subscription_id text,p_customer_id text,
   p_price_id text,p_livemode boolean,p_packs integer,p_status text,p_cancel_at_period_end boolean,p_ended_at timestamptz,
   p_checked_at timestamptz,p_invoices jsonb
-) returns jsonb language plpgsql security invoker set search_path = '' as $$
+) returns jsonb language plpgsql security definer set search_path = '' as $$
 declare v_intent private.workspace_capacity_intents; v_invoice jsonb; v_existing private.workspace_capacity_subscriptions;
 begin
+  perform private.require_capacity_service_v1();
   select * into v_intent from private.workspace_capacity_intents where id=p_intent_id;
   if not found or v_intent.stripe_session_id is distinct from p_session_id or v_intent.terms_accepted_at is null
     or v_intent.state not in ('checkout','complete') or v_intent.packs<>p_packs or v_intent.stripe_price_id<>p_price_id

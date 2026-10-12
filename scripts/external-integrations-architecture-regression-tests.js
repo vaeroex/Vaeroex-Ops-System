@@ -412,6 +412,9 @@ for (const manifest of [currentMigrations.filter(name => name !== "2026100502201
   currentMigrations.filter(name => name !== "20261005202215_sheets_dispatch_round_robin.sql"),
   currentMigrations.filter(name => name !== "20261008190000_vsi_private_chat.sql"),
   currentMigrations.filter(name => name !== "20261009041421_vsi_adaptive_research.sql"),
+  currentMigrations.filter(name => name !== "20261012003846_workspace_storage_capacity.sql"),
+  currentMigrations.filter(name => name !== "20261012003920_workspace_storage_capacity_billing.sql"),
+  currentMigrations.filter(name => name !== "20261012013508_workspace_storage_invoice_capacity.sql"),
   currentMigrations.filter(name => name !== "20260907174326_square_dormant_account_connection.sql"),
   currentMigrations.filter(name => name !== "20260902191325_square_production_internal_pilot_runtime.sql"),
   currentMigrations.filter(name => name !== "20260907225626_square_remote_sandbox_binding.sql"),
@@ -530,8 +533,11 @@ assert.deepEqual(approvedSquareQualificationPaths.filter(file => file.startsWith
 assertionCount++;
 assert.deepEqual(JSON.parse(read("vercel.json")), {
   git: { deploymentEnabled: { "main": false, "codex/intelligence-health-consolidation": false, "codex/square-remote-sandbox-binding": false, "codex/square-sandbox-qualification": false, "codex/square-gcp-sandbox-callback": false, "codex/workspace-audit-security": false, "codex/workspace-audit-evidence": false, "codex/workspace-audit-workflows": false } },
-  crons: [{ path: "/api/integrations/google-sheets/scheduled-sync", schedule: "*/15 * * * *" }]
-}, "Main and held review branches cannot auto-deploy; only the reviewed Sheets cron is configured");
+  crons: [
+    { path: "/api/storage-capacity/maintenance", schedule: "*/15 * * * *" },
+    { path: "/api/integrations/google-sheets/scheduled-sync", schedule: "*/15 * * * *" }
+  ]
+}, "Main and held review branches cannot auto-deploy; only reviewed authenticated storage and Sheets crons are configured");
 equal(withoutSquareQualificationPaths(approvedSquareQualificationPaths.join("\n")), "", "exact qualification paths are exempt from legacy phase-only scope assertions");
 for (const protectedPath of [
   ...approvedSquareQualificationPaths.map(file => `${file}.unexpected`),
@@ -562,6 +568,9 @@ const approvedProtectedPaths = new Set([
   "components/integrations/ConnectionStatusPanel.tsx",
   "components/operations/StatusBadge.tsx",
   "lib/supabase/types.ts",
+  "supabase/migrations/20261012003846_workspace_storage_capacity.sql",
+  "supabase/migrations/20261012003920_workspace_storage_capacity_billing.sql",
+  "supabase/migrations/20261012013508_workspace_storage_invoice_capacity.sql",
   "supabase/migrations/20260820233007_external_integrations_phase_1_canonical_foundation.sql",
   "supabase/tests/external_integrations_phase_1_canonical_foundation.test.sql",
   "supabase/migrations/20260821064333_external_integrations_phase_2_reconciliation.sql",
