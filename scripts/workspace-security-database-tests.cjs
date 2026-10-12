@@ -150,6 +150,9 @@ async function fixture(c) {
   await c.query(policy("security audit events contributors create",high));
   for(const n of ["workspace files members read"]) await c.query(policy(n,files));
   for(const n of ["workspace files contributors insert","workspace files contributors update"]) await c.query(policy(n,high));
+  // The ledger must exist before the dynamic audit migration so this fixture
+  // reproduces both the accidental entitlement trigger and restrictive RLS.
+  await c.query(read("20260820170000_pre_checkout_legal_acceptance.sql"));
   await projectionFixture(c);
   await c.query(`create function public.synthetic_definer_write(p_workspace uuid) returns void language plpgsql security definer set search_path='' as $$begin insert into public.tasks(workspace_id,title) values(p_workspace,'Synthetic definer'); end$$;
     grant execute on function public.synthetic_definer_write(uuid) to authenticated;
@@ -167,12 +170,92 @@ async function fixture(c) {
   pass("before migration: staff can persist a cross-workspace form parent",(await c.query("select count(*)::int n from form_submissions where submitter_name='Historical mismatch'")).rows[0].n,1);
   await admin(c);
 }
+async function preCheckoutLegalTests(c, migration) {
+  const acceptance = (n, workspace, hash = "a".repeat(64), agent = "synthetic-original") => {
+    const policies = JSON.stringify([{ id: "synthetic-policy", version: "1", contentHash: hash }]);
+    const snapshot = JSON.stringify({ acceptanceSetId: "synthetic-pre-checkout", acceptanceSetVersion: "1", requiredPolicyHash: hash, recordClass: "pre_checkout_legal_acceptance", requiredPolicies: JSON.parse(policies) });
+    return `insert into public.checkout_legal_acceptances(user_id,workspace_id,acceptance_set_id,acceptance_set_version,required_policy_hash,accepted_policies_json,acceptance_snapshot_json,acceptance_source,acceptance_action,user_agent)
+      values('${user(n)}',${workspace ? `'${workspace}'` : "null"},'synthetic-pre-checkout','1','${hash}','${policies}'::jsonb,'${snapshot}'::jsonb,'pre_checkout','accept_and_continue_to_stripe_checkout','${agent}')
+      on conflict(user_id,acceptance_set_id,acceptance_set_version,required_policy_hash) do nothing returning id`;
+  };
+  const unrelatedGuards = async () => (await c.query(`
+    select 'policy' kind, n.nspname schema, c.relname relation, p.polname name,
+      pg_get_expr(p.polqual,p.polrelid) using_expression, pg_get_expr(p.polwithcheck,p.polrelid) check_expression
+    from pg_policy p join pg_class c on c.oid=p.polrelid join pg_namespace n on n.oid=c.relnamespace
+    where p.polname like 'audit_entitled_%' and c.oid<>'public.checkout_legal_acceptances'::regclass
+    union all
+    select 'trigger',n.nspname,c.relname,t.tgname,pg_get_triggerdef(t.oid),null
+    from pg_trigger t join pg_class c on c.oid=t.tgrelid join pg_namespace n on n.oid=c.relnamespace
+    where t.tgname='audit_workspace_entitlement' and c.oid<>'public.checkout_legal_acceptances'::regclass
+    order by 1,2,3,4`)).rows;
+  const originalLedgerProtections = async () => (await c.query(`select
+    c.relrowsecurity rls,
+    (select array_agg(pg_get_expr(p.polwithcheck,p.polrelid) order by p.polname) from pg_policy p where p.polrelid=c.oid and p.polname='users can create own checkout legal acceptances') insert_policies,
+    (select pg_get_triggerdef(t.oid) from pg_trigger t where t.tgrelid=c.oid and t.tgname='checkout_legal_acceptances_immutable') immutable_trigger,
+    has_table_privilege('authenticated',c.oid,'SELECT') authenticated_select,
+    has_table_privilege('authenticated',c.oid,'INSERT') authenticated_insert,
+    has_table_privilege('authenticated',c.oid,'UPDATE,DELETE') authenticated_mutation,
+    has_table_privilege('anon',c.oid,'SELECT,INSERT,UPDATE,DELETE') anonymous_access
+    from pg_class c where c.oid='public.checkout_legal_acceptances'::regclass`)).rows[0];
+  await admin(c);
+  const guardsBefore = await unrelatedGuards(), ledgerBefore = await originalLedgerProtections();
+  pass("fixture reproduces all three restrictive pre-checkout policies",(await c.query("select count(*)::int n from pg_policy where polrelid='public.checkout_legal_acceptances'::regclass and polname in ('audit_entitled_insert','audit_entitled_update','audit_entitled_delete') and not polpermissive")).rows[0].n,3);
+  pass("fixture reproduces accidental pre-checkout entitlement trigger",(await c.query("select count(*)::int n from pg_trigger where tgrelid='public.checkout_legal_acceptances'::regclass and tgname='audit_workspace_entitlement'")).rows[0].n,1);
+  await c.query(`update workspaces set subscription_required=true,subscription_status='expired' where id='${A}';
+    insert into workspace_members(workspace_id,user_id,role,status) values('${A}','${user(6)}','staff','disabled')`);
+  pass("pre-checkout owner has no subscription",(await c.query(`select count(*)::int n from customer_subscriptions where workspace_id='${A}'`)).rows[0].n,0);
+  await actor(c,1);
+  await denied(c,"before correction: unsubscribed workspace owner cannot accept checkout policies",acceptance(1,A));
+  await actor(c,5);
+  await denied(c,"before correction: account without a workspace cannot accept checkout policies",acceptance(5,null));
+  await admin(c);
+  await c.query(read(migration));
+  pass("correction removes only the ledger entitlement policies",(await c.query("select count(*)::int n from pg_policy where polrelid='public.checkout_legal_acceptances'::regclass and polname like 'audit_entitled_%'")).rows[0].n,0);
+  pass("correction removes only the ledger entitlement trigger",(await c.query("select count(*)::int n from pg_trigger where tgrelid='public.checkout_legal_acceptances'::regclass and tgname='audit_workspace_entitlement'")).rows[0].n,0);
+  pass("all other workspace and storage entitlement guards remain unchanged",await unrelatedGuards(),guardsBefore);
+  pass("ledger RLS membership ownership immutability and grants remain unchanged",await originalLedgerProtections(),ledgerBefore);
+  await actor(c,1);
+  pass("unsubscribed workspace owner can accept checkout policies",(await c.query(acceptance(1,A))).rowCount,1);
+  const original = (await c.query("select row_to_json(a) proof from checkout_legal_acceptances a where user_id=$1",[user(1)])).rows[0].proof;
+  pass("exact action conflict target safely ignores duplicate legal submission",(await c.query(acceptance(1,A,"a".repeat(64),"synthetic-retry"))).rowCount,0);
+  pass("duplicate submission preserves the original complete proof",(await c.query("select row_to_json(a) proof from checkout_legal_acceptances a where user_id=$1",[user(1)])).rows[0].proof,original);
+  await denied(c,"legal acceptance cannot claim another user",acceptance(2,A));
+  await denied(c,"legal acceptance cannot claim another workspace",acceptance(1,B,"b".repeat(64)));
+  await denied(c,"authenticated user cannot update legal proof",`update checkout_legal_acceptances set user_agent='tampered' where user_id='${user(1)}'`);
+  await denied(c,"authenticated user cannot delete legal proof",`delete from checkout_legal_acceptances where user_id='${user(1)}'`);
+  await denied(c,"legal acceptance does not unlock workspace task creation",`insert into tasks(workspace_id,title) values('${A}','Unpaid legal acceptance')`);
+  await denied(c,"legal acceptance does not unlock workspace definer writes",`select synthetic_definer_write('${A}')`);
+  await denied(c,"legal acceptance does not unlock workspace file storage",`insert into storage.objects(bucket_id,name) values('workspace-files','${A}/unpaid-legal')`);
+  pass("legal acceptance does not unlock workspace task updates",(await c.query(`update tasks set title='Unpaid update' where workspace_id='${A}' returning id`)).rowCount,0);
+  pass("legal acceptance does not unlock workspace task deletion",(await c.query(`delete from tasks where workspace_id='${A}' returning id`)).rowCount,0);
+  await actor(c,5);
+  pass("account without a workspace can accept checkout policies",(await c.query(acceptance(5,null))).rowCount,1);
+  await actor(c,6);
+  await denied(c,"inactive member cannot attach legal acceptance to workspace",acceptance(6,A));
+  await actor(c,4);
+  pass("other workspace owner cannot read foreign legal proof",(await c.query(`select count(*)::int n from checkout_legal_acceptances where user_id='${user(1)}'`)).rows[0].n,0);
+  await actor(c,0,"anon");
+  await denied(c,"anonymous caller cannot create legal acceptance",acceptance(1,A,"c".repeat(64)));
+  await actor(c,0);
+  await denied(c,"authenticated role without user identity cannot accept policies",acceptance(1,null,"d".repeat(64)));
+  await admin(c);
+  await denied(c,"immutable trigger rejects privileged legal proof updates",`update checkout_legal_acceptances set user_agent='tampered' where user_id='${user(1)}'`,"P0001");
+  await denied(c,"immutable trigger rejects privileged legal proof deletion",`delete from checkout_legal_acceptances where user_id='${user(1)}'`,"P0001");
+  pass("failed mutations retain both legal proofs",(await c.query("select count(*)::int n from checkout_legal_acceptances")).rows[0].n,2);
+  // Continue the pre-existing security suite against the corrected database,
+  // returning only the temporary workspace and membership fixtures to baseline.
+  await c.query(`update workspaces set subscription_required=false,subscription_status='demo' where id='${A}';
+    delete from workspace_members where workspace_id='${A}' and user_id='${user(6)}'`);
+}
 async function tests(c) {
   await fixture(c);
   await c.query(read("20260731071855_business_health_generation_claim.sql"));
   await c.query(must(/create unique index if not exists ai_agent_runs_intelligence_briefing_generation_claim_uidx[\s\S]*?;/,read("20260817185529_intelligence_briefing_storage_contract.sql")));
   const migrations=["20261005022017_workspace_security_boundaries.sql","20261005022445_workspace_persisted_usage_limits.sql"];
   for(const m of migrations) await c.query(read(m));
+  const legalMigration="20261012082738_pre_checkout_legal_entitlement_boundary.sql";
+  await preCheckoutLegalTests(c,legalMigration);
+  migrations.push(legalMigration);
   pass("historical mismatched asset row retained",(await c.query(`select count(*)::int n from asset_checks where id='${check(99)}'`)).rows[0].n,1);
   pass("tenant FK remains NOT VALID pending historical review",(await c.query("select convalidated from pg_constraint where conname='asset_checks_workspace_asset_fkey'")).rows[0].convalidated,false);
   pass("form tenant FK remains NOT VALID pending historical review",(await c.query("select convalidated from pg_constraint where conname='form_submissions_workspace_form_fkey'")).rows[0].convalidated,false);

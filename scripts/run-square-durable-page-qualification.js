@@ -224,6 +224,8 @@ async function migrationQualification(target, administrator) {
   ];
   const workspaceCapacityTail = files.filter(name => workspaceCapacityMigrations.includes(name));
   equal(workspaceCapacityTail.join("\n"), workspaceCapacityMigrations.join("\n"), "exact separately qualified capacity migration tail present");
+  const legalAcceptanceTail = files.filter(name => name === "20261012082738_pre_checkout_legal_entitlement_boundary.sql");
+  equal(legalAcceptanceTail.length, 1, "pre-purchase legal acceptance boundary migration present");
   const pricingTail = files.filter(name => name === "20261012064502_vaeroex_subscription_price_250.sql");
   equal(pricingTail.length, 1, "exact Executive Intelligence price migration present");
   const vsiTail = files.filter(name => name === "20261008190000_vsi_private_chat.sql");
@@ -253,7 +255,7 @@ async function migrationQualification(target, administrator) {
   equal(preferencesTail.length, 1, "separately qualified personal summary preferences migration present");
   equal(workspaceSecurityTail.length, 1, "separately qualified workspace security migration present");
   equal(workspaceQuotaTail.length, 1, "separately qualified persisted usage migration present");
-  equal(baseline.length + added.length + accountTail.length + remoteTail.length + brokerTail.length + gcpTail.length + recoveryTail.length + mappedTail.length + mappedFenceTail.length + observationTail.length + interpretationTail.length + evidenceTail.length + cardTail.length + operationalTail.length + productionFoundationTail.length + productionOverlayTail.length + productionInternalRuntimeTail.length + productionFoundationMarkerTail.length + productionLegacyGuardTail.length + sheetsCompleteTail.length + sheetsLifecycleTail.length + preferencesTail.length + workspaceSecurityTail.length + workspaceQuotaTail.length + workspaceCloseoutTail0.length + workspaceCloseoutTail1.length + workspaceCloseoutTail2.length + workspaceCloseoutTail3.length + workspaceCloseoutTail4.length + workspaceCapacityTail.length + pricingTail.length + vsiTail.length + vsiResearchTail.length, files.length, "migration manifest is explicit");
+  equal(baseline.length + added.length + accountTail.length + remoteTail.length + brokerTail.length + gcpTail.length + recoveryTail.length + mappedTail.length + mappedFenceTail.length + observationTail.length + interpretationTail.length + evidenceTail.length + cardTail.length + operationalTail.length + productionFoundationTail.length + productionOverlayTail.length + productionInternalRuntimeTail.length + productionFoundationMarkerTail.length + productionLegacyGuardTail.length + sheetsCompleteTail.length + sheetsLifecycleTail.length + preferencesTail.length + workspaceSecurityTail.length + workspaceQuotaTail.length + workspaceCloseoutTail0.length + workspaceCloseoutTail1.length + workspaceCloseoutTail2.length + workspaceCloseoutTail3.length + workspaceCloseoutTail4.length + workspaceCapacityTail.length + pricingTail.length + legalAcceptanceTail.length + vsiTail.length + vsiResearchTail.length, files.length, "migration manifest is explicit");
   const clean = await createDatabase(target, administrator, "clean");
   await applyMigrations(clean.client, baseline);
   const before = await sourceSchemaFingerprint(clean.client);
