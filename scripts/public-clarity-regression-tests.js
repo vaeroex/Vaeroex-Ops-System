@@ -101,7 +101,7 @@ async function main() {
   }
   assert.equal(
     loadTs("lib/billing/plans.ts").VAEROEX_PLAN_PRICE_LABEL,
-    "$500/month",
+    "$250/month",
   );
 
   const routes = [
@@ -281,7 +281,7 @@ async function main() {
     "Pricing must expose one product checkout action",
   );
   assert.equal(
-    (pricing.match(/\$500\/month/g) || []).length,
+    (pricing.match(/\$250\/month/g) || []).length,
     1,
     "Pricing must render the authoritative price once",
   );
