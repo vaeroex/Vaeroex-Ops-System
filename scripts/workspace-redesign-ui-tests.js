@@ -110,9 +110,13 @@ async function main() {
   const result = await build({ test: true });
   const screens = require(path.join(result.output, "render.cjs"));
   const { renderToStaticMarkup } = require("react-dom/server");
-  const overviewHtml = renderToStaticMarkup(await screens.renderScreen("/app", "populated", "owner"));
-  assert.match(overviewHtml, /href="\/app\/intelligence#business-health"/, "Overview retains a direct path to Health");
+  const overviewBody = await screens.renderScreen("/app", "populated", "owner");
+  const overviewHtml = renderToStaticMarkup(overviewBody);
+  assert.ok(!overviewHtml.includes("Business Health is part of Intelligence")
+    && !overviewHtml.includes('href="/app/intelligence#business-health"'), "Overview omits the relocation announcement");
   assert.doesNotMatch(overviewHtml, /id="business-health"|View analysis/, "Health review controls belong to Intelligence");
+  const overviewShell = renderToStaticMarkup(screens.wrapScreen(overviewBody, "owner", "/app"));
+  assert.ok(overviewShell.includes('href="/app/intelligence"'), "Workspace navigation still reaches Intelligence");
   for (const role of ["owner", "viewer"]) {
     const emptyBody = await screens.renderScreen("/app/intelligence", "empty", role);
     const emptyHtml = renderToStaticMarkup(emptyBody);
