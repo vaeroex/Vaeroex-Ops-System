@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "preparedAt": "2026-10-12T21:59:59.285Z",
+  "reviewedCommit": "457c3b588db5afaef85d87ba04a6833d444344f8",
+  "project": "vaeroex-integrations-prod",
+  "projectNumber": "711446392261",
+  "location": "us-west1",
+  "primaryDatabase": {
+    "host": "db.mdiianhfrojmxqpwrflh.supabase.co",
+    "port": 5432,
+    "database": "postgres"
+  },
+  "pins": {
+    "version": 1,
+    "bucket": "vaeroex-integrations-prod-sheets-erasure-witness",
+    "serviceAccount": "sheets-erasure-witness@vaeroex-integrations-prod.iam.gserviceaccount.com",
+    "datasetId": "943fe4ff-0ad4-44ae-94ed-26240ca9fd3a",
+    "primaryEndpointHash": "a219a6050f6bccabbdfaadf31a0497764ba8c2e23e2b32fae7ea1b83a9cf39ad",
+    "publicKey": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAPtZlYhg5SBhWG0wrYVcapNda0XFiN/m9tkpfMa2oXBU=\n-----END PUBLIC KEY-----\n",
+    "pinnedFingerprint": "b16edf12f5e1fcc77ae65617d47c2422a6f6e8e68a438511e917ecae00763116",
+    "genesisDigest": "d86d8d699da9dc21b250c99323a728861b2cbf50589a4ec86cdbe4624c47a786",
+    "genesisObject": "google-sheets-erasure/943fe4ff-0ad4-44ae-94ed-26240ca9fd3a/genesis.json"
+  },
+  "ca": {
+    "source": "https://supabase-downloads.s3-ap-southeast-1.amazonaws.com/prod/ssl/prod-ca-2021.crt",
+    "pemSha256": "700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7",
+    "fingerprint256": "80:70:25:AD:50:D4:ED:21:9D:2C:9C:7D:29:9C:00:4F:82:4E:B0:0C:F7:F6:5A:FE:F6:07:D0:7B:72:E6:CA:FA"
+  },
+  "credentialsIncluded": false,
+  "databaseConnected": false,
+  "genesisUploaded": false,
+  "requiredNextStep": "retain_public_trust_then_store_and_recover_encrypted_password_manager_backup_before_live_genesis"
+}
