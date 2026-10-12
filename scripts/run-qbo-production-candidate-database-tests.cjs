@@ -605,6 +605,6 @@ async function main() {
 
 if (require.main === module) main().catch(error => { console.error(error); process.exitCode = 1; });
 module.exports = { checkTap, expandFixture, suiteRequests, candidateDblinkSetting, candidates, pendingSuite, eligibilitySuite,
-  productionSquare, productionSheets, auditMigrations, capacityMigrations, assertProductionBaselineLedger,
+  productionSquare, productionSheets, auditMigrations, capacityMigrations, storageMigrations, assertProductionBaselineLedger,
   dashboardMigrations, dashboardSuites, dashboardPlan, checkDashboardAssertionNames, composeSquareIdentitySuite, executeDashboardSuite,
   preferenceAssertionNames, reportingTimezoneAssertionNames, squareIdentityAssertionNames, squareCatalog };
