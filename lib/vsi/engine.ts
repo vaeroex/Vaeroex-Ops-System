@@ -39,12 +39,16 @@ type ProviderPayload = { model?: string; status?: string; output_text?: string; 
   usage?: { input_tokens?: number; output_tokens?: number; input_tokens_details?: { cached_tokens?: number }; output_tokens_details?: { reasoning_tokens?: number } } };
 export class VsiEngineError extends Error {
   public readonly accountingUncertain: boolean;
-  constructor(message: string, public readonly usage: VsiUsage, accountingUncertain = false) {
+  constructor(message: string, public readonly usage: VsiUsage, accountingUncertain = false, category: NonNullable<VsiUsage["outcomeFailure"]> = "application") {
     super(message); this.name = "VsiEngineError"; this.accountingUncertain = accountingUncertain || usage.costEstimated === true;
+    usage.outcomeFailure = category;
+    if (category === "provider" || category === "timeout") usage.providerFailures = (usage.providerFailures || 0) + 1;
+    if (category === "output_validation") usage.outputValidationFailures = (usage.outputValidationFailures || 0) + 1;
+    if (category === "citation_validation") { usage.citationValidationFailures = (usage.citationValidationFailures || 0) + 1; usage.citationStatus = "failed"; }
   }
 }
 export function emptyVsiUsage(): VsiUsage {
-  return { model: VSI_MODEL, inputTokens: 0, cachedInputTokens: 0, outputTokens: 0, reasoningTokens: 0, webSearchCalls: 0, retries: 0, estimatedCostUsd: 0, latencyMs: 0 };
+  return { model: VSI_MODEL, inputTokens: 0, cachedInputTokens: 0, outputTokens: 0, reasoningTokens: 0, webSearchCalls: 0, retries: 0, estimatedCostUsd: 0, latencyMs: 0, telemetryVersion: 1, evidenceLimitations: false, noteProposal: false, providerFailures: 0, outputValidationFailures: 0, citationValidationFailures: 0 };
 }
 function outputText(payload: ProviderPayload) {
   return payload.output_text || (payload.output || []).flatMap(item => (item.content || []).filter(part => part.type === "output_text").map(part => part.text || "")).join("\n");
@@ -179,6 +183,10 @@ async function runVsiAnswerInternal(input: VsiRunInput, startedAt: number): Prom
   if (!input.question.trim() || input.question.length > config.maxQuestionChars) throw new VsiEngineError("Use a question of 8,000 characters or fewer.", usage);
   const finish = (answer: Omit<VsiAnswer, "usage">): VsiAnswer => {
     usage.latencyMs = Date.now() - startedAt;
+    delete usage.outcomeFailure;
+    usage.noteProposal = Boolean(answer.noteDraft);
+    usage.researchStatus ??= "not_required";
+    usage.citationStatus = answer.citations.length ? "validated" : "not_required";
     if (usage.costEstimated) usage.estimatedCostUsd = Math.max(config.requestReserveUsd, usage.estimatedCostUsd);
     return { ...answer, usage };
   };
@@ -188,15 +196,15 @@ async function runVsiAnswerInternal(input: VsiRunInput, startedAt: number): Prom
   const key = process.env.OPENAI_API_KEY?.trim();
   if (!key) throw new VsiEngineError("Vaeroex Super Intelligence is temporarily unavailable because its provider connection is not configured. Please try again later.", usage);
   const call = async (body: Record<string, unknown>, reserveAnswerMs = 0) => {
-    if (usage.estimatedCostUsd >= config.requestReserveUsd) throw new VsiEngineError("This question reached its spending safeguard. Please narrow it and retry.", usage);
+    if (usage.estimatedCostUsd >= config.requestReserveUsd) throw new VsiEngineError("This question reached its spending safeguard. Please narrow it and retry.", usage, false, "budget_block");
     const remaining = config.timeoutMs - (Date.now() - startedAt) - reserveAnswerMs;
-    if (remaining < 4000) throw new VsiEngineError("This answer took too long. Please retry or ask a narrower question.", usage);
+    if (remaining < 4000) throw new VsiEngineError("This answer took too long. Please retry or ask a narrower question.", usage, false, "timeout");
     if ((usage.providerCalls || 0) >= config.maxProviderCalls || Buffer.byteLength(JSON.stringify(body.input), "utf8") > config.maxProviderInputBytes) {
-      throw new VsiEngineError("This question exceeded its research context safeguard. Please narrow it and retry.", usage);
+      throw new VsiEngineError("This question exceeded its research context safeguard. Please narrow it and retry.", usage, false, "context_block");
     }
     // The shared provider guard rejects an open circuit synchronously, before fetch.
     // That is known-zero work, not an uncertain paid transport failure.
-    if (getAIProviderCircuitSnapshot("openai").open) throw new VsiEngineError("Vaeroex is temporarily unavailable after repeated failed requests. Please retry shortly. Your question has not been counted.", usage);
+    if (getAIProviderCircuitSnapshot("openai").open) throw new VsiEngineError("Vaeroex is temporarily unavailable after repeated failed requests. Please retry shortly. Your question has not been counted.", usage, false, "provider");
     usage.providerCalls = (usage.providerCalls || 0) + 1;
     try {
       const { response, value } = await consumeAIProviderResponse("openai", "https://api.openai.com/v1/responses", {
@@ -206,17 +214,17 @@ async function runVsiAnswerInternal(input: VsiRunInput, startedAt: number): Prom
       { ...getAIProviderRetrySettings("openai"), timeoutMs: remaining, maxRetries: 0 });
       addUsage(usage, value, response.headers.get("x-request-id"));
       if (!response.ok) throw new VsiEngineError(response.status === 429 ? "Vaeroex is busy right now. Please retry shortly. Your question has not been counted."
-        : "Vaeroex could not complete this answer. Please retry. Your question has not been counted.", usage, response.status >= 500);
+        : "Vaeroex could not complete this answer. Please retry. Your question has not been counted.", usage, response.status >= 500, "provider");
       if (!Number.isSafeInteger(value.usage?.input_tokens) || !Number.isSafeInteger(value.usage?.output_tokens)) {
-        throw new VsiEngineError("The service did not return reliable usage accounting. Please retry later.", usage, true);
+        throw new VsiEngineError("The service did not return reliable usage accounting. Please retry later.", usage, true, "provider");
       }
-      if (value.model && !new RegExp(`^${VSI_MODEL}(?:-|$)`).test(value.model)) throw new VsiEngineError("The configured service was not returned. Please retry later.", usage);
-      if (value.status === "incomplete" || !outputText(value)) throw new VsiEngineError("Vaeroex could not finish this answer within the response limit. Try a narrower question.", usage);
-      if (usage.estimatedCostUsd >= config.requestReserveUsd) throw new VsiEngineError("This question reached its spending safeguard. Please narrow it and retry.", usage);
+      if (value.model && !new RegExp(`^${VSI_MODEL}(?:-|$)`).test(value.model)) throw new VsiEngineError("The configured service was not returned. Please retry later.", usage, false, "provider");
+      if (value.status === "incomplete" || !outputText(value)) throw new VsiEngineError("Vaeroex could not finish this answer within the response limit. Try a narrower question.", usage, false, "output_validation");
+      if (usage.estimatedCostUsd >= config.requestReserveUsd) throw new VsiEngineError("This question reached its spending safeguard. Please narrow it and retry.", usage, false, "budget_block");
       return value;
     } catch (error) {
       if (error instanceof VsiEngineError) throw error;
-      throw new VsiEngineError("Vaeroex could not be reached in time. Please retry. Your question has not been counted.", usage, true);
+      throw new VsiEngineError("Vaeroex could not be reached in time. Please retry. Your question has not been counted.", usage, true, error instanceof Error && ["AbortError", "TimeoutError"].includes(error.name) ? "timeout" : "provider");
     }
   };
   let product;
@@ -233,7 +241,7 @@ async function runVsiAnswerInternal(input: VsiRunInput, startedAt: number): Prom
     max_output_tokens: 1600, text: { format: { type: "json_schema", name: "vsi_research_plan_v1", strict: true, schema: VSI_PLAN_JSON_SCHEMA } } }, 45_000);
   let plan;
   try { plan = validateVsiResearchPlan(JSON.parse(outputText(planned)), input.question, approvedPublicTopics); }
-  catch { throw new VsiEngineError("Vaeroex could not prepare a reliable answer plan. Please retry.", usage); }
+  catch { throw new VsiEngineError("Vaeroex could not prepare a reliable answer plan. Please retry.", usage, false, "output_validation"); }
   if (plan.mode === "clarify") return finish({ content: plan.clarification || "Which public business name, website or topic should I research?", citations: [] });
 
   const webSources: VsiCitation[] = [], webClaims: VsiPublicResearchResult["claims"] = [];
@@ -242,6 +250,7 @@ async function runVsiAnswerInternal(input: VsiRunInput, startedAt: number): Prom
   const publicResearchTopics = plan.mode === "research" ? [...new Set(plan.publicTargets.map(target => target.text))].slice(0, 12) : undefined;
   if (plan.mode === "research") {
     usage.researchTier = plan.tier;
+    usage.researchStatus = "failed";
     const limits = vsiResearchLimits(plan.tier), requiresIndependent = plan.objectives.includes("independent_verification");
     let needsMore = true;
     while (needsMore && researchRounds < limits.rounds && totalWebTools(usage) < limits.totalTools) {
@@ -283,15 +292,15 @@ async function runVsiAnswerInternal(input: VsiRunInput, startedAt: number): Prom
       let result;
       try { result = validateVsiPublicResearch(JSON.parse(outputText(web)), [...webSources, ...consulted]); }
       catch {
-        if (webSources.length) { researchPartial = true; researchLimitations.push("A later lookup could not be verified, so only the earlier verified evidence is used."); break; }
-        throw new VsiEngineError("The public lookup did not return reliable source evidence. Please retry.", usage);
+        if (webSources.length) { usage.outputValidationFailures = (usage.outputValidationFailures || 0) + 1; researchPartial = true; researchLimitations.push("A later lookup could not be verified, so only the earlier verified evidence is used."); break; }
+        throw new VsiEngineError("The public lookup did not return reliable source evidence. Please retry.", usage, false, "output_validation");
       }
       if (!result.sources.length) {
         if (researchFocus === "independent_evidence") { researchPartial = true; researchLimitations.push("The independent-source pass did not return a verifiable source. Independent corroboration remains unestablished unless a later pass supplies it."); }
         console.error("[vsi-live-lookup]", vsiLiveLookupDiagnostic(web));
         if (webSources.length) { researchPartial = true; researchLimitations.push("A follow-up lookup did not return another verifiable source."); break; }
         if (!roundAllowanceExceeded && researchRounds < limits.rounds && totalWebTools(usage) < limits.totalTools) { needsMore = true; continue; }
-        throw new VsiEngineError("The live lookup did not return a verifiable source. Please retry shortly.", usage);
+        throw new VsiEngineError("The live lookup did not return a verifiable source. Please retry shortly.", usage, false, "evidence_unavailable");
       }
       for (const source of result.sources) {
         const existing = webSources.findIndex(item => item.url === source.url);
@@ -309,7 +318,7 @@ async function runVsiAnswerInternal(input: VsiRunInput, startedAt: number): Prom
   const previousQuestion = [...selectedMessages].reverse().find(message => message.role === "user")?.content || "";
   let evidence: VsiEvidenceResult = { sources: [], limitations: [] };
   try { if (plan.businessEvidence) evidence = await retrieveVsiEvidence(access, `${input.question}\n${previousQuestion.slice(0, 800)}`); }
-  catch { throw new VsiEngineError("Vaeroex could not check the permitted business sources for this answer. Please retry.", usage); }
+  catch { throw new VsiEngineError("Vaeroex could not check the permitted business sources for this answer. Please retry.", usage, false, "evidence_unavailable"); }
   const history = prepareVsiHistory(selectedMessages, [...evidence.sources, ...product.sources], input.question);
   let publicSelection = boundedVsiPublicEvidence(webClaims, webSources, 16_000);
   const payload = { question: input.question, now: new Date().toISOString(), privateConversationSummary: readVsiPrivateSummary(input.contextSummary),
@@ -330,23 +339,28 @@ async function runVsiAnswerInternal(input: VsiRunInput, startedAt: number): Prom
     const withoutLookup = JSON.stringify({ ...payload, livePublicLookup: null }).length + VSI_SYSTEM_PROMPT.length;
     publicSelection = boundedVsiPublicEvidence(webClaims, webSources, Math.max(0, Math.min(16_000, config.maxInputChars - withoutLookup - 1000)));
     payload.livePublicLookup = publicSelection.lookup;
-    if (!publicSelection.citations.length) throw new VsiEngineError("The verified research is too large to summarize safely with this question. Please ask about a narrower part.", usage);
+    if (!publicSelection.citations.length) throw new VsiEngineError("The verified research is too large to summarize safely with this question. Please ask about a narrower part.", usage, false, "context_block");
     if (publicSelection.omittedClaims) {
       payload.researchStatus.partial = true;
       payload.researchStatus.limitations.push(`${publicSelection.omittedClaims} additional verified findings from ${publicSelection.omittedSourceTitles.join(", ")} were left outside this bounded answer context. State that coverage is partial and offer a focused follow-up; do not claim those details were all assessed in the answer.`);
     }
   }
   if (JSON.stringify(payload).length + VSI_SYSTEM_PROMPT.length > config.maxInputChars) {
-    throw new VsiEngineError("This question and its sources are too large for one answer. Please narrow the question.", usage);
+    throw new VsiEngineError("This question and its sources are too large for one answer. Please narrow the question.", usage, false, "context_block");
   }
+  usage.researchStatus = plan.mode === "research" ? payload.researchStatus.partial ? "partial" : "completed" : "not_required";
+  usage.evidenceLimitations = payload.evidenceLimitations.length > 0 || payload.researchStatus.limitations.length > 0;
   const reply = await call({ input: [{ role: "system", content: VSI_SYSTEM_PROMPT }, { role: "user", content: JSON.stringify(payload) }],
     reasoning: { effort: plan.tier === "deep" ? "high" : "medium" }, max_output_tokens: Math.min(config.maxOutputTokens, plan.tier === "deep" ? 6000 : 4000),
     text: { format: { type: "json_schema", name: "vsi_answer_v1", strict: true, schema: answerJsonSchema } } });
+  let structuredAnswer;
+  try { structuredAnswer = answerSchema.parse(JSON.parse(outputText(reply))); }
+  catch { throw new VsiEngineError("Vaeroex could not verify this answer and its sources. Please retry. Your question has not been counted.", usage, false, "output_validation"); }
   try {
-    const answer = validateVsiAnswer(JSON.parse(outputText(reply)), [...payload.businessSources, ...payload.productSources, ...payload.historicalSources, ...publicSelection.citations]);
+    const answer = validateVsiAnswer(structuredAnswer, [...payload.businessSources, ...payload.productSources, ...payload.historicalSources, ...publicSelection.citations]);
     if (webSources.length && !answer.citations.some(source => source.sourceType === "web")) throw new Error("The live answer omitted its source.");
     return finish({ ...answer, ...(publicResearchTopics ? { publicResearchTopics } : {}) });
   } catch {
-    throw new VsiEngineError("Vaeroex could not verify this answer and its sources. Please retry. Your question has not been counted.", usage);
+    throw new VsiEngineError("Vaeroex could not verify this answer and its sources. Please retry. Your question has not been counted.", usage, false, "citation_validation");
   }
 }

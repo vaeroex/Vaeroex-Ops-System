@@ -9,14 +9,11 @@ import {
   type AiTrustUsageRow
 } from "@/lib/admin/ai-trust-dashboard";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { getVaeroexAdminAccess } from "@/lib/admin/vaeroex-admin";
+import { getAdminUsageData } from "@/lib/admin/usage-data";
 
 const MAX_ROWS_PER_SOURCE = 5_000;
-const USAGE_SELECT = "id,agent_type,status,model,latency_ms,created_at,provider:metadata_json->>provider,fallback_used:metadata_json->fallback_used,provider_attempts:metadata_json->provider_attempts,trust_shadow:metadata_json->trust_shadow";
-const NOTE_SELECT = "id,status,evidence_lifecycle_status,provider_name,model_used,fallback_used,provider_attempts_json,release_channel,latency_ms,extracted_at,approved_at,archived_at,deleted_at,created_at,extraction_confidence:extraction_json->>extractionConfidence,correction_count:user_corrections_json->>correction_count";
-
 type AdminClient = NonNullable<ReturnType<typeof createSupabaseAdminClient>>;
-type SafeRows = Readonly<{ rows: readonly Record<string, unknown>[]; count: number; failed: boolean }>;
-
 function objectRows(value: unknown) {
   return Array.isArray(value) ? value.filter((row): row is Record<string, unknown> => Boolean(row) && typeof row === "object" && !Array.isArray(row)) : [];
 }
@@ -35,17 +32,6 @@ function nullableNumber(value: unknown) {
 
 function booleanValue(value: unknown) {
   return value === true || value === "true";
-}
-
-async function safeRows(source: string, promise: PromiseLike<{ data: unknown; error: unknown; count?: number | null }>): Promise<SafeRows & { source: string }> {
-  try {
-    const result = await promise;
-    if (result.error) return { source, rows: [], count: 0, failed: true };
-    const rows = objectRows(result.data);
-    return { source, rows, count: result.count ?? rows.length, failed: false };
-  } catch {
-    return { source, rows: [], count: 0, failed: true };
-  }
 }
 
 function usageRows(rows: readonly Record<string, unknown>[]): AiTrustUsageRow[] {
@@ -110,64 +96,48 @@ function businessNoteRows(rows: readonly Record<string, unknown>[]): AiTrustBusi
   });
 }
 
-async function loadUsage(admin: AdminClient, agentType: string, start: string | null) {
-  let query = admin.from("ai_usage").select(USAGE_SELECT, { count: "exact" }).eq("agent_type", agentType)
-    .order("created_at", { ascending: false }).limit(MAX_ROWS_PER_SOURCE);
-  if (start) query = query.gte("created_at", start);
-  return query;
-}
-
-async function loadRuns(admin: AdminClient, agentType: string, start: string | null) {
-  let query = admin.from("ai_agent_runs").select("id,agent_type,status,created_at", { count: "exact" }).eq("agent_type", agentType)
-    .order("created_at", { ascending: false }).limit(MAX_ROWS_PER_SOURCE);
-  if (start) query = query.gte("created_at", start);
-  return query;
-}
-
-async function loadNotes(admin: AdminClient, start: string | null) {
-  let query = admin.from("business_notes").select(NOTE_SELECT, { count: "exact" })
-    .order("created_at", { ascending: false }).limit(MAX_ROWS_PER_SOURCE);
-  if (start) query = query.gte("created_at", start);
-  return query;
-}
-
-async function loadSavedFindingAnalysisCount(admin: AdminClient, start: string | null) {
-  let query = admin.from("reports").select("id", { count: "exact", head: true })
-    .eq("report_type", "Saved Analysis")
-    .contains("source_data_json", { record_kind: "saved_analysis", analysis_type: "finding_explanation" });
-  if (start) query = query.gte("created_at", start);
-  return query;
+/** Only bounded diagnostic row sources can be truncated. Count-only saved analyses
+ * have no fetched rows and must never participate in this comparison. */
+export function trustRowsTruncated(counts: Record<string, unknown>, sources: { usage: readonly unknown[]; runs: readonly unknown[]; notes: readonly unknown[] }) {
+  return (["usage", "runs", "notes"] as const).some((source) => typeof counts[source] === "number" && Number(counts[source]) > sources[source].length);
 }
 
 export async function getAiTrustDashboardData(input: {
   admin: AdminClient;
   filters: AiTrustFilters;
 }): Promise<AiTrustDashboardSnapshot> {
-  const start = aiTrustRangeStart(input.filters.range);
-  const sources = await Promise.all([
-    safeRows("Business Health telemetry", loadUsage(input.admin, "business_health_explanation_v1", start)),
-    safeRows("Explain Finding telemetry", loadUsage(input.admin, "finding_explanation_v1", start)),
-    safeRows("File Analysis telemetry", loadUsage(input.admin, "file_analysis", start)),
-    safeRows("Explain Finding artifacts", loadRuns(input.admin, "finding_explanation_v1", start)),
-    safeRows("File Analysis artifacts", loadRuns(input.admin, "file_analysis", start)),
-    safeRows("Business Notes lifecycle", loadNotes(input.admin, start)),
-    safeRows("Saved Analysis count", loadSavedFindingAnalysisCount(input.admin, start))
-  ]);
-  const [businessHealthUsage, findingUsage, fileUsage, findingRuns, fileRuns, notes, savedAnalyses] = sources;
-  const sourceErrors = sources.filter((source) => source.failed).map((source) => ({
-    source: source.source,
-    message: `${source.source} could not be loaded. Other available AI Trust metrics remain visible.`
-  }));
-  return buildAiTrustDashboardSnapshot({
-    filters: input.filters,
-    businessHealthUsage: usageRows(businessHealthUsage.rows),
-    findingExplanationUsage: usageRows(findingUsage.rows),
-    fileAnalysisUsage: usageRows(fileUsage.rows),
-    findingExplanationRuns: agentRunRows(findingRuns.rows),
-    fileAnalysisRuns: agentRunRows(fileRuns.rows),
-    businessNotes: businessNoteRows(notes.rows),
-    savedFindingAnalyses: savedAnalyses.failed ? null : savedAnalyses.count,
-    truncated: sources.some((source) => source.count > source.rows.length),
-    sourceErrors
-  });
+  // Reauthorize this reusable data boundary as well as the admin page/layout.
+  const access = await getVaeroexAdminAccess();
+  const now = new Date();
+  const start = aiTrustRangeStart(input.filters.range, now)!;
+  const end = now.toISOString();
+  const empty = (message: string) => buildAiTrustDashboardSnapshot({ filters: input.filters, businessHealthUsage: [], findingExplanationUsage: [], fileAnalysisUsage: [], findingExplanationRuns: [], fileAnalysisRuns: [], businessNotes: [], savedFindingAnalyses: null, generatedAt: end, sourceErrors: [{ source: "Trust telemetry", message }] });
+  if (!access.allowed || !access.admin) return empty("Vaeroex admin access is required.");
+  const operational = await getAdminUsageData({ start, end, workspaceId: input.filters.workspace || null });
+  try {
+    // PostgreSQL explicitly reconstructs every nested operational field before it
+    // leaves the database. Never fall back to selecting raw JSON on an RPC error.
+    const { data, error } = await access.admin.rpc("admin_ai_trust_rows_v1", {
+      p_start: start, p_end: end, p_workspace_id: input.filters.workspace || null, p_limit: MAX_ROWS_PER_SOURCE
+    });
+    if (error || !data || typeof data !== "object" || Array.isArray(data)) return { ...empty("Trust diagnostics are unavailable. No reliability conclusion can be drawn."), operational, periodStart: start, periodEnd: end };
+    const raw = data as Record<string, unknown>;
+    const rows = { usage: objectRows(raw.usage), runs: objectRows(raw.runs), notes: objectRows(raw.notes) };
+    const counts = raw.counts && typeof raw.counts === "object" && !Array.isArray(raw.counts) ? raw.counts as Record<string, unknown> : {};
+    const usage = usageRows(rows.usage);
+    const runs = agentRunRows(rows.runs);
+    return {
+      ...buildAiTrustDashboardSnapshot({ filters: input.filters,
+        businessHealthUsage: usage.filter((row) => row.agent_type === "business_health_explanation_v1"),
+        findingExplanationUsage: usage.filter((row) => row.agent_type === "finding_explanation_v1"),
+        fileAnalysisUsage: usage.filter((row) => row.agent_type === "file_analysis"),
+        findingExplanationRuns: runs.filter((row) => row.agent_type === "finding_explanation_v1"),
+        fileAnalysisRuns: runs.filter((row) => row.agent_type === "file_analysis"), businessNotes: businessNoteRows(rows.notes),
+        savedFindingAnalyses: nullableNumber(counts.saved_analyses), generatedAt: end,
+        truncated: trustRowsTruncated(counts, rows)
+      }), operational, periodStart: start, periodEnd: end
+    };
+  } catch {
+    return { ...empty("Trust diagnostics are unavailable. No reliability conclusion can be drawn."), operational, periodStart: start, periodEnd: end };
+  }
 }

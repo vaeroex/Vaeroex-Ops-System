@@ -439,7 +439,8 @@ check(adminWorkspaceActions.includes("admin.update_workspace_access"), "Admin wo
 const adminSubscriptionActions = read("app/app/admin/subscriptions/actions.ts");
 check(adminSubscriptionActions.includes("admin.update_subscription") && adminSubscriptionActions.includes("admin.create_manual_subscription"), "Admin subscription mutations must write security audit events.");
 const adminSupportActions = read("app/app/admin/support-requests/actions.ts");
-check(adminSupportActions.includes("admin.update_support_request") && adminSupportActions.includes("admin_support_request_action"), "Admin support request mutations must write security audit events.");
+const adminSupportMigration = read("supabase/migrations/20261012091842_admin_usage_trust_support_telemetry.sql");
+check(adminSupportActions.includes('rpc("admin_manage_support_requests_v1"') && adminSupportMigration.includes("insert into public.security_audit_events") && adminSupportMigration.includes("admin_support_request_action") && adminSupportMigration.includes("affected_ids") && adminSupportMigration.includes("changed_count"), "Admin support request mutations must atomically write content-free security audit events.");
 
 const adminAuditPage = read("app/app/admin/audit-logs/page.tsx");
 check(adminAuditPage.includes("security_audit_events") && adminAuditPage.includes("Security events"), "Admin audit page must show security audit events.");

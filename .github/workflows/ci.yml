@@ -61,6 +61,7 @@ jobs:
           audit_pg_bin="$(pg_config --bindir)"
           WORKSPACE_AUDIT_PG_BIN="$audit_pg_bin" pnpm test:workspace-audit:database
           WORKSPACE_STORAGE_PG_BIN="$audit_pg_bin" node scripts/workspace-storage-database-tests.cjs
+          ADMIN_METRICS_PG_BIN="$audit_pg_bin" node scripts/admin-metrics-database-tests.cjs
           ISSUE_TEST_PG_BIN="$audit_pg_bin" node scripts/issue-submission-native-tests.cjs
           SHEETS_TEST_PG_BIN="$audit_pg_bin" node scripts/google-sheets-dispatch-native-tests.cjs
           SHEETS_TEST_PG_BIN="$audit_pg_bin" node scripts/google-sheets-dispatch-fairness-native-tests.cjs
@@ -186,6 +187,11 @@ jobs:
         run: |
           pnpm exec playwright install --with-deps chromium
           pnpm test:google-sheets-ui
+
+      - name: Private admin telemetry and support regressions
+        run: |
+          pnpm test:admin-operations
+          pnpm test:admin-operations:browser
 
       - name: VSI desktop and mobile chat flow
         run: pnpm test:vsi-ui

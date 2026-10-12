@@ -59,6 +59,18 @@ type GoogleSheetsFactLinkRow = {
 export type Database = {
   public: {
     Functions: {
+      admin_usage_snapshot_v1: {
+        Args: { p_start: string; p_end: string; p_workspace_id?: string | null; p_page?: number; p_page_size?: number; p_workspace_page?: number };
+        Returns: Json;
+      };
+      admin_ai_trust_rows_v1: {
+        Args: { p_start: string | null; p_end: string; p_workspace_id?: string | null; p_limit?: number };
+        Returns: Json;
+      };
+      admin_manage_support_requests_v1: {
+        Args: { p_actor_user_id: string; p_request_ids: string[]; p_action: string; p_operation_id: string; p_status?: string | null; p_priority?: string | null };
+        Returns: Json;
+      };
       submit_issue_v1: {
         Args: { p_workspace_id: string; p_request_id: string; p_payload: Json };
         Returns: Json;

@@ -38,7 +38,7 @@ assert.ok(authorization >= 0 && redirect > authorization, "all Agents URLs must 
 assert.equal(exists("app/app/agents/actions.ts"), false, "the page-specific Agents server actions must be deleted");
 assert.equal(exists("app/app/agents/loading.tsx"), false, "the page-specific Agents loading UI must be deleted");
 assert.doesNotMatch(route, /searchParams|ai_agent_runs|runVaeroexAction|output_json|ManagedRecordList/, "run IDs and debug payloads must not render");
-assert.match(askRoute, /params\.run[\s\S]*requireWorkspacePage\(\)[\s\S]*redirect\("\/app\/intelligence"\)/, "old Ask result links must authorize and redirect");
+assert.match(askRoute, /requireWorkspacePage\(\)[\s\S]*params\.run[\s\S]*redirect\("\/app\/intelligence"\)/, "old Ask result links must authorize and redirect");
 assert.doesNotMatch(askRoute, /\/app\/agents/, "Ask must not link back to Agents");
 
 for (const source of [search, searchTypes]) {
@@ -80,9 +80,12 @@ assert.doesNotMatch(fileActions, /revalidatePath\("\/app\/agents"\)/);
 for (const type of ["business_health_explanation_v1", "finding_explanation_v1", "file_analysis"]) {
   assert.match(activeTypes, new RegExp(`"${type}"`), `${type} must remain an active diagnostic artifact`);
 }
-for (const adminSource of [adminUsage, adminHome, adminAudit]) {
+for (const adminSource of [adminHome, adminAudit]) {
   assert.match(adminSource, /ACTIVE_AI_AGENT_RUN_TYPES/, "admin diagnostics must scope run rows to current supported artifacts");
 }
+assert.match(adminUsage, /getAdminUsageData/, "usage must use the content-free server aggregate");
+const adminTelemetryMigration = read("supabase/migrations/20261012091842_admin_usage_trust_support_telemetry.sql");
+assert.match(adminTelemetryMigration, /agent_type.*intelligence_briefing_v1/, "current briefing artifacts are included in aggregate telemetry");
 assert.doesNotMatch(adminUsage, /Ask Vaeroex|Operations audit|ask_vaeroex|operations_audit/);
 assert.match(adminAudit, /security_audit_events/);
 assert.match(adminAudit, /audit_logs/);

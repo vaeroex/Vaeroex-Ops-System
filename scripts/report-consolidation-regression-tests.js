@@ -123,10 +123,13 @@ assert.deepEqual(reportTableUsers, [
   "app/app/reports/[id]/page.tsx",
   "app/app/reports/page.tsx",
   "app/app/reports/saved-analysis-actions.ts",
-  "lib/admin/ai-trust-data.ts"
+  "lib/vsi/retrieval.ts"
 ]);
+assert.match(read("lib/vsi/retrieval.ts"), /from\("reports"\)[\s\S]*eq\("workspace_id", workspaceId\)[\s\S]*record_kind: "saved_analysis"/, "VSI may retrieve only tenant-scoped current saved analyses");
 const aiTrustData = read("lib/admin/ai-trust-data.ts");
-assert.match(aiTrustData, /from\("reports"\)\.select\("id", \{ count: "exact", head: true \}\)[\s\S]*\.eq\("report_type", "Saved Analysis"\)[\s\S]*analysis_type: "finding_explanation"/, "the admin Trust reader may count only current finding Saved Analyses, not retired report artifacts");
+assert.match(aiTrustData, /admin_ai_trust_rows_v1/, "Trust uses the service-only allowlist projection");
+const adminTelemetry = read("supabase/migrations/20261012091842_admin_usage_trust_support_telemetry.sql");
+assert.match(adminTelemetry, /'saved_analyses',\(select count\(\*\) from public\.reports where report_type='Saved Analysis' and source_data_json @> '\{"record_kind":"saved_analysis","analysis_type":"finding_explanation"\}'/, "Trust counts only current finding Saved Analyses without fetching contents");
 
 const { SAVED_ANALYSIS_TYPES, parseSavedAnalysisEnvelope, savedAnalysisListItem } = require("../lib/reports/saved-analysis.ts");
 assert.deepEqual([...SAVED_ANALYSIS_TYPES], [
