@@ -16,6 +16,7 @@ class VsiHttpError extends Error {
 }
 const mocks = {
   'server-only': {},
+  '@/lib/integrations/google-sheets/read-authority': { beginGoogleSheetsRead: async () => ({ ticketId: requestId }), bindGoogleSheetsRead: async () => ({ ticketId: requestId }), googleSheetsReadSources: (table, rows) => rows.map(({ id }) => ({ table, id })) },
   'next/server': { NextResponse: { json: (body, options) => Response.json(body, options) } },
   zod: { z },
   '@/lib/security/rate-limit': { enforceRateLimit: async () => ({ allowed: true }) },

@@ -6,7 +6,7 @@ const os = require('node:os');
 const { spawnSync } = require('node:child_process');
 const vm = require('node:vm');
 const { checkTap, expandFixture, suiteRequests, candidateDblinkSetting, candidates, pendingSuite, eligibilitySuite,
-  productionSquare, productionSheets, auditMigrations, capacityMigrations, storageMigrations, pricingMigration, legalAcceptanceMigration, adminTelemetryMigration, assertProductionBaselineLedger,
+  productionSquare, productionSheets, auditMigrations, capacityMigrations, storageMigrations, pricingMigration, legalAcceptanceMigration, adminTelemetryMigration, sheetsErasureMigrations, assertProductionBaselineLedger,
   dashboardMigrations, dashboardSuites, dashboardPlan, checkDashboardAssertionNames, composeSquareIdentitySuite, executeDashboardSuite,
   preferenceAssertionNames, reportingTimezoneAssertionNames, squareIdentityAssertionNames } = require('./run-qbo-production-candidate-database-tests.cjs');
 const { verifyLocalContext, verifyOwnedContainer, verifyBridgeGateway } = require('./qbo-candidate-local-container.cjs');
@@ -26,15 +26,15 @@ assert.match(candidateRunner, /outcome\.assertions = await require\('\.\/qbo-pen
   'eligibility tests use the owned per-suite database clone'); assertions++;
 assert.match(candidateRunner, /assert\.equal\(outcome\.assertions, suite\.expectedScenarios/, 'incomplete native coverage fails the candidate run'); assertions++;
 assert.match(candidateRunner, /result\.suites\.length === shapeSuites\.length \+ 4/, 'candidate success requires the registered dashboard suites and all four existing native suites'); assertions++;
-assert.match(candidateRunner, /assert\.equal\(canonical\.length, 144,/, 'canonical count remains exact'); assertions++;
+assert.match(candidateRunner, /assert\.equal\(canonical\.length, 146,/, 'canonical count remains exact'); assertions++;
 assert.deepEqual(storageMigrations, [
   '20261012003846_workspace_storage_capacity.sql',
   '20261012003920_workspace_storage_capacity_billing.sql',
   '20261012013508_workspace_storage_invoice_capacity.sql',
 ], 'only the three reviewed storage migrations extend the existing canonical baseline'); assertions++;
 const canonicalNames = fs.readdirSync(path.join(__dirname, '../supabase/migrations')).filter(name => /^\d+_.+\.sql$/.test(name)).sort();
-assert.equal(canonicalNames.filter(name => ![...storageMigrations, pricingMigration, legalAcceptanceMigration, adminTelemetryMigration].includes(name)).length, 138, 'the reviewed pre-storage canonical baseline remains exact'); assertions++;
-assert.deepEqual(canonicalNames.slice(-6), [...storageMigrations, pricingMigration, legalAcceptanceMigration, adminTelemetryMigration], 'the exact storage, price and legal boundary migrations are the final ordered tail'); assertions++;
+assert.equal(canonicalNames.filter(name => ![...storageMigrations, pricingMigration, legalAcceptanceMigration, adminTelemetryMigration, ...sheetsErasureMigrations].includes(name)).length, 138, 'the reviewed pre-storage canonical baseline remains exact'); assertions++;
+assert.deepEqual(canonicalNames.filter(name => !sheetsErasureMigrations.includes(name)).slice(-6), [...storageMigrations, pricingMigration, legalAcceptanceMigration, adminTelemetryMigration], 'the exact storage, price and legal boundary migrations are the final ordered tail'); assertions++;
 assert.ok(candidateRunner.indexOf('await apply(legalAcceptance);') > candidateRunner.indexOf('await apply(pricing);'), 'legal acceptance exception follows the shared entitlement audit in both shapes'); assertions++;
 assert.ok(candidateRunner.indexOf('for (const item of storage) await apply(item);') > candidateRunner.indexOf('await apply(vsiResearch);'),
   'storage follows its full authorization and billing prerequisites in both shapes'); assertions++;
@@ -49,9 +49,9 @@ assert.deepEqual(auditMigrations, [
   '20261005061024_internal_form_submission_idempotency.sql', '20261005062005_durable_import_attempt_reconciliation.sql',
   '20261005070311_worksheet_import_publication_heads.sql',
 ]); assertions++;
-assert.match(candidateRunner, /'20261002040024_google_sheets_complete\.sql',\s*'20261002040031_google_sheets_lifecycle\.sql',\s*'20261002182049_integration_summary_preferences\.sql',\s*\.\.\.auditMigrations,\s*\.\.\.capacityMigrations,\s*vsiMigration,\s*vsiResearchMigration,\s*\.\.\.storageMigrations,\s*pricingMigration,\s*legalAcceptanceMigration,\s*adminTelemetryMigration,\s*\]/,
+assert.match(candidateRunner, /'20261002040024_google_sheets_complete\.sql',\s*'20261002040031_google_sheets_lifecycle\.sql',\s*'20261002182049_integration_summary_preferences\.sql',\s*sheetsErasureMigrations\[0\],\s*\.\.\.auditMigrations,\s*\.\.\.capacityMigrations,\s*vsiMigration,\s*vsiResearchMigration,\s*\.\.\.storageMigrations,\s*pricingMigration,\s*legalAcceptanceMigration,\s*adminTelemetryMigration,\s*sheetsErasureMigrations\[1\],\s*\]/,
   'canonical tail remains exactly Sheets, preferences, audit, capacity, VSI and reviewed storage tails'); assertions++;
-assert.match(candidateRunner, /canonical\.filter\(item => !\[\.\.\.auditMigrations, \.\.\.capacityMigrations, vsiMigration, vsiResearchMigration, \.\.\.storageMigrations, pricingMigration, legalAcceptanceMigration, adminTelemetryMigration\]\.includes\(path\.basename\(item\.file\)\)\)/,
+assert.match(candidateRunner, /canonical\.filter\(item => !\[\.\.\.auditMigrations, \.\.\.capacityMigrations, vsiMigration, vsiResearchMigration, \.\.\.storageMigrations, pricingMigration, legalAcceptanceMigration, adminTelemetryMigration, \.\.\.sheetsErasureMigrations\]\.includes\(path\.basename\(item\.file\)\)\)/,
   'canonical does not apply audit guards before new provider tables exist'); assertions++;
 assert.match(candidateRunner, /const vsiMigration = '20261008190000_vsi_private_chat\.sql'/, 'VSI tail is explicitly reviewed'); assertions++;
 assert.match(candidateRunner, /const vsiResearchMigration = '20261009041421_vsi_adaptive_research\.sql'/, 'research tail is explicitly reviewed'); assertions++;
@@ -458,3 +458,7 @@ dashboardExecutionTests().then(containerLifecycleTests).then(() => {
 }).catch(error => { console.error(error); process.exitCode = 1; });
 
 assert.ok(candidateRunner.indexOf('await apply(adminTelemetry);') > candidateRunner.indexOf('await apply(legalAcceptance);'), 'admin telemetry follows all authorization, cost ledger and legal boundary migrations');
+
+assert.deepEqual(sheetsErasureMigrations, ['20261002225025_google_sheets_support_erasure.sql', '20261012191836_google_sheets_restricted_erasure_retention.sql']); assertions++;
+assert.ok(candidateRunner.indexOf('for (const item of sheetsErasure) await apply(item);') > candidateRunner.indexOf('await apply(adminTelemetry);'), 'erasure candidates follow the complete canonical destination schema in both shapes'); assertions++;
+assert.match(candidateRunner, /sheetsErasureTailHashes: sheetsErasure\.map/, 'qualification records exact candidate hashes'); assertions++;

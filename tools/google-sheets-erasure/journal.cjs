@@ -15,7 +15,9 @@ const TABLES = Object.freeze([
   'reports', 'kpi_alert_events', 'business_memory_chunks', 'record_shares', 'notifications',
   'operational_assignments', 'business_decisions', 'vaeroex_recommendation_outcomes',
   'scheduled_report_runs', 'kpi_settings', 'kpi_alert_rules', 'audit_logs',
-  'security_audit_events', 'ai_usage'
+  'security_audit_events', 'ai_usage', 'business_health_snapshots', 'vsi_exchanges',
+  'vsi_conversations', 'business_notes', 'file_uploads', 'file_imports', 'operational_metrics',
+  'intelligence_card_lifecycle', 'intelligence_card_lifecycle_events', 'file_upload_analysis', 'vsi_request_content', 'file_processing_jobs', 'google_sheets_retention_boundary'
 ]);
 const allowedTables = new Set(TABLES);
 const KEY_FILE = 'ed25519-private.pem';
@@ -70,23 +72,36 @@ function digest(bytes) {
   return crypto.createHash('sha256').update(bytes).digest('hex');
 }
 
-/** Pure, strict schema normalization. IDs only: fact links use their unique kpi_id,
- * credentials use connection_id, other targets use id. Scope/ownership comes from
+/** Pure, strict schema normalization. v2 uses stable row IDs plus content hashes;
+ * credentials use connection_id. Legacy v1 fact links used unique kpi_id. Scope/ownership comes from
  * the parent's reviewed SQL inventory; a signature is not authorization evidence. */
 function normalizeManifest(input) {
-  exactKeys(input, MANIFEST_FIELDS);
-  if (input.version !== 1) deny('schema');
+  const supplied = objectKeys(input), hasWithdrawal = supplied.includes('withdrawal'), hasStorage = supplied.includes('storageReceipts');
+  exactKeys(input, [...MANIFEST_FIELDS, ...(hasStorage ? ['storageReceipts'] : []), ...(hasWithdrawal ? ['withdrawal'] : [])]);
+  if (![1, 2].includes(input.version)) deny('schema');
   for (const key of ['requestId', 'workspaceId', 'connectionId']) uuid(input[key]);
   if (typeof input.scopeHash !== 'string' || !HEX.test(input.scopeHash)) deny('schema');
   if (input.completedAt !== null && (typeof input.completedAt !== 'string' ||
       !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(input.completedAt) ||
       !Number.isFinite(Date.parse(input.completedAt)) ||
       new Date(input.completedAt).toISOString() !== input.completedAt)) deny('schema');
+  let withdrawal;
+  if (hasWithdrawal) {
+    if (input.version !== 2 || input.completedAt !== null) deny('state');
+    exactKeys(input.withdrawal, ['at', 'reason', 'intentDigest', 'inventoryDigest']);
+    const w = input.withdrawal;
+    if (typeof w.at !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(w.at) ||
+        !Number.isFinite(Date.parse(w.at)) || new Date(w.at).toISOString() !== w.at ||
+        !['scope_changed', 'approval_expired', 'owner_withdrawn'].includes(w.reason) ||
+        !HEX.test(w.intentDigest) || !HEX.test(w.inventoryDigest)) deny('withdrawal');
+    withdrawal = { at: w.at, reason: w.reason, intentDigest: w.intentDigest, inventoryDigest: w.inventoryDigest };
+  }
   strictArray(input.targets);
   const seen = new Set();
   const totals = new Map();
   const targets = input.targets.map(target => {
-    exactKeys(target, ['table', 'id']);
+    exactKeys(target, input.version === 2 ? ['table', 'id', 'hash'] : ['table', 'id']);
+    if (input.version === 2 && (typeof target.hash !== 'string' || !HEX.test(target.hash))) deny('hash');
     if (!allowedTables.has(target.table)) deny('table');
     uuid(target.id);
     if (['google_sheets_connections', 'google_sheets_credentials'].includes(target.table) &&
@@ -95,7 +110,7 @@ function normalizeManifest(input) {
     if (seen.has(key)) deny('duplicate_target');
     seen.add(key);
     totals.set(target.table, (totals.get(target.table) || 0) + 1);
-    return { table: target.table, id: target.id };
+    return { table: target.table, id: target.id, ...(input.version === 2 ? { hash: target.hash } : {}) };
   }).sort((a, b) => a.table < b.table ? -1 : a.table > b.table ? 1 : a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
   const countKeys = objectKeys(input.counts).sort();
   const counts = {};
@@ -106,10 +121,25 @@ function normalizeManifest(input) {
     counts[table] = input.counts[table];
   }
   if ([...totals.keys()].some(table => !countKeys.includes(table))) deny('counts');
+  let storageReceipts;
+  if (hasStorage) {
+    if (input.version !== 2) deny('storage_receipt');
+    strictArray(input.storageReceipts); const files = new Set();
+    storageReceipts = input.storageReceipts.map(receipt => {
+      exactKeys(receipt, ['fileId', 'bucket', 'path', 'purgedAt', 'rowHash']); uuid(receipt.fileId);
+      if (receipt.bucket !== 'workspace-files' || typeof receipt.path !== 'string' || receipt.path.length > 1024 ||
+          !receipt.path.startsWith(`${input.workspaceId}/`) || /[\x00-\x1f\\]/.test(receipt.path) || receipt.path.split('/').some(part => !part || part === '.' || part === '..') ||
+          typeof receipt.purgedAt !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(receipt.purgedAt) ||
+          !Number.isFinite(Date.parse(receipt.purgedAt)) || new Date(receipt.purgedAt).toISOString() !== receipt.purgedAt ||
+          files.has(receipt.fileId) || !targets.some(t => t.table === 'file_uploads' && t.id === receipt.fileId && t.hash === receipt.rowHash)) deny('storage_receipt');
+      files.add(receipt.fileId);
+      return { fileId: receipt.fileId, bucket: receipt.bucket, path: receipt.path, purgedAt: receipt.purgedAt, rowHash: receipt.rowHash };
+    }).sort((a, b) => a.fileId.localeCompare(b.fileId));
+  }
   return {
-    version: 1, requestId: input.requestId, workspaceId: input.workspaceId,
+    version: input.version, requestId: input.requestId, workspaceId: input.workspaceId,
     connectionId: input.connectionId, scopeHash: input.scopeHash,
-    targets, counts, completedAt: input.completedAt
+    targets, counts, completedAt: input.completedAt, ...(storageReceipts ? { storageReceipts } : {}), ...(withdrawal ? { withdrawal } : {})
   };
 }
 
@@ -167,7 +197,7 @@ function verifyRecord(input, publicKey, pinnedFingerprint) {
   if (signature.length !== 64 || signature.toString('base64') !== envelope.signature) deny('signature');
   if (!bytes.equals(envelopeBytes(manifest, envelope.signature))) deny('noncanonical');
   if (!crypto.verify(null, signedBytes(manifest), key, signature)) deny('signature');
-  return { state: manifest.completedAt === null ? 'pending' : 'completed', manifest, digest: digest(bytes) };
+  return { state: manifest.withdrawal ? 'withdrawn' : manifest.completedAt === null ? 'pending' : 'completed', manifest, digest: digest(bytes) };
 }
 
 function isWithin(candidate, root) {
@@ -263,7 +293,7 @@ function storage(directory, adapter) {
     for (const name of names) {
       if (name === LOCK && locked) continue;
       if (name === LOCK || name.startsWith('.stage-')) deny('recovery_required');
-      if (name !== KEY_FILE && !/^[a-f0-9-]{36}\.(pending|completed)\.json$/.test(name)) deny('unexpected_file');
+      if (name !== KEY_FILE && !/^[a-f0-9-]{36}\.(pending|completed|withdrawn)\.json$/.test(name)) deny('unexpected_file');
       privateMode(io.lstatSync(path.join(directory, name)), uid);
     }
     return names.filter(name => name !== LOCK);
@@ -346,9 +376,12 @@ function generateJournalKey(options, adapter = nodeAdapter) {
   });
 }
 
-function pendingIdentity(manifest) {
-  return JSON.stringify({ ...manifest, completedAt: null });
+function pendingManifest(manifest) {
+  const pending = { ...manifest, completedAt: null };
+  delete pending.withdrawal;
+  return pending;
 }
+function pendingIdentity(manifest) { return JSON.stringify(pendingManifest(manifest)); }
 
 /** Synchronous durability boundary for the parent's private support entry point.
  * writePending must return before SQL. writeCompletedReceipt must be called only
@@ -369,22 +402,31 @@ function openJournal(options, adapter = nodeAdapter) {
     });
     if (JSON.stringify(names) !== JSON.stringify(store.entries(locked))) deny('journal_changed');
     const pending = new Map(result.filter(record => record.state === 'pending')
-      .map(record => [record.manifest.requestId, record.manifest]));
+      .map(record => [record.manifest.requestId, record]));
     for (const record of result.filter(item => item.state === 'completed')) {
       const intent = pending.get(record.manifest.requestId);
-      if (!intent || pendingIdentity(intent) !== pendingIdentity(record.manifest)) deny('receipt_without_matching_intent');
+      if (!intent || pendingIdentity(intent.manifest) !== pendingIdentity(record.manifest)) deny('receipt_without_matching_intent');
+    }
+    for (const record of result.filter(item => item.state === 'withdrawn')) {
+      const intent = pending.get(record.manifest.requestId);
+      if (!intent || intent.digest !== record.manifest.withdrawal.intentDigest ||
+          pendingIdentity(intent.manifest) !== pendingIdentity(record.manifest) ||
+          result.some(item => item.state === 'completed' && item.manifest.requestId === record.manifest.requestId)) deny('withdrawal_conflict');
     }
     return result;
   }
   function append(input, expectedState) {
     const manifest = normalizeManifest(input);
-    const state = manifest.completedAt === null ? 'pending' : 'completed';
+    const state = manifest.withdrawal ? 'withdrawn' : manifest.completedAt === null ? 'pending' : 'completed';
     if (state !== expectedState) deny('state');
     return store.withLock(transaction => {
       const existing = records(true);
-      if (state === 'completed') {
+      if (state !== 'pending') {
         const intent = existing.find(record => record.state === 'pending' && record.manifest.requestId === manifest.requestId);
         if (!intent || pendingIdentity(intent.manifest) !== pendingIdentity(manifest)) deny('receipt_without_matching_intent');
+        if (state === 'withdrawn' && (intent.digest !== manifest.withdrawal.intentDigest ||
+            existing.some(record => record.state === 'completed' && record.manifest.requestId === manifest.requestId))) deny('withdrawal_conflict');
+        if (state === 'completed' && existing.some(record => record.state === 'withdrawn' && record.manifest.requestId === manifest.requestId)) deny('withdrawal_conflict');
       }
       const pem = store.read(KEY_FILE, 16 * 1024);
       let privateKey;
@@ -397,11 +439,18 @@ function openJournal(options, adapter = nodeAdapter) {
   return Object.freeze({
     writePending: manifest => append(manifest, 'pending'),
     writeCompletedReceipt: manifest => append(manifest, 'completed'),
-    listRecords: () => records()
+    writeWithdrawalReceipt: manifest => append(manifest, 'withdrawn'),
+    listRecords: () => records(),
+    readSignedRecord: (requestId, state) => {
+      uuid(requestId);
+      if (!['pending', 'completed', 'withdrawn'].includes(state)) deny('state');
+      records();
+      return store.read(`${requestId}.${state}.json`);
+    }
   });
 }
 
 module.exports = Object.freeze({
-  TABLES, normalizeManifest, publicKeyFingerprint, signManifest, verifyRecord,
+  TABLES, normalizeManifest, pendingManifest, publicKeyFingerprint, signManifest, verifyRecord,
   generateJournalKey, openJournal
 });

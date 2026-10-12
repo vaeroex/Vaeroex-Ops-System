@@ -1,5 +1,8 @@
 "use server";
 
+import { beginGoogleSheetsRead, bindGoogleSheetsRead, googleSheetsReadTicketFields } from "@/lib/integrations/google-sheets/read-authority";
+
+
 import { revalidatePath } from "next/cache";
 import {
   INTELLIGENCE_BRIEFING_CONTRACT_ID,
@@ -79,10 +82,13 @@ export async function generateIntelligenceBriefingAction(input: {
     return unavailable(briefingType, "Active workspace access is required.");
   }
   const workspaceId = context.activeWorkspace.id;
+  const readTicket = await beginGoogleSheetsRead(supabase, workspaceId, user.id).catch(() => null);
+  if (!readTicket) return unavailable(briefingType, "Workspace data is being updated. Reload before requesting analysis.");
   const current = await loadCurrentIntelligenceBriefing({ supabase, workspaceId, briefingType }).catch(() => null);
   let briefingPackage;
   try {
     ({ briefingPackage } = await buildWorkspaceIntelligenceBriefingPackage({
+      readTicket,
       supabase,
       workspaceId,
       workspace: context.activeWorkspace,
@@ -94,7 +100,7 @@ export async function generateIntelligenceBriefingAction(input: {
       } : null
     }));
   } catch {
-    return { ...unavailable(briefingType, "Eligible evidence could not be verified safely."), artifact: current?.artifact || null };
+    return unavailable(briefingType, "Eligible evidence could not be verified safely.");
   }
   const state = briefingStateFromPackage({ briefingPackage, current });
   if (!intelligenceBriefingStateAllowsGeneration(state)) return state;
@@ -134,6 +140,7 @@ export async function generateIntelligenceBriefingAction(input: {
     return { ...state, status: "unavailable", message: "Intelligence request limits could not be verified. Please try again shortly." };
   }
   const inputJson = {
+    ...googleSheetsReadTicketFields(readTicket.ticketId),
     workflow: INTELLIGENCE_BRIEFING_CONTRACT_ID,
     briefing_type: briefingType,
     generation_key: briefingPackage.generationKey,
@@ -151,6 +158,7 @@ export async function generateIntelligenceBriefingAction(input: {
     original_evidence_eligible: false
   } satisfies Json;
   const claim = await claimIntelligenceBriefingGeneration({
+    reader: supabase,
     admin,
     workspaceId,
     userId: user.id,
@@ -163,10 +171,12 @@ export async function generateIntelligenceBriefingAction(input: {
   if (claim.status === "hidden_completed") return { ...state, status: "unavailable", message: "This exact briefing is retained as hidden historical data and cannot be regenerated." };
   if (claim.status !== "claimed") return { ...state, status: "failed", message: SAFE_FAILURE_MESSAGE };
   try {
-    const generated = await generateIntelligenceBriefing({ supabase, workspaceId, briefingPackage, startedAtMs: startedAt });
+    await bindGoogleSheetsRead(supabase, readTicket.ticketId, []);
+    const generated = await generateIntelligenceBriefing({ supabase, workspaceId, briefingPackage, readTicketId: readTicket.ticketId, startedAtMs: startedAt });
     const { data: updated, error: updateError } = await admin
       .from("ai_agent_runs")
       .update({
+        ...googleSheetsReadTicketFields(readTicket.ticketId),
         output_json: generated.artifact as unknown as Json,
         status: "completed",
         error_message: null,
@@ -201,6 +211,6 @@ export async function generateIntelligenceBriefingAction(input: {
       agentType: INTELLIGENCE_BRIEFING_CONTRACT_ID,
       usage: failedUsage(error, Date.now() - startedAt, briefingType)
     });
-    return { ...state, status: "failed", artifact: current?.artifact || null, message: SAFE_FAILURE_MESSAGE };
+    return { ...state, status: "failed", artifact: null, message: SAFE_FAILURE_MESSAGE };
   }
 }

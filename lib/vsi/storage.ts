@@ -1,3 +1,4 @@
+import { beginGoogleSheetsRead, bindGoogleSheetsRead, googleSheetsReadSources, type GoogleSheetsReadTicket } from "@/lib/integrations/google-sheets/read-authority";
 import "server-only";
 
 import { createHash } from "crypto";
@@ -21,10 +22,12 @@ export class VsiHttpError extends Error {
 }
 export const vsiUuid = z.string().uuid();
 export type ConversationRow = {
+  google_sheets_read_ticket_id: string | null;
   id: string; workspace_id: string; actor_user_id: string; title: string; exchange_count: number;
   context_summary: string; parent_conversation_id: string | null; created_at: string; updated_at: string;
 };
 export type ExchangeRow = {
+  google_sheets_read_ticket_id: string | null;
   id: string; workspace_id: string; actor_user_id: string; conversation_id: string;
   user_message: string; answer: string; citations: Json; public_research_topics?: Json; remember_proposal: Json | null; saved_note_id: string | null; created_at: string;
 };
@@ -134,11 +137,15 @@ export function updateVsiSummary(previous: string, question: string, answer: str
   return updateVsiPrivateSummary(previous, question);
 }
 
-export async function confirmVsiNote(access: VsiAccess, conversationId: string, exchangeId: string) {
+export async function confirmVsiNote(access: VsiAccess, conversationId: string, exchangeId: string, inheritedTicket?: GoogleSheetsReadTicket) {
   if (!access.canEditBusinessNotes) throw new VsiHttpError(403, "note_permission", "You do not have permission to create Business Notes. This note was not saved.");
+  const readTicket = inheritedTicket ?? await beginGoogleSheetsRead(access.supabase, access.workspaceId, access.userId);
   const chat = await loadVsiConversation(access, conversationId);
   const exchange = chat.exchanges.find((item) => item.id === exchangeId);
   if (!exchange?.rememberProposal) throw new VsiHttpError(404, "proposal_missing", "This note proposal is no longer available.");
+  await bindGoogleSheetsRead(access.supabase, readTicket.ticketId, [
+    { table: "vsi_conversations", id: conversationId }, ...googleSheetsReadSources("vsi_exchanges", [exchange])
+  ]);
   const { content, title } = exchange.rememberProposal;
   if (hasProhibitedVsiIdentifiers(`${title}\n${content}`)) throw new VsiHttpError(422, "prohibited_identifiers", VSI_PROHIBITED_INPUT_MESSAGE);
   // The proposal is a user-authorized note, never an independently verified fact.
@@ -152,6 +159,6 @@ export async function confirmVsiNote(access: VsiAccess, conversationId: string, 
   };
   const validated = validateBusinessNoteExtraction(extraction, content);
   if (!validated.ok) throw new VsiHttpError(422, "note_review_required", "This note needs to be entered and reviewed in Business Notes. It has not been saved.");
-  return mutateVsi<{ noteId: string }>(access, "remember", { conversationId, exchangeId, content, sourceHash: questionHash(content),
+  return mutateVsi<{ noteId: string }>(access, "remember", { readTicketId: readTicket.ticketId, conversationId, exchangeId, content, sourceHash: questionHash(content),
     releaseChannel: businessNoteReleaseChannel(), extraction: validated.value, spans: businessNoteSourceSpans(validated.value, content) });
 }

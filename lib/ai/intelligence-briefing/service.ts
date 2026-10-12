@@ -174,11 +174,13 @@ export function filterIntelligenceBriefingPackageForAcceptedCandidate(
 export async function generateIntelligenceBriefing({
   supabase,
   workspaceId,
+  readTicketId,
   briefingPackage,
   startedAtMs = Date.now()
 }: {
   supabase: SupabaseClient<Database>;
   workspaceId: string;
+  readTicketId: string;
   briefingPackage: IntelligenceBriefingPackage;
   startedAtMs?: number;
 }) {
@@ -200,6 +202,7 @@ export async function generateIntelligenceBriefing({
   await assertWorkspaceTokenBudget({ supabase, workspaceId, estimatedRequestTokens });
   const baseSettings = getAIProviderRetrySettings(primary.provider);
   const generation = await runStructuredAI({
+    googleSheetsReadTicketId: readTicketId,
     primaryProvider: primary.provider,
     primaryModel: primary.model,
     fallbackModel: BUSINESS_HEALTH_GPT56_TERRA_MODEL,

@@ -30,6 +30,7 @@ export type AIProviderInputPart =
   | { type: "file"; fileName: string; mimeType: string; base64Data: string };
 
 export type AIProviderRequest = {
+  googleSheetsReadTicketId?: string;
   model: string;
   systemPrompt: string;
   userContent: AIProviderInputPart[];

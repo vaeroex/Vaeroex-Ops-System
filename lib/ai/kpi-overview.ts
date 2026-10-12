@@ -1,3 +1,4 @@
+import { beginGoogleSheetsRead, bindGoogleSheetsRead, googleSheetsReadSources, type GoogleSheetsReadTicket } from "@/lib/integrations/google-sheets/read-authority";
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { cleanVaeroexErrorMessage } from "@/lib/ai/errors";
@@ -92,6 +93,7 @@ export type KpiOverviewDiagnostics = {
 type StageLogger = (event: string, details?: Record<string, unknown>) => void;
 
 export type KpiOverviewDataLoad = {
+  readTicket: GoogleSheetsReadTicket;
   rows: KpiRow[];
   settings: KpiSettingRow[];
   summary: KpiOverviewSummary;
@@ -288,12 +290,15 @@ export function buildKpiOverviewSummary(rows: KpiRow[], settings: KpiSettingRow[
 }
 
 export async function loadKpiOverviewData({
+  readTicket: inheritedTicket,
   supabase,
   workspaceId
 }: {
+  readTicket?: GoogleSheetsReadTicket;
   supabase: SupabaseClient<Database>;
   workspaceId: string;
 }): Promise<KpiOverviewDataLoad> {
+  const readTicket = inheritedTicket ?? await beginGoogleSheetsRead(supabase, workspaceId);
   const queryStartedAt = Date.now();
   const [kpiResult, settingsResult] = await Promise.all([
     supabase
@@ -325,7 +330,9 @@ export async function loadKpiOverviewData({
   const rows = filterBySourceParentEligibility(rawRows, parentEligibility);
   const queryMs = Date.now() - queryStartedAt;
 
+  await bindGoogleSheetsRead(supabase, readTicket.ticketId, [...googleSheetsReadSources("kpis", rows), ...googleSheetsReadSources("kpi_settings", settings)]);
   return {
+    readTicket,
     rows,
     settings,
     summary: buildKpiOverviewSummary(rows, settings),
@@ -468,6 +475,7 @@ function normalizeModelOutput(value: Json, fallback: Json) {
 }
 
 async function runCompactProviderKpiAnswer({
+  readTicketId,
   supabase,
   workspaceId,
   userId,
@@ -475,6 +483,7 @@ async function runCompactProviderKpiAnswer({
   summary,
   providerSettings
 }: {
+  readTicketId: string;
   supabase: SupabaseClient<Database>;
   workspaceId: string;
   userId?: string | null;
@@ -514,6 +523,7 @@ async function runCompactProviderKpiAnswer({
     maxRetries: 0
   };
   const generation = await runStructuredAI({
+    googleSheetsReadTicketId: readTicketId,
     primaryProvider,
     primaryModel: model,
     fallbackModel,
@@ -622,7 +632,7 @@ export async function runLightweightKpiOverview({
 
     try {
       const modelResult = await runCompactProviderKpiAnswer({
-        supabase,
+        readTicketId: overviewData.readTicket.ticketId,        supabase,
         workspaceId,
         userId,
         userPrompt,

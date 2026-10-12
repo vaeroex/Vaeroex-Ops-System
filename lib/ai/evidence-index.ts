@@ -1,3 +1,4 @@
+import { beginGoogleSheetsRead, bindGoogleSheetsRead, googleSheetsReadTicketFields, type GoogleSheetsReadTicket } from "@/lib/integrations/google-sheets/read-authority";
 import "server-only";
 import { createHash } from "crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -375,8 +376,8 @@ function terms(value: string) {
   ).slice(0, 16);
 }
 
-async function createEmbeddings(inputs: string[], timeoutMs?: number) {
-  return createAIEmbeddings(inputs, timeoutMs);
+async function createEmbeddings(inputs: string[], timeoutMs?: number, googleSheetsReadTicketId?: string) {
+  return createAIEmbeddings(inputs, timeoutMs, { googleSheetsReadTicketId });
 }
 
 function evidencePolicy() {
@@ -784,6 +785,7 @@ export class SupabasePgvectorCandidateRetriever implements CandidateRetriever {
     stageLogger?: EvidenceStageLogger;
     timingLogger?: WorkflowStageLogger;
     embeddingTimeoutMs?: number;
+    googleSheetsReadTicketId?: string;
   }) {}
 
   async retrieve(query: EvidenceQuery): Promise<CandidateRetrievalResult & {
@@ -804,7 +806,7 @@ export class SupabasePgvectorCandidateRetriever implements CandidateRetriever {
     if (query.strategy === "auto") {
       stageLogger?.("embeddings_started", { queryLength: query.text.length, limit: query.resultLimit });
       const embeddingStartedAt = Date.now();
-      const embedding = await createEmbeddings([query.text.slice(0, 4_000)], embeddingTimeoutMs);
+      const embedding = await createEmbeddings([query.text.slice(0, 4_000)], embeddingTimeoutMs, this.dependencies.googleSheetsReadTicketId);
       timingLogger?.("embedding_retrieval_ms", Date.now() - embeddingStartedAt);
       embeddingVersion = embedding.embeddings[0] ? embedding.model || ACTIVE_EMBEDDING_VERSION : null;
       stageLogger?.("embeddings_finished", {
@@ -910,6 +912,7 @@ export class SupabasePgvectorCandidateRetriever implements CandidateRetriever {
 }
 
 export async function buildWorkspaceEvidenceContext({
+  readTicket: inheritedTicket,
   supabase,
   workspaceId,
   query,
@@ -919,6 +922,7 @@ export async function buildWorkspaceEvidenceContext({
   retrievalStrategy = "auto",
   embeddingTimeoutMs
 }: {
+  readTicket?: GoogleSheetsReadTicket;
   supabase: SupabaseClient<Database>;
   workspaceId: string;
   query: string;
@@ -928,6 +932,8 @@ export async function buildWorkspaceEvidenceContext({
   retrievalStrategy?: "auto" | "keyword_only";
   embeddingTimeoutMs?: number;
 }): Promise<EvidenceContext> {
+  const readTicket = inheritedTicket ?? await beginGoogleSheetsRead(supabase, workspaceId);
+  await bindGoogleSheetsRead(supabase, readTicket.ticketId, []);
   const configuredLimit = maxEvidenceChunks();
   const limit = Math.min(Math.max(maxChunks ?? configuredLimit, 1), configuredLimit);
   const evidenceQuery: EvidenceQuery = {
@@ -942,6 +948,7 @@ export async function buildWorkspaceEvidenceContext({
     freshnessAfter: null
   };
   const retriever = new SupabasePgvectorCandidateRetriever({
+    googleSheetsReadTicketId: readTicket.ticketId,
     supabase,
     stageLogger,
     timingLogger,
@@ -949,6 +956,7 @@ export async function buildWorkspaceEvidenceContext({
   });
   const retrievalStartedAt = Date.now();
   const retrieval = await retriever.retrieve(evidenceQuery);
+  await bindGoogleSheetsRead(supabase, readTicket.ticketId, retrieval.candidates.map(candidate => ({ table: "business_memory_chunks", id: candidate.candidateId })));
   const trace = new EvidenceDecisionTrace();
   trace.add({
     stage: "candidate_retrieval",
@@ -1083,6 +1091,7 @@ export function evidenceContextAsJson(context: EvidenceContext): Json {
 }
 
 export async function indexFileAnalysisEvidence({
+  readTicket,
   supabase,
   workspaceId,
   userId,
@@ -1093,6 +1102,7 @@ export async function indexFileAnalysisEvidence({
   metadata,
   confirmation
 }: {
+  readTicket: GoogleSheetsReadTicket;
   supabase: SupabaseClient<Database>;
   workspaceId: string;
   userId?: string | null;
@@ -1181,10 +1191,12 @@ export async function indexFileAnalysisEvidence({
     return { indexedChunks: 0, error: "No readable evidence chunks were available to index." };
   }
 
-  const embedding = await createEmbeddings(chunks);
+  await bindGoogleSheetsRead(supabase, readTicket.ticketId, [{ table: "file_uploads", id: file.id }, ...(runId ? [{ table: "ai_agent_runs", id: runId }] : [])]);
+  const embedding = await createEmbeddings(chunks, undefined, readTicket.ticketId);
   const quality = sourceQualityForFile(file, normalized);
   const confidenceScore = chunkConfidenceScore({ quality, chunkCount: chunks.length, textLength: normalized.length });
   const rows = chunks.map<MemoryChunkInsert>((chunk, index) => ({
+    ...googleSheetsReadTicketFields(readTicket.ticketId),
     workspace_id: workspaceId,
     source_type: "file_analysis",
     source_id: file.id,
@@ -1197,6 +1209,7 @@ export async function indexFileAnalysisEvidence({
     embedding: embedding.embeddings[index],
     embedding_model: embedding.embeddings[index] ? embedding.model : null,
     source_metadata: {
+      ...googleSheetsReadTicketFields(readTicket.ticketId),
       file_name: file.display_name,
       original_name: file.original_name,
       file_extension: file.file_extension,
@@ -1252,6 +1265,7 @@ export type WorksheetImportEvidence = {
 };
 
 export async function indexWorksheetImportEvidence({
+  readTicket,
   supabase,
   workspaceId,
   userId,
@@ -1260,6 +1274,7 @@ export async function indexWorksheetImportEvidence({
   importAttemptId,
   worksheets
 }: {
+  readTicket: GoogleSheetsReadTicket;
   supabase: SupabaseClient<Database>;
   workspaceId: string;
   userId?: string | null;
@@ -1312,11 +1327,13 @@ export async function indexWorksheetImportEvidence({
   }
 
   const indexedAt = new Date().toISOString();
-  const embedding = await createEmbeddings(chunks.map((chunk) => chunk.text));
+  await bindGoogleSheetsRead(supabase, readTicket.ticketId, [{ table: "file_uploads", id: file.id }, { table: "file_imports", id: importId }]);
+  const embedding = await createEmbeddings(chunks.map((chunk) => chunk.text), undefined, readTicket.ticketId);
   const rows = chunks.map<MemoryChunkInsert>((chunk, index) => {
     const rowNumbers = chunk.rows.map((row) => row.rowNumber);
     return {
-      workspace_id: workspaceId,
+      ...googleSheetsReadTicketFields(readTicket.ticketId),
+    workspace_id: workspaceId,
       source_type: "file",
       source_id: file.id,
       source_file_id: file.id,
@@ -1328,6 +1345,7 @@ export async function indexWorksheetImportEvidence({
       embedding: embedding.embeddings[index] || null,
       embedding_model: embedding.embeddings[index] ? embedding.model : null,
       source_metadata: {
+      ...googleSheetsReadTicketFields(readTicket.ticketId),
         workbook_name: file.display_name,
         original_file_name: file.original_name,
         source_file_id: file.id,

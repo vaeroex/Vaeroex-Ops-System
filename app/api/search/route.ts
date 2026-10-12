@@ -1,3 +1,4 @@
+import { beginGoogleSheetsRead, bindGoogleSheetsRead } from "@/lib/integrations/google-sheets/read-authority";
 import { randomUUID } from "crypto";
 import { NextResponse } from "next/server";
 import { buildBoundedWorkspaceContext } from "@/lib/ai/bounded-context";
@@ -654,6 +655,8 @@ export async function POST(request: Request) {
   }
 
   const workspaceId = context.activeWorkspace.id;
+  const readTicket = await beginGoogleSheetsRead(supabase, workspaceId, user.id);
+  await bindGoogleSheetsRead(supabase, readTicket.ticketId, []);
   const subscriptionStatus = await timing.measure(
     "subscription_authorization_ms",
     () => getSubscriptionStatus({ supabase, userId: user.id, email: user.email, workspaceId })
@@ -759,7 +762,7 @@ export async function POST(request: Request) {
 
   const kpiIntent = classifyKpiOverviewIntent(query);
   if (shouldUseKpiOverviewAnswer(query, kpiIntent)) {
-    const { summary } = await loadKpiOverviewData({ supabase, workspaceId });
+    const { summary } = await loadKpiOverviewData({ supabase, workspaceId, readTicket });
     return respond(buildKpiGlobalAnswer(query, summary, []));
   }
 
@@ -790,6 +793,7 @@ export async function POST(request: Request) {
     const structuredContextPromise = timing.measure(
       "structured_context_loading_ms",
       () => buildBoundedWorkspaceContext({
+        readTicket,
         supabase,
         workspaceId,
         query: planningQuery,
@@ -799,6 +803,7 @@ export async function POST(request: Request) {
     );
     const memoryContextPromise = queryPlan.requiresOpenAI && queryPlan.maxEvidenceChunks > 0
       ? timing.measure("business_memory_retrieval_ms", () => buildWorkspaceEvidenceContext({
+          readTicket,
           supabase,
           workspaceId,
           query: planningQuery.slice(0, 4_000),
@@ -876,6 +881,7 @@ export async function POST(request: Request) {
 
   try {
     const generation = await runVaeroexCompletionWithUsage({
+      googleSheetsReadTicketId: readTicket.ticketId,
       workflow,
       userPrompt: query,
       workspaceSnapshot: executiveReasoning.modelWorkspaceSnapshot,

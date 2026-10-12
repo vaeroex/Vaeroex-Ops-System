@@ -124,6 +124,7 @@ function row(status, overrides = {}) {
 async function claim(existingRows) {
   return claimIntelligenceBriefingGeneration({
     admin: createAdmin(existingRows),
+    reader: createAdmin(existingRows),
     workspaceId,
     userId,
     briefingType: "monthly",

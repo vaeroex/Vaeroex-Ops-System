@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { GOOGLE_SHEETS_CALLBACK_PATH, GOOGLE_SHEETS_READ_SCOPE } from "@/lib/integrations/google-sheets/contracts";
 
 export function googleSheetsAuthorizationTarget(value: unknown) {
@@ -17,6 +17,7 @@ export function googleSheetsAuthorizationTarget(value: unknown) {
 export function GoogleSheetsAuthorizationForm({ children, mode = "connect", className }: {
   children: ReactNode; mode?: "connect" | "reconnect"; className?: string;
 }) {
+  const disclosureId = useId();
   const [ready, setReady] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -57,8 +58,14 @@ export function GoogleSheetsAuthorizationForm({ children, mode = "connect", clas
     }
   }
 
-  return <form action={`/api/integrations/google-sheets/${mode}`} method="post" onSubmit={submit} className={className} aria-busy={pending}>
+  return <form action={`/api/integrations/google-sheets/${mode}`} method="post" onSubmit={submit} className={className} aria-busy={pending} aria-describedby={disclosureId}>
     {children}
+    <div id={disclosureId} className="space-y-2 text-sm leading-6 text-slate-600 sm:col-span-full">
+      <p>Google grants read-only access to spreadsheets your account can access. Vaeroex reads the spreadsheet you configure, its worksheet details and headings, and the columns you select for preview or approve for sync. It cannot edit your spreadsheet.</p>
+      <p>Approved metrics and their history are stored in your workspace for Performance and Intelligence. Relevant data may be sent to OpenAI for requested analyses, conversations, and Business Memory indexing. OpenAI data sharing is disabled and Responses use store:false; standard abuse-monitoring retention may be up to 30 days with legal or safety exceptions, and prompt caching may last up to 24 hours. This is not Zero Data Retention.</p>
+      <p>History expires 13 calendar months after first import, or 30 days after disconnect, whichever comes first. Refreshes and copies do not restart the clock. Identified copies and analyses expire with their sources. Expired content becomes unavailable immediately and support purges it the next business day. Disconnect stops refresh but does not immediately erase history.</p>
+      <p>Review our <a href="/privacy" className="font-semibold text-vaeroex-blue underline">Privacy Policy</a> and <a href="/data-retention" className="font-semibold text-vaeroex-blue underline">Data Retention Notice</a> before connecting. For a deletion request, contact <a href="mailto:support@vaeroex.com" className="font-semibold text-vaeroex-blue underline">support@vaeroex.com</a> with your workspace and connection name. Do not send spreadsheet contents or credentials.</p>
+    </div>
     <button type="submit" disabled={!ready || pending} className="min-h-11 justify-self-start rounded-md bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white disabled:cursor-wait disabled:opacity-60">{pending ? "Opening Google…" : mode === "connect" ? "Connect Google Sheets" : "Reconnect Google Sheets"}</button>
     {pending ? <p role="status" className="text-sm text-slate-600 sm:col-span-full">Opening Google securely…</p> : null}
     {error ? <p role="alert" className="text-sm text-red-700 sm:col-span-full">{error}</p> : null}

@@ -1,5 +1,7 @@
 "use server";
 
+import { beginGoogleSheetsRead, bindGoogleSheetsRead, googleSheetsReadSources, googleSheetsReadTicketFields, type GoogleSheetsReadTicket } from "@/lib/integrations/google-sheets/read-authority";
+
 import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
 import type { Route } from "next";
@@ -453,9 +455,11 @@ async function downloadFileBuffer(file: FileUploadRow) {
 }
 
 async function claimFileAnalysis({
+  readTicketId,
   supabase,
   file
 }: {
+  readTicketId: string;
   supabase: SupabaseServerClient;
   file: FileUploadRow;
 }) {
@@ -463,6 +467,7 @@ async function claimFileAnalysis({
   const { data, error } = await supabase
     .from("file_uploads")
     .update({
+      ...googleSheetsReadTicketFields(readTicketId),
       processing_status: "processing",
       processing_error: null,
       processed_at: null,
@@ -1859,6 +1864,7 @@ async function extractFileContent(file: FileUploadRow, rowLimit: number): Promis
 }
 
 async function runFileVaeroexAnalysis({
+  readTicket,
   supabase,
   userId,
   email,
@@ -1868,6 +1874,7 @@ async function runFileVaeroexAnalysis({
   rowLimit,
   activeRunId
 }: {
+  readTicket: GoogleSheetsReadTicket;
   supabase: SupabaseServerClient;
   userId: string;
   email: string | undefined;
@@ -1898,6 +1905,7 @@ async function runFileVaeroexAnalysis({
       .order("created_at", { ascending: false })
       .limit(10),
     buildWorkspaceEvidenceContext({
+      readTicket,
       supabase,
       workspaceId,
       query: `${prompt}\nFile: ${file.display_name}\nType: ${file.file_extension}`,
@@ -1905,6 +1913,7 @@ async function runFileVaeroexAnalysis({
       retrievalStrategy: "keyword_only"
     })
   ]);
+  await bindGoogleSheetsRead(supabase, readTicket.ticketId, googleSheetsReadSources("file_imports", fileImports.data));
   const workspaceSnapshot = {
     scope: "selected_file_analysis",
     selected_file: {
@@ -1971,6 +1980,7 @@ async function runFileVaeroexAnalysis({
   }
 
   const { outputJson, usage } = await runVaeroexCompletionWithUsage({
+    googleSheetsReadTicketId: readTicket.ticketId,
     workflow,
     userPrompt: prompt,
     workspaceSnapshot,
@@ -2098,6 +2108,7 @@ async function runFileVaeroexAnalysis({
   }
 
   const completedRun = {
+    ...googleSheetsReadTicketFields(readTicket.ticketId),
     workspace_id: workspaceId,
     agent_type: workflow.key,
     input_json: classifiedInputJson,
@@ -2144,6 +2155,7 @@ async function runFileVaeroexAnalysis({
 
   if (learningDecision.status === "auto_learned") {
     indexResult = await indexFileAnalysisEvidence({
+      readTicket,
       supabase,
       workspaceId,
       userId,
@@ -2192,9 +2204,10 @@ async function runFileVaeroexAnalysis({
     };
   }
 
-  await supabase
+  const { error: analysisSaveError } = await supabase
     .from("file_uploads")
     .update({
+      ...googleSheetsReadTicketFields(readTicket.ticketId),
       analysis_prompt: prompt,
       analysis_summary: summary,
       processing_status: "ready",
@@ -2259,6 +2272,8 @@ async function runFileVaeroexAnalysis({
     })
     .eq("id", file.id)
     .eq("workspace_id", workspaceId);
+
+  if (analysisSaveError) throw new Error("The source changed while its analysis was being saved. Reload before trying again.");
 
   return {
     workflow,
@@ -2554,8 +2569,10 @@ function latestExtractedText(file: FileUploadRow) {
 
 export async function approveFileAnalysisAction(formData: FormData) {
   const { supabase, user, workspaceId, membership } = await requireWorkspace();
+  const readTicket = await beginGoogleSheetsRead(supabase, workspaceId, user.id);
   const returnPath = safeFileReturnPath(text(formData, "return_path"));
   const file = await getFileForWorkspace(text(formData, "file_id"), workspaceId);
+  await bindGoogleSheetsRead(supabase, readTicket.ticketId, [{ table: "file_uploads", id: file.id }]);
   const runId = text(formData, "run_id") || latestAnalysisRunId(file);
   const summary = text(formData, "summary") || file.analysis_summary || "Approved file analysis.";
 
@@ -2610,6 +2627,7 @@ export async function approveFileAnalysisAction(formData: FormData) {
     }
 
     const indexResult = await indexFileAnalysisEvidence({
+      readTicket,
       supabase,
       workspaceId,
       userId: user.id,
@@ -3489,6 +3507,7 @@ async function upsertWorkbookKpiTargetSettings({
 }
 
 async function saveWorkbookImport({
+  readTicket,
   supabase,
   user,
   workspaceId,
@@ -3498,6 +3517,7 @@ async function saveWorkbookImport({
   stagedRows,
   formData
 }: {
+  readTicket: GoogleSheetsReadTicket;
   supabase: SupabaseServerClient;
   user: { id: string };
   workspaceId: string;
@@ -3665,7 +3685,7 @@ async function saveWorkbookImport({
       }));
       return rows.length ? [{ name: plan.name, index: plan.index, type: worksheetTypeLabel(plan.selected_type), rows }] : [];
     });
-    const indexing = await indexWorksheetImportEvidence({ supabase, workspaceId, userId: user.id, file, importId: importRecord.id, importAttemptId, worksheets: evidenceWorksheets });
+    const indexing = await indexWorksheetImportEvidence({ readTicket, supabase, workspaceId, userId: user.id, file, importId: importRecord.id, importAttemptId, worksheets: evidenceWorksheets });
     const indexingSucceeded = indexing.indexedChunks > 0;
     if (indexingSucceeded) indexedImportRows = validRows.length;
     if (!indexingSucceeded) {
@@ -3750,7 +3770,9 @@ async function saveWorkbookImport({
 
 export async function saveExtractedImportAction(formData: FormData) {
   const { supabase, user, workspaceId, membership } = await requireWorkspace();
+  const readTicket = await beginGoogleSheetsRead(supabase, workspaceId, user.id);
   const file = await getFileForWorkspace(text(formData, "file_id"), workspaceId);
+  await bindGoogleSheetsRead(supabase, readTicket.ticketId, [{ table: "file_uploads", id: file.id }]);
   const importId = text(formData, "import_id");
 
   if (!importId) {
@@ -3821,6 +3843,7 @@ export async function saveExtractedImportAction(formData: FormData) {
 
   if (isRecord(importRecord.mapping_json) && importRecord.mapping_json.mode === "workbook") {
     return saveWorkbookImport({
+      readTicket,
       supabase,
       user,
       workspaceId,
@@ -4102,8 +4125,10 @@ export async function saveExtractedImportAction(formData: FormData) {
 
 export async function analyzeFileAction(formData: FormData) {
   const { supabase, user, workspaceId } = await requireWorkspace();
+  const readTicket = await beginGoogleSheetsRead(supabase, workspaceId, user.id);
   const returnPath = safeFileReturnPath(text(formData, "return_path"));
   const file = await getFileForWorkspace(text(formData, "file_id"), workspaceId);
+  await bindGoogleSheetsRead(supabase, readTicket.ticketId, [{ table: "file_uploads", id: file.id }]);
   const prompt =
     text(formData, "suggested_prompt") ||
     text(formData, "analysis_prompt") ||
@@ -4130,6 +4155,7 @@ export async function analyzeFileAction(formData: FormData) {
 
   const workflow = getVaeroexWorkflow("file_analysis");
   let inputJson: Json = {
+    ...googleSheetsReadTicketFields(readTicket.ticketId),
     workflow: workflow.key,
     user_prompt: prompt,
     extra_inputs: {
@@ -4141,7 +4167,7 @@ export async function analyzeFileAction(formData: FormData) {
     },
     workspace_snapshot: {}
   } satisfies Json;
-  const claimed = await claimFileAnalysis({ supabase, file });
+  const claimed = await claimFileAnalysis({ readTicketId: readTicket.ticketId, supabase, file });
 
   if (!claimed) {
     redirectWithPathMessage(returnPath, "Analysis is already running for this source. Refresh shortly to review the result.", file.id);
@@ -4149,6 +4175,7 @@ export async function analyzeFileAction(formData: FormData) {
 
   const activeRunId = randomUUID();
   const { error: runStartError } = await supabase.from("ai_agent_runs").insert({
+    ...googleSheetsReadTicketFields(readTicket.ticketId),
     id: activeRunId,
     workspace_id: workspaceId,
     agent_type: workflow.key,
@@ -4162,6 +4189,7 @@ export async function analyzeFileAction(formData: FormData) {
     await supabase
       .from("file_uploads")
       .update({
+        ...googleSheetsReadTicketFields(readTicket.ticketId),
         processing_status: file.processing_status || "uploaded",
         processing_error: runStartError.message,
         metadata_json: file.metadata_json
@@ -4173,6 +4201,7 @@ export async function analyzeFileAction(formData: FormData) {
 
   try {
     const result = await runFileVaeroexAnalysis({
+      readTicket,
       supabase,
       userId: user.id,
       email: user.email,
@@ -4212,6 +4241,7 @@ export async function analyzeFileAction(formData: FormData) {
     await supabase
       .from("file_uploads")
       .update({
+        ...googleSheetsReadTicketFields(readTicket.ticketId),
         metadata_json: {
           ...(isRecord(file.metadata_json) ? file.metadata_json : {}),
           latest_analysis_status: "failed",
@@ -4243,6 +4273,7 @@ export async function analyzeFileAction(formData: FormData) {
     await supabase
       .from("ai_agent_runs")
       .update({
+        ...googleSheetsReadTicketFields(readTicket.ticketId),
         input_json: failureInputJson,
         output_json: failureOutputJson,
         status: "failed",

@@ -7,7 +7,7 @@ import { legalDocuments, type LegalDocumentId } from "@/lib/legal/content";
 import type { Database, Json } from "@/lib/supabase/types";
 
 export const PRE_CHECKOUT_ACCEPTANCE_SET_ID = "vaeroex_pre_checkout_terms" as const;
-export const PRE_CHECKOUT_ACCEPTANCE_SET_VERSION = "2026-08-20.2" as const;
+export const PRE_CHECKOUT_ACCEPTANCE_SET_VERSION = "2026-10-12.sheets1" as const;
 export const PRE_CHECKOUT_ACCEPTANCE_RECORD_CLASS = "pre_checkout_legal_acceptance" as const;
 
 export const PRE_CHECKOUT_REQUIRED_POLICY_IDS = [

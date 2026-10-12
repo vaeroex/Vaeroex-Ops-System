@@ -1,3 +1,4 @@
+import { beginGoogleSheetsRead, bindGoogleSheetsRead, googleSheetsReadSources } from "@/lib/integrations/google-sheets/read-authority";
 import Link from "next/link";
 import { unstable_rethrow } from "next/navigation";
 import { HealthSnapshotUnavailable } from "@/components/intelligence/HealthSnapshotUnavailable";
@@ -48,6 +49,7 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
   const params = await searchParams;
   const access = await requireWorkspaceAccess();
   const { supabase, workspaceId, context } = access;
+  const readTicket = await beginGoogleSheetsRead(supabase, workspaceId, access.user.id);
   const [issuesResult, kpisResult, kpiSettingsResult, filesResult, crmResult, importsResult, sopsResult, formsResult, submissionsResult, peopleResult, decisionsResult, metricsResult, memoryResult, lifecycleResult, briefingStates, healthView] = await Promise.all([
     supabase.from("issues").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
     loadActiveWorkspaceKpis({ supabase, workspaceId }),
@@ -77,7 +79,7 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
     })
   ]);
 
-  const lifecycleRecords = (lifecycleResult.data || []) as IntelligenceCardLifecycleRecord[];
+  const lifecycleRecords = (lifecycleResult.data || []) as unknown as IntelligenceCardLifecycleRecord[];
   const dismissalActorIds = [...new Set(lifecycleRecords
     .filter((record) => record.lifecycle_state === "dismissed")
     .map((record) => record.last_mutated_by))];
@@ -188,6 +190,16 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
       reason: businessNoteContext.error.message
     }));
   }
+  await bindGoogleSheetsRead(supabase, readTicket.ticketId, [
+    ...googleSheetsReadSources("kpis", eligibleKpis), ...googleSheetsReadSources("kpi_settings", kpiSettingsResult.data),
+    ...googleSheetsReadSources("issues", issuesResult.data), ...googleSheetsReadSources("file_uploads", filesResult.data),
+    ...googleSheetsReadSources("file_imports", importsResult.data), ...googleSheetsReadSources("crm_leads", eligibleCustomerEvidence),
+    ...googleSheetsReadSources("operational_metrics", eligibleOperationalMetrics), ...googleSheetsReadSources("business_memory_chunks", eligibleMemoryChunks),
+    ...googleSheetsReadSources("sops", sopsResult.data), ...googleSheetsReadSources("forms", formsResult.data),
+    ...googleSheetsReadSources("form_submissions", submissionsResult.data), ...googleSheetsReadSources("people", peopleResult.data),
+    ...googleSheetsReadSources("business_decisions", decisionsResult.data),
+    ...businessNoteContext.records.map(record => ({ table: "business_notes", id: record.sourceNoteId }))
+  ]);
   const qboAccounting = await loadQboAccountingIntelligence(workspaceId, snapshotAsOf);
   const { dashboard, currentQboAccounting } = await loadIntegrationDashboard({ access, qbo: qboAccounting, eligibleKpis });
   let intelligenceSnapshot: IntelligenceSnapshotV1 | null = null;
@@ -238,7 +250,7 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
               }).analysisPackage
             : buildFindingExplanationPackage({ workspaceId, insight, now: new Date(snapshotAsOf) });
           if (!analysisPackage.requiredCitationIds.length) return [];
-          const token = trySealFindingExplanationPackage({ analysisPackage, workspaceId, userId });
+          const token = trySealFindingExplanationPackage({ analysisPackage, workspaceId, userId, readTicketId: readTicket.ticketId });
           return token ? [[insight.id, token]] : [];
         } catch {
           return [];
@@ -255,6 +267,7 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
         const identity = lifecycleIdentities[insight.id];
         const token = trySealIntelligenceCardLifecycleToken({
           workspaceId,
+          readTicketId: readTicket.ticketId,
           userId,
           findingKeyHash: identity.findingKeyHash,
           findingFingerprint: insight.fingerprint,

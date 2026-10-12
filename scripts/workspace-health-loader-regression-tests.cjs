@@ -38,6 +38,11 @@ global.Date = class extends originalDate {
 };
 const sha = x => crypto.createHash('sha256').update(x).digest('hex');
 Module._load = function (r, p, ...args) {
+    if (r === '@/lib/integrations/google-sheets/read-authority') return {
+        beginGoogleSheetsRead: async () => { state.authorityTrace.push('begin'); return { ticketId: '33333333-3333-4333-8333-333333333333', epoch: 1, expiresAt: '2099-01-01T00:00:00Z' }; },
+        bindGoogleSheetsRead: async (_client, ticketId, sources) => { assert.equal(ticketId, '33333333-3333-4333-8333-333333333333'); state.authorityTrace.push(['bind', sources]); },
+        googleSheetsReadSources: (table, rows) => (rows || []).map(({ id }) => ({ table, id }))
+    };
     if (r === 'server-only')
         return {};
     if (r === '@/lib/kpis/load-workspace-kpis')
@@ -56,7 +61,7 @@ Module._load = function (r, p, ...args) {
     if (r === '@/lib/ai/business-notes/contextual-evidence')
         return { loadApprovedBusinessNoteContextV1: async ({ workspaceId, releaseChannel, asOf }) => { state.trace.push(['notes', workspaceId, releaseChannel, asOf]); return { records: [], error: null }; } };
     if (r === '@/lib/ai/business-health-explanation/token')
-        return { trySealBusinessHealthExplanationPackage: x => { state.trace.push(['seal', x]); return 'synthetic-' + sha(JSON.stringify(x)); } };
+        return { trySealBusinessHealthExplanationPackage: x => { state.trace.push(['seal', x]); const { readTicketId, ...historicalPackage } = x; assert.equal(readTicketId, '33333333-3333-4333-8333-333333333333'); return 'synthetic-' + sha(JSON.stringify(historicalPackage)); } };
     if (r === '@/lib/ai/business-health-explanation/storage')
         return { loadBusinessHealthAnalysisState: async ({ workspaceId, analysisPackage, requestTokenAvailable }) => { state.trace.push(['analysisState', workspaceId, analysisPackage, requestTokenAvailable]); return { status: 'available', artifact: null, message: null }; } };
     return originalLoad.call(this, r, p, ...args);
@@ -67,13 +72,13 @@ const settings = { id: 'setting', workspace_id: workspaceId, name: 'Revenue', ca
 const base = { kpis: [80, 90, 85].map((x, i) => ({ id: 'kpi' + i, workspace_id: workspaceId, name: 'Revenue', actual_value: x, target: 100, metric_date: '2026-10-0' + (i + 1), created_at: date, updated_at: date, unit: 'USD', category: 'Sales', archived_at: null, deleted_at: null, source_file_id: null, raw_data_json: {} })), kpi_settings: [settings], issues: [{ id: 'issue', workspace_id: workspaceId, title: 'Synthetic late delivery', description: 'Observed delay', status: 'Open', severity: 'High', created_at: date, updated_at: date, archived_at: null, deleted_at: null }], file_uploads: [{ id: 'file', workspace_id: workspaceId, display_name: 'Synthetic source', original_name: 'Source.csv', file_extension: 'csv', created_at: date, updated_at: date, archived_at: null, deleted_at: null, metadata_json: {} }] };
 function client() { return { from(table) { const ops = []; const query = new Proxy({}, { get(_, key) { if (key === 'then')
             return (resolve, reject) => { state.trace.push(['query', table, ...ops]); return Promise.resolve({ data: state.rows[table] || [], error: state.error === table ? new Error('synthetic ' + table + ' unavailable') : null }).then(resolve, reject); }; return (...args) => { ops.push([key, ...args]); return query; }; } }); return query; } }; }
-async function run(fn, test) { state = { rows: structuredClone(test.empty ? {} : base), error: test.error, trace: [], writes: [] }; if (test.inactive)
+async function run(fn, test) { state = { rows: structuredClone(test.empty ? {} : base), error: test.error, trace: [], writes: [], authorityTrace: [] }; if (test.inactive)
     state.rows.file_uploads[0].archived_at = date; let value, error; try {
     value = await fn({ supabase: client(), workspaceId, workspace: { id: workspaceId, name: 'Synthetic owner workspace' }, userId: test.userId === null ? null : userId, comparisonTrends: [{ name: 'Revenue', changePercent: -4 }], includeAnalysis: test.includeAnalysis !== false });
 }
 catch (e) {
     error = { name: e.name, message: e.message };
-} return { value, error, trace: state.trace, writes: state.writes }; }
+} return { value, error, trace: state.trace, writes: state.writes, authorityTrace: state.authorityTrace }; }
 (async () => {
     const shared = req(path.join(root, 'lib/intelligence/workspace-health.ts')).loadWorkspaceHealth;
     const fixture = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures/workspace-health-extraction-contract.json'), 'utf8'));
@@ -82,7 +87,10 @@ catch (e) {
     for (const test of cases) {
         const result = await run(shared, test);
         assert.equal(result.error, undefined, test.name + ' must complete without a loader error');
-        const contract = JSON.parse(JSON.stringify({ trace: result.trace, model: result.value.executiveHomepageModel, evidence: result.value.evidence, history: result.value.businessHealthHistory, analysisPackage: result.value.businessHealthAnalysisPackage, token: result.value.businessHealthAnalysisToken, state: result.value.businessHealthAnalysisState, error: result.error, writes: result.writes }, (_key, value) => value instanceof Error ? { name: value.name, message: value.message } : value));
+        assert.equal(result.authorityTrace[0], 'begin');
+        assert(result.authorityTrace.some(item => Array.isArray(item) && item[0] === 'bind'));
+        if (!test.empty) assert(result.authorityTrace.some(item => Array.isArray(item) && item[1].some(source => source.table === 'kpis' && source.id === 'kpi0')), 'source rows remain bound before being aggregated');
+        const contract = JSON.parse(JSON.stringify({ trace: result.trace.map(item => item[0] === "query" && item[1] === "ai_agent_runs" ? item.map(part => Array.isArray(part) && part[0] === "select" ? [part[0], part[1].replace(/^id,/, "")] : part) : item), model: result.value.executiveHomepageModel, evidence: result.value.evidence, history: result.value.businessHealthHistory, analysisPackage: result.value.businessHealthAnalysisPackage, token: result.value.businessHealthAnalysisToken, state: result.value.businessHealthAnalysisState, error: result.error, writes: result.writes }, (key, value) => ["readTicket", "readTicketId", "consumedSources"].includes(key) ? undefined : value instanceof Error ? { name: value.name, message: value.message } : value));
         const expected = fixture.cases.find(x => x.name === test.name).componentHashes;
         for (const [key, value] of Object.entries(contract)) {
             if (recordContract) expected[key] = sha(JSON.stringify(value));
@@ -111,7 +119,7 @@ catch (e) {
     const { loadWorkspaceHealthEvidence } = req(path.join(root, 'lib/intelligence/workspace-health.ts'));
     const errors = ['kpis', 'kpi_settings', 'issues', 'sops', 'file_uploads', 'file_imports', 'assets', 'crm_leads', 'crm_lead_history', 'ai_agent_runs', 'operational_metrics', 'people', 'business_decisions', 'business_memory_chunks', 'sourceParents', 'memoryEligibility'];
     for (const error of errors) {
-        state = { rows: structuredClone(base), error, trace: [], writes: [] };
+        state = { rows: structuredClone(base), error, trace: [], writes: [], authorityTrace: [] };
         const evidence = await loadWorkspaceHealthEvidence({ supabase: client(), workspaceId });
         assert.equal(evidence.businessHealthSourceErrors.length, 1, error + ' is not silently treated as complete data');
         assert.equal(evidence.errors.length, 1, error + ' propagates its source failure');

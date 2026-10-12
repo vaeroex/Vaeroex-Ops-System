@@ -1,3 +1,4 @@
+import { googleSheetsReadTicketId } from "@/lib/integrations/google-sheets/read-authority";
 import "server-only";
 
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
@@ -13,6 +14,7 @@ const MAX_TOKEN_LENGTH = 16_000;
 type IntelligenceCardLifecycleTokenPayload = Readonly<{
   version: typeof TOKEN_VERSION;
   workspaceId: string;
+  readTicketId: string;
   userId: string;
   issuedAt: number;
   expiresAt: number;
@@ -52,6 +54,7 @@ function isCardSnapshot(value: unknown): value is IntelligenceCardSnapshotV1 {
 
 export function sealIntelligenceCardLifecycleToken({
   workspaceId,
+  readTicketId,
   userId,
   findingKeyHash,
   findingFingerprint,
@@ -60,12 +63,13 @@ export function sealIntelligenceCardLifecycleToken({
   cardSnapshot,
   nowMs = Date.now()
 }: Omit<IntelligenceCardLifecycleTokenPayload, "version" | "issuedAt" | "expiresAt"> & { nowMs?: number }) {
-  if (!isHash(findingKeyHash) || !isHash(materialSignature) || !findingFingerprint || !findingId || !isCardSnapshot(cardSnapshot)) {
+  if (!googleSheetsReadTicketId.safeParse(readTicketId).success || !isHash(findingKeyHash) || !isHash(materialSignature) || !findingFingerprint || !findingId || !isCardSnapshot(cardSnapshot)) {
     throw new Error("Intelligence lifecycle identity is invalid.");
   }
   const payload: IntelligenceCardLifecycleTokenPayload = {
     version: TOKEN_VERSION,
     workspaceId,
+    readTicketId,
     userId,
     issuedAt: nowMs,
     expiresAt: nowMs + TOKEN_TTL_MS,
@@ -106,7 +110,8 @@ export function openIntelligenceCardLifecycleToken(
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) return { ok: false as const, reason: "invalid" as const };
   const candidate = payload as Partial<IntelligenceCardLifecycleTokenPayload>;
   if (
-    candidate.version !== TOKEN_VERSION
+    !googleSheetsReadTicketId.safeParse(candidate.readTicketId).success
+    || candidate.version !== TOKEN_VERSION
     || candidate.workspaceId !== expected.workspaceId
     || candidate.userId !== expected.userId
     || !Number.isFinite(candidate.issuedAt)

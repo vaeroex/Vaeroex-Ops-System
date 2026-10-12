@@ -224,6 +224,8 @@ async function migrationQualification(target, administrator) {
   ];
   const workspaceCapacityTail = files.filter(name => workspaceCapacityMigrations.includes(name));
   equal(workspaceCapacityTail.join("\n"), workspaceCapacityMigrations.join("\n"), "exact separately qualified capacity migration tail present");
+  const sheetsErasureTail = files.filter(name => ["20261002225025_google_sheets_support_erasure.sql","20261012191836_google_sheets_restricted_erasure_retention.sql"].includes(name));
+  equal(sheetsErasureTail.length, 2, "exact separately qualified Sheets privacy migrations present");
   const adminTelemetryTail = files.filter(name => name === "20261012091842_admin_usage_trust_support_telemetry.sql");
   equal(adminTelemetryTail.length, 1, "admin aggregation, safe trust telemetry and support boundary migration present");
   const legalAcceptanceTail = files.filter(name => name === "20261012082738_pre_checkout_legal_entitlement_boundary.sql");
@@ -257,7 +259,7 @@ async function migrationQualification(target, administrator) {
   equal(preferencesTail.length, 1, "separately qualified personal summary preferences migration present");
   equal(workspaceSecurityTail.length, 1, "separately qualified workspace security migration present");
   equal(workspaceQuotaTail.length, 1, "separately qualified persisted usage migration present");
-  equal(baseline.length + added.length + accountTail.length + remoteTail.length + brokerTail.length + gcpTail.length + recoveryTail.length + mappedTail.length + mappedFenceTail.length + observationTail.length + interpretationTail.length + evidenceTail.length + cardTail.length + operationalTail.length + productionFoundationTail.length + productionOverlayTail.length + productionInternalRuntimeTail.length + productionFoundationMarkerTail.length + productionLegacyGuardTail.length + sheetsCompleteTail.length + sheetsLifecycleTail.length + preferencesTail.length + workspaceSecurityTail.length + workspaceQuotaTail.length + workspaceCloseoutTail0.length + workspaceCloseoutTail1.length + workspaceCloseoutTail2.length + workspaceCloseoutTail3.length + workspaceCloseoutTail4.length + workspaceCapacityTail.length + pricingTail.length + legalAcceptanceTail.length + adminTelemetryTail.length + vsiTail.length + vsiResearchTail.length, files.length, "migration manifest is explicit");
+  equal(baseline.length + added.length + accountTail.length + remoteTail.length + brokerTail.length + gcpTail.length + recoveryTail.length + mappedTail.length + mappedFenceTail.length + observationTail.length + interpretationTail.length + evidenceTail.length + cardTail.length + operationalTail.length + productionFoundationTail.length + productionOverlayTail.length + productionInternalRuntimeTail.length + productionFoundationMarkerTail.length + productionLegacyGuardTail.length + sheetsCompleteTail.length + sheetsLifecycleTail.length + preferencesTail.length + workspaceSecurityTail.length + workspaceQuotaTail.length + workspaceCloseoutTail0.length + workspaceCloseoutTail1.length + workspaceCloseoutTail2.length + workspaceCloseoutTail3.length + workspaceCloseoutTail4.length + workspaceCapacityTail.length + pricingTail.length + legalAcceptanceTail.length + adminTelemetryTail.length + sheetsErasureTail.length + vsiTail.length + vsiResearchTail.length, files.length, "migration manifest is explicit");
   const clean = await createDatabase(target, administrator, "clean");
   await applyMigrations(clean.client, baseline);
   const before = await sourceSchemaFingerprint(clean.client);

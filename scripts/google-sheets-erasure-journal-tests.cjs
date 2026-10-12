@@ -119,14 +119,16 @@ test('the exact Google-base and dependent-table allowlist accepts identifiers on
     'google_sheets_source_versions', 'google_sheets_fact_links', 'kpis', 'ai_agent_runs', 'reports',
     'kpi_alert_events', 'business_memory_chunks', 'record_shares', 'notifications',
     'operational_assignments', 'business_decisions', 'vaeroex_recommendation_outcomes',
-    'scheduled_report_runs', 'kpi_settings', 'kpi_alert_rules', 'audit_logs', 'security_audit_events', 'ai_usage'
+    'scheduled_report_runs', 'kpi_settings', 'kpi_alert_rules', 'audit_logs', 'security_audit_events', 'ai_usage',
+    'business_health_snapshots', 'vsi_exchanges', 'vsi_conversations', 'business_notes', 'file_uploads', 'file_imports', 'operational_metrics',
+    'intelligence_card_lifecycle', 'intelligence_card_lifecycle_events', 'file_upload_analysis', 'vsi_request_content', 'file_processing_jobs', 'google_sheets_retention_boundary'
   ];
   assert.deepEqual([...TABLES].sort(), expected.sort());
   const input = manifest();
   input.targets = TABLES.map(table => ({ table, id: ['google_sheets_connections', 'google_sheets_credentials'].includes(table)
     ? input.connectionId : crypto.randomUUID() }));
   input.counts = Object.fromEntries(TABLES.map(table => [table, 1]));
-  assert.equal(verifyRecord(signManifest(input, pair.privateKey), pair.publicKey, pin).manifest.targets.length, 24);
+  assert.equal(verifyRecord(signManifest(input, pair.privateKey), pair.publicKey, pin).manifest.targets.length, 37);
   for (const table of ['square_connections', 'workspaces', 'profiles', 'google_sheets_erasure_requests', 'public.kpis', '__proto__']) {
     const bad = manifest({ targets: [{ table, id: crypto.randomUUID() }], counts: { [table]: 1 } });
     assert.throws(() => signManifest(bad, pair.privateKey), /sheets_journal_table/);
@@ -401,3 +403,34 @@ test('permissions and directory identity are checked again after opening a journ
     assert.throws(() => f.journal.listRecords(), /directory_changed/);
   });
 });
+
+test('v2 binds every exact table/row to its full old-content hash without retaining values', () => fixture(f => {
+  f.initialize();
+  const input = manifest({ version: 2 });
+  input.targets = input.targets.map(target => ({ ...target, hash: 'b'.repeat(64) }));
+  const result = f.journal.writePending(input);
+  const signed = f.journal.readSignedRecord(input.requestId, 'pending');
+  const verified = verifyRecord(signed, f.options.publicKey, f.options.pinnedFingerprint);
+  assert.equal(result.digest, verified.digest);
+  assert.equal(verified.manifest.version, 2);
+  assert(verified.manifest.targets.every(target => target.hash === 'b'.repeat(64)));
+  const stale = clone(input); stale.targets[0].hash = 'c'.repeat(64);
+  assert.throws(() => f.journal.writePending(stale), /conflict/);
+  assert.throws(() => f.journal.readSignedRecord('../request', 'pending'), /schema/);
+  assert.throws(() => f.journal.readSignedRecord(input.requestId, 'anything'), /state/);
+  delete stale.targets[0].hash;
+  assert.throws(() => normalizeManifest(stale), /schema/);
+}));
+
+test('withdrawal receipt retains the exact intent and rejects completion or relabeling', () => fixture(f => {
+  f.initialize(); const m = manifest({ version: 2 }); m.targets = m.targets.map(t => ({ ...t, hash: 'b'.repeat(64) }));
+  const intent = f.journal.writePending(m);
+  const withdrawn = { ...m, withdrawal: { at: COMPLETED_AT, reason: 'approval_expired', intentDigest: intent.digest, inventoryDigest: 'd'.repeat(64) } };
+  f.journal.writeWithdrawalReceipt(withdrawn);
+  assert.equal(f.journal.listRecords().length, 2);
+  assert.equal(verifyRecord(f.journal.readSignedRecord(m.requestId, 'withdrawn'), f.options.publicKey, f.options.pinnedFingerprint).state, 'withdrawn');
+  f.journal.writeWithdrawalReceipt(withdrawn);
+  assert.throws(() => f.journal.writeCompletedReceipt({ ...m, completedAt: COMPLETED_AT }), /withdrawal_conflict/);
+  assert.throws(() => f.journal.writeWithdrawalReceipt({ ...withdrawn, withdrawal: { ...withdrawn.withdrawal, reason: 'scope_changed' } }), /conflict/);
+  assert.throws(() => normalizeManifest({ ...withdrawn, withdrawal: { ...withdrawn.withdrawal, intentDigest: 'not-a-hash' } }), /withdrawal/);
+}));

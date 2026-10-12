@@ -6,6 +6,7 @@ import type { BusinessNoteExtraction, BusinessNoteUserAddedContext } from "@/lib
 import { businessNoteUserAddedContextText } from "@/lib/ai/business-notes/review-context";
 import { chunkEvidenceText } from "@/lib/ai/evidence-index";
 import { createAIEmbeddings } from "@/lib/ai/providers/provider-manager";
+import { bindGoogleSheetsRead, googleSheetsReadTicketFields } from "@/lib/integrations/google-sheets/read-authority";
 import { estimateTokenCount } from "@/lib/ai/usage";
 import type { Database, Json } from "@/lib/supabase/types";
 
@@ -64,6 +65,8 @@ function applicationConfidenceScore(extraction: BusinessNoteExtraction) {
 
 export async function indexApprovedBusinessNote({
   supabase,
+  authoritySupabase,
+  readTicketId,
   workspaceId,
   note,
   extraction,
@@ -71,6 +74,8 @@ export async function indexApprovedBusinessNote({
   approvedBy
 }: {
   supabase: SupabaseClient<Database>;
+  authoritySupabase: SupabaseClient<Database>;
+  readTicketId: string;
   workspaceId: string;
   note: BusinessNoteRow;
   extraction: BusinessNoteExtraction;
@@ -88,10 +93,12 @@ export async function indexApprovedBusinessNote({
   const chunks = chunkEvidenceText(contextualText);
   if (!chunks.length) return { indexedChunks: 0, error: "No approved Business Note context was available to index." };
 
-  const embedding = await createAIEmbeddings(chunks);
+  await bindGoogleSheetsRead(authoritySupabase, readTicketId, [{ table: "business_notes", id: note.id }]);
+  const embedding = await createAIEmbeddings(chunks, undefined, { googleSheetsReadTicketId: readTicketId });
   const indexedAt = new Date().toISOString();
   const confidenceScore = applicationConfidenceScore(extraction);
   const rows = chunks.map<MemoryChunkInsert>((chunk, index) => ({
+    ...googleSheetsReadTicketFields(readTicketId),
     workspace_id: workspaceId,
     source_type: "business_note",
     source_id: note.id,
@@ -104,6 +111,7 @@ export async function indexApprovedBusinessNote({
     embedding: embedding.embeddings[index] || null,
     embedding_model: embedding.embeddings[index] ? embedding.model : null,
     source_metadata: {
+      ...googleSheetsReadTicketFields(readTicketId),
       source_record_type: "business_note",
       source_record_id: note.id,
       source_version: note.source_version,

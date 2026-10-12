@@ -26,6 +26,7 @@ function record(value: Json): Record<string, Json | undefined> {
 
 export async function claimIntelligenceBriefingGeneration({
   admin,
+  reader,
   workspaceId,
   userId,
   briefingType,
@@ -33,6 +34,7 @@ export async function claimIntelligenceBriefingGeneration({
   inputJson
 }: {
   admin: SupabaseClient<Database>;
+  reader: SupabaseClient<Database>;
   workspaceId: string;
   userId: string;
   briefingType: IntelligenceBriefingType;
@@ -50,7 +52,7 @@ export async function claimIntelligenceBriefingGeneration({
   if (!insertError && inserted?.id) return { status: "claimed", runId: inserted.id };
   if (insertError?.code !== "23505") return { status: "failed_closed" };
 
-  const { data, error } = await admin
+  const { data, error } = await reader
     .from("ai_agent_runs")
     .select("id,status,input_json,output_json,archived_at,deleted_at")
     .eq("workspace_id", workspaceId)

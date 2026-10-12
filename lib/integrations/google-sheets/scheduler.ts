@@ -54,6 +54,7 @@ export function createSheetsScheduledAdmission(deadlineAt: number, now = Date.no
  * never a whole batch. All launched work is awaited, including cancellation and
  * cleanup. SQL owns admission, expiring leases and stale-worker fencing. */
 export async function runDueSheetsRefreshes(input: {
+  eligible?: (connection: DueSheetsConnection) => boolean;
   due: (tickAt: string, limit: number, deadlineAt: number, excludedConnectionIds: readonly string[]) => Promise<DueSheetsConnection[]>;
   sync: (connection: DueSheetsConnection, execution: SheetsExecutionBudget, admission: SheetsScheduledAdmission) => Promise<unknown>;
   backoff: (connection: DueSheetsConnection, tickAt: string, deadlineAt: number) => Promise<unknown>;
@@ -82,6 +83,7 @@ export async function runDueSheetsRefreshes(input: {
         for (const connection of candidates) {
           if (seenIds.has(connection.id)) continue;
           seenIds.add(connection.id);
+          if (input.eligible && !input.eligible(connection)) continue;
           pending.push(connection);
         }
         next = pending.findIndex(connection => !activeWorkspaces.has(connection.workspace_id));
@@ -96,7 +98,7 @@ export async function runDueSheetsRefreshes(input: {
           catch (error) {
             // A race for admission accepted no work. Leave original eligibility
             // unchanged; another tick can admit it without an hour-long backoff.
-            if (error instanceof Error && /google_sheets_(?:capacity|workspace|sync)_busy/.test(error.message)) deferred++;
+            if (error instanceof Error && /google_sheets_(?:(?:capacity|workspace|sync)_busy|pilot_limited)/.test(error.message)) deferred++;
             else {
               failed++;
               await input.backoff(connection, tickAt, execution.cleanupDeadlineAt).catch(() => { backoffFailed++; });

@@ -30,6 +30,7 @@ import {
   businessNoteSourceSpans,
   validateBusinessNoteExtraction
 } from "@/lib/ai/business-notes/validation";
+import { beginGoogleSheetsRead, bindGoogleSheetsRead, googleSheetsReadSources, googleSheetsReadTicketFields } from "@/lib/integrations/google-sheets/read-authority";
 import { enforceAIProviderRateLimits } from "@/lib/ai/provider-guardrails";
 import { AIProviderExecutionError } from "@/lib/ai/providers/provider-manager";
 import { isBusinessNoteExtractionEnabled } from "@/lib/ai/providers/workflow-provider-policy";
@@ -109,6 +110,7 @@ export async function submitBusinessNoteForReviewAction(formData: FormData) {
   }
 
   const { supabase, user, workspaceId } = await requireWorkspaceAccess();
+  const readTicket = await beginGoogleSheetsRead(supabase, workspaceId, user.id);
   const releaseChannel = businessNoteReleaseChannel();
   const sourceTextHash = hashSource(originalNote);
   const { data: existing } = await supabase
@@ -121,11 +123,12 @@ export async function submitBusinessNoteForReviewAction(formData: FormData) {
     .is("deleted_at", null)
     .maybeSingle();
 
+  await bindGoogleSheetsRead(supabase, readTicket.ticketId, googleSheetsReadSources("business_notes", existing ? [existing] : []));
   if (existing) {
     if (existing.status === "rejected" && validateBusinessNoteExtraction(existing.extraction_json, originalNote).ok) {
       await supabase
         .from("business_notes")
-        .update({ status: "review_required", failure_reason: null })
+        .update({ status: "review_required", failure_reason: null, ...googleSheetsReadTicketFields(readTicket.ticketId) })
         .eq("workspace_id", workspaceId)
         .eq("id", existing.id);
     }
@@ -166,6 +169,7 @@ export async function submitBusinessNoteForReviewAction(formData: FormData) {
   const { data: note, error: insertError } = await supabase
     .from("business_notes")
     .insert({
+      ...googleSheetsReadTicketFields(readTicket.ticketId),
       workspace_id: workspaceId,
       author_user_id: user.id,
       original_note_text: originalNote,
@@ -185,11 +189,12 @@ export async function submitBusinessNoteForReviewAction(formData: FormData) {
 
   const startedAt = Date.now();
   try {
-    const generated = await generateBusinessNoteExtraction({ supabase, workspaceId, originalNote, startedAtMs: startedAt });
+    const generated = await generateBusinessNoteExtraction({ supabase, workspaceId, originalNote, readTicketId: readTicket.ticketId, startedAtMs: startedAt });
     const extraction = generated.extraction;
     const spans = businessNoteSourceSpans(extraction, originalNote);
     const attempts = generated.attempts.map(businessNoteProviderAttemptTelemetry);
     const update = {
+      ...googleSheetsReadTicketFields(readTicket.ticketId),
       status: "review_required" as const,
       extraction_json: extraction as unknown as Json,
       reviewed_extraction_json: {} as Json,
@@ -309,6 +314,7 @@ export async function approveBusinessNoteAction(formData: FormData) {
   const noteId = trimmedText(formData, "note_id");
   if (!uuidSchema.safeParse(noteId).success) redirect(noticeUrl("error", "The Business Note could not be identified safely."));
   const { supabase, user, workspaceId, membership } = await requireWorkspaceAccess();
+  const readTicket = await beginGoogleSheetsRead(supabase, workspaceId, user.id);
   const { data } = await supabase
     .from("business_notes")
     .select("*")
@@ -319,6 +325,7 @@ export async function approveBusinessNoteAction(formData: FormData) {
     .maybeSingle();
   const note = data as BusinessNoteRow | null;
   if (!note || note.status !== "review_required") redirect(noticeUrl("error", "This Business Note is no longer available for review."));
+  await bindGoogleSheetsRead(supabase, readTicket.ticketId, googleSheetsReadSources("business_notes", [note]));
   const canApproveNote = note.author_user_id === user.id || ["owner", "admin", "manager"].includes(membership.role);
   if (!canApproveNote) redirect(noticeUrl("error", "You do not have permission to approve this Business Note."));
   const validation = validateBusinessNoteExtraction(note.extraction_json, note.original_note_text);
@@ -340,6 +347,8 @@ export async function approveBusinessNoteAction(formData: FormData) {
   if (!admin) redirect(noticeUrl("error", "Business Note approval storage is temporarily unavailable."));
   const indexed = await indexApprovedBusinessNote({
     supabase: admin,
+    authoritySupabase: supabase,
+    readTicketId: readTicket.ticketId,
     workspaceId,
     note,
     extraction: reviewed,
@@ -352,6 +361,7 @@ export async function approveBusinessNoteAction(formData: FormData) {
   const { error: approvalError } = await admin
     .from("business_notes")
     .update({
+      ...googleSheetsReadTicketFields(readTicket.ticketId),
       status: "approved",
       evidence_lifecycle_status: "active",
       reviewed_extraction_json: reviewed as unknown as Json,
@@ -427,6 +437,7 @@ export async function bulkManageBusinessNotesAction(input: {
   }
 
   const { supabase, user, workspaceId, membership } = await requireWorkspaceAccess();
+  const readTicket = await beginGoogleSheetsRead(supabase, workspaceId, user.id);
   const releaseChannel = businessNoteReleaseChannel();
   const { data, error } = await supabase
     .from("business_notes")
@@ -440,6 +451,7 @@ export async function bulkManageBusinessNotesAction(input: {
     return { ok: false, message: "One or more Business Notes are stale or unavailable in this workspace." };
   }
 
+  await bindGoogleSheetsRead(supabase, readTicket.ticketId, googleSheetsReadSources("business_notes", notes));
   const canManageAll = notes.every((note) => note.author_user_id === user.id || ["owner", "admin", "manager"].includes(membership.role));
   if (!canManageAll) return { ok: false, message: "You do not have permission to manage every selected Business Note." };
 
@@ -462,6 +474,8 @@ export async function bulkManageBusinessNotesAction(input: {
     for (const { note, extraction } of approvedCandidates) {
       const indexed = await indexApprovedBusinessNote({
         supabase: admin,
+        authoritySupabase: supabase,
+        readTicketId: readTicket.ticketId,
         workspaceId,
         note,
         extraction,
@@ -475,7 +489,8 @@ export async function bulkManageBusinessNotesAction(input: {
       const { error: approvalError } = await admin
         .from("business_notes")
         .update({
-          status: "approved",
+          ...googleSheetsReadTicketFields(readTicket.ticketId),
+      status: "approved",
           evidence_lifecycle_status: "active",
           reviewed_extraction_json: extraction as unknown as Json,
           source_spans_json: businessNoteSourceSpans(extraction, note.original_note_text) as unknown as Json,
@@ -550,14 +565,14 @@ export async function bulkManageBusinessNotesAction(input: {
 
   if (input.action === "restore") {
     const restoreApproved = approvedIds.length
-      ? await admin.from("business_notes").update({ status: "approved", evidence_lifecycle_status: "active", archived_at: null }).eq("workspace_id", workspaceId).eq("release_channel", releaseChannel).in("id", approvedIds)
+      ? await admin.from("business_notes").update({ ...googleSheetsReadTicketFields(readTicket.ticketId), status: "approved", evidence_lifecycle_status: "active", archived_at: null }).eq("workspace_id", workspaceId).eq("release_channel", releaseChannel).in("id", approvedIds)
       : { error: null };
     const restoreUnapproved = unapprovedIds.length
-      ? await admin.from("business_notes").update({ status: "review_required", evidence_lifecycle_status: "inactive", archived_at: null }).eq("workspace_id", workspaceId).eq("release_channel", releaseChannel).in("id", unapprovedIds)
+      ? await admin.from("business_notes").update({ ...googleSheetsReadTicketFields(readTicket.ticketId), status: "review_required", evidence_lifecycle_status: "inactive", archived_at: null }).eq("workspace_id", workspaceId).eq("release_channel", releaseChannel).in("id", unapprovedIds)
       : { error: null };
     if (restoreApproved.error || restoreUnapproved.error) return { ok: false, message: "Selected Business Notes could not all be restored." };
     if (approvedIds.length) {
-      const { error: chunkError } = await admin.from("business_memory_chunks").update({ archived_at: null, deleted_at: null, updated_at: now }).eq("workspace_id", workspaceId).eq("source_type", "business_note").in("source_id", approvedIds);
+      const { error: chunkError } = await admin.from("business_memory_chunks").update({ ...googleSheetsReadTicketFields(readTicket.ticketId), archived_at: null, deleted_at: null, updated_at: now }).eq("workspace_id", workspaceId).eq("source_type", "business_note").in("source_id", approvedIds);
       if (chunkError) return { ok: false, message: "Business Notes were restored, but their Learned Knowledge could not be reactivated safely." };
     }
   } else {
@@ -565,6 +580,7 @@ export async function bulkManageBusinessNotesAction(input: {
     const { error: noteError } = await admin
       .from("business_notes")
       .update({
+        ...googleSheetsReadTicketFields(readTicket.ticketId),
         status: "archived",
         evidence_lifecycle_status: "archived",
         archived_at: now,

@@ -18,6 +18,8 @@ let retrievalCalls = 0, permitted = true, productAvailable = true;
 const source = { id:'B1', title:'Repair turnaround', url:'/app/kpis?q=Repair', sourceType:'kpi', sourceId:'metric-1',
   evidenceDate:'2026-09-01', retrievedAt:'2026-10-08T12:00:00Z', excerpt:'Turnaround rose from 2 to 4 days; cause not established.', text:'Turnaround rose from 2 to 4 days; cause not established.', treatment:'record' };
 const mock=(file,exports)=>{const filename=path.join(root,file);require.cache[filename]={id:filename,filename,loaded:true,exports};};
+mock('lib/integrations/google-sheets/read-authority.ts', { bindGoogleSheetsRead: async () => ({ ticketId: 'synthetic-ticket' }) });
+mock('lib/ai/providers/google-data-policy.ts', { googleSheetsOpenAIHeaders: async () => ({}) });
 mock('lib/vsi/retrieval.ts',{
   authorizeVsiRead: async () => { if (!permitted) throw new Error('Workspace denied'); return {}; },
   retrieveVsiEvidence: async () => { retrievalCalls++; return { sources:[source], limitations:['Only aggregate measurements are available.'] }; }
@@ -82,7 +84,7 @@ global.fetch=async(url,init)=>{
   const content=isWeb?`Here are the public findings${payload.researchStatus.partial?'; some checks remain unresolved':''} [${cited[0].id}].`:isBusiness?`Turnaround is 4 days, up from 2. The aggregate does not establish a cause [${cited[0].id}].`:mode==='history'?`The earlier research used its cited source snapshot [${cited[0].id}].`:mode==='product'?`Vaeroex supports public research [${cited[0].id}].`:'Here is a clear three-step writing plan.';
   return response({model:'gpt-6-luna',status:'completed',usage:mode==='later_failure_over_reserve'?{...usage,input_tokens:3000000}:usage,output_text:JSON.stringify({content,citationIds:['bad_cite','later_failure_bad_answer'].includes(mode)?['B99']:cited.slice(0,1).map(source=>source.id)})});
 };
-const input=(question,extras={})=>({supabase:{},workspaceId:'synthetic-a',actorUserId:'actor-a',requestId:'request',question,recentMessages:[],...extras});
+const input=(question,extras={})=>({readTicket:{ticketId:'synthetic-ticket'},supabase:{},workspaceId:'synthetic-a',actorUserId:'actor-a',requestId:'request',question,recentMessages:[],...extras});
 const answerPayload=()=>JSON.parse(calls.at(-1).input[1].content);
 async function main(){
   process.env.OPENAI_API_KEY='synthetic-test-key';

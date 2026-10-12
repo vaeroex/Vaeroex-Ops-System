@@ -143,7 +143,9 @@ assert.equal(validateFindingExplanationOutput({ ...validOutput, what_happened: "
 assert.equal(validateFindingExplanationOutput({ ...validOutput, investigate_next: "Inspect source_file_id within the approved reporting records before proceeding." }, analysisPackage).diagnostic.reasonCode, "invalid_citation_id");
 assert.equal(validateFindingExplanationOutput({ ...validOutput, what_happened: "My hidden reasoning shows a revenue issue." }, analysisPackage).diagnostic.reasonCode, "contextual_validation_failed");
 
-const token = sealFindingExplanationPackage({ analysisPackage, workspaceId, userId, nowMs: Date.parse("2026-07-20T00:00:00.000Z") });
+const token = sealFindingExplanationPackage({ readTicketId: workspaceId, analysisPackage, workspaceId, userId, nowMs: Date.parse("2026-07-20T00:00:00.000Z") });
+assert.equal(openFindingExplanationPackage(token, { workspaceId, userId }, Date.parse("2026-07-20T00:00:00.000Z")).readTicketId, workspaceId, "the sealed finding preserves its pre-read authority");
+assert.throws(() => sealFindingExplanationPackage({ analysisPackage, workspaceId, userId }), /read authority/);
 assert.doesNotMatch(token, /Revenue|retail-workbook|11111111/, "the browser token must encrypt business facts and workspace identity");
 assert.equal(openFindingExplanationPackage(token, { workspaceId, userId }, Date.parse("2026-07-20T00:01:00.000Z")).ok, true);
 assert.equal(openFindingExplanationPackage(token, { workspaceId, userId: "different-user" }, Date.parse("2026-07-20T00:01:00.000Z")).ok, false);

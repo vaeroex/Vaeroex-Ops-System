@@ -5,6 +5,9 @@ require.extensions['.ts']=(module,filename)=>module._compile(ts.transpileModule(
 const resolve=Module._resolveFilename;
 Module._resolveFilename=function(request,parent,...rest){if(request==='server-only')return request;return resolve.call(this,request.startsWith('@/')?path.join(root,request.slice(2)):request,parent,...rest)};
 require.cache['server-only']={id:'server-only',filename:'server-only',loaded:true,exports:{}};
+const authority = require('../lib/integrations/google-sheets/read-authority.ts');
+authority.beginGoogleSheetsRead = async () => ({ ticketId: 'synthetic-ticket' });
+authority.bindGoogleSheetsRead = async () => ({ ticketId: 'synthetic-ticket' });
 const {authorizeVsiRead,retrieveVsiEvidence,publicVsiExcerpt}=require('../lib/vsi/retrieval.ts');
 const workspace={id:'w-a',name:'Synthetic repairs'},user={id:'u-a',email:'synthetic@example.test'};
 let context={profile:null,workspaces:[workspace],activeWorkspace:workspace,membership:{workspace_id:'w-a',user_id:'u-a',role:'owner',status:'active'}};
@@ -21,7 +24,7 @@ const supabase={auth:{getUser:async()=>({data:{user},error:null})},from(table){c
 const access={supabase,user,context,workspace,workspaceId:'w-a',membership:context.membership};
 const imageChunk={id:'chunk-image',workspace_id:'w-a',source_type:'file',source_id:'file-image',source_file_id:'file-image',
   source_title:'Approved warehouse image',source_excerpt:'The photographed receiving log records three deliveries on October 1.',indexed_at:'2026-10-02T00:00:00Z'};
-function health(){return {errors:[],businessHealthSourceErrors:[],kpis:[{id:'image-kpi',source_file_id:'file-image',name:'Receiving image count',actual_value:3,target:3,metric_date:'2026-10-01',notes:null}],kpiSettings:[],intelligenceKpis:[],intelligenceKpiSettings:[],issues:[],sops:[],
+function health(){return {consumedSources:[],errors:[],businessHealthSourceErrors:[],kpis:[{id:'image-kpi',source_file_id:'file-image',name:'Receiving image count',actual_value:3,target:3,metric_date:'2026-10-01',notes:null}],kpiSettings:[],intelligenceKpis:[],intelligenceKpiSettings:[],issues:[],sops:[],
   files:[{id:'file-image',created_at:'2026-10-01T00:00:00Z'}],imports:[],assets:[],crmLeads:[],crmHistory:[],operationalMetrics:[],intelligenceOperationalMetrics:[],people:[],decisions:[],
   memoryChunks:[{...imageChunk}],forms:[],submissions:[],sourceParentResult:{eligibility:{records:{files:[],imports:[]}},error:null}}}
 require('../lib/intelligence/workspace-health.ts').loadWorkspaceHealthEvidence=async()=>health();
@@ -30,7 +33,7 @@ require('../lib/ai/evidence-index.ts').SupabasePgvectorCandidateRetriever=class{
 require('../lib/ai/business-notes/contextual-evidence.ts').loadApprovedBusinessNoteContextV1=async({workspaceId})=>{assert.equal(workspaceId,'w-a');return {records:[],error:null}};
 const authorityCalls=[];
 require('../lib/document-extraction/approval-guard.ts').assertDocumentExtractionAuthority=async(input)=>{authorityCalls.push(input);assert.equal(input.supabase,supabase);assert.equal(input.workspaceId,'w-a');return {eligible:approved}};
-require('../lib/integrations/dashboard/server.ts').loadIntegrationDashboard=async({access:input})=>{assert.equal(input.user.id,'u-a');return {dashboard:{entries:[],unavailable:[]}}};
+require('../lib/integrations/dashboard/server.ts').loadIntegrationDashboard=async({access:input})=>{assert.equal(input.user.id,'u-a');return {googleSheetsConnectionIds:[],dashboard:{entries:[],unavailable:[]}}};
 require('../lib/intelligence/operational-evidence.ts').buildOperationalEvidenceInsights=({memoryChunks})=>{if(!approved)assert.equal(memoryChunks.length,0);return []};
 require('../lib/intelligence/layer.ts').buildIntelligenceLayer=()=>({businessHealth:{available:false},executiveSummary:'Insufficient data',dataQuality:{},forecastReadiness:{},insights:[]});
 async function main(){

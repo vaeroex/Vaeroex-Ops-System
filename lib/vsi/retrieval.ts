@@ -1,3 +1,4 @@
+import { beginGoogleSheetsRead, bindGoogleSheetsRead, googleSheetsReadSources, type GoogleSheetsReadTicket } from "@/lib/integrations/google-sheets/read-authority";
 import "server-only";
 import { getSubscriptionStatus } from "@/lib/billing/get-subscription-status";
 import { getWorkspaceContext } from "@/lib/workspaces/current";
@@ -76,10 +77,11 @@ function relevance(question: string, text: string) {
 
 /** Authenticated client, explicit workspace predicates, existing RLS and source lifecycle on every read.
  * No admin client, external refresh, transcript indexing, embedding call or new memory store. */
-export async function retrieveVsiEvidence(access: WorkspaceAccess, question: string, asOf = new Date().toISOString()): Promise<VsiEvidenceResult> {
+export async function retrieveVsiEvidence(access: WorkspaceAccess, question: string, asOf = new Date().toISOString(), inheritedTicket?: GoogleSheetsReadTicket): Promise<VsiEvidenceResult> {
   const { supabase, workspaceId } = access;
+  const readTicket = inheritedTicket ?? await beginGoogleSheetsRead(supabase, workspaceId, access.user.id);
   const [health, memory, notes, reports] = await Promise.all([
-    loadWorkspaceHealthEvidence({ supabase, workspaceId }),
+    loadWorkspaceHealthEvidence({ supabase, workspaceId, readTicket }),
     new SupabasePgvectorCandidateRetriever({ supabase }).retrieve({ version: EVIDENCE_QUERY_VERSION, workspaceId, text: question,
       requestedDomains: ["business_memory"], strategy: "keyword_only", candidateLimit: 24, resultLimit: 16, minimumSourceDiversity: 2, freshnessAfter: null }),
     loadApprovedBusinessNoteContextV1({ supabase, workspaceId, releaseChannel: businessNoteReleaseChannel(), asOf, maximumRows: 50 }),
@@ -196,5 +198,14 @@ export async function retrieveVsiEvidence(access: WorkspaceAccess, question: str
   const bounded = selected.filter(source => { chars += source.text.length; return chars <= 24_000; }).map((source, index) => ({ ...source, id: `B${index + 1}` }));
   if (ranked.length > bounded.length) limitations.push("This answer uses a relevant, bounded selection of workspace records, not an exhaustive audit. Ask about a specific metric, date or file to narrow the evidence.");
   if (!bounded.length) limitations.push("No permitted matching business evidence is available for this answer.");
+  await bindGoogleSheetsRead(supabase, readTicket.ticketId, [
+    ...health.consumedSources,
+    ...integrations.googleSheetsConnectionIds.map(id => ({ table: "google_sheets_connections", id })),
+    ...googleSheetsReadSources("kpis", health.kpis),
+    ...googleSheetsReadSources("operational_metrics", health.operationalMetrics),
+    ...googleSheetsReadSources("business_memory_chunks", memory.candidates.map(row => ({ id: row.candidateId }))),
+    ...notes.records.map(record => ({ table: "business_notes", id: record.sourceNoteId })),
+    ...googleSheetsReadSources("reports", reports.data)
+  ]);
   return { sources: bounded, limitations: [...new Set(limitations)] };
 }

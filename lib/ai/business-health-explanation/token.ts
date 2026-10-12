@@ -1,3 +1,4 @@
+import { googleSheetsReadTicketId } from "@/lib/integrations/google-sheets/read-authority";
 import "server-only";
 
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "crypto";
@@ -20,6 +21,7 @@ type TokenPayload = {
   issuedAt: number;
   expiresAt: number;
   analysisPackage: BusinessHealthExplanationPackage;
+  readTicketId: string;
 };
 
 function encryptionKey() {
@@ -51,11 +53,13 @@ function validPackage(value: unknown): value is BusinessHealthExplanationPackage
 
 export function sealBusinessHealthExplanationPackage({
   analysisPackage,
+  readTicketId,
   workspaceId,
   userId,
   nowMs = Date.now()
 }: {
   analysisPackage: BusinessHealthExplanationPackage;
+  readTicketId: string;
   workspaceId: string;
   userId: string;
   nowMs?: number;
@@ -63,7 +67,9 @@ export function sealBusinessHealthExplanationPackage({
   if (analysisPackage.manifest.workspaceId !== workspaceId) {
     throw new Error("The Business Health evidence package must belong to the authorized workspace.");
   }
+  if (!googleSheetsReadTicketId.safeParse(readTicketId).success) throw new Error("Evidence read authority is unavailable.");
   const payload: TokenPayload = {
+    readTicketId,
     version: TOKEN_VERSION,
     workspaceId,
     userId,
@@ -105,6 +111,7 @@ export function openBusinessHealthExplanationPackage(
     return { ok: false as const, reason: "invalid" as const };
   }
   const candidate = payload as Partial<TokenPayload>;
+  if (!googleSheetsReadTicketId.safeParse(candidate.readTicketId).success) return { ok: false as const, reason: "invalid" as const };
   if (
     candidate.version !== TOKEN_VERSION ||
     candidate.workspaceId !== expected.workspaceId ||
@@ -122,7 +129,7 @@ export function openBusinessHealthExplanationPackage(
     return { ok: false as const, reason: "invalid" as const };
   }
 
-  return { ok: true as const, analysisPackage: candidate.analysisPackage };
+  return { ok: true as const, analysisPackage: candidate.analysisPackage, readTicketId: candidate.readTicketId! };
 }
 
 export function trySealBusinessHealthExplanationPackage(input: Parameters<typeof sealBusinessHealthExplanationPackage>[0]) {

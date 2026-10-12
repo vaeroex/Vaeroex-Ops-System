@@ -1,3 +1,4 @@
+import { beginGoogleSheetsRead, bindGoogleSheetsRead, googleSheetsReadSources, type GoogleSheetsReadTicket } from "@/lib/integrations/google-sheets/read-authority";
 import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -46,7 +47,8 @@ export async function buildWorkspaceIntelligenceBriefingPackage({
   workspace,
   briefingType,
   asOf = new Date().toISOString(),
-  previousBriefing = null
+  previousBriefing = null,
+  readTicket: inheritedTicket
 }: {
   supabase: SupabaseClient<Database>;
   workspaceId: string;
@@ -54,8 +56,10 @@ export async function buildWorkspaceIntelligenceBriefingPackage({
   briefingType: IntelligenceBriefingType;
   asOf?: string;
   previousBriefing?: IntelligenceBriefingPackage["previousBriefing"];
+  readTicket?: GoogleSheetsReadTicket;
 }) {
   if (!Number.isFinite(Date.parse(asOf))) throw new Error("Intelligence briefing as-of time is invalid.");
+  const readTicket = inheritedTicket ?? await beginGoogleSheetsRead(supabase, workspaceId);
   const period = intelligenceBriefingPeriod(briefingType, new Date(asOf));
   const [
     issuesResult,
@@ -218,7 +222,18 @@ export async function buildWorkspaceIntelligenceBriefingPackage({
     sourceLabelByCandidateId: evidence.sourceLabelByCandidateId,
     previousBriefing
   });
-  return { briefingPackage, snapshot: snapshot.snapshot, receipt: snapshot.receipt };
+  await bindGoogleSheetsRead(supabase, readTicket.ticketId, [
+    ...googleSheetsReadSources("kpis", kpis), ...googleSheetsReadSources("kpi_settings", settings),
+    ...googleSheetsReadSources("issues", issuesResult.data), ...googleSheetsReadSources("file_uploads", files),
+    ...googleSheetsReadSources("file_imports", imports), ...googleSheetsReadSources("crm_leads", customers),
+    ...googleSheetsReadSources("operational_metrics", operationalMetrics), ...googleSheetsReadSources("business_memory_chunks", memoryChunks),
+    ...googleSheetsReadSources("sops", sopsResult.data), ...googleSheetsReadSources("forms", formsResult.data),
+    ...googleSheetsReadSources("form_submissions", submissionsResult.data), ...googleSheetsReadSources("people", peopleResult.data),
+    ...googleSheetsReadSources("business_decisions", decisionsResult.data), ...googleSheetsReadSources("assets", assetsResult.data),
+    ...businessNotes.records.map(record => ({ table: "business_notes", id: record.sourceNoteId })),
+    ...(previousBriefing ? [{ table: "ai_agent_runs", id: previousBriefing.runId }] : [])
+  ]);
+  return { briefingPackage, snapshot: snapshot.snapshot, receipt: snapshot.receipt, readTicket };
 }
 
 export async function loadWorkspaceIntelligenceBriefingStates({
@@ -233,6 +248,7 @@ export async function loadWorkspaceIntelligenceBriefingStates({
   asOf?: string;
 }): Promise<Readonly<Record<IntelligenceBriefingType, IntelligenceBriefingState>>> {
   async function stateFor(briefingType: IntelligenceBriefingType) {
+    const readTicket = await beginGoogleSheetsRead(supabase, workspaceId);
     const current = await loadCurrentIntelligenceBriefing({
       supabase,
       workspaceId,
@@ -241,6 +257,7 @@ export async function loadWorkspaceIntelligenceBriefingStates({
 
     try {
       const { briefingPackage } = await buildWorkspaceIntelligenceBriefingPackage({
+        readTicket,
         supabase,
         workspaceId,
         workspace,

@@ -1,5 +1,6 @@
 import "server-only";
 
+import { googleSheetsOpenAIHeaders } from "@/lib/ai/providers/google-data-policy";
 import { consumeAIProviderResponse, isRetryableAIProviderStatus } from "@/lib/ai/provider-resilience";
 import { AIProviderError, type AIEmbeddingResult, type AIProvider, type AIProviderRequest } from "@/lib/ai/providers/types";
 
@@ -55,10 +56,11 @@ export class OpenAIProvider implements AIProvider {
           if (part.type === "image") return { type: "input_image", image_url: dataUrl(part.mimeType, part.base64Data), detail: part.detail || "auto" };
           return { type: "input_file", filename: part.fileName, file_data: dataUrl(part.mimeType, part.base64Data) };
         });
+    const googleHeaders = await googleSheetsOpenAIHeaders(request.googleSheetsReadTicketId);
     const startedAt = Date.now();
     const { response, value: payload } = await consumeAIProviderResponse("openai", OPENAI_RESPONSES_ENDPOINT, {
       method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json", ...googleHeaders },
       body: JSON.stringify({
         model: request.model,
         ...(typeof request.temperature === "number" ? { temperature: request.temperature } : {}),
@@ -80,7 +82,7 @@ export class OpenAIProvider implements AIProvider {
               }
             : { type: "json_object" }
         },
-        ...(typeof request.store === "boolean" ? { store: request.store } : {}),
+        ...(googleHeaders["OpenAI-Project"] ? { store: false } : typeof request.store === "boolean" ? { store: request.store } : {}),
         ...(request.stream === false ? { stream: false } : {}),
         input: [
           { role: "system", content: request.systemPrompt },
@@ -129,16 +131,17 @@ export class OpenAIProvider implements AIProvider {
     };
   }
 
-  async createEmbeddings(inputs: string[], model: string, settings: AIProviderRequest["settings"]): Promise<AIEmbeddingResult> {
+  async createEmbeddings(inputs: string[], model: string, settings: AIProviderRequest["settings"], googleSheetsReadTicketId?: string): Promise<AIEmbeddingResult> {
     const apiKey = process.env.OPENAI_API_KEY?.trim();
     if (!apiKey || !inputs.length) {
       return { model, embeddings: inputs.map(() => null), tokens: 0, error: apiKey ? undefined : "OpenAI embedding key is not configured." };
     }
 
+    const googleHeaders = await googleSheetsOpenAIHeaders(googleSheetsReadTicketId);
     try {
       const { response, value: payload } = await consumeAIProviderResponse("openai", OPENAI_EMBEDDINGS_ENDPOINT, {
         method: "POST",
-        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json", ...googleHeaders },
         body: JSON.stringify({ model, input: inputs })
       }, async (providerResponse) => {
         const body = await providerResponse.text();
