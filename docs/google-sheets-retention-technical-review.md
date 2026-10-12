@@ -2,7 +2,7 @@
 
 The October2 audit below is retained as historical evidence. Its “not implemented” findings and draft policy wording are superseded by PR#458’s current implementation/release plan and the updated verification packet in this PR. Do not use this historical text as the published policy or current submission status.
 
-The owner has selected13calendar months from first import while connected, shortened to30days after disconnect, with immediate access expiry and next-business-day physical purge. Isaac monitors deletion support each business day; acknowledgement within2businessdays and active-system completion target within30calendar days. Current code covers VSI, lifecycle snapshots, notes/memory and file-analysis consumers added after the initial audit. Production provider key replacement, live operational provisioning, release and authentic video/submission remain gated until the final release record confirms them.
+The owner has selected13calendar months from first import while connected, shortened to30days after disconnect, with immediate access expiry and next-business-day physical purge. Isaac monitors deletion support each business day; acknowledgement within2businessdays and active-system completion target within30calendar days. Current code covers VSI, lifecycle snapshots, notes/memory and file-analysis consumers added after the initial audit. Dedicated Google-data provider key qualification (preserving the existing shared Production/Preview key), live operational provisioning, release and authentic video/submission remain gated until the final release record confirms them.
 
 ## Historical October2 audit
 

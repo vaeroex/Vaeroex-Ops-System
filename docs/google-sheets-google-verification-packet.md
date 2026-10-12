@@ -33,7 +33,11 @@ These periods are business choices, not Google-prescribed or approved periods. M
 
 ## Processor provenance
 
-The existing Vercel Production model key is unreadable and its issuing project is unproven. One controlled replacement is planned: preserve the existing shared write-only key by narrowing its environment targets to Preview only, then the owner creates and privately stores a separate Production-only key for the verified OpenAI organization/project, records non-secret provenance and sets the two project pins. The shared old value must not be overwritten or revoked. Google-derived requests must use that project, force Responses store:false, and cannot fall back to NVIDIA. Sharing disabled +store:false is not ZDR. OpenAI’s standard abuse-monitoring and prompt-cache retention must remain disclosed. Deployment/submission is blocked until private replacement and verification are complete.
+The existing shared `OPENAI_API_KEY` remains unchanged in Production and Preview. Its issuing project is unproven, so Google-derived requests use a separate Production-only `GOOGLE_SHEETS_OPENAI_API_KEY` from the verified OpenAI organization/project, with nonsecret issuing-project provenance and both project pins. This dedicated key is required only for Google-derived model/embedding requests; missing configuration blocks those requests, and unrelated application credentials/routing remain unchanged. Replacing the shared Production key is not a Google OAuth requirement; that broader proposal was withdrawn after owner review.
+
+Google-derived requests must use the verified project, force Responses `store:false`, and cannot fall back to the shared key or NVIDIA. Sharing disabled plus `store:false` is not ZDR. OpenAI's standard abuse-monitoring and prompt-cache retention must remain disclosed. Deployment/submission remains blocked until private dedicated-key qualification and its deployed fingerprint match are complete.
+
+Before the first live signed witness upload or activation, Isaac must store the encrypted signing-key recovery image in his existing password manager and verify an actually downloaded copy against independently retained public key/dataset/genesis pins. A local archive alone does not satisfy this gate. Reserve15–30minutes for the whole-site cutover after private setup, recovery verification and staging; unresolved drain/schema/deployment checks may extend the hold.
 
 ## Authentic English demonstration
 
