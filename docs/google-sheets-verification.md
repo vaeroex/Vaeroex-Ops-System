@@ -1,6 +1,6 @@
 # Verification continuation — October12,2026
 
-The October2 implementation record below is historical. The live connector was subsequently released. Current verification work is tracked by PR#457’s submission packet and PR#458’s exact erasure/retention release plan. The current baseline main and public app commit is002c2536583ce455f2ce8ee1bc58b430c3da3b74. Google remains External/Testing, not submitted. The new release remains held pending its exact approval and operational checks.
+The October2 implementation record below is historical. The live connector was subsequently released. Current verification work is tracked by PR#457’s submission packet and PR#458’s exact erasure/retention release plan. The current baseline main and public app commit is212e3b5832ad201dee8ab14e42f3e8affeb54968. Google remains External/Testing, not submitted. The new release remains held pending its exact approval and operational checks.
 
 ## Historical implementation record
 

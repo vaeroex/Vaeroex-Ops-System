@@ -1,6 +1,6 @@
 # Google Sheets verification submission packet
 
-Updated October12,2026. Resume PRs #457 (packet) and #458 (implementation), based on current deployed main `002c2536583ce455f2ce8ee1bc58b430c3da3b74`. Earlier October2 drafts are superseded by this packet and the completed implementation release receipt. This is not a Google approval or a submitted application.
+Updated October12,2026. Resume PRs #457 (packet) and #458 (implementation), based on current deployed main `212e3b5832ad201dee8ab14e42f3e8affeb54968`. Earlier October2 drafts are superseded by this packet and the completed implementation release receipt. This is not a Google approval or a submitted application.
 
 ## Current facts
 
@@ -33,7 +33,7 @@ These periods are business choices, not Google-prescribed or approved periods. M
 
 ## Processor provenance
 
-The existing Vercel Production model key is unreadable and its issuing project is unproven. One controlled replacement is planned: owner creates and privately stores a Production key for the verified OpenAI organization/project, records non-secret provenance and sets the two project pins. Google-derived requests must use that project, force Responses store:false, and cannot fall back to NVIDIA. Sharing disabled +store:false is not ZDR. OpenAI’s standard abuse-monitoring and prompt-cache retention must remain disclosed. Deployment/submission is blocked until private replacement and verification are complete.
+The existing Vercel Production model key is unreadable and its issuing project is unproven. One controlled replacement is planned: preserve the existing shared write-only key by narrowing its environment targets to Preview only, then the owner creates and privately stores a separate Production-only key for the verified OpenAI organization/project, records non-secret provenance and sets the two project pins. The shared old value must not be overwritten or revoked. Google-derived requests must use that project, force Responses store:false, and cannot fall back to NVIDIA. Sharing disabled +store:false is not ZDR. OpenAI’s standard abuse-monitoring and prompt-cache retention must remain disclosed. Deployment/submission is blocked until private replacement and verification are complete.
 
 ## Authentic English demonstration
 
