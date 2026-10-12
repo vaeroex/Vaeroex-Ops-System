@@ -120,8 +120,9 @@ for (const retiredPath of [
 ]) assert.equal(fs.existsSync(path.join(root, retiredPath)), false, `${retiredPath} must stay retired`);
 assert.doesNotMatch(vercel, /report-subscriptions/, "retired report scheduling remains absent");
 assert.deepEqual(JSON.parse(vercel).crons, [
+  { path: "/api/storage-capacity/maintenance", schedule: "*/15 * * * *" },
   { path: "/api/integrations/google-sheets/scheduled-sync", schedule: "*/15 * * * *" }
-], "only the established Sheets schedule is permitted; this does not authorize additional cron jobs");
+], "only the established Sheets schedule and explicitly authorized storage-retention maintenance are permitted; report scheduling remains retired");
 
 // Run the actual client date formatter in independent host timezone contexts.
 // SSR and hydration must agree even when a UTC timestamp crosses a local date.

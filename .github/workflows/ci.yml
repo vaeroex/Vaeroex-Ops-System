@@ -60,11 +60,19 @@ jobs:
         run: |
           audit_pg_bin="$(pg_config --bindir)"
           WORKSPACE_AUDIT_PG_BIN="$audit_pg_bin" pnpm test:workspace-audit:database
+          WORKSPACE_STORAGE_PG_BIN="$audit_pg_bin" node scripts/workspace-storage-database-tests.cjs
           ISSUE_TEST_PG_BIN="$audit_pg_bin" node scripts/issue-submission-native-tests.cjs
           SHEETS_TEST_PG_BIN="$audit_pg_bin" node scripts/google-sheets-dispatch-native-tests.cjs
           SHEETS_TEST_PG_BIN="$audit_pg_bin" node scripts/google-sheets-dispatch-fairness-native-tests.cjs
           SHEETS_TEST_PG_BIN="$audit_pg_bin" node scripts/google-sheets-recovery-continuation-native-tests.cjs
           SHEETS_TEST_PG_BIN="$audit_pg_bin" node scripts/google-sheets-failure-cleanup-native-tests.cjs
+
+      - name: Workspace storage capacity policy and controlled billing regressions
+        run: |
+          node scripts/workspace-capacity-billing-tests.cjs
+          node scripts/stripe-webhook-receipt-tests.cjs
+          node scripts/storage-capacity-ui-tests.cjs
+          node scripts/storage-capacity-upload-client-tests.cjs
 
       - name: Workspace navigation and bounded-list regressions
         run: pnpm test:workspace-clarity

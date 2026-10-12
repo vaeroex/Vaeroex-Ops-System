@@ -6,7 +6,7 @@ import { ReportingTimezoneForm } from "@/components/settings/ReportingTimezoneFo
 import { changePasswordAction } from "@/lib/auth/actions";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
 import Link from "next/link";
-import { ArrowRight, Plug } from "lucide-react";
+import { ArrowRight, HardDrive, Plug } from "lucide-react";
 
 type SettingsPageProps = {
   searchParams?: Promise<{
@@ -37,6 +37,16 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
         </div>
         <Link href="/app/integrations" className="workspace-row-link inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-line px-4 py-2 text-sm font-semibold text-vaeroex-blue">
           Manage integrations<ArrowRight aria-hidden="true" className="h-4 w-4 shrink-0" />
+        </Link>
+      </section>
+
+      <section aria-labelledby="settings-storage" className="flex flex-col gap-3 border-b border-line pb-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <h2 id="settings-storage" className="flex items-center gap-2 text-lg font-semibold text-ink"><HardDrive aria-hidden="true" className="h-5 w-5" />Usage &amp; Storage</h2>
+          <p className="mt-1 text-sm text-muted">This workspace’s file storage, available capacity, Trash, and recurring capacity purchases.</p>
+        </div>
+        <Link href="/app/settings/storage" className="workspace-row-link inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-line px-4 py-2 text-sm font-semibold text-vaeroex-blue">
+          View usage &amp; storage<ArrowRight aria-hidden="true" className="h-4 w-4 shrink-0" />
         </Link>
       </section>
 

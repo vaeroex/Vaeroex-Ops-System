@@ -52,7 +52,6 @@ import {
 } from "@/lib/kpis/settings";
 import { deterministicKpiSemantics, KPI_SEMANTIC_VERSION } from "@/lib/kpis/semantics";
 import { enforceRateLimit, rateLimitMessage } from "@/lib/security/rate-limit";
-import { validateUploadFileSafety } from "@/lib/security/file-upload-safety";
 import { requireToolExecution, type RegisteredToolName } from "@/lib/security/tool-execution-gateway";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Database, Json } from "@/lib/supabase/types";
@@ -163,7 +162,6 @@ type FileAnalysisEvidenceAssessment = ReturnType<typeof assessFileAnalysisEviden
 
 const FILES_PATH = "/app/files";
 const SOURCES_PATH = "/app/sources";
-const STORAGE_BUCKET = "workspace-files";
 const MAX_ANALYSIS_ROWS = 60;
 const MAX_IMPORT_ROWS = 1000;
 const MAX_EXTRACTED_TEXT_CHARS = 18_000;
@@ -368,16 +366,6 @@ function unsupportedFileContentMessage(file: Pick<FileUploadRow, "file_extension
   return "This file type cannot be reviewed yet. Upload CSV/XLSX for data import, or text-based PDF/DOCX files for Vaeroex review.";
 }
 
-function safeFileName(value: string) {
-  const cleaned = value
-    .normalize("NFKD")
-    .replace(/[^\w.\- ]+/g, "")
-    .replace(/\s+/g, "-")
-    .replace(/^-+|-+$/g, "");
-
-  return cleaned || `upload-${Date.now()}`;
-}
-
 function validImportType(value: string): ImportType {
   if (value === "crm") {
     redirectWithError("Customer record imports have been retired. Upload the file as source evidence, analyze it with Vaeroex, or import only KPI/business metric history.");
@@ -430,33 +418,6 @@ async function requireWorkspace({ allowExpired = false }: { allowExpired?: boole
     workspaceId: context.activeWorkspace.id,
     membership: context.membership
   };
-}
-
-async function validateFolder(workspaceId: string, folderId: string) {
-  if (!folderId) {
-    return null;
-  }
-
-  const supabase = await createSupabaseServerClient();
-
-  if (!supabase) {
-    redirectWithError("Supabase is not configured.");
-  }
-
-  const { data, error } = await supabase
-    .from("record_folders")
-    .select("id")
-    .eq("id", folderId)
-    .eq("workspace_id", workspaceId)
-    .eq("collection_type", "files")
-    .is("archived_at", null)
-    .maybeSingle();
-
-  if (error || !data) {
-    throw new Error(error?.message || "Folder not found for this workspace.");
-  }
-
-  return folderId;
 }
 
 async function getFileForWorkspace(fileId: string, workspaceId: string) {
@@ -2312,203 +2273,52 @@ async function runFileVaeroexAnalysis({
   };
 }
 
-async function uploadSource(formData: FormData): Promise<UploadSourceState> {
-  const { supabase, user, workspaceId } = await requireWorkspace();
-  const returnPath = safeFileReturnPath(text(formData, "return_path"));
-  const uploadedFile = formData.get("file");
-  const allowDuplicateUpload = formData.get("allow_duplicate") === "on";
-
-  if (!(uploadedFile instanceof File) || uploadedFile.size === 0) {
-    return { error: "Choose a file to upload." };
+/** Upload bodies go directly to Storage. This action receives saved metadata only. */
+export async function prepareUploadedSourceAction(_previousState: UploadSourceState, formData: FormData): Promise<UploadSourceState> {
+  const { supabase, workspaceId, membership } = await requireWorkspace();
+  if (text(formData, "expectedWorkspaceId") !== workspaceId) {
+    return { error: "Your workspace changed during upload. Switch back to the original workspace and open its saved source.", blocked: true };
   }
-
-  const rateLimit = await enforceRateLimit({
-    action: "file.upload",
-    limit: 20,
-    windowSeconds: 10 * 60,
-    userId: user.id,
-    workspaceId,
-    identifiers: [user.email],
-    metadata: { source: "file_upload" },
-    strict: true
-  });
-
-  if (!rateLimit.allowed) {
-    return { error: rateLimitMessage(rateLimit) };
+  if (formData.has("file")) return { error: "Reload Sources to use the secure direct upload form.", blocked: true };
+  if (!["owner", "admin", "manager", "staff"].includes(membership.role)) {
+    return { error: "Your workspace role cannot prepare uploaded sources.", blocked: true };
   }
-
-  const fileLimit = await isUsageLimitReached({
-    supabase,
-    userId: user.id,
-    email: user.email,
-    workspaceId,
-    limit: "files"
-  });
-
-  if (fileLimit.reached) {
-    return { error: `This workspace has reached the file upload limit for the current Vaeroex plan (${fileLimit.limitValue} files).` };
-  }
-
-  const buffer = Buffer.from(await uploadedFile.arrayBuffer());
-  const validation = validateUploadFileSafety({
-    fileName: uploadedFile.name,
-    browserMimeType: uploadedFile.type,
-    size: uploadedFile.size,
-    buffer
-  });
-
-  if (!validation.ok) {
-    return { error: validation.error };
-  }
-
-  const extension = validation.extension;
-  const storedExtension = validation.storedExtension;
-  let folderId: string | null;
-  try {
-    folderId = await validateFolder(workspaceId, text(formData, "folder_id"));
-  } catch (error) {
-    return { error: actionErrorMessage(error, "The selected folder could not be checked. Please try again.") };
-  }
-  const safeName = safeFileName(uploadedFile.name);
-  const storagePath = `${workspaceId}/${randomUUID()}/${safeName}`;
-  const mimeType = validation.mimeType;
-  const { data: possibleDuplicate, error: duplicateError } = await supabase
-    .from("file_uploads")
-    .select("id,display_name,created_at")
-    .eq("workspace_id", workspaceId)
-    .eq("original_name", uploadedFile.name)
-    .eq("file_size_bytes", uploadedFile.size)
-    .eq("file_extension", storedExtension)
-    .is("deleted_at", null)
-    .is("archived_at", null)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (duplicateError) {
-    return { error: "Existing sources could not be checked. Please try again." };
-  }
-
-  if (possibleDuplicate && !allowDuplicateUpload) {
-    return { error: `This looks like a duplicate of "${possibleDuplicate.display_name}". Check "Upload anyway" if you intentionally want another copy.` };
-  }
-
-  // Once storage has been contacted, leave the form on any uncertain result.
-  // A retry must not silently upload a second copy of an already saved source.
-  const upload = await supabase.storage.from(STORAGE_BUCKET).upload(storagePath, buffer, {
-    contentType: mimeType,
-    upsert: false
-  }).catch(() => {
-    redirectWithPathError(returnPath, "The upload result could not be confirmed. Check Sources before uploading this file again.");
-  });
-
-  if (upload.error) {
-    redirectWithPathError(returnPath, "The upload could not be completed. Check Sources before uploading this file again.");
-  }
-
-  const displayName = text(formData, "display_name") || uploadedFile.name;
-  const { data, error } = await Promise.resolve(supabase
-    .from("file_uploads")
-    .insert({
-      workspace_id: workspaceId,
-      folder_id: folderId,
-      original_name: uploadedFile.name,
-      display_name: displayName,
-      file_extension: storedExtension,
-      mime_type: mimeType,
-      file_size_bytes: uploadedFile.size,
-      storage_bucket: STORAGE_BUCKET,
-      storage_path: storagePath,
-      import_status: extension === "csv" || extension === "xlsx" ? "ready" : "not_imported",
-      processing_status: "uploaded",
-      processing_error: null,
-      processed_at: null,
-      metadata_json: {
-        upload_method: "files_module",
-        can_import: extension === "csv" || extension === "xlsx",
-        can_analyze:
-          storedExtension === "csv" ||
-          storedExtension === "xlsx" ||
-          storedExtension === "pdf" ||
-          storedExtension === "docx" ||
-          storedExtension === "png" ||
-          storedExtension === "jpg",
-        supported_import_types: extension === "csv" || extension === "xlsx" ? ["kpi", "metrics"] : [],
-        extraction_support:
-          storedExtension === "csv" || storedExtension === "xlsx"
-            ? "Spreadsheet rows can be parsed, analyzed, and imported after review."
-            : storedExtension === "pdf" || storedExtension === "docx"
-              ? "Text can be extracted for analysis and report creation when the document contains readable text."
-              : "Image OCR and visual analysis are supported through Vaeroex."
-      },
-      created_by: user.id
-    })
-    .select("id")
-    .single())
-    .catch(() => {
-      redirectWithPathError(returnPath, "The file reached secure storage, but its source record could not be confirmed. Check Sources before uploading this file again.");
-    });
-
-  if (error || !data) {
-    redirectWithPathError(returnPath, "The file reached secure storage, but its source record could not be confirmed. Check Sources before uploading this file again.");
-  }
-
-  // This legacy job is bookkeeping; preparation is performed below and does
-  // not depend on a background consumer accepting the queued record.
-  await Promise.resolve(supabase.from("file_processing_jobs").insert({
-    workspace_id: workspaceId,
-    file_upload_id: data.id,
-    job_type: "extract",
-    status: "queued",
-    created_by: user.id,
-    metadata_json: {
-      source: "upload",
-      file_name: displayName,
-      file_extension: storedExtension,
-      file_size_bytes: uploadedFile.size
-    }
-  })).catch(() => undefined);
-
+  const file = await getFileForWorkspace(text(formData, "file_id"), workspaceId);
+  if (file.deleted_at || file.archived_at) return { error: "Restore this source before preparing it for review.", blocked: true };
   revalidatePath(FILES_PATH);
   revalidatePath(SOURCES_PATH);
+  revalidatePath("/app/settings/storage");
 
-  if (storedExtension === "csv" || storedExtension === "xlsx") {
+  if (file.file_extension === "csv" || file.file_extension === "xlsx") {
     const preparation = new FormData();
-    preparation.set("file_id", data.id);
+    preparation.set("file_id", file.id);
     try {
-      // The upload authorizes preparation only. The existing import action
-      // retains its workspace, permission, rate-limit and final-review gates.
+      // Upload authorizes preparation only. The import action retains its
+      // workspace, permission, rate-limit and final-review gates.
       return await importFileAction(preparation);
     } catch (error) {
+      if (isNextRedirectError(error)) throw error;
       const message = actionErrorMessage(error, "The workbook could not be prepared.");
       await Promise.resolve(supabase
         .from("file_uploads")
         .update({ import_status: "failed", processing_status: "failed", processing_error: message, processed_at: new Date().toISOString() })
-        .eq("id", data.id)
+        .eq("id", file.id)
         .eq("workspace_id", workspaceId)).catch(() => undefined);
-      redirectWithFileError(`File uploaded. ${message} Open Imported Data to prepare the saved file again.`, data.id, "imported");
+      redirectWithFileError(`File uploaded. ${message} Open Imported Data to prepare the saved file again.`, file.id, "imported");
     }
   }
-
-  redirectWithPathMessage(
-    sourceDetailPath(data.id),
-    "File uploaded. Choose Analyze source to extract findings. This file is not yet available in Learned Knowledge."
-  );
+  redirectWithPathMessage(sourceDetailPath(file.id),
+    "File uploaded. Choose Analyze source to extract findings. This file is not yet available in Learned Knowledge.");
 }
 
-export async function uploadSourceAction(_previousState: UploadSourceState, formData: FormData): Promise<UploadSourceState> {
-  try {
-    const result = await uploadSource(formData);
-    return { ...result, error: result.error ? cleanNoticeMessage(result.error, "The file could not be uploaded.") : null };
-  } catch (error) {
-    if (isNextRedirectError(error)) throw error;
-    return { error: "The upload result could not be confirmed. Check Sources before uploading this file again.", blocked: true };
-  }
+/** Old clients cannot bypass atomic admission by posting a binary server action. */
+export async function uploadSourceAction(_previousState: UploadSourceState, _formData: FormData): Promise<UploadSourceState> {
+  void _previousState; void _formData;
+  return { error: "Reload Sources to upload with the secure direct upload form.", blocked: true };
 }
 
 export async function uploadFileAction(formData: FormData) {
-  const result = await uploadSource(formData);
-  redirectWithPathError(safeFileReturnPath(text(formData, "return_path")), result.error || "Choose a file to upload.");
+  redirectWithPathError(safeFileReturnPath(text(formData, "return_path")), "Reload Sources to upload with the secure direct upload form.");
 }
 
 export async function manageSourceFileAction(formData: FormData) {
@@ -2571,7 +2381,7 @@ export async function manageSourceFileAction(formData: FormData) {
     action === "archive"
       ? "Source archived. Its learned evidence is excluded from future Vaeroex answers until it is analyzed again."
       : action === "delete"
-        ? "Source deleted from active views. Its learned evidence is excluded from future Vaeroex answers."
+        ? "Source moved to Trash for 30 days. Recover or permanently delete it in Settings → Usage & Storage. Bytes and its file slot remain used until permanent deletion. Its learned evidence is excluded from future Vaeroex answers."
         : "Source restored. Its eligible learned evidence is active again.",
     file.id
   );
