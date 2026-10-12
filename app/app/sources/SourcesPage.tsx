@@ -20,6 +20,7 @@ import { LoadingLink } from "@/components/operations/LoadingLink";
 import { PendingSubmitButton } from "@/components/operations/PendingSubmitButton";
 import { StatusBadge } from "@/components/operations/StatusBadge";
 import { SourceImportReview, sourceImportReviewRecords } from "@/components/evidence/SourceImportReview";
+import { BusinessInformationEntry } from "@/components/evidence/BusinessInformationEntry";
 import { BusinessNoteEntry, BusinessNotesPanel, type BusinessNotesObservability } from "@/components/evidence/BusinessNotesPanel";
 import { EvidenceLifecycleCheckbox } from "@/components/evidence/EvidenceLifecycleSelection";
 import { EvidenceBatchList } from "@/components/evidence/EvidenceBatchList";
@@ -1275,22 +1276,9 @@ export async function renderSourcesPage(params: SourceSearchParams = {}, options
       </header>
 
       {activeTab !== "legal" ? (
-        <div className="space-y-2" aria-label="Add business information">
-          <div className="grid items-start gap-3 md:grid-cols-2">
-            <section aria-labelledby="upload-files-heading" className="workspace-panel min-w-0 p-3 sm:p-4">
-              <h2 id="upload-files-heading" className="text-sm font-semibold text-slate-100">Upload files</h2>
-              <p className="mt-1 text-sm leading-5 text-[color:var(--workspace-muted)]">Add reports, spreadsheets, documents, or photos of business records for Vaeroex to review.</p>
-              <p className="mt-1 text-xs leading-5 text-[color:var(--workspace-muted)]">Supports PDF, CSV, Excel (.xlsx), Word (.docx), and PNG/JPG images.</p>
-              <div className="mt-3"><UploadSourceDrawer folders={folders} workspaceId={workspaceId} /></div>
-            </section>
-            <section aria-labelledby="business-notes-heading" className="workspace-panel min-w-0 p-3 sm:p-4">
-              <h2 id="business-notes-heading" className="text-sm font-semibold text-slate-100">Business Notes</h2>
-              <p className="mt-1 text-sm leading-5 text-[color:var(--workspace-muted)]">Give Vaeroex context about your business—what you sell, your locations, operating hours, goals, and important details. You can also add meeting notes, decisions, and updates.</p>
-              <div className="mt-3"><BusinessNoteEntry enabled={isBusinessNoteExtractionEnabled()} /></div>
-            </section>
-          </div>
-          <p className="text-xs leading-5 text-[color:var(--workspace-muted)]">Review and approve information before Vaeroex uses it as business evidence.</p>
-        </div>
+        <BusinessInformationEntry uploadAction={<UploadSourceDrawer folders={folders} workspaceId={workspaceId} />}>
+          <BusinessNoteEntry enabled={isBusinessNoteExtractionEnabled()} />
+        </BusinessInformationEntry>
       ) : null}
 
       {showNoteFeedback ? notesPanel : actionFeedback}
