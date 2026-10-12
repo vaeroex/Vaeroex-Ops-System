@@ -120,20 +120,58 @@ test("Square never-completed detail stays concise while completed empty reads re
   assert.match(completed, /last completed search checked/);
 });
 
-test("Sheets failed-consent detail preserves setup controls without zero-sync diagnostics", async () => {
+async function renderSheetsDetail({ allowed = true, role = "owner" } = {}) {
+  const workspaceId = "workspace-a", queries = [];
+  let policyChecks = 0;
   const connection = { ...sheetAttempt, status: "reauthorization_required", tabs: [], headers: [], field_mapping: null,
     sync_lease_expires_at: null, oauth_lease_expires_at: null, last_sync_rejected_count: 0, last_sync_conflict_count: 0 };
-  const query = table => ({ select() { return this; }, eq() { return this; }, order() { return this; }, limit() { return this; },
-    then(resolve) { return Promise.resolve({ data: table === "google_sheets_connections" ? [connection] : [], error: null }).then(resolve); } });
+  const query = table => {
+    const filters = [];
+    queries.push(table);
+    return { select() { return this; }, eq(...args) { filters.push(args); return this; }, order() { return this; }, limit() { return this; },
+      then(resolve) {
+        assert(filters.some(([key, value]) => key === "workspace_id" && value === workspaceId), "detail reads stay in the authenticated workspace");
+        if (table === "business_entities") assert(allowed && role === "owner", "only an admitted owner can load connection setup choices");
+        return Promise.resolve({ data: table === "google_sheets_connections" ? [connection] : [], error: null }).then(resolve);
+      } };
+  };
   const { default: Page } = loadSource("app/app/settings/integrations/google-sheets/page.tsx", {
     "next/link": link,
-    "@/lib/integrations/google-sheets/server": { sheetsEnabled: () => true },
-    "@/lib/workspaces/page-context": { requireWorkspacePage: async () => ({ context: { membership: { role: "owner" } }, workspaceId: "workspace-a", supabase: { from: query } }) },
+    "@/lib/integrations/google-sheets/server": { sheetsEnabled: () => true, sheetsWorkspaceAllowed: actualWorkspaceId => {
+      assert.equal(actualWorkspaceId, workspaceId, "pilot policy checks the authenticated workspace");
+      policyChecks++;
+      return allowed;
+    } },
+    "@/lib/workspaces/page-context": { requireWorkspacePage: async () => ({ context: { membership: { role } }, workspaceId, supabase: { from: query } }) },
     "@/components/operations/PageHeader": { PageHeader: ({ title }) => React.createElement("h1", null, title) }
   });
   const html = renderToStaticMarkup(await Page({ searchParams: Promise.resolve({}) }));
+  assert.equal(policyChecks, 1, "the detail page must check pilot admission");
+  return { html, queries };
+}
+
+test("Sheets failed-consent detail preserves setup controls without zero-sync diagnostics", async () => {
+  const { html } = await renderSheetsDetail();
   assert.match(html, /Authorization not completed/);
   assert.match(html, /No spreadsheet data has been imported/);
   assert.match(html, /action="\/api\/integrations\/google-sheets\/reconnect"/);
   assert.doesNotMatch(html, /Never synced|Last successful sync|Rows read|Validated metrics|Reauthorization required/);
+});
+
+test("Sheets pilot denial retains scoped connection status and disconnect without setup admission", async () => {
+  const { html, queries } = await renderSheetsDetail({ allowed: false });
+  assert.match(html, /available only to selected pilot workspaces/);
+  assert.match(html, /Daily operations/);
+  assert.match(html, /Authorization not completed/);
+  assert.match(html, /action="\/api\/integrations\/google-sheets\/disconnect"/);
+  assert.doesNotMatch(html, /action="\/api\/integrations\/google-sheets\/(?:connect|reconnect|entity|spreadsheet|tab|mapping|sync)"/);
+  assert.deepEqual(queries, ["google_sheets_connections", "google_sheets_sync_runs"]);
+});
+
+test("Sheets pilot admission never grants a non-owner connection controls", async () => {
+  const { html, queries } = await renderSheetsDetail({ role: "viewer" });
+  assert.match(html, /The workspace owner can connect a spreadsheet/);
+  assert.match(html, /Daily operations/);
+  assert.doesNotMatch(html, /action="\/api\/integrations\/google-sheets\//);
+  assert.deepEqual(queries, ["google_sheets_connections", "google_sheets_sync_runs"]);
 });
