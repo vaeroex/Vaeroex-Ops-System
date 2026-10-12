@@ -46,8 +46,9 @@ export class OpenAIProvider implements AIProvider {
   }
 
   async generate(request: AIProviderRequest) {
+    const googleHeaders = await googleSheetsOpenAIHeaders(request.googleSheetsReadTicketId);
     const apiKey = process.env.OPENAI_API_KEY?.trim();
-    if (!apiKey) throw new AIProviderError("OpenAI API key is not configured.", "openai", false, undefined, "configuration");
+    if (!apiKey && !googleHeaders.Authorization) throw new AIProviderError("OpenAI API key is not configured.", "openai", false, undefined, "configuration");
 
     const userContent = request.userContent.length === 1 && request.userContent[0]?.type === "text"
       ? request.userContent[0].text
@@ -56,7 +57,6 @@ export class OpenAIProvider implements AIProvider {
           if (part.type === "image") return { type: "input_image", image_url: dataUrl(part.mimeType, part.base64Data), detail: part.detail || "auto" };
           return { type: "input_file", filename: part.fileName, file_data: dataUrl(part.mimeType, part.base64Data) };
         });
-    const googleHeaders = await googleSheetsOpenAIHeaders(request.googleSheetsReadTicketId);
     const startedAt = Date.now();
     const { response, value: payload } = await consumeAIProviderResponse("openai", OPENAI_RESPONSES_ENDPOINT, {
       method: "POST",
@@ -133,11 +133,14 @@ export class OpenAIProvider implements AIProvider {
 
   async createEmbeddings(inputs: string[], model: string, settings: AIProviderRequest["settings"], googleSheetsReadTicketId?: string): Promise<AIEmbeddingResult> {
     const apiKey = process.env.OPENAI_API_KEY?.trim();
-    if (!apiKey || !inputs.length) {
+    if (!inputs.length) {
       return { model, embeddings: inputs.map(() => null), tokens: 0, error: apiKey ? undefined : "OpenAI embedding key is not configured." };
     }
 
     const googleHeaders = await googleSheetsOpenAIHeaders(googleSheetsReadTicketId);
+    if (!apiKey && !googleHeaders.Authorization) {
+      return { model, embeddings: inputs.map(() => null), tokens: 0, error: "OpenAI embedding key is not configured." };
+    }
     try {
       const { response, value: payload } = await consumeAIProviderResponse("openai", OPENAI_EMBEDDINGS_ENDPOINT, {
         method: "POST",

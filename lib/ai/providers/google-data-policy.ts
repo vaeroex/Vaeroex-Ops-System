@@ -34,14 +34,15 @@ export async function assertGoogleSheetsProviderPolicy(ticketId: string | undefi
 }
 
 function verifiedOpenAIHeaders(): Record<string, string> {
-  // Configure only after the production key's issuing project and data controls
+  // Configure only after the dedicated key's issuing project and data controls
   // have been verified. These settings are not a Zero Data Retention claim.
+  const apiKey = process.env.GOOGLE_SHEETS_OPENAI_API_KEY?.trim();
   const organization = process.env.GOOGLE_SHEETS_OPENAI_ORGANIZATION_ID?.trim();
   const project = process.env.GOOGLE_SHEETS_OPENAI_PROJECT_ID?.trim();
-  if (!organization || !/^org-[A-Za-z0-9_-]+$/.test(organization) || !project || !/^proj_[A-Za-z0-9_-]+$/.test(project)) {
-    throw new AIProviderPolicyError("Google Sheets analysis is unavailable until its provider project is verified.");
+  if (!apiKey || !organization || !/^org-[A-Za-z0-9_-]+$/.test(organization) || !project || !/^proj_[A-Za-z0-9_-]+$/.test(project)) {
+    throw new AIProviderPolicyError("Google Sheets analysis is unavailable until its provider connection is verified.");
   }
-  return { "OpenAI-Organization": organization, "OpenAI-Project": project };
+  return { Authorization: `Bearer ${apiKey}`, "OpenAI-Organization": organization, "OpenAI-Project": project };
 }
 
 export async function googleSheetsOpenAIHeaders(ticketId: string | undefined): Promise<Record<string, string>> {

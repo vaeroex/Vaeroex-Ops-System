@@ -366,8 +366,13 @@ public key from the preceding command. It writes three 0600 files in that direct
 idempotent only when all bytes agree. It does not connect to cloud or database.
 
 Independently retain the public key, dataset, primary endpoint and genesis digest
-outside this bucket and application/local-journal backup. After approved bucket/IAM
-provisioning, upload **only** that exact genesis file, with a create-only generation
+outside this bucket and application/local-journal backup. Before any live genesis
+upload or operation relying on this key, Isaac must store the encrypted recovery
+image in his existing password manager, download/decrypt that stored copy, verify
+its private key against the independently retained public fingerprint/dataset/genesis,
+and detach the recovery mount. Local archive creation alone is insufficient.
+Retain the completed nonsecret recovery receipt. After this gate and approved
+bucket/IAM provisioning, upload **only** that exact genesis file, with a create-only generation
 precondition, using the restricted impersonated identity:
 
 ```text

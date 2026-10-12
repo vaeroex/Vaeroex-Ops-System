@@ -196,7 +196,6 @@ async function runVsiAnswerInternal(input: VsiRunInput, startedAt: number): Prom
   if (noteDraft) return finish({ content: "Here is the Business Note I propose to save. Review the exact text below and confirm to add it to Business Notes for review. It will become business context only after approval.", citations: [], noteDraft });
   if (/^(?:please\s+)?remember(?:\s+this)?(?:[.!?:\s]|$)/i.test(input.question)) return finish({ content: "Tell me the exact business context you want saved, in 1,800 characters or fewer. I will show a Business Note proposal for you to confirm.", citations: [] });
   const key = process.env.OPENAI_API_KEY?.trim();
-  if (!key) throw new VsiEngineError("Vaeroex Super Intelligence is temporarily unavailable because its provider connection is not configured. Please try again later.", usage);
   const call = async (body: Record<string, unknown>, reserveAnswerMs = 0) => {
     let googleDataHeaders: Record<string, string>;
     try {
@@ -204,6 +203,7 @@ async function runVsiAnswerInternal(input: VsiRunInput, startedAt: number): Prom
       googleDataHeaders = await googleSheetsOpenAIHeaders(input.readTicket.ticketId);
     }
     catch { throw new VsiEngineError("Workspace data changed. Reload this chat before trying again.", usage, false, "evidence_unavailable"); }
+    if (!key && !googleDataHeaders.Authorization) throw new VsiEngineError("Vaeroex Super Intelligence is temporarily unavailable because its provider connection is not configured. Please try again later.", usage);
     if (usage.estimatedCostUsd >= config.requestReserveUsd) throw new VsiEngineError("This question reached its spending safeguard. Please narrow it and retry.", usage, false, "budget_block");
     const remaining = config.timeoutMs - (Date.now() - startedAt) - reserveAnswerMs;
     if (remaining < 4000) throw new VsiEngineError("This answer took too long. Please retry or ask a narrower question.", usage, false, "timeout");
