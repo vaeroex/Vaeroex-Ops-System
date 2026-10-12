@@ -1,14 +1,16 @@
 import Link from "next/link";
 import type { Route } from "next";
+import type { ReactNode } from "react";
 import { ArrowRight } from "lucide-react";
 import { StatusBadge } from "@/components/operations/StatusBadge";
 
-export function ProviderCard({ name, description, statuses, href, action }: {
+export function ProviderCard({ name, description, statuses, href, action, children }: {
   name: string;
   description: string;
   statuses: readonly string[];
   href: string;
   action: string;
+  children?: ReactNode;
 }) {
   return (
     <article aria-label={name} className="flex min-w-0 flex-col gap-4 rounded-lg border border-line bg-white p-4 sm:p-5">
@@ -19,6 +21,7 @@ export function ProviderCard({ name, description, statuses, href, action }: {
       <div role="status" className="flex flex-wrap gap-2">
         {statuses.map((status) => <StatusBadge key={status} value={status} />)}
       </div>
+      {children}
       <Link href={href as Route} prefetch={false} className="mt-auto inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-line px-4 py-2 text-sm font-semibold text-vaeroex-blue focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vaeroex-blue">
         {action}<ArrowRight aria-hidden="true" className="h-4 w-4 shrink-0" />
       </Link>

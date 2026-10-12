@@ -7,6 +7,51 @@ const { root, harness, connection, loadSource, React, renderToStaticMarkup } = r
 const landing = "app/app/integrations/page.tsx";
 const management = "app/app/settings/integrations/quickbooks/page.tsx";
 
+test("Sheets pilot eligibility is disclosed before purchase and connection, with an upload fallback", async () => {
+  const Link = ({ children, prefetch, ...props }) => {
+    if (props.href === "/app/sources") assert.equal(prefetch, false, "Upload fallbacks must preserve app navigation without prefetch");
+    return React.createElement("a", props, children);
+  };
+  let user = null;
+  const mocks = {
+    "next/link": { __esModule: true, default: Link },
+    "@/components/legal/PublicSiteHeader": { PublicSiteHeader: () => null },
+    "@/components/legal/PublicFooter": { PublicFooter: () => null },
+    "@/lib/supabase/server": { createSupabaseServerClient: async () => ({ auth: { getUser: async () => ({ data: { user } }) } }) },
+    "@/app/checkout/legal/actions": { acceptPreCheckoutLegalPoliciesAction: async () => { throw Error("mutation_forbidden"); } },
+    "@/lib/legal/pre-checkout-acceptance": { hasAcceptedCurrentPreCheckoutPolicies: async () => false,
+      preCheckoutAcceptanceSnapshot: () => ({ requiredPolicies: [], requiredPolicyHash: "synthetic" }) }
+  };
+  for (const signedIn of [false, true]) {
+    user = signedIn ? { id: "synthetic", email_confirmed_at: "2026-10-12T00:00:00Z" } : null;
+    for (const file of ["app/help/page.tsx", "app/checkout/legal/page.tsx"]) {
+      const html = renderToStaticMarkup(await loadSource(file, mocks).default({}));
+      assert.match(html, /Google Sheets limited pilot/);
+      assert.match(html, /Google account must be an approved test user/);
+      assert.match(html, /paid Vaeroex subscription does not grant pilot access/);
+      assert.match(html, /href="\/app\/sources"[^>]*>Upload supported spreadsheet files/);
+      if (file.includes("checkout")) {
+        assert(html.indexOf("data-google-sheets-pilot") < html.indexOf('name="accept_pre_checkout_legal"'));
+        assert.match(html, /\$250\/month/);
+      }
+    }
+  }
+  const { searchHelpArticles } = loadSource("lib/help/content.ts");
+  const guide = searchHelpArticles("Google Sheets").find(article => article.id === "google-sheets-pilot");
+  assert(guide);
+  assert.match(guide.summary, /approved test user/);
+  assert.equal(guide.nextHref, "/app/sources");
+  assert(guide.workflow.some(step => step.includes("seven days")));
+  for (const connected of [false, true]) {
+    const html = await harness({ sheetsEnabled: true,
+      sheetsConnections: connected ? [{ status: "connected", active_approval_id: "synthetic" }] : [] }).render(landing);
+    assert.match(html, /Limited pilot for approved Google test accounts/);
+    assert.match(html, /Upload spreadsheet files instead/);
+    assert.match(html, /Manage Google Sheets/);
+    assert.match(html, connected ? /Connected/ : /Not connected/);
+  }
+});
+
 test("only database-confirmed unconsented attempts offer cancellation on either management page", async () => {
   const { canOfferPendingCancellation } = loadSource("lib/integrations/control-plane/customer-status.ts");
   for (const status of ["pending_authorization", "error"]) {

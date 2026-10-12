@@ -55,6 +55,12 @@ export type StripeInvoice = {
   customer?: string | { id?: string; email?: string | null; name?: string | null } | null;
   customer_email?: string | null;
   subscription?: string | { id?: string } | null;
+  parent?: {
+    type?: string | null;
+    subscription_details?: {
+      subscription?: string | { id?: string } | null;
+    } | null;
+  } | null;
 };
 
 export type StripeCustomer = {
@@ -206,6 +212,28 @@ export function stripeObjectId(value: unknown) {
   if (typeof value === "string") return value;
   if (value && typeof value === "object" && "id" in value && typeof value.id === "string") return value.id;
   return null;
+}
+
+/** Accept both Stripe invoice contracts without guessing between conflicting references. */
+export function stripeInvoiceSubscriptionId(invoice: StripeInvoice) {
+  const legacyId = stripeObjectId(invoice.subscription);
+  const parent = invoice.parent;
+  let parentId: string | null = null;
+
+  if (parent) {
+    if (parent.type === "subscription_details") {
+      parentId = stripeObjectId(parent.subscription_details?.subscription);
+      if (!parentId) throw new Error("Stripe invoice subscription parent is invalid.");
+    } else if (parent.subscription_details || legacyId) {
+      throw new Error("Stripe invoice parent type conflicts with its subscription reference.");
+    }
+  }
+
+  if (legacyId && parentId && legacyId !== parentId) {
+    throw new Error("Stripe invoice subscription references disagree.");
+  }
+
+  return parentId || legacyId;
 }
 
 export function stripeTimestampToIso(value?: number | null) {

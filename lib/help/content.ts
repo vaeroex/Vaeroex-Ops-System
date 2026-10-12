@@ -1,5 +1,6 @@
 import type { Route } from "next";
 import { VAEROEX_CONTACT_EMAILS } from "@/lib/contact/emails";
+import { GOOGLE_SHEETS_PILOT } from "@/lib/integrations/google-sheets/availability";
 
 export type HelpCategory =
   | "Getting Started"
@@ -40,6 +41,20 @@ function article(input: HelpArticle): HelpArticle {
 }
 
 export const helpArticles: HelpArticle[] = [
+  article({
+    id: "google-sheets-pilot",
+    category: "Getting Started",
+    title: GOOGLE_SHEETS_PILOT.title,
+    summary: GOOGLE_SHEETS_PILOT.eligibility,
+    what: GOOGLE_SHEETS_PILOT.catalog,
+    why: GOOGLE_SHEETS_PILOT.fallback,
+    when: "Check pilot eligibility before trying to connect or relying on Google Sheets when purchasing Vaeroex.",
+    workflow: ["Confirm with Vaeroex support that the Google account you will use is an approved pilot test user.", "If eligible, open Integrations → Google Sheets and follow the existing connection and mapping approval steps.", GOOGLE_SHEETS_PILOT.reconnect, GOOGLE_SHEETS_PILOT.fallback],
+    mistakes: ["Assuming a paid subscription grants Google pilot eligibility.", "Assuming a successful test connection means Google Sheets is generally available."],
+    nextLabel: "Open Files & Notes",
+    nextHref: "/app/sources",
+    related: ["files-imports", "first-follow-up"]
+  }),
   article({
     id: "vaeroex-super-intelligence",
     category: "Getting Started",
