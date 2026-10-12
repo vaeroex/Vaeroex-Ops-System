@@ -166,7 +166,8 @@ async function main() {
     const checkedRestoreDb = { ...restoreDb,
       replay: async (...args) => {
         const result = await restoreDb.replay(...args);
-        await assert.rejects(seed.beginReader(adapter(restoredAdmin), []), /privacy_paused/); checks++;
+        const replayedSeed = args[0] === seed.request ? seed : recoverySeed;
+        await assert.rejects(replayedSeed.beginReader(adapter(restoredAdmin), []), /privacy_paused/); checks++;
         return result;
       },
       finishRestore: async (...args) => {
