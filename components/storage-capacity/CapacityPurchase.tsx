@@ -25,7 +25,7 @@ export function CapacityPurchase({ workspaceId, workspaceName, currentPacks, bil
   const router = useRouter();
   const [expanded, setExpanded] = useState(false);
   const [packs, setPacks] = useState(1);
-  const [billingAddress, setBillingAddress] = useState<CapacityBillingAddress>({ line1: "", line2: "", city: "", state: "", postalCode: "", country: "" });
+  const [billingAddress, setBillingAddress] = useState<CapacityBillingAddress>({ line1: "", line2: "", city: "", state: "", postalCode: "", country: "US" });
   const [quote, setQuote] = useState<CapacityQuote | null>(null);
   const [accepted, setAccepted] = useState(false);
   const [paymentSession, setPaymentSession] = useState<CapacityPaymentSession | null>(null);

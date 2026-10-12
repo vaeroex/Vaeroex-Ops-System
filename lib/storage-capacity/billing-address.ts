@@ -7,8 +7,8 @@ export const capacityBillingAddressSchema = z.object({
   city: text(100).refine(Boolean, "Enter a city."),
   state: text(100).optional(),
   postalCode: text(32).optional(),
-  country: z.string().trim().toUpperCase().regex(/^[A-Z]{2}$/)
+  country: z.literal("US")
 }).strict().superRefine((address, context) => {
-  if (["US", "CA"].includes(address.country) && !address.state) context.addIssue({ code: z.ZodIssueCode.custom, path: ["state"], message: "Enter a state or province." });
-  if (["US", "CA", "GB"].includes(address.country) && !address.postalCode) context.addIssue({ code: z.ZodIssueCode.custom, path: ["postalCode"], message: "Enter a postal code." });
+  if (!address.state) context.addIssue({ code: z.ZodIssueCode.custom, path: ["state"], message: "Enter a state or province." });
+  if (!address.postalCode) context.addIssue({ code: z.ZodIssueCode.custom, path: ["postalCode"], message: "Enter a postal code." });
 });

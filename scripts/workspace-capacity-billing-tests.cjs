@@ -100,6 +100,11 @@ test('recurring review excludes canceled paid capacity and includes unpaid renew
   assert.equal(quote.existingMonthlyCents,1500);assert.equal(quote.monthlyCents+quote.existingMonthlyCents,2500);
   assert.equal(quote.totalPacks,4);assert.equal(quote.totalBytes,55000000000);assert.equal(quote.totalFiles,2500);
 });
+test('non-US billing addresses are rejected before a provider request',async()=>{
+  await assert.rejects(()=>billing.quoteWorkspaceCapacity(workspaceId,actorId,1,{...address,country:'GB'}),/valid billing address/);
+  assert.equal(requests.length,0);
+  assert.equal(rpcCalls.length,0);
+});
 test('older prorated Checkout purchase requests cannot start a new payment',async()=>{
   await assert.rejects(()=>billing.checkoutWorkspaceCapacity(workspaceId,actorId,'owner@example.test',intentId),/older payment review/);
   assert.equal(requests.filter(r=>r.init.method==='POST').length,0);

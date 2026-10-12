@@ -261,15 +261,17 @@ test("purchase requires an explicit reviewed recurring authorization, binds the 
   } finally { global.fetch = oldFetch; global.window = oldWindow; }
 });
 
-test("billing address validation requests only the location fields needed by the selected country, and no incomplete address is submitted", async () => {
+test("US billing address validation rejects missing fields and other countries before payment review", async () => {
   const { billingAddressError, BillingAddressFields } = addressFields;
   assert.equal(billingAddressError(syntheticBillingAddress), null);
-  assert.match(billingAddressError({ ...syntheticBillingAddress, state: "" }), /state or province/);
-  assert.match(billingAddressError({ ...syntheticBillingAddress, postalCode: "" }), /ZIP or postal/);
-  assert.equal(billingAddressError({ ...syntheticBillingAddress, country: "GB", state: "", postalCode: "SW1A 1AA" }), null);
-  assert.equal(billingAddressError({ ...syntheticBillingAddress, country: "HK", state: "", postalCode: "" }), null);
-  assert.match(billingAddressError({ ...syntheticBillingAddress, country: "XX" }), /country/);
+  assert.match(billingAddressError({ ...syntheticBillingAddress, state: "" }), /billing state/);
+  assert.match(billingAddressError({ ...syntheticBillingAddress, postalCode: "" }), /ZIP code/);
+  assert.match(billingAddressError({ ...syntheticBillingAddress, country: "GB" }), /only for United States/);
+  assert.match(billingAddressError({ ...syntheticBillingAddress, country: "HK" }), /only for United States/);
+  assert.match(billingAddressError({ ...syntheticBillingAddress, country: "XX" }), /only for United States/);
   const html = render(BillingAddressFields, { value: syntheticBillingAddress, onChange() {}, disabled: false });
+  assert.match(html, /United States/);
+  assert.doesNotMatch(html, /option value="(?:GB|HK)"/);
   assert.match(html, /not saved in Vaeroex workspace records/);
   assert.match(html, /Enter card details only in Stripe’s secure payment fields/);
   assert.doesNotMatch(html, /name="(?:card|credit|cvc|ssn|taxId)/i);
