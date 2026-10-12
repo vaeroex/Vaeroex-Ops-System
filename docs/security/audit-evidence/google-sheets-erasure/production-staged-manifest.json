@@ -1,7 +1,7 @@
 {
   "projectRef": "mdiianhfrojmxqpwrflh",
-  "appliedLedgerCount": 141,
-  "stagedCount": 143,
+  "appliedLedgerCount": 142,
+  "stagedCount": 144,
   "pendingCount": 2,
   "migrations": [
     {
@@ -1004,6 +1004,13 @@
       "sha256": "107075b9e5ecfba7235bd98d911ee320dde614ef6eed4f689c414d1f6c2209c8",
       "state": "pending",
       "source": "supabase/production-migrations/20261012191836_google_sheets_restricted_erasure_retention.sql"
+    },
+    {
+      "version": "20261012201726",
+      "filename": "20261012201726_stripe_subscription_observation_fence.sql",
+      "sha256": "48b9234b28e6f40aa9ce8624a7adc9311617ac1d155e3f218d2c054ee54a1db5",
+      "state": "applied",
+      "source": "supabase/migrations/20261012201726_stripe_subscription_observation_fence.sql"
     }
   ],
   "remoteMutations": false

@@ -1,5 +1,5 @@
 {
-  "startedAt": "2026-10-12T20:34:44.086Z",
+  "startedAt": "2026-10-12T21:07:52.551Z",
   "scope": "Full canonical application SQL with existing synthetic Supabase platform prerequisites, owned native PostgreSQL only",
   "productionAccess": false,
   "bootstrapSha256": "1613c8630c563eed640efc4d8b80278b67b4195fb9cdbad4bc97bd34dcb8c4de",
@@ -725,6 +725,11 @@
       "sha256": "8d50cbfb21fba60a981f4d2c86b487d672bd2a820f603a8b53c8750f5ce0edce"
     },
     {
+      "file": "20261012201726_stripe_subscription_observation_fence.sql",
+      "version": "20261012201726",
+      "sha256": "48b9234b28e6f40aa9ce8624a7adc9311617ac1d155e3f218d2c054ee54a1db5"
+    },
+    {
       "file": "20261002225025_google_sheets_support_erasure.sql",
       "version": "20261002225025",
       "sha256": "4ac30e7a57290eb554c7edfff2672b59ae59458dca632f5d269915f6f8c8b33b"
@@ -740,8 +745,12 @@
   "vsiExactPolicyCatalogChecks": 4,
   "pgtapAvailable": true,
   "vsiPrivateChatTapChecks": 10,
-  "ledgerCount": 146,
+  "ledgerCount": 147,
   "candidateCount": 2,
-  "finishedAt": "2026-10-12T20:34:46.601Z",
-  "stopped": true
+  "finishedAt": "2026-10-12T21:08:11.315Z",
+  "stopped": true,
+  "snapshotAt": "2026-10-12T21:06:20.536250+00:00",
+  "sourceHeadAtSnapshot": "b2fe9f3e2375283ce2da1a3b20e78b444dcfb8cc",
+  "mergedMainAtSnapshot": "212e3b5832ad201dee8ab14e42f3e8affeb54968",
+  "qualificationContext": "Exact uncommitted merge snapshot of the listed two source heads; per-file migration hashes are authoritative."
 }

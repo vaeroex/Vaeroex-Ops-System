@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { GOOGLE_SHEETS_CALLBACK_PATH, GOOGLE_SHEETS_READ_SCOPE } from "@/lib/integrations/google-sheets/contracts";
+import { GOOGLE_SHEETS_PILOT } from "@/lib/integrations/google-sheets/availability";
 
 export function googleSheetsAuthorizationTarget(value: unknown) {
   if (typeof value !== "string" || value.length > 8192) throw new Error("invalid_authorization_url");
@@ -60,6 +61,7 @@ export function GoogleSheetsAuthorizationForm({ children, mode = "connect", clas
 
   return <form action={`/api/integrations/google-sheets/${mode}`} method="post" onSubmit={submit} className={className} aria-busy={pending} aria-describedby={disclosureId}>
     {children}
+    <p className="text-sm leading-6 text-slate-600 sm:col-span-full"><strong>{GOOGLE_SHEETS_PILOT.title}.</strong> {GOOGLE_SHEETS_PILOT.eligibility}</p>
     <div id={disclosureId} className="space-y-2 text-sm leading-6 text-slate-600 sm:col-span-full">
       <p>Google grants read-only access to spreadsheets your account can access. Vaeroex reads the spreadsheet you configure, its worksheet details and headings, and the columns you select for preview or approve for sync. It cannot edit your spreadsheet.</p>
       <p>Approved metrics and their history are stored in your workspace for Performance and Intelligence. Relevant data may be sent to OpenAI for requested analyses, conversations, and Business Memory indexing. OpenAI data sharing is disabled and Responses use store:false; standard abuse-monitoring retention may be up to 30 days with legal or safety exceptions, and prompt caching may last up to 24 hours. This is not Zero Data Retention.</p>

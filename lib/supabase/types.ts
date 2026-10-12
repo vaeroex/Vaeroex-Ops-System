@@ -235,6 +235,16 @@ export type Database = {
         Args: { p_intent_id: string; p_user_id: string; p_session_id: string };
         Returns: boolean;
       };
+      claim_stripe_subscription_observation_v1: {
+        Args: { p_stripe_subscription_id: string };
+        Returns: number;
+      };
+      sync_stripe_subscription_entitlement_v2: {
+        Args: Database["public"]["Functions"]["sync_stripe_subscription_entitlement_v1"]["Args"] & {
+          p_observation_generation: number;
+        };
+        Returns: Json;
+      };
       sync_stripe_subscription_entitlement_v1: {
         Args: {
           p_event_id: string;

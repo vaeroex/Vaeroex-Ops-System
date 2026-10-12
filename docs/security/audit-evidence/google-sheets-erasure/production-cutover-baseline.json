@@ -1,18 +1,19 @@
 {
   "productionMutationPerformed": false,
   "deployment": {
-    "observedAt": "2026-10-12T20:44:10.532Z",
-    "api": "GET /v13/deployments/{id}",
-    "id": "dpl_CVRQMCWb4D51xEpung5sSeQNX9dR",
+    "observedAt": "2026-10-12T21:07:59.661144+00:00",
+    "id": "dpl_CHQzNLCwTqwCKY1zoxFuFnZ9ofSk",
+    "url": "vaeroex-ops-system-835rlaq0i-vaeroex-2167s-projects.vercel.app",
     "readyState": "READY",
-    "commit": "002c2536583ce455f2ce8ee1bc58b430c3da3b74",
-    "target": "production",
+    "createdAt": 1791838853450,
     "functionTimeout": 300,
     "functionType": "fluid",
-    "createdAt": 1791830860572
+    "api": "GET /v13/deployments/{id}",
+    "commit": "212e3b5832ad201dee8ab14e42f3e8affeb54968",
+    "target": "production"
   },
   "project": {
-    "observedAt": "2026-10-12T20:44:25.530Z",
+    "observedAt": "2026-10-12T21:08:51.013368+00:00",
     "api": "GET /v9/projects/{id}",
     "id": "prj_J810bZ9ECoN4CyLKujUoEEH8N6ja",
     "autoAssignCustomDomains": true,
@@ -27,5 +28,16 @@
     "Read-only baseline; recheck immediately before any approved cutover.",
     "Null paused is the API observation, not a completed pause receipt.",
     "Git main auto-deployment hold is independently defined by vercel.json git.deploymentEnabled.main=false."
-  ]
+  ],
+  "priorDeployment": {
+    "observedAt": "2026-10-12T20:44:10.532Z",
+    "api": "GET /v13/deployments/{id}",
+    "id": "dpl_CVRQMCWb4D51xEpung5sSeQNX9dR",
+    "readyState": "READY",
+    "commit": "002c2536583ce455f2ce8ee1bc58b430c3da3b74",
+    "target": "production",
+    "functionTimeout": 300,
+    "functionType": "fluid",
+    "createdAt": 1791830860572
+  }
 }

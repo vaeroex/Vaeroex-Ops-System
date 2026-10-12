@@ -1,5 +1,5 @@
 {
-  "completedAt": "2026-10-12T20:33:32.101802+00:00",
+  "completedAt": "2026-10-12T21:05:55.103065+00:00",
   "projectRef": "mdiianhfrojmxqpwrflh",
   "cliVersion": "2.111.0",
   "command": [
@@ -12,9 +12,9 @@
   ],
   "exitCode": 0,
   "dryRun": true,
-  "appliedLedgerCount": 141,
+  "appliedLedgerCount": 142,
   "ledgerUnchanged": true,
-  "stagedCount": 143,
+  "stagedCount": 144,
   "allStagedHashesVerified": true,
   "pending": [
     {
@@ -35,6 +35,6 @@
   "roles": [],
   "seeds": [],
   "migrationApplicationPerformed": false,
-  "includeAllReason": "Reviewed October2 approval version predates already applied migration versions. Only exact live ledger files plus these two candidates were staged.",
+  "includeAllReason": "Reviewed October2 approval and October12 retention versions predate already applied migration versions. Only exact live ledger files plus these two candidates were staged.",
   "limitations": "CLI dry run enumerates pending migrations; SQL execution is separately qualified in synthetic native/full-schema databases."
 }

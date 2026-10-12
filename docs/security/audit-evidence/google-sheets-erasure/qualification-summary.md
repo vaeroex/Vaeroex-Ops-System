@@ -11,7 +11,7 @@ Canonical and production candidate copies are byte-identical. No migration was a
 
 ## Production dry run
 
-The live Production ledger contains **141 applied migrations**, ending at `20261012091842`. An isolated stage contained those exact 141 files plus the two candidates: **143 staged files**, all hashes checked. Both the migration-list result and direct ledger count confirmed 141; the ledger was identical after the dry run.
+The refreshed live Production ledger contains **142 applied migrations**, ending at the separately approved billing migration `20261012201726`. An isolated stage contained those exact 142 files plus the two Sheets candidates: **144 staged files**, all hashes checked. The direct ledger exactly matched the prior141 entries plus that billing migration and remained identical after the21:05UTC dry run.
 
 Official Supabase CLI **2.111.0** ran `db push --linked --dry-run --include-all` successfully against project `mdiianhfrojmxqpwrflh`. Its only pending migrations were the two versions above. Roles and seeds were empty. `--include-all` was required because the reviewed October 2 approval version predates migrations already present in Production.
 
@@ -23,11 +23,11 @@ The CLI dry run enumerates pending files; it does not execute or validate the mi
 
 ## Separate local execution qualification
 
-The **146-migration canonical chain** is a different historical chain from Production's 141 applied versions. All 146 migrations, including the final `107075b9` candidate, applied successfully in an owned native PostgreSQL database with synthetic Supabase platform prerequisites. The rehearsal also passed four exact VSI policy catalog checks and the complete existing VSI pgTAP fixture (**10/10 assertions**). The cluster was stopped afterward. See [final canonical proof](canonical-bootstrap-proof.json); the [prior proof](historical-33677930/canonical-bootstrap-proof.json) remains historical.
+The **147-migration canonical chain** is a different historical chain from Production's 142 applied versions. All 147 migrations, including the final `107075b9` candidate, applied successfully in an owned native PostgreSQL database with synthetic Supabase platform prerequisites. The rehearsal also passed four exact VSI policy catalog checks and the complete existing VSI pgTAP fixture (**10/10 assertions**). The cluster was stopped afterward. See [final canonical proof](canonical-bootstrap-proof.json); the [prior146-migration proof](historical-20261012T203446Z-146/canonical-bootstrap-proof.json) remains historical.
 
 - Restricted database suite: **95 checks**, plus **103 connector baseline checks**.
 - Final native operator rehearsal (`107075b9`): **48 checks**, plus **103 connector baseline checks**. Covers actual competing writers, stale tickets, uncertain execution acknowledgement, exact-hash conflict rollback, expired approval withdrawal and fresh approval, isolated physical-cluster backup/restore with ACLs, and external-witness reconciliation after local journal loss.
-- Architecture manifest suite: **585 assertions**.
+- Architecture manifest suite: **586 assertions**.
 - Scoped test lint: no warnings. Whitespace check passed.
 
 Synthetic qualification does not provision or qualify live operator identities, GCS IAM, signing material, provider keys, or the external Storage checkpoint. Those remain release gates.

@@ -48,6 +48,7 @@ async function main() {
   assert.equal(googleSheetsAuthorizationTarget(target.toString()), target.toString());
   for (const invalid of [target.toString().replace("accounts.google.com", "evil.invalid"), target.toString() + "&state=duplicate", target.toString().replace("spreadsheets.readonly", "drive"), target.toString().replace("/o/oauth2/v2/auth", "/other")]) assert.throws(() => googleSheetsAuthorizationTarget(invalid));
   let previewPosts = 0, authorizationPosts = 0, formPosts = [], failPreview = false, failAuthorization = false;
+  let authorizationResponseGate = null;
   const escape = value => String(value).replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;");
   const server = http.createServer(async (request, response) => {
     try {
@@ -62,7 +63,7 @@ async function main() {
         }
         if (/\/(connect|reconnect)$/.test(request.url)) {
           authorizationPosts++; assert.equal(request.headers.accept, "application/json");
-          await new Promise(resolve => setTimeout(resolve, 200));
+          if (authorizationResponseGate) await authorizationResponseGate;
           response.writeHead(failAuthorization ? 409 : 200, { "content-type": "application/json" }); response.end(JSON.stringify(failAuthorization ? { ok: false } : { ok: true, authorizationUrl: target.toString() })); return;
         }
         formPosts.push({ path: request.url, fields: Object.fromEntries(input) });
@@ -102,6 +103,9 @@ async function main() {
     for (const width of [1440, 390]) {
       await page.setViewportSize({ width, height: 950 });
       await page.goto(`${origin}/connected`);
+      assert(await page.getByRole("complementary", { name: "Google Sheets availability" }).isVisible());
+      assert(await page.getByRole("link", { name: "Upload supported spreadsheet files in Files & Notes" }).isVisible());
+      assert(await page.getByText("While the pilot remains in Google Testing, you may need to reconnect after seven days.", { exact: true }).isVisible());
       assert.equal(await page.getByRole("button", { name: "Sync now", exact: true }).count(), 1);
       assert.equal(await page.getByText("192", { exact: true }).count(), 1);
       assert.equal(await page.locator("dd").filter({ hasText: "Every 15 minutes" }).count(), 1);
@@ -145,9 +149,20 @@ async function main() {
       for (const mode of ["connect", "reconnect"]) {
         authorizationPosts = 0;
         await page.goto(`${origin}/${mode}`);
-        await page.getByRole("button", { name: mode === "connect" ? "Connect Google Sheets" : "Reconnect Google Sheets" }).click();
-        await page.getByRole("button", { name: "Opening Google…" }).waitFor();
-        await page.locator("form").evaluate(form => form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
+        assert(await page.getByText("Google Sheets limited pilot.", { exact: true }).isVisible());
+        assert(await page.getByText(/Your Google account must be an approved test user to connect/).isVisible());
+        // Keep the actual response pending until the repeated submit is tested;
+        // a fixed delay races browser navigation on busy CI workers.
+        let releaseAuthorization;
+        authorizationResponseGate = new Promise(resolve => { releaseAuthorization = resolve; });
+        try {
+          await page.getByRole("button", { name: mode === "connect" ? "Connect Google Sheets" : "Reconnect Google Sheets" }).click();
+          await page.getByRole("button", { name: "Opening Google…" }).waitFor();
+          await page.locator("form").evaluate(form => form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
+        } finally {
+          releaseAuthorization();
+          authorizationResponseGate = null;
+        }
         await page.getByRole("heading", { name: "Synthetic Google consent" }).waitFor();
         assert.equal(authorizationPosts, 1, "Repeated submit must not create duplicate authorization attempts");
       }
