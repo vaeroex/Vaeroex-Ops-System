@@ -179,8 +179,11 @@ require("node:test")("incremental selection stays capped as batches grow and sub
 const page = read("app/app/sources/SourcesPage.tsx");
 const notes = read("components/evidence/BusinessNotesPanel.tsx");
 const entry = notes.slice(notes.indexOf("export function BusinessNoteEntry"), notes.indexOf("export function BusinessNotesPanel"));
-assert.match(entry, /<details[\s\S]*Add business note[\s\S]*<form action=\{submitBusinessNoteForReviewAction\}/);
-assert.doesNotMatch(entry, /\bopen=|useState|\?\s*<form/, "native collapsed details preserve the mounted draft when toggled");
+assert.match(entry, /<form action=\{submitBusinessNoteForReviewAction\}/);
+const entryLayout = read("components/evidence/BusinessInformationEntry.tsx");
+assert.match(entryLayout, /aria-expanded=\{editorOpen\} aria-controls=\{editorId\}/);
+assert.match(entryLayout, /hidden=\{!editorOpen\}[\s\S]*\{children\}/, "the full-width editor stays mounted while collapsed");
+assert.doesNotMatch(entryLayout, /editorOpen\s*&&|editorOpen\s*\?\s*</, "disclosure must not remount the draft");
 assert.match(entry, /<BusinessNoteComposer disabled=\{!enabled\}/);
 assert.match(entry, /name="observation_date" disabled=\{!enabled\}/);
 assert.ok(page.indexOf("{!showNoteFeedback ? notesPanel : null}") > page.indexOf('>Source Files</h2>'), "ordinary saved-source browsing precedes the notes list");
