@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { startTransition, useActionState, useEffect, useRef, useState } from "react";
-import { uploadSourceAction } from "@/app/app/files/actions";
+import { prepareUploadedSourceAction } from "@/app/app/files/actions";
 import type { UploadSourceState } from "@/lib/files/upload-types";
+import { uploadSourceDirect } from "@/lib/storage-capacity/upload-client";
 
 const fieldClass = "mt-2 min-h-11 w-full rounded-lg border border-white/10 bg-slate-950/70 px-3 py-2 text-sm text-slate-100 outline-none focus:border-vaeroex-accent";
 
@@ -17,10 +18,10 @@ export function UploadSourceTrigger() {
   }}>Upload file</button>;
 }
 
-export function UploadSourceForm({ folders }: { folders: { id: string; name: string }[] }) {
-  const [state, submit, pending] = useActionState<UploadSourceState, FormData>(async (previous, data) => {
+export function UploadSourceForm({ folders, workspaceId }: { folders: { id: string; name: string }[]; workspaceId: string }) {
+  const [state, submit, pending] = useActionState<UploadSourceState, FormData>(async (_previous, data) => {
     try {
-      return await uploadSourceAction(previous, data);
+      return await uploadSourceDirect(workspaceId, data, prepareUploadedSourceAction);
     } catch (error) {
       // Preserve framework navigation (including sign-in). A lost transport
       // acknowledgment must not reset the form or invite a duplicate upload.
@@ -78,7 +79,7 @@ export function UploadSourceForm({ folders }: { folders: { id: string; name: str
           <input name="file" type="file" accept=".csv,.xlsx,.pdf,.png,.jpg,.jpeg,.docx" required className={`${fieldClass} file:mr-3 file:rounded-md file:border-0 file:bg-vaeroex-blue file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-white`} />
         </label>
         <label className="block text-sm font-medium text-slate-200">Display name
-          <input name="display_name" placeholder="Optional name shown in Vaeroex" className={fieldClass} />
+          <input name="display_name" maxLength={255} placeholder="Optional name shown in Vaeroex" className={fieldClass} />
         </label>
         <label className="block text-sm font-medium text-slate-200">Folder
           <select name="folder_id" className={fieldClass}>
@@ -93,7 +94,7 @@ export function UploadSourceForm({ folders }: { folders: { id: string; name: str
             <span>Upload anyway if this is a duplicate source. Vaeroex checks the file name, type, and size against active sources.</span>
           </label>
         </details>
-        <p className="text-xs leading-5 text-slate-400">Documents and images are saved for a separate analysis decision.</p>
+        <p className="text-xs leading-5 text-slate-400">Up to 25 MiB per file. Documents and images are saved for a separate analysis decision. <Link href="/app/settings/storage" className="font-semibold underline">View workspace storage and capacity</Link>.</p>
         <p data-upload-sensitive-reminder className="text-xs leading-5 text-slate-400">Do not upload patient data, PHI/ePHI, Social Security numbers, insurance IDs, or other regulated sensitive information.</p>
         <button type="submit" disabled={busy || state.blocked} aria-busy={busy} data-vaeroex-local-activity="true" className="min-h-11 rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">
           {busy ? "Uploading and preparing review…" : "Upload and prepare review"}

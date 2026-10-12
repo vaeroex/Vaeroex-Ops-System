@@ -1,0 +1,135 @@
+{
+  "scope": "Focused source SQL, real independent Postgres transactions; synthetic JWTs, vector represented as real[], no full Supabase/extraction-provider proof",
+  "migration": "20261005062005_durable_import_attempt_reconciliation.sql",
+  "checks": 32,
+  "results": [
+    {
+      "name": "operator first claim is durable before business writes",
+      "status": "pass"
+    },
+    {
+      "name": "lost claim acknowledgement never admits a second writer",
+      "status": "pass"
+    },
+    {
+      "name": "claim retry reads the same durable attempt",
+      "status": "pass"
+    },
+    {
+      "name": "ordinary caller cannot configure a private attempt",
+      "status": "pass"
+    },
+    {
+      "name": "unresolved preparation generation cannot be overwritten",
+      "status": "pass"
+    },
+    {
+      "name": "approved source row cannot be reparented away from held source",
+      "status": "pass"
+    },
+    {
+      "name": "accepted import cannot be reparented away from held source",
+      "status": "pass"
+    },
+    {
+      "name": "new staging rows are rejected while accepted work is uncertain",
+      "status": "pass"
+    },
+    {
+      "name": "new import record is rejected for the unresolved source",
+      "status": "pass"
+    },
+    {
+      "name": "approved source content cannot be rewritten",
+      "status": "pass"
+    },
+    {
+      "name": "terminated worker leaves truthful persisted record inventory",
+      "status": "pass"
+    },
+    {
+      "name": "partial accepted work becomes explicit reconciliation required",
+      "status": "pass"
+    },
+    {
+      "name": "partial worker cannot be silently retried",
+      "status": "pass"
+    },
+    {
+      "name": "client cannot forge completed recovery projection",
+      "status": "pass"
+    },
+    {
+      "name": "sixteen independent import requests admit exactly one writer",
+      "status": "pass"
+    },
+    {
+      "name": "all losing claims identify the same durable attempt",
+      "status": "pass"
+    },
+    {
+      "name": "old file completion marker cannot confirm a newer import generation",
+      "status": "pass"
+    },
+    {
+      "name": "saved completion can be recovered after acknowledgement loss",
+      "status": "pass"
+    },
+    {
+      "name": "complete reconciliation never duplicates a business record",
+      "status": "pass"
+    },
+    {
+      "name": "completed claim replay cannot write another batch",
+      "status": "pass"
+    },
+    {
+      "name": "completed source supports a separately reviewed preparation",
+      "status": "pass"
+    },
+    {
+      "name": "repreparation preserves original accepted business rows",
+      "status": "pass"
+    },
+    {
+      "name": "staff cannot approve import work",
+      "status": "pass"
+    },
+    {
+      "name": "viewer cannot approve import work",
+      "status": "pass"
+    },
+    {
+      "name": "foreign operator cannot claim another workspace",
+      "status": "pass"
+    },
+    {
+      "name": "foreign row identity cannot enter an approved claim",
+      "status": "pass"
+    },
+    {
+      "name": "duplicate row IDs cannot inflate a claim",
+      "status": "pass"
+    },
+    {
+      "name": "expired workspace cannot start import writes",
+      "status": "pass"
+    },
+    {
+      "name": "expired workspace retains readback recovery without new admission",
+      "status": "pass"
+    },
+    {
+      "name": "staged rows prevent a false completed reconciliation",
+      "status": "pass"
+    },
+    {
+      "name": "anonymous cannot access attempt authority",
+      "status": "pass"
+    },
+    {
+      "name": "generic service role cannot invent user approval",
+      "status": "pass"
+    }
+  ]
+}

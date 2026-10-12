@@ -19,9 +19,10 @@ const actionModules = Object.freeze([
   "app/app/intelligence/lifecycle-actions.ts", "app/app/intelligence/briefings/actions.ts",
   "app/app/reports/saved-analysis-actions.ts", "app/app/accountability/actions.ts",
   "app/app/records/actions.ts", "app/app/record-management/actions.ts", "app/app/operations/record-management-actions.ts",
-  "app/app/settings/reporting-timezone-action.ts"
+  "app/app/settings/reporting-timezone-action.ts", "app/app/files/worksheet-approval-action.ts"
 ]);
 const actionExportContracts = Object.freeze({
+  "app/app/files/worksheet-approval-action.ts": Object.freeze(["submitWorksheetApproval"]),
   "app/app/settings/reporting-timezone-action.ts": Object.freeze(["saveReportingTimezoneAction"]),
 });
 const readModules = Object.freeze([

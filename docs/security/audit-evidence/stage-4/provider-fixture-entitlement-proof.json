@@ -1,0 +1,102 @@
+{
+  "baseline": "d91be079c7beb0b6f21a4c5e6b451f90ca06e035",
+  "scope": "Actual fixture profile/workspace/membership INSERT statements before/after; actual new entitlement functions/trigger, synthetic definer write target. Native local PostgreSQL; no provider RPC/full-suite replay.",
+  "version": "17.11",
+  "boundarySha256": "1cd376c41b5b980c0bd1ca09f3a0053d7a167644af16fdafc3bb32de0388363a",
+  "fixtureSha256": {
+    "external_integrations_phase_1_canonical_foundation.test.sql": "5d9f293668914640b9d12398933c83d666fa6e78aa892028840e1f9dc44e8237",
+    "external_integrations_phase_4_control_plane.test.sql": "36d57ec1fa3e2343e07a3bdf916caa34ef6905d11591f07c3d7f3d543d626ea0",
+    "external_integrations_phase_8a0_contract_convergence.test.sql": "6892dc1ddee8f01f995fedfbe42bba6a6cfde928e749207bbc968c0e3ba87210",
+    "external_integrations_qbo_production_convergence.test.sql": "62f98e3bee5a1df1ae361ef49ada43a01ed605086d4cbee818e9e186608c7a60"
+  },
+  "results": [
+    {
+      "fixture": "external_integrations_phase_1_canonical_foundation.test.sql",
+      "case": "baseline manual_review blocks authenticated positive write",
+      "status": "pass",
+      "code": "42501"
+    },
+    {
+      "fixture": "external_integrations_phase_1_canonical_foundation.test.sql",
+      "case": "baseline manual_review blocks authenticated positive write",
+      "status": "pass",
+      "code": "42501"
+    },
+    {
+      "fixture": "external_integrations_phase_1_canonical_foundation.test.sql",
+      "case": "bounded trial permits authenticated positive write",
+      "status": "pass"
+    },
+    {
+      "fixture": "external_integrations_phase_1_canonical_foundation.test.sql",
+      "case": "bounded trial permits authenticated positive write",
+      "status": "pass"
+    },
+    {
+      "fixture": "external_integrations_phase_4_control_plane.test.sql",
+      "case": "baseline manual_review blocks authenticated positive write",
+      "status": "pass",
+      "code": "42501"
+    },
+    {
+      "fixture": "external_integrations_phase_4_control_plane.test.sql",
+      "case": "baseline manual_review blocks authenticated positive write",
+      "status": "pass",
+      "code": "42501"
+    },
+    {
+      "fixture": "external_integrations_phase_4_control_plane.test.sql",
+      "case": "bounded trial permits authenticated positive write",
+      "status": "pass"
+    },
+    {
+      "fixture": "external_integrations_phase_4_control_plane.test.sql",
+      "case": "bounded trial permits authenticated positive write",
+      "status": "pass"
+    },
+    {
+      "fixture": "external_integrations_phase_8a0_contract_convergence.test.sql",
+      "case": "baseline manual_review blocks authenticated positive write",
+      "status": "pass",
+      "code": "42501"
+    },
+    {
+      "fixture": "external_integrations_phase_8a0_contract_convergence.test.sql",
+      "case": "baseline manual_review blocks authenticated positive write",
+      "status": "pass",
+      "code": "42501"
+    },
+    {
+      "fixture": "external_integrations_phase_8a0_contract_convergence.test.sql",
+      "case": "bounded trial permits authenticated positive write",
+      "status": "pass"
+    },
+    {
+      "fixture": "external_integrations_phase_8a0_contract_convergence.test.sql",
+      "case": "bounded trial permits authenticated positive write",
+      "status": "pass"
+    },
+    {
+      "fixture": "external_integrations_qbo_production_convergence.test.sql",
+      "case": "baseline manual_review blocks authenticated positive write",
+      "status": "pass",
+      "code": "42501"
+    },
+    {
+      "fixture": "external_integrations_qbo_production_convergence.test.sql",
+      "case": "baseline manual_review blocks authenticated positive write",
+      "status": "pass",
+      "code": "42501"
+    },
+    {
+      "fixture": "external_integrations_qbo_production_convergence.test.sql",
+      "case": "bounded trial permits authenticated positive write",
+      "status": "pass"
+    },
+    {
+      "fixture": "external_integrations_qbo_production_convergence.test.sql",
+      "case": "bounded trial permits authenticated positive write",
+      "status": "pass"
+    }
+  ]
+}

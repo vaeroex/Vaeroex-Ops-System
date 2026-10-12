@@ -1,0 +1,8 @@
+const fs=require('node:fs'),Module=require('node:module'),root='/Users/isaacvizcarra/.codex/worktrees/workspace-audit-fixes/Vaeroex';
+const ts=require(root+'/node_modules/typescript'),{createClient}=require(root+'/node_modules/@supabase/supabase-js');
+const original=Module._load;Module._load=function(id,...args){if(id==='server-only')return {};return original.call(this,id,...args);};
+require.extensions['.ts']=(m,f)=>m._compile(ts.transpileModule(fs.readFileSync(f,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,f);
+const {assertWorkspaceTokenBudget}=require(root+'/lib/ai/usage.ts');
+const full=Array.from({length:1001},(_,i)=>({tokens_used:i===1000?2000000:0}));let reads=0;
+const client=createClient('http://127.0.0.1:1','synthetic-only',{auth:{persistSession:false,autoRefreshToken:false},global:{fetch:async(input,init)=>{reads++;const u=new URL(String(input));if(u.pathname!='/rest/v1/ai_usage')throw Error('unexpected_request');const headers=new Headers(init.headers);return new Response(JSON.stringify(full.slice(0,1000)),{status:206,headers:{'content-type':'application/json','content-range':headers.get('prefer')?.includes('count=exact')?'0-999/1001':'0-999/*'}});}}});
+assertWorkspaceTokenBudget({supabase:client,workspaceId:'11111111-1111-4111-8111-111111111111',estimatedRequestTokens:1}).then(result=>console.log(JSON.stringify({scope:'Actual usage function and actual Supabase SDK with synthetic capped response; no sockets/provider calls/database',reads,fullRecordedTokens:2000000,returnedRows:1000,matchingRows:1001,result}))).catch(error=>console.log(JSON.stringify({reads,denied:true,message:error.message})));

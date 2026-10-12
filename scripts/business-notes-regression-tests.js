@@ -662,8 +662,7 @@ async function main() {
   assert.match(panel, /Archived Business Notes/);
   assert.match(panel, /bulkManageBusinessNotesAction/);
   assert.match(panel, /BusinessNoteComposer disabled=\{!enabled\}/);
-  assert.match(composer, /Business Notes are for important business observations, decisions, temporary conditions, incidents, assumptions, and executive context that may not appear in formal reports\./);
-  assert.match(composer, /For best results, keep notes focused on a single business event or topic\./);
+  assert.match(composer, /Capture observations, decisions, and next steps in your own words\./);
   assert.match(composer, /Recommended length:/);
   assert.match(composer, /BUSINESS_NOTE_RECOMMENDED_MIN_CHARACTERS/);
   assert.match(composer, /BUSINESS_NOTE_RECOMMENDED_MAX_CHARACTERS/);

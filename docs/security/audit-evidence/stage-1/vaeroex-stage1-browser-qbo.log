@@ -1,0 +1,1 @@
+PASS: deployed CSP legacy failure reproduced; actual hydrated form navigates on desktop/mobile, one in-flight request, loading, errors, hostile-target denial; zero external requests.

@@ -1,0 +1,862 @@
+{
+  "checkedAt": "2026-10-05T23:30:35.935508+00:00",
+  "readOnly": true,
+  "qbo-services": [
+    {
+      "name": "qbo-production-credential-broker",
+      "revision": "qbo-production-credential-broker-00002-b5b",
+      "annotations": {
+        "autoscaling.knative.dev/maxScale": "5",
+        "autoscaling.knative.dev/minScale": "0",
+        "run.googleapis.com/cpu-throttling": "true",
+        "run.googleapis.com/network-interfaces": "[{\"network\":\"projects/vaeroex-qbo-prod-20260827/global/networks/qbo-production-egress\",\"subnetwork\":\"projects/vaeroex-qbo-prod-20260827/regions/us-central1/subnetworks/qbo-production-egress-us-central1\",\"tags\":[\"qbo-production-provider-egress\"]}]"
+      },
+      "image": "us-central1-docker.pkg.dev/vaeroex-qbo-prod-20260827/qbo-production/runtime@sha256:4c4bfbcf29cc6587a4ab8f84170a94b1d6b8cb688fe46c1fa8a4b665014bfb07",
+      "url": "https://qbo-production-credential-broker-i75yimopha-uc.a.run.app",
+      "serviceAccount": "qbo-credential-broker@vaeroex-qbo-prod-20260827.iam.gserviceaccount.com",
+      "concurrency": 40,
+      "timeoutSeconds": 120,
+      "resources": {
+        "limits": {
+          "cpu": "1000m",
+          "memory": "512Mi"
+        }
+      },
+      "env": [
+        {
+          "name": "QBO_QUEUE_RESOURCE",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_DISPATCH_SCHEDULER_SERVICE_ACCOUNT",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_KMS_KEY_RESOURCE",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_PROVIDER_RUNTIME_SERVICE_ACCOUNT",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_BROKER_URL",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_RUNTIME_INVOKER_SERVICE_ACCOUNT",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_DATABASE_CA_PEM",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_SERVICE_MODE",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_OAUTH_INGRESS_SERVICE_ACCOUNT",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_PRODUCTION_CALLBACK_URI",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "DATABASE_URL",
+          "presence": true,
+          "source": "secretRef"
+        },
+        {
+          "name": "QBO_SERVICE_AUDIENCE",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_SOURCE_COMMIT",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_PROVIDER_SECRET_VERSION_RESOURCE",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_TASK_SCHEDULER_SERVICE_ACCOUNT",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_PROVIDER_RUNTIME_URL",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_WEBHOOK_SECRET_VERSION_RESOURCE",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_INITIALIZATION_SCHEDULER_SERVICE_ACCOUNT",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_APPLICATION_ORIGIN",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_QUEUE_NAME",
+          "presence": true,
+          "source": "literal"
+        }
+      ]
+    },
+    {
+      "name": "qbo-production-oauth-ingress",
+      "revision": "qbo-production-oauth-ingress-00004-m7v",
+      "annotations": {
+        "autoscaling.knative.dev/maxScale": "5",
+        "autoscaling.knative.dev/minScale": "0",
+        "run.googleapis.com/cpu-throttling": "true"
+      },
+      "image": "us-central1-docker.pkg.dev/vaeroex-qbo-prod-20260827/qbo-production/runtime@sha256:4c4bfbcf29cc6587a4ab8f84170a94b1d6b8cb688fe46c1fa8a4b665014bfb07",
+      "url": null,
+      "serviceAccount": "qbo-oauth-ingress@vaeroex-qbo-prod-20260827.iam.gserviceaccount.com",
+      "concurrency": 40,
+      "timeoutSeconds": 120,
+      "resources": {
+        "limits": {
+          "cpu": "1",
+          "memory": "256Mi"
+        }
+      },
+      "env": [
+        {
+          "name": "QBO_QUEUE_RESOURCE",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_DISPATCH_SCHEDULER_SERVICE_ACCOUNT",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_KMS_KEY_RESOURCE",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_PROVIDER_RUNTIME_SERVICE_ACCOUNT",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_BROKER_URL",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_SERVICE_AUDIENCE",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_RUNTIME_INVOKER_SERVICE_ACCOUNT",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_DATABASE_CA_PEM",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_OAUTH_INGRESS_SERVICE_ACCOUNT",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_SERVICE_MODE",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_PRODUCTION_CALLBACK_URI",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_SOURCE_COMMIT",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "DATABASE_URL",
+          "presence": true,
+          "source": "secretRef"
+        },
+        {
+          "name": "QBO_PROVIDER_SECRET_VERSION_RESOURCE",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_TASK_SCHEDULER_SERVICE_ACCOUNT",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_PROVIDER_RUNTIME_URL",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_WEBHOOK_SECRET_VERSION_RESOURCE",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_INITIALIZATION_SCHEDULER_SERVICE_ACCOUNT",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_APPLICATION_ORIGIN",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_QUEUE_NAME",
+          "presence": true,
+          "source": "literal"
+        }
+      ]
+    },
+    {
+      "name": "qbo-production-provider-runtime",
+      "revision": "qbo-production-provider-runtime-00002-m4b",
+      "annotations": {
+        "autoscaling.knative.dev/maxScale": "20",
+        "autoscaling.knative.dev/minScale": "0",
+        "run.googleapis.com/cpu-throttling": "true",
+        "run.googleapis.com/network-interfaces": "[{\"network\":\"projects/vaeroex-qbo-prod-20260827/global/networks/qbo-production-egress\",\"subnetwork\":\"projects/vaeroex-qbo-prod-20260827/regions/us-central1/subnetworks/qbo-production-egress-us-central1\",\"tags\":[\"qbo-production-provider-egress\"]}]"
+      },
+      "image": "us-central1-docker.pkg.dev/vaeroex-qbo-prod-20260827/qbo-production/runtime@sha256:4c4bfbcf29cc6587a4ab8f84170a94b1d6b8cb688fe46c1fa8a4b665014bfb07",
+      "url": "https://qbo-production-provider-runtime-i75yimopha-uc.a.run.app",
+      "serviceAccount": "qbo-provider-runtime@vaeroex-qbo-prod-20260827.iam.gserviceaccount.com",
+      "concurrency": 10,
+      "timeoutSeconds": 900,
+      "resources": {
+        "limits": {
+          "cpu": "1000m",
+          "memory": "512Mi"
+        }
+      },
+      "env": [
+        {
+          "name": "QBO_QUEUE_RESOURCE",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_DISPATCH_SCHEDULER_SERVICE_ACCOUNT",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_KMS_KEY_RESOURCE",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_PROVIDER_RUNTIME_SERVICE_ACCOUNT",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_BROKER_URL",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_SERVICE_AUDIENCE",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_RUNTIME_INVOKER_SERVICE_ACCOUNT",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_DATABASE_CA_PEM",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_OAUTH_INGRESS_SERVICE_ACCOUNT",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "DATABASE_URL",
+          "presence": true,
+          "source": "secretRef"
+        },
+        {
+          "name": "QBO_PRODUCTION_CALLBACK_URI",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_SOURCE_COMMIT",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_PROVIDER_SECRET_VERSION_RESOURCE",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_TASK_SCHEDULER_SERVICE_ACCOUNT",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_SERVICE_MODE",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_PROVIDER_RUNTIME_URL",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_WEBHOOK_SECRET_VERSION_RESOURCE",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_INITIALIZATION_SCHEDULER_SERVICE_ACCOUNT",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_APPLICATION_ORIGIN",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_QUEUE_NAME",
+          "presence": true,
+          "source": "literal"
+        }
+      ]
+    },
+    {
+      "name": "qbo-production-task-dispatcher",
+      "revision": "qbo-production-task-dispatcher-00002-nhv",
+      "annotations": {
+        "autoscaling.knative.dev/maxScale": "5",
+        "autoscaling.knative.dev/minScale": "0",
+        "run.googleapis.com/cpu-throttling": "true"
+      },
+      "image": "us-central1-docker.pkg.dev/vaeroex-qbo-prod-20260827/qbo-production/runtime@sha256:4c4bfbcf29cc6587a4ab8f84170a94b1d6b8cb688fe46c1fa8a4b665014bfb07",
+      "url": "https://qbo-production-task-dispatcher-i75yimopha-uc.a.run.app",
+      "serviceAccount": "qbo-task-dispatcher@vaeroex-qbo-prod-20260827.iam.gserviceaccount.com",
+      "concurrency": 40,
+      "timeoutSeconds": 120,
+      "resources": {
+        "limits": {
+          "cpu": "1000m",
+          "memory": "512Mi"
+        }
+      },
+      "env": [
+        {
+          "name": "QBO_QUEUE_RESOURCE",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_DISPATCH_SCHEDULER_SERVICE_ACCOUNT",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_KMS_KEY_RESOURCE",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_PROVIDER_RUNTIME_SERVICE_ACCOUNT",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_BROKER_URL",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_SERVICE_AUDIENCE",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_RUNTIME_INVOKER_SERVICE_ACCOUNT",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_DATABASE_CA_PEM",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_OAUTH_INGRESS_SERVICE_ACCOUNT",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "DATABASE_URL",
+          "presence": true,
+          "source": "secretRef"
+        },
+        {
+          "name": "QBO_SERVICE_MODE",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_PRODUCTION_CALLBACK_URI",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_SOURCE_COMMIT",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_PROVIDER_SECRET_VERSION_RESOURCE",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_TASK_SCHEDULER_SERVICE_ACCOUNT",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_PROVIDER_RUNTIME_URL",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_WEBHOOK_SECRET_VERSION_RESOURCE",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_INITIALIZATION_SCHEDULER_SERVICE_ACCOUNT",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_APPLICATION_ORIGIN",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_QUEUE_NAME",
+          "presence": true,
+          "source": "literal"
+        }
+      ]
+    },
+    {
+      "name": "qbo-production-task-scheduler",
+      "revision": "qbo-production-task-scheduler-00002-phn",
+      "annotations": {
+        "autoscaling.knative.dev/maxScale": "5",
+        "autoscaling.knative.dev/minScale": "0",
+        "run.googleapis.com/cpu-throttling": "true"
+      },
+      "image": "us-central1-docker.pkg.dev/vaeroex-qbo-prod-20260827/qbo-production/runtime@sha256:4c4bfbcf29cc6587a4ab8f84170a94b1d6b8cb688fe46c1fa8a4b665014bfb07",
+      "url": "https://qbo-production-task-scheduler-i75yimopha-uc.a.run.app",
+      "serviceAccount": "qbo-task-scheduler@vaeroex-qbo-prod-20260827.iam.gserviceaccount.com",
+      "concurrency": 40,
+      "timeoutSeconds": 120,
+      "resources": {
+        "limits": {
+          "cpu": "1000m",
+          "memory": "512Mi"
+        }
+      },
+      "env": [
+        {
+          "name": "QBO_QUEUE_RESOURCE",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_DISPATCH_SCHEDULER_SERVICE_ACCOUNT",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_KMS_KEY_RESOURCE",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_PROVIDER_RUNTIME_SERVICE_ACCOUNT",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_BROKER_URL",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_SERVICE_AUDIENCE",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_RUNTIME_INVOKER_SERVICE_ACCOUNT",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_DATABASE_CA_PEM",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_OAUTH_INGRESS_SERVICE_ACCOUNT",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_PRODUCTION_CALLBACK_URI",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "DATABASE_URL",
+          "presence": true,
+          "source": "secretRef"
+        },
+        {
+          "name": "QBO_SOURCE_COMMIT",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_PROVIDER_SECRET_VERSION_RESOURCE",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_TASK_SCHEDULER_SERVICE_ACCOUNT",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_PROVIDER_RUNTIME_URL",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_SERVICE_MODE",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_WEBHOOK_SECRET_VERSION_RESOURCE",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_INITIALIZATION_SCHEDULER_SERVICE_ACCOUNT",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_APPLICATION_ORIGIN",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "QBO_QUEUE_NAME",
+          "presence": true,
+          "source": "literal"
+        }
+      ]
+    }
+  ],
+  "qbo-schedules": [
+    {
+      "name": "projects/vaeroex-qbo-prod-20260827/locations/us-central1/jobs/qbo-production-initialization",
+      "schedule": "*/5 * * * *",
+      "timeZone": "Etc/UTC",
+      "state": "ENABLED",
+      "attemptDeadline": "180s",
+      "retryConfig": {
+        "maxBackoffDuration": "60s",
+        "maxDoublings": 2,
+        "maxRetryDuration": "0s",
+        "minBackoffDuration": "10s",
+        "retryCount": 3
+      },
+      "httpTarget": {
+        "httpMethod": "POST",
+        "oidcToken": {
+          "audience": "https://qbo-production-task-scheduler-999493700992.us-central1.run.app",
+          "serviceAccountEmail": "qbo-initialization-scheduler@vaeroex-qbo-prod-20260827.iam.gserviceaccount.com"
+        },
+        "uri": "https://qbo-production-task-scheduler-999493700992.us-central1.run.app/tasks/schedule"
+      }
+    },
+    {
+      "name": "projects/vaeroex-qbo-prod-20260827/locations/us-central1/jobs/qbo-production-dispatch",
+      "schedule": "*/5 * * * *",
+      "timeZone": "Etc/UTC",
+      "state": "ENABLED",
+      "attemptDeadline": "180s",
+      "retryConfig": {
+        "maxBackoffDuration": "60s",
+        "maxDoublings": 2,
+        "maxRetryDuration": "0s",
+        "minBackoffDuration": "10s",
+        "retryCount": 3
+      },
+      "httpTarget": {
+        "httpMethod": "POST",
+        "oidcToken": {
+          "audience": "https://qbo-production-task-dispatcher-999493700992.us-central1.run.app",
+          "serviceAccountEmail": "qbo-dispatch-scheduler@vaeroex-qbo-prod-20260827.iam.gserviceaccount.com"
+        },
+        "uri": "https://qbo-production-task-dispatcher-999493700992.us-central1.run.app/tasks/dispatch"
+      }
+    },
+    {
+      "name": "projects/vaeroex-qbo-prod-20260827/locations/us-central1/jobs/qbo-production-dispatch-interactive",
+      "schedule": "*/5 * * * *",
+      "timeZone": "Etc/UTC",
+      "state": "ENABLED",
+      "attemptDeadline": "180s",
+      "retryConfig": {
+        "maxBackoffDuration": "60s",
+        "maxDoublings": 2,
+        "maxRetryDuration": "0s",
+        "minBackoffDuration": "10s",
+        "retryCount": 3
+      },
+      "httpTarget": {
+        "httpMethod": "POST",
+        "oidcToken": {
+          "audience": "https://qbo-production-task-dispatcher-999493700992.us-central1.run.app",
+          "serviceAccountEmail": "qbo-dispatch-scheduler@vaeroex-qbo-prod-20260827.iam.gserviceaccount.com"
+        },
+        "uri": "https://qbo-production-task-dispatcher-999493700992.us-central1.run.app/tasks/dispatch"
+      }
+    }
+  ],
+  "qbo-queues": [
+    {
+      "name": "projects/vaeroex-qbo-prod-20260827/locations/us-central1/queues/qbo-production",
+      "state": "RUNNING",
+      "rateLimits": {
+        "maxBurstSize": 10,
+        "maxConcurrentDispatches": 10,
+        "maxDispatchesPerSecond": 5.0
+      },
+      "retryConfig": {
+        "maxAttempts": 8,
+        "maxBackoff": "300s",
+        "maxDoublings": 5,
+        "maxRetryDuration": "3600s",
+        "minBackoff": "10s"
+      },
+      "purgeTime": null,
+      "taskTtl": null,
+      "tombstoneTtl": null
+    }
+  ],
+  "integration-schedules": [],
+  "document-services": [
+    {
+      "name": "vaeroex-doc-broker-production",
+      "revision": "vaeroex-doc-broker-production-00011-52n",
+      "annotations": {
+        "autoscaling.knative.dev/maxScale": "20",
+        "run.googleapis.com/execution-environment": "gen2",
+        "run.googleapis.com/startup-cpu-boost": "true"
+      },
+      "image": "us-west1-docker.pkg.dev/vaeroex-document-worker/vaeroex-document-workers-preview/document-extraction-broker@sha256:e61019287d57c739faf7454d9d36e4037557fc87ea8a4e15c259f3085bd8ddaf",
+      "url": "https://vaeroex-doc-broker-production-ew3lc6vbna-uw.a.run.app",
+      "serviceAccount": "vaeroex-doc-broker-prod@vaeroex-document-worker.iam.gserviceaccount.com",
+      "concurrency": 1,
+      "timeoutSeconds": 60,
+      "resources": {
+        "limits": {
+          "cpu": "1",
+          "memory": "512Mi"
+        }
+      },
+      "env": [
+        {
+          "name": "DOCUMENT_EXTRACTION_BROKER_RUNTIME_ENVIRONMENT",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "DOCUMENT_EXTRACTION_PRIVATE_WORKER_ENABLED",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "DOCUMENT_EXTRACTION_PROVIDER_EXECUTION_ENABLED",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "DOCUMENT_EXTRACTION_SYNTHETIC_QUALIFICATION_ENABLED",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "DOCUMENT_EXTRACTION_SYNTHETIC_PROVIDER_CALLS_ENABLED",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "DOCUMENT_EXTRACTION_GOOGLE_FROZEN_CONTROLLER_ENABLED",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "DOCUMENT_EXTRACTION_RESPONSE_PROFILE_DIAGNOSTIC_ENABLED",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "DOCUMENT_EXTRACTION_FIELD_PATH_DIAGNOSTIC_ENABLED",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "DOCUMENT_EXTRACTION_ACTIVE_PROVIDER_PROFILE",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "DOCUMENT_EXTRACTION_PRODUCTION_APPROVAL",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "DOCUMENT_EXTRACTION_GOOGLE_PRODUCTION_APPROVAL",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "DOCUMENT_EXTRACTION_GOOGLE_PROJECT_NUMBER",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "DOCUMENT_EXTRACTION_GOOGLE_PROCESSOR_ID",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "DOCUMENT_EXTRACTION_GOOGLE_LOCATION",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "DOCUMENT_EXTRACTION_GOOGLE_PROCESSOR_VERSION",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "DOCUMENT_EXTRACTION_GOOGLE_MODEL",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "DOCUMENT_EXTRACTION_GOOGLE_CLIENT_REVISION",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "DOCUMENT_EXTRACTION_GOOGLE_PARSER_REVISION",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "DOCUMENT_EXTRACTION_BROKER_CAPABILITY_CURRENT_KEY_VERSION",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "DOCUMENT_EXTRACTION_ENCRYPTION_CURRENT_KEY_VERSION",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "NEXT_PUBLIC_SUPABASE_URL",
+          "presence": true,
+          "source": "literal"
+        },
+        {
+          "name": "SUPABASE_SERVICE_ROLE_KEY",
+          "presence": true,
+          "source": "secretRef"
+        },
+        {
+          "name": "DOCUMENT_EXTRACTION_WORKER_PUBLIC_KEYS_JSON",
+          "presence": true,
+          "source": "secretRef"
+        },
+        {
+          "name": "DOCUMENT_EXTRACTION_BROKER_CAPABILITY_KEYS_JSON",
+          "presence": true,
+          "source": "secretRef"
+        },
+        {
+          "name": "DOCUMENT_EXTRACTION_TELEMETRY_HMAC_SECRET",
+          "presence": true,
+          "source": "secretRef"
+        },
+        {
+          "name": "DOCUMENT_EXTRACTION_ENCRYPTION_KEYS_JSON",
+          "presence": true,
+          "source": "secretRef"
+        }
+      ]
+    }
+  ]
+}

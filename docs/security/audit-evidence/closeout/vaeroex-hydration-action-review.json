@@ -1,0 +1,17 @@
+{
+  "checks": [
+    {
+      "stage": "form-1440",
+      "errors": 0
+    },
+    {
+      "stage": "form-390",
+      "errors": 0
+    },
+    {
+      "stage": "memory-approve",
+      "errors": 0
+    }
+  ],
+  "errors": []
+}

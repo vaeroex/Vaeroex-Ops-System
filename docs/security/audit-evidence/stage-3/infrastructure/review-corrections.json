@@ -1,0 +1,16 @@
+{
+  "reviewedAtLocalDate": "2026-10-04",
+  "supersedesAnySimplifiedAgentInterpretation": true,
+  "cloudTasks": {
+    "declaredMaxAttempts": 8,
+    "declaredMaxRetryDurationSeconds": 3600,
+    "interpretation": "Both retry conditions must be satisfied before retries stop, unless success or retention ends the task. Neither eight attempts nor one hour is an independent hard cap. Queue dispatch limits include retries. Eight-attempt cost scenarios are illustrative, not upper bounds.",
+    "sources": ["https://docs.cloud.google.com/tasks/docs/reference/rest/v2beta3/RetryConfig", "https://docs.cloud.google.com/tasks/docs/configure-retry-task?hl=en", "https://docs.cloud.google.com/tasks/docs/reference/rest/v2/projects.locations.queues#RateLimits"]
+  },
+  "serverlessNEG": {
+    "sourceBackendTimeoutSeconds": 30,
+    "sourceCloudRunServiceTimeoutSeconds": 120,
+    "interpretation": "Backend timeoutSec does not apply to serverless NEGs; Google documents fixed nonconfigurable 60-minute backend timeout and unsupported timeoutSec modification. Do not infer effective 30-second callback deadline or assert deployment failed. Applied resources/provider handling not observed.",
+    "source": "https://docs.cloud.google.com/load-balancing/docs/negs/serverless-neg-concepts#limitations_with_backend_services"
+  }
+}

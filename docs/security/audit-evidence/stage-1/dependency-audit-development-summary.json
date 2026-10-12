@@ -1,0 +1,321 @@
+{
+  "metadata": {
+    "vulnerabilities": {
+      "info": 0,
+      "low": 0,
+      "moderate": 3,
+      "high": 16,
+      "critical": 0
+    },
+    "dependencies": 530,
+    "devDependencies": 0,
+    "optionalDependencies": 0,
+    "totalDependencies": 530
+  },
+  "advisories": [
+    {
+      "module_name": "brace-expansion",
+      "severity": "high",
+      "title": "brace-expansion: DoS via exponential-time expansion of consecutive non-expanding {} groups",
+      "url": "https://github.com/advisories/GHSA-3jxr-9vmj-r5cp",
+      "vulnerable_versions": "<1.1.16",
+      "patched_versions": ">=1.1.16",
+      "findings": [
+        {
+          "version": "1.1.15",
+          "paths": [
+            ". > @eslint/eslintrc@3.3.5 > minimatch@3.1.5 > brace-expansion@1.1.15"
+          ]
+        }
+      ]
+    },
+    {
+      "module_name": "brace-expansion",
+      "severity": "high",
+      "title": "brace-expansion: DoS via exponential-time expansion of consecutive non-expanding {} groups",
+      "url": "https://github.com/advisories/GHSA-3jxr-9vmj-r5cp",
+      "vulnerable_versions": ">=3.0.0 <5.0.7",
+      "patched_versions": ">=5.0.7",
+      "findings": [
+        {
+          "version": "5.0.6",
+          "paths": [
+            ". > eslint-config-next@15.5.24 > @typescript-eslint/eslint-plugin@8.61.1 > @typescript-eslint/parser@8.61.1 > @typescript-eslint/typescript-estree@8.61.1 > minimatch@10.2.5 > brace-expansion@5.0.6"
+          ]
+        }
+      ]
+    },
+    {
+      "module_name": "js-yaml",
+      "severity": "high",
+      "title": "js-yaml: YAML merge-key chains can force quadratic CPU consumption",
+      "url": "https://github.com/advisories/GHSA-52cp-r559-cp3m",
+      "vulnerable_versions": ">=4.0.0 <4.3.0",
+      "patched_versions": ">=4.3.0",
+      "findings": [
+        {
+          "version": "4.2.0",
+          "paths": [
+            ". > @eslint/eslintrc@3.3.5 > js-yaml@4.2.0"
+          ]
+        }
+      ]
+    },
+    {
+      "module_name": "brace-expansion",
+      "severity": "high",
+      "title": "brace-expansion: DoS via unbounded expansion length causing an out-of-memory process crash",
+      "url": "https://github.com/advisories/GHSA-mh99-v99m-4gvg",
+      "vulnerable_versions": "<1.1.17",
+      "patched_versions": ">=1.1.17",
+      "findings": [
+        {
+          "version": "1.1.15",
+          "paths": [
+            ". > @eslint/eslintrc@3.3.5 > minimatch@3.1.5 > brace-expansion@1.1.15"
+          ]
+        }
+      ]
+    },
+    {
+      "module_name": "brace-expansion",
+      "severity": "high",
+      "title": "brace-expansion: DoS via unbounded expansion length causing an out-of-memory process crash",
+      "url": "https://github.com/advisories/GHSA-mh99-v99m-4gvg",
+      "vulnerable_versions": ">=4.0.0 <5.0.8",
+      "patched_versions": ">=5.0.8",
+      "findings": [
+        {
+          "version": "5.0.6",
+          "paths": [
+            ". > eslint-config-next@15.5.24 > @typescript-eslint/eslint-plugin@8.61.1 > @typescript-eslint/parser@8.61.1 > @typescript-eslint/typescript-estree@8.61.1 > minimatch@10.2.5 > brace-expansion@5.0.6"
+          ]
+        }
+      ]
+    },
+    {
+      "module_name": "brace-expansion",
+      "severity": "high",
+      "title": "brace-expansion: DoS via unbounded intermediate arrays, bypassing the CVE-2026-14257 mitigation",
+      "url": "https://github.com/advisories/GHSA-rgw5-rvv9-x895",
+      "vulnerable_versions": ">=4.0.0 <5.0.9",
+      "patched_versions": ">=5.0.9",
+      "findings": [
+        {
+          "version": "5.0.6",
+          "paths": [
+            ". > eslint-config-next@15.5.24 > @typescript-eslint/eslint-plugin@8.61.1 > @typescript-eslint/parser@8.61.1 > @typescript-eslint/typescript-estree@8.61.1 > minimatch@10.2.5 > brace-expansion@5.0.6"
+          ]
+        }
+      ]
+    },
+    {
+      "module_name": "brace-expansion",
+      "severity": "high",
+      "title": "brace-expansion: DoS via unbounded intermediate arrays, bypassing the CVE-2026-14257 mitigation",
+      "url": "https://github.com/advisories/GHSA-rgw5-rvv9-x895",
+      "vulnerable_versions": "<1.1.18",
+      "patched_versions": ">=1.1.18",
+      "findings": [
+        {
+          "version": "1.1.15",
+          "paths": [
+            ". > @eslint/eslintrc@3.3.5 > minimatch@3.1.5 > brace-expansion@1.1.15"
+          ]
+        }
+      ]
+    },
+    {
+      "module_name": "js-yaml",
+      "severity": "high",
+      "title": "JS-YAML: Quadratic CPU consumption in !!omap resolution (3.x and 4.x) \u2014 CVE-2026-59870 fix not backported",
+      "url": "https://github.com/advisories/GHSA-5p4m-2wfm-xmqj",
+      "vulnerable_versions": ">=4.0.0 <4.3.1",
+      "patched_versions": ">=4.3.1",
+      "findings": [
+        {
+          "version": "4.2.0",
+          "paths": [
+            ". > @eslint/eslintrc@3.3.5 > js-yaml@4.2.0"
+          ]
+        }
+      ]
+    },
+    {
+      "module_name": "browserslist",
+      "severity": "high",
+      "title": "Browserslist: Unbounded memory growth (no cache eviction) via distinct query results, leading to eventual OOM",
+      "url": "https://github.com/advisories/GHSA-c83g-rgw3-j3cx",
+      "vulnerable_versions": "<=4.28.6",
+      "patched_versions": ">=4.28.7",
+      "findings": [
+        {
+          "version": "4.28.2",
+          "paths": [
+            ". > autoprefixer@10.5.0 > browserslist@4.28.2 > update-browserslist-db@1.2.3 > browserslist@4.28.2"
+          ]
+        }
+      ]
+    },
+    {
+      "module_name": "browserslist",
+      "severity": "high",
+      "title": "Browserslist: Uncaught crash / prototype write via untrusted browserslist-stats.json custom stats (normalizeStats)",
+      "url": "https://github.com/advisories/GHSA-73wf-gq98-2v4g",
+      "vulnerable_versions": "<=4.28.6",
+      "patched_versions": ">=4.28.7",
+      "findings": [
+        {
+          "version": "4.28.2",
+          "paths": [
+            ". > autoprefixer@10.5.0 > browserslist@4.28.2 > update-browserslist-db@1.2.3 > browserslist@4.28.2"
+          ]
+        }
+      ]
+    },
+    {
+      "module_name": "baseline-browser-mapping",
+      "severity": "moderate",
+      "title": "baseline-browser-mapping process termination on invalid input causes denial of service",
+      "url": "https://github.com/advisories/GHSA-w5vr-8v7q-w6rv",
+      "vulnerable_versions": ">=2.0.0 <2.11.0",
+      "patched_versions": ">=2.11.0",
+      "findings": [
+        {
+          "version": "2.10.38",
+          "paths": [
+            ". > autoprefixer@10.5.0 > browserslist@4.28.2 > baseline-browser-mapping@2.10.38"
+          ]
+        }
+      ]
+    },
+    {
+      "module_name": "js-yaml",
+      "severity": "high",
+      "title": "js-yaml: maxTotalMergeKeys does not limit CPU use for empty merge sources",
+      "url": "https://github.com/advisories/GHSA-2883-xcg3-v3hh",
+      "vulnerable_versions": ">=4.0.0 <4.3.2",
+      "patched_versions": ">=4.3.2",
+      "findings": [
+        {
+          "version": "4.2.0",
+          "paths": [
+            ". > @eslint/eslintrc@3.3.5 > js-yaml@4.2.0"
+          ]
+        }
+      ]
+    },
+    {
+      "module_name": "brace-expansion",
+      "severity": "moderate",
+      "title": "brace-expansion: Quadratic-time expansion of the `{a},b}` rewrite causes CPU denial of service",
+      "url": "https://github.com/advisories/GHSA-q2hr-2g5m-vwhr",
+      "vulnerable_versions": "<1.1.21",
+      "patched_versions": ">=1.1.21",
+      "findings": [
+        {
+          "version": "1.1.15",
+          "paths": [
+            ". > @eslint/eslintrc@3.3.5 > minimatch@3.1.5 > brace-expansion@1.1.15"
+          ]
+        }
+      ]
+    },
+    {
+      "module_name": "brace-expansion",
+      "severity": "moderate",
+      "title": "brace-expansion: Quadratic-time expansion of the `{a},b}` rewrite causes CPU denial of service",
+      "url": "https://github.com/advisories/GHSA-q2hr-2g5m-vwhr",
+      "vulnerable_versions": ">=4.0.0 <5.0.12",
+      "patched_versions": ">=5.0.12",
+      "findings": [
+        {
+          "version": "5.0.6",
+          "paths": [
+            ". > eslint-config-next@15.5.24 > @typescript-eslint/eslint-plugin@8.61.1 > @typescript-eslint/parser@8.61.1 > @typescript-eslint/typescript-estree@8.61.1 > minimatch@10.2.5 > brace-expansion@5.0.6"
+          ]
+        }
+      ]
+    },
+    {
+      "module_name": "brace-expansion",
+      "severity": "high",
+      "title": "brace-expansion: DoS via uncontrolled recursion on nested brace groups causing stack exhaustion",
+      "url": "https://github.com/advisories/GHSA-qhr7-859c-m2p7",
+      "vulnerable_versions": "<1.1.20",
+      "patched_versions": ">=1.1.20",
+      "findings": [
+        {
+          "version": "1.1.15",
+          "paths": [
+            ". > @eslint/eslintrc@3.3.5 > minimatch@3.1.5 > brace-expansion@1.1.15"
+          ]
+        }
+      ]
+    },
+    {
+      "module_name": "brace-expansion",
+      "severity": "high",
+      "title": "brace-expansion: DoS via uncontrolled recursion on nested brace groups causing stack exhaustion",
+      "url": "https://github.com/advisories/GHSA-qhr7-859c-m2p7",
+      "vulnerable_versions": ">=4.0.0 <5.0.11",
+      "patched_versions": ">=5.0.11",
+      "findings": [
+        {
+          "version": "5.0.6",
+          "paths": [
+            ". > eslint-config-next@15.5.24 > @typescript-eslint/eslint-plugin@8.61.1 > @typescript-eslint/parser@8.61.1 > @typescript-eslint/typescript-estree@8.61.1 > minimatch@10.2.5 > brace-expansion@5.0.6"
+          ]
+        }
+      ]
+    },
+    {
+      "module_name": "brace-expansion",
+      "severity": "high",
+      "title": "brace-expansion: DoS via uncontrolled recursion in parseCommaParts causing stack exhaustion",
+      "url": "https://github.com/advisories/GHSA-6j4f-fj2g-mc7p",
+      "vulnerable_versions": "<1.1.19",
+      "patched_versions": ">=1.1.19",
+      "findings": [
+        {
+          "version": "1.1.15",
+          "paths": [
+            ". > @eslint/eslintrc@3.3.5 > minimatch@3.1.5 > brace-expansion@1.1.15"
+          ]
+        }
+      ]
+    },
+    {
+      "module_name": "brace-expansion",
+      "severity": "high",
+      "title": "brace-expansion: DoS via uncontrolled recursion in parseCommaParts causing stack exhaustion",
+      "url": "https://github.com/advisories/GHSA-6j4f-fj2g-mc7p",
+      "vulnerable_versions": ">=4.0.0 <5.0.10",
+      "patched_versions": ">=5.0.10",
+      "findings": [
+        {
+          "version": "5.0.6",
+          "paths": [
+            ". > eslint-config-next@15.5.24 > @typescript-eslint/eslint-plugin@8.61.1 > @typescript-eslint/parser@8.61.1 > @typescript-eslint/typescript-estree@8.61.1 > minimatch@10.2.5 > brace-expansion@5.0.6"
+          ]
+        }
+      ]
+    },
+    {
+      "module_name": "braces",
+      "severity": "high",
+      "title": "braces vulnerable to stack-exhaustion denial of service through deeply nested patterns",
+      "url": "https://github.com/advisories/GHSA-vfj7-8cjw-p6xm",
+      "vulnerable_versions": "<=3.0.3",
+      "patched_versions": "<0.0.0",
+      "findings": [
+        {
+          "version": "3.0.3",
+          "paths": [
+            ". > eslint-config-next@15.5.24 > @next/eslint-plugin-next@15.5.24 > fast-glob@3.3.1 > micromatch@4.0.8 > braces@3.0.3"
+          ]
+        }
+      ]
+    }
+  ]
+}

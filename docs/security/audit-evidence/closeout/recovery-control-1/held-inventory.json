@@ -1,0 +1,266 @@
+{
+  "before": {
+    "receipt": [
+      {
+        "id": "39a3d8b8-9760-4372-b10e-1287a565be13",
+        "workspace_id": "3955a678-2e06-4e57-90fe-56f9c59f237e",
+        "file_id": "448a4109-f529-4bdd-a8fe-78d810d76c71",
+        "import_id": "63ddee0b-5962-4e78-a6d3-a5a13d7142ce",
+        "status": "running",
+        "preparation_key": "b9c8b202-1bbf-4526-abc5-e0b40f727f6d",
+        "actor_id": "5b71579b-4084-4192-9d05-6c0819aef084",
+        "prior_imported_at": null,
+        "approved_mapping": {
+          "mode": "workbook",
+          "worksheets": [
+            {
+              "name": "CSV",
+              "index": 1,
+              "state": "visible",
+              "status": "parsed",
+              "columns": [
+                "date",
+                "revenue"
+              ],
+              "enabled": true,
+              "mapping": {
+                "period": "date"
+              },
+              "row_count": 1,
+              "detected_type": "sales",
+              "selected_type": "wide_time_series",
+              "metric_columns": [
+                "revenue"
+              ],
+              "relationship_id": null,
+              "relationship_target": null
+            }
+          ],
+          "detected_at": "2026-10-05T07:35:12.250Z",
+          "preparation_id": "b9c8b202-1bbf-4526-abc5-e0b40f727f6d",
+          "detection_version": 3
+        },
+        "approved_row_ids": [
+          "c6ff0c65-59d3-4d53-9ecd-0ef5ea774b74"
+        ],
+        "accepted_at": "2026-10-05T07:35:34.131Z",
+        "completed_at": null
+      }
+    ],
+    "chunks": [
+      {
+        "id": "df5a9b9e-c997-4a2b-8c1b-78237e67cb66",
+        "content_hash": "7fa74654a8c5123fb0bf8fb7982e4d105bb86bfdc6501770e2cec77ba9d67cfb",
+        "source_type": "file",
+        "source_id": "448a4109-f529-4bdd-a8fe-78d810d76c71",
+        "source_file_id": "448a4109-f529-4bdd-a8fe-78d810d76c71",
+        "source_metadata": {
+          "import_id": "63ddee0b-5962-4e78-a6d3-a5a13d7142ce",
+          "review_status": "approved",
+          "indexing_method": "worksheet_import",
+          "import_attempt_id": "39a3d8b8-9760-4372-b10e-1287a565be13",
+          "extraction_outcome": "completed",
+          "evidence_classification": "business_evidence"
+        },
+        "entire_row_hash": "fbb69454faf53fa143efb1c1e849df59"
+      }
+    ],
+    "rows": [
+      {
+        "id": "c6ff0c65-59d3-4d53-9ecd-0ef5ea774b74",
+        "status": "staged",
+        "data_json": {
+          "date": "2026-03-01",
+          "revenue": 99
+        },
+        "mapped_data_json": {
+          "__source": {
+            "worksheet": "CSV",
+            "row_number": 2,
+            "worksheet_index": 1
+          }
+        },
+        "validation_errors_json": []
+      }
+    ],
+    "imports": [
+      {
+        "id": "63ddee0b-5962-4e78-a6d3-a5a13d7142ce",
+        "status": "needs_review",
+        "recovery_status": "running",
+        "rows_total": 1,
+        "rows_imported": 0,
+        "mapping_json": {
+          "mode": "workbook",
+          "worksheets": [
+            {
+              "name": "CSV",
+              "index": 1,
+              "state": "visible",
+              "status": "parsed",
+              "columns": [
+                "date",
+                "revenue"
+              ],
+              "enabled": true,
+              "mapping": {
+                "period": "date"
+              },
+              "row_count": 1,
+              "detected_type": "sales",
+              "selected_type": "wide_time_series",
+              "metric_columns": [
+                "revenue"
+              ],
+              "relationship_id": null,
+              "relationship_target": null
+            }
+          ],
+          "detected_at": "2026-10-05T07:35:12.250Z",
+          "preparation_id": "b9c8b202-1bbf-4526-abc5-e0b40f727f6d",
+          "detection_version": 3
+        },
+        "imported_at": null
+      }
+    ],
+    "counts": {
+      "imports": "304",
+      "import_rows": "4",
+      "kpis": "2",
+      "metrics": "0",
+      "chunks": "3"
+    }
+  },
+  "after": {
+    "receipt": [
+      {
+        "id": "39a3d8b8-9760-4372-b10e-1287a565be13",
+        "workspace_id": "3955a678-2e06-4e57-90fe-56f9c59f237e",
+        "file_id": "448a4109-f529-4bdd-a8fe-78d810d76c71",
+        "import_id": "63ddee0b-5962-4e78-a6d3-a5a13d7142ce",
+        "status": "running",
+        "preparation_key": "b9c8b202-1bbf-4526-abc5-e0b40f727f6d",
+        "actor_id": "5b71579b-4084-4192-9d05-6c0819aef084",
+        "prior_imported_at": null,
+        "approved_mapping": {
+          "mode": "workbook",
+          "worksheets": [
+            {
+              "name": "CSV",
+              "index": 1,
+              "state": "visible",
+              "status": "parsed",
+              "columns": [
+                "date",
+                "revenue"
+              ],
+              "enabled": true,
+              "mapping": {
+                "period": "date"
+              },
+              "row_count": 1,
+              "detected_type": "sales",
+              "selected_type": "wide_time_series",
+              "metric_columns": [
+                "revenue"
+              ],
+              "relationship_id": null,
+              "relationship_target": null
+            }
+          ],
+          "detected_at": "2026-10-05T07:35:12.250Z",
+          "preparation_id": "b9c8b202-1bbf-4526-abc5-e0b40f727f6d",
+          "detection_version": 3
+        },
+        "approved_row_ids": [
+          "c6ff0c65-59d3-4d53-9ecd-0ef5ea774b74"
+        ],
+        "accepted_at": "2026-10-05T07:35:34.131Z",
+        "completed_at": null
+      }
+    ],
+    "chunks": [
+      {
+        "id": "df5a9b9e-c997-4a2b-8c1b-78237e67cb66",
+        "content_hash": "7fa74654a8c5123fb0bf8fb7982e4d105bb86bfdc6501770e2cec77ba9d67cfb",
+        "source_type": "file",
+        "source_id": "448a4109-f529-4bdd-a8fe-78d810d76c71",
+        "source_file_id": "448a4109-f529-4bdd-a8fe-78d810d76c71",
+        "source_metadata": {
+          "import_id": "63ddee0b-5962-4e78-a6d3-a5a13d7142ce",
+          "review_status": "approved",
+          "indexing_method": "worksheet_import",
+          "import_attempt_id": "39a3d8b8-9760-4372-b10e-1287a565be13",
+          "extraction_outcome": "completed",
+          "evidence_classification": "business_evidence"
+        },
+        "entire_row_hash": "fbb69454faf53fa143efb1c1e849df59"
+      }
+    ],
+    "rows": [
+      {
+        "id": "c6ff0c65-59d3-4d53-9ecd-0ef5ea774b74",
+        "status": "staged",
+        "data_json": {
+          "date": "2026-03-01",
+          "revenue": 99
+        },
+        "mapped_data_json": {
+          "__source": {
+            "worksheet": "CSV",
+            "row_number": 2,
+            "worksheet_index": 1
+          }
+        },
+        "validation_errors_json": []
+      }
+    ],
+    "imports": [
+      {
+        "id": "63ddee0b-5962-4e78-a6d3-a5a13d7142ce",
+        "status": "needs_review",
+        "recovery_status": "running",
+        "rows_total": 1,
+        "rows_imported": 0,
+        "mapping_json": {
+          "mode": "workbook",
+          "worksheets": [
+            {
+              "name": "CSV",
+              "index": 1,
+              "state": "visible",
+              "status": "parsed",
+              "columns": [
+                "date",
+                "revenue"
+              ],
+              "enabled": true,
+              "mapping": {
+                "period": "date"
+              },
+              "row_count": 1,
+              "detected_type": "sales",
+              "selected_type": "wide_time_series",
+              "metric_columns": [
+                "revenue"
+              ],
+              "relationship_id": null,
+              "relationship_target": null
+            }
+          ],
+          "detected_at": "2026-10-05T07:35:12.250Z",
+          "preparation_id": "b9c8b202-1bbf-4526-abc5-e0b40f727f6d",
+          "detection_version": 3
+        },
+        "imported_at": null
+      }
+    ],
+    "counts": {
+      "imports": "304",
+      "import_rows": "4",
+      "kpis": "2",
+      "metrics": "0",
+      "chunks": "3"
+    }
+  }
+}

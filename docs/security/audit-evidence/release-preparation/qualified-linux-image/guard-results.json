@@ -1,0 +1,7 @@
+{
+  "guardChecks": 17,
+  "passed": true,
+  "dockerInvoked": false,
+  "network": false,
+  "scriptSha256": "d148eb7697cd3871f1d78edae9e5eba2bcb20a8a6c745a68039f0b6383b50e0a"
+}

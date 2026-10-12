@@ -1,0 +1,161 @@
+{
+  "createdAt": "2026-10-05T06:18:16.121Z",
+  "productionAccess": false,
+  "providerCalls": false,
+  "scope": "Full canonical baseline and separately declared production migration shape; isolated native PostgreSQL, synthetic historical anomalies. Not production deployment rehearsal at production volume, not Auth HTTP.",
+  "runs": [
+    {
+      "name": "canonical-native-full-schema",
+      "checks": [
+        {
+          "name": "empty application database before synthetic seed",
+          "status": "pass"
+        },
+        {
+          "name": "aborted security migration removes new exemption table",
+          "status": "pass"
+        },
+        {
+          "name": "aborted security migration restores original single-parent foreign keys",
+          "status": "pass"
+        },
+        {
+          "name": "aborted migration preserves all preexisting rows",
+          "status": "pass"
+        },
+        {
+          "name": "successful migration preserves historical children and parent states",
+          "status": "pass"
+        },
+        {
+          "name": "both composite foreign keys remain NOT VALID",
+          "status": "pass"
+        },
+        {
+          "name": "constraint validation exposes existing asset mismatch without repairing it",
+          "status": "pass"
+        },
+        {
+          "name": "constraint validation exposes existing form mismatch without repairing it",
+          "status": "pass"
+        },
+        {
+          "name": "new cross-workspace check blocked",
+          "status": "pass"
+        },
+        {
+          "name": "new cross-workspace submission blocked",
+          "status": "pass"
+        },
+        {
+          "name": "unconfigured platform administrator has no expired workspace bypass",
+          "status": "pass"
+        },
+        {
+          "name": "database-owner configured exemption preserves legitimate expired-admin write",
+          "status": "pass"
+        },
+        {
+          "name": "service API cannot configure administrator exemptions",
+          "status": "pass"
+        },
+        {
+          "name": "authenticated API cannot configure administrator exemptions",
+          "status": "pass"
+        },
+        {
+          "name": "administrator exemption does not grant foreign workspace role",
+          "status": "pass"
+        },
+        {
+          "name": "removing administrator exemption immediately restores expiry denial",
+          "status": "pass"
+        },
+        {
+          "name": "latest legitimate check overrides historical future readiness",
+          "status": "pass"
+        },
+        {
+          "name": "authenticated future timestamp replaced by current server time",
+          "status": "pass"
+        },
+        {
+          "name": "authenticated retiming fails",
+          "status": "pass"
+        },
+        {
+          "name": "foreign parent deletion preserves mismatched historical check",
+          "status": "pass"
+        },
+        {
+          "name": "foreign parent deletion preserves mismatched historical form submission",
+          "status": "pass"
+        },
+        {
+          "name": "private schema still unavailable to API roles",
+          "status": "pass"
+        },
+        {
+          "name": "trusted analysis RPC remains inaccessible to authenticated clients",
+          "status": "pass"
+        },
+        {
+          "name": "trusted service analysis live member admitted",
+          "status": "pass"
+        },
+        {
+          "name": "trusted analysis transaction leaves no reusable authorization",
+          "status": "pass"
+        }
+      ],
+      "migrations": [
+        {
+          "name": "20261005022017_workspace_security_boundaries.sql",
+          "sha256": "16974e4960b31dcbd80479e27734bf82cda7fb0cfc63c7a3d1d56b32114b661d",
+          "milliseconds": 30.77
+        },
+        {
+          "name": "20261005022445_workspace_persisted_usage_limits.sql",
+          "sha256": "5fd3459dafcbe199c8ff893dfb726bce30d850e55a229375482e54f3256495e6",
+          "milliseconds": 4.73
+        },
+        {
+          "name": "20261005060101_atomic_confirmed_memory_publication.sql",
+          "sha256": "b68055b634130fe6a5820852b217e3755dc9613fcd7b975a182af927dd5ee930",
+          "milliseconds": 1.84
+        },
+        {
+          "name": "20261005060258_asset_check_server_chronology.sql",
+          "sha256": "a62006fb63a14cf9f018bab292a4b4ecfbcbee555b1bebcf841cdf7732211722",
+          "milliseconds": 0.81
+        },
+        {
+          "name": "20261005061024_internal_form_submission_idempotency.sql",
+          "sha256": "6db3df03b9fa2502e12fb71ddceb7a18c7cd26f6ad2a1f52a1bf10746f9cad03",
+          "milliseconds": 3.04
+        }
+      ],
+      "notices": [
+        "Asset check tenant FK: 1 historical rows require review before VALIDATE CONSTRAINT",
+        "Form submission tenant FK: 1 historical rows require review before VALIDATE CONSTRAINT",
+        "Asset check tenant FK: 1 historical rows require review before VALIDATE CONSTRAINT",
+        "Form submission tenant FK: 1 historical rows require review before VALIDATE CONSTRAINT"
+      ],
+      "runtime": {
+        "version": "17.11",
+        "maxConnections": "100",
+        "database": "postgres"
+      },
+      "finalProtectedHistory": {
+        "mismatchedChecks": 1,
+        "mismatchedSubmissions": 1,
+        "historicalFutureChecks": 1
+      },
+      "passed": true
+    }
+  ],
+  "baseline": {
+    "count": 123,
+    "sha256": "7abd048f15611ca63c7c2f12ef7520f467919f577b310916c41c02a9cec82166"
+  }
+}

@@ -86,6 +86,9 @@ export async function googleCreateCloudTask(input: {
       body: JSON.stringify({
         task: {
           name: taskName,
+          // Useful work stops at240s, fenced cleanup at255s, and new leases at270s.
+          // Delivery retains its300s bound; SQL denies writes after lease expiry.
+          dispatchDeadline: "300s",
           httpRequest: {
             httpMethod: "POST",
             url: target.toString(),

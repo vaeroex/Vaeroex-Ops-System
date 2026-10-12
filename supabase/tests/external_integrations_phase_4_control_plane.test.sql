@@ -304,9 +304,11 @@ insert into public.profiles (id, email, full_name) values
   ('a7400000-0000-4000-8000-000000000006', 'phase4-nonmember@example.test', 'Phase 4 Nonmember'),
   ('a7400000-0000-4000-8000-000000000007', 'phase4-other-owner@example.test', 'Phase 4 Other Owner');
 
-insert into public.workspaces (id, name, created_by) values
-  ('b7400000-0000-4000-8000-000000000001', 'Phase 4 Workspace A', 'a7400000-0000-4000-8000-000000000001'),
-  ('b7400000-0000-4000-8000-000000000002', 'Phase 4 Workspace B', 'a7400000-0000-4000-8000-000000000007');
+-- These role/provider tests require an entitled workspace for the legitimate
+-- authenticated connection-intent writes; a bounded trial keeps guards active.
+insert into public.workspaces (id, name, created_by, subscription_status, trial_ends_at) values
+  ('b7400000-0000-4000-8000-000000000001', 'Phase 4 Workspace A', 'a7400000-0000-4000-8000-000000000001', 'trialing', now() + interval '1 day'),
+  ('b7400000-0000-4000-8000-000000000002', 'Phase 4 Workspace B', 'a7400000-0000-4000-8000-000000000007', 'trialing', now() + interval '1 day');
 
 insert into public.workspace_members (id, workspace_id, user_id, role, status) values
   ('c7400000-0000-4000-8000-000000000001', 'b7400000-0000-4000-8000-000000000001', 'a7400000-0000-4000-8000-000000000001', 'owner', 'active'),

@@ -1,0 +1,882 @@
+{
+  "kind": "authenticated_health_consolidation_v1",
+  "runId": "a1e04d67-2093-4783-b5d9-815b7c3c97f5",
+  "sourceCommit": "639c4670895c835a62de51f0999e5e48cd3d6434",
+  "buildId": "Nn-YxH6DTf0HzOgt91urw",
+  "harnessSha256": "5d620d627e64b2dbb156f4612e256d05efc608217d7488c9c96f5b7728b2b3bd",
+  "instanceNonce": "be061b2be120854aba43ebc428f571c35523e1193a562483",
+  "startedAt": "2026-10-06T01:19:35.532Z",
+  "widths": [
+    1440,
+    390
+  ],
+  "repetitions": 2,
+  "providerMode": "Preserved synthetic saved artifact; no generation submitted",
+  "loadedRuntimeSourceFiles": {
+    "workspace-capacity-environment.cjs": "092a11c3ec303259a662dabebfaf85724d7548c6ddd1d1e586ce9510b1cce9ae",
+    "workspace-capacity-preload.cjs": "7d01f2ad6fee9004570d61834d620c1520ae60eb584e53b89dacc7e86ea6065d",
+    "workspace-capacity-providers.cjs": "26b35b290afe6fbf2431848e07dee2f4d55a57a37e2fe91fd0958bfc1a7ce677",
+    "workspace-capacity-next-server.cjs": "26fe8ba0ff955747f61bf71ab384e879f26b60c22780812d0a716e18fb1f378c",
+    "workspace-capacity-next-config.cjs": "795a3cf0790176d88b6f688ae5e3f27abaa9181d2a7a28336804f57103fd4e47"
+  },
+  "nextConfigOverride": {
+    "skipMiddlewareUrlNormalize": true,
+    "originalConfigSha256": "ab9707ea1b885652c1281f96d314492fa1fc81321c5257f539901dfea8b1a663",
+    "originalLoaderSha256": "b570ac53c237e06a066c86781a8666026aa088bc82a27d8ac60f5be480e405fe"
+  },
+  "checks": [
+    {
+      "name": "overview_to_intelligence_health",
+      "actor": "current",
+      "width": 1440,
+      "iteration": 0,
+      "automaticTransition": true,
+      "pendingCleared": true,
+      "expectedEvidenceState": "current",
+      "passed": true
+    },
+    {
+      "name": "factor_and_evidence_keyboard",
+      "actor": "current",
+      "width": 1440,
+      "iteration": 0,
+      "passed": true
+    },
+    {
+      "name": "history_all_ranges_and_version_boundary",
+      "actor": "current",
+      "width": 1440,
+      "iteration": 0,
+      "ranges": 5,
+      "missingDaysNotInvented": true,
+      "passed": true
+    },
+    {
+      "name": "existing_analysis_dialog_and_focus",
+      "actor": "current",
+      "width": 1440,
+      "iteration": 0,
+      "noGenerationRequested": true,
+      "passed": true
+    },
+    {
+      "name": "saved_analysis_link_and_preserved_citation",
+      "actor": "current",
+      "width": 1440,
+      "iteration": 0,
+      "savedArtifactAvailable": true,
+      "passed": true
+    },
+    {
+      "name": "overview_to_intelligence_health",
+      "actor": "viewer",
+      "width": 1440,
+      "iteration": 0,
+      "automaticTransition": true,
+      "pendingCleared": true,
+      "expectedEvidenceState": "current",
+      "passed": true
+    },
+    {
+      "name": "factor_and_evidence_keyboard",
+      "actor": "viewer",
+      "width": 1440,
+      "iteration": 0,
+      "passed": true
+    },
+    {
+      "name": "history_all_ranges_and_version_boundary",
+      "actor": "viewer",
+      "width": 1440,
+      "iteration": 0,
+      "ranges": 5,
+      "missingDaysNotInvented": true,
+      "passed": true
+    },
+    {
+      "name": "existing_analysis_dialog_and_focus",
+      "actor": "viewer",
+      "width": 1440,
+      "iteration": 0,
+      "noGenerationRequested": true,
+      "passed": true
+    },
+    {
+      "name": "saved_analysis_link_and_preserved_citation",
+      "actor": "viewer",
+      "width": 1440,
+      "iteration": 0,
+      "savedArtifactAvailable": true,
+      "passed": true
+    },
+    {
+      "name": "overview_to_intelligence_health",
+      "actor": "stale",
+      "width": 1440,
+      "iteration": 0,
+      "automaticTransition": true,
+      "pendingCleared": true,
+      "expectedEvidenceState": "stale",
+      "passed": true
+    },
+    {
+      "name": "factor_and_evidence_keyboard",
+      "actor": "stale",
+      "width": 1440,
+      "iteration": 0,
+      "passed": true
+    },
+    {
+      "name": "history_all_ranges_and_version_boundary",
+      "actor": "stale",
+      "width": 1440,
+      "iteration": 0,
+      "ranges": 5,
+      "missingDaysNotInvented": true,
+      "passed": true
+    },
+    {
+      "name": "existing_analysis_dialog_and_focus",
+      "actor": "stale",
+      "width": 1440,
+      "iteration": 0,
+      "noGenerationRequested": true,
+      "passed": true
+    },
+    {
+      "name": "saved_analysis_link_and_preserved_citation",
+      "actor": "stale",
+      "width": 1440,
+      "iteration": 0,
+      "savedArtifactAvailable": true,
+      "passed": true
+    },
+    {
+      "name": "overview_to_intelligence_health",
+      "actor": "empty",
+      "width": 1440,
+      "iteration": 0,
+      "automaticTransition": true,
+      "pendingCleared": true,
+      "expectedEvidenceState": "empty",
+      "passed": true
+    },
+    {
+      "name": "factor_and_evidence_keyboard",
+      "actor": "empty",
+      "width": 1440,
+      "iteration": 0,
+      "passed": true
+    },
+    {
+      "name": "history_all_ranges_and_version_boundary",
+      "actor": "empty",
+      "width": 1440,
+      "iteration": 0,
+      "ranges": 5,
+      "missingDaysNotInvented": true,
+      "passed": true
+    },
+    {
+      "name": "existing_analysis_dialog_and_focus",
+      "actor": "empty",
+      "width": 1440,
+      "iteration": 0,
+      "noGenerationRequested": true,
+      "passed": true
+    },
+    {
+      "name": "saved_analysis_link_and_preserved_citation",
+      "actor": "empty",
+      "width": 1440,
+      "iteration": 0,
+      "savedArtifactAvailable": false,
+      "passed": true
+    },
+    {
+      "name": "overview_to_intelligence_health",
+      "actor": "current",
+      "width": 1440,
+      "iteration": 1,
+      "automaticTransition": true,
+      "pendingCleared": true,
+      "expectedEvidenceState": "current",
+      "passed": true
+    },
+    {
+      "name": "factor_and_evidence_keyboard",
+      "actor": "current",
+      "width": 1440,
+      "iteration": 1,
+      "passed": true
+    },
+    {
+      "name": "history_all_ranges_and_version_boundary",
+      "actor": "current",
+      "width": 1440,
+      "iteration": 1,
+      "ranges": 5,
+      "missingDaysNotInvented": true,
+      "passed": true
+    },
+    {
+      "name": "existing_analysis_dialog_and_focus",
+      "actor": "current",
+      "width": 1440,
+      "iteration": 1,
+      "noGenerationRequested": true,
+      "passed": true
+    },
+    {
+      "name": "saved_analysis_link_and_preserved_citation",
+      "actor": "current",
+      "width": 1440,
+      "iteration": 1,
+      "savedArtifactAvailable": true,
+      "passed": true
+    },
+    {
+      "name": "overview_to_intelligence_health",
+      "actor": "viewer",
+      "width": 1440,
+      "iteration": 1,
+      "automaticTransition": true,
+      "pendingCleared": true,
+      "expectedEvidenceState": "current",
+      "passed": true
+    },
+    {
+      "name": "factor_and_evidence_keyboard",
+      "actor": "viewer",
+      "width": 1440,
+      "iteration": 1,
+      "passed": true
+    },
+    {
+      "name": "history_all_ranges_and_version_boundary",
+      "actor": "viewer",
+      "width": 1440,
+      "iteration": 1,
+      "ranges": 5,
+      "missingDaysNotInvented": true,
+      "passed": true
+    },
+    {
+      "name": "existing_analysis_dialog_and_focus",
+      "actor": "viewer",
+      "width": 1440,
+      "iteration": 1,
+      "noGenerationRequested": true,
+      "passed": true
+    },
+    {
+      "name": "saved_analysis_link_and_preserved_citation",
+      "actor": "viewer",
+      "width": 1440,
+      "iteration": 1,
+      "savedArtifactAvailable": true,
+      "passed": true
+    },
+    {
+      "name": "overview_to_intelligence_health",
+      "actor": "stale",
+      "width": 1440,
+      "iteration": 1,
+      "automaticTransition": true,
+      "pendingCleared": true,
+      "expectedEvidenceState": "stale",
+      "passed": true
+    },
+    {
+      "name": "factor_and_evidence_keyboard",
+      "actor": "stale",
+      "width": 1440,
+      "iteration": 1,
+      "passed": true
+    },
+    {
+      "name": "history_all_ranges_and_version_boundary",
+      "actor": "stale",
+      "width": 1440,
+      "iteration": 1,
+      "ranges": 5,
+      "missingDaysNotInvented": true,
+      "passed": true
+    },
+    {
+      "name": "existing_analysis_dialog_and_focus",
+      "actor": "stale",
+      "width": 1440,
+      "iteration": 1,
+      "noGenerationRequested": true,
+      "passed": true
+    },
+    {
+      "name": "saved_analysis_link_and_preserved_citation",
+      "actor": "stale",
+      "width": 1440,
+      "iteration": 1,
+      "savedArtifactAvailable": true,
+      "passed": true
+    },
+    {
+      "name": "overview_to_intelligence_health",
+      "actor": "empty",
+      "width": 1440,
+      "iteration": 1,
+      "automaticTransition": true,
+      "pendingCleared": true,
+      "expectedEvidenceState": "empty",
+      "passed": true
+    },
+    {
+      "name": "factor_and_evidence_keyboard",
+      "actor": "empty",
+      "width": 1440,
+      "iteration": 1,
+      "passed": true
+    },
+    {
+      "name": "history_all_ranges_and_version_boundary",
+      "actor": "empty",
+      "width": 1440,
+      "iteration": 1,
+      "ranges": 5,
+      "missingDaysNotInvented": true,
+      "passed": true
+    },
+    {
+      "name": "existing_analysis_dialog_and_focus",
+      "actor": "empty",
+      "width": 1440,
+      "iteration": 1,
+      "noGenerationRequested": true,
+      "passed": true
+    },
+    {
+      "name": "saved_analysis_link_and_preserved_citation",
+      "actor": "empty",
+      "width": 1440,
+      "iteration": 1,
+      "savedArtifactAvailable": false,
+      "passed": true
+    },
+    {
+      "name": "foreign_saved_analysis_and_rls_denied",
+      "width": 1440,
+      "tables": [
+        "business_health_snapshots",
+        "ai_agent_runs",
+        "reports"
+      ],
+      "passed": true
+    },
+    {
+      "name": "foreign_workspace_cookie_does_not_grant_membership",
+      "width": 1440,
+      "passed": true
+    },
+    {
+      "name": "unentitled_health_access_blocked",
+      "width": 1440,
+      "passed": true
+    },
+    {
+      "name": "scoped_health_failure_and_automatic_retry",
+      "width": 1440,
+      "actualInjectedFailures": 1,
+      "faultId": "77eba3bb-9c65-4833-8d7d-c45e3c5ebf21",
+      "affectedRequest": "authenticated scoped GET /rest/v1/assets",
+      "independentFindingsPreserved": true,
+      "keyboardRetry": true,
+      "automaticRecovery": true,
+      "pendingCleared": true,
+      "manualNavigationAfterRetry": false,
+      "passed": true
+    },
+    {
+      "name": "overview_to_intelligence_health",
+      "actor": "current",
+      "width": 390,
+      "iteration": 0,
+      "automaticTransition": true,
+      "pendingCleared": true,
+      "expectedEvidenceState": "current",
+      "passed": true
+    },
+    {
+      "name": "factor_and_evidence_keyboard",
+      "actor": "current",
+      "width": 390,
+      "iteration": 0,
+      "passed": true
+    },
+    {
+      "name": "history_all_ranges_and_version_boundary",
+      "actor": "current",
+      "width": 390,
+      "iteration": 0,
+      "ranges": 5,
+      "missingDaysNotInvented": true,
+      "passed": true
+    },
+    {
+      "name": "existing_analysis_dialog_and_focus",
+      "actor": "current",
+      "width": 390,
+      "iteration": 0,
+      "noGenerationRequested": true,
+      "passed": true
+    },
+    {
+      "name": "saved_analysis_link_and_preserved_citation",
+      "actor": "current",
+      "width": 390,
+      "iteration": 0,
+      "savedArtifactAvailable": true,
+      "passed": true
+    },
+    {
+      "name": "overview_to_intelligence_health",
+      "actor": "viewer",
+      "width": 390,
+      "iteration": 0,
+      "automaticTransition": true,
+      "pendingCleared": true,
+      "expectedEvidenceState": "current",
+      "passed": true
+    },
+    {
+      "name": "factor_and_evidence_keyboard",
+      "actor": "viewer",
+      "width": 390,
+      "iteration": 0,
+      "passed": true
+    },
+    {
+      "name": "history_all_ranges_and_version_boundary",
+      "actor": "viewer",
+      "width": 390,
+      "iteration": 0,
+      "ranges": 5,
+      "missingDaysNotInvented": true,
+      "passed": true
+    },
+    {
+      "name": "existing_analysis_dialog_and_focus",
+      "actor": "viewer",
+      "width": 390,
+      "iteration": 0,
+      "noGenerationRequested": true,
+      "passed": true
+    },
+    {
+      "name": "saved_analysis_link_and_preserved_citation",
+      "actor": "viewer",
+      "width": 390,
+      "iteration": 0,
+      "savedArtifactAvailable": true,
+      "passed": true
+    },
+    {
+      "name": "overview_to_intelligence_health",
+      "actor": "stale",
+      "width": 390,
+      "iteration": 0,
+      "automaticTransition": true,
+      "pendingCleared": true,
+      "expectedEvidenceState": "stale",
+      "passed": true
+    },
+    {
+      "name": "factor_and_evidence_keyboard",
+      "actor": "stale",
+      "width": 390,
+      "iteration": 0,
+      "passed": true
+    },
+    {
+      "name": "history_all_ranges_and_version_boundary",
+      "actor": "stale",
+      "width": 390,
+      "iteration": 0,
+      "ranges": 5,
+      "missingDaysNotInvented": true,
+      "passed": true
+    },
+    {
+      "name": "existing_analysis_dialog_and_focus",
+      "actor": "stale",
+      "width": 390,
+      "iteration": 0,
+      "noGenerationRequested": true,
+      "passed": true
+    },
+    {
+      "name": "saved_analysis_link_and_preserved_citation",
+      "actor": "stale",
+      "width": 390,
+      "iteration": 0,
+      "savedArtifactAvailable": true,
+      "passed": true
+    },
+    {
+      "name": "overview_to_intelligence_health",
+      "actor": "empty",
+      "width": 390,
+      "iteration": 0,
+      "automaticTransition": true,
+      "pendingCleared": true,
+      "expectedEvidenceState": "empty",
+      "passed": true
+    },
+    {
+      "name": "factor_and_evidence_keyboard",
+      "actor": "empty",
+      "width": 390,
+      "iteration": 0,
+      "passed": true
+    },
+    {
+      "name": "history_all_ranges_and_version_boundary",
+      "actor": "empty",
+      "width": 390,
+      "iteration": 0,
+      "ranges": 5,
+      "missingDaysNotInvented": true,
+      "passed": true
+    },
+    {
+      "name": "existing_analysis_dialog_and_focus",
+      "actor": "empty",
+      "width": 390,
+      "iteration": 0,
+      "noGenerationRequested": true,
+      "passed": true
+    },
+    {
+      "name": "saved_analysis_link_and_preserved_citation",
+      "actor": "empty",
+      "width": 390,
+      "iteration": 0,
+      "savedArtifactAvailable": false,
+      "passed": true
+    },
+    {
+      "name": "overview_to_intelligence_health",
+      "actor": "current",
+      "width": 390,
+      "iteration": 1,
+      "automaticTransition": true,
+      "pendingCleared": true,
+      "expectedEvidenceState": "current",
+      "passed": true
+    },
+    {
+      "name": "factor_and_evidence_keyboard",
+      "actor": "current",
+      "width": 390,
+      "iteration": 1,
+      "passed": true
+    },
+    {
+      "name": "history_all_ranges_and_version_boundary",
+      "actor": "current",
+      "width": 390,
+      "iteration": 1,
+      "ranges": 5,
+      "missingDaysNotInvented": true,
+      "passed": true
+    },
+    {
+      "name": "existing_analysis_dialog_and_focus",
+      "actor": "current",
+      "width": 390,
+      "iteration": 1,
+      "noGenerationRequested": true,
+      "passed": true
+    },
+    {
+      "name": "saved_analysis_link_and_preserved_citation",
+      "actor": "current",
+      "width": 390,
+      "iteration": 1,
+      "savedArtifactAvailable": true,
+      "passed": true
+    },
+    {
+      "name": "overview_to_intelligence_health",
+      "actor": "viewer",
+      "width": 390,
+      "iteration": 1,
+      "automaticTransition": true,
+      "pendingCleared": true,
+      "expectedEvidenceState": "current",
+      "passed": true
+    },
+    {
+      "name": "factor_and_evidence_keyboard",
+      "actor": "viewer",
+      "width": 390,
+      "iteration": 1,
+      "passed": true
+    },
+    {
+      "name": "history_all_ranges_and_version_boundary",
+      "actor": "viewer",
+      "width": 390,
+      "iteration": 1,
+      "ranges": 5,
+      "missingDaysNotInvented": true,
+      "passed": true
+    },
+    {
+      "name": "existing_analysis_dialog_and_focus",
+      "actor": "viewer",
+      "width": 390,
+      "iteration": 1,
+      "noGenerationRequested": true,
+      "passed": true
+    },
+    {
+      "name": "saved_analysis_link_and_preserved_citation",
+      "actor": "viewer",
+      "width": 390,
+      "iteration": 1,
+      "savedArtifactAvailable": true,
+      "passed": true
+    },
+    {
+      "name": "overview_to_intelligence_health",
+      "actor": "stale",
+      "width": 390,
+      "iteration": 1,
+      "automaticTransition": true,
+      "pendingCleared": true,
+      "expectedEvidenceState": "stale",
+      "passed": true
+    },
+    {
+      "name": "factor_and_evidence_keyboard",
+      "actor": "stale",
+      "width": 390,
+      "iteration": 1,
+      "passed": true
+    },
+    {
+      "name": "history_all_ranges_and_version_boundary",
+      "actor": "stale",
+      "width": 390,
+      "iteration": 1,
+      "ranges": 5,
+      "missingDaysNotInvented": true,
+      "passed": true
+    },
+    {
+      "name": "existing_analysis_dialog_and_focus",
+      "actor": "stale",
+      "width": 390,
+      "iteration": 1,
+      "noGenerationRequested": true,
+      "passed": true
+    },
+    {
+      "name": "saved_analysis_link_and_preserved_citation",
+      "actor": "stale",
+      "width": 390,
+      "iteration": 1,
+      "savedArtifactAvailable": true,
+      "passed": true
+    },
+    {
+      "name": "overview_to_intelligence_health",
+      "actor": "empty",
+      "width": 390,
+      "iteration": 1,
+      "automaticTransition": true,
+      "pendingCleared": true,
+      "expectedEvidenceState": "empty",
+      "passed": true
+    },
+    {
+      "name": "factor_and_evidence_keyboard",
+      "actor": "empty",
+      "width": 390,
+      "iteration": 1,
+      "passed": true
+    },
+    {
+      "name": "history_all_ranges_and_version_boundary",
+      "actor": "empty",
+      "width": 390,
+      "iteration": 1,
+      "ranges": 5,
+      "missingDaysNotInvented": true,
+      "passed": true
+    },
+    {
+      "name": "existing_analysis_dialog_and_focus",
+      "actor": "empty",
+      "width": 390,
+      "iteration": 1,
+      "noGenerationRequested": true,
+      "passed": true
+    },
+    {
+      "name": "saved_analysis_link_and_preserved_citation",
+      "actor": "empty",
+      "width": 390,
+      "iteration": 1,
+      "savedArtifactAvailable": false,
+      "passed": true
+    },
+    {
+      "name": "foreign_saved_analysis_and_rls_denied",
+      "width": 390,
+      "tables": [
+        "business_health_snapshots",
+        "ai_agent_runs",
+        "reports"
+      ],
+      "passed": true
+    },
+    {
+      "name": "foreign_workspace_cookie_does_not_grant_membership",
+      "width": 390,
+      "passed": true
+    },
+    {
+      "name": "unentitled_health_access_blocked",
+      "width": 390,
+      "passed": true
+    },
+    {
+      "name": "scoped_health_failure_and_automatic_retry",
+      "width": 390,
+      "actualInjectedFailures": 1,
+      "faultId": "f17f7aec-b5f7-4210-8832-558f301a852b",
+      "affectedRequest": "authenticated scoped GET /rest/v1/assets",
+      "independentFindingsPreserved": true,
+      "keyboardRetry": true,
+      "automaticRecovery": true,
+      "pendingCleared": true,
+      "manualNavigationAfterRetry": false,
+      "passed": true
+    }
+  ],
+  "errors": [],
+  "foreignRequests": [],
+  "failedResponses": [],
+  "providerRequests": [],
+  "passed": true,
+  "capacityClaim": false,
+  "testOnlyFaultRuntime": {
+    "kind": "isolated_health_fault_preload_v1",
+    "applicationOnly": true,
+    "sourceCommit": "639c4670895c835a62de51f0999e5e48cd3d6434",
+    "preloadSha256": "733a1266da27be23b63f74403d2b138842994f70e9a962ea891d498206522fa3",
+    "wrapperSha256": "630ccb245e363d13d994fa9a1ea3181ec09519346e789222cca44c9bc1e257f0",
+    "reusedVerifiedBuild": true,
+    "scope": "One authenticated GET /rest/v1/assets for current synthetic workspace, once per explicit fault id; no application source or authority changes."
+  },
+  "fixtureHarnessSha256": "943231c1862c60e668308930b8176c426add4c1ba306523ddeeb317d3877a76d",
+  "browserTimezone": "America/Los_Angeles",
+  "viewportHeights": {
+    "desktop": 1000,
+    "mobile": 900
+  },
+  "osNetworkDenial": "EPERM",
+  "databaseIdentity": {
+    "migrationCount": 136,
+    "migrationVersionsSha256": "cbbc1c11c27de71f59a2d12d223fd93708d023cc3e3d68160ae27a6251559817",
+    "schemaFingerprint": "41a316952fddf5da306655c42b58c4667fc70c0678b27ff7b93b43973adeaac8",
+    "exactRepositoryVersions": true,
+    "retainedCapacitySchemaMatched": true,
+    "productionPrefixDifferent": true
+  },
+  "before": {
+    "workspaces": {
+      "count": "5",
+      "hash0": "12819647129911187704",
+      "hash1": "-12085619936534618769"
+    },
+    "business_health_snapshots": {
+      "count": "24",
+      "hash0": "21697811088379342166",
+      "hash1": "10138892255146403713"
+    },
+    "ai_agent_runs": {
+      "count": "3",
+      "hash0": "2018680328208877457",
+      "hash1": "-9629518970241645215"
+    },
+    "reports": {
+      "count": "3",
+      "hash0": "-874566520635137400",
+      "hash1": "11081716407959868185"
+    },
+    "kpis": {
+      "count": "18",
+      "hash0": "-819962579190743429",
+      "hash1": "-27489105526020839023"
+    },
+    "kpi_settings": {
+      "count": "3",
+      "hash0": "-14121885417961715771",
+      "hash1": "2448913664084166698"
+    },
+    "file_uploads": {
+      "count": "3",
+      "hash0": "3149740293802510451",
+      "hash1": "12859224719848899113"
+    },
+    "sops": {
+      "count": "3",
+      "hash0": "1856325571650384483",
+      "hash1": "1453822989039401400"
+    }
+  },
+  "after": {
+    "workspaces": {
+      "count": "5",
+      "hash0": "12819647129911187704",
+      "hash1": "-12085619936534618769"
+    },
+    "business_health_snapshots": {
+      "count": "24",
+      "hash0": "21697811088379342166",
+      "hash1": "10138892255146403713"
+    },
+    "ai_agent_runs": {
+      "count": "3",
+      "hash0": "2018680328208877457",
+      "hash1": "-9629518970241645215"
+    },
+    "reports": {
+      "count": "3",
+      "hash0": "-874566520635137400",
+      "hash1": "11081716407959868185"
+    },
+    "kpis": {
+      "count": "18",
+      "hash0": "-819962579190743429",
+      "hash1": "-27489105526020839023"
+    },
+    "kpi_settings": {
+      "count": "3",
+      "hash0": "-14121885417961715771",
+      "hash1": "2448913664084166698"
+    },
+    "file_uploads": {
+      "count": "3",
+      "hash0": "3149740293802510451",
+      "hash1": "12859224719848899113"
+    },
+    "sops": {
+      "count": "3",
+      "hash0": "1856325571650384483",
+      "hash1": "1453822989039401400"
+    }
+  },
+  "finishedAt": "2026-10-06T01:20:36.595Z"
+}

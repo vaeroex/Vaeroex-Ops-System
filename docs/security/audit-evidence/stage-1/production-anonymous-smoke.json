@@ -1,0 +1,54 @@
+{
+  "observedAt": "2026-10-04T09:59:42.436990+00:00",
+  "scope": "3 anonymous read-only GETs, no cookies or credentials, no production mutations",
+  "requests": [
+    {
+      "path": "/app",
+      "status": 200,
+      "finalUrl": "https://www.vaeroex.com/login",
+      "headers": {
+        "Content-Type": "text/html; charset=utf-8",
+        "Cache-Control": "private, no-cache, no-store, max-age=0, must-revalidate",
+        "content-security-policy": "base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self' https://checkout.stripe.com https://*.stripe.com; upgrade-insecure-requests",
+        "content-security-policy-report-only": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self' https://checkout.stripe.com https://*.stripe.com; script-src 'self' 'unsafe-inline' https://js.stripe.com https://checkout.stripe.com https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https://mdiianhfrojmxqpwrflh.supabase.co https://*.supabase.co wss://*.supabase.co https://api.stripe.com https://checkout.stripe.com https://vitals.vercel-insights.com; worker-src 'self' blob:; frame-src 'self' https://js.stripe.com https://checkout.stripe.com https://challenges.cloudflare.com; upgrade-insecure-requests",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "strict-transport-security": "max-age=63072000; includeSubDomains; preload",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY"
+      },
+      "bodyRecorded": false
+    },
+    {
+      "path": "/api/subscription/status",
+      "status": 401,
+      "finalUrl": "https://www.vaeroex.com/api/subscription/status",
+      "headers": {
+        "Content-Type": "application/json",
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "content-security-policy": "base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self' https://checkout.stripe.com https://*.stripe.com; upgrade-insecure-requests",
+        "content-security-policy-report-only": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self' https://checkout.stripe.com https://*.stripe.com; script-src 'self' 'unsafe-inline' https://js.stripe.com https://checkout.stripe.com https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https://mdiianhfrojmxqpwrflh.supabase.co https://*.supabase.co wss://*.supabase.co https://api.stripe.com https://checkout.stripe.com https://vitals.vercel-insights.com; worker-src 'self' blob:; frame-src 'self' https://js.stripe.com https://checkout.stripe.com https://challenges.cloudflare.com; upgrade-insecure-requests",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "strict-transport-security": "max-age=63072000; includeSubDomains; preload",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY"
+      },
+      "bodyRecorded": false
+    },
+    {
+      "path": "/api/integrations/dashboard",
+      "status": 400,
+      "finalUrl": "https://www.vaeroex.com/api/integrations/dashboard",
+      "headers": {
+        "Content-Type": "application/json",
+        "Cache-Control": "private, no-store, max-age=0",
+        "content-security-policy": "base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self' https://checkout.stripe.com https://*.stripe.com; upgrade-insecure-requests",
+        "content-security-policy-report-only": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self' https://checkout.stripe.com https://*.stripe.com; script-src 'self' 'unsafe-inline' https://js.stripe.com https://checkout.stripe.com https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https://mdiianhfrojmxqpwrflh.supabase.co https://*.supabase.co wss://*.supabase.co https://api.stripe.com https://checkout.stripe.com https://vitals.vercel-insights.com; worker-src 'self' blob:; frame-src 'self' https://js.stripe.com https://checkout.stripe.com https://challenges.cloudflare.com; upgrade-insecure-requests",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "strict-transport-security": "max-age=63072000; includeSubDomains; preload",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY"
+      },
+      "bodyRecorded": false
+    }
+  ]
+}

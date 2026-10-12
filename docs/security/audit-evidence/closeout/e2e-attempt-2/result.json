@@ -1,0 +1,289 @@
+{
+  "runId": "936c8871-1be8-405e-a6f6-3ca528318302",
+  "executionId": "461b8bf1-90fe-4a4d-bc14-828230c5bb50",
+  "sourceCommit": "9359bb30b2e48f775dcecb666f3a61b571c8adf2",
+  "results": [
+    {
+      "name": "real_auth_and_synthetic_seed",
+      "passed": true,
+      "registeredUsers": 7,
+      "workspaces": 3,
+      "db": {
+        "db": "postgres",
+        "version": "17.11",
+        "max_connections": "100",
+        "data_directory": "/private/tmp/vaeroex-closeout-supabase-home/stacks/deece66ca22c4ddf936bb8a83cdc24088b783ac58737f44ecb2dedf7208ed770/data/89afef45-e528-4559-8150-81844966c6d9/data"
+      },
+      "legalAcceptance": "seeded synthetic latest-policy acceptance"
+    },
+    {
+      "name": "real_postgrest_form_replay_and_payload_conflict",
+      "passed": true,
+      "width": 1440
+    },
+    {
+      "name": "browser_form_persists_after_reload",
+      "passed": true,
+      "width": 1440
+    },
+    {
+      "name": "authenticated_browser",
+      "passed": false,
+      "error": "The expression evaluated to a falsy value:\n\n  assert((await page.getByRole('navigation',{name:'Asset check history pages'}).innerText()).includes('Page 2'))\n"
+    }
+  ],
+  "requests": [
+    {
+      "path": "/app/forms/4e9dfa03-c14d-49c6-b8c3-dcffb44d1423",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/intelligence",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/kpis",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/sources",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/reports",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/integrations",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/settings",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/help",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/help/trust",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/terms",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/privacy",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/support",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/forms",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/forms/4e9dfa03-c14d-49c6-b8c3-dcffb44d1423",
+      "method": "POST",
+      "status": 303
+    },
+    {
+      "path": "/app/forms/4e9dfa03-c14d-49c6-b8c3-dcffb44d1423",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/forms/4e9dfa03-c14d-49c6-b8c3-dcffb44d1423",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/intelligence",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/kpis",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/sources",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/reports",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/integrations",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/settings",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/help",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/help/trust",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/terms",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/privacy",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/support",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/forms",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/assets/checks",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/intelligence",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/kpis",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/sources",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/reports",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/integrations",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/settings",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/help",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/help/trust",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/terms",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/privacy",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/support",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/assets",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/assets/checks",
+      "method": "GET",
+      "status": 200
+    }
+  ],
+  "browserErrors": [],
+  "limitations": [
+    "Supabase native service versions differ from deployed PostgreSQL17.6",
+    "Synthetic legal acceptance seeded",
+    "No paid provider or customer connections",
+    "No full-system capacity target or worker soak performed"
+  ]
+}

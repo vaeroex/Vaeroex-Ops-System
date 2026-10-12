@@ -1,0 +1,310 @@
+{
+  "runId": "99799ab6-c939-4b3e-aacc-2a30ffaeb14f",
+  "sourceCommit": "396ec2f7752eb30fea99f30a73068d53ff29cc0a",
+  "buildId": "Auls728kWl18cXUO1oXpO",
+  "harnessSha256": "6a2cae6f62cf1552edbf5b5af803f7ae835508fe239ada52c38584ced3bf5deb",
+  "kind": "worker_interruption",
+  "localOnly": true,
+  "faultId": "0f87e76a-dad3-472b-be19-8b5833a4885c",
+  "mode": "single_qualification",
+  "plannedStartSecond": 0,
+  "plannedEndSecond": 10,
+  "controlStartedAt": "2026-10-05T20:48:30.023Z",
+  "controlEndedAt": "2026-10-05T20:48:40.034Z",
+  "acceptedDuringFault": [
+    {
+      "id": "385682f4-f5b6-4fc9-981c-9b7bcebae8dd",
+      "status": "running",
+      "started_at": "2026-10-05T20:48:30.129Z",
+      "completed_at": null,
+      "error_code": null,
+      "row_count": 0,
+      "fact_count": 0
+    }
+  ],
+  "canonicalBaseline": {
+    "workspaceId": "94e1e8b3-a38c-4780-9870-702dd157ebb1",
+    "total": 100,
+    "active": 100
+  },
+  "canonicalBaselines": [
+    {
+      "workspaceId": "c347b4e6-d38f-457b-8667-a117e3c2423b",
+      "total": 100,
+      "active": 100
+    },
+    {
+      "workspaceId": "94e1e8b3-a38c-4780-9870-702dd157ebb1",
+      "total": 100,
+      "active": 100
+    }
+  ],
+  "factsBeforeSha256": "4c92d668099e84f1598e682e1ec6e65253106808591150cf49dd30d67798a0d7",
+  "integrity": {
+    "duplicateCanonicalFacts": 0,
+    "acceptedWorkTerminal": true,
+    "acceptedClaimsHaveDurableRuns": true,
+    "interruptedRunsTruthfullyFailed": true
+  },
+  "workerRestart": {
+    "profile": "immediate_supervisor_recovery_v1",
+    "oldPid": 17811,
+    "newPid": 21009,
+    "configuredKillPauseMs": 0,
+    "manifestSpawnDelayMs": 2,
+    "actualUnavailableMs": 1031,
+    "maximumUnavailableMs": 3000,
+    "measuredTo": "worker_restarted event after actual /login readiness",
+    "withinThreshold": true
+  },
+  "observations": [
+    {
+      "startedAt": "2026-10-05T20:48:30.727Z",
+      "endedAt": "2026-10-05T20:48:31.758Z",
+      "actualInjection": true,
+      "workspaceId": "94e1e8b3-a38c-4780-9870-702dd157ebb1",
+      "observedInjectionEvents": [
+        {
+          "file": "/tmp/vaeroex-capacity-small-02/transport-events.jsonl",
+          "line": 243,
+          "eventSha256": "8a00439cc9ed2d15535b364956dbbcf57d4f53ebe606e319adeaf1fdab203cf6",
+          "at": "2026-10-05T20:48:30.727Z",
+          "pid": 17811,
+          "workspaceId": null
+        }
+      ]
+    }
+  ],
+  "recovery": {
+    "healthy": true,
+    "faultKind": "worker_interruption",
+    "endedAt": "2026-10-05T20:48:31.758Z",
+    "checkedAt": "2026-10-05T20:53:16.178Z",
+    "recoveryMs": 284420,
+    "queueDepth": 0,
+    "inFlight": 0,
+    "providerInFlight": 0,
+    "connected": true,
+    "postFaultSuccessfulSync": true,
+    "terminalAcceptedWork": true,
+    "acceptedRunIdsConfirmed": [
+      "385682f4-f5b6-4fc9-981c-9b7bcebae8dd",
+      "2f64f971-4f91-4e4d-a470-6c16e9084fba"
+    ],
+    "truthfullyFailedAcceptedWork": false,
+    "acceptedWork": [
+      {
+        "id": "385682f4-f5b6-4fc9-981c-9b7bcebae8dd",
+        "status": "failed",
+        "started_at": "2026-10-05T20:48:30.129Z",
+        "completed_at": "2026-10-05T20:53:15.076Z",
+        "error_code": "lease_expired",
+        "row_count": 0,
+        "fact_count": 0
+      },
+      {
+        "id": "2f64f971-4f91-4e4d-a470-6c16e9084fba",
+        "status": "succeeded",
+        "started_at": "2026-10-05T20:53:15.776Z",
+        "completed_at": "2026-10-05T20:53:16.058Z",
+        "error_code": null,
+        "row_count": 100,
+        "fact_count": 100
+      }
+    ],
+    "postFaultSuccessfulRunIds": [
+      "2f64f971-4f91-4e4d-a470-6c16e9084fba"
+    ]
+  },
+  "requests": [
+    {
+      "label": "fault_trigger_worker_interruption",
+      "startedAt": "2026-10-05T20:48:30.034Z",
+      "endedAt": "2026-10-05T20:48:30.728Z",
+      "method": "POST",
+      "path": "/api/integrations/google-sheets/sync",
+      "status": 503,
+      "durationMs": 694
+    },
+    {
+      "label": "independent_recovery_poll",
+      "startedAt": "2026-10-05T20:48:44.519Z",
+      "endedAt": "2026-10-05T20:48:44.575Z",
+      "method": "GET",
+      "path": "/api/integrations/google-sheets/recover-syncs",
+      "status": 200,
+      "durationMs": 56
+    },
+    {
+      "label": "independent_recovery_poll",
+      "startedAt": "2026-10-05T20:48:59.549Z",
+      "endedAt": "2026-10-05T20:48:59.599Z",
+      "method": "GET",
+      "path": "/api/integrations/google-sheets/recover-syncs",
+      "status": 200,
+      "durationMs": 50
+    },
+    {
+      "label": "independent_recovery_poll",
+      "startedAt": "2026-10-05T20:49:14.578Z",
+      "endedAt": "2026-10-05T20:49:14.640Z",
+      "method": "GET",
+      "path": "/api/integrations/google-sheets/recover-syncs",
+      "status": 200,
+      "durationMs": 62
+    },
+    {
+      "label": "independent_recovery_poll",
+      "startedAt": "2026-10-05T20:49:29.607Z",
+      "endedAt": "2026-10-05T20:49:29.661Z",
+      "method": "GET",
+      "path": "/api/integrations/google-sheets/recover-syncs",
+      "status": 200,
+      "durationMs": 54
+    },
+    {
+      "label": "independent_recovery_poll",
+      "startedAt": "2026-10-05T20:49:44.633Z",
+      "endedAt": "2026-10-05T20:49:44.825Z",
+      "method": "GET",
+      "path": "/api/integrations/google-sheets/recover-syncs",
+      "status": 200,
+      "durationMs": 192
+    },
+    {
+      "label": "independent_recovery_poll",
+      "startedAt": "2026-10-05T20:49:59.657Z",
+      "endedAt": "2026-10-05T20:49:59.706Z",
+      "method": "GET",
+      "path": "/api/integrations/google-sheets/recover-syncs",
+      "status": 200,
+      "durationMs": 49
+    },
+    {
+      "label": "independent_recovery_poll",
+      "startedAt": "2026-10-05T20:50:14.686Z",
+      "endedAt": "2026-10-05T20:50:14.744Z",
+      "method": "GET",
+      "path": "/api/integrations/google-sheets/recover-syncs",
+      "status": 200,
+      "durationMs": 58
+    },
+    {
+      "label": "independent_recovery_poll",
+      "startedAt": "2026-10-05T20:50:29.714Z",
+      "endedAt": "2026-10-05T20:50:29.762Z",
+      "method": "GET",
+      "path": "/api/integrations/google-sheets/recover-syncs",
+      "status": 200,
+      "durationMs": 48
+    },
+    {
+      "label": "independent_recovery_poll",
+      "startedAt": "2026-10-05T20:50:44.747Z",
+      "endedAt": "2026-10-05T20:50:44.832Z",
+      "method": "GET",
+      "path": "/api/integrations/google-sheets/recover-syncs",
+      "status": 200,
+      "durationMs": 85
+    },
+    {
+      "label": "independent_recovery_poll",
+      "startedAt": "2026-10-05T20:50:59.778Z",
+      "endedAt": "2026-10-05T20:50:59.827Z",
+      "method": "GET",
+      "path": "/api/integrations/google-sheets/recover-syncs",
+      "status": 200,
+      "durationMs": 49
+    },
+    {
+      "label": "independent_recovery_poll",
+      "startedAt": "2026-10-05T20:51:14.804Z",
+      "endedAt": "2026-10-05T20:51:14.876Z",
+      "method": "GET",
+      "path": "/api/integrations/google-sheets/recover-syncs",
+      "status": 200,
+      "durationMs": 72
+    },
+    {
+      "label": "independent_recovery_poll",
+      "startedAt": "2026-10-05T20:51:29.829Z",
+      "endedAt": "2026-10-05T20:51:29.867Z",
+      "method": "GET",
+      "path": "/api/integrations/google-sheets/recover-syncs",
+      "status": 200,
+      "durationMs": 38
+    },
+    {
+      "label": "independent_recovery_poll",
+      "startedAt": "2026-10-05T20:51:44.864Z",
+      "endedAt": "2026-10-05T20:51:44.903Z",
+      "method": "GET",
+      "path": "/api/integrations/google-sheets/recover-syncs",
+      "status": 200,
+      "durationMs": 39
+    },
+    {
+      "label": "independent_recovery_poll",
+      "startedAt": "2026-10-05T20:51:59.890Z",
+      "endedAt": "2026-10-05T20:51:59.938Z",
+      "method": "GET",
+      "path": "/api/integrations/google-sheets/recover-syncs",
+      "status": 200,
+      "durationMs": 48
+    },
+    {
+      "label": "independent_recovery_poll",
+      "startedAt": "2026-10-05T20:52:14.919Z",
+      "endedAt": "2026-10-05T20:52:14.975Z",
+      "method": "GET",
+      "path": "/api/integrations/google-sheets/recover-syncs",
+      "status": 200,
+      "durationMs": 56
+    },
+    {
+      "label": "independent_recovery_poll",
+      "startedAt": "2026-10-05T20:52:29.949Z",
+      "endedAt": "2026-10-05T20:52:29.996Z",
+      "method": "GET",
+      "path": "/api/integrations/google-sheets/recover-syncs",
+      "status": 200,
+      "durationMs": 47
+    },
+    {
+      "label": "independent_recovery_poll",
+      "startedAt": "2026-10-05T20:52:44.978Z",
+      "endedAt": "2026-10-05T20:52:45.023Z",
+      "method": "GET",
+      "path": "/api/integrations/google-sheets/recover-syncs",
+      "status": 200,
+      "durationMs": 45
+    },
+    {
+      "label": "independent_recovery_poll",
+      "startedAt": "2026-10-05T20:53:00.004Z",
+      "endedAt": "2026-10-05T20:53:00.047Z",
+      "method": "GET",
+      "path": "/api/integrations/google-sheets/recover-syncs",
+      "status": 200,
+      "durationMs": 43
+    },
+    {
+      "label": "independent_recovery_poll",
+      "startedAt": "2026-10-05T20:53:15.033Z",
+      "endedAt": "2026-10-05T20:53:15.083Z",
+      "method": "GET",
+      "path": "/api/integrations/google-sheets/recover-syncs",
+      "status": 200,
+      "durationMs": 50
+    },
+    {
+      "label": "post_fault_recovery_probe_worker_interruption",
+      "startedAt": "2026-10-05T20:53:15.247Z",
+      "endedAt": "2026-10-05T20:53:16.174Z",
+      "method": "POST",
+      "path": "/api/integrations/google-sheets/sync",
+      "status": 303,
+      "durationMs": 927
+    }
+  ]
+}

@@ -1,0 +1,452 @@
+{
+  "kind": "isolated_upload_boundary_verification",
+  "executionId": "f0e73dfd-b746-4504-8ca5-d1ca5a46ed79",
+  "runId": "99799ab6-c939-4b3e-aacc-2a30ffaeb14f",
+  "sourceCommit": "0a15ddcd3b564086280fec21b79b6976b3a3cc44",
+  "buildId": "ReUcdHr1ALEejCvoUeFTc",
+  "schemaFingerprint": "70296597bd7052059ad724071493758968ec4f032b5607753cbf65e6c96af0eb",
+  "nextConfigOverride": {
+    "skipMiddlewareUrlNormalize": true,
+    "originalConfigSha256": "ab9707ea1b885652c1281f96d314492fa1fc81321c5257f539901dfea8b1a663",
+    "originalLoaderSha256": "b570ac53c237e06a066c86781a8666026aa088bc82a27d8ac60f5be480e405fe"
+  },
+  "osExternalNetworkDenied": "EPERM",
+  "results": [
+    {
+      "label": "http-1000",
+      "transport": "captured_authenticated_server_action",
+      "expectedRows": 1000,
+      "bytes": 40960,
+      "status": 303,
+      "ackMs": 1673.7111670000002,
+      "preparationAccepted": true,
+      "workloadMutationAckThresholdMs": 2000,
+      "individuallyWithinAckThreshold": true,
+      "persisted": {
+        "fileId": "d9024c11-d088-416b-9333-23076105f5db",
+        "fileSizeBytes": 40960,
+        "originalSha256": "b1ddc902d63833506d0d56b8aa64371725353dd9058e21770ac20a826f165273",
+        "storedSha256": "b1ddc902d63833506d0d56b8aa64371725353dd9058e21770ac20a826f165273",
+        "originalRetained": true,
+        "ownerDownloadVerified": true,
+        "importStatus": "extracted",
+        "processingStatus": "ready",
+        "processingError": null,
+        "stagedRows": 1000,
+        "importRecords": 1,
+        "kpiWrites": 0,
+        "metricWrites": 0,
+        "duplicateOrLostStagedRows": 0
+      },
+      "resourceSnapshots": {
+        "before": {
+          "observedAt": "2026-10-05T19:44:10.621Z",
+          "source": "darwin_libproc_same_uid",
+          "uid": 501,
+          "missingRoots": 0,
+          "processes": [
+            {
+              "pid": 76514,
+              "ppid": 76510,
+              "rootIndex": 0,
+              "rssBytes": 8192000,
+              "userCpuNanoseconds": 1418959791,
+              "systemCpuNanoseconds": 180327208,
+              "startSeconds": 1791229314,
+              "startMicroseconds": 17799,
+              "startTimestamp": "2026-10-05T19:41:54.017Z",
+              "startedAtUnixMs": 1791229314017.799
+            }
+          ]
+        },
+        "after": {
+          "observedAt": "2026-10-05T19:44:12.300Z",
+          "source": "darwin_libproc_same_uid",
+          "uid": 501,
+          "missingRoots": 0,
+          "processes": [
+            {
+              "pid": 76514,
+              "ppid": 76510,
+              "rootIndex": 0,
+              "rssBytes": 177569792,
+              "userCpuNanoseconds": 1765481958,
+              "systemCpuNanoseconds": 269024291,
+              "startSeconds": 1791229314,
+              "startMicroseconds": 17799,
+              "startTimestamp": "2026-10-05T19:41:54.017Z",
+              "startedAtUnixMs": 1791229314017.799
+            }
+          ]
+        }
+      }
+    },
+    {
+      "label": "http-1001",
+      "transport": "captured_authenticated_server_action",
+      "expectedRows": 1001,
+      "bytes": 40993,
+      "status": 303,
+      "ackMs": 343.12175000000025,
+      "preparationAccepted": false,
+      "workloadMutationAckThresholdMs": 2000,
+      "individuallyWithinAckThreshold": true,
+      "persisted": {
+        "fileId": "edbbd191-5c06-4e2c-a267-b22fa8d24c57",
+        "fileSizeBytes": 40993,
+        "originalSha256": "53ff07cf714562a2d1d054afa23ffdbff555b54e4c1aa9323f21727b7b2629c3",
+        "storedSha256": "53ff07cf714562a2d1d054afa23ffdbff555b54e4c1aa9323f21727b7b2629c3",
+        "originalRetained": true,
+        "ownerDownloadVerified": true,
+        "importStatus": "failed",
+        "processingStatus": "failed",
+        "processingError": "This workbook contains 1001 data rows across 1 worksheets. The current reviewed-import limit is 1000 rows, so no rows were staged and none were silently discarded. Split the workbook into smaller files and try again.",
+        "stagedRows": 0,
+        "importRecords": 0,
+        "kpiWrites": 0,
+        "metricWrites": 0,
+        "duplicateOrLostStagedRows": 0
+      },
+      "resourceSnapshots": {
+        "before": {
+          "observedAt": "2026-10-05T19:44:12.326Z",
+          "source": "darwin_libproc_same_uid",
+          "uid": 501,
+          "missingRoots": 0,
+          "processes": [
+            {
+              "pid": 76514,
+              "ppid": 76510,
+              "rootIndex": 0,
+              "rssBytes": 177553408,
+              "userCpuNanoseconds": 1765481958,
+              "systemCpuNanoseconds": 269024291,
+              "startSeconds": 1791229314,
+              "startMicroseconds": 17799,
+              "startTimestamp": "2026-10-05T19:41:54.017Z",
+              "startedAtUnixMs": 1791229314017.799
+            }
+          ]
+        },
+        "after": {
+          "observedAt": "2026-10-05T19:44:12.673Z",
+          "source": "darwin_libproc_same_uid",
+          "uid": 501,
+          "missingRoots": 0,
+          "processes": [
+            {
+              "pid": 76514,
+              "ppid": 76510,
+              "rootIndex": 0,
+              "rssBytes": 185040896,
+              "userCpuNanoseconds": 1844097666,
+              "systemCpuNanoseconds": 274855041,
+              "startSeconds": 1791229314,
+              "startMicroseconds": 17799,
+              "startTimestamp": "2026-10-05T19:41:54.017Z",
+              "startedAtUnixMs": 1791229314017.799
+            }
+          ]
+        }
+      }
+    },
+    {
+      "label": "http-10000",
+      "transport": "captured_authenticated_server_action",
+      "expectedRows": 10000,
+      "bytes": 419430,
+      "status": 303,
+      "ackMs": 381.3949170000001,
+      "preparationAccepted": false,
+      "workloadMutationAckThresholdMs": 2000,
+      "individuallyWithinAckThreshold": true,
+      "persisted": {
+        "fileId": "bf64c658-5bff-4bf8-8b57-d3d2067032ac",
+        "fileSizeBytes": 419430,
+        "originalSha256": "a1a571359530701520106bc56f093e6be5dee22fb4c38c52641c954da7d7d4a3",
+        "storedSha256": "a1a571359530701520106bc56f093e6be5dee22fb4c38c52641c954da7d7d4a3",
+        "originalRetained": true,
+        "ownerDownloadVerified": true,
+        "importStatus": "failed",
+        "processingStatus": "failed",
+        "processingError": "This workbook contains 10000 data rows across 1 worksheets. The current reviewed-import limit is 1000 rows, so no rows were staged and none were silently discarded. Split the workbook into smaller files and try again.",
+        "stagedRows": 0,
+        "importRecords": 0,
+        "kpiWrites": 0,
+        "metricWrites": 0,
+        "duplicateOrLostStagedRows": 0
+      },
+      "resourceSnapshots": {
+        "before": {
+          "observedAt": "2026-10-05T19:44:12.687Z",
+          "source": "darwin_libproc_same_uid",
+          "uid": 501,
+          "missingRoots": 0,
+          "processes": [
+            {
+              "pid": 76514,
+              "ppid": 76510,
+              "rootIndex": 0,
+              "rssBytes": 185040896,
+              "userCpuNanoseconds": 1844097666,
+              "systemCpuNanoseconds": 274855041,
+              "startSeconds": 1791229314,
+              "startMicroseconds": 17799,
+              "startTimestamp": "2026-10-05T19:41:54.017Z",
+              "startedAtUnixMs": 1791229314017.799
+            }
+          ]
+        },
+        "after": {
+          "observedAt": "2026-10-05T19:44:13.072Z",
+          "source": "darwin_libproc_same_uid",
+          "uid": 501,
+          "missingRoots": 0,
+          "processes": [
+            {
+              "pid": 76514,
+              "ppid": 76510,
+              "rootIndex": 0,
+              "rssBytes": 199376896,
+              "userCpuNanoseconds": 2025777500,
+              "systemCpuNanoseconds": 284449250,
+              "startSeconds": 1791229314,
+              "startMicroseconds": 17799,
+              "startTimestamp": "2026-10-05T19:41:54.017Z",
+              "startedAtUnixMs": 1791229314017.799
+            }
+          ]
+        }
+      }
+    },
+    {
+      "label": "http-50000",
+      "transport": "captured_authenticated_server_action",
+      "expectedRows": 50000,
+      "bytes": 2202009,
+      "status": 303,
+      "ackMs": 530.7757500000002,
+      "preparationAccepted": false,
+      "workloadMutationAckThresholdMs": 2000,
+      "individuallyWithinAckThreshold": true,
+      "persisted": {
+        "fileId": "8ab2cc3f-89b8-48ee-b7cb-8b9f88a7b6d7",
+        "fileSizeBytes": 2202009,
+        "originalSha256": "b9836f3575e9094f5f1fcd7fc7d6e6aa54edf3fb2b91c0d47e66948e013ff753",
+        "storedSha256": "b9836f3575e9094f5f1fcd7fc7d6e6aa54edf3fb2b91c0d47e66948e013ff753",
+        "originalRetained": true,
+        "ownerDownloadVerified": true,
+        "importStatus": "failed",
+        "processingStatus": "failed",
+        "processingError": "This workbook contains 50000 data rows across 1 worksheets. The current reviewed-import limit is 1000 rows, so no rows were staged and none were silently discarded. Split the workbook into smaller files and try again.",
+        "stagedRows": 0,
+        "importRecords": 0,
+        "kpiWrites": 0,
+        "metricWrites": 0,
+        "duplicateOrLostStagedRows": 0
+      },
+      "resourceSnapshots": {
+        "before": {
+          "observedAt": "2026-10-05T19:44:13.104Z",
+          "source": "darwin_libproc_same_uid",
+          "uid": 501,
+          "missingRoots": 0,
+          "processes": [
+            {
+              "pid": 76514,
+              "ppid": 76510,
+              "rootIndex": 0,
+              "rssBytes": 199376896,
+              "userCpuNanoseconds": 2025790458,
+              "systemCpuNanoseconds": 284455250,
+              "startSeconds": 1791229314,
+              "startMicroseconds": 17799,
+              "startTimestamp": "2026-10-05T19:41:54.017Z",
+              "startedAtUnixMs": 1791229314017.799
+            }
+          ]
+        },
+        "after": {
+          "observedAt": "2026-10-05T19:44:13.638Z",
+          "source": "darwin_libproc_same_uid",
+          "uid": 501,
+          "missingRoots": 0,
+          "processes": [
+            {
+              "pid": 76514,
+              "ppid": 76510,
+              "rootIndex": 0,
+              "rssBytes": 272990208,
+              "userCpuNanoseconds": 2293925375,
+              "systemCpuNanoseconds": 306116583,
+              "startSeconds": 1791229314,
+              "startMicroseconds": 17799,
+              "startTimestamp": "2026-10-05T19:41:54.017Z",
+              "startedAtUnixMs": 1791229314017.799
+            }
+          ]
+        }
+      }
+    },
+    {
+      "label": "browser-desktop-1000",
+      "transport": "authenticated_browser",
+      "width": 1440,
+      "expectedRows": 1000,
+      "bytes": 40960,
+      "status": 303,
+      "ackMs": 692.7659590000003,
+      "preparationAccepted": true,
+      "workloadMutationAckThresholdMs": 2000,
+      "individuallyWithinAckThreshold": true,
+      "browser": {
+        "automatic": true,
+        "feedbackVisible": true,
+        "pendingCleared": true,
+        "manualRecoveryNavigation": false,
+        "transitionMs": 873.9603749999997
+      },
+      "persisted": {
+        "fileId": "58014cf5-ad04-443a-ba7b-bfd056a5457a",
+        "fileSizeBytes": 40960,
+        "originalSha256": "b1ddc902d63833506d0d56b8aa64371725353dd9058e21770ac20a826f165273",
+        "storedSha256": "b1ddc902d63833506d0d56b8aa64371725353dd9058e21770ac20a826f165273",
+        "originalRetained": true,
+        "ownerDownloadVerified": true,
+        "importStatus": "extracted",
+        "processingStatus": "ready",
+        "processingError": null,
+        "stagedRows": 1000,
+        "importRecords": 1,
+        "kpiWrites": 0,
+        "metricWrites": 0,
+        "duplicateOrLostStagedRows": 0
+      },
+      "resourceSnapshots": {
+        "before": {
+          "observedAt": "2026-10-05T19:44:15.968Z",
+          "source": "darwin_libproc_same_uid",
+          "uid": 501,
+          "missingRoots": 0,
+          "processes": [
+            {
+              "pid": 76514,
+              "ppid": 76510,
+              "rootIndex": 0,
+              "rssBytes": 200704000,
+              "userCpuNanoseconds": 2553158458,
+              "systemCpuNanoseconds": 380540708,
+              "startSeconds": 1791229314,
+              "startMicroseconds": 17799,
+              "startTimestamp": "2026-10-05T19:41:54.017Z",
+              "startedAtUnixMs": 1791229314017.799
+            }
+          ]
+        },
+        "after": {
+          "observedAt": "2026-10-05T19:44:16.858Z",
+          "source": "darwin_libproc_same_uid",
+          "uid": 501,
+          "missingRoots": 0,
+          "processes": [
+            {
+              "pid": 76514,
+              "ppid": 76510,
+              "rootIndex": 0,
+              "rssBytes": 217219072,
+              "userCpuNanoseconds": 2696080416,
+              "systemCpuNanoseconds": 407174000,
+              "startSeconds": 1791229314,
+              "startMicroseconds": 17799,
+              "startTimestamp": "2026-10-05T19:41:54.017Z",
+              "startedAtUnixMs": 1791229314017.799
+            }
+          ]
+        }
+      }
+    },
+    {
+      "label": "browser-mobile-1001",
+      "transport": "authenticated_browser",
+      "width": 390,
+      "expectedRows": 1001,
+      "bytes": 40993,
+      "status": 303,
+      "ackMs": 294.42120799999975,
+      "preparationAccepted": false,
+      "workloadMutationAckThresholdMs": 2000,
+      "individuallyWithinAckThreshold": true,
+      "browser": {
+        "automatic": true,
+        "feedbackVisible": true,
+        "pendingCleared": true,
+        "manualRecoveryNavigation": false,
+        "transitionMs": 418.90941699999985
+      },
+      "persisted": {
+        "fileId": "df2243d3-5912-4d8c-803a-2fd2aef2621b",
+        "fileSizeBytes": 40993,
+        "originalSha256": "53ff07cf714562a2d1d054afa23ffdbff555b54e4c1aa9323f21727b7b2629c3",
+        "storedSha256": "53ff07cf714562a2d1d054afa23ffdbff555b54e4c1aa9323f21727b7b2629c3",
+        "originalRetained": true,
+        "ownerDownloadVerified": true,
+        "importStatus": "failed",
+        "processingStatus": "failed",
+        "processingError": "This workbook contains 1001 data rows across 1 worksheets. The current reviewed-import limit is 1000 rows, so no rows were staged and none were silently discarded. Split the workbook into smaller files and try again.",
+        "stagedRows": 0,
+        "importRecords": 0,
+        "kpiWrites": 0,
+        "metricWrites": 0,
+        "duplicateOrLostStagedRows": 0
+      },
+      "resourceSnapshots": {
+        "before": {
+          "observedAt": "2026-10-05T19:44:17.599Z",
+          "source": "darwin_libproc_same_uid",
+          "uid": 501,
+          "missingRoots": 0,
+          "processes": [
+            {
+              "pid": 76514,
+              "ppid": 76510,
+              "rootIndex": 0,
+              "rssBytes": 226639872,
+              "userCpuNanoseconds": 2822309125,
+              "systemCpuNanoseconds": 432630375,
+              "startSeconds": 1791229314,
+              "startMicroseconds": 17799,
+              "startTimestamp": "2026-10-05T19:41:54.017Z",
+              "startedAtUnixMs": 1791229314017.799
+            }
+          ]
+        },
+        "after": {
+          "observedAt": "2026-10-05T19:44:18.030Z",
+          "source": "darwin_libproc_same_uid",
+          "uid": 501,
+          "missingRoots": 0,
+          "processes": [
+            {
+              "pid": 76514,
+              "ppid": 76510,
+              "rootIndex": 0,
+              "rssBytes": 238632960,
+              "userCpuNanoseconds": 2907887208,
+              "systemCpuNanoseconds": 446451541,
+              "startSeconds": 1791229314,
+              "startMicroseconds": 17799,
+              "startTimestamp": "2026-10-05T19:41:54.017Z",
+              "startedAtUnixMs": 1791229314017.799
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "browserErrors": [],
+  "foreignRequests": [],
+  "allOriginalsAndRowsRetained": true,
+  "activeUserCapacityClaim": false,
+  "limits": "Sequential component checks with local Supabase; 30-second diagnostic bound is not a relaxed workload threshold. Over-limit uploads are preparation failures, never successful import workload samples.",
+  "passed": true
+}

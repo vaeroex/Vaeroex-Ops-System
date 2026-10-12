@@ -1,0 +1,7 @@
+# CI follow-up diagnostic reproduction
+
+The normal maintained regression entry point is `WORKSPACE_AUDIT_PG_BIN=/path/to/postgresql17/bin node scripts/workspace-security-database-tests.cjs`. It uses an owned Unix-socket-only temporary database and refuses inherited connection/credential configuration. The hosted security-database job remains the full Supabase migration/provider-suite qualification.
+
+The copied `ci-security-fixture-proof.cjs`, `provider-fixture-entitlement-proof.cjs` and `ci-manifest-assertions.cjs` are preserved diagnostic snapshots, not portable application tools. To repeat them, inspect and set their explicit local `root`, PostgreSQL binary and locked dependency paths to a disposable reviewed checkout. They must not target a hosted database. The three synthetic `vaeroex-ci-*-before.sql` inputs are preserved alongside this document; the first diagnostic expects copies at their same basenames under `/tmp`. Write new result JSON to a fresh path. The four-provider diagnostic reads its original fixture version directly from Git at `d91be079c7beb0b6f21a4c5e6b451f90ca06e035`.
+
+Do not overwrite earlier evidence. Initial and corrected outputs retain their real execution boundaries; diagnostic seed proofs do not establish full provider RPC behavior. `pre-ci-*` files preserve the superseded draft capture (including the subsequently removed private-schema grant); current source hashes and the corrected106 checks are in `review-verification.json`, `security-source-inventory.json` and `security-database-results.json`.

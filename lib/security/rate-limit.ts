@@ -74,14 +74,23 @@ export async function enforceRateLimit(options: RateLimitOptions): Promise<RateL
     options.workspaceId ? `workspace:${options.workspaceId}` : "",
     options.userId ? `user:${options.userId}` : "",
     ...((options.identifiers || []).filter(Boolean).map((item) => `extra:${item}`) as string[]),
-    `ip:${ip}`
+    // Authenticated quotas follow the principal across devices and networks.
+    // Anonymous/public actions retain their independent IP partition.
+    !options.userId && !options.workspaceId ? `ip:${ip}` : ""
   ]
     .filter(Boolean)
     .join("|");
   const identifierHash = sha256(`${options.action}:${identifier}`);
   const admin = createSupabaseAdminClient();
 
+  // VSI diagnostics deliberately exclude database messages, identifiers and values.
+  const reportVsiFailure = (operation: string, code: string) => {
+    if (options.action === "vsi.manage" || options.action === "vsi.questions") {
+      console.error("[vsi-rate-limit]", { operation, code });
+    }
+  };
   if (!admin) {
+    reportVsiFailure("createSupabaseAdminClient", "configuration_missing");
     if (options.strict) throw new Error("Vaeroex could not verify request limits. Please try again shortly.");
     return {
       allowed: true,
@@ -103,6 +112,7 @@ export async function enforceRateLimit(options: RateLimitOptions): Promise<RateL
     .maybeSingle();
 
   if (error) {
+    reportVsiFailure("consume_request_rate_limit_v1", /^(?:[A-Z0-9]{5}|PGRST[0-9]{3})$/.test(error.code || "") ? error.code : "unknown");
     if (options.strict) throw new Error("Vaeroex could not verify request limits. Please try again shortly.");
     console.warn("[rate-limit] atomic quota check failed:", error.message);
 
@@ -116,6 +126,7 @@ export async function enforceRateLimit(options: RateLimitOptions): Promise<RateL
   }
 
   if (!data) {
+    reportVsiFailure("consume_request_rate_limit_v1", "empty_result");
     if (options.strict) throw new Error("Vaeroex could not verify request limits. Please try again shortly.");
     return {
       allowed: true,

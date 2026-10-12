@@ -1,0 +1,22 @@
+/* eslint-disable @typescript-eslint/no-require-imports -- Real QBO recovery repository/dispatcher with inert transports. */
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),ts=require('typescript');
+require('./qbo-customer-test-support.cjs').installLoader();const {z}=require('zod');
+const {recoverQboRuntimeTasks}=require('../lib/integrations/persistence/qbo-production-repository.ts');
+const root=path.resolve(__dirname,'..');let checks=0;
+(async()=>{
+ const zero={recoveredCount:0,readyCount:0,deadLetterCount:0,cancelledCount:0};
+ const client={rpc:async(name,args)=>{assert.equal(name,'recover_qbo_runtime_tasks_v1');assert.equal(args.p_queue_class,'provider_bulk');assert.equal(args.p_limit,20);assert.equal(args.p_request_id,'test_recovery');return {data:zero,error:null};}};
+ assert.deepEqual(await recoverQboRuntimeTasks('provider_bulk',20,'test_recovery',client),zero);checks++;
+ for(const limit of [0,101,1.5,NaN]){await assert.rejects(recoverQboRuntimeTasks('provider_bulk',limit,'test', {rpc:()=>{throw Error('must_not_call');}}));checks++;}
+ for(const data of [{...zero,recoveredCount:1},{...zero,readyCount:21,recoveredCount:21},{...zero,extra:'authority'},{...zero,readyCount:-1},null]){await assert.rejects(recoverQboRuntimeTasks('provider_bulk',20,'test',{rpc:async()=>({data,error:null})}));checks++;}
+ await assert.rejects(recoverQboRuntimeTasks('provider_bulk',20,'test',{rpc:async()=>({data:zero,error:{code:'42501',message:'private'}})}));checks++;
+ const file=path.join(root,'services/external-integrations-qbo/src/server.ts'),source=ts.createSourceFile(file,fs.readFileSync(file,'utf8'),ts.ScriptTarget.Latest,true);const fn=source.statements.find(n=>ts.isFunctionDeclaration(n)&&n.name?.text==='handleDispatcher');assert(fn);
+ for(const fail of [false,true]){const calls=[],checkedClient={role:'dispatch'};const context={exports:{},z,URL,config:{runtimeUrl:'https://runtime.example'},readBody:async()=>({maximumTasks:20,queueClass:'provider_bulk'}),queueConfiguration:()=>({queueName:'qbo-production',queueResource:'projects/example/locations/region/queues/qbo-production'}),database:()=>({role:role=>{assert.equal(role,'integration_task_dispatch_authority');return checkedClient;},close:async()=>calls.push('close')}),readQboRuntimeConfiguration:async()=>{calls.push('configuration');return {queueName:'qbo-production',queueAudience:'https://runtime.example'};},randomUUID:()=> 'synthetic',recoverQboRuntimeTasks:async(queue,limit,id,client)=>{assert.equal(queue,'provider_bulk');assert.equal(limit,20);assert.equal(id,'qbo_recover_synthetic');assert.equal(client,checkedClient);calls.push('recover');if(fail)throw Error('synthetic_recovery_failed');return zero;},safeEvent:()=>{},discoverQboRuntimeDispatchReconciliation:async()=>{calls.push('reconciliation');return [];},discoverQboRuntimeDispatch:async()=>{calls.push('discover');return [];},json:(response,status,body)=>({status,body})};
+  vm.runInNewContext(ts.transpileModule(fn.getText(source)+'\nexports.handle=handleDispatcher;',{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText,context);
+  const work=context.exports.handle({method:'POST'},{},new URL('https://runtime.example/tasks/dispatch'));
+  if(fail){await assert.rejects(work,/synthetic_recovery_failed/);assert.deepEqual(calls,['configuration','recover','close']);}else{assert.equal((await work).status,200);assert.deepEqual(calls,['configuration','recover','reconciliation','discover','close']);}checks++;
+ }
+ const migration=fs.readFileSync(path.join(root,'supabase/migrations/20261005184031_qbo_scoped_runtime_recovery.sql'),'utf8');
+ for(const predicate of ["task.provider_key = 'quickbooks_online'","task.provider_environment = 'production'","task.delivery_attribution_state <> 'legacy_unattributed'","task.queue_class = p_queue_class","configuration.enabled","policy.sync_enabled","for update of task skip locked"]){assert(migration.includes(predicate));checks++;}
+ console.log(JSON.stringify({passed:true,checks,coverage:['validated bounded recovery response contract','actual dispatcher configuration gate and recovery-before-discovery order','recovery errors cannot dispatch unverified candidates','scope/legacy/queue/admission/locking source assertions'],limitation:'Scope predicate assertions are not substituted for native row-isolation tests'},null,2));
+})().catch(error=>{console.error(error);process.exitCode=1;});

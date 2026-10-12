@@ -1,0 +1,606 @@
+{
+  "runId": "1061111f-557e-49af-a2cd-145cc6e9949f",
+  "executionId": "882aefdd-7c8d-46f4-b61a-51a6c07b659c",
+  "sourceCommit": "9359bb30b2e48f775dcecb666f3a61b571c8adf2",
+  "results": [
+    {
+      "name": "real_auth_and_synthetic_seed",
+      "passed": true,
+      "registeredUsers": 7,
+      "workspaces": 3,
+      "db": {
+        "db": "postgres",
+        "version": "17.11",
+        "max_connections": "100",
+        "data_directory": "/private/tmp/vaeroex-closeout-assembly-final/home/stacks/2955723b0b149dc6874689e05b5918bfad2a5dbdde05d1f028faef2112c1ff22/data/eb46e0b8-720a-4463-b031-60e9bc435740/data"
+      },
+      "legalAcceptance": "seeded synthetic latest-policy acceptance"
+    },
+    {
+      "name": "real_postgrest_form_replay_and_payload_conflict",
+      "passed": true,
+      "width": 1440
+    },
+    {
+      "name": "browser_form_persists_after_reload",
+      "passed": true,
+      "width": 1440
+    },
+    {
+      "name": "browser_complete_history_filter_pagination",
+      "passed": true,
+      "width": 1440
+    },
+    {
+      "name": "real_postgrest_form_replay_and_payload_conflict",
+      "passed": true,
+      "width": 390
+    },
+    {
+      "name": "browser_form_persists_after_reload",
+      "passed": true,
+      "width": 390
+    },
+    {
+      "name": "browser_complete_history_filter_pagination",
+      "passed": true,
+      "width": 390
+    },
+    {
+      "name": "browser_operator_form_persistence",
+      "passed": true,
+      "role": "manager"
+    },
+    {
+      "name": "browser_operator_form_persistence",
+      "passed": true,
+      "role": "admin"
+    },
+    {
+      "name": "browser_memory_confirmation",
+      "passed": false,
+      "error": "The expression evaluated to a falsy value:\n\n  assert((await memory.page.locator('body').innerText()).includes('Available to Intelligence and Learned Knowledge.'))\n"
+    }
+  ],
+  "requests": [
+    {
+      "path": "/app/forms/c9b27a2d-9ab9-4375-aa30-c22340890332",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/intelligence",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/kpis",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/sources",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/reports",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/integrations",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/settings",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/help",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/help/trust",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/terms",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/privacy",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/support",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/forms",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/forms/c9b27a2d-9ab9-4375-aa30-c22340890332",
+      "method": "POST",
+      "status": 303
+    },
+    {
+      "path": "/app/forms/c9b27a2d-9ab9-4375-aa30-c22340890332",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/forms/c9b27a2d-9ab9-4375-aa30-c22340890332",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/intelligence",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/kpis",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/sources",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/reports",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/integrations",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/settings",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/help",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/help/trust",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/terms",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/privacy",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/support",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/forms",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/assets/checks",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/intelligence",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/kpis",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/sources",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/reports",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/integrations",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/settings",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/help",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/help/trust",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/terms",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/privacy",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/support",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/assets",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/assets/checks",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/assets/checks",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/intelligence",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/kpis",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/sources",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/reports",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/integrations",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/settings",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/help",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/help/trust",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/terms",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/privacy",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/support",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/assets",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/forms/c9b27a2d-9ab9-4375-aa30-c22340890332",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/forms",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/forms/c9b27a2d-9ab9-4375-aa30-c22340890332",
+      "method": "POST",
+      "status": 303
+    },
+    {
+      "path": "/app/forms/c9b27a2d-9ab9-4375-aa30-c22340890332",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/help",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/help/trust",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/terms",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/privacy",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/support",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/forms/c9b27a2d-9ab9-4375-aa30-c22340890332",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/forms",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/assets/checks",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/assets",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/assets/checks",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/assets/checks",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/assets",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/forms/c9b27a2d-9ab9-4375-aa30-c22340890332",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/forms",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/forms/c9b27a2d-9ab9-4375-aa30-c22340890332",
+      "method": "POST",
+      "status": 303
+    },
+    {
+      "path": "/app/forms/c9b27a2d-9ab9-4375-aa30-c22340890332",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/forms",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/forms/c9b27a2d-9ab9-4375-aa30-c22340890332",
+      "method": "POST",
+      "status": 303
+    },
+    {
+      "path": "/app/sources/f945d9f8-9441-40b1-83c0-d39ba40c893e",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/help",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/help/trust",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/terms",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/privacy",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/support",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/sources",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/sources/f945d9f8-9441-40b1-83c0-d39ba40c893e",
+      "method": "POST",
+      "status": 303
+    },
+    {
+      "path": "/app/sources/f945d9f8-9441-40b1-83c0-d39ba40c893e",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    }
+  ],
+  "browserErrors": [
+    "Minified React error #418; visit https://react.dev/errors/418?args[]=HTML&args[]= for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
+  ],
+  "limitations": [
+    "Supabase native service versions differ from deployed PostgreSQL17.6",
+    "Synthetic legal acceptance seeded",
+    "No paid provider or customer connections",
+    "No full-system capacity target or worker soak performed"
+  ]
+}

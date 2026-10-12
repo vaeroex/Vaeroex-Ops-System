@@ -1,0 +1,72 @@
+{
+  "recordedAt": "2026-10-05T02:49:17.961Z",
+  "baseline": "d91be079c7beb0b6f21a4c5e6b451f90ca06e035",
+  "engine": "isolated in-memory PGlite",
+  "sourceRoot": "/Users/isaacvizcarra/.codex/worktrees/workspace-audit-fixes/Vaeroex",
+  "sourceHashes": {
+    "202606170001_phase_1_schema_rls.sql": "a479826e516951c093ae080c1c0f5aa06cefc6dd1217c4b9c6bdbb59c88f74e9",
+    "20260819174100_security_high_findings_remediation.sql": "3236bc16194d53a67eb3011758427f7ec4e3f4fd3d3ace0b95b53db039bff178"
+  },
+  "tests": [
+    {
+      "name": "staff cannot read foreign private parent",
+      "actual": 0,
+      "expected": 0,
+      "status": "pass"
+    },
+    {
+      "name": "same-workspace staff submission persists",
+      "actual": 1,
+      "expected": 1,
+      "status": "pass"
+    },
+    {
+      "name": "VXA005 foreign private form accepted in owned workspace",
+      "actual": {
+        "workspace_id": "11111111-1111-4111-8111-111111111111",
+        "form_id": "44444444-4444-4444-8444-000000000002"
+      },
+      "expected": {
+        "workspace_id": "11111111-1111-4111-8111-111111111111",
+        "form_id": "44444444-4444-4444-8444-000000000002"
+      },
+      "status": "pass"
+    },
+    {
+      "name": "inserting directly into foreign workspace remains denied",
+      "actual": "42501",
+      "expected": "42501",
+      "status": "pass"
+    },
+    {
+      "name": "viewer cannot insert same-workspace submission",
+      "actual": "42501",
+      "expected": "42501",
+      "status": "pass"
+    },
+    {
+      "name": "baseline FK contains form_id alone",
+      "actual": "FOREIGN KEY (form_id) REFERENCES forms(id) ON DELETE CASCADE",
+      "expected": "FOREIGN KEY (form_id) REFERENCES forms(id) ON DELETE CASCADE",
+      "status": "pass"
+    },
+    {
+      "name": "foreign parent deletion cascades into owned workspace submission",
+      "actual": 0,
+      "expected": 0,
+      "status": "pass"
+    },
+    {
+      "name": "same-workspace control is retained",
+      "actual": 1,
+      "expected": 1,
+      "status": "pass"
+    }
+  ],
+  "status": "pass",
+  "limitations": [
+    "Actual selected DDL and policy templates; fixture emulates Supabase JWT GUC, grants authenticated table privileges, and omits hosted API/Auth behavior.",
+    "Existing new entitlement migration not applied in this baseline-only proof; entitlement adds workspace predicate but does not bind form parent.",
+    "Foreign parent UUID is assumed known; no disclosure of form contents proved."
+  ]
+}

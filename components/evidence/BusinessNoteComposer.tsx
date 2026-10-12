@@ -11,7 +11,7 @@ import {
 } from "@/lib/ai/business-notes/input-guidance";
 
 const PURPOSE_HELPER =
-  "Business Notes are for important business observations, decisions, temporary conditions, incidents, assumptions, and executive context that may not appear in formal reports. For best results, keep notes focused on a single business event or topic.";
+  "Capture observations, decisions, and next steps in your own words.";
 
 const LARGE_NOTE_WARNING =
   "This is a large Business Note and may take longer to analyze. If this is a meeting transcript, SOP, report, or other long-form document, consider uploading it as a document instead.";
@@ -27,19 +27,21 @@ export function BusinessNoteComposer({ disabled }: { disabled: boolean }) {
         name="note_text"
         required
         maxLength={BUSINESS_NOTE_SUBMISSION_MAX_CHARACTERS}
-        rows={8}
+        rows={16}
         disabled={disabled}
         aria-describedby="business-note-purpose business-note-length business-note-character-count business-note-length-warning"
         placeholder="Write or paste the observation exactly as it was recorded..."
         onChange={(event) => setCharacterCount(event.currentTarget.value.length)}
-        className="w-full resize-y rounded-md border border-white/10 bg-slate-950/70 px-3 py-2 text-sm leading-6 text-slate-100 outline-none placeholder:text-slate-500 focus:border-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
+        className="h-[clamp(18rem,45svh,32rem)] min-h-48 w-full resize-y rounded-md border border-white/10 bg-slate-950/70 px-3 py-3 text-base leading-6 md:h-[clamp(22rem,50vh,44rem)] md:text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
       />
       <span id="business-note-purpose" className="mt-2 block text-xs leading-5 text-slate-400">{PURPOSE_HELPER}</span>
-      <span id="business-note-length" className="mt-1 block text-xs font-medium text-slate-300">
-        Recommended length: {BUSINESS_NOTE_RECOMMENDED_MIN_CHARACTERS.toLocaleString()}–{BUSINESS_NOTE_RECOMMENDED_MAX_CHARACTERS.toLocaleString()} characters.
-      </span>
-      <span id="business-note-character-count" aria-live="polite" className="mt-1 block text-xs tabular-nums text-slate-400">
-        {characterCount.toLocaleString()} / {BUSINESS_NOTE_SUBMISSION_MAX_CHARACTERS.toLocaleString()} characters
+      <span className="mt-1 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <span id="business-note-length" className="mt-1 block text-xs font-medium text-slate-300">
+          Recommended length: {BUSINESS_NOTE_RECOMMENDED_MIN_CHARACTERS.toLocaleString()}–{BUSINESS_NOTE_RECOMMENDED_MAX_CHARACTERS.toLocaleString()} characters.
+        </span>
+        <span id="business-note-character-count" aria-live="polite" className="mt-1 block text-xs tabular-nums text-slate-400">
+          {characterCount.toLocaleString()} / {BUSINESS_NOTE_SUBMISSION_MAX_CHARACTERS.toLocaleString()} characters
+        </span>
       </span>
       {guidance.showLargeNoteWarning ? (
         <span id="business-note-length-warning" className="mt-2 block rounded-md border border-amber-300/20 bg-amber-950/15 p-3 text-xs leading-5 text-amber-100">

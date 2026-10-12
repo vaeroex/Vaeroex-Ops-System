@@ -236,7 +236,7 @@ function decisionFromIntelligence(intelligence: IntelligenceLayerResult): Execut
   return {
     label: "Recommended Decision",
     title,
-    summary: conciseSentences(recommendation.recommendedAction, recommendation.why, 1),
+    summary: conciseSentences(recommendation.recommendedAction, recommendation.why, 2),
     metadata: `Priority: ${recommendation.priority}`,
     confidence: recommendation.confidence,
     priority: recommendation.priority,
@@ -258,14 +258,14 @@ function healthStatusLabel(status: IntelligenceLayerResult["businessHealth"]["st
   return status;
 }
 
-function previousReviewSnapshot(snapshots: BusinessHealthSnapshotRow[]) {
+export function previousReviewSnapshot(snapshots: readonly BusinessHealthSnapshotRow[], asOf = new Date()) {
   const ordered = snapshots
     .filter((snapshot) => businessHealthSnapshotCalculationVersion(snapshot) === BUSINESS_HEALTH_CALCULATION_VERSION)
     .sort((a, b) => a.snapshot_date.localeCompare(b.snapshot_date));
   const latest = ordered.at(-1);
   if (!latest) return null;
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = asOf.toISOString().slice(0, 10);
   return latest.snapshot_date === today ? ordered.at(-2) || null : latest;
 }
 
@@ -357,7 +357,7 @@ export function buildExecutiveHomepageModel({
     throw new Error("Eligible Business Signal categories do not match the authoritative total.");
   }
   const previousSnapshot = previousReviewSnapshot(snapshots);
-  const trendDelta = previousSnapshot ? intelligence.businessHealth.score - previousSnapshot.score : null;
+  const trendDelta = hasUsableHealth && previousSnapshot ? intelligence.businessHealth.score - previousSnapshot.score : null;
   const strongest = [...coverage.categories].sort((a, b) => b.coverage - a.coverage)[0];
   const weakest = [...coverage.categories].sort((a, b) => a.coverage - b.coverage)[0];
 
@@ -410,7 +410,7 @@ export function buildExecutiveHomepageModel({
         : hasEvidenceButNoEvaluableOutcome
           ? "Needs KPI meaning"
           : "Limited evidence",
-      trend: hasUsableHealth && trendDelta !== null ? intelligence.businessHealth.trend : null,
+      trend: trendDelta === null ? null : trendDelta > 0 ? "Improving" : trendDelta < 0 ? "Declining" : "Holding steady",
       trendDelta,
       summary: healthSummary,
       driver: healthDriver,

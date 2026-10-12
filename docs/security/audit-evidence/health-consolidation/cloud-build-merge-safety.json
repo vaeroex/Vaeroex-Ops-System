@@ -1,0 +1,126 @@
+{
+  "schemaVersion": 1,
+  "observedAt": "2026-10-06 00:39:09 UTC",
+  "method": "Existing authenticated gcloud read-only trigger list with explicit metadata projections; committed build-source inspection",
+  "productionMutated": false,
+  "triggerExecuted": false,
+  "triggerApproved": false,
+  "secretsRead": false,
+  "configurationChanged": false,
+  "apiEnabled": false,
+  "purchases": 0,
+  "checks": [
+    {
+      "project": "vaeroex-qbo-prod-20260827",
+      "region": "global",
+      "exitCode": 0,
+      "triggers": []
+    },
+    {
+      "project": "vaeroex-qbo-prod-20260827",
+      "region": "us-central1",
+      "exitCode": 0,
+      "triggers": []
+    },
+    {
+      "project": "vaeroex-integrations-prod",
+      "region": "global",
+      "exitCode": 0,
+      "triggers": []
+    },
+    {
+      "project": "vaeroex-integrations-prod",
+      "region": "us-west1",
+      "exitCode": 0,
+      "triggers": [
+        {
+          "approvalConfig": {
+            "approvalRequired": true
+          },
+          "filename": "services/external-integrations-production/image-build/cloudbuild.yaml",
+          "github": {
+            "name": "Vaeroex-Ops-System",
+            "owner": "vaeroex",
+            "push": {
+              "branch": "^main$"
+            }
+          },
+          "id": "93e36742-16eb-4c94-8bad-a06502e69362",
+          "name": "vaeroex-production-images",
+          "serviceAccountIdentityOmitted": true
+        }
+      ]
+    },
+    {
+      "project": "vaeroex-document-worker",
+      "region": "global",
+      "exitCode": 0,
+      "triggers": []
+    },
+    {
+      "project": "vaeroex-document-worker",
+      "region": "us-west1",
+      "exitCode": 0,
+      "triggers": []
+    }
+  ],
+  "matchingMainTrigger": {
+    "approvalConfig": {
+      "approvalRequired": true
+    },
+    "filename": "services/external-integrations-production/image-build/cloudbuild.yaml",
+    "github": {
+      "push": {
+        "branch": "^main$"
+      }
+    },
+    "id": "93e36742-16eb-4c94-8bad-a06502e69362",
+    "includedFiles": [
+      "services/external-integrations-production/bootstrap-runtime/**",
+      "services/external-integrations-production/callback-edge/**",
+      "services/external-integrations-production/image-build/**",
+      "services/external-integrations-production/internal-consent/**",
+      "lib/integrations/contracts/**",
+      "lib/integrations/credentials/**",
+      "lib/integrations/providers/square/**",
+      "lib/integrations/control-plane/square-production-customer-view.ts",
+      "scripts/square-production-internal-consent-tests.js",
+      "scripts/square-production-customer-flow-tests.js",
+      "scripts/square-production-customer-workspace-tests.js",
+      "package.json",
+      "pnpm-lock.yaml",
+      "tsconfig.json"
+    ],
+    "name": "vaeroex-production-images"
+  },
+  "reviewedSource": {
+    "head": "2cde427c8b30cf34702baf43f7b3fc2d17f48b81",
+    "comparisonBase": "d91be079c7beb0b6f21a4c5e6b451f90ca06e035",
+    "buildFile": "services/external-integrations-production/image-build/cloudbuild.yaml",
+    "buildFileSha256": "7257345550bc02c60df65f72a487a8778a43fecfe10a46c6ac2e48b2b065d7b5",
+    "triggerVerifierSha256": "a303d6f9b23c578269cc155a38013d4484c8f857fb4cd05dd168c849ea24525b",
+    "scanQualifierSha256": "bef9d675ee62c8b07a2aad62368fa6b76c53eaf4734a2cdba66e343c2618d90e",
+    "buildSourceUnchangedAgainstComparisonBase": true,
+    "matchingChangedFiles": [
+      "package.json",
+      "pnpm-lock.yaml"
+    ],
+    "stepsSummary": "Verify approved trigger/source identity, test/build integration images, push Artifact Registry images, wait for scan evidence and upload an immutable release-candidate manifest. No deploy, Terraform apply, production SQL or Supabase migration command in this build file.",
+    "candidateManifest": {
+      "deploymentEligible": false,
+      "requiresReviewedDigestPin": true,
+      "automaticRuntimeRollout": false
+    }
+  },
+  "approvalSemantics": {
+    "source": "https://docs.cloud.google.com/build/docs/securing-builds/gate-builds-on-approval",
+    "meaning": "Approval-gated triggers create a pending build instead of immediately executing. Build starts only after approval.",
+    "operationalRequirement": "Do not approve the pending image build or change this approval gate as part of the merge-only task."
+  },
+  "conclusion": "A main merge matching package/lockfile path filters can create a pending approval build in integrations/us-west1. The observed approval gate prevents automatic execution, and the referenced unchanged source build does not deploy runtime services or apply production migrations. No other Cloud Build triggers exist in the checked global/configured-region project pairs.",
+  "limitations": [
+    "Region coverage is global plus each known configured region, not every Cloud Build region worldwide.",
+    "Does not cover separate GitHub Actions, Vercel deployment hooks, external auto-approvers, Eventarc or independently configured automation; parent handles repository/Vercel scope.",
+    "No permission denial occurred in cloud reads. Initial local sandbox credential-file access failed; approved read-only gcloud execution then succeeded without account or project configuration changes."
+  ]
+}

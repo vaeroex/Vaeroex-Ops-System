@@ -23,10 +23,12 @@ insert into auth.users(id) values
   ('a9910000-0000-4000-8000-000000000001'), ('a9910000-0000-4000-8000-000000000002');
 insert into public.profiles(id) values
   ('a9910000-0000-4000-8000-000000000001'), ('a9910000-0000-4000-8000-000000000002') on conflict do nothing;
-insert into public.workspaces(id, name, created_by) values
-  ('b9910000-0000-4000-8000-000000000001', 'Preference A', 'a9910000-0000-4000-8000-000000000001'),
-  ('b9910000-0000-4000-8000-000000000002', 'Preference B', 'a9910000-0000-4000-8000-000000000001'),
-  ('b9910000-0000-4000-8000-000000000003', 'Preference inaccessible', 'a9910000-0000-4000-8000-000000000002');
+-- Exercise preference identity/role rules in an entitled, bounded trial.
+-- Subscription denial is verified separately; no policy is bypassed here.
+insert into public.workspaces(id, name, created_by, subscription_status, trial_ends_at) values
+  ('b9910000-0000-4000-8000-000000000001', 'Preference A', 'a9910000-0000-4000-8000-000000000001', 'trialing', now() + interval '1 day'),
+  ('b9910000-0000-4000-8000-000000000002', 'Preference B', 'a9910000-0000-4000-8000-000000000001', 'trialing', now() + interval '1 day'),
+  ('b9910000-0000-4000-8000-000000000003', 'Preference inaccessible', 'a9910000-0000-4000-8000-000000000002', 'trialing', now() + interval '1 day');
 insert into public.workspace_members(workspace_id, user_id, role, status) values
   ('b9910000-0000-4000-8000-000000000001', 'a9910000-0000-4000-8000-000000000001', 'viewer', 'active'),
   ('b9910000-0000-4000-8000-000000000002', 'a9910000-0000-4000-8000-000000000001', 'staff', 'active'),

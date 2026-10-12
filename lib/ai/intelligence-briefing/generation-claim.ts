@@ -40,16 +40,12 @@ export async function claimIntelligenceBriefingGeneration({
   inputJson: Json;
 }): Promise<IntelligenceBriefingGenerationClaim> {
   const { data: inserted, error: insertError } = await admin
-    .from("ai_agent_runs")
-    .insert({
-      workspace_id: workspaceId,
-      agent_type: INTELLIGENCE_BRIEFING_CONTRACT_ID,
-      input_json: inputJson,
-      output_json: {},
-      status: "processing",
-      created_by: userId
+    .rpc("create_trusted_analysis_run_v1", {
+      p_workspace_id: workspaceId,
+      p_actor_id: userId,
+      p_agent_type: INTELLIGENCE_BRIEFING_CONTRACT_ID,
+      p_input_json: inputJson
     })
-    .select("id")
     .maybeSingle();
   if (!insertError && inserted?.id) return { status: "claimed", runId: inserted.id };
   if (insertError?.code !== "23505") return { status: "failed_closed" };

@@ -60,6 +60,7 @@ const rateLimitedSources = [
   "app/app/easter-egg/actions.ts",
   "app/app/business-health-analysis/actions.ts",
   "app/app/sources/business-notes/actions.ts",
+  "app/api/storage-capacity/reserve/route.ts",
   "app/app/files/actions.ts"
 ].map(read).join("\n");
 

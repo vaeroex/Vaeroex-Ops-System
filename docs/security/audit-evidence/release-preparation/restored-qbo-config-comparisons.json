@@ -1,0 +1,256 @@
+{
+  "checkedAt": "2026-10-05T23:32:54.998691+00:00",
+  "mode": "read-only comparisons; no env URLs/emails/PEM values retained",
+  "services": {
+    "qbo-production-credential-broker": {
+      "QBO_QUEUE_RESOURCE": {
+        "matchesExpected": true
+      },
+      "QBO_DISPATCH_SCHEDULER_SERVICE_ACCOUNT": {
+        "matchesExpected": true
+      },
+      "QBO_PROVIDER_RUNTIME_SERVICE_ACCOUNT": {
+        "matchesExpected": true
+      },
+      "QBO_BROKER_URL": {
+        "matchesExpected": true
+      },
+      "QBO_RUNTIME_INVOKER_SERVICE_ACCOUNT": {
+        "matchesExpected": true
+      },
+      "QBO_DATABASE_CA_PEM": {
+        "sha256": "700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7",
+        "present": true
+      },
+      "QBO_SERVICE_MODE": "credential_broker",
+      "QBO_OAUTH_INGRESS_SERVICE_ACCOUNT": {
+        "matchesExpected": true
+      },
+      "QBO_PRODUCTION_CALLBACK_URI": {
+        "matchesExpected": true
+      },
+      "QBO_SERVICE_AUDIENCE": {
+        "matchesServiceUrl": true
+      },
+      "QBO_SOURCE_COMMIT": "94baa9dd1560370485c91c27bca701d78a288bb3",
+      "QBO_TASK_SCHEDULER_SERVICE_ACCOUNT": {
+        "matchesExpected": true
+      },
+      "QBO_PROVIDER_RUNTIME_URL": {
+        "matchesExpected": true
+      },
+      "QBO_INITIALIZATION_SCHEDULER_SERVICE_ACCOUNT": {
+        "matchesExpected": true
+      },
+      "QBO_APPLICATION_ORIGIN": {
+        "matchesExpected": true
+      },
+      "QBO_QUEUE_NAME": {
+        "matchesExpected": true
+      },
+      "QBO_INGRESS_BOOTSTRAP_ONLY": {
+        "absent": true
+      }
+    },
+    "qbo-production-oauth-ingress": {
+      "QBO_QUEUE_RESOURCE": {
+        "matchesExpected": true
+      },
+      "QBO_DISPATCH_SCHEDULER_SERVICE_ACCOUNT": {
+        "matchesExpected": true
+      },
+      "QBO_PROVIDER_RUNTIME_SERVICE_ACCOUNT": {
+        "matchesExpected": true
+      },
+      "QBO_BROKER_URL": {
+        "matchesExpected": true
+      },
+      "QBO_SERVICE_AUDIENCE": {
+        "matchesServiceUrl": true
+      },
+      "QBO_RUNTIME_INVOKER_SERVICE_ACCOUNT": {
+        "matchesExpected": true
+      },
+      "QBO_DATABASE_CA_PEM": {
+        "sha256": "700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7",
+        "present": true
+      },
+      "QBO_OAUTH_INGRESS_SERVICE_ACCOUNT": {
+        "matchesExpected": true
+      },
+      "QBO_SERVICE_MODE": "oauth_ingress",
+      "QBO_PRODUCTION_CALLBACK_URI": {
+        "matchesExpected": true
+      },
+      "QBO_SOURCE_COMMIT": "94baa9dd1560370485c91c27bca701d78a288bb3",
+      "QBO_TASK_SCHEDULER_SERVICE_ACCOUNT": {
+        "matchesExpected": true
+      },
+      "QBO_PROVIDER_RUNTIME_URL": {
+        "matchesExpected": true
+      },
+      "QBO_INITIALIZATION_SCHEDULER_SERVICE_ACCOUNT": {
+        "matchesExpected": true
+      },
+      "QBO_APPLICATION_ORIGIN": {
+        "matchesExpected": true
+      },
+      "QBO_QUEUE_NAME": {
+        "matchesExpected": true
+      },
+      "QBO_INGRESS_BOOTSTRAP_ONLY": {
+        "absent": true
+      }
+    },
+    "qbo-production-provider-runtime": {
+      "QBO_QUEUE_RESOURCE": {
+        "matchesExpected": true
+      },
+      "QBO_DISPATCH_SCHEDULER_SERVICE_ACCOUNT": {
+        "matchesExpected": true
+      },
+      "QBO_PROVIDER_RUNTIME_SERVICE_ACCOUNT": {
+        "matchesExpected": true
+      },
+      "QBO_BROKER_URL": {
+        "matchesExpected": true
+      },
+      "QBO_SERVICE_AUDIENCE": {
+        "matchesServiceUrl": true
+      },
+      "QBO_RUNTIME_INVOKER_SERVICE_ACCOUNT": {
+        "matchesExpected": true
+      },
+      "QBO_DATABASE_CA_PEM": {
+        "sha256": "700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7",
+        "present": true
+      },
+      "QBO_OAUTH_INGRESS_SERVICE_ACCOUNT": {
+        "matchesExpected": true
+      },
+      "QBO_PRODUCTION_CALLBACK_URI": {
+        "matchesExpected": true
+      },
+      "QBO_SOURCE_COMMIT": "94baa9dd1560370485c91c27bca701d78a288bb3",
+      "QBO_TASK_SCHEDULER_SERVICE_ACCOUNT": {
+        "matchesExpected": true
+      },
+      "QBO_SERVICE_MODE": "provider_runtime",
+      "QBO_PROVIDER_RUNTIME_URL": {
+        "matchesExpected": true
+      },
+      "QBO_INITIALIZATION_SCHEDULER_SERVICE_ACCOUNT": {
+        "matchesExpected": true
+      },
+      "QBO_APPLICATION_ORIGIN": {
+        "matchesExpected": true
+      },
+      "QBO_QUEUE_NAME": {
+        "matchesExpected": true
+      },
+      "QBO_INGRESS_BOOTSTRAP_ONLY": {
+        "absent": true
+      }
+    },
+    "qbo-production-task-dispatcher": {
+      "QBO_QUEUE_RESOURCE": {
+        "matchesExpected": true
+      },
+      "QBO_DISPATCH_SCHEDULER_SERVICE_ACCOUNT": {
+        "matchesExpected": true
+      },
+      "QBO_PROVIDER_RUNTIME_SERVICE_ACCOUNT": {
+        "matchesExpected": true
+      },
+      "QBO_BROKER_URL": {
+        "matchesExpected": true
+      },
+      "QBO_SERVICE_AUDIENCE": {
+        "matchesServiceUrl": true
+      },
+      "QBO_RUNTIME_INVOKER_SERVICE_ACCOUNT": {
+        "matchesExpected": true
+      },
+      "QBO_DATABASE_CA_PEM": {
+        "sha256": "700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7",
+        "present": true
+      },
+      "QBO_OAUTH_INGRESS_SERVICE_ACCOUNT": {
+        "matchesExpected": true
+      },
+      "QBO_SERVICE_MODE": "task_dispatcher",
+      "QBO_PRODUCTION_CALLBACK_URI": {
+        "matchesExpected": true
+      },
+      "QBO_SOURCE_COMMIT": "94baa9dd1560370485c91c27bca701d78a288bb3",
+      "QBO_TASK_SCHEDULER_SERVICE_ACCOUNT": {
+        "matchesExpected": true
+      },
+      "QBO_PROVIDER_RUNTIME_URL": {
+        "matchesExpected": true
+      },
+      "QBO_INITIALIZATION_SCHEDULER_SERVICE_ACCOUNT": {
+        "matchesExpected": true
+      },
+      "QBO_APPLICATION_ORIGIN": {
+        "matchesExpected": true
+      },
+      "QBO_QUEUE_NAME": {
+        "matchesExpected": true
+      },
+      "QBO_INGRESS_BOOTSTRAP_ONLY": {
+        "absent": true
+      }
+    },
+    "qbo-production-task-scheduler": {
+      "QBO_QUEUE_RESOURCE": {
+        "matchesExpected": true
+      },
+      "QBO_DISPATCH_SCHEDULER_SERVICE_ACCOUNT": {
+        "matchesExpected": true
+      },
+      "QBO_PROVIDER_RUNTIME_SERVICE_ACCOUNT": {
+        "matchesExpected": true
+      },
+      "QBO_BROKER_URL": {
+        "matchesExpected": true
+      },
+      "QBO_SERVICE_AUDIENCE": {
+        "matchesServiceUrl": true
+      },
+      "QBO_RUNTIME_INVOKER_SERVICE_ACCOUNT": {
+        "matchesExpected": true
+      },
+      "QBO_DATABASE_CA_PEM": {
+        "sha256": "700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7",
+        "present": true
+      },
+      "QBO_OAUTH_INGRESS_SERVICE_ACCOUNT": {
+        "matchesExpected": true
+      },
+      "QBO_PRODUCTION_CALLBACK_URI": {
+        "matchesExpected": true
+      },
+      "QBO_SOURCE_COMMIT": "94baa9dd1560370485c91c27bca701d78a288bb3",
+      "QBO_TASK_SCHEDULER_SERVICE_ACCOUNT": {
+        "matchesExpected": true
+      },
+      "QBO_PROVIDER_RUNTIME_URL": {
+        "matchesExpected": true
+      },
+      "QBO_SERVICE_MODE": "task_scheduler",
+      "QBO_INITIALIZATION_SCHEDULER_SERVICE_ACCOUNT": {
+        "matchesExpected": true
+      },
+      "QBO_APPLICATION_ORIGIN": {
+        "matchesExpected": true
+      },
+      "QBO_QUEUE_NAME": {
+        "matchesExpected": true
+      },
+      "QBO_INGRESS_BOOTSTRAP_ONLY": {
+        "absent": true
+      }
+    }
+  }
+}

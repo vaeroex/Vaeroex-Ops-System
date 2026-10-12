@@ -19,7 +19,16 @@ test("preference migration and SQL isolation assertions run only in fresh in-mem
         $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
       create table auth.users(id uuid primary key);
       create table public.profiles(id uuid primary key);
-      create table public.workspaces(id uuid primary key, name text, created_by uuid);
+      -- Match the billing columns used by both canonical SQL fixtures.
+      -- Definitions and allowed statuses come from 202606170003_phase_6_squarespace_subscriptions.sql.
+      create table public.workspaces(
+        id uuid primary key, name text, created_by uuid,
+        subscription_status text not null default 'manual_review',
+        trial_ends_at timestamptz,
+        constraint workspaces_subscription_status_check check (
+          subscription_status in ('active', 'trialing', 'past_due', 'canceled', 'expired', 'manual_review', 'demo')
+        )
+      );
       create table public.workspace_members(workspace_id uuid, user_id uuid, role text, status text);
       grant select on public.workspaces to authenticated;
       grant select, update on public.workspaces to anon;

@@ -1,0 +1,46 @@
+{
+  "scope": "Actual source manifest assertions evaluated without DB/provider calls; no full Square qualification claim",
+  "migrationCount": 125,
+  "results": [
+    {
+      "file": "run-square-account-connection-qualification.js",
+      "currentManifest": "pass",
+      "unexpectedMigrationRejected": true
+    },
+    {
+      "file": "run-square-remote-sandbox-qualification.js",
+      "currentManifest": "pass",
+      "unexpectedMigrationRejected": true
+    },
+    {
+      "file": "run-square-broker-runtime-qualification.js",
+      "currentManifest": "pass",
+      "unexpectedMigrationRejected": true
+    },
+    {
+      "file": "run-square-gcp-callback-database-qualification.js",
+      "currentManifest": "pass",
+      "unexpectedMigrationRejected": true
+    },
+    {
+      "file": "run-square-gcp-mapped-database-qualification.js",
+      "currentManifest": "pass",
+      "unexpectedMigrationRejected": true
+    },
+    {
+      "file": "run-square-durable-page-qualification.js",
+      "currentManifest": "pass",
+      "unexpectedMigrationRejected": true
+    },
+    {
+      "file": "run-square-observation-database-qualification.js",
+      "currentManifest": "pass",
+      "unexpectedMigrationRejected": true
+    },
+    {
+      "file": "run-qbo-production-candidate-database-tests.cjs",
+      "currentManifest": "pass",
+      "unexpectedMigrationRejected": true
+    }
+  ]
+}

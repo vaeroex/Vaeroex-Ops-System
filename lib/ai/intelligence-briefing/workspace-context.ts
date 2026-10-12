@@ -40,20 +40,6 @@ function queryFailure(errors: readonly ({ message: string } | null | undefined)[
   return errors.find(Boolean)?.message || null;
 }
 
-export async function loadIntelligenceBriefingCrmHistory({
-  supabase,
-  workspaceId
-}: {
-  supabase: SupabaseClient<Database>;
-  workspaceId: string;
-}) {
-  return supabase
-    .from("crm_lead_history")
-    .select("*")
-    .eq("workspace_id", workspaceId)
-    .order("created_at", { ascending: false });
-}
-
 export async function buildWorkspaceIntelligenceBriefingPackage({
   supabase,
   workspaceId,
@@ -77,7 +63,6 @@ export async function buildWorkspaceIntelligenceBriefingPackage({
     settingsResult,
     filesResult,
     crmResult,
-    crmHistoryResult,
     importsResult,
     sopsResult,
     formsResult,
@@ -93,7 +78,6 @@ export async function buildWorkspaceIntelligenceBriefingPackage({
     supabase.from("kpi_settings").select("*").eq("workspace_id", workspaceId).order("sort_order", { ascending: true }).order("weight", { ascending: false }),
     supabase.from("file_uploads").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("created_at", { ascending: false }),
     supabase.from("crm_leads").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("created_at", { ascending: false }),
-    loadIntelligenceBriefingCrmHistory({ supabase, workspaceId }),
     supabase.from("file_imports").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
     supabase.from("sops").select("*").eq("workspace_id", workspaceId).order("updated_at", { ascending: false }),
     supabase.from("forms").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
@@ -110,7 +94,6 @@ export async function buildWorkspaceIntelligenceBriefingPackage({
     settingsResult.error,
     filesResult.error,
     crmResult.error,
-    crmHistoryResult.error,
     importsResult.error,
     sopsResult.error,
     formsResult.error,
@@ -129,7 +112,7 @@ export async function buildWorkspaceIntelligenceBriefingPackage({
   const sourceParent = await loadSourceParentEligibilityResult({
     supabase,
     workspaceId,
-    rows: [...rawKpis, ...rawCustomers, ...rawMetrics]
+    rows: [...rawKpis, ...rawCustomers, ...rawMetrics, ...(memoryResult.data || [])]
   });
   if (sourceParent.error) throw new Error("Intelligence briefing source lifecycle could not be verified.");
   const kpis = filterBySourceParentEligibility(rawKpis, sourceParent.eligibility);
@@ -144,6 +127,7 @@ export async function buildWorkspaceIntelligenceBriefingPackage({
   const files = filesResult.data || [];
   const imports = importsResult.data || [];
   const operationalInsights = buildOperationalEvidenceInsights({
+    sourceParents: sourceParent.eligibility.records,
     kpis,
     kpiSettings: settings,
     operationalMetrics,
@@ -152,6 +136,7 @@ export async function buildWorkspaceIntelligenceBriefingPackage({
     imports
   });
   const intelligence = buildIntelligenceLayer({
+    sourceParents: sourceParent.eligibility.records,
     asOf,
     workspace,
     issues: issuesResult.data || [],
@@ -168,6 +153,7 @@ export async function buildWorkspaceIntelligenceBriefingPackage({
     operationalInsights
   });
   const coverage = buildBusinessIntelligenceCoverage({
+    sourceParents: sourceParent.eligibility.records,
     kpis,
     issues: issuesResult.data || [],
     files,
@@ -177,7 +163,6 @@ export async function buildWorkspaceIntelligenceBriefingPackage({
     submissions: submissionsResult.data || [],
     people: peopleResult.data || [],
     crmLeads: customers,
-    crmHistory: crmHistoryResult.data || [],
     operationalMetrics,
     assets: assetsResult.data || [],
     decisions: decisionsResult.data || [],
@@ -191,7 +176,7 @@ export async function buildWorkspaceIntelligenceBriefingPackage({
     asOf
   });
   if (businessNotes.error) throw new Error("Approved Business Note context could not be loaded safely.");
-  const sourceLabelsById = Object.fromEntries(files.map((file) => [file.id, file.display_name]));
+  const sourceLabelsById = Object.fromEntries([...files, ...(sourceParent.eligibility.records?.files || [])].map((file) => [file.id, file.display_name]));
   const evidence = buildIntelligenceBriefingEvidence({
     workspaceId,
     period,

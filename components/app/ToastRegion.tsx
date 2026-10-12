@@ -21,7 +21,9 @@ function ToastContent() {
     // mounted form; a later identical outcome can then be announced again.
     const url = new URL(window.location.href);
     for (const key of ["saved", "message", "error"]) url.searchParams.delete(key);
-    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+    // Next copies its internal history state for external updates. Passing its
+    // existing marker back would bypass search-param synchronization.
+    window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
   }
 
   if (!visible || (!message && !error)) {

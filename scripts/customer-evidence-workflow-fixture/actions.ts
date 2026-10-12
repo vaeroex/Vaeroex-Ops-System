@@ -34,6 +34,13 @@ export async function uploadSourceAction(_previous: UploadSourceState, formData:
     return { error: "The local fixture response could not be confirmed. Check saved sources before another upload.", blocked: true };
   }
 }
+// This historical workflow fixture simulates transport; dedicated capacity tests
+// exercise the real reserve -> signed PUT -> complete -> metadata-only pipeline.
+export const prepareUploadedSourceAction = uploadSourceAction;
+export async function uploadSourceDirect(workspaceId: string, formData: FormData): Promise<UploadSourceState> {
+  if (workspaceId !== "synthetic-workspace") throw new Error("Fixture workspace mismatch.");
+  return uploadSourceAction({ error: null }, formData);
+}
 export async function runSharedAction(kind: "primary" | "analysis") {
   const key = kind === "primary" ? "primaryRequests" : "analysisRequests";
   update({ [key]: state[key] + 1 });

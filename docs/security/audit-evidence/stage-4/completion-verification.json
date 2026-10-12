@@ -1,0 +1,446 @@
+{
+  "recordedAt": "2026-10-05T04:30:39.552156+00:00",
+  "sourceCommit": "64038f4a4cb607862175c00c663edd76cb675c96",
+  "heads": {
+    "codex/workspace-audit-security": "be65d144beac1ffa56aca48b6b82dc8d38401cb6",
+    "codex/workspace-audit-evidence": "9d0cfa328986cd7d1adaa079c99083659ecd54d0",
+    "codex/workspace-audit-workflows": "64038f4a4cb607862175c00c663edd76cb675c96"
+  },
+  "sourceHashes": [
+    {
+      "path": ".gitattributes",
+      "sha256": "50bf17e1762bcf88bcc6dbea064a3480bab060ba4cb7a83bb189f71d96586640"
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "sha256": "018a534d935bf148188eff7693027404c615b1c652f567b3cb40807f492311a6"
+    },
+    {
+      "path": "app/api/integrations/google-sheets/scheduled-sync/route.ts",
+      "sha256": "d2bdb5ab980a76c33af7a6563967dbb018e517c2c7c4f5350ea1167551a55c2a"
+    },
+    {
+      "path": "app/api/subscription/status/route.ts",
+      "sha256": "473931f3ad45d1bc64efcfd95a96d3c2e0afcf651dd192322fe43d4b300ecacc"
+    },
+    {
+      "path": "app/app/[module]/page.tsx",
+      "sha256": "b72f91134ac69f718e58bf03b0bb52653fe0e98312f05a97d3fc693d01d911c8"
+    },
+    {
+      "path": "app/app/account/subscription/page.tsx",
+      "sha256": "f76e51d2e556722bc4c9987b468c98e9630ae5501979064e59c31eb142d0e2df"
+    },
+    {
+      "path": "app/app/admin/ai-usage/page.tsx",
+      "sha256": "7a9b0ea7213178f29a488f84a18060381629d415f5130145ea9c57cf9f9b7dab"
+    },
+    {
+      "path": "app/app/assets/checks/page.tsx",
+      "sha256": "c278d1d5bbc4a10fef7b4ea824ae8f05957cf2da5e4f0c299fbbc118d1c517e5"
+    },
+    {
+      "path": "app/app/assets/page.tsx",
+      "sha256": "3d889dd2701eabc1416a041859a2136017e412517a83d13227133365884bdc29"
+    },
+    {
+      "path": "app/app/files/actions.ts",
+      "sha256": "58831a8ce63ac919e27f54c8e403f1881ecc46b1ddd9142fe9601b4f85cba274"
+    },
+    {
+      "path": "app/app/finding-explanation/actions.ts",
+      "sha256": "a3e6c6fbce7b1ca0d56df7f16708e824ea61d9e4a6ae85c1c2dbdbe60870fff6"
+    },
+    {
+      "path": "app/app/form-submissions/page.tsx",
+      "sha256": "0f9d11c9a71ba02dd2318556a80b47fd4d4f7c9116a949a7de037634ef4d1963"
+    },
+    {
+      "path": "app/app/forms/[id]/page.tsx",
+      "sha256": "82966428dfd65ea927f9efea2c929c04820a3b63f5e742982de270861bbb896b"
+    },
+    {
+      "path": "app/app/intelligence/page.tsx",
+      "sha256": "7cfb0a19e54072938a0e0fbce58c6e1189439e119d7e2e5cd42e9516ffd58009"
+    },
+    {
+      "path": "app/app/operations/actions.ts",
+      "sha256": "d5daa963e0c117b3129819ec59a9e89d16066a7828df3dbc6d32d1b985392e2d"
+    },
+    {
+      "path": "app/app/operations/form-submission-action.ts",
+      "sha256": "6df810a3fb48e7b60be722e544118e6be28df18738b045f02f7e14985b2567d5"
+    },
+    {
+      "path": "app/app/operations/record-management-actions.ts",
+      "sha256": "6cbd8546bfe9d74dd9934d32a13afef4234be286dcf8759407c9adf6b9a9a36d"
+    },
+    {
+      "path": "app/app/page.tsx",
+      "sha256": "4c643260a8e9c3d552d5030a37395e5a9a6b33c6a24f47ecbb849d72f7691fd5"
+    },
+    {
+      "path": "components/app/GlobalSearch.tsx",
+      "sha256": "a3f65fa69614220a2df0feed823b6ffffcbfe9c1d08de73b5ab846e8e560452a"
+    },
+    {
+      "path": "components/app/GlobalSearchTrigger.tsx",
+      "sha256": "e7447e1aaba447cca20da18ba8484fc392c78cd2c3fffc2cd726ceead885a4eb"
+    },
+    {
+      "path": "components/integrations/SquareSheetsResults.tsx",
+      "sha256": null
+    },
+    {
+      "path": "components/integrations/SquareSheetsResultsView.tsx",
+      "sha256": null
+    },
+    {
+      "path": "components/legal/LegalSafetyNotice.tsx",
+      "sha256": null
+    },
+    {
+      "path": "components/operations/ComplianceNotice.tsx",
+      "sha256": null
+    },
+    {
+      "path": "components/operations/FormControls.tsx",
+      "sha256": "28fc8805d24d81a642de9639989cda5869c37259567caa8e7949cfabec6bd881"
+    },
+    {
+      "path": "components/operations/InternalFormSubmissionForm.tsx",
+      "sha256": "f9cb15a73b5251f2dcb8a7a97f0d319e9eb10fa152d7c8a4904d605ee6932a14"
+    },
+    {
+      "path": "components/operations/ManagedRecordList.tsx",
+      "sha256": "6a47d91032fd43dbc91357216d28a29d95b8dcf6e390f0ff3233f05c77094294"
+    },
+    {
+      "path": "components/operations/ModalDialog.tsx",
+      "sha256": "e2fbcaaadc4d5e52109ec2bf15f9cfce4c11b43e1a9801adb92daf806b90e7f0"
+    },
+    {
+      "path": "components/operations/PendingSubmitButton.tsx",
+      "sha256": "3415f6caa83d49f315241427cb230526600626f6fe8877e3149dc0dd2e55f624"
+    },
+    {
+      "path": "components/operations/RecordDetailDrawer.tsx",
+      "sha256": "3d73f9e031a9d264ba85adccee561c24e2552cead54c8c0348f36ed0cd6e9b59"
+    },
+    {
+      "path": "eslint.config.mjs",
+      "sha256": "03f96a9e116820efaa7879f9860154caa9b3e9d698fc8241df215a08caf62882"
+    },
+    {
+      "path": "lib/ai/business-health-explanation/context.ts",
+      "sha256": "e85a2f5c1dec6da1c9d99fd68151c038fd26b088b31b8afc0b03dcae0d977e76"
+    },
+    {
+      "path": "lib/ai/business-health-explanation/contracts.ts",
+      "sha256": "a0f2922734d761685c0483b7e81de91252d465eda076ada72bb66749ce77fdc5"
+    },
+    {
+      "path": "lib/ai/business-health-explanation/generation-claim.ts",
+      "sha256": "03c9f50f43fc31b4eb2e4cb9e06308eb7e0d4678cfe9cd859f30432a1e1b0b8d"
+    },
+    {
+      "path": "lib/ai/evidence-index.ts",
+      "sha256": "4ac0a846387efe07e32093c9b58d856406f3e3ced4283e1caec1ebc69d62d6c1"
+    },
+    {
+      "path": "lib/ai/intelligence-briefing/generation-claim.ts",
+      "sha256": "5d7c7e6d37d008388ddd1f4b9c421193bb4eb12408552e3b91f70e487da166b8"
+    },
+    {
+      "path": "lib/ai/intelligence-briefing/workspace-context.ts",
+      "sha256": "48e6eac7228d6307d686a88aee7d8af6ac00501dc34a795a0e667ff25d3bfd33"
+    },
+    {
+      "path": "lib/ai/usage.ts",
+      "sha256": "5492b43614e212c19ab82eea2acb5e52825c54170ef871179f79b42498693b15"
+    },
+    {
+      "path": "lib/billing/usage-limits.ts",
+      "sha256": "9c88f207a589cff69eb659f79e08e7c64b8906d033302de1bd59716bbd019c42"
+    },
+    {
+      "path": "lib/forms/submission-schema.ts",
+      "sha256": "d32c96115bbecfcaf154ef10afc1bf3743d6fbbce223094035f3f907ad449af7"
+    },
+    {
+      "path": "lib/imports/document-text.ts",
+      "sha256": "1263041f478e77c2aedff610bf83d9aa788b24f97c9adb69c16d317db4e8750a"
+    },
+    {
+      "path": "lib/imports/spreadsheets.ts",
+      "sha256": "49b1990d6e727aa8e090ea84332b359bf21bd0a02a0725af630eb2de05823fbc"
+    },
+    {
+      "path": "lib/integrations/google-sheets/scheduler.ts",
+      "sha256": "40f8b92a19204ae4de7eadd96839ba48ca864905b71582a53b5197749f6b0b28"
+    },
+    {
+      "path": "lib/intelligence/coverage.ts",
+      "sha256": "be138d5dabe02dab4802d2b5591fe7805d84dfd334d1bb417aa9e756a596bd1f"
+    },
+    {
+      "path": "lib/intelligence/executive-homepage.ts",
+      "sha256": "5213c014e3c93ca83463537151c9d4b51306777e9c3e210c7b1454ff4fd2705d"
+    },
+    {
+      "path": "lib/intelligence/layer.ts",
+      "sha256": "6e37aad814d3d12c4f38455c0c3f9964aa85dccb982cc861670ac920148c1521"
+    },
+    {
+      "path": "lib/intelligence/operational-evidence.ts",
+      "sha256": "2185d43faac75a70aa18e0ee9ce5f14bd33b32e3289eb01402023c63bd368cd9"
+    },
+    {
+      "path": "lib/intelligence/source-parent-eligibility.ts",
+      "sha256": "440b06e2a015879fddc00e1ac4115440bdd94f2daedc914fbd84fed0597d56b7"
+    },
+    {
+      "path": "lib/records/asset-check-history.ts",
+      "sha256": "ea248d72c02afd7938676ffeac25fa88a08f9f62d0adfdd94e1f43a45d5d9daf"
+    },
+    {
+      "path": "lib/security/rate-limit.ts",
+      "sha256": "aecaa568e3a7c4b1f254fb07c56915ebacc4016a63a5690fa78fb3dbeb411b56"
+    },
+    {
+      "path": "lib/security/tool-execution-gateway.ts",
+      "sha256": "e521bb3900454d7f06877088a3ae814fcff1726ac7027e6df985c0edb4321046"
+    },
+    {
+      "path": "lib/supabase/types.ts",
+      "sha256": "74da9bfad814f3a9803012816aafc8bcfe5e2ce8ff7d8ba3b3866d30be5a384d"
+    },
+    {
+      "path": "package.json",
+      "sha256": "870375bf85a63ea36d58ad4827e4090011684b92954852a14b0c16ecc914a4b9"
+    },
+    {
+      "path": "scripts/adversarial-regression-tests.js",
+      "sha256": "8a751fc8b00ec90bf5ba98a6c543fc0179b3d351510babd4aaf20408361ab82e"
+    },
+    {
+      "path": "scripts/agents-retirement-regression-tests.js",
+      "sha256": "42853fc73373729890fd92a16a1b83c37b7523f0eff5ac6f9d9919c60379ee8b"
+    },
+    {
+      "path": "scripts/audit-bounded-run.cjs",
+      "sha256": "6d62fdcb0e28bc3dfb255a66f8fe6f29f9375e4bbfc7d76fb44a8ac1d35eacc3"
+    },
+    {
+      "path": "scripts/audit-cost-regression.cjs",
+      "sha256": "ca90430bf470b49643136239d7e4887bf7c86c7c3da9292ef3f9fe900f22169f"
+    },
+    {
+      "path": "scripts/audit-health-trend-regression.cjs",
+      "sha256": "54b375d0282d6fa3b538d54b1da1f0aeef2200401d16466a9be4917e34018a2e"
+    },
+    {
+      "path": "scripts/audit-import-evidence-fixes.cjs",
+      "sha256": "b973978a76bca4cdf5f341dd499c7106eae2f5edd20e96f1280e705caeed55a2"
+    },
+    {
+      "path": "scripts/audit-import-finalization.cjs",
+      "sha256": "3ecbc6b0538d6e6bb62aaf09fc6afc3869066ff79eac80eb6563571d3e02fa15"
+    },
+    {
+      "path": "scripts/audit-principal-parent-regression.cjs",
+      "sha256": "3e9f829fa6b646958f442cb8a1711ee8f72ce3645c15061e59f8bba79081a5d9"
+    },
+    {
+      "path": "scripts/audit-scheduler-regression.cjs",
+      "sha256": "0bcf8695360505275f8adb41b97bf82af566e9dd5da440a0b16f32bbb720c0f3"
+    },
+    {
+      "path": "scripts/billing-policy-regression-tests.js",
+      "sha256": "8a4d6f6f2f53f5f1d5e512cf436e69301935b935a343ec033ea7a0735151add0"
+    },
+    {
+      "path": "scripts/business-health-explanation-regression-tests.js",
+      "sha256": "e35202b4d43f98cdbc361bdad122c9fb567c9fb0a8faeba1f2933032fa2bc17a"
+    },
+    {
+      "path": "scripts/current-integrations-tests.cjs",
+      "sha256": "576e75855107e3399e06b39bd3a0088453fd4a236cbdb1de0ad0262a1f165c3e"
+    },
+    {
+      "path": "scripts/external-integrations-architecture-regression-tests.js",
+      "sha256": "87fe7c841b327a5fcb1ef32f93ca3f871e7e5df8452ca13350408adddc88426d"
+    },
+    {
+      "path": "scripts/file-analysis-regression-tests.js",
+      "sha256": "f280ca38136bc1eefb8561f90a076d19f9254af81cd2eb2cae1412308e03495f"
+    },
+    {
+      "path": "scripts/gpt56-business-health-routing-regression-tests.js",
+      "sha256": "56fe8f35d613b568a34740377bfa35c6347fdca1c72fd8e9d4f8720ac732b2e6"
+    },
+    {
+      "path": "scripts/integration-summary-preferences-database-tests.cjs",
+      "sha256": "5dacc7e8a274d0268e11d7daf44bd1447fc3150df2873556ec54d7ed031f26f4"
+    },
+    {
+      "path": "scripts/intelligence-briefing-generation-claim-regression-tests.js",
+      "sha256": "32b4a8359b3cafada7f86197719ccf4618be85381662acdcc31c135a03675de2"
+    },
+    {
+      "path": "scripts/intelligence-briefing-preflight-regression-tests.js",
+      "sha256": "9d7fb46775a82ab14094a06550e510b4fbdc59136f2140ca70a76e170ddb64b7"
+    },
+    {
+      "path": "scripts/interaction-feedback-regression-tests.js",
+      "sha256": "c59d10368e085caafb3433c18eb26995b3e660af826303fd97809b3462216f39"
+    },
+    {
+      "path": "scripts/lifecycle-consistency-regression-tests.js",
+      "sha256": "78365b4c01a123e1cdda9e36e9dd07936e5d973508f7d60b1e90e87dbb495084"
+    },
+    {
+      "path": "scripts/qbo-pending-cancellation-eligibility-database-tests.cjs",
+      "sha256": "a48abbdc50bb39e7e4956ea7b28a3a6556802ad12b666d5bcbb63c49cc7a9862"
+    },
+    {
+      "path": "scripts/qbo-production-candidate-runner-tests.cjs",
+      "sha256": "a5b609cf46b275fcc4570deab015d0108ce3595dd2d9d440cf68ce9332465cad"
+    },
+    {
+      "path": "scripts/run-phase8b-zero-based-delivery-migration-tests.js",
+      "sha256": "ca386031b1eb02d7ea53e391957ff7da6fbee588b8f367bba2c3f6c701daddeb"
+    },
+    {
+      "path": "scripts/run-qbo-production-candidate-database-tests.cjs",
+      "sha256": "57073da81198a3663a14496f99e8317c2780a8df6a187e03d1c475e00720be46"
+    },
+    {
+      "path": "scripts/run-square-account-connection-qualification.js",
+      "sha256": "92f4cf91c262c10db663d686222a59e343bacc959bc1cab348a3513a79d13cad"
+    },
+    {
+      "path": "scripts/run-square-broker-runtime-qualification.js",
+      "sha256": "d97c4cc186c081483f86c9958c839b51a367502cdffbfd03e263fab07e701d51"
+    },
+    {
+      "path": "scripts/run-square-durable-page-qualification.js",
+      "sha256": "391aa0131e1ed5286d7dbf96ad4e29a76275676ef2aa721f27312b3548463898"
+    },
+    {
+      "path": "scripts/run-square-gcp-callback-database-qualification.js",
+      "sha256": "f9b14404a384ef3d05e3d56e98c10d50e6a3df33819c3b1840a61c6d0a117aa4"
+    },
+    {
+      "path": "scripts/run-square-gcp-mapped-database-qualification.js",
+      "sha256": "cd9cf3aa6a5a20aec8532c8d555baec4d02c5ad7b9b203e53c0ae8a42fb5190b"
+    },
+    {
+      "path": "scripts/run-square-observation-database-qualification.js",
+      "sha256": "8390c92c9056f6ee6d54b06768576a7ad3518e86c965e20f2cc096e0650c3f17"
+    },
+    {
+      "path": "scripts/run-square-remote-sandbox-qualification.js",
+      "sha256": "2328428eb50c778cb87240beb30bdd0e21c985480af753c6df0dc5f84e7ccccb"
+    },
+    {
+      "path": "scripts/square-sheets-result-visibility-tests.cjs",
+      "sha256": "7041d796ac755878f8d18a73027a54402fc4d0850dc47cfed74a156309a737c1"
+    },
+    {
+      "path": "scripts/test-stubs/workspace-workflow-actions.tsx",
+      "sha256": "d0fa515bb2eebf70fddd9fe9e4d6e554d37eda1a147de64363d5dde3f940aeb7"
+    },
+    {
+      "path": "scripts/test-stubs/workspace-workflow-activity.tsx",
+      "sha256": "ecd6a10d9fe50b9a90f087d78e46dceb8656ff9ab59bcd9e8f847e3ef45548ec"
+    },
+    {
+      "path": "scripts/test-stubs/workspace-workflow-entry.tsx",
+      "sha256": "d94b329f078171c4cfc6b8f810eb4c22e1253f79e4dd8e8838ec3ad8c12bb487"
+    },
+    {
+      "path": "scripts/test-stubs/workspace-workflow-navigation.tsx",
+      "sha256": "216cfbbd23bc96d88f07ab854c24260262ee01889fedd0a778863339a5138c81"
+    },
+    {
+      "path": "scripts/workspace-executive-presentation-contract-tests.js",
+      "sha256": "d2eca996dff49e5821edfb43fefd46a0761717700f60803a3cb0c55c5c3b77f6"
+    },
+    {
+      "path": "scripts/workspace-security-database-tests.cjs",
+      "sha256": "91084205f86920627499f74d24d12ce6cd4987f49eb4561563ec3a3eee4230cc"
+    },
+    {
+      "path": "scripts/workspace-security-helper-tests.cjs",
+      "sha256": "2ae44532c38271d8204ee4d77f04287d9ed309b10e3907d0e952ff82ef3df6a6"
+    },
+    {
+      "path": "scripts/workspace-workflow-browser-tests.cjs",
+      "sha256": "b57f848dc004a9439d5195c9d90d587ef0f36c45b8511cf4b069db9ab1b487b9"
+    },
+    {
+      "path": "scripts/workspace-workflow-tests.cjs",
+      "sha256": "587c18ed2bd730bf31a69bfc3097846f353cf1d47fdcd45291828eebd8dcf76c"
+    },
+    {
+      "path": "supabase/migrations/20261005022017_workspace_security_boundaries.sql",
+      "sha256": "16974e4960b31dcbd80479e27734bf82cda7fb0cfc63c7a3d1d56b32114b661d"
+    },
+    {
+      "path": "supabase/migrations/20261005022445_workspace_persisted_usage_limits.sql",
+      "sha256": "5fd3459dafcbe199c8ff893dfb726bce30d850e55a229375482e54f3256495e6"
+    },
+    {
+      "path": "supabase/tests/external_integrations_phase_1_canonical_foundation.test.sql",
+      "sha256": "5359c4d01e6219c790c257497ad31023ba8a31f60426ba5c76b1c7ff724ca7b0"
+    },
+    {
+      "path": "supabase/tests/external_integrations_phase_4_control_plane.test.sql",
+      "sha256": "36d57ec1fa3e2343e07a3bdf916caa34ef6905d11591f07c3d7f3d543d626ea0"
+    },
+    {
+      "path": "supabase/tests/external_integrations_phase_8a0_contract_convergence.test.sql",
+      "sha256": "6892dc1ddee8f01f995fedfbe42bba6a6cfde928e749207bbc968c0e3ba87210"
+    },
+    {
+      "path": "supabase/tests/external_integrations_qbo_production_convergence.test.sql",
+      "sha256": "62f98e3bee5a1df1ae361ef49ada43a01ed605086d4cbee818e9e186608c7a60"
+    },
+    {
+      "path": "supabase/tests/integration_summary_preferences.test.sql",
+      "sha256": "38ecdaa35badeba30e9879ff09504c23e231fc7d40ec6d56344b00622e24b9db"
+    },
+    {
+      "path": "supabase/tests/security_high_findings_remediation.test.sql",
+      "sha256": "ba681e81f2b00e7f88426b03f349d632d15943ab8d3cd77a9e8b51f93c7b64f0"
+    },
+    {
+      "path": "supabase/tests/workspace_reporting_timezone.test.sql",
+      "sha256": "6b0575146d33fd16d3b239acbdbbdd06950a3175816dd5d71548d05e325247fc"
+    },
+    {
+      "path": "vercel.json",
+      "sha256": "1fb358f59faab6cd853d70b83a821c16bece147397bacd6a23ba007f4a745788"
+    }
+  ],
+  "scope": "Final proposed application source. Later audit documentation commits do not change these sources. Results are attributed to actual test environments and source hashes; no deployed-state certification.",
+  "nativeSecurityChecks": 119,
+  "workflowContracts": 36,
+  "browser": {
+    "runs": 2,
+    "groupsPerRun": 36,
+    "runtime": "Next App Router compiled React client",
+    "transport": "loopback synthetic"
+  },
+  "releaseGaps": [
+    "real Auth/API/Storage and provider workflows",
+    "schema-matched deployment rehearsal",
+    "100/250/500 active-user targets and multiworker soak",
+    "generic form pending/idempotency and backend-error retention",
+    "provider spend reservation and durable import/memory recovery"
+  ],
+  "hostedResults": "completion-hosted-ci.json",
+  "localFinalBuild": "server-adapter-build.json",
+  "allHostedJobsPassed": true
+}

@@ -1,0 +1,57 @@
+{
+  "packageScript": "security:check",
+  "command": "node scripts/security-check.ts && node scripts/adversarial-regression-tests.js && node scripts/security-high-remediation-regression-tests.js && node scripts/security-medium-hardening-regression-tests.js && node scripts/auth-captcha-regression-tests.js && node scripts/customer-1-billing-remediation-regression-tests.js && node scripts/platform-failure-evidence-regression-tests.js && node scripts/demo-retirement-regression-tests.js && node scripts/search-ask-generation-regression-tests.js && node scripts/persistent-ask-regression-tests.js && node scripts/ask-vaeroex-retirement-regression-tests.js",
+  "exitCode": 0,
+  "signal": null,
+  "elapsedMs": 12723,
+  "logSha256": "cb07713bbef046b0ab4f3410d281873c3779656d8ccb327bba1528a2334e9acf",
+  "sourceCommit": "7090198137261c850a3bcca8248813f5deed923c",
+  "workingTreeTestCorrections": true,
+  "applicationChanges": false,
+  "securityCommands": 11,
+  "snapshotGuard": {
+    "validSharedLoader": true,
+    "negativeMutationsRejected": 8,
+    "requiredConditions": [
+      "no required source errors",
+      "sufficient evidence"
+    ],
+    "requiredScope": [
+      "awaited writer",
+      "scoped Supabase client",
+      "workspaceId"
+    ],
+    "mutations": [
+      "remove source-error condition",
+      "remove evidence-available condition",
+      "OR instead of AND",
+      "remove guard",
+      "move write to else",
+      "add unguarded write",
+      "remove writer",
+      "change workspaceId"
+    ]
+  },
+  "loaderRegression": {
+    "exactBaselineContracts": 8,
+    "fullViewCoreFailureCasesWithoutSnapshotWrites": 16,
+    "emptyContractWithoutSnapshotWrites": true
+  },
+  "checks": {
+    "fullSecurityChain": "passed",
+    "loaderRegression": "passed",
+    "typescriptNoEmit": "passed",
+    "scopedEslint": "passed",
+    "gitDiffCheck": "passed"
+  },
+  "sourceHashes": {
+    "scripts/security-check.ts": "85218197871f49635f899a6bdf56001c0af1d98364f4e27152e84d5ff2313ac2",
+    "scripts/workspace-health-loader-regression-tests.cjs": "b7206271f2d4f8a388bb30b56926a3daf4fad42f1f25df3625d006848febb05b"
+  },
+  "applicationBytesUnchanged": true,
+  "limitations": [
+    "Local regression evidence does not substitute for the final corrected-head CI run.",
+    "Three pre-existing debug-rendering warnings remain unchanged.",
+    "No production request, migration, provider activation or capacity measurement performed."
+  ]
+}

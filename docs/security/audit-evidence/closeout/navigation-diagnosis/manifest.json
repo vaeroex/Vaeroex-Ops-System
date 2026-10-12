@@ -1,0 +1,92 @@
+[
+  {
+    "path": "README.md",
+    "bytes": 6518,
+    "sha256": "8f8b869087de5a9634cf3d7467e749b9408b3068d561ca888e6720f98379eadd"
+  },
+  {
+    "path": "navigation-decoder-review.cjs",
+    "bytes": 8843,
+    "sha256": "b04ebace86300ec6346efd1cc0af9cab31de394c1dc5de0f1b96d1b7bf9aa842"
+  },
+  {
+    "path": "navigation-decoder-review.json",
+    "bytes": 3781,
+    "sha256": "6b36c03f673b7209c487496bb5fea5ee42e7eaf74943758d37306db2b79dabe8"
+  },
+  {
+    "path": "navigation-lazy-no-preload-review.cjs",
+    "bytes": 10757,
+    "sha256": "0b2be081b971ec49be27c1515a7820611db6ea83e642233789fb0b7d7658e2b9"
+  },
+  {
+    "path": "navigation-lazy-no-preload-review.json",
+    "bytes": 43918,
+    "sha256": "18ece4542d6abe2cc53acfaf097a15bf1da911a42b198f31744a45b010a81e73"
+  },
+  {
+    "path": "navigation-no-interception-review.cjs",
+    "bytes": 7553,
+    "sha256": "2c74dae6f8041acb111055698f6e174b90b1488b50bde172635859f674834420"
+  },
+  {
+    "path": "navigation-no-interception-review.json",
+    "bytes": 2830,
+    "sha256": "be7079972cc5d5d4c4403c8ad836fae8e76476f739cd8f5c4e1b35bd425a980d"
+  },
+  {
+    "path": "navigation-reducer-review.cjs",
+    "bytes": 10180,
+    "sha256": "fb3547934dda279981e2814dabddb16d34bebb3235d16f0006c5453eb1ce0de2"
+  },
+  {
+    "path": "navigation-reducer-review.json",
+    "bytes": 4367,
+    "sha256": "6fd67892177bbda70eb450c21898bd021285dc21bd66bbe2f4303001918433f6"
+  },
+  {
+    "path": "navigation-review.cjs",
+    "bytes": 6435,
+    "sha256": "f687499beb89a417f46fe83b391e9b633e2d999ca332074346b7ad2d9bff9fbe"
+  },
+  {
+    "path": "navigation-review.json",
+    "bytes": 2551,
+    "sha256": "0b1152fc1d2045c35e4aaed0875849d1e40b674b6d1b7728b1e4f371be9da738"
+  },
+  {
+    "path": "navigation-root-state-review.cjs",
+    "bytes": 11739,
+    "sha256": "d6f9e7b4e8cd25fbcca75a1113d53300faa04235f17d41aa3d92f6ec7b93eb20"
+  },
+  {
+    "path": "navigation-root-state-review.json",
+    "bytes": 59061,
+    "sha256": "0c0b268c0b4777916f14e05f711455f91fc25bbda53fb152e2582c5829e8eb9d"
+  },
+  {
+    "path": "navigation-suspension-review.cjs",
+    "bytes": 12323,
+    "sha256": "7ffc884502a2f136c13475fd755c0af916d6da24851461e08197f2776528170e"
+  },
+  {
+    "path": "navigation-suspension-review.json",
+    "bytes": 69318,
+    "sha256": "6ef3b3f32bd9985fbab3a3c61d2ff63cc9c99833d121bcaea0d9d0e5e5726a78"
+  },
+  {
+    "path": "vaeroex-closeout-e2e-navigation-lint.log",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "vaeroex-closeout-navigation-helper-selftest.cjs",
+    "bytes": 6344,
+    "sha256": "908e493acd618b7751ad7d1492eecf44dd21e7501b7e19a76889c9cc36ea49f4"
+  },
+  {
+    "path": "vaeroex-closeout-navigation-helper-selftest.log",
+    "bytes": 2459,
+    "sha256": "835980477864ed77930a01eb455bfd5a6c965cfef95aea85ac70cb0db28cb4c0"
+  }
+]

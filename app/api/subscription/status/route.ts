@@ -19,15 +19,16 @@ export async function GET() {
   }
 
   const context = await getWorkspaceContext();
-  const result = await getSubscriptionUsageStatus({
-    supabase,
-    userId: user.id,
-    email: user.email,
-    workspaceId: context.activeWorkspace?.id
-  });
+  try {
+    const result = await getSubscriptionUsageStatus({
+      supabase,
+      userId: user.id,
+      email: user.email,
+      workspaceId: context.activeWorkspace?.id
+    });
 
-  return NextResponse.json({
-    ok: true,
-    ...result
-  });
+    return NextResponse.json({ ok: true, ...result });
+  } catch {
+    return NextResponse.json({ ok: false, error: "Workspace usage is temporarily unavailable. Please try again." }, { status: 503 });
+  }
 }

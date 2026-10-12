@@ -1,0 +1,20 @@
+{
+  "observed_at": "2026-10-04",
+  "configured_project": "vaeroex-document-worker",
+  "configured_region": "us-west1",
+  "operation": "gcloud run services list with projection limited to service identity, ready revision, concurrency, timeout and resource limits",
+  "remote_result": "blocked_reauthentication_required",
+  "remote_service_data_obtained": false,
+  "first_attempt": "sandbox credential-cache access prevented read-only command",
+  "second_attempt": "read-only command elevation approved; gcloud existing session reauthentication failed noninteractively",
+  "secrets_or_tokens_printed": false,
+  "auth_or_remote_configuration_changed": false,
+  "not_attempted": [
+    "auth login",
+    "token output",
+    "secret/env reads",
+    "remote job dispatch",
+    "mutations",
+    "production workload calls"
+  ]
+}

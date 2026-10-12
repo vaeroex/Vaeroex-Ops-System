@@ -1,0 +1,155 @@
+
+> vaeroex-ops-system@0.1.0 test:workspace-clarity /Users/isaacvizcarra/.codex/worktrees/workspace-audit-fixes/Vaeroex
+> node --test scripts/workspace-navigation-list-regression-tests.js scripts/intelligence-inbox-ui-regression-tests.js scripts/evidence-browsing-clarity-regression-tests.js scripts/settings-clarity-regression-tests.js scripts/interaction-feedback-regression-tests.js scripts/source-upload-action-tests.js scripts/source-upload-form-tests.js && pnpm test:workspace-redesign && pnpm test:admin-company-management
+
+Evidence browsing clarity: 357-record batches, visible-only selection, mounted composer, filters, and lifecycle regressions passed.
+✔ 125 and 357 shown records retain a 100-ID action cap, truthful selection label, and one confirmed submission (122.668292ms)
+✔ incremental selection stays capped as batches grow and subset lists keep Select All behavior (16.275125ms)
+✔ Intelligence SSR dates match browser rendering across timezones and preserve reporting days (754.8735ms)
+✔ 320 current findings are batched by ten in All, with truthful remaining-category text (486.892041ms)
+✔ default desktop selection uses the first sorted visible finding, while explicit deep links override it (72.601ms)
+✔ mobile selection and Back restore the list without resetting filters, batch, or scroll target (36.62075ms)
+✔ confidence and history changes reset the batch while deep links still open a finding beyond it (70.91225ms)
+✔ confidence-filter fallback becomes the selection and survives clearing the filter without reopening mobile Back (26.670959ms)
+✔ unavailable briefings collapse only on request, retaining completed and generatable briefings (15.622375ms)
+✔ the main route places findings before briefings without changing their data loading (0.275ms)
+✔ security feedback remains explicit without trapping workspace navigation (70.462375ms)
+✔ error feedback stays readable until explicitly dismissed (16.768375ms)
+✔ message feedback stays readable until explicitly dismissed (16.850542ms)
+✔ first submission is acknowledged and a repeated submit before render is blocked (26.070833ms)
+✔ controlled action pending keeps the capture lock when host form context resets (48.195167ms)
+✔ cancelled submissions do not lock the form (7.106334ms)
+✔ an uncertain timeout keeps the submission locked without inviting a blind retry (4.356542ms)
+✔ a completed action releases the submission lock for a subsequent intentional submission (11.123333ms)
+✔ primary and analysis actions use the guarded submit control without changing their button styles (60.721916ms)
+✔ Settings puts the Integrations entry before account, workspace, and collapsed appearance (38.199709ms)
+✔ optional Square navigation retains its enabled-owner restriction on Integrations (227.265625ms)
+✔ password entry is collapsed until selected and response feedback opens it without changing the action (60.242334ms)
+✔ appearance shows a compact current setting with choices and preview disclosed separately (2.6135ms)
+Source upload action tests passed: retained validation state, one-time preparation, tenant/role gates, approval boundary, uncertain outcomes and legacy redirects.
+✔ scripts/source-upload-action-tests.js (2803.869833ms)
+✔ legacy dormant check exempts only the exact upload/feedback paths (1.518041ms)
+✔ one discreet generic reminder stays inside file upload without repeated workspace notices (9.607375ms)
+✔ both upload entry points reuse one persistent form with its reminder and entered work (115.098583ms)
+✔ first submit acknowledges immediately and blocks a repeated submission (21.556084ms)
+✔ recoverable validation preserves file and entered fields without resetting the form (1.086375ms)
+✔ lost transport acknowledgment stays readable and blocked without automatic retry (1.495833ms)
+✔ framework authentication redirects retain their control flow (1.800583ms)
+✔ workspace navigation matches path boundaries and labels the current destination without changing links (0.949416ms)
+✔ actual mobile menu and header expose the active destination before opening and preserve canonical navigation (165.088875ms)
+✔ mobile navigation closes its menu only for a link activation without intercepting normal navigation (18.330625ms)
+✔ numeric list batching is bounded and covers a 320-item list in six-row increments (0.364ms)
+✔ stale Performance detail selections fall back to overview while ordinary section precedence is preserved (0.1345ms)
+✔ 300 saved analyses render in 25-row batches without changing or skipping a saved record (466.867167ms)
+✔ Saved Analyses Select all visible never selects unloaded cards and filtering clears selection and resets the batch (74.650292ms)
+✔ Saved Analyses search includes records beyond the first batch and empty states distinguish no records from no match (99.702083ms)
+ℹ tests 39
+ℹ suites 0
+ℹ pass 39
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2820.661333
+
+> vaeroex-ops-system@0.1.0 test:workspace-redesign /Users/isaacvizcarra/.codex/worktrees/workspace-audit-fixes/Vaeroex
+> node --test scripts/business-health-visual-alternatives-tests.js scripts/performance-metric-list-tests.js scripts/workspace-executive-presentation-contract-tests.js scripts/workspace-redesign-contract-tests.js && node scripts/workspace-redesign-ui-tests.js && pnpm test:evidence-ui && pnpm test:homepage && pnpm test:executive-kpi-analysis-retirement && pnpm test:spatial-ui
+
+✔ scorecard: preserves supplied values and status at all existing boundaries (8.719334ms)
+✔ scorecard: null is unavailable, not a zero measurement (1.072834ms)
+✔ scorecard: keeps display clamping and fractional fill without rounding score (3.637875ms)
+✔ arc: preserves supplied values and status at all existing boundaries (5.358458ms)
+✔ arc: null is unavailable, not a zero measurement (0.437834ms)
+✔ arc: keeps display clamping and fractional fill without rounding score (1.183334ms)
+✔ ten equal scale segments do not add thresholds, calculations, state or interactions (1.924417ms)
+✔ existing KPI business, value, history, comparison and edit helpers remain byte-equivalent after TypeScript printing (1440.124875ms)
+✔ the original workspace-scoped queries, eligibility, canonical calculations and detail data statements are unchanged (1.586917ms)
+✔ all seven existing mutation forms preserve targets, named fields and safeguards (3.341625ms)
+✔ actual Performance renders bounded six-row batches over the full 112-metric fixture (2907.845792ms)
+✔ search, category and existing status combine across the complete loaded set before six-row batching (2246.037125ms)
+✔ metric search normalizes normal, empty and repeated parameters to the first supported string (4035.228125ms)
+✔ category normalizes single, empty and repeated parameters without trimming or reclassifying categories (6384.883208ms)
+✔ new single-value filters normalize together and preserve existing dates, status, batching and detail return context (18450.883125ms)
+✔ normalizing list filters preserves intentionally multi-value metric comparison selection (848.503625ms)
+✔ zero remains a value, null remains unavailable, and long metric identities remain intact (1212.008208ms)
+✔ the existing deterministic status and category populations are neither merged nor reclassified (2785.678209ms)
+✔ detail and Back retain search/category/status/batch and the exact custom date range (747.855834ms)
+✔ the filter form is GET-only and empty results retain a bounded path back (818.837542ms)
+✔ category selection remounts when available options change and preserves an unavailable selected value (1109.645291ms)
+✔ timeline controls retain list filters and custom-range fields without changing recorded-value semantics (1121.555583ms)
+✔ components/intelligence/ExecutiveHomepage.tsx preserves the inventoried workflow beneath its presentation (22.751625ms)
+✔ components/intelligence/IntelligenceSignalInbox.tsx preserves the inventoried workflow beneath its presentation (27.411083ms)
+✔ components/intelligence/IntelligenceBriefingCards.tsx preserves the inventoried workflow beneath its presentation (2.115375ms)
+✔ components/intelligence/IntelligenceBriefingViewer.tsx preserves the inventoried workflow beneath its presentation (2.473583ms)
+✔ app/app/intelligence/page.tsx preserves the inventoried workflow beneath its presentation (10.219167ms)
+✔ app/app/intelligence/briefings/page.tsx preserves the inventoried workflow beneath its presentation (0.86875ms)
+✔ current integration dashboard rejects changed imports, authorization, scope, props and restored sections (25.186ms)
+✔ dashboard exceptions reject missing, duplicate and extra bindings (31.966208ms)
+✔ the integration exception still detects changes to existing Intelligence imports, queries and state (16.121917ms)
+✔ accounting exception rejects changed scope, timing and current evidence bindings (10.0415ms)
+✔ source-parent completeness exception rejects altered scope, rows and consumer evidence (23.459125ms)
+✔ source-parent completeness exception rejects missing, duplicate and extra bindings (16.66075ms)
+✔ legacy dormant scope permits only the nine authorized presentation paths, not neighboring or backend files (0.9ms)
+✔ presentation scope excludes Admin while retaining customer workspace navigation (0.523792ms)
+✔ standalone Square panel uses the same theme scope without substituting its handlers (0.588792ms)
+✔ visual theme remains scoped, semantic and responsive (0.700542ms)
+✔ Light list surfaces have readable foregrounds without recoloring primary actions or dark detail panels (0.545083ms)
+ℹ tests 39
+ℹ suites 0
+ℹ pass 39
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 44644.286625
+Workspace preview: note form classification, readable unavailable result and reset preservation passed; 56 route/state/role server renders passed (six AppShell routes + standalone Square); real CurrentIntegrations empty dashboard, inbox/briefings, owner-only Settings timezone form, exact inert action export and live-client import boundary verified. No browser/backend authorization testing claimed.
+
+> vaeroex-ops-system@0.1.0 test:evidence-ui /Users/isaacvizcarra/.codex/worktrees/workspace-audit-fixes/Vaeroex
+> node scripts/evidence-source-experience-tests.js
+
+Evidence source experience regression tests passed.
+
+> vaeroex-ops-system@0.1.0 test:homepage /Users/isaacvizcarra/.codex/worktrees/workspace-audit-fixes/Vaeroex
+> node scripts/executive-homepage-regression-tests.js
+
+Executive homepage regressions passed.
+
+> vaeroex-ops-system@0.1.0 test:executive-kpi-analysis-retirement /Users/isaacvizcarra/.codex/worktrees/workspace-audit-fixes/Vaeroex
+> node scripts/executive-kpi-analysis-retirement-regression-tests.js
+
+Executive KPI Analysis retirement regressions passed.
+
+> vaeroex-ops-system@0.1.0 test:spatial-ui /Users/isaacvizcarra/.codex/worktrees/workspace-audit-fixes/Vaeroex
+> node scripts/spatial-ui-regression-tests.js
+
+Authenticated classic-workspace and public spatial boundary regressions passed.
+
+> vaeroex-ops-system@0.1.0 test:admin-company-management /Users/isaacvizcarra/.codex/worktrees/workspace-audit-fixes/Vaeroex
+> node scripts/admin-company-management-regression-tests.js && node --test scripts/admin-account-action-tests.js
+
+Admin company-management regressions passed.
+✔ all admin actions deny signed-out, non-admin and unconfigured sessions before reading or changing accounts (369.789333ms)
+✔ invalid account targets, statuses and lifecycle actions fail before mutation (95.051292ms)
+✔ access editing changes only the submitted workspace access fields and emits its scoped audit (21.74325ms)
+✔ subscription edits derive workspace from the stored subscription, preserving identity and provider billing fields (25.456625ms)
+✔ write failures surface errors without reporting success or altering fixture state (34.261125ms)
+✔ external or malformed return targets fall back to the existing admin route (54.892625ms)
+✔ archive and restore send exact workspace/actor targets and preserve access, subscriptions and account history (11.906916ms)
+✔ lifecycle RPC rejections are surfaced with blocked audit metadata and no fixture changes (24.0575ms)
+✔ real lifecycle controls require confirmation, cancel without submission and disable while pending (52.108916ms)
+✔ older pending requests remain actionable after twelve newer resolved requests (47.8015ms)
+✔ account overview reads at most 100 workspace memberships and only those members' profile identities (29.962542ms)
+✔ billing overview distinguishes no linked subscription from workspace fallback status and a failed read (48.263334ms)
+✔ overview read errors and unknown counts stay unavailable instead of being reported as zero or absent (57.149417ms)
+✔ manual subscription partial failure is a persistent error, never confirmed access or a blind retry (29.887042ms)
+✔ ordinary non-admin pilot: manual grant targets one workspace, preserves Stripe/other workspace, and can end without disabling login (25.473542ms)
+✔ first-time manual pilot record is unlinked for setup, never moves an existing workspace record (19.944834ms)
+✔ manual lookup failures or unknown workspace cause no writes; a rejected second write stops with exact partial-result feedback (53.534959ms)
+ℹ tests 17
+ℹ suites 0
+ℹ pass 17
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1185.393125

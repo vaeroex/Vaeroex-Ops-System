@@ -1,0 +1,2 @@
+{"test":"docx_unbounded_decompression","fixtureBytes":2215,"observations":[{"compressedBytes":2083,"expandedBytes":2097188,"maxOutputLength":null}],"result":"REPRODUCED","syntheticOnly":true,"maximumExpandedBytes":2097192}
+{"test":"xlsx_forged_uncompressed_size_bypasses_preinflate_limits","fixtureBytes":2215,"declaredExpandedBytes":1,"observations":[{"compressedBytes":2083,"expandedBytes":2097188,"maxOutputLength":null}],"errorAfterExpansion":"The XLSX package contains an incomplete file entry.","result":"REPRODUCED","syntheticOnly":true}

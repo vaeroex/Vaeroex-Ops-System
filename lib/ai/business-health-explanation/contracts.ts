@@ -32,6 +32,7 @@ export type BusinessHealthExplanationSubmode =
   | "healthy_slowing"
   | "stable"
   | "watch_recovering"
+  | "watch_worsening"
   | "at_risk_worsening"
   | "evidence_limited"
   | "evidence_stale";
@@ -52,6 +53,7 @@ export type BusinessHealthExplanationDriver = Readonly<{
   scoreImpact: number;
   citationIds: readonly number[];
   limitation: string | null;
+  investigationNext?: string;
 }>;
 
 export type BusinessHealthExplanationFacts = Readonly<{

@@ -1,0 +1,56 @@
+{
+  "kind": "health_existing_artifact_save_v1",
+  "sourceCommit": "639c4670895c835a62de51f0999e5e48cd3d6434",
+  "buildId": "Nn-YxH6DTf0HzOgt91urw",
+  "runId": "a1e04d67-2093-4783-b5d9-815b7c3c97f5",
+  "matrixEvidenceSha256": "8b67117753c5f973c480096adb0218c79cb3d54b924830ec14a83b1e37c19bd8",
+  "harnessSha256": "4a3c2dbb6a55380d7fcbe97f120c50482ff0ac69edb6aa79340b3035b193cdc2",
+  "startedAt": "2026-10-06T01:21:32.641Z",
+  "generationSubmitted": false,
+  "productionTouched": false,
+  "capacityClaim": false,
+  "passed": true,
+  "errors": [],
+  "checks": [
+    {
+      "name": "save_existing_validated_artifact",
+      "width": 1440,
+      "automaticFeedback": "Already saved",
+      "pendingCleared": true,
+      "newReports": 1,
+      "artifactAndCitationsCopiedExactly": true
+    },
+    {
+      "name": "two_repeated_authenticated_save_requests",
+      "acknowledgedAlreadySaved": 2,
+      "canonicalReports": 1,
+      "requestBodySha256": "404f891dff9e39881d2060ddf8a12f99247b023db802cae11474a33851ef966f"
+    },
+    {
+      "name": "persisted_already_saved_mobile_and_detail",
+      "width": 390,
+      "automaticTransition": true,
+      "citationVisible": true,
+      "pendingCleared": true
+    }
+  ],
+  "osNetworkDenial": "EPERM",
+  "databaseIdentity": {
+    "migrationCount": 136,
+    "migrationVersionsSha256": "cbbc1c11c27de71f59a2d12d223fd93708d023cc3e3d68160ae27a6251559817",
+    "schemaFingerprint": "41a316952fddf5da306655c42b58c4667fc70c0678b27ff7b93b43973adeaac8",
+    "exactRepositoryVersions": true,
+    "retainedCapacitySchemaMatched": true,
+    "productionPrefixDifferent": true
+  },
+  "preservation": {
+    "originalSavedReports": 3,
+    "originalReportRowsUnchanged": true,
+    "healthHistoryAndArtifactsUnchanged": true,
+    "priorWorkspacesUnchanged": true,
+    "canonicalReportAdded": 1,
+    "canonicalReportId": "17434111-36a5-4561-8c3f-7b4f22551ff8",
+    "providerRequests": 0
+  },
+  "finishedAt": "2026-10-06T01:21:38.499Z"
+}

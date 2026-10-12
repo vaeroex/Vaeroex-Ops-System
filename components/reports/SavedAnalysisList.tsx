@@ -25,7 +25,7 @@ function readableDate(value: string) {
   const date = new Date(value);
   return Number.isNaN(date.getTime())
     ? "Date unavailable"
-    : new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(date);
+    : new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }).format(date);
 }
 
 export function SavedAnalysisList({ analyses, loadLimitReached = false }: { analyses: readonly SavedAnalysisListItem[]; loadLimitReached?: boolean }) {

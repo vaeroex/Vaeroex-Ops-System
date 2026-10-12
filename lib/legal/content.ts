@@ -8,8 +8,9 @@ export const LEGAL_DOCUMENT_VERSIONS = {
   acceptableUse: "2026-08-20",
   refundPolicy: "2026-08-20",
   sensitiveData: "2026-08-20",
-  subscriptionBillingTerms: "2026-08-20",
-  dataRetention: "2026-08-20",
+  subscriptionBillingTerms: "2026-10-12.1",
+  dataRetention: "2026-10-12",
+  workspaceCapacity: "storage-capacity-v1",
   humanReview: "2026-08-20"
 } as const;
 
@@ -25,6 +26,7 @@ export type LegalDocumentId =
   | "sensitive-data-policy"
   | "subscription-billing-terms"
   | "data-retention"
+  | "workspace-capacity-terms"
   | "human-review";
 
 export type LegalDocument = {
@@ -46,6 +48,7 @@ export const legalLinks: Array<{ href: Route; label: string }> = [
   { href: "/subscription-billing-terms", label: "Subscription Billing Terms" },
   { href: "/sensitive-data-policy", label: "Sensitive Data Policy" },
   { href: "/data-retention", label: "Data Retention" },
+  { href: "/workspace-capacity-terms", label: "Workspace Capacity Terms" },
   { href: "/human-review", label: "Human Review" },
   { href: "/contact", label: "Contact" }
 ];
@@ -350,13 +353,14 @@ export const legalDocuments: Record<LegalDocumentId, LegalDocument> = {
     href: "/subscription-billing-terms",
     updated: LEGAL_DOCUMENT_VERSIONS.subscriptionBillingTerms,
     sections: [
-      { title: "Single Plan", body: ["Vaeroex currently offers one customer-facing plan: Vaeroex Executive Intelligence, $500/month, Everything Included."] },
+      { title: "Base Plan", body: ["The Vaeroex Executive Intelligence base subscription is $250/month and includes the product's standard features and allowances. Optional workspace capacity is purchased explicitly and billed separately under the Workspace Capacity Terms."] },
       { title: "Vaeroex Checkout", body: ["Vaeroex subscriptions are purchased through Vaeroex checkout, the Vaeroex Direct Website, or official Vaeroex sales channels. Promotions, discounts, and special offers may be available through those same Vaeroex channels."] },
       { title: "Access Matching", body: ["Customers should create their Vaeroex account with the same email used for Vaeroex checkout so subscription access can be matched."] },
       { title: "Manage Billing and Cancellation", body: [`Customers may manage and cancel an eligible subscription through Manage billing in the Stripe Customer Portal. ${VAEROEX_CONTACT_EMAILS.billing} remains available for billing assistance.`] },
       { title: "Renewal and Cancellation Timing", body: ["Vaeroex subscriptions renew automatically unless cancellation is scheduled. A scheduled cancellation prevents the next renewal and takes effect at the end of the current paid billing period, based on the billing provider's actual period-end timestamp. Access continues through that paid period."] },
       { title: "Refunds and Unused Time", body: ["All purchases and subscription payments are final and non-refundable, except where a refund is required by applicable law. Cancellation does not provide a prorated refund, credit, or refund for unused time in the current paid billing period."] },
       { title: "Access Changes", body: ["Once the current paid billing period ends, a canceled subscription may be routed to the billing-required flow unless access is manually unlocked by Vaeroex. Expired or past-due subscriptions may also be routed to that flow."] },
+      { title: "Optional Workspace Capacity", body: ["Capacity purchases are separate from the base subscription. Canceling or failing to renew a capacity purchase does not cancel base-plan access or delete existing originals. Only new uploads that exceed the resulting workspace allowance are blocked. Owners manage capacity purchases in Settings → Usage & Storage; the Workspace Capacity Terms describe that allowance and purchase consent."] },
       { title: "Subscription Pricing", body: ["Your subscription price will not increase while your subscription remains continuously active. If Vaeroex lowers the applicable subscription price, active subscribers will receive the lower price for future renewals.", "If you cancel and later resubscribe, your new subscription will be subject to the pricing available at the time you resubscribe. A price reduction does not provide a retroactive refund or credit for billing periods already paid."] }
     ]
   },
@@ -369,7 +373,26 @@ export const legalDocuments: Record<LegalDocumentId, LegalDocument> = {
     sections: [
       { title: "Retention Purpose", body: ["Vaeroex may retain account, workspace, support, billing, usage, audit, and security records as needed to operate the platform, resolve issues, enforce agreements, and comply with applicable obligations."] },
       { title: "Customer Records", body: ["Workspace owners should decide what business records to keep, archive, or delete according to their own policies and legal obligations."] },
+      { title: "Uploaded-File Trash", body: ["New deletions of uploaded originals use a 30-day recoverable Trash period unless an authorized user explicitly confirms permanent deletion sooner. All retained originals, including archived files and Trash, continue to use uploaded-file bytes and file slots until physical deletion is confirmed. Historical deleted originals present before this policy took effect remain protected from permanent deletion pending advance notice and a recovery/export window. The Workspace Capacity Terms describe file retention, separate business records, and capacity behavior."] },
       { title: "Backups and Logs", body: ["Deleted records may remain in backups or operational logs for a limited period depending on infrastructure and support needs."] }
+    ]
+  },
+  "workspace-capacity-terms": {
+    id: "workspace-capacity-terms",
+    title: "Workspace Capacity Terms",
+    summary: "Included uploaded-file capacity, optional recurring packs, and recoverable file deletion for each workspace.",
+    href: "/workspace-capacity-terms",
+    updated: LEGAL_DOCUMENT_VERSIONS.workspaceCapacity,
+    sections: [
+      { title: "Independent Included Allowance", body: ["Each workspace independently includes 15 GB of uploaded-original storage and 500 retained-file slots. Allowances are not pooled across workspaces or businesses. One GB means 1,000,000,000 bytes; an individual original may be up to 25 MiB (26,214,400 bytes)."] },
+      { title: "What Uses Capacity", body: ["Active originals, archived originals, recoverable Trash, and protected historical Trash use both storage bytes and file slots until permanent deletion is confirmed. Missing originals do not consume uploaded-file capacity. Uploads in progress reserve capacity before admission. Synced integration data, chats, saved analyses, extracted text, derived database records, and infrastructure backups are outside this paid uploaded-file quota. Their separate service and processing limits still apply."] },
+      { title: "Explicit Recurring Purchase", body: ["A workspace owner may explicitly buy one or more recurring capacity packs for that workspace. Each pack adds 10 GB and 500 retained-file slots for exactly $5 USD for the first payment and $5 USD each month after that, including applicable tax. No additional tax or processing fee is added to that advertised price. The self-service purchase limit is 10 committed packs. Each subscription counts once while it can renew or has a paid period that has not ended or been fully refunded. This includes unpaid or refunded renewable subscriptions and disputed paid periods that could regain capacity; disputed periods reserve their packs until the period ends. A fully refunded subscription stops counting after renewal is canceled unless another qualifying paid period remains. Only currently paid, undisputed capacity increases the allowance, up to 115 GB and 5,500 slots including the base allowance. Owners may need to resolve existing renewals or wait for a committed period to end before buying additional packs. Larger needs require a separately qualified plan; buying storage does not raise unrelated processing or integration limits.", "Before payment confirmation, the review shows the workspace, number of packs, new total allowance, recurring price, exact amount due immediately, exact renewal date, and cancellation effect. Each purchase has its own monthly renewal schedule. Existing purchases keep their renewal dates, and scheduled cancellations are excluded from the future recurring-charge total. Vaeroex does not automatically buy more packs or charge usage overages when the workspace fills."] },
+      { title: "Billing Address and Included Tax", body: ["The workspace owner supplies a billing address so Stripe can determine any tax included in the advertised price. Vaeroex sends the address to Stripe for billing and tax calculation; it is not saved in Vaeroex workspace records. The purchase cannot proceed unless the exact tax-inclusive amount and renewal date have been confirmed. Card details are entered in Stripe's secure embedded fields and transmitted directly to Stripe."] },
+      { title: "Confirmation and Renewal", body: ["Purchases require explicit recurring-payment consent, including authorization for Stripe to save the payment method for these monthly renewals, followed by confirmation using Stripe's secure embedded payment fields. Preparing a review or an unpaid invoice does not authorize a charge or grant capacity. Capacity is granted automatically only after the payment provider confirms a successful attributed payment. A return URL does not prove payment. The capacity subscription renews automatically at the disclosed rate until its renewal is canceled.", "An owner may explicitly resolve a failed renewal by reviewing and paying the existing invoice for its displayed capacity period. That payment does not buy additional packs or restart a canceled renewal. The review shows whether any future renewal remains scheduled, the exact invoice amount, and the paid period before payment confirmation."] },
+      { title: "Cancellation, Failed Payment, and Refund Effects", body: ["An owner can cancel a capacity subscription's renewal from Settings → Usage & Storage. Canceling renewal retains capacity until the end of the paid period and prevents the next capacity charge. A failed renewal does not create a new paid period. Existing originals remain accessible and retained, and retained originals may still be restored above the reduced allowance; only new uploads that exceed it are blocked.", "The Refund Policy applies. Cancellation does not itself provide a prorated refund or unused-time credit. A partial refund does not change that invoice's capacity; a full refund permanently revokes capacity for that invoice period. An active or lost payment dispute withdraws the affected invoice period's capacity. If a dispute is won or an inquiry is closed, reconciliation restores capacity for any unrefunded, currently paid period. These capacity effects do not delete existing files."] },
+      { title: "Trash and Permanent Deletion", body: ["A new deletion moves an original to recoverable Trash for 30 days. The original continues to use bytes and a file slot. Authorized users can restore or download it during that period, or explicitly confirm permanent deletion sooner. After the retention period it is eligible for permanent deletion. Bytes and the file slot are released after physical deletion is confirmed; pending or retried deletion remains visible as retained usage.", "Historical deleted originals present before this retention policy took effect remain protected from permanent deletion pending advance notice and a recovery/export window. They may be restored or downloaded while retained. Deleting an original does not silently delete saved analyses, imported business records, chats, or other separately retained records; those have their own deletion controls and applicable retention rules."] },
+      { title: "Existing Customers and Service Access", body: ["The included allowance applies separately to existing and new workspaces. Existing originals are not automatically deleted because an allowance is exceeded, a capacity purchase is canceled, or a capacity payment fails. File viewing, download, search, export, restoration, and ordinary workspace use remain subject to existing access permissions and separate service limits. This does not extend or replace the base subscription's access terms."] },
+      { title: "Relationship to Other Terms", body: ["These terms supplement the Terms of Service, Subscription and Billing Terms, Refund Policy, and Data Retention Notice for uploaded-file capacity. The base subscription and optional capacity purchases are distinct. A workspace owner accepts this capacity terms version during the specific capacity purchase; viewing storage usage does not authorize a purchase."] }
     ]
   },
   "human-review": {

@@ -1,0 +1,143 @@
+{
+  "scope": "Focused source SQL, real independent Postgres transactions; synthetic JWTs, vector represented as real[], no full Supabase/extraction-provider proof",
+  "migration": "20261005060101_atomic_confirmed_memory_publication.sql",
+  "checks": 34,
+  "results": [
+    {
+      "name": "first confirmed publication admits one bounded chunk",
+      "status": "pass"
+    },
+    {
+      "name": "all1205 old chunks are archived without deletion",
+      "status": "pass"
+    },
+    {
+      "name": "historical source metadata survives atomic merge",
+      "status": "pass"
+    },
+    {
+      "name": "lost acknowledgement retry returns the original citation IDs",
+      "status": "pass"
+    },
+    {
+      "name": "receipt records replay without duplicating job",
+      "status": "pass"
+    },
+    {
+      "name": "replay does not create another completed job",
+      "status": "pass"
+    },
+    {
+      "name": "same run cannot relabel committed content",
+      "status": "pass"
+    },
+    {
+      "name": "retry does not revive deliberately archived memory",
+      "status": "pass"
+    },
+    {
+      "name": "staff cannot elevate to operator confirmation",
+      "status": "pass"
+    },
+    {
+      "name": "viewer cannot confirm publication",
+      "status": "pass"
+    },
+    {
+      "name": "foreign workspace operator cannot publish",
+      "status": "pass"
+    },
+    {
+      "name": "actor identity cannot be forged",
+      "status": "pass"
+    },
+    {
+      "name": "a run from another source cannot be attached",
+      "status": "pass"
+    },
+    {
+      "name": "current metadata alone cannot forge run-to-file lineage",
+      "status": "pass"
+    },
+    {
+      "name": "ineligible current source run denied",
+      "status": "pass"
+    },
+    {
+      "name": "withdrawn source denied at commit",
+      "status": "pass"
+    },
+    {
+      "name": "subscription expiry denies publication through retained RLS",
+      "status": "pass"
+    },
+    {
+      "name": "post-publication job failure rolls back complete transaction",
+      "status": "pass"
+    },
+    {
+      "name": "rolled-back replacement retains only prior memory",
+      "status": "pass"
+    },
+    {
+      "name": "failed transaction does not retire previously approved memory",
+      "status": "pass"
+    },
+    {
+      "name": "rolled-back source receipt is absent",
+      "status": "pass"
+    },
+    {
+      "name": "sixteen independent approvals create one publication",
+      "status": "pass"
+    },
+    {
+      "name": "sixteen requests share the exact citation identity",
+      "status": "pass"
+    },
+    {
+      "name": "waiting stale analysis cannot replace a newer source generation",
+      "status": "pass"
+    },
+    {
+      "name": "membership revoked before publication is denied",
+      "status": "pass"
+    },
+    {
+      "name": "same source text in a newer run receives a new citation ID",
+      "status": "pass"
+    },
+    {
+      "name": "new run never rewrites the older citation provenance",
+      "status": "pass"
+    },
+    {
+      "name": "older immutable citation is archived not deleted",
+      "status": "pass"
+    },
+    {
+      "name": "repeatable-read loser fails safely after another publication",
+      "status": "pass"
+    },
+    {
+      "name": "processing a newer analysis cannot be cleared by old approval",
+      "status": "pass"
+    },
+    {
+      "name": "invalid second chunk rolls back the earlier chunk",
+      "status": "pass"
+    },
+    {
+      "name": "partial chunk batch persists no rows",
+      "status": "pass"
+    },
+    {
+      "name": "anonymous RPC execution denied",
+      "status": "pass"
+    },
+    {
+      "name": "generic service caller cannot bypass confirmed actor RPC",
+      "status": "pass"
+    }
+  ]
+}

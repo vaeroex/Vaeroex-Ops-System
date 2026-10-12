@@ -1,0 +1,61 @@
+{
+  "scope": "actual helper logic with synthetic database responses; no HTTP/provider calls",
+  "results": [
+    {
+      "name": "SQL count error blocks generic and AI quota preflights",
+      "status": "pass"
+    },
+    {
+      "name": "missing count blocks generic and AI quota preflights",
+      "status": "pass"
+    },
+    {
+      "name": "negative count blocks generic and AI quota preflights",
+      "status": "pass"
+    },
+    {
+      "name": "invalid count blocks generic and AI quota preflights",
+      "status": "pass"
+    },
+    {
+      "name": "known zero remains zero, known final count reaches limit",
+      "status": "pass"
+    },
+    {
+      "name": "missing workspace/user context uses intentional empty snapshot without queries",
+      "status": "pass"
+    },
+    {
+      "name": "preflight remains advisory; atomicity belongs to database trigger",
+      "status": "pass"
+    },
+    {
+      "name": "trusted service client handles audit writes and scoped trusted count",
+      "status": "pass"
+    },
+    {
+      "name": "missing audit credential fails closed",
+      "status": "pass"
+    },
+    {
+      "name": "audit count failure fails closed without raw details",
+      "status": "pass"
+    },
+    {
+      "name": "trusted blocked-event threshold rejects mutation",
+      "status": "pass"
+    },
+    {
+      "name": "confirmation remains required after trusted writer change",
+      "status": "pass"
+    },
+    {
+      "name": "billing recovery stays visible when usage is unknown",
+      "status": "pass"
+    },
+    {
+      "name": "subscription status API returns explicit unavailable response",
+      "status": "pass"
+    }
+  ]
+}

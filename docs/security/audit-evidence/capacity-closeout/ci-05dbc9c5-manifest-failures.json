@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "kind": "preserved_ci_failure",
+  "head": "05dbc9c5201a49872bd1669ac58e1fa5dfac1fa0",
+  "workflowRun": 37368121641,
+  "conclusion": "failure",
+  "diagnosis": "Exact isolated qualification manifest guards still listed the seven original audit migrations; the five capacity migrations at this head were missing. Architecture stopped at the pure guard; Square qualifiers stopped before behavioral assertions; QBO stopped at 135 != 130. The proposed correction also pins the subsequently reviewed sixth round-robin migration, so the next canonical count is 136.",
+  "jobs": [
+    {
+      "jobId": 111958186015,
+      "url": "https://github.com/vaeroex/Vaeroex-Ops-System/actions/runs/37368121641/job/111958186015",
+      "sourceLogCharacters": 289454,
+      "selectedFailureLines": [
+        "2026-10-05T20:24:25.0090860Z     process: { env: {}, stderr: { write() {} }, exit() { throw new Error(\"fixture_manifest_denied\"); } }",
+        "2026-10-05T20:24:25.0091751Z Error: fixture_manifest_denied",
+        "2026-10-05T20:24:25.0455917Z ##[error]Process completed with exit code 1."
+      ]
+    },
+    {
+      "jobId": 111958186267,
+      "url": "https://github.com/vaeroex/Vaeroex-Ops-System/actions/runs/37368121641/job/111958186267",
+      "sourceLogCharacters": 114501,
+      "selectedFailureLines": [
+        "2026-10-05T20:23:33.8504825Z Square durable qualification failed at startup (ERR_ASSERTION).",
+        "2026-10-05T20:23:33.8505374Z Assertion: migration manifest is explicit",
+        "2026-10-05T20:23:33.8557737Z ##[error]Process completed with exit code 1.",
+        "2026-10-05T20:24:06.5243994Z Square account connection qualification failed at migration_clean_install (ERR_ASSERTION).",
+        "2026-10-05T20:24:06.5245043Z Assertion: account and separately qualified remote Sandbox and broker corrections are the exact additive tail",
+        "2026-10-05T20:24:06.5290310Z ##[error]Process completed with exit code 1.",
+        "2026-10-05T20:24:07.3701720Z Square remote Sandbox qualification failed at canonical_migrations_and_atomic_additive_install (ERR_ASSERTION).",
+        "2026-10-05T20:24:07.3702777Z Assertion: remote binding and separately qualified broker correction are the exact additive tail",
+        "2026-10-05T20:24:07.3746119Z ##[error]Process completed with exit code 1.",
+        "2026-10-05T20:24:08.8962635Z Square broker/runtime qualification failed at startup (ERR_ASSERTION).",
+        "2026-10-05T20:24:08.8963137Z Assertion: exact reviewed corrective and GCP callback tail",
+        "2026-10-05T20:24:08.9117094Z ##[error]Process completed with exit code 1.",
+        "2026-10-05T20:24:11.5656188Z Square GCP callback database qualification failed at startup (ERR_ASSERTION).",
+        "2026-10-05T20:24:11.5825274Z ##[error]Process completed with exit code 1.",
+        "2026-10-05T20:24:13.1138621Z Square GCP mapped database qualification failed at startup (ERR_ASSERTION).",
+        "2026-10-05T20:24:13.1326582Z ##[error]Process completed with exit code 1.",
+        "2026-10-05T20:24:14.4108437Z Square observation database qualification failed at startup (ERR_ASSERTION).",
+        "2026-10-05T20:24:14.4221893Z ##[error]Process completed with exit code 1.",
+        "2026-10-05T20:29:10.8854900Z AssertionError [ERR_ASSERTION]: review the canonical migration manifest if it changes",
+        "2026-10-05T20:29:10.8855559Z 135 !== 130",
+        "2026-10-05T20:29:10.8856394Z     at main (/home/runner/work/Vaeroex-Ops-System/Vaeroex-Ops-System/scripts/run-qbo-production-candidate-database-tests.cjs:370:10)",
+        "2026-10-05T20:29:10.9279746Z ##[error]Process completed with exit code 1."
+      ]
+    }
+  ],
+  "limits": "Failure excerpts only. Not full job logs; no private environment, request, response, or credentials retained. Final corrected-head CI is still required."
+}

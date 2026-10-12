@@ -1,0 +1,34 @@
+{
+  "sourceCommit": "4c28c134fe6751347ca98e86241bcce104836467",
+  "startedAt": "2026-10-05T22:45:32.672003+00:00",
+  "pnpmVersion": "9.15.4",
+  "nodeVersion": "v24.19.0",
+  "case": "paired context with required tracked patch",
+  "copyFiles": [
+    "package.json",
+    "pnpm-lock.yaml",
+    "patches/next@15.5.24.patch"
+  ],
+  "network": "OS outbound deny; pnpm --offline; no lifecycle scripts",
+  "command": [
+    "/usr/bin/sandbox-exec",
+    "-f",
+    "/tmp/vaeroex-capacity-small-02/network.sb",
+    "/Users/isaacvizcarra/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+    "/Users/isaacvizcarra/.cache/node/corepack/v1/pnpm/9.15.4/bin/pnpm.cjs",
+    "install",
+    "--offline",
+    "--frozen-lockfile",
+    "--ignore-scripts",
+    "--reporter=append-only"
+  ],
+  "exitCode": 0,
+  "output": "Lockfile is up to date, resolution step is skipped\nProgress: resolved 1, reused 0, downloaded 0, added 0\nPackages: +471\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\nProgress: resolved 471, reused 471, downloaded 0, added 129\nProgress: resolved 471, reused 471, downloaded 0, added 466\nProgress: resolved 471, reused 471, downloaded 0, added 470\nProgress: resolved 471, reused 471, downloaded 0, added 471, done\n\ndependencies:\n+ @pdf-lib/fontkit 1.1.1\n+ @react-three/drei 10.7.8\n+ @react-three/fiber 9.7.0\n+ @supabase/ssr 0.7.0\n+ @supabase/supabase-js 2.45.4\n+ @vercel/oidc 3.8.5\n+ jose 6.2.12\n+ lossless-json 4.3.0\n+ lucide-react 1.38.0\n+ next 15.5.24\n+ pdf-lib 1.17.1\n+ pg 8.23.0\n+ phaser 3.90.0\n+ react 19.2.8\n+ react-dom 19.2.8\n+ server-only 0.0.1\n+ three 0.185.1\n+ zod 3.25.76\n\ndevDependencies:\n+ @electric-sql/pglite 0.3.14\n+ @eslint/eslintrc 3.3.5\n+ @types/node 22.19.21\n+ @types/pg 8.23.1\n+ @types/react 19.2.18\n+ @types/react-dom 19.2.3\n+ @types/three 0.185.4\n+ @vercel/ncc 0.45.0\n+ autoprefixer 10.5.0\n+ eslint 9.39.4\n+ eslint-config-next 15.5.24\n+ playwright 1.62.1\n+ postcss 8.5.23\n+ tailwindcss 3.4.19\n+ typescript 5.9.3\n\nDone in 3.7s\n(node:60306) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.\n(Use `node --trace-deprecation ...` to show where the warning was created)\n",
+  "fileHashes": {
+    "package.json": "6d3ba3ac193d7ed715e002bd54b77365e55186b230477b35c7c4a715594b65a9",
+    "pnpm-lock.yaml": "40bc351ed2e2d30f313ba0014f3777bbd563b59fc988b120c00d5cc67ec89c59"
+  },
+  "dockerfileHash": "b75c1cb070c569f72d217d9cd09344f2141209491bd92f0bc8682484249535f7",
+  "execution": "authorized host process with OS network deny; initial nested sandbox failure preserved",
+  "patchHash": "72d9011592c467205574770e1d8f1ef3329602d1774a52730120e491be2158ad"
+}

@@ -1,0 +1,65 @@
+✔ security feedback remains explicit without trapping workspace navigation (36.638291ms)
+✖ error feedback stays readable until explicitly dismissed (8.198ms)
+✖ message feedback stays readable until explicitly dismissed (6.2665ms)
+✔ first submission is acknowledged and a repeated submit before render is blocked (7.317125ms)
+✔ controlled action pending keeps the capture lock when host form context resets (4.477917ms)
+✔ cancelled submissions do not lock the form (4.108083ms)
+✔ an uncertain timeout keeps the submission locked without inviting a blind retry (3.806125ms)
+✔ a completed action releases the submission lock for a subsequent intentional submission (4.492166ms)
+✔ primary and analysis actions use the guarded submit control without changing their button styles (7.364792ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 7
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 91.007333
+
+✖ failing tests:
+
+test at ../../../../../../private/tmp/vaeroex-vxa039-feedback-negative.js:105:3
+✖ error feedback stays readable until explicitly dismissed (8.198ms)
+  AssertionError [ERR_ASSERTION]: dismissal must synchronize the native URL with router search params
+  
+  true !== false
+  
+      at /private/tmp/vaeroex-vxa039-feedback-negative.js:133:12
+      at withWindow (/private/tmp/vaeroex-vxa039-feedback-negative.js:84:16)
+      at TestContext.<anonymous> (/private/tmp/vaeroex-vxa039-feedback-negative.js:105:76)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)
+      at Test.postRun (node:internal/test_runner/test:1522:19)
+      at Test.run (node:internal/test_runner/test:1447:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at ../../../../../../private/tmp/vaeroex-vxa039-feedback-negative.js:105:3
+✖ message feedback stays readable until explicitly dismissed (6.2665ms)
+  AssertionError [ERR_ASSERTION]: dismissal must synchronize the native URL with router search params
+  
+  true !== false
+  
+      at /private/tmp/vaeroex-vxa039-feedback-negative.js:133:12
+      at withWindow (/private/tmp/vaeroex-vxa039-feedback-negative.js:84:16)
+      at TestContext.<anonymous> (/private/tmp/vaeroex-vxa039-feedback-negative.js:105:76)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)
+      at Test.postRun (node:internal/test_runner/test:1522:19)
+      at Test.run (node:internal/test_runner/test:1447:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

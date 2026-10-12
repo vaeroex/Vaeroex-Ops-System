@@ -24,7 +24,7 @@ export default async function DemoPage({ searchParams }: DemoPageProps) {
   const params = await searchParams;
 
   return (
-    <main className="min-h-screen bg-slate-50 text-ink">
+    <main className="vaeroex-public-site vx-utility min-h-screen bg-slate-50 text-ink">
       <PublicSiteHeader />
       <section className="mx-auto grid max-w-6xl gap-8 px-6 py-12 lg:grid-cols-[0.82fr_1.18fr] lg:items-start">
         <div className="vaeroex-hero-reveal">

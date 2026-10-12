@@ -1,0 +1,19 @@
+{
+  "at": "2026-10-05T18:56:02.364Z",
+  "ownedLocalOnly": true,
+  "files": [
+    {
+      "name": "20261005182541_bounded_google_sheets_dispatch.sql",
+      "sha256": "65aefcf36bec8de2bbf3bdcd9e3a02fc3a12547a554d3f9443076fc67248b119"
+    },
+    {
+      "name": "20261005183352_issue_submission_receipts.sql",
+      "sha256": "7d6f6bbe69e43da35adb43e40f55e6369b2251db911a74faf845234a626f9e34"
+    },
+    {
+      "name": "20261005184031_qbo_scoped_runtime_recovery.sql",
+      "sha256": "02250c444a352454f0a46baf9842efa2aa9db23fc878c4b1637e39054929f51c"
+    }
+  ],
+  "productionTouched": false
+}

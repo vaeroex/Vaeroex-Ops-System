@@ -1,0 +1,40 @@
+{
+  "result": {
+    "id": "prj_J810bZ9ECoN4CyLKujUoEEH8N6ja",
+    "name": "vaeroex-ops-system",
+    "framework": "nextjs",
+    "accountId": "team_uORtrMvad77Qz6HikOgD4cnp",
+    "createdAt": 1781743396653,
+    "updatedAt": 1791001217100,
+    "nodeVersion": "24.x",
+    "live": false,
+    "latestDeployment": {
+      "id": "dpl_A9tgEHvj54MkLCxCyac7FGokaM1t",
+      "url": "vaeroex-ops-system-2y5y78sld-vaeroex-2167s-projects.vercel.app",
+      "createdAt": 1791001097151,
+      "readyState": "READY",
+      "target": "production"
+    },
+    "domains": [
+      "www.vaeroex.com",
+      "vaeroex-ops-system.vercel.app",
+      "vaeroex.com",
+      "vaeroex-ops-system-vaeroex-2167s-projects.vercel.app",
+      "vaeroex-ops-system-git-main-vaeroex-2167s-projects.vercel.app"
+    ],
+    "passwordProtection": {
+      "enabled": false,
+      "deploymentType": null
+    },
+    "ssoProtection": {
+      "enabled": true,
+      "deploymentType": "all_except_custom_domains"
+    },
+    "trustedIps": {
+      "enabled": false,
+      "deploymentType": null,
+      "addresses": [],
+      "protectionMode": null
+    }
+  }
+}

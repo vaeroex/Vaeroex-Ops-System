@@ -1,0 +1,21 @@
+{
+  "kind": "independent_persistence_verification",
+  "runId": "99799ab6-c939-4b3e-aacc-2a30ffaeb14f",
+  "status": "PASSED_FOR_EXPORTED_CONTRACT",
+  "blocked": [],
+  "violations": [],
+  "scheduledCoverage": {
+    "requiredForCapacity": true,
+    "scheduledRequests": 0,
+    "coveredWorkspaceIds": [],
+    "missingWorkspaceIds": [
+      "c347b4e6-d38f-457b-8667-a117e3c2423b",
+      "94e1e8b3-a38c-4780-9870-702dd157ebb1"
+    ],
+    "complete": false,
+    "scope": "Aggregate actual admitted scheduled jobs across the measured burst; truthful empty or deferred ticks do not establish workspace coverage."
+  },
+  "capacityCoverageQualified": false,
+  "zeroLossDuplicatesCrossTenant": true,
+  "limitation": "Only complete, independently sourced DB/storage/job exports can qualify; HTTP success or mocked collector values do not."
+}

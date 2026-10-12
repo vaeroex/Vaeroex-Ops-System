@@ -12,8 +12,8 @@ type PublicPageHeroProps = {
 
 export function PublicPageHero({ eyebrow, title, description, actions, aside }: PublicPageHeroProps) {
   return (
-    <section className="vaeroex-public-hero relative overflow-hidden px-5 py-16 text-white sm:px-6 sm:py-20 lg:py-24">
-      <div className="vaeroex-public-hero__veil pointer-events-none absolute inset-0" aria-hidden="true" />
+    <section className="vaeroex-public-hero vx-page-hero relative overflow-hidden px-5 py-16 text-white sm:px-6 sm:py-20 lg:py-24">
+      <div className="vx-page-hero-rule" aria-hidden="true" />
       <div className="relative mx-auto max-w-[86rem]">
         <div className="vaeroex-hero-reveal max-w-4xl py-4 lg:py-8">
           <p className="text-xs font-semibold uppercase tracking-normal text-cyan-200">{eyebrow}</p>

@@ -1,0 +1,178 @@
+{
+  "kind": "isolated_upload_boundary_verification",
+  "executionId": "ae24159f-f8b9-405a-85ae-473e991b6765",
+  "runId": "99799ab6-c939-4b3e-aacc-2a30ffaeb14f",
+  "sourceCommit": "0a15ddcd3b564086280fec21b79b6976b3a3cc44",
+  "buildId": "ReUcdHr1ALEejCvoUeFTc",
+  "schemaFingerprint": "70296597bd7052059ad724071493758968ec4f032b5607753cbf65e6c96af0eb",
+  "nextConfigOverride": {
+    "skipMiddlewareUrlNormalize": true,
+    "originalConfigSha256": "ab9707ea1b885652c1281f96d314492fa1fc81321c5257f539901dfea8b1a663",
+    "originalLoaderSha256": "b570ac53c237e06a066c86781a8666026aa088bc82a27d8ac60f5be480e405fe"
+  },
+  "osExternalNetworkDenied": "EPERM",
+  "results": [
+    {
+      "label": "browser-desktop-1000",
+      "transport": "authenticated_browser",
+      "width": 1440,
+      "expectedRows": 1000,
+      "bytes": 40960,
+      "status": 303,
+      "ackMs": 674.0191669999999,
+      "preparationAccepted": true,
+      "workloadMutationAckThresholdMs": 2000,
+      "individuallyWithinAckThreshold": true,
+      "browser": {
+        "automatic": true,
+        "feedbackVisible": true,
+        "pendingCleared": true,
+        "destinationRendered": true,
+        "manualRecoveryNavigation": false,
+        "transitionMs": 1647.501209
+      },
+      "persisted": {
+        "fileId": "00b67994-6835-48f2-83ef-8d23dbb30ba6",
+        "fileSizeBytes": 40960,
+        "originalSha256": "b1ddc902d63833506d0d56b8aa64371725353dd9058e21770ac20a826f165273",
+        "storedSha256": "b1ddc902d63833506d0d56b8aa64371725353dd9058e21770ac20a826f165273",
+        "originalRetained": true,
+        "ownerDownloadVerified": true,
+        "importStatus": "extracted",
+        "processingStatus": "ready",
+        "processingError": null,
+        "stagedRows": 1000,
+        "importRecords": 1,
+        "kpiWrites": 0,
+        "metricWrites": 0,
+        "duplicateOrLostStagedRows": 0
+      },
+      "resourceSnapshots": {
+        "before": {
+          "observedAt": "2026-10-05T19:45:31.907Z",
+          "source": "darwin_libproc_same_uid",
+          "uid": 501,
+          "missingRoots": 0,
+          "processes": [
+            {
+              "pid": 76514,
+              "ppid": 76510,
+              "rootIndex": 0,
+              "rssBytes": 190119936,
+              "userCpuNanoseconds": 3114380708,
+              "systemCpuNanoseconds": 553796333,
+              "startSeconds": 1791229314,
+              "startMicroseconds": 17799,
+              "startTimestamp": "2026-10-05T19:41:54.017Z",
+              "startedAtUnixMs": 1791229314017.799
+            }
+          ]
+        },
+        "after": {
+          "observedAt": "2026-10-05T19:45:33.598Z",
+          "source": "darwin_libproc_same_uid",
+          "uid": 501,
+          "missingRoots": 0,
+          "processes": [
+            {
+              "pid": 76514,
+              "ppid": 76510,
+              "rootIndex": 0,
+              "rssBytes": 302645248,
+              "userCpuNanoseconds": 3334430916,
+              "systemCpuNanoseconds": 632930833,
+              "startSeconds": 1791229314,
+              "startMicroseconds": 17799,
+              "startTimestamp": "2026-10-05T19:41:54.017Z",
+              "startedAtUnixMs": 1791229314017.799
+            }
+          ]
+        }
+      }
+    },
+    {
+      "label": "browser-mobile-1001",
+      "transport": "authenticated_browser",
+      "width": 390,
+      "expectedRows": 1001,
+      "bytes": 40993,
+      "status": 303,
+      "ackMs": 315.91341699999975,
+      "preparationAccepted": false,
+      "workloadMutationAckThresholdMs": 2000,
+      "individuallyWithinAckThreshold": true,
+      "browser": {
+        "automatic": true,
+        "feedbackVisible": true,
+        "pendingCleared": true,
+        "destinationRendered": true,
+        "manualRecoveryNavigation": false,
+        "transitionMs": 1232.4168330000002
+      },
+      "persisted": {
+        "fileId": "7c0f2561-a693-44ec-b9f6-42e474dab182",
+        "fileSizeBytes": 40993,
+        "originalSha256": "53ff07cf714562a2d1d054afa23ffdbff555b54e4c1aa9323f21727b7b2629c3",
+        "storedSha256": "53ff07cf714562a2d1d054afa23ffdbff555b54e4c1aa9323f21727b7b2629c3",
+        "originalRetained": true,
+        "ownerDownloadVerified": true,
+        "importStatus": "failed",
+        "processingStatus": "failed",
+        "processingError": "This workbook contains 1001 data rows across 1 worksheets. The current reviewed-import limit is 1000 rows, so no rows were staged and none were silently discarded. Split the workbook into smaller files and try again.",
+        "stagedRows": 0,
+        "importRecords": 0,
+        "kpiWrites": 0,
+        "metricWrites": 0,
+        "duplicateOrLostStagedRows": 0
+      },
+      "resourceSnapshots": {
+        "before": {
+          "observedAt": "2026-10-05T19:45:34.379Z",
+          "source": "darwin_libproc_same_uid",
+          "uid": 501,
+          "missingRoots": 0,
+          "processes": [
+            {
+              "pid": 76514,
+              "ppid": 76510,
+              "rootIndex": 0,
+              "rssBytes": 307314688,
+              "userCpuNanoseconds": 3490403708,
+              "systemCpuNanoseconds": 661597708,
+              "startSeconds": 1791229314,
+              "startMicroseconds": 17799,
+              "startTimestamp": "2026-10-05T19:41:54.017Z",
+              "startedAtUnixMs": 1791229314017.799
+            }
+          ]
+        },
+        "after": {
+          "observedAt": "2026-10-05T19:45:35.625Z",
+          "source": "darwin_libproc_same_uid",
+          "uid": 501,
+          "missingRoots": 0,
+          "processes": [
+            {
+              "pid": 76514,
+              "ppid": 76510,
+              "rootIndex": 0,
+              "rssBytes": 266420224,
+              "userCpuNanoseconds": 3566862375,
+              "systemCpuNanoseconds": 671886416,
+              "startSeconds": 1791229314,
+              "startMicroseconds": 17799,
+              "startTimestamp": "2026-10-05T19:41:54.017Z",
+              "startedAtUnixMs": 1791229314017.799
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "browserErrors": [],
+  "foreignRequests": [],
+  "allOriginalsAndRowsRetained": true,
+  "activeUserCapacityClaim": false,
+  "limits": "Sequential component checks with local Supabase; 30-second diagnostic bound is not a relaxed workload threshold. Over-limit uploads are preparation failures, never successful import workload samples.",
+  "passed": true
+}

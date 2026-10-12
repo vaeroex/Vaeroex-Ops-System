@@ -1,0 +1,64 @@
+{
+  "merges": [
+    {
+      "pr": 462,
+      "head": "98d14c124297d899b8a36a8a243a58d2a87d3881",
+      "merge": "b37600ef46595abc8a0038ce416e2dee99478357",
+      "ciRun": 37395176822
+    },
+    {
+      "pr": 463,
+      "head": "729eb0a9e89c50801fd9c2658a76342d5eca77c1",
+      "merge": "fe82cc3b66d5a8f2dad02f308585e8d20fcd0974",
+      "ciRun": 37396870931
+    },
+    {
+      "pr": 464,
+      "head": "f46db3bea85b800a594d598d439bcb8c979755d4",
+      "merge": "f4ad5eb88e1426ef4507c91e0fc1634ccd20139d",
+      "ciRun": 37396961877
+    }
+  ],
+  "allFourPremergeJobsPassed": true,
+  "method": "merge",
+  "finalMainTree": "0e7bf30051cf39dcd234af4be901c759c0ba383c",
+  "finalMainTreeEqualsQualified464Head": true,
+  "vercelLatestProductionDeployment": "dpl_A9tgEHvj54MkLCxCyac7FGokaM1t",
+  "vercelUnchangedFromPremerge": true,
+  "cloudBuildRead": [
+    {
+      "approval": {
+        "state": "PENDING"
+      },
+      "buildTriggerId": "93e36742-16eb-4c94-8bad-a06502e69362",
+      "createTime": "2026-10-06T01:18:34.705580483Z",
+      "id": "ae9a0d3e-3097-4fc8-be27-db634137b1db",
+      "status": "PENDING"
+    },
+    {
+      "approval": {
+        "state": "PENDING"
+      },
+      "buildTriggerId": "93e36742-16eb-4c94-8bad-a06502e69362",
+      "createTime": "2026-10-06T01:11:41.465080455Z",
+      "id": "2435d8a2-47b5-4c15-be88-dab3382f40be",
+      "status": "PENDING"
+    },
+    {
+      "approval": {
+        "state": "PENDING"
+      },
+      "buildTriggerId": "93e36742-16eb-4c94-8bad-a06502e69362",
+      "createTime": "2026-10-06T00:55:10.556132958Z",
+      "id": "e7ab4aa6-0318-4115-9147-ada520f881d1",
+      "status": "PENDING"
+    }
+  ],
+  "cloudBuildApproved": false,
+  "productionMigrationApplied": false,
+  "productionDeploymentPerformed": false,
+  "providerActivationPerformed": false,
+  "customerLimitsChanged": false,
+  "followupPr": 465,
+  "followupMerged": false
+}

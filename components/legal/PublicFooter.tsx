@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Route } from "next";
-import { VaeroexLogo } from "@/components/brand/VaeroexLogo";
+import "@/components/marketing/public-design.css";
 import { VAEROEX_COMPANY_ADDRESS_LINES, VAEROEX_CONTACT_EMAILS, VAEROEX_FOOTER_LOCATION, VAEROEX_MAILTO_LINKS } from "@/lib/contact/emails";
 import { legalLinks } from "@/lib/legal/content";
 
@@ -35,14 +35,13 @@ const emailLinks = [
 
 export function PublicFooter() {
   return (
-    <footer className="vaeroex-public-footer px-5 py-10 text-sm text-slate-400 sm:px-6 lg:py-14">
+    <footer className="vx-footer px-5 py-10 text-sm text-slate-400 sm:px-6 lg:py-14">
       <div className="mx-auto grid max-w-[86rem] gap-10 lg:grid-cols-[1.1fr_1.5fr] lg:items-start">
         <div>
           <Link href="/" className="inline-flex items-center gap-3 text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60" aria-label="Vaeroex home">
-            <VaeroexLogo variant="symbol" size="xs" />
-            <span className="font-semibold">Vaeroex</span>
+            <span className="vx-footer-wordmark">VAEROEX</span>
           </Link>
-          <p className="mt-4 max-w-sm text-base leading-7 text-slate-300">Vaeroex Intelligence Systems transforms complex information into visibility, awareness, prediction, and action across specialized domains.</p>
+          <p className="mt-4 max-w-sm text-base leading-7 text-slate-300">Complex information. Clearer perspective. Intelligence shaped around the decisions that matter.</p>
           <p className="mt-3 text-xs">{VAEROEX_FOOTER_LOCATION}</p>
           <div className="mt-4 text-xs leading-5">
             <p className="font-semibold text-slate-200">Business Address</p>

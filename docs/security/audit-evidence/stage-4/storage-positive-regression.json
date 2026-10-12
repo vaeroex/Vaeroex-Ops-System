@@ -1,0 +1,10 @@
+{
+  "scope": "Owned native PostgreSQL focused fixture with actual existing contributor INSERT policy; no provider HTTP",
+  "status": "failed",
+  "code": "42501",
+  "message": "permission denied for schema private",
+  "operation": "entitled own-workspace owner storage metadata INSERT",
+  "source_proof": "/tmp/vaeroex-storage-positive-proof.cjs",
+  "correction": "Only private.workspace_storage_mutation_entitled_v1 changed to SECURITY DEFINER; fixed search_path and original auth.uid membership/entitlement predicates retained",
+  "after": "113/113 native regression checks passed, including seven positive and negative Storage cases"
+}

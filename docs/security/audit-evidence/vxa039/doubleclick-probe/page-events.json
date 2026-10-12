@@ -1,0 +1,72 @@
+[
+  {
+    "url": "http://127.0.0.1:56344/app/sources/e1c26770-babf-45a6-ada9-6bab491a62b0?section=imported",
+    "events": [
+      {
+        "kind": "click",
+        "at": 1791190297101,
+        "text": "Import 1 approved worksheet",
+        "busy": "false",
+        "disabled": false,
+        "buttonType": "submit",
+        "url": "http://127.0.0.1:56344/app/sources/e1c26770-babf-45a6-ada9-6bab491a62b0?section=imported",
+        "prevented": false
+      },
+      {
+        "kind": "submit",
+        "at": 1791190297102,
+        "text": "Import 1 approved worksheet",
+        "busy": "false",
+        "disabled": false,
+        "buttonType": "submit",
+        "url": "http://127.0.0.1:56344/app/sources/e1c26770-babf-45a6-ada9-6bab491a62b0?section=imported",
+        "prevented": false
+      },
+      {
+        "kind": "click",
+        "at": 1791190297159,
+        "text": "Import 1 approved worksheet",
+        "busy": "false",
+        "disabled": false,
+        "buttonType": "submit",
+        "url": "http://127.0.0.1:56344/app/sources/e1c26770-babf-45a6-ada9-6bab491a62b0?section=imported",
+        "prevented": false
+      },
+      {
+        "kind": "submit",
+        "at": 1791190297159,
+        "text": "Import 1 approved worksheet",
+        "busy": "false",
+        "disabled": false,
+        "buttonType": "submit",
+        "url": "http://127.0.0.1:56344/app/sources/e1c26770-babf-45a6-ada9-6bab491a62b0?section=imported",
+        "prevented": false
+      }
+    ],
+    "text": "Vaeroex\n\nCLOSEOUT 1061111f 45708faa A\n\nACTIVE\nOverview\nIntelligence\nPerformance\nFiles & Notes\nSaved Analyses\nIntegrations\nSettings\nSign out\n\nCLOSEOUT 1061111f 45708faa A · Active\n\nFiles & Notes\n\nSearch\nK\nFiles & Notes\n/\nCLOSEOUT 1061111f ab49ae65 1440 0 upload\nCLOSEOUT 1061111f ab49ae65 1440 0 upload\nLearned\n\nvxa039-ab49ae65-ad49-4c05-8227-9b51178e24a5-1440-0.csv\n\nCSV · 41 B · Uploaded Oct 5, 2026\n\nSummary\nImported Data\nHistory\n\nImported\n\n2 of 2 rows were saved from this source.\n\n1 worksheet processed independently. 2 rows accepted, 0 issues recorded, and 1 evidence chunk added to Business Memory.\n\nWorksheet detection\n\nRe-run worksheet detection using the latest import rules. Existing approved records will not be duplicated.\n\nRe-prepare workbook\nWorksheets inspected (1)\nIngestion pipeline trace\n\nVaeroex turns business evidence into leadership clarity.\n\nHelp Center\nTrust Center\nTerms\nPrivacy\nSupport",
+    "buttons": [
+      {
+        "text": "Re-prepare workbook",
+        "busy": "false",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "url": "http://127.0.0.1:56344/app/sources/e1c26770-babf-45a6-ada9-6bab491a62b0?section=imported",
+    "events": [],
+    "text": "Vaeroex\n\nCLOSEOUT 1061111f 45708faa A\n\nACTIVE\nOverview\nIntelligence\nPerformance\nFiles & Notes\nSaved Analyses\nIntegrations\nSettings\nSign out\n\nCLOSEOUT 1061111f 45708faa A · Active\n\nFiles & Notes\n\nSearch\nK\nFiles & Notes\n/\nCLOSEOUT 1061111f ab49ae65 1440 0 upload\nCLOSEOUT 1061111f ab49ae65 1440 0 upload\nImport Review\n\nvxa039-ab49ae65-ad49-4c05-8227-9b51178e24a5-1440-0.csv\n\nCSV · 41 B · Uploaded Oct 5, 2026\n\nSummary\nImported Data\nHistory\n\nWorksheet detection\n\nRe-run worksheet detection using the latest import rules. Existing approved records will not be duplicated.\n\nRe-prepare workbook\nWorksheets inspected (1)\nIngestion pipeline trace\n\nWORKBOOK\n\nCLOSEOUT 1061111f ab49ae65 1440 0 upload\n\nVaeroex inspected each worksheet independently. Confirm the detected context and mapping for each dataset you want to import.\n\nCSV\n\nDetected: Sales · 2 rows\n\nImport worksheet\nDataset type\nCompany Profile\nTime Series\nKPI Targets\nKPIs\nSales\nFinancials\nInventory\nOrders\nCustomers\nEmployees\nVendors\nMarketing\nUnknown\nTIME SERIES MAPPING\nDate or period *\nDo not import\ndate\nrevenue\n\nMETRIC SERIES\n\nEach valid numeric cell becomes a dated metric. Invalid cells are reported individually without rejecting other metrics in that row.\n\nrevenue\nRow\tdate\trevenue\n2\t2026-01-01\t42\n3\t2026-02-01\t43\nImport 1 approved worksheet\n\nOnly approved worksheets are validated and imported.\n\nVaeroex turns business evidence into leadership clarity.\n\nHelp Center\nTrust Center\nTerms\nPrivacy\nSupport",
+    "buttons": [
+      {
+        "text": "Re-prepare workbook",
+        "busy": "false",
+        "disabled": false
+      },
+      {
+        "text": "Import 1 approved worksheet",
+        "busy": "false",
+        "disabled": false
+      }
+    ]
+  }
+]

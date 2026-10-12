@@ -35,7 +35,7 @@ export function ReleaseNotesPage({ inApp = false }: { inApp?: boolean }) {
   }
 
   return (
-    <main className="min-h-screen bg-slate-50 text-ink">
+    <main className="vaeroex-public-site vx-utility min-h-screen bg-slate-50 text-ink">
       <PublicSiteHeader />
       <section className="mx-auto max-w-5xl px-6 py-10">{content}</section>
       <PublicFooter />

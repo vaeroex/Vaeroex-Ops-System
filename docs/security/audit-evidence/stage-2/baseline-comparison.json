@@ -1,0 +1,15 @@
+{
+  "branch": "codex/external-integrations-phase-8b-qbo-sandbox",
+  "commit": "90982062976ca905095ba68c193c52eddf795f1b",
+  "stage1FingerprintFiles": 1044,
+  "changed": [],
+  "missing": [],
+  "manifestTopLevelCounts": {
+    "app": 169,
+    "components": 122,
+    "lib": 337,
+    "services": 174,
+    "supabase": 128,
+    "scripts": 114
+  }
+}

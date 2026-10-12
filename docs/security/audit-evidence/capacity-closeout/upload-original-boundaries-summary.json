@@ -1,0 +1,236 @@
+{
+  "kind": "isolated_upload_boundary_verification",
+  "runId": "99799ab6-c939-4b3e-aacc-2a30ffaeb14f",
+  "sourceCommit": "0a15ddcd3b564086280fec21b79b6976b3a3cc44",
+  "buildId": "ReUcdHr1ALEejCvoUeFTc",
+  "schemaFingerprint": "70296597bd7052059ad724071493758968ec4f032b5607753cbf65e6c96af0eb",
+  "nextConfigOverride": {
+    "skipMiddlewareUrlNormalize": true,
+    "originalConfigSha256": "ab9707ea1b885652c1281f96d314492fa1fc81321c5257f539901dfea8b1a663",
+    "originalLoaderSha256": "b570ac53c237e06a066c86781a8666026aa088bc82a27d8ac60f5be480e405fe"
+  },
+  "osExternalNetworkDenied": "EPERM",
+  "browserErrors": [],
+  "foreignRequests": [],
+  "allOriginalsAndRowsRetained": true,
+  "activeUserCapacityClaim": false,
+  "limits": "Sequential component checks with local Supabase; 30-second diagnostic bound is not a relaxed workload threshold. Over-limit uploads are preparation failures, never successful import workload samples.",
+  "passed": true,
+  "results": [
+    {
+      "label": "http-1000",
+      "transport": "captured_authenticated_server_action",
+      "expectedRows": 1000,
+      "bytes": 40960,
+      "status": 303,
+      "ackMs": 1673.7111670000002,
+      "preparationAccepted": true,
+      "workloadMutationAckThresholdMs": 2000,
+      "individuallyWithinAckThreshold": true,
+      "persisted": {
+        "fileId": "d9024c11-d088-416b-9333-23076105f5db",
+        "fileSizeBytes": 40960,
+        "originalSha256": "b1ddc902d63833506d0d56b8aa64371725353dd9058e21770ac20a826f165273",
+        "storedSha256": "b1ddc902d63833506d0d56b8aa64371725353dd9058e21770ac20a826f165273",
+        "originalRetained": true,
+        "ownerDownloadVerified": true,
+        "importStatus": "extracted",
+        "processingStatus": "ready",
+        "processingError": null,
+        "stagedRows": 1000,
+        "importRecords": 1,
+        "kpiWrites": 0,
+        "metricWrites": 0,
+        "duplicateOrLostStagedRows": 0
+      },
+      "componentResources": {
+        "rssAfterBytes": 177569792,
+        "appTreeCpuDeltaMs": 435.21925,
+        "scope": "App process tree only, not aggregate capacity telemetry or peak memory."
+      }
+    },
+    {
+      "label": "http-1001",
+      "transport": "captured_authenticated_server_action",
+      "expectedRows": 1001,
+      "bytes": 40993,
+      "status": 303,
+      "ackMs": 343.12175000000025,
+      "preparationAccepted": false,
+      "workloadMutationAckThresholdMs": 2000,
+      "individuallyWithinAckThreshold": true,
+      "persisted": {
+        "fileId": "edbbd191-5c06-4e2c-a267-b22fa8d24c57",
+        "fileSizeBytes": 40993,
+        "originalSha256": "53ff07cf714562a2d1d054afa23ffdbff555b54e4c1aa9323f21727b7b2629c3",
+        "storedSha256": "53ff07cf714562a2d1d054afa23ffdbff555b54e4c1aa9323f21727b7b2629c3",
+        "originalRetained": true,
+        "ownerDownloadVerified": true,
+        "importStatus": "failed",
+        "processingStatus": "failed",
+        "processingError": "This workbook contains 1001 data rows across 1 worksheets. The current reviewed-import limit is 1000 rows, so no rows were staged and none were silently discarded. Split the workbook into smaller files and try again.",
+        "stagedRows": 0,
+        "importRecords": 0,
+        "kpiWrites": 0,
+        "metricWrites": 0,
+        "duplicateOrLostStagedRows": 0
+      },
+      "componentResources": {
+        "rssAfterBytes": 185040896,
+        "appTreeCpuDeltaMs": 84.446458,
+        "scope": "App process tree only, not aggregate capacity telemetry or peak memory."
+      }
+    },
+    {
+      "label": "http-10000",
+      "transport": "captured_authenticated_server_action",
+      "expectedRows": 10000,
+      "bytes": 419430,
+      "status": 303,
+      "ackMs": 381.3949170000001,
+      "preparationAccepted": false,
+      "workloadMutationAckThresholdMs": 2000,
+      "individuallyWithinAckThreshold": true,
+      "persisted": {
+        "fileId": "bf64c658-5bff-4bf8-8b57-d3d2067032ac",
+        "fileSizeBytes": 419430,
+        "originalSha256": "a1a571359530701520106bc56f093e6be5dee22fb4c38c52641c954da7d7d4a3",
+        "storedSha256": "a1a571359530701520106bc56f093e6be5dee22fb4c38c52641c954da7d7d4a3",
+        "originalRetained": true,
+        "ownerDownloadVerified": true,
+        "importStatus": "failed",
+        "processingStatus": "failed",
+        "processingError": "This workbook contains 10000 data rows across 1 worksheets. The current reviewed-import limit is 1000 rows, so no rows were staged and none were silently discarded. Split the workbook into smaller files and try again.",
+        "stagedRows": 0,
+        "importRecords": 0,
+        "kpiWrites": 0,
+        "metricWrites": 0,
+        "duplicateOrLostStagedRows": 0
+      },
+      "componentResources": {
+        "rssAfterBytes": 199376896,
+        "appTreeCpuDeltaMs": 191.274043,
+        "scope": "App process tree only, not aggregate capacity telemetry or peak memory."
+      }
+    },
+    {
+      "label": "http-50000",
+      "transport": "captured_authenticated_server_action",
+      "expectedRows": 50000,
+      "bytes": 2202009,
+      "status": 303,
+      "ackMs": 530.7757500000002,
+      "preparationAccepted": false,
+      "workloadMutationAckThresholdMs": 2000,
+      "individuallyWithinAckThreshold": true,
+      "persisted": {
+        "fileId": "8ab2cc3f-89b8-48ee-b7cb-8b9f88a7b6d7",
+        "fileSizeBytes": 2202009,
+        "originalSha256": "b9836f3575e9094f5f1fcd7fc7d6e6aa54edf3fb2b91c0d47e66948e013ff753",
+        "storedSha256": "b9836f3575e9094f5f1fcd7fc7d6e6aa54edf3fb2b91c0d47e66948e013ff753",
+        "originalRetained": true,
+        "ownerDownloadVerified": true,
+        "importStatus": "failed",
+        "processingStatus": "failed",
+        "processingError": "This workbook contains 50000 data rows across 1 worksheets. The current reviewed-import limit is 1000 rows, so no rows were staged and none were silently discarded. Split the workbook into smaller files and try again.",
+        "stagedRows": 0,
+        "importRecords": 0,
+        "kpiWrites": 0,
+        "metricWrites": 0,
+        "duplicateOrLostStagedRows": 0
+      },
+      "componentResources": {
+        "rssAfterBytes": 272990208,
+        "appTreeCpuDeltaMs": 289.79625,
+        "scope": "App process tree only, not aggregate capacity telemetry or peak memory."
+      }
+    },
+    {
+      "label": "browser-desktop-1000",
+      "transport": "authenticated_browser",
+      "width": 1440,
+      "expectedRows": 1000,
+      "bytes": 40960,
+      "status": 303,
+      "ackMs": 674.0191669999999,
+      "preparationAccepted": true,
+      "workloadMutationAckThresholdMs": 2000,
+      "individuallyWithinAckThreshold": true,
+      "browser": {
+        "automatic": true,
+        "feedbackVisible": true,
+        "pendingCleared": true,
+        "destinationRendered": true,
+        "manualRecoveryNavigation": false,
+        "transitionMs": 1647.501209
+      },
+      "persisted": {
+        "fileId": "00b67994-6835-48f2-83ef-8d23dbb30ba6",
+        "fileSizeBytes": 40960,
+        "originalSha256": "b1ddc902d63833506d0d56b8aa64371725353dd9058e21770ac20a826f165273",
+        "storedSha256": "b1ddc902d63833506d0d56b8aa64371725353dd9058e21770ac20a826f165273",
+        "originalRetained": true,
+        "ownerDownloadVerified": true,
+        "importStatus": "extracted",
+        "processingStatus": "ready",
+        "processingError": null,
+        "stagedRows": 1000,
+        "importRecords": 1,
+        "kpiWrites": 0,
+        "metricWrites": 0,
+        "duplicateOrLostStagedRows": 0
+      },
+      "componentResources": {
+        "rssAfterBytes": 302645248,
+        "appTreeCpuDeltaMs": 299.184708,
+        "scope": "App process tree only, not aggregate capacity telemetry or peak memory."
+      }
+    },
+    {
+      "label": "browser-mobile-1001",
+      "transport": "authenticated_browser",
+      "width": 390,
+      "expectedRows": 1001,
+      "bytes": 40993,
+      "status": 303,
+      "ackMs": 315.91341699999975,
+      "preparationAccepted": false,
+      "workloadMutationAckThresholdMs": 2000,
+      "individuallyWithinAckThreshold": true,
+      "browser": {
+        "automatic": true,
+        "feedbackVisible": true,
+        "pendingCleared": true,
+        "destinationRendered": true,
+        "manualRecoveryNavigation": false,
+        "transitionMs": 1232.4168330000002
+      },
+      "persisted": {
+        "fileId": "7c0f2561-a693-44ec-b9f6-42e474dab182",
+        "fileSizeBytes": 40993,
+        "originalSha256": "53ff07cf714562a2d1d054afa23ffdbff555b54e4c1aa9323f21727b7b2629c3",
+        "storedSha256": "53ff07cf714562a2d1d054afa23ffdbff555b54e4c1aa9323f21727b7b2629c3",
+        "originalRetained": true,
+        "ownerDownloadVerified": true,
+        "importStatus": "failed",
+        "processingStatus": "failed",
+        "processingError": "This workbook contains 1001 data rows across 1 worksheets. The current reviewed-import limit is 1000 rows, so no rows were staged and none were silently discarded. Split the workbook into smaller files and try again.",
+        "stagedRows": 0,
+        "importRecords": 0,
+        "kpiWrites": 0,
+        "metricWrites": 0,
+        "duplicateOrLostStagedRows": 0
+      },
+      "componentResources": {
+        "rssAfterBytes": 266420224,
+        "appTreeCpuDeltaMs": 86.747375,
+        "scope": "App process tree only, not aggregate capacity telemetry or peak memory."
+      }
+    }
+  ],
+  "allEightOriginalUploadsRetained": true,
+  "firstEvidence": "/tmp/vaeroex-capacity-small-02/upload-boundaries/f0e73dfd-b746-4504-8ca5-d1ca5a46ed79/result.json",
+  "finalBrowserEvidence": "/tmp/vaeroex-capacity-small-02/upload-boundaries/ae24159f-f8b9-405a-85ae-473e991b6765/result.json",
+  "qualificationCorrection": "The first browser observations verified automatic URL/feedback and persistence but captured the streaming loading shell. They are not evidence of destination completion. Stronger follow-up required the saved-source heading, hidden loading shell, cleared pending buttons, visible feedback and byte-identical storage readback; both passed without manual navigation. All original observations retained.",
+  "scriptSha256": "903891c93b941277303a3b2aa1b4f661398b92be1c76e2de32b4f5022bd7125d"
+}

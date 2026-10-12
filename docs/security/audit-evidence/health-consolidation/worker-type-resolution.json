@@ -1,0 +1,25 @@
+{
+  "passed": true,
+  "scope": "Disposable Docker-like source boundary: lib + QBO worker src + tsconfig/package only; existing dependency symlink; no app/components or dependency install/network/provider/db execution.",
+  "platform": "darwin",
+  "architecture": "arm64",
+  "nodeVersion": "v24.19.0",
+  "sourceFile": "lib/intelligence/workspace-health.ts",
+  "sourceSha256": "d1eea97ebb8e8b848159b1c2a0e3711aa8fd77d2aaabcc300349e9c13de3b6a5",
+  "negative": {
+    "exitCode": 1,
+    "ts2307UiImportProved": true,
+    "logSha256": "66fdd194163daf5a807e6787c77b8d03e89d2babbf45cdb5e4a559f24cfeb1ac"
+  },
+  "positive": {
+    "exitCode": 0,
+    "logSha256": "4cfeb6adb202082de96167c432706a9a7d5f88ea1cc4068bc7f4e8770930488e",
+    "bundledArtifactSha256": "5461ae223eba8f3f2f29a95a1be6207cd5ff42b1d82d01254aee4753a9b6b878",
+    "unresolvedLibAlias": false
+  },
+  "emittedEquivalence": "worker-type-emitted-equivalence.json",
+  "limitations": [
+    "Uses macOS arm64 and existing installed dependencies; actual Linux Docker CI is the final image proof.",
+    "Emitted JavaScript equality does not claim identical source maps."
+  ]
+}

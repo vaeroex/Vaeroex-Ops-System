@@ -4,6 +4,7 @@ import { randomUUID } from "crypto";
 import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { securityResponseMessage } from "@/lib/security/security-response";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import type { Database, Json, WorkspaceRole } from "@/lib/supabase/types";
 
 export type ToolOperationType =
@@ -302,7 +303,12 @@ async function logSecurityEvent(
   reasonBlocked?: string
 ) {
   const operationType = spec?.operationType || "SYSTEM";
-  const { error } = await context.supabase.from("security_audit_events").insert({
+  const auditClient = createSupabaseAdminClient();
+  if (!auditClient) {
+    console.warn("Security audit writer is unavailable");
+    return;
+  }
+  const { error } = await auditClient.from("security_audit_events").insert({
     workspace_id: context.workspaceId,
     user_id: context.userId,
     action_name: request.toolName || "unknown_tool",
@@ -319,13 +325,12 @@ async function logSecurityEvent(
     metadata_json: securityMetadata(request.metadata)
   });
 
-  if (error && error.code !== "42P01" && error.code !== "PGRST205") {
-    console.warn("Could not log security audit event", error.message);
+  if (error) {
+    console.warn("Could not log security audit event");
   }
 }
 
 export async function logSecurityAuditEvent({
-  supabase,
   workspaceId,
   userId = null,
   actionName,
@@ -357,7 +362,12 @@ export async function logSecurityAuditEvent({
   model?: string | null;
   metadata?: Json;
 }) {
-  const { error } = await supabase.from("security_audit_events").insert({
+  const auditClient = createSupabaseAdminClient();
+  if (!auditClient) {
+    console.warn("Security audit writer is unavailable");
+    return;
+  }
+  const { error } = await auditClient.from("security_audit_events").insert({
     workspace_id: workspaceId,
     user_id: userId,
     action_name: actionName,
@@ -374,8 +384,8 @@ export async function logSecurityAuditEvent({
     metadata_json: securityMetadata(metadata)
   });
 
-  if (error && error.code !== "42P01" && error.code !== "PGRST205" && error.code !== "23502") {
-    console.warn("Could not log security audit event", error.message);
+  if (error) {
+    console.warn("Could not log security audit event");
   }
 }
 
@@ -383,21 +393,21 @@ async function recentBlockedActionCount(context: ToolExecutionContext) {
   const threshold = Number.parseInt(process.env.VAEROEX_BLOCKED_ACTION_RATE_LIMIT || "", 10) || DEFAULT_BLOCK_RATE_LIMIT;
   const since = new Date(Date.now() - BLOCK_RATE_LIMIT_WINDOW_MINUTES * 60_000).toISOString();
 
-  const { count, error } = await context.supabase
+  const auditClient = createSupabaseAdminClient();
+  if (!auditClient) return { count: threshold, threshold, unavailable: true };
+  const { count, error } = await auditClient
     .from("security_audit_events")
     .select("id", { count: "exact", head: true })
     .eq("workspace_id", context.workspaceId)
     .eq("user_id", context.userId)
     .eq("allowed", false)
+    .eq("server_recorded", true)
     .gte("created_at", since);
 
-  if (error && error.code !== "42P01" && error.code !== "PGRST205") {
-    console.warn("Could not evaluate blocked action rate limit", error.message);
-  }
-
   return {
-    count: count || 0,
-    threshold
+    count: error || typeof count !== "number" ? threshold : count,
+    threshold,
+    unavailable: Boolean(error) || typeof count !== "number"
   };
 }
 
@@ -422,6 +432,10 @@ export async function evaluateToolExecution<TArgs = unknown>(
 ): Promise<ToolExecutionDecision<TArgs>> {
   const requestId = request.requestId || randomUUID();
   const rateLimit = await recentBlockedActionCount(context);
+
+  if (rateLimit.unavailable) {
+    return { allowed: false, requestId, reasonBlocked: "Security checks are temporarily unavailable. Please try again." };
+  }
 
   if (rateLimit.count >= rateLimit.threshold) {
     return blocked(

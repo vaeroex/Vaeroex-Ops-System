@@ -10,6 +10,7 @@ import {
   unattributedContextField
 } from "@/lib/ai/business-notes/reasoning-context";
 import { validateAiGeneratedOutput } from "@/lib/security/ai-output-validation";
+import { completeApprovedMissingDetail, followsApprovedInvestigation, hasTechnicalAdviceLanguage } from "@/lib/ai/investigation-action-quality";
 import type { StructuredOutputValidation } from "@/lib/ai/providers/provider-manager";
 import { validationFailure, validationValueType } from "@/lib/ai/validation-diagnostics";
 import type { Json } from "@/lib/supabase/types";
@@ -17,7 +18,7 @@ import type { Json } from "@/lib/supabase/types";
 const outputSchema = z.object({
   executive_interpretation: z.string().trim().min(30).max(700),
   why_it_matters: z.string().trim().min(20).max(420),
-  leadership_consideration: z.string().trim().min(20).max(420),
+  leadership_consideration: z.string().trim().min(20).max(620),
   provisional_hypothesis: z.string().trim().min(20).max(420).nullable()
 }).strict();
 
@@ -117,8 +118,27 @@ export function validateBusinessHealthExplanationOutput(
     });
   }
 
-  const output = parsed.data;
+  const approvedInvestigations = context.facts.drivers.map((driver) => driver.investigationNext).filter((step): step is string => Boolean(step));
+  const approvedStep = approvedInvestigations.find((step) => followsApprovedInvestigation(parsed.data.leadership_consideration, step, context.facts.freshness === "stale"))
+    || context.facts.drivers.find((driver) => driver.investigationNext
+      && driverTerms(driver.label).some((term) => parsed.data.leadership_consideration.toLowerCase().includes(term))
+      && completeApprovedMissingDetail(parsed.data.leadership_consideration, driver.investigationNext, context.facts.freshness === "stale", 620) !== parsed.data.leadership_consideration)?.investigationNext;
+  const output = {
+    ...parsed.data,
+    leadership_consideration: approvedStep
+      ? completeApprovedMissingDetail(parsed.data.leadership_consideration, approvedStep, context.facts.freshness === "stale", 620)
+      : parsed.data.leadership_consideration
+  };
   const text = combinedText(output);
+  if (hasTechnicalAdviceLanguage(text)) {
+    return validationFailure("The explanation used technical source language instead of plain business English.", {
+      reasonCode: "contextual_validation_failed",
+      stage: "contextual_validation",
+      expectedField: hasTechnicalAdviceLanguage(output.leadership_consideration) ? "leadership_consideration" : "$",
+      expectedType: "string",
+      observedType: "string"
+    });
+  }
   if (UUID_PATTERN.test(text) || CITATION_PATTERN.test(text)) {
     return validationFailure("The provider must not generate record identifiers or citation IDs.", {
       reasonCode: "invalid_citation_id",
@@ -163,9 +183,17 @@ export function validateBusinessHealthExplanationOutput(
     dataQualityBase: context.facts.dataQualityBase,
     riskPenalty: context.facts.riskPenalty,
     opportunityAdjustment: context.facts.opportunityAdjustment,
+    comparison: context.facts.comparison,
+    deterministicSummary: context.facts.deterministicSummary,
+    limitations: context.facts.limitations,
+    latestEvidenceAt: context.facts.latestEvidenceAt,
     drivers: context.facts.drivers.map((driver) => ({
       scoreImpact: driver.scoreImpact,
       fact: driver.fact
+    })),
+    citations: (context.citations || []).map((citation) => ({
+      recordedAt: citation.recordedAt,
+      excerpt: citation.excerpt
     }))
   });
   const approvedFactText = JSON.stringify({
@@ -219,6 +247,19 @@ export function validateBusinessHealthExplanationOutput(
       observedType: "string",
       expectedCount: requiredDrivers.length,
       observedCount: requiredDrivers.length - missingDrivers.length
+    });
+  }
+
+  const consideration = output.leadership_consideration.toLowerCase();
+  const repeatedCauseCaveats = [output.executive_interpretation, output.why_it_matters, output.leadership_consideration]
+    .filter((field) => /\b(?:does not|cannot|can.t|not enough to)\b.{0,55}\b(?:cause|causation)\b/i.test(field)).length;
+  if ((approvedInvestigations.length > 0 && !approvedInvestigations.some((step) => followsApprovedInvestigation(consideration, step, context.facts.freshness === "stale"))) || repeatedCauseCaveats > 1) {
+    return validationFailure("The leadership step must use the approved investigation and avoid repeating the same limitation.", {
+      reasonCode: "contextual_validation_failed",
+      stage: "contextual_validation",
+      expectedField: "leadership_consideration",
+      expectedType: "string",
+      observedType: "string"
     });
   }
 

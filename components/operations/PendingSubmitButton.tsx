@@ -13,6 +13,7 @@ export function PendingSubmitButton({
   disabled = false,
   activityDisabled = false,
   pendingContent,
+  pendingOverride,
   timeoutMs = LOCAL_PENDING_TIMEOUT_MS
 }: {
   children: ReactNode;
@@ -21,9 +22,11 @@ export function PendingSubmitButton({
   disabled?: boolean;
   activityDisabled?: boolean;
   pendingContent?: ReactNode;
+  pendingOverride?: boolean;
   timeoutMs?: number;
 }) {
-  const { pending } = useFormStatus();
+  const { pending: formPending } = useFormStatus();
+  const pending = pendingOverride ?? formPending;
   const [localPending, setLocalPending] = useState(false);
   const [localError, setLocalError] = useState("");
   const buttonRef = useRef<HTMLButtonElement | null>(null);

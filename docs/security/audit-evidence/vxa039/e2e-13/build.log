@@ -1,0 +1,282 @@
+   ▲ Next.js 15.5.24
+   - Experiments (use with caution):
+     · serverActions
+
+   Creating an optimized production build ...
+ ✓ Compiled successfully in 8.1s
+   Linting and checking validity of types ...
+
+./app/api/internal/nvidia-qualification/stage-three-a/route.ts
+57:24  Warning: '_blindOutput' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./app/api/internal/nvidia-qualification/stage-three-b/route.ts
+82:24  Warning: '_blindOutput' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./app/api/internal/nvidia-qualification/stage-two/route.ts
+45:24  Warning: '_blindOutput' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./app/app/admin/audit-logs/page.tsx
+3:10  Warning: 'CompactRunTable' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./app/app/admin/nvidia-qualification/stage-three-a/page.tsx
+65:24  Warning: '_blindOutput' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./app/app/admin/nvidia-qualification/stage-three-b/page.tsx
+79:24  Warning: '_blindOutput' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./app/app/admin/nvidia-qualification/stage-two/page.tsx
+51:24  Warning: '_blindOutput' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./app/app/files/actions.ts
+18:3  Warning: 'previewRows' is defined but never used.  @typescript-eslint/no-unused-vars
+335:10  Warning: 'fileExtension' is defined but never used.  @typescript-eslint/no-unused-vars
+592:10  Warning: 'inferMapping' is defined but never used.  @typescript-eslint/no-unused-vars
+1654:10  Warning: 'fileContentStatus' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./app/app/kpis/page.tsx
+152:10  Warning: 'explicitKpiDirection' is defined but never used.  @typescript-eslint/no-unused-vars
+194:10  Warning: 'formatMetricValue' is defined but never used.  @typescript-eslint/no-unused-vars
+373:10  Warning: 'MetricCard' is defined but never used.  @typescript-eslint/no-unused-vars
+401:10  Warning: 'SummaryStat' is defined but never used.  @typescript-eslint/no-unused-vars
+475:10  Warning: 'KpiDetailPanel' is defined but never used.  @typescript-eslint/no-unused-vars
+502:10  Warning: 'metricDetailsHref' is defined but never used.  @typescript-eslint/no-unused-vars
+764:10  Warning: 'trendDeltaLabel' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./app/app/page.tsx
+50:25  Warning: 'Json' is defined but never used.  @typescript-eslint/no-unused-vars
+130:10  Warning: 'dashboardHref' is defined but never used.  @typescript-eslint/no-unused-vars
+230:10  Warning: 'isRecord' is defined but never used.  @typescript-eslint/no-unused-vars
+294:10  Warning: 'metricNames' is defined but never used.  @typescript-eslint/no-unused-vars
+553:10  Warning: 'severityTone' is defined but never used.  @typescript-eslint/no-unused-vars
+730:10  Warning: 'signalRecommendedAction' is defined but never used.  @typescript-eslint/no-unused-vars
+798:10  Warning: 'IntelligenceLayerSummary' is defined but never used.  @typescript-eslint/no-unused-vars
+1162:9  Warning: 'weeklyTrends' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+1190:9  Warning: 'risks' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+1195:9  Warning: 'opportunities' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+1201:9  Warning: 'recommendedActions' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+1225:9  Warning: 'smartAlerts' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./app/app/sources/SourcesPage.tsx
+1164:9  Warning: 'isArchivedView' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./components/evidence/BusinessNotesPanel.tsx
+80:108  Warning: `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities
+80:127  Warning: `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities
+
+./components/intelligence/IntelligenceSignalInbox.tsx
+37:7  Warning: 'confidenceOptions' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./components/marketing/spatial/PublicSpatialCanvas.tsx
+9:3  Warning: 'Group' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./components/operations/ManagedRecordList.tsx
+161:10  Warning: 'collectionLabel' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./components/spatial/PublicSpatialCanvasGuard.tsx
+24:21  Warning: '_error' is defined but never used.  @typescript-eslint/no-unused-vars
+24:36  Warning: '_info' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./lib/ai/bounded-context.ts
+29:10  Warning: 'compactText' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./lib/ai/business-health-explanation/snapshot-context.ts
+27:26  Warning: '_fingerprint' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+27:60  Warning: '_contextualEvidence' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+27:99  Warning: '_contextAuthority' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./lib/ai/evidence-engine/benchmark.ts
+202:7  Warning: 'POC_RECALL_CUTOFFS' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+203:7  Warning: 'POC_PRECISION_CUTOFFS' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+874:17  Warning: '_runs' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./lib/ai/executive-output.ts
+344:10  Warning: 'citationObjects' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./lib/ai/finding-explanation/snapshot-context.ts
+20:26  Warning: '_fingerprint' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+20:60  Warning: '_contextualEvidence' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+20:99  Warning: '_contextAuthority' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./lib/ai/intelligence-briefing/storage.ts
+12:3  Warning: 'INTELLIGENCE_BRIEFING_PROMPT_VERSION' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./lib/ai/kpi-overview.ts
+109:10  Warning: 'numberValue' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./lib/ai/qualification/stage-three-b.ts
+229:7  Warning: 'parsedValue' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./lib/ai/qualification/stage-two-fixtures.ts
+15:8  Warning: 'EvidenceManifest' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./lib/ai/trust/workflows/business-health.ts
+243:562  Warning: '_text' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./lib/intelligence/operational-evidence.ts
+311:17  Warning: '_kind' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+info  - Need to disable some ESLint rules? Learn more here: https://nextjs.org/docs/app/api-reference/config/eslint#disabling-rules
+   Collecting page data ...
+   Generating static pages (0/95) ...
+   Generating static pages (23/95) 
+   Generating static pages (47/95) 
+   Generating static pages (71/95) 
+ ✓ Generating static pages (95/95)
+   Finalizing page optimization ...
+   Collecting build traces ...
+
+Route (app)                                               Size  First Load JS
+┌ ƒ /                                                   3.2 kB         119 kB
+├ ○ /_not-found                                          283 B         102 kB
+├ ƒ /about                                               134 B         114 kB
+├ ƒ /accept-invite                                       131 B         113 kB
+├ ƒ /acceptable-use                                      135 B         114 kB
+├ ƒ /ai-disclaimer                                       134 B         114 kB
+├ ƒ /api/admin/workspace-agreements/[agreementId]/pdf    283 B         102 kB
+├ ƒ /api/health/openai                                   283 B         102 kB
+├ ƒ /api/integrations/dashboard                          283 B         102 kB
+├ ƒ /api/integrations/dashboard/preferences              283 B         102 kB
+├ ƒ /api/integrations/google-sheets/callback             283 B         102 kB
+├ ƒ /api/integrations/google-sheets/connect              283 B         102 kB
+├ ƒ /api/integrations/google-sheets/disconnect           283 B         102 kB
+├ ƒ /api/integrations/google-sheets/entity               283 B         102 kB
+├ ƒ /api/integrations/google-sheets/mapping              283 B         102 kB
+├ ƒ /api/integrations/google-sheets/preview              283 B         102 kB
+├ ƒ /api/integrations/google-sheets/reconnect            283 B         102 kB
+├ ƒ /api/integrations/google-sheets/recovery             283 B         102 kB
+├ ƒ /api/integrations/google-sheets/scheduled-sync       283 B         102 kB
+├ ƒ /api/integrations/google-sheets/spreadsheet          283 B         102 kB
+├ ƒ /api/integrations/google-sheets/sync                 283 B         102 kB
+├ ƒ /api/integrations/google-sheets/tab                  283 B         102 kB
+├ ƒ /api/integrations/qbo/accounting-authority           283 B         102 kB
+├ ƒ /api/integrations/qbo/cancel                         283 B         102 kB
+├ ƒ /api/integrations/qbo/connect                        283 B         102 kB
+├ ƒ /api/integrations/qbo/disconnect                     283 B         102 kB
+├ ƒ /api/integrations/qbo/reauthorize                    283 B         102 kB
+├ ƒ /api/integrations/square/callback                    283 B         102 kB
+├ ƒ /api/integrations/square/connect                     283 B         102 kB
+├ ƒ /api/integrations/square/disconnect                  283 B         102 kB
+├ ƒ /api/integrations/square/internal/connect            283 B         102 kB
+├ ƒ /api/integrations/square/internal/manual/[action]    283 B         102 kB
+├ ƒ /api/integrations/square/mapping                     283 B         102 kB
+├ ƒ /api/integrations/square/read                        283 B         102 kB
+├ ƒ /api/integrations/square/reauthorize                 283 B         102 kB
+├ ƒ /api/integrations/square/status                      283 B         102 kB
+├ ƒ /api/integrations/square/webhook                     283 B         102 kB
+├ ƒ /api/internal/document-extraction/broker             283 B         102 kB
+├ ƒ /api/internal/nvidia-qualification                   283 B         102 kB
+├ ƒ /api/internal/nvidia-qualification/stage-three-a     283 B         102 kB
+├ ƒ /api/internal/nvidia-qualification/stage-three-b     283 B         102 kB
+├ ƒ /api/internal/nvidia-qualification/stage-two         283 B         102 kB
+├ ƒ /api/legal/workspace-agreements/[agreementId]/pdf    283 B         102 kB
+├ ƒ /api/public/forms/[slug]/submit                      283 B         102 kB
+├ ƒ /api/search                                          283 B         102 kB
+├ ƒ /api/stripe/checkout                                 283 B         102 kB
+├ ƒ /api/stripe/portal                                   283 B         102 kB
+├ ƒ /api/stripe/webhook                                  283 B         102 kB
+├ ƒ /api/subscription/request-activation                 283 B         102 kB
+├ ƒ /api/subscription/status                             283 B         102 kB
+├ ƒ /app                                                 13 kB         125 kB
+├ ƒ /app/[module]                                        404 B         106 kB
+├ ƒ /app/account/subscription                            179 B         106 kB
+├ ƒ /app/admin                                           190 B         111 kB
+├ ƒ /app/admin/ai-trust                                  827 B         112 kB
+├ ƒ /app/admin/ai-usage                                  190 B         111 kB
+├ ƒ /app/admin/audit-logs                                190 B         111 kB
+├ ƒ /app/admin/customers                                 190 B         111 kB
+├ ƒ /app/admin/customers/[workspaceId]                 4.95 kB         116 kB
+├ ƒ /app/admin/easter-egg                              2.26 kB         108 kB
+├ ƒ /app/admin/nvidia-qualification                      283 B         102 kB
+├ ƒ /app/admin/nvidia-qualification/stage-three-a        283 B         102 kB
+├ ƒ /app/admin/nvidia-qualification/stage-three-b        283 B         102 kB
+├ ƒ /app/admin/nvidia-qualification/stage-two            283 B         102 kB
+├ ƒ /app/admin/subscriptions                           2.61 kB         113 kB
+├ ƒ /app/admin/support-requests                        2.29 kB         113 kB
+├ ƒ /app/admin/workspace-agreements                      179 B         106 kB
+├ ƒ /app/admin/workspace-agreements/[agreementId]      1.72 kB         107 kB
+├ ƒ /app/admin/workspaces                                190 B         111 kB
+├ ƒ /app/agents                                          283 B         102 kB
+├ ƒ /app/ask                                           10.8 kB         120 kB
+├ ƒ /app/assets                                          204 B         115 kB
+├ ƒ /app/assets/checks                                   196 B         115 kB
+├ ƒ /app/checklist-runs                                  283 B         102 kB
+├ ƒ /app/checklists                                      283 B         102 kB
+├ ƒ /app/crm                                             171 B         106 kB
+├ ƒ /app/easter-egg                                    5.77 kB         108 kB
+├ ƒ /app/files                                           283 B         102 kB
+├ ƒ /app/form-submissions                              2.08 kB         117 kB
+├ ƒ /app/forms                                           204 B         115 kB
+├ ƒ /app/forms/[id]                                    4.26 kB         115 kB
+├ ƒ /app/help                                            171 B         106 kB
+├ ƒ /app/help/release-notes                              134 B         114 kB
+├ ƒ /app/help/trust                                      134 B         114 kB
+├ ƒ /app/integrations                                    834 B         106 kB
+├ ƒ /app/integrations/square                             834 B         106 kB
+├ ƒ /app/intelligence                                  14.9 kB         137 kB
+├ ƒ /app/intelligence/briefings                          813 B         109 kB
+├ ƒ /app/intelligence/briefings/[type]                 2.27 kB         108 kB
+├ ƒ /app/issues                                          204 B         115 kB
+├ ƒ /app/kpis                                          1.83 kB         117 kB
+├ ƒ /app/kpis/profit-leakage                           1.23 kB         107 kB
+├ ƒ /app/kpis/settings                                   638 B         106 kB
+├ ƒ /app/legal/agreements/[agreementId]                1.72 kB         107 kB
+├ ƒ /app/notifications                                   283 B         102 kB
+├ ƒ /app/people                                          283 B         102 kB
+├ ƒ /app/reports                                       3.94 kB         109 kB
+├ ƒ /app/reports/[id]                                    834 B         106 kB
+├ ƒ /app/settings                                      3.73 kB         109 kB
+├ ƒ /app/settings/integrations/google-sheets           5.52 kB         127 kB
+├ ƒ /app/settings/integrations/quickbooks              3.06 kB         109 kB
+├ ƒ /app/settings/integrations/quickbooks/accounting     834 B         106 kB
+├ ƒ /app/settings/integrations/quickbooks/data           834 B         106 kB
+├ ƒ /app/settings/integrations/quickbooks/disconnect   1.86 kB         107 kB
+├ ƒ /app/settings/integrations/square                    171 B         106 kB
+├ ƒ /app/settings/integrations/square/internal           283 B         102 kB
+├ ƒ /app/setup                                         5.08 kB         114 kB
+├ ƒ /app/sops                                            433 B         115 kB
+├ ƒ /app/sources                                         132 B         118 kB
+├ ƒ /app/sources/[fileId]                                132 B         118 kB
+├ ƒ /app/support                                        2.6 kB         108 kB
+├ ƒ /app/tasks                                           283 B         102 kB
+├ ƒ /auth/callback                                       283 B         102 kB
+├ ƒ /billing-required                                    179 B         106 kB
+├ ƒ /biological-intelligence                             138 B         119 kB
+├ ƒ /careers                                             135 B         114 kB
+├ ƒ /checkout/legal                                      135 B         114 kB
+├ ƒ /checkout/success                                    134 B         114 kB
+├ ƒ /contact                                             134 B         116 kB
+├ ƒ /data-retention                                      134 B         114 kB
+├ ƒ /demo                                              5.59 kB         116 kB
+├ ƒ /drug-discovery-intelligence                         139 B         119 kB
+├ ƒ /executive-intelligence                            5.74 kB         122 kB
+├ ƒ /forgot-password                                     132 B         113 kB
+├ ○ /future-domains                                      283 B         102 kB
+├ ƒ /help                                                134 B         114 kB
+├ ƒ /human-review                                        135 B         114 kB
+├ ƒ /intelligence-systems                                139 B         119 kB
+├ ƒ /login                                               130 B         113 kB
+├ ○ /manifest.webmanifest                                283 B         102 kB
+├ ƒ /networking                                          135 B         114 kB
+├ ○ /offline                                             175 B         111 kB
+├ ƒ /pricing                                           3.83 kB         115 kB
+├ ƒ /privacy                                             135 B         114 kB
+├ ƒ /refund-policy                                       135 B         114 kB
+├ ƒ /release-notes                                       135 B         114 kB
+├ ƒ /reset-password                                      190 B         111 kB
+├ ○ /robots.txt                                          283 B         102 kB
+├ ƒ /sensitive-data-policy                               134 B         114 kB
+├ ƒ /signup                                              131 B         113 kB
+├ ○ /sitemap.xml                                         283 B         102 kB
+├ ƒ /subscription-billing-terms                          135 B         114 kB
+├ ƒ /support                                             135 B         116 kB
+├ ƒ /terms                                               134 B         114 kB
+└ ƒ /trust                                               135 B         114 kB
++ First Load JS shared by all                           102 kB
+  ├ chunks/4674-775fcf7c622710d3.js                    45.6 kB
+  ├ chunks/bf553b51-3cd140e4f18cf7f9.js                54.2 kB
+  └ other shared chunks (total)                        2.26 kB
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+

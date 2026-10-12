@@ -38,11 +38,12 @@ async function qualify(db) {
   await client.query(suite.slice(suite.indexOf('create function pg_temp.fp'), suite.indexOf('\nselect ok(')));
   const template = (await client.query('select pg_temp.intent($1) as command', [randomUUID()])).rows[0].command;
   function attempt(name = randomUUID(), overrides = {}) {
-    const connection = { ...template, id: randomUUID(), safeDisplayName: name, requestedAt: new Date().toISOString(), ...overrides };
+    const requestedAt = new Date();
+    const connection = { ...template, id: randomUUID(), safeDisplayName: name, requestedAt: requestedAt.toISOString(), ...overrides };
     const state = { contractVersion: 'qbo_customer_oauth_state_v2', stateId: randomUUID(), connectionId: connection.id,
       expectedConnectionGeneration: 1, expectedConnectionRowVersion: 1, requestedScopes: connection.requestedScopes,
       redirectUri: 'https://integrations.vaeroex.com/oauth/callback', returnIntent: '/app/settings',
-      stateHash: fp(randomUUID()), requestedAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 600000).toISOString() };
+      stateHash: fp(randomUUID()), requestedAt: requestedAt.toISOString(), expiresAt: new Date(requestedAt.getTime() + 600000).toISOString() };
     return { connection, state };
   }
   const begin = async a => { await actor(client); return start(client, a.connection, a.state); };

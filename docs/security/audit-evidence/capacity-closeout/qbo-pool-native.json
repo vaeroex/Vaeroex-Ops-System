@@ -1,0 +1,68 @@
+{
+  "offline": {
+    "passed": true,
+    "scope": "offline pool ownership, role denial, rollback destruction, monotonic budget, late-acquisition cancellation",
+    "requestHandles": 40,
+    "poolInstances": 1
+  },
+  "native": {
+    "passed": true,
+    "scope": "native PostgreSQL transaction/pool budget; synthetic RPC only; TLS separately qualified; not provider throughput or full customer capacity",
+    "databaseName": "vxa_budget_dd77982431cc41d6",
+    "processes": 2,
+    "concurrentHandles": 80,
+    "poolMaximumPerProcess": 4,
+    "peakConnections": 8,
+    "peakActive": 8,
+    "peakWaiting": 8,
+    "samples": 66,
+    "inventory": {
+      "total": 66,
+      "cancelled": 0,
+      "recovered": 2
+    },
+    "workers": [
+      {
+        "passed": true,
+        "worker": 0,
+        "success": 32,
+        "failed": 8,
+        "replays": 32,
+        "recovered": 1,
+        "maxTotal": 4,
+        "maxWaiting": 36,
+        "cancelledInMs": 102.36775000000011,
+        "cancellationCode": "unknown",
+        "p95Ms": 296.46737499999995,
+        "p99Ms": 296.85362499999985,
+        "idle": {
+          "total": 3,
+          "idle": 3,
+          "waiting": 0,
+          "idleErrors": 0
+        }
+      },
+      {
+        "passed": true,
+        "worker": 1,
+        "success": 32,
+        "failed": 8,
+        "replays": 32,
+        "recovered": 1,
+        "maxTotal": 4,
+        "maxWaiting": 36,
+        "cancelledInMs": 102.2099169999999,
+        "cancellationCode": "unknown",
+        "p95Ms": 296.681333,
+        "p99Ms": 296.838125,
+        "idle": {
+          "total": 3,
+          "idle": 3,
+          "waiting": 0,
+          "idleErrors": 0
+        }
+      }
+    ],
+    "preserved": true
+  }
+}

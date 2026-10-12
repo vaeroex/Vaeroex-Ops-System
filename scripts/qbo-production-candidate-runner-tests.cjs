@@ -6,6 +6,7 @@ const os = require('node:os');
 const { spawnSync } = require('node:child_process');
 const vm = require('node:vm');
 const { checkTap, expandFixture, suiteRequests, candidateDblinkSetting, candidates, pendingSuite, eligibilitySuite,
+  productionSquare, productionSheets, auditMigrations, capacityMigrations, storageMigrations, pricingMigration, legalAcceptanceMigration, adminTelemetryMigration, assertProductionBaselineLedger,
   dashboardMigrations, dashboardSuites, dashboardPlan, checkDashboardAssertionNames, composeSquareIdentitySuite, executeDashboardSuite,
   preferenceAssertionNames, reportingTimezoneAssertionNames, squareIdentityAssertionNames } = require('./run-qbo-production-candidate-database-tests.cjs');
 const { verifyLocalContext, verifyOwnedContainer, verifyBridgeGateway } = require('./qbo-candidate-local-container.cjs');
@@ -25,10 +26,72 @@ assert.match(candidateRunner, /outcome\.assertions = await require\('\.\/qbo-pen
   'eligibility tests use the owned per-suite database clone'); assertions++;
 assert.match(candidateRunner, /assert\.equal\(outcome\.assertions, suite\.expectedScenarios/, 'incomplete native coverage fails the candidate run'); assertions++;
 assert.match(candidateRunner, /result\.suites\.length === shapeSuites\.length \+ 4/, 'candidate success requires the registered dashboard suites and all four existing native suites'); assertions++;
-assert.match(candidateRunner, /assert\.equal\(canonical\.length, 123,/, 'canonical count remains exact'); assertions++;
-assert.match(candidateRunner, /'20261002040024_google_sheets_complete\.sql',\s*'20261002040031_google_sheets_lifecycle\.sql',\s*'20261002182049_integration_summary_preferences\.sql',/,
-  'canonical tail remains the two Sheets migrations plus preferences'); assertions++;
+assert.match(candidateRunner, /assert\.equal\(canonical\.length, 144,/, 'canonical count remains exact'); assertions++;
+assert.deepEqual(storageMigrations, [
+  '20261012003846_workspace_storage_capacity.sql',
+  '20261012003920_workspace_storage_capacity_billing.sql',
+  '20261012013508_workspace_storage_invoice_capacity.sql',
+], 'only the three reviewed storage migrations extend the existing canonical baseline'); assertions++;
+const canonicalNames = fs.readdirSync(path.join(__dirname, '../supabase/migrations')).filter(name => /^\d+_.+\.sql$/.test(name)).sort();
+assert.equal(canonicalNames.filter(name => ![...storageMigrations, pricingMigration, legalAcceptanceMigration, adminTelemetryMigration].includes(name)).length, 138, 'the reviewed pre-storage canonical baseline remains exact'); assertions++;
+assert.deepEqual(canonicalNames.slice(-6), [...storageMigrations, pricingMigration, legalAcceptanceMigration, adminTelemetryMigration], 'the exact storage, price and legal boundary migrations are the final ordered tail'); assertions++;
+assert.ok(candidateRunner.indexOf('await apply(legalAcceptance);') > candidateRunner.indexOf('await apply(pricing);'), 'legal acceptance exception follows the shared entitlement audit in both shapes'); assertions++;
+assert.ok(candidateRunner.indexOf('for (const item of storage) await apply(item);') > candidateRunner.indexOf('await apply(vsiResearch);'),
+  'storage follows its full authorization and billing prerequisites in both shapes'); assertions++;
+assert.ok(candidateRunner.indexOf('for (const item of storage) await apply(item);') < candidateRunner.indexOf("await client.query('create extension if not exists pgtap with schema extensions')"),
+  'every behavior suite includes the final storage admission guards'); assertions++;
+assert.match(candidateRunner, /storageTailHashes: storage\.map\(\(\{ file, sha256 \}\) => \(\{ file, sha256 \}\)\)/,
+  'qualification evidence records the exact storage migration bytes'); assertions++;
+assert.deepEqual(productionSheets, ['20261002040024_google_sheets_complete.sql', '20261002040031_google_sheets_lifecycle.sql']); assertions++;
+assert.deepEqual(auditMigrations, [
+  '20261005022017_workspace_security_boundaries.sql', '20261005022445_workspace_persisted_usage_limits.sql',
+  '20261005060101_atomic_confirmed_memory_publication.sql', '20261005060258_asset_check_server_chronology.sql',
+  '20261005061024_internal_form_submission_idempotency.sql', '20261005062005_durable_import_attempt_reconciliation.sql',
+  '20261005070311_worksheet_import_publication_heads.sql',
+]); assertions++;
+assert.match(candidateRunner, /'20261002040024_google_sheets_complete\.sql',\s*'20261002040031_google_sheets_lifecycle\.sql',\s*'20261002182049_integration_summary_preferences\.sql',\s*\.\.\.auditMigrations,\s*\.\.\.capacityMigrations,\s*vsiMigration,\s*vsiResearchMigration,\s*\.\.\.storageMigrations,\s*pricingMigration,\s*legalAcceptanceMigration,\s*adminTelemetryMigration,\s*\]/,
+  'canonical tail remains exactly Sheets, preferences, audit, capacity, VSI and reviewed storage tails'); assertions++;
+assert.match(candidateRunner, /canonical\.filter\(item => !\[\.\.\.auditMigrations, \.\.\.capacityMigrations, vsiMigration, vsiResearchMigration, \.\.\.storageMigrations, pricingMigration, legalAcceptanceMigration, adminTelemetryMigration\]\.includes\(path\.basename\(item\.file\)\)\)/,
+  'canonical does not apply audit guards before new provider tables exist'); assertions++;
+assert.match(candidateRunner, /const vsiMigration = '20261008190000_vsi_private_chat\.sql'/, 'VSI tail is explicitly reviewed'); assertions++;
+assert.match(candidateRunner, /const vsiResearchMigration = '20261009041421_vsi_adaptive_research\.sql'/, 'research tail is explicitly reviewed'); assertions++;
+assert.ok(candidateRunner.indexOf('await apply(vsiResearch);') > candidateRunner.indexOf('await apply(vsi);'), 'research follows original VSI in both database shapes'); assertions++;
+assert.match(candidateRunner, /vsiResearchTailHash: \{ file: vsiResearch\.file, sha256: vsiResearch\.sha256 \}/, 'research migration bytes are captured in qualification evidence'); assertions++;
+assert.ok(candidateRunner.indexOf('await apply(vsi);') > candidateRunner.indexOf('for (const item of capacity) await apply(item);'), 'VSI follows its authorization dependencies in both database shapes'); assertions++;
+assert.deepEqual(capacityMigrations, [
+  '20261005182541_bounded_google_sheets_dispatch.sql',
+  '20261005183352_issue_submission_receipts.sql',
+  '20261005184031_qbo_scoped_runtime_recovery.sql',
+  '20261005190709_sheets_recovery_fair_scan.sql',
+  '20261005194244_google_sheets_failure_cleanup_transition.sql',
+  '20261005202215_sheets_dispatch_round_robin.sql',
+]); assertions++;
+assert.ok(candidateRunner.indexOf('for (const item of capacity) await apply(item);') > candidateRunner.indexOf('for (const item of audit) await apply(item);'),
+  'capacity changes follow their audit helper dependencies in both isolated shapes'); assertions++;
+assert.ok(candidateRunner.indexOf('for (const item of capacity) await apply(item);') < candidateRunner.indexOf("await client.query('create extension if not exists pgtap with schema extensions')"),
+  'every behavior suite includes the capacity changes'); assertions++;
+assert.match(candidateRunner, /assert\.equal\(canonicalBaseline\.length, 123,/, 'canonical baseline stays exact'); assertions++;
+assert.match(candidateRunner, /if \(shape\.name === 'production'\) for \(const item of sheets\) await apply\(item\)/,
+  'Production includes both hosted Sheets migrations exactly once'); assertions++;
+assert.ok(candidateRunner.indexOf('for (const item of audit) await apply(item);')
+  > candidateRunner.indexOf('for (const name of plan.migrations) await apply('),
+  'audit tail follows complete provider and dashboard history'); assertions++;
+assert.ok(candidateRunner.indexOf('for (const item of audit) await apply(item);')
+  < candidateRunner.indexOf("await client.query('create extension if not exists pgtap with schema extensions')"),
+  'every suite clone includes the security and closeout corrections'); assertions++;
+assert.match(candidateRunner, /for \(const item of \[\.\.\.sheets, \.\.\.audit\]\)/,
+  'shared migration hashes checked across both layouts'); assertions++;
 assert.match(candidateRunner, /assert\.equal\(prefix\.length, 104,/, 'production baseline remains exactly 104'); assertions++;
+const productionVersions = [
+  ...fs.readdirSync(path.join(__dirname, '../supabase/migrations')).filter(name => /^\d+_.+\.sql$/.test(name) && name.split('_')[0] <= '20260902191325'),
+  ...productionSquare, ...candidates, ...productionSheets, ...Object.values(dashboardMigrations),
+].map(name => name.split('_')[0]);
+assertProductionBaselineLedger(productionVersions); assertions++;
+assertProductionBaselineLedger([...productionVersions].reverse()); assertions++;
+for (const changed of [productionVersions.slice(1), [...productionVersions, '99999999999999'],
+  ['99999999999999', ...productionVersions.slice(1)], [productionVersions[1], ...productionVersions.slice(1)]]) {
+  assert.throws(() => assertProductionBaselineLedger(changed)); assertions++;
+}
 assert.ok(candidateRunner.indexOf('for (const item of qbo) await apply(item);')
   < candidateRunner.indexOf("assert.equal(await squareCatalog(client), before")); assertions++;
 assert.ok(candidateRunner.indexOf("assert.equal(await squareCatalog(client), before")
@@ -393,3 +456,5 @@ async function dashboardExecutionTests() {
 dashboardExecutionTests().then(containerLifecycleTests).then(() => {
   console.log(`QBO candidate runner: ${assertions} assertions passed; no database or network used.`);
 }).catch(error => { console.error(error); process.exitCode = 1; });
+
+assert.ok(candidateRunner.indexOf('await apply(adminTelemetry);') > candidateRunner.indexOf('await apply(legalAcceptance);'), 'admin telemetry follows all authorization, cost ledger and legal boundary migrations');

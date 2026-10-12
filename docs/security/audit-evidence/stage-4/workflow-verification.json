@@ -1,0 +1,180 @@
+{
+  "baseCommit": "d91be079c7beb0b6f21a4c5e6b451f90ca06e035",
+  "branch": "codex/workspace-audit-security",
+  "testedUncommittedChanges": true,
+  "workflowContracts": {
+    "passed": 34,
+    "failed": 0,
+    "command": "node scripts/workspace-workflow-tests.cjs",
+    "scope": "Actual TypeScript actions, schema validator and query builder through isolated PGlite SQL adapter, plus installed Supabase HTTP client with synthetic fetch responses for bounded pagination recovery; authentication, subscription and Next cache/navigation stubbed. No external requests."
+  },
+  "browser": {
+    "scope": "Actual hydrated components, repository Tailwind config and app/globals.css under the exact workspace shell classes in light and pulsar themes, in a loopback-only synthetic fixture. Browser submission transport, search responses, navigation and activity are stubs; server actions and database persistence are tested separately. No auth or production/provider access.",
+    "results": [
+      {
+        "theme": "light",
+        "width": 1440,
+        "drawerTheme": {
+          "customerScope": true,
+          "surface": "#ffffff",
+          "fontSize": "14px",
+          "inputRadius": "7px",
+          "inputMinimum": "42px",
+          "inputBackground": "rgb(255, 255, 255)"
+        },
+        "searchTheme": {
+          "surface": "#ffffff",
+          "inputRadius": "7px",
+          "customerScope": true
+        },
+        "passed": [
+          "workspace_scoped_theme_inheritance",
+          "drawer_initial_focus_tab_wrap_inert_background_escape_restore",
+          "single_responsive_search_shortcut",
+          "search_results_tab_wrap_external_invoker_restore",
+          "nested_escape_scroll_lock_restore",
+          "schema_field_switch_reset_and_submission_payload",
+          "pending_repeat_click_single_request",
+          "native_validation_preserves_inputs",
+          "no_horizontal_overflow"
+        ]
+      },
+      {
+        "theme": "light",
+        "width": 390,
+        "drawerTheme": {
+          "customerScope": true,
+          "surface": "#ffffff",
+          "fontSize": "14px",
+          "inputRadius": "7px",
+          "inputMinimum": "42px",
+          "inputBackground": "rgb(255, 255, 255)"
+        },
+        "searchTheme": {
+          "surface": "#ffffff",
+          "inputRadius": "7px",
+          "customerScope": true
+        },
+        "passed": [
+          "workspace_scoped_theme_inheritance",
+          "drawer_initial_focus_tab_wrap_inert_background_escape_restore",
+          "single_responsive_search_shortcut",
+          "search_results_tab_wrap_external_invoker_restore",
+          "nested_escape_scroll_lock_restore",
+          "schema_field_switch_reset_and_submission_payload",
+          "pending_repeat_click_single_request",
+          "native_validation_preserves_inputs",
+          "no_horizontal_overflow"
+        ]
+      },
+      {
+        "theme": "pulsar",
+        "width": 1440,
+        "drawerTheme": {
+          "customerScope": true,
+          "surface": "#111827",
+          "fontSize": "14px",
+          "inputRadius": "7px",
+          "inputMinimum": "42px",
+          "inputBackground": "rgba(3, 7, 18, 0.78)"
+        },
+        "searchTheme": {
+          "surface": "#111827",
+          "inputRadius": "7px",
+          "customerScope": true
+        },
+        "passed": [
+          "workspace_scoped_theme_inheritance",
+          "drawer_initial_focus_tab_wrap_inert_background_escape_restore",
+          "single_responsive_search_shortcut",
+          "search_results_tab_wrap_external_invoker_restore",
+          "nested_escape_scroll_lock_restore",
+          "schema_field_switch_reset_and_submission_payload",
+          "pending_repeat_click_single_request",
+          "native_validation_preserves_inputs",
+          "no_horizontal_overflow"
+        ]
+      },
+      {
+        "theme": "pulsar",
+        "width": 390,
+        "drawerTheme": {
+          "customerScope": true,
+          "surface": "#111827",
+          "fontSize": "14px",
+          "inputRadius": "7px",
+          "inputMinimum": "42px",
+          "inputBackground": "rgba(3, 7, 18, 0.78)"
+        },
+        "searchTheme": {
+          "surface": "#111827",
+          "inputRadius": "7px",
+          "customerScope": true
+        },
+        "passed": [
+          "workspace_scoped_theme_inheritance",
+          "drawer_initial_focus_tab_wrap_inert_background_escape_restore",
+          "single_responsive_search_shortcut",
+          "search_results_tab_wrap_external_invoker_restore",
+          "nested_escape_scroll_lock_restore",
+          "schema_field_switch_reset_and_submission_payload",
+          "pending_repeat_click_single_request",
+          "native_validation_preserves_inputs",
+          "no_horizontal_overflow"
+        ]
+      }
+    ],
+    "errors": [],
+    "submittedCount": 4
+  },
+  "integrationHelperContracts": {
+    "passed": 10,
+    "failed": 0,
+    "command": "node scripts/square-sheets-result-visibility-tests.cjs"
+  },
+  "activeIntegrationContracts": {
+    "passed": 15,
+    "failed": 0,
+    "command": "node scripts/current-integrations-tests.cjs"
+  },
+  "typecheck": "passed tsc --noEmit --incremental false",
+  "lint": "Passed targeted files; one existing collectionLabel unused warning in ManagedRecordList.tsx. Final history loader and workflow-contract files pass with zero warnings.",
+  "sha256": {
+    "components/operations/ModalDialog.tsx": "e2fbcaaadc4d5e52109ec2bf15f9cfce4c11b43e1a9801adb92daf806b90e7f0",
+    "components/operations/RecordDetailDrawer.tsx": "3d73f9e031a9d264ba85adccee561c24e2552cead54c8c0348f36ed0cd6e9b59",
+    "components/app/GlobalSearch.tsx": "a3f65fa69614220a2df0feed823b6ffffcbfe9c1d08de73b5ab846e8e560452a",
+    "components/app/GlobalSearchTrigger.tsx": "e7447e1aaba447cca20da18ba8484fc392c78cd2c3fffc2cd726ceead885a4eb",
+    "components/operations/InternalFormSubmissionForm.tsx": "5ff910d068ac26c2c413b4b2c74fdeec52f7dc3270c2f85043c953d561b78d81",
+    "lib/forms/submission-schema.ts": "d32c96115bbecfcaf154ef10afc1bf3743d6fbbce223094035f3f907ad449af7",
+    "app/app/operations/actions.ts": "d5daa963e0c117b3129819ec59a9e89d16066a7828df3dbc6d32d1b985392e2d",
+    "app/app/operations/record-management-actions.ts": "6cbd8546bfe9d74dd9934d32a13afef4234be286dcf8759407c9adf6b9a9a36d",
+    "components/operations/ManagedRecordList.tsx": "6a47d91032fd43dbc91357216d28a29d95b8dcf6e390f0ff3233f05c77094294",
+    "lib/records/asset-check-history.ts": "ea248d72c02afd7938676ffeac25fa88a08f9f62d0adfdd94e1f43a45d5d9daf",
+    "app/app/assets/checks/page.tsx": "c278d1d5bbc4a10fef7b4ea824ae8f05957cf2da5e4f0c299fbbc118d1c517e5",
+    "app/app/assets/page.tsx": "3d889dd2701eabc1416a041859a2136017e412517a83d13227133365884bdc29",
+    "app/app/forms/[id]/page.tsx": "82966428dfd65ea927f9efea2c929c04820a3b63f5e742982de270861bbb896b",
+    "app/app/form-submissions/page.tsx": "0f9d11c9a71ba02dd2318556a80b47fd4d4f7c9116a949a7de037634ef4d1963",
+    "scripts/workspace-workflow-tests.cjs": "78de1c903aef9cb08327aaf05f8e8ba36b6d6010fd0b08a346e2ad720a6b2590",
+    "scripts/workspace-workflow-browser-tests.cjs": "eff182612a7f93d97c6cd3a01e836f4f54eadf01057a88d36eff19980cf288e5",
+    "scripts/current-integrations-tests.cjs": "576e75855107e3399e06b39bd3a0088453fd4a236cbdb1de0ad0262a1f165c3e",
+    "scripts/square-sheets-result-visibility-tests.cjs": "7041d796ac755878f8d18a73027a54402fc4d0850dc47cfed74a156309a737c1"
+  },
+  "deletedUnusedFiles": [
+    "components/integrations/SquareSheetsResults.tsx",
+    "components/integrations/SquareSheetsResultsView.tsx"
+  ],
+  "themeReview": "Shell portal confirmed preserving customer workspace variables, 14px inherited font, 7px input radius and 42px input minimum. Both light and pulsar at 1440/390. Actual Tailwind config and app/globals.css; no application change needed in follow-up.",
+  "paginationRecovery": {
+    "passed": 5,
+    "failed": 0,
+    "maximumRequests": 3,
+    "cases": [
+      "stale_last_page",
+      "all_rows_disappeared",
+      "persistent_range_error",
+      "recovery_page_race",
+      "unrelated_error_not_retried"
+    ],
+    "scope": "Actual installed client with injected synthetic fetch; every retry asserts identical workspace, asset, lifecycle, status, folder, text/date filters, order and page size."
+  }
+}

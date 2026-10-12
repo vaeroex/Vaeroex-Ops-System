@@ -1,0 +1,490 @@
+{
+  "runId": "1061111f-557e-49af-a2cd-145cc6e9949f",
+  "executionId": "cb920153-126b-4839-b67d-9244b7facece",
+  "passed": false,
+  "sourceCommit": "6407d26670886f6b1f16db03a78187cd84334a8a",
+  "results": [
+    {
+      "name": "targeted_source_tail_setup",
+      "passed": true,
+      "navigationFailuresBeforeCheck": 0,
+      "reusedSyntheticWorkspace": "3955a678-2e06-4e57-90fe-56f9c59f237e",
+      "priorFormsAndStorageTestsRepeated": false,
+      "buildPerformed": false,
+      "expectedBuildId": "cSVqf7vjN_9OKube66GYE",
+      "expectedAppOrigin": "http://127.0.0.1:51562"
+    },
+    {
+      "name": "browser_action_navigation",
+      "passed": true,
+      "navigationFailuresBeforeCheck": 0,
+      "actionLabel": "source_upload_prepare",
+      "response": {
+        "path": "/app/sources",
+        "method": "POST",
+        "status": 303,
+        "xActionRedirect": "/app/sources/a7beaf27-d37a-49cf-b898-201d16e9d0ca?section=imported&message=Data%20extracted%20from%202%20rows%20across%201%20worksheet.%20Review%20the%20mappings%20before%20saving%20records.;push",
+        "contentType": "text/x-component"
+      },
+      "manualRecovery": false
+    },
+    {
+      "name": "browser_upload_real_storage_and_source_record",
+      "passed": true,
+      "navigationFailuresBeforeCheck": 0,
+      "width": 390
+    },
+    {
+      "name": "browser_action_navigation",
+      "passed": false,
+      "actionLabel": "worksheet_import_approval",
+      "response": {
+        "path": "/app/sources/a7beaf27-d37a-49cf-b898-201d16e9d0ca",
+        "method": "POST",
+        "status": 303,
+        "xActionRedirect": "/app/sources/a7beaf27-d37a-49cf-b898-201d16e9d0ca?section=imported&message=1%20worksheet%20imported%20independently.%20Business%20Memory%20now%20preserves%20workbook%2C%20worksheet%2C%20and%20original-row%20lineage.;push",
+        "contentType": "text/x-component"
+      },
+      "pending": [],
+      "path": "/app/sources/a7beaf27-d37a-49cf-b898-201d16e9d0ca",
+      "error": "page.waitForURL: Timeout 20000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation until \"load\"\n============================================================",
+      "screenshot": "navigation-failure-1.png",
+      "manualRecoveryRequested": true
+    },
+    {
+      "name": "manual_navigation_recovery",
+      "passed": true,
+      "navigationFailuresBeforeCheck": 1,
+      "actionLabel": "worksheet_import_approval",
+      "destination": "/app/sources/a7beaf27-d37a-49cf-b898-201d16e9d0ca?section=imported&message=1%20worksheet%20imported%20independently.%20Business%20Memory%20now%20preserves%20workbook%2C%20worksheet%2C%20and%20original-row%20lineage.",
+      "automaticNavigationPassed": false,
+      "purpose": "Continue independent persisted/UI checks; client behavior remains failed."
+    },
+    {
+      "name": "browser_import_confirmed_once_with_real_reconciliation",
+      "passed": true,
+      "navigationFailuresBeforeCheck": 1,
+      "width": 390,
+      "kpiRecords": 2,
+      "approvedRows": 2,
+      "replayAdmitted": false
+    },
+    {
+      "name": "seeded_partial_import_remains_unpublished",
+      "passed": true,
+      "navigationFailuresBeforeCheck": 1,
+      "width": 390,
+      "fixture": "Real authenticated admission plus a deliberately incomplete synthetic worksheet chunk; no worker or provider call",
+      "pendingChunkPersisted": true,
+      "pendingChunkRetrieved": false,
+      "confirmedVectorPositiveControl": true,
+      "embedding": "Synthetic fixed basis vector; no semantic-ranking claim",
+      "priorCompletedChunkCount": 1,
+      "priorKpiCount": 2
+    },
+    {
+      "name": "mobile_held_import_beyond_300_history_headers",
+      "passed": true,
+      "navigationFailuresBeforeCheck": 1,
+      "width": 390,
+      "fixture": "Old staged import plus301newer synthetic historical headers seeded before authenticated admission; no successful historical workers claimed",
+      "historicalHeaders": 301,
+      "visibleHistoryRows": 300,
+      "heldReceiptVisibleInHistoryWindow": false,
+      "recoveryTargetsActualOldImport": true,
+      "historicalOrderAndValuesUnchanged": true
+    },
+    {
+      "name": "closeout_complete",
+      "passed": false,
+      "navigationFailuresBeforeCheck": 1,
+      "capacityTargetsExecuted": false,
+      "providerCalls": 0,
+      "automaticNavigationPassed": false,
+      "manualRecoveryMode": true
+    }
+  ],
+  "requests": [
+    {
+      "path": "/app/sources",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/sources/6800357c-2436-45a4-8699-aebf2c3efe32",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/help",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/help/trust",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/terms",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/privacy",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/support",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/sources",
+      "method": "POST",
+      "status": 303
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/sources/a7beaf27-d37a-49cf-b898-201d16e9d0ca",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/sources",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/help",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/help/trust",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/terms",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/privacy",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/support",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/sources/a7beaf27-d37a-49cf-b898-201d16e9d0ca",
+      "method": "POST",
+      "status": 303
+    },
+    {
+      "path": "/app/sources",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/sources/a7beaf27-d37a-49cf-b898-201d16e9d0ca",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/sources/a7beaf27-d37a-49cf-b898-201d16e9d0ca",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/sources/a7beaf27-d37a-49cf-b898-201d16e9d0ca",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/sources",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/sources/448a4109-f529-4bdd-a8fe-78d810d76c71",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/help",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/help/trust",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/terms",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/privacy",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/support",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/sources",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/sources/448a4109-f529-4bdd-a8fe-78d810d76c71",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/help",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/help/trust",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/terms",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/privacy",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/support",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/sources",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/sources/6792b8bd-2cb3-4481-ada2-cfdbccccc327",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/help",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/help/trust",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/terms",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/privacy",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/support",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/sources",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/sources/6792b8bd-2cb3-4481-ada2-cfdbccccc327",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/help",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/help/trust",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/terms",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/privacy",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/support",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/sources",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/sources/6792b8bd-2cb3-4481-ada2-cfdbccccc327",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/favicon.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/help",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/help/trust",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/terms",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/privacy",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/support",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/app/sources",
+      "method": "GET",
+      "status": 200
+    }
+  ],
+  "browserErrors": [],
+  "actionResponses": [
+    {
+      "actionLabel": "source_upload_prepare",
+      "path": "/app/sources",
+      "method": "POST",
+      "status": 303,
+      "xActionRedirect": "/app/sources/a7beaf27-d37a-49cf-b898-201d16e9d0ca?section=imported&message=Data%20extracted%20from%202%20rows%20across%201%20worksheet.%20Review%20the%20mappings%20before%20saving%20records.;push",
+      "contentType": "text/x-component"
+    },
+    {
+      "actionLabel": "worksheet_import_approval",
+      "path": "/app/sources/a7beaf27-d37a-49cf-b898-201d16e9d0ca",
+      "method": "POST",
+      "status": 303,
+      "xActionRedirect": "/app/sources/a7beaf27-d37a-49cf-b898-201d16e9d0ca?section=imported&message=1%20worksheet%20imported%20independently.%20Business%20Memory%20now%20preserves%20workbook%2C%20worksheet%2C%20and%20original-row%20lineage.;push",
+      "contentType": "text/x-component"
+    }
+  ],
+  "navigationFailures": [
+    {
+      "name": "browser_action_navigation",
+      "passed": false,
+      "actionLabel": "worksheet_import_approval",
+      "response": {
+        "path": "/app/sources/a7beaf27-d37a-49cf-b898-201d16e9d0ca",
+        "method": "POST",
+        "status": 303,
+        "xActionRedirect": "/app/sources/a7beaf27-d37a-49cf-b898-201d16e9d0ca?section=imported&message=1%20worksheet%20imported%20independently.%20Business%20Memory%20now%20preserves%20workbook%2C%20worksheet%2C%20and%20original-row%20lineage.;push",
+        "contentType": "text/x-component"
+      },
+      "pending": [],
+      "path": "/app/sources/a7beaf27-d37a-49cf-b898-201d16e9d0ca",
+      "error": "page.waitForURL: Timeout 20000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation until \"load\"\n============================================================",
+      "screenshot": "navigation-failure-1.png",
+      "manualRecoveryRequested": true
+    }
+  ],
+  "manualRecoveryMode": true,
+  "limitations": [
+    "Supabase native service versions differ from deployed PostgreSQL17.6",
+    "Synthetic legal acceptance seeded",
+    "No paid provider or customer connections",
+    "No full-system capacity target or worker soak performed",
+    "Known client navigation failures remain failed; explicit same-origin manual navigation was used only when the continuation flag was supplied."
+  ]
+}

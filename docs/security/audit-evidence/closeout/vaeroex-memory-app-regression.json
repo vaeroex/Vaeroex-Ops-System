@@ -1,0 +1,132 @@
+{
+  "kind": "audit_import_evidence_regression",
+  "status": "passed",
+  "checks": 26,
+  "names": [
+    "CSV duplicate suffix collision retains all columns",
+    "header truncation, fallback, repeated suffixes and reserved keys retain values",
+    "XLSX duplicate suffix collision retains all columns",
+    "CSV physical start-line provenance survives blanks and quoted CRLF",
+    "ordinary DOCX and compressed PDF text still extract",
+    "forged DOCX size is stopped by zlib before output allocation",
+    "forged XLSX size is stopped by zlib before output allocation",
+    "unneeded DOCX/XLSX package parts are not inflated",
+    "ZIP duplicate entries, inconsistent local headers, excessive ratio reject",
+    "compressed PDF expansion rejects rather than falling through to model extraction",
+    "magnitude, signed values, percentage, small numbers, currency, labels, periods, direction fail closed",
+    "one supported fact cannot admit an unrelated false claim or summary",
+    "supported numerical claim is eligible only for explicit review",
+    "file_uploads lifecycle failure propagates a sanitized unavailable result",
+    "ai_agent_runs lifecycle failure propagates a sanitized unavailable result",
+    "business_notes lifecycle failure propagates a sanitized unavailable result",
+    "genuinely empty lifecycle evidence remains empty",
+    "missing or mismatched confirmation cannot write generated Business Memory",
+    "explicitly confirmed supported analysis reaches actual indexer write boundary",
+    "explicit confirmation cannot admit contradictory numerical output",
+    "failed replacement write preserves previously approved memory",
+    "indexer delegates replacement and retirement to one confirmed transaction",
+    "identical confirmed retry keeps its idempotent chunk active",
+    "separate worksheet approvals with identical text preserve old citation identity and import provenance",
+    "same durable worksheet attempt keeps a stable content identity",
+    "worksheet publication without durable approval identity fails before writes"
+  ],
+  "inflations": [
+    {
+      "method": "inflateRawSync",
+      "compressedBytes": 54,
+      "maxOutputLength": 71,
+      "expandedBytes": 71
+    },
+    {
+      "method": "inflateRawSync",
+      "compressedBytes": 79,
+      "maxOutputLength": 110,
+      "expandedBytes": 110
+    },
+    {
+      "method": "inflateRawSync",
+      "compressedBytes": 130,
+      "maxOutputLength": 303,
+      "expandedBytes": 303
+    },
+    {
+      "method": "inflateRawSync",
+      "compressedBytes": 36,
+      "maxOutputLength": 36,
+      "expandedBytes": 36
+    },
+    {
+      "method": "inflateSync",
+      "compressedBytes": 39,
+      "maxOutputLength": 1048576,
+      "expandedBytes": 31
+    },
+    {
+      "method": "inflateRawSync",
+      "compressedBytes": 2050,
+      "maxOutputLength": 1,
+      "expandedBytes": null
+    },
+    {
+      "method": "inflateRawSync",
+      "compressedBytes": 2050,
+      "maxOutputLength": 1,
+      "expandedBytes": null
+    },
+    {
+      "method": "inflateRawSync",
+      "compressedBytes": 17,
+      "maxOutputLength": 18,
+      "expandedBytes": 18
+    },
+    {
+      "method": "inflateRawSync",
+      "compressedBytes": 54,
+      "maxOutputLength": 71,
+      "expandedBytes": 71
+    },
+    {
+      "method": "inflateRawSync",
+      "compressedBytes": 79,
+      "maxOutputLength": 110,
+      "expandedBytes": 110
+    },
+    {
+      "method": "inflateRawSync",
+      "compressedBytes": 130,
+      "maxOutputLength": 303,
+      "expandedBytes": 303
+    },
+    {
+      "method": "inflateRawSync",
+      "compressedBytes": 7,
+      "maxOutputLength": 5,
+      "expandedBytes": 5
+    },
+    {
+      "method": "inflateSync",
+      "compressedBytes": 2056,
+      "maxOutputLength": 1048576,
+      "expandedBytes": null
+    }
+  ],
+  "resourceUsage": {
+    "userCPUTime": 528711,
+    "systemCPUTime": 36172,
+    "maxRSS": 185584,
+    "sharedMemorySize": 0,
+    "unsharedDataSize": 0,
+    "unsharedStackSize": 0,
+    "minorPageFault": 11690,
+    "majorPageFault": 168,
+    "swappedOut": 0,
+    "fsRead": 0,
+    "fsWrite": 0,
+    "ipcSent": 0,
+    "ipcReceived": 0,
+    "signalsCount": 0,
+    "voluntaryContextSwitches": 38,
+    "involuntaryContextSwitches": 1935
+  },
+  "limitation": "Actual parser and indexer functions; synthetic query responses and in-memory write recording, no real database/provider/UI."
+}

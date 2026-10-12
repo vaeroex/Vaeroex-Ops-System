@@ -79,7 +79,7 @@ async function inspectUpload(request) {
 
 async function build() {
   const navigation = path.join(fixture, "navigation.tsx");
-  const aliases = { "@/app/app/files/actions$": path.join(fixture, "actions.ts"), "next/link$": navigation, "next/navigation$": navigation, "@": root };
+  const aliases = { "@/app/app/files/actions$": path.join(fixture, "actions.ts"), "@/lib/storage-capacity/upload-client$": path.join(fixture, "actions.ts"), "next/link$": navigation, "next/navigation$": navigation, "@": root };
   await new Promise((resolve, reject) => webpack({ mode: "development", target: "web", devtool: false, entry: path.join(fixture, "entry.tsx"), output: { path: output, filename: "preview.js" }, resolve: { extensions: [".tsx", ".ts", ".js"], alias: aliases }, module: { rules: [{ test: /\.tsx?$/, exclude: /node_modules/, use: path.join(__dirname, "workspace-clarity-fixture/ts-loader.cjs") }] }, plugins: [new webpack.DefinePlugin({ "process.env.NODE_ENV": JSON.stringify("development") })] }, (error, stats) => {
     if (error || stats.hasErrors()) reject(error || new Error(stats.toString({ all: false, errors: true })));
     else resolve();

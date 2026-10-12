@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "observedAt": "2026-10-05 23:36:42 UTC",
+  "method": "Read-only existing Chrome session through cua_repl",
+  "productionMutated": false,
+  "paidProviderCalls": 0,
+  "keysFetched": false,
+  "newAuthenticationSubmitted": false,
+  "termsAccepted": false,
+  "google": {
+    "project": "vaeroex-integrations-prod",
+    "requestedView": "Google Auth Platform / Audience",
+    "restoredCliMatchingExistingBrowserAccount": true,
+    "observedBlock": "Organization-required 'Verify it's you' password challenge after selecting the already-listed account matching the restored CLI identity",
+    "publishingStatus": "unverified",
+    "audience": "unverified",
+    "testUserEligibility": "unverified",
+    "requestedScopes": "unverified",
+    "redirectUris": "unverified",
+    "iamPermissionDenied": "not observed",
+    "requiredOwnerAction": "Complete existing Google Console browser re-verification; read Audience, Data Access, Clients and Verification Center without changing settings. Preserve exact readonly Sheets scope and existing callback mapping."
+  },
+  "openai": {
+    "sessionPresent": true,
+    "observedOrganizationLabel": "Personal",
+    "selectableOrganizationCount": 1,
+    "observedProjectLabel": "Default project",
+    "selectableProjectCount": 1,
+    "productionCredentialAttribution": "unverified; neither names nor zero usage establish attribution",
+    "usage": {
+      "view": "Organization Usage",
+      "projects": "All projects",
+      "apiSources": "All API sources",
+      "period": "Last 7 days",
+      "displayedSpendUsd": 0,
+      "displayedRequests": 0,
+      "displayedTokens": 0
+    },
+    "limitsView": "Loading persisted during bounded observation",
+    "projectSettingsView": "Loading persisted during bounded observation",
+    "allowedModels": "unverified",
+    "billingBalance": "unverified",
+    "budgetEnforcement": "unverified",
+    "requiredOwnerAction": "Identify the current production credential's existing organization/project through its private configuration owner, without revealing keys. Provide working owner Limits/Billing/Usage views or protected metadata/usage export for that actual scope; verify model access, rates, attributable usage and whether any budget stops requests."
+  },
+  "nvidia": {
+    "entry": "https://build.nvidia.com/",
+    "observed": "Login button; no signed-in provider session",
+    "loginStarted": false,
+    "usage": "unverified",
+    "modelEntitlement": "unverified",
+    "creditsOrBilling": "unverified",
+    "requiredOwnerAction": "Open the existing account/organization privately and show current usage/credits or invoice rates and approved model entitlement; do not create keys/accounts or assume public free-inference advertising describes the production account."
+  },
+  "connectors": {
+    "providerBillingConnector": "No OpenAI/NVIDIA billing or Google Auth Platform connector in current available tool inventory"
+  }
+}

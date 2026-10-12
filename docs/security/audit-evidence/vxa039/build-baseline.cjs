@@ -1,0 +1,6 @@
+const fs=require('fs'),os=require('os'),cp=require('child_process'),assert=require('assert/strict');
+const root='/tmp/vaeroex-vxa039-baseline',src='/Users/isaacvizcarra/.codex/worktrees/workspace-audit-fixes/Vaeroex';
+const config=JSON.parse(fs.readFileSync('/tmp/vaeroex-closeout-assembly-final/private-e2e-config.json'));
+assert.equal(new URL(config.apiUrl).hostname,'127.0.0.1');
+const env={PATH:process.env.PATH,HOME:os.homedir(),NODE_ENV:'production',NEXT_TELEMETRY_DISABLED:'1',NODE_OPTIONS:'--max-old-space-size=2048 --require='+src+'/scripts/workspace-closeout-egress.cjs',NEXT_PUBLIC_SUPABASE_URL:config.apiUrl,NEXT_PUBLIC_SUPABASE_ANON_KEY:config.anonKey,SUPABASE_SERVICE_ROLE_KEY:config.serviceKey,NEXT_PUBLIC_APP_URL:'http://127.0.0.1:51562',TZ:'UTC'};
+const r=cp.spawnSync(process.execPath,[root+'/node_modules/next/dist/bin/next','build'],{cwd:root,env,encoding:'utf8',timeout:600000,maxBuffer:16*1024*1024});let log=(r.stdout||'')+(r.stderr||'');for(const k of [config.anonKey,config.serviceKey,config.dbUrl])log=log.split(k).join('[local-secret]');fs.writeFileSync('/tmp/vaeroex-vxa039-baseline-build.log',log);assert.equal(r.status,0,'baseline_build_failed');console.log('Baseline build complete: '+fs.readFileSync(root+'/.next/BUILD_ID','utf8'));

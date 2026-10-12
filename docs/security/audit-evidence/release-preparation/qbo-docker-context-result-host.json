@@ -1,0 +1,32 @@
+{
+  "sourceCommit": "4c28c134fe6751347ca98e86241bcce104836467",
+  "startedAt": "2026-10-05T22:45:00.140517+00:00",
+  "pnpmVersion": "9.15.4",
+  "nodeVersion": "v24.19.0",
+  "case": "exact Docker dependency COPY file set",
+  "copyFiles": [
+    "package.json",
+    "pnpm-lock.yaml"
+  ],
+  "network": "OS outbound deny; pnpm --offline; no lifecycle scripts",
+  "command": [
+    "/usr/bin/sandbox-exec",
+    "-f",
+    "/tmp/vaeroex-capacity-small-02/network.sb",
+    "/Users/isaacvizcarra/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+    "/Users/isaacvizcarra/.cache/node/corepack/v1/pnpm/9.15.4/bin/pnpm.cjs",
+    "install",
+    "--offline",
+    "--frozen-lockfile",
+    "--ignore-scripts",
+    "--reporter=append-only"
+  ],
+  "exitCode": 254,
+  "output": "\u2009ENOENT\u2009 ENOENT: no such file or directory, open '/private/tmp/vaeroex-cl02-readiness-4c28c134/qbo-dependency-stage-proof/docker-context/patches/next@15.5.24.patch'\n\npnpm: ENOENT: no such file or directory, open '/private/tmp/vaeroex-cl02-readiness-4c28c134/qbo-dependency-stage-proof/docker-context/patches/next@15.5.24.patch'\n    at async open (node:internal/fs/promises:697:25)\n    at async Object.readFile (node:internal/fs/promises:1348:14)\n    at async createBase32HashFromFile (/Users/isaacvizcarra/.cache/node/corepack/v1/pnpm/9.15.4/dist/pnpm.cjs:8816:23)\n    at async /Users/isaacvizcarra/.cache/node/corepack/v1/pnpm/9.15.4/dist/pnpm.cjs:138813:17\n    at async /Users/isaacvizcarra/.cache/node/corepack/v1/pnpm/9.15.4/dist/pnpm.cjs:138790:24\n    at async Promise.all (index 0)\n    at async pMapValue (/Users/isaacvizcarra/.cache/node/corepack/v1/pnpm/9.15.4/dist/pnpm.cjs:138789:7)\n    at async _install (/Users/isaacvizcarra/.cache/node/corepack/v1/pnpm/9.15.4/dist/pnpm.cjs:184714:134)\n    at async mutateModules (/Users/isaacvizcarra/.cache/node/corepack/v1/pnpm/9.15.4/dist/pnpm.cjs:184673:23)\n    at async install (/Users/isaacvizcarra/.cache/node/corepack/v1/pnpm/9.15.4/dist/pnpm.cjs:184599:45)\n(node:60294) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.\n(Use `node --trace-deprecation ...` to show where the warning was created)\n",
+  "fileHashes": {
+    "package.json": "6d3ba3ac193d7ed715e002bd54b77365e55186b230477b35c7c4a715594b65a9",
+    "pnpm-lock.yaml": "40bc351ed2e2d30f313ba0014f3777bbd563b59fc988b120c00d5cc67ec89c59"
+  },
+  "dockerfileHash": "b75c1cb070c569f72d217d9cd09344f2141209491bd92f0bc8682484249535f7",
+  "execution": "authorized host process with OS network deny; initial nested sandbox failure preserved"
+}

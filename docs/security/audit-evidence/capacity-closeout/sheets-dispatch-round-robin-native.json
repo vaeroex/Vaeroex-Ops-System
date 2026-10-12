@@ -1,0 +1,36 @@
+{
+  "suite": "google_sheets_dispatch_fairness_native",
+  "checks": 19,
+  "passed": true,
+  "migration": "20261005202215_sheets_dispatch_round_robin.sql",
+  "migrationSha256": "5d8525e08f981b1dbafae1fa0267eeeb421fea8aa02275da214ce43616f8a190",
+  "schedulerSha256": "2d2c901e334fe23fa362a001f9030ee0994405507339cc1ad87364e36f314a8c",
+  "syntheticWorkspaces": 100,
+  "eligibleConnections": 190,
+  "ineligibleConnections": 5,
+  "oldSql": {
+    "attempts": 50,
+    "workspacesServed": 10,
+    "maxExcluded": 50
+  },
+  "corrected": {
+    "attempted": 100,
+    "succeeded": 100,
+    "failed": 0,
+    "deferred": 0,
+    "backoffFailed": 0,
+    "peakActive": 4,
+    "admissionRpcAttempts": 0,
+    "admissionRetries": 0,
+    "admissionWaitMs": 0,
+    "dueQueries": 10,
+    "workspacesServed": 100,
+    "remainingDue": 90,
+    "elapsedMs": 117
+  },
+  "historyPreservedByMigration": true,
+  "originalEligibilityPreserved": true,
+  "advancedConnectionsRetainTenantOrder": true,
+  "liveProviderCalls": 0,
+  "limits": "Owned Unix-only native PostgreSQL reduced selection schema and actual scheduler. Synthetic completion updates next eligibility only. No provider, import, HTTP, throughput, elapsed worker-recovery, or active-user capacity claim."
+}

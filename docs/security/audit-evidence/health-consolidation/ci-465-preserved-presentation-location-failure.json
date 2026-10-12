@@ -1,0 +1,12 @@
+{
+  "head": "4604d8f6e8f11c25a2132dab3b58863e94ce730e",
+  "run": 37396393706,
+  "verifyJob": 112053277503,
+  "url": "https://github.com/vaeroex/Vaeroex-Ops-System/actions/runs/37396393706",
+  "failedStep": "Workspace navigation and bounded-list regressions",
+  "failedTests": 4,
+  "cause": "Strict historical presentation contracts still expected Health imports/control bindings on Overview and no additional scoped Health loader on Intelligence. The changed authorized layout was not normalized before checking original fingerprints.",
+  "correction": "8a0c172577b7262603737546342d2b61d013fb1c adds exact eight reviewed hunk normalization in two files; original six action/logic fingerprints remain unchanged. Independent byte-for-byte forward/reverse replay and thirteen contract tests pass. Negative mutations reject missing, duplicate, altered, wrong-workspace, changed authorization and extra consumer bindings.",
+  "testsSkippedAfterFailure": true,
+  "notAnApplicationPass": true
+}

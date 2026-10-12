@@ -494,7 +494,17 @@ async function main() {
     assert.equal(result.authorization,`Bearer ${token}`);assert.equal(result['x-serverless-authorization'],`Bearer ${token}`);
     for(const name of ['callBroker','callBrokerWebhook','callValidationRecovery']) {
       const fn=source.statements.find(n=>ts.isFunctionDeclaration(n)&&n.name?.text===name);assert(fn);
-      assert.match(fn.getText(source),/\.\.\.await internalAuthorizationHeaders\(/);
+      if(name==='callBroker') {
+        const calls=[];const brokerContext={exports:{},URL,AbortSignal,config:{brokerUrl:audience},
+          internalAuthorizationHeaders:async aud=>{assert.equal(aud,audience);return result;},
+          fetch:async(url,init)=>{calls.push({url,init});return {ok:true,json:async()=>({accepted:true})};}};
+        vm.runInNewContext(ts.transpileModule(fn.getText(source)+'\nexports.call=callBroker;',{
+          compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText,brokerContext);
+        await brokerContext.exports.call('/credentials/read',{},()=>5000);
+        assert.equal(calls.length,1);assert.equal(calls[0].init.headers.authorization,result.authorization);
+        assert.equal(calls[0].init.headers['x-serverless-authorization'],result['x-serverless-authorization']);
+        assert.equal(calls[0].init.redirect,'error');assert.ok(calls[0].init.signal instanceof AbortSignal);
+      } else assert.match(fn.getText(source),/\.\.\.await internalAuthorizationHeaders\(/);
     }
   });
   const context={exports:{},URL,z,BoundedIdentifierSchema,QBO_PRODUCTION_OAUTH_POLICY,normalizeProviderOAuthReturnPath,

@@ -1,0 +1,14 @@
+{
+  "passed": true,
+  "scenarios": 6,
+  "coverage": [
+    "lazy process-owned pool used by40 handler handles",
+    "explicit300s CloudTask delivery deadline retains OIDC audience",
+    "real executeTask lease300 with useful240 and cleanup285",
+    "provider timeout clipped to remaining work budget",
+    "scope,rowVersion,lease,owner retained in retryable durable timeout",
+    "expired cleanup cannot claim successful failure recording",
+    "lost completion acknowledgement cannot bypass stale failure fence"
+  ],
+  "limitations": "Synthetic dependencies and monotonic clock; no native lease-expiry or killed-worker recovery claim"
+}

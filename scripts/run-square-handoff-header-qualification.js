@@ -245,8 +245,10 @@ async function qualify(directory, fixtures, variant, enforce) {
   stage = "synthetic_" + variant + (enforce ? "_enforced" : "_report_only");
   const env = environment(enforce);
   const moduleUrl = pathToFileURL(path.join(root, "next.config.mjs")).href;
-  const mutation = variant === "legacy" ? "return [{source:'/:path*',headers:rules[0].headers},...rules.filter(rule=>rule.source==='/sw.js')];"
-    : variant === "excluded" ? "return [{source:'/:path((?!api/integrations/square/(?:connect|reauthorize|callback)$).*)',headers:rules[0].headers},{source:'/api/integrations/square/:handoff(connect|reauthorize|callback)',headers:rules[1].headers.filter(header=>!['Content-Security-Policy','Content-Security-Policy-Report-Only'].includes(header.key))},...rules.filter(rule=>rule.source==='/sw.js')];"
+  // Locate policies by their route scope: unrelated exact-route exceptions can
+  // precede Square's rule without changing the historical variants reproduced here.
+  const mutation = variant === "legacy" ? "return [{source:'/:path*',headers:rules.find(rule=>rule.source==='/:path*').headers},...rules.filter(rule=>rule.source==='/sw.js')];"
+    : variant === "excluded" ? "return [{source:'/:path((?!api/integrations/square/(?:connect|reauthorize|callback)$).*)',headers:rules.find(rule=>rule.source==='/:path*').headers},{source:'/api/integrations/square/:handoff(connect|reauthorize|callback)',headers:rules.find(rule=>rule.source==='/api/integrations/square/:handoff(connect|reauthorize|callback)').headers.filter(header=>!['Content-Security-Policy','Content-Security-Policy-Report-Only'].includes(header.key))},...rules.filter(rule=>rule.source==='/sw.js')];"
     : "return rules;";
   fs.writeFileSync(path.join(directory, "next.config.mjs"), `import baseline from ${JSON.stringify(moduleUrl)};\nexport default {...baseline,generateBuildId:async()=> 'square-synthetic-header-qualification',typedRoutes:false,outputFileTracingRoot:${JSON.stringify(directory)},outputFileTracingIncludes:{},async headers(){const rules=await baseline.headers();${mutation}}};\n`);
   const build = processRun(["build"], directory, env);

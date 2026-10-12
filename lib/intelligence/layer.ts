@@ -7,9 +7,11 @@ import {
   calculateIntelligenceReadiness,
   type BusinessHealthPerformanceSignal
 } from "@/lib/intelligence/business-health-formula";
-import { buildSourceParentEligibility, filterBySourceParentEligibility } from "@/lib/intelligence/source-parent-eligibility";
+import { buildSourceParentEligibility, filterBySourceParentEligibility, type SourceParentRecords } from "@/lib/intelligence/source-parent-eligibility";
 import { compareKpiRowsNewest, groupKpisByNormalizedName, normalizeKpiName } from "@/lib/intelligence/kpi-identity";
-import { applyKpiSettingsToRows, kpiSemantics, type KpiSettingRow } from "@/lib/kpis/settings";
+import { kpiRiskInvestigation } from "@/lib/intelligence/kpi-investigation";
+import { applyKpiSettingsToRows, kpiSemantics, kpiSettingForName, type KpiSettingRow } from "@/lib/kpis/settings";
+import { availableInvestigationFields, planInvestigation, type InvestigationContext } from "@/lib/intelligence/investigation-plan";
 import {
   effectiveKpiTarget,
   evaluateKpiPerformance,
@@ -40,6 +42,7 @@ export type IntelligenceEvidenceRecord = {
   classification: "Original" | "Manual" | "Derived";
   sourceKey: string;
   groupHint?: string;
+  availableFields?: string[];
 };
 
 export type IntelligenceInsight = {
@@ -66,6 +69,7 @@ export type IntelligenceInsight = {
   limitation: string;
   fingerprint: string;
   suggestedNextData?: string;
+  investigationContext?: InvestigationContext;
   businessHealthEffect?: Readonly<{
     identity: string;
     points: 8 | 10;
@@ -162,6 +166,7 @@ export type IntelligenceLayerInput = {
   kpiSettings?: KpiSettingRow[];
   issues?: IssueRow[];
   files?: FileUploadRow[];
+  sourceParents?: SourceParentRecords;
   vaeroexRuns?: VaeroexRunRow[];
   crmLeads?: CrmLeadRow[];
   imports?: FileImportRow[];
@@ -243,9 +248,10 @@ function evidenceRecord({
   href,
   sourceKey,
   groupHint,
+  availableFields,
   classification = "Original"
 }: IntelligenceEvidenceRecord) {
-  return { id, title, recordType, date, value, support, href, sourceKey, classification, groupHint };
+  return { id, title, recordType, date, value, support, href, sourceKey, classification, groupHint, availableFields };
 }
 
 function kpiEvidenceRecord(kpi: KpiRow, semantics: KpiSemantics, support: string): IntelligenceEvidenceRecord {
@@ -266,7 +272,8 @@ function kpiEvidenceRecord(kpi: KpiRow, semantics: KpiSemantics, support: string
     href: `/app/kpis?metric=${encodeURIComponent(kpi.name)}&section=detail`,
     classification: recordClassification(kpi),
     sourceKey,
-    groupHint: kpi.category || kpi.name
+    groupHint: kpi.category || kpi.name,
+    availableFields: availableInvestigationFields(kpi.raw_data_json)
   });
 }
 
@@ -554,7 +561,10 @@ function isMaterialTargetMiss(row: KpiRow, semantics: KpiSemantics) {
 export function buildIntelligenceLayer(input: IntelligenceLayerInput): IntelligenceLayerResult {
   const workspace = input.workspace || null;
   const files = filterOriginalBusinessEvidence(input.files);
-  const parentEligibility = buildSourceParentEligibility({ files, imports: input.imports || [] });
+  const parentEligibility = buildSourceParentEligibility({
+    files: filterOriginalBusinessEvidence(input.sourceParents?.files ?? files),
+    imports: input.sourceParents?.imports ?? input.imports ?? []
+  });
   const kpiSettings = excludeChecklistDerivedMetrics(input.kpiSettings || []);
   const kpis = applyKpiSettingsToRows(
     excludeChecklistDerivedMetrics(filterBySourceParentEligibility(filterOriginalBusinessEvidence(input.kpis), parentEligibility)),
@@ -692,6 +702,7 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
         why: issue.root_cause ? `The record attributes the issue to ${issue.root_cause}` : `The issue remains ${lower(issue.status)} and no root cause is recorded.`,
         impact: issue.description || "The unresolved issue may continue to affect the business area described in the record.",
         recommendedAction: issue.recommended_fix || "Decide whether this issue requires an investigation and what evidence should be collected next.",
+        investigationContext: { kind: "records" as const, preserveSpecificAction: Boolean(issue.recommended_fix) },
         confidence: confidenceFromEvidence(evidence.length, priority),
         evidence,
         evidenceCount: supportingRecords.length,
@@ -710,6 +721,7 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
       };
     }),
     ...materialTargetMisses.map(({ kpi, semantics, evaluation, history: kpiHistory }) => {
+      const investigation = kpiRiskInvestigation(kpi, input.asOf);
       const key = normalizeKpiName(kpi.name);
       const history = historyCounts.get(key) || 1;
       const targetMissPeriods = kpiHistory.filter((row) => isMaterialTargetMiss(row, semantics)).length;
@@ -734,15 +746,24 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
         title: targetMissPeriods >= 2 ? `${kpi.name} remained ${condition} for ${targetMissPeriods} periods` : `${kpi.name} is ${condition}`,
         summary: `Actual ${formatMetric(kpi.actual_value, kpi.name)}${reference ? ` vs ${reference}` : ""}.`,
         why: `The latest recorded value is ${condition} under the canonical KPI semantics.`,
-        impact: "The gap needs context before it can be tied to a cause or business impact.",
-        recommendedAction: "Decide whether leadership should investigate the cause now or continue monitoring the next reporting period.",
+        impact: `This high-priority target miss across ${targetMissPeriods} recorded period${targetMissPeriods === 1 ? "" : "s"} warrants an owner-led source review now.`,
+        recommendedAction: investigation.action,
+        investigationContext: {
+          kind: "kpi" as const,
+          definition: kpiSettingForName(kpiSettings, kpi.name)?.definition,
+          unit: semantics.unit,
+          direction: semantics.desiredDirection,
+          targetAvailable: Boolean(reference),
+          availableFields: availableInvestigationFields(kpi.raw_data_json),
+          preserveSpecificAction: investigation.specific === true
+        },
         confidence: history >= 3 && independentSourceCount >= 2 ? "High" : "Medium",
         evidence,
         evidenceCount: supportingRecords.length,
         supportingRecords,
         independentSourceCount,
         contradictoryEvidence: [],
-        missingEvidence: history < 3 ? ["At least three comparable historical periods", "Evidence explaining the change"] : ["Evidence explaining the change"],
+        missingEvidence: history < 3 ? ["At least three comparable historical periods", ...investigation.missingEvidence] : investigation.missingEvidence,
         sourceTypes: ["KPIs"],
         sourceHref: "/app/kpis",
         priority: "High" as const,
@@ -812,8 +833,9 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
         title: `${kpi.name} is ${condition}`,
         summary: `Actual ${formatMetric(kpi.actual_value, kpi.name)}${reference ? ` vs ${reference}` : ""}.`,
         why: `The latest recorded value is ${condition} under the canonical KPI semantics.`,
-        impact: "The result may be worth preserving, but the current records do not establish its cause.",
+        impact: `This target achievement has ${history} recorded period${history === 1 ? "" : "s"} of context and merits a repeatability check before adopting it as a practice.`,
         recommendedAction: "Decide whether the practice behind this result is clear enough to preserve or requires a focused review.",
+        investigationContext: { kind: "kpi" as const, definition: kpiSettingForName(kpiSettings, kpi.name)?.definition, unit: semantics.unit, direction: semantics.desiredDirection, targetAvailable: Boolean(reference), availableFields: availableInvestigationFields(kpi.raw_data_json) },
         confidence: history >= 3 && independentSourceCount >= 2 ? "High" : "Medium",
         evidence: [`Metric date: ${kpi.metric_date}`, `Historical records: ${history}`, kpi.source ? `Source: ${kpi.source}` : "Source not recorded"],
         evidenceCount: supportingRecords.length,
@@ -852,8 +874,9 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
         title: `${kpi.name} has a sustained favorable trend`,
         summary: `${formatMetric(start.actual_value, kpi.name)} to ${formatMetric(latest.actual_value, kpi.name)} across ${datedHistory.length} dated periods.`,
         why: "The canonical KPI semantics classify the sustained movement as favorable, and no authoritative target is configured.",
-        impact: "The trend is confirmed in the KPI history, but the current evidence does not establish its cause or durability beyond the measured periods.",
+        impact: `The favorable movement spans ${datedHistory.length} dated periods and merits a review of whether it is repeatable.`,
         recommendedAction: "Decide whether the practices associated with this trend should be documented and monitored.",
+        investigationContext: { kind: "kpi" as const, definition: kpiSettingForName(kpiSettings, kpi.name)?.definition, unit: semantics.unit, direction: semantics.desiredDirection, availableFields: availableInvestigationFields(kpi.raw_data_json) },
         confidence: independentSourceCount >= 2 ? "High" as const : "Medium" as const,
         evidence: [`Dated periods: ${datedHistory.length}`, `Latest value: ${formatMetric(latest.actual_value, kpi.name)}`, "No authoritative target is configured"],
         evidenceCount: supportingRecords.length,
@@ -897,6 +920,7 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
         why: "The import has not completed its required review step.",
         impact: "Current intelligence excludes the staged data until it is approved.",
         recommendedAction: "Decide whether the structured import is accurate enough to approve.",
+        investigationContext: { kind: "records" as const, sourceAction: "Check the import's field mapping and staged row counts before approving it." },
         confidence: "Medium" as const,
         evidence: [`Status: ${item.status}`, `Rows staged: ${item.rows_total}`, item.extraction_summary || "No extraction summary recorded"],
         evidenceCount: supportingRecords.length,
@@ -937,6 +961,7 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
           why: "The process documents have not been updated in more than 90 days.",
           impact: "Older process documentation can limit confidence in process-related conclusions.",
           recommendedAction: "Decide which process documents still reflect current operations and retire or update the rest in the source system.",
+          investigationContext: { kind: "records" as const, sourceAction: "Confirm which documents still match current operations; update or retire outdated versions in the source system." },
           confidence: "Medium",
           evidence: [`Stale SOPs: ${staleSops.length}`, staleSops[0]?.title ? `Oldest example: ${staleSops[0].title}` : "No example available"],
           evidenceCount: supportingRecords.length,
@@ -956,11 +981,11 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
       })()
       : null
   ].filter(Boolean) as IntelligenceInsight[];
-  const normalizedInsights = insights.map((insight) => ({
+  const normalizedInsights = insights.map((insight) => ({ ...insight, fingerprint: insight.fingerprint || findingFingerprint(insight) }));
+  const sortedInsights = consolidateDuplicateInsights(normalizedInsights).map((insight) => ({
     ...insight,
-    fingerprint: insight.fingerprint || findingFingerprint(insight)
+    recommendedAction: planInvestigation(insight, input.asOf || new Date())
   }));
-  const sortedInsights = consolidateDuplicateInsights(normalizedInsights);
   const risks = sortedInsights.filter((insight) => insight.type === "Risk" || insight.type === "Bottleneck" || insight.type === "Anomaly");
   const opportunities = sortedInsights.filter((insight) => insight.type === "Opportunity");
   const recommendations = sortedInsights.filter((insight) => insight.type === "Recommendation" || insight.type === "Risk" || insight.type === "Bottleneck");

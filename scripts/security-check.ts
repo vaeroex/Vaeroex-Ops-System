@@ -269,7 +269,7 @@ const askSession = read("lib/search/ask-session.ts");
 const askSessionToken = read("lib/search/ask-session-token.ts");
 const conversationalPolicy = read("lib/product/conversational-vaeroex.ts");
 check(conversationalPolicy.includes('VAEROEX_CONVERSATIONAL_POLICY') && conversationalPolicy.includes('premium_conversational_v1'), "Dormant conversational access must require its dedicated server-side premium policy.");
-check(appShell.includes("isPremiumConversationalVaeroexEnabled") && appShell.includes('href: "/app/ask"'), "The future premium Ask destination must remain hidden unless its dedicated policy is enabled.");
+check(appShell.includes('href: "/app/si"') && !appShell.includes("isPremiumConversationalVaeroexEnabled"), "VSI navigation must use the dedicated customer chat route without the retired premium Ask gate.");
 check(appShell.includes("GlobalSearch"), "The authenticated shell must preserve the separate global Search overlay.");
 check(globalSearch.includes("Search workspace") && globalSearch.includes("vaeroex:open-global-search"), "Global Search must remain a Search-only in-place panel.");
 check(globalSearch.includes("openSelectedResult") && globalSearch.includes("/api/search?q="), "Global Search Enter must navigate deterministic GET results.");
@@ -291,7 +291,7 @@ check(!/kpiOverviewIntent\.matched\s*\|\|\s*\/\\b\(kpi\|kpis\|metric\|metrics\|w
 check(searchRoute.includes("business_memory_chunks") && searchRoute.includes('"Learned Knowledge"'), "Global Search or Ask must search active Learned Knowledge instead of implementation-only result records.");
 check(!searchRoute.includes("/app/agents") && !searchRoute.includes('"Diagnostics"'), "Global Search must not expose the retired Agents diagnostics destination.");
 check(!/sourceType:\s*"Vaeroex Result"/.test(searchRoute), "Global Search or Ask must not expose Vaeroex Result records as ordinary customer-facing knowledge.");
-check(legacyAskPage.includes("AskVaeroexWorkspace") && legacyAskPage.includes("isPremiumConversationalVaeroexEnabled") && legacyAskPage.includes('redirect("/app/intelligence")'), "The dormant premium Ask workspace must fail closed to Intelligence in Version 1.");
+check(legacyAskPage.includes("requireWorkspacePage") && legacyAskPage.includes("/app/si") && !legacyAskPage.includes("AskVaeroexWorkspace") && legacyAskPage.includes('redirect("/app/intelligence")'), "Authorized freeform Ask links must redirect to VSI while legacy saved analyses still resolve to Intelligence.");
 check(legacyAskPage.includes("params.run") && legacyAskPage.includes("requireWorkspacePage") && !legacyAskPage.includes("/app/agents"), "Saved legacy result URLs must authorize and return to Intelligence.");
 check(agentsPage.indexOf("requireWorkspacePage()") < agentsPage.indexOf('permanentRedirect("/app/intelligence")'), "Every retired Agents URL must authorize before redirecting to structured Intelligence.");
 check(!exists("app/app/agents/actions.ts") && !exists("app/app/agents/loading.tsx"), "The retired Agents action and loading surfaces must stay deleted.");
@@ -329,7 +329,9 @@ for (const file of workspaceActionFiles) {
 
 const fileActions = read("app/app/files/actions.ts");
 check(fileActions.includes("getFileForWorkspace") && fileActions.includes('.eq("workspace_id", workspaceId)'), "File actions must read files through workspace-scoped lookup.");
-check(fileActions.includes("storagePath = `${workspaceId}/"), "Uploaded file storage paths must start with workspaceId.");
+const storageCapacityMigration = read("supabase/migrations/20261012003846_workspace_storage_capacity.sql");
+check(storageCapacityMigration.includes("p_workspace_id::text||'/reserved/'||rid::text"), "Reserved uploaded-file storage paths must start with the authorized workspace ID.");
+check(read("app/api/storage-capacity/complete/route.ts").includes("startsWith(`${access.workspaceId}/`)"), "Upload completion must reject storage paths outside the authorized workspace.");
 
 const supportActions = read("app/support/actions.ts");
 check(supportActions.includes(".from(\"workspace_members\")") && supportActions.includes(".eq(\"user_id\", user.id)"), "Support requests must validate workspace membership before storing workspace_id.");
@@ -437,7 +439,8 @@ check(adminWorkspaceActions.includes("admin.update_workspace_access"), "Admin wo
 const adminSubscriptionActions = read("app/app/admin/subscriptions/actions.ts");
 check(adminSubscriptionActions.includes("admin.update_subscription") && adminSubscriptionActions.includes("admin.create_manual_subscription"), "Admin subscription mutations must write security audit events.");
 const adminSupportActions = read("app/app/admin/support-requests/actions.ts");
-check(adminSupportActions.includes("admin.update_support_request") && adminSupportActions.includes("admin_support_request_action"), "Admin support request mutations must write security audit events.");
+const adminSupportMigration = read("supabase/migrations/20261012091842_admin_usage_trust_support_telemetry.sql");
+check(adminSupportActions.includes('rpc("admin_manage_support_requests_v1"') && adminSupportMigration.includes("insert into public.security_audit_events") && adminSupportMigration.includes("admin_support_request_action") && adminSupportMigration.includes("affected_ids") && adminSupportMigration.includes("changed_count"), "Admin support request mutations must atomically write content-free security audit events.");
 
 const adminAuditPage = read("app/app/admin/audit-logs/page.tsx");
 check(adminAuditPage.includes("security_audit_events") && adminAuditPage.includes("Security events"), "Admin audit page must show security audit events.");
@@ -466,7 +469,41 @@ check(
 check(intelligenceCoverage.includes("filterOriginalBusinessEvidence") && intelligenceCoverage.includes("uniqueSources") && !intelligenceCoverage.includes('label: "Vaeroex Memory"'), "Derived runs and chunks must not inflate coverage or Source Mix.");
 check(boundedContextRuntime.includes("sanitizeBusinessEvidenceText") && boundedContextRuntime.includes("filterOriginalBusinessEvidence") && boundedContextRuntime.includes("filterBusinessEvidence"), "Bounded conversational context must sanitize platform failures and reject ineligible business evidence.");
 const dashboardRuntime = read("app/app/page.tsx");
-check(dashboardRuntime.includes("businessHealthSourceErrors") && dashboardRuntime.includes("intelligenceLayer.businessHealth.available"), "Business Health snapshots must not persist when required source queries fail or evidence is insufficient.");
+const healthRuntime = read("lib/intelligence/workspace-health.ts");
+const securityTs: typeof import("typescript") = require("typescript");
+function preservesBusinessHealthSnapshotGate(source: string) {
+  const tree = securityTs.createSourceFile("workspace-health.ts", source, securityTs.ScriptTarget.Latest, true);
+  const writes: import("typescript").CallExpression[] = [];
+  function visit(node: import("typescript").Node) {
+    if (securityTs.isCallExpression(node) && securityTs.isIdentifier(node.expression) && node.expression.text === "recordDailyBusinessHealthSnapshot") writes.push(node);
+    securityTs.forEachChild(node, visit);
+  }
+  visit(tree);
+  if (writes.length !== 1) return false;
+  const write = writes[0];
+  if (!securityTs.isAwaitExpression(write.parent) || write.arguments[0]?.getText(tree) !== "supabase") return false;
+  const input = write.arguments[1];
+  if (!input || !securityTs.isObjectLiteralExpression(input) || !input.properties.some(property => securityTs.isShorthandPropertyAssignment(property) && property.name.text === "workspaceId")) return false;
+  for (let child: import("typescript").Node = write; child.parent; child = child.parent) {
+    const parent = child.parent;
+    if (securityTs.isIfStatement(parent) && parent.thenStatement === child
+      && parent.expression.getText(tree).replace(/\s+/g, "") === "!businessHealthSourceErrors.length&&intelligenceLayer.businessHealth.available") return true;
+  }
+  return false;
+}
+check(dashboardRuntime.includes("buildWorkspaceHealthView"), "Overview must use the shared guarded Health view.");
+check(preservesBusinessHealthSnapshotGate(healthRuntime), "Business Health snapshots must persist only inside the source-success AND sufficient-evidence gate, using the scoped client and workspace.");
+const healthGate = "if (!businessHealthSourceErrors.length && intelligenceLayer.businessHealth.available) {";
+for (const replacement of [
+  "if (intelligenceLayer.businessHealth.available) {",
+  "if (!businessHealthSourceErrors.length) {",
+  "if (!businessHealthSourceErrors.length || intelligenceLayer.businessHealth.available) {",
+  "{",
+  healthGate + "} else {"
+]) check(!preservesBusinessHealthSnapshotGate(healthRuntime.replace(healthGate, replacement)), "The Health security contract must reject removed, bypassed or else-branch snapshot gates.");
+check(!preservesBusinessHealthSnapshotGate(healthRuntime + "\nawait recordDailyBusinessHealthSnapshot(supabase, { workspaceId });"), "The Health security contract must reject an extra unguarded snapshot write.");
+check(!preservesBusinessHealthSnapshotGate(healthRuntime.replace("await recordDailyBusinessHealthSnapshot", "await unreviewedSnapshotWriter")), "The Health security contract must reject a missing guarded snapshot writer.");
+check(!preservesBusinessHealthSnapshotGate(healthRuntime.replace("      workspaceId,\n      score:", '      workspaceId: "other-workspace",\n      score:')), "The Health security contract must reject changed snapshot workspace scope.");
 const evidenceRetrievalMigration = read("supabase/migrations/202607110001_business_memory_evidence_eligibility.sql");
 check(evidenceRetrievalMigration.includes("left join public.file_uploads source_file") && evidenceRetrievalMigration.includes("left join public.ai_agent_runs source_run"), "Vector retrieval must validate source file and source run lifecycle before limiting evidence.");
 check(evidenceRetrievalMigration.includes("security invoker") && evidenceRetrievalMigration.includes("public.is_workspace_member"), "Evidence retrieval migration must preserve invoker security and workspace authorization.");

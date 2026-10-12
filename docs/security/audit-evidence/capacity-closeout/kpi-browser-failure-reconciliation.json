@@ -1,0 +1,62 @@
+{
+  "kind": "browser_harness_failure_reconciliation_v1",
+  "failedAttempts": [
+    "../56206311-66d1-41b4-bf1f-eacea2bdad14/result.json",
+    "../a798428d-d1ae-4e38-92c0-fe42c1c1561a/result.json"
+  ],
+  "qualifiedResult": "result.json",
+  "demonstratedCause": "A generic role=alert visibility assertion counted the Next accessibility route announcer. Failure screenshot shows Executive Overview rendered, pending zero, no actual error notice; Next installed implementation sets role alert on a clipped 1px element. Corrected check excludes only exact __next-route-announcer__ inside NEXT-ROUTE-ANNOUNCER shadow host.",
+  "consoleDiagnostic": "Existing report-only CSP upgrade-insecure-requests warning remains recorded explicitly; all other console/page errors continue to fail.",
+  "thresholdChanges": false,
+  "applicationChangeForHarnessFailure": false,
+  "noReloadWorkaround": true,
+  "newRuntimeSourceCommit": "396ec2f7752eb30fea99f30a73068d53ff29cc0a",
+  "newRuntimeBuildId": "Auls728kWl18cXUO1oXpO",
+  "workflowTransitions": 32,
+  "dataUnchanged": true,
+  "originalFailureEvidence": [
+    {
+      "sourcePath": "/tmp/vaeroex-capacity-small-02/kpi-browser/56206311-66d1-41b4-bf1f-eacea2bdad14/result.json",
+      "sha256": "f7293e2e858b3f9f5f093994f285313bd31ee7708aab12a61e95f309bd166d45",
+      "passed": false,
+      "sourceCommit": "396ec2f7752eb30fea99f30a73068d53ff29cc0a",
+      "buildId": "Auls728kWl18cXUO1oXpO",
+      "harnessSha256": "2606e34e9e44b1926aecd7bf9fbe29c34037014a30969d44031062e5131a359d",
+      "failure": {
+        "stage": "1440:c347b4e6-d38f-457b-8667-a117e3c2423b:0:/app",
+        "code": "ERR_ASSERTION",
+        "message": "browser_qualification_assertion_failed"
+      },
+      "failureSnapshot": null,
+      "failedHttpCount": 0,
+      "scope": "Original failed result remains at its evidence path; this summary preserves its hash and diagnostic fields without copying browser state/screenshots.",
+      "originalConsoleErrorsCount": 1
+    },
+    {
+      "sourcePath": "/tmp/vaeroex-capacity-small-02/kpi-browser/a798428d-d1ae-4e38-92c0-fe42c1c1561a/result.json",
+      "sha256": "b32b29d1951bfa09e6d7f2cf14f92d15618d7bcba75f2569c0bbac10b73fdbe4",
+      "passed": false,
+      "sourceCommit": "396ec2f7752eb30fea99f30a73068d53ff29cc0a",
+      "buildId": "Auls728kWl18cXUO1oXpO",
+      "harnessSha256": "e0db7b2213b9ead279c865b8e16662405d52e84bc461ae7d87efd29c4deb6b2e",
+      "failure": {
+        "stage": "1440:c347b4e6-d38f-457b-8667-a117e3c2423b:0:/app",
+        "code": "ERR_ASSERTION",
+        "message": "browser_qualification_assertion_failed"
+      },
+      "failureSnapshot": {
+        "headings": [
+          "Executive Overview"
+        ],
+        "alerts": [
+          ""
+        ],
+        "errors": [],
+        "pending": 0
+      },
+      "failedHttpCount": 0,
+      "scope": "Original failed result remains at its evidence path; this summary preserves its hash and diagnostic fields without copying browser state/screenshots.",
+      "originalConsoleErrorsCount": 1
+    }
+  ]
+}

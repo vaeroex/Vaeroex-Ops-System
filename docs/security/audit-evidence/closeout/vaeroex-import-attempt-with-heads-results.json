@@ -1,0 +1,239 @@
+{
+  "scope": "Focused source SQL, real independent Postgres transactions; synthetic JWTs, vector represented as real[], no full Supabase/extraction-provider proof",
+  "migration": "20261005062005_durable_import_attempt_reconciliation.sql",
+  "checks": 58,
+  "results": [
+    {
+      "name": "operator first claim is durable before business writes",
+      "status": "pass"
+    },
+    {
+      "name": "lost claim acknowledgement never admits a second writer",
+      "status": "pass"
+    },
+    {
+      "name": "claim retry reads the same durable attempt",
+      "status": "pass"
+    },
+    {
+      "name": "ordinary caller cannot configure a private attempt",
+      "status": "pass"
+    },
+    {
+      "name": "unresolved preparation generation cannot be overwritten",
+      "status": "pass"
+    },
+    {
+      "name": "approved source row cannot be reparented away from held source",
+      "status": "pass"
+    },
+    {
+      "name": "accepted import cannot be reparented away from held source",
+      "status": "pass"
+    },
+    {
+      "name": "new staging rows are rejected while accepted work is uncertain",
+      "status": "pass"
+    },
+    {
+      "name": "new import record is rejected for the unresolved source",
+      "status": "pass"
+    },
+    {
+      "name": "approved source content cannot be rewritten",
+      "status": "pass"
+    },
+    {
+      "name": "terminated worker leaves truthful persisted record inventory",
+      "status": "pass"
+    },
+    {
+      "name": "partial accepted work becomes explicit reconciliation required",
+      "status": "pass"
+    },
+    {
+      "name": "partial worker cannot be silently retried",
+      "status": "pass"
+    },
+    {
+      "name": "client cannot forge completed recovery projection",
+      "status": "pass"
+    },
+    {
+      "name": "sixteen independent import requests admit exactly one writer",
+      "status": "pass"
+    },
+    {
+      "name": "all losing claims identify the same durable attempt",
+      "status": "pass"
+    },
+    {
+      "name": "old file completion marker cannot confirm a newer import generation",
+      "status": "pass"
+    },
+    {
+      "name": "saved completion can be recovered after acknowledgement loss",
+      "status": "pass"
+    },
+    {
+      "name": "complete reconciliation never duplicates a business record",
+      "status": "pass"
+    },
+    {
+      "name": "completed claim replay cannot write another batch",
+      "status": "pass"
+    },
+    {
+      "name": "completed source supports a separately reviewed preparation",
+      "status": "pass"
+    },
+    {
+      "name": "repreparation preserves original accepted business rows",
+      "status": "pass"
+    },
+    {
+      "name": "staff cannot approve import work",
+      "status": "pass"
+    },
+    {
+      "name": "viewer cannot approve import work",
+      "status": "pass"
+    },
+    {
+      "name": "foreign operator cannot claim another workspace",
+      "status": "pass"
+    },
+    {
+      "name": "foreign row identity cannot enter an approved claim",
+      "status": "pass"
+    },
+    {
+      "name": "duplicate row IDs cannot inflate a claim",
+      "status": "pass"
+    },
+    {
+      "name": "expired workspace cannot start import writes",
+      "status": "pass"
+    },
+    {
+      "name": "expired workspace retains readback recovery without new admission",
+      "status": "pass"
+    },
+    {
+      "name": "staged rows prevent a false completed reconciliation",
+      "status": "pass"
+    },
+    {
+      "name": "anonymous cannot access attempt authority",
+      "status": "pass"
+    },
+    {
+      "name": "generic service role cannot invent user approval",
+      "status": "pass"
+    },
+    {
+      "name": "head RPC gives explicit legacy fallback row before first completed attempt",
+      "status": "pass"
+    },
+    {
+      "name": "running first attempt never becomes committed head",
+      "status": "pass"
+    },
+    {
+      "name": "direct vector retrieval excludes running attempt but retains legacy evidence",
+      "status": "pass"
+    },
+    {
+      "name": "held failed attempt cannot enter direct vector retrieval",
+      "status": "pass"
+    },
+    {
+      "name": "completed private receipt selects first durable publication",
+      "status": "pass"
+    },
+    {
+      "name": "direct vector SQL excludes all321 stale old chunks before rank limit",
+      "status": "pass"
+    },
+    {
+      "name": "historical321 citation IDs remain directly readable",
+      "status": "pass"
+    },
+    {
+      "name": "new preparation cannot regress the completed head",
+      "status": "pass"
+    },
+    {
+      "name": "older completed generation remains eligible while next attempt runs",
+      "status": "pass"
+    },
+    {
+      "name": "older completed evidence survives held next attempt",
+      "status": "pass"
+    },
+    {
+      "name": "uncommitted completion is not visible to another actual session",
+      "status": "pass"
+    },
+    {
+      "name": "committed completion advances head once",
+      "status": "pass"
+    },
+    {
+      "name": "direct vector retrieval switches to complete new generation",
+      "status": "pass"
+    },
+    {
+      "name": "completion replay cannot reorder the publication head",
+      "status": "pass"
+    },
+    {
+      "name": "viewer retains read-only completed-head access",
+      "status": "pass"
+    },
+    {
+      "name": "staff retains read-only completed-head access",
+      "status": "pass"
+    },
+    {
+      "name": "foreign member cannot query another workspace publication authority",
+      "status": "pass"
+    },
+    {
+      "name": "requested foreign or nonexistent file produces no leaked head",
+      "status": "pass"
+    },
+    {
+      "name": "duplicate requested file IDs return exactly one authority row",
+      "status": "pass"
+    },
+    {
+      "name": "empty request has explicit empty output",
+      "status": "pass"
+    },
+    {
+      "name": "null requested file array fails closed",
+      "status": "pass"
+    },
+    {
+      "name": "more than200 requested IDs are rejected",
+      "status": "pass"
+    },
+    {
+      "name": "expired workspace retains read-only committed evidence authority",
+      "status": "pass"
+    },
+    {
+      "name": "anonymous cannot read publication heads",
+      "status": "pass"
+    },
+    {
+      "name": "trusted service client preserves existing workspace read capability",
+      "status": "pass"
+    },
+    {
+      "name": "head RPC does not grant private schema usage to authenticated or service",
+      "status": "pass"
+    }
+  ]
+}

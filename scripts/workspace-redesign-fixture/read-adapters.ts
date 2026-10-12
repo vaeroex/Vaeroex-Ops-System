@@ -1,4 +1,4 @@
-import { AS_OF, WORKSPACE_ID, files, kpis, performanceKpis, performanceKpiSettings, profile, workspace, analyses, cards, briefings, freeze, type FixtureRole, type FixtureState } from "./data";
+import { AS_OF, WORKSPACE_ID, files, kpis, performanceKpis, performanceKpiSettings, profile, workspace, analyses, cards, briefings, freeze, executiveModel, businessHealthFacts, type FixtureRole, type FixtureState } from "./data";
 import type { IntegrationDashboard } from "../../lib/integrations/dashboard/model";
 let current = { state: "populated" as FixtureState, role: "owner" as FixtureRole };
 export function setFixture(state: FixtureState, role: FixtureRole) { current = { state, role }; }
@@ -51,4 +51,4 @@ export async function readSquareWorkspaceEvidence() { return null; }
 export async function headers() { return new Headers(); }
 export const fixedAsOf = AS_OF;
 const dashboard = freeze<IntegrationDashboard>({ workspaceId: WORKSPACE_ID, observedAt: AS_OF, timeZone: "UTC", timeZoneConfirmed: false, preferencesAvailable: false, entries: [], unavailable: [] });
-export function intelligenceFixture() { return { workspaceId: WORKSPACE_ID, dashboard, displayErrors: [], lifecycleCards: { current: current.state === "empty" ? [] : cards, history: [] }, explanationTokens: {}, canManageLifecycle: false, blockedState: null, briefingStates: briefings, isIntelligenceBriefingEnabled: () => false }; }
+export function intelligenceFixture() { const empty = current.state === "empty"; return { healthView: freeze({ executiveHomepageModel: executiveModel(empty), businessHealthAnalysisPackage: { facts: businessHealthFacts(empty), citations: [] }, businessHealthHistory: [], businessHealthExplanationAsOf: AS_OF, businessHealthSnapshotResult: { errorMessage: null }, businessHealthAnalysisState: { status: "unavailable", artifact: null, message: "Analysis generation is unavailable in this isolated preview." }, businessHealthAnalysisToken: null }), workspaceId: WORKSPACE_ID, dashboard, displayErrors: [], lifecycleCards: { current: current.state === "empty" ? [] : cards, history: [] }, explanationTokens: {}, canManageLifecycle: false, blockedState: null, briefingStates: briefings, isIntelligenceBriefingEnabled: () => false }; }

@@ -1,0 +1,11 @@
+{
+  "at": "2026-10-05T19:54:03.246Z",
+  "ownedLocalOnly": true,
+  "files": [
+    {
+      "name": "20261005194244_google_sheets_failure_cleanup_transition.sql",
+      "sha256": "a77bd7729038b76ac0f2d1be3e92d713ea5bee828d0d3dbd7049e36f16c4fd5c"
+    }
+  ],
+  "productionTouched": false
+}

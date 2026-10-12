@@ -1,0 +1,32 @@
+[
+  {
+    "path": "package.json",
+    "matchesStage1Export": true,
+    "bothExist": true
+  },
+  {
+    "path": "pnpm-lock.yaml",
+    "matchesStage1Export": true,
+    "bothExist": true
+  },
+  {
+    "path": "next.config.mjs",
+    "matchesStage1Export": true,
+    "bothExist": true
+  },
+  {
+    "path": "tsconfig.json",
+    "matchesStage1Export": true,
+    "bothExist": true
+  },
+  {
+    "path": ".env.example",
+    "matchesStage1Export": true,
+    "bothExist": true
+  },
+  {
+    "path": "README.md",
+    "matchesStage1Export": true,
+    "bothExist": true
+  }
+]

@@ -1,0 +1,123 @@
+{
+  "engine": "PGlite PostgreSQL",
+  "source": "/tmp/vaeroex-audit-production",
+  "sourceScope": "Selected actual core table DDL, helper functions and policies + explicit grants matching inspected production; emulated auth.uid; synthetic roles/rows only",
+  "results": [
+    {
+      "test": "owner sees only own tenant tasks",
+      "actual": [
+        "Synthetic Task A"
+      ],
+      "expected": [
+        "Synthetic Task A"
+      ],
+      "status": "pass"
+    },
+    {
+      "test": "owner cannot insert task into tenant B",
+      "actual": "42501",
+      "expected": "42501",
+      "status": "pass"
+    },
+    {
+      "test": "owner cannot update tenant B task",
+      "actual": 0,
+      "expected": 0,
+      "status": "pass"
+    },
+    {
+      "test": "owner cannot delete tenant B task",
+      "actual": 0,
+      "expected": 0,
+      "status": "pass"
+    },
+    {
+      "test": "owner reads only own storage objects",
+      "actual": [
+        "11111111-1111-4111-8111-111111111111/a.csv"
+      ],
+      "expected": [
+        "11111111-1111-4111-8111-111111111111/a.csv"
+      ],
+      "status": "pass"
+    },
+    {
+      "test": "owner cannot upload into tenant B prefix",
+      "actual": "42501",
+      "expected": "42501",
+      "status": "pass"
+    },
+    {
+      "test": "owner cannot move object to tenant B prefix",
+      "actual": "42501",
+      "expected": "42501",
+      "status": "pass"
+    },
+    {
+      "test": "DEFECT canceled workspace owner can create KPI via DB",
+      "actual": 1,
+      "expected": 1,
+      "status": "pass"
+    },
+    {
+      "test": "admin cannot promote own membership to owner",
+      "actual": "42501",
+      "expected": "42501",
+      "status": "pass"
+    },
+    {
+      "test": "viewer cannot create KPI",
+      "actual": "42501",
+      "expected": "42501",
+      "status": "pass"
+    },
+    {
+      "test": "viewer cannot create storage object",
+      "actual": "42501",
+      "expected": "42501",
+      "status": "pass"
+    },
+    {
+      "test": "staff can update own assigned task",
+      "actual": 1,
+      "expected": 1,
+      "status": "pass"
+    },
+    {
+      "test": "staff cannot read tenant B asset",
+      "actual": 0,
+      "expected": 0,
+      "status": "pass"
+    },
+    {
+      "test": "DEFECT staff can create tenant A child referencing hidden tenant B asset",
+      "actual": 1,
+      "expected": 1,
+      "status": "pass"
+    },
+    {
+      "test": "DEFECT staff forges 12 blocked events attributed to owner",
+      "actual": 12,
+      "expected": 12,
+      "status": "pass"
+    },
+    {
+      "test": "DEFECT owner sees 12 forged events used by tool lockout",
+      "actual": 12,
+      "expected": 12,
+      "status": "pass"
+    },
+    {
+      "test": "disabled member no longer reads own tenant task",
+      "actual": 0,
+      "expected": 0,
+      "status": "pass"
+    },
+    {
+      "test": "anonymous cannot query tasks",
+      "actual": "42501",
+      "expected": "42501",
+      "status": "pass"
+    }
+  ]
+}

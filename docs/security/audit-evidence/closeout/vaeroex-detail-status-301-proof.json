@@ -1,0 +1,11 @@
+{
+  "status": "verified",
+  "fixture": "301 same-source imports, oldest reused import held after prior newer-created historical imports",
+  "historicalDisplayCount": 300,
+  "independentStatusCount": 1,
+  "currentHistoryOnlyLabel": "Learned",
+  "proposedStatusOnlyPropLabel": "Import held",
+  "currentDetailUsesHistoricalProp": true,
+  "historicalRecordsChanged": false,
+  "limitation": "Actual status function and status loader with synthetic responses; not a browser or live DB test. Four-line prop fix does not expand historical pagination or make every old recovery control discoverable."
+}

@@ -1,0 +1,303 @@
+{
+  "runId": "99799ab6-c939-4b3e-aacc-2a30ffaeb14f",
+  "sourceCommit": "0a15ddcd3b564086280fec21b79b6976b3a3cc44",
+  "buildId": "ReUcdHr1ALEejCvoUeFTc",
+  "harnessSha256": "e41c6fb32622e1bfd847c0c3e1a270398eaef1382818b36fdb8ed5a45413e053",
+  "kind": "worker_interruption",
+  "localOnly": true,
+  "faultId": "572b3df4-f6e7-4c77-aa17-c87308cade83",
+  "mode": "single_qualification",
+  "plannedStartSecond": 0,
+  "plannedEndSecond": 10,
+  "controlStartedAt": "2026-10-05T19:56:19.127Z",
+  "controlEndedAt": "2026-10-05T20:01:23.043Z",
+  "acceptedDuringFault": [
+    {
+      "id": "ec7de4b1-dc10-4f6e-8b3b-9559d51ddd7e",
+      "status": "running",
+      "started_at": "2026-10-05T19:56:19.224Z",
+      "completed_at": null,
+      "error_code": null,
+      "row_count": 0,
+      "fact_count": 0
+    }
+  ],
+  "canonicalBaseline": {
+    "workspaceId": "94e1e8b3-a38c-4780-9870-702dd157ebb1",
+    "total": 100,
+    "active": 100
+  },
+  "canonicalBaselines": [
+    {
+      "workspaceId": "c347b4e6-d38f-457b-8667-a117e3c2423b",
+      "total": 100,
+      "active": 100
+    },
+    {
+      "workspaceId": "94e1e8b3-a38c-4780-9870-702dd157ebb1",
+      "total": 100,
+      "active": 100
+    }
+  ],
+  "factsBeforeSha256": "4c92d668099e84f1598e682e1ec6e65253106808591150cf49dd30d67798a0d7",
+  "integrity": null,
+  "observations": [
+    {
+      "startedAt": "2026-10-05T19:56:19.591Z",
+      "endedAt": "2026-10-05T19:56:22.599Z",
+      "actualInjection": true,
+      "workspaceId": "94e1e8b3-a38c-4780-9870-702dd157ebb1",
+      "observedInjectionEvents": [
+        {
+          "file": "/tmp/vaeroex-capacity-small-02/transport-events.jsonl",
+          "line": 82,
+          "eventSha256": "7985e0b605a6f8880cf62d7b99a7e8d0787293196570a500227180f8c4916286",
+          "at": "2026-10-05T19:56:19.591Z",
+          "pid": 76515,
+          "workspaceId": null
+        }
+      ]
+    }
+  ],
+  "recovery": {
+    "healthy": false,
+    "faultKind": "worker_interruption",
+    "endedAt": "2026-10-05T19:56:22.599Z",
+    "checkedAt": "2026-10-05T20:01:23.038Z",
+    "recoveryMs": 300439,
+    "queueDepth": 1,
+    "inFlight": 0,
+    "providerInFlight": 0,
+    "connected": true,
+    "postFaultSuccessfulSync": true,
+    "terminalAcceptedWork": true,
+    "acceptedRunIdsConfirmed": [
+      "ec7de4b1-dc10-4f6e-8b3b-9559d51ddd7e",
+      "0ac5f7c0-955b-4c14-8340-7a2f578b5a8b"
+    ],
+    "truthfullyFailedAcceptedWork": false,
+    "acceptedWork": [
+      {
+        "id": "ec7de4b1-dc10-4f6e-8b3b-9559d51ddd7e",
+        "status": "failed",
+        "started_at": "2026-10-05T19:56:19.224Z",
+        "completed_at": "2026-10-05T20:01:04.178Z",
+        "error_code": "lease_expired",
+        "row_count": 0,
+        "fact_count": 0
+      },
+      {
+        "id": "0ac5f7c0-955b-4c14-8340-7a2f578b5a8b",
+        "status": "succeeded",
+        "started_at": "2026-10-05T20:01:04.462Z",
+        "completed_at": "2026-10-05T20:01:04.725Z",
+        "error_code": null,
+        "row_count": 100,
+        "fact_count": 100
+      }
+    ],
+    "postFaultSuccessfulRunIds": [
+      "0ac5f7c0-955b-4c14-8340-7a2f578b5a8b"
+    ]
+  },
+  "requests": [
+    {
+      "label": "fault_trigger_worker_interruption",
+      "startedAt": "2026-10-05T19:56:19.134Z",
+      "endedAt": "2026-10-05T19:56:19.592Z",
+      "method": "POST",
+      "path": "/api/integrations/google-sheets/sync",
+      "status": 503,
+      "durationMs": 458
+    },
+    {
+      "label": "independent_recovery_poll",
+      "startedAt": "2026-10-05T19:56:33.711Z",
+      "endedAt": "2026-10-05T19:56:33.764Z",
+      "method": "GET",
+      "path": "/api/integrations/google-sheets/recover-syncs",
+      "status": 200,
+      "durationMs": 53
+    },
+    {
+      "label": "independent_recovery_poll",
+      "startedAt": "2026-10-05T19:56:48.744Z",
+      "endedAt": "2026-10-05T19:56:48.772Z",
+      "method": "GET",
+      "path": "/api/integrations/google-sheets/recover-syncs",
+      "status": 200,
+      "durationMs": 28
+    },
+    {
+      "label": "independent_recovery_poll",
+      "startedAt": "2026-10-05T19:57:03.773Z",
+      "endedAt": "2026-10-05T19:57:03.822Z",
+      "method": "GET",
+      "path": "/api/integrations/google-sheets/recover-syncs",
+      "status": 200,
+      "durationMs": 49
+    },
+    {
+      "label": "independent_recovery_poll",
+      "startedAt": "2026-10-05T19:57:18.802Z",
+      "endedAt": "2026-10-05T19:57:18.823Z",
+      "method": "GET",
+      "path": "/api/integrations/google-sheets/recover-syncs",
+      "status": 200,
+      "durationMs": 21
+    },
+    {
+      "label": "independent_recovery_poll",
+      "startedAt": "2026-10-05T19:57:33.827Z",
+      "endedAt": "2026-10-05T19:57:33.875Z",
+      "method": "GET",
+      "path": "/api/integrations/google-sheets/recover-syncs",
+      "status": 200,
+      "durationMs": 48
+    },
+    {
+      "label": "independent_recovery_poll",
+      "startedAt": "2026-10-05T19:57:48.871Z",
+      "endedAt": "2026-10-05T19:57:48.932Z",
+      "method": "GET",
+      "path": "/api/integrations/google-sheets/recover-syncs",
+      "status": 200,
+      "durationMs": 61
+    },
+    {
+      "label": "independent_recovery_poll",
+      "startedAt": "2026-10-05T19:58:03.898Z",
+      "endedAt": "2026-10-05T19:58:03.954Z",
+      "method": "GET",
+      "path": "/api/integrations/google-sheets/recover-syncs",
+      "status": 200,
+      "durationMs": 56
+    },
+    {
+      "label": "independent_recovery_poll",
+      "startedAt": "2026-10-05T19:58:18.925Z",
+      "endedAt": "2026-10-05T19:58:19.021Z",
+      "method": "GET",
+      "path": "/api/integrations/google-sheets/recover-syncs",
+      "status": 200,
+      "durationMs": 96
+    },
+    {
+      "label": "independent_recovery_poll",
+      "startedAt": "2026-10-05T19:58:33.949Z",
+      "endedAt": "2026-10-05T19:58:33.994Z",
+      "method": "GET",
+      "path": "/api/integrations/google-sheets/recover-syncs",
+      "status": 200,
+      "durationMs": 45
+    },
+    {
+      "label": "independent_recovery_poll",
+      "startedAt": "2026-10-05T19:58:48.978Z",
+      "endedAt": "2026-10-05T19:58:49.030Z",
+      "method": "GET",
+      "path": "/api/integrations/google-sheets/recover-syncs",
+      "status": 200,
+      "durationMs": 52
+    },
+    {
+      "label": "independent_recovery_poll",
+      "startedAt": "2026-10-05T19:59:04.003Z",
+      "endedAt": "2026-10-05T19:59:04.047Z",
+      "method": "GET",
+      "path": "/api/integrations/google-sheets/recover-syncs",
+      "status": 200,
+      "durationMs": 44
+    },
+    {
+      "label": "independent_recovery_poll",
+      "startedAt": "2026-10-05T19:59:19.031Z",
+      "endedAt": "2026-10-05T19:59:19.113Z",
+      "method": "GET",
+      "path": "/api/integrations/google-sheets/recover-syncs",
+      "status": 200,
+      "durationMs": 82
+    },
+    {
+      "label": "independent_recovery_poll",
+      "startedAt": "2026-10-05T19:59:34.044Z",
+      "endedAt": "2026-10-05T19:59:34.093Z",
+      "method": "GET",
+      "path": "/api/integrations/google-sheets/recover-syncs",
+      "status": 200,
+      "durationMs": 49
+    },
+    {
+      "label": "independent_recovery_poll",
+      "startedAt": "2026-10-05T19:59:49.061Z",
+      "endedAt": "2026-10-05T19:59:49.091Z",
+      "method": "GET",
+      "path": "/api/integrations/google-sheets/recover-syncs",
+      "status": 200,
+      "durationMs": 30
+    },
+    {
+      "label": "independent_recovery_poll",
+      "startedAt": "2026-10-05T20:00:04.075Z",
+      "endedAt": "2026-10-05T20:00:04.124Z",
+      "method": "GET",
+      "path": "/api/integrations/google-sheets/recover-syncs",
+      "status": 200,
+      "durationMs": 49
+    },
+    {
+      "label": "independent_recovery_poll",
+      "startedAt": "2026-10-05T20:00:19.088Z",
+      "endedAt": "2026-10-05T20:00:19.140Z",
+      "method": "GET",
+      "path": "/api/integrations/google-sheets/recover-syncs",
+      "status": 200,
+      "durationMs": 52
+    },
+    {
+      "label": "independent_recovery_poll",
+      "startedAt": "2026-10-05T20:00:34.106Z",
+      "endedAt": "2026-10-05T20:00:34.171Z",
+      "method": "GET",
+      "path": "/api/integrations/google-sheets/recover-syncs",
+      "status": 200,
+      "durationMs": 65
+    },
+    {
+      "label": "independent_recovery_poll",
+      "startedAt": "2026-10-05T20:00:49.121Z",
+      "endedAt": "2026-10-05T20:00:49.166Z",
+      "method": "GET",
+      "path": "/api/integrations/google-sheets/recover-syncs",
+      "status": 200,
+      "durationMs": 45
+    },
+    {
+      "label": "independent_recovery_poll",
+      "startedAt": "2026-10-05T20:01:04.137Z",
+      "endedAt": "2026-10-05T20:01:04.185Z",
+      "method": "GET",
+      "path": "/api/integrations/google-sheets/recover-syncs",
+      "status": 200,
+      "durationMs": 48
+    },
+    {
+      "label": "post_fault_recovery_probe_worker_interruption",
+      "startedAt": "2026-10-05T20:01:04.286Z",
+      "endedAt": "2026-10-05T20:01:04.831Z",
+      "method": "POST",
+      "path": "/api/integrations/google-sheets/sync",
+      "status": 303,
+      "durationMs": 545
+    },
+    {
+      "label": "independent_recovery_poll",
+      "startedAt": "2026-10-05T20:01:19.152Z",
+      "endedAt": "2026-10-05T20:01:19.167Z",
+      "method": "GET",
+      "path": "/api/integrations/google-sheets/recover-syncs",
+      "status": 200,
+      "durationMs": 15
+    }
+  ]
+}

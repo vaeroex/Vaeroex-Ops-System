@@ -14,6 +14,8 @@ const config = [
       "out/**",
       "build/**",
       "coverage/**",
+      // Immutable audit captures include historical source/harness snapshots.
+      "docs/security/audit-evidence/**",
       "**/dist/**",
       "next-env.d.ts"
     ]

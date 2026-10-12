@@ -1,0 +1,20 @@
+{
+  "passed": false,
+  "buildId": null,
+  "executionId": "cdad6b70-83f7-4566-8366-1d5e1b7bfaf1",
+  "runId": "1061111f-557e-49af-a2cd-145cc6e9949f",
+  "results": [
+    {
+      "name": "build",
+      "passed": false,
+      "error": "production_build_failed\n\n1 !== 0\n"
+    }
+  ],
+  "actionResponses": [],
+  "requests": [],
+  "browserErrors": [],
+  "limitations": [
+    "Real isolated Auth/PostgREST/Storage; synthetic seeded legal acceptance and completed model outputs",
+    "No provider calls, production configuration, capacity or full lifecycle qualification"
+  ]
+}

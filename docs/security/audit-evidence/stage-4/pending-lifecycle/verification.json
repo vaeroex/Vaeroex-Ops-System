@@ -1,0 +1,64 @@
+{
+  "scope": "Stage 4 scoped internal-form pending lifecycle correction; no production or provider access",
+  "branch": "codex/workspace-audit-workflows",
+  "headBeforeUncommittedFix": "60b1863edde66df3be7cb6a06dfb340f07598be6",
+  "changes": [
+    "app/app/operations/form-submission-action.ts",
+    "components/operations/FormControls.tsx",
+    "components/operations/InternalFormSubmissionForm.tsx",
+    "components/operations/PendingSubmitButton.tsx",
+    "scripts/interaction-feedback-regression-tests.js",
+    "scripts/workspace-workflow-browser-tests.cjs",
+    "scripts/workspace-workflow-tests.cjs",
+    "scripts/test-stubs/workspace-workflow-actions.tsx",
+    "scripts/test-stubs/workspace-workflow-entry.tsx"
+  ],
+  "sha256": {
+    "app/app/operations/form-submission-action.ts": "6df810a3fb48e7b60be722e544118e6be28df18738b045f02f7e14985b2567d5",
+    "components/operations/FormControls.tsx": "28fc8805d24d81a642de9639989cda5869c37259567caa8e7949cfabec6bd881",
+    "components/operations/InternalFormSubmissionForm.tsx": "f9cb15a73b5251f2dcb8a7a97f0d319e9eb10fa152d7c8a4904d605ee6932a14",
+    "components/operations/PendingSubmitButton.tsx": "3415f6caa83d49f315241427cb230526600626f6fe8877e3149dc0dd2e55f624",
+    "scripts/interaction-feedback-regression-tests.js": "c59d10368e085caafb3433c18eb26995b3e660af826303fd97809b3462216f39",
+    "scripts/workspace-workflow-browser-tests.cjs": "b57f848dc004a9439d5195c9d90d587ef0f36c45b8511cf4b069db9ab1b487b9",
+    "scripts/workspace-workflow-tests.cjs": "587c18ed2bd730bf31a69bfc3097846f353cf1d47fdcd45291828eebd8dcf76c",
+    "scripts/test-stubs/workspace-workflow-actions.tsx": "d0fa515bb2eebf70fddd9fe9e4d6e554d37eda1a147de64363d5dde3f940aeb7",
+    "scripts/test-stubs/workspace-workflow-entry.tsx": "d94b329f078171c4cfc6b8f810eb4c22e1253f79e4dd8e8838ec3ad8c12bb487"
+  },
+  "workflowContracts": {
+    "passed": 36,
+    "failed": 0,
+    "log": "logs/workflow-contracts.log"
+  },
+  "feedbackContracts": {
+    "passed": 9,
+    "failed": 0,
+    "log": "logs/interaction-feedback.log"
+  },
+  "browser": {
+    "runs": 2,
+    "scenarioGroupsPerRun": 36,
+    "submissionsPerRun": 6,
+    "expectedFailedSubmissionsPerRun": 1,
+    "results": [
+      "browser/run-1/result.json",
+      "browser/run-2/result.json"
+    ],
+    "scope": "Actual hydrated components, repository Tailwind config and app/globals.css under the exact workspace shell classes in light and pulsar themes, in a loopback-only synthetic fixture. Browser submission transport, search responses, navigation and activity are stubs; server actions and database persistence are tested separately. No auth or production/provider access.",
+    "errorRecovery": "Synthetic 503 caught by fixture boundary; no automatic retry; explicit remount and intentional retry. Does not qualify real Next redirects or backend-error input retention.",
+    "runtime": "Next App Router compiled React client"
+  },
+  "lint": {
+    "passed": true,
+    "log": "logs/lint.log"
+  },
+  "typecheck": {
+    "passed": true,
+    "log": "logs/typecheck.log"
+  },
+  "limits": [
+    "Hydrated action and fixture transport qualification; hosted authenticated persistence not tested",
+    "Server-reference structure preserved, but no-JavaScript authenticated post not executed",
+    "Synthetic boundary reset/remount recovery is not a test of real Next redirect or backend-error input retention",
+    "Other generic forms retain their existing pending behavior; durable server idempotency remains open"
+  ]
+}

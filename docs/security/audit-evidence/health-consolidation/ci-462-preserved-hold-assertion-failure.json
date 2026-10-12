@@ -1,0 +1,805 @@
+{
+  "head": "16ac195b32ad046521bfe4f4e8726ae71094df1a",
+  "runId": 37394738905,
+  "testMerge": "fc09cecc1794f4e5062d329f729f02f3b4b86e6a",
+  "status": "failure-remaining-jobs-pending",
+  "capturedAt": "2026-10-06T00:39:37.098Z",
+  "jobs": [
+    {
+      "id": 112047903963,
+      "name": "jit-canary-linux-qualification",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1
+        },
+        {
+          "name": "Check out exact canary source revision",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2
+        },
+        {
+          "name": "Install and verify exact isolated-host libpq packages",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3
+        },
+        {
+          "name": "Qualify changed canary with native loopback TLS only",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4
+        },
+        {
+          "name": "Qualify private entry on the exact Linux client profile",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5
+        },
+        {
+          "name": "Build inert private-entry clients and record nonsecret provenance",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6
+        },
+        {
+          "name": "Upload only inert private-entry binaries and provenance",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7
+        },
+        {
+          "name": "Build inert public canary artifact and record provenance",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8
+        },
+        {
+          "name": "Upload only public canary binary and nonsecret provenance",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9
+        },
+        {
+          "name": "Post Check out exact canary source revision",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 18
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 19
+        }
+      ]
+    },
+    {
+      "id": 112047904138,
+      "name": "verify",
+      "status": "completed",
+      "conclusion": "failure",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1
+        },
+        {
+          "name": "Check out repository",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2
+        },
+        {
+          "name": "Set up pnpm",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3
+        },
+        {
+          "name": "Set up Node.js",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4
+        },
+        {
+          "name": "Set up Go",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5
+        },
+        {
+          "name": "Set up Terraform",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6
+        },
+        {
+          "name": "Install dependencies",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7
+        },
+        {
+          "name": "Workspace audit security, evidence and workflow regressions",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8
+        },
+        {
+          "name": "Isolated workspace authorization and concurrent slot regressions",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9
+        },
+        {
+          "name": "Workspace navigation and bounded-list regressions",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10
+        },
+        {
+          "name": "Restricted Square workspace host Linux qualification",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11
+        },
+        {
+          "name": "Google Sheets runtime and database admission regressions",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12
+        },
+        {
+          "name": "External integrations contract regressions",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13
+        },
+        {
+          "name": "External integrations Phase 1A operation-policy regressions",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 14
+        },
+        {
+          "name": "External integrations Phase 1B OAuth authority regressions",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15
+        },
+        {
+          "name": "External integrations Square Phase 2A dormant contract regressions",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 16
+        },
+        {
+          "name": "External integrations Square Phase 2B.1A response validation regressions",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 17
+        },
+        {
+          "name": "External integrations Square Phase 2B.1B-1 Catalog response validation regressions",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 18
+        },
+        {
+          "name": "External integrations Square Phase 2B.1B-2 Catalog response validation regressions",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 19
+        },
+        {
+          "name": "External integrations Square Phase 2B.2A Order-core response validation regressions",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 20
+        },
+        {
+          "name": "External integrations Square Phase 2B.2B-1 Order line-item response validation regressions",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 21
+        },
+        {
+          "name": "External integrations Square Phase 2B.2B-2 Order adjustment response validation regressions",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 22
+        },
+        {
+          "name": "External integrations Square Phase 2B.2B-3 Order Tender response validation regressions",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 23
+        },
+        {
+          "name": "External integrations Square Payment response validation regressions",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 24
+        },
+        {
+          "name": "External integrations Square Refund response validation regressions",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 25
+        },
+        {
+          "name": "External integrations Square Catalog request-bound response validation regressions",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 26
+        },
+        {
+          "name": "External integrations Square Inventory response validation regressions",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 27
+        },
+        {
+          "name": "External integrations Square dormant ingestion regressions",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 28
+        },
+        {
+          "name": "External integrations Square dormant durable boundary regressions",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 29
+        },
+        {
+          "name": "Verify dormant Square account connection contracts and closed routes",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 30
+        },
+        {
+          "name": "External integrations architecture regressions",
+          "status": "completed",
+          "conclusion": "failure",
+          "number": 31
+        },
+        {
+          "name": "Native broker provisioning lifecycle and closed release boundary",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 32
+        },
+        {
+          "name": "Verify isolated Square remote Sandbox binding and closed Production gates",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 33
+        },
+        {
+          "name": "Google Sheets desktop and mobile customer flow",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 34
+        },
+        {
+          "name": "Verify optimized Square handoff headers and isolated synthetic browser navigation",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 35
+        },
+        {
+          "name": "Verify isolated native Square callback credentials, portal and guest controls",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 36
+        },
+        {
+          "name": "External integrations Phase 1 regressions",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 37
+        },
+        {
+          "name": "External integrations Phase 2 reconciliation regressions",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 38
+        },
+        {
+          "name": "External integrations Phase 3 deterministic dependency regressions",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 39
+        },
+        {
+          "name": "External integrations Phase 4 control-plane regressions",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 40
+        },
+        {
+          "name": "External integrations Phase 5 credential-security regressions",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 41
+        },
+        {
+          "name": "External integrations Phase 6 durable-runtime regressions",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 42
+        },
+        {
+          "name": "External integrations Phase 7 QBO provider regressions",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 43
+        },
+        {
+          "name": "External integrations Phase 8A.0 contract-convergence regressions",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 44
+        },
+        {
+          "name": "External integrations Phase 8A live-GCP readiness regressions",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 45
+        },
+        {
+          "name": "External integrations Phase 8B QBO sandbox regressions",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 46
+        },
+        {
+          "name": "External integrations QBO Production multi-tenant regressions",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 47
+        },
+        {
+          "name": "Current integrations dashboard, preferences and browser regressions",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 48
+        },
+        {
+          "name": "External integrations Phase 8B OAuth callback edge tests",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 49
+        },
+        {
+          "name": "External integrations QBO Production callback edge tests",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 50
+        },
+        {
+          "name": "External integrations Square Production callback edge tests",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 51
+        },
+        {
+          "name": "Validate external integrations QBO Production infrastructure",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 52
+        },
+        {
+          "name": "Validate dormant provider-neutral Production integration composition",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 53
+        },
+        {
+          "name": "Test provider-neutral and Square Production contracts",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 54
+        },
+        {
+          "name": "Test closed Square Production internal-pilot runtime contract",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 55
+        },
+        {
+          "name": "Test Square internal seller consent handlers",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 56
+        },
+        {
+          "name": "Test Production Square one-customer pilot package",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 57
+        },
+        {
+          "name": "Test repository-bound Production image trigger",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 58
+        },
+        {
+          "name": "Build external integrations QBO sandbox runtime",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 59
+        },
+        {
+          "name": "Set up pinned Terraform for isolated Square template tests",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 60
+        },
+        {
+          "name": "Validate dormant Square resources with mocked provider only",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 61
+        },
+        {
+          "name": "Build external integrations QBO Production runtime",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 62
+        },
+        {
+          "name": "TypeScript check",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 63
+        },
+        {
+          "name": "ESLint",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 64
+        },
+        {
+          "name": "Public website rendering and policy regressions",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 65
+        },
+        {
+          "name": "Production build",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 66
+        },
+        {
+          "name": "Security regression check",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 67
+        },
+        {
+          "name": "Whitespace check",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 68
+        },
+        {
+          "name": "Post Set up Go",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 133
+        },
+        {
+          "name": "Post Set up Node.js",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 134
+        },
+        {
+          "name": "Post Set up pnpm",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 135
+        },
+        {
+          "name": "Post Check out repository",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 136
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 137
+        }
+      ]
+    },
+    {
+      "id": 112047904202,
+      "name": "security-database",
+      "status": "in_progress",
+      "conclusion": null,
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1
+        },
+        {
+          "name": "Check out repository",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2
+        },
+        {
+          "name": "Set up pnpm",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3
+        },
+        {
+          "name": "Set up Node.js",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4
+        },
+        {
+          "name": "Install database test dependencies",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5
+        },
+        {
+          "name": "Set up Supabase CLI",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6
+        },
+        {
+          "name": "Initialize isolated local Supabase configuration",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7
+        },
+        {
+          "name": "Apply migrations to isolated local Postgres",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8
+        },
+        {
+          "name": "Verify authorization and Customer",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9
+        },
+        {
+          "name": "Verify Square Production runtime foundation in the isolated database",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10
+        },
+        {
+          "name": "Qualify dormant Square authority and atomic pages in disposable local databases",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11
+        },
+        {
+          "name": "Qualify dormant Square account lifecycle in disposable local databases",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12
+        },
+        {
+          "name": "Verify fixture-rich zero-based delivery migration",
+          "status": "in_progress",
+          "conclusion": null,
+          "number": 13
+        },
+        {
+          "name": "Qualify remote Sandbox binding in disposable local databases only",
+          "status": "pending",
+          "conclusion": null,
+          "number": 14
+        },
+        {
+          "name": "Qualify separate Square broker and runtime authority in disposable databases only",
+          "status": "pending",
+          "conclusion": null,
+          "number": 15
+        },
+        {
+          "name": "Qualify native GCP callback first-consent authority in disposable databases only",
+          "status": "pending",
+          "conclusion": null,
+          "number": 16
+        },
+        {
+          "name": "Qualify mapped Square native role and recovery boundaries in disposable databases only",
+          "status": "pending",
+          "conclusion": null,
+          "number": 17
+        },
+        {
+          "name": "Qualify non-economic Square observation admission in disposable databases only",
+          "status": "pending",
+          "conclusion": null,
+          "number": 18
+        },
+        {
+          "name": "Qualify the exact Production baseline and dormant Square runtime overlay",
+          "status": "pending",
+          "conclusion": null,
+          "number": 19
+        },
+        {
+          "name": "Qualify the closed Square Production internal-pilot runtime",
+          "status": "pending",
+          "conclusion": null,
+          "number": 20
+        },
+        {
+          "name": "Qualify closed Square Production customer authority in disposable PostgreSQL",
+          "status": "pending",
+          "conclusion": null,
+          "number": 21
+        },
+        {
+          "name": "Qualify dormant customer Square backend on the exact 105-migration baseline",
+          "status": "pending",
+          "conclusion": null,
+          "number": 22
+        },
+        {
+          "name": "Verify manual pilot activation in the isolated database",
+          "status": "pending",
+          "conclusion": null,
+          "number": 23
+        },
+        {
+          "name": "Qualify QBO completion on canonical and exact Production migration shapes",
+          "status": "pending",
+          "conclusion": null,
+          "number": 24
+        },
+        {
+          "name": "Remove isolated database state",
+          "status": "pending",
+          "conclusion": null,
+          "number": 25
+        },
+        {
+          "name": "Post Set up Supabase CLI",
+          "status": "pending",
+          "conclusion": null,
+          "number": 47
+        },
+        {
+          "name": "Post Set up Node.js",
+          "status": "pending",
+          "conclusion": null,
+          "number": 48
+        },
+        {
+          "name": "Post Set up pnpm",
+          "status": "pending",
+          "conclusion": null,
+          "number": 49
+        },
+        {
+          "name": "Post Check out repository",
+          "status": "pending",
+          "conclusion": null,
+          "number": 50
+        }
+      ]
+    },
+    {
+      "id": 112047904251,
+      "name": "native-broker-qualification",
+      "status": "in_progress",
+      "conclusion": null,
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1
+        },
+        {
+          "name": "Check out repository",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2
+        },
+        {
+          "name": "Set up pnpm",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3
+        },
+        {
+          "name": "Set up Node.js",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4
+        },
+        {
+          "name": "Install frozen synthetic test dependencies",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5
+        },
+        {
+          "name": "Install public native build dependencies",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6
+        },
+        {
+          "name": "Qualify fixed native provisioning against private local PostgreSQL",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7
+        },
+        {
+          "name": "Qualify managed SCRAM profile using the same private local database build",
+          "status": "in_progress",
+          "conclusion": null,
+          "number": 8
+        },
+        {
+          "name": "Record public mapped-maintenance binary provenance",
+          "status": "pending",
+          "conclusion": null,
+          "number": 9
+        },
+        {
+          "name": "Preserve only public mapped-maintenance binaries for later installation",
+          "status": "pending",
+          "conclusion": null,
+          "number": 10
+        },
+        {
+          "name": "Qualify parked JIT regression tools offline only",
+          "status": "pending",
+          "conclusion": null,
+          "number": 11
+        },
+        {
+          "name": "Post Set up Node.js",
+          "status": "pending",
+          "conclusion": null,
+          "number": 20
+        },
+        {
+          "name": "Post Set up pnpm",
+          "status": "pending",
+          "conclusion": null,
+          "number": 21
+        },
+        {
+          "name": "Post Check out repository",
+          "status": "pending",
+          "conclusion": null,
+          "number": 22
+        }
+      ]
+    }
+  ],
+  "verifiedCause": "Exact deploymentEnabled assertion rejects authorized additional main:false",
+  "errorExcerpt": "2026-10-06T00:37:46.3374878Z node:assert:152\n2026-10-06T00:37:46.3375420Z   throw new AssertionError(obj);\n2026-10-06T00:37:46.3376725Z   ^\n2026-10-06T00:37:46.3377026Z \n2026-10-06T00:37:46.3378215Z AssertionError [ERR_ASSERTION]: Square review branches cannot auto-deploy; other branches keep default behavior and only the reviewed Sheets cron is configured\n2026-10-06T00:37:46.3379043Z + actual - expected\n2026-10-06T00:37:46.3379334Z ... Skipped lines\n2026-10-06T00:37:46.3379474Z \n2026-10-06T00:37:46.3379561Z   {\n2026-10-06T00:37:46.3379794Z     crons: [\n2026-10-06T00:37:46.3380026Z       {\n2026-10-06T00:37:46.3380576Z         path: '/api/integrations/google-sheets/scheduled-sync',\n2026-10-06T00:37:46.3381028Z         schedule: '*/15 * * * *'\n2026-10-06T00:37:46.3381304Z ...\n2026-10-06T00:37:46.3381710Z         'codex/workspace-audit-workflows': false,\n2026-10-06T00:37:46.3382054Z +       main: false\n2026-10-06T00:37:46.3382290Z       }\n2026-10-06T00:37:46.3382483Z     }\n2026-10-06T00:37:46.3382677Z   }\n2026-10-06T00:37:46.3382782Z \n2026-10-06T00:37:46.3383678Z     at Object.<anonymous> (/home/runner/work/Vaeroex-Ops-System/Vaeroex-Ops-System/scripts/external-integrations-architecture-regression-tests.js:518:8)\n2026-10-06T00:37:46.3384688Z     at Module._compile (node:internal/modules/cjs/loader:1929:14)\n2026-10-06T00:37:46.3385240Z     at Object..js (node:internal/modules/cjs/loader:2060:10)\n2026-10-06T00:37:46.3386180Z     at Module.load (node:internal/modules/cjs/loader:1651:32)\n2026-10-06T00:37:46.3386719Z     at Module._load (node:internal/modules/cjs/loader:1443:12)\n2026-10-06T00:37:46.3387287Z     at wrapModuleLoad (node:internal/modules/cjs/loader:261:19)\n2026-10-06T00:37:46.3388131Z     at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)\n2026-10-06T00:37:46.3388734Z     at node:internal/main/run_main_module:33:47 {\n2026-10-06T00:37:46.3389105Z   generatedMessage: false,\n2026-10-06T00:37:46.3389401Z   code: 'ERR_ASSERTION',\n2026-10-06T00:37:46.3389655Z   actual: {\n2026-10-06T00:37:46.3389886Z     git: {\n2026-10-06T00:37:46.3390153Z       deploymentEnabled: {\n2026-10-06T00:37:46.3390481Z         main: false,\n2026-10-06T00:37:46.3390929Z         'codex/square-remote-sandbox-binding': false,\n2026-10-06T00:37:46.3391480Z         'codex/square-sandbox-qualification': false,\n2026-10-06T00:37:46.3392015Z         'codex/square-gcp-sandbox-callback': false,\n2026-10-06T00:37:46.3392532Z         'codex/workspace-audit-security': false,\n2026-10-06T00:37:46.3393012Z         'codex/workspace-audit-evidence': false,\n2026-10-06T00:37:46.3393502Z         'codex/workspace-audit-workflows': false\n2026-10-06T00:37:46.3393858Z       }\n2026-10-06T00:37:46.3394073Z     },\n2026-10-06T00:37:46.3394291Z     crons: [\n2026-10-06T00:37:46.3394510Z       {\n2026-10-06T00:37:46.3394979Z         path: '/api/integrations/google-sheets/scheduled-sync',\n2026-10-06T00:37:46.3395448Z         schedule: '*/15 * * * *'\n2026-10-06T00:37:46.3395732Z       }\n2026-10-06T00:37:46.3395939Z     ]\n2026-10-06T00:37:46.3396144Z   },\n2026-10-06T00:37:46.3396367Z   expected: {\n2026-10-06T00:37:46.3396607Z     git: {\n2026-10-06T00:37:46.3396871Z       deploymentEnabled: {\n2026-10-06T00:37:46.3397344Z         'codex/square-remote-sandbox-binding': false,\n2026-10-06T00:37:46.3398235Z         'codex/square-sandbox-qualification': false,\n2026-10-06T00:37:46.3398849Z         'codex/square-gcp-sandbox-callback': false,\n2026-10-06T00:37:46.3399430Z         'codex/workspace-audit-security': false,\n2026-10-06T00:37:46.3399983Z         'codex/workspace-audit-evidence': false,\n2026-10-06T00:37:46.3400524Z         'codex/workspace-audit-workflows': false\n2026-10-06T00:37:46.3400889Z       }\n2026-10-06T00:37:46.3401120Z     },\n2026-10-06T00:37:46.3401366Z     crons: [\n2026-10-06T00:37:46.3401593Z       {\n2026-10-06T00:37:46.3402055Z         path: '/api/integrations/google-sheets/scheduled-sync',\n2026-10-06T00:37:46.3402516Z         schedule: '*/15 * * * *'\n2026-10-06T00:37:46.3402785Z       }\n2026-10-06T00:37:46.3402978Z     ]\n2026-10-06T00:37:46.3403168Z   },\n2026-10-06T00:37:46.3403430Z   operator: 'deepStrictEqual',\n2026-10-06T00:37:46.3403717Z   diff: 'simple'\n2026-10-06T00:37:46.3403931Z }\n2026-10-06T00:37:46.3404041Z \n2026-10-06T00:37:46.3404143Z Node.js v24.21.0\n2026-10-06T00:37:46.3431196Z \u2009ELIFECYCLE\u2009 Command failed with exit code 1.\n2026-10-06T00:37:46.3926218Z ##[error]Process completed with exit code 1."
+}

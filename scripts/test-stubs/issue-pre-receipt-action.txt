@@ -1,0 +1,33 @@
+// Exact pre-correction createIssueAction from application head 8d9ca438.
+// Synthetic negative-control fixture only; never imported by the application.
+export async function createIssueAction(formData: FormData) {
+  const path = "/app/issues";
+  const { supabase, user, workspaceId } = await requireWorkspace(path);
+  const title = text(formData, "title");
+
+  requireValue(path, "Issue title", title);
+  validateLength(path, "Issue description", text(formData, "description"), 2000);
+
+  const { error } = await supabase.from("issues").insert({
+    workspace_id: workspaceId,
+    title,
+    description: text(formData, "description"),
+    issue_type: text(formData, "issue_type"),
+    severity: text(formData, "severity") || "Medium",
+    status: text(formData, "status") || "Open",
+    root_cause: text(formData, "root_cause"),
+    recommended_fix: text(formData, "recommended_fix"),
+    assigned_person_id: text(formData, "person_id") || null,
+    assigned_role: text(formData, "role") || null,
+    assigned_department: text(formData, "department") || null,
+    due_date: text(formData, "due_date") || null,
+    created_by: user.id
+  });
+
+  if (error) {
+    redirectWithError(path, error.message);
+  }
+
+  revalidatePath(path);
+  redirectWithMessage(path, "Issue logged.");
+}

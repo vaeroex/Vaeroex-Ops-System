@@ -1,0 +1,72 @@
+{
+  "kind": "actual_cli_migration_qualification_reconciliation",
+  "capturedAt": "2026-10-05T23:32:24.631864+00:00",
+  "sourceCommitAtSuccessfulExecution": "cea1a1f23f9ab634b6993af7d86140cd98bac68a",
+  "successfulOriginalResultSha256": "71a1dfcf4f86be7fb668feb05e43bfb19d50661c09267001e502715d3db89947",
+  "harnessSha256": "e479c4bdcf0ef65f0552066344140117708b2a527d83db8f46170ca5829c8798",
+  "networkProfileSha256": "cc7a0124f33852d8f73af0b5b26cfc54b939e5ad24a2040cd82bae128d87e4e9",
+  "priorAttempts": [
+    {
+      "resultFile": "/tmp/vaeroex-cli-rollout-ZSkSPD/result.json",
+      "sha256": "fb6d6653935fa35938e398ebf0f44e52f6c6099250766c22c9d4e3ee88c6671c",
+      "harnessSha256": "94804a0c7f12965d702a0c32821ae43a335a90b04ed6354bc69158e5099a2ba7",
+      "failure": {
+        "stage": "bounded_failure_on_eighth",
+        "code": "ERR_ASSERTION",
+        "message": "exact CLI-created ledger at 127\n+ actual - expected\n... Skipped lines\n\n  [\n    '202606170001',\n    '202606170002',\n    '202606170003',\n    '202606170004',\n...\n    '20261002182746',\n-   '20261005022017',\n-   '20261005022445',\n-   '20261005060101',\n-   '20261005060258',\n-   '20261005061024',\n-   '20261005062005',\n-   '20261005070311'\n  ]\n"
+      },
+      "interpretation": "First test-lock placement also blocks migration1; expected127 was an incorrect harness boundary. Actual55P03 and exact120 prefix were preserved.",
+      "ownedClusterStopped": true
+    },
+    {
+      "resultFile": "/tmp/vaeroex-cli-rollout-YhWeMS/result.json",
+      "sha256": "706f9bd737171c71d7c136fc08155aef1bb3045675d48cfe474ec8c8ea3116cf",
+      "harnessSha256": "7dcca1fa0238cfda1f6312c7cc4856d9f3ccb4bf1c8200a7716226c288ee8dff",
+      "failure": {
+        "stage": "bounded_failure_on_first",
+        "code": "57014",
+        "message": "canceling statement due to statement timeout"
+      },
+      "interpretation": "Catalog verification ran while the test still held its own exclusive relation lock; harness inspection hit its15-second statement timeout. CLI failure/ledger rollback had already passed.",
+      "ownedClusterStopped": true
+    },
+    {
+      "resultFile": "/tmp/vaeroex-cli-rollout-Km01Iv/result.json",
+      "sha256": "e06f860132e095d4fc5ee8dcc8b071e334f8d79f42ef8ec4327e0acc354f4f95",
+      "harnessSha256": "334802217124b3c905bc85eb59f5be5792e798e1c290453b076e919612b19aac",
+      "failure": {
+        "stage": "actual_cli_interruption_after_partial_commit",
+        "code": "Error",
+        "message": "bounded_wait_failed_actual_cli_after_eighth_before_ninth"
+      },
+      "interpretation": "CLI overrides requested application_name, so a backend-name-based kill trigger did not fire; migration9 timed out normally after migration8 committed. This is not an actual interruption pass.",
+      "ownedClusterStopped": true
+    }
+  ],
+  "qualified": [
+    "Actual CLI2.119.0 creates ledger and applies exact120 reviewed production-shape prefix from unchanged files.",
+    "Actual dry-run selects exactly13 pending audit/capacity migrations without catalog/ledger/history mutation.",
+    "Actual first/eighth migration lock-timeout55P03 failures retain exact committed prefix and restore application catalog/history.",
+    "Actual process-group SIGKILL after committed migration8 while migration9 waits on an owned lock leaves128 ledger entries and no ninth catalog/ledger after backend exits.",
+    "Recovery dry-run excludes128 committed entries and selects5; actual push completes exact133; repeat dry-run/push preserves full ledger/catalog/history.",
+    "Both historical mismatch constraints remain NOT VALID; original mismatched child records and source record remain intact."
+  ],
+  "limits": [
+    "Native minimal Supabase platform prerequisite fixture, not actual Auth HTTP/token validation or customer workflow retest.",
+    "Only owned Unix-domain socket, PostgreSQL17.11 max20connections/shared_buffers32MB; no production timing/pooler/TLS/permissions/volume guarantee.",
+    "Process interruption is real; exact post-COMMIT acknowledgement-packet loss is not claimed. No universal DDL/ledger atomicity claim outside the observed failure boundaries.",
+    "First7-tail partial boundary is deliberately established through an isolated CLI project containing120prefix+7 files; final project contains exact133. No source SQL, historical ledger row or migration repair operation is used.",
+    "CLI human output says remote database because --db-url is used; actual verified target has empty listen_addresses, a private owned Unix socket and nonlocalTCP denialEPERM.",
+    "Actual destination ledger, administrator roster, admission/drain mechanism, compatible artifact, backup/recovery owners and release approval remain operator inputs."
+  ],
+  "checks": 443,
+  "checkCountIncludes": "Per-file source hash and dry-run selection/exclusion assertions; not443 independent behavior scenarios.",
+  "productionAccess": false,
+  "capacityDatabaseTouched": false,
+  "allOwnedClustersStopped": true,
+  "originalResultsUnchanged": true,
+  "matchesRetainedSqlRehearsalMigrationManifest": {
+    "matchedFileHashes": 133,
+    "passed": true
+  }
+}
