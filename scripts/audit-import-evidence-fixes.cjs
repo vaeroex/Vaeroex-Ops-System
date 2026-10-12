@@ -16,8 +16,15 @@ const resolve = Module._resolveFilename;
 Module._resolveFilename = function(request, parent, ...rest) { return resolve.call(this, request.startsWith('@/') ? path.join(root, request.slice(2)) : request, parent, ...rest); };
 const load = Module._load;
 const inflations = [];
+const readTicket = { ticketId: '00000000-0000-4000-8000-000000000019', epoch: 0, expiresAt: '2099-01-01T00:00:00.000Z' };
 Module._load = function(request, parent, ...rest) {
   if (request === 'server-only') return {};
+  // These parser/publication regressions use non-UUID fixture records. Authority
+  // denial/race semantics are qualified in the separate application-authority gate.
+  if (request === '@/lib/integrations/google-sheets/read-authority') return {
+    bindGoogleSheetsRead: async (_db, ticketId, sources) => { assert.equal(ticketId, readTicket.ticketId); assert(Array.isArray(sources)); return readTicket; },
+    googleSheetsReadTicketFields: ticketId => { assert.equal(ticketId, readTicket.ticketId); return { google_sheets_read_ticket_id: ticketId }; }
+  };
   if (request === 'zlib') return { ...zlib, ...Object.fromEntries(['inflateSync', 'inflateRawSync'].map(name => [name, (input, options) => {
     const observation = { method: name, compressedBytes: input.length, maxOutputLength: options?.maxOutputLength, expandedBytes: null };
     inflations.push(observation);
@@ -184,7 +191,7 @@ function client(failTable, options = {}) {
   assert.deepEqual(await evidence.filterEligibleMemoryRowsByLifecycle({ supabase: client(), workspaceId: 'workspace-one', rows: [] }), []); checks.push('genuinely empty lifecycle evidence remains empty');
   const file = { id: 'file-one', display_name: 'Synthetic source', original_name: 'synthetic.txt', file_extension: 'txt', deleted_at: null, archived_at: null };
   const metadata = { analysis_output: { findings: ['Revenue amount October 100'] }, extracted_row_count: 1 };
-  const input = { workspaceId: 'workspace-one', userId: 'user-one', file, runId: 'run-one', extractedText: 'Revenue amount October 100. This financial worksheet records the actual October revenue amount for the business.', metadata };
+  const input = { readTicket, workspaceId: 'workspace-one', userId: 'user-one', file, runId: 'run-one', extractedText: 'Revenue amount October 100. This financial worksheet records the actual October revenue amount for the business.', metadata };
   for (const confirmation of [undefined, { userId: 'other-user', runId: 'run-one' }, { userId: 'user-one', runId: 'other-run' }]) {
     const db = client(); const result = await evidence.indexFileAnalysisEvidence({ ...input, supabase: db, confirmation }); assert.equal(result.indexedChunks, 0); assert.equal(db.writes.length, 0);
   } checks.push('missing or mismatched confirmation cannot write generated Business Memory');
@@ -194,7 +201,7 @@ function client(failTable, options = {}) {
   db = client(null, { memory: [previous], failUpsert: true }); result = await evidence.indexFileAnalysisEvidence({ ...input, supabase: db, confirmation: { userId: 'user-one', runId: 'run-one' } }); assert.equal(result.indexedChunks, 0); assert.deepEqual(db.memory, [previous]); checks.push('failed replacement write preserves previously approved memory');
   db = client(null, { memory: [previous] }); result = await evidence.indexFileAnalysisEvidence({ ...input, supabase: db, confirmation: { userId: 'user-one', runId: 'run-one' } }); assert.ok(result.indexedChunks > 0); assert.ok(db.memory[0].archived_at); assert.equal(db.memory[1].archived_at, null); assert.equal(db.memory[1].deleted_at, null); const memoryWrites = db.writes.filter(w => w.table === 'business_memory_chunks'); assert.deepEqual(memoryWrites.map(w => w.operation), ['publication_rpc']); checks.push('indexer delegates replacement and retirement to one confirmed transaction');
   result = await evidence.indexFileAnalysisEvidence({ ...input, supabase: db, confirmation: { userId: 'user-one', runId: 'run-one' } }); assert.ok(result.indexedChunks > 0); assert.equal(db.memory.filter(row => !row.archived_at && !row.deleted_at).length, 1); checks.push('identical confirmed retry keeps its idempotent chunk active');
-  const worksheetInput = { supabase: client(), workspaceId: input.workspaceId, userId: input.userId, file, importId: 'reused-import-record', importAttemptId: 'attempt-one', worksheets: [{ name: 'Metrics', index: 0, type: 'KPIs', rows: [{ rowNumber: 2, values: { Revenue: 100 } }] }] };
+  const worksheetInput = { readTicket, supabase: client(), workspaceId: input.workspaceId, userId: input.userId, file, importId: 'reused-import-record', importAttemptId: 'attempt-one', worksheets: [{ name: 'Metrics', index: 0, type: 'KPIs', rows: [{ rowNumber: 2, values: { Revenue: 100 } }] }] };
   db = worksheetInput.supabase; result = await evidence.indexWorksheetImportEvidence(worksheetInput); assert.equal(result.indexedChunks, 1);
   const originalCitation = structuredClone(db.memory[0]);
   result = await evidence.indexWorksheetImportEvidence({ ...worksheetInput, importAttemptId: 'attempt-two' });
@@ -203,6 +210,6 @@ function client(failTable, options = {}) {
   checks.push('separate worksheet approvals with identical text preserve old citation identity and import provenance');
   const sameAttemptId = db.memory[1].id; await evidence.indexWorksheetImportEvidence({ ...worksheetInput, importAttemptId: 'attempt-two' }); assert.equal(db.memory.length, 2); assert.equal(db.memory[1].id, sameAttemptId); checks.push('same durable worksheet attempt keeps a stable content identity');
   const writesBefore = db.writes.length; result = await evidence.indexWorksheetImportEvidence({ ...worksheetInput, importAttemptId: '' }); assert.equal(result.indexedChunks, 0); assert.equal(db.writes.length, writesBefore); checks.push('worksheet publication without durable approval identity fails before writes');
-  await require('./workspace-worksheet-publication-tests.cjs').qualify({ evidence, checks });
+  await require('./workspace-worksheet-publication-tests.cjs').qualify({ evidence, checks, readTicket });
   console.log(JSON.stringify({ kind: 'audit_import_evidence_regression', status: 'passed', checks: checks.length, names: checks, inflations, resourceUsage: process.resourceUsage(), limitation: 'Actual parser and indexer functions; synthetic query responses and in-memory write recording, no real database/provider/UI.' }, null, 2));
 })().catch(error => { console.error(error); process.exitCode = 1; });

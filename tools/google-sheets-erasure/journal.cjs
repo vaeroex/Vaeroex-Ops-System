@@ -32,7 +32,9 @@ const MANIFEST_FIELDS = [
   'targets', 'counts', 'completedAt'
 ];
 const nodeAdapter = Object.freeze({
-  fs, cwd: () => process.cwd(), tmpdir: () => os.tmpdir(), uid: () => process.getuid()
+  fs, cwd: () => process.cwd(), tmpdir: () => os.tmpdir(), uid: () => process.getuid(),
+  hostname: () => os.hostname(), pid: () => process.pid,
+  isAlive: pid => { try { process.kill(pid, 0); return true; } catch (error) { if (error.code === 'ESRCH') return false; throw error; } }
 });
 
 function deny(code) {
@@ -309,6 +311,12 @@ function storage(directory, adapter) {
     let succeeded = false;
     try {
       privateMode(io.lstatSync(lockPath), uid, true);
+      const ownerPath = path.join(lockPath, 'owner.json');
+      const fd = io.openSync(ownerPath, flags.O_WRONLY | flags.O_CREAT | flags.O_EXCL | flags.O_NOFOLLOW, 0o600);
+      try { io.writeFileSync(fd, Buffer.from(JSON.stringify({ version: 1, hostname: adapter.hostname?.() ?? os.hostname(),
+        pid: adapter.pid?.() ?? process.pid, createdAt: new Date().toISOString() }) + '\n')); io.fsyncSync(fd); } finally { io.closeSync(fd); }
+      const ownerDirectory = io.openSync(lockPath, flags.O_RDONLY | flags.O_DIRECTORY | flags.O_NOFOLLOW);
+      try { io.fsyncSync(ownerDirectory); } finally { io.closeSync(ownerDirectory); }
       syncDirectory();
       const result = action(transaction);
       succeeded = true;
@@ -318,6 +326,7 @@ function storage(directory, adapter) {
       // Never automatically break a possibly live lock or label an uncertain write complete.
       if (succeeded || !transaction.dirty) {
         checkDirectory();
+        if (maybeStat(io, path.join(lockPath, 'owner.json'))) io.unlinkSync(path.join(lockPath, 'owner.json'));
         io.rmdirSync(lockPath);
         syncDirectory();
       }
@@ -450,7 +459,100 @@ function openJournal(options, adapter = nodeAdapter) {
   });
 }
 
+/** Recovery never removes or edits the original lock/staging evidence. A verified
+ * dead local writer plus a fixed snapshot authorizes reconstruction elsewhere. */
+function recoverySnapshot(options, adapter) {
+  exactKeys(options, ['directory', 'publicKey', 'pinnedFingerprint']);
+  const publicKey = trustedKey(options.publicKey, options.pinnedFingerprint);
+  const store = storage(options.directory, adapter), io = adapter.fs;
+  const names = io.readdirSync(options.directory).sort();
+  const lockPath = path.join(options.directory, LOCK);
+  if (!names.includes(LOCK)) deny('recovery_lock_required');
+  privateMode(io.lstatSync(lockPath), adapter.uid(), true);
+  if (JSON.stringify(io.readdirSync(lockPath).sort()) !== JSON.stringify(['owner.json'])) deny('recovery_owner_unknown');
+  const ownerBytes = store.read(`${LOCK}/owner.json`, 4096), owner = JSON.parse(ownerBytes);
+  exactKeys(owner, ['version', 'hostname', 'pid', 'createdAt']);
+  if (owner.version !== 1 || owner.hostname !== (adapter.hostname?.() ?? os.hostname()) ||
+      !Number.isSafeInteger(owner.pid) || owner.pid < 1) deny('recovery_owner_unknown');
+  const alive = adapter.isAlive ?? nodeAdapter.isAlive;
+  if (alive(owner.pid)) deny('recovery_writer_alive');
+  const records = [], files = [{ name: `${LOCK}/owner.json`, digest: digest(ownerBytes), size: ownerBytes.length }];
+  let incompleteStages = 0;
+  for (const name of names) {
+    if (name === LOCK) continue;
+    if (name !== KEY_FILE && !/^\.stage-[a-f0-9-]{36}$/.test(name) && !/^[a-f0-9-]{36}\.(pending|completed|withdrawn)\.json$/.test(name)) deny('unexpected_file');
+    const bytes = store.read(name, name === KEY_FILE ? 16384 : MAX_RECORD_BYTES);
+    files.push({ name, digest: digest(bytes), size: bytes.length });
+    if (name === KEY_FILE) {
+      try { trustedKey(crypto.createPublicKey(keyObject(bytes, 'private')), options.pinnedFingerprint); } finally { bytes.fill(0); }
+      continue;
+    }
+    let record;
+    try { record = verifyRecord(bytes, publicKey, options.pinnedFingerprint); } catch (error) {
+      if (!name.startsWith('.stage-')) throw error;
+      incompleteStages++; continue;
+    }
+    if (record.manifest.version !== 2) deny('exact_hash_manifest_required');
+    const expected = `${record.manifest.requestId}.${record.state}.json`;
+    if (!name.startsWith('.stage-') && name !== expected) deny('record_name');
+    records.push({ name: expected, bytes, ...record });
+  }
+  if (!names.includes(KEY_FILE)) deny('key');
+  if (JSON.stringify(names) !== JSON.stringify(io.readdirSync(options.directory).sort())) deny('journal_changed');
+  const snapshotDigest = digest(Buffer.from(JSON.stringify(files)));
+  return { store, records, snapshotDigest, owner, incompleteStages, fileCount: files.length };
+}
+function inspectJournalRecovery(options, adapter = nodeAdapter) {
+  const snapshot = recoverySnapshot(options, adapter);
+  return { snapshotDigest: snapshot.snapshotDigest, writerPid: snapshot.owner.pid,
+    writerHost: snapshot.owner.hostname, writerConfirmedStopped: true,
+    fileCount: snapshot.fileCount, verifiedRecords: snapshot.records.length, incompleteStagesRetained: snapshot.incompleteStages };
+}
+function rebuildJournal(options, input, adapter = nodeAdapter) {
+  exactKeys(input, ['destination', 'snapshotDigest', 'witnessRecords']);
+  if (isWithin(input.destination, options.directory) || isWithin(options.directory, input.destination) || !HEX.test(input.snapshotDigest) || !Array.isArray(input.witnessRecords)) deny('recovery_schema');
+  const before = recoverySnapshot(options, adapter);
+  if (before.snapshotDigest !== input.snapshotDigest) deny('journal_changed');
+  const merged = new Map();
+  for (const item of [...before.records, ...input.witnessRecords]) {
+    const verified = verifyRecord(item.bytes, options.publicKey, options.pinnedFingerprint);
+    if (verified.manifest.version !== 2) deny('exact_hash_manifest_required');
+    const name = `${verified.manifest.requestId}.${verified.state}.json`;
+    if (item.name !== name || (merged.has(name) && !merged.get(name).bytes.equals(item.bytes))) deny('conflict');
+    merged.set(name, { ...verified, bytes: Buffer.from(item.bytes) });
+  }
+  // Independently signed receipts may outlive the local pending file. Recreate
+  // only their exact deterministic intent with the original pinned signing key.
+  const pem = before.store.read(KEY_FILE, 16384);
+  let privateKey;
+  try { privateKey = keyObject(pem, 'private'); } finally { pem.fill(0); }
+  for (const item of [...merged.values()]) if (item.state !== 'pending') {
+    const pending = pendingManifest(item.manifest), bytes = signManifest(pending, privateKey);
+    const name = `${pending.requestId}.pending.json`;
+    if (merged.has(name) && !merged.get(name).bytes.equals(bytes)) deny('conflict');
+    if (item.state === 'withdrawn' && digest(bytes) !== item.manifest.withdrawal.intentDigest) deny('withdrawal_conflict');
+    merged.set(name, { ...verifyRecord(bytes, options.publicKey, options.pinnedFingerprint), bytes });
+  }
+  for (const item of merged.values()) if (item.state === 'withdrawn' && merged.has(`${item.manifest.requestId}.completed.json`)) deny('withdrawal_conflict');
+  const target = storage(input.destination, adapter);
+  if (target.entries().length || maybeStat(adapter.fs, path.join(input.destination, KEY_FILE))) deny('not_empty');
+  target.withLock(transaction => {
+    const keyBytes = Buffer.from(privateKey.export({ type: 'pkcs8', format: 'pem' }));
+    try { target.writeOnce(KEY_FILE, keyBytes, transaction); } finally { keyBytes.fill(0); }
+  });
+  const journal = openJournal({ ...options, directory: input.destination }, adapter);
+  for (const item of [...merged.values()].sort((a, b) => (a.state === 'pending' ? 0 : 1) - (b.state === 'pending' ? 0 : 1))) {
+    if (item.state === 'pending') journal.writePending(item.manifest);
+    else if (item.state === 'completed') journal.writeCompletedReceipt(item.manifest);
+    else journal.writeWithdrawalReceipt(item.manifest);
+  }
+  if (recoverySnapshot(options, adapter).snapshotDigest !== before.snapshotDigest) deny('journal_changed');
+  return { state: 'journal_rebuilt', activation: 'config-cutover-required', sourcePreserved: true,
+    sourceSnapshotDigest: before.snapshotDigest, records: journal.listRecords().length,
+    incompleteStagesRetained: before.incompleteStages };
+}
+
 module.exports = Object.freeze({
   TABLES, normalizeManifest, pendingManifest, publicKeyFingerprint, signManifest, verifyRecord,
-  generateJournalKey, openJournal
+  generateJournalKey, openJournal, inspectJournalRecovery, rebuildJournal
 });

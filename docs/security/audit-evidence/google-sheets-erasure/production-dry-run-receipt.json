@@ -1,0 +1,40 @@
+{
+  "completedAt": "2026-10-12T20:33:32.101802+00:00",
+  "projectRef": "mdiianhfrojmxqpwrflh",
+  "cliVersion": "2.111.0",
+  "command": [
+    "supabase",
+    "db",
+    "push",
+    "--linked",
+    "--dry-run",
+    "--include-all"
+  ],
+  "exitCode": 0,
+  "dryRun": true,
+  "appliedLedgerCount": 141,
+  "ledgerUnchanged": true,
+  "stagedCount": 143,
+  "allStagedHashesVerified": true,
+  "pending": [
+    {
+      "version": "20261002225025",
+      "filename": "20261002225025_google_sheets_support_erasure.sql",
+      "sha256": "4ac30e7a57290eb554c7edfff2672b59ae59458dca632f5d269915f6f8c8b33b",
+      "state": "pending",
+      "source": "supabase/production-migrations/20261002225025_google_sheets_support_erasure.sql"
+    },
+    {
+      "version": "20261012191836",
+      "filename": "20261012191836_google_sheets_restricted_erasure_retention.sql",
+      "sha256": "107075b9e5ecfba7235bd98d911ee320dde614ef6eed4f689c414d1f6c2209c8",
+      "state": "pending",
+      "source": "supabase/production-migrations/20261012191836_google_sheets_restricted_erasure_retention.sql"
+    }
+  ],
+  "roles": [],
+  "seeds": [],
+  "migrationApplicationPerformed": false,
+  "includeAllReason": "Reviewed October2 approval version predates already applied migration versions. Only exact live ledger files plus these two candidates were staged.",
+  "limitations": "CLI dry run enumerates pending migrations; SQL execution is separately qualified in synthetic native/full-schema databases."
+}

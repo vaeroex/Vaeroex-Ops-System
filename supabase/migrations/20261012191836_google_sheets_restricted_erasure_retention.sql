@@ -172,6 +172,7 @@ begin
  -- Fresh uploads and ordinary settings are user-supplied records. Their model
  -- generated fields use this same fence without blocking storage bookkeeping.
  if tg_table_name='file_uploads' and nullif(n->>'google_sheets_read_ticket_id','') is null
+  and nullif(current_setting('vaeroex.google_sheets_read_ticket_id',true),'') is null
   and (tg_op='INSERT' and coalesce(n->>'analysis_summary','')='' or tg_op='UPDATE'
    and n->>'analysis_summary' is not distinct from to_jsonb(old)->>'analysis_summary'
    and not exists(select 1 from private.google_sheets_derivation_roots where workspace_id=w and table_name=sink_table and record_id=(n->>'id')::uuid)) then return new; end if;
@@ -182,12 +183,13 @@ begin
   (n-'processing_status'-'processing_error'-'processed_at'-'index_status'-'index_error'-'indexed_at'-'indexed_chunk_count'-'import_status'-'imported_rows'-'updated_at')=
   (to_jsonb(old)-'processing_status'-'processing_error'-'processed_at'-'index_status'-'index_error'-'indexed_at'-'indexed_chunk_count'-'import_status'-'imported_rows'-'updated_at') then return new; end if;
  if tg_table_name='kpi_settings' and coalesce(n->>'classification_source','unknown')<>'luna'
-  and nullif(n->>'google_sheets_read_ticket_id','') is null then return new; end if;
+  and nullif(n->>'google_sheets_read_ticket_id','') is null
+  and nullif(current_setting('vaeroex.google_sheets_read_ticket_id',true),'') is null then return new; end if;
  if tg_op='UPDATE' then
   old_data:=to_jsonb(old);
   -- Lifecycle-only changes do not produce new Google-derived content.
-  if (n-'archived_at'-'deleted_at'-'updated_at'-'status'-'error_message'-'google_sheets_read_ticket_id')=
-     (old_data-'archived_at'-'deleted_at'-'updated_at'-'status'-'error_message'-'google_sheets_read_ticket_id') then return new; end if;
+  if (n-'archived_at'-'deleted_at'-'updated_at'-'status'-'error_message')=
+     (old_data-'archived_at'-'deleted_at'-'updated_at'-'status'-'error_message') then return new; end if;
  end if;
  if not exists(select 1 from private.google_sheets_source_root_links where workspace_id=w) and not exists(select 1 from private.google_sheets_connection_root_links where workspace_id=w) then return new; end if;
  tid:=coalesce(nullif(current_setting('vaeroex.google_sheets_read_ticket_id',true),'')::uuid,
@@ -197,6 +199,16 @@ begin
   nullif(n#>>'{input_json,google_sheets_read_ticket_id}','')::uuid);
  t:=private.google_sheets_checked_ticket_v1(tid,w);
  if not t.bound then raise exception 'google_sheets_read_ticket_unbound' using errcode='40001'; end if;
+ if (public.get_google_sheets_read_context_v1(tid)->>'hasUnattributedDerivedSources')::boolean then
+  raise exception 'google_sheets_unattributed_source' using errcode='55000'; end if;
+ -- A new empty ticket cannot relabel an existing legacy derived record as
+ -- proven unrelated. Lifecycle-only updates above preserve its old ticket.
+ if tg_op='UPDATE' and nullif(old_data->>'google_sheets_read_ticket_id','') is null
+  and not exists(select 1 from private.google_sheets_derivation_roots where workspace_id=w and table_name=sink_table and record_id=(n->>'id')::uuid)
+  and not (tg_table_name='file_uploads' and coalesce(old_data->>'analysis_summary','')='' and coalesce(old_data->>'analysis_prompt','')=''
+   and coalesce(old_data->'metadata_json','{}')=private.google_sheets_file_metadata_without_analysis_v1(old_data->'metadata_json'))
+  and not(tg_table_name='kpi_settings' and coalesce(old_data->>'classification_source','unknown')<>'luna') then
+  raise exception 'google_sheets_unattributed_source' using errcode='55000'; end if;
  if exists(select 1 from jsonb_array_elements(t.sources) s join private.google_sheets_derivation_roots d
   on d.workspace_id=w and (d.table_name=s->>'table' or s->>'table'='file_uploads' and d.table_name='file_upload_analysis') and d.record_id=(s->>'id')::uuid
   join private.google_sheets_retention_roots r on r.id=d.root_id where r.erased_at is not null or r.expires_at<=clock_timestamp()) then
@@ -567,6 +579,23 @@ begin
  return receipts;
 end $$;
 
+-- The operator can hash only an exact owner-identified artifact. It cannot
+-- list or read table contents, and this preview grants no deletion authority.
+create function private.preview_google_sheets_erasure_artifact_v1(p_workspace_id uuid,p_connection_id uuid,p_table text,p_record_id uuid) returns jsonb
+language plpgsql security definer set search_path='' as $$
+declare c public.google_sheets_connections;
+begin
+ perform private.google_sheets_privacy_lock_v1(p_workspace_id);
+ select * into c from public.google_sheets_connections where id=p_connection_id and workspace_id=p_workspace_id for update;
+ if c.id is null or c.status<>'disconnected' or c.revocation_pending or c.authorization_uncertain
+  or exists(select 1 from public.google_sheets_credentials where connection_id=c.id)
+  or c.sync_lease_run_id is not null or c.oauth_lease_expires_at>clock_timestamp() or c.refresh_lease_expires_at>clock_timestamp() then
+  raise exception 'sheets_erasure_disconnect_required' using errcode='55000'; end if;
+ if p_table is null or p_table like 'google_sheets_%' or not private.google_sheets_erasure_table_v1(p_table) then
+  raise exception 'sheets_erasure_table_denied' using errcode='42501'; end if;
+ return private.google_sheets_target_v1(p_workspace_id,p_table,p_record_id);
+end $$;
+
 create function private.prepare_google_sheets_erasure_v1(p_request_id uuid,p_workspace_id uuid,p_connection_id uuid,p_case_id uuid,p_artifacts jsonb,p_review_complete boolean)
 returns jsonb language plpgsql security definer set search_path='' as $$
 declare c public.google_sheets_connections; base jsonb; all_targets jsonb; decisions jsonb:='[]'; a jsonb; target jsonb; inventory jsonb; scope text;
@@ -795,7 +824,7 @@ create function private.finish_google_sheets_restore_v1(p_manifests jsonb,p_inve
 language plpgsql security definer set search_path='' as $$
 declare m jsonb; target jsonb; w uuid; r private.google_sheets_erasure_requests; wd jsonb;
 begin
- if jsonb_typeof(p_manifests) is distinct from 'array' or jsonb_array_length(p_manifests) not between 1 and 5000
+ if jsonb_typeof(p_manifests) is distinct from 'array' or jsonb_array_length(p_manifests) not between 0 and 5000
   or p_inventory_digest is null or p_inventory_digest !~ '^[a-f0-9]{64}$' then raise exception 'sheets_erasure_manifest_invalid'; end if;
  for m in select value from jsonb_array_elements(p_manifests) order by value->>'workspaceId',value->>'requestId' loop
   w:=(m->>'workspaceId')::uuid;
@@ -828,14 +857,16 @@ begin
  return jsonb_build_object('remaining',0,'inventoryDigest',p_inventory_digest);
 end $$;
 
-create function private.due_google_sheets_retention_v1(p_limit integer default 100) returns jsonb
+create function private.due_google_sheets_retention_v1(p_limit integer default 100,p_after_expires_at timestamptz default null,p_after_id uuid default null) returns jsonb
 language plpgsql security definer set search_path='' as $$
 begin
- if p_limit not between 1 and 500 then raise exception 'sheets_erasure_inventory_limit'; end if;
+ if p_limit is null or p_limit not between 1 and 500 then raise exception 'sheets_erasure_inventory_limit'; end if;
+ if (p_after_expires_at is null)<>(p_after_id is null) then raise exception 'sheets_erasure_cursor_invalid'; end if;
  return (select coalesce(jsonb_agg(to_jsonb(q)),'[]') from(select r.id as "rootId",r.workspace_id as "workspaceId",min(l.connection_id::text)::uuid as "connectionId",
-  r.expires_at as "expiresAt",r.automatic_expiry_authorized as "automaticExpiryAuthorized"
+  r.expires_at as "expiresAt",r.automatic_expiry_authorized as "automaticExpiryAuthorized",
+  (select jsonb_build_object('requestId',req.id,'scopeHash',req.scope_hash,'state',req.state) from private.google_sheets_privacy_epochs e join private.google_sheets_erasure_requests req on req.id=e.request_id and req.workspace_id=e.workspace_id where e.workspace_id=r.workspace_id and e.blocked) as "activeRequest"
   from private.google_sheets_retention_roots r join (select workspace_id,connection_id,root_id from private.google_sheets_source_root_links union select workspace_id,connection_id,root_id from private.google_sheets_connection_root_links) l on l.root_id=r.id
-  where r.erased_at is null and r.expires_at<=clock_timestamp() group by r.id order by r.expires_at,r.id limit p_limit) q);
+  where r.erased_at is null and r.expires_at<=clock_timestamp() and (p_after_expires_at is null or (r.expires_at,r.id)>(p_after_expires_at,p_after_id)) group by r.id order by r.expires_at,r.id limit p_limit) q);
 end $$;
 create function private.prepare_google_sheets_retention_v1(p_request_id uuid,p_workspace_id uuid,p_connection_id uuid,p_case_id uuid,p_root_ids uuid[]) returns jsonb
 language plpgsql security definer set search_path='' as $$
@@ -922,18 +953,21 @@ end $$;
 -- Configuration and count history cannot outlive the disconnect cutoff merely
 -- because there were no rows to import. The operator prepares an exact bounded
 -- manifest and uses the same externally witnessed executor, never direct DML.
-create function private.due_google_sheets_disconnected_expiry_v1(p_limit integer default 100) returns jsonb
+create function private.due_google_sheets_disconnected_expiry_v1(p_limit integer default 100,p_after_expires_at timestamptz default null,p_after_id uuid default null) returns jsonb
 language plpgsql security definer set search_path='' as $$
 begin
- if p_limit not between 1 and 500 then raise exception 'sheets_erasure_inventory_limit'; end if;
+ if p_limit is null or p_limit not between 1 and 500 then raise exception 'sheets_erasure_inventory_limit'; end if;
+ if (p_after_expires_at is null)<>(p_after_id is null) then raise exception 'sheets_erasure_cursor_invalid'; end if;
  return (select coalesce(jsonb_agg(to_jsonb(q)),'[]') from(select c.workspace_id as "workspaceId",c.id as "connectionId",
   c.disconnected_at+interval '30 days' as "expiresAt",
+  (select jsonb_build_object('requestId',req.id,'scopeHash',req.scope_hash,'state',req.state) from private.google_sheets_privacy_epochs e join private.google_sheets_erasure_requests req on req.id=e.request_id and req.workspace_id=e.workspace_id where e.workspace_id=c.workspace_id and e.blocked) as "activeRequest",
   exists(select 1 from (select workspace_id,connection_id,root_id from private.google_sheets_source_root_links union select workspace_id,connection_id,root_id from private.google_sheets_connection_root_links) l join private.google_sheets_retention_roots r on r.id=l.root_id
    where l.connection_id=c.id and l.workspace_id=c.workspace_id and r.erased_at is null and not r.automatic_expiry_authorized) as "manualReviewRequired",
   case when exists(select 1 from (select workspace_id,connection_id,root_id from private.google_sheets_source_root_links union select workspace_id,connection_id,root_id from private.google_sheets_connection_root_links) l join private.google_sheets_retention_roots r on r.id=l.root_id
    where l.connection_id=c.id and l.workspace_id=c.workspace_id and r.erased_at is null and not r.automatic_expiry_authorized)
    then 'legacy_source_review' else null end as "reasonCode"
   from public.google_sheets_connections c where c.status='disconnected' and c.disconnected_at+interval '30 days'<=clock_timestamp()
+   and (p_after_expires_at is null or (c.disconnected_at+interval '30 days',c.id)>(p_after_expires_at,p_after_id))
   order by c.disconnected_at,c.id limit p_limit) q);
 end $$;
 create function private.prepare_google_sheets_disconnected_expiry_v1(p_request_id uuid,p_workspace_id uuid,p_connection_id uuid,p_case_id uuid) returns jsonb
@@ -964,16 +998,17 @@ end $$;
 -- are available to the non-login restricted support role.
 do $$ declare p record; begin
  for p in select oid::regprocedure as signature from pg_proc where pronamespace='private'::regnamespace
-  and (proname like 'google_sheets_%' or proname in ('prepare_google_sheets_erasure_v1','get_google_sheets_erasure_execution_v1',
+  and (proname like 'google_sheets_%' or proname in ('prepare_google_sheets_erasure_v1','preview_google_sheets_erasure_artifact_v1','get_google_sheets_erasure_execution_v1',
    'execute_google_sheets_erasure_v1','replay_google_sheets_erasure_v1','finish_google_sheets_restore_v1','due_google_sheets_retention_v1','prepare_google_sheets_retention_v1','get_google_sheets_erasure_recovery_v1','withdraw_google_sheets_erasure_v1','finish_google_sheets_withdrawal_v1','due_google_sheets_disconnected_expiry_v1','prepare_google_sheets_disconnected_expiry_v1')) loop
   execute format('revoke all on function %s from public,anon,authenticated,service_role,google_sheets_erasure_support,google_sheets_erasure_restore',p.signature);
  end loop;
 end $$;
-grant execute on function private.prepare_google_sheets_erasure_v1(uuid,uuid,uuid,uuid,jsonb,boolean),
+grant execute on function private.preview_google_sheets_erasure_artifact_v1(uuid,uuid,text,uuid),
+ private.prepare_google_sheets_erasure_v1(uuid,uuid,uuid,uuid,jsonb,boolean),
  private.get_google_sheets_erasure_execution_v1(uuid,text),private.execute_google_sheets_erasure_v1(uuid,text,text),
- private.due_google_sheets_retention_v1(integer),
+ private.due_google_sheets_retention_v1(integer,timestamptz,uuid),
  private.prepare_google_sheets_retention_v1(uuid,uuid,uuid,uuid,uuid[]),private.get_google_sheets_erasure_recovery_v1(uuid,text),
  private.withdraw_google_sheets_erasure_v1(uuid,text,text,text),private.finish_google_sheets_withdrawal_v1(uuid,text,text,text),
- private.due_google_sheets_disconnected_expiry_v1(integer),private.prepare_google_sheets_disconnected_expiry_v1(uuid,uuid,uuid,uuid) to google_sheets_erasure_support;
+ private.due_google_sheets_disconnected_expiry_v1(integer,timestamptz,uuid),private.prepare_google_sheets_disconnected_expiry_v1(uuid,uuid,uuid,uuid) to google_sheets_erasure_support;
 grant execute on function private.replay_google_sheets_erasure_v1(uuid,text,jsonb,text),private.finish_google_sheets_restore_v1(jsonb,text) to google_sheets_erasure_restore;
 commit;

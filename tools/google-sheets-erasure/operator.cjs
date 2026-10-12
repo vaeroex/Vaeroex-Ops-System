@@ -99,27 +99,58 @@ function createOperator({ database, journal, witness, publicKey, pinnedFingerpri
       inventoryDigest: witnessed.digest, nextStep: 'fresh-exact-preparation-and-owner-approval-required' };
   }
 
-  async function dailyExpiry(limit = 10) {
+  async function dailyExpiry(limit = 10, continuation = { roots: null, disconnected: null }) {
     if (!Number.isSafeInteger(limit) || limit < 1 || limit > 10) fail('daily_limit');
-    const [roots, disconnected] = await Promise.all([database.dueRetention(), database.dueDisconnected()]);
-    if (!Array.isArray(roots) || !Array.isArray(disconnected)) fail('database_response');
+    if (!continuation || Object.keys(continuation).sort().join(',') !== 'disconnected,roots') fail('cursor');
+    const cursorTime = value => {
+      if (typeof value !== 'string') return null;
+      const m = /^(.*T\d{2}:\d{2}:\d{2})(?:\.(\d{1,6}))?(Z|[+-]\d{2}:\d{2})$/.exec(value);
+      if (!m || !Number.isFinite(Date.parse(m[1] + m[3]))) return null;
+      return BigInt(Date.parse(m[1] + m[3])) * 1000n + BigInt((m[2] ?? '').padEnd(6, '0'));
+    };
+    const cursorValid = c => c === null || (Object.keys(c).sort().join(',') === 'expiresAt,id' && UUID.test(c.id) && cursorTime(c.expiresAt) !== null);
+    if (!cursorValid(continuation.roots) || !cursorValid(continuation.disconnected)) fail('cursor');
+    async function collect(fetch, initial, idKey) {
+      const rows = []; let cursor = initial;
+      for (let page = 0; page < 10; page++) {
+        const values = await fetch(cursor);
+        if (!Array.isArray(values) || values.length > 100) fail('database_response');
+        for (const item of values) {
+          const next = { expiresAt: item.expiresAt, id: item[idKey] };
+          if (!cursorValid(next) || (cursor && (cursorTime(next.expiresAt) < cursorTime(cursor.expiresAt) ||
+              (cursorTime(next.expiresAt) === cursorTime(cursor.expiresAt) && next.id <= cursor.id)))) fail('cursor');
+          cursor = next; rows.push(item);
+        }
+        if (values.length < 100) return { rows, next: null, more: false };
+      }
+      return { rows, next: cursor, more: true };
+    }
+    const [rootPage, disconnectedPage] = await Promise.all([
+      collect(c => database.dueRetention(c), continuation.roots, 'rootId'),
+      collect(c => database.dueDisconnected(c), continuation.disconnected, 'connectionId')]);
+    const roots = rootPage.rows, disconnected = disconnectedPage.rows;
     const operations = [], groups = new Map(), held = [];
     for (const item of disconnected) {
       if (!UUID.test(item.workspaceId) || !UUID.test(item.connectionId)) fail('database_response');
       const key = `${item.workspaceId}:${item.connectionId}`;
-      if (item.manualReviewRequired) held.push({ workspaceId: item.workspaceId, connectionId: item.connectionId, reason: 'disconnected_review_required' });
+      if (item.activeRequest) held.push({ workspaceId: item.workspaceId, connectionId: item.connectionId, ...item.activeRequest, reason: 'active_request_recovery_required' });
+      else if (item.manualReviewRequired) held.push({ workspaceId: item.workspaceId, connectionId: item.connectionId, reason: 'disconnected_review_required' });
       else operations.push({ kind: 'disconnected', workspaceId: item.workspaceId, connectionId: item.connectionId });
       groups.set(key, null);
     }
     for (const item of roots) {
       if (!UUID.test(item.rootId) || !UUID.test(item.workspaceId) || !UUID.test(item.connectionId)) fail('database_response');
+      if (item.activeRequest) { held.push({ workspaceId: item.workspaceId, connectionId: item.connectionId, ...item.activeRequest, reason: 'active_request_recovery_required' }); continue; }
       if (!item.automaticExpiryAuthorized) { held.push({ workspaceId: item.workspaceId, connectionId: item.connectionId, reason: 'retention_review_required' }); continue; }
       const key = `${item.workspaceId}:${item.connectionId}`;
       if (groups.has(key) && groups.get(key) === null) continue;
       if (!groups.has(key)) groups.set(key, { kind: 'roots', workspaceId: item.workspaceId, connectionId: item.connectionId, rootIds: [] });
       const group = groups.get(key); if (!group.rootIds.includes(item.rootId)) group.rootIds.push(item.rootId);
     }
-    operations.push(...[...groups.values()].filter(Boolean));
+    for (const group of [...groups.values()].filter(Boolean)) {
+      for (let offset = 0; offset < group.rootIds.length; offset += 500)
+        operations.push({ ...group, rootIds: group.rootIds.slice(offset, offset + 500) });
+    }
     const completed = [];
     for (const operation of operations.slice(0, limit)) {
       const requestId = crypto.randomUUID(), caseId = crypto.randomUUID(); let scopeHash = null, stage = 'prepare';
@@ -138,8 +169,9 @@ function createOperator({ database, journal, witness, publicKey, pinnedFingerpri
     }
     const deferred = Math.max(0, operations.length - limit);
     return { runAt: now().toISOString(), processed: completed.length, held: held.length, deferred,
-      inventoryMayHaveMore: roots.length >= 100 || disconnected.length >= 100,
-      attentionRequired: held.length > 0 || deferred > 0 || roots.length >= 100 || disconnected.length >= 100,
+      inventoryMayHaveMore: rootPage.more || disconnectedPage.more,
+      continuation: deferred ? continuation : rootPage.more || disconnectedPage.more ? { roots: rootPage.next, disconnected: disconnectedPage.next } : null,
+      attentionRequired: held.length > 0 || deferred > 0 || rootPage.more || disconnectedPage.more,
       completed, reviewQueue: held, physicalPurgeTarget: 'next-business-day-support-run' };
   }
 
@@ -200,6 +232,10 @@ async function restrictedDatabase(client, purpose = 'support') {
     return result.rows[0].result;
   };
   return Object.freeze({
+    previewArtifact: (workspaceId, connectionId, table, id) => {
+      if (![workspaceId, connectionId, id].every(value => UUID.test(value)) || typeof table !== 'string' || !/^[a-z_]{1,64}$/.test(table)) fail('identity');
+      return call('select private.preview_google_sheets_erasure_artifact_v1($1,$2,$3,$4) result', [workspaceId, connectionId, table, id]);
+    },
     prepare: input => {
       if (!input || Object.keys(input).sort().join(',') !== 'artifacts,caseId,connectionId,requestId,reviewComplete,workspaceId' ||
           !['requestId', 'workspaceId', 'connectionId', 'caseId'].every(key => UUID.test(input[key])) ||
@@ -207,7 +243,7 @@ async function restrictedDatabase(client, purpose = 'support') {
       return call('select private.prepare_google_sheets_erasure_v1($1,$2,$3,$4,$5::jsonb,$6) result',
         [input.requestId, input.workspaceId, input.connectionId, input.caseId, JSON.stringify(input.artifacts), input.reviewComplete]);
     },
-    dueDisconnected: () => call('select private.due_google_sheets_disconnected_expiry_v1($1) result', [100]),
+    dueDisconnected: (cursor = null) => call('select private.due_google_sheets_disconnected_expiry_v1($1,$2,$3) result', [100, cursor?.expiresAt ?? null, cursor?.id ?? null]),
     prepareDisconnected: input => {
       if (!input || Object.keys(input).sort().join(',') !== 'caseId,connectionId,requestId,workspaceId' ||
           !['requestId', 'workspaceId', 'connectionId', 'caseId'].every(key => UUID.test(input[key]))) fail('retention_schema');
@@ -224,7 +260,11 @@ async function restrictedDatabase(client, purpose = 'support') {
     getRecovery: (id, hash) => call('select private.get_google_sheets_erasure_recovery_v1($1,$2) result', [id, hash]),
     withdraw: (id, hash, inventory, reason) => call('select private.withdraw_google_sheets_erasure_v1($1,$2,$3,$4) result', [id, hash, inventory, reason]),
     finishWithdrawal: (id, hash, receipt, inventory) => call('select private.finish_google_sheets_withdrawal_v1($1,$2,$3,$4) result', [id, hash, receipt, inventory]),
-    dueRetention: () => call('select private.due_google_sheets_retention_v1($1) result', [100]),
+    dueRetention: (cursor = null) => call('select private.due_google_sheets_retention_v1($1,$2,$3) result', [100, cursor?.expiresAt ?? null, cursor?.id ?? null]),
+    assertExclusiveSession: async () => {
+      const row = (await client.query('select count(*)::int as other_sessions from pg_stat_activity where usename=current_user and pid<>pg_backend_pid()')).rows[0];
+      if (!row || row.other_sessions !== 0) fail('other_operator_session');
+    },
     prepareRetention: input => {
       if (!input || Object.keys(input).sort().join(',') !== 'caseId,connectionId,requestId,rootIds,workspaceId' ||
           !['requestId', 'workspaceId', 'connectionId', 'caseId'].every(key => UUID.test(input[key])) ||

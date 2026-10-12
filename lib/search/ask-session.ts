@@ -9,7 +9,7 @@ export const ASK_MAX_STORED_SESSION_CHARS = 500_000;
 const MAX_QUESTION_CHARS = 600;
 const MAX_SESSION_SUMMARY_CHARS = 2_200;
 const MAX_PREVIOUS_ANSWER_SUMMARY_CHARS = 1_800;
-const MAX_SESSION_TOKEN_CHARS = 4_096;
+export const ASK_MAX_SESSION_TOKEN_CHARS = 32_768;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 type UnknownRecord = Record<string, unknown>;
@@ -110,7 +110,7 @@ export function parseAskAnalysisRequest(value: unknown, fallbackSessionId: strin
 
   const followUpNumber = Number(rawFollowUpNumber);
   const isFollowUp = followUpNumber > 0;
-  const sessionToken = compactText(value.sessionToken, MAX_SESSION_TOKEN_CHARS);
+  const sessionToken = compactText(value.sessionToken, ASK_MAX_SESSION_TOKEN_CHARS);
   const originalQuestion = compactText(value.originalQuestion, MAX_QUESTION_CHARS);
   const sessionSummary = compactText(value.sessionSummary, MAX_SESSION_SUMMARY_CHARS);
   const previousQuestion = compactText(value.previousQuestion, MAX_QUESTION_CHARS);
@@ -144,7 +144,7 @@ export function isAskSessionExpired(lastActiveAt: string, nowMs = Date.now()) {
 export function parseStoredAskSession(value: unknown, nowMs = Date.now()): ParsedStoredAskSession {
   if (!isRecord(value) || value.version !== ASK_SESSION_VERSION) return { session: null, expired: false };
   if (!UUID_PATTERN.test(String(value.sessionId || ""))) return { session: null, expired: false };
-  if (typeof value.sessionToken !== "string" || !value.sessionToken || value.sessionToken.length > MAX_SESSION_TOKEN_CHARS) {
+  if (typeof value.sessionToken !== "string" || !value.sessionToken || value.sessionToken.length > ASK_MAX_SESSION_TOKEN_CHARS) {
     return { session: null, expired: false };
   }
   if (compactText(value.originalQuestion, MAX_QUESTION_CHARS).length < 2 || !isStoredAnswer(value.originalAnswer)) {

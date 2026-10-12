@@ -1,4 +1,4 @@
-import { beginGoogleSheetsRead, bindGoogleSheetsRead } from "@/lib/integrations/google-sheets/read-authority";
+import { beginGoogleSheetsRead, bindGoogleSheetsRead, type GoogleSheetsReadTicket } from "@/lib/integrations/google-sheets/read-authority";
 import { randomUUID } from "crypto";
 import { NextResponse } from "next/server";
 import { buildBoundedWorkspaceContext } from "@/lib/ai/bounded-context";
@@ -40,7 +40,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Database, Json } from "@/lib/supabase/types";
 import { getWorkspaceContext } from "@/lib/workspaces/current";
 import { ASK_MAX_FOLLOW_UPS, parseAskAnalysisRequest, type AskAnalysisRequest } from "@/lib/search/ask-session";
-import { issueAskSessionToken, verifyAskSessionToken } from "@/lib/search/ask-session-token";
+import { askSessionContinuationContext, issueAskSessionToken, nextAskSessionContext, verifyAskSessionToken, type AskSessionContext } from "@/lib/search/ask-session-token";
 import type { GlobalSearchAnswer, GlobalSearchDestination, GlobalSearchGroup, GlobalSearchGroupLabel, GlobalSearchResult } from "@/lib/search/types";
 
 export const dynamic = "force-dynamic";
@@ -624,7 +624,7 @@ export async function POST(request: Request) {
   const parsedRequest = parseAskAnalysisRequest(body, randomUUID());
   if (!parsedRequest.ok) return NextResponse.json({ error: parsedRequest.error }, { status: 400 });
 
-  const analysisRequest = parsedRequest.value;
+  let analysisRequest = parsedRequest.value;
   const query = analysisRequest.query;
 
   const authentication = await timing.measure("authentication_ms", async () => {
@@ -655,8 +655,6 @@ export async function POST(request: Request) {
   }
 
   const workspaceId = context.activeWorkspace.id;
-  const readTicket = await beginGoogleSheetsRead(supabase, workspaceId, user.id);
-  await bindGoogleSheetsRead(supabase, readTicket.ticketId, []);
   const subscriptionStatus = await timing.measure(
     "subscription_authorization_ms",
     () => getSubscriptionStatus({ supabase, userId: user.id, email: user.email, workspaceId })
@@ -666,50 +664,65 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Subscription access is required." }, { status: 402 });
   }
 
-  const sessionError = timing.measureSync("session_security_validation_ms", () => {
-    if (!analysisRequest.isFollowUp) return null;
-    const verification = verifyAskSessionToken(analysisRequest.sessionToken || "", {
-      sessionId: analysisRequest.sessionId,
-      workspaceId,
-      userId: user.id,
-      originalQuestion: analysisRequest.originalQuestion,
-      previousFollowUpCount: analysisRequest.followUpNumber - 1
-    });
-
-    if (!verification.ok) {
-      const message = verification.reason === "expired"
-        ? "This Executive Analysis session expired. Start a new analysis to continue."
-        : "This Executive Analysis cannot be continued safely. Start a new analysis and try again.";
-      return message;
-    }
-    return null;
-  });
-  if (sessionError) return NextResponse.json({ error: sessionError }, { status: 409 });
-
-  let nextSessionToken: string;
+  let readTicket: GoogleSheetsReadTicket;
+  let previousContext: AskSessionContext | undefined;
   try {
-    nextSessionToken = issueAskSessionToken({
-      sessionId: analysisRequest.sessionId,
-      workspaceId,
-      userId: user.id,
-      originalQuestion: analysisRequest.originalQuestion,
-      followUpCount: analysisRequest.followUpNumber
-    });
+    if (analysisRequest.isFollowUp) {
+      const verification = timing.measureSync("session_security_validation_ms", () => verifyAskSessionToken(analysisRequest.sessionToken || "", {
+        sessionId: analysisRequest.sessionId,
+        workspaceId,
+        userId: user.id,
+        originalQuestion: analysisRequest.originalQuestion,
+        previousFollowUpCount: analysisRequest.followUpNumber - 1
+      }));
+      if (!verification.ok) {
+        const message = verification.reason === "expired"
+          ? "This Executive Analysis session expired. Start a new analysis to continue."
+          : "This Executive Analysis cannot be continued safely. Start a new analysis and try again.";
+        return NextResponse.json({ error: message }, { status: 409 });
+      }
+      readTicket = verification.payload.readTicket;
+      previousContext = verification.payload.context;
+      // Restore server-authenticated context, never the browser's summary claims.
+      analysisRequest = { ...analysisRequest, ...askSessionContinuationContext(previousContext) };
+    } else {
+      readTicket = await beginGoogleSheetsRead(supabase, workspaceId, user.id);
+    }
+    // A continuation retains the original authority before retrieval or embeddings.
+    // Re-minting here could relabel expired or revoked history as ordinary context.
+    await bindGoogleSheetsRead(supabase, readTicket.ticketId, []);
   } catch {
-    return NextResponse.json({ error: "Vaeroex could not verify this analysis session. Please try again shortly." }, { status: 503 });
+    return NextResponse.json({ error: "This analysis context is no longer available. Start a new analysis to continue." }, { status: analysisRequest.isFollowUp ? 409 : 503 });
   }
 
-  const respond = (answer: GlobalSearchAnswer, groups: GlobalSearchGroup[] = []) => NextResponse.json({
-    query,
-    groups,
-    answer,
-    analysisSession: {
-      sessionId: analysisRequest.sessionId,
-      sessionToken: nextSessionToken,
-      followUpNumber: analysisRequest.followUpNumber,
-      followUpsRemaining: Math.max(0, ASK_MAX_FOLLOW_UPS - analysisRequest.followUpNumber)
+  const respond = async (answer: GlobalSearchAnswer, groups: GlobalSearchGroup[] = []) => {
+    try {
+      // Revocation during an asynchronous answer also invalidates the response.
+      await bindGoogleSheetsRead(supabase, readTicket.ticketId, []);
+      const nextSessionToken = issueAskSessionToken({
+        sessionId: analysisRequest.sessionId,
+        workspaceId,
+        userId: user.id,
+        originalQuestion: analysisRequest.originalQuestion,
+        followUpCount: analysisRequest.followUpNumber,
+        readTicket,
+        context: nextAskSessionContext(answer, query, previousContext)
+      });
+      return NextResponse.json({
+        query,
+        groups,
+        answer,
+        analysisSession: {
+          sessionId: analysisRequest.sessionId,
+          sessionToken: nextSessionToken,
+          followUpNumber: analysisRequest.followUpNumber,
+          followUpsRemaining: Math.max(0, ASK_MAX_FOLLOW_UPS - analysisRequest.followUpNumber)
+        }
+      });
+    } catch {
+      return NextResponse.json({ error: "This analysis context is no longer available. Start a new analysis to continue." }, { status: 409 });
     }
-  });
+  };
 
   const rateLimit = await timing.measure("request_rate_limit_ms", () => enforceRateLimit({
     action: "global.answer",

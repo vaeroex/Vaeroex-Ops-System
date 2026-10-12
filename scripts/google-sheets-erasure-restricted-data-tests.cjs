@@ -267,6 +267,53 @@ async function qualifyRestricted(db) {
   assert.equal(storageManifest.storageReceipts[0].path,storage.workspace+'/copy.pdf');assert.equal(storageManifest.storageReceipts[0].rowHash,(await fullTarget()).hash);checks+=2;
   await storage.call('private.execute_google_sheets_erasure_v1',[storage.request,storagePrepared.scopeHash,'7'.repeat(64)],'google_sheets_erasure_support');
   assert.equal((await db.query('select count(*)::int n from public.file_uploads where id=$1',[fullFile])).rows[0].n,0);checks++;
+  // A genesis-only witness has no erasures to replay and cannot mutate any
+  // workspace barrier. A valid empty inventory can still finish qualification.
+  const barrierBefore=(await db.query('select jsonb_agg(to_jsonb(e) order by workspace_id) snapshot from private.google_sheets_privacy_epochs e')).rows[0].snapshot;
+  assert.equal((await storage.call('private.finish_google_sheets_restore_v1',['[]','8'.repeat(64)],'google_sheets_erasure_restore')).remaining,0);checks++;
+  assert.deepEqual((await db.query('select jsonb_agg(to_jsonb(e) order by workspace_id) snapshot from private.google_sheets_privacy_epochs e')).rows[0].snapshot,barrierBefore);checks++;
+  // 101 permanently held entries cannot prevent the bounded operator from
+  // discovering later due work. Tuple cursors retain full timestamp precision.
+  const backlog=await fixture.seed();
+  await db.query("insert into public.google_sheets_connections(workspace_id,business_entity_id,created_by,status,display_name,disconnected_at) select $1,$2,$3,'disconnected','Synthetic paging metadata','1950-01-01T00:00:00Z'::timestamptz from generate_series(1,101)",[backlog.workspace,backlog.entity,backlog.owner]);
+  await db.query("update private.google_sheets_retention_roots set automatic_expiry_authorized=false where workspace_id=$1 and expires_at<'1951-01-01'",[backlog.workspace]);
+  for(const [rpc,key] of [['private.due_google_sheets_retention_v1','rootId'],['private.due_google_sheets_disconnected_expiry_v1','connectionId']]) {
+    const all=await backlog.call(rpc,[500],'google_sheets_erasure_support');
+    const first=await backlog.call(rpc,[100],'google_sheets_erasure_support');
+    assert.equal(first.length,100);checks++;
+    const cursor=first.at(-1);
+    const second=await backlog.call(rpc,[100,cursor.expiresAt,cursor[key]],'google_sheets_erasure_support');
+    assert.deepEqual([...first,...second],all);assert(second.some(item=>new Date(item.expiresAt).getUTCFullYear()===1950));checks+=2;
+    await deny(()=>backlog.call(rpc,[100,cursor.expiresAt,null],'google_sheets_erasure_support'),/cursor_invalid/);
+  }
+  // A pre-connector run stays unknown when copied or relabeled. It cannot
+  // acquire clean provenance merely because the copy uses a fresh empty ticket.
+  const legacyWorkspace=randomUUID(),legacyRun=randomUUID();
+  await db.query('insert into public.workspaces(id) values($1)',[legacyWorkspace]);
+  await db.query("insert into public.ai_agent_runs(id,workspace_id,status,output_json) values($1,$2,'completed','{\"summary\":\"Legacy unclassified content\"}')",[legacyRun,legacyWorkspace]);
+  await db.query("insert into public.workspace_members values($1,$2,'owner','active')",[legacyWorkspace,backlog.owner]);
+  const legacyEntity=randomUUID();await db.query("insert into public.business_entities values($1,$2,'active','Legacy fixture entity')",[legacyEntity,legacyWorkspace]);
+  await db.query("insert into public.google_sheets_connections(workspace_id,business_entity_id,created_by,status,display_name) values($1,$2,$3,'disconnected','Legacy exposure fixture')",[legacyWorkspace,legacyEntity,backlog.owner]);
+  const legacyTicket=await backlog.call('public.begin_google_sheets_read_v1',[legacyWorkspace,backlog.owner]);
+  await backlog.call('public.bind_google_sheets_read_v1',[legacyTicket.ticketId,JSON.stringify([{table:'ai_agent_runs',id:legacyRun}])]);
+  await deny(()=>db.query("insert into public.reports(workspace_id,title,google_sheets_read_ticket_id) values($1,'Copied legacy output',$2)",[legacyWorkspace,legacyTicket.ticketId]),/unattributed_source/);
+  const emptyLegacy=await backlog.call('public.begin_google_sheets_read_v1',[legacyWorkspace,backlog.owner]);
+  await backlog.call('public.bind_google_sheets_read_v1',[emptyLegacy.ticketId,'[]']);
+  await deny(()=>db.query('update public.ai_agent_runs set google_sheets_read_ticket_id=$2 where id=$1',[legacyRun,emptyLegacy.ticketId]),/unattributed_source/);
+  assert.equal((await backlog.call('public.get_google_sheets_read_context_v1',[legacyTicket.ticketId])).hasUnattributedDerivedSources,true);checks++;
+  // A paused backlog row exposes only its precise recovery handle.
+  await db.query("update private.google_sheets_retention_roots set expires_at=clock_timestamp()-interval '1 second' where id in(select root_id from private.google_sheets_source_root_links where connection_id=$1)",[cascade.connection]);
+  const activeDue=await cascade.call('private.due_google_sheets_retention_v1',[500],'google_sheets_erasure_support');
+  assert.deepEqual(activeDue.find(row=>row.connectionId===cascade.connection).activeRequest,{requestId:cascade.request,scopeHash:cascadePrepared.scopeHash,state:'approved'});checks++;
+  assert(activeDue.every(row=>row.activeRequest===null||Object.keys(row.activeRequest).sort().join(',')==='requestId,scopeHash,state'));checks++;
+  // Exact artifact preview closes the operator workflow without granting any
+  // raw table reads or target-helper access to the support identity.
+  const preview=await publication.call('private.preview_google_sheets_erasure_artifact_v1',[publication.workspace,publication.connection,'reports',publication.report],'google_sheets_erasure_support');
+  assert.deepEqual(Object.keys(preview).sort(),['hash','id','table']);assert.equal(preview.id,publication.report);assert.match(preview.hash,/^[a-f0-9]{64}$/);checks++;
+  for(const role of ['anon','authenticated','service_role','google_sheets_erasure_restore']) await deny(()=>publication.call('private.preview_google_sheets_erasure_artifact_v1',[publication.workspace,publication.connection,'reports',publication.report],role),/permission denied/);
+  await deny(()=>publication.call('private.preview_google_sheets_erasure_artifact_v1',[publication.workspace,publication.connection,'reports',publication.otherRecord],'google_sheets_erasure_support'),/target_unavailable/);
+  await deny(()=>publication.call('private.preview_google_sheets_erasure_artifact_v1',[publication.workspace,publication.connection,'google_sheets_connections',publication.connection],'google_sheets_erasure_support'),/table_denied/);
+  await deny(()=>publication.as('google_sheets_erasure_support',client=>client.query('select * from public.reports where id=$1',[publication.report])),/permission denied/);
   return { ...fixture, checks, scope: 'Actual new migration; synthetic source/sink tables; no production mutation' };
 }
 module.exports = { setupRestricted, qualifyRestricted };

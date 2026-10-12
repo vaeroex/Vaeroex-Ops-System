@@ -286,8 +286,8 @@ test('a completion receipt conflicts with withdrawal and blocks all restore inve
 });
 
 test('daily expiry is bounded and alerts on manual review, failure, pagination and deferred backlog', async () => {
-  const f = cloud(), local = localJournal([]), rows = Array.from({ length: 12 }, () => ({ workspaceId: crypto.randomUUID(), connectionId: crypto.randomUUID(), rootId: crypto.randomUUID(), automaticExpiryAuthorized: true }));
-  rows.push({ ...rows[0], rootId: crypto.randomUUID(), automaticExpiryAuthorized: false });
+  const f = cloud(), local = localJournal([]), rows = Array.from({ length: 12 }, () => ({ workspaceId: crypto.randomUUID(), connectionId: crypto.randomUUID(), rootId: crypto.randomUUID(), automaticExpiryAuthorized: true, expiresAt: completedAt })).sort((a,b)=>a.rootId.localeCompare(b.rootId));
+  rows.push({ ...rows[0], rootId: crypto.randomUUID(), automaticExpiryAuthorized: false }); rows.sort((a,b)=>a.rootId.localeCompare(b.rootId));
   const manifests = new Map(); let prepared = 0;
   const database = {
     dueRetention: async () => rows, dueDisconnected: async () => [],
@@ -364,4 +364,93 @@ test('same-request status recovers a lost preparation acknowledgement without ex
   assert.equal(result.scopeHash, m.scopeHash); assert.equal(result.state, 'prepared');
   assert.deepEqual(calls.at(-1).params, [m.requestId, null]);
   assert.equal(Object.hasOwn(result, 'targets'), false); assert.equal(Object.hasOwn(result, 'storageReceipts'), false);
+});
+
+test('genesis-only restore finalizes an independently pinned empty inventory without destructive calls', async () => {
+  const f = cloud(); let finalized = false;
+  const operator = createOperator({ database: { replay: async () => assert.fail('no erasure targets'),
+    finishRestore: async (manifests, inventoryDigest) => { assert.deepEqual(manifests, []); finalized = true; return { remaining: 0, inventoryDigest }; } },
+    witness: f.witness, publicKey: pair.publicKey, pinnedFingerprint: pin });
+  const proof = await operator.restore((await f.witness.inventory()).digest, 'e'.repeat(64));
+  assert.equal(finalized, true); assert.equal(proof.requestsReplayed, 0); assert.equal(proof.activation, 'external-release-required');
+});
+
+test('expiry pagination reaches eligible work after held pages and exposes same-request crash recovery', async () => {
+  const f = cloud(), rows = Array.from({ length: 101 }, (_, i) => ({ rootId: `00000000-0000-0000-0000-${String(i).padStart(12,'0')}`,
+    workspaceId: crypto.randomUUID(), connectionId: crypto.randomUUID(), expiresAt: completedAt, automaticExpiryAuthorized: i === 100 }));
+  rows[0].activeRequest = { requestId: crypto.randomUUID(), scopeHash: 'a'.repeat(64), state: 'approved' };
+  const manifests = new Map(), cursors = [];
+  const database = { dueRetention: async cursor => { cursors.push(cursor); return cursor ? rows.slice(100) : rows.slice(0,100); }, dueDisconnected: async () => [],
+    prepareRetention: async input => { const m = { ...manifest(), requestId: input.requestId, workspaceId: input.workspaceId, connectionId: input.connectionId };
+      manifests.set(input.requestId,m); return { requestId: input.requestId, scopeHash: m.scopeHash, state: 'approved' }; },
+    getExecution: async id => manifests.get(id), execute: async id => manifests.set(id,{ ...manifests.get(id), completedAt }) };
+  const result = await createOperator({ database, journal: localJournal([]), witness: f.witness, publicKey: pair.publicKey, pinnedFingerprint: pin }).dailyExpiry();
+  assert.equal(cursors.length,2); assert.equal(cursors[1].id,rows[99].rootId);
+  assert.equal(result.processed,1); assert.equal(result.held,100);
+  assert.equal(result.reviewQueue[0].requestId,rows[0].activeRequest.requestId);
+  assert.equal(result.continuation,null);
+});
+
+test('bounded held backlog returns a usable continuation and rejects repeated cursor pages', async () => {
+  const rows = Array.from({ length: 1001 }, (_, i) => ({ rootId: `00000000-0000-0000-0000-${String(i).padStart(12,'0')}`,
+    workspaceId: crypto.randomUUID(), connectionId: crypto.randomUUID(), expiresAt: completedAt, automaticExpiryAuthorized: false }));
+  const database = { dueRetention: async cursor => rows.filter(row => !cursor || row.rootId>cursor.id).slice(0,100), dueDisconnected: async () => [] };
+  const operator = createOperator({ database, now: () => new Date(completedAt) });
+  const first = await operator.dailyExpiry(); assert.equal(first.held,1000); assert.equal(first.inventoryMayHaveMore,true);
+  const next = await operator.dailyExpiry(10,first.continuation); assert.equal(next.held,1); assert.equal(next.continuation,null);
+  database.dueRetention = async () => rows.slice(0,100);
+  await assert.rejects(operator.dailyExpiry(), /cursor/);
+});
+
+test('private bootstrap package is deterministic and refuses changing an already pinned genesis', () => {
+  const { preparePackage } = require('../tools/google-sheets-erasure/bootstrap-cli.cjs');
+  const directory = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'sheets-bootstrap-test-'))); fs.chmodSync(directory,0o700);
+  try {
+    const input = { version:1,bucket:'synthetic-witness',datasetId:crypto.randomUUID(),serviceAccount:'sheets-witness@synthetic-project.iam.gserviceaccount.com',
+      gcloudPath:'/approved/gcloud',journalDirectory:'/approved/journal',outputDirectory:directory,primaryEndpointHash:'d'.repeat(64),
+      publicKey:pair.publicKey.export({type:'spki',format:'pem'}),pinnedFingerprint:pin };
+    const first = preparePackage(input); assert.equal(first.provisioned,false);
+    assert.deepEqual(preparePackage(input),first);
+    assert.equal(fs.statSync(path.join(directory,'support-config.json')).mode & 0o777,0o600);
+    assert.throws(() => preparePackage({...input,datasetId:crypto.randomUUID()}),/existing_file_conflict/);
+  } finally { fs.rmSync(directory,{recursive:true,force:true}); }
+});
+
+test('exact artifact hash preview is a fixed parameterized read with no raw table query', async () => {
+  const m = manifest(), calls = [];
+  const database = await restrictedDatabase({ query: async (sql, params) => {
+    calls.push({sql,params}); return calls.length === 1 ? {rows:[{session_user:'operator',current_user:'operator',support:true}]} :
+      {rows:[{result:{table:'reports',id:m.requestId,hash:m.scopeHash}}]};
+  }});
+  const result = await database.previewArtifact(m.workspaceId,m.connectionId,'reports',m.requestId);
+  assert.deepEqual(result,{table:'reports',id:m.requestId,hash:m.scopeHash});
+  assert.equal(calls.at(-1).sql,'select private.preview_google_sheets_erasure_artifact_v1($1,$2,$3,$4) result');
+  assert.deepEqual(calls.at(-1).params,[m.workspaceId,m.connectionId,'reports',m.requestId]);
+  await assert.rejects(async()=>database.previewArtifact(m.workspaceId,m.connectionId,'reports;delete',m.requestId),/identity/);
+});
+
+test('journal recovery session check rejects another live dedicated-login connection', async () => {
+  let other = 1;
+  const database = await restrictedDatabase({query:async sql=> sql.includes('session_user::text') ?
+    {rows:[{session_user:'operator',current_user:'operator',support:true}]} : {rows:[{other_sessions:other}]}});
+  await assert.rejects(database.assertExclusiveSession(),/other_operator_session/);
+  other=0; await database.assertExclusiveSession();
+});
+
+test('large same-connection expiry splits into500-root requests and defers without losing roots', async () => {
+  const f=cloud(), workspaceId=crypto.randomUUID(), connectionId=crypto.randomUUID();
+  let rows=Array.from({length:1201},(_,i)=>({rootId:`00000000-0000-0000-0000-${String(i).padStart(12,'0')}`,
+    workspaceId,connectionId,expiresAt:completedAt,automaticExpiryAuthorized:true}));
+  const manifests=new Map(), selected=new Map(), batches=[];
+  const database={dueRetention:async cursor=>rows.filter(row=>!cursor||row.rootId>cursor.id).slice(0,100),dueDisconnected:async()=>[],
+    prepareRetention:async input=>{assert(input.rootIds.length<=500);batches.push(input.rootIds.length);selected.set(input.requestId,input.rootIds);
+      const m={...manifest(),requestId:input.requestId,workspaceId,connectionId};manifests.set(input.requestId,m);
+      return{requestId:input.requestId,scopeHash:m.scopeHash,state:'approved'};},
+    getExecution:async id=>manifests.get(id),execute:async id=>{rows=rows.filter(row=>!selected.get(id).includes(row.rootId));manifests.set(id,{...manifests.get(id),completedAt});}};
+  const operator=createOperator({database,journal:localJournal([]),witness:f.witness,publicKey:pair.publicKey,pinnedFingerprint:pin});
+  const first=await operator.dailyExpiry(1);assert.equal(first.processed,1);assert.equal(first.deferred,1);assert.equal(first.inventoryMayHaveMore,true);
+  assert.deepEqual(first.continuation,{roots:null,disconnected:null});
+  const second=await operator.dailyExpiry(1,first.continuation);assert.equal(second.processed,1);assert.equal(second.deferred,1);
+  const third=await operator.dailyExpiry(1,second.continuation);assert.equal(third.processed,1);assert.equal(third.continuation,null);
+  assert.deepEqual(batches,[500,500,201]);assert.equal(rows.length,0);
 });

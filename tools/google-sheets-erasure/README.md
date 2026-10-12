@@ -69,7 +69,7 @@ a completion/withdrawal conflict blocks recovery and restore for investigation.
 Use a private Cloud Storage bucket in the existing owner-approved Google Cloud
 project, outside the application database backup and local journal recovery.
 Provisioning is held for separate approval. No bucket creation, deletion, IAM
-change, lifecycle change, retention locking, or key generation occurs in the CLI.
+change, lifecycle change, retention locking, or automatic key generation occurs in the operator CLI.
 
 The operator verifies at runtime:
 
@@ -104,7 +104,9 @@ Official transport references checked October 12, 2026:
 [IAM permissions](https://docs.cloud.google.com/storage/docs/access-control/iam-roles),
 [retention locking consequences](https://docs.cloud.google.com/storage/docs/bucket-lock),
 [short-lived impersonation](https://docs.cloud.google.com/docs/authentication/use-service-account-impersonation),
-[token command](https://docs.cloud.google.com/sdk/gcloud/reference/auth/print-access-token).
+[token command](https://docs.cloud.google.com/sdk/gcloud/reference/auth/print-access-token),
+[create-only CLI upload](https://docs.cloud.google.com/sdk/gcloud/reference/storage/cp),
+[access-token permission](https://docs.cloud.google.com/iam/docs/service-account-permissions).
 These document provider behavior; synthetic tests do not qualify a live bucket.
 
 ## Private configuration and commands
@@ -307,3 +309,144 @@ TCP listener or live provider calls, and exercises actual migration SQL with a
 native backup/restore and concurrent writer sessions. The cloud adapter is injected
 with an in-memory provider fixture; live Cloud Storage IAM, retention, account
 binding and persistence still need the separately authorized provisioning check.
+
+## Explicit private bootstrap and final provisioning scope
+
+These steps are **pending final owner approval**, not work performed by this change.
+Use one dedicated support workstation and login. The following proposed resource
+names make the approval concrete; bucket availability and the selected storage
+region must be checked before creation:
+
+- Existing project: `vaeroex-integrations-prod`.
+- Private bucket: `vaeroex-integrations-prod-sheets-erasure-witness`; Standard
+  storage in `us-west1`, uniform access,
+  public-access prevention enforced, versioning enabled, no lifecycle rules.
+  No irreversible retention lock is proposed. Record current retention and soft
+  delete metadata, cost ownership, and backup-expiry custody separately.
+- Dedicated keyless identity:
+  `sheets-erasure-witness@vaeroex-integrations-prod.iam.gserviceaccount.com`.
+  A project custom role `SheetsErasureWitnessObjects` contains exactly
+  `storage.buckets.get`, `storage.objects.create`, `storage.objects.get`,
+  `storage.objects.list`, granted only on this bucket. No project-wide Storage role,
+  application access, service-account key, object update/delete, or IAM permission.
+- Isaac's approved operator identity receives only
+  `iam.serviceAccounts.getAccessToken` on that exact service account through a
+  custom impersonation role. The owner verified that IAM Service Account Credentials and Storage APIs are
+  already enabled on project `711446392261`; no API enablement is proposed. The owner
+  performs resource/IAM bootstrap separately; the restricted operator cannot.
+- Production login `google_sheets_erasure_operator`: LOGIN, INHERIT,
+  NOSUPERUSER, NOBYPASSRLS, NOCREATEDB, NOCREATEROLE, NOREPLICATION,
+  `CONNECTION LIMIT 1`; membership only in `google_sheets_erasure_support`, without
+  ADMIN OPTION. Grant CONNECT to the intended database if required. No table,
+  sequence, extra schema, or extra function grants. Supply a unique password through
+  the approved private database credential channel; never paste it into SQL history,
+  source, tickets, or command arguments. Store it only in the approved operator
+  secret store and inject `GOOGLE_SHEETS_ERASURE_DATABASE_URL` for a session.
+- At an actual isolated restore, create a different login on that target only,
+  with the same negative capabilities and connection limit, but membership only
+  in `google_sheets_erasure_restore`. No production restore login is needed now.
+
+After local key initialization is approved, create persistent owner-only directories
+outside the repository and temporary storage. With a private shell umask, run:
+
+```text
+node tools/google-sheets-erasure/bootstrap-cli.cjs key /approved/private/journal
+node tools/google-sheets-erasure/bootstrap-cli.cjs package /approved/private/bootstrap-input.json
+```
+
+`key` is the only explicit key-generation command. It writes the private key solely
+inside the journal and returns only public key/fingerprint. Save those public pins
+privately. It refuses an existing key or nonempty journal; never rerun it as a key
+rotation shortcut. `package` reads a 0600 file with exactly these fields:
+`version: 1`, `bucket`, `datasetId` (fresh UUID), `serviceAccount`, `gcloudPath`,
+`journalDirectory`, `outputDirectory` (existing 0700), `primaryEndpointHash`,
+`publicKey`, `pinnedFingerprint`. Use the exact reviewed database identity hash and
+public key from the preceding command. It writes three 0600 files in that directory:
+`genesis.json`, `support-config.json`, `independent-pins.json`. The package is
+idempotent only when all bytes agree. It does not connect to cloud or database.
+
+Independently retain the public key, dataset, primary endpoint and genesis digest
+outside this bucket and application/local-journal backup. After approved bucket/IAM
+provisioning, upload **only** that exact genesis file, with a create-only generation
+precondition, using the restricted impersonated identity:
+
+```text
+gcloud storage cp /approved/private/bootstrap/genesis.json gs://APPROVED_BUCKET/google-sheets-erasure/DATASET_UUID/genesis.json --if-generation-match=0 --impersonate-service-account=APPROVED_SERVICE_ACCOUNT
+node tools/google-sheets-erasure/operator-cli.cjs /approved/private/bootstrap/support-config.json inventory
+```
+
+An existing genesis is read back and compared byte-for-byte; never overwrite it.
+`inventory` must verify the exact pins, effective restricted IAM, current bucket
+metadata and complete genesis-only inventory before any prepare/expiry run. Retain
+that sanitized live receipt and verify the restricted database login separately.
+After approved deployment, run one authorized synthetic-owner request through
+normal confirmation, exact execute/retry and isolated restore; passing local tests
+alone is not this live qualification. No real customer purge is a bootstrap test.
+
+## Interrupted local journal recovery
+
+Every new journal lock records and fsyncs its host/PID owner before a record write.
+Do not kill a live operator merely to recover a lock, and do not remove `.journal-lock`
+or `.stage-*`. Stop operator dispatch and retain the original directory. Recovery
+requires the recorded writer to be dead on the same host; a missing/foreign owner
+or reused/live PID is a hold for custody investigation. The dedicated DB login must
+have no other session. Current witness inventory must be readable and stable.
+
+```text
+node tools/google-sheets-erasure/operator-cli.cjs /private/config.json journal-inspect
+node tools/google-sheets-erasure/operator-cli.cjs /private/config.json journal-recover /private/recovery-plan.json
+```
+
+The private recovery plan contains exactly `snapshotDigest`, `inventoryDigest`
+from inspection and `destination`, an existing empty 0700 persistent directory.
+Recovery verifies all named signatures, exact conflicts, the original pinned key,
+and independent receipts. It rebuilds only exact verified records in that **new**
+directory. Incomplete staging bytes and the original lock remain untouched as
+custody evidence. A verified receipt can recreate only its exact deterministic
+pending record; it cannot widen targets or create approval. Source snapshot and
+witness inventory are checked again. No destructive SQL or witness mutation runs.
+
+The result is `config-cutover-required`, not resumed execution. Review the retained
+inspection/rebuild evidence, stop all old operator invocations, then update only
+`journalDirectory` in the private config. Reconcile each known pending request with
+`status` and retry the same request or the signed withdrawal process. The due queue
+includes `activeRequest` IDs/scopes, allowing discovery when a daily process died
+after preparation but before printing its result. An unknown lock owner or lost
+signing key remains held; preserve the directory and arrange separately reviewed
+key/custody recovery rather than deleting evidence or generating a replacement key.
+
+## Expiry continuation and recovery queue
+
+Each `daily-expiry` invocation reads at most ten 100-row pages for each due source,
+using the stable expiry/UUID cursor, and executes at most ten requests. Held rows
+are still reported; they do not hide the next page. A result with `continuation`
+contains the exact `{roots, disconnected}` object to save as a 0600 private file:
+
+```text
+node tools/google-sheets-erasure/operator-cli.cjs /private/config.json daily-expiry /private/continuation.json
+```
+
+When eligible work is deferred, the cursor intentionally stays at the same starting
+point until those rows complete; completed rows leave the due inventory. When a
+bounded scan contains only held rows, the next cursor moves beyond them and their
+recovery IDs stay in the retained review queue. Keep all held pages in the support
+case and work their same-request recovery separately. Start each new business day's
+sweep from the beginning so newly due earlier records are not skipped. Run until
+`continuation` is null and deferred work is zero, then resolve any held/backlog alert.
+
+## Exact manual artifact hash preview
+
+After the owner identifies a specific manual/legacy artifact through the normal
+product and the source is disconnected/revoked, retrieve its exact current hash:
+
+```text
+node tools/google-sheets-erasure/operator-cli.cjs /private/config.json artifact-preview WORKSPACE_UUID CONNECTION_UUID TABLE RECORD_UUID
+```
+
+The fixed support RPC validates that workspace/connection and a single allowlisted
+artifact ID. It returns only `{table,id,hash}`; no row contents or general table
+access. It neither classifies the artifact as Google-derived nor approves deletion.
+Record the owner's exact `delete` or `keep_unrelated` decision separately and use
+that hash in preparation. Changes after preview fail the hash check; preview again
+and obtain a fresh review. A full-file original still requires the normal owner
+Storage purge before preparation. An exact preview never bypasses that requirement.

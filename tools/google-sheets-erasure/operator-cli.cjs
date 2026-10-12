@@ -7,7 +7,7 @@ const crypto = require('node:crypto');
 const { execFile } = require('node:child_process');
 const { promisify } = require('node:util');
 const { Client } = require('pg');
-const { openJournal } = require('./journal.cjs');
+const { openJournal, inspectJournalRecovery, rebuildJournal } = require('./journal.cjs');
 const { createGcsWitness } = require('./witness.cjs');
 const { createOperator, restrictedDatabase } = require('./operator.cjs');
 const run = promisify(execFile);
@@ -52,7 +52,7 @@ function endpointHash(connectionString) {
 }
 async function main(argv) {
   const [filename, command, ...args] = argv;
-  if (!['inventory', 'status', 'prepare', 'retention-due', 'prepare-retention', 'daily-expiry', 'execute', 'withdraw', 'restore'].includes(command)) fail('usage_config_inventory_prepare_execute_restore');
+  if (!['inventory', 'status', 'artifact-preview', 'prepare', 'retention-due', 'prepare-retention', 'daily-expiry', 'journal-inspect', 'journal-recover', 'execute', 'withdraw', 'restore'].includes(command)) fail('usage_config_inventory_prepare_execute_restore');
   const config = privateJson(filename);
   if (config.version !== 1 || !['support', 'isolated-restore'].includes(config.purpose) ||
       !/^[a-f0-9]{64}$/.test(config.databaseEndpointHash) || !/^[a-f0-9]{64}$/.test(config.primaryEndpointHash)) fail('configuration');
@@ -85,6 +85,10 @@ async function main(argv) {
   try {
     await client.connect();
     const database = await restrictedDatabase(client, config.purpose);
+    if (command === 'artifact-preview') {
+      if (args.length !== 4) fail('arguments');
+      return await database.previewArtifact(args[0], args[1], args[2], args[3]);
+    }
     if (command === 'status') {
       if (args.length !== 1) fail('arguments');
       return await database.inspectRecovery(args[0]);
@@ -103,12 +107,31 @@ async function main(argv) {
       // the exact stored scope in the authenticated application before execution.
       return await database.prepare(privateJson(args[0]));
     }
+    if (command === 'journal-inspect' || command === 'journal-recover') {
+      await database.assertExclusiveSession();
+      const options = { directory: config.journalDirectory, publicKey: config.publicKey, pinnedFingerprint: config.pinnedFingerprint };
+      const inventory = await witness.inventory();
+      const snapshot = inspectJournalRecovery(options);
+      if (command === 'journal-inspect') {
+        if (args.length) fail('arguments');
+        return { ...snapshot, inventoryDigest: inventory.digest, state: 'inspection-only-source-unchanged' };
+      }
+      if (args.length !== 1) fail('arguments');
+      const plan = privateJson(args[0]);
+      if (Object.keys(plan).sort().join(',') !== 'destination,inventoryDigest,snapshotDigest' || plan.inventoryDigest !== inventory.digest ||
+          plan.snapshotDigest !== snapshot.snapshotDigest) fail('recovery_plan_changed');
+      const result = rebuildJournal(options, { destination: plan.destination, snapshotDigest: plan.snapshotDigest,
+        witnessRecords: inventory.records.map(r => ({ name: `${r.manifest.requestId}.${r.state}.json`, bytes: r.bytes })) });
+      await database.assertExclusiveSession();
+      if ((await witness.inventory()).digest !== inventory.digest) fail('inventory_changed');
+      return { ...result, inventoryDigest: inventory.digest, destination: plan.destination };
+    }
     const journal = command === 'restore' ? null : openJournal({ directory: config.journalDirectory,
       publicKey: config.publicKey, pinnedFingerprint: config.pinnedFingerprint });
     const operator = createOperator({ database, journal, witness, publicKey: config.publicKey, pinnedFingerprint: config.pinnedFingerprint });
     if (command === 'daily-expiry') {
-      if (args.length) fail('arguments');
-      return await operator.dailyExpiry();
+      if (args.length > 1) fail('arguments');
+      return await operator.dailyExpiry(10, args[0] ? privateJson(args[0]) : undefined);
     }
     if (command === 'withdraw') {
       if (args.length !== 4) fail('arguments');

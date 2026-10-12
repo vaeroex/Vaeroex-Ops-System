@@ -9,7 +9,7 @@ const path = require('node:path');
 const { test } = require('node:test');
 const {
   TABLES, normalizeManifest, publicKeyFingerprint, signManifest, verifyRecord,
-  generateJournalKey, openJournal
+  generateJournalKey, openJournal, inspectJournalRecovery, rebuildJournal
 } = require('../tools/google-sheets-erasure/journal.cjs');
 
 const KEY_FILE = 'ed25519-private.pem';
@@ -59,6 +59,7 @@ function fixture(run) {
     },
     readdirSync: filename => { event('readdir', filename); return fs.readdirSync(toReal(filename)); },
     mkdirSync: (filename, options) => { event('mkdir', filename); return fs.mkdirSync(toReal(filename), options); },
+    unlinkSync: filename => fs.unlinkSync(toReal(filename)),
     rmdirSync: filename => { event('rmdir', filename); return fs.rmdirSync(toReal(filename)); },
     openSync: (filename, flags, mode) => {
       event('open', filename, { flags, mode });
@@ -369,7 +370,7 @@ for (const phase of ['pending', 'completed']) {
       let renamed = false, fired = false, followingSql = 0;
       f.hook = event => {
         if (event.op === 'rename') renamed = true;
-        const hit = (interruption === 'write' && event.op === 'write') ||
+        const hit = (interruption === 'write' && event.op === 'write' && event.name.includes('.stage-')) ||
           (interruption === 'file-fsync' && event.op === 'fsync-file' && event.name.includes('.stage-')) ||
           (interruption === 'rename' && event.op === 'rename') ||
           (interruption === 'parent-fsync' && renamed && event.op === 'fsync-directory');
@@ -433,4 +434,58 @@ test('withdrawal receipt retains the exact intent and rejects completion or rela
   assert.throws(() => f.journal.writeCompletedReceipt({ ...m, completedAt: COMPLETED_AT }), /withdrawal_conflict/);
   assert.throws(() => f.journal.writeWithdrawalReceipt({ ...withdrawn, withdrawal: { ...withdrawn.withdrawal, reason: 'scope_changed' } }), /conflict/);
   assert.throws(() => normalizeManifest({ ...withdrawn, withdrawal: { ...withdrawn.withdrawal, intentDigest: 'not-a-hash' } }), /withdrawal/);
+}));
+
+test('stopped-writer recovery preserves original lock/staging evidence and rebuilds exact records elsewhere', () => fixture(f => {
+  f.initialize();
+  const input = manifest({ version: 2 }); input.targets = input.targets.map(item => ({ ...item, hash: 'a'.repeat(64) }));
+  f.journal.writePending(input);
+  let hit = false;
+  f.hook = event => { if (!hit && event.op === 'write' && event.name.includes('.stage-')) { hit = true; throw Error('synthetic-power-loss'); } };
+  assert.throws(() => f.journal.writeCompletedReceipt({ ...input, completedAt: COMPLETED_AT }), /power-loss/);
+  f.hook = null;
+  f.adapter.isAlive = () => true;
+  assert.throws(() => inspectJournalRecovery(f.options, f.adapter), /writer_alive/);
+  f.adapter.isAlive = () => false;
+  const snapshot = inspectJournalRecovery(f.options, f.adapter);
+  assert.equal(snapshot.incompleteStagesRetained, 1);
+  const before = fs.readdirSync(f.toReal(f.directory)).sort();
+  const destination = '/journal-test/rebuilt'; fs.mkdirSync(f.toReal(destination), { mode: 0o700 });
+  assert.throws(() => rebuildJournal(f.options, { destination, snapshotDigest: '0'.repeat(64), witnessRecords: [] }, f.adapter), /journal_changed/);
+  const result = rebuildJournal(f.options, { destination, snapshotDigest: snapshot.snapshotDigest, witnessRecords: [] }, f.adapter);
+  assert.equal(result.sourcePreserved, true); assert.equal(result.activation, 'config-cutover-required');
+  assert.deepEqual(fs.readdirSync(f.toReal(f.directory)).sort(), before);
+  assert.equal(inspectJournalRecovery(f.options, f.adapter).snapshotDigest, snapshot.snapshotDigest);
+  const rebuilt = openJournal({ ...f.options, directory: destination }, f.adapter);
+  assert.deepEqual(rebuilt.listRecords().map(r => r.manifest), [normalizeManifest(input)]);
+  rebuilt.writeCompletedReceipt({ ...input, completedAt: COMPLETED_AT });
+  assert.equal(rebuilt.listRecords().length, 2);
+  assert.throws(() => f.journal.writePending(input), /recovery_required/);
+}));
+
+test('journal recovery rejects unknown writer identity and conflicting independent records', () => fixture(f => {
+  f.initialize(); const input = manifest({ version: 2 }); input.targets = input.targets.map(item => ({ ...item, hash: 'a'.repeat(64) }));
+  f.journal.writePending(input);
+  const lock = f.toReal(`${f.directory}/.journal-lock`); fs.mkdirSync(lock, { mode: 0o700 });
+  assert.throws(() => inspectJournalRecovery(f.options, f.adapter), /owner_unknown/);
+  fs.writeFileSync(path.join(lock, 'owner.json'), JSON.stringify({ version: 1, hostname: os.hostname(), pid: process.pid, createdAt: COMPLETED_AT }), { mode: 0o600 });
+  f.adapter.isAlive = () => false;
+  const snapshot = inspectJournalRecovery(f.options, f.adapter), destination = '/journal-test/rebuilt';
+  fs.mkdirSync(f.toReal(destination), { mode: 0o700 });
+  const key = crypto.createPrivateKey(fs.readFileSync(f.toReal(`${f.directory}/${KEY_FILE}`)));
+  const bytes = signManifest({ ...input, scopeHash: 'b'.repeat(64) }, key);
+  assert.throws(() => rebuildJournal(f.options, { destination, snapshotDigest: snapshot.snapshotDigest,
+    witnessRecords: [{ name: `${input.requestId}.pending.json`, bytes }] }, f.adapter), /conflict/);
+  assert.deepEqual(fs.readdirSync(f.toReal(destination)), []);
+}));
+
+test('journal recovery consults the real host process table before accepting a stopped writer', () => fixture(f => {
+  f.initialize(); const lock=f.toReal(`${f.directory}/.journal-lock`); fs.mkdirSync(lock,{mode:0o700});
+  const owner={version:1,hostname:os.hostname(),pid:process.pid,createdAt:COMPLETED_AT};
+  fs.writeFileSync(path.join(lock,'owner.json'),JSON.stringify(owner),{mode:0o600});
+  assert.throws(()=>inspectJournalRecovery(f.options,f.adapter),/writer_alive/);
+  const child=require('node:child_process').spawnSync(process.execPath,['-e','process.stdout.write(String(process.pid))'],{encoding:'utf8',timeout:5000});
+  assert.equal(child.status,0); owner.pid=Number(child.stdout); assert(Number.isSafeInteger(owner.pid));
+  fs.writeFileSync(path.join(lock,'owner.json'),JSON.stringify(owner));
+  assert.equal(inspectJournalRecovery(f.options,f.adapter).writerConfirmedStopped,true);
 }));
