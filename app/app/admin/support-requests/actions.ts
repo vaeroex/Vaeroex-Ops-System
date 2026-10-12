@@ -10,7 +10,7 @@ export async function manageSupportRequestAction(formData: FormData): Promise<Su
   if (!input) return { ok: false, message: "Choose 1–50 valid requests and a supported action, then try again." };
 
   // The service-only RPC commits the mutation, admin.<action>_support_request
-  // security event and idempotency receipt together. Source: admin_support_request_action.
+  // workspace-scoped security events and idempotency receipt together. Source: admin_support_request_action.
   // This includes admin.update_support_request. Request bodies never enter audit metadata.
   const { data, error } = await admin.rpc("admin_manage_support_requests_v1", {
     p_actor_user_id: user.id,

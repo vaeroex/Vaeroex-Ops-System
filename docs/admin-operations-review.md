@@ -14,7 +14,7 @@ The hosted review fixture renders these actual UI components with synthetic data
 
 The migration adds service-role-only, SECURITY INVOKER RPCs and explicit nested scalar/enum allowlists. Its helpers and operation receipts occupy a dedicated `admin_telemetry` schema. Existing denial of API-role access to the integration `private` schema remains unchanged. Each reusable server loader independently checks the existing platform-admin authorization. Usage and Trust never fall back to fetching raw JSON when their RPC is unavailable. Unsupported or missing financial data is unavailable, uncertain, or unknown rather than silently zero.
 
-No customer prompts, answers, chat titles, summaries, Business Note/file contents, research queries, full research URLs, or raw provider payloads are returned by the admin telemetry RPCs. Support messages are excluded from the inbox list and load only through a separately authorized action when a request is expanded. Audit metadata contains actor, operation, request IDs and counts, not message bodies.
+No customer prompts, answers, chat titles, summaries, Business Note/file contents, research queries, full research URLs, or raw provider payloads are returned by the admin telemetry RPCs. Support messages are excluded from the inbox list and load only through a separately authorized action when a request is expanded. Audit metadata contains actor, operation, request IDs and counts, not message bodies. Each affected workspace receives its own audit row containing only its local requested/changed IDs and counts; the existing manager-read RLS exposes it only to authorized administrators of that workspace. Truly unassigned requests remain in an admin-only null-workspace row. The aggregate batch result and no-op receipts stay service-only. All rows, audit groups and the retry receipt commit atomically.
 
 ## Accounting and measurement limits
 
@@ -33,7 +33,7 @@ No customer prompts, answers, chat titles, summaries, Business Note/file content
 
 `ADMIN_METRICS_PG_BIN=/path/to/postgres/bin node scripts/admin-metrics-database-tests.cjs` creates a disposable local Unix-socket-only database and refuses hosted database configuration. It exercises aggregates beyond 6,000 rows, precision/uncertainty, VSI deduplication, periods and workspace scope, malicious nested metadata, ordinary-role denial, support concurrency/replay, and audit-failure rollback. CI also replays the canonical migration sequence and runs existing security, VSI, integration and application checks. All provider responses used by these tests are synthetic.
 
-## Remaining production release (separate approval)
+## Production release procedure
 
 1. Review and merge the tested PR through normal CI. Preserve the existing `main` auto-deployment hold.
 2. Take the normal protected database backup, verify the production project and migration history, and apply **only** `20261012091842_admin_usage_trust_support_telemetry.sql` after `20261012082738_pre_checkout_legal_entitlement_boundary.sql`. No older migrations need replaying in production.

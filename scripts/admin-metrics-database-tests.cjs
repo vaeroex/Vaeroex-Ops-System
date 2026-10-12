@@ -16,6 +16,83 @@ function cmd(name,args) { const result=spawnSync(path.join(bin,name),args,{encod
 async function connect() { const c=new Client({...config,ssl:false,statement_timeout:15000}); c.on('error',()=>{}); await c.connect();clients.push(c);return c; }
 function equal(name,value,expected) { assert.deepEqual(value,expected,name); checks.push(name); }
 async function rejects(name,operation,code) { await assert.rejects(operation,error=>error.code===code,name);checks.push(name); }
+// Use the repository's actual audit SELECT policy and authorization helpers,
+// not a service-role query with an application-side workspace filter.
+async function auditVisibilityFixture(c) {
+ const base=fs.readFileSync(path.join(root,'supabase/migrations/202606170001_phase_1_schema_rls.sql'),'utf8');
+ const audit=fs.readFileSync(path.join(root,'supabase/migrations/202607080003_security_audit_service_events.sql'),'utf8');
+ await c.query(`create schema auth;
+ create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
+ grant usage on schema auth to authenticated;
+ grant execute on function auth.uid() to authenticated;
+ create table workspace_members(workspace_id uuid,user_id uuid,role text,status text);
+ alter table security_audit_events enable row level security;
+ grant select on security_audit_events to authenticated;`);
+ for(const name of ['workspace_member_role','has_workspace_role','can_edit_operations']) {
+  const sql=base.match(new RegExp('create or replace function public\\.'+name+'\\([\\s\\S]*?\\n\\$\\$;'))?.[0];
+  assert(sql,`Missing authoritative helper ${name}`);await c.query(sql);
+ }
+ const policy=audit.match(/create policy "security audit events managers read"[\s\S]*?;/)?.[0];
+ assert(policy,'Missing authoritative audit SELECT policy');await c.query(policy);
+ await c.query(`insert into profiles(id) select ('44444444-4444-4444-8444-'||lpad(n::text,12,'0'))::uuid from generate_series(901,907) n;
+ insert into workspace_members(workspace_id,user_id,role,status) values
+ ('${A}','${uuid(901)}','manager','active'),('${A}','${uuid(902)}','admin','active'),('${B}','${uuid(903)}','owner','active'),
+ ('${A}','${uuid(904)}','staff','active'),('${B}','${uuid(905)}','staff','active'),('${A}','${uuid(907)}','manager','disabled');`);
+}
+async function auditTenantTests(c) {
+ await c.query(`insert into support_requests(id,workspace_id,name,email,message,deleted_at,status) values
+ ('${uuid(401)}','${A}','Synthetic A1','a1@example.invalid','PRIVATE_SENTINEL',null,'open'),
+ ('${uuid(402)}','${A}','Synthetic A2','a2@example.invalid','PRIVATE_SENTINEL',null,'open'),
+ ('${uuid(403)}','${B}','Synthetic B1','b1@example.invalid','PRIVATE_SENTINEL',null,'open'),
+ ('${uuid(404)}',null,'Synthetic unassigned','none@example.invalid','PRIVATE_SENTINEL',null,'open'),
+ ('${uuid(405)}','${A}','Synthetic deleted','deleted@example.invalid','PRIVATE_SENTINEL',now(),'closed'),
+ ('${uuid(406)}','${A}','Synthetic rollback A','rollback-a@example.invalid','PRIVATE_SENTINEL',null,'open'),
+ ('${uuid(407)}','${B}','Synthetic rollback B','rollback-b@example.invalid','PRIVATE_SENTINEL',null,'open'),
+ ('${uuid(408)}',null,'Synthetic rollback unassigned','rollback-none@example.invalid','PRIVATE_SENTINEL',null,'open');`);
+ const mixedIds=[uuid(401),uuid(402),uuid(403),uuid(404),uuid(405),uuid(999)];
+ const operation=uuid(701);
+ const mixed=await support(c,mixedIds,'delete',operation);
+ equal('mixed-workspace receipt retains the aggregate service-only result',mixed,{changed_count:4,changed_ids:[uuid(401),uuid(402),uuid(403),uuid(404)],requested_count:6,replayed:false});
+ const auditRows=await c.query('select workspace_id,user_id,action_name,request_id,metadata_json from security_audit_events where request_id=$1 order by workspace_id nulls last',[operation]);
+ equal('mixed batch produces one audit row per actual affected workspace',auditRows.rows.map(row=>row.workspace_id),[A,B,null]);
+ const expectedMeta=(requested,changed)=>({source:'admin_support_request_action',requested_ids:requested,affected_ids:changed,requested_count:requested.length,changed_count:changed.length});
+ const expected=[expectedMeta([uuid(401),uuid(402),uuid(405)],[uuid(401),uuid(402)]),expectedMeta([uuid(403)],[uuid(403)]),expectedMeta([uuid(404)],[uuid(404)])];
+ equal('audit IDs and counts are local to each affected workspace',auditRows.rows.map(row=>row.metadata_json),expected);
+ equal('audit groups record exact actor action and operation',auditRows.rows.every(row=>row.user_id===U&&row.action_name==='admin.delete_support_request'&&row.request_id===operation),true);
+ equal('scoped audit metadata contains no support contents',JSON.stringify(auditRows.rows).includes('PRIVATE_SENTINEL'),false);
+ equal('mixed operation retry returns original receipt',(await support(c,[...mixedIds].reverse(),'delete',operation)).replayed,true);
+ equal('mixed retry does not create duplicate audit groups',(await c.query('select count(*)::int n from security_audit_events where request_id=$1',[operation])).rows[0].n,3);
+ // Reads below execute the actual RLS policy as authenticated, with only a JWT
+ // subject. They do not filter by workspace, so foreign rows would be detected.
+ for(const [actor,visible,label] of [[901,[A],'workspace A manager'],[902,[A],'workspace A administrator'],[903,[B],'workspace B owner'],[904,[],'workspace A staff'],[905,[],'workspace B staff'],[906,[],'nonmember outsider'],[907,[],'disabled manager']]) {
+  await c.query('reset role');await c.query("select set_config('request.jwt.claim.sub',$1,false)",[uuid(actor)]);await c.query('set role authenticated');
+  const visibleRows=(await c.query('select workspace_id,metadata_json from security_audit_events where request_id=$1',[operation])).rows;
+  equal(`${label} audit RLS visibility`,visibleRows.map(row=>row.workspace_id),visible);
+  equal(`${label} sees no foreign IDs counts or private null bucket`,visibleRows.map(row=>row.metadata_json),visible.map(workspace=>expected[workspace===A?0:1]));
+  await rejects(`${label} cannot read aggregate receipt`,()=>c.query('select * from admin_telemetry.admin_support_operation_receipts where operation_id=$1',[operation]),'42501');
+ }
+ await c.query('reset role');await c.query('set role service_role');
+ const noop=await support(c,mixedIds,'delete',uuid(702));
+ equal('mixed no-op reports no changed requests',[noop.changed_count,noop.requested_count],[0,6]);
+ equal('mixed no-op creates no invented audit workspace',(await c.query('select count(*)::int n from security_audit_events where request_id=$1',[uuid(702)])).rows[0].n,0);
+ equal('mixed no-op has one durable service receipt',(await c.query('select count(*)::int n from admin_telemetry.admin_support_operation_receipts where operation_id=$1',[uuid(702)])).rows[0].n,1);
+ equal('missing request alone does not count as changed',(await support(c,[uuid(999)],'delete',uuid(703))).changed_count,0);
+ equal('missing request has no null-workspace audit',(await c.query('select count(*)::int n from security_audit_events where request_id=$1',[uuid(703)])).rows[0].n,0);
+ const c2=await connect();await c2.query('set role service_role');
+ const restoring=[uuid(401),uuid(402),uuid(403),uuid(404)];
+ const concurrent=await Promise.all([support(c,restoring,'restore',uuid(704)),support(c2,[...restoring].reverse(),'restore',uuid(704))]);
+ equal('concurrent mixed-workspace retry commits once',concurrent.map(row=>row.replayed).sort(),[false,true]);
+ equal('concurrent mixed restore preserves original aggregate count',concurrent.map(row=>row.changed_count),[4,4]);
+ equal('concurrent mixed restore writes three audit groups once',(await c.query('select count(*)::int n from security_audit_events where request_id=$1',[uuid(704)])).rows[0].n,3);
+ // Fail only workspace B's audit after the ordered workspace A audit. The
+ // entire operation must roll back, including A's event and all lifecycle rows.
+ await c.query('reset role');await c.query(`alter table security_audit_events add constraint synthetic_one_group_reject check(request_id<>'${uuid(705)}' or workspace_id is distinct from '${B}'::uuid)`);await c.query('set role service_role');
+ await rejects('one workspace audit failure rolls back whole mixed batch',()=>support(c,[uuid(406),uuid(407),uuid(408)],'delete',uuid(705)),'23514');
+ equal('failed audit group restores all workspaces lifecycle',(await c.query('select count(*)::int n from support_requests where id=any($1) and deleted_at is null and status=$2',[[uuid(406),uuid(407),uuid(408)],'open'])).rows[0].n,3);
+ equal('failed audit group removes earlier workspace event',(await c.query('select count(*)::int n from security_audit_events where request_id=$1',[uuid(705)])).rows[0].n,0);
+ equal('failed audit group creates no durable receipt',(await c.query('select count(*)::int n from admin_telemetry.admin_support_operation_receipts where operation_id=$1',[uuid(705)])).rows[0].n,0);
+}
+
 async function fixture(c) {
  await c.query(`create role anon;create role authenticated;create role service_role bypassrls;create schema private;
  create table private.synthetic_private_guard(id integer);
@@ -45,6 +122,7 @@ async function fixture(c) {
  insert into ai_agent_runs(workspace_id,agent_type,status,created_at) values('${A}','file_analysis','completed','2026-10-05Z'),('${B}','intelligence_briefing_v1','completed','2026-10-05Z'),('${A}','retired_workflow','completed','2026-10-05Z');
  insert into reports(workspace_id,report_type,source_data_json,created_at) select '${A}','Saved Analysis','{"record_kind":"saved_analysis","analysis_type":"finding_explanation","answer":"PRIVATE_SENTINEL"}','2026-10-05Z' from generate_series(1,6002);
  insert into support_requests(id,workspace_id,name,email,message) select ('44444444-4444-4444-8444-'||lpad(n::text,12,'0'))::uuid,'${A}','Synthetic','test@example.invalid','PRIVATE_SENTINEL' from generate_series(201,270) n;`);
+ await auditVisibilityFixture(c);
  const beforePrivate=(await c.query("select role,has_schema_privilege(role,'private','USAGE') usage,has_schema_privilege(role,'private','CREATE') create_privilege from unnest(array['anon','authenticated','service_role']) role order by role")).rows;
  equal('all API roles start without private schema usage or create',beforePrivate.every(row=>!row.usage&&!row.create_privilege),true);
  await c.query(migration);
@@ -152,6 +230,7 @@ async function tests(c) {
  await rejects('audit failure rolls back lifecycle mutation',()=>support(c,[uuid(207)],'delete',uuid(313)),'23514');
  equal('failed atomic operation retains original lifecycle',(await c.query('select deleted_at from support_requests where id=$1',[uuid(207)])).rows[0].deleted_at,null);
  equal('failed atomic operation has no receipt',(await c.query('select count(*)::int n from admin_telemetry.admin_support_operation_receipts where operation_id=$1',[uuid(313)])).rows[0].n,0);
+ await auditTenantTests(c);
  await c.query(`insert into ai_usage(workspace_id,agent_type,created_at,status,input_tokens) values('${A}','file_analysis','2026-10-05Z','completed',0),('${A}','file_analysis','2026-10-05Z','completed',10);insert into vsi_cost_events(workspace_id,request_id,occurred_at,cost_usd,usage_json) values('${A}','${uuid(1)}','2026-10-05Z',0.5,'{}');`);
  const missing=await snapshot(c);
  equal('missing and rounded legacy zero costs are unknown rather than confirmed free',missing.totals.unknownCostCount,3);

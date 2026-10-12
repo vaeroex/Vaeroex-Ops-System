@@ -166,12 +166,23 @@ begin
  or (p_action='archive' and deleted_at is null and archived_at is null)
  or (p_action='restore' and (deleted_at is not null or archived_at is not null))
  or (p_action='update' and archived_at is null and deleted_at is null and (status is distinct from p_status or priority is distinct from p_priority)))
+ returning id,workspace_id),
+ -- Workspace administrators can read their workspace's audit rows. Use the
+ -- actual locked/returned workspace and only its local IDs/counts, never the
+ -- cross-workspace batch. NULL is reserved for truly unassigned requests.
+ -- A no-op has no affected workspace; its result remains in the private receipt.
+ audited as (
+ insert into public.security_audit_events(workspace_id,user_id,action_name,operation_type,target_table,initiated_by,required_confirmation,confirmation_received,allowed,request_id,metadata_json)
+ select c.workspace_id,p_actor_user_id,'admin.'||p_action||'_support_request','ADMIN','support_requests','user',true,true,true,p_operation_id::text,
+ jsonb_build_object('source','admin_support_request_action',
+ 'requested_ids',(select jsonb_agg(s.id order by s.id) from public.support_requests s where s.id=any(v_ids) and s.workspace_id is not distinct from c.workspace_id),
+ 'affected_ids',jsonb_agg(c.id order by c.id),
+ 'requested_count',(select count(*) from public.support_requests s where s.id=any(v_ids) and s.workspace_id is not distinct from c.workspace_id),
+ 'changed_count',count(*))
+ from changed c group by c.workspace_id order by c.workspace_id nulls last
  returning id)
  select coalesce(array_agg(id order by id),'{}'::uuid[]) into v_changed from changed;
  v_result:=jsonb_build_object('changed_count',cardinality(v_changed),'changed_ids',to_jsonb(v_changed),'requested_count',cardinality(v_ids),'replayed',false);
- insert into public.security_audit_events(workspace_id,user_id,action_name,operation_type,target_table,initiated_by,required_confirmation,confirmation_received,allowed,request_id,metadata_json)
- values(null,p_actor_user_id,'admin.'||p_action||'_support_request','ADMIN','support_requests','user',true,true,true,p_operation_id::text,
- jsonb_build_object('source','admin_support_request_action','requested_ids',to_jsonb(v_ids),'affected_ids',to_jsonb(v_changed),'requested_count',cardinality(v_ids),'changed_count',cardinality(v_changed)));
  insert into admin_telemetry.admin_support_operation_receipts(actor_user_id,operation_id,arguments,result) values(p_actor_user_id,p_operation_id,v_args,v_result);
  return v_result;
 end;
