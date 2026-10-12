@@ -1,4 +1,5 @@
 import { headers } from "next/headers";
+import Link from "next/link";
 import { PageHeader } from "@/components/operations/PageHeader";
 import { customerConnectionStatus } from "@/lib/integrations/control-plane/customer-status";
 import { qboProductionCustomerConnectionsEnabled } from "@/lib/integrations/control-plane/qbo-customer-availability";
@@ -6,6 +7,7 @@ import { readSquareWorkspaceEvidence } from "@/lib/integrations/control-plane/sq
 import { squareDirectEnabled, squareDirectView, squareSettingsPath } from "@/lib/integrations/square-direct/server";
 import type { DirectView } from "@/lib/integrations/square-direct/contracts";
 import { sheetsEnabled } from "@/lib/integrations/google-sheets/server";
+import { GOOGLE_SHEETS_PILOT } from "@/lib/integrations/google-sheets/availability";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
 import { ProviderCard } from "./_ProviderCard";
 import { readQuickBooksStatus } from "./_qbo";
@@ -53,10 +55,12 @@ export default async function IntegrationsPage() {
           {qboEnabled ? <ProviderCard name="QuickBooks Online" description="Accounting connections and stored financial data."
             statuses={!qbo ? ["Status unavailable"] : qboStatuses?.length ? [...new Set(qboStatuses)] : ["Not connected"]}
             href="/app/settings/integrations/quickbooks" action={owner && qbo && !qbo.connections.length ? "Connect QuickBooks" : "Manage QuickBooks"} /> : null}
-          {googleSheetsEnabled || owner ? <ProviderCard name="Google Sheets" description="Approved spreadsheet metrics with Sync now and automatic refresh every 15 minutes."
+          {googleSheetsEnabled || owner ? <ProviderCard name="Google Sheets" description={GOOGLE_SHEETS_PILOT.catalog}
             statuses={!googleSheetsEnabled ? ["Configuration required"] : googleSheets?.error ? ["Status unavailable"] : googleSheets?.data?.length ? [...new Set(googleSheets.data.map((connection) =>
               connection.revocation_pending ? "Disconnect needs another attempt" : connection.authorization_uncertain ? "Authorization needs recovery" : connection.status === "connected" ? connection.active_approval_id ? "Connected" : "Mapping needs approval" : connection.status === "reauthorization_required" ? "Reauthorization required" : connection.status === "pending_authorization" ? "Waiting for Google authorization" : "Disconnected"))] : ["Not connected"]}
-            href="/app/settings/integrations/google-sheets" action={googleSheetsEnabled ? "Manage Google Sheets" : "View Google Sheets setup"} /> : null}
+            href="/app/settings/integrations/google-sheets" action={googleSheetsEnabled ? "Manage Google Sheets" : "View Google Sheets setup"}>
+            <Link href="/app/sources" className="text-sm font-semibold text-vaeroex-blue underline underline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">Upload spreadsheet files instead</Link>
+          </ProviderCard> : null}
           {squareEvidence ? <ProviderCard name="Square Sandbox" description="Verified non-economic observations."
             statuses={["Sync health unknown"]} href="/app/integrations/square" action="View Square Sandbox" /> : null}
         </div>

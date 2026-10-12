@@ -102,6 +102,9 @@ async function main() {
     for (const width of [1440, 390]) {
       await page.setViewportSize({ width, height: 950 });
       await page.goto(`${origin}/connected`);
+      assert(await page.getByRole("complementary", { name: "Google Sheets availability" }).isVisible());
+      assert(await page.getByRole("link", { name: "Upload supported spreadsheet files in Files & Notes" }).isVisible());
+      assert(await page.getByText("While the pilot remains in Google Testing, you may need to reconnect after seven days.", { exact: true }).isVisible());
       assert.equal(await page.getByRole("button", { name: "Sync now", exact: true }).count(), 1);
       assert.equal(await page.getByText("192", { exact: true }).count(), 1);
       assert.equal(await page.locator("dd").filter({ hasText: "Every 15 minutes" }).count(), 1);
@@ -143,6 +146,8 @@ async function main() {
       for (const mode of ["connect", "reconnect"]) {
         authorizationPosts = 0;
         await page.goto(`${origin}/${mode}`);
+        assert(await page.getByText("Google Sheets limited pilot.", { exact: true }).isVisible());
+        assert(await page.getByText(/Your Google account must be an approved test user to connect/).isVisible());
         await page.getByRole("button", { name: mode === "connect" ? "Connect Google Sheets" : "Reconnect Google Sheets" }).click();
         await page.getByRole("button", { name: "Opening Google…" }).waitFor();
         await page.locator("form").evaluate(form => form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));

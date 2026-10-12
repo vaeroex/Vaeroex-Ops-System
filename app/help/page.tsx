@@ -4,6 +4,7 @@ import type { Route } from "next";
 import { ArrowRight, LifeBuoy, Mail } from "lucide-react";
 import { PublicFooter } from "@/components/legal/PublicFooter";
 import { PublicSiteHeader } from "@/components/legal/PublicSiteHeader";
+import { GoogleSheetsPilotNotice } from "@/components/integrations/google-sheets/GoogleSheetsPilotNotice";
 import { PublicPageHero, PublicSectionHeading } from "@/components/marketing/PublicPagePrimitives";
 import { VAEROEX_CONTACT_EMAILS, VAEROEX_MAILTO_LINKS } from "@/lib/contact/emails";
 import { publicPageMetadata } from "@/lib/seo/public-seo";
@@ -62,6 +63,7 @@ export default async function PublicHelpPage() {
       <section className="border-b border-white/10 bg-[#050b18] px-5 py-14 sm:px-6 sm:py-16">
         <div className="mx-auto max-w-7xl">
           <PublicSectionHeading eyebrow="Help by task" title="Start with what you need to accomplish." />
+          <GoogleSheetsPilotNotice className="mt-5 text-slate-300" showReconnect />
           <div className="mt-7 grid gap-3 md:grid-cols-2">
             {categories.map((category) => (
               <details key={category.title} className="group rounded-lg border border-white/10 bg-white/[0.035] px-4 py-3">

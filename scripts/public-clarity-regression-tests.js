@@ -540,6 +540,10 @@ async function main() {
       `Image must be meaningful and bounded below 900 KB: ${asset}`,
     );
   }
+  assert.match(pricing, /Google Sheets limited pilot/);
+  assert.match(pricing, /Google account must be an approved test user/);
+  assert.match(pricing, /paid Vaeroex subscription does not grant pilot access/);
+  assert.match(pricing, /href="\/app\/sources"[^>]*>Upload supported spreadsheet files/);
   process.stdout.write(
     "Public clarity rendering, commerce, availability, and fallback regressions passed.\n",
   );

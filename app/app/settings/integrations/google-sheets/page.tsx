@@ -3,6 +3,7 @@ import { ArrowLeft, ExternalLink } from "lucide-react";
 
 import { AuthMessage } from "@/components/auth/AuthMessage";
 import { GoogleSheetsAuthorizationForm } from "@/components/integrations/google-sheets/GoogleSheetsAuthorizationForm";
+import { GoogleSheetsPilotNotice } from "@/components/integrations/google-sheets/GoogleSheetsPilotNotice";
 import { GoogleSheetsMappingEditor } from "@/components/integrations/google-sheets/GoogleSheetsMappingEditor";
 import { googleSheetsErrorMessage, googleSheetsResults, googleSheetsReviewReason } from "@/components/integrations/google-sheets/status";
 import { PageHeader } from "@/components/operations/PageHeader";
@@ -55,6 +56,7 @@ export default async function GoogleSheetsSettingsPage({ searchParams }: PagePro
     <PageHeader eyebrow="Integrations" title="Google Sheets" description="Keep Executive Intelligence up to date with the business metrics you approve."
       actions={<Link href="/app/integrations" title="Back to integrations" aria-label="Back to integrations" className="inline-flex h-11 w-11 items-center justify-center rounded-md border border-line bg-white text-ink hover:bg-slate-50"><ArrowLeft aria-hidden="true" className="h-4 w-4" /></Link>} />
     <div role={error ? "alert" : "status"}><AuthMessage message={result && Object.hasOwn(googleSheetsResults, result) ? googleSheetsResults[result] : undefined} error={googleSheetsErrorMessage(error) ?? undefined} /></div>
+    <GoogleSheetsPilotNotice showReconnect className="border-y border-line py-3 text-slate-600" />
     <SectionCard title={enabled ? "Read only connection" : "Google Sheets is not available yet"}>
       <div className="space-y-2 text-sm leading-6 text-slate-600">
         {!enabled ? <p>The connector is disabled until the Google connection configuration is complete.</p> : null}

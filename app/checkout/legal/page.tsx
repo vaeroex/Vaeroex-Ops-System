@@ -5,6 +5,7 @@ import { ShieldCheck } from "lucide-react";
 import { acceptPreCheckoutLegalPoliciesAction } from "@/app/checkout/legal/actions";
 import { PublicFooter } from "@/components/legal/PublicFooter";
 import { PublicSiteHeader } from "@/components/legal/PublicSiteHeader";
+import { GoogleSheetsPilotNotice } from "@/components/integrations/google-sheets/GoogleSheetsPilotNotice";
 import { VAEROEX_PLAN_PRICE_LABEL } from "@/lib/billing/plans";
 import { VAEROEX_CONTACT_EMAILS, VAEROEX_MAILTO_LINKS } from "@/lib/contact/emails";
 import {
@@ -114,6 +115,8 @@ export default async function CheckoutLegalPage({ searchParams }: CheckoutLegalP
               <a href={VAEROEX_MAILTO_LINKS.billing} className="font-semibold text-vaeroex-blue">{VAEROEX_CONTACT_EMAILS.billing}</a>.
             </p>
           </div>
+
+          <GoogleSheetsPilotNotice className="mt-5 border-y border-line py-4 text-slate-700" />
 
           <form action={acceptPreCheckoutLegalPoliciesAction} className="mt-6 space-y-4">
             <input type="hidden" name="required_policy_hash" value={snapshot.requiredPolicyHash} />

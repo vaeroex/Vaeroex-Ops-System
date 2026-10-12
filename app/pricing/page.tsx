@@ -4,6 +4,7 @@ import { ArrowRight, Check } from "lucide-react";
 import { PublicFooter } from "@/components/legal/PublicFooter";
 import { PublicSiteHeader } from "@/components/legal/PublicSiteHeader";
 import { StartWithVaeroexMenu } from "@/components/legal/StartWithVaeroexMenu";
+import { GoogleSheetsPilotNotice } from "@/components/integrations/google-sheets/GoogleSheetsPilotNotice";
 import { VAEROEX_PLAN_PRICE_LABEL } from "@/lib/billing/plans";
 import {
   VAEROEX_CONTACT_EMAILS,
@@ -117,6 +118,7 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
                       </li>
                     ))}
                   </ul>
+                  <GoogleSheetsPilotNotice className="mt-4" />
                   <p className={styles.billingFine}>
                     Renews monthly unless canceled through Manage billing.
                     Cancellation takes effect at the end of the current paid
