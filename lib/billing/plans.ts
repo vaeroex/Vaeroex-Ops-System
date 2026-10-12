@@ -2,7 +2,7 @@ import type { PlanLimits } from "@/lib/billing/types";
 
 export const VAEROEX_PLAN_SLUG = "vaeroex";
 export const VAEROEX_PLAN_NAME = "Vaeroex";
-export const VAEROEX_PLAN_PRICE_LABEL = "$500/month";
+export const VAEROEX_PLAN_PRICE_LABEL = "$250/month";
 
 export const VAEROEX_PLAN_LIMITS = {
   max_workspaces: 1,
