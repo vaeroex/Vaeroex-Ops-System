@@ -8,7 +8,7 @@ export const LEGAL_DOCUMENT_VERSIONS = {
   acceptableUse: "2026-08-20",
   refundPolicy: "2026-08-20",
   sensitiveData: "2026-08-20",
-  subscriptionBillingTerms: "2026-10-12",
+  subscriptionBillingTerms: "2026-10-12.1",
   dataRetention: "2026-10-12",
   workspaceCapacity: "storage-capacity-v1",
   humanReview: "2026-08-20"
@@ -353,7 +353,7 @@ export const legalDocuments: Record<LegalDocumentId, LegalDocument> = {
     href: "/subscription-billing-terms",
     updated: LEGAL_DOCUMENT_VERSIONS.subscriptionBillingTerms,
     sections: [
-      { title: "Base Plan", body: ["The Vaeroex Executive Intelligence base subscription is $500/month and includes the product's standard features and allowances. Optional workspace capacity is purchased explicitly and billed separately under the Workspace Capacity Terms."] },
+      { title: "Base Plan", body: ["The Vaeroex Executive Intelligence base subscription is $250/month and includes the product's standard features and allowances. Optional workspace capacity is purchased explicitly and billed separately under the Workspace Capacity Terms."] },
       { title: "Vaeroex Checkout", body: ["Vaeroex subscriptions are purchased through Vaeroex checkout, the Vaeroex Direct Website, or official Vaeroex sales channels. Promotions, discounts, and special offers may be available through those same Vaeroex channels."] },
       { title: "Access Matching", body: ["Customers should create their Vaeroex account with the same email used for Vaeroex checkout so subscription access can be matched."] },
       { title: "Manage Billing and Cancellation", body: [`Customers may manage and cancel an eligible subscription through Manage billing in the Stripe Customer Portal. ${VAEROEX_CONTACT_EMAILS.billing} remains available for billing assistance.`] },
