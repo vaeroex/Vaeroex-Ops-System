@@ -11,7 +11,7 @@ Updated October12,2026. Resume PRs #457 (packet) and #458 (implementation), base
 | Callback | `https://www.vaeroex.com/api/integrations/google-sheets/callback` |
 | Scope | Only `https://www.googleapis.com/auth/spreadsheets.readonly`; no Drive scope |
 | Audience/review | External / Testing; Verification Center reports no verification required while Testing; not submitted |
-| Branding | Existing Vaeroex app logo saved October12. Homepage, privacy, terms and authorized `vaeroex.com` domain populated |
+| Branding | Existing Vaeroex app logo saved October12. Homepage, privacy, terms populated. `vaeroex.com` ownership automatically verified from existing DNS in Search Console under isaac@vaeroex.com on October12 |
 | Contact | Google support/developer contact isaac@vaeroex.com; deletion help support@vaeroex.com, monitored daily by Isaac |
 | Application | Current-main paths reconciled in #458; Production deployment hold until exact release approval |
 | Demo | Not recorded/uploaded; authenticated real consent required after deployment |
@@ -29,7 +29,7 @@ Vaeroex Executive Intelligence imports business metrics from a spreadsheet chose
 - support@vaeroex.com is monitored each business day by isaac@vaeroex.com. Acknowledge within2businessdays; target active-system deletion within30calendar days of receipt after verifying authority; explain blockers promptly.
 - Backup and processor retention are separate. Independently retained signed instructions must be replayed into an isolated restored environment before any access/workers resume.
 
-These periods are business choices, not Google-prescribed or approved periods. Final public text is maintained in the application’s privacy/data-retention documents and adjacent consent UI in #458. Do not publish an older generic-provider or indefinite-history draft.
+These periods are business choices, not Google-prescribed or approved periods. Mapping consent separately confirms content ownership or permission from the content owner to store the approved metric/history/source-reference records and create the disclosed analyses. This is the permission basis under Google API Terms section5(e); finite retention alone is not asserted as an exception to copy/cache restrictions. Final public text is maintained in the application’s privacy/data-retention documents and adjacent consent UI in #458. Do not publish an older generic-provider or indefinite-history draft.
 
 ## Processor provenance
 
