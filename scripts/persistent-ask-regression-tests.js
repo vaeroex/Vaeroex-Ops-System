@@ -120,7 +120,10 @@ const tokenPayloadStart = sessionToken.indexOf("type AskSessionTokenPayload");
 const tokenPayloadEnd = sessionToken.indexOf("};", tokenPayloadStart);
 const tokenPayloadSource = sessionToken.slice(tokenPayloadStart, tokenPayloadEnd);
 assert.match(tokenPayloadSource, /originalQuestionHash:\s*string/, "the token may bind a one-way original-question hash");
-assert.doesNotMatch(tokenPayloadSource, /originalQuestion:(?!Hash)|previousAnswer|sessionSummary|evidence|provider/i, "the opaque session token payload must not contain prompts, answers, evidence, or provider data");
+assert.match(tokenPayloadSource, /readTicket:/, "continuation authority must retain the original pre-read ticket");
+assert.match(tokenPayloadSource, /context: AskSessionContext/, "bounded continuation context must be constructed by the server");
+assert.match(sessionToken, /createCipheriv\("aes-256-gcm"[\s\S]*cipher\.setAAD\(TOKEN_AAD\)/, "business context must be authenticated and encrypted rather than exposed in a signed-only token");
+assert.match(route, /analysisRequest = \{ \.\.\.analysisRequest, \.\.\.askSessionContinuationContext\(previousContext\) \}/, "the model must receive server-authenticated context rather than browser summary claims");
 assert.match(sessionToken, /createHmac\("sha256", signingKey\(\)\)[\s\S]*executive-analysis-question/, "the original-question binding must use a keyed digest rather than an exposed plain hash");
 
 const {
@@ -190,16 +193,16 @@ assert.match(compactAnswerForFollowUp(answer), /Revenue is stable/, "answer comp
 assert.ok(buildCompactSessionSummary(storedSession).length <= 2_200, "session context must remain deterministically bounded");
 
 process.env.SUPABASE_SERVICE_ROLE_KEY = "persistent-ask-regression-secret";
-const { issueAskSessionToken, verifyAskSessionToken } = require("../lib/search/ask-session-token.ts");
+const { issueAskSessionToken, nextAskSessionContext, verifyAskSessionToken } = require("../lib/search/ask-session-token.ts");
 const workspaceId = "22222222-2222-4222-8222-222222222222";
 const userId = "33333333-3333-4333-8333-333333333333";
 const originalQuestion = "What should leadership review?";
-const token = issueAskSessionToken({ sessionId, workspaceId, userId, originalQuestion, followUpCount: 0, nowMs: now });
+const token = issueAskSessionToken({ sessionId, workspaceId, userId, originalQuestion, followUpCount: 0, readTicket: { ticketId: "66666666-6666-4666-8666-666666666666", epoch: 1, expiresAt: new Date(now + 30 * 60 * 1000).toISOString() }, context: nextAskSessionContext(answer, originalQuestion), nowMs: now });
 assert.equal(verifyAskSessionToken(token, { sessionId, workspaceId, userId, originalQuestion, previousFollowUpCount: 0 }, now).ok, true, "the server token must authorize the next sequential follow-up");
 assert.equal(verifyAskSessionToken(token, { sessionId, workspaceId, userId: "44444444-4444-4444-8444-444444444444", originalQuestion, previousFollowUpCount: 0 }, now).ok, false, "session authority must not cross users");
 assert.equal(verifyAskSessionToken(token, { sessionId, workspaceId: "55555555-5555-4555-8555-555555555555", userId, originalQuestion, previousFollowUpCount: 0 }, now).ok, false, "session authority must not cross workspaces");
 assert.equal(verifyAskSessionToken(token, { sessionId, workspaceId, userId, originalQuestion: "A different question", previousFollowUpCount: 0 }, now).ok, false, "session authority must remain bound to the original question");
 assert.equal(verifyAskSessionToken(token, { sessionId, workspaceId, userId, originalQuestion, previousFollowUpCount: 1 }, now).ok, false, "the browser cannot forge a later follow-up count");
-assert.equal(verifyAskSessionToken(token, { sessionId, workspaceId, userId, originalQuestion, previousFollowUpCount: 0 }, now + 8 * 60 * 60 * 1000 + 1).ok, false, "expired server authority must not continue a session");
+assert.equal(verifyAskSessionToken(token, { sessionId, workspaceId, userId, originalQuestion, previousFollowUpCount: 0 }, now + 30 * 60 * 1000).ok, false, "expired server authority must not continue a session");
 
 console.log("Persistent Ask Vaeroex regression tests passed.");

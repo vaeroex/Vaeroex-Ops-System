@@ -20,5 +20,5 @@ export async function POST(request: Request) {
     }, access.user.id, access.sessionId);
     return NextResponse.json({ ok: true, authorizationUrl: sheetsAuthorizationUrl(state).toString() },
       { headers: { "cache-control": "no-store", "referrer-policy": "no-referrer" } });
-  } catch { return sheetsFailure(409); }
+  } catch (error) { return sheetsFailure(409, error); }
 }

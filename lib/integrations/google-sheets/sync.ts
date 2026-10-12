@@ -6,13 +6,14 @@ import {
   mappedColumnIndexes, sheetColumn, sheetRange
 } from "./contracts";
 import { normalizeSheetsRows, sheetsSyncErrorCode } from "./ingestion";
-import { sheetsAdmin, sheetsHeaders, sheetsMappedColumns, sheetsMetadata } from "./server";
+import { assertSheetsWorkspaceAllowed, sheetsAdmin, sheetsHeaders, sheetsMappedColumns, sheetsMetadata } from "./server";
 import { assertSheetsTimeRemaining, withSheetsRequest, type SheetsAbortableResult, type SheetsExecutionBudget } from "./execution";
 
 export async function runSheetsSync(input: {
   workspaceId: string; connectionId: string; actorId: string | null; sessionId: string | null;
   trigger: "manual" | "scheduled"; execution?: SheetsExecutionBudget; admission?: SheetsScheduledAdmission;
 }) {
+  assertSheetsWorkspaceAllowed(input.workspaceId);
   const startedAt = Date.now();
   // Manual runs share the route's five-minute ceiling. Scheduled runs inherit
   // the tick's remaining budget rather than resetting it for each connection.
@@ -30,7 +31,7 @@ export async function runSheetsSync(input: {
     if (claimed.error) {
       const message = claimed.error.message || "";
       const admissionBusy = message.match(/google_sheets_(?:capacity|workspace|sync)_busy/)?.[0];
-      throw new Error(admissionBusy ?? "google_sheets_mapping_required");
+      throw new Error(admissionBusy ?? (message.includes("google_sheets_retention_consent_required") ? "google_sheets_retention_consent_required" : "google_sheets_mapping_required"));
     }
     return claimed;
   };

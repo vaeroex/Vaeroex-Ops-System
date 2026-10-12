@@ -58,6 +58,23 @@ export function sheetsEnabled() {
   }
 }
 
+/** Optional deployment pilot boundary. A present but invalid list fails closed. */
+export function sheetsAllowedWorkspaceIds(): string[] | null {
+  const configured = process.env.GOOGLE_SHEETS_ALLOWED_WORKSPACE_IDS;
+  if (configured === undefined) return null;
+  const parsed = z.array(z.string().uuid()).min(1).max(100).safeParse(configured.split(",").map(value => value.trim().toLowerCase()));
+  return parsed.success ? [...new Set(parsed.data)] : [];
+}
+
+export function sheetsWorkspaceAllowed(workspaceId: string) {
+  const allowed = sheetsAllowedWorkspaceIds();
+  return allowed === null || allowed.includes(workspaceId.toLowerCase());
+}
+
+export function assertSheetsWorkspaceAllowed(workspaceId: string) {
+  if (!sheetsWorkspaceAllowed(workspaceId)) throw new Error("google_sheets_pilot_limited");
+}
+
 export function sheetsConfiguration() {
   if (process.env.GOOGLE_SHEETS_ENABLED !== "true") throw new Error("google_sheets_disabled");
   const app = new URL(process.env.GOOGLE_SHEETS_REDIRECT_URI ?? "");

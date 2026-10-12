@@ -1,5 +1,6 @@
 "use server";
 
+import { bindGoogleSheetsRead, googleSheetsReadTicketFields } from "@/lib/integrations/google-sheets/read-authority";
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import {
@@ -30,6 +31,8 @@ export async function mutateIntelligenceCardLifecycleAction(input: {
   if (!opened.ok) {
     return { ok: false, message: opened.reason === "expired" ? "This finding changed or the action expired. Reload and try again." : "This finding action could not be verified." };
   }
+  try { await bindGoogleSheetsRead(access.supabase, opened.payload.readTicketId, []); }
+  catch { return { ok: false, message: "Workspace data changed. Reload this finding before trying again." }; }
   const reasonCode = input.reasonCode || null;
   const reasonText = input.reasonText?.trim() || null;
   if (reasonCode && !allowedReasons.has(reasonCode)) return { ok: false, message: "Choose a supported dismissal reason." };
@@ -47,7 +50,7 @@ export async function mutateIntelligenceCardLifecycleAction(input: {
     p_finding_fingerprint: opened.payload.findingFingerprint,
     p_material_signature: opened.payload.materialSignature,
     p_finding_id: opened.payload.findingId,
-    p_card_snapshot_json: opened.payload.cardSnapshot,
+    p_card_snapshot_json: { ...opened.payload.cardSnapshot, ...googleSheetsReadTicketFields(opened.payload.readTicketId) },
     p_reason_code: reasonCode,
     p_reason_text: reasonText,
     p_recheck_after: recheckAfter,

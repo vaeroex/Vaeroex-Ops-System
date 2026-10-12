@@ -1,3 +1,4 @@
+import { googleSheetsReadTicketFields } from "@/lib/integrations/google-sheets/read-authority";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { filterBusinessEvidence } from "@/lib/intelligence/evidence-eligibility";
 import {
@@ -16,6 +17,7 @@ export type BusinessHealthSnapshotResult = {
 };
 
 type BusinessHealthSnapshotInput = {
+  readTicketId: string;
   workspaceId: string;
   score: number;
   status: string;
@@ -54,6 +56,7 @@ export async function recordDailyBusinessHealthSnapshot(
     .from("business_health_snapshots")
     .upsert(
       {
+        ...googleSheetsReadTicketFields(input.readTicketId),
         workspace_id: input.workspaceId,
         snapshot_date: today,
         score: input.score,

@@ -1,3 +1,4 @@
+import { beginGoogleSheetsRead, bindGoogleSheetsRead, googleSheetsReadSources, type GoogleSheetsReadTicket } from "@/lib/integrations/google-sheets/read-authority";
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildBusinessHealthDecisionContext } from "@/lib/ai/business-health-context";
@@ -101,18 +102,22 @@ function filterOriginalOrSourceBackedRows<T extends { source_file_id?: string | 
 }
 
 export async function buildBoundedWorkspaceContext({
+  readTicket: inheritedTicket,
   supabase,
   workspaceId,
   query,
   plan,
   stageLogger
 }: {
+  readTicket?: GoogleSheetsReadTicket;
   supabase: SupabaseClient<Database>;
   workspaceId: string;
   query: string;
   plan: VaeroexQueryPlan;
   stageLogger?: WorkflowStageLogger;
 }): Promise<BoundedWorkspaceContext> {
+  const readTicket = inheritedTicket ?? await beginGoogleSheetsRead(supabase, workspaceId);
+  const consumedSources: { table: string; id: string }[] = [];
   const startedAt = Date.now();
   const limitations: string[] = [];
   const domainSet = new Set(plan.domains);
@@ -127,7 +132,7 @@ export async function buildBoundedWorkspaceContext({
   if (domainSet.has("kpis") || domainSet.has("financials") || domainSet.has("business_health")) {
     loaders.push(timedContextStage("kpi_context_loading_ms", stageLogger, async () => {
       try {
-        const kpiData = await loadKpiOverviewData({ supabase, workspaceId });
+        const kpiData = await loadKpiOverviewData({ supabase, workspaceId, readTicket });
         const eligibleKpiRows = filterOriginalOrSourceBackedRows(kpiData.rows);
         kpiSummary = buildKpiOverviewSummary(eligibleKpiRows, kpiData.settings);
         context.kpi_summary = kpiSummary;
@@ -165,6 +170,7 @@ export async function buildBoundedWorkspaceContext({
       ).then((rows) => {
         const eligibleRows = filterBusinessEvidence(rows);
         businessHealthRows = eligibleRows as Json[];
+        consumedSources.push(...googleSheetsReadSources("business_health_snapshots", eligibleRows));
         context.business_health = eligibleRows;
         structuredEvidenceCount += eligibleRows.length;
         loadedDomainSet.add("business_health");
@@ -187,6 +193,7 @@ export async function buildBoundedWorkspaceContext({
         limitations
       ).then((issues) => {
         const eligibleIssues = filterOriginalBusinessEvidence(issues).slice(0, 8);
+        consumedSources.push(...googleSheetsReadSources("issues", eligibleIssues));
         context.risk_and_priority_evidence = { issues: eligibleIssues, recommendations: [] };
         structuredEvidenceCount += eligibleIssues.length;
         if (domainSet.has("risks")) loadedDomainSet.add("risks");
@@ -211,6 +218,7 @@ export async function buildBoundedWorkspaceContext({
         limitations
       ).then((rows) => {
         const eligibleRows = filterBusinessEvidence(rows);
+        consumedSources.push(...googleSheetsReadSources("file_uploads", eligibleRows));
         context.sources = eligibleRows.map((row) => ({
           id: row.id,
           display_name: row.display_name,
@@ -247,6 +255,7 @@ export async function buildBoundedWorkspaceContext({
       ).then(async (rows) => {
         const sourceBackedRows = await sourceEligibleRows({ supabase, workspaceId, rows, label: "Operational metrics", limitations });
         const eligibleRows = filterOriginalOrSourceBackedRows(sourceBackedRows);
+        consumedSources.push(...googleSheetsReadSources("operational_metrics", eligibleRows));
         context.operational_metrics = eligibleRows;
         structuredEvidenceCount += eligibleRows.length;
         if (domainSet.has("financials")) loadedDomainSet.add("financials");
@@ -271,6 +280,7 @@ export async function buildBoundedWorkspaceContext({
       ).then(async (rows) => {
         const sourceBackedRows = await sourceEligibleRows({ supabase, workspaceId, rows, label: "Customer activity", limitations });
         const eligibleRows = filterOriginalOrSourceBackedRows(sourceBackedRows);
+        consumedSources.push(...googleSheetsReadSources("crm_leads", eligibleRows));
         context.historical_customer_activity = eligibleRows;
         structuredEvidenceCount += eligibleRows.length;
         loadedDomainSet.add("customers");
@@ -292,6 +302,7 @@ export async function buildBoundedWorkspaceContext({
           .limit(8),
         limitations
       ).then((rows) => {
+        consumedSources.push(...googleSheetsReadSources("people", rows));
         context.people_context = rows;
         structuredEvidenceCount += rows.length;
         loadedDomainSet.add("people");
@@ -314,6 +325,7 @@ export async function buildBoundedWorkspaceContext({
         limitations
       ).then((rows) => {
         const eligibleRows = filterOriginalBusinessEvidence(rows).slice(0, 8);
+        consumedSources.push(...googleSheetsReadSources("sops", eligibleRows));
         context.process_and_policy_context = eligibleRows;
         structuredEvidenceCount += eligibleRows.length;
         loadedDomainSet.add("compliance");
@@ -322,6 +334,7 @@ export async function buildBoundedWorkspaceContext({
   }
 
   await Promise.all(loaders);
+  await bindGoogleSheetsRead(supabase, readTicket.ticketId, consumedSources);
 
   if (domainSet.has("business_health")) {
     const businessHealthStartedAt = Date.now();

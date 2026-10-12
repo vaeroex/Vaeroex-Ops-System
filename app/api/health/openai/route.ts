@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import { isVaeroexAdminUser } from "@/lib/admin/admin-emails";
 import { getVaeroexAIRuntimeStatus } from "@/lib/ai/vaeroex-client";
@@ -61,6 +62,10 @@ export async function GET() {
   if (authorization.response) return authorization.response;
 
   const openai = getVaeroexAIRuntimeStatus();
+  const googleSheetsOpenaiApiKey = process.env.GOOGLE_SHEETS_OPENAI_API_KEY?.trim();
+  const googleSheetsOpenaiKeyFingerprint = googleSheetsOpenaiApiKey
+    ? createHash("sha256").update(googleSheetsOpenaiApiKey).digest("hex").slice(0, 12)
+    : null;
   console.log(
     JSON.stringify({
       level: "info",
@@ -92,6 +97,8 @@ export async function GET() {
         activeProvider: openai.activeProvider,
         configurationValid: openai.configurationValid,
         openaiApiKeyConfigured: openai.openaiApiKeyConfigured,
+        googleSheetsOpenaiApiKeyConfigured: Boolean(googleSheetsOpenaiApiKey),
+        googleSheetsOpenaiKeyFingerprint,
         nvidiaConfigured: openai.nvidiaConfigured,
         nvidiaModel: openai.nvidiaModel,
         embeddingProvider: openai.embeddingProvider,

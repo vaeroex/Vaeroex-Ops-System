@@ -1,3 +1,4 @@
+import { beginGoogleSheetsRead, bindGoogleSheetsRead, googleSheetsReadSources, type GoogleSheetsReadTicket } from "@/lib/integrations/google-sheets/read-authority";
 import "server-only";
 
 import type { StoredBusinessHealthTrendPoint as BusinessHealthTrendPoint } from "@/lib/intelligence/business-health-trend";
@@ -47,13 +48,15 @@ type BusinessMemoryChunkRow = Database["public"]["Tables"]["business_memory_chun
 type WorkspaceHealthQueryInput = {
   supabase: Parameters<typeof loadActiveWorkspaceKpis>[0]["supabase"];
   workspaceId: string;
+  readTicket?: GoogleSheetsReadTicket;
 };
 
 export type WorkspaceHealthComparisonTrend = Parameters<typeof buildExecutiveHomepageModel>[0]["kpiTrends"][number];
 
 // Request-scoped authenticated client only: callers keep their workspace access
 // gate. No service credentials or cross-request cache are introduced here.
-export async function loadWorkspaceHealthEvidence({ supabase, workspaceId }: WorkspaceHealthQueryInput) {
+export async function loadWorkspaceHealthEvidence({ supabase, workspaceId, readTicket: inheritedTicket }: WorkspaceHealthQueryInput) {
+  const readTicket = inheritedTicket ?? await beginGoogleSheetsRead(supabase, workspaceId);
   const [
     kpiResult,
     kpiSettingsResult,
@@ -83,7 +86,7 @@ export async function loadWorkspaceHealthEvidence({ supabase, workspaceId }: Wor
     supabase.from("crm_lead_history").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(300),
     supabase
       .from("ai_agent_runs")
-      .select("agent_type,input_json,output_json,status,error_message,created_at,updated_at,archived_at,deleted_at")
+      .select("id,agent_type,input_json,output_json,status,error_message,created_at,updated_at,archived_at,deleted_at")
       .eq("workspace_id", workspaceId)
       .order("created_at", { ascending: false })
       .limit(10),
@@ -179,7 +182,21 @@ export async function loadWorkspaceHealthEvidence({ supabase, workspaceId }: Wor
     sourceParentResult.error,
     memoryEligibilityError
   ].filter(Boolean);
+  const consumedSources = [
+    ...googleSheetsReadSources("kpis", intelligenceKpis),
+    ...googleSheetsReadSources("kpi_settings", intelligenceKpiSettings),
+    ...googleSheetsReadSources("issues", issues), ...googleSheetsReadSources("sops", sops),
+    ...googleSheetsReadSources("file_uploads", files), ...googleSheetsReadSources("file_imports", imports),
+    ...googleSheetsReadSources("assets", assets), ...googleSheetsReadSources("crm_leads", crmLeads),
+    ...googleSheetsReadSources("crm_lead_history", crmHistory), ...googleSheetsReadSources("operational_metrics", intelligenceOperationalMetrics),
+    ...googleSheetsReadSources("people", people), ...googleSheetsReadSources("business_decisions", decisions),
+    ...googleSheetsReadSources("business_memory_chunks", memoryChunks), ...googleSheetsReadSources("ai_agent_runs", vaeroexRunResult.data),
+    ...googleSheetsReadSources("forms", formResult.data), ...googleSheetsReadSources("form_submissions", submissionResult.data)
+  ];
+  await bindGoogleSheetsRead(supabase, readTicket.ticketId, consumedSources);
   return {
+    readTicket,
+    consumedSources,
     kpis,
     kpiSettings,
     intelligenceKpis,
@@ -276,6 +293,7 @@ export async function buildWorkspaceHealthView({
   const businessHealthMemorySignals = intelligenceLayer.memorySummary.sourceRecords + intelligenceLayer.memorySummary.kpiHistoryRecords;
   if (!businessHealthSourceErrors.length && intelligenceLayer.businessHealth.available) {
     await recordDailyBusinessHealthSnapshot(supabase, {
+      readTicketId: evidence.readTicket.ticketId,
       workspaceId,
       score: intelligenceLayer.businessHealth.score,
       status: intelligenceLayer.businessHealth.status,
@@ -397,10 +415,15 @@ export async function buildWorkspaceHealthView({
     sourceLabelsByKey: executiveSourceLabelsByKey,
     asOf: businessHealthExplanationAsOf
   });
+  await bindGoogleSheetsRead(supabase, evidence.readTicket.ticketId, [
+    ...googleSheetsReadSources("business_health_snapshots", businessHealthSnapshotResult.snapshots),
+    ...businessNoteContext.records.map(record => ({ table: "business_notes", id: record.sourceNoteId }))
+  ]);
   const businessHealthAnalysisPackage = businessHealthExplanationSnapshot.analysisPackage;
   const businessHealthAnalysisToken = userId && includeAnalysis
     ? trySealBusinessHealthExplanationPackage({
         analysisPackage: businessHealthAnalysisPackage,
+        readTicketId: evidence.readTicket.ticketId,
         workspaceId,
         userId
       })

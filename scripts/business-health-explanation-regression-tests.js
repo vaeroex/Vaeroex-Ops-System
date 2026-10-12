@@ -675,12 +675,15 @@ assert.equal(validateBusinessHealthExplanationOutput({
 }, analysisPackage).ok, false, "required top-driver omissions must be rejected");
 assert.equal(validateBusinessHealthExplanationOutput({ ...validOutput, why_it_matters: "See [9] for the evidence." }, analysisPackage).ok, false, "providers must not generate citation IDs");
 
-const token = sealBusinessHealthExplanationPackage({ analysisPackage, workspaceId, userId, nowMs: now.getTime() });
+const token = sealBusinessHealthExplanationPackage({ readTicketId: workspaceId, analysisPackage, workspaceId, userId, nowMs: now.getTime() });
 assert.doesNotMatch(token, /Monthly Revenue|11111111|22222222/, "the client handoff must encrypt facts and internal identifiers");
 assert.equal(openBusinessHealthExplanationPackage(token, { workspaceId, userId }, now.getTime()).ok, true, "the authorized user and workspace must open the package");
+assert.equal(openBusinessHealthExplanationPackage(token, { workspaceId, userId }, now.getTime()).readTicketId, workspaceId, "sealed evidence must retain its originating read authority");
+assert.throws(() => sealBusinessHealthExplanationPackage({ analysisPackage, workspaceId, userId }), /read authority/, "pre-ticket evidence cannot be upgraded with fresh authority");
 assert.equal(openBusinessHealthExplanationPackage(token, { workspaceId: "33333333-3333-4333-8333-333333333333", userId }, now.getTime()).ok, false, "another workspace must not open the package");
 assert.equal(openBusinessHealthExplanationPackage(token, { workspaceId, userId }, now.getTime() + 16 * 60 * 1000).reason, "expired", "stale page tokens must expire safely");
 const wrongPolicyToken = sealBusinessHealthExplanationPackage({
+  readTicketId: workspaceId,
   analysisPackage: { ...analysisPackage, generationPolicyVersion: "business_health_generation_policy_v3" },
   workspaceId,
   userId,
@@ -688,6 +691,7 @@ const wrongPolicyToken = sealBusinessHealthExplanationPackage({
 });
 assert.equal(openBusinessHealthExplanationPackage(wrongPolicyToken, { workspaceId, userId }, now.getTime()).ok, false, "an incorrect sealed generation-policy version must fail closed");
 const missingPolicyToken = sealBusinessHealthExplanationPackage({
+  readTicketId: workspaceId,
   analysisPackage: Object.fromEntries(Object.entries(analysisPackage).filter(([key]) => key !== "generationPolicyVersion")),
   workspaceId,
   userId,
@@ -878,6 +882,7 @@ async function runGenerationClaimRegressions() {
   const admin = fakeClaimAdmin();
   const request = (overrides = {}) => claimBusinessHealthGeneration({
     admin,
+    reader: admin,
     workspaceId,
     userId,
     fingerprint: analysisPackage.fingerprint,
@@ -890,6 +895,8 @@ async function runGenerationClaimRegressions() {
   assert.equal(parallel.filter((result) => result.status === "claimed").length, 1, "parallel same-tab and multi-tab requests must produce exactly one database claim");
   assert.equal(parallel.filter((result) => result.status === "processing").length, 7, "parallel duplicates must reuse the in-flight claim without another provider call");
   assert.equal(admin.rows.length, 1);
+  const hiddenReader = { from: () => { const query = { select: () => query, eq: () => query, contains: () => query, in: () => query, limit: async () => ({ data: [], error: null }) }; return query; } };
+  assert.equal((await request({ reader: hiddenReader })).status, "failed_closed", "an admin uniqueness conflict cannot expose a row hidden by authenticated expiry RLS");
 
   const differentUser = await request({ userId: "44444444-4444-4444-8444-444444444444" });
   assert.equal(differentUser.status, "processing", "different users in one workspace must share the same claim");

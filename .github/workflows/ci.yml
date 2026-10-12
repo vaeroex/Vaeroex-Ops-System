@@ -94,6 +94,9 @@ jobs:
       - name: Google Sheets runtime and database admission regressions
         run: pnpm test:google-sheets
 
+      - name: Google Sheets approval and isolated erasure primitives
+        run: pnpm test:google-sheets-erasure
+
       - name: External integrations contract regressions
         run: pnpm test:external-integrations-contracts
 
@@ -188,6 +191,7 @@ jobs:
         run: |
           pnpm exec playwright install --with-deps chromium
           pnpm test:google-sheets-ui
+          pnpm test:google-sheets-erasure-browser
 
       - name: Private admin telemetry and support regressions
         run: |

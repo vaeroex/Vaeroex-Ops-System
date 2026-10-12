@@ -10,7 +10,7 @@ select ok(not has_table_privilege('authenticated','public.vsi_requests','select'
 select ok(not has_table_privilege('authenticated','public.vsi_cost_events','select'), 'provider ledger is server only');
 select ok(not has_function_privilege('authenticated','public.vsi_mutate_v1(uuid,uuid,text,jsonb)','execute'), 'customers cannot invoke trusted persistence RPC');
 select ok(has_function_privilege('service_role','public.vsi_mutate_v1(uuid,uuid,text,jsonb)','execute'), 'trusted server can call persistence RPC');
-select ok((select qual like '%workspace_mutation_entitled_v1%' and qual like '%actor_role%' from pg_policies where tablename='vsi_conversations'), 'read policy enforces entitlement and role snapshot');
+select ok((select qual like '%workspace_mutation_entitled_v1%' and qual like '%actor_role%' from pg_policies where schemaname='public' and tablename='vsi_conversations' and policyname='VSI private conversations'), 'read policy enforces entitlement and role snapshot');
 select ok((select confdeltype='n' from pg_constraint where conrelid='public.vsi_requests'::regclass and confrelid='public.vsi_conversations'::regclass), 'transcript deletion retains content-free quota ledger');
 select * from finish();
 rollback;

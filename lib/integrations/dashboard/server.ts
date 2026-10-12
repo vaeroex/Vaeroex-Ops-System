@@ -38,7 +38,7 @@ export async function loadIntegrationDashboard(input: DashboardInput) {
     const observedAt = new Date().toISOString();
     // An unavailable saved projection must not take findings or briefings down,
     // or fabricate an empty connected-state/zero financial result.
-    return { loadFailed: true, dashboard: IntegrationDashboardSchema.parse({ workspaceId: input.access.workspaceId, observedAt,
+    return { loadFailed: true, googleSheetsConnectionIds: [] as string[], dashboard: IntegrationDashboardSchema.parse({ workspaceId: input.access.workspaceId, observedAt,
       timeZone: "UTC", timeZoneConfirmed: false, preferencesAvailable: false, entries: [], unavailable: ["Integration"] }),
       currentQboAccounting: buildQboAccountingIntelligence({ workspaceId: input.access.workspaceId, summaries: [], asOf: observedAt }) };
   }
@@ -204,6 +204,6 @@ async function readIntegrationDashboard(input: DashboardInput) {
     if ([...scopeCounts.values()].some(count => count > 1)) unavailable.push("Shared-entity QuickBooks totals");
     currentQboAccounting = buildQboAccountingIntelligence({ workspaceId, summaries: unambiguous, asOf: observedAt });
   }
-  return { loadFailed: false, dashboard: IntegrationDashboardSchema.parse({ workspaceId, observedAt, timeZone, timeZoneConfirmed,
+  return { loadFailed: false, googleSheetsConnectionIds: sheetsGroups.map(connection => connection.id), dashboard: IntegrationDashboardSchema.parse({ workspaceId, observedAt, timeZone, timeZoneConfirmed,
     preferencesAvailable: preferences.state === "ready", entries, unavailable: [...new Set(unavailable)] }), currentQboAccounting };
 }

@@ -102,11 +102,13 @@ export function findingExplanationModelInput(analysisPackage: FindingExplanation
 export async function generateFindingExplanation({
   supabase,
   workspaceId,
+  readTicketId,
   analysisPackage,
   startedAtMs = Date.now()
 }: {
   supabase: SupabaseClient<Database>;
   workspaceId: string;
+  readTicketId: string;
   analysisPackage: FindingExplanationPackage;
   startedAtMs?: number;
 }) {
@@ -122,6 +124,7 @@ export async function generateFindingExplanation({
   await assertWorkspaceTokenBudget({ supabase, workspaceId, estimatedRequestTokens });
   const baseSettings = getAIProviderRetrySettings(primary.provider);
   const generation = await runStructuredAI({
+    googleSheetsReadTicketId: readTicketId,
     primaryProvider: primary.provider,
     primaryModel: primary.model,
     fallbackModel: BUSINESS_HEALTH_GPT56_TERRA_MODEL,

@@ -52,6 +52,7 @@ const performanceSeries = performanceMetrics.flatMap((metric, metricIndex) => pe
   return { metric, metricIndex, area, areaIndex, name, target, currentValue };
 }));
 export const performanceKpiSettings = freeze(performanceSeries.map(({ metric, metricIndex, areaIndex, name, target }, index) => ({
+  google_sheets_read_ticket_id: null,
   id: `performance-setting-${index}`, workspace_id: WORKSPACE_ID, kpi_name: name, category: metric.category,
   target, weight: 1, definition: `Synthetic weekly ${metric.name.toLowerCase()} for interface qualification only.`,
   color: performanceColors[areaIndex], color_source: "user", is_visible: true, sort_order: index,

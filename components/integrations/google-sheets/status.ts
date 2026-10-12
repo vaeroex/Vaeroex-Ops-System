@@ -11,6 +11,7 @@ export const googleSheetsResults: Record<string, string> = {
 };
 
 export const googleSheetsErrors: Record<string, string> = {
+  pilot_limited: "Google Sheets is available only to selected pilot workspaces. Existing history and disconnect remain available.",
   entity_create_failed: "The business entity could not be created. Check its name, three-letter currency, time zone, and fiscal month, then try again as the workspace owner.",
   automatic_refresh_unavailable: "Automatic refresh could not start. Check the workspace subscription and approved mapping, then try Sync now.",
   reconnect_required: "Google access has expired or was revoked. Reconnect to continue syncing.",
@@ -24,6 +25,7 @@ export const googleSheetsErrors: Record<string, string> = {
   sync_busy: "A sync is already running. Refresh this page after it completes.",
   capacity_busy: "The sync service is at its safe concurrency limit. No new sync was started. Try again shortly.",
   workspace_busy: "Another spreadsheet is syncing in this workspace. No new sync was started. Try again after it completes.",
+  retention_consent_required: "Review the retention disclosure and approve your mapping again before syncing. Existing imported history keeps its original retention clock.",
   mapping_required: "Review and approve the field mapping before syncing. The current workspace owner must approve the source.",
   row_key_invalid: "A data row has an empty or invalid row ID. Fill every data row with a stable business record ID and sync again.",
   workspace_capacity: "This import would exceed the workspace’s 20,000 active metric limit. Reduce the report or archive older metrics before syncing again.",

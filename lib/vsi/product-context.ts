@@ -1,4 +1,5 @@
 import "server-only";
+import { beginGoogleSheetsRead, bindGoogleSheetsRead, type GoogleSheetsReadTicket } from "@/lib/integrations/google-sheets/read-authority";
 
 import { createHash } from "node:crypto";
 
@@ -36,13 +37,15 @@ type ConnectionContext = {
 
 /** Read saved, permission-filtered status through the same producer as Overview.
  * No OAuth action, external refresh, provider request or financial result is returned. */
-async function connectionContext(access: WorkspaceAccess, observedAt: string): Promise<ConnectionContext> {
+async function connectionContext(access: WorkspaceAccess, observedAt: string, readTicket: GoogleSheetsReadTicket): Promise<ConnectionContext> {
   const unknown: ConnectionContext = { state: "unavailable", omittedCount: null, entries: [],
     interpretation: "Connection status could not be verified. Do not infer that nothing is connected." };
   try {
     const loaded = await loadIntegrationDashboard({ access, eligibleKpis: [] });
     const parsed = IntegrationDashboardSchema.safeParse(loaded.dashboard);
     if (loaded.loadFailed || !parsed.success || parsed.data.workspaceId !== access.workspaceId) return unknown;
+    await bindGoogleSheetsRead(access.supabase, readTicket.ticketId,
+      loaded.googleSheetsConnectionIds.map(id => ({ table: "google_sheets_connections", id })));
     const permitted = parsed.data.entries.filter(entry => !entry.hidden
       && (access.membership.role === "owner" || entry.provider === "Google Sheets"));
     return { state: "ready", omittedCount: Math.max(0, permitted.length - 4), entries: permitted.slice(0, 4).map(entry => ({
@@ -60,13 +63,14 @@ async function connectionContext(access: WorkspaceAccess, observedAt: string): P
 /** Runtime product facts belong in private reasoning, never in a public research query.
  * Revalidate current actor, workspace, membership and entitlement on every call.
  * Product/public identity is separate from untrusted workspace labels and demo data. */
-export async function loadVsiProductContext(access: WorkspaceAccess) {
+export async function loadVsiProductContext(access: WorkspaceAccess, inheritedTicket?: GoogleSheetsReadTicket) {
   const current = await authorizeVsiRead({ supabase: access.supabase, workspaceId: access.workspaceId, actorUserId: access.user.id });
   const subscription = await getSubscriptionStatus({ supabase: current.supabase, workspaceId: current.workspaceId,
     userId: current.user.id, email: current.user.email });
   if (!subscription.allowed) throw new Error("Workspace subscription access could not be verified. Please retry.");
+  const readTicket = inheritedTicket ?? await beginGoogleSheetsRead(current.supabase, current.workspaceId, current.user.id);
   const observedAt = new Date().toISOString(), config = getVsiConfig();
-  const connections = await connectionContext(current, observedAt);
+  const connections = await connectionContext(current, observedAt, readTicket);
   const planSlug = normalizePlanSlug(subscription.plan_slug || subscription.plan?.slug);
   const currentPlanKnown = planSlug === VAEROEX_PLAN_SLUG;
   const authoritative = {

@@ -1,0 +1,20 @@
+{
+  "kind": "local_candidate_manifest",
+  "productionApplied": false,
+  "prerequisiteVersion": "20261012091842",
+  "applicationOrder": [
+    {
+      "version": "20261002225025",
+      "filename": "20261002225025_google_sheets_support_erasure.sql",
+      "sha256": "4ac30e7a57290eb554c7edfff2672b59ae59458dca632f5d269915f6f8c8b33b",
+      "status": "pending_not_applied"
+    },
+    {
+      "version": "20261012191836",
+      "filename": "20261012191836_google_sheets_restricted_erasure_retention.sql",
+      "sha256": "107075b9e5ecfba7235bd98d911ee320dde614ef6eed4f689c414d1f6c2209c8",
+      "status": "pending_not_applied"
+    }
+  ],
+  "qualification": "Synthetic native and full canonical qualification required before production application; this is not a captured production ledger."
+}

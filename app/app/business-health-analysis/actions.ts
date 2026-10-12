@@ -1,5 +1,7 @@
 "use server";
 
+import { bindGoogleSheetsRead, googleSheetsReadTicketFields } from "@/lib/integrations/google-sheets/read-authority";
+
 import { AIProviderExecutionError } from "@/lib/ai/providers/provider-manager";
 import { enforceAIProviderRateLimits } from "@/lib/ai/provider-guardrails";
 import { recordVaeroexAiUsage } from "@/lib/ai/usage";
@@ -115,6 +117,8 @@ export async function generateBusinessHealthExplanationAction(
         : "Business Health analysis could not be authorized. Refresh the page and try again."
     };
   }
+  try { await bindGoogleSheetsRead(supabase, opened.readTicketId, []); }
+  catch { return { status: "unavailable", artifact: null, message: "Workspace data changed. Refresh this page before requesting analysis." }; }
   const analysisPackage = opened.analysisPackage;
   if (!analysisPackage.facts.available) {
     return {
@@ -207,6 +211,7 @@ export async function generateBusinessHealthExplanationAction(
     return { status: "unavailable", artifact: null, message: "Business Health analysis request limits could not be verified. Please try again shortly." };
   }
   const inputJson = {
+    ...googleSheetsReadTicketFields(opened.readTicketId),
     workflow: BUSINESS_HEALTH_EXPLANATION_CONTRACT_ID,
     contract_id: analysisPackage.contractId,
     contract_version: analysisPackage.contractVersion,
@@ -221,6 +226,7 @@ export async function generateBusinessHealthExplanationAction(
     original_evidence_eligible: false
   } satisfies Json;
   const generationClaim = await claimBusinessHealthGeneration({
+    reader: supabase,
     admin,
     workspaceId,
     userId: user.id,
@@ -263,15 +269,18 @@ export async function generateBusinessHealthExplanationAction(
   const runId = generationClaim.runId;
 
   try {
+    await bindGoogleSheetsRead(supabase, opened.readTicketId, []);
     const generated = await generateBusinessHealthExplanation({
       supabase,
       workspaceId,
       analysisPackage,
+      readTicketId: opened.readTicketId,
       startedAtMs: startedAt
     });
     const { error: updateError } = await admin
       .from("ai_agent_runs")
       .update({
+        ...googleSheetsReadTicketFields(opened.readTicketId),
         output_json: generated.artifact as unknown as Json,
         status: "completed",
         error_message: null,

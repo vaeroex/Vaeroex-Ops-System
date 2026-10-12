@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { sheetsAdmin, sheetsEnabled, validSheetsSchedulerSecret } from "@/lib/integrations/google-sheets/server";
+import { sheetsAdmin, sheetsAllowedWorkspaceIds, sheetsEnabled, sheetsWorkspaceAllowed, validSheetsSchedulerSecret } from "@/lib/integrations/google-sheets/server";
 import { runSheetsSync } from "@/lib/integrations/google-sheets/sync";
 import { runDueSheetsRefreshes } from "@/lib/integrations/google-sheets/scheduler";
 import { withSheetsRequest } from "@/lib/integrations/google-sheets/execution";
@@ -15,11 +15,24 @@ export async function GET(request: Request) {
   if (!sheetsEnabled()) return NextResponse.json({ enabled: false, attempted: 0 }, { headers });
   try {
     const result = await runDueSheetsRefreshes({
+      eligible: connection => sheetsWorkspaceAllowed(connection.workspace_id),
       due: async (tickAt, limit, deadlineAt, excludedConnectionIds) => {
-        const { data, error } = await withSheetsRequest(deadlineAt, 10_000, signal =>
-          sheetsAdmin().rpc("due_google_sheets_syncs_v1", {
+        const allowed = sheetsAllowedWorkspaceIds();
+        if (allowed?.length === 0) return [];
+        const { data, error } = await withSheetsRequest(deadlineAt, 10_000, signal => {
+          if (allowed === null) return sheetsAdmin().rpc("due_google_sheets_syncs_v1", {
             p_tick_at: tickAt, p_limit: limit, p_excluded_ids: [...excludedConnectionIds]
-          }).abortSignal(signal));
+          }).abortSignal(signal);
+          // Apply the pilot scope before the limit, so excluded tenants cannot
+          // fill every due page. SQL still owns admission and lease fencing.
+          let due = sheetsAdmin().from("google_sheets_connections").select("id,workspace_id")
+            .in("workspace_id", allowed).eq("status", "connected").eq("automatic_refresh_enabled", true)
+            .not("active_approval_id", "is", null).lte("next_sync_at", tickAt)
+            .or(`sync_lease_expires_at.is.null,sync_lease_expires_at.lte.${tickAt}`)
+            .order("next_sync_at", { ascending: true }).order("id", { ascending: true }).limit(limit);
+          if (excludedConnectionIds.length) due = due.not("id", "in", `(${excludedConnectionIds.join(",")})`);
+          return due.abortSignal(signal);
+        });
         if (error) throw new Error("google_sheets_scheduling_unavailable");
         return data ?? [];
       },

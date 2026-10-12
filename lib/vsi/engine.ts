@@ -1,3 +1,5 @@
+import { googleSheetsOpenAIHeaders } from "@/lib/ai/providers/google-data-policy";
+import { bindGoogleSheetsRead } from "@/lib/integrations/google-sheets/read-authority";
 import "server-only";
 import { z } from "zod";
 import { hasProhibitedVsiIdentifiers, VSI_PROHIBITED_INPUT_MESSAGE } from "./sensitive-input";
@@ -194,8 +196,14 @@ async function runVsiAnswerInternal(input: VsiRunInput, startedAt: number): Prom
   if (noteDraft) return finish({ content: "Here is the Business Note I propose to save. Review the exact text below and confirm to add it to Business Notes for review. It will become business context only after approval.", citations: [], noteDraft });
   if (/^(?:please\s+)?remember(?:\s+this)?(?:[.!?:\s]|$)/i.test(input.question)) return finish({ content: "Tell me the exact business context you want saved, in 1,800 characters or fewer. I will show a Business Note proposal for you to confirm.", citations: [] });
   const key = process.env.OPENAI_API_KEY?.trim();
-  if (!key) throw new VsiEngineError("Vaeroex Super Intelligence is temporarily unavailable because its provider connection is not configured. Please try again later.", usage);
   const call = async (body: Record<string, unknown>, reserveAnswerMs = 0) => {
+    let googleDataHeaders: Record<string, string>;
+    try {
+      await bindGoogleSheetsRead(input.supabase, input.readTicket.ticketId, []);
+      googleDataHeaders = await googleSheetsOpenAIHeaders(input.readTicket.ticketId);
+    }
+    catch { throw new VsiEngineError("Workspace data changed. Reload this chat before trying again.", usage, false, "evidence_unavailable"); }
+    if (!key && !googleDataHeaders.Authorization) throw new VsiEngineError("Vaeroex Super Intelligence is temporarily unavailable because its provider connection is not configured. Please try again later.", usage);
     if (usage.estimatedCostUsd >= config.requestReserveUsd) throw new VsiEngineError("This question reached its spending safeguard. Please narrow it and retry.", usage, false, "budget_block");
     const remaining = config.timeoutMs - (Date.now() - startedAt) - reserveAnswerMs;
     if (remaining < 4000) throw new VsiEngineError("This answer took too long. Please retry or ask a narrower question.", usage, false, "timeout");
@@ -208,7 +216,7 @@ async function runVsiAnswerInternal(input: VsiRunInput, startedAt: number): Prom
     usage.providerCalls = (usage.providerCalls || 0) + 1;
     try {
       const { response, value } = await consumeAIProviderResponse("openai", "https://api.openai.com/v1/responses", {
-        method: "POST", headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+        method: "POST", headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json", ...googleDataHeaders },
         body: JSON.stringify({ store: false, stream: false, reasoning: { effort: "low" }, max_output_tokens: config.maxOutputTokens, ...body, model: VSI_MODEL })
       }, async response => { try { return await response.json() as ProviderPayload; } catch { return {} as ProviderPayload; } },
       { ...getAIProviderRetrySettings("openai"), timeoutMs: remaining, maxRetries: 0 });
@@ -228,7 +236,7 @@ async function runVsiAnswerInternal(input: VsiRunInput, startedAt: number): Prom
     }
   };
   let product;
-  try { product = await loadVsiProductContext(access); }
+  try { product = await loadVsiProductContext(access, input.readTicket); }
   catch { throw new VsiEngineError("Vaeroex could not check the current product and workspace context. Please retry.", usage); }
   const selectedMessages = selectVsiHistory(input.recentMessages, input.question);
   const approvedPublicTopics = priorVsiPublicTopics(input.recentMessages, input.priorPublicResearchTopics);
@@ -317,7 +325,7 @@ async function runVsiAnswerInternal(input: VsiRunInput, startedAt: number): Prom
   }
   const previousQuestion = [...selectedMessages].reverse().find(message => message.role === "user")?.content || "";
   let evidence: VsiEvidenceResult = { sources: [], limitations: [] };
-  try { if (plan.businessEvidence) evidence = await retrieveVsiEvidence(access, `${input.question}\n${previousQuestion.slice(0, 800)}`); }
+  try { if (plan.businessEvidence) evidence = await retrieveVsiEvidence(access, `${input.question}\n${previousQuestion.slice(0, 800)}`, new Date().toISOString(), input.readTicket); }
   catch { throw new VsiEngineError("Vaeroex could not check the permitted business sources for this answer. Please retry.", usage, false, "evidence_unavailable"); }
   const history = prepareVsiHistory(selectedMessages, [...evidence.sources, ...product.sources], input.question);
   let publicSelection = boundedVsiPublicEvidence(webClaims, webSources, 16_000);

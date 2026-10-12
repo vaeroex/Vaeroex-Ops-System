@@ -35,6 +35,16 @@ export function LegalDocumentPage({ documentId }: { documentId: LegalDocumentId 
           ))}
         </div>
 
+        {documentId === "privacy" || documentId === "data-retention" ? <section className="mt-8 rounded-lg border border-line bg-white p-5 text-sm leading-6 shadow-panel">
+          <h2 className="text-base font-semibold">Google Sheets privacy resources</h2>
+          <ul className="mt-3 list-disc space-y-2 pl-5">
+            <li><a className="text-vaeroex-blue underline" href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a></li>
+            <li><a className="text-vaeroex-blue underline" href="https://developers.google.com/workspace/workspace-api-user-data-developer-policy">Google Workspace API User Data and Developer Policy</a></li>
+            <li><a className="text-vaeroex-blue underline" href="https://developers.openai.com/api/docs/guides/your-data">OpenAI API data controls and retention</a></li>
+            <li><a className="text-vaeroex-blue underline" href="mailto:support@vaeroex.com">Contact support for deletion</a></li>
+          </ul>
+        </section> : null}
+
         <section className="mt-8 rounded-lg border border-line bg-white p-5 shadow-panel">
           <h2 className="text-base font-semibold">Related policies</h2>
           <div className="mt-3 flex flex-wrap gap-2">

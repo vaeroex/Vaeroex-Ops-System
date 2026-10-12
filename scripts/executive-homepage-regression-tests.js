@@ -28,8 +28,18 @@ Module._resolveFilename = function resolveAlias(request, parent, isMain, options
   return originalResolveFilename.call(this, request, parent, isMain, options);
 };
 
+// This presentation suite consumes only the pure snapshot-version helper from
+// business-health-history. Its server-only writer dependency must never execute.
+const originalLoad = Module._load;
+Module._load = function loadPresentationFixture(request, parent, isMain) {
+  if (request === "@/lib/integrations/google-sheets/read-authority") return {
+    googleSheetsReadTicketFields: () => assert.fail("Presentation fixtures must not publish a Health snapshot")
+  };
+  return originalLoad.call(this, request, parent, isMain);
+};
 const { buildExecutiveHomepageModel } = require("../lib/intelligence/executive-homepage.ts");
 const { isWorkspacePathActive } = require("../lib/presentation/app-navigation.ts");
+Module._load = originalLoad;
 
 function snapshotDate(daysAgo = 0) {
   const date = new Date();

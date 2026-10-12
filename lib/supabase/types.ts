@@ -51,6 +51,7 @@ type GoogleSheetsSourceVersionRow = {
   sync_run_id: string; created_at: string;
 };
 type GoogleSheetsFactLinkRow = {
+  id: string;
   workspace_id: string; connection_id: string; source_row_id: string; metric_column: number;
   source_version_id: string; approval_id: string; kpi_id: string;
   admission_state: "accepted" | "review_required" | "retired";
@@ -59,6 +60,9 @@ type GoogleSheetsFactLinkRow = {
 export type Database = {
   public: {
     Functions: {
+      begin_google_sheets_read_v1: { Args: { p_workspace_id: string; p_actor_id?: string | null }; Returns: Json };
+      bind_google_sheets_read_v1: { Args: { p_ticket_id: string; p_sources: Json }; Returns: Json };
+      get_google_sheets_read_context_v1: { Args: { p_ticket_id: string }; Returns: Json };
       admin_usage_snapshot_v1: {
         Args: { p_start: string; p_end: string; p_workspace_id?: string | null; p_page?: number; p_page_size?: number; p_workspace_page?: number };
         Returns: Json;
@@ -1110,7 +1114,7 @@ export type Database = {
       };
       google_sheets_fact_links: {
         Row: GoogleSheetsFactLinkRow;
-        Insert: GoogleSheetsFactLinkRow;
+        Insert: Omit<GoogleSheetsFactLinkRow, "id"> & { id?: string };
         Update: Partial<GoogleSheetsFactLinkRow>;
         Relationships: [];
       };
@@ -2450,6 +2454,7 @@ export type Database = {
       };
       intelligence_card_lifecycle: {
         Row: {
+          google_sheets_read_ticket_id: string | null;
           id: string;
           workspace_id: string;
           finding_key_hash: string;
@@ -2471,6 +2476,7 @@ export type Database = {
           updated_at: string;
         };
         Insert: {
+          google_sheets_read_ticket_id?: string | null;
           id?: string;
           workspace_id: string;
           finding_key_hash: string;
@@ -2496,6 +2502,7 @@ export type Database = {
       };
       intelligence_card_lifecycle_events: {
         Row: {
+          google_sheets_read_ticket_id: string | null;
           id: string;
           workspace_id: string;
           lifecycle_id: string;
@@ -2513,6 +2520,7 @@ export type Database = {
           created_at: string;
         };
         Insert: {
+          google_sheets_read_ticket_id?: string | null;
           id?: string;
           workspace_id: string;
           lifecycle_id: string;
@@ -2846,6 +2854,7 @@ export type Database = {
       };
       file_uploads: {
         Row: {
+          google_sheets_read_ticket_id: string | null;
           id: string;
           workspace_id: string;
           folder_id: string | null;
@@ -2876,6 +2885,7 @@ export type Database = {
           deleted_at: string | null;
         };
         Insert: {
+          google_sheets_read_ticket_id?: string | null;
           id?: string;
           workspace_id: string;
           folder_id?: string | null;
@@ -2982,6 +2992,7 @@ export type Database = {
       };
       file_processing_jobs: {
         Row: {
+          google_sheets_read_ticket_id: string | null;
           id: string;
           workspace_id: string;
           file_upload_id: string;
@@ -2999,6 +3010,7 @@ export type Database = {
           updated_at: string;
         };
         Insert: {
+          google_sheets_read_ticket_id?: string | null;
           id?: string;
           workspace_id: string;
           file_upload_id: string;
@@ -3020,6 +3032,7 @@ export type Database = {
       };
       business_memory_chunks: {
         Row: {
+          google_sheets_read_ticket_id: string | null;
           id: string;
           workspace_id: string;
           source_type: string;
@@ -3043,6 +3056,7 @@ export type Database = {
           deleted_at: string | null;
         };
         Insert: {
+          google_sheets_read_ticket_id?: string | null;
           id?: string;
           workspace_id: string;
           source_type: string;
@@ -3070,6 +3084,7 @@ export type Database = {
       };
       business_notes: {
         Row: {
+          google_sheets_read_ticket_id: string | null;
           id: string;
           workspace_id: string;
           author_user_id: string | null;
@@ -3113,6 +3128,7 @@ export type Database = {
           updated_at: string;
         };
         Insert: {
+          google_sheets_read_ticket_id?: string | null;
           id?: string;
           workspace_id: string;
           author_user_id?: string | null;
@@ -3160,6 +3176,7 @@ export type Database = {
       };
       business_health_snapshots: {
         Row: {
+          google_sheets_read_ticket_id: string | null;
           id: string;
           workspace_id: string;
           snapshot_date: string;
@@ -3174,6 +3191,7 @@ export type Database = {
           updated_at: string;
         };
         Insert: {
+          google_sheets_read_ticket_id?: string | null;
           id?: string;
           workspace_id: string;
           snapshot_date?: string;
@@ -3606,6 +3624,7 @@ export type Database = {
       };
       kpi_settings: {
         Row: {
+          google_sheets_read_ticket_id: string | null;
           id: string;
           workspace_id: string;
           kpi_name: string;
@@ -3647,6 +3666,7 @@ export type Database = {
           updated_at: string;
         };
         Insert: {
+          google_sheets_read_ticket_id?: string | null;
           id?: string;
           workspace_id: string;
           kpi_name: string;
@@ -3877,6 +3897,7 @@ export type Database = {
       };
       reports: {
         Row: {
+          google_sheets_read_ticket_id: string | null;
           id: string;
           workspace_id: string;
           report_type: string;
@@ -3893,6 +3914,7 @@ export type Database = {
           updated_at: string;
         };
         Insert: {
+          google_sheets_read_ticket_id?: string | null;
           id?: string;
           workspace_id: string;
           report_type: string;
@@ -3913,6 +3935,7 @@ export type Database = {
       };
       ai_agent_runs: {
         Row: {
+          google_sheets_read_ticket_id: string | null;
           id: string;
           workspace_id: string;
           folder_id: string | null;
@@ -3928,6 +3951,7 @@ export type Database = {
           deleted_at: string | null;
         };
         Insert: {
+          google_sheets_read_ticket_id?: string | null;
           id?: string;
           workspace_id: string;
           folder_id?: string | null;

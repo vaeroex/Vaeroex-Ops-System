@@ -2,6 +2,7 @@ import "server-only";
 
 import { getAIProviderRetrySettings, type AIProviderRetrySettings } from "@/lib/ai/provider-resilience";
 import { resolveAIProviderAttemptWindow, type AIProviderExecutionBudget } from "@/lib/ai/providers/execution-budget";
+import { assertGoogleSheetsProviderPolicy } from "@/lib/ai/providers/google-data-policy";
 import { OpenAIProvider } from "@/lib/ai/providers/openai-provider";
 import { NvidiaProvider } from "@/lib/ai/providers/nvidia-provider";
 import {
@@ -103,6 +104,7 @@ export class AIProviderExecutionError extends Error {
 type ProviderRegistry = Record<AIProviderName, AIProvider>;
 
 type RunStructuredAIRequest<T> = {
+  googleSheetsReadTicketId?: string;
   primaryProvider: AIProviderName;
   primaryModel: string;
   fallbackModel: string;
@@ -364,7 +366,9 @@ async function runProvider<T>({
     };
     const startedAt = Date.now();
     try {
+      const googlePolicy = await assertGoogleSheetsProviderPolicy(request.googleSheetsReadTicketId, providerName);
       const result = await provider.generate({
+        googleSheetsReadTicketId: request.googleSheetsReadTicketId,
         model,
         systemPrompt: request.systemPrompt,
         userContent: validationReason ? repairContent(request.userContent, validationReason) : request.userContent,
@@ -374,7 +378,7 @@ async function runProvider<T>({
         maxOutputTokens: workflowConfiguration?.maxOutputTokens ?? request.maxOutputTokens,
         reasoning: workflowConfiguration?.reasoning,
         structuredOutput: workflowConfiguration?.structuredOutput,
-        store: workflowConfiguration?.store,
+        store: googlePolicy.containsGoogleSheets ? false : workflowConfiguration?.store,
         stream: workflowConfiguration?.stream,
         settings: providerSettings
       });
@@ -577,7 +581,7 @@ async function runProvider<T>({
 export async function runStructuredAI<T>(request: RunStructuredAIRequest<T>) {
   const providers = request.providers || providerRegistry();
   const attempts: AIProviderAttempt[] = [];
-  const policy: AIProviderRoutingPolicy = request.providerPolicy || {
+  let policy: AIProviderRoutingPolicy = request.providerPolicy || {
     id: "legacy_configured_provider_order",
     steps: [
       { provider: request.primaryProvider, model: request.primaryModel },
@@ -594,6 +598,11 @@ export async function runStructuredAI<T>(request: RunStructuredAIRequest<T>) {
     })
   ) {
     throw new AIProviderPolicyError("The AI provider policy is invalid.");
+  }
+  const googlePolicy = await assertGoogleSheetsProviderPolicy(request.googleSheetsReadTicketId, "openai");
+  if (googlePolicy.containsGoogleSheets) {
+    policy = { ...policy, steps: policy.steps.filter(step => step.provider === "openai") };
+    if (!policy.steps.length) throw new AIProviderPolicyError("No verified provider is configured for Google Sheets analysis.");
   }
   const primaryProvider = policy.steps[0].provider;
   let finalResult: Awaited<ReturnType<typeof runProvider<T>>> | null = null;
@@ -668,11 +677,11 @@ export async function runStructuredAI<T>(request: RunStructuredAIRequest<T>) {
   };
 }
 
-export async function createAIEmbeddings(inputs: string[], timeoutMs?: number) {
+export async function createAIEmbeddings(inputs: string[], timeoutMs?: number, options?: { googleSheetsReadTicketId?: string }) {
   const provider = new OpenAIProvider();
   const model = process.env.OPENAI_EMBEDDING_MODEL || "text-embedding-3-small";
   const base = getAIProviderRetrySettings("openai");
-  return provider.createEmbeddings(inputs, model, timeoutMs ? { ...base, timeoutMs: Math.min(base.timeoutMs, timeoutMs), maxRetries: 0 } : base);
+  return provider.createEmbeddings(inputs, model, timeoutMs ? { ...base, timeoutMs: Math.min(base.timeoutMs, timeoutMs), maxRetries: 0 } : base, options?.googleSheetsReadTicketId);
 }
 
 export function getAIProviderRuntimeStatus() {

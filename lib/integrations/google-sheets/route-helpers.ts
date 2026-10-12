@@ -3,7 +3,7 @@ import "server-only";
 import { z } from "zod";
 import { NextResponse } from "next/server";
 import { GOOGLE_SHEETS_SETTINGS_PATH } from "@/lib/integrations/google-sheets/contracts";
-import { sheetsAdmin, sheetsConfiguration } from "@/lib/integrations/google-sheets/server";
+import { assertSheetsWorkspaceAllowed, sheetsAdmin, sheetsConfiguration } from "@/lib/integrations/google-sheets/server";
 import { requireWorkspaceAccess } from "@/lib/security/require-workspace-access";
 import { requireAuth } from "@/lib/security/require-auth";
 import { getCurrentWorkspace } from "@/lib/security/get-current-workspace";
@@ -26,6 +26,8 @@ export async function requireSheetsManager(workspaceId?: string, requireSubscrip
       access.membership.user_id !== access.user.id || access.membership.workspace_id !== access.workspaceId) {
     throw new Error("google_sheets_management_denied");
   }
+  // Pilot admission must not prevent disconnect, recovery or deletion requests.
+  if (requireSubscription) assertSheetsWorkspaceAllowed(access.workspaceId);
   const claims = await access.supabase.auth.getClaims();
   if (claims.error || claims.data?.claims.sub !== access.user.id) throw new Error("google_sheets_session_denied");
   const sessionId = z.string().uuid().parse(claims.data.claims.session_id);
@@ -41,6 +43,7 @@ export async function sheetsConnection(workspaceId: string, connectionId: string
 }
 
 const actionable = new Map([
+  ["google_sheets_pilot_limited", "pilot_limited"],
   ["google_sheets_authorization_required", "reconnect_required"],
   ["google_sheets_revocation_pending", "revocation_pending"],
   ["google_sheets_response_too_large", "report_too_large"],
@@ -52,7 +55,9 @@ export function sheetsFailure(status = 400, error?: unknown) {
     try { return sheetsRedirect("error", error instanceof Error ? actionable.get(error.message) ?? "request_failed" : "request_failed"); }
     catch { /* Closed response when unconfigured. */ }
   }
-  return NextResponse.json({ ok: false, error: "Google Sheets request could not be completed." }, {
+  return NextResponse.json({ ok: false, error: error instanceof Error && error.message === "google_sheets_pilot_limited"
+    ? "Google Sheets is available only to selected pilot workspaces. Existing history and disconnect remain available."
+    : "Google Sheets request could not be completed." }, {
     status, headers: { "cache-control": "no-store", "referrer-policy": "no-referrer" }
   });
 }

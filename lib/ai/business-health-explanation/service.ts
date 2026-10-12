@@ -122,11 +122,13 @@ export function businessHealthProviderRequestPayload(analysisPackage: BusinessHe
 export async function generateBusinessHealthExplanation({
   supabase,
   workspaceId,
+  readTicketId,
   analysisPackage,
   startedAtMs = Date.now()
 }: {
   supabase: SupabaseClient<Database>;
   workspaceId: string;
+  readTicketId: string;
   analysisPackage: BusinessHealthExplanationPackage;
   startedAtMs?: number;
 }) {
@@ -146,6 +148,7 @@ export async function generateBusinessHealthExplanation({
   await assertWorkspaceTokenBudget({ supabase, workspaceId, estimatedRequestTokens });
   const baseSettings = getAIProviderRetrySettings(primary.provider);
   const generation = await runStructuredAI({
+    googleSheetsReadTicketId: readTicketId,
     primaryProvider: primary.provider,
     primaryModel: primary.model,
     fallbackModel: resolveVaeroexModel("cross_business_reasoning", "openai"),

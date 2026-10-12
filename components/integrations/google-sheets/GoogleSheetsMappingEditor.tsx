@@ -42,6 +42,7 @@ export function GoogleSheetsMappingEditor({ connectionId, headers, savedMapping,
   const [previewing, setPreviewing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
+  const [retentionConsent, setRetentionConsent] = useState(false);
   const validMapping = FieldMappingSchema.safeParse(mapping);
   const usedColumns = new Set([mapping.rowKeyColumn, mapping.dateColumn, mapping.locationColumn, ...mapping.metrics.map((metric) => metric.column)]);
   const nextMetricColumn = headers.findIndex((header, index) => header && header !== "[restricted column]" && !usedColumns.has(index));
@@ -52,6 +53,7 @@ export function GoogleSheetsMappingEditor({ connectionId, headers, savedMapping,
     setPreview(null);
     setPreviewError(null);
     setConfirmed(false);
+    setRetentionConsent(false);
   }
 
   function updateMetric(index: number, change: Partial<FieldMapping["metrics"][number]>) {
@@ -161,8 +163,12 @@ export function GoogleSheetsMappingEditor({ connectionId, headers, savedMapping,
         <input type="checkbox" name="confirmation" value="approve" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} required className="mt-1.5 h-4 w-4 shrink-0" />
         <span>I confirm these columns contain business data only and approve this spreadsheet and mapping as a source for these metrics. Validated values may update Executive Intelligence. Invalid or conflicting values must be held for review.</span>
       </label>
+      <label className="flex items-start gap-3 text-sm leading-6 text-ink">
+        <input type="checkbox" name="retentionConsent" value="true" checked={retentionConsent} onChange={(event) => setRetentionConsent(event.target.checked)} required className="mt-1.5 h-4 w-4 shrink-0" />
+        <span>I own this content or have permission from its owner to authorize Vaeroex to store the approved metrics, import history, and source references and create the disclosed reports and analyses. I approve retention and expiry of this history and its identified copies: up to 13 calendar months from first import while connected, or 30 days after disconnect, whichever ends first. Refreshing or copying a record does not restart its clock. An analysis containing expiring Google data may be removed in full; unrelated source records are preserved. <a href="/data-retention" className="underline">Read retention and deletion help</a>.</span>
+      </label>
       <p className="text-xs leading-5 text-slate-600">{approved ? "Saving confirms the mapping and refresh preference again. Changed mappings require a new approval." : "Nothing flows into Executive Intelligence until you approve the mapping and run a successful sync."}</p>
-      <button type="submit" disabled={!validMapping.success || !confirmed || saving} className="min-h-11 rounded-md bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">{saving ? "Saving…" : "Approve and save mapping"}</button>
+      <button type="submit" disabled={!validMapping.success || !confirmed || !retentionConsent || saving} className="min-h-11 rounded-md bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">{saving ? "Saving…" : "Approve and save mapping"}</button>
     </div>
   </form>;
 }

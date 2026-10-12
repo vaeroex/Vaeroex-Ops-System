@@ -1,5 +1,8 @@
 "use server";
 
+import { beginGoogleSheetsRead, bindGoogleSheetsRead, googleSheetsReadSources, googleSheetsReadTicketFields } from "@/lib/integrations/google-sheets/read-authority";
+
+
 import { createHash } from "crypto";
 import { revalidatePath } from "next/cache";
 import {
@@ -287,6 +290,8 @@ export async function saveAnalysisAction(input: SaveAnalysisInput): Promise<Save
     return { status: "error", message: "This completed analysis could not be identified safely." };
   }
   const { supabase, user, workspaceId, membership } = await requireWorkspaceAccess();
+  const readTicket = await beginGoogleSheetsRead(supabase, workspaceId, user.id).catch(() => null);
+  if (!readTicket) return { status: "error", message: "Workspace data is being updated. Reload before saving this analysis." };
   const completed = await completedArtifact({ ...input, supabase, workspaceId });
   if (!completed) return { status: "error", message: "Only a completed validated analysis can be saved." };
 
@@ -311,6 +316,8 @@ export async function saveAnalysisAction(input: SaveAnalysisInput): Promise<Save
     return { status: "error", message: "You do not have permission to save this analysis." };
   }
 
+  try { await bindGoogleSheetsRead(supabase, readTicket.ticketId, googleSheetsReadSources("ai_agent_runs", [{ id: completed.runId }])); }
+  catch { return { status: "error", message: "The source analysis changed. Reload before saving it." }; }
   const metadata = analysisMetadata(input.analysisType, completed.artifact);
   const savedAt = new Date().toISOString();
   const envelope: SavedAnalysisEnvelope = {
@@ -358,6 +365,7 @@ export async function saveAnalysisAction(input: SaveAnalysisInput): Promise<Save
   const { data: report, error } = await supabase
     .from("reports")
     .insert({
+      ...googleSheetsReadTicketFields(readTicket.ticketId),
       workspace_id: workspaceId,
       report_type: "Saved Analysis",
       title: envelope.title,

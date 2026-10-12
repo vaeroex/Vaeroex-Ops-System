@@ -1,3 +1,4 @@
+import { beginGoogleSheetsRead, bindGoogleSheetsRead, googleSheetsReadSources } from "@/lib/integrations/google-sheets/read-authority";
 import "server-only";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -38,6 +39,9 @@ export async function vsiRoute(request: Request, action: RouteAction, conversati
       if (!rate.allowed) throw new VsiHttpError(429, "burst_limit", rateLimitMessage(rate));
     }
     operation = action;
+    const readTicket = ["create", "rename", "continue", "remember", "messages"].includes(action)
+      ? await beginGoogleSheetsRead(access.supabase, workspaceId, access.userId) : null;
+    if (readTicket) await bindGoogleSheetsRead(access.supabase, readTicket.ticketId, []);
     if (action === "list") return json({ ...common, ...await listVsiConversations(access, new URL(request.url).searchParams.get("before")) });
     if (action === "usage") {
       const usage = await mutateVsi<{ used: number; resetsAt: string | null; spentUsd: number; reservedUsd: number; periodStart: string }>(access, "usage");
@@ -47,7 +51,7 @@ export async function vsiRoute(request: Request, action: RouteAction, conversati
     if (action === "create") {
       const input = base.extend({ title: z.string().trim().min(1).max(120).optional() }).strict().parse(raw);
       if (input.title && hasProhibitedVsiIdentifiers(input.title)) throw new VsiHttpError(422, "prohibited_identifiers", VSI_PROHIBITED_INPUT_MESSAGE);
-      return json({ ...common, conversation: conversationView(await mutateVsi<ConversationRow>(access, "create", { title: input.title })) }, 201);
+      return json({ ...common, conversation: conversationView(await mutateVsi<ConversationRow>(access, "create", { title: input.title, readTicketId: readTicket!.ticketId })) }, 201);
     }
     if (!conversationId || !vsiUuid.safeParse(conversationId).success) throw new VsiHttpError(404, "not_found", "This chat is unavailable.");
     if (action === "detail") {
@@ -57,7 +61,8 @@ export async function vsiRoute(request: Request, action: RouteAction, conversati
     if (action === "rename") {
       const input = base.extend({ title: z.string().trim().min(1).max(120) }).strict().parse(raw);
       if (hasProhibitedVsiIdentifiers(input.title)) throw new VsiHttpError(422, "prohibited_identifiers", VSI_PROHIBITED_INPUT_MESSAGE);
-      return json({ ...common, conversation: conversationView(await mutateVsi<ConversationRow>(access, "rename", { conversationId, title: input.title })) });
+      await bindGoogleSheetsRead(access.supabase, readTicket!.ticketId, [{ table: "vsi_conversations", id: conversationId }]);
+      return json({ ...common, conversation: conversationView(await mutateVsi<ConversationRow>(access, "rename", { conversationId, title: input.title, readTicketId: readTicket!.ticketId })) });
     }
     if (action === "delete") {
       base.strict().parse(raw);
@@ -66,11 +71,12 @@ export async function vsiRoute(request: Request, action: RouteAction, conversati
     }
     if (action === "continue") {
       base.strict().parse(raw);
-      return json({ ...common, conversation: conversationView(await mutateVsi<ConversationRow>(access, "continue", { conversationId })) });
+      await bindGoogleSheetsRead(access.supabase, readTicket!.ticketId, [{ table: "vsi_conversations", id: conversationId }]);
+      return json({ ...common, conversation: conversationView(await mutateVsi<ConversationRow>(access, "continue", { conversationId, readTicketId: readTicket!.ticketId })) });
     }
     if (action === "remember") {
       const input = base.extend({ exchangeId: vsiUuid, confirm: z.literal(true) }).strict().parse(raw);
-      return json({ workspaceId, ...await confirmVsiNote(access, conversationId, input.exchangeId) });
+      return json({ workspaceId, ...await confirmVsiNote(access, conversationId, input.exchangeId, readTicket!) });
     }
     const config = getVsiConfig();
     const input = base.extend({ message: z.string().trim().min(1).max(config.maxQuestionChars), requestId: vsiUuid }).strict().parse(raw);
@@ -83,6 +89,11 @@ export async function vsiRoute(request: Request, action: RouteAction, conversati
       try { inheritedExchanges = (await loadVsiConversation(access, chat.row.parent_conversation_id)).exchanges.slice(-4); }
       catch (error) { if (!(error instanceof VsiHttpError && error.status === 404)) throw error; }
     }
+    await bindGoogleSheetsRead(access.supabase, readTicket!.ticketId, [
+      { table: "vsi_conversations", id: conversationId },
+      ...(chat.row.parent_conversation_id ? [{ table: "vsi_conversations", id: chat.row.parent_conversation_id }] : []),
+      ...googleSheetsReadSources("vsi_exchanges", [...inheritedExchanges, ...chat.exchanges])
+    ]);
     const claim = await mutateVsi<{ state: "reserved" | "completed"; request: { id: string; attempt: number } }>(access, "reserve", {
       conversationId, requestId: input.requestId, questionHash: questionHash(input.message), reserveUsd: config.requestReserveUsd, monthlyBudgetUsd: config.workspaceMonthlyBudgetUsd
     });
@@ -94,7 +105,7 @@ export async function vsiRoute(request: Request, action: RouteAction, conversati
     }
     let generated;
     try {
-      generated = await runVsiAnswer({ supabase: access.supabase, workspaceId, actorUserId: access.userId, question: input.message,
+      generated = await runVsiAnswer({ readTicket: readTicket!, supabase: access.supabase, workspaceId, actorUserId: access.userId, question: input.message,
         recentMessages: [...inheritedExchanges, ...chat.exchanges].flatMap((item) => [
           { role: "user" as const, content: item.userMessage },
           { role: "assistant" as const, content: item.answer, citations: item.citations, publicResearchTopics: item.publicResearchTopics }
@@ -108,7 +119,7 @@ export async function vsiRoute(request: Request, action: RouteAction, conversati
       if (engineError) throw new VsiHttpError(503, "answer_unavailable", engineError.message);
       throw new VsiHttpError(503, "answer_unavailable", "Vaeroex could not complete this answer. Please retry; this question was not counted.");
     }
-    await mutateVsi(access, "settle", { conversationId, id: claim.request.id, attempt: claim.request.attempt, question: input.message, answer: generated.content,
+    await mutateVsi(access, "settle", { conversationId, readTicketId: readTicket!.ticketId, id: claim.request.id, attempt: claim.request.attempt, question: input.message, answer: generated.content,
       citations: generated.citations, publicResearchTopics: generated.publicResearchTopics || [], rememberProposal: generated.noteDraft || null, usage: generated.usage,
       summary: updateVsiSummary(chat.row.context_summary, input.message, generated.content) });
     const saved = await loadVsiConversation(access, conversationId);

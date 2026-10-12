@@ -1,3 +1,4 @@
+import { beginGoogleSheetsRead, bindGoogleSheetsRead, googleSheetsReadSources, googleSheetsReadTicketFields, type GoogleSheetsReadTicket } from "@/lib/integrations/google-sheets/read-authority";
 import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -24,6 +25,7 @@ You may propose identity, display label, unit, scale, aggregation, cadence, desi
 Do not calculate performance or targets. Do not merge records. Do not invent business scope, a denominator, a unit, or an ideal value. Use unknown when meaning is ambiguous. Target-like series must remain separate from actual measurements.`;
 
 export async function classifyAndPersistKpiSemantics({
+  readTicket: inheritedTicket,
   supabase,
   workspaceId,
   userId,
@@ -32,6 +34,7 @@ export async function classifyAndPersistKpiSemantics({
   definition = null,
   requestLuna = false
 }: {
+  readTicket?: GoogleSheetsReadTicket;
   supabase: SupabaseClient<Database>;
   workspaceId: string;
   userId: string;
@@ -40,6 +43,7 @@ export async function classifyAndPersistKpiSemantics({
   definition?: string | null;
   requestLuna?: boolean;
 }) {
+  const readTicket = inheritedTicket ?? await beginGoogleSheetsRead(supabase, workspaceId, userId);
   const deterministic = deterministicKpiSemantics(label);
   const existing = await supabase
     .from("kpi_settings")
@@ -48,6 +52,12 @@ export async function classifyAndPersistKpiSemantics({
     .eq("kpi_name", label)
     .limit(1)
     .maybeSingle();
+  const metrics = await supabase.from("kpis").select("id").eq("workspace_id", workspaceId).eq("name", label).is("archived_at", null).is("deleted_at", null).limit(20_000);
+  if (metrics.error) return { status: "failed" as const, reason: "KPI source authority could not be verified." };
+  await bindGoogleSheetsRead(supabase, readTicket.ticketId, [
+    ...googleSheetsReadSources("kpis", metrics.data),
+    ...googleSheetsReadSources("kpi_settings", existing.data ? [existing.data] : [])
+  ]);
   if (existing.error) return { status: "failed" as const, reason: existing.error.message };
   if (existing.data?.classification_confirmed) return { status: "already_confirmed" as const };
   if (existing.data?.classification_source === "luna" && existing.data.classification_version === KPI_SEMANTIC_VERSION) {
@@ -62,6 +72,7 @@ export async function classifyAndPersistKpiSemantics({
     try {
       const settings = getAIProviderRetrySettings("openai");
       const generation = await runStructuredAI({
+        googleSheetsReadTicketId: readTicket.ticketId,
         primaryProvider: "openai",
         primaryModel: KPI_SEMANTIC_CLASSIFICATION_LUNA_MODEL,
         fallbackModel: KPI_SEMANTIC_CLASSIFICATION_LUNA_MODEL,
@@ -142,10 +153,11 @@ export async function classifyAndPersistKpiSemantics({
       };
 
   if (existing.data) {
-    const persisted = await supabase.from("kpi_settings").update(values).eq("id", existing.data.id).eq("workspace_id", workspaceId);
+    const persisted = await supabase.from("kpi_settings").update({ ...values, ...googleSheetsReadTicketFields(readTicket.ticketId) }).eq("id", existing.data.id).eq("workspace_id", workspaceId);
     if (persisted.error) return { status: "failed" as const, reason: persisted.error.message };
   } else {
     const persisted = await supabase.from("kpi_settings").insert({
+      ...googleSheetsReadTicketFields(readTicket.ticketId),
       workspace_id: workspaceId,
       kpi_name: label,
       category,

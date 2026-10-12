@@ -17,6 +17,7 @@ import type { Database, Json } from "@/lib/supabase/types";
 import type { WorkflowStageLogger } from "@/lib/ai/workflow-timing";
 
 type RunVaeroexRequest = {
+  googleSheetsReadTicketId?: string;
   workflow: VaeroexWorkflow;
   userPrompt: string;
   workspaceSnapshot: Json;
@@ -398,18 +399,20 @@ export function getVaeroexAIRuntimeStatus() {
 export const getVaeroexOpenAIRuntimeStatus = getVaeroexAIRuntimeStatus;
 
 export async function runVaeroexCompletion({
+  googleSheetsReadTicketId,
   workflow,
   userPrompt,
   workspaceSnapshot,
   extraInputs = {},
   fileAttachment
 }: RunVaeroexRequest) {
-  const result = await runVaeroexCompletionWithUsage({ workflow, userPrompt, workspaceSnapshot, extraInputs, fileAttachment });
+  const result = await runVaeroexCompletionWithUsage({ googleSheetsReadTicketId, workflow, userPrompt, workspaceSnapshot, extraInputs, fileAttachment });
 
   return result.outputJson;
 }
 
 export async function runVaeroexCompletionWithUsage({
+  googleSheetsReadTicketId,
   workflow,
   userPrompt,
   workspaceSnapshot,
@@ -529,6 +532,7 @@ export async function runVaeroexCompletionWithUsage({
   let generation: Awaited<ReturnType<typeof runStructuredAI<Json>>>;
   try {
     generation = await runStructuredAI({
+      googleSheetsReadTicketId,
       primaryProvider,
       primaryModel: model,
       fallbackModel,

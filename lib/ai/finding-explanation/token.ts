@@ -1,3 +1,4 @@
+import { googleSheetsReadTicketId } from "@/lib/integrations/google-sheets/read-authority";
 import "server-only";
 
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "crypto";
@@ -19,6 +20,7 @@ type TokenPayload = {
   issuedAt: number;
   expiresAt: number;
   analysisPackage: FindingExplanationPackage;
+  readTicketId: string;
 };
 
 function encryptionKey() {
@@ -46,17 +48,21 @@ function validPackage(value: unknown): value is FindingExplanationPackage {
 
 export function sealFindingExplanationPackage({
   analysisPackage,
+  readTicketId,
   workspaceId,
   userId,
   nowMs = Date.now()
 }: {
   analysisPackage: FindingExplanationPackage;
+  readTicketId: string;
   workspaceId: string;
   userId: string;
   nowMs?: number;
 }) {
   if (analysisPackage.manifest.workspaceId !== workspaceId) throw new Error("Finding evidence must belong to the authorized workspace.");
+  if (!googleSheetsReadTicketId.safeParse(readTicketId).success) throw new Error("Evidence read authority is unavailable.");
   const payload: TokenPayload = {
+    readTicketId,
     version: TOKEN_VERSION,
     workspaceId,
     userId,
@@ -90,6 +96,7 @@ export function openFindingExplanationPackage(token: string, expected: { workspa
   }
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) return { ok: false as const, reason: "invalid" as const };
   const candidate = payload as Partial<TokenPayload>;
+  if (!googleSheetsReadTicketId.safeParse(candidate.readTicketId).success) return { ok: false as const, reason: "invalid" as const };
   if (
     candidate.version !== TOKEN_VERSION
     || candidate.workspaceId !== expected.workspaceId
@@ -102,7 +109,7 @@ export function openFindingExplanationPackage(token: string, expected: { workspa
   ) return { ok: false as const, reason: "invalid" as const };
   if (Number(candidate.expiresAt) < nowMs) return { ok: false as const, reason: "expired" as const };
   if (candidate.analysisPackage.manifest.workspaceId !== expected.workspaceId) return { ok: false as const, reason: "invalid" as const };
-  return { ok: true as const, analysisPackage: candidate.analysisPackage };
+  return { ok: true as const, analysisPackage: candidate.analysisPackage, readTicketId: candidate.readTicketId! };
 }
 
 export function trySealFindingExplanationPackage(input: Parameters<typeof sealFindingExplanationPackage>[0]) {

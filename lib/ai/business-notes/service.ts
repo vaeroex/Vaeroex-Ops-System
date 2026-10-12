@@ -59,11 +59,13 @@ export function businessNoteProviderAttemptTelemetry(attempt: AIProviderAttempt)
 export async function generateBusinessNoteExtraction({
   supabase,
   workspaceId,
+  readTicketId,
   originalNote,
   startedAtMs = Date.now()
 }: {
   supabase: SupabaseClient<Database>;
   workspaceId: string;
+  readTicketId: string;
   originalNote: string;
   startedAtMs?: number;
 }): Promise<{
@@ -97,6 +99,7 @@ export async function generateBusinessNoteExtraction({
   await assertWorkspaceTokenBudget({ supabase, workspaceId, estimatedRequestTokens });
   const baseSettings = getAIProviderRetrySettings(primary.provider);
   const generation = await runStructuredAI({
+    googleSheetsReadTicketId: readTicketId,
     primaryProvider: primary.provider,
     primaryModel: primary.model,
     fallbackModel: BUSINESS_NOTE_EXTRACTION_TERRA_MODEL,

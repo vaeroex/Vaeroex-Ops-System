@@ -68,7 +68,8 @@ export function normalizeSheetsRows(input: {
 }
 
 export const SHEETS_SYNC_ERROR_CODES = new Set([
-  "google_sheets_authorization_required", "google_sheets_headers_changed", "google_sheets_tab_missing",
+  "google_sheets_pilot_limited",
+  "google_sheets_retention_consent_required", "google_sheets_authorization_required", "google_sheets_headers_changed", "google_sheets_tab_missing",
   "google_sheets_row_limit", "google_sheets_observation_limit", "google_sheets_row_key_invalid",
   "google_sheets_duplicate_row_key", "google_sheets_provider_request_failed", "google_sheets_response_too_large",
   "google_sheets_deadline_exceeded", "google_sheets_request_timeout",

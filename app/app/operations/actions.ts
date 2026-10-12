@@ -1,5 +1,7 @@
 "use server";
 
+import { beginGoogleSheetsRead } from "@/lib/integrations/google-sheets/read-authority";
+
 import { revalidatePath } from "next/cache";
 import type { Route } from "next";
 import { redirect } from "next/navigation";
@@ -703,6 +705,7 @@ export async function requestKpiSemanticSuggestionAction(formData: FormData) {
   const kpiName = text(formData, "kpi_name");
   requireValue(path, "KPI name", kpiName);
 
+  const readTicket = await beginGoogleSheetsRead(supabase, workspaceId, user.id);
   const [settingResult, kpiResult] = await Promise.all([
     supabase.from("kpi_settings").select("*").eq("workspace_id", workspaceId).eq("kpi_name", kpiName).limit(1).maybeSingle(),
     supabase
@@ -740,6 +743,7 @@ export async function requestKpiSemanticSuggestionAction(formData: FormData) {
   }
 
   const result = await classifyAndPersistKpiSemantics({
+    readTicket,
     supabase,
     workspaceId,
     userId: user.id,

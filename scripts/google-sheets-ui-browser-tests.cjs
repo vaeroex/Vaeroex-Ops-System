@@ -22,7 +22,7 @@ function query(table) {
     then(resolve) { return Promise.resolve({ data: table === "google_sheets_connections" ? [currentConnection()] : table === "business_entities" ? scenario === "empty" ? [] : [{ id: ids.entity, display_name: "Northstar Coffee" }] : [{ id: "run-1", connection_id: ids.connection, trigger_kind: "scheduled", status: "succeeded", row_count: 100, fact_count: 192, rejected_count: 3, conflict_count: 5, started_at: "2026-10-02T09:00:00Z", error_code: null, review_issues: [{ rowNumber: 4, metricName: "Revenue", reason: "numeric_column_4_invalid" }] }], error: null }).then(resolve); } };
 }
 installLoader({
-  "@/lib/integrations/google-sheets/server": { sheetsEnabled: () => scenario !== "disabled" },
+  "@/lib/integrations/google-sheets/server": { sheetsEnabled: () => scenario !== "disabled", sheetsWorkspaceAllowed: () => scenario !== "pilot" },
   "@/lib/workspaces/page-context": { requireWorkspacePage: async () => ({ context: { membership: { role: scenario === "viewer" ? "viewer" : "owner" } }, workspaceId: ids.workspace, supabase: { from: query } }) }
 });
 const Page = require("../app/app/settings/integrations/google-sheets/page.tsx").default;
@@ -48,6 +48,7 @@ async function main() {
   assert.equal(googleSheetsAuthorizationTarget(target.toString()), target.toString());
   for (const invalid of [target.toString().replace("accounts.google.com", "evil.invalid"), target.toString() + "&state=duplicate", target.toString().replace("spreadsheets.readonly", "drive"), target.toString().replace("/o/oauth2/v2/auth", "/other")]) assert.throws(() => googleSheetsAuthorizationTarget(invalid));
   let previewPosts = 0, authorizationPosts = 0, formPosts = [], failPreview = false, failAuthorization = false;
+  let authorizationResponseGate = null;
   const escape = value => String(value).replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;");
   const server = http.createServer(async (request, response) => {
     try {
@@ -62,7 +63,7 @@ async function main() {
         }
         if (/\/(connect|reconnect)$/.test(request.url)) {
           authorizationPosts++; assert.equal(request.headers.accept, "application/json");
-          await new Promise(resolve => setTimeout(resolve, 200));
+          if (authorizationResponseGate) await authorizationResponseGate;
           response.writeHead(failAuthorization ? 409 : 200, { "content-type": "application/json" }); response.end(JSON.stringify(failAuthorization ? { ok: false } : { ok: true, authorizationUrl: target.toString() })); return;
         }
         formPosts.push({ path: request.url, fields: Object.fromEntries(input) });
@@ -138,28 +139,40 @@ async function main() {
       await page.getByRole("button", { name: "Preview selected columns" }).click();
       await page.getByRole("table").waitFor();
       await page.getByRole("checkbox", { name: /I confirm these columns/ }).check();
+      assert(await save.isDisabled(), "Mapping approval alone cannot authorize retention");
+      await page.getByRole("checkbox", { name: /I approve retention and expiry/ }).check();
       assert(await save.isEnabled());
       assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
       await page.screenshot({ path: path.join(screenshotDir, `google-sheets-mapping-${width}.png`), fullPage: true });
       await save.click(); await page.getByRole("heading", { name: "Synthetic form received" }).waitFor();
-      const saved = formPosts.at(-1); assert.equal(saved.path, "/api/integrations/google-sheets/mapping"); assert.equal(saved.fields.confirmation, "approve"); assert.equal(saved.fields.automaticRefresh, "true"); assert.equal(JSON.parse(saved.fields.fieldMapping).metrics.length, 3);
+      const saved = formPosts.at(-1); assert.equal(saved.path, "/api/integrations/google-sheets/mapping"); assert.equal(saved.fields.confirmation, "approve"); assert.equal(saved.fields.retentionConsent, "true"); assert.equal(saved.fields.automaticRefresh, "true"); assert.equal(JSON.parse(saved.fields.fieldMapping).metrics.length, 3);
       for (const mode of ["connect", "reconnect"]) {
         authorizationPosts = 0;
         await page.goto(`${origin}/${mode}`);
         assert(await page.getByText("Google Sheets limited pilot.", { exact: true }).isVisible());
         assert(await page.getByText(/Your Google account must be an approved test user to connect/).isVisible());
-        await page.getByRole("button", { name: mode === "connect" ? "Connect Google Sheets" : "Reconnect Google Sheets" }).click();
-        await page.getByRole("button", { name: "Opening Google…" }).waitFor();
-        await page.locator("form").evaluate(form => form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
+        // Keep the actual response pending until the repeated submit is tested;
+        // a fixed delay races browser navigation on busy CI workers.
+        let releaseAuthorization;
+        authorizationResponseGate = new Promise(resolve => { releaseAuthorization = resolve; });
+        try {
+          await page.getByRole("button", { name: mode === "connect" ? "Connect Google Sheets" : "Reconnect Google Sheets" }).click();
+          await page.getByRole("button", { name: "Opening Google…" }).waitFor();
+          await page.locator("form").evaluate(form => form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
+        } finally {
+          releaseAuthorization();
+          authorizationResponseGate = null;
+        }
         await page.getByRole("heading", { name: "Synthetic Google consent" }).waitFor();
         assert.equal(authorizationPosts, 1, "Repeated submit must not create duplicate authorization attempts");
       }
     }
     failPreview = true; await page.goto(`${origin}/mapping`); await page.getByRole("button", { name: "Preview selected columns" }).click(); await page.getByRole("alert").waitFor(); assert(await page.getByRole("button", { name: "Preview selected columns" }).isEnabled());
     failAuthorization = true; await page.goto(`${origin}/connect`); await page.getByRole("button", { name: "Connect Google Sheets" }).click(); await page.getByRole("alert").waitFor(); assert(await page.getByRole("button", { name: "Connect Google Sheets" }).isEnabled());
-    for (const mode of ["disabled", "viewer", "reauth", "revocation", "uncertain", "running"]) {
+    for (const mode of ["disabled", "viewer", "pilot", "reauth", "revocation", "uncertain", "running"]) {
       await page.goto(`${origin}/${mode}`);
       assert.equal(await page.getByRole("button", { name: "Sync now", exact: true }).count(), 0, `${mode} must not offer sync`);
+      if (mode === "pilot") { assert.equal(await page.getByRole("button", { name: "Connect Google Sheets", exact: true }).count(), 0); assert.equal(await page.getByText("Google Sheets is available only to selected pilot workspaces.", { exact: false }).count(), 1); assert.equal(await page.getByText("Disconnect Google Sheets", { exact: true }).count(), 1); }
       if (mode === "reauth") assert.equal(await page.getByRole("button", { name: "Reconnect Google Sheets" }).count(), 1);
       if (mode === "viewer" || mode === "disabled") assert.equal(await page.locator("form").count(), 0);
       if (mode === "uncertain") {
