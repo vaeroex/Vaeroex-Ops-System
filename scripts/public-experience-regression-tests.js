@@ -69,7 +69,7 @@ for (const capability of ["Business Health", "Intelligence", "Explain Finding", 
 }
 assert.doesNotMatch(operations, /Generated Outputs|Optional Outputs|Files & Imports|generic forecast/i, "Executive Intelligence must not expose retired product language");
 
-assert.match(plans, /VAEROEX_PLAN_PRICE_LABEL = "\$500\/month"/, "public subscription price must remain $500/month");
+assert.match(plans, /VAEROEX_PLAN_PRICE_LABEL = "\$250\/month"/, "public subscription price must remain $250/month");
 assert.match(pricing, /VAEROEX_PLAN_PRICE_LABEL/, "pricing page must use the authoritative plan price constant");
 assert.match(pricing, /PUBLIC_SYSTEMS\.map[\s\S]*data-pricing-system/, "pricing must render one primary card per registered intelligence offering");
 assert.equal((pricing.match(/<StartWithVaeroexMenu/g) || []).length, 1, "pricing must expose one purchase action for Executive Intelligence");
