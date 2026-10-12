@@ -1,0 +1,31 @@
+{
+  "productionMutationPerformed": false,
+  "deployment": {
+    "observedAt": "2026-10-12T20:44:10.532Z",
+    "api": "GET /v13/deployments/{id}",
+    "id": "dpl_CVRQMCWb4D51xEpung5sSeQNX9dR",
+    "readyState": "READY",
+    "commit": "002c2536583ce455f2ce8ee1bc58b430c3da3b74",
+    "target": "production",
+    "functionTimeout": 300,
+    "functionType": "fluid",
+    "createdAt": 1791830860572
+  },
+  "project": {
+    "observedAt": "2026-10-12T20:44:25.530Z",
+    "api": "GET /v9/projects/{id}",
+    "id": "prj_J810bZ9ECoN4CyLKujUoEEH8N6ja",
+    "autoAssignCustomDomains": true,
+    "skewProtectionBoundaryAt": null,
+    "skewProtectionMaxAge": 43200,
+    "paused": null,
+    "ssoProtection": {
+      "deploymentType": "all_except_custom_domains"
+    }
+  },
+  "limitations": [
+    "Read-only baseline; recheck immediately before any approved cutover.",
+    "Null paused is the API observation, not a completed pause receipt.",
+    "Git main auto-deployment hold is independently defined by vercel.json git.deploymentEnabled.main=false."
+  ]
+}

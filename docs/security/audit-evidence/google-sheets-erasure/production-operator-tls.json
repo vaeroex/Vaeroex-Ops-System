@@ -1,0 +1,35 @@
+{
+  "checkedAt": "2026-10-12T20:42:12.524Z",
+  "projectRef": "mdiianhfrojmxqpwrflh",
+  "host": "db.mdiianhfrojmxqpwrflh.supabase.co",
+  "port": 5432,
+  "credentialsSent": false,
+  "querySent": false,
+  "certificateUrl": "https://supabase-downloads.s3-ap-southeast-1.amazonaws.com/prod/ssl/prod-ca-2021.crt",
+  "certificateFingerprint256": "80:70:25:AD:50:D4:ED:21:9D:2C:9C:7D:29:9C:00:4F:82:4E:B0:0C:F7:F6:5A:FE:F6:07:D0:7B:72:E6:CA:FA",
+  "certificatePemSha256": "700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7",
+  "certificateSubject": "C=US\nST=Delware\nL=New Castle\nO=Supabase Inc\nCN=Supabase Root 2021 CA",
+  "certificateIssuer": "C=US\nST=Delware\nL=New Castle\nO=Supabase Inc\nCN=Supabase Root 2021 CA",
+  "certificateValidFrom": "Apr 28 10:56:53 2021 GMT",
+  "certificateValidTo": "Apr 26 10:56:53 2031 GMT",
+  "tls": {
+    "ok": true,
+    "hostnameVerified": true,
+    "caVerified": true,
+    "protocol": "TLSv1.3",
+    "peerFingerprint256": "3D:60:1B:52:3E:5E:C3:DF:7B:2E:6C:8D:93:79:C2:44:C5:01:FB:D9:21:B5:17:AC:2C:D7:FE:C3:27:35:38:F6"
+  },
+  "nodeExtraCaProbe": {
+    "checkedAt": "2026-10-12T20:42:32.262Z",
+    "credentialsSent": false,
+    "querySent": false,
+    "ok": true,
+    "hostnameVerified": true,
+    "caVerified": true,
+    "protocol": "TLSv1.3",
+    "explicitCaOption": false,
+    "trustSource": "NODE_EXTRA_CA_CERTS"
+  },
+  "primaryEndpointHash": "a219a6050f6bccabbdfaadf31a0497764ba8c2e23e2b32fae7ea1b83a9cf39ad",
+  "scope": "Credential-free reachability and strict TLS only; does not qualify Production database authorization."
+}

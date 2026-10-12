@@ -163,8 +163,48 @@ function withoutHealthConsolidation(file, source) {
   return source;
 }
 
+// Restricted Sheets erasure separately qualifies the authority fence. Normalize
+// only its exact reviewed bindings; retain the original workflow hashes and
+// require the mint before reads, complete source binding, and original sealed
+// ticket propagation. Do not accept other source, actor or workspace substitutions.
+const googleSheetsAuthorityReplacements = [
+  [
+    "(lifecycleResult.data || []) as unknown as IntelligenceCardLifecycleRecord[]",
+    "(lifecycleResult.data || []) as IntelligenceCardLifecycleRecord[]"
+  ],
+  [
+    "import { beginGoogleSheetsRead, bindGoogleSheetsRead, googleSheetsReadSources } from \"@/lib/integrations/google-sheets/read-authority\";\n",
+    ""
+  ],
+  [
+    "  const { supabase, workspaceId, context } = access;\n  const readTicket = await beginGoogleSheetsRead(supabase, workspaceId, access.user.id);\n  const [issuesResult,",
+    "  const { supabase, workspaceId, context } = access;\n  const [issuesResult,"
+  ],
+  [
+    "  await bindGoogleSheetsRead(supabase, readTicket.ticketId, [\n    ...googleSheetsReadSources(\"kpis\", eligibleKpis), ...googleSheetsReadSources(\"kpi_settings\", kpiSettingsResult.data),\n    ...googleSheetsReadSources(\"issues\", issuesResult.data), ...googleSheetsReadSources(\"file_uploads\", filesResult.data),\n    ...googleSheetsReadSources(\"file_imports\", importsResult.data), ...googleSheetsReadSources(\"crm_leads\", eligibleCustomerEvidence),\n    ...googleSheetsReadSources(\"operational_metrics\", eligibleOperationalMetrics), ...googleSheetsReadSources(\"business_memory_chunks\", eligibleMemoryChunks),\n    ...googleSheetsReadSources(\"sops\", sopsResult.data), ...googleSheetsReadSources(\"forms\", formsResult.data),\n    ...googleSheetsReadSources(\"form_submissions\", submissionsResult.data), ...googleSheetsReadSources(\"people\", peopleResult.data),\n    ...googleSheetsReadSources(\"business_decisions\", decisionsResult.data),\n    ...businessNoteContext.records.map(record => ({ table: \"business_notes\", id: record.sourceNoteId }))\n  ]);\n  const qboAccounting = await loadQboAccountingIntelligence(workspaceId, snapshotAsOf);\n",
+    "  const qboAccounting = await loadQboAccountingIntelligence(workspaceId, snapshotAsOf);\n"
+  ],
+  [
+    "trySealFindingExplanationPackage({ analysisPackage, workspaceId, userId, readTicketId: readTicket.ticketId })",
+    "trySealFindingExplanationPackage({ analysisPackage, workspaceId, userId })"
+  ],
+  [
+    "trySealIntelligenceCardLifecycleToken({\n          workspaceId,\n          readTicketId: readTicket.ticketId,\n          userId,",
+    "trySealIntelligenceCardLifecycleToken({\n          workspaceId,\n          userId,"
+  ]
+];
+function withoutGoogleSheetsAuthority(source) {
+  for (const [current, original] of googleSheetsAuthorityReplacements) {
+    assert.equal(source.split(current).length, 2, "Require exactly the reviewed Sheets authority binding");
+    source = source.replace(current, original);
+  }
+  assert.doesNotMatch(source, /\b(?:beginGoogleSheetsRead|bindGoogleSheetsRead|googleSheetsReadSources|readTicket|readTicketId)\b/,
+    "No extra Sheets authority use may escape the exact functional exception");
+  return source;
+}
+
 function withoutIntegrationResults(source) {
-  source = withoutHealthConsolidation(intelligenceFile, source);
+  source = withoutHealthConsolidation(intelligenceFile, withoutGoogleSheetsAuthority(source));
   // Strip only the reviewed dashboard bindings and restore the exact former
   // access binding. The original 75c3d61 workflow hashes stay frozen.
   assert.doesNotMatch(source, /QboIntelligenceDiagnostic|qboProductionCustomerConnectionsEnabled|qbo-customer\/intelligence-diagnostic/,
@@ -249,6 +289,34 @@ test("dashboard exceptions reject missing, duplicate and extra bindings", () => 
     }
   }
   for (const name of ["CurrentIntegrations", "loadIntegrationDashboard", "dashboard", "currentQboAccounting", "requireWorkspaceAccess", "access", "qboAccounting", "loadQboAccountingIntelligence"]) {
+    assert.throws(() => withoutIntegrationResults(source + `\nconst unreviewedBinding = ${name};\n`), assert.AssertionError);
+  }
+});
+
+test("Sheets authority exception rejects missing, duplicated, unscoped and substituted authority", () => {
+  const source = fs.readFileSync(path.join(__dirname, "..", intelligenceFile), "utf8");
+  for (const [binding] of googleSheetsAuthorityReplacements) {
+    assert(source.includes(binding));
+    for (const replacement of ["", binding + binding]) {
+      assert.throws(() => withoutIntegrationResults(source.replace(binding, replacement)), assert.AssertionError);
+    }
+  }
+  for (const [before, after] of [
+    ["beginGoogleSheetsRead(supabase, workspaceId, access.user.id)", "beginGoogleSheetsRead(supabase, otherWorkspace, access.user.id)"],
+    ["beginGoogleSheetsRead(supabase, workspaceId, access.user.id)", "beginGoogleSheetsRead(adminClient, workspaceId, otherUser.id)"],
+    ['googleSheetsReadSources("kpis", eligibleKpis)', 'googleSheetsReadSources("kpis", unscopedKpis)'],
+    ['googleSheetsReadSources("business_decisions", decisionsResult.data)', 'googleSheetsReadSources("business_decisions", [])'],
+    ['id: record.sourceNoteId', 'id: record.id'],
+    ["bindGoogleSheetsRead(supabase, readTicket.ticketId", "bindGoogleSheetsRead(supabase, replacementTicket.ticketId"],
+    ["readTicketId: readTicket.ticketId", "readTicketId: replacementTicket.ticketId"],
+  ]) {
+    assert(source.includes(before));
+    assert.throws(() => withoutIntegrationResults(source.replace(before, after)), assert.AssertionError);
+  }
+  const mint = "  const readTicket = await beginGoogleSheetsRead(supabase, workspaceId, access.user.id);\n";
+  assert.throws(() => withoutIntegrationResults(source.replace(mint, "") + mint), assert.AssertionError,
+    "Moving authority mint after context reads must fail");
+  for (const name of ["beginGoogleSheetsRead", "bindGoogleSheetsRead", "googleSheetsReadSources", "readTicket", "readTicketId"]) {
     assert.throws(() => withoutIntegrationResults(source + `\nconst unreviewedBinding = ${name};\n`), assert.AssertionError);
   }
 });

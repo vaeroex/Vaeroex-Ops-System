@@ -33,6 +33,16 @@ function analysisInputFixtures() {
   // silently omitted. All current production fields are scalar identifiers,
   // code-owned versions, timestamps or counts; no source text/arrays are sent.
   const strict = value => new Proxy(value,{get(target,key){if(key in target)return target[key];throw new Error(`unqualified_analysis_input_field:${String(key)}`);}});
+  const authoritySource=ts.transpileModule(fs.readFileSync(path.join(root,"lib/integrations/google-sheets/read-authority.ts"),"utf8"),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText;
+  const authority={};
+  new Function("require","exports",authoritySource)(name=>{
+    if(name==="server-only")return {};
+    if(name==="zod")return require("zod");
+    throw new Error(`unqualified_read_authority_dependency:${name}`);
+  },authority);
+  const opened=strict({readTicketId:"99999999-9999-4999-8999-999999999991"});
+  const readTicket=strict({ticketId:"99999999-9999-4999-8999-999999999992"});
+  assert.throws(()=>authority.googleSheetsReadTicketFields("invalid-ticket"), /Workspace data changed/);
   const text="x".repeat(1024), count=Number.MAX_SAFE_INTEGER;
   const analysisPackage=strict({contractId:text,contractVersion:text,validatorVersion:text,generationPolicyVersion:text,fingerprint:text,
     manifest:strict({version:text}),submode:text,requiredCitationIds:strict({length:count}),facts:strict({drivers:strict({length:count}),independentSourceCount:count})});
@@ -47,9 +57,11 @@ function analysisInputFixtures() {
     let expression;
     function visit(node){if(ts.isVariableDeclaration(node)&&node.name.getText(ast)==="inputJson")expression=node.initializer.getText(ast);ts.forEachChild(node,visit);} visit(ast);
     assert(expression,`actual input initializer missing: ${relativePath}`);
-    const moduleSource=ts.transpileModule(`exports.build=(analysisPackage,briefingPackage,briefingType)=>{const BUSINESS_HEALTH_EXPLANATION_CONTRACT_ID='business_health_explanation_v1';const INTELLIGENCE_BRIEFING_CONTRACT_ID='intelligence_briefing_v1';const FINDING_EXPLANATION_CONTRACT_ID='finding_explanation_v1';return (${expression});};`,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText;
+    const moduleSource=ts.transpileModule(`exports.build=(analysisPackage,briefingPackage,briefingType,googleSheetsReadTicketFields,opened,readTicket)=>{const BUSINESS_HEALTH_EXPLANATION_CONTRACT_ID='business_health_explanation_v1';const INTELLIGENCE_BRIEFING_CONTRACT_ID='intelligence_briefing_v1';const FINDING_EXPLANATION_CONTRACT_ID='finding_explanation_v1';return (${expression});};`,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText;
     const exported={}; new Function("exports",moduleSource)(exported);
-    return {relativePath,workflow,input:exported.build(analysisPackage,briefingPackage,"monthly")};
+    const input=exported.build(analysisPackage,briefingPackage,"monthly",authority.googleSheetsReadTicketFields,opened,readTicket);
+    assert.equal(input.google_sheets_read_ticket_id,workflow==="intelligence_briefing_v1"?readTicket.ticketId:opened.readTicketId,`actual ${workflow} initializer preserves its originating read ticket`);
+    return {relativePath,workflow,input};
   });
 }
 function command(name,args) {

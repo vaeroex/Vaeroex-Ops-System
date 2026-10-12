@@ -1,0 +1,100 @@
+{
+  "scope": "Exact CI isolated workspace authorization group; fresh owned Unix-socket PostgreSQL only",
+  "productionAccess": false,
+  "commands": [
+    {
+      "script": "scripts/workspace-security-database-tests.cjs",
+      "environmentKey": "WORKSPACE_AUDIT_PG_BIN",
+      "exitCode": 0,
+      "seconds": 1.83,
+      "log": "workspace-security-database-tests.log"
+    },
+    {
+      "script": "scripts/workspace-asset-chronology-database-tests.cjs",
+      "environmentKey": "WORKSPACE_AUDIT_PG_BIN",
+      "exitCode": 0,
+      "seconds": 1.47,
+      "log": "workspace-asset-chronology-database-tests.log"
+    },
+    {
+      "script": "scripts/workspace-memory-publication-tests.cjs",
+      "environmentKey": "WORKSPACE_AUDIT_PG_BIN",
+      "exitCode": 0,
+      "seconds": 1.83,
+      "log": "workspace-memory-publication-tests.log"
+    },
+    {
+      "script": "scripts/internal-form-idempotency-tests.cjs",
+      "environmentKey": "WORKSPACE_AUDIT_PG_BIN",
+      "exitCode": 0,
+      "seconds": 1.67,
+      "log": "internal-form-idempotency-tests.log"
+    },
+    {
+      "script": "scripts/workspace-import-attempt-database-tests.cjs",
+      "environmentKey": "WORKSPACE_AUDIT_PG_BIN",
+      "exitCode": 0,
+      "seconds": 2.23,
+      "log": "workspace-import-attempt-database-tests.log"
+    },
+    {
+      "script": "scripts/issue-submission-tests.cjs",
+      "environmentKey": "WORKSPACE_AUDIT_PG_BIN",
+      "exitCode": 0,
+      "seconds": 1.72,
+      "log": "issue-submission-tests.log"
+    },
+    {
+      "script": "scripts/workspace-storage-database-tests.cjs",
+      "environmentKey": "WORKSPACE_STORAGE_PG_BIN",
+      "exitCode": 0,
+      "seconds": 5.78,
+      "log": "workspace-storage-database-tests.log"
+    },
+    {
+      "script": "scripts/admin-metrics-database-tests.cjs",
+      "environmentKey": "ADMIN_METRICS_PG_BIN",
+      "exitCode": 0,
+      "seconds": 5.35,
+      "log": "admin-metrics-database-tests.log"
+    },
+    {
+      "script": "scripts/issue-submission-native-tests.cjs",
+      "environmentKey": "ISSUE_TEST_PG_BIN",
+      "exitCode": 0,
+      "seconds": 1.64,
+      "log": "issue-submission-native-tests.log"
+    },
+    {
+      "script": "scripts/google-sheets-dispatch-native-tests.cjs",
+      "environmentKey": "SHEETS_TEST_PG_BIN",
+      "exitCode": 0,
+      "seconds": 13.06,
+      "log": "google-sheets-dispatch-native-tests.log"
+    },
+    {
+      "script": "scripts/google-sheets-dispatch-fairness-native-tests.cjs",
+      "environmentKey": "SHEETS_TEST_PG_BIN",
+      "exitCode": 0,
+      "seconds": 1.75,
+      "log": "google-sheets-dispatch-fairness-native-tests.log"
+    },
+    {
+      "script": "scripts/google-sheets-recovery-continuation-native-tests.cjs",
+      "environmentKey": "SHEETS_TEST_PG_BIN",
+      "exitCode": 0,
+      "seconds": 8.02,
+      "log": "google-sheets-recovery-continuation-native-tests.log"
+    },
+    {
+      "script": "scripts/google-sheets-failure-cleanup-native-tests.cjs",
+      "environmentKey": "SHEETS_TEST_PG_BIN",
+      "exitCode": 0,
+      "seconds": 7.61,
+      "log": "google-sheets-failure-cleanup-native-tests.log"
+    }
+  ],
+  "passed": true,
+  "postgresVersion": "17.11.0.002-r0",
+  "nodeVersion": "24.19.0"
+}
