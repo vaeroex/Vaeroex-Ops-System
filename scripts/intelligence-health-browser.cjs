@@ -59,9 +59,12 @@ async function qualifyHealth(a, width, iteration) {
     await page.goto(runtime.appOrigin + '/app', { waitUntil: 'domcontentloaded' });
     await page.getByRole('heading', { name: 'Executive Overview', exact: true }).waitFor();
     assert.equal(await page.locator('[data-business-health-trend]').count(), 0, 'overview_still_contains_full_health_history');
-    const overviewLink = page.locator('a[href="/app/intelligence#business-health"]').first(); await overviewLink.waitFor();
-    const transition = page.waitForURL(u => u.pathname === '/app/intelligence' && u.hash === '#business-health');
-    await overviewLink.click(); await transition;
+    assert.equal(await page.locator('section[aria-label="Business Health in Intelligence"]').count(), 0, 'obsolete_health_announcement_visible');
+    const nav = width === 1440 ? page.locator('.workspace-sidebar') : page.locator('.workspace-mobile-navigation');
+    if (width !== 1440) await nav.locator('summary').first().click();
+    const intelligenceLink = nav.getByRole('link', { name: 'Intelligence', exact: true }); await intelligenceLink.waitFor();
+    const transition = page.waitForURL(u => u.pathname === '/app/intelligence');
+    await intelligenceLink.click(); await transition;
     const health = page.locator('#business-health'); await health.getByRole('heading', { name: 'Business Health', exact: true }).waitFor(); await noPending(page);
     await inViewport(health, width);
     assert.equal(await page.getByText(workspace('foreign').label, { exact: false }).count(), 0, 'foreign_label_visible');

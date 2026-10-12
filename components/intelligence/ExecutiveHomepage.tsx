@@ -99,18 +99,6 @@ export function ExecutiveHomepage({
         <p className="shrink-0 text-xs text-muted">Last updated {lastUpdatedLabel}</p>
       </header>
 
-      <section aria-label="Business Health in Intelligence" className="rounded-xl border border-cyan-200/25 bg-vaeroex-navy p-5 text-white">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2 className="font-semibold">Business Health is part of Intelligence</h2>
-            <p className="mt-1 text-sm text-slate-300">Review the score, movement, freshness and contributing evidence alongside current findings.</p>
-          </div>
-          <Link href="/app/intelligence#business-health" className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-lg border border-cyan-200/30 px-4 py-2 text-sm font-semibold text-cyan-100 hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300">
-            Review Business Health <ArrowRight aria-hidden="true" className="h-4 w-4" />
-          </Link>
-        </div>
-      </section>
-
       <section aria-label="Executive priorities" className="workspace-executive-priorities grid items-stretch gap-4 lg:grid-cols-[1fr_1fr_.78fr]">
         <SpatialSurface as="article" depth="raised" interactive className={`workspace-priority-card vaeroex-semantic-card ${semanticStatusClass(riskStatus)} flex flex-col rounded-lg border p-4 shadow-panel`}>
           <div className="flex flex-wrap items-center justify-between gap-2">
