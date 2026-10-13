@@ -365,7 +365,7 @@ async function main() {
   );
   assert.match(
     executive,
-    /<figcaption[^>]*>Coastal Kitchen · Fictional business example<\/figcaption>/,
+    /<figcaption[^>]*>Coastal Kitchen · Fictional business example/,
     "Fictional business information must be visibly disclosed beneath the image",
   );
   assert.doesNotMatch(executive, /Demo data|Simulated integration data/, "Retired capture labels must not be displayed");

@@ -28,8 +28,9 @@ export function WorkspaceCapture({ view }: { view: CaptureView }) {
         <img src={`${base}-desktop.webp`} srcSet={`${base}-desktop.webp 2x`} width={capture.desktop[0]} height={capture.desktop[1]} alt={capture.alt} loading="lazy" decoding="async" />
       </picture>
     </a>
-    <figcaption className={styles.attribution}>Coastal Kitchen · Fictional business example</figcaption>
-    <p className={styles.enlarge}>Select the image to view it at full size.</p>
+    <figcaption className={styles.attribution}>Coastal Kitchen · Fictional business example
+      <p className={styles.enlarge}>Select the image to view it at full size.</p>
+    </figcaption>
   </figure>;
 }
 
