@@ -1,0 +1,16 @@
+.tour { min-width: 0; width: 100%; max-width: 900px; margin-inline: auto; }
+.tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+.tabs button { min-height: 44px; padding: 9px 15px; border: 1px solid #394352; border-radius: 5px; background: #111720; color: #cdd5e2; font: inherit; font-size: 14px; cursor: pointer; }
+.tabs button[aria-selected="true"] { color: #fff; background: #23334d; border-color: #8bafff; }
+.tabs button:hover { background: #263144; }
+.tabs button:focus-visible, .imageLink:focus-visible { outline: 2px solid #9ebfff; outline-offset: 4px; }
+.capture { margin: 0 auto; min-width: 0; width: 100%; max-width: 900px; }
+.capture[data-workspace-capture="findings"], .capture[data-workspace-capture="evidence"] { max-width: 720px; }
+.caption { display: grid; gap: 10px; margin-bottom: 18px; color: #b6c0cf; font-size: 14px; line-height: 1.65; }
+.caption strong { color: #f1f5fb; font-weight: 500; font-size: clamp(19px, 2vw, 25px); line-height: 1.3; }
+.attribution { margin-top: 10px; color: #aab8cb; font-size: 12px; line-height: 1.5; }
+.imageLink { display: block; border: 1px solid #344052; border-radius: 8px; overflow: hidden; background: #0c1220; }
+.imageLink picture, .imageLink img { display: block; width: 100%; }
+.imageLink img { height: auto; }
+.enlarge { margin: 10px 0 0; color: #99a7bb; font-size: 12px; }
+@media(max-width:600px) { .capture { max-width: 340px; } .tabs { gap: 6px; } .tabs button { padding: 8px 10px; font-size: 12px; } .caption { font-size: 13px; } }

@@ -1,10 +1,12 @@
 import Link from "next/link";
+import { VsiScreenshotTour } from "@/components/marketing/VsiScreenshots";
 import type { Metadata } from "next";
 import { ArrowRight } from "lucide-react";
 import { PublicFooter } from "@/components/legal/PublicFooter";
 import { PublicSiteHeader } from "@/components/legal/PublicSiteHeader";
 import { StartWithVaeroexMenu } from "@/components/legal/StartWithVaeroexMenu";
-import { OperationsIntelligenceEngineDemo } from "@/components/motion/OperationsIntelligenceEngineDemo";
+import { IntegrationScreenshotTour } from "@/components/marketing/IntegrationScreenshots";
+import { WorkspaceScreenshotTour } from "@/components/marketing/WorkspaceScreenshots";
 import story from "@/components/marketing/ExecutiveStory.module.css";
 import { ClarityJourney } from "@/components/marketing/clarity/ClarityJourney";
 import {
@@ -105,14 +107,9 @@ export default function OperationsIntelligencePage() {
             <div><p className={styles.sectionLabel}>Inside Executive Intelligence</p><h2 id="product-experience-title">From the overview<br />to the evidence behind it.</h2></div>
             <p className={styles.copy}>See what changed, investigate what matters, and keep useful analysis in one private workspace.</p>
           </div>
-          <div className={styles.productCaption}>
-            <span>Interactive product walkthrough</span>
-            <span>Illustrative sample information · No customer data</span>
+          <div data-executive-product-mount>
+            <WorkspaceScreenshotTour />
           </div>
-          <div className={styles.productFrame} data-executive-product-mount>
-            <OperationsIntelligenceEngineDemo />
-          </div>
-          <p className={styles.caption}>This walkthrough illustrates the product experience. Example findings are not live business results or promises of an outcome.</p>
           <div className={story.featureGrid}>
             {capabilities.map(([title, body]) => (
               <article key={title}><h3>{title}</h3><p>{body}</p></article>
@@ -144,6 +141,7 @@ export default function OperationsIntelligencePage() {
               <p>Add Business Notes for context. Review and approve proposed information before it becomes business evidence; image recognition can miss details.</p>
             </article>
           </div>
+          <IntegrationScreenshotTour />
           <p className={story.sourceRule}>Each metric uses one authoritative source within a reporting scope. Overlapping connected, uploaded, and manual values are not automatically consolidated or deduplicated. Source changes require review.</p>
           <div className={story.integrationStatus}>
             <Link href="/pricing#google-sheets-availability" className={story.pilotLink}>Google Sheets · Limited pilot<ArrowRight size={15} aria-hidden="true" /></Link>
@@ -166,6 +164,7 @@ export default function OperationsIntelligencePage() {
             <p>Go beyond business, too—from everyday questions and learning to creative writing and brainstorming—all within your Vaeroex workspace.</p>
           </div>
         </div>
+        <div className={styles.container}><VsiScreenshotTour /></div>
       </section>
 
       <section id="executive-close" className={styles.closing} aria-labelledby="getting-started-title">

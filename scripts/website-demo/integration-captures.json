@@ -1,0 +1,162 @@
+{
+  "applicationCommit": "dd16057ad68239b17c567ec3617c7a59fdd1a86c",
+  "scenario": "Coastal Kitchen",
+  "assets": [
+    {
+      "original": "127.0.0.1_3190_app_settings_integrations_square (2).png",
+      "sourceDimensions": [
+        1680,
+        2382
+      ],
+      "crop": [
+        48,
+        744,
+        1632,
+        2050
+      ],
+      "dimensions": [
+        1584,
+        1306
+      ],
+      "dpr": 2,
+      "encoding": "PNG to lossless WebP, no resizing",
+      "file": "integration-square-desktop.webp",
+      "sha256": "fb8e4cda1cc38e8a7b38d6ef56fa7eb3b051e54a05be078508a6f79fe89edad9",
+      "viewport": [
+        840,
+        1000
+      ],
+      "sourceScreen": "/app/settings/integrations/square"
+    },
+    {
+      "original": "127.0.0.1_3190_app_settings_integrations_square (3).png",
+      "sourceDimensions": [
+        780,
+        3030
+      ],
+      "crop": [
+        32,
+        884,
+        748,
+        2690
+      ],
+      "dimensions": [
+        716,
+        1806
+      ],
+      "dpr": 2,
+      "encoding": "PNG to lossless WebP, no resizing",
+      "file": "integration-square-mobile.webp",
+      "sha256": "837b7db66767d8eaa0dab4cfe3abb00036112e6961e4f40185b387f1c5b4a64a",
+      "viewport": [
+        390,
+        1000
+      ],
+      "sourceScreen": "/app/settings/integrations/square"
+    },
+    {
+      "original": "127.0.0.1_3190_app_settings_integrations_quickbooks_data (1).png",
+      "sourceDimensions": [
+        2080,
+        5246
+      ],
+      "crop": [
+        536,
+        4104,
+        2016,
+        4982
+      ],
+      "dimensions": [
+        1480,
+        878
+      ],
+      "dpr": 2,
+      "encoding": "PNG to lossless WebP, no resizing",
+      "file": "integration-qbo-desktop.webp",
+      "sha256": "393570cbeaf7a1f357c8103b36b619c9dc489112f2bddcfd6ea6472becb3d709",
+      "viewport": [
+        1040,
+        1000
+      ],
+      "sourceScreen": "/app/settings/integrations/quickbooks/data"
+    },
+    {
+      "original": "127.0.0.1_3190_app_settings_integrations_quickbooks_data.png",
+      "sourceDimensions": [
+        780,
+        7524
+      ],
+      "crop": [
+        28,
+        6270,
+        752,
+        7228
+      ],
+      "dimensions": [
+        724,
+        958
+      ],
+      "dpr": 2,
+      "encoding": "PNG to lossless WebP, no resizing",
+      "file": "integration-qbo-mobile.webp",
+      "sha256": "a4e33a30bb897adb12b6904ed848b8d79aa6885922ebd8f3a79c1f6ab04aed7b",
+      "viewport": [
+        390,
+        1000
+      ],
+      "sourceScreen": "/app/settings/integrations/quickbooks/data"
+    },
+    {
+      "original": "127.0.0.1_3190_app_settings_integrations_google-sheets (2).png",
+      "sourceDimensions": [
+        2080,
+        3412
+      ],
+      "crop": [
+        536,
+        1122,
+        2016,
+        2352
+      ],
+      "dimensions": [
+        1480,
+        1230
+      ],
+      "dpr": 2,
+      "encoding": "PNG to lossless WebP, no resizing",
+      "file": "integration-sheets-desktop.webp",
+      "sha256": "431f9fe791128b55cf9615faa2b88e9eb1c64f08b88ff94a0fd0f338a5e4485b",
+      "viewport": [
+        1040,
+        1000
+      ],
+      "sourceScreen": "/app/settings/integrations/google-sheets"
+    },
+    {
+      "original": "127.0.0.1_3190_app_settings_integrations_google-sheets (1).png",
+      "sourceDimensions": [
+        780,
+        5346
+      ],
+      "crop": [
+        28,
+        3298,
+        752,
+        3782
+      ],
+      "dimensions": [
+        724,
+        484
+      ],
+      "dpr": 2,
+      "encoding": "PNG to lossless WebP, no resizing",
+      "file": "integration-sheets-mobile.webp",
+      "sha256": "371aad0db14078983c1ece34a7031c84ba53582aa690b56bfe6c99d75f30a123",
+      "viewport": [
+        390,
+        1000
+      ],
+      "sourceScreen": "/app/settings/integrations/google-sheets"
+    }
+  ]
+}

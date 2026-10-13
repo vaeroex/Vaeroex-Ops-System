@@ -1,0 +1,252 @@
+{
+  "applicationCommit": "3f5431207c43534caf2c4f3b9d4b9057c8583799",
+  "asOf": "2026-10-12T18:00:00.000Z",
+  "scenario": "Coastal Kitchen \u2014 fictional 54-seat restaurant; 168 weekly KPI observations, 64 dated source files, 20 operational records and reviewed contextual notes.",
+  "captureMethod": "Chrome DevTools native full-size PNG capture at devicePixelRatio 2, after document.fonts.status=loaded. Crop existing pixels only, then encode lossless WebP once. No resizing, retouching, generated imagery, labels or value substitutions.",
+  "assets": [
+    {
+      "file": "evidence-desktop.webp",
+      "width": 1472,
+      "height": 1680,
+      "bytes": 65738,
+      "sha256": "6d0758cd895ba2832ae6e6d5254fc0ee002c268da1b23cd5c61adff8266959ea",
+      "sourceDimensions": [
+        2880,
+        4584
+      ],
+      "crop": [
+        1320,
+        2296,
+        2792,
+        3976
+      ],
+      "dimensions": [
+        1472,
+        1680
+      ],
+      "dpr": 2,
+      "encoding": "PNG to lossless WebP, no resizing"
+    },
+    {
+      "file": "evidence-mobile.webp",
+      "width": 704,
+      "height": 2156,
+      "bytes": 64856,
+      "sha256": "6508867724f80cae01246bf228c8a7995aca18bdbfe5eb20fd9f389e6ac7eb55",
+      "sourceDimensions": [
+        780,
+        6554
+      ],
+      "crop": [
+        38,
+        3660,
+        742,
+        5816
+      ],
+      "dimensions": [
+        704,
+        2156
+      ],
+      "dpr": 2,
+      "encoding": "PNG to lossless WebP, no resizing"
+    },
+    {
+      "file": "findings-desktop.webp",
+      "width": 1472,
+      "height": 1056,
+      "bytes": 54980,
+      "sha256": "316189733caa685cbc6b2a24550bdd1f88c6a3bc2355dee8503073d5cb91f963",
+      "sourceDimensions": [
+        2880,
+        4126
+      ],
+      "crop": [
+        1320,
+        2256,
+        2792,
+        3312
+      ],
+      "dimensions": [
+        1472,
+        1056
+      ],
+      "dpr": 2,
+      "encoding": "PNG to lossless WebP, no resizing"
+    },
+    {
+      "file": "findings-mobile.webp",
+      "width": 704,
+      "height": 1524,
+      "bytes": 54134,
+      "sha256": "f2a434a43e2b0e26b8b54724444d7e8fbed5111926b5de5da705a3019d8aaabd",
+      "sourceDimensions": [
+        780,
+        5922
+      ],
+      "crop": [
+        38,
+        3660,
+        742,
+        5184
+      ],
+      "dimensions": [
+        704,
+        1524
+      ],
+      "dpr": 2,
+      "encoding": "PNG to lossless WebP, no resizing"
+    },
+    {
+      "file": "intelligence-desktop.webp",
+      "width": 1840,
+      "height": 1444,
+      "bytes": 76732,
+      "sha256": "5556b80255952584acebbd84e272922355a045565659ba647b4ed2bf33a5f680",
+      "sourceDimensions": [
+        2400,
+        4668
+      ],
+      "crop": [
+        516,
+        0,
+        2356,
+        1444
+      ],
+      "dimensions": [
+        1840,
+        1444
+      ],
+      "dpr": 2,
+      "encoding": "PNG to lossless WebP, no resizing"
+    },
+    {
+      "file": "intelligence-mobile.webp",
+      "width": 756,
+      "height": 1858,
+      "bytes": 61548,
+      "sha256": "7e041c9e650f681dc4598faa7ea1dca1f2c304629c62d13d0c9cd50df709ef8b",
+      "sourceDimensions": [
+        780,
+        6262
+      ],
+      "crop": [
+        12,
+        596,
+        768,
+        2454
+      ],
+      "dimensions": [
+        756,
+        1858
+      ],
+      "dpr": 2,
+      "encoding": "PNG to lossless WebP, no resizing"
+    },
+    {
+      "file": "notes-desktop.webp",
+      "width": 1832,
+      "height": 1580,
+      "bytes": 63458,
+      "sha256": "5f898a60778de3cf799f1fe219d5ccced15a389168463eb54e8c59a2db27df56",
+      "sourceDimensions": [
+        2400,
+        9328
+      ],
+      "crop": [
+        520,
+        780,
+        2352,
+        2360
+      ],
+      "dimensions": [
+        1832,
+        1580
+      ],
+      "dpr": 2,
+      "encoding": "PNG to lossless WebP, no resizing"
+    },
+    {
+      "file": "notes-mobile.webp",
+      "width": 756,
+      "height": 1592,
+      "bytes": 49078,
+      "sha256": "381daf049fdfee93063b11ccbb8349cb406b20942712114b408d75df527c393d",
+      "sourceDimensions": [
+        780,
+        15574
+      ],
+      "crop": [
+        12,
+        1348,
+        768,
+        2940
+      ],
+      "dimensions": [
+        756,
+        1592
+      ],
+      "dpr": 2,
+      "encoding": "PNG to lossless WebP, no resizing"
+    },
+    {
+      "file": "performance-desktop.webp",
+      "width": 1832,
+      "height": 2096,
+      "bytes": 77276,
+      "sha256": "debf74bf418d2fcd372fd501b17d766bb3db0369effd3a55df4482b7de3bc13b",
+      "sourceDimensions": [
+        2400,
+        4888
+      ],
+      "crop": [
+        520,
+        708,
+        2352,
+        2804
+      ],
+      "dimensions": [
+        1832,
+        2096
+      ],
+      "dpr": 2,
+      "encoding": "PNG to lossless WebP, no resizing",
+      "viewport": [
+        1200,
+        1000
+      ],
+      "applicationCommit": "dc3e650bb1d651046701ab4f72ba79e33b5272f5",
+      "sourceScreen": "/app/kpis?timeline=90D&metric=Weekly+net+sales&section=detail",
+      "scope": "Historical target hit rate 17/28 (60.71%); latest 12 recorded values in chart, all 12 meeting the unchanged $24,000 target."
+    },
+    {
+      "file": "performance-mobile.webp",
+      "width": 692,
+      "height": 1256,
+      "bytes": 30874,
+      "sha256": "9583a34f80f3e04d15d7966a6385c24a4f66f0639acc5b460f1bb1ce58c0255d",
+      "sourceDimensions": [
+        780,
+        6496
+      ],
+      "crop": [
+        44,
+        2294,
+        736,
+        3550
+      ],
+      "dimensions": [
+        692,
+        1256
+      ],
+      "dpr": 2,
+      "encoding": "PNG to lossless WebP, no resizing",
+      "viewport": [
+        390,
+        1000
+      ],
+      "applicationCommit": "dc3e650bb1d651046701ab4f72ba79e33b5272f5",
+      "sourceScreen": "/app/kpis?timeline=90D&metric=Weekly+net+sales&section=detail",
+      "scope": "Historical target hit rate 17/28 (60.71%); latest 12 recorded values in chart, all 12 meeting the unchanged $24,000 target."
+    }
+  ]
+}

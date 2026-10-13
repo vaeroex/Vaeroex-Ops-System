@@ -88,7 +88,7 @@ assert.doesNotMatch(instrument, /fetch\(|canvas|requestAnimationFrame|WebGL|thre
 
 assert.match(intelligencePage, /<IntelligenceSignalInbox[\s\S]*currentCards=\{lifecycleCards\.current\}[\s\S]*historyCards=\{lifecycleCards\.history\}/, "authoritative Intelligence cards must continue to render directly");
 assert.doesNotMatch(intelligencePage, /SpatialIntelligenceWorkspace|Cards[\s\S]*Spatial/, "the retired Intelligence-only spatial mode must remain absent");
-assert.match(kpiPage, /<TrendChart rows=\{selectedMetricRows\.slice\(-12\)\} metricName=\{primaryMetric\} settings=\{kpiSettings\} \/>/, "KPI detail must retain the authoritative 2D trend chart");
+assert.match(kpiPage, /<TrendChart rows=\{detailChartScope === "all" \? selectedMetricRows : selectedMetricRows\.slice\(-12\)\} metricName=\{primaryMetric\} settings=\{kpiSettings\} scope=\{detailChartScope\} \/>/, "KPI detail must retain the authoritative 2D trend chart");
 assert.match(kpiPage, /resolveKpiTargetReference\(semantics, row\.target\)/, "KPI targets must remain intact");
 assert.match(kpiPage, /const chartColor = kpiColor\(metricName, settings\)/, "persisted KPI colors must remain intact");
 assert.doesNotMatch(kpiPage, /KpiVisualizationSwitcher|KpiSpatialCanvas|spatial-kpi|2D\s*\/\s*3D/, "KPI Performance must not regain a 3D mode");

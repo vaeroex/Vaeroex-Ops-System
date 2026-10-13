@@ -1,0 +1,175 @@
+{
+  "applicationCommit": "f0ed69eaf4838c6321256043db65c3c1f9a7f26f",
+  "scenario": "Coastal Kitchen",
+  "response": "vsi-response.json",
+  "assets": [
+    {
+      "original": "127.0.0.1_3190_app_si (1).png",
+      "sourceDimensions": [
+        2080,
+        2000
+      ],
+      "crop": [
+        490,
+        590,
+        2062,
+        1390
+      ],
+      "dimensions": [
+        1572,
+        800
+      ],
+      "viewport": [
+        1040,
+        1000
+      ],
+      "transcriptScrollTop": 0,
+      "dpr": 2,
+      "encoding": "Native PNG to lossless WebP, integer crop, no resizing",
+      "file": "vsi-recommendation-desktop.webp",
+      "sha256": "b1e557391ae4c80ac5c9a35c89cbc0d6cb27472588c72fa31c97865711baf133",
+      "sourceScreen": "/app/si",
+      "bytes": 294052
+    },
+    {
+      "original": "127.0.0.1_3190_app_si (2).png",
+      "sourceDimensions": [
+        2080,
+        2200
+      ],
+      "crop": [
+        490,
+        590,
+        2062,
+        1752
+      ],
+      "dimensions": [
+        1572,
+        1162
+      ],
+      "viewport": [
+        1040,
+        1100
+      ],
+      "transcriptScrollTop": 400,
+      "dpr": 2,
+      "encoding": "Native PNG to lossless WebP, integer crop, no resizing",
+      "file": "vsi-plan-desktop.webp",
+      "sha256": "2b70a114b9fd26e684da8053e080e09dd4bb3d7a347fe26a68e4a380312ddd1e",
+      "sourceScreen": "/app/si",
+      "bytes": 354812
+    },
+    {
+      "original": "127.0.0.1_3190_app_si (3).png",
+      "sourceDimensions": [
+        780,
+        2200
+      ],
+      "crop": [
+        18,
+        740,
+        762,
+        1710
+      ],
+      "dimensions": [
+        744,
+        970
+      ],
+      "viewport": [
+        390,
+        1100
+      ],
+      "transcriptScrollTop": 219,
+      "dpr": 2,
+      "encoding": "Native PNG to lossless WebP, integer crop, no resizing",
+      "file": "vsi-recommendation-mobile.webp",
+      "sha256": "ee78f524b4e7467a1509ba8bcea1dc56001b840c889a3eb3411313e5714d737f",
+      "sourceScreen": "/app/si",
+      "bytes": 116758
+    },
+    {
+      "original": "127.0.0.1_3190_app_si (4).png",
+      "sourceDimensions": [
+        780,
+        2200
+      ],
+      "crop": [
+        18,
+        746,
+        762,
+        1800
+      ],
+      "dimensions": [
+        744,
+        1054
+      ],
+      "viewport": [
+        390,
+        1100
+      ],
+      "transcriptScrollTop": 698,
+      "dpr": 2,
+      "encoding": "Native PNG to lossless WebP, integer crop, no resizing",
+      "file": "vsi-plan-mobile.webp",
+      "sha256": "a76e9dfc34068d8024c991f57c260f044f624f8802777ae2ff63ae26a71523d5",
+      "sourceScreen": "/app/si",
+      "bytes": 106438
+    },
+    {
+      "original": "127.0.0.1_3190_app_si (5).png",
+      "sourceDimensions": [
+        640,
+        2400
+      ],
+      "crop": [
+        18,
+        732,
+        622,
+        1942
+      ],
+      "dimensions": [
+        604,
+        1210
+      ],
+      "viewport": [
+        320,
+        1200
+      ],
+      "transcriptScrollTop": 271,
+      "dpr": 2,
+      "encoding": "Native PNG to lossless WebP, integer crop, no resizing",
+      "file": "vsi-recommendation-narrow.webp",
+      "sha256": "e72940a041b1c206b91dd8f217472e7b14eaaf6a548993d810816889f20b6080",
+      "sourceScreen": "/app/si",
+      "bytes": 118768
+    },
+    {
+      "original": "127.0.0.1_3190_app_si (6).png",
+      "sourceDimensions": [
+        640,
+        2400
+      ],
+      "crop": [
+        18,
+        740,
+        622,
+        1982
+      ],
+      "dimensions": [
+        604,
+        1242
+      ],
+      "viewport": [
+        320,
+        1200
+      ],
+      "transcriptScrollTop": 871,
+      "dpr": 2,
+      "encoding": "Native PNG to lossless WebP, integer crop, no resizing",
+      "file": "vsi-plan-narrow.webp",
+      "sha256": "c38958fc0910ff5f98c8a11176a0899d79bdc0d0f976d3c1f223e6d009f79f10",
+      "sourceScreen": "/app/si",
+      "bytes": 225014
+    }
+  ]
+}

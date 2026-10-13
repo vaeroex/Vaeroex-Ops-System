@@ -194,6 +194,8 @@ const semanticDefaults = {
 };
 
 const actions = loadTypescriptModule("app/app/operations/actions.ts", {
+  "@/lib/integrations/google-sheets/read-authority": { beginGoogleSheetsRead: () => assert.fail("KPI settings writes must not read Google Sheets") },
+  "@/lib/forms/submission-schema": loadTypescriptModule("lib/forms/submission-schema.ts"),
   "next/cache": { revalidatePath: (value) => revalidatedPaths.push(value) },
   "next/navigation": { redirect },
   "@/lib/ai/prompts/vaeroex-system-prompt": { VAEROEX_SYSTEM_PROMPT: "" },

@@ -1,0 +1,25 @@
+{
+  "reason": "Reviewed historical target numerator/denominator and explicit latest/all chart scope; canonical target rules and chart geometry unchanged.",
+  "changes": [
+    {
+      "before": "  if (semantics.desiredDirection === \"unknown\") return \"Direction needed\";",
+      "after": "  if (semantics.desiredDirection === \"unknown\") return {\n    value: \"Direction needed\",\n    detail: \"Confirm direction in KPI settings to interpret target performance\"\n  };"
+    },
+    {
+      "before": "    return \"No targets\";",
+      "after": "    return { value: \"No targets\", detail: \"No recorded values with a target to evaluate\" };"
+    },
+    {
+      "before": "  return `${numberFormatter.format((onTarget / rowsWithTargets.length) * 100)}%`;",
+      "after": "  const excluded = rows.length - rowsWithTargets.length;\n  return {\n    value: `${numberFormatter.format((onTarget / rowsWithTargets.length) * 100)}%`,\n    detail: `${onTarget} of ${rowsWithTargets.length} recorded ${rowsWithTargets.length === 1 ? \"value\" : \"values\"} met target.${excluded ? ` ${excluded} ${excluded === 1 ? \"record\" : \"records\"} without a value or target excluded.` : \"\"}`\n  };"
+    },
+    {
+      "before": "function TrendChart({ rows, metricName, settings }: { rows: KpiRow[]; metricName: string; settings: KpiSettingRow[] }) {",
+      "after": "function TrendChart({ rows, metricName, settings, scope }: { rows: KpiRow[]; metricName: string; settings: KpiSettingRow[]; scope: \"latest\" | \"all\" }) {"
+    },
+    {
+      "before": "<p className=\"text-xs text-slate-400\">Last {chartRows.length} recorded values \u00b7 {axisX} / {axisY}</p>",
+      "after": "<p className=\"mt-1 text-sm font-medium text-slate-200\">{scope === \"all\" ? \"All history \u00b7\" : \"Latest\"} {chartRows.length} recorded values</p>\n          <p className=\"mt-1 text-xs text-slate-400\">{axisX} / {axisY}</p>"
+    }
+  ]
+}
