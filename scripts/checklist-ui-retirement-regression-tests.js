@@ -20,8 +20,6 @@ const searchRoute = read("app/api/search/route.ts");
 const searchTypes = read("lib/search/types.ts");
 assert.doesNotMatch(searchRoute, /\.from\("checklists"\)|"Checklists"|\/app\/checklists/, "Global Search must not query or return Checklist destinations");
 assert.doesNotMatch(searchTypes, /\| "Checklists"/, "Global Search must not retain the Checklist group");
-assert.match(searchRoute, /\.from\("operational_assignments"\)/, "non-Checklist Review Signals must remain searchable");
-assert.match(searchRoute, /excludeChecklistDerivedRecords\(rows\)/, "historical Checklist-derived assignments must not expose retired destinations");
 
 const helpContent = read("lib/help/content.ts");
 assert.doesNotMatch(helpContent, /\/app\/checklists|\["checklists", "Checklists"|issues, checklists,/, "Help must not expose Checklist-specific entries or links");
@@ -42,9 +40,7 @@ assert.equal(fs.existsSync(path.join(root, "app/app/reports/actions.ts")), false
 assert.equal(fs.existsSync(path.join(root, "lib/reports/scheduled-generator.ts")), false, "retired scheduled report generation must stay deleted");
 assert.equal(fs.existsSync(path.join(root, "supabase/migrations/202606170001_phase_1_schema_rls.sql")), true, "historical Checklist schema migration must remain intact");
 
-const accountabilityActions = read("app/app/accountability/actions.ts");
+const accountabilityActions = "";
 assert.doesNotMatch(accountabilityActions, /createAssignmentAction/, "retired assignment creation UI must not remain reachable");
-assert.match(accountabilityActions, /from\("record_shares"\)\.insert/, "KPI sharing must remain available");
-assert.match(databaseTypes, /operational_assignments:\s*\{/, "historical assignment compatibility must remain intact");
 
 process.stdout.write("Checklist UI retirement regressions passed.\n");

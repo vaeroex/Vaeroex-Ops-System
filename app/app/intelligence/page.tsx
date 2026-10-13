@@ -1,5 +1,4 @@
 import { IntelligenceReadiness } from "@/components/intelligence/IntelligenceReadiness";
-import { IntelligenceWorkspaceContext } from "@/components/intelligence/IntelligenceWorkspaceContext";
 import { overviewComparisons, overviewPeriod } from "@/lib/presentation/overview-comparison";
 import { beginGoogleSheetsRead, bindGoogleSheetsRead, googleSheetsReadSources } from "@/lib/integrations/google-sheets/read-authority";
 import Link from "next/link";
@@ -53,7 +52,7 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
   const access = await requireWorkspaceAccess();
   const { supabase, workspaceId, context } = access;
   const readTicket = await beginGoogleSheetsRead(supabase, workspaceId, access.user.id);
-  const [issuesResult, kpisResult, kpiSettingsResult, filesResult, crmResult, importsResult, sopsResult, formsResult, submissionsResult, peopleResult, decisionsResult, metricsResult, memoryResult, lifecycleResult, briefingStates, healthView, sharesResult] = await Promise.all([
+  const [issuesResult, kpisResult, kpiSettingsResult, filesResult, crmResult, importsResult, sopsResult, formsResult, submissionsResult, peopleResult, decisionsResult, metricsResult, memoryResult, lifecycleResult, briefingStates, healthView] = await Promise.all([
     supabase.from("issues").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
     loadActiveWorkspaceKpis({ supabase, workspaceId }),
     supabase.from("kpi_settings").select("*").eq("workspace_id", workspaceId).order("sort_order", { ascending: true }).order("weight", { ascending: false }),
@@ -83,8 +82,7 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
       // dependency fails. Do not disclose raw database details or fabricate a score.
       console.error(JSON.stringify({ component: "intelligence-health", event: "health_snapshot_unavailable" }));
       return null;
-    }),
-    supabase.from("record_shares").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("created_at", { ascending: false }).limit(40)
+    })
   ]);
 
   const lifecycleRecords = (lifecycleResult.data || []) as unknown as IntelligenceCardLifecycleRecord[];
@@ -293,7 +291,6 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
     lifecycleTokens,
     actorDisplayNames
   });
-  const workspaceReviewContext = { shares: sharesResult.data || [], people: peopleResult.data || [], decisions: decisionsResult.data || [], unavailable: Boolean(sharesResult.error) };
   return (
     <div className="workspace-intelligence space-y-6">
       <header className="workspace-page-header workspace-intelligence-header flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -346,7 +343,6 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
           compactUnavailable
         />
       </section>
-      <IntelligenceWorkspaceContext {...workspaceReviewContext} legacyView={params?.view} />
     </div>
   );
 }

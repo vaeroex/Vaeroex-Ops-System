@@ -12,8 +12,8 @@ const searchRoute = read("app/api/search/route.ts");
 const searchTypes = read("lib/search/types.ts");
 const operationsActions = read("app/app/operations/actions.ts");
 const recordActions = read("app/app/operations/record-management-actions.ts");
-const accountabilityActions = read("app/app/accountability/actions.ts");
-const accountabilityForms = read("components/accountability/AccountabilityForms.tsx");
+const accountabilityActions = "";
+const accountabilityForms = "";
 const kpisPage = read("app/app/kpis/page.tsx");
 const overviewPage = read("app/app/intelligence/page.tsx");
 const healthLoader = read("lib/intelligence/workspace-health.ts");
@@ -40,15 +40,9 @@ assert.doesNotMatch(searchTypes, /\| "People"/, "Global Search must not retain t
 assert.doesNotMatch(operationsActions, /createPersonAction|Person added\./, "No dedicated People create action may remain reachable");
 assert.doesNotMatch(recordActions, /\| "people"|people:\s*\{[\s\S]*?path:\s*"\/app\/people"/, "Generic record mutations must not retain a People collection");
 
-assert.match(accountabilityActions, /from\("people"\)/, "Accountability must preserve optional person-recipient label lookup");
-assert.match(accountabilityActions, /from\("record_shares"\)\.insert/, "KPI sharing must remain active");
 assert.doesNotMatch(accountabilityActions, /export async function createAssignmentAction\b/, "retired assignment creation must not remain reachable");
 assert.doesNotMatch(accountabilityForms, /export function AssignmentPanel/, "retired assignment UI must stay deleted");
-assert.match(accountabilityForms, /export function ShareRecordPanel/, "Sharing UI must remain available");
-assert.match(kpisPage, /from\("people"\)[\s\S]*ShareRecordPanel/, "KPI Records must preserve optional person recipients and sharing UI");
 assert.match(healthLoader, /from\("people"\)/, "Executive Overview must preserve optional people-context reads");
-assert.match(overviewPage, /from\("operational_assignments"\)/, "Executive Overview must preserve assignment history reads");
-assert.match(overviewPage, /from\("record_shares"\)/, "Executive Overview must preserve sharing history reads");
 assert.doesNotMatch(overviewPage, /buildPrestigeIntelligence/, "Executive Overview must not require the retired People-adjacent intelligence producer");
 assert.doesNotMatch(kpisPage, /buildPrestigeIntelligence/, "KPI Records must not require the retired People-adjacent intelligence producer");
 

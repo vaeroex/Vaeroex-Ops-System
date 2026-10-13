@@ -34,8 +34,6 @@ const runtimeFiles = [
   "app/app/page.tsx",
   "app/app/operations/actions.ts",
   "app/app/operations/record-management-actions.ts",
-  "app/app/accountability/actions.ts",
-  "app/app/intelligence/actions.ts",
   "app/app/intelligence/page.tsx",
   "app/app/kpis/page.tsx",
   "app/app/people/page.tsx",
@@ -75,7 +73,7 @@ assert.equal(fs.existsSync(path.join(root, "components/setup/SetupWizard.tsx")),
 const evidenceIndex = read("lib/ai/evidence-index.ts");
 assert.match(evidenceIndex, /\["business_signal", "task", "report", "saved_analysis"\]\.includes\(row\.source_type\)/, "legacy Business Signal and task-backed memory must remain in the explicit fail-closed source list");
 
-const sourcesPage = read("app/app/sources/page.tsx");
+const sourcesPage = read("app/app/sources/SourcesPage.tsx");
 const fileActions = read("app/app/files/actions.ts");
 assert.match(sourcesPage, /UploadSourceDrawer/, "the approved Evidence upload surface must remain available");
 assert.match(sourcesPage, /LearnedKnowledgeView/, "the approved Evidence learned-knowledge surface must remain available");

@@ -9,7 +9,6 @@ import {
   updateKpiValueAction
 } from "@/app/app/operations/actions";
 import { KpiPerformanceMeaningFields } from "@/components/kpis/KpiPerformanceMeaningFields";
-import { ShareRecordPanel, type TeamPersonOption } from "@/components/accountability/AccountabilityForms";
 import { CreateDrawer } from "@/components/operations/CreateDrawer";
 import { EmptyState } from "@/components/operations/EmptyState";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
@@ -98,7 +97,6 @@ type KpisPageProps = {
 
 type KpiRow = Database["public"]["Tables"]["kpis"]["Row"];
 type FileUploadRow = Database["public"]["Tables"]["file_uploads"]["Row"];
-type ShareRow = Database["public"]["Tables"]["record_shares"]["Row"];
 type KpiTone = "green" | "yellow" | "red" | "neutral";
 type KpiDirection = KpiDesiredDirection;
 type ComparisonMode = "actual" | "percent" | "normalized";
@@ -1545,15 +1543,11 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
   const [
     kpiResult,
     folderResult,
-    peopleResult,
-    shareResult,
     fileResult,
     kpiSettingsResult
   ] = await Promise.all([
     loadActiveWorkspaceKpis({ supabase, workspaceId }),
     getRecordFolders(supabase, workspaceId, "kpis"),
-    supabase.from("people").select("id,full_name,role_title,department").eq("workspace_id", workspaceId).is("deleted_at", null).order("full_name"),
-    supabase.from("record_shares").select("*").eq("workspace_id", workspaceId).eq("source_type", "kpi").is("deleted_at", null).order("created_at", { ascending: false }),
     supabase.from("file_uploads").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("created_at", { ascending: false }).limit(100),
     supabase.from("kpi_settings").select("*").eq("workspace_id", workspaceId).order("sort_order", { ascending: true }).order("weight", { ascending: false })
   ]);
@@ -1570,8 +1564,6 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
   const activeStatusFilter = isKpiStatusFilter(params?.status) ? params.status : "all";
   const kpis = filterKpisByTimeline(adjustedKpis, selectedTimelineRange);
   const allVisibleKpis = adjustedKpis;
-  const people = (peopleResult.data || []) as TeamPersonOption[];
-  const shares = (shareResult.data || []) as ShareRow[];
 
   const metricNames = getConfiguredMetricNames(allVisibleKpis, kpiSettings);
   const kpiSnapshotAsOf = new Date().toISOString();
@@ -1722,7 +1714,6 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
   const undoLatestKpi = undoMetricName ? getMetricHistoryRows(allVisibleKpis, undoMetricName).at(-1) : undefined;
   const managedKpis = filteredKpis.map((kpi) => {
     const management = managedValues(kpi);
-    const kpiShares = shares.filter((share) => share.source_id === kpi.id);
     const semantics = kpiStateForName(kpi.name).semantics;
     const targetReference = resolveKpiTargetReference(semantics, kpi.target);
 
@@ -1743,8 +1734,7 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
         { label: "Date", value: kpi.metric_date },
         { label: "Actual", value: formatNumericValue(kpi.actual_value, kpi.name) },
         { label: "Target", value: formatTargetReference(targetReference, kpi.name, kpiSettings, "No target") },
-        { label: "Source", value: kpi.source || "Manual" },
-        { label: "Shares", value: kpiShares.length ? `${kpiShares.length} share record${kpiShares.length === 1 ? "" : "s"}` : "Not shared" }
+        { label: "Source", value: kpi.source || "Manual" }
       ],
       editFields: kpiEditFields,
       editValues: {
@@ -1760,15 +1750,6 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
           <p>
             <span className="font-semibold text-ink">Current status:</span> {kpiStatusText(kpi, semantics)}
           </p>
-          <ShareRecordPanel
-            sourceType="kpi"
-            sourceId={kpi.id}
-            sourceTitle={kpi.name}
-            relatedModule="KPIs"
-            returnPath="/app/kpis"
-            actionHref="/app/kpis"
-            people={people}
-          />
         </div>
       )
     };
@@ -1803,8 +1784,6 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
           params?.error ||
           kpiResult.error?.message ||
     folderResult.error?.message ||
-    peopleResult.error?.message ||
-    shareResult.error?.message ||
     fileResult.error?.message ||
     kpiSettingsResult.error?.message ||
     sourceParentResult.error?.message

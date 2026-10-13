@@ -317,8 +317,6 @@ check(
 const workspaceActionFiles = [
   "app/app/operations/actions.ts",
   "app/app/files/actions.ts",
-  "app/app/accountability/actions.ts",
-  "app/app/intelligence/actions.ts"
 ];
 
 for (const file of workspaceActionFiles) {

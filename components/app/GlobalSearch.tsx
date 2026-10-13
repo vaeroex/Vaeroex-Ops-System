@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { visibleSearchGroups } from "@/lib/search/retired-records";
 import type { Route } from "next";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Command, Loader2, Search, X } from "lucide-react";
@@ -127,6 +128,7 @@ export function GlobalSearch({ className = "", variant = "desktop" }: GlobalSear
       try {
         const response = await fetch(`/api/search?q=${encodeURIComponent(trimmedQuery)}`, {
           signal: controller.signal,
+          cache: "no-store",
           headers: { Accept: "application/json" }
         });
         if (!response.ok) {
@@ -141,7 +143,7 @@ export function GlobalSearch({ className = "", variant = "desktop" }: GlobalSear
           setSecurityBlocked(true);
           return;
         }
-        const nextGroups = payload.groups || [];
+        const nextGroups = visibleSearchGroups(payload.groups || []);
         setGroups(nextGroups);
         setSelectedIndex(flattenResults(nextGroups).length ? 0 : -1);
       } catch (searchError) {

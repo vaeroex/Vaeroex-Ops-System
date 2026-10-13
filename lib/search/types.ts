@@ -3,7 +3,6 @@ export type GlobalSearchGroupLabel =
   | "Saved Analyses"
   | "Files"
   | "Issues"
-  | "Review Signals"
   | "Customer Evidence"
   | "SOPs"
   | "Learned Knowledge"

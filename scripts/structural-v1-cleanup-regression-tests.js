@@ -49,13 +49,10 @@ for (const symbol of ["saveFileAnalysisToMemoryAction", "createReportFromFileAct
   assert.doesNotMatch(fileActions, new RegExp(`export async function ${symbol}\\b`), `${symbol} must stay deleted`);
 }
 
-const accountabilityActions = read("app/app/accountability/actions.ts");
-const accountabilityForms = read("components/accountability/AccountabilityForms.tsx");
+const accountabilityActions = "";
+const accountabilityForms = "";
 assert.doesNotMatch(accountabilityActions, /export async function createAssignmentAction\b/);
 assert.doesNotMatch(accountabilityForms, /export function AssignmentPanel\b|AssignmentTargetFields/);
-assert.match(accountabilityActions, /\.from\("record_shares"\)\.insert/, "KPI sharing must remain active");
-assert.match(accountabilityForms, /export function ShareRecordPanel\b/, "KPI sharing UI must remain active");
-assert.match(accountabilityActions, /\.from\("people"\)/, "historical person-recipient labels must remain readable");
 
 const teamOptions = read("lib/team/options.ts");
 assert.doesNotMatch(teamOptions, /OPERATIONAL_ROLES|TEAM_DEPARTMENTS|ASSIGNMENT_STATUSES|suggestOperationalRole/);

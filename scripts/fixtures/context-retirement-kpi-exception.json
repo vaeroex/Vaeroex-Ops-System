@@ -1,0 +1,41 @@
+{
+  "scope": "Explicitly authorized removal of metadata-sharing UI/read/errors only; original KPI calculation and mutation hashes stay frozen.",
+  "changes": [
+    {
+      "before": "} from \"@/app/app/operations/actions\";\nimport { KpiPerformanceMeaningFields } from \"@/components/kpis/KpiPerformanceMeaningFields\";\nimport { ShareRecordPanel, type TeamPersonOption } from \"@/components/accountability/AccountabilityForms\";\nimport { CreateDrawer } from \"@/components/operations/CreateDrawer\";\nimport { EmptyState } from \"@/components/operations/EmptyState\";\n",
+      "after": "} from \"@/app/app/operations/actions\";\nimport { KpiPerformanceMeaningFields } from \"@/components/kpis/KpiPerformanceMeaningFields\";\nimport { CreateDrawer } from \"@/components/operations/CreateDrawer\";\nimport { EmptyState } from \"@/components/operations/EmptyState\";\n"
+    },
+    {
+      "before": "type KpiRow = Database[\"public\"][\"Tables\"][\"kpis\"][\"Row\"];\ntype FileUploadRow = Database[\"public\"][\"Tables\"][\"file_uploads\"][\"Row\"];\ntype ShareRow = Database[\"public\"][\"Tables\"][\"record_shares\"][\"Row\"];\ntype KpiTone = \"green\" | \"yellow\" | \"red\" | \"neutral\";\ntype KpiDirection = KpiDesiredDirection;\n",
+      "after": "type KpiRow = Database[\"public\"][\"Tables\"][\"kpis\"][\"Row\"];\ntype FileUploadRow = Database[\"public\"][\"Tables\"][\"file_uploads\"][\"Row\"];\ntype KpiTone = \"green\" | \"yellow\" | \"red\" | \"neutral\";\ntype KpiDirection = KpiDesiredDirection;\n"
+    },
+    {
+      "before": "    kpiResult,\n    folderResult,\n    peopleResult,\n    shareResult,\n    fileResult,\n    kpiSettingsResult\n",
+      "after": "    kpiResult,\n    folderResult,\n    fileResult,\n    kpiSettingsResult\n"
+    },
+    {
+      "before": "    loadActiveWorkspaceKpis({ supabase, workspaceId }),\n    getRecordFolders(supabase, workspaceId, \"kpis\"),\n    supabase.from(\"people\").select(\"id,full_name,role_title,department\").eq(\"workspace_id\", workspaceId).is(\"deleted_at\", null).order(\"full_name\"),\n    supabase.from(\"record_shares\").select(\"*\").eq(\"workspace_id\", workspaceId).eq(\"source_type\", \"kpi\").is(\"deleted_at\", null).order(\"created_at\", { ascending: false }),\n    supabase.from(\"file_uploads\").select(\"*\").eq(\"workspace_id\", workspaceId).is(\"archived_at\", null).is(\"deleted_at\", null).order(\"created_at\", { ascending: false }).limit(100),\n    supabase.from(\"kpi_settings\").select(\"*\").eq(\"workspace_id\", workspaceId).order(\"sort_order\", { ascending: true }).order(\"weight\", { ascending: false })\n",
+      "after": "    loadActiveWorkspaceKpis({ supabase, workspaceId }),\n    getRecordFolders(supabase, workspaceId, \"kpis\"),\n    supabase.from(\"file_uploads\").select(\"*\").eq(\"workspace_id\", workspaceId).is(\"archived_at\", null).is(\"deleted_at\", null).order(\"created_at\", { ascending: false }).limit(100),\n    supabase.from(\"kpi_settings\").select(\"*\").eq(\"workspace_id\", workspaceId).order(\"sort_order\", { ascending: true }).order(\"weight\", { ascending: false })\n"
+    },
+    {
+      "before": "  const kpis = filterKpisByTimeline(adjustedKpis, selectedTimelineRange);\n  const allVisibleKpis = adjustedKpis;\n  const people = (peopleResult.data || []) as TeamPersonOption[];\n  const shares = (shareResult.data || []) as ShareRow[];\n\n  const metricNames = getConfiguredMetricNames(allVisibleKpis, kpiSettings);\n",
+      "after": "  const kpis = filterKpisByTimeline(adjustedKpis, selectedTimelineRange);\n  const allVisibleKpis = adjustedKpis;\n\n  const metricNames = getConfiguredMetricNames(allVisibleKpis, kpiSettings);\n"
+    },
+    {
+      "before": "  const managedKpis = filteredKpis.map((kpi) => {\n    const management = managedValues(kpi);\n    const kpiShares = shares.filter((share) => share.source_id === kpi.id);\n    const semantics = kpiStateForName(kpi.name).semantics;\n    const targetReference = resolveKpiTargetReference(semantics, kpi.target);\n",
+      "after": "  const managedKpis = filteredKpis.map((kpi) => {\n    const management = managedValues(kpi);\n    const semantics = kpiStateForName(kpi.name).semantics;\n    const targetReference = resolveKpiTargetReference(semantics, kpi.target);\n"
+    },
+    {
+      "before": "        { label: \"Actual\", value: formatNumericValue(kpi.actual_value, kpi.name) },\n        { label: \"Target\", value: formatTargetReference(targetReference, kpi.name, kpiSettings, \"No target\") },\n        { label: \"Source\", value: kpi.source || \"Manual\" },\n        { label: \"Shares\", value: kpiShares.length ? `${kpiShares.length} share record${kpiShares.length === 1 ? \"\" : \"s\"}` : \"Not shared\" }\n      ],\n      editFields: kpiEditFields,\n",
+      "after": "        { label: \"Actual\", value: formatNumericValue(kpi.actual_value, kpi.name) },\n        { label: \"Target\", value: formatTargetReference(targetReference, kpi.name, kpiSettings, \"No target\") },\n        { label: \"Source\", value: kpi.source || \"Manual\" }\n      ],\n      editFields: kpiEditFields,\n"
+    },
+    {
+      "before": "            <span className=\"font-semibold text-ink\">Current status:</span> {kpiStatusText(kpi, semantics)}\n          </p>\n          <ShareRecordPanel\n            sourceType=\"kpi\"\n            sourceId={kpi.id}\n            sourceTitle={kpi.name}\n            relatedModule=\"KPIs\"\n            returnPath=\"/app/kpis\"\n            actionHref=\"/app/kpis\"\n            people={people}\n          />\n        </div>\n      )\n",
+      "after": "            <span className=\"font-semibold text-ink\">Current status:</span> {kpiStatusText(kpi, semantics)}\n          </p>\n        </div>\n      )\n"
+    },
+    {
+      "before": "          kpiResult.error?.message ||\n    folderResult.error?.message ||\n    peopleResult.error?.message ||\n    shareResult.error?.message ||\n    fileResult.error?.message ||\n    kpiSettingsResult.error?.message ||\n",
+      "after": "          kpiResult.error?.message ||\n    folderResult.error?.message ||\n    fileResult.error?.message ||\n    kpiSettingsResult.error?.message ||\n"
+    }
+  ]
+}
