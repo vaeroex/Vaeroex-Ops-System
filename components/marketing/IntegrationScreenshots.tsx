@@ -31,7 +31,7 @@ export function IntegrationScreenshotTour() {
             <img key={view} src={`${base}-desktop.webp`} srcSet={`${base}-desktop.webp 2x`} width={capture.desktop[0]} height={capture.desktop[1]} alt={capture.alt} loading="lazy" decoding="async" />
           </picture>
         </a>
-        <figcaption className={styles.caption}>Coastal Kitchen · Demo data</figcaption>
+        <figcaption className={styles.caption}>Coastal Kitchen · Fictional business example</figcaption>
       </figure>
     </div>
   </div>;

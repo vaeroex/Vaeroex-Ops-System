@@ -36,3 +36,7 @@ The integration screenshots do **not** add duplicate sources to the approved Hea
 9. Build a Preview deployment, never Production. Check all provider tabs, keyboard navigation, 390px/320px layout, DPR2 source resolution, image loading and caption; retain Google Sheets pilot eligibility and spreadsheet-upload fallback at connection and pre-purchase points. Keep the main automatic deployment hold.
 
 See also [workspace screenshot capture record](website-workspace-captures.md) for the original scenario and approved screenshots.
+
+## Connected insights and VSI follow-up
+
+The focused [workflow review](coastal-kitchen-connected-insights-review.md) records the real retrieval boundary and the proposed smallest extension. Do not treat the disconnected provider-browser fixtures as connected analysis evidence or insert a scripted VSI answer. Use the visible caption “Coastal Kitchen · Fictional business example” beneath each image or shared group.

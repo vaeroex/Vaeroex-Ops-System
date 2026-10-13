@@ -8,7 +8,7 @@
 .capture[data-workspace-capture="findings"], .capture[data-workspace-capture="evidence"] { max-width: 720px; }
 .caption { display: grid; gap: 10px; margin-bottom: 18px; color: #b6c0cf; font-size: 14px; line-height: 1.65; }
 .caption strong { color: #f1f5fb; font-weight: 500; font-size: clamp(19px, 2vw, 25px); line-height: 1.3; }
-.label { color: #a9c4f0; font-size: 11px; letter-spacing: .06em; }
+.attribution { margin-top: 10px; color: #aab8cb; font-size: 12px; line-height: 1.5; }
 .imageLink { display: block; border: 1px solid #344052; border-radius: 8px; overflow: hidden; background: #0c1220; }
 .imageLink picture, .imageLink img { display: block; width: 100%; }
 .imageLink img { height: auto; }

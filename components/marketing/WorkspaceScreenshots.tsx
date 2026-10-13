@@ -17,11 +17,10 @@ export function WorkspaceCapture({ view }: { view: CaptureView }) {
   const capture = captures[view];
   const base = `/images/workspace-demo/${view}`;
   return <figure className={styles.capture} data-workspace-capture={view}>
-    <figcaption className={styles.caption}>
-      <span className={styles.label}>Actual Vaeroex workspace · Demo data</span>
+    <div className={styles.caption}>
       <strong>{capture.title}</strong>
       <span>{capture.caption}</span>
-    </figcaption>
+    </div>
     <a href={`${base}-desktop.webp`} target="_blank" rel="noopener noreferrer" className={styles.imageLink} aria-label={`Open full-size ${capture.label} screenshot`}>
       <picture>
         <source media="(max-width: 600px)" srcSet={`${base}-mobile.webp 2x`} width={capture.mobile[0]} height={capture.mobile[1]} />
@@ -29,6 +28,7 @@ export function WorkspaceCapture({ view }: { view: CaptureView }) {
         <img src={`${base}-desktop.webp`} srcSet={`${base}-desktop.webp 2x`} width={capture.desktop[0]} height={capture.desktop[1]} alt={capture.alt} loading="lazy" decoding="async" />
       </picture>
     </a>
+    <figcaption className={styles.attribution}>Coastal Kitchen · Fictional business example</figcaption>
     <p className={styles.enlarge}>Select the image to view it at full size.</p>
   </figure>;
 }
