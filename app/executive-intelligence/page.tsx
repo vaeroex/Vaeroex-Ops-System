@@ -5,6 +5,8 @@ import { PublicFooter } from "@/components/legal/PublicFooter";
 import { PublicSiteHeader } from "@/components/legal/PublicSiteHeader";
 import { StartWithVaeroexMenu } from "@/components/legal/StartWithVaeroexMenu";
 import { OperationsIntelligenceEngineDemo } from "@/components/motion/OperationsIntelligenceEngineDemo";
+import { GoogleSheetsPilotNotice } from "@/components/integrations/google-sheets/GoogleSheetsPilotNotice";
+import story from "@/components/marketing/ExecutiveStory.module.css";
 import { ClarityJourney } from "@/components/marketing/clarity/ClarityJourney";
 import {
   operationsIntelligenceJsonLd,
@@ -15,7 +17,7 @@ import styles from "@/components/marketing/IntelligencePages.module.css";
 export const metadata: Metadata = publicPageMetadata({
   title: "Executive Intelligence | Vaeroex",
   description:
-    "Turn fragmented business information into a clearer view of Business Health, performance, risks, opportunities, and what deserves leadership attention.",
+    "Executive Intelligence for restaurants, breweries, retailers, and other businesses. Explore connected records, uploads, Business Notes, and Vaeroex Super Intelligence (VSI).",
   path: "/executive-intelligence",
 });
 
@@ -45,11 +47,11 @@ const capabilities = [
 const information = [
   [
     "What information can I bring?",
-    "Supported spreadsheets, PDFs, reports, screenshots, exports, photos, paper records, and handwritten business notes. Clear images can help bring offline information into the workspace. Recognition and analysis remain reviewable, with no guarantee that every source can be interpreted perfectly.",
+    "Upload PDF or Word (.docx) documents, CSV or Excel (.xlsx) spreadsheets, and PNG/JPG images of business records, including clear photos of paper notes. Add Business Notes for context. Extraction and proposed facts remain subject to review and approval; image recognition can miss details.",
   ],
   [
     "What can Vaeroex help me notice?",
-    "KPI movement, missed targets, meaningful changes, risks, opportunities, and developing issues. For example, it can help investigate whether sales are improving while margins weaken, or whether separate records point toward the same operational problem.",
+    "KPI movement, missed targets, and changes supported by the information you provide. Investigate a slower sales period or a cost change when those records are available. Missing or stale evidence can limit the answer; a pattern alone does not establish its cause.",
   ],
   [
     "How do intelligence briefings work?",
@@ -125,27 +127,27 @@ export default function OperationsIntelligencePage() {
           <div className={styles.heroGrid}>
             <div>
               <p className={styles.heroLead}>
-                Your numbers, reports, and business context. Connected into a
-                clearer view of performance, risk, and what deserves your
-                attention.
+                For restaurants, breweries, retailers, and other businesses ready
+                to make more of their information. Explore performance,
+                investigate changes, and prepare clearer next steps with evidence you can review.
               </p>
               <div className={styles.actions}>
                 <StartWithVaeroexMenu
                   className={styles.primary}
                   label="Start Executive Intelligence"
                 />
-                <a href="#product-experience" className={styles.textLink}>
-                  Explore the experience
+                <a href="#vsi" className={styles.textLink}>
+                  Explore VSI
                   <ArrowRight aria-hidden="true" />
                 </a>
               </div>
             </div>
             <div className={styles.heroSide}>
-              <strong>A second set of eyes on your business.</strong>
+              <strong>Start with the information you already have.</strong>
               <p>
-                Vaeroex&apos;s flagship Executive Intelligence platform helps
-                owners and operations leaders make sense of information they
-                already have. Supporting evidence stays available for review.
+                Connect supported Square or QuickBooks records, upload reports,
+                and add Business Notes. Receive performance views, findings,
+                on-demand briefings, saved analyses, and a place to ask deeper questions.
               </p>
             </div>
           </div>
@@ -158,6 +160,51 @@ export default function OperationsIntelligencePage() {
         compact
         stages={evidenceJourney}
       />
+
+      <section id="vsi" className={`${styles.section} ${story.vsi}`} aria-labelledby="vsi-title">
+        <div className={`${styles.container} ${story.vsiLayout}`}>
+          <div>
+            <p className={styles.sectionLabel}>Vaeroex Super Intelligence / VSI</p>
+            <h2 id="vsi-title" className={story.headline}>Ask deeper questions.<br /><em>See the bigger picture.</em></h2>
+            <p className={story.aside}>A text conversation with room to investigate, imagine, and refine.</p>
+          </div>
+          <div className={story.prose}>
+            <p className={story.lead}>Built with advanced artificial intelligence and Vaeroex-developed technology, VSI turns questions into insights, ideas into strategies, and complex information into clearer next steps—all through natural conversation.</p>
+            <p>If you prefer to talk things through, start with a question and let the conversation develop. Explore your business performance, investigate the evidence behind an insight, research market trends, develop marketing ideas, and draft plans, SOPs, or meeting agendas. Ask follow-up questions, work through possibilities, and refine your thinking with relevant business context—without having to fit your questions into a dashboard.</p>
+            <p>And when your curiosity goes beyond business, keep asking. From everyday questions and creative writing to brainstorming and learning something new, VSI gives you room to think, explore, and create—all within your Vaeroex workspace.</p>
+            <p className={story.reviewNote}>Plans and SOPs are drafts for your review. They do not become approved company policy or change business records automatically. Review supporting evidence and check important answers.</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="business-information" className={styles.section} aria-labelledby="business-information-title">
+        <div className={styles.container}>
+          <div className={styles.sectionHead}>
+            <div><p className={styles.sectionLabel}>Your business information</p><h2 id="business-information-title">Connect what you use.<br />Bring what you know.</h2></div>
+            <p className={styles.copy}>Begin with a supported connection or a few useful files. Add Business Notes to explain your locations, goals, operating hours, meeting decisions, and recent changes.</p>
+          </div>
+          <div className={story.inputGrid}>
+            <article className={story.inputItem}>
+              <span>01 / PAYMENTS</span><h3>Square</h3>
+              <p>Connect Square and choose a location to bring payment records into your workspace. Refresh payments on request or select a supported historical date range.</p>
+              <p>Payment activity alone does not establish inventory, labor costs, or profit. Review the dates and coverage shown with your records.</p>
+            </article>
+            <article className={story.inputItem}>
+              <span>02 / ACCOUNTING</span><h3>QuickBooks Online</h3>
+              <p>Connect supported accounting records, including invoices, sales receipts, bills, and payments, along with reports such as Profit and Loss and Balance Sheet.</p>
+              <p>After connection, scheduled checks look for transaction changes every 15 minutes and refresh reports hourly. Check freshness and available coverage; a connection does not guarantee complete accounting history.</p>
+            </article>
+            <article className={story.inputItem}>
+              <span>03 / FILES &amp; CONTEXT</span><h3>Uploads &amp; Business Notes</h3>
+              <p>Upload PDF and Word (.docx) documents, CSV and Excel (.xlsx) spreadsheets, and PNG/JPG photos of business records. Each file can be up to 25 MiB.</p>
+              <p>Add Business Notes for information that does not live in a report. Review and approve proposed information before Vaeroex uses it as business evidence.</p>
+            </article>
+          </div>
+          <p className={story.sourceRule}>For a metric within a reporting scope, Vaeroex uses one authoritative source. Overlapping connected, uploaded, and manually entered values are not automatically consolidated or deduplicated. Source changes require review.</p>
+          <GoogleSheetsPilotNotice className="mt-6" />
+          <p className={styles.caption}>Additional integrations are in development. Availability will be announced when they are ready.</p>
+        </div>
+      </section>
 
       <section id="product-experience" className={styles.sectionTight}>
         <div className={styles.container}>

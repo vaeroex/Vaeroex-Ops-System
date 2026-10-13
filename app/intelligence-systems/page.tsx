@@ -9,9 +9,9 @@ import { publicPageMetadata } from "@/lib/seo/public-seo";
 import styles from "@/components/marketing/IntelligencePages.module.css";
 
 export const metadata: Metadata = publicPageMetadata({
-  title: "Intelligence Systems | Vaeroex",
+  title: "The Vaeroex Approach | Executive Intelligence",
   description:
-    "Discover how Vaeroex turns complex information into visibility, awareness, prediction, and action across specialized intelligence domains.",
+    "Explore how Vaeroex-developed software, connected records, business context, and reviewable analysis support informed business decisions.",
   path: "/intelligence-systems",
 });
 
@@ -26,13 +26,13 @@ const intelligencePath = [
   },
   {
     label: "Visibility",
-    title: "A shared standard. Distinct domains.",
+    title: "Bring business context into view.",
     description:
-      "Bring important conditions, relationships, and changes into view so they can be examined together. Each intelligence environment is shaped around the evidence, constraints, and expertise its domain requires.",
-    detail: "Executive · Drug Discovery · Biological Intelligence",
+      "Bring important conditions, relationships, and changes into view so they can be examined together. Executive Intelligence keeps the business context, sources, and limitations available for review.",
+    detail: "Business records · Business Notes · Performance",
   },
   {
-    label: "Awareness & prediction",
+    label: "Awareness & investigation",
     title: "See a signal in its wider context.",
     description:
       "Understand why a signal may matter and what remains uncertain. Recognize supported patterns and possible outcomes. A possibility stays distinct from an established fact.",
@@ -67,7 +67,7 @@ export default function IntelligenceSystemsPage() {
               </p>
               <div className={styles.actions}>
                 <a href="#specialized-intelligence" className={styles.primary}>
-                  Explore our intelligence areas
+                  Explore Executive Intelligence
                   <ArrowRight aria-hidden="true" />
                 </a>
               </div>
@@ -75,9 +75,9 @@ export default function IntelligenceSystemsPage() {
             <div className={styles.heroSide}>
               <strong>From complexity to a clearer decision.</strong>
               <p>
-                Vaeroex Intelligence Systems transforms complex information into
-                visibility, awareness, prediction, and action through
-                environments shaped around distinct domains.
+                Vaeroex-developed software connects business information with
+                reviewable analysis. It helps you see changes, ask better
+                questions, and consider what to do next.
               </p>
             </div>
           </div>
@@ -96,7 +96,7 @@ export default function IntelligenceSystemsPage() {
           <div className={styles.sectionHead}>
             <div>
               <p className={styles.sectionLabel}>
-                <span>02</span>One identity. Distinct domains.
+                <span>02</span>Built for business decisions
               </p>
               <h2>
                 Intelligence shaped
@@ -105,8 +105,8 @@ export default function IntelligenceSystemsPage() {
               </h2>
             </div>
             <p className={styles.copy}>
-              Different decisions depend on different evidence, constraints, and
-              expertise. Each environment respects those differences.
+              Start with Executive Intelligence. Restaurants, breweries, retailers,
+              and other businesses can bring their own evidence and questions.
             </p>
           </div>
           {PUBLIC_SYSTEMS.map((system, index) => (
@@ -114,7 +114,7 @@ export default function IntelligenceSystemsPage() {
               <span>0{index + 1}</span>
               <div>
                 <span
-                  className={`${styles.status} ${system.availability === "under_development" ? styles.development : ""}`}
+                  className={`${styles.status} `}
                 >
                   {system.statusLabel}
                 </span>

@@ -139,13 +139,13 @@ assert.match(
 );
 for (const route of [
   "/executive-intelligence",
-  "/drug-discovery-intelligence",
-  "/biological-intelligence",
   "/pricing",
   "/contact",
 ])
   assert.ok(sitemap.includes(`"${route}"`));
 assert.doesNotMatch(sitemap, /"\/operations-intelligence"/);
+assert.doesNotMatch(sitemap, /biological-intelligence|drug-discovery-intelligence/);
+assert.doesNotMatch(navigation + footer + seo, /Biological Intelligence|Drug Discovery Intelligence/);
 assert.doesNotMatch(
   layout + navigation,
   /IntelligenceUniverseProvider|IntelligenceUniverseShell|UniverseNavigationLink|fast_travel|destination gravity/,
@@ -233,8 +233,8 @@ assert.doesNotMatch(
   "The membership attribution must not expand into infrastructure or vendor claims",
 );
 const researchSources =
-  read("app/drug-discovery-intelligence/page.tsx") +
-  read("app/biological-intelligence/page.tsx");
+  read("app/drug-discovery-intelligence/_archived-page.tsx") +
+  read("app/biological-intelligence/_archived-page.tsx");
 assert.doesNotMatch(
   researchSources,
   /discovered (?:a )?drug|replaces? scientists?|replaces? laborator|proves? (?:therapeutic )?efficacy|clinical approval|FDA approval|guaranteed successful/i,

@@ -15,9 +15,9 @@ import { publicPageMetadata } from "@/lib/seo/public-seo";
 import styles from "@/components/marketing/IntelligencePages.module.css";
 
 export const metadata: Metadata = publicPageMetadata({
-  title: "Vaeroex Intelligence Pricing",
+  title: "Executive Intelligence Pricing | Vaeroex",
   description:
-    "Executive Intelligence is available through the current Vaeroex subscription. Review pricing, included capabilities, and the availability of our research environments.",
+    "Executive Intelligence at $250/month. Review workspace capabilities, storage options, and the current Google Sheets pilot restriction before subscribing.",
   path: "/pricing",
 });
 
@@ -28,6 +28,8 @@ const executiveInclusions = [
   "Prioritized Intelligence and Explain Finding",
   "Evidence and trusted business context",
   "Saved Analyses and document analysis",
+  "Vaeroex Super Intelligence (VSI)",
+  "File uploads, Business Notes, Square and QuickBooks connections",
 ] as const;
 
 type PricingPageProps = {
@@ -118,6 +120,11 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
                       </li>
                     ))}
                   </ul>
+                  <p className={styles.billingFine}>
+                    Each workspace includes 15 GB of uploaded-file storage and 500 file slots.
+                    Optional capacity packs are $5/month each for another 10 GB and 500 slots,
+                    purchased explicitly in Settings → Usage &amp; Storage. No automatic overage charges.
+                  </p>
                   <GoogleSheetsPilotNotice className="mt-4" />
                   <p className={styles.billingFine}>
                     Renews monthly unless canceled through Manage billing.
@@ -134,35 +141,7 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
             Start with Vaeroex to review the required legal terms before
             checkout.
           </p>
-          <div className={styles.futurePrice}>
-            {PUBLIC_SYSTEMS.map((system) =>
-              system.availability === "under_development" ? (
-                <article key={system.id} data-pricing-system={system.id}>
-                  <span className={`${styles.status} ${styles.development}`}>
-                    {system.statusLabel}
-                  </span>
-                  <h2>{system.name}</h2>
-                  <p>{system.description}</p>
-                  <strong className={styles.statusLabel}>
-                    {system.pricing.display}
-                  </strong>
-                  <p className={styles.caption}>
-                    This environment is not currently available for purchase or
-                    subscription activation.
-                  </p>
-                  <span className={styles.caption} aria-disabled="true">
-                    {system.pricing.ctaLabel}
-                  </span>
-                  <div>
-                    <Link href={system.route} className={styles.textLink}>
-                      Explore the research direction
-                      <ArrowRight aria-hidden="true" />
-                    </Link>
-                  </div>
-                </article>
-              ) : null,
-            )}
-          </div>
+
         </div>
       </section>
 

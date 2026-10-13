@@ -59,7 +59,7 @@ type PublicCtaBandProps = {
 };
 
 export function PublicCtaBand({
-  eyebrow = "Vaeroex Intelligence Systems",
+  eyebrow = "Vaeroex Executive Intelligence",
   title,
   description,
   primaryHref = "/pricing",

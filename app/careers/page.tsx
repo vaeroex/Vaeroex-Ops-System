@@ -23,7 +23,7 @@ export default function CareersPage() {
     <main className="vaeroex-public-site min-h-screen bg-[#030712] text-white">
       <PublicSiteHeader />
       <PublicPageHero
-        eyebrow="Vaeroex Intelligence Systems"
+        eyebrow="Vaeroex Executive Intelligence"
         title="We are not currently listing open positions."
         description="Vaeroex is building evidence-backed intelligence systems carefully. As the company grows, future work may require engineers, product thinkers, operators, and domain specialists who value clarity, evidence, and responsible execution."
         actions={

@@ -17,9 +17,9 @@ import { publicPageMetadata } from "@/lib/seo/public-seo";
 import styles from "./public-home.module.css";
 
 export const metadata: Metadata = publicPageMetadata({
-  title: "Vaeroex | Complexity, made clear.",
+  title: "Vaeroex | The advantage of knowing first",
   description:
-    "Turn fragmented business information into a clearer view of performance, risks, and what deserves your attention. Explore Vaeroex Executive Intelligence.",
+    "Executive Intelligence for restaurants, breweries, retailers, and other businesses. Connect records, upload reports, add business context, and explore what matters with Vaeroex.",
   path: "/",
 });
 
@@ -33,7 +33,7 @@ export default function HomePage() {
         stages={[
           {
             label: "Source fragments",
-            title: "Complexity, made clear.",
+            title: "The advantage of knowing first",
             description:
               "Your business has the information. Vaeroex helps you see what it means.",
           },
@@ -66,18 +66,18 @@ export default function HomePage() {
               "Keep source information, supported patterns, and uncertainty distinct. Move between the wider picture and the detail behind a finding.",
           },
           {
-            label: "Distinct perspectives",
+            label: "Business perspective",
             title: (
               <>
-                One philosophy.
+                Your business.
                 <br />
-                Different worlds.
+                A wider perspective.
               </>
             ),
             description:
-              "Intelligence takes its shape from the questions, evidence, and constraints of each domain.",
+              "A restaurant, brewery, or retailer has its own questions. Bring the context that makes your business different.",
             detail:
-              "Executive Intelligence is available now. Drug Discovery and Biological Intelligence are in development, each with its own research focus.",
+              "Explore performance with connected records, uploaded reports, and Business Notes. Useful for these industries and other businesses with evidence to investigate.",
           },
           {
             label: "Clarity for people",
@@ -97,22 +97,20 @@ export default function HomePage() {
         intro={
           <div className={`${styles.heroCopy} ${styles.journeyHero}`}>
             <p className={styles.eyebrow}>
-              <span className={styles.signalDot} /> THE ADVANTAGE OF KNOWING
-              FIRST
+              <span className={styles.signalDot} /> EXECUTIVE INTELLIGENCE
             </p>
             <h1 id="home-title">
-              Complexity,
+              The advantage{" "}
               <br />
-              <span>made clear.</span>
+              <span>of knowing first</span>
             </h1>
             <p className={styles.lede}>
-              Your business has the information.
-              <br />
-              Vaeroex helps you see what it means.
+              A clearer view for restaurants, breweries, retailers—and the people who run them.
             </p>
             <p className={styles.heroDescription}>
-              Bring scattered records, performance, and evidence into one
-              clearer view of your business—and what deserves your attention.
+              Turn everyday business information into a clearer view of performance.
+              Bring connected records, uploaded reports, and business context together
+              to recognize changes, investigate problems, and make informed decisions sooner.
             </p>
             <div className={styles.actions}>
               <Link
@@ -139,9 +137,10 @@ export default function HomePage() {
             <br />A sharper focus.
           </h2>
           <p>
-            Built for the people responsible for the business. One inspectable
-            environment for its condition, its performance, and its next
-            questions.
+            Investigate a quieter week at the restaurant, a change in tasting-room
+            sales, or a retailer’s performance against its targets. Start with
+            the records you have and see what they support. Executive Intelligence
+            also works for other businesses with information to explore.
           </p>
           <Link href="/executive-intelligence" className="vx-text-link">
             Meet Executive Intelligence
@@ -184,17 +183,38 @@ export default function HomePage() {
         </div>
       </section>
 
+      <section className={styles.product} aria-labelledby="information-title">
+        <div className={styles.productIntro}>
+          <p className={styles.eyebrow}>03 / START WITH WHAT YOU KNOW</p>
+          <h2 id="information-title">Your information.<br />A useful starting point.</h2>
+          <p>Use a supported connection, upload a report, or add the context only your team knows. Review and approve information before it becomes business evidence.</p>
+          <Link href="/executive-intelligence#business-information" className="vx-text-link">
+            Explore connections and uploads<ArrowUpRight size={18} aria-hidden="true" />
+          </Link>
+        </div>
+        <div className={styles.featureRows}>
+          {[
+            ["01", "Connect business records.", "Square & QuickBooks Online", "Review Square payment activity with refreshes you start, or supported QuickBooks accounting records with scheduled updates."],
+            ["02", "Upload the reports you use.", "Files & Notes", "Bring PDF and Word (.docx) documents, CSV and Excel (.xlsx) spreadsheets, and PNG/JPG photos of business records."],
+            ["03", "Add the context behind the numbers.", "Business Notes", "Describe your locations, goals, operating hours, meeting decisions, and important changes. Give Vaeroex more context for the questions you ask."],
+          ].map(([n, title, label, copy]) => (
+            <div key={n}><span>{n}</span><div><small>{label}</small><h3>{title}</h3><p>{copy}</p></div></div>
+          ))}
+        </div>
+      </section>
+
       <section className={styles.material} aria-labelledby="trust-title">
         <div className={styles.materialCopy}>
-          <p className={styles.eyebrow}>03 / BUILT TO BE INSPECTED</p>
+          <p className={styles.eyebrow}>04 / SOFTWARE, CONTEXT & ANALYSIS</p>
           <h2 id="trust-title">
-            Clarity you can
+            Built to connect information
             <br />
-            look into.
+            with decisions.
           </h2>
           <p>
-            An answer is only as useful as the context behind it. Keep sources,
-            interpretation, and important limitations in view.
+            Vaeroex combines its own software and analysis workflows with advanced
+            AI technology to organize business evidence, surface meaningful
+            changes, and deliver insights you can explore.
           </p>
           <Link href="/trust" className="vx-text-link">
             Explore the Trust Center
@@ -236,16 +256,16 @@ export default function HomePage() {
 
       <section className={styles.domains} aria-labelledby="domains-title">
         <div className={styles.sectionLabel}>
-          <span>04 / SPECIALIZED INTELLIGENCE</span>
+          <span>05 / CONTINUOUS DEVELOPMENT</span>
           <Link href="/intelligence-systems">
             Explore our approach
             <ArrowUpRight size={14} aria-hidden="true" />
           </Link>
         </div>
         <h2 id="domains-title">
-          One philosophy.
+          Continuously developed.
           <br />
-          <span>Distinct perspectives.</span>
+          <span>Carefully tested.</span>
         </h2>
         <div className={styles.domainList}>
           {PUBLIC_SYSTEMS.map((system, index) => (
@@ -270,8 +290,8 @@ export default function HomePage() {
           ))}
         </div>
         <p className={styles.domainNote}>
-          Executive Intelligence is available today. Research environments
-          remain in development, with pricing not yet announced.
+          We continue to refine Vaeroex’s intelligence tools, test their performance,
+          and expand how businesses can connect and understand their information.
         </p>
       </section>
 
@@ -292,6 +312,7 @@ export default function HomePage() {
             <ArrowRight size={18} aria-hidden="true" />
           </Link>
         </div>
+        <p className={styles.ownership}>Veteran owned and operated</p>
       </section>
       <section
         className={styles.membership}

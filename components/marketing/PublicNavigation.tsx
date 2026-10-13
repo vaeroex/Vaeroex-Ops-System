@@ -68,6 +68,7 @@ export function PublicNavigation({ loggedIn }: { loggedIn: boolean }) {
                 <small>{system.statusLabel}</small>
               </Link>
             ))}
+            <Link href="/executive-intelligence#vsi"><strong>Vaeroex Super Intelligence</strong><small>VSI · Included in your workspace</small></Link>
           </div>
         </details>
         <Link
@@ -107,13 +108,14 @@ export function PublicNavigation({ loggedIn }: { loggedIn: boolean }) {
           <nav className="vx-mobile-menu" aria-label="Public navigation mobile">
             <span>EXPLORE VAEROEX</span>
             <Link href="/">Home</Link>
-            <Link href="/intelligence-systems">Intelligence Systems</Link>
+            <Link href="/intelligence-systems">The Vaeroex approach</Link>
             {PUBLIC_SYSTEMS.map((system) => (
               <Link key={system.id} href={system.route}>
                 {system.name}
                 <small>{system.statusLabel}</small>
               </Link>
             ))}
+            <Link href="/executive-intelligence#vsi">Vaeroex Super Intelligence (VSI)</Link>
             <Link href="/pricing">Pricing</Link>
             <Link href="/trust">Trust Center</Link>
             {company.map(([label, href]) => (

@@ -11,7 +11,7 @@ import { publicPageMetadata } from "@/lib/seo/public-seo";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = publicPageMetadata({
-  title: "Help | Vaeroex Intelligence Systems",
+  title: "Help | Vaeroex Executive Intelligence",
   description: "Find direct help for Vaeroex accounts, Executive Intelligence, Business Health, Intelligence, Explain Finding, Evidence, Saved Analyses, billing, privacy, and support.",
   path: "/help"
 });
@@ -46,7 +46,7 @@ export default async function PublicHelpPage() {
     <main className="vaeroex-public-site vx-utility min-h-screen bg-[#030712] text-white">
       <PublicSiteHeader />
       <PublicPageHero
-        eyebrow="Vaeroex Intelligence Systems"
+        eyebrow="Vaeroex Executive Intelligence"
         title="Find the answer or reach the right team."
         description="Choose the area that matches what you are trying to do. Product guidance stays close to Executive Intelligence, while billing, privacy, trust, and support resources remain available here."
         actions={

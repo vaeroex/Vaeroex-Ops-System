@@ -30,7 +30,7 @@ export default function NetworkingPage() {
     <main className="vaeroex-public-site min-h-screen bg-[#030712] text-white">
       <PublicSiteHeader />
       <PublicPageHero
-        eyebrow="Vaeroex Intelligence Systems"
+        eyebrow="Vaeroex Executive Intelligence"
         title="A curated network for relationships that strengthen evidence-backed intelligence."
         description="The Vaeroex Network connects credible operators, domain experts, technology partners, and strategic organizations around one goal: helping leadership understand complex information with greater clarity."
         actions={
