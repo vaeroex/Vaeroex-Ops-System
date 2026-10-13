@@ -680,13 +680,13 @@ export function IntelligenceSignalInbox({
     const selected = selectedCard?.findingKeyHash === card.findingKeyHash;
     const keyFigure = card.insight?.supportingRecords?.find(record => record.recordType === "KPI record")?.value;
     return (
-      <button key={card.findingKeyHash} type="button" data-finding-key={card.findingKeyHash} aria-current={selected ? "true" : undefined} onClick={(event) => selectCard(card, event.currentTarget)} className={`workspace-finding-card intelligence-finding-row cursor-pointer ${selected ? "is-selected" : ""}`}>
+      <button key={card.findingKeyHash} type="button" data-finding-key={card.findingKeyHash} data-finding-category={card.snapshot.type} aria-current={selected ? "true" : undefined} onClick={(event) => selectCard(card, event.currentTarget)} className={`workspace-finding-card intelligence-finding-row cursor-pointer ${selected ? "is-selected" : ""}`}>
         <div className="flex items-start justify-between gap-3"><h3 className="min-w-0 text-sm font-semibold leading-6 text-white">{card.snapshot.title}</h3><span className="mt-1 inline-flex shrink-0 gap-1">{card.pinned ? <Pin aria-label="Pinned" className="h-4 w-4 text-cyan-200" /> : null}<span className="sr-only">View details</span><ChevronRight aria-hidden="true" className="h-4 w-4 text-slate-400" /></span></div>
         {keyFigure ? <p className="mt-1 break-words text-sm font-medium tabular-nums text-slate-200">{keyFigure}</p> : null}
         <p className="mt-1 line-clamp-2 text-sm leading-5 text-slate-400">{compactText(card.snapshot.summary, 130)}</p>
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs leading-5 text-slate-400">
-          <span className="inline-flex items-center gap-1.5 text-slate-300"><CategoryIcon aria-hidden="true" className={`h-3.5 w-3.5 ${card.snapshot.type === "Risk" ? "text-amber-300" : card.snapshot.type === "Opportunity" ? "text-emerald-300" : "text-slate-400"}`} />{card.snapshot.type}</span>
-          <span>{priority.label}</span><span>{card.snapshot.confidence} confidence</span><time dateTime={card.snapshot.lastUpdated}>{formatSignalDate(card.snapshot.lastUpdated)}</time>
+          <span className="intelligence-category-badge" data-finding-category={card.snapshot.type}><CategoryIcon aria-hidden="true" className="h-3.5 w-3.5" />{card.snapshot.type}</span>
+          <span className="intelligence-priority" data-priority={card.snapshot.priority}>{card.snapshot.priority === "Low" ? "Low priority" : priority.label}</span><span>{card.snapshot.confidence} confidence</span><time dateTime={card.snapshot.lastUpdated}>{formatSignalDate(card.snapshot.lastUpdated)}</time>
           {statusLabel ? <span className="text-slate-300">{statusLabel}</span> : null}
         </div>
       </button>
@@ -769,8 +769,9 @@ export function IntelligenceSignalInbox({
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <div className="flex flex-wrap gap-2">
-                    <span className={`vaeroex-semantic-badge rounded-full border px-2.5 py-1 text-xs font-semibold ${semanticStatusClass(findingCategoryStatus(selectedCard.snapshot.type))}`}>{selectedCard.snapshot.type}</span>
-                    <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${confidenceClass(selectedCard.snapshot.confidence)}`}>Confidence: {selectedCard.snapshot.confidence}</span>
+                    <span className={`intelligence-category-badge ${semanticStatusClass(findingCategoryStatus(selectedCard.snapshot.type))}`} data-finding-category={selectedCard.snapshot.type}>{selectedCard.snapshot.type}</span>
+                    <span className="intelligence-priority text-xs" data-priority={selectedCard.snapshot.priority}>{selectedCard.snapshot.priority} priority</span>
+                    <span className={`intelligence-detail-confidence text-xs ${confidenceClass(selectedCard.snapshot.confidence)}`}>Confidence: {selectedCard.snapshot.confidence}</span>
                     {lifecycleStatusLabel(selectedCard) ? <span className="rounded-full border border-white/15 bg-white/[0.04] px-2.5 py-1 text-xs font-semibold text-slate-200">{lifecycleStatusLabel(selectedCard)}</span> : null}
                   </div>
                   <h3 className="mt-3 break-words text-xl font-semibold leading-8 text-white">{selectedCard.snapshot.title}</h3>

@@ -52,7 +52,7 @@ export function IntelligenceHealthSnapshot({ health, facts, citations, history, 
   const status = businessHealthStatus(health.status);
   const citationsById = new Map(citations.map((citation) => [citation.citationId, citation]));
   return (
-    <section id="business-health" aria-labelledby="intelligence-health-heading" className="intelligence-summary-card scroll-mt-24 text-white">
+    <section id="business-health" data-health-status={status} aria-labelledby="intelligence-health-heading" className="intelligence-summary-card scroll-mt-24 text-white">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div><h2 id="intelligence-health-heading" className="text-base font-semibold">Business Health</h2><p className="mt-1 text-sm text-slate-400">How the business is performing.</p></div>
         <span className={`vaeroex-semantic-badge rounded-full border px-3 py-1 text-xs font-semibold ${semanticStatusClass(status)}`}>{health.status}</span>

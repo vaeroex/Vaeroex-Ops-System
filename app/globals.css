@@ -3095,8 +3095,36 @@ html:not(.pulsar) .vaeroex-customer-workspace .workspace-saved-analyses .workspa
 .vaeroex-customer-workspace .intelligence-change-summary { border-bottom:1px solid #293343; }
 .vaeroex-customer-workspace .intelligence-finding-row { display:block; width:100%; padding:14px 12px; text-align:left; border:1px solid transparent; border-bottom-color:#293343; border-radius:8px; background:transparent; box-shadow:none; overflow-wrap:anywhere; transition:background .15s,border-color .15s; }
 .vaeroex-customer-workspace .intelligence-finding-row:hover { background:#192231; }
-.vaeroex-customer-workspace .intelligence-finding-row.is-selected { background:#1b2635; border-color:#3b4d63; }
-.vaeroex-customer-workspace .intelligence-finding-row:focus-visible { outline:2px solid #67e8f9; outline-offset:2px; }
+.vaeroex-customer-workspace .intelligence-finding-row.is-selected { background:#17283f; border-color:#547baa; }
+.vaeroex-customer-workspace .intelligence-finding-row:focus-visible { outline:2px solid #bfdbfe; outline-offset:3px; }
 .vaeroex-customer-workspace .intelligence-finding-detail { background:#151c28; border-color:#293343; box-shadow:none; overflow-wrap:anywhere; }
 @media(min-width:1024px) { .vaeroex-customer-workspace .intelligence-summary-grid { grid-template-columns:minmax(0,1.3fr) minmax(0,1fr); } }
 @media(max-width:639px) { .vaeroex-customer-workspace .intelligence-summary-card { padding:14px; } }
+
+/* Category color is deliberately separate from blue selection and priority. */
+.vaeroex-customer-workspace [data-finding-category] { --finding-accent:#b5c5db; }
+.vaeroex-customer-workspace [data-finding-category="Risk"],
+.vaeroex-customer-workspace [data-finding-category="Bottleneck"] { --finding-accent:#e6a0a7; }
+.vaeroex-customer-workspace [data-finding-category="Opportunity"] { --finding-accent:#78d5bd; }
+.vaeroex-customer-workspace [data-finding-category="Recommendation"] { --finding-accent:#95bfff; }
+.vaeroex-customer-workspace [data-finding-category="Anomaly"] { --finding-accent:#e8c078; }
+.vaeroex-customer-workspace .intelligence-category-badge { display:inline-flex; align-items:center; gap:6px; padding:1px 7px; border:0; border-left:2px solid var(--finding-accent); border-radius:3px; background:#ffffff06; color:var(--finding-accent); font-size:12px; line-height:20px; font-weight:600; }
+.vaeroex-customer-workspace .intelligence-category-badge svg { color:inherit; }
+.vaeroex-customer-workspace .intelligence-priority { display:inline-flex; align-items:center; gap:4px; color:#cbd5e1; line-height:22px; }
+.vaeroex-customer-workspace .intelligence-priority[data-priority="High"] { color:#e2e8f0; font-weight:600; }
+.vaeroex-customer-workspace .intelligence-priority[data-priority="High"]::before { content:"↑"; font-size:14px; }
+.vaeroex-customer-workspace .intelligence-priority[data-priority="Low"] { color:#a7b4c7; }
+.vaeroex-customer-workspace .intelligence-detail-confidence { align-self:center; border:0; background:transparent; color:#a7b4c7; font-weight:400; box-shadow:none; }
+.vaeroex-customer-workspace #business-health { --health-accent:#b5c5db; }
+.vaeroex-customer-workspace #business-health[data-health-status="positive"] { --health-accent:#78d5bd; }
+.vaeroex-customer-workspace #business-health[data-health-status="risk-medium"] { --health-accent:#e8c078; }
+.vaeroex-customer-workspace #business-health[data-health-status="critical"] { --health-accent:#e6a0a7; }
+.vaeroex-customer-workspace #intelligence-health-heading { display:flex; align-items:center; gap:8px; }
+.vaeroex-customer-workspace #intelligence-health-heading::before { content:""; width:6px; height:16px; border-radius:2px; background:var(--health-accent); }
+.vaeroex-customer-workspace #business-health [aria-label^="Business Health score"] > span:first-child { color:var(--health-accent); }
+.vaeroex-customer-workspace .intelligence-readiness > div:first-child > svg,
+.vaeroex-customer-workspace .intelligence-readiness .tabular-nums { color:#95bfff; }
+.vaeroex-customer-workspace .intelligence-coverage-meter { display:block; width:100%; height:4px; margin-top:10px; border:0; border-radius:2px; background:#293343; }
+.vaeroex-customer-workspace .intelligence-coverage-meter::-webkit-meter-bar { height:4px; border:0; background:#293343; border-radius:2px; }
+.vaeroex-customer-workspace .intelligence-coverage-meter::-webkit-meter-optimum-value { background:#709bd2; border-radius:2px; }
+.vaeroex-customer-workspace .intelligence-coverage-meter::-moz-meter-bar { background:#709bd2; border-radius:2px; }
