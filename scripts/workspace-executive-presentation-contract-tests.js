@@ -208,6 +208,15 @@ function withoutGoogleSheetsAuthority(source) {
 // A scope, token, handler or new-state substitution inside a hunk is rejected;
 // all untouched logic remains covered by the original frozen fingerprints.
 const intelligenceRefinement = require("./fixtures/intelligence-refinement-presentation-exception.json");
+const intelligencePagination = require("./fixtures/intelligence-pagination-presentation-exception.json");
+function withoutPagination(file, source) {
+  if (file !== intelligencePagination.file) return source;
+  for (const {before, after} of intelligencePagination.changes) {
+    assert.equal(source.split(after).length, 2, "Require exactly the requested pagination binding");
+    source = source.replace(after, before);
+  }
+  return source;
+}
 function withoutIntelligenceRefinement(file, source) {
   const entry = intelligenceRefinement.files.find(item => item.file === file);
   if (!entry) return source;
@@ -264,7 +273,7 @@ for (const [file, count, actionsDigest, logicDigest] of contracts) {
       }
     }
     if (file === intelligenceFile) source = withoutIntegrationResults(source);
-    if (file === "components/intelligence/IntelligenceSignalInbox.tsx") source = withoutIntelligenceRefinement(file, source);
+    if (file === "components/intelligence/IntelligenceSignalInbox.tsx") source = withoutIntelligenceRefinement(file, withoutPagination(file, source));
     const tree = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
     const actions = actionInventory(tree);
     assert.equal(actions.length, count, "No existing action or protected form binding may be lost or added by this presentation change");
@@ -435,7 +444,7 @@ test("Health relocation exception rejects missing, duplicate and altered reviewe
 
 test("Intelligence refinement exception rejects missing, duplicate and altered reviewed hunks", () => {
   for (const {file, changes} of intelligenceRefinement.files) {
-    const source = fs.readFileSync(path.join(__dirname, "..", file), "utf8");
+    const source = withoutPagination(file, fs.readFileSync(path.join(__dirname, "..", file), "utf8"));
     for (const {after} of changes) {
       for (const replacement of ["", after + after, after.replace(/\S/, "!")]) {
         assert.throws(() => withoutIntelligenceRefinement(file, source.replace(after, replacement)), assert.AssertionError);
@@ -450,5 +459,14 @@ test("relocated Overview period calculations match the original implementation e
   const functions = new Map(tree.statements.filter(ts.isFunctionDeclaration).map(node => [node.name.text, printer.printNode(ts.EmitHint.Unspecified, node, tree)]));
   for (const {name, digest: expected} of intelligenceRefinement.comparisonFunctions) {
     assert.equal(digest(functions.get(name)), expected, `${name} must preserve its former Overview calculation`);
+  }
+});
+
+
+test("pagination exception rejects substitutions while retaining original action fingerprints", () => {
+  const source = fs.readFileSync(path.join(__dirname, "..", intelligencePagination.file), "utf8");
+  for (const {after} of intelligencePagination.changes) {
+    assert.throws(() => withoutPagination(intelligencePagination.file, source.replace(after, "")));
+    assert.throws(() => withoutPagination(intelligencePagination.file, source.replace(after, after + after)));
   }
 });

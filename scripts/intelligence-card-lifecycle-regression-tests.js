@@ -180,8 +180,8 @@ assert.match(migration, /grant select, insert on table public\.intelligence_card
 assert.doesNotMatch(migration, /grant[^;]*(update|delete|truncate)[^;]*intelligence_card_lifecycle_events/i, "events cannot be updated, deleted, or truncated by the application role");
 assert.match(migration, /p_workspace_id.*p_actor_id.*p_action/is, "transactional mutation verifies workspace and actor inputs");
 assert.match(migration, /jsonb_build_object\('changed', v_changed, 'idempotent', not v_changed\)/i, "same-state lifecycle mutations are idempotent");
-assert.match(component, /No active issues require attention\./, "healthy state is explicit");
-assert.match(component, /No undismissed issues are in the current feed\. Dismissed findings remain in History\./, "dismissed-only state is explicit");
+assert.match(component, /No evidence-backed findings currently require leadership review\./, "empty filtered findings state is explicit");
+assert.match(component, /No lifecycle history matches these filters\./, "empty filtered History state is explicit");
 assert.match(component, /What could improve the business further/, "deterministic improvements remain visible in healthy states");
 assert.match(component, /requestedCard\?\.view \|\| "current"/, "direct links to dismissed cards open History");
 assert.match(component, /cursor-pointer/, "History cards expose a pointer cursor");

@@ -67,6 +67,7 @@ function inboxHarness(props, runEffects = false, mocks = {}) {
       return slots[index];
     },
     useMemo: (compute) => compute(),
+    useCallback: callback => callback,
     useEffect: (effect) => { if (runEffects && !mounted) effects.push(effect); },
     useTransition: () => [false, (fn) => fn()],
   };
@@ -146,19 +147,22 @@ test("Intelligence SSR dates match browser rendering across timezones and preser
   }
 });
 
-test("320 current findings are batched by ten in All, with truthful remaining-category text", () => {
-  const render = inboxHarness({ currentCards: Array.from({ length: 320 }, (_, i) => card(i)), historyCards: [], canManageLifecycle: false });
-  let tree = render();
-  assert.equal(rows(tree).length, 10);
-  assert.match(content(tree), /Showing 1-10 of 320/);
-  assert.match(content(tree), /More improvement findings are available/);
-  for (let count = 20; count <= 320; count += 10) {
-    button(tree, "Load more").props.onClick();
-    tree = render();
-    assert.equal(rows(tree).length, count);
+test("pagination replaces five rows across the complete ordered set, with controls at both ends", () => {
+  const cards = Array.from({length: 18}, (_, i) => card(i, {snapshot:{...card(i).snapshot, confidence:"High",type:i < 7 ? "Risk" : "Opportunity"}}));
+  const render = inboxHarness({currentCards:cards,historyCards:[],canManageLifecycle:false});
+  let tree=render(); const seen=[];
+  for(let page=1;page<=4;page++) {
+    const current=rows(tree).map(row=>row.props["data-finding-key"]); seen.push(...current);
+    assert.deepEqual(current,cards.slice((page-1)*5,page*5).map(item=>item.findingKeyHash));
+    assert.equal(nodes(tree,node=>node.type==="nav").length,2);
+    assert.match(content(tree),new RegExp(`Showing ${(page-1)*5+1}–${Math.min(page*5,18)} of 18`));
+    assert.equal(nodes(tree,node=>node.props?.id==="attention-findings-heading").length,page<=2?1:0);
+    assert.equal(nodes(tree,node=>node.props?.id==="improvement-findings-heading").length,page>=2?1:0);
+    if(page<4) {button(tree,"Next").props.onClick();tree=render();}
   }
-  assert.equal(button(tree, "Load more"), undefined);
-  assert.equal(new Set(rows(tree).map((node) => node.props["data-finding-key"])).size, 320);
+  assert.equal(new Set(seen).size,18);assert.equal(button(tree,"Next").props.disabled,true);
+  button(tree,"Previous").props.onClick();tree=render();assert.match(content(tree),/Showing 11–15 of 18/);
+  assert.equal(button(tree,"Load more"),undefined);
 });
 
 test("default desktop selection uses the first sorted visible finding, while explicit deep links override it", () => {
@@ -169,7 +173,7 @@ test("default desktop selection uses the first sorted visible finding, while exp
   const props = { currentCards: cards, historyCards: [], canManageLifecycle: false };
   const render = inboxHarness(props);
   let tree = render();
-  assert.equal(rows(tree).length, 10);
+  assert.equal(rows(tree).length, 5);
   assert.equal(rows(tree)[0].props["data-finding-key"], "finding-001");
   assert.equal(rows(tree)[0].props["aria-current"], "true", "the preview's selected row must be in the initial visible batch");
   assert.match(content(nodes(tree, (node) => node.type === "aside")[0]), /Synthetic finding 1/);
@@ -181,10 +185,10 @@ test("default desktop selection uses the first sorted visible finding, while exp
   assert.equal(rows(tree)[0].props["aria-current"], "true", "view defaults use the same sorted visible order");
   const deep = inboxHarness({ ...props, initialFindingId: "id-0" })();
   assert.match(content(nodes(deep, (node) => node.type === "aside")[0]), /Synthetic finding 0/);
-  assert.equal(rows(deep).some((node) => node.props["aria-current"] === "true"), false, "an explicit deep link may intentionally select beyond the first batch");
+  assert.equal(rows(deep).some((node) => node.props["aria-current"] === "true"), true, "an explicit deep link opens the page containing its selected row");
 });
 
-test("mobile selection and Back restore the list without resetting filters, batch, or scroll target", () => {
+test("mobile selection and Back restore the list without resetting filters, page, or scroll target", () => {
   const previousWindow = global.window;
   const scrolls = [];
   let focusRestored = false;
@@ -194,11 +198,11 @@ test("mobile selection and Back restore the list without resetting filters, batc
     let tree = render();
     button(tree, "Opportunities").props.onClick();
     tree = render();
-    button(tree, "Load more").props.onClick();
+    button(tree, "Next").props.onClick();
     tree = render();
     const before = rows(tree).map((node) => node.props["data-finding-key"]);
-    assert.equal(before.length, 20);
-    const selected = rows(tree)[15];
+    assert.equal(before.length, 5);
+    const selected = rows(tree)[3];
     selected.props.onClick({ currentTarget: { focus: (options) => { assert.equal(options.preventScroll, true); focusRestored = true; } } });
     tree = render();
     assert.match(nodes(tree, (node) => node.props?.["data-finding-list"] !== undefined)[0].props.className, /^hidden xl:block/);
@@ -206,7 +210,7 @@ test("mobile selection and Back restore the list without resetting filters, batc
     button(tree, "← Back to list").props.onClick();
     tree = render();
     assert.deepEqual(rows(tree).map((node) => node.props["data-finding-key"]), before);
-    assert.match(content(tree), /Showing 1-20 of 120/);
+    assert.match(content(tree), /Showing 6–10 of 120/);
     assert.match(nodes(tree, (node) => node.type === "aside")[0].props.className, /^hidden xl:block/);
     assert.equal(rows(tree).find(node => node.props["aria-current"] === "true").props["data-finding-key"], selected.props["data-finding-key"], "Back preserves the selected row without reopening detail");
     assert.deepEqual(scrolls, [{ top: 930, behavior: "instant" }]);
@@ -214,21 +218,21 @@ test("mobile selection and Back restore the list without resetting filters, batc
   } finally { global.window = previousWindow; }
 });
 
-test("confidence and history changes reset the batch while deep links still open a finding beyond it", () => {
+test("confidence and history changes reset the page while deep links open the page containing the finding", () => {
   const cards = Array.from({ length: 320 }, (_, i) => card(i));
   const render = inboxHarness({ currentCards: cards, historyCards: cards.slice(0, 24).map((item) => ({ ...item, view: "history" })), canManageLifecycle: false });
   let tree = render();
-  button(tree, "Load more").props.onClick();
+  button(tree, "Next").props.onClick();
   tree = render();
   nodes(tree, (node) => node.type === "input")[0].props.onChange({ currentTarget: { checked: true } });
   tree = render();
-  assert.equal(rows(tree).length, 10);
-  assert.match(content(tree), /Showing 1-10 of 160/);
+  assert.equal(rows(tree).length, 5);
+  assert.match(content(tree), /Showing 1–5 of 160/);
   button(tree, "History").props.onClick();
   tree = render();
-  assert.match(content(tree), /Showing 1-10 of 12/);
+  assert.match(content(tree), /Showing 1–5 of 12/);
   const deep = inboxHarness({ currentCards: cards, historyCards: [], canManageLifecycle: false, initialFindingId: "id-319" })();
-  assert.equal(rows(deep).length, 10);
+  assert.equal(rows(deep).length, 5);
   assert.match(content(nodes(deep, (node) => node.type === "aside")[0]), /Synthetic finding 319/);
   assert.doesNotMatch(nodes(deep, (node) => node.type === "aside")[0].props.className, /^hidden/);
 });
@@ -311,7 +315,7 @@ test("the selected finding shows the complete approved investigation", () => {
 });
 
 
-test("native Back/Forward restores workspace-local filter, batch, selection, panel and scroll", () => {
+test("native Back/Forward restores workspace-local filter, page, selection, panel and scroll", () => {
   const previousWindow = global.window;
   const listeners = new Map(); const entries = [{state: {next: "preserved"}, url: "https://example.test/app/intelligence?period=Monthly"}]; let position = 0;
   const scrolls = [];
@@ -327,19 +331,24 @@ test("native Back/Forward restores workspace-local filter, batch, selection, pan
     const props = {workspaceId: "workspace-a", currentCards: Array.from({length:320},(_,i)=>card(i)), historyCards: [], canManageLifecycle: false};
     const render = inboxHarness(props, true); let tree = render();
     button(tree,"Opportunities").props.onClick(); tree=render();
-    button(tree,"Load more").props.onClick(); tree=render();
-    const chosen=rows(tree)[15].props["data-finding-key"];
-    rows(tree)[15].props.onClick({currentTarget:{focus(){}}}); tree=render();
+    button(tree,"Next").props.onClick(); tree=render();
+    const chosen=rows(tree)[3].props["data-finding-key"];
+    rows(tree)[3].props.onClick({currentTarget:{focus(){}}}); tree=render();
     assert.equal(global.window.history.state.next,"preserved");
     assert.match(location.search,/period=Monthly.*finding=id-/);
     global.window.history.back(); tree=render();
-    assert.equal(rows(tree).length,20); assert.match(content(tree),/Showing 1-20 of 120/);
+    assert.equal(rows(tree).length,5); assert.match(content(tree),/Showing 6–10 of 120/);
     assert.equal(rows(tree).find(row=>row.props["aria-current"]==="true").props["data-finding-key"],chosen);
     assert.match(nodes(tree,node=>node.type==="aside")[0].props.className,/^hidden xl:block/);
     assert.deepEqual(scrolls.at(-1),{top:930,behavior:"instant"});
     global.window.history.forward(); tree=render();
     assert.doesNotMatch(nodes(tree,node=>node.type==="aside")[0].props.className,/^hidden/);
     assert.equal(rows(tree).find(row=>row.props["aria-current"]==="true").props["data-finding-key"],chosen);
+    global.window.history.back(); tree=render();
+    global.window.history.back(); tree=render(); assert.match(content(tree),/Showing 1–5 of 120/);
+    global.window.history.back(); tree=render(); assert.match(content(tree),/Showing 1–5 of 320/);
+    global.window.history.forward(); tree=render(); assert.match(content(tree),/Showing 1–5 of 120/);
+    global.window.history.forward(); tree=render(); assert.match(content(tree),/Showing 6–10 of 120/);
     // A second workspace never restores the first workspace's UI state or finding IDs.
     const other=inboxHarness({...props,workspaceId:"workspace-b",currentCards:[card(900)]},true); other();
     const isolated=other(); assert.equal(rows(isolated).length,1); assert.match(content(isolated),/Synthetic finding 900/);
@@ -420,4 +429,39 @@ test("workspace selection keeps active membership and authentication checks befo
   assert.deepEqual(filters,[["workspace_id","workspace-a"],["user_id","user-a"],["status","active"]]);assert.equal(cookies.length,1);assert.equal(cookies[0][1],"workspace-a");
   membership=null; await assert.rejects(selectWorkspaceAction(form),/only have access to workspaces where you are an active member/);assert.equal(cookies.length,1);
   user=null; await assert.rejects(selectWorkspaceAction(form),{message:"/login"});assert.equal(cookies.length,1);
+});
+
+
+test("shrinking last page and empty filters never leave stale detail selection", () => {
+  const props={currentCards:Array.from({length:11},(_,i)=>card(i)),historyCards:[],canManageLifecycle:false};
+  const render=inboxHarness(props);let tree=render();
+  button(tree,"Next").props.onClick();tree=render();button(tree,"Next").props.onClick();tree=render();
+  assert.match(content(tree),/Showing 11–11 of 11/);
+  props.currentCards=props.currentCards.slice(0,6);tree=render();
+  assert.match(content(tree),/Showing 6–6 of 6/);assert.equal(rows(tree).length,1);
+  assert.equal(rows(tree)[0].props["aria-current"],"true");
+  props.currentCards=[];tree=render();assert.match(content(tree),/Showing 0 of 0/);
+  assert.equal(rows(tree).length,0);assert.equal(button(tree,"Next").props.disabled,true);assert.equal(button(tree,"Previous").props.disabled,true);
+  assert.doesNotMatch(content(nodes(tree,n=>n.type==="aside")[0]),/Synthetic finding/);
+});
+
+test("History direct links locate their page and page-number navigation selects only visible rows", () => {
+  const history=Array.from({length:18},(_,i)=>card(i,{view:"history"}));
+  const render=inboxHarness({currentCards:[],historyCards:history,initialFindingId:"id-17",canManageLifecycle:false});let tree=render();
+  assert.equal(rows(tree).find(n=>n.props["aria-current"]==="true").props["data-finding-key"],"finding-017");
+  const page1=nodes(tree,n=>n.type==="button"&&n.props["aria-label"]==="Page 1")[0];page1.props.onClick();tree=render();
+  assert.match(content(tree),/Showing 1–5 of 18/);assert.equal(rows(tree)[0].props["aria-current"],"true");
+});
+
+test("duplicate figures are suppressed only for an exact whole-sentence repetition", () => {
+  const {repeatsFindingFigures,findingPageNumbers}=loadSource("lib/presentation/finding-pagination.ts");
+  for(const [actual,target] of [["5.9","4.97"],["$7,000","$6,000"],["0%","95%"],["-2.5","0"]]) {
+    assert.equal(repeatsFindingFigures(`Actual ${actual} vs target ${target}.`,`Actual ${actual} · Target ${target}`),true);
+    assert.equal(repeatsFindingFigures(`Actual ${actual} vs target ${target}. Updated this week.`,`Actual ${actual} · Target ${target}`),false);
+  }
+  assert.equal(repeatsFindingFigures("Actual 4 vs target 5, with two missing periods.","Actual 4 · Target 5"),false);
+  assert.equal(repeatsFindingFigures("Actual 4 vs target 5.","Actual 4% · Target 5%"),false);
+  assert.equal(repeatsFindingFigures("Actual 4 vs target 5.",undefined),false);
+  assert.deepEqual(findingPageNumbers(50,100),[1,"…",49,50,51,"…",100]);
+  assert.deepEqual(findingPageNumbers(1,1),[1]);
 });
