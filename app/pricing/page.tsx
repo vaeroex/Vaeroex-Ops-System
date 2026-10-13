@@ -125,7 +125,7 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
                     Optional capacity packs are $5/month each for another 10 GB and 500 slots,
                     purchased explicitly in Settings → Usage &amp; Storage. No automatic overage charges.
                   </p>
-                  <GoogleSheetsPilotNotice className="mt-4" />
+                  <div id="google-sheets-availability"><GoogleSheetsPilotNotice className="mt-4" /></div>
                   <p className={styles.billingFine}>
                     Renews monthly unless canceled through Manage billing.
                     Cancellation takes effect at the end of the current paid

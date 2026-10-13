@@ -34,7 +34,7 @@ export default function AboutPage() {
           </div>
           <div className={story.prose}>
             <p className={story.lead}>Isaac founded Vaeroex to help businesses turn scattered information into a clearer understanding of their operations. His goal is to reduce the time teams spend gathering and interpreting data, helping them make informed decisions while automating routine analysis wherever practical.</p>
-            <p>His background spans hospital and EMS experience, operational leadership, business operations, and U.S. Air Force service. Those experiences shaped his interest in making complex information easier to understand and act on.</p>
+            <p>His background includes operational leadership in hospital and emergency medical services settings, business operations, and U.S. Air Force service. Those experiences shaped his interest in making complex information easier to understand and act on.</p>
           </div>
         </div>
       </section>

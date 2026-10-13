@@ -425,19 +425,24 @@ async function main() {
   const about = await renderPage("app/about/page.tsx");
   assert.match(about, /Isaac Vizcarra/);
   assert.match(about, /Founder &amp; CEO/);
-  assert.match(about, /hospital and EMS experience/);
+  assert.match(about, /operational leadership in hospital and emergency medical services settings, business operations/);
   assert.match(about, /U.S. Air Force service/);
   assert.match(executive, /Vaeroex Super Intelligence \/ VSI/);
   assert.match(executive, /Ask deeper questions/);
   assert.match(executive, /one authoritative source/);
   assert.match(executive, /not automatically consolidated or deduplicated/);
-  assert.match(executive, /Plans and SOPs are drafts/);
+  assert.match(executive, /Included with Executive Intelligence/);
+  assert.match(executive, /VSI helps turn questions into insights/);
+  assert.doesNotMatch(executive, /Plans and SOPs are drafts for your review/);
   assert.match(executive, /Refresh payments on request/);
   assert.match(executive, /transaction changes every 15 minutes/);
   assert.match(executive, /PDF and Word \(\.docx\)/);
   assert.match(executive, /CSV and Excel \(\.xlsx\)/);
   assert.match(executive, /PNG\/JPG/);
-  assert.match(executive, /Google Sheets limited pilot/);
+  assert.match(executive, /Google Sheets · Limited pilot/);
+  assert.match(executive, /href="\/pricing#google-sheets-availability"/);
+  assert.doesNotMatch(executive, /Your Google account must be an approved test user/);
+  assert.match(pricing, /id="google-sheets-availability"/);
   assert.match(pricing, /15 GB of uploaded-file storage and 500 file slots/);
   assert.match(pricing, /\$5\/month each for another 10 GB and 500 slots/);
   const retiredPromotion = /Biological Intelligence|Drug Discovery|drug-discovery-intelligence|biological-intelligence/i;
@@ -483,6 +488,13 @@ async function main() {
       navigation.includes(`href="${system.route}"`),
       `Navigation must reach ${system.route}`,
     );
+  const productGroups = [...navigation.matchAll(/<div class="vx-nav-product" role="group" aria-label="Executive Intelligence">([\s\S]*?)<\/div>/g)];
+  assert.equal(productGroups.length, 2, "Desktop and mobile group VSI under its included product");
+  for (const [, group] of productGroups) {
+    assert.match(group, /href="\/executive-intelligence"/);
+    assert.match(group, /href="\/executive-intelligence#vsi" class="vx-nav-included">Includes Vaeroex Super Intelligence/);
+    assert.doesNotMatch(group, /The Vaeroex approach/, "The approach remains separate from the product group");
+  }
   assert.doesNotMatch(navigation, retiredPromotion);
   assert.match(navigation, /Open navigation menu/);
   assert.match(navigation, /href="\/login"/);
