@@ -15,9 +15,12 @@ module.exports = function(source) {
     if (render.split('<CurrentIntegrations key={workspaceId} initial={dashboard} />').length !== 2) {
       throw new Error("Intelligence dashboard binding changed; review the fixture adapter");
     }
-    source = `import Link from "next/link"; import { CalendarRange } from "lucide-react";
+    source = `import { overviewPeriod } from "@/lib/presentation/overview-comparison";
+      import Link from "next/link"; import { CalendarRange } from "lucide-react";
       import { HealthSnapshotUnavailable } from "@/components/intelligence/HealthSnapshotUnavailable";
       import { IntelligenceHealthSnapshot } from "@/components/intelligence/IntelligenceHealthSnapshot";
+      import { IntelligenceReadiness } from "@/components/intelligence/IntelligenceReadiness";
+      import { IntelligenceWorkspaceContext } from "@/components/intelligence/IntelligenceWorkspaceContext";
       import { IntelligenceBriefingCards } from "@/components/intelligence/IntelligenceBriefingCards";
       import { IntelligenceSignalInbox } from "@/components/intelligence/IntelligenceSignalInbox";
       import { ErrorNotice } from "@/components/operations/ErrorNotice";
@@ -25,7 +28,7 @@ module.exports = function(source) {
       import { intelligenceFixture } from ${JSON.stringify(options.readRuntime)};
       export default async function IntelligencePage({searchParams}) {
         const params = await searchParams;
-        const {healthView,workspaceId,dashboard,displayErrors,lifecycleCards,explanationTokens,canManageLifecycle,blockedState,briefingStates,isIntelligenceBriefingEnabled} = intelligenceFixture();
+        const {workspaceReviewContext,healthView,workspaceId,dashboard,displayErrors,lifecycleCards,explanationTokens,canManageLifecycle,blockedState,briefingStates,isIntelligenceBriefingEnabled} = intelligenceFixture();
         return ${render};
       }`;
   }

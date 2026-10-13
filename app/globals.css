@@ -3086,3 +3086,17 @@ html:not(.pulsar) .vaeroex-customer-workspace .workspace-saved-analyses .workspa
   .vsi-chat-row:hover .vsi-chat-menu-trigger,
   .vsi-chat-row:focus-within .vsi-chat-menu-trigger { opacity: 1; }
 }
+
+/* Intelligence: compact neutral review surfaces, with one page scroll. */
+.vaeroex-customer-workspace .intelligence-summary-grid { display:grid; gap:16px; align-items:start; }
+.vaeroex-customer-workspace .intelligence-summary-card { min-width:0; padding:18px; border:1px solid #293343; border-radius:12px; background:#111827; color:#e2e8f0; box-shadow:none; }
+.vaeroex-customer-workspace .intelligence-disclosure { padding:12px 0; min-height:44px; cursor:pointer; font-size:14px; font-weight:600; color:#e2e8f0; }
+.vaeroex-customer-workspace .intelligence-disclosure:focus-visible { outline:2px solid #67e8f9; outline-offset:4px; border-radius:4px; }
+.vaeroex-customer-workspace .intelligence-change-summary { border-bottom:1px solid #293343; }
+.vaeroex-customer-workspace .intelligence-finding-row { display:block; width:100%; padding:14px 12px; text-align:left; border:1px solid transparent; border-bottom-color:#293343; border-radius:8px; background:transparent; box-shadow:none; overflow-wrap:anywhere; transition:background .15s,border-color .15s; }
+.vaeroex-customer-workspace .intelligence-finding-row:hover { background:#192231; }
+.vaeroex-customer-workspace .intelligence-finding-row.is-selected { background:#1b2635; border-color:#3b4d63; }
+.vaeroex-customer-workspace .intelligence-finding-row:focus-visible { outline:2px solid #67e8f9; outline-offset:2px; }
+.vaeroex-customer-workspace .intelligence-finding-detail { background:#151c28; border-color:#293343; box-shadow:none; overflow-wrap:anywhere; }
+@media(min-width:1024px) { .vaeroex-customer-workspace .intelligence-summary-grid { grid-template-columns:minmax(0,1.3fr) minmax(0,1fr); } }
+@media(max-width:639px) { .vaeroex-customer-workspace .intelligence-summary-card { padding:14px; } }

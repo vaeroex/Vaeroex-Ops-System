@@ -2,7 +2,7 @@
 import type { Database } from "../../lib/supabase/types";
 export const AS_OF = "2026-09-29T08:00:00.000Z";
 export const WORKSPACE_ID = "00000000-0000-4000-8000-000000000001";
-export type FixtureState = "populated" | "empty" | "loading" | "error";
+export type FixtureState = "populated" | "partial" | "empty" | "loading" | "error";
 export type FixtureRole = "owner" | "viewer";
 export function freeze<T>(value: T): T { if (value && typeof value === "object") { Object.freeze(value); Object.values(value).forEach(item => { if (item && typeof item === "object" && !Object.isFrozen(item)) freeze(item); }); } return value; }
 export const workspace = freeze({ id: WORKSPACE_ID, name: "Harbor Supply · Synthetic", business_type: "Retail", industry: "Retail", created_at: AS_OF, updated_at: AS_OF, subscription_status: "active", subscription_required: true, manually_unlocked: false });

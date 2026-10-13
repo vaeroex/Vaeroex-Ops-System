@@ -17,7 +17,6 @@ const baseNavSections = [
     collapsible: false,
     items: [
       { href: "/app/intelligence", label: "Intelligence" },
-      { href: "/app", label: "Overview" },
       { href: "/app/si", label: "Super Intelligence" },
       { href: "/app/kpis", label: "Performance" },
       { href: "/app/sources", label: "Files & Notes" },

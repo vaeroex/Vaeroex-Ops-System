@@ -255,7 +255,7 @@ const lifecycleService = fs.readFileSync(path.join(root, "lib/ai/kpi-semantics/s
 const classificationContract = fs.readFileSync(path.join(root, "lib/ai/kpi-semantics/contracts.ts"), "utf8");
 const kpiPage = fs.readFileSync(path.join(root, "app/app/kpis/page.tsx"), "utf8");
 const performanceFields = fs.readFileSync(path.join(root, "components/kpis/KpiPerformanceMeaningFields.tsx"), "utf8");
-const overview = fs.readFileSync(path.join(root, "app/app/page.tsx"), "utf8");
+const overview = fs.readFileSync(path.join(root, "lib/presentation/overview-comparison.ts"), "utf8");
 const kpiOverview = fs.readFileSync(path.join(root, "lib/ai/kpi-overview.ts"), "utf8");
 const kpiSettingsPage = fs.readFileSync(path.join(root, "app/app/kpis/settings/page.tsx"), "utf8");
 const operationalEvidence = fs.readFileSync(path.join(root, "lib/intelligence/operational-evidence.ts"), "utf8");
@@ -274,7 +274,7 @@ assert.doesNotMatch(lifecycleService, /proposal\.confidence >= KPI_SEMANTIC_ACCE
 assert.match(lifecycleService, /\.eq\("workspace_id", workspaceId\)/);
 assert.match(classificationContract, /targetBehaviorForDirection/);
 assert.match(overview, /evaluateKpiPerformance/);
-assert.match(overview, /trendTone\(trend\.performanceEffect\)/, "Executive Overview colors KPI movement by canonical performance effect");
+assert.match(overview, /performanceEffect: periodEvaluation.latestPerformanceEffect/, "Relocated period comparisons retain canonical performance effect");
 assert.doesNotMatch(overview, /trendTone\(trend\.change/, "raw movement cannot drive Executive Overview performance color");
 assert.match(kpiOverview, /definition: setting\?\.definition\?\.trim\(\) \|\| null/);
 assert.match(kpiOverview, /desired_direction: metric\.desiredDirection/);

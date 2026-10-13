@@ -473,7 +473,7 @@ assert.doesNotMatch(
   "the full snapshot and its diagnostics must never enter the provider request"
 );
 
-const overviewPage = read("app/app/page.tsx");
+const overviewPage = read("app/app/intelligence/page.tsx");
 const healthLoader = read("lib/intelligence/workspace-health.ts");
 const intelligencePage = read("app/app/intelligence/page.tsx");
 const kpiPage = read("app/app/kpis/page.tsx");

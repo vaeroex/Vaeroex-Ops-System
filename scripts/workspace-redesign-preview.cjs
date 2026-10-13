@@ -16,7 +16,7 @@ const actionModules = Object.freeze([
   "lib/auth/actions.ts", "lib/workspaces/actions.ts", "app/app/operations/actions.ts",
   "app/app/files/actions.ts", "app/app/sources/business-notes/actions.ts",
   "app/app/business-health-analysis/actions.ts", "app/app/finding-explanation/actions.ts",
-  "app/app/intelligence/lifecycle-actions.ts", "app/app/intelligence/briefings/actions.ts",
+  "app/app/intelligence/actions.ts", "app/app/intelligence/lifecycle-actions.ts", "app/app/intelligence/briefings/actions.ts",
   "app/app/reports/saved-analysis-actions.ts", "app/app/accountability/actions.ts",
   "app/app/records/actions.ts", "app/app/record-management/actions.ts", "app/app/operations/record-management-actions.ts",
   "app/app/settings/reporting-timezone-action.ts", "app/app/files/worksheet-approval-action.ts"

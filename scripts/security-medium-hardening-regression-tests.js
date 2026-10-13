@@ -36,7 +36,7 @@ for (const unsafePath of [
   "/app%",
   "/app\u0000/unsafe"
 ]) {
-  assert.equal(safeAuthRedirectPath(unsafePath), "/app", `auth redirect must reject ${String(unsafePath)}`);
+  assert.equal(safeAuthRedirectPath(unsafePath), "/app/intelligence", `auth redirect must reject ${String(unsafePath)}`);
 }
 
 const callback = read("app/auth/callback/route.ts");

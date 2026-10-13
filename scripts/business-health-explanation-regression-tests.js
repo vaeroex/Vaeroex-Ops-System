@@ -699,7 +699,7 @@ const missingPolicyToken = sealBusinessHealthExplanationPackage({
 });
 assert.equal(openBusinessHealthExplanationPackage(missingPolicyToken, { workspaceId, userId }, now.getTime()).ok, false, "a missing sealed generation-policy version must fail closed");
 
-const pageSource = read("app/app/page.tsx");
+const pageSource = read("app/app/intelligence/page.tsx");
 const healthLoaderSource = read("lib/intelligence/workspace-health.ts");
 const actionSource = read("app/app/business-health-analysis/actions.ts");
 const serviceSource = read("lib/ai/business-health-explanation/service.ts");

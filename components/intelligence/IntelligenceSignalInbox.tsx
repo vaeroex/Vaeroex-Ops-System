@@ -3,12 +3,11 @@
 import Link from "next/link";
 import type { Route } from "next";
 import { useRouter } from "next/navigation";
-import { Check, ChevronRight, History, Pin, PinOff, X } from "lucide-react";
+import { Check, History, Pin, PinOff, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { explainFindingAction } from "@/app/app/finding-explanation/actions";
 import { mutateIntelligenceCardLifecycleAction } from "@/app/app/intelligence/lifecycle-actions";
 import { SaveAnalysisButton } from "@/components/reports/SaveAnalysisButton";
-import { spatialSurfaceClassName } from "@/components/spatial/SpatialSurface";
 import type { FindingExplanationState } from "@/lib/ai/finding-explanation/contracts";
 import type {
   IntelligenceCardLifecycleAction,
@@ -34,7 +33,6 @@ import {
 
 const signalTypes: IntelligenceInsightType[] = ["Risk", "Opportunity", "Forecast", "Bottleneck", "Recommendation", "Anomaly"];
 type SignalView = "All" | IntelligenceInsightType;
-const confidenceOptions: Array<"All" | IntelligenceConfidence> = ["All", "High", "Medium", "Low"];
 const pageSize = 10;
 
 type PanelMode = "summary" | "evidence" | "analysis";
@@ -118,12 +116,10 @@ function PanelTabs({
   mode,
   onChange,
   analysisAvailable,
-  categoryStatus
 }: {
   mode: PanelMode;
   onChange: (mode: PanelMode) => void;
   analysisAvailable: boolean;
-  categoryStatus: ReturnType<typeof findingCategoryStatus>;
 }) {
   const tabs: Array<{ id: PanelMode; label: string }> = [
     { id: "summary", label: "Summary" },
@@ -141,7 +137,7 @@ function PanelTabs({
           aria-selected={mode === tab.id}
           onClick={() => onChange(tab.id)}
           className={`vaeroex-semantic-interactive min-h-10 rounded-md px-2 py-2 text-xs font-semibold transition ${
-            mode === tab.id ? `vaeroex-semantic-badge ${semanticStatusClass(categoryStatus)}` : "text-slate-300 hover:bg-cyan-950/35 hover:text-white"
+            mode === tab.id ? "bg-white/10 text-white" : "text-slate-300 hover:bg-white/5 hover:text-white"
           }`}
         >
           {tab.label}
@@ -154,13 +150,11 @@ function PanelTabs({
 function SummaryPanel({
   insight,
   canExplain,
-  onExplain,
-  categoryStatus
+  onExplain
 }: {
   insight: IntelligenceInsight;
   canExplain: boolean;
   onExplain: () => void;
-  categoryStatus: ReturnType<typeof findingCategoryStatus>;
 }) {
   if (lacksFindingSpecificity(insight)) {
     return (
@@ -175,19 +169,19 @@ function SummaryPanel({
     <div className="space-y-4 text-sm leading-6">
       <section>
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">What happened</p>
-        <p className="mt-2 text-slate-100">{compactText(insight.summary, 320)}</p>
+        <p className="mt-2 text-slate-100">{insight.summary}</p>
       </section>
       <section>
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Why it matters</p>
-        <p className="mt-2 text-slate-200">{compactText(insight.impact, 260)}</p>
+        <p className="mt-2 text-slate-200">{insight.impact}</p>
       </section>
-      <section className={`vaeroex-semantic-detail border-l-2 pl-3 ${semanticStatusClass(categoryStatus)}`}>
+      <section className="border-l-2 border-slate-500 pl-3">
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan-100">Leadership decision</p>
         <p className="mt-2 break-words text-slate-100">{insight.recommendedAction}</p>
       </section>
       <section>
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Limitation</p>
-        <p className="mt-2 text-slate-300">{compactText(limitationFor(insight), 280)}</p>
+        <p className="mt-2 text-slate-300">{limitationFor(insight)}</p>
       </section>
       {insight.type === "Risk" || insight.type === "Anomaly" || insight.type === "Bottleneck" ? (
         canExplain ? (
@@ -256,7 +250,7 @@ function FindingExplanationPanel({
             <li key={citation.citationId} className="py-3">
               <p className="text-xs font-semibold text-white">[{citation.citationId}] {citation.title}</p>
               <p className="mt-1 text-[11px] text-slate-500">{citation.sourceLabel} · {citation.sourceType}</p>
-              <p className="mt-1 text-xs leading-5 text-slate-300">{compactText(citation.excerpt, 220)}</p>
+              <p className="mt-1 text-xs leading-5 text-slate-300">{citation.excerpt}</p>
             </li>
           ))}
         </ol>
@@ -276,9 +270,9 @@ function EvidenceRecordRow({ record }: { record: IntelligenceEvidenceRecord }) {
           </Link>
           <p className="mt-0.5 text-[11px] text-slate-500">{record.recordType} · {formatSignalDate(record.date)}{record.classification === "Manual" ? "" : ` · ${record.classification}`}</p>
         </div>
-        <span className="break-words text-xs font-semibold text-slate-200 sm:max-w-44 sm:text-right">{compactText(record.value, 90)}</span>
+        <span className="break-words text-xs font-semibold text-slate-200 sm:max-w-44 sm:text-right">{record.value}</span>
       </div>
-      <p className="mt-1.5 break-words text-xs leading-5 text-slate-400">{compactText(record.support, 180)}</p>
+      <p className="mt-1.5 break-words text-xs leading-5 text-slate-400">{record.support}</p>
     </li>
   );
 }
@@ -360,7 +354,7 @@ function EvidencePanel({ insight }: { insight: IntelligenceInsight }) {
                   </span>
                   <span className="shrink-0 pt-0.5 text-xs font-semibold text-cyan-200">{expanded ? "Collapse" : "Expand"}</span>
                 </button>
-                <p className="mt-1 text-xs leading-5 text-slate-400">{compactText(group.explanation, 180)}</p>
+                <p className="mt-1 text-xs leading-5 text-slate-400">{group.explanation}</p>
                 {records.length ? <ul className="mt-2">{records.map((record) => <EvidenceRecordRow key={record.id} record={record} />)}</ul> : null}
                 {expanded && group.records.length > records.length ? (
                   <button type="button" onClick={() => setExpandedRecordLimit((limit) => limit + 10)} className="mt-2 min-h-9 text-xs font-semibold text-cyan-200 hover:text-white">
@@ -398,7 +392,7 @@ function EvidencePanel({ insight }: { insight: IntelligenceInsight }) {
         ) : null}
         <div>
           <p className="font-semibold text-slate-100">Missing evidence</p>
-          <p className="mt-1 text-slate-400">{insight.missingEvidence.length ? compactText(insight.missingEvidence.join("; "), 220) : "No material gap recorded."}</p>
+          <p className="mt-1 text-slate-400">{insight.missingEvidence.length ? insight.missingEvidence.join("; ") : "No material gap recorded."}</p>
         </div>
       </div>
     </div>
@@ -451,11 +445,13 @@ function LeadershipDisposition({ card }: { card: IntelligenceLifecycleCardV1 }) 
 export function IntelligenceSignalInbox({
   currentCards,
   historyCards,
+  workspaceId = "",
   initialFindingId,
   explanationTokens = {},
   canManageLifecycle,
   blockedState = null
 }: {
+  workspaceId?: string;
   currentCards: IntelligenceLifecycleCardV1[];
   historyCards: IntelligenceLifecycleCardV1[];
   initialFindingId?: string;
@@ -489,6 +485,52 @@ export function IntelligenceSignalInbox({
     detailRef.current?.scrollIntoView({ block: "start" });
   }, [mobileDetailOpen, selectedKey]);
 
+  // UI-only history belongs to this workspace. Native history integrates with
+  // Next without a server navigation or regenerating evidence on selection.
+  type NavigationState = { workspaceId: string; lifecycleView: LifecycleView; activeType: SignalView; selectedKey: string; mobileDetailOpen: boolean; hideLowConfidence: boolean; visibleCount: number; panelMode: PanelMode; listTop: number; returnEntry: boolean };
+  const navigationRef = useRef<NavigationState | null>(null);
+  const returnEntryRef = useRef(false);
+  navigationRef.current = { workspaceId, lifecycleView, activeType, selectedKey, mobileDetailOpen, hideLowConfidence, visibleCount, panelMode, listTop: listReturnRef.current.top, returnEntry: returnEntryRef.current };
+
+  function commitNavigation(overrides: Partial<NavigationState>, push = false) {
+    if (typeof window === "undefined" || !window.history || !window.location) return;
+    const state = { ...navigationRef.current!, ...overrides };
+    const url = new URL(window.location.href);
+    const card = [...currentCards, ...historyCards].find(item => item.findingKeyHash === state.selectedKey);
+    if (state.mobileDetailOpen && card) url.searchParams.set("finding", card.findingId);
+    else url.searchParams.delete("finding");
+    window.history[push ? "pushState" : "replaceState"]({ ...window.history.state, vaeroexFindings: state }, "", `${url.pathname}${url.search}${url.hash}`);
+    returnEntryRef.current = state.returnEntry;
+  }
+
+  useEffect(() => {
+    function restore() {
+      const candidate = window.history.state?.vaeroexFindings as NavigationState | undefined;
+      const valid = candidate?.workspaceId === workspaceId && ["current", "history"].includes(candidate.lifecycleView)
+        && ["All", ...signalTypes].includes(candidate.activeType) && ["summary", "evidence", "analysis"].includes(candidate.panelMode)
+        && Number.isSafeInteger(candidate.visibleCount) && candidate.visibleCount >= pageSize && Number.isFinite(candidate.listTop);
+      const requested = new URLSearchParams(window.location.search).get("finding");
+      const linked = [...currentCards, ...historyCards].find(card => card.findingId === requested);
+      if (valid && candidate) {
+        setLifecycleView(candidate.lifecycleView); setActiveType(candidate.activeType); setHideLowConfidence(candidate.hideLowConfidence);
+        setVisibleCount(candidate.visibleCount); setSelectedKey(candidate.selectedKey); setMobileDetailOpen(candidate.mobileDetailOpen);
+        setPanelMode(candidate.panelMode); returnEntryRef.current = candidate.returnEntry;
+        listReturnRef.current.top = candidate.listTop;
+        if (!candidate.mobileDetailOpen) window.requestAnimationFrame(() => {
+          listReturnRef.current.trigger?.focus({ preventScroll: true });
+          window.scrollTo({ top: candidate.listTop, behavior: "instant" });
+        });
+      } else if (linked) {
+        setLifecycleView(linked.view); setActiveType("All"); setHideLowConfidence(false); setSelectedKey(linked.findingKeyHash); setMobileDetailOpen(true); setPanelMode("summary");
+        returnEntryRef.current = false;
+      }
+      setDismissOpen(false);
+    }
+    restore();
+    window.addEventListener("popstate", restore);
+    return () => window.removeEventListener("popstate", restore);
+  }, [workspaceId, currentCards, historyCards]);
+
   const viewCards = lifecycleView === "current" ? currentCards : historyCards;
   const counts = useMemo(
     () => signalTypes.reduce<Record<SignalView, number>>((acc, type) => ({ ...acc, [type]: viewCards.filter((card) => card.snapshot.type === type).length }), { All: viewCards.length } as Record<SignalView, number>),
@@ -515,6 +557,7 @@ export function IntelligenceSignalInbox({
   function selectView(view: LifecycleView) {
     const cards = sortIntelligenceLifecycleCardsV1((view === "current" ? currentCards : historyCards)
       .filter((card) => !hideLowConfidence || card.snapshot.confidence !== "Low"));
+    commitNavigation({ lifecycleView: view, activeType: "All", selectedKey: cards[0]?.findingKeyHash || "", mobileDetailOpen: false, visibleCount: pageSize, panelMode: "summary", returnEntry: false });
     setLifecycleView(view);
     setActiveType("All");
     setSelectedKey(cards[0]?.findingKeyHash || "");
@@ -528,6 +571,7 @@ export function IntelligenceSignalInbox({
     const firstCard = sortIntelligenceLifecycleCardsV1(viewCards
       .filter((card) => type === "All" || card.snapshot.type === type)
       .filter((card) => !hideLowConfidence || card.snapshot.confidence !== "Low"))[0];
+    commitNavigation({ activeType: type, selectedKey: firstCard?.findingKeyHash || "", mobileDetailOpen: false, visibleCount: pageSize, panelMode: "summary", returnEntry: false });
     setActiveType(type);
     setSelectedKey(firstCard?.findingKeyHash || "");
     setMobileDetailOpen(false);
@@ -545,6 +589,7 @@ export function IntelligenceSignalInbox({
       setPanelMode("summary");
       setDismissOpen(false);
     }
+    commitNavigation({ hideLowConfidence: hide, selectedKey: nextCards.some(card => card.findingKeyHash === selectedKey) ? selectedKey : nextCards[0]?.findingKeyHash || "", mobileDetailOpen: false, visibleCount: pageSize, panelMode: "summary", returnEntry: false });
     setHideLowConfidence(hide);
     setVisibleCount(pageSize);
     setMobileDetailOpen(false);
@@ -552,6 +597,8 @@ export function IntelligenceSignalInbox({
 
   function selectCard(card: IntelligenceLifecycleCardV1, trigger: HTMLButtonElement) {
     listReturnRef.current = { top: window.scrollY, trigger };
+    commitNavigation({ selectedKey: card.findingKeyHash, mobileDetailOpen: false, listTop: window.scrollY, returnEntry: false });
+    commitNavigation({ selectedKey: card.findingKeyHash, mobileDetailOpen: true, panelMode: "summary", listTop: window.scrollY, returnEntry: true }, true);
     setSelectedKey(card.findingKeyHash);
     setMobileDetailOpen(true);
     setPanelMode("summary");
@@ -559,8 +606,9 @@ export function IntelligenceSignalInbox({
   }
 
   function backToList() {
+    if (returnEntryRef.current && window.history) { window.history.back(); return; }
+    commitNavigation({ mobileDetailOpen: false, returnEntry: false });
     setMobileDetailOpen(false);
-    setSelectedKey("");
     setDismissOpen(false);
     const { top, trigger } = listReturnRef.current;
     window.requestAnimationFrame(() => {
@@ -598,6 +646,7 @@ export function IntelligenceSignalInbox({
   }
 
   function changePanelMode(mode: PanelMode) {
+    commitNavigation({ panelMode: mode });
     setPanelMode(mode);
     if (mode === "analysis" && selectedInsight && !explanationStates[selectedInsight.id]) requestExplanation(selectedInsight.id);
   }
@@ -627,35 +676,25 @@ export function IntelligenceSignalInbox({
     const category = semanticPresentation(categoryStatus);
     const priority = semanticPresentation(priorityStatus);
     const CategoryIcon = category.Icon;
-    const PriorityIcon = priority.Icon;
     const statusLabel = lifecycleStatusLabel(card);
     const selected = selectedCard?.findingKeyHash === card.findingKeyHash;
-    const historyAffordance = card.view === "history";
+    const keyFigure = card.insight?.supportingRecords?.find(record => record.recordType === "KPI record")?.value;
     return (
-      <button key={card.findingKeyHash} type="button" data-finding-key={card.findingKeyHash} aria-current={selected ? "true" : undefined} onClick={(event) => selectCard(card, event.currentTarget)} className={`workspace-finding-card ${spatialSurfaceClassName({ depth: selected ? "raised" : "subtle", interactive: true, selected })} vaeroex-semantic-card vaeroex-semantic-interactive ${semanticStatusClass(categoryStatus)} block w-full rounded-lg border p-4 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/80 ${historyAffordance ? "cursor-pointer" : ""} ${selected ? historyAffordance ? "border-cyan-300/55 bg-cyan-950/25 ring-2 ring-cyan-300/55 shadow-[0_0_0_1px_rgba(103,232,249,0.08)]" : "ring-1 ring-current/30" : historyAffordance ? "hover:border-cyan-300/50 hover:bg-cyan-950/20 hover:shadow-md" : "hover:brightness-[1.03]"}`}>
-        <div className="flex flex-wrap items-start justify-between gap-2">
-          <div className="min-w-0">
-            <div className="mb-2 flex flex-wrap gap-2">
-              <span className={`vaeroex-semantic-badge inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold ${semanticStatusClass(categoryStatus)}`}><CategoryIcon aria-hidden="true" className="h-3.5 w-3.5" />{card.snapshot.type}</span>
-              <span className={`vaeroex-semantic-badge inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold ${semanticStatusClass(priorityStatus)}`}><PriorityIcon aria-hidden="true" className="h-3.5 w-3.5" />{priority.label}</span>
-              {card.pinned ? <span className="inline-flex items-center gap-1 rounded-full border border-cyan-300/30 bg-cyan-950/30 px-2.5 py-1 text-xs font-semibold text-cyan-100"><Pin aria-hidden="true" className="h-3.5 w-3.5" />Pinned</span> : null}
-              {statusLabel ? <span className="rounded-full border border-white/15 bg-white/[0.04] px-2.5 py-1 text-xs font-semibold text-slate-200">{statusLabel}</span> : null}
-            </div>
-            <h3 className="text-sm font-semibold leading-5 text-white">{compactText(card.snapshot.title, 110)}</h3>
-            <p className="mt-1 line-clamp-2 text-sm leading-5 text-slate-300">{compactText(card.snapshot.summary)}</p>
-          </div>
-          <div className="flex shrink-0 flex-col items-end gap-2">
-            <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${confidenceClass(card.snapshot.confidence)}`}>Confidence: {card.snapshot.confidence}</span>
-            {historyAffordance ? <span className="inline-flex items-center gap-1 text-xs font-semibold text-cyan-200">View details <ChevronRight aria-hidden="true" className="h-4 w-4" /></span> : null}
-          </div>
+      <button key={card.findingKeyHash} type="button" data-finding-key={card.findingKeyHash} aria-current={selected ? "true" : undefined} onClick={(event) => selectCard(card, event.currentTarget)} className={`workspace-finding-card intelligence-finding-row ${selected ? "is-selected" : ""}`}>
+        <div className="flex items-start justify-between gap-3"><h3 className="min-w-0 text-sm font-semibold leading-6 text-white">{card.snapshot.title}</h3>{card.pinned ? <Pin aria-label="Pinned" className="mt-1 h-4 w-4 shrink-0 text-cyan-200" /> : null}</div>
+        {keyFigure ? <p className="mt-1 break-words text-sm font-medium tabular-nums text-slate-200">{keyFigure}</p> : null}
+        <p className="mt-1 line-clamp-2 text-sm leading-5 text-slate-400">{compactText(card.snapshot.summary, 130)}</p>
+        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs leading-5 text-slate-400">
+          <span className="inline-flex items-center gap-1.5 text-slate-300"><CategoryIcon aria-hidden="true" className={`h-3.5 w-3.5 ${card.snapshot.type === "Risk" ? "text-amber-300" : card.snapshot.type === "Opportunity" ? "text-emerald-300" : "text-slate-400"}`} />{card.snapshot.type}</span>
+          <span>{priority.label}</span><span>{card.snapshot.confidence} confidence</span><time dateTime={card.snapshot.lastUpdated}>{formatSignalDate(card.snapshot.lastUpdated)}</time>
+          {statusLabel ? <span className="text-slate-300">{statusLabel}</span> : null}
         </div>
-        <p className="mt-2 text-xs text-slate-500">{formatSignalDate(card.snapshot.lastUpdated)}</p>
       </button>
     );
   }
 
   return (
-    <section className="workspace-findings vaeroex-intelligence-inbox vaeroex-priority-surface rounded-xl border border-white/10 bg-[#07101f] p-4 text-slate-100 shadow-command">
+    <section className="workspace-findings vaeroex-intelligence-inbox rounded-xl border border-white/10 bg-[#10151f] p-3 text-slate-100 sm:p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-base font-semibold text-white">Current findings and history</h2>
@@ -679,7 +718,7 @@ export function IntelligenceSignalInbox({
         </label>
       </div>
 
-      <div className="workspace-finding-categories mt-4 flex gap-2 overflow-x-auto border-b border-white/10 pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="workspace-finding-categories mt-4 flex flex-wrap gap-1 border-b border-white/10 pb-3">
         {visibleTypes.map((type) => (
           <button key={type} type="button" onClick={() => selectType(type)} className={`inline-flex min-h-10 shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/60 ${activeType === type ? "bg-vaeroex-blue text-white" : "text-slate-300 hover:bg-cyan-950/30 hover:text-white"}`}>
             {typeTabLabel(type)} <span className="rounded-full bg-white/10 px-2 py-0.5 text-[0.7rem]">{counts[type]}</span>
@@ -687,14 +726,14 @@ export function IntelligenceSignalInbox({
         ))}
       </div>
 
-      <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(23rem,.82fr)]">
-        <div data-finding-list className={`${mobileDetailOpen && selectedCard ? "hidden xl:block" : "block"} workspace-finding-list space-y-5 xl:max-h-[calc(100dvh-10rem)] xl:overflow-y-auto xl:pr-1`}>
+      <div className="intelligence-findings-layout mt-4 grid items-start gap-5 xl:grid-cols-[minmax(17rem,.8fr)_minmax(0,1.6fr)]">
+        <div data-finding-list className={`${mobileDetailOpen && selectedCard ? "hidden xl:block" : "block"} workspace-finding-list min-w-0 space-y-5`}>
           {lifecycleView === "current" && activeType === "All" ? (
             <>
-              <section className="space-y-3" aria-labelledby="attention-findings-heading">
+              <section className="space-y-1" aria-labelledby="attention-findings-heading">
                 <div>
                   <h3 id="attention-findings-heading" className="text-base font-semibold text-white">What needs attention</h3>
-                  <p className="mt-1 text-xs text-slate-400">Current risks, bottlenecks, and anomalies supported by deterministic evidence.</p>
+                  <p className="mt-1 text-xs text-slate-400">Risks, bottlenecks, and anomalies.</p>
                 </div>
                 {currentAttention.length ? currentAttention.map(renderCard) : (
                   <div className="rounded-lg border border-dashed border-white/15 bg-slate-950/35 p-5 text-sm leading-6 text-slate-300">
@@ -706,10 +745,10 @@ export function IntelligenceSignalInbox({
                   </div>
                 )}
               </section>
-              <section className="space-y-3 border-t border-white/10 pt-5" aria-labelledby="improvement-findings-heading">
+              <section className="space-y-1 border-t border-white/10 pt-5" aria-labelledby="improvement-findings-heading">
                 <div>
                   <h3 id="improvement-findings-heading" className="text-base font-semibold text-white">What could improve the business further</h3>
-                  <p className="mt-1 text-xs text-slate-400">Current opportunities, recommendations, and forecasts already produced by deterministic intelligence.</p>
+                  <p className="mt-1 text-xs text-slate-400">Opportunities, recommendations, and forecasts.</p>
                 </div>
                 {currentImprovements.length ? currentImprovements.map(renderCard) : (
                   <div className="rounded-lg border border-dashed border-white/15 bg-slate-950/35 p-5 text-sm leading-6 text-slate-300">{remainingImprovements ? "More improvement findings are available. Load more to view them." : hideLowConfidence && totalCurrentImprovements.length ? "No improvement findings match the selected filter." : blockedState?.title || "No evidence-backed improvement finding is currently surfaced."}</div>
@@ -721,10 +760,10 @@ export function IntelligenceSignalInbox({
               {lifecycleView === "history" ? "No lifecycle history matches these filters." : typeEmptyMessage(activeType)}
             </div>
           )}
-          {filteredCards.length > pagedCards.length ? <button type="button" onClick={() => setVisibleCount((count) => count + pageSize)} className="min-h-10 rounded-lg border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-semibold text-slate-100 hover:border-cyan-300/40 hover:bg-cyan-950/30">Load more</button> : null}
+          {filteredCards.length > pagedCards.length ? <button type="button" onClick={() => { commitNavigation({ visibleCount: visibleCount + pageSize }); setVisibleCount((count) => count + pageSize); }} className="min-h-10 rounded-lg border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-semibold text-slate-100 hover:border-cyan-300/40 hover:bg-cyan-950/30">Load more</button> : null}
         </div>
 
-        <aside ref={detailRef} tabIndex={-1} aria-label="Selected finding" className={`${mobileDetailOpen && selectedCard ? "block" : "hidden xl:block"} workspace-finding-detail scroll-mt-24 ${spatialSurfaceClassName({ depth: "raised", selected: Boolean(selectedCard) })} vaeroex-semantic-card ${selectedCard ? semanticStatusClass(findingCategoryStatus(selectedCard.snapshot.type)) : semanticStatusClass("neutral")} rounded-lg border p-4 shadow-panel xl:sticky xl:top-24 xl:max-h-[calc(100dvh-8rem)] xl:self-start xl:overflow-y-auto`}>
+        <aside ref={detailRef} tabIndex={-1} aria-label="Selected finding" className={`${mobileDetailOpen && selectedCard ? "block" : "hidden xl:block"} workspace-finding-detail intelligence-finding-detail min-w-0 scroll-mt-24 rounded-lg border border-white/10 bg-[#151c28] p-4 sm:p-6 xl:sticky xl:top-20 xl:self-start`}>
           {selectedCard ? (
             <div className="space-y-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
@@ -734,7 +773,8 @@ export function IntelligenceSignalInbox({
                     <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${confidenceClass(selectedCard.snapshot.confidence)}`}>Confidence: {selectedCard.snapshot.confidence}</span>
                     {lifecycleStatusLabel(selectedCard) ? <span className="rounded-full border border-white/15 bg-white/[0.04] px-2.5 py-1 text-xs font-semibold text-slate-200">{lifecycleStatusLabel(selectedCard)}</span> : null}
                   </div>
-                  <h3 className="mt-3 break-words text-lg font-semibold leading-7 text-white">{compactText(selectedCard.snapshot.title, 140)}</h3>
+                  <h3 className="mt-3 break-words text-xl font-semibold leading-8 text-white">{selectedCard.snapshot.title}</h3>
+                  <p className="mt-2 text-xs text-slate-400">Finding evidence date: {formatSignalDate(selectedCard.snapshot.lastUpdated)}</p>
                 </div>
                 <button type="button" onClick={backToList} className="min-h-10 rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-slate-300 hover:bg-cyan-950/30 xl:hidden">← Back to list</button>
               </div>
@@ -780,8 +820,8 @@ export function IntelligenceSignalInbox({
 
               {selectedInsight ? (
                 <>
-                  <PanelTabs mode={panelMode} onChange={changePanelMode} analysisAvailable={Boolean(explanationTokens[selectedInsight.id])} categoryStatus={findingCategoryStatus(selectedInsight.type)} />
-                  {panelMode === "summary" ? <SummaryPanel insight={selectedInsight} canExplain={Boolean(explanationTokens[selectedInsight.id])} onExplain={() => requestExplanation(selectedInsight.id)} categoryStatus={findingCategoryStatus(selectedInsight.type)} /> : null}
+                  <PanelTabs mode={panelMode} onChange={changePanelMode} analysisAvailable={Boolean(explanationTokens[selectedInsight.id])}  />
+                  {panelMode === "summary" ? <SummaryPanel insight={selectedInsight} canExplain={Boolean(explanationTokens[selectedInsight.id])} onExplain={() => requestExplanation(selectedInsight.id)}  /> : null}
                   {panelMode === "evidence" ? <EvidencePanel insight={selectedInsight} /> : null}
                   {panelMode === "analysis" ? <FindingExplanationPanel state={explanationStates[selectedInsight.id] || { status: "available", artifact: null, message: null }} onRetry={() => requestExplanation(selectedInsight.id)} pending={isExplanationPending} /> : null}
                 </>
