@@ -85,7 +85,7 @@ export default function OperationsIntelligencePage() {
             </div>
             <div className={styles.heroSide}>
               <strong>Turn everyday records into useful questions.</strong>
-              <p>Investigate a slower restaurant week, a shift in tasting-room sales, or a retailer’s performance against its targets.</p>
+              <p>Ask questions, explore ideas, and work through challenges with VSI—from understanding your business to researching a topic or creating something new—all through natural conversation.</p>
               <a href="#vsi" className={styles.textLink}>Explore included VSI<ArrowRight aria-hidden="true" /></a>
             </div>
           </div>
