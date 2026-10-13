@@ -352,9 +352,13 @@ test("Overview redirect retains query values and ordinary auth defaults preserve
   const {safeAuthRedirectPath}=loadSource("lib/auth/safe-redirect.ts");
   assert.equal(safeAuthRedirectPath(null),"/app/intelligence");
   for(const target of ["/app/sources?file=test#review","/app/intelligence?finding=id-7","/onboarding","/checkout/legal","/app?view=Operations%20View"]) assert.equal(safeAuthRedirectPath(target),target);
-  const Overview=loadSource("app/app/page.tsx",{"next/navigation":{redirect: value=>{throw new Error(value);}}}).default;
+  let authorized=0;
+  const Overview=loadSource("app/app/page.tsx",{"@/lib/workspaces/page-context":{requireWorkspacePage:async()=>{authorized++;}},"next/navigation":{redirect: value=>{throw new Error(value);}}}).default;
   await assert.rejects(Overview({}),{message:"/app/intelligence"});
   await assert.rejects(Overview({searchParams:Promise.resolve({finding:"id-7",period:"Monthly",tag:["a","b"]})}),{message:"/app/intelligence?finding=id-7&period=Monthly&tag=a&tag=b"});
+  assert.equal(authorized,2,"legacy redirects retain the existing workspace guard");
+  const Denied=loadSource("app/app/page.tsx",{"@/lib/workspaces/page-context":{requireWorkspacePage:async()=>{throw new Error("access denied");}},"next/navigation":{redirect:()=>assert.fail("cannot redirect before workspace authorization")}}).default;
+  await assert.rejects(Denied({}),{message:"access denied"});
   const shell=fs.readFileSync(path.join(root,"components/app/AppShell.tsx"),"utf8");
   assert.doesNotMatch(shell,/href: "\/app", label: "Overview"/);
   const page=fs.readFileSync(path.join(root,"app/app/intelligence/page.tsx"),"utf8");

@@ -468,7 +468,9 @@ check(
 );
 check(intelligenceCoverage.includes("filterOriginalBusinessEvidence") && intelligenceCoverage.includes("uniqueSources") && !intelligenceCoverage.includes('label: "Vaeroex Memory"'), "Derived runs and chunks must not inflate coverage or Source Mix.");
 check(boundedContextRuntime.includes("sanitizeBusinessEvidenceText") && boundedContextRuntime.includes("filterOriginalBusinessEvidence") && boundedContextRuntime.includes("filterBusinessEvidence"), "Bounded conversational context must sanitize platform failures and reject ineligible business evidence.");
-const dashboardRuntime = read("app/app/page.tsx");
+const dashboardRuntime = read("app/app/intelligence/page.tsx");
+const overviewRedirect = read("app/app/page.tsx");
+check(overviewRedirect.includes('dynamic = "force-dynamic"') && overviewRedirect.indexOf("await requireWorkspacePage()") < overviewRedirect.indexOf("redirect(`"), "The retired Overview route must authorize before redirecting to Intelligence.");
 const healthRuntime = read("lib/intelligence/workspace-health.ts");
 const securityTs: typeof import("typescript") = require("typescript");
 function preservesBusinessHealthSnapshotGate(source: string) {
@@ -491,7 +493,7 @@ function preservesBusinessHealthSnapshotGate(source: string) {
   }
   return false;
 }
-check(dashboardRuntime.includes("buildWorkspaceHealthView"), "Overview must use the shared guarded Health view.");
+check(dashboardRuntime.includes("buildWorkspaceHealthView"), "Intelligence must use the shared guarded Health view.");
 check(preservesBusinessHealthSnapshotGate(healthRuntime), "Business Health snapshots must persist only inside the source-success AND sufficient-evidence gate, using the scoped client and workspace.");
 const healthGate = "if (!businessHealthSourceErrors.length && intelligenceLayer.businessHealth.available) {";
 for (const replacement of [

@@ -114,7 +114,9 @@ async function main() {
   const overviewHtml = renderToStaticMarkup(overviewBody);
   assert.ok(!overviewHtml.includes("Business Health is part of Intelligence")
     && !overviewHtml.includes('href="/app/intelligence#business-health"'), "Overview omits the relocation announcement");
-  assert.doesNotMatch(overviewHtml, /id="business-health"|View analysis/, "Health review controls belong to Intelligence");
+  assert.match(overviewHtml, /id="business-health"/, "Legacy preview entry now renders the consolidated Intelligence landing");
+  assert.match(overviewHtml, /Intelligence readiness/);
+  assert.doesNotMatch(overviewHtml, /Executive Overview|Executive priorities/, "Retired duplicate priorities stay absent");
   const overviewShell = renderToStaticMarkup(screens.wrapScreen(overviewBody, "owner", "/app"));
   assert.ok(overviewShell.includes('href="/app/intelligence"'), "Workspace navigation still reaches Intelligence");
   for (const role of ["owner", "viewer"]) {
@@ -141,13 +143,13 @@ async function main() {
     assert.equal(businessHealthAnalysis.requestToken, null);
   }
   let rendered = 0;
-  for (const route of screens.routes) for (const state of ["populated", "empty", "loading", "error"]) for (const role of ["owner", "viewer"]) {
+  for (const route of screens.routes) for (const state of ["populated", "partial", "empty", "loading", "error"]) for (const role of ["owner", "viewer"]) {
     try {
       const body = await screens.renderScreen(route.href, state, role);
       const html = renderToStaticMarkup(screens.wrapScreen(body, role, route.href));
       if (route.href === "/app/settings/integrations/square") {
         assert.doesNotMatch(html, /workspace-content|workspace-sidebar|workspace-topbar|aria-label="Vaeroex (?:Overview|Intelligence)"|aria-label="Workspace switcher"/, "Square is standalone, matching its real route group; its own theme wrapper is allowed");
-        if (state === "populated" || state === "empty") assert.match(html, /Back to Settings/);
+        if (state !== "loading" && state !== "error") assert.match(html, /Back to Settings/);
       } else {
         assert.ok(html.includes("Harbor Supply"), `${route.label}: real shell workspace`);
         assert.ok(html.includes("vaeroex-app-shell"), `${route.label}: actual shell`);
@@ -156,7 +158,7 @@ async function main() {
       if (route.href === "/app/intelligence") {
         assert.doesNotMatch(html, /QuickBooks admitted posted revenue subtotal|QuickBooks accounting summary unavailable|aria-label="Connected data"/,
           "Former integration sections stay absent from the dashboard fixture");
-        if (state === "populated" || state === "empty") {
+        if (state !== "loading" && state !== "error") {
           const integrations = body.props.children.find(child => child?.type?.name === "CurrentIntegrations");
           assert.ok(integrations, "The unchanged page JSX renders the real CurrentIntegrations client");
           assert.deepEqual(integrations.props.initial, {
@@ -175,7 +177,7 @@ async function main() {
           assert.doesNotMatch(html, /Previously connected|Hidden integrations|View supporting data/);
         }
       }
-      if (route.href === "/app/settings" && (state === "populated" || state === "empty")) {
+      if (route.href === "/app/settings" && (state !== "loading" && state !== "error")) {
         const forms = findElements(body, "ReportingTimezoneForm");
         assert.equal(forms.length, role === "owner" ? 1 : 0, "Only the owner sees the real timezone form");
         assert.match(html, /Reporting timezone/);
@@ -218,6 +220,6 @@ async function main() {
   ]) assert.ok(!boundary.moduleFiles.some(moduleFile => moduleFile.endsWith(file)), `No operational loader or replaced integration view enters the synthetic preview: ${file}`);
   assert.ok(!boundary.moduleFiles.some(file => /\/lib\/supabase\/(server|client|admin)\./.test(file)));
   assert.throws(() => createServer({ ...result, port: 3000 }), /comparison ports/);
-  console.log(`Workspace preview: note form classification, readable unavailable result and reset preservation passed; ${rendered} route/state/role server renders passed (six AppShell routes + standalone Square); real CurrentIntegrations empty dashboard, inbox/briefings, owner-only Settings timezone form, exact inert action export and live-client import boundary verified. No browser/backend authorization testing claimed.`);
+  console.log(`Workspace preview: note form classification, readable unavailable result and reset preservation passed; ${rendered} route/state/role server renders passed (five AppShell routes + standalone Square); real CurrentIntegrations empty dashboard, inbox/briefings, owner-only Settings timezone form, exact inert action export and live-client import boundary verified. No browser/backend authorization testing claimed.`);
 }
 main().catch(error => { console.error(error.stack); process.exitCode = 1; });
