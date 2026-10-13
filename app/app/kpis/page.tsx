@@ -81,6 +81,7 @@ type KpisPageProps = {
     sort?: string;
     timeline?: string;
     mode?: string;
+    chart?: string;
     status?: string;
     show?: string;
     target_applied?: string;
@@ -779,19 +780,26 @@ function trendDeltaLabel(latest: KpiRow | undefined, previous: KpiRow | undefine
 }
 
 function targetHitRate(rows: KpiRow[], semantics: KpiSemantics) {
-  if (semantics.desiredDirection === "unknown") return "Direction needed";
+  if (semantics.desiredDirection === "unknown") return {
+    value: "Direction needed",
+    detail: "Confirm direction in KPI settings to interpret target performance"
+  };
   const rowsWithTargets = rows.filter(
     (row) => row.actual_value !== null && resolveKpiTargetReference(semantics, row.target).kind !== "none"
   );
 
   if (!rowsWithTargets.length) {
-    return "No targets";
+    return { value: "No targets", detail: "No recorded values with a target to evaluate" };
   }
 
   const onTarget = rowsWithTargets.filter((row) =>
     isKpiTargetMet(evaluateKpiPerformance({ observations: [row], semantics, target: row.target }).targetStatus)
   ).length;
-  return `${numberFormatter.format((onTarget / rowsWithTargets.length) * 100)}%`;
+  const excluded = rows.length - rowsWithTargets.length;
+  return {
+    value: `${numberFormatter.format((onTarget / rowsWithTargets.length) * 100)}%`,
+    detail: `${onTarget} of ${rowsWithTargets.length} recorded ${rowsWithTargets.length === 1 ? "value" : "values"} met target.${excluded ? ` ${excluded} ${excluded === 1 ? "record" : "records"} without a value or target excluded.` : ""}`
+  };
 }
 
 function TrendSummaryCard({ label, value, detail }: { label: string; value: string; detail: string }) {
@@ -804,7 +812,7 @@ function TrendSummaryCard({ label, value, detail }: { label: string; value: stri
   );
 }
 
-function TrendChart({ rows, metricName, settings }: { rows: KpiRow[]; metricName: string; settings: KpiSettingRow[] }) {
+function TrendChart({ rows, metricName, settings, scope }: { rows: KpiRow[]; metricName: string; settings: KpiSettingRow[]; scope: "latest" | "all" }) {
   const chartRows = rows.filter((row) => row.actual_value !== null);
 
   if (chartRows.length < 2) {
@@ -854,7 +862,8 @@ function TrendChart({ rows, metricName, settings }: { rows: KpiRow[]; metricName
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
         <div>
           <p className="text-sm font-semibold text-white">{metricName}</p>
-          <p className="text-xs text-slate-400">Last {chartRows.length} recorded values · {axisX} / {axisY}</p>
+          <p className="mt-1 text-sm font-medium text-slate-200">{scope === "all" ? "All history ·" : "Latest"} {chartRows.length} recorded values</p>
+          <p className="mt-1 text-xs text-slate-400">{axisX} / {axisY}</p>
         </div>
         <div className="flex items-center gap-4 text-xs text-slate-400">
           <span className="inline-flex items-center gap-2">
@@ -1667,6 +1676,8 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
   }
   const selectedKpiDirection = selectedKpiState?.semantics.desiredDirection ?? "unknown";
   const selectedKpiSemantics = selectedKpiState?.semantics ?? kpiSemantics("Unknown KPI", []);
+  const selectedTargetHistory = targetHitRate(selectedMetricRows, selectedKpiSemantics);
+  const detailChartScope = params?.chart === "all" ? "all" : "latest";
   const selectedManualTarget = selectedKpiState?.manualTarget ?? null;
   const selectedTargetReference = selectedKpiState?.targetReference ?? { kind: "none" as const };
   const selectedKpiEvaluation = selectedKpiState?.evaluation ?? null;
@@ -1899,9 +1910,9 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
                     detail={`Across ${selectedMetricActualValues.length} recorded value${selectedMetricActualValues.length === 1 ? "" : "s"}`}
                   />
                   <TrendSummaryCard
-                    label="Target Hit Rate"
-                    value={targetHitRate(selectedMetricRows, selectedKpiSemantics)}
-                    detail={selectedKpiDirection !== "unknown" ? "Share of history meeting the confirmed target direction" : "Confirm direction in KPI settings to interpret target performance"}
+                    label="Historical target hit rate"
+                    value={selectedTargetHistory.value}
+                    detail={selectedTargetHistory.detail}
                   />
                   <TrendSummaryCard
                     label="Records"
@@ -1909,8 +1920,21 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
                     detail="Historical KPI values stored"
                   />
                 </div>
-                <div className="mt-4">
-                  <TrendChart rows={selectedMetricRows.slice(-12)} metricName={primaryMetric} settings={kpiSettings} />
+                <div id="kpi-trend" className="mt-4 scroll-mt-24">
+                  <nav aria-label="Chart history" className="mb-3 flex flex-wrap gap-2">
+                    {(["latest", "all"] as const).map((scope) => (
+                      <Link
+                        key={scope}
+                        href={`${kpiHref({ ...timelineQueryParams(timeline, selectedTimelineRange), ...listQuery, status: activeStatusFilter, show: params?.show, metric: primaryMetric, section: "detail", chart: scope })}#kpi-trend` as Route}
+                        aria-current={detailChartScope === scope ? "true" : undefined}
+                        className={`inline-flex min-h-11 items-center rounded-lg border px-3 py-2 text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vaeroex-accent ${detailChartScope === scope ? "border-sky-400/40 bg-sky-400/10 text-sky-100" : "border-white/10 text-slate-300 hover:border-white/25 hover:text-white"}`}
+                      >
+                        {scope === "all" ? "All history" : "Latest 12"}
+                      </Link>
+                    ))}
+                  </nav>
+                  <TrendChart rows={detailChartScope === "all" ? selectedMetricRows : selectedMetricRows.slice(-12)} metricName={primaryMetric} settings={kpiSettings} scope={detailChartScope} />
+                  <p className="mt-2 text-xs leading-5 text-slate-400">Historical statistics above use all recorded history, regardless of chart view.</p>
                 </div>
                 <div className="mt-4 rounded-lg border border-white/10 bg-slate-950/35 p-4">
                   <p className="text-sm font-semibold text-white">Vaeroex summary</p>

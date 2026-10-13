@@ -14,6 +14,12 @@ for (const {before, after} of require("./fixtures/context-retirement-kpi-excepti
   assert.equal(protectedSource.split(after).length, 2, "Require exactly the reviewed metadata-sharing removal");
   protectedSource = protectedSource.replace(after, before);
 }
+// Reconstruct only the explicitly reviewed history labels/summary return shape.
+// Behavioral tests separately verify the unchanged numerator and denominator.
+for (const {before, after} of require("./fixtures/kpi-history-scope-exception.json").changes) {
+  assert.equal(protectedSource.split(after).length, 2, "Require exactly the reviewed history scope change");
+  protectedSource = protectedSource.replace(after, before);
+}
 const ast = ts.createSourceFile("page.tsx", protectedSource, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 const printer = ts.createPrinter({ removeComments: true });
 const print = (node) => printer.printNode(ts.EmitHint.Unspecified, node, ast);
