@@ -53,7 +53,7 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
   const access = await requireWorkspaceAccess();
   const { supabase, workspaceId, context } = access;
   const readTicket = await beginGoogleSheetsRead(supabase, workspaceId, access.user.id);
-  const [issuesResult, kpisResult, kpiSettingsResult, filesResult, crmResult, importsResult, sopsResult, formsResult, submissionsResult, peopleResult, decisionsResult, metricsResult, memoryResult, lifecycleResult, briefingStates, healthView, assignmentsResult, sharesResult] = await Promise.all([
+  const [issuesResult, kpisResult, kpiSettingsResult, filesResult, crmResult, importsResult, sopsResult, formsResult, submissionsResult, peopleResult, decisionsResult, metricsResult, memoryResult, lifecycleResult, briefingStates, healthView, sharesResult] = await Promise.all([
     supabase.from("issues").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
     loadActiveWorkspaceKpis({ supabase, workspaceId }),
     supabase.from("kpi_settings").select("*").eq("workspace_id", workspaceId).order("sort_order", { ascending: true }).order("weight", { ascending: false }),
@@ -84,7 +84,6 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
       console.error(JSON.stringify({ component: "intelligence-health", event: "health_snapshot_unavailable" }));
       return null;
     }),
-    supabase.from("operational_assignments").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("due_date", { ascending: true, nullsFirst: false }).limit(60),
     supabase.from("record_shares").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("created_at", { ascending: false }).limit(40)
   ]);
 
@@ -294,7 +293,7 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
     lifecycleTokens,
     actorDisplayNames
   });
-  const workspaceReviewContext = { assignments: assignmentsResult.data || [], shares: sharesResult.data || [], people: peopleResult.data || [], decisions: decisionsResult.data || [], userEmail: access.user.email, unavailable: Boolean(assignmentsResult.error || sharesResult.error) };
+  const workspaceReviewContext = { shares: sharesResult.data || [], people: peopleResult.data || [], decisions: decisionsResult.data || [], unavailable: Boolean(sharesResult.error) };
   return (
     <div className="workspace-intelligence space-y-6">
       <header className="workspace-page-header workspace-intelligence-header flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

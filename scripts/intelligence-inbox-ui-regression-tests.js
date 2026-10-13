@@ -364,7 +364,8 @@ test("Overview redirect retains query values and ordinary auth defaults preserve
   const page=fs.readFileSync(path.join(root,"app/app/intelligence/page.tsx"),"utf8");
   assert.match(page,/await requireWorkspaceAccess\(\)/);
   assert.ok(page.includes('key={`findings-${workspaceId}`}'), "workspace inbox key must be distinct from the integration sibling key");
-  for(const table of ["operational_assignments","record_shares"]) assert.ok(page.includes(`from("${table}").select("*").eq("workspace_id", workspaceId).is("deleted_at", null)`));
+  assert.doesNotMatch(page, /from\("operational_assignments"\)/, "retired assignment panels must not add a database read to Intelligence");
+  for(const table of ["record_shares"]) assert.ok(page.includes(`from("${table}").select("*").eq("workspace_id", workspaceId).is("deleted_at", null)`));
 });
 
 test("readiness renders existing coverage and expandable source guidance without estimating missing scores", () => {

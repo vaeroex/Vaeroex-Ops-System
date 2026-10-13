@@ -139,3 +139,20 @@ export function squareData(empty: boolean, role: FixtureRole, params: URLSearchP
     browser: empty ? null : { connectionId: connection.connectionId, currentConnection: connection, timeZone: "UTC", timeZoneFallback: false, page, pageSize: 25, totalCount: filtered.length, totalPages, payments: filtered.slice((page - 1) * 25, page * 25), connections: [{ connectionId: connection.connectionId, businessEntityId: connection.businessEntityId, businessEntityLabel: "Harbor Supply · Synthetic", sellerLabel: connection.sellerLabel, locationLabel: "Main location", state: "connected", timeZone: "UTC", timeZoneFallback: false, createdAt: AS_OF, paymentCount: payments.length }], filters: { startDate, endDate, status } },
   };
 }
+
+// Fictional retained records for reviewing journal/share-history presentation only.
+export const reviewShares = freeze([{
+  id: "synthetic-share-1", workspace_id: WORKSPACE_ID, source_type: "kpi", source_id: "kpi-0-0",
+  source_title: "Revenue — synthetic internal share", share_scope: "workspace", person_id: null,
+  role: null, department: null, message: "Fictional review context; no message sent.",
+  distribution_schedule: "one_time", last_shared_at: AS_OF, created_by: profile.id,
+  created_at: AS_OF, updated_at: AS_OF, archived_at: null, deleted_at: null,
+} satisfies Database["public"]["Tables"]["record_shares"]["Row"]]);
+export const reviewDecisions = freeze([{
+  id: "synthetic-decision-1", workspace_id: WORKSPACE_ID, title: "Review supplier lead times — synthetic decision",
+  reason: "Record the leadership discussion before changing reorder thresholds.",
+  expected_outcome: "A documented comparison for the next leadership review.", related_kpi: "Order fulfillment",
+  related_report_id: null, related_issue_id: null, related_sop_id: null, owner: "Operations lead",
+  review_date: "2026-10-06", status: "open", outcome_summary: null, created_by: profile.id,
+  created_at: AS_OF, updated_at: AS_OF, archived_at: null, deleted_at: null,
+} satisfies Database["public"]["Tables"]["business_decisions"]["Row"]]);
